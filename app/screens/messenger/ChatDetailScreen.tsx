@@ -1,204 +1,284 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView } from 'react-native';
-import { colors, spacing, radius, typography, sizes } from '../../constants/design';
-import { useChatMessages } from '../../lib/useSupabaseSubscription';
-import { useSupabase } from '../../contexts/SupabaseContext';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Avatar } from '../../components/Avatar';
+import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { CURRENT_USER_ID, mockMessages, mockUsers } from '../../mocks';
+import { Chat, Message } from '../../types';
 
-interface Message {
-  id: string;
-  text: string;
-  sent: boolean;
-  timestamp: Date;
+const REPLIES = ['Alles klar!', 'Sehe ich genauso.', 'Melde mich gleich.', 'Danke dir!', 'Passt für mich.'];
+
+const nowTime = () =>
+  new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+interface Props {
+  chat: Chat;
+  onBack: () => void;
+  onCall: (kind: 'audio' | 'video') => void;
+  onCamera: () => void;
 }
 
-interface ChatDetailScreenProps {
-  chatId?: string;
-  chatName?: string;
-}
+export const ChatDetailScreen = ({ chat, onBack, onCall, onCamera }: Props) => {
+  const [messages, setMessages] = useState<Message[]>(() => mockMessages[chat.id] ?? []);
+  const [draft, setDraft] = useState('');
+  const [typing, setTyping] = useState(false);
+  const listRef = useRef<FlatList<Message>>(null);
 
-export const ChatDetailScreenComponent = ({ chatId = 'demo_chat', chatName = 'Anna Schmidt' }: ChatDetailScreenProps) => {
-  // Try to use Supabase if available, fallback to local state
-  const { supabase } = useSupabase();
-  const { messages: supabaseMessages, isLoading } = useChatMessages(chatId);
+  const scrollToEnd = useCallback(() => {
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+  }, []);
 
-  const [localMessages, setLocalMessages] = useState<Message[]>([
-    { id: '1', text: 'Hey, wie gehts?', sent: false, timestamp: new Date(Date.now() - 3600000) },
-    { id: '2', text: 'Mir gehts gut!', sent: true, timestamp: new Date(Date.now() - 3500000) },
-    { id: '3', text: 'Treffen wir uns später?', sent: false, timestamp: new Date(Date.now() - 1800000) },
-  ]);
-  const [input, setInput] = useState('');
+  const send = () => {
+    const text = draft.trim();
+    if (!text) return;
 
-  // Use Supabase messages if available, otherwise use mock
-  const displayMessages = supabaseMessages.length > 0
-    ? supabaseMessages.map((msg: any) => ({
-        id: msg.id,
-        text: msg.content,
-        sent: msg.user_id === 'current_user', // Will be updated when auth is integrated
-        timestamp: new Date(msg.created_at),
-      }))
-    : localMessages;
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    const newMessage: Message = {
-      id: String(Date.now()),
-      text: input,
-      sent: true,
-      timestamp: new Date(),
+    const message: Message = {
+      id: `m${Date.now()}`,
+      chatId: chat.id,
+      senderId: CURRENT_USER_ID,
+      text,
+      time: nowTime(),
+      read: false,
     };
+    setMessages((prev) => [...prev, message]);
+    setDraft('');
+    scrollToEnd();
 
-    // Try to save to Supabase
-    if (supabase) {
-      try {
-        await supabase.from('messages').insert({
-          chat_id: chatId,
-          user_id: 'current_user', // Will be replaced with actual auth user
-          content: input,
-          created_at: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.warn('Failed to send to Supabase:', err);
-        // Fall through to local storage
-      }
-    }
+    if (chat.isGroup || !chat.userId) return;
 
-    // Local fallback
-    setLocalMessages([...localMessages, newMessage]);
-    setInput('');
-
-    // Simulate response (if no Supabase)
-    if (!supabase) {
-      setTimeout(() => {
-        setLocalMessages((prev) => [
-          ...prev,
-          {
-            id: String(Date.now()),
-            text: '👍 Erhalten!',
-            sent: false,
-            timestamp: new Date(),
-          },
-        ]);
-      }, 1000);
-    }
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `r${Date.now()}`,
+          chatId: chat.id,
+          senderId: chat.userId!,
+          text: REPLIES[Math.floor(Math.random() * REPLIES.length)],
+          time: nowTime(),
+        },
+      ]);
+      scrollToEnd();
+    }, 1400);
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.messageBubble, item.sent ? styles.sentBubble : styles.receivedBubble]}>
-      <Text style={[styles.messageText, item.sent ? styles.sentText : styles.receivedText]}>
-        {item.text}
-      </Text>
-    </View>
-  );
+  const renderMessage = ({ item }: { item: Message }) => {
+    const out = item.senderId === CURRENT_USER_ID;
+    const sender = mockUsers[item.senderId];
+
+    return (
+      <View style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}>
+        {!out && chat.isGroup && <Text style={styles.sender}>{sender?.name ?? 'Unbekannt'}</Text>}
+
+        {item.media ? (
+          <View style={styles.media}>
+            <Ionicons
+              name={item.media === 'image' ? 'image-outline' : 'mic-outline'}
+              size={18}
+              color={colors.text2}
+            />
+            <Text style={styles.mediaText}>
+              {item.media === 'image' ? 'Foto' : 'Sprachnachricht · 0:14'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.messageText, out && styles.messageTextOut]}>{item.text}</Text>
+        )}
+
+        <View style={styles.bubbleFoot}>
+          <Text style={[styles.time, out && styles.timeOut]}>{item.time}</Text>
+          {out && <Ionicons name="checkmark-done" size={14} color={colors.bubbleOutMeta} />}
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior="padding">
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.chatName}>{chatName}</Text>
+        <Pressable style={styles.headerBack} onPress={onBack} hitSlop={6}>
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
+        </Pressable>
+        <Avatar id={chat.userId ?? chat.id} name={chat.name} size={sizes.avatarSm} group={chat.isGroup} />
+        <View style={styles.headerBody}>
+          <Text style={styles.headerName} numberOfLines={1}>
+            {chat.name}
+          </Text>
+          <Text style={[styles.headerStatus, chat.isGroup && styles.headerStatusMuted]}>
+            {chat.isGroup ? `${(chat.memberIds?.length ?? 0) + 1} Mitglieder` : 'Online'}
+          </Text>
+        </View>
+        <Pressable style={styles.headerAction} onPress={() => onCall('video')} hitSlop={4}>
+          <Ionicons name="videocam-outline" size={22} color={colors.text2} />
+        </Pressable>
+        <Pressable style={styles.headerAction} onPress={() => onCall('audio')} hitSlop={4}>
+          <Ionicons name="call-outline" size={20} color={colors.text2} />
+        </Pressable>
       </View>
 
-      {/* Messages */}
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-      />
-
-      {/* Input */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nachricht..."
-          value={input}
-          onChangeText={setInput}
-          placeholderTextColor={colors.mediumGray}
-          multiline
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <FlatList
+          ref={listRef}
+          style={styles.messages}
+          contentContainerStyle={styles.messagesContent}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          onContentSizeChange={scrollToEnd}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <View style={styles.dayDivider}>
+              <Text style={styles.dayDividerText}>Heute</Text>
+            </View>
+          }
+          ListFooterComponent={
+            typing ? (
+              <View style={[styles.bubble, styles.bubbleIn, styles.typing]}>
+                <Text style={styles.typingText}>schreibt …</Text>
+              </View>
+            ) : null
+          }
         />
-        <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-          <Text style={styles.sendButtonText}>➤</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+
+        <View style={styles.composer}>
+          <Pressable style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
+            <Ionicons name="add" size={24} color={colors.text2} />
+          </Pressable>
+          <View style={styles.composerField}>
+            <TextInput
+              style={styles.composerInput}
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Nachricht"
+              placeholderTextColor={colors.text3}
+              multiline
+            />
+            <Pressable style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
+              <Ionicons name="camera-outline" size={21} color={colors.text2} />
+            </Pressable>
+          </View>
+          <Pressable
+            style={[styles.send, !draft.trim() && styles.sendDisabled]}
+            onPress={send}
+            disabled={!draft.trim()}
+          >
+            <Ionicons name="send" size={17} color={colors.white} />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
+  container: { flex: 1, backgroundColor: colors.surface },
+  flex: { flex: 1 },
+
   header: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  chatName: {
-    fontSize: typography.h3.fontSize,
-    fontWeight: '700',
-    color: colors.darkGray,
-  },
-  messagesList: {
-    flex: 1,
-  },
-  messagesContent: {
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  messageBubble: {
-    maxWidth: '80%',
-    padding: spacing.md,
-    borderRadius: radius.large,
-  },
-  sentBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: colors.brand,
-  },
-  receivedBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.lightGray,
-  },
-  messageText: {
-    fontSize: typography.body.fontSize,
-  },
-  sentText: {
-    color: colors.white,
-  },
-  receivedText: {
-    color: colors.darkGray,
-  },
-  inputContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
-    gap: spacing.sm,
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.lightGray,
-    borderRadius: radius.small,
-    padding: spacing.sm,
-    fontSize: typography.body.fontSize,
-    maxHeight: 100,
-    color: colors.darkGray,
-  },
-  sendButton: {
-    backgroundColor: colors.brand,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
     alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  sendButtonText: {
-    color: colors.white,
-    fontSize: 20,
+  headerBack: { width: 30, alignItems: 'center' },
+  headerBody: { flex: 1, minWidth: 0 },
+  headerName: { color: colors.text, ...typography.name },
+  headerStatus: { marginTop: 1, color: colors.success, ...typography.small },
+  headerStatusMuted: { color: colors.text3 },
+  headerAction: { width: 34, alignItems: 'center' },
+
+  messages: { flex: 1, backgroundColor: colors.surface2 },
+  messagesContent: { padding: 14, paddingBottom: spacing.sm, gap: 3 },
+
+  dayDivider: { alignSelf: 'center', marginBottom: 10 },
+  dayDividerText: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface3,
+    color: colors.text2,
+    fontSize: 11.5,
+    fontWeight: '600',
+    overflow: 'hidden',
   },
+
+  bubble: { maxWidth: '78%', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderRadius: radius.lg },
+  bubbleIn: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.bubbleIn,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderBottomLeftRadius: 5,
+  },
+  bubbleOut: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.bubbleOut,
+    borderBottomRightRadius: 5,
+  },
+  sender: { marginBottom: 2, color: colors.brand, fontSize: 12.5, fontWeight: '700' },
+  messageText: { color: colors.text, ...typography.message, lineHeight: 20 },
+  messageTextOut: { color: colors.bubbleOutText },
+  media: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
+  mediaText: { color: colors.text2, ...typography.preview },
+  bubbleFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
+  time: { color: colors.text3, ...typography.tiny },
+  timeOut: { color: colors.bubbleOutMeta },
+
+  typing: { paddingVertical: 10 },
+  typingText: { color: colors.text3, ...typography.preview, fontStyle: 'italic' },
+
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  composerField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface3,
+    paddingLeft: 14,
+    paddingRight: 2,
+  },
+  composerInput: {
+    flex: 1,
+    maxHeight: 108,
+    paddingVertical: 10,
+    color: colors.text,
+    ...typography.body,
+  },
+  send: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendDisabled: { opacity: 0.4 },
 });

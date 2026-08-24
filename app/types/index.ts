@@ -1,22 +1,13 @@
-// User
+export type PresenceStatus = 'online' | 'away' | 'offline';
+export type ContactStatus = 'friend' | 'pending' | 'blocked';
+export type MediaType = 'image' | 'video' | 'audio';
+
 export interface User {
   id: string;
   name: string;
   handle: string;
-  avatar?: string;
-  status?: 'online' | 'offline' | 'idle';
-}
-
-// Chat
-export interface Chat {
-  id: string;
-  participantIds: string[];
-  lastMessage?: Message;
-  updatedAt: Date;
-  isGroup: boolean;
-  groupName?: string;
-  groupAvatar?: string;
-  unreadCount?: number;
+  status: PresenceStatus;
+  about?: string;
 }
 
 export interface Message {
@@ -24,28 +15,42 @@ export interface Message {
   chatId: string;
   senderId: string;
   text: string;
-  timestamp: Date;
-  read: boolean;
-  type?: 'text' | 'image' | 'video';
+  time: string;
+  media?: MediaType;
+  read?: boolean;
 }
 
-// Contact
+export interface Chat {
+  id: string;
+  name: string;
+  /** Undefined for group chats. */
+  userId?: string;
+  isGroup: boolean;
+  memberIds?: string[];
+  preview: string;
+  previewMedia?: MediaType;
+  time: string;
+  unreadCount: number;
+  muted?: boolean;
+}
+
 export interface Contact {
+  id: string;
+  name: string;
+  status: ContactStatus;
+  about: string;
+}
+
+export interface Story {
   id: string;
   userId: string;
   name: string;
-  phone?: string;
-  email?: string;
-  avatar?: string;
-  status: 'friend' | 'pending' | 'blocked';
-  addedAt?: Date;
+  viewed: boolean;
+  own?: boolean;
 }
 
-// Auth
 export interface AuthUser {
   id: string;
   email: string;
-  phone?: string;
   profile: User;
-  contacts: Contact[];
 }

@@ -1,195 +1,153 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Image } from 'react-native';
-import { colors, spacing, radius, typography, sizes } from '../../constants/design';
-import { mockChats, mockUsers } from '../../mocks';
-import { Chat } from '../../types';
+import React, { useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Avatar } from '../../components/Avatar';
+import { EmptyState } from '../../components/EmptyState';
+import { SearchBar } from '../../components/SearchBar';
+import { StoryRail } from '../../components/StoryRail';
+import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { mockChats, mockStories } from '../../mocks';
+import { Chat, Story } from '../../types';
 
-export const ChatListScreen = () => {
-  const [filter, setFilter] = useState<'all' | 'contacts' | 'groups'>('all');
+type Filter = 'all' | 'contacts' | 'groups';
 
-  const filteredChats = mockChats.filter((chat) => {
-    if (filter === 'contacts') return !chat.isGroup;
-    if (filter === 'groups') return chat.isGroup;
-    return true;
-  });
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'Alle' },
+  { key: 'contacts', label: 'Kontakte' },
+  { key: 'groups', label: 'Gruppen' },
+];
 
-  const renderChatItem = ({ item }: { item: Chat }) => {
-    const otherUserId = item.participantIds.find((id) => id !== 'current');
-    const otherUser = otherUserId ? mockUsers[otherUserId as keyof typeof mockUsers] : null;
-    const displayName = item.isGroup ? item.groupName : otherUser?.name || 'Unknown';
+const mediaIcon = (media?: string) =>
+  media === 'image' ? 'image-outline' : media === 'audio' ? 'mic-outline' : null;
+
+interface Props {
+  onOpenChat: (chat: Chat) => void;
+  onOpenStory: (story: Story) => void;
+  onNewChat: () => void;
+}
+
+export const ChatListScreen = ({ onOpenChat, onOpenStory, onNewChat }: Props) => {
+  const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
+
+  const chats = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return mockChats.filter((chat) => {
+      if (filter === 'contacts' && chat.isGroup) return false;
+      if (filter === 'groups' && !chat.isGroup) return false;
+      if (!q) return true;
+      return chat.name.toLowerCase().includes(q) || chat.preview.toLowerCase().includes(q);
+    });
+  }, [filter, query]);
+
+  const renderChat = ({ item }: { item: Chat }) => {
+    const unread = item.unreadCount > 0;
+    const icon = mediaIcon(item.previewMedia);
 
     return (
-      <TouchableOpacity style={styles.chatItem}>
-        {/* Avatar */}
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>👤</Text>
-        </View>
-
-        {/* Chat Info */}
-        <View style={styles.chatContent}>
-          <Text style={styles.chatName}>{displayName}</Text>
-          <Text style={styles.chatMessage} numberOfLines={1}>
-            {item.lastMessage?.text || '(Kein Nachricht)'}
-          </Text>
-        </View>
-
-        {/* Unread badge */}
-        {item.unreadCount ? (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>{item.unreadCount}</Text>
+      <Pressable
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        onPress={() => onOpenChat(item)}
+      >
+        <Avatar id={item.userId ?? item.id} name={item.name} size={sizes.avatarLg} group={item.isGroup} />
+        <View style={styles.rowBody}>
+          <View style={styles.rowTop}>
+            <Text style={styles.rowName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={[styles.rowTime, unread && styles.rowTimeUnread]}>{item.time}</Text>
           </View>
-        ) : null}
-      </TouchableOpacity>
+          <View style={styles.rowBottom}>
+            {icon && <Ionicons name={icon} size={14} color={colors.text3} />}
+            <Text style={[styles.rowPreview, unread && styles.rowPreviewUnread]} numberOfLines={1}>
+              {item.preview}
+            </Text>
+            {item.muted && <Ionicons name="volume-mute-outline" size={15} color={colors.text3} />}
+            {unread && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{item.unreadCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Pressable>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Messenger</Text>
-        <TextInput
-          placeholder="Suche Chats..."
-          style={styles.searchBox}
-          placeholderTextColor={colors.mediumGray}
+        <Text style={styles.title}>Chats</Text>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Suche nach Chats oder Namen"
+          onAdd={onNewChat}
         />
       </View>
 
-      {/* Filter Buttons */}
-      <View style={styles.filterButtons}>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
-            Alle
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'contacts' && styles.filterButtonActive]}
-          onPress={() => setFilter('contacts')}
-        >
-          <Text style={[styles.filterText, filter === 'contacts' && styles.filterTextActive]}>
-            Kontakte
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'groups' && styles.filterButtonActive]}
-          onPress={() => setFilter('groups')}
-        >
-          <Text style={[styles.filterText, filter === 'groups' && styles.filterTextActive]}>
-            Gruppen
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.pills}>
+        {FILTERS.map(({ key, label }) => (
+          <Pressable
+            key={key}
+            style={[styles.pill, filter === key && styles.pillActive]}
+            onPress={() => setFilter(key)}
+          >
+            <Text style={[styles.pillText, filter === key && styles.pillTextActive]}>{label}</Text>
+          </Pressable>
+        ))}
       </View>
 
-      {/* Chat List */}
       <FlatList
-        data={filteredChats}
-        renderItem={renderChatItem}
+        data={chats}
+        renderItem={renderChat}
         keyExtractor={(item) => item.id}
-        scrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          query.trim() ? null : <StoryRail stories={mockStories} onPress={onOpenStory} />
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon="search-outline"
+            title="Keine Treffer"
+            text={`Für „${query}" wurde nichts gefunden.`}
+          />
+        }
       />
     </View>
   );
 };
 
-export const ChatDetailScreen = () => (
-  <View style={styles.container}>
-    <Text>Chat Detail (coming soon)</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  header: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  title: {
-    fontSize: typography.h2.fontSize,
-    fontWeight: '700',
-    marginBottom: spacing.md,
-    color: colors.darkGray,
-  },
-  searchBox: {
-    backgroundColor: colors.lightGray,
-    borderRadius: radius.small,
-    padding: spacing.md,
-    fontSize: typography.body.fontSize,
-    color: colors.darkGray,
-  },
-  filterButtons: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  filterButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-    backgroundColor: colors.lightGray,
-  },
-  filterButtonActive: {
+  container: { flex: 1, backgroundColor: colors.surface },
+  header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
+  title: { marginBottom: spacing.md, color: colors.text, ...typography.title },
+
+  pills: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: 6 },
+  pill: { paddingHorizontal: 15, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface3 },
+  pillActive: { backgroundColor: colors.brand },
+  pillText: { color: colors.text2, fontSize: 13.5, fontWeight: '600' },
+  pillTextActive: { color: colors.white },
+
+  row: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: spacing.lg, paddingVertical: 10 },
+  rowPressed: { backgroundColor: colors.surface2 },
+  rowBody: { flex: 1, minWidth: 0 },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowName: { flex: 1, color: colors.text, ...typography.name },
+  rowTime: { color: colors.text3, ...typography.small },
+  rowTimeUnread: { color: colors.brand, fontWeight: '600' },
+  rowBottom: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  rowPreview: { flex: 1, color: colors.text2, ...typography.preview },
+  rowPreviewUnread: { color: colors.text, fontWeight: '500' },
+
+  badge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 10,
     backgroundColor: colors.brand,
-  },
-  filterText: {
-    fontSize: typography.small.fontSize,
-    color: colors.darkGray,
-    fontWeight: '500',
-  },
-  filterTextActive: {
-    color: colors.white,
-  },
-  chatItem: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
     alignItems: 'center',
-    gap: spacing.md,
-  },
-  avatar: {
-    width: sizes.avatar,
-    height: sizes.avatar,
-    borderRadius: radius.medium,
-    backgroundColor: colors.lightGray,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  avatarText: {
-    fontSize: 24,
-  },
-  chatContent: {
-    flex: 1,
-  },
-  chatName: {
-    fontSize: typography.body.fontSize,
-    fontWeight: '600',
-    color: colors.darkGray,
-  },
-  chatMessage: {
-    fontSize: typography.small.fontSize,
-    color: colors.mediumGray,
-    marginTop: spacing.xs,
-  },
-  unreadBadge: {
-    backgroundColor: colors.brand,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  unreadText: {
-    color: colors.white,
-    fontSize: typography.tiny.fontSize,
-    fontWeight: '600',
-  },
+  badgeText: { color: colors.white, fontSize: 11.5, fontWeight: '700' },
 });

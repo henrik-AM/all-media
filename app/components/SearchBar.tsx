@@ -1,78 +1,71 @@
-import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors, spacing, radius, typography } from '../constants/design';
+import React from 'react';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors, radius, spacing, typography } from '../constants/design';
 
-interface SearchBarProps {
+interface Props {
+  value: string;
+  onChangeText: (text: string) => void;
   placeholder?: string;
-  onSearch?: (text: string) => void;
-  onClear?: () => void;
+  onAdd?: () => void;
 }
 
-export const SearchBar = ({ placeholder = 'Suche...', onSearch, onClear }: SearchBarProps) => {
-  const [text, setText] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-
-  const handleClear = () => {
-    setText('');
-    onClear?.();
-  };
-
-  const handleChangeText = (value: string) => {
-    setText(value);
-    onSearch?.(value);
-  };
-
-  return (
-    <View style={[styles.container, isFocused && styles.containerFocused]}>
-      <Text style={styles.searchIcon}>🔍</Text>
+export const SearchBar = ({ value, onChangeText, placeholder = 'Suchen', onAdd }: Props) => (
+  <View style={styles.row}>
+    <View style={styles.box}>
+      <Ionicons name="search" size={18} color={colors.text3} />
       <TextInput
         style={styles.input}
+        value={value}
+        onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.mediumGray}
-        value={text}
-        onChangeText={handleChangeText}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
+        placeholderTextColor={colors.text3}
+        autoCorrect={false}
+        returnKeyType="search"
+        clearButtonMode="never"
       />
-      {text ? (
-        <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
-          <Text style={styles.clearIcon}>✕</Text>
-        </TouchableOpacity>
-      ) : null}
+      {value.length > 0 && (
+        <Pressable onPress={() => onChangeText('')} hitSlop={8}>
+          <Ionicons name="close-circle" size={18} color={colors.text3} />
+        </Pressable>
+      )}
     </View>
-  );
-};
+    {onAdd && (
+      <Pressable style={styles.add} onPress={onAdd}>
+        <Ionicons name="add" size={22} color={colors.white} />
+      </Pressable>
+    )}
+  </View>
+);
 
 const styles = StyleSheet.create({
-  container: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.lightGray,
-    borderRadius: radius.small,
+    gap: spacing.md,
+  },
+  box: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  containerFocused: {
-    borderColor: colors.brand,
-    backgroundColor: colors.white,
-  },
-  searchIcon: {
-    fontSize: 16,
+    height: 40,
+    paddingHorizontal: 13,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface3,
   },
   input: {
     flex: 1,
-    fontSize: typography.body.fontSize,
-    color: colors.darkGray,
     padding: 0,
+    color: colors.text,
+    ...typography.body,
   },
-  clearButton: {
-    padding: spacing.sm,
-  },
-  clearIcon: {
-    fontSize: 16,
-    color: colors.mediumGray,
+  add: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
