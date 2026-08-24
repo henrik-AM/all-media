@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
-import { CURRENT_USER_ID, mockMessages, mockUsers } from '../../mocks';
+import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from '../../mocks';
 import { Chat, Message } from '../../types';
 
 const REPLIES = ['Alles klar!', 'Sehe ich genauso.', 'Melde mich gleich.', 'Danke dir!', 'Passt für mich.'];
@@ -29,7 +29,9 @@ interface Props {
 }
 
 export const ChatDetailScreen = ({ chat, onBack, onCall, onCamera }: Props) => {
-  const [messages, setMessages] = useState<Message[]>(() => mockMessages[chat.id] ?? []);
+  const [messages, setMessages] = useState<Message[]>(
+    () => mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []
+  );
   const [draft, setDraft] = useState('');
   const [typing, setTyping] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);

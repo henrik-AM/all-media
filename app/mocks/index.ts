@@ -1,4 +1,4 @@
-import { AuthUser, Chat, Contact, Message, Story, User } from '../types';
+import { AuthUser, Chat, Community, Contact, Message, Story, User } from '../types';
 
 export const CURRENT_USER_ID = 'me';
 
@@ -69,6 +69,35 @@ export const mockContacts: Contact[] = [
   { id: 'u5', name: 'Elif Yilmaz', status: 'friend', about: 'Hey, ich nutze All Media!' },
   { id: 'u6', name: 'Finn Bauer', status: 'friend', about: 'Nur dringende Anrufe' },
 ];
+
+export const mockCommunities: Community[] = [
+  { id: 'k1', name: 'Design Systeme', topic: 'Komponenten, Tokens, Figma', members: 1284, visibility: 'public', joined: true, unreadCount: 3 },
+  { id: 'k2', name: 'React Native DE', topic: 'Expo, Navigation, Performance', members: 842, visibility: 'public', joined: true, unreadCount: 0 },
+  { id: 'k3', name: 'Fotografie', topic: 'Licht, Komposition, Nachbearbeitung', members: 3120, visibility: 'public', joined: false, unreadCount: 0 },
+  { id: 'k4', name: 'Team Intern', topic: 'Nur für das Kernteam', members: 12, visibility: 'private', joined: true, unreadCount: 5 },
+  { id: 'k5', name: 'Laufgruppe Köln', topic: 'Treffpunkte und Termine', members: 96, visibility: 'private', joined: true, unreadCount: 0 },
+  { id: 'k6', name: 'Musikproduktion', topic: 'Ableton, Mixing, Sounddesign', members: 671, visibility: 'public', joined: false, unreadCount: 0 },
+];
+
+export const mockCommunityMessages: Record<string, Message[]> = {
+  k1: [
+    { id: 'm1', chatId: 'k1', senderId: 'u1', text: 'Hat jemand Erfahrung mit Design Tokens in Figma Variables?', time: '09:12' },
+    { id: 'm2', chatId: 'k1', senderId: 'u4', text: 'Ja, wir nutzen das seit einem halben Jahr produktiv', time: '09:20' },
+    { id: 'm3', chatId: 'k1', senderId: 'me', text: 'Wie handhabt ihr Dark Mode dabei?', time: '09:24', read: true },
+    { id: 'm4', chatId: 'k1', senderId: 'u4', text: 'Zwei Modi in einer Collection, das reicht meistens', time: '09:31' },
+  ],
+  k2: [
+    { id: 'm1', chatId: 'k2', senderId: 'u2', text: 'Expo SDK 57 läuft bei mir stabil', time: 'Gestern' },
+    { id: 'm2', chatId: 'k2', senderId: 'u5', text: 'Bei mir auch, nur der Metro Cache zickt manchmal', time: 'Gestern' },
+  ],
+  k3: [{ id: 'm1', chatId: 'k3', senderId: 'u3', text: 'Goldene Stunde heute um 19:40', time: 'Mo' }],
+  k4: [
+    { id: 'm1', chatId: 'k4', senderId: 'u1', text: 'Sprint-Planung morgen um 10 Uhr', time: '11:02' },
+    { id: 'm2', chatId: 'k4', senderId: 'me', text: 'Bin dabei', time: '11:05', read: true },
+  ],
+  k5: [{ id: 'm1', chatId: 'k5', senderId: 'u6', text: 'Samstag 8 Uhr am Rheinpark?', time: 'So' }],
+  k6: [{ id: 'm1', chatId: 'k6', senderId: 'u5', text: 'Neuer Track ist fertig gemischt', time: 'Sa' }],
+};
 
 export const mockStories: Story[] = [
   { id: 's0', userId: 'me', name: 'Deine Story', viewed: false, own: true },

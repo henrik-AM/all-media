@@ -13,10 +13,11 @@ import { ContactsScreen } from './screens/messenger/ContactsScreen';
 import { StoriesScreen } from './screens/messenger/StoriesScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
+import { CommunitiesScreen } from './screens/communities/CommunitiesScreen';
 import { ProfileScreen } from './screens/profile/ProfileScreen';
 import { colors } from './constants/design';
 import { mockChats } from './mocks';
-import { Chat, Contact, Story } from './types';
+import { Chat, Community, Contact, Story } from './types';
 
 type Overlay =
   | { kind: 'chat'; chat: Chat }
@@ -42,6 +43,21 @@ const Shell = () => {
   const openStory = (story: Story) => {
     if (story.own) setOverlay({ kind: 'camera' });
     else setOverlay({ kind: 'story', story });
+  };
+
+  const openCommunity = (community: Community) => {
+    setOverlay({
+      kind: 'chat',
+      chat: {
+        id: community.id,
+        name: community.name,
+        isGroup: true,
+        memberIds: new Array(Math.max(community.members - 1, 0)).fill(''),
+        preview: community.topic,
+        time: '',
+        unreadCount: 0,
+      },
+    });
   };
 
   const handleArea = (next: AreaKey) => {
@@ -93,6 +109,10 @@ const Shell = () => {
           text="Dieser Bereich kommt in einer späteren Phase."
         />
       );
+    }
+
+    if (area === 'communities') {
+      return <CommunitiesScreen onOpenCommunity={openCommunity} onNotice={setNotice} />;
     }
 
     if (area === 'profile' || tab === 'settings') {

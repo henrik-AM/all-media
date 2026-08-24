@@ -35,6 +35,35 @@ const stories = [
   { id: 's6', userId: 'u6', name: 'Finn', viewed: true },
 ];
 
+const communities = [
+  { id: 'k1', name: 'Design Systeme', members: 1284, visibility: 'public', topic: 'Komponenten, Tokens, Figma', joined: true, unread: 3 },
+  { id: 'k2', name: 'React Native DE', members: 842, visibility: 'public', topic: 'Expo, Navigation, Performance', joined: true, unread: 0 },
+  { id: 'k3', name: 'Fotografie', members: 3120, visibility: 'public', topic: 'Licht, Komposition, Nachbearbeitung', joined: false, unread: 0 },
+  { id: 'k4', name: 'Team Intern', members: 12, visibility: 'private', topic: 'Nur für das Kernteam', joined: true, unread: 5 },
+  { id: 'k5', name: 'Laufgruppe Köln', members: 96, visibility: 'private', topic: 'Treffpunkte und Termine', joined: true, unread: 0 },
+  { id: 'k6', name: 'Musikproduktion', members: 671, visibility: 'public', topic: 'Ableton, Mixing, Sounddesign', joined: false, unread: 0 },
+];
+
+const communityMessages = {
+  k1: [
+    { id: 'm1', from: 'u1', text: 'Hat jemand Erfahrung mit Design Tokens in Figma Variables?', time: '09:12' },
+    { id: 'm2', from: 'u4', text: 'Ja, wir nutzen das seit einem halben Jahr produktiv', time: '09:20' },
+    { id: 'm3', from: 'me', text: 'Wie handhabt ihr Dark Mode dabei?', time: '09:24' },
+    { id: 'm4', from: 'u4', text: 'Zwei Modi in einer Collection, das reicht meistens', time: '09:31' },
+  ],
+  k2: [
+    { id: 'm1', from: 'u2', text: 'Expo SDK 57 läuft bei mir stabil', time: 'Gestern' },
+    { id: 'm2', from: 'u5', text: 'Bei mir auch, nur der Metro Cache zickt manchmal', time: 'Gestern' },
+  ],
+  k3: [{ id: 'm1', from: 'u3', text: 'Goldene Stunde heute um 19:40', time: 'Mo' }],
+  k4: [
+    { id: 'm1', from: 'u1', text: 'Sprint-Planung morgen um 10 Uhr', time: '11:02' },
+    { id: 'm2', from: 'me', text: 'Bin dabei', time: '11:05' },
+  ],
+  k5: [{ id: 'm1', from: 'u6', text: 'Samstag 8 Uhr am Rheinpark?', time: 'So' }],
+  k6: [{ id: 'm1', from: 'u5', text: 'Neuer Track ist fertig gemischt', time: 'Sa' }],
+};
+
 const contacts = [
   { id: 'u1', name: 'Anna Schmidt', status: 'friend', about: 'Verfügbar' },
   { id: 'u2', name: 'Bob Müller', status: 'friend', about: 'Im Meeting' },
@@ -86,11 +115,20 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/bootstrap', (req, res) => {
-  res.json({ users, chats, stories, contacts });
+  res.json({ users, chats, stories, contacts, communities });
 });
 
 app.get('/api/messages/:chatId', (req, res) => {
-  res.json(messages[req.params.chatId] || []);
+  res.json(messages[req.params.chatId] || communityMessages[req.params.chatId] || []);
+});
+
+app.post('/api/communities/:id/join', (req, res) => {
+  const community = communities.find((c) => c.id === req.params.id);
+  if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  community.joined = !community.joined;
+  community.members += community.joined ? 1 : -1;
+  res.json(community);
 });
 
 app.post('/api/messages/:chatId', (req, res) => {
@@ -99,11 +137,12 @@ app.post('/api/messages/:chatId', (req, res) => {
     return res.status(400).json({ error: 'Text erforderlich' });
   }
   const chatId = req.params.chatId;
-  if (!messages[chatId]) messages[chatId] = [];
+  const store = communityMessages[chatId] ? communityMessages : messages;
+  if (!store[chatId]) store[chatId] = [];
 
   const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   const message = { id: 'm' + Date.now(), from: 'me', text: text.trim(), time };
-  messages[chatId].push(message);
+  store[chatId].push(message);
 
   const chat = chats.find((c) => c.id === chatId);
   if (chat) {

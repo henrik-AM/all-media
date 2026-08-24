@@ -41,6 +41,16 @@ export interface Contact {
   about: string;
 }
 
+export interface Community {
+  id: string;
+  name: string;
+  topic: string;
+  members: number;
+  visibility: 'public' | 'private';
+  joined: boolean;
+  unreadCount: number;
+}
+
 export interface Story {
   id: string;
   userId: string;

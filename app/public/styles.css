@@ -102,7 +102,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   flex: 0 0 auto;
   height: var(--top-h);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   align-items: center;
   gap: 8px;
   padding: 0 16px;
@@ -359,6 +359,17 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .row__chevron { color: var(--text-3); }
 .row__chevron svg { width: 18px; height: 18px; }
+
+.joinbtn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.joinbtn.is-joined { background: var(--surface-3); color: var(--text-2); }
 
 .listhead {
   padding: 16px 16px 6px;

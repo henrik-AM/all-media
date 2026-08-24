@@ -3,11 +3,14 @@ const state = {
   chats: [],
   stories: [],
   contacts: [],
+  communities: [],
   view: 'chats',
   area: 'messenger',
   filter: 'all',
   query: '',
   contactQuery: '',
+  communityQuery: '',
+  communityFilter: 'all',
   theme: localStorage.getItem('am-theme') || 'system',
   openChatId: null,
   messages: [],
@@ -66,14 +69,16 @@ async function bootstrap() {
 
 /* ------------------------------------------------------------------ views */
 function render() {
+  const navActive = state.area === 'messenger' || state.area === 'profile';
   document.querySelectorAll('.navbtn').forEach((b) =>
-    b.classList.toggle('is-active', b.dataset.view === state.view)
+    b.classList.toggle('is-active', navActive && b.dataset.view === state.view)
   );
   document.querySelectorAll('.topbar__btn').forEach((b) =>
     b.classList.toggle('is-active', b.dataset.area === state.area)
   );
 
   if (state.area === 'video') return renderPlaceholder('Video-Feed', 'play', 'Der Video-Bereich kommt in einer späteren Phase.');
+  if (state.area === 'communities') return renderCommunities();
   if (state.area === 'profile') return renderProfile();
   if (state.area === 'camera') return openCamera();
 
@@ -334,6 +339,132 @@ function renderContacts() {
   );
 }
 
+/* ---------------------------------------------------------- communities */
+function communityAvatar(c, size = 52) {
+  const palette = ['#5C6BC0', '#26A69A', '#EF6C6C', '#8D6E63', '#7E57C2', '#42A5F5'];
+  let hash = 0;
+  for (let i = 0; i < c.id.length; i++) hash = (hash * 31 + c.id.charCodeAt(i)) >>> 0;
+  const initials = c.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+  return `<div class="avatar avatar--${size}" style="background:${palette[hash % palette.length]};border-radius:16px">${esc(initials)}</div>`;
+}
+
+function renderCommunities() {
+  const q = state.communityQuery.trim().toLowerCase();
+  const list = state.communities.filter((c) => {
+    if (state.communityFilter === 'public' && c.visibility !== 'public') return false;
+    if (state.communityFilter === 'private' && c.visibility !== 'private') return false;
+    if (!q) return true;
+    return c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
+  });
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <h1 class="pagehead__title">Communitys</h1>
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="commSearch" type="search" placeholder="Suche nach Communitys" value="${esc(state.communityQuery)}" autocomplete="off" />
+          ${state.communityQuery ? `<button class="searchbox__clear" id="commSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
+        </label>
+        <button class="iconbtn-primary" id="newCommunity" aria-label="Community erstellen">${ICONS.plus}</button>
+      </div>
+    </div>
+    <div class="pills">
+      ${['all', 'public', 'private']
+        .map(
+          (f) =>
+            `<button class="pill ${state.communityFilter === f ? 'is-active' : ''}" data-cfilter="${f}">${
+              { all: 'Alle', public: 'Öffentlich', private: 'Privat' }[f]
+            }</button>`
+        )
+        .join('')}
+    </div>
+    <div class="scroll">
+      ${
+        list.length
+          ? `<ul class="rows">${list.map(communityRow).join('')}</ul>`
+          : `<div class="empty">${ICONS.people}
+              <div class="empty__title">Keine Community gefunden</div>
+              <div class="empty__text">Für „${esc(state.communityQuery)}" wurde nichts gefunden.</div>
+            </div>`
+      }
+    </div>`;
+
+  const input = $('#commSearch');
+  input.addEventListener('input', (e) => {
+    state.communityQuery = e.target.value;
+    const pos = e.target.selectionStart;
+    renderCommunities();
+    const next = $('#commSearch');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  $('#commSearchClear')?.addEventListener('click', () => {
+    state.communityQuery = '';
+    renderCommunities();
+    $('#commSearch').focus();
+  });
+  $('#newCommunity').addEventListener('click', () => toast('Community erstellen folgt in Phase 3'));
+
+  main.querySelectorAll('[data-cfilter]').forEach((p) =>
+    p.addEventListener('click', () => {
+      state.communityFilter = p.dataset.cfilter;
+      renderCommunities();
+    })
+  );
+
+  main.querySelectorAll('[data-community]').forEach((row) =>
+    row.addEventListener('click', () => {
+      const community = state.communities.find((c) => c.id === row.dataset.community);
+      if (!community.joined) return toast('Tritt der Community zuerst bei');
+      openChat(community.id);
+    })
+  );
+
+  main.querySelectorAll('[data-join]').forEach((btn) =>
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const res = await fetch(`/api/communities/${btn.dataset.join}/join`, { method: 'POST' });
+      const updated = await res.json();
+      const idx = state.communities.findIndex((c) => c.id === updated.id);
+      state.communities[idx] = updated;
+      toast(updated.joined ? `„${updated.name}" beigetreten` : `„${updated.name}" verlassen`);
+      renderCommunities();
+    })
+  );
+}
+
+function communityRow(c) {
+  const members = c.members.toLocaleString('de-DE');
+  return `
+    <li>
+      <button class="row ${c.unread ? 'is-unread' : ''}" data-community="${c.id}">
+        ${communityAvatar(c)}
+        <div class="row__body">
+          <div class="row__top">
+            <span class="row__name">${esc(c.name)}</span>
+            ${c.visibility === 'private' ? `<span class="row__meta">${ICONS.lock}</span>` : ''}
+          </div>
+          <div class="row__bottom">
+            <span class="row__preview">${esc(c.topic)}</span>
+          </div>
+          <div class="row__bottom">
+            <span class="row__preview" style="font-size:12px;color:var(--text-3)">${members} Mitglieder</span>
+          </div>
+        </div>
+        <span class="row__meta">
+          ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
+          <span class="joinbtn ${c.joined ? 'is-joined' : ''}" data-join="${c.id}">${c.joined ? 'Mitglied' : 'Beitreten'}</span>
+        </span>
+      </button>
+    </li>`;
+}
+
 /* ---------------------------------------------------------- settings */
 function renderSettings() {
   const me = user('me');
@@ -414,8 +545,21 @@ function renderProfile() {
 
 /* ---------------------------------------------------------- chat detail */
 async function openChat(chatId) {
-  const chat = state.chats.find((c) => c.id === chatId);
-  if (!chat) return;
+  let chat = state.chats.find((c) => c.id === chatId);
+
+  if (!chat) {
+    const community = state.communities.find((c) => c.id === chatId);
+    if (!community) return;
+    chat = {
+      id: community.id,
+      name: community.name,
+      isGroup: true,
+      members: new Array(Math.max(community.members - 1, 0)),
+      unread: community.unread,
+    };
+    community.unread = 0;
+  }
+
   state.openChatId = chatId;
 
   const res = await fetch(`/api/messages/${chatId}`);
@@ -434,7 +578,7 @@ async function openChat(chatId) {
       <div class="chathead__body">
         <div class="chathead__name">${esc(chat.name)}</div>
         <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}">${
-          chat.isGroup ? `${(chat.members || []).length + 1} Mitglieder` : 'Online'
+          chat.isGroup ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder` : 'Online'
         }</div>
       </div>
       <div class="chathead__actions">
@@ -698,7 +842,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------------------------------------------------- icons in chrome */
 function paintChrome() {
-  const top = [ICONS.play, ICONS.chat, ICONS.camera, ICONS.person];
+  const top = [ICONS.play, ICONS.chat, ICONS.people, ICONS.camera, ICONS.person];
   document.querySelectorAll('.topbar__btn').forEach((b, i) => (b.innerHTML = top[i]));
   const nav = [ICONS.chat, ICONS.image, ICONS.people, ICONS.settings];
   document.querySelectorAll('.navbtn__icon').forEach((el, i) => (el.innerHTML = nav[i]));

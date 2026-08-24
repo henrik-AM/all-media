@@ -3,13 +3,14 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, sizes, spacing } from '../constants/design';
 
-export type AreaKey = 'video' | 'messenger' | 'camera' | 'profile';
+export type AreaKey = 'video' | 'messenger' | 'communities' | 'camera' | 'profile';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const AREAS: { key: AreaKey; icon: IconName }[] = [
   { key: 'video', icon: 'play-outline' },
   { key: 'messenger', icon: 'chatbubble-outline' },
+  { key: 'communities', icon: 'people-outline' },
   { key: 'camera', icon: 'camera-outline' },
   { key: 'profile', icon: 'person-outline' },
 ];
