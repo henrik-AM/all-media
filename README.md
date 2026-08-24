@@ -63,12 +63,37 @@ All-Media/
 - [x] Suche-Komponent
 - [x] Dark Mode Support (ThemeContext)
 
-### Phase 3 🔄 (Backend)
-- [ ] Supabase Integration
-- [ ] Echtzeit-Chat (Realtime)
-- [ ] Media-Upload (expo-image-picker)
-- [ ] Push-Notifications
-- [ ] Video-Calls (WebRTC)
+### Phase 3 🔄 (Backend & Realtime)
+- [x] Supabase Foundation (Context, Auth, Types)
+- [x] Realtime Message Sync (useChatMessages Hook)
+- [x] Media-Upload (expo-image-picker + supabaseStorage)
+- [x] User Presence Tracking (online/offline status)
+- [x] Typing Indicators (\"user is typing\")
+- [x] Photo/Video Capture to Storage
+- [ ] LoginScreen with Supabase Auth
+- [ ] Push-Notifications (expo-notifications)
+- [ ] Video-Calls (WebRTC) — see VIDEO_CALLS_SETUP.md
+- [ ] Stories Realtime Upload
+
+**Status**: Foundation complete. Awaiting Supabase setup (see SUPABASE_SETUP.md)
+
+## 🔧 Backend Setup (Phase 3)
+
+### Supabase Integration
+1. **Choose**: Local (Docker) or Cloud (Supabase.com)
+2. **Read**: `SUPABASE_SETUP.md` for detailed instructions
+3. **Schema**: Deploy SQL schema from SUPABASE_SETUP.md
+4. **Env**: Create `.env.local` with credentials
+5. **Test**: Realtime chat & media upload
+
+### What's Already Built
+- ✅ SupabaseContext for client initialization
+- ✅ supabaseAuth.ts (signup/signin with fallback)
+- ✅ Hooks: useChatMessages, usePresence, useTypingIndicator
+- ✅ supabaseStorage.ts (photo/video upload)
+- ✅ ChatDetailScreen & CameraScreen connected
+
+No Supabase config needed = app uses mock data automatically.
 
 ## 🎨 Design-System
 
@@ -87,4 +112,4 @@ Alle Komponenten folgen dem **Instagram-inspirierten Design**:
 
 ---
 
-**Stand**: 2026-08-24 | **Commits**: 4 | **Screens**: 10+ | **Components**: 25+
+**Stand**: 2026-08-24 | **Commits**: 6 | **Screens**: 10+ | **Components**: 25+ | **Hooks**: 10+
