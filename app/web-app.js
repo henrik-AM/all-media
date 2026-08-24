@@ -10,6 +10,12 @@ const mockChats = [
   { id: '4', name: 'Projekt Team', lastMessage: 'Bis später!', unread: 0, avatar: '👥', isGroup: true },
 ];
 
+const mockStories = [
+  { id: '1', userName: 'Anna Schmidt', avatar: '👩', viewed: false },
+  { id: '2', userName: 'Bob Müller', avatar: '👨', viewed: true },
+  { id: '3', userName: 'Clara Weber', avatar: '👩‍🦰', viewed: true },
+];
+
 const mockContacts = [
   { id: '1', name: 'Anna Schmidt', status: 'friend' },
   { id: '2', name: 'Bob Müller', status: 'friend' },
@@ -24,12 +30,9 @@ mockChats.forEach(c => unreadMessages[c.id] = c.unread || 0);
 app.use(express.json());
 
 // API endpoints
-app.get('/api/chats', (req, res) => {
-  res.json(mockChats.map(c => ({ ...c, unread: unreadMessages[c.id] || 0 })));
-});
-
+app.get('/api/chats', (req, res) => res.json(mockChats.map(c => ({ ...c, unread: unreadMessages[c.id] || 0 }))));
+app.get('/api/stories', (req, res) => res.json(mockStories));
 app.get('/api/contacts', (req, res) => res.json(mockContacts));
-
 app.post('/api/messages/:chatId', (req, res) => {
   const { text } = req.body;
   if (text) {
@@ -107,8 +110,9 @@ app.get('/', (req, res) => {
           overflow-y: auto;
           background: white;
         }
+        .content.hidden { display: none; }
         
-        .chat-item {
+        .chat-item, .story-item {
           padding: 16px;
           border-bottom: 1px solid #f0f0f0;
           display: flex;
@@ -116,8 +120,7 @@ app.get('/', (req, res) => {
           cursor: pointer;
           transition: background 0.2s;
         }
-        .chat-item:hover { background: #f9f9f9; }
-        .chat-item.active { background: #f0f7ff; border-left: 4px solid #0A66FF; }
+        .chat-item:hover, .story-item:hover { background: #f9f9f9; }
         
         .avatar {
           width: 50px;
@@ -131,11 +134,15 @@ app.get('/', (req, res) => {
           flex-shrink: 0;
         }
         
-        .chat-info { flex: 1; }
-        .chat-name { font-weight: 600; font-size: 15px; }
-        .chat-message { font-size: 13px; color: #65676b; margin-top: 4px; }
+        .story-item .avatar {
+          border: 3px solid #0A66FF;
+        }
         
-        .unread-badge {
+        .info { flex: 1; }
+        .name { font-weight: 600; font-size: 15px; }
+        .subtitle { font-size: 13px; color: #65676b; margin-top: 4px; }
+        
+        .badge {
           background: #0A66FF;
           color: white;
           border-radius: 50%;
@@ -147,79 +154,6 @@ app.get('/', (req, res) => {
           font-size: 12px;
           font-weight: 600;
         }
-        
-        .chat-detail {
-          display: none;
-          flex-direction: column;
-          height: 100%;
-        }
-        .chat-detail.active { display: flex; }
-        
-        .chat-header {
-          padding: 16px;
-          border-bottom: 1px solid #e5e5e5;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .back-btn {
-          background: none;
-          border: none;
-          font-size: 20px;
-          cursor: pointer;
-        }
-        
-        .messages {
-          flex: 1;
-          overflow-y: auto;
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        
-        .message {
-          max-width: 80%;
-          padding: 12px;
-          border-radius: 16px;
-          word-wrap: break-word;
-        }
-        .message.sent {
-          align-self: flex-end;
-          background: #0A66FF;
-          color: white;
-        }
-        .message.received {
-          align-self: flex-start;
-          background: #e5e5e5;
-          color: #262626;
-        }
-        
-        .input-box {
-          padding: 16px;
-          border-top: 1px solid #e5e5e5;
-          display: flex;
-          gap: 8px;
-        }
-        .input-box input {
-          flex: 1;
-          padding: 10px;
-          border: 1px solid #e5e5e5;
-          border-radius: 20px;
-          font-size: 14px;
-        }
-        .send-btn {
-          background: #0A66FF;
-          color: white;
-          border: none;
-          border-radius: 20px;
-          padding: 10px 16px;
-          cursor: pointer;
-          font-weight: 600;
-        }
-        .send-btn:hover { background: #0052CC; }
-        
-        .empty { text-align: center; padding: 20px; color: #65676b; }
         
         .bottom-nav {
           display: flex;
@@ -243,30 +177,21 @@ app.get('/', (req, res) => {
         </header>
         
         <div class="nav-tabs">
-          <button class="nav-tab active" onclick="switchTab('chats')">Alle</button>
-          <button class="nav-tab" onclick="switchTab('contacts')">Kontakte</button>
-          <button class="nav-tab" onclick="switchTab('groups')">Gruppen</button>
+          <button class="nav-tab active" onclick="switchTab('chats')">💬 Chats</button>
+          <button class="nav-tab" onclick="switchTab('stories')">📖 Stories</button>
+          <button class="nav-tab" onclick="switchTab('contacts')">👥 Kontakte</button>
         </div>
         
-        <div id="chats-view" class="content active">
+        <div id="chats-view" class="content">
           <div id="chats-list"></div>
         </div>
         
-        <div id="contacts-view" class="content">
-          <div id="contacts-list"></div>
+        <div id="stories-view" class="content hidden">
+          <div id="stories-list"></div>
         </div>
         
-        <div id="chat-detail" class="content chat-detail">
-          <div class="chat-header">
-            <button class="back-btn" onclick="backToChats()">←</button>
-            <span id="chat-name"></span>
-            <span>⋯</span>
-          </div>
-          <div id="messages" class="messages"></div>
-          <div class="input-box">
-            <input id="message-input" type="text" placeholder="Nachricht...">
-            <button class="send-btn" onclick="sendMessage()">Senden</button>
-          </div>
+        <div id="contacts-view" class="content hidden">
+          <div id="contacts-list"></div>
         </div>
         
         <div class="bottom-nav">
@@ -279,123 +204,71 @@ app.get('/', (req, res) => {
       </div>
       
       <script>
-        let currentChatId = null;
-        let chatsData = [];
-        
         function loadChats() {
           fetch('/api/chats')
             .then(r => r.json())
             .then(data => {
-              chatsData = data;
-              renderChats();
-            })
-            .catch(e => console.error('Chats laden fehlgeschlagen:', e));
+              const list = document.getElementById('chats-list');
+              list.innerHTML = data.map(chat => \`
+                <div class="chat-item">
+                  <div class="avatar">\${chat.avatar}</div>
+                  <div class="info">
+                    <div class="name">\${chat.name}</div>
+                    <div class="subtitle">\${chat.lastMessage}</div>
+                  </div>
+                  \${chat.unread > 0 ? \`<div class="badge">\${chat.unread}</div>\` : ''}
+                </div>
+              \`).join('');
+            });
         }
         
-        function renderChats() {
-          const list = document.getElementById('chats-list');
-          if (chatsData.length === 0) {
-            list.innerHTML = '<div class="empty">Keine Chats</div>';
-            return;
-          }
-          list.innerHTML = chatsData.map(chat => \`
-            <div class="chat-item" onclick="openChat('\${chat.id}', '\${chat.name}')">
-              <div class="avatar">\${chat.avatar}</div>
-              <div class="chat-info">
-                <div class="chat-name">\${chat.name}</div>
-                <div class="chat-message">\${chat.lastMessage}</div>
-              </div>
-              \${chat.unread > 0 ? \`<div class="unread-badge">\${chat.unread}</div>\` : ''}
-            </div>
-          \`).join('');
+        function loadStories() {
+          fetch('/api/stories')
+            .then(r => r.json())
+            .then(data => {
+              const list = document.getElementById('stories-list');
+              list.innerHTML = data.map(story => \`
+                <div class="story-item">
+                  <div class="avatar">\${story.avatar}</div>
+                  <div class="info">
+                    <div class="name">\${story.userName}</div>
+                    <div class="subtitle">\${story.viewed ? '✓ gesehen' : '● neu'}</div>
+                  </div>
+                </div>
+              \`).join('');
+            });
         }
         
         function loadContacts() {
           fetch('/api/contacts')
             .then(r => r.json())
-            .then(data => renderContacts(data))
-            .catch(e => console.error('Kontakte laden fehlgeschlagen:', e));
-        }
-        
-        function renderContacts(contacts) {
-          const list = document.getElementById('contacts-list');
-          list.innerHTML = contacts.map(c => \`
-            <div class="chat-item">
-              <div class="avatar">👤</div>
-              <div class="chat-info">
-                <div class="chat-name">\${c.name}</div>
-                <div class="chat-message">\${c.status === 'friend' ? '✓ Kontakt' : 'Ausstehend'}</div>
-              </div>
-            </div>
-          \`).join('');
+            .then(data => {
+              const list = document.getElementById('contacts-list');
+              list.innerHTML = data.map(c => \`
+                <div class="chat-item">
+                  <div class="avatar">👤</div>
+                  <div class="info">
+                    <div class="name">\${c.name}</div>
+                    <div class="subtitle">\${c.status === 'friend' ? '✓ Kontakt' : 'ausstehend'}</div>
+                  </div>
+                </div>
+              \`).join('');
+            });
         }
         
         function switchTab(tab) {
           document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-          document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-          document.getElementById(tab + '-view').classList.add('active');
+          document.querySelectorAll('.content').forEach(c => c.classList.add('hidden'));
+          
+          document.getElementById(tab + '-view').classList.remove('hidden');
           event.target.classList.add('active');
           
+          if (tab === 'stories') loadStories();
           if (tab === 'contacts') loadContacts();
-        }
-        
-        function openChat(id, name) {
-          currentChatId = id;
-          document.getElementById('chat-name').textContent = name;
-          document.getElementById('chat-detail').classList.add('active');
-          document.getElementById('chats-list').parentElement.classList.remove('active');
-          
-          // Mock messages
-          document.getElementById('messages').innerHTML = \`
-            <div class="message received">Hey, wie gehts?</div>
-            <div class="message sent">Mir gehts gut!</div>
-          \`;
-          document.getElementById('message-input').focus();
-        }
-        
-        function backToChats() {
-          document.getElementById('chat-detail').classList.remove('active');
-          document.getElementById('chats-list').parentElement.classList.add('active');
-          currentChatId = null;
-        }
-        
-        function sendMessage() {
-          const input = document.getElementById('message-input');
-          const text = input.value.trim();
-          
-          if (!text) return;
-          
-          const messagesDiv = document.getElementById('messages');
-          const msgEl = document.createElement('div');
-          msgEl.className = 'message sent';
-          msgEl.textContent = text;
-          messagesDiv.appendChild(msgEl);
-          messagesDiv.scrollTop = messagesDiv.scrollHeight;
-          
-          input.value = '';
-          
-          // Mock response nach 1 Sekunde
-          setTimeout(() => {
-            const response = document.createElement('div');
-            response.className = 'message received';
-            response.textContent = '👍 Erhalten!';
-            messagesDiv.appendChild(response);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-          }, 1000);
         }
         
         // Load initial data
         loadChats();
-        
-        // Allow Enter to send
-        document.addEventListener('DOMContentLoaded', () => {
-          const input = document.getElementById('message-input');
-          if (input) {
-            input.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') sendMessage();
-            });
-          }
-        });
       </script>
     </body>
     </html>
@@ -403,6 +276,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✓ All Media App läuft auf http://localhost:${PORT}`);
-  console.log('📱 Öffne im Browser: http://localhost:' + PORT);
+  console.log(\`✓ All Media App läuft auf http://localhost:\${PORT}\`);
 });
