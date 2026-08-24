@@ -1,115 +1,90 @@
-# All Media App 📱
+# All Media
 
-Eine moderne Social-Media-App mit Messenger, Video-Feed, Communitys und mehr — gebaut mit React Native (Expo) und einer Web-Mockup für schnelles Testing.
+Social-App mit Messenger, Storys, Video-Feed und Communitys — gebaut aus dem
+Figma-Prototypen. Zwei Wege zum Testen: eine Web-Version im Browser und die
+echte React-Native-App über Expo Go.
 
-## 🚀 Schnellstart
+## Starten
 
-### Web-Version (lokal testen)
+### Web-Version (schnellster Weg)
+
 ```bash
 cd app
 node web-app.js
 ```
-Öffne dann im Browser: **http://localhost:3000**
 
-### React-Native (Entwicklung)
+Dann im Browser öffnen: **http://localhost:3000**
+
+### React-Native über Expo Go
+
 ```bash
 cd app
 npm install
-npm start
+npx expo start
 ```
 
-## 📁 Projektstruktur
+Danach den QR-Code aus dem Terminal mit der **Expo Go**-App scannen
+(iOS: Kamera-App, Android: Expo Go direkt). Handy und Rechner müssen im
+gleichen WLAN sein. Ein Expo-Konto ist dafür nicht nötig.
+
+## Was funktioniert
+
+| Bereich | Stand |
+|---|---|
+| Chat-Liste mit Suche, Filtern und Story-Rail | fertig |
+| Einzelchat: Nachrichten senden, Antwort-Simulation, Tippen-Indikator | fertig |
+| Gruppenchat mit Absendernamen | fertig |
+| Kontakte mit Live-Suche | fertig |
+| Storys: Liste und Viewer mit Fortschrittsbalken | fertig |
+| Kamera: Foto/Video über Kamera oder Galerie | fertig (RN), UI-Gerüst (Web) |
+| Einstellungen/Profil inkl. Dark Mode | fertig |
+| Login/Registrierung mit Validierung | fertig (Mock-Auth) |
+| Video-Feed, Communitys | noch nicht gebaut |
+| Supabase-Backend | vorbereitet, siehe unten |
+
+## Projektstruktur
 
 ```
 All-Media/
-├── app/                          # Hauptanwendung
-│   ├── screens/                  # React Native Screens
-│   │   ├── messenger/
-│   │   │   ├── ChatListScreen.tsx
-│   │   │   ├── ChatDetailScreen.tsx
-│   │   │   ├── ContactsScreen.tsx
-│   │   │   ├── StoriesScreen.tsx
-│   │   │   ├── CameraScreen.tsx
-│   │   │   └── GroupManagementScreen.tsx
-│   ├── components/               # Wiederverwendbare Komponenten
-│   │   └── SearchBar.tsx
-│   ├── contexts/                 # State Management
-│   │   ├── AuthContext.tsx
-│   │   ├── ThemeContext.tsx
-│   │   └── NotificationContext.tsx
-│   ├── types/                    # TypeScript Interfaces
-│   ├── mocks/                    # Mock-Daten für Tests
-│   ├── constants/                # Design-Tokens
-│   ├── web-app.js                # Express Web-Server (HTML/CSS/JS)
-│   └── App.tsx                   # Hauptapp mit Navigation
-├── .claude/                      # Claude Code Konfiguration
-│   └── skills/
-│       └── ig-inspired-design/   # Design-System Skill
-└── README.md
+├── app/
+│   ├── App.tsx              Shell: Top-Switcher, Tabs, Overlays
+│   ├── components/          Avatar, SearchBar, StoryRail, TabBar, Toast …
+│   ├── screens/             Login, Messenger-Screens, Profil
+│   ├── constants/design.ts  Farben, Abstände, Typografie, Avatar-Farben
+│   ├── types/               TypeScript-Modelle
+│   ├── mocks/               Testdaten (Nutzer, Chats, Nachrichten, Storys)
+│   ├── lib/                 Supabase-Anbindung (Auth, Storage, Typen)
+│   ├── web-app.js           Express-Server + Mock-API
+│   └── public/              Web-Version (index.html, styles.css, app.js, icons.js)
+├── SUPABASE_SETUP.md        Backend-Anleitung (lokal oder Cloud)
+└── VIDEO_CALLS_SETUP.md     Konzept für Video-Anrufe (noch nicht umgesetzt)
 ```
 
-## 🎯 Features
+## Design
 
-### Phase 1 ✓ (Messenger Core)
-- [x] Chat-Liste mit ungelesenen Badges
-- [x] Einzelner Chat mit Nachrichten
-- [x] Kontakte-Verwaltung
-- [x] Profil & Einstellungen
+Orientiert am Figma-Prototypen, professionell ausgearbeitet:
 
-### Phase 2 ✓ (Erweitert)
-- [x] Stories (Ansehen & Viewer)
-- [x] Kamera-UI (Photo/Video Modus)
-- [x] Gruppen erstellen & verwalten
-- [x] Suche-Komponent
-- [x] Dark Mode Support (ThemeContext)
+- **Akzentfarbe** `#0A66FF`
+- **Icons** durchgehend Strich-Icons (Ionicons in der App, eigenes SVG-Set im Web) — bewusst keine Emojis in der Oberfläche
+- **Avatare** Initialen auf einer festen Farbe pro Person
+- **Nachrichten** grün (eigene) / weiß (fremde), wie im Prototypen
+- **Dark Mode** in Web und App
 
-### Phase 3 🔄 (Backend & Realtime)
-- [x] Supabase Foundation (Context, Auth, Types)
-- [x] Realtime Message Sync (useChatMessages Hook)
-- [x] Media-Upload (expo-image-picker + supabaseStorage)
-- [x] User Presence Tracking (online/offline status)
-- [x] Typing Indicators (\"user is typing\")
-- [x] Photo/Video Capture to Storage
-- [ ] LoginScreen with Supabase Auth
-- [ ] Push-Notifications (expo-notifications)
-- [ ] Video-Calls (WebRTC) — see VIDEO_CALLS_SETUP.md
-- [ ] Stories Realtime Upload
+## Backend (Supabase)
 
-**Status**: Foundation complete. Awaiting Supabase setup (see SUPABASE_SETUP.md)
+Die App läuft vollständig ohne Backend auf Mock-Daten. Sobald in
+`app/.env.local` echte Zugangsdaten stehen, wird Supabase automatisch benutzt:
 
-## 🔧 Backend Setup (Phase 3)
+```env
+EXPO_PUBLIC_SUPABASE_URL=...
+EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+```
 
-### Supabase Integration
-1. **Choose**: Local (Docker) or Cloud (Supabase.com)
-2. **Read**: `SUPABASE_SETUP.md` for detailed instructions
-3. **Schema**: Deploy SQL schema from SUPABASE_SETUP.md
-4. **Env**: Create `.env.local` with credentials
-5. **Test**: Realtime chat & media upload
+Schema und Einrichtung: siehe `SUPABASE_SETUP.md`.
 
-### What's Already Built
-- ✅ SupabaseContext for client initialization
-- ✅ supabaseAuth.ts (signup/signin with fallback)
-- ✅ Hooks: useChatMessages, usePresence, useTypingIndicator
-- ✅ supabaseStorage.ts (photo/video upload)
-- ✅ ChatDetailScreen & CameraScreen connected
+## Prüfen
 
-No Supabase config needed = app uses mock data automatically.
-
-## 🎨 Design-System
-
-Alle Komponenten folgen dem **Instagram-inspirierten Design**:
-
-- **Akzent-Farbe**: `#0A66FF` (Brand-Blau)
-- **Typografie**: System Fonts
-- **Spacing**: 4px-Basiseinheit
-- **Radius**: 8-16px
-
-## 📱 Multi-Plattform
-
-- ✅ iOS (Expo/TestFlight)
-- ✅ Android (Expo/Google Play)
-- ✅ Web (Browser-Mockup)
-
----
-
-**Stand**: 2026-08-24 | **Commits**: 6 | **Screens**: 10+ | **Components**: 25+ | **Hooks**: 10+
+```bash
+cd app
+npx tsc --noEmit    # Typprüfung, muss fehlerfrei durchlaufen
+```
