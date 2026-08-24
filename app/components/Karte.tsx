@@ -57,13 +57,25 @@ const BLOECKE = [
 export const Karte = forwardRef<KartenSteuerung, Props>(
   ({ pins, aktiv, onPinPress, hoehe = 320 }, ref) => {
     const [zoom, setZoom] = useState(MIN_ZOOM);
+    // Die Breite steht erst nach dem Layout fest - vorher ein Schaetzwert.
+    const [breite, setBreite] = useState(340);
     const versatz = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
     const zoomWert = useRef(new Animated.Value(MIN_ZOOM)).current;
     const stand = useRef({ x: 0, y: 0, zoom: MIN_ZOOM });
 
+    // Nadeln und der eigene Punkt sollen ihre Groesse behalten - sonst fuellt
+    // eine Nadel beim Hineinzoomen den halben Bildschirm. Dazu gegen den
+    // Kartenzoom skalieren.
+    const gegenZoom = useRef(
+      zoomWert.interpolate({
+        inputRange: [MIN_ZOOM, MAX_ZOOM],
+        outputRange: [1, 1 / MAX_ZOOM],
+      })
+    ).current;
+
     /** Wie weit darf man schieben, ohne dass die Karte den Rahmen verlaesst. */
     const grenze = (z: number) => ({
-      x: ((z - 1) * 340) / 2,
+      x: ((z - 1) * breite) / 2,
       y: ((z - 1) * hoehe) / 2,
     });
 
@@ -90,11 +102,14 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
         if (!pin) return;
 
         // Der Pin sitzt bei x/y Prozent. Beim Zoomen muss er in die Mitte -
-        // dazu die Karte um die Abweichung von der Mitte verschieben.
-        const z = 2.6;
+        // dazu die Karte um die Abweichung von der Mitte verschieben. Je
+        // weiter aussen die Person steht, desto weiter muss hineingezoomt
+        // werden, damit die Verschiebung ueberhaupt erlaubt ist.
+        const abstand = Math.max(Math.abs(50 - pin.x), Math.abs(50 - pin.y)) / 100;
+        const z = Math.min(MAX_ZOOM, Math.max(2.4, 1 / Math.max(0.001, 0.52 - abstand)));
         const abweichungX = (50 - pin.x) / 100;
         const abweichungY = (50 - pin.y) / 100;
-        setzeZoom(z, { x: abweichungX * 340 * z, y: abweichungY * hoehe * z });
+        setzeZoom(z, { x: abweichungX * breite * z, y: abweichungY * hoehe * z });
       },
       zuruecksetzen: () => setzeZoom(MIN_ZOOM, { x: 0, y: 0 }),
     }));
@@ -147,11 +162,14 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
             versatz.setValue({ x: stand.current.x, y: stand.current.y });
           },
         }),
-      [hoehe]
+      [hoehe, breite]
     );
 
     return (
-      <View style={[styles.rahmen, { height: hoehe }]}>
+      <View
+        style={[styles.rahmen, { height: hoehe }]}
+        onLayout={(e) => setBreite(e.nativeEvent.layout.width)}
+      >
         <Animated.View
           style={[
             styles.flaeche,
@@ -189,20 +207,22 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
           ))}
 
           {/* Eigener Standort */}
-          <View style={styles.ich}>
+          <Animated.View style={[styles.ich, { transform: [{ scale: gegenZoom }] }]}>
             <View style={styles.ichPunkt} />
-          </View>
+          </Animated.View>
 
           {/* Die Freunde */}
           {pins.map((pin) => {
             const istAktiv = aktiv === pin.id;
             return (
-              <Pressable
+              <Animated.View
                 key={pin.id}
-                style={[styles.pin, { left: `${pin.x}%`, top: `${pin.y}%` }]}
-                onPress={() => onPinPress?.(pin.id)}
-                hitSlop={6}
+                style={[
+                  styles.pin,
+                  { left: `${pin.x}%`, top: `${pin.y}%`, transform: [{ scale: gegenZoom }] },
+                ]}
               >
+              <Pressable onPress={() => onPinPress?.(pin.id)} hitSlop={6} style={styles.pinInhalt}>
                 <View
                   style={[
                     styles.punkt,
@@ -216,6 +236,7 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
                   {pin.name.split(' ')[0]}
                 </Text>
               </Pressable>
+              </Animated.View>
             );
           })}
         </Animated.View>
@@ -299,7 +320,8 @@ const styles = StyleSheet.create({
     borderColor: colors.white,
   },
 
-  pin: { position: 'absolute', alignItems: 'center', gap: 2, marginLeft: -17, marginTop: -40, width: 34 },
+  pin: { position: 'absolute', alignItems: 'center', marginLeft: -17, marginTop: -40, width: 34 },
+  pinInhalt: { alignItems: 'center', gap: 2 },
   punkt: {
     width: 34,
     height: 34,

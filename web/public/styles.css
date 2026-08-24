@@ -1234,6 +1234,10 @@ body:has(.camera) .toast { bottom: 132px; }
 .map__strasse-h { position: absolute; left: 0; right: 0; height: 5px; background: #FAFAF8; }
 .map { background: #E8EDE4; touch-action: none; }
 .map__pin.is-aktiv .map__dot { border-color: var(--brand); border-width: 3.5px; }
+/* Der Ursprung sitzt unten mittig, damit die Nadelspitze beim Skalieren
+   auf ihrem Punkt stehen bleibt. */
+.map__pin { transform-origin: bottom center; transition: transform .25s ease; }
+.map__me { transform-origin: center; transition: transform .25s ease; }
 
 .map__zoom {
   position: absolute; right: 10px; top: 10px; z-index: 2;

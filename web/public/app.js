@@ -1537,11 +1537,13 @@ function renderFriendMap() {
             .join('')}
           ${strassenX.map((x) => `<div class="map__strasse-v" style="left:${x}%"></div>`).join('')}
           ${strassenY.map((y) => `<div class="map__strasse-h" style="top:${y}%"></div>`).join('')}
-          <div class="map__me" title="Dein Standort"><span></span></div>
+          <div class="map__me" title="Dein Standort" style="transform:scale(${(1 / k.zoom).toFixed(3)})"><span></span></div>
           ${state.friends
             .map((f) => {
               const u = user(f.id);
-              return `<button class="map__pin ${k.aktiv === f.id ? 'is-aktiv' : ''}" style="left:${f.x}%;top:${f.y}%" data-pin="${f.id}" title="${esc(u.name)}">
+              // Gegen den Zoom skalieren: Nadeln sollen ihre Groesse behalten,
+              // sonst fuellt eine Nadel beim Hineinzoomen den halben Schirm.
+              return `<button class="map__pin ${k.aktiv === f.id ? 'is-aktiv' : ''}" style="left:${f.x}%;top:${f.y}%;transform:scale(${(1 / k.zoom).toFixed(3)})" data-pin="${f.id}" title="${esc(u.name)}">
                 <span class="map__dot" style="background:${u.color}">${esc(u.initials)}</span>
                 <span class="map__label">${esc(u.name.split(' ')[0])}</span>
               </button>`;
@@ -1609,7 +1611,16 @@ function renderFriendMap() {
   };
   anwenden();
 
-  const grenze = () => ({ x: ((k.zoom - 1) * 340) / 2, y: ((k.zoom - 1) * 340) / 2 });
+  // Mit den echten Maszen rechnen, nicht mit geschaetzten - sonst sitzt die
+  // Person beim Hineinzoomen nicht mittig.
+  const masze = () => {
+    const r = $('#map').getBoundingClientRect();
+    return { b: r.width, h: r.height };
+  };
+  const grenze = () => {
+    const m = masze();
+    return { x: ((k.zoom - 1) * m.b) / 2, y: ((k.zoom - 1) * m.h) / 2 };
+  };
   const begrenzen = () => {
     const g = grenze();
     k.x = Math.max(-g.x, Math.min(g.x, k.x));
@@ -1637,12 +1648,33 @@ function renderFriendMap() {
   const zoomAuf = (id) => {
     const f = state.friends.find((x) => x.id === id);
     if (!f) return;
+    const m = masze();
+
+    // Erst grob hinzoomen ...
+    const abstand = Math.max(Math.abs(50 - f.x), Math.abs(50 - f.y)) / 100;
+    k.zoom = Math.min(4, Math.max(2.4, 1 / Math.max(0.001, 0.52 - abstand)));
     k.aktiv = id;
-    k.zoom = 2.6;
-    k.x = ((50 - f.x) / 100) * 340 * k.zoom;
-    k.y = ((50 - f.y) / 100) * 340 * k.zoom;
+    k.x = ((50 - f.x) / 100) * m.b * k.zoom;
+    k.y = ((50 - f.y) / 100) * m.h * k.zoom;
     begrenzen();
     renderFriendMap();
+
+    // ... danach genau nachzentrieren. Die Nadel sitzt wegen ihrer Spitze
+    // und der Gegenskalierung nicht exakt auf dem gerechneten Punkt -
+    // messen ist hier verlaesslicher als rechnen.
+    requestAnimationFrame(() => {
+      const rahmen = $('#map');
+      const nadel = document.querySelector('.map__pin.is-aktiv');
+      const flaeche = $('#mapFlaeche');
+      if (!rahmen || !nadel || !flaeche) return;
+
+      const rm = rahmen.getBoundingClientRect();
+      const rn = nadel.getBoundingClientRect();
+      k.x += rm.x + rm.width / 2 - (rn.x + rn.width / 2);
+      k.y += rm.y + rm.height / 2 - (rn.y + rn.height / 2);
+      begrenzen();
+      flaeche.style.transform = `translate(${k.x}px, ${k.y}px) scale(${k.zoom})`;
+    });
   };
 
   main.querySelectorAll('[data-pin]').forEach((el) =>
