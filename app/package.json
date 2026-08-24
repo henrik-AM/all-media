@@ -25,7 +25,11 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "web-app": "node web-app.js",
+    "dev": "concurrently \"npm start\" \"npm run web-app\"",
+    "lint": "tsc --noEmit",
+    "test": "echo 'Tests coming in Phase 4'"
   },
   "private": true
 }
