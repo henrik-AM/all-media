@@ -1,9 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Avatar } from '../../components/Avatar';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
-import { mockUsers } from '../../mocks';
+import { colors, radius, spacing, typography } from '../../constants/design';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -89,12 +87,9 @@ export const SettingsScreen = ({ onNotice, onLogout }: Props) => {
     commPrivate: false,
   });
 
-  const me = mockUsers.me;
-
   return (
     <View style={styles.screen}>
       <View style={styles.head}>
-        <Text style={styles.title}>Einstellungen</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
           {SECTIONS.map((section) => (
             <Pressable
@@ -109,12 +104,6 @@ export const SettingsScreen = ({ onNotice, onLogout }: Props) => {
       </View>
 
       <ScrollView ref={scroll} contentContainerStyle={styles.content}>
-        <View style={styles.profile}>
-          <Avatar id="me" name={me.name} size={sizes.avatarXl} />
-          <Text style={styles.profileName}>Henrik</Text>
-          <Text style={styles.profileSub}>{me.handle} · Hey, ich nutze All Media!</Text>
-        </View>
-
         {SECTIONS.map((section) => (
           <View
             key={section.id}
@@ -164,14 +153,10 @@ export const SettingsScreen = ({ onNotice, onLogout }: Props) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
   head: { paddingTop: spacing.md, paddingBottom: spacing.sm },
-  title: { ...typography.title, color: colors.text, paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   pills: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   pill: { paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface3 },
   pillText: { ...typography.small, fontWeight: '600', color: colors.text2 },
   content: { paddingBottom: spacing.xxl },
-  profile: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
-  profileName: { ...typography.h2, color: colors.text },
-  profileSub: { ...typography.preview, color: colors.text2 },
   sectionHead: {
     ...typography.overline,
     color: colors.text3,

@@ -216,8 +216,7 @@ const Shell = () => {
         return (
           <MessengerProfileScreen
             onSwitchArea={switchArea}
-            onOpenContacts={() => setOverlay({ kind: 'contacts' })}
-            onOpenCamera={() => setOverlay({ kind: 'camera' })}
+            onOpenSettings={() => setArea('settings')}
             onNotice={setNotice}
           />
         );

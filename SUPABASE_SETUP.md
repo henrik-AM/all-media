@@ -1,4 +1,44 @@
-# Supabase Setup Guide
+# Supabase — Einrichtung
+
+Das Projekt ist angelegt: `https://ijztosbjfybdgotpdixw.supabase.co`.
+Zugangsdaten stehen im Vault unter `04 Ressourcen/Zugangsdaten/Supabase.md`
+und lokal in `app/.env.local` (nicht im Repo).
+
+## Was noch fehlt: das Schema
+
+Die Datenbank ist leer. Einmalig einspielen:
+
+1. Supabase-Dashboard öffnen → **SQL Editor** → **New query**
+2. Den kompletten Inhalt von **`SUPABASE_SCHEMA.sql`** hineinkopieren
+3. **Run**
+
+Das Skript ist wiederholbar — es legt nur an, was fehlt, und löscht nichts.
+
+## Warum Row Level Security wichtig ist
+
+Der Publishable Key steckt im App-Bundle und ist damit öffentlich. Ohne
+Zugriffsregeln könnte jeder alle Daten lesen und ändern. `SUPABASE_SCHEMA.sql`
+schaltet deshalb für jede Tabelle Row Level Security ein:
+
+- Profile sind für Angemeldete lesbar, ändern darf jeder nur sich selbst
+- Chats und Nachrichten sieht nur, wer Mitglied des Chats ist
+- Private Communitys sehen nur ihre Mitglieder
+- Likes und Kommentare kann jeder nur für sich setzen
+
+**Der ältere Schema-Vorschlag weiter unten hatte das nicht** und ist damit
+unsicher. Er bleibt nur als Referenz stehen; maßgeblich ist
+`SUPABASE_SCHEMA.sql`.
+
+## Kosten
+
+Der kostenlose Tarif reicht für dieses Projekt. Sollte etwas kostenpflichtig
+werden, wird das vorher angesprochen.
+
+---
+
+## Älterer Entwurf (nicht verwenden, ohne RLS)
+
+
 
 ## Phase 3: Backend Integration
 

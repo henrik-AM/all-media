@@ -25,7 +25,6 @@ export const CommunityChatsScreen = ({ onOpenCommunity }: Props) => {
   return (
     <View style={styles.screen}>
       <View style={styles.head}>
-        <Text style={styles.title}>Chats</Text>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Suche hier nach Kontakten/Gruppen..." />
       </View>
 

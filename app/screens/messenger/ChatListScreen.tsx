@@ -77,12 +77,14 @@ export const ChatListScreen = ({ allChats, onOpenChat, onOpenStory, onNewChat }:
 
   return (
     <View style={styles.container}>
+      {/* Reihenfolge wie im Prototyp: Story-Leiste, Suche, Filter, Liste. */}
+      <StoryRail stories={mockStories} onPress={onOpenStory} />
+
       <View style={styles.header}>
-        <Text style={styles.title}>Chats</Text>
         <SearchBar
           value={query}
           onChangeText={setQuery}
-          placeholder="Suche nach Chats oder Namen"
+          placeholder="Suche hier nach deinen Chats ..."
           onAdd={onNewChat}
         />
       </View>
@@ -104,9 +106,6 @@ export const ChatListScreen = ({ allChats, onOpenChat, onOpenStory, onNewChat }:
         renderItem={renderChat}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          query.trim() ? null : <StoryRail stories={mockStories} onPress={onOpenStory} />
-        }
         ListEmptyComponent={
           <EmptyState
             icon="search-outline"
@@ -122,7 +121,6 @@ export const ChatListScreen = ({ allChats, onOpenChat, onOpenStory, onNewChat }:
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
-  title: { marginBottom: spacing.md, color: colors.text, ...typography.title },
 
   pills: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: 6 },
   pill: { paddingHorizontal: 15, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface3 },

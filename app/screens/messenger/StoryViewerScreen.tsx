@@ -87,20 +87,24 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Ein Balken, Zurueck-Pfeil links, Mehr-Menue rechts — wie im Prototyp. */}
       <View style={styles.bars}>
-        {stories.map((s, i) => (
-          <View key={s.id} style={styles.bar}>
-            {i < index && <View style={styles.fillFull} />}
-            {i === index && <Animated.View style={[styles.fill, { width }]} />}
-          </View>
-        ))}
+        <View style={styles.bar}>
+          <Animated.View style={[styles.fill, { width }]} />
+        </View>
       </View>
 
       <View style={styles.head}>
-        <Avatar id={current.userId} name={person?.name ?? current.name} size={sizes.avatarSm} />
-        <Text style={styles.name}>{person?.name ?? current.name}</Text>
         <Pressable onPress={onClose} hitSlop={10}>
-          <Ionicons name="close" size={24} color={colors.white} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
+        </Pressable>
+        <Avatar id={current.userId} name={person?.name ?? current.name} size={sizes.avatarSm} />
+        <View style={styles.who}>
+          <Text style={styles.name}>{person?.name ?? current.name}</Text>
+          <Text style={styles.time}>vor 2 Std.</Text>
+        </View>
+        <Pressable onPress={() => onNotice('Weitere Optionen folgen')} hitSlop={10}>
+          <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.white} />
         </Pressable>
       </View>
 
@@ -124,7 +128,7 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
           style={styles.reply}
           value={reply}
           onChangeText={setReply}
-          placeholder="Auf Story antworten"
+          placeholder="Antworten"
           placeholderTextColor="rgba(255,255,255,0.6)"
           onFocus={() => setPaused(true)}
           onBlur={() => setPaused(reply.trim().length > 0)}
@@ -146,9 +150,6 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
             color={liked[current.id] ? colors.danger : colors.white}
           />
         </Pressable>
-        <Pressable onPress={send} hitSlop={8}>
-          <Ionicons name="send" size={22} color={colors.white} />
-        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -159,10 +160,11 @@ const styles = StyleSheet.create({
   bars: { flexDirection: 'row', gap: 4, paddingHorizontal: spacing.md, paddingTop: spacing.md },
   bar: { flex: 1, height: 2.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
   fill: { height: '100%', backgroundColor: colors.white },
-  fillFull: { height: '100%', width: '100%', backgroundColor: colors.white },
 
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-  name: { flex: 1, color: colors.white, ...typography.name },
+  who: { flex: 1 },
+  name: { color: colors.white, ...typography.name },
+  time: { color: 'rgba(255,255,255,0.75)', fontSize: 11.5 },
 
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   caption: {

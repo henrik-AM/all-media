@@ -126,7 +126,6 @@ export const HomeFeedScreen = ({ onOpenStory, onOpenProfile, onNotice }: Props) 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Start</Text>
       </View>
 
       <FlatList

@@ -30,7 +30,8 @@
     "web-app": "node web-app.js",
     "lint": "tsc --noEmit",
     "test": "node test/smoke.js",
-    "app": "expo start"
+    "app": "expo start",
+    "compare": "node test/figma-compare.js"
   },
   "private": true
 }

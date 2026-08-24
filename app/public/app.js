@@ -74,6 +74,7 @@ const state = {
   videoSearchQuery: '',
   clipQuery: '',
   theme: localStorage.getItem('am-theme') || 'system',
+  ownProfileTab: 'grid',
   openChatId: null,
   messages: [],
 };
@@ -217,12 +218,12 @@ function filteredChats() {
 function renderChats() {
   const list = filteredChats();
   main.innerHTML = `
+    ${storyRail()}
     <div class="pagehead">
-      <h1 class="pagehead__title">Chats</h1>
       <div class="searchrow">
         <label class="searchbox">
           ${ICONS.search}
-          <input id="chatSearch" type="search" placeholder="Suche nach Chats oder Namen" value="${esc(state.query)}" autocomplete="off" />
+          <input id="chatSearch" type="search" placeholder="Suche hier nach deinen Chats ..." value="${esc(state.query)}" autocomplete="off" />
           ${state.query ? `<button class="searchbox__clear" id="chatSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
         </label>
         <button class="iconbtn-primary" id="newChat" aria-label="Neuer Chat">${ICONS.plus}</button>
@@ -239,7 +240,6 @@ function renderChats() {
         .join('')}
     </div>
     <div class="scroll">
-      ${state.query ? '' : storyRail()}
       ${
         list.length
           ? `<ul class="rows">${list.map(chatRow).join('')}</ul>`
@@ -782,7 +782,6 @@ function commentRow(c) {
 /* ---------------------------------------------------------- home feed */
 function renderHomeFeed() {
   main.innerHTML = `
-    <div class="pagehead"><h1 class="pagehead__title">Start</h1></div>
     <div class="scroll" id="homeScroll">
       ${storyRail()}
       <div class="postlist">${state.posts.map(postCard).join('')}</div>
@@ -968,14 +967,12 @@ function renderCommunities() {
 
   main.innerHTML = `
     <div class="pagehead">
-      <h1 class="pagehead__title">Communitys</h1>
       <div class="searchrow">
         <label class="searchbox">
           ${ICONS.search}
           <input id="commSearch" type="search" placeholder="Suche nach Communitys" value="${esc(state.communityQuery)}" autocomplete="off" />
           ${state.communityQuery ? `<button class="searchbox__clear" id="commSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
         </label>
-        <button class="iconbtn-primary" id="newCommunity" aria-label="Community erstellen">${ICONS.plus}</button>
       </div>
     </div>
     <div class="pills">
@@ -1013,7 +1010,6 @@ function renderCommunities() {
     renderCommunities();
     $('#commSearch').focus();
   });
-  $('#newCommunity').addEventListener('click', () => toast('Community erstellen folgt in Phase 3'));
 
   main.querySelectorAll('[data-cfilter]').forEach((p) =>
     p.addEventListener('click', () => {
@@ -1136,8 +1132,6 @@ const SETTINGS = [
 const toggles = { videoPrivate: false, commPrivate: false };
 
 function renderSettings() {
-  const me = user('me');
-
   const itemHtml = (it) => {
     if (it.toggle) {
       const on = it.toggle === 'theme' ? state.theme === 'dark' : toggles[it.toggle];
@@ -1156,17 +1150,11 @@ function renderSettings() {
 
   main.innerHTML = `
     <div class="pagehead">
-      <h1 class="pagehead__title">Einstellungen</h1>
       <div class="pills">
         ${SETTINGS.map((sec) => `<button class="pill" data-jump="${sec.id}">${esc(sec.title)}</button>`).join('')}
       </div>
     </div>
     <div class="scroll" id="settingsScroll">
-      <div class="profilehead">
-        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
-        <div class="profilehead__name">Henrik</div>
-        <div class="profilehead__sub">${esc(me.handle)} · Hey, ich nutze All Media!</div>
-      </div>
       ${SETTINGS.map(
         (sec) => `<div class="listhead" id="sec-${sec.id}">${esc(sec.title)} →</div>
           <div class="group">${sec.items.map(itemHtml).join('')}</div>`
@@ -1214,7 +1202,6 @@ function renderSettings() {
 // Liste mit letztem Standort.
 function renderFriendMap() {
   main.innerHTML = `
-    <div class="pagehead"><h1 class="pagehead__title">Friend-Map</h1></div>
     <div class="scroll">
       <div class="map" id="map">
         <div class="map__grid"></div>
@@ -1298,47 +1285,52 @@ function renderCameraPage() {
 }
 
 /* ---------------------------------------------------- Messenger: Profil */
-// Prototyp-Frame "Messenger - Profil": Profilbild, Name, Biografie und die
-// Verweise auf das Video- und das Community-Profil ("Profil wechseln").
+/*
+ * Prototyp-Frame "Messenger - Profil": Leiste "Profil wechseln" ueber die
+ * volle Breite, darunter Bild links neben Name und Biografie, dann die beiden
+ * Profilverweise und der Abschnitt Einstellungen.
+ */
+function switchBar(onClickId) {
+  return `<button class="switchbar" id="${onClickId}">Profil wechseln</button>`;
+}
+
 function renderMessengerProfile() {
   const me = user('me');
   main.innerHTML = `
+    ${switchBar('switchProfile')}
     <div class="scroll">
-      <div class="ownprof">
-        <button class="ownprof__switch" id="switchProfile">Profil wechseln ${ICONS.chevron}</button>
+      <div class="mprof">
         <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
-        <div class="ownprof__name">Henrik</div>
-        <div class="ownprof__bio">Baue gerade All Media. Erreichbar über Chat und Story.</div>
-        <div class="ownprof__links">
-          <button class="chip" data-switch="videos">@videoprofil</button>
-          <button class="chip" data-switch="communities">@communityprofil</button>
+        <div class="mprof__text">
+          <div class="mprof__name">Henrik</div>
+          <div class="mprof__bio">Baue gerade All Media.</div>
         </div>
       </div>
+      <div class="mprof__links">
+        <button data-switch="videos">@videoprofil</button>
+        <button data-switch="communities">@communityprofil</button>
+      </div>
+
+      <button class="sectionlink" data-mact="settings">Einstellungen <span>${ICONS.chevron}</span></button>
       <div class="group">
-        <button class="item" data-mact="contacts">
-          <span class="item__icon">${ICONS.person}</span>
-          <span class="item__label">Kontakte</span>
-          <span class="item__value">${state.contacts.length}</span>
-        </button>
-        <button class="item" data-mact="stories">
-          <span class="item__icon">${ICONS.image}</span>
-          <span class="item__label">Deine Story</span>
+        <button class="item" data-mact="location">
+          <span class="item__label">Standort-Sichtbarkeit</span>
           <span class="row__chevron">${ICONS.chevron}</span>
         </button>
-        <button class="item" data-mact="visibility">
-          <span class="item__icon">${ICONS.eye}</span>
+        <button class="item" data-mact="story">
           <span class="item__label">Story-Sichtbarkeit</span>
           <span class="row__chevron">${ICONS.chevron}</span>
         </button>
-        <button class="item" data-mact="location">
-          <span class="item__icon">${ICONS.mapPin}</span>
-          <span class="item__label">Standort-Sichtbarkeit</span>
-          <span class="item__value">Freunde</span>
+        <button class="item" data-mact="read">
+          <span class="item__label">Lesebestätigung</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
         </button>
       </div>
     </div>`;
 
-  $('#switchProfile').addEventListener('click', () => toast('Wähle unten „@videoprofil" oder „@communityprofil"'));
+  $('#switchProfile').addEventListener('click', () =>
+    toast('Wähle unten „@videoprofil" oder „@communityprofil"')
+  );
   main.querySelectorAll('[data-switch]').forEach((b) =>
     b.addEventListener('click', () => {
       state.area = b.dataset.switch;
@@ -1348,12 +1340,13 @@ function renderMessengerProfile() {
   );
   main.querySelectorAll('[data-mact]').forEach((b) =>
     b.addEventListener('click', () => {
-      if (b.dataset.mact === 'contacts') return renderContacts();
-      if (b.dataset.mact === 'stories') {
-        state.sub.messenger = 'camera';
+      if (b.dataset.mact === 'settings') {
+        state.area = 'settings';
         return render();
       }
-      toast('Diese Einstellung findest du unter Einstellungen › Messenger');
+      state.area = 'settings';
+      render();
+      toast('Zu finden im Abschnitt Messenger');
     })
   );
 }
@@ -1575,23 +1568,47 @@ function renderVideoSearch() {
 }
 
 /* ------------------------------------------------------- Videos: Profil */
-// Prototyp-Frame "Videos - Profil": Zahlen, Biografie, Link, Playlists und
-// Highlights, darunter das Beitragsraster.
+/*
+ * Prototyp-Frame "Videos - Profil": Leiste "Profil wechseln", darunter
+ * @Nutzername mit Glocke/Plus/Menue, Bild links neben den Zahlen, dann Name,
+ * Biografie und Link linksbuendig, Playlists und Highlights, Tab-Leiste und
+ * das Beitragsraster.
+ */
+function ownProfileTop(handle) {
+  return `
+    <div class="oprof__bar">
+      <span class="oprof__handle">${esc(handle)}</span>
+      <span class="oprof__acts">
+        <button data-oact="bell" aria-label="Mitteilungen">${ICONS.bell}<i class="oprof__dot"></i></button>
+        <button data-oact="create" aria-label="Erstellen">${ICONS.plus}</button>
+        <button data-oact="menu" aria-label="Menü">${ICONS.settings}</button>
+      </span>
+    </div>`;
+}
+
+const PROFILE_TABS = [
+  { id: 'grid', icon: 'grid' },
+  { id: 'repost', icon: 'repeat' },
+  { id: 'tagged', icon: 'person' },
+  { id: 'saved', icon: 'bookmark' },
+];
+
 async function renderVideoProfile() {
   const res = await fetch('/api/profile/me');
   const me = await res.json();
+  const tab = state.ownProfileTab;
 
   main.innerHTML = `
+    ${switchBar('switchProfile')}
     <div class="scroll">
-      <div class="ownprof ownprof--tight">
-        <button class="ownprof__switch" id="switchProfile">Profil wechseln ${ICONS.chevron}</button>
-        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
-        <div class="ownprof__handle">${esc(me.handle)}</div>
-      </div>
-      <div class="prof__stats">
-        <div class="prof__stat"><strong>${compactNumber(me.posts)}</strong><span>Beiträge</span></div>
-        <div class="prof__stat"><strong>${compactNumber(me.followers)}</strong><span>Follower</span></div>
-        <div class="prof__stat"><strong>${compactNumber(me.following)}</strong><span>Gefolgt</span></div>
+      ${ownProfileTop(me.handle)}
+      <div class="oprof__top">
+        <div class="avatar avatar--88 has-status" style="background:${me.color}">${esc(me.initials)}</div>
+        <div class="prof__stats">
+          <div class="prof__stat"><span>Beiträge</span><strong>${compactNumber(me.posts)}</strong></div>
+          <div class="prof__stat"><span>Follower</span><strong>${compactNumber(me.followers)}</strong></div>
+          <div class="prof__stat"><span>Gefolgt</span><strong>${compactNumber(me.following)}</strong></div>
+        </div>
       </div>
       <div class="prof__about">
         <div class="prof__name">Henrik</div>
@@ -1599,15 +1616,27 @@ async function renderVideoProfile() {
         <a class="prof__link" href="#" id="profLink">${esc(me.link)}</a>
       </div>
       <div class="highlights">
-        <button class="highlight"><span class="highlight__ring">${ICONS.folder}</span><span class="highlight__label">Playlist</span></button>
-        <button class="highlight"><span class="highlight__ring">${ICONS.folder}</span><span class="highlight__label">Tutorials</span></button>
+        <button class="highlight"><span class="highlight__ring is-playlist">${ICONS.play}</span><span class="highlight__label">Playlistname</span></button>
+        <button class="highlight"><span class="highlight__ring is-playlist">${ICONS.play}</span><span class="highlight__label">Playlistname</span></button>
         ${me.highlights
-          .map((h) => `<button class="highlight"><span class="highlight__ring">${ICONS.image}</span><span class="highlight__label">${esc(h)}</span></button>`)
+          .map((h) => `<button class="highlight"><span class="highlight__ring is-highlight">${ICONS.image}</span><span class="highlight__label">${esc(h)}</span></button>`)
           .join('')}
       </div>
-      <div class="prof__grid">
-        ${me.grid.map((g) => `<div class="griditem">${g.kind === 'video' ? ICONS.play : ICONS.image}</div>`).join('')}
+      <div class="prof__tabs">
+        ${PROFILE_TABS.map(
+          (t) => `<button class="prof__tab ${tab === t.id ? 'is-active' : ''}" data-otab="${t.id}">${ICONS[t.icon]}</button>`
+        ).join('')}
       </div>
+      ${
+        tab === 'grid'
+          ? `<div class="prof__grid">${me.grid
+              .map((g) => `<div class="griditem">${g.kind === 'video' ? ICONS.play : ICONS.image}</div>`)
+              .join('')}</div>`
+          : `<div class="empty">${ICONS[PROFILE_TABS.find((t) => t.id === tab).icon]}
+              <div class="empty__title">Noch nichts hier</div>
+              <div class="empty__text">Dieser Bereich füllt sich, sobald du ihn benutzt.</div>
+            </div>`
+      }
     </div>`;
 
   $('#switchProfile').addEventListener('click', () => {
@@ -1619,6 +1648,17 @@ async function renderVideoProfile() {
     e.preventDefault();
     toast(me.link);
   });
+  main.querySelectorAll('[data-otab]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.ownProfileTab = b.dataset.otab;
+      renderVideoProfile();
+    })
+  );
+  main.querySelectorAll('[data-oact]').forEach((b) =>
+    b.addEventListener('click', () =>
+      toast({ bell: 'Mitteilungen', create: 'Erstellen', menu: 'Menü' }[b.dataset.oact] + ' folgt')
+    )
+  );
 }
 
 /* ---------------------------------------------------- Communitys: Chats */
@@ -1632,7 +1672,6 @@ function renderCommunityChats() {
 
   main.innerHTML = `
     <div class="pagehead">
-      <h1 class="pagehead__title">Chats</h1>
       <div class="searchrow">
         <label class="searchbox">
           ${ICONS.search}
@@ -1794,15 +1833,15 @@ function renderCommunityProfile() {
   const joined = state.communities.filter((c) => c.joined && !created.includes(c));
 
   main.innerHTML = `
+    ${switchBar('switchProfile')}
     <div class="scroll">
-      <div class="ownprof ownprof--tight">
-        <button class="ownprof__switch" id="switchProfile">Profil wechseln ${ICONS.chevron}</button>
-        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
-        <div class="ownprof__handle">${esc(me.handle)}</div>
-      </div>
-      <div class="prof__stats">
-        <div class="prof__stat"><strong>${created.length}</strong><span>Erstellte Communitys</span></div>
-        <div class="prof__stat"><strong>${joined.length}</strong><span>Beigetretene Communitys</span></div>
+      ${ownProfileTop(me.handle)}
+      <div class="oprof__top">
+        <div class="avatar avatar--88 has-status" style="background:${me.color}">${esc(me.initials)}</div>
+        <div class="prof__stats">
+          <div class="prof__stat"><span>Erstellte Communitys</span><strong>${created.length}</strong></div>
+          <div class="prof__stat"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></div>
+        </div>
       </div>
       <div class="prof__about">
         <div class="prof__name">Henrik</div>
@@ -1822,6 +1861,11 @@ function renderCommunityProfile() {
     e.preventDefault();
     toast('all-media.app');
   });
+  main.querySelectorAll('[data-oact]').forEach((b) =>
+    b.addEventListener('click', () =>
+      toast({ bell: 'Mitteilungen', create: 'Erstellen', menu: 'Menü' }[b.dataset.oact] + ' folgt')
+    )
+  );
   main.querySelectorAll('[data-community]').forEach((r) =>
     r.addEventListener('click', () => openChat(r.dataset.community))
   );
@@ -2014,17 +2058,16 @@ function openStory(storyId) {
   overlay.innerHTML = `
     <div class="viewer">
       <div class="viewer__bars">
-        ${list
-          .map(
-            (x, i) =>
-              `<div class="viewer__bar"><div class="viewer__fill" ${i === idx ? 'id="storyFill"' : ''} style="width:${i < idx ? '100%' : '0'}"></div></div>`
-          )
-          .join('')}
+        <div class="viewer__bar"><div class="viewer__fill" id="storyFill" style="width:0"></div></div>
       </div>
       <div class="viewer__head">
+        <button class="viewer__close" id="storyClose" aria-label="Zurück">${ICONS.back}</button>
         <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
-        <div class="viewer__name" data-profile="${u.id}">${esc(u.name)}</div>
-        <button class="viewer__close" id="storyClose" aria-label="Schließen">${ICONS.close}</button>
+        <div class="viewer__who" data-profile="${u.id}">
+          <div class="viewer__name">${esc(u.name)}</div>
+          <div class="viewer__time">${esc(s.time || 'vor 2 Std.')}</div>
+        </div>
+        <button class="viewer__more" id="storyMore" aria-label="Mehr">${ICONS.settings}</button>
       </div>
       <div class="viewer__stage">
         <button class="viewer__zone viewer__zone--prev" id="storyPrev" aria-label="Vorherige Story"></button>
@@ -2033,9 +2076,9 @@ function openStory(storyId) {
         ${s.caption ? `<div class="viewer__caption">${esc(s.caption)}</div>` : ''}
       </div>
       <form class="viewer__foot" id="storyForm">
-        <input class="viewer__reply" id="storyReply" placeholder="Auf Story antworten" autocomplete="off" />
+        <input class="viewer__reply" id="storyReply" placeholder="Antworten" autocomplete="off" />
         <button type="button" class="viewer__act ${s.liked ? 'is-liked' : ''}" id="storyLike" aria-label="Gefällt mir">${ICONS.heart}</button>
-        <button type="submit" class="viewer__act" id="storySend" aria-label="Senden">${ICONS.send}</button>
+        <button type="submit" class="viewer__hidden" tabindex="-1" aria-hidden="true"></button>
       </form>
     </div>`;
 
@@ -2084,6 +2127,8 @@ function openStory(storyId) {
 
   $('#storyPrev').addEventListener('click', () => go(-1));
   $('#storyNext').addEventListener('click', () => go(1));
+
+  $('#storyMore').addEventListener('click', () => toast('Weitere Optionen folgen'));
 
   $('#storyLike').addEventListener('click', async (e) => {
     const btn = e.currentTarget;

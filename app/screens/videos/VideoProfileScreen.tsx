@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { EmptyState } from '../../components/EmptyState';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { SwitchBar } from '../../components/SwitchBar';
+import { colors, spacing, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { mockProfiles, mockUsers } from '../../mocks';
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+type Tab = 'grid' | 'repost' | 'tagged' | 'saved';
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
@@ -14,88 +19,113 @@ interface Props {
 const compact = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(n);
 
+const TABS: { key: Tab; icon: IconName }[] = [
+  { key: 'grid', icon: 'grid-outline' },
+  { key: 'repost', icon: 'repeat-outline' },
+  { key: 'tagged', icon: 'person-outline' },
+  { key: 'saved', icon: 'bookmark-outline' },
+];
+
 const GRID = ['image', 'video', 'image', 'video', 'image', 'image', 'video', 'image', 'video', 'image', 'video', 'image'];
 
 /** Prototyp-Frame "Videos - Profil". */
 export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
+  const [tab, setTab] = useState<Tab>('grid');
   const me = mockProfiles.me;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <OwnProfileHead handle={mockUsers.me.handle} onSwitch={() => onSwitchArea('messenger')} />
+    <View style={styles.screen}>
+      <SwitchBar onPress={() => onSwitchArea('messenger')} />
 
-      <View style={styles.stats}>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>{compact(me.posts)}</Text>
-          <Text style={styles.statLabel}>Beiträge</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <OwnProfileHead
+          handle={mockUsers.me.handle}
+          stats={[
+            { label: 'Beiträge', value: compact(me.posts) },
+            { label: 'Follower', value: compact(me.followers) },
+            { label: 'Gefolgt', value: compact(me.following) },
+          ]}
+          name="Henrik"
+          bio={me.bio}
+          link={me.link}
+          onAction={(key) =>
+            onNotice({ bell: 'Mitteilungen', create: 'Erstellen', menu: 'Menü' }[key] + ' folgt')
+          }
+          onLink={() => onNotice(me.link)}
+        />
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
+          {['Playlistname', 'Playlistname'].map((label, i) => (
+            <Pressable key={`pl${i}`} style={styles.highlight} onPress={() => onNotice('Playlist folgt')}>
+              <View style={[styles.ring, styles.ringPlaylist]}>
+                <Ionicons name="play-outline" size={24} color="#E5484D" />
+              </View>
+              <Text style={styles.highlightLabel} numberOfLines={1}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+          {me.highlights.map((label) => (
+            <Pressable key={label} style={styles.highlight} onPress={() => onNotice(`„${label}" folgt`)}>
+              <View style={[styles.ring, styles.ringHighlight]}>
+                <Ionicons name="image-outline" size={24} color="#F5A524" />
+              </View>
+              <Text style={styles.highlightLabel} numberOfLines={1}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <View style={styles.tabs}>
+          {TABS.map((item) => (
+            <Pressable
+              key={item.key}
+              style={[styles.tab, tab === item.key && styles.tabActive]}
+              onPress={() => setTab(item.key)}
+            >
+              <Ionicons name={item.icon} size={22} color={tab === item.key ? colors.text : colors.text3} />
+            </Pressable>
+          ))}
         </View>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>{compact(me.followers)}</Text>
-          <Text style={styles.statLabel}>Follower</Text>
-        </View>
-        <View style={styles.stat}>
-          <Text style={styles.statNum}>{compact(me.following)}</Text>
-          <Text style={styles.statLabel}>Gefolgt</Text>
-        </View>
-      </View>
 
-      <View style={styles.about}>
-        <Text style={styles.name}>Henrik</Text>
-        <Text style={styles.bio}>{me.bio}</Text>
-        <Pressable onPress={() => onNotice(me.link)}>
-          <Text style={styles.link}>{me.link}</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
-        {['Playlist', 'Tutorials', ...me.highlights].map((label, i) => (
-          <Pressable key={label} style={styles.highlight} onPress={() => onNotice(`„${label}" folgt`)}>
-            <View style={styles.ring}>
-              <Ionicons name={i < 2 ? 'folder-outline' : 'image-outline'} size={24} color={colors.text3} />
-            </View>
-            <Text style={styles.highlightLabel} numberOfLines={1}>
-              {label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <View style={styles.grid}>
-        {GRID.map((kind, i) => (
-          <View key={i} style={styles.gridItem}>
-            <Ionicons name={kind === 'video' ? 'play-outline' : 'image-outline'} size={26} color={colors.text3} />
+        {tab === 'grid' ? (
+          <View style={styles.grid}>
+            {GRID.map((kind, i) => (
+              <View key={i} style={styles.gridItem}>
+                <Ionicons name={kind === 'video' ? 'play-outline' : 'image-outline'} size={26} color={colors.text3} />
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
-    </ScrollView>
+        ) : (
+          <EmptyState
+            icon={TABS.find((t) => t.key === tab)!.icon}
+            title="Noch nichts hier"
+            text="Dieser Bereich füllt sich, sobald du ihn benutzt."
+          />
+        )}
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { paddingBottom: spacing.xl },
-  stats: { flexDirection: 'row', justifyContent: 'space-around', paddingBottom: spacing.md },
-  stat: { alignItems: 'center', gap: 2 },
-  statNum: { fontSize: 17, fontWeight: '700', color: colors.text },
-  statLabel: { ...typography.small, color: colors.text2 },
-  about: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  name: { ...typography.h3, color: colors.text },
-  bio: { ...typography.message, color: colors.text, marginTop: 3 },
-  link: { ...typography.message, color: colors.brand, marginTop: 4 },
   highlights: { gap: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   highlight: { alignItems: 'center', gap: 6, width: 68 },
-  ring: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: colors.surface3,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  ring: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  ringPlaylist: { borderColor: '#E5484D' },
+  ringHighlight: { borderColor: '#F5A524' },
   highlightLabel: { ...typography.small, color: colors.text2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
+  tabs: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  tab: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabActive: { borderBottomColor: colors.text },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2, paddingTop: 2 },
   gridItem: {
     width: '33%',
     aspectRatio: 1,

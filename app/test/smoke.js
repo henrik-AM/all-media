@@ -253,11 +253,13 @@ const STRUCTURE = {
   await p.click('[data-sub="profile"]');
   await p.waitForTimeout(400);
   assert('Community-Profil zeigt beide Abschnitte', (await p.$$eval('.exp__head', e => e.length)) === 2);
+  assert('Profil wechseln steht über dem Profil', !!(await p.$('.switchbar')));
 
   // --- Einstellungen mit Dark-Mode ---
   await p.click('[data-area="settings"]');
   await p.waitForTimeout(400);
   assert('Einstellungen ohne obere Leiste', await p.$eval('#topbar', e => e.hidden));
+  assert('Einstellungen ohne Seitentitel', !(await p.$('.pagehead__title')));
   assert('Vier Abschnitte im Prototyp', (await p.$$eval('[data-jump]', e => e.length)) === 4);
   await p.click('[data-toggle="theme"]');
   await p.waitForTimeout(300);

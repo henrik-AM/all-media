@@ -12,8 +12,6 @@ interface Props {
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
 export const FriendMapScreen = ({ onOpenProfile }: Props) => (
   <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-    <Text style={styles.title}>Friend-Map</Text>
-
     <View style={styles.map}>
       {mockFriendPins.map((pin) => {
         const person = mockUsers[pin.id];

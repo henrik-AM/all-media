@@ -99,12 +99,10 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Communitys</Text>
         <SearchBar
           value={query}
           onChangeText={setQuery}
-          placeholder="Suche nach Communitys"
-          onAdd={() => onNotice('Community erstellen folgt in Phase 3')}
+          placeholder="Suche hier nach deinen Communitys..."
         />
       </View>
 
