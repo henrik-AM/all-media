@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "playwright-core": "^1.62.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -27,9 +28,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "web-app": "node web-app.js",
-    "dev": "concurrently \"npm start\" \"npm run web-app\"",
     "lint": "tsc --noEmit",
-    "test": "echo 'Tests coming in Phase 4'"
+    "test": "node test/smoke.js"
   },
   "private": true
 }

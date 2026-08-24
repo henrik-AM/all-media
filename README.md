@@ -31,6 +31,9 @@ gleichen WLAN sein. Ein Expo-Konto ist dafür nicht nötig.
 
 | Bereich | Stand |
 |---|---|
+| Bild-Feed (Start): Beiträge, Like, Folgen, Merken | fertig |
+| Video-Feed: Vollbild-Slides, Like, Teilen, Merken | fertig |
+| Communitys: Liste, Filter, Beitreten, Kanal-Chat | fertig |
 | Chat-Liste mit Suche, Filtern und Story-Rail | fertig |
 | Einzelchat: Nachrichten senden, Antwort-Simulation, Tippen-Indikator | fertig |
 | Gruppenchat mit Absendernamen | fertig |
@@ -39,7 +42,7 @@ gleichen WLAN sein. Ein Expo-Konto ist dafür nicht nötig.
 | Kamera: Foto/Video über Kamera oder Galerie | fertig (RN), UI-Gerüst (Web) |
 | Einstellungen/Profil inkl. Dark Mode | fertig |
 | Login/Registrierung mit Validierung | fertig (Mock-Auth) |
-| Video-Feed, Communitys | noch nicht gebaut |
+| Kommentare, Anrufe, Repost | noch nicht gebaut |
 | Supabase-Backend | vorbereitet, siehe unten |
 
 ## Projektstruktur
@@ -49,7 +52,8 @@ All-Media/
 ├── app/
 │   ├── App.tsx              Shell: Top-Switcher, Tabs, Overlays
 │   ├── components/          Avatar, SearchBar, StoryRail, TabBar, Toast …
-│   ├── screens/             Login, Messenger-Screens, Profil
+│   ├── screens/             Login, Home, Video, Messenger, Communitys, Profil
+│   ├── test/smoke.js        Smoke-Test der Web-Version
 │   ├── constants/design.ts  Farben, Abstände, Typografie, Avatar-Farben
 │   ├── types/               TypeScript-Modelle
 │   ├── mocks/               Testdaten (Nutzer, Chats, Nachrichten, Storys)
@@ -86,5 +90,14 @@ Schema und Einrichtung: siehe `SUPABASE_SETUP.md`.
 
 ```bash
 cd app
-npx tsc --noEmit    # Typprüfung, muss fehlerfrei durchlaufen
+npm run lint    # Typprüfung, muss fehlerfrei durchlaufen
+npm test        # Smoke-Test der Web-Version (Server muss laufen)
+```
+
+Der Smoke-Test klickt alle fünf Bereiche durch und prüft Suche, Filter,
+Nachricht senden, Story-Viewer, Kamera und den Dark-Mode-Schalter. Beim ersten
+Mal muss der Browser einmalig geladen werden:
+
+```bash
+npx playwright install chromium
 ```
