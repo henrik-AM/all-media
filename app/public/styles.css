@@ -638,6 +638,56 @@ ul { margin: 0; padding: 0; list-style: none; }
 .camera__side { width: 44px; height: 44px; display: grid; place-items: center; color: #fff; border-radius: 50%; background: rgba(255,255,255,.12); }
 .camera__side svg { width: 22px; height: 22px; }
 
+/* ---------- Home feed (posts) ---------- */
+.postlist { padding: 12px 0 16px; }
+.post {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+}
+.post:last-child { border-bottom: 0; margin-bottom: 0; }
+
+.post__head { display: flex; align-items: center; gap: 10px; padding: 0 16px 10px; }
+.post__who { flex: 1 1 auto; min-width: 0; }
+.post__name { font-size: 14px; font-weight: 700; }
+.post__sub { font-size: 11.5px; color: var(--text-2); margin-top: 1px; }
+.post__follow {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.post__follow.is-on { background: var(--surface-3); color: var(--text-2); }
+.post__bell { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; color: var(--text-2); border-radius: 50%; }
+.post__bell svg { width: 19px; height: 19px; }
+.post__bell.is-on { color: var(--brand); }
+.post__bell:hover { background: var(--surface-2); }
+
+.post__media {
+  aspect-ratio: 1 / 1;
+  background: var(--surface-3);
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+}
+.post__media svg { width: 56px; height: 56px; }
+
+.post__actions { display: flex; align-items: center; gap: 14px; padding: 10px 16px 6px; }
+.postbtn { color: var(--text); display: grid; place-items: center; }
+.postbtn svg { width: 25px; height: 25px; }
+.postbtn:active { transform: scale(.9); }
+.postbtn--end { margin-left: auto; }
+.postbtn.is-liked { color: #FF3040; }
+.postbtn.is-liked svg { fill: #FF3040; }
+.postbtn.is-saved svg { fill: currentColor; }
+
+.post__likes { padding: 2px 16px; font-size: 13.5px; }
+.post__desc { padding: 5px 16px 0; font-size: 14px; line-height: 1.45; }
+.post__comments { padding: 6px 16px 0; font-size: 13.5px; color: var(--text-3); }
+
 /* ---------- Video feed ---------- */
 .feed {
   flex: 1 1 auto;

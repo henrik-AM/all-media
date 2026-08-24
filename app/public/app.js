@@ -5,6 +5,7 @@ const state = {
   contacts: [],
   communities: [],
   videos: [],
+  posts: [],
   view: 'chats',
   area: 'messenger',
   filter: 'all',
@@ -78,6 +79,7 @@ function render() {
     b.classList.toggle('is-active', b.dataset.area === state.area)
   );
 
+  if (state.area === 'home') return renderHomeFeed();
   if (state.area === 'video') return renderVideoFeed();
   if (state.area === 'communities') return renderCommunities();
   if (state.area === 'profile') return renderProfile();
@@ -87,17 +89,6 @@ function render() {
   if (state.view === 'stories') return renderStories();
   if (state.view === 'contacts') return renderContacts();
   if (state.view === 'settings') return renderSettings();
-}
-
-function renderPlaceholder(title, icon, text) {
-  main.innerHTML = `
-    <div class="pagehead"><h1 class="pagehead__title">${esc(title)}</h1></div>
-    <div class="scroll">
-      <div class="empty">${ICONS[icon]}
-        <div class="empty__title">Bald verfügbar</div>
-        <div class="empty__text">${esc(text)}</div>
-      </div>
-    </div>`;
 }
 
 /* ---------------------------------------------------------- chats view */
@@ -338,6 +329,81 @@ function renderContacts() {
       else toast('Noch kein Chat mit diesem Kontakt');
     })
   );
+}
+
+/* ---------------------------------------------------------- home feed */
+function renderHomeFeed() {
+  main.innerHTML = `
+    <div class="pagehead"><h1 class="pagehead__title">Start</h1></div>
+    <div class="scroll" id="homeScroll">
+      ${storyRail()}
+      <div class="postlist">${state.posts.map(postCard).join('')}</div>
+    </div>`;
+
+  bindStoryRail();
+
+  main.querySelectorAll('[data-paction]').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      const { paction, pid } = btn.dataset;
+
+      if (paction === 'comment') return toast('Kommentare folgen in Phase 3');
+      if (paction === 'share') return toast('Beitrag geteilt');
+      if (paction === 'repost') return toast('Repost folgt in Phase 3');
+
+      const res = await fetch(`/api/posts/${pid}/${paction}`, { method: 'POST' });
+      const updated = await res.json();
+      const idx = state.posts.findIndex((p) => p.id === updated.id);
+      state.posts[idx] = updated;
+
+      if (paction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
+      if (paction === 'follow') toast(updated.following ? 'Du folgst jetzt' : 'Nicht mehr gefolgt');
+      if (paction === 'notify') toast(updated.notify ? 'Benachrichtigungen an' : 'Benachrichtigungen aus');
+
+      const scrollTop = $('#homeScroll').scrollTop;
+      renderHomeFeed();
+      $('#homeScroll').scrollTop = scrollTop;
+    })
+  );
+}
+
+function postCard(p) {
+  const u = user(p.userId);
+  return `
+    <article class="post">
+      <header class="post__head">
+        <div class="story__ring" style="width:40px;height:40px;padding:2px">
+          <div class="story__inner" style="background:${u.color};font-size:13px">${esc(u.initials)}</div>
+        </div>
+        <div class="post__who">
+          <div class="post__name">${esc(u.name)}</div>
+          <div class="post__sub">${esc(p.location)} · ${esc(p.music)}</div>
+        </div>
+        <button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
+          ${p.following ? 'Gefolgt' : 'Folgen'}
+        </button>
+        <button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="Benachrichtigungen">
+          ${ICONS.bell}
+        </button>
+      </header>
+
+      <div class="post__media">${ICONS.image}</div>
+
+      <div class="post__actions">
+        <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-paction="like" data-pid="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
+        <button class="postbtn" data-paction="comment" data-pid="${p.id}" aria-label="Kommentieren">${ICONS.chat}</button>
+        <button class="postbtn" data-paction="share" data-pid="${p.id}" aria-label="Senden">${ICONS.send}</button>
+        <button class="postbtn" data-paction="repost" data-pid="${p.id}" aria-label="Repost">${ICONS.repeat}</button>
+        <button class="postbtn postbtn--end ${p.saved ? 'is-saved' : ''}" data-paction="save" data-pid="${p.id}" aria-label="Speichern">${ICONS.bookmark}</button>
+      </div>
+
+      <div class="post__likes">
+        Gefällt <strong>${esc(p.likedBy)}</strong> und ${compactNumber(Math.max(p.likes - 1, 0))} weiteren Personen
+      </div>
+      <div class="post__desc"><strong>${esc(u.name)}</strong> ${esc(p.description)}</div>
+      <button class="post__comments" data-paction="comment" data-pid="${p.id}">
+        Alle ${p.comments} Kommentare ansehen
+      </button>
+    </article>`;
 }
 
 /* ---------------------------------------------------------- video feed */
@@ -898,11 +964,6 @@ document.querySelectorAll('.navbtn').forEach((b) =>
 document.querySelectorAll('.topbar__btn').forEach((b) =>
   b.addEventListener('click', () => {
     const area = b.dataset.area;
-    if (area === 'camera') {
-      state.area = 'camera';
-      render();
-      return;
-    }
     state.area = area;
     if (area === 'profile') state.view = 'settings';
     if (area === 'messenger') state.view = 'chats';
@@ -920,7 +981,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------------------------------------------------- icons in chrome */
 function paintChrome() {
-  const top = [ICONS.play, ICONS.chat, ICONS.people, ICONS.camera, ICONS.person];
+  const top = [ICONS.home, ICONS.play, ICONS.chat, ICONS.people, ICONS.person];
   document.querySelectorAll('.topbar__btn').forEach((b, i) => (b.innerHTML = top[i]));
   const nav = [ICONS.chat, ICONS.image, ICONS.people, ICONS.settings];
   document.querySelectorAll('.navbtn__icon').forEach((el, i) => (el.innerHTML = nav[i]));

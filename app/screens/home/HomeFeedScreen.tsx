@@ -1,0 +1,166 @@
+import React, { useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Avatar } from '../../components/Avatar';
+import { StoryRail } from '../../components/StoryRail';
+import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { mockPosts, mockStories, mockUsers } from '../../mocks';
+import { Post, Story } from '../../types';
+
+const compactNumber = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mio.`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace('.', ',')}k`;
+  return String(n);
+};
+
+interface Props {
+  onOpenStory: (story: Story) => void;
+  onNotice: (message: string) => void;
+}
+
+export const HomeFeedScreen = ({ onOpenStory, onNotice }: Props) => {
+  const [posts, setPosts] = useState<Post[]>(mockPosts);
+
+  const update = (id: string, change: (post: Post) => Post) =>
+    setPosts((prev) => prev.map((p) => (p.id === id ? change(p) : p)));
+
+  const toggleLike = (post: Post) =>
+    update(post.id, (p) => ({ ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) }));
+
+  const toggleSave = (post: Post) => {
+    update(post.id, (p) => ({ ...p, saved: !p.saved }));
+    onNotice(post.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
+  };
+
+  const toggleFollow = (post: Post) => {
+    update(post.id, (p) => ({ ...p, following: !p.following }));
+    onNotice(post.following ? 'Nicht mehr gefolgt' : 'Du folgst jetzt');
+  };
+
+  const toggleNotify = (post: Post) => {
+    update(post.id, (p) => ({ ...p, notify: !p.notify }));
+    onNotice(post.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+  };
+
+  const renderPost = ({ item }: { item: Post }) => {
+    const author = mockUsers[item.userId];
+
+    return (
+      <View style={styles.post}>
+        <View style={styles.head}>
+          <View style={styles.ring}>
+            <Avatar id={item.userId} name={author?.name ?? ''} size={36} />
+          </View>
+          <View style={styles.who}>
+            <Text style={styles.name} numberOfLines={1}>
+              {author?.name}
+            </Text>
+            <Text style={styles.sub} numberOfLines={1}>
+              {item.location} · {item.music}
+            </Text>
+          </View>
+          <Pressable
+            style={[styles.follow, item.following && styles.followActive]}
+            onPress={() => toggleFollow(item)}
+          >
+            <Text style={[styles.followText, item.following && styles.followTextActive]}>
+              {item.following ? 'Gefolgt' : 'Folgen'}
+            </Text>
+          </Pressable>
+          <Pressable style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
+            <Ionicons
+              name={item.notify ? 'notifications' : 'notifications-outline'}
+              size={19}
+              color={item.notify ? colors.brand : colors.text2}
+            />
+          </Pressable>
+        </View>
+
+        <View style={styles.media}>
+          <Ionicons name="image-outline" size={56} color={colors.text3} />
+        </View>
+
+        <View style={styles.actions}>
+          <Pressable onPress={() => toggleLike(item)} hitSlop={6}>
+            <Ionicons
+              name={item.liked ? 'heart' : 'heart-outline'}
+              size={26}
+              color={item.liked ? '#FF3040' : colors.text}
+            />
+          </Pressable>
+          <Pressable onPress={() => onNotice('Kommentare folgen in Phase 3')} hitSlop={6}>
+            <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
+          </Pressable>
+          <Pressable onPress={() => onNotice('Beitrag geteilt')} hitSlop={6}>
+            <Ionicons name="paper-plane-outline" size={24} color={colors.text} />
+          </Pressable>
+          <Pressable onPress={() => onNotice('Repost folgt in Phase 3')} hitSlop={6}>
+            <Ionicons name="repeat" size={26} color={colors.text} />
+          </Pressable>
+          <Pressable style={styles.actionEnd} onPress={() => toggleSave(item)} hitSlop={6}>
+            <Ionicons
+              name={item.saved ? 'bookmark' : 'bookmark-outline'}
+              size={24}
+              color={colors.text}
+            />
+          </Pressable>
+        </View>
+
+        <Text style={styles.likes}>
+          Gefällt <Text style={styles.bold}>{item.likedBy}</Text> und{' '}
+          {compactNumber(Math.max(item.likes - 1, 0))} weiteren Personen
+        </Text>
+        <Text style={styles.description}>
+          <Text style={styles.bold}>{author?.name}</Text> {item.description}
+        </Text>
+        <Pressable onPress={() => onNotice('Kommentare folgen in Phase 3')}>
+          <Text style={styles.commentsLink}>Alle {item.comments} Kommentare ansehen</Text>
+        </Pressable>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Start</Text>
+      </View>
+
+      <FlatList
+        data={posts}
+        renderItem={renderPost}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={<StoryRail stories={mockStories} onPress={onOpenStory} />}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.surface },
+  header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
+  title: { color: colors.text, ...typography.title },
+
+  post: { paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+
+  head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingVertical: 10 },
+  ring: { padding: 2, borderRadius: 22, borderWidth: 2, borderColor: colors.brand },
+  who: { flex: 1, minWidth: 0 },
+  name: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  sub: { marginTop: 1, color: colors.text2, fontSize: 11.5 },
+  follow: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brand },
+  followActive: { backgroundColor: colors.surface3 },
+  followText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  followTextActive: { color: colors.text2 },
+  bell: { width: 30, alignItems: 'center' },
+
+  media: { aspectRatio: 1, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center' },
+
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: spacing.lg, paddingTop: 10, paddingBottom: 6 },
+  actionEnd: { marginLeft: 'auto' },
+
+  likes: { paddingHorizontal: spacing.lg, color: colors.text, ...typography.preview },
+  description: { paddingHorizontal: spacing.lg, paddingTop: 5, color: colors.text, ...typography.message, lineHeight: 20 },
+  bold: { fontWeight: '700' },
+  commentsLink: { paddingHorizontal: spacing.lg, paddingTop: 6, color: colors.text3, ...typography.preview },
+});

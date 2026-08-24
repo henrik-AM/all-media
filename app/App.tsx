@@ -2,7 +2,6 @@ import React, { useCallback, useContext, useState } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { SupabaseProvider } from './contexts/SupabaseContext';
-import { EmptyState } from './components/EmptyState';
 import { TabBar, TabKey } from './components/TabBar';
 import { TopSwitcher, AreaKey } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
@@ -15,6 +14,7 @@ import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
 import { CommunitiesScreen } from './screens/communities/CommunitiesScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
+import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { ProfileScreen } from './screens/profile/ProfileScreen';
 import { colors } from './constants/design';
 import { mockChats } from './mocks';
@@ -62,10 +62,6 @@ const Shell = () => {
   };
 
   const handleArea = (next: AreaKey) => {
-    if (next === 'camera') {
-      setOverlay({ kind: 'camera' });
-      return;
-    }
     setArea(next);
     if (next === 'messenger') setTab('chats');
     if (next === 'profile') setTab('settings');
@@ -102,6 +98,10 @@ const Shell = () => {
   }
 
   const renderContent = () => {
+    if (area === 'home') {
+      return <HomeFeedScreen onOpenStory={openStory} onNotice={setNotice} />;
+    }
+
     if (area === 'video') {
       return <VideoFeedScreen onNotice={setNotice} />;
     }

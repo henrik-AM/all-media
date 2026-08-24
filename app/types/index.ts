@@ -41,6 +41,21 @@ export interface Contact {
   about: string;
 }
 
+export interface Post {
+  id: string;
+  userId: string;
+  location: string;
+  music: string;
+  description: string;
+  likedBy: string;
+  likes: number;
+  comments: number;
+  liked: boolean;
+  saved: boolean;
+  following: boolean;
+  notify: boolean;
+}
+
 export interface Video {
   id: string;
   userId: string;

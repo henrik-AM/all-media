@@ -1,4 +1,4 @@
-import { AuthUser, Chat, Community, Contact, Message, Story, User, Video } from '../types';
+import { AuthUser, Chat, Community, Contact, Message, Post, Story, User, Video } from '../types';
 
 export const CURRENT_USER_ID = 'me';
 
@@ -68,6 +68,13 @@ export const mockContacts: Contact[] = [
   { id: 'u4', name: 'David König', status: 'friend', about: 'Beschäftigt' },
   { id: 'u5', name: 'Elif Yilmaz', status: 'friend', about: 'Hey, ich nutze All Media!' },
   { id: 'u6', name: 'Finn Bauer', status: 'friend', about: 'Nur dringende Anrufe' },
+];
+
+export const mockPosts: Post[] = [
+  { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, liked: false, saved: false, following: true, notify: false },
+  { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, liked: true, saved: false, following: true, notify: true },
+  { id: 'p3', userId: 'u1', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', description: 'Oben angekommen. Der Aufstieg war jede Minute wert.', likedBy: 'David König', likes: 1204, comments: 96, liked: false, saved: true, following: false, notify: false },
+  { id: 'p4', userId: 'u6', location: 'Berlin', music: 'Lo-Fi Focus – beatlab', description: 'Kleine Commits, klare Historie. Mein Team dankt es mir.', likedBy: 'Elif Yilmaz', likes: 87, comments: 9, liked: false, saved: false, following: true, notify: false },
 ];
 
 export const mockVideos: Video[] = [
