@@ -1,0 +1,6 @@
+{
+  "_hinweis": "Feste Adresse aus Henriks eigenem ngrok-Konto. Sie bleibt ueber Neustarts gleich.",
+  "oeffentlicheAdresse": "https://ended-floral-departure.ngrok-free.dev",
+  "webPort": 3000,
+  "expoPort": 8081
+}

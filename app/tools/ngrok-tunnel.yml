@@ -1,0 +1,11 @@
+# ngrok v3 Tunnel-Konfiguration für die beiden festen Adressen.
+version: "3"
+tunnels:
+  website:
+    proto: http
+    addr: 3000
+    subdomain: all-media-hd
+  app:
+    proto: http
+    addr: 8081
+    subdomain: all-media-hd-app

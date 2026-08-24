@@ -1,0 +1,13 @@
+{
+  "name": "all-media-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Die dauerhaft erreichbare Fassung der All-Media-Website.",
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "scripts": {
+    "start": "node server/lokal.js",
+    "deploy": "npx --yes vercel@latest deploy --prod --yes"
+  }
+}
