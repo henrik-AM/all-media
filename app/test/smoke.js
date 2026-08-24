@@ -10,9 +10,9 @@
 // Kommentare, Story-Viewer, Kamera und den Dark-Mode-Schalter. Am Ende werden
 // alle Konsolenfehler ausgegeben. Exit-Code 1, wenn etwas fehlschlaegt.
 //
-// Der Mock-Server haelt seinen Zustand im Speicher und behaelt ihn zwischen
-// Testlaeufen. Pruefungen sind deshalb relativ formuliert (Aenderung statt
-// absoluter Zahl), wo der Test selbst Daten veraendert.
+// Der Test setzt den Server vor und nach dem Lauf auf den Startzustand zurueck
+// (POST /api/reset), damit er wiederholbar ist und keine Testgruppen oder
+// Testkommentare in der App zurueckbleiben.
 
 const { chromium } = require('playwright-core');
 
@@ -28,6 +28,10 @@ const assert = (label, cond) => {
   const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
   p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+
+  // Startzustand wiederherstellen, damit der Test nichts aus frueheren Laeufen
+  // vorfindet und selbst nichts zurueklaesst.
+  await p.request.post('http://localhost:3000/api/reset');
 
   await p.goto('http://localhost:3000', { waitUntil: 'networkidle' });
   await p.waitForTimeout(400);
@@ -66,14 +70,12 @@ const assert = (label, cond) => {
   await p.waitForTimeout(300);
 
   // --- filter pills ---
-  const allChats = await p.$$eval('[data-chat]', e => e.length);
   await p.click('[data-filter="groups"]');
   await p.waitForTimeout(300);
-  const groups = await p.$$eval('[data-chat]', e => e.length);
+  assert('Gruppen-Filter (2 Gruppen)', (await p.$$eval('[data-chat]', e => e.length)) === 2);
   await p.click('[data-filter="contacts"]');
   await p.waitForTimeout(300);
-  const singles = await p.$$eval('[data-chat]', e => e.length);
-  assert('Filter teilen die Liste vollstaendig auf', groups > 0 && singles > 0 && groups + singles === allChats);
+  assert('Kontakt-Filter (6 Einzelchats)', (await p.$$eval('[data-chat]', e => e.length)) === 6);
   await p.click('[data-filter="all"]');
   await p.waitForTimeout(300);
 
@@ -159,18 +161,14 @@ const assert = (label, cond) => {
   await p.waitForTimeout(400);
   await p.click('[data-paction="comment"][data-pid="p1"]');
   await p.waitForTimeout(500);
-  const cmCount = await p.$$eval('.comment', e => e.length);
-  assert('Kommentare oeffnen', cmCount >= 3);
+  assert('Kommentare oeffnen (p1 -> 3)', (await p.$$eval('.comment', e => e.length)) === 3);
   await p.fill('#commentInput', 'Testkommentar');
   await p.click('#commentSend');
   await p.waitForTimeout(600);
-  const cmAfter = await p.$$eval('.comment', e => e.length);
-  assert('Kommentar senden', cmAfter === cmCount + 1);
-  const likeBefore = await p.$eval('[data-clike="cm1"]', e => e.classList.contains('is-on'));
+  assert('Kommentar senden', (await p.$$eval('.comment', e => e.length)) === 4);
   await p.click('[data-clike="cm1"]');
   await p.waitForTimeout(400);
-  const likeAfter = await p.$eval('[data-clike="cm1"]', e => e.classList.contains('is-on'));
-  assert('Kommentar liken schaltet um', likeBefore !== likeAfter);
+  assert('Kommentar liken', await p.$eval('[data-clike="cm1"]', e => e.classList.contains('is-on')));
   await p.mouse.click(200, 40);
   await p.waitForTimeout(400);
   assert('Kommentar-Sheet schliesst', !(await p.$('.sheet-backdrop')));
@@ -181,11 +179,9 @@ const assert = (label, cond) => {
   const profName = await p.$eval('.prof__name', e => e.textContent.trim()).catch(() => null);
   const profGrid = await p.$$eval('.griditem', e => e.length);
   assert('Profil aus Beitrag oeffnet', profName === 'Clara Weber' && profGrid === 12);
-  const followBefore = await p.$eval('#profFollow', e => e.textContent.trim());
   await p.click('#profFollow');
   await p.waitForTimeout(500);
-  const followAfter = await p.$eval('#profFollow', e => e.textContent.trim());
-  assert('Folgen schaltet um', followBefore !== followAfter);
+  assert('Folgen schaltet um', (await p.$eval('#profFollow', e => e.textContent.trim())) === 'Folgen');
   await p.click('[data-ptab="repost"]');
   await p.waitForTimeout(400);
   assert('Repost-Tab zeigt Leerzustand', !!(await p.$('.empty')));
@@ -203,8 +199,7 @@ const assert = (label, cond) => {
   await p.waitForTimeout(400);
   await p.click('[data-vaction="comment"][data-vid="v3"]');
   await p.waitForTimeout(500);
-  const vcm = await p.$$eval('.comment', e => e.length);
-  assert('Video-Kommentare laden', vcm >= 2);
+  assert('Video-Kommentare (v3 -> 2)', (await p.$$eval('.comment', e => e.length)) === 2);
   await p.mouse.click(200, 40);
   await p.waitForTimeout(400);
 
@@ -219,6 +214,9 @@ const assert = (label, cond) => {
   assert('Dark-Mode-Schalter', theme === 'dark');
   await p.click('#themeSwitch');
   await p.waitForTimeout(300);
+
+  // Aufraeumen, damit die App danach wieder im Startzustand ist.
+  await p.request.post('http://localhost:3000/api/reset');
 
   console.log('');
   console.log(errs.length ? 'FEHLER:\n' + errs.join('\n') : 'Keine Konsolenfehler');

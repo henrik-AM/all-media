@@ -167,8 +167,41 @@ const messages = {
   ],
 };
 
+// Der Server haelt alles im Speicher. Damit der Smoke-Test nicht bei jedem Lauf
+// Testgruppen und Testkommentare hinterlaesst, wird hier ein Abzug des
+// Startzustands gemacht, den /api/reset wiederherstellt. Die Sammlungen werden
+// dabei an Ort und Stelle geleert und neu gefuellt, damit alle Handler
+// weiterhin auf dieselben Referenzen zeigen.
+const SEED = structuredClone({ chats, contacts, posts, videos, communities, messages, communityMessages, comments, profiles });
+
+function resetState() {
+  const restoreList = (list, seed) => {
+    list.length = 0;
+    list.push(...structuredClone(seed));
+  };
+  const restoreMap = (map, seed) => {
+    for (const key of Object.keys(map)) delete map[key];
+    Object.assign(map, structuredClone(seed));
+  };
+
+  restoreList(chats, SEED.chats);
+  restoreList(contacts, SEED.contacts);
+  restoreList(posts, SEED.posts);
+  restoreList(videos, SEED.videos);
+  restoreList(communities, SEED.communities);
+  restoreMap(messages, SEED.messages);
+  restoreMap(communityMessages, SEED.communityMessages);
+  restoreMap(comments, SEED.comments);
+  restoreMap(profiles, SEED.profiles);
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.post('/api/reset', (req, res) => {
+  resetState();
+  res.json({ ok: true });
+});
 
 app.get('/api/bootstrap', (req, res) => {
   res.json({ users, chats, stories, contacts, communities, videos, posts });
