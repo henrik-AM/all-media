@@ -1,29 +1,101 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, radius, typography } from '../../constants/design';
+import { uploadImage } from '../../lib/supabaseStorage';
 
-export const CameraScreen = ({ onCapture, onClose }: { onCapture?: () => void; onClose?: () => void }) => {
+export const CameraScreen = ({
+  onCapture,
+  onClose,
+}: {
+  onCapture?: (mediaUrl: string) => void;
+  onClose?: () => void;
+}) => {
   const [mode, setMode] = useState<'photo' | 'video'>('photo');
-  const [isRecording, setIsRecording] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleCapture = () => {
-    if (mode === 'photo') {
-      // Simulate photo capture
-      alert('📸 Foto aufgenommen!');
-      onCapture?.();
-    } else {
-      // Simulate video toggle
-      setIsRecording(!isRecording);
+  const handleCapture = async () => {
+    try {
+      setIsUploading(true);
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: mode === 'photo' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        aspect: [9, 16],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+
+        // Upload to Supabase
+        const fileName = `${Date.now()}_${mode}.${mode === 'photo' ? 'jpg' : 'mp4'}`;
+        const { success, url } = await uploadImage(asset as any, 'stories', fileName);
+
+        if (success && url) {
+          alert(`✅ ${mode === 'photo' ? 'Foto' : 'Video'} hochgeladen!`);
+          onCapture?.(url);
+        } else {
+          alert('❌ Upload fehlgeschlagen');
+        }
+      }
+    } catch (err) {
+      console.warn('Camera error:', err);
+      alert('Fehler beim Zugriff auf die Kamera');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    try {
+      setIsUploading(true);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: mode === 'photo' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        aspect: [9, 16],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+
+        // Upload to Supabase
+        const fileName = `${Date.now()}_${mode}.${mode === 'photo' ? 'jpg' : 'mp4'}`;
+        const { success, url } = await uploadImage(asset as any, 'stories', fileName);
+
+        if (success && url) {
+          alert(`✅ ${mode === 'photo' ? 'Foto' : 'Video'} hochgeladen!`);
+          onCapture?.(url);
+        } else {
+          alert('❌ Upload fehlgeschlagen');
+        }
+      }
+    } catch (err) {
+      console.warn('Gallery error:', err);
+      alert('Fehler beim Zugriff auf die Galerie');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Camera Preview (Placeholder) */}
+      {/* Camera Preview Area */}
       <View style={styles.cameraPreview}>
-        <Text style={styles.cameraIcon}>📷</Text>
-        <Text style={styles.previewText}>Kamera-Vorschau</Text>
-        <Text style={styles.previewSubtext}>(würde echte Kamera sein mit expo-camera)</Text>
+        {isUploading ? (
+          <View style={styles.uploadingOverlay}>
+            <ActivityIndicator size="large" color={colors.brand} />
+            <Text style={styles.uploadingText}>Hochladen...</Text>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.cameraIcon}>📷</Text>
+            <Text style={styles.previewText}>Kamera & Galerie</Text>
+            <Text style={styles.previewSubtext}>Tippe auf Capture oder Galerie</Text>
+          </>
+        )}
       </View>
 
       {/* Controls */}
@@ -33,6 +105,7 @@ export const CameraScreen = ({ onCapture, onClose }: { onCapture?: () => void; o
           <TouchableOpacity
             style={[styles.modeButton, mode === 'photo' && styles.modeButtonActive]}
             onPress={() => setMode('photo')}
+            disabled={isUploading}
           >
             <Text style={styles.modeIcon}>📸</Text>
             <Text style={styles.modeText}>Foto</Text>
@@ -40,30 +113,42 @@ export const CameraScreen = ({ onCapture, onClose }: { onCapture?: () => void; o
           <TouchableOpacity
             style={[styles.modeButton, mode === 'video' && styles.modeButtonActive]}
             onPress={() => setMode('video')}
+            disabled={isUploading}
           >
             <Text style={styles.modeIcon}>🎥</Text>
             <Text style={styles.modeText}>Video</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Capture Button */}
-        <View style={styles.captureContainer}>
+        {/* Button Row */}
+        <View style={styles.buttonRow}>
+          {/* Capture Button */}
           <TouchableOpacity
-            style={[styles.captureButton, isRecording && styles.captureButtonRecording]}
+            style={[styles.actionButton, isUploading && styles.actionButtonDisabled]}
             onPress={handleCapture}
+            disabled={isUploading}
           >
-            <View
-              style={[
-                styles.captureBtnInner,
-                isRecording && styles.captureBtnInnerRecording,
-              ]}
-            />
+            <Text style={styles.actionButtonIcon}>📹</Text>
+            <Text style={styles.actionButtonText}>Capture</Text>
           </TouchableOpacity>
-          <Text style={styles.captureText}>{isRecording ? 'Stop' : 'Aufnahme'}</Text>
+
+          {/* Gallery Button */}
+          <TouchableOpacity
+            style={[styles.actionButton, isUploading && styles.actionButtonDisabled]}
+            onPress={handlePickFromGallery}
+            disabled={isUploading}
+          >
+            <Text style={styles.actionButtonIcon}>🖼️</Text>
+            <Text style={styles.actionButtonText}>Galerie</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Close Button */}
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          style={[styles.closeButton, isUploading && styles.closeButtonDisabled]}
+          onPress={onClose}
+          disabled={isUploading}
+        >
           <Text style={styles.closeText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -82,6 +167,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#1a1a1a',
   },
+  uploadingOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  uploadingText: {
+    color: colors.white,
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
+  },
   cameraIcon: {
     fontSize: 48,
     marginBottom: spacing.md,
@@ -99,11 +194,11 @@ const styles = StyleSheet.create({
   controlsContainer: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
+    gap: spacing.lg,
   },
   modeToggle: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginBottom: spacing.xl,
   },
   modeButton: {
     flex: 1,
@@ -126,35 +221,27 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     fontWeight: '600',
   },
-  captureContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
+  buttonRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
   },
-  captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: colors.white,
+  actionButton: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  captureButtonRecording: {
-    backgroundColor: colors.like,
-  },
-  captureBtnInner: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.medium,
     backgroundColor: colors.brand,
   },
-  captureBtnInnerRecording: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    backgroundColor: colors.white,
+  actionButtonDisabled: {
+    opacity: 0.5,
   },
-  captureText: {
+  actionButtonIcon: {
+    fontSize: 24,
+    marginBottom: spacing.sm,
+  },
+  actionButtonText: {
     color: colors.white,
     fontSize: typography.small.fontSize,
     fontWeight: '600',
@@ -169,6 +256,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  closeButtonDisabled: {
+    opacity: 0.3,
   },
   closeText: {
     fontSize: 24,

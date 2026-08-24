@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView } from 'react-native';
 import { colors, spacing, radius, typography, sizes } from '../../constants/design';
+import { useChatMessages } from '../../lib/useSupabaseSubscription';
+import { useSupabase } from '../../contexts/SupabaseContext';
 
 interface Message {
   id: string;
@@ -9,31 +11,69 @@ interface Message {
   timestamp: Date;
 }
 
-export const ChatDetailScreenComponent = ({ chatName = 'Anna Schmidt' }) => {
-  const [messages, setMessages] = useState<Message[]>([
+interface ChatDetailScreenProps {
+  chatId?: string;
+  chatName?: string;
+}
+
+export const ChatDetailScreenComponent = ({ chatId = 'demo_chat', chatName = 'Anna Schmidt' }: ChatDetailScreenProps) => {
+  // Try to use Supabase if available, fallback to local state
+  const { supabase } = useSupabase();
+  const { messages: supabaseMessages, isLoading } = useChatMessages(chatId);
+
+  const [localMessages, setLocalMessages] = useState<Message[]>([
     { id: '1', text: 'Hey, wie gehts?', sent: false, timestamp: new Date(Date.now() - 3600000) },
     { id: '2', text: 'Mir gehts gut!', sent: true, timestamp: new Date(Date.now() - 3500000) },
     { id: '3', text: 'Treffen wir uns später?', sent: false, timestamp: new Date(Date.now() - 1800000) },
   ]);
   const [input, setInput] = useState('');
 
-  const handleSend = () => {
-    if (input.trim()) {
-      const newMessage: Message = {
-        id: String(messages.length + 1),
-        text: input,
-        sent: true,
-        timestamp: new Date(),
-      };
-      setMessages([...messages, newMessage]);
-      setInput('');
+  // Use Supabase messages if available, otherwise use mock
+  const displayMessages = supabaseMessages.length > 0
+    ? supabaseMessages.map((msg: any) => ({
+        id: msg.id,
+        text: msg.content,
+        sent: msg.user_id === 'current_user', // Will be updated when auth is integrated
+        timestamp: new Date(msg.created_at),
+      }))
+    : localMessages;
 
-      // Simulate response
+  const handleSend = async () => {
+    if (!input.trim()) return;
+
+    const newMessage: Message = {
+      id: String(Date.now()),
+      text: input,
+      sent: true,
+      timestamp: new Date(),
+    };
+
+    // Try to save to Supabase
+    if (supabase) {
+      try {
+        await supabase.from('messages').insert({
+          chat_id: chatId,
+          user_id: 'current_user', // Will be replaced with actual auth user
+          content: input,
+          created_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Failed to send to Supabase:', err);
+        // Fall through to local storage
+      }
+    }
+
+    // Local fallback
+    setLocalMessages([...localMessages, newMessage]);
+    setInput('');
+
+    // Simulate response (if no Supabase)
+    if (!supabase) {
       setTimeout(() => {
-        setMessages((prev) => [
+        setLocalMessages((prev) => [
           ...prev,
           {
-            id: String(prev.length + 1),
+            id: String(Date.now()),
             text: '👍 Erhalten!',
             sent: false,
             timestamp: new Date(),

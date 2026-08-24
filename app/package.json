@@ -8,6 +8,7 @@
     "@react-navigation/native": "^7.3.17",
     "@supabase/supabase-js": "^2.112.4",
     "expo": "~57.0.16",
+    "expo-image-picker": "^57.0.13",
     "expo-router": "^57.0.16",
     "expo-status-bar": "~57.0.1",
     "express": "^5.2.1",
