@@ -2,6 +2,9 @@ import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
+import { SupabaseProvider } from './contexts/SupabaseContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { LoginScreen } from './screens/LoginScreen';
 import { ChatListScreen, ChatDetailScreen } from './screens/messenger/ChatListScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
@@ -53,9 +56,15 @@ const RootNavigator = () => {
 };
 
 const App = () => (
-  <AuthProvider>
-    <RootNavigator />
-  </AuthProvider>
+  <SupabaseProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <NotificationProvider>
+          <RootNavigator />
+        </NotificationProvider>
+      </ThemeProvider>
+    </AuthProvider>
+  </SupabaseProvider>
 );
 
 export default App;

@@ -6,6 +6,7 @@
     "@expo/vector-icons": "^15.1.1",
     "@react-navigation/bottom-tabs": "^7.18.17",
     "@react-navigation/native": "^7.3.17",
+    "@supabase/supabase-js": "^2.112.4",
     "expo": "~57.0.16",
     "expo-router": "^57.0.16",
     "expo-status-bar": "~57.0.1",
