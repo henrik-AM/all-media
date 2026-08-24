@@ -41,6 +41,19 @@ export interface Contact {
   about: string;
 }
 
+export interface Video {
+  id: string;
+  userId: string;
+  description: string;
+  location: string;
+  music: string;
+  likes: number;
+  comments: number;
+  shares: number;
+  liked: boolean;
+  saved: boolean;
+}
+
 export interface Community {
   id: string;
   name: string;

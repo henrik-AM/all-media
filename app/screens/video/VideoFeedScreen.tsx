@@ -1,0 +1,147 @@
+import React, { useState } from 'react';
+import { FlatList, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Avatar } from '../../components/Avatar';
+import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { mockUsers, mockVideos } from '../../mocks';
+import { Video } from '../../types';
+
+const compactNumber = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mio.`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace('.', ',')}k`;
+  return String(n);
+};
+
+interface Props {
+  onNotice: (message: string) => void;
+}
+
+export const VideoFeedScreen = ({ onNotice }: Props) => {
+  const [videos, setVideos] = useState<Video[]>(mockVideos);
+  const [slideHeight, setSlideHeight] = useState(0);
+
+  const measure = (event: LayoutChangeEvent) => setSlideHeight(event.nativeEvent.layout.height);
+
+  const update = (id: string, change: (video: Video) => Video) =>
+    setVideos((prev) => prev.map((v) => (v.id === id ? change(v) : v)));
+
+  const toggleLike = (video: Video) =>
+    update(video.id, (v) => ({ ...v, liked: !v.liked, likes: v.likes + (v.liked ? -1 : 1) }));
+
+  const toggleSave = (video: Video) => {
+    update(video.id, (v) => ({ ...v, saved: !v.saved }));
+    onNotice(video.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
+  };
+
+  const share = (video: Video) => {
+    update(video.id, (v) => ({ ...v, shares: v.shares + 1 }));
+    onNotice('Beitrag geteilt');
+  };
+
+  const renderVideo = ({ item }: { item: Video }) => {
+    const author = mockUsers[item.userId];
+
+    return (
+      <View style={[styles.slide, slideHeight > 0 && { height: slideHeight }]}>
+        <View style={styles.stage}>
+          <Ionicons name="play" size={72} color="rgba(255,255,255,0.2)" />
+        </View>
+
+        <View style={styles.rail}>
+          <Pressable style={styles.railBtn} onPress={() => toggleLike(item)}>
+            <Ionicons
+              name={item.liked ? 'heart' : 'heart-outline'}
+              size={28}
+              color={item.liked ? '#FF4D6D' : colors.white}
+            />
+            <Text style={styles.railLabel}>{compactNumber(item.likes)}</Text>
+          </Pressable>
+
+          <Pressable style={styles.railBtn} onPress={() => onNotice('Kommentare folgen in Phase 3')}>
+            <Ionicons name="chatbubble-outline" size={26} color={colors.white} />
+            <Text style={styles.railLabel}>{compactNumber(item.comments)}</Text>
+          </Pressable>
+
+          <Pressable style={styles.railBtn} onPress={() => share(item)}>
+            <Ionicons name="paper-plane-outline" size={26} color={colors.white} />
+            <Text style={styles.railLabel}>{compactNumber(item.shares)}</Text>
+          </Pressable>
+
+          <Pressable style={styles.railBtn} onPress={() => onNotice('Repost folgt in Phase 3')}>
+            <Ionicons name="repeat" size={28} color={colors.white} />
+            <Text style={styles.railLabel}>Repost</Text>
+          </Pressable>
+
+          <Pressable style={styles.railBtn} onPress={() => toggleSave(item)}>
+            <Ionicons
+              name={item.saved ? 'bookmark' : 'bookmark-outline'}
+              size={25}
+              color={colors.white}
+            />
+            <Text style={styles.railLabel}>{item.saved ? 'Gespeichert' : 'Merken'}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.meta}>
+          <View style={styles.author}>
+            <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
+            <Text style={styles.authorName}>{author?.name}</Text>
+            <Pressable style={styles.follow} onPress={() => onNotice('Folgen folgt in Phase 3')}>
+              <Text style={styles.followText}>Folgen</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.description}>{item.description}</Text>
+          <Text style={styles.sub}>
+            {item.location} · {item.music}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container} onLayout={measure}>
+      <FlatList
+        data={videos}
+        renderItem={renderVideo}
+        keyExtractor={(item) => item.id}
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
+        decelerationRate="fast"
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.black },
+  slide: { width: '100%', justifyContent: 'flex-end' },
+  stage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#12161B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  rail: { position: 'absolute', right: 10, bottom: 96, alignItems: 'center', gap: 18 },
+  railBtn: { alignItems: 'center', gap: 4 },
+  railLabel: { color: colors.white, fontSize: 11, fontWeight: '600' },
+
+  meta: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, paddingRight: 78 },
+  author: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: spacing.sm },
+  authorName: { color: colors.white, fontSize: 14.5, fontWeight: '700' },
+  follow: {
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+  },
+  followText: { color: colors.white, fontSize: 12, fontWeight: '600' },
+  description: { color: colors.white, ...typography.message, lineHeight: 20 },
+  sub: { marginTop: 6, color: 'rgba(255,255,255,0.75)', ...typography.small },
+});

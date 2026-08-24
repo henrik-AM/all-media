@@ -14,6 +14,7 @@ import { StoriesScreen } from './screens/messenger/StoriesScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
 import { CommunitiesScreen } from './screens/communities/CommunitiesScreen';
+import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
 import { ProfileScreen } from './screens/profile/ProfileScreen';
 import { colors } from './constants/design';
 import { mockChats } from './mocks';
@@ -102,13 +103,7 @@ const Shell = () => {
 
   const renderContent = () => {
     if (area === 'video') {
-      return (
-        <EmptyState
-          icon="play-circle-outline"
-          title="Video-Feed"
-          text="Dieser Bereich kommt in einer späteren Phase."
-        />
-      );
+      return <VideoFeedScreen onNotice={setNotice} />;
     }
 
     if (area === 'communities') {

@@ -4,6 +4,7 @@ const state = {
   stories: [],
   contacts: [],
   communities: [],
+  videos: [],
   view: 'chats',
   area: 'messenger',
   filter: 'all',
@@ -77,7 +78,7 @@ function render() {
     b.classList.toggle('is-active', b.dataset.area === state.area)
   );
 
-  if (state.area === 'video') return renderPlaceholder('Video-Feed', 'play', 'Der Video-Bereich kommt in einer späteren Phase.');
+  if (state.area === 'video') return renderVideoFeed();
   if (state.area === 'communities') return renderCommunities();
   if (state.area === 'profile') return renderProfile();
   if (state.area === 'camera') return openCamera();
@@ -337,6 +338,83 @@ function renderContacts() {
       else toast('Noch kein Chat mit diesem Kontakt');
     })
   );
+}
+
+/* ---------------------------------------------------------- video feed */
+function compactNumber(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.', ',') + ' Mio.';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k';
+  return String(n);
+}
+
+function renderVideoFeed() {
+  main.innerHTML = `<div class="feed" id="feed">${state.videos.map(videoSlide).join('')}</div>`;
+
+  main.querySelectorAll('[data-vaction]').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      const { vaction, vid } = btn.dataset;
+
+      if (vaction === 'comment') return toast('Kommentare folgen in Phase 3');
+      if (vaction === 'repost') return toast('Repost folgt in Phase 3');
+
+      const res = await fetch(`/api/videos/${vid}/${vaction}`, { method: 'POST' });
+      const updated = await res.json();
+      const idx = state.videos.findIndex((v) => v.id === updated.id);
+      state.videos[idx] = updated;
+
+      if (vaction === 'share') toast('Beitrag geteilt');
+      if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
+
+      const scrollTop = $('#feed').scrollTop;
+      renderVideoFeed();
+      $('#feed').scrollTop = scrollTop;
+    })
+  );
+
+  main.querySelectorAll('[data-vfollow]').forEach((btn) =>
+    btn.addEventListener('click', () => toast('Folgen folgt in Phase 3'))
+  );
+}
+
+function videoSlide(v) {
+  const u = user(v.userId);
+  return `
+    <section class="slide">
+      <div class="slide__stage">${ICONS.play}</div>
+
+      <div class="slide__rail">
+        <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
+          ${ICONS.heart}
+          <span>${compactNumber(v.likes)}</span>
+        </button>
+        <button class="railbtn" data-vaction="comment" data-vid="${v.id}" aria-label="Kommentare">
+          ${ICONS.chat}
+          <span>${compactNumber(v.comments)}</span>
+        </button>
+        <button class="railbtn" data-vaction="share" data-vid="${v.id}" aria-label="Teilen">
+          ${ICONS.send}
+          <span>${compactNumber(v.shares)}</span>
+        </button>
+        <button class="railbtn" data-vaction="repost" data-vid="${v.id}" aria-label="Repost">
+          ${ICONS.repeat}
+          <span>Repost</span>
+        </button>
+        <button class="railbtn ${v.saved ? 'is-saved' : ''}" data-vaction="save" data-vid="${v.id}" aria-label="Speichern">
+          ${ICONS.bookmark}
+          <span>${v.saved ? 'Gespeichert' : 'Merken'}</span>
+        </button>
+      </div>
+
+      <div class="slide__meta">
+        <div class="slide__author">
+          <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
+          <span class="slide__name">${esc(u.name)}</span>
+          <button class="slide__follow" data-vfollow="${v.id}">Folgen</button>
+        </div>
+        <div class="slide__desc">${esc(v.description)}</div>
+        <div class="slide__sub">${esc(v.location)} · ${esc(v.music)}</div>
+      </div>
+    </section>`;
 }
 
 /* ---------------------------------------------------------- communities */
