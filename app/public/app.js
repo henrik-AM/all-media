@@ -331,6 +331,100 @@ function renderContacts() {
   );
 }
 
+/* ---------------------------------------------------------- comments */
+async function openComments(targetId, onCountChange) {
+  const res = await fetch(`/api/comments/${targetId}`);
+  let list = await res.json();
+
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet-backdrop';
+  document.querySelector('.app').appendChild(sheet);
+
+  const paint = () => {
+    sheet.innerHTML = `
+      <div class="sheet sheet--tall" role="dialog" aria-label="Kommentare">
+        <div class="sheet__handle"></div>
+        <div class="sheet__title">${list.length} ${list.length === 1 ? 'Kommentar' : 'Kommentare'}</div>
+        <div class="sheet__body">
+          ${
+            list.length
+              ? list.map(commentRow).join('')
+              : `<div class="empty">${ICONS.chat}
+                  <div class="empty__title">Noch keine Kommentare</div>
+                  <div class="empty__text">Schreib den ersten.</div>
+                </div>`
+          }
+        </div>
+        <form class="composer" id="commentForm">
+          <div class="avatar avatar--36" style="background:${user('me').color}">DU</div>
+          <div class="composer__field">
+            <textarea id="commentInput" rows="1" placeholder="Kommentar hinzufügen"></textarea>
+          </div>
+          <button type="submit" class="composer__send" id="commentSend" aria-label="Senden" disabled>${ICONS.send}</button>
+        </form>
+      </div>`;
+
+    sheet.querySelectorAll('[data-clike]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const r = await fetch(`/api/comments/${targetId}/${btn.dataset.clike}/like`, { method: 'POST' });
+        const updated = await r.json();
+        list = list.map((c) => (c.id === updated.id ? updated : c));
+        paint();
+      })
+    );
+
+    const input = sheet.querySelector('#commentInput');
+    const send = sheet.querySelector('#commentSend');
+
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 108) + 'px';
+      send.disabled = !input.value.trim();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sheet.querySelector('#commentForm').requestSubmit();
+      }
+    });
+
+    sheet.querySelector('#commentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      const r = await fetch(`/api/comments/${targetId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      list = [...list, await r.json()];
+      onCountChange?.(list.length);
+      paint();
+      sheet.querySelector('.sheet__body').scrollTop = sheet.querySelector('.sheet__body').scrollHeight;
+    });
+  };
+
+  paint();
+
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet) sheet.remove();
+  });
+}
+
+function commentRow(c) {
+  const u = user(c.userId);
+  return `
+    <div class="comment">
+      <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
+      <div class="comment__body">
+        <div class="comment__text"><strong>${esc(u.name)}</strong> ${esc(c.text)}</div>
+        <div class="comment__meta">${esc(c.time)}${c.likes ? ` · ${c.likes} Gefällt mir` : ''}</div>
+      </div>
+      <button class="comment__like ${c.liked ? 'is-on' : ''}" data-clike="${c.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
+    </div>`;
+}
+
 /* ---------------------------------------------------------- home feed */
 function renderHomeFeed() {
   main.innerHTML = `
@@ -346,7 +440,12 @@ function renderHomeFeed() {
     btn.addEventListener('click', async () => {
       const { paction, pid } = btn.dataset;
 
-      if (paction === 'comment') return toast('Kommentare folgen in Phase 3');
+      if (paction === 'comment') {
+        return openComments(pid, (count) => {
+          const idx = state.posts.findIndex((x) => x.id === pid);
+          state.posts[idx] = { ...state.posts[idx], comments: count };
+        });
+      }
       if (paction === 'share') return toast('Beitrag geteilt');
       if (paction === 'repost') return toast('Repost folgt in Phase 3');
 
@@ -420,7 +519,12 @@ function renderVideoFeed() {
     btn.addEventListener('click', async () => {
       const { vaction, vid } = btn.dataset;
 
-      if (vaction === 'comment') return toast('Kommentare folgen in Phase 3');
+      if (vaction === 'comment') {
+        return openComments(vid, (count) => {
+          const idx = state.videos.findIndex((x) => x.id === vid);
+          state.videos[idx] = { ...state.videos[idx], comments: count };
+        });
+      }
       if (vaction === 'repost') return toast('Repost folgt in Phase 3');
 
       const res = await fetch(`/api/videos/${vid}/${vaction}`, { method: 'POST' });

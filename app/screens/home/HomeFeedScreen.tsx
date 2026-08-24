@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { CommentSheet } from '../../components/CommentSheet';
 import { StoryRail } from '../../components/StoryRail';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { mockPosts, mockStories, mockUsers } from '../../mocks';
@@ -20,6 +21,7 @@ interface Props {
 
 export const HomeFeedScreen = ({ onOpenStory, onNotice }: Props) => {
   const [posts, setPosts] = useState<Post[]>(mockPosts);
+  const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
   const update = (id: string, change: (post: Post) => Post) =>
     setPosts((prev) => prev.map((p) => (p.id === id ? change(p) : p)));
@@ -88,7 +90,7 @@ export const HomeFeedScreen = ({ onOpenStory, onNotice }: Props) => {
               color={item.liked ? '#FF3040' : colors.text}
             />
           </Pressable>
-          <Pressable onPress={() => onNotice('Kommentare folgen in Phase 3')} hitSlop={6}>
+          <Pressable onPress={() => setCommentsFor(item.id)} hitSlop={6}>
             <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
           </Pressable>
           <Pressable onPress={() => onNotice('Beitrag geteilt')} hitSlop={6}>
@@ -113,7 +115,7 @@ export const HomeFeedScreen = ({ onOpenStory, onNotice }: Props) => {
         <Text style={styles.description}>
           <Text style={styles.bold}>{author?.name}</Text> {item.description}
         </Text>
-        <Pressable onPress={() => onNotice('Kommentare folgen in Phase 3')}>
+        <Pressable onPress={() => setCommentsFor(item.id)}>
           <Text style={styles.commentsLink}>Alle {item.comments} Kommentare ansehen</Text>
         </Pressable>
       </View>
@@ -131,6 +133,12 @@ export const HomeFeedScreen = ({ onOpenStory, onNotice }: Props) => {
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={<StoryRail stories={mockStories} onPress={onOpenStory} />}
+      />
+
+      <CommentSheet
+        targetId={commentsFor}
+        onClose={() => setCommentsFor(null)}
+        onCountChange={(id, count) => update(id, (p) => ({ ...p, comments: count }))}
       />
     </View>
   );

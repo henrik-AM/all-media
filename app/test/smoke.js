@@ -7,8 +7,12 @@
 // Start:  node test/smoke.js
 //
 // Der Test klickt alle Bereiche durch und prueft Suche, Filter, Chat,
-// Story-Viewer, Kamera und den Dark-Mode-Schalter. Am Ende werden alle
-// Konsolenfehler ausgegeben. Exit-Code 1, wenn etwas fehlschlaegt.
+// Kommentare, Story-Viewer, Kamera und den Dark-Mode-Schalter. Am Ende werden
+// alle Konsolenfehler ausgegeben. Exit-Code 1, wenn etwas fehlschlaegt.
+//
+// Der Mock-Server haelt seinen Zustand im Speicher und behaelt ihn zwischen
+// Testlaeufen. Pruefungen sind deshalb relativ formuliert (Aenderung statt
+// absoluter Zahl), wo der Test selbst Daten veraendert.
 
 const { chromium } = require('playwright-core');
 
@@ -107,7 +111,40 @@ const assert = (label, cond) => {
   const c = await p.$$eval('[data-contact]', e => e.length);
   assert('Kontakt-Suche filtert (elif -> 1)', c === 1);
 
+  // --- comments (Bild-Feed) ---
+  await p.click('[data-area="home"]');
+  await p.waitForTimeout(400);
+  await p.click('[data-paction="comment"][data-pid="p1"]');
+  await p.waitForTimeout(500);
+  const cmCount = await p.$$eval('.comment', e => e.length);
+  assert('Kommentare oeffnen', cmCount >= 3);
+  await p.fill('#commentInput', 'Testkommentar');
+  await p.click('#commentSend');
+  await p.waitForTimeout(600);
+  const cmAfter = await p.$$eval('.comment', e => e.length);
+  assert('Kommentar senden', cmAfter === cmCount + 1);
+  const likeBefore = await p.$eval('[data-clike="cm1"]', e => e.classList.contains('is-on'));
+  await p.click('[data-clike="cm1"]');
+  await p.waitForTimeout(400);
+  const likeAfter = await p.$eval('[data-clike="cm1"]', e => e.classList.contains('is-on'));
+  assert('Kommentar liken schaltet um', likeBefore !== likeAfter);
+  await p.mouse.click(200, 40);
+  await p.waitForTimeout(400);
+  assert('Kommentar-Sheet schliesst', !(await p.$('.sheet-backdrop')));
+
+  // --- comments (Video-Feed) ---
+  await p.click('[data-area="video"]');
+  await p.waitForTimeout(400);
+  await p.click('[data-vaction="comment"][data-vid="v3"]');
+  await p.waitForTimeout(500);
+  const vcm = await p.$$eval('.comment', e => e.length);
+  assert('Video-Kommentare laden', vcm >= 2);
+  await p.mouse.click(200, 40);
+  await p.waitForTimeout(400);
+
   // --- theme toggle ---
+  await p.click('[data-area="messenger"]');
+  await p.waitForTimeout(300);
   await p.click('[data-view="settings"]');
   await p.waitForTimeout(300);
   await p.click('#themeSwitch');

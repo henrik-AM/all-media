@@ -35,6 +35,31 @@ const stories = [
   { id: 's6', userId: 'u6', name: 'Finn', viewed: true },
 ];
 
+const comments = {
+  p1: [
+    { id: 'cm1', userId: 'u1', text: 'Das Licht ist der Wahnsinn. Welche Blende?', time: '07:12', likes: 12, liked: false },
+    { id: 'cm2', userId: 'u3', text: 'f/8, Stativ und zehn Sekunden Belichtung.', time: '07:20', likes: 4, liked: false },
+    { id: 'cm3', userId: 'u4', text: 'Da will ich auch mal hin.', time: '08:02', likes: 1, liked: false },
+  ],
+  p2: [
+    { id: 'cm1', userId: 'u2', text: 'Welche Monitore sind das?', time: 'Gestern', likes: 3, liked: false },
+    { id: 'cm2', userId: 'u5', text: 'Zwei 27 Zoll, nichts Besonderes, aber gleiche Höhe ist wichtig.', time: 'Gestern', likes: 7, liked: true },
+  ],
+  p3: [{ id: 'cm1', userId: 'u6', text: 'Respekt für den Aufstieg!', time: 'Mo', likes: 22, liked: false }],
+  p4: [{ id: 'cm1', userId: 'u1', text: 'Kann ich nur unterschreiben.', time: 'So', likes: 5, liked: false }],
+  v1: [
+    { id: 'cm1', userId: 'u4', text: 'Wie früh musstest du los?', time: '05:40', likes: 8, liked: false },
+    { id: 'cm2', userId: 'u1', text: 'Vier Uhr ab Parkplatz, dann zwei Stunden hoch.', time: '05:55', likes: 15, liked: false },
+  ],
+  v2: [{ id: 'cm1', userId: 'u6', text: 'Kurz und hilfreich, danke.', time: 'Gestern', likes: 6, liked: false }],
+  v3: [
+    { id: 'cm1', userId: 'u2', text: 'Ohne Sahne cremig? Verrate das Geheimnis.', time: 'Mo', likes: 31, liked: false },
+    { id: 'cm2', userId: 'u5', text: 'Nudelwasser. Immer Nudelwasser.', time: 'Mo', likes: 88, liked: true },
+  ],
+  v4: [],
+  v5: [{ id: 'cm1', userId: 'u3', text: 'Mache ich seit einem Jahr, will nicht mehr zurück.', time: 'Sa', likes: 9, liked: false }],
+};
+
 const posts = [
   { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, liked: false, saved: false, following: true, notify: false },
   { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, liked: true, saved: false, following: true, notify: true },
@@ -131,6 +156,43 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/bootstrap', (req, res) => {
   res.json({ users, chats, stories, contacts, communities, videos, posts });
+});
+
+app.get('/api/comments/:targetId', (req, res) => {
+  res.json(comments[req.params.targetId] || []);
+});
+
+app.post('/api/comments/:targetId', (req, res) => {
+  const { text } = req.body || {};
+  if (!text || !text.trim()) return res.status(400).json({ error: 'Text erforderlich' });
+
+  const targetId = req.params.targetId;
+  if (!comments[targetId]) comments[targetId] = [];
+
+  const comment = {
+    id: 'cm' + Date.now(),
+    userId: 'me',
+    text: text.trim(),
+    time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+    likes: 0,
+    liked: false,
+  };
+  comments[targetId].push(comment);
+
+  const target = posts.find((p) => p.id === targetId) || videos.find((v) => v.id === targetId);
+  if (target) target.comments += 1;
+
+  res.json(comment);
+});
+
+app.post('/api/comments/:targetId/:commentId/like', (req, res) => {
+  const list = comments[req.params.targetId] || [];
+  const comment = list.find((c) => c.id === req.params.commentId);
+  if (!comment) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  comment.liked = !comment.liked;
+  comment.likes += comment.liked ? 1 : -1;
+  res.json(comment);
 });
 
 app.post('/api/posts/:id/:action', (req, res) => {

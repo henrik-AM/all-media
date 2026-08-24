@@ -41,6 +41,15 @@ export interface Contact {
   about: string;
 }
 
+export interface Comment {
+  id: string;
+  userId: string;
+  text: string;
+  time: string;
+  likes: number;
+  liked: boolean;
+}
+
 export interface Post {
   id: string;
   userId: string;

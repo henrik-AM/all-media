@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FlatList, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { CommentSheet } from '../../components/CommentSheet';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { mockUsers, mockVideos } from '../../mocks';
 import { Video } from '../../types';
@@ -19,6 +20,7 @@ interface Props {
 export const VideoFeedScreen = ({ onNotice }: Props) => {
   const [videos, setVideos] = useState<Video[]>(mockVideos);
   const [slideHeight, setSlideHeight] = useState(0);
+  const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
   const measure = (event: LayoutChangeEvent) => setSlideHeight(event.nativeEvent.layout.height);
 
@@ -57,7 +59,7 @@ export const VideoFeedScreen = ({ onNotice }: Props) => {
             <Text style={styles.railLabel}>{compactNumber(item.likes)}</Text>
           </Pressable>
 
-          <Pressable style={styles.railBtn} onPress={() => onNotice('Kommentare folgen in Phase 3')}>
+          <Pressable style={styles.railBtn} onPress={() => setCommentsFor(item.id)}>
             <Ionicons name="chatbubble-outline" size={26} color={colors.white} />
             <Text style={styles.railLabel}>{compactNumber(item.comments)}</Text>
           </Pressable>
@@ -108,6 +110,12 @@ export const VideoFeedScreen = ({ onNotice }: Props) => {
         pagingEnabled
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"
+      />
+
+      <CommentSheet
+        targetId={commentsFor}
+        onClose={() => setCommentsFor(null)}
+        onCountChange={(id, count) => update(id, (v) => ({ ...v, comments: count }))}
       />
     </View>
   );
