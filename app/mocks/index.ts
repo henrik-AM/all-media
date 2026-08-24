@@ -1,4 +1,4 @@
-import { AuthUser, Chat, Comment, Community, Contact, Message, Post, Story, User, Video } from '../types';
+import { AuthUser, Chat, Comment, Community, Contact, Message, Post, Profile, Story, User, Video } from '../types';
 
 export const CURRENT_USER_ID = 'me';
 
@@ -69,6 +69,16 @@ export const mockContacts: Contact[] = [
   { id: 'u5', name: 'Elif Yilmaz', status: 'friend', about: 'Hey, ich nutze All Media!' },
   { id: 'u6', name: 'Finn Bauer', status: 'friend', about: 'Nur dringende Anrufe' },
 ];
+
+export const mockProfiles: Record<string, Profile> = {
+  u1: { userId: 'u1', bio: 'Bergsteigerin und Fotografin. Immer auf der Suche nach dem ersten Licht.', link: 'anna-schmidt.de', posts: 148, followers: 12400, following: 312, isFollowing: true, highlights: ['Alpen', 'Ausrüstung', 'Touren'] },
+  u2: { userId: 'u2', bio: 'Entwickler. Schreibt über Expo, Navigation und Performance.', link: 'bobmueller.dev', posts: 63, followers: 2140, following: 189, isFollowing: true, highlights: ['Talks', 'Setup'] },
+  u3: { userId: 'u3', bio: 'Hafen, Hamburg, Hochformat.', link: 'clara.photo', posts: 421, followers: 8730, following: 640, isFollowing: true, highlights: ['Hafen', 'Nebel', 'Nacht'] },
+  u4: { userId: 'u4', bio: 'Produktdesign und Design Systeme. Kaffee als Grundnahrungsmittel.', link: 'davidkoenig.design', posts: 97, followers: 5310, following: 274, isFollowing: true, highlights: ['Tokens', 'Prozess'] },
+  u5: { userId: 'u5', bio: 'Kochen ohne Schnickschnack. Rezepte unter zehn Minuten.', link: 'elif-kocht.de', posts: 289, followers: 31200, following: 128, isFollowing: false, highlights: ['Pasta', 'Meal Prep', 'Basics'] },
+  u6: { userId: 'u6', bio: 'Schreibt Software und läuft danach zwanzig Kilometer.', link: 'finnbauer.io', posts: 54, followers: 1180, following: 402, isFollowing: true, highlights: ['Laufen'] },
+  me: { userId: 'me', bio: 'Baue gerade All Media.', link: 'all-media.app', posts: 12, followers: 340, following: 186, isFollowing: false, highlights: ['Projekt'] },
+};
 
 export const mockComments: Record<string, Comment[]> = {
   p1: [

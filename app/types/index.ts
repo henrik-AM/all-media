@@ -41,6 +41,17 @@ export interface Contact {
   about: string;
 }
 
+export interface Profile {
+  userId: string;
+  bio: string;
+  link: string;
+  posts: number;
+  followers: number;
+  following: number;
+  isFollowing: boolean;
+  highlights: string[];
+}
+
 export interface Comment {
   id: string;
   userId: string;

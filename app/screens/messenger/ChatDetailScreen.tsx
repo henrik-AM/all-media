@@ -26,9 +26,10 @@ interface Props {
   onBack: () => void;
   onCall: (kind: 'audio' | 'video') => void;
   onCamera: () => void;
+  onOpenProfile: (userId: string) => void;
 }
 
-export const ChatDetailScreen = ({ chat, onBack, onCall, onCamera }: Props) => {
+export const ChatDetailScreen = ({ chat, onBack, onCall, onCamera, onOpenProfile }: Props) => {
   const [messages, setMessages] = useState<Message[]>(
     () => mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []
   );
@@ -113,14 +114,20 @@ export const ChatDetailScreen = ({ chat, onBack, onCall, onCamera }: Props) => {
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
         <Avatar id={chat.userId ?? chat.id} name={chat.name} size={sizes.avatarSm} group={chat.isGroup} />
-        <View style={styles.headerBody}>
+        <Pressable
+          style={styles.headerBody}
+          onPress={() => chat.userId && onOpenProfile(chat.userId)}
+          disabled={!chat.userId}
+        >
           <Text style={styles.headerName} numberOfLines={1}>
             {chat.name}
           </Text>
           <Text style={[styles.headerStatus, chat.isGroup && styles.headerStatusMuted]}>
-            {chat.isGroup ? `${(chat.memberIds?.length ?? 0) + 1} Mitglieder` : 'Online'}
+            {chat.isGroup
+              ? `${((chat.memberIds?.length ?? 0) + 1).toLocaleString('de-DE')} Mitglieder`
+              : 'Online'}
           </Text>
-        </View>
+        </Pressable>
         <Pressable style={styles.headerAction} onPress={() => onCall('video')} hitSlop={4}>
           <Ionicons name="videocam-outline" size={22} color={colors.text2} />
         </Pressable>

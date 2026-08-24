@@ -331,6 +331,122 @@ function renderContacts() {
   );
 }
 
+/* ---------------------------------------------------------- user profile */
+async function openProfile(userId) {
+  const res = await fetch(`/api/profile/${userId}`);
+  if (!res.ok) return toast('Profil nicht verfügbar');
+  let profile = await res.json();
+  let tab = 'grid';
+
+  overlay.hidden = false;
+
+  const paint = () => {
+    overlay.innerHTML = `
+      <header class="chathead">
+        <button class="chathead__back" id="profBack" aria-label="Zurück">${ICONS.back}</button>
+        <div class="chathead__body"><div class="chathead__name">${esc(profile.handle || '@' + profile.name)}</div></div>
+        <div class="chathead__actions">
+          <button id="profMore" aria-label="Mehr">${ICONS.info}</button>
+        </div>
+      </header>
+
+      <div class="scroll">
+        <div class="prof__top">
+          <div class="story__ring" style="width:88px;height:88px;padding:3px">
+            <div class="story__inner" style="background:${profile.color};font-size:28px">${esc(profile.initials)}</div>
+          </div>
+          <div class="prof__stats">
+            <div class="prof__stat"><strong>${compactNumber(profile.posts)}</strong><span>Beiträge</span></div>
+            <div class="prof__stat"><strong>${compactNumber(profile.followers)}</strong><span>Follower</span></div>
+            <div class="prof__stat"><strong>${compactNumber(profile.following)}</strong><span>Gefolgt</span></div>
+          </div>
+        </div>
+
+        <div class="prof__about">
+          <div class="prof__name">${esc(profile.name)}</div>
+          <div class="prof__bio">${esc(profile.bio)}</div>
+          <a class="prof__link" href="#" id="profLink">${esc(profile.link)}</a>
+        </div>
+
+        <div class="prof__buttons">
+          <button class="prof__btn ${profile.following_me ? 'is-following' : 'is-primary'}" id="profFollow">
+            ${profile.following_me ? 'Gefolgt' : 'Folgen'}
+          </button>
+          <button class="prof__btn" id="profMessage">Nachricht</button>
+        </div>
+
+        ${
+          profile.highlights.length
+            ? `<div class="storyrail">${profile.highlights
+                .map(
+                  (h) => `<div class="story">
+                    <div class="story__ring is-viewed">
+                      <div class="story__inner" style="background:${profile.color};font-size:13px">${esc(
+                        h.slice(0, 2).toUpperCase()
+                      )}</div>
+                    </div>
+                    <div class="story__name">${esc(h)}</div>
+                  </div>`
+                )
+                .join('')}</div>`
+            : ''
+        }
+
+        <div class="prof__tabs">
+          <button class="prof__tab ${tab === 'grid' ? 'is-active' : ''}" data-ptab="grid" aria-label="Beiträge">${ICONS.image}</button>
+          <button class="prof__tab ${tab === 'repost' ? 'is-active' : ''}" data-ptab="repost" aria-label="Reposts">${ICONS.repeat}</button>
+          <button class="prof__tab ${tab === 'tagged' ? 'is-active' : ''}" data-ptab="tagged" aria-label="Markiert">${ICONS.person}</button>
+        </div>
+
+        ${
+          tab === 'grid'
+            ? `<div class="prof__grid">${profile.grid
+                .map(
+                  (g) => `<div class="griditem">
+                    ${ICONS.image}
+                    ${g.kind === 'video' ? `<span class="griditem__badge">${ICONS.play}</span>` : ''}
+                  </div>`
+                )
+                .join('')}</div>`
+            : `<div class="empty">${tab === 'repost' ? ICONS.repeat : ICONS.person}
+                <div class="empty__title">${tab === 'repost' ? 'Keine Reposts' : 'Keine Markierungen'}</div>
+                <div class="empty__text">Hier ist noch nichts.</div>
+              </div>`
+        }
+      </div>`;
+
+    $('#profBack').addEventListener('click', closeOverlay);
+    $('#profMore').addEventListener('click', () => toast('Weitere Optionen folgen in Phase 3'));
+    $('#profLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      toast(profile.link);
+    });
+
+    $('#profFollow').addEventListener('click', async () => {
+      const r = await fetch(`/api/profile/${userId}/follow`, { method: 'POST' });
+      const updated = await r.json();
+      profile = { ...profile, ...updated };
+      toast(updated.following_me ? `Du folgst ${profile.name}` : `${profile.name} nicht mehr gefolgt`);
+      paint();
+    });
+
+    $('#profMessage').addEventListener('click', () => {
+      const chat = state.chats.find((c) => c.userId === userId);
+      if (chat) openChat(chat.id);
+      else toast('Noch kein Chat mit dieser Person');
+    });
+
+    overlay.querySelectorAll('[data-ptab]').forEach((b) =>
+      b.addEventListener('click', () => {
+        tab = b.dataset.ptab;
+        paint();
+      })
+    );
+  };
+
+  paint();
+}
+
 /* ---------------------------------------------------------- comments */
 async function openComments(targetId, onCountChange) {
   const res = await fetch(`/api/comments/${targetId}`);
@@ -418,7 +534,7 @@ function commentRow(c) {
     <div class="comment">
       <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
       <div class="comment__body">
-        <div class="comment__text"><strong>${esc(u.name)}</strong> ${esc(c.text)}</div>
+        <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${esc(c.text)}</div>
         <div class="comment__meta">${esc(c.time)}${c.likes ? ` · ${c.likes} Gefällt mir` : ''}</div>
       </div>
       <button class="comment__like ${c.liked ? 'is-on' : ''}" data-clike="${c.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
@@ -473,10 +589,10 @@ function postCard(p) {
         <div class="story__ring" style="width:40px;height:40px;padding:2px">
           <div class="story__inner" style="background:${u.color};font-size:13px">${esc(u.initials)}</div>
         </div>
-        <div class="post__who">
+        <button class="post__who" data-profile="${p.userId}">
           <div class="post__name">${esc(u.name)}</div>
           <div class="post__sub">${esc(p.location)} · ${esc(p.music)}</div>
-        </div>
+        </button>
         <button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
           ${p.following ? 'Gefolgt' : 'Folgen'}
         </button>
@@ -577,8 +693,10 @@ function videoSlide(v) {
 
       <div class="slide__meta">
         <div class="slide__author">
-          <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
-          <span class="slide__name">${esc(u.name)}</span>
+          <button class="slide__who" data-profile="${v.userId}">
+            <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
+            <span class="slide__name">${esc(u.name)}</span>
+          </button>
           <button class="slide__follow" data-vfollow="${v.id}">Folgen</button>
         </div>
         <div class="slide__desc">${esc(v.description)}</div>
@@ -823,7 +941,7 @@ async function openChat(chatId) {
     <header class="chathead">
       <button class="chathead__back" id="chatBack" aria-label="Zurück">${ICONS.back}</button>
       ${avatarOf(chat, 36)}
-      <div class="chathead__body">
+      <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} style="${chat.userId ? 'cursor:pointer' : ''}">
         <div class="chathead__name">${esc(chat.name)}</div>
         <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}">${
           chat.isGroup ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder` : 'Online'
@@ -1074,6 +1192,16 @@ document.querySelectorAll('.topbar__btn').forEach((b) =>
     render();
   })
 );
+
+// Profile öffnen: überall dort, wo ein Element data-profile trägt.
+document.querySelector('.app').addEventListener('click', (e) => {
+  const target = e.target.closest('[data-profile]');
+  if (!target) return;
+  e.stopPropagation();
+  clearInterval(storyTimer);
+  document.querySelector('.sheet-backdrop')?.remove();
+  openProfile(target.dataset.profile);
+});
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !overlay.hidden) {

@@ -132,6 +132,29 @@ const assert = (label, cond) => {
   await p.waitForTimeout(400);
   assert('Kommentar-Sheet schliesst', !(await p.$('.sheet-backdrop')));
 
+  // --- user profile ---
+  await p.click('.post__who[data-profile="u3"]');
+  await p.waitForTimeout(600);
+  const profName = await p.$eval('.prof__name', e => e.textContent.trim()).catch(() => null);
+  const profGrid = await p.$$eval('.griditem', e => e.length);
+  assert('Profil aus Beitrag oeffnet', profName === 'Clara Weber' && profGrid === 12);
+  const followBefore = await p.$eval('#profFollow', e => e.textContent.trim());
+  await p.click('#profFollow');
+  await p.waitForTimeout(500);
+  const followAfter = await p.$eval('#profFollow', e => e.textContent.trim());
+  assert('Folgen schaltet um', followBefore !== followAfter);
+  await p.click('[data-ptab="repost"]');
+  await p.waitForTimeout(400);
+  assert('Repost-Tab zeigt Leerzustand', !!(await p.$('.empty')));
+  await p.click('#profMessage');
+  await p.waitForTimeout(600);
+  assert('Nachricht oeffnet Chat', !!(await p.$('#msgInput')));
+  await p.click('.chathead__body[data-profile="u3"]');
+  await p.waitForTimeout(600);
+  assert('Profil aus Chat-Kopf', !!(await p.$('.prof__name')));
+  await p.click('#profBack');
+  await p.waitForTimeout(500);
+
   // --- comments (Video-Feed) ---
   await p.click('[data-area="video"]');
   await p.waitForTimeout(400);

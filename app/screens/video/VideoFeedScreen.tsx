@@ -14,10 +14,11 @@ const compactNumber = (n: number): string => {
 };
 
 interface Props {
+  onOpenProfile: (userId: string) => void;
   onNotice: (message: string) => void;
 }
 
-export const VideoFeedScreen = ({ onNotice }: Props) => {
+export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
   const [videos, setVideos] = useState<Video[]>(mockVideos);
   const [slideHeight, setSlideHeight] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
@@ -86,8 +87,10 @@ export const VideoFeedScreen = ({ onNotice }: Props) => {
 
         <View style={styles.meta}>
           <View style={styles.author}>
-            <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
-            <Text style={styles.authorName}>{author?.name}</Text>
+            <Pressable style={styles.authorTap} onPress={() => onOpenProfile(item.userId)}>
+              <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
+              <Text style={styles.authorName}>{author?.name}</Text>
+            </Pressable>
             <Pressable style={styles.follow} onPress={() => onNotice('Folgen folgt in Phase 3')}>
               <Text style={styles.followText}>Folgen</Text>
             </Pressable>
@@ -141,6 +144,7 @@ const styles = StyleSheet.create({
 
   meta: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, paddingRight: 78 },
   author: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: spacing.sm },
+  authorTap: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   authorName: { color: colors.white, fontSize: 14.5, fontWeight: '700' },
   follow: {
     paddingHorizontal: 11,

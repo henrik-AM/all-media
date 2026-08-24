@@ -16,10 +16,11 @@ const compactNumber = (n: number): string => {
 
 interface Props {
   onOpenStory: (story: Story) => void;
+  onOpenProfile: (userId: string) => void;
   onNotice: (message: string) => void;
 }
 
-export const HomeFeedScreen = ({ onOpenStory, onNotice }: Props) => {
+export const HomeFeedScreen = ({ onOpenStory, onOpenProfile, onNotice }: Props) => {
   const [posts, setPosts] = useState<Post[]>(mockPosts);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
@@ -50,17 +51,17 @@ export const HomeFeedScreen = ({ onOpenStory, onNotice }: Props) => {
     return (
       <View style={styles.post}>
         <View style={styles.head}>
-          <View style={styles.ring}>
+          <Pressable style={styles.ring} onPress={() => onOpenProfile(item.userId)}>
             <Avatar id={item.userId} name={author?.name ?? ''} size={36} />
-          </View>
-          <View style={styles.who}>
+          </Pressable>
+          <Pressable style={styles.who} onPress={() => onOpenProfile(item.userId)}>
             <Text style={styles.name} numberOfLines={1}>
               {author?.name}
             </Text>
             <Text style={styles.sub} numberOfLines={1}>
               {item.location} · {item.music}
             </Text>
-          </View>
+          </Pressable>
           <Pressable
             style={[styles.follow, item.following && styles.followActive]}
             onPress={() => toggleFollow(item)}

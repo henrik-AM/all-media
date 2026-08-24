@@ -42,7 +42,9 @@ gleichen WLAN sein. Ein Expo-Konto ist dafür nicht nötig.
 | Kamera: Foto/Video über Kamera oder Galerie | fertig (RN), UI-Gerüst (Web) |
 | Einstellungen/Profil inkl. Dark Mode | fertig |
 | Login/Registrierung mit Validierung | fertig (Mock-Auth) |
-| Kommentare, Anrufe, Repost | noch nicht gebaut |
+| Kommentare schreiben und liken | fertig |
+| Nutzerprofile mit Statistiken, Bio, Highlights, Raster | fertig |
+| Anrufe, Repost, Kontakt hinzufügen | noch nicht gebaut |
 | Supabase-Backend | vorbereitet, siehe unten |
 
 ## Projektstruktur

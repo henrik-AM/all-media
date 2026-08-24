@@ -5,13 +5,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const users = {
-  u1: { id: 'u1', name: 'Anna Schmidt', initials: 'AS', color: '#F2A65A' },
-  u2: { id: 'u2', name: 'Bob Müller', initials: 'BM', color: '#6C8AE4' },
-  u3: { id: 'u3', name: 'Clara Weber', initials: 'CW', color: '#E4699B' },
-  u4: { id: 'u4', name: 'David König', initials: 'DK', color: '#4DB6AC' },
-  u5: { id: 'u5', name: 'Elif Yilmaz', initials: 'EY', color: '#9575CD' },
-  u6: { id: 'u6', name: 'Finn Bauer', initials: 'FB', color: '#7986CB' },
-  me: { id: 'me', name: 'Du', initials: 'DU', color: '#0A66FF' },
+  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: '#F2A65A' },
+  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', initials: 'BM', color: '#6C8AE4' },
+  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', initials: 'CW', color: '#E4699B' },
+  u4: { id: 'u4', name: 'David König', handle: '@david', initials: 'DK', color: '#4DB6AC' },
+  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: '#9575CD' },
+  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: '#7986CB' },
+  me: { id: 'me', name: 'Du', handle: '@henrik', initials: 'DU', color: '#0A66FF' },
 };
 
 const chats = [
@@ -34,6 +34,22 @@ const stories = [
   { id: 's5', userId: 'u5', name: 'Elif', viewed: true },
   { id: 's6', userId: 'u6', name: 'Finn', viewed: true },
 ];
+
+const profiles = {
+  u1: { bio: 'Bergsteigerin und Fotografin. Immer auf der Suche nach dem ersten Licht.', link: 'anna-schmidt.de', posts: 148, followers: 12400, following: 312, following_me: true, highlights: ['Alpen', 'Ausrüstung', 'Touren'] },
+  u2: { bio: 'Entwickler. Schreibt über Expo, Navigation und Performance.', link: 'bobmueller.dev', posts: 63, followers: 2140, following: 189, following_me: true, highlights: ['Talks', 'Setup'] },
+  u3: { bio: 'Hafen, Hamburg, Hochformat.', link: 'clara.photo', posts: 421, followers: 8730, following: 640, following_me: true, highlights: ['Hafen', 'Nebel', 'Nacht'] },
+  u4: { bio: 'Produktdesign und Design Systeme. Kaffee als Grundnahrungsmittel.', link: 'davidkoenig.design', posts: 97, followers: 5310, following: 274, following_me: true, highlights: ['Tokens', 'Prozess'] },
+  u5: { bio: 'Kochen ohne Schnickschnack. Rezepte unter zehn Minuten.', link: 'elif-kocht.de', posts: 289, followers: 31200, following: 128, following_me: false, highlights: ['Pasta', 'Meal Prep', 'Basics'] },
+  u6: { bio: 'Schreibt Software und läuft danach zwanzig Kilometer.', link: 'finnbauer.io', posts: 54, followers: 1180, following: 402, following_me: true, highlights: ['Laufen'] },
+  me: { bio: 'Baue gerade All Media.', link: 'all-media.app', posts: 12, followers: 340, following: 186, following_me: false, highlights: ['Projekt'] },
+};
+
+const gridItems = {};
+for (const id of Object.keys(profiles)) {
+  const kinds = ['image', 'video', 'image', 'video', 'image', 'image', 'video', 'image', 'video', 'image', 'video', 'image'];
+  gridItems[id] = kinds.map((kind, i) => ({ id: `${id}_g${i}`, kind }));
+}
 
 const comments = {
   p1: [
@@ -156,6 +172,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/bootstrap', (req, res) => {
   res.json({ users, chats, stories, contacts, communities, videos, posts });
+});
+
+app.get('/api/profile/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const profile = profiles[userId];
+  const person = users[userId];
+  if (!profile || !person) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  res.json({ ...person, ...profile, grid: gridItems[userId] || [] });
+});
+
+app.post('/api/profile/:userId/follow', (req, res) => {
+  const profile = profiles[req.params.userId];
+  if (!profile) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  profile.following_me = !profile.following_me;
+  profile.followers += profile.following_me ? 1 : -1;
+  res.json({ following_me: profile.following_me, followers: profile.followers });
 });
 
 app.get('/api/comments/:targetId', (req, res) => {
