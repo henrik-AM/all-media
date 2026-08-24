@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, sizes, spacing } from '../constants/design';
 import { AreaKey, SubKey, areaOf } from '../constants/navigation';
@@ -16,11 +17,14 @@ interface Props {
  * zeigen gar keine Leiste.
  */
 export const TopSwitcher = ({ area, active, onChange }: Props) => {
+  const insets = useSafeAreaInsets();
   const subs = areaOf(area).subs;
   if (!subs.length) return null;
 
   return (
-    <View style={styles.bar}>
+    // Die Leiste haelt sich den Platz unter der Statusleiste selbst frei,
+    // damit der App-Hintergrund bis an den oberen Rand laeuft.
+    <View style={[styles.bar, { height: sizes.topBar + insets.top, paddingTop: insets.top }]}>
       {subs.map((item) => {
         const isActive = item.key === active;
         return (

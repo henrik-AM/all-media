@@ -13,6 +13,8 @@ const ICONS = (() => {
     plus: wrap('<path d="M12 5v14M5 12h14"/>'),
     back: wrap('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
     close: wrap('<path d="M18 6 6 18M6 6l12 12"/>'),
+    minus: wrap('<path d="M5 12h14"/>'),
+    clock: wrap('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     video: wrap('<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>'),
     phone: wrap('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>'),
     send: wrap('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>'),

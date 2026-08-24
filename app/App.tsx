@@ -1,10 +1,12 @@
 import React, { useCallback, useContext, useState } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { SupabaseProvider } from './contexts/SupabaseContext';
 import { ActionSheet } from './components/ActionSheet';
 import { AddContactSheet } from './components/AddContactSheet';
 import { NewGroupSheet } from './components/NewGroupSheet';
+import { KontoWechsel } from './components/KontoWechsel';
 import { TabBar } from './components/TabBar';
 import { TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
@@ -13,6 +15,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { ChatListScreen } from './screens/messenger/ChatListScreen';
 import { ChatDetailScreen } from './screens/messenger/ChatDetailScreen';
 import { ContactsScreen } from './screens/messenger/ContactsScreen';
+import { ContactProfileScreen } from './screens/messenger/ContactProfileScreen';
 import { FriendMapScreen } from './screens/messenger/FriendMapScreen';
 import { MessengerProfileScreen } from './screens/messenger/MessengerProfileScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
@@ -35,12 +38,17 @@ import { Chat, Community, Contact, Message, Story } from './types';
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
   | { kind: 'story'; story: Story }
-  | { kind: 'profile'; userId: string }
+  /**
+   * variant entscheidet, welches Profil gezeigt wird: im Messenger das
+   * Kontaktprofil (Nummer, Medien, Blockieren), sonst das oeffentliche
+   * Profil mit Beitraegen.
+   */
+  | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich' }
   | { kind: 'contacts' }
   | { kind: 'camera' }
   | null;
 
-type Sheet = 'new' | 'group' | 'contact' | null;
+type Sheet = 'new' | 'group' | 'contact' | 'konto' | null;
 
 const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
@@ -69,25 +77,73 @@ const Shell = () => {
     else setNotice('Noch kein Chat mit dieser Person');
   };
 
-  const createGroup = (name: string, memberIds: string[]) => {
+  const createGroup = (name: string, memberIds: string[], info?: string) => {
     const chat: Chat = {
       id: `c${Date.now()}`,
       name,
       isGroup: true,
       memberIds,
-      preview: 'Gruppe erstellt',
+      preview: info ? info : 'Gruppe erstellt',
       time: now(),
       unreadCount: 0,
     };
     setChats((prev) => [chat, ...prev]);
     setSheet(null);
-    setNotice(`Gruppe „${name}" erstellt`);
+    setNotice(`Gruppe „${name}“ erstellt`);
     setOverlay({ kind: 'chat', chat });
   };
 
-  const addContact = (contact: Contact) => {
+  /**
+   * Kontaktanfrage. Bis zur Annahme ist genau die eine mitgeschickte Nachricht
+   * erlaubt - der Chat dazu wird gleich angelegt und als 'pending' markiert.
+   */
+  const addContact = (contact: Contact, ersteNachricht?: string) => {
     setContacts((prev) => [...prev, contact]);
     setSheet(null);
+
+    const chat: Chat = {
+      id: `c${Date.now()}`,
+      name: contact.name,
+      userId: contact.id,
+      isGroup: false,
+      preview: ersteNachricht ?? 'Anfrage gesendet',
+      time: now(),
+      unreadCount: 0,
+      requestState: 'pending',
+    };
+    setChats((prev) => [chat, ...prev]);
+
+    if (ersteNachricht) {
+      const message: Message = {
+        id: `m${Date.now()}`,
+        chatId: chat.id,
+        senderId: 'me',
+        text: ersteNachricht,
+        time: now(),
+      };
+      setOverlay({ kind: 'chat', chat, extra: [message] });
+    }
+  };
+
+  /** Anfrage angenommen: der Chat ist ab jetzt frei benutzbar. */
+  const acceptRequest = (chatId: string) => {
+    setChats((prev) =>
+      prev.map((c) => (c.id === chatId ? { ...c, requestState: 'accepted' as const } : c))
+    );
+    setOverlay((prev) =>
+      prev?.kind === 'chat' && prev.chat.id === chatId
+        ? { ...prev, chat: { ...prev.chat, requestState: 'accepted' as const } }
+        : prev
+    );
+    setContacts((prev) =>
+      prev.map((c) => {
+        const chat = chats.find((x) => x.id === chatId);
+        return chat && c.id === chat.userId
+          ? { ...c, status: 'friend' as const, about: 'Kontakt' }
+          : c;
+      })
+    );
+    setNotice('Anfrage angenommen');
   };
 
   const befriend = (userId: string) => {
@@ -97,7 +153,14 @@ const Shell = () => {
     setNotice(`Anfrage an ${person.name} gesendet`);
   };
 
-  const openProfile = (userId: string) => setOverlay({ kind: 'profile', userId });
+  // Aus dem Messenger heraus gehoert das Kontaktprofil dazu - Henrik wurde
+  // vorher aus einem Chat heraus im Bereich Videos abgesetzt.
+  const openProfile = (userId: string) =>
+    setOverlay({ kind: 'profile', userId, variant: area === 'messenger' ? 'kontakt' : 'oeffentlich' });
+
+  /** Ausdruecklich das oeffentliche Profil, unabhaengig vom Bereich. */
+  const openPublicProfile = (userId: string) =>
+    setOverlay({ kind: 'profile', userId, variant: 'oeffentlich' });
 
   const openStory = (story: Story) => {
     if (story.own) setOverlay({ kind: 'camera' });
@@ -167,11 +230,22 @@ const Shell = () => {
         onCall={(kind) => setNotice(kind === 'video' ? 'Videoanruf folgt' : 'Sprachanruf folgt')}
         onCamera={() => setOverlay({ kind: 'camera' })}
         onOpenProfile={openProfile}
+        onAcceptRequest={acceptRequest}
       />
     );
   }
 
   if (overlay?.kind === 'profile') {
+    if (overlay.variant === 'kontakt') {
+      return (
+        <ContactProfileScreen
+          userId={overlay.userId}
+          onBack={() => setOverlay(null)}
+          onMessage={openChatWith}
+          onNotice={setNotice}
+        />
+      );
+    }
     return (
       <UserProfileScreen
         userId={overlay.userId}
@@ -210,12 +284,13 @@ const Shell = () => {
 
   const renderContent = () => {
     if (area === 'messenger') {
-      if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} />;
+      if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onNotice={setNotice} />;
       if (sub === 'camera') return <CameraScreen embedded onClose={() => setSub('chats')} onNotice={setNotice} />;
       if (sub === 'profile') {
         return (
           <MessengerProfileScreen
             onSwitchArea={switchArea}
+            onSwitchAccount={() => setSheet('konto')}
             onOpenSettings={() => setArea('settings')}
             onNotice={setNotice}
           />
@@ -232,11 +307,11 @@ const Shell = () => {
     }
 
     if (area === 'videos') {
-      if (sub === 'portrait') return <VideoFeedScreen onOpenProfile={openProfile} onNotice={setNotice} />;
+      if (sub === 'portrait') return <VideoFeedScreen onOpenProfile={openPublicProfile} onNotice={setNotice} />;
       if (sub === 'landscape') return <LandscapeVideosScreen onNotice={setNotice} />;
-      if (sub === 'search') return <VideoSearchScreen onOpenProfile={openProfile} onNotice={setNotice} />;
+      if (sub === 'search') return <VideoSearchScreen onOpenProfile={openPublicProfile} onNotice={setNotice} />;
       if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onNotice={setNotice} />;
-      return <HomeFeedScreen onOpenStory={openStory} onOpenProfile={openProfile} onNotice={setNotice} />;
+      return <HomeFeedScreen onOpenStory={openStory} onOpenProfile={openPublicProfile} onNotice={setNotice} />;
     }
 
     if (area === 'communities') {
@@ -263,11 +338,14 @@ const Shell = () => {
       return <CommunitiesScreen onOpenCommunity={openCommunity} onNotice={setNotice} />;
     }
 
-    return <SettingsScreen onNotice={setNotice} onLogout={logout} />;
+    return <SettingsScreen onNotice={setNotice} onLogout={logout} onSwitchAccount={() => setSheet('konto')} />;
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    // Kein SafeAreaView um die ganze Shell: Der Hintergrund soll bis in die
+    // Ecken laufen, damit es wie eine echte App aussieht. Den Platz fuer Notch
+    // und Home-Anzeige halten sich die obere und die untere Leiste selbst frei.
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <TopSwitcher area={area} active={sub} onChange={setSub} />
       <View style={styles.content}>{renderContent()}</View>
@@ -306,8 +384,14 @@ const Shell = () => {
         onNotice={setNotice}
       />
 
+      <KontoWechsel
+        visible={sheet === 'konto'}
+        onClose={() => setSheet(null)}
+        onNotice={setNotice}
+      />
+
       <Toast message={notice} onHide={hideNotice} />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -317,11 +401,13 @@ const Root = () => {
 };
 
 const App = () => (
-  <SupabaseProvider>
-    <AuthProvider>
-      <Root />
-    </AuthProvider>
-  </SupabaseProvider>
+  <SafeAreaProvider>
+    <SupabaseProvider>
+      <AuthProvider>
+        <Root />
+      </AuthProvider>
+    </SupabaseProvider>
+  </SafeAreaProvider>
 );
 
 const styles = StyleSheet.create({

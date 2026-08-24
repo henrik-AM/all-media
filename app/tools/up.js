@@ -27,7 +27,9 @@ function log(zeile) {
 }
 
 function aufraeumen() {
-  for (const muster of ['ngrok http', 'expo start', 'web-app.js']) {
+  // "ngrok" ohne Zusatz, damit auch anders gestartete Tunnel erwischt werden -
+  // sonst blockiert ein uebrig gebliebener die feste Adresse (ERR_NGROK_334).
+  for (const muster of ['ngrok', 'expo start', 'web-app.js']) {
     try { execSync(`pkill -f "${muster}"`, { stdio: 'ignore' }); } catch { /* lief nicht */ }
   }
   // Die Ports muessen frei sein - weicht Expo auf 8082 aus, findet die
@@ -92,8 +94,32 @@ log('');
 log('  Alte Prozesse werden aufgeraeumt ...');
 aufraeumen();
 
+// Der Tunnel bekommt eigene Versuche: Nach dem Aufraeumen haelt ngrok die
+// alte Sitzung in seiner Cloud noch ein paar Sekunden offen und lehnt einen
+// sofortigen Neustart mit ERR_NGROK_334 ab.
+let tunnelVersuch = 0;
+
+function starteTunnel() {
+  tunnelVersuch += 1;
+  const kind = spawn(NGROK, ['http', String(FEST.webPort), '--log=stdout'], {
+    cwd: ROOT,
+    stdio: ['ignore', kindLog(), kindLog()],
+  });
+  kind.on('error', (e) => log(`  [tunnel] START FEHLGESCHLAGEN: ${e.message}`));
+  kind.on('exit', (code) => {
+    if (beenden || code === 0) return;
+    if (tunnelVersuch >= 6) {
+      log(`  [tunnel] gibt nach ${tunnelVersuch} Versuchen auf (Code ${code})`);
+      return;
+    }
+    log(`  [tunnel] Versuch ${tunnelVersuch} fehlgeschlagen, neuer Versuch in 5 Sekunden ...`);
+    setTimeout(starteTunnel, 5000);
+  });
+  kinder.push(kind);
+}
+
 starte('web', process.execPath, ['web-app.js']);
-starte('tunnel', NGROK, ['http', String(FEST.webPort), '--log=stdout']);
+starteTunnel();
 starte('expo', 'npx', ['expo', 'start', '--port', String(FEST.expoPort)], {
   // Sagt Metro, unter welcher oeffentlichen Adresse es erreichbar ist. Ohne
   // das haengt Expo ":8081" an die Paketadressen und das Handy scheitert.

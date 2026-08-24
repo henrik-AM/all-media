@@ -1,105 +1,158 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
-import { avatarColor, colors, radius, spacing, typography } from '../../constants/design';
+import { Karte, KartenSteuerung } from '../../components/Karte';
+import { colors, radius, spacing, typography } from '../../constants/design';
 import { mockFriendPins, mockUsers } from '../../mocks';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
+  onNotice?: (message: string) => void;
 }
 
+/** Wem der eigene Standort gezeigt wird. */
+type Freigabe = 'niemand' | 'kontakte' | 'ausgewaehlt';
+
+const FREIGABEN: { key: Freigabe; label: string; text: string }[] = [
+  { key: 'niemand', label: 'Niemand', text: 'Dein Standort bleibt privat' },
+  { key: 'kontakte', label: 'Alle Kontakte', text: 'Alle deine Kontakte sehen dich' },
+  { key: 'ausgewaehlt', label: 'Ausgewählte', text: 'Nur wen du freigibst' },
+];
+
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
-export const FriendMapScreen = ({ onOpenProfile }: Props) => (
-  <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-    <View style={styles.map}>
+export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
+  const karte = useRef<KartenSteuerung>(null);
+  const [aktiv, setAktiv] = useState<string | null>(null);
+  const [sichtbar, setSichtbar] = useState(true);
+  const [freigabe, setFreigabe] = useState<Freigabe>('kontakte');
+
+  const pins = mockFriendPins.map((pin) => ({
+    id: pin.id,
+    name: mockUsers[pin.id].name,
+    x: pin.x,
+    y: pin.y,
+  }));
+
+  /**
+   * Tippen auf einen Kontakt zoomt auf der Karte zu ihm - vorher landete man
+   * im Bereich Videos, was aus der Karte heraus nicht passt.
+   */
+  const zeigeAufKarte = (id: string) => {
+    setAktiv(id);
+    karte.current?.zoomAuf(id);
+  };
+
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Karte ref={karte} pins={pins} aktiv={aktiv} onPinPress={zeigeAufKarte} />
+
+      {/* Standort-Freigabe: steht bewusst ueber der Liste, weil es die Frage
+          ist, die man sich zuerst stellt. */}
+      <View style={styles.freigabe}>
+        <View style={styles.freigabeKopf}>
+          <Ionicons name="location-outline" size={19} color={colors.brand} />
+          <View style={styles.freigabeText}>
+            <Text style={styles.freigabeTitel}>Deinen Standort teilen</Text>
+            <Text style={styles.freigabeSub}>
+              {sichtbar ? FREIGABEN.find((f) => f.key === freigabe)?.text : 'Standort ist aus'}
+            </Text>
+          </View>
+          <Switch
+            value={sichtbar}
+            onValueChange={(an) => {
+              setSichtbar(an);
+              onNotice?.(an ? 'Standort wird geteilt' : 'Standort ist aus');
+            }}
+            trackColor={{ true: colors.brand, false: colors.surface3 }}
+          />
+        </View>
+
+        {sichtbar && (
+          <View style={styles.optionen}>
+            {FREIGABEN.map((f) => {
+              const an = freigabe === f.key;
+              return (
+                <Pressable
+                  key={f.key}
+                  style={[styles.option, an && styles.optionAn]}
+                  onPress={() => {
+                    setFreigabe(f.key);
+                    onNotice?.(`Standort sichtbar für: ${f.label}`);
+                  }}
+                >
+                  <Text style={[styles.optionText, an && styles.optionTextAn]}>{f.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
+      <Text style={styles.listHead}>IN DEINER NÄHE</Text>
       {mockFriendPins.map((pin) => {
         const person = mockUsers[pin.id];
+        const istAktiv = aktiv === pin.id;
         return (
           <Pressable
             key={pin.id}
-            style={[styles.pin, { left: `${pin.x}%`, top: `${pin.y}%` }]}
-            onPress={() => onOpenProfile(pin.id)}
+            style={[styles.row, istAktiv && styles.rowAktiv]}
+            onPress={() => zeigeAufKarte(pin.id)}
           >
-            <View style={[styles.dot, { backgroundColor: avatarColor(pin.id) }]}>
-              <Text style={styles.dotText}>{person.name.slice(0, 2).toUpperCase()}</Text>
+            <Avatar id={pin.id} name={person.name} size={44} />
+            <View style={styles.rowBody}>
+              <Text style={styles.rowName}>{person.name}</Text>
+              <Text style={styles.rowSub}>
+                {pin.place} · {pin.when}
+              </Text>
             </View>
-            <Text style={styles.pinLabel}>{person.name.split(' ')[0]}</Text>
+            {/* Zum Profil geht es weiterhin - aber ausdruecklich ueber diesen
+                Knopf, nicht mehr durch Tippen auf die ganze Zeile. */}
+            <Pressable
+              hitSlop={8}
+              style={styles.profilBtn}
+              onPress={() => onOpenProfile(pin.id)}
+            >
+              <Ionicons name="person-circle-outline" size={24} color={colors.text3} />
+            </Pressable>
           </Pressable>
         );
       })}
-      <View style={styles.me} />
-    </View>
-
-    <Text style={styles.listHead}>IN DEINER NÄHE</Text>
-    {mockFriendPins.map((pin) => {
-      const person = mockUsers[pin.id];
-      return (
-        <Pressable key={pin.id} style={styles.row} onPress={() => onOpenProfile(pin.id)}>
-          <Avatar id={pin.id} name={person.name} size={44} />
-          <View style={styles.rowBody}>
-            <Text style={styles.rowName}>{person.name}</Text>
-            <Text style={styles.rowSub}>
-              {pin.place} · {pin.when}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-        </Pressable>
-      );
-    })}
-  </ScrollView>
-);
+    </ScrollView>
+  );
+};
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
-  content: { paddingBottom: spacing.xl },
-  title: { ...typography.title, color: colors.text, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  map: {
-    height: 320,
-    margin: spacing.lg,
+  content: { paddingTop: spacing.lg, paddingBottom: spacing.xl },
+
+  freigabe: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.md,
     borderRadius: radius.lg,
+    backgroundColor: colors.surface2,
+  },
+  freigabeKopf: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  freigabeText: { flex: 1 },
+  freigabeTitel: { color: colors.text, ...typography.name },
+  freigabeSub: { color: colors.text2, marginTop: 2, ...typography.small },
+  optionen: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  option: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
     backgroundColor: colors.surface3,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    overflow: 'hidden',
   },
-  pin: { position: 'absolute', alignItems: 'center', gap: 3, marginLeft: -19, marginTop: -44 },
-  dot: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2.5,
-    borderColor: colors.surface,
-  },
-  dotText: { color: colors.white, fontSize: 13, fontWeight: '700' },
-  pinLabel: {
-    ...typography.small,
-    color: colors.text,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 7,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  me: {
-    position: 'absolute',
-    left: '50%',
-    top: '46%',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    marginLeft: -9,
-    marginTop: -9,
-    backgroundColor: colors.brand,
-    borderWidth: 3,
-    borderColor: colors.surface,
-  },
+  optionAn: { backgroundColor: colors.brand },
+  optionText: { color: colors.text2, fontSize: 13, fontWeight: '600' },
+  optionTextAn: { color: colors.white },
+
   listHead: {
     ...typography.overline,
     color: colors.text3,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
   row: {
@@ -109,7 +162,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: 9,
   },
+  rowAktiv: { backgroundColor: colors.brandSoft },
   rowBody: { flex: 1 },
   rowName: { ...typography.name, color: colors.text },
   rowSub: { ...typography.preview, color: colors.text2, marginTop: 2 },
+  profilBtn: { padding: 2 },
 });

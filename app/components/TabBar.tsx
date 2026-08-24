@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, sizes, typography } from '../constants/design';
 import { AreaKey, NAV } from '../constants/navigation';
@@ -11,8 +12,13 @@ interface Props {
 }
 
 /** Untere Leiste: die vier Bereiche aus dem Prototyp. */
-export const TabBar = ({ active, onChange, unreadCount = 0 }: Props) => (
-  <View style={styles.bar}>
+export const TabBar = ({ active, onChange, unreadCount = 0 }: Props) => {
+  const insets = useSafeAreaInsets();
+
+  return (
+  // Die Leiste haelt sich den Platz ueber der Home-Anzeige selbst frei, damit
+  // der App-Hintergrund bis an den unteren Rand laeuft.
+  <View style={[styles.bar, { height: sizes.tabBar + insets.bottom, paddingBottom: insets.bottom }]}>
     {NAV.map((area) => {
       const isActive = area.key === active;
       return (
@@ -36,7 +42,8 @@ export const TabBar = ({ active, onChange, unreadCount = 0 }: Props) => (
       );
     })}
   </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   bar: {

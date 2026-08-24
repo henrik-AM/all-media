@@ -98,14 +98,21 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 
 /* ---------- Top switcher ---------- */
+/*
+  Zum Homescreen hinzugefuegt laeuft die Seite unter der Statusleiste hindurch
+  (viewport-fit=cover). Die oberste Leiste haelt sich deshalb selbst den Platz
+  fuer Uhrzeit und Notch frei - sonst liegt sie darunter.
+*/
 .topbar {
   flex: 0 0 auto;
-  height: var(--top-h);
+  height: calc(var(--top-h) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
   gap: 6px;
-  padding: 0 14px;
+  padding-left: 14px;
+  padding-right: 14px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -225,11 +232,22 @@ ul { margin: 0; padding: 0; list-style: none; }
 .iconbtn-primary:active { transform: scale(.94); }
 
 /* ---------- Filter pills ---------- */
-.pills { display: flex; gap: 8px; padding: 12px 16px 6px; overflow-x: auto; scrollbar-width: none; }
+/*
+  overflow-x macht die Achse quer scrollbar, beschneidet dafuer aber senkrecht -
+  deshalb unten genug Luft, sonst wirken die Pills angeschnitten.
+*/
+.pills { display: flex; gap: 8px; padding: 12px 16px 10px; overflow-x: auto; scrollbar-width: none; }
 .pills::-webkit-scrollbar { display: none; }
-.pill { flex: 0 0 auto; }
 .pill {
-  padding: 7px 15px;
+  flex: 0 0 auto;
+  /* Ein Button zentriert seinen Text nicht von allein - erst inline-flex
+     stellt die Schrift sicher in die Mitte der Pille. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  line-height: 1;
+  padding: 0 15px;
   border-radius: 999px;
   background: var(--surface-3);
   color: var(--text-2);
@@ -412,6 +430,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   align-items: center;
   gap: 11px;
   padding: 9px 12px;
+  padding-top: calc(9px + env(safe-area-inset-top));
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -862,6 +881,55 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-size: 15px;
 }
 .sheet__field input:focus { box-shadow: 0 0 0 2px var(--brand); }
+
+/* Mehrzeilige Felder (Gruppen-Info, Nachricht zur Kontaktanfrage) */
+.sheet__field textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-3);
+  outline: none;
+  font-size: 15px;
+  resize: none;
+}
+.sheet__field textarea:focus { box-shadow: 0 0 0 2px var(--brand); }
+.sheet__label { display: block; margin-bottom: 6px; font-size: 12.5px; color: var(--text-2); }
+.sheet__row { display: flex; align-items: center; gap: 10px; }
+.sheet__row input { flex: 1 1 auto; }
+.group-pic {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.row__sub { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
+
+/* Hinweis im Chat, solange die Kontaktanfrage noch laeuft */
+.anfrage {
+  flex: 0 0 auto;
+  margin: 0 12px 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface-3);
+}
+.anfrage__text { font-size: 12.5px; color: var(--text-2); }
+.anfrage__btn {
+  margin-top: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.composer__field textarea:disabled { opacity: .6; cursor: not-allowed; }
 .sheet__hint { padding: 0 16px 8px; font-size: 12.5px; color: var(--text-3); }
 .sheet__footer { padding: 10px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
 
@@ -1138,3 +1206,135 @@ body:has(.camera) .toast { bottom: 132px; }
 .highlight__ring.is-highlight { border-color: #F5A524; border-width: 2px; color: #F5A524; }
 
 .viewer__hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+
+/* ---------- Karte (Friend-Map) ---------- */
+/*
+  Selbst gezeichnete Karte statt echter Kacheln: laeuft ohne Kartendienst,
+  ohne Schluessel und ohne Netz. Fuer echte Kacheln spaeter ein Kartenanbieter.
+*/
+.map__flaeche {
+  position: absolute;
+  inset: 0;
+  transform-origin: center;
+  transition: transform .25s ease;
+  cursor: grab;
+}
+.map__flaeche:active { cursor: grabbing; }
+.map__park {
+  position: absolute; left: 54%; top: 24%; width: 30%; height: 22%;
+  border-radius: 14px; background: #CFE0C3;
+}
+.map__fluss {
+  position: absolute; left: -10%; top: 60%; width: 130%; height: 22px;
+  background: #BBD7E8; transform: rotate(-8deg);
+}
+.map__block { position: absolute; background: #DCDFD8; border-radius: 3px; }
+.map__strasse-v { position: absolute; top: 0; bottom: 0; width: 5px; background: #FAFAF8; }
+.map__strasse-h { position: absolute; left: 0; right: 0; height: 5px; background: #FAFAF8; }
+.map { background: #E8EDE4; touch-action: none; }
+.map__pin.is-aktiv .map__dot { border-color: var(--brand); border-width: 3.5px; }
+
+.map__zoom {
+  position: absolute; right: 10px; top: 10px; z-index: 2;
+  border-radius: 12px; overflow: hidden; background: rgba(255,255,255,.94);
+}
+.map__zoom button {
+  display: grid; place-items: center;
+  width: 36px; height: 36px; color: var(--text);
+}
+.map__zoom button + button { border-top: 1px solid var(--border); }
+.map__zoom svg { width: 20px; height: 20px; }
+.map__reset {
+  position: absolute; left: 10px; bottom: 10px; z-index: 2;
+  padding: 7px 12px; border-radius: 999px;
+  background: rgba(255,255,255,.94);
+  font-size: 12.5px; font-weight: 600; color: var(--text);
+}
+
+/* ---------- Standort-Freigabe ---------- */
+.standort { margin: 12px 16px 0; padding: 12px; border-radius: 14px; background: var(--surface-2); }
+.standort__kopf { display: flex; align-items: center; gap: 12px; }
+.standort__icon { display: grid; place-items: center; color: var(--brand); }
+.standort__icon svg { width: 19px; height: 19px; }
+.standort__text { flex: 1 1 auto; min-width: 0; }
+.standort__titel { font-size: 15px; font-weight: 600; }
+.standort__sub { margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
+.standort__optionen { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+.schalter { position: relative; display: inline-block; width: 46px; height: 28px; flex: 0 0 auto; }
+.schalter input { opacity: 0; width: 0; height: 0; }
+.schalter span {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--surface-3); transition: background .2s; cursor: pointer;
+}
+.schalter span::before {
+  content: ''; position: absolute; left: 3px; top: 3px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .2s;
+}
+.schalter input:checked + span { background: var(--brand); }
+.schalter input:checked + span::before { transform: translateX(18px); }
+
+.row.is-aktiv { background: var(--brand-soft); }
+.iconbtn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--text-3); }
+.iconbtn:hover { background: var(--surface-2); }
+.iconbtn svg { width: 20px; height: 20px; }
+
+/* ---------- Kontaktprofil (Messenger) ---------- */
+.kp__kopf {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 28px 16px; background: var(--surface);
+}
+.kp__name { margin-top: 12px; font-size: 21px; font-weight: 700; }
+.kp__handle { font-size: 15px; color: var(--text-3); }
+.kp__nummer { margin-top: 2px; font-size: 15px; color: var(--text-2); }
+.kp__aktionen {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: 14px 0; margin-bottom: 8px;
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.kp__aktionen button {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  color: var(--brand); font-size: 12.5px;
+}
+.kp__aktionen svg { width: 21px; height: 21px; }
+.kp__liste { background: var(--surface); margin-bottom: 8px; }
+.kp__zeile {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 16px; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.kp__zeileText { flex: 1 1 auto; font-size: 15px; }
+.kp__zeileWert { font-size: 12.5px; color: var(--text-3); }
+.kp__zeile.is-danger .kp__zeileText { color: var(--danger); }
+
+/* ---------- Kontowechsel ---------- */
+.konto__aktiv { display: grid; place-items: center; color: var(--brand); }
+.konto__aktiv svg { width: 22px; height: 22px; }
+.konto__rund {
+  flex: 0 0 auto;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--brand-soft); color: var(--brand);
+  display: grid; place-items: center;
+}
+.konto__rund svg { width: 20px; height: 20px; }
+.konto__aktion { font-size: 15px; font-weight: 600; color: var(--brand); }
+
+.konto__kopf {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; background: var(--surface); cursor: pointer;
+}
+.konto__body { flex: 1 1 auto; min-width: 0; }
+.konto__name { font-size: 17px; font-weight: 700; }
+.konto__mail { margin-top: 2px; font-size: 12.5px; color: var(--text-3); }
+.konto__pfeil { color: var(--text-3); display: grid; place-items: center; }
+.konto__wechsel {
+  display: flex; align-items: center; gap: 8px; width: calc(100% - 32px);
+  margin: 0 16px 8px; padding: 11px 12px;
+  border-radius: 12px; background: var(--brand-soft);
+  color: var(--brand); font-size: 15px; font-weight: 600;
+}
+.konto__wechsel svg { width: 18px; height: 18px; }
+.avatar--52 { width: 52px; height: 52px; font-size: 17px; }

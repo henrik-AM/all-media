@@ -148,12 +148,17 @@ const STRUCTURE = {
   assert('Neu-Menue mit drei Eintraegen', (await p.$$eval('[data-new]', e => e.length)) === 3);
   await p.click('[data-new="group"]');
   await p.waitForTimeout(400);
-  await p.fill('#groupName', 'Smoke-Test-Gruppe');
+  // Schritt 1: erst die Personen auswaehlen (Name kommt erst danach).
   await p.click('[data-member="u1"]');
   await p.waitForTimeout(250);
   await p.click('[data-member="u2"]');
   await p.waitForTimeout(250);
-  assert('Auswahl wird gezaehlt', (await p.$eval('.sheet__title', e => e.textContent)).includes('2 ausgewählt'));
+  assert('Auswahl wird gezaehlt', (await p.$eval('.sheet__title', e => e.textContent)).includes('2'));
+  await p.click('#groupNext');
+  await p.waitForTimeout(400);
+  // Schritt 2: Name und Info.
+  assert('Schritt 2 fragt den Namen', !!(await p.$('#groupName')));
+  await p.fill('#groupName', 'Smoke-Test-Gruppe');
   await p.click('#groupCreate');
   await p.waitForTimeout(800);
   assert('Gruppe oeffnet sich als Chat', (await p.$eval('.chathead__name', e => e.textContent.trim())) === 'Smoke-Test-Gruppe');
@@ -246,7 +251,9 @@ const STRUCTURE = {
   await p.waitForTimeout(400);
   await p.click('[data-csfilter="people"]');
   await p.waitForTimeout(350);
-  assert('Filter Kontakte zeigt nur Profile', (await p.$$eval('[data-befriend]', e => e.length)) === 6);
+  // Neun Personen: sechs Kontakte plus drei, die noch keine sind (damit sich
+  // "Kontakt hinzufuegen" ueberhaupt ausprobieren laesst).
+  assert('Filter Kontakte zeigt nur Profile', (await p.$$eval('[data-befriend]', e => e.length)) === 9);
   await p.click('[data-csfilter="channels"]');
   await p.waitForTimeout(350);
   assert('Filter Communitys zeigt nur Kanaele', (await p.$$eval('[data-community]', e => e.length)) === 6);
@@ -260,7 +267,12 @@ const STRUCTURE = {
   await p.waitForTimeout(400);
   assert('Einstellungen ohne obere Leiste', await p.$eval('#topbar', e => e.hidden));
   assert('Einstellungen ohne Seitentitel', !(await p.$('.pagehead__title')));
-  assert('Vier Abschnitte im Prototyp', (await p.$$eval('[data-jump]', e => e.length)) === 4);
+  // Die vier Abschnitte aus dem Prototyp muessen da sein. Weitere sind seit
+  // Henriks Rueckmeldung ausdruecklich erwuenscht, deshalb keine feste Anzahl.
+  const abschnitte = await p.$$eval('[data-jump]', e => e.map(x => x.dataset.jump));
+  assert('Prototyp-Abschnitte vorhanden',
+    ['allgemein', 'messenger', 'videos', 'communitys'].every(a => abschnitte.includes(a)));
+  assert('Zusaetzliche Abschnitte ergaenzt', abschnitte.length > 4);
   await p.click('[data-toggle="theme"]');
   await p.waitForTimeout(300);
   assert('Dark-Mode-Schalter', (await p.$eval('html', e => e.getAttribute('data-theme'))) === 'dark');

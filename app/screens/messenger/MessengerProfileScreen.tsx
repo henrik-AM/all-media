@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { AuthContext } from '../../contexts/AuthContext';
 import { SwitchBar } from '../../components/SwitchBar';
 import { colors, sizes, spacing, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
+  /** Oeffnet die Kontoliste (anderes eigenes Konto). */
+  onSwitchAccount: () => void;
   onOpenSettings: () => void;
   onNotice: (message: string) => void;
 }
@@ -19,16 +22,20 @@ const ITEMS = ['Standort-Sichtbarkeit', 'Story-Sichtbarkeit', 'Lesebestätigung'
  * neben Name und Biografie, die beiden Profilverweise, dann der Abschnitt
  * Einstellungen.
  */
-export const MessengerProfileScreen = ({ onSwitchArea, onOpenSettings, onNotice }: Props) => (
+export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSettings, onNotice }: Props) => {
+  const { user } = useContext(AuthContext);
+
+  return (
   <View style={styles.screen}>
-    <SwitchBar onPress={() => onNotice('Wähle „@videoprofil" oder „@communityprofil"')} />
+    {/* Fuehrt zur Kontoliste - hier hat Henrik den Kontowechsel gesucht. */}
+    <SwitchBar onPress={onSwitchAccount} />
 
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.head}>
-        <Avatar id="me" name="Du" size={sizes.avatarXl} />
+        <Avatar id={user?.profile.id ?? 'me'} name={user?.profile.name ?? 'Du'} size={sizes.avatarXl} />
         <View style={styles.headText}>
-          <Text style={styles.name}>Henrik</Text>
-          <Text style={styles.bio}>Baue gerade All Media.</Text>
+          <Text style={styles.name}>{user?.profile.name ?? 'Henrik'}</Text>
+          <Text style={styles.bio}>{user?.profile.about ?? 'Baue gerade All Media.'}</Text>
         </View>
       </View>
 
@@ -56,7 +63,8 @@ export const MessengerProfileScreen = ({ onSwitchArea, onOpenSettings, onNotice 
       </View>
     </ScrollView>
   </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },

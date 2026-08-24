@@ -8,6 +8,8 @@ export interface User {
   handle: string;
   status: PresenceStatus;
   about?: string;
+  /** Fuer das Finden ueber die Telefonnummer statt ueber den Benutzernamen. */
+  phone?: string;
 }
 
 export interface Message {
@@ -32,6 +34,11 @@ export interface Chat {
   time: string;
   unreadCount: number;
   muted?: boolean;
+  /**
+   * 'pending' = Kontaktanfrage laeuft noch. Bis zur Annahme ist genau eine
+   * Nachricht erlaubt, danach ist das Eingabefeld gesperrt.
+   */
+  requestState?: 'pending' | 'accepted';
 }
 
 export interface Contact {
@@ -39,6 +46,7 @@ export interface Contact {
   name: string;
   status: ContactStatus;
   about: string;
+  phone?: string;
 }
 
 export interface Profile {

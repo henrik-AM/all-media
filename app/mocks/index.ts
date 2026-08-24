@@ -3,13 +3,18 @@ import { AuthUser, Chat, Clip, Comment, Community, Contact, FriendPin, Hashtag, 
 export const CURRENT_USER_ID = 'me';
 
 export const mockUsers: Record<string, User> = {
-  me: { id: 'me', name: 'Henrik', handle: '@henrik', status: 'online', about: 'Hey, ich nutze All Media!' },
-  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', status: 'online', about: 'Verfügbar' },
-  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', status: 'away', about: 'Im Meeting' },
-  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', status: 'offline', about: 'Anfrage gesendet' },
-  u4: { id: 'u4', name: 'David König', handle: '@david', status: 'away', about: 'Beschäftigt' },
-  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', status: 'online', about: 'Hey, ich nutze All Media!' },
-  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', status: 'offline', about: 'Nur dringende Anrufe' },
+  me: { id: 'me', name: 'Henrik', handle: '@henrik', status: 'online', about: 'Hey, ich nutze All Media!', phone: '+49 170 1234567' },
+  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', status: 'online', about: 'Verfügbar', phone: '+49 151 2345678' },
+  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', status: 'away', about: 'Im Meeting', phone: '+49 152 3456789' },
+  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', status: 'offline', about: 'Anfrage gesendet', phone: '+49 160 4567890' },
+  u4: { id: 'u4', name: 'David König', handle: '@david', status: 'away', about: 'Beschäftigt', phone: '+49 171 5678901' },
+  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', status: 'online', about: 'Hey, ich nutze All Media!', phone: '+49 172 6789012' },
+  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', status: 'offline', about: 'Nur dringende Anrufe', phone: '+49 173 7890123' },
+  // Diese drei stehen bewusst NICHT in den Kontakten - sonst laesst sich
+  // "Kontakt hinzufuegen" gar nicht ausprobieren.
+  u7: { id: 'u7', name: 'Greta Hoffmann', handle: '@greta', status: 'online', about: 'Hey, ich nutze All Media!', phone: '+49 174 8901234' },
+  u8: { id: 'u8', name: 'Hakan Demir', handle: '@hakan', status: 'away', about: 'Unterwegs', phone: '+49 175 9012345' },
+  u9: { id: 'u9', name: 'Ida Nowak', handle: '@ida', status: 'offline', about: 'Bin bald zurück', phone: '+49 176 0123456' },
 };
 
 export const mockChats: Chat[] = [

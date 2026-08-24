@@ -9,14 +9,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { antwortAuf } from '../../lib/antworten';
 import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from '../../mocks';
 import { Chat, Message } from '../../types';
-
-const REPLIES = ['Alles klar!', 'Sehe ich genauso.', 'Melde mich gleich.', 'Danke dir!', 'Passt für mich.'];
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -29,9 +28,12 @@ interface Props {
   onCall: (kind: 'audio' | 'video') => void;
   onCamera: () => void;
   onOpenProfile: (userId: string) => void;
+  /** Offene Kontaktanfrage annehmen. */
+  onAcceptRequest?: (chatId: string) => void;
 }
 
-export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera, onOpenProfile }: Props) => {
+export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera, onOpenProfile, onAcceptRequest }: Props) => {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>(() => [
     ...(mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []),
     ...(extraMessages ?? []),
@@ -44,9 +46,13 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, []);
 
+  // Bis die Anfrage angenommen ist, bleibt es bei der einen Nachricht, die
+  // schon mit der Anfrage rausging.
+  const gesperrt = chat.requestState === 'pending';
+
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || gesperrt) return;
 
     const message: Message = {
       id: `m${Date.now()}`,
@@ -71,7 +77,7 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
           id: `r${Date.now()}`,
           chatId: chat.id,
           senderId: chat.userId!,
-          text: REPLIES[Math.floor(Math.random() * REPLIES.length)],
+          text: antwortAuf(text, chat.name),
           time: nowTime(),
         },
       ]);
@@ -111,8 +117,10 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    // Vollbild bis in die Ecken; Kopf- und Eingabezeile halten sich den Platz
+    // fuer Notch und Home-Anzeige selbst frei.
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={styles.headerBack} onPress={onBack} hitSlop={6}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
@@ -167,7 +175,21 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
           }
         />
 
-        <View style={styles.composer}>
+        {gesperrt && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
+              sobald {chat.name} sie angenommen hat.
+            </Text>
+            {/* In der Demo nimmt der Knopf die Anfrage stellvertretend an,
+                damit sich der weitere Ablauf ausprobieren laesst. */}
+            <Pressable style={styles.anfrageBtn} onPress={() => onAcceptRequest?.(chat.id)}>
+              <Text style={styles.anfrageBtnText}>Annahme simulieren</Text>
+            </Pressable>
+          </View>
+        )}
+
+        <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
           <Pressable style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
             <Ionicons name="add" size={24} color={colors.text2} />
           </Pressable>
@@ -176,8 +198,9 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
               style={styles.composerInput}
               value={draft}
               onChangeText={setDraft}
-              placeholder="Nachricht"
+              placeholder={gesperrt ? 'Warten auf Annahme …' : 'Nachricht'}
               placeholderTextColor={colors.text3}
+              editable={!gesperrt}
               multiline
             />
             <Pressable style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
@@ -185,19 +208,37 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
             </Pressable>
           </View>
           <Pressable
-            style={[styles.send, !draft.trim() && styles.sendDisabled]}
+            style={[styles.send, (!draft.trim() || gesperrt) && styles.sendDisabled]}
             onPress={send}
-            disabled={!draft.trim()}
+            disabled={!draft.trim() || gesperrt}
           >
             <Ionicons name="send" size={17} color={colors.white} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  anfrage: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface3,
+    gap: spacing.sm,
+  },
+  anfrageText: { color: colors.text2, ...typography.small },
+  anfrageBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+  },
+  anfrageBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+
   container: { flex: 1, backgroundColor: colors.surface },
   flex: { flex: 1 },
 

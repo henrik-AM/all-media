@@ -1,7 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { Avatar } from '../../components/Avatar';
+import { AuthContext } from '../../contexts/AuthContext';
+import { colors, radius, sizes, spacing, typography } from '../../constants/design';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -34,12 +36,61 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    id: 'messenger',
-    title: 'Messenger',
+    id: 'konto',
+    title: 'Konto',
     items: [
-      { label: 'Lesebestätigung', icon: 'checkmark-done-outline' },
+      { label: 'Profil bearbeiten', icon: 'person-circle-outline' },
+      { label: 'Telefonnummer ändern', icon: 'call-outline' },
+      { label: 'Passwort ändern', icon: 'key-outline' },
+      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield-checkmark-outline' },
+      { label: 'Konto löschen', icon: 'trash-outline' },
+    ],
+  },
+  {
+    id: 'datenschutz',
+    title: 'Datenschutz',
+    items: [
+      { label: 'Zuletzt online', icon: 'time-outline' },
+      { label: 'Profilbild sichtbar für', icon: 'image-outline' },
+      { label: 'Info sichtbar für', icon: 'information-circle-outline' },
+      { label: 'Blockierte Kontakte', icon: 'ban-outline' },
+      { label: 'Gruppen: wer darf hinzufügen', icon: 'people-outline' },
+      { label: 'Bildschirmsperre', icon: 'finger-print-outline', toggle: 'bildschirmsperre' },
+    ],
+  },
+  {
+    id: 'benachrichtigungen',
+    title: 'Mitteilungen',
+    items: [
+      { label: 'Nachrichten-Töne', icon: 'notifications-outline', toggle: 'toene' },
+      { label: 'Vibration', icon: 'phone-portrait-outline', toggle: 'vibration' },
+      { label: 'Vorschau anzeigen', icon: 'eye-outline', toggle: 'vorschau' },
+      { label: 'Gruppen-Mitteilungen', icon: 'people-circle-outline' },
+      { label: 'Ruhezeiten', icon: 'moon-outline' },
+    ],
+  },
+  {
+    id: 'messenger',
+    title: 'Chats',
+    items: [
+      { label: 'Lesebestätigung', icon: 'checkmark-done-outline', toggle: 'lesebestaetigung' },
       { label: 'Standort-Sichtbarkeit', icon: 'location-outline' },
       { label: 'Story-Sichtbarkeit', icon: 'eye-outline' },
+      { label: 'Mit Enter senden', icon: 'return-down-back-outline', toggle: 'entersenden' },
+      { label: 'Chat-Hintergrund', icon: 'color-palette-outline' },
+      { label: 'Schriftgröße', icon: 'text-outline' },
+      { label: 'Chat-Verlauf sichern', icon: 'cloud-upload-outline' },
+      { label: 'Archivierte Chats', icon: 'archive-outline' },
+    ],
+  },
+  {
+    id: 'speicher',
+    title: 'Speicher',
+    items: [
+      { label: 'Automatischer Download', icon: 'download-outline' },
+      { label: 'Speicher verwalten', icon: 'pie-chart-outline' },
+      { label: 'Datensparmodus', icon: 'cellular-outline', toggle: 'datensparen' },
+      { label: 'Medienqualität', icon: 'options-outline' },
     ],
   },
   {
@@ -56,6 +107,17 @@ const SECTIONS: Section[] = [
       { label: 'Story-Sichtbarkeit', icon: 'eye-outline' },
       { label: 'Nutzerstatus', icon: 'person-outline' },
       { label: 'Profilbanner', icon: 'tv-outline' },
+    ],
+  },
+  {
+    id: 'hilfe',
+    title: 'Hilfe',
+    items: [
+      { label: 'Hilfebereich', icon: 'help-circle-outline' },
+      { label: 'Problem melden', icon: 'bug-outline' },
+      { label: 'Nutzungsbedingungen', icon: 'document-text-outline' },
+      { label: 'Datenschutzerklärung', icon: 'lock-closed-outline' },
+      { label: 'Freunde einladen', icon: 'share-social-outline' },
     ],
   },
   {
@@ -76,15 +138,25 @@ const SECTIONS: Section[] = [
 interface Props {
   onNotice: (message: string) => void;
   onLogout: () => void;
+  /** Oeffnet die Kontoliste zum Umschalten. */
+  onSwitchAccount: () => void;
 }
 
-export const SettingsScreen = ({ onNotice, onLogout }: Props) => {
+export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount }: Props) => {
+  const { user, konten } = useContext(AuthContext);
   const scroll = useRef<ScrollView>(null);
   const offsets = useRef<Record<string, number>>({});
   const [switches, setSwitches] = useState<Record<string, boolean>>({
     theme: false,
     videoPrivate: false,
     commPrivate: false,
+    bildschirmsperre: false,
+    toene: true,
+    vibration: true,
+    vorschau: true,
+    lesebestaetigung: true,
+    entersenden: false,
+    datensparen: false,
   });
 
   return (
@@ -104,6 +176,31 @@ export const SettingsScreen = ({ onNotice, onLogout }: Props) => {
       </View>
 
       <ScrollView ref={scroll} contentContainerStyle={styles.content}>
+        {/*
+          Der Kontowechsel gehoert nach ganz oben: Es ist die Einstellung, die
+          das ganze uebrige Bild veraendert.
+        */}
+        <Pressable style={styles.konto} onPress={onSwitchAccount}>
+          <Avatar
+            id={user?.profile.id ?? 'me'}
+            name={user?.profile.name ?? 'Konto'}
+            size={sizes.avatarLg}
+          />
+          <View style={styles.kontoBody}>
+            <Text style={styles.kontoName}>{user?.profile.name ?? 'Nicht angemeldet'}</Text>
+            <Text style={styles.kontoSub}>
+              {user?.email ?? '—'}
+              {konten.length > 1 ? `  ·  ${konten.length} Konten` : ''}
+            </Text>
+          </View>
+          <Ionicons name="swap-horizontal-outline" size={22} color={colors.brand} />
+        </Pressable>
+
+        <Pressable style={styles.wechselBtn} onPress={onSwitchAccount}>
+          <Ionicons name="people-outline" size={18} color={colors.brand} />
+          <Text style={styles.wechselText}>Konto wechseln oder hinzufügen</Text>
+        </Pressable>
+
         {SECTIONS.map((section) => (
           <View
             key={section.id}
@@ -164,6 +261,30 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
+  konto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  kontoBody: { flex: 1, minWidth: 0 },
+  kontoName: { color: colors.text, ...typography.h3 },
+  kontoSub: { color: colors.text3, marginTop: 2, ...typography.small },
+  wechselBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandSoft,
+  },
+  wechselText: { color: colors.brand, ...typography.name },
+
   group: { backgroundColor: colors.surface },
   item: {
     flexDirection: 'row',

@@ -5,10 +5,13 @@ import { colors, spacing, typography } from '../constants/design';
 /**
  * Leiste „Profil wechseln" über die volle Breite. Im Prototyp steht sie über
  * jedem der drei eigenen Profile (Messenger, Videos, Communitys).
+ *
+ * Sie fuehrt zur Kontoliste - also zum Wechsel auf ein anderes eigenes Konto,
+ * nicht zum Wechsel zwischen den drei Profilen desselben Kontos.
  */
-export const SwitchBar = ({ onPress }: { onPress: () => void }) => (
+export const SwitchBar = ({ onPress, label = 'Profil wechseln' }: { onPress: () => void; label?: string }) => (
   <Pressable style={styles.bar} onPress={onPress}>
-    <Text style={styles.text}>Profil wechseln</Text>
+    <Text style={styles.text}>{label}</Text>
   </Pressable>
 );
 

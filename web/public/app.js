@@ -461,70 +461,175 @@ function openNewMenu() {
 }
 
 function openNewGroup() {
-  const selected = new Set();
+  // Zwei Schritte wie bei WhatsApp: erst die Personen, dann Name und Infos.
+  // Vorher musste der Gruppenname vor der Auswahl feststehen - das war
+  // verdreht.
+  const zustand = { schritt: 1, gewaehlt: new Set(), extern: [], name: '', info: '' };
 
-  const body = () => `
+  const schrittEins = () => `
     <div class="sheet__field">
-      <input id="groupName" placeholder="Gruppenname" maxlength="40" />
+      <div class="sheet__row">
+        <input id="groupPhone" placeholder="Telefonnummer hinzufügen" autocomplete="off" />
+        <button class="iconbtn-primary" id="groupPhoneAdd" aria-label="Hinzufügen">${ICONS.plus}</button>
+      </div>
     </div>
+    <div class="sheet__hint">Auch Personen, die noch nicht in deinen Kontakten stehen.</div>
     <div class="sheet__body">
+      ${zustand.extern
+        .map(
+          (e) => `<div class="row">
+            ${avatarForUser(e.id, 44)}
+            <div class="row__body">
+              <div class="row__name">${esc(e.name)}</div>
+              <div class="row__sub">${e.extern ? 'Wird eingeladen' : esc(e.phone || '')}</div>
+            </div>
+            <button class="iconbtn" data-extern-remove="${e.id}" aria-label="Entfernen">${ICONS.close || '×'}</button>
+          </div>`
+        )
+        .join('')}
       ${state.contacts
         .filter((c) => c.status === 'friend')
         .map(
           (c) => `<button class="row" data-member="${c.id}">
             ${avatarForUser(c.id, 44)}
             <div class="row__body"><div class="row__name">${esc(c.name)}</div></div>
-            <span class="checkbox ${selected.has(c.id) ? 'is-on' : ''}">${selected.has(c.id) ? ICONS.check : ''}</span>
+            <span class="checkbox ${zustand.gewaehlt.has(c.id) ? 'is-on' : ''}">${
+              zustand.gewaehlt.has(c.id) ? ICONS.check : ''
+            }</span>
           </button>`
         )
         .join('')}
     </div>
     <div class="sheet__footer">
+      <button class="prof__btn is-primary" id="groupNext">Weiter</button>
+    </div>`;
+
+  const schrittZwei = () => `
+    <div class="sheet__field">
+      <div class="sheet__row">
+        <div class="group-pic" id="groupPic">${ICONS.camera}</div>
+        <span class="sheet__label">Gruppenbild hinzufügen</span>
+      </div>
+    </div>
+    <div class="sheet__field">
+      <label class="sheet__label" for="groupName">Gruppenname</label>
+      <input id="groupName" placeholder="z. B. Wochenend-Crew" maxlength="40" value="${esc(zustand.name)}" />
+    </div>
+    <div class="sheet__field">
+      <label class="sheet__label" for="groupInfo">Gruppen-Info (freiwillig)</label>
+      <textarea id="groupInfo" rows="3" maxlength="200" placeholder="Worum geht es in der Gruppe?">${esc(
+        zustand.info
+      )}</textarea>
+    </div>
+    <div class="sheet__hint">${anzahl()} ${anzahl() === 1 ? 'Person' : 'Personen'} ausgewählt</div>
+    <div class="sheet__footer">
       <button class="prof__btn is-primary" id="groupCreate">Gruppe erstellen</button>
     </div>`;
 
-  openSheet('Neue Gruppe', body(), (sheet, close) => {
-    const rerender = () => {
+  const anzahl = () => zustand.gewaehlt.size + zustand.extern.length;
+
+  const titel = () =>
+    zustand.schritt === 1
+      ? `Personen auswählen${anzahl() ? ` · ${anzahl()}` : ''}`
+      : 'Gruppe einrichten';
+
+  openSheet('Neue Gruppe', schrittEins(), (sheet, close) => {
+    const neuZeichnen = () => {
       sheet.querySelector('.sheet').innerHTML = `
         <div class="sheet__handle"></div>
-        <div class="sheet__title">Neue Gruppe${selected.size ? ` · ${selected.size} ausgewählt` : ''}</div>
-        ${body()}`;
-      bind();
+        <div class="sheet__title">${titel()}</div>
+        ${zustand.schritt === 1 ? schrittEins() : schrittZwei()}`;
+      binden();
     };
 
-    const bind = () => {
-      const nameInput = sheet.querySelector('#groupName');
-      nameInput.value = sheet.dataset.name || '';
-      nameInput.addEventListener('input', (e) => (sheet.dataset.name = e.target.value));
+    const binden = () => {
+      if (zustand.schritt === 1) {
+        sheet.querySelectorAll('[data-member]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const id = b.dataset.member;
+            zustand.gewaehlt.has(id) ? zustand.gewaehlt.delete(id) : zustand.gewaehlt.add(id);
+            neuZeichnen();
+          })
+        );
 
-      sheet.querySelectorAll('[data-member]').forEach((b) =>
-        b.addEventListener('click', () => {
-          const id = b.dataset.member;
-          selected.has(id) ? selected.delete(id) : selected.add(id);
-          rerender();
-        })
-      );
+        sheet.querySelectorAll('[data-extern-remove]').forEach((b) =>
+          b.addEventListener('click', () => {
+            zustand.extern = zustand.extern.filter((e) => e.id !== b.dataset.externRemove);
+            neuZeichnen();
+          })
+        );
+
+        const nummerFeld = sheet.querySelector('#groupPhone');
+        const nummerHinzu = async () => {
+          const roh = nummerFeld.value.trim();
+          if (!roh) return toast('Bitte eine Telefonnummer eingeben');
+
+          const res = await fetch('/api/personen/suche', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eingabe: roh }),
+          });
+          const gefunden = await res.json();
+
+          if (gefunden.person) {
+            const id = gefunden.person.id;
+            if (zustand.gewaehlt.has(id) || zustand.extern.some((e) => e.id === id)) {
+              return toast(`${gefunden.person.name} ist schon dabei`);
+            }
+            zustand.extern.push({ id, name: gefunden.person.name, phone: gefunden.person.phone });
+            toast(`${gefunden.person.name} hinzugefügt`);
+          } else {
+            if (zustand.extern.some((e) => e.phone === roh)) return toast('Diese Nummer ist schon dabei');
+            zustand.extern.push({ id: 'ext' + Date.now(), name: roh, phone: roh, extern: true });
+            toast(`${roh} wird eingeladen`);
+          }
+          neuZeichnen();
+        };
+
+        nummerFeld.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') nummerHinzu();
+        });
+        sheet.querySelector('#groupPhoneAdd').addEventListener('click', nummerHinzu);
+
+        sheet.querySelector('#groupNext').addEventListener('click', () => {
+          if (!anzahl()) return toast('Bitte mindestens eine Person auswählen');
+          zustand.schritt = 2;
+          neuZeichnen();
+        });
+        return;
+      }
+
+      // Schritt 2
+      const nameFeld = sheet.querySelector('#groupName');
+      const infoFeld = sheet.querySelector('#groupInfo');
+      nameFeld.focus();
+      nameFeld.addEventListener('input', (e) => (zustand.name = e.target.value));
+      infoFeld.addEventListener('input', (e) => (zustand.info = e.target.value));
+      sheet.querySelector('#groupPic').addEventListener('click', () => toast('Gruppenbild auswählen folgt'));
 
       sheet.querySelector('#groupCreate').addEventListener('click', async () => {
-        const name = (sheet.dataset.name || '').trim();
+        const name = zustand.name.trim();
         if (!name) return toast('Bitte einen Gruppennamen eingeben');
-        if (!selected.size) return toast('Bitte mindestens einen Kontakt auswählen');
 
         const res = await fetch('/api/groups', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, memberIds: [...selected] }),
+          body: JSON.stringify({
+            name,
+            memberIds: [...zustand.gewaehlt, ...zustand.extern.map((e) => e.id)],
+            info: zustand.info.trim(),
+          }),
         });
         const chat = await res.json();
         state.chats.unshift(chat);
         close();
-        toast(`Gruppe „${chat.name}" erstellt`);
+        toast(`Gruppe „${chat.name}“ erstellt`);
         openChat(chat.id);
       });
     };
 
     sheet.querySelector('.sheet').classList.add('sheet--tall');
-    bind();
+    neuZeichnen();
   });
 }
 
@@ -532,45 +637,153 @@ function openAddContact() {
   openSheet(
     'Kontakt hinzufügen',
     `<div class="sheet__field">
-      <input id="contactHandle" placeholder="Benutzername, z. B. @anna" autocomplete="off" />
+      <input id="contactHandle" placeholder="Benutzername oder Telefonnummer" autocomplete="off" />
     </div>
-    <div class="sheet__hint">Verfügbar: @anna, @bob, @clara, @david, @elif, @finn</div>
+    <div class="sheet__hint">Noch keine Kontakte: @greta, @hakan, @ida — oder deren Nummer, z. B. +49 174 8901234</div>
+    <div class="sheet__field">
+      <label class="sheet__label" for="contactMsg">Nachricht (freiwillig)</label>
+      <textarea id="contactMsg" rows="3" placeholder="Kurz schreiben, wer du bist …"></textarea>
+    </div>
+    <div class="sheet__hint">
+      Diese eine Nachricht geht schon mit der Anfrage raus. Weitere erst,
+      wenn die Anfrage angenommen wurde.
+    </div>
     <div class="sheet__footer">
       <button class="prof__btn is-primary" id="contactAdd">Anfrage senden</button>
     </div>`,
     (sheet, close) => {
       const input = sheet.querySelector('#contactHandle');
+      const msg = sheet.querySelector('#contactMsg');
       input.focus();
 
       const submit = async () => {
         const handle = input.value.trim();
-        if (!handle) return toast('Bitte einen Benutzernamen eingeben');
+        if (!handle) return toast('Bitte Benutzername oder Telefonnummer eingeben');
 
+        const nachricht = msg.value.trim();
         const res = await fetch('/api/contacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ handle }),
+          body: JSON.stringify({ handle, nachricht }),
         });
         const result = await res.json();
 
         if (!result.ok) return toast(result.error);
 
         state.contacts.push(result.contact);
+        if (result.chat) state.chats.unshift(result.chat);
         close();
-        toast(`Anfrage an ${result.contact.name} gesendet`);
+        toast(
+          nachricht
+            ? `Anfrage mit Nachricht an ${result.contact.name} gesendet`
+            : `Anfrage an ${result.contact.name} gesendet`
+        );
         if (overlay.querySelector('#contactSearch')) renderContacts();
+        else if (result.chat) openChat(result.chat.id);
       };
 
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') submit();
+        if (e.key === 'Enter') msg.focus();
       });
       sheet.querySelector('#contactAdd').addEventListener('click', submit);
     }
   );
 }
 
+/* ------------------------------------------------------ contact profile */
+/** Kontaktinfo aus Sicht des Messengers - an WhatsApp angelehnt. */
+async function openContactProfile(userId) {
+  const u = user(userId);
+  if (!u) return toast('Diese Person gibt es nicht');
+
+  const eintraege = [
+    ['images', 'Medien, Links und Dokumente', '128'],
+    ['star', 'Markierte Nachrichten', '3'],
+    ['mute', 'Stummschalten', ''],
+    ['clock', 'Selbstlöschende Nachrichten', 'Aus'],
+    ['lock', 'Verschlüsselung', 'Ende-zu-Ende'],
+  ];
+
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <header class="chathead">
+      <button class="chathead__back" id="kpBack" aria-label="Zurück">${ICONS.back}</button>
+      <div class="chathead__body"><div class="chathead__name">Kontaktinfo</div></div>
+    </header>
+
+    <div class="scroll">
+      <div class="kp__kopf">
+        ${avatarForUser(userId, 104)}
+        <div class="kp__name">${esc(u.name)}</div>
+        <div class="kp__handle">${esc(u.handle)}</div>
+        ${u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
+      </div>
+
+      <div class="kp__aktionen">
+        <button data-kp="message">${ICONS.chat || ICONS.send}<span>Nachricht</span></button>
+        <button data-kp="audio">${ICONS.phone}<span>Anrufen</span></button>
+        <button data-kp="video">${ICONS.video}<span>Video</span></button>
+        <button data-kp="search">${ICONS.search}<span>Suchen</span></button>
+      </div>
+
+      <div class="kp__liste">
+        ${eintraege
+          .map(
+            ([, label, wert]) => `<button class="kp__zeile" data-kp-item="${esc(label)}">
+              <span class="kp__zeileText">${esc(label)}</span>
+              ${wert ? `<span class="kp__zeileWert">${esc(wert)}</span>` : ''}
+              <span class="row__chevron">${ICONS.chevron}</span>
+            </button>`
+          )
+          .join('')}
+      </div>
+
+      <div class="kp__liste">
+        <button class="kp__zeile is-danger" data-kp-item="Kontakt blockieren">
+          <span class="kp__zeileText">Kontakt blockieren</span>
+        </button>
+        <button class="kp__zeile is-danger" data-kp-item="Kontakt melden">
+          <span class="kp__zeileText">Kontakt melden</span>
+        </button>
+      </div>
+    </div>`;
+
+  $('#kpBack').addEventListener('click', () => {
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+  });
+
+  overlay.querySelectorAll('[data-kp]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const was = b.dataset.kp;
+      if (was === 'message') {
+        const chat = state.chats.find((c) => c.userId === userId);
+        if (chat) return openChat(chat.id);
+        return toast('Noch kein Chat mit dieser Person');
+      }
+      toast(`${b.textContent.trim()} folgt`);
+    })
+  );
+
+  overlay.querySelectorAll('[data-kp-item]').forEach((b) =>
+    b.addEventListener('click', () => toast(`${b.dataset.kpItem} folgt`))
+  );
+}
+
 /* ---------------------------------------------------------- user profile */
-async function openProfile(userId) {
+/**
+ * Profil einer Person.
+ *
+ * variante 'kontakt'   = Sicht des Messengers, an WhatsApp angelehnt
+ * variante 'oeffentlich' = Beitragsprofil wie im Bereich Videos
+ *
+ * Vorher landete man aus einem Chat heraus immer im Beitragsprofil - aus dem
+ * Messenger heraus will man aber Nummer, Medien und Stummschalten sehen.
+ */
+async function openProfile(userId, variante) {
+  if (variante === undefined) variante = state.view === 'chats' || state.view === 'friendmap' ? 'kontakt' : 'oeffentlich';
+  if (variante === 'kontakt') return openContactProfile(userId);
+
   const res = await fetch(`/api/profile/${userId}`);
   if (!res.ok) return toast('Profil nicht verfügbar');
   let profile = await res.json();
@@ -1090,12 +1303,72 @@ const SETTINGS = [
     ],
   },
   {
-    id: 'messenger',
-    title: 'Messenger',
+    id: 'konto',
+    title: 'Konto',
     items: [
-      { label: 'Lesebestätigung', icon: 'checkDouble' },
+      { label: 'Profil bearbeiten', icon: 'person' },
+      { label: 'Telefonnummer ändern', icon: 'phone' },
+      { label: 'Passwort ändern', icon: 'lock' },
+      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield' },
+      { label: 'Konto löschen', icon: 'block' },
+    ],
+  },
+  {
+    id: 'datenschutz',
+    title: 'Datenschutz',
+    items: [
+      { label: 'Zuletzt online', icon: 'clock' },
+      { label: 'Profilbild sichtbar für', icon: 'image' },
+      { label: 'Info sichtbar für', icon: 'info' },
+      { label: 'Blockierte Kontakte', icon: 'block' },
+      { label: 'Gruppen: wer darf hinzufügen', icon: 'people' },
+      { label: 'Bildschirmsperre', icon: 'lock', toggle: 'bildschirmsperre' },
+    ],
+  },
+  {
+    id: 'mitteilungen',
+    title: 'Mitteilungen',
+    items: [
+      { label: 'Nachrichten-Töne', icon: 'bell', toggle: 'toene' },
+      { label: 'Vibration', icon: 'portrait', toggle: 'vibration' },
+      { label: 'Vorschau anzeigen', icon: 'eye', toggle: 'vorschau' },
+      { label: 'Gruppen-Mitteilungen', icon: 'people' },
+      { label: 'Ruhezeiten', icon: 'moon' },
+    ],
+  },
+  {
+    id: 'messenger',
+    title: 'Chats',
+    items: [
+      { label: 'Lesebestätigung', icon: 'checkDouble', toggle: 'lesebestaetigung' },
       { label: 'Standort-Sichtbarkeit', icon: 'mapPin' },
       { label: 'Story-Sichtbarkeit', icon: 'eye' },
+      { label: 'Mit Enter senden', icon: 'send', toggle: 'entersenden' },
+      { label: 'Chat-Hintergrund', icon: 'image' },
+      { label: 'Schriftgröße', icon: 'info' },
+      { label: 'Chat-Verlauf sichern', icon: 'bookmark' },
+      { label: 'Archivierte Chats', icon: 'bookmark' },
+    ],
+  },
+  {
+    id: 'speicher',
+    title: 'Speicher',
+    items: [
+      { label: 'Automatischer Download', icon: 'image' },
+      { label: 'Speicher verwalten', icon: 'compass' },
+      { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
+      { label: 'Medienqualität', icon: 'image' },
+    ],
+  },
+  {
+    id: 'hilfe',
+    title: 'Hilfe',
+    items: [
+      { label: 'Hilfebereich', icon: 'info' },
+      { label: 'Problem melden', icon: 'shield' },
+      { label: 'Nutzungsbedingungen', icon: 'bookmark' },
+      { label: 'Datenschutzerklärung', icon: 'lock' },
+      { label: 'Freunde einladen', icon: 'people' },
     ],
   },
   {
@@ -1129,7 +1402,17 @@ const SETTINGS = [
   },
 ];
 
-const toggles = { videoPrivate: false, commPrivate: false };
+const toggles = {
+  videoPrivate: false,
+  commPrivate: false,
+  bildschirmsperre: false,
+  toene: true,
+  vibration: true,
+  vorschau: true,
+  lesebestaetigung: true,
+  entersenden: false,
+  datensparen: false,
+};
 
 function renderSettings() {
   const itemHtml = (it) => {
@@ -1151,7 +1434,29 @@ function renderSettings() {
   main.innerHTML = `
     <div class="pagehead">
       <div class="pills">
-        ${SETTINGS.map((sec) => `<button class="pill" data-jump="${sec.id}">${esc(sec.title)}</button>`).join('')}
+        ${(() => {
+        if (!state.konten) {
+          const me = user('me');
+          state.konten = [{ id: 'me', name: 'Henrik', email: 'henrik@allmedia.de', initials: me.initials, color: me.color }];
+          state.kontoAktiv = 'me';
+        }
+        const aktiv = state.konten.find((k) => k.id === state.kontoAktiv) || state.konten[0];
+        return `
+        <div class="konto__kopf" id="kontoKopf">
+          <span class="avatar avatar--52" style="background:${aktiv.color}">${esc(aktiv.initials)}</span>
+          <div class="konto__body">
+            <div class="konto__name">${esc(aktiv.name)}</div>
+            <div class="konto__mail">${esc(aktiv.email)}${
+              state.konten.length > 1 ? `  ·  ${state.konten.length} Konten` : ''
+            }</div>
+          </div>
+          <span class="konto__pfeil">${ICONS.chevron}</span>
+        </div>
+        <button class="konto__wechsel" id="kontoWechselBtn">
+          ${ICONS.people}<span>Konto wechseln oder hinzufügen</span>
+        </button>`;
+      })()}
+      ${SETTINGS.map((sec) => `<button class="pill" data-jump="${sec.id}">${esc(sec.title)}</button>`).join('')}
       </div>
     </div>
     <div class="scroll" id="settingsScroll">
@@ -1171,6 +1476,9 @@ function renderSettings() {
         </button>
       </div>
     </div>`;
+
+  $('#kontoKopf')?.addEventListener('click', openKontoWechsel);
+  $('#kontoWechselBtn')?.addEventListener('click', openKontoWechsel);
 
   main.querySelectorAll('[data-jump]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -1201,42 +1509,186 @@ function renderSettings() {
 // Prototyp-Frame "Messenger - Friend-Map": Karte mit Freunden, darunter eine
 // Liste mit letztem Standort.
 function renderFriendMap() {
+  // Zoom und Verschiebung der Karte. Bleibt zwischen den Neuzeichnungen
+  // erhalten, damit ein Klick auf einen Kontakt nicht zurueckspringt.
+  const k = (state.karte = state.karte || { zoom: 1, x: 0, y: 0, aktiv: null });
+  const freigabeTexte = {
+    niemand: 'Dein Standort bleibt privat',
+    kontakte: 'Alle deine Kontakte sehen dich',
+    ausgewaehlt: 'Nur wen du freigibst',
+  };
+  if (state.standort === undefined) state.standort = { an: true, wer: 'kontakte' };
+
+  const strassenX = [12, 27, 44, 61, 78, 92];
+  const strassenY = [15, 33, 52, 70, 87];
+  const bloecke = [
+    [4, 6, 16, 18], [32, 4, 20, 14], [66, 8, 22, 16], [6, 40, 14, 20],
+    [34, 38, 18, 22], [70, 42, 18, 18], [14, 74, 22, 16], [52, 76, 26, 14],
+  ];
+
   main.innerHTML = `
     <div class="scroll">
       <div class="map" id="map">
-        <div class="map__grid"></div>
-        ${state.friends
-          .map((f) => {
-            const u = user(f.id);
-            return `<button class="map__pin" style="left:${f.x}%;top:${f.y}%" data-friend="${f.id}" title="${esc(u.name)}">
-              <span class="map__dot" style="background:${u.color}">${esc(u.initials)}</span>
-              <span class="map__label">${esc(u.name.split(' ')[0])}</span>
-            </button>`;
-          })
-          .join('')}
-        <div class="map__me" title="Dein Standort"><span></span></div>
+        <div class="map__flaeche" id="mapFlaeche">
+          <div class="map__park"></div>
+          <div class="map__fluss"></div>
+          ${bloecke
+            .map(([x, y, w, h]) => `<div class="map__block" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%"></div>`)
+            .join('')}
+          ${strassenX.map((x) => `<div class="map__strasse-v" style="left:${x}%"></div>`).join('')}
+          ${strassenY.map((y) => `<div class="map__strasse-h" style="top:${y}%"></div>`).join('')}
+          <div class="map__me" title="Dein Standort"><span></span></div>
+          ${state.friends
+            .map((f) => {
+              const u = user(f.id);
+              return `<button class="map__pin ${k.aktiv === f.id ? 'is-aktiv' : ''}" style="left:${f.x}%;top:${f.y}%" data-pin="${f.id}" title="${esc(u.name)}">
+                <span class="map__dot" style="background:${u.color}">${esc(u.initials)}</span>
+                <span class="map__label">${esc(u.name.split(' ')[0])}</span>
+              </button>`;
+            })
+            .join('')}
+        </div>
+
+        <div class="map__zoom">
+          <button id="zoomIn" aria-label="Näher">${ICONS.plus}</button>
+          <button id="zoomOut" aria-label="Weiter weg">${ICONS.minus || '−'}</button>
+        </div>
+        ${k.zoom > 1.05 ? '<button class="map__reset" id="mapReset">Ganze Karte</button>' : ''}
       </div>
+
+      <div class="standort">
+        <div class="standort__kopf">
+          <span class="standort__icon">${ICONS.mapPin}</span>
+          <div class="standort__text">
+            <div class="standort__titel">Deinen Standort teilen</div>
+            <div class="standort__sub">${
+              state.standort.an ? freigabeTexte[state.standort.wer] : 'Standort ist aus'
+            }</div>
+          </div>
+          <label class="schalter">
+            <input type="checkbox" id="standortAn" ${state.standort.an ? 'checked' : ''} />
+            <span></span>
+          </label>
+        </div>
+        ${
+          state.standort.an
+            ? `<div class="standort__optionen">
+                ${['niemand', 'kontakte', 'ausgewaehlt']
+                  .map(
+                    (w) => `<button class="pill ${state.standort.wer === w ? 'is-active' : ''}" data-wer="${w}">${
+                      { niemand: 'Niemand', kontakte: 'Alle Kontakte', ausgewaehlt: 'Ausgewählte' }[w]
+                    }</button>`
+                  )
+                  .join('')}
+              </div>`
+            : ''
+        }
+      </div>
+
       <div class="listhead">In deiner Nähe</div>
       <ul class="rows">
         ${state.friends
           .map((f) => {
             const u = user(f.id);
-            return `<li><button class="row" data-friend="${f.id}">
+            return `<li><div class="row ${k.aktiv === f.id ? 'is-aktiv' : ''}" data-zoom="${f.id}">
               ${avatarForUser(f.id, 44)}
               <div class="row__body">
                 <div class="row__name">${esc(u.name)}</div>
                 <div class="row__bottom"><span class="row__preview">${esc(f.place)} · ${esc(f.when)}</span></div>
               </div>
-              <span class="row__chevron">${ICONS.chevron}</span>
-            </button></li>`;
+              <button class="iconbtn" data-friend-profil="${f.id}" aria-label="Profil von ${esc(u.name)}">${ICONS.person || ICONS.chevron}</button>
+            </div></li>`;
           })
           .join('')}
       </ul>
     </div>`;
 
-  main.querySelectorAll('[data-friend]').forEach((el) =>
-    el.addEventListener('click', () => openProfile(el.dataset.friend))
+  const flaeche = $('#mapFlaeche');
+  const anwenden = () => {
+    flaeche.style.transform = `translate(${k.x}px, ${k.y}px) scale(${k.zoom})`;
+  };
+  anwenden();
+
+  const grenze = () => ({ x: ((k.zoom - 1) * 340) / 2, y: ((k.zoom - 1) * 340) / 2 });
+  const begrenzen = () => {
+    const g = grenze();
+    k.x = Math.max(-g.x, Math.min(g.x, k.x));
+    k.y = Math.max(-g.y, Math.min(g.y, k.y));
+  };
+
+  const setzeZoom = (z) => {
+    k.zoom = Math.max(1, Math.min(4, z));
+    begrenzen();
+    anwenden();
+    renderFriendMap();
+  };
+
+  $('#zoomIn').addEventListener('click', () => setzeZoom(k.zoom + 0.6));
+  $('#zoomOut').addEventListener('click', () => setzeZoom(k.zoom - 0.6));
+  $('#mapReset')?.addEventListener('click', () => {
+    k.zoom = 1; k.x = 0; k.y = 0; k.aktiv = null;
+    renderFriendMap();
+  });
+
+  /**
+   * Auf eine Person zoomen: Sie sitzt bei x/y Prozent und soll in die Mitte -
+   * dazu die Karte um die Abweichung von der Mitte verschieben.
+   */
+  const zoomAuf = (id) => {
+    const f = state.friends.find((x) => x.id === id);
+    if (!f) return;
+    k.aktiv = id;
+    k.zoom = 2.6;
+    k.x = ((50 - f.x) / 100) * 340 * k.zoom;
+    k.y = ((50 - f.y) / 100) * 340 * k.zoom;
+    begrenzen();
+    renderFriendMap();
+  };
+
+  main.querySelectorAll('[data-pin]').forEach((el) =>
+    el.addEventListener('click', () => zoomAuf(el.dataset.pin))
   );
+  // Tippen auf den Kontakt zoomt auf der Karte - fuehrt nicht mehr weg.
+  main.querySelectorAll('[data-zoom]').forEach((el) =>
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-friend-profil]')) return;
+      zoomAuf(el.dataset.zoom);
+    })
+  );
+  main.querySelectorAll('[data-friend-profil]').forEach((el) =>
+    el.addEventListener('click', () => openProfile(el.dataset.friendProfil, 'kontakt'))
+  );
+
+  $('#standortAn').addEventListener('change', (e) => {
+    state.standort.an = e.target.checked;
+    toast(state.standort.an ? 'Standort wird geteilt' : 'Standort ist aus');
+    renderFriendMap();
+  });
+  main.querySelectorAll('[data-wer]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.standort.wer = b.dataset.wer;
+      toast(`Standort sichtbar für: ${b.textContent.trim()}`);
+      renderFriendMap();
+    })
+  );
+
+  // Verschieben mit der Maus oder dem Finger
+  let zieht = false, startX = 0, startY = 0;
+  const map = $('#map');
+  const beginn = (cx, cy) => { zieht = true; startX = cx - k.x; startY = cy - k.y; };
+  const zug = (cx, cy) => {
+    if (!zieht) return;
+    k.x = cx - startX;
+    k.y = cy - startY;
+    begrenzen();
+    anwenden();
+  };
+  map.addEventListener('mousedown', (e) => beginn(e.clientX, e.clientY));
+  window.addEventListener('mousemove', (e) => zug(e.clientX, e.clientY));
+  window.addEventListener('mouseup', () => (zieht = false));
+  map.addEventListener('touchstart', (e) => beginn(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  map.addEventListener('touchmove', (e) => zug(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  map.addEventListener('touchend', () => (zieht = false));
 }
 
 /* ---------------------------------------------------- Messenger: Kamera */
@@ -1290,6 +1742,169 @@ function renderCameraPage() {
  * volle Breite, darunter Bild links neben Name und Biografie, dann die beiden
  * Profilverweise und der Abschnitt Einstellungen.
  */
+/* ------------------------------------------------------- Konto wechseln */
+/*
+ * Mehrere eigene Konten nebeneinander, wie man es von Instagram kennt.
+ *
+ * Henrik meinte mit "Profil wechseln" ausdruecklich nicht den Wechsel
+ * zwischen Messenger-, Video- und Community-Profil desselben Kontos, sondern
+ * ein zweites eigenstaendiges Konto, auf das man umschaltet.
+ */
+function openKontoWechsel() {
+  if (!state.konten) {
+    const me = user('me');
+    state.konten = [{ id: 'me', name: 'Henrik', email: 'henrik@allmedia.de', initials: me.initials, color: me.color }];
+    state.kontoAktiv = 'me';
+  }
+
+  const zustand = { ansicht: 'liste', name: '', email: '', passwort: '' };
+
+  const liste = () => `
+    <div class="sheet__body">
+      ${state.konten
+        .map(
+          (k) => `<div class="row" data-konto="${k.id}">
+            <span class="avatar avatar--44" style="background:${k.color}">${esc(k.initials)}</span>
+            <div class="row__body">
+              <div class="row__name">${esc(k.name)}</div>
+              <div class="row__sub">${esc(k.email)}</div>
+            </div>
+            ${
+              k.id === state.kontoAktiv
+                ? `<span class="konto__aktiv">${ICONS.check}</span>`
+                : `<button class="iconbtn" data-konto-weg="${k.id}" aria-label="Abmelden">${ICONS.close}</button>`
+            }
+          </div>`
+        )
+        .join('')}
+
+      <button class="row" data-konto-neu="anmelden">
+        <span class="konto__rund">${ICONS.person}</span>
+        <div class="row__body"><div class="konto__aktion">Bestehendes Konto hinzufügen</div></div>
+      </button>
+      <button class="row" data-konto-neu="neu">
+        <span class="konto__rund">${ICONS.plus}</span>
+        <div class="row__body"><div class="konto__aktion">Neues Konto erstellen</div></div>
+      </button>
+    </div>`;
+
+  const formular = () => `
+    ${
+      zustand.ansicht === 'neu'
+        ? `<div class="sheet__field">
+            <label class="sheet__label" for="kontoName">Name</label>
+            <input id="kontoName" placeholder="Wie sollen dich andere sehen?" value="${esc(zustand.name)}" />
+          </div>`
+        : ''
+    }
+    <div class="sheet__field">
+      <label class="sheet__label" for="kontoMail">E-Mail</label>
+      <input id="kontoMail" type="email" placeholder="name@beispiel.de" value="${esc(zustand.email)}" />
+    </div>
+    <div class="sheet__field">
+      <label class="sheet__label" for="kontoPass">Passwort</label>
+      <input id="kontoPass" type="password" placeholder="••••••••" />
+    </div>
+    <div class="sheet__footer">
+      <button class="prof__btn is-primary" id="kontoOk">
+        ${zustand.ansicht === 'neu' ? 'Konto erstellen' : 'Anmelden'}
+      </button>
+    </div>`;
+
+  const titel = () =>
+    zustand.ansicht === 'liste'
+      ? 'Konto wechseln'
+      : zustand.ansicht === 'anmelden'
+      ? 'Konto anmelden'
+      : 'Neues Konto';
+
+  openSheet('Konto wechseln', liste(), (sheet, close) => {
+    const neuZeichnen = () => {
+      sheet.querySelector('.sheet').innerHTML = `
+        <div class="sheet__handle"></div>
+        <div class="sheet__title">${titel()}</div>
+        ${zustand.ansicht === 'liste' ? liste() : formular()}`;
+      binden();
+    };
+
+    const anlegen = () => {
+      const email = ($('#kontoMail')?.value || '').trim();
+      const pass = ($('#kontoPass')?.value || '').trim();
+      const name = ($('#kontoName')?.value || '').trim();
+
+      if (zustand.ansicht === 'neu' && !name) return toast('Bitte einen Namen eingeben');
+      if (!email) return toast('Bitte E-Mail eingeben');
+      if (zustand.ansicht === 'neu' && pass.length < 6) return toast('Passwort: mindestens 6 Zeichen');
+      if (!pass) return toast('Bitte Passwort eingeben');
+
+      const vorhanden = state.konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
+      if (vorhanden) {
+        state.kontoAktiv = vorhanden.id;
+        close();
+        toast(`Gewechselt zu ${vorhanden.name}`);
+        return render();
+      }
+
+      const anzeige = name || email.split('@')[0].replace(/[._-]+/g, ' ');
+      const farben = ['#F2A65A', '#6C8AE4', '#E4699B', '#4DB6AC', '#9575CD', '#7986CB'];
+      const id = 'acc' + Date.now();
+      state.konten.push({
+        id,
+        name: anzeige.charAt(0).toUpperCase() + anzeige.slice(1),
+        email,
+        initials: anzeige.slice(0, 2).toUpperCase(),
+        color: farben[state.konten.length % farben.length],
+      });
+      state.kontoAktiv = id;
+      close();
+      toast(zustand.ansicht === 'neu' ? `Konto für ${anzeige} erstellt` : `Angemeldet als ${email}`);
+      render();
+    };
+
+    const binden = () => {
+      if (zustand.ansicht === 'liste') {
+        sheet.querySelectorAll('[data-konto]').forEach((el) =>
+          el.addEventListener('click', (e) => {
+            if (e.target.closest('[data-konto-weg]')) return;
+            const id = el.dataset.konto;
+            if (id === state.kontoAktiv) return close();
+            state.kontoAktiv = id;
+            const k = state.konten.find((x) => x.id === id);
+            close();
+            toast(`Gewechselt zu ${k.name}`);
+            render();
+          })
+        );
+        sheet.querySelectorAll('[data-konto-weg]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const id = b.dataset.kontoWeg;
+            const k = state.konten.find((x) => x.id === id);
+            state.konten = state.konten.filter((x) => x.id !== id);
+            if (state.kontoAktiv === id) state.kontoAktiv = state.konten[0]?.id || null;
+            toast(`${k.name} abgemeldet`);
+            neuZeichnen();
+          })
+        );
+        sheet.querySelectorAll('[data-konto-neu]').forEach((b) =>
+          b.addEventListener('click', () => {
+            zustand.ansicht = b.dataset.kontoNeu;
+            neuZeichnen();
+          })
+        );
+        return;
+      }
+
+      sheet.querySelector('#kontoOk').addEventListener('click', anlegen);
+      sheet.querySelector('#kontoPass').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') anlegen();
+      });
+    };
+
+    sheet.querySelector('.sheet').classList.add('sheet--tall');
+    neuZeichnen();
+  });
+}
+
 function switchBar(onClickId) {
   return `<button class="switchbar" id="${onClickId}">Profil wechseln</button>`;
 }
@@ -1328,9 +1943,8 @@ function renderMessengerProfile() {
       </div>
     </div>`;
 
-  $('#switchProfile').addEventListener('click', () =>
-    toast('Wähle unten „@videoprofil" oder „@communityprofil"')
-  );
+  // Fuehrt zur Kontoliste - hier hat Henrik den Kontowechsel gesucht.
+  $('#switchProfile').addEventListener('click', openKontoWechsel);
   main.querySelectorAll('[data-switch]').forEach((b) =>
     b.addEventListener('click', () => {
       state.area = b.dataset.switch;
@@ -1639,11 +2253,7 @@ async function renderVideoProfile() {
       }
     </div>`;
 
-  $('#switchProfile').addEventListener('click', () => {
-    state.area = 'messenger';
-    state.sub.messenger = 'profile';
-    render();
-  });
+  $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profLink').addEventListener('click', (e) => {
     e.preventDefault();
     toast(me.link);
@@ -1852,11 +2462,7 @@ function renderCommunityProfile() {
       ${joined.length ? `<div class="exp__head">Beigetreten →</div><ul class="rows">${joined.map(communityRow).join('')}</ul>` : ''}
     </div>`;
 
-  $('#switchProfile').addEventListener('click', () => {
-    state.area = 'messenger';
-    state.sub.messenger = 'profile';
-    render();
-  });
+  $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profLink').addEventListener('click', (e) => {
     e.preventDefault();
     toast('all-media.app');
@@ -1916,10 +2522,23 @@ async function openChat(chatId) {
       </div>
     </header>
     <div class="messages" id="messages"></div>
+    ${
+      chat.requestState === 'pending'
+        ? `<div class="anfrage">
+            <div class="anfrage__text">
+              Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
+              sobald ${esc(chat.name)} sie angenommen hat.
+            </div>
+            <button class="anfrage__btn" id="anfrageOk">Annahme simulieren</button>
+          </div>`
+        : ''
+    }
     <form class="composer" id="composer">
       <button type="button" class="composer__icon" id="attach" aria-label="Anhang">${ICONS.plus}</button>
       <div class="composer__field">
-        <textarea id="msgInput" rows="1" placeholder="Nachricht" autocomplete="off"></textarea>
+        <textarea id="msgInput" rows="1" placeholder="${
+          chat.requestState === 'pending' ? 'Warten auf Annahme …' : 'Nachricht'
+        }" autocomplete="off" ${chat.requestState === 'pending' ? 'disabled' : ''}></textarea>
         <button type="button" class="composer__icon" id="camBtn" aria-label="Kamera">${ICONS.camera}</button>
       </div>
       <button type="submit" class="composer__send" id="sendBtn" aria-label="Senden" disabled>${ICONS.send}</button>
@@ -1928,6 +2547,20 @@ async function openChat(chatId) {
   paintMessages(chat);
 
   $('#chatBack').addEventListener('click', closeChat);
+  $('#anfrageOk')?.addEventListener('click', async () => {
+    const res = await fetch(`/api/chats/${chat.id}/accept`, { method: 'POST' });
+    const result = await res.json();
+    if (!result.ok) return toast(result.error);
+
+    chat.requestState = 'accepted';
+    const inState = state.chats.find((c) => c.id === chat.id);
+    if (inState) inState.requestState = 'accepted';
+    const kontakt = state.contacts.find((c) => c.id === chat.userId);
+    if (kontakt) { kontakt.status = 'friend'; kontakt.about = 'Kontakt'; }
+
+    toast('Anfrage angenommen');
+    openChat(chat.id);
+  });
   overlay.querySelectorAll('[data-call]').forEach((b) =>
     b.addEventListener('click', () =>
       toast(b.dataset.call === 'video' ? 'Videoanruf folgt in Phase 3' : 'Anruf folgt in Phase 3')
@@ -1999,10 +2632,10 @@ async function sendMessage(chat) {
   state.messages.push(msg);
   paintMessages(chat);
 
-  if (!chat.isGroup) simulateReply(chat);
+  if (!chat.isGroup) simulateReply(chat, text);
 }
 
-function simulateReply(chat) {
+function simulateReply(chat, eingabe) {
   const box = $('#messages');
   if (!box) return;
   const typing = document.createElement('div');
@@ -2014,11 +2647,11 @@ function simulateReply(chat) {
   setTimeout(() => {
     if (state.openChatId !== chat.id) return;
     typing.remove();
-    const replies = ['Alles klar!', 'Sehe ich genauso.', 'Melde mich gleich.', 'Danke dir!', 'Passt für mich.'];
     state.messages.push({
       id: 'r' + Date.now(),
       from: chat.userId,
-      text: replies[Math.floor(Math.random() * replies.length)],
+      // Antwort richtet sich nach dem, was geschrieben wurde (antworten.js).
+      text: antwortAuf(eingabe || '', chat.name),
       time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
     });
     paintMessages(chat);

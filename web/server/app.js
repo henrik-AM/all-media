@@ -12,14 +12,49 @@ const path = require('path');
 const app = express();
 
 const users = {
-  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: '#F2A65A' },
-  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', initials: 'BM', color: '#6C8AE4' },
-  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', initials: 'CW', color: '#E4699B' },
-  u4: { id: 'u4', name: 'David König', handle: '@david', initials: 'DK', color: '#4DB6AC' },
-  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: '#9575CD' },
-  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: '#7986CB' },
-  me: { id: 'me', name: 'Du', handle: '@henrik', initials: 'DU', color: '#0A66FF' },
+  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: '#F2A65A', phone: '+49 151 2345678' },
+  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', initials: 'BM', color: '#6C8AE4', phone: '+49 152 3456789' },
+  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', initials: 'CW', color: '#E4699B', phone: '+49 160 4567890' },
+  u4: { id: 'u4', name: 'David König', handle: '@david', initials: 'DK', color: '#4DB6AC', phone: '+49 171 5678901' },
+  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: '#9575CD', phone: '+49 172 6789012' },
+  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: '#7986CB', phone: '+49 173 7890123' },
+  me: { id: 'me', name: 'Du', handle: '@henrik', initials: 'DU', color: '#0A66FF', phone: '+49 170 1234567' },
+  // Diese drei stehen bewusst NICHT in den Kontakten - sonst laesst sich
+  // "Kontakt hinzufuegen" gar nicht ausprobieren.
+  u7: { id: 'u7', name: 'Greta Hoffmann', handle: '@greta', initials: 'GH', color: '#EF6C6C', phone: '+49 174 8901234' },
+  u8: { id: 'u8', name: 'Hakan Demir', handle: '@hakan', initials: 'HD', color: '#5C9E6F', phone: '+49 175 9012345' },
+  u9: { id: 'u9', name: 'Ida Nowak', handle: '@ida', initials: 'IN', color: '#C48BD9', phone: '+49 176 0123456' },
 };
+
+// --- Person finden: Benutzername ODER Telefonnummer ------------------------
+// Henrik wollte nicht mehr an den Benutzernamen gebunden sein.
+
+/** Nur Ziffern, Laendervorwahl vereinheitlicht - "+49 170..." = "0170...". */
+function normalisiereNummer(eingabe) {
+  let z = String(eingabe).replace(/[^\d+]/g, '').replace(/^\+/, '00');
+  if (z.startsWith('00')) z = z.slice(2);
+  else if (z.startsWith('0')) z = '49' + z.slice(1);
+  return z;
+}
+
+function istNummer(eingabe) {
+  return /^[+\d][\d\s/()-]{4,}$/.test(String(eingabe).trim());
+}
+
+function findePerson(eingabe) {
+  const roh = String(eingabe).trim();
+  if (!roh) return null;
+  const personen = Object.values(users).filter((u) => u.id !== 'me');
+
+  if (istNummer(roh)) {
+    const gesucht = normalisiereNummer(roh);
+    return personen.find((u) => u.phone && normalisiereNummer(u.phone) === gesucht) || null;
+  }
+  const name = roh.replace(/^@/, '').toLowerCase();
+  return personen.find(
+    (u) => u.handle.replace('@', '').toLowerCase() === name || u.name.toLowerCase() === name
+  ) || null;
+}
 
 const chats = [
   { id: 'c1', userId: 'u1', name: 'Anna Schmidt', preview: 'Klingt gut, bis später!', time: '14:32', unread: 2, muted: false, isGroup: false },
@@ -377,6 +412,14 @@ app.post('/api/messages/:chatId', (req, res) => {
     return res.status(400).json({ error: 'Text erforderlich' });
   }
   const chatId = req.params.chatId;
+
+  // Solange die Anfrage laeuft, bleibt es bei der einen Nachricht, die schon
+  // mit der Anfrage rausging.
+  const offen = chats.find((c) => c.id === chatId);
+  if (offen && offen.requestState === 'pending') {
+    return res.json({ ok: false, error: 'Warte, bis die Anfrage angenommen wurde' });
+  }
+
   const store = communityMessages[chatId] ? communityMessages : messages;
   if (!store[chatId]) store[chatId] = [];
 
@@ -394,7 +437,7 @@ app.post('/api/messages/:chatId', (req, res) => {
 });
 
 app.post('/api/groups', (req, res) => {
-  const { name, memberIds } = req.body || {};
+  const { name, memberIds, info } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name erforderlich' });
   if (!Array.isArray(memberIds) || memberIds.length === 0) {
     return res.status(400).json({ error: 'Mindestens ein Mitglied erforderlich' });
@@ -404,7 +447,8 @@ app.post('/api/groups', (req, res) => {
     id: 'c' + Date.now(),
     userId: null,
     name: name.trim(),
-    preview: 'Gruppe erstellt',
+    preview: (info && info.trim()) || 'Gruppe erstellt',
+    info: (info && info.trim()) || '',
     time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
     unread: 0,
     muted: false,
@@ -421,24 +465,68 @@ app.post('/api/groups', (req, res) => {
 // Suche, keine Fehler der Anfrage. Deshalb 200 mit ok-Feld statt 404/409 —
 // sonst protokolliert der Browser bei jeder Fehleingabe einen Ladefehler.
 app.post('/api/contacts', (req, res) => {
-  const { handle } = req.body || {};
+  const { handle, nachricht } = req.body || {};
   if (!handle || !handle.trim()) {
-    return res.json({ ok: false, error: 'Bitte einen Benutzernamen eingeben' });
+    return res.json({ ok: false, error: 'Bitte Benutzername oder Telefonnummer eingeben' });
   }
 
-  const query = handle.trim().replace(/^@/, '').toLowerCase();
-  const person = Object.values(users).find(
-    (u) => u.id !== 'me' && (u.handle.replace('@', '').toLowerCase() === query || u.name.toLowerCase() === query)
-  );
+  const person = findePerson(handle);
 
-  if (!person) return res.json({ ok: false, error: 'Niemand mit diesem Namen gefunden' });
+  if (!person) {
+    return res.json({
+      ok: false,
+      error: istNummer(handle)
+        ? 'Zu dieser Nummer gibt es noch kein Konto'
+        : 'Niemand mit diesem Benutzernamen gefunden',
+    });
+  }
   if (contacts.some((c) => c.id === person.id)) {
     return res.json({ ok: false, error: `${person.name} ist bereits in deinen Kontakten` });
   }
 
-  const contact = { id: person.id, name: person.name, status: 'pending', about: 'Anfrage gesendet' };
+  const contact = { id: person.id, name: person.name, status: 'pending', about: 'Anfrage gesendet', phone: person.phone };
   contacts.push(contact);
-  res.json({ ok: true, contact });
+
+  // Chat zur Anfrage anlegen. Bis zur Annahme ist genau die eine
+  // mitgeschickte Nachricht erlaubt.
+  const text = (nachricht || '').trim();
+  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const chat = {
+    id: 'c' + Date.now(),
+    userId: person.id,
+    name: person.name,
+    preview: text || 'Anfrage gesendet',
+    time,
+    unread: 0,
+    muted: false,
+    isGroup: false,
+    requestState: 'pending',
+  };
+  chats.unshift(chat);
+  messages[chat.id] = text ? [{ id: 'm' + Date.now(), from: 'me', text, time }] : [];
+
+  res.json({ ok: true, contact, chat });
+});
+
+/** Person zu einer Nummer oder einem Benutzernamen nachschlagen. */
+app.post('/api/personen/suche', (req, res) => {
+  const { eingabe } = req.body || {};
+  const person = findePerson(eingabe || '');
+  res.json({ person: person || null });
+});
+
+/** Anfrage annehmen - danach ist der Chat frei benutzbar. */
+app.post('/api/chats/:chatId/accept', (req, res) => {
+  const chat = chats.find((c) => c.id === req.params.chatId);
+  if (!chat) return res.json({ ok: false, error: 'Chat nicht gefunden' });
+
+  chat.requestState = 'accepted';
+  const kontakt = contacts.find((c) => c.id === chat.userId);
+  if (kontakt) {
+    kontakt.status = 'friend';
+    kontakt.about = 'Kontakt';
+  }
+  res.json({ ok: true, chat });
 });
 
 // Story liken. Der Zustand liegt beim Server, damit das Herz beim erneuten

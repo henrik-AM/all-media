@@ -2,9 +2,23 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#ffffff" />
   <title>All Media</title>
+
+  <!--
+    Zum Homescreen hinzugefuegt laeuft die Seite ohne Safari-Leisten ueber den
+    ganzen Bildschirm. Ohne diese Angaben bleiben oben die Adresszeile und
+    unten die Werkzeugleiste stehen - das ist der Rand, den man sonst sieht.
+    "black-translucent" zieht den Inhalt bis unter die Statusleiste; den Platz
+    fuer Uhrzeit und Home-Anzeige haelt das CSS ueber env(safe-area-inset-*) frei.
+  -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="All Media" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -32,6 +46,7 @@
   <div class="toast" id="toast" hidden></div>
 
   <script src="/icons.js"></script>
+  <script src="/antworten.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
