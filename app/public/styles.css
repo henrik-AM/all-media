@@ -889,6 +889,8 @@ ul { margin: 0; padding: 0; list-style: none; }
   bottom: 28px;
   transform: translateX(-50%);
   z-index: 100;
+  max-width: 320px;
+  text-align: center;
   padding: 11px 18px;
   border-radius: 12px;
   background: #14171A;
@@ -1070,3 +1072,8 @@ ul { margin: 0; padding: 0; list-style: none; }
   border-bottom: 1px solid currentColor;
   border-bottom-color: rgba(128,128,128,.35);
 }
+
+/* Im Story-Viewer und in der Kamera sitzt unten die Eingabezeile — der Hinweis
+   rueckt darueber, damit er sie nicht verdeckt. */
+body:has(.viewer) .toast,
+body:has(.camera) .toast { bottom: 132px; }
