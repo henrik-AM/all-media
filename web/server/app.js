@@ -167,18 +167,18 @@ const comments = {
 };
 
 const posts = [
-  { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, liked: false, saved: false, following: true, notify: false },
-  { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, liked: true, saved: false, following: true, notify: true },
-  { id: 'p3', userId: 'u1', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', description: 'Oben angekommen. Der Aufstieg war jede Minute wert.', likedBy: 'David König', likes: 1204, comments: 96, liked: false, saved: true, following: false, notify: false },
-  { id: 'p4', userId: 'u6', location: 'Berlin', music: 'Lo-Fi Focus – beatlab', description: 'Kleine Commits, klare Historie. Mein Team dankt es mir.', likedBy: 'Elif Yilmaz', likes: 87, comments: 9, liked: false, saved: false, following: true, notify: false },
+  { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false },
+  { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, reposts: 0, reposted: false, liked: true, saved: false, following: true, notify: true },
+  { id: 'p3', userId: 'u1', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', description: 'Oben angekommen. Der Aufstieg war jede Minute wert.', likedBy: 'David König', likes: 1204, comments: 96, reposts: 0, reposted: false, liked: false, saved: true, following: false, notify: false },
+  { id: 'p4', userId: 'u6', location: 'Berlin', music: 'Lo-Fi Focus – beatlab', description: 'Kleine Commits, klare Historie. Mein Team dankt es mir.', likedBy: 'Elif Yilmaz', likes: 87, comments: 9, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false },
 ];
 
 const videos = [
-  { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, liked: false, saved: false },
-  { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, liked: true, saved: true },
-  { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, liked: false, saved: false },
-  { id: 'v4', userId: 'u2', description: 'Erster Laufversuch mit der neuen Kamera-Stabilisierung.', location: 'Rheinpark', music: 'Runner High – Aster', likes: 3140, comments: 74, shares: 22, liked: false, saved: false },
-  { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, liked: false, saved: false },
+  { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, reposted: false, liked: false, saved: false },
+  { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, reposted: false, liked: true, saved: true },
+  { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, reposted: false, liked: false, saved: false },
+  { id: 'v4', userId: 'u2', description: 'Erster Laufversuch mit der neuen Kamera-Stabilisierung.', location: 'Rheinpark', music: 'Runner High – Aster', likes: 3140, comments: 74, shares: 22, reposted: false, liked: false, saved: false },
+  { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false },
 ];
 
 const communities = [
@@ -262,6 +262,17 @@ const messages = {
 // Startzustands gemacht, den /api/reset wiederherstellt. Die Sammlungen werden
 // dabei an Ort und Stelle geleert und neu gefuellt, damit alle Handler
 // weiterhin auf dieselben Referenzen zeigen.
+// Was der Nutzer selbst repostet hat - fuellt den Repost-Reiter im eigenen
+// Profil. Ohne diese Liste blieb der Reiter immer leer.
+const reposts = [];
+
+/** Repost setzen oder zuruecknehmen. */
+function setzeRepost(art, id, an) {
+  const stelle = reposts.findIndex((r) => r.art === art && r.id === id);
+  if (an && stelle === -1) reposts.unshift({ art, id, zeit: Date.now() });
+  if (!an && stelle !== -1) reposts.splice(stelle, 1);
+}
+
 const SEED = structuredClone({ chats, contacts, posts, videos, communities, messages, communityMessages, comments, profiles, stories });
 
 function resetState() {
@@ -284,6 +295,7 @@ function resetState() {
   restoreMap(communityMessages, SEED.communityMessages);
   restoreMap(comments, SEED.comments);
   restoreMap(profiles, SEED.profiles);
+  reposts.length = 0;
 }
 
 app.use(express.json());
@@ -296,6 +308,19 @@ app.post('/api/reset', (req, res) => {
 
 app.get('/api/bootstrap', (req, res) => {
   res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends });
+});
+
+/** Die eigenen Reposts, aufgeloest zu Beitraegen und Videos. */
+app.get('/api/reposts', (req, res) => {
+  res.json(
+    reposts
+      .map((r) =>
+        r.art === 'post'
+          ? { art: 'post', eintrag: posts.find((p) => p.id === r.id) }
+          : { art: 'video', eintrag: videos.find((v) => v.id === r.id) }
+      )
+      .filter((r) => r.eintrag)
+  );
 });
 
 app.get('/api/profile/:userId', (req, res) => {
@@ -367,6 +392,11 @@ app.post('/api/posts/:id/:action', (req, res) => {
     post.following = !post.following;
   } else if (action === 'notify') {
     post.notify = !post.notify;
+  } else if (action === 'repost') {
+    // Der eigene Repost landet im Repost-Reiter des eigenen Profils.
+    post.reposted = !post.reposted;
+    post.reposts += post.reposted ? 1 : -1;
+    setzeRepost('post', post.id, post.reposted);
   } else {
     return res.status(400).json({ error: 'Unbekannte Aktion' });
   }
@@ -386,6 +416,10 @@ app.post('/api/videos/:id/:action', (req, res) => {
     video.saved = !video.saved;
   } else if (action === 'share') {
     video.shares += 1;
+  } else if (action === 'repost') {
+    video.reposted = !video.reposted;
+    video.shares += video.reposted ? 1 : -1;
+    setzeRepost('video', video.id, video.reposted);
   } else {
     return res.status(400).json({ error: 'Unbekannte Aktion' });
   }

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native';
+import { } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, spacing, typography } from '../../constants/design';
 import { uploadImage } from '../../lib/supabaseStorage';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }: Props) => {
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('photo');
   const [busy, setBusy] = useState(false);
 
@@ -55,7 +57,7 @@ export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: embedded ? 0 : insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.top}>
         {embedded ? (
           <View style={styles.spacer} />
@@ -103,7 +105,7 @@ export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }
           <Ionicons name="camera-reverse-outline" size={22} color={colors.white} />
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

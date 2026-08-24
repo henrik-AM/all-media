@@ -1342,3 +1342,16 @@ body:has(.camera) .toast { bottom: 132px; }
 }
 .konto__wechsel svg { width: 18px; height: 18px; }
 .avatar--52 { width: 52px; height: 52px; font-size: 17px; }
+
+/* Repost: aktiver Zustand */
+.postbtn.is-reposted, .railbtn.is-reposted { color: var(--success); }
+.postbtn__zahl { margin-left: 4px; font-size: 12px; font-weight: 600; }
+.postbtn { display: inline-flex; align-items: center; }
+
+/* Eigene Story im Betrachter */
+.viewer__bild { width: 100%; height: 100%; object-fit: contain; }
+.viewer__eigen {
+  flex: 1 1 auto; display: flex; align-items: center; gap: 8px;
+  color: #fff; font-size: 15px;
+}
+.viewer__eigen svg { width: 20px; height: 20px; }

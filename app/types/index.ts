@@ -82,6 +82,9 @@ export interface Post {
   saved: boolean;
   following: boolean;
   notify: boolean;
+  /** Wie oft der Beitrag geteilt wurde, und ob man selbst dabei ist. */
+  reposts: number;
+  reposted: boolean;
 }
 
 export interface Video {
@@ -95,6 +98,7 @@ export interface Video {
   shares: number;
   liked: boolean;
   saved: boolean;
+  reposted: boolean;
 }
 
 export interface Community {
@@ -115,6 +119,13 @@ export interface Story {
   own?: boolean;
   liked?: boolean;
   caption?: string;
+  /**
+   * Bei der eigenen Story: die aufgenommene Datei. Solange leer, fuehrt ein
+   * Tippen zur Kamera; sobald gefuellt, oeffnet sich der Betrachter.
+   */
+  mediaUri?: string;
+  /** Wann sie aufgenommen wurde - fuer "vor 3 Min." im Betrachter. */
+  aufgenommen?: number;
 }
 
 /** Querformat-Video aus dem Prototyp-Frame "Videos - Querformat". */

@@ -4,8 +4,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { StoryRail } from '../../components/StoryRail';
+import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
-import { mockPosts, mockStories, mockUsers } from '../../mocks';
+import { mockPosts, mockUsers } from '../../mocks';
 import { Post, Story } from '../../types';
 
 const compactNumber = (n: number): string => {
@@ -15,12 +16,14 @@ const compactNumber = (n: number): string => {
 };
 
 interface Props {
+  stories: Story[];
   onOpenStory: (story: Story) => void;
   onOpenProfile: (userId: string) => void;
   onNotice: (message: string) => void;
 }
 
-export const HomeFeedScreen = ({ onOpenStory, onOpenProfile, onNotice }: Props) => {
+export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onNotice }: Props) => {
+  const { istRepostet, umschalten } = useReposts();
   const [posts, setPosts] = useState<Post[]>(mockPosts);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
@@ -38,6 +41,16 @@ export const HomeFeedScreen = ({ onOpenStory, onOpenProfile, onNotice }: Props) 
   const toggleFollow = (post: Post) => {
     update(post.id, (p) => ({ ...p, following: !p.following }));
     onNotice(post.following ? 'Nicht mehr gefolgt' : 'Du folgst jetzt');
+  };
+
+  const toggleRepost = (post: Post) => {
+    const jetztAn = umschalten('post', post.id, post.description);
+    update(post.id, (p) => ({
+      ...p,
+      reposted: jetztAn,
+      reposts: p.reposts + (jetztAn ? 1 : -1),
+    }));
+    onNotice(jetztAn ? 'Repostet' : 'Repost zurückgenommen');
   };
 
   const toggleNotify = (post: Post) => {
@@ -97,8 +110,15 @@ export const HomeFeedScreen = ({ onOpenStory, onOpenProfile, onNotice }: Props) 
           <Pressable onPress={() => onNotice('Beitrag geteilt')} hitSlop={6}>
             <Ionicons name="paper-plane-outline" size={24} color={colors.text} />
           </Pressable>
-          <Pressable onPress={() => onNotice('Repost folgt in Phase 3')} hitSlop={6}>
-            <Ionicons name="repeat" size={26} color={colors.text} />
+          <Pressable style={styles.repost} onPress={() => toggleRepost(item)} hitSlop={6}>
+            <Ionicons
+              name="repeat"
+              size={26}
+              color={istRepostet('post', item.id) ? colors.success : colors.text}
+            />
+            {item.reposts > 0 && (
+              <Text style={styles.repostZahl}>{compactNumber(item.reposts)}</Text>
+            )}
           </Pressable>
           <Pressable style={styles.actionEnd} onPress={() => toggleSave(item)} hitSlop={6}>
             <Ionicons
@@ -132,7 +152,7 @@ export const HomeFeedScreen = ({ onOpenStory, onOpenProfile, onNotice }: Props) 
         data={posts}
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={<StoryRail stories={mockStories} onPress={onOpenStory} />}
+        ListHeaderComponent={<StoryRail stories={stories} onPress={onOpenStory} />}
       />
 
       <CommentSheet
@@ -145,6 +165,9 @@ export const HomeFeedScreen = ({ onOpenStory, onOpenProfile, onNotice }: Props) 
 };
 
 const styles = StyleSheet.create({
+  repost: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  repostZahl: { color: colors.success, fontSize: 12.5, fontWeight: '600' },
+
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
   title: { color: colors.text, ...typography.title },

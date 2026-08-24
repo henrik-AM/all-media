@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FlatList, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useReposts } from '../../contexts/RepostContext';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
+  const { istRepostet, umschalten } = useReposts();
   const [videos, setVideos] = useState<Video[]>(mockVideos);
   const [slideHeight, setSlideHeight] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
@@ -34,6 +36,16 @@ export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
   const toggleSave = (video: Video) => {
     update(video.id, (v) => ({ ...v, saved: !v.saved }));
     onNotice(video.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
+  };
+
+  const toggleRepost = (video: Video) => {
+    const jetztAn = umschalten('video', video.id, video.description);
+    update(video.id, (v) => ({
+      ...v,
+      reposted: jetztAn,
+      shares: v.shares + (jetztAn ? 1 : -1),
+    }));
+    onNotice(jetztAn ? 'Repostet' : 'Repost zurückgenommen');
   };
 
   const share = (video: Video) => {
@@ -70,9 +82,15 @@ export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
             <Text style={styles.railLabel}>{compactNumber(item.shares)}</Text>
           </Pressable>
 
-          <Pressable style={styles.railBtn} onPress={() => onNotice('Repost folgt in Phase 3')}>
-            <Ionicons name="repeat" size={28} color={colors.white} />
-            <Text style={styles.railLabel}>Repost</Text>
+          <Pressable style={styles.railBtn} onPress={() => toggleRepost(item)}>
+            <Ionicons
+              name="repeat"
+              size={28}
+              color={istRepostet('video', item.id) ? colors.success : colors.white}
+            />
+            <Text style={styles.railLabel}>
+              {istRepostet('video', item.id) ? 'Repostet' : 'Repost'}
+            </Text>
           </Pressable>
 
           <Pressable style={styles.railBtn} onPress={() => toggleSave(item)}>

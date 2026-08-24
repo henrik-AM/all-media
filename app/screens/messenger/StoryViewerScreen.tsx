@@ -1,15 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
-import { mockStories, mockUsers } from '../../mocks';
+import { mockUsers } from '../../mocks';
 import { Story } from '../../types';
 
 const DURATION = 6000;
 
 interface Props {
   story: Story;
+  /** Alle Storys - damit auch die eigene Aufnahme blaetterbar ist. */
+  alle: Story[];
   onClose: () => void;
   /** Antwort auf die Story — landet im Chat mit dieser Person. */
   onReply: (story: Story, text: string) => void;
@@ -23,8 +26,10 @@ interface Props {
  *  3. Eine Antwort landet wirklich im Chat mit dieser Person.
  *  4. Tippen links/rechts blaettert zur vorigen/naechsten Story.
  */
-export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) => {
-  const stories = mockStories.filter((s) => !s.own);
+export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice }: Props) => {
+  const insets = useSafeAreaInsets();
+  // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
+  const stories = alle.filter((s) => !s.own || s.mediaUri);
   const [index, setIndex] = useState(() => Math.max(stories.findIndex((s) => s.id === story.id), 0));
   const [liked, setLiked] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(stories.map((s) => [s.id, !!s.liked]))
@@ -34,6 +39,7 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
 
   const current = stories[index];
   const person = mockUsers[current.userId];
+  const istEigene = !!current.own;
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -85,8 +91,17 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
     onReply(current, text);
   };
 
+  /** "vor 3 Min." aus dem Aufnahmezeitpunkt. */
+  const alter = () => {
+    if (!current.aufgenommen) return 'vor 2 Std.';
+    const min = Math.floor((Date.now() - current.aufgenommen) / 60000);
+    if (min < 1) return 'gerade eben';
+    if (min < 60) return `vor ${min} Min.`;
+    return `vor ${Math.floor(min / 60)} Std.`;
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* Ein Balken, Zurueck-Pfeil links, Mehr-Menue rechts — wie im Prototyp. */}
       <View style={styles.bars}>
         <View style={styles.bar}>
@@ -100,8 +115,8 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
         </Pressable>
         <Avatar id={current.userId} name={person?.name ?? current.name} size={sizes.avatarSm} />
         <View style={styles.who}>
-          <Text style={styles.name}>{person?.name ?? current.name}</Text>
-          <Text style={styles.time}>vor 2 Std.</Text>
+          <Text style={styles.name}>{istEigene ? 'Deine Story' : person?.name ?? current.name}</Text>
+          <Text style={styles.time}>{alter()}</Text>
         </View>
         <Pressable onPress={() => onNotice('Weitere Optionen folgen')} hitSlop={10}>
           <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.white} />
@@ -109,7 +124,11 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
       </View>
 
       <View style={styles.stage}>
-        <Ionicons name="image-outline" size={56} color="rgba(255,255,255,0.4)" />
+        {current.mediaUri ? (
+          <Image source={{ uri: current.mediaUri }} style={styles.bild} resizeMode="contain" />
+        ) : (
+          <Ionicons name="image-outline" size={56} color="rgba(255,255,255,0.4)" />
+        )}
         {current.caption ? <Text style={styles.caption}>{current.caption}</Text> : null}
         <Pressable
           accessibilityLabel="Vorherige Story"
@@ -123,6 +142,22 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
         />
       </View>
 
+      {istEigene ? (
+        // Sich selbst antwortet man nicht - stattdessen der Blick darauf,
+        // wer die Story gesehen hat.
+        <View style={styles.foot}>
+          <Pressable
+            style={styles.ansichten}
+            onPress={() => onNotice('Wer deine Story gesehen hat, folgt mit dem Backend')}
+          >
+            <Ionicons name="eye-outline" size={20} color={colors.white} />
+            <Text style={styles.ansichtenText}>Ansichten</Text>
+          </Pressable>
+          <Pressable onPress={() => onNotice('Story löschen folgt')} hitSlop={8}>
+            <Ionicons name="trash-outline" size={22} color={colors.white} />
+          </Pressable>
+        </View>
+      ) : (
       <View style={styles.foot}>
         <TextInput
           style={styles.reply}
@@ -151,11 +186,16 @@ export const StoryViewerScreen = ({ story, onClose, onReply, onNotice }: Props) 
           />
         </Pressable>
       </View>
-    </SafeAreaView>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  bild: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
+  ansichten: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  ansichtenText: { color: colors.white, ...typography.body },
+
   container: { flex: 1, backgroundColor: colors.black },
   bars: { flexDirection: 'row', gap: 4, paddingHorizontal: spacing.md, paddingTop: spacing.md },
   bar: { flex: 1, height: 2.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },

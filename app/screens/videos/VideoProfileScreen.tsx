@@ -7,6 +7,7 @@ import { SwitchBar } from '../../components/SwitchBar';
 import { colors, spacing, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { mockProfiles, mockUsers } from '../../mocks';
+import { useReposts } from '../../contexts/RepostContext';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Tab = 'grid' | 'repost' | 'tagged' | 'saved';
@@ -30,6 +31,7 @@ const GRID = ['image', 'video', 'image', 'video', 'image', 'image', 'video', 'im
 
 /** Prototyp-Frame "Videos - Profil". */
 export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
+  const { reposts } = useReposts();
   const [tab, setTab] = useState<Tab>('grid');
   const me = mockProfiles.me;
 
@@ -97,11 +99,32 @@ export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
               </View>
             ))}
           </View>
+        ) : tab === 'repost' && reposts.length > 0 ? (
+          // Der Reiter war immer leer. Jetzt stehen hier die Beitraege und
+          // Videos, die man selbst repostet hat.
+          <View style={styles.grid}>
+            {reposts.map((r) => (
+              <View key={`${r.art}-${r.id}`} style={styles.gridItem}>
+                <Ionicons
+                  name={r.art === 'video' ? 'play-outline' : 'image-outline'}
+                  size={26}
+                  color={colors.text3}
+                />
+                <View style={styles.repostMarke}>
+                  <Ionicons name="repeat" size={12} color={colors.white} />
+                </View>
+              </View>
+            ))}
+          </View>
         ) : (
           <EmptyState
             icon={TABS.find((t) => t.key === tab)!.icon}
-            title="Noch nichts hier"
-            text="Dieser Bereich füllt sich, sobald du ihn benutzt."
+            title={tab === 'repost' ? 'Noch nichts repostet' : 'Noch nichts hier'}
+            text={
+              tab === 'repost'
+                ? 'Tippe im Feed auf den Repost-Knopf, dann erscheint es hier.'
+                : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
+            }
           />
         )}
       </ScrollView>
@@ -111,6 +134,17 @@ export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
+  repostMarke: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: { paddingBottom: spacing.xl },
   highlights: { gap: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   highlight: { alignItems: 'center', gap: 6, width: 68 },

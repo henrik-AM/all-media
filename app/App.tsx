@@ -3,6 +3,7 @@ import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { SupabaseProvider } from './contexts/SupabaseContext';
+import { RepostProvider } from './contexts/RepostContext';
 import { ActionSheet } from './components/ActionSheet';
 import { AddContactSheet } from './components/AddContactSheet';
 import { NewGroupSheet } from './components/NewGroupSheet';
@@ -32,7 +33,7 @@ import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors } from './constants/design';
-import { mockChats, mockContacts, mockUsers } from './mocks';
+import { mockChats, mockContacts, mockStories, mockUsers } from './mocks';
 import { Chat, Community, Contact, Message, Story } from './types';
 
 type Overlay =
@@ -64,6 +65,9 @@ const Shell = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>(mockChats);
   const [contacts, setContacts] = useState<Contact[]>(mockContacts);
+  // Storys liegen in der Shell, damit die eigene Aufnahme in der Leiste
+  // ankommt - vorher las jeder Bildschirm direkt die Mock-Daten.
+  const [stories, setStories] = useState<Story[]>(mockStories);
 
   const sub = subs[area];
   const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
@@ -163,8 +167,22 @@ const Shell = () => {
     setOverlay({ kind: 'profile', userId, variant: 'oeffentlich' });
 
   const openStory = (story: Story) => {
-    if (story.own) setOverlay({ kind: 'camera' });
-    else setOverlay({ kind: 'story', story });
+    // Eigene Story: noch leer -> aufnehmen, sonst ansehen.
+    if (story.own && !story.mediaUri) return setOverlay({ kind: 'camera' });
+    setOverlay({ kind: 'story', story });
+  };
+
+  /** Aufnahme aus der Kamera landet in der eigenen Story. */
+  const storyAufgenommen = (uri: string) => {
+    setStories((prev) =>
+      prev.map((s) =>
+        s.own
+          ? { ...s, mediaUri: uri, aufgenommen: Date.now(), viewed: false, name: 'Deine Story' }
+          : s
+      )
+    );
+    setOverlay(null);
+    setNotice('Deine Story ist online');
   };
 
   // Antwort auf eine Story: sie landet im Chat mit dieser Person, und der Chat
@@ -260,6 +278,7 @@ const Shell = () => {
     return (
       <StoryViewerScreen
         story={overlay.story}
+        alle={stories}
         onClose={() => setOverlay(null)}
         onReply={replyToStory}
         onNotice={setNotice}
@@ -279,13 +298,31 @@ const Shell = () => {
   }
 
   if (overlay?.kind === 'camera') {
-    return <CameraScreen onClose={() => setOverlay(null)} onNotice={setNotice} />;
+    return (
+      <CameraScreen
+        onClose={() => setOverlay(null)}
+        onCaptured={storyAufgenommen}
+        onNotice={setNotice}
+      />
+    );
   }
 
   const renderContent = () => {
     if (area === 'messenger') {
       if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onNotice={setNotice} />;
-      if (sub === 'camera') return <CameraScreen embedded onClose={() => setSub('chats')} onNotice={setNotice} />;
+      if (sub === 'camera') {
+        return (
+          <CameraScreen
+            embedded
+            onClose={() => setSub('chats')}
+            onCaptured={(uri) => {
+              storyAufgenommen(uri);
+              setSub('chats');
+            }}
+            onNotice={setNotice}
+          />
+        );
+      }
       if (sub === 'profile') {
         return (
           <MessengerProfileScreen
@@ -299,6 +336,7 @@ const Shell = () => {
       return (
         <ChatListScreen
           allChats={chats}
+          stories={stories}
           onOpenChat={(chat) => setOverlay({ kind: 'chat', chat })}
           onOpenStory={openStory}
           onNewChat={() => setSheet('new')}
@@ -311,7 +349,7 @@ const Shell = () => {
       if (sub === 'landscape') return <LandscapeVideosScreen onNotice={setNotice} />;
       if (sub === 'search') return <VideoSearchScreen onOpenProfile={openPublicProfile} onNotice={setNotice} />;
       if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onNotice={setNotice} />;
-      return <HomeFeedScreen onOpenStory={openStory} onOpenProfile={openPublicProfile} onNotice={setNotice} />;
+      return <HomeFeedScreen stories={stories} onOpenStory={openStory} onOpenProfile={openPublicProfile} onNotice={setNotice} />;
     }
 
     if (area === 'communities') {
@@ -404,7 +442,9 @@ const App = () => (
   <SafeAreaProvider>
     <SupabaseProvider>
       <AuthProvider>
-        <Root />
+        <RepostProvider>
+          <Root />
+        </RepostProvider>
       </AuthProvider>
     </SupabaseProvider>
   </SafeAreaProvider>

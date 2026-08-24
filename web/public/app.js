@@ -128,6 +128,17 @@ async function bootstrap() {
   const res = await fetch('/api/bootstrap');
   const data = await res.json();
   Object.assign(state, data);
+
+  // Die eigene Story liegt nur im Browser - nach dem Laden wieder einsetzen.
+  const eigene = eigeneStoryLaden();
+  if (eigene) {
+    const s = state.stories.find((x) => x.own);
+    if (s) {
+      s.mediaUri = eigene.mediaUri;
+      s.aufgenommen = eigene.aufgenommen;
+    }
+  }
+
   applyTheme();
   render();
 }
@@ -300,6 +311,99 @@ function chatRow(c) {
     </li>`;
 }
 
+/* ------------------------------------------------------- eigene Story */
+/*
+ * Aufnehmen laeuft ueber ein verstecktes Dateifeld mit "capture" - auf dem
+ * Handy oeffnet das direkt die Kamera, am Rechner die Dateiauswahl. Damit
+ * braucht es keinen Kamerazugriff ueber getUserMedia und keine Berechtigung
+ * im Voraus.
+ *
+ * Die Aufnahme bleibt im Browser (localStorage), nicht auf dem Server: sie
+ * gehoert nur diesem einen Nutzer, und der Server teilt seinen Speicher mit
+ * allen. Vorher auf 1200 Pixel verkleinert, sonst sprengt sie den Platz.
+ */
+const STORY_SPEICHER = 'allmedia.eigeneStory';
+
+function eigeneStoryLaden() {
+  try {
+    const roh = localStorage.getItem(STORY_SPEICHER);
+    return roh ? JSON.parse(roh) : null;
+  } catch {
+    return null;
+  }
+}
+
+function eigeneStorySichern(daten) {
+  try {
+    if (daten) localStorage.setItem(STORY_SPEICHER, JSON.stringify(daten));
+    else localStorage.removeItem(STORY_SPEICHER);
+  } catch {
+    /* Speicher voll oder gesperrt - die Story gilt dann nur fuer diese Sitzung */
+  }
+}
+
+/** Bild auf hoechstens 1200 Pixel bringen und als Datenadresse zurueckgeben. */
+function bildVerkleinern(datei) {
+  return new Promise((fertig, fehler) => {
+    const leser = new FileReader();
+    leser.onerror = () => fehler(new Error('Datei nicht lesbar'));
+    leser.onload = () => {
+      const bild = new Image();
+      bild.onerror = () => fehler(new Error('Kein gueltiges Bild'));
+      bild.onload = () => {
+        const faktor = Math.min(1, 1200 / Math.max(bild.width, bild.height));
+        const flaeche = document.createElement('canvas');
+        flaeche.width = Math.round(bild.width * faktor);
+        flaeche.height = Math.round(bild.height * faktor);
+        flaeche.getContext('2d').drawImage(bild, 0, 0, flaeche.width, flaeche.height);
+        fertig(flaeche.toDataURL('image/jpeg', 0.82));
+      };
+      bild.src = leser.result;
+    };
+    leser.readAsDataURL(datei);
+  });
+}
+
+/** Dateiauswahl oeffnen und das Ergebnis als eigene Story uebernehmen. */
+function storyAufnehmen(art = 'photo') {
+  const feld = document.createElement('input');
+  feld.type = 'file';
+  feld.accept = art === 'photo' ? 'image/*' : 'video/*';
+  feld.capture = 'environment';
+  feld.style.display = 'none';
+  document.body.appendChild(feld);
+
+  feld.addEventListener('change', async () => {
+    const datei = feld.files && feld.files[0];
+    feld.remove();
+    if (!datei) return;
+
+    try {
+      if (art === 'video') {
+        // Videos werden nicht verkleinert - fuer die Demo reicht der Hinweis.
+        toast('Video aufgenommen (Vorschau folgt mit dem Backend)');
+        return;
+      }
+      const bild = await bildVerkleinern(datei);
+      const eigene = { mediaUri: bild, aufgenommen: Date.now() };
+      eigeneStorySichern(eigene);
+
+      const s = state.stories.find((x) => x.own);
+      if (s) {
+        s.mediaUri = eigene.mediaUri;
+        s.aufgenommen = eigene.aufgenommen;
+        s.viewed = false;
+      }
+      toast('Deine Story ist online');
+      render();
+    } catch (e) {
+      toast('Aufnahme konnte nicht gelesen werden');
+    }
+  });
+
+  feld.click();
+}
+
 function storyRail() {
   return `<div class="storyrail">${state.stories.map(storyItem).join('')}</div>`;
 }
@@ -307,11 +411,18 @@ function storyRail() {
 function storyItem(s) {
   const u = user(s.userId);
   if (s.own) {
+    // Solange nichts aufgenommen ist, laedt das Plus dazu ein. Danach
+    // verhaelt sich die eigene Story wie jede andere.
+    const gefuellt = !!s.mediaUri;
     return `
       <button class="story" data-story="${s.id}">
-        <div class="story__ring is-viewed story__add">
-          <div class="story__inner" style="background:${u.color}">${esc(u.initials)}</div>
-          <span class="story__add-badge">${ICONS.plus}</span>
+        <div class="story__ring ${gefuellt ? '' : 'is-viewed story__add'}">
+          <div class="story__inner" style="${
+            gefuellt
+              ? `background-image:url(${s.mediaUri});background-size:cover;background-position:center`
+              : `background:${u.color}`
+          }">${gefuellt ? '' : esc(u.initials)}</div>
+          ${gefuellt ? '' : `<span class="story__add-badge">${ICONS.plus}</span>`}
         </div>
         <div class="story__name">${esc(s.name)}</div>
       </button>`;
@@ -329,7 +440,7 @@ function bindStoryRail() {
   main.querySelectorAll('[data-story]').forEach((el) =>
     el.addEventListener('click', () => {
       const s = state.stories.find((x) => x.id === el.dataset.story);
-      if (s.own) return openCamera();
+      if (s.own && !s.mediaUri) return openCamera();
       openStory(s.id);
     })
   );
@@ -1013,13 +1124,13 @@ function renderHomeFeed() {
         });
       }
       if (paction === 'share') return toast('Beitrag geteilt');
-      if (paction === 'repost') return toast('Repost folgt in Phase 3');
 
       const res = await fetch(`/api/posts/${pid}/${paction}`, { method: 'POST' });
       const updated = await res.json();
       const idx = state.posts.findIndex((p) => p.id === updated.id);
       state.posts[idx] = updated;
 
+      if (paction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (paction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
       if (paction === 'follow') toast(updated.following ? 'Du folgst jetzt' : 'Nicht mehr gefolgt');
       if (paction === 'notify') toast(updated.notify ? 'Benachrichtigungen an' : 'Benachrichtigungen aus');
@@ -1057,7 +1168,9 @@ function postCard(p) {
         <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-paction="like" data-pid="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
         <button class="postbtn" data-paction="comment" data-pid="${p.id}" aria-label="Kommentieren">${ICONS.chat}</button>
         <button class="postbtn" data-paction="share" data-pid="${p.id}" aria-label="Senden">${ICONS.send}</button>
-        <button class="postbtn" data-paction="repost" data-pid="${p.id}" aria-label="Repost">${ICONS.repeat}</button>
+        <button class="postbtn ${p.reposted ? 'is-reposted' : ''}" data-paction="repost" data-pid="${p.id}" aria-label="Repost">
+          ${ICONS.repeat}${p.reposts ? `<span class="postbtn__zahl">${p.reposts}</span>` : ''}
+        </button>
         <button class="postbtn postbtn--end ${p.saved ? 'is-saved' : ''}" data-paction="save" data-pid="${p.id}" aria-label="Speichern">${ICONS.bookmark}</button>
       </div>
 
@@ -1091,7 +1204,7 @@ function renderVideoFeed() {
           state.videos[idx] = { ...state.videos[idx], comments: count };
         });
       }
-      if (vaction === 'repost') return toast('Repost folgt in Phase 3');
+
 
       const res = await fetch(`/api/videos/${vid}/${vaction}`, { method: 'POST' });
       const updated = await res.json();
@@ -1099,6 +1212,7 @@ function renderVideoFeed() {
       state.videos[idx] = updated;
 
       if (vaction === 'share') toast('Beitrag geteilt');
+      if (vaction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
 
       const scrollTop = $('#feed').scrollTop;
@@ -1131,9 +1245,9 @@ function videoSlide(v) {
           ${ICONS.send}
           <span>${compactNumber(v.shares)}</span>
         </button>
-        <button class="railbtn" data-vaction="repost" data-vid="${v.id}" aria-label="Repost">
+        <button class="railbtn ${v.reposted ? 'is-reposted' : ''}" data-vaction="repost" data-vid="${v.id}" aria-label="Repost">
           ${ICONS.repeat}
-          <span>Repost</span>
+          <span>${v.reposted ? 'Repostet' : 'Repost'}</span>
         </button>
         <button class="railbtn ${v.saved ? 'is-saved' : ''}" data-vaction="save" data-vid="${v.id}" aria-label="Speichern">
           ${ICONS.bookmark}
@@ -1749,7 +1863,7 @@ function renderCameraPage() {
     </div>`;
 
   $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
-  $('#camGallery').addEventListener('click', () => toast('Galerie folgt mit dem Backend'));
+  $('#camGallery').addEventListener('click', () => storyAufnehmen('photo'));
   $('#camSwitch').addEventListener('click', () => toast('Kamera gewechselt'));
 
   main.querySelectorAll('.camera__mode').forEach((b) =>
@@ -1761,10 +1875,11 @@ function renderCameraPage() {
 
   $('#camShutter').addEventListener('click', (e) => {
     const btn = e.currentTarget;
-    if (mode === 'photo') return toast('Foto aufgenommen');
+    if (mode === 'photo') return storyAufnehmen('photo');
     recording = !recording;
     btn.classList.toggle('is-rec', recording);
-    toast(recording ? 'Aufnahme gestartet' : 'Aufnahme gespeichert');
+    if (recording) return toast('Aufnahme gestartet');
+    storyAufnehmen('video');
   });
 }
 
@@ -2244,6 +2359,10 @@ async function renderVideoProfile() {
   const me = await res.json();
   const tab = state.ownProfileTab;
 
+  // Der Repost-Reiter war immer leer. Jetzt stehen dort die Beitraege und
+  // Videos, die man selbst repostet hat.
+  const meineReposts = tab === 'repost' ? await (await fetch('/api/reposts')).json() : [];
+
   main.innerHTML = `
     ${switchBar('switchProfile')}
     <div class="scroll">
@@ -2278,9 +2397,22 @@ async function renderVideoProfile() {
           ? `<div class="prof__grid">${me.grid
               .map((g) => `<div class="griditem">${g.kind === 'video' ? ICONS.play : ICONS.image}</div>`)
               .join('')}</div>`
+          : tab === 'repost' && meineReposts.length
+          ? `<div class="prof__grid">${meineReposts
+              .map(
+                (r) => `<div class="griditem" title="${esc(r.eintrag.description || '')}">
+                  ${r.art === 'video' ? ICONS.play : ICONS.image}
+                  <span class="griditem__badge">${ICONS.repeat}</span>
+                </div>`
+              )
+              .join('')}</div>`
           : `<div class="empty">${ICONS[PROFILE_TABS.find((t) => t.id === tab).icon]}
-              <div class="empty__title">Noch nichts hier</div>
-              <div class="empty__text">Dieser Bereich füllt sich, sobald du ihn benutzt.</div>
+              <div class="empty__title">${tab === 'repost' ? 'Noch nichts repostet' : 'Noch nichts hier'}</div>
+              <div class="empty__text">${
+                tab === 'repost'
+                  ? 'Tippe im Feed auf den Repost-Knopf, dann erscheint es hier.'
+                  : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
+              }</div>
             </div>`
       }
     </div>`;
@@ -2705,12 +2837,22 @@ function closeChat() {
  *  3. Eine Antwort landet wirklich im Chat mit dieser Person.
  *  4. Tippen links/rechts blaettert zur vorigen/naechsten Story.
  */
+/** "vor 3 Min." aus dem Aufnahmezeitpunkt. */
+function storyAlter(s) {
+  if (!s.aufgenommen) return s.time || 'vor 2 Std.';
+  const min = Math.floor((Date.now() - s.aufgenommen) / 60000);
+  if (min < 1) return 'gerade eben';
+  if (min < 60) return `vor ${min} Min.`;
+  return `vor ${Math.floor(min / 60)} Std.`;
+}
+
 let storyTimer;
 const STORY_DURATION = 6000;
 const STORY_STEP = 60;
 
 function openStory(storyId) {
-  const list = state.stories.filter((s) => !s.own);
+  // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
+  const list = state.stories.filter((s) => !s.own || s.mediaUri);
   const idx = list.findIndex((s) => s.id === storyId);
   if (idx < 0) return;
 
@@ -2728,23 +2870,34 @@ function openStory(storyId) {
       <div class="viewer__head">
         <button class="viewer__close" id="storyClose" aria-label="Zurück">${ICONS.back}</button>
         <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
-        <div class="viewer__who" data-profile="${u.id}">
-          <div class="viewer__name">${esc(u.name)}</div>
-          <div class="viewer__time">${esc(s.time || 'vor 2 Std.')}</div>
+        <div class="viewer__who" ${s.own ? '' : `data-profile="${u.id}"`}>
+          <div class="viewer__name">${s.own ? 'Deine Story' : esc(u.name)}</div>
+          <div class="viewer__time">${esc(storyAlter(s))}</div>
         </div>
         <button class="viewer__more" id="storyMore" aria-label="Mehr">${ICONS.settings}</button>
       </div>
       <div class="viewer__stage">
         <button class="viewer__zone viewer__zone--prev" id="storyPrev" aria-label="Vorherige Story"></button>
         <button class="viewer__zone viewer__zone--next" id="storyNext" aria-label="Nächste Story"></button>
-        <div class="viewer__media">${ICONS.image}</div>
+        <div class="viewer__media">${
+          s.mediaUri ? `<img class="viewer__bild" src="${s.mediaUri}" alt="Deine Story" />` : ICONS.image
+        }</div>
         ${s.caption ? `<div class="viewer__caption">${esc(s.caption)}</div>` : ''}
       </div>
-      <form class="viewer__foot" id="storyForm">
-        <input class="viewer__reply" id="storyReply" placeholder="Antworten" autocomplete="off" />
-        <button type="button" class="viewer__act ${s.liked ? 'is-liked' : ''}" id="storyLike" aria-label="Gefällt mir">${ICONS.heart}</button>
-        <button type="submit" class="viewer__hidden" tabindex="-1" aria-hidden="true"></button>
-      </form>
+      ${
+        s.own
+          ? // Sich selbst antwortet man nicht - stattdessen der Blick darauf,
+            // wer die Story gesehen hat.
+            `<div class="viewer__foot">
+              <button class="viewer__eigen" id="storyViews">${ICONS.eye}<span>Ansichten</span></button>
+              <button class="viewer__act" id="storyDelete" aria-label="Story löschen">${ICONS.trash || ICONS.close}</button>
+            </div>`
+          : `<form class="viewer__foot" id="storyForm">
+              <input class="viewer__reply" id="storyReply" placeholder="Antworten" autocomplete="off" />
+              <button type="button" class="viewer__act ${s.liked ? 'is-liked' : ''}" id="storyLike" aria-label="Gefällt mir">${ICONS.heart}</button>
+              <button type="submit" class="viewer__hidden" tabindex="-1" aria-hidden="true"></button>
+            </form>`
+      }
     </div>`;
 
   const fill = $('#storyFill');
@@ -2794,6 +2947,26 @@ function openStory(storyId) {
   $('#storyNext').addEventListener('click', () => go(1));
 
   $('#storyMore').addEventListener('click', () => toast('Weitere Optionen folgen'));
+
+  // Bei der eigenen Story gibt es weder Herz noch Antwortfeld.
+  if (s.own) {
+    $('#storyViews').addEventListener('click', () =>
+      toast('Wer deine Story gesehen hat, folgt mit dem Backend')
+    );
+    $('#storyDelete').addEventListener('click', () => {
+      eigeneStorySichern(null);
+      const eigene = state.stories.find((x) => x.own);
+      if (eigene) {
+        delete eigene.mediaUri;
+        delete eigene.aufgenommen;
+      }
+      stop();
+      closeOverlay();
+      toast('Deine Story wurde gelöscht');
+      render();
+    });
+    return;
+  }
 
   $('#storyLike').addEventListener('click', async (e) => {
     const btn = e.currentTarget;

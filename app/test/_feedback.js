@@ -3,8 +3,31 @@
 // Start:  node test/_feedback.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
+const fs = require('fs');
+const path = require('path');
+
+// Kleines Testbild fuer die Story-Aufnahme.
+const BILD = path.join(__dirname, '_teststory.png');
+if (!fs.existsSync(BILD)) {
+  fs.writeFileSync(
+    BILD,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAG0lEQVQIW2P8z8Dwn4EIwDiqkL4hRQAAAP//AwDPUAX3rN6iSwAAAABJRU5ErkJggg==',
+      'base64'
+    )
+  );
+}
 
 let fehlgeschlagen = 0;
+
+/** Alle offenen Blaetter schliessen - sonst fangen sie die naechsten Klicks ab. */
+const blaetterZu = async (page) => {
+  await page.evaluate(() => {
+    document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+  });
+  await page.waitForTimeout(200);
+};
+
 const pruefe = (was, ok, zusatz = '') => {
   if (!ok) fehlgeschlagen++;
   console.log((ok ? '  OK   ' : '  FEHL ') + was + (zusatz ? '  — ' + zusatz : ''));
@@ -23,7 +46,15 @@ const pruefe = (was, ok, zusatz = '') => {
   page.on('pageerror', (e) => konsolenfehler.push('pageerror: ' + e.message));
 
   const ziel = process.env.ZIEL || 'http://localhost:3000/';
+
+  // Der Server haelt alles im Speicher. Ohne Ruecksetzen waeren Kontakte und
+  // Gruppen aus dem vorigen Lauf noch da und der Test schluege zu Unrecht fehl.
   await page.goto(ziel, { waitUntil: 'networkidle' });
+  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await page.evaluate(() => {
+    try { localStorage.removeItem('allmedia.eigeneStory'); } catch {}
+  });
+  await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
 
   // ---------------------------------------------------------------- Chats
@@ -157,8 +188,11 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.waitForTimeout(400);
   pruefe('Schritt 2 fragt Name und Info', !!(await page.$('#groupName')) && !!(await page.$('#groupInfo')));
   pruefe('Gruppenbild anlegbar', !!(await page.$('#groupPic')));
+  // Klick neben das Blatt schliesst es.
   await page.click('.sheet-backdrop', { position: { x: 10, y: 10 } }).catch(() => {});
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(400);
+  pruefe('Blatt schliesst per Klick daneben', !(await page.$('.sheet-backdrop')));
+  await blaetterZu(page);
 
   // ----------------------------------------------------------- Konto
   console.log('\nKonto wechseln');
@@ -169,11 +203,65 @@ const pruefe = (was, ok, zusatz = '') => {
   const kontoDialog = await page.$('[data-konto]');
   pruefe('Profil wechseln fuehrt zur Kontoliste', !!kontoDialog);
   pruefe('Zweites Konto anlegbar', !!(await page.$('[data-konto-neu="neu"]')));
+  await blaetterZu(page);
+
+  // ------------------------------------------------------ Repost + Story
+  console.log('\nRepost');
+  await page.click('[data-area="videos"]').catch(() => {});
+  await page.waitForTimeout(600);
+  await page.click('[data-sub="home"]').catch(() => {});
+  await page.waitForTimeout(600);
+
+  const vorRepost = await page.$eval('[data-paction="repost"]', (e) => e.className);
+  await page.click('[data-paction="repost"]');
+  await page.waitForTimeout(700);
+  const nachRepost = await page.$eval('[data-paction="repost"]', (e) => e.className);
+  pruefe('Repost schaltet um', vorRepost !== nachRepost && /is-reposted/.test(nachRepost));
+  pruefe('Repost meldet sich', /Repostet/i.test(await page.$eval('#toast', (e) => e.textContent)));
+
+  await page.click('[data-sub="profile"]');
+  await page.waitForTimeout(800);
+  await page.click('[data-otab="repost"]');
+  await page.waitForTimeout(800);
+  const repostKacheln = await page.$$eval('.prof__grid .griditem', (n) => n.length);
+  pruefe('Repost erscheint im Profil', repostKacheln > 0, `${repostKacheln} Kachel(n)`);
+
+  console.log('\nEigene Story');
+  await page.click('[data-area="messenger"]');
+  await page.waitForTimeout(600);
+  await page.click('[data-sub="camera"]');
+  await page.waitForTimeout(600);
+
+  const [auswahl] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#camShutter'),
+  ]);
+  await auswahl.setFiles(BILD);
+  await page.waitForTimeout(1200);
+  pruefe('Aufnahme wird übernommen',
+         /Story ist online/i.test(await page.$eval('#toast', (e) => e.textContent)));
+
+  await page.click('[data-sub="chats"]');
+  await page.waitForTimeout(700);
+  const ring = await page.$eval('[data-story="s0"] .story__ring', (e) => e.className);
+  pruefe('Eigene Story zeigt keinen Plus-Knopf mehr', !/story__add/.test(ring), ring.trim());
+
+  await page.click('[data-story="s0"]');
+  await page.waitForTimeout(900);
+  pruefe('Eigene Story lässt sich ansehen', !!(await page.$('.viewer__bild')));
+  pruefe('Ansichten statt Antwortfeld', !!(await page.$('#storyViews')) && !(await page.$('#storyReply')));
+  await page.click('#storyClose').catch(() => {});
+  await page.waitForTimeout(400);
 
   console.log('\nKonsolenfehler: ' + (konsolenfehler.length ? konsolenfehler.join(' | ') : 'keine'));
   if (konsolenfehler.length) fehlgeschlagen++;
 
-  await page.screenshot({ path: 'test/_feedback.png', fullPage: false });
+  // Aufraeumen, damit der naechste Lauf sauber startet.
+  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await page.evaluate(() => {
+    try { localStorage.removeItem('allmedia.eigeneStory'); } catch {}
+  });
+
   await browser.close();
 
   console.log(fehlgeschlagen ? `\n${fehlgeschlagen} Punkt(e) offen` : '\nAlles gruen');

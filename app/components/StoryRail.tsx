@@ -23,7 +23,9 @@ export const StoryRail = ({ stories, onPress }: Props) => (
           <View style={styles.inner}>
             <Avatar id={story.userId} name={story.name} size={sizes.storyRing - 11} />
           </View>
-          {story.own && (
+          {/* Solange die eigene Story leer ist, laedt das Plus zur Aufnahme
+              ein. Ist sie gefuellt, verhaelt sie sich wie jede andere. */}
+          {story.own && !story.mediaUri && (
             <View style={styles.addBadge}>
               <Ionicons name="add" size={13} color={colors.white} />
             </View>

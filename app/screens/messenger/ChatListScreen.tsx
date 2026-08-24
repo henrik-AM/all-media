@@ -6,7 +6,6 @@ import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { StoryRail } from '../../components/StoryRail';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
-import { mockStories } from '../../mocks';
 import { Chat, Story } from '../../types';
 
 type Filter = 'all' | 'contacts' | 'groups';
@@ -22,12 +21,13 @@ const mediaIcon = (media?: string) =>
 
 interface Props {
   allChats: Chat[];
+  stories: Story[];
   onOpenChat: (chat: Chat) => void;
   onOpenStory: (story: Story) => void;
   onNewChat: () => void;
 }
 
-export const ChatListScreen = ({ allChats, onOpenChat, onOpenStory, onNewChat }: Props) => {
+export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onNewChat }: Props) => {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
@@ -78,7 +78,7 @@ export const ChatListScreen = ({ allChats, onOpenChat, onOpenStory, onNewChat }:
   return (
     <View style={styles.container}>
       {/* Reihenfolge wie im Prototyp: Story-Leiste, Suche, Filter, Liste. */}
-      <StoryRail stories={mockStories} onPress={onOpenStory} />
+      <StoryRail stories={stories} onPress={onOpenStory} />
 
       <View style={styles.header}>
         <SearchBar
