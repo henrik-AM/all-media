@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>All Media</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="device">
+    <div class="app" id="app">
+      <!-- Top switcher -->
+      <header class="topbar" id="topbar">
+        <button class="topbar__btn" data-area="video" aria-label="Videos"></button>
+        <button class="topbar__btn is-active" data-area="messenger" aria-label="Messenger"></button>
+        <button class="topbar__btn" data-area="camera" aria-label="Kamera"></button>
+        <button class="topbar__btn" data-area="profile" aria-label="Profil"></button>
+      </header>
+
+      <main class="main" id="main"></main>
+
+      <!-- Bottom navigation -->
+      <nav class="bottomnav" id="bottomnav">
+        <button class="navbtn is-active" data-view="chats">
+          <span class="navbtn__icon"></span>
+          <span class="navbtn__label">Chats</span>
+        </button>
+        <button class="navbtn" data-view="stories">
+          <span class="navbtn__icon"></span>
+          <span class="navbtn__label">Storys</span>
+        </button>
+        <button class="navbtn" data-view="contacts">
+          <span class="navbtn__icon"></span>
+          <span class="navbtn__label">Kontakte</span>
+        </button>
+        <button class="navbtn" data-view="settings">
+          <span class="navbtn__icon"></span>
+          <span class="navbtn__label">Einstellungen</span>
+        </button>
+      </nav>
+
+      <!-- Full screen overlays -->
+      <section class="overlay" id="overlay" hidden></section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/icons.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
