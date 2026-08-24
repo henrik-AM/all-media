@@ -801,6 +801,146 @@ function openAddContact() {
   );
 }
 
+/* ------------------------------------------------------------- Anruf */
+/*
+ * Die Oberflaeche eines Anrufs.
+ *
+ * Die Uebertragung selbst fehlt bewusst: dafuer braucht es WebRTC, einen
+ * Signalweg und einen TURN-Server. Die Oberflaeche steht damit schon
+ * vollstaendig, der Verlauf ist simuliert:
+ * klingelt -> verbunden (Dauer laeuft) -> beendet.
+ */
+let anrufTimer;
+
+function zweistellig(n) {
+  return String(n).padStart(2, '0');
+}
+
+/** Sekunden als mm:ss, ab einer Stunde als h:mm:ss. */
+function dauerText(sekunden) {
+  const st = Math.floor(sekunden / 3600);
+  const min = Math.floor((sekunden % 3600) / 60);
+  const sek = sekunden % 60;
+  return st > 0
+    ? `${st}:${zweistellig(min)}:${zweistellig(sek)}`
+    : `${zweistellig(min)}:${zweistellig(sek)}`;
+}
+
+function openCall(userId, art) {
+  const u = user(userId);
+  if (!u) return toast('Diese Person gibt es nicht');
+
+  let zustand = 'klingelt';
+  let dauer = 0;
+  const an = { stumm: false, laut: art === 'video', kamera: art === 'video' };
+
+  overlay.hidden = false;
+
+  const zeichnen = () => {
+    const status =
+      zustand === 'klingelt'
+        ? art === 'video' ? 'Videoanruf …' : 'Klingelt …'
+        : zustand === 'verbunden' ? dauerText(dauer) : 'Beendet';
+
+    overlay.innerHTML = `
+      <div class="anruf">
+        ${
+          art === 'video' && zustand === 'verbunden'
+            ? `<div class="anruf__video">${ICONS.video}
+                <span>Bildübertragung folgt mit dem Backend</span>
+              </div>`
+            : ''
+        }
+        <div class="anruf__kopf">
+          <div class="anruf__avatar ${zustand === 'klingelt' ? 'is-klingelt' : ''}"
+               style="background:${u.color}">${esc(u.initials)}</div>
+          <div class="anruf__name">${esc(u.name)}</div>
+          <div class="anruf__status" id="anrufStatus">${esc(status)}</div>
+          ${
+            zustand === 'verbunden'
+              ? `<div class="anruf__krypto">${ICONS.lock}<span>Ende-zu-Ende-verschlüsselt</span></div>`
+              : ''
+          }
+        </div>
+
+        ${
+          art === 'video' && an.kamera && zustand === 'verbunden'
+            ? `<div class="anruf__eigen">${ICONS.person}</div>`
+            : ''
+        }
+
+        <div class="anruf__leiste">
+          <button class="anruf__knopf ${an.stumm ? 'is-an' : ''}" data-anruf="stumm">
+            ${an.stumm ? ICONS.micOff || ICONS.mic : ICONS.mic}<span>Stumm</span>
+          </button>
+          <button class="anruf__knopf ${an.laut ? 'is-an' : ''}" data-anruf="laut">
+            ${ICONS.volume || ICONS.mic}<span>Laut</span>
+          </button>
+          <button class="anruf__knopf ${an.kamera ? 'is-an' : ''}" data-anruf="kamera">
+            ${ICONS.video}<span>Video</span>
+          </button>
+        </div>
+
+        <div class="anruf__unten">
+          ${
+            zustand === 'klingelt'
+              ? `<button class="anruf__rund is-annehmen" data-anruf="annehmen" aria-label="Annehmen">${ICONS.phone}</button>`
+              : ''
+          }
+          <button class="anruf__rund is-auflegen" data-anruf="auflegen" aria-label="Auflegen">${ICONS.phone}</button>
+        </div>
+      </div>`;
+
+    binden();
+  };
+
+  const beenden = () => {
+    clearInterval(anrufTimer);
+    zustand = 'beendet';
+    toast(dauer > 0 ? `Anruf beendet · ${dauerText(dauer)}` : 'Anruf beendet');
+    zeichnen();
+    setTimeout(() => {
+      overlay.hidden = true;
+      overlay.innerHTML = '';
+    }, 700);
+  };
+
+  const verbinden = () => {
+    if (zustand !== 'klingelt') return;
+    zustand = 'verbunden';
+    zeichnen();
+    clearInterval(anrufTimer);
+    anrufTimer = setInterval(() => {
+      dauer += 1;
+      const feld = $('#anrufStatus');
+      if (feld) feld.textContent = dauerText(dauer);
+    }, 1000);
+  };
+
+  const binden = () => {
+    overlay.querySelectorAll('[data-anruf]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const was = b.dataset.anruf;
+        if (was === 'auflegen') return beenden();
+        if (was === 'annehmen') return verbinden();
+
+        an[was] = !an[was];
+        const texte = {
+          stumm: an.stumm ? 'Mikrofon stumm' : 'Mikrofon an',
+          laut: an.laut ? 'Lautsprecher an' : 'Lautsprecher aus',
+          kamera: an.kamera ? 'Kamera an' : 'Kamera aus',
+        };
+        toast(texte[was]);
+        zeichnen();
+      })
+    );
+  };
+
+  zeichnen();
+  // In der Demo nimmt die Gegenseite von selbst ab.
+  setTimeout(verbinden, 2600);
+}
+
 /* ------------------------------------------------------ contact profile */
 /** Kontaktinfo aus Sicht des Messengers - an WhatsApp angelehnt. */
 async function openContactProfile(userId) {
@@ -872,6 +1012,7 @@ async function openContactProfile(userId) {
         if (chat) return openChat(chat.id);
         return toast('Noch kein Chat mit dieser Person');
       }
+      if (was === 'audio' || was === 'video') return openCall(userId, was);
       toast(`${b.textContent.trim()} folgt`);
     })
   );
@@ -2727,7 +2868,9 @@ async function openChat(chatId) {
   });
   overlay.querySelectorAll('[data-call]').forEach((b) =>
     b.addEventListener('click', () =>
-      toast(b.dataset.call === 'video' ? 'Videoanruf folgt in Phase 3' : 'Anruf folgt in Phase 3')
+      chat.userId
+        ? openCall(chat.userId, b.dataset.call === 'video' ? 'video' : 'audio')
+        : toast('Gruppenanrufe folgen später')
     )
   );
   $('#attach').addEventListener('click', () => toast('Anhänge folgen in Phase 3'));

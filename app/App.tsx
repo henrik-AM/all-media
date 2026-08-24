@@ -21,6 +21,7 @@ import { FriendMapScreen } from './screens/messenger/FriendMapScreen';
 import { MessengerProfileScreen } from './screens/messenger/MessengerProfileScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
+import { CallScreen } from './screens/messenger/CallScreen';
 import { CommunitiesScreen } from './screens/communities/CommunitiesScreen';
 import { CommunityChatsScreen } from './screens/communities/CommunityChatsScreen';
 import { CommunityProfileScreen } from './screens/communities/CommunityProfileScreen';
@@ -47,6 +48,7 @@ type Overlay =
   | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich' }
   | { kind: 'contacts' }
   | { kind: 'camera' }
+  | { kind: 'call'; userId: string; art: 'audio' | 'video' }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | null;
@@ -245,7 +247,10 @@ const Shell = () => {
         chat={overlay.chat}
         extraMessages={overlay.extra}
         onBack={() => setOverlay(null)}
-        onCall={(kind) => setNotice(kind === 'video' ? 'Videoanruf folgt' : 'Sprachanruf folgt')}
+        onCall={(art) => {
+          if (!overlay.chat.userId) return setNotice('Gruppenanrufe folgen später');
+          setOverlay({ kind: 'call', userId: overlay.chat.userId, art });
+        }}
         onCamera={() => setOverlay({ kind: 'camera' })}
         onOpenProfile={openProfile}
         onAcceptRequest={acceptRequest}
@@ -260,6 +265,7 @@ const Shell = () => {
           userId={overlay.userId}
           onBack={() => setOverlay(null)}
           onMessage={openChatWith}
+          onCall={(id, art) => setOverlay({ kind: 'call', userId: id, art })}
           onNotice={setNotice}
         />
       );
@@ -293,6 +299,17 @@ const Shell = () => {
         onBack={() => setOverlay(null)}
         onOpenContact={(contact: Contact) => openProfile(contact.id)}
         onAddContact={() => setSheet('contact')}
+      />
+    );
+  }
+
+  if (overlay?.kind === 'call') {
+    return (
+      <CallScreen
+        userId={overlay.userId}
+        art={overlay.art}
+        onClose={() => setOverlay(null)}
+        onNotice={setNotice}
       />
     );
   }

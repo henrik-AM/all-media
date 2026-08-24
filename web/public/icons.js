@@ -14,6 +14,8 @@ const ICONS = (() => {
     back: wrap('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
     close: wrap('<path d="M18 6 6 18M6 6l12 12"/>'),
     minus: wrap('<path d="M5 12h14"/>'),
+    volume: wrap('<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/>'),
+    micOff: wrap('<path d="M12 2a3 3 0 0 1 3 3v5m-6 0V5a3 3 0 0 1 .5-1.7"/><path d="M19 10a7 7 0 0 1-10.6 6M5 10a7 7 0 0 0 2 4.9"/><path d="M12 19v3M3 3l18 18"/>'),
     clock: wrap('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     video: wrap('<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>'),
     phone: wrap('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>'),

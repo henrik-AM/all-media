@@ -10,6 +10,7 @@ interface Props {
   userId: string;
   onBack: () => void;
   onMessage: (userId: string) => void;
+  onCall: (userId: string, art: 'audio' | 'video') => void;
   onNotice: (message: string) => void;
 }
 
@@ -39,7 +40,7 @@ const GEFAHR = [
  * Bewusst getrennt vom Profil im Bereich Videos: Aus einem Chat heraus will
  * man Nummer, Medien und Stummschalten sehen, keine Beitragsstatistik.
  */
-export const ContactProfileScreen = ({ userId, onBack, onMessage, onNotice }: Props) => {
+export const ContactProfileScreen = ({ userId, onBack, onMessage, onCall, onNotice }: Props) => {
   const insets = useSafeAreaInsets();
   const person = mockUsers[userId];
 
@@ -85,9 +86,12 @@ export const ContactProfileScreen = ({ userId, onBack, onMessage, onNotice }: Pr
             <Pressable
               key={a.key}
               style={styles.aktion}
-              onPress={() =>
-                a.key === 'message' ? onMessage(person.id) : onNotice(`${a.label} folgt`)
-              }
+              onPress={() => {
+                if (a.key === 'message') return onMessage(person.id);
+                if (a.key === 'audio') return onCall(person.id, 'audio');
+                if (a.key === 'video') return onCall(person.id, 'video');
+                onNotice(`${a.label} folgt`);
+              }}
             >
               <Ionicons name={a.icon} size={21} color={colors.brand} />
               <Text style={styles.aktionText}>{a.label}</Text>

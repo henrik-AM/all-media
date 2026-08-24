@@ -253,6 +253,37 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.click('#storyClose').catch(() => {});
   await page.waitForTimeout(400);
 
+  console.log('\nAnruf');
+  await page.click('[data-area="messenger"]').catch(() => {});
+  await page.waitForTimeout(500);
+  await page.click('[data-sub="chats"]').catch(() => {});
+  await page.waitForTimeout(500);
+  await page.click('[data-chat="c1"]');
+  await page.waitForTimeout(600);
+  await page.click('[data-call="audio"]');
+  await page.waitForTimeout(800);
+
+  pruefe('Anruf öffnet sich', !!(await page.$('.anruf')));
+  pruefe('Zeigt zuerst "Klingelt"',
+         /Klingelt|Videoanruf/.test(await page.$eval('#anrufStatus', (e) => e.textContent)));
+
+  await page.waitForTimeout(3000);
+  const laufend = await page.$eval('#anrufStatus', (e) => e.textContent);
+  pruefe('Verbindet und zählt die Dauer', /^\d{2}:\d{2}$/.test(laufend.trim()), laufend.trim());
+
+  await page.click('[data-anruf="stumm"]');
+  await page.waitForTimeout(400);
+  pruefe('Stummschalten wirkt',
+         await page.$eval('[data-anruf="stumm"]', (e) => e.className.includes('is-an')));
+
+  await page.click('[data-anruf="auflegen"]');
+  await page.waitForTimeout(1100);
+  pruefe('Auflegen nennt die Dauer',
+         /Anruf beendet · \d{2}:\d{2}/.test(await page.$eval('#toast', (e) => e.textContent)));
+  pruefe('Anruf schließt sich', !(await page.$('.anruf')));
+  await page.click('#chatBack').catch(() => {});
+  await page.waitForTimeout(400);
+
   console.log('\nKonsolenfehler: ' + (konsolenfehler.length ? konsolenfehler.join(' | ') : 'keine'));
   if (konsolenfehler.length) fehlgeschlagen++;
 

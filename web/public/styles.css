@@ -1355,3 +1355,52 @@ body:has(.camera) .toast { bottom: 132px; }
   color: #fff; font-size: 15px;
 }
 .viewer__eigen svg { width: 20px; height: 20px; }
+
+/* ---------- Anruf ---------- */
+.anruf {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: calc(48px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+  background: #101418; color: #fff;
+}
+.anruf__video {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: #171C22; color: rgba(255,255,255,.4); font-size: 12.5px;
+}
+.anruf__video svg { width: 44px; height: 44px; }
+.anruf__kopf { display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1; }
+.anruf__avatar {
+  width: 124px; height: 124px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 40px; font-weight: 700; color: #fff;
+}
+.anruf__avatar.is-klingelt { animation: anrufPuls 1.8s ease-in-out infinite; }
+@keyframes anrufPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }
+.anruf__name { margin-top: 12px; font-size: 26px; font-weight: 700; }
+.anruf__status { color: rgba(255,255,255,.65); font-size: 15px; }
+.anruf__krypto { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,.7); font-size: 12.5px; }
+.anruf__krypto svg { width: 12px; height: 12px; }
+.anruf__eigen {
+  position: absolute; right: 16px; top: 110px;
+  width: 92px; height: 128px; border-radius: 12px;
+  background: #252B33; display: grid; place-items: center; color: rgba(255,255,255,.5);
+  z-index: 1;
+}
+.anruf__leiste { display: flex; justify-content: center; gap: 24px; z-index: 1; }
+.anruf__knopf {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 76px; padding: 12px 0; border-radius: 16px;
+  background: rgba(255,255,255,.12); color: #fff; font-size: 12.5px;
+}
+.anruf__knopf.is-an { background: #fff; color: #14171A; }
+.anruf__knopf svg { width: 24px; height: 24px; }
+.anruf__unten { display: flex; justify-content: center; gap: 32px; z-index: 1; }
+.anruf__rund {
+  width: 68px; height: 68px; border-radius: 50%;
+  display: grid; place-items: center; color: #fff;
+}
+.anruf__rund svg { width: 28px; height: 28px; }
+.anruf__rund.is-annehmen { background: var(--success); }
+.anruf__rund.is-auflegen { background: var(--danger); }
+.anruf__rund.is-auflegen svg { transform: rotate(135deg); }
