@@ -23,16 +23,19 @@ const nowTime = () =>
 
 interface Props {
   chat: Chat;
+  /** Nachrichten, die ausserhalb des Chats entstanden sind (Story-Antwort). */
+  extraMessages?: Message[];
   onBack: () => void;
   onCall: (kind: 'audio' | 'video') => void;
   onCamera: () => void;
   onOpenProfile: (userId: string) => void;
 }
 
-export const ChatDetailScreen = ({ chat, onBack, onCall, onCamera, onOpenProfile }: Props) => {
-  const [messages, setMessages] = useState<Message[]>(
-    () => mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []
-  );
+export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera, onOpenProfile }: Props) => {
+  const [messages, setMessages] = useState<Message[]>(() => [
+    ...(mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []),
+    ...(extraMessages ?? []),
+  ]);
   const [draft, setDraft] = useState('');
   const [typing, setTyping] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);

@@ -1,4 +1,4 @@
-import { AuthUser, Chat, Comment, Community, Contact, Message, Post, Profile, Story, User, Video } from '../types';
+import { AuthUser, Chat, Clip, Comment, Community, Contact, FriendPin, Hashtag, Message, Place, Post, Profile, Sound, Story, User, Video } from '../types';
 
 export const CURRENT_USER_ID = 'me';
 
@@ -150,13 +150,61 @@ export const mockCommunityMessages: Record<string, Message[]> = {
 };
 
 export const mockStories: Story[] = [
-  { id: 's0', userId: 'me', name: 'Deine Story', viewed: false, own: true },
-  { id: 's1', userId: 'u1', name: 'Anna', viewed: false },
-  { id: 's2', userId: 'u2', name: 'Bob', viewed: false },
-  { id: 's3', userId: 'u3', name: 'Clara', viewed: false },
-  { id: 's4', userId: 'u4', name: 'David', viewed: true },
-  { id: 's5', userId: 'u5', name: 'Elif', viewed: true },
-  { id: 's6', userId: 'u6', name: 'Finn', viewed: true },
+  { id: 's0', userId: 'me', name: 'Deine Story', viewed: false, own: true, liked: false },
+  { id: 's1', userId: 'u1', name: 'Anna', viewed: false, liked: false, caption: 'Erstes Licht auf 2500 Metern' },
+  { id: 's2', userId: 'u2', name: 'Bob', viewed: false, liked: false, caption: 'Neuer Build läuft durch' },
+  { id: 's3', userId: 'u3', name: 'Clara', viewed: false, liked: false, caption: 'Hafen im Nebel' },
+  { id: 's4', userId: 'u4', name: 'David', viewed: true, liked: false, caption: 'Schreibtisch neu sortiert' },
+  { id: 's5', userId: 'u5', name: 'Elif', viewed: true, liked: false, caption: 'Pasta in zehn Minuten' },
+  { id: 's6', userId: 'u6', name: 'Finn', viewed: true, liked: false, caption: '20 Kilometer geschafft' },
+];
+
+/** Querformat-Videos, Prototyp-Frame "Videos - Querformat". */
+export const mockClips: Clip[] = [
+  { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen' },
+  { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen' },
+  { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche' },
+  { id: 'q4', userId: 'u2', title: 'Expo SDK 57: Was sich geändert hat', duration: '09:55', views: 18700, age: 'vor 1 Woche' },
+  { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen' },
+  { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen' },
+];
+
+/** Friend-Map, Prototyp-Frame "Messenger - Friend-Map". */
+export const mockFriendPins: FriendPin[] = [
+  { id: 'u1', x: 24, y: 30, place: 'Zugspitze', when: 'vor 5 Min.' },
+  { id: 'u2', x: 62, y: 22, place: 'Köln Innenstadt', when: 'vor 12 Min.' },
+  { id: 'u3', x: 45, y: 55, place: 'Hamburger Hafen', when: 'vor 1 Std.' },
+  { id: 'u4', x: 76, y: 63, place: 'Köln Ehrenfeld', when: 'vor 2 Std.' },
+  { id: 'u5', x: 18, y: 72, place: 'Zuhause', when: 'gerade eben' },
+  { id: 'u6', x: 58, y: 82, place: 'Rheinpark', when: 'vor 20 Min.' },
+];
+
+/** Explorer-Abschnitte, Prototyp-Frame "Video - Suche". */
+export const mockHashtags: Hashtag[] = [
+  { tag: '#sonnenaufgang', posts: 128400 },
+  { tag: '#designsystem', posts: 41200 },
+  { tag: '#mealprep', posts: 302900 },
+  { tag: '#reactnative', posts: 18700 },
+  { tag: '#hafen', posts: 87300 },
+  { tag: '#laufen', posts: 220100 },
+  { tag: '#homeoffice', posts: 64800 },
+  { tag: '#nachtfotografie', posts: 39100 },
+];
+
+export const mockSounds: Sound[] = [
+  { id: 'so1', title: 'Golden Hour', artist: 'Lys', uses: 12400 },
+  { id: 'so2', title: 'Lo-Fi Focus', artist: 'beatlab', uses: 8210 },
+  { id: 'so3', title: 'Kitchen Groove', artist: 'Milo', uses: 24800 },
+  { id: 'so4', title: 'Runner High', artist: 'Aster', uses: 3140 },
+  { id: 'so5', title: 'Ambient Sunrise', artist: 'Nora K.', uses: 5670 },
+];
+
+export const mockPlaces: Place[] = [
+  { id: 'pl1', name: 'Hamburger Hafen', posts: 8730 },
+  { id: 'pl2', name: 'Zugspitze', posts: 12400 },
+  { id: 'pl3', name: 'Rheinpark Köln', posts: 3140 },
+  { id: 'pl4', name: 'Berlin Mitte', posts: 22100 },
+  { id: 'pl5', name: 'Alster', posts: 5310 },
 ];
 
 export const mockCurrentUser: AuthUser = {

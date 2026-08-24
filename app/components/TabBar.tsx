@@ -2,44 +2,35 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, sizes, typography } from '../constants/design';
-
-export type TabKey = 'chats' | 'stories' | 'contacts' | 'settings';
-
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const TABS: { key: TabKey; label: string; icon: IconName; iconActive: IconName }[] = [
-  { key: 'chats', label: 'Chats', icon: 'chatbubble-outline', iconActive: 'chatbubble' },
-  { key: 'stories', label: 'Storys', icon: 'aperture-outline', iconActive: 'aperture' },
-  { key: 'contacts', label: 'Kontakte', icon: 'people-outline', iconActive: 'people' },
-  { key: 'settings', label: 'Einstellungen', icon: 'settings-outline', iconActive: 'settings' },
-];
+import { AreaKey, NAV } from '../constants/navigation';
 
 interface Props {
-  active: TabKey;
-  onChange: (tab: TabKey) => void;
+  active: AreaKey;
+  onChange: (area: AreaKey) => void;
   unreadCount?: number;
 }
 
+/** Untere Leiste: die vier Bereiche aus dem Prototyp. */
 export const TabBar = ({ active, onChange, unreadCount = 0 }: Props) => (
   <View style={styles.bar}>
-    {TABS.map((tab) => {
-      const isActive = tab.key === active;
+    {NAV.map((area) => {
+      const isActive = area.key === active;
       return (
-        <Pressable key={tab.key} style={styles.tab} onPress={() => onChange(tab.key)}>
+        <Pressable key={area.key} style={styles.tab} onPress={() => onChange(area.key)}>
           <View>
             <Ionicons
-              name={isActive ? tab.iconActive : tab.icon}
+              name={isActive ? area.iconActive : area.icon}
               size={23}
               color={isActive ? colors.brand : colors.text3}
             />
-            {tab.key === 'chats' && unreadCount > 0 && (
+            {area.key === 'messenger' && unreadCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{unreadCount}</Text>
               </View>
             )}
           </View>
           <Text style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>
-            {tab.label}
+            {area.label}
           </Text>
         </Pressable>
       );

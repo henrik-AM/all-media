@@ -10,10 +10,13 @@ echte React-Native-App über Expo Go.
 
 ```bash
 cd app
-node web-app.js
+npm run web-app
 ```
 
-Dann im Browser öffnen: **http://localhost:3000**
+Der Server nennt beim Start zwei Adressen: **http://localhost:3000** für diesen
+Rechner und eine Adresse mit IP für das Handy im selben WLAN. Der Link
+funktioniert nur, solange dieses Fenster offen ist — schließt du das Terminal,
+ist die Seite nicht mehr erreichbar.
 
 ### React-Native über Expo Go
 
@@ -27,6 +30,21 @@ Danach den QR-Code aus dem Terminal mit der **Expo Go**-App scannen
 (iOS: Kamera-App, Android: Expo Go direkt). Handy und Rechner müssen im
 gleichen WLAN sein. Ein Expo-Konto ist dafür nicht nötig.
 
+## Aufbau (folgt dem Figma-Prototypen)
+
+Unten die vier Bereiche, oben die Unterpunkte des gerade offenen Bereichs.
+Diese Struktur ist im Prototyp festgelegt und wird nicht abgewandelt:
+
+| Bereich (unten) | Unterpunkte (oben) |
+|---|---|
+| Messenger | Friend-Map · Chats · Kamera · Profil |
+| Videos | Home · Hochformat · Querformat · Suche · Profil |
+| Communitys | Home · Chats · Suchen · Profil |
+| Einstellungen | *(keine obere Leiste)* |
+
+Kontakte sind kein Navigationspunkt, sondern werden aus der Chatliste über das
+Plus geöffnet — genau wie im Prototyp.
+
 ## Was funktioniert
 
 | Bereich | Stand |
@@ -34,11 +52,17 @@ gleichen WLAN sein. Ein Expo-Konto ist dafür nicht nötig.
 | Bild-Feed (Start): Beiträge, Like, Folgen, Merken | fertig |
 | Video-Feed: Vollbild-Slides, Like, Teilen, Merken | fertig |
 | Communitys: Liste, Filter, Beitreten, Kanal-Chat | fertig |
+| Friend-Map: Karte mit Freunden und Standortliste | fertig (Mock) |
+| Querformat-Videos mit Suche | fertig |
+| Video-Explorer: Reels, Querformat, Beiträge, Profile, Hashtags, Standorte, Sounds | fertig |
+| Eigene Profile für Messenger, Videos und Communitys | fertig |
+| Community-Chats, Community-Suche mit Befreunden | fertig |
+| Einstellungen mit den vier Abschnitten aus dem Prototyp | fertig |
 | Chat-Liste mit Suche, Filtern und Story-Rail | fertig |
 | Einzelchat: Nachrichten senden, Antwort-Simulation, Tippen-Indikator | fertig |
 | Gruppenchat mit Absendernamen | fertig |
 | Kontakte mit Live-Suche | fertig |
-| Storys: Liste und Viewer mit Fortschrittsbalken | fertig |
+| Storys: Viewer mit Blättern, Liken und Antworten in den Chat | fertig |
 | Kamera: Foto/Video über Kamera oder Galerie | fertig (RN), UI-Gerüst (Web) |
 | Einstellungen/Profil inkl. Dark Mode | fertig |
 | Login/Registrierung mit Validierung | fertig (Mock-Auth) |
@@ -55,7 +79,8 @@ All-Media/
 ├── app/
 │   ├── App.tsx              Shell: Top-Switcher, Tabs, Overlays
 │   ├── components/          Avatar, SearchBar, StoryRail, TabBar, Toast …
-│   ├── screens/             Login, Home, Video, Messenger, Communitys, Profil
+│   ├── constants/navigation.ts  Bereiche und Unterpunkte (Prototyp-Struktur)
+│   ├── screens/             Login, Messenger, Videos, Communitys, Einstellungen
 │   ├── test/smoke.js        Smoke-Test der Web-Version
 │   ├── constants/design.ts  Farben, Abstände, Typografie, Avatar-Farben
 │   ├── types/               TypeScript-Modelle
@@ -97,9 +122,11 @@ npm run lint    # Typprüfung, muss fehlerfrei durchlaufen
 npm test        # Smoke-Test der Web-Version (Server muss laufen)
 ```
 
-Der Smoke-Test klickt alle fünf Bereiche durch und prüft Suche, Filter,
-Nachricht senden, Story-Viewer, Kamera und den Dark-Mode-Schalter. Beim ersten
-Mal muss der Browser einmalig geladen werden:
+Der Smoke-Test prüft zuerst die Grundstruktur (unten vier Bereiche, oben die
+richtigen Unterpunkte je Bereich), klickt danach jeden Unterpunkt durch und
+testet Suche, Filter, Nachricht senden, Story-Viewer, Kamera, Kommentare,
+Profile und den Dark-Mode-Schalter — 61 Prüfungen. Beim ersten Mal muss der
+Browser einmalig geladen werden:
 
 ```bash
 npx playwright install chromium

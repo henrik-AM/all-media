@@ -13,38 +13,18 @@
 <body>
   <div class="device">
     <div class="app" id="app">
-      <!-- Top switcher -->
-      <header class="topbar" id="topbar">
-        <button class="topbar__btn" data-area="home" aria-label="Start"></button>
-        <button class="topbar__btn" data-area="video" aria-label="Videos"></button>
-        <button class="topbar__btn is-active" data-area="messenger" aria-label="Messenger"></button>
-        <button class="topbar__btn" data-area="communities" aria-label="Communitys"></button>
-        <button class="topbar__btn" data-area="profile" aria-label="Profil"></button>
-      </header>
+      <!--
+        Oben: die Unterpunkte des gerade offenen Bereichs. Der Inhalt wird in
+        app.js aus NAV erzeugt, weil er sich je nach Bereich unterscheidet.
+      -->
+      <header class="topbar" id="topbar"></header>
 
       <main class="main" id="main"></main>
 
-      <!-- Bottom navigation -->
-      <nav class="bottomnav" id="bottomnav">
-        <button class="navbtn is-active" data-view="chats">
-          <span class="navbtn__icon"></span>
-          <span class="navbtn__label">Chats</span>
-        </button>
-        <button class="navbtn" data-view="stories">
-          <span class="navbtn__icon"></span>
-          <span class="navbtn__label">Storys</span>
-        </button>
-        <button class="navbtn" data-view="contacts">
-          <span class="navbtn__icon"></span>
-          <span class="navbtn__label">Kontakte</span>
-        </button>
-        <button class="navbtn" data-view="settings">
-          <span class="navbtn__icon"></span>
-          <span class="navbtn__label">Einstellungen</span>
-        </button>
-      </nav>
+      <!-- Unten: die vier Bereiche. Diese Struktur ist fest. -->
+      <nav class="bottomnav" id="bottomnav"></nav>
 
-      <!-- Full screen overlays -->
+      <!-- Vollbild-Ebenen (Chat, Story, Profil, Kamera) -->
       <section class="overlay" id="overlay" hidden></section>
     </div>
   </div>

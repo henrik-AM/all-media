@@ -102,13 +102,14 @@ ul { margin: 0; padding: 0; list-style: none; }
   flex: 0 0 auto;
   height: var(--top-h);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
+  gap: 6px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
+.topbar[hidden] { display: none; }
 .topbar__btn {
   height: 38px;
   display: grid;
@@ -224,7 +225,9 @@ ul { margin: 0; padding: 0; list-style: none; }
 .iconbtn-primary:active { transform: scale(.94); }
 
 /* ---------- Filter pills ---------- */
-.pills { display: flex; gap: 8px; padding: 12px 16px 6px; }
+.pills { display: flex; gap: 8px; padding: 12px 16px 6px; overflow-x: auto; scrollbar-width: none; }
+.pills::-webkit-scrollbar { display: none; }
+.pill { flex: 0 0 auto; }
 .pill {
   padding: 7px 15px;
   border-radius: 999px;
@@ -894,4 +897,176 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-weight: 500;
   box-shadow: var(--shadow);
   animation: fade .16s ease;
+}
+
+
+/* ================= Struktur nach Prototyp: neue Bereiche ================= */
+
+/* ---------- Overlay-Seite (Kontakte) ---------- */
+.page { display: flex; flex-direction: column; height: 100%; background: var(--surface); }
+.pagehead__row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.pagehead__row .pagehead__title { margin: 0; }
+.iconbtn {
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border-radius: 12px; color: var(--text-1);
+}
+.iconbtn:hover { background: var(--surface-2); }
+.iconbtn svg { width: 22px; height: 22px; }
+
+/* ---------- Friend-Map ---------- */
+.map {
+  position: relative;
+  margin: 0 16px 8px;
+  height: 340px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+}
+.map__grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 44px 44px;
+  opacity: .7;
+}
+.map__pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.map__dot {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: #fff; font-size: 13px; font-weight: 700;
+  border: 2.5px solid var(--surface);
+  box-shadow: 0 2px 8px rgba(0,0,0,.22);
+}
+.map__label {
+  font-size: 11px; font-weight: 600; color: var(--text-1);
+  background: var(--surface); padding: 1px 7px; border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.map__me {
+  position: absolute; left: 50%; top: 46%;
+  transform: translate(-50%, -50%);
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--brand); border: 3px solid var(--surface);
+  box-shadow: 0 0 0 8px rgba(10,102,255,.18);
+}
+
+/* ---------- Eigene Profile (Messenger / Videos / Communitys) ---------- */
+.ownprof {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 46px 16px 18px;
+}
+.ownprof--tight { padding-bottom: 8px; }
+.ownprof__switch {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 13.5px; font-weight: 600; color: var(--text-2);
+  padding: 5px 12px; border-radius: 999px; background: var(--surface-3);
+}
+.ownprof__switch svg { width: 15px; height: 15px; transform: rotate(90deg); }
+.ownprof__name { font-size: 19px; font-weight: 700; }
+.ownprof__handle { font-size: 15px; font-weight: 600; color: var(--text-2); }
+.ownprof__bio { font-size: 14px; color: var(--text-2); text-align: center; max-width: 280px; }
+.ownprof__links { display: flex; gap: 8px; margin-top: 4px; }
+.chip {
+  font-size: 13px; font-weight: 600; color: var(--brand);
+  background: var(--brand-soft); padding: 6px 12px; border-radius: 999px;
+}
+
+/* ---------- Querformat-Videos ---------- */
+.clip { padding: 0 0 18px; cursor: pointer; }
+.clip__thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: grid; place-items: center;
+  background: var(--surface-3); color: var(--text-3);
+}
+.clip__thumb svg { width: 42px; height: 42px; }
+.clip__time {
+  position: absolute; right: 8px; bottom: 8px;
+  background: rgba(0,0,0,.75); color: #fff;
+  font-size: 11.5px; font-weight: 600;
+  padding: 2px 6px; border-radius: 5px;
+}
+.clip__meta { display: flex; gap: 12px; padding: 11px 16px 0; align-items: flex-start; }
+.clip__title { font-size: 14.5px; font-weight: 600; line-height: 1.32; }
+.clip__sub { font-size: 12.5px; color: var(--text-3); margin-top: 3px; }
+
+/* ---------- Explorer (Videos / Suche) ---------- */
+.exp { padding-bottom: 10px; }
+.exp__head {
+  padding: 16px 16px 8px;
+  font-size: 15px; font-weight: 700; color: var(--text-1);
+}
+.exp__reels { display: flex; gap: 10px; overflow-x: auto; padding: 0 16px 4px; }
+.exp__reel {
+  flex: 0 0 116px; height: 190px; border-radius: 12px;
+  background: var(--surface-3); color: var(--text-3);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+}
+.exp__reel svg { width: 28px; height: 28px; }
+.exp__reel span { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.exp__list { display: flex; flex-direction: column; }
+.exp__row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 16px; width: 100%; text-align: left;
+}
+.exp__row:hover { background: var(--surface-2); }
+.exp__thumb {
+  flex: 0 0 auto; width: 56px; height: 40px; border-radius: 8px;
+  background: var(--surface-3); color: var(--text-3);
+  display: grid; place-items: center;
+}
+.exp__thumb svg { width: 20px; height: 20px; }
+.exp__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.exp__text strong { font-size: 14px; font-weight: 600; }
+.exp__text small { font-size: 12.5px; color: var(--text-3); }
+.exp__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 0 2px; }
+.exp__tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px; }
+
+/* ---------- Story-Viewer: Blätterzonen und Pause ---------- */
+.viewer__stage { position: relative; }
+.viewer__media { display: grid; place-items: center; width: 100%; height: 100%; }
+.viewer__zone { position: absolute; top: 0; bottom: 0; width: 32%; z-index: 2; }
+.viewer__zone--prev { left: 0; }
+.viewer__zone--next { right: 0; }
+.viewer__caption {
+  position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 1;
+  color: #fff; font-size: 14.5px; font-weight: 500; text-align: center;
+  text-shadow: 0 1px 6px rgba(0,0,0,.6);
+}
+.viewer__act.is-liked { color: var(--danger); }
+.viewer__act.is-liked svg { fill: var(--danger); }
+.viewer.is-paused .viewer__fill { opacity: .55; }
+
+/* ---------- Kamera als Seite ---------- */
+.camera--page { position: static; inset: auto; flex: 1 1 auto; min-height: 0; }
+
+/* ---------- Playlists und Highlights im eigenen Profil ---------- */
+.highlights { display: flex; gap: 14px; overflow-x: auto; padding: 4px 16px 14px; scrollbar-width: none; }
+.highlights::-webkit-scrollbar { display: none; }
+.highlight { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 68px; }
+.highlight__ring {
+  width: 62px; height: 62px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--surface-3); color: var(--text-3);
+  border: 1px solid var(--border);
+}
+.highlight__ring svg { width: 24px; height: 24px; }
+.highlight__label {
+  font-size: 11.5px; color: var(--text-2); max-width: 68px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.msg__reply {
+  font-size: 11.5px; font-weight: 600; opacity: .8;
+  padding-bottom: 4px; margin-bottom: 4px;
+  border-bottom: 1px solid currentColor;
+  border-bottom-color: rgba(128,128,128,.35);
 }

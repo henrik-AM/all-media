@@ -9,11 +9,13 @@ import { Contact } from '../../types';
 
 interface Props {
   contacts: Contact[];
+  /** Kontakte sind im Prototyp kein Navigationspunkt, sondern eine eigene Seite. */
+  onBack?: () => void;
   onOpenContact: (contact: Contact) => void;
   onAddContact: () => void;
 }
 
-export const ContactsScreen = ({ contacts, onOpenContact, onAddContact }: Props) => {
+export const ContactsScreen = ({ contacts, onBack, onOpenContact, onAddContact }: Props) => {
   const [query, setQuery] = useState('');
 
   const { friends, pending, total } = useMemo(() => {
@@ -48,7 +50,14 @@ export const ContactsScreen = ({ contacts, onOpenContact, onAddContact }: Props)
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Kontakte</Text>
+        <View style={styles.titleRow}>
+          {onBack && (
+            <Pressable onPress={onBack} hitSlop={10}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </Pressable>
+          )}
+          <Text style={styles.title}>Kontakte</Text>
+        </View>
         <SearchBar
           value={query}
           onChangeText={setQuery}
@@ -88,7 +97,8 @@ export const ContactsScreen = ({ contacts, onOpenContact, onAddContact }: Props)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
-  title: { marginBottom: spacing.md, color: colors.text, ...typography.title },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  title: { color: colors.text, ...typography.title },
 
   sectionHead: {
     paddingHorizontal: spacing.lg,

@@ -2,48 +2,53 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, sizes, spacing } from '../constants/design';
-
-export type AreaKey = 'home' | 'video' | 'messenger' | 'communities' | 'profile';
-
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const AREAS: { key: AreaKey; icon: IconName }[] = [
-  { key: 'home', icon: 'home-outline' },
-  { key: 'video', icon: 'play-outline' },
-  { key: 'messenger', icon: 'chatbubble-outline' },
-  { key: 'communities', icon: 'people-outline' },
-  { key: 'profile', icon: 'person-outline' },
-];
+import { AreaKey, SubKey, areaOf } from '../constants/navigation';
 
 interface Props {
-  active: AreaKey;
-  onChange: (area: AreaKey) => void;
+  area: AreaKey;
+  active: SubKey;
+  onChange: (sub: SubKey) => void;
 }
 
-export const TopSwitcher = ({ active, onChange }: Props) => (
-  <View style={styles.bar}>
-    {AREAS.map((area) => {
-      const isActive = area.key === active;
-      return (
-        <Pressable
-          key={area.key}
-          style={[styles.btn, isActive && styles.btnActive]}
-          onPress={() => onChange(area.key)}
-        >
-          <Ionicons name={area.icon} size={22} color={isActive ? colors.brand : colors.text2} />
-        </Pressable>
-      );
-    })}
-  </View>
-);
+/**
+ * Obere Leiste: die Unterpunkte des offenen Bereichs. Sie wechselt mit dem
+ * Bereich — genau wie im Prototyp. Bereiche ohne Unterpunkte (Einstellungen)
+ * zeigen gar keine Leiste.
+ */
+export const TopSwitcher = ({ area, active, onChange }: Props) => {
+  const subs = areaOf(area).subs;
+  if (!subs.length) return null;
+
+  return (
+    <View style={styles.bar}>
+      {subs.map((item) => {
+        const isActive = item.key === active;
+        return (
+          <Pressable
+            key={item.key}
+            accessibilityLabel={item.label}
+            style={[styles.btn, isActive && styles.btnActive]}
+            onPress={() => onChange(item.key)}
+          >
+            <Ionicons
+              name={isActive ? item.iconActive : item.icon}
+              size={22}
+              color={isActive ? colors.brand : colors.text2}
+            />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     height: sizes.topBar,
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,

@@ -105,6 +105,45 @@ export interface Story {
   name: string;
   viewed: boolean;
   own?: boolean;
+  liked?: boolean;
+  caption?: string;
+}
+
+/** Querformat-Video aus dem Prototyp-Frame "Videos - Querformat". */
+export interface Clip {
+  id: string;
+  userId: string;
+  title: string;
+  duration: string;
+  views: number;
+  age: string;
+}
+
+/** Eintrag der Friend-Map. x/y sind Prozentwerte auf der Kartenflaeche. */
+export interface FriendPin {
+  id: string;
+  x: number;
+  y: number;
+  place: string;
+  when: string;
+}
+
+export interface Hashtag {
+  tag: string;
+  posts: number;
+}
+
+export interface Sound {
+  id: string;
+  title: string;
+  artist: string;
+  uses: number;
+}
+
+export interface Place {
+  id: string;
+  name: string;
+  posts: number;
 }
 
 export interface AuthUser {

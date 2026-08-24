@@ -9,12 +9,14 @@ import { uploadImage } from '../../lib/supabaseStorage';
 type Mode = 'photo' | 'video';
 
 interface Props {
+  /** Als Unterpunkt der oberen Leiste, also ohne Schliessen-Schaltflaeche. */
+  embedded?: boolean;
   onClose: () => void;
   onCaptured?: (uri: string) => void;
   onNotice: (message: string) => void;
 }
 
-export const CameraScreen = ({ onClose, onCaptured, onNotice }: Props) => {
+export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }: Props) => {
   const [mode, setMode] = useState<Mode>('photo');
   const [busy, setBusy] = useState(false);
 
@@ -55,9 +57,13 @@ export const CameraScreen = ({ onClose, onCaptured, onNotice }: Props) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.top}>
-        <Pressable onPress={onClose} hitSlop={10}>
-          <Ionicons name="close" size={26} color={colors.white} />
-        </Pressable>
+        {embedded ? (
+          <View style={styles.spacer} />
+        ) : (
+          <Pressable onPress={onClose} hitSlop={10}>
+            <Ionicons name="close" size={26} color={colors.white} />
+          </Pressable>
+        )}
         <Pressable onPress={() => onNotice('Blitz umgeschaltet')} hitSlop={10}>
           <Ionicons name="flash-outline" size={24} color={colors.white} />
         </Pressable>
@@ -102,6 +108,7 @@ export const CameraScreen = ({ onClose, onCaptured, onNotice }: Props) => {
 };
 
 const styles = StyleSheet.create({
+  spacer: { width: 26, height: 26 },
   container: { flex: 1, backgroundColor: '#0B0B0C' },
   top: {
     flexDirection: 'row',

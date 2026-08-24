@@ -1,3 +1,53 @@
+/*
+ * Grundstruktur der App — sie folgt dem Figma-Prototypen und wird nicht
+ * abgewandelt:
+ *
+ *   unten  : vier Bereiche (Messenger, Videos, Communitys, Einstellungen)
+ *   oben   : die Unterpunkte des gerade offenen Bereichs
+ *
+ * Die Unterpunkte je Bereich stammen aus den Prototyp-Frames:
+ *   Messenger   -> Friend-Map | Chats | Kamera | Profil
+ *   Videos      -> Home | Hochformat | Querformat | Suche | Profil
+ *   Communitys  -> Home | Chats | Suchen | Profil
+ *   Einstellungen hat im Prototyp keine obere Leiste.
+ */
+const NAV = {
+  messenger: {
+    label: 'Messenger',
+    icon: 'chat',
+    subs: [
+      { id: 'friendmap', label: 'Friend-Map', icon: 'mapPin' },
+      { id: 'chats', label: 'Chats', icon: 'chat' },
+      { id: 'camera', label: 'Kamera', icon: 'camera' },
+      { id: 'profile', label: 'Profil', icon: 'person' },
+    ],
+  },
+  videos: {
+    label: 'Videos',
+    icon: 'play',
+    subs: [
+      { id: 'home', label: 'Home', icon: 'home' },
+      { id: 'portrait', label: 'Hochformat', icon: 'portrait' },
+      { id: 'landscape', label: 'Querformat', icon: 'landscape' },
+      { id: 'search', label: 'Suche', icon: 'search' },
+      { id: 'profile', label: 'Profil', icon: 'person' },
+    ],
+  },
+  communities: {
+    label: 'Communitys',
+    icon: 'people',
+    subs: [
+      { id: 'home', label: 'Home', icon: 'grid' },
+      { id: 'chats', label: 'Chats', icon: 'chat' },
+      { id: 'search', label: 'Suchen', icon: 'search' },
+      { id: 'profile', label: 'Profil', icon: 'person' },
+    ],
+  },
+  settings: { label: 'Einstellungen', icon: 'settings', subs: [] },
+};
+
+const AREAS = ['messenger', 'videos', 'communities', 'settings'];
+
 const state = {
   users: {},
   chats: [],
@@ -6,17 +56,29 @@ const state = {
   communities: [],
   videos: [],
   posts: [],
-  view: 'chats',
+  clips: [],
+  hashtags: [],
+  sounds: [],
+  places: [],
+  friends: [],
   area: 'messenger',
+  // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt.
+  sub: { messenger: 'chats', videos: 'home', communities: 'home', settings: 'main' },
   filter: 'all',
   query: '',
   contactQuery: '',
   communityQuery: '',
   communityFilter: 'all',
+  commSearchQuery: '',
+  commSearchFilter: 'all',
+  videoSearchQuery: '',
+  clipQuery: '',
   theme: localStorage.getItem('am-theme') || 'system',
   openChatId: null,
   messages: [],
 };
+
+const sub = () => state.sub[state.area];
 
 const $ = (sel) => document.querySelector(sel);
 const main = $('#main');
@@ -70,25 +132,75 @@ async function bootstrap() {
 }
 
 /* ------------------------------------------------------------------ views */
+
+// Untere Leiste: die vier Bereiche. Sie aendert sich nie.
+function renderBottomNav() {
+  const nav = $('#bottomnav');
+  nav.innerHTML = AREAS.map((id) => `
+    <button class="navbtn ${state.area === id ? 'is-active' : ''}" data-area="${id}">
+      <span class="navbtn__icon">${ICONS[NAV[id].icon]}</span>
+      <span class="navbtn__label">${NAV[id].label}</span>
+    </button>`).join('');
+
+  nav.querySelectorAll('[data-area]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.area = b.dataset.area;
+      render();
+    })
+  );
+}
+
+// Obere Leiste: die Unterpunkte des offenen Bereichs.
+function renderTopBar() {
+  const bar = $('#topbar');
+  const subs = NAV[state.area].subs;
+
+  if (!subs.length) {
+    bar.hidden = true;
+    bar.innerHTML = '';
+    return;
+  }
+
+  bar.hidden = false;
+  bar.style.gridTemplateColumns = `repeat(${subs.length}, 1fr)`;
+  bar.innerHTML = subs.map((s) => `
+    <button class="topbar__btn ${sub() === s.id ? 'is-active' : ''}" data-sub="${s.id}" title="${s.label}" aria-label="${s.label}">
+      ${ICONS[s.icon]}
+    </button>`).join('');
+
+  bar.querySelectorAll('[data-sub]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.sub[state.area] = b.dataset.sub;
+      render();
+    })
+  );
+}
+
 function render() {
-  const navActive = state.area === 'messenger' || state.area === 'profile';
-  document.querySelectorAll('.navbtn').forEach((b) =>
-    b.classList.toggle('is-active', navActive && b.dataset.view === state.view)
-  );
-  document.querySelectorAll('.topbar__btn').forEach((b) =>
-    b.classList.toggle('is-active', b.dataset.area === state.area)
-  );
+  renderBottomNav();
+  renderTopBar();
 
-  if (state.area === 'home') return renderHomeFeed();
-  if (state.area === 'video') return renderVideoFeed();
-  if (state.area === 'communities') return renderCommunities();
-  if (state.area === 'profile') return renderProfile();
-  if (state.area === 'camera') return openCamera();
-
-  if (state.view === 'chats') return renderChats();
-  if (state.view === 'stories') return renderStories();
-  if (state.view === 'contacts') return renderContacts();
-  if (state.view === 'settings') return renderSettings();
+  const v = sub();
+  if (state.area === 'messenger') {
+    if (v === 'friendmap') return renderFriendMap();
+    if (v === 'chats') return renderChats();
+    if (v === 'camera') return renderCameraPage();
+    if (v === 'profile') return renderMessengerProfile();
+  }
+  if (state.area === 'videos') {
+    if (v === 'home') return renderHomeFeed();
+    if (v === 'portrait') return renderVideoFeed();
+    if (v === 'landscape') return renderLandscapeVideos();
+    if (v === 'search') return renderVideoSearch();
+    if (v === 'profile') return renderVideoProfile();
+  }
+  if (state.area === 'communities') {
+    if (v === 'home') return renderCommunities();
+    if (v === 'chats') return renderCommunityChats();
+    if (v === 'search') return renderCommunitySearch();
+    if (v === 'profile') return renderCommunityProfile();
+  }
+  return renderSettings();
 }
 
 /* ---------------------------------------------------------- chats view */
@@ -223,47 +335,9 @@ function bindStoryRail() {
   );
 }
 
-/* ---------------------------------------------------------- stories view */
-function renderStories() {
-  const unseen = state.stories.filter((s) => !s.own && !s.viewed);
-  const seen = state.stories.filter((s) => !s.own && s.viewed);
-  const own = state.stories.find((s) => s.own);
-
-  const item = (s) => {
-    const u = user(s.userId);
-    return `<li><button class="row" data-story="${s.id}">
-        <div class="story__ring ${s.viewed ? 'is-viewed' : ''}" style="width:52px;height:52px">
-          <div class="story__inner" style="background:${u.color};font-size:15px">${esc(u.initials)}</div>
-        </div>
-        <div class="row__body">
-          <div class="row__name">${esc(u.name)}</div>
-          <div class="row__bottom"><span class="row__preview">${s.viewed ? 'Bereits angesehen' : 'Neue Story'}</span></div>
-        </div>
-      </button></li>`;
-  };
-
-  main.innerHTML = `
-    <div class="pagehead"><h1 class="pagehead__title">Storys</h1></div>
-    <div class="scroll">
-      <ul class="rows">
-        <li><button class="row" data-story="${own.id}">
-          <div class="story__ring is-viewed story__add" style="width:52px;height:52px">
-            <div class="story__inner" style="background:${user('me').color};font-size:15px">DU</div>
-            <span class="story__add-badge">${ICONS.plus}</span>
-          </div>
-          <div class="row__body">
-            <div class="row__name">Deine Story</div>
-            <div class="row__bottom"><span class="row__preview">Tippe, um etwas zu teilen</span></div>
-          </div>
-        </button></li>
-      </ul>
-      ${unseen.length ? `<div class="listhead">Neu</div><ul class="rows">${unseen.map(item).join('')}</ul>` : ''}
-      ${seen.length ? `<div class="listhead">Angesehen</div><ul class="rows">${seen.map(item).join('')}</ul>` : ''}
-    </div>`;
-  bindStoryRail();
-}
-
-/* ---------------------------------------------------------- contacts view */
+/* ---------------------------------------------------------- contacts page */
+// Kontakte sind im Prototyp kein eigener Navigationspunkt, sondern werden aus
+// der Chatliste heraus geoeffnet. Deshalb eine Overlay-Seite statt eines Tabs.
 function renderContacts() {
   const q = state.contactQuery.trim().toLowerCase();
   const list = state.contacts.filter((c) => !q || c.name.toLowerCase().includes(q));
@@ -280,9 +354,14 @@ function renderContacts() {
       <span class="row__chevron">${ICONS.chevron}</span>
     </button></li>`;
 
-  main.innerHTML = `
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="page">
     <div class="pagehead">
-      <h1 class="pagehead__title">Kontakte</h1>
+      <div class="pagehead__row">
+        <button class="iconbtn" id="contactsBack" aria-label="Zurück">${ICONS.back}</button>
+        <h1 class="pagehead__title">Kontakte</h1>
+      </div>
       <div class="searchrow">
         <label class="searchbox">
           ${ICONS.search}
@@ -302,8 +381,10 @@ function renderContacts() {
               <div class="empty__text">Für „${esc(state.contactQuery)}" wurde nichts gefunden.</div>
             </div>`
       }
+    </div>
     </div>`;
 
+  $('#contactsBack').addEventListener('click', closeOverlay);
   const input = $('#contactSearch');
   input.addEventListener('input', (e) => {
     state.contactQuery = e.target.value;
@@ -319,7 +400,7 @@ function renderContacts() {
     $('#contactSearch').focus();
   });
   $('#addContact').addEventListener('click', openAddContact);
-  main.querySelectorAll('[data-contact]').forEach((r) =>
+  overlay.querySelectorAll('[data-contact]').forEach((r) =>
     r.addEventListener('click', () => {
       const chat = state.chats.find((c) => c.userId === r.dataset.contact);
       if (chat) openChat(chat.id);
@@ -357,8 +438,13 @@ function openNewMenu() {
       <span class="row__chevron">${ICONS.chevron}</span>
     </button>
     <button class="item" data-new="contact">
-      <span class="item__icon">${ICONS.person}</span>
+      <span class="item__icon">${ICONS.userPlus}</span>
       <span class="item__label">Kontakt hinzufügen</span>
+      <span class="row__chevron">${ICONS.chevron}</span>
+    </button>
+    <button class="item" data-new="contacts">
+      <span class="item__icon">${ICONS.person}</span>
+      <span class="item__label">Kontakte</span>
       <span class="row__chevron">${ICONS.chevron}</span>
     </button>`,
     (sheet, close) => {
@@ -366,6 +452,7 @@ function openNewMenu() {
         b.addEventListener('click', () => {
           close();
           if (b.dataset.new === 'group') openNewGroup();
+          else if (b.dataset.new === 'contacts') renderContacts();
           else openAddContact();
         })
       );
@@ -471,7 +558,7 @@ function openAddContact() {
         state.contacts.push(result.contact);
         close();
         toast(`Anfrage an ${result.contact.name} gesendet`);
-        if (state.view === 'contacts') renderContacts();
+        if (overlay.querySelector('#contactSearch')) renderContacts();
       };
 
       input.addEventListener('keydown', (e) => {
@@ -943,6 +1030,12 @@ function renderCommunities() {
     })
   );
 
+  bindJoinButtons(renderCommunities);
+}
+
+// Beitreten/Verlassen wird an mehreren Stellen angeboten. Der Aufrufer sagt,
+// was danach neu gezeichnet wird.
+function bindJoinButtons(rerender) {
   main.querySelectorAll('[data-join]').forEach((btn) =>
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -951,7 +1044,7 @@ function renderCommunities() {
       const idx = state.communities.findIndex((c) => c.id === updated.id);
       state.communities[idx] = updated;
       toast(updated.joined ? `„${updated.name}" beigetreten` : `„${updated.name}" verlassen`);
-      renderCommunities();
+      rerender();
     })
   );
 }
@@ -983,81 +1076,756 @@ function communityRow(c) {
 }
 
 /* ---------------------------------------------------------- settings */
+/*
+ * Prototyp-Frame "Einstellungen": vier Abschnitte (Allgemein, Messenger,
+ * Videos, Communitys) mit einer Sprungleiste darueber. Die Eintraege sind
+ * eins zu eins uebernommen.
+ */
+const SETTINGS = [
+  {
+    id: 'allgemein',
+    title: 'Allgemein',
+    items: [
+      { label: 'Erziehungsberechtigte/r', icon: 'shield' },
+      { label: 'Spendencode', icon: 'bookmark' },
+      { label: 'Sicherheits-/Entsperrcode', icon: 'lock' },
+      { label: 'Geräteverknüpfung', icon: 'portrait' },
+      { label: 'Dunkles Design', icon: 'moon', toggle: 'theme' },
+    ],
+  },
+  {
+    id: 'messenger',
+    title: 'Messenger',
+    items: [
+      { label: 'Lesebestätigung', icon: 'checkDouble' },
+      { label: 'Standort-Sichtbarkeit', icon: 'mapPin' },
+      { label: 'Story-Sichtbarkeit', icon: 'eye' },
+    ],
+  },
+  {
+    id: 'videos',
+    title: 'Videos',
+    items: [
+      { label: 'Privates Profil', icon: 'lock', toggle: 'videoPrivate' },
+      { label: 'Spendencode', icon: 'bookmark' },
+      { label: 'Insights', icon: 'compass' },
+      { label: 'Mit Glocke markierte Profile', icon: 'bell' },
+      { label: 'Repost-Sichtbarkeit', icon: 'repeat' },
+      { label: 'Likes-Sichtbarkeit', icon: 'heart' },
+      { label: 'Downloadeinstellungen', icon: 'image' },
+      { label: 'Story-Sichtbarkeit', icon: 'eye' },
+      { label: 'Nutzerstatus', icon: 'person' },
+      { label: 'Profilbanner', icon: 'landscape' },
+    ],
+  },
+  {
+    id: 'communitys',
+    title: 'Communitys',
+    items: [
+      { label: 'Spendencode', icon: 'bookmark' },
+      { label: 'Nutzerstatus', icon: 'person' },
+      { label: 'Privates Profil', icon: 'lock', toggle: 'commPrivate' },
+      { label: 'Nachrichtenerlaubnis', icon: 'chat' },
+      { label: 'Push-to-Talk Nachricht', icon: 'mic' },
+      { label: 'Gestummte Communitys', icon: 'mute' },
+      { label: 'Gestummte Profile', icon: 'block' },
+    ],
+  },
+];
+
+const toggles = { videoPrivate: false, commPrivate: false };
+
 function renderSettings() {
   const me = user('me');
+
+  const itemHtml = (it) => {
+    if (it.toggle) {
+      const on = it.toggle === 'theme' ? state.theme === 'dark' : toggles[it.toggle];
+      return `<div class="item">
+        <span class="item__icon">${ICONS[it.icon]}</span>
+        <span class="item__label">${esc(it.label)}</span>
+        <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}"><span class="switch__knob"></span></button>
+      </div>`;
+    }
+    return `<button class="item" data-setting="${esc(it.label)}">
+      <span class="item__icon">${ICONS[it.icon]}</span>
+      <span class="item__label">${esc(it.label)}</span>
+      <span class="row__chevron">${ICONS.chevron}</span>
+    </button>`;
+  };
+
   main.innerHTML = `
-    <div class="scroll">
+    <div class="pagehead">
+      <h1 class="pagehead__title">Einstellungen</h1>
+      <div class="pills">
+        ${SETTINGS.map((sec) => `<button class="pill" data-jump="${sec.id}">${esc(sec.title)}</button>`).join('')}
+      </div>
+    </div>
+    <div class="scroll" id="settingsScroll">
       <div class="profilehead">
-        <div class="avatar avatar--88" style="background:${me.color}">DU</div>
+        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
         <div class="profilehead__name">Henrik</div>
-        <div class="profilehead__sub">@henrik · Hey, ich nutze All Media!</div>
+        <div class="profilehead__sub">${esc(me.handle)} · Hey, ich nutze All Media!</div>
       </div>
+      ${SETTINGS.map(
+        (sec) => `<div class="listhead" id="sec-${sec.id}">${esc(sec.title)} →</div>
+          <div class="group">${sec.items.map(itemHtml).join('')}</div>`
+      ).join('')}
       <div class="group">
-        <button class="item" data-act="edit">
-          <span class="item__icon">${ICONS.edit}</span>
-          <span class="item__label">Profil bearbeiten</span>
-          <span class="row__chevron">${ICONS.chevron}</span>
-        </button>
-        <button class="item" data-act="notifications">
-          <span class="item__icon">${ICONS.bell}</span>
-          <span class="item__label">Benachrichtigungen</span>
-          <span class="row__chevron">${ICONS.chevron}</span>
-        </button>
-        <button class="item" data-act="privacy">
-          <span class="item__icon">${ICONS.lock}</span>
-          <span class="item__label">Privatsphäre</span>
-          <span class="row__chevron">${ICONS.chevron}</span>
-        </button>
-        <div class="item">
-          <span class="item__icon">${ICONS.moon}</span>
-          <span class="item__label">Dunkles Design</span>
-          <button class="switch ${state.theme === 'dark' ? 'is-on' : ''}" id="themeSwitch" aria-label="Dunkles Design">
-            <span class="switch__knob"></span>
-          </button>
-        </div>
-      </div>
-      <div class="group">
-        <button class="item" data-act="storage">
-          <span class="item__icon">${ICONS.image}</span>
-          <span class="item__label">Speicher &amp; Daten</span>
-          <span class="item__value">1,2 GB</span>
-        </button>
-        <button class="item" data-act="about">
+        <button class="item" data-setting="Über All Media">
           <span class="item__icon">${ICONS.info}</span>
           <span class="item__label">Über All Media</span>
           <span class="item__value">1.0.0</span>
         </button>
-        <button class="item item--danger" data-act="logout">
+        <button class="item item--danger" data-setting="Abmelden">
           <span class="item__icon">${ICONS.logout}</span>
           <span class="item__label">Abmelden</span>
         </button>
       </div>
     </div>`;
 
-  $('#themeSwitch').addEventListener('click', () => {
-    state.theme = state.theme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('am-theme', state.theme);
-    applyTheme();
-    renderSettings();
-  });
-  main.querySelectorAll('[data-act]').forEach((b) =>
+  main.querySelectorAll('[data-jump]').forEach((b) =>
     b.addEventListener('click', () => {
-      const labels = {
-        edit: 'Profil bearbeiten',
-        notifications: 'Benachrichtigungen',
-        privacy: 'Privatsphäre',
-        storage: 'Speicher & Daten',
-        about: 'All Media 1.0.0',
-        logout: 'Abmelden',
-      };
-      toast(labels[b.dataset.act] + ' folgt in Phase 3');
+      document.getElementById('sec-' + b.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    })
+  );
+
+  main.querySelectorAll('[data-toggle]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const key = b.dataset.toggle;
+      if (key === 'theme') {
+        state.theme = state.theme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('am-theme', state.theme);
+        applyTheme();
+      } else {
+        toggles[key] = !toggles[key];
+      }
+      b.classList.toggle('is-on');
+    })
+  );
+
+  main.querySelectorAll('[data-setting]').forEach((b) =>
+    b.addEventListener('click', () => toast(`${b.dataset.setting} folgt mit dem Backend`))
+  );
+}
+
+/* ------------------------------------------------- Messenger: Friend-Map */
+// Prototyp-Frame "Messenger - Friend-Map": Karte mit Freunden, darunter eine
+// Liste mit letztem Standort.
+function renderFriendMap() {
+  main.innerHTML = `
+    <div class="pagehead"><h1 class="pagehead__title">Friend-Map</h1></div>
+    <div class="scroll">
+      <div class="map" id="map">
+        <div class="map__grid"></div>
+        ${state.friends
+          .map((f) => {
+            const u = user(f.id);
+            return `<button class="map__pin" style="left:${f.x}%;top:${f.y}%" data-friend="${f.id}" title="${esc(u.name)}">
+              <span class="map__dot" style="background:${u.color}">${esc(u.initials)}</span>
+              <span class="map__label">${esc(u.name.split(' ')[0])}</span>
+            </button>`;
+          })
+          .join('')}
+        <div class="map__me" title="Dein Standort"><span></span></div>
+      </div>
+      <div class="listhead">In deiner Nähe</div>
+      <ul class="rows">
+        ${state.friends
+          .map((f) => {
+            const u = user(f.id);
+            return `<li><button class="row" data-friend="${f.id}">
+              ${avatarForUser(f.id, 44)}
+              <div class="row__body">
+                <div class="row__name">${esc(u.name)}</div>
+                <div class="row__bottom"><span class="row__preview">${esc(f.place)} · ${esc(f.when)}</span></div>
+              </div>
+              <span class="row__chevron">${ICONS.chevron}</span>
+            </button></li>`;
+          })
+          .join('')}
+      </ul>
+    </div>`;
+
+  main.querySelectorAll('[data-friend]').forEach((el) =>
+    el.addEventListener('click', () => openProfile(el.dataset.friend))
+  );
+}
+
+/* ---------------------------------------------------- Messenger: Kamera */
+// Prototyp-Frame "Messenger - Kamera". Als Seite, nicht als Overlay, weil die
+// Kamera im Prototyp ein eigener Unterpunkt der oberen Leiste ist.
+function renderCameraPage() {
+  let mode = 'photo';
+  let recording = false;
+
+  main.innerHTML = `
+    <div class="camera camera--page">
+      <div class="camera__top">
+        <span></span>
+        <button id="camFlash" aria-label="Blitz">${ICONS.flash}</button>
+      </div>
+      <div class="camera__stage">${ICONS.camera}</div>
+      <div class="camera__modes">
+        <button class="camera__mode is-active" data-mode="photo">FOTO</button>
+        <button class="camera__mode" data-mode="video">VIDEO</button>
+      </div>
+      <div class="camera__bottom">
+        <button class="camera__side" id="camGallery" aria-label="Galerie">${ICONS.image}</button>
+        <button class="camera__shutter" id="camShutter" aria-label="Aufnehmen"><span class="camera__shutter-inner"></span></button>
+        <button class="camera__side" id="camSwitch" aria-label="Kamera wechseln">${ICONS.switchCam}</button>
+      </div>
+    </div>`;
+
+  $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
+  $('#camGallery').addEventListener('click', () => toast('Galerie folgt mit dem Backend'));
+  $('#camSwitch').addEventListener('click', () => toast('Kamera gewechselt'));
+
+  main.querySelectorAll('.camera__mode').forEach((b) =>
+    b.addEventListener('click', () => {
+      mode = b.dataset.mode;
+      main.querySelectorAll('.camera__mode').forEach((x) => x.classList.toggle('is-active', x === b));
+    })
+  );
+
+  $('#camShutter').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    if (mode === 'photo') return toast('Foto aufgenommen');
+    recording = !recording;
+    btn.classList.toggle('is-rec', recording);
+    toast(recording ? 'Aufnahme gestartet' : 'Aufnahme gespeichert');
+  });
+}
+
+/* ---------------------------------------------------- Messenger: Profil */
+// Prototyp-Frame "Messenger - Profil": Profilbild, Name, Biografie und die
+// Verweise auf das Video- und das Community-Profil ("Profil wechseln").
+function renderMessengerProfile() {
+  const me = user('me');
+  main.innerHTML = `
+    <div class="scroll">
+      <div class="ownprof">
+        <button class="ownprof__switch" id="switchProfile">Profil wechseln ${ICONS.chevron}</button>
+        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
+        <div class="ownprof__name">Henrik</div>
+        <div class="ownprof__bio">Baue gerade All Media. Erreichbar über Chat und Story.</div>
+        <div class="ownprof__links">
+          <button class="chip" data-switch="videos">@videoprofil</button>
+          <button class="chip" data-switch="communities">@communityprofil</button>
+        </div>
+      </div>
+      <div class="group">
+        <button class="item" data-mact="contacts">
+          <span class="item__icon">${ICONS.person}</span>
+          <span class="item__label">Kontakte</span>
+          <span class="item__value">${state.contacts.length}</span>
+        </button>
+        <button class="item" data-mact="stories">
+          <span class="item__icon">${ICONS.image}</span>
+          <span class="item__label">Deine Story</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>
+        <button class="item" data-mact="visibility">
+          <span class="item__icon">${ICONS.eye}</span>
+          <span class="item__label">Story-Sichtbarkeit</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>
+        <button class="item" data-mact="location">
+          <span class="item__icon">${ICONS.mapPin}</span>
+          <span class="item__label">Standort-Sichtbarkeit</span>
+          <span class="item__value">Freunde</span>
+        </button>
+      </div>
+    </div>`;
+
+  $('#switchProfile').addEventListener('click', () => toast('Wähle unten „@videoprofil" oder „@communityprofil"'));
+  main.querySelectorAll('[data-switch]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.area = b.dataset.switch;
+      state.sub[state.area] = 'profile';
+      render();
+    })
+  );
+  main.querySelectorAll('[data-mact]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (b.dataset.mact === 'contacts') return renderContacts();
+      if (b.dataset.mact === 'stories') {
+        state.sub.messenger = 'camera';
+        return render();
+      }
+      toast('Diese Einstellung findest du unter Einstellungen › Messenger');
     })
   );
 }
 
-function renderProfile() {
-  state.view = 'settings';
-  renderSettings();
+/* --------------------------------------------------- Videos: Querformat */
+// Prototyp-Frame "Videos - Querformat": Suchleiste und Liste von
+// Querformat-Videos mit Vorschaubild, Titel, Kanal und Laufzeit.
+function renderLandscapeVideos() {
+  const q = state.clipQuery.trim().toLowerCase();
+  const list = state.clips.filter(
+    (c) => !q || c.title.toLowerCase().includes(q) || user(c.userId).name.toLowerCase().includes(q)
+  );
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="clipSearch" type="search" placeholder="Querformat durchsuchen" value="${esc(state.clipQuery)}" autocomplete="off" />
+          ${state.clipQuery ? `<button class="searchbox__clear" id="clipSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
+        </label>
+      </div>
+    </div>
+    <div class="scroll">
+      ${
+        list.length
+          ? list
+              .map((c) => {
+                const u = user(c.userId);
+                return `<article class="clip" data-clip="${c.id}">
+                  <div class="clip__thumb">${ICONS.landscape}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__meta">
+                    <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
+                    <div>
+                      <div class="clip__title">${esc(c.title)}</div>
+                      <div class="clip__sub">${esc(u.name)} · ${compactNumber(c.views)} Aufrufe · ${esc(c.age)}</div>
+                    </div>
+                  </div>
+                </article>`;
+              })
+              .join('')
+          : `<div class="empty">${ICONS.landscape}
+              <div class="empty__title">Kein Video gefunden</div>
+              <div class="empty__text">Für „${esc(state.clipQuery)}" gibt es keinen Treffer.</div>
+            </div>`
+      }
+    </div>`;
+
+  const input = $('#clipSearch');
+  input.addEventListener('input', (e) => {
+    state.clipQuery = e.target.value;
+    const pos = e.target.selectionStart;
+    renderLandscapeVideos();
+    const next = $('#clipSearch');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  $('#clipSearchClear')?.addEventListener('click', () => {
+    state.clipQuery = '';
+    renderLandscapeVideos();
+    $('#clipSearch').focus();
+  });
+  main.querySelectorAll('[data-clip]').forEach((el) =>
+    el.addEventListener('click', () => {
+      const c = state.clips.find((x) => x.id === el.dataset.clip);
+      toast(`„${c.title}" — Wiedergabe folgt mit dem Backend`);
+    })
+  );
+}
+
+/* -------------------------------------------------------- Videos: Suche */
+// Prototyp-Frame "Video - Suche": Explorer mit den Abschnitten Reels,
+// Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
+function renderVideoSearch() {
+  const q = state.videoSearchQuery.trim().toLowerCase();
+  const hit = (t) => !q || String(t).toLowerCase().includes(q);
+
+  const reels = state.videos.filter((v) => hit(v.description) || hit(user(v.userId).name));
+  const clips = state.clips.filter((c) => hit(c.title) || hit(user(c.userId).name));
+  const posts = state.posts.filter((p) => hit(p.description) || hit(user(p.userId).name));
+  const people = Object.values(state.users).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle)));
+  const tags = state.hashtags.filter((h) => hit(h.tag));
+  const places = state.places.filter((pl) => hit(pl.name));
+  const sounds = state.sounds.filter((so) => hit(so.title) || hit(so.artist));
+
+  const section = (title, body) => (body ? `<div class="exp"><div class="exp__head">${title} →</div>${body}</div>` : '');
+  const total = reels.length + clips.length + posts.length + people.length + tags.length + places.length + sounds.length;
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="videoSearch" type="search" placeholder="Suche nach Videos, Profilen, #Hashtags" value="${esc(state.videoSearchQuery)}" autocomplete="off" />
+          ${state.videoSearchQuery ? `<button class="searchbox__clear" id="videoSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
+        </label>
+      </div>
+    </div>
+    <div class="scroll">
+      ${
+        total
+          ? section(
+              'Reels',
+              reels.length
+                ? `<div class="exp__reels">${reels
+                    .map((v) => `<button class="exp__reel" data-openvideo="${v.id}">${ICONS.portrait}<span>${esc(user(v.userId).name)}</span></button>`)
+                    .join('')}</div>`
+                : ''
+            ) +
+            section(
+              'Querformat',
+              clips.length
+                ? `<div class="exp__list">${clips
+                    .map(
+                      (c) => `<button class="exp__row" data-openclip="${c.id}">
+                        <span class="exp__thumb">${ICONS.landscape}</span>
+                        <span class="exp__text"><strong>${esc(c.title)}</strong><small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small></span>
+                      </button>`
+                    )
+                    .join('')}</div>`
+                : ''
+            ) +
+            section(
+              'Beiträge',
+              posts.length ? `<div class="exp__grid">${posts.map((p) => `<button class="griditem" data-openpost="${p.id}">${ICONS.image}</button>`).join('')}</div>` : ''
+            ) +
+            section(
+              'Profile',
+              people.length
+                ? `<div class="exp__list">${people
+                    .map(
+                      (u) => `<button class="exp__row" data-profile="${u.id}">
+                        <span class="avatar avatar--44" style="background:${u.color}">${esc(u.initials)}</span>
+                        <span class="exp__text"><strong>${esc(u.name)}</strong><small>${esc(u.handle)}</small></span>
+                      </button>`
+                    )
+                    .join('')}</div>`
+                : ''
+            ) +
+            section(
+              '# Hashtags',
+              tags.length
+                ? `<div class="exp__tags">${tags
+                    .map((h) => `<button class="chip" data-tag="${esc(h.tag)}">${esc(h.tag)} · ${compactNumber(h.posts)}</button>`)
+                    .join('')}</div>`
+                : ''
+            ) +
+            section(
+              'Standorte',
+              places.length
+                ? `<div class="exp__list">${places
+                    .map(
+                      (pl) => `<button class="exp__row" data-place="${pl.id}">
+                        <span class="exp__thumb">${ICONS.mapPin}</span>
+                        <span class="exp__text"><strong>${esc(pl.name)}</strong><small>${compactNumber(pl.posts)} Beiträge</small></span>
+                      </button>`
+                    )
+                    .join('')}</div>`
+                : ''
+            ) +
+            section(
+              'Sounds',
+              sounds.length
+                ? `<div class="exp__list">${sounds
+                    .map(
+                      (so) => `<button class="exp__row" data-sound="${so.id}">
+                        <span class="exp__thumb">${ICONS.music}</span>
+                        <span class="exp__text"><strong>${esc(so.title)}</strong><small>${esc(so.artist)} · ${compactNumber(so.uses)} Videos</small></span>
+                      </button>`
+                    )
+                    .join('')}</div>`
+                : ''
+            )
+          : `<div class="empty">${ICONS.search}
+              <div class="empty__title">Nichts gefunden</div>
+              <div class="empty__text">Für „${esc(state.videoSearchQuery)}" gibt es keinen Treffer.</div>
+            </div>`
+      }
+    </div>`;
+
+  const input = $('#videoSearch');
+  input.addEventListener('input', (e) => {
+    state.videoSearchQuery = e.target.value;
+    const pos = e.target.selectionStart;
+    renderVideoSearch();
+    const next = $('#videoSearch');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  $('#videoSearchClear')?.addEventListener('click', () => {
+    state.videoSearchQuery = '';
+    renderVideoSearch();
+    $('#videoSearch').focus();
+  });
+
+  main.querySelectorAll('[data-openvideo]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.sub.videos = 'portrait';
+      render();
+    })
+  );
+  main.querySelectorAll('[data-openclip]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.sub.videos = 'landscape';
+      render();
+    })
+  );
+  main.querySelectorAll('[data-openpost]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.sub.videos = 'home';
+      render();
+    })
+  );
+  main.querySelectorAll('[data-tag]').forEach((b) =>
+    b.addEventListener('click', () => toast(`${b.dataset.tag} — Hashtag-Seite folgt`))
+  );
+  main.querySelectorAll('[data-place]').forEach((b) => b.addEventListener('click', () => toast('Standort-Seite folgt')));
+  main.querySelectorAll('[data-sound]').forEach((b) => b.addEventListener('click', () => toast('Sound-Seite folgt')));
+}
+
+/* ------------------------------------------------------- Videos: Profil */
+// Prototyp-Frame "Videos - Profil": Zahlen, Biografie, Link, Playlists und
+// Highlights, darunter das Beitragsraster.
+async function renderVideoProfile() {
+  const res = await fetch('/api/profile/me');
+  const me = await res.json();
+
+  main.innerHTML = `
+    <div class="scroll">
+      <div class="ownprof ownprof--tight">
+        <button class="ownprof__switch" id="switchProfile">Profil wechseln ${ICONS.chevron}</button>
+        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
+        <div class="ownprof__handle">${esc(me.handle)}</div>
+      </div>
+      <div class="prof__stats">
+        <div class="prof__stat"><strong>${compactNumber(me.posts)}</strong><span>Beiträge</span></div>
+        <div class="prof__stat"><strong>${compactNumber(me.followers)}</strong><span>Follower</span></div>
+        <div class="prof__stat"><strong>${compactNumber(me.following)}</strong><span>Gefolgt</span></div>
+      </div>
+      <div class="prof__about">
+        <div class="prof__name">Henrik</div>
+        <div class="prof__bio">${esc(me.bio)}</div>
+        <a class="prof__link" href="#" id="profLink">${esc(me.link)}</a>
+      </div>
+      <div class="highlights">
+        <button class="highlight"><span class="highlight__ring">${ICONS.folder}</span><span class="highlight__label">Playlist</span></button>
+        <button class="highlight"><span class="highlight__ring">${ICONS.folder}</span><span class="highlight__label">Tutorials</span></button>
+        ${me.highlights
+          .map((h) => `<button class="highlight"><span class="highlight__ring">${ICONS.image}</span><span class="highlight__label">${esc(h)}</span></button>`)
+          .join('')}
+      </div>
+      <div class="prof__grid">
+        ${me.grid.map((g) => `<div class="griditem">${g.kind === 'video' ? ICONS.play : ICONS.image}</div>`).join('')}
+      </div>
+    </div>`;
+
+  $('#switchProfile').addEventListener('click', () => {
+    state.area = 'messenger';
+    state.sub.messenger = 'profile';
+    render();
+  });
+  $('#profLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    toast(me.link);
+  });
+}
+
+/* ---------------------------------------------------- Communitys: Chats */
+// Prototyp-Frame "Community - Chats": Suchleiste plus Liste der Chats, die
+// innerhalb der Communitys entstanden sind.
+function renderCommunityChats() {
+  const q = state.commSearchQuery.trim().toLowerCase();
+  const list = state.communities
+    .filter((c) => c.joined)
+    .filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <h1 class="pagehead__title">Chats</h1>
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="commChatSearch" type="search" placeholder="Suche hier nach Kontakten/Gruppen..." value="${esc(state.commSearchQuery)}" autocomplete="off" />
+          ${state.commSearchQuery ? `<button class="searchbox__clear" id="commChatSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
+        </label>
+      </div>
+    </div>
+    <div class="scroll">
+      ${
+        list.length
+          ? `<ul class="rows">${list
+              .map(
+                (c) => `<li><button class="row" data-commchat="${c.id}">
+                  ${communityAvatar(c, 52)}
+                  <div class="row__body">
+                    <div class="row__top"><span class="row__name">${esc(c.name)}</span></div>
+                    <div class="row__bottom"><span class="row__preview">${esc(c.topic)}</span>
+                    ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}</div>
+                  </div>
+                </button></li>`
+              )
+              .join('')}</ul>`
+          : `<div class="empty">${ICONS.chat}
+              <div class="empty__title">Kein Chat gefunden</div>
+              <div class="empty__text">Für „${esc(state.commSearchQuery)}" gibt es keinen Treffer.</div>
+            </div>`
+      }
+    </div>`;
+
+  const input = $('#commChatSearch');
+  input.addEventListener('input', (e) => {
+    state.commSearchQuery = e.target.value;
+    const pos = e.target.selectionStart;
+    renderCommunityChats();
+    const next = $('#commChatSearch');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  $('#commChatSearchClear')?.addEventListener('click', () => {
+    state.commSearchQuery = '';
+    renderCommunityChats();
+    $('#commChatSearch').focus();
+  });
+  main.querySelectorAll('[data-commchat]').forEach((r) =>
+    r.addEventListener('click', () => openChat(r.dataset.commchat))
+  );
+}
+
+/* --------------------------------------------------- Communitys: Suchen */
+// Prototyp-Frame "Community - Suchen": Filter Alle/Communitys/Kontakte, dann
+// die Abschnitte Kanäle und Profile mit Befreunden-Schaltfläche.
+function renderCommunitySearch() {
+  const q = state.communityQuery.trim().toLowerCase();
+  const f = state.commSearchFilter;
+  const chans = f === 'people' ? [] : state.communities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
+  const people =
+    f === 'channels'
+      ? []
+      : Object.values(state.users).filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)));
+
+  const statusOf = (id) => {
+    const c = state.contacts.find((x) => x.id === id);
+    if (!c) return 'none';
+    return c.status === 'pending' ? 'pending' : 'friend';
+  };
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="commSearch" type="search" placeholder="Suche hier nach Communitys/Kontakten..." value="${esc(state.communityQuery)}" autocomplete="off" />
+          ${state.communityQuery ? `<button class="searchbox__clear" id="commSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
+        </label>
+      </div>
+      <div class="pills">
+        <button class="pill ${f === 'all' ? 'is-active' : ''}" data-csfilter="all">Alle</button>
+        <button class="pill ${f === 'channels' ? 'is-active' : ''}" data-csfilter="channels">Communitys</button>
+        <button class="pill ${f === 'people' ? 'is-active' : ''}" data-csfilter="people">Kontakte</button>
+      </div>
+    </div>
+    <div class="scroll">
+      ${
+        chans.length || people.length
+          ? `${chans.length ? `<div class="exp__head">Kanäle →</div><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
+             ${
+               people.length
+                 ? `<div class="exp__head">Profile →</div><ul class="rows">${people
+                     .map((u) => {
+                       const st = statusOf(u.id);
+                       const label = st === 'friend' ? 'Befreundet' : st === 'pending' ? 'Angefragt' : '+ Befreunden';
+                       return `<li><div class="row">
+                          <span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>
+                          <div class="row__body" data-profile="${u.id}">
+                            <div class="row__name">${esc(u.name)}</div>
+                            <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
+                          </div>
+                          <button class="joinbtn ${st === 'none' ? '' : 'is-joined'}" data-befriend="${u.id}" ${st === 'none' ? '' : 'disabled'}>${label}</button>
+                        </div></li>`;
+                     })
+                     .join('')}</ul>`
+                 : ''
+             }`
+          : `<div class="empty">${ICONS.search}
+              <div class="empty__title">Nichts gefunden</div>
+              <div class="empty__text">Für „${esc(state.communityQuery)}" gibt es keinen Treffer.</div>
+            </div>`
+      }
+    </div>`;
+
+  const input = $('#commSearch');
+  input.addEventListener('input', (e) => {
+    state.communityQuery = e.target.value;
+    const pos = e.target.selectionStart;
+    renderCommunitySearch();
+    const next = $('#commSearch');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  $('#commSearchClear')?.addEventListener('click', () => {
+    state.communityQuery = '';
+    renderCommunitySearch();
+    $('#commSearch').focus();
+  });
+  main.querySelectorAll('[data-csfilter]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.commSearchFilter = b.dataset.csfilter;
+      renderCommunitySearch();
+    })
+  );
+  main.querySelectorAll('[data-community]').forEach((r) =>
+    r.addEventListener('click', () => openChat(r.dataset.community))
+  );
+  bindJoinButtons(renderCommunitySearch);
+  main.querySelectorAll('[data-befriend]').forEach((b) =>
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const u = state.users[b.dataset.befriend];
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: u.handle }),
+      });
+      const result = await res.json();
+      if (!result.ok) return toast(result.error);
+      state.contacts.push(result.contact);
+      toast(`Anfrage an ${u.name} gesendet`);
+      renderCommunitySearch();
+    })
+  );
+}
+
+/* --------------------------------------------------- Communitys: Profil */
+// Prototyp-Frame "Community - Profil": erstellte und beigetretene Communitys.
+function renderCommunityProfile() {
+  const me = user('me');
+  const created = state.communities.filter((c) => c.visibility === 'private' && c.joined);
+  const joined = state.communities.filter((c) => c.joined && !created.includes(c));
+
+  main.innerHTML = `
+    <div class="scroll">
+      <div class="ownprof ownprof--tight">
+        <button class="ownprof__switch" id="switchProfile">Profil wechseln ${ICONS.chevron}</button>
+        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
+        <div class="ownprof__handle">${esc(me.handle)}</div>
+      </div>
+      <div class="prof__stats">
+        <div class="prof__stat"><strong>${created.length}</strong><span>Erstellte Communitys</span></div>
+        <div class="prof__stat"><strong>${joined.length}</strong><span>Beigetretene Communitys</span></div>
+      </div>
+      <div class="prof__about">
+        <div class="prof__name">Henrik</div>
+        <div class="prof__bio">Baue gerade All Media.</div>
+        <a class="prof__link" href="#" id="profLink">all-media.app</a>
+      </div>
+      ${created.length ? `<div class="exp__head">Erstellt →</div><ul class="rows">${created.map(communityRow).join('')}</ul>` : ''}
+      ${joined.length ? `<div class="exp__head">Beigetreten →</div><ul class="rows">${joined.map(communityRow).join('')}</ul>` : ''}
+    </div>`;
+
+  $('#switchProfile').addEventListener('click', () => {
+    state.area = 'messenger';
+    state.sub.messenger = 'profile';
+    render();
+  });
+  $('#profLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    toast('all-media.app');
+  });
+  main.querySelectorAll('[data-community]').forEach((r) =>
+    r.addEventListener('click', () => openChat(r.dataset.community))
+  );
+  bindJoinButtons(renderCommunityProfile);
 }
 
 /* ---------------------------------------------------------- chat detail */
@@ -1163,6 +1931,7 @@ function messageBubble(m, chat) {
   return `
     <div class="msg msg--${out ? 'out' : 'in'}">
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
+      ${m.replyToStory ? `<div class="msg__reply">Antwort auf die Story von ${esc(m.replyToStory)}</div>` : ''}
       ${media || esc(m.text)}
       <div class="msg__foot">${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
     </div>`;
@@ -1220,50 +1989,157 @@ function closeChat() {
 }
 
 /* ---------------------------------------------------------- story viewer */
+/*
+ * Der Viewer haelt sich an vier Regeln aus Henriks Rueckmeldung:
+ *  1. Das Herz bleibt rot, solange die Story geliked ist (Zustand im Server).
+ *  2. Sobald das Antwortfeld benutzt wird, laeuft die Zeit nicht weiter.
+ *  3. Eine Antwort landet wirklich im Chat mit dieser Person.
+ *  4. Tippen links/rechts blaettert zur vorigen/naechsten Story.
+ */
 let storyTimer;
+const STORY_DURATION = 6000;
+const STORY_STEP = 60;
+
 function openStory(storyId) {
-  const idx = state.stories.findIndex((s) => s.id === storyId);
-  const s = state.stories[idx];
+  const list = state.stories.filter((s) => !s.own);
+  const idx = list.findIndex((s) => s.id === storyId);
+  if (idx < 0) return;
+
+  const s = list[idx];
   const u = user(s.userId);
+  let paused = false;
+  let elapsed = 0;
 
   overlay.hidden = false;
   overlay.innerHTML = `
     <div class="viewer">
-      <div class="viewer__bars"><div class="viewer__bar"><div class="viewer__fill" id="storyFill"></div></div></div>
+      <div class="viewer__bars">
+        ${list
+          .map(
+            (x, i) =>
+              `<div class="viewer__bar"><div class="viewer__fill" ${i === idx ? 'id="storyFill"' : ''} style="width:${i < idx ? '100%' : '0'}"></div></div>`
+          )
+          .join('')}
+      </div>
       <div class="viewer__head">
-        <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
-        <div class="viewer__name">${esc(u.name)}</div>
+        <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
+        <div class="viewer__name" data-profile="${u.id}">${esc(u.name)}</div>
         <button class="viewer__close" id="storyClose" aria-label="Schließen">${ICONS.close}</button>
       </div>
-      <div class="viewer__stage">${ICONS.image}</div>
-      <div class="viewer__foot">
-        <input class="viewer__reply" placeholder="Auf Story antworten" />
-        <button class="viewer__act" id="storyLike" aria-label="Gefällt mir">${ICONS.heart}</button>
-        <button class="viewer__act" id="storySend" aria-label="Senden">${ICONS.send}</button>
+      <div class="viewer__stage">
+        <button class="viewer__zone viewer__zone--prev" id="storyPrev" aria-label="Vorherige Story"></button>
+        <button class="viewer__zone viewer__zone--next" id="storyNext" aria-label="Nächste Story"></button>
+        <div class="viewer__media">${ICONS.image}</div>
+        ${s.caption ? `<div class="viewer__caption">${esc(s.caption)}</div>` : ''}
       </div>
+      <form class="viewer__foot" id="storyForm">
+        <input class="viewer__reply" id="storyReply" placeholder="Auf Story antworten" autocomplete="off" />
+        <button type="button" class="viewer__act ${s.liked ? 'is-liked' : ''}" id="storyLike" aria-label="Gefällt mir">${ICONS.heart}</button>
+        <button type="submit" class="viewer__act" id="storySend" aria-label="Senden">${ICONS.send}</button>
+      </form>
     </div>`;
 
-  let p = 0;
-  clearInterval(storyTimer);
+  const fill = $('#storyFill');
+  const setFill = () => {
+    if (fill) fill.style.width = Math.min(100, (elapsed / STORY_DURATION) * 100) + '%';
+  };
+
+  const stop = () => clearInterval(storyTimer);
+  const pause = () => {
+    paused = true;
+    overlay.querySelector('.viewer').classList.add('is-paused');
+  };
+  const resume = () => {
+    paused = false;
+    overlay.querySelector('.viewer')?.classList.remove('is-paused');
+  };
+
+  const markSeen = () => {
+    s.viewed = true;
+    fetch(`/api/stories/${s.id}/seen`, { method: 'POST' });
+  };
+
+  const go = (step) => {
+    stop();
+    markSeen();
+    const next = list[idx + step];
+    if (next) openStory(next.id);
+    else closeOverlay();
+  };
+
+  stop();
   storyTimer = setInterval(() => {
-    p += 2;
-    const fill = $('#storyFill');
-    if (!fill) return clearInterval(storyTimer);
-    fill.style.width = p + '%';
-    if (p >= 100) {
-      clearInterval(storyTimer);
-      s.viewed = true;
-      closeOverlay();
-    }
-  }, 60);
+    if (paused) return;
+    elapsed += STORY_STEP;
+    if (!$('#storyFill')) return stop();
+    setFill();
+    if (elapsed >= STORY_DURATION) go(1);
+  }, STORY_STEP);
 
   $('#storyClose').addEventListener('click', () => {
-    clearInterval(storyTimer);
-    s.viewed = true;
+    stop();
+    markSeen();
     closeOverlay();
   });
-  $('#storyLike').addEventListener('click', () => toast('Story gefällt dir'));
-  $('#storySend').addEventListener('click', () => toast('Antwort gesendet'));
+
+  $('#storyPrev').addEventListener('click', () => go(-1));
+  $('#storyNext').addEventListener('click', () => go(1));
+
+  $('#storyLike').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const res = await fetch(`/api/stories/${s.id}/like`, { method: 'POST' });
+    const updated = await res.json();
+    s.liked = updated.liked;
+    btn.classList.toggle('is-liked', s.liked);
+    toast(s.liked ? `Dir gefällt die Story von ${u.name}` : 'Gefällt-mir entfernt');
+  });
+
+  // Solange im Antwortfeld etwas steht oder es den Fokus hat, steht die Zeit.
+  const reply = $('#storyReply');
+  reply.addEventListener('focus', pause);
+  reply.addEventListener('blur', () => {
+    if (!reply.value.trim()) resume();
+  });
+  reply.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      reply.value = '';
+      reply.blur();
+      resume();
+    }
+  });
+
+  $('#storyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = reply.value.trim();
+    if (!text) return toast('Bitte etwas schreiben');
+
+    const res = await fetch(`/api/stories/${s.id}/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const result = await res.json();
+    if (!result.ok) return toast(result.error);
+
+    reply.value = '';
+    reply.blur();
+
+    // Chatliste aktuell halten, damit die Antwort dort sofort sichtbar ist.
+    const chat = state.chats.find((c) => c.id === result.chatId);
+    if (chat) {
+      chat.preview = text;
+      chat.time = result.message.time;
+    } else {
+      const res2 = await fetch('/api/bootstrap');
+      const data = await res2.json();
+      state.chats = data.chats;
+    }
+
+    stop();
+    markSeen();
+    toast(`Antwort an ${u.name} gesendet`);
+    openChat(result.chatId);
+  });
 }
 
 /* ---------------------------------------------------------- camera */
@@ -1326,24 +2202,6 @@ function closeOverlay() {
 }
 
 /* ---------------------------------------------------------- navigation */
-document.querySelectorAll('.navbtn').forEach((b) =>
-  b.addEventListener('click', () => {
-    state.area = 'messenger';
-    state.view = b.dataset.view;
-    render();
-  })
-);
-
-document.querySelectorAll('.topbar__btn').forEach((b) =>
-  b.addEventListener('click', () => {
-    const area = b.dataset.area;
-    state.area = area;
-    if (area === 'profile') state.view = 'settings';
-    if (area === 'messenger') state.view = 'chats';
-    render();
-  })
-);
-
 // Profile öffnen: überall dort, wo ein Element data-profile trägt.
 document.querySelector('.app').addEventListener('click', (e) => {
   const target = e.target.closest('[data-profile]');
@@ -1362,13 +2220,4 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* ---------------------------------------------------------- icons in chrome */
-function paintChrome() {
-  const top = [ICONS.home, ICONS.play, ICONS.chat, ICONS.people, ICONS.person];
-  document.querySelectorAll('.topbar__btn').forEach((b, i) => (b.innerHTML = top[i]));
-  const nav = [ICONS.chat, ICONS.image, ICONS.people, ICONS.settings];
-  document.querySelectorAll('.navbtn__icon').forEach((el, i) => (el.innerHTML = nav[i]));
-}
-
-paintChrome();
 bootstrap();

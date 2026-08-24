@@ -26,13 +26,61 @@ const chats = [
 ];
 
 const stories = [
-  { id: 's0', userId: 'me', name: 'Deine Story', own: true, viewed: false },
-  { id: 's1', userId: 'u1', name: 'Anna', viewed: false },
-  { id: 's2', userId: 'u2', name: 'Bob', viewed: false },
-  { id: 's3', userId: 'u3', name: 'Clara', viewed: false },
-  { id: 's4', userId: 'u4', name: 'David', viewed: true },
-  { id: 's5', userId: 'u5', name: 'Elif', viewed: true },
-  { id: 's6', userId: 'u6', name: 'Finn', viewed: true },
+  { id: 's0', userId: 'me', name: 'Deine Story', own: true, viewed: false, liked: false },
+  { id: 's1', userId: 'u1', name: 'Anna', viewed: false, liked: false, caption: 'Erstes Licht auf 2500 Metern' },
+  { id: 's2', userId: 'u2', name: 'Bob', viewed: false, liked: false, caption: 'Neuer Build läuft durch' },
+  { id: 's3', userId: 'u3', name: 'Clara', viewed: false, liked: false, caption: 'Hafen im Nebel' },
+  { id: 's4', userId: 'u4', name: 'David', viewed: true, liked: false, caption: 'Schreibtisch neu sortiert' },
+  { id: 's5', userId: 'u5', name: 'Elif', viewed: true, liked: false, caption: 'Pasta in zehn Minuten' },
+  { id: 's6', userId: 'u6', name: 'Finn', viewed: true, liked: false, caption: '20 Kilometer geschafft' },
+];
+
+// Querformat-Videos (Videos / Querformat im Prototyp)
+const clips = [
+  { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen' },
+  { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen' },
+  { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche' },
+  { id: 'q4', userId: 'u2', title: 'Expo SDK 57: Was sich geändert hat', duration: '09:55', views: 18700, age: 'vor 1 Woche' },
+  { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen' },
+  { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen' },
+];
+
+// Explorer-Abschnitte (Video - Suche im Prototyp)
+const hashtags = [
+  { tag: '#sonnenaufgang', posts: 128400 },
+  { tag: '#designsystem', posts: 41200 },
+  { tag: '#mealprep', posts: 302900 },
+  { tag: '#reactnative', posts: 18700 },
+  { tag: '#hafen', posts: 87300 },
+  { tag: '#laufen', posts: 220100 },
+  { tag: '#homeoffice', posts: 64800 },
+  { tag: '#nachtfotografie', posts: 39100 },
+];
+
+const sounds = [
+  { id: 'so1', title: 'Golden Hour', artist: 'Lys', uses: 12400 },
+  { id: 'so2', title: 'Lo-Fi Focus', artist: 'beatlab', uses: 8210 },
+  { id: 'so3', title: 'Kitchen Groove', artist: 'Milo', uses: 24800 },
+  { id: 'so4', title: 'Runner High', artist: 'Aster', uses: 3140 },
+  { id: 'so5', title: 'Ambient Sunrise', artist: 'Nora K.', uses: 5670 },
+];
+
+const places = [
+  { id: 'pl1', name: 'Hamburger Hafen', posts: 8730 },
+  { id: 'pl2', name: 'Zugspitze', posts: 12400 },
+  { id: 'pl3', name: 'Rheinpark Köln', posts: 3140 },
+  { id: 'pl4', name: 'Berlin Mitte', posts: 22100 },
+  { id: 'pl5', name: 'Alster', posts: 5310 },
+];
+
+// Friend-Map (Messenger / Friend-Map im Prototyp)
+const friends = [
+  { id: 'u1', x: 24, y: 30, place: 'Zugspitze', when: 'vor 5 Min.' },
+  { id: 'u2', x: 62, y: 22, place: 'Köln Innenstadt', when: 'vor 12 Min.' },
+  { id: 'u3', x: 45, y: 55, place: 'Hamburger Hafen', when: 'vor 1 Std.' },
+  { id: 'u4', x: 76, y: 63, place: 'Köln Ehrenfeld', when: 'vor 2 Std.' },
+  { id: 'u5', x: 18, y: 72, place: 'Zuhause', when: 'gerade eben' },
+  { id: 'u6', x: 58, y: 82, place: 'Rheinpark', when: 'vor 20 Min.' },
 ];
 
 const profiles = {
@@ -172,7 +220,7 @@ const messages = {
 // Startzustands gemacht, den /api/reset wiederherstellt. Die Sammlungen werden
 // dabei an Ort und Stelle geleert und neu gefuellt, damit alle Handler
 // weiterhin auf dieselben Referenzen zeigen.
-const SEED = structuredClone({ chats, contacts, posts, videos, communities, messages, communityMessages, comments, profiles });
+const SEED = structuredClone({ chats, contacts, posts, videos, communities, messages, communityMessages, comments, profiles, stories });
 
 function resetState() {
   const restoreList = (list, seed) => {
@@ -189,6 +237,7 @@ function resetState() {
   restoreList(posts, SEED.posts);
   restoreList(videos, SEED.videos);
   restoreList(communities, SEED.communities);
+  restoreList(stories, SEED.stories);
   restoreMap(messages, SEED.messages);
   restoreMap(communityMessages, SEED.communityMessages);
   restoreMap(comments, SEED.comments);
@@ -204,7 +253,7 @@ app.post('/api/reset', (req, res) => {
 });
 
 app.get('/api/bootstrap', (req, res) => {
-  res.json({ users, chats, stories, contacts, communities, videos, posts });
+  res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends });
 });
 
 app.get('/api/profile/:userId', (req, res) => {
@@ -385,12 +434,90 @@ app.post('/api/contacts', (req, res) => {
   res.json({ ok: true, contact });
 });
 
+// Story liken. Der Zustand liegt beim Server, damit das Herz beim erneuten
+// Oeffnen der Story noch rot ist.
+app.post('/api/stories/:id/like', (req, res) => {
+  const story = stories.find((s) => s.id === req.params.id);
+  if (!story) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  story.liked = !story.liked;
+  res.json(story);
+});
+
+app.post('/api/stories/:id/seen', (req, res) => {
+  const story = stories.find((s) => s.id === req.params.id);
+  if (story) story.viewed = true;
+  res.json({ ok: true });
+});
+
+// Antwort auf eine Story landet im normalen Chat mit dieser Person. Gibt es
+// noch keinen, wird er angelegt — sonst waere die Antwort nirgends zu sehen.
+app.post('/api/stories/:id/reply', (req, res) => {
+  const story = stories.find((s) => s.id === req.params.id);
+  const { text } = req.body || {};
+  if (!story) return res.status(404).json({ error: 'Nicht gefunden' });
+  if (!text || !text.trim()) return res.json({ ok: false, error: 'Bitte etwas schreiben' });
+
+  let chat = chats.find((c) => !c.isGroup && c.userId === story.userId);
+  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+  if (!chat) {
+    const person = users[story.userId];
+    chat = {
+      id: 'c' + Date.now(),
+      userId: story.userId,
+      name: person ? person.name : 'Unbekannt',
+      preview: '',
+      time,
+      unread: 0,
+      muted: false,
+      isGroup: false,
+    };
+    chats.unshift(chat);
+    messages[chat.id] = [];
+  }
+
+  if (!messages[chat.id]) messages[chat.id] = [];
+  const message = {
+    id: 'm' + Date.now(),
+    from: 'me',
+    text: text.trim(),
+    time,
+    replyToStory: story.name,
+  };
+  messages[chat.id].push(message);
+
+  chat.preview = text.trim();
+  chat.time = time;
+
+  res.json({ ok: true, chatId: chat.id, message });
+});
+
 app.post('/api/chats/:chatId/read', (req, res) => {
   const chat = chats.find((c) => c.id === req.params.chatId);
   if (chat) chat.unread = 0;
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n  All Media läuft auf http://localhost:${PORT}\n`);
+// Auf allen Netzwerkschnittstellen lauschen, damit die Web-Version auch vom
+// Handy im selben WLAN erreichbar ist. Beide Adressen werden ausgegeben,
+// damit klar ist, welche wofuer gilt.
+const os = require('os');
+
+function localAddress() {
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const net of list || []) {
+      if (net.family === 'IPv4' && !net.internal) return net.address;
+    }
+  }
+  return null;
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  const ip = localAddress();
+  console.log('');
+  console.log(`  All Media läuft.`);
+  console.log(`  Auf diesem Rechner : http://localhost:${PORT}`);
+  if (ip) console.log(`  Im selben WLAN     : http://${ip}:${PORT}`);
+  console.log('');
 });
