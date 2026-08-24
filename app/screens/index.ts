@@ -1,6 +1,5 @@
 export { LoginScreen } from './LoginScreen';
-export { ChatListScreen } from './messenger/ChatListScreen';
-export { ChatDetailScreen } from './messenger/ChatDetailScreen';
+export { ChatListScreen, ChatDetailScreen } from './messenger/ChatListScreen';
 export { VideoFeedScreen } from './video/VideoFeedScreen';
 export { CommunitiesScreen } from './communities/CommunitiesScreen';
 export { HomeFeedScreen } from './home/HomeFeedScreen';
