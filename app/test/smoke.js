@@ -66,10 +66,14 @@ const assert = (label, cond) => {
   await p.waitForTimeout(300);
 
   // --- filter pills ---
+  const allChats = await p.$$eval('[data-chat]', e => e.length);
   await p.click('[data-filter="groups"]');
   await p.waitForTimeout(300);
   const groups = await p.$$eval('[data-chat]', e => e.length);
-  assert('Gruppen-Filter (2 Gruppen)', groups === 2);
+  await p.click('[data-filter="contacts"]');
+  await p.waitForTimeout(300);
+  const singles = await p.$$eval('[data-chat]', e => e.length);
+  assert('Filter teilen die Liste vollstaendig auf', groups > 0 && singles > 0 && groups + singles === allChats);
   await p.click('[data-filter="all"]');
   await p.waitForTimeout(300);
 
@@ -87,6 +91,45 @@ const assert = (label, cond) => {
   await p.click('#chatBack');
   await p.waitForTimeout(400);
   assert('Zurueck aus Chat', !!(await p.$('#chatSearch')));
+
+  // --- new group ---
+  const chatsBefore = await p.$$eval('[data-chat]', e => e.length);
+  await p.click('#newChat');
+  await p.waitForTimeout(400);
+  assert('Neu-Menue oeffnet', (await p.$$eval('[data-new]', e => e.length)) === 2);
+  await p.click('[data-new="group"]');
+  await p.waitForTimeout(400);
+  await p.fill('#groupName', 'Smoke-Test-Gruppe');
+  await p.click('[data-member="u1"]');
+  await p.waitForTimeout(250);
+  await p.click('[data-member="u2"]');
+  await p.waitForTimeout(250);
+  assert('Auswahl wird gezaehlt', (await p.$eval('.sheet__title', e => e.textContent)).includes('2 ausgewählt'));
+  await p.click('#groupCreate');
+  await p.waitForTimeout(800);
+  assert('Gruppe oeffnet sich als Chat', (await p.$eval('.chathead__name', e => e.textContent.trim())) === 'Smoke-Test-Gruppe');
+  assert('Mitgliederzahl stimmt', (await p.$eval('.chathead__status', e => e.textContent.trim())) === '3 Mitglieder');
+  await p.click('#chatBack');
+  await p.waitForTimeout(500);
+  assert('Gruppe steht in der Chatliste', (await p.$$eval('[data-chat]', e => e.length)) === chatsBefore + 1);
+
+  // --- add contact: Fehlerfaelle ---
+  await p.click('#newChat');
+  await p.waitForTimeout(400);
+  await p.click('[data-new="contact"]');
+  await p.waitForTimeout(400);
+  await p.fill('#contactHandle', '@niemand');
+  await p.click('#contactAdd');
+  await p.waitForTimeout(500);
+  assert('Unbekannter Kontakt wird abgelehnt',
+    (await p.$eval('#toast', e => e.textContent)).includes('Niemand'));
+  await p.fill('#contactHandle', '@anna');
+  await p.click('#contactAdd');
+  await p.waitForTimeout(500);
+  assert('Doppelter Kontakt wird abgelehnt',
+    (await p.$eval('#toast', e => e.textContent)).includes('bereits'));
+  await p.mouse.click(200, 40);
+  await p.waitForTimeout(400);
 
   // --- story viewer ---
   await p.click('[data-story="s1"]');

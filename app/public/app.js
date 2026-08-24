@@ -152,10 +152,7 @@ function renderChats() {
     renderChats();
     $('#chatSearch').focus();
   });
-  $('#newChat').addEventListener('click', () => {
-    state.view = 'contacts';
-    render();
-  });
+  $('#newChat').addEventListener('click', openNewMenu);
   main.querySelectorAll('.pill').forEach((p) =>
     p.addEventListener('click', () => {
       state.filter = p.dataset.filter;
@@ -321,13 +318,167 @@ function renderContacts() {
     renderContacts();
     $('#contactSearch').focus();
   });
-  $('#addContact').addEventListener('click', () => toast('Kontakt hinzufügen folgt in Phase 3'));
+  $('#addContact').addEventListener('click', openAddContact);
   main.querySelectorAll('[data-contact]').forEach((r) =>
     r.addEventListener('click', () => {
       const chat = state.chats.find((c) => c.userId === r.dataset.contact);
       if (chat) openChat(chat.id);
       else toast('Noch kein Chat mit diesem Kontakt');
     })
+  );
+}
+
+/* ---------------------------------------------------------- new: sheet */
+function openSheet(title, bodyHtml, onMount) {
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet-backdrop';
+  sheet.innerHTML = `
+    <div class="sheet" role="dialog" aria-label="${esc(title)}">
+      <div class="sheet__handle"></div>
+      <div class="sheet__title">${esc(title)}</div>
+      ${bodyHtml}
+    </div>`;
+  document.querySelector('.app').appendChild(sheet);
+
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet) sheet.remove();
+  });
+
+  onMount?.(sheet, () => sheet.remove());
+  return sheet;
+}
+
+function openNewMenu() {
+  openSheet(
+    'Neu',
+    `<button class="item" data-new="group">
+      <span class="item__icon">${ICONS.people}</span>
+      <span class="item__label">Neue Gruppe</span>
+      <span class="row__chevron">${ICONS.chevron}</span>
+    </button>
+    <button class="item" data-new="contact">
+      <span class="item__icon">${ICONS.person}</span>
+      <span class="item__label">Kontakt hinzufügen</span>
+      <span class="row__chevron">${ICONS.chevron}</span>
+    </button>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-new]').forEach((b) =>
+        b.addEventListener('click', () => {
+          close();
+          if (b.dataset.new === 'group') openNewGroup();
+          else openAddContact();
+        })
+      );
+    }
+  );
+}
+
+function openNewGroup() {
+  const selected = new Set();
+
+  const body = () => `
+    <div class="sheet__field">
+      <input id="groupName" placeholder="Gruppenname" maxlength="40" />
+    </div>
+    <div class="sheet__body">
+      ${state.contacts
+        .filter((c) => c.status === 'friend')
+        .map(
+          (c) => `<button class="row" data-member="${c.id}">
+            ${avatarForUser(c.id, 44)}
+            <div class="row__body"><div class="row__name">${esc(c.name)}</div></div>
+            <span class="checkbox ${selected.has(c.id) ? 'is-on' : ''}">${selected.has(c.id) ? ICONS.check : ''}</span>
+          </button>`
+        )
+        .join('')}
+    </div>
+    <div class="sheet__footer">
+      <button class="prof__btn is-primary" id="groupCreate">Gruppe erstellen</button>
+    </div>`;
+
+  openSheet('Neue Gruppe', body(), (sheet, close) => {
+    const rerender = () => {
+      sheet.querySelector('.sheet').innerHTML = `
+        <div class="sheet__handle"></div>
+        <div class="sheet__title">Neue Gruppe${selected.size ? ` · ${selected.size} ausgewählt` : ''}</div>
+        ${body()}`;
+      bind();
+    };
+
+    const bind = () => {
+      const nameInput = sheet.querySelector('#groupName');
+      nameInput.value = sheet.dataset.name || '';
+      nameInput.addEventListener('input', (e) => (sheet.dataset.name = e.target.value));
+
+      sheet.querySelectorAll('[data-member]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const id = b.dataset.member;
+          selected.has(id) ? selected.delete(id) : selected.add(id);
+          rerender();
+        })
+      );
+
+      sheet.querySelector('#groupCreate').addEventListener('click', async () => {
+        const name = (sheet.dataset.name || '').trim();
+        if (!name) return toast('Bitte einen Gruppennamen eingeben');
+        if (!selected.size) return toast('Bitte mindestens einen Kontakt auswählen');
+
+        const res = await fetch('/api/groups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, memberIds: [...selected] }),
+        });
+        const chat = await res.json();
+        state.chats.unshift(chat);
+        close();
+        toast(`Gruppe „${chat.name}" erstellt`);
+        openChat(chat.id);
+      });
+    };
+
+    sheet.querySelector('.sheet').classList.add('sheet--tall');
+    bind();
+  });
+}
+
+function openAddContact() {
+  openSheet(
+    'Kontakt hinzufügen',
+    `<div class="sheet__field">
+      <input id="contactHandle" placeholder="Benutzername, z. B. @anna" autocomplete="off" />
+    </div>
+    <div class="sheet__hint">Verfügbar: @anna, @bob, @clara, @david, @elif, @finn</div>
+    <div class="sheet__footer">
+      <button class="prof__btn is-primary" id="contactAdd">Anfrage senden</button>
+    </div>`,
+    (sheet, close) => {
+      const input = sheet.querySelector('#contactHandle');
+      input.focus();
+
+      const submit = async () => {
+        const handle = input.value.trim();
+        if (!handle) return toast('Bitte einen Benutzernamen eingeben');
+
+        const res = await fetch('/api/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ handle }),
+        });
+        const result = await res.json();
+
+        if (!result.ok) return toast(result.error);
+
+        state.contacts.push(result.contact);
+        close();
+        toast(`Anfrage an ${result.contact.name} gesendet`);
+        if (state.view === 'contacts') renderContacts();
+      };
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submit();
+      });
+      sheet.querySelector('#contactAdd').addEventListener('click', submit);
+    }
   );
 }
 

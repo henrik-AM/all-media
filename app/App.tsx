@@ -2,6 +2,9 @@ import React, { useCallback, useContext, useState } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { SupabaseProvider } from './contexts/SupabaseContext';
+import { ActionSheet } from './components/ActionSheet';
+import { AddContactSheet } from './components/AddContactSheet';
+import { NewGroupSheet } from './components/NewGroupSheet';
 import { TabBar, TabKey } from './components/TabBar';
 import { TopSwitcher, AreaKey } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
@@ -18,7 +21,7 @@ import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { ProfileScreen } from './screens/profile/ProfileScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors } from './constants/design';
-import { mockChats } from './mocks';
+import { mockChats, mockContacts } from './mocks';
 import { Chat, Community, Contact, Story } from './types';
 
 type Overlay =
@@ -28,19 +31,45 @@ type Overlay =
   | { kind: 'camera' }
   | null;
 
+type Sheet = 'new' | 'group' | 'contact' | null;
+
 const Shell = () => {
   const [area, setArea] = useState<AreaKey>('messenger');
   const [tab, setTab] = useState<TabKey>('chats');
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const [sheet, setSheet] = useState<Sheet>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [chats, setChats] = useState<Chat[]>(mockChats);
+  const [contacts, setContacts] = useState<Contact[]>(mockContacts);
 
-  const unreadCount = mockChats.reduce((sum, chat) => sum + chat.unreadCount, 0);
+  const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
   const hideNotice = useCallback(() => setNotice(null), []);
 
   const openChatWith = (userId: string) => {
-    const chat = mockChats.find((c) => c.userId === userId);
+    const chat = chats.find((c) => c.userId === userId);
     if (chat) setOverlay({ kind: 'chat', chat });
     else setNotice('Noch kein Chat mit dieser Person');
+  };
+
+  const createGroup = (name: string, memberIds: string[]) => {
+    const chat: Chat = {
+      id: `c${Date.now()}`,
+      name,
+      isGroup: true,
+      memberIds,
+      preview: 'Gruppe erstellt',
+      time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      unreadCount: 0,
+    };
+    setChats((prev) => [chat, ...prev]);
+    setSheet(null);
+    setNotice(`Gruppe „${name}" erstellt`);
+    setOverlay({ kind: 'chat', chat });
+  };
+
+  const addContact = (contact: Contact) => {
+    setContacts((prev) => [...prev, contact]);
+    setSheet(null);
   };
 
   const openProfile = (userId: string) => setOverlay({ kind: 'profile', userId });
@@ -144,17 +173,19 @@ const Shell = () => {
     if (tab === 'contacts') {
       return (
         <ContactsScreen
+          contacts={contacts}
           onOpenContact={(contact: Contact) => openProfile(contact.id)}
-          onAddContact={() => setNotice('Kontakt hinzufügen folgt in Phase 3')}
+          onAddContact={() => setSheet('contact')}
         />
       );
     }
 
     return (
       <ChatListScreen
+        allChats={chats}
         onOpenChat={(chat) => setOverlay({ kind: 'chat', chat })}
         onOpenStory={openStory}
-        onNewChat={() => setTab('contacts')}
+        onNewChat={() => setSheet('new')}
       />
     );
   };
@@ -172,6 +203,32 @@ const Shell = () => {
         }}
         unreadCount={unreadCount}
       />
+
+      <ActionSheet
+        visible={sheet === 'new'}
+        title="Neu"
+        items={[
+          { key: 'group', label: 'Neue Gruppe', icon: 'people-outline' },
+          { key: 'contact', label: 'Kontakt hinzufügen', icon: 'person-add-outline' },
+        ]}
+        onSelect={(key) => setSheet(key as Sheet)}
+        onClose={() => setSheet(null)}
+      />
+      <NewGroupSheet
+        visible={sheet === 'group'}
+        contacts={contacts}
+        onClose={() => setSheet(null)}
+        onCreate={createGroup}
+        onNotice={setNotice}
+      />
+      <AddContactSheet
+        visible={sheet === 'contact'}
+        contacts={contacts}
+        onClose={() => setSheet(null)}
+        onAdd={addContact}
+        onNotice={setNotice}
+      />
+
       <Toast message={notice} onHide={hideNotice} />
     </SafeAreaView>
   );

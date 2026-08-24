@@ -44,7 +44,8 @@ gleichen WLAN sein. Ein Expo-Konto ist dafür nicht nötig.
 | Login/Registrierung mit Validierung | fertig (Mock-Auth) |
 | Kommentare schreiben und liken | fertig |
 | Nutzerprofile mit Statistiken, Bio, Highlights, Raster | fertig |
-| Anrufe, Repost, Kontakt hinzufügen | noch nicht gebaut |
+| Gruppe erstellen, Kontakt per Benutzername hinzufügen | fertig |
+| Anrufe, Repost, Story hochladen | noch nicht gebaut |
 | Supabase-Backend | vorbereitet, siehe unten |
 
 ## Projektstruktur

@@ -6,7 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { StoryRail } from '../../components/StoryRail';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
-import { mockChats, mockStories } from '../../mocks';
+import { mockStories } from '../../mocks';
 import { Chat, Story } from '../../types';
 
 type Filter = 'all' | 'contacts' | 'groups';
@@ -21,24 +21,25 @@ const mediaIcon = (media?: string) =>
   media === 'image' ? 'image-outline' : media === 'audio' ? 'mic-outline' : null;
 
 interface Props {
+  allChats: Chat[];
   onOpenChat: (chat: Chat) => void;
   onOpenStory: (story: Story) => void;
   onNewChat: () => void;
 }
 
-export const ChatListScreen = ({ onOpenChat, onOpenStory, onNewChat }: Props) => {
+export const ChatListScreen = ({ allChats, onOpenChat, onOpenStory, onNewChat }: Props) => {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
   const chats = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return mockChats.filter((chat) => {
+    return allChats.filter((chat) => {
       if (filter === 'contacts' && chat.isGroup) return false;
       if (filter === 'groups' && !chat.isGroup) return false;
       if (!q) return true;
       return chat.name.toLowerCase().includes(q) || chat.preview.toLowerCase().includes(q);
     });
-  }, [filter, query]);
+  }, [allChats, filter, query]);
 
   const renderChat = ({ item }: { item: Chat }) => {
     const unread = item.unreadCount > 0;

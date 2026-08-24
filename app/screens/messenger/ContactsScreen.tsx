@@ -5,26 +5,26 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, sizes, spacing, typography } from '../../constants/design';
-import { mockContacts } from '../../mocks';
 import { Contact } from '../../types';
 
 interface Props {
+  contacts: Contact[];
   onOpenContact: (contact: Contact) => void;
   onAddContact: () => void;
 }
 
-export const ContactsScreen = ({ onOpenContact, onAddContact }: Props) => {
+export const ContactsScreen = ({ contacts, onOpenContact, onAddContact }: Props) => {
   const [query, setQuery] = useState('');
 
   const { friends, pending, total } = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = mockContacts.filter((c) => !q || c.name.toLowerCase().includes(q));
+    const list = contacts.filter((c) => !q || c.name.toLowerCase().includes(q));
     return {
       friends: list.filter((c) => c.status === 'friend'),
       pending: list.filter((c) => c.status === 'pending'),
       total: list.length,
     };
-  }, [query]);
+  }, [contacts, query]);
 
   const renderContact = (contact: Contact) => (
     <Pressable

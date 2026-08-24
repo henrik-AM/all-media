@@ -304,6 +304,54 @@ app.post('/api/messages/:chatId', (req, res) => {
   res.json(message);
 });
 
+app.post('/api/groups', (req, res) => {
+  const { name, memberIds } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name erforderlich' });
+  if (!Array.isArray(memberIds) || memberIds.length === 0) {
+    return res.status(400).json({ error: 'Mindestens ein Mitglied erforderlich' });
+  }
+
+  const chat = {
+    id: 'c' + Date.now(),
+    userId: null,
+    name: name.trim(),
+    preview: 'Gruppe erstellt',
+    time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+    unread: 0,
+    muted: false,
+    isGroup: true,
+    members: memberIds,
+  };
+  chats.unshift(chat);
+  messages[chat.id] = [];
+
+  res.json(chat);
+});
+
+// "Nicht gefunden" und "schon vorhanden" sind hier normale Ergebnisse einer
+// Suche, keine Fehler der Anfrage. Deshalb 200 mit ok-Feld statt 404/409 —
+// sonst protokolliert der Browser bei jeder Fehleingabe einen Ladefehler.
+app.post('/api/contacts', (req, res) => {
+  const { handle } = req.body || {};
+  if (!handle || !handle.trim()) {
+    return res.json({ ok: false, error: 'Bitte einen Benutzernamen eingeben' });
+  }
+
+  const query = handle.trim().replace(/^@/, '').toLowerCase();
+  const person = Object.values(users).find(
+    (u) => u.id !== 'me' && (u.handle.replace('@', '').toLowerCase() === query || u.name.toLowerCase() === query)
+  );
+
+  if (!person) return res.json({ ok: false, error: 'Niemand mit diesem Namen gefunden' });
+  if (contacts.some((c) => c.id === person.id)) {
+    return res.json({ ok: false, error: `${person.name} ist bereits in deinen Kontakten` });
+  }
+
+  const contact = { id: person.id, name: person.name, status: 'pending', about: 'Anfrage gesendet' };
+  contacts.push(contact);
+  res.json({ ok: true, contact });
+});
+
 app.post('/api/chats/:chatId/read', (req, res) => {
   const chat = chats.find((c) => c.id === req.params.chatId);
   if (chat) chat.unread = 0;
