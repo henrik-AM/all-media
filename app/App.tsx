@@ -286,6 +286,14 @@ const Shell = () => {
         story={overlay.story}
         alle={stories}
         onClose={() => setOverlay(null)}
+        onDelete={() => {
+          setStories((prev) =>
+            prev.map((s) =>
+              s.own ? { ...s, mediaUri: undefined, aufgenommen: undefined } : s
+            )
+          );
+          setNotice('Deine Story wurde gelöscht');
+        }}
         onReply={replyToStory}
         onNotice={setNotice}
       />

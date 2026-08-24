@@ -1404,3 +1404,5 @@ body:has(.camera) .toast { bottom: 132px; }
 .anruf__rund.is-annehmen { background: var(--success); }
 .anruf__rund.is-auflegen { background: var(--danger); }
 .anruf__rund.is-auflegen svg { transform: rotate(135deg); }
+
+.slide__follow.is-gefolgt { background: rgba(255,255,255,.2); color: #fff; }

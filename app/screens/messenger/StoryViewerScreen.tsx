@@ -13,6 +13,8 @@ interface Props {
   story: Story;
   /** Alle Storys - damit auch die eigene Aufnahme blaetterbar ist. */
   alle: Story[];
+  /** Eigene Story wieder entfernen. */
+  onDelete?: () => void;
   onClose: () => void;
   /** Antwort auf die Story — landet im Chat mit dieser Person. */
   onReply: (story: Story, text: string) => void;
@@ -26,7 +28,7 @@ interface Props {
  *  3. Eine Antwort landet wirklich im Chat mit dieser Person.
  *  4. Tippen links/rechts blaettert zur vorigen/naechsten Story.
  */
-export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice }: Props) => {
+export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice, onDelete }: Props) => {
   const insets = useSafeAreaInsets();
   // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
   const stories = alle.filter((s) => !s.own || s.mediaUri);
@@ -153,7 +155,13 @@ export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice }: P
             <Ionicons name="eye-outline" size={20} color={colors.white} />
             <Text style={styles.ansichtenText}>Ansichten</Text>
           </Pressable>
-          <Pressable onPress={() => onNotice('Story löschen folgt')} hitSlop={8}>
+          <Pressable
+            onPress={() => {
+              onDelete?.();
+              onClose();
+            }}
+            hitSlop={8}
+          >
             <Ionicons name="trash-outline" size={22} color={colors.white} />
           </Pressable>
         </View>

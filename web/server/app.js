@@ -307,7 +307,12 @@ app.post('/api/reset', (req, res) => {
 });
 
 app.get('/api/bootstrap', (req, res) => {
-  res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends });
+  // Wem man folgt, gleich mitliefern - sonst zeigt der Folgen-Knopf im
+  // Video-Feed "Folgen", obwohl man der Person laengst folgt.
+  const gefolgt = Object.fromEntries(
+    Object.entries(profiles).map(([id, p]) => [id, !!p.following_me])
+  );
+  res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends, gefolgt });
 });
 
 /** Die eigenen Reposts, aufgeloest zu Beitraegen und Videos. */
@@ -330,6 +335,16 @@ app.get('/api/profile/:userId', (req, res) => {
   if (!profile || !person) return res.status(404).json({ error: 'Nicht gefunden' });
 
   res.json({ ...person, ...profile, grid: gridItems[userId] || [] });
+});
+
+/** Einem Video-Autor folgen oder entfolgen. */
+app.post('/api/autoren/:userId/follow', (req, res) => {
+  const profil = profiles[req.params.userId];
+  if (!profil) return res.json({ ok: false, error: 'Profil nicht gefunden' });
+
+  profil.following_me = !profil.following_me;
+  profil.followers += profil.following_me ? 1 : -1;
+  res.json({ ok: true, following: profil.following_me, followers: profil.followers });
 });
 
 app.post('/api/profile/:userId/follow', (req, res) => {

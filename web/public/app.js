@@ -575,7 +575,7 @@ function openNewGroup() {
   // Zwei Schritte wie bei WhatsApp: erst die Personen, dann Name und Infos.
   // Vorher musste der Gruppenname vor der Auswahl feststehen - das war
   // verdreht.
-  const zustand = { schritt: 1, gewaehlt: new Set(), extern: [], name: '', info: '' };
+  const zustand = { schritt: 1, gewaehlt: new Set(), extern: [], name: '', info: '', bild: null };
 
   const schrittEins = () => `
     <div class="sheet__field">
@@ -618,8 +618,12 @@ function openNewGroup() {
   const schrittZwei = () => `
     <div class="sheet__field">
       <div class="sheet__row">
-        <div class="group-pic" id="groupPic">${ICONS.camera}</div>
-        <span class="sheet__label">Gruppenbild hinzufügen</span>
+        <div class="group-pic" id="groupPic" ${
+          zustand.bild
+            ? `style="background-image:url(${zustand.bild});background-size:cover;background-position:center"`
+            : ''
+        }>${zustand.bild ? '' : ICONS.camera}</div>
+        <span class="sheet__label">${zustand.bild ? 'Gruppenbild ändern' : 'Gruppenbild hinzufügen'}</span>
       </div>
     </div>
     <div class="sheet__field">
@@ -716,7 +720,26 @@ function openNewGroup() {
       nameFeld.focus();
       nameFeld.addEventListener('input', (e) => (zustand.name = e.target.value));
       infoFeld.addEventListener('input', (e) => (zustand.info = e.target.value));
-      sheet.querySelector('#groupPic').addEventListener('click', () => toast('Gruppenbild auswählen folgt'));
+      sheet.querySelector('#groupPic').addEventListener('click', () => {
+        const feld = document.createElement('input');
+        feld.type = 'file';
+        feld.accept = 'image/*';
+        feld.style.display = 'none';
+        document.body.appendChild(feld);
+        feld.addEventListener('change', async () => {
+          const datei = feld.files && feld.files[0];
+          feld.remove();
+          if (!datei) return;
+          try {
+            zustand.bild = await bildVerkleinern(datei);
+            toast('Gruppenbild ausgewählt');
+            neuZeichnen();
+          } catch {
+            toast('Bild konnte nicht gelesen werden');
+          }
+        });
+        feld.click();
+      });
 
       sheet.querySelector('#groupCreate').addEventListener('click', async () => {
         const name = zustand.name.trim();
@@ -1363,7 +1386,20 @@ function renderVideoFeed() {
   );
 
   main.querySelectorAll('[data-vfollow]').forEach((btn) =>
-    btn.addEventListener('click', () => toast('Folgen folgt in Phase 3'))
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.vfollow;
+      const res = await fetch(`/api/autoren/${id}/follow`, { method: 'POST' });
+      const r = await res.json();
+      if (!r.ok) return toast(r.error);
+
+      // Merken, damit der Zustand beim Blaettern erhalten bleibt.
+      state.gefolgt = state.gefolgt || {};
+      state.gefolgt[id] = r.following;
+
+      btn.textContent = r.following ? 'Gefolgt' : 'Folgen';
+      btn.classList.toggle('is-gefolgt', r.following);
+      toast(r.following ? `Du folgst ${user(id).name}` : `${user(id).name} nicht mehr gefolgt`);
+    })
   );
 }
 
@@ -1402,7 +1438,9 @@ function videoSlide(v) {
             <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
             <span class="slide__name">${esc(u.name)}</span>
           </button>
-          <button class="slide__follow" data-vfollow="${v.id}">Folgen</button>
+          <button class="slide__follow ${
+            state.gefolgt && state.gefolgt[u.id] ? 'is-gefolgt' : ''
+          }" data-vfollow="${u.id}">${state.gefolgt && state.gefolgt[u.id] ? 'Gefolgt' : 'Folgen'}</button>
         </div>
         <div class="slide__desc">${esc(v.description)}</div>
         <div class="slide__sub">${esc(v.location)} · ${esc(v.music)}</div>

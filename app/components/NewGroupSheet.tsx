@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { colors, radius, sizes, spacing, typography } from '../constants/design';
@@ -47,6 +49,7 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
   const [nummer, setNummer] = useState('');
   const [name, setName] = useState('');
   const [info, setInfo] = useState('');
+  const [bild, setBild] = useState<string | null>(null);
 
   const friends = contacts.filter((c) => c.status === 'friend');
   const anzahl = selected.length + extern.length;
@@ -58,7 +61,25 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
     setNummer('');
     setName('');
     setInfo('');
+    setBild(null);
     onClose();
+  };
+
+  /** Gruppenbild aus der Galerie waehlen. */
+  const bildWaehlen = async () => {
+    try {
+      const ergebnis = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (ergebnis.canceled || !ergebnis.assets.length) return;
+      setBild(ergebnis.assets[0].uri);
+      onNotice('Gruppenbild ausgewählt');
+    } catch {
+      onNotice('Auf die Galerie kann nicht zugegriffen werden');
+    }
   };
 
   const toggle = (id: string) =>
@@ -96,6 +117,7 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
     if (!name.trim()) return onNotice('Bitte einen Gruppennamen eingeben');
     onCreate(name.trim(), [...selected, ...extern.map((e) => e.id)], info.trim() || undefined);
     setSchritt(1);
+    setBild(null);
     setSelected([]);
     setExtern([]);
     setNummer('');
@@ -196,13 +218,16 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
             <>
               <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
                 <View style={styles.bildZeile}>
-                  <Pressable
-                    style={styles.bild}
-                    onPress={() => onNotice('Gruppenbild auswählen folgt')}
-                  >
-                    <Ionicons name="camera-outline" size={24} color={colors.text2} />
+                  <Pressable style={styles.bild} onPress={bildWaehlen}>
+                    {bild ? (
+                      <Image source={{ uri: bild }} style={styles.bildVorschau} />
+                    ) : (
+                      <Ionicons name="camera-outline" size={24} color={colors.text2} />
+                    )}
                   </Pressable>
-                  <Text style={styles.bildText}>Gruppenbild hinzufügen</Text>
+                  <Text style={styles.bildText}>
+                    {bild ? 'Gruppenbild ändern' : 'Gruppenbild hinzufügen'}
+                  </Text>
                 </View>
 
                 <View style={styles.field}>
@@ -340,6 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bildVorschau: { width: 56, height: 56, borderRadius: 28 },
   bildText: { color: colors.text2, ...typography.body },
 
   mitglieder: {

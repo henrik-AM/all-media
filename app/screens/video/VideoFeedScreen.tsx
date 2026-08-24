@@ -22,6 +22,8 @@ interface Props {
 export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
   const { istRepostet, umschalten } = useReposts();
   const [videos, setVideos] = useState<Video[]>(mockVideos);
+  // Wem man folgt - nach Personen-Kennung, damit es beim Blaettern bleibt.
+  const [gefolgt, setGefolgt] = useState<Record<string, boolean>>({});
   const [slideHeight, setSlideHeight] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
@@ -109,8 +111,19 @@ export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
               <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
               <Text style={styles.authorName}>{author?.name}</Text>
             </Pressable>
-            <Pressable style={styles.follow} onPress={() => onNotice('Folgen folgt in Phase 3')}>
-              <Text style={styles.followText}>Folgen</Text>
+            <Pressable
+              style={[styles.follow, gefolgt[item.userId] && styles.followAn]}
+              onPress={() => {
+                const jetzt = !gefolgt[item.userId];
+                setGefolgt((prev) => ({ ...prev, [item.userId]: jetzt }));
+                onNotice(
+                  jetzt ? `Du folgst ${author?.name}` : `${author?.name} nicht mehr gefolgt`
+                );
+              }}
+            >
+              <Text style={styles.followText}>
+                {gefolgt[item.userId] ? 'Gefolgt' : 'Folgen'}
+              </Text>
             </Pressable>
           </View>
           <Text style={styles.description}>{item.description}</Text>
@@ -143,6 +156,8 @@ export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
 };
 
 const styles = StyleSheet.create({
+  followAn: { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'transparent' },
+
   container: { flex: 1, backgroundColor: colors.black },
   slide: { width: '100%', justifyContent: 'flex-end' },
   stage: {
