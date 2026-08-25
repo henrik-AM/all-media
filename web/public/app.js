@@ -1954,6 +1954,65 @@ function communityAvatar(c, size = 52) {
   return `<div class="avatar avatar--${size}" style="background:${palette[hash % palette.length]};border-radius:16px">${esc(initials)}</div>`;
 }
 
+function renderCommunityChannels(communityId) {
+  const community = state.communities.find((c) => c.id === communityId);
+  if (!community) return renderCommunities();
+
+  const channels = [
+    { id: 'ch+', name: 'CH+ Kanal', unread: 3 },
+    { id: 'allgemein', name: 'Allgemein', unread: 0 },
+    { id: 'ankuendigung', name: 'Ankündigungen', unread: 1 },
+  ];
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <button class="back-btn" id="backBtn">${ICONS.back}</button>
+      <h2>${esc(community.name)}</h2>
+    </div>
+    <div class="scroll">
+      ${channels.map((ch) => `
+        <button class="row" data-channel="${ch.id}">
+          <span class="avatar avatar--44" style="background:#0A66FF">${ICONS.hash}</span>
+          <div class="row__body">
+            <div class="row__name">${esc(ch.name)}</div>
+            <div class="row__bottom"><span class="row__preview">${ch.id === 'ch+' ? 'Themenkanal' : 'Diskussionen'}</span></div>
+          </div>
+          ${ch.unread ? `<span class="badge">${ch.unread}</span>` : ''}
+        </button>`).join('')}
+    </div>`;
+
+  $('#backBtn')?.addEventListener('click', renderCommunities);
+  main.querySelectorAll('[data-channel]').forEach((b) =>
+    b.addEventListener('click', () => renderCommunityChat(communityId, b.dataset.channel))
+  );
+}
+
+function renderCommunityChat(communityId, channelId) {
+  const community = state.communities.find((c) => c.id === communityId);
+  main.innerHTML = `
+    <div class="pagehead">
+      <button class="back-btn" id="backBtn">${ICONS.back}</button>
+      <div class="chathead__body">
+        <div class="chathead__name">${esc(community?.name || 'Community')}</div>
+        <div class="chathead__status">#${esc(channelId)}</div>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="messages">
+        <div class="message is-other">
+          <div class="message__avatar" style="background:#0A66FF">👥</div>
+          <div class="message__bubble">Willkommen im #${esc(channelId)} Kanal!</div>
+        </div>
+      </div>
+    </div>
+    <div class="messageinput">
+      <input type="text" placeholder="Nachricht schreiben..." id="communityMsgInput">
+      <button>${ICONS.send}</button>
+    </div>`;
+
+  $('#backBtn')?.addEventListener('click', () => renderCommunityChannels(communityId));
+}
+
 function renderCommunities() {
   const q = state.communityQuery.trim().toLowerCase();
   const list = state.communities.filter((c) => {
