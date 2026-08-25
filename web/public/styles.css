@@ -1494,3 +1494,125 @@ body:has(.camera) .toast { bottom: 132px; }
 .spende__balken { margin-top: 9px; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
 .spende__fuellung { height: 100%; background: var(--brand); }
 .spende__zahlen { margin-top: 6px; font-size: 12.5px; color: var(--text-3); }
+
+/* --------------------------------------------------------------- Teilen */
+.teilen__kopf { padding: 12px 16px 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.teilen {
+  list-style: none;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  padding: 0 12px 8px;
+}
+.teilen__kachel {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  width: 100%; padding: 12px 6px; border-radius: 14px;
+}
+.teilen__kachel:hover { background: var(--surface-2); }
+.teilen__name {
+  max-width: 100%; font-size: 12.5px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.teilen__haken {
+  position: absolute; top: 10px; right: 50%; transform: translateX(28px);
+  display: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--brand); color: #fff;
+  align-items: center; justify-content: center;
+}
+.teilen__haken svg { width: 13px; height: 13px; }
+.teilen__kachel.is-gesendet .teilen__haken { display: flex; }
+.teilen__kachel.is-gesendet { opacity: .55; }
+
+/* --------------------------------------- Geteilter Beitrag im Chat */
+.msg__geteilt {
+  display: flex; align-items: center; gap: 10px;
+  margin: 2px 0 4px; padding: 8px;
+  border-radius: 12px; background: rgba(0,0,0,.05);
+}
+[data-theme="dark"] .msg__geteilt { background: rgba(255,255,255,.07); }
+.msg__geteiltBild {
+  flex: 0 0 auto;
+  width: 42px; height: 42px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-3); color: var(--text-3);
+}
+.msg__geteiltBild svg { width: 20px; height: 20px; }
+.msg__geteiltText { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+.msg__geteiltText span {
+  color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ------------------------------------------------------ Explorer-Seiten */
+.page__bar {
+  display: flex; align-items: center;
+  padding: calc(8px + env(safe-area-inset-top)) 8px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.exp__kopf { padding: 16px; }
+.exp__kopf--hashtag, .exp__kopf--sound { text-align: center; }
+.exp__titel { font-size: 24px; font-weight: 700; }
+.exp__titel--mitte { margin-top: 12px; }
+.exp__zahl { margin-top: 3px; font-size: 13px; color: var(--text-2); }
+.exp__zahl--mitte { margin-bottom: 4px; }
+
+.exp__ortkopf { display: flex; align-items: baseline; gap: 8px; }
+.exp__ortkopf svg { width: 22px; height: 22px; align-self: center; color: var(--text); }
+.exp__ortkopf .exp__titel { font-size: 21px; }
+.exp__ortkopf .exp__zahl { margin: 0; }
+.exp__adresse { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 14.5px; }
+.exp__koordinaten { margin-top: 2px; font-size: 12.5px; color: var(--text-3); }
+
+.minikarte {
+  position: relative;
+  margin-top: 12px; height: 150px; border-radius: 14px; overflow: hidden;
+  background:
+    repeating-linear-gradient(0deg, var(--border) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(90deg, var(--border) 0 1px, transparent 1px 26px),
+    var(--surface-2);
+}
+.minikarte__nadel { position: absolute; transform: translate(-50%, -100%); color: var(--danger); }
+.minikarte__nadel svg { width: 28px; height: 28px; }
+.exp__link {
+  display: block; margin-top: 12px;
+  font-size: 14.5px; font-weight: 600; color: var(--brand); text-align: left;
+}
+
+.soundcover {
+  width: 148px; height: 148px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 16px; background: var(--surface-2); color: var(--text-3);
+}
+.soundcover svg { width: 52px; height: 52px; }
+.welle {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 14px; padding: 10px 12px;
+  border-radius: 14px; background: var(--surface-2);
+}
+.welle__play {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--text);
+}
+.welle__play svg { width: 16px; height: 16px; }
+.welle__balken { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; height: 34px; }
+.welle__balken i { flex: 1 1 auto; border-radius: 1px; background: var(--text-3); opacity: .45; }
+.welle__balken i.is-gespielt { background: var(--brand); opacity: 1; }
+.welle__zeit { flex: 0 0 auto; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.exp__lyrics { margin-top: 10px; font-size: 13.5px; color: var(--text-2); }
+
+.expreels { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 4px; }
+.expreel {
+  position: relative; flex: 0 0 108px; height: 168px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; overflow: hidden;
+  background: var(--surface-3); color: var(--text-3);
+}
+.expreel svg { width: 30px; height: 30px; }
+.expreel__text {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 16px 7px 7px; font-size: 11px; color: #fff; text-align: left;
+  background: linear-gradient(transparent, rgba(0,0,0,.65));
+}
+.expclips { padding: 0 16px; }
+.clip--klein .clip__thumb { height: 150px; }

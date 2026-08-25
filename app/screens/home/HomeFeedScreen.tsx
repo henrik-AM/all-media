@@ -20,10 +20,12 @@ interface Props {
   stories: Story[];
   onOpenStory: (story: Story) => void;
   onOpenProfile: (userId: string) => void;
+  /** Oeffnet das Teilen-Blatt mit dem Personen-Raster. */
+  onShare: (post: Post) => void;
   onNotice: (message: string) => void;
 }
 
-export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onNotice }: Props) => {
+export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, onNotice }: Props) => {
   const { istRepostet, umschalten } = useReposts();
   // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
   // damit sie auch im Profilraster auftauchen.
@@ -125,7 +127,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onNotice }
           <Pressable onPress={() => setCommentsFor(item.id)} hitSlop={6}>
             <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
           </Pressable>
-          <Pressable onPress={() => onNotice('Beitrag geteilt')} hitSlop={6}>
+          <Pressable onPress={() => onShare(item)} hitSlop={6}>
             <Ionicons name="paper-plane-outline" size={24} color={colors.text} />
           </Pressable>
           <Pressable style={styles.repost} onPress={() => toggleRepost(item)} hitSlop={6}>

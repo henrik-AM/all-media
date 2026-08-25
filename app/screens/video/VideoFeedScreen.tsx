@@ -17,13 +17,15 @@ const compactNumber = (n: number): string => {
 
 interface Props {
   onOpenProfile: (userId: string) => void;
+  /** Oeffnet das Teilen-Blatt mit dem Personen-Raster. */
+  onShare: (video: Video) => void;
   onNotice: (message: string) => void;
 }
 
-export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
+export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => {
   const { istRepostet, umschalten } = useReposts();
   // Eigene Reels stehen oben im Feed.
-  const { eigeneVideos } = useProfil();
+  const { eigeneVideos, geteiltZaehler } = useProfil();
   const [videos, setVideos] = useState<Video[]>(mockVideos);
 
   // Wie im Bild-Feed: eigene Reels kommen in dieselbe Liste, damit Like,
@@ -63,8 +65,9 @@ export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
   };
 
   const share = (video: Video) => {
-    update(video.id, (v) => ({ ...v, shares: v.shares + 1 }));
-    onNotice('Beitrag geteilt');
+    // Zaehlt erst hoch, wenn wirklich jemand ausgewaehlt wurde - das
+    // uebernimmt der Aufrufer nach dem Senden.
+    onShare(video);
   };
 
   const renderVideo = ({ item }: { item: Video }) => {
@@ -97,7 +100,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
 
           <Pressable style={styles.railBtn} onPress={() => share(item)}>
             <Ionicons name="paper-plane-outline" size={26} color={colors.white} />
-            <Text style={styles.railLabel}>{compactNumber(item.shares)}</Text>
+            <Text style={styles.railLabel}>{compactNumber(item.shares + (geteiltZaehler[item.id] ?? 0))}</Text>
           </Pressable>
 
           <Pressable style={styles.railBtn} onPress={() => toggleRepost(item)}>

@@ -114,6 +114,11 @@ interface ProfilWert {
   spendeSetzen: (spende: Spende) => void;
   aufzeichnungAnlegen: (sekunden: number, zuschauer: number) => void;
 
+  /* --- Teilen --- */
+  /** Wie oft dieser Beitrag oder dieses Video von hier aus gesendet wurde. */
+  geteiltZaehler: Record<string, number>;
+  geteilt: (id: string) => void;
+
   /* --- Communitys --- */
   communities: Community[];
   kanalAnlegen: (name: string, thema: string) => string | null;
@@ -148,6 +153,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const [playlists, setPlaylists] = useState<string[]>(['Beste Clips', 'Tutorials']);
   const [spende, setSpende] = useState<Spende | null>(null);
   const [raster, setRaster] = useState<RasterEintrag[]>(GRUND_RASTER);
+  const [geteiltZaehler, setGeteiltZaehler] = useState<Record<string, number>>({});
 
   const mitteilungen = useCallback(
     (bereich: MitteilungsBereich): MitteilungAnzeige[] =>
@@ -299,6 +305,10 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }, []);
 
+  const geteilt = useCallback((id: string) => {
+    setGeteiltZaehler((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+  }, []);
+
   const kanalGelesen = useCallback((id: string) => {
     setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)));
   }, []);
@@ -322,6 +332,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       playlistAnlegen,
       spendeSetzen,
       aufzeichnungAnlegen,
+      geteiltZaehler,
+      geteilt,
       communities,
       kanalAnlegen,
       kanalBeitreten,
@@ -331,7 +343,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
-      aufzeichnungAnlegen, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
+      aufzeichnungAnlegen, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
     ]
   );
 

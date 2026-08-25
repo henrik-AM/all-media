@@ -11,6 +11,7 @@ import { ErstellenSheet, ErstellenPunkt } from './components/ErstellenSheet';
 import { FormularFeld, FormularSheet } from './components/FormularSheet';
 import { MitteilungenSheet } from './components/MitteilungenSheet';
 import { NewGroupSheet } from './components/NewGroupSheet';
+import { TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { KontoWechsel } from './components/KontoWechsel';
 import { TabBar } from './components/TabBar';
 import { TopSwitcher } from './components/TopSwitcher';
@@ -32,6 +33,7 @@ import { CommunityProfileScreen } from './screens/communities/CommunityProfileSc
 import { CommunitySearchScreen } from './screens/communities/CommunitySearchScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
 import { LandscapeVideosScreen } from './screens/videos/LandscapeVideosScreen';
+import { ExplorerScreen, ExplorerZiel } from './screens/videos/ExplorerScreen';
 import { LivestreamScreen } from './screens/videos/LivestreamScreen';
 import { VideoProfileScreen } from './screens/videos/VideoProfileScreen';
 import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
@@ -41,7 +43,7 @@ import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
 import { mockChats, mockContacts, mockStories, mockUsers } from './mocks';
-import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Story } from './types';
+import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Video } from './types';
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
@@ -56,6 +58,7 @@ type Overlay =
   | { kind: 'camera' }
   | { kind: 'call'; userId: string; art: 'audio' | 'video' }
   | { kind: 'livestream' }
+  | { kind: 'explorer'; ziel: ExplorerZiel }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -93,6 +96,13 @@ const Shell = () => {
   const [formular, setFormular] = useState<Formular | null>(null);
   /** Abschnitt, bei dem die Einstellungen aufgehen sollen. */
   const [settingsSprung, setSettingsSprung] = useState<string | null>(null);
+  const [teilenZiel, setTeilenZiel] = useState<TeilenZiel | null>(null);
+  /*
+   * Weitergeleitete Beitraege. Sie muessen die Shell ueberleben: der Chat
+   * baut seine Nachrichten beim Oeffnen neu auf, ein Beitrag, den man vorher
+   * geteilt hat, waere sonst wieder weg.
+   */
+  const [extraNachrichten, setExtraNachrichten] = useState<Record<string, Message[]>>({});
   const profil = useProfil();
 
   const sub = subs[area];
@@ -101,10 +111,49 @@ const Shell = () => {
   const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
   const hideNotice = useCallback(() => setNotice(null), []);
 
+  /** Chat oeffnen und dabei alles mitgeben, was frueher hineingeteilt wurde. */
+  const oeffneChat = (chat: Chat, zusatz?: Message[]) =>
+    setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])] });
+
   const openChatWith = (userId: string) => {
     const chat = chats.find((c) => c.userId === userId);
-    if (chat) setOverlay({ kind: 'chat', chat });
+    if (chat) oeffneChat(chat);
     else setNotice('Noch kein Chat mit dieser Person');
+  };
+
+  /** Beitrag oder Video in den Chat mit dieser Person legen. */
+  const teileMit = (userId: string, ziel: TeilenZiel) => {
+    const person = mockUsers[userId];
+    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
+    const vorschau = ziel.art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
+
+    if (!chat) {
+      chat = {
+        id: `c${Date.now()}`,
+        name: person.name,
+        userId,
+        isGroup: false,
+        preview: vorschau,
+        time: now(),
+        unreadCount: 0,
+      };
+      setChats((prev) => [chat as Chat, ...prev]);
+    } else {
+      const id = chat.id;
+      setChats((prev) => prev.map((c) => (c.id === id ? { ...c, preview: vorschau, time: now() } : c)));
+    }
+
+    const nachricht: Message = {
+      id: `m${Date.now()}`,
+      chatId: chat.id,
+      senderId: 'me',
+      text: vorschau,
+      time: now(),
+      geteilt: ziel,
+    };
+    setExtraNachrichten((prev) => ({ ...prev, [chat!.id]: [...(prev[chat!.id] ?? []), nachricht] }));
+    profil.geteilt(ziel.id);
+    setNotice(`An ${person.name} gesendet`);
   };
 
   const createGroup = (name: string, memberIds: string[], info?: string) => {
@@ -120,7 +169,7 @@ const Shell = () => {
     setChats((prev) => [chat, ...prev]);
     setSheet(null);
     setNotice(`Gruppe „${name}“ erstellt`);
-    setOverlay({ kind: 'chat', chat });
+    oeffneChat(chat);
   };
 
   /**
@@ -151,7 +200,7 @@ const Shell = () => {
         text: ersteNachricht,
         time: now(),
       };
-      setOverlay({ kind: 'chat', chat, extra: [message] });
+      oeffneChat(chat, [message]);
     }
   };
 
@@ -242,21 +291,18 @@ const Shell = () => {
     };
 
     setNotice(`Antwort an ${person.name} gesendet`);
-    setOverlay({ kind: 'chat', chat, extra: [message] });
+    oeffneChat(chat, [message]);
   };
 
   const openCommunity = (community: Community) => {
-    setOverlay({
-      kind: 'chat',
-      chat: {
-        id: community.id,
-        name: community.name,
-        isGroup: true,
-        memberIds: new Array(Math.max(community.members - 1, 0)).fill(''),
-        preview: community.topic,
-        time: '',
-        unreadCount: 0,
-      },
+    oeffneChat({
+      id: community.id,
+      name: community.name,
+      isGroup: true,
+      memberIds: new Array(Math.max(community.members - 1, 0)).fill(''),
+      preview: community.topic,
+      time: '',
+      unreadCount: 0,
     });
   };
 
@@ -380,6 +426,22 @@ const Shell = () => {
     });
   };
 
+  const teileBeitrag = (post: Post) =>
+    setTeilenZiel({
+      art: 'post',
+      id: post.id,
+      titel: post.description,
+      autor: mockUsers[post.userId]?.name ?? 'Unbekannt',
+    });
+
+  const teileVideo = (video: Video) =>
+    setTeilenZiel({
+      art: 'video',
+      id: video.id,
+      titel: video.description,
+      autor: mockUsers[video.userId]?.name ?? 'Unbekannt',
+    });
+
   const switchArea = (next: AreaKey) => {
     setArea(next);
     setSubs((prev) => ({ ...prev, [next]: 'profile' as SubKey }));
@@ -476,6 +538,10 @@ const Shell = () => {
     );
   }
 
+  if (overlay?.kind === 'explorer') {
+    return <ExplorerScreen ziel={overlay.ziel} onBack={() => setOverlay(null)} onNotice={setNotice} />;
+  }
+
   if (overlay?.kind === 'livestream') {
     return (
       <LivestreamScreen
@@ -520,7 +586,7 @@ const Shell = () => {
         <ChatListScreen
           allChats={chats}
           stories={stories}
-          onOpenChat={(chat) => setOverlay({ kind: 'chat', chat })}
+          onOpenChat={(chat) => oeffneChat(chat)}
           onOpenStory={openStory}
           onNewChat={() => setSheet('new')}
         />
@@ -528,11 +594,26 @@ const Shell = () => {
     }
 
     if (area === 'videos') {
-      if (sub === 'portrait') return <VideoFeedScreen onOpenProfile={openPublicProfile} onNotice={setNotice} />;
+      if (sub === 'portrait') return <VideoFeedScreen onOpenProfile={openPublicProfile} onShare={teileVideo} onNotice={setNotice} />;
       if (sub === 'landscape') return <LandscapeVideosScreen onNotice={setNotice} />;
-      if (sub === 'search') return <VideoSearchScreen onOpenProfile={openPublicProfile} onNotice={setNotice} />;
+      if (sub === 'search')
+        return (
+          <VideoSearchScreen
+            onOpenProfile={openPublicProfile}
+            onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
+            onNotice={setNotice}
+          />
+        );
       if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onNotice={setNotice} />;
-      return <HomeFeedScreen stories={stories} onOpenStory={openStory} onOpenProfile={openPublicProfile} onNotice={setNotice} />;
+      return (
+        <HomeFeedScreen
+          stories={stories}
+          onOpenStory={openStory}
+          onOpenProfile={openPublicProfile}
+          onShare={teileBeitrag}
+          onNotice={setNotice}
+        />
+      );
     }
 
     if (area === 'communities') {
@@ -618,6 +699,13 @@ const Shell = () => {
         visible={sheet === 'konto'}
         onClose={() => setSheet(null)}
         onNotice={setNotice}
+      />
+
+      <TeilenSheet
+        ziel={teilenZiel}
+        contacts={contacts}
+        onClose={() => setTeilenZiel(null)}
+        onSend={teileMit}
       />
 
       <MitteilungenSheet

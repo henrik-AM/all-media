@@ -37,7 +37,9 @@
     "compare": "node test/figma-compare.js",
     "links": "node tools/links.js",
     "up": "node tools/up.js",
-    "test:erstellen": "node test/_erstellen.js"
+    "test:erstellen": "node test/_erstellen.js",
+    "test:teilen": "node test/_teilen.js",
+    "test:explorer": "node test/_explorer.js"
   },
   "private": true
 }

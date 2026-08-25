@@ -79,12 +79,12 @@ const stories = [
 
 // Querformat-Videos (Videos / Querformat im Prototyp)
 const clips = [
-  { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen' },
-  { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen' },
-  { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche' },
-  { id: 'q4', userId: 'u2', title: 'Expo SDK 57: Was sich geändert hat', duration: '09:55', views: 18700, age: 'vor 1 Woche' },
-  { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen' },
-  { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen' },
+  { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen' , location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', tags: ['#sonnenaufgang'] },
+  { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen' , location: 'Köln', music: 'Lo-Fi Focus – beatlab', tags: ['#designsystem'] },
+  { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche' , location: 'Hamburg', music: 'Kitchen Groove – Milo', tags: ['#mealprep'] },
+  { id: 'q4', userId: 'u2', title: 'Expo SDK 57: Was sich geändert hat', duration: '09:55', views: 18700, age: 'vor 1 Woche' , location: 'Köln', music: 'Originalton', tags: ['#reactnative'] },
+  { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen' , location: 'Hamburg', music: 'Golden Hour – Lys', tags: ['#hafen', '#nachtfotografie'] },
+  { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen' , location: 'Berlin', music: 'Originalton', tags: ['#reactnative'] },
 ];
 
 // Explorer-Abschnitte (Video - Suche im Prototyp)
@@ -99,20 +99,25 @@ const hashtags = [
   { tag: '#nachtfotografie', posts: 39100 },
 ];
 
+// dauer und lyrics werden auf der Sound-Seite gebraucht (Prototyp-Frame
+// "VSSo + Sound": Wellenform mit Laufzeit und eine Lyrics-Zeile).
 const sounds = [
-  { id: 'so1', title: 'Golden Hour', artist: 'Lys', uses: 12400 },
-  { id: 'so2', title: 'Lo-Fi Focus', artist: 'beatlab', uses: 8210 },
-  { id: 'so3', title: 'Kitchen Groove', artist: 'Milo', uses: 24800 },
-  { id: 'so4', title: 'Runner High', artist: 'Aster', uses: 3140 },
-  { id: 'so5', title: 'Ambient Sunrise', artist: 'Nora K.', uses: 5670 },
+  { id: 'so1', title: 'Golden Hour', artist: 'Lys', uses: 12400, dauer: '3:46', lyrics: 'And the light comes slow over the water' },
+  { id: 'so2', title: 'Lo-Fi Focus', artist: 'beatlab', uses: 8210, dauer: '2:58', lyrics: 'Instrumental' },
+  { id: 'so3', title: 'Kitchen Groove', artist: 'Milo', uses: 24800, dauer: '3:12', lyrics: 'Ten minutes and the table is set' },
+  { id: 'so4', title: 'Runner High', artist: 'Aster', uses: 3140, dauer: '4:05', lyrics: 'One more mile, one more morning' },
+  { id: 'so5', title: 'Ambient Sunrise', artist: 'Nora K.', uses: 5670, dauer: '5:21', lyrics: 'Instrumental' },
 ];
 
+// ort verbindet den Standort mit dem location-Feld der Beitraege - ohne das
+// waere die Standort-Seite immer leer. adresse und koordinaten stehen im
+// Prototyp-Frame "VSS + Standort" im Kopf.
 const places = [
-  { id: 'pl1', name: 'Hamburger Hafen', posts: 8730 },
-  { id: 'pl2', name: 'Zugspitze', posts: 12400 },
-  { id: 'pl3', name: 'Rheinpark Köln', posts: 3140 },
-  { id: 'pl4', name: 'Berlin Mitte', posts: 22100 },
-  { id: 'pl5', name: 'Alster', posts: 5310 },
+  { id: 'pl1', name: 'Hamburger Hafen', posts: 8730, ort: 'Hamburg', adresse: 'Am Sandtorkai, 20457 Hamburg, Deutschland', koordinaten: '53.5413° N, 9.9891° O', x: 44, y: 28 },
+  { id: 'pl2', name: 'Zugspitze', posts: 12400, ort: 'Zugspitze', adresse: 'Zugspitzplatt, 82475 Garmisch-Partenkirchen, Deutschland', koordinaten: '47.4211° N, 10.9853° O', x: 52, y: 78 },
+  { id: 'pl3', name: 'Rheinpark Köln', posts: 3140, ort: 'Rheinpark', adresse: 'Sachsenbergstraße, 50679 Köln, Deutschland', koordinaten: '50.9494° N, 6.9722° O', x: 30, y: 52 },
+  { id: 'pl4', name: 'Berlin Mitte', posts: 22100, ort: 'Berlin', adresse: 'Unter den Linden, 10117 Berlin, Deutschland', koordinaten: '52.5170° N, 13.3889° O', x: 70, y: 34 },
+  { id: 'pl5', name: 'Alster', posts: 5310, ort: 'Hamburg', adresse: 'An der Alster, 20099 Hamburg, Deutschland', koordinaten: '53.5586° N, 10.0011° O', x: 46, y: 25 },
 ];
 
 // Friend-Map (Messenger / Friend-Map im Prototyp)
@@ -167,18 +172,18 @@ const comments = {
 };
 
 const posts = [
-  { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false },
-  { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, reposts: 0, reposted: false, liked: true, saved: false, following: true, notify: true },
-  { id: 'p3', userId: 'u1', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', description: 'Oben angekommen. Der Aufstieg war jede Minute wert.', likedBy: 'David König', likes: 1204, comments: 96, reposts: 0, reposted: false, liked: false, saved: true, following: false, notify: false },
-  { id: 'p4', userId: 'u6', location: 'Berlin', music: 'Lo-Fi Focus – beatlab', description: 'Kleine Commits, klare Historie. Mein Team dankt es mir.', likedBy: 'Elif Yilmaz', likes: 87, comments: 9, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false },
+  { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false , tags: ['#hafen', '#nachtfotografie'] },
+  { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, reposts: 0, reposted: false, liked: true, saved: false, following: true, notify: true , tags: ['#homeoffice', '#designsystem'] },
+  { id: 'p3', userId: 'u1', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', description: 'Oben angekommen. Der Aufstieg war jede Minute wert.', likedBy: 'David König', likes: 1204, comments: 96, reposts: 0, reposted: false, liked: false, saved: true, following: false, notify: false , tags: ['#sonnenaufgang'] },
+  { id: 'p4', userId: 'u6', location: 'Berlin', music: 'Lo-Fi Focus – beatlab', description: 'Kleine Commits, klare Historie. Mein Team dankt es mir.', likedBy: 'Elif Yilmaz', likes: 87, comments: 9, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false , tags: ['#reactnative'] },
 ];
 
 const videos = [
-  { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, reposted: false, liked: false, saved: false },
-  { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, reposted: false, liked: true, saved: true },
-  { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, reposted: false, liked: false, saved: false },
-  { id: 'v4', userId: 'u2', description: 'Erster Laufversuch mit der neuen Kamera-Stabilisierung.', location: 'Rheinpark', music: 'Runner High – Aster', likes: 3140, comments: 74, shares: 22, reposted: false, liked: false, saved: false },
-  { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false },
+  { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, reposted: false, liked: false, saved: false , tags: ['#sonnenaufgang'] },
+  { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, reposted: false, liked: true, saved: true , tags: ['#homeoffice', '#designsystem'] },
+  { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, reposted: false, liked: false, saved: false , tags: ['#mealprep'] },
+  { id: 'v4', userId: 'u2', description: 'Erster Laufversuch mit der neuen Kamera-Stabilisierung.', location: 'Rheinpark', music: 'Runner High – Aster', likes: 3140, comments: 74, shares: 22, reposted: false, liked: false, saved: false , tags: ['#laufen'] },
+  { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false , tags: ['#reactnative'] },
 ];
 
 const communities = [
@@ -398,6 +403,49 @@ app.get('/api/bootstrap', (req, res) => {
     communities: mitteilungen.filter((m) => m.bereich === 'communities' && !m.gelesen).length,
   };
   res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends, gefolgt, ungelesen });
+});
+
+/* ------------------------------------------------------- Explorer-Seiten */
+/*
+ * Was hinter einem Hashtag, einem Standort und einem Sound steckt.
+ * Prototyp-Frames "VS# - Hashtagoptionen", "VSS + Standort" und
+ * "VSSo + Sound". Alle drei sind gleich aufgebaut: ein Kopf und darunter
+ * die Abschnitte Reels, Querformat und Beitraege.
+ *
+ * Bisher gab jeder dieser Knoepfe nur "... folgt" aus.
+ */
+app.get('/api/explorer/:art/:wert', (req, res) => {
+  const { art } = req.params;
+  const wert = decodeURIComponent(req.params.wert);
+
+  let passt;
+  let kopf;
+
+  if (art === 'hashtag') {
+    const tag = wert.startsWith('#') ? wert : `#${wert}`;
+    passt = (e) => (e.tags || []).includes(tag);
+    kopf = { art, titel: tag, anzahl: hashtags.find((h) => h.tag === tag)?.posts || 0 };
+  } else if (art === 'standort') {
+    const platz = places.find((p) => p.id === wert || p.name === wert);
+    if (!platz) return res.json({ ok: false, error: 'Diesen Standort gibt es nicht' });
+    passt = (e) => e.location === platz.ort;
+    kopf = { art, titel: platz.name, anzahl: platz.posts, adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y };
+  } else if (art === 'sound') {
+    const sound = sounds.find((s) => s.id === wert || s.title === wert);
+    if (!sound) return res.json({ ok: false, error: 'Diesen Sound gibt es nicht' });
+    passt = (e) => typeof e.music === 'string' && e.music.startsWith(sound.title);
+    kopf = { art, titel: sound.title, produzent: sound.artist, anzahl: sound.uses, dauer: sound.dauer, lyrics: sound.lyrics };
+  } else {
+    return res.json({ ok: false, error: 'Unbekannter Bereich' });
+  }
+
+  res.json({
+    ok: true,
+    kopf,
+    reels: videos.filter(passt),
+    clips: clips.filter(passt),
+    beitraege: posts.filter(passt),
+  });
 });
 
 /** Eigenen Kanal anlegen (Prototyp "CP + erstellen"). */
@@ -744,6 +792,61 @@ app.post('/api/messages/:chatId', (req, res) => {
   }
 
   res.json(message);
+});
+
+/*
+ * Einen Beitrag oder ein Video an Kontakte schicken - Prototyp-Frames
+ * "Nutzer B + Beitrag teilen" und "VQ + Video teilen". Dort steht ein Raster
+ * mit Personen; wen man antippt, der bekommt es in den Chat.
+ */
+app.post('/api/teilen', (req, res) => {
+  const { art, id } = req.body || {};
+  const empfaenger = Array.isArray(req.body?.empfaenger) ? req.body.empfaenger : [];
+  if (!empfaenger.length) return res.json({ ok: false, error: 'Bitte mindestens eine Person auswählen' });
+
+  const eintrag = art === 'video' ? videos.find((v) => v.id === id) : posts.find((p) => p.id === id);
+  if (!eintrag) return res.json({ ok: false, error: 'Diesen Beitrag gibt es nicht mehr' });
+
+  const autor = users[eintrag.userId]?.name || 'Unbekannt';
+  const titel = eintrag.description || 'Ohne Beschreibung';
+  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const vorschau = art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
+  const gesendet = [];
+
+  for (const userId of empfaenger) {
+    if (!users[userId]) continue;
+
+    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
+    if (!chat) {
+      chat = {
+        id: `c${Date.now()}${gesendet.length}`,
+        userId,
+        name: users[userId].name,
+        preview: vorschau,
+        time,
+        unread: 0,
+        muted: false,
+        isGroup: false,
+      };
+      chats.unshift(chat);
+    }
+
+    if (!messages[chat.id]) messages[chat.id] = [];
+    messages[chat.id].push({
+      id: `m${Date.now()}${gesendet.length}`,
+      from: 'me',
+      text: vorschau,
+      time,
+      geteilt: { art, id, titel, autor },
+    });
+
+    chat.preview = vorschau;
+    chat.time = time;
+    gesendet.push(userId);
+  }
+
+  if (art === 'video') eintrag.shares = (eintrag.shares || 0) + gesendet.length;
+  res.json({ ok: true, gesendet, chats });
 });
 
 app.post('/api/groups', (req, res) => {

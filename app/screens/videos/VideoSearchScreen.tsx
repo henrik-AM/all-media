@@ -14,9 +14,12 @@ import {
   mockUsers,
   mockVideos,
 } from '../../mocks';
+import { ExplorerZiel } from './ExplorerScreen';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
+  /** Oeffnet die Seite zu einem Hashtag, Standort oder Sound. */
+  onOpenExplorer: (ziel: ExplorerZiel) => void;
   onNotice: (message: string) => void;
 }
 
@@ -56,7 +59,7 @@ const Row = ({
  * Prototyp-Frame "Video - Suche": Explorer mit den Abschnitten Reels,
  * Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
  */
-export const VideoSearchScreen = ({ onOpenProfile, onNotice }: Props) => {
+export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: Props) => {
   const [query, setQuery] = useState('');
 
   const result = useMemo(() => {
@@ -147,7 +150,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onNotice }: Props) => {
             <Section title="# Hashtags">
               <View style={styles.tags}>
                 {result.tags.map((h) => (
-                  <Pressable key={h.tag} style={styles.tag} onPress={() => onNotice(`${h.tag} — Hashtag-Seite folgt`)}>
+                  <Pressable key={h.tag} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: h.tag })}>
                     <Text style={styles.tagText}>
                       {h.tag} · {compact(h.posts)}
                     </Text>
@@ -165,7 +168,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onNotice }: Props) => {
                   icon="location-outline"
                   title={p.name}
                   sub={`${compact(p.posts)} Beiträge`}
-                  onPress={() => onNotice('Standort-Seite folgt')}
+                  onPress={() => onOpenExplorer({ art: 'standort', wert: p.id })}
                 />
               ))}
             </Section>
@@ -179,7 +182,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onNotice }: Props) => {
                   icon="musical-notes-outline"
                   title={s.title}
                   sub={`${s.artist} · ${compact(s.uses)} Videos`}
-                  onPress={() => onNotice('Sound-Seite folgt')}
+                  onPress={() => onOpenExplorer({ art: 'sound', wert: s.id })}
                 />
               ))}
             </Section>

@@ -93,7 +93,26 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
       <View style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}>
         {!out && chat.isGroup && <Text style={styles.sender}>{sender?.name ?? 'Unbekannt'}</Text>}
 
-        {item.media ? (
+        {item.geteilt ? (
+          // Weitergeleiteter Beitrag: kleine Karte statt nacktem Text.
+          <View style={styles.geteilt}>
+            <View style={styles.geteiltBild}>
+              <Ionicons
+                name={item.geteilt.art === 'video' ? 'play' : 'image-outline'}
+                size={20}
+                color={colors.text3}
+              />
+            </View>
+            <View style={styles.geteiltText}>
+              <Text style={styles.geteiltAutor} numberOfLines={1}>
+                {item.geteilt.autor}
+              </Text>
+              <Text style={styles.geteiltTitel} numberOfLines={1}>
+                {item.geteilt.titel}
+              </Text>
+            </View>
+          </View>
+        ) : item.media ? (
           <View style={styles.media}>
             <Ionicons
               name={item.media === 'image' ? 'image-outline' : 'mic-outline'}
@@ -291,6 +310,26 @@ const styles = StyleSheet.create({
   messageTextOut: { color: colors.bubbleOutText },
   media: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
   mediaText: { color: colors.text2, ...typography.preview },
+  geteilt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  geteiltBild: {
+    width: 42,
+    height: 42,
+    borderRadius: 9,
+    backgroundColor: colors.surface3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  geteiltText: { flex: 1, minWidth: 0 },
+  geteiltAutor: { ...typography.small, fontWeight: '600', color: colors.text },
+  geteiltTitel: { ...typography.small, color: colors.text2, marginTop: 2 },
   bubbleFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
   time: { color: colors.text3, ...typography.tiny },
   timeOut: { color: colors.bubbleOutMeta },

@@ -1373,7 +1373,7 @@ function renderHomeFeed() {
           state.posts[idx] = { ...state.posts[idx], comments: count };
         });
       }
-      if (paction === 'share') return toast('Beitrag geteilt');
+      if (paction === 'share') return openTeilen('post', pid);
 
       const res = await fetch(`/api/posts/${pid}/${paction}`, { method: 'POST' });
       const updated = await res.json();
@@ -1455,13 +1455,14 @@ function renderVideoFeed() {
         });
       }
 
+      if (vaction === 'share') return openTeilen('video', vid);
+
 
       const res = await fetch(`/api/videos/${vid}/${vaction}`, { method: 'POST' });
       const updated = await res.json();
       const idx = state.videos.findIndex((v) => v.id === updated.id);
       state.videos[idx] = updated;
 
-      if (vaction === 'share') toast('Beitrag geteilt');
       if (vaction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
 
@@ -2595,10 +2596,14 @@ function renderVideoSearch() {
     })
   );
   main.querySelectorAll('[data-tag]').forEach((b) =>
-    b.addEventListener('click', () => toast(`${b.dataset.tag} — Hashtag-Seite folgt`))
+    b.addEventListener('click', () => openExplorer('hashtag', b.dataset.tag))
   );
-  main.querySelectorAll('[data-place]').forEach((b) => b.addEventListener('click', () => toast('Standort-Seite folgt')));
-  main.querySelectorAll('[data-sound]').forEach((b) => b.addEventListener('click', () => toast('Sound-Seite folgt')));
+  main.querySelectorAll('[data-place]').forEach((b) =>
+    b.addEventListener('click', () => openExplorer('standort', b.dataset.place))
+  );
+  main.querySelectorAll('[data-sound]').forEach((b) =>
+    b.addEventListener('click', () => openExplorer('sound', b.dataset.sound))
+  );
 }
 
 /* ------------------------------- Glocke, Plus und Menü im eigenen Profil */
@@ -2743,6 +2748,227 @@ function openErstellen(bereich) {
       );
     },
     { schliessen: true }
+  );
+}
+
+/* ------------------------------------------------------ Explorer-Seiten */
+/*
+ * Hashtag, Standort und Sound. Prototyp-Frames "VS# - Hashtagoptionen",
+ * "VSS + Standort" und "VSSo + Sound". Alle drei sind gleich aufgebaut:
+ * ein eigener Kopf und darunter Reels, Querformat und Beitraege.
+ *
+ * Vorher gab jeder dieser Knoepfe nur einen Hinweis aus.
+ */
+async function openExplorer(art, wert) {
+  const res = await fetch(`/api/explorer/${art}/${encodeURIComponent(wert)}`);
+  const daten = await res.json();
+  if (!daten.ok) return toast(daten.error);
+
+  const { kopf, reels, clips, beitraege } = daten;
+
+  const abschnitt = (titel, inhalt) =>
+    inhalt ? `<div class="exp__head">${titel} →</div>${inhalt}` : '';
+
+  const reelsReihe = reels.length
+    ? `<div class="expreels">${reels
+        .map(
+          (v) => `<button class="expreel" data-openvideo="${v.id}">
+            ${medienFlaeche(v.id, ICONS.play)}
+            <span class="expreel__text">${esc(v.description.slice(0, 40))}</span>
+          </button>`
+        )
+        .join('')}</div>`
+    : '';
+
+  const clipListe = clips.length
+    ? `<div class="expclips">${clips
+        .map((c) => {
+          const u = user(c.userId);
+          return `<article class="clip clip--klein" data-clip="${c.id}">
+            <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}<span class="clip__time">${esc(c.duration)}</span></div>
+            <div class="clip__meta">
+              <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
+              <div>
+                <div class="clip__title">${esc(c.title)}</div>
+                <div class="clip__sub">${esc(u.name)} · ${compactNumber(c.views)} Aufrufe</div>
+              </div>
+            </div>
+          </article>`;
+        })
+        .join('')}</div>`
+    : '';
+
+  const beitragRaster = beitraege.length
+    ? `<div class="exp__grid">${beitraege
+        .map((p) => `<button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image)}</button>`)
+        .join('')}</div>`
+    : '';
+
+  const kopfHtml = {
+    hashtag: () => `<div class="exp__titel">${esc(kopf.titel)}</div>
+      <div class="exp__zahl">${compactNumber(kopf.anzahl)} Beiträge</div>`,
+
+    standort: () => `<div class="exp__ortkopf">
+        ${ICONS.mapPin}<span class="exp__titel">${esc(kopf.titel)}</span>
+        <span class="exp__zahl">${compactNumber(kopf.anzahl)} Beiträge</span>
+      </div>
+      <div class="exp__adresse">${esc(kopf.adresse)}</div>
+      <div class="exp__koordinaten">${esc(kopf.koordinaten)}</div>
+      <div class="minikarte">
+        <span class="minikarte__nadel" style="left:${kopf.x}%;top:${kopf.y}%">${ICONS.mapPin}</span>
+      </div>
+      <button class="exp__link" id="expFotos">Alle Fotos ansehen →</button>`,
+
+    sound: () => `<div class="soundcover">${ICONS.music}</div>
+      <div class="exp__titel exp__titel--mitte">${esc(kopf.titel)}</div>
+      <div class="exp__zahl exp__zahl--mitte">${esc(kopf.produzent)} · ${compactNumber(kopf.anzahl)} Beiträge</div>
+      <div class="welle">
+        <button class="welle__play" id="soundPlay" aria-label="Abspielen">${ICONS.play}</button>
+        <div class="welle__balken" id="welleBalken">
+          ${Array.from({ length: 44 }, (_, i) => `<i style="height:${20 + Math.round(60 * Math.abs(Math.sin(i * 1.1)))}%"></i>`).join('')}
+        </div>
+        <span class="welle__zeit" id="welleZeit">0:00 / ${esc(kopf.dauer)}</span>
+      </div>
+      <div class="exp__lyrics">${esc(kopf.lyrics)}</div>`,
+  }[kopf.art]();
+
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="page">
+      <div class="page__bar">
+        <button class="topbar__btn" id="expBack" aria-label="Zurück">${ICONS.back}</button>
+      </div>
+      <div class="scroll">
+        <div class="exp__kopf exp__kopf--${kopf.art}">${kopfHtml}</div>
+        ${
+          reels.length || clips.length || beitraege.length
+            ? abschnitt('Reels', reelsReihe) + abschnitt('Querformat', clipListe) + abschnitt('Beiträge', beitragRaster)
+            : `<div class="empty">${ICONS.search}
+                 <div class="empty__title">Noch nichts hier</div>
+                 <div class="empty__text">Zu ${esc(kopf.titel)} gibt es bisher keine Beiträge.</div>
+               </div>`
+        }
+      </div>
+    </div>`;
+
+  overlay.querySelector('#expBack').addEventListener('click', () => {
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+  });
+
+  overlay.querySelector('#expFotos')?.addEventListener('click', () => {
+    const anzahl = beitraege.length + clips.length + reels.length;
+    toast(anzahl ? `${anzahl} Aufnahmen von diesem Ort stehen unten` : 'Von diesem Ort gibt es noch nichts');
+    overlay.querySelector('.exp__head')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // Wellenform: der Balken laeuft mit, solange abgespielt wird.
+  const play = overlay.querySelector('#soundPlay');
+  if (play) {
+    const [min, sek] = String(kopf.dauer).split(':').map(Number);
+    const gesamt = min * 60 + sek;
+    let bei = 0;
+    let uhr = null;
+
+    play.addEventListener('click', () => {
+      if (uhr) {
+        clearInterval(uhr);
+        uhr = null;
+        play.innerHTML = ICONS.play;
+        return;
+      }
+      play.innerHTML = ICONS.pause;
+      uhr = setInterval(() => {
+        const zeitFeld = overlay.querySelector('#welleZeit');
+        if (!zeitFeld) return clearInterval(uhr);
+        bei = (bei + 1) % (gesamt + 1);
+        zeitFeld.textContent = `${Math.floor(bei / 60)}:${String(bei % 60).padStart(2, '0')} / ${kopf.dauer}`;
+        const balken = overlay.querySelectorAll('#welleBalken i');
+        const bis = Math.round((bei / gesamt) * balken.length);
+        balken.forEach((b, i) => b.classList.toggle('is-gespielt', i < bis));
+      }, 1000);
+    });
+  }
+
+  overlay.querySelectorAll('[data-openpost]').forEach((b) =>
+    b.addEventListener('click', () => {
+      overlay.hidden = true;
+      overlay.innerHTML = '';
+      state.area = 'videos';
+      state.sub.videos = 'home';
+      render();
+      setTimeout(() => document.getElementById('post-' + b.dataset.openpost)?.scrollIntoView({ block: 'center' }), 60);
+    })
+  );
+
+  overlay.querySelectorAll('[data-openvideo]').forEach((b) =>
+    b.addEventListener('click', () => {
+      overlay.hidden = true;
+      overlay.innerHTML = '';
+      state.area = 'videos';
+      state.sub.videos = 'portrait';
+      render();
+      setTimeout(() => document.getElementById('slide-' + b.dataset.openvideo)?.scrollIntoView({ block: 'start' }), 60);
+    })
+  );
+
+  overlay.querySelectorAll('[data-clip]').forEach((b) =>
+    b.addEventListener('click', () => {
+      overlay.hidden = true;
+      overlay.innerHTML = '';
+      state.area = 'videos';
+      state.sub.videos = 'landscape';
+      render();
+    })
+  );
+}
+
+/* --------------------------------------------------------------- Teilen */
+/*
+ * Prototyp-Frames "Nutzer B + Beitrag teilen" und "VQ + Video teilen": ein
+ * Blatt mit einem Raster aus Personen. Wen man antippt, der bekommt den
+ * Beitrag in den Chat - der Knopf gab vorher nur einen Hinweis aus.
+ */
+function openTeilen(art, id) {
+  const kontakte = state.contacts.map((c) => c.id).filter((cid) => state.users[cid]);
+  const uebrige = Object.keys(state.users).filter((uid) => uid !== 'me' && !kontakte.includes(uid));
+  const kachel = (uid) => {
+    const u = user(uid);
+    return `<li>
+      <button class="teilen__kachel" data-teilen="${uid}">
+        <span class="avatar avatar--52" style="background:${u.color}">${esc(u.initials)}</span>
+        <span class="teilen__name">${esc(u.name)}</span>
+        <span class="teilen__haken">${ICONS.check}</span>
+      </button>
+    </li>`;
+  };
+
+  openSheet(
+    art === 'video' ? 'Video teilen' : 'Beitrag teilen',
+    `<div class="sheet__body">
+       ${kontakte.length ? `<div class="teilen__kopf">Deine Kontakte</div><ul class="teilen">${kontakte.map(kachel).join('')}</ul>` : ''}
+       ${uebrige.length ? `<div class="teilen__kopf">Weitere Vorschläge</div><ul class="teilen">${uebrige.map(kachel).join('')}</ul>` : ''}
+     </div>`,
+    (sheet) => {
+      sheet.querySelectorAll('[data-teilen]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          if (b.classList.contains('is-gesendet')) return;
+
+          const res = await fetch('/api/teilen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ art, id, empfaenger: [b.dataset.teilen] }),
+          });
+          const daten = await res.json();
+          if (!daten.ok) return toast(daten.error);
+
+          state.chats = daten.chats;
+          b.classList.add('is-gesendet');
+          toast(`An ${user(b.dataset.teilen).name} gesendet`);
+        })
+      );
+    },
+    { schliessen: true, hoch: true }
   );
 }
 
@@ -3459,7 +3685,17 @@ function messageBubble(m, chat) {
     <div class="msg msg--${out ? 'out' : 'in'}">
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
       ${m.replyToStory ? `<div class="msg__reply">Antwort auf die Story von ${esc(m.replyToStory)}</div>` : ''}
-      ${media || esc(m.text)}
+      ${
+        m.geteilt
+          ? `<div class="msg__geteilt">
+               <span class="msg__geteiltBild">${m.geteilt.art === 'video' ? ICONS.play : ICONS.image}</span>
+               <span class="msg__geteiltText">
+                 <strong>${esc(m.geteilt.autor)}</strong>
+                 <span>${esc(m.geteilt.titel)}</span>
+               </span>
+             </div>`
+          : media || esc(m.text)
+      }
       <div class="msg__foot">${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
     </div>`;
 }

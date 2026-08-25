@@ -20,6 +20,8 @@ export interface Message {
   time: string;
   media?: MediaType;
   read?: boolean;
+  /** Weitergeleiteter Beitrag oder weitergeleitetes Video. */
+  geteilt?: { art: 'post' | 'video'; id: string; titel: string; autor: string };
 }
 
 export interface Chat {
@@ -87,6 +89,8 @@ export interface Post {
   reposted: boolean;
   /** Selbst aufgenommen: die Datei, die statt des Platzhalters gezeigt wird. */
   mediaUri?: string;
+  /** Fuer die Hashtag-Seite. */
+  tags?: string[];
 }
 
 export interface Video {
@@ -103,6 +107,8 @@ export interface Video {
   reposted: boolean;
   /** Selbst aufgenommen: Standbild oder Datei fuer die Vorschau. */
   mediaUri?: string;
+  /** Fuer die Hashtag-Seite. */
+  tags?: string[];
 }
 
 export interface Community {
@@ -140,6 +146,10 @@ export interface Clip {
   duration: string;
   views: number;
   age: string;
+  /** Damit Querformat-Videos auf den Explorer-Seiten auftauchen koennen. */
+  location?: string;
+  music?: string;
+  tags?: string[];
 }
 
 /** Eintrag der Friend-Map. x/y sind Prozentwerte auf der Kartenflaeche. */
@@ -161,12 +171,22 @@ export interface Sound {
   title: string;
   artist: string;
   uses: number;
+  /** Fuer die Sound-Seite: Laufzeit und die angezeigte Lyrics-Zeile. */
+  dauer?: string;
+  lyrics?: string;
 }
 
 export interface Place {
   id: string;
   name: string;
   posts: number;
+  /** Verbindet den Standort mit dem location-Feld der Beitraege. */
+  ort?: string;
+  adresse?: string;
+  koordinaten?: string;
+  /** Lage der Nadel auf der kleinen Karte, in Prozent. */
+  x?: number;
+  y?: number;
 }
 
 export interface AuthUser {

@@ -14,6 +14,7 @@ const ICONS = (() => {
     back: wrap('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
     close: wrap('<path d="M18 6 6 18M6 6l12 12"/>'),
     minus: wrap('<path d="M5 12h14"/>'),
+    pause: wrap('<path d="M9 5v14M15 5v14"/>', { sw: 2.2 }),
     volume: wrap('<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/>'),
     micOff: wrap('<path d="M12 2a3 3 0 0 1 3 3v5m-6 0V5a3 3 0 0 1 .5-1.7"/><path d="M19 10a7 7 0 0 1-10.6 6M5 10a7 7 0 0 0 2 4.9"/><path d="M12 19v3M3 3l18 18"/>'),
     clock: wrap('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
