@@ -105,14 +105,23 @@ function ok(name, bedingung, zusatz = '') {
 
     // "Bei Nachrichten im Community-Chat links klein das Profilbild des
     //  Absenders anzeigen. Anklicken fuehrt zum Profil."
-    const kanal = seite.locator('[data-channel]').first();
+    // Seit dem Umbau sind es drei Ebenen: Kanal -> Thema -> Chat.
+    const kanal = seite.locator('[data-channel]').nth(1);
     if (await kanal.count()) {
       await kanal.click();
       await seite.waitForTimeout(400);
+      ok('Themen statt direkt Chat', (await seite.locator('[data-thema]').count()) > 0);
+
+      await seite.locator('[data-thema]').first().click();
+      await seite.waitForTimeout(600);
       ok('Profilbild am Absender im Kanal-Chat',
-        (await seite.locator('.msg__avatar, [data-msgprofil]').count()) > 0);
+        (await seite.locator('.msgzeile__avatar').count()) > 0);
+      ok('Profilbild fuehrt zum Profil',
+        (await seite.locator('.msgzeile__avatar[data-profile]').count()) > 0);
     } else {
-      ok('Profilbild am Absender im Kanal-Chat', false, 'kein Kanal zum Oeffnen gefunden');
+      ok('Themen statt direkt Chat', false, 'kein Kanal gefunden');
+      ok('Profilbild am Absender im Kanal-Chat', false, 'kein Kanal gefunden');
+      ok('Profilbild fuehrt zum Profil', false, 'kein Kanal gefunden');
     }
   } else {
     ok('Kanalliste statt direkt Chat', false, 'keine Community gefunden');

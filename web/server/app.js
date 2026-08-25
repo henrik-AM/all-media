@@ -242,24 +242,59 @@ const communityChannels = {
   'ch-mixing': { name: 'Mixing & Mastering', topics: ['Techniken', 'Feedback'] },
 };
 
+/*
+ * Nachrichten in den Kanaelen einer Community.
+ *
+ * Der Schluessel ist die KANAL-Kennung, nicht die der Community. Vorher stand
+ * hier "k1", "k2" - also die Community. Der Kanal-Endpunkt sucht aber nach
+ * "ch-tokens", fand deshalb nie etwas, und jeder Kanal war leer. Seit Henriks
+ * Aufbau Community -> Kanal -> Thema gilt, gehoeren sie ohnehin an den Kanal:
+ * eine Community hat mehrere Kanaele mit je eigenem Verlauf.
+ */
 const communityMessages = {
-  k1: [
+  'ch-tokens': [
     { id: 'm1', from: 'u1', text: 'Hat jemand Erfahrung mit Design Tokens in Figma Variables?', time: '09:12' },
     { id: 'm2', from: 'u4', text: 'Ja, wir nutzen das seit einem halben Jahr produktiv', time: '09:20' },
     { id: 'm3', from: 'me', text: 'Wie handhabt ihr Dark Mode dabei?', time: '09:24' },
     { id: 'm4', from: 'u4', text: 'Zwei Modi in einer Collection, das reicht meistens', time: '09:31' },
   ],
-  k2: [
+  'ch-figma': [
+    { id: 'm1', from: 'u3', text: 'Welches Plugin nutzt ihr zum Exportieren?', time: 'Gestern' },
+    { id: 'm2', from: 'u1', text: 'Wir gehen inzwischen ohne Plugin über die API', time: 'Gestern' },
+  ],
+  'ch-expo': [
     { id: 'm1', from: 'u2', text: 'Expo SDK 57 läuft bei mir stabil', time: 'Gestern' },
     { id: 'm2', from: 'u5', text: 'Bei mir auch, nur der Metro Cache zickt manchmal', time: 'Gestern' },
+    { id: 'm3', from: 'me', text: 'Hilft bei mir: npx expo start -c', time: 'Gestern' },
   ],
-  k3: [{ id: 'm1', from: 'u3', text: 'Goldene Stunde heute um 19:40', time: 'Mo' }],
-  k4: [
+  'ch-navigation': [
+    { id: 'm1', from: 'u6', text: 'Router oder React Navigation für neue Projekte?', time: 'Mo' },
+    { id: 'm2', from: 'u2', text: 'Router, wenn du sowieso auf Expo setzt', time: 'Mo' },
+  ],
+  'ch-licht': [
+    { id: 'm1', from: 'u3', text: 'Goldene Stunde heute um 19:40', time: 'Mo' },
+  ],
+  'ch-nachbearbeitung': [
+    { id: 'm1', from: 'u5', text: 'Capture One für Farben, Lightroom für alles andere', time: 'Sa' },
+  ],
+  'ch-sprint': [
     { id: 'm1', from: 'u1', text: 'Sprint-Planung morgen um 10 Uhr', time: '11:02' },
     { id: 'm2', from: 'me', text: 'Bin dabei', time: '11:05' },
   ],
-  k5: [{ id: 'm1', from: 'u6', text: 'Samstag 8 Uhr am Rheinpark?', time: 'So' }],
-  k6: [{ id: 'm1', from: 'u5', text: 'Neuer Track ist fertig gemischt', time: 'Sa' }],
+  'ch-termine': [
+    { id: 'm1', from: 'u6', text: 'Samstag 8 Uhr am Rheinpark?', time: 'So' },
+    { id: 'm2', from: 'u4', text: 'Passt, ich bringe Wasser mit', time: 'So' },
+  ],
+  'ch-ableton': [
+    { id: 'm1', from: 'u5', text: 'Neuer Track ist fertig gemischt', time: 'Sa' },
+  ],
+  'ch-mixing': [
+    { id: 'm1', from: 'u2', text: 'Wie laut mastert ihr für Streaming?', time: 'Fr' },
+    { id: 'm2', from: 'u5', text: '-14 LUFS integrated, dann macht keine Plattform Ärger', time: 'Fr' },
+  ],
+  'ch-allgemein': [
+    { id: 'm1', from: 'u4', text: 'Willkommen allen Neuen hier!', time: '08:30' },
+  ],
 };
 
 const contacts = [

@@ -2337,63 +2337,244 @@ function communityAvatar(c, size = 52) {
   return `<div class="avatar avatar--${size}" style="background:${palette[hash % palette.length]};border-radius:16px">${esc(initials)}</div>`;
 }
 
-function renderCommunityChannels(communityId) {
-  const community = state.communities.find((c) => c.id === communityId);
-  if (!community) return renderCommunities();
+/*
+ * Aufbau einer Community nach dem Prototyp-Frame "CH + Kanal".
+ *
+ * Henrik: "Beim Oeffnen einer Community muss die Seite wie im Figma-Prototyp
+ * auf 'CH+ Kanal' aufgebaut sein. Erst nach Auswahl eines Themas gelangt man
+ * in den eigentlichen Chat."
+ *
+ * Es sind also drei Ebenen: Community -> Kanal -> Thema -> Chat. Vorher
+ * standen hier drei fest eingetippte Kanaele, und der Klick fuehrte sofort in
+ * einen Platzhalter-Chat. Die echten Kanaele und ihre Themen liegen auf dem
+ * Server.
+ */
+async function renderCommunityChannels(communityId) {
+  const lauf = ++renderLauf;
+  const daten = await fetch(`/api/communities/${communityId}`).then((r) => r.json());
+  if (lauf !== renderLauf) return;
 
-  const channels = [
-    { id: 'ch+', name: 'CH+ Kanal', unread: 3 },
-    { id: 'allgemein', name: 'Allgemein', unread: 0 },
-    { id: 'ankuendigung', name: 'Ankündigungen', unread: 1 },
-  ];
+  if (daten.error) {
+    state.openCommunityId = null;
+    return renderCommunities();
+  }
 
   main.innerHTML = `
-    <div class="pagehead">
-      <button class="back-btn" id="backBtn">${ICONS.back}</button>
-      <h2>${esc(community.name)}</h2>
+    <div class="pagehead pagehead__row">
+      <button class="back-btn" id="backBtn" aria-label="Zurück">${ICONS.back}</button>
+      <button class="kanalkopf" id="communityKopf">
+        <span class="kanalkopf__name">${esc(daten.name)}</span>
+        <span class="kanalkopf__sub">${daten.members.toLocaleString('de-DE')} Mitglieder · ${esc(daten.topic)}</span>
+      </button>
     </div>
     <div class="scroll">
-      ${channels.map((ch) => `
-        <button class="row" data-channel="${ch.id}">
-          <span class="avatar avatar--44" style="background:#0A66FF">${ICONS.hash}</span>
+      <div class="listhead">Kanäle</div>
+      ${daten.channels
+        .map(
+          (ch) => `
+        <button class="row" data-channel="${esc(ch.id)}">
+          <span class="avatar avatar--44" style="background:var(--brand)">${ICONS.hash}</span>
           <div class="row__body">
-            <div class="row__name">${esc(ch.name)}</div>
-            <div class="row__bottom"><span class="row__preview">${ch.id === 'ch+' ? 'Themenkanal' : 'Diskussionen'}</span></div>
+            <div class="row__top"><span class="row__name">${esc(ch.name)}</span></div>
+            <div class="row__bottom">
+              <span class="row__preview row__preview--text">${
+                ch.topics.length ? ch.topics.map(esc).join(' · ') : 'Noch keine Themen'
+              }</span>
+            </div>
           </div>
-          ${ch.unread ? `<span class="badge">${ch.unread}</span>` : ''}
-        </button>`).join('')}
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`
+        )
+        .join('')}
     </div>`;
 
-  $('#backBtn')?.addEventListener('click', renderCommunities);
+  $('#backBtn').addEventListener('click', () => {
+    state.openCommunityId = null;
+    renderCommunities();
+  });
+  // Henrik: "Gruppennamen muessen anklickbar sein und zu den vorgesehenen
+  // Einstellungen fuehren."
+  $('#communityKopf').addEventListener('click', () => openCommunityEinstellungen(daten));
+
   main.querySelectorAll('[data-channel]').forEach((b) =>
-    b.addEventListener('click', () => renderCommunityChat(communityId, b.dataset.channel))
+    b.addEventListener('click', () => {
+      const kanal = daten.channels.find((ch) => ch.id === b.dataset.channel);
+      renderKanalThemen(daten, kanal);
+    })
   );
 }
 
-function renderCommunityChat(communityId, channelId) {
-  const community = state.communities.find((c) => c.id === communityId);
+/** Zweite Ebene: die Themen eines Kanals. */
+function renderKanalThemen(community, kanal) {
   main.innerHTML = `
-    <div class="pagehead">
-      <button class="back-btn" id="backBtn">${ICONS.back}</button>
-      <div class="chathead__body">
-        <div class="chathead__name">${esc(community?.name || 'Community')}</div>
-        <div class="chathead__status">#${esc(channelId)}</div>
-      </div>
+    <div class="pagehead pagehead__row">
+      <button class="back-btn" id="backBtn" aria-label="Zurück">${ICONS.back}</button>
+      <button class="kanalkopf" id="kanalKopf">
+        <span class="kanalkopf__name">#${esc(kanal.name)}</span>
+        <span class="kanalkopf__sub">${esc(community.name)}</span>
+      </button>
     </div>
     <div class="scroll">
-      <div class="messages">
-        <div class="message is-other">
-          <div class="message__avatar" style="background:#0A66FF">👥</div>
-          <div class="message__bubble">Willkommen im #${esc(channelId)} Kanal!</div>
-        </div>
-      </div>
-    </div>
-    <div class="messageinput">
-      <input type="text" placeholder="Nachricht schreiben..." id="communityMsgInput">
-      <button>${ICONS.send}</button>
+      <div class="listhead">Themen</div>
+      ${kanal.topics
+        .map(
+          (thema) => `
+        <button class="row" data-thema="${esc(thema)}">
+          <span class="avatar avatar--44" style="background:var(--surface-3);color:var(--text-2)">${ICONS.chat}</span>
+          <div class="row__body">
+            <div class="row__top"><span class="row__name">${esc(thema)}</span></div>
+          </div>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`
+        )
+        .join('')}
     </div>`;
 
-  $('#backBtn')?.addEventListener('click', () => renderCommunityChannels(communityId));
+  $('#backBtn').addEventListener('click', () => renderCommunityChannels(community.id));
+  $('#kanalKopf').addEventListener('click', () => openCommunityEinstellungen(community));
+  main.querySelectorAll('[data-thema]').forEach((b) =>
+    b.addEventListener('click', () => renderCommunityChat(community, kanal, b.dataset.thema))
+  );
+}
+
+/** Dritte Ebene: der Chat zu einem Thema. */
+async function renderCommunityChat(community, kanal, thema) {
+  const lauf = ++renderLauf;
+  const daten = await fetch(`/api/communities/${community.id}/channels/${kanal.id}`)
+    .then((r) => r.json())
+    .catch(() => ({ messages: [] }));
+  if (lauf !== renderLauf) return;
+
+  const nachrichten = daten.messages || [];
+
+  main.innerHTML = `
+    <div class="pagehead pagehead__row">
+      <button class="back-btn" id="backBtn" aria-label="Zurück">${ICONS.back}</button>
+      <button class="kanalkopf" id="kanalKopf">
+        <span class="kanalkopf__name">${esc(thema)}</span>
+        <span class="kanalkopf__sub">#${esc(kanal.name)} · ${esc(community.name)}</span>
+      </button>
+    </div>
+    <div class="messages" id="commMsgs">
+      ${
+        nachrichten.length
+          ? nachrichten.map(kanalNachricht).join('')
+          : `<div class="empty">${ICONS.chat}
+              <div class="empty__title">Noch keine Nachricht</div>
+              <div class="empty__text">Schreib die erste zu „${esc(thema)}".</div>
+            </div>`
+      }
+    </div>
+    <form class="composer" id="commForm">
+      <div class="composer__field">
+        <textarea id="commMsgInput" rows="1" placeholder="Nachricht schreiben ..."></textarea>
+      </div>
+      <button type="submit" class="composer__send" id="commSend" aria-label="Senden" disabled>${ICONS.send}</button>
+    </form>`;
+
+  $('#backBtn').addEventListener('click', () => renderKanalThemen(community, kanal));
+  $('#kanalKopf').addEventListener('click', () => openCommunityEinstellungen(community));
+
+  // Der Verlauf steht unten - wie in jedem Chat.
+  const liste = $('#commMsgs');
+  liste.scrollTop = liste.scrollHeight;
+
+  const feld = $('#commMsgInput');
+  const sendKnopf = $('#commSend');
+  feld.addEventListener('input', () => {
+    sendKnopf.disabled = !feld.value.trim();
+  });
+  // Enter sendet, Umschalt+Enter macht eine neue Zeile - wie im Einzelchat.
+  feld.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      $('#commForm').requestSubmit();
+    }
+  });
+
+  $('#commForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = feld.value.trim();
+    if (!text) return;
+    feld.value = '';
+    sendKnopf.disabled = true;
+
+    await fetch(`/api/messages/${kanal.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    renderCommunityChat(community, kanal, thema);
+  });
+}
+
+/*
+ * Eine Nachricht im Kanal.
+ *
+ * Henrik: "Bei Nachrichten im Community-Chat links klein das Profilbild des
+ * Absenders anzeigen. Anklicken fuehrt zum Profil." Beim eigenen Beitrag
+ * steht kein Bild - man weiss, wer man ist.
+ */
+function kanalNachricht(m) {
+  // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
+  if (m.from === 'me') {
+    return `<div class="msg msg--out">${esc(m.text)}<div class="msg__foot">${esc(m.time)}</div></div>`;
+  }
+  const u = user(m.from);
+  return `<div class="msgzeile">
+    <button class="msgzeile__avatar" data-profile="${esc(m.from)}" style="background:${u.color}" aria-label="Profil von ${esc(u.name)}">${esc(u.initials)}</button>
+    <div class="msg msg--in">
+      <button class="msg__sender" data-profile="${esc(m.from)}">${esc(u.name)}</button>
+      ${esc(m.text)}
+      <div class="msg__foot">${esc(m.time)}</div>
+    </div>
+  </div>`;
+}
+
+/** Einstellungen einer Community - erreichbar ueber den Namen im Kopf. */
+function openCommunityEinstellungen(community) {
+  openSheet(
+    community.name,
+    `<div class="sheet__body">
+      <div class="item">
+        <span class="item__icon">${ICONS.people}</span>
+        <div class="item__body">
+          <span class="item__label">Mitglieder</span>
+          <span class="item__sub">${community.members.toLocaleString('de-DE')} in dieser Community</span>
+        </div>
+      </div>
+      <div class="item">
+        <span class="item__icon">${ICONS.lock}</span>
+        <div class="item__body">
+          <span class="item__label">Sichtbarkeit</span>
+          <span class="item__sub">${community.visibility === 'private' ? 'Privat — nur auf Anfrage' : 'Öffentlich'}</span>
+        </div>
+      </div>
+      <div class="item">
+        <span class="item__icon">${ICONS.bell}</span>
+        <span class="item__label">Benachrichtigungen</span>
+        <button class="switch is-on" data-commtoggle="mitteilungen" aria-label="Benachrichtigungen"><span class="switch__knob"></span></button>
+      </div>
+      <button class="item item--danger" data-commaction="verlassen">
+        <span class="item__icon">${ICONS.close}</span>
+        <span class="item__label">Community verlassen</span>
+      </button>
+    </div>`,
+    (sheet, close) => {
+      sheet.querySelector('[data-commtoggle]')?.addEventListener('click', (e) => {
+        e.currentTarget.classList.toggle('is-on');
+        toast(e.currentTarget.classList.contains('is-on') ? 'Benachrichtigungen an' : 'Benachrichtigungen aus');
+      });
+      sheet.querySelector('[data-commaction="verlassen"]')?.addEventListener('click', async () => {
+        close();
+        await fetch(`/api/communities/${community.id}/join`, { method: 'POST' });
+        state.openCommunityId = null;
+        await bootstrap();
+        toast(`„${community.name}" verlassen`);
+      });
+    },
+    { schliessen: true }
+  );
 }
 
 /*
@@ -2406,6 +2587,9 @@ function renderCommunityChat(communityId, channelId) {
  * beigetreten und nicht beigetreten waren nicht auseinanderzuhalten.
  */
 function renderCommunities() {
+  // Ist eine Community offen, gehoert der Bildschirm ihren Kanaelen.
+  if (state.openCommunityId) return renderCommunityChannels(state.openCommunityId);
+
   const q = state.communityQuery.trim().toLowerCase();
   const passt = (c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
 
