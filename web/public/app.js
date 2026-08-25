@@ -72,6 +72,8 @@ const state = {
   communityFilter: 'meine',
   commSearchQuery: '',
   commSearchFilter: 'all',
+  // Filter der persoenlichen Chats im Community-Bereich.
+  commChatFilter: 'all',
   videoSearchQuery: '',
   clipQuery: '',
   theme: localStorage.getItem('am-theme') || 'system',
@@ -326,7 +328,10 @@ function render() {
 /* ---------------------------------------------------------- chats view */
 function filteredChats() {
   const q = state.query.trim().toLowerCase();
+  const weg = state.archiviert || [];
   return state.chats.filter((c) => {
+    // Archivierte liegen unter Einstellungen > Messenger > Archivierte Chats.
+    if (weg.includes(c.id)) return false;
     if (state.filter === 'contacts' && c.isGroup) return false;
     if (state.filter === 'groups' && !c.isGroup) return false;
     if (!q) return true;
@@ -393,7 +398,117 @@ function renderChats() {
   main.querySelectorAll('[data-chat]').forEach((r) =>
     r.addEventListener('click', () => openChat(r.dataset.chat))
   );
+  bindChatVerwaltung();
   bindStoryRail();
+}
+
+/*
+ * Chats verwalten wie bei WhatsApp.
+ *
+ * Henrik: "Messenger- und Community-Chats sollen sich wie bei WhatsApp
+ * verwalten lassen: nach links swipen oder lange gedrueckt halten - Optionen
+ * wie Archivieren, Loeschen und weitere Chat-Einstellungen anzeigen."
+ *
+ * Umgesetzt sind langes Druecken und Wischen nach links. Beides fuehrt zum
+ * selben Blatt - am Rechner gibt es keine Wischgeste, und mit der Tastatur
+ * waere eine reine Wischloesung gar nicht bedienbar.
+ */
+function bindChatVerwaltung() {
+  main.querySelectorAll('[data-chat]').forEach((zeile) => {
+    const id = zeile.dataset.chat;
+    let halten;
+    let startX = null;
+    let langGedrueckt = false;
+
+    const oeffnen = () => {
+      langGedrueckt = true;
+      chatOptionen(id);
+    };
+
+    zeile.addEventListener('pointerdown', (e) => {
+      langGedrueckt = false;
+      startX = e.clientX;
+      halten = setTimeout(oeffnen, 550);
+    });
+
+    const abbrechen = () => clearTimeout(halten);
+    zeile.addEventListener('pointerup', abbrechen);
+    zeile.addEventListener('pointerleave', abbrechen);
+    zeile.addEventListener('pointercancel', abbrechen);
+
+    // Wischen nach links: ab 60 Pixeln zaehlt es als Geste.
+    zeile.addEventListener('pointermove', (e) => {
+      if (startX === null) return;
+      if (startX - e.clientX > 60) {
+        clearTimeout(halten);
+        startX = null;
+        oeffnen();
+      }
+    });
+
+    // Nach langem Druecken oder Wischen soll der Chat nicht auch noch aufgehen.
+    zeile.addEventListener('click', (e) => {
+      if (langGedrueckt) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        langGedrueckt = false;
+      }
+    }, true);
+  });
+}
+
+/** Das Blatt mit den Optionen zu einem Chat. */
+function chatOptionen(chatId) {
+  const chat =
+    state.chats.find((c) => c.id === chatId) ||
+    (state.communityChats || []).find((c) => c.id === chatId);
+  if (!chat) return;
+
+  const archiviert = (state.archiviert || []).includes(chatId);
+
+  openSheet(
+    chat.name,
+    `<button class="item" data-copt="archiv">
+      <span class="item__icon">${ICONS.bookmark}</span>
+      <span class="item__label">${archiviert ? 'Aus dem Archiv holen' : 'Archivieren'}</span>
+    </button>
+    <button class="item" data-copt="stumm">
+      <span class="item__icon">${ICONS.mute}</span>
+      <span class="item__label">${chat.muted ? 'Stummschaltung aufheben' : 'Stummschalten'}</span>
+    </button>
+    <button class="item" data-copt="gelesen">
+      <span class="item__icon">${ICONS.checkDouble}</span>
+      <span class="item__label">${chat.unread ? 'Als gelesen markieren' : 'Als ungelesen markieren'}</span>
+    </button>
+    <button class="item" data-copt="einstellungen">
+      <span class="item__icon">${ICONS.settings}</span>
+      <span class="item__label">Chat-Einstellungen</span>
+      <span class="row__chevron">${ICONS.chevron}</span>
+    </button>
+    <button class="item item--danger" data-copt="loeschen">
+      <span class="item__icon">${ICONS.trash || ICONS.close}</span>
+      <span class="item__label">Chat löschen</span>
+    </button>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-copt]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const was = b.dataset.copt;
+          close();
+
+          if (was === 'einstellungen') return openChatSettings(chatId);
+
+          const antwort = await fetch(`/api/chats/${chatId}/${was}`, { method: 'POST' })
+            .then((r) => r.json())
+            .catch(() => ({ ok: false, error: 'Das hat gerade nicht geklappt' }));
+
+          if (!antwort.ok) return toast(antwort.error || 'Das hat gerade nicht geklappt');
+
+          await bootstrap();
+          toast(antwort.meldung);
+        })
+      );
+    }
+  );
 }
 
 function chatRow(c) {
@@ -2052,10 +2167,14 @@ function postCard(p) {
         <button class="story__ring story-ring-btn" style="width:40px;height:40px;padding:2px" data-openStory="${p.userId}">
           <div class="story__inner" style="background:${u.color};font-size:13px">${esc(u.initials)}</div>
         </button>
-        <button class="post__who" data-profile="${p.userId}">
-          <div class="post__name">${esc(u.name)}</div>
-          <div class="post__sub">${esc(p.location)} · ${esc(p.music)}</div>
-        </button>
+        <div class="post__who">
+          <button class="post__name" data-profile="${p.userId}">${esc(u.name)}</button>
+          <div class="post__sub">
+            ${p.location ? `<button class="post__meta" data-postort="${esc(p.location)}">${esc(p.location)}</button>` : ''}
+            ${p.location && p.music ? '<span class="post__punkt">·</span>' : ''}
+            ${p.music ? `<button class="post__meta" data-postsound="${esc(p.music)}">${esc(p.music)}</button>` : ''}
+          </div>
+        </div>
         <button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
           ${p.following ? 'Gefolgt' : 'Folgen'}
         </button>
@@ -2195,7 +2314,11 @@ function videoSlide(v) {
           }" data-vfollow="${u.id}">${state.gefolgt && state.gefolgt[u.id] ? 'Gefolgt' : 'Folgen'}</button>
         </div>
         <div class="slide__desc">${esc(v.description)}</div>
-        <div class="slide__sub">${esc(v.location)} · ${esc(v.music)}</div>
+        <div class="slide__sub">
+          ${v.location ? `<button class="slide__ziel" data-slideort="${esc(v.location)}">${esc(v.location)}</button>` : ''}
+          ${v.location && v.music ? '<span class="slide__punkt">·</span>' : ''}
+          ${v.music ? `<button class="slide__ziel" data-slidesound="${esc(v.music)}">${esc(v.music)}</button>` : ''}
+        </div>
       </div>
     </section>`;
 }
@@ -2708,7 +2831,15 @@ function einstellungsListe(art) {
     };
   }
   if (art === 'archiv') {
-    return { leer: 'Kein Chat ist archiviert.', zeilen: [] };
+    const ids = state.archiviert || [];
+    const alle = [...state.chats, ...(state.communityChats || [])];
+    return {
+      leer: 'Kein Chat ist archiviert.',
+      zeilen: ids
+        .map((id) => alle.find((c) => c.id === id))
+        .filter(Boolean)
+        .map((c) => ({ text: c.name, neben: 'archiviert' })),
+    };
   }
   if (art === 'speicher') {
     const nachrichten = state.chats.length;
@@ -5284,11 +5415,27 @@ async function renderVideoProfile() {
 /* ---------------------------------------------------- Communitys: Chats */
 // Prototyp-Frame "Community - Chats": Suchleiste plus Liste der Chats, die
 // innerhalb der Communitys entstanden sind.
+/*
+ * Persoenliche Chats im Community-Bereich.
+ *
+ * Henrik: "Hier nur persoenliche Chats zwischen Nutzern anzeigen, keine
+ * Community-Chats. Messenger = Chat ueber Telefonnummer/Kontakt.
+ * Community-Chat = Kommunikation ohne Telefonnummer."
+ *
+ * Vorher standen hier die Communitys selbst - die stehen aber schon unter
+ * Home. Jetzt kommen die Eintraege aus `communityChats`: Leute, die man aus
+ * einer Community kennt und nicht aus dem Telefonbuch.
+ */
 function renderCommunityChats() {
   const q = state.commSearchQuery.trim().toLowerCase();
-  const list = state.communities
-    .filter((c) => c.joined)
-    .filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
+  const alle = state.communityChats || [];
+
+  const list = alle.filter((c) => {
+    if (state.commChatFilter === 'chats' && c.isGroup) return false;
+    if (state.commChatFilter === 'groups' && !c.isGroup) return false;
+    if (!q) return true;
+    return c.name.toLowerCase().includes(q) || (c.preview || '').toLowerCase().includes(q);
+  });
 
   main.innerHTML = `
     <div class="pagehead">
@@ -5298,26 +5445,30 @@ function renderCommunityChats() {
           <input id="commChatSearch" type="search" placeholder="Suche hier nach Kontakten/Gruppen..." value="${esc(state.commSearchQuery)}" autocomplete="off" />
           ${state.commSearchQuery ? `<button class="searchbox__clear" id="commChatSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
         </label>
+        <button class="iconbtn-primary" id="commNewChat" aria-label="Person hinzufügen">${ICONS.plus}</button>
       </div>
+    </div>
+    <div class="pills">
+      ${['all', 'chats', 'groups']
+        .map(
+          (f) =>
+            `<button class="pill ${state.commChatFilter === f ? 'is-active' : ''}" data-ccfilter="${f}">${
+              { all: 'Alle', chats: 'Chats', groups: 'Gruppen' }[f]
+            }</button>`
+        )
+        .join('')}
     </div>
     <div class="scroll">
       ${
         list.length
-          ? `<ul class="rows">${list
-              .map(
-                (c) => `<li><button class="row" data-commchat="${c.id}">
-                  ${communityAvatar(c, 52)}
-                  <div class="row__body">
-                    <div class="row__top"><span class="row__name">${esc(c.name)}</span></div>
-                    <div class="row__bottom"><span class="row__preview">${esc(c.topic)}</span>
-                    ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}</div>
-                  </div>
-                </button></li>`
-              )
-              .join('')}</ul>`
+          ? `<ul class="rows">${list.map(chatRow).join('')}</ul>`
           : `<div class="empty">${ICONS.chat}
-              <div class="empty__title">Kein Chat gefunden</div>
-              <div class="empty__text">Für „${esc(state.commSearchQuery)}" gibt es keinen Treffer.</div>
+              <div class="empty__title">${state.commSearchQuery ? 'Kein Chat gefunden' : 'Noch keine Unterhaltung'}</div>
+              <div class="empty__text">${
+                state.commSearchQuery
+                  ? `Für „${esc(state.commSearchQuery)}" gibt es keinen Treffer.`
+                  : 'Über das Plus rechts oben findest du Leute aus deinen Communitys.'
+              }</div>
             </div>`
       }
     </div>`;
@@ -5336,9 +5487,22 @@ function renderCommunityChats() {
     renderCommunityChats();
     $('#commChatSearch').focus();
   });
-  main.querySelectorAll('[data-commchat]').forEach((r) =>
-    r.addEventListener('click', () => openChat(r.dataset.commchat))
+  $('#commNewChat')?.addEventListener('click', () => {
+    // Im Community-Bereich sucht man nach Benutzernamen, nicht nach
+    // Telefonnummer - genau das unterscheidet ihn vom Messenger.
+    state.sub.communities = 'search';
+    render();
+  });
+  main.querySelectorAll('[data-ccfilter]').forEach((p) =>
+    p.addEventListener('click', () => {
+      state.commChatFilter = p.dataset.ccfilter;
+      renderCommunityChats();
+    })
   );
+  main.querySelectorAll('[data-chat]').forEach((r) =>
+    r.addEventListener('click', () => openChat(r.dataset.chat))
+  );
+  bindChatVerwaltung();
 }
 
 /* --------------------------------------------------- Communitys: Suchen */
@@ -6110,14 +6274,40 @@ function closeOverlay() {
 }
 
 /* ---------------------------------------------------------- navigation */
-// Profile öffnen: überall dort, wo ein Element data-profile trägt.
+/*
+ * Ein Handler fuer die Sprungziele, die es an vielen Stellen zugleich gibt.
+ * Er haengt an der ganzen App, damit neu aufgebaute Bildschirme ihn nicht
+ * jedes Mal neu binden muessen - vergisst man das an einer Stelle, ist der
+ * Knopf dort tot, und genau solche Faelle hatte Henrik gemeldet.
+ */
 document.querySelector('.app').addEventListener('click', (e) => {
-  const target = e.target.closest('[data-profile]');
-  if (!target) return;
-  e.stopPropagation();
-  clearInterval(storyTimer);
-  document.querySelector('.sheet-backdrop')?.remove();
-  openProfile(target.dataset.profile);
+  // Profil
+  const profil = e.target.closest('[data-profile]');
+  if (profil) {
+    e.stopPropagation();
+    clearInterval(storyTimer);
+    document.querySelector('.sheet-backdrop')?.remove();
+    return openProfile(profil.dataset.profile);
+  }
+
+  /*
+   * Henrik: "Standort und Musik eines Beitrags muessen anklickbar sein."
+   * Die Uebersichtsseiten dahinter gab es schon (openExplorer), sie waren
+   * bisher nur ueber die Suche erreichbar.
+   */
+  const ort = e.target.closest('[data-postort], [data-slideort]');
+  if (ort) {
+    e.stopPropagation();
+    clearInterval(storyTimer);
+    return openExplorer('standort', ort.dataset.postort || ort.dataset.slideort);
+  }
+
+  const sound = e.target.closest('[data-postsound], [data-slidesound]');
+  if (sound) {
+    e.stopPropagation();
+    clearInterval(storyTimer);
+    return openExplorer('sound', sound.dataset.postsound || sound.dataset.slidesound);
+  }
 });
 
 document.addEventListener('keydown', (e) => {

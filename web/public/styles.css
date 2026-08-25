@@ -742,8 +742,21 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 .post__head { display: flex; align-items: center; gap: 10px; padding: 0 16px 10px; }
 .post__who { flex: 1 1 auto; min-width: 0; text-align: left; color: inherit; }
-.post__name { font-size: 14px; font-weight: 700; }
-.post__sub { font-size: 11.5px; color: var(--text-2); margin-top: 1px; }
+.post__name { display: block; font-size: 14px; font-weight: 700; text-align: left; }
+.post__sub {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11.5px; color: var(--text-2); margin-top: 1px;
+  min-width: 0;
+}
+/* Ort und Musik fuehren zu ihrer Uebersichtsseite - deshalb Knoepfe.
+   Sie sollen aber wie Text aussehen, nicht wie Schaltflaechen. */
+.post__meta {
+  color: inherit;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 55%;
+}
+.post__meta:hover { color: var(--brand); text-decoration: underline; }
+.post__punkt { flex: 0 0 auto; opacity: .7; }
 .post__follow {
   flex: 0 0 auto;
   padding: 5px 12px;
@@ -833,16 +846,21 @@ ul { margin: 0; padding: 0; list-style: none; }
 .railbtn.is-saved svg { fill: #fff; }
 .railbtn:active { transform: scale(.92); }
 
+/*
+ * Henrik: "Der untere Informationsbereich soll weniger Platz einnehmen und
+ * staerker in der Ecke liegen." Deshalb naeher an den Rand, schmaler und mit
+ * kleinerer Schrift als vorher.
+ */
 .slide__meta {
   position: absolute;
   left: 0;
-  right: 74px;
-  bottom: 20px;
-  padding: 0 16px;
+  right: 68px;
+  bottom: 10px;
+  padding: 0 12px;
   color: #fff;
   text-shadow: 0 1px 4px rgba(0,0,0,.7);
 }
-.slide__author { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+.slide__author { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .slide__who { display: flex; align-items: center; gap: 9px; color: inherit; }
 .slide__name { font-size: 14.5px; font-weight: 700; }
 .slide__follow {
@@ -853,8 +871,27 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-size: 12px;
   font-weight: 600;
 }
-.slide__desc { font-size: 14px; line-height: 1.4; }
-.slide__sub { margin-top: 6px; font-size: 12.5px; color: rgba(255,255,255,.75); }
+/* Beschreibung auf zwei Zeilen begrenzt - sonst waechst der Block bei
+   langen Texten ueber das halbe Bild. */
+.slide__desc {
+  font-size: 13px; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.slide__sub {
+  display: flex; align-items: center; gap: 4px;
+  margin-top: 3px; font-size: 11.5px; color: rgba(255,255,255,.75);
+  min-width: 0;
+}
+/* Ort und Musik fuehren zu ihrer Uebersichtsseite. Eigener Name, weil
+   .slide__meta schon der umgebende Block ist. */
+.slide__ziel {
+  color: inherit;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 55%;
+}
+.slide__ziel:hover { text-decoration: underline; }
+.slide__punkt { flex: 0 0 auto; opacity: .7; }
 
 /* ---------- Sheet ---------- */
 .sheet-backdrop {

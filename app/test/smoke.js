@@ -240,7 +240,7 @@ const STRUCTURE = {
   await p.waitForTimeout(400);
 
   // --- Profil aus Beitrag ---
-  await p.click('.post__who[data-profile="u3"]');
+  await p.click('.post__name[data-profile="u3"]');
   await p.waitForTimeout(600);
   assert('Profil aus Beitrag oeffnet',
     (await p.$eval('.prof__name', e => e.textContent.trim())) === 'Clara Weber' &&
@@ -255,7 +255,18 @@ const STRUCTURE = {
   await p.click('[data-area="communities"]');
   await p.click('[data-sub="chats"]');
   await p.waitForTimeout(400);
-  assert('Community-Chats zeigen 4 beigetretene', (await p.$$eval('[data-commchat]', e => e.length)) === 4);
+  // Henrik wollte hier persoenliche Chats sehen, keine Communitys - die
+  // stehen schon unter Home. Es sind Leute ohne Telefonnummer, also solche,
+  // die man aus einer Community kennt und nicht aus dem Telefonbuch.
+  assert('Community-Chats zeigen persoenliche Chats', (await p.$$eval('[data-chat]', e => e.length)) === 4);
+  assert('Community-Chats zeigen keine Communitys', (await p.$$eval('[data-commchat]', e => e.length)) === 0);
+  assert('Filter Alle/Chats/Gruppen vorhanden', (await p.$$eval('[data-ccfilter]', e => e.length)) === 3);
+  assert('Plus-Knopf zum Hinzufuegen', !!(await p.$('#commNewChat')));
+  await p.click('[data-ccfilter="groups"]');
+  await p.waitForTimeout(300);
+  assert('Filter Gruppen zeigt nur die Gruppe', (await p.$$eval('[data-chat]', e => e.length)) === 1);
+  await p.click('[data-ccfilter="all"]');
+  await p.waitForTimeout(300);
   await p.click('[data-sub="search"]');
   await p.waitForTimeout(400);
   await p.click('[data-csfilter="people"]');

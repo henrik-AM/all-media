@@ -271,6 +271,41 @@ const contacts = [
   { id: 'u6', name: 'Finn Bauer', status: 'friend', about: 'Nur dringende Anrufe' },
 ];
 
+/*
+ * Persoenliche Chats im Community-Bereich.
+ *
+ * Henriks Trennung: "Messenger = Chat ueber Telefonnummer/Kontakt.
+ * Community-Chat = Kommunikation ohne Telefonnummer, z. B. zum Teilen von
+ * Videos oder fuer normale Nachrichten."
+ *
+ * Hier stehen deshalb Leute, die NICHT in den Kontakten sind - man kennt sie
+ * aus einer Community, nicht aus dem Telefonbuch. Der Bereich zeigte vorher
+ * die Communitys selbst; die stehen aber schon unter Home.
+ */
+const communityChats = [
+  { id: 'cc1', userId: 'u7', name: 'Greta Hoffmann', preview: 'Dein Reel vom Hafen ist stark!', time: '15:04', unread: 2, muted: false, isGroup: false },
+  { id: 'cc2', userId: 'u8', name: 'Hakan Demir', preview: 'Schaust du mal in den Tokens-Kanal?', time: '12:41', unread: 0, muted: false, isGroup: false },
+  { id: 'cc3', userId: null, name: 'Design-Runde', preview: 'Ida: Donnerstag passt mir', time: 'Gestern', unread: 1, muted: false, isGroup: true, members: ['u7', 'u8', 'u9'] },
+  { id: 'cc4', userId: 'u9', name: 'Ida Nowak', preview: 'Danke für den Tipp mit dem Stativ', time: 'Mo', unread: 0, muted: false, isGroup: false },
+];
+
+const communityChatMessages = {
+  cc1: [
+    { id: 'm1', from: 'u7', text: 'Dein Reel vom Hafen ist stark!', time: '15:04' },
+  ],
+  cc2: [
+    { id: 'm1', from: 'u8', text: 'Schaust du mal in den Tokens-Kanal?', time: '12:41' },
+    { id: 'm2', from: 'me', text: 'Mache ich heute Abend', time: '12:52' },
+  ],
+  cc3: [
+    { id: 'm1', from: 'u8', text: 'Wann passt es euch diese Woche?', time: 'Gestern' },
+    { id: 'm2', from: 'u9', text: 'Donnerstag passt mir', time: 'Gestern' },
+  ],
+  cc4: [
+    { id: 'm1', from: 'u9', text: 'Danke für den Tipp mit dem Stativ', time: 'Mo' },
+  ],
+};
+
 const messages = {
   c1: [
     { id: 'm1', from: 'u1', text: 'Hey! Wie läuft das Projekt?', time: '14:02' },
@@ -402,7 +437,7 @@ function setzeRepost(art, id, an) {
   if (!an && stelle !== -1) reposts.splice(stelle, 1);
 }
 
-const SEED = structuredClone({ chats, contacts, posts, videos, clips, communities, messages, communityMessages, comments, profiles, stories, mitteilungen, gridItems });
+const SEED = structuredClone({ chats, contacts, posts, videos, clips, communities, messages, communityMessages, communityChats, communityChatMessages, comments, profiles, stories, mitteilungen, gridItems });
 
 function resetState() {
   const restoreList = (list, seed) => {
@@ -426,6 +461,8 @@ function resetState() {
   eigeneNummer = 0;
   restoreMap(messages, SEED.messages);
   restoreMap(communityMessages, SEED.communityMessages);
+  restoreList(communityChats, SEED.communityChats);
+  restoreMap(communityChatMessages, SEED.communityChatMessages);
   restoreMap(comments, SEED.comments);
   restoreMap(profiles, SEED.profiles);
   reposts.length = 0;
@@ -460,6 +497,8 @@ app.get('/api/bootstrap', (req, res) => {
     videos: mitKommentarzahl(videos),
     posts: mitKommentarzahl(posts),
     clips: mitKommentarzahl(clips),
+    communityChats,
+    archiviert,
     hashtags, sounds, places, friends, gefolgt, ungelesen, blockiert, stummgeschaltet,
   });
 });
@@ -471,8 +510,75 @@ app.get('/api/bootstrap', (req, res) => {
  */
 
 /** Nachricht mit einem Stern markieren oder die Markierung wieder wegnehmen. */
+/*
+ * Chat verwalten: archivieren, stummschalten, gelesen, loeschen.
+ *
+ * Henrik wollte die WhatsApp-Optionen hinter langem Druecken. Ein Chat kann
+ * aus dem Messenger oder aus dem Community-Bereich kommen - beide liegen in
+ * eigenen Listen, deshalb wird hier zuerst gesucht, wo er steht.
+ */
+const archiviert = [];
+
+function findeChat(chatId) {
+  const imMessenger = chats.find((c) => c.id === chatId);
+  if (imMessenger) return { chat: imMessenger, liste: chats };
+  const imCommunity = communityChats.find((c) => c.id === chatId);
+  if (imCommunity) return { chat: imCommunity, liste: communityChats };
+  return null;
+}
+
+app.post('/api/chats/:chatId/:was', (req, res) => {
+  const treffer = findeChat(req.params.chatId);
+  if (!treffer) return res.json({ ok: false, error: 'Diesen Chat gibt es nicht' });
+
+  const { chat, liste } = treffer;
+  const { was } = req.params;
+
+  if (was === 'archiv') {
+    const drin = archiviert.indexOf(chat.id);
+    if (drin === -1) archiviert.push(chat.id);
+    else archiviert.splice(drin, 1);
+    return res.json({
+      ok: true,
+      archiviert: drin === -1,
+      meldung: drin === -1 ? `„${chat.name}" archiviert` : `„${chat.name}" ist wieder in der Liste`,
+    });
+  }
+
+  if (was === 'stumm') {
+    chat.muted = !chat.muted;
+    return res.json({
+      ok: true,
+      muted: chat.muted,
+      meldung: chat.muted ? `„${chat.name}" stummgeschaltet` : `„${chat.name}" ist nicht mehr stumm`,
+    });
+  }
+
+  if (was === 'gelesen') {
+    // Ohne Gegenstueck waere "als ungelesen markieren" nicht rueckgaengig zu
+    // machen - deshalb schaltet derselbe Punkt in beide Richtungen.
+    chat.unread = chat.unread ? 0 : 1;
+    return res.json({
+      ok: true,
+      unread: chat.unread,
+      meldung: chat.unread ? 'Als ungelesen markiert' : 'Als gelesen markiert',
+    });
+  }
+
+  if (was === 'loeschen') {
+    const stelle = liste.indexOf(chat);
+    if (stelle !== -1) liste.splice(stelle, 1);
+    // Die Nachrichten gehen mit - sonst taucht der Verlauf wieder auf,
+    // sobald jemand denselben Chat neu anlegt.
+    delete nachrichtenSpeicher(chat.id)[chat.id];
+    return res.json({ ok: true, meldung: `„${chat.name}" gelöscht` });
+  }
+
+  return res.json({ ok: false, error: 'Unbekannte Aktion' });
+});
+
 app.post('/api/messages/:chatId/:messageId/stern', (req, res) => {
-  const store = communityMessages[req.params.chatId] ? communityMessages : messages;
+  const store = nachrichtenSpeicher(req.params.chatId);
   const nachricht = (store[req.params.chatId] || []).find((m) => m.id === req.params.messageId);
   if (!nachricht) return res.json({ ok: false, error: 'Diese Nachricht gibt es nicht' });
 
@@ -482,7 +588,7 @@ app.post('/api/messages/:chatId/:messageId/stern', (req, res) => {
 
 /** Alles, was in diesem Chat an Medien und Weitergeleitetem liegt. */
 app.get('/api/chats/:chatId/medien', (req, res) => {
-  const store = communityMessages[req.params.chatId] ? communityMessages : messages;
+  const store = nachrichtenSpeicher(req.params.chatId);
   const alle = store[req.params.chatId] || [];
 
   res.json({
@@ -494,7 +600,7 @@ app.get('/api/chats/:chatId/medien', (req, res) => {
 
 /** Chat leeren - die Unterhaltung bleibt, die Nachrichten sind weg. */
 app.post('/api/chats/:chatId/leeren', (req, res) => {
-  const store = communityMessages[req.params.chatId] ? communityMessages : messages;
+  const store = nachrichtenSpeicher(req.params.chatId);
   store[req.params.chatId] = [];
 
   const chat = chats.find((c) => c.id === req.params.chatId);
@@ -601,13 +707,39 @@ app.get('/api/explorer/:art/:wert', (req, res) => {
     passt = (e) => (e.tags || []).includes(tag);
     kopf = { art, titel: tag, anzahl: hashtags.find((h) => h.tag === tag)?.posts || 0 };
   } else if (art === 'standort') {
-    const platz = places.find((p) => p.id === wert || p.name === wert);
+    /*
+     * Auch nach `ort` suchen, nicht nur nach Kennung und Name.
+     *
+     * An einem Beitrag steht "Hamburg", der Standort heisst aber
+     * "Hamburger Hafen" und traegt "Hamburg" nur im Feld `ort`. Seit der
+     * Standort am Beitrag anklickbar ist, kommt genau dieser Wert hier an -
+     * vorher fuehrte der Weg nur ueber die Suche, wo der volle Name steht.
+     */
+    const platz =
+      places.find((p) => p.id === wert || p.name === wert) ||
+      places.find((p) => p.ort === wert);
     if (!platz) return res.json({ ok: false, error: 'Diesen Standort gibt es nicht' });
     passt = (e) => e.location === platz.ort;
     kopf = { art, titel: platz.name, anzahl: platz.posts, adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y };
   } else if (art === 'sound') {
-    const sound = sounds.find((s) => s.id === wert || s.title === wert);
-    if (!sound) return res.json({ ok: false, error: 'Diesen Sound gibt es nicht' });
+    /*
+     * An einem Beitrag steht "Golden Hour – Lys", der Sound heisst aber nur
+     * "Golden Hour" - der Teil hinter dem Gedankenstrich ist der Interpret.
+     * Deshalb wird der vordere Teil abgetrennt, bevor gesucht wird.
+     *
+     * "Originalton" ist kein Eintrag in der Liste und faellt bewusst in die
+     * Fehlermeldung: dahinter steckt keine Seite.
+     */
+    const titelTeil = wert.split(/\s+[–—-]\s+/)[0].trim();
+    const sound =
+      sounds.find((s) => s.id === wert || s.title === wert) ||
+      sounds.find((s) => s.title === titelTeil);
+    if (!sound) {
+      return res.json({
+        ok: false,
+        error: wert === 'Originalton' ? 'Originalton hat keine eigene Seite' : 'Diesen Sound gibt es nicht',
+      });
+    }
     passt = (e) => typeof e.music === 'string' && e.music.startsWith(sound.title);
     kopf = { art, titel: sound.title, produzent: sound.artist, anzahl: sound.uses, dauer: sound.dauer, lyrics: sound.lyrics };
   } else {
@@ -982,8 +1114,18 @@ app.post('/api/videos/:id/:action', (req, res) => {
   res.json(video);
 });
 
+/*
+ * Nachrichten eines Chats. Der Aufrufer muss nicht wissen, aus welchem
+ * Bereich der Chat kommt - hier wird nachgesehen, wo er liegt.
+ */
+function nachrichtenSpeicher(chatId) {
+  if (communityChatMessages[chatId]) return communityChatMessages;
+  if (communityMessages[chatId]) return communityMessages;
+  return messages;
+}
+
 app.get('/api/messages/:chatId', (req, res) => {
-  res.json(messages[req.params.chatId] || communityMessages[req.params.chatId] || []);
+  res.json(nachrichtenSpeicher(req.params.chatId)[req.params.chatId] || []);
 });
 
 app.post('/api/communities/:id/join', (req, res) => {
@@ -1012,7 +1154,7 @@ app.post('/api/messages/:chatId', (req, res) => {
     return res.json({ ok: false, error: 'Diese Person ist blockiert' });
   }
 
-  const store = communityMessages[chatId] ? communityMessages : messages;
+  const store = nachrichtenSpeicher(chatId);
   if (!store[chatId]) store[chatId] = [];
 
   const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -1129,7 +1271,7 @@ app.post('/api/messages/:chatId/anhang', (req, res) => {
     return res.json({ ok: false, error: 'Unbekannter Anhang' });
   }
 
-  const store = communityMessages[chatId] ? communityMessages : messages;
+  const store = nachrichtenSpeicher(chatId);
   if (!store[chatId]) store[chatId] = [];
   store[chatId].push(message);
 
