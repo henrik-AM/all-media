@@ -81,6 +81,9 @@ const state = {
   openChatId: null,
   openChatSettingsId: null,
   openCommunityId: null,
+  // Friend-Map: Vollbild und Kartenansicht.
+  karteVollbild: false,
+  karteStil: 'standard',
   openChannelId: null,
   communitiesFilter: 'joined',
   messages: [],
@@ -3364,7 +3367,7 @@ function renderFriendMap() {
 
   main.innerHTML = `
     <div class="scroll">
-      <div class="map" id="map">
+      <div class="map map--${state.karteStil || 'standard'} ${state.karteVollbild ? 'map--voll' : ''}" id="map">
         <div class="map__flaeche" id="mapFlaeche">
           <div class="map__park"></div>
           <div class="map__fluss"></div>
@@ -3387,9 +3390,11 @@ function renderFriendMap() {
             .join('')}
         </div>
 
-        <div class="map__zoom">
-          <button id="zoomIn" aria-label="Näher">${ICONS.plus}</button>
-          <button id="zoomOut" aria-label="Weiter weg">${ICONS.minus || '−'}</button>
+        <div class="map__werkzeuge">
+          <button class="map__werkzeug" data-mapfull aria-label="${state.karteVollbild ? 'Vollbild verlassen' : 'Karte im Vollbild'}">
+            ${state.karteVollbild ? ICONS.einklappen : ICONS.ausklappen}
+          </button>
+          <button class="map__werkzeug" data-mapstil aria-label="Kartenansicht wechseln">${ICONS.ebenen}</button>
         </div>
         ${k.zoom > 1.05 ? '<button class="map__reset" id="mapReset">Ganze Karte</button>' : ''}
       </div>
@@ -3470,8 +3475,33 @@ function renderFriendMap() {
     renderFriendMap();
   };
 
-  $('#zoomIn').addEventListener('click', () => setzeZoom(k.zoom + 0.6));
-  $('#zoomOut').addEventListener('click', () => setzeZoom(k.zoom - 0.6));
+  /*
+   * Henrik: "Zoom per Fingergeste ermoeglichen; Plus/Minus rechts oben
+   * entfernen und durch einen diagonalen Pfeil nach oben/unten ersetzen.
+   * Dieser oeffnet eine vergroesserte Vollbild-Kartenansicht."
+   */
+  main.querySelector('[data-mapfull]')?.addEventListener('click', () => {
+    state.karteVollbild = !state.karteVollbild;
+    renderFriendMap();
+  });
+
+  /*
+   * "In normaler und grosser Ansicht einen Button fuer verschiedene
+   * Kartenansichten ergaenzen, z. B. Satellit/geografisch."
+   *
+   * Die Karte ist selbst gezeichnet - echte Satellitenkacheln braeuchten
+   * einen Kartenanbieter und damit einen Vertrag. Die drei Ansichten
+   * unterscheiden sich deshalb in der Farbgebung: Standard hell,
+   * Satellit dunkel mit gruenen Flaechen, Gelaende in Erdtoenen.
+   */
+  main.querySelector('[data-mapstil]')?.addEventListener('click', () => {
+    const reihe = ['standard', 'satellit', 'gelaende'];
+    const jetzt = reihe.indexOf(state.karteStil || 'standard');
+    state.karteStil = reihe[(jetzt + 1) % reihe.length];
+    renderFriendMap();
+    toast({ standard: 'Standard', satellit: 'Satellit', gelaende: 'Gelände' }[state.karteStil]);
+  });
+
   $('#mapReset')?.addEventListener('click', () => {
     k.zoom = 1; k.x = 0; k.y = 0; k.aktiv = null;
     renderFriendMap();

@@ -9,6 +9,12 @@ const ICONS = (() => {
     camera: wrap('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.5L8 3h8l1.5 3H21a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),
     person: wrap('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
     people: wrap('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
+    /* Diagonaler Doppelpfeil - oeffnet die Karte im Vollbild und schliesst
+       sie wieder. Henrik wollte ihn anstelle von Plus/Minus. */
+    ausklappen: wrap('<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7.5 7.5"/><path d="M3 21l7.5-7.5"/>'),
+    einklappen: wrap('<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/>'),
+    /* Gestapelte Ebenen - Umschalter fuer die Kartenansicht. */
+    ebenen: wrap('<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>'),
     search: wrap('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>'),
     plus: wrap('<path d="M12 5v14M5 12h14"/>'),
     back: wrap('<path d="M19 12H5M12 19l-7-7 7-7"/>'),

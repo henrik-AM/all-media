@@ -2123,3 +2123,66 @@ button.msg__sender {
   cursor: pointer;
 }
 button.msg__sender:hover { text-decoration: underline; }
+
+/* ------------------------------------------------------------------
+ * Friend-Map: Vollbild und Kartenansichten
+ * ------------------------------------------------------------------ */
+
+/*
+ * Henrik: "Plus/Minus rechts oben entfernen und durch einen diagonalen Pfeil
+ * nach oben/unten ersetzen. Dieser oeffnet eine vergroesserte Vollbild-
+ * Kartenansicht." Dazu der Umschalter fuer die Ansicht daneben.
+ */
+.map__werkzeuge {
+  position: absolute; right: 10px; top: 10px; z-index: 2;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.map__werkzeug {
+  display: grid; place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 11px;
+  background: rgba(255,255,255,.94);
+  color: #1a1d21;
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  cursor: pointer;
+}
+.map__werkzeug svg { width: 18px; height: 18px; }
+.map__werkzeug:hover { background: #fff; }
+
+/* Vollbild: die Karte fuellt den Bereich zwischen den Leisten. */
+.map--voll {
+  position: fixed;
+  inset: var(--top-h) 0 var(--nav-h) 0;
+  margin: 0;
+  height: auto;
+  border-radius: 0;
+  border: 0;
+  z-index: 30;
+}
+
+/*
+ * Drei Ansichten. Die Karte ist selbst gezeichnet - echte Satellitenkacheln
+ * braeuchten einen Kartenanbieter und damit einen Vertrag. Die Ansichten
+ * unterscheiden sich deshalb in der Farbgebung, nicht im Bildmaterial.
+ */
+.map--satellit { background: #1B2A20; }
+.map--satellit .map__block { background: #2E3A2C; }
+.map--satellit .map__strasse-v,
+.map--satellit .map__strasse-h { background: #3D4A3A; }
+.map--satellit .map__park { background: #2F5233; }
+.map--satellit .map__fluss { background: #1E3A4C; }
+/* Das Schild ist eine helle Flaeche mit dunklem Text. Auf der dunklen
+   Karte muss deshalb die Flaeche mitwechseln - nur die Schriftfarbe
+   umzustellen ergaebe hellen Text auf hellem Grund. */
+.map--satellit .map__label {
+  background: rgba(12,20,15,.9);
+  border-color: rgba(255,255,255,.22);
+  color: #EAF0E6;
+}
+
+.map--gelaende { background: #EFE7D8; }
+.map--gelaende .map__block { background: #E2D7C2; }
+.map--gelaende .map__strasse-v,
+.map--gelaende .map__strasse-h { background: #FBF7EF; }
+.map--gelaende .map__park { background: #C7D6A8; }
+.map--gelaende .map__fluss { background: #A9C9DC; }
