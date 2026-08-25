@@ -44,7 +44,8 @@
     "test:anhang": "node test/_anhang.js",
     "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang && npm run test:einstellungen && npm run test:kontaktinfo",
     "test:einstellungen": "node test/_einstellungen.js",
-    "test:kontaktinfo": "node test/_kontaktinfo.js"
+    "test:kontaktinfo": "node test/_kontaktinfo.js",
+    "wlan": "node tools/lokal.js"
   },
   "private": true
 }
