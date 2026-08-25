@@ -7,12 +7,19 @@ import { avatarColor, colors, initialsOf, radius, spacing, typography } from '..
 import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
-type Filter = 'all' | 'public' | 'private';
+/*
+ * Henrik: "Home zeigt nur Communitys, denen der Nutzer bereits beigetreten
+ * ist. Noch nicht beigetretene Communitys unter 'Entdecken' o. Ae. anzeigen."
+ *
+ * Vorher standen alle in einer Liste, getrennt nur nach oeffentlich/privat -
+ * beigetreten und nicht beigetreten waren nicht auseinanderzuhalten. Genauso
+ * geloest wie in der Website (renderCommunities).
+ */
+type Filter = 'meine' | 'entdecken';
 
 const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'Alle' },
-  { key: 'public', label: 'Öffentlich' },
-  { key: 'private', label: 'Privat' },
+  { key: 'meine', label: 'Meine' },
+  { key: 'entdecken', label: 'Entdecken' },
 ];
 
 interface Props {
@@ -24,16 +31,21 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
   // Die Liste liegt im gemeinsamen Zustand: ein selbst erstellter Kanal muss
   // hier genauso auftauchen wie im Community-Profil.
   const { communities, kanalBeitreten, kanalGelesen } = useProfil();
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<Filter>('meine');
   const [query, setQuery] = useState('');
 
-  const visible = useMemo(() => {
+  const { visible, anzahl } = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return communities.filter((c) => {
-      if (filter !== 'all' && c.visibility !== filter) return false;
-      if (!q) return true;
-      return c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
-    });
+    const passt = (c: Community) =>
+      !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
+
+    const meine = communities.filter((c) => c.joined && passt(c));
+    const entdecken = communities.filter((c) => !c.joined && passt(c));
+
+    return {
+      visible: filter === 'entdecken' ? entdecken : meine,
+      anzahl: { meine: meine.length, entdecken: entdecken.length },
+    };
   }, [communities, filter, query]);
 
   const toggleJoin = (community: Community) => {
@@ -109,7 +121,10 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
             style={[styles.pill, filter === key && styles.pillActive]}
             onPress={() => setFilter(key)}
           >
-            <Text style={[styles.pillText, filter === key && styles.pillTextActive]}>{label}</Text>
+            <Text style={[styles.pillText, filter === key && styles.pillTextActive]}>
+              {label}
+              {anzahl[key] ? <Text style={styles.pillZahl}> {anzahl[key]}</Text> : null}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -122,8 +137,20 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
         ListEmptyComponent={
           <EmptyState
             icon="people-outline"
-            title="Keine Community gefunden"
-            text={`Für „${query}" wurde nichts gefunden.`}
+            title={
+              query
+                ? 'Keine Community gefunden'
+                : filter === 'entdecken'
+                  ? 'Du bist überall dabei'
+                  : 'Noch keiner Community beigetreten'
+            }
+            text={
+              query
+                ? `Für „${query}" wurde nichts gefunden.`
+                : filter === 'entdecken'
+                  ? 'Es gibt gerade nichts Neues zu entdecken.'
+                  : 'Unter „Entdecken" findest du Communitys zum Beitreten.'
+            }
           />
         }
       />
@@ -140,6 +167,9 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: 15, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface3 },
   pillActive: { backgroundColor: colors.brand },
   pillText: { color: colors.text2, fontSize: 13.5, fontWeight: '600' },
+  // Zahl in der Filterpille (Meine 4 / Entdecken 2) - etwas zurueckgenommen,
+  // damit die Beschriftung fuehrt.
+  pillZahl: { opacity: 0.65 },
   pillTextActive: { color: colors.white },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: spacing.lg, paddingVertical: 10 },

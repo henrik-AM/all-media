@@ -10,7 +10,7 @@ import {
   Spende,
   Video,
 } from '../types';
-import { mockClips, mockCommunities, mockUsers } from '../mocks';
+import { mockClips, mockCommunities, mockPosts, mockUsers } from '../mocks';
 
 /*
  * Was hinter den drei Knoepfen oben rechts im eigenen Profil steckt:
@@ -150,6 +150,22 @@ interface ProfilWert {
   kanalBeitreten: (id: string) => void;
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
+
+  /* --- Folgen --- */
+  /*
+   * Henrik: "Follower/Follows muessen ueberall synchronisiert werden: Home,
+   * Kurzvideos, normale Videos, Suche, Profile usw."
+   *
+   * Vorher hing der Zustand am einzelnen Beitrag (post.following). Wer im
+   * Feed auf "Folgen" tippte, aenderte damit nur diesen einen Beitrag - ein
+   * zweiter Beitrag derselben Person zeigte weiter "Folgen", und im Profil
+   * stand auch nichts anderes. Jetzt haengt er an der Person und gilt damit
+   * an jeder Stelle gleich.
+   */
+  gefolgt: string[];
+  folgtPerson: (userId: string) => boolean;
+  /** Umschalten. Gibt zurueck, ob man der Person danach folgt. */
+  folgenUmschalten: (userId: string) => boolean;
 }
 
 const GRUND_RASTER: RasterEintrag[] = [
@@ -186,6 +202,27 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const [favoriten, setFavoriten] = useState<string[]>([]);
   const [chatStumm, setChatStumm] = useState<string[]>([]);
   const [geleerteChats, setGeleerteChats] = useState<string[]>([]);
+
+  /*
+   * Wem man folgt - eine Liste fuer die ganze App, siehe ProfilWert.
+   *
+   * Der Ausgangsstand kommt aus den Beitraegen: dort stand bisher, wem man
+   * folgt. So bleibt der Stand nach dem Umbau derselbe, den Henrik kennt.
+   */
+  const [gefolgt, setGefolgt] = useState<string[]>(() => [
+    ...new Set(mockPosts.filter((p) => p.following).map((p) => p.userId)),
+  ]);
+
+  const folgtPerson = useCallback((userId: string) => gefolgt.includes(userId), [gefolgt]);
+
+  const folgenUmschalten = useCallback(
+    (userId: string) => {
+      const danach = !gefolgt.includes(userId);
+      setGefolgt((prev) => (danach ? [...prev, userId] : prev.filter((id) => id !== userId)));
+      return danach;
+    },
+    [gefolgt]
+  );
 
   const mitteilungen = useCallback(
     (bereich: MitteilungsBereich): MitteilungAnzeige[] =>
@@ -440,6 +477,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       kanalAnlegen,
       kanalBeitreten,
       kanalGelesen,
+      gefolgt,
+      folgtPerson,
+      folgenUmschalten,
     }),
     [
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
@@ -447,6 +487,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       aufzeichnungAnlegen, clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
       chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
+      gefolgt, folgtPerson, folgenUmschalten,
     ]
   );
 

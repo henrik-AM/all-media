@@ -166,15 +166,21 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    // Henrik: "Insbesondere einen Messenger-Unterpunkt ergaenzen, analog zu
+    // Videos und Communitys." Der Abschnitt hiess "Chats" und war damit der
+    // einzige, der nicht nach seinem Bereich benannt war.
     id: 'messenger',
-    title: 'Chats',
+    title: 'Messenger',
     items: [
       { label: 'Lesebestätigung', icon: 'checkmark-done-outline', toggle: 'lesebestaetigung' },
       { label: 'Standort-Sichtbarkeit', icon: 'location-outline', wahl: ['Alle Kontakte', 'Ausgewählte Kontakte', 'Niemand'], standard: 'Alle Kontakte' },
       { label: 'Story-Sichtbarkeit', icon: 'eye-outline', wahl: STORY, standard: 'Meine Kontakte' },
+      { label: 'Zuletzt online', icon: 'eye-outline', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
       { label: 'Mit Enter senden', icon: 'return-down-back-outline', toggle: 'entersenden' },
       { label: 'Chat-Hintergrund', icon: 'color-palette-outline', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
       { label: 'Schriftgröße', icon: 'text-outline', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
+      { label: 'Wer darf mich zu Gruppen hinzufügen', icon: 'people-outline', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Selbstlöschende Nachrichten', icon: 'time-outline', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen', 'Nach 90 Tagen'], standard: 'Aus' },
       { label: 'Chat-Verlauf sichern', icon: 'cloud-upload-outline', aktion: 'sicherung' },
       { label: 'Archivierte Chats', icon: 'archive-outline', liste: 'archiv' },
     ],
@@ -196,6 +202,7 @@ const SECTIONS: Section[] = [
       { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'videoPrivate' },
       SPENDENCODE,
       { label: 'Insights', icon: 'compass-outline', liste: 'insights' },
+      { label: 'Wem ich folge', icon: 'person-outline', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
       { label: 'Repost-Sichtbarkeit', icon: 'repeat-outline', wahl: ['Alle', 'Meine Follower', 'Niemand'], standard: 'Alle' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart-outline', wahl: ['Alle', 'Nur ich'], standard: 'Alle' },
@@ -266,7 +273,7 @@ interface Props {
 
 export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig }: Props) => {
   const { user, konten } = useContext(AuthContext);
-  const { communities, istBlockiert, istStumm, raster } = useProfil();
+  const { communities, istBlockiert, istStumm, raster, gefolgt } = useProfil();
   const scroll = useRef<ScrollView>(null);
   // Der offene Punkt und die getroffenen Auswahlen. Sie gelten fuer diese
   // Sitzung - dauerhaft speichern kann erst das Backend.
@@ -319,6 +326,20 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           { text: 'Aufrufe (30 Tage)', neben: '1.284' },
           { text: 'Neue Follower (30 Tage)', neben: '46' },
         ],
+      };
+    }
+    /*
+     * Henrik: "In den Einstellungen muss man sehen koennen, wem man folgt."
+     * Die Liste kommt aus demselben Zustand wie die Folgen-Knoepfe im Feed
+     * (ProfilContext), damit beide immer dasselbe zeigen.
+     */
+    if (art === 'gefolgt') {
+      return {
+        leer: 'Du folgst noch niemandem.',
+        zeilen: gefolgt.map((id) => ({
+          text: mockUsers[id]?.name ?? id,
+          neben: mockUsers[id]?.handle ?? '',
+        })),
       };
     }
     const mit = mockPosts.filter((p) => p.notify);

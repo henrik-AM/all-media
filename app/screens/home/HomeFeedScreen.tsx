@@ -6,6 +6,7 @@ import { CommentSheet } from '../../components/CommentSheet';
 import { StoryRail } from '../../components/StoryRail';
 import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { kommentarZeile } from '../../lib/kommentare';
 import { mockPosts, mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Post, Story } from '../../types';
@@ -29,7 +30,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
   const { istRepostet, umschalten } = useReposts();
   // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
   // damit sie auch im Profilraster auftauchen.
-  const { eigeneBeitraege } = useProfil();
+  const { eigeneBeitraege, folgtPerson, folgenUmschalten } = useProfil();
   const [posts, setPosts] = useState<Post[]>(mockPosts);
 
   // Neue eigene Beitraege wandern in dieselbe Liste wie alle anderen. Sonst
@@ -54,9 +55,14 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
     onNotice(post.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
   };
 
+  /*
+   * Folgen haengt an der Person, nicht am Beitrag - siehe ProfilContext.
+   * Vorher wurde nur dieser eine Beitrag geaendert; ein zweiter Beitrag
+   * derselben Person zeigte weiter "Folgen".
+   */
   const toggleFollow = (post: Post) => {
-    update(post.id, (p) => ({ ...p, following: !p.following }));
-    onNotice(post.following ? 'Nicht mehr gefolgt' : 'Du folgst jetzt');
+    const jetztAn = folgenUmschalten(post.userId);
+    onNotice(jetztAn ? 'Du folgst jetzt' : 'Nicht mehr gefolgt');
   };
 
   const toggleRepost = (post: Post) => {
@@ -92,11 +98,11 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.follow, item.following && styles.followActive]}
+            style={[styles.follow, folgtPerson(item.userId) && styles.followActive]}
             onPress={() => toggleFollow(item)}
           >
-            <Text style={[styles.followText, item.following && styles.followTextActive]}>
-              {item.following ? 'Gefolgt' : 'Folgen'}
+            <Text style={[styles.followText, folgtPerson(item.userId) && styles.followTextActive]}>
+              {folgtPerson(item.userId) ? 'Gefolgt' : 'Folgen'}
             </Text>
           </Pressable>
           <Pressable style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
@@ -157,7 +163,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
           <Text style={styles.bold}>{author?.name}</Text> {item.description}
         </Text>
         <Pressable onPress={() => setCommentsFor(item.id)}>
-          <Text style={styles.commentsLink}>Alle {item.comments} Kommentare ansehen</Text>
+          <Text style={styles.commentsLink}>{kommentarZeile(item.comments)}</Text>
         </Pressable>
       </View>
     );

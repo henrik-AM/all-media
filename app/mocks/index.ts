@@ -110,14 +110,27 @@ export const mockComments: Record<string, Comment[]> = {
   v5: [{ id: 'cm1', userId: 'u3', text: 'Mache ich seit einem Jahr, will nicht mehr zurück.', time: 'Sa', likes: 9, liked: false }],
 };
 
-export const mockPosts: Post[] = [
+/*
+ * Die Kommentarzahl steht nicht mehr als eigene Zahl am Beitrag.
+ *
+ * Henrik hatte gemeldet, dass "Alle 28 Kommentare ansehen" dasteht, obwohl
+ * es nur vier gibt - das feste Feld und mockComments waren auseinander-
+ * gelaufen. Jetzt zaehlt die Liste selbst, dann kann es nicht wieder
+ * passieren. Genauso geloest wie in der Website (mitKommentarzahl in
+ * web/server/app.js).
+ */
+function mitKommentarzahl<T extends { id: string; comments?: number }>(eintraege: T[]): T[] {
+  return eintraege.map((e) => ({ ...e, comments: (mockComments[e.id] || []).length }));
+}
+
+const mockPostsRoh: Post[] = [
   { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false, tags: ['#hafen', '#nachtfotografie'] },
   { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, reposts: 0, reposted: false, liked: true, saved: false, following: true, notify: true, tags: ['#homeoffice', '#designsystem'] },
   { id: 'p3', userId: 'u1', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', description: 'Oben angekommen. Der Aufstieg war jede Minute wert.', likedBy: 'David König', likes: 1204, comments: 96, reposts: 0, reposted: false, liked: false, saved: true, following: false, notify: false, tags: ['#sonnenaufgang'] },
   { id: 'p4', userId: 'u6', location: 'Berlin', music: 'Lo-Fi Focus – beatlab', description: 'Kleine Commits, klare Historie. Mein Team dankt es mir.', likedBy: 'Elif Yilmaz', likes: 87, comments: 9, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false, tags: ['#reactnative'] },
 ];
 
-export const mockVideos: Video[] = [
+const mockVideosRoh: Video[] = [
   { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, reposted: false, liked: false, saved: false, tags: ['#sonnenaufgang'] },
   { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, reposted: false, liked: true, saved: true, tags: ['#homeoffice', '#designsystem'] },
   { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, reposted: false, liked: false, saved: false, tags: ['#mealprep'] },
@@ -165,7 +178,7 @@ export const mockStories: Story[] = [
 ];
 
 /** Querformat-Videos, Prototyp-Frame "Videos - Querformat". */
-export const mockClips: Clip[] = [
+const mockClipsRoh: Clip[] = [
   { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', tags: ['#sonnenaufgang'], description: 'Die ganze Tour von der Hütte bis zum Gipfel, ungeschnitten. Kapitel in der Beschreibung.', likes: 8420, comments: 214, liked: false, saved: false, reposted: false },
   { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen', location: 'Köln', music: 'Lo-Fi Focus – beatlab', tags: ['#designsystem'], description: 'Von der ersten Farbvariable bis zum fertigen Theme — Schritt für Schritt mitgebaut.', likes: 3110, comments: 96, liked: false, saved: false, reposted: false },
   { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche', location: 'Hamburg', music: 'Kitchen Groove – Milo', tags: ['#mealprep'], description: 'Fünf Gerichte, eine Stunde Arbeit, eine ganze Woche satt. Einkaufszettel unten.', likes: 24800, comments: 612, liked: false, saved: false, reposted: false },
@@ -173,6 +186,11 @@ export const mockClips: Clip[] = [
   { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen', location: 'Hamburg', music: 'Golden Hour – Lys', tags: ['#hafen', '#nachtfotografie'], description: 'Blaue Stunde am Hafen: Einstellungen, Stativ, Nachbearbeitung.', likes: 6180, comments: 143, liked: false, saved: false, reposted: false },
   { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen', location: 'Berlin', music: 'Originalton', tags: ['#reactnative'], description: 'Warum kleine Commits das Review leichter machen — mit Beispielen aus echten Projekten.', likes: 1870, comments: 74, liked: false, saved: false, reposted: false },
 ];
+
+// Die drei Listen mit abgeleiteter Kommentarzahl, siehe mitKommentarzahl.
+export const mockPosts = mitKommentarzahl(mockPostsRoh);
+export const mockVideos = mitKommentarzahl(mockVideosRoh);
+export const mockClips = mitKommentarzahl(mockClipsRoh);
 
 /** Friend-Map, Prototyp-Frame "Messenger - Friend-Map". */
 export const mockFriendPins: FriendPin[] = [

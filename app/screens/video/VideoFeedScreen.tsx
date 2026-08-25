@@ -120,7 +120,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
               size={25}
               color={colors.white}
             />
-            <Text style={styles.railLabel}>{item.saved ? 'Gespeichert' : 'Merken'}</Text>
+            <Text style={styles.railLabel}>{item.saved ? 'Gespeichert' : 'Speichern'}</Text>
           </Pressable>
         </View>
 
