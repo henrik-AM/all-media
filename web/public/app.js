@@ -1858,7 +1858,7 @@ function videoSlide(v) {
         </button>
         <button class="railbtn ${v.saved ? 'is-saved' : ''}" data-vaction="save" data-vid="${v.id}" aria-label="Speichern">
           ${ICONS.bookmark}
-          <span>${v.saved ? 'Gespeichert' : 'Merken'}</span>
+          <span>${v.saved ? 'Gespeichert' : 'Speichern'}</span>
         </button>
       </div>
 
@@ -3978,7 +3978,7 @@ function openClip(clipId) {
             </button>
             <button class="postbtn" data-clipact="share" aria-label="Senden">${ICONS.send}</button>
             <button class="postbtn ${clip.reposted ? 'is-reposted' : ''}" data-clipact="repost" aria-label="Repost">${ICONS.repeat}</button>
-            <button class="postbtn postbtn--end ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Merken">${ICONS.bookmark}</button>
+            <button class="postbtn postbtn--end ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Speichern">${ICONS.bookmark}</button>
           </div>
 
           <div class="player__text">${esc(clip.description || '')}</div>
