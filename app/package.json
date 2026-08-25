@@ -36,7 +36,8 @@
     "app": "expo start",
     "compare": "node test/figma-compare.js",
     "links": "node tools/links.js",
-    "up": "node tools/up.js"
+    "up": "node tools/up.js",
+    "test:erstellen": "node test/_erstellen.js"
   },
   "private": true
 }

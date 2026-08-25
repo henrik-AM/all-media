@@ -188,7 +188,17 @@ function renderTopBar() {
   );
 }
 
+/*
+ * Zaehler gegen ueberholende Bildaufbauten: renderVideoProfile holt seine
+ * Daten erst vom Server. Wechselt man in der Zwischenzeit den Bildschirm,
+ * kam das Profil danach trotzdem noch an und hat den neuen Inhalt wieder
+ * ueberschrieben. Jeder Aufbau merkt sich deshalb seine Nummer und schreibt
+ * nur noch, wenn er der zuletzt gestartete ist.
+ */
+let renderLauf = 0;
+
 function render() {
+  renderLauf++;
   renderBottomNav();
   renderTopBar();
 
@@ -364,6 +374,69 @@ function bildVerkleinern(datei) {
   });
 }
 
+/**
+ * Kamera bzw. Dateiauswahl oeffnen. Liefert die gewaehlte Datei oder null,
+ * wenn abgebrochen wurde. `capture` sorgt am Handy dafuer, dass direkt die
+ * Kamera aufgeht - ohne vorher nach der Kameraberechtigung zu fragen.
+ */
+function dateiWaehlen(art = 'photo', ausGalerie = false) {
+  return new Promise((fertig) => {
+    const feld = document.createElement('input');
+    feld.type = 'file';
+    feld.accept = art === 'photo' ? 'image/*' : 'video/*';
+    if (!ausGalerie) feld.capture = 'environment';
+    feld.style.display = 'none';
+    document.body.appendChild(feld);
+
+    // "cancel" gibt es nicht in jedem Browser - darum zusaetzlich beim
+    // naechsten Fokus aufraeumen, sonst haengt das Versprechen fuer immer.
+    let erledigt = false;
+    const schliessen = (datei) => {
+      if (erledigt) return;
+      erledigt = true;
+      feld.remove();
+      fertig(datei || null);
+    };
+
+    feld.addEventListener('change', () => schliessen(feld.files && feld.files[0]));
+    feld.addEventListener('cancel', () => schliessen(null));
+    feld.click();
+  });
+}
+
+/** Erstes Standbild eines Videos - damit im Raster nicht nur ein Symbol steht. */
+function videoStandbild(datei) {
+  return new Promise((fertig) => {
+    const el = document.createElement('video');
+    el.preload = 'metadata';
+    el.muted = true;
+    el.playsInline = true;
+    const adresse = URL.createObjectURL(datei);
+
+    const aufgeben = () => {
+      URL.revokeObjectURL(adresse);
+      fertig(null);
+    };
+    el.onerror = aufgeben;
+    el.onloadeddata = () => {
+      try {
+        const faktor = Math.min(1, 800 / Math.max(el.videoWidth || 1, el.videoHeight || 1));
+        const flaeche = document.createElement('canvas');
+        flaeche.width = Math.max(1, Math.round((el.videoWidth || 320) * faktor));
+        flaeche.height = Math.max(1, Math.round((el.videoHeight || 240) * faktor));
+        flaeche.getContext('2d').drawImage(el, 0, 0, flaeche.width, flaeche.height);
+        URL.revokeObjectURL(adresse);
+        fertig(flaeche.toDataURL('image/jpeg', 0.8));
+      } catch {
+        aufgeben();
+      }
+    };
+    el.src = adresse;
+    // Ein Stueck vorspulen: das allererste Bild ist oft noch schwarz.
+    el.currentTime = 0.1;
+  });
+}
+
 /** Dateiauswahl oeffnen und das Ergebnis als eigene Story uebernehmen. */
 function storyAufnehmen(art = 'photo') {
   const feld = document.createElement('input');
@@ -521,13 +594,25 @@ function renderContacts() {
 }
 
 /* ---------------------------------------------------------- new: sheet */
-function openSheet(title, bodyHtml, onMount) {
+/*
+ * opts.schliessen  -> X links neben dem mittigen Titel (Prototyp-Frames
+ *                     "VP + Mitteilung" und "VP + erstellen")
+ * opts.hoch        -> Blatt auf 74% Hoehe, Inhalt scrollt
+ */
+function openSheet(title, bodyHtml, onMount, opts = {}) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet-backdrop';
   sheet.innerHTML = `
-    <div class="sheet" role="dialog" aria-label="${esc(title)}">
-      <div class="sheet__handle"></div>
-      <div class="sheet__title">${esc(title)}</div>
+    <div class="sheet ${opts.hoch ? 'sheet--tall' : ''}" role="dialog" aria-label="${esc(title)}">
+      ${
+        opts.schliessen
+          ? `<div class="sheet__kopf">
+               <button class="sheet__x" data-sheet-close aria-label="Schließen">${ICONS.close}</button>
+               <div class="sheet__titel-mitte">${esc(title)}</div>
+             </div>`
+          : `<div class="sheet__handle"></div>
+             <div class="sheet__title">${esc(title)}</div>`
+      }
       ${bodyHtml}
     </div>`;
   document.querySelector('.app').appendChild(sheet);
@@ -535,6 +620,7 @@ function openSheet(title, bodyHtml, onMount) {
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet) sheet.remove();
   });
+  sheet.querySelector('[data-sheet-close]')?.addEventListener('click', () => sheet.remove());
 
   onMount?.(sheet, () => sheet.remove());
   return sheet;
@@ -1309,7 +1395,7 @@ function renderHomeFeed() {
 function postCard(p) {
   const u = user(p.userId);
   return `
-    <article class="post">
+    <article class="post" id="post-${p.id}">
       <header class="post__head">
         <div class="story__ring" style="width:40px;height:40px;padding:2px">
           <div class="story__inner" style="background:${u.color};font-size:13px">${esc(u.initials)}</div>
@@ -1326,7 +1412,7 @@ function postCard(p) {
         </button>
       </header>
 
-      <div class="post__media">${ICONS.image}</div>
+      <div class="post__media">${medienFlaeche(p.id, ICONS.image)}</div>
 
       <div class="post__actions">
         <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-paction="like" data-pid="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
@@ -1406,8 +1492,8 @@ function renderVideoFeed() {
 function videoSlide(v) {
   const u = user(v.userId);
   return `
-    <section class="slide">
-      <div class="slide__stage">${ICONS.play}</div>
+    <section class="slide" id="slide-${v.id}">
+      <div class="slide__stage">${medienFlaeche(v.id, ICONS.play)}</div>
 
       <div class="slide__rail">
         <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
@@ -1778,6 +1864,14 @@ function renderSettings() {
       document.getElementById('sec-' + b.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     })
   );
+
+  // Aus dem Menü im eigenen Profil kommend: gleich beim richtigen Abschnitt
+  // anfangen (Prototyp "VP + Einstellung" / "CP + Einstellung").
+  if (state.settingsSprung) {
+    const ziel = document.getElementById('sec-' + state.settingsSprung);
+    state.settingsSprung = null;
+    setTimeout(() => ziel?.scrollIntoView({ block: 'start' }), 30);
+  }
 
   main.querySelectorAll('[data-toggle]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -2317,7 +2411,7 @@ function renderLandscapeVideos() {
               .map((c) => {
                 const u = user(c.userId);
                 return `<article class="clip" data-clip="${c.id}">
-                  <div class="clip__thumb">${ICONS.landscape}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
                     <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
                     <div>
@@ -2507,6 +2601,404 @@ function renderVideoSearch() {
   main.querySelectorAll('[data-sound]').forEach((b) => b.addEventListener('click', () => toast('Sound-Seite folgt')));
 }
 
+/* ------------------------------- Glocke, Plus und Menü im eigenen Profil */
+/*
+ * Die drei Knoepfe oben rechts im eigenen Profil. Prototyp-Frames:
+ *   Glocke -> "VP + Mitteilung" / "CP + Mitteilungen"
+ *   Plus   -> "VP + erstellen"  / "CP + erstellen"
+ *   Menü   -> "VP + Einstellung" / "CP + Einstellung"
+ *
+ * Die Einstellungen aus den beiden Menue-Frames stehen bereits im Bereich
+ * Einstellungen (Abschnitte "Videos" und "Communitys"). Das Menü springt
+ * deshalb dorthin, statt die Liste ein zweites Mal zu fuehren.
+ */
+
+/** Eine Mitteilung anklickbar machen: dorthin springen, wo sie herkommt. */
+function mitteilungOeffnen(ziel) {
+  if (ziel.art === 'profile') return openProfile(ziel.id);
+  if (ziel.art === 'community') return openChat(ziel.id);
+
+  if (ziel.art === 'post') {
+    state.area = 'videos';
+    state.sub.videos = 'home';
+    render();
+    setTimeout(() => document.getElementById('post-' + ziel.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+    return;
+  }
+  if (ziel.art === 'video') {
+    state.area = 'videos';
+    state.sub.videos = 'portrait';
+    render();
+    setTimeout(() => document.getElementById('slide-' + ziel.id)?.scrollIntoView({ block: 'start' }), 60);
+  }
+}
+
+async function openMitteilungen(bereich) {
+  const res = await fetch(`/api/mitteilungen/${bereich}`);
+  const { eintraege } = await res.json();
+
+  const zeile = (m) => `
+    <li>
+      <button class="mitt ${m.gelesen ? '' : 'is-neu'}" data-mitt="${m.id}" data-ziel-art="${m.ziel.art}" data-ziel-id="${m.ziel.id}">
+        <span class="mitt__icon">${ICONS.bell}${m.gelesen ? '' : '<i class="mitt__dot"></i>'}</span>
+        <span class="mitt__text">${esc(m.text)}</span>
+        <span class="mitt__zeit">${esc(m.zeit)}</span>
+      </button>
+    </li>`;
+
+  openSheet(
+    'Mitteilungen',
+    `<div class="sheet__body">
+       ${
+         eintraege.length
+           ? `<ul class="mitt-liste">${eintraege.map(zeile).join('')}</ul>`
+           : `<div class="empty">${ICONS.bell}
+                <div class="empty__title">Keine Mitteilungen</div>
+                <div class="empty__text">Hier erscheint, was andere mit deinen Beiträgen machen.</div>
+              </div>`
+       }
+     </div>
+     ${eintraege.some((m) => !m.gelesen) ? `<div class="sheet__footer"><button class="prof__btn" id="mittAlle">Alle als gelesen markieren</button></div>` : ''}`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-mitt]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          await fetch(`/api/mitteilungen/${b.dataset.mitt}/gelesen`, { method: 'POST' });
+          close();
+          await mitteilungenZaehlen();
+          mitteilungOeffnen({ art: b.dataset.zielArt, id: b.dataset.zielId });
+        })
+      );
+
+      sheet.querySelector('#mittAlle')?.addEventListener('click', async () => {
+        await fetch(`/api/mitteilungen/${bereich}/alle-gelesen`, { method: 'POST' });
+        close();
+        await mitteilungenZaehlen();
+        render();
+        toast('Alle Mitteilungen gelesen');
+      });
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/** Roten Punkt an der Glocke nachfuehren. */
+async function mitteilungenZaehlen() {
+  const res = await fetch('/api/bootstrap');
+  const data = await res.json();
+  state.ungelesen = data.ungelesen;
+}
+
+/** Glocke, Plus und Menü im Profilkopf verdrahten. */
+function bindProfilAktionen(bereich) {
+  main.querySelectorAll('[data-oact]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (b.dataset.oact === 'bell') return openMitteilungen(bereich);
+      if (b.dataset.oact === 'create') return openErstellen(bereich);
+
+      // Menü: die Einstellungen zu diesem Bereich, wie im Prototyp-Frame
+      // "VP + Einstellung" bzw. "CP + Einstellung".
+      state.area = 'settings';
+      state.settingsSprung = bereich === 'communities' ? 'communitys' : 'videos';
+      render();
+    })
+  );
+}
+
+/* ---------------------------------------------------------- Plus: Erstellen */
+// Genau die Punkte aus dem Prototyp-Frame "VP + erstellen".
+const ERSTELLEN_VIDEOS = [
+  { key: 'reels', label: 'Reels' },
+  { key: 'landscape', label: 'Querformat' },
+  { key: 'post', label: 'Beitrag' },
+  { key: 'story', label: 'Story' },
+  { key: 'highlight', label: 'Highlight' },
+  { key: 'playlist', label: 'Playlist' },
+  { key: 'livestream', label: 'Livestream' },
+  { key: 'spende', label: 'Spendenaktion' },
+];
+
+function openErstellen(bereich) {
+  const punkte = bereich === 'communities' ? [{ key: 'kanal', label: 'Neuen Kanal erstellen', icon: 'plus' }] : ERSTELLEN_VIDEOS;
+
+  openSheet(
+    'Erstellen',
+    `<div class="sheet__body">
+       <ul class="erstellen">
+         ${punkte
+           .map(
+             (p) => `<li><button class="erstellen__punkt" data-erstellen="${p.key}">
+               ${p.icon ? `<span class="erstellen__icon">${ICONS[p.icon]}</span>` : ''}
+               <span>${esc(p.label)}</span>
+             </button></li>`
+           )
+           .join('')}
+       </ul>
+     </div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-erstellen]').forEach((b) =>
+        b.addEventListener('click', () => {
+          close();
+          erstelle(b.dataset.erstellen);
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/* -------------------------------------- Eigene Bilder bleiben im Browser */
+/*
+ * Der Server teilt seinen Speicher mit allen Besuchern - eigene Fotos haben
+ * dort nichts zu suchen. Auf dem Server steht nur der Eintrag, das Bild
+ * liegt hier. Genauso ist es schon bei "Deine Story" geloest.
+ */
+const MEDIEN_SPEICHER = 'am-eigene-medien';
+
+function eigeneMedien() {
+  try {
+    return JSON.parse(localStorage.getItem(MEDIEN_SPEICHER) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function eigenesMediumSichern(id, bild) {
+  if (!bild) return;
+  try {
+    const alle = eigeneMedien();
+    alle[id] = bild;
+    localStorage.setItem(MEDIEN_SPEICHER, JSON.stringify(alle));
+  } catch {
+    /* Speicher voll - dann bleibt der Eintrag ohne Bild, statt abzustuerzen */
+  }
+}
+
+/** Bildflaeche fuer einen eigenen Eintrag, sonst das Platzhalter-Symbol. */
+function medienFlaeche(id, symbol) {
+  const bild = eigeneMedien()[id];
+  return bild ? `<img class="eigenbild" src="${bild}" alt="">` : symbol;
+}
+
+/* ------------------------------------------------------ Formular-Blatt */
+/**
+ * Ein Blatt mit Eingabefeldern. felder: { key, label, typ, platzhalter,
+ * pflicht, wert }. `aufSenden` bekommt die Werte und gibt bei einem Fehler
+ * einen Text zurueck - dann bleibt das Blatt offen.
+ */
+function openFormular(titel, felder, senden, knopf = 'Fertig') {
+  const feldHtml = (f) => {
+    const gemeinsam = `id="f_${f.key}" placeholder="${esc(f.platzhalter || '')}"`;
+    const eingabe =
+      f.typ === 'mehrzeilig'
+        ? `<textarea ${gemeinsam} rows="3">${esc(f.wert || '')}</textarea>`
+        : `<input ${gemeinsam} type="${f.typ === 'zahl' ? 'number' : 'text'}" value="${esc(f.wert || '')}">`;
+    return `<div class="sheet__field">
+      <label class="sheet__label" for="f_${f.key}">${esc(f.label)}</label>
+      ${eingabe}
+    </div>`;
+  };
+
+  openSheet(
+    titel,
+    `<div class="sheet__body">${felder.map(feldHtml).join('')}</div>
+     <div class="sheet__footer"><button class="prof__btn is-primary" id="formOk">${esc(knopf)}</button></div>`,
+    (sheet, close) => {
+      const ersteseingabe = sheet.querySelector('input, textarea');
+      setTimeout(() => ersteseingabe?.focus(), 80);
+
+      const absenden = async () => {
+        const werte = {};
+        for (const f of felder) werte[f.key] = sheet.querySelector('#f_' + f.key).value.trim();
+
+        const fehlt = felder.find((f) => f.pflicht && !werte[f.key]);
+        if (fehlt) return toast(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
+
+        const fehler = await senden(werte);
+        if (fehler) return toast(fehler);
+        close();
+      };
+
+      sheet.querySelector('#formOk').addEventListener('click', absenden);
+      sheet.querySelectorAll('input').forEach((el) =>
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') absenden();
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/* --------------------------------------------- Was der Plus-Knopf anlegt */
+async function erstelle(was) {
+  if (was === 'story') return storyAufnehmen('photo');
+  if (was === 'kanal') return openKanalErstellen();
+
+  if (was === 'highlight' || was === 'playlist') {
+    const istHighlight = was === 'highlight';
+    return openFormular(
+      istHighlight ? 'Neues Highlight' : 'Neue Playlist',
+      [{ key: 'name', label: 'Name', platzhalter: istHighlight ? 'z. B. Sommer' : 'z. B. Beste Clips', pflicht: true }],
+      async ({ name }) => {
+        const res = await fetch(`/api/eigene/${was}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const daten = await res.json();
+        if (!daten.ok) return daten.error;
+        toast(`„${name}" angelegt`);
+        render();
+      },
+      'Anlegen'
+    );
+  }
+
+  if (was === 'spende') {
+    return openFormular(
+      'Spendenaktion',
+      [
+        { key: 'titel', label: 'Wofür sammelst du?', platzhalter: 'z. B. Bäume für den Stadtpark', pflicht: true },
+        { key: 'ziel', label: 'Spendenziel in Euro', typ: 'zahl', platzhalter: '500', pflicht: true },
+        { key: 'text', label: 'Beschreibung (freiwillig)', typ: 'mehrzeilig', platzhalter: 'Worum geht es?' },
+      ],
+      async (werte) => {
+        const res = await fetch('/api/eigene/spende', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(werte),
+        });
+        const daten = await res.json();
+        if (!daten.ok) return daten.error;
+        toast('Spendenaktion läuft');
+        render();
+      },
+      'Starten'
+    );
+  }
+
+  if (was === 'livestream') return openLivestream();
+
+  // Beitrag, Reels und Querformat: erst aufnehmen, dann beschreiben.
+  const istBild = was === 'post';
+  const datei = await dateiWaehlen(istBild ? 'photo' : 'video');
+  if (!datei) return;
+
+  let bild = null;
+  try {
+    bild = istBild ? await bildVerkleinern(datei) : await videoStandbild(datei);
+  } catch {
+    return toast('Aufnahme konnte nicht gelesen werden');
+  }
+
+  const quer = was === 'landscape';
+  openFormular(
+    { post: 'Neuer Beitrag', reels: 'Neues Reel', landscape: 'Neues Querformat-Video' }[was],
+    [
+      { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true },
+      { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
+    ],
+    async (werte) => {
+      const ziel = istBild ? '/api/eigene/beitrag' : '/api/eigene/video';
+      const res = await fetch(ziel, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...werte, format: quer ? 'quer' : 'hoch' }),
+      });
+      const daten = await res.json();
+      if (!daten.ok) return daten.error;
+
+      const eintrag = daten.beitrag || daten.video || daten.clip;
+      eigenesMediumSichern(eintrag.id, bild);
+
+      // Erst das Ziel setzen, dann laden: bootstrap baut das Bild selbst auf.
+      state.area = 'videos';
+      state.sub.videos = istBild ? 'home' : quer ? 'landscape' : 'portrait';
+      await bootstrap();
+      toast(istBild ? 'Beitrag veröffentlicht' : 'Video veröffentlicht');
+    },
+    'Veröffentlichen'
+  );
+}
+
+/** Neuen Kanal in einer Community anlegen (Prototyp "CP + erstellen"). */
+function openKanalErstellen() {
+  openFormular(
+    'Neuen Kanal erstellen',
+    [
+      { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
+      { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
+    ],
+    async ({ name, thema }) => {
+      const res = await fetch('/api/communities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, thema, sichtbarkeit: 'private' }),
+      });
+      const daten = await res.json();
+      if (!daten.ok) return daten.error;
+
+      state.area = 'communities';
+      state.sub.communities = 'profile';
+      await bootstrap();
+      toast(`„${name}" erstellt`);
+    },
+    'Erstellen'
+  );
+}
+
+/** Livestream: laufende Sendung mit Dauer, danach bleibt die Aufzeichnung. */
+function openLivestream() {
+  const begonnen = Date.now();
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="live">
+      <div class="live__stage">
+        ${ICONS.video}
+        <div class="live__marke"><span class="live__punkt"></span>LIVE</div>
+        <div class="live__zeit" id="liveZeit">00:00</div>
+      </div>
+      <div class="live__leiste">
+        <div class="live__zuschauer" id="liveZuschauer">0 Zuschauer</div>
+        <button class="prof__btn is-primary" id="liveStop">Livestream beenden</button>
+      </div>
+    </div>`;
+
+  fetch('/api/eigene/livestream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ aktion: 'start' }),
+  });
+
+  // Die Zuschauerzahl waechst langsam - sonst sieht der Bildschirm tot aus.
+  let zuschauer = 0;
+  const uhr = setInterval(() => {
+    const s = Math.round((Date.now() - begonnen) / 1000);
+    const zeit = overlay.querySelector('#liveZeit');
+    if (!zeit) return clearInterval(uhr);
+    zeit.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    if (s % 3 === 0) {
+      zuschauer += 1;
+      overlay.querySelector('#liveZuschauer').textContent = `${zuschauer} ${zuschauer === 1 ? 'Zuschauer' : 'Zuschauer'}`;
+    }
+  }, 1000);
+
+  overlay.querySelector('#liveStop').addEventListener('click', async () => {
+    clearInterval(uhr);
+    await fetch('/api/eigene/livestream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktion: 'stop' }),
+    });
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+    state.area = 'videos';
+    state.sub.videos = 'landscape';
+    await bootstrap();
+    toast('Livestream beendet, die Aufzeichnung steht im Querformat');
+  });
+}
+
 /* ------------------------------------------------------- Videos: Profil */
 /*
  * Prototyp-Frame "Videos - Profil": Leiste "Profil wechseln", darunter
@@ -2514,12 +3006,15 @@ function renderVideoSearch() {
  * Biografie und Link linksbuendig, Playlists und Highlights, Tab-Leiste und
  * das Beitragsraster.
  */
-function ownProfileTop(handle) {
+function ownProfileTop(handle, bereich) {
+  const ungelesen = state.ungelesen?.[bereich] || 0;
   return `
     <div class="oprof__bar">
       <span class="oprof__handle">${esc(handle)}</span>
       <span class="oprof__acts">
-        <button data-oact="bell" aria-label="Mitteilungen">${ICONS.bell}<i class="oprof__dot"></i></button>
+        <button data-oact="bell" aria-label="Mitteilungen${ungelesen ? `, ${ungelesen} ungelesen` : ''}">${ICONS.bell}${
+          ungelesen ? '<i class="oprof__dot"></i>' : ''
+        }</button>
         <button data-oact="create" aria-label="Erstellen">${ICONS.plus}</button>
         <button data-oact="menu" aria-label="Menü">${ICONS.settings}</button>
       </span>
@@ -2534,6 +3029,7 @@ const PROFILE_TABS = [
 ];
 
 async function renderVideoProfile() {
+  const lauf = ++renderLauf;
   const res = await fetch('/api/profile/me');
   const me = await res.json();
   const tab = state.ownProfileTab;
@@ -2542,10 +3038,13 @@ async function renderVideoProfile() {
   // Videos, die man selbst repostet hat.
   const meineReposts = tab === 'repost' ? await (await fetch('/api/reposts')).json() : [];
 
+  // Inzwischen wurde etwas anderes aufgebaut - dann nichts mehr schreiben.
+  if (lauf !== renderLauf) return;
+
   main.innerHTML = `
     ${switchBar('switchProfile')}
     <div class="scroll">
-      ${ownProfileTop(me.handle)}
+      ${ownProfileTop(me.handle, 'videos')}
       <div class="oprof__top">
         <div class="avatar avatar--88 has-status" style="background:${me.color}">${esc(me.initials)}</div>
         <div class="prof__stats">
@@ -2559,9 +3058,23 @@ async function renderVideoProfile() {
         <div class="prof__bio">${esc(me.bio)}</div>
         <a class="prof__link" href="#" id="profLink">${esc(me.link)}</a>
       </div>
+      ${
+        me.spende
+          ? `<div class="spende">
+               <div class="spende__titel">${esc(me.spende.titel)}</div>
+               ${me.spende.text ? `<div class="spende__text">${esc(me.spende.text)}</div>` : ''}
+               <div class="spende__balken"><div class="spende__fuellung" style="width:${Math.min(
+                 100,
+                 Math.round((me.spende.gesammelt / me.spende.ziel) * 100)
+               )}%"></div></div>
+               <div class="spende__zahlen">${me.spende.gesammelt} € von ${me.spende.ziel} € gesammelt</div>
+             </div>`
+          : ''
+      }
       <div class="highlights">
-        <button class="highlight"><span class="highlight__ring is-playlist">${ICONS.play}</span><span class="highlight__label">Playlistname</span></button>
-        <button class="highlight"><span class="highlight__ring is-playlist">${ICONS.play}</span><span class="highlight__label">Playlistname</span></button>
+        ${(me.playlists || [])
+          .map((pl) => `<button class="highlight" data-playlist="${esc(pl)}"><span class="highlight__ring is-playlist">${ICONS.play}</span><span class="highlight__label">${esc(pl)}</span></button>`)
+          .join('')}
         ${me.highlights
           .map((h) => `<button class="highlight"><span class="highlight__ring is-highlight">${ICONS.image}</span><span class="highlight__label">${esc(h)}</span></button>`)
           .join('')}
@@ -2574,7 +3087,7 @@ async function renderVideoProfile() {
       ${
         tab === 'grid'
           ? `<div class="prof__grid">${me.grid
-              .map((g) => `<div class="griditem">${g.kind === 'video' ? ICONS.play : ICONS.image}</div>`)
+              .map((g) => `<div class="griditem">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image)}</div>`)
               .join('')}</div>`
           : tab === 'repost' && meineReposts.length
           ? `<div class="prof__grid">${meineReposts
@@ -2607,11 +3120,7 @@ async function renderVideoProfile() {
       renderVideoProfile();
     })
   );
-  main.querySelectorAll('[data-oact]').forEach((b) =>
-    b.addEventListener('click', () =>
-      toast({ bell: 'Mitteilungen', create: 'Erstellen', menu: 'Menü' }[b.dataset.oact] + ' folgt')
-    )
-  );
+  bindProfilAktionen('videos');
 }
 
 /* ---------------------------------------------------- Communitys: Chats */
@@ -2788,7 +3297,7 @@ function renderCommunityProfile() {
   main.innerHTML = `
     ${switchBar('switchProfile')}
     <div class="scroll">
-      ${ownProfileTop(me.handle)}
+      ${ownProfileTop(me.handle, 'communities')}
       <div class="oprof__top">
         <div class="avatar avatar--88 has-status" style="background:${me.color}">${esc(me.initials)}</div>
         <div class="prof__stats">
@@ -2810,11 +3319,7 @@ function renderCommunityProfile() {
     e.preventDefault();
     toast('all-media.app');
   });
-  main.querySelectorAll('[data-oact]').forEach((b) =>
-    b.addEventListener('click', () =>
-      toast({ bell: 'Mitteilungen', create: 'Erstellen', menu: 'Menü' }[b.dataset.oact] + ' folgt')
-    )
-  );
+  bindProfilAktionen('communities');
   main.querySelectorAll('[data-community]').forEach((r) =>
     r.addEventListener('click', () => openChat(r.dataset.community))
   );

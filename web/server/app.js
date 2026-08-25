@@ -132,7 +132,7 @@ const profiles = {
   u4: { bio: 'Produktdesign und Design Systeme. Kaffee als Grundnahrungsmittel.', link: 'davidkoenig.design', posts: 97, followers: 5310, following: 274, following_me: true, highlights: ['Tokens', 'Prozess'] },
   u5: { bio: 'Kochen ohne Schnickschnack. Rezepte unter zehn Minuten.', link: 'elif-kocht.de', posts: 289, followers: 31200, following: 128, following_me: false, highlights: ['Pasta', 'Meal Prep', 'Basics'] },
   u6: { bio: 'Schreibt Software und läuft danach zwanzig Kilometer.', link: 'finnbauer.io', posts: 54, followers: 1180, following: 402, following_me: true, highlights: ['Laufen'] },
-  me: { bio: 'Baue gerade All Media.', link: 'all-media.app', posts: 12, followers: 340, following: 186, following_me: false, highlights: ['Projekt'] },
+  me: { bio: 'Baue gerade All Media.', link: 'all-media.app', posts: 12, followers: 340, following: 186, following_me: false, highlights: ['Projekt'], playlists: ['Beste Clips', 'Tutorials'], spende: null, live: null },
 };
 
 const gridItems = {};
@@ -264,6 +264,83 @@ const messages = {
 // weiterhin auf dieselben Referenzen zeigen.
 // Was der Nutzer selbst repostet hat - fuellt den Repost-Reiter im eigenen
 // Profil. Ohne diese Liste blieb der Reiter immer leer.
+// --- Mitteilungen ---------------------------------------------------------
+// Prototyp-Frames "VP + Mitteilung" (Videos-Profil) und "CP + Mitteilungen"
+// (Community-Profil). Beide Bereiche haben eine eigene Liste, weil im
+// Prototyp auch beide eine eigene Glocke haben.
+//
+// Gespeichert wird nur, was passiert ist - der Satz entsteht erst beim
+// Ausliefern. Sonst muesste bei jeder Textaenderung der Bestand mitwandern.
+const mitteilungen = [
+  { id: 'n1', bereich: 'videos', art: 'like', userId: 'u1', ziel: { art: 'post', id: 'p1' }, minuten: 10, gelesen: false },
+  { id: 'n2', bereich: 'videos', art: 'follow', userId: 'u5', ziel: { art: 'profile', id: 'u5' }, minuten: 95, gelesen: false },
+  { id: 'n3', bereich: 'videos', art: 'comment', userId: 'u3', ziel: { art: 'post', id: 'p2' }, minuten: 260, gelesen: false },
+  { id: 'n4', bereich: 'videos', art: 'repost', userId: 'u4', ziel: { art: 'video', id: 'v1' }, minuten: 1500, gelesen: true },
+  { id: 'n5', bereich: 'videos', art: 'mention', userId: 'u2', ziel: { art: 'profile', id: 'u2' }, minuten: 7200, gelesen: true },
+  { id: 'n6', bereich: 'videos', art: 'story', userId: 'u6', ziel: { art: 'profile', id: 'u6' }, minuten: 11000, gelesen: true },
+  { id: 'n7', bereich: 'videos', art: 'like', userId: 'u3', ziel: { art: 'video', id: 'v2' }, minuten: 30000, gelesen: true },
+  { id: 'n8', bereich: 'videos', art: 'follow', userId: 'u7', ziel: { art: 'profile', id: 'u7' }, minuten: 46000, gelesen: true },
+
+  { id: 'c1', bereich: 'communities', art: 'kanal', userId: 'u2', ziel: { art: 'community', id: 'k1' }, minuten: 25, gelesen: false },
+  { id: 'c2', bereich: 'communities', art: 'beitritt', userId: 'u5', ziel: { art: 'community', id: 'k2' }, minuten: 180, gelesen: false },
+  { id: 'c3', bereich: 'communities', art: 'nachricht', userId: 'u1', ziel: { art: 'community', id: 'k1' }, minuten: 1400, gelesen: true },
+  { id: 'c4', bereich: 'communities', art: 'einladung', userId: 'u4', ziel: { art: 'community', id: 'k3' }, minuten: 6000, gelesen: true },
+  { id: 'c5', bereich: 'communities', art: 'beitritt', userId: 'u6', ziel: { art: 'community', id: 'k4' }, minuten: 20000, gelesen: true },
+];
+
+/** "vor 10 min", "vor 4 h", "vor 5 Tagen", "vor 3 W", "vor 2 M" - wie im Prototyp. */
+function zeitText(minuten) {
+  if (minuten < 60) return `vor ${minuten} min`;
+  const stunden = Math.floor(minuten / 60);
+  if (stunden < 24) return `vor ${stunden} h`;
+  const tage = Math.floor(stunden / 24);
+  if (tage === 1) return 'vor 1 Tag';
+  if (tage < 7) return `vor ${tage} Tagen`;
+  const wochen = Math.floor(tage / 7);
+  if (wochen < 5) return `vor ${wochen} W`;
+  return `vor ${Math.floor(tage / 30)} M`;
+}
+
+function mitteilungText(m) {
+  const name = users[m.userId]?.name || 'Jemand';
+  const community = communities.find((c) => c.id === m.ziel.id)?.name || 'einer Community';
+  return {
+    like: `${name} gefällt dein ${m.ziel.art === 'video' ? 'Video' : 'Beitrag'}.`,
+    follow: `${name} folgt dir jetzt.`,
+    comment: `${name} hat deinen Beitrag kommentiert.`,
+    repost: `${name} hat dein Video repostet.`,
+    mention: `${name} hat dich in einem Kommentar erwähnt.`,
+    story: `${name} hat auf deine Story geantwortet.`,
+    kanal: `${name} hat einen neuen Kanal in „${community}" erstellt.`,
+    beitritt: `${name} ist „${community}" beigetreten.`,
+    nachricht: `Neue Nachrichten in „${community}".`,
+    einladung: `${name} hat dich zu „${community}" eingeladen.`,
+  }[m.art];
+}
+
+/** Liste eines Bereichs, fertig fuer die Anzeige. */
+function mitteilungenFuer(bereich) {
+  return mitteilungen
+    .filter((m) => m.bereich === bereich)
+    .sort((a, b) => a.minuten - b.minuten)
+    .map((m) => ({
+      id: m.id,
+      art: m.art,
+      userId: m.userId,
+      text: mitteilungText(m),
+      zeit: zeitText(m.minuten),
+      gelesen: m.gelesen,
+      ziel: m.ziel,
+    }));
+}
+
+/** Neue Mitteilung anlegen - wird benutzt, wenn in der App etwas passiert. */
+function neueMitteilung(bereich, art, userId, ziel) {
+  const eintrag = { id: `n${Date.now()}${mitteilungen.length}`, bereich, art, userId, ziel, minuten: 0, gelesen: false };
+  mitteilungen.unshift(eintrag);
+  return eintrag;
+}
+
 const reposts = [];
 
 /** Repost setzen oder zuruecknehmen. */
@@ -273,7 +350,7 @@ function setzeRepost(art, id, an) {
   if (!an && stelle !== -1) reposts.splice(stelle, 1);
 }
 
-const SEED = structuredClone({ chats, contacts, posts, videos, communities, messages, communityMessages, comments, profiles, stories });
+const SEED = structuredClone({ chats, contacts, posts, videos, clips, communities, messages, communityMessages, comments, profiles, stories, mitteilungen, gridItems });
 
 function resetState() {
   const restoreList = (list, seed) => {
@@ -291,6 +368,10 @@ function resetState() {
   restoreList(videos, SEED.videos);
   restoreList(communities, SEED.communities);
   restoreList(stories, SEED.stories);
+  restoreList(mitteilungen, SEED.mitteilungen);
+  restoreList(clips, SEED.clips);
+  restoreMap(gridItems, SEED.gridItems);
+  eigeneNummer = 0;
   restoreMap(messages, SEED.messages);
   restoreMap(communityMessages, SEED.communityMessages);
   restoreMap(comments, SEED.comments);
@@ -312,7 +393,187 @@ app.get('/api/bootstrap', (req, res) => {
   const gefolgt = Object.fromEntries(
     Object.entries(profiles).map(([id, p]) => [id, !!p.following_me])
   );
-  res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends, gefolgt });
+  const ungelesen = {
+    videos: mitteilungen.filter((m) => m.bereich === 'videos' && !m.gelesen).length,
+    communities: mitteilungen.filter((m) => m.bereich === 'communities' && !m.gelesen).length,
+  };
+  res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends, gefolgt, ungelesen });
+});
+
+/** Eigenen Kanal anlegen (Prototyp "CP + erstellen"). */
+app.post('/api/communities', (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  const thema = String(req.body?.thema || '').trim();
+  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
+  if (communities.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+    return res.json({ ok: false, error: 'Diesen Kanal gibt es schon' });
+  }
+
+  const community = {
+    id: `k${Date.now()}`,
+    name,
+    members: 1,
+    visibility: req.body?.sichtbarkeit === 'public' ? 'public' : 'private',
+    topic: thema || 'Ohne Beschreibung',
+    joined: true,
+    unread: 0,
+    eigen: true,
+  };
+  communities.unshift(community);
+  communityMessages[community.id] = [];
+  res.json({ ok: true, community });
+});
+
+/* --------------------------------------------------------- Eigene Inhalte */
+/*
+ * Was der Plus-Knopf im eigenen Profil anlegt (Prototyp "VP + erstellen").
+ * Das Bild selbst bleibt im Browser - der Server teilt seinen Speicher mit
+ * allen Besuchern, dort haette ein privates Foto nichts zu suchen. Hier
+ * steht nur der Eintrag.
+ */
+let eigeneNummer = 0;
+const eigeneId = (praefix) => `${praefix}_e${++eigeneNummer}`;
+
+app.post('/api/eigene/beitrag', (req, res) => {
+  const beschreibung = String(req.body?.beschreibung || '').trim();
+  if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
+
+  const beitrag = {
+    id: eigeneId('p'),
+    userId: 'me',
+    location: String(req.body?.ort || '').trim() || 'Ohne Ort',
+    music: 'Originalton',
+    description: beschreibung,
+    likedBy: '',
+    likes: 0,
+    comments: 0,
+    reposts: 0,
+    reposted: false,
+    liked: false,
+    saved: false,
+    following: false,
+    notify: false,
+    eigen: true,
+  };
+  posts.unshift(beitrag);
+  gridItems.me.unshift({ id: beitrag.id, kind: 'image', eigen: true });
+  profiles.me.posts += 1;
+  res.json({ ok: true, beitrag });
+});
+
+app.post('/api/eigene/video', (req, res) => {
+  const beschreibung = String(req.body?.beschreibung || '').trim();
+  if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
+  const quer = req.body?.format === 'quer';
+
+  if (quer) {
+    const clip = {
+      id: eigeneId('q'),
+      userId: 'me',
+      title: beschreibung,
+      duration: String(req.body?.dauer || '00:15'),
+      views: 0,
+      age: 'gerade eben',
+      eigen: true,
+    };
+    clips.unshift(clip);
+    gridItems.me.unshift({ id: clip.id, kind: 'video', eigen: true });
+    profiles.me.posts += 1;
+    return res.json({ ok: true, clip });
+  }
+
+  const video = {
+    id: eigeneId('v'),
+    userId: 'me',
+    description: beschreibung,
+    location: String(req.body?.ort || '').trim() || 'Ohne Ort',
+    music: 'Originalton',
+    likes: 0,
+    comments: 0,
+    shares: 0,
+    reposted: false,
+    liked: false,
+    saved: false,
+    eigen: true,
+  };
+  videos.unshift(video);
+  gridItems.me.unshift({ id: video.id, kind: 'video', eigen: true });
+  profiles.me.posts += 1;
+  res.json({ ok: true, video });
+});
+
+app.post('/api/eigene/highlight', (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
+  if (profiles.me.highlights.includes(name)) return res.json({ ok: false, error: 'Dieses Highlight gibt es schon' });
+  profiles.me.highlights.push(name);
+  res.json({ ok: true, highlights: profiles.me.highlights });
+});
+
+app.post('/api/eigene/playlist', (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
+  profiles.me.playlists = profiles.me.playlists || [];
+  if (profiles.me.playlists.includes(name)) return res.json({ ok: false, error: 'Diese Playlist gibt es schon' });
+  profiles.me.playlists.push(name);
+  res.json({ ok: true, playlists: profiles.me.playlists });
+});
+
+app.post('/api/eigene/spende', (req, res) => {
+  const titel = String(req.body?.titel || '').trim();
+  const ziel = Number(req.body?.ziel);
+  if (!titel) return res.json({ ok: false, error: 'Bitte einen Titel eingeben' });
+  if (!Number.isFinite(ziel) || ziel <= 0) return res.json({ ok: false, error: 'Bitte ein Spendenziel in Euro eingeben' });
+
+  profiles.me.spende = { titel, ziel, gesammelt: 0, text: String(req.body?.text || '').trim() };
+  res.json({ ok: true, spende: profiles.me.spende });
+});
+
+/** Livestream starten und beenden. Die Aufzeichnung bleibt im Profil. */
+app.post('/api/eigene/livestream', (req, res) => {
+  if (req.body?.aktion === 'start') {
+    profiles.me.live = { seit: Date.now(), zuschauer: 0 };
+    return res.json({ ok: true, live: true });
+  }
+
+  const lief = profiles.me.live;
+  profiles.me.live = null;
+  if (!lief) return res.json({ ok: true, live: false });
+
+  const sekunden = Math.max(1, Math.round((Date.now() - lief.seit) / 1000));
+  const clip = {
+    id: eigeneId('q'),
+    userId: 'me',
+    title: String(req.body?.titel || '').trim() || 'Livestream-Aufzeichnung',
+    duration: `${String(Math.floor(sekunden / 60)).padStart(2, '0')}:${String(sekunden % 60).padStart(2, '0')}`,
+    views: lief.zuschauer,
+    age: 'gerade eben',
+    eigen: true,
+    aufzeichnung: true,
+  };
+  clips.unshift(clip);
+  gridItems.me.unshift({ id: clip.id, kind: 'video', eigen: true });
+  res.json({ ok: true, live: false, clip });
+});
+
+/** Mitteilungen eines Bereichs ("videos" oder "communities"). */
+app.get('/api/mitteilungen/:bereich', (req, res) => {
+  const eintraege = mitteilungenFuer(req.params.bereich);
+  res.json({ eintraege, ungelesen: eintraege.filter((m) => !m.gelesen).length });
+});
+
+/** Eine einzelne Mitteilung als gelesen markieren. */
+app.post('/api/mitteilungen/:id/gelesen', (req, res) => {
+  const m = mitteilungen.find((x) => x.id === req.params.id);
+  if (!m) return res.json({ ok: false, error: 'Diese Mitteilung gibt es nicht' });
+  m.gelesen = true;
+  res.json({ ok: true, ungelesen: mitteilungen.filter((x) => x.bereich === m.bereich && !x.gelesen).length });
+});
+
+/** Alle Mitteilungen eines Bereichs als gelesen markieren. */
+app.post('/api/mitteilungen/:bereich/alle-gelesen', (req, res) => {
+  for (const m of mitteilungen) if (m.bereich === req.params.bereich) m.gelesen = true;
+  res.json({ ok: true, ungelesen: 0 });
 });
 
 /** Die eigenen Reposts, aufgeloest zu Beitraegen und Videos. */
