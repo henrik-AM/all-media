@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
@@ -7,6 +7,7 @@ import { StoryRail } from '../../components/StoryRail';
 import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { mockPosts, mockUsers } from '../../mocks';
+import { useProfil } from '../../contexts/ProfilContext';
 import { Post, Story } from '../../types';
 
 const compactNumber = (n: number): string => {
@@ -24,7 +25,20 @@ interface Props {
 
 export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onNotice }: Props) => {
   const { istRepostet, umschalten } = useReposts();
+  // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
+  // damit sie auch im Profilraster auftauchen.
+  const { eigeneBeitraege } = useProfil();
   const [posts, setPosts] = useState<Post[]>(mockPosts);
+
+  // Neue eigene Beitraege wandern in dieselbe Liste wie alle anderen. Sonst
+  // wuerden Like, Speichern und Repost bei ihnen nichts tun - sie waeren
+  // dann naemlich gar nicht im Zustand, den diese Knoepfe aendern.
+  useEffect(() => {
+    setPosts((prev) => {
+      const neue = eigeneBeitraege.filter((p) => !prev.some((x) => x.id === p.id));
+      return neue.length ? [...neue, ...prev] : prev;
+    });
+  }, [eigeneBeitraege]);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
   const update = (id: string, change: (post: Post) => Post) =>
@@ -93,7 +107,11 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onNotice }
         </View>
 
         <View style={styles.media}>
-          <Ionicons name="image-outline" size={56} color={colors.text3} />
+          {item.mediaUri ? (
+            <Image source={{ uri: item.mediaUri }} style={styles.mediaBild} />
+          ) : (
+            <Ionicons name="image-outline" size={56} color={colors.text3} />
+          )}
         </View>
 
         <View style={styles.actions}>
@@ -185,7 +203,8 @@ const styles = StyleSheet.create({
   followTextActive: { color: colors.text2 },
   bell: { width: 30, alignItems: 'center' },
 
-  media: { aspectRatio: 1, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center' },
+  media: { aspectRatio: 1, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  mediaBild: { width: '100%', height: '100%' },
 
   actions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: spacing.lg, paddingTop: 10, paddingBottom: 6 },
   actionEnd: { marginLeft: 'auto' },

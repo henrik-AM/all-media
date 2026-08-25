@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { avatarColor, colors, initialsOf, radius, spacing, typography } from '../../constants/design';
-import { mockCommunities } from '../../mocks';
+import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
 type Filter = 'all' | 'public' | 'private';
@@ -21,7 +21,9 @@ interface Props {
 }
 
 export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
-  const [communities, setCommunities] = useState<Community[]>(mockCommunities);
+  // Die Liste liegt im gemeinsamen Zustand: ein selbst erstellter Kanal muss
+  // hier genauso auftauchen wie im Community-Profil.
+  const { communities, kanalBeitreten, kanalGelesen } = useProfil();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
@@ -35,13 +37,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
   }, [communities, filter, query]);
 
   const toggleJoin = (community: Community) => {
-    setCommunities((prev) =>
-      prev.map((c) =>
-        c.id === community.id
-          ? { ...c, joined: !c.joined, members: c.members + (c.joined ? -1 : 1) }
-          : c
-      )
-    );
+    kanalBeitreten(community.id);
     onNotice(community.joined ? `„${community.name}" verlassen` : `„${community.name}" beigetreten`);
   };
 
@@ -50,7 +46,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
       onNotice('Tritt der Community zuerst bei');
       return;
     }
-    setCommunities((prev) => prev.map((c) => (c.id === community.id ? { ...c, unreadCount: 0 } : c)));
+    kanalGelesen(community.id);
     onOpenCommunity(community);
   };
 

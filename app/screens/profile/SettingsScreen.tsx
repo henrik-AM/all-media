@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -140,9 +140,15 @@ interface Props {
   onLogout: () => void;
   /** Oeffnet die Kontoliste zum Umschalten. */
   onSwitchAccount: () => void;
+  /**
+   * Abschnitt, bei dem die Seite aufgehen soll - kommt aus dem Menue im
+   * eigenen Profil (Prototyp "VP + Einstellung" / "CP + Einstellung").
+   */
+  sprung?: string | null;
+  onSprungFertig?: () => void;
 }
 
-export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount }: Props) => {
+export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig }: Props) => {
   const { user, konten } = useContext(AuthContext);
   const scroll = useRef<ScrollView>(null);
   const offsets = useRef<Record<string, number>>({});
@@ -158,6 +164,17 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount }: Props) =
     entersenden: false,
     datensparen: false,
   });
+
+  // Die Abstaende stehen erst nach dem ersten Zeichnen fest, deshalb der
+  // kurze Aufschub - vorher waere offsets.current noch leer.
+  useEffect(() => {
+    if (!sprung) return;
+    const zeit = setTimeout(() => {
+      scroll.current?.scrollTo({ y: offsets.current[sprung] ?? 0, animated: false });
+      onSprungFertig?.();
+    }, 80);
+    return () => clearTimeout(zeit);
+  }, [sprung, onSprungFertig]);
 
   return (
     <View style={styles.screen}>

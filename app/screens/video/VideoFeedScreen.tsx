@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { FlatList, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Image, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { mockUsers, mockVideos } from '../../mocks';
+import { useProfil } from '../../contexts/ProfilContext';
 import { Video } from '../../types';
 
 const compactNumber = (n: number): string => {
@@ -21,7 +22,18 @@ interface Props {
 
 export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
   const { istRepostet, umschalten } = useReposts();
+  // Eigene Reels stehen oben im Feed.
+  const { eigeneVideos } = useProfil();
   const [videos, setVideos] = useState<Video[]>(mockVideos);
+
+  // Wie im Bild-Feed: eigene Reels kommen in dieselbe Liste, damit Like,
+  // Speichern und Repost auch bei ihnen wirken.
+  useEffect(() => {
+    setVideos((prev) => {
+      const neue = eigeneVideos.filter((v) => !prev.some((x) => x.id === v.id));
+      return neue.length ? [...neue, ...prev] : prev;
+    });
+  }, [eigeneVideos]);
   // Wem man folgt - nach Personen-Kennung, damit es beim Blaettern bleibt.
   const [gefolgt, setGefolgt] = useState<Record<string, boolean>>({});
   const [slideHeight, setSlideHeight] = useState(0);
@@ -61,7 +73,11 @@ export const VideoFeedScreen = ({ onOpenProfile, onNotice }: Props) => {
     return (
       <View style={[styles.slide, slideHeight > 0 && { height: slideHeight }]}>
         <View style={styles.stage}>
-          <Ionicons name="play" size={72} color="rgba(255,255,255,0.2)" />
+          {item.mediaUri ? (
+            <Image source={{ uri: item.mediaUri }} style={styles.stageBild} />
+          ) : (
+            <Ionicons name="play" size={72} color="rgba(255,255,255,0.2)" />
+          )}
         </View>
 
         <View style={styles.rail}>
@@ -160,6 +176,7 @@ const styles = StyleSheet.create({
 
   container: { flex: 1, backgroundColor: colors.black },
   slide: { width: '100%', justifyContent: 'flex-end' },
+  stageBild: { width: '100%', height: '100%' },
   stage: {
     position: 'absolute',
     top: 0,
@@ -167,6 +184,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#12161B',
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },

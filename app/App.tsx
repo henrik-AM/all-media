@@ -4,8 +4,12 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { SupabaseProvider } from './contexts/SupabaseContext';
 import { RepostProvider } from './contexts/RepostContext';
+import { ProfilProvider, useProfil } from './contexts/ProfilContext';
 import { ActionSheet } from './components/ActionSheet';
 import { AddContactSheet } from './components/AddContactSheet';
+import { ErstellenSheet, ErstellenPunkt } from './components/ErstellenSheet';
+import { FormularFeld, FormularSheet } from './components/FormularSheet';
+import { MitteilungenSheet } from './components/MitteilungenSheet';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { KontoWechsel } from './components/KontoWechsel';
 import { TabBar } from './components/TabBar';
@@ -28,14 +32,16 @@ import { CommunityProfileScreen } from './screens/communities/CommunityProfileSc
 import { CommunitySearchScreen } from './screens/communities/CommunitySearchScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
 import { LandscapeVideosScreen } from './screens/videos/LandscapeVideosScreen';
+import { LivestreamScreen } from './screens/videos/LivestreamScreen';
 import { VideoProfileScreen } from './screens/videos/VideoProfileScreen';
 import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
 import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors } from './constants/design';
+import { aufnehmen } from './lib/aufnehmen';
 import { mockChats, mockContacts, mockStories, mockUsers } from './mocks';
-import { Chat, Community, Contact, Message, Story } from './types';
+import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Story } from './types';
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
@@ -49,9 +55,18 @@ type Overlay =
   | { kind: 'contacts' }
   | { kind: 'camera' }
   | { kind: 'call'; userId: string; art: 'audio' | 'video' }
+  | { kind: 'livestream' }
   | null;
 
-type Sheet = 'new' | 'group' | 'contact' | 'konto' | null;
+type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
+
+/** Ein offenes Formular-Blatt aus dem Erstellen-Menü. */
+interface Formular {
+  title: string;
+  felder: FormularFeld[];
+  knopf: string;
+  absenden: (werte: Record<string, string>) => string | null;
+}
 
 const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
@@ -70,6 +85,15 @@ const Shell = () => {
   // Storys liegen in der Shell, damit die eigene Aufnahme in der Leiste
   // ankommt - vorher las jeder Bildschirm direkt die Mock-Daten.
   const [stories, setStories] = useState<Story[]>(mockStories);
+
+  // Die drei Knoepfe oben rechts im eigenen Profil gehoeren zu genau einem
+  // Bereich - Videos oder Communitys. Beide haben eigene Mitteilungen und ein
+  // eigenes Erstellen-Menue, so wie im Prototyp.
+  const [profilBereich, setProfilBereich] = useState<MitteilungsBereich>('videos');
+  const [formular, setFormular] = useState<Formular | null>(null);
+  /** Abschnitt, bei dem die Einstellungen aufgehen sollen. */
+  const [settingsSprung, setSettingsSprung] = useState<string | null>(null);
+  const profil = useProfil();
 
   const sub = subs[area];
   const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
@@ -236,6 +260,126 @@ const Shell = () => {
     });
   };
 
+  /* ---------------- Glocke, Plus und Menü im eigenen Profil -------------- */
+  /*
+   * Prototyp-Frames "VP + Mitteilung / erstellen / Einstellung" und die
+   * Gegenstuecke "CP + ...". Das Menue springt in die Einstellungen zum
+   * passenden Abschnitt - die Punkte stehen dort schon, eine zweite Liste
+   * waere nur auseinandergelaufen.
+   */
+  const profilAktion = (key: string) => {
+    const bereich: MitteilungsBereich = area === 'communities' ? 'communities' : 'videos';
+    setProfilBereich(bereich);
+
+    if (key === 'bell') return setSheet('mitteilungen');
+    if (key === 'create') return setSheet('erstellen');
+    setSettingsSprung(bereich === 'communities' ? 'communitys' : 'videos');
+    setArea('settings');
+  };
+
+  /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
+  const mitteilungOeffnen = (ziel: MitteilungsZiel) => {
+    if (ziel.art === 'profile') return openPublicProfile(ziel.id);
+    if (ziel.art === 'community') {
+      const community = profil.communities.find((c) => c.id === ziel.id);
+      return community ? openCommunity(community) : setNotice('Diesen Kanal gibt es nicht mehr');
+    }
+    setArea('videos');
+    setSubs((prev) => ({ ...prev, videos: ziel.art === 'post' ? 'home' : 'portrait' }));
+  };
+
+  const erstelle = async (punkt: ErstellenPunkt) => {
+    setSheet(null);
+
+    if (punkt === 'story') return setOverlay({ kind: 'camera' });
+    if (punkt === 'livestream') return setOverlay({ kind: 'livestream' });
+
+    if (punkt === 'highlight' || punkt === 'playlist') {
+      const istHighlight = punkt === 'highlight';
+      return setFormular({
+        title: istHighlight ? 'Neues Highlight' : 'Neue Playlist',
+        knopf: 'Anlegen',
+        felder: [
+          {
+            key: 'name',
+            label: 'Name',
+            platzhalter: istHighlight ? 'z. B. Sommer' : 'z. B. Beste Clips',
+            pflicht: true,
+          },
+        ],
+        absenden: ({ name }) => {
+          const fehler = istHighlight ? profil.highlightAnlegen(name) : profil.playlistAnlegen(name);
+          if (fehler) return fehler;
+          setNotice(`„${name}“ angelegt`);
+          return null;
+        },
+      });
+    }
+
+    if (punkt === 'spende') {
+      return setFormular({
+        title: 'Spendenaktion',
+        knopf: 'Starten',
+        felder: [
+          { key: 'titel', label: 'Wofür sammelst du?', platzhalter: 'z. B. Bäume für den Stadtpark', pflicht: true },
+          { key: 'ziel', label: 'Spendenziel in Euro', typ: 'zahl', platzhalter: '500', pflicht: true },
+          { key: 'text', label: 'Beschreibung (freiwillig)', typ: 'mehrzeilig', platzhalter: 'Worum geht es?' },
+        ],
+        absenden: ({ titel, ziel, text }) => {
+          const betrag = Number(ziel.replace(',', '.'));
+          if (!Number.isFinite(betrag) || betrag <= 0) return 'Bitte ein Spendenziel in Euro eingeben';
+          profil.spendeSetzen({ titel, ziel: betrag, gesammelt: 0, text });
+          setNotice('Spendenaktion läuft');
+          return null;
+        },
+      });
+    }
+
+    if (punkt === 'kanal') {
+      return setFormular({
+        title: 'Neuen Kanal erstellen',
+        knopf: 'Erstellen',
+        felder: [
+          { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
+          { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
+        ],
+        absenden: ({ name, thema }) => {
+          const fehler = profil.kanalAnlegen(name, thema);
+          if (fehler) return fehler;
+          setNotice(`„${name}“ erstellt`);
+          return null;
+        },
+      });
+    }
+
+    // Beitrag, Reels und Querformat: erst aufnehmen, dann beschreiben.
+    const istBild = punkt === 'post';
+    const uri = await aufnehmen(istBild ? 'photo' : 'video', setNotice);
+    if (!uri) return;
+
+    const quer = punkt === 'landscape';
+    setFormular({
+      title: { post: 'Neuer Beitrag', reels: 'Neues Reel', landscape: 'Neues Querformat-Video' }[
+        punkt as 'post' | 'reels' | 'landscape'
+      ],
+      knopf: 'Veröffentlichen',
+      felder: [
+        { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true },
+        { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
+      ],
+      absenden: ({ beschreibung, ort }) => {
+        if (istBild) profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri });
+        else profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri });
+
+        // Gleich dorthin, wo das Neue jetzt steht.
+        setArea('videos');
+        setSubs((prev) => ({ ...prev, videos: istBild ? 'home' : quer ? 'landscape' : 'portrait' }));
+        setNotice(istBild ? 'Beitrag veröffentlicht' : 'Video veröffentlicht');
+        return null;
+      },
+    });
+  };
+
   const switchArea = (next: AreaKey) => {
     setArea(next);
     setSubs((prev) => ({ ...prev, [next]: 'profile' as SubKey }));
@@ -332,6 +476,20 @@ const Shell = () => {
     );
   }
 
+  if (overlay?.kind === 'livestream') {
+    return (
+      <LivestreamScreen
+        onEnd={(sekunden, zuschauer) => {
+          profil.aufzeichnungAnlegen(sekunden, zuschauer);
+          setOverlay(null);
+          setArea('videos');
+          setSubs((prev) => ({ ...prev, videos: 'landscape' }));
+          setNotice('Livestream beendet, die Aufzeichnung steht im Querformat');
+        }}
+      />
+    );
+  }
+
   const renderContent = () => {
     if (area === 'messenger') {
       if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onNotice={setNotice} />;
@@ -373,7 +531,7 @@ const Shell = () => {
       if (sub === 'portrait') return <VideoFeedScreen onOpenProfile={openPublicProfile} onNotice={setNotice} />;
       if (sub === 'landscape') return <LandscapeVideosScreen onNotice={setNotice} />;
       if (sub === 'search') return <VideoSearchScreen onOpenProfile={openPublicProfile} onNotice={setNotice} />;
-      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onNotice={setNotice} />;
+      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onNotice={setNotice} />;
       return <HomeFeedScreen stories={stories} onOpenStory={openStory} onOpenProfile={openPublicProfile} onNotice={setNotice} />;
     }
 
@@ -394,6 +552,7 @@ const Shell = () => {
           <CommunityProfileScreen
             onSwitchArea={switchArea}
             onOpenCommunity={openCommunity}
+            onAction={profilAktion}
             onNotice={setNotice}
           />
         );
@@ -401,7 +560,15 @@ const Shell = () => {
       return <CommunitiesScreen onOpenCommunity={openCommunity} onNotice={setNotice} />;
     }
 
-    return <SettingsScreen onNotice={setNotice} onLogout={logout} onSwitchAccount={() => setSheet('konto')} />;
+    return (
+      <SettingsScreen
+        onNotice={setNotice}
+        onLogout={logout}
+        onSwitchAccount={() => setSheet('konto')}
+        sprung={settingsSprung}
+        onSprungFertig={() => setSettingsSprung(null)}
+      />
+    );
   };
 
   return (
@@ -453,6 +620,31 @@ const Shell = () => {
         onNotice={setNotice}
       />
 
+      <MitteilungenSheet
+        visible={sheet === 'mitteilungen'}
+        bereich={profilBereich}
+        onClose={() => setSheet(null)}
+        onOpen={mitteilungOeffnen}
+        onNotice={setNotice}
+      />
+      <ErstellenSheet
+        visible={sheet === 'erstellen'}
+        bereich={profilBereich}
+        onClose={() => setSheet(null)}
+        onSelect={erstelle}
+      />
+      {formular && (
+        <FormularSheet
+          visible
+          title={formular.title}
+          felder={formular.felder}
+          knopf={formular.knopf}
+          onClose={() => setFormular(null)}
+          onSubmit={formular.absenden}
+          onNotice={setNotice}
+        />
+      )}
+
       <Toast message={notice} onHide={hideNotice} />
     </View>
   );
@@ -468,7 +660,9 @@ const App = () => (
     <SupabaseProvider>
       <AuthProvider>
         <RepostProvider>
-          <Root />
+          <ProfilProvider>
+            <Root />
+          </ProfilProvider>
         </RepostProvider>
       </AuthProvider>
     </SupabaseProvider>

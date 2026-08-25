@@ -4,7 +4,7 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, spacing, typography } from '../../constants/design';
-import { mockCommunities } from '../../mocks';
+import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
 interface Props {
@@ -13,14 +13,15 @@ interface Props {
 
 /** Prototyp-Frame "Community - Chats". */
 export const CommunityChatsScreen = ({ onOpenCommunity }: Props) => {
+  const { communities } = useProfil();
   const [query, setQuery] = useState('');
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return mockCommunities
+    return communities
       .filter((c) => c.joined)
       .filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
-  }, [query]);
+  }, [communities, query]);
 
   return (
     <View style={styles.screen}>

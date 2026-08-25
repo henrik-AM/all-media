@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EmptyState } from '../../components/EmptyState';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
-import { colors, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { mockProfiles, mockUsers } from '../../mocks';
 import { useReposts } from '../../contexts/RepostContext';
+import { useProfil } from '../../contexts/ProfilContext';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Tab = 'grid' | 'repost' | 'tagged' | 'saved';
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
+  /** Glocke, Plus und Menü oben rechts. */
+  onAction: (key: string) => void;
   onNotice: (message: string) => void;
 }
 
@@ -27,11 +30,10 @@ const TABS: { key: Tab; icon: IconName }[] = [
   { key: 'saved', icon: 'bookmark-outline' },
 ];
 
-const GRID = ['image', 'video', 'image', 'video', 'image', 'image', 'video', 'image', 'video', 'image', 'video', 'image'];
-
 /** Prototyp-Frame "Videos - Profil". */
-export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
+export const VideoProfileScreen = ({ onSwitchArea, onAction, onNotice }: Props) => {
   const { reposts } = useReposts();
+  const { ungelesen, highlights, playlists, spende, raster, eigeneBeitraege } = useProfil();
   const [tab, setTab] = useState<Tab>('grid');
   const me = mockProfiles.me;
 
@@ -43,22 +45,39 @@ export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
         <OwnProfileHead
           handle={mockUsers.me.handle}
           stats={[
-            { label: 'Beiträge', value: compact(me.posts) },
+            { label: 'Beiträge', value: compact(me.posts + eigeneBeitraege.length) },
             { label: 'Follower', value: compact(me.followers) },
             { label: 'Gefolgt', value: compact(me.following) },
           ]}
           name="Henrik"
           bio={me.bio}
           link={me.link}
-          onAction={(key) =>
-            onNotice({ bell: 'Mitteilungen', create: 'Erstellen', menu: 'Menü' }[key] + ' folgt')
-          }
+          ungelesen={ungelesen('videos')}
+          onAction={onAction}
           onLink={() => onNotice(me.link)}
         />
 
+        {spende && (
+          <View style={styles.spende}>
+            <Text style={styles.spendeTitel}>{spende.titel}</Text>
+            {!!spende.text && <Text style={styles.spendeText}>{spende.text}</Text>}
+            <View style={styles.spendeBalken}>
+              <View
+                style={[
+                  styles.spendeFuellung,
+                  { width: `${Math.min(100, Math.round((spende.gesammelt / spende.ziel) * 100))}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.spendeZahlen}>
+              {spende.gesammelt} € von {spende.ziel} € gesammelt
+            </Text>
+          </View>
+        )}
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
-          {['Playlistname', 'Playlistname'].map((label, i) => (
-            <Pressable key={`pl${i}`} style={styles.highlight} onPress={() => onNotice('Playlist folgt')}>
+          {playlists.map((label) => (
+            <Pressable key={`pl-${label}`} style={styles.highlight} onPress={() => onNotice(`Playlist „${label}“`)}>
               <View style={[styles.ring, styles.ringPlaylist]}>
                 <Ionicons name="play-outline" size={24} color="#E5484D" />
               </View>
@@ -67,8 +86,8 @@ export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
               </Text>
             </Pressable>
           ))}
-          {me.highlights.map((label) => (
-            <Pressable key={label} style={styles.highlight} onPress={() => onNotice(`„${label}" folgt`)}>
+          {highlights.map((label) => (
+            <Pressable key={`hl-${label}`} style={styles.highlight} onPress={() => onNotice(`Highlight „${label}“`)}>
               <View style={[styles.ring, styles.ringHighlight]}>
                 <Ionicons name="image-outline" size={24} color="#F5A524" />
               </View>
@@ -93,9 +112,18 @@ export const VideoProfileScreen = ({ onSwitchArea, onNotice }: Props) => {
 
         {tab === 'grid' ? (
           <View style={styles.grid}>
-            {GRID.map((kind, i) => (
-              <View key={i} style={styles.gridItem}>
-                <Ionicons name={kind === 'video' ? 'play-outline' : 'image-outline'} size={26} color={colors.text3} />
+            {raster.map((eintrag) => (
+              <View key={eintrag.id} style={styles.gridItem}>
+                {eintrag.mediaUri ? (
+                  // Selbst aufgenommen: das echte Bild statt des Platzhalters.
+                  <Image source={{ uri: eintrag.mediaUri }} style={styles.gridBild} />
+                ) : (
+                  <Ionicons
+                    name={eintrag.kind === 'video' ? 'play-outline' : 'image-outline'}
+                    size={26}
+                    color={colors.text3}
+                  />
+                )}
               </View>
             ))}
           </View>
@@ -146,6 +174,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: { paddingBottom: spacing.xl },
+
+  spende: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface2,
+  },
+  spendeTitel: { ...typography.name, color: colors.text },
+  spendeText: { ...typography.preview, color: colors.text2, marginTop: 3 },
+  spendeBalken: {
+    marginTop: 9,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.surface3,
+    overflow: 'hidden',
+  },
+  spendeFuellung: { height: '100%', backgroundColor: colors.brand },
+  spendeZahlen: { ...typography.small, color: colors.text3, marginTop: 6 },
+
   highlights: { gap: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   highlight: { alignItems: 'center', gap: 6, width: 68 },
   ring: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
@@ -166,5 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  gridBild: { width: '100%', height: '100%' },
 });

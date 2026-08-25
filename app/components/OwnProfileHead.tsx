@@ -17,6 +17,8 @@ interface Props {
   link: string;
   onAction: (key: string) => void;
   onLink: () => void;
+  /** Ungelesene Mitteilungen - nur dann steht ein roter Punkt an der Glocke. */
+  ungelesen?: number;
 }
 
 /**
@@ -24,14 +26,18 @@ interface Props {
  * Glocke/Plus/Menü, darunter Bild links neben den Zahlen, dann Name,
  * Biografie und Link linksbündig.
  */
-export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink }: Props) => (
+export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, ungelesen = 0 }: Props) => (
   <View>
     <View style={styles.bar}>
       <Text style={styles.handle}>{handle}</Text>
       <View style={styles.actions}>
-        <Pressable onPress={() => onAction('bell')} hitSlop={8}>
+        <Pressable
+          onPress={() => onAction('bell')}
+          hitSlop={8}
+          accessibilityLabel={ungelesen ? `Mitteilungen, ${ungelesen} ungelesen` : 'Mitteilungen'}
+        >
           <Ionicons name="notifications-outline" size={21} color={colors.text} />
-          <View style={styles.dot} />
+          {ungelesen > 0 && <View style={styles.dot} />}
         </Pressable>
         <Pressable onPress={() => onAction('create')} hitSlop={8}>
           <Ionicons name="add-circle-outline" size={21} color={colors.text} />

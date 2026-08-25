@@ -5,7 +5,8 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, radius, spacing, typography } from '../../constants/design';
-import { mockClips, mockUsers } from '../../mocks';
+import { mockUsers } from '../../mocks';
+import { useProfil } from '../../contexts/ProfilContext';
 
 interface Props {
   onNotice: (message: string) => void;
@@ -16,15 +17,18 @@ const compact = (n: number) =>
 
 /** Prototyp-Frame "Videos - Querformat": Suchleiste plus Videoliste. */
 export const LandscapeVideosScreen = ({ onNotice }: Props) => {
+  // Eigene Aufnahmen und die Livestream-Aufzeichnung stehen im gemeinsamen
+  // Zustand und sollen hier oben mit auftauchen.
+  const { clips } = useProfil();
   const [query, setQuery] = useState('');
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return mockClips;
-    return mockClips.filter(
+    if (!q) return clips;
+    return clips.filter(
       (c) => c.title.toLowerCase().includes(q) || mockUsers[c.userId].name.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [clips, query]);
 
   return (
     <View style={styles.screen}>

@@ -85,6 +85,8 @@ export interface Post {
   /** Wie oft der Beitrag geteilt wurde, und ob man selbst dabei ist. */
   reposts: number;
   reposted: boolean;
+  /** Selbst aufgenommen: die Datei, die statt des Platzhalters gezeigt wird. */
+  mediaUri?: string;
 }
 
 export interface Video {
@@ -99,6 +101,8 @@ export interface Video {
   liked: boolean;
   saved: boolean;
   reposted: boolean;
+  /** Selbst aufgenommen: Standbild oder Datei fuer die Vorschau. */
+  mediaUri?: string;
 }
 
 export interface Community {
@@ -169,4 +173,65 @@ export interface AuthUser {
   id: string;
   email: string;
   profile: User;
+}
+
+/**
+ * Mitteilung im eigenen Profil - Prototyp-Frames "VP + Mitteilung" und
+ * "CP + Mitteilungen". Gespeichert wird nur, was passiert ist; der Satz
+ * entsteht erst beim Anzeigen.
+ */
+export type MitteilungArt =
+  | 'like'
+  | 'follow'
+  | 'comment'
+  | 'repost'
+  | 'mention'
+  | 'story'
+  | 'kanal'
+  | 'beitritt'
+  | 'nachricht'
+  | 'einladung';
+
+export type MitteilungsBereich = 'videos' | 'communities';
+
+export interface MitteilungsZiel {
+  art: 'post' | 'video' | 'profile' | 'community';
+  id: string;
+}
+
+export interface Mitteilung {
+  id: string;
+  bereich: MitteilungsBereich;
+  art: MitteilungArt;
+  userId: string;
+  ziel: MitteilungsZiel;
+  /** Wie lange her, in Minuten. Daraus wird "vor 10 min", "vor 3 W" ... */
+  minuten: number;
+  gelesen: boolean;
+}
+
+/** Fertig fuer die Anzeige aufbereitete Mitteilung. */
+export interface MitteilungAnzeige {
+  id: string;
+  text: string;
+  zeit: string;
+  gelesen: boolean;
+  ziel: MitteilungsZiel;
+}
+
+/** Spendenaktion aus dem Erstellen-Blatt. */
+export interface Spende {
+  titel: string;
+  ziel: number;
+  gesammelt: number;
+  text: string;
+}
+
+/** Ein Eintrag im eigenen Beitragsraster. */
+export interface RasterEintrag {
+  id: string;
+  kind: 'image' | 'video';
+  /** Selbst aufgenommen - dann steht in mediaUri das Bild. */
+  eigen?: boolean;
+  mediaUri?: string;
 }

@@ -6,19 +6,25 @@ import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
 import { colors, spacing, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
-import { mockCommunities, mockUsers } from '../../mocks';
+import { mockUsers } from '../../mocks';
+import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
   onOpenCommunity: (community: Community) => void;
+  /** Glocke, Plus und Menü oben rechts. */
+  onAction: (key: string) => void;
   onNotice: (message: string) => void;
 }
 
 /** Prototyp-Frame "Community - Profil": Erstellt und Beigetreten. */
-export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onNotice }: Props) => {
-  const created = mockCommunities.filter((c) => c.visibility === 'private' && c.joined);
-  const joined = mockCommunities.filter((c) => c.joined && !created.includes(c));
+export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction, onNotice }: Props) => {
+  // Die Liste kommt aus dem gemeinsamen Zustand, nicht mehr direkt aus den
+  // Mock-Daten - sonst taucht ein neu erstellter Kanal hier nicht auf.
+  const { communities, ungelesen } = useProfil();
+  const created = communities.filter((c) => c.visibility === 'private' && c.joined);
+  const joined = communities.filter((c) => c.joined && !created.includes(c));
 
   const list = (items: Community[]) =>
     items.map((c) => (
@@ -48,9 +54,8 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onNotice
           name="Henrik"
           bio="Baue gerade All Media."
           link="all-media.app"
-          onAction={(key) =>
-            onNotice({ bell: 'Mitteilungen', create: 'Erstellen', menu: 'Menü' }[key] + ' folgt')
-          }
+          ungelesen={ungelesen('communities')}
+          onAction={onAction}
           onLink={() => onNotice('all-media.app')}
         />
 
