@@ -43,7 +43,7 @@ import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
-import { mockChats, mockContacts, mockPlaces, mockStories, mockUsers } from './mocks';
+import { mockChats, mockContacts, mockMessages, mockPlaces, mockStories, mockUsers } from './mocks';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Video } from './types';
 
 type Overlay =
@@ -57,7 +57,7 @@ type Overlay =
   | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich' }
   | { kind: 'contacts' }
   | { kind: 'camera' }
-  | { kind: 'call'; userId: string; art: 'audio' | 'video' }
+  | { kind: 'call'; userId?: string; gruppenName?: string; teilnehmer?: string[]; art: 'audio' | 'video' }
   | { kind: 'livestream' }
   | { kind: 'explorer'; ziel: ExplorerZiel }
   | { kind: 'clip'; clipId: string }
@@ -112,6 +112,10 @@ const Shell = () => {
 
   const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
   const hideNotice = useCallback(() => setNotice(null), []);
+
+  /** Alle Nachrichten eines Chats - fuer Medien, Markiertes und die Suche. */
+  const nachrichtenVon = (chatId?: string): Message[] =>
+    chatId ? [...(mockMessages[chatId] ?? []), ...(extraNachrichten[chatId] ?? [])] : [];
 
   /** Chat oeffnen und dabei alles mitgeben, was frueher hineingeteilt wurde. */
   const oeffneChat = (chat: Chat, zusatz?: Message[]) =>
@@ -455,10 +459,18 @@ const Shell = () => {
         chat={overlay.chat}
         extraMessages={overlay.extra}
         onBack={() => setOverlay(null)}
-        onCall={(art) => {
-          if (!overlay.chat.userId) return setNotice('Gruppenanrufe folgen später');
-          setOverlay({ kind: 'call', userId: overlay.chat.userId, art });
-        }}
+        onCall={(art) =>
+          setOverlay(
+            overlay.chat.userId
+              ? { kind: 'call', userId: overlay.chat.userId, art }
+              : {
+                  kind: 'call',
+                  gruppenName: overlay.chat.name,
+                  teilnehmer: overlay.chat.memberIds ?? [],
+                  art,
+                }
+          )
+        }
         onCamera={() => setOverlay({ kind: 'camera' })}
         onOpenProfile={openProfile}
         onAcceptRequest={acceptRequest}
@@ -480,6 +492,11 @@ const Shell = () => {
           onBack={() => setOverlay(null)}
           onMessage={openChatWith}
           onCall={(id, art) => setOverlay({ kind: 'call', userId: id, art })}
+          chat={chats.find((c) => !c.isGroup && c.userId === overlay.userId)}
+          nachrichten={nachrichtenVon(chats.find((c) => !c.isGroup && c.userId === overlay.userId)?.id)}
+          gruppen={chats.filter((c) => c.isGroup && (c.memberIds ?? []).includes(overlay.userId))}
+          onOpenChat={oeffneChat}
+          onOpenPublicProfile={openPublicProfile}
           onNotice={setNotice}
         />
       );
@@ -541,6 +558,8 @@ const Shell = () => {
     return (
       <CallScreen
         userId={overlay.userId}
+        gruppenName={overlay.gruppenName}
+        teilnehmer={overlay.teilnehmer}
         art={overlay.art}
         onClose={() => setOverlay(null)}
         onNotice={setNotice}

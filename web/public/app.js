@@ -936,8 +936,20 @@ function dauerText(sekunden) {
     : `${zweistellig(min)}:${zweistellig(sek)}`;
 }
 
-function openCall(userId, art) {
-  const u = user(userId);
+/*
+ * Anruf - fuer eine Person oder fuer eine Gruppe. Bei einer Gruppe stehen
+ * alle Mitglieder oben, sonst die eine Person. Prototyp-Frames
+ * "MC + Sprachanruf" und "CC+ Sprachanruf".
+ */
+function openCall(ziel, art) {
+  // Bei einer Gruppe wird der Chat uebergeben, sonst die Kennung der Person.
+  const gruppe = typeof ziel === 'object' ? ziel : null;
+  const userId = gruppe ? null : ziel;
+  const teilnehmer = gruppe ? (gruppe.members || []).filter((id) => state.users[id]) : [];
+
+  const u = gruppe
+    ? { name: gruppe.name, initials: '', color: '#5C6BC0' }
+    : user(userId);
   if (!u) return toast('Diese Person gibt es nicht');
 
   let zustand = 'klingelt';
@@ -962,9 +974,20 @@ function openCall(userId, art) {
             : ''
         }
         <div class="anruf__kopf">
-          <div class="anruf__avatar ${zustand === 'klingelt' ? 'is-klingelt' : ''}"
-               style="background:${u.color}">${esc(u.initials)}</div>
+          ${
+            gruppe && teilnehmer.length
+              ? `<div class="anruf__runde">${teilnehmer
+                  .map((id) => `<span class="avatar avatar--52" style="background:${user(id).color}">${esc(user(id).initials)}</span>`)
+                  .join('')}</div>`
+              : `<div class="anruf__avatar ${zustand === 'klingelt' ? 'is-klingelt' : ''}"
+                   style="background:${u.color}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}</div>`
+          }
           <div class="anruf__name">${esc(u.name)}</div>
+          ${
+            gruppe && teilnehmer.length
+              ? `<div class="anruf__teilnehmer">${teilnehmer.map((id) => esc(user(id).name.split(' ')[0])).join(', ')}</div>`
+              : ''
+          }
           <div class="anruf__status" id="anrufStatus">${esc(status)}</div>
           ${
             zustand === 'verbunden'
@@ -1053,82 +1076,386 @@ function openCall(userId, art) {
 
 /* ------------------------------------------------------ contact profile */
 /** Kontaktinfo aus Sicht des Messengers - an WhatsApp angelehnt. */
+/*
+ * Kontaktinfo im Messenger - aufgebaut nach dem Prototyp-Frame
+ * "MC + Kontakteinstellungen": Bearbeiten oben rechts, Name mit Nummer und
+ * Biografie, die beiden anderen Profile der Person, drei Knoepfe
+ * (Audioanruf, Videoanruf, Suchen) und darunter die Gruppen aus dem Frame.
+ *
+ * Vorher gaben fast alle Zeilen hier nur "... folgt" aus.
+ */
 async function openContactProfile(userId) {
   const u = user(userId);
   if (!u) return toast('Diese Person gibt es nicht');
 
-  const eintraege = [
-    ['images', 'Medien, Links und Dokumente', '128'],
-    ['star', 'Markierte Nachrichten', '3'],
-    ['mute', 'Stummschalten', ''],
-    ['clock', 'Selbstlöschende Nachrichten', 'Aus'],
-    ['lock', 'Verschlüsselung', 'Ende-zu-Ende'],
-  ];
+  const chat = state.chats.find((c) => !c.isGroup && c.userId === userId);
+  const profil = await (await fetch(`/api/profile/${userId}`)).json().catch(() => ({}));
+  let daten = { medien: [], markiert: [], gesamt: 0 };
+  if (chat) daten = await (await fetch(`/api/chats/${chat.id}/medien`)).json();
+
+  const kontakt = state.contacts.find((c) => c.id === userId);
+  const gemeinsameGruppen = state.chats.filter((c) => c.isGroup && (c.members || []).includes(userId));
+
+  const zeile = (label, wert, art = '') =>
+    `<button class="kp__zeile ${art}" data-kp-item="${esc(label)}">
+       <span class="kp__zeileText">${esc(label)}</span>
+       ${wert ? `<span class="kp__zeileWert">${esc(wert)}</span>` : ''}
+       ${art.includes('is-danger') || art.includes('is-gruen') ? '' : `<span class="row__chevron">${ICONS.chevron}</span>`}
+     </button>`;
 
   overlay.hidden = false;
   overlay.innerHTML = `
     <header class="chathead">
       <button class="chathead__back" id="kpBack" aria-label="Zurück">${ICONS.back}</button>
       <div class="chathead__body"><div class="chathead__name">Kontaktinfo</div></div>
+      <div class="chathead__actions"><button class="kp__bearbeiten" id="kpEdit">Bearbeiten</button></div>
     </header>
 
     <div class="scroll">
       <div class="kp__kopf">
         ${avatarForUser(userId, 104)}
         <div class="kp__name">${esc(u.name)}</div>
-        <div class="kp__handle">${esc(u.handle)}</div>
         ${u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
       </div>
 
+      ${profil.bio ? `<div class="kp__bio">${esc(profil.bio)}</div>` : ''}
+
+      <div class="kp__profile">
+        <button data-kp="videoprofil">${esc(u.handle)} · Videos</button>
+        <button data-kp="communityprofil">${esc(u.handle)} · Communitys</button>
+      </div>
+
       <div class="kp__aktionen">
-        <button data-kp="message">${ICONS.chat || ICONS.send}<span>Nachricht</span></button>
-        <button data-kp="audio">${ICONS.phone}<span>Anrufen</span></button>
-        <button data-kp="video">${ICONS.video}<span>Video</span></button>
+        <button data-kp="audio">${ICONS.phone}<span>Audioanruf</span></button>
+        <button data-kp="video">${ICONS.video}<span>Videoanruf</span></button>
         <button data-kp="search">${ICONS.search}<span>Suchen</span></button>
       </div>
 
       <div class="kp__liste">
-        ${eintraege
-          .map(
-            ([, label, wert]) => `<button class="kp__zeile" data-kp-item="${esc(label)}">
-              <span class="kp__zeileText">${esc(label)}</span>
-              ${wert ? `<span class="kp__zeileWert">${esc(wert)}</span>` : ''}
-              <span class="row__chevron">${ICONS.chevron}</span>
-            </button>`
-          )
-          .join('')}
+        ${zeile('Medien, Links, Doks', String(daten.medien.length))}
+        ${zeile('Speicher verwalten', `${daten.gesamt} Nachrichten`)}
+        ${zeile('Mit Stern markiert', String(daten.markiert.length))}
       </div>
 
       <div class="kp__liste">
-        <button class="kp__zeile is-danger" data-kp-item="Kontakt blockieren">
-          <span class="kp__zeileText">Kontakt blockieren</span>
-        </button>
-        <button class="kp__zeile is-danger" data-kp-item="Kontakt melden">
-          <span class="kp__zeileText">Kontakt melden</span>
-        </button>
+        ${zeile('Benachrichtigungen', chat?.muted ? 'Aus' : 'An')}
+        ${zeile('Chatdesign', einstellung({ label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' }))}
+        ${zeile('In Fotos speichern', einstellung({ label: 'In Fotos speichern', wahl: ['An', 'Aus'], standard: 'Aus' }))}
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('Selbstlöschende Nachrichten', einstellung({ label: 'Selbstlöschende Nachrichten', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen'], standard: 'Aus' }))}
+        <div class="kp__zeile">
+          <span class="kp__zeileText">Chat sperren</span>
+          <button class="switch ${state.chatGesperrt?.[userId] ? 'is-on' : ''}" id="kpSperre" aria-label="Chat sperren"><span class="switch__knob"></span></button>
+        </div>
+        ${zeile('Erweiterter Chat-Datenschutz', einstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' }))}
+        ${zeile('Verschlüsselung', 'Ende-zu-Ende')}
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('Kontaktdetails', u.handle)}
+      </div>
+
+      <div class="kp__gruppenkopf">${gemeinsameGruppen.length} gemeinsame ${gemeinsameGruppen.length === 1 ? 'Gruppe' : 'Gruppen'}</div>
+      ${
+        gemeinsameGruppen.length
+          ? `<ul class="rows">${gemeinsameGruppen
+              .map(
+                (g) => `<li><button class="row" data-kp-gruppe="${g.id}">
+                  ${avatarOf(g, 44)}
+                  <div class="row__body">
+                    <div class="row__name">${esc(g.name)}</div>
+                    <div class="row__bottom"><span class="row__preview">${(g.members || []).length + 1} Mitglieder</span></div>
+                  </div>
+                  <span class="row__chevron">${ICONS.chevron}</span>
+                </button></li>`
+              )
+              .join('')}</ul>`
+          : `<div class="sheet__hint">Ihr seid in keiner gemeinsamen Gruppe.</div>`
+      }
+
+      <div class="kp__liste">
+        ${zeile('Kontakt teilen', '', 'is-gruen')}
+        ${zeile(kontakt?.favorit ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen', '', 'is-gruen')}
+        ${zeile('Chat exportieren', '', 'is-gruen')}
+        ${zeile('Chat leeren', '', 'is-danger')}
+      </div>
+
+      <div class="kp__liste">
+        ${zeile(`„${u.name}" blockieren`, '', 'is-danger')}
+        ${zeile(`„${u.name}" melden`, '', 'is-danger')}
       </div>
     </div>`;
 
-  $('#kpBack').addEventListener('click', () => {
+  const schliessen = () => {
     overlay.hidden = true;
     overlay.innerHTML = '';
+  };
+
+  $('#kpBack').addEventListener('click', schliessen);
+
+  $('#kpEdit').addEventListener('click', () =>
+    openFormular(
+      'Kontakt bearbeiten',
+      [
+        { key: 'name', label: 'Angezeigter Name', wert: u.name, pflicht: true },
+        { key: 'notiz', label: 'Notiz (nur für dich)' },
+      ],
+      ({ name }) => {
+        // Der angezeigte Name gilt nur hier - er aendert nichts am Profil
+        // der anderen Person.
+        state.users[userId] = { ...u, name };
+        state.chats = state.chats.map((c) => (c.userId === userId ? { ...c, name } : c));
+        toast('Kontakt gespeichert');
+        openContactProfile(userId);
+        return null;
+      },
+      'Speichern'
+    )
+  );
+
+  $('#kpSperre')?.addEventListener('click', (e) => {
+    state.chatGesperrt = { ...(state.chatGesperrt || {}) };
+    state.chatGesperrt[userId] = !state.chatGesperrt[userId];
+    e.currentTarget.classList.toggle('is-on');
+    toast(state.chatGesperrt[userId] ? 'Chat gesperrt' : 'Chatsperre aufgehoben');
   });
 
   overlay.querySelectorAll('[data-kp]').forEach((b) =>
     b.addEventListener('click', () => {
       const was = b.dataset.kp;
-      if (was === 'message') {
-        const chat = state.chats.find((c) => c.userId === userId);
-        if (chat) return openChat(chat.id);
-        return toast('Noch kein Chat mit dieser Person');
-      }
       if (was === 'audio' || was === 'video') return openCall(userId, was);
-      toast(`${b.textContent.trim()} folgt`);
+      if (was === 'search') return openChatSuche(chat);
+      schliessen();
+      openProfile(userId, 'oeffentlich');
     })
   );
 
+  overlay.querySelectorAll('[data-kp-gruppe]').forEach((b) =>
+    b.addEventListener('click', () => openChat(b.dataset.kpGruppe))
+  );
+
   overlay.querySelectorAll('[data-kp-item]').forEach((b) =>
-    b.addEventListener('click', () => toast(`${b.dataset.kpItem} folgt`))
+    b.addEventListener('click', () => kontaktZeile(b.dataset.kpItem, userId, chat, daten))
+  );
+}
+
+/** Was hinter den Zeilen der Kontaktinfo steckt. */
+async function kontaktZeile(label, userId, chat, daten) {
+  const u = user(userId);
+
+  if (label === 'Medien, Links, Doks') return openChatMedien(chat, daten.medien, 'Medien, Links, Doks');
+  if (label === 'Mit Stern markiert') return openChatMedien(chat, daten.markiert, 'Mit Stern markiert');
+
+  if (label === 'Speicher verwalten') {
+    return openEinstellung({
+      label: 'Speicher in diesem Chat',
+      liste: 'chatspeicher',
+      _zeilen: [
+        { text: 'Nachrichten', neben: String(daten.gesamt) },
+        { text: 'Medien', neben: String(daten.medien.length) },
+        { text: 'Markiert', neben: String(daten.markiert.length) },
+      ],
+    });
+  }
+
+  if (label === 'Benachrichtigungen') {
+    if (!chat) return toast('Noch kein Chat mit dieser Person');
+    chat.muted = !chat.muted;
+    toast(chat.muted ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+    return openContactProfile(userId);
+  }
+
+  if (label === 'Chatdesign') {
+    return openEinstellung({ label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' });
+  }
+  if (label === 'In Fotos speichern') {
+    return openEinstellung({ label: 'In Fotos speichern', wahl: ['An', 'Aus'], standard: 'Aus' });
+  }
+  if (label === 'Selbstlöschende Nachrichten') {
+    return openEinstellung({
+      label: 'Selbstlöschende Nachrichten',
+      wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen'],
+      standard: 'Aus',
+    });
+  }
+  if (label === 'Erweiterter Chat-Datenschutz') {
+    return openEinstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' });
+  }
+  if (label === 'Verschlüsselung') {
+    return openEinstellung({
+      label: 'Verschlüsselung',
+      info: 'Nachrichten in diesem Chat sind Ende-zu-Ende verschlüsselt. Niemand außer euch beiden kann sie lesen — auch All Media nicht.',
+    });
+  }
+  if (label === 'Kontaktdetails') {
+    return openEinstellung({
+      label: 'Kontaktdetails',
+      liste: 'kontaktdetails',
+      _zeilen: [
+        { text: 'Benutzername', neben: u.handle },
+        { text: 'Telefonnummer', neben: u.phone || 'nicht hinterlegt' },
+        { text: 'In deinen Kontakten', neben: state.contacts.some((c) => c.id === userId) ? 'ja' : 'nein' },
+      ],
+    });
+  }
+
+  if (label === 'Kontakt teilen') return openProfilSenden({ ...u, id: userId });
+
+  if (label.includes('Favoriten')) {
+    const res = await fetch(`/api/kontakte/${userId}/favorit`, { method: 'POST' });
+    const antwort = await res.json();
+    if (!antwort.ok) return toast(antwort.error);
+    state.contacts = antwort.contacts;
+    toast(antwort.favorit ? `${u.name} ist jetzt ein Favorit` : 'Aus den Favoriten entfernt');
+    return openContactProfile(userId);
+  }
+
+  if (label === 'Chat exportieren') {
+    if (!chat) return toast('Noch kein Chat mit dieser Person');
+    const verlauf = await (await fetch(`/api/messages/${chat.id}`)).json();
+    const text = verlauf
+      .map((m) => `[${m.time}] ${m.from === 'me' ? 'Du' : user(m.from).name}: ${m.text || ''}`)
+      .join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+    a.download = `chat-${u.name.toLowerCase().replace(/\s+/g, '-')}.txt`;
+    a.click();
+    return toast(`${verlauf.length} Nachrichten gesichert`);
+  }
+
+  if (label === 'Chat leeren') {
+    if (!chat) return toast('Noch kein Chat mit dieser Person');
+    await fetch(`/api/chats/${chat.id}/leeren`, { method: 'POST' });
+    const frisch = await (await fetch('/api/bootstrap')).json();
+    state.chats = frisch.chats;
+    toast('Chat geleert');
+    return openContactProfile(userId);
+  }
+
+  if (label.includes('blockieren')) {
+    const res = await fetch(`/api/profile/${userId}/block`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const antwort = await res.json();
+    if (!antwort.ok) return toast(antwort.error);
+    state.contacts = antwort.contacts;
+    state.chats = antwort.chats;
+    toast(antwort.blocked ? `${u.name} blockiert` : 'Blockierung aufgehoben');
+    render();
+    return openContactProfile(userId);
+  }
+
+  // Melden
+  openSheet(
+    'Kontakt melden',
+    `<div class="sheet__body">${MELDE_GRUENDE.map(
+      (g) => `<button class="item" data-grund="${esc(g)}">
+        <span class="item__label">${esc(g)}</span>
+        <span class="row__chevron">${ICONS.chevron}</span>
+      </button>`
+    ).join('')}</div>`,
+    (blatt, zu) => {
+      blatt.querySelectorAll('[data-grund]').forEach((g) =>
+        g.addEventListener('click', async () => {
+          zu();
+          await fetch(`/api/profile/${userId}/melden`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ grund: g.dataset.grund }),
+          });
+          toast('Danke, wir sehen uns das an');
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/** Medien oder markierte Nachrichten eines Chats. */
+function openChatMedien(chat, liste, titel) {
+  if (!chat) return toast('Noch kein Chat mit dieser Person');
+
+  const beschreibung = (m) =>
+    m.geteilt
+      ? `${m.geteilt.autor}: ${m.geteilt.titel}`
+      : m.standort
+      ? m.standort.name
+      : m.kontakt
+      ? m.kontakt.name
+      : m.text || 'Foto';
+
+  openSheet(
+    titel,
+    `<div class="sheet__body">
+       ${
+         liste.length
+           ? liste
+               .map(
+                 (m) => `<div class="item">
+                   <span class="item__icon">${
+                     m.media === 'audio' ? ICONS.mic : m.standort ? ICONS.mapPin : m.kontakt ? ICONS.person : ICONS.image
+                   }</span>
+                   <span class="item__label">${esc(beschreibung(m))}</span>
+                   <span class="item__value">${esc(m.time)}</span>
+                 </div>`
+               )
+               .join('')
+           : `<div class="sheet__hint">${
+               titel === 'Mit Stern markiert'
+                 ? 'Noch nichts markiert. Halte eine Nachricht im Chat gedrückt, um sie zu markieren.'
+                 : 'In diesem Chat liegen noch keine Medien.'
+             }</div>`
+       }
+     </div>`,
+    null,
+    { schliessen: true, hoch: liste.length > 4 }
+  );
+}
+
+/** Nachrichten dieses Chats durchsuchen. */
+async function openChatSuche(chat) {
+  if (!chat) return toast('Noch kein Chat mit dieser Person');
+  const verlauf = await (await fetch(`/api/messages/${chat.id}`)).json();
+
+  openSheet(
+    'Im Chat suchen',
+    `<div class="sheet__field">
+       <input id="chatSucheFeld" type="search" placeholder="Wonach suchst du?" autocomplete="off">
+     </div>
+     <div class="sheet__body" id="chatSucheListe">
+       <div class="sheet__hint">${verlauf.length} Nachrichten in diesem Chat.</div>
+     </div>`,
+    (sheet, close) => {
+      const feld = sheet.querySelector('#chatSucheFeld');
+      const liste = sheet.querySelector('#chatSucheListe');
+      setTimeout(() => feld.focus(), 80);
+
+      feld.addEventListener('input', () => {
+        const q = feld.value.trim().toLowerCase();
+        if (!q) {
+          liste.innerHTML = `<div class="sheet__hint">${verlauf.length} Nachrichten in diesem Chat.</div>`;
+          return;
+        }
+        const treffer = verlauf.filter((m) => (m.text || '').toLowerCase().includes(q));
+        liste.innerHTML = treffer.length
+          ? treffer
+              .map(
+                (m) => `<div class="item">
+                  <span class="item__label">${esc(m.text)}</span>
+                  <span class="item__value">${esc(m.time)}</span>
+                </div>`
+              )
+              .join('')
+          : `<div class="sheet__hint">Nichts gefunden.</div>`;
+      });
+
+      void close;
+    },
+    { schliessen: true, hoch: true }
   );
 }
 
@@ -1143,7 +1470,11 @@ async function openContactProfile(userId) {
  * Messenger heraus will man aber Nummer, Medien und Stummschalten sehen.
  */
 async function openProfile(userId, variante) {
-  if (variante === undefined) variante = state.view === 'chats' || state.view === 'friendmap' ? 'kontakt' : 'oeffentlich';
+  // Aus dem Messenger heraus gehoert die Kontaktinfo dazu, sonst das
+  // oeffentliche Profil. Frueher stand hier state.view - die Variable gibt
+  // es seit dem Umbau auf Bereiche nicht mehr, damit war die Weiche tot und
+  // es kam immer das Beitragsprofil.
+  if (variante === undefined) variante = state.area === 'messenger' ? 'kontakt' : 'oeffentlich';
   if (variante === 'kontakt') return openContactProfile(userId);
 
   const res = await fetch(`/api/profile/${userId}`);
@@ -2024,7 +2355,10 @@ function openEinstellung(punkt) {
           b.addEventListener('click', () => {
             einstellungSetzen(punkt, b.dataset.wahl);
             close();
-            renderSettings();
+            // Nur dort neu zeichnen, wo die Liste auch steht. Aus der
+            // Kontaktinfo heraus haette das sonst den Einstellungs-
+            // Bildschirm unter das offene Fenster gebaut.
+            if (state.area === 'settings') renderSettings();
             toast(`${punkt.label}: ${b.dataset.wahl}`);
           })
         );
@@ -2049,7 +2383,10 @@ function openEinstellung(punkt) {
   }
 
   if (punkt.liste) {
-    const { zeilen, leer, knopf, knopfText } = einstellungsListe(punkt.liste);
+    // Manche Aufrufer bringen ihre Zeilen selbst mit (Kontaktinfo).
+    const { zeilen, leer, knopf, knopfText } = punkt._zeilen
+      ? { zeilen: punkt._zeilen, leer: '', knopf: null, knopfText: '' }
+      : einstellungsListe(punkt.liste);
     return openSheet(
       punkt.label,
       `<div class="sheet__body">
@@ -4650,9 +4987,7 @@ async function openChat(chatId) {
   });
   overlay.querySelectorAll('[data-call]').forEach((b) =>
     b.addEventListener('click', () =>
-      chat.userId
-        ? openCall(chat.userId, b.dataset.call === 'video' ? 'video' : 'audio')
-        : toast('Gruppenanrufe folgen später')
+      openCall(chat.userId || chat, b.dataset.call === 'video' ? 'video' : 'audio')
     )
   );
   $('#attach').addEventListener('click', () => openAnhang(chat));
@@ -4687,6 +5022,31 @@ function paintMessages(chat) {
 
   // Angehaengter Kontakt fuehrt zu seinem Profil, ein Standort zu der
   // Standort-Seite - sonst waeren beide Karten nur Bilder.
+  // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt sich
+  // "Mit Stern markiert" in der Kontaktinfo wirklich.
+  box.querySelectorAll('[data-msgid]').forEach((el) => {
+    let halten;
+    const start = () => {
+      halten = setTimeout(async () => {
+        const res = await fetch(`/api/messages/${chat.id}/${el.dataset.msgid}/stern`, { method: 'POST' });
+        const daten = await res.json();
+        if (!daten.ok) return toast(daten.error);
+        const m = state.messages.find((x) => x.id === daten.id);
+        if (m) m.stern = daten.stern;
+        paintMessages(chat);
+        toast(daten.stern ? 'Nachricht markiert' : 'Markierung entfernt');
+      }, 500);
+    };
+    const ende = () => clearTimeout(halten);
+
+    el.addEventListener('pointerdown', start);
+    el.addEventListener('pointerup', ende);
+    el.addEventListener('pointerleave', ende);
+    el.addEventListener('pointercancel', ende);
+    // Ohne das oeffnet sich auf dem Handy beim Halten das Systemmenue.
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
+
   box.querySelectorAll('[data-msgkontakt]').forEach((b) =>
     b.addEventListener('click', () => openContactProfile(b.dataset.msgkontakt))
   );
@@ -4731,7 +5091,7 @@ function messageBubble(m, chat) {
        </button>`
     : '';
   return `
-    <div class="msg msg--${out ? 'out' : 'in'}">
+    <div class="msg msg--${out ? 'out' : 'in'}" data-msgid="${esc(m.id)}">
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
       ${m.replyToStory ? `<div class="msg__reply">Antwort auf die Story von ${esc(m.replyToStory)}</div>` : ''}
       ${
@@ -4745,7 +5105,7 @@ function messageBubble(m, chat) {
              </div>`
           : standort || kontakt || media || esc(m.text)
       }
-      <div class="msg__foot">${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
+      <div class="msg__foot">${m.stern ? `<span class="msg__stern">${ICONS.star}</span>` : ''}${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
     </div>`;
 }
 

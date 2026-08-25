@@ -53,7 +53,7 @@ export const ChatDetailScreen = ({
   onOpenStandort,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
-  const { istBlockiert } = useProfil();
+  const { istBlockiert, markierte, markieren } = useProfil();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>(() => [
     ...(mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []),
@@ -114,7 +114,16 @@ export const ChatDetailScreen = ({
     const sender = mockUsers[item.senderId];
 
     return (
-      <View style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}>
+      // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt
+      // sich "Mit Stern markiert" in der Kontaktinfo wirklich.
+      <Pressable
+        style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}
+        onLongPress={() => {
+          const jetzt = markieren(item.id);
+          onNotice?.(jetzt ? 'Nachricht markiert' : 'Markierung entfernt');
+        }}
+        delayLongPress={450}
+      >
         {!out && chat.isGroup && <Text style={styles.sender}>{sender?.name ?? 'Unbekannt'}</Text>}
 
         {item.bildUri ? (
@@ -174,10 +183,11 @@ export const ChatDetailScreen = ({
         )}
 
         <View style={styles.bubbleFoot}>
+          {markierte.includes(item.id) && <Ionicons name="star" size={12} color="#F5A524" />}
           <Text style={[styles.time, out && styles.timeOut]}>{item.time}</Text>
           {out && <Ionicons name="checkmark-done" size={14} color={colors.bubbleOutMeta} />}
         </View>
-      </View>
+      </Pressable>
     );
   };
 

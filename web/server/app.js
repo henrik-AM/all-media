@@ -413,6 +413,56 @@ app.get('/api/bootstrap', (req, res) => {
   });
 });
 
+/* ------------------------------------------------- Kontakteinstellungen */
+/*
+ * Was der Prototyp-Frame "MC + Kontakteinstellungen" anbietet: Medien,
+ * markierte Nachrichten, gemeinsame Gruppen, Chat leeren, Favorit.
+ */
+
+/** Nachricht mit einem Stern markieren oder die Markierung wieder wegnehmen. */
+app.post('/api/messages/:chatId/:messageId/stern', (req, res) => {
+  const store = communityMessages[req.params.chatId] ? communityMessages : messages;
+  const nachricht = (store[req.params.chatId] || []).find((m) => m.id === req.params.messageId);
+  if (!nachricht) return res.json({ ok: false, error: 'Diese Nachricht gibt es nicht' });
+
+  nachricht.stern = !nachricht.stern;
+  res.json({ ok: true, stern: nachricht.stern, id: nachricht.id });
+});
+
+/** Alles, was in diesem Chat an Medien und Weitergeleitetem liegt. */
+app.get('/api/chats/:chatId/medien', (req, res) => {
+  const store = communityMessages[req.params.chatId] ? communityMessages : messages;
+  const alle = store[req.params.chatId] || [];
+
+  res.json({
+    medien: alle.filter((m) => m.media || m.geteilt || m.standort || m.kontakt),
+    markiert: alle.filter((m) => m.stern),
+    gesamt: alle.length,
+  });
+});
+
+/** Chat leeren - die Unterhaltung bleibt, die Nachrichten sind weg. */
+app.post('/api/chats/:chatId/leeren', (req, res) => {
+  const store = communityMessages[req.params.chatId] ? communityMessages : messages;
+  store[req.params.chatId] = [];
+
+  const chat = chats.find((c) => c.id === req.params.chatId);
+  if (chat) {
+    chat.preview = 'Keine Nachrichten';
+    chat.unread = 0;
+  }
+  res.json({ ok: true, chats });
+});
+
+/** Kontakt als Favorit merken. */
+app.post('/api/kontakte/:userId/favorit', (req, res) => {
+  const kontakt = contacts.find((c) => c.id === req.params.userId);
+  if (!kontakt) return res.json({ ok: false, error: 'Diese Person steht nicht in deinen Kontakten' });
+
+  kontakt.favorit = !kontakt.favorit;
+  res.json({ ok: true, favorit: kontakt.favorit, contacts });
+});
+
 /*
  * Querformat-Player (Prototyp-Frame "VQ + Video"). Like, Merken und Repost
  * wie beim Hochformat - vorher liess sich ein Querformat-Video ueberhaupt

@@ -19,7 +19,12 @@ import { mockUsers } from '../../mocks';
 type Zustand = 'klingelt' | 'verbunden' | 'beendet';
 
 interface Props {
-  userId: string;
+  /** Bei einem Gruppenanruf leer - dann zaehlen name und teilnehmer. */
+  userId?: string;
+  /** Name der Gruppe. */
+  gruppenName?: string;
+  /** Kennungen der Mitglieder. */
+  teilnehmer?: string[];
   art: 'audio' | 'video';
   onClose: () => void;
   onNotice: (message: string) => void;
@@ -35,9 +40,11 @@ export const dauerText = (sekunden: number) => {
   return st > 0 ? `${st}:${zweistellig(min)}:${zweistellig(sek)}` : `${zweistellig(min)}:${zweistellig(sek)}`;
 };
 
-export const CallScreen = ({ userId, art, onClose, onNotice }: Props) => {
+export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose, onNotice }: Props) => {
   const insets = useSafeAreaInsets();
-  const person = mockUsers[userId];
+  const gruppe = !userId && !!gruppenName;
+  const person = userId ? mockUsers[userId] : undefined;
+  const dabei = teilnehmer.filter((id) => mockUsers[id]);
 
   const [zustand, setZustand] = useState<Zustand>('klingelt');
   const [dauer, setDauer] = useState(0);
@@ -100,10 +107,24 @@ export const CallScreen = ({ userId, art, onClose, onNotice }: Props) => {
       )}
 
       <View style={styles.kopf}>
-        <Animated.View style={{ transform: [{ scale: zustand === 'klingelt' ? puls : 1 }] }}>
-          <Avatar id={userId} name={person?.name ?? 'Unbekannt'} size={124} />
-        </Animated.View>
-        <Text style={styles.name}>{person?.name ?? 'Unbekannt'}</Text>
+        {gruppe && dabei.length > 0 ? (
+          // Bei einer Gruppe stehen alle Mitglieder oben statt eines
+          // grossen Bildes. Bei einer Community sind die Mitglieder nicht
+          // namentlich bekannt - dann bleibt es beim einen grossen Bild.
+          <View style={styles.runde}>
+            {dabei.map((id) => (
+              <Avatar key={id} id={id} name={mockUsers[id].name} size={52} />
+            ))}
+          </View>
+        ) : gruppe ? (
+          <Avatar id={gruppenName ?? 'gruppe'} name={gruppenName ?? 'Gruppe'} size={124} />
+        ) : (
+          <Animated.View style={{ transform: [{ scale: zustand === 'klingelt' ? puls : 1 }] }}>
+            <Avatar id={userId ?? 'me'} name={person?.name ?? 'Unbekannt'} size={124} />
+          </Animated.View>
+        )}
+        <Text style={styles.name}>{gruppe ? gruppenName : person?.name ?? 'Unbekannt'}</Text>
+        {gruppe && <Text style={styles.dabei}>{dabei.map((id) => mockUsers[id].name.split(' ')[0]).join(', ')}</Text>}
         <Text style={styles.status}>{statusText}</Text>
         {zustand === 'verbunden' && (
           <View style={styles.verschluesselt}>
@@ -194,6 +215,8 @@ const styles = StyleSheet.create({
   },
   videoHinweis: { color: 'rgba(255,255,255,0.4)', ...typography.small },
 
+  runde: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', maxWidth: 260, marginBottom: 6 },
+  dabei: { marginTop: 4, ...typography.preview, color: 'rgba(255,255,255,0.65)', textAlign: 'center' },
   kopf: { alignItems: 'center', gap: spacing.sm },
   name: { marginTop: spacing.lg, color: colors.white, ...typography.title },
   status: { color: 'rgba(255,255,255,0.65)', ...typography.body },

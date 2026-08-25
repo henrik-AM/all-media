@@ -117,6 +117,19 @@ interface ProfilWert {
   /** Like, Merken oder Repost bei einem Querformat-Video umschalten. */
   clipUmschalten: (id: string, was: 'like' | 'save' | 'repost') => void;
 
+  /* --- Kontaktinfo (Prototyp "MC + Kontakteinstellungen") --- */
+  /** Mit einem Stern markierte Nachrichten. */
+  markierte: string[];
+  markieren: (messageId: string) => boolean;
+  /** Favoriten und stummgeschaltete Chats. */
+  favoriten: string[];
+  favoritUmschalten: (userId: string) => boolean;
+  chatStumm: string[];
+  chatStummUmschalten: (chatId: string) => boolean;
+  /** Geleerte Chats - ihre Nachrichten werden nicht mehr angezeigt. */
+  geleerteChats: string[];
+  chatLeeren: (chatId: string) => void;
+
   /* --- Weitere Optionen im Profil einer Person --- */
   istStumm: (userId: string) => boolean;
   istBlockiert: (userId: string) => boolean;
@@ -169,6 +182,10 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const [stumm, setStumm] = useState<string[]>([]);
   const [blockiert, setBlockiert] = useState<string[]>([]);
   const [gemeldet, setGemeldet] = useState<Record<string, string>>({});
+  const [markierte, setMarkierte] = useState<string[]>([]);
+  const [favoriten, setFavoriten] = useState<string[]>([]);
+  const [chatStumm, setChatStumm] = useState<string[]>([]);
+  const [geleerteChats, setGeleerteChats] = useState<string[]>([]);
 
   const mitteilungen = useCallback(
     (bereich: MitteilungsBereich): MitteilungAnzeige[] =>
@@ -334,6 +351,21 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }, []);
 
+  /** Umschalten. Gibt zurueck, was danach gilt. */
+  const umschalter = (liste: string[], setzen: (f: (p: string[]) => string[]) => void) => (id: string) => {
+    const danach = !liste.includes(id);
+    setzen((prev) => (danach ? [...prev, id] : prev.filter((x) => x !== id)));
+    return danach;
+  };
+
+  const markieren = useCallback(umschalter(markierte, setMarkierte), [markierte]);
+  const favoritUmschalten = useCallback(umschalter(favoriten, setFavoriten), [favoriten]);
+  const chatStummUmschalten = useCallback(umschalter(chatStumm, setChatStumm), [chatStumm]);
+
+  const chatLeeren = useCallback((chatId: string) => {
+    setGeleerteChats((prev) => (prev.includes(chatId) ? prev : [...prev, chatId]));
+  }, []);
+
   const istStumm = useCallback((id: string) => stumm.includes(id), [stumm]);
   const istBlockiert = useCallback((id: string) => blockiert.includes(id), [blockiert]);
   const meldeGrund = useCallback((id: string) => gemeldet[id], [gemeldet]);
@@ -388,6 +420,14 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       spendeSetzen,
       aufzeichnungAnlegen,
       clipUmschalten,
+      markierte,
+      markieren,
+      favoriten,
+      favoritUmschalten,
+      chatStumm,
+      chatStummUmschalten,
+      geleerteChats,
+      chatLeeren,
       istStumm,
       istBlockiert,
       meldeGrund,
@@ -405,7 +445,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
-      aufzeichnungAnlegen, clipUmschalten, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
+      aufzeichnungAnlegen, clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
     ]
   );
 

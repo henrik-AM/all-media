@@ -1704,3 +1704,29 @@ body:has(.camera) .toast { bottom: 132px; }
 .player__autor .prof__btn { flex: 0 0 auto; width: auto; padding: 0 16px; }
 .player__text { padding: 4px 16px 10px; font-size: 14px; line-height: 1.45; color: var(--text); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; }
+
+/* ------------------------------- Kontaktinfo nach dem Prototyp-Frame */
+.kp__bearbeiten { font-size: 15px; font-weight: 600; color: var(--brand); padding: 0 4px; }
+.kp__bio { padding: 0 16px 12px; font-size: 14.5px; line-height: 1.45; }
+.kp__profile { display: flex; gap: 8px; padding: 0 16px 12px; }
+.kp__profile button {
+  flex: 1 1 0; padding: 9px 8px; border-radius: 12px;
+  background: var(--surface-2); font-size: 12.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kp__profile button:hover { background: var(--surface-3); }
+.kp__gruppenkopf { padding: 16px 16px 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.kp__zeile.is-gruen .kp__zeileText { color: var(--success); }
+.kp__zeile.is-danger .kp__zeileText { color: var(--danger); }
+
+/* Markierte Nachricht */
+.msg__stern { display: inline-flex; margin-left: 4px; color: #F5A524; }
+.msg__stern svg { width: 12px; height: 12px; }
+
+/* Kontaktinfo: grosses Bild und die Bearbeiten-Schaltflaeche */
+.avatar--104 { width: 104px; height: 104px; font-size: 34px; }
+.chathead__actions .kp__bearbeiten { width: auto; height: auto; border-radius: 10px; padding: 6px 8px; }
+
+/* Gruppenanruf: alle Mitglieder statt eines grossen Bildes */
+.anruf__runde { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 260px; margin-bottom: 6px; }
+.anruf__teilnehmer { margin-top: 4px; font-size: 13px; color: rgba(255,255,255,.65); text-align: center; }
