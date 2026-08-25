@@ -67,7 +67,9 @@ const state = {
   query: '',
   contactQuery: '',
   communityQuery: '',
-  communityFilter: 'all',
+  // Home startet bei den eigenen Communitys, nicht bei allen - siehe
+  // renderCommunities.
+  communityFilter: 'meine',
   commSearchQuery: '',
   commSearchFilter: 'all',
   videoSearchQuery: '',
@@ -111,8 +113,35 @@ function avatarOf(chat, size = 52) {
 }
 
 function avatarForUser(id, size = 44) {
+  if (id === 'me') return eigenerAvatar(state.users.me, size);
   const u = user(id);
   return `<div class="avatar avatar--${size}" style="background:${u.color}">${esc(u.initials)}</div>`;
+}
+
+/*
+ * Der eigene Avatar zeigt das selbst gewaehlte Bild, wenn eines hinterlegt
+ * ist. Es liegt nur im Browser (siehe openProfilBearbeiten), deshalb wird es
+ * hier und nicht ueber die Daten vom Server geholt.
+ */
+function eigenerAvatar(me, size = 44, extra = '') {
+  const bild = eigenesProfilbildLaden();
+  const klassen = `avatar avatar--${size}${extra ? ' ' + extra : ''}`;
+  if (bild) return `<div class="${klassen}"><img src="${bild}" alt="" /></div>`;
+  return `<div class="${klassen}" style="background:${me.color}">${esc(me.initials)}</div>`;
+}
+
+/*
+ * Link in der Profilbeschreibung. Henrik: "Links in Profilbeschreibungen
+ * muessen anklickbar sein." Vorher stand dort ein Anker auf "#", der nur
+ * einen Hinweis eingeblendet hat.
+ *
+ * Ohne Schema faengt der Browser sonst an, relativ zur eigenen Seite zu
+ * suchen - "all-media.app" wuerde auf der App-Adresse landen statt auf der
+ * Zielseite.
+ */
+function bioLink(adresse) {
+  const ziel = /^https?:\/\//i.test(adresse) ? adresse : `https://${adresse}`;
+  return `<a class="prof__link" href="${esc(ziel)}" target="_blank" rel="noopener noreferrer">${esc(adresse)}</a>`;
 }
 
 /* ------------------------------------------------------------------ theme */
@@ -727,6 +756,174 @@ function openSheet(title, bodyHtml, onMount, opts = {}) {
 
   onMount?.(sheet, () => sheet.remove());
   return sheet;
+}
+
+/*
+ * Eigenes Profil bearbeiten. Henrik: "Profilbild, Name, Info/Bio, Link usw.
+ * ueber eine Bearbeitungseinstellung aendern koennen."
+ *
+ * Das Bild bleibt im Browser - der Server teilt seinen Speicher mit allen
+ * Besuchern, so wie schon bei "Deine Story". Auf dem Server steht nur die
+ * Ersatzfarbe.
+ */
+const PROFILBILD_SPEICHER = 'allmedia.eigenesProfilbild';
+
+function eigenesProfilbildLaden() {
+  try {
+    return localStorage.getItem(PROFILBILD_SPEICHER) || null;
+  } catch {
+    return null;
+  }
+}
+
+function eigenesProfilbildSichern(datenUri) {
+  try {
+    if (datenUri) localStorage.setItem(PROFILBILD_SPEICHER, datenUri);
+    else localStorage.removeItem(PROFILBILD_SPEICHER);
+  } catch {
+    /* Speicher voll oder gesperrt - dann bleibt es bei den Initialen. */
+  }
+}
+
+// Auswahl der Ersatzfarbe, wenn kein Bild hinterlegt ist.
+const PROFILFARBEN = ['#0A66FF', '#E4699B', '#F2A65A', '#4DB6AC', '#9575CD', '#EF6C6C', '#5C9E6F'];
+
+function openProfilBearbeiten(fertig) {
+  const me = state.users.me;
+  const profil = state.eigenesProfil || {};
+  const bild = eigenesProfilbildLaden();
+
+  openSheet(
+    'Profil bearbeiten',
+    `<div class="sheet__body">
+      <div class="bearbeiten__bild">
+        <div class="avatar avatar--88" id="pbVorschau" style="background:${me.color}">
+          ${bild ? `<img src="${bild}" alt="" />` : esc(me.initials)}
+        </div>
+        <div class="bearbeiten__bildaktionen">
+          <button class="pill is-active" id="pbWaehlen">Bild wählen</button>
+          ${bild ? '<button class="pill" id="pbEntfernen">Entfernen</button>' : ''}
+        </div>
+        <input type="file" accept="image/*" id="pbDatei" hidden />
+      </div>
+
+      <label class="feld">
+        <span class="feld__label">Name</span>
+        <input class="feld__eingabe" id="pbName" value="${esc(me.name)}" maxlength="40" />
+      </label>
+
+      <label class="feld">
+        <span class="feld__label">Info</span>
+        <textarea class="feld__eingabe feld__eingabe--mehrzeilig" id="pbBio" rows="3" maxlength="150">${esc(profil.bio || '')}</textarea>
+        <span class="feld__zaehler" id="pbZaehler"></span>
+      </label>
+
+      <label class="feld">
+        <span class="feld__label">Link</span>
+        <input class="feld__eingabe" id="pbLink" value="${esc(profil.link || '')}" placeholder="deine-seite.de" />
+      </label>
+
+      <div class="feld">
+        <span class="feld__label">Farbe, wenn kein Bild gewählt ist</span>
+        <div class="farbwahl">
+          ${PROFILFARBEN.map(
+            (f) =>
+              `<button class="farbwahl__punkt ${f === me.color ? 'is-gewaehlt' : ''}" data-farbe="${f}" style="background:${f}" aria-label="Farbe ${f}"></button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="sheet__footer">
+      <button class="btn btn--primary" id="pbSichern">Speichern</button>
+    </div>`,
+    (sheet, close) => {
+      let farbe = me.color;
+      let neuesBild = bild;
+
+      const zaehler = sheet.querySelector('#pbZaehler');
+      const bio = sheet.querySelector('#pbBio');
+      const zaehlerAktualisieren = () => {
+        zaehler.textContent = `${bio.value.length}/150`;
+      };
+      bio.addEventListener('input', zaehlerAktualisieren);
+      zaehlerAktualisieren();
+
+      sheet.querySelectorAll('[data-farbe]').forEach((b) =>
+        b.addEventListener('click', () => {
+          farbe = b.dataset.farbe;
+          sheet.querySelectorAll('[data-farbe]').forEach((x) => x.classList.remove('is-gewaehlt'));
+          b.classList.add('is-gewaehlt');
+          const vorschau = sheet.querySelector('#pbVorschau');
+          if (!neuesBild) vorschau.style.background = farbe;
+        })
+      );
+
+      sheet.querySelector('#pbWaehlen').addEventListener('click', () => sheet.querySelector('#pbDatei').click());
+
+      sheet.querySelector('#pbDatei').addEventListener('change', async (e) => {
+        const datei = e.target.files?.[0];
+        if (!datei) return;
+        neuesBild = await bildVerkleinern(datei, 400);
+        sheet.querySelector('#pbVorschau').innerHTML = `<img src="${neuesBild}" alt="" />`;
+      });
+
+      sheet.querySelector('#pbEntfernen')?.addEventListener('click', () => {
+        neuesBild = null;
+        const vorschau = sheet.querySelector('#pbVorschau');
+        vorschau.innerHTML = esc(state.users.me.initials);
+        vorschau.style.background = farbe;
+      });
+
+      sheet.querySelector('#pbSichern').addEventListener('click', async () => {
+        const antwort = await fetch('/api/eigene/profil', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: sheet.querySelector('#pbName').value,
+            bio: bio.value,
+            link: sheet.querySelector('#pbLink').value,
+            color: farbe,
+          }),
+        }).then((r) => r.json());
+
+        if (!antwort.ok) return toast(antwort.error);
+
+        eigenesProfilbildSichern(neuesBild);
+        Object.assign(state.users.me, {
+          name: antwort.profil.name,
+          initials: antwort.profil.initials,
+          color: antwort.profil.color,
+        });
+        state.eigenesProfil = { ...state.eigenesProfil, bio: antwort.profil.bio, link: antwort.profil.link };
+
+        close();
+        toast('Profil gespeichert');
+        fertig?.();
+      });
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/* Verkleinert ein gewaehltes Bild, bevor es im Browser abgelegt wird -
+   sonst sprengt es den Platz im localStorage. */
+function bildVerkleinern(datei, maxKante) {
+  return new Promise((fertig) => {
+    const leser = new FileReader();
+    leser.onload = () => {
+      const bild = new Image();
+      bild.onload = () => {
+        const faktor = Math.min(1, maxKante / Math.max(bild.width, bild.height));
+        const flaeche = document.createElement('canvas');
+        flaeche.width = Math.round(bild.width * faktor);
+        flaeche.height = Math.round(bild.height * faktor);
+        flaeche.getContext('2d').drawImage(bild, 0, 0, flaeche.width, flaeche.height);
+        fertig(flaeche.toDataURL('image/jpeg', 0.85));
+      };
+      bild.src = leser.result;
+    };
+    leser.readAsDataURL(datei);
+  });
 }
 
 function openNewMenu() {
@@ -2076,14 +2273,22 @@ function renderCommunityChat(communityId, channelId) {
   $('#backBtn')?.addEventListener('click', () => renderCommunityChannels(communityId));
 }
 
+/*
+ * Communitys-Startseite.
+ *
+ * Henrik: "Home zeigt nur Communitys, denen der Nutzer bereits beigetreten
+ * ist. Noch nicht beigetretene Communitys unter 'Entdecken' o. Ae. anzeigen."
+ *
+ * Vorher standen alle in einer Liste, getrennt nur nach oeffentlich/privat -
+ * beigetreten und nicht beigetreten waren nicht auseinanderzuhalten.
+ */
 function renderCommunities() {
   const q = state.communityQuery.trim().toLowerCase();
-  const list = state.communities.filter((c) => {
-    if (state.communityFilter === 'public' && c.visibility !== 'public') return false;
-    if (state.communityFilter === 'private' && c.visibility !== 'private') return false;
-    if (!q) return true;
-    return c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
-  });
+  const passt = (c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
+
+  const meine = state.communities.filter((c) => c.joined && passt(c));
+  const entdecken = state.communities.filter((c) => !c.joined && passt(c));
+  const list = state.communityFilter === 'entdecken' ? entdecken : meine;
 
   main.innerHTML = `
     <div class="pagehead">
@@ -2096,11 +2301,14 @@ function renderCommunities() {
       </div>
     </div>
     <div class="pills">
-      ${['all', 'public', 'private']
+      ${[
+        ['meine', 'Meine', meine.length],
+        ['entdecken', 'Entdecken', entdecken.length],
+      ]
         .map(
-          (f) =>
-            `<button class="pill ${state.communityFilter === f ? 'is-active' : ''}" data-cfilter="${f}">${
-              { all: 'Alle', public: 'Öffentlich', private: 'Privat' }[f]
+          ([f, label, anzahl]) =>
+            `<button class="pill ${state.communityFilter === f ? 'is-active' : ''}" data-cfilter="${f}">${label}${
+              anzahl ? ` <span class="pill__zahl">${anzahl}</span>` : ''
             }</button>`
         )
         .join('')}
@@ -2110,8 +2318,20 @@ function renderCommunities() {
         list.length
           ? `<ul class="rows">${list.map(communityRow).join('')}</ul>`
           : `<div class="empty">${ICONS.people}
-              <div class="empty__title">Keine Community gefunden</div>
-              <div class="empty__text">Für „${esc(state.communityQuery)}" wurde nichts gefunden.</div>
+              <div class="empty__title">${
+                state.communityQuery
+                  ? 'Keine Community gefunden'
+                  : state.communityFilter === 'entdecken'
+                    ? 'Du bist überall dabei'
+                    : 'Noch keiner Community beigetreten'
+              }</div>
+              <div class="empty__text">${
+                state.communityQuery
+                  ? `Für „${esc(state.communityQuery)}" wurde nichts gefunden.`
+                  : state.communityFilter === 'entdecken'
+                    ? 'Es gibt gerade nichts Neues zu entdecken.'
+                    : 'Unter „Entdecken" findest du Communitys zum Beitreten.'
+              }</div>
             </div>`
       }
     </div>`;
@@ -2179,10 +2399,10 @@ function communityRow(c) {
             ${c.visibility === 'private' ? `<span class="row__meta">${ICONS.lock}</span>` : ''}
           </div>
           <div class="row__bottom">
-            <span class="row__preview">${esc(c.topic)}</span>
+            <span class="row__preview row__preview--text">${esc(c.topic)}</span>
           </div>
           <div class="row__bottom">
-            <span class="row__preview" style="font-size:12px;color:var(--text-3)">${members} Mitglieder</span>
+            <span class="row__preview row__preview--text" style="font-size:12px;color:var(--text-3)">${members} Mitglieder</span>
           </div>
         </div>
         <span class="row__meta">
@@ -2317,17 +2537,24 @@ const SETTINGS = [
     ],
   },
   {
+    // Henrik: "Insbesondere einen Messenger-Unterpunkt ergaenzen, analog zu
+    // Videos und Communitys." Der Abschnitt hiess "Chats" und war damit der
+    // einzige, der nicht nach seinem Bereich benannt war.
     id: 'messenger',
-    title: 'Chats',
+    title: 'Messenger',
     items: [
       { label: 'Lesebestätigung', icon: 'checkDouble', toggle: 'lesebestaetigung' },
       { label: 'Standort-Sichtbarkeit', icon: 'mapPin', wahl: ['Alle Kontakte', 'Ausgewählte Kontakte', 'Niemand'], standard: 'Alle Kontakte' },
       { label: 'Story-Sichtbarkeit', icon: 'eye', wahl: ['Alle', 'Meine Kontakte', 'Enge Freunde'], standard: 'Meine Kontakte' },
+      { label: 'Zuletzt online', icon: 'eye', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
       { label: 'Mit Enter senden', icon: 'send', toggle: 'entersenden' },
       { label: 'Chat-Hintergrund', icon: 'image', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
       { label: 'Schriftgröße', icon: 'info', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
+      { label: 'Wer darf mich zu Gruppen hinzufügen', icon: 'people', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Selbstlöschende Nachrichten', icon: 'clock', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen', 'Nach 90 Tagen'], standard: 'Aus' },
       { label: 'Chat-Verlauf sichern', icon: 'bookmark', aktion: 'sicherung' },
       { label: 'Archivierte Chats', icon: 'bookmark', liste: 'archiv' },
+      { label: 'Blockierte Kontakte', icon: 'shield', liste: 'blockiert' },
     ],
   },
   {
@@ -2383,6 +2610,7 @@ const SETTINGS = [
         fertig: 'Spendencode gespeichert',
       },
       { label: 'Insights', icon: 'compass', liste: 'insights' },
+      { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
       { label: 'Repost-Sichtbarkeit', icon: 'repeat', wahl: ['Alle', 'Meine Follower', 'Niemand'], standard: 'Alle' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart', wahl: ['Alle', 'Nur ich'], standard: 'Alle' },
@@ -2510,6 +2738,19 @@ function einstellungsListe(art) {
     return {
       leer: 'Du hast bei keinem Profil die Glocke angeschaltet.',
       zeilen: mit.map((p) => ({ text: user(p.userId).name, neben: 'Glocke an' })),
+    };
+  }
+  /*
+   * Henrik: "In den Einstellungen muss man sehen koennen, wem man folgt."
+   * `state.gefolgt` kommt aus /api/bootstrap und ist dieselbe Quelle, aus
+   * der auch die Folgen-Knoepfe im Feed ihren Zustand nehmen - damit stimmt
+   * die Liste immer mit den Knoepfen ueberein.
+   */
+  if (art === 'gefolgt') {
+    const ids = Object.keys(state.gefolgt || {}).filter((id) => state.gefolgt[id]);
+    return {
+      leer: 'Du folgst noch niemandem.',
+      zeilen: ids.map((id) => ({ text: user(id).name, neben: user(id).handle })),
     };
   }
   if (art === 'stummeKanaele') {
@@ -3447,6 +3688,22 @@ function medienKachel(eintrag, art, symbol, form) {
     </button>`;
 }
 
+/*
+ * Wechselt in einen Unterpunkt und stellt das genannte Element oben hin.
+ *
+ * Der Aufbau laeuft ueber render(); erst danach steht das Element im
+ * Dokument. requestAnimationFrame wartet genau diesen einen Bildaufbau ab -
+ * ein fester Zeitwert waere geraten und bei langsamen Geraeten zu kurz.
+ */
+function springeZu(unterpunkt, elementId) {
+  state.sub.videos = unterpunkt;
+  render();
+  requestAnimationFrame(() => {
+    const ziel = document.getElementById(elementId);
+    if (ziel) ziel.scrollIntoView({ block: 'start' });
+  });
+}
+
 /* -------------------------------------------------------- Videos: Suche */
 // Prototyp-Frame "Video - Suche": Explorer mit den Abschnitten Reels,
 // Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
@@ -3462,7 +3719,22 @@ function renderVideoSearch() {
   const places = state.places.filter((pl) => hit(pl.name));
   const sounds = state.sounds.filter((so) => hit(so.title) || hit(so.artist));
 
-  const section = (title, body) => (body ? `<div class="exp"><div class="exp__head">${title} →</div>${body}</div>` : '');
+  /*
+   * Henrik: "Die Kategorien muessen jeweils auf eigene Uebersichtsseiten
+   * fuehren, wenn man auf die Ueberschrift bzw. den Pfeil drueckt."
+   *
+   * Die Uebersichtsseiten gab es schon (renderReelsExplorer und die anderen),
+   * aber die Ueberschrift war ein <div> - man kam also nie hin. `ziel` ist
+   * der Wert fuer state.explorerView; ohne Ziel bleibt die Zeile eine reine
+   * Beschriftung.
+   */
+  const section = (title, body, ziel) => {
+    if (!body) return '';
+    const kopf = ziel
+      ? `<button class="exp__head" data-explorer="${ziel}">${title} →</button>`
+      : `<div class="exp__head">${title}</div>`;
+    return `<div class="exp">${kopf}${body}</div>`;
+  };
   const total = reels.length + clips.length + posts.length + people.length + tags.length + places.length + sounds.length;
 
   main.innerHTML = `
@@ -3484,7 +3756,8 @@ function renderVideoSearch() {
                 ? `<div class="exp__reels">${reels
                     .map((v) => medienKachel(v, 'openvideo', ICONS.portrait, 'reihe'))
                     .join('')}</div>`
-                : ''
+                : '',
+              'reels'
             ) +
             section(
               'Querformat',
@@ -3497,13 +3770,15 @@ function renderVideoSearch() {
                       </button>`
                     )
                     .join('')}</div>`
-                : ''
+                : '',
+              'clips'
             ) +
             section(
               'Beiträge',
               posts.length
                 ? `<div class="exp__grid">${posts.map((p) => medienKachel(p, 'openpost', ICONS.image, 'raster')).join('')}</div>`
-                : ''
+                : '',
+              'posts'
             ) +
             section(
               'Profile',
@@ -3574,21 +3849,26 @@ function renderVideoSearch() {
     $('#videoSearch').focus();
   });
 
+  /*
+   * Henrik: "Beim Anklicken eines Reels direkt zum jeweiligen Reel gehen,
+   * nicht zur Startseite." Dasselbe fuer Querformat und Beitraege.
+   *
+   * Vorher wurde nur der Bereich gewechselt - man landete oben im Feed und
+   * musste das angetippte Video selbst wiederfinden.
+   */
   main.querySelectorAll('[data-openvideo]').forEach((b) =>
-    b.addEventListener('click', () => {
-      state.sub.videos = 'portrait';
-      render();
-    })
+    b.addEventListener('click', () => springeZu('portrait', `slide-${b.dataset.openvideo}`))
   );
   main.querySelectorAll('[data-openclip]').forEach((b) =>
-    b.addEventListener('click', () => {
-      state.sub.videos = 'landscape';
-      render();
-    })
+    b.addEventListener('click', () => openClip(b.dataset.openclip))
   );
   main.querySelectorAll('[data-openpost]').forEach((b) =>
+    b.addEventListener('click', () => springeZu('home', `post-${b.dataset.openpost}`))
+  );
+  // Ueberschrift oder Pfeil oeffnet die Uebersichtsseite der Kategorie.
+  main.querySelectorAll('[data-explorer]').forEach((b) =>
     b.addEventListener('click', () => {
-      state.sub.videos = 'home';
+      state.explorerView = b.dataset.explorer;
       render();
     })
   );
@@ -4922,7 +5202,7 @@ async function renderVideoProfile() {
     <div class="scroll">
       ${ownProfileTop(me.handle, 'videos')}
       <div class="oprof__top">
-        <div class="avatar avatar--88 has-status" style="background:${me.color}">${esc(me.initials)}</div>
+        ${eigenerAvatar(me, 88)}
         <div class="prof__stats">
           <div class="prof__stat"><span>Beiträge</span><strong>${compactNumber(me.posts)}</strong></div>
           <button class="prof__stat" id="followerBtn"><span>Follower</span><strong>${compactNumber(me.followers)}</strong></button>
@@ -4930,9 +5210,12 @@ async function renderVideoProfile() {
         </div>
       </div>
       <div class="prof__about">
-        <div class="prof__name">Henrik</div>
-        <div class="prof__bio">${esc(me.bio)}</div>
-        <a class="prof__link" href="#" id="profLink">${esc(me.link)}</a>
+        <div class="prof__name">${esc(me.name)}</div>
+        ${me.bio ? `<div class="prof__bio">${esc(me.bio)}</div>` : ''}
+        ${me.link ? bioLink(me.link) : ''}
+      </div>
+      <div class="prof__aktionen">
+        <button class="btn btn--breit" id="profilBearbeiten">Profil bearbeiten</button>
       </div>
       ${
         me.spende
@@ -4986,10 +5269,7 @@ async function renderVideoProfile() {
     </div>`;
 
   $('#switchProfile').addEventListener('click', openKontoWechsel);
-  $('#profLink').addEventListener('click', (e) => {
-    e.preventDefault();
-    toast(me.link);
-  });
+  $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderVideoProfile));
   $('#followerBtn')?.addEventListener('click', () => openFollowerList(me, 'follower'));
   $('#followingBtn')?.addEventListener('click', () => openFollowerList(me, 'following'));
   main.querySelectorAll('[data-otab]').forEach((b) =>

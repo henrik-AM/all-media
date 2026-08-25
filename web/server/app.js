@@ -725,6 +725,60 @@ app.post('/api/eigene/video', (req, res) => {
   res.json({ ok: true, video });
 });
 
+/*
+ * Eigenes Profil bearbeiten - Henrik: "Profilbild, Name, Info/Bio, Link usw.
+ * ueber eine Bearbeitungseinstellung aendern koennen."
+ *
+ * Name und Kuerzel stehen in `users`, Bio und Link in `profiles`. Beides
+ * wird hier zusammen gepflegt, damit der Aufrufer nur einen Weg kennen muss.
+ *
+ * Das Profilbild selbst bleibt im Browser: der Server teilt seinen Speicher
+ * mit allen Besuchern, dort hat ein privates Foto nichts zu suchen. Hier
+ * steht nur die Farbe, die als Ersatzbild dient.
+ */
+app.post('/api/eigene/profil', (req, res) => {
+  const { name, bio, link, color } = req.body || {};
+
+  if (name !== undefined) {
+    const sauber = String(name).trim();
+    if (!sauber) return res.json({ ok: false, error: 'Der Name darf nicht leer sein' });
+    if (sauber.length > 40) return res.json({ ok: false, error: 'Der Name ist zu lang (hoechstens 40 Zeichen)' });
+    users.me.name = sauber;
+    // Kuerzel aus den Anfangsbuchstaben, hoechstens zwei.
+    users.me.initials = sauber
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase();
+  }
+
+  if (bio !== undefined) {
+    const sauber = String(bio).trim();
+    if (sauber.length > 150) return res.json({ ok: false, error: 'Die Info ist zu lang (hoechstens 150 Zeichen)' });
+    profiles.me.bio = sauber;
+  }
+
+  if (link !== undefined) {
+    profiles.me.link = String(link).trim();
+  }
+
+  if (color !== undefined && /^#[0-9a-fA-F]{6}$/.test(color)) {
+    users.me.color = color;
+  }
+
+  res.json({
+    ok: true,
+    profil: {
+      name: users.me.name,
+      initials: users.me.initials,
+      color: users.me.color,
+      bio: profiles.me.bio,
+      link: profiles.me.link,
+    },
+  });
+});
+
 app.post('/api/eigene/highlight', (req, res) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
