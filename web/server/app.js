@@ -187,13 +187,27 @@ const videos = [
 ];
 
 const communities = [
-  { id: 'k1', name: 'Design Systeme', members: 1284, visibility: 'public', topic: 'Komponenten, Tokens, Figma', joined: true, unread: 3 },
-  { id: 'k2', name: 'React Native DE', members: 842, visibility: 'public', topic: 'Expo, Navigation, Performance', joined: true, unread: 0 },
-  { id: 'k3', name: 'Fotografie', members: 3120, visibility: 'public', topic: 'Licht, Komposition, Nachbearbeitung', joined: false, unread: 0 },
-  { id: 'k4', name: 'Team Intern', members: 12, visibility: 'private', topic: 'Nur für das Kernteam', joined: true, unread: 5 },
-  { id: 'k5', name: 'Laufgruppe Köln', members: 96, visibility: 'private', topic: 'Treffpunkte und Termine', joined: true, unread: 0 },
-  { id: 'k6', name: 'Musikproduktion', members: 671, visibility: 'public', topic: 'Ableton, Mixing, Sounddesign', joined: false, unread: 0 },
+  { id: 'k1', name: 'Design Systeme', members: 1284, visibility: 'public', topic: 'Komponenten, Tokens, Figma', joined: true, unread: 3, channels: ['ch-allgemein', 'ch-tokens', 'ch-figma'] },
+  { id: 'k2', name: 'React Native DE', members: 842, visibility: 'public', topic: 'Expo, Navigation, Performance', joined: true, unread: 0, channels: ['ch-allgemein', 'ch-expo', 'ch-navigation'] },
+  { id: 'k3', name: 'Fotografie', members: 3120, visibility: 'public', topic: 'Licht, Komposition, Nachbearbeitung', joined: false, unread: 0, channels: ['ch-allgemein', 'ch-licht', 'ch-nachbearbeitung'] },
+  { id: 'k4', name: 'Team Intern', members: 12, visibility: 'private', topic: 'Nur für das Kernteam', joined: true, unread: 5, channels: ['ch-allgemein', 'ch-sprint'] },
+  { id: 'k5', name: 'Laufgruppe Köln', members: 96, visibility: 'private', topic: 'Treffpunkte und Termine', joined: true, unread: 0, channels: ['ch-allgemein', 'ch-termine'] },
+  { id: 'k6', name: 'Musikproduktion', members: 671, visibility: 'public', topic: 'Ableton, Mixing, Sounddesign', joined: false, unread: 0, channels: ['ch-allgemein', 'ch-ableton', 'ch-mixing'] },
 ];
+
+const communityChannels = {
+  'ch-allgemein': { name: 'Allgemein', topics: ['Diskussionen', 'News'] },
+  'ch-tokens': { name: 'Design Tokens', topics: ['Struktur', 'Best Practices'] },
+  'ch-figma': { name: 'Figma', topics: ['Plugins', 'Workflows'] },
+  'ch-expo': { name: 'Expo', topics: ['SDK Updates', 'Debugging'] },
+  'ch-navigation': { name: 'Navigation', topics: ['React Navigation', 'Router'] },
+  'ch-licht': { name: 'Licht & Belichtung', topics: ['Goldene Stunde', 'ISO'] },
+  'ch-nachbearbeitung': { name: 'Nachbearbeitung', topics: ['Lightroom', 'Capture One'] },
+  'ch-sprint': { name: 'Sprint Planning', topics: ['Backlog', 'Reviews'] },
+  'ch-termine': { name: 'Termine', topics: ['Diese Woche', 'Nächste Woche'] },
+  'ch-ableton': { name: 'Ableton Live', topics: ['Devices', 'Workflow'] },
+  'ch-mixing': { name: 'Mixing & Mastering', topics: ['Techniken', 'Feedback'] },
+};
 
 const communityMessages = {
   k1: [
@@ -1192,6 +1206,56 @@ app.post('/api/stories/:id/reply', (req, res) => {
 app.post('/api/chats/:chatId/read', (req, res) => {
   const chat = chats.find((c) => c.id === req.params.chatId);
   if (chat) chat.unread = 0;
+  res.json({ ok: true });
+});
+
+/** Communities: beigetretene vs. Entdecken */
+app.get('/api/communities', (req, res) => {
+  const filter = req.query.filter || 'joined'; // joined | discover
+  const result = communities.filter((c) => filter === 'discover' ? !c.joined : c.joined);
+  res.json(result);
+});
+
+/** Community mit Kanälen */
+app.get('/api/communities/:id', (req, res) => {
+  const community = communities.find((c) => c.id === req.params.id);
+  if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  const channels = community.channels.map((chId) => ({
+    id: chId,
+    name: communityChannels[chId]?.name || chId,
+    topics: communityChannels[chId]?.topics || [],
+  }));
+
+  res.json({ ...community, channels });
+});
+
+/** Community-Kanal öffnen (zeigt Themen oder Chat) */
+app.get('/api/communities/:id/channels/:chId', (req, res) => {
+  const community = communities.find((c) => c.id === req.params.id);
+  const channel = communityChannels[req.params.chId];
+
+  if (!community || !channel) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  res.json({
+    community: community.name,
+    channel: channel.name,
+    topics: channel.topics,
+    messages: communityMessages[req.params.chId] || [],
+  });
+});
+
+/** Community beitreten */
+app.post('/api/communities/:id/join', (req, res) => {
+  const community = communities.find((c) => c.id === req.params.id);
+  if (community) community.joined = true;
+  res.json({ ok: true });
+});
+
+/** Community verlassen */
+app.post('/api/communities/:id/leave', (req, res) => {
+  const community = communities.find((c) => c.id === req.params.id);
+  if (community) community.joined = false;
   res.json({ ok: true });
 });
 

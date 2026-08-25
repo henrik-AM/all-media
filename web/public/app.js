@@ -76,6 +76,9 @@ const state = {
   ownProfileTab: 'grid',
   openChatId: null,
   openChatSettingsId: null,
+  openCommunityId: null,
+  openChannelId: null,
+  communitiesFilter: 'joined',
   messages: [],
   currentUserId: localStorage.getItem('am-user-id') || 'me',
   profiles: JSON.parse(localStorage.getItem('am-profiles') || '["me"]'),
@@ -597,6 +600,39 @@ function renderContacts() {
       if (chat) openChat(chat.id);
       else toast('Noch kein Chat mit diesem Kontakt');
     })
+  );
+}
+
+/** Follower/Gefolgte Listen */
+function openFollowerList(profile, art) {
+  const liste = art === 'follower'
+    ? (state.users.followers || []).map(id => user(id))
+    : (state.users.following || []).map(id => user(id));
+
+  const titel = art === 'follower' ? 'Follower' : 'Gefolgt';
+  openSheet(
+    titel,
+    `<div class="sheet__body">${liste.length ? liste.map(u => `
+      <button class="item" data-uid="${u.id}">
+        <span class="avatar avatar--40" style="background:${u.color}">${esc(u.initials)}</span>
+        <span class="item__body">
+          <div class="item__label">${esc(u.name)}</div>
+          <div class="item__sub">${esc(u.handle)}</div>
+        </span>
+        <span class="row__chevron">${ICONS.chevron}</span>
+      </button>
+    `).join('') : '<div style="text-align:center;padding:30px;color:var(--text-2)">Noch niemand</div>'}</div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-uid]').forEach(b =>
+        b.addEventListener('click', () => {
+          close();
+          state.area = 'videos';
+          state.sub.videos = 'profile';
+          render();
+        })
+      );
+    },
+    { schliessen: true, hoch: true }
   );
 }
 
@@ -1974,7 +2010,9 @@ function renderCommunities() {
     row.addEventListener('click', () => {
       const community = state.communities.find((c) => c.id === row.dataset.community);
       if (!community.joined) return toast('Tritt der Community zuerst bei');
-      openChat(community.id);
+      state.openCommunityId = community.id;
+      state.openChannelId = null;
+      renderCommunities();
     })
   );
 
@@ -3113,8 +3151,9 @@ function renderMessengerProfile() {
 // Querformat-Videos mit Vorschaubild, Titel, Kanal und Laufzeit.
 function renderLandscapeVideos() {
   const q = state.clipQuery.trim().toLowerCase();
+  const filter = state.clipFilter || 'alle';
   const list = state.clips.filter(
-    (c) => !q || c.title.toLowerCase().includes(q) || user(c.userId).name.toLowerCase().includes(q)
+    (c) => (!q || c.title.toLowerCase().includes(q) || user(c.userId).name.toLowerCase().includes(q))
   );
 
   main.innerHTML = `
@@ -3125,6 +3164,9 @@ function renderLandscapeVideos() {
           <input id="clipSearch" type="search" placeholder="Querformat durchsuchen" value="${esc(state.clipQuery)}" autocomplete="off" />
           ${state.clipQuery ? `<button class="searchbox__clear" id="clipSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
         </label>
+      </div>
+      <div class="pills">
+        ${['alle', 'standard', '360°', 'live'].map((f) => `<button class="pill ${filter === f ? 'is-active' : ''}" data-clipfilter="${f}">${f.charAt(0).toUpperCase() + f.slice(1)}</button>`).join('')}
       </div>
     </div>
     <div class="scroll">
@@ -3168,6 +3210,12 @@ function renderLandscapeVideos() {
   });
   main.querySelectorAll('[data-clip]').forEach((el) =>
     el.addEventListener('click', () => openClip(el.dataset.clip))
+  );
+  main.querySelectorAll('[data-clipfilter]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.clipFilter = b.dataset.clipfilter;
+      renderLandscapeVideos();
+    })
   );
 }
 
@@ -4715,8 +4763,8 @@ async function renderVideoProfile() {
         <div class="avatar avatar--88 has-status" style="background:${me.color}">${esc(me.initials)}</div>
         <div class="prof__stats">
           <div class="prof__stat"><span>Beiträge</span><strong>${compactNumber(me.posts)}</strong></div>
-          <div class="prof__stat"><span>Follower</span><strong>${compactNumber(me.followers)}</strong></div>
-          <div class="prof__stat"><span>Gefolgt</span><strong>${compactNumber(me.following)}</strong></div>
+          <button class="prof__stat" id="followerBtn"><span>Follower</span><strong>${compactNumber(me.followers)}</strong></button>
+          <button class="prof__stat" id="followingBtn"><span>Gefolgt</span><strong>${compactNumber(me.following)}</strong></button>
         </div>
       </div>
       <div class="prof__about">
@@ -4780,6 +4828,8 @@ async function renderVideoProfile() {
     e.preventDefault();
     toast(me.link);
   });
+  $('#followerBtn')?.addEventListener('click', () => openFollowerList(me, 'follower'));
+  $('#followingBtn')?.addEventListener('click', () => openFollowerList(me, 'following'));
   main.querySelectorAll('[data-otab]').forEach((b) =>
     b.addEventListener('click', () => {
       state.ownProfileTab = b.dataset.otab;
