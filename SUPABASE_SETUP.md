@@ -179,17 +179,13 @@ The app automatically:
 
 To use Realtime messages in a chat screen:
 
-```typescript
-import { useChatMessages } from '../lib/useSupabaseSubscription';
-
-export default function ChatDetailScreen({ chatId }) {
-  const { messages, isLoading } = useChatMessages(chatId);
-
-  return (
-    // Render messages...
-  );
-}
-```
+> **Hinweis (25.08.2026):** Der hier beschriebene Haken
+> `useChatMessages` aus `lib/useSupabaseSubscription` **gibt es nicht
+> mehr.** Die Phase-3-Haken liessen sich nicht uebersetzen und wurden
+> entfernt. Vorhanden sind heute: `contexts/SupabaseContext.tsx`,
+> `lib/supabaseAuth.ts`, `lib/supabaseStorage.ts` und
+> `lib/supabaseTypes.ts`. Die Realtime-Anbindung wird neu geschrieben,
+> sobald das Schema in der Datenbank steht.
 
 ### Testing
 
