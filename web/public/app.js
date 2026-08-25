@@ -1180,11 +1180,19 @@ async function openProfile(userId, variante) {
           <a class="prof__link" href="#" id="profLink">${esc(profile.link)}</a>
         </div>
 
+        ${
+          profile.blocked
+            ? `<div class="prof__hinweis">${ICONS.block} ${esc(profile.name)} ist blockiert. Ihr könnt euch keine Nachrichten schreiben.</div>`
+            : profile.muted
+            ? `<div class="prof__hinweis">${ICONS.mute} ${esc(profile.name)} ist stummgeschaltet.</div>`
+            : ''
+        }
+
         <div class="prof__buttons">
           <button class="prof__btn ${profile.following_me ? 'is-following' : 'is-primary'}" id="profFollow">
             ${profile.following_me ? 'Gefolgt' : 'Folgen'}
           </button>
-          <button class="prof__btn" id="profMessage">Nachricht</button>
+          <button class="prof__btn" id="profMessage" ${profile.blocked ? 'disabled' : ''}>Nachricht</button>
         </div>
 
         ${
@@ -1228,7 +1236,7 @@ async function openProfile(userId, variante) {
       </div>`;
 
     $('#profBack').addEventListener('click', closeOverlay);
-    $('#profMore').addEventListener('click', () => toast('Weitere Optionen folgen in Phase 3'));
+    $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
     $('#profLink').addEventListener('click', (e) => {
       e.preventDefault();
       toast(profile.link);
@@ -2751,6 +2759,291 @@ function openErstellen(bereich) {
   );
 }
 
+/* ------------------------------ Weitere Optionen im Profil einer Person */
+/*
+ * Der Knopf gab bisher "folgen in Phase 3" aus. Jetzt hat jede Option
+ * wirklich eine Folge: Stummschalten merkt sich der Server, Blockieren
+ * nimmt die Person aus den Kontakten und sperrt den gemeinsamen Chat,
+ * Melden haelt den Grund fest.
+ */
+const MELDE_GRUENDE = [
+  'Spam oder Werbung',
+  'Beleidigung oder Hass',
+  'Gefälschtes Profil',
+  'Nicht jugendfreie Inhalte',
+  'Etwas anderes',
+];
+
+function openProfilOptionen(profile, aktualisiert) {
+  const senden = async (was, koerper) => {
+    const res = await fetch(`/api/profile/${profile.id}/${was}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(koerper || {}),
+    });
+    const daten = await res.json();
+    if (!daten.ok) {
+      toast(daten.error);
+      return null;
+    }
+    if (daten.contacts) state.contacts = daten.contacts;
+    if (daten.chats) state.chats = daten.chats;
+
+    // Das Profil frisch holen, damit der Kopf den neuen Stand zeigt.
+    const neu = await (await fetch(`/api/profile/${profile.id}`)).json();
+    aktualisiert?.(neu);
+    return daten;
+  };
+
+  const punkte = [
+    { key: 'senden', label: 'Profil an einen Kontakt senden', icon: 'send' },
+    { key: 'link', label: 'Link kopieren', icon: 'bookmark' },
+    { key: 'stumm', label: profile.muted ? 'Stummschaltung aufheben' : 'Stummschalten', icon: 'mute' },
+    { key: 'block', label: profile.blocked ? 'Blockierung aufheben' : 'Blockieren', icon: 'block', gefahr: true },
+    { key: 'melden', label: 'Profil melden', icon: 'shield', gefahr: true },
+  ];
+
+  openSheet(
+    profile.name,
+    `<div class="sheet__body">${punkte
+      .map(
+        (p) => `<button class="item ${p.gefahr ? 'item--danger' : ''}" data-popt="${p.key}">
+          <span class="item__icon">${ICONS[p.icon]}</span>
+          <span class="item__label">${esc(p.label)}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`
+      )
+      .join('')}</div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-popt]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const was = b.dataset.popt;
+
+          if (was === 'link') {
+            close();
+            const adresse = `all-media.app/${profile.handle.replace('@', '')}`;
+            try {
+              await navigator.clipboard.writeText(adresse);
+              return toast('Link kopiert');
+            } catch {
+              // Ohne Zwischenablage-Recht wenigstens die Adresse zeigen.
+              return toast(adresse);
+            }
+          }
+
+          if (was === 'senden') {
+            close();
+            return openProfilSenden(profile);
+          }
+
+          if (was === 'melden') {
+            close();
+            return openSheet(
+              'Profil melden',
+              `<div class="sheet__body">${MELDE_GRUENDE.map(
+                (g) => `<button class="item" data-grund="${esc(g)}">
+                  <span class="item__label">${esc(g)}</span>
+                  <span class="row__chevron">${ICONS.chevron}</span>
+                </button>`
+              ).join('')}</div>`,
+              (blatt, zu) => {
+                blatt.querySelectorAll('[data-grund]').forEach((g) =>
+                  g.addEventListener('click', async () => {
+                    zu();
+                    const daten = await senden('melden', { grund: g.dataset.grund });
+                    if (daten) toast('Danke, wir sehen uns das an');
+                  })
+                );
+              },
+              { schliessen: true }
+            );
+          }
+
+          close();
+          const daten = await senden(was);
+          if (!daten) return;
+          if (was === 'stumm') return toast(daten.muted ? `${profile.name} stummgeschaltet` : 'Stummschaltung aufgehoben');
+          toast(daten.blocked ? `${profile.name} blockiert` : 'Blockierung aufgehoben');
+          render();
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/** Ein Profil als Kontaktkarte an jemanden schicken. */
+function openProfilSenden(profile) {
+  const auswahl = state.contacts.filter((c) => state.users[c.id] && c.id !== profile.id);
+  if (!auswahl.length) return toast('Du hast noch keinen Kontakt zum Weitergeben');
+
+  openSheet(
+    'Profil senden',
+    `<div class="sheet__body">${auswahl
+      .map((c) => {
+        const u = user(c.id);
+        return `<button class="item" data-an="${c.id}">
+          <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+          <span class="item__label">${esc(u.name)}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`;
+      })
+      .join('')}</div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-an]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          close();
+          const chat = state.chats.find((c) => !c.isGroup && c.userId === b.dataset.an);
+          if (!chat) return toast('Noch kein Chat mit dieser Person');
+
+          const res = await fetch(`/api/messages/${chat.id}/anhang`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ art: 'kontakt', id: profile.id }),
+          });
+          const daten = await res.json();
+          if (!daten.ok) return toast(daten.error);
+          toast(`Profil an ${user(b.dataset.an).name} gesendet`);
+        })
+      );
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/* ------------------------------------------------------- Anhang im Chat */
+/*
+ * Das Plus in der Nachrichtenzeile. Foto, Standort und Kontakt - alles
+ * drei landet wirklich im Chat, statt wie bisher nur einen Hinweis
+ * auszugeben.
+ */
+function openAnhang(chat) {
+  if (chat.requestState === 'pending') return toast('Warte, bis die Anfrage angenommen wurde');
+
+  const punkte = [
+    { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera' },
+    { key: 'galerie', label: 'Aus der Galerie', icon: 'image' },
+    { key: 'standort', label: 'Standort senden', icon: 'mapPin' },
+    { key: 'kontakt', label: 'Kontakt senden', icon: 'person' },
+  ];
+
+  openSheet(
+    'Anhang',
+    punkte
+      .map(
+        (p) => `<button class="item" data-anhang="${p.key}">
+          <span class="item__icon">${ICONS[p.icon]}</span>
+          <span class="item__label">${esc(p.label)}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`
+      )
+      .join(''),
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-anhang]').forEach((b) =>
+        b.addEventListener('click', () => {
+          close();
+          anhangSenden(chat, b.dataset.anhang);
+        })
+      );
+    }
+  );
+}
+
+/** Anhang wirklich verschicken und im Chat anzeigen. */
+async function anhangSenden(chat, art) {
+  const senden = async (koerper) => {
+    const res = await fetch(`/api/messages/${chat.id}/anhang`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(koerper),
+    });
+    const daten = await res.json();
+    if (!daten.ok) {
+      toast(daten.error);
+      return null;
+    }
+    return daten.message;
+  };
+
+  if (art === 'kamera' || art === 'galerie') {
+    const datei = await dateiWaehlen('photo', art === 'galerie');
+    if (!datei) return;
+
+    let bild;
+    try {
+      bild = await bildVerkleinern(datei);
+    } catch {
+      return toast('Bild konnte nicht gelesen werden');
+    }
+
+    const nachricht = await senden({ art: 'foto' });
+    if (!nachricht) return;
+    eigenesMediumSichern(nachricht.id, bild);
+    state.messages.push(nachricht);
+    paintMessages(chat);
+    return toast('Foto gesendet');
+  }
+
+  if (art === 'standort') {
+    return openSheet(
+      'Standort senden',
+      `<div class="sheet__body">${state.places
+        .map(
+          (p) => `<button class="item" data-ort="${p.id}">
+            <span class="item__icon">${ICONS.mapPin}</span>
+            <span class="item__label">${esc(p.name)}</span>
+            <span class="row__chevron">${ICONS.chevron}</span>
+          </button>`
+        )
+        .join('')}</div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-ort]').forEach((b) =>
+          b.addEventListener('click', async () => {
+            close();
+            const nachricht = await senden({ art: 'standort', id: b.dataset.ort });
+            if (!nachricht) return;
+            state.messages.push(nachricht);
+            paintMessages(chat);
+            toast('Standort gesendet');
+          })
+        );
+      },
+      { schliessen: true, hoch: true }
+    );
+  }
+
+  // Kontakt: nur Personen, die man auch wirklich kennt.
+  const auswahl = state.contacts.filter((c) => state.users[c.id] && c.id !== chat.userId);
+  if (!auswahl.length) return toast('Du hast noch keinen Kontakt zum Weitergeben');
+
+  openSheet(
+    'Kontakt senden',
+    `<div class="sheet__body">${auswahl
+      .map((c) => {
+        const u = user(c.id);
+        return `<button class="item" data-kontakt="${c.id}">
+          <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+          <span class="item__label">${esc(u.name)}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`;
+      })
+      .join('')}</div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-kontakt]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          close();
+          const nachricht = await senden({ art: 'kontakt', id: b.dataset.kontakt });
+          if (!nachricht) return;
+          state.messages.push(nachricht);
+          paintMessages(chat);
+          toast('Kontakt gesendet');
+        })
+      );
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
 /* ------------------------------------------------------ Explorer-Seiten */
 /*
  * Hashtag, Standort und Sound. Prototyp-Frames "VS# - Hashtagoptionen",
@@ -3642,7 +3935,7 @@ async function openChat(chatId) {
         : toast('Gruppenanrufe folgen später')
     )
   );
-  $('#attach').addEventListener('click', () => toast('Anhänge folgen in Phase 3'));
+  $('#attach').addEventListener('click', () => openAnhang(chat));
   $('#camBtn').addEventListener('click', openCamera);
 
   const input = $('#msgInput');
@@ -3671,16 +3964,52 @@ function paintMessages(chat) {
     `<div class="daydivider">Heute</div>` +
     state.messages.map((m) => messageBubble(m, chat)).join('');
   box.scrollTop = box.scrollHeight;
+
+  // Angehaengter Kontakt fuehrt zu seinem Profil, ein Standort zu der
+  // Standort-Seite - sonst waeren beide Karten nur Bilder.
+  box.querySelectorAll('[data-msgkontakt]').forEach((b) =>
+    b.addEventListener('click', () => openContactProfile(b.dataset.msgkontakt))
+  );
+  box.querySelectorAll('[data-msgort]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const platz = state.places.find((p) => p.name === b.dataset.msgort);
+      if (platz) openExplorer('standort', platz.id);
+    })
+  );
 }
 
 function messageBubble(m, chat) {
   const out = m.from === 'me';
+  // Ein selbst geschicktes Foto liegt im Browser, nicht auf dem Server.
+  const eigenesBild = eigeneMedien()[m.id];
   const media =
     m.media === 'image'
-      ? `<div class="msg__media">${ICONS.image} Foto</div>`
+      ? eigenesBild
+        ? `<img class="msg__bild" src="${eigenesBild}" alt="Foto">`
+        : `<div class="msg__media">${ICONS.image} Foto</div>`
       : m.media === 'audio'
       ? `<div class="msg__media">${ICONS.mic} Sprachnachricht · 0:14</div>`
       : '';
+
+  const standort = m.standort
+    ? `<button class="msg__standort" data-msgort="${esc(m.standort.name)}">
+         <span class="msg__standortKarte">
+           <i class="msg__standortNadel" style="left:${m.standort.x}%;top:${m.standort.y}%">${ICONS.mapPin}</i>
+         </span>
+         <span class="msg__standortName">${esc(m.standort.name)}</span>
+         <span class="msg__standortSub">${esc(m.standort.adresse || m.standort.koordinaten || '')}</span>
+       </button>`
+    : '';
+
+  const kontakt = m.kontakt
+    ? `<button class="msg__kontakt" data-msgkontakt="${esc(m.kontakt.id)}">
+         <span class="avatar avatar--44" style="background:${user(m.kontakt.id).color}">${esc(user(m.kontakt.id).initials)}</span>
+         <span class="msg__kontaktText">
+           <strong>${esc(m.kontakt.name)}</strong>
+           <span>${esc(m.kontakt.handle)}</span>
+         </span>
+       </button>`
+    : '';
   return `
     <div class="msg msg--${out ? 'out' : 'in'}">
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
@@ -3694,7 +4023,7 @@ function messageBubble(m, chat) {
                  <span>${esc(m.geteilt.titel)}</span>
                </span>
              </div>`
-          : media || esc(m.text)
+          : standort || kontakt || media || esc(m.text)
       }
       <div class="msg__foot">${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
     </div>`;
@@ -3978,7 +4307,27 @@ function openCamera() {
 
   $('#camClose').addEventListener('click', close);
   $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
-  $('#camGallery').addEventListener('click', () => toast('Galerie folgt in Phase 3'));
+  // Aus der Galerie statt aus der Kamera - dieselbe Aufnahme, nur ohne
+  // capture-Kennzeichen, damit das Handy den Bildordner oeffnet.
+  $('#camGallery').addEventListener('click', async () => {
+    const datei = await dateiWaehlen('photo', true);
+    if (!datei) return;
+    try {
+      const bild = await bildVerkleinern(datei);
+      eigeneStorySichern({ mediaUri: bild, aufgenommen: Date.now() });
+      const eigene = state.stories.find((x) => x.own);
+      if (eigene) {
+        eigene.mediaUri = bild;
+        eigene.aufgenommen = Date.now();
+        eigene.viewed = false;
+      }
+      closeOverlay();
+      toast('Deine Story ist online');
+      render();
+    } catch {
+      toast('Bild konnte nicht gelesen werden');
+    }
+  });
   $('#camSwitch').addEventListener('click', () => toast('Kamera gewechselt'));
 
   overlay.querySelectorAll('.camera__mode').forEach((b) =>

@@ -22,6 +22,10 @@ export interface Message {
   read?: boolean;
   /** Weitergeleiteter Beitrag oder weitergeleitetes Video. */
   geteilt?: { art: 'post' | 'video'; id: string; titel: string; autor: string };
+  /** Anhang aus dem Plus in der Nachrichtenzeile. */
+  bildUri?: string;
+  standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number };
+  kontakt?: { id: string; name: string; handle: string };
 }
 
 export interface Chat {

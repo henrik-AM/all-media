@@ -405,6 +405,47 @@ app.get('/api/bootstrap', (req, res) => {
   res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends, gefolgt, ungelesen });
 });
 
+/* --------------------------------------- Weitere Optionen im Fremdprofil */
+/*
+ * Stummschalten, Blockieren und Melden. Blockieren hat Folgen: die Person
+ * fliegt aus den Kontakten, der gemeinsame Chat wird gesperrt, und sie
+ * taucht in Auswahllisten nicht mehr auf. Sonst waere der Knopf nur ein
+ * Hinweis mit anderem Text.
+ */
+app.post('/api/profile/:userId/:was', (req, res, next) => {
+  const { userId, was } = req.params;
+  if (!['stumm', 'block', 'melden'].includes(was)) return next();
+
+  const profil = profiles[userId];
+  const person = users[userId];
+  if (!profil || !person) return res.json({ ok: false, error: 'Profil nicht gefunden' });
+
+  if (was === 'stumm') {
+    profil.muted = !profil.muted;
+    return res.json({ ok: true, muted: profil.muted });
+  }
+
+  if (was === 'melden') {
+    const grund = String(req.body?.grund || '').trim();
+    if (!grund) return res.json({ ok: false, error: 'Bitte einen Grund auswählen' });
+    profil.gemeldet = grund;
+    return res.json({ ok: true, gemeldet: grund });
+  }
+
+  profil.blocked = !profil.blocked;
+
+  const chat = chats.find((c) => !c.isGroup && c.userId === userId);
+  if (profil.blocked) {
+    const stelle = contacts.findIndex((c) => c.id === userId);
+    if (stelle !== -1) contacts.splice(stelle, 1);
+    if (chat) chat.blocked = true;
+  } else if (chat) {
+    delete chat.blocked;
+  }
+
+  res.json({ ok: true, blocked: profil.blocked, contacts, chats });
+});
+
 /* ------------------------------------------------------- Explorer-Seiten */
 /*
  * Was hinter einem Hashtag, einem Standort und einem Sound steckt.
@@ -777,6 +818,9 @@ app.post('/api/messages/:chatId', (req, res) => {
   if (offen && offen.requestState === 'pending') {
     return res.json({ ok: false, error: 'Warte, bis die Anfrage angenommen wurde' });
   }
+  if (offen && offen.blocked) {
+    return res.json({ ok: false, error: 'Diese Person ist blockiert' });
+  }
 
   const store = communityMessages[chatId] ? communityMessages : messages;
   if (!store[chatId]) store[chatId] = [];
@@ -847,6 +891,60 @@ app.post('/api/teilen', (req, res) => {
 
   if (art === 'video') eintrag.shares = (eintrag.shares || 0) + gesendet.length;
   res.json({ ok: true, gesendet, chats });
+});
+
+/*
+ * Anhang im Chat: Foto, Standort oder ein weitergereichter Kontakt.
+ * Das Bild selbst bleibt im Browser - der Server merkt sich nur, dass an
+ * dieser Stelle ein Foto steht. Genauso ist es bei "Deine Story" und bei
+ * eigenen Beitraegen geloest.
+ */
+app.post('/api/messages/:chatId/anhang', (req, res) => {
+  const chatId = req.params.chatId;
+  const art = req.body?.art;
+
+  const offen = chats.find((c) => c.id === chatId);
+  if (offen && offen.requestState === 'pending') {
+    return res.json({ ok: false, error: 'Warte, bis die Anfrage angenommen wurde' });
+  }
+  if (offen && offen.blocked) {
+    return res.json({ ok: false, error: 'Diese Person ist blockiert' });
+  }
+
+  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const message = { id: 'm' + Date.now(), from: 'me', time };
+  let vorschau;
+
+  if (art === 'foto') {
+    message.media = 'image';
+    message.text = 'Foto';
+    vorschau = 'Foto';
+  } else if (art === 'standort') {
+    const platz = places.find((p) => p.id === req.body?.id) || places[0];
+    message.standort = { name: platz.name, adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y };
+    message.text = `Standort: ${platz.name}`;
+    vorschau = 'Standort';
+  } else if (art === 'kontakt') {
+    const person = users[req.body?.id];
+    if (!person) return res.json({ ok: false, error: 'Diese Person gibt es nicht' });
+    message.kontakt = { id: person.id, name: person.name, handle: person.handle, phone: person.phone };
+    message.text = `Kontakt: ${person.name}`;
+    vorschau = 'Kontakt';
+  } else {
+    return res.json({ ok: false, error: 'Unbekannter Anhang' });
+  }
+
+  const store = communityMessages[chatId] ? communityMessages : messages;
+  if (!store[chatId]) store[chatId] = [];
+  store[chatId].push(message);
+
+  const chat = chats.find((c) => c.id === chatId);
+  if (chat) {
+    chat.preview = vorschau;
+    chat.time = time;
+  }
+
+  res.json({ ok: true, message });
 });
 
 app.post('/api/groups', (req, res) => {

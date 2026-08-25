@@ -39,7 +39,9 @@
     "up": "node tools/up.js",
     "test:erstellen": "node test/_erstellen.js",
     "test:teilen": "node test/_teilen.js",
-    "test:explorer": "node test/_explorer.js"
+    "test:explorer": "node test/_explorer.js",
+    "test:anhang": "node test/_anhang.js",
+    "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang"
   },
   "private": true
 }

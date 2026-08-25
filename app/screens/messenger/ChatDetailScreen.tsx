@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,7 +16,9 @@ import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { antwortAuf } from '../../lib/antworten';
 import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from '../../mocks';
-import { Chat, Message } from '../../types';
+import { AnhangSheet } from '../../components/AnhangSheet';
+import { useProfil } from '../../contexts/ProfilContext';
+import { Chat, Contact, Message } from '../../types';
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -27,12 +30,30 @@ interface Props {
   onBack: () => void;
   onCall: (kind: 'audio' | 'video') => void;
   onCamera: () => void;
+  /** Kontakte fuer den Anhang "Kontakt senden". */
+  contacts?: Contact[];
+  onNotice?: (message: string) => void;
+  /** Standort-Karte im Chat antippen. */
+  onOpenStandort?: (name: string) => void;
   onOpenProfile: (userId: string) => void;
   /** Offene Kontaktanfrage annehmen. */
   onAcceptRequest?: (chatId: string) => void;
 }
 
-export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera, onOpenProfile, onAcceptRequest }: Props) => {
+export const ChatDetailScreen = ({
+  chat,
+  extraMessages,
+  onBack,
+  onCall,
+  onCamera,
+  onOpenProfile,
+  onAcceptRequest,
+  contacts = [],
+  onNotice,
+  onOpenStandort,
+}: Props) => {
+  const [anhangOffen, setAnhangOffen] = useState(false);
+  const { istBlockiert } = useProfil();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>(() => [
     ...(mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []),
@@ -48,7 +69,10 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
 
   // Bis die Anfrage angenommen ist, bleibt es bei der einen Nachricht, die
   // schon mit der Anfrage rausging.
-  const gesperrt = chat.requestState === 'pending';
+  // Gesperrt ist der Chat aus zwei Gruenden: die Anfrage laeuft noch, oder
+  // die Person ist blockiert.
+  const blockiert = !!chat.userId && istBlockiert(chat.userId);
+  const gesperrt = chat.requestState === 'pending' || blockiert;
 
   const send = () => {
     const text = draft.trim();
@@ -93,7 +117,29 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
       <View style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}>
         {!out && chat.isGroup && <Text style={styles.sender}>{sender?.name ?? 'Unbekannt'}</Text>}
 
-        {item.geteilt ? (
+        {item.bildUri ? (
+          <Image source={{ uri: item.bildUri }} style={styles.anhangBild} />
+        ) : item.standort ? (
+          <Pressable style={styles.ortKarte} onPress={() => onOpenStandort?.(item.standort!.name)}>
+            <View style={styles.ortBild}>
+              <View style={[styles.ortNadel, { left: `${item.standort.x ?? 50}%`, top: `${item.standort.y ?? 50}%` }]}>
+                <Ionicons name="location" size={22} color={colors.danger} />
+              </View>
+            </View>
+            <Text style={styles.ortName}>{item.standort.name}</Text>
+            <Text style={styles.ortSub} numberOfLines={1}>
+              {item.standort.adresse ?? item.standort.koordinaten}
+            </Text>
+          </Pressable>
+        ) : item.kontakt ? (
+          <Pressable style={styles.kontaktKarte} onPress={() => onOpenProfile(item.kontakt!.id)}>
+            <Avatar id={item.kontakt.id} name={item.kontakt.name} size={sizes.avatarMd} />
+            <View style={styles.kontaktText}>
+              <Text style={styles.kontaktName}>{item.kontakt.name}</Text>
+              <Text style={styles.kontaktHandle}>{item.kontakt.handle}</Text>
+            </View>
+          </Pressable>
+        ) : item.geteilt ? (
           // Weitergeleiteter Beitrag: kleine Karte statt nacktem Text.
           <View style={styles.geteilt}>
             <View style={styles.geteiltBild}>
@@ -194,7 +240,15 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
           }
         />
 
-        {gesperrt && (
+        {blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              {chat.name} ist blockiert. Hebe die Blockierung im Profil auf, um wieder zu schreiben.
+            </Text>
+          </View>
+        )}
+
+        {gesperrt && !blockiert && (
           <View style={styles.anfrage}>
             <Text style={styles.anfrageText}>
               Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
@@ -209,7 +263,15 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
         )}
 
         <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
-          <Pressable style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
+          <Pressable
+            style={styles.composerIcon}
+            onPress={() =>
+              gesperrt
+                ? onNotice?.(blockiert ? 'Diese Person ist blockiert' : 'Warte, bis die Anfrage angenommen wurde')
+                : setAnhangOffen(true)
+            }
+            hitSlop={4}
+          >
             <Ionicons name="add" size={24} color={colors.text2} />
           </Pressable>
           <View style={styles.composerField}>
@@ -217,7 +279,7 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
               style={styles.composerInput}
               value={draft}
               onChangeText={setDraft}
-              placeholder={gesperrt ? 'Warten auf Annahme …' : 'Nachricht'}
+              placeholder={blockiert ? 'Blockiert' : gesperrt ? 'Warten auf Annahme …' : 'Nachricht'}
               placeholderTextColor={colors.text3}
               editable={!gesperrt}
               multiline
@@ -235,6 +297,21 @@ export const ChatDetailScreen = ({ chat, extraMessages, onBack, onCall, onCamera
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <AnhangSheet
+        visible={anhangOffen}
+        contacts={contacts}
+        ausserId={chat.userId}
+        onClose={() => setAnhangOffen(false)}
+        onAnhang={(teil) => {
+          setMessages((prev) => [
+            ...prev,
+            { id: `m${Date.now()}`, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil },
+          ]);
+          scrollToEnd();
+        }}
+        onNotice={(text) => onNotice?.(text)}
+      />
     </View>
   );
 };
@@ -310,6 +387,25 @@ const styles = StyleSheet.create({
   messageTextOut: { color: colors.bubbleOutText },
   media: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
   mediaText: { color: colors.text2, ...typography.preview },
+  anhangBild: { width: 210, height: 150, borderRadius: 12, marginBottom: 4 },
+  ortKarte: { width: 210, borderRadius: 12, overflow: 'hidden', marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.05)' },
+  ortBild: { height: 96, backgroundColor: colors.surface2 },
+  ortNadel: { position: 'absolute', transform: [{ translateX: -11 }, { translateY: -22 }] },
+  ortName: { ...typography.small, fontWeight: '600', color: colors.text, paddingHorizontal: 10, paddingTop: 7 },
+  ortSub: { ...typography.tiny, color: colors.text2, paddingHorizontal: 10, paddingBottom: 8, paddingTop: 1 },
+  kontaktKarte: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: 210,
+    padding: 8,
+    marginBottom: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  kontaktText: { flex: 1, minWidth: 0 },
+  kontaktName: { ...typography.small, fontWeight: '600', color: colors.text },
+  kontaktHandle: { ...typography.tiny, color: colors.text2, marginTop: 2 },
   geteilt: {
     flexDirection: 'row',
     alignItems: 'center',

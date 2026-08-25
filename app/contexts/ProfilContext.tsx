@@ -114,6 +114,15 @@ interface ProfilWert {
   spendeSetzen: (spende: Spende) => void;
   aufzeichnungAnlegen: (sekunden: number, zuschauer: number) => void;
 
+  /* --- Weitere Optionen im Profil einer Person --- */
+  istStumm: (userId: string) => boolean;
+  istBlockiert: (userId: string) => boolean;
+  meldeGrund: (userId: string) => string | undefined;
+  /** Umschalten. Gibt zurueck, was danach gilt. */
+  stummSchalten: (userId: string) => boolean;
+  blockieren: (userId: string) => boolean;
+  melden: (userId: string, grund: string) => void;
+
   /* --- Teilen --- */
   /** Wie oft dieser Beitrag oder dieses Video von hier aus gesendet wurde. */
   geteiltZaehler: Record<string, number>;
@@ -154,6 +163,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const [spende, setSpende] = useState<Spende | null>(null);
   const [raster, setRaster] = useState<RasterEintrag[]>(GRUND_RASTER);
   const [geteiltZaehler, setGeteiltZaehler] = useState<Record<string, number>>({});
+  const [stumm, setStumm] = useState<string[]>([]);
+  const [blockiert, setBlockiert] = useState<string[]>([]);
+  const [gemeldet, setGemeldet] = useState<Record<string, string>>({});
 
   const mitteilungen = useCallback(
     (bereich: MitteilungsBereich): MitteilungAnzeige[] =>
@@ -305,6 +317,32 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }, []);
 
+  const istStumm = useCallback((id: string) => stumm.includes(id), [stumm]);
+  const istBlockiert = useCallback((id: string) => blockiert.includes(id), [blockiert]);
+  const meldeGrund = useCallback((id: string) => gemeldet[id], [gemeldet]);
+
+  const stummSchalten = useCallback(
+    (id: string) => {
+      const danach = !stumm.includes(id);
+      setStumm((prev) => (danach ? [...prev, id] : prev.filter((x) => x !== id)));
+      return danach;
+    },
+    [stumm]
+  );
+
+  const blockieren = useCallback(
+    (id: string) => {
+      const danach = !blockiert.includes(id);
+      setBlockiert((prev) => (danach ? [...prev, id] : prev.filter((x) => x !== id)));
+      return danach;
+    },
+    [blockiert]
+  );
+
+  const melden = useCallback((id: string, grund: string) => {
+    setGemeldet((prev) => ({ ...prev, [id]: grund }));
+  }, []);
+
   const geteilt = useCallback((id: string) => {
     setGeteiltZaehler((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
   }, []);
@@ -332,6 +370,12 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       playlistAnlegen,
       spendeSetzen,
       aufzeichnungAnlegen,
+      istStumm,
+      istBlockiert,
+      meldeGrund,
+      stummSchalten,
+      blockieren,
+      melden,
       geteiltZaehler,
       geteilt,
       communities,
@@ -343,7 +387,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
-      aufzeichnungAnlegen, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
+      aufzeichnungAnlegen, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
     ]
   );
 

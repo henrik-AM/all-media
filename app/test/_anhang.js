@@ -1,0 +1,198 @@
+// Prueft zwei Knoepfe, die vorher nur einen Hinweis ausgegeben haben:
+//   - das Plus in der Nachrichtenzeile (Foto, Standort, Kontakt)
+//   - die drei Punkte im Profil einer anderen Person
+//
+// Start:  node test/_anhang.js   (Server muss laufen)
+
+const { chromium } = require('playwright-core');
+const fs = require('fs');
+const path = require('path');
+
+const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
+
+const BILD = path.join(__dirname, '_testbild.png');
+if (!fs.existsSync(BILD)) {
+  fs.writeFileSync(
+    BILD,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAG0lEQVQIW2P8z8Dwn4EIwDiqkL4hRQAAAP//AwDPUAX3rN6iSwAAAABJRU5ErkJggg==',
+      'base64'
+    )
+  );
+}
+
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+  // Ohne Deckel wartet ein blockierter Klick sonst endlos.
+  page.setDefaultTimeout(8000);
+
+  const browserFehler = [];
+  page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
+  page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
+
+  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
+  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+
+  const ergebnisse = [];
+  const pruefe = async (name, fn) => {
+    try {
+      await fn();
+      ergebnisse.push(true);
+      console.log('  OK   ' + name);
+    } catch (e) {
+      ergebnisse.push(false);
+      console.log('  FEHL ' + name + ' — ' + (e.message || 'kein Treffer'));
+    }
+  };
+
+  const imChat = async () => {
+    await page.click('[data-area="messenger"]');
+    await page.waitForTimeout(300);
+    await page.click('[data-chat="c1"]');
+    await page.waitForTimeout(600);
+  };
+
+  const anhangAuf = async (art) => {
+    await page.click('#attach');
+    await page.waitForSelector('[data-anhang]', { timeout: 3000 });
+    await page.click(`[data-anhang="${art}"]`);
+  };
+
+  console.log('\nAnhang im Chat');
+  await imChat();
+
+  await pruefe('Das Plus zeigt vier Anhang-Arten', async () => {
+    await page.click('#attach');
+    await page.waitForSelector('[data-anhang]', { timeout: 3000 });
+    const punkte = await page.$$eval('[data-anhang]', (els) => els.map((e) => e.textContent.trim()));
+    const soll = ['Foto aufnehmen', 'Aus der Galerie', 'Standort senden', 'Kontakt senden'];
+    if (JSON.stringify(punkte) !== JSON.stringify(soll)) throw new Error(punkte.join(' | '));
+    // Das Anhang-Menue schliesst wie das Neu-Menue: Tippen daneben.
+    await page.mouse.click(195, 60);
+    await page.waitForTimeout(300);
+  });
+
+  await pruefe('Standort landet als Karte im Chat', async () => {
+    await anhangAuf('standort');
+    await page.waitForSelector('[data-ort]', { timeout: 3000 });
+    await page.click('[data-ort="pl2"]');
+    await page.waitForTimeout(700);
+    const namen = await page.$$eval('.msg__standortName', (els) => els.map((e) => e.textContent));
+    if (!namen.includes('Zugspitze')) throw new Error(namen.join(' | '));
+    const adresse = await page.$eval('.msg__standortSub', (e) => e.textContent);
+    if (!adresse.trim()) throw new Error('keine Adresse auf der Karte');
+  });
+
+  await pruefe('Die Standort-Karte fuehrt zur Standort-Seite', async () => {
+    await page.click('[data-msgort]');
+    await page.waitForSelector('.exp__adresse', { timeout: 3000 });
+    const titel = await page.$eval('#overlay .exp__titel', (e) => e.textContent);
+    if (titel !== 'Zugspitze') throw new Error(titel);
+    await page.click('#expBack');
+    await page.waitForTimeout(400);
+    await imChat();
+  });
+
+  await pruefe('Kontakt landet als Karte im Chat', async () => {
+    await anhangAuf('kontakt');
+    await page.waitForSelector('[data-kontakt]', { timeout: 3000 });
+    await page.click('[data-kontakt="u4"]');
+    await page.waitForTimeout(700);
+    const namen = await page.$$eval('.msg__kontaktText strong', (els) => els.map((e) => e.textContent));
+    if (!namen.includes('David König')) throw new Error(namen.join(' | '));
+  });
+
+  await pruefe('Der Chatpartner steht nicht in der Auswahl', async () => {
+    await anhangAuf('kontakt');
+    await page.waitForSelector('[data-kontakt]', { timeout: 3000 });
+    const ids = await page.$$eval('[data-kontakt]', (els) => els.map((e) => e.dataset.kontakt));
+    if (ids.includes('u1')) throw new Error('Anna Schmidt steht in ihrem eigenen Chat zur Auswahl');
+    await page.click('[data-sheet-close]');
+  });
+
+  await pruefe('Foto wird wirklich angezeigt, nicht nur benannt', async () => {
+    // Der Fehlschlag darf nicht als unbehandelte Zusage enden - sonst
+    // bricht Node ab, statt die Pruefung rot zu melden.
+    const wartet = page.waitForEvent('filechooser').catch(() => null);
+    await anhangAuf('kamera');
+    const auswahl = await wartet;
+    if (!auswahl) throw new Error('die Dateiauswahl ging nicht auf');
+    await auswahl.setFiles(BILD);
+    await page.waitForTimeout(1000);
+    const bilder = await page.$$eval('.msg__bild', (els) => els.length);
+    if (bilder < 1) throw new Error('kein Bild in der Blase');
+  });
+
+  await pruefe('Die Chatliste zeigt den Anhang als Vorschau', async () => {
+    await page.click('#chatBack');
+    await page.waitForTimeout(600);
+    const text = await page.$eval('#main', (e) => e.textContent);
+    if (!text.includes('Foto')) throw new Error('Vorschau fehlt');
+  });
+
+  console.log('\nWeitere Optionen im Profil');
+
+  await pruefe('Der Mehr-Knopf zeigt fuenf Optionen', async () => {
+    await page.click('[data-area="videos"]');
+    await page.waitForTimeout(400);
+    await page.click('[data-profile]');
+    await page.waitForTimeout(700);
+    await page.click('#profMore');
+    await page.waitForSelector('[data-popt]', { timeout: 3000 });
+    const punkte = await page.$$eval('[data-popt]', (els) => els.map((e) => e.textContent.trim()));
+    if (punkte.length !== 5) throw new Error(punkte.join(' | '));
+    if (!punkte.some((t) => t.includes('Blockieren'))) throw new Error(punkte.join(' | '));
+  });
+
+  await pruefe('Stummschalten wird im Profil angezeigt', async () => {
+    await page.click('[data-popt="stumm"]');
+    await page.waitForTimeout(800);
+    const hinweis = await page.$eval('.prof__hinweis', (e) => e.textContent);
+    if (!hinweis.includes('stummgeschaltet')) throw new Error(hinweis);
+  });
+
+  await pruefe('Blockieren nimmt die Person aus den Kontakten', async () => {
+    const vorher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).contacts.length);
+    await page.click('#profMore');
+    await page.waitForSelector('[data-popt]');
+    await page.click('[data-popt="block"]');
+    await page.waitForTimeout(900);
+    const hinweis = await page.$eval('.prof__hinweis', (e) => e.textContent);
+    if (!hinweis.includes('blockiert')) throw new Error(hinweis);
+    const nachher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).contacts.length);
+    if (nachher !== vorher - 1) throw new Error(`${vorher} -> ${nachher}`);
+  });
+
+  await pruefe('Der Nachricht-Knopf ist dann gesperrt', async () => {
+    const aus = await page.$eval('#profMessage', (e) => e.disabled);
+    if (!aus) throw new Error('Knopf ist noch aktiv');
+  });
+
+  await pruefe('Melden fragt nach einem Grund', async () => {
+    await page.click('#profMore');
+    await page.waitForSelector('[data-popt]');
+    await page.click('[data-popt="melden"]');
+    await page.waitForSelector('[data-grund]', { timeout: 3000 });
+    const gruende = await page.$$eval('[data-grund]', (els) => els.length);
+    if (gruende < 3) throw new Error('nur ' + gruende + ' Gruende');
+    await page.click('[data-grund]');
+    await page.waitForTimeout(600);
+    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+    if (!hinweis.includes('Danke')) throw new Error(hinweis);
+  });
+
+  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
+
+  const fehler = ergebnisse.filter((ok) => !ok).length;
+  const eindeutig = [...new Set(browserFehler)];
+  console.log(`\n${ergebnisse.length - fehler} von ${ergebnisse.length} Pruefungen bestanden`);
+  console.log(eindeutig.length ? 'Konsolenfehler:\n' + eindeutig.join('\n') : 'Konsolenfehler: keine');
+
+  await browser.close();
+  process.exit(fehler || eindeutig.length ? 1 : 0);
+})();

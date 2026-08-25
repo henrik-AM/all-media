@@ -42,7 +42,7 @@ import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
-import { mockChats, mockContacts, mockStories, mockUsers } from './mocks';
+import { mockChats, mockContacts, mockPlaces, mockStories, mockUsers } from './mocks';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Video } from './types';
 
 type Overlay =
@@ -460,6 +460,12 @@ const Shell = () => {
         onCamera={() => setOverlay({ kind: 'camera' })}
         onOpenProfile={openProfile}
         onAcceptRequest={acceptRequest}
+        contacts={contacts}
+        onNotice={setNotice}
+        onOpenStandort={(name) => {
+          const platz = mockPlaces.find((p) => p.name === name);
+          if (platz) setOverlay({ kind: 'explorer', ziel: { art: 'standort', wert: platz.id } });
+        }}
       />
     );
   }
@@ -481,6 +487,16 @@ const Shell = () => {
         userId={overlay.userId}
         onBack={() => setOverlay(null)}
         onMessage={openChatWith}
+        onBlockiert={(userId, blockiert) => {
+          // Blockieren hat Folgen: die Person faellt aus den Kontakten, beim
+          // Aufheben kommt sie zurueck. Sonst waere der Knopf nur ein Wort.
+          if (blockiert) {
+            setContacts((prev) => prev.filter((c) => c.id !== userId));
+          } else if (!contacts.some((c) => c.id === userId)) {
+            const person = mockUsers[userId];
+            setContacts((prev) => [...prev, { id: userId, name: person.name, status: 'friend', about: 'Kontakt' }]);
+          }
+        }}
         onNotice={setNotice}
       />
     );

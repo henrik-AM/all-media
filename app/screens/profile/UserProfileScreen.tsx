@@ -5,6 +5,8 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { avatarColor, colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { mockProfiles, mockUsers } from '../../mocks';
+import { useProfil } from '../../contexts/ProfilContext';
+import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
 
 type Tab = 'grid' | 'repost' | 'tagged';
 
@@ -23,10 +25,14 @@ interface Props {
   userId: string;
   onBack: () => void;
   onMessage: (userId: string) => void;
+  /** Beim Blockieren: die Person aus den Kontakten nehmen. */
+  onBlockiert?: (userId: string, blockiert: boolean) => void;
   onNotice: (message: string) => void;
 }
 
-export const UserProfileScreen = ({ userId, onBack, onMessage, onNotice }: Props) => {
+export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNotice }: Props) => {
+  const { istStumm, istBlockiert } = useProfil();
+  const [optionenOffen, setOptionenOffen] = useState(false);
   const person = mockUsers[userId];
   const [profile, setProfile] = useState(mockProfiles[userId]);
   const [tab, setTab] = useState<Tab>('grid');
@@ -55,7 +61,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onNotice }: Props
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
         <Text style={styles.handle}>{person.handle}</Text>
-        <Pressable onPress={() => onNotice('Weitere Optionen folgen in Phase 3')} hitSlop={6}>
+        <Pressable onPress={() => setOptionenOffen(true)} hitSlop={6}>
           <Ionicons name="information-circle-outline" size={22} color={colors.text2} />
         </Pressable>
       </View>
@@ -87,6 +93,20 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onNotice }: Props
           </Pressable>
         </View>
 
+        {istBlockiert(userId) ? (
+          <View style={styles.hinweis}>
+            <Ionicons name="ban-outline" size={17} color={colors.text2} />
+            <Text style={styles.hinweisText}>
+              {person.name} ist blockiert. Ihr könnt euch keine Nachrichten schreiben.
+            </Text>
+          </View>
+        ) : istStumm(userId) ? (
+          <View style={styles.hinweis}>
+            <Ionicons name="volume-mute-outline" size={17} color={colors.text2} />
+            <Text style={styles.hinweisText}>{person.name} ist stummgeschaltet.</Text>
+          </View>
+        ) : null}
+
         <View style={styles.buttons}>
           <Pressable
             style={[styles.button, !profile.isFollowing && styles.buttonPrimary]}
@@ -96,7 +116,11 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onNotice }: Props
               {profile.isFollowing ? 'Gefolgt' : 'Folgen'}
             </Text>
           </Pressable>
-          <Pressable style={styles.button} onPress={() => onMessage(userId)}>
+          <Pressable
+            style={[styles.button, istBlockiert(userId) && styles.buttonAus]}
+            disabled={istBlockiert(userId)}
+            onPress={() => onMessage(userId)}
+          >
             <Text style={styles.buttonText}>Nachricht</Text>
           </Pressable>
         </View>
@@ -159,6 +183,14 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onNotice }: Props
           />
         )}
       </ScrollView>
+
+      <ProfilOptionenSheet
+        visible={optionenOffen}
+        userId={userId}
+        onClose={() => setOptionenOffen(false)}
+        onNotice={onNotice}
+        onBlockiert={onBlockiert}
+      />
     </SafeAreaView>
   );
 };
@@ -223,6 +255,20 @@ const styles = StyleSheet.create({
   },
   highlightText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   highlightLabel: { marginTop: 6, color: colors.text2, fontSize: 11.5 },
+
+  hinweis: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface2,
+  },
+  hinweisText: { flex: 1, ...typography.preview, color: colors.text2 },
+  buttonAus: { opacity: 0.45 },
 
   tabs: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   tab: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
