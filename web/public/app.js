@@ -211,6 +211,16 @@ function render() {
   renderBottomNav();
   renderTopBar();
 
+  // Explorer-Übersichtsseiten (Kategorien aus Video-Suche)
+  if (state.explorerView) {
+    if (state.explorerView === 'reels') return renderReelsExplorer();
+    if (state.explorerView === 'clips') return renderClipsExplorer();
+    if (state.explorerView === 'posts') return renderPostsExplorer();
+    if (state.explorerView === 'hashtag') return renderHashtagExplorer(state.explorerParam);
+    if (state.explorerView === 'place') return renderPlaceExplorer(state.explorerParam);
+    state.explorerView = null;
+  }
+
   const v = sub();
   if (state.area === 'messenger') {
     if (v === 'friendmap') return renderFriendMap();
@@ -5114,8 +5124,8 @@ async function openChat(chatId) {
   const profileBtn = overlay.querySelector('[data-profile]');
   if (profileBtn) {
     profileBtn.addEventListener('click', () => {
-      closeChat();
-      openContactProfile(chat.userId);
+      state.openChatSettingsId = chat.id;
+      render();
     });
   }
   $('#anfrageOk')?.addEventListener('click', async () => {
