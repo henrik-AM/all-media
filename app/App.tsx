@@ -329,6 +329,17 @@ const Shell = () => {
     setArea('settings');
   };
 
+  /*
+   * "Profil bearbeiten" fuehrt in die Einstellungen zum Abschnitt Konto -
+   * dort steht das Formular, das Name, Info und Link wirklich aendert.
+   * Ein eigenes Blatt im Profil waere ein zweites Formular fuer dieselben
+   * Felder; so gibt es nur eine Stelle, an der sich das Profil aendert.
+   */
+  const profilBearbeiten = () => {
+    setSettingsSprung('konto');
+    setArea('settings');
+  };
+
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
   const mitteilungOeffnen = (ziel: MitteilungsZiel) => {
     if (ziel.art === 'profile') return openPublicProfile(ziel.id);
@@ -673,7 +684,7 @@ const Shell = () => {
             onNotice={setNotice}
           />
         );
-      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onNotice={setNotice} />;
+      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onNotice={setNotice} />;
       return (
         <HomeFeedScreen
           stories={stories}
@@ -703,6 +714,7 @@ const Shell = () => {
             onSwitchArea={switchArea}
             onOpenCommunity={openCommunity}
             onAction={profilAktion}
+            onBearbeiten={profilBearbeiten}
             onNotice={setNotice}
           />
         );

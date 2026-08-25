@@ -273,7 +273,8 @@ interface Props {
 
 export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig }: Props) => {
   const { user, konten } = useContext(AuthContext);
-  const { communities, istBlockiert, istStumm, raster, gefolgt } = useProfil();
+  const { communities, istBlockiert, istStumm, raster, gefolgt, eigenesProfil, profilSpeichern } =
+    useProfil();
   const scroll = useRef<ScrollView>(null);
   // Der offene Punkt und die getroffenen Auswahlen. Sie gelten fuer diese
   // Sitzung - dauerhaft speichern kann erst das Backend.
@@ -475,10 +476,27 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           title={offen.label}
           felder={offen.eingabe}
           knopf="Speichern"
+          vorbelegung={
+            offen.label === 'Profil bearbeiten'
+              ? { name: eigenesProfil.name, bio: eigenesProfil.bio, link: eigenesProfil.link }
+              : undefined
+          }
           onClose={() => setOffen(null)}
           onSubmit={(werte) => {
             const fehler = offen.pruefen?.(werte);
             if (fehler) return fehler;
+            /*
+             * "Profil bearbeiten" hat den Namen bisher nirgends
+             * hingeschrieben - es kam nur ein Hinweis. Jetzt landet er im
+             * gemeinsamen Zustand und steht damit auch im Profil.
+             */
+            if (offen.label === 'Profil bearbeiten') {
+              profilSpeichern({
+                name: werte.name?.trim() || eigenesProfil.name,
+                bio: werte.bio ?? eigenesProfil.bio,
+                link: werte.link ?? eigenesProfil.link,
+              });
+            }
             setGewaehlt((prev) => ({ ...prev, [offen.label]: werte[offen.eingabe![0].key] }));
             onNotice(offen.fertig ?? 'Gespeichert');
             return null;

@@ -10,7 +10,7 @@ import {
   Spende,
   Video,
 } from '../types';
-import { mockClips, mockCommunities, mockPosts, mockUsers } from '../mocks';
+import { mockClips, mockCommunities, mockPosts, mockProfiles, mockUsers } from '../mocks';
 
 /*
  * Was hinter den drei Knoepfen oben rechts im eigenen Profil steckt:
@@ -166,6 +166,26 @@ interface ProfilWert {
   folgtPerson: (userId: string) => boolean;
   /** Umschalten. Gibt zurueck, ob man der Person danach folgt. */
   folgenUmschalten: (userId: string) => boolean;
+
+  /* --- Eigenes Profil bearbeiten --- */
+  /*
+   * Henrik: "Profilbild, Name, Info/Bio, Link usw. ueber eine
+   * Bearbeitungseinstellung aendern koennen."
+   *
+   * In den Einstellungen gab es zwar ein Formular, es hat den Namen aber
+   * nirgends hingeschrieben - nur einen Hinweis eingeblendet. Der Wert liegt
+   * jetzt hier, damit ihn Profil, Einstellungen und Feed gleich sehen.
+   */
+  eigenesProfil: EigenesProfil;
+  profilSpeichern: (werte: Partial<EigenesProfil>) => void;
+}
+
+export interface EigenesProfil {
+  name: string;
+  bio: string;
+  link: string;
+  /** Selbst gewaehltes Bild. Liegt nur auf diesem Geraet. */
+  bildUri?: string;
 }
 
 const GRUND_RASTER: RasterEintrag[] = [
@@ -214,6 +234,20 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   ]);
 
   const folgtPerson = useCallback((userId: string) => gefolgt.includes(userId), [gefolgt]);
+
+  /*
+   * Eigenes Profil. Der Ausgangsstand kommt aus den Mockdaten, damit nach
+   * dem Umbau dasselbe dasteht wie vorher.
+   */
+  const [eigenesProfil, setEigenesProfil] = useState<EigenesProfil>(() => ({
+    name: mockUsers.me.name,
+    bio: mockProfiles.me.bio,
+    link: mockProfiles.me.link,
+  }));
+
+  const profilSpeichern = useCallback((werte: Partial<EigenesProfil>) => {
+    setEigenesProfil((vorher) => ({ ...vorher, ...werte }));
+  }, []);
 
   const folgenUmschalten = useCallback(
     (userId: string) => {
@@ -480,6 +514,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       gefolgt,
       folgtPerson,
       folgenUmschalten,
+      eigenesProfil,
+      profilSpeichern,
     }),
     [
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
@@ -487,7 +523,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       aufzeichnungAnlegen, clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
       chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
-      gefolgt, folgtPerson, folgenUmschalten,
+      gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]
   );
 

@@ -17,6 +17,12 @@ interface Props {
   link: string;
   onAction: (key: string) => void;
   onLink: () => void;
+  /*
+   * Henrik: "Profilbild, Name, Info/Bio, Link usw. ueber eine
+   * Bearbeitungseinstellung aendern koennen." Der Knopf steht hier im
+   * geteilten Kopf und erscheint damit im Videos- wie im Community-Profil.
+   */
+  onBearbeiten?: () => void;
   /** Ungelesene Mitteilungen - nur dann steht ein roter Punkt an der Glocke. */
   ungelesen?: number;
 }
@@ -26,7 +32,7 @@ interface Props {
  * Glocke/Plus/Menü, darunter Bild links neben den Zahlen, dann Name,
  * Biografie und Link linksbündig.
  */
-export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, ungelesen = 0 }: Props) => (
+export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onBearbeiten, ungelesen = 0 }: Props) => (
   <View>
     <View style={styles.bar}>
       <Text style={styles.handle}>{handle}</Text>
@@ -65,11 +71,19 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
 
     <View style={styles.about}>
       <Text style={styles.name}>{name}</Text>
-      <Text style={styles.bio}>{bio}</Text>
-      <Pressable onPress={onLink}>
-        <Text style={styles.link}>{link}</Text>
-      </Pressable>
+      {!!bio && <Text style={styles.bio}>{bio}</Text>}
+      {!!link && (
+        <Pressable onPress={onLink}>
+          <Text style={styles.link}>{link}</Text>
+        </Pressable>
+      )}
     </View>
+
+    {onBearbeiten && (
+      <Pressable style={styles.bearbeiten} onPress={onBearbeiten}>
+        <Text style={styles.bearbeitenText}>Profil bearbeiten</Text>
+      </Pressable>
+    )}
   </View>
 );
 
@@ -112,4 +126,13 @@ const styles = StyleSheet.create({
   name: { ...typography.h2, color: colors.text },
   bio: { ...typography.message, color: colors.text, marginTop: 3 },
   link: { ...typography.message, color: colors.brand, marginTop: 4 },
+  bearbeiten: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    paddingVertical: 9,
+    borderRadius: 9,
+    backgroundColor: colors.surface3,
+    alignItems: 'center',
+  },
+  bearbeitenText: { fontSize: 14, fontWeight: '700', color: colors.text },
 });

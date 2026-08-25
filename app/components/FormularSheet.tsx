@@ -25,6 +25,13 @@ interface Props {
   title: string;
   felder: FormularFeld[];
   knopf?: string;
+  /*
+   * Was beim Oeffnen schon in den Feldern stehen soll. Beim Bearbeiten -
+   * etwa des eigenen Profils - muss der jetzige Wert drinstehen: sonst
+   * muesste man alles neu tippen, und ein leer gelassenes Feld wuerde den
+   * bisherigen Wert loeschen.
+   */
+  vorbelegung?: Record<string, string>;
   onClose: () => void;
   /** Gibt einen Fehlertext zurueck, dann bleibt das Blatt offen. */
   onSubmit: (werte: Record<string, string>) => string | null;
@@ -35,12 +42,16 @@ interface Props {
  * Ein Blatt mit Eingabefeldern - fuer Highlight, Playlist, Spendenaktion,
  * neuen Kanal und die Beschreibung zu einer Aufnahme.
  */
-export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', onClose, onSubmit, onNotice }: Props) => {
+export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbelegung, onClose, onSubmit, onNotice }: Props) => {
   const [werte, setWerte] = useState<Record<string, string>>({});
 
-  // Beim Oeffnen leeren, sonst steht die vorige Eingabe noch drin.
+  // Beim Oeffnen zuruecksetzen, sonst steht die vorige Eingabe noch drin -
+  // auf die Vorbelegung, wo es eine gibt.
   useEffect(() => {
-    if (visible) setWerte({});
+    if (visible) setWerte(vorbelegung ?? {});
+    // vorbelegung bewusst nicht in der Liste: sie ist bei jedem Bildaufbau
+    // ein neues Objekt und wuerde das Feld beim Tippen staendig zuruecksetzen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, title]);
 
   const absenden = () => {

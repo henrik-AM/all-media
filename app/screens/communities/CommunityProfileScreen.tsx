@@ -8,6 +8,7 @@ import { colors, spacing, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
+import { oeffneLink } from '../../lib/links';
 import { Community } from '../../types';
 
 interface Props {
@@ -15,14 +16,16 @@ interface Props {
   onOpenCommunity: (community: Community) => void;
   /** Glocke, Plus und Menü oben rechts. */
   onAction: (key: string) => void;
+  /** Fuehrt zum Formular, das Name, Info und Link aendert. */
+  onBearbeiten: () => void;
   onNotice: (message: string) => void;
 }
 
 /** Prototyp-Frame "Community - Profil": Erstellt und Beigetreten. */
-export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction, onNotice }: Props) => {
+export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction, onBearbeiten, onNotice }: Props) => {
   // Die Liste kommt aus dem gemeinsamen Zustand, nicht mehr direkt aus den
   // Mock-Daten - sonst taucht ein neu erstellter Kanal hier nicht auf.
-  const { communities, ungelesen } = useProfil();
+  const { communities, ungelesen, eigenesProfil } = useProfil();
   const created = communities.filter((c) => c.visibility === 'private' && c.joined);
   const joined = communities.filter((c) => c.joined && !created.includes(c));
 
@@ -51,12 +54,16 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
             { label: 'Erstellte Communitys', value: created.length },
             { label: 'Beigetretene Communitys', value: joined.length },
           ]}
-          name="Henrik"
-          bio="Baue gerade All Media."
-          link="all-media.app"
+          // Name, Info und Link standen hier fest im Code - eine Aenderung
+          // im Profil waere also nie angekommen. Sie kommen jetzt aus
+          // demselben Zustand wie im Videos-Profil.
+          name={eigenesProfil.name}
+          bio={eigenesProfil.bio}
+          link={eigenesProfil.link}
           ungelesen={ungelesen('communities')}
           onAction={onAction}
-          onLink={() => onNotice('all-media.app')}
+          onBearbeiten={onBearbeiten}
+          onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
         />
 
         {created.length > 0 && <Text style={styles.sectionHead}>Erstellt →</Text>}

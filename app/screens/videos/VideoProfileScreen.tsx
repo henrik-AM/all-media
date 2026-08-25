@@ -9,6 +9,7 @@ import { AreaKey } from '../../constants/navigation';
 import { mockProfiles, mockUsers } from '../../mocks';
 import { useReposts } from '../../contexts/RepostContext';
 import { useProfil } from '../../contexts/ProfilContext';
+import { oeffneLink } from '../../lib/links';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Tab = 'grid' | 'repost' | 'tagged' | 'saved';
@@ -17,6 +18,8 @@ interface Props {
   onSwitchArea: (area: AreaKey) => void;
   /** Glocke, Plus und Menü oben rechts. */
   onAction: (key: string) => void;
+  /** Fuehrt zum Formular, das Name, Info und Link aendert. */
+  onBearbeiten: () => void;
   onNotice: (message: string) => void;
 }
 
@@ -31,9 +34,10 @@ const TABS: { key: Tab; icon: IconName }[] = [
 ];
 
 /** Prototyp-Frame "Videos - Profil". */
-export const VideoProfileScreen = ({ onSwitchArea, onAction, onNotice }: Props) => {
+export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNotice }: Props) => {
   const { reposts } = useReposts();
-  const { ungelesen, highlights, playlists, spende, raster, eigeneBeitraege } = useProfil();
+  const { ungelesen, highlights, playlists, spende, raster, eigeneBeitraege, gefolgt, eigenesProfil } =
+    useProfil();
   const [tab, setTab] = useState<Tab>('grid');
   const me = mockProfiles.me;
 
@@ -47,14 +51,17 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onNotice }: Props) 
           stats={[
             { label: 'Beiträge', value: compact(me.posts + eigeneBeitraege.length) },
             { label: 'Follower', value: compact(me.followers) },
-            { label: 'Gefolgt', value: compact(me.following) },
+            // Wem man folgt, kommt aus dem gemeinsamen Zustand - sonst
+            // aendert sich die Zahl nicht, wenn man im Feed jemandem folgt.
+            { label: 'Gefolgt', value: compact(gefolgt.length) },
           ]}
-          name="Henrik"
-          bio={me.bio}
-          link={me.link}
+          name={eigenesProfil.name}
+          bio={eigenesProfil.bio}
+          link={eigenesProfil.link}
           ungelesen={ungelesen('videos')}
           onAction={onAction}
-          onLink={() => onNotice(me.link)}
+          onBearbeiten={onBearbeiten}
+          onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
         />
 
         {spende && (
