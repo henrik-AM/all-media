@@ -124,14 +124,24 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.click('[data-sub="friendmap"]').catch(() => {});
   await page.waitForTimeout(600);
   pruefe('Karte ist da', !!(await page.$('#mapFlaeche')));
-  pruefe('Zoomknoepfe sind da', !!(await page.$('#zoomIn')) && !!(await page.$('#zoomOut')));
+  // Plus und Minus sind auf Henriks Wunsch weg - an ihrer Stelle stehen der
+  // Vollbild-Pfeil und der Umschalter fuer die Kartenansicht.
+  pruefe('Kein Plus/Minus mehr', !(await page.$('#zoomIn')) && !(await page.$('#zoomOut')));
+  pruefe('Vollbild-Pfeil ist da', !!(await page.$('[data-mapfull]')));
+  pruefe('Ansicht-Umschalter ist da', !!(await page.$('[data-mapstil]')));
   pruefe('Standort-Freigabe ist da', !!(await page.$('#standortAn')));
 
-  const vorher = await page.$eval('#mapFlaeche', (e) => getComputedStyle(e).transform);
-  await page.click('#zoomIn');
+  await page.click('[data-mapfull]');
   await page.waitForTimeout(500);
-  const nachher = await page.$eval('#mapFlaeche', (e) => getComputedStyle(e).transform);
-  pruefe('Zoom veraendert die Karte', vorher !== nachher);
+  pruefe('Vollbild schaltet um', !!(await page.$('.map--voll')));
+  await page.click('[data-mapfull]');
+  await page.waitForTimeout(500);
+  pruefe('Vollbild laesst sich verlassen', !(await page.$('.map--voll')));
+
+  const vorherStil = await page.$eval('#map', (e) => e.className);
+  await page.click('[data-mapstil]');
+  await page.waitForTimeout(400);
+  pruefe('Kartenansicht wechselt', vorherStil !== (await page.$eval('#map', (e) => e.className)));
 
   // Kontakt antippen zoomt, statt wegzunavigieren
   const reihe = await page.$('[data-zoom]');

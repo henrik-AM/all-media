@@ -562,7 +562,17 @@ function findeChat(chatId) {
   return null;
 }
 
-app.post('/api/chats/:chatId/:was', (req, res) => {
+/*
+ * Diese Route ist bewusst eng gefasst. `:was` wuerde sonst auch /accept
+ * und alles andere unter /api/chats/... abfangen, was spaeter im Code
+ * steht - Express nimmt die erste passende Route. Unbekanntes geht
+ * deshalb mit next() weiter an die naechste.
+ */
+const CHAT_AKTIONEN = ['archiv', 'stumm', 'gelesen', 'loeschen'];
+
+app.post('/api/chats/:chatId/:was', (req, res, next) => {
+  if (!CHAT_AKTIONEN.includes(req.params.was)) return next();
+
   const treffer = findeChat(req.params.chatId);
   if (!treffer) return res.json({ ok: false, error: 'Diesen Chat gibt es nicht' });
 
@@ -609,7 +619,8 @@ app.post('/api/chats/:chatId/:was', (req, res) => {
     return res.json({ ok: true, meldung: `„${chat.name}" gelöscht` });
   }
 
-  return res.json({ ok: false, error: 'Unbekannte Aktion' });
+  // Hierher kommt nichts mehr: CHAT_AKTIONEN oben filtert bereits.
+  return next();
 });
 
 app.post('/api/messages/:chatId/:messageId/stern', (req, res) => {
