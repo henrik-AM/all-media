@@ -62,7 +62,6 @@ const state = {
   places: [],
   friends: [],
   area: 'messenger',
-  // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt.
   sub: { messenger: 'chats', videos: 'home', communities: 'home', settings: 'main' },
   filter: 'all',
   query: '',
@@ -76,7 +75,14 @@ const state = {
   theme: localStorage.getItem('am-theme') || 'system',
   ownProfileTab: 'grid',
   openChatId: null,
+  openChatSettingsId: null,
   messages: [],
+  currentUserId: localStorage.getItem('am-user-id') || 'me',
+  profiles: JSON.parse(localStorage.getItem('am-profiles') || '["me"]'),
+  blockedUsers: JSON.parse(localStorage.getItem('am-blocked') || '[]'),
+  starredMessages: {},
+  mutedChats: {},
+  notifications: { sound: true, vibration: true, led: true },
 };
 
 const sub = () => state.sub[state.area];
@@ -1706,6 +1712,16 @@ function renderHomeFeed() {
 
   bindStoryRail();
 
+  // Story-Ringe anklickbar
+  main.querySelectorAll('[data-openStory]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const userId = btn.dataset.openStory;
+      const story = state.stories.find((s) => s.userId === userId);
+      if (story) openStory(userId, 0);
+      else toast('Keine Story vorhanden');
+    })
+  );
+
   main.querySelectorAll('[data-paction]').forEach((btn) =>
     btn.addEventListener('click', async () => {
       const { paction, pid } = btn.dataset;
@@ -1740,9 +1756,9 @@ function postCard(p) {
   return `
     <article class="post" id="post-${p.id}">
       <header class="post__head">
-        <div class="story__ring" style="width:40px;height:40px;padding:2px">
+        <button class="story__ring story-ring-btn" style="width:40px;height:40px;padding:2px" data-openStory="${p.userId}">
           <div class="story__inner" style="background:${u.color};font-size:13px">${esc(u.initials)}</div>
-        </div>
+        </button>
         <button class="post__who" data-profile="${p.userId}">
           <div class="post__name">${esc(u.name)}</div>
           <div class="post__sub">${esc(p.location)} · ${esc(p.music)}</div>
@@ -1750,7 +1766,7 @@ function postCard(p) {
         <button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
           ${p.following ? 'Gefolgt' : 'Folgen'}
         </button>
-        <button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="Benachrichtigungen">
+        <button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="Benachrichtigungen" style="color: ${p.notify ? '#0A66FF' : '#9AA1AC'}; opacity: ${p.notify ? 1 : 0.5}; text-decoration: ${p.notify ? 'none' : 'line-through'}">
           ${ICONS.bell}
         </button>
       </header>
@@ -3153,6 +3169,74 @@ function renderLandscapeVideos() {
   main.querySelectorAll('[data-clip]').forEach((el) =>
     el.addEventListener('click', () => openClip(el.dataset.clip))
   );
+}
+
+/* -------------------------------- Videos: Explorer-Seiten */
+function renderReelsExplorer() {
+  main.innerHTML = `
+    <div class="pagehead"><h2>Reels</h2></div>
+    <div class="scroll">
+      <div class="exp__grid">${state.videos.map((v) => `
+        <button class="exp__card" data-openvideo="${v.id}">
+          ${ICONS.portrait}
+          <div class="exp__card-info">
+            <strong>${esc(user(v.userId).name)}</strong>
+            ${v.location ? `<small>${esc(v.location)}</small>` : ''}
+          </div>
+        </button>`).join('')}</div>
+    </div>`;
+  main.querySelectorAll('[data-openvideo]').forEach(b => b.addEventListener('click', () => openVideo(b.dataset.openvideo)));
+}
+
+function renderClipsExplorer() {
+  main.innerHTML = `
+    <div class="pagehead"><h2>Querformat</h2></div>
+    <div class="scroll">
+      ${state.clips.map((c) => `
+        <button class="exp__row" data-openclip="${c.id}">
+          <span class="exp__thumb">${ICONS.landscape}</span>
+          <span class="exp__text">
+            <strong>${esc(c.title)}</strong>
+            <small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small>
+          </span>
+        </button>`).join('')}
+    </div>`;
+  main.querySelectorAll('[data-openclip]').forEach(b => b.addEventListener('click', () => openClip(b.dataset.openclip)));
+}
+
+function renderPostsExplorer() {
+  main.innerHTML = `
+    <div class="pagehead"><h2>Beiträge</h2></div>
+    <div class="scroll">
+      <div class="exp__grid">${state.posts.map((p) => `
+        <button class="griditem" data-openpost="${p.id}">${ICONS.image}</button>`).join('')}</div>
+    </div>`;
+  main.querySelectorAll('[data-openpost]').forEach(b => b.addEventListener('click', () => openPost(b.dataset.openpost)));
+}
+
+function renderHashtagExplorer(tag) {
+  const items = state.videos.filter(v => v.tags?.includes(tag))
+    .concat(state.clips.filter(c => c.tags?.includes(tag)))
+    .concat(state.posts.filter(p => p.tags?.includes(tag)));
+  main.innerHTML = `
+    <div class="pagehead"><h2>${esc(tag)}</h2></div>
+    <div class="scroll">
+      <div class="exp__grid">${items.slice(0, 20).map((i) => `
+        <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${ICONS.image}</button>`).join('')}</div>
+    </div>`;
+}
+
+function renderPlaceExplorer(placeId) {
+  const place = state.places.find(p => p.id === placeId);
+  const items = state.videos.filter(v => v.location === place?.name)
+    .concat(state.clips.filter(c => c.location === place?.name))
+    .concat(state.posts.filter(p => p.location === place?.name));
+  main.innerHTML = `
+    <div class="pagehead"><h2>${esc(place?.name || 'Standort')}</h2></div>
+    <div class="scroll">
+      <div class="exp__grid">${items.slice(0, 20).map((i) => `
+        <button class="griditem" data-item="${i.id}">${ICONS.image}</button>`).join('')}</div>
+    </div>`;
 }
 
 /* -------------------------------------------------------- Videos: Suche */
