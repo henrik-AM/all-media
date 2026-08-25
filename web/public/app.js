@@ -1268,20 +1268,23 @@ async function kontaktZeile(label, userId, chat, daten) {
   }
 
   if (label === 'Chatdesign') {
-    return openEinstellung({ label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' });
+    return openEinstellung({ label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' }, () => openContactProfile(userId));
   }
   if (label === 'In Fotos speichern') {
-    return openEinstellung({ label: 'In Fotos speichern', wahl: ['An', 'Aus'], standard: 'Aus' });
+    return openEinstellung({ label: 'In Fotos speichern', wahl: ['An', 'Aus'], standard: 'Aus' }, () => openContactProfile(userId));
   }
   if (label === 'Selbstlöschende Nachrichten') {
-    return openEinstellung({
-      label: 'Selbstlöschende Nachrichten',
-      wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen'],
-      standard: 'Aus',
-    });
+    return openEinstellung(
+      {
+        label: 'Selbstlöschende Nachrichten',
+        wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen'],
+        standard: 'Aus',
+      },
+      () => openContactProfile(userId)
+    );
   }
   if (label === 'Erweiterter Chat-Datenschutz') {
-    return openEinstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' });
+    return openEinstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' }, () => openContactProfile(userId));
   }
   if (label === 'Verschlüsselung') {
     return openEinstellung({
@@ -2337,7 +2340,9 @@ function einstellungsListe(art) {
   };
 }
 
-function openEinstellung(punkt) {
+/** `nachher` wird gerufen, wenn sich etwas geaendert hat - damit die
+ *  aufrufende Seite ihren neuen Stand zeigen kann. */
+function openEinstellung(punkt, nachher) {
   if (punkt.wahl) {
     const jetzt = einstellung(punkt);
     return openSheet(
@@ -2359,6 +2364,7 @@ function openEinstellung(punkt) {
             // Kontaktinfo heraus haette das sonst den Einstellungs-
             // Bildschirm unter das offene Fenster gebaut.
             if (state.area === 'settings') renderSettings();
+            nachher?.();
             toast(`${punkt.label}: ${b.dataset.wahl}`);
           })
         );

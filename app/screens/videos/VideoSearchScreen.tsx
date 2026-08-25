@@ -6,7 +6,6 @@ import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, radius, spacing, typography } from '../../constants/design';
 import {
-  mockClips,
   mockHashtags,
   mockPlaces,
   mockPosts,
@@ -15,6 +14,7 @@ import {
   mockVideos,
 } from '../../mocks';
 import { ExplorerZiel } from './ExplorerScreen';
+import { useProfil } from '../../contexts/ProfilContext';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -60,6 +60,8 @@ const Row = ({
  * Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
  */
 export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: Props) => {
+  // Eigene Aufnahmen sollen auch ueber die Suche zu finden sein.
+  const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
   const [query, setQuery] = useState('');
 
   const result = useMemo(() => {
@@ -67,15 +69,15 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
     const hit = (text: string) => !q || text.toLowerCase().includes(q);
 
     return {
-      reels: mockVideos.filter((v) => hit(v.description) || hit(mockUsers[v.userId].name)),
-      clips: mockClips.filter((c) => hit(c.title) || hit(mockUsers[c.userId].name)),
-      posts: mockPosts.filter((p) => hit(p.description) || hit(mockUsers[p.userId].name)),
+      reels: [...eigeneVideos, ...mockVideos].filter((v) => hit(v.description) || hit(mockUsers[v.userId].name)),
+      clips: clips.filter((c) => hit(c.title) || hit(mockUsers[c.userId].name)),
+      posts: [...eigeneBeitraege, ...mockPosts].filter((p) => hit(p.description) || hit(mockUsers[p.userId].name)),
       people: Object.values(mockUsers).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
       tags: mockHashtags.filter((h) => hit(h.tag)),
       places: mockPlaces.filter((p) => hit(p.name)),
       sounds: mockSounds.filter((s) => hit(s.title) || hit(s.artist)),
     };
-  }, [query]);
+  }, [query, clips, eigeneBeitraege, eigeneVideos]);
 
   const total = Object.values(result).reduce((sum, list) => sum + list.length, 0);
 
