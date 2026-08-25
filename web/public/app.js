@@ -4977,6 +4977,13 @@ async function openChat(chatId) {
   paintMessages(chat);
 
   $('#chatBack').addEventListener('click', closeChat);
+  const profileBtn = overlay.querySelector('[data-profile]');
+  if (profileBtn) {
+    profileBtn.addEventListener('click', () => {
+      closeChat();
+      openContactProfile(chat.userId);
+    });
+  }
   $('#anfrageOk')?.addEventListener('click', async () => {
     const res = await fetch(`/api/chats/${chat.id}/accept`, { method: 'POST' });
     const result = await res.json();

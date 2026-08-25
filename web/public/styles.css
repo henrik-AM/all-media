@@ -517,8 +517,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 .prof__stat strong { font-size: 18px; font-weight: 800; }
 .prof__stat span { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 
-.prof__about { padding: 0 16px 14px; }
-.prof__name { font-size: 16px; font-weight: 700; }
+.prof__about { padding: 0 16px 14px; text-align: center; }
+.prof__name { font-size: 16px; font-weight: 700; margin-top: 12px; }
 .prof__bio { margin-top: 4px; font-size: 14px; line-height: 1.45; color: var(--text-secondary); }
 .prof__link { display: inline-block; margin-top: 6px; font-size: 14px; color: var(--accent); text-decoration: none; font-weight: 600; }
 
