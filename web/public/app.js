@@ -133,6 +133,56 @@ function toast(msg) {
 }
 
 /* ------------------------------------------------------------------ data */
+/* ----------------------------------------- Login & Profile Switching */
+function openKontoWechsel() {
+  const konten = state.profiles.map((pid) => ({
+    id: pid,
+    name: pid === 'me' ? 'Du' : `Profil ${pid}`,
+    email: `${pid}@allmedia.de`,
+    initials: pid === 'me' ? 'DU' : pid.slice(0, 2).toUpperCase(),
+  }));
+
+  const kontoList = konten
+    .map((k) => `
+      <button class="konto-item ${state.currentUserId === k.id ? 'is-aktiv' : ''}" data-konto="${k.id}">
+        <span class="avatar avatar--44" style="background:#0A66FF">${esc(k.initials)}</span>
+        <div><strong>${esc(k.name)}</strong><small>${esc(k.email)}</small></div>
+        ${state.currentUserId === k.id ? ICONS.checkDouble : ''}
+      </button>`)
+    .join('');
+
+  openSheet(
+    'Konto wechseln',
+    `<div class="sheet__body">
+      ${kontoList}
+      <button class="item" id="addKonto">
+        <span class="item__icon">${ICONS.plus}</span>
+        <span>Neues Konto hinzufügen</span>
+      </button>
+    </div>`,
+    (sheet) => {
+      sheet.querySelectorAll('[data-konto]').forEach((b) => {
+        b.addEventListener('click', () => {
+          state.currentUserId = b.dataset.konto;
+          localStorage.setItem('am-user-id', state.currentUserId);
+          toast(`Zu ${user('me').name} gewechselt`);
+          render();
+        });
+      });
+      $('#addKonto')?.addEventListener('click', () => {
+        const newId = `profile-${Date.now()}`;
+        state.profiles.push(newId);
+        localStorage.setItem('am-profiles', JSON.stringify(state.profiles));
+        state.currentUserId = newId;
+        localStorage.setItem('am-user-id', state.currentUserId);
+        toast('Neues Konto erstellt');
+        render();
+      });
+    },
+    { schliessen: true }
+  );
+}
+
 async function bootstrap() {
   const res = await fetch('/api/bootstrap');
   const data = await res.json();
