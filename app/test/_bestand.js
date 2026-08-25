@@ -70,7 +70,9 @@ const BEREICHE = {
         });
         const blattOffen = !!(await page.$('.sheet-backdrop'));
 
-        if (/folgt|Phase 3/i.test(meldung)) {
+        // Wortgrenzen, sonst zaehlt "nicht mehr gefolgt" als Platzhalter -
+        // da steckt "folgt" nur zufaellig drin.
+        if (/\bfolgt\b|\bfolgen\b|Phase 3/i.test(meldung)) {
           platzhalter++;
           offen.push(`${beschriftung.trim().slice(0, 28)} → "${meldung.trim().slice(0, 40)}"`);
         } else if (overlayOffen || blattOffen || nachher !== vorher || meldung.trim()) {

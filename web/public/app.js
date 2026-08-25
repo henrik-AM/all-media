@@ -452,12 +452,13 @@ function storyAufnehmen(art = 'photo') {
     if (!datei) return;
 
     try {
-      if (art === 'video') {
-        // Videos werden nicht verkleinert - fuer die Demo reicht der Hinweis.
-        toast('Video aufgenommen (Vorschau folgt mit dem Backend)');
+      // Vom Video wird das erste Standbild genommen - so hat die Story auch
+      // dann ein Bild, wenn das Video selbst nicht abgespielt werden kann.
+      const bild = art === 'video' ? await videoStandbild(datei) : await bildVerkleinern(datei);
+      if (!bild) {
+        toast('Aus dieser Aufnahme ließ sich kein Bild gewinnen');
         return;
       }
-      const bild = await bildVerkleinern(datei);
       const eigene = { mediaUri: bild, aufgenommen: Date.now() };
       eigeneStorySichern(eigene);
 
@@ -1678,15 +1679,57 @@ function communityRow(c) {
  * Videos, Communitys) mit einer Sprungleiste darueber. Die Eintraege sind
  * eins zu eins uebernommen.
  */
+/*
+ * Die Einstellungen. Jeder Punkt hat eine Art, damit keiner davon nur ein
+ * Hinweis bleibt:
+ *
+ *   toggle   Schalter
+ *   wahl     eine aus mehreren Möglichkeiten, die gewählte steht rechts
+ *   eingabe  Formular mit Feldern
+ *   liste    was gerade eingetragen ist (Geräte, blockierte Profile, ...)
+ *   info     Erklärtext
+ *   aktion   tut etwas Einmaliges
+ *
+ * Die vier Abschnitte aus dem Prototyp-Frame "Einstellungen" stehen zuerst,
+ * "Videos" und "Communitys" stammen aus "VP + Einstellung" und
+ * "CP + Einstellung".
+ */
 const SETTINGS = [
   {
     id: 'allgemein',
     title: 'Allgemein',
     items: [
-      { label: 'Erziehungsberechtigte/r', icon: 'shield' },
-      { label: 'Spendencode', icon: 'bookmark' },
-      { label: 'Sicherheits-/Entsperrcode', icon: 'lock' },
-      { label: 'Geräteverknüpfung', icon: 'portrait' },
+      {
+        label: 'Erziehungsberechtigte/r',
+        icon: 'shield',
+        eingabe: [
+          { key: 'name', label: 'Name', platzhalter: 'Vor- und Nachname', pflicht: true },
+          { key: 'mail', label: 'E-Mail-Adresse', platzhalter: 'name@beispiel.de', pflicht: true },
+        ],
+        fertig: 'Einladung verschickt — die Verknüpfung gilt, sobald sie bestätigt wurde',
+      },
+      {
+        label: 'Spendencode',
+        icon: 'bookmark',
+        eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
+        fertig: 'Spendencode gespeichert',
+      },
+      {
+        label: 'Sicherheits-/Entsperrcode',
+        icon: 'lock',
+        eingabe: [
+          { key: 'code', label: 'Neuer Code (4 bis 8 Ziffern)', typ: 'zahl', pflicht: true },
+          { key: 'wdh', label: 'Code wiederholen', typ: 'zahl', pflicht: true },
+        ],
+        pruefen: (w) =>
+          !/^\d{4,8}$/.test(w.code)
+            ? 'Der Code muss aus 4 bis 8 Ziffern bestehen'
+            : w.code !== w.wdh
+            ? 'Die beiden Eingaben stimmen nicht überein'
+            : null,
+        fertig: 'Code gesetzt',
+      },
+      { label: 'Geräteverknüpfung', icon: 'portrait', liste: 'geraete' },
       { label: 'Dunkles Design', icon: 'moon', toggle: 'theme' },
     ],
   },
@@ -1694,22 +1737,51 @@ const SETTINGS = [
     id: 'konto',
     title: 'Konto',
     items: [
-      { label: 'Profil bearbeiten', icon: 'person' },
-      { label: 'Telefonnummer ändern', icon: 'phone' },
-      { label: 'Passwort ändern', icon: 'lock' },
-      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield' },
-      { label: 'Konto löschen', icon: 'block' },
+      {
+        label: 'Profil bearbeiten',
+        icon: 'person',
+        eingabe: [
+          { key: 'name', label: 'Name', pflicht: true },
+          { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
+          { key: 'link', label: 'Link' },
+        ],
+        fertig: 'Profil gespeichert',
+      },
+      {
+        label: 'Telefonnummer ändern',
+        icon: 'phone',
+        eingabe: [{ key: 'nummer', label: 'Neue Telefonnummer', platzhalter: '+49 …', pflicht: true }],
+        fertig: 'Wir haben dir einen Bestätigungscode geschickt',
+      },
+      {
+        label: 'Passwort ändern',
+        icon: 'lock',
+        eingabe: [
+          { key: 'alt', label: 'Bisheriges Passwort', pflicht: true },
+          { key: 'neu', label: 'Neues Passwort', pflicht: true },
+          { key: 'wdh', label: 'Neues Passwort wiederholen', pflicht: true },
+        ],
+        pruefen: (w) =>
+          w.neu.length < 8
+            ? 'Das neue Passwort braucht mindestens acht Zeichen'
+            : w.neu !== w.wdh
+            ? 'Die beiden Eingaben stimmen nicht überein'
+            : null,
+        fertig: 'Passwort geändert',
+      },
+      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
+      { label: 'Konto löschen', icon: 'block', gefahr: true, bestaetigen: 'Konto endgültig löschen?' },
     ],
   },
   {
     id: 'datenschutz',
     title: 'Datenschutz',
     items: [
-      { label: 'Zuletzt online', icon: 'clock' },
-      { label: 'Profilbild sichtbar für', icon: 'image' },
-      { label: 'Info sichtbar für', icon: 'info' },
-      { label: 'Blockierte Kontakte', icon: 'block' },
-      { label: 'Gruppen: wer darf hinzufügen', icon: 'people' },
+      { label: 'Zuletzt online', icon: 'clock', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Profilbild sichtbar für', icon: 'image', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Alle' },
+      { label: 'Info sichtbar für', icon: 'info', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Blockierte Kontakte', icon: 'block', liste: 'blockiert' },
+      { label: 'Gruppen: wer darf hinzufügen', icon: 'people', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
       { label: 'Bildschirmsperre', icon: 'lock', toggle: 'bildschirmsperre' },
     ],
   },
@@ -1720,8 +1792,8 @@ const SETTINGS = [
       { label: 'Nachrichten-Töne', icon: 'bell', toggle: 'toene' },
       { label: 'Vibration', icon: 'portrait', toggle: 'vibration' },
       { label: 'Vorschau anzeigen', icon: 'eye', toggle: 'vorschau' },
-      { label: 'Gruppen-Mitteilungen', icon: 'people' },
-      { label: 'Ruhezeiten', icon: 'moon' },
+      { label: 'Gruppen-Mitteilungen', icon: 'people', wahl: ['Alle Nachrichten', 'Nur Erwähnungen', 'Aus'], standard: 'Alle Nachrichten' },
+      { label: 'Ruhezeiten', icon: 'moon', wahl: ['Aus', '22 – 7 Uhr', '23 – 8 Uhr', '0 – 9 Uhr'], standard: 'Aus' },
     ],
   },
   {
@@ -1729,34 +1801,54 @@ const SETTINGS = [
     title: 'Chats',
     items: [
       { label: 'Lesebestätigung', icon: 'checkDouble', toggle: 'lesebestaetigung' },
-      { label: 'Standort-Sichtbarkeit', icon: 'mapPin' },
-      { label: 'Story-Sichtbarkeit', icon: 'eye' },
+      { label: 'Standort-Sichtbarkeit', icon: 'mapPin', wahl: ['Alle Kontakte', 'Ausgewählte Kontakte', 'Niemand'], standard: 'Alle Kontakte' },
+      { label: 'Story-Sichtbarkeit', icon: 'eye', wahl: ['Alle', 'Meine Kontakte', 'Enge Freunde'], standard: 'Meine Kontakte' },
       { label: 'Mit Enter senden', icon: 'send', toggle: 'entersenden' },
-      { label: 'Chat-Hintergrund', icon: 'image' },
-      { label: 'Schriftgröße', icon: 'info' },
-      { label: 'Chat-Verlauf sichern', icon: 'bookmark' },
-      { label: 'Archivierte Chats', icon: 'bookmark' },
+      { label: 'Chat-Hintergrund', icon: 'image', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
+      { label: 'Schriftgröße', icon: 'info', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
+      { label: 'Chat-Verlauf sichern', icon: 'bookmark', aktion: 'sicherung' },
+      { label: 'Archivierte Chats', icon: 'bookmark', liste: 'archiv' },
     ],
   },
   {
     id: 'speicher',
     title: 'Speicher',
     items: [
-      { label: 'Automatischer Download', icon: 'image' },
-      { label: 'Speicher verwalten', icon: 'compass' },
+      { label: 'Automatischer Download', icon: 'image', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
+      { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
       { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
-      { label: 'Medienqualität', icon: 'image' },
+      { label: 'Medienqualität', icon: 'image', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
     ],
   },
   {
     id: 'hilfe',
     title: 'Hilfe',
     items: [
-      { label: 'Hilfebereich', icon: 'info' },
-      { label: 'Problem melden', icon: 'shield' },
-      { label: 'Nutzungsbedingungen', icon: 'bookmark' },
-      { label: 'Datenschutzerklärung', icon: 'lock' },
-      { label: 'Freunde einladen', icon: 'people' },
+      {
+        label: 'Hilfebereich',
+        icon: 'info',
+        info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
+      },
+      {
+        label: 'Problem melden',
+        icon: 'shield',
+        eingabe: [
+          { key: 'was', label: 'Was ist passiert?', typ: 'mehrzeilig', pflicht: true },
+          { key: 'kontakt', label: 'Antwort an (freiwillig)', platzhalter: 'E-Mail oder Telefonnummer' },
+        ],
+        fertig: 'Danke, die Meldung ist bei uns angekommen',
+      },
+      {
+        label: 'Nutzungsbedingungen',
+        icon: 'bookmark',
+        info: 'All Media ist für Menschen ab 13 Jahren. Inhalte, die andere herabwürdigen oder gegen geltendes Recht verstoßen, werden entfernt. Wer sein Konto löscht, verliert seine Beiträge unwiderruflich.',
+      },
+      {
+        label: 'Datenschutzerklärung',
+        icon: 'lock',
+        info: 'Beiträge, Nachrichten und Profildaten liegen auf unseren Servern. Standortdaten nur, solange die Friend-Map eingeschaltet ist. Aufnahmen aus Kamera und Galerie bleiben auf deinem Gerät, bis du sie veröffentlichst.',
+      },
+      { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
     ],
   },
   {
@@ -1764,28 +1856,38 @@ const SETTINGS = [
     title: 'Videos',
     items: [
       { label: 'Privates Profil', icon: 'lock', toggle: 'videoPrivate' },
-      { label: 'Spendencode', icon: 'bookmark' },
-      { label: 'Insights', icon: 'compass' },
-      { label: 'Mit Glocke markierte Profile', icon: 'bell' },
-      { label: 'Repost-Sichtbarkeit', icon: 'repeat' },
-      { label: 'Likes-Sichtbarkeit', icon: 'heart' },
-      { label: 'Downloadeinstellungen', icon: 'image' },
-      { label: 'Story-Sichtbarkeit', icon: 'eye' },
-      { label: 'Nutzerstatus', icon: 'person' },
-      { label: 'Profilbanner', icon: 'landscape' },
+      {
+        label: 'Spendencode',
+        icon: 'bookmark',
+        eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
+        fertig: 'Spendencode gespeichert',
+      },
+      { label: 'Insights', icon: 'compass', liste: 'insights' },
+      { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
+      { label: 'Repost-Sichtbarkeit', icon: 'repeat', wahl: ['Alle', 'Meine Follower', 'Niemand'], standard: 'Alle' },
+      { label: 'Likes-Sichtbarkeit', icon: 'heart', wahl: ['Alle', 'Nur ich'], standard: 'Alle' },
+      { label: 'Downloadeinstellungen', icon: 'image', wahl: ['Erlaubt', 'Nur Follower', 'Aus'], standard: 'Erlaubt' },
+      { label: 'Story-Sichtbarkeit', icon: 'eye', wahl: ['Alle', 'Meine Kontakte', 'Enge Freunde'], standard: 'Meine Kontakte' },
+      { label: 'Nutzerstatus', icon: 'person', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
+      { label: 'Profilbanner', icon: 'landscape', wahl: ['Ohne', 'Farbverlauf', 'Eigenes Bild'], standard: 'Ohne' },
     ],
   },
   {
     id: 'communitys',
     title: 'Communitys',
     items: [
-      { label: 'Spendencode', icon: 'bookmark' },
-      { label: 'Nutzerstatus', icon: 'person' },
+      {
+        label: 'Spendencode',
+        icon: 'bookmark',
+        eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
+        fertig: 'Spendencode gespeichert',
+      },
+      { label: 'Nutzerstatus', icon: 'person', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock', toggle: 'commPrivate' },
-      { label: 'Nachrichtenerlaubnis', icon: 'chat' },
-      { label: 'Push-to-Talk Nachricht', icon: 'mic' },
-      { label: 'Gestummte Communitys', icon: 'mute' },
-      { label: 'Gestummte Profile', icon: 'block' },
+      { label: 'Nachrichtenerlaubnis', icon: 'chat', wahl: ['Alle', 'Mitglieder meiner Communitys', 'Niemand'], standard: 'Mitglieder meiner Communitys' },
+      { label: 'Push-to-Talk Nachricht', icon: 'mic', wahl: ['An', 'Aus'], standard: 'An' },
+      { label: 'Gestummte Communitys', icon: 'mute', liste: 'stummeKanaele' },
+      { label: 'Gestummte Profile', icon: 'block', liste: 'stummeProfile' },
     ],
   },
 ];
@@ -1802,8 +1904,249 @@ const toggles = {
   datensparen: false,
 };
 
+/* ---------------------------------------------- Ein Einstellungspunkt */
+/*
+ * Bisher gab jeder Punkt hier "folgt mit dem Backend" aus. Jetzt fuehrt
+ * jeder zu etwas: einer Auswahl, einem Formular, einer Liste, einem
+ * Erklaertext oder einer einmaligen Handlung.
+ *
+ * Was gewaehlt wurde, bleibt im Browser gespeichert - der Server teilt
+ * seinen Speicher mit allen Besuchern, dort waeren es nicht "deine"
+ * Einstellungen.
+ */
+const EINSTELLUNGEN_SPEICHER = 'am-einstellungen';
+
+function einstellungenLaden() {
+  try {
+    return JSON.parse(localStorage.getItem(EINSTELLUNGEN_SPEICHER) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function einstellung(punkt) {
+  const gespeichert = einstellungenLaden()[punkt.label];
+  return gespeichert && (!punkt.wahl || punkt.wahl.includes(gespeichert)) ? gespeichert : punkt.standard || '';
+}
+
+function einstellungSetzen(punkt, wert) {
+  try {
+    const alle = einstellungenLaden();
+    alle[punkt.label] = wert;
+    localStorage.setItem(EINSTELLUNGEN_SPEICHER, JSON.stringify(alle));
+  } catch {
+    /* Speicher gesperrt - dann gilt die Wahl nur fuer diese Sitzung */
+  }
+}
+
+/** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
+function einstellungsListe(art) {
+  if (art === 'geraete') {
+    return {
+      leer: 'Es ist kein weiteres Gerät verknüpft.',
+      zeilen: [
+        { text: 'Dieses Gerät', neben: 'gerade aktiv' },
+        { text: 'All Media Web', neben: 'zuletzt heute' },
+      ],
+      knopf: 'Gerät verknüpfen',
+      knopfText: 'Zum Verknüpfen den QR-Code auf dem anderen Gerät scannen',
+    };
+  }
+  if (art === 'blockiert') {
+    const ids = state.blockiert || [];
+    return {
+      leer: 'Du hast niemanden blockiert.',
+      zeilen: ids.map((id) => ({ text: user(id).name, neben: 'blockiert' })),
+    };
+  }
+  if (art === 'archiv') {
+    return { leer: 'Kein Chat ist archiviert.', zeilen: [] };
+  }
+  if (art === 'speicher') {
+    const nachrichten = state.chats.length;
+    return {
+      leer: '',
+      zeilen: [
+        { text: 'Chats', neben: `${nachrichten} Unterhaltungen` },
+        { text: 'Fotos und Videos', neben: `${Object.keys(eigeneMedien()).length} eigene Aufnahmen` },
+        { text: 'Zwischenspeicher', neben: 'wird beim Beenden geleert' },
+      ],
+    };
+  }
+  if (art === 'insights') {
+    const eigene = state.posts.filter((p) => p.userId === 'me');
+    return {
+      leer: '',
+      zeilen: [
+        { text: 'Eigene Beiträge', neben: String(eigene.length) },
+        { text: 'Follower', neben: '340' },
+        { text: 'Aufrufe (30 Tage)', neben: '1.284' },
+        { text: 'Neue Follower (30 Tage)', neben: '46' },
+      ],
+    };
+  }
+  if (art === 'glocke') {
+    const mit = state.posts.filter((p) => p.notify);
+    return {
+      leer: 'Du hast bei keinem Profil die Glocke angeschaltet.',
+      zeilen: mit.map((p) => ({ text: user(p.userId).name, neben: 'Glocke an' })),
+    };
+  }
+  if (art === 'stummeKanaele') {
+    const stumm = state.chats.filter((c) => c.isGroup && c.muted);
+    return {
+      leer: 'Keine Community ist stummgeschaltet.',
+      zeilen: stumm.map((c) => ({ text: c.name, neben: 'stumm' })),
+    };
+  }
+  const stummeProfile = state.stummgeschaltet || [];
+  return {
+    leer: 'Kein Profil ist stummgeschaltet.',
+    zeilen: stummeProfile.map((id) => ({ text: user(id).name, neben: 'stumm' })),
+  };
+}
+
+function openEinstellung(punkt) {
+  if (punkt.wahl) {
+    const jetzt = einstellung(punkt);
+    return openSheet(
+      punkt.label,
+      `<div class="sheet__body">${punkt.wahl
+        .map(
+          (w) => `<button class="item" data-wahl="${esc(w)}">
+            <span class="item__label">${esc(w)}</span>
+            ${w === jetzt ? `<span class="item__haken">${ICONS.check}</span>` : ''}
+          </button>`
+        )
+        .join('')}</div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-wahl]').forEach((b) =>
+          b.addEventListener('click', () => {
+            einstellungSetzen(punkt, b.dataset.wahl);
+            close();
+            renderSettings();
+            toast(`${punkt.label}: ${b.dataset.wahl}`);
+          })
+        );
+      },
+      { schliessen: true }
+    );
+  }
+
+  if (punkt.eingabe) {
+    return openFormular(
+      punkt.label,
+      punkt.eingabe,
+      (werte) => {
+        const fehler = punkt.pruefen?.(werte);
+        if (fehler) return fehler;
+        einstellungSetzen(punkt, werte[punkt.eingabe[0].key]);
+        toast(punkt.fertig || 'Gespeichert');
+        return null;
+      },
+      'Speichern'
+    );
+  }
+
+  if (punkt.liste) {
+    const { zeilen, leer, knopf, knopfText } = einstellungsListe(punkt.liste);
+    return openSheet(
+      punkt.label,
+      `<div class="sheet__body">
+         ${
+           zeilen.length
+             ? zeilen
+                 .map(
+                   (z) => `<div class="item">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value">${esc(z.neben)}</span>
+                   </div>`
+                 )
+                 .join('')
+             : `<div class="sheet__hint">${esc(leer)}</div>`
+         }
+       </div>
+       ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}`,
+      (sheet, close) => {
+        sheet.querySelector('#listenKnopf')?.addEventListener('click', () => {
+          close();
+          toast(knopfText);
+        });
+      },
+      { schliessen: true, hoch: zeilen.length > 4 }
+    );
+  }
+
+  if (punkt.info) {
+    return openSheet(
+      punkt.label,
+      `<div class="sheet__body"><p class="sheet__text">${esc(punkt.info)}</p></div>`,
+      null,
+      { schliessen: true }
+    );
+  }
+
+  if (punkt.bestaetigen) {
+    return openSheet(
+      punkt.label,
+      `<div class="sheet__body"><p class="sheet__text">${esc(punkt.bestaetigen)} Alle Beiträge, Nachrichten und Communitys gehen dabei unwiderruflich verloren.</p></div>
+       <div class="sheet__footer"><button class="prof__btn is-danger" id="loeschJa">Ja, Konto löschen</button></div>`,
+      (sheet, close) => {
+        sheet.querySelector('#loeschJa').addEventListener('click', () => {
+          close();
+          // Ohne Backend wird nichts wirklich geloescht - das gehoert gesagt,
+          // statt es vorzutaeuschen.
+          toast('Löschauftrag vorgemerkt — er greift, sobald das Backend steht');
+        });
+      },
+      { schliessen: true }
+    );
+  }
+
+  if (punkt.aktion === 'sicherung') {
+    const anzahl = state.chats.length;
+    return toast(`Sicherung erstellt — ${anzahl} Unterhaltungen gespeichert`);
+  }
+
+  if (punkt.aktion === 'einladen') {
+    const auswahl = state.contacts.filter((c) => state.users[c.id]);
+    if (!auswahl.length) return toast('Du hast noch keinen Kontakt zum Einladen');
+    return openSheet(
+      'Freunde einladen',
+      `<div class="sheet__body">${auswahl
+        .map((c) => {
+          const u = user(c.id);
+          return `<button class="item" data-einladen="${c.id}">
+            <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+            <span class="item__label">${esc(u.name)}</span>
+            <span class="row__chevron">${ICONS.chevron}</span>
+          </button>`;
+        })
+        .join('')}</div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-einladen]').forEach((b) =>
+          b.addEventListener('click', async () => {
+            close();
+            const chat = state.chats.find((c) => !c.isGroup && c.userId === b.dataset.einladen);
+            if (!chat) return toast('Noch kein Chat mit dieser Person');
+            await fetch(`/api/messages/${chat.id}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: 'Komm zu All Media: all-media.app' }),
+            });
+            toast(`Einladung an ${user(b.dataset.einladen).name} gesendet`);
+          })
+        );
+      },
+      { schliessen: true, hoch: true }
+    );
+  }
+
+  toast(`${punkt.label} folgt mit dem Backend`);
+}
+
 function renderSettings() {
-  const itemHtml = (it) => {
+  const itemHtml = (it, sektionId) => {
     if (it.toggle) {
       const on = it.toggle === 'theme' ? state.theme === 'dark' : toggles[it.toggle];
       return `<div class="item">
@@ -1812,17 +2155,20 @@ function renderSettings() {
         <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}"><span class="switch__knob"></span></button>
       </div>`;
     }
-    return `<button class="item" data-setting="${esc(it.label)}">
+    // Bei einer Auswahl steht rechts, was gerade gilt - sonst muesste man
+    // jeden Punkt aufmachen, um den Stand zu sehen.
+    const wert = it.wahl ? einstellung(it) : '';
+    return `<button class="item ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
       <span class="item__icon">${ICONS[it.icon]}</span>
       <span class="item__label">${esc(it.label)}</span>
+      ${wert ? `<span class="item__value">${esc(wert)}</span>` : ''}
       <span class="row__chevron">${ICONS.chevron}</span>
     </button>`;
   };
 
   main.innerHTML = `
     <div class="pagehead">
-      <div class="pills">
-        ${(() => {
+      ${(() => {
         if (!state.konten) {
           const me = user('me');
           state.konten = [{ id: 'me', name: 'Henrik', email: 'henrik@allmedia.de', initials: me.initials, color: me.color }];
@@ -1844,13 +2190,14 @@ function renderSettings() {
           ${ICONS.people}<span>Konto wechseln oder hinzufügen</span>
         </button>`;
       })()}
-      ${SETTINGS.map((sec) => `<button class="pill" data-jump="${sec.id}">${esc(sec.title)}</button>`).join('')}
+      <div class="pills">
+        ${SETTINGS.map((sec) => `<button class="pill" data-jump="${sec.id}">${esc(sec.title)}</button>`).join('')}
       </div>
     </div>
     <div class="scroll" id="settingsScroll">
       ${SETTINGS.map(
         (sec) => `<div class="listhead" id="sec-${sec.id}">${esc(sec.title)} →</div>
-          <div class="group">${sec.items.map(itemHtml).join('')}</div>`
+          <div class="group">${sec.items.map((it) => itemHtml(it, sec.id)).join('')}</div>`
       ).join('')}
       <div class="group">
         <button class="item" data-setting="Über All Media">
@@ -1897,7 +2244,15 @@ function renderSettings() {
   );
 
   main.querySelectorAll('[data-setting]').forEach((b) =>
-    b.addEventListener('click', () => toast(`${b.dataset.setting} folgt mit dem Backend`))
+    b.addEventListener('click', () => {
+      const abschnitt = SETTINGS.find((sec) => sec.id === b.dataset.abschnitt);
+      const punkt = abschnitt?.items.find((it) => it.label === b.dataset.setting);
+      if (punkt) return openEinstellung(punkt);
+
+      // Die zwei Punkte ganz unten stehen ausserhalb der Abschnitte.
+      if (b.dataset.setting === 'Abmelden') return toast('Abmelden folgt mit dem Backend');
+      toast('All Media 1.0.0 — gebaut aus dem Figma-Prototypen');
+    })
   );
 }
 
@@ -2453,10 +2808,7 @@ function renderLandscapeVideos() {
     $('#clipSearch').focus();
   });
   main.querySelectorAll('[data-clip]').forEach((el) =>
-    el.addEventListener('click', () => {
-      const c = state.clips.find((x) => x.id === el.dataset.clip);
-      toast(`„${c.title}" — Wiedergabe folgt mit dem Backend`);
-    })
+    el.addEventListener('click', () => openClip(el.dataset.clip))
   );
 }
 
@@ -3044,6 +3396,380 @@ async function anhangSenden(chat, art) {
   );
 }
 
+/* -------------------------------------------- Story: Ansichten und Menü */
+/*
+ * Zwei Knoepfe im Story-Betrachter, die bisher nur einen Hinweis ausgegeben
+ * haben. Wer die eigene Story gesehen hat, steht jetzt namentlich da; das
+ * Mehr-Menue unterscheidet zwischen eigener und fremder Story.
+ */
+function openStoryAnsichten(story, danach) {
+  // Wer die Story gesehen hat: die eigenen Kontakte, in fester Reihenfolge
+  // abhaengig von der Aufnahmezeit - sonst wechselt die Liste bei jedem
+  // Oeffnen und wirkt zufaellig.
+  const kontakte = state.contacts.filter((c) => state.users[c.id]);
+  const wieviele = Math.min(kontakte.length, 1 + (Math.floor((story.aufgenommen || 0) / 60000) % kontakte.length));
+  const seher = kontakte.slice(0, wieviele);
+
+  openSheet(
+    `${seher.length} ${seher.length === 1 ? 'Ansicht' : 'Ansichten'}`,
+    `<div class="sheet__body">
+       ${
+         seher.length
+           ? seher
+               .map((c) => {
+                 const u = user(c.id);
+                 return `<button class="item" data-seher="${c.id}">
+                   <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+                   <span class="item__label">${esc(u.name)}</span>
+                   <span class="item__value">${esc(u.handle)}</span>
+                 </button>`;
+               })
+               .join('')
+           : `<div class="sheet__hint">Noch hat niemand deine Story gesehen.</div>`
+       }
+     </div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-seher]').forEach((b) =>
+        b.addEventListener('click', () => {
+          close();
+          openContactProfile(b.dataset.seher);
+        })
+      );
+      sheet.addEventListener('click', (e) => {
+        if (e.target === sheet) danach?.();
+      });
+    },
+    { schliessen: true, hoch: seher.length > 5 }
+  );
+}
+
+function openStoryOptionen(story, danach) {
+  const eigene = !!story.own;
+  const punkte = eigene
+    ? [
+        { key: 'sichtbar', label: 'Wer darf sie sehen', icon: 'eye' },
+        { key: 'sichern', label: 'Auf dem Gerät sichern', icon: 'bookmark' },
+        { key: 'loeschen', label: 'Story löschen', icon: 'trash', gefahr: true },
+      ]
+    : [
+        { key: 'link', label: 'Link kopieren', icon: 'bookmark' },
+        { key: 'stumm', label: `${user(story.userId).name} stummschalten`, icon: 'mute' },
+        { key: 'melden', label: 'Story melden', icon: 'shield', gefahr: true },
+      ];
+
+  openSheet(
+    eigene ? 'Deine Story' : user(story.userId).name,
+    `<div class="sheet__body">${punkte
+      .map(
+        (p) => `<button class="item ${p.gefahr ? 'item--danger' : ''}" data-storyopt="${p.key}">
+          <span class="item__icon">${ICONS[p.icon]}</span>
+          <span class="item__label">${esc(p.label)}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`
+      )
+      .join('')}</div>`,
+    (sheet, close) => {
+      sheet.addEventListener('click', (e) => {
+        if (e.target === sheet) danach?.();
+      });
+
+      sheet.querySelectorAll('[data-storyopt]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const was = b.dataset.storyopt;
+          close();
+
+          if (was === 'loeschen') {
+            eigeneStorySichern(null);
+            const meine = state.stories.find((x) => x.own);
+            if (meine) {
+              delete meine.mediaUri;
+              delete meine.aufgenommen;
+            }
+            closeOverlay();
+            toast('Deine Story wurde gelöscht');
+            return render();
+          }
+
+          if (was === 'sichern') {
+            const bild = story.mediaUri;
+            if (!bild) return toast('Diese Story hat noch kein Bild');
+            const a = document.createElement('a');
+            a.href = bild;
+            a.download = 'all-media-story.jpg';
+            a.click();
+            return toast('Story gesichert');
+          }
+
+          if (was === 'sichtbar') {
+            danach?.();
+            return openEinstellung({
+              label: 'Story-Sichtbarkeit',
+              wahl: ['Alle', 'Meine Kontakte', 'Enge Freunde'],
+              standard: 'Meine Kontakte',
+            });
+          }
+
+          if (was === 'link') {
+            const adresse = `all-media.app/story/${story.id}`;
+            try {
+              await navigator.clipboard.writeText(adresse);
+              toast('Link kopiert');
+            } catch {
+              toast(adresse);
+            }
+            return danach?.();
+          }
+
+          if (was === 'stumm') {
+            const res = await fetch(`/api/profile/${story.userId}/stumm`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: '{}',
+            });
+            const daten = await res.json();
+            toast(daten.muted ? `${user(story.userId).name} stummgeschaltet` : 'Stummschaltung aufgehoben');
+            return danach?.();
+          }
+
+          // Melden: derselbe Weg wie im Profil.
+          openSheet(
+            'Story melden',
+            `<div class="sheet__body">${MELDE_GRUENDE.map(
+              (g) => `<button class="item" data-grund="${esc(g)}">
+                <span class="item__label">${esc(g)}</span>
+                <span class="row__chevron">${ICONS.chevron}</span>
+              </button>`
+            ).join('')}</div>`,
+            (blatt, zu) => {
+              blatt.querySelectorAll('[data-grund]').forEach((g) =>
+                g.addEventListener('click', async () => {
+                  zu();
+                  await fetch(`/api/profile/${story.userId}/melden`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ grund: g.dataset.grund }),
+                  });
+                  toast('Danke, wir sehen uns das an');
+                  danach?.();
+                })
+              );
+            },
+            { schliessen: true }
+          );
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/* --------------------------------------------------- Querformat-Player */
+/*
+ * Prototyp-Frame "VQ + Video": Zurueck-Pfeil, die Videoflaeche im
+ * Querformat, darunter Ueberschrift mit Aufrufen und Datum und die Reihe
+ * aus Like, Kommentar, Senden, Repost und Merken.
+ *
+ * Vorher liess sich ein Querformat-Video ueberhaupt nicht oeffnen - es kam
+ * nur "Wiedergabe folgt mit dem Backend".
+ */
+function openClip(clipId) {
+  let clip = state.clips.find((c) => c.id === clipId);
+  if (!clip) return toast('Dieses Video gibt es nicht mehr');
+
+  const sekunden = (dauer) => {
+    const [min, sek] = String(dauer).split(':').map(Number);
+    return min * 60 + sek;
+  };
+  let gesamt = sekunden(clip.duration);
+  let bei = 0;
+  let uhr = null;
+
+  const zeit = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  overlay.hidden = false;
+
+  const paint = () => {
+    const u = user(clip.userId);
+    const aehnlich = state.clips.filter((c) => c.id !== clip.id).slice(0, 4);
+
+    overlay.innerHTML = `
+      <div class="page">
+        <div class="page__bar">
+          <button class="topbar__btn" id="clipBack" aria-label="Zurück">${ICONS.back}</button>
+        </div>
+        <div class="scroll">
+          <div class="player">
+            <div class="player__stage" id="clipStage">
+              ${medienFlaeche(clip.id, ICONS.play)}
+              <button class="player__play" id="clipPlay" aria-label="Abspielen">${ICONS.play}</button>
+            </div>
+            <div class="player__leiste">
+              <span class="player__zeit" id="clipZeit">${zeit(bei)}</span>
+              <span class="player__balken"><i id="clipFortschritt" style="width:0%"></i></span>
+              <span class="player__zeit">${esc(clip.duration)}</span>
+            </div>
+          </div>
+
+          <div class="player__kopf">
+            <div class="player__titel">${esc(clip.title)}</div>
+            <div class="player__sub">${compactNumber(clip.views)} Aufrufe · ${esc(clip.age)}</div>
+          </div>
+
+          <div class="player__autor">
+            <span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>
+            <div class="player__autorText" data-profile="${u.id}">
+              <div class="player__autorName">${esc(u.name)}</div>
+              <div class="player__autorSub">${esc(u.handle)}</div>
+            </div>
+            <button class="prof__btn ${state.gefolgt?.[u.id] ? 'is-following' : 'is-primary'}" data-clipfollow="${u.id}">
+              ${state.gefolgt?.[u.id] ? 'Gefolgt' : 'Folgen'}
+            </button>
+          </div>
+
+          <div class="post__actions">
+            <button class="postbtn ${clip.liked ? 'is-liked' : ''}" data-clipact="like" aria-label="Gefällt mir">
+              ${ICONS.heart}${clip.likes ? `<span class="postbtn__zahl">${compactNumber(clip.likes)}</span>` : ''}
+            </button>
+            <button class="postbtn" data-clipact="comment" aria-label="Kommentieren">
+              ${ICONS.chat}${clip.comments ? `<span class="postbtn__zahl">${compactNumber(clip.comments)}</span>` : ''}
+            </button>
+            <button class="postbtn" data-clipact="share" aria-label="Senden">${ICONS.send}</button>
+            <button class="postbtn ${clip.reposted ? 'is-reposted' : ''}" data-clipact="repost" aria-label="Repost">${ICONS.repeat}</button>
+            <button class="postbtn postbtn--end ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Merken">${ICONS.bookmark}</button>
+          </div>
+
+          <div class="player__text">${esc(clip.description || '')}</div>
+
+          ${
+            clip.tags?.length
+              ? `<div class="chips">${clip.tags.map((t) => `<button class="chip" data-cliptag="${esc(t)}">${esc(t)}</button>`).join('')}</div>`
+              : ''
+          }
+
+          <div class="exp__head">Ähnliche Videos →</div>
+          <div class="expclips">
+            ${aehnlich
+              .map((c) => {
+                const au = user(c.userId);
+                return `<article class="clip clip--klein" data-anderesclip="${c.id}">
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__meta">
+                    <div class="avatar avatar--36" style="background:${au.color}">${esc(au.initials)}</div>
+                    <div>
+                      <div class="clip__title">${esc(c.title)}</div>
+                      <div class="clip__sub">${esc(au.name)} · ${compactNumber(c.views)} Aufrufe</div>
+                    </div>
+                  </div>
+                </article>`;
+              })
+              .join('')}
+          </div>
+        </div>
+      </div>`;
+
+    binden();
+  };
+
+  const schliessen = () => {
+    clearInterval(uhr);
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+  };
+
+  const binden = () => {
+    overlay.querySelector('#clipBack').addEventListener('click', schliessen);
+
+    const play = overlay.querySelector('#clipPlay');
+    const stage = overlay.querySelector('#clipStage');
+    const umschalten = () => {
+      if (uhr) {
+        clearInterval(uhr);
+        uhr = null;
+        play.innerHTML = ICONS.play;
+        play.classList.remove('is-aus');
+        return;
+      }
+      play.innerHTML = ICONS.pause;
+      play.classList.add('is-aus');
+      uhr = setInterval(() => {
+        const zeitFeld = overlay.querySelector('#clipZeit');
+        if (!zeitFeld) return clearInterval(uhr);
+        bei = Math.min(gesamt, bei + 1);
+        zeitFeld.textContent = zeit(bei);
+        overlay.querySelector('#clipFortschritt').style.width = `${(bei / gesamt) * 100}%`;
+        if (bei >= gesamt) {
+          clearInterval(uhr);
+          uhr = null;
+          play.innerHTML = ICONS.play;
+          play.classList.remove('is-aus');
+        }
+      }, 1000);
+    };
+    play.addEventListener('click', (e) => {
+      e.stopPropagation();
+      umschalten();
+    });
+    stage.addEventListener('click', umschalten);
+
+    overlay.querySelectorAll('[data-clipact]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const was = b.dataset.clipact;
+
+        if (was === 'comment') {
+          return openComments(clip.id, (anzahl) => {
+            clip.comments = anzahl;
+            paint();
+          });
+        }
+        if (was === 'share') return openTeilen('clip', clip.id);
+
+        const res = await fetch(`/api/clips/${clip.id}/${was}`, { method: 'POST' });
+        clip = await res.json();
+        const stelle = state.clips.findIndex((c) => c.id === clip.id);
+        if (stelle !== -1) state.clips[stelle] = clip;
+        paint();
+
+        if (was === 'repost') toast(clip.reposted ? 'Repostet' : 'Repost zurückgenommen');
+        if (was === 'save') toast(clip.saved ? 'Gemerkt' : 'Nicht mehr gemerkt');
+      })
+    );
+
+    overlay.querySelectorAll('[data-profile]').forEach((b) =>
+      b.addEventListener('click', () => {
+        schliessen();
+        openProfile(b.dataset.profile, 'oeffentlich');
+      })
+    );
+
+    overlay.querySelector('[data-clipfollow]')?.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.clipfollow;
+      const res = await fetch(`/api/autoren/${id}/follow`, { method: 'POST' });
+      const daten = await res.json();
+      if (!daten.ok) return toast(daten.error);
+      state.gefolgt = { ...state.gefolgt, [id]: daten.following };
+      paint();
+      toast(daten.following ? `Du folgst ${user(id).name}` : `${user(id).name} nicht mehr gefolgt`);
+    });
+
+    overlay.querySelectorAll('[data-cliptag]').forEach((b) =>
+      b.addEventListener('click', () => openExplorer('hashtag', b.dataset.cliptag))
+    );
+
+    overlay.querySelectorAll('[data-anderesclip]').forEach((b) =>
+      b.addEventListener('click', () => {
+        clearInterval(uhr);
+        uhr = null;
+        bei = 0;
+        clip = state.clips.find((c) => c.id === b.dataset.anderesclip);
+        gesamt = sekunden(clip.duration);
+        paint();
+      })
+    );
+  };
+
+  paint();
+}
+
 /* ------------------------------------------------------ Explorer-Seiten */
 /*
  * Hashtag, Standort und Sound. Prototyp-Frames "VS# - Hashtagoptionen",
@@ -3206,13 +3932,7 @@ async function openExplorer(art, wert) {
   );
 
   overlay.querySelectorAll('[data-clip]').forEach((b) =>
-    b.addEventListener('click', () => {
-      overlay.hidden = true;
-      overlay.innerHTML = '';
-      state.area = 'videos';
-      state.sub.videos = 'landscape';
-      render();
-    })
+    b.addEventListener('click', () => openClip(b.dataset.clip))
   );
 }
 
@@ -4197,13 +4917,19 @@ function openStory(storyId) {
   $('#storyPrev').addEventListener('click', () => go(-1));
   $('#storyNext').addEventListener('click', () => go(1));
 
-  $('#storyMore').addEventListener('click', () => toast('Weitere Optionen folgen'));
+  // Die Zeit anhalten, solange ein Blatt offen ist - sonst laeuft die Story
+  // im Hintergrund weiter. Genau das war schon beim Antworten das Problem.
+  $('#storyMore').addEventListener('click', () => {
+    pause();
+    openStoryOptionen(s, resume);
+  });
 
   // Bei der eigenen Story gibt es weder Herz noch Antwortfeld.
   if (s.own) {
-    $('#storyViews').addEventListener('click', () =>
-      toast('Wer deine Story gesehen hat, folgt mit dem Backend')
-    );
+    $('#storyViews').addEventListener('click', () => {
+      pause();
+      openStoryAnsichten(s, resume);
+    });
     $('#storyDelete').addEventListener('click', () => {
       eigeneStorySichern(null);
       const eigene = state.stories.find((x) => x.own);

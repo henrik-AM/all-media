@@ -9,6 +9,8 @@ import { mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 
 interface Props {
+  /** Oeffnet den Querformat-Player. */
+  onOpenClip: (clipId: string) => void;
   onNotice: (message: string) => void;
 }
 
@@ -16,7 +18,7 @@ const compact = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(n);
 
 /** Prototyp-Frame "Videos - Querformat": Suchleiste plus Videoliste. */
-export const LandscapeVideosScreen = ({ onNotice }: Props) => {
+export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
   // Eigene Aufnahmen und die Livestream-Aufzeichnung stehen im gemeinsamen
   // Zustand und sollen hier oben mit auftauchen.
   const { clips } = useProfil();
@@ -47,7 +49,7 @@ export const LandscapeVideosScreen = ({ onNotice }: Props) => {
             return (
               <Pressable
                 style={styles.clip}
-                onPress={() => onNotice(`„${item.title}" — Wiedergabe folgt mit dem Backend`)}
+                onPress={() => onOpenClip(item.id)}
               >
                 <View style={styles.thumb}>
                   <Ionicons name="tv-outline" size={42} color={colors.text3} />

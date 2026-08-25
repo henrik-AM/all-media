@@ -114,6 +114,9 @@ interface ProfilWert {
   spendeSetzen: (spende: Spende) => void;
   aufzeichnungAnlegen: (sekunden: number, zuschauer: number) => void;
 
+  /** Like, Merken oder Repost bei einem Querformat-Video umschalten. */
+  clipUmschalten: (id: string, was: 'like' | 'save' | 'repost') => void;
+
   /* --- Weitere Optionen im Profil einer Person --- */
   istStumm: (userId: string) => boolean;
   istBlockiert: (userId: string) => boolean;
@@ -317,6 +320,20 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }, []);
 
+  const clipUmschalten = useCallback((id: string, was: 'like' | 'save' | 'repost') => {
+    setClips((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c;
+        if (was === 'like') {
+          const jetzt = !c.liked;
+          return { ...c, liked: jetzt, likes: Math.max(0, (c.likes ?? 0) + (jetzt ? 1 : -1)) };
+        }
+        if (was === 'save') return { ...c, saved: !c.saved };
+        return { ...c, reposted: !c.reposted };
+      })
+    );
+  }, []);
+
   const istStumm = useCallback((id: string) => stumm.includes(id), [stumm]);
   const istBlockiert = useCallback((id: string) => blockiert.includes(id), [blockiert]);
   const meldeGrund = useCallback((id: string) => gemeldet[id], [gemeldet]);
@@ -370,6 +387,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       playlistAnlegen,
       spendeSetzen,
       aufzeichnungAnlegen,
+      clipUmschalten,
       istStumm,
       istBlockiert,
       meldeGrund,
@@ -387,7 +405,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
-      aufzeichnungAnlegen, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
+      aufzeichnungAnlegen, clipUmschalten, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
     ]
   );
 

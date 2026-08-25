@@ -33,6 +33,7 @@ import { CommunityProfileScreen } from './screens/communities/CommunityProfileSc
 import { CommunitySearchScreen } from './screens/communities/CommunitySearchScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
 import { LandscapeVideosScreen } from './screens/videos/LandscapeVideosScreen';
+import { ClipPlayerScreen } from './screens/videos/ClipPlayerScreen';
 import { ExplorerScreen, ExplorerZiel } from './screens/videos/ExplorerScreen';
 import { LivestreamScreen } from './screens/videos/LivestreamScreen';
 import { VideoProfileScreen } from './screens/videos/VideoProfileScreen';
@@ -59,6 +60,7 @@ type Overlay =
   | { kind: 'call'; userId: string; art: 'audio' | 'video' }
   | { kind: 'livestream' }
   | { kind: 'explorer'; ziel: ExplorerZiel }
+  | { kind: 'clip'; clipId: string }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -517,6 +519,8 @@ const Shell = () => {
           setNotice('Deine Story wurde gelöscht');
         }}
         onReply={replyToStory}
+        contacts={contacts}
+        onOpenProfile={openProfile}
         onNotice={setNotice}
       />
     );
@@ -555,7 +559,34 @@ const Shell = () => {
   }
 
   if (overlay?.kind === 'explorer') {
-    return <ExplorerScreen ziel={overlay.ziel} onBack={() => setOverlay(null)} onNotice={setNotice} />;
+    return (
+      <ExplorerScreen
+        ziel={overlay.ziel}
+        onBack={() => setOverlay(null)}
+        onOpenClip={(clipId) => setOverlay({ kind: 'clip', clipId })}
+        onNotice={setNotice}
+      />
+    );
+  }
+
+  if (overlay?.kind === 'clip') {
+    return (
+      <ClipPlayerScreen
+        clipId={overlay.clipId}
+        onBack={() => setOverlay(null)}
+        onOpenProfile={openPublicProfile}
+        onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
+        onShare={(clip) =>
+          setTeilenZiel({
+            art: 'video',
+            id: clip.id,
+            titel: clip.title,
+            autor: mockUsers[clip.userId]?.name ?? 'Unbekannt',
+          })
+        }
+        onNotice={setNotice}
+      />
+    );
   }
 
   if (overlay?.kind === 'livestream') {
@@ -611,7 +642,10 @@ const Shell = () => {
 
     if (area === 'videos') {
       if (sub === 'portrait') return <VideoFeedScreen onOpenProfile={openPublicProfile} onShare={teileVideo} onNotice={setNotice} />;
-      if (sub === 'landscape') return <LandscapeVideosScreen onNotice={setNotice} />;
+      if (sub === 'landscape')
+        return (
+          <LandscapeVideosScreen onOpenClip={(clipId) => setOverlay({ kind: 'clip', clipId })} onNotice={setNotice} />
+        );
       if (sub === 'search')
         return (
           <VideoSearchScreen

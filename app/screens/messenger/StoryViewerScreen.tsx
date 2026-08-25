@@ -5,7 +5,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { mockUsers } from '../../mocks';
-import { Story } from '../../types';
+import { StoryAnsichtenSheet, StoryOptionenSheet } from '../../components/StoryOptionenSheet';
+import { Contact, Story } from '../../types';
 
 const DURATION = 6000;
 
@@ -18,6 +19,9 @@ interface Props {
   onClose: () => void;
   /** Antwort auf die Story — landet im Chat mit dieser Person. */
   onReply: (story: Story, text: string) => void;
+  /** Fuer die Liste "wer hat sie gesehen". */
+  contacts?: Contact[];
+  onOpenProfile?: (userId: string) => void;
   onNotice: (message: string) => void;
 }
 
@@ -28,7 +32,18 @@ interface Props {
  *  3. Eine Antwort landet wirklich im Chat mit dieser Person.
  *  4. Tippen links/rechts blaettert zur vorigen/naechsten Story.
  */
-export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice, onDelete }: Props) => {
+export const StoryViewerScreen = ({
+  story,
+  alle,
+  onClose,
+  onReply,
+  onNotice,
+  onDelete,
+  contacts = [],
+  onOpenProfile,
+}: Props) => {
+  const [ansichtenOffen, setAnsichtenOffen] = useState(false);
+  const [optionenOffen, setOptionenOffen] = useState(false);
   const insets = useSafeAreaInsets();
   // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
   const stories = alle.filter((s) => !s.own || s.mediaUri);
@@ -120,7 +135,15 @@ export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice, onD
           <Text style={styles.name}>{istEigene ? 'Deine Story' : person?.name ?? current.name}</Text>
           <Text style={styles.time}>{alter()}</Text>
         </View>
-        <Pressable onPress={() => onNotice('Weitere Optionen folgen')} hitSlop={10}>
+        <Pressable
+          onPress={() => {
+            // Zeit anhalten, solange das Blatt offen ist - sonst laeuft die
+            // Story im Hintergrund weiter.
+            setPaused(true);
+            setOptionenOffen(true);
+          }}
+          hitSlop={10}
+        >
           <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.white} />
         </Pressable>
       </View>
@@ -150,7 +173,10 @@ export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice, onD
         <View style={styles.foot}>
           <Pressable
             style={styles.ansichten}
-            onPress={() => onNotice('Wer deine Story gesehen hat, folgt mit dem Backend')}
+            onPress={() => {
+              setPaused(true);
+              setAnsichtenOffen(true);
+            }}
           >
             <Ionicons name="eye-outline" size={20} color={colors.white} />
             <Text style={styles.ansichtenText}>Ansichten</Text>
@@ -194,6 +220,37 @@ export const StoryViewerScreen = ({ story, alle, onClose, onReply, onNotice, onD
           />
         </Pressable>
       </View>
+      )}
+
+      {ansichtenOffen && (
+        <StoryAnsichtenSheet
+          story={current}
+          contacts={contacts}
+          onClose={() => {
+            setAnsichtenOffen(false);
+            setPaused(false);
+          }}
+          onOpenProfile={(userId) => {
+            onClose();
+            onOpenProfile?.(userId);
+          }}
+        />
+      )}
+
+      {optionenOffen && (
+        <StoryOptionenSheet
+          story={current}
+          eigene={istEigene}
+          onClose={() => {
+            setOptionenOffen(false);
+            setPaused(false);
+          }}
+          onDelete={() => {
+            onDelete?.();
+            onClose();
+          }}
+          onNotice={onNotice}
+        />
       )}
     </View>
   );

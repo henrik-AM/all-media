@@ -20,6 +20,8 @@ export interface ExplorerZiel {
 interface Props {
   ziel: ExplorerZiel;
   onBack: () => void;
+  /** Oeffnet den Querformat-Player. */
+  onOpenClip: (clipId: string) => void;
   onNotice: (message: string) => void;
 }
 
@@ -32,7 +34,7 @@ const compact = (n: number) =>
  * "VSSo + Sound". Alle drei sind gleich aufgebaut: ein eigener Kopf und
  * darunter die Abschnitte Reels, Querformat und Beiträge.
  */
-export const ExplorerScreen = ({ ziel, onBack, onNotice }: Props) => {
+export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) => {
   const insets = useSafeAreaInsets();
   const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
 
@@ -99,7 +101,7 @@ export const ExplorerScreen = ({ ziel, onBack, onNotice }: Props) => {
               <>
                 <Text style={styles.abschnitt}>Querformat →</Text>
                 {treffer.clips.map((c: Clip) => (
-                  <Pressable key={c.id} style={styles.clip} onPress={() => onNotice(c.title)}>
+                  <Pressable key={c.id} style={styles.clip} onPress={() => onOpenClip(c.id)}>
                     <View style={styles.clipBild}>
                       <Ionicons name="tv-outline" size={30} color={colors.text3} />
                       <View style={styles.clipZeit}>

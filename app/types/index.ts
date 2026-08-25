@@ -154,6 +154,13 @@ export interface Clip {
   location?: string;
   music?: string;
   tags?: string[];
+  /** Fuer den Querformat-Player (Prototyp-Frame "VQ + Video"). */
+  description?: string;
+  likes?: number;
+  comments?: number;
+  liked?: boolean;
+  saved?: boolean;
+  reposted?: boolean;
 }
 
 /** Eintrag der Friend-Map. x/y sind Prozentwerte auf der Kartenflaeche. */

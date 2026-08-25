@@ -79,12 +79,12 @@ const stories = [
 
 // Querformat-Videos (Videos / Querformat im Prototyp)
 const clips = [
-  { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen' , location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', tags: ['#sonnenaufgang'] },
-  { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen' , location: 'Köln', music: 'Lo-Fi Focus – beatlab', tags: ['#designsystem'] },
-  { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche' , location: 'Hamburg', music: 'Kitchen Groove – Milo', tags: ['#mealprep'] },
-  { id: 'q4', userId: 'u2', title: 'Expo SDK 57: Was sich geändert hat', duration: '09:55', views: 18700, age: 'vor 1 Woche' , location: 'Köln', music: 'Originalton', tags: ['#reactnative'] },
-  { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen' , location: 'Hamburg', music: 'Golden Hour – Lys', tags: ['#hafen', '#nachtfotografie'] },
-  { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen' , location: 'Berlin', music: 'Originalton', tags: ['#reactnative'] },
+  { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen' , location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', tags: ['#sonnenaufgang'], description: 'Die ganze Tour von der Hütte bis zum Gipfel, ungeschnitten. Kapitel in der Beschreibung.', likes: 8420, comments: 214, liked: false, saved: false, reposted: false },
+  { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen' , location: 'Köln', music: 'Lo-Fi Focus – beatlab', tags: ['#designsystem'], description: 'Von der ersten Farbvariable bis zum fertigen Theme — Schritt für Schritt mitgebaut.', likes: 3110, comments: 96, liked: false, saved: false, reposted: false },
+  { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche' , location: 'Hamburg', music: 'Kitchen Groove – Milo', tags: ['#mealprep'], description: 'Fünf Gerichte, eine Stunde Arbeit, eine ganze Woche satt. Einkaufszettel unten.', likes: 24800, comments: 612, liked: false, saved: false, reposted: false },
+  { id: 'q4', userId: 'u2', title: 'Expo SDK 57: Was sich geändert hat', duration: '09:55', views: 18700, age: 'vor 1 Woche' , location: 'Köln', music: 'Originalton', tags: ['#reactnative'], description: 'Was sich mit Expo SDK 57 ändert und worauf man beim Umstieg achten muss.', likes: 1240, comments: 58, liked: false, saved: false, reposted: false },
+  { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen' , location: 'Hamburg', music: 'Golden Hour – Lys', tags: ['#hafen', '#nachtfotografie'], description: 'Blaue Stunde am Hafen: Einstellungen, Stativ, Nachbearbeitung.', likes: 6180, comments: 143, liked: false, saved: false, reposted: false },
+  { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen' , location: 'Berlin', music: 'Originalton', tags: ['#reactnative'], description: 'Warum kleine Commits das Review leichter machen — mit Beispielen aus echten Projekten.', likes: 1870, comments: 74, liked: false, saved: false, reposted: false },
 ];
 
 // Explorer-Abschnitte (Video - Suche im Prototyp)
@@ -402,7 +402,40 @@ app.get('/api/bootstrap', (req, res) => {
     videos: mitteilungen.filter((m) => m.bereich === 'videos' && !m.gelesen).length,
     communities: mitteilungen.filter((m) => m.bereich === 'communities' && !m.gelesen).length,
   };
-  res.json({ users, chats, stories, contacts, communities, videos, posts, clips, hashtags, sounds, places, friends, gefolgt, ungelesen });
+  // Wen man blockiert oder stummgeschaltet hat - fuer die Listen in den
+  // Einstellungen.
+  const blockiert = Object.keys(profiles).filter((id) => profiles[id].blocked);
+  const stummgeschaltet = Object.keys(profiles).filter((id) => profiles[id].muted);
+
+  res.json({
+    users, chats, stories, contacts, communities, videos, posts, clips,
+    hashtags, sounds, places, friends, gefolgt, ungelesen, blockiert, stummgeschaltet,
+  });
+});
+
+/*
+ * Querformat-Player (Prototyp-Frame "VQ + Video"). Like, Merken und Repost
+ * wie beim Hochformat - vorher liess sich ein Querformat-Video ueberhaupt
+ * nicht oeffnen.
+ */
+app.post('/api/clips/:id/:action', (req, res) => {
+  const clip = clips.find((c) => c.id === req.params.id);
+  if (!clip) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  const { action } = req.params;
+  if (action === 'like') {
+    clip.liked = !clip.liked;
+    clip.likes = Math.max(0, (clip.likes || 0) + (clip.liked ? 1 : -1));
+  } else if (action === 'save') {
+    clip.saved = !clip.saved;
+  } else if (action === 'repost') {
+    clip.reposted = !clip.reposted;
+    setzeRepost('clip', clip.id, clip.reposted);
+  } else {
+    return res.status(400).json({ error: 'Unbekannte Aktion' });
+  }
+
+  res.json(clip);
 });
 
 /* --------------------------------------- Weitere Optionen im Fremdprofil */
@@ -672,6 +705,8 @@ app.get('/api/reposts', (req, res) => {
       .map((r) =>
         r.art === 'post'
           ? { art: 'post', eintrag: posts.find((p) => p.id === r.id) }
+          : r.art === 'clip'
+          ? { art: 'clip', eintrag: clips.find((c) => c.id === r.id) }
           : { art: 'video', eintrag: videos.find((v) => v.id === r.id) }
       )
       .filter((r) => r.eintrag)
@@ -848,13 +883,18 @@ app.post('/api/teilen', (req, res) => {
   const empfaenger = Array.isArray(req.body?.empfaenger) ? req.body.empfaenger : [];
   if (!empfaenger.length) return res.json({ ok: false, error: 'Bitte mindestens eine Person auswählen' });
 
-  const eintrag = art === 'video' ? videos.find((v) => v.id === id) : posts.find((p) => p.id === id);
+  const eintrag =
+    art === 'video'
+      ? videos.find((v) => v.id === id)
+      : art === 'clip'
+      ? clips.find((c) => c.id === id)
+      : posts.find((p) => p.id === id);
   if (!eintrag) return res.json({ ok: false, error: 'Diesen Beitrag gibt es nicht mehr' });
 
   const autor = users[eintrag.userId]?.name || 'Unbekannt';
-  const titel = eintrag.description || 'Ohne Beschreibung';
+  const titel = eintrag.title || eintrag.description || 'Ohne Beschreibung';
   const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const vorschau = art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
+  const vorschau = art === 'post' ? 'Beitrag geteilt' : 'Video geteilt';
   const gesendet = [];
 
   for (const userId of empfaenger) {
