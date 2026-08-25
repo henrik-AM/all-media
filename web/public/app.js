@@ -5111,6 +5111,69 @@ function renderCommunityProfile() {
   bindJoinButtons(renderCommunityProfile);
 }
 
+/* ------------------------------------------------- Chat-Einstellungen Modal */
+function openChatSettings(chatId) {
+  const chat = state.chats.find((c) => c.id === chatId);
+  if (!chat) return;
+
+  const settingsHtml = `
+    <div class="sheet__header">Chat-Einstellungen</div>
+    <div class="sheet__body">
+      <div class="item">
+        <span class="item__label">Benachrichtigungen</span>
+        <button class="switch is-on" data-toggle="notifications" aria-label="Mitteilungen"></button>
+      </div>
+      <div class="item">
+        <span class="item__label">Stumm</span>
+        <button class="switch ${state.mutedChats[chatId] ? 'is-on' : ''}" data-toggle="mute" aria-label="Stummschalten"></button>
+      </div>
+      <button class="item" id="chatClear">
+        <span class="item__label">Chat leeren</span>
+      </button>
+      <button class="item" id="chatExport">
+        <span class="item__label">Chat exportieren</span>
+      </button>
+      <button class="item item--danger" id="chatBlock">
+        <span class="item__label">Blockieren</span>
+      </button>
+      <button class="item item--danger" id="chatReport">
+        <span class="item__label">Melden</span>
+      </button>
+    </div>`;
+
+  openSheet('Chat-Optionen', settingsHtml, (sheet) => {
+    sheet.querySelectorAll('[data-toggle]').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (b.dataset.toggle === 'mute') {
+          state.mutedChats[chatId] = !state.mutedChats[chatId];
+        }
+        b.classList.toggle('is-on');
+      });
+    });
+    $('#chatClear')?.addEventListener('click', () => {
+      state.messages = [];
+      toast('Chat geleert');
+    });
+    $('#chatExport')?.addEventListener('click', () => {
+      const text = state.messages.map((m) => `${user(m.from).name}: ${m.text}`).join('\n');
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat-${chatId}.txt`;
+      a.click();
+      toast('Chat exportiert');
+    });
+    $('#chatBlock')?.addEventListener('click', () => {
+      state.blockedUsers.push(chat.userId);
+      toast('Kontakt blockiert');
+    });
+    $('#chatReport')?.addEventListener('click', () => {
+      toast('Meldung gesendet');
+    });
+  }, { schliessen: true });
+}
+
 /* ---------------------------------------------------------- chat detail */
 async function openChat(chatId) {
   let chat = state.chats.find((c) => c.id === chatId);
