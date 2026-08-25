@@ -1884,9 +1884,22 @@ function postCard(p) {
       </div>
       <div class="post__desc"><strong>${esc(u.name)}</strong> ${esc(p.description)}</div>
       <button class="post__comments" data-paction="comment" data-pid="${p.id}">
-        Alle ${p.comments} Kommentare ansehen
+        ${kommentarZeile(p.comments)}
       </button>
     </article>`;
+}
+
+/*
+ * Der Satz unter dem Beitrag richtet sich nach der Zahl. "Alle 3 Kommentare
+ * ansehen" klingt falsch, wenn ohnehin alle drei ins Bild passen, und bei
+ * null Kommentaren gibt es nichts anzusehen - dann lädt der Knopf zum
+ * Schreiben ein.
+ */
+function kommentarZeile(anzahl) {
+  if (!anzahl) return 'Kommentar schreiben';
+  if (anzahl === 1) return '1 Kommentar ansehen';
+  if (anzahl <= 3) return `${anzahl} Kommentare ansehen`;
+  return `Alle ${anzahl} Kommentare ansehen`;
 }
 
 /* ---------------------------------------------------------- video feed */
@@ -3406,6 +3419,34 @@ function renderPlaceExplorer(placeId) {
     </div>`;
 }
 
+/*
+ * Kachel fuer Reels und Beitraege in den Uebersichten.
+ *
+ * Henrik wollte unter jedem Video dieselben Angaben sehen wie im Kurzformat:
+ * Profilbild, Name und - wenn vorhanden - Ort und Musik. Vorher stand dort
+ * nur der Name mitten in einer leeren Flaeche.
+ *
+ * `art` ist das data-Attribut, ueber das der Klick verarbeitet wird
+ * ("openvideo" oder "openpost"), `form` unterscheidet die waagerechte Reihe
+ * von der dreispaltigen Rasterdarstellung.
+ */
+function medienKachel(eintrag, art, symbol, form) {
+  const u = user(eintrag.userId);
+  const zusatz = [eintrag.location, eintrag.music].filter(Boolean).join(' · ');
+
+  return `
+    <button class="exp__card exp__card--${form}" data-${art}="${eintrag.id}">
+      <span class="exp__card-media">${symbol}</span>
+      <span class="exp__card-info">
+        <span class="exp__card-kopf">
+          <span class="exp__card-avatar" style="background:${u.color}">${esc(u.initials)}</span>
+          <strong>${esc(u.name)}</strong>
+        </span>
+        ${zusatz ? `<small>${esc(zusatz)}</small>` : ''}
+      </span>
+    </button>`;
+}
+
 /* -------------------------------------------------------- Videos: Suche */
 // Prototyp-Frame "Video - Suche": Explorer mit den Abschnitten Reels,
 // Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
@@ -3441,7 +3482,7 @@ function renderVideoSearch() {
               'Reels',
               reels.length
                 ? `<div class="exp__reels">${reels
-                    .map((v) => `<button class="exp__reel" data-openvideo="${v.id}">${ICONS.portrait}<span>${esc(user(v.userId).name)}</span></button>`)
+                    .map((v) => medienKachel(v, 'openvideo', ICONS.portrait, 'reihe'))
                     .join('')}</div>`
                 : ''
             ) +
@@ -3460,7 +3501,9 @@ function renderVideoSearch() {
             ) +
             section(
               'Beiträge',
-              posts.length ? `<div class="exp__grid">${posts.map((p) => `<button class="griditem" data-openpost="${p.id}">${ICONS.image}</button>`).join('')}</div>` : ''
+              posts.length
+                ? `<div class="exp__grid">${posts.map((p) => medienKachel(p, 'openpost', ICONS.image, 'raster')).join('')}</div>`
+                : ''
             ) +
             section(
               'Profile',

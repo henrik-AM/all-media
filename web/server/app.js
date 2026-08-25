@@ -169,7 +169,40 @@ const comments = {
   ],
   v4: [],
   v5: [{ id: 'cm1', userId: 'u3', text: 'Mache ich seit einem Jahr, will nicht mehr zurück.', time: 'Sa', likes: 9, liked: false }],
+  q1: [
+    { id: 'cm1', userId: 'u2', text: 'Die Kapitelmarken sind Gold wert.', time: 'vor 2 Tagen', likes: 14, liked: false },
+    { id: 'cm2', userId: 'u5', text: 'Wie lange wart ihr insgesamt unterwegs?', time: 'vor 2 Tagen', likes: 3, liked: false },
+    { id: 'cm3', userId: 'u1', text: 'Neun Stunden mit Pausen.', time: 'vor 1 Tag', likes: 11, liked: false },
+  ],
+  q2: [
+    { id: 'cm1', userId: 'u6', text: 'Endlich mal ohne Framework-Geplänkel erklärt.', time: 'vor 4 Tagen', likes: 22, liked: false },
+    { id: 'cm2', userId: 'u3', text: 'Teil zwei zu Dark Mode wäre super.', time: 'vor 3 Tagen', likes: 8, liked: false },
+  ],
+  q3: [
+    { id: 'cm1', userId: 'u1', text: 'Der Einkaufszettel spart mir jede Woche eine Stunde.', time: 'vor 6 Tagen', likes: 41, liked: false },
+    { id: 'cm2', userId: 'u4', text: 'Hält das wirklich fünf Tage frisch?', time: 'vor 5 Tagen', likes: 6, liked: false },
+    { id: 'cm3', userId: 'u5', text: 'Vier sicher, am fünften würde ich einfrieren.', time: 'vor 5 Tagen', likes: 19, liked: false },
+  ],
+  q4: [{ id: 'cm1', userId: 'u4', text: 'Der Hinweis zum Umstieg hat mir zwei Stunden gespart.', time: 'vor 6 Tagen', likes: 12, liked: false }],
+  q5: [
+    { id: 'cm1', userId: 'u6', text: 'Blaue Stunde ist einfach unschlagbar.', time: 'vor 2 Wochen', likes: 17, liked: false },
+    { id: 'cm2', userId: 'u2', text: 'Welches Stativ nutzt du?', time: 'vor 12 Tagen', likes: 2, liked: false },
+  ],
+  q6: [{ id: 'cm1', userId: 'u5', text: 'Mein Team hat es nach dem Video übernommen.', time: 'vor 3 Wochen', likes: 9, liked: false }],
 };
+
+/*
+ * Wie viele Kommentare ein Beitrag hat, steht NICHT mehr als eigene Zahl am
+ * Beitrag. Henrik hatte gemeldet, dass "Alle 28 Kommentare ansehen" dasteht,
+ * obwohl es nur vier gibt - die feste Zahl und die echte Liste waren
+ * auseinandergelaufen.
+ *
+ * Jetzt zaehlt beim Ausliefern die Liste selbst. Damit kann es nicht wieder
+ * auseinanderlaufen, auch nicht nachdem jemand einen Kommentar schreibt.
+ */
+function mitKommentarzahl(eintraege) {
+  return eintraege.map((e) => ({ ...e, comments: (comments[e.id] || []).length }));
+}
 
 const posts = [
   { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false , tags: ['#hafen', '#nachtfotografie'] },
@@ -422,7 +455,11 @@ app.get('/api/bootstrap', (req, res) => {
   const stummgeschaltet = Object.keys(profiles).filter((id) => profiles[id].muted);
 
   res.json({
-    users, chats, stories, contacts, communities, videos, posts, clips,
+    users, chats, stories, contacts, communities,
+    // Die Kommentarzahl kommt aus der echten Liste, siehe mitKommentarzahl.
+    videos: mitKommentarzahl(videos),
+    posts: mitKommentarzahl(posts),
+    clips: mitKommentarzahl(clips),
     hashtags, sounds, places, friends, gefolgt, ungelesen, blockiert, stummgeschaltet,
   });
 });
