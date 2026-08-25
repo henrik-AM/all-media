@@ -126,7 +126,16 @@ const STRUCTURE = {
   const w2 = await p.$eval('#storyFill', e => e.style.width);
   assert('Zeit steht waehrend des Tippens', w1 === w2);
 
+  // Enter schickt bewusst nicht mehr ab - Henrik wollte einen sichtbaren
+  // Senden-Pfeil. Der Test prueft beides: dass Enter nichts tut und dass
+  // der Pfeil abschickt.
   await p.press('#storyReply', 'Enter');
+  await p.waitForTimeout(400);
+  assert('Enter schickt die Story-Antwort nicht ab', !!(await p.$('#storyReply')));
+
+  assert('Senden-Pfeil ist nutzbar, sobald etwas dasteht',
+    !(await p.$eval('#storySenden', e => e.disabled)));
+  await p.click('#storySenden');
   await p.waitForTimeout(900);
   assert('Antwort oeffnet den Chat', (await p.$eval('.chathead__name', e => e.textContent.trim())) === 'Anna Schmidt');
   assert('Antwort steht im Chat',

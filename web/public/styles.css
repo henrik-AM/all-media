@@ -1987,3 +1987,29 @@ button.exp__head:hover { color: var(--brand); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/*
+ * Senden-Pfeil im Story-Betrachter.
+ *
+ * Henrik: "Antworten auf Stories nicht per Enter absenden. Stattdessen einen
+ * kleinen Senden-Button mit Pfeil verwenden." Der Knopf war vorher versteckt,
+ * es ging nur mit Enter - man konnte nicht sehen, wie man abschickt.
+ *
+ * Solange nichts dasteht, ist er ausgegraut: ein Pfeil, der eine leere
+ * Antwort schickt, waere schlimmer als keiner.
+ */
+.viewer__senden {
+  flex: 0 0 38px;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  transition: opacity .12s, transform .12s;
+}
+.viewer__senden svg { width: 19px; height: 19px; }
+.viewer__senden:disabled {
+  opacity: .35;
+  cursor: default;
+  transform: scale(.92);
+}

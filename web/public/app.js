@@ -5875,10 +5875,15 @@ function openStory(storyId) {
               <button class="viewer__eigen" id="storyViews">${ICONS.eye}<span>Ansichten</span></button>
               <button class="viewer__act" id="storyDelete" aria-label="Story löschen">${ICONS.trash || ICONS.close}</button>
             </div>`
-          : `<form class="viewer__foot" id="storyForm">
+          : // Henrik: "Antworten auf Stories nicht per Enter absenden.
+            // Stattdessen einen kleinen Senden-Button mit Pfeil verwenden."
+            // Der Absende-Knopf war vorher versteckt (viewer__hidden), das
+            // Formular ging nur mit Enter ab - man konnte also nicht sehen,
+            // wie man abschickt.
+            `<form class="viewer__foot" id="storyForm">
               <input class="viewer__reply" id="storyReply" placeholder="Antworten" autocomplete="off" />
+              <button type="submit" class="viewer__senden" id="storySenden" aria-label="Antwort senden" disabled>${ICONS.send}</button>
               <button type="button" class="viewer__act ${s.liked ? 'is-liked' : ''}" id="storyLike" aria-label="Gefällt mir">${ICONS.heart}</button>
-              <button type="submit" class="viewer__hidden" tabindex="-1" aria-hidden="true"></button>
             </form>`
       }
     </div>`;
@@ -5978,7 +5983,18 @@ function openStory(storyId) {
       reply.blur();
       resume();
     }
+    // Enter schickt nicht mehr ab - dafuer gibt es den Pfeil daneben.
+    if (e.key === 'Enter') e.preventDefault();
   });
+
+  // Der Pfeil ist nur nutzbar, solange etwas dasteht. Sonst laedt er dazu
+  // ein, eine leere Antwort zu schicken.
+  const senden = $('#storySenden');
+  const sendenPruefen = () => {
+    if (senden) senden.disabled = !reply.value.trim();
+  };
+  reply.addEventListener('input', sendenPruefen);
+  sendenPruefen();
 
   $('#storyForm').addEventListener('submit', async (e) => {
     e.preventDefault();

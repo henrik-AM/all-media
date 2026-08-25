@@ -201,9 +201,21 @@ export const StoryViewerScreen = ({
           placeholderTextColor="rgba(255,255,255,0.6)"
           onFocus={() => setPaused(true)}
           onBlur={() => setPaused(reply.trim().length > 0)}
-          onSubmitEditing={send}
-          returnKeyType="send"
+          // Henrik: "Antworten auf Stories nicht per Enter absenden.
+          // Stattdessen einen kleinen Senden-Button mit Pfeil verwenden."
+          // Deshalb kein onSubmitEditing - der Pfeil daneben schickt ab.
+          returnKeyType="default"
+          blurOnSubmit={false}
         />
+        <Pressable
+          style={[styles.senden, !reply.trim() && styles.sendenAus]}
+          onPress={send}
+          disabled={!reply.trim()}
+          hitSlop={8}
+          accessibilityLabel="Antwort senden"
+        >
+          <Ionicons name="send" size={17} color="#fff" />
+        </Pressable>
         <Pressable
           onPress={() => {
             const next = !liked[current.id];
@@ -287,6 +299,17 @@ const styles = StyleSheet.create({
   zoneRight: { right: 0 },
 
   foot: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+  /* Senden-Pfeil neben dem Antwortfeld. Ausgegraut, solange nichts dasteht -
+     ein Pfeil, der eine leere Antwort schickt, waere schlimmer als keiner. */
+  senden: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.brand,
+  },
+  sendenAus: { opacity: 0.35, transform: [{ scale: 0.92 }] },
   reply: {
     flex: 1,
     height: 42,
