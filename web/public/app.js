@@ -2913,16 +2913,20 @@ function renderCommunities() {
         </label>
       </div>
     </div>
+    ${/*
+        Ohne Zahlen. Henrik am 26.08.2026: "Zahl bei Entdecken wird angezeigt.
+        Nur Communitys, keine Zahl." Die Zahl an einem Filter liest sich wie
+        ein Zaehler fuer Ungelesenes - hier zaehlte sie nur, wie lang die
+        Liste dahinter ist, und das sieht man ohnehin sofort.
+      */ ''}
     <div class="pills">
       ${[
-        ['meine', 'Meine', meine.length],
-        ['entdecken', 'Entdecken', entdecken.length],
+        ['meine', 'Meine'],
+        ['entdecken', 'Entdecken'],
       ]
         .map(
-          ([f, label, anzahl]) =>
-            `<button class="pill ${state.communityFilter === f ? 'is-active' : ''}" data-cfilter="${f}">${label}${
-              anzahl ? ` <span class="pill__zahl">${anzahl}</span>` : ''
-            }</button>`
+          ([f, label]) =>
+            `<button class="pill ${state.communityFilter === f ? 'is-active' : ''}" data-cfilter="${f}">${label}</button>`
         )
         .join('')}
     </div>

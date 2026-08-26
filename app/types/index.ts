@@ -115,6 +115,14 @@ export interface Video {
   tags?: string[];
 }
 
+/** Ein Unterthema (Kanal) innerhalb einer Community. */
+export interface Unterthema {
+  id: string;
+  name: string;
+  /** Worueber dort gesprochen wird - steht als zweite Zeile in der Liste. */
+  themen: string[];
+}
+
 export interface Community {
   id: string;
   name: string;
@@ -123,6 +131,16 @@ export interface Community {
   visibility: 'public' | 'private';
   joined: boolean;
   unreadCount: number;
+  /*
+   * Ab hier: was der Prototyp-Frame "CH + Kanal" auf der Community-Seite
+   * verlangt. Bis zum 26.08.2026 gab es diese Seite in der App gar nicht -
+   * eine Community oeffnete direkt einen Chat.
+   */
+  bio?: string;
+  link?: string;
+  /** Selbst angelegt. Eine eigene Community laesst sich nicht verlassen. */
+  eigen?: boolean;
+  unterthemen?: Unterthema[];
 }
 
 export interface Story {

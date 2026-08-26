@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EmptyState } from '../../components/EmptyState';
+import { FilterPillen } from '../../components/FilterPillen';
 import { SearchBar } from '../../components/SearchBar';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
@@ -36,7 +37,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
   const [filter, setFilter] = useState<Filter>('meine');
   const [query, setQuery] = useState('');
 
-  const { visible, anzahl } = useMemo(() => {
+  const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     const passt = (c: Community) =>
       !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
@@ -44,10 +45,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
     const meine = communities.filter((c) => c.joined && passt(c));
     const entdecken = communities.filter((c) => !c.joined && passt(c));
 
-    return {
-      visible: filter === 'entdecken' ? entdecken : meine,
-      anzahl: { meine: meine.length, entdecken: entdecken.length },
-    };
+    return filter === 'entdecken' ? entdecken : meine;
   }, [communities, filter, query]);
 
   const toggleJoin = (community: Community) => {
@@ -120,20 +118,13 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
         />
       </View>
 
-      <View style={styles.pills}>
-        {FILTERS.map(({ key, label }) => (
-          <Druck
-            key={key}
-            style={[styles.pill, filter === key && styles.pillActive]}
-            onPress={() => setFilter(key)}
-          >
-            <Text style={[styles.pillText, filter === key && styles.pillTextActive]}>
-              {label}
-              {anzahl[key] ? <Text style={styles.pillZahl}> {anzahl[key]}</Text> : null}
-            </Text>
-          </Druck>
-        ))}
-      </View>
+      {/*
+        Ohne Zahlen. Henrik am 26.08.2026: "Zahl bei Entdecken wird angezeigt.
+        Nur Communitys, keine Zahl." Die Zahl an einem Filter liest sich wie
+        ein Zaehler fuer Ungelesenes - hier zaehlte sie nur, wie lang die
+        Liste dahinter ist, und das sieht man ohnehin sofort.
+      */}
+      <FilterPillen pillen={FILTERS} aktiv={filter} onChange={setFilter} />
 
       <FlatList
         data={visible}
@@ -169,14 +160,6 @@ const styles = themenStyles((colors) => ({
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
   title: { marginBottom: spacing.md, color: colors.text, ...typography.title },
 
-  pills: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: 6 },
-  pill: { paddingHorizontal: 15, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface3 },
-  pillActive: { backgroundColor: colors.brand },
-  pillText: { color: colors.text2, fontSize: 13.5, fontWeight: '600' },
-  // Zahl in der Filterpille (Meine 4 / Entdecken 2) - etwas zurueckgenommen,
-  // damit die Beschriftung fuehrt.
-  pillZahl: { opacity: 0.65 },
-  pillTextActive: { color: colors.white },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: spacing.lg, paddingVertical: 10 },
   rowPressed: { backgroundColor: colors.surface2 },

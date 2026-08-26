@@ -163,13 +163,41 @@ const mockVideosRoh: Video[] = [
   { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false, tags: ['#reactnative'] },
 ];
 
+/*
+ * Communitys. bio, link, eigen und unterthemen kamen am 26.08.2026 dazu -
+ * die Community-Seite folgt jetzt dem Prototyp-Frame "CH + Kanal", und der
+ * verlangt Biografie, Link und eine Liste von Unterthemen. Dieselben Daten
+ * stehen in web/server/app.js.
+ */
 export const mockCommunities: Community[] = [
-  { id: 'k1', name: 'Design Systeme', topic: 'Komponenten, Tokens, Figma', members: 1284, visibility: 'public', joined: true, unreadCount: 3 },
-  { id: 'k2', name: 'React Native DE', topic: 'Expo, Navigation, Performance', members: 842, visibility: 'public', joined: true, unreadCount: 0 },
-  { id: 'k3', name: 'Fotografie', topic: 'Licht, Komposition, Nachbearbeitung', members: 3120, visibility: 'public', joined: false, unreadCount: 0 },
-  { id: 'k4', name: 'Team Intern', topic: 'Nur für das Kernteam', members: 12, visibility: 'private', joined: true, unreadCount: 5 },
-  { id: 'k5', name: 'Laufgruppe Köln', topic: 'Treffpunkte und Termine', members: 96, visibility: 'private', joined: true, unreadCount: 0 },
-  { id: 'k6', name: 'Musikproduktion', topic: 'Ableton, Mixing, Sounddesign', members: 671, visibility: 'public', joined: false, unreadCount: 0 },
+  { id: 'k1', name: 'Design Systeme', topic: 'Komponenten, Tokens, Figma', members: 1284, visibility: 'public', joined: true, unreadCount: 3, bio: 'Alles rund um Komponenten, Tokens und den Weg von Figma in den Code. Fragen jederzeit willkommen.', link: 'designsysteme.de', eigen: false, unterthemen: [
+    { id: 'k1-allgemein', name: 'Allgemein', themen: ['Diskussionen', 'News'] },
+    { id: 'k1-tokens', name: 'Design Tokens', themen: ['Struktur', 'Best Practices'] },
+    { id: 'k1-figma', name: 'Figma', themen: ['Plugins', 'Workflows'] },
+  ] },
+  { id: 'k2', name: 'React Native DE', topic: 'Expo, Navigation, Performance', members: 842, visibility: 'public', joined: true, unreadCount: 0, bio: 'Deutschsprachige Runde zu React Native und Expo. Von der ersten App bis zum Store-Release.', link: 'rn-de.dev', eigen: false, unterthemen: [
+    { id: 'k2-allgemein', name: 'Allgemein', themen: ['Diskussionen', 'News'] },
+    { id: 'k2-expo', name: 'Expo', themen: ['SDK Updates', 'Debugging'] },
+    { id: 'k2-navigation', name: 'Navigation', themen: ['React Navigation', 'Router'] },
+  ] },
+  { id: 'k3', name: 'Fotografie', topic: 'Licht, Komposition, Nachbearbeitung', members: 3120, visibility: 'public', joined: false, unreadCount: 0, bio: 'Licht, Komposition, Nachbearbeitung. Jeden Sonntag ein gemeinsames Thema.', link: 'lichtundschatten.foto', eigen: false, unterthemen: [
+    { id: 'k3-allgemein', name: 'Allgemein', themen: ['Diskussionen', 'News'] },
+    { id: 'k3-licht', name: 'Licht & Belichtung', themen: ['Goldene Stunde', 'ISO'] },
+    { id: 'k3-nachbearbeitung', name: 'Nachbearbeitung', themen: ['Lightroom', 'Capture One'] },
+  ] },
+  { id: 'k4', name: 'Team Intern', topic: 'Nur für das Kernteam', members: 12, visibility: 'private', joined: true, unreadCount: 5, bio: 'Interner Kanal des Kernteams. Sprintplanung, Entscheidungen, alles Kurzfristige.', link: '', eigen: true, unterthemen: [
+    { id: 'k4-allgemein', name: 'Allgemein', themen: ['Diskussionen', 'News'] },
+    { id: 'k4-sprint', name: 'Sprint Planning', themen: ['Backlog', 'Reviews'] },
+  ] },
+  { id: 'k5', name: 'Laufgruppe Köln', topic: 'Treffpunkte und Termine', members: 96, visibility: 'private', joined: true, unreadCount: 0, bio: 'Wir laufen dienstags und samstags. Treffpunkte und Termine stehen hier.', link: 'laufgruppe-koeln.de', eigen: true, unterthemen: [
+    { id: 'k5-allgemein', name: 'Allgemein', themen: ['Diskussionen', 'News'] },
+    { id: 'k5-termine', name: 'Termine', themen: ['Diese Woche', 'Nächste Woche'] },
+  ] },
+  { id: 'k6', name: 'Musikproduktion', topic: 'Ableton, Mixing, Sounddesign', members: 671, visibility: 'public', joined: false, unreadCount: 0, bio: 'Ableton, Mixing, Sounddesign. Feedback-Runden am Monatsende.', link: 'musikproduktion.club', eigen: false, unterthemen: [
+    { id: 'k6-allgemein', name: 'Allgemein', themen: ['Diskussionen', 'News'] },
+    { id: 'k6-ableton', name: 'Ableton Live', themen: ['Devices', 'Workflow'] },
+    { id: 'k6-mixing', name: 'Mixing & Mastering', themen: ['Techniken', 'Feedback'] },
+  ] },
 ];
 
 export const mockCommunityMessages: Record<string, Message[]> = {

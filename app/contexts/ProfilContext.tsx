@@ -147,6 +147,8 @@ interface ProfilWert {
   /* --- Communitys --- */
   communities: Community[];
   kanalAnlegen: (name: string, thema: string) => string | null;
+  /** Unterthema in einer Community anlegen. Gibt einen Fehlertext zurueck. */
+  unterthemaAnlegen: (communityId: string, name: string) => string | null;
   kanalBeitreten: (id: string) => void;
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
@@ -397,6 +399,12 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           visibility: 'private',
           joined: true,
           unreadCount: 0,
+          // Selbst angelegt: sie laesst sich nicht verlassen, und sie faengt
+          // mit dem einen Unterthema an, das jede Community hat.
+          eigen: true,
+          bio: thema || '',
+          link: '',
+          unterthemen: [{ id: `k${Date.now()}-allgemein`, name: 'Allgemein', themen: [] }],
         },
         ...prev,
       ]);
@@ -404,6 +412,37 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     },
     [communities]
   );
+
+  /*
+   * Ein Unterthema in einer Community anlegen.
+   * Prototyp-Frame "CH + Unterthema erstellen" - auf der Community-Seite gab
+   * es dafuer bis zum 26.08.2026 keinen Weg.
+   */
+  const unterthemaAnlegen = useCallback((communityId: string, name: string) => {
+    const sauber = name.trim();
+    if (!sauber) return 'Bitte einen Namen eingeben';
+
+    const community = communities.find((c) => c.id === communityId);
+    if (!community) return 'Diese Community gibt es nicht mehr';
+    if ((community.unterthemen ?? []).some((u) => u.name.toLowerCase() === sauber.toLowerCase())) {
+      return 'Dieses Unterthema gibt es schon';
+    }
+
+    setCommunities((prev) =>
+      prev.map((c) =>
+        c.id === communityId
+          ? {
+              ...c,
+              unterthemen: [
+                ...(c.unterthemen ?? []),
+                { id: `${c.id}-${Date.now()}`, name: sauber, themen: [] },
+              ],
+            }
+          : c
+      )
+    );
+    return null;
+  }, [communities]);
 
   const kanalBeitreten = useCallback((id: string) => {
     setCommunities((prev) =>
@@ -512,6 +551,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       geteilt,
       communities,
       kanalAnlegen,
+      unterthemaAnlegen,
       kanalBeitreten,
       kanalGelesen,
       gefolgt,
@@ -525,7 +565,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       aufzeichnungAnlegen, clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, kanalBeitreten, kanalGelesen,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalGelesen,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]
   );

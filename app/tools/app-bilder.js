@@ -68,6 +68,9 @@ const SEITEN = [
   ['messenger/chats#blatt:erstellen', 'detail-erstellen'],
   ['videos/profile#profil:u1', 'detail-fremdprofil'],
   ['videos/landscape#clip:q1', 'detail-clip'],
+  // Die Community-Seite nach dem Prototyp-Frame "CH + Kanal". Sie kam in
+  // keinem Bild vor - den Bildschirm gab es bis zum 26.08.2026 nicht.
+  ['communities/home#community:k1', 'detail-community'],
 ];
 
 const SITZUNG = {

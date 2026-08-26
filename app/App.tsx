@@ -31,6 +31,7 @@ import { CameraScreen } from './screens/messenger/CameraScreen';
 import { CallScreen } from './screens/messenger/CallScreen';
 import { CommunitiesScreen } from './screens/communities/CommunitiesScreen';
 import { CommunityChatsScreen } from './screens/communities/CommunityChatsScreen';
+import { CommunityDetailScreen } from './screens/communities/CommunityDetailScreen';
 import { CommunityProfileScreen } from './screens/communities/CommunityProfileScreen';
 import { CommunitySearchScreen } from './screens/communities/CommunitySearchScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
@@ -45,8 +46,8 @@ import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors, themenStyles } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
-import { mockChats, mockClips, mockContacts, mockMessages, mockPlaces, mockStories, mockUsers } from './mocks';
-import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Video } from './types';
+import { mockChats, mockClips, mockCommunities, mockContacts, mockMessages, mockPlaces, mockStories, mockUsers } from './mocks';
+import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
@@ -63,6 +64,12 @@ type Overlay =
   | { kind: 'livestream' }
   | { kind: 'explorer'; ziel: ExplorerZiel }
   | { kind: 'clip'; clipId: string }
+  /**
+   * Die Seite einer Community — Prototyp-Frame "CH + Kanal". Vorher fuehrte
+   * eine Community direkt in einen Gruppenchat; die Seite dazwischen gab es
+   * in der App gar nicht.
+   */
+  | { kind: 'community'; communityId: string }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -199,6 +206,9 @@ const Shell = () => {
         break;
       case 'kontakte':
         setOverlay({ kind: 'contacts' });
+        break;
+      case 'community':
+        if (mockCommunities.some((c) => c.id === a)) setOverlay({ kind: 'community', communityId: a });
         break;
       case 'anruf':
         if (mockUsers[a]) setOverlay({ kind: 'call', userId: a, art: b === 'video' ? 'video' : 'audio' });
@@ -416,17 +426,25 @@ const Shell = () => {
     oeffneChat(chat, [message]);
   };
 
-  const openCommunity = (community: Community) => {
+  /*
+   * Eine Community oeffnet ihre Seite, nicht mehr direkt einen Chat.
+   * Prototyp-Frame "CH + Kanal": erst Kopfbild, Biografie und die
+   * Unterthemen, und ein Chat steckt hinter einem Unterthema.
+   */
+  const openCommunity = (community: Community) =>
+    setOverlay({ kind: 'community', communityId: community.id });
+
+  /** Der Chat eines Unterthemas. */
+  const oeffneUnterthema = (community: Community, unterthema: Unterthema) =>
     oeffneChat({
-      id: community.id,
-      name: community.name,
+      id: unterthema.id,
+      name: `${community.name} · ${unterthema.name}`,
       isGroup: true,
       memberIds: new Array(Math.max(community.members - 1, 0)).fill(''),
-      preview: community.topic,
+      preview: unterthema.themen.join(' · '),
       time: '',
       unreadCount: 0,
     });
-  };
 
   /* ---------------- Glocke, Plus und Menü im eigenen Profil -------------- */
   /*
@@ -733,6 +751,50 @@ const Shell = () => {
         onNotice={setNotice}
       />
     );
+  }
+
+  if (overlay?.kind === 'community') {
+    const community = profil.communities.find((c) => c.id === overlay.communityId);
+    // Sie kann verschwunden sein, wenn man sie in der Zwischenzeit verlassen
+    // hat - dann schlicht zurueck zur Liste, statt auf einer leeren Seite zu
+    // stehen.
+    if (!community) {
+      setOverlay(null);
+    } else {
+      return (
+        <CommunityDetailScreen
+          community={community}
+          onBack={() => setOverlay(null)}
+          onOpenUnterthema={(ut) => oeffneUnterthema(community, ut)}
+          onEinstellungen={() => setNotice(`Einstellungen zu „${community.name}“`)}
+          onBeitreten={() => {
+            profil.kanalBeitreten(community.id);
+            setNotice(community.joined ? `„${community.name}“ verlassen` : `„${community.name}“ beigetreten`);
+          }}
+          onNeuesUnterthema={() =>
+            setFormular({
+              title: 'Neues Unterthema',
+              knopf: 'Anlegen',
+              felder: [
+                {
+                  key: 'name',
+                  label: 'Name des Unterthemas',
+                  platzhalter: 'z. B. Ankündigungen',
+                  pflicht: true,
+                },
+              ],
+              absenden: ({ name }) => {
+                const fehler = profil.unterthemaAnlegen(community.id, name);
+                if (fehler) return fehler;
+                setNotice(`„${name}“ angelegt`);
+                return null;
+              },
+            })
+          }
+          onNotice={setNotice}
+        />
+      );
+    }
   }
 
   if (overlay?.kind === 'livestream') {
