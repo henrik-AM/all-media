@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
-import { avatarColor, colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockProfiles, mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
@@ -132,9 +132,19 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
             {profile.highlights.map((highlight) => (
               <View key={highlight} style={styles.highlight}>
                 <View style={styles.highlightRing}>
-                  <View style={[styles.highlightInner, { backgroundColor: avatarColor(userId) }]}>
-                    <Text style={styles.highlightText}>{highlight.slice(0, 2).toUpperCase()}</Text>
-                  </View>
+                  {/*
+                    Highlights sind Bilder, keine Personen. Vorher stand hier
+                    eine Flaeche in EINER Farbe (die des Profils) mit den ersten
+                    zwei Buchstaben darin - alle Highlights sahen also gleich
+                    aus. Die Website zeichnet laengst je Highlight ein eigenes
+                    Motiv; die App hatte den Wechsel nicht mitgemacht.
+                  */}
+                  <Motiv
+                    id={`hl-${highlight}`}
+                    icon="image-outline"
+                    iconSize={18}
+                    style={styles.highlightInner}
+                  />
                 </View>
                 <Text style={styles.highlightLabel} numberOfLines={1}>
                   {highlight}
@@ -255,7 +265,6 @@ const styles = themenStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  highlightText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   highlightLabel: { marginTop: 6, color: colors.text2, fontSize: 11.5 },
 
   hinweis: {

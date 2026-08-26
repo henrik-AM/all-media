@@ -4,7 +4,8 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
-import { avatarColor, colors, initialsOf, radius, spacing, themenStyles, typography } from '../../constants/design';
+import { Avatar } from '../../components/Avatar';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
@@ -68,9 +69,13 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={() => open(item)}
     >
-      <View style={[styles.tile, { backgroundColor: avatarColor(item.id) }]}>
-        <Text style={styles.tileText}>{initialsOf(item.name)}</Text>
-      </View>
+      {/*
+        Frueher eine Flaeche in einer von acht Farben - als einzige Stelle der
+        App, die den Wechsel auf Verlaeufe nicht mitgemacht hat. Neben der
+        Community-Uebersicht im Profil, wo laengst Verlaeufe stehen, sah das
+        aus wie zwei verschiedene Apps.
+      */}
+      <Avatar id={item.id} name={item.name} size={52} ecke={radius.lg} />
 
       <View style={styles.body}>
         <View style={styles.titleRow}>
@@ -175,9 +180,6 @@ const styles = themenStyles((colors) => ({
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: spacing.lg, paddingVertical: 10 },
   rowPressed: { backgroundColor: colors.surface2 },
-  tile: { width: 52, height: 52, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  tileText: { color: colors.white, fontSize: 17, fontWeight: '600' },
-
   body: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { flexShrink: 1, color: colors.text, ...typography.name },

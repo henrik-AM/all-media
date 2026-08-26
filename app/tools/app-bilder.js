@@ -19,15 +19,23 @@
 //
 // Damit die App nicht auf dem Anmeldebildschirm haengen bleibt, legt das
 // Skript ausserdem eine angemeldete Sitzung an.
+//
+// Wichtig: das Ganze laeuft auf einem EIGENEN Simulator ("All-Media Test",
+// siehe tools/pruefgeraet.js) und nicht mehr auf dem Geraet, das gerade
+// gestartet ist. Vorher hat jeder Durchlauf Henriks Simulator 14-mal neu
+// gestartet und jedes Mal auf einen anderen Bildschirm gesprungen - Testen war
+// waehrenddessen unmoeglich.
 
 const fs = require('fs');
 const path = require('path');
 const { execSync, execFileSync } = require('child_process');
+const { pruefgeraet, fensterZuklappen, dialogBestaetigen, EXPO_GO_ID } = require('./pruefgeraet');
 
 const DUNKEL = process.argv.includes('dunkel');
 const ZIEL = path.join(__dirname, '..', '..', 'bilder', DUNKEL ? 'app-dunkel' : 'app-hell');
-const EXPO_GO_ID = 'host.exp.Exponent';
 const EXPO_URL = 'exp://127.0.0.1:8081';
+/** Kennung des Pruefgeraets - wird im Ablauf gesetzt, danach ueberall statt "booted". */
+let GERAET = null;
 
 // Bereich/Unterpunkt, Name des Bildes. Dieselbe Liste wie test/_ansehen.js
 // fuer die Website, damit sich beide Seiten nebeneinander vergleichen lassen.
@@ -73,7 +81,7 @@ function schlaf(ms) { execSync(`sleep ${ms / 1000}`); }
 
 /** Die manifest.json von AsyncStorage im Container von Expo Go. */
 function speicherDatei() {
-  const container = sh(`xcrun simctl get_app_container booted ${EXPO_GO_ID} data`).trim();
+  const container = sh(`xcrun simctl get_app_container ${GERAET} ${EXPO_GO_ID} data`).trim();
   const basis = path.join(container, 'Documents', 'ExponentExperienceData');
   // Der Ordnername enthaelt eine Kennung, die sich pro Projekt unterscheidet -
   // deshalb suchen statt raten.
@@ -104,9 +112,22 @@ function speicherSchreiben(datei, bereich) {
 }
 
 function appNeuStarten() {
-  still(`xcrun simctl terminate booted ${EXPO_GO_ID}`);
+  still(`xcrun simctl terminate ${GERAET} ${EXPO_GO_ID}`);
   schlaf(500);
-  execFileSync('xcrun', ['simctl', 'openurl', 'booted', EXPO_URL]);
+  execFileSync('xcrun', ['simctl', 'openurl', GERAET, EXPO_URL]);
+}
+
+/**
+ * Beim allerersten Aufruf auf einem frischen Geraet fragt iOS "In Expo Go
+ * oeffnen?". Der Umweg ueber ein Startargument (simctl launch mit der Adresse)
+ * hilft nicht - Expo Go wertet das nicht aus und bleibt auf seiner Startseite.
+ * Also einmal bestaetigen; danach merkt sich iOS das Ziel.
+ */
+function erstesOeffnen() {
+  still(`xcrun simctl openurl ${GERAET} "${EXPO_URL}"`);
+  schlaf(4000);
+  dialogBestaetigen();
+  schlaf(20000);
 }
 
 function metroLaeuft() {
@@ -118,12 +139,9 @@ function metroLaeuft() {
     log('  Metro laeuft nicht. Erst "npm run wlan" (oder "npm run up") starten.');
     process.exit(1);
   }
-  if (!still('xcrun simctl list devices booted').includes('(Booted)')) {
-    log('  Kein Simulator gestartet. Erst "npm run mac" ausfuehren.');
-    process.exit(1);
-  }
+  GERAET = pruefgeraet();
 
-  still(`xcrun simctl ui booted appearance ${DUNKEL ? 'dark' : 'light'}`);
+  still(`xcrun simctl ui ${GERAET} appearance ${DUNKEL ? 'dark' : 'light'}`);
   fs.mkdirSync(ZIEL, { recursive: true });
 
   // Beim ersten Durchlauf muss Expo Go die App schon einmal geoeffnet haben,
@@ -131,8 +149,8 @@ function metroLaeuft() {
   let datei = speicherDatei();
   if (!datei) {
     log('  Speicher noch nicht angelegt - App wird einmal geoeffnet ...');
-    appNeuStarten();
-    schlaf(20000);
+    erstesOeffnen();
+    schlaf(8000);
     datei = speicherDatei();
   }
   if (!datei) {
@@ -147,8 +165,12 @@ function metroLaeuft() {
     // grosszuegig, aber ein zu kurzer Wert liefert ein Bild vom Ladebalken -
     // und das faellt beim Durchsehen nicht sofort auf.
     schlaf(14000);
-    execFileSync('xcrun', ['simctl', 'io', 'booted', 'screenshot', path.join(ZIEL, `${name}.png`)]);
+    execFileSync('xcrun', ['simctl', 'io', GERAET, 'screenshot', path.join(ZIEL, `${name}.png`)], {
+      stdio: 'ignore',
+    });
     log(`  ${name}.png`);
+    // Simulator.app klappt das Fenster beim Starten der App gern wieder auf.
+    fensterZuklappen();
   }
 
   // Schalter wieder entfernen, damit die App danach normal startet.

@@ -11,6 +11,11 @@ interface Props {
   group?: boolean;
   /** Grüner Punkt unten rechts. */
   online?: boolean;
+  /**
+   * Eckenrundung. Ohne Angabe ein Kreis. Communitys werden als abgerundetes
+   * Quadrat gezeichnet — das unterscheidet Gruppe von Person auf einen Blick.
+   */
+  ecke?: number;
   style?: ViewStyle;
 }
 
@@ -20,11 +25,11 @@ interface Props {
  * Die Initialen liegen mit leichtem Schatten darauf, damit sie auf dem
  * helleren Ende des Verlaufs nicht wegkippen.
  */
-export const Avatar = ({ id, name, size = 54, group = false, online = false, style }: Props) => {
+export const Avatar = ({ id, name, size = 54, group = false, online = false, ecke, style }: Props) => {
   const base: ViewStyle = {
     width: size,
     height: size,
-    borderRadius: size / 2,
+    borderRadius: ecke ?? size / 2,
     alignItems: 'center',
     justifyContent: 'center',
   };
