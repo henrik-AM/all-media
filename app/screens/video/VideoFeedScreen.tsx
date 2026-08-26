@@ -91,17 +91,17 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
               size={28}
               color={item.liked ? '#FF4D6D' : colors.white}
             />
-            <Text style={styles.railLabel}>{compactNumber(item.likes)}</Text>
+            <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.likes)}</Text>
           </Druck>
 
           <Druck style={styles.railBtn} onPress={() => setCommentsFor(item.id)}>
             <Ionicons name="chatbubble-outline" size={26} color={colors.white} />
-            <Text style={styles.railLabel}>{compactNumber(item.comments)}</Text>
+            <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.comments)}</Text>
           </Druck>
 
           <Druck style={styles.railBtn} onPress={() => share(item)}>
             <Ionicons name="paper-plane-outline" size={26} color={colors.white} />
-            <Text style={styles.railLabel}>{compactNumber(item.shares + (geteiltZaehler[item.id] ?? 0))}</Text>
+            <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.shares + (geteiltZaehler[item.id] ?? 0))}</Text>
           </Druck>
 
           <Druck style={styles.railBtn} onPress={() => toggleRepost(item)}>
@@ -110,7 +110,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
               size={28}
               color={istRepostet('video', item.id) ? colors.success : colors.white}
             />
-            <Text style={styles.railLabel}>
+            <Text style={styles.railLabel} numberOfLines={1}>
               {istRepostet('video', item.id) ? 'Repostet' : 'Repost'}
             </Text>
           </Druck>
@@ -121,7 +121,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
               size={25}
               color={colors.white}
             />
-            <Text style={styles.railLabel}>{item.saved ? 'Gespeichert' : 'Speichern'}</Text>
+            <Text style={styles.railLabel} numberOfLines={1}>{item.saved ? 'Gespeichert' : 'Speichern'}</Text>
           </Druck>
         </View>
 
@@ -193,8 +193,19 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
 
-  rail: { position: 'absolute', right: 10, bottom: 96, alignItems: 'center', gap: 18 },
-  railBtn: { alignItems: 'center', gap: 4 },
+  /*
+   * Feste Breite. Henrik am 26.08.2026: "Like speichern → Spalte mit
+   * Like/Kommentar/Teilen/Repost/Speichern verschiebt sich nach links."
+   *
+   * Der Grund war die Breite der Beschriftungen: aus "Repost" wird
+   * "Repostet", aus "Speichern" wird "Gespeichert", aus "999" wird "1k". Ohne
+   * feste Breite war die Spalte nur so breit wie ihr breitester Eintrag und
+   * rechts verankert - wurde ein Wort laenger, wuchs sie nach links und alle
+   * fuenf Symbole sprangen mit. Dieselbe Aenderung steht in der Website unter
+   * .slide__rail.
+   */
+  rail: { position: 'absolute', right: 10, bottom: 96, width: 62, alignItems: 'center', gap: 18 },
+  railBtn: { width: '100%', alignItems: 'center', gap: 4 },
   railLabel: { color: colors.white, fontSize: 11, fontWeight: '600' },
 
   meta: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, paddingRight: 78 },

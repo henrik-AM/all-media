@@ -11,6 +11,14 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { useReposts } from '../../contexts/RepostContext';
 import { Clip } from '../../types';
 import { ExplorerZiel } from './ExplorerScreen';
+import { ActionSheet } from '../../components/ActionSheet';
+import { EinstellungSheet } from '../../components/EinstellungSheet';
+import {
+  QUALITAET_STUFEN,
+  TEMPO_STUFEN,
+  tempoText,
+  useVideoEinstellungen,
+} from '../../lib/videoEinstellungen';
 
 interface Props {
   clipId: string;
@@ -48,6 +56,20 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   const [laeuft, setLaeuft] = useState(false);
   const [bei, setBei] = useState(0);
   const stand = useRef(0);
+  /*
+   * Vollbild (Punkt 30). In der App gibt es keine Fullscreen-API - der
+   * Player legt sich stattdessen ueber den ganzen Bildschirm und die Buehne
+   * nimmt die volle Hoehe. Henrik hatte "Handy quer → Video im Vollformat"
+   * beschrieben; der Knopf tut dasselbe, ohne dass man drehen muss.
+   */
+  const [vollbild, setVollbild] = useState(false);
+  /*
+   * Video-Einstellungen (Punkt 31). `optionen` ist das Hauptblatt, `wahl`
+   * die Liste dahinter - Geschwindigkeit oder Qualitaet.
+   */
+  const [optionen, setOptionen] = useState(false);
+  const [wahl, setWahl] = useState<'tempo' | 'qualitaet' | null>(null);
+  const video = useVideoEinstellungen();
 
   const clip = clips.find((c) => c.id === offen);
   const gesamt = clip ? sekundenVon(clip.duration) : 0;
@@ -93,7 +115,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
-        <Druck style={styles.buehne} onPress={() => setLaeuft((v) => !v)}>
+        <Druck style={[styles.buehne, vollbild && styles.buehneVoll]} onPress={() => setLaeuft((v) => !v)}>
           {eigenesBild ? (
             <Image source={{ uri: eigenesBild }} style={styles.voll} />
           ) : (
@@ -110,7 +132,50 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             <View style={[styles.fortschritt, { width: `${gesamt ? (bei / gesamt) * 100 : 0}%` }]} />
           </View>
           <Text style={styles.zeit}>{clip.duration}</Text>
+          {/* Einstellungen und Vollbild - dort sucht man sie von YouTube her. */}
+          <Druck style={styles.leisteKnopf} onPress={() => setOptionen(true)} hitSlop={8} accessibilityLabel="Video-Einstellungen">
+            <Ionicons name="settings-outline" size={18} color="#C6CAD2" />
+          </Druck>
+          <Druck
+            style={styles.leisteKnopf}
+            onPress={() => setVollbild((v) => !v)}
+            hitSlop={8}
+            accessibilityLabel={vollbild ? 'Vollbild beenden' : 'Vollbild'}
+          >
+            <Ionicons name={vollbild ? 'contract-outline' : 'expand-outline'} size={18} color="#C6CAD2" />
+          </Druck>
         </View>
+
+        {/*
+          Kapitel (Punkt 32). Nur wenn das Video welche hat - eine leere
+          Ueberschrift ueber nichts waere schlechter als gar keine.
+        */}
+        {!!clip.kapitel?.length && (
+          <View style={styles.kapitel}>
+            <Text style={styles.kapitelKopf}>KAPITEL</Text>
+            {clip.kapitel.map((k, i) => {
+              const aktiv = bei >= k.bei && (!clip.kapitel![i + 1] || bei < clip.kapitel![i + 1].bei);
+              return (
+                <Druck
+                  key={k.bei}
+                  style={[styles.kapitelZeile, aktiv && styles.kapitelZeileAktiv]}
+                  onPress={() => {
+                    stand.current = Math.min(gesamt, k.bei);
+                    setBei(stand.current);
+                  }}
+                >
+                  <Text style={styles.kapitelZeit}>{zeitText(k.bei)}</Text>
+                  <Text style={styles.kapitelTitel} numberOfLines={1}>
+                    {k.titel}
+                  </Text>
+                  <Text style={styles.kapitelDauer}>
+                    {zeitText((clip.kapitel![i + 1]?.bei ?? gesamt) - k.bei)}
+                  </Text>
+                </Druck>
+              );
+            })}
+          </View>
+        )}
 
         <View style={styles.kopf}>
           <Text style={styles.titel}>{clip.title}</Text>
@@ -129,6 +194,18 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           </Druck>
         </View>
 
+        {/*
+          Fuenf gleiche Spalten. Henrik am 26.08.2026, Punkte 28 und 29:
+          "Speichern zu weit entfernt; Teilen/Repost zu nah beieinander. Alle
+          fünf sauber nebeneinander" und "Aktionsspalte verändert sich beim
+          Liken".
+
+          Beides kam aus derselben Ecke: "Speichern" hatte aktionEnde
+          (marginLeft: 'auto') und wurde ans Ende geschoben, waehrend die
+          anderen vier links zusammenklebten - und weil nur zwei der fuenf
+          eine Zahl trugen, sprang die Reihe, sobald sich eine Zahl aenderte.
+          Jetzt hat jeder Knopf ein Fuenftel der Breite und eine Beschriftung.
+        */}
         <View style={styles.aktionen}>
           <Druck style={styles.aktion} onPress={() => clipUmschalten(clip.id, 'like')}>
             <Ionicons
@@ -136,16 +213,21 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
               size={24}
               color={clip.liked ? colors.danger : colors.text}
             />
-            <Text style={styles.aktionZahl}>{compact(clip.likes ?? 0)}</Text>
+            <Text style={[styles.aktionZahl, clip.liked && styles.aktionZahlAn]} numberOfLines={1}>
+              {clip.likes ? compact(clip.likes) : 'Like'}
+            </Text>
           </Druck>
 
           <Druck style={styles.aktion} onPress={() => onNotice(`${clip.comments ?? 0} Kommentare`)}>
             <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
-            <Text style={styles.aktionZahl}>{compact(clip.comments ?? 0)}</Text>
+            <Text style={styles.aktionZahl} numberOfLines={1}>
+              {clip.comments ? compact(clip.comments) : 'Kommentar'}
+            </Text>
           </Druck>
 
           <Druck style={styles.aktion} onPress={() => onShare(clip)}>
             <Ionicons name="paper-plane-outline" size={22} color={colors.text} />
+            <Text style={styles.aktionZahl} numberOfLines={1}>Teilen</Text>
           </Druck>
 
           <Druck
@@ -161,16 +243,18 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
               size={24}
               color={istRepostet('video', clip.id) ? colors.success : colors.text}
             />
+            <Text style={styles.aktionZahl} numberOfLines={1}>Repost</Text>
           </Druck>
 
           <Druck
-            style={[styles.aktion, styles.aktionEnde]}
+            style={styles.aktion}
             onPress={() => {
               clipUmschalten(clip.id, 'save');
               onNotice(clip.saved ? 'Nicht mehr gemerkt' : 'Gemerkt');
             }}
           >
             <Ionicons name={clip.saved ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.text} />
+            <Text style={styles.aktionZahl} numberOfLines={1}>Speichern</Text>
           </Druck>
         </View>
 
@@ -209,6 +293,69 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           </Druck>
         ))}
       </ScrollView>
+
+      {/*
+        Video-Einstellungen nach dem Vorbild von YouTube: ein Blatt mit den
+        drei Punkten, dahinter je eine Liste. Untertitel bietet nur an, wer
+        welche hat - ein Punkt, der bei jedem zweiten Video ins Leere fuehrt,
+        ist schlechter als keiner.
+      */}
+      <ActionSheet
+        visible={optionen}
+        title="Video-Einstellungen"
+        items={[
+          { key: 'tempo', label: `Geschwindigkeit · ${tempoText(video.werte.tempo)}`, icon: 'time-outline' },
+          { key: 'qualitaet', label: `Qualität · ${video.werte.qualitaet}`, icon: 'settings-outline' },
+          ...(clip.untertitel
+            ? [
+                {
+                  key: 'untertitel',
+                  label: `Untertitel · ${video.werte.untertitel ? 'An' : 'Aus'}`,
+                  icon: 'chatbox-ellipses-outline' as const,
+                },
+              ]
+            : []),
+        ]}
+        onSelect={(key) => {
+          setOptionen(false);
+          if (key === 'untertitel') {
+            const jetzt = !video.werte.untertitel;
+            video.setzen({ untertitel: jetzt });
+            return onNotice(jetzt ? 'Untertitel an' : 'Untertitel aus');
+          }
+          setWahl(key as 'tempo' | 'qualitaet');
+        }}
+        onClose={() => setOptionen(false)}
+      />
+
+      {wahl === 'tempo' && (
+        <EinstellungSheet
+          titel="Geschwindigkeit"
+          wahl={TEMPO_STUFEN.map(tempoText)}
+          aktuell={tempoText(video.werte.tempo)}
+          onWahl={(wert) => {
+            const stufe = TEMPO_STUFEN.find((t) => tempoText(t) === wert);
+            if (stufe) video.setzen({ tempo: stufe });
+            setWahl(null);
+            onNotice(`Geschwindigkeit: ${wert}`);
+          }}
+          onClose={() => setWahl(null)}
+        />
+      )}
+
+      {wahl === 'qualitaet' && (
+        <EinstellungSheet
+          titel="Qualität"
+          wahl={[...QUALITAET_STUFEN]}
+          aktuell={video.werte.qualitaet}
+          onWahl={(wert) => {
+            video.setzen({ qualitaet: wert });
+            setWahl(null);
+            onNotice(`Qualität: ${wert}`);
+          }}
+          onClose={() => setWahl(null)}
+        />
+      )}
     </View>
   );
 };
@@ -231,6 +378,9 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  /* Im Vollbild faellt das Seitenverhaeltnis weg und die Buehne nimmt fast
+     den ganzen Bildschirm. */
+  buehneVoll: { aspectRatio: undefined, height: '78%' },
   voll: { width: '100%', height: '100%' },
   play: {
     position: 'absolute',
@@ -243,6 +393,35 @@ const styles = themenStyles((colors) => ({
   },
   playAus: { opacity: 0 },
   leiste: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: colors.black },
+  leisteKnopf: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+
+  /* Kapitel eines langen Videos - Prototyp: "anzeigen und direkt dorthin
+     springen". */
+  kapitel: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
+  kapitelKopf: {
+    ...typography.overline,
+    color: colors.text2,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  kapitelZeile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+  },
+  kapitelZeileAktiv: { backgroundColor: colors.brandSoft },
+  kapitelZeit: {
+    minWidth: 44,
+    ...typography.small,
+    fontWeight: '600',
+    color: colors.brand,
+    fontVariant: ['tabular-nums'],
+  },
+  kapitelTitel: { flex: 1, ...typography.body, color: colors.text },
+  kapitelDauer: { ...typography.small, color: colors.text3, fontVariant: ['tabular-nums'] },
   zeit: { ...typography.tiny, color: '#B9BDC6', fontVariant: ['tabular-nums'] },
   balken: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' },
   fortschritt: { height: '100%', backgroundColor: colors.danger },
@@ -256,10 +435,21 @@ const styles = themenStyles((colors) => ({
   autorName: { ...typography.name, color: colors.text },
   autorSub: { ...typography.small, color: colors.text3 },
 
-  aktionen: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  aktion: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  aktionEnde: { marginLeft: 'auto' },
+  /* Fuenf gleiche Spalten - siehe der Kommentar an der Reihe selbst. */
+  aktionen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  aktion: { flex: 1, alignItems: 'center', gap: 5 },
   aktionZahl: { ...typography.small, color: colors.text2 },
+  aktionZahlAn: { color: colors.danger },
 
   text: { ...typography.message, color: colors.text, paddingHorizontal: spacing.lg, paddingBottom: 10, lineHeight: 20 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: spacing.lg, paddingBottom: 10 },

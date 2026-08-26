@@ -179,6 +179,14 @@ export interface Clip {
   art?: ClipArt;
   /** Nur bei art === 'live': wie viele gerade zusehen. */
   zuschauer?: number;
+  /*
+   * Kapitel eines langen Videos (Prototyp: "Wenn Video in Kapitel aufgeteilt,
+   * anzeigen und direkt dort springen"). `bei` ist die Sekunde, an der das
+   * Kapitel anfaengt.
+   */
+  kapitel?: { bei: number; titel: string }[];
+  /** Ob es Untertitel gibt - steht in den Video-Einstellungen zur Wahl. */
+  untertitel?: boolean;
   /** Damit Querformat-Videos auf den Explorer-Seiten auftauchen koennen. */
   location?: string;
   music?: string;

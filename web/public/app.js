@@ -95,6 +95,16 @@ const state = {
   starredMessages: {},
   mutedChats: {},
   notifications: { sound: true, vibration: true, led: true },
+  /*
+   * Video-Einstellungen im Querformat (Henrik, Punkt 31: "Keine
+   * Einstellungen. Nach YouTube - Untertitel, Geschwindigkeit, Qualität").
+   * Sie gelten fuer alle Videos, nicht je Video - so haelt es YouTube auch.
+   */
+  video: {
+    tempo: JSON.parse(localStorage.getItem('am-video-tempo') || '1'),
+    qualitaet: localStorage.getItem('am-video-qualitaet') || 'Automatisch',
+    untertitel: localStorage.getItem('am-video-untertitel') === 'an',
+  },
 };
 
 const sub = () => state.sub[state.area];
@@ -5431,6 +5441,119 @@ function openStoryOptionen(story, danach) {
  * Vorher liess sich ein Querformat-Video ueberhaupt nicht oeffnen - es kam
  * nur "Wiedergabe folgt mit dem Backend".
  */
+/*
+ * Video-Einstellungen im Querformat — Henrik, Punkt 31: "Keine Einstellungen
+ * (Untertitel, Geschwindigkeit). Nach YouTube."
+ *
+ * Aufgebaut wie dort: ein Blatt mit drei Punkten, jeder zeigt rechts seinen
+ * Stand. Die Auswahl gilt fuer alle Videos und ueberlebt einen Neustart -
+ * eine Geschwindigkeit, die man bei jedem Video neu einstellen muss, waere
+ * keine Einstellung, sondern ein Schalter.
+ *
+ * Untertitel bietet nur an, wer welche hat. Ein Punkt, der bei jedem zweiten
+ * Video ins Leere fuehrt, ist schlechter als keiner.
+ */
+function openVideoOptionen(clip, danach) {
+  const TEMPO = [0.5, 0.75, 1, 1.25, 1.5, 2];
+  const QUALITAET = ['Automatisch', '1080p', '720p', '480p', '240p'];
+  const tempoText = (t) => (t === 1 ? 'Normal' : `${String(t).replace('.', ',')}×`);
+
+  const sichern = () => {
+    localStorage.setItem('am-video-tempo', JSON.stringify(state.video.tempo));
+    localStorage.setItem('am-video-qualitaet', state.video.qualitaet);
+    localStorage.setItem('am-video-untertitel', state.video.untertitel ? 'an' : 'aus');
+  };
+
+  /** Eine der Listen als eigenes Blatt oeffnen. */
+  const waehlen = (titel, werte, aktuell, beschriften, uebernehmen) => {
+    openSheet(
+      titel,
+      `<div class="sheet__body">
+         ${werte
+           .map(
+             (w) => `<button class="item ${w === aktuell ? 'is-aktiv' : ''}" data-vwahl="${esc(String(w))}">
+               <span class="item__label">${esc(beschriften(w))}</span>
+               ${w === aktuell ? `<span class="item__value">${ICONS.check}</span>` : ''}
+             </button>`
+           )
+           .join('')}
+       </div>`,
+      (blatt, zu) => {
+        blatt.querySelectorAll('[data-vwahl]').forEach((b) =>
+          b.addEventListener('click', () => {
+            uebernehmen(b.dataset.vwahl);
+            sichern();
+            zu();
+            toast(`${titel}: ${beschriften(werte.find((w) => String(w) === b.dataset.vwahl))}`);
+            danach?.();
+          })
+        );
+      },
+      { schliessen: true }
+    );
+  };
+
+  /*
+   * Nur wer das Feld hat, hat Untertitel. Andersherum (`!== false`) waere es
+   * falsch: ein Video ohne Angabe bekaeme den Punkt angeboten und der
+   * Schalter fuehrte ins Leere. Live-Videos und 360°-Aufnahmen haben in
+   * dieser Fassung keine.
+   */
+  const hatUntertitel = !!clip.untertitel;
+
+  openSheet(
+    'Video-Einstellungen',
+    `<div class="sheet__body">
+       <button class="item" data-vopt="tempo">
+         <span class="item__icon">${ICONS.clock}</span>
+         <span class="item__label">Wiedergabegeschwindigkeit</span>
+         <span class="item__value">${esc(tempoText(state.video.tempo))}</span>
+         <span class="row__chevron">${ICONS.chevron}</span>
+       </button>
+       <button class="item" data-vopt="qualitaet">
+         <span class="item__icon">${ICONS.settings}</span>
+         <span class="item__label">Qualität</span>
+         <span class="item__value">${esc(state.video.qualitaet)}</span>
+         <span class="row__chevron">${ICONS.chevron}</span>
+       </button>
+       ${
+         hatUntertitel
+           ? `<div class="item">
+                <span class="item__icon">${ICONS.checkDouble}</span>
+                <span class="item__label">Untertitel</span>
+                <button class="switch ${state.video.untertitel ? 'is-on' : ''}" data-vopt="untertitel" aria-label="Untertitel"><span class="switch__knob"></span></button>
+              </div>`
+           : `<div class="sheet__hint">Für dieses Video gibt es keine Untertitel.</div>`
+       }
+     </div>`,
+    (blatt, zu) => {
+      blatt.querySelectorAll('[data-vopt]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const was = b.dataset.vopt;
+
+          if (was === 'untertitel') {
+            state.video.untertitel = !state.video.untertitel;
+            sichern();
+            b.classList.toggle('is-on');
+            return toast(state.video.untertitel ? 'Untertitel an' : 'Untertitel aus');
+          }
+
+          zu();
+          if (was === 'tempo') {
+            return waehlen('Geschwindigkeit', TEMPO, state.video.tempo, tempoText, (w) => {
+              state.video.tempo = Number(w);
+            });
+          }
+          waehlen('Qualität', QUALITAET, state.video.qualitaet, (w) => w, (w) => {
+            state.video.qualitaet = w;
+          });
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
 function openClip(clipId) {
   let clip = state.clips.find((c) => c.id === clipId);
   if (!clip) return toast('Dieses Video gibt es nicht mehr');
@@ -5464,10 +5587,39 @@ function openClip(clipId) {
             </div>
             <div class="player__leiste">
               <span class="player__zeit" id="clipZeit">${zeit(bei)}</span>
-              <span class="player__balken"><i id="clipFortschritt" style="width:0%"></i></span>
+              <span class="player__balken" id="clipBalken"><i id="clipFortschritt" style="width:0%"></i></span>
               <span class="player__zeit">${esc(clip.duration)}</span>
+              ${/*
+                  Punkt 31 und 30: Einstellungen und Vollbild. Beide sitzen in
+                  der Leiste unter dem Bild, dort sucht man sie von YouTube her.
+                */ ''}
+              <button class="player__knopf" id="clipOptionen" aria-label="Video-Einstellungen">${ICONS.settings}</button>
+              <button class="player__knopf" id="clipVollbild" aria-label="Vollbild">${ICONS.ausklappen}</button>
             </div>
           </div>
+
+          ${
+            /*
+             * Kapitel (Punkt 32). Nur wenn das Video welche hat - eine leere
+             * Ueberschrift ueber nichts waere schlechter als gar keine.
+             */
+            clip.kapitel?.length
+              ? `<div class="kapitel">
+                   <div class="kapitel__kopf">Kapitel</div>
+                   ${clip.kapitel
+                     .map(
+                       (k, i) => `<button class="kapitel__zeile" data-kapitel="${k.bei}">
+                         <span class="kapitel__zeit">${zeit(k.bei)}</span>
+                         <span class="kapitel__titel">${esc(k.titel)}</span>
+                         <span class="kapitel__dauer">${
+                           clip.kapitel[i + 1] ? zeit(clip.kapitel[i + 1].bei - k.bei) : zeit(gesamt - k.bei)
+                         }</span>
+                       </button>`
+                     )
+                     .join('')}
+                 </div>`
+              : ''
+          }
 
           <div class="player__kopf">
             <div class="player__titel">${esc(clip.title)}</div>
@@ -5485,16 +5637,38 @@ function openClip(clipId) {
             </button>
           </div>
 
-          <div class="post__actions">
+          ${/*
+              Henrik am 26.08.2026, Punkte 28 und 29: "Speichern zu weit
+              entfernt; Teilen/Repost zu nah beieinander. Alle fünf sauber
+              nebeneinander." Und: "Aktionsspalte verändert sich beim Liken."
+
+              Beides kam aus derselben Ecke. "Speichern" trug
+              postbtn--end (margin-left: auto) und wurde deshalb ans Ende
+              geschoben, waehrend die anderen vier links zusammenklebten. Und
+              weil die Zahl neben Herz und Sprechblase erst auftaucht, wenn es
+              etwas zu zaehlen gibt, sprang beim ersten Like die ganze Reihe.
+
+              Jetzt ein Raster aus fuenf gleichen Spalten: jeder Knopf hat
+              seinen Platz, unabhaengig davon, was in ihm steht. Die Zahl
+              steht unter dem Symbol statt daneben - so aendert sie die Breite
+              gar nicht mehr.
+            */ ''}
+          <div class="post__actions post__actions--fuenf">
             <button class="postbtn ${clip.liked ? 'is-liked' : ''}" data-clipact="like" aria-label="Gefällt mir">
-              ${ICONS.heart}${clip.likes ? `<span class="postbtn__zahl">${compactNumber(clip.likes)}</span>` : ''}
+              ${ICONS.heart}<span class="postbtn__zahl">${clip.likes ? compactNumber(clip.likes) : 'Like'}</span>
             </button>
             <button class="postbtn" data-clipact="comment" aria-label="Kommentieren">
-              ${ICONS.chat}${clip.comments ? `<span class="postbtn__zahl">${compactNumber(clip.comments)}</span>` : ''}
+              ${ICONS.chat}<span class="postbtn__zahl">${clip.comments ? compactNumber(clip.comments) : 'Kommentar'}</span>
             </button>
-            <button class="postbtn" data-clipact="share" aria-label="Senden">${ICONS.send}</button>
-            <button class="postbtn ${clip.reposted ? 'is-reposted' : ''}" data-clipact="repost" aria-label="Repost">${ICONS.repeat}</button>
-            <button class="postbtn postbtn--end ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Speichern">${ICONS.bookmark}</button>
+            <button class="postbtn" data-clipact="share" aria-label="Senden">
+              ${ICONS.send}<span class="postbtn__zahl">Teilen</span>
+            </button>
+            <button class="postbtn ${clip.reposted ? 'is-reposted' : ''}" data-clipact="repost" aria-label="Repost">
+              ${ICONS.repeat}<span class="postbtn__zahl">Repost</span>
+            </button>
+            <button class="postbtn ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Speichern">
+              ${ICONS.bookmark}<span class="postbtn__zahl">Speichern</span>
+            </button>
           </div>
 
           <div class="player__text">${esc(clip.description || '')}</div>
@@ -5569,6 +5743,82 @@ function openClip(clipId) {
       umschalten();
     });
     stage.addEventListener('click', umschalten);
+
+    /*
+     * Vollbild (Punkt 30). Zwei Wege, weil keiner allein reicht: im Browser
+     * die Fullscreen-API, und wo die fehlt oder abgelehnt wird - iOS Safari
+     * erlaubt sie nur fuer echte <video>-Elemente - eine Klasse, die den
+     * Player ueber den ganzen Bildschirm legt. Beides zusammen heisst: der
+     * Knopf tut immer etwas.
+     */
+    const vollbildKnopf = overlay.querySelector('#clipVollbild');
+    const spieler = overlay.querySelector('.player');
+
+    const vollbildAn = () => document.fullscreenElement === spieler || spieler.classList.contains('player--voll');
+
+    const vollbildUmschalten = async () => {
+      if (vollbildAn()) {
+        if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+        spieler.classList.remove('player--voll');
+        vollbildKnopf.innerHTML = ICONS.ausklappen;
+        vollbildKnopf.setAttribute('aria-label', 'Vollbild');
+        return;
+      }
+
+      if (spieler.requestFullscreen) {
+        try {
+          await spieler.requestFullscreen();
+        } catch {
+          spieler.classList.add('player--voll');
+        }
+      } else {
+        spieler.classList.add('player--voll');
+      }
+      vollbildKnopf.innerHTML = ICONS.einklappen;
+      vollbildKnopf.setAttribute('aria-label', 'Vollbild beenden');
+    };
+
+    vollbildKnopf.addEventListener('click', (e) => {
+      e.stopPropagation();
+      vollbildUmschalten();
+    });
+
+    // Escape oder die Geste des Systems beenden das Vollbild ohne unseren
+    // Knopf - dann muss das Symbol trotzdem zurueckspringen.
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && !spieler.classList.contains('player--voll')) {
+        vollbildKnopf.innerHTML = ICONS.ausklappen;
+        vollbildKnopf.setAttribute('aria-label', 'Vollbild');
+      }
+    });
+
+    /* Video-Einstellungen (Punkt 31), nach dem Vorbild von YouTube. */
+    overlay.querySelector('#clipOptionen').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openVideoOptionen(clip, paint);
+    });
+
+    /* Kapitel (Punkt 32): ein Klick springt an die Stelle. */
+    overlay.querySelectorAll('[data-kapitel]').forEach((b) =>
+      b.addEventListener('click', () => {
+        bei = Math.min(gesamt, Number(b.dataset.kapitel));
+        const zeitFeld = overlay.querySelector('#clipZeit');
+        if (zeitFeld) zeitFeld.textContent = zeit(bei);
+        const balken = overlay.querySelector('#clipFortschritt');
+        if (balken) balken.style.width = `${(bei / gesamt) * 100}%`;
+        overlay.querySelectorAll('[data-kapitel]').forEach((x) => x.classList.remove('is-aktiv'));
+        b.classList.add('is-aktiv');
+      })
+    );
+
+    /* Im Balken an eine Stelle springen - ohne das ist er nur Deko. */
+    overlay.querySelector('#clipBalken').addEventListener('click', (e) => {
+      const kasten = e.currentTarget.getBoundingClientRect();
+      const anteil = Math.min(1, Math.max(0, (e.clientX - kasten.left) / kasten.width));
+      bei = Math.round(gesamt * anteil);
+      overlay.querySelector('#clipZeit').textContent = zeit(bei);
+      overlay.querySelector('#clipFortschritt').style.width = `${anteil * 100}%`;
+    });
 
     overlay.querySelectorAll('[data-clipact]').forEach((b) =>
       b.addEventListener('click', async () => {

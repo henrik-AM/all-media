@@ -1065,6 +1065,34 @@ ul { margin: 0; padding: 0; list-style: none; }
 .post__media svg { width: 56px; height: 56px; }
 
 .post__actions { display: flex; align-items: center; gap: 14px; padding: 10px 16px 6px; }
+/*
+  Die fuenf Aktionen im Querformat-Player: Like, Kommentar, Teilen, Repost,
+  Speichern. Fuenf gleiche Spalten statt einer Reihe mit Luecke - so hat
+  jeder Knopf seinen festen Platz und nichts springt, wenn eine Zahl
+  auftaucht oder ein Wort laenger wird.
+*/
+.post__actions--fuenf {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  padding: 12px 8px 8px;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  margin-top: 4px;
+}
+.post__actions--fuenf .postbtn {
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.post__actions--fuenf .postbtn__zahl {
+  margin-left: 0;
+  max-width: 100%;
+  font-size: 11.5px;
+  color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.post__actions--fuenf .postbtn.is-liked .postbtn__zahl { color: #FF3040; }
 .postbtn { color: var(--text); display: grid; place-items: center; }
 .postbtn svg { width: 25px; height: 25px; }
 .postbtn:active { transform: scale(.9); }
@@ -1104,10 +1132,27 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .slide__stage svg { width: 72px; height: 72px; }
 
+/*
+  Die Aktionsspalte rechts im Hochformat.
+
+  Henrik am 26.08.2026: "Like speichern → Spalte mit Like/Kommentar/Teilen/
+  Repost/Speichern verschiebt sich nach links."
+
+  Der Grund war die Breite der Beschriftungen: aus "Repost" wird "Repostet",
+  aus "Speichern" wird "Gespeichert", und aus "999" wird "1k". Die Spalte war
+  nur so breit wie ihr breitester Eintrag und rechts verankert - wurde ein
+  Wort laenger, wuchs sie nach links, und weil alles zentriert ist, sprangen
+  gleich alle fuenf Symbole mit.
+
+  Feste Breite loest das: die Symbole stehen ab jetzt auf einer Senkrechten,
+  egal was darunter steht. Ein zu langes Wort wird abgeschnitten statt die
+  Spalte zu verschieben.
+*/
 .slide__rail {
   position: absolute;
   right: 10px;
   bottom: 108px;
+  width: 62px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1118,10 +1163,15 @@ ul { margin: 0; padding: 0; list-style: none; }
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  width: 100%;
   color: #fff;
   font-size: 11px;
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.railbtn > span {
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .railbtn svg { width: 27px; height: 27px; }
 .railbtn.is-on { color: #FF4D6D; }
@@ -2202,6 +2252,78 @@ body:has(.camera) .toast { bottom: 132px; }
 .player__autor .prof__btn { flex: 0 0 auto; width: auto; padding: 0 16px; }
 .player__text { padding: 4px 16px 10px; font-size: 14px; line-height: 1.45; color: var(--text); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; }
+
+/*
+  Die beiden Knoepfe rechts in der Player-Leiste: Einstellungen und Vollbild.
+  Hell auf schwarzem Grund, weil die ganze Leiste schwarz ist.
+*/
+.player__knopf {
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  color: #C6CAD2;
+}
+.player__knopf:hover { background: rgba(255,255,255,.12); color: #fff; }
+.player__knopf svg { width: 18px; height: 18px; }
+/*
+  Der Balken ist anklickbar (an eine Stelle springen), also auch so zeigen -
+  und mit etwas Luft darum, damit man ihn mit dem Daumen trifft.
+
+  box-sizing: content-box ist hier noetig: der Balken ist 3px hoch, und mit
+  dem sonst geltenden border-box haette das Polster die Hoehe des Inhalts auf
+  null gedrueckt. Genau das ist beim ersten Anlauf passiert - der Balken war
+  schlicht weg, sichtbar nur im Bild.
+*/
+#clipBalken {
+  cursor: pointer;
+  box-sizing: content-box;
+  padding: 6px 0;
+  background-clip: content-box;
+}
+
+/*
+  Vollbild ohne die Fullscreen-API. iOS Safari erlaubt sie nur fuer echte
+  <video>-Elemente; dort legt sich der Player stattdessen ueber den ganzen
+  Bildschirm. Die Buehne bekommt die volle Hoehe, die Leiste bleibt unten.
+*/
+.player--voll {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #000;
+}
+.player--voll .player__stage { flex: 1 1 auto; aspect-ratio: auto; }
+.player--voll .player__leiste { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+/* Dasselbe fuer den echten Vollbildmodus des Browsers. */
+.player:fullscreen { display: flex; flex-direction: column; justify-content: center; background: #000; }
+.player:fullscreen .player__stage { flex: 1 1 auto; aspect-ratio: auto; }
+
+/*
+  Kapitel eines langen Videos (Prototyp: "Wenn das Video in Kapitel
+  aufgeteilt ist, anzeigen und direkt dorthin springen").
+*/
+.kapitel { padding: 10px 0 6px; border-bottom: 1px solid var(--hairline); }
+.kapitel__kopf { padding: 4px 16px 8px; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.kapitel__zeile {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 9px 16px;
+  text-align: left;
+}
+.kapitel__zeile:hover { background: var(--surface-2); }
+.kapitel__zeile.is-aktiv { background: var(--brand-soft); }
+.kapitel__zeit {
+  flex: 0 0 auto; min-width: 44px;
+  font-size: 12.5px; font-weight: 600; color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+.kapitel__titel {
+  flex: 1 1 auto; min-width: 0; font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kapitel__dauer { flex: 0 0 auto; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------- Kontaktinfo nach dem Prototyp-Frame */
 .kp__bearbeiten { font-size: 15px; font-weight: 600; color: var(--brand); padding: 0 4px; }
