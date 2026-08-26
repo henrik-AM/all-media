@@ -6661,6 +6661,13 @@ function openLivestream() {
       <div class="live__leiste">
         <div class="live__zuschauer" id="liveZuschauer">0 Zuschauer</div>
         <button class="prof__btn is-primary" id="liveStop">Livestream beenden</button>
+        ${/*
+            Punkt 46: "Keine Lösch-Option. Löschen möglich (neben Beenden)."
+            "Beenden" behaelt die Aufzeichnung und legt sie ins Querformat -
+            "Verwerfen" laesst gar nichts zurueck. Beides muss zur Wahl
+            stehen, sonst bleibt jeder Versuchsstream fuer immer im Profil.
+          */ ''}
+        <button class="prof__btn" id="liveWeg">Verwerfen</button>
       </div>
     </div>`;
 
@@ -6696,6 +6703,36 @@ function openLivestream() {
     state.sub.videos = 'landscape';
     await bootstrap();
     toast('Livestream beendet, die Aufzeichnung steht im Querformat');
+  });
+
+  overlay.querySelector('#liveWeg').addEventListener('click', async () => {
+    const sicher = await bestaetigen(
+      'Livestream verwerfen',
+      'Der Stream endet und es bleibt keine Aufzeichnung zurück.',
+      'Verwerfen'
+    );
+    if (!sicher) return;
+
+    clearInterval(uhr);
+    /*
+     * Erst beenden, dann die entstandene Aufzeichnung wieder loeschen. Der
+     * Server legt sie beim Beenden an - ein eigener "abbrechen"-Weg waere
+     * eine zweite Stelle, an der dieselbe Logik steht.
+     */
+    const daten = await fetch('/api/eigene/livestream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktion: 'stop' }),
+    }).then((r) => r.json());
+
+    if (daten.clip?.id) {
+      await fetch(`/api/eigene/${daten.clip.id}/loeschen`, { method: 'POST' });
+    }
+
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+    await bootstrap();
+    toast('Livestream verworfen');
   });
 }
 
@@ -6843,6 +6880,71 @@ const PROFILE_TABS = [
   { id: 'saved', icon: 'bookmark' },
 ];
 
+/*
+ * Was man mit einem eigenen Beitrag machen kann — Loeschen und Einsortieren.
+ * Henriks Punkte 37 und 40.
+ */
+function openEigenerBeitrag(id, art, me) {
+  const sammlungen = [
+    ...(me.playlists || []).map((name) => ({ art: 'playlist', name })),
+    ...(me.highlights || []).map((name) => ({ art: 'highlight', name })),
+  ];
+
+  openSheet(
+    art === 'video' ? 'Dein Video' : 'Dein Beitrag',
+    `<div class="sheet__body">
+       ${
+         sammlungen.length
+           ? `<div class="listhead">Hinzufügen zu</div>
+              ${sammlungen
+                .map(
+                  (sml) => `<button class="item" data-sml="${esc(sml.art)}" data-smlname="${esc(sml.name)}">
+                    <span class="item__icon">${sml.art === 'playlist' ? ICONS.play : ICONS.image}</span>
+                    <span class="item__label">${esc(sml.name)}</span>
+                    <span class="item__value">${sml.art === 'playlist' ? 'Playlist' : 'Highlight'}</span>
+                  </button>`
+                )
+                .join('')}`
+           : `<div class="sheet__hint">Du hast noch keine Playlist und kein Highlight. Über das Plus oben rechts legst du eine an.</div>`
+       }
+       <div class="listhead">Verwalten</div>
+       <button class="item item--danger" data-eigenaktion="loeschen">
+         <span class="item__icon">${ICONS.trash}</span>
+         <span class="item__label">${art === 'video' ? 'Video löschen' : 'Beitrag löschen'}</span>
+       </button>
+     </div>`,
+    (blatt, zu) => {
+      blatt.querySelectorAll('[data-sml]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const res = await fetch(`/api/eigene/${id}/sammlung`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ art: b.dataset.sml, name: b.dataset.smlname }),
+          }).then((r) => r.json());
+          zu();
+          toast(res.ok ? res.meldung : res.error);
+        })
+      );
+
+      blatt.querySelector('[data-eigenaktion="loeschen"]').addEventListener('click', async () => {
+        zu();
+        const sicher = await bestaetigen(
+          art === 'video' ? 'Video löschen' : 'Beitrag löschen',
+          'Das lässt sich nicht rückgängig machen.',
+          'Löschen'
+        );
+        if (!sicher) return;
+
+        const res = await fetch(`/api/eigene/${id}/loeschen`, { method: 'POST' }).then((r) => r.json());
+        if (!res.ok) return toast(res.error);
+        toast(res.meldung);
+        await bootstrap();
+      });
+    },
+    { schliessen: true }
+  );
+}
+
 async function renderVideoProfile() {
   const lauf = ++renderLauf;
   const res = await fetch('/api/profile/me');
@@ -6904,8 +7006,15 @@ async function renderVideoProfile() {
       </div>
       ${
         tab === 'grid'
-          ? `<div class="prof__grid">${me.grid
-              .map((g) => `<div class="griditem">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image)}</div>`)
+          ? // Punkt 37 und 40: langes Druecken oeffnet die Optionen zu einem
+            // eigenen Beitrag - loeschen, oder in eine Playlist bzw. ein
+            // Highlight legen. Vorher war die Kachel ein totes <div>.
+            `<div class="prof__grid">${me.grid
+              .map(
+                (g) => `<button class="griditem" data-eigen="${esc(g.id)}" data-eigenart="${
+                  g.kind === 'video' ? 'video' : 'post'
+                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image)}</button>`
+              )
               .join('')}</div>`
           : tab === 'repost' && meineReposts.length
           ? `<div class="prof__grid">${meineReposts
@@ -6932,6 +7041,36 @@ async function renderVideoProfile() {
   bindSammlungen();
   $('#followerBtn')?.addEventListener('click', () => openFollowerList(me, 'follower'));
   $('#followingBtn')?.addEventListener('click', () => openFollowerList(me, 'following'));
+  /*
+   * Punkt 37: "Eigene Beiträge können nicht gelöscht werden. Lange drücken →
+   * Einstellungen-Panel mit Löschen-Option." Dazu Punkt 40, das Einsortieren
+   * in eine Playlist oder ein Highlight.
+   *
+   * Langes Druecken statt eines Menue-Knopfes an jeder Kachel: der Knopf
+   * waere auf einer Drittel-Breite kaum zu treffen und wuerde das Raster
+   * unruhig machen.
+   */
+  main.querySelectorAll('[data-eigen]').forEach((kachel) => {
+    let halten = null;
+    const los = () => {
+      clearTimeout(halten);
+      halten = null;
+    };
+    const start = () => {
+      halten = setTimeout(() => openEigenerBeitrag(kachel.dataset.eigen, kachel.dataset.eigenart, me), 500);
+    };
+
+    kachel.addEventListener('pointerdown', start);
+    kachel.addEventListener('pointerup', los);
+    kachel.addEventListener('pointerleave', los);
+    kachel.addEventListener('pointercancel', los);
+    // Rechtsklick am Rechner tut dasselbe wie langes Druecken.
+    kachel.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openEigenerBeitrag(kachel.dataset.eigen, kachel.dataset.eigenart, me);
+    });
+  });
+
   main.querySelectorAll('[data-otab]').forEach((b) =>
     b.addEventListener('click', () => {
       state.ownProfileTab = b.dataset.otab;

@@ -301,6 +301,111 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (!(await page.$('#expFotos'))) throw new Error('man landet woanders');
   });
 
+  /* ------------------------------ Eigene Inhalte verwalten (37, 40, 46) */
+  console.log('\nVideos — eigene Beiträge verwalten');
+
+  const zumEigenenProfil = async () => {
+    /*
+     * Erst die Vollbild-Ebene zuklappen. Der Abschnitt davor endet auf der
+     * Fotoseite eines Ortes - sie liegt ueber allem, und ein Klick auf die
+     * untere Leiste kaeme dort gar nicht an.
+     */
+    await page.evaluate(() => {
+      const o = document.querySelector('#overlay');
+      if (o) {
+        o.hidden = true;
+        o.innerHTML = '';
+      }
+      document.querySelector('.sheet-backdrop')?.remove();
+    });
+    await page.waitForTimeout(250);
+    await page.click('[data-area="videos"]');
+    await page.waitForTimeout(200);
+    await page.click('[data-sub="profile"]');
+    await page.waitForSelector('[data-eigen]');
+    await page.waitForTimeout(400);
+  };
+
+  await pruefe('Langes Drücken öffnet die Optionen zu einem eigenen Beitrag', async () => {
+    await zumEigenenProfil();
+    await page.click('[data-eigen]', { button: 'right' });
+    await page.waitForTimeout(500);
+    if (!(await page.$('.sheet'))) throw new Error('es geht nichts auf');
+    if (!(await page.$('[data-eigenaktion="loeschen"]'))) throw new Error('keine Lösch-Option');
+  });
+
+  await pruefe('Die eigenen Playlists und Highlights stehen zur Wahl', async () => {
+    const namen = await page.$$eval('[data-sml]', (n) => n.map((x) => x.dataset.smlname));
+    if (namen.length < 2) throw new Error('nur ' + namen.length + ' Sammlungen');
+  });
+
+  await pruefe('Ein Beitrag lässt sich in eine Playlist legen', async () => {
+    await page.click('[data-sml]');
+    await page.waitForTimeout(700);
+    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
+    if (!toast.includes('hinzugefügt')) throw new Error('Toast sagt „' + toast + '"');
+  });
+
+  await pruefe('Zweimal dieselbe Sammlung wird abgelehnt', async () => {
+    await page.click('[data-eigen]', { button: 'right' });
+    await page.waitForTimeout(400);
+    await page.click('[data-sml]');
+    await page.waitForTimeout(700);
+    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
+    if (!toast.includes('schon')) throw new Error('Toast sagt „' + toast + '"');
+  });
+
+  await pruefe('Löschen fragt nach und nimmt die Kachel dann weg', async () => {
+    await zumEigenenProfil();
+    const vorher = await page.$$eval('[data-eigen]', (n) => n.length);
+
+    await page.click('[data-eigen]', { button: 'right' });
+    await page.waitForTimeout(400);
+    await page.click('[data-eigenaktion="loeschen"]');
+    await page.waitForTimeout(500);
+    if (!(await page.$('#nachfrageJa'))) throw new Error('es wird nicht nachgefragt');
+
+    // Abbrechen darf nichts loeschen.
+    await page.click('#nachfrageNein');
+    await page.waitForTimeout(600);
+    const dazwischen = await page.$$eval('[data-eigen]', (n) => n.length);
+    if (dazwischen !== vorher) throw new Error('„Abbrechen" hat trotzdem gelöscht');
+
+    await page.click('[data-eigen]', { button: 'right' });
+    await page.waitForTimeout(400);
+    await page.click('[data-eigenaktion="loeschen"]');
+    await page.waitForTimeout(400);
+    await page.click('#nachfrageJa');
+    await page.waitForTimeout(1400);
+    const nachher = await page.$$eval('[data-eigen]', (n) => n.length);
+    if (nachher !== vorher - 1) throw new Error(`${vorher} vorher, ${nachher} nachher`);
+  });
+
+  await pruefe('Ein Livestream lässt sich verwerfen statt zu beenden', async () => {
+    await zumEigenenProfil();
+    await page.click('[data-oact="create"]');
+    await page.waitForTimeout(500);
+    await page.click('[data-erstellen="livestream"]');
+    await page.waitForSelector('#liveStop');
+    await page.waitForTimeout(600);
+
+    if (!(await page.$('#liveWeg'))) throw new Error('es gibt keine Verwerfen-Option');
+    await page.click('#liveWeg');
+    await page.waitForTimeout(500);
+    await page.click('#nachfrageJa');
+    await page.waitForTimeout(1500);
+
+    // Nach dem Verwerfen darf keine Aufzeichnung im Querformat stehen.
+    await page.click('[data-area="videos"]');
+    await page.waitForTimeout(200);
+    await page.click('[data-sub="landscape"]');
+    await page.waitForTimeout(600);
+    const titel = await page.$$eval('.clip__title', (n) => n.map((x) => x.textContent));
+    if (titel.some((t) => t.includes('Livestream-Aufzeichnung'))) {
+      throw new Error('die Aufzeichnung steht trotzdem da');
+    }
+  });
+
   const erfuellt = ergebnisse.filter(Boolean).length;
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');

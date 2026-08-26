@@ -1142,6 +1142,69 @@ app.post('/api/eigene/spende', (req, res) => {
   res.json({ ok: true, spende: profiles.me.spende });
 });
 
+/*
+ * Einen eigenen Beitrag oder ein eigenes Video loeschen.
+ *
+ * Henrik am 26.08.2026, Punkt 37: "Eigene Beiträge können nicht gelöscht
+ * werden." Und Punkt 46 fuer die Livestream-Aufzeichnung, die als
+ * Querformat-Video im Profil liegt.
+ *
+ * Nur eigene Inhalte - alles andere gehoert jemand anderem.
+ */
+app.post('/api/eigene/:id/loeschen', (req, res) => {
+  const id = req.params.id;
+
+  const imRaster = gridItems.me.some((g) => g.id === id);
+
+  /*
+   * Zwei Faelle. Selbst veroeffentlichte Beitraege stehen in posts, videos
+   * oder clips - die kommen dort raus. Die Kacheln, mit denen das Profil von
+   * Anfang an gefuellt ist (me_g0 …), stehen nur im Raster; sie sind
+   * trotzdem eigene Inhalte und muessen sich genauso loeschen lassen. Ohne
+   * diesen zweiten Fall waere "Löschen" auf zwoelf von zwoelf Kacheln
+   * wirkungslos gewesen.
+   */
+  for (const liste of [posts, videos, clips]) {
+    const stelle = liste.findIndex((e) => e.id === id);
+    if (stelle === -1) continue;
+    if (liste[stelle].userId !== 'me') {
+      return res.json({ ok: false, error: 'Das ist nicht dein Beitrag' });
+    }
+    liste.splice(stelle, 1);
+    gridItems.me = gridItems.me.filter((g) => g.id !== id);
+    if (liste === posts) profiles.me.posts = Math.max(0, profiles.me.posts - 1);
+    return res.json({ ok: true, meldung: 'Gelöscht' });
+  }
+
+  if (imRaster) {
+    gridItems.me = gridItems.me.filter((g) => g.id !== id);
+    profiles.me.posts = Math.max(0, profiles.me.posts - 1);
+    return res.json({ ok: true, meldung: 'Gelöscht' });
+  }
+
+  res.json({ ok: false, error: 'Das gibt es nicht mehr' });
+});
+
+/*
+ * Einen eigenen Beitrag in eine Playlist oder ein Highlight legen.
+ * Punkt 40: "Keine Möglichkeit, Inhalte zu Playlists/Highlights
+ * hinzuzufügen."
+ */
+app.post('/api/eigene/:id/sammlung', (req, res) => {
+  const id = req.params.id;
+  const name = String(req.body?.name || '').trim();
+  const art = req.body?.art === 'highlight' ? 'highlights' : 'playlists';
+  if (!name) return res.json({ ok: false, error: 'Bitte eine Sammlung wählen' });
+
+  profiles.me.sammlungen = profiles.me.sammlungen || {};
+  const schluessel = `${art}:${name}`;
+  const drin = profiles.me.sammlungen[schluessel] || [];
+  if (drin.includes(id)) return res.json({ ok: false, error: `Steht schon in „${name}"` });
+
+  profiles.me.sammlungen[schluessel] = [...drin, id];
+  res.json({ ok: true, meldung: `Zu „${name}" hinzugefügt` });
+});
+
 /** Livestream starten und beenden. Die Aufzeichnung bleibt im Profil. */
 app.post('/api/eigene/livestream', (req, res) => {
   if (req.body?.aktion === 'start') {
