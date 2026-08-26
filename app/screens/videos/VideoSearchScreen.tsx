@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
@@ -44,7 +45,7 @@ const Row = ({
   sub: string;
   onPress: () => void;
 }) => (
-  <Pressable style={styles.row} onPress={onPress}>
+  <Druck style={styles.row} onPress={onPress}>
     <View style={styles.rowThumb}>
       <Ionicons name={icon} size={20} color={colors.text3} />
     </View>
@@ -52,7 +53,7 @@ const Row = ({
       <Text style={styles.rowTitle}>{title}</Text>
       <Text style={styles.rowSub}>{sub}</Text>
     </View>
-  </Pressable>
+  </Druck>
 );
 
 /**
@@ -99,10 +100,10 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
             <Section title="Reels">
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reelRow}>
                 {result.reels.map((v) => (
-                  <Pressable key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
+                  <Druck key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
                     <Ionicons name="phone-portrait-outline" size={28} color={colors.text3} />
                     <Text style={styles.reelName}>{mockUsers[v.userId].name}</Text>
-                  </Pressable>
+                  </Druck>
                 ))}
               </ScrollView>
             </Section>
@@ -126,9 +127,9 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
             <Section title="Beiträge">
               <View style={styles.grid}>
                 {result.posts.map((p) => (
-                  <Pressable key={p.id} style={styles.gridItem} onPress={() => onNotice('Beitrag öffnet im Feed')}>
+                  <Druck key={p.id} style={styles.gridItem} onPress={() => onNotice('Beitrag öffnet im Feed')}>
                     <Ionicons name="image-outline" size={26} color={colors.text3} />
-                  </Pressable>
+                  </Druck>
                 ))}
               </View>
             </Section>
@@ -137,13 +138,13 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           {result.people.length > 0 && (
             <Section title="Profile">
               {result.people.map((u) => (
-                <Pressable key={u.id} style={styles.row} onPress={() => onOpenProfile(u.id)}>
+                <Druck key={u.id} style={styles.row} onPress={() => onOpenProfile(u.id)}>
                   <Avatar id={u.id} name={u.name} size={44} />
                   <View style={styles.rowText}>
                     <Text style={styles.rowTitle}>{u.name}</Text>
                     <Text style={styles.rowSub}>{u.handle}</Text>
                   </View>
-                </Pressable>
+                </Druck>
               ))}
             </Section>
           )}
@@ -152,11 +153,11 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
             <Section title="# Hashtags">
               <View style={styles.tags}>
                 {result.tags.map((h) => (
-                  <Pressable key={h.tag} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: h.tag })}>
+                  <Druck key={h.tag} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: h.tag })}>
                     <Text style={styles.tagText}>
                       {h.tag} · {compact(h.posts)}
                     </Text>
-                  </Pressable>
+                  </Druck>
                 ))}
               </View>
             </Section>

@@ -820,7 +820,19 @@ const Shell = () => {
 };
 
 const Root = () => {
-  const { isLoggedIn } = useContext(AuthContext);
+  const { isLoggedIn, sitzungGeladen } = useContext(AuthContext);
+
+  /*
+   * Solange die gespeicherte Sitzung noch geholt wird, zeigen wir eine leere
+   * Flaeche in der App-Farbe. Ohne das blitzt der Anmeldebildschirm fuer
+   * einen Bildaufbau auf und verschwindet wieder - das sieht aus, als waere
+   * etwas schiefgegangen.
+   *
+   * Die Flaeche ist bewusst leer und nicht ein Kreisel: das Holen dauert
+   * wenige Millisekunden, ein Kreisel wuerde nur kurz aufblitzen.
+   */
+  if (!sitzungGeladen) return <View style={{ flex: 1, backgroundColor: colors.surface }} />;
+
   return isLoggedIn ? <Shell /> : <LoginScreen />;
 };
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -90,9 +91,9 @@ export const ContactProfileScreen = ({
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <Pressable onPress={onBack} hitSlop={8}>
+          <Druck onPress={onBack} hitSlop={8}>
             <Ionicons name="arrow-back" size={22} color={colors.text} />
-          </Pressable>
+          </Druck>
         </View>
         <Text style={styles.leer}>Diese Person gibt es nicht.</Text>
       </View>
@@ -115,11 +116,11 @@ export const ContactProfileScreen = ({
     m.geteilt ? `${m.geteilt.autor}: ${m.geteilt.titel}` : m.standort ? m.standort.name : m.kontakt ? m.kontakt.name : m.text || 'Foto';
 
   const zeile = (label: string, neben: string, onPress: () => void, art?: 'gruen' | 'gefahr') => (
-    <Pressable key={label} style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]} onPress={onPress}>
+    <Druck key={label} style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]} onPress={onPress}>
       <Text style={[styles.zeileText, art === 'gruen' && styles.gruen, art === 'gefahr' && styles.gefahrText]}>{label}</Text>
       {!!neben && <Text style={styles.zeileWert}>{neben}</Text>}
       {!art && <Ionicons name="chevron-forward" size={17} color={colors.text3} />}
-    </Pressable>
+    </Druck>
   );
 
   const treffer = suche.trim()
@@ -129,13 +130,13 @@ export const ContactProfileScreen = ({
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={onBack} hitSlop={8}>
+        <Druck onPress={onBack} hitSlop={8}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </Pressable>
+        </Druck>
         <Text style={styles.headerTitel}>Kontaktinfo</Text>
-        <Pressable onPress={() => setOffen({ art: 'bearbeiten' })} hitSlop={8}>
+        <Druck onPress={() => setOffen({ art: 'bearbeiten' })} hitSlop={8}>
           <Text style={styles.bearbeiten}>Bearbeiten</Text>
-        </Pressable>
+        </Druck>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl + insets.bottom }}>
@@ -148,31 +149,31 @@ export const ContactProfileScreen = ({
         {!!bio && <Text style={styles.bio}>{bio}</Text>}
 
         <View style={styles.profile}>
-          <Pressable style={styles.profilKnopf} onPress={() => onOpenPublicProfile?.(userId)}>
+          <Druck style={styles.profilKnopf} onPress={() => onOpenPublicProfile?.(userId)}>
             <Text style={styles.profilText} numberOfLines={1}>
               {person.handle} · Videos
             </Text>
-          </Pressable>
-          <Pressable style={styles.profilKnopf} onPress={() => onOpenPublicProfile?.(userId)}>
+          </Druck>
+          <Druck style={styles.profilKnopf} onPress={() => onOpenPublicProfile?.(userId)}>
             <Text style={styles.profilText} numberOfLines={1}>
               {person.handle} · Communitys
             </Text>
-          </Pressable>
+          </Druck>
         </View>
 
         <View style={styles.aktionen}>
-          <Pressable style={styles.aktion} onPress={() => onCall(userId, 'audio')}>
+          <Druck style={styles.aktion} onPress={() => onCall(userId, 'audio')}>
             <Ionicons name="call-outline" size={21} color={colors.brand} />
             <Text style={styles.aktionText}>Audioanruf</Text>
-          </Pressable>
-          <Pressable style={styles.aktion} onPress={() => onCall(userId, 'video')}>
+          </Druck>
+          <Druck style={styles.aktion} onPress={() => onCall(userId, 'video')}>
             <Ionicons name="videocam-outline" size={21} color={colors.brand} />
             <Text style={styles.aktionText}>Videoanruf</Text>
-          </Pressable>
-          <Pressable style={styles.aktion} onPress={() => setOffen({ art: 'suche' })}>
+          </Druck>
+          <Druck style={styles.aktion} onPress={() => setOffen({ art: 'suche' })}>
             <Ionicons name="search-outline" size={21} color={colors.brand} />
             <Text style={styles.aktionText}>Suchen</Text>
-          </Pressable>
+          </Druck>
         </View>
 
         <View style={styles.liste}>
@@ -231,7 +232,7 @@ export const ContactProfileScreen = ({
           )}
           <View style={styles.zeile}>
             <Text style={styles.zeileText}>Chat sperren</Text>
-            <Pressable
+            <Druck
               style={[styles.schalter, gesperrt && styles.schalterAn]}
               onPress={() => {
                 setGesperrt((v) => !v);
@@ -239,7 +240,7 @@ export const ContactProfileScreen = ({
               }}
             >
               <View style={[styles.knopf, gesperrt && styles.knopfAn]} />
-            </Pressable>
+            </Druck>
           </View>
           {zeile('Erweiterter Chat-Datenschutz', wert('Erweiterter Chat-Datenschutz', 'Aus'), () =>
             setOffen({ art: 'wahl', label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' })
@@ -275,11 +276,11 @@ export const ContactProfileScreen = ({
         ) : (
           <View style={styles.liste}>
             {gruppen.map((g) => (
-              <Pressable key={g.id} style={styles.zeile} onPress={() => onOpenChat?.(g)}>
+              <Druck key={g.id} style={styles.zeile} onPress={() => onOpenChat?.(g)}>
                 <Avatar id={g.id} name={g.name} size={40} />
                 <Text style={styles.zeileText}>{g.name}</Text>
                 <Ionicons name="chevron-forward" size={17} color={colors.text3} />
-              </Pressable>
+              </Druck>
             ))}
           </View>
         )}

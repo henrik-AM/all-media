@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, sizes, spacing } from '../constants/design';
@@ -28,7 +29,7 @@ export const TopSwitcher = ({ area, active, onChange }: Props) => {
       {subs.map((item) => {
         const isActive = item.key === active;
         return (
-          <Pressable
+          <Druck
             key={item.key}
             accessibilityLabel={item.label}
             style={[styles.btn, isActive && styles.btnActive]}
@@ -39,7 +40,7 @@ export const TopSwitcher = ({ area, active, onChange }: Props) => {
               size={22}
               color={isActive ? colors.brand : colors.text2}
             />
-          </Pressable>
+          </Druck>
         );
       })}
     </View>

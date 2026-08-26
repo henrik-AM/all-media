@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,9 +65,9 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Pressable onPress={onBack} hitSlop={10}>
+        <Druck onPress={onBack} hitSlop={10}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </Pressable>
+        </Druck>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
@@ -83,7 +84,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 <Text style={styles.abschnitt}>Reels →</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reels}>
                   {treffer.reels.map((v: Video) => (
-                    <Pressable key={v.id} style={styles.reel} onPress={() => onNotice(v.description)}>
+                    <Druck key={v.id} style={styles.reel} onPress={() => onNotice(v.description)}>
                       {v.mediaUri ? (
                         <Image source={{ uri: v.mediaUri }} style={styles.voll} />
                       ) : (
@@ -92,7 +93,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                       <Text style={styles.reelText} numberOfLines={2}>
                         {v.description}
                       </Text>
-                    </Pressable>
+                    </Druck>
                   ))}
                 </ScrollView>
               </>
@@ -102,7 +103,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
               <>
                 <Text style={styles.abschnitt}>Querformat →</Text>
                 {treffer.clips.map((c: Clip) => (
-                  <Pressable key={c.id} style={styles.clip} onPress={() => onOpenClip(c.id)}>
+                  <Druck key={c.id} style={styles.clip} onPress={() => onOpenClip(c.id)}>
                     <View style={styles.clipBild}>
                       <Motiv id={c.id} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       <View style={styles.clipZeit}>
@@ -120,7 +121,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                         </Text>
                       </View>
                     </View>
-                  </Pressable>
+                  </Druck>
                 ))}
               </>
             )}
@@ -130,13 +131,13 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 <Text style={styles.abschnitt}>Beiträge →</Text>
                 <View style={styles.raster}>
                   {treffer.beitraege.map((p: Post) => (
-                    <Pressable key={p.id} style={styles.rasterFeld} onPress={() => onNotice(p.description)}>
+                    <Druck key={p.id} style={styles.rasterFeld} onPress={() => onNotice(p.description)}>
                       {p.mediaUri ? (
                         <Image source={{ uri: p.mediaUri }} style={styles.voll} />
                       ) : (
                         <Motiv id={p.id} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       )}
-                    </Pressable>
+                    </Druck>
                   ))}
                 </View>
               </>
@@ -190,11 +191,11 @@ const StandortKopf = ({
       </View>
     </View>
 
-    <Pressable
+    <Druck
       onPress={() => onNotice(anzahl ? `${anzahl} Aufnahmen von diesem Ort stehen unten` : 'Von diesem Ort gibt es noch nichts')}
     >
       <Text style={styles.link}>Alle Fotos ansehen →</Text>
-    </Pressable>
+    </Druck>
   </View>
 );
 
@@ -229,9 +230,9 @@ const SoundKopf = ({ sound }: { sound: (typeof mockSounds)[number] }) => {
       </Text>
 
       <View style={styles.welle}>
-        <Pressable style={styles.play} onPress={() => setLaeuft((v) => !v)} accessibilityLabel={laeuft ? 'Pause' : 'Abspielen'}>
+        <Druck style={styles.play} onPress={() => setLaeuft((v) => !v)} accessibilityLabel={laeuft ? 'Pause' : 'Abspielen'}>
           <Ionicons name={laeuft ? 'pause' : 'play'} size={16} color={colors.text} />
-        </Pressable>
+        </Druck>
         <View style={styles.wellenBalken}>
           {Array.from({ length: balken }, (_, i) => (
             <View

@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
+<body class="is-startet">
   <div class="device">
     <div class="app" id="app">
       <!--
@@ -33,7 +33,38 @@
       -->
       <header class="topbar" id="topbar"></header>
 
-      <main class="main" id="main"></main>
+      <!--
+        Das Geruest steht direkt im HTML und nicht im Skript. Nur so ist es
+        schon beim allerersten Bildaufbau da - also bevor app.js geladen,
+        geparst und ausgefuehrt wurde und bevor /api/bootstrap geantwortet hat.
+        Genau in dieser Zeit war der Bildschirm vorher weiss.
+
+        Die Form entspricht der spaeteren Chatliste (Kreis links, zwei Zeilen
+        rechts). Ein Geruest, das der echten Liste gleicht, wirkt wie "gleich
+        da"; ein Kreisel wirkt wie "warte".
+
+        Dieselbe Struktur erzeugt geruest() in app.js noch einmal - sie wird
+        gebraucht, wenn nach einem Fehlschlag erneut geladen wird.
+      -->
+      <main class="main" id="main">
+        <div class="geruest" aria-hidden="true">
+          <div class="geruest__stories">
+            <div class="skelett geruest__story"></div>
+            <div class="skelett geruest__story"></div>
+            <div class="skelett geruest__story"></div>
+            <div class="skelett geruest__story"></div>
+            <div class="skelett geruest__story"></div>
+          </div>
+          <div class="geruest__suche skelett"></div>
+          <div class="geruest__zeile"><div class="skelett geruest__kreis"></div><div class="geruest__text"><div class="skelett geruest__balken geruest__balken--kurz"></div><div class="skelett geruest__balken"></div></div></div>
+          <div class="geruest__zeile"><div class="skelett geruest__kreis"></div><div class="geruest__text"><div class="skelett geruest__balken geruest__balken--kurz"></div><div class="skelett geruest__balken"></div></div></div>
+          <div class="geruest__zeile"><div class="skelett geruest__kreis"></div><div class="geruest__text"><div class="skelett geruest__balken geruest__balken--kurz"></div><div class="skelett geruest__balken"></div></div></div>
+          <div class="geruest__zeile"><div class="skelett geruest__kreis"></div><div class="geruest__text"><div class="skelett geruest__balken geruest__balken--kurz"></div><div class="skelett geruest__balken"></div></div></div>
+          <div class="geruest__zeile"><div class="skelett geruest__kreis"></div><div class="geruest__text"><div class="skelett geruest__balken geruest__balken--kurz"></div><div class="skelett geruest__balken"></div></div></div>
+          <div class="geruest__zeile"><div class="skelett geruest__kreis"></div><div class="geruest__text"><div class="skelett geruest__balken geruest__balken--kurz"></div><div class="skelett geruest__balken"></div></div></div>
+          <div class="geruest__zeile"><div class="skelett geruest__kreis"></div><div class="geruest__text"><div class="skelett geruest__balken geruest__balken--kurz"></div><div class="skelett geruest__balken"></div></div></div>
+        </div>
+      </main>
 
       <!-- Unten: die vier Bereiche. Diese Struktur ist fest. -->
       <nav class="bottomnav" id="bottomnav"></nav>

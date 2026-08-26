@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
@@ -55,7 +56,7 @@ export const StoryAnsichtenSheet = ({ story, contacts, onClose, onOpenProfile }:
           {seher.map((c) => {
             const person = mockUsers[c.id];
             return (
-              <Pressable
+              <Druck
                 key={c.id}
                 style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
                 onPress={() => {
@@ -66,7 +67,7 @@ export const StoryAnsichtenSheet = ({ story, contacts, onClose, onOpenProfile }:
                 <Avatar id={c.id} name={person.name} size={sizes.avatarSm} />
                 <Text style={styles.label}>{person.name}</Text>
                 <Text style={styles.neben}>{person.handle}</Text>
-              </Pressable>
+              </Druck>
             );
           })}
         </ScrollView>
@@ -136,7 +137,7 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
       {meldeSchritt ? (
         <ScrollView>
           {GRUENDE.map((grund) => (
-            <Pressable
+            <Druck
               key={grund}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
               onPress={() => {
@@ -147,13 +148,13 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
             >
               <Text style={styles.label}>{grund}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Pressable>
+            </Druck>
           ))}
         </ScrollView>
       ) : (
         <View>
           {punkte.map((p) => (
-            <Pressable
+            <Druck
               key={p.key}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
               onPress={() => waehlen(p.key)}
@@ -163,7 +164,7 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
               </View>
               <Text style={[styles.label, p.gefahr && styles.gefahr]}>{p.label}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Pressable>
+            </Druck>
           ))}
         </View>
       )}

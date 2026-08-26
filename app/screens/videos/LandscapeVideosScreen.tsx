@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
@@ -48,7 +49,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
           renderItem={({ item }) => {
             const person = mockUsers[item.userId];
             return (
-              <Pressable
+              <Druck
                 style={styles.clip}
                 onPress={() => onOpenClip(item.id)}
               >
@@ -65,7 +66,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
                     </Text>
                   </View>
                 </View>
-              </Pressable>
+              </Druck>
             );
           }}
         />

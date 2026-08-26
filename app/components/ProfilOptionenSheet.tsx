@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
 import { useProfil } from '../contexts/ProfilContext';
@@ -87,7 +88,7 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
       {meldeSchritt ? (
         <ScrollView>
           {GRUENDE.map((grund) => (
-            <Pressable
+            <Druck
               key={grund}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
               onPress={() => {
@@ -98,13 +99,13 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
             >
               <Text style={styles.label}>{grund}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Pressable>
+            </Druck>
           ))}
         </ScrollView>
       ) : (
         <View>
           {punkte.map((p) => (
-            <Pressable
+            <Druck
               key={p.key}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
               onPress={() => waehlen(p.key)}
@@ -114,7 +115,7 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
               </View>
               <Text style={[styles.label, p.gefahr && styles.gefahr]}>{p.label}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Pressable>
+            </Druck>
           ))}
         </View>
       )}

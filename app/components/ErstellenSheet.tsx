@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, spacing } from '../constants/design';
@@ -47,7 +48,7 @@ export const ErstellenSheet = ({ visible, bereich, onClose, onSelect }: Props) =
     <SheetRahmen visible={visible} title="Erstellen" onClose={onClose}>
       <View>
         {punkte.map((p, i) => (
-          <Pressable
+          <Druck
             key={p.key}
             style={({ pressed }) => [
               styles.punkt,
@@ -58,7 +59,7 @@ export const ErstellenSheet = ({ visible, bereich, onClose, onSelect }: Props) =
           >
             {'icon' in p && <Ionicons name="add-circle" size={22} color={colors.brand} />}
             <Text style={styles.label}>{p.label}</Text>
-          </Pressable>
+          </Druck>
         ))}
       </View>
     </SheetRahmen>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
@@ -58,13 +59,13 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Pressable style={styles.back} onPress={onBack} hitSlop={6}>
+        <Druck style={styles.back} onPress={onBack} hitSlop={6}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </Pressable>
+        </Druck>
         <Text style={styles.handle}>{person.handle}</Text>
-        <Pressable onPress={() => setOptionenOffen(true)} hitSlop={6}>
+        <Druck onPress={() => setOptionenOffen(true)} hitSlop={6}>
           <Ionicons name="information-circle-outline" size={22} color={colors.text2} />
-        </Pressable>
+        </Druck>
       </View>
 
       <ScrollView>
@@ -89,9 +90,9 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
         <View style={styles.about}>
           <Text style={styles.name}>{person.name}</Text>
           <Text style={styles.bio}>{profile.bio}</Text>
-          <Pressable onPress={() => onNotice(profile.link)}>
+          <Druck onPress={() => onNotice(profile.link)}>
             <Text style={styles.link}>{profile.link}</Text>
-          </Pressable>
+          </Druck>
         </View>
 
         {istBlockiert(userId) ? (
@@ -109,21 +110,21 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
         ) : null}
 
         <View style={styles.buttons}>
-          <Pressable
+          <Druck
             style={[styles.button, !profile.isFollowing && styles.buttonPrimary]}
             onPress={toggleFollow}
           >
             <Text style={[styles.buttonText, !profile.isFollowing && styles.buttonTextPrimary]}>
               {profile.isFollowing ? 'Gefolgt' : 'Folgen'}
             </Text>
-          </Pressable>
-          <Pressable
+          </Druck>
+          <Druck
             style={[styles.button, istBlockiert(userId) && styles.buttonAus]}
             disabled={istBlockiert(userId)}
             onPress={() => onMessage(userId)}
           >
             <Text style={styles.buttonText}>Nachricht</Text>
-          </Pressable>
+          </Druck>
         </View>
 
         {profile.highlights.length > 0 && (
@@ -149,7 +150,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
             { key: 'repost', icon: 'repeat' },
             { key: 'tagged', icon: 'person-outline' },
           ] as { key: Tab; icon: React.ComponentProps<typeof Ionicons>['name'] }[]).map((item) => (
-            <Pressable
+            <Druck
               key={item.key}
               style={[styles.tab, tab === item.key && styles.tabActive]}
               onPress={() => setTab(item.key)}
@@ -159,7 +160,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
                 size={22}
                 color={tab === item.key ? colors.text : colors.text3}
               />
-            </Pressable>
+            </Druck>
           ))}
         </View>
 

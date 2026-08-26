@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
+import { Druck } from './Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { brandGradient, colors, radius, shadow, spacing, typography } from '../constants/design';
@@ -34,13 +35,13 @@ export const SearchBar = ({ value, onChangeText, placeholder = 'Suchen', onAdd }
         clearButtonMode="never"
       />
       {value.length > 0 && (
-        <Pressable onPress={() => onChangeText('')} hitSlop={8}>
+        <Druck onPress={() => onChangeText('')} hitSlop={8}>
           <Ionicons name="close-circle" size={17} color={colors.text3} />
-        </Pressable>
+        </Druck>
       )}
     </View>
     {onAdd && (
-      <Pressable
+      <Druck
         style={({ pressed }) => [styles.addWrap, pressed && styles.addPressed]}
         onPress={onAdd}
         accessibilityLabel="Neu"
@@ -53,7 +54,7 @@ export const SearchBar = ({ value, onChangeText, placeholder = 'Suchen', onAdd }
         >
           <Ionicons name="add" size={22} color={colors.white} />
         </LinearGradient>
-      </Pressable>
+      </Druck>
     )}
   </View>
 );

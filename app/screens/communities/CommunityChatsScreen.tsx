@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
@@ -36,7 +37,7 @@ export const CommunityChatsScreen = ({ onOpenCommunity }: Props) => {
           data={list}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <Pressable style={styles.row} onPress={() => onOpenCommunity(item)}>
+            <Druck style={styles.row} onPress={() => onOpenCommunity(item)}>
               <Avatar id={item.id} name={item.name} size={52} />
               <View style={styles.body}>
                 <Text style={styles.name}>{item.name}</Text>
@@ -49,7 +50,7 @@ export const CommunityChatsScreen = ({ onOpenCommunity }: Props) => {
                   <Text style={styles.badgeText}>{item.unreadCount}</Text>
                 </View>
               )}
-            </Pressable>
+            </Druck>
           )}
         />
       )}

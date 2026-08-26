@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -389,13 +390,13 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       <View style={styles.head}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
           {SECTIONS.map((section) => (
-            <Pressable
+            <Druck
               key={section.id}
               style={styles.pill}
               onPress={() => scroll.current?.scrollTo({ y: offsets.current[section.id] ?? 0, animated: true })}
             >
               <Text style={styles.pillText}>{section.title}</Text>
-            </Pressable>
+            </Druck>
           ))}
         </ScrollView>
       </View>
@@ -405,7 +406,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           Der Kontowechsel gehoert nach ganz oben: Es ist die Einstellung, die
           das ganze uebrige Bild veraendert.
         */}
-        <Pressable style={styles.konto} onPress={onSwitchAccount}>
+        <Druck style={styles.konto} onPress={onSwitchAccount}>
           <Avatar
             id={user?.profile.id ?? 'me'}
             name={user?.profile.name ?? 'Konto'}
@@ -419,12 +420,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             </Text>
           </View>
           <Ionicons name="swap-horizontal-outline" size={22} color={colors.brand} />
-        </Pressable>
+        </Druck>
 
-        <Pressable style={styles.wechselBtn} onPress={onSwitchAccount}>
+        <Druck style={styles.wechselBtn} onPress={onSwitchAccount}>
           <Ionicons name="people-outline" size={18} color={colors.brand} />
           <Text style={styles.wechselText}>Konto wechseln oder hinzufügen</Text>
-        </Pressable>
+        </Druck>
 
         {SECTIONS.map((section) => (
           <View
@@ -446,10 +447,10 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       trackColor={{ true: colors.brand, false: colors.surface3 }}
                     />
                   ) : (
-                    <Pressable style={styles.rechts} onPress={() => oeffne(item)} hitSlop={10}>
+                    <Druck style={styles.rechts} onPress={() => oeffne(item)} hitSlop={10}>
                       {!!item.wahl && <Text style={styles.itemValue}>{wert(item)}</Text>}
                       <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-                    </Pressable>
+                    </Druck>
                   )}
                 </View>
               ))}
@@ -463,10 +464,10 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             <Text style={styles.itemLabel}>Über All Media</Text>
             <Text style={styles.itemValue}>1.0.0</Text>
           </View>
-          <Pressable style={styles.item} onPress={onLogout}>
+          <Druck style={styles.item} onPress={onLogout}>
             <Ionicons name="log-out-outline" size={20} color={colors.danger} />
             <Text style={[styles.itemLabel, styles.danger]}>Abmelden</Text>
-          </Pressable>
+          </Druck>
         </View>
       </ScrollView>
 

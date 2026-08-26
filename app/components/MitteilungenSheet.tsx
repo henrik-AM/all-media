@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
 import { EmptyState } from './EmptyState';
@@ -30,7 +31,7 @@ export const MitteilungenSheet = ({ visible, bereich, onClose, onOpen, onNotice 
       hoch
       fuss={
         offen ? (
-          <Pressable
+          <Druck
             style={styles.alle}
             onPress={() => {
               alleGelesen(bereich);
@@ -39,7 +40,7 @@ export const MitteilungenSheet = ({ visible, bereich, onClose, onOpen, onNotice 
             }}
           >
             <Text style={styles.alleText}>Alle als gelesen markieren</Text>
-          </Pressable>
+          </Druck>
         ) : undefined
       }
     >
@@ -52,7 +53,7 @@ export const MitteilungenSheet = ({ visible, bereich, onClose, onOpen, onNotice 
       ) : (
         <ScrollView contentContainerStyle={styles.liste}>
           {liste.map((m) => (
-            <Pressable
+            <Druck
               key={m.id}
               style={({ pressed }) => [styles.zeile, pressed && styles.zeileGedrueckt]}
               onPress={() => {
@@ -67,7 +68,7 @@ export const MitteilungenSheet = ({ visible, bereich, onClose, onOpen, onNotice 
               </View>
               <Text style={[styles.text, !m.gelesen && styles.textNeu]}>{m.text}</Text>
               <Text style={styles.zeit}>{m.zeit}</Text>
-            </Pressable>
+            </Druck>
           ))}
         </ScrollView>
       )}

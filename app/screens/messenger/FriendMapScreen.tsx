@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { Karte, KartenSteuerung } from '../../components/Karte';
@@ -73,7 +74,7 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
             {FREIGABEN.map((f) => {
               const an = freigabe === f.key;
               return (
-                <Pressable
+                <Druck
                   key={f.key}
                   style={[styles.option, an && styles.optionAn]}
                   onPress={() => {
@@ -82,7 +83,7 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
                   }}
                 >
                   <Text style={[styles.optionText, an && styles.optionTextAn]}>{f.label}</Text>
-                </Pressable>
+                </Druck>
               );
             })}
           </View>
@@ -94,7 +95,7 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
         const person = mockUsers[pin.id];
         const istAktiv = aktiv === pin.id;
         return (
-          <Pressable
+          <Druck
             key={pin.id}
             style={[styles.row, istAktiv && styles.rowAktiv]}
             onPress={() => zeigeAufKarte(pin.id)}
@@ -108,14 +109,14 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
             </View>
             {/* Zum Profil geht es weiterhin - aber ausdruecklich ueber diesen
                 Knopf, nicht mehr durch Tippen auf die ganze Zeile. */}
-            <Pressable
+            <Druck
               hitSlop={8}
               style={styles.profilBtn}
               onPress={() => onOpenProfile(pin.id)}
             >
               <Ionicons name="person-circle-outline" size={24} color={colors.text3} />
-            </Pressable>
-          </Pressable>
+            </Druck>
+          </Druck>
         );
       })}
     </ScrollView>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, spacing, typography } from '../constants/design';
 
@@ -21,12 +22,12 @@ interface Props {
 
 export const ActionSheet = ({ visible, title, items, onSelect, onClose }: Props) => (
   <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-    <Pressable style={styles.backdrop} onPress={onClose} />
+    <Druck style={styles.backdrop} onPress={onClose} />
     <View style={styles.sheet}>
       <View style={styles.handle} />
       <Text style={styles.title}>{title}</Text>
       {items.map((item) => (
-        <Pressable
+        <Druck
           key={item.key}
           style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
           onPress={() => onSelect(item.key)}
@@ -36,7 +37,7 @@ export const ActionSheet = ({ visible, title, items, onSelect, onClose }: Props)
           </View>
           <Text style={styles.label}>{item.label}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-        </Pressable>
+        </Druck>
       ))}
     </View>
   </Modal>

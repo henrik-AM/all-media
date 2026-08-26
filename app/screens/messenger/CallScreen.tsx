@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -148,7 +149,7 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
       )}
 
       <View style={styles.leiste}>
-        <Pressable
+        <Druck
           style={[styles.knopf, stumm && styles.knopfAn]}
           onPress={() => {
             setStumm(!stumm);
@@ -157,9 +158,9 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
         >
           <Ionicons name={stumm ? 'mic-off' : 'mic'} size={24} color={stumm ? colors.text : colors.white} />
           <Text style={[styles.knopfText, stumm && styles.knopfTextAn]}>Stumm</Text>
-        </Pressable>
+        </Druck>
 
-        <Pressable
+        <Druck
           style={[styles.knopf, lautsprecher && styles.knopfAn]}
           onPress={() => {
             setLautsprecher(!lautsprecher);
@@ -172,9 +173,9 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
             color={lautsprecher ? colors.text : colors.white}
           />
           <Text style={[styles.knopfText, lautsprecher && styles.knopfTextAn]}>Laut</Text>
-        </Pressable>
+        </Druck>
 
-        <Pressable
+        <Druck
           style={[styles.knopf, kameraAn && styles.knopfAn]}
           onPress={() => {
             setKameraAn(!kameraAn);
@@ -187,20 +188,20 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
             color={kameraAn ? colors.text : colors.white}
           />
           <Text style={[styles.knopfText, kameraAn && styles.knopfTextAn]}>Video</Text>
-        </Pressable>
+        </Druck>
       </View>
 
       <View style={styles.unten}>
         {zustand === 'klingelt' && (
           // In der Demo nimmt die Gegenseite von selbst ab - der Knopf
           // ueberspringt das Warten.
-          <Pressable style={[styles.rund, styles.annehmen]} onPress={() => setZustand('verbunden')}>
+          <Druck style={[styles.rund, styles.annehmen]} onPress={() => setZustand('verbunden')}>
             <Ionicons name="call" size={28} color={colors.white} />
-          </Pressable>
+          </Druck>
         )}
-        <Pressable style={[styles.rund, styles.auflegen]} onPress={auflegen}>
+        <Druck style={[styles.rund, styles.auflegen]} onPress={auflegen}>
           <Ionicons name="call" size={28} color={colors.white} style={styles.aufgelegt} />
-        </Pressable>
+        </Druck>
       </View>
     </View>
   );

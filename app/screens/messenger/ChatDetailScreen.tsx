@@ -4,12 +4,12 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -116,7 +116,7 @@ export const ChatDetailScreen = ({
     return (
       // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt
       // sich "Mit Stern markiert" in der Kontaktinfo wirklich.
-      <Pressable
+      <Druck
         style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}
         onLongPress={() => {
           const jetzt = markieren(item.id);
@@ -129,7 +129,7 @@ export const ChatDetailScreen = ({
         {item.bildUri ? (
           <Image source={{ uri: item.bildUri }} style={styles.anhangBild} />
         ) : item.standort ? (
-          <Pressable style={styles.ortKarte} onPress={() => onOpenStandort?.(item.standort!.name)}>
+          <Druck style={styles.ortKarte} onPress={() => onOpenStandort?.(item.standort!.name)}>
             <View style={styles.ortBild}>
               <View style={[styles.ortNadel, { left: `${item.standort.x ?? 50}%`, top: `${item.standort.y ?? 50}%` }]}>
                 <Ionicons name="location" size={22} color={colors.danger} />
@@ -139,15 +139,15 @@ export const ChatDetailScreen = ({
             <Text style={styles.ortSub} numberOfLines={1}>
               {item.standort.adresse ?? item.standort.koordinaten}
             </Text>
-          </Pressable>
+          </Druck>
         ) : item.kontakt ? (
-          <Pressable style={styles.kontaktKarte} onPress={() => onOpenProfile(item.kontakt!.id)}>
+          <Druck style={styles.kontaktKarte} onPress={() => onOpenProfile(item.kontakt!.id)}>
             <Avatar id={item.kontakt.id} name={item.kontakt.name} size={sizes.avatarMd} />
             <View style={styles.kontaktText}>
               <Text style={styles.kontaktName}>{item.kontakt.name}</Text>
               <Text style={styles.kontaktHandle}>{item.kontakt.handle}</Text>
             </View>
-          </Pressable>
+          </Druck>
         ) : item.geteilt ? (
           // Weitergeleiteter Beitrag: kleine Karte statt nacktem Text.
           <View style={styles.geteilt}>
@@ -187,7 +187,7 @@ export const ChatDetailScreen = ({
           <Text style={[styles.time, out && styles.timeOut]}>{item.time}</Text>
           {out && <Ionicons name="checkmark-done" size={14} color={colors.bubbleOutMeta} />}
         </View>
-      </Pressable>
+      </Druck>
     );
   };
 
@@ -196,11 +196,11 @@ export const ChatDetailScreen = ({
     // fuer Notch und Home-Anzeige selbst frei.
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={styles.headerBack} onPress={onBack} hitSlop={6}>
+        <Druck style={styles.headerBack} onPress={onBack} hitSlop={6}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </Pressable>
+        </Druck>
         <Avatar id={chat.userId ?? chat.id} name={chat.name} size={sizes.avatarSm} group={chat.isGroup} />
-        <Pressable
+        <Druck
           style={styles.headerBody}
           onPress={() => chat.userId && onOpenProfile(chat.userId)}
           disabled={!chat.userId}
@@ -213,13 +213,13 @@ export const ChatDetailScreen = ({
               ? `${((chat.memberIds?.length ?? 0) + 1).toLocaleString('de-DE')} Mitglieder`
               : 'Online'}
           </Text>
-        </Pressable>
-        <Pressable style={styles.headerAction} onPress={() => onCall('video')} hitSlop={4}>
+        </Druck>
+        <Druck style={styles.headerAction} onPress={() => onCall('video')} hitSlop={4}>
           <Ionicons name="videocam-outline" size={22} color={colors.text2} />
-        </Pressable>
-        <Pressable style={styles.headerAction} onPress={() => onCall('audio')} hitSlop={4}>
+        </Druck>
+        <Druck style={styles.headerAction} onPress={() => onCall('audio')} hitSlop={4}>
           <Ionicons name="call-outline" size={20} color={colors.text2} />
-        </Pressable>
+        </Druck>
       </View>
 
       <KeyboardAvoidingView
@@ -266,14 +266,14 @@ export const ChatDetailScreen = ({
             </Text>
             {/* In der Demo nimmt der Knopf die Anfrage stellvertretend an,
                 damit sich der weitere Ablauf ausprobieren laesst. */}
-            <Pressable style={styles.anfrageBtn} onPress={() => onAcceptRequest?.(chat.id)}>
+            <Druck style={styles.anfrageBtn} onPress={() => onAcceptRequest?.(chat.id)}>
               <Text style={styles.anfrageBtnText}>Annahme simulieren</Text>
-            </Pressable>
+            </Druck>
           </View>
         )}
 
         <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
-          <Pressable
+          <Druck
             style={styles.composerIcon}
             onPress={() =>
               gesperrt
@@ -283,7 +283,7 @@ export const ChatDetailScreen = ({
             hitSlop={4}
           >
             <Ionicons name="add" size={24} color={colors.text2} />
-          </Pressable>
+          </Druck>
           <View style={styles.composerField}>
             <TextInput
               style={styles.composerInput}
@@ -294,17 +294,17 @@ export const ChatDetailScreen = ({
               editable={!gesperrt}
               multiline
             />
-            <Pressable style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
+            <Druck style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
               <Ionicons name="camera-outline" size={21} color={colors.text2} />
-            </Pressable>
+            </Druck>
           </View>
-          <Pressable
+          <Druck
             style={[styles.send, (!draft.trim() || gesperrt) && styles.sendDisabled]}
             onPress={send}
             disabled={!draft.trim() || gesperrt}
           >
             <Ionicons name="send" size={17} color={colors.white} />
-          </Pressable>
+          </Druck>
         </View>
       </KeyboardAvoidingView>
 

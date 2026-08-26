@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, spacing, typography } from '../constants/design';
@@ -53,27 +54,27 @@ export const EinstellungSheet = ({
     hoch={!!zeilen && zeilen.length > 4}
     fuss={
       knopf ? (
-        <Pressable style={styles.knopf} onPress={onKnopf}>
+        <Druck style={styles.knopf} onPress={onKnopf}>
           <Text style={styles.knopfText}>{knopf}</Text>
-        </Pressable>
+        </Druck>
       ) : bestaetigen ? (
-        <Pressable style={[styles.knopf, styles.gefahr]} onPress={onBestaetigt}>
+        <Druck style={[styles.knopf, styles.gefahr]} onPress={onBestaetigt}>
           <Text style={styles.knopfText}>Ja, Konto löschen</Text>
-        </Pressable>
+        </Druck>
       ) : undefined
     }
   >
     {wahl && (
       <ScrollView>
         {wahl.map((w) => (
-          <Pressable
+          <Druck
             key={w}
             style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
             onPress={() => onWahl?.(w)}
           >
             <Text style={styles.label}>{w}</Text>
             {w === aktuell && <Ionicons name="checkmark" size={19} color={colors.brand} />}
-          </Pressable>
+          </Druck>
         ))}
       </ScrollView>
     )}

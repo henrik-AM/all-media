@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -47,7 +48,7 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
     const icon = mediaIcon(item.previewMedia);
 
     return (
-      <Pressable
+      <Druck
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         onPress={() => onOpenChat(item)}
       >
@@ -77,7 +78,7 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
             )}
           </View>
         </View>
-      </Pressable>
+      </Druck>
     );
   };
 
@@ -99,7 +100,7 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
         {FILTERS.map(({ key, label }) => {
           const on = filter === key;
           return (
-            <Pressable key={key} onPress={() => setFilter(key)}>
+            <Druck key={key} onPress={() => setFilter(key)}>
               {on ? (
                 <LinearGradient
                   colors={brandGradient}
@@ -114,7 +115,7 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
                   <Text style={styles.pillText}>{label}</Text>
                 </View>
               )}
-            </Pressable>
+            </Druck>
           );
         })}
       </View>

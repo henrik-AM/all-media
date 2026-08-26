@@ -1,9 +1,11 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { brandGradient, colors, sizes, spacing, storyGradient, typography } from '../constants/design';
+import { mockUsers } from '../mocks';
 import { Story } from '../types';
 
 interface Props {
@@ -24,8 +26,17 @@ export const StoryRail = ({ stories, onPress }: Props) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
       {stories.map((story) => {
         const inner = RING - 7;
+        /*
+         * story.name ist der kurze Name UNTER dem Ring ("Anna", "Deine
+         * Story"). Die Initialen im Kreis gehören aber zur Person, sonst
+         * stand dort "A" statt "AS" und bei der eigenen Story "DS" statt
+         * "DU" — in der Chatliste direkt darunter steht es richtig, also
+         * fiel der Unterschied sofort auf.
+         */
+        const person = mockUsers[story.userId];
+        const vollerName = person?.name ?? story.name;
         return (
-          <Pressable
+          <Druck
             key={story.id}
             style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
             onPress={() => onPress(story)}
@@ -33,7 +44,7 @@ export const StoryRail = ({ stories, onPress }: Props) => (
             {story.viewed ? (
               <View style={[styles.ring, styles.ringViewed]}>
                 <View style={styles.inner}>
-                  <Avatar id={story.userId} name={story.name} size={inner - 4} />
+                  <Avatar id={story.userId} name={vollerName} size={inner - 4} />
                 </View>
               </View>
             ) : (
@@ -44,7 +55,7 @@ export const StoryRail = ({ stories, onPress }: Props) => (
                 style={styles.ring}
               >
                 <View style={styles.inner}>
-                  <Avatar id={story.userId} name={story.name} size={inner - 4} />
+                  <Avatar id={story.userId} name={vollerName} size={inner - 4} />
                 </View>
               </LinearGradient>
             )}
@@ -65,7 +76,7 @@ export const StoryRail = ({ stories, onPress }: Props) => (
             <Text style={[styles.name, story.own && styles.nameOwn]} numberOfLines={1}>
               {story.name}
             </Text>
-          </Pressable>
+          </Druck>
         );
       })}
     </ScrollView>

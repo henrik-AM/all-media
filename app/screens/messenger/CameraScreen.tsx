@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import { } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,13 +63,13 @@ export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }
         {embedded ? (
           <View style={styles.spacer} />
         ) : (
-          <Pressable onPress={onClose} hitSlop={10}>
+          <Druck onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={26} color={colors.white} />
-          </Pressable>
+          </Druck>
         )}
-        <Pressable onPress={() => onNotice('Blitz umgeschaltet')} hitSlop={10}>
+        <Druck onPress={() => onNotice('Blitz umgeschaltet')} hitSlop={10}>
           <Ionicons name="flash-outline" size={24} color={colors.white} />
-        </Pressable>
+        </Druck>
       </View>
 
       <View style={styles.stage}>
@@ -95,26 +96,26 @@ export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }
 
       <View style={styles.modes}>
         {(['photo', 'video'] as Mode[]).map((m) => (
-          <Pressable key={m} onPress={() => setMode(m)} disabled={busy}>
+          <Druck key={m} onPress={() => setMode(m)} disabled={busy}>
             <Text style={[styles.mode, mode === m && styles.modeActive]}>
               {m === 'photo' ? 'FOTO' : 'VIDEO'}
             </Text>
-          </Pressable>
+          </Druck>
         ))}
       </View>
 
       <View style={styles.bottom}>
-        <Pressable style={styles.side} onPress={() => pick('library')} disabled={busy}>
+        <Druck style={styles.side} onPress={() => pick('library')} disabled={busy}>
           <Ionicons name="image-outline" size={22} color={colors.white} />
-        </Pressable>
+        </Druck>
 
-        <Pressable style={styles.shutter} onPress={() => pick('camera')} disabled={busy}>
+        <Druck style={styles.shutter} onPress={() => pick('camera')} disabled={busy}>
           <View style={styles.shutterInner} />
-        </Pressable>
+        </Druck>
 
-        <Pressable style={styles.side} onPress={() => onNotice('Kamera gewechselt')} disabled={busy}>
+        <Druck style={styles.side} onPress={() => onNotice('Kamera gewechselt')} disabled={busy}>
           <Ionicons name="camera-reverse-outline" size={22} color={colors.white} />
-        </Pressable>
+        </Druck>
       </View>
     </View>
   );

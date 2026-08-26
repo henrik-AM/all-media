@@ -1,5 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { avatarColor, colors, radius, spacing, typography } from '../constants/design';
 
@@ -222,7 +223,7 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
                   { left: `${pin.x}%`, top: `${pin.y}%`, transform: [{ scale: gegenZoom }] },
                 ]}
               >
-              <Pressable onPress={() => onPinPress?.(pin.id)} hitSlop={6} style={styles.pinInhalt}>
+              <Druck onPress={() => onPinPress?.(pin.id)} hitSlop={6} style={styles.pinInhalt}>
                 <View
                   style={[
                     styles.punkt,
@@ -235,7 +236,7 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
                 <Text style={styles.pinName} numberOfLines={1}>
                   {pin.name.split(' ')[0]}
                 </Text>
-              </Pressable>
+              </Druck>
               </Animated.View>
             );
           })}
@@ -243,20 +244,20 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
 
         {/* Zoomknöpfe - verlässlicher als Zwei-Finger-Gesten auf kleinen Geräten */}
         <View style={styles.zoomLeiste}>
-          <Pressable style={styles.zoomBtn} onPress={() => setzeZoom(stand.current.zoom + 0.6)}>
+          <Druck style={styles.zoomBtn} onPress={() => setzeZoom(stand.current.zoom + 0.6)}>
             <Ionicons name="add" size={20} color={colors.text} />
-          </Pressable>
+          </Druck>
           <View style={styles.zoomTrenner} />
-          <Pressable style={styles.zoomBtn} onPress={() => setzeZoom(stand.current.zoom - 0.6)}>
+          <Druck style={styles.zoomBtn} onPress={() => setzeZoom(stand.current.zoom - 0.6)}>
             <Ionicons name="remove" size={20} color={colors.text} />
-          </Pressable>
+          </Druck>
         </View>
 
         {zoom > MIN_ZOOM + 0.05 && (
-          <Pressable style={styles.zurueck} onPress={() => setzeZoom(MIN_ZOOM, { x: 0, y: 0 })}>
+          <Druck style={styles.zurueck} onPress={() => setzeZoom(MIN_ZOOM, { x: 0, y: 0 })}>
             <Ionicons name="scan-outline" size={15} color={colors.text} />
             <Text style={styles.zurueckText}>Ganze Karte</Text>
-          </Pressable>
+          </Druck>
         )}
       </View>
     );

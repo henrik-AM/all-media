@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
@@ -55,7 +56,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
       {schritt === 'menue' && (
         <View>
           {PUNKTE.map((p) => (
-            <Pressable
+            <Druck
               key={p.key}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
               onPress={() => {
@@ -69,7 +70,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
               </View>
               <Text style={styles.label}>{p.label}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Pressable>
+            </Druck>
           ))}
         </View>
       )}
@@ -77,7 +78,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
       {schritt === 'standort' && (
         <ScrollView>
           {mockPlaces.map((platz) => (
-            <Pressable
+            <Druck
               key={platz.id}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
               onPress={() => {
@@ -100,7 +101,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
               </View>
               <Text style={styles.label}>{platz.name}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Pressable>
+            </Druck>
           ))}
         </ScrollView>
       )}
@@ -113,7 +114,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
             {auswahl.map((c) => {
               const person = mockUsers[c.id];
               return (
-                <Pressable
+                <Druck
                   key={c.id}
                   style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
                   onPress={() => {
@@ -128,7 +129,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
                   <Avatar id={person.id} name={person.name} size={sizes.avatarSm} />
                   <Text style={styles.label}>{person.name}</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-                </Pressable>
+                </Druck>
               );
             })}
           </ScrollView>

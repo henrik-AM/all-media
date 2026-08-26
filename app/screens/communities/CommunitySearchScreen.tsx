@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
@@ -62,13 +63,13 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
               ['people', 'Kontakte'],
             ] as [Filter, string][]
           ).map(([key, label]) => (
-            <Pressable
+            <Druck
               key={key}
               style={[styles.pill, filter === key && styles.pillActive]}
               onPress={() => setFilter(key)}
             >
               <Text style={[styles.pillText, filter === key && styles.pillTextActive]}>{label}</Text>
-            </Pressable>
+            </Druck>
           ))}
         </View>
       </View>
@@ -79,7 +80,7 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
         <ScrollView contentContainerStyle={styles.content}>
           {channels.length > 0 && <Text style={styles.sectionHead}>Kanäle →</Text>}
           {channels.map((c) => (
-            <Pressable key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
+            <Druck key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
               <Avatar id={c.id} name={c.name} size={44} />
               <View style={styles.body}>
                 <View style={styles.nameRow}>
@@ -95,7 +96,7 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
                   {c.joined ? 'Mitglied' : 'Beitreten'}
                 </Text>
               </View>
-            </Pressable>
+            </Druck>
           ))}
 
           {people.length > 0 && <Text style={styles.sectionHead}>Profile →</Text>}
@@ -104,20 +105,20 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
             const label = status === 'friend' ? 'Befreundet' : status === 'pending' ? 'Angefragt' : '+ Befreunden';
             return (
               <View key={u.id} style={styles.row}>
-                <Pressable style={styles.person} onPress={() => onOpenProfile(u.id)}>
+                <Druck style={styles.person} onPress={() => onOpenProfile(u.id)}>
                   <Avatar id={u.id} name={u.name} size={44} />
                   <View style={styles.body}>
                     <Text style={styles.name}>{u.name}</Text>
                     <Text style={styles.sub}>{u.handle}</Text>
                   </View>
-                </Pressable>
-                <Pressable
+                </Druck>
+                <Druck
                   disabled={status !== 'none'}
                   style={[styles.action, status !== 'none' && styles.actionDone]}
                   onPress={() => onBefriend(u.id)}
                 >
                   <Text style={[styles.actionText, status !== 'none' && styles.actionTextDone]}>{label}</Text>
-                </Pressable>
+                </Druck>
               </View>
             );
           })}

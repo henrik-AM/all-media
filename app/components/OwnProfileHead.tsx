@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { colors, sizes, spacing, typography } from '../constants/design';
@@ -37,20 +38,20 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
     <View style={styles.bar}>
       <Text style={styles.handle}>{handle}</Text>
       <View style={styles.actions}>
-        <Pressable
+        <Druck
           onPress={() => onAction('bell')}
           hitSlop={8}
           accessibilityLabel={ungelesen ? `Mitteilungen, ${ungelesen} ungelesen` : 'Mitteilungen'}
         >
           <Ionicons name="notifications-outline" size={21} color={colors.text} />
           {ungelesen > 0 && <View style={styles.dot} />}
-        </Pressable>
-        <Pressable onPress={() => onAction('create')} hitSlop={8}>
+        </Druck>
+        <Druck onPress={() => onAction('create')} hitSlop={8}>
           <Ionicons name="add-circle-outline" size={21} color={colors.text} />
-        </Pressable>
-        <Pressable onPress={() => onAction('menu')} hitSlop={8}>
+        </Druck>
+        <Druck onPress={() => onAction('menu')} hitSlop={8}>
           <Ionicons name="menu-outline" size={21} color={colors.text} />
-        </Pressable>
+        </Druck>
       </View>
     </View>
 
@@ -73,16 +74,16 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
       <Text style={styles.name}>{name}</Text>
       {!!bio && <Text style={styles.bio}>{bio}</Text>}
       {!!link && (
-        <Pressable onPress={onLink}>
+        <Druck onPress={onLink}>
           <Text style={styles.link}>{link}</Text>
-        </Pressable>
+        </Druck>
       )}
     </View>
 
     {onBearbeiten && (
-      <Pressable style={styles.bearbeiten} onPress={onBearbeiten}>
+      <Druck style={styles.bearbeiten} onPress={onBearbeiten}>
         <Text style={styles.bearbeitenText}>Profil bearbeiten</Text>
-      </Pressable>
+      </Druck>
     )}
   </View>
 );

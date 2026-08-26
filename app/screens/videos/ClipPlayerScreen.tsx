@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,9 +65,9 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   if (!clip) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <Pressable style={styles.bar} onPress={onBack}>
+        <Druck style={styles.bar} onPress={onBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </Pressable>
+        </Druck>
         <Text style={styles.leer}>Dieses Video gibt es nicht mehr.</Text>
       </View>
     );
@@ -86,13 +87,13 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Pressable onPress={onBack} hitSlop={10}>
+        <Druck onPress={onBack} hitSlop={10}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </Pressable>
+        </Druck>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
-        <Pressable style={styles.buehne} onPress={() => setLaeuft((v) => !v)}>
+        <Druck style={styles.buehne} onPress={() => setLaeuft((v) => !v)}>
           {eigenesBild ? (
             <Image source={{ uri: eigenesBild }} style={styles.voll} />
           ) : (
@@ -101,7 +102,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           <View style={[styles.play, laeuft && styles.playAus]}>
             <Ionicons name={laeuft ? 'pause' : 'play'} size={26} color={colors.white} />
           </View>
-        </Pressable>
+        </Druck>
 
         <View style={styles.leiste}>
           <Text style={styles.zeit}>{zeitText(bei)}</Text>
@@ -119,35 +120,35 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         </View>
 
         <View style={styles.autor}>
-          <Pressable onPress={() => onOpenProfile(clip.userId)}>
+          <Druck onPress={() => onOpenProfile(clip.userId)}>
             <Avatar id={clip.userId} name={autor.name} size={sizes.avatarMd} />
-          </Pressable>
-          <Pressable style={styles.autorText} onPress={() => onOpenProfile(clip.userId)}>
+          </Druck>
+          <Druck style={styles.autorText} onPress={() => onOpenProfile(clip.userId)}>
             <Text style={styles.autorName}>{autor.name}</Text>
             <Text style={styles.autorSub}>{autor.handle}</Text>
-          </Pressable>
+          </Druck>
         </View>
 
         <View style={styles.aktionen}>
-          <Pressable style={styles.aktion} onPress={() => clipUmschalten(clip.id, 'like')}>
+          <Druck style={styles.aktion} onPress={() => clipUmschalten(clip.id, 'like')}>
             <Ionicons
               name={clip.liked ? 'heart' : 'heart-outline'}
               size={24}
               color={clip.liked ? colors.danger : colors.text}
             />
             <Text style={styles.aktionZahl}>{compact(clip.likes ?? 0)}</Text>
-          </Pressable>
+          </Druck>
 
-          <Pressable style={styles.aktion} onPress={() => onNotice(`${clip.comments ?? 0} Kommentare`)}>
+          <Druck style={styles.aktion} onPress={() => onNotice(`${clip.comments ?? 0} Kommentare`)}>
             <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
             <Text style={styles.aktionZahl}>{compact(clip.comments ?? 0)}</Text>
-          </Pressable>
+          </Druck>
 
-          <Pressable style={styles.aktion} onPress={() => onShare(clip)}>
+          <Druck style={styles.aktion} onPress={() => onShare(clip)}>
             <Ionicons name="paper-plane-outline" size={22} color={colors.text} />
-          </Pressable>
+          </Druck>
 
-          <Pressable
+          <Druck
             style={styles.aktion}
             onPress={() => {
               clipUmschalten(clip.id, 'repost');
@@ -160,9 +161,9 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
               size={24}
               color={istRepostet('video', clip.id) ? colors.success : colors.text}
             />
-          </Pressable>
+          </Druck>
 
-          <Pressable
+          <Druck
             style={[styles.aktion, styles.aktionEnde]}
             onPress={() => {
               clipUmschalten(clip.id, 'save');
@@ -170,7 +171,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             }}
           >
             <Ionicons name={clip.saved ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.text} />
-          </Pressable>
+          </Druck>
         </View>
 
         {!!clip.description && <Text style={styles.text}>{clip.description}</Text>}
@@ -178,16 +179,16 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         {!!clip.tags?.length && (
           <View style={styles.tags}>
             {clip.tags.map((t) => (
-              <Pressable key={t} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: t })}>
+              <Druck key={t} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: t })}>
                 <Text style={styles.tagText}>{t}</Text>
-              </Pressable>
+              </Druck>
             ))}
           </View>
         )}
 
         <Text style={styles.abschnitt}>Ähnliche Videos →</Text>
         {aehnlich.map((c) => (
-          <Pressable key={c.id} style={styles.clip} onPress={() => wechseln(c.id)}>
+          <Druck key={c.id} style={styles.clip} onPress={() => wechseln(c.id)}>
             <View style={styles.clipBild}>
               <Motiv id={c.id} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
               <View style={styles.clipZeit}>
@@ -205,7 +206,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
                 </Text>
               </View>
             </View>
-          </Pressable>
+          </Druck>
         ))}
       </ScrollView>
     </View>

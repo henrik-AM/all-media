@@ -4,13 +4,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -131,16 +131,16 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
         style={styles.fill}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Pressable style={styles.backdrop} onPress={schliessen} />
+        <Druck style={styles.backdrop} onPress={schliessen} />
 
         <View style={[styles.sheet, { paddingBottom: spacing.md + insets.bottom }]}>
           <View style={styles.handle} />
 
           <View style={styles.head}>
             {schritt === 2 && (
-              <Pressable onPress={() => setSchritt(1)} hitSlop={8} style={styles.back}>
+              <Druck onPress={() => setSchritt(1)} hitSlop={8} style={styles.back}>
                 <Ionicons name="arrow-back" size={20} color={colors.text} />
-              </Pressable>
+              </Druck>
             )}
             <Text style={styles.title}>
               {schritt === 1
@@ -163,9 +163,9 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
                     onSubmitEditing={nummerHinzufuegen}
                     returnKeyType="done"
                   />
-                  <Pressable style={styles.nummerBtn} onPress={nummerHinzufuegen}>
+                  <Druck style={styles.nummerBtn} onPress={nummerHinzufuegen}>
                     <Ionicons name="add" size={22} color={colors.white} />
-                  </Pressable>
+                  </Druck>
                 </View>
                 <Text style={styles.hint}>
                   Auch Personen, die noch nicht in deinen Kontakten stehen.
@@ -182,19 +182,19 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
                         {person.extern ? 'Wird eingeladen' : person.phone}
                       </Text>
                     </View>
-                    <Pressable
+                    <Druck
                       hitSlop={8}
                       onPress={() => setExtern((prev) => prev.filter((e) => e.id !== person.id))}
                     >
                       <Ionicons name="close" size={20} color={colors.text3} />
-                    </Pressable>
+                    </Druck>
                   </View>
                 ))}
 
                 {friends.map((contact) => {
                   const isOn = selected.includes(contact.id);
                   return (
-                    <Pressable key={contact.id} style={styles.row} onPress={() => toggle(contact.id)}>
+                    <Druck key={contact.id} style={styles.row} onPress={() => toggle(contact.id)}>
                       <Avatar id={contact.id} name={contact.name} size={sizes.avatarMd} />
                       <View style={styles.rowBody}>
                         <Text style={styles.rowName}>{contact.name}</Text>
@@ -203,28 +203,28 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
                       <View style={[styles.check, isOn && styles.checkOn]}>
                         {isOn && <Ionicons name="checkmark" size={15} color={colors.white} />}
                       </View>
-                    </Pressable>
+                    </Druck>
                   );
                 })}
               </ScrollView>
 
               <View style={styles.footer}>
-                <Pressable style={styles.button} onPress={weiter}>
+                <Druck style={styles.button} onPress={weiter}>
                   <Text style={styles.buttonText}>Weiter</Text>
-                </Pressable>
+                </Druck>
               </View>
             </>
           ) : (
             <>
               <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
                 <View style={styles.bildZeile}>
-                  <Pressable style={styles.bild} onPress={bildWaehlen}>
+                  <Druck style={styles.bild} onPress={bildWaehlen}>
                     {bild ? (
                       <Image source={{ uri: bild }} style={styles.bildVorschau} />
                     ) : (
                       <Ionicons name="camera-outline" size={24} color={colors.text2} />
                     )}
-                  </Pressable>
+                  </Druck>
                   <Text style={styles.bildText}>
                     {bild ? 'Gruppenbild ändern' : 'Gruppenbild hinzufügen'}
                   </Text>
@@ -262,9 +262,9 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
               </ScrollView>
 
               <View style={styles.footer}>
-                <Pressable style={styles.button} onPress={erstellen}>
+                <Druck style={styles.button} onPress={erstellen}>
                   <Text style={styles.buttonText}>Gruppe erstellen</Text>
-                </Pressable>
+                </Druck>
               </View>
             </>
           )}

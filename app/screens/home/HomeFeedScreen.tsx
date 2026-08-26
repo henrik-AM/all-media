@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
@@ -87,32 +88,32 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
     return (
       <View style={styles.post}>
         <View style={styles.head}>
-          <Pressable style={styles.ring} onPress={() => onOpenProfile(item.userId)}>
+          <Druck style={styles.ring} onPress={() => onOpenProfile(item.userId)}>
             <Avatar id={item.userId} name={author?.name ?? ''} size={36} />
-          </Pressable>
-          <Pressable style={styles.who} onPress={() => onOpenProfile(item.userId)}>
+          </Druck>
+          <Druck style={styles.who} onPress={() => onOpenProfile(item.userId)}>
             <Text style={styles.name} numberOfLines={1}>
               {author?.name}
             </Text>
             <Text style={styles.sub} numberOfLines={1}>
               {item.location} · {item.music}
             </Text>
-          </Pressable>
-          <Pressable
+          </Druck>
+          <Druck
             style={[styles.follow, folgtPerson(item.userId) && styles.followActive]}
             onPress={() => toggleFollow(item)}
           >
             <Text style={[styles.followText, folgtPerson(item.userId) && styles.followTextActive]}>
               {folgtPerson(item.userId) ? 'Gefolgt' : 'Folgen'}
             </Text>
-          </Pressable>
-          <Pressable style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
+          </Druck>
+          <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
             <Ionicons
               name={item.notify ? 'notifications' : 'notifications-outline'}
               size={19}
               color={item.notify ? colors.brand : colors.text2}
             />
-          </Pressable>
+          </Druck>
         </View>
 
         <View style={styles.media}>
@@ -124,20 +125,20 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
         </View>
 
         <View style={styles.actions}>
-          <Pressable onPress={() => toggleLike(item)} hitSlop={6}>
+          <Druck onPress={() => toggleLike(item)} hitSlop={6}>
             <Ionicons
               name={item.liked ? 'heart' : 'heart-outline'}
               size={26}
               color={item.liked ? '#FF3040' : colors.text}
             />
-          </Pressable>
-          <Pressable onPress={() => setCommentsFor(item.id)} hitSlop={6}>
+          </Druck>
+          <Druck onPress={() => setCommentsFor(item.id)} hitSlop={6}>
             <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
-          </Pressable>
-          <Pressable onPress={() => onShare(item)} hitSlop={6}>
+          </Druck>
+          <Druck onPress={() => onShare(item)} hitSlop={6}>
             <Ionicons name="paper-plane-outline" size={24} color={colors.text} />
-          </Pressable>
-          <Pressable style={styles.repost} onPress={() => toggleRepost(item)} hitSlop={6}>
+          </Druck>
+          <Druck style={styles.repost} onPress={() => toggleRepost(item)} hitSlop={6}>
             <Ionicons
               name="repeat"
               size={26}
@@ -146,14 +147,14 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
             {item.reposts > 0 && (
               <Text style={styles.repostZahl}>{compactNumber(item.reposts)}</Text>
             )}
-          </Pressable>
-          <Pressable style={styles.actionEnd} onPress={() => toggleSave(item)} hitSlop={6}>
+          </Druck>
+          <Druck style={styles.actionEnd} onPress={() => toggleSave(item)} hitSlop={6}>
             <Ionicons
               name={item.saved ? 'bookmark' : 'bookmark-outline'}
               size={24}
               color={colors.text}
             />
-          </Pressable>
+          </Druck>
         </View>
 
         <Text style={styles.likes}>
@@ -163,9 +164,9 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
         <Text style={styles.description}>
           <Text style={styles.bold}>{author?.name}</Text> {item.description}
         </Text>
-        <Pressable onPress={() => setCommentsFor(item.id)}>
+        <Druck onPress={() => setCommentsFor(item.id)}>
           <Text style={styles.commentsLink}>{kommentarZeile(item.comments)}</Text>
-        </Pressable>
+        </Druck>
       </View>
     );
   };

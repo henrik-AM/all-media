@@ -217,9 +217,26 @@ function openKontoWechsel() {
   );
 }
 
+/*
+ * Erster Aufbau. Bis hierher zeigt die Seite das Geruest aus index.html -
+ * eine graue Chatliste, die schon steht, bevor irgendein Skript laeuft.
+ *
+ * Warum das wichtig ist: die Website liegt auf Render, und ein Dienst, der
+ * eine Weile nicht angefragt wurde, faehrt erst hoch. Vorher war der
+ * Bildschirm in dieser Zeit vollstaendig weiss - der erste Eindruck der App
+ * war eine leere Flaeche. Und schlug der Aufruf fehl, blieb sie es fuer
+ * immer, weil niemand den Fehler aufgefangen hat.
+ */
 async function bootstrap() {
-  const res = await fetch('/api/bootstrap');
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch('/api/bootstrap');
+    if (!res.ok) throw new Error('Server antwortet mit ' + res.status);
+    data = await res.json();
+  } catch (fehler) {
+    zeigeStartfehler(fehler);
+    return;
+  }
   Object.assign(state, data);
 
   // Die eigene Story liegt nur im Browser - nach dem Laden wieder einsetzen.
@@ -233,7 +250,59 @@ async function bootstrap() {
   }
 
   applyTheme();
+  document.body.classList.remove('is-startet');
   render();
+}
+
+/*
+ * Wenn der erste Aufruf scheitert, muss etwas dastehen, das weiterhilft.
+ * Ein stiller Fehlschlag ist die schlechteste aller Moeglichkeiten: die Seite
+ * sieht dann aus, als lade sie noch, und tut es nie wieder.
+ */
+function zeigeStartfehler(fehler) {
+  document.body.classList.remove('is-startet');
+  const ziel = $('#main');
+  if (!ziel) return;
+  ziel.innerHTML = `
+    <div class="startfehler">
+      <div class="startfehler__symbol">${ICONS.info}</div>
+      <div class="startfehler__titel">All Media ist gerade nicht erreichbar</div>
+      <div class="startfehler__text">
+        Der Server hat nicht geantwortet. Das passiert, wenn er nach einer
+        Ruhephase erst wieder hochfährt — meist reicht ein zweiter Versuch.
+      </div>
+      <button class="btn btn--primary" id="startNochmal">Nochmal versuchen</button>
+      <div class="startfehler__grund">${esc(String(fehler && fehler.message ? fehler.message : fehler))}</div>
+    </div>`;
+  $('#startNochmal').addEventListener('click', () => {
+    document.body.classList.add('is-startet');
+    ziel.innerHTML = geruest();
+    bootstrap();
+  });
+}
+
+/*
+ * Das Geruest. Dieselbe Form wie die spaetere Chatliste - Kreis links, zwei
+ * Zeilen rechts - nur ohne Inhalt. Ein Geruest, das der echten Liste gleicht,
+ * wirkt wie "gleich da"; ein Kreisel wirkt wie "warte".
+ */
+function geruest() {
+  const zeile = `
+    <div class="geruest__zeile">
+      <div class="skelett geruest__kreis"></div>
+      <div class="geruest__text">
+        <div class="skelett geruest__balken geruest__balken--kurz"></div>
+        <div class="skelett geruest__balken"></div>
+      </div>
+    </div>`;
+  return `
+    <div class="geruest" aria-hidden="true">
+      <div class="geruest__stories">
+        ${Array.from({ length: 5 }, () => '<div class="skelett geruest__story"></div>').join('')}
+      </div>
+      <div class="geruest__suche skelett"></div>
+      ${zeile.repeat(7)}
+    </div>`;
 }
 
 /* ------------------------------------------------------------------ views */

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../constants/design';
@@ -24,12 +25,12 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
+      <Druck style={styles.backdrop} onPress={onClose} />
       <View style={[styles.sheet, hoch && styles.sheetHoch, { paddingBottom: fuss ? 0 : insets.bottom + spacing.md }]}>
         <View style={styles.kopf}>
-          <Pressable style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Schließen">
+          <Druck style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Schließen">
             <Ionicons name="close" size={22} color={colors.text} />
-          </Pressable>
+          </Druck>
           <Text style={styles.titel}>{title}</Text>
         </View>
 

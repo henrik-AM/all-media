@@ -1,5 +1,6 @@
 import React, { useContext } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -40,25 +41,25 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
       </View>
 
       <View style={styles.links}>
-        <Pressable onPress={() => onSwitchArea('videos')}>
+        <Druck onPress={() => onSwitchArea('videos')}>
           <Text style={styles.link}>@videoprofil</Text>
-        </Pressable>
-        <Pressable onPress={() => onSwitchArea('communities')}>
+        </Druck>
+        <Druck onPress={() => onSwitchArea('communities')}>
           <Text style={styles.link}>@communityprofil</Text>
-        </Pressable>
+        </Druck>
       </View>
 
-      <Pressable style={styles.sectionLink} onPress={onOpenSettings}>
+      <Druck style={styles.sectionLink} onPress={onOpenSettings}>
         <Text style={styles.sectionLinkText}>Einstellungen</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.text} />
-      </Pressable>
+      </Druck>
 
       <View style={styles.group}>
         {ITEMS.map((label) => (
-          <Pressable key={label} style={styles.item} onPress={onOpenSettings}>
+          <Druck key={label} style={styles.item} onPress={onOpenSettings}>
             <Text style={styles.itemLabel}>{label}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-          </Pressable>
+          </Druck>
         ))}
       </View>
     </ScrollView>

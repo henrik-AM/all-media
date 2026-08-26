@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Druck } from './Druck';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, spacing, typography } from '../constants/design';
 
@@ -72,9 +72,9 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
       title={title}
       onClose={onClose}
       fuss={
-        <Pressable style={styles.knopf} onPress={absenden}>
+        <Druck style={styles.knopf} onPress={absenden}>
           <Text style={styles.knopfText}>{knopf}</Text>
-        </Pressable>
+        </Druck>
       }
     >
       {/*

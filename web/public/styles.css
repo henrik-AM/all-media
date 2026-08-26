@@ -2546,3 +2546,143 @@ button.msg__sender:hover { text-decoration: underline; }
 /* Im Story-Vollbild darf das Symbol nicht so gross sein wie das fehlende
    Bild - klein und blass sagt "Foto", gross sagt "Fehler". */
 .viewer__media .motiv svg { width: 40px; height: 40px; }
+
+/* ---------- Ladezustand: Geruest statt weisser Flaeche ---------- */
+/*
+  Bis /api/bootstrap antwortet, war der Bildschirm vollstaendig weiss. Auf
+  Render faehrt der Dienst nach einer Ruhephase erst hoch - der erste Eindruck
+  der App war also eine leere Flaeche, teils mehrere Sekunden lang.
+
+  Das Geruest steht im HTML und ist damit beim allerersten Bildaufbau da. Der
+  Schimmer laeuft von links nach rechts durch und sagt "es passiert etwas",
+  ohne dass ein Kreisel die Mitte besetzt.
+*/
+.skelett {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: 8px;
+}
+.skelett::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.62), transparent);
+  animation: schimmer 1.4s infinite;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .skelett::after {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+  }
+}
+:root[data-theme="dark"] .skelett::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+}
+@keyframes schimmer { to { transform: translateX(100%); } }
+
+/*
+  Wer "weniger Bewegung" eingestellt hat, bekommt keinen laufenden Schimmer.
+  Die Flaechen bleiben trotzdem sichtbar - der Ladezustand geht also nicht
+  verloren, er steht nur still.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .skelett::after { animation: none; }
+}
+
+.geruest { padding: 13px 0 0; }
+.geruest__stories { display: flex; gap: 15px; padding: 0 16px 12px; }
+.geruest__story { width: 64px; height: 64px; border-radius: 50%; flex: 0 0 auto; }
+.geruest__suche { height: 42px; margin: 14px 16px 18px; border-radius: 14px; }
+.geruest__zeile { display: flex; align-items: center; gap: 13px; padding: 11px 16px; }
+.geruest__kreis { width: 54px; height: 54px; border-radius: 50%; flex: 0 0 auto; }
+.geruest__text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
+.geruest__balken { height: 11px; border-radius: 6px; }
+.geruest__balken--kurz { width: 42%; height: 13px; }
+
+/*
+  Solange geladen wird, haben die Leisten oben und unten noch keinen Inhalt.
+  Ohne diese Regel klappt die Seite beim Eintreffen der Daten sichtbar um,
+  weil die Leisten ploetzlich Hoehe bekommen.
+*/
+body.is-startet .topbar,
+body.is-startet .bottomnav { visibility: hidden; }
+
+/* ---------- Wenn der erste Aufruf scheitert ---------- */
+.startfehler {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 32px 28px; text-align: center;
+}
+.startfehler__symbol {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand);
+}
+.startfehler__symbol svg { width: 26px; height: 26px; }
+.startfehler__titel { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.startfehler__text { font-size: 14px; line-height: 1.5; color: var(--text-2); max-width: 300px; }
+.startfehler .btn { margin-top: 4px; min-width: 180px; }
+.startfehler__grund { margin-top: 6px; font-size: 11.5px; color: var(--text-3); }
+
+/* ---------- Anfassgefuehl ---------- */
+/*
+  Bis hierher gab es Rueckmeldung auf eine Beruehrung nur an acht Stellen. An
+  allen anderen passierte beim Druecken nichts, und die Seite wechselte
+  einfach - das ist der Unterschied zwischen "reagiert" und "haengt".
+
+  Grundregel: alles, was gedrueckt werden kann, wird beim Druecken kurz
+  kleiner. Kleine Ziele (Symbole) staerker als grosse Flaechen, weil der
+  Effekt sonst nicht auffaellt.
+*/
+button,
+[role="button"],
+.row,
+.item,
+.story,
+.griditem,
+.exp__row,
+.clip {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/*
+  :where() haelt die Gewichtung bei null. So ueberschreibt jede spaetere
+  Regel im Kopf dieser Datei diese Vorgabe, ohne dass irgendwo !important
+  noetig wird - und die acht Stellen, die schon ein eigenes :active hatten,
+  behalten ihres.
+*/
+:where(button, [role="button"]) { transition: transform .1s ease, opacity .12s ease; }
+:where(button, [role="button"]):active { transform: scale(.97); }
+
+/* Grosse Flaechen: kein Schrumpfen, das wirkt bei Listen wackelig. Sie
+   bekommen stattdessen einen kurzen Untergrund. */
+:where(.row, .item, .exp__row, .clip):active { transform: none; }
+
+.story:active .story__ring { transform: scale(.94); }
+.griditem:active { opacity: .78; }
+
+/*
+  Der Bildwechsel zwischen zwei Bereichen kam bisher hart. Ein sehr kurzes
+  Aufblenden mit minimalem Versatz macht daraus einen Wechsel statt eines
+  Sprungs. Laenger als 160 ms darf es nicht sein - sonst wartet man darauf.
+*/
+.main > * { animation: eintritt .16s ease-out; }
+@keyframes eintritt {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/*
+  Wer im Betriebssystem "weniger Bewegung" eingestellt hat, bekommt keine.
+  Das ist keine Kuer: Bewegung kann bei entsprechender Veranlagung Uebelkeit
+  ausloesen, und das Betriebssystem fragt genau deshalb danach.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .main > * { animation: none; }
+  .sheet { animation: none; }
+  :where(button, [role="button"]):active { transform: none; }
+  .story:active .story__ring { transform: none; }
+  * { scroll-behavior: auto !important; }
+}

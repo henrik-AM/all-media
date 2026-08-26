@@ -3,13 +3,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
@@ -76,16 +76,16 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
         style={styles.fill}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Pressable style={styles.backdrop} onPress={schliessen} />
+        <Druck style={styles.backdrop} onPress={schliessen} />
 
         <View style={[styles.sheet, { paddingBottom: spacing.md + insets.bottom }]}>
           <View style={styles.handle} />
 
           <View style={styles.head}>
             {ansicht !== 'liste' && (
-              <Pressable onPress={() => setAnsicht('liste')} hitSlop={8} style={styles.back}>
+              <Druck onPress={() => setAnsicht('liste')} hitSlop={8} style={styles.back}>
                 <Ionicons name="arrow-back" size={20} color={colors.text} />
-              </Pressable>
+              </Druck>
             )}
             <Text style={styles.title}>
               {ansicht === 'liste' ? 'Konto wechseln' : ansicht === 'anmelden' ? 'Konto anmelden' : 'Neues Konto'}
@@ -97,7 +97,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
               {konten.map((konto) => {
                 const aktiv = konto.id === user?.id;
                 return (
-                  <Pressable key={konto.id} style={styles.zeile} onPress={() => wechseln(konto.id)}>
+                  <Druck key={konto.id} style={styles.zeile} onPress={() => wechseln(konto.id)}>
                     <Avatar id={konto.profile.id} name={konto.profile.name} size={sizes.avatarMd} />
                     <View style={styles.zeileBody}>
                       <Text style={styles.zeileName}>{konto.profile.name}</Text>
@@ -106,7 +106,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                     {aktiv ? (
                       <Ionicons name="checkmark-circle" size={22} color={colors.brand} />
                     ) : (
-                      <Pressable
+                      <Druck
                         hitSlop={8}
                         onPress={() => {
                           kontoAbmelden(konto.id);
@@ -114,25 +114,25 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                         }}
                       >
                         <Ionicons name="close" size={20} color={colors.text3} />
-                      </Pressable>
+                      </Druck>
                     )}
-                  </Pressable>
+                  </Druck>
                 );
               })}
 
-              <Pressable style={styles.zeile} onPress={() => setAnsicht('anmelden')}>
+              <Druck style={styles.zeile} onPress={() => setAnsicht('anmelden')}>
                 <View style={styles.rund}>
                   <Ionicons name="person-add-outline" size={20} color={colors.brand} />
                 </View>
                 <Text style={styles.aktionText}>Bestehendes Konto hinzufügen</Text>
-              </Pressable>
+              </Druck>
 
-              <Pressable style={styles.zeile} onPress={() => setAnsicht('neu')}>
+              <Druck style={styles.zeile} onPress={() => setAnsicht('neu')}>
                 <View style={styles.rund}>
                   <Ionicons name="add" size={22} color={colors.brand} />
                 </View>
                 <Text style={styles.aktionText}>Neues Konto erstellen</Text>
-              </Pressable>
+              </Druck>
             </ScrollView>
           ) : (
             <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
@@ -179,14 +179,14 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
               </View>
 
               <View style={styles.footer}>
-                <Pressable
+                <Druck
                   style={styles.button}
                   onPress={ansicht === 'neu' ? neuErstellen : anmelden}
                 >
                   <Text style={styles.buttonText}>
                     {ansicht === 'neu' ? 'Konto erstellen' : 'Anmelden'}
                   </Text>
-                </Pressable>
+                </Druck>
               </View>
             </ScrollView>
           )}

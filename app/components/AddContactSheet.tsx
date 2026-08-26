@@ -3,13 +3,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../constants/design';
 import { findePerson, istNummer, nichtGefundenText } from '../lib/personSuche';
@@ -64,7 +64,7 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
         style={styles.fill}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Druck style={styles.backdrop} onPress={onClose} />
 
         <View style={[styles.sheet, { paddingBottom: spacing.md + insets.bottom }]}>
           <View style={styles.handle} />
@@ -108,9 +108,9 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
           </ScrollView>
 
           <View style={styles.footer}>
-            <Pressable style={styles.button} onPress={submit}>
+            <Druck style={styles.button} onPress={submit}>
               <Text style={styles.buttonText}>Anfrage senden</Text>
-            </Pressable>
+            </Druck>
           </View>
         </View>
       </KeyboardAvoidingView>

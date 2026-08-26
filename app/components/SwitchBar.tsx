@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
+import { Druck } from './Druck';
 import { colors, spacing, typography } from '../constants/design';
 
 /**
@@ -10,9 +11,9 @@ import { colors, spacing, typography } from '../constants/design';
  * nicht zum Wechsel zwischen den drei Profilen desselben Kontos.
  */
 export const SwitchBar = ({ onPress, label = 'Profil wechseln' }: { onPress: () => void; label?: string }) => (
-  <Pressable style={styles.bar} onPress={onPress}>
+  <Druck style={styles.bar} onPress={onPress}>
     <Text style={styles.text}>{label}</Text>
-  </Pressable>
+  </Druck>
 );
 
 const styles = StyleSheet.create({

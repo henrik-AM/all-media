@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
@@ -31,7 +32,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
 
   const list = (items: Community[]) =>
     items.map((c) => (
-      <Pressable key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
+      <Druck key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
         <Avatar id={c.id} name={c.name} size={44} />
         <View style={styles.body}>
           <Text style={styles.name}>{c.name}</Text>
@@ -40,7 +41,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-      </Pressable>
+      </Druck>
     ));
 
   return (

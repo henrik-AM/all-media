@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
@@ -29,7 +30,7 @@ export const ContactsScreen = ({ contacts, onBack, onOpenContact, onAddContact }
   }, [contacts, query]);
 
   const renderContact = (contact: Contact) => (
-    <Pressable
+    <Druck
       key={contact.id}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={() => onOpenContact(contact)}
@@ -44,7 +45,7 @@ export const ContactsScreen = ({ contacts, onBack, onOpenContact, onAddContact }
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-    </Pressable>
+    </Druck>
   );
 
   return (
@@ -52,9 +53,9 @@ export const ContactsScreen = ({ contacts, onBack, onOpenContact, onAddContact }
       <View style={styles.header}>
         <View style={styles.titleRow}>
           {onBack && (
-            <Pressable onPress={onBack} hitSlop={10}>
+            <Druck onPress={onBack} hitSlop={10}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
-            </Pressable>
+            </Druck>
           )}
           <Text style={styles.title}>Kontakte</Text>
         </View>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Image, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
 import { Avatar } from '../../components/Avatar';
@@ -84,26 +85,26 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
         </View>
 
         <View style={styles.rail}>
-          <Pressable style={styles.railBtn} onPress={() => toggleLike(item)}>
+          <Druck style={styles.railBtn} onPress={() => toggleLike(item)}>
             <Ionicons
               name={item.liked ? 'heart' : 'heart-outline'}
               size={28}
               color={item.liked ? '#FF4D6D' : colors.white}
             />
             <Text style={styles.railLabel}>{compactNumber(item.likes)}</Text>
-          </Pressable>
+          </Druck>
 
-          <Pressable style={styles.railBtn} onPress={() => setCommentsFor(item.id)}>
+          <Druck style={styles.railBtn} onPress={() => setCommentsFor(item.id)}>
             <Ionicons name="chatbubble-outline" size={26} color={colors.white} />
             <Text style={styles.railLabel}>{compactNumber(item.comments)}</Text>
-          </Pressable>
+          </Druck>
 
-          <Pressable style={styles.railBtn} onPress={() => share(item)}>
+          <Druck style={styles.railBtn} onPress={() => share(item)}>
             <Ionicons name="paper-plane-outline" size={26} color={colors.white} />
             <Text style={styles.railLabel}>{compactNumber(item.shares + (geteiltZaehler[item.id] ?? 0))}</Text>
-          </Pressable>
+          </Druck>
 
-          <Pressable style={styles.railBtn} onPress={() => toggleRepost(item)}>
+          <Druck style={styles.railBtn} onPress={() => toggleRepost(item)}>
             <Ionicons
               name="repeat"
               size={28}
@@ -112,25 +113,25 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
             <Text style={styles.railLabel}>
               {istRepostet('video', item.id) ? 'Repostet' : 'Repost'}
             </Text>
-          </Pressable>
+          </Druck>
 
-          <Pressable style={styles.railBtn} onPress={() => toggleSave(item)}>
+          <Druck style={styles.railBtn} onPress={() => toggleSave(item)}>
             <Ionicons
               name={item.saved ? 'bookmark' : 'bookmark-outline'}
               size={25}
               color={colors.white}
             />
             <Text style={styles.railLabel}>{item.saved ? 'Gespeichert' : 'Speichern'}</Text>
-          </Pressable>
+          </Druck>
         </View>
 
         <View style={styles.meta}>
           <View style={styles.author}>
-            <Pressable style={styles.authorTap} onPress={() => onOpenProfile(item.userId)}>
+            <Druck style={styles.authorTap} onPress={() => onOpenProfile(item.userId)}>
               <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
               <Text style={styles.authorName}>{author?.name}</Text>
-            </Pressable>
-            <Pressable
+            </Druck>
+            <Druck
               style={[styles.follow, gefolgt[item.userId] && styles.followAn]}
               onPress={() => {
                 const jetzt = !gefolgt[item.userId];
@@ -143,7 +144,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
               <Text style={styles.followText}>
                 {gefolgt[item.userId] ? 'Gefolgt' : 'Folgen'}
               </Text>
-            </Pressable>
+            </Druck>
           </View>
           <Text style={styles.description}>{item.description}</Text>
           <Text style={styles.sub}>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -31,7 +32,7 @@ export const TabBar = ({ active, onChange, unreadCount = 0 }: Props) => {
       {NAV.map((area) => {
         const isActive = area.key === active;
         return (
-          <Pressable key={area.key} style={styles.tab} onPress={() => onChange(area.key)}>
+          <Druck key={area.key} style={styles.tab} onPress={() => onChange(area.key)}>
             {isActive ? (
               <LinearGradient
                 colors={brandGradient}
@@ -57,7 +58,7 @@ export const TabBar = ({ active, onChange, unreadCount = 0 }: Props) => {
             <Text style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>
               {area.label}
             </Text>
-          </Pressable>
+          </Druck>
         );
       })}
     </View>

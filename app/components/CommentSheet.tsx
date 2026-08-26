@@ -4,12 +4,12 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { EmptyState } from './EmptyState';
@@ -74,20 +74,20 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
             {item.likes > 0 ? ` · ${item.likes} Gefällt mir` : ''}
           </Text>
         </View>
-        <Pressable onPress={() => toggleLike(item)} hitSlop={8}>
+        <Druck onPress={() => toggleLike(item)} hitSlop={8}>
           <Ionicons
             name={item.liked ? 'heart' : 'heart-outline'}
             size={17}
             color={item.liked ? '#FF3040' : colors.text3}
           />
-        </Pressable>
+        </Druck>
       </View>
     );
   };
 
   return (
     <Modal visible={!!targetId} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
+      <Druck style={styles.backdrop} onPress={onClose} />
       <KeyboardAvoidingView
         style={styles.sheet}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -124,13 +124,13 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
               multiline
             />
           </View>
-          <Pressable
+          <Druck
             style={[styles.send, !draft.trim() && styles.sendDisabled]}
             onPress={send}
             disabled={!draft.trim()}
           >
             <Ionicons name="send" size={17} color={colors.white} />
-          </Pressable>
+          </Druck>
         </View>
       </KeyboardAvoidingView>
     </Modal>

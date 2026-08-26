@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
@@ -39,7 +40,7 @@ export const TeilenSheet = ({ ziel, contacts, onClose, onSend }: Props) => {
       {ids.map((id) => {
         const fertig = gesendet.includes(id);
         return (
-          <Pressable
+          <Druck
             key={id}
             style={[styles.kachel, fertig && styles.kachelFertig]}
             disabled={fertig}
@@ -57,7 +58,7 @@ export const TeilenSheet = ({ ziel, contacts, onClose, onSend }: Props) => {
             <Text style={styles.name} numberOfLines={1}>
               {mockUsers[id].name}
             </Text>
-          </Pressable>
+          </Druck>
         );
       })}
     </View>

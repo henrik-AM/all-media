@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../../constants/design';
@@ -58,12 +59,12 @@ export const LivestreamScreen = ({ onEnd }: Props) => {
         <Text style={styles.zuschauer}>
           {zuschauer} {zuschauer === 1 ? 'Zuschauer' : 'Zuschauer'}
         </Text>
-        <Pressable
+        <Druck
           style={styles.stop}
           onPress={() => onEnd(Math.max(1, stand.current.sekunden), stand.current.zuschauer)}
         >
           <Text style={styles.stopText}>Livestream beenden</Text>
-        </Pressable>
+        </Druck>
       </View>
     </View>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -129,15 +130,15 @@ export const StoryViewerScreen = ({
       </View>
 
       <View style={styles.head}>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Druck onPress={onClose} hitSlop={10}>
           <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </Pressable>
+        </Druck>
         <Avatar id={current.userId} name={person?.name ?? current.name} size={sizes.avatarSm} />
         <View style={styles.who}>
           <Text style={styles.name}>{istEigene ? 'Deine Story' : person?.name ?? current.name}</Text>
           <Text style={styles.time}>{alter()}</Text>
         </View>
-        <Pressable
+        <Druck
           onPress={() => {
             // Zeit anhalten, solange das Blatt offen ist - sonst laeuft die
             // Story im Hintergrund weiter.
@@ -147,7 +148,7 @@ export const StoryViewerScreen = ({
           hitSlop={10}
         >
           <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.white} />
-        </Pressable>
+        </Druck>
       </View>
 
       <View style={styles.stage}>
@@ -177,12 +178,12 @@ export const StoryViewerScreen = ({
           pointerEvents="none"
         />
         {current.caption ? <Text style={styles.caption}>{current.caption}</Text> : null}
-        <Pressable
+        <Druck
           accessibilityLabel="Vorherige Story"
           style={[styles.zone, styles.zoneLeft]}
           onPress={() => go(-1)}
         />
-        <Pressable
+        <Druck
           accessibilityLabel="Nächste Story"
           style={[styles.zone, styles.zoneRight]}
           onPress={() => go(1)}
@@ -193,7 +194,7 @@ export const StoryViewerScreen = ({
         // Sich selbst antwortet man nicht - stattdessen der Blick darauf,
         // wer die Story gesehen hat.
         <View style={styles.foot}>
-          <Pressable
+          <Druck
             style={styles.ansichten}
             onPress={() => {
               setPaused(true);
@@ -202,8 +203,8 @@ export const StoryViewerScreen = ({
           >
             <Ionicons name="eye-outline" size={20} color={colors.white} />
             <Text style={styles.ansichtenText}>Ansichten</Text>
-          </Pressable>
-          <Pressable
+          </Druck>
+          <Druck
             onPress={() => {
               onDelete?.();
               onClose();
@@ -211,7 +212,7 @@ export const StoryViewerScreen = ({
             hitSlop={8}
           >
             <Ionicons name="trash-outline" size={22} color={colors.white} />
-          </Pressable>
+          </Druck>
         </View>
       ) : (
       <View style={styles.foot}>
@@ -229,7 +230,7 @@ export const StoryViewerScreen = ({
           returnKeyType="default"
           blurOnSubmit={false}
         />
-        <Pressable
+        <Druck
           style={[styles.senden, !reply.trim() && styles.sendenAus]}
           onPress={send}
           disabled={!reply.trim()}
@@ -237,8 +238,8 @@ export const StoryViewerScreen = ({
           accessibilityLabel="Antwort senden"
         >
           <Ionicons name="send" size={17} color="#fff" />
-        </Pressable>
-        <Pressable
+        </Druck>
+        <Druck
           onPress={() => {
             const next = !liked[current.id];
             setLiked({ ...liked, [current.id]: next });
@@ -252,7 +253,7 @@ export const StoryViewerScreen = ({
             size={24}
             color={liked[current.id] ? colors.danger : colors.white}
           />
-        </Pressable>
+        </Druck>
       </View>
       )}
 

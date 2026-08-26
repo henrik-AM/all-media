@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
@@ -63,7 +64,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
   };
 
   const renderCommunity = ({ item }: { item: Community }) => (
-    <Pressable
+    <Druck
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={() => open(item)}
     >
@@ -92,16 +93,16 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
             <Text style={styles.badgeText}>{item.unreadCount}</Text>
           </View>
         )}
-        <Pressable
+        <Druck
           style={[styles.join, item.joined && styles.joinActive]}
           onPress={() => toggleJoin(item)}
         >
           <Text style={[styles.joinText, item.joined && styles.joinTextActive]}>
             {item.joined ? 'Mitglied' : 'Beitreten'}
           </Text>
-        </Pressable>
+        </Druck>
       </View>
-    </Pressable>
+    </Druck>
   );
 
   return (
@@ -116,7 +117,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
 
       <View style={styles.pills}>
         {FILTERS.map(({ key, label }) => (
-          <Pressable
+          <Druck
             key={key}
             style={[styles.pill, filter === key && styles.pillActive]}
             onPress={() => setFilter(key)}
@@ -125,7 +126,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
               {label}
               {anzahl[key] ? <Text style={styles.pillZahl}> {anzahl[key]}</Text> : null}
             </Text>
-          </Pressable>
+          </Druck>
         ))}
       </View>
 

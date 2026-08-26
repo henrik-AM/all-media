@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { EmptyState } from '../../components/EmptyState';
@@ -85,36 +86,36 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
           {playlists.map((label) => (
-            <Pressable key={`pl-${label}`} style={styles.highlight} onPress={() => onNotice(`Playlist „${label}“`)}>
+            <Druck key={`pl-${label}`} style={styles.highlight} onPress={() => onNotice(`Playlist „${label}“`)}>
               <View style={styles.ring}>
                 <Motiv id={`pl-${label}`} icon="play-outline" iconSize={22} style={{ width: 58, height: 58 }} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
                 {label}
               </Text>
-            </Pressable>
+            </Druck>
           ))}
           {highlights.map((label) => (
-            <Pressable key={`hl-${label}`} style={styles.highlight} onPress={() => onNotice(`Highlight „${label}“`)}>
+            <Druck key={`hl-${label}`} style={styles.highlight} onPress={() => onNotice(`Highlight „${label}“`)}>
               <View style={styles.ring}>
                 <Motiv id={`hl-${label}`} icon="image-outline" iconSize={22} style={{ width: 58, height: 58 }} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
                 {label}
               </Text>
-            </Pressable>
+            </Druck>
           ))}
         </ScrollView>
 
         <View style={styles.tabs}>
           {TABS.map((item) => (
-            <Pressable
+            <Druck
               key={item.key}
               style={[styles.tab, tab === item.key && styles.tabActive]}
               onPress={() => setTab(item.key)}
             >
               <Ionicons name={item.icon} size={22} color={tab === item.key ? colors.text : colors.text3} />
-            </Pressable>
+            </Druck>
           ))}
         </View>
 
