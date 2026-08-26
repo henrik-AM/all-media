@@ -12,6 +12,7 @@ import { mockProfiles, mockUsers } from '../../mocks';
 import { useReposts } from '../../contexts/RepostContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { oeffneLink } from '../../lib/links';
+import { useKachelHoehe } from '../../lib/raster';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Tab = 'grid' | 'repost' | 'tagged' | 'saved';
@@ -37,6 +38,7 @@ const TABS: { key: Tab; icon: IconName }[] = [
 
 /** Prototyp-Frame "Videos - Profil". */
 export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNotice }: Props) => {
+  const kachelHoehe = useKachelHoehe();
   const { reposts } = useReposts();
   const { ungelesen, highlights, playlists, spende, raster, eigeneBeitraege, gefolgt, eigenesProfil } =
     useProfil();
@@ -122,7 +124,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
         {tab === 'grid' ? (
           <View style={styles.grid}>
             {raster.map((eintrag) => (
-              <View key={eintrag.id} style={styles.gridItem}>
+              <View key={eintrag.id} style={[styles.gridItem, { height: kachelHoehe }]}>
                 {eintrag.mediaUri ? (
                   // Selbst aufgenommen: das echte Bild statt des Platzhalters.
                   <Image source={{ uri: eintrag.mediaUri }} style={styles.gridBild} />
@@ -142,7 +144,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           // Videos, die man selbst repostet hat.
           <View style={styles.grid}>
             {reposts.map((r) => (
-              <View key={`${r.art}-${r.id}`} style={styles.gridItem}>
+              <View key={`${r.art}-${r.id}`} style={[styles.gridItem, { height: kachelHoehe }]}>
                 <Motiv
                   id={`${r.art}-${r.id}`}
                   icon={r.art === 'video' ? 'play-outline' : 'image-outline'}
@@ -244,7 +246,6 @@ const styles = themenStyles((colors) => ({
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   gridItem: {
     width: '33.333%',
-    aspectRatio: 1,
     borderWidth: 1,
     borderColor: colors.surface,
     backgroundColor: colors.surface3,

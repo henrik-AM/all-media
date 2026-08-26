@@ -10,6 +10,7 @@ import { colors, radius, sizes, spacing, themenStyles, typography } from '../../
 import { mockPlaces, mockPosts, mockSounds, mockUsers, mockVideos } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Clip, Post, Video } from '../../types';
+import { useKachelHoehe } from '../../lib/raster';
 
 export type ExplorerArt = 'hashtag' | 'standort' | 'sound';
 
@@ -37,6 +38,7 @@ const compact = (n: number) =>
  * darunter die Abschnitte Reels, Querformat und Beiträge.
  */
 export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) => {
+  const kachelHoehe = useKachelHoehe();
   const insets = useSafeAreaInsets();
   const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
 
@@ -131,7 +133,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 <Text style={styles.abschnitt}>Beiträge →</Text>
                 <View style={styles.raster}>
                   {treffer.beitraege.map((p: Post) => (
-                    <Druck key={p.id} style={styles.rasterFeld} onPress={() => onNotice(p.description)}>
+                    <Druck key={p.id} style={[styles.rasterFeld, { height: kachelHoehe }]} onPress={() => onNotice(p.description)}>
                       {p.mediaUri ? (
                         <Image source={{ uri: p.mediaUri }} style={styles.voll} />
                       ) : (
@@ -381,7 +383,6 @@ const styles = themenStyles((colors) => ({
   raster: { flexDirection: 'row', flexWrap: 'wrap' },
   rasterFeld: {
     width: '33.333%',
-    aspectRatio: 1,
     borderWidth: 1,
     borderColor: colors.surface,
     backgroundColor: colors.surface3,

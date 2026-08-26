@@ -9,6 +9,7 @@ import { colors, radius, sizes, spacing, themenStyles, typography } from '../../
 import { mockProfiles, mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
+import { useKachelHoehe } from '../../lib/raster';
 
 type Tab = 'grid' | 'repost' | 'tagged';
 
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNotice }: Props) => {
+  const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
   const person = mockUsers[userId];
@@ -177,7 +179,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
         {tab === 'grid' ? (
           <View style={styles.grid}>
             {GRID_KINDS.map((kind, index) => (
-              <View key={index} style={styles.gridItem}>
+              <View key={index} style={[styles.gridItem, { height: kachelHoehe }]}>
                 <Motiv id={`grid-${index}`} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                 {kind === 'video' && (
                   <View style={styles.gridBadge}>
@@ -288,7 +290,6 @@ const styles = themenStyles((colors) => ({
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   gridItem: {
     width: '33.333%',
-    aspectRatio: 1,
     borderWidth: 1,
     borderColor: colors.surface,
     backgroundColor: colors.surface3,

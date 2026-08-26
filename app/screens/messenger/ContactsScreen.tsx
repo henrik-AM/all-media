@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -17,6 +18,13 @@ interface Props {
 }
 
 export const ContactsScreen = ({ contacts, onBack, onOpenContact, onAddContact }: Props) => {
+  /*
+   * Kontakte liegen als eigene Seite ueber allem - ohne die obere Leiste, die
+   * sonst den Platz fuer Uhrzeit und Notch frei haelt. Ohne diesen Abstand
+   * lief die Ueberschrift "Kontakte" hinter die Dynamic Island und war zur
+   * Haelfte verdeckt.
+   */
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
 
   const { friends, pending, total } = useMemo(() => {
@@ -50,7 +58,7 @@ export const ContactsScreen = ({ contacts, onBack, onOpenContact, onAddContact }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.titleRow}>
           {onBack && (
             <Druck onPress={onBack} hitSlop={10}>

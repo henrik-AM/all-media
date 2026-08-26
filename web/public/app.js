@@ -4424,15 +4424,19 @@ function bindProfilAktionen(bereich) {
 
 /* ---------------------------------------------------------- Plus: Erstellen */
 // Genau die Punkte aus dem Prototyp-Frame "VP + erstellen".
+// Die Symbole kamen spaeter dazu. Vorher standen hier acht nackte Textzeilen
+// untereinander - das liest sich wie eine unfertige Liste, nicht wie das
+// Menue, ueber das in dieser App alles entsteht. Gleiche Zuordnung wie in der
+// App (components/ErstellenSheet.tsx).
 const ERSTELLEN_VIDEOS = [
-  { key: 'reels', label: 'Reels' },
-  { key: 'landscape', label: 'Querformat' },
-  { key: 'post', label: 'Beitrag' },
-  { key: 'story', label: 'Story' },
-  { key: 'highlight', label: 'Highlight' },
-  { key: 'playlist', label: 'Playlist' },
-  { key: 'livestream', label: 'Livestream' },
-  { key: 'spende', label: 'Spendenaktion' },
+  { key: 'reels', label: 'Reels', icon: 'portrait' },
+  { key: 'landscape', label: 'Querformat', icon: 'landscape' },
+  { key: 'post', label: 'Beitrag', icon: 'image' },
+  { key: 'story', label: 'Story', icon: 'camera' },
+  { key: 'highlight', label: 'Highlight', icon: 'folder' },
+  { key: 'playlist', label: 'Playlist', icon: 'ebenen' },
+  { key: 'livestream', label: 'Livestream', icon: 'video' },
+  { key: 'spende', label: 'Spendenaktion', icon: 'heart' },
 ];
 
 function openErstellen(bereich) {
@@ -4445,7 +4449,7 @@ function openErstellen(bereich) {
          ${punkte
            .map(
              (p) => `<li><button class="erstellen__punkt" data-erstellen="${p.key}">
-               ${p.icon ? `<span class="erstellen__icon">${ICONS[p.icon]}</span>` : ''}
+               <span class="erstellen__icon">${ICONS[p.icon]}</span>
                <span>${esc(p.label)}</span>
              </button></li>`
            )

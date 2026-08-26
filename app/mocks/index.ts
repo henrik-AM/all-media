@@ -108,6 +108,31 @@ export const mockComments: Record<string, Comment[]> = {
   ],
   v4: [],
   v5: [{ id: 'cm1', userId: 'u3', text: 'Mache ich seit einem Jahr, will nicht mehr zurück.', time: 'Sa', likes: 9, liked: false }],
+
+  // Querformat-Clips. Die fehlten hier komplett, während die Website sie
+  // längst hatte — dadurch zählte `mitKommentarzahl` bei jedem Clip null, und
+  // im Spieler stand "0" neben 8,4k Gefällt-mir. Gleiche Texte wie in der
+  // Website, damit App und Website dieselben Zahlen zeigen.
+  q1: [
+    { id: 'cm1', userId: 'u2', text: 'Die Kapitelmarken sind Gold wert.', time: 'vor 2 Tagen', likes: 14, liked: false },
+    { id: 'cm2', userId: 'u5', text: 'Wie lange wart ihr insgesamt unterwegs?', time: 'vor 2 Tagen', likes: 3, liked: false },
+    { id: 'cm3', userId: 'u1', text: 'Neun Stunden mit Pausen.', time: 'vor 1 Tag', likes: 11, liked: false },
+  ],
+  q2: [
+    { id: 'cm1', userId: 'u6', text: 'Endlich mal ohne Framework-Geplänkel erklärt.', time: 'vor 4 Tagen', likes: 22, liked: false },
+    { id: 'cm2', userId: 'u3', text: 'Teil zwei zu Dark Mode wäre super.', time: 'vor 3 Tagen', likes: 8, liked: false },
+  ],
+  q3: [
+    { id: 'cm1', userId: 'u1', text: 'Der Einkaufszettel spart mir jede Woche eine Stunde.', time: 'vor 6 Tagen', likes: 41, liked: false },
+    { id: 'cm2', userId: 'u4', text: 'Hält das wirklich fünf Tage frisch?', time: 'vor 5 Tagen', likes: 6, liked: false },
+    { id: 'cm3', userId: 'u5', text: 'Vier sicher, am fünften würde ich einfrieren.', time: 'vor 5 Tagen', likes: 19, liked: false },
+  ],
+  q4: [{ id: 'cm1', userId: 'u4', text: 'Der Hinweis zum Umstieg hat mir zwei Stunden gespart.', time: 'vor 6 Tagen', likes: 12, liked: false }],
+  q5: [
+    { id: 'cm1', userId: 'u6', text: 'Blaue Stunde ist einfach unschlagbar.', time: 'vor 2 Wochen', likes: 17, liked: false },
+    { id: 'cm2', userId: 'u2', text: 'Welches Stativ nutzt du?', time: 'vor 12 Tagen', likes: 2, liked: false },
+  ],
+  q6: [{ id: 'cm1', userId: 'u5', text: 'Mein Team hat es nach dem Video übernommen.', time: 'vor 3 Wochen', likes: 9, liked: false }],
 };
 
 /*

@@ -45,7 +45,7 @@ import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors, themenStyles } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
-import { mockChats, mockContacts, mockMessages, mockPlaces, mockStories, mockUsers } from './mocks';
+import { mockChats, mockClips, mockContacts, mockMessages, mockPlaces, mockStories, mockUsers } from './mocks';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Video } from './types';
 
 type Overlay =
@@ -126,6 +126,18 @@ const Shell = () => {
    * über den ersten Bildschirm hinaus, weil sich ein Tippen von außen nicht
    * auslösen lässt.
    *
+   * Format:  bereich/unterpunkt[#überlagerung:parameter]
+   *
+   *   messenger/chats              die Chatliste
+   *   messenger/chats#chat:c1      ein offener Chat darin
+   *   videos/profile#profil:u1     ein fremdes Profil
+   *
+   * Der Teil hinter der Raute kam später dazu: die vierzehn Bereiche allein
+   * decken keinen einzigen Detailbildschirm ab. Ein Chat, ein Story-Betrachter
+   * und ein fremdes Profil sind aber genau die Bildschirme, auf denen ein
+   * Nutzer die meiste Zeit verbringt — und die einzigen, für die es bis dahin
+   * kein Bild gab. Ein Fehler an einer Sprechblase wäre nie aufgefallen.
+   *
    * `__DEV__` ist in einem veröffentlichten Build false — der Schalter
    * existiert dort also nicht, und der Schlüssel wird nie gelesen.
    */
@@ -134,15 +146,58 @@ const Shell = () => {
     AsyncStorage.getItem('all-media.pruefbild')
       .then((roh) => {
         if (!roh) return;
-        const [zielArea, zielSub] = roh.split('/') as [AreaKey, SubKey | undefined];
+        const [pfad, ueberlagerung] = roh.split('#');
+        const [zielArea, zielSub] = pfad.split('/') as [AreaKey, SubKey | undefined];
         if (!NAV.some((a) => a.key === zielArea)) return;
         setArea(zielArea);
         if (zielSub) setSubs((prev) => ({ ...prev, [zielArea]: zielSub }));
+        if (ueberlagerung) pruefUeberlagerung(ueberlagerung);
       })
       .catch(() => {
         // Kein Schalter gesetzt oder Speicher nicht lesbar: normal starten.
       });
   }, []);
+
+  /**
+   * Den Teil hinter der Raute in eine Überlagerung übersetzen. Bewusst
+   * nachsichtig: eine unbekannte Angabe lässt schlicht den Grundbildschirm
+   * stehen, statt die App beim Start abstürzen zu lassen.
+   */
+  const pruefUeberlagerung = (angabe: string) => {
+    const [art, a, b] = angabe.split(':');
+    switch (art) {
+      case 'chat': {
+        const chat = mockChats.find((c) => c.id === a);
+        if (chat) setOverlay({ kind: 'chat', chat, extra: [] });
+        break;
+      }
+      case 'story': {
+        const story = mockStories.find((s) => s.id === a);
+        if (story) setOverlay({ kind: 'story', story });
+        break;
+      }
+      case 'profil':
+        if (mockUsers[a]) setOverlay({ kind: 'profile', userId: a, variant: 'oeffentlich' });
+        break;
+      case 'kontakt':
+        if (mockUsers[a]) setOverlay({ kind: 'profile', userId: a, variant: 'kontakt' });
+        break;
+      case 'kontakte':
+        setOverlay({ kind: 'contacts' });
+        break;
+      case 'anruf':
+        if (mockUsers[a]) setOverlay({ kind: 'call', userId: a, art: b === 'video' ? 'video' : 'audio' });
+        break;
+      case 'clip':
+        if (mockClips.some((c) => c.id === a)) setOverlay({ kind: 'clip', clipId: a });
+        break;
+      case 'blatt':
+        if (['new', 'group', 'contact', 'konto', 'mitteilungen', 'erstellen'].includes(a)) {
+          setSheet(a as Sheet);
+        }
+        break;
+    }
+  };
 
   const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
   const hideNotice = useCallback(() => setNotice(null), []);

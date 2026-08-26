@@ -236,7 +236,14 @@ const styles = themenStyles((colors) => ({
 
   runde: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', maxWidth: 260, marginBottom: 6 },
   dabei: { marginTop: 4, ...typography.preview, color: 'rgba(255,255,255,0.65)', textAlign: 'center' },
-  kopf: { alignItems: 'center', gap: spacing.sm },
+  /*
+   * Der Block aus Bild, Name und Dauer nimmt den ganzen freien Platz und
+   * zentriert sich darin. Vorher klebte er direkt unter der Statusleiste,
+   * waehrend die Knoepfe unten standen - dazwischen lag ein Loch ueber die
+   * halbe Bildschirmhoehe. Ein Anruf ist der Bildschirm, auf den man am
+   * laengsten schaut; da faellt so etwas sofort auf.
+   */
+  kopf: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   name: { marginTop: spacing.lg, color: colors.white, ...typography.title },
   status: { color: 'rgba(255,255,255,0.65)', ...typography.body },
   verschluesselt: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.xs },
@@ -254,7 +261,7 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
 
-  leiste: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginTop: 'auto', marginBottom: 28 },
+  leiste: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginBottom: 28 },
   knopf: {
     alignItems: 'center',
     gap: 6,

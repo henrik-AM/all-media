@@ -54,6 +54,20 @@ const SEITEN = [
   ['communities/search', 'community-suche'],
   ['communities/profile', 'community-profil'],
   ['settings', 'einstellungen'],
+
+  // Detailbildschirme. Die vierzehn Bereiche darueber sind nur die
+  // Einstiegsseiten - ein Chat, ein Story-Betrachter oder ein fremdes Profil
+  // kam in keinem Bild vor, obwohl ein Nutzer dort die meiste Zeit verbringt.
+  // Ein Fehler an einer Sprechblase waere nie aufgefallen.
+  ['messenger/chats#chat:c1', 'detail-chat'],
+  ['messenger/chats#chat:c4', 'detail-chat-gruppe'],
+  ['messenger/chats#story:s1', 'detail-story'],
+  ['messenger/chats#kontakt:u1', 'detail-kontaktprofil'],
+  ['messenger/chats#kontakte', 'detail-kontakte'],
+  ['messenger/chats#anruf:u1:audio', 'detail-anruf'],
+  ['messenger/chats#blatt:erstellen', 'detail-erstellen'],
+  ['videos/profile#profil:u1', 'detail-fremdprofil'],
+  ['videos/landscape#clip:q1', 'detail-clip'],
 ];
 
 const SITZUNG = {

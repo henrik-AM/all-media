@@ -17,6 +17,7 @@ import {
 } from '../../mocks';
 import { ExplorerZiel } from './ExplorerScreen';
 import { useProfil } from '../../contexts/ProfilContext';
+import { useKachelHoehe } from '../../lib/raster';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -73,6 +74,7 @@ const Row = ({
  * Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
  */
 export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: Props) => {
+  const kachelHoehe = useKachelHoehe();
   // Eigene Aufnahmen sollen auch ueber die Suche zu finden sein.
   const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
   const [query, setQuery] = useState('');
@@ -140,7 +142,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
             <Section title="Beiträge">
               <View style={styles.grid}>
                 {result.posts.map((p) => (
-                  <Druck key={p.id} style={styles.gridItem} onPress={() => onNotice('Beitrag öffnet im Feed')}>
+                  <Druck key={p.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice('Beitrag öffnet im Feed')}>
                     <Motiv id={p.id} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                   </Druck>
                 ))}
@@ -259,7 +261,6 @@ const styles = themenStyles((colors) => ({
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   gridItem: {
     width: '33.333%',
-    aspectRatio: 1,
     borderWidth: 1,
     borderColor: colors.surface,
     backgroundColor: colors.surface3,

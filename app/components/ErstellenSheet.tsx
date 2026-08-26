@@ -24,21 +24,32 @@ interface Props {
   onSelect: (punkt: ErstellenPunkt) => void;
 }
 
-// Genau die Punkte aus dem Prototyp-Frame "VP + erstellen", in dieser Reihenfolge.
-const VIDEOS: { key: ErstellenPunkt; label: string }[] = [
-  { key: 'reels', label: 'Reels' },
-  { key: 'landscape', label: 'Querformat' },
-  { key: 'post', label: 'Beitrag' },
-  { key: 'story', label: 'Story' },
-  { key: 'highlight', label: 'Highlight' },
-  { key: 'playlist', label: 'Playlist' },
-  { key: 'livestream', label: 'Livestream' },
-  { key: 'spende', label: 'Spendenaktion' },
+type Symbol = React.ComponentProps<typeof Ionicons>['name'];
+
+/*
+ * Genau die Punkte aus dem Prototyp-Frame "VP + erstellen", in dieser
+ * Reihenfolge.
+ *
+ * Die Symbole kamen später dazu. Vorher standen hier acht nackte Textzeilen
+ * untereinander — das liest sich wie eine unfertige Liste, nicht wie das
+ * Menü, über das in dieser App alles entsteht. Wo es die Art des Inhalts
+ * schon anderswo gibt, ist es dasselbe Symbol wie in der oberen Leiste
+ * (Hochformat, Querformat), damit beide Stellen zusammenpassen.
+ */
+const VIDEOS: { key: ErstellenPunkt; label: string; symbol: Symbol }[] = [
+  { key: 'reels', label: 'Reels', symbol: 'phone-portrait-outline' },
+  { key: 'landscape', label: 'Querformat', symbol: 'tv-outline' },
+  { key: 'post', label: 'Beitrag', symbol: 'image-outline' },
+  { key: 'story', label: 'Story', symbol: 'camera-outline' },
+  { key: 'highlight', label: 'Highlight', symbol: 'folder-outline' },
+  { key: 'playlist', label: 'Playlist', symbol: 'layers-outline' },
+  { key: 'livestream', label: 'Livestream', symbol: 'videocam-outline' },
+  { key: 'spende', label: 'Spendenaktion', symbol: 'heart-outline' },
 ];
 
-// "CP + erstellen" zeigt genau einen Punkt, mit blauem Plus davor.
-const COMMUNITYS: { key: ErstellenPunkt; label: string; icon: true }[] = [
-  { key: 'kanal', label: 'Neuen Kanal erstellen', icon: true },
+// "CP + erstellen" zeigt genau einen Punkt.
+const COMMUNITYS: { key: ErstellenPunkt; label: string; symbol: Symbol }[] = [
+  { key: 'kanal', label: 'Neuen Kanal erstellen', symbol: 'add-outline' },
 ];
 
 export const ErstellenSheet = ({ visible, bereich, onClose, onSelect }: Props) => {
@@ -57,7 +68,9 @@ export const ErstellenSheet = ({ visible, bereich, onClose, onSelect }: Props) =
             ]}
             onPress={() => onSelect(p.key)}
           >
-            {'icon' in p && <Ionicons name="add-circle" size={22} color={colors.brand} />}
+            <View style={styles.symbolFeld}>
+              <Ionicons name={p.symbol} size={19} color={colors.brand} />
+            </View>
             <Text style={styles.label}>{p.label}</Text>
           </Druck>
         ))}
@@ -75,6 +88,17 @@ const styles = themenStyles((colors) => ({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+  },
+  // Getönte Fläche statt eines freistehenden Symbols: acht freistehende
+  // Symbole in einer Spalte wirken zerfasert, acht gleich große Flächen geben
+  // der Liste eine Kante, an der das Auge herunterläuft.
+  symbolFeld: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   letzter: { borderBottomWidth: 0 },
   gedrueckt: { backgroundColor: colors.surface2 },

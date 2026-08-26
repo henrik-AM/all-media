@@ -31,6 +31,23 @@ const SEITEN = [
   ['settings', null, 'einstellungen'],
 ];
 
+/*
+ * Detailseiten. Die vierzehn Bereiche oben sind nur die Einstiegsseiten - ein
+ * offener Chat, eine Story oder das Erstellen-Menue kam in keinem Bild vor,
+ * obwohl ein Nutzer dort die meiste Zeit verbringt. Dieselbe Liste gibt es
+ * fuer die App in app/tools/app-bilder.js.
+ *
+ * Jeder Eintrag: Bereich, Unterpunkt, Name, danach die Klicks bis zum Ziel.
+ */
+const DETAILS = [
+  ['messenger', 'chats', 'detail-chat', ['[data-chat="c1"]']],
+  ['messenger', 'chats', 'detail-chat-gruppe', ['[data-chat="c4"]']],
+  ['messenger', 'chats', 'detail-story', ['[data-story="s1"]']],
+  ['videos', 'profile', 'detail-erstellen', ['[data-oact="create"]']],
+  ['videos', 'profile', 'detail-mitteilungen', ['[data-oact="bell"]']],
+  ['videos', 'landscape', 'detail-clip', ['[data-clip="q1"]']],
+];
+
 (async () => {
   fs.mkdirSync(ZIEL, { recursive: true });
 
@@ -60,9 +77,31 @@ const SEITEN = [
     console.log(`  ${name}.png`);
   }
 
+  for (const [bereich, unterpunkt, name, schritte] of DETAILS) {
+    await seite.click(`[data-area="${bereich}"]`);
+    await seite.waitForTimeout(150);
+    if (unterpunkt) {
+      await seite.click(`[data-sub="${unterpunkt}"]`);
+      await seite.waitForTimeout(250);
+    }
+    for (const schritt of schritte) {
+      await seite.click(schritt);
+      await seite.waitForTimeout(350);
+    }
+    await seite.screenshot({ path: path.join(ZIEL, `${name}.png`) });
+    console.log(`  ${name}.png`);
+    /*
+     * Neu laden statt zurueckklicken. Ein offenes Blatt legt eine Flaeche
+     * ueber die ganze Seite; der naechste Klick landet dann darauf statt auf
+     * dem Knopf. Escape half nicht - die Blaetter schliessen darueber nicht.
+     */
+    await seite.goto(ADRESSE);
+    await seite.waitForSelector('.navbtn');
+  }
+
   await browser.close();
 
-  console.log(`\n  ${SEITEN.length} Bilder in bilder/${DUNKEL ? 'dunkel' : 'hell'}/`);
+  console.log(`\n  ${SEITEN.length + DETAILS.length} Bilder in bilder/${DUNKEL ? 'dunkel' : 'hell'}/`);
   if (fehler.length) {
     console.log(`\n  ${fehler.length} Konsolenfehler:`);
     [...new Set(fehler)].forEach((f) => console.log(`    ${f}`));
