@@ -1170,6 +1170,15 @@ ul { margin: 0; padding: 0; list-style: none; }
   box-shadow: 0 -1px 0 rgba(12,14,20,.06), 0 -12px 40px rgba(12,14,20,.18);
   padding: 8px 0 calc(12px + env(safe-area-inset-bottom));
   animation: up .24s cubic-bezier(.2,.8,.2,1);
+  /*
+    Ein langes Blatt scrollt, statt oben aus dem Bild zu laufen.
+    Ohne diese zwei Zeilen waren die unteren Punkte der Chat-Einstellungen
+    schlicht nicht erreichbar, sobald die Liste laenger wurde - aufgefallen
+    beim Erweitern eben dieser Liste.
+  */
+  max-height: 88dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 /* Aus dem Bild heraus statt nur ein bisschen versetzt - das ist die Bewegung,
    die man von einem Blatt erwartet. */
@@ -1247,6 +1256,30 @@ ul { margin: 0; padding: 0; list-style: none; }
 .composer__field textarea:disabled { opacity: .6; cursor: not-allowed; }
 .sheet__hint { padding: 0 16px 8px; font-size: 12.5px; color: var(--text-3); }
 .sheet__footer { padding: 10px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+/* Nachfrage mit zwei Knoepfen: Abbrechen links, die Antwort rechts. */
+.sheet__footer:has(.btn + .btn) { display: flex; gap: 10px; }
+.sheet__footer .btn { flex: 1 1 0; }
+
+/*
+  Kopf der Chat-Einstellungen. Henrik: "Bearbeitungsansicht wirkt leer."
+  Sie fing frueher direkt mit den Schaltern an und sagte nirgends, um wen
+  es ueberhaupt geht.
+*/
+.chatopt__kopf {
+  display: flex; align-items: center; gap: 14px;
+  padding: 6px 16px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.chatopt__text { min-width: 0; }
+.chatopt__name {
+  font-size: 17px; font-weight: 700; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chatopt__sub { font-size: 13px; color: var(--text-3); margin-top: 1px; }
+
+/* Ein gesperrter Chat zeigt statt der Vorschau ein Schloss. */
+.row__preview--gesperrt { color: var(--text-3); font-style: italic; }
+.row__preview--gesperrt svg { width: 14px; height: 14px; }
 
 .checkbox {
   flex: 0 0 auto;

@@ -715,6 +715,13 @@ function chatOptionen(chatId) {
 
 function chatRow(c) {
   const mediaIcon = c.mediaPreview === 'image' ? ICONS.image : c.mediaPreview === 'audio' ? ICONS.mic : '';
+  /*
+   * Ein gesperrter Chat zeigt keine Vorschau - das ist der halbe Sinn der
+   * Sperre. Statt des Textes steht dort ein Schloss.
+   */
+  const vorschau = c.gesperrt
+    ? `<span class="row__preview row__preview--gesperrt">${ICONS.lock}Gesperrt</span>`
+    : `<span class="row__preview">${mediaIcon}${esc(c.preview)}</span>`;
   return `
     <li>
       <button class="row ${c.unread ? 'is-unread' : ''}" data-chat="${c.id}">
@@ -725,8 +732,9 @@ function chatRow(c) {
             <span class="row__time">${esc(c.time)}</span>
           </div>
           <div class="row__bottom">
-            <span class="row__preview">${mediaIcon}${esc(c.preview)}</span>
+            ${vorschau}
             <span class="row__meta">
+              ${c.gesperrt ? ICONS.lock : ''}
               ${c.muted ? ICONS.mute : ''}
               ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
             </span>
@@ -1048,30 +1056,52 @@ function openFollowerList(profile, art) {
  *                     "VP + Mitteilung" und "VP + erstellen")
  * opts.hoch        -> Blatt auf 74% Hoehe, Inhalt scrollt
  */
+/*
+ * Der Kopf eines Blattes. Als eigene Funktion, weil ein Blatt seinen Inhalt
+ * auch nachtraeglich ersetzen kann (siehe openChatSettings) - und dabei
+ * denselben Kopf wieder braucht. Vorher stand die Form nur hier inline, und
+ * ein neu gezeichnetes Blatt verlor seinen Schliessen-Knopf.
+ */
+function sheetKopf(title, mitX) {
+  return mitX
+    ? `<div class="sheet__kopf">
+         <button class="sheet__x" data-sheet-close aria-label="Schließen">${ICONS.close}</button>
+         <div class="sheet__titel-mitte">${esc(title)}</div>
+       </div>`
+    : `<div class="sheet__handle"></div>
+       <div class="sheet__title">${esc(title)}</div>`;
+}
+
 function openSheet(title, bodyHtml, onMount, opts = {}) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet-backdrop';
   sheet.innerHTML = `
     <div class="sheet ${opts.hoch ? 'sheet--tall' : ''}" role="dialog" aria-label="${esc(title)}">
-      ${
-        opts.schliessen
-          ? `<div class="sheet__kopf">
-               <button class="sheet__x" data-sheet-close aria-label="Schließen">${ICONS.close}</button>
-               <div class="sheet__titel-mitte">${esc(title)}</div>
-             </div>`
-          : `<div class="sheet__handle"></div>
-             <div class="sheet__title">${esc(title)}</div>`
-      }
+      ${sheetKopf(title, opts.schliessen)}
       ${bodyHtml}
     </div>`;
   document.querySelector('.app').appendChild(sheet);
 
-  sheet.addEventListener('click', (e) => {
-    if (e.target === sheet) sheet.remove();
-  });
-  sheet.querySelector('[data-sheet-close]')?.addEventListener('click', () => sheet.remove());
+  /*
+   * Ein Blatt kann auf drei Wegen zugehen: Klick daneben, Klick auf das X,
+   * oder von innen ueber close(). `beimSchliessen` laeuft in allen drei
+   * Faellen genau einmal - bestaetigen() haengt daran und wartet auf die
+   * Antwort.
+   */
+  let schonZu = false;
+  const zumachen = () => {
+    if (schonZu) return;
+    schonZu = true;
+    sheet.remove();
+    opts.beimSchliessen?.();
+  };
 
-  onMount?.(sheet, () => sheet.remove());
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet) zumachen();
+  });
+  sheet.querySelector('[data-sheet-close]')?.addEventListener('click', zumachen);
+
+  onMount?.(sheet, zumachen);
   return sheet;
 }
 
@@ -5836,6 +5866,37 @@ function medienFlaeche(id, symbol) {
  * pflicht, wert }. `aufSenden` bekommt die Werte und gibt bei einem Fehler
  * einen Text zurueck - dann bleibt das Blatt offen.
  */
+/*
+ * Nachfrage mit zwei Knoepfen. Gibt true zurueck, wenn bestaetigt wurde.
+ *
+ * Gebraucht fuer gesperrte Chats: dort muss eine Antwort abgewartet werden,
+ * bevor der Chat aufgeht. window.confirm waere der kuerzere Weg, sieht aber
+ * auf dem Handy nach Browser aus und nicht nach App.
+ */
+function bestaetigen(titel, text, knopf = 'Weiter') {
+  return new Promise((fertig) => {
+    let antwort = false;
+    openSheet(
+      titel,
+      `<div class="sheet__body">
+         <div class="sheet__hint">${esc(text)}</div>
+         <div class="sheet__footer">
+           <button class="btn" id="nachfrageNein">Abbrechen</button>
+           <button class="btn btn--primary" id="nachfrageJa">${esc(knopf)}</button>
+         </div>
+       </div>`,
+      (sheet, close) => {
+        sheet.querySelector('#nachfrageJa').addEventListener('click', () => {
+          antwort = true;
+          close();
+        });
+        sheet.querySelector('#nachfrageNein').addEventListener('click', close);
+      },
+      { schliessen: true, beimSchliessen: () => fertig(antwort) }
+    );
+  });
+}
+
 function openFormular(titel, felder, senden, knopf = 'Fertig') {
   const feldHtml = (f) => {
     const gemeinsam = `id="f_${f.key}" placeholder="${esc(f.platzhalter || '')}"`;
@@ -6628,66 +6689,235 @@ function renderCommunityListe() {
 }
 
 /* ------------------------------------------------- Chat-Einstellungen Modal */
-function openChatSettings(chatId) {
-  const chat = state.chats.find((c) => c.id === chatId);
-  if (!chat) return;
+/*
+ * Die Einstellungen eines Chats — Prototyp-Frame "MC + Kontakteinstellungen".
+ *
+ * Henrik am 26.08.2026: "Bearbeitungsansicht wirkt leer; Einstellungen (z. B.
+ * Chat sperren) sind nicht funktionsfähig. Inspiration WhatsApp — mehr Felder
+ * hinzufügen; Einstellungen müssen echte Funktion haben."
+ *
+ * Beides stimmte. Vorher standen hier sechs Punkte, von denen kein einziger
+ * wirklich etwas tat: die Schalter kippten nur ihre eigene Farbe, "Chat
+ * leeren" leerte die Ansicht und nicht den Verlauf (beim naechsten Oeffnen
+ * war alles zurueck), "Blockieren" schob eine Kennung in eine Liste im
+ * Browser, die niemand ausgewertet hat, und "Melden" gab einen Hinweis aus
+ * und vergass ihn. "Chat sperren" fehlte ganz.
+ *
+ * Jetzt geht jeder Punkt an den Server und der Stand kommt von dort zurueck.
+ * Was dort passiert, steht in CHAT_AKTIONEN in web/server/app.js.
+ */
+async function openChatSettings(chatId) {
+  const treffer =
+    state.chats.find((c) => c.id === chatId) ||
+    (state.communityChats || []).find((c) => c.id === chatId);
+  if (!treffer) return;
 
-  const settingsHtml = `
-    <div class="sheet__header">Chat-Einstellungen</div>
+  let chat = treffer;
+
+  /** Einen Punkt am Server umschalten und das Blatt neu zeichnen. */
+  const schalte = async (was, sheet) => {
+    const antwort = await fetch(`/api/chats/${chatId}/${was}`, { method: 'POST' })
+      .then((r) => r.json())
+      .catch(() => ({ ok: false, error: 'Das hat gerade nicht geklappt' }));
+    if (!antwort.ok) return toast(antwort.error || 'Das hat gerade nicht geklappt');
+
+    // Den Stand am Chat mitfuehren, damit die Liste ihn gleich zeigt.
+    if ('muted' in antwort) chat.muted = antwort.muted;
+    if ('gesperrt' in antwort) chat.gesperrt = antwort.gesperrt;
+    if ('aus' in antwort) chat.mitteilungenAus = antwort.aus;
+    if ('blocked' in antwort) chat.blocked = antwort.blocked;
+
+    toast(antwort.meldung);
+    zeichne(sheet);
+  };
+
+  const koerper = () => {
+    const person = chat.isGroup ? null : user(chat.userId);
+    return `
+    ${/*
+        Der Kopf. Er war der Grund fuer "wirkt leer": das Blatt fing frueher
+        direkt mit den Schaltern an, ohne zu zeigen, um wen es ueberhaupt
+        geht.
+      */ ''}
+    <div class="chatopt__kopf">
+      ${avatarOf(chat, 54)}
+      <div class="chatopt__text">
+        <div class="chatopt__name">${esc(chat.name)}</div>
+        <div class="chatopt__sub">${
+          chat.isGroup
+            ? `${(chat.members || []).length + 1} Mitglieder`
+            : esc(person?.handle || '')
+        }</div>
+      </div>
+    </div>
+
     <div class="sheet__body">
+      <div class="listhead">Benachrichtigungen</div>
       <div class="item">
-        <span class="item__label">Benachrichtigungen</span>
-        <button class="switch is-on" data-toggle="notifications" aria-label="Mitteilungen"></button>
+        <span class="item__icon">${ICONS.bell}</span>
+        <span class="item__label">Mitteilungen</span>
+        <button class="switch ${chat.mitteilungenAus ? '' : 'is-on'}" data-chatopt="mitteilungen" aria-label="Mitteilungen"><span class="switch__knob"></span></button>
       </div>
       <div class="item">
+        <span class="item__icon">${ICONS.mute}</span>
         <span class="item__label">Stumm</span>
-        <button class="switch ${state.mutedChats[chatId] ? 'is-on' : ''}" data-toggle="mute" aria-label="Stummschalten"></button>
+        <button class="switch ${chat.muted ? 'is-on' : ''}" data-chatopt="stumm" aria-label="Stummschalten"><span class="switch__knob"></span></button>
       </div>
-      <button class="item" id="chatClear">
-        <span class="item__label">Chat leeren</span>
+
+      <div class="listhead">Datenschutz</div>
+      <div class="item">
+        <span class="item__icon">${ICONS.lock}</span>
+        <span class="item__label">Chat sperren</span>
+        <button class="switch ${chat.gesperrt ? 'is-on' : ''}" data-chatopt="sperren" aria-label="Chat sperren"><span class="switch__knob"></span></button>
+      </div>
+      <div class="sheet__hint">Ein gesperrter Chat zeigt in der Liste keine Vorschau und fragt vor dem Öffnen nach.</div>
+
+      <div class="listhead">Inhalt</div>
+      <button class="item" data-chatopt-aktion="medien">
+        <span class="item__icon">${ICONS.image}</span>
+        <span class="item__label">Medien und Anhänge</span>
+        <span class="row__chevron">${ICONS.chevron}</span>
       </button>
-      <button class="item" id="chatExport">
+      <button class="item" data-chatopt-aktion="markiert">
+        <span class="item__icon">${ICONS.star}</span>
+        <span class="item__label">Markierte Nachrichten</span>
+        <span class="row__chevron">${ICONS.chevron}</span>
+      </button>
+      <button class="item" data-chatopt-aktion="suche">
+        <span class="item__icon">${ICONS.search}</span>
+        <span class="item__label">Im Chat suchen</span>
+        <span class="row__chevron">${ICONS.chevron}</span>
+      </button>
+      <button class="item" data-chatopt-aktion="export">
+        <span class="item__icon">${ICONS.bookmark}</span>
         <span class="item__label">Chat exportieren</span>
       </button>
-      <button class="item item--danger" id="chatBlock">
-        <span class="item__label">Blockieren</span>
+
+      <div class="listhead">Verwalten</div>
+      <button class="item" data-chatopt-aktion="archiv">
+        <span class="item__icon">${ICONS.bookmark}</span>
+        <span class="item__label">Archivieren</span>
       </button>
-      <button class="item item--danger" id="chatReport">
-        <span class="item__label">Melden</span>
+      <button class="item item--danger" data-chatopt-aktion="leeren">
+        <span class="item__icon">${ICONS.trash}</span>
+        <span class="item__label">Chat leeren</span>
+      </button>
+      ${
+        chat.isGroup
+          ? ''
+          : `<button class="item item--danger" data-chatopt="blockieren">
+              <span class="item__icon">${ICONS.block}</span>
+              <span class="item__label">${chat.blocked ? 'Blockierung aufheben' : 'Blockieren'}</span>
+            </button>
+            <button class="item item--danger" data-chatopt-aktion="melden">
+              <span class="item__icon">${ICONS.shield}</span>
+              <span class="item__label">Melden</span>
+            </button>`
+      }
+      <button class="item item--danger" data-chatopt-aktion="loeschen">
+        <span class="item__icon">${ICONS.trash}</span>
+        <span class="item__label">Chat löschen</span>
       </button>
     </div>`;
+  };
 
-  openSheet('Chat-Optionen', settingsHtml, (sheet) => {
-    sheet.querySelectorAll('[data-toggle]').forEach((b) => {
-      b.addEventListener('click', () => {
-        if (b.dataset.toggle === 'mute') {
-          state.mutedChats[chatId] = !state.mutedChats[chatId];
+  /** Den Inhalt des offenen Blattes ersetzen, ohne es zu schliessen. */
+  const zeichne = (sheet) => {
+    const koerperEl = sheet.querySelector('.sheet');
+    koerperEl.innerHTML = sheetKopf('Chat-Einstellungen', true) + koerper();
+    // Der Schliessen-Knopf ist mit neu entstanden und braucht seinen Griff
+    // wieder - openSheet hat ihn nur am urspruenglichen Element gehabt.
+    koerperEl
+      .querySelector('[data-sheet-close]')
+      ?.addEventListener('click', () => sheet.remove());
+    verdrahte(sheet);
+  };
+
+  const verdrahte = (sheet) => {
+    sheet.querySelectorAll('[data-chatopt]').forEach((b) =>
+      b.addEventListener('click', () => schalte(b.dataset.chatopt, sheet))
+    );
+
+    sheet.querySelectorAll('[data-chatopt-aktion]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const was = b.dataset.chatoptAktion;
+
+        if (was === 'medien' || was === 'markiert') {
+          const daten = await (await fetch(`/api/chats/${chatId}/medien`)).json();
+          return openChatMedien(
+            chat,
+            was === 'medien' ? daten.medien : daten.markiert,
+            was === 'medien' ? 'Medien und Anhänge' : 'Markierte Nachrichten'
+          );
         }
-        b.classList.toggle('is-on');
-      });
-    });
-    $('#chatClear')?.addEventListener('click', () => {
-      state.messages = [];
-      toast('Chat geleert');
-    });
-    $('#chatExport')?.addEventListener('click', () => {
-      const text = state.messages.map((m) => `${user(m.from).name}: ${m.text}`).join('\n');
-      const blob = new Blob([text], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `chat-${chatId}.txt`;
-      a.click();
-      toast('Chat exportiert');
-    });
-    $('#chatBlock')?.addEventListener('click', () => {
-      state.blockedUsers.push(chat.userId);
-      toast('Kontakt blockiert');
-    });
-    $('#chatReport')?.addEventListener('click', () => {
-      toast('Meldung gesendet');
-    });
-  }, { schliessen: true });
+
+        if (was === 'suche') return openChatSuche(chat);
+
+        if (was === 'export') {
+          /*
+           * Der Verlauf kommt vom Server, nicht aus state.messages - dort
+           * steht nur, was gerade offen ist. Vorher exportierte der Knopf
+           * bei einem Chat, den man nicht offen hatte, eine leere Datei.
+           */
+          const verlauf = await (await fetch(`/api/messages/${chatId}`)).json();
+          const text = verlauf
+            .map((m) => `${m.from === 'me' ? 'Du' : user(m.from).name} (${m.time}): ${m.text || ''}`)
+            .join('\n');
+          const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `chat-${chatId}.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+          return toast('Chat exportiert');
+        }
+
+        if (was === 'melden') {
+          return openFormular(
+            'Chat melden',
+            [{ key: 'grund', label: 'Was ist passiert?', typ: 'mehrzeilig', pflicht: true }],
+            async ({ grund }) => {
+              const res = await fetch(`/api/chats/${chatId}/melden`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ grund }),
+              }).then((r) => r.json());
+              if (!res.ok) return res.error || 'Das hat nicht geklappt';
+              toast(res.meldung);
+              return null;
+            },
+            'Melden'
+          );
+        }
+
+        if (was === 'leeren') {
+          const res = await (await fetch(`/api/chats/${chatId}/leeren`, { method: 'POST' })).json();
+          if (!res.ok) return toast('Das hat gerade nicht geklappt');
+          state.messages = [];
+          chat.preview = 'Keine Nachrichten';
+          toast('Chat geleert');
+          return render();
+        }
+
+        // Archivieren und Loeschen gehen ueber dieselbe Route wie in der
+        // Chatliste - der Chat verschwindet danach, also Blatt zu.
+        const res = await fetch(`/api/chats/${chatId}/${was}`, { method: 'POST' })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false }));
+        if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
+        toast(res.meldung);
+        state.openChatId = null;
+        state.openChatSettingsId = null;
+        closeOverlay();
+        document.querySelector('.sheet-backdrop')?.remove();
+        // bootstrap() holt die Listen frisch - der Chat ist am Server weg
+        // bzw. archiviert, und die Liste muss das zeigen.
+        await bootstrap();
+      })
+    );
+  };
+
+  openSheet('Chat-Einstellungen', koerper(), (sheet) => verdrahte(sheet), { schliessen: true });
 }
 
 /* ---------------------------------------------------------- chat detail */
@@ -6716,6 +6946,20 @@ async function openChat(chatId) {
       unread: community.unread,
     };
     community.unread = 0;
+  }
+
+  /*
+   * Gesperrte Chats fragen vor dem Oeffnen nach. Ohne echte Anmeldung mit
+   * Face ID oder Code ist eine Rueckfrage die ehrliche Fassung - eine
+   * Abfrage, die nichts prueft, waere Theater.
+   */
+  if (chat.gesperrt) {
+    const weiter = await bestaetigen(
+      'Gesperrter Chat',
+      `„${chat.name}" ist gesperrt. Trotzdem öffnen?`,
+      'Öffnen'
+    );
+    if (!weiter) return;
   }
 
   state.openChatId = chatId;

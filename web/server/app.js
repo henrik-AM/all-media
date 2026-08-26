@@ -591,7 +591,7 @@ function findeChat(chatId) {
  * steht - Express nimmt die erste passende Route. Unbekanntes geht
  * deshalb mit next() weiter an die naechste.
  */
-const CHAT_AKTIONEN = ['archiv', 'stumm', 'gelesen', 'loeschen'];
+const CHAT_AKTIONEN = ['archiv', 'stumm', 'gelesen', 'loeschen', 'sperren', 'mitteilungen', 'blockieren'];
 
 app.post('/api/chats/:chatId/:was', (req, res, next) => {
   if (!CHAT_AKTIONEN.includes(req.params.was)) return next();
@@ -633,6 +633,54 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
     });
   }
 
+  /*
+   * Chat sperren. Henrik hat am 26.08.2026 gemeldet, dass die Einstellungen
+   * der Kontaktinfo "nicht funktionsfähig" sind und "Chat sperren" darunter
+   * ausdruecklich genannt.
+   *
+   * Was es hier heisst: ein gesperrter Chat zeigt in der Liste keine
+   * Vorschau mehr, und vor dem Oeffnen wird nachgefragt. Ohne echte
+   * Anmeldung mit Face ID oder Code ist das die ehrliche Fassung - eine
+   * Abfrage, die nichts prueft, waere Theater.
+   */
+  if (was === 'sperren') {
+    chat.gesperrt = !chat.gesperrt;
+    return res.json({
+      ok: true,
+      gesperrt: chat.gesperrt,
+      meldung: chat.gesperrt ? `„${chat.name}" ist gesperrt` : `„${chat.name}" ist wieder offen`,
+    });
+  }
+
+  if (was === 'mitteilungen') {
+    // Getrennt von "stumm": stumm schaltet nur den Ton, hier gehen die
+    // Mitteilungen zu diesem Chat ganz aus.
+    chat.mitteilungenAus = !chat.mitteilungenAus;
+    return res.json({
+      ok: true,
+      aus: chat.mitteilungenAus,
+      meldung: chat.mitteilungenAus
+        ? `Keine Mitteilungen mehr aus „${chat.name}"`
+        : `Mitteilungen aus „${chat.name}" wieder an`,
+    });
+  }
+
+  /*
+   * Blockieren hat Folgen: der Chat nimmt keine Nachrichten mehr an (siehe
+   * POST /api/messages/:chatId, das `blocked` bereits abfragt) und das
+   * Profil merkt es sich. Vorher wurde die Person nur in eine Liste im
+   * Browser geschoben, die niemand ausgewertet hat.
+   */
+  if (was === 'blockieren') {
+    chat.blocked = !chat.blocked;
+    if (chat.userId && profiles[chat.userId]) profiles[chat.userId].blocked = chat.blocked;
+    return res.json({
+      ok: true,
+      blocked: chat.blocked,
+      meldung: chat.blocked ? `„${chat.name}" blockiert` : `„${chat.name}" nicht mehr blockiert`,
+    });
+  }
+
   if (was === 'loeschen') {
     const stelle = liste.indexOf(chat);
     if (stelle !== -1) liste.splice(stelle, 1);
@@ -644,6 +692,22 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
 
   // Hierher kommt nichts mehr: CHAT_AKTIONEN oben filtert bereits.
   return next();
+});
+
+/*
+ * Einen Chat melden. Der Grund wird mitgeschickt und am Profil vermerkt -
+ * vorher gab der Knopf nur einen Hinweis aus und vergass ihn sofort.
+ */
+app.post('/api/chats/:chatId/melden', (req, res) => {
+  const treffer = findeChat(req.params.chatId);
+  if (!treffer) return res.json({ ok: false, error: 'Diesen Chat gibt es nicht' });
+
+  const grund = String(req.body?.grund || '').trim();
+  if (!grund) return res.json({ ok: false, error: 'Bitte einen Grund angeben' });
+
+  const { chat } = treffer;
+  if (chat.userId && profiles[chat.userId]) profiles[chat.userId].gemeldet = grund;
+  res.json({ ok: true, grund, meldung: 'Danke, die Meldung ist bei uns angekommen' });
 });
 
 app.post('/api/messages/:chatId/:messageId/stern', (req, res) => {
