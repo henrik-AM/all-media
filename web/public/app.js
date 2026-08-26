@@ -105,12 +105,12 @@ const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function user(id) {
-  return state.users[id] || { name: '?', initials: '?', color: '#9AA1AC' };
+  return state.users[id] || { name: '?', initials: '?', color: 'linear-gradient(135deg,#B4BBC7,#8C94A3)' };
 }
 
-function avatarOf(chat, size = 52) {
+function avatarOf(chat, size = 54) {
   if (chat.isGroup) {
-    return `<div class="avatar avatar--${size}" style="background:linear-gradient(135deg,#5C6BC0,#26A69A)">${ICONS.people}</div>`
+    return `<div class="avatar avatar--${size}" style="background:linear-gradient(135deg,#7E93C4,#4A6699)">${ICONS.people}</div>`
       .replace('<svg', '<svg style="width:45%;height:45%"');
   }
   const u = user(chat.userId);
@@ -519,7 +519,7 @@ function chatRow(c) {
   return `
     <li>
       <button class="row ${c.unread ? 'is-unread' : ''}" data-chat="${c.id}">
-        ${avatarOf(c, 52)}
+        ${avatarOf(c, 54)}
         <div class="row__body">
           <div class="row__top">
             <span class="row__name">${esc(c.name)}</span>
@@ -904,7 +904,19 @@ function eigenesProfilbildSichern(datenUri) {
 }
 
 // Auswahl der Ersatzfarbe, wenn kein Bild hinterlegt ist.
-const PROFILFARBEN = ['#0A66FF', '#E4699B', '#F2A65A', '#4DB6AC', '#9575CD', '#EF6C6C', '#5C9E6F'];
+// Verläufe statt einzelner Farben - dieselben Paare wie in der App
+// (app/constants/design.ts, AVATAR_PAIRS), damit ein Profil auf beiden
+// Wegen gleich aussieht.
+const PROFILFARBEN = [
+  'linear-gradient(135deg,#7C6BF0,#4B32C9)',
+  'linear-gradient(135deg,#FFB877,#EE5F2A)',
+  'linear-gradient(135deg,#93AEFF,#4152D8)',
+  'linear-gradient(135deg,#FBA0C4,#DC3F7C)',
+  'linear-gradient(135deg,#6FE2D0,#12907F)',
+  'linear-gradient(135deg,#C4A4F7,#7C46EE)',
+  'linear-gradient(135deg,#A3B6F7,#5062D0)',
+  'linear-gradient(135deg,#FCA2BC,#E04570)',
+];
 
 function openProfilBearbeiten(fertig) {
   const me = state.users.me;
@@ -2328,7 +2340,17 @@ function videoSlide(v) {
 
 /* ---------------------------------------------------------- communities */
 function communityAvatar(c, size = 52) {
-  const palette = ['#5C6BC0', '#26A69A', '#EF6C6C', '#8D6E63', '#7E57C2', '#42A5F5'];
+  // Verlaeufe wie bei den Personen-Avataren, aber eigene Farbwege - eine
+  // Community soll sich von einem Menschen unterscheiden lassen. Das
+  // abgerundete Quadrat unten tut den Rest.
+  const palette = [
+    'linear-gradient(135deg,#93AEFF,#4152D8)',
+    'linear-gradient(135deg,#6FE2D0,#12907F)',
+    'linear-gradient(135deg,#FCA2BC,#E04570)',
+    'linear-gradient(135deg,#FBD277,#D88F1C)',
+    'linear-gradient(135deg,#C4A4F7,#7C46EE)',
+    'linear-gradient(135deg,#75DCF2,#1791BA)',
+  ];
   let hash = 0;
   for (let i = 0; i < c.id.length; i++) hash = (hash * 31 + c.id.charCodeAt(i)) >>> 0;
   const initials = c.name
@@ -3975,7 +3997,7 @@ function renderPostsExplorer() {
     <div class="pagehead"><h2>Beiträge</h2></div>
     <div class="scroll">
       <div class="exp__grid">${state.posts.map((p) => `
-        <button class="griditem" data-openpost="${p.id}">${ICONS.image}</button>`).join('')}</div>
+        <button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image)}</button>`).join('')}</div>
     </div>`;
   main.querySelectorAll('[data-openpost]').forEach(b => b.addEventListener('click', () => openPost(b.dataset.openpost)));
 }
@@ -3988,7 +4010,7 @@ function renderHashtagExplorer(tag) {
     <div class="pagehead"><h2>${esc(tag)}</h2></div>
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
-        <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${ICONS.image}</button>`).join('')}</div>
+        <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${medienFlaeche(i.id, ICONS.image)}</button>`).join('')}</div>
     </div>`;
 }
 
@@ -4001,7 +4023,7 @@ function renderPlaceExplorer(placeId) {
     <div class="pagehead"><h2>${esc(place?.name || 'Standort')}</h2></div>
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
-        <button class="griditem" data-item="${i.id}">${ICONS.image}</button>`).join('')}</div>
+        <button class="griditem" data-item="${i.id}">${medienFlaeche(i.id, ICONS.image)}</button>`).join('')}</div>
     </div>`;
 }
 
@@ -5275,9 +5297,25 @@ function eigenesMediumSichern(id, bild) {
 }
 
 /** Bildflaeche fuer einen eigenen Eintrag, sonst das Platzhalter-Symbol. */
+/*
+ * Wo noch kein echtes Bild liegt, stand bisher ein graues Feld mit einem
+ * durchgestrichenen Bildsymbol darin - das liest sich wie ein Ladefehler und
+ * zieht die ganze Seite nach unten. Stattdessen bekommt jeder Beitrag eine
+ * ruhige Farbflaeche, stabil aus seiner Kennung gewaehlt. Das Symbol liegt
+ * blass darauf und sagt nur noch, um welche Art Medium es geht.
+ */
+const MOTIVE = 8;
+
+function motivVon(id) {
+  let h = 0;
+  for (const z of String(id)) h = (h * 31 + z.charCodeAt(0)) >>> 0;
+  return h % MOTIVE;
+}
+
 function medienFlaeche(id, symbol) {
   const bild = eigeneMedien()[id];
-  return bild ? `<img class="eigenbild" src="${bild}" alt="">` : symbol;
+  if (bild) return `<img class="eigenbild" src="${bild}" alt="">`;
+  return `<span class="motiv motiv--${motivVon(id)}">${symbol}</span>`;
 }
 
 /* ------------------------------------------------------ Formular-Blatt */

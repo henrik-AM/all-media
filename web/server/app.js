@@ -12,18 +12,18 @@ const path = require('path');
 const app = express();
 
 const users = {
-  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: '#F2A65A', phone: '+49 151 2345678' },
-  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', initials: 'BM', color: '#6C8AE4', phone: '+49 152 3456789' },
-  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', initials: 'CW', color: '#E4699B', phone: '+49 160 4567890' },
-  u4: { id: 'u4', name: 'David König', handle: '@david', initials: 'DK', color: '#4DB6AC', phone: '+49 171 5678901' },
-  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: '#9575CD', phone: '+49 172 6789012' },
-  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: '#7986CB', phone: '+49 173 7890123' },
-  me: { id: 'me', name: 'Du', handle: '@henrik', initials: 'DU', color: '#0A66FF', phone: '+49 170 1234567' },
+  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: 'linear-gradient(135deg,#FCA2BC,#E04570)', phone: '+49 151 2345678' },
+  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', initials: 'BM', color: 'linear-gradient(135deg,#75DCF2,#1791BA)', phone: '+49 152 3456789' },
+  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', initials: 'CW', color: 'linear-gradient(135deg,#FBD277,#D88F1C)', phone: '+49 160 4567890' },
+  u4: { id: 'u4', name: 'David König', handle: '@david', initials: 'DK', color: 'linear-gradient(135deg,#9FDD84,#419A32)', phone: '+49 171 5678901' },
+  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 172 6789012' },
+  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: 'linear-gradient(135deg,#93AEFF,#4152D8)', phone: '+49 173 7890123' },
+  me: { id: 'me', name: 'Du', handle: '@henrik', initials: 'DU', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 170 1234567' },
   // Diese drei stehen bewusst NICHT in den Kontakten - sonst laesst sich
   // "Kontakt hinzufuegen" gar nicht ausprobieren.
-  u7: { id: 'u7', name: 'Greta Hoffmann', handle: '@greta', initials: 'GH', color: '#EF6C6C', phone: '+49 174 8901234' },
-  u8: { id: 'u8', name: 'Hakan Demir', handle: '@hakan', initials: 'HD', color: '#5C9E6F', phone: '+49 175 9012345' },
-  u9: { id: 'u9', name: 'Ida Nowak', handle: '@ida', initials: 'IN', color: '#C48BD9', phone: '+49 176 0123456' },
+  u7: { id: 'u7', name: 'Greta Hoffmann', handle: '@greta', initials: 'GH', color: 'linear-gradient(135deg,#FBA0C4,#DC3F7C)', phone: '+49 174 8901234' },
+  u8: { id: 'u8', name: 'Hakan Demir', handle: '@hakan', initials: 'HD', color: 'linear-gradient(135deg,#6FE2D0,#12907F)', phone: '+49 175 9012345' },
+  u9: { id: 'u9', name: 'Ida Nowak', handle: '@ida', initials: 'IN', color: 'linear-gradient(135deg,#C4A4F7,#7C46EE)', phone: '+49 176 0123456' },
 };
 
 // --- Person finden: Benutzername ODER Telefonnummer ------------------------
@@ -941,7 +941,12 @@ app.post('/api/eigene/profil', (req, res) => {
     profiles.me.link = String(link).trim();
   }
 
-  if (color !== undefined && /^#[0-9a-fA-F]{6}$/.test(color)) {
+  // Erlaubt ist eine einzelne Farbe oder ein Zwei-Ton-Verlauf. Der Wert landet
+  // ungefiltert in einem style-Attribut, deshalb wird er hier eng geprueft und
+  // nicht nur auf Laenge.
+  const istFarbe = /^#[0-9a-fA-F]{6}$/.test(String(color));
+  const istVerlauf = /^linear-gradient\(135deg,#[0-9a-fA-F]{6},#[0-9a-fA-F]{6}\)$/.test(String(color));
+  if (color !== undefined && (istFarbe || istVerlauf)) {
     users.me.color = color;
   }
 

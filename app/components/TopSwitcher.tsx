@@ -51,12 +51,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: sizes.topBar,
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
+    gap: 0,
+    paddingHorizontal: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-  btn: { flex: 1, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  /* Die aktive Pille ist schmaler als das Feld — sie soll um das Symbol
+     sitzen, nicht das ganze Viertel füllen. Sonst wirkt die Leiste wie ein
+     Baukasten aus vier Kacheln. */
+  btn: {
+    flex: 1,
+    height: 36,
+    marginHorizontal: 10,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   btnActive: { backgroundColor: colors.brandSoft },
 });

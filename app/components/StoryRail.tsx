@@ -1,8 +1,9 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
-import { colors, sizes, spacing, typography } from '../constants/design';
+import { brandGradient, colors, sizes, spacing, storyGradient, typography } from '../constants/design';
 import { Story } from '../types';
 
 interface Props {
@@ -10,33 +11,65 @@ interface Props {
   onPress: (story: Story) => void;
 }
 
+const RING = sizes.storyRing;
+
+/**
+ * Story-Leiste. Der Ring ist ein Verlauf, kein einfarbiger Rand — das ist der
+ * eine Punkt, an dem eine Story-Leiste hochwertig oder selbstgebaut aussieht.
+ * Gesehene Stories bekommen einen sehr feinen grauen Ring statt gar keinem,
+ * damit die Reihe optisch nicht auseinanderfällt.
+ */
 export const StoryRail = ({ stories, onPress }: Props) => (
-  <ScrollView
-    horizontal
-    showsHorizontalScrollIndicator={false}
-    contentContainerStyle={styles.rail}
-    style={styles.railWrap}
-  >
-    {stories.map((story) => (
-      <Pressable key={story.id} style={styles.item} onPress={() => onPress(story)}>
-        <View style={[styles.ring, story.viewed && styles.ringViewed]}>
-          <View style={styles.inner}>
-            <Avatar id={story.userId} name={story.name} size={sizes.storyRing - 11} />
-          </View>
-          {/* Solange die eigene Story leer ist, laedt das Plus zur Aufnahme
-              ein. Ist sie gefuellt, verhaelt sie sich wie jede andere. */}
-          {story.own && !story.mediaUri && (
-            <View style={styles.addBadge}>
-              <Ionicons name="add" size={13} color={colors.white} />
-            </View>
-          )}
-        </View>
-        <Text style={styles.name} numberOfLines={1}>
-          {story.name}
-        </Text>
-      </Pressable>
-    ))}
-  </ScrollView>
+  <View style={styles.railWrap}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+      {stories.map((story) => {
+        const inner = RING - 7;
+        return (
+          <Pressable
+            key={story.id}
+            style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+            onPress={() => onPress(story)}
+          >
+            {story.viewed ? (
+              <View style={[styles.ring, styles.ringViewed]}>
+                <View style={styles.inner}>
+                  <Avatar id={story.userId} name={story.name} size={inner - 4} />
+                </View>
+              </View>
+            ) : (
+              <LinearGradient
+                colors={storyGradient}
+                start={{ x: 0.1, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.ring}
+              >
+                <View style={styles.inner}>
+                  <Avatar id={story.userId} name={story.name} size={inner - 4} />
+                </View>
+              </LinearGradient>
+            )}
+
+            {/* Solange die eigene Story leer ist, lädt das Plus zur Aufnahme
+                ein. Ist sie gefüllt, verhält sie sich wie jede andere. */}
+            {story.own && !story.mediaUri && (
+              <LinearGradient
+                colors={brandGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.addBadge}
+              >
+                <Ionicons name="add" size={14} color={colors.white} />
+              </LinearGradient>
+            )}
+
+            <Text style={[styles.name, story.own && styles.nameOwn]} numberOfLines={1}>
+              {story.name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  </View>
 );
 
 const styles = StyleSheet.create({
@@ -44,50 +77,61 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   rail: {
-    gap: 14,
+    gap: 15,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingTop: 13,
+    paddingBottom: 12,
   },
   item: {
-    width: sizes.storyRing,
+    width: RING,
     alignItems: 'center',
   },
+  itemPressed: { opacity: 0.62 },
   ring: {
-    width: sizes.storyRing,
-    height: sizes.storyRing,
-    borderRadius: sizes.storyRing / 2,
-    borderWidth: 2.5,
-    borderColor: colors.brand,
+    width: RING,
+    height: RING,
+    borderRadius: RING / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ringViewed: {
-    borderColor: colors.border,
+    backgroundColor: colors.border,
   },
+  /* Der weiße Spalt zwischen Ring und Bild — ohne ihn klebt der Verlauf am
+     Gesicht und der Ring wirkt wie ein Rahmen statt wie ein Signal. */
   inner: {
-    borderWidth: 2,
-    borderColor: colors.surface,
-    borderRadius: sizes.storyRing / 2,
+    width: RING - 5,
+    height: RING - 5,
+    borderRadius: (RING - 5) / 2,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addBadge: {
     position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.brand,
+    right: -1,
+    top: RING - 21,
+    width: 21,
+    height: 21,
+    borderRadius: 10.5,
     borderWidth: 2.5,
     borderColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /* Breiter als der Ring — sonst wird „Deine Story" auf „Deine Sto…" gekürzt. */
   name: {
-    marginTop: 6,
+    width: 72,
+    marginHorizontal: -4,
+    textAlign: 'center',
+    marginTop: 7,
     color: colors.text2,
     ...typography.small,
     fontSize: 11.5,
+    letterSpacing: -0.1,
   },
+  nameOwn: { color: colors.text, fontWeight: '600' },
 });

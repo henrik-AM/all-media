@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, radius, spacing, typography } from '../constants/design';
+import { brandGradient, colors, radius, shadow, spacing, typography } from '../constants/design';
 
 interface Props {
   value: string;
@@ -10,10 +11,18 @@ interface Props {
   onAdd?: () => void;
 }
 
+/**
+ * Suchfeld. Weiches Rechteck statt voller Pille — die Pille ist der Default,
+ * den jede App benutzt; das weiche Rechteck wirkt gesetzt. Dazu eine feine
+ * Kante, damit das Feld auf weißem Grund überhaupt eine Form hat.
+ *
+ * Der Plus-Knopf trägt den Markenverlauf und einen farbigen Schatten. Er ist
+ * damit die einzige echte Farbfläche auf dem Bildschirm und wird zum Blickziel.
+ */
 export const SearchBar = ({ value, onChangeText, placeholder = 'Suchen', onAdd }: Props) => (
   <View style={styles.row}>
     <View style={styles.box}>
-      <Ionicons name="search" size={18} color={colors.text3} />
+      <Ionicons name="search" size={17} color={colors.text3} />
       <TextInput
         style={styles.input}
         value={value}
@@ -26,13 +35,24 @@ export const SearchBar = ({ value, onChangeText, placeholder = 'Suchen', onAdd }
       />
       {value.length > 0 && (
         <Pressable onPress={() => onChangeText('')} hitSlop={8}>
-          <Ionicons name="close-circle" size={18} color={colors.text3} />
+          <Ionicons name="close-circle" size={17} color={colors.text3} />
         </Pressable>
       )}
     </View>
     {onAdd && (
-      <Pressable style={styles.add} onPress={onAdd}>
-        <Ionicons name="add" size={22} color={colors.white} />
+      <Pressable
+        style={({ pressed }) => [styles.addWrap, pressed && styles.addPressed]}
+        onPress={onAdd}
+        accessibilityLabel="Neu"
+      >
+        <LinearGradient
+          colors={brandGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.add}
+        >
+          <Ionicons name="add" size={22} color={colors.white} />
+        </LinearGradient>
       </Pressable>
     )}
   </View>
@@ -42,17 +62,19 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 10,
   },
   box: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    height: 40,
+    gap: 8,
+    height: 42,
     paddingHorizontal: 13,
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface3,
+    borderRadius: radius.soft,
+    backgroundColor: colors.surface2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   input: {
     flex: 1,
@@ -60,11 +82,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     ...typography.body,
   },
+  addWrap: {
+    borderRadius: radius.soft,
+    ...shadow.brand,
+  },
+  addPressed: { opacity: 0.85, transform: [{ scale: 0.95 }] },
   add: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.brand,
+    width: 42,
+    height: 42,
+    borderRadius: radius.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },

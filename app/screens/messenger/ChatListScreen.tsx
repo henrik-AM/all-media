@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { StoryRail } from '../../components/StoryRail';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { brandGradient, colors, radius, sizes, spacing, typography } from '../../constants/design';
 import { Chat, Story } from '../../types';
 
 type Filter = 'all' | 'contacts' | 'groups';
@@ -65,9 +66,14 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
             </Text>
             {item.muted && <Ionicons name="volume-mute-outline" size={15} color={colors.text3} />}
             {unread && (
-              <View style={styles.badge}>
+              <LinearGradient
+                colors={brandGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.badge}
+              >
                 <Text style={styles.badgeText}>{item.unreadCount}</Text>
-              </View>
+              </LinearGradient>
             )}
           </View>
         </View>
@@ -90,15 +96,27 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
       </View>
 
       <View style={styles.pills}>
-        {FILTERS.map(({ key, label }) => (
-          <Pressable
-            key={key}
-            style={[styles.pill, filter === key && styles.pillActive]}
-            onPress={() => setFilter(key)}
-          >
-            <Text style={[styles.pillText, filter === key && styles.pillTextActive]}>{label}</Text>
-          </Pressable>
-        ))}
+        {FILTERS.map(({ key, label }) => {
+          const on = filter === key;
+          return (
+            <Pressable key={key} onPress={() => setFilter(key)}>
+              {on ? (
+                <LinearGradient
+                  colors={brandGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pill}
+                >
+                  <Text style={[styles.pillText, styles.pillTextActive]}>{label}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.pill, styles.pillIdle]}>
+                  <Text style={styles.pillText}>{label}</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
       </View>
 
       <FlatList
@@ -122,13 +140,21 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
 
-  pills: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: 6 },
-  pill: { paddingHorizontal: 15, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface3 },
-  pillActive: { backgroundColor: colors.brand },
-  pillText: { color: colors.text2, fontSize: 13.5, fontWeight: '600' },
+  pills: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: 8 },
+  /* Nicht gewählte Filter sind nur eine Linie, keine graue Fläche. Drei graue
+     Kacheln nebeneinander erzeugen Unruhe direkt unter dem Suchfeld. */
+  pill: {
+    height: 33,
+    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillIdle: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  pillText: { color: colors.text2, fontSize: 13.5, fontWeight: '600', letterSpacing: -0.1 },
   pillTextActive: { color: colors.white },
 
-  row: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: spacing.lg, paddingVertical: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingHorizontal: spacing.lg, paddingVertical: 11 },
   rowPressed: { backgroundColor: colors.surface2 },
   rowBody: { flex: 1, minWidth: 0 },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
