@@ -203,12 +203,20 @@ const styles = StyleSheet.create({
   post: { paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
 
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingVertical: 10 },
-  ring: { padding: 2, borderRadius: 22, borderWidth: 2, borderColor: colors.brand },
+  /*
+   * Der Ring um den Avatar im Beitragskopf ist weg. Er trug die Markenfarbe
+   * und sah damit aus wie ein Story-Ring — stand aber für gar nichts, denn ob
+   * jemand eine Story hat, sagt die Leiste oben. Die Website hatte ihn nie;
+   * beide Seiten sind jetzt gleich.
+   */
+  ring: { padding: 2, borderRadius: 22 },
   who: { flex: 1, minWidth: 0 },
   name: { color: colors.text, fontSize: 14, fontWeight: '700' },
   sub: { marginTop: 1, color: colors.text2, fontSize: 11.5 },
-  follow: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.brand },
-  followActive: { backgroundColor: colors.surface3 },
+  follow: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.brand },
+  /* Ein erledigter Zustand ("Gefolgt") ist ruhiger als die Aufforderung
+     ("Folgen") — aber als Kante, nicht als graue Fläche. */
+  followActive: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   followText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   followTextActive: { color: colors.text2 },
   bell: { width: 30, alignItems: 'center' },

@@ -234,10 +234,19 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: colors.text },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2, paddingTop: 2 },
+  /*
+   * Das Raster hatte nur zwei Spalten statt drei. Grund: 3 × 33 % plus zwei
+   * Luecken von je 2px sind zusammen breiter als die Zeile — das dritte Feld
+   * rutschte um. Abstand jetzt ueber einen Rand in Hintergrundfarbe statt
+   * ueber gap, dann bleibt die Breite exakt ein Drittel. Genauso macht es
+   * UserProfileScreen, wo es immer richtig war.
+   */
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
   gridItem: {
-    width: '33%',
+    width: '33.333%',
     aspectRatio: 1,
+    borderWidth: 1,
+    borderColor: colors.surface,
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',

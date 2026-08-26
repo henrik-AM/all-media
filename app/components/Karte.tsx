@@ -2,7 +2,8 @@ import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } fro
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { avatarColor, colors, radius, spacing, typography } from '../constants/design';
+import { LinearGradient } from 'expo-linear-gradient';
+import { avatarPair, colors, initialsOf, radius, spacing, typography } from '../constants/design';
 
 /**
  * Eine gezeichnete Stadtkarte zum Zoomen und Schieben.
@@ -38,6 +39,10 @@ interface Props {
   aktiv?: string | null;
   onPinPress?: (pinId: string) => void;
   hoehe?: number;
+  /** Fuellt die Karte gerade den Bildschirm? */
+  vollbild?: boolean;
+  /** Umschalten. Ohne diese Angabe erscheint der Knopf nicht. */
+  onVollbild?: () => void;
 }
 
 /** Strassenraster und Blockflaechen - rein zur Optik. */
@@ -56,7 +61,7 @@ const BLOECKE = [
 ];
 
 export const Karte = forwardRef<KartenSteuerung, Props>(
-  ({ pins, aktiv, onPinPress, hoehe = 320 }, ref) => {
+  ({ pins, aktiv, onPinPress, hoehe = 320, vollbild, onVollbild }, ref) => {
     const [zoom, setZoom] = useState(MIN_ZOOM);
     // Die Breite steht erst nach dem Layout fest - vorher ein Schaetzwert.
     const [breite, setBreite] = useState(340);
@@ -168,7 +173,7 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
 
     return (
       <View
-        style={[styles.rahmen, { height: hoehe }]}
+        style={[styles.rahmen, vollbild && styles.rahmenVoll, { height: hoehe }]}
         onLayout={(e) => setBreite(e.nativeEvent.layout.width)}
       >
         <Animated.View
@@ -224,15 +229,20 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
                 ]}
               >
               <Druck onPress={() => onPinPress?.(pin.id)} hitSlop={6} style={styles.pinInhalt}>
-                <View
-                  style={[
-                    styles.punkt,
-                    { backgroundColor: avatarColor(pin.id) },
-                    istAktiv && styles.punktAktiv,
-                  ]}
+                {/*
+                  * Die Nadel zeigte die ersten zwei Buchstaben des Namens —
+                  * bei „Anna Schmidt" also „AN". In der Liste direkt darunter
+                  * steht „AS". Jetzt kommen Initialen und Farbe aus derselben
+                  * Quelle wie jeder andere Avatar der App.
+                  */}
+                <LinearGradient
+                  colors={avatarPair(pin.id)}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.punkt, istAktiv && styles.punktAktiv]}
                 >
-                  <Text style={styles.punktText}>{pin.name.slice(0, 2).toUpperCase()}</Text>
-                </View>
+                  <Text style={styles.punktText}>{initialsOf(pin.name)}</Text>
+                </LinearGradient>
                 <Text style={styles.pinName} numberOfLines={1}>
                   {pin.name.split(' ')[0]}
                 </Text>
@@ -242,16 +252,23 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
           })}
         </Animated.View>
 
-        {/* Zoomknöpfe - verlässlicher als Zwei-Finger-Gesten auf kleinen Geräten */}
-        <View style={styles.zoomLeiste}>
-          <Druck style={styles.zoomBtn} onPress={() => setzeZoom(stand.current.zoom + 0.6)}>
-            <Ionicons name="add" size={20} color={colors.text} />
-          </Druck>
-          <View style={styles.zoomTrenner} />
-          <Druck style={styles.zoomBtn} onPress={() => setzeZoom(stand.current.zoom - 0.6)}>
-            <Ionicons name="remove" size={20} color={colors.text} />
-          </Druck>
-        </View>
+        {/*
+          * Henrik wollte hier den Vollbild-Pfeil statt Plus und Minus. In der
+          * Website steht das seit dem 25.08. so, in der App war es liegen
+          * geblieben. Zoomen geht ohnehin mit zwei Fingern; die zwei Knöpfe
+          * haben nur Platz auf der Karte weggenommen.
+          */}
+        {onVollbild && (
+          <View style={styles.zoomLeiste}>
+            <Druck
+              style={styles.zoomBtn}
+              onPress={onVollbild}
+              accessibilityLabel={vollbild ? 'Vollbild verlassen' : 'Karte im Vollbild'}
+            >
+              <Ionicons name={vollbild ? 'contract-outline' : 'expand-outline'} size={19} color={colors.text} />
+            </Druck>
+          </View>
+        )}
 
         {zoom > MIN_ZOOM + 0.05 && (
           <Druck style={styles.zurueck} onPress={() => setzeZoom(MIN_ZOOM, { x: 0, y: 0 })}>
@@ -270,11 +287,15 @@ const styles = StyleSheet.create({
   rahmen: {
     marginHorizontal: spacing.lg,
     borderRadius: radius.lg,
+    // Der Rahmen wird im Vollbild aufgehoben, siehe rahmenVoll.
     backgroundColor: '#E8EDE4',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',
   },
+  /* Im Vollbild ist die Karte die ganze Flaeche: kein Rand, keine Rundung,
+     keine Kante - sonst schwebt sie als Kachel im Bildschirm. */
+  rahmenVoll: { marginHorizontal: 0, borderRadius: 0, borderWidth: 0 },
   flaeche: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
 
   park: {
@@ -321,7 +342,12 @@ const styles = StyleSheet.create({
     borderColor: colors.white,
   },
 
-  pin: { position: 'absolute', alignItems: 'center', marginLeft: -17, marginTop: -40, width: 34 },
+  /*
+   * Breiter als der Punkt (34), damit die Beschriftung darunter Platz hat —
+   * vorher war sie auf Punktbreite begrenzt und „Anna" wurde zu „An…".
+   * marginLeft hält den Punkt trotzdem genau über seiner Position.
+   */
+  pin: { position: 'absolute', alignItems: 'center', marginLeft: -38, marginTop: -40, width: 76 },
   pinInhalt: { alignItems: 'center', gap: 2 },
   punkt: {
     width: 34,

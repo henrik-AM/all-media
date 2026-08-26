@@ -57,7 +57,10 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
 
     <View style={styles.top}>
       <View>
-        <Avatar id="me" name="Du" size={sizes.avatarXl} />
+        {/* Der Name stand hier fest als "Du" - die Initiale im Kreis war
+            deshalb "D", waehrend direkt darunter "Henrik" steht. Jetzt kommt
+            der Name von aussen, wie ueberall sonst. */}
+        <Avatar id="me" name={name} size={sizes.avatarXl} />
         <View style={styles.online} />
       </View>
       <View style={styles.stats}>

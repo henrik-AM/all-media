@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useState } from 'react';
+import React, { useEffect, useCallback, useContext, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
@@ -16,7 +16,8 @@ import { KontoWechsel } from './components/KontoWechsel';
 import { TabBar } from './components/TabBar';
 import { TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
-import { AreaKey, SubKey, defaultSub } from './constants/navigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AreaKey, NAV, SubKey, defaultSub } from './constants/navigation';
 import { LoginScreen } from './screens/LoginScreen';
 import { ChatListScreen } from './screens/messenger/ChatListScreen';
 import { ChatDetailScreen } from './screens/messenger/ChatDetailScreen';
@@ -109,6 +110,37 @@ const Shell = () => {
 
   const sub = subs[area];
   const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
+
+  /*
+   * Prüf-Schalter: beim Start auf einen bestimmten Bildschirm springen.
+   *
+   * Warum es das gibt: die rund 108 Prüfungen des Projekts laufen alle gegen
+   * die Website. Für die App gab es nur `tsc` und den Metro-Bau — beide sagen
+   * nichts darüber, wie ein Bildschirm aussieht. Genau deshalb ist am
+   * 26.08.2026 ein falscher Avatar in der Story-Leiste durchgerutscht.
+   *
+   * `tools/app-bilder.js` schreibt hier einen Bereich hinein, startet die App
+   * neu und legt ein Bild ab. Ohne diesen Schalter käme man im Simulator nie
+   * über den ersten Bildschirm hinaus, weil sich ein Tippen von außen nicht
+   * auslösen lässt.
+   *
+   * `__DEV__` ist in einem veröffentlichten Build false — der Schalter
+   * existiert dort also nicht, und der Schlüssel wird nie gelesen.
+   */
+  useEffect(() => {
+    if (!__DEV__) return;
+    AsyncStorage.getItem('all-media.pruefbild')
+      .then((roh) => {
+        if (!roh) return;
+        const [zielArea, zielSub] = roh.split('/') as [AreaKey, SubKey | undefined];
+        if (!NAV.some((a) => a.key === zielArea)) return;
+        setArea(zielArea);
+        if (zielSub) setSubs((prev) => ({ ...prev, [zielArea]: zielSub }));
+      })
+      .catch(() => {
+        // Kein Schalter gesetzt oder Speicher nicht lesbar: normal starten.
+      });
+  }, []);
 
   const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
   const hideNotice = useCallback(() => setNotice(null), []);

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
@@ -35,19 +36,30 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 );
 
 const Row = ({
+  id,
   icon,
   title,
   sub,
   onPress,
 }: {
+  /*
+   * Ohne id ist die Zeile eine Kategorie (Ort, Musik) und keine Aufnahme —
+   * dann gibt es keine Motivfläche, sondern die gedämpfte Markenfarbe. Sonst
+   * sähen Orte und Musik aus wie Vorschaubilder, die nicht geladen haben.
+   */
+  id?: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   title: string;
   sub: string;
   onPress: () => void;
 }) => (
   <Druck style={styles.row} onPress={onPress}>
-    <View style={styles.rowThumb}>
-      <Ionicons name={icon} size={20} color={colors.text3} />
+    <View style={[styles.rowThumb, !id && styles.rowThumbKategorie]}>
+      {id ? (
+        <Motiv id={id} icon={icon} iconSize={18} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+      ) : (
+        <Ionicons name={icon} size={18} color={colors.brand} />
+      )}
     </View>
     <View style={styles.rowText}>
       <Text style={styles.rowTitle}>{title}</Text>
@@ -101,7 +113,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reelRow}>
                 {result.reels.map((v) => (
                   <Druck key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
-                    <Ionicons name="phone-portrait-outline" size={28} color={colors.text3} />
+                    <Motiv id={v.id} icon="phone-portrait-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                     <Text style={styles.reelName}>{mockUsers[v.userId].name}</Text>
                   </Druck>
                 ))}
@@ -114,6 +126,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
               {result.clips.map((c) => (
                 <Row
                   key={c.id}
+                  id={c.id}
                   icon="tv-outline"
                   title={c.title}
                   sub={`${mockUsers[c.userId].name} · ${c.duration}`}
@@ -128,7 +141,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
               <View style={styles.grid}>
                 {result.posts.map((p) => (
                   <Druck key={p.id} style={styles.gridItem} onPress={() => onNotice('Beitrag öffnet im Feed')}>
-                    <Ionicons name="image-outline" size={26} color={colors.text3} />
+                    <Motiv id={p.id} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                   </Druck>
                 ))}
               </View>
@@ -217,6 +230,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
+    overflow: 'hidden',
   },
   reelName: { ...typography.small, color: colors.text2 },
   row: {
@@ -233,17 +247,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  rowThumbKategorie: { backgroundColor: colors.brandSoft },
   rowText: { flex: 1 },
   rowTitle: { ...typography.message, fontWeight: '600', color: colors.text },
   rowSub: { ...typography.small, color: colors.text3, marginTop: 2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
+  /* 3 × 33 % plus zwei Lücken von je 2px sind breiter als die Zeile - das
+     dritte Feld rutscht um. Abstand deshalb über einen Rand in
+     Hintergrundfarbe, dann bleibt die Breite exakt ein Drittel. */
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
   gridItem: {
-    width: '33%',
+    width: '33.333%',
     aspectRatio: 1,
+    borderWidth: 1,
+    borderColor: colors.surface,
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg },
   tag: {

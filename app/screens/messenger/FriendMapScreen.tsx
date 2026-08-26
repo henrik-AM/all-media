@@ -27,6 +27,18 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
   const [aktiv, setAktiv] = useState<string | null>(null);
   const [sichtbar, setSichtbar] = useState(true);
   const [freigabe, setFreigabe] = useState<Freigabe>('kontakte');
+  /*
+   * Vollbild: die Karte füllt den Bereich, Freigabe und Liste treten zurück.
+   * Henrik hatte das für die Website gefordert („Vollbild-Pfeil statt
+   * Plus/Minus") — in der App war es liegen geblieben.
+   */
+  const [vollbild, setVollbild] = useState(false);
+  /*
+   * Die sichtbare Hoehe des Bereichs. Sie wird gemessen und nicht geraten:
+   * die Karte rechnet mit `hoehe` (Zoomweg, Mittigsetzen einer Nadel), ein
+   * geschaetzter Wert wuerde die Nadel beim Hineinzoomen danebensetzen.
+   */
+  const [flaeche, setFlaeche] = useState(0);
 
   const pins = mockFriendPins.map((pin) => ({
     id: pin.id,
@@ -45,11 +57,28 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Karte ref={karte} pins={pins} aktiv={aktiv} onPinPress={zeigeAufKarte} />
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={[styles.content, vollbild && styles.contentVoll]}
+      scrollEnabled={!vollbild}
+      onLayout={(e) => setFlaeche(e.nativeEvent.layout.height)}
+    >
+      <Karte
+        ref={karte}
+        pins={pins}
+        aktiv={aktiv}
+        onPinPress={zeigeAufKarte}
+        vollbild={vollbild}
+        onVollbild={() => setVollbild((v) => !v)}
+        // Im Vollbild bekommt die Karte den ganzen Bereich. flex allein reicht
+        // nicht, weil die Karte eine feste Hoehe erwartet.
+        hoehe={vollbild && flaeche > 0 ? flaeche : 320}
+      />
 
       {/* Standort-Freigabe: steht bewusst ueber der Liste, weil es die Frage
-          ist, die man sich zuerst stellt. */}
+          ist, die man sich zuerst stellt. Im Vollbild gehoert der Platz
+          ganz der Karte. */}
+      {!vollbild && (
       <View style={styles.freigabe}>
         <View style={styles.freigabeKopf}>
           <Ionicons name="location-outline" size={19} color={colors.brand} />
@@ -89,9 +118,10 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
           </View>
         )}
       </View>
+      )}
 
-      <Text style={styles.listHead}>IN DEINER NÄHE</Text>
-      {mockFriendPins.map((pin) => {
+      {!vollbild && <Text style={styles.listHead}>IN DEINER NÄHE</Text>}
+      {!vollbild && mockFriendPins.map((pin) => {
         const person = mockUsers[pin.id];
         const istAktiv = aktiv === pin.id;
         return (
@@ -126,6 +156,8 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { paddingTop: spacing.lg, paddingBottom: spacing.xl },
+  /* Im Vollbild fuellt die Karte den Bereich - kein Rand, kein Scrollen. */
+  contentVoll: { flexGrow: 1, paddingTop: 0, paddingBottom: 0 },
 
   freigabe: {
     marginHorizontal: spacing.lg,
@@ -139,13 +171,17 @@ const styles = StyleSheet.create({
   freigabeTitel: { color: colors.text, ...typography.name },
   freigabeSub: { color: colors.text2, marginTop: 2, ...typography.small },
   optionen: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  /* Wie die Filter im Messenger: nicht gewählt ist nur eine Linie, gewählt
+     trägt die Markenfarbe. Drei graue Kacheln nebeneinander sind unruhig. */
   option: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface3,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  optionAn: { backgroundColor: colors.brand },
+  optionAn: { backgroundColor: colors.brand, borderColor: 'transparent' },
   optionText: { color: colors.text2, fontSize: 13, fontWeight: '600' },
   optionTextAn: { color: colors.white },
 

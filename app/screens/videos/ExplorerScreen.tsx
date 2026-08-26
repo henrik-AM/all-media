@@ -375,10 +375,15 @@ const styles = StyleSheet.create({
   clipTitel: { ...typography.name, color: colors.text },
   clipSub: { ...typography.small, color: colors.text2, marginTop: 2 },
 
-  raster: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
+  /* 3 × 33 % plus zwei Lücken von je 2px sind breiter als die Zeile - das
+     dritte Feld rutscht um. Abstand deshalb über einen Rand in
+     Hintergrundfarbe, dann bleibt die Breite exakt ein Drittel. */
+  raster: { flexDirection: 'row', flexWrap: 'wrap' },
   rasterFeld: {
-    width: '33%',
+    width: '33.333%',
     aspectRatio: 1,
+    borderWidth: 1,
+    borderColor: colors.surface,
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
