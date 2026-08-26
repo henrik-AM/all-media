@@ -138,6 +138,28 @@ function eigenerAvatar(me, size = 44, extra = '') {
 }
 
 /*
+ * Der eigene Avatar mit Story-Ring, wenn gerade eine eigene Story laeuft.
+ *
+ * Henrik am 26.08.2026: "Neue Story wird nicht unter dem Profilbild mit
+ * einem Kreis angezeigt." Sie stand nur in der Story-Leiste der Chatliste -
+ * im eigenen Profil war ihr nichts anzusehen.
+ *
+ * Ein Klick fuehrt in die Story, genau wie in der Leiste. Ohne laufende
+ * Story bleibt es der schlichte Avatar; ein Ring, der immer da ist, sagt
+ * nichts mehr aus.
+ */
+function eigenerAvatarMitStory(me, size = 88) {
+  const story = eigeneStoryLaden();
+  if (!story?.mediaUri) return eigenerAvatar(me, size, 'has-status');
+
+  return `<button class="profilstory" data-eigene-story aria-label="Deine Story ansehen">
+    <span class="profilstory__ring">
+      <span class="profilstory__innen">${eigenerAvatar(me, size)}</span>
+    </span>
+  </button>`;
+}
+
+/*
  * Link in der Profilbeschreibung. Henrik: "Links in Profilbeschreibungen
  * muessen anklickbar sein." Vorher stand dort ein Anker auf "#", der nur
  * einen Hinweis eingeblendet hat.
@@ -4198,6 +4220,16 @@ function renderMessengerProfile() {
         <button data-switch="communities">@communityprofil</button>
       </div>
 
+      ${/*
+          "Profil bearbeiten" gab es nur im Videos-Profil. Henrik hat das fuer
+          alle drei gemeldet - Name, Info und Link gehoeren zum Konto, nicht zu
+          einem einzelnen Profil, also fuehrt der Knopf ueberall zu demselben
+          Formular.
+        */ ''}
+      <div class="prof__aktionen">
+        <button class="btn btn--breit" id="profilBearbeiten">Profil bearbeiten</button>
+      </div>
+
       <button class="sectionlink" data-mact="settings">Einstellungen <span>${ICONS.chevron}</span></button>
       <div class="group">
         <button class="item" data-mact="location">
@@ -4217,6 +4249,7 @@ function renderMessengerProfile() {
 
   // Fuehrt zur Kontoliste - hier hat Henrik den Kontowechsel gesucht.
   $('#switchProfile').addEventListener('click', openKontoWechsel);
+  $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderMessengerProfile));
   main.querySelectorAll('[data-switch]').forEach((b) =>
     b.addEventListener('click', () => {
       state.area = b.dataset.switch;
@@ -6273,7 +6306,7 @@ async function renderVideoProfile() {
     <div class="scroll">
       ${ownProfileTop(me.handle, 'videos')}
       <div class="oprof__top">
-        ${eigenerAvatar(me, 88)}
+        ${eigenerAvatarMitStory(me)}
         <div class="prof__stats">
           <div class="prof__stat"><span>Beiträge</span><strong>${compactNumber(me.posts)}</strong></div>
           <button class="prof__stat" id="followerBtn"><span>Follower</span><strong>${compactNumber(me.followers)}</strong></button>
@@ -6591,7 +6624,7 @@ function renderCommunityProfile() {
     <div class="scroll">
       ${ownProfileTop(me.handle, 'communities')}
       <div class="oprof__top">
-        <div class="avatar avatar--88 has-status" style="background:${me.color}">${esc(me.initials)}</div>
+        ${eigenerAvatarMitStory(me)}
         <div class="prof__stats">
           <div class="prof__stat"><span>Erstellte Communitys</span><strong>${created.length}</strong></div>
           <div class="prof__stat"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></div>
@@ -7515,6 +7548,17 @@ function closeOverlay() {
  * Knopf dort tot, und genau solche Faelle hatte Henrik gemeldet.
  */
 document.querySelector('.app').addEventListener('click', (e) => {
+  /*
+   * Der Story-Ring am eigenen Profilbild. Er steht im Videos- und im
+   * Communitys-Profil; ueber den Klickfaenger hier gilt er in beiden, ohne
+   * ihn zweimal verdrahten zu muessen.
+   */
+  if (e.target.closest('[data-eigene-story]')) {
+    e.stopPropagation();
+    const eigene = state.stories.find((x) => x.own);
+    if (eigene) return openStory(eigene.id);
+  }
+
   // Profil
   const profil = e.target.closest('[data-profile]');
   if (profil) {

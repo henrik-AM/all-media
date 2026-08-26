@@ -466,6 +466,35 @@ ul { margin: 0; padding: 0; list-style: none; }
   :root:not([data-theme="light"]) .story__ring.is-viewed { background: #2C3038; }
 }
 :root[data-theme="dark"] .story__ring.is-viewed { background: #2C3038; }
+/*
+  Der Story-Ring am eigenen Profilbild. Henrik am 26.08.2026: "Neue Story
+  wird nicht unter dem Profilbild mit einem Kreis angezeigt."
+
+  Derselbe Verlauf wie in der Story-Leiste, nur groesser und mit dickerem
+  Rand - auf 88px waere ein 3px-Ring kaum zu sehen. Steht kein Ring da, laeuft
+  gerade keine eigene Story; ein Ring, der immer da ist, sagt nichts mehr aus.
+*/
+.profilstory { flex: 0 0 auto; display: block; }
+.profilstory__ring {
+  display: grid; place-items: center;
+  width: 98px; height: 98px;
+  border-radius: 50%;
+  padding: 4px;
+  background: var(--story-grad);
+  transition: transform .16s;
+}
+.profilstory:hover .profilstory__ring { transform: scale(1.03); }
+.profilstory:active .profilstory__ring { transform: scale(.96); }
+/* Ein Ring in Hintergrundfarbe zwischen Verlauf und Bild - sonst klebt das
+   Bild am Verlauf und der Ring liest sich als dicker Rahmen. */
+.profilstory__innen {
+  display: grid; place-items: center;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  background: var(--surface);
+  padding: 2px;
+}
+
 .story__inner {
   width: 100%; height: 100%;
   border-radius: 50%;

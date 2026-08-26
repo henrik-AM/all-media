@@ -147,6 +147,58 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     });
   }
 
+  await pruefe('Auch das Messenger-Profil hat „Profil bearbeiten"', async () => {
+    await zumProfil('messenger');
+    if (!(await page.$('#profilBearbeiten'))) throw new Error('kein Knopf');
+    await page.click('#profilBearbeiten');
+    await page.waitForTimeout(500);
+    const felder = await page.$$eval('.sheet input, .sheet textarea', (n) => n.length);
+    if (!felder) throw new Error('das Formular geht nicht auf');
+    await page.click('[data-sheet-close]').catch(() => {});
+    await page.waitForTimeout(300);
+  });
+
+  /* --------------------------------------------- Story-Ring am Profil */
+  console.log('\nStory-Ring am eigenen Profil');
+
+  await pruefe('Ohne eigene Story ist kein Ring da', async () => {
+    await page.evaluate(() => localStorage.removeItem('allmedia.eigeneStory'));
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('#topbar button');
+    await zumProfil('videos');
+    if (await page.$('[data-eigene-story]')) throw new Error('der Ring steht ohne Story da');
+  });
+
+  await pruefe('Mit eigener Story steht der Ring am Profilbild', async () => {
+    await page.evaluate(() =>
+      localStorage.setItem(
+        'allmedia.eigeneStory',
+        JSON.stringify({ mediaUri: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', aufgenommen: Date.now() })
+      )
+    );
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('#topbar button');
+    await zumProfil('videos');
+    if (!(await page.$('[data-eigene-story]'))) throw new Error('kein Ring');
+  });
+
+  await pruefe('Der Ring steht auch im Communitys-Profil', async () => {
+    await zumProfil('communities');
+    if (!(await page.$('[data-eigene-story]'))) throw new Error('kein Ring');
+  });
+
+  await pruefe('Ein Klick auf den Ring oeffnet die Story', async () => {
+    await zumProfil('videos');
+    await page.click('[data-eigene-story]');
+    await page.waitForTimeout(700);
+    if (!(await page.$('.viewer, .story-viewer, #storyClose'))) {
+      throw new Error('der Betrachter geht nicht auf');
+    }
+    // Wieder zumachen - sonst liegt er ueber allem, was danach geprueft wird.
+    await page.evaluate(() => document.querySelector('#overlay')?.setAttribute('hidden', ''));
+    await page.waitForTimeout(300);
+  });
+
   /* ------------------------------------- Playlists und Highlights */
   console.log('\nPlaylists und Highlights');
 
