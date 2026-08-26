@@ -46,6 +46,11 @@ const DETAILS = [
   ['videos', 'profile', 'detail-erstellen', ['[data-oact="create"]']],
   ['videos', 'profile', 'detail-mitteilungen', ['[data-oact="bell"]']],
   ['videos', 'landscape', 'detail-clip', ['[data-clip="q1"]']],
+  // Die Uebersichtsseiten der Video-Suche. Sie kamen in keinem Bild vor,
+  // obwohl Henrik dort gleich drei Punkte gemeldet hat (kein Zurueck-Pfeil,
+  // fehlende Kategorien, und der Bug, der die App festsetzte).
+  ['videos', 'search', 'detail-suche-sounds', ['[data-explorer="sounds"]']],
+  ['videos', 'search', 'detail-suche-profile', ['[data-explorer="profile"]']],
 ];
 
 (async () => {

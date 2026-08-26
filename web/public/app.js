@@ -387,6 +387,7 @@ function renderBottomNav() {
        */
       state.area = ziel;
       state.sub[ziel] = STARTPUNKT[ziel];
+      verlasseExplorer();
       render();
     })
   );
@@ -422,9 +423,27 @@ function renderTopBar() {
   bar.querySelectorAll('[data-sub]').forEach((b) =>
     b.addEventListener('click', () => {
       state.sub[state.area] = b.dataset.sub;
+      verlasseExplorer();
       render();
     })
   );
+}
+
+/*
+ * Eine offene Uebersichtsseite der Video-Suche schliessen.
+ *
+ * Das war der Fehler hinter "nach Klick auf einen Unterpunkt buggt die ganze
+ * App" (Henrik, 26.08.2026): render() prueft state.explorerView ganz oben und
+ * kehrt sofort zurueck, wenn dort noch etwas steht. Wer eine Uebersichtsseite
+ * offen hatte und dann irgendwohin tippte, bekam wieder dieselbe Seite - egal
+ * welchen Bereich oder Unterpunkt er gewaehlt hatte. Die App wirkte fest.
+ *
+ * Deshalb raeumt jeder Navigationsklick den Zustand ab. Das ist die einzige
+ * Stelle, an der er ausser vom Zurueck-Pfeil geleert wird.
+ */
+function verlasseExplorer() {
+  state.explorerView = null;
+  state.explorerParam = null;
 }
 
 /*
@@ -448,6 +467,10 @@ function render() {
     if (state.explorerView === 'posts') return renderPostsExplorer();
     if (state.explorerView === 'hashtag') return renderHashtagExplorer(state.explorerParam);
     if (state.explorerView === 'place') return renderPlaceExplorer(state.explorerParam);
+    if (state.explorerView === 'profile') return renderProfileExplorer();
+    if (state.explorerView === 'hashtags') return renderHashtagsExplorer();
+    if (state.explorerView === 'standorte') return renderStandorteExplorer();
+    if (state.explorerView === 'sounds') return renderSoundsExplorer();
     state.explorerView = null;
   }
 
@@ -4148,9 +4171,34 @@ function renderLandscapeVideos() {
 }
 
 /* -------------------------------- Videos: Explorer-Seiten */
+/*
+ * Seitenkopf der Uebersichtsseiten aus der Video-Suche.
+ *
+ * Henrik am 26.08.2026: "Keine Moeglichkeit, von der Detail-Seite zurueck zur
+ * Suche." Die Seiten hatten nur eine Ueberschrift - man kam nur ueber die
+ * untere Leiste weg, und die warf einen aus dem Bereich.
+ */
+function explorerKopf(titel) {
+  return `<div class="pagehead">
+    <div class="pagehead__row">
+      <button class="iconbtn" data-explorer-back aria-label="Zurück zur Suche">${ICONS.back}</button>
+      <h2 class="pagehead__title">${titel}</h2>
+    </div>
+  </div>`;
+}
+
+/** Den Zurueck-Pfeil verdrahten. Jede Uebersichtsseite ruft das am Ende auf. */
+function explorerZurueck() {
+  main.querySelector('[data-explorer-back]')?.addEventListener('click', () => {
+    state.explorerView = null;
+    state.explorerParam = null;
+    render();
+  });
+}
+
 function renderReelsExplorer() {
   main.innerHTML = `
-    <div class="pagehead"><h2>Reels</h2></div>
+    ${explorerKopf('Reels')}
     <div class="scroll">
       <div class="exp__grid">${state.videos.map((v) => `
         <button class="exp__card" data-openvideo="${v.id}">
@@ -4162,11 +4210,12 @@ function renderReelsExplorer() {
         </button>`).join('')}</div>
     </div>`;
   main.querySelectorAll('[data-openvideo]').forEach(b => b.addEventListener('click', () => openVideo(b.dataset.openvideo)));
+  explorerZurueck();
 }
 
 function renderClipsExplorer() {
   main.innerHTML = `
-    <div class="pagehead"><h2>Querformat</h2></div>
+    ${explorerKopf('Querformat')}
     <div class="scroll">
       ${state.clips.map((c) => `
         <button class="exp__row" data-openclip="${c.id}">
@@ -4178,16 +4227,18 @@ function renderClipsExplorer() {
         </button>`).join('')}
     </div>`;
   main.querySelectorAll('[data-openclip]').forEach(b => b.addEventListener('click', () => openClip(b.dataset.openclip)));
+  explorerZurueck();
 }
 
 function renderPostsExplorer() {
   main.innerHTML = `
-    <div class="pagehead"><h2>Beiträge</h2></div>
+    ${explorerKopf('Beiträge')}
     <div class="scroll">
       <div class="exp__grid">${state.posts.map((p) => `
         <button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image)}</button>`).join('')}</div>
     </div>`;
   main.querySelectorAll('[data-openpost]').forEach(b => b.addEventListener('click', () => openPost(b.dataset.openpost)));
+  explorerZurueck();
 }
 
 function renderHashtagExplorer(tag) {
@@ -4195,11 +4246,99 @@ function renderHashtagExplorer(tag) {
     .concat(state.clips.filter(c => c.tags?.includes(tag)))
     .concat(state.posts.filter(p => p.tags?.includes(tag)));
   main.innerHTML = `
-    <div class="pagehead"><h2>${esc(tag)}</h2></div>
+    ${explorerKopf(esc(tag))}
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
         <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${medienFlaeche(i.id, ICONS.image)}</button>`).join('')}</div>
     </div>`;
+  explorerZurueck();
+}
+
+/*
+ * Uebersichtsseiten fuer Profile, Hashtags, Standorte und Sounds.
+ *
+ * Henrik am 26.08.2026: "Profile, Hashtags, Standorte, Sounds haben keinen
+ * Pfeil zum Mehr anzeigen." Reels, Querformat und Beitraege hatten laengst
+ * eine eigene Seite, diese vier nicht — die Suche zeigte dort nur die ersten
+ * Treffer und man kam nicht weiter.
+ *
+ * Alle vier zeigen dieselbe Liste wie die Suche, nur vollstaendig und ohne
+ * die Beschraenkung auf den Suchbegriff.
+ */
+function renderProfileExplorer() {
+  const leute = Object.values(state.users).filter((u) => u.id !== 'me');
+  main.innerHTML = `
+    ${explorerKopf('Profile')}
+    <div class="scroll">
+      <div class="exp__list">${leute
+        .map(
+          (u) => `<button class="exp__row" data-profile="${u.id}">
+            <span class="avatar avatar--44" style="background:${u.color}">${esc(u.initials)}</span>
+            <span class="exp__text"><strong>${esc(u.name)}</strong><small>${esc(u.handle)}</small></span>
+          </button>`
+        )
+        .join('')}</div>
+    </div>`;
+  // data-profile faengt der Klickfaenger an .app ab - hier nichts verdrahten,
+  // sonst ginge das Profil zweimal auf.
+  explorerZurueck();
+}
+
+function renderHashtagsExplorer() {
+  main.innerHTML = `
+    ${explorerKopf('# Hashtags')}
+    <div class="scroll">
+      <div class="exp__list">${state.hashtags
+        .map(
+          (h) => `<button class="exp__row" data-tag="${esc(h.tag)}">
+            <span class="exp__thumb exp__thumb--kategorie">${ICONS.hash || ICONS.search}</span>
+            <span class="exp__text"><strong>${esc(h.tag)}</strong><small>${compactNumber(h.posts)} Beiträge</small></span>
+          </button>`
+        )
+        .join('')}</div>
+    </div>`;
+  main.querySelectorAll('[data-tag]').forEach((b) =>
+    b.addEventListener('click', () => openExplorer('hashtag', b.dataset.tag))
+  );
+  explorerZurueck();
+}
+
+function renderStandorteExplorer() {
+  main.innerHTML = `
+    ${explorerKopf('Standorte')}
+    <div class="scroll">
+      <div class="exp__list">${state.places
+        .map(
+          (pl) => `<button class="exp__row" data-place="${pl.id}">
+            <span class="exp__thumb exp__thumb--kategorie">${ICONS.mapPin}</span>
+            <span class="exp__text"><strong>${esc(pl.name)}</strong><small>${compactNumber(pl.posts)} Beiträge</small></span>
+          </button>`
+        )
+        .join('')}</div>
+    </div>`;
+  main.querySelectorAll('[data-place]').forEach((b) =>
+    b.addEventListener('click', () => openExplorer('standort', b.dataset.place))
+  );
+  explorerZurueck();
+}
+
+function renderSoundsExplorer() {
+  main.innerHTML = `
+    ${explorerKopf('Sounds')}
+    <div class="scroll">
+      <div class="exp__list">${state.sounds
+        .map(
+          (so) => `<button class="exp__row" data-sound="${so.id}">
+            <span class="exp__thumb exp__thumb--kategorie">${ICONS.music}</span>
+            <span class="exp__text"><strong>${esc(so.title)}</strong><small>${esc(so.artist)} · ${compactNumber(so.uses)} Videos</small></span>
+          </button>`
+        )
+        .join('')}</div>
+    </div>`;
+  main.querySelectorAll('[data-sound]').forEach((b) =>
+    b.addEventListener('click', () => openExplorer('sound', b.dataset.sound))
+  );
+  explorerZurueck();
 }
 
 function renderPlaceExplorer(placeId) {
@@ -4208,11 +4347,12 @@ function renderPlaceExplorer(placeId) {
     .concat(state.clips.filter(c => c.location === place?.name))
     .concat(state.posts.filter(p => p.location === place?.name));
   main.innerHTML = `
-    <div class="pagehead"><h2>${esc(place?.name || 'Standort')}</h2></div>
+    ${explorerKopf(esc(place?.name || 'Standort'))}
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
         <button class="griditem" data-item="${i.id}">${medienFlaeche(i.id, ICONS.image)}</button>`).join('')}</div>
     </div>`;
+  explorerZurueck();
 }
 
 /*
@@ -4346,7 +4486,8 @@ function renderVideoSearch() {
                       </button>`
                     )
                     .join('')}</div>`
-                : ''
+                : '',
+              'profile'
             ) +
             section(
               '# Hashtags',
@@ -4354,7 +4495,8 @@ function renderVideoSearch() {
                 ? `<div class="exp__tags">${tags
                     .map((h) => `<button class="chip" data-tag="${esc(h.tag)}">${esc(h.tag)} · ${compactNumber(h.posts)}</button>`)
                     .join('')}</div>`
-                : ''
+                : '',
+              'hashtags'
             ) +
             section(
               'Standorte',
@@ -4367,7 +4509,8 @@ function renderVideoSearch() {
                       </button>`
                     )
                     .join('')}</div>`
-                : ''
+                : '',
+              'standorte'
             ) +
             section(
               'Sounds',
@@ -4380,7 +4523,8 @@ function renderVideoSearch() {
                       </button>`
                     )
                     .join('')}</div>`
-                : ''
+                : '',
+              'sounds'
             )
           : `<div class="empty">${ICONS.search}
               <div class="empty__title">Nichts gefunden</div>
