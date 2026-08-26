@@ -6279,7 +6279,7 @@ function openStory(storyId) {
         <button class="viewer__zone viewer__zone--prev" id="storyPrev" aria-label="Vorherige Story"></button>
         <button class="viewer__zone viewer__zone--next" id="storyNext" aria-label="Nächste Story"></button>
         <div class="viewer__media">${
-          s.mediaUri ? `<img class="viewer__bild" src="${s.mediaUri}" alt="Deine Story" />` : ICONS.image
+          s.mediaUri ? `<img class="viewer__bild" src="${s.mediaUri}" alt="Deine Story" />` : medienFlaeche(s.id, ICONS.image)
         }</div>
         ${s.caption ? `<div class="viewer__caption">${esc(s.caption)}</div>` : ''}
       </div>

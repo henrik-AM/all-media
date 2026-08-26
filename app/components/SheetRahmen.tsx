@@ -42,11 +42,19 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
 };
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  /* 40 Prozent waren zu hell - die Seite darunter blieb voll lesbar und das
+     Blatt wirkte aufgeklebt statt darueber. */
+  backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    /* Schatten nach oben: ohne ihn hat die Oberkante des Blattes keine Hoehe. */
+    shadowColor: '#0C0E14',
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 16,
   },
   // 74 Prozent: genug fuer eine lange Liste, aber der Bildschirm dahinter
   // bleibt sichtbar - sonst wirkt es wie eine eigene Seite.

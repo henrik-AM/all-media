@@ -198,7 +198,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: 20,

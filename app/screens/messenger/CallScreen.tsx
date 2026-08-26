@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, spacing, typography } from '../../constants/design';
@@ -98,6 +99,12 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.lg }]}>
+      <LinearGradient
+        colors={['rgba(91,69,224,0.22)', 'transparent']}
+        style={styles.schleier}
+        pointerEvents="none"
+      />
+
       {/* Bei einem Videoanruf steht hier spaeter das Bild der Gegenseite. */}
       {art === 'video' && zustand === 'verbunden' && (
         <View style={styles.videoFlaeche}>
@@ -200,7 +207,18 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#101418', justifyContent: 'space-between' },
+  /*
+   * Vorher verteilte space-between Kopf, Bedienleiste und Anrufknöpfe über die
+   * ganze Höhe — die Bedienleiste hing frei in der Mitte, oben und unten
+   * klaffte eine Lücke. Jetzt steht der Kopf oben, und die beiden Knopfreihen
+   * rücken als eine Gruppe an den unteren Rand, wie in jeder Anruf-Oberfläche.
+   *
+   * Der Verlauf statt der flachen Fläche gibt dem Bildschirm Tiefe und nimmt
+   * die Markenfarbe auf; React Native kann keinen Verlauf als Hintergrundfarbe,
+   * deshalb liegt er als eigene Fläche darunter (siehe schleier).
+   */
+  container: { flex: 1, backgroundColor: '#0A0C10', justifyContent: 'flex-start' },
+  schleier: { position: 'absolute', top: 0, left: 0, right: 0, height: '55%' },
 
   videoFlaeche: {
     position: 'absolute',
@@ -235,22 +253,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  leiste: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xl },
+  leiste: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginTop: 'auto', marginBottom: 28 },
   knopf: {
     alignItems: 'center',
     gap: 6,
     width: 76,
     paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
-  knopfAn: { backgroundColor: colors.white },
+  /* Eingeschaltet ist hell — das ist die Erwartung aus iOS. Ein Hauch weniger
+     als reines Weiß, damit die Fläche auf Schwarz nicht sticht. */
+  knopfAn: { backgroundColor: '#F2F3F6', borderColor: 'transparent' },
   knopfText: { color: colors.white, ...typography.small },
   knopfTextAn: { color: colors.text },
 
   unten: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xxl },
   rund: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
-  annehmen: { backgroundColor: colors.success },
-  auflegen: { backgroundColor: colors.danger },
+  annehmen: {
+    backgroundColor: '#17A458',
+    shadowColor: '#12A150',
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  auflegen: {
+    backgroundColor: '#DC474C',
+    shadowColor: '#E5484D',
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
   aufgelegt: { transform: [{ rotate: '135deg' }] },
 });

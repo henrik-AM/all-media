@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, shadow, sizes, spacing, typography } from '../../constants/design';
 import { mockUsers } from '../../mocks';
 import { StoryAnsichtenSheet, StoryOptionenSheet } from '../../components/StoryOptionenSheet';
 import { Contact, Story } from '../../types';
@@ -152,8 +154,28 @@ export const StoryViewerScreen = ({
         {current.mediaUri ? (
           <Image source={{ uri: current.mediaUri }} style={styles.bild} resizeMode="contain" />
         ) : (
-          <Ionicons name="image-outline" size={56} color="rgba(255,255,255,0.4)" />
+          <Motiv
+            id={current.id}
+            icon="image-outline"
+            iconSize={40}
+            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+          />
         )}
+        {/* Verlauf oben und unten: Name, Uhrzeit und Bildunterschrift lagen
+            direkt auf dem Motiv. Solange dort Schwarz stand, ging das gut —
+            sobald ein echtes Foto oder eine helle Fläche darunterliegt, ist
+            weiße Schrift darauf nicht mehr lesbar. Jede Story-App löst das
+            so. Die Verläufe liegen unter den Bedienelementen. */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.55)', 'transparent']}
+          style={styles.schleierOben}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.6)']}
+          style={styles.schleierUnten}
+          pointerEvents="none"
+        />
         {current.caption ? <Text style={styles.caption}>{current.caption}</Text> : null}
         <Pressable
           accessibilityLabel="Vorherige Story"
@@ -283,7 +305,9 @@ const styles = StyleSheet.create({
   name: { color: colors.white, ...typography.name },
   time: { color: 'rgba(255,255,255,0.75)', fontSize: 11.5 },
 
-  stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  schleierOben: { position: 'absolute', top: 0, left: 0, right: 0, height: 120 },
+  schleierUnten: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 160 },
   caption: {
     position: 'absolute',
     left: spacing.lg,
@@ -293,6 +317,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     ...typography.message,
     fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   zone: { position: 'absolute', top: 0, bottom: 0, width: '32%' },
   zoneLeft: { left: 0 },
@@ -308,6 +335,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.brand,
+    ...shadow.brand,
   },
   sendenAus: { opacity: 0.35, transform: [{ scale: 0.92 }] },
   reply: {

@@ -1082,9 +1082,16 @@ ul { margin: 0; padding: 0; list-style: none; }
 .slide__punkt { flex: 0 0 auto; opacity: .7; }
 
 /* ---------- Sheet ---------- */
+/*
+  Der Schleier war mit 40% zu hell - die Seite darunter blieb voll lesbar und
+  das Blatt wirkte wie aufgeklebt statt darueber. Kraeftiger und mit leichter
+  Unschaerfe rueckt der Hintergrund erkennbar nach hinten.
+*/
 .sheet-backdrop {
   position: absolute; inset: 0; z-index: 50;
-  background: rgba(0,0,0,.4);
+  background: rgba(6,8,12,.52);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
   display: flex; align-items: flex-end;
   animation: fade .18s ease;
 }
@@ -1092,12 +1099,16 @@ ul { margin: 0; padding: 0; list-style: none; }
 .sheet {
   width: 100%;
   background: var(--surface);
-  border-radius: 20px 20px 0 0;
+  border-radius: 22px 22px 0 0;
+  /* Schatten nach oben: ohne ihn hat die Oberkante des Blattes keine Hoehe. */
+  box-shadow: 0 -1px 0 rgba(12,14,20,.06), 0 -12px 40px rgba(12,14,20,.18);
   padding: 8px 0 calc(12px + env(safe-area-inset-bottom));
-  animation: up .22s ease;
+  animation: up .24s cubic-bezier(.2,.8,.2,1);
 }
-@keyframes up { from { transform: translateY(24px) } to { transform: none } }
-.sheet__handle { width: 38px; height: 4px; border-radius: 2px; background: var(--border); margin: 6px auto 10px; }
+/* Aus dem Bild heraus statt nur ein bisschen versetzt - das ist die Bewegung,
+   die man von einem Blatt erwartet. */
+@keyframes up { from { transform: translateY(64px) } to { transform: none } }
+.sheet__handle { width: 40px; height: 4px; border-radius: 2px; background: var(--text-3); opacity: .35; margin: 6px auto 10px; }
 .sheet__title {
   padding: 4px 16px 10px;
   font-size: 16px;
@@ -1603,12 +1614,24 @@ body:has(.camera) .toast { bottom: 132px; }
 .viewer__eigen svg { width: 20px; height: 20px; }
 
 /* ---------- Anruf ---------- */
+/*
+  Vorher verteilte space-between Kopf, Bedienleiste und Anrufknoepfe ueber die
+  ganze Hoehe - die Bedienleiste hing frei in der Mitte, oben und unten klaffte
+  eine Luecke. Jetzt steht der Kopf oben, und die beiden Knopfreihen ruecken
+  als eine Gruppe an den unteren Rand, so wie in jeder Anruf-Oberflaeche.
+*/
 .anruf {
   position: absolute; inset: 0;
-  display: flex; flex-direction: column; justify-content: space-between;
+  display: flex; flex-direction: column; justify-content: flex-start;
   padding: calc(48px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
-  background: #101418; color: #fff;
+  /* Kein flaches Anthrazit: ein Schimmer von oben gibt der Flaeche Tiefe und
+     nimmt die Markenfarbe auf. */
+  background:
+    radial-gradient(90% 55% at 50% 0%, rgba(91,69,224,.22), transparent 70%),
+    linear-gradient(180deg, #14171D, #0A0C10);
+  color: #fff;
 }
+.anruf__leiste { margin-top: auto; margin-bottom: 28px; }
 .anruf__video {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
@@ -1621,6 +1644,9 @@ body:has(.camera) .toast { bottom: 132px; }
   display: grid; place-items: center;
   font-size: 40px; font-weight: 700; color: #fff;
 }
+/* Ein weicher Lichtkranz statt einer harten Kante - der Avatar ist das
+   einzige grosse Element auf der Flaeche und darf Gewicht haben. */
+.anruf__avatar { box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 0 6px rgba(255,255,255,.05); }
 .anruf__avatar.is-klingelt { animation: anrufPuls 1.8s ease-in-out infinite; }
 @keyframes anrufPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }
 .anruf__name { margin-top: 12px; font-size: 26px; font-weight: 700; }
@@ -1636,19 +1662,27 @@ body:has(.camera) .toast { bottom: 132px; }
 .anruf__leiste { display: flex; justify-content: center; gap: 24px; z-index: 1; }
 .anruf__knopf {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
-  width: 76px; padding: 12px 0; border-radius: 16px;
-  background: rgba(255,255,255,.12); color: #fff; font-size: 12.5px;
+  width: 76px; padding: 12px 0; border-radius: 18px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.10);
+  color: #fff; font-size: 12.5px; font-weight: 500;
+  transition: background .15s, color .15s;
 }
-.anruf__knopf.is-an { background: #fff; color: #14171A; }
+.anruf__knopf:hover { background: rgba(255,255,255,.16); }
+/* Eingeschaltet ist hell - das ist die Erwartung aus iOS. Ein Hauch weniger
+   als reines Weiss, damit die Flaeche auf Schwarz nicht sticht. */
+.anruf__knopf.is-an { background: #F2F3F6; border-color: transparent; color: #14171A; }
 .anruf__knopf svg { width: 24px; height: 24px; }
 .anruf__unten { display: flex; justify-content: center; gap: 32px; z-index: 1; }
 .anruf__rund {
   width: 68px; height: 68px; border-radius: 50%;
   display: grid; place-items: center; color: #fff;
+  transition: transform .12s;
 }
+.anruf__rund:active { transform: scale(.94); }
 .anruf__rund svg { width: 28px; height: 28px; }
-.anruf__rund.is-annehmen { background: var(--success); }
-.anruf__rund.is-auflegen { background: var(--danger); }
+.anruf__rund.is-annehmen { background: linear-gradient(160deg, #2ABF6B, #0E8F45); box-shadow: 0 6px 20px rgba(18,161,80,.45); }
+.anruf__rund.is-auflegen { background: linear-gradient(160deg, #F0595E, #C9343A); box-shadow: 0 6px 20px rgba(229,72,77,.45); }
 .anruf__rund.is-auflegen svg { transform: rotate(135deg); }
 
 .slide__follow.is-gefolgt { background: rgba(255,255,255,.2); color: #fff; }
@@ -2460,3 +2494,55 @@ button.msg__sender:hover { text-decoration: underline; }
    Motivflaeche, sondern die gedaempfte Markenfarbe. Sonst sehen sie aus wie
    Vorschaubilder, die nicht geladen haben. */
 .exp__thumb--kategorie { background: var(--brand-soft); color: var(--brand); }
+
+/* ---------- Story-Betrachter: Lesbarkeit auf hellem Motiv ---------- */
+/*
+  Name, Uhrzeit und Bildunterschrift lagen direkt auf dem Motiv. Solange dort
+  Schwarz stand, ging das gut - sobald ein echtes Foto oder eine helle
+  Motivflaeche darunterliegt, ist weisse Schrift darauf nicht mehr lesbar.
+
+  Jede Story-App loest das gleich: ein Verlauf von oben und einer von unten,
+  die nur so weit reichen wie die Schrift. Sie liegen unter den Bedienelementen
+  und ueber dem Bild.
+*/
+.viewer__stage::before,
+.viewer__stage::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.viewer__stage::before {
+  top: 0; height: 120px;
+  background: linear-gradient(180deg, rgba(0,0,0,.55), transparent);
+}
+.viewer__stage::after {
+  bottom: 0; height: 160px;
+  background: linear-gradient(0deg, rgba(0,0,0,.6), transparent);
+}
+/* Die Blaetterzonen und die Bildunterschrift muessen ueber den Verlaeufen
+   liegen - sonst faengt der Verlauf die Klicks ab. */
+.viewer__zone { z-index: 2; }
+.viewer__caption { z-index: 3; }
+
+/* Kopf und Fuss stehen ausserhalb der Buehne und brauchen deshalb ihren
+   eigenen Verlauf, damit sie auch ueber einem hellen Motiv lesbar bleiben. */
+.viewer__head {
+  position: relative;
+  z-index: 4;
+  background: linear-gradient(180deg, rgba(0,0,0,.45), transparent);
+}
+.viewer__bars { position: relative; z-index: 4; }
+
+.viewer__caption {
+  text-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+
+/* Der Senden-Pfeil war ein dunkler Kreis auf schwarzem Grund - praktisch
+   unsichtbar. Er traegt jetzt den Markenverlauf wie jede andere Hauptaktion. */
+.viewer__senden { background: var(--brand-grad); box-shadow: var(--shadow-brand); }
+
+/* Im Story-Vollbild darf das Symbol nicht so gross sein wie das fehlende
+   Bild - klein und blass sagt "Foto", gross sagt "Fehler". */
+.viewer__media .motiv svg { width: 40px; height: 40px; }

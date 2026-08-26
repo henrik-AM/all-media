@@ -43,7 +43,7 @@ export const ActionSheet = ({ visible, title, items, onSelect, onClose }: Props)
 );
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: 20,
