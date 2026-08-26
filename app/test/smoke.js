@@ -206,7 +206,10 @@ const STRUCTURE = {
   await p.click('[data-area="videos"]');
   await p.click('[data-sub="landscape"]');
   await p.waitForTimeout(400);
-  assert('Querformat zeigt 6 Videos', (await p.$$eval('[data-clip]', e => e.length)) === 6);
+  // Neun statt der frueheren sechs: die Filterleiste braucht von jeder Art
+  // (Standard, 360°, Live) mehrere Videos, sonst laesst sich nicht erkennen,
+  // ob sie wirklich filtert. Siehe test/_insel.js.
+  assert('Querformat zeigt 9 Videos', (await p.$$eval('[data-clip]', e => e.length)) === 9);
   await p.fill('#clipSearch', 'pasta');
   await p.waitForTimeout(300);
   assert('Querformat-Suche ohne Treffer', !!(await p.$('.empty')));

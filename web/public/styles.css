@@ -1506,11 +1506,29 @@ body:has(.camera) .toast { bottom: 132px; }
 .sectionlink svg { width: 18px; height: 18px; }
 
 /* ---------- Videos- und Community-Profil ---------- */
+/*
+  Der Name steht mittig ueber der Leiste - nicht mittig im Rest neben den drei
+  Knoepfen. Genau das war der Unterschied: mit `flex: 1` sass er zwar zentriert
+  in seinem Feld, aber dieses Feld endet vor den Knoepfen, also stand er auf
+  dem Bildschirm sichtbar zu weit links. Henrik hat das am 26.08.2026 fuer das
+  Videos- und das Communitys-Profil gemeldet.
+
+  Deshalb absolut ueber die volle Breite: dann ist "mittig" wirklich die Mitte
+  des Bildschirms, unabhaengig davon, wie breit die Knoepfe rechts werden.
+*/
 .oprof__bar {
-  display: flex; align-items: center; gap: 10px;
+  position: relative;
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  min-height: 34px;
   padding: 10px 16px 2px;
 }
-.oprof__handle { flex: 1 1 auto; text-align: center; font-size: 17px; font-weight: 700; }
+.oprof__handle {
+  position: absolute;
+  left: 56px; right: 56px; top: 10px;
+  text-align: center; font-size: 17px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
 .oprof__acts { display: flex; align-items: center; gap: 12px; }
 .oprof__acts button { position: relative; color: var(--text); display: grid; place-items: center; }
 .oprof__acts button svg { width: 21px; height: 21px; }

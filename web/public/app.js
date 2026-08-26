@@ -444,6 +444,14 @@ function renderTopBar() {
 function verlasseExplorer() {
   state.explorerView = null;
   state.explorerParam = null;
+  /*
+   * Auch der Weg zurueck ins Profil gilt nur fuer den Besuch, aus dem er kam.
+   * Wer die Einstellungen ueber die untere Leiste oeffnet, soll dort keinen
+   * Zurueck-Pfeil sehen - es gibt kein "zurueck".
+   */
+  state.settingsAus = null;
+  state.settingsPunkt = null;
+  state.commProfilView = null;
 }
 
 /*
@@ -492,7 +500,10 @@ function render() {
     if (v === 'home') return renderCommunities();
     if (v === 'chats') return renderCommunityChats();
     if (v === 'search') return renderCommunitySearch();
-    if (v === 'profile') return renderCommunityProfile();
+    // Die Seite hinter "Erstellt"/"Beigetreten". Sie wird hier mit
+    // abgefragt, damit ein erneutes render() sie nicht wegwischt - und in
+    // verlasseExplorer() geleert, damit sie nicht haengen bleibt.
+    if (v === 'profile') return state.commProfilView ? renderCommunityListe() : renderCommunityProfile();
   }
   return renderSettings();
 }
@@ -3447,6 +3458,16 @@ function renderSettings() {
 
   main.innerHTML = `
     <div class="pagehead">
+      ${
+        // Nur wenn man aus einem Profil kam - wer die Einstellungen ueber die
+        // untere Leiste oeffnet, hat kein "zurueck".
+        state.settingsAus
+          ? `<div class="pagehead__row">
+              <button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
+              <h2 class="pagehead__title">Einstellungen</h2>
+            </div>`
+          : ''
+      }
       ${(() => {
         if (!state.konten) {
           const me = user('me');
@@ -3503,10 +3524,36 @@ function renderSettings() {
   // Aus dem Menü im eigenen Profil kommend: gleich beim richtigen Abschnitt
   // anfangen (Prototyp "VP + Einstellung" / "CP + Einstellung").
   if (state.settingsSprung) {
-    const ziel = document.getElementById('sec-' + state.settingsSprung);
+    const abschnittId = state.settingsSprung;
+    const ziel = document.getElementById('sec-' + abschnittId);
     state.settingsSprung = null;
     setTimeout(() => ziel?.scrollIntoView({ block: 'start' }), 30);
+
+    /*
+     * Kam man ueber einen einzelnen Unterpunkt (z. B. "Story-Sichtbarkeit" im
+     * Messenger-Profil), geht der Punkt gleich auf. Vorher landete man in der
+     * langen Liste und musste ihn selbst suchen - das war Henriks Punkt.
+     */
+    if (state.settingsPunkt) {
+      const abschnitt = SETTINGS.find((sec) => sec.id === abschnittId);
+      const punkt = abschnitt?.items.find((it) => it.label === state.settingsPunkt);
+      state.settingsPunkt = null;
+      if (punkt) setTimeout(() => openEinstellung(punkt), 60);
+    }
   }
+
+  /*
+   * Zurueck zum Profil, aus dem man kam. Ohne diesen Pfeil fuehrte der Weg
+   * nur ueber die untere Leiste - und die landet auf der Hauptseite des
+   * Bereichs, nicht wieder im Profil.
+   */
+  $('#settingsBack')?.addEventListener('click', () => {
+    const zurueck = state.settingsAus;
+    state.settingsAus = null;
+    state.area = zurueck;
+    state.sub[zurueck] = 'profile';
+    render();
+  });
 
   main.querySelectorAll('[data-toggle]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -4042,17 +4089,42 @@ function renderMessengerProfile() {
       render();
     })
   );
+  /*
+   * Henrik am 26.08.2026: "Klick auf einen Einstellungs-Unterpunkt leitet zu
+   * den Haupt-Einstellungen statt zur spezifischen Seite. Nur die dicke
+   * Schrift soll zu den Haupt-Einstellungen fuehren."
+   *
+   * Vorher wechselte jeder dieser Knoepfe nur in den Bereich Einstellungen
+   * und gab einen Hinweis aus, wo der Punkt zu finden sei - man musste ihn
+   * dann selbst suchen. Jetzt geht der Punkt direkt auf.
+   */
   main.querySelectorAll('[data-mact]').forEach((b) =>
     b.addEventListener('click', () => {
-      if (b.dataset.mact === 'settings') {
-        state.area = 'settings';
-        return render();
-      }
-      state.area = 'settings';
-      render();
-      toast('Zu finden im Abschnitt Messenger');
+      if (b.dataset.mact === 'settings') return zuDenEinstellungen('messenger');
+      const punkte = {
+        location: 'Standort-Sichtbarkeit',
+        story: 'Story-Sichtbarkeit',
+        read: 'Lesebestätigung',
+      };
+      zuDenEinstellungen('messenger', punkte[b.dataset.mact]);
     })
   );
+}
+
+/*
+ * In die Einstellungen wechseln - wahlweise direkt zu einem Punkt.
+ *
+ * `abschnitt` bestimmt, wo die Liste anfaengt. Steht `punkt` dabei, geht
+ * dieser Punkt gleich auf (Auswahl, Formular oder Liste). `state.settingsAus`
+ * merkt sich, aus welchem Bereich man kam - daraus wird der Zurueck-Pfeil
+ * oben links, den Henrik ebenfalls gemeldet hat.
+ */
+function zuDenEinstellungen(abschnitt, punkt) {
+  state.settingsAus = state.area;
+  state.settingsSprung = abschnitt;
+  state.settingsPunkt = punkt || null;
+  state.area = 'settings';
+  render();
 }
 
 /* --------------------------------------------------- Videos: Querformat */
@@ -4677,10 +4749,9 @@ function bindProfilAktionen(bereich) {
       if (b.dataset.oact === 'create') return openErstellen(bereich);
 
       // Menü: die Einstellungen zu diesem Bereich, wie im Prototyp-Frame
-      // "VP + Einstellung" bzw. "CP + Einstellung".
-      state.area = 'settings';
-      state.settingsSprung = bereich === 'communities' ? 'communitys' : 'videos';
-      render();
+      // "VP + Einstellung" bzw. "CP + Einstellung". Der Pfeil oben links
+      // fuehrt von dort wieder ins Profil zurueck.
+      zuDenEinstellungen(bereich === 'communities' ? 'communitys' : 'videos');
     })
   );
 }
@@ -6218,22 +6289,92 @@ function renderCommunityProfile() {
       <div class="prof__about">
         <div class="prof__name">Henrik</div>
         <div class="prof__bio">Baue gerade All Media.</div>
-        <a class="prof__link" href="#" id="profLink">all-media.app</a>
+        ${/* Derselbe echte Link wie im Videos-Profil, nicht mehr ein Hinweis. */ ''}
+        ${bioLink('all-media.app')}
       </div>
-      ${created.length ? `<div class="exp__head">Erstellt →</div><ul class="rows">${created.map(communityRow).join('')}</ul>` : ''}
-      ${joined.length ? `<div class="exp__head">Beigetreten →</div><ul class="rows">${joined.map(communityRow).join('')}</ul>` : ''}
+      ${/*
+          "Profil bearbeiten" gab es nur im Videos-Profil. Hier fuehrt derselbe
+          Knopf zu demselben Formular - Name, Info und Link gehoeren zum Konto,
+          nicht zu einem der drei Profile.
+        */ ''}
+      <div class="prof__aktionen">
+        <button class="btn btn--breit" id="profilBearbeiten">Profil bearbeiten</button>
+      </div>
+      ${
+        /*
+         * "Erstellt" und "Beigetreten" fuehren jetzt auf eine eigene Seite mit
+         * nur dieser Kategorie - vorher war die Ueberschrift samt Pfeil ein
+         * totes <div>, genau wie bei den Kategorien der Video-Suche.
+         */
+        created.length
+          ? `<button class="exp__head" data-commview="erstellt">Erstellt →</button><ul class="rows">${created.map(communityRow).join('')}</ul>`
+          : ''
+      }
+      ${
+        joined.length
+          ? `<button class="exp__head" data-commview="beigetreten">Beigetreten →</button><ul class="rows">${joined.map(communityRow).join('')}</ul>`
+          : ''
+      }
     </div>`;
 
   $('#switchProfile').addEventListener('click', openKontoWechsel);
-  $('#profLink').addEventListener('click', (e) => {
-    e.preventDefault();
-    toast('all-media.app');
-  });
+  $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderCommunityProfile));
+  main.querySelectorAll('[data-commview]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.commProfilView = b.dataset.commview;
+      renderCommunityListe();
+    })
+  );
   bindProfilAktionen('communities');
   main.querySelectorAll('[data-community]').forEach((r) =>
     r.addEventListener('click', () => openChat(r.dataset.community))
   );
   bindJoinButtons(renderCommunityProfile);
+}
+
+/*
+ * Die Seite hinter "Erstellt" bzw. "Beigetreten" im Communitys-Profil.
+ *
+ * Prototyp-Frames "CP + erstellte Kanäle" und "CP + beigetretene Kanäle".
+ * Aufgebaut wie die Uebersichtsseiten der Video-Suche: Zurueck-Pfeil oben
+ * links, darunter nur diese eine Kategorie.
+ */
+function renderCommunityListe() {
+  const erstellt = state.commProfilView === 'erstellt';
+  const created = state.communities.filter((c) => c.visibility === 'private' && c.joined);
+  const joined = state.communities.filter((c) => c.joined && !created.includes(c));
+  const liste = erstellt ? created : joined;
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="pagehead__row">
+        <button class="iconbtn" id="commListeBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
+        <h2 class="pagehead__title">${erstellt ? 'Erstellte Communitys' : 'Beigetretene Communitys'}</h2>
+      </div>
+    </div>
+    <div class="scroll">
+      ${
+        liste.length
+          ? `<ul class="rows">${liste.map(communityRow).join('')}</ul>`
+          : `<div class="empty">${ICONS.people}
+              <div class="empty__title">${erstellt ? 'Noch nichts erstellt' : 'Noch nichts beigetreten'}</div>
+              <div class="empty__text">${
+                erstellt
+                  ? 'Über das Plus oben rechts legst du eine eigene Community an.'
+                  : 'Unter „Suchen" findest du Communitys zum Beitreten.'
+              }</div>
+            </div>`
+      }
+    </div>`;
+
+  $('#commListeBack').addEventListener('click', () => {
+    state.commProfilView = null;
+    renderCommunityProfile();
+  });
+  main.querySelectorAll('[data-community]').forEach((r) =>
+    r.addEventListener('click', () => openChat(r.dataset.community))
+  );
+  bindJoinButtons(renderCommunityListe);
 }
 
 /* ------------------------------------------------- Chat-Einstellungen Modal */
