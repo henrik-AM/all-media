@@ -4,7 +4,7 @@ import { Druck } from './Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
-import { brandGradient, colors, sizes, spacing, storyGradient, typography } from '../constants/design';
+import { brandGradient, colors, sizes, spacing, storyGradient, themenStyles, typography } from '../constants/design';
 import { mockUsers } from '../mocks';
 import { Story } from '../types';
 
@@ -83,7 +83,7 @@ export const StoryRail = ({ stories, onPress }: Props) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   railWrap: {
     flexGrow: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -145,4 +145,4 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
   nameOwn: { color: colors.text, fontWeight: '600' },
-});
+}));

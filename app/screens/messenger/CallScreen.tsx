@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { mockUsers } from '../../mocks';
 
 /*
@@ -207,7 +207,7 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   /*
    * Vorher verteilte space-between Kopf, Bedienleiste und Anrufknöpfe über die
    * ganze Höhe — die Bedienleiste hing frei in der Mitte, oben und unten
@@ -290,4 +290,4 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   aufgelegt: { transform: [{ rotate: '135deg' }] },
-});
+}));

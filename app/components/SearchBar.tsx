@@ -3,7 +3,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { Druck } from './Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { brandGradient, colors, radius, shadow, spacing, typography } from '../constants/design';
+import { brandGradient, colors, radius, shadow, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
   value: string;
@@ -59,7 +59,7 @@ export const SearchBar = ({ value, onChangeText, placeholder = 'Suchen', onAdd }
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -95,4 +95,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

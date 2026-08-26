@@ -5,7 +5,7 @@ import { } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, spacing, typography } from '../../constants/design';
+import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { uploadImage } from '../../lib/supabaseStorage';
 
 type Mode = 'photo' | 'video';
@@ -121,7 +121,7 @@ export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   spacer: { width: 26, height: 26 },
   container: { flex: 1, backgroundColor: '#0B0B0C' },
   top: {
@@ -181,4 +181,4 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   shutterInner: { flex: 1, borderRadius: 26, backgroundColor: colors.white },
-});
+}));

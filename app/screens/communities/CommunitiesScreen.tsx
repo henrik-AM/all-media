@@ -4,7 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
-import { avatarColor, colors, initialsOf, radius, spacing, typography } from '../../constants/design';
+import { avatarColor, colors, initialsOf, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
@@ -159,7 +159,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
   title: { marginBottom: spacing.md, color: colors.text, ...typography.title },
@@ -199,4 +199,4 @@ const styles = StyleSheet.create({
   joinActive: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   joinText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   joinTextActive: { color: colors.text2 },
-});
+}));

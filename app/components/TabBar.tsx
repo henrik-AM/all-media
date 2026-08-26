@@ -4,7 +4,7 @@ import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { brandGradient, colors, sizes, typography } from '../constants/design';
+import { brandGradient, colors, sizes, themenStyles, typography } from '../constants/design';
 import { AreaKey, NAV } from '../constants/navigation';
 
 interface Props {
@@ -65,7 +65,7 @@ export const TabBar = ({ active, onChange, unreadCount = 0 }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   bar: {
     flexDirection: 'row',
     height: sizes.tabBar,
@@ -100,4 +100,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: colors.white, fontSize: 10, fontWeight: '700' },
-});
+}));

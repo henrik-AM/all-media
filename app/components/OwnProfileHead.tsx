@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
-import { colors, sizes, spacing, typography } from '../constants/design';
+import { colors, sizes, spacing, themenStyles, typography } from '../constants/design';
 
 interface Stat {
   label: string;
@@ -91,7 +91,7 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -143,4 +143,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bearbeitenText: { fontSize: 14, fontWeight: '600', color: colors.text, letterSpacing: -0.1 },
-});
+}));

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, spacing, typography } from '../constants/design';
+import { colors, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -17,7 +17,7 @@ export const EmptyState = ({ icon, title, text }: Props) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   wrap: {
     paddingVertical: 56,
     paddingHorizontal: spacing.xxl,
@@ -33,4 +33,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     ...typography.preview,
   },
-});
+}));

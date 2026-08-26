@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
-import { colors, radius, spacing, typography } from '../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
 export interface ListenZeile {
   text: string;
@@ -103,7 +103,7 @@ export const EinstellungSheet = ({
   </SheetRahmen>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -127,4 +127,4 @@ const styles = StyleSheet.create({
   },
   gefahr: { backgroundColor: colors.danger },
   knopfText: { ...typography.name, color: colors.white },
-});
+}));

@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { mockCommunities, mockUsers } from '../../mocks';
 import { Community, Contact } from '../../types';
 
@@ -128,7 +128,7 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   head: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   pills: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
@@ -165,4 +165,4 @@ const styles = StyleSheet.create({
   actionDone: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   actionText: { ...typography.small, fontWeight: '600', color: colors.white },
   actionTextDone: { color: colors.text2 },
-});
+}));

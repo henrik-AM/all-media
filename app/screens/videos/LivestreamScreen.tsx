@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 
 interface Props {
   /** Bekommt Dauer in Sekunden und die erreichte Zuschauerzahl. */
@@ -70,7 +70,7 @@ export const LivestreamScreen = ({ onEnd }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.black },
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#101014' },
   marke: {
@@ -107,4 +107,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stopText: { ...typography.name, color: colors.white },
-});
+}));

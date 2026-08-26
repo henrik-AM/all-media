@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
-import { colors, sizes, spacing, typography } from '../../constants/design';
+import { colors, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { Contact } from '../../types';
 
 interface Props {
@@ -95,7 +95,7 @@ export const ContactsScreen = ({ contacts, onBack, onOpenContact, onAddContact }
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
@@ -115,4 +115,4 @@ const styles = StyleSheet.create({
   rowBody: { flex: 1, minWidth: 0 },
   rowName: { color: colors.text, ...typography.name },
   rowAbout: { marginTop: 3, color: colors.text2, ...typography.preview },
-});
+}));

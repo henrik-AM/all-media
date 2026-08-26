@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Druck } from './Druck';
 import { SheetRahmen } from './SheetRahmen';
-import { colors, radius, spacing, typography } from '../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
 export interface FormularFeld {
   key: string;
@@ -107,7 +107,7 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   inhalt: { paddingVertical: spacing.sm },
   feld: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   label: { ...typography.small, color: colors.text2, marginBottom: 6 },
@@ -129,4 +129,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   knopfText: { ...typography.name, color: colors.white },
-});
+}));

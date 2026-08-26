@@ -8,7 +8,7 @@ import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet
 import { FormularSheet } from '../../components/FormularSheet';
 import { SheetRahmen } from '../../components/SheetRahmen';
 import { useProfil } from '../../contexts/ProfilContext';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { mockProfiles, mockUsers } from '../../mocks';
 import { Chat, Message } from '../../types';
 
@@ -415,7 +415,7 @@ export const ContactProfileScreen = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface2 },
   header: {
     flexDirection: 'row',
@@ -484,4 +484,4 @@ const styles = StyleSheet.create({
     color: colors.text,
     ...typography.body,
   },
-});
+}));

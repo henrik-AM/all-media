@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
-import { avatarColor, colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { avatarColor, colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockProfiles, mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
@@ -197,7 +197,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
 
   header: {
@@ -288,4 +288,4 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   gridBadge: { position: 'absolute', top: 6, right: 6 },
-});
+}));

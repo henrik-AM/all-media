@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockUsers, mockVideos } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Video } from '../../types';
@@ -175,7 +175,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   followAn: { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'transparent' },
 
   container: { flex: 1, backgroundColor: colors.black },
@@ -211,4 +211,4 @@ const styles = StyleSheet.create({
   followText: { color: colors.white, fontSize: 12, fontWeight: '600' },
   description: { color: colors.white, ...typography.message, lineHeight: 20 },
   sub: { marginTop: 6, color: 'rgba(255,255,255,0.75)', ...typography.small },
-});
+}));

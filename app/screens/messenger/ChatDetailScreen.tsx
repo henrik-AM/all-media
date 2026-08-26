@@ -13,7 +13,7 @@ import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
-import { colors, radius, shadow, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { antwortAuf } from '../../lib/antworten';
 import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from '../../mocks';
 import { AnhangSheet } from '../../components/AnhangSheet';
@@ -326,7 +326,7 @@ export const ChatDetailScreen = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   anfrage: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
@@ -484,4 +484,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendDisabled: { opacity: 0.4 },
-});
+}));

@@ -3,7 +3,7 @@ import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { avatarPair, colors, initialsOf, radius, spacing, typography } from '../constants/design';
+import { avatarPair, colors, initialsOf, radius, spacing, themenStyles, typography } from '../constants/design';
 
 /**
  * Eine gezeichnete Stadtkarte zum Zoomen und Schieben.
@@ -283,7 +283,7 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
 
 Karte.displayName = 'Karte';
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   rahmen: {
     marginHorizontal: spacing.lg,
     borderRadius: radius.lg,
@@ -394,4 +394,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.94)',
   },
   zurueckText: { ...typography.small, color: colors.text, fontWeight: '600' },
-});
+}));

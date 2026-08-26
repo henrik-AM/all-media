@@ -4,7 +4,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
-import { colors, radius, sizes, spacing, typography } from '../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { mockUsers } from '../mocks';
 import { Contact } from '../types';
 
@@ -84,7 +84,7 @@ export const TeilenSheet = ({ ziel, contacts, onClose, onSend }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   inhalt: { paddingBottom: spacing.lg },
   kopf: { ...typography.small, fontWeight: '600', color: colors.text2, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: 6 },
   raster: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.md },
@@ -109,4 +109,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   name: { ...typography.small, color: colors.text, maxWidth: '92%' },
-});
+}));

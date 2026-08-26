@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
-import { colors, spacing } from '../constants/design';
+import { colors, spacing, themenStyles } from '../constants/design';
 import { MitteilungsBereich } from '../types';
 
 export type ErstellenPunkt =
@@ -66,7 +66,7 @@ export const ErstellenSheet = ({ visible, bereich, onClose, onSelect }: Props) =
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   punkt: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -79,4 +79,4 @@ const styles = StyleSheet.create({
   letzter: { borderBottomWidth: 0 },
   gedrueckt: { backgroundColor: colors.surface2 },
   label: { fontSize: 15.5, color: colors.text },
-});
+}));

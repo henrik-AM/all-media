@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
-import { colors, radius, shadow, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockUsers } from '../../mocks';
 import { StoryAnsichtenSheet, StoryOptionenSheet } from '../../components/StoryOptionenSheet';
 import { Contact, Story } from '../../types';
@@ -291,7 +291,7 @@ export const StoryViewerScreen = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   bild: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   ansichten: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   ansichtenText: { color: colors.white, ...typography.body },
@@ -348,4 +348,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     color: colors.white,
   },
-});
+}));

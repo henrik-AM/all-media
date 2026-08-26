@@ -6,7 +6,7 @@ import { Motiv } from '../../components/Motiv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockPlaces, mockPosts, mockSounds, mockUsers, mockVideos } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Clip, Post, Video } from '../../types';
@@ -255,7 +255,7 @@ const SoundKopf = ({ sound }: { sound: (typeof mockSounds)[number] }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   bar: {
     height: 48,
@@ -389,4 +389,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-});
+}));

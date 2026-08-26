@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { AuthContext } from '../contexts/AuthContext';
-import { colors, radius, sizes, spacing, typography } from '../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
   visible: boolean;
@@ -196,7 +196,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   fill: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
@@ -266,4 +266,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { color: colors.white, ...typography.h3 },
-});
+}));

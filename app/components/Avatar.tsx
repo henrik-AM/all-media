@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { avatarPair, colors, initialsOf } from '../constants/design';
+import { avatarPair, colors, initialsOf, themenStyles } from '../constants/design';
 
 interface Props {
   id: string;
@@ -58,7 +58,7 @@ export const Avatar = ({ id, name, size = 54, group = false, online = false, sty
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   initials: {
     color: colors.white,
     fontWeight: '600',
@@ -74,4 +74,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.online,
     borderColor: colors.surface,
   },
-});
+}));

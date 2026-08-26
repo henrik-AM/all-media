@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { AuthContext } from '../../contexts/AuthContext';
 import { SwitchBar } from '../../components/SwitchBar';
-import { colors, sizes, spacing, typography } from '../../constants/design';
+import { colors, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 
 interface Props {
@@ -67,7 +67,7 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { paddingBottom: spacing.xl },
   head: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md },
@@ -98,4 +98,4 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   itemLabel: { ...typography.body, color: colors.text },
-});
+}));

@@ -6,7 +6,7 @@ import { Motiv } from '../../components/Motiv';
 import { EmptyState } from '../../components/EmptyState';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { mockProfiles, mockUsers } from '../../mocks';
 import { useReposts } from '../../contexts/RepostContext';
@@ -171,7 +171,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   repostMarke: {
     position: 'absolute',
@@ -253,4 +253,4 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   gridBild: { width: '100%', height: '100%' },
-});
+}));

@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, radius, spacing, typography } from '../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -43,7 +43,7 @@ export const ActionSheet = ({ visible, title, items, onSelect, onClose }: Props)
   </Modal>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
     backgroundColor: colors.surface,
@@ -87,4 +87,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: { flex: 1, color: colors.text, ...typography.body },
-});
+}));

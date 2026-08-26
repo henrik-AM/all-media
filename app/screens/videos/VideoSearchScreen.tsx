@@ -6,7 +6,7 @@ import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import {
   mockHashtags,
   mockPlaces,
@@ -209,7 +209,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   head: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   content: { paddingBottom: spacing.xl },
@@ -275,4 +275,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brandSoft,
   },
   tagText: { ...typography.small, color: colors.brand, fontWeight: '600' },
-});
+}));

@@ -95,6 +95,10 @@ function speicherSchreiben(datei, bereich) {
   try { daten = JSON.parse(fs.readFileSync(datei, 'utf8')); } catch { /* neu anlegen */ }
   daten['all-media.sitzung.v1'] = JSON.stringify(SITZUNG);
   daten['all-media.pruefbild'] = bereich;
+  // Thema ausdruecklich setzen statt auf die Simulator-Einstellung zu bauen:
+  // die wirkt nur, wenn app.json userInterfaceStyle "automatic" sagt, und
+  // genau das war lange nicht so.
+  daten['all-media.thema.v1'] = DUNKEL ? 'dark' : 'light';
   fs.mkdirSync(path.dirname(datei), { recursive: true });
   fs.writeFileSync(datei, JSON.stringify(daten));
 }

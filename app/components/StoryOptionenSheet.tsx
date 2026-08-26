@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { useProfil } from '../contexts/ProfilContext';
-import { colors, radius, sizes, spacing, typography } from '../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { mockUsers } from '../mocks';
 import { Contact, Story } from '../types';
 
@@ -172,7 +172,7 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,4 +195,4 @@ const styles = StyleSheet.create({
   neben: { ...typography.small, color: colors.text3 },
   gefahr: { color: colors.danger },
   hinweis: { ...typography.message, color: colors.text2, padding: spacing.lg },
-});
+}));

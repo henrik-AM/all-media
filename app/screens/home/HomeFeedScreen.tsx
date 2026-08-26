@@ -7,7 +7,7 @@ import { CommentSheet } from '../../components/CommentSheet';
 import { Motiv } from '../../components/Motiv';
 import { StoryRail } from '../../components/StoryRail';
 import { useReposts } from '../../contexts/RepostContext';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { kommentarZeile } from '../../lib/kommentare';
 import { mockPosts, mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
@@ -192,7 +192,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   repost: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   repostZahl: { color: colors.success, fontSize: 12.5, fontWeight: '600' },
 
@@ -231,4 +231,4 @@ const styles = StyleSheet.create({
   description: { paddingHorizontal: spacing.lg, paddingTop: 5, color: colors.text, ...typography.message, lineHeight: 20 },
   bold: { fontWeight: '700' },
   commentsLink: { paddingHorizontal: spacing.lg, paddingTop: 6, color: colors.text3, ...typography.preview },
-});
+}));

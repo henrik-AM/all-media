@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
 import { EmptyState } from './EmptyState';
 import { useProfil } from '../contexts/ProfilContext';
-import { colors, spacing, typography } from '../constants/design';
+import { colors, spacing, themenStyles, typography } from '../constants/design';
 import { MitteilungsBereich, MitteilungsZiel } from '../types';
 
 interface Props {
@@ -76,7 +76,7 @@ export const MitteilungenSheet = ({ visible, bereich, onClose, onOpen, onNotice 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   liste: { paddingBottom: spacing.md },
   zeile: {
     flexDirection: 'row',
@@ -109,4 +109,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   alleText: { ...typography.name, color: colors.text },
-});
+}));

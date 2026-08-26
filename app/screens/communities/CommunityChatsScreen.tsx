@@ -4,7 +4,7 @@ import { Druck } from '../../components/Druck';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
-import { colors, spacing, typography } from '../../constants/design';
+import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
@@ -58,7 +58,7 @@ export const CommunityChatsScreen = ({ onOpenCommunity }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   head: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   title: { ...typography.title, color: colors.text, marginBottom: spacing.md },
@@ -82,4 +82,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-});
+}));

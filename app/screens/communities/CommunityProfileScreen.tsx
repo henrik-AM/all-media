@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
-import { colors, spacing, typography } from '../../constants/design';
+import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
@@ -76,7 +76,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { paddingBottom: spacing.xl },
   sectionHead: {
@@ -96,4 +96,4 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   name: { ...typography.name, color: colors.text },
   sub: { ...typography.preview, color: colors.text2, marginTop: 2 },
-});
+}));

@@ -1,14 +1,16 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { AuthContext } from '../../contexts/AuthContext';
+import { ThemeContext } from '../../contexts/ThemeContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet';
 import { FormularSheet } from '../../components/FormularSheet';
 import { mockChats, mockPosts, mockUsers } from '../../mocks';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -361,8 +363,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     setOffen(item);
   };
   const offsets = useRef<Record<string, number>>({});
+  const { isDark, setTheme } = useContext(ThemeContext);
+  const insets = useSafeAreaInsets();
   const [switches, setSwitches] = useState<Record<string, boolean>>({
-    theme: false,
     videoPrivate: false,
     commPrivate: false,
     bildschirmsperre: false,
@@ -387,7 +390,14 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
   return (
     <View style={styles.screen}>
-      <View style={styles.head}>
+      {/*
+        Einstellungen ist der einzige Bereich ohne obere Leiste (so steht es im
+        Prototyp). Damit fehlt aber auch derjenige, der sonst den Platz für
+        Uhrzeit und Notch frei hält — die Reiter liefen bisher unter die
+        Statusleiste. Dieser Bildschirm muss sich den Platz deshalb selbst
+        nehmen.
+      */}
+      <View style={[styles.head, { paddingTop: insets.top + spacing.sm }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
           {SECTIONS.map((section) => (
             <Druck
@@ -442,8 +452,20 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                   <Text style={[styles.itemLabel, item.gefahr && styles.danger]}>{item.label}</Text>
                   {item.toggle ? (
                     <Switch
-                      value={switches[item.toggle]}
-                      onValueChange={(next) => setSwitches({ ...switches, [item.toggle as string]: next })}
+                      /*
+                       * „Dunkles Design" ist der einzige Schalter, der echte
+                       * Wirkung hat — er hängt am ThemeContext. Vorher lag er
+                       * wie alle anderen nur im lokalen Zustand und tat
+                       * nichts, obwohl er umsprang.
+                       */
+                      value={item.toggle === 'theme' ? isDark : switches[item.toggle]}
+                      onValueChange={(next) => {
+                        if (item.toggle === 'theme') {
+                          setTheme(next ? 'dark' : 'light');
+                          return;
+                        }
+                        setSwitches({ ...switches, [item.toggle as string]: next });
+                      }}
                       trackColor={{ true: colors.brand, false: colors.surface3 }}
                     />
                   ) : (
@@ -538,11 +560,18 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   head: { paddingTop: spacing.md, paddingBottom: spacing.sm },
   pills: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  pill: { paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface3 },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   pillText: { ...typography.small, fontWeight: '600', color: colors.text2 },
   content: { paddingBottom: spacing.xxl },
   sectionHead: {
@@ -590,4 +619,4 @@ const styles = StyleSheet.create({
   itemValue: { ...typography.preview, color: colors.text3 },
   rechts: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   danger: { color: colors.danger },
-});
+}));

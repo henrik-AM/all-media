@@ -13,7 +13,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { EmptyState } from './EmptyState';
-import { colors, radius, sizes, spacing, typography } from '../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { CURRENT_USER_ID, mockComments, mockUsers } from '../mocks';
 import { Comment } from '../types';
 
@@ -137,7 +137,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
     height: '74%',
@@ -195,4 +195,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendDisabled: { opacity: 0.4 },
-});
+}));

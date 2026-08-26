@@ -7,7 +7,7 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { StoryRail } from '../../components/StoryRail';
-import { brandGradient, colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { brandGradient, colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { Chat, Story } from '../../types';
 
 type Filter = 'all' | 'contacts' | 'groups';
@@ -137,7 +137,7 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
 
@@ -176,4 +176,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: colors.white, fontSize: 11.5, fontWeight: '700' },
-});
+}));

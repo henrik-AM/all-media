@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
-import { colors, radius, spacing, typography } from '../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
   message: string | null;
@@ -30,7 +30,7 @@ export const Toast = ({ message, onHide }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   toast: {
     position: 'absolute',
     bottom: 96,
@@ -42,4 +42,4 @@ const styles = StyleSheet.create({
     maxWidth: '86%',
   },
   text: { color: colors.white, textAlign: 'center', ...typography.body },
-});
+}));

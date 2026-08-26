@@ -13,7 +13,7 @@ import { Druck } from '../components/Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AuthContext } from '../contexts/AuthContext';
-import { brandGradient, colors, radius, shadow, spacing, typography } from '../constants/design';
+import { brandGradient, colors, radius, shadow, spacing, themenStyles, typography } from '../constants/design';
 
 export const LoginScreen = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -123,7 +123,7 @@ export const LoginScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
@@ -172,4 +172,4 @@ const styles = StyleSheet.create({
   switchText: { color: colors.brand, ...typography.body },
 
   hint: { textAlign: 'center', color: colors.text3, ...typography.small },
-});
+}));

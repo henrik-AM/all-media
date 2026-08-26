@@ -3,7 +3,7 @@ import { Modal, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../constants/design';
+import { colors, spacing, themenStyles } from '../constants/design';
 
 interface Props {
   visible: boolean;
@@ -42,7 +42,7 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   /* 40 Prozent waren zu hell - die Seite darunter blieb voll lesbar und das
      Blatt wirkte aufgeklebt statt darueber. */
   backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
@@ -76,4 +76,4 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-});
+}));

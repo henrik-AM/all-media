@@ -4,7 +4,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
-import { colors, radius, sizes, spacing, typography } from '../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { aufnehmen, ausGalerie } from '../lib/aufnehmen';
 import { mockPlaces, mockUsers } from '../mocks';
 import { Contact, Message } from '../types';
@@ -138,7 +138,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -159,4 +159,4 @@ const styles = StyleSheet.create({
   },
   label: { flex: 1, ...typography.body, color: colors.text },
   leer: { ...typography.message, color: colors.text2, padding: spacing.lg },
-});
+}));

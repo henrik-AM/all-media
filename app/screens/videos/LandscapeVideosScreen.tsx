@@ -6,7 +6,7 @@ import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 
@@ -75,7 +75,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   head: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   clip: { paddingBottom: spacing.lg },
@@ -103,4 +103,4 @@ const styles = StyleSheet.create({
   metaText: { flex: 1 },
   clipTitle: { ...typography.name, color: colors.text, lineHeight: 19 },
   clipSub: { ...typography.small, color: colors.text3, marginTop: 3 },
-});
+}));

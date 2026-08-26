@@ -1,3 +1,5 @@
+import { StyleSheet } from 'react-native';
+
 /*
  * All Media — Designsprache.
  *
@@ -18,7 +20,7 @@
  * Die Token-NAMEN bleiben stabil — daran hängen alle Screens.
  */
 
-export const colors = {
+const hellFarben = {
   brand: '#5B45E0',
   brand2: '#8B5CF6',
   brandDeep: '#3D2CB8',
@@ -51,7 +53,7 @@ export const colors = {
   black: '#000000',
 };
 
-export const darkColors: typeof colors = {
+const dunkelFarben: typeof hellFarben = {
   brand: '#8B7CF6',
   brand2: '#A78BFA',
   brandDeep: '#6D5AE6',
@@ -217,4 +219,81 @@ export function initialsOf(name: string): string {
     .map((part) => part[0])
     .join('')
     .toUpperCase();
+}
+
+/* ------------------------------------------------------------------ Thema */
+/*
+ * Dunkelmodus.
+ *
+ * Vorher gab es `darkColors` — aber niemand hat sie benutzt. Der Schalter
+ * „Dunkles Design" in den Einstellungen der App hat deshalb nichts bewirkt:
+ * die App war immer hell, während die Website längst einen Dunkelmodus hatte.
+ *
+ * Das Problem beim Nachrüsten: `StyleSheet.create` liest die Farbwerte einmal
+ * beim Laden des Moduls und friert sie ein. In 51 Dateien mit zusammen 634
+ * Farbverwendungen jede Komponente auf einen Hook umzubauen wäre ein Umbau
+ * mit hohem Risiko und wenig Gewinn.
+ *
+ * Deshalb dieser Weg: `themenStyles` baut beide Fassungen einmal beim Laden
+ * und gibt einen Stellvertreter zurück, der bei jedem Zugriff die passende
+ * heraussucht. In den Dateien ändert sich damit nur eine Zeile — aus
+ *
+ *   const styles = StyleSheet.create({ … colors.surface … });
+ * wird
+ *   const styles = themenStyles((colors) => ({ … colors.surface … }));
+ *
+ * Das `colors` im Inneren ist jetzt der Parameter statt des Moduls, und
+ * derselbe Rumpf erzeugt beide Fassungen.
+ */
+
+let dunkelAktiv = false;
+
+/** Wird vom ThemeProvider gesetzt, bevor der Baum neu aufgebaut wird. */
+export function setzeDunkel(an: boolean) {
+  dunkelAktiv = an;
+}
+
+export type Farbsatz = typeof hellFarben;
+
+/**
+ * Farben für die Verwendung direkt im JSX (z. B. `color={colors.text3}` an
+ * einem Symbol). Auch das ist ein Stellvertreter, damit die 634 Stellen
+ * unverändert bleiben können.
+ */
+export const colors: Farbsatz = new Proxy({} as Farbsatz, {
+  get: (_ziel, schluessel) => (dunkelAktiv ? dunkelFarben : hellFarben)[schluessel as keyof Farbsatz],
+  // Ohne diese beiden Fallen wirft ein Aufzählen über das Objekt.
+  has: (_ziel, schluessel) => schluessel in hellFarben,
+  ownKeys: () => Reflect.ownKeys(hellFarben),
+  getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
+});
+
+/** Nur für Stellen, die beide Sätze brauchen (Prüfwerkzeuge). */
+export const farbsaetze = { hell: hellFarben, dunkel: dunkelFarben };
+
+/**
+ * Stylesheet, das dem Thema folgt. Ersatz für `StyleSheet.create`.
+ *
+ * Beide Fassungen entstehen einmal beim Laden — der Stellvertreter kostet zur
+ * Laufzeit nur einen Zugriff und keine neue Berechnung.
+ */
+export function themenStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
+  // Wortgleiche Schranke wie bei StyleSheet.create - inklusive des any, das
+  // dort steht. Ohne sie verliert TypeScript die genauen Werte: aus
+  // flexDirection: 'row' wird string, und jede Verwendung schlägt fehl.
+  bauen: (farben: Farbsatz) => T & StyleSheet.NamedStyles<any>
+): T {
+  const hell = StyleSheet.create(bauen(hellFarben));
+  const dunkel = StyleSheet.create(bauen(dunkelFarben));
+  return new Proxy({} as T, {
+    get: (_ziel, schluessel) => (dunkelAktiv ? dunkel : hell)[schluessel as keyof T],
+    has: (_ziel, schluessel) => schluessel in hell,
+    ownKeys: () => Reflect.ownKeys(hell),
+    getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
+  });
+}
+
+/** Der Markenverlauf folgt dem Thema — im Dunkeln ist er eine Spur heller. */
+export function markenVerlauf(): readonly [string, string] {
+  return dunkelAktiv ? brandGradientDark : brandGradient;
 }

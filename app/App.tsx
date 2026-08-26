@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useContext, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
+import { ThemeContext, ThemeProvider } from './contexts/ThemeContext';
 import { SupabaseProvider } from './contexts/SupabaseContext';
 import { RepostProvider } from './contexts/RepostContext';
 import { ProfilProvider, useProfil } from './contexts/ProfilContext';
@@ -42,7 +43,7 @@ import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
 import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
-import { colors } from './constants/design';
+import { colors, themenStyles } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
 import { mockChats, mockContacts, mockMessages, mockPlaces, mockStories, mockUsers } from './mocks';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Video } from './types';
@@ -78,6 +79,7 @@ const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minu
 
 const Shell = () => {
   const { logout } = useContext(AuthContext);
+  const { isDark } = useContext(ThemeContext);
 
   // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt — genau wie im
   // Prototyp, wo die obere Leiste zum Bereich gehoert.
@@ -770,7 +772,9 @@ const Shell = () => {
     // Ecken laufen, damit es wie eine echte App aussieht. Den Platz fuer Notch
     // und Home-Anzeige halten sich die obere und die untere Leiste selbst frei.
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      {/* Im Dunkelmodus muss die Schrift der Statusleiste hell sein - sonst
+          steht die Uhrzeit schwarz auf schwarzem Grund. */}
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopSwitcher area={area} active={sub} onChange={setSub} />
       <View style={styles.content}>{renderContent()}</View>
       <TabBar active={area} onChange={setArea} unreadCount={unreadCount} />
@@ -870,21 +874,27 @@ const Root = () => {
 
 const App = () => (
   <SafeAreaProvider>
-    <SupabaseProvider>
-      <AuthProvider>
-        <RepostProvider>
-          <ProfilProvider>
-            <Root />
-          </ProfilProvider>
-        </RepostProvider>
-      </AuthProvider>
-    </SupabaseProvider>
+    {/*
+      Der ThemeProvider steht ganz aussen: er baut den Baum bei einem
+      Themenwechsel neu auf, und das soll wirklich alles betreffen.
+    */}
+    <ThemeProvider>
+      <SupabaseProvider>
+        <AuthProvider>
+          <RepostProvider>
+            <ProfilProvider>
+              <Root />
+            </ProfilProvider>
+          </RepostProvider>
+        </AuthProvider>
+      </SupabaseProvider>
+    </ThemeProvider>
   </SafeAreaProvider>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
   content: { flex: 1 },
-});
+}));
 
 export default App;

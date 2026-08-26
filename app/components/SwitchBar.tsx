@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { Druck } from './Druck';
-import { colors, spacing, typography } from '../constants/design';
+import { colors, spacing, themenStyles, typography } from '../constants/design';
 
 /**
  * Leiste „Profil wechseln" über die volle Breite. Im Prototyp steht sie über
@@ -16,7 +16,7 @@ export const SwitchBar = ({ onPress, label = 'Profil wechseln' }: { onPress: () 
   </Druck>
 );
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   bar: {
     paddingVertical: 11,
     paddingHorizontal: spacing.lg,
@@ -26,4 +26,4 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   text: { ...typography.body, color: colors.text },
-});
+}));

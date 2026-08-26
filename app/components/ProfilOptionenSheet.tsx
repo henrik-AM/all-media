@@ -4,7 +4,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
 import { useProfil } from '../contexts/ProfilContext';
-import { colors, radius, spacing, typography } from '../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { mockUsers } from '../mocks';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -123,7 +123,7 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -144,4 +144,4 @@ const styles = StyleSheet.create({
   },
   label: { flex: 1, ...typography.body, color: colors.text },
   gefahr: { color: colors.danger },
-});
+}));

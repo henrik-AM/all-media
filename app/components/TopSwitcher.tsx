@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, radius, sizes, spacing } from '../constants/design';
+import { colors, radius, sizes, spacing, themenStyles } from '../constants/design';
 import { AreaKey, SubKey, areaOf } from '../constants/navigation';
 
 interface Props {
@@ -47,7 +47,7 @@ export const TopSwitcher = ({ area, active, onChange }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   bar: {
     flexDirection: 'row',
     height: sizes.topBar,
@@ -70,4 +70,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnActive: { backgroundColor: colors.brandSoft },
-});
+}));

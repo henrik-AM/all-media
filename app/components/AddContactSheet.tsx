@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, spacing, typography } from '../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { findePerson, istNummer, nichtGefundenText } from '../lib/personSuche';
 import { Contact } from '../types';
 
@@ -118,7 +118,7 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   fill: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
@@ -167,4 +167,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { color: colors.white, ...typography.h3 },
-});
+}));

@@ -4,7 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { Karte, KartenSteuerung } from '../../components/Karte';
-import { colors, radius, spacing, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { mockFriendPins, mockUsers } from '../../mocks';
 
 interface Props {
@@ -153,7 +153,7 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { paddingTop: spacing.lg, paddingBottom: spacing.xl },
   /* Im Vollbild fuellt die Karte den Bereich - kein Rand, kein Scrollen. */
@@ -204,4 +204,4 @@ const styles = StyleSheet.create({
   rowName: { ...typography.name, color: colors.text },
   rowSub: { ...typography.preview, color: colors.text2, marginTop: 2 },
   profilBtn: { padding: 2 },
-});
+}));

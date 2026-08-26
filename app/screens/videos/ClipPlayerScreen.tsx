@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useReposts } from '../../contexts/RepostContext';
@@ -213,7 +213,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   bar: {
     height: 48,
@@ -275,4 +275,4 @@ const styles = StyleSheet.create({
   clipTexte: { flex: 1 },
   clipTitel: { ...typography.name, color: colors.text },
   clipSub: { ...typography.small, color: colors.text2, marginTop: 2 },
-});
+}));
