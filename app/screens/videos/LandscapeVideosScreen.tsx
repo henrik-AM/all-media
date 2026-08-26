@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
@@ -52,7 +53,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
                 onPress={() => onOpenClip(item.id)}
               >
                 <View style={styles.thumb}>
-                  <Ionicons name="tv-outline" size={42} color={colors.text3} />
+                  <Motiv id={item.id} icon="tv-outline" iconSize={32} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                   <Text style={styles.duration}>{item.duration}</Text>
                 </View>
                 <View style={styles.meta}>
@@ -82,6 +83,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   duration: {
     position: 'absolute',

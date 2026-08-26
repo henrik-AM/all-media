@@ -3,6 +3,7 @@ import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
+import { Motiv } from '../../components/Motiv';
 import { StoryRail } from '../../components/StoryRail';
 import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
@@ -118,7 +119,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
           {item.mediaUri ? (
             <Image source={{ uri: item.mediaUri }} style={styles.mediaBild} />
           ) : (
-            <Ionicons name="image-outline" size={56} color={colors.text3} />
+            <Motiv id={item.id} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
           )}
         </View>
 

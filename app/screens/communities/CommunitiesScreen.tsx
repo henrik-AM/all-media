@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: colors.white, fontSize: 11.5, fontWeight: '700' },
   join: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.brand },
-  joinActive: { backgroundColor: colors.surface3 },
+  joinActive: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   joinText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   joinTextActive: { color: colors.text2 },
 });

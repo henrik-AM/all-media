@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Motiv } from '../../components/Motiv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, typography } from '../../constants/design';
@@ -95,7 +96,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           {eigenesBild ? (
             <Image source={{ uri: eigenesBild }} style={styles.voll} />
           ) : (
-            <Ionicons name="tv-outline" size={64} color="#3A3A44" />
+            <Motiv id={clip.id} icon="tv-outline" iconSize={48} dunkel style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
           )}
           <View style={[styles.play, laeuft && styles.playAus]}>
             <Ionicons name={laeuft ? 'pause' : 'play'} size={26} color={colors.white} />
@@ -188,7 +189,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         {aehnlich.map((c) => (
           <Pressable key={c.id} style={styles.clip} onPress={() => wechseln(c.id)}>
             <View style={styles.clipBild}>
-              <Ionicons name="tv-outline" size={30} color={colors.text3} />
+              <Motiv id={c.id} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
               <View style={styles.clipZeit}>
                 <Text style={styles.clipZeitText}>{c.duration}</Text>
               </View>
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
 
   abschnitt: { ...typography.h3, color: colors.text, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   clip: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
-  clipBild: { height: 150, borderRadius: radius.md, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center' },
+  clipBild: { height: 150, borderRadius: radius.md, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   clipZeit: { position: 'absolute', right: 8, bottom: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.7)' },
   clipZeitText: { ...typography.tiny, color: colors.white },
   clipMeta: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },

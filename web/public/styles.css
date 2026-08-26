@@ -530,7 +530,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-weight: 600;
   white-space: nowrap;
 }
-.joinbtn.is-joined { background: var(--surface-3); color: var(--text-2); }
+.joinbtn.is-joined { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); box-shadow: none; }
 
 .listhead {
   padding: 16px 16px 6px;
@@ -796,15 +796,21 @@ ul { margin: 0; padding: 0; list-style: none; }
 .prof__buttons { display: flex; gap: 8px; padding: 0 16px 14px; }
 .prof__btn {
   flex: 1;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--surface-3);
+  height: 38px;
+  border-radius: 11px;
+  /* Kante statt Graufuellung: eine graue Flaeche ueber die volle Breite liest
+     sich wie ein Platzhalter, eine Kante wie ein Knopf. */
+  background: var(--surface);
+  border: 1px solid var(--border);
   color: var(--text);
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: background .15s, border-color .15s;
 }
+.prof__btn:hover { background: var(--surface-2); }
 .prof__btn.is-primary { background: var(--brand-grad); color: #fff; box-shadow: 0 1px 3px rgba(91,69,224,.22); }
-.prof__btn.is-following { background: var(--surface-3); color: var(--text-2); }
+.prof__btn.is-following { background: var(--surface); border-color: var(--border); color: var(--text-2); box-shadow: none; }
 
 .prof__tabs {
   display: grid;
@@ -865,13 +871,50 @@ ul { margin: 0; padding: 0; list-style: none; }
 .camera__top { display: flex; align-items: center; justify-content: space-between; padding: 14px; }
 .camera__top button { width: 38px; height: 38px; display: grid; place-items: center; color: #fff; border-radius: 50%; }
 .camera__top svg { width: 22px; height: 22px; }
-.camera__stage { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; color: rgba(255,255,255,.35); }
-.camera__stage svg { width: 64px; height: 64px; }
-.camera__modes { display: flex; justify-content: center; gap: 22px; padding: 12px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.5); }
-.camera__mode.is-active { color: #fff; }
+/*
+  Der Sucher zeigte flaches Schwarz mit einem grossen grauen Kamerasymbol -
+  das liest sich als "hier fehlt etwas". Jetzt: ein leichter Lichtabfall zu
+  den Raendern wie bei einem echten Objektiv, dazu die vier Fokus-Ecken, die
+  jede Kamera-App zeigt. Das Symbol wird klein und blass.
+
+  (Expo Go liefert kein Kamerabild in der Website - der Sucher bleibt ein
+  Platzhalter, soll aber wie ein Sucher aussehen.)
+*/
+.camera__stage {
+  position: relative;
+  flex: 1 1 auto; min-height: 0;
+  display: grid; place-items: center;
+  color: rgba(255,255,255,.22);
+  background:
+    radial-gradient(120% 80% at 50% 42%, #1D2027, #0B0C0F 72%);
+}
+.camera__stage svg { width: 34px; height: 34px; }
+.camera__sucher {
+  position: absolute;
+  inset: 12% 10%;
+  pointer-events: none;
+}
+.camera__sucher span {
+  position: absolute;
+  width: 26px; height: 26px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-radius: 3px;
+}
+.camera__sucher span:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+.camera__sucher span:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+.camera__sucher span:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+.camera__sucher span:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+.camera__modes { display: flex; justify-content: center; gap: 8px; padding: 12px; font-size: 12.5px; font-weight: 700; letter-spacing: .06em; color: rgba(255,255,255,.45); }
+.camera__mode { padding: 6px 14px; border-radius: 999px; transition: background .15s, color .15s; }
+/* Die aktive Betriebsart bekommt eine eigene Flaeche. Nur "heller weiss"
+   gegen "blasser weiss" ist auf schwarzem Grund kaum zu erkennen. */
+.camera__mode.is-active { background: rgba(255,255,255,.14); color: #fff; }
 .camera__bottom { display: flex; align-items: center; justify-content: space-around; padding: 8px 24px 30px; }
 .camera__shutter { width: 68px; height: 68px; border-radius: 50%; border: 4px solid #fff; padding: 4px; }
-.camera__shutter-inner { width: 100%; height: 100%; border-radius: 50%; background: #fff; transition: background .15s, border-radius .15s; }
+/* display:block ist Pflicht: das Element ist ein <span>, und auf einem
+   Inline-Element wirkt width/height nicht - der Ausloeser war dadurch hohl. */
+.camera__shutter-inner { display: block; width: 100%; height: 100%; border-radius: 50%; background: #fff; transition: background .15s, border-radius .15s, transform .12s; }
+.camera__shutter:active .camera__shutter-inner { transform: scale(.9); }
 .camera__shutter.is-rec .camera__shutter-inner { background: var(--danger); border-radius: 8px; }
 .camera__side { width: 44px; height: 44px; display: grid; place-items: center; color: #fff; border-radius: 50%; background: rgba(255,255,255,.12); }
 .camera__side svg { width: 22px; height: 22px; }
@@ -911,7 +954,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-size: 12.5px;
   font-weight: 600;
 }
-.post__follow.is-on { background: var(--surface-3); color: var(--text-2); }
+.post__follow.is-on { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); box-shadow: none; }
 .post__bell { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; color: var(--text-2); border-radius: 50%; }
 .post__bell svg { width: 19px; height: 19px; }
 .post__bell.is-on { color: var(--brand); }
@@ -1397,8 +1440,16 @@ body:has(.camera) .toast { bottom: 132px; }
   width: 14px; height: 14px; border-radius: 50%;
   background: #34C759; border: 2.5px solid var(--surface);
 }
-.highlight__ring.is-playlist { border-color: #E5484D; border-width: 2px; color: #E5484D; }
-.highlight__ring.is-highlight { border-color: #F5A524; border-width: 2px; color: #F5A524; }
+/*
+  Vorher trugen Playlists einen roten und Highlights einen orangen Ring - die
+  einzigen zwei Stellen der App mit diesen Farben, und beide standen fuer
+  nichts. Ein Highlight ist in Wahrheit ein Standbild, also traegt der Kreis
+  jetzt eine Motivflaeche und der Ring ist wieder neutral. Welche Art es ist,
+  sagt das Symbol darin.
+*/
+.highlight__ring { position: relative; overflow: hidden; border-color: var(--border); }
+.highlight__ring .motiv { color: rgba(255,255,255,.65); }
+.highlight__ring .motiv svg { width: 22px; height: 22px; opacity: .75; }
 
 .viewer__hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
@@ -2068,16 +2119,22 @@ body:has(.camera) .toast { bottom: 132px; }
 .btn {
   display: inline-grid;
   place-items: center;
-  min-height: 34px;
+  min-height: 38px;
   padding: 0 16px;
-  border-radius: 9px;
+  border-radius: 11px;
   font-size: 14px;
   font-weight: 600;
-  background: var(--surface-3);
+  letter-spacing: -0.01em;
+  /* Kante statt Graufuellung: eine graue Flaeche ueber die volle Breite liest
+     sich wie ein Platzhalter, eine Kante wie ein Knopf. */
+  background: var(--surface);
+  border: 1px solid var(--border);
   color: var(--text);
-  transition: background .12s;
+  transition: background .15s, border-color .15s;
 }
-.btn:hover { background: var(--border); }
+.btn:hover { background: var(--surface-2); }
+/* Der Hauptknopf traegt den Verlauf und braucht deshalb keine Kante. */
+.btn--primary { border-color: transparent; }
 .btn--breit { width: 100%; }
 .btn--primary { background: var(--brand-grad); color: #fff; box-shadow: var(--shadow-brand); }
 .btn--primary:hover { filter: brightness(1.07); }
@@ -2398,3 +2455,8 @@ button.msg__sender:hover { text-decoration: underline; }
     linear-gradient(180deg, rgba(0,0,0,.34), rgba(0,0,0,.66));
 }
 .slide__stage .motiv svg { opacity: .35; }
+
+/* Ort und Musik sind Kategorien, keine Aufnahmen - sie bekommen deshalb keine
+   Motivflaeche, sondern die gedaempfte Markenfarbe. Sonst sehen sie aus wie
+   Vorschaubilder, die nicht geladen haben. */
+.exp__thumb--kategorie { background: var(--brand-soft); color: var(--brand); }

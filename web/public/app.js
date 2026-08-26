@@ -3624,7 +3624,7 @@ function renderCameraPage() {
         <span></span>
         <button id="camFlash" aria-label="Blitz">${ICONS.flash}</button>
       </div>
-      <div class="camera__stage">${ICONS.camera}</div>
+      <div class="camera__stage">${ICONS.camera}<span class="camera__sucher"><span></span><span></span><span></span><span></span></span></div>
       <div class="camera__modes">
         <button class="camera__mode is-active" data-mode="photo">FOTO</button>
         <button class="camera__mode" data-mode="video">VIDEO</button>
@@ -3982,7 +3982,7 @@ function renderClipsExplorer() {
     <div class="scroll">
       ${state.clips.map((c) => `
         <button class="exp__row" data-openclip="${c.id}">
-          <span class="exp__thumb">${ICONS.landscape}</span>
+          <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape)}</span>
           <span class="exp__text">
             <strong>${esc(c.title)}</strong>
             <small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small>
@@ -4044,7 +4044,7 @@ function medienKachel(eintrag, art, symbol, form) {
 
   return `
     <button class="exp__card exp__card--${form}" data-${art}="${eintrag.id}">
-      <span class="exp__card-media">${symbol}</span>
+      <span class="exp__card-media">${medienFlaeche(eintrag.id, symbol)}</span>
       <span class="exp__card-info">
         <span class="exp__card-kopf">
           <span class="exp__card-avatar" style="background:${u.color}">${esc(u.initials)}</span>
@@ -4132,7 +4132,7 @@ function renderVideoSearch() {
                 ? `<div class="exp__list">${clips
                     .map(
                       (c) => `<button class="exp__row" data-openclip="${c.id}">
-                        <span class="exp__thumb">${ICONS.landscape}</span>
+                        <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape)}</span>
                         <span class="exp__text"><strong>${esc(c.title)}</strong><small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small></span>
                       </button>`
                     )
@@ -4174,7 +4174,7 @@ function renderVideoSearch() {
                 ? `<div class="exp__list">${places
                     .map(
                       (pl) => `<button class="exp__row" data-place="${pl.id}">
-                        <span class="exp__thumb">${ICONS.mapPin}</span>
+                        <span class="exp__thumb exp__thumb--kategorie">${ICONS.mapPin}</span>
                         <span class="exp__text"><strong>${esc(pl.name)}</strong><small>${compactNumber(pl.posts)} Beiträge</small></span>
                       </button>`
                     )
@@ -4187,7 +4187,7 @@ function renderVideoSearch() {
                 ? `<div class="exp__list">${sounds
                     .map(
                       (so) => `<button class="exp__row" data-sound="${so.id}">
-                        <span class="exp__thumb">${ICONS.music}</span>
+                        <span class="exp__thumb exp__thumb--kategorie">${ICONS.music}</span>
                         <span class="exp__text"><strong>${esc(so.title)}</strong><small>${esc(so.artist)} · ${compactNumber(so.uses)} Videos</small></span>
                       </button>`
                     )
@@ -5615,10 +5615,10 @@ async function renderVideoProfile() {
       }
       <div class="highlights">
         ${(me.playlists || [])
-          .map((pl) => `<button class="highlight" data-playlist="${esc(pl)}"><span class="highlight__ring is-playlist">${ICONS.play}</span><span class="highlight__label">${esc(pl)}</span></button>`)
+          .map((pl) => `<button class="highlight" data-playlist="${esc(pl)}"><span class="highlight__ring is-playlist">${medienFlaeche('pl-' + pl, ICONS.play)}</span><span class="highlight__label">${esc(pl)}</span></button>`)
           .join('')}
         ${me.highlights
-          .map((h) => `<button class="highlight"><span class="highlight__ring is-highlight">${ICONS.image}</span><span class="highlight__label">${esc(h)}</span></button>`)
+          .map((h) => `<button class="highlight"><span class="highlight__ring is-highlight">${medienFlaeche('hl-' + h, ICONS.image)}</span><span class="highlight__label">${esc(h)}</span></button>`)
           .join('')}
       </div>
       <div class="prof__tabs">
@@ -6458,7 +6458,7 @@ function openCamera() {
         <button id="camClose" aria-label="Schließen">${ICONS.close}</button>
         <button id="camFlash" aria-label="Blitz">${ICONS.flash}</button>
       </div>
-      <div class="camera__stage">${ICONS.camera}</div>
+      <div class="camera__stage">${ICONS.camera}<span class="camera__sucher"><span></span><span></span><span></span><span></span></span></div>
       <div class="camera__modes">
         <button class="camera__mode is-active" data-mode="photo">FOTO</button>
         <button class="camera__mode" data-mode="video">VIDEO</button>

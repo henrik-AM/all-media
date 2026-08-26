@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.brand,
   },
-  actionDone: { backgroundColor: colors.surface3 },
+  actionDone: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   actionText: { ...typography.small, fontWeight: '600', color: colors.white },
   actionTextDone: { color: colors.text2 },
 });

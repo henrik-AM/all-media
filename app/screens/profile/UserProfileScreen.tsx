@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { avatarColor, colors, radius, sizes, spacing, typography } from '../../constants/design';
@@ -166,7 +167,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
           <View style={styles.grid}>
             {GRID_KINDS.map((kind, index) => (
               <View key={index} style={styles.gridItem}>
-                <Ionicons name="image-outline" size={26} color={colors.text3} />
+                <Motiv id={`grid-${index}`} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                 {kind === 'video' && (
                   <View style={styles.gridBadge}>
                     <Ionicons name="play" size={13} color={colors.white} />
@@ -283,6 +284,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   gridBadge: { position: 'absolute', top: 6, right: 6 },
 });

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Motiv } from '../../components/Motiv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
@@ -86,7 +87,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                       {v.mediaUri ? (
                         <Image source={{ uri: v.mediaUri }} style={styles.voll} />
                       ) : (
-                        <Ionicons name="play-outline" size={30} color={colors.text3} />
+                        <Motiv id={v.id} icon="play-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       )}
                       <Text style={styles.reelText} numberOfLines={2}>
                         {v.description}
@@ -103,7 +104,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 {treffer.clips.map((c: Clip) => (
                   <Pressable key={c.id} style={styles.clip} onPress={() => onOpenClip(c.id)}>
                     <View style={styles.clipBild}>
-                      <Ionicons name="tv-outline" size={30} color={colors.text3} />
+                      <Motiv id={c.id} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       <View style={styles.clipZeit}>
                         <Text style={styles.clipZeitText}>{c.duration}</Text>
                       </View>
@@ -133,7 +134,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                       {p.mediaUri ? (
                         <Image source={{ uri: p.mediaUri }} style={styles.voll} />
                       ) : (
-                        <Ionicons name="image-outline" size={26} color={colors.text3} />
+                        <Motiv id={p.id} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       )}
                     </Pressable>
                   ))}
@@ -356,6 +357,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   clipZeit: {
     position: 'absolute',

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Motiv } from '../../components/Motiv';
 import { EmptyState } from '../../components/EmptyState';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
@@ -85,8 +86,8 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
           {playlists.map((label) => (
             <Pressable key={`pl-${label}`} style={styles.highlight} onPress={() => onNotice(`Playlist „${label}“`)}>
-              <View style={[styles.ring, styles.ringPlaylist]}>
-                <Ionicons name="play-outline" size={24} color="#E5484D" />
+              <View style={styles.ring}>
+                <Motiv id={`pl-${label}`} icon="play-outline" iconSize={22} style={{ width: 58, height: 58 }} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
                 {label}
@@ -95,8 +96,8 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           ))}
           {highlights.map((label) => (
             <Pressable key={`hl-${label}`} style={styles.highlight} onPress={() => onNotice(`Highlight „${label}“`)}>
-              <View style={[styles.ring, styles.ringHighlight]}>
-                <Ionicons name="image-outline" size={24} color="#F5A524" />
+              <View style={styles.ring}>
+                <Motiv id={`hl-${label}`} icon="image-outline" iconSize={22} style={{ width: 58, height: 58 }} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
                 {label}
@@ -125,10 +126,11 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
                   // Selbst aufgenommen: das echte Bild statt des Platzhalters.
                   <Image source={{ uri: eintrag.mediaUri }} style={styles.gridBild} />
                 ) : (
-                  <Ionicons
-                    name={eintrag.kind === 'video' ? 'play-outline' : 'image-outline'}
-                    size={26}
-                    color={colors.text3}
+                  <Motiv
+                    id={eintrag.id}
+                    icon={eintrag.kind === 'video' ? 'play-outline' : 'image-outline'}
+                    iconSize={20}
+                    style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
                   />
                 )}
               </View>
@@ -140,10 +142,11 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           <View style={styles.grid}>
             {reposts.map((r) => (
               <View key={`${r.art}-${r.id}`} style={styles.gridItem}>
-                <Ionicons
-                  name={r.art === 'video' ? 'play-outline' : 'image-outline'}
-                  size={26}
-                  color={colors.text3}
+                <Motiv
+                  id={`${r.art}-${r.id}`}
+                  icon={r.art === 'video' ? 'play-outline' : 'image-outline'}
+                  iconSize={20}
+                  style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
                 />
                 <View style={styles.repostMarke}>
                   <Ionicons name="repeat" size={12} color={colors.white} />
@@ -205,9 +208,23 @@ const styles = StyleSheet.create({
 
   highlights: { gap: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   highlight: { alignItems: 'center', gap: 6, width: 68 },
-  ring: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  ringPlaylist: { borderColor: '#E5484D' },
-  ringHighlight: { borderColor: '#F5A524' },
+  /*
+   * Vorher trugen Playlists einen roten und Highlights einen orangen Ring —
+   * die einzigen zwei Stellen der App mit diesen Farben, und beide standen
+   * für nichts. Ein Highlight ist in Wahrheit ein Standbild, also trägt der
+   * Kreis jetzt eine Motivfläche und der Ring ist wieder neutral. Welche Art
+   * es ist, sagt das Symbol darin.
+   */
+  ring: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
   highlightLabel: { ...typography.small, color: colors.text2 },
   tabs: {
     flexDirection: 'row',

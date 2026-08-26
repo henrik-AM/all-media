@@ -126,13 +126,17 @@ const styles = StyleSheet.create({
   name: { ...typography.h2, color: colors.text },
   bio: { ...typography.message, color: colors.text, marginTop: 3 },
   link: { ...typography.message, color: colors.brand, marginTop: 4 },
+  /* Kante statt Graufüllung: eine graue Fläche über die volle Breite liest
+     sich wie ein Platzhalter, eine Kante wie ein Knopf. */
   bearbeiten: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
-    paddingVertical: 9,
-    borderRadius: 9,
-    backgroundColor: colors.surface3,
+    paddingVertical: 10,
+    borderRadius: 11,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
   },
-  bearbeitenText: { fontSize: 14, fontWeight: '700', color: colors.text },
+  bearbeitenText: { fontSize: 14, fontWeight: '600', color: colors.text, letterSpacing: -0.1 },
 });
