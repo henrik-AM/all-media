@@ -4055,56 +4055,23 @@ function renderSettings() {
 // Prototyp-Frame "Messenger - Friend-Map": Karte mit Freunden, darunter eine
 // Liste mit letztem Standort.
 function renderFriendMap() {
-  // Zoom und Verschiebung der Karte. Bleibt zwischen den Neuzeichnungen
-  // erhalten, damit ein Klick auf einen Kontakt nicht zurueckspringt.
-  const k = (state.karte = state.karte || { zoom: 1, x: 0, y: 0, aktiv: null });
   const freigabeTexte = {
     niemand: 'Dein Standort bleibt privat',
     kontakte: 'Alle deine Kontakte sehen dich',
     ausgewaehlt: 'Nur wen du freigibst',
   };
   if (state.standort === undefined) state.standort = { an: true, wer: 'kontakte' };
+  if (!state.karte) state.karte = { aktiv: null, mapInstance: null, markers: {} };
 
-  const strassenX = [12, 27, 44, 61, 78, 92];
-  const strassenY = [15, 33, 52, 70, 87];
-  const bloecke = [
-    [4, 6, 16, 18], [32, 4, 20, 14], [66, 8, 22, 16], [6, 40, 14, 20],
-    [34, 38, 18, 22], [70, 42, 18, 18], [14, 74, 22, 16], [52, 76, 26, 14],
-  ];
+  const percentToCoords = (x, y) => {
+    const lat = 55.1 - ((y / 100) * (55.1 - 47.3));
+    const lng = 5.9 + ((x / 100) * (15.0 - 5.9));
+    return [lat, lng];
+  };
 
   main.innerHTML = `
     <div class="scroll">
-      <div class="map map--${state.karteStil || 'standard'} ${state.karteVollbild ? 'map--voll' : ''}" id="map">
-        <div class="map__flaeche" id="mapFlaeche">
-          <div class="map__park"></div>
-          <div class="map__fluss"></div>
-          ${bloecke
-            .map(([x, y, w, h]) => `<div class="map__block" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%"></div>`)
-            .join('')}
-          ${strassenX.map((x) => `<div class="map__strasse-v" style="left:${x}%"></div>`).join('')}
-          ${strassenY.map((y) => `<div class="map__strasse-h" style="top:${y}%"></div>`).join('')}
-          <div class="map__me" title="Dein Standort" style="transform:scale(${(1 / k.zoom).toFixed(3)})"><span></span></div>
-          ${state.friends
-            .map((f) => {
-              const u = user(f.id);
-              // Gegen den Zoom skalieren: Nadeln sollen ihre Groesse behalten,
-              // sonst fuellt eine Nadel beim Hineinzoomen den halben Schirm.
-              return `<button class="map__pin ${k.aktiv === f.id ? 'is-aktiv' : ''}" style="left:${f.x}%;top:${f.y}%;transform:scale(${(1 / k.zoom).toFixed(3)})" data-pin="${f.id}" title="${esc(u.name)}">
-                <span class="map__dot" style="background:${u.color}">${esc(u.initials)}</span>
-                <span class="map__label">${esc(u.name.split(' ')[0])}</span>
-              </button>`;
-            })
-            .join('')}
-        </div>
-
-        <div class="map__werkzeuge">
-          <button class="map__werkzeug" data-mapfull aria-label="${state.karteVollbild ? 'Vollbild verlassen' : 'Karte im Vollbild'}">
-            ${state.karteVollbild ? ICONS.einklappen : ICONS.ausklappen}
-          </button>
-          <button class="map__werkzeug" data-mapstil aria-label="Kartenansicht wechseln">${ICONS.ebenen}</button>
-        </div>
-        ${k.zoom > 1.05 ? '<button class="map__reset" id="mapReset">Ganze Karte</button>' : ''}
-      </div>
+      <div id="leaflet-map" style="height: 320px; border-radius: 12px; margin: 0 16px; overflow: hidden;"></div>
 
       <div class="standort">
         <div class="standort__kopf">
@@ -4140,7 +4107,7 @@ function renderFriendMap() {
         ${state.friends
           .map((f) => {
             const u = user(f.id);
-            return `<li><div class="row ${k.aktiv === f.id ? 'is-aktiv' : ''}" data-zoom="${f.id}">
+            return `<li><div class="row ${state.karte.aktiv === f.id ? 'is-aktiv' : ''}" data-zoom="${f.id}">
               ${avatarForUser(f.id, 44)}
               <div class="row__body">
                 <div class="row__name">${esc(u.name)}</div>
@@ -4153,147 +4120,75 @@ function renderFriendMap() {
       </ul>
     </div>`;
 
-  const flaeche = $('#mapFlaeche');
-  const anwenden = () => {
-    flaeche.style.transform = `translate(${k.x}px, ${k.y}px) scale(${k.zoom})`;
-  };
-  anwenden();
+  setTimeout(() => {
+    const mapContainer = $('#leaflet-map');
+    if (!mapContainer) return;
 
-  // Mit den echten Maszen rechnen, nicht mit geschaetzten - sonst sitzt die
-  // Person beim Hineinzoomen nicht mittig.
-  const masze = () => {
-    const r = $('#map').getBoundingClientRect();
-    return { b: r.width, h: r.height };
-  };
-  const grenze = () => {
-    const m = masze();
-    return { x: ((k.zoom - 1) * m.b) / 2, y: ((k.zoom - 1) * m.h) / 2 };
-  };
-  const begrenzen = () => {
-    const g = grenze();
-    k.x = Math.max(-g.x, Math.min(g.x, k.x));
-    k.y = Math.max(-g.y, Math.min(g.y, k.y));
-  };
+    if (state.karte.mapInstance) {
+      state.karte.mapInstance.remove();
+      state.karte.mapInstance = null;
+      state.karte.markers = {};
+    }
 
-  const setzeZoom = (z) => {
-    k.zoom = Math.max(1, Math.min(4, z));
-    begrenzen();
-    anwenden();
-    renderFriendMap();
-  };
+    const map = L.map(mapContainer).setView([51.5, 10], 4);
+    state.karte.mapInstance = map;
 
-  /*
-   * Henrik: "Zoom per Fingergeste ermoeglichen; Plus/Minus rechts oben
-   * entfernen und durch einen diagonalen Pfeil nach oben/unten ersetzen.
-   * Dieser oeffnet eine vergroesserte Vollbild-Kartenansicht."
-   */
-  main.querySelector('[data-mapfull]')?.addEventListener('click', () => {
-    state.karteVollbild = !state.karteVollbild;
-    renderFriendMap();
-  });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 18,
+    }).addTo(map);
 
-  /*
-   * "In normaler und grosser Ansicht einen Button fuer verschiedene
-   * Kartenansichten ergaenzen, z. B. Satellit/geografisch."
-   *
-   * Die Karte ist selbst gezeichnet - echte Satellitenkacheln braeuchten
-   * einen Kartenanbieter und damit einen Vertrag. Die drei Ansichten
-   * unterscheiden sich deshalb in der Farbgebung: Standard hell,
-   * Satellit dunkel mit gruenen Flaechen, Gelaende in Erdtoenen.
-   */
-  main.querySelector('[data-mapstil]')?.addEventListener('click', () => {
-    const reihe = ['standard', 'satellit', 'gelaende'];
-    const jetzt = reihe.indexOf(state.karteStil || 'standard');
-    state.karteStil = reihe[(jetzt + 1) % reihe.length];
-    renderFriendMap();
-    toast({ standard: 'Standard', satellit: 'Satellit', gelaende: 'Gelände' }[state.karteStil]);
-  });
+    state.friends.forEach((f) => {
+      const u = user(f.id);
+      const [lat, lng] = percentToCoords(f.x, f.y);
+      const isActive = state.karte.aktiv === f.id;
+      const marker = L.circleMarker([lat, lng], {
+        radius: isActive ? 12 : 8,
+        fillColor: isActive ? '#ff3b30' : u.color,
+        color: isActive ? '#ff3b30' : u.color,
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8,
+      })
+        .bindPopup(`<div style="text-align: center; font-weight: 600;">${esc(u.name)}</div>`)
+        .addTo(map);
 
-  $('#mapReset')?.addEventListener('click', () => {
-    k.zoom = 1; k.x = 0; k.y = 0; k.aktiv = null;
-    renderFriendMap();
-  });
+      marker.on('click', () => {
+        state.karte.aktiv = f.id;
+        renderFriendMap();
+      });
 
-  /**
-   * Auf eine Person zoomen: Sie sitzt bei x/y Prozent und soll in die Mitte -
-   * dazu die Karte um die Abweichung von der Mitte verschieben.
-   */
-  const zoomAuf = (id) => {
-    const f = state.friends.find((x) => x.id === id);
-    if (!f) return;
-    const m = masze();
-
-    // Erst grob hinzoomen ...
-    const abstand = Math.max(Math.abs(50 - f.x), Math.abs(50 - f.y)) / 100;
-    k.zoom = Math.min(4, Math.max(2.4, 1 / Math.max(0.001, 0.52 - abstand)));
-    k.aktiv = id;
-    k.x = ((50 - f.x) / 100) * m.b * k.zoom;
-    k.y = ((50 - f.y) / 100) * m.h * k.zoom;
-    begrenzen();
-    renderFriendMap();
-
-    // ... danach genau nachzentrieren. Die Nadel sitzt wegen ihrer Spitze
-    // und der Gegenskalierung nicht exakt auf dem gerechneten Punkt -
-    // messen ist hier verlaesslicher als rechnen.
-    requestAnimationFrame(() => {
-      const rahmen = $('#map');
-      const nadel = document.querySelector('.map__pin.is-aktiv');
-      const flaeche = $('#mapFlaeche');
-      if (!rahmen || !nadel || !flaeche) return;
-
-      const rm = rahmen.getBoundingClientRect();
-      const rn = nadel.getBoundingClientRect();
-      k.x += rm.x + rm.width / 2 - (rn.x + rn.width / 2);
-      k.y += rm.y + rm.height / 2 - (rn.y + rn.height / 2);
-      begrenzen();
-      flaeche.style.transform = `translate(${k.x}px, ${k.y}px) scale(${k.zoom})`;
+      state.karte.markers[f.id] = marker;
     });
-  };
-
-  main.querySelectorAll('[data-pin]').forEach((el) =>
-    el.addEventListener('click', () => zoomAuf(el.dataset.pin))
-  );
-  // Tippen auf den Kontakt zoomt auf der Karte - fuehrt nicht mehr weg.
-  main.querySelectorAll('[data-zoom]').forEach((el) =>
-    el.addEventListener('click', (e) => {
-      if (e.target.closest('[data-friend-profil]')) return;
-      zoomAuf(el.dataset.zoom);
-    })
-  );
-  main.querySelectorAll('[data-friend-profil]').forEach((el) =>
-    el.addEventListener('click', () => openProfile(el.dataset.friendProfil, 'kontakt'))
-  );
+  }, 0);
 
   $('#standortAn').addEventListener('change', (e) => {
     state.standort.an = e.target.checked;
     toast(state.standort.an ? 'Standort wird geteilt' : 'Standort ist aus');
-    renderFriendMap();
   });
   main.querySelectorAll('[data-wer]').forEach((b) =>
     b.addEventListener('click', () => {
       state.standort.wer = b.dataset.wer;
       toast(`Standort sichtbar für: ${b.textContent.trim()}`);
-      renderFriendMap();
     })
   );
 
-  // Verschieben mit der Maus oder dem Finger
-  let zieht = false, startX = 0, startY = 0;
-  const map = $('#map');
-  const beginn = (cx, cy) => { zieht = true; startX = cx - k.x; startY = cy - k.y; };
-  const zug = (cx, cy) => {
-    if (!zieht) return;
-    k.x = cx - startX;
-    k.y = cy - startY;
-    begrenzen();
-    anwenden();
-  };
-  map.addEventListener('mousedown', (e) => beginn(e.clientX, e.clientY));
-  window.addEventListener('mousemove', (e) => zug(e.clientX, e.clientY));
-  window.addEventListener('mouseup', () => (zieht = false));
-  map.addEventListener('touchstart', (e) => beginn(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-  map.addEventListener('touchmove', (e) => zug(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-  map.addEventListener('touchend', () => (zieht = false));
+  main.querySelectorAll('[data-zoom]').forEach((el) =>
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-friend-profil]')) return;
+      const id = el.dataset.zoom;
+      state.karte.aktiv = id;
+      const f = state.friends.find((x) => x.id === id);
+      if (f && state.karte.mapInstance) {
+        const [lat, lng] = percentToCoords(f.x, f.y);
+        state.karte.mapInstance.setView([lat, lng], 10, { animate: true });
+      }
+      renderFriendMap();
+    })
+  );
+  main.querySelectorAll('[data-friend-profil]').forEach((el) =>
+    el.addEventListener('click', () => openProfile(el.dataset.friendProfil, 'kontakt'))
+  );
 }
 
 /* ---------------------------------------------------- Messenger: Kamera */

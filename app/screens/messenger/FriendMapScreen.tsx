@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
-import { Karte, KartenSteuerung } from '../../components/Karte';
+import { KarteWeb, KartenSteuerung, Pin } from '../../components/KarteWeb';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { mockFriendPins, mockUsers } from '../../mocks';
 
@@ -40,12 +40,21 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
    */
   const [flaeche, setFlaeche] = useState(0);
 
-  const pins = mockFriendPins.map((pin) => ({
-    id: pin.id,
-    name: mockUsers[pin.id].name,
-    x: pin.x,
-    y: pin.y,
-  }));
+  const percentToCoords = (x: number, y: number): [number, number] => {
+    const lat = 55.1 - ((y / 100) * (55.1 - 47.3));
+    const lng = 5.9 + ((x / 100) * (15.0 - 5.9));
+    return [lat, lng];
+  };
+
+  const pins: Pin[] = mockFriendPins.map((pin) => {
+    const [lat, lng] = percentToCoords(pin.x, pin.y);
+    return {
+      id: pin.id,
+      name: mockUsers[pin.id].name,
+      lat,
+      lng,
+    };
+  });
 
   /**
    * Tippen auf einen Kontakt zoomt auf der Karte zu ihm - vorher landete man
@@ -63,15 +72,13 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
       scrollEnabled={!vollbild}
       onLayout={(e) => setFlaeche(e.nativeEvent.layout.height)}
     >
-      <Karte
+      <KarteWeb
         ref={karte}
         pins={pins}
         aktiv={aktiv}
         onPinPress={zeigeAufKarte}
         vollbild={vollbild}
         onVollbild={() => setVollbild((v) => !v)}
-        // Im Vollbild bekommt die Karte den ganzen Bereich. flex allein reicht
-        // nicht, weil die Karte eine feste Hoehe erwartet.
         hoehe={vollbild && flaeche > 0 ? flaeche : 320}
       />
 
