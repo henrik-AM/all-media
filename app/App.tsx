@@ -15,10 +15,10 @@ import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { KontoWechsel } from './components/KontoWechsel';
 import { TabBar } from './components/TabBar';
-import { TopSwitcher } from './components/TopSwitcher';
+import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AreaKey, NAV, SubKey, defaultSub } from './constants/navigation';
+import { AreaKey, NAV, SubKey, areaOf, defaultSub } from './constants/navigation';
 import { LoginScreen } from './screens/LoginScreen';
 import { ChatListScreen } from './screens/messenger/ChatListScreen';
 import { ChatDetailScreen } from './screens/messenger/ChatDetailScreen';
@@ -80,6 +80,7 @@ const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minu
 const Shell = () => {
   const { logout } = useContext(AuthContext);
   const { isDark } = useContext(ThemeContext);
+  const insets = useSafeAreaInsets();
 
   // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt — genau wie im
   // Prototyp, wo die obere Leiste zum Bereich gehoert.
@@ -112,6 +113,20 @@ const Shell = () => {
 
   const sub = subs[area];
   const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
+
+  /*
+   * Bereichswechsel unten: jeder Bereich faengt auf seiner Hauptseite an.
+   *
+   * Vorher merkte sich jeder Bereich seinen zuletzt offenen Unterpunkt. Wer
+   * den Messenger auf der Kamera verlassen hatte, stand beim naechsten Mal
+   * wieder in der Kamera statt in der Chatliste. Erneutes Tippen auf den
+   * bereits offenen Bereich springt ebenfalls zurueck - so wie in jeder App
+   * mit unterer Leiste.
+   */
+  const wechsleBereich = (next: AreaKey) => {
+    setArea(next);
+    setSubs((prev) => ({ ...prev, [next]: defaultSub[next] }));
+  };
 
   /*
    * Prüf-Schalter: beim Start auf einen bestimmten Bildschirm springen.
@@ -201,6 +216,18 @@ const Shell = () => {
 
   const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
   const hideNotice = useCallback(() => setNotice(null), []);
+
+  /*
+   * Platz und Zaehler der Dynamic Island.
+   *
+   * Zaehler: eine neue Nachricht stand bisher nur unten am Bereich, nicht
+   * oben am Unterpunkt, zu dem sie gehoert. Beide zeigen sie jetzt — im
+   * Messenger unter "Chats", im Bereich Communitys unter "Chats".
+   */
+  const hatInsel = areaOf(area).subs.length > 0;
+  const inselPlatz = insets.top + INSEL_ABSTAND + INSEL_HOEHE + INSEL_ABSTAND;
+  const inselZaehler: Partial<Record<SubKey, number>> =
+    area === 'messenger' ? { chats: unreadCount } : {};
 
   /** Alle Nachrichten eines Chats - fuer Medien, Markiertes und die Suche. */
   const nachrichtenVon = (chatId?: string): Message[] =>
@@ -830,9 +857,15 @@ const Shell = () => {
       {/* Im Dunkelmodus muss die Schrift der Statusleiste hell sein - sonst
           steht die Uhrzeit schwarz auf schwarzem Grund. */}
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <TopSwitcher area={area} active={sub} onChange={setSub} />
-      <View style={styles.content}>{renderContent()}</View>
-      <TabBar active={area} onChange={setArea} unreadCount={unreadCount} />
+      {/*
+        Die Insel steht ausserhalb des Flusses, deshalb haelt der Inhalt sich
+        den Platz darunter selbst frei — sonst laege der oberste Teil jedes
+        Bildschirms dauerhaft dahinter. In Einstellungen gibt es keine Insel
+        und damit auch keinen Abstand.
+      */}
+      <View style={[styles.content, hatInsel && { paddingTop: inselPlatz }]}>{renderContent()}</View>
+      <TopSwitcher area={area} active={sub} onChange={setSub} zaehler={inselZaehler} />
+      <TabBar active={area} onChange={wechsleBereich} unreadCount={unreadCount} />
 
       <ActionSheet
         visible={sheet === 'new'}

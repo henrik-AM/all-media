@@ -72,7 +72,9 @@ export const NAV: AreaItem[] = [
     icon: 'people-outline',
     iconActive: 'people',
     subs: [
-      { key: 'home', label: 'Home', icon: 'grid-outline', iconActive: 'grid' },
+      // Haus wie bei Videos-Home. Vier Quadrate lasen sich als "Uebersicht",
+      // nicht als Startseite des Bereichs.
+      { key: 'home', label: 'Home', icon: 'home-outline', iconActive: 'home' },
       { key: 'chats', label: 'Chats', icon: 'chatbubble-outline', iconActive: 'chatbubble' },
       { key: 'search', label: 'Suchen', icon: 'search-outline', iconActive: 'search' },
       { key: 'profile', label: 'Profil', icon: 'person-outline', iconActive: 'person' },

@@ -37,7 +37,9 @@ const NAV = {
     label: 'Communitys',
     icon: 'people',
     subs: [
-      { id: 'home', label: 'Home', icon: 'grid' },
+      // Haus wie bei Videos-Home. Vier Quadrate lasen sich als "Uebersicht",
+      // nicht als Startseite des Bereichs.
+      { id: 'home', label: 'Home', icon: 'home' },
       { id: 'chats', label: 'Chats', icon: 'chat' },
       { id: 'search', label: 'Suchen', icon: 'search' },
       { id: 'profile', label: 'Profil', icon: 'person' },
@@ -307,24 +309,96 @@ function geruest() {
 
 /* ------------------------------------------------------------------ views */
 
+/*
+ * Ungelesene Nachrichten, aufgeschluesselt nach Bereich und Unterpunkt.
+ *
+ * Henrik hat am 26.08.2026 zurueckgemeldet, dass eine neue Nachricht nur
+ * unten am Bereich auftaucht, aber nicht oben am Unterpunkt, zu dem sie
+ * gehoert. Beide sollen sie zeigen: kommt eine Nachricht im Chat an, steht
+ * die "1" am Bereich Messenger *und* an dessen Unterpunkt Chats.
+ *
+ * Gezaehlt wird genau das, was der jeweilige Bildschirm auch auflistet:
+ * state.chats im Messenger, state.communityChats im Bereich Communitys,
+ * die ungelesenen Mitteilungen hinter der Glocke im Profil bei Videos.
+ * Archivierte und der gerade offene Chat bleiben draussen - der gilt als
+ * gelesen, solange man darin steht.
+ *
+ * Das Feld am Chat heisst `unread` (so liefert es der Server) - nicht
+ * `unreadCount` wie in den App-Mocks. Genau daran haben die Zaehler beim
+ * ersten Anlauf nichts angezeigt, und genau deshalb wird jede Aenderung hier
+ * am Bild geprueft und nicht nur an gruenen Pruefungen.
+ */
+function ungelesen() {
+  const weg = state.archiviert || [];
+  const zaehle = (liste) =>
+    (liste || [])
+      .filter((c) => !weg.includes(c.id) && c.id !== state.openChatId)
+      .reduce((summe, c) => summe + (c.unread || 0), 0);
+
+  const messenger = zaehle(state.chats);
+  const commChats = zaehle(state.communityChats);
+  const commMitteilungen = state.ungelesen?.communities || 0;
+  const videos = state.ungelesen?.videos || 0;
+  const communities = commChats + commMitteilungen;
+
+  return {
+    bereich: { messenger, communities, videos, settings: 0 },
+    unterpunkt: {
+      messenger: { chats: messenger },
+      // Mitteilungen liegen hinter der Glocke im eigenen Profil - deshalb
+      // steht ihr Zaehler auf dem Unterpunkt "Profil", nicht auf "Home".
+      communities: { chats: commChats, profile: commMitteilungen },
+      videos: { profile: videos },
+      settings: {},
+    },
+  };
+}
+
+/** Kleiner roter Zaehler. Ab 99 abgekuerzt, sonst sprengt er die Insel. */
+function badge(zahl, klasse) {
+  if (!zahl) return '';
+  return `<span class="${klasse}">${zahl > 99 ? '99+' : zahl}</span>`;
+}
+
 // Untere Leiste: die vier Bereiche. Sie aendert sich nie.
 function renderBottomNav() {
   const nav = $('#bottomnav');
+  const zahlen = ungelesen().bereich;
+
   nav.innerHTML = AREAS.map((id) => `
     <button class="navbtn ${state.area === id ? 'is-active' : ''}" data-area="${id}">
-      <span class="navbtn__icon">${ICONS[NAV[id].icon]}</span>
+      <span class="navbtn__icon">${ICONS[NAV[id].icon]}${badge(zahlen[id], 'navbtn__badge')}</span>
       <span class="navbtn__label">${NAV[id].label}</span>
     </button>`).join('');
 
   nav.querySelectorAll('[data-area]').forEach((b) =>
     b.addEventListener('click', () => {
-      state.area = b.dataset.area;
+      const ziel = b.dataset.area;
+      /*
+       * Jeder Bereich faengt auf seiner Hauptseite an - Messenger bei den
+       * Chats, Videos und Communitys bei Home. Vorher merkte sich jeder
+       * Bereich seinen zuletzt offenen Unterpunkt; wer den Messenger zuletzt
+       * auf der Kamera verlassen hatte, landete beim naechsten Mal wieder
+       * dort statt in der Chatliste.
+       *
+       * Beim erneuten Tippen auf den bereits offenen Bereich springt es
+       * ebenfalls zurueck auf die Hauptseite - so wie in jeder App mit
+       * unterer Leiste.
+       */
+      state.area = ziel;
+      state.sub[ziel] = STARTPUNKT[ziel];
       render();
     })
   );
 }
 
-// Obere Leiste: die Unterpunkte des offenen Bereichs.
+/*
+ * Wo jeder Bereich anfaengt. Aus dem Prototyp: Messenger -> Chats,
+ * Videos -> Home, Communitys -> Home. Einstellungen haben nur eine Seite.
+ */
+const STARTPUNKT = { messenger: 'chats', videos: 'home', communities: 'home', settings: 'main' };
+
+// Obere Leiste: die Unterpunkte des offenen Bereichs, als schwebende Insel.
 function renderTopBar() {
   const bar = $('#topbar');
   const subs = NAV[state.area].subs;
@@ -332,14 +406,17 @@ function renderTopBar() {
   if (!subs.length) {
     bar.hidden = true;
     bar.innerHTML = '';
+    main.classList.remove('main--insel');
     return;
   }
 
   bar.hidden = false;
-  bar.style.gridTemplateColumns = `repeat(${subs.length}, 1fr)`;
+  main.classList.add('main--insel');
+
+  const zahlen = ungelesen().unterpunkt[state.area] || {};
   bar.innerHTML = subs.map((s) => `
     <button class="topbar__btn ${sub() === s.id ? 'is-active' : ''}" data-sub="${s.id}" title="${s.label}" aria-label="${s.label}">
-      ${ICONS[s.icon]}
+      ${ICONS[s.icon]}${badge(zahlen[s.id], 'topbar__badge')}
     </button>`).join('');
 
   bar.querySelectorAll('[data-sub]').forEach((b) =>
@@ -3958,11 +4035,28 @@ function renderMessengerProfile() {
 /* --------------------------------------------------- Videos: Querformat */
 // Prototyp-Frame "Videos - Querformat": Suchleiste und Liste von
 // Querformat-Videos mit Vorschaubild, Titel, Kanal und Laufzeit.
+/*
+ * Die vier Knoepfe der Querformat-Leiste und was sie zeigen.
+ *
+ * Henrik hat am 26.08.2026 gemeldet, dass die Leiste nichts tut: der Wert
+ * wurde gelesen, aber nie auf die Liste angewandt - alle vier Knoepfe zeigten
+ * dieselben Videos. Jetzt entscheidet `art` am Video, wohin es gehoert.
+ */
+const CLIP_FILTER = {
+  alle: { label: 'Alle', passt: () => true },
+  standard: { label: 'Standard', passt: (c) => (c.art || 'standard') === 'standard' },
+  '360°': { label: '360°', passt: (c) => c.art === '360' },
+  live: { label: 'Live', passt: (c) => c.art === 'live' },
+};
+
 function renderLandscapeVideos() {
   const q = state.clipQuery.trim().toLowerCase();
-  const filter = state.clipFilter || 'alle';
+  const filter = CLIP_FILTER[state.clipFilter] ? state.clipFilter : 'alle';
+  const passt = CLIP_FILTER[filter].passt;
   const list = state.clips.filter(
-    (c) => (!q || c.title.toLowerCase().includes(q) || user(c.userId).name.toLowerCase().includes(q))
+    (c) =>
+      passt(c) &&
+      (!q || c.title.toLowerCase().includes(q) || user(c.userId).name.toLowerCase().includes(q))
   );
 
   main.innerHTML = `
@@ -3975,7 +4069,12 @@ function renderLandscapeVideos() {
         </label>
       </div>
       <div class="pills">
-        ${['alle', 'standard', '360°', 'live'].map((f) => `<button class="pill ${filter === f ? 'is-active' : ''}" data-clipfilter="${f}">${f.charAt(0).toUpperCase() + f.slice(1)}</button>`).join('')}
+        ${Object.entries(CLIP_FILTER)
+          .map(
+            ([id, f]) =>
+              `<button class="pill ${filter === id ? 'is-active' : ''}" data-clipfilter="${id}">${f.label}</button>`
+          )
+          .join('')}
       </div>
     </div>
     <div class="scroll">
@@ -3984,13 +4083,29 @@ function renderLandscapeVideos() {
           ? list
               .map((c) => {
                 const u = user(c.userId);
+                const art = c.art || 'standard';
+                /*
+                 * Live und 360° bekommen ein Abzeichen auf der Kachel. Ohne
+                 * es waere am Ergebnis nicht zu sehen, dass der Filter etwas
+                 * getan hat - die Kacheln saehen alle gleich aus.
+                 */
+                const marke =
+                  art === 'live'
+                    ? '<span class="clip__art clip__art--live">LIVE</span>'
+                    : art === '360'
+                      ? '<span class="clip__art clip__art--360">360°</span>'
+                      : '';
+                const rechts =
+                  art === 'live'
+                    ? `${compactNumber(c.zuschauer || 0)} sehen zu`
+                    : `${compactNumber(c.views)} Aufrufe · ${esc(c.age)}`;
                 return `<article class="clip" data-clip="${c.id}">
-                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}${marke}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
                     <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
                     <div>
                       <div class="clip__title">${esc(c.title)}</div>
-                      <div class="clip__sub">${esc(u.name)} · ${compactNumber(c.views)} Aufrufe · ${esc(c.age)}</div>
+                      <div class="clip__sub">${esc(u.name)} · ${rechts}</div>
                     </div>
                   </div>
                 </article>`;
@@ -3998,7 +4113,11 @@ function renderLandscapeVideos() {
               .join('')
           : `<div class="empty">${ICONS.landscape}
               <div class="empty__title">Kein Video gefunden</div>
-              <div class="empty__text">Für „${esc(state.clipQuery)}" gibt es keinen Treffer.</div>
+              <div class="empty__text">${
+                state.clipQuery
+                  ? `Für „${esc(state.clipQuery)}" gibt es unter „${CLIP_FILTER[filter].label}" keinen Treffer.`
+                  : `Unter „${CLIP_FILTER[filter].label}" liegt gerade nichts.`
+              }</div>
             </div>`
       }
     </div>`;

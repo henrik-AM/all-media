@@ -72,6 +72,20 @@ ul { margin: 0; padding: 0; list-style: none; }
   --shadow-brand: 0 2px 6px rgba(91,69,224,.22), 0 8px 20px rgba(91,69,224,.26);
   --nav-h: 60px;
   --top-h: 56px;
+  /*
+   * Die Dynamic Island. Sie ist bewusst in beiden Themen dunkel - genau wie
+   * beim iPhone, wo die Insel immer schwarz ist, egal ob die App hell oder
+   * dunkel laeuft. Ein weisses Kaestchen auf weissem Grund waere wieder eine
+   * Leiste, keine Insel.
+   *
+   * --insel-grund-fest ist derselbe Ton ohne Transparenz. Er wird als
+   * Rand um den Zaehler gebraucht: mit Transparenz schiene dort der Inhalt
+   * durch und der Ring um die rote Zahl waere fleckig.
+   */
+  --insel-grund: rgba(22,24,29,.82);
+  --insel-grund-fest: #16181D;
+  --insel-rand: rgba(255,255,255,.1);
+  --insel-text: rgba(255,255,255,.62);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -158,40 +172,85 @@ ul { margin: 0; padding: 0; list-style: none; }
   }
 }
 
-/* ---------- Top switcher ---------- */
+/* ---------- Top switcher: die Dynamic Island ---------- */
 /*
+  Die obere Leiste ist keine angeklebte Leiste mehr, sondern schwebt als
+  eigenstaendige Pille ueber dem Bildschirm - wie die Dynamic Island beim
+  iPhone. Henrik hat die alte Fassung am 26.08.2026 als "stark hingeklatscht"
+  zurueckgemeldet; genau das war sie: volle Breite, Trennlinie unten, gleiche
+  Flaeche wie der Inhalt darunter.
+
+  Drei Dinge machen aus einer Leiste eine schwebende Insel:
+    1. Sie sitzt absolut, nicht im Fluss - der Inhalt laeuft darunter durch.
+    2. Sie ist nur so breit wie ihre Knoepfe und rundum von Luft umgeben.
+    3. Sie hat einen dunklen, leicht durchscheinenden Grund mit Unschaerfe
+       und einen weichen Schatten. Ohne Unschaerfe wirkt sie wie aufgeklebt.
+
+  Der Platz darunter wird ueber .main--insel freigehalten, damit kein Inhalt
+  dauerhaft unter der Insel verschwindet.
+
   Zum Homescreen hinzugefuegt laeuft die Seite unter der Statusleiste hindurch
-  (viewport-fit=cover). Die oberste Leiste haelt sich deshalb selbst den Platz
-  fuer Uhrzeit und Notch frei - sonst liegt sie darunter.
+  (viewport-fit=cover). Der Abstand nach oben rechnet env(safe-area-inset-top)
+  deshalb mit ein.
 */
 .topbar {
-  flex: 0 0 auto;
-  height: calc(var(--top-h) + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  position: absolute;
+  /* Unter der Vollbild-Ebene (z-index 20): ein offener Chat oder eine Story
+     deckt die Insel zu, statt dass sie darueber stehen bleibt. */
+  z-index: 15;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 52px;
   align-items: center;
-  gap: 0;
-  padding-left: 4px;
-  padding-right: 4px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  height: 44px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--insel-rand);
+  background: var(--insel-grund);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--shadow);
+  /* Die Insel selbst faengt keine Klicks ausserhalb ihrer Knoepfe ab. */
+  pointer-events: auto;
 }
 .topbar[hidden] { display: none; }
-/* Die aktive Pille sitzt um das Symbol, nicht ums ganze Viertel - sonst wirkt
-   die Leiste wie ein Baukasten aus vier Kacheln. */
 .topbar__btn {
-  height: 36px;
-  margin: 0 10px;
+  position: relative;
+  height: 34px;
+  margin: 0 3px;
   display: grid;
   place-items: center;
-  border-radius: 11px;
-  color: var(--text-2);
+  border-radius: 999px;
+  color: var(--insel-text);
   transition: background .15s, color .15s;
 }
-.topbar__btn svg { width: 22px; height: 22px; }
-.topbar__btn:hover { background: var(--surface-2); }
-.topbar__btn.is-active { background: var(--brand-soft); color: var(--brand); }
+.topbar__btn svg { width: 21px; height: 21px; }
+.topbar__btn:hover { background: rgba(255,255,255,.1); }
+.topbar__btn.is-active { background: var(--brand-grad); color: #fff; }
+/*
+  Zaehler auf einem Unterpunkt - z. B. ungelesene Chats unter "Chats".
+  Er sitzt oben rechts am Symbol, damit man ihn auch auf der schmalen Insel
+  noch trifft.
+*/
+.topbar__badge {
+  position: absolute;
+  top: -1px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  border: 1.5px solid var(--insel-grund-fest);
+}
 
 /* ---------- Main ---------- */
 .main {
@@ -201,6 +260,11 @@ ul { margin: 0; padding: 0; list-style: none; }
   flex-direction: column;
   background: var(--surface);
 }
+/*
+  Platz fuer die schwebende Insel. Sie steht ausserhalb des Flusses, sonst
+  laege der oberste Inhalt jedes Bildschirms dauerhaft darunter.
+*/
+.main--insel { padding-top: calc(env(safe-area-inset-top) + 64px); }
 .scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* ---------- Bottom nav ---------- */
@@ -1318,6 +1382,19 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-size: 11.5px; font-weight: 600;
   padding: 2px 6px; border-radius: 5px;
 }
+/*
+  Abzeichen oben links auf der Kachel: LIVE oder 360°. Es macht sichtbar,
+  wonach die Filterleiste im Querformat sortiert - ohne es saehen alle
+  Kacheln gleich aus und der Filter wirkte weiterhin wie ohne Funktion.
+*/
+.clip__art {
+  position: absolute; left: 8px; top: 8px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+  padding: 3px 7px; border-radius: 5px;
+  color: #fff;
+}
+.clip__art--live { background: var(--danger); }
+.clip__art--360 { background: rgba(0,0,0,.72); backdrop-filter: blur(4px); }
 .clip__meta { display: flex; gap: 12px; padding: 11px 16px 0; align-items: flex-start; }
 .clip__title { font-size: 14.5px; font-weight: 600; line-height: 1.32; }
 .clip__sub { font-size: 12.5px; color: var(--text-3); margin-top: 3px; }

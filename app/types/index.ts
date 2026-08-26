@@ -143,6 +143,13 @@ export interface Story {
 }
 
 /** Querformat-Video aus dem Prototyp-Frame "Videos - Querformat". */
+/**
+ * Art eines Querformat-Videos. Sie traegt die Filterleiste im Querformat
+ * ("Alle | Standard | 360° | Live"): ohne dieses Feld zeigten alle vier
+ * Knoepfe dieselbe Liste, weil es nichts zu unterscheiden gab.
+ */
+export type ClipArt = 'standard' | '360' | 'live';
+
 export interface Clip {
   id: string;
   userId: string;
@@ -150,6 +157,10 @@ export interface Clip {
   duration: string;
   views: number;
   age: string;
+  /** Fehlt sie, gilt das Video als 'standard'. */
+  art?: ClipArt;
+  /** Nur bei art === 'live': wie viele gerade zusehen. */
+  zuschauer?: number;
   /** Damit Querformat-Videos auf den Explorer-Seiten auftauchen koennen. */
   location?: string;
   music?: string;

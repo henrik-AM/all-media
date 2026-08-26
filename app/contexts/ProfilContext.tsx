@@ -318,7 +318,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (quer) {
       setClips((prev) => [
-        { id, userId: 'me', title: beschreibung, duration: '00:15', views: 0, age: 'gerade eben' },
+        { id, userId: 'me', title: beschreibung, duration: '00:15', views: 0, age: 'gerade eben', art: 'standard' },
         ...prev,
       ]);
     } else {
@@ -374,6 +374,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         duration: `${zweistellig(Math.floor(sekunden / 60))}:${zweistellig(sekunden % 60)}`,
         views: zuschauer,
         age: 'gerade eben',
+        // Die Aufzeichnung ist ein normales Video, kein laufender Stream -
+        // sie gehoert unter "Standard", nicht unter "Live".
+        art: 'standard',
       },
       ...prev,
     ]);
