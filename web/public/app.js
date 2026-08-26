@@ -452,6 +452,7 @@ function verlasseExplorer() {
   state.settingsAus = null;
   state.settingsPunkt = null;
   state.commProfilView = null;
+  state.sammlung = null;
 }
 
 /*
@@ -467,6 +468,14 @@ function render() {
   renderLauf++;
   renderBottomNav();
   renderTopBar();
+
+  /*
+   * Die Seite hinter einer Playlist bzw. einem Highlight. Sie steht ganz
+   * oben, weil man sie auch von einem fremden Profil aus oeffnen kann - und
+   * das liegt in einem beliebigen Bereich. Geleert wird sie vom Zurueck-Pfeil
+   * und von jedem Navigationsklick (verlasseExplorer).
+   */
+  if (state.sammlung) return renderSammlung();
 
   // Explorer-Übersichtsseiten (Kategorien aus Video-Suche)
   if (state.explorerView) {
@@ -2121,7 +2130,11 @@ async function openProfile(userId, variante) {
         <div class="prof__about">
           <div class="prof__name">${esc(profile.name)}</div>
           <div class="prof__bio">${esc(profile.bio)}</div>
-          <a class="prof__link" href="#" id="profLink">${esc(profile.link)}</a>
+          ${/* Ein echter Link, der im Browser aufgeht - vorher stand hier
+                href="#" und ein Klick gab nur die Adresse als Hinweis aus.
+                Das war Henriks Punkt 9. bioLink macht daraus dasselbe
+                target="_blank"-Element wie im eigenen Profil. */ ''}
+          ${bioLink(profile.link)}
         </div>
 
         ${
@@ -2141,18 +2154,9 @@ async function openProfile(userId, variante) {
 
         ${
           profile.highlights.length
-            ? `<div class="storyrail">${profile.highlights
-                .map(
-                  (h) => `<div class="story">
-                    <div class="story__ring is-viewed">
-                      <div class="story__inner" style="background:${profile.color};font-size:13px">${esc(
-                        h.slice(0, 2).toUpperCase()
-                      )}</div>
-                    </div>
-                    <div class="story__name">${esc(h)}</div>
-                  </div>`
-                )
-                .join('')}</div>`
+            ? // Dieselbe Reihe wie im eigenen Profil - vorher standen die
+              // Highlights hier als nicht klickbare Story-Kreise.
+              sammlungenReihe(profile.id, profile.playlists, profile.highlights)
             : ''
         }
 
@@ -2181,10 +2185,7 @@ async function openProfile(userId, variante) {
 
     $('#profBack').addEventListener('click', closeOverlay);
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
-    $('#profLink').addEventListener('click', (e) => {
-      e.preventDefault();
-      toast(profile.link);
-    });
+    bindSammlungen(overlay);
 
     $('#profFollow').addEventListener('click', async () => {
       const r = await fetch(`/api/profile/${userId}/follow`, { method: 'POST' });
@@ -5967,6 +5968,121 @@ function ownProfileTop(handle, bereich) {
     </div>`;
 }
 
+/*
+ * Die Reihe aus Playlists und Highlights unter einem Profil.
+ *
+ * Als eigene Funktion, weil Henrik am 26.08.2026 zwei Dinge dazu gemeldet
+ * hat, die beide daher kamen, dass es die Reihe zweimal gab:
+ *
+ *   Punkt 39  Playlist und Highlight waren nicht zu unterscheiden.
+ *   Punkt 48  Auf fremden Profilen waren sie ueberhaupt nicht klickbar - dort
+ *             standen sie als <div> in der Story-Leiste, im eigenen Profil
+ *             als <button> in einer anderen Leiste.
+ *
+ * Jetzt bauen beide Profile dieselbe Reihe. Das Aussehen (Kreis gegen weiches
+ * Quadrat, zwei Verlaeufe, Kennzeichen) steckt im CSS unter `.highlight`.
+ *
+ * `userId` wandert mit ins Attribut, damit die Seite dahinter weiss, wessen
+ * Sammlung sie zeigt.
+ */
+function sammlungenReihe(userId, playlists, highlights) {
+  const eintraege = [
+    ...(playlists || []).map((name) => ({ art: 'playlist', name })),
+    ...(highlights || []).map((name) => ({ art: 'highlight', name })),
+  ];
+  if (!eintraege.length) return '';
+
+  return `<div class="highlights">${eintraege
+    .map(({ art, name }) => {
+      const symbol = art === 'playlist' ? ICONS.play : ICONS.image;
+      return `<button class="highlight" data-sammlung="${art}" data-sammlung-name="${esc(name)}" data-sammlung-user="${esc(userId)}">
+        <span class="highlight__ring is-${art}">${medienFlaeche(art.slice(0, 2) + '-' + name, symbol)}</span>
+        <span class="highlight__label">${esc(name)}</span>
+      </button>`;
+    })
+    .join('')}</div>`;
+}
+
+/*
+ * Die Knoepfe der Reihe verdrahten.
+ *
+ * `wurzel` ist noetig, weil das fremde Profil kein Teil von #main ist,
+ * sondern eine Vollbild-Ebene darueber. Sie muss zugeklappt werden, sonst
+ * laege die Sammlung darunter.
+ */
+function bindSammlungen(wurzel = main) {
+  wurzel.querySelectorAll('[data-sammlung]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.sammlung = {
+        art: b.dataset.sammlung,
+        name: b.dataset.sammlungName,
+        userId: b.dataset.sammlungUser,
+      };
+      if (wurzel !== main) closeOverlay();
+      renderSammlung();
+    })
+  );
+}
+
+/*
+ * Was in einer Playlist oder einem Highlight steckt.
+ * Prototyp-Frames "VP + Playlist" und "VP + Highlight".
+ *
+ * Die Zuordnung ist bewusst schlicht: eine Playlist sammelt Videos, ein
+ * Highlight Beitraege. Welche genau, entscheidet sich stabil aus dem Namen -
+ * es gibt im Prototyp keine echte Zuordnung, und eine erfundene waere bei
+ * jedem Aufruf eine andere.
+ */
+function renderSammlung() {
+  const { art, name, userId } = state.sammlung;
+  const istPlaylist = art === 'playlist';
+  const quelle = istPlaylist ? state.videos : state.posts;
+  const eigen = quelle.filter((e) => e.userId === userId);
+  const liste = (eigen.length ? eigen : quelle).filter((_, i) => i % 2 === (name.length % 2));
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="pagehead__row">
+        <button class="iconbtn" id="sammlungBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
+        <h2 class="pagehead__title">${esc(name)}</h2>
+      </div>
+      <div class="pagehead__sub">${istPlaylist ? 'Playlist' : 'Highlight'} · ${liste.length} ${
+        liste.length === 1 ? 'Beitrag' : 'Beiträge'
+      }</div>
+    </div>
+    <div class="scroll">
+      ${
+        liste.length
+          ? `<div class="exp__grid">${liste
+              .map(
+                (e) =>
+                  `<button class="griditem" data-${istPlaylist ? 'openvideo' : 'openpost'}="${e.id}">${medienFlaeche(
+                    e.id,
+                    istPlaylist ? ICONS.portrait : ICONS.image
+                  )}</button>`
+              )
+              .join('')}</div>`
+          : `<div class="empty">${istPlaylist ? ICONS.play : ICONS.image}
+              <div class="empty__title">Noch nichts drin</div>
+              <div class="empty__text">Über das Plus oben rechts legst du etwas hinein.</div>
+            </div>`
+      }
+    </div>`;
+
+  $('#sammlungBack').addEventListener('click', () => {
+    const zurueck = state.sammlung.userId;
+    state.sammlung = null;
+    if (zurueck === 'me') render();
+    else openProfile(zurueck);
+  });
+  main.querySelectorAll('[data-openvideo]').forEach((b) =>
+    b.addEventListener('click', () => openVideo(b.dataset.openvideo))
+  );
+  main.querySelectorAll('[data-openpost]').forEach((b) =>
+    b.addEventListener('click', () => openPost(b.dataset.openpost))
+  );
+}
+
 const PROFILE_TABS = [
   { id: 'grid', icon: 'grid' },
   { id: 'repost', icon: 'repeat' },
@@ -6020,14 +6136,7 @@ async function renderVideoProfile() {
              </div>`
           : ''
       }
-      <div class="highlights">
-        ${(me.playlists || [])
-          .map((pl) => `<button class="highlight" data-playlist="${esc(pl)}"><span class="highlight__ring is-playlist">${medienFlaeche('pl-' + pl, ICONS.play)}</span><span class="highlight__label">${esc(pl)}</span></button>`)
-          .join('')}
-        ${me.highlights
-          .map((h) => `<button class="highlight"><span class="highlight__ring is-highlight">${medienFlaeche('hl-' + h, ICONS.image)}</span><span class="highlight__label">${esc(h)}</span></button>`)
-          .join('')}
-      </div>
+      ${sammlungenReihe('me', me.playlists, me.highlights)}
       <div class="prof__tabs">
         ${PROFILE_TABS.map(
           (t) => `<button class="prof__tab ${tab === t.id ? 'is-active' : ''}" data-otab="${t.id}">${ICONS[t.icon]}</button>`
@@ -6060,6 +6169,7 @@ async function renderVideoProfile() {
 
   $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderVideoProfile));
+  bindSammlungen();
   $('#followerBtn')?.addEventListener('click', () => openFollowerList(me, 'follower'));
   $('#followingBtn')?.addEventListener('click', () => openFollowerList(me, 'following'));
   main.querySelectorAll('[data-otab]').forEach((b) =>

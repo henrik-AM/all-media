@@ -339,6 +339,8 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-weight: 700;
   letter-spacing: -.02em;
 }
+/* Zweite Zeile unter einem Seitentitel - etwa "Playlist · 4 Beiträge". */
+.pagehead__sub { margin-top: -6px; font-size: 13px; color: var(--text-3); }
 .searchrow { display: flex; align-items: center; gap: 10px; }
 /*
   Weiches Rechteck statt voller Pille. Die Pille ist der Default, den jede App
@@ -1450,18 +1452,70 @@ ul { margin: 0; padding: 0; list-style: none; }
 .camera--page { position: static; inset: auto; flex: 1 1 auto; min-height: 0; }
 
 /* ---------- Playlists und Highlights im eigenen Profil ---------- */
-.highlights { display: flex; gap: 14px; overflow-x: auto; padding: 4px 16px 14px; scrollbar-width: none; }
-.highlights::-webkit-scrollbar { display: none; }
-.highlight { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 68px; }
-.highlight__ring {
-  width: 62px; height: 62px; border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--surface-3); color: var(--text-3);
-  border: 1px solid var(--border);
+/*
+  Playlists und Highlights.
+
+  Henrik am 26.08.2026: alle Playlists sahen gleich aus, alle Highlights sahen
+  gleich aus, und zwischen Playlist und Highlight gab es keinen Unterschied.
+  Der Grund war schlicht: die Klassen `is-playlist` und `is-highlight` standen
+  im HTML, hatten hier aber keine Regel.
+
+  Was die beiden jetzt trennt, in dieser Reihenfolge:
+
+   1. Die FORM. Highlights sind Kreise - so kennt man Momente aus jeder App.
+      Playlists sind weiche Quadrate, wie ein Albumcover. Form liest sich aus
+      dem Augenwinkel, Farbe nicht.
+   2. Der RING. Playlists tragen den Markenverlauf, Highlights den waermeren
+      Story-Verlauf - dieselben zwei Verlaeufe, die im Rest der App schon
+      "Inhalt" und "Moment" bedeuten.
+   3. Das MOTIV. Jede Playlist und jedes Highlight bekommt ueber
+      medienFlaeche() ein eigenes Standbild, stabil aus dem Namen berechnet.
+      Damit unterscheiden sich auch zwei Playlists voneinander.
+
+  Der Abstand nach oben ist groesser als vorher: die Reihe klebte an
+  "Profil bearbeiten" (Henriks Punkt 41).
+*/
+.highlights {
+  display: flex; gap: 14px; overflow-x: auto;
+  padding: 16px 16px 16px;
+  scrollbar-width: none;
 }
+.highlights::-webkit-scrollbar { display: none; }
+.highlight { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 7px; width: 72px; }
+/* Der Ring ist der Rahmen, das Motiv liegt als eigene Flaeche darin - sonst
+   liesse sich der Verlauf nicht vom Bild trennen. */
+.highlight__ring {
+  position: relative;
+  width: 64px; height: 64px;
+  display: grid; place-items: center;
+  padding: 2.5px;
+  background: var(--surface-3); color: var(--text-3);
+}
+.highlight__ring > * { width: 100%; height: 100%; }
 .highlight__ring svg { width: 24px; height: 24px; }
+
+.highlight__ring.is-highlight { border-radius: 50%; background: var(--story-grad); }
+.highlight__ring.is-highlight > * { border-radius: 50%; }
+
+.highlight__ring.is-playlist { border-radius: 18px; background: var(--brand-grad); }
+.highlight__ring.is-playlist > * { border-radius: 15.5px; }
+
+/* Kleines Kennzeichen unten rechts: Notenzeichen bzw. Stern. Es traegt den
+   Unterschied auch dort, wo Form und Farbe schwer zu sehen sind - etwa im
+   Dunkelmodus auf einem kleinen Bildschirm. */
+.highlight__ring::after {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 10px; line-height: 1;
+  color: #fff;
+  border: 2px solid var(--surface);
+}
+.highlight__ring.is-playlist::after { content: '▶'; background: var(--brand); }
+.highlight__ring.is-highlight::after { content: '★'; background: #F0397E; }
+
 .highlight__label {
-  font-size: 11.5px; color: var(--text-2); max-width: 68px;
+  font-size: 11.5px; color: var(--text-2); max-width: 72px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
@@ -1547,15 +1601,14 @@ body:has(.camera) .toast { bottom: 132px; }
   background: #34C759; border: 2.5px solid var(--surface);
 }
 /*
-  Vorher trugen Playlists einen roten und Highlights einen orangen Ring - die
-  einzigen zwei Stellen der App mit diesen Farben, und beide standen fuer
-  nichts. Ein Highlight ist in Wahrheit ein Standbild, also traegt der Kreis
-  jetzt eine Motivflaeche und der Ring ist wieder neutral. Welche Art es ist,
-  sagt das Symbol darin.
+  Das Motiv im Ring. Beschnitten wird die Flaeche selbst, nicht der Ring -
+  ein `overflow: hidden` am Ring wuerde das Kennzeichen unten rechts
+  abschneiden, das gerade den Unterschied zwischen Playlist und Highlight
+  traegt.
 */
-.highlight__ring { position: relative; overflow: hidden; border-color: var(--border); }
-.highlight__ring .motiv { color: rgba(255,255,255,.65); }
-.highlight__ring .motiv svg { width: 22px; height: 22px; opacity: .75; }
+.highlight__ring > * { overflow: hidden; }
+.highlight__ring .motiv { color: rgba(255,255,255,.7); }
+.highlight__ring .motiv svg { width: 22px; height: 22px; opacity: .8; }
 
 .viewer__hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 

@@ -147,6 +147,78 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     });
   }
 
+  /* ------------------------------------- Playlists und Highlights */
+  console.log('\nPlaylists und Highlights');
+
+  const ringe = async () =>
+    page.$$eval('.highlight__ring', (n) =>
+      n.map((x) => {
+        const s = getComputedStyle(x);
+        return {
+          art: x.classList.contains('is-playlist') ? 'playlist' : 'highlight',
+          radius: parseFloat(s.borderTopLeftRadius),
+          grund: s.backgroundImage,
+        };
+      })
+    );
+
+  await pruefe('Playlist und Highlight sehen unterschiedlich aus', async () => {
+    await zumProfil('videos');
+    const alle = await ringe();
+    const pl = alle.filter((r) => r.art === 'playlist');
+    const hl = alle.filter((r) => r.art === 'highlight');
+    if (!pl.length || !hl.length) throw new Error('es gibt nicht von beidem etwas');
+    // Form: das Highlight ist ein Kreis, die Playlist nicht.
+    if (pl[0].radius >= 30) throw new Error('die Playlist ist auch ein Kreis');
+    if (hl[0].radius < 30) throw new Error('das Highlight ist kein Kreis');
+    // Grund: zwei verschiedene Verlaeufe.
+    if (pl[0].grund === hl[0].grund) throw new Error('beide tragen denselben Verlauf');
+  });
+
+  await pruefe('Zwei Playlists sind voneinander zu unterscheiden', async () => {
+    const bilder = await page.$$eval('.highlight__ring.is-playlist .motiv', (n) =>
+      n.map((x) => getComputedStyle(x).backgroundImage)
+    );
+    if (bilder.length < 2) throw new Error('nur ' + bilder.length + ' Playlist');
+    if (new Set(bilder).size !== bilder.length) throw new Error('gleiches Motiv');
+  });
+
+  await pruefe('Eine Playlist laesst sich oeffnen und wieder schliessen', async () => {
+    await page.click('.highlight[data-sammlung="playlist"]');
+    await page.waitForTimeout(400);
+    const unter = await page.$eval('.pagehead__sub', (n) => n.textContent);
+    if (!unter.startsWith('Playlist')) throw new Error('Kopf sagt „' + unter + '"');
+    await page.click('#sammlungBack');
+    await page.waitForTimeout(500);
+    if (!(await page.$('#profilBearbeiten'))) throw new Error('der Pfeil fuehrt nicht zurueck');
+  });
+
+  await pruefe('Auf einem fremden Profil sind Highlights klickbar', async () => {
+    await page.click('[data-area="videos"]');
+    await page.click('[data-sub="home"]');
+    await page.waitForTimeout(500);
+    await page.click('[data-profile="u1"]');
+    await page.waitForTimeout(600);
+    const knopf = await page.$('.highlight[data-sammlung]');
+    if (!knopf) throw new Error('die Highlights sind keine Knoepfe');
+    await knopf.click();
+    await page.waitForTimeout(500);
+    const unter = await page.$eval('.pagehead__sub', (n) => n.textContent);
+    if (!unter.startsWith('Highlight')) throw new Error('Kopf sagt „' + unter + '"');
+  });
+
+  await pruefe('Der Link auf einem fremden Profil ist ein echter Link', async () => {
+    await page.click('[data-area="videos"]');
+    await page.click('[data-sub="home"]');
+    await page.waitForTimeout(500);
+    await page.click('[data-profile="u1"]');
+    await page.waitForTimeout(600);
+    const href = await page.$eval('.prof__link', (n) => n.getAttribute('href'));
+    if (!href || !href.startsWith('http')) throw new Error('href ist „' + href + '"');
+    await page.click('#profBack');
+    await page.waitForTimeout(300);
+  });
+
   await pruefe('Ein Bereichswechsel laesst die Seite nicht haengen', async () => {
     await zumProfil('communities');
     await page.click('[data-commview="erstellt"]');
