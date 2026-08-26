@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockPlaces, mockPosts, mockSounds, mockUsers, mockVideos } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
+import { aufnehmen } from '../../lib/aufnehmen';
 import { Clip, Post, Video } from '../../types';
 import { useKachelHoehe } from '../../lib/raster';
 
@@ -42,6 +43,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
   const insets = useSafeAreaInsets();
   const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
 
+  const [nurFotos, setNurFotos] = useState(false);
   const platz = ziel.art === 'standort' ? mockPlaces.find((p) => p.id === ziel.wert) : undefined;
   const sound = ziel.art === 'sound' ? mockSounds.find((s) => s.id === ziel.wert) : undefined;
 
@@ -64,6 +66,22 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
 
   const leer = !treffer.reels.length && !treffer.clips.length && !treffer.beitraege.length;
 
+  /*
+   * Punkt 10: die eigene Seite mit allen Fotos an diesem Ort. Sie liegt als
+   * Zustand im selben Bildschirm und nicht als eigene Ueberlagerung - der
+   * Weg zurueck fuehrt genau hierher, und der Ort steht dann schon fest.
+   */
+  if (nurFotos && platz) {
+    return (
+      <OrtFotos
+        platz={platz}
+        fotos={treffer.beitraege}
+        onBack={() => setNurFotos(false)}
+        onNotice={onNotice}
+      />
+    );
+  }
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
@@ -74,7 +92,9 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
         {ziel.art === 'hashtag' && <HashtagKopf tag={ziel.wert} />}
-        {ziel.art === 'standort' && platz && <StandortKopf platz={platz} onNotice={onNotice} anzahl={treffer.beitraege.length + treffer.clips.length + treffer.reels.length} />}
+        {ziel.art === 'standort' && platz && (
+          <StandortKopf platz={platz} onAlleFotos={() => setNurFotos(true)} />
+        )}
         {ziel.art === 'sound' && sound && <SoundKopf sound={sound} />}
 
         {leer ? (
@@ -159,14 +179,106 @@ const HashtagKopf = ({ tag }: { tag: string }) => (
   </View>
 );
 
-const StandortKopf = ({
+/**
+ * Alle Fotos an einem Ort — Prototyp-Frame "VSS + Standort + Alle Fotos".
+ *
+ * Der Frame zeigt quadratische Aufnahmen untereinander, jede mit Autorzeile
+ * (Bild, Name, "Standort · Musik") darunter. Also ein Feed, keine
+ * Rasteruebersicht - und ausdruecklich nur Fotos: Reels und
+ * Querformat-Videos bleiben draussen.
+ */
+const OrtFotos = ({
   platz,
-  anzahl,
+  fotos,
+  onBack,
   onNotice,
 }: {
   platz: (typeof mockPlaces)[number];
-  anzahl: number;
+  fotos: Post[];
+  onBack: () => void;
   onNotice: (message: string) => void;
+}) => {
+  const insets = useSafeAreaInsets();
+  const { eigeneBeitraege, beitragAnlegen, raster } = useProfil();
+
+  // Selbst hinzugefuegte Fotos an diesem Ort kommen oben dazu.
+  const eigene = eigeneBeitraege.filter((p) => p.location === platz.name || p.location === platz.ort);
+  const alle = [...eigene.filter((p) => !fotos.some((f) => f.id === p.id)), ...fotos];
+
+  const hinzufuegen = async () => {
+    const uri = await aufnehmen('photo', onNotice);
+    if (!uri) return;
+    beitragAnlegen({ beschreibung: 'Aufnahme an diesem Ort', ort: platz.name, mediaUri: uri });
+    onNotice('Foto hinzugefügt');
+  };
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={styles.fotosBar}>
+        <Druck onPress={onBack} hitSlop={10} accessibilityLabel="Zurück">
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </Druck>
+        <Text style={styles.fotosTitel}>Alle Fotos</Text>
+        {/* Punkt 10, zweiter Teil: "Möglichkeit für User, Fotos hochzuladen." */}
+        <Druck onPress={hinzufuegen} hitSlop={10} accessibilityLabel="Foto hinzufügen">
+          <Ionicons name="add" size={26} color={colors.text} />
+        </Druck>
+      </View>
+
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
+        <Text style={styles.fotosSub}>
+          {platz.name} · {alle.length} {alle.length === 1 ? 'Foto' : 'Fotos'}
+        </Text>
+
+        {alle.length === 0 ? (
+          <EmptyState
+            icon="image-outline"
+            title="Noch keine Fotos"
+            text="Über das Plus oben rechts legst du das erste hier ab."
+          />
+        ) : (
+          alle.map((p) => {
+            const person = mockUsers[p.userId];
+            const eigenesBild = p.mediaUri ?? raster.find((r) => r.id === p.id)?.mediaUri;
+            return (
+              <View key={p.id} style={styles.ortfoto}>
+                <View style={styles.ortfotoBild}>
+                  {eigenesBild ? (
+                    <Image source={{ uri: eigenesBild }} style={styles.voll} />
+                  ) : (
+                    <Motiv
+                      id={p.id}
+                      icon="image-outline"
+                      iconSize={44}
+                      style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+                    />
+                  )}
+                </View>
+                <View style={styles.ortfotoZeile}>
+                  <Avatar id={p.userId} name={person.name} size={36} />
+                  <View style={styles.ortfotoWer}>
+                    <Text style={styles.ortfotoName}>{person.name}</Text>
+                    <Text style={styles.ortfotoMeta} numberOfLines={1}>
+                      {p.location}
+                      {p.music ? ` · ${p.music}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
+  );
+};
+
+const StandortKopf = ({
+  platz,
+  onAlleFotos,
+}: {
+  platz: (typeof mockPlaces)[number];
+  onAlleFotos: () => void;
 }) => (
   <View style={styles.kopf}>
     <View style={styles.ortZeile}>
@@ -193,9 +305,14 @@ const StandortKopf = ({
       </View>
     </View>
 
-    <Druck
-      onPress={() => onNotice(anzahl ? `${anzahl} Aufnahmen von diesem Ort stehen unten` : 'Von diesem Ort gibt es noch nichts')}
-    >
+    {/*
+      Punkt 10: "Alle Fotos ansehen leitet zu Videos/Beiträgen; soll nur
+      Fotos zeigen." Vorher gab der Knopf nur einen Hinweis aus und man blieb
+      in derselben Liste aus Reels, Querformat und Beitraegen, aus der man
+      kam. Jetzt fuehrt er auf eine eigene Seite - Prototyp-Frame
+      "VSS + Standort + Alle Fotos".
+    */}
+    <Druck onPress={onAlleFotos}>
       <Text style={styles.link}>Alle Fotos ansehen →</Text>
     </Druck>
   </View>
@@ -252,7 +369,34 @@ const SoundKopf = ({ sound }: { sound: (typeof mockSounds)[number] }) => {
         </Text>
       </View>
 
-      <Text style={styles.lyrics}>{sound.lyrics}</Text>
+      {/*
+        Punkt 11: der Liedtext. Prototyp-Frame "VSSo + Sound + Lyrics" -
+        Songname, Produzent/in, Trennlinie, darunter der Text ueber die ganze
+        Seite. Vorher stand hier eine einzige Zeile, und bei einem
+        Instrumental das Wort "Instrumental" als waere es eine Liedzeile.
+
+        Leere Eintraege sind Strophenabstaende. Sie bekommen eine eigene
+        Hoehe statt einer leeren Textzeile - so bleibt der Abstand gleich,
+        egal wie gross die Schrift eingestellt ist.
+      */}
+      {sound.lyrics?.length ? (
+        <View style={styles.lyrics}>
+          <Text style={styles.lyricsKopf}>LIEDTEXT</Text>
+          {sound.lyrics.map((zeile, i) =>
+            zeile.trim() ? (
+              <Text key={i} style={styles.lyricsZeile}>
+                {zeile}
+              </Text>
+            ) : (
+              <View key={i} style={styles.lyricsLuecke} />
+            )
+          )}
+        </View>
+      ) : (
+        <View style={styles.lyrics}>
+          <Text style={styles.lyricsOhne}>Zu diesem Sound gibt es keinen Liedtext.</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -327,7 +471,19 @@ const styles = themenStyles((colors) => ({
   balken: { flex: 1, borderRadius: 1, backgroundColor: colors.text3, opacity: 0.45 },
   balkenGespielt: { backgroundColor: colors.brand, opacity: 1 },
   wellenZeit: { ...typography.small, color: colors.text2, fontVariant: ['tabular-nums'] },
-  lyrics: { ...typography.preview, color: colors.text2, marginTop: 10 },
+  /* Zeilenhoehe 26 auf 15px Schrift - Liedtext liest sich mit mehr Luft als
+     Fliesstext, weil jede Zeile eine eigene Einheit ist. */
+  lyrics: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    alignSelf: 'stretch',
+  },
+  lyricsKopf: { ...typography.overline, color: colors.text3, marginBottom: 10 },
+  lyricsZeile: { fontSize: 15, lineHeight: 26, color: colors.text },
+  lyricsLuecke: { height: 14 },
+  lyricsOhne: { ...typography.preview, color: colors.text3 },
 
   abschnitt: { ...typography.h3, color: colors.text, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
 
@@ -381,6 +537,30 @@ const styles = themenStyles((colors) => ({
      dritte Feld rutscht um. Abstand deshalb über einen Rand in
      Hintergrundfarbe, dann bleibt die Breite exakt ein Drittel. */
   raster: { flexDirection: 'row', flexWrap: 'wrap' },
+  /* ---- Alle Fotos an einem Ort (Prototyp "VSS + Standort + Alle Fotos") ---- */
+  fotosBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  fotosTitel: { flex: 1, textAlign: 'center', ...typography.h3, fontSize: 17, color: colors.text },
+  fotosSub: { ...typography.small, color: colors.text3, paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 4 },
+  ortfoto: { paddingBottom: 18, marginBottom: 18, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
+  ortfotoBild: {
+    marginHorizontal: '8%',
+    aspectRatio: 1,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surface3,
+  },
+  ortfotoZeile: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: '8%', paddingTop: 10 },
+  ortfotoWer: { flex: 1, minWidth: 0 },
+  ortfotoName: { ...typography.name, fontSize: 14.5, color: colors.text },
+  ortfotoMeta: { ...typography.small, color: colors.text3 },
+
   rasterFeld: {
     width: '33.333%',
     borderWidth: 1,

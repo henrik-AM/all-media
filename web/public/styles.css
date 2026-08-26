@@ -2129,6 +2129,73 @@ body:has(.camera) .toast { bottom: 132px; }
   padding: calc(8px + env(safe-area-inset-top)) 8px 8px;
   border-bottom: 1px solid var(--border);
 }
+/*
+  Knoepfe in einer normalen Kopfleiste - Zurueck-Pfeil, Plus.
+
+  Sie trugen bis zum 26.08.2026 dieselbe Klasse wie die Knoepfe der oberen
+  Navigation. Als daraus die Dynamic Island wurde, bekam .topbar__btn eine
+  helle Schrift fuer den dunklen Inselgrund - und damit waren diese Knoepfe
+  weiss auf weiss, also unsichtbar. Betroffen waren der Zurueck-Pfeil im
+  Querformat-Player und auf allen Uebersichtsseiten.
+
+  Aufgefallen ist das erst auf dem Bild der neuen Fotoseite; keine Pruefung
+  haette es gemeldet, weil die Knoepfe ja da waren und funktionierten.
+*/
+.seitenbtn {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: var(--text);
+}
+.seitenbtn:hover { background: var(--surface-2); }
+.seitenbtn svg { width: 22px; height: 22px; }
+/*
+  Titel mittig in der Kopfleiste einer Vollbild-Seite.
+
+  Beim ersten Anlauf stand hier ein negativer Rand, um den Knopf links
+  auszugleichen - der Titel legte sich dadurch ueber den Zurueck-Pfeil und
+  den Plus-Knopf, und beide waren nicht mehr anklickbar. Im Bild sah man nur
+  noch die Ueberschrift. Jetzt nimmt der Titel den Platz zwischen den
+  Knoepfen und ueberdeckt nichts.
+*/
+.page__titel {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/*
+  Alle Fotos an einem Ort — Prototyp-Frame "VSS + Standort + Alle Fotos".
+  Der Frame zeigt quadratische Aufnahmen untereinander, jede mit Autorzeile
+  darunter. Also ein Feed, keine Rasteruebersicht.
+*/
+.ortfotos__sub { padding: 14px 16px 4px; font-size: 13px; color: var(--text-3); }
+.ortfoto { padding-bottom: 18px; border-bottom: 1px solid var(--hairline); margin-bottom: 18px; }
+.ortfoto:last-child { border-bottom: 0; }
+.ortfoto__bild {
+  position: relative;
+  margin: 0 8%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.ortfoto__bild img { width: 100%; height: 100%; object-fit: cover; }
+/* Ohne eigene Groesse waechst das Platzhalter-Symbol auf die ganze
+   Kachel - .motiv gibt nur die Flaeche vor, die Groesse steht je Ort. */
+.ortfoto__bild .motiv svg { width: 44px; height: 44px; }
+.ortfoto__zeile { display: flex; align-items: center; gap: 10px; padding: 10px 8% 0; }
+.ortfoto__wer { flex: 1 1 auto; min-width: 0; }
+.ortfoto__name { font-size: 14.5px; font-weight: 600; cursor: pointer; }
+.ortfoto__meta {
+  font-size: 12px; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 .exp__kopf { padding: 16px; }
 .exp__kopf--hashtag, .exp__kopf--sound { text-align: center; }
 .exp__titel { font-size: 24px; font-weight: 700; }
@@ -2179,7 +2246,29 @@ body:has(.camera) .toast { bottom: 132px; }
 .welle__balken i { flex: 1 1 auto; border-radius: 1px; background: var(--text-3); opacity: .45; }
 .welle__balken i.is-gespielt { background: var(--brand); opacity: 1; }
 .welle__zeit { flex: 0 0 auto; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
-.exp__lyrics { margin-top: 10px; font-size: 13.5px; color: var(--text-2); }
+/*
+  Der Liedtext auf der Sound-Seite. Prototyp-Frame "VSSo + Sound + Lyrics":
+  eine Trennlinie und darunter der Text ueber die ganze Seite.
+
+  Zeilenhoehe 1.75 - Liedtext liest sich mit mehr Luft als Fliesstext, weil
+  jede Zeile eine eigene Einheit ist und nicht Teil eines Absatzes.
+*/
+.lyrics {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+.lyrics__kopf {
+  font-size: 12px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-3);
+  margin-bottom: 10px;
+}
+.lyrics__zeile { font-size: 15px; line-height: 1.75; color: var(--text); }
+/* Strophenabstand. Als eigene Hoehe statt eines leeren Absatzes - so
+   bleibt der Abstand gleich, egal wie gross die Schrift eingestellt ist. */
+.lyrics__luecke { height: 14px; }
+.lyrics--ohne { font-size: 14px; color: var(--text-3); }
 
 .expreels { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 4px; }
 .expreel {

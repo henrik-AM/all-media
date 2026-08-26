@@ -113,14 +113,62 @@ const hashtags = [
   { tag: '#nachtfotografie', posts: 39100 },
 ];
 
-// dauer und lyrics werden auf der Sound-Seite gebraucht (Prototyp-Frame
-// "VSSo + Sound": Wellenform mit Laufzeit und eine Lyrics-Zeile).
+/*
+ * dauer und lyrics werden auf der Sound-Seite gebraucht.
+ *
+ * Prototyp-Frame "VSSo + Sound + Lyrics": Songname, Produzent/in, eine
+ * Trennlinie und darunter der Liedtext ueber die ganze Seite. Henrik am
+ * 26.08.2026, Punkt 11: "Sound öffnet, aber keine Lyrics-Anzeige."
+ *
+ * Vorher stand hier eine einzelne Zeile. Der Frame zeigt einen ganzen Text,
+ * in Strophen getrennt - deshalb jetzt mehrere Zeilen je Lied. Instrumentale
+ * Stuecke haben keinen Text; sie bekommen null und die Seite sagt das auch,
+ * statt "Instrumental" als Liedzeile auszugeben.
+ */
 const sounds = [
-  { id: 'so1', title: 'Golden Hour', artist: 'Lys', uses: 12400, dauer: '3:46', lyrics: 'And the light comes slow over the water' },
-  { id: 'so2', title: 'Lo-Fi Focus', artist: 'beatlab', uses: 8210, dauer: '2:58', lyrics: 'Instrumental' },
-  { id: 'so3', title: 'Kitchen Groove', artist: 'Milo', uses: 24800, dauer: '3:12', lyrics: 'Ten minutes and the table is set' },
-  { id: 'so4', title: 'Runner High', artist: 'Aster', uses: 3140, dauer: '4:05', lyrics: 'One more mile, one more morning' },
-  { id: 'so5', title: 'Ambient Sunrise', artist: 'Nora K.', uses: 5670, dauer: '5:21', lyrics: 'Instrumental' },
+  {
+    id: 'so1', title: 'Golden Hour', artist: 'Lys', uses: 12400, dauer: '3:46',
+    lyrics: [
+      'And the light comes slow over the water',
+      'nobody up but the gulls and me',
+      '',
+      'Cranes in the mist like a paper drawing',
+      'the harbour holds its breath',
+      '',
+      'Golden hour, golden hour',
+      'stay a little longer now',
+      'Golden hour, golden hour',
+      'nothing here needs fixing',
+    ],
+  },
+  { id: 'so2', title: 'Lo-Fi Focus', artist: 'beatlab', uses: 8210, dauer: '2:58', lyrics: null },
+  {
+    id: 'so3', title: 'Kitchen Groove', artist: 'Milo', uses: 24800, dauer: '3:12',
+    lyrics: [
+      'Ten minutes and the table is set',
+      'onions going soft in the pan',
+      '',
+      'Nobody taught me, I just kept going',
+      'burnt a lot of Sundays learning how',
+      '',
+      'Kitchen groove, kitchen groove',
+      'dinner is an easy thing',
+    ],
+  },
+  {
+    id: 'so4', title: 'Runner High', artist: 'Aster', uses: 3140, dauer: '4:05',
+    lyrics: [
+      'One more mile, one more morning',
+      'the city still asleep behind me',
+      '',
+      'Legs remember what the head forgets',
+      'keep the rhythm, keep the rhythm',
+      '',
+      'Runner high, runner high',
+      'nothing hurts until I stop',
+    ],
+  },
+  { id: 'so5', title: 'Ambient Sunrise', artist: 'Nora K.', uses: 5670, dauer: '5:21', lyrics: null },
 ];
 
 // ort verbindet den Standort mit dem location-Feld der Beitraege - ohne das
@@ -853,7 +901,9 @@ app.get('/api/explorer/:art/:wert', (req, res) => {
       places.find((p) => p.ort === wert);
     if (!platz) return res.json({ ok: false, error: 'Diesen Standort gibt es nicht' });
     passt = (e) => e.location === platz.ort;
-    kopf = { art, titel: platz.name, anzahl: platz.posts, adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y };
+    // `id` gehoert dazu: die Fotoseite braucht sie, um von dort wieder
+    // hierher zurueckzufinden.
+    kopf = { art, id: platz.id, titel: platz.name, anzahl: platz.posts, adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y };
   } else if (art === 'sound') {
     /*
      * An einem Beitrag steht "Golden Hour – Lys", der Sound heisst aber nur

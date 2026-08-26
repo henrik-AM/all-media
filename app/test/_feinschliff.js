@@ -204,6 +204,103 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await zu();
 
+  /* ------------------------------------------ Sound-Seite (Punkt 11) */
+  console.log('\nVideos — Sound-Seite');
+
+  const zurSuche = async () => {
+    await page.click('[data-area="videos"]');
+    await page.waitForTimeout(200);
+    await page.click('[data-sub="search"]');
+    await page.waitForSelector('#videoSearch');
+    await page.waitForTimeout(400);
+  };
+
+  await pruefe('Ein Sound zeigt seinen Liedtext', async () => {
+    await zurSuche();
+    await page.click('[data-sound="so1"]');
+    await page.waitForSelector('.exp__kopf');
+    await page.waitForTimeout(500);
+    const zeilen = await page.$$eval('.lyrics__zeile', (n) => n.map((x) => x.textContent));
+    if (zeilen.length < 4) throw new Error('nur ' + zeilen.length + ' Zeilen');
+    if (!zeilen[0].includes('light comes slow')) throw new Error('erste Zeile: „' + zeilen[0] + '"');
+  });
+
+  await pruefe('Die Strophen sind voneinander abgesetzt', async () => {
+    const luecken = await page.$$eval('.lyrics__luecke', (n) => n.length);
+    if (!luecken) throw new Error('keine Strophenabstände');
+  });
+
+  await pruefe('Ein Instrumental sagt, dass es keinen Text gibt', async () => {
+    await page.click('#expBack');
+    await page.waitForTimeout(400);
+    await zurSuche();
+    await page.click('[data-sound="so2"]');
+    await page.waitForSelector('.exp__kopf');
+    await page.waitForTimeout(500);
+    if (await page.$('.lyrics__zeile')) throw new Error('es stehen trotzdem Liedzeilen da');
+    const hinweis = await page.$eval('.lyrics--ohne', (n) => n.textContent);
+    if (!hinweis.includes('keinen Liedtext')) throw new Error('es steht „' + hinweis + '"');
+  });
+
+  /* ------------------------------------ Alle Fotos am Ort (Punkt 10) */
+  console.log('\nVideos — Alle Fotos an einem Ort');
+
+  const zuDenFotos = async () => {
+    await page.click('#expBack').catch(() => {});
+    await page.waitForTimeout(300);
+    await zurSuche();
+    await page.click('[data-place]');
+    await page.waitForSelector('#expFotos');
+    await page.waitForTimeout(400);
+    await page.click('#expFotos');
+    await page.waitForSelector('.ortfoto, .empty');
+    await page.waitForTimeout(400);
+  };
+
+  await pruefe('„Alle Fotos ansehen" öffnet eine eigene Seite', async () => {
+    await zuDenFotos();
+    const titel = await page.$eval('.page__titel', (n) => n.textContent.trim());
+    if (titel !== 'Alle Fotos') throw new Error('der Kopf sagt „' + titel + '"');
+  });
+
+  await pruefe('Der Zurück-Pfeil und das Plus sind sichtbar', async () => {
+    for (const [wahl, was] of [['#fotosBack', 'der Zurück-Pfeil'], ['#fotosNeu', 'das Plus']]) {
+      const knopf = await page.$(wahl);
+      if (!knopf) throw new Error(was + ' fehlt');
+      const sichtbar = await knopf.evaluate((n) => {
+        const s = getComputedStyle(n);
+        const k = n.getBoundingClientRect();
+        return k.width > 0 && k.height > 0 && s.visibility !== 'hidden' && s.opacity !== '0';
+      });
+      if (!sichtbar) throw new Error(was + ' ist da, aber nicht zu sehen');
+    }
+  });
+
+  await pruefe('Es stehen dort nur Fotos, keine Videos', async () => {
+    /*
+     * Nur in der Vollbild-Ebene suchen. Dahinter liegt die Video-Suche mit
+     * ihrer Querformat-Liste - ein globaler Selektor fand die und meldete
+     * einen Fehler, den es gar nicht gab.
+     */
+    if (await page.$('#overlay .clip, #overlay .exp__reels')) {
+      throw new Error('es stehen auch Videos darin');
+    }
+    const fotos = await page.$$eval('.ortfoto', (n) => n.length);
+    if (!fotos) throw new Error('gar keine Fotos');
+  });
+
+  await pruefe('Jedes Foto trägt eine Autorzeile', async () => {
+    const bilder = await page.$$eval('.ortfoto__bild', (n) => n.length);
+    const zeilen = await page.$$eval('.ortfoto__zeile', (n) => n.length);
+    if (bilder !== zeilen) throw new Error(bilder + ' Bilder, ' + zeilen + ' Zeilen');
+  });
+
+  await pruefe('Der Pfeil führt zurück zum Ort', async () => {
+    await page.click('#fotosBack');
+    await page.waitForTimeout(600);
+    if (!(await page.$('#expFotos'))) throw new Error('man landet woanders');
+  });
+
   const erfuellt = ergebnisse.filter(Boolean).length;
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');

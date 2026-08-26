@@ -219,9 +219,16 @@ export interface Sound {
   title: string;
   artist: string;
   uses: number;
-  /** Fuer die Sound-Seite: Laufzeit und die angezeigte Lyrics-Zeile. */
+  /** Fuer die Sound-Seite: Laufzeit und der Liedtext. */
   dauer?: string;
-  lyrics?: string;
+  /*
+   * Der Liedtext, Zeile fuer Zeile. Leere Eintraege sind Strophenabstaende.
+   * null bei Instrumentalstuecken - die Seite sagt das dann auch, statt
+   * "Instrumental" als Liedzeile auszugeben.
+   *
+   * Prototyp-Frame "VSSo + Sound + Lyrics", Henriks Punkt 11.
+   */
+  lyrics?: string[] | null;
 }
 
 export interface Place {

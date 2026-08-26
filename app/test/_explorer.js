@@ -84,22 +84,32 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (!(await page.$('.minikarte__nadel'))) throw new Error('keine Nadel auf der Karte');
   });
 
-  await pruefe('"Alle Fotos ansehen" springt zu den Beitraegen', async () => {
+  /*
+   * Frueher hiess diese Pruefung '"Alle Fotos ansehen" springt zu den
+   * Beitraegen' und war zufrieden, wenn ein Hinweis erschien. Genau das hat
+   * Henrik am 26.08.2026 als Punkt 10 gemeldet: der Knopf soll auf eine
+   * eigene Seite nur mit Fotos fuehren. Die Einzelheiten stehen in
+   * test/_feinschliff.js; hier bleibt der Weg hin und zurueck.
+   */
+  await pruefe('"Alle Fotos ansehen" fuehrt auf die Fotoseite', async () => {
     await page.click('#expFotos');
-    await page.waitForTimeout(500);
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
-    if (!hinweis) throw new Error('kein Hinweis');
+    await page.waitForSelector('#fotosBack', { timeout: 3000 });
+    const titel = await page.$eval('.page__titel', (e) => e.textContent.trim());
+    if (titel !== 'Alle Fotos') throw new Error('der Kopf sagt "' + titel + '"');
+    await page.click('#fotosBack');
+    await page.waitForSelector('#expFotos', { timeout: 3000 });
     await zurueck();
   });
 
   console.log('\nSound-Seite');
-  await pruefe('Ein Sound zeigt Cover, Produzent und Lyrics-Zeile', async () => {
+  await pruefe('Ein Sound zeigt Cover, Produzent und Liedtext', async () => {
     await page.click('[data-sound="so1"]');
     await page.waitForSelector('.soundcover', { timeout: 3000 });
     const zahl = await page.$eval('.exp__zahl', (e) => e.textContent);
     if (!zahl.includes('Lys')) throw new Error(zahl);
-    const lyrics = await page.$eval('.exp__lyrics', (e) => e.textContent);
-    if (!lyrics.trim()) throw new Error('keine Lyrics-Zeile');
+    // Aus der einen Zeile ist ein ganzer Text geworden - Punkt 11.
+    const zeilen = await page.$$eval('.lyrics__zeile', (n) => n.length);
+    if (!zeilen) throw new Error('kein Liedtext');
   });
 
   await pruefe('Der Abspielknopf laesst die Zeit laufen', async () => {

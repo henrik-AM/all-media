@@ -5734,7 +5734,7 @@ function openClip(clipId) {
     overlay.innerHTML = `
       <div class="page">
         <div class="page__bar">
-          <button class="topbar__btn" id="clipBack" aria-label="Zurück">${ICONS.back}</button>
+          <button class="seitenbtn" id="clipBack" aria-label="Zurück">${ICONS.back}</button>
         </div>
         <div class="scroll">
           <div class="player">
@@ -6044,6 +6044,124 @@ function openClip(clipId) {
  *
  * Vorher gab jeder dieser Knoepfe nur einen Hinweis aus.
  */
+/*
+ * Alle Fotos an einem Ort — Prototyp-Frame "VSS + Standort + Alle Fotos".
+ *
+ * Der Frame zeigt untereinander quadratische Aufnahmen, jede mit Autorzeile
+ * (Bild, Name, "Standort · Musik") und der Aktionsreihe darunter. Also ein
+ * Feed, keine Rasteruebersicht - und ausdruecklich nur Fotos: Reels und
+ * Querformat-Videos bleiben draussen.
+ */
+function openOrtFotos(ort, fotos) {
+  const zeichnen = (liste) => {
+    overlay.innerHTML = `
+      <div class="page">
+        <div class="page__bar">
+          <button class="seitenbtn" id="fotosBack" aria-label="Zurück">${ICONS.back}</button>
+          <div class="page__titel">Alle Fotos</div>
+          ${/*
+              Punkt 10, zweiter Teil: "Möglichkeit für User, Fotos
+              hochzuladen." Der Knopf nimmt eine Datei entgegen und legt sie
+              als Beitrag an diesem Ort ab.
+            */ ''}
+          <button class="seitenbtn" id="fotosNeu" aria-label="Foto hinzufügen">${ICONS.plus}</button>
+        </div>
+        <div class="scroll">
+          <div class="ortfotos__sub">${esc(ort.titel)} · ${liste.length} ${
+            liste.length === 1 ? 'Foto' : 'Fotos'
+          }</div>
+          ${
+            liste.length
+              ? liste
+                  .map((p) => {
+                    const u = user(p.userId);
+                    return `<article class="ortfoto">
+                      <div class="ortfoto__bild">${
+                        p.mediaUri
+                          ? `<img src="${esc(p.mediaUri)}" alt="" />`
+                          : medienFlaeche(p.id, ICONS.image)
+                      }</div>
+                      <div class="ortfoto__zeile">
+                        <span data-profile="${p.userId}">${avatarForUser(p.userId, 36)}</span>
+                        <div class="ortfoto__wer">
+                          <div class="ortfoto__name" data-profile="${p.userId}">${esc(u.name)}</div>
+                          <div class="ortfoto__meta">${esc(p.location || ort.titel)}${
+                            p.music ? ` · ${esc(p.music)}` : ''
+                          }</div>
+                        </div>
+                        <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-fotolike="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
+                      </div>
+                    </article>`;
+                  })
+                  .join('')
+              : `<div class="empty">${ICONS.image}
+                   <div class="empty__title">Noch keine Fotos</div>
+                   <div class="empty__text">Über das Plus oben rechts legst du das erste hier ab.</div>
+                 </div>`
+          }
+        </div>
+      </div>`;
+
+    overlay.querySelector('#fotosBack').addEventListener('click', () => openExplorer('standort', ort.id));
+
+    overlay.querySelectorAll('[data-fotolike]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const res = await fetch(`/api/posts/${b.dataset.fotolike}/like`, { method: 'POST' });
+        const frisch = await res.json();
+        const stelle = liste.findIndex((x) => x.id === frisch.id);
+        if (stelle !== -1) liste[stelle] = frisch;
+        const imFeed = state.posts.findIndex((x) => x.id === frisch.id);
+        if (imFeed !== -1) state.posts[imFeed] = frisch;
+        zeichnen(liste);
+      })
+    );
+
+    overlay.querySelector('#fotosNeu').addEventListener('click', async () => {
+      const datei = await dateiWaehlen('photo');
+      if (!datei) return;
+
+      let bild = null;
+      try {
+        bild = await bildVerkleinern(datei);
+      } catch {
+        return toast('Aufnahme konnte nicht gelesen werden');
+      }
+
+      /*
+       * Der Ort steht schon fest - man kam ja von seiner Seite. Deshalb nur
+       * die Beschreibung erfragen und nicht noch einmal nach dem Ort.
+       */
+      openFormular(
+        'Foto an diesem Ort',
+        [{ key: 'beschreibung', label: 'Beschreibung', typ: 'mehrzeilig', pflicht: true }],
+        async ({ beschreibung }) => {
+          const res = await fetch('/api/eigene/beitrag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ beschreibung, ort: ort.titel }),
+          }).then((r) => r.json());
+
+          if (!res.ok) return res.error || 'Das hat nicht geklappt';
+
+          // Das Bild selbst bleibt im Browser - der Server teilt seinen
+          // Speicher mit allen, siehe eigenesMediumSichern.
+          eigenesMediumSichern(res.beitrag.id, bild);
+          res.beitrag.mediaUri = bild;
+          liste.unshift(res.beitrag);
+          state.posts.unshift(res.beitrag);
+          toast('Foto hinzugefügt');
+          zeichnen(liste);
+          return null;
+        },
+        'Hinzufügen'
+      );
+    });
+  };
+
+  overlay.hidden = false;
+  zeichnen([...fotos]);
+}
+
 async function openExplorer(art, wert) {
   const res = await fetch(`/api/explorer/${art}/${encodeURIComponent(wert)}`);
   const daten = await res.json();
@@ -6114,14 +6232,37 @@ async function openExplorer(art, wert) {
         </div>
         <span class="welle__zeit" id="welleZeit">0:00 / ${esc(kopf.dauer)}</span>
       </div>
-      <div class="exp__lyrics">${esc(kopf.lyrics)}</div>`,
+      ${/*
+          Punkt 11: der Liedtext. Prototyp-Frame "VSSo + Sound + Lyrics" -
+          Songname, Produzent/in, Trennlinie, darunter der Text ueber die
+          ganze Seite. Vorher stand hier eine einzige Zeile, und bei einem
+          Instrumental das Wort "Instrumental" als waere es eine Liedzeile.
+
+          Leere Eintraege in der Liste sind Strophenabstaende - sie bekommen
+          eine eigene Klasse, damit die Luecke im CSS steht und nicht als
+          leerer Absatz im Text.
+        */ ''}
+      ${
+        kopf.lyrics?.length
+          ? `<div class="lyrics">
+               <div class="lyrics__kopf">Liedtext</div>
+               ${kopf.lyrics
+                 .map((zeile) =>
+                   zeile.trim()
+                     ? `<div class="lyrics__zeile">${esc(zeile)}</div>`
+                     : '<div class="lyrics__luecke"></div>'
+                 )
+                 .join('')}
+             </div>`
+          : `<div class="lyrics lyrics--ohne">Zu diesem Sound gibt es keinen Liedtext.</div>`
+      }`,
   }[kopf.art]();
 
   overlay.hidden = false;
   overlay.innerHTML = `
     <div class="page">
       <div class="page__bar">
-        <button class="topbar__btn" id="expBack" aria-label="Zurück">${ICONS.back}</button>
+        <button class="seitenbtn" id="expBack" aria-label="Zurück">${ICONS.back}</button>
       </div>
       <div class="scroll">
         <div class="exp__kopf exp__kopf--${kopf.art}">${kopfHtml}</div>
@@ -6141,11 +6282,16 @@ async function openExplorer(art, wert) {
     overlay.innerHTML = '';
   });
 
-  overlay.querySelector('#expFotos')?.addEventListener('click', () => {
-    const anzahl = beitraege.length + clips.length + reels.length;
-    toast(anzahl ? `${anzahl} Aufnahmen von diesem Ort stehen unten` : 'Von diesem Ort gibt es noch nichts');
-    overlay.querySelector('.exp__head')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
+  /*
+   * Punkt 10: "Alle Fotos ansehen bei einem Ort leitet zu Videos/Beiträgen;
+   * soll nur Fotos zeigen. Eigene Seite nur mit Fotos an diesem Ort;
+   * Möglichkeit für User, Fotos hochzuladen."
+   *
+   * Vorher scrollte der Knopf nur nach unten und gab einen Hinweis aus - man
+   * landete in derselben Liste aus Reels, Querformat und Beitraegen, aus der
+   * man kam.
+   */
+  overlay.querySelector('#expFotos')?.addEventListener('click', () => openOrtFotos(kopf, beitraege));
 
   // Wellenform: der Balken laeuft mit, solange abgespielt wird.
   const play = overlay.querySelector('#soundPlay');
