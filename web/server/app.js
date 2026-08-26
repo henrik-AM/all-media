@@ -233,13 +233,22 @@ const videos = [
   { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false , tags: ['#reactnative'] },
 ];
 
+/*
+ * Communitys.
+ *
+ * `bio`, `link` und `eigen` kamen am 26.08.2026 dazu: die Kanalseite wird
+ * nach dem Prototyp-Frame "CH + Kanal" gebaut, und dort stehen unter dem
+ * Kopfbild eine Biografie und ein Link. `eigen` sagt, ob Henrik die
+ * Community selbst angelegt hat - eine eigene Community kann man nicht
+ * verlassen (sonst stuende sie ohne Besitzer da).
+ */
 const communities = [
-  { id: 'k1', name: 'Design Systeme', members: 1284, visibility: 'public', topic: 'Komponenten, Tokens, Figma', joined: true, unread: 3, channels: ['ch-allgemein', 'ch-tokens', 'ch-figma'] },
-  { id: 'k2', name: 'React Native DE', members: 842, visibility: 'public', topic: 'Expo, Navigation, Performance', joined: true, unread: 0, channels: ['ch-allgemein', 'ch-expo', 'ch-navigation'] },
-  { id: 'k3', name: 'Fotografie', members: 3120, visibility: 'public', topic: 'Licht, Komposition, Nachbearbeitung', joined: false, unread: 0, channels: ['ch-allgemein', 'ch-licht', 'ch-nachbearbeitung'] },
-  { id: 'k4', name: 'Team Intern', members: 12, visibility: 'private', topic: 'Nur für das Kernteam', joined: true, unread: 5, channels: ['ch-allgemein', 'ch-sprint'] },
-  { id: 'k5', name: 'Laufgruppe Köln', members: 96, visibility: 'private', topic: 'Treffpunkte und Termine', joined: true, unread: 0, channels: ['ch-allgemein', 'ch-termine'] },
-  { id: 'k6', name: 'Musikproduktion', members: 671, visibility: 'public', topic: 'Ableton, Mixing, Sounddesign', joined: false, unread: 0, channels: ['ch-allgemein', 'ch-ableton', 'ch-mixing'] },
+  { id: 'k1', name: 'Design Systeme', members: 1284, visibility: 'public', topic: 'Komponenten, Tokens, Figma', bio: 'Alles rund um Komponenten, Tokens und den Weg von Figma in den Code. Fragen jederzeit willkommen.', link: 'designsysteme.de', eigen: false, joined: true, unread: 3, channels: ['ch-allgemein', 'ch-tokens', 'ch-figma'] },
+  { id: 'k2', name: 'React Native DE', members: 842, visibility: 'public', topic: 'Expo, Navigation, Performance', bio: 'Deutschsprachige Runde zu React Native und Expo. Von der ersten App bis zum Store-Release.', link: 'rn-de.dev', eigen: false, joined: true, unread: 0, channels: ['ch-allgemein', 'ch-expo', 'ch-navigation'] },
+  { id: 'k3', name: 'Fotografie', members: 3120, visibility: 'public', topic: 'Licht, Komposition, Nachbearbeitung', bio: 'Licht, Komposition, Nachbearbeitung. Jeden Sonntag ein gemeinsames Thema.', link: 'lichtundschatten.foto', eigen: false, joined: false, unread: 0, channels: ['ch-allgemein', 'ch-licht', 'ch-nachbearbeitung'] },
+  { id: 'k4', name: 'Team Intern', members: 12, visibility: 'private', topic: 'Nur für das Kernteam', bio: 'Interner Kanal des Kernteams. Sprintplanung, Entscheidungen, alles Kurzfristige.', link: '', eigen: true, joined: true, unread: 5, channels: ['ch-allgemein', 'ch-sprint'] },
+  { id: 'k5', name: 'Laufgruppe Köln', members: 96, visibility: 'private', topic: 'Treffpunkte und Termine', bio: 'Wir laufen dienstags und samstags. Treffpunkte und Termine stehen hier.', link: 'laufgruppe-koeln.de', eigen: true, joined: true, unread: 0, channels: ['ch-allgemein', 'ch-termine'] },
+  { id: 'k6', name: 'Musikproduktion', members: 671, visibility: 'public', topic: 'Ableton, Mixing, Sounddesign', bio: 'Ableton, Mixing, Sounddesign. Feedback-Runden am Monatsende.', link: 'musikproduktion.club', eigen: false, joined: false, unread: 0, channels: ['ch-allgemein', 'ch-ableton', 'ch-mixing'] },
 ];
 
 const communityChannels = {
@@ -1530,6 +1539,29 @@ app.get('/api/communities/:id', (req, res) => {
   }));
 
   res.json({ ...community, channels });
+});
+
+/*
+ * Neues Unterthema in einer Community anlegen.
+ * Prototyp-Frame "CH + Unterthema erstellen" - auf der Kanalseite gab es
+ * dafuer bis zum 26.08.2026 keinen Weg.
+ */
+app.post('/api/communities/:id/channels', (req, res) => {
+  const community = communities.find((c) => c.id === req.params.id);
+  if (!community) return res.status(404).json({ ok: false, error: 'Nicht gefunden' });
+
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
+
+  const schon = community.channels.some(
+    (chId) => (communityChannels[chId]?.name || '').toLowerCase() === name.toLowerCase()
+  );
+  if (schon) return res.json({ ok: false, error: 'Dieses Unterthema gibt es schon' });
+
+  const id = 'ch-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
+  communityChannels[id] = { name, topics: [] };
+  community.channels.push(id);
+  res.json({ ok: true, id, name });
 });
 
 /** Community-Kanal öffnen (zeigt Themen oder Chat) */

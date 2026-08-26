@@ -46,14 +46,15 @@
     "test:anhang": "node test/_anhang.js",
     "test:insel": "node test/_insel.js",
     "test:suche": "node test/_suche.js",
-    "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang && npm run test:einstellungen && npm run test:kontaktinfo && npm run test:henrik && npm run test:insel && npm run test:suche && npm run test:profil",
+    "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang && npm run test:einstellungen && npm run test:kontaktinfo && npm run test:henrik && npm run test:insel && npm run test:suche && npm run test:profil && npm run test:community",
     "test:einstellungen": "node test/_einstellungen.js",
     "test:kontaktinfo": "node test/_kontaktinfo.js",
     "wlan": "node tools/lokal.js",
     "test:henrik": "node test/_henrik.js && node test/_henrik2.js",
     "ansehen": "node test/_ansehen.js",
     "mac:bilder": "node tools/app-bilder.js",
-    "test:profil": "node test/_profil.js"
+    "test:profil": "node test/_profil.js",
+    "test:community": "node test/_community.js"
   },
   "private": true
 }

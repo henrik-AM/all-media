@@ -2472,6 +2472,123 @@ button.exp__head:hover { color: var(--brand); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* ------------------------------------------------------------------
+ * Die Seite einer Community — Prototyp-Frame "CH + Kanal".
+ *
+ * Henrik am 26.08.2026: "Design ist völlig falsch, geht am Prototyp vorbei."
+ * Vorher stand hier eine schmale Kopfzeile mit Name und Untertitel und
+ * darunter eine Liste im Stil der Chatliste. Der Frame gibt etwas ganz
+ * anderes vor: ein grosses Kopfbild, darunter eine Zeile aus Name,
+ * Mitgliederzahl und Knopf, dann Biografie und Link, dann der Weg zu einem
+ * neuen Unterthema, dann die Unterthemen als breite Zeilen.
+ *
+ * Die Masse folgen dem Frame (402px breit): Bild 344x258 mit 29px Rand,
+ * Zeilen 68px hoch.
+ * ------------------------------------------------------------------ */
+
+.kanal { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* Das Kopfbild. 4:3 wie im Frame (344 zu 258), mit Rand ringsum. */
+.kanal__bild {
+  position: relative;
+  margin: 12px 7.2% 0;
+  aspect-ratio: 344 / 258;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.kanal__bild > .motiv { position: absolute; inset: 0; }
+/*
+  Der Pfeil liegt auf dem Bild, nicht darueber - im Frame steht er frei in
+  der oberen linken Ecke. Er bekommt einen dunklen Grund, damit er auf einem
+  hellen Motiv nicht verschwindet.
+*/
+.kanal__zurueck {
+  position: absolute; left: 10px; top: 10px;
+  width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: #fff;
+  background: rgba(0,0,0,.42);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.kanal__zurueck svg { width: 20px; height: 20px; }
+
+.kanal__kopfzeile {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 7.2% 0;
+}
+/*
+  Name und Mitgliederzahl stehen untereinander in einem Knopf. Im Frame
+  stehen sie nebeneinander - dort ist der Name aber der Platzhalter "Name".
+  Echte Namen wie "Design Systeme" wurden nebeneinander abgeschnitten, und
+  ein abgeschnittener Name ist schlimmer als eine zweite Zeile.
+*/
+.kanal__titel {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: left;
+}
+.kanal__name {
+  font-size: 20px; font-weight: 700; letter-spacing: -.02em;
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kanal__mitglieder { font-size: 13px; color: var(--text-3); }
+/* Steht statt des Knopfes, wenn es die eigene Community ist: sie laesst sich
+   nicht verlassen. */
+.kanal__eigen {
+  font-size: 12px; font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-soft);
+  padding: 6px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+/* Das "..." aus dem Frame - es fuehrt zu denselben Einstellungen wie der
+   Name. */
+.kanal__mehr {
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  color: var(--text-3);
+}
+.kanal__mehr:hover { background: var(--surface-2); }
+.kanal__mehr svg { width: 20px; height: 20px; }
+.kanal__bio { padding: 12px 7.2% 0; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+.kanal__link { padding: 6px 7.2% 0; font-size: 14px; }
+
+.kanal__neu {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%;
+  padding: 20px 7.2% 18px;
+  font-size: 14.5px; color: var(--text);
+  text-align: left;
+}
+.kanal__neu-kreis {
+  flex: 0 0 auto;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--brand-grad); color: #fff;
+}
+.kanal__neu-kreis svg { width: 17px; height: 17px; }
+
+/* Die Unterthemen: breite Zeilen ueber die volle Breite, 68px hoch. */
+.kanal__themen { padding-bottom: 12px; }
+.kanal__thema {
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  width: 100%; min-height: 68px;
+  padding: 10px 7.2%;
+  text-align: left;
+  border-top: 1px solid var(--hairline);
+}
+.kanal__thema:last-child { border-bottom: 1px solid var(--hairline); }
+.kanal__thema:hover { background: var(--surface-2); }
+.kanal__thema-name { font-size: 15.5px; font-weight: 600; color: var(--text); }
+.kanal__thema-sub {
+  font-size: 12.5px; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* Zwischenueberschrift ueber einer Liste ("Kanäle", "Themen"). */
 .listhead {
   padding: 14px 16px 6px;

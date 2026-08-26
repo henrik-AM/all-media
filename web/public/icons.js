@@ -61,5 +61,9 @@ const ICONS = (() => {
     shield: wrap('<path d="M12 2 4 5.5v6c0 5 3.4 8.9 8 10.5 4.6-1.6 8-5.5 8-10.5v-6z"/>'),
     globe: wrap('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>'),
     repeat: wrap('<path d="m17 1 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 23-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>'),
+    // Das "..." aus dem Prototyp-Frame "CH + Kanal". Als gefuellte Kreise,
+    // nicht als drei Punkte im Text - Satzzeichen sitzen auf der Grundlinie
+    // und stehen dadurch nie mittig in einem Knopf.
+    dots: wrap('<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>'),
   };
 })();

@@ -453,6 +453,16 @@ function verlasseExplorer() {
   state.settingsPunkt = null;
   state.commProfilView = null;
   state.sammlung = null;
+  /*
+   * Auch die offene Community. Sie hatte denselben Fehler wie die
+   * Uebersichtsseiten der Video-Suche: wer in einer Community stand und
+   * unten auf einen Bereich tippte, bekam beim Zurueckkommen wieder dieselbe
+   * Community statt der Liste - und beim Tippen auf "Communitys" selbst
+   * passierte gar nichts sichtbar. Aufgefallen ist das erst, als die
+   * Pruefung fuer die neue Kanalseite zweimal hintereinander oeffnen wollte.
+   */
+  state.openCommunityId = null;
+  state.openChannelId = null;
 }
 
 /*
@@ -2565,33 +2575,84 @@ async function renderCommunityChannels(communityId) {
     return renderCommunities();
   }
 
+  /*
+   * Aufbau nach dem Prototyp-Frame "CH + Kanal". Henrik am 26.08.2026:
+   * "Design ist völlig falsch, geht am Prototyp vorbei."
+   *
+   * Der Frame gibt von oben nach unten vor:
+   *
+   *   ←                                   Zurueck-Pfeil, frei ueber dem Bild
+   *   [ grosses Kopfbild, 344x258 ]       also rund 4:3, fast volle Breite
+   *   Name        Mitglieder     [Knopf]  eine Zeile, Knopf rechts
+   *                  ...                  Mehr-Menue darunter
+   *   Biografie
+   *   Link
+   *   (+) neues Unterthema erstellen
+   *   # Unterthema                        Zeilen ueber die volle Breite
+   *   # Unterthema
+   *
+   * Vorher stand hier eine schmale Kopfzeile mit Name und Untertitel und
+   * darunter eine Liste im Stil der Chatliste - kein Kopfbild, keine
+   * Biografie, kein Link, kein Weg, ein Unterthema anzulegen.
+   */
+  const eigen = !!daten.eigen;
+
   main.innerHTML = `
-    <div class="pagehead pagehead__row">
-      <button class="back-btn" id="backBtn" aria-label="Zurück">${ICONS.back}</button>
-      <button class="kanalkopf" id="communityKopf">
-        <span class="kanalkopf__name">${esc(daten.name)}</span>
-        <span class="kanalkopf__sub">${daten.members.toLocaleString('de-DE')} Mitglieder · ${esc(daten.topic)}</span>
+    <div class="kanal">
+      <div class="kanal__bild">
+        ${medienFlaeche('community-' + daten.id, ICONS.people)}
+        <button class="kanal__zurueck" id="backBtn" aria-label="Zurück">${ICONS.back}</button>
+      </div>
+
+      <div class="kanal__kopfzeile">
+        <button class="kanal__titel" id="communityKopf">
+          <span class="kanal__name">${esc(daten.name)}</span>
+          <span class="kanal__mitglieder">${daten.members.toLocaleString('de-DE')} Mitglieder</span>
+        </button>
+        ${
+          /*
+           * Der Knopf rechts. Eine eigene Community laesst sich nicht
+           * verlassen - vorher konnte Henrik sich aus seiner eigenen
+           * Community als Mitglied entfernen und stand dann davor.
+           */
+          eigen
+            ? '<span class="kanal__eigen">Deine Community</span>'
+            : // Beitreten traegt den Verlauf, Verlassen bleibt die leise
+              // Kante - der Weg hinein soll der auffaellige sein.
+              `<button class="btn ${daten.joined ? '' : 'btn--primary'}" data-join="${esc(daten.id)}">${
+                daten.joined ? 'Verlassen' : daten.visibility === 'private' ? 'Anfrage' : 'Beitreten'
+              }</button>`
+        }
+        ${/*
+            Das "..." aus dem Frame. Dort steht es unter der Mitgliederzahl;
+            hier sitzt es rechts in derselben Zeile. Auf einem echten Geraet
+            stand es sonst allein unter dem Text und wirkte verloren - der
+            Frame arbeitet mit dem Platzhalter "Name", echte Namen sind
+            laenger und schieben die Zeile anders.
+          */ ''}
+        <button class="kanal__mehr" id="communityMehr" aria-label="Mehr">${ICONS.dots || '···'}</button>
+      </div>
+
+      ${daten.bio ? `<div class="kanal__bio">${esc(daten.bio)}</div>` : ''}
+      ${daten.link ? `<div class="kanal__link">${bioLink(daten.link)}</div>` : ''}
+
+      <button class="kanal__neu" id="neuesUnterthema">
+        <span class="kanal__neu-kreis">${ICONS.plus}</span>
+        <span>neues Unterthema erstellen</span>
       </button>
-    </div>
-    <div class="scroll">
-      <div class="listhead">Kanäle</div>
-      ${daten.channels
-        .map(
-          (ch) => `
-        <button class="row" data-channel="${esc(ch.id)}">
-          <span class="avatar avatar--44" style="background:var(--brand)">${ICONS.hash}</span>
-          <div class="row__body">
-            <div class="row__top"><span class="row__name">${esc(ch.name)}</span></div>
-            <div class="row__bottom">
-              <span class="row__preview row__preview--text">${
+
+      <div class="kanal__themen">
+        ${daten.channels
+          .map(
+            (ch) => `<button class="kanal__thema" data-channel="${esc(ch.id)}">
+              <span class="kanal__thema-name"># ${esc(ch.name)}</span>
+              <span class="kanal__thema-sub">${
                 ch.topics.length ? ch.topics.map(esc).join(' · ') : 'Noch keine Themen'
               }</span>
-            </div>
-          </div>
-          <span class="row__chevron">${ICONS.chevron}</span>
-        </button>`
-        )
-        .join('')}
+            </button>`
+          )
+          .join('')}
+      </div>
     </div>`;
 
   $('#backBtn').addEventListener('click', () => {
@@ -2599,14 +2660,53 @@ async function renderCommunityChannels(communityId) {
     renderCommunities();
   });
   // Henrik: "Gruppennamen muessen anklickbar sein und zu den vorgesehenen
-  // Einstellungen fuehren."
-  $('#communityKopf').addEventListener('click', () => openCommunityEinstellungen(daten));
+  // Einstellungen fuehren." Das gilt fuer den Namen und fuer das "...".
+  const einstellungen = () => openCommunityEinstellungen(daten);
+  $('#communityKopf').addEventListener('click', einstellungen);
+  $('#communityMehr').addEventListener('click', einstellungen);
+
+  $('#neuesUnterthema').addEventListener('click', () => neuesUnterthema(daten));
+
+  main.querySelectorAll('[data-join]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      await fetch(`/api/communities/${b.dataset.join}/join`, { method: 'POST' });
+      const frisch = state.communities.find((c) => c.id === b.dataset.join);
+      if (frisch) {
+        frisch.joined = !frisch.joined;
+        frisch.members += frisch.joined ? 1 : -1;
+      }
+      renderCommunityChannels(communityId);
+    })
+  );
 
   main.querySelectorAll('[data-channel]').forEach((b) =>
     b.addEventListener('click', () => {
       const kanal = daten.channels.find((ch) => ch.id === b.dataset.channel);
       renderKanalThemen(daten, kanal);
     })
+  );
+}
+
+/*
+ * "neues Unterthema erstellen" aus dem Prototyp-Frame "CH + Unterthema
+ * erstellen". Vorher gab es den Punkt auf dieser Seite gar nicht.
+ */
+function neuesUnterthema(daten) {
+  openFormular(
+    'Neues Unterthema',
+    [{ key: 'name', label: 'Name des Unterthemas', platzhalter: 'z. B. Ankündigungen', pflicht: true }],
+    async ({ name }) => {
+      const res = await fetch(`/api/communities/${daten.id}/channels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      }).then((r) => r.json());
+      if (!res.ok) return res.error || 'Das hat nicht geklappt';
+      toast(`„${name}" angelegt`);
+      renderCommunityChannels(daten.id);
+      return null;
+    },
+    'Anlegen'
   );
 }
 
