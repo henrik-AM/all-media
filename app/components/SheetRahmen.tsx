@@ -1,9 +1,10 @@
 import React from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, themenStyles } from '../constants/design';
+import { useZiehenZumSchliessen } from '../lib/ziehen';
 
 interface Props {
   visible: boolean;
@@ -22,12 +23,27 @@ interface Props {
  */
 export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: Props) => {
   const insets = useSafeAreaInsets();
+  /*
+   * Punkt 23: nach unten ziehen schliesst das Blatt. Der Griff sitzt nur am
+   * Kopf und nicht am ganzen Blatt - sonst liesse sich in einer langen Liste
+   * darin nicht mehr blaettern.
+   */
+  const { griff, ziehStil } = useZiehenZumSchliessen(onClose);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Druck style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, hoch && styles.sheetHoch, { paddingBottom: fuss ? 0 : insets.bottom + spacing.md }]}>
-        <View style={styles.kopf}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          hoch && styles.sheetHoch,
+          { paddingBottom: fuss ? 0 : insets.bottom + spacing.md },
+          ziehStil,
+        ]}
+      >
+        <View style={styles.kopf} {...griff}>
+          {/* Der Griff, an dem gezogen wird - er zeigt auch, dass es geht. */}
+          <View style={styles.griff} />
           <Druck style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Schließen">
             <Ionicons name="close" size={22} color={colors.text} />
           </Druck>
@@ -37,7 +53,7 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
         <View style={hoch ? styles.inhaltHoch : undefined}>{children}</View>
 
         {fuss ? <View style={[styles.fuss, { paddingBottom: insets.bottom + spacing.md }]}>{fuss}</View> : null}
-      </View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -61,6 +77,15 @@ const styles = themenStyles((colors) => ({
   // bleibt sichtbar - sonst wirkt es wie eine eigene Seite.
   sheetHoch: { height: '74%' },
   inhaltHoch: { flex: 1, minHeight: 0 },
+  griff: {
+    position: 'absolute',
+    top: 7,
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.text3,
+    opacity: 0.35,
+  },
   kopf: {
     height: 52,
     alignItems: 'center',

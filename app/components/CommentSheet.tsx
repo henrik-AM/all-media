@@ -7,14 +7,14 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View, Animated } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { EmptyState } from './EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { CURRENT_USER_ID, mockComments, mockUsers } from '../mocks';
+import { useZiehenZumSchliessen } from '../lib/ziehen';
 import { Comment } from '../types';
 
 interface Props {
@@ -60,6 +60,8 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
     onCountChange?.(targetId, next.length);
   };
 
+  const { griff, ziehStil } = useZiehenZumSchliessen(onClose);
+
   const renderComment = ({ item }: { item: Comment }) => {
     const author = mockUsers[item.userId];
     return (
@@ -69,17 +71,24 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
           <Text style={styles.commentText}>
             <Text style={styles.bold}>{author?.name}</Text> {item.text}
           </Text>
-          <Text style={styles.commentMeta}>
-            {item.time}
-            {item.likes > 0 ? ` · ${item.likes} Gefällt mir` : ''}
-          </Text>
+          <Text style={styles.commentMeta}>{item.time}</Text>
         </View>
-        <Druck onPress={() => toggleLike(item)} hitSlop={8}>
+        {/*
+          Herz und Zahl untereinander. Henrik am 26.08.2026, Punkt 24: "Keine
+          Anzahl der Likes unter Kommentaren." Sie stand in der Metazeile
+          ("14:02 · 3 Gefällt mir") und nur, wenn es ueberhaupt Likes gab -
+          dort sucht sie niemand. Jetzt steht sie unter dem Herz, also direkt
+          unter dem Knopf, der sie veraendert.
+        */}
+        <Druck style={styles.likeSpalte} onPress={() => toggleLike(item)} hitSlop={8}>
           <Ionicons
             name={item.liked ? 'heart' : 'heart-outline'}
             size={17}
             color={item.liked ? '#FF3040' : colors.text3}
           />
+          <Text style={[styles.likeZahl, item.liked && styles.likeZahlAn]}>
+            {item.likes > 0 ? item.likes : ''}
+          </Text>
         </Druck>
       </View>
     );
@@ -92,7 +101,14 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
         style={styles.sheet}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.handle} />
+        {/*
+          Punkt 23: nach unten ziehen schliesst das Blatt. Der Griff nimmt
+          den Zug entgegen, nicht die Liste - sonst liesse sich in den
+          Kommentaren nicht mehr blaettern.
+        */}
+        <Animated.View {...griff} style={[styles.griffFeld, ziehStil]}>
+          <View style={styles.handle} />
+        </Animated.View>
         <Text style={styles.title}>
           {comments.length} {comments.length === 1 ? 'Kommentar' : 'Kommentare'}
         </Text>
@@ -167,6 +183,11 @@ const styles = themenStyles((colors) => ({
   comment: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, paddingHorizontal: spacing.lg, paddingVertical: 9 },
   commentBody: { flex: 1, minWidth: 0 },
   commentText: { color: colors.text, ...typography.message, lineHeight: 20 },
+  /* Flaeche um den Griff - sie ist der Anfasspunkt zum Wegziehen. */
+  griffFeld: { paddingTop: 6, paddingBottom: 4, alignItems: 'center' },
+  likeSpalte: { alignItems: 'center', gap: 2, minWidth: 26 },
+  likeZahl: { fontSize: 11, fontWeight: '600', lineHeight: 13, color: colors.text3 },
+  likeZahlAn: { color: '#FF3040' },
   commentMeta: { marginTop: 3, color: colors.text3, ...typography.small },
   bold: { fontWeight: '700' },
 

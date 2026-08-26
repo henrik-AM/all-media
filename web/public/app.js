@@ -1104,6 +1104,74 @@ function sheetKopf(title, mitX) {
        <div class="sheet__title">${esc(title)}</div>`;
 }
 
+/*
+ * Ein Blatt nach unten wegziehen.
+ *
+ * Henrik am 26.08.2026, Punkt 23: "Kommentar-Sheet schließt nicht durch
+ * Downswipe." Es gab nur den Weg ueber das X oder einen Klick daneben - beide
+ * verlangen, dass man genau trifft, waehrend der Daumen ohnehin schon auf dem
+ * Blatt liegt.
+ *
+ * Als eigene Funktion, weil es fuer jedes Blatt gilt und nicht nur fuer die
+ * Kommentare. Zwei Regeln halten die Geste aus dem Weg des normalen
+ * Bedienens:
+ *
+ *   1. Gezogen wird nur, wenn der Inhalt oben steht. Sonst waere Scrollen in
+ *      einer langen Liste nicht mehr moeglich - jeder Zug nach unten wuerde
+ *      das Blatt schliessen statt zu blaettern.
+ *   2. Erst ab 90px oder einem schnellen Zug faellt es zu. Ein kurzes
+ *      Verrutschen federt zurueck.
+ */
+function ziehenZumSchliessen(blatt, zumachen) {
+  let startY = null;
+  let startZeit = 0;
+  let weg = 0;
+
+  const scrollbar = () => blatt.querySelector('.sheet__body, .scroll') || blatt;
+
+  blatt.addEventListener(
+    'touchstart',
+    (e) => {
+      // Nur wenn oben - siehe Regel 1.
+      if (scrollbar().scrollTop > 0) return;
+      startY = e.touches[0].clientY;
+      startZeit = Date.now();
+      weg = 0;
+      blatt.style.transition = 'none';
+    },
+    { passive: true }
+  );
+
+  blatt.addEventListener(
+    'touchmove',
+    (e) => {
+      if (startY === null) return;
+      weg = e.touches[0].clientY - startY;
+      // Nach oben ziehen tut nichts - das Blatt sitzt bereits am Anschlag.
+      if (weg <= 0) return;
+      blatt.style.transform = `translateY(${weg}px)`;
+    },
+    { passive: true }
+  );
+
+  const loslassen = () => {
+    if (startY === null) return;
+    const schnell = weg > 40 && Date.now() - startZeit < 300;
+    blatt.style.transition = 'transform .2s ease';
+
+    if (weg > 90 || schnell) {
+      blatt.style.transform = 'translateY(100%)';
+      setTimeout(zumachen, 180);
+    } else {
+      blatt.style.transform = '';
+    }
+    startY = null;
+  };
+
+  blatt.addEventListener('touchend', loslassen);
+  blatt.addEventListener('touchcancel', loslassen);
+}
+
 function openSheet(title, bodyHtml, onMount, opts = {}) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet-backdrop';
@@ -1132,6 +1200,8 @@ function openSheet(title, bodyHtml, onMount, opts = {}) {
     if (e.target === sheet) zumachen();
   });
   sheet.querySelector('[data-sheet-close]')?.addEventListener('click', zumachen);
+
+  ziehenZumSchliessen(sheet.querySelector('.sheet'), zumachen);
 
   onMount?.(sheet, zumachen);
   return sheet;
@@ -2341,6 +2411,14 @@ async function openComments(targetId, onCountChange) {
       }
     });
 
+    /*
+     * Punkt 23: nach unten wegziehen. Dieses Blatt baut sein Markup selbst
+     * und geht nicht durch openSheet, deshalb wird die Geste hier
+     * eingehaengt - und weil paint() den Inhalt bei jedem Like neu aufbaut,
+     * muss das am Ende von paint() stehen und nicht daneben.
+     */
+    ziehenZumSchliessen(sheet.querySelector('.sheet'), () => sheet.remove());
+
     sheet.querySelector('#commentForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const text = input.value.trim();
@@ -2363,8 +2441,18 @@ async function openComments(targetId, onCountChange) {
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet) sheet.remove();
   });
+
 }
 
+/*
+ * Eine Kommentarzeile.
+ *
+ * Henrik am 26.08.2026, Punkt 24: "Keine Anzahl der Likes unter Kommentaren."
+ * Sie stand zwar in der Metazeile ("14:02 · 3 Gefällt mir"), aber nur wenn es
+ * ueberhaupt Likes gab, und dort sucht sie niemand. Jetzt steht sie unter dem
+ * Herz rechts - genau dort, wo man sie von Instagram und TikTok her erwartet,
+ * und direkt neben dem Knopf, der sie veraendert.
+ */
 function commentRow(c) {
   const u = user(c.userId);
   return `
@@ -2372,9 +2460,14 @@ function commentRow(c) {
       <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
       <div class="comment__body">
         <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${esc(c.text)}</div>
-        <div class="comment__meta">${esc(c.time)}${c.likes ? ` · ${c.likes} Gefällt mir` : ''}</div>
+        <div class="comment__meta">${esc(c.time)}</div>
       </div>
-      <button class="comment__like ${c.liked ? 'is-on' : ''}" data-clike="${c.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
+      <button class="comment__like ${c.liked ? 'is-on' : ''}" data-clike="${c.id}" aria-label="${
+        c.likes ? `Gefällt mir, ${c.likes} mal` : 'Gefällt mir'
+      }">
+        ${ICONS.heart}
+        <span class="comment__likes">${c.likes || ''}</span>
+      </button>
     </div>`;
 }
 
@@ -2406,6 +2499,15 @@ function renderHomeFeed() {
         return openComments(pid, (count) => {
           const idx = state.posts.findIndex((x) => x.id === pid);
           state.posts[idx] = { ...state.posts[idx], comments: count };
+          /*
+           * Henrik am 26.08.2026, Punkt 25: "Angezeigte Anzahl ≠ echte
+           * Anzahl." Der Zustand wurde zwar mitgezaehlt, aber niemand hat es
+           * dem Knopf gesagt - der Feed wird nicht neu gebaut, solange man
+           * darin steht. Also den Text direkt setzen; ein render() waere
+           * hier falsch, das wuerde die Scrollposition verlieren.
+           */
+          const knopf = main.querySelector(`.post__comments[data-pid="${pid}"]`);
+          if (knopf) knopf.textContent = kommentarZeile(count);
         });
       }
       if (paction === 'share') return openTeilen('post', pid);
@@ -2504,6 +2606,9 @@ function renderVideoFeed() {
         return openComments(vid, (count) => {
           const idx = state.videos.findIndex((x) => x.id === vid);
           state.videos[idx] = { ...state.videos[idx], comments: count };
+          // Dieselbe Sache wie beim Beitrag - siehe dort.
+          const zahl = main.querySelector(`[data-vaction="comment"][data-vid="${vid}"] span`);
+          if (zahl) zahl.textContent = compactNumber(count);
         });
       }
 
@@ -7606,11 +7711,74 @@ function openStory(storyId) {
     if (elapsed >= STORY_DURATION) go(1);
   }, STORY_STEP);
 
-  $('#storyClose').addEventListener('click', () => {
+  const storyZu = () => {
     stop();
     markSeen();
     closeOverlay();
-  });
+  };
+
+  $('#storyClose').addEventListener('click', storyZu);
+
+  /*
+   * Punkt 5: nach unten wischen beendet den Story-Betrachter.
+   *
+   * Vorher gab es nur den kleinen Pfeil oben links - und der liegt genau
+   * dort, wo beim Halten des Handys die andere Hand ist. Nach unten wischen
+   * ist die Geste, die man von Instagram und TikTok her kennt.
+   *
+   * Das Antwortfeld ist ausgenommen: dort wischt man zum Auswaehlen von
+   * Text, nicht zum Schliessen.
+   */
+  const betrachter = overlay.querySelector('.viewer');
+  let ziehStart = null;
+  let ziehWeg = 0;
+  let ziehZeit = 0;
+
+  betrachter.addEventListener(
+    'touchstart',
+    (e) => {
+      if (e.target.closest('.viewer__reply, input, textarea')) return;
+      ziehStart = e.touches[0].clientY;
+      ziehZeit = Date.now();
+      ziehWeg = 0;
+      betrachter.style.transition = 'none';
+      pause();
+    },
+    { passive: true }
+  );
+
+  betrachter.addEventListener(
+    'touchmove',
+    (e) => {
+      if (ziehStart === null) return;
+      ziehWeg = e.touches[0].clientY - ziehStart;
+      if (ziehWeg <= 0) return;
+      betrachter.style.transform = `translateY(${ziehWeg}px)`;
+      // Mit dem Ziehen wird der Hintergrund frei - das zeigt, wohin es geht.
+      betrachter.style.opacity = String(Math.max(0.35, 1 - ziehWeg / 500));
+    },
+    { passive: true }
+  );
+
+  const ziehEnde = () => {
+    if (ziehStart === null) return;
+    const schnell = ziehWeg > 40 && Date.now() - ziehZeit < 300;
+    betrachter.style.transition = 'transform .2s ease, opacity .2s ease';
+
+    if (ziehWeg > 110 || schnell) {
+      betrachter.style.transform = 'translateY(100%)';
+      betrachter.style.opacity = '0';
+      setTimeout(storyZu, 180);
+    } else {
+      betrachter.style.transform = '';
+      betrachter.style.opacity = '';
+      resume();
+    }
+    ziehStart = null;
+  };
+
+  betrachter.addEventListener('touchend', ziehEnde);
+  betrachter.addEventListener('touchcancel', ziehEnde);
 
   $('#storyPrev').addEventListener('click', () => go(-1));
   $('#storyNext').addEventListener('click', () => go(1));

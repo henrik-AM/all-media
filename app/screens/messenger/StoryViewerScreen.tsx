@@ -9,6 +9,7 @@ import { Avatar } from '../../components/Avatar';
 import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { mockUsers } from '../../mocks';
 import { StoryAnsichtenSheet, StoryOptionenSheet } from '../../components/StoryOptionenSheet';
+import { useZiehenZumSchliessen } from '../../lib/ziehen';
 import { Contact, Story } from '../../types';
 
 const DURATION = 6000;
@@ -97,6 +98,23 @@ export const StoryViewerScreen = ({
 
   const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
+  /*
+   * Punkt 5: nach unten wischen beendet den Betrachter.
+   *
+   * Vorher gab es nur den kleinen Pfeil oben links - und der liegt genau
+   * dort, wo beim Halten des Handys die andere Hand ist. Die Schwelle liegt
+   * hoeher als bei einem Blatt (140 statt 100): eine Vollbild-Ebene soll
+   * nicht schon bei einem Verrutschen weggehen.
+   *
+   * Waehrend des Ziehens steht die Zeit still, sonst laeuft die Story im
+   * Hintergrund weiter und springt beim Zurueckfedern zur naechsten.
+   */
+  const ziehen = useZiehenZumSchliessen(onClose, {
+    schwelle: 140,
+    onStart: () => setPaused(true),
+    onAbbruch: () => setPaused(false),
+  });
+
   const go = (step: number) => {
     const next = index + step;
     if (next < 0 || next >= stories.length) return onClose();
@@ -121,7 +139,14 @@ export const StoryViewerScreen = ({
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <Animated.View
+      {...ziehen.griff}
+      style={[
+        styles.container,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+        ziehen.ziehStil,
+      ]}
+    >
       {/* Ein Balken, Zurueck-Pfeil links, Mehr-Menue rechts — wie im Prototyp. */}
       <View style={styles.bars}>
         <View style={styles.bar}>
@@ -287,7 +312,7 @@ export const StoryViewerScreen = ({
           onNotice={onNotice}
         />
       )}
-    </View>
+    </Animated.View>
   );
 };
 
