@@ -1793,7 +1793,27 @@ body:has(.camera) .toast { bottom: 132px; }
 .standort__text { flex: 1 1 auto; min-width: 0; }
 .standort__titel { font-size: 15px; font-weight: 600; }
 .standort__sub { margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
-.standort__optionen { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+/*
+  Die drei Freigabe-Stufen nebeneinander. Henrik am 26.08.2026, Punkt 13:
+  "Standort-Freigabe-Punkte sind untereinander, sollen nebeneinander sein."
+
+  Der Grund war flex-wrap: wrap - "Niemand · Alle Kontakte · Ausgewählte"
+  passt auf einem 390px-Schirm nicht in eine Zeile, also rutschte die dritte
+  nach unten. Drei gleiche Spalten passen immer; ist eine Beschriftung zu
+  lang, wird sie gekuerzt statt umzubrechen.
+*/
+.standort__optionen {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.standort__optionen .pill {
+  min-width: 0;
+  padding-left: 8px; padding-right: 8px;
+  justify-content: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 .schalter { position: relative; display: inline-block; width: 46px; height: 28px; flex: 0 0 auto; }
 .schalter input { opacity: 0; width: 0; height: 0; }

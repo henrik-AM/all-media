@@ -208,12 +208,32 @@ if (!fs.existsSync(BILD)) {
     if (!zahlen.includes('500')) throw new Error(zahlen);
   });
 
-  await pruefe('Spendenziel ohne Betrag wird abgelehnt', async () => {
+  /*
+   * Frueher stand hier "Spendenziel ohne Betrag wird abgelehnt". Henrik hat
+   * am 26.08.2026 gemeldet, dass das Ziel freiwillig sein soll (Punkt 44) -
+   * nicht jede Sammlung laeuft auf einen Betrag zu. Die Pruefung dreht sich
+   * deshalb um: ohne Ziel muss es gehen, und unsinnige Eingaben muessen
+   * weiterhin abgelehnt werden.
+   */
+  await pruefe('Eine Spendenaktion geht auch ohne Ziel', async () => {
     await erstellen('spende');
     await page.waitForSelector('#f_titel');
     await page.fill('#f_titel', 'Ohne Ziel');
     await page.click('#formOk');
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(900);
+    const titel = await page.$eval('.spende__titel', (e) => e.textContent);
+    if (titel !== 'Ohne Ziel') throw new Error('es steht „' + titel + '"');
+    // Ohne Ziel gibt es keinen Balken - er haette keine Bezugsgroesse.
+    if (await page.$('.spende__balken')) throw new Error('der Balken steht ohne Ziel da');
+  });
+
+  await pruefe('Ein unsinniges Spendenziel wird weiterhin abgelehnt', async () => {
+    await erstellen('spende');
+    await page.waitForSelector('#f_titel');
+    await page.fill('#f_titel', 'Mit Unsinn');
+    await page.fill('#f_ziel', '-5');
+    await page.click('#formOk');
+    await page.waitForTimeout(500);
     const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
     if (!hinweis) throw new Error('kein Hinweis');
     await page.click('[data-sheet-close]');

@@ -1014,8 +1014,11 @@ function renderContacts() {
     <div class="scroll">
       ${
         list.length
-          ? `${friends.length ? `<div class="listhead">Kontakte auf All Media</div><ul class="rows">${friends.map(item).join('')}</ul>` : ''}
-             ${pending.length ? `<div class="listhead">Ausstehende Anfragen</div><ul class="rows">${pending.map(item).join('')}</ul>` : ''}`
+          ? // Punkt 16: "Ausstehende Anfragen" steht ueber den Kontakten.
+            // Eine offene Anfrage will beantwortet werden - sie gehoert nach
+            // oben, nicht ans Ende einer langen Kontaktliste.
+            `${pending.length ? `<div class="listhead">Ausstehende Anfragen</div><ul class="rows">${pending.map(item).join('')}</ul>` : ''}
+             ${friends.length ? `<div class="listhead">Kontakte auf All Media</div><ul class="rows">${friends.map(item).join('')}</ul>` : ''}`
           : `<div class="empty">${ICONS.person}
               <div class="empty__title">Keine Kontakte gefunden</div>
               <div class="empty__text">Für „${esc(state.contactQuery)}" wurde nichts gefunden.</div>
@@ -2259,9 +2262,22 @@ async function openProfile(userId, variante) {
 
       <div class="scroll">
         <div class="prof__top">
-          <div class="story__ring" style="width:88px;height:88px;padding:3px">
-            <div class="story__inner" style="background:${profile.color};font-size:28px">${esc(profile.initials)}</div>
-          </div>
+          ${/*
+              Punkt 12: "Story von fremdem Profil öffnet nicht."
+              Der Ring war ein <div> ohne jede Verdrahtung - er sah aus wie
+              eine laufende Story und war doch nur Zierde. Jetzt traegt ihn
+              ein Knopf, aber nur, wenn diese Person auch wirklich eine Story
+              hat; sonst bliebe der Ring ein Versprechen ohne Inhalt.
+            */ ''}
+          ${
+            state.stories.some((st) => st.userId === userId)
+              ? `<button class="story__ring" data-profilstory="${esc(userId)}" style="width:88px;height:88px;padding:3px" aria-label="Story von ${esc(profile.name)} ansehen">
+                   <span class="story__inner" style="background:${profile.color};font-size:28px">${esc(profile.initials)}</span>
+                 </button>`
+              : `<div class="story__ring is-viewed" style="width:88px;height:88px;padding:3px">
+                   <div class="story__inner" style="background:${profile.color};font-size:28px">${esc(profile.initials)}</div>
+                 </div>`
+          }
           <div class="prof__stats">
             <div class="prof__stat"><strong>${compactNumber(profile.posts)}</strong><span>Beiträge</span></div>
             <div class="prof__stat"><strong>${compactNumber(profile.followers)}</strong><span>Follower</span></div>
@@ -2328,6 +2344,14 @@ async function openProfile(userId, variante) {
     $('#profBack').addEventListener('click', closeOverlay);
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
     bindSammlungen(overlay);
+
+    // Punkt 12: der Story-Ring auf einem fremden Profil oeffnet die Story.
+    overlay.querySelector('[data-profilstory]')?.addEventListener('click', () => {
+      const story = state.stories.find((st) => st.userId === userId);
+      if (!story) return;
+      closeOverlay();
+      openStory(story.id);
+    });
 
     $('#profFollow').addEventListener('click', async () => {
       const r = await fetch(`/api/profile/${userId}/follow`, { method: 'POST' });
@@ -2482,12 +2506,21 @@ function renderHomeFeed() {
   bindStoryRail();
 
   // Story-Ringe anklickbar
-  main.querySelectorAll('[data-openStory]').forEach((btn) =>
+  /*
+   * Punkt 21: "Klick auf das Profilbild zeigt 'Keine Story' statt zum Profil
+   * zu gehen."
+   *
+   * Zwei Dinge waren falsch. Erstens ging ohne Story nur ein Hinweis auf -
+   * ein Profilbild soll aber zum Profil fuehren, wenn es nichts anderes zu
+   * zeigen gibt. Zweitens bekam openStory die Kennung der PERSON statt die
+   * der Story; selbst mit Story waere also nichts aufgegangen.
+   */
+  main.querySelectorAll('[data-story-user]').forEach((btn) =>
     btn.addEventListener('click', () => {
-      const userId = btn.dataset.openStory;
+      const userId = btn.dataset.storyUser;
       const story = state.stories.find((s) => s.userId === userId);
-      if (story) openStory(userId, 0);
-      else toast('Keine Story vorhanden');
+      if (story) return openStory(story.id);
+      openProfile(userId);
     })
   );
 
@@ -2534,7 +2567,14 @@ function postCard(p) {
   return `
     <article class="post" id="post-${p.id}">
       <header class="post__head">
-        <button class="story__ring story-ring-btn" style="width:40px;height:40px;padding:2px" data-openStory="${p.userId}">
+        ${/*
+            Das Attribut heisst bewusst data-story-user und nicht
+            data-openStory: HTML schreibt Attributnamen klein, aus
+            data-openStory wird data-openstory - und dataset.openStory liest
+            data-open-story. Der Wert war deshalb immer undefined, und der
+            Klick auf ein Profilbild im Feed hat nie etwas geoeffnet.
+          */ ''}
+        <button class="story__ring story-ring-btn" style="width:40px;height:40px;padding:2px" data-story-user="${p.userId}">
           <div class="story__inner" style="background:${u.color};font-size:13px">${esc(u.initials)}</div>
         </button>
         <div class="post__who">
@@ -2548,8 +2588,20 @@ function postCard(p) {
         <button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
           ${p.following ? 'Gefolgt' : 'Folgen'}
         </button>
-        <button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="Benachrichtigungen" style="color: ${p.notify ? '#0A66FF' : '#9AA1AC'}; opacity: ${p.notify ? 1 : 0.5}; text-decoration: ${p.notify ? 'none' : 'line-through'}">
-          ${ICONS.bell}
+        ${/*
+            Punkt 22: die abgeschaltete Glocke traegt einen Strich. Vorher
+            stand hier text-decoration: line-through - das wirkt auf Text und
+            nicht auf ein SVG, es war also nie ein Strich zu sehen, nur ein
+            blasses Grau. Jetzt ist es ein eigenes Symbol.
+
+            Die Farbe kam ausserdem aus einer festen Angabe im Markup und war
+            noch das alte Blau (#0A66FF), das die App sonst nirgends mehr
+            benutzt. Sie steht jetzt im CSS und folgt der Marke.
+          */ ''}
+        <button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="${
+          p.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'
+        }">
+          ${p.notify ? ICONS.bell : ICONS.bellOff}
         </button>
       </header>
 
@@ -6359,7 +6411,9 @@ async function erstelle(was) {
       'Spendenaktion',
       [
         { key: 'titel', label: 'Wofür sammelst du?', platzhalter: 'z. B. Bäume für den Stadtpark', pflicht: true },
-        { key: 'ziel', label: 'Spendenziel in Euro', typ: 'zahl', platzhalter: '500', pflicht: true },
+        // Punkt 44: das Ziel ist freiwillig. Nicht jede Sammlung hat einen
+        // Betrag, auf den sie zulaeuft - manche laufen einfach.
+        { key: 'ziel', label: 'Spendenziel in Euro (freiwillig)', typ: 'zahl', platzhalter: '500' },
         { key: 'text', label: 'Beschreibung (freiwillig)', typ: 'mehrzeilig', platzhalter: 'Worum geht es?' },
       ],
       async (werte) => {
@@ -6678,14 +6732,21 @@ async function renderVideoProfile() {
       </div>
       ${
         me.spende
-          ? `<div class="spende">
+          ? // Punkt 44: das Ziel ist freiwillig. Ohne Ziel gibt es keinen
+            // Balken - er waere ohne Bezugsgroesse sinnlos, und die Rechnung
+            // gesammelt/ziel ergaebe eine Division durch null.
+            `<div class="spende">
                <div class="spende__titel">${esc(me.spende.titel)}</div>
                ${me.spende.text ? `<div class="spende__text">${esc(me.spende.text)}</div>` : ''}
-               <div class="spende__balken"><div class="spende__fuellung" style="width:${Math.min(
-                 100,
-                 Math.round((me.spende.gesammelt / me.spende.ziel) * 100)
-               )}%"></div></div>
-               <div class="spende__zahlen">${me.spende.gesammelt} € von ${me.spende.ziel} € gesammelt</div>
+               ${
+                 me.spende.ziel > 0
+                   ? `<div class="spende__balken"><div class="spende__fuellung" style="width:${Math.min(
+                       100,
+                       Math.round((me.spende.gesammelt / me.spende.ziel) * 100)
+                     )}%"></div></div>
+                      <div class="spende__zahlen">${me.spende.gesammelt} € von ${me.spende.ziel} € gesammelt</div>`
+                   : `<div class="spende__zahlen">${me.spende.gesammelt} € gesammelt</div>`
+               }
              </div>`
           : ''
       }
@@ -6899,7 +6960,10 @@ function renderCommunitySearch() {
     <div class="scroll">
       ${
         chans.length || people.length
-          ? `${chans.length ? `<div class="exp__head">Kanäle →</div><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
+          ? // Punkt 55: die Liste heisst nach dem, was drinsteht. "Kanäle"
+            // ist der Name der Unterthemen INNERHALB einer Community - hier
+            // stehen aber die Communitys selbst.
+            `${chans.length ? `<div class="exp__head">Communitys →</div><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
              ${
                people.length
                  ? `<div class="exp__head">Profile →</div><ul class="rows">${people

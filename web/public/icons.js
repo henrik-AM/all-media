@@ -61,6 +61,13 @@ const ICONS = (() => {
     shield: wrap('<path d="M12 2 4 5.5v6c0 5 3.4 8.9 8 10.5 4.6-1.6 8-5.5 8-10.5v-6z"/>'),
     globe: wrap('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>'),
     repeat: wrap('<path d="m17 1 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 23-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>'),
+    /*
+     * Durchgestrichene Glocke. Henrik am 26.08.2026, Punkt 22: "Nur Grau,
+     * kein Strich wenn deaktiviert." Vorher wurde die normale Glocke mit
+     * CSS durchgestrichen - text-decoration wirkt aber auf Text und nicht
+     * auf ein SVG, also war da schlicht nie ein Strich.
+     */
+    bellOff: wrap('<path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0 1 18 8"/><path d="M6.26 6.26A5.9 5.9 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><path d="m2 2 20 20"/>'),
     // Das "..." aus dem Prototyp-Frame "CH + Kanal". Als gefuellte Kreise,
     // nicht als drei Punkte im Text - Satzzeichen sitzen auf der Grundlinie
     // und stehen dadurch nie mittig in einem Knopf.

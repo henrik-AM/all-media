@@ -1069,9 +1069,24 @@ app.post('/api/eigene/playlist', (req, res) => {
 
 app.post('/api/eigene/spende', (req, res) => {
   const titel = String(req.body?.titel || '').trim();
-  const ziel = Number(req.body?.ziel);
   if (!titel) return res.json({ ok: false, error: 'Bitte einen Titel eingeben' });
-  if (!Number.isFinite(ziel) || ziel <= 0) return res.json({ ok: false, error: 'Bitte ein Spendenziel in Euro eingeben' });
+
+  /*
+   * Punkt 44: das Ziel ist freiwillig. Nicht jede Sammlung laeuft auf einen
+   * Betrag zu - manche laufen einfach. Steht keiner da, gilt 0; die Anzeige
+   * zeigt dann den gesammelten Betrag ohne Balken.
+   *
+   * Eine unsinnige Eingabe (Text, negative Zahl) wird weiterhin abgelehnt -
+   * freiwillig heisst nicht beliebig.
+   */
+  const roh = String(req.body?.ziel ?? '').trim();
+  let ziel = 0;
+  if (roh) {
+    ziel = Number(roh.replace(',', '.'));
+    if (!Number.isFinite(ziel) || ziel <= 0) {
+      return res.json({ ok: false, error: 'Das Spendenziel muss eine Zahl über null sein' });
+    }
+  }
 
   profiles.me.spende = { titel, ziel, gesammelt: 0, text: String(req.body?.text || '').trim() };
   res.json({ ok: true, spende: profiles.me.spende });
