@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
-import { colors, radius, sizes, spacing, typography } from '../../constants/design';
+import { colors, radius, shadow, sizes, spacing, typography } from '../../constants/design';
 import { antwortAuf } from '../../lib/antworten';
 import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from '../../mocks';
 import { AnhangSheet } from '../../components/AnhangSheet';
@@ -379,18 +379,23 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  bubble: { maxWidth: '78%', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderRadius: radius.lg },
+  bubble: { maxWidth: '76%', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 7, borderRadius: 18 },
+  /*
+   * Kein Rahmen mehr, sondern ein weicher Schatten: die Blase liegt dann auf
+   * dem grauen Grund statt als Karte darin zu stecken. Ein 1px-Rahmen um jede
+   * einzelne Nachricht macht einen Verlauf unruhig.
+   */
   bubbleIn: {
     alignSelf: 'flex-start',
     backgroundColor: colors.bubbleIn,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    borderBottomLeftRadius: 5,
+    borderBottomLeftRadius: 6,
+    ...shadow.sm,
   },
   bubbleOut: {
     alignSelf: 'flex-end',
     backgroundColor: colors.bubbleOut,
-    borderBottomRightRadius: 5,
+    borderBottomRightRadius: 6,
+    ...shadow.sm,
   },
   sender: { marginBottom: 2, color: colors.brand, fontSize: 12.5, fontWeight: '700' },
   messageText: { color: colors.text, ...typography.message, lineHeight: 20 },

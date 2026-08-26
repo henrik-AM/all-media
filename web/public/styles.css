@@ -47,6 +47,7 @@ ul { margin: 0; padding: 0; list-style: none; }
      Aber ein gedaempfter, kuehlerer Ton statt des grellen Originals. */
   --bubble-out: #DCF5E3;
   --bubble-out-text: #0D2E19;
+  --bubble-out-meta: #4A7A5C;
   --bubble-in: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F7F8FB;
@@ -82,6 +83,7 @@ ul { margin: 0; padding: 0; list-style: none; }
     --accent: #22D3EE;
     --bubble-out: #16452F;
     --bubble-out-text: #DDF5E5;
+    --bubble-out-meta: #7FB694;
     --bubble-in: #16181D;
     --surface: #000000;
     --surface-2: #0E1014;
@@ -108,6 +110,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   --accent: #22D3EE;
   --bubble-out: #16452F;
   --bubble-out-text: #DDF5E5;
+  --bubble-out-meta: #7FB694;
   --bubble-in: #16181D;
   --surface: #000000;
   --surface-2: #0E1014;
@@ -604,28 +607,38 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-weight: 600;
 }
 .msg {
-  max-width: 78%;
-  padding: 8px 12px 6px;
-  border-radius: 16px;
-  font-size: 14.5px;
-  line-height: 1.4;
+  max-width: 76%;
+  padding: 8px 12px 7px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.42;
+  letter-spacing: -0.01em;
   word-wrap: break-word;
   position: relative;
 }
+/* Die Blase raeumt hinter dem gefloateten Zeitstempel auf - ohne das haengt
+   er unten aus der Blase heraus. */
+.msg::after { content: ''; display: block; clear: both; }
+/*
+  Kein Rahmen mehr, sondern ein weicher Schatten: die Blase liegt dann auf dem
+  grauen Grund statt als Karte darin zu stecken. Ein 1px-Rahmen um jede
+  einzelne Nachricht macht einen Verlauf unruhig.
+*/
 .msg--in {
   align-self: flex-start;
   background: var(--bubble-in);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: 5px;
+  box-shadow: 0 1px 1px rgba(12,14,20,.05), 0 1px 3px rgba(12,14,20,.06);
+  border-bottom-left-radius: 6px;
 }
 .msg--out {
   align-self: flex-end;
   background: var(--bubble-out);
   color: var(--bubble-out-text);
-  border-bottom-right-radius: 5px;
+  box-shadow: 0 1px 1px rgba(12,14,20,.04), 0 1px 3px rgba(12,14,20,.05);
+  border-bottom-right-radius: 6px;
 }
 .msg + .msg--in { margin-top: 2px; }
-.msg__sender { font-size: 12.5px; font-weight: 700; color: var(--brand); margin-bottom: 2px; }
+.msg__sender { display: block; font-size: 12.5px; font-weight: 700; color: var(--brand); margin-bottom: 2px; letter-spacing: -0.01em; }
 .msg__media {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 4px;
@@ -633,16 +646,24 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-size: 13.5px;
 }
 .msg__media svg { width: 18px; height: 18px; }
+/*
+  Die Uhrzeit stand bisher in einer eigenen Zeile unter dem Text und hat jede
+  Blase unnoetig hoch gemacht. Gefloatet setzt sie sich ans Ende der letzten
+  Textzeile, wenn dort Platz ist, und rutscht sonst von allein eine Zeile
+  tiefer - genau das Verhalten, das man aus echten Messengern kennt.
+*/
 .msg__foot {
-  display: flex; align-items: center; justify-content: flex-end; gap: 4px;
-  margin-top: 2px;
-  font-size: 10.5px;
+  float: right;
+  display: inline-flex; align-items: center; gap: 4px;
+  margin: 5px 0 0 10px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   color: var(--text-3);
 }
-.msg--out .msg__foot { color: #4E7A5C; }
+.msg--out .msg__foot { color: var(--bubble-out-meta, #4A7A5C); }
 .msg__foot svg { width: 14px; height: 14px; }
 
-.typing { align-self: flex-start; display: flex; gap: 4px; padding: 12px 14px; background: var(--bubble-in); border: 1px solid var(--border); border-radius: 16px; border-bottom-left-radius: 5px; }
+.typing { align-self: flex-start; display: flex; gap: 4px; padding: 12px 14px; background: var(--bubble-in); box-shadow: 0 1px 1px rgba(12,14,20,.05), 0 1px 3px rgba(12,14,20,.06); border-radius: 18px; border-bottom-left-radius: 6px; }
 .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); animation: bounce 1.2s infinite; }
 .typing span:nth-child(2) { animation-delay: .15s }
 .typing span:nth-child(3) { animation-delay: .3s }
