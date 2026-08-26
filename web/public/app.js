@@ -6360,11 +6360,47 @@ function renderCommunityChats() {
     renderCommunityChats();
     $('#commChatSearch').focus();
   });
+  /*
+   * Henrik am 26.08.2026: "Plus leitet zur Suche weiter. Es soll auf der
+   * Chats-Seite bleiben, neuer Kontakt oder neue Gruppe öffnet direkt."
+   *
+   * Vorher sprang das Plus in den Unterpunkt "Suchen" - man verlor die Liste
+   * und musste sich selbst zurueckfinden. Jetzt geht ein Menue auf, genau wie
+   * beim Plus in der Chatliste des Messengers.
+   */
   $('#commNewChat')?.addEventListener('click', () => {
-    // Im Community-Bereich sucht man nach Benutzernamen, nicht nach
-    // Telefonnummer - genau das unterscheidet ihn vom Messenger.
-    state.sub.communities = 'search';
-    render();
+    openSheet(
+      'Neu',
+      `<div class="sheet__body">
+         <button class="item" data-cneu="gruppe">
+           <span class="item__icon">${ICONS.people}</span>
+           <span class="item__label">Neue Gruppe</span>
+         </button>
+         <button class="item" data-cneu="kontakt">
+           <span class="item__icon">${ICONS.userPlus}</span>
+           <span class="item__label">Kontakt hinzufügen</span>
+         </button>
+         <button class="item" data-cneu="suchen">
+           <span class="item__icon">${ICONS.search}</span>
+           <span class="item__label">In Communitys suchen</span>
+         </button>
+       </div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-cneu]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const was = b.dataset.cneu;
+            close();
+            if (was === 'gruppe') return openNewGroup();
+            if (was === 'kontakt') return openAddContact();
+            // Nur dieser dritte Punkt fuehrt noch in die Suche - und zwar,
+            // weil man ihn ausdruecklich gewaehlt hat.
+            state.sub.communities = 'search';
+            render();
+          })
+        );
+      },
+      { schliessen: true }
+    );
   });
   main.querySelectorAll('[data-ccfilter]').forEach((p) =>
     p.addEventListener('click', () => {
@@ -6656,7 +6692,18 @@ function openChatSettings(chatId) {
 
 /* ---------------------------------------------------------- chat detail */
 async function openChat(chatId) {
-  let chat = state.chats.find((c) => c.id === chatId);
+  /*
+   * Henrik am 26.08.2026: "Einzelne Chats oder Gruppenchats im
+   * Community-Bereich lassen sich nicht öffnen."
+   *
+   * Der Grund stand hier: gesucht wurde in state.chats und in
+   * state.communities - die persoenlichen Chats des Community-Bereichs
+   * liegen aber in state.communityChats. Ein Klick fand nichts, die Funktion
+   * kehrte still zurueck, und auf dem Bildschirm passierte gar nichts.
+   */
+  let chat =
+    state.chats.find((c) => c.id === chatId) ||
+    (state.communityChats || []).find((c) => c.id === chatId);
 
   if (!chat) {
     const community = state.communities.find((c) => c.id === chatId);

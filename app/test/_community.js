@@ -160,6 +160,63 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-sheet-close]').catch(() => {});
   });
 
+  /* ------------------------------------------- Community-Chats */
+  console.log('\nCommunitys — Chats');
+
+  const zuDenChats = async () => {
+    await page.click('[data-area="communities"]');
+    await page.waitForTimeout(300);
+    await page.click('[data-sub="chats"]');
+    await page.waitForSelector('#commChatSearch');
+  };
+
+  await pruefe('Ein einzelner Chat laesst sich oeffnen', async () => {
+    await zuDenChats();
+    const zeilen = await page.$$('[data-chat]');
+    if (!zeilen.length) throw new Error('die Liste ist leer');
+    await zeilen[0].click();
+    await page.waitForTimeout(700);
+    if (!(await page.$('#chatBack'))) throw new Error('der Chat geht nicht auf');
+    await page.click('#chatBack');
+    await page.waitForTimeout(400);
+  });
+
+  await pruefe('Auch ein Gruppenchat laesst sich oeffnen', async () => {
+    await zuDenChats();
+    await page.click('[data-ccfilter="groups"]');
+    await page.waitForTimeout(300);
+    const zeilen = await page.$$('[data-chat]');
+    if (!zeilen.length) throw new Error('keine Gruppe in der Liste');
+    await zeilen[0].click();
+    await page.waitForTimeout(700);
+    if (!(await page.$('#chatBack'))) throw new Error('der Gruppenchat geht nicht auf');
+    await page.click('#chatBack');
+    await page.waitForTimeout(400);
+  });
+
+  await pruefe('Das Plus bleibt auf der Chats-Seite', async () => {
+    await zuDenChats();
+    await page.click('#commNewChat');
+    await page.waitForTimeout(500);
+    if (!(await page.$('[data-cneu]'))) throw new Error('es geht kein Menue auf');
+    const aktiv = await page.$eval('#topbar .is-active', (n) => n.dataset.sub);
+    if (aktiv !== 'chats') throw new Error('gesprungen nach „' + aktiv + '"');
+    await page.click('[data-sheet-close]').catch(() => {});
+    await page.waitForTimeout(300);
+  });
+
+  await pruefe('„Neue Gruppe" aus dem Menue oeffnet direkt', async () => {
+    await zuDenChats();
+    await page.click('#commNewChat');
+    await page.waitForTimeout(400);
+    await page.click('[data-cneu="gruppe"]');
+    await page.waitForTimeout(600);
+    const titel = await page.$eval('.sheet__title', (n) => n.textContent);
+    if (!titel.includes('Personen')) throw new Error('Blatt heisst „' + titel + '"');
+    await page.click('[data-sheet-close]').catch(() => {});
+    await page.waitForTimeout(300);
+  });
+
   const erfuellt = ergebnisse.filter(Boolean).length;
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
