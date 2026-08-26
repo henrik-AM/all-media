@@ -18,7 +18,8 @@
     "qrcode-terminal": "^0.12.0",
     "react": "19.2.3",
     "react-native": "0.86.2",
-    "react-native-safe-area-context": "~5.7.0"
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-webview": "^13.10.5"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
@@ -46,7 +47,7 @@
     "test:anhang": "node test/_anhang.js",
     "test:insel": "node test/_insel.js",
     "test:suche": "node test/_suche.js",
-    "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang && npm run test:einstellungen && npm run test:kontaktinfo && npm run test:henrik && npm run test:insel && npm run test:suche && npm run test:profil && npm run test:community && npm run test:chatoptionen && npm run test:player && npm run test:gesten && npm run test:feinschliff",
+    "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang && npm run test:einstellungen && npm run test:kontaktinfo && npm run test:henrik && npm run test:insel && npm run test:suche && npm run test:profil && npm run test:community && npm run test:chatoptionen && npm run test:player && npm run test:gesten && npm run test:feinschliff && npm run test:kamera",
     "test:einstellungen": "node test/_einstellungen.js",
     "test:kontaktinfo": "node test/_kontaktinfo.js",
     "wlan": "node tools/lokal.js",
@@ -58,7 +59,8 @@
     "test:chatoptionen": "node test/_chatoptionen.js",
     "test:player": "node test/_player.js",
     "test:gesten": "node test/_gesten.js",
-    "test:feinschliff": "node test/_feinschliff.js"
+    "test:feinschliff": "node test/_feinschliff.js",
+    "test:kamera": "node test/_kamera.js"
   },
   "private": true
 }

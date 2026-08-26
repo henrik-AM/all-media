@@ -11,19 +11,25 @@ const path = require('path');
 
 const app = express();
 
+/*
+ * `privat` steuert, wie man an eine Person herankommt: bei einem oeffentlichen
+ * Profil ist man mit einem Tippen befreundet, bei einem privaten geht erst
+ * eine Anfrage raus (Punkt 57). Es steht hier und nicht bei `profiles`, weil
+ * gerade die Leute, die man neu anfragt, dort keinen Eintrag haben.
+ */
 const users = {
-  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: 'linear-gradient(135deg,#FCA2BC,#E04570)', phone: '+49 151 2345678' },
-  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', initials: 'BM', color: 'linear-gradient(135deg,#75DCF2,#1791BA)', phone: '+49 152 3456789' },
-  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', initials: 'CW', color: 'linear-gradient(135deg,#FBD277,#D88F1C)', phone: '+49 160 4567890' },
-  u4: { id: 'u4', name: 'David König', handle: '@david', initials: 'DK', color: 'linear-gradient(135deg,#9FDD84,#419A32)', phone: '+49 171 5678901' },
-  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 172 6789012' },
-  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: 'linear-gradient(135deg,#93AEFF,#4152D8)', phone: '+49 173 7890123' },
+  u1: { id: 'u1', privat: false, name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: 'linear-gradient(135deg,#FCA2BC,#E04570)', phone: '+49 151 2345678' },
+  u2: { id: 'u2', privat: true, name: 'Bob Müller', handle: '@bob', initials: 'BM', color: 'linear-gradient(135deg,#75DCF2,#1791BA)', phone: '+49 152 3456789' },
+  u3: { id: 'u3', privat: false, name: 'Clara Weber', handle: '@clara', initials: 'CW', color: 'linear-gradient(135deg,#FBD277,#D88F1C)', phone: '+49 160 4567890' },
+  u4: { id: 'u4', privat: false, name: 'David König', handle: '@david', initials: 'DK', color: 'linear-gradient(135deg,#9FDD84,#419A32)', phone: '+49 171 5678901' },
+  u5: { id: 'u5', privat: true, name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 172 6789012' },
+  u6: { id: 'u6', privat: false, name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: 'linear-gradient(135deg,#93AEFF,#4152D8)', phone: '+49 173 7890123' },
   me: { id: 'me', name: 'Du', handle: '@henrik', initials: 'DU', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 170 1234567' },
   // Diese drei stehen bewusst NICHT in den Kontakten - sonst laesst sich
   // "Kontakt hinzufuegen" gar nicht ausprobieren.
-  u7: { id: 'u7', name: 'Greta Hoffmann', handle: '@greta', initials: 'GH', color: 'linear-gradient(135deg,#FBA0C4,#DC3F7C)', phone: '+49 174 8901234' },
-  u8: { id: 'u8', name: 'Hakan Demir', handle: '@hakan', initials: 'HD', color: 'linear-gradient(135deg,#6FE2D0,#12907F)', phone: '+49 175 9012345' },
-  u9: { id: 'u9', name: 'Ida Nowak', handle: '@ida', initials: 'IN', color: 'linear-gradient(135deg,#C4A4F7,#7C46EE)', phone: '+49 176 0123456' },
+  u7: { id: 'u7', privat: true, name: 'Greta Hoffmann', handle: '@greta', initials: 'GH', color: 'linear-gradient(135deg,#FBA0C4,#DC3F7C)', phone: '+49 174 8901234' },
+  u8: { id: 'u8', privat: false, name: 'Hakan Demir', handle: '@hakan', initials: 'HD', color: 'linear-gradient(135deg,#6FE2D0,#12907F)', phone: '+49 175 9012345' },
+  u9: { id: 'u9', privat: false, name: 'Ida Nowak', handle: '@ida', initials: 'IN', color: 'linear-gradient(135deg,#C4A4F7,#7C46EE)', phone: '+49 176 0123456' },
 };
 
 // --- Person finden: Benutzername ODER Telefonnummer ------------------------
@@ -264,6 +270,18 @@ const comments = {
  */
 function mitKommentarzahl(eintraege) {
   return eintraege.map((e) => ({ ...e, comments: (comments[e.id] || []).length }));
+}
+
+/*
+ * Punkt 42: derselbe Grund wie bei der Kommentarzahl. Ob man einer Person
+ * folgt, steht im Profil - nicht am einzelnen Beitrag. Beim Ausliefern wird
+ * es von dort geholt, sonst behauptet der Feed etwas anderes als das Profil.
+ */
+function mitFolgezustand(eintraege) {
+  return eintraege.map((e) => ({
+    ...e,
+    following: !!(profiles[e.userId] && profiles[e.userId].following_me),
+  }));
 }
 
 const posts = [
@@ -596,16 +614,21 @@ app.get('/api/bootstrap', (req, res) => {
   // Einstellungen.
   const blockiert = Object.keys(profiles).filter((id) => profiles[id].blocked);
   const stummgeschaltet = Object.keys(profiles).filter((id) => profiles[id].muted);
+  // Punkt 57: wer ein privates Profil hat, bekommt eine Anfrage statt einer
+  // sofortigen Freundschaft. Die Oberflaeche muss das vorher wissen, damit
+  // der Knopf gleich richtig beschriftet ist.
+  const privateProfile = Object.keys(users).filter((id) => users[id].privat);
 
   res.json({
     users, chats, stories, contacts, communities,
     // Die Kommentarzahl kommt aus der echten Liste, siehe mitKommentarzahl.
     videos: mitKommentarzahl(videos),
-    posts: mitKommentarzahl(posts),
+    posts: mitFolgezustand(mitKommentarzahl(posts)),
     clips: mitKommentarzahl(clips),
     communityChats,
     archiviert,
     hashtags, sounds, places, friends, gefolgt, ungelesen, blockiert, stummgeschaltet,
+    privateProfile,
   });
 });
 
@@ -972,6 +995,13 @@ app.post('/api/communities', (req, res) => {
 let eigeneNummer = 0;
 const eigeneId = (praefix) => `${praefix}_e${++eigeneNummer}`;
 
+/*
+ * Punkt 38: die Musik kommt jetzt aus dem Erstellen-Formular. Ohne Angabe
+ * bleibt es beim Originalton - das ist auch, was ein Beitrag ohne gewaehlten
+ * Sound wirklich hat.
+ */
+const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
+
 app.post('/api/eigene/beitrag', (req, res) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
   if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
@@ -980,7 +1010,7 @@ app.post('/api/eigene/beitrag', (req, res) => {
     id: eigeneId('p'),
     userId: 'me',
     location: String(req.body?.ort || '').trim() || 'Ohne Ort',
-    music: 'Originalton',
+    music: musikAus(req.body),
     description: beschreibung,
     likedBy: '',
     likes: 0,
@@ -1026,7 +1056,7 @@ app.post('/api/eigene/video', (req, res) => {
     userId: 'me',
     description: beschreibung,
     location: String(req.body?.ort || '').trim() || 'Ohne Ort',
-    music: 'Originalton',
+    music: musikAus(req.body),
     likes: 0,
     comments: 0,
     shares: 0,
@@ -1279,23 +1309,33 @@ app.get('/api/profile/:userId', (req, res) => {
   res.json({ ...person, ...profile, grid: gridItems[userId] || [] });
 });
 
+/*
+ * Punkt 42: Folgen wirkt auf beiden Seiten. Der andere bekommt einen Follower
+ * mehr - und die eigene Zahl "Gefolgt" steigt mit. Vorher stand sie fest bei
+ * 186, egal wem man folgte: die Zahl im eigenen Profil war blosse Zierde.
+ */
+function folgenUmschalten(profil) {
+  profil.following_me = !profil.following_me;
+  profil.followers += profil.following_me ? 1 : -1;
+  profiles.me.following += profil.following_me ? 1 : -1;
+  return profil.following_me;
+}
+
 /** Einem Video-Autor folgen oder entfolgen. */
 app.post('/api/autoren/:userId/follow', (req, res) => {
   const profil = profiles[req.params.userId];
   if (!profil) return res.json({ ok: false, error: 'Profil nicht gefunden' });
 
-  profil.following_me = !profil.following_me;
-  profil.followers += profil.following_me ? 1 : -1;
-  res.json({ ok: true, following: profil.following_me, followers: profil.followers });
+  const folgt = folgenUmschalten(profil);
+  res.json({ ok: true, following: folgt, followers: profil.followers });
 });
 
 app.post('/api/profile/:userId/follow', (req, res) => {
   const profile = profiles[req.params.userId];
   if (!profile) return res.status(404).json({ error: 'Nicht gefunden' });
 
-  profile.following_me = !profile.following_me;
-  profile.followers += profile.following_me ? 1 : -1;
-  res.json({ following_me: profile.following_me, followers: profile.followers });
+  const folgt = folgenUmschalten(profile);
+  res.json({ following_me: folgt, followers: profile.followers });
 });
 
 app.get('/api/comments/:targetId', (req, res) => {
@@ -1346,7 +1386,16 @@ app.post('/api/posts/:id/:action', (req, res) => {
   } else if (action === 'save') {
     post.saved = !post.saved;
   } else if (action === 'follow') {
-    post.following = !post.following;
+    /*
+     * Punkt 42: Folgen am Beitrag war bisher ein Merkmal der einen Kachel -
+     * das Profil des Autors und die eigene "Gefolgt"-Zahl blieben davon
+     * unberuehrt, und zwei Beitraege derselben Person konnten sich
+     * widersprechen. Jetzt laeuft es ueber dasselbe Umschalten wie ueberall
+     * sonst, und alle Beitraege dieser Person ziehen mit.
+     */
+    const profil = profiles[post.userId];
+    const folgt = profil ? folgenUmschalten(profil) : !post.following;
+    for (const p of posts) if (p.userId === post.userId) p.following = folgt;
   } else if (action === 'notify') {
     post.notify = !post.notify;
   } else if (action === 'repost') {
@@ -1602,7 +1651,22 @@ app.post('/api/contacts', (req, res) => {
     return res.json({ ok: false, error: `${person.name} ist bereits in deinen Kontakten` });
   }
 
-  const contact = { id: person.id, name: person.name, status: 'pending', about: 'Anfrage gesendet', phone: person.phone };
+  /*
+   * Punkt 57: bei einem privaten Profil bleibt die Anfrage offen, bis die
+   * Person sie annimmt - bis dahin ist der Chat gesperrt. Ein oeffentliches
+   * Profil nimmt sie sofort an; dort waere ein Warten auf eine Freigabe, die
+   * niemand geben muss, nur eine Huerde ohne Zweck. Der Knopf heisst darum
+   * auch verschieden: "Anfrage senden" gegen "+ Befreunden".
+   */
+  const privat = !!person.privat;
+
+  const contact = {
+    id: person.id,
+    name: person.name,
+    status: privat ? 'pending' : 'friend',
+    about: privat ? 'Anfrage gesendet' : 'Kontakt',
+    phone: person.phone,
+  };
   contacts.push(contact);
 
   // Chat zur Anfrage anlegen. Bis zur Annahme ist genau die eine
@@ -1613,17 +1677,17 @@ app.post('/api/contacts', (req, res) => {
     id: 'c' + Date.now(),
     userId: person.id,
     name: person.name,
-    preview: text || 'Anfrage gesendet',
+    preview: text || (privat ? 'Anfrage gesendet' : 'Neuer Kontakt'),
     time,
     unread: 0,
     muted: false,
     isGroup: false,
-    requestState: 'pending',
+    requestState: privat ? 'pending' : 'accepted',
   };
   chats.unshift(chat);
   messages[chat.id] = text ? [{ id: 'm' + Date.now(), from: 'me', text, time }] : [];
 
-  res.json({ ok: true, contact, chat });
+  res.json({ ok: true, contact, chat, privat });
 });
 
 /** Person zu einer Nummer oder einem Benutzernamen nachschlagen. */

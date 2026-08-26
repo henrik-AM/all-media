@@ -135,7 +135,10 @@ if (!fs.existsSync(BILD)) {
     await page.click('[data-oact="create"]');
     await page.waitForSelector('.erstellen', { timeout: 3000 });
     const punkte = await page.$$eval('.erstellen__punkt', (els) => els.map((e) => e.textContent.trim()));
-    const soll = ['Reels', 'Querformat', 'Beitrag', 'Story', 'Highlight', 'Playlist', 'Livestream', 'Spendenaktion'];
+    // Punkt 45: Livestream steht direkt unter Story - beides ist im
+    // Augenblick aufgenommen. Highlight und Playlist sortieren dagegen
+    // vorhandene Beitraege und stehen darum darunter.
+    const soll = ['Reels', 'Querformat', 'Beitrag', 'Story', 'Livestream', 'Highlight', 'Playlist', 'Spendenaktion'];
     if (JSON.stringify(punkte) !== JSON.stringify(soll)) throw new Error(punkte.join(' | '));
     await page.click('[data-sheet-close]');
   });

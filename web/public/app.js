@@ -700,9 +700,30 @@ function chatOptionen(chatId) {
 
   const archiviert = (state.archiviert || []).includes(chatId);
 
+  /*
+   * Punkt 15: das Blatt sah aus wie eine nackte Liste. WhatsApp zeigt beim
+   * langen Druecken zuerst, um wen es ueberhaupt geht - Bild, Name, Zustand -
+   * und setzt das Loeschen von den harmlosen Punkten ab. Genau das hier:
+   * Kopfzeile mit Avatar, darunter die Aktionen, das Loeschen abgetrennt.
+   */
+  const zustand = chat.isGroup
+    ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder`
+    : archiviert
+      ? 'Im Archiv'
+      : chat.muted
+        ? 'Stummgeschaltet'
+        : 'Online';
+
   openSheet(
     chat.name,
-    `<button class="item" data-copt="archiv">
+    `<div class="coptkopf">
+      ${avatarOf(chat, 54)}
+      <div class="coptkopf__text">
+        <div class="coptkopf__name">${esc(chat.name)}</div>
+        <div class="coptkopf__sub">${esc(zustand)}</div>
+      </div>
+    </div>
+    <button class="item" data-copt="archiv">
       <span class="item__icon">${ICONS.bookmark}</span>
       <span class="item__label">${archiviert ? 'Aus dem Archiv holen' : 'Archivieren'}</span>
     </button>
@@ -719,6 +740,7 @@ function chatOptionen(chatId) {
       <span class="item__label">Chat-Einstellungen</span>
       <span class="row__chevron">${ICONS.chevron}</span>
     </button>
+    <div class="copt__trenner"></div>
     <button class="item item--danger" data-copt="loeschen">
       <span class="item__icon">${ICONS.trash || ICONS.close}</span>
       <span class="item__label">Chat löschen</span>
@@ -892,45 +914,162 @@ function videoStandbild(datei) {
   });
 }
 
-/** Dateiauswahl oeffnen und das Ergebnis als eigene Story uebernehmen. */
-function storyAufnehmen(art = 'photo') {
-  const feld = document.createElement('input');
-  feld.type = 'file';
-  feld.accept = art === 'photo' ? 'image/*' : 'video/*';
-  feld.capture = 'environment';
-  feld.style.display = 'none';
-  document.body.appendChild(feld);
+/**
+ * Aufnahme oder Galeriebild holen und als Datenadresse zurueckgeben.
+ * `ausGalerie` laesst das capture-Kennzeichen weg, damit das Handy den
+ * Bildordner statt der Kamera oeffnet (Punkt 18).
+ */
+async function aufnahmeHolen(art = 'photo', ausGalerie = false) {
+  const datei = await dateiWaehlen(art, ausGalerie);
+  if (!datei) return null;
 
-  feld.addEventListener('change', async () => {
-    const datei = feld.files && feld.files[0];
-    feld.remove();
-    if (!datei) return;
-
-    try {
-      // Vom Video wird das erste Standbild genommen - so hat die Story auch
-      // dann ein Bild, wenn das Video selbst nicht abgespielt werden kann.
-      const bild = art === 'video' ? await videoStandbild(datei) : await bildVerkleinern(datei);
-      if (!bild) {
-        toast('Aus dieser Aufnahme ließ sich kein Bild gewinnen');
-        return;
-      }
-      const eigene = { mediaUri: bild, aufgenommen: Date.now() };
-      eigeneStorySichern(eigene);
-
-      const s = state.stories.find((x) => x.own);
-      if (s) {
-        s.mediaUri = eigene.mediaUri;
-        s.aufgenommen = eigene.aufgenommen;
-        s.viewed = false;
-      }
-      toast('Deine Story ist online');
-      render();
-    } catch (e) {
-      toast('Aufnahme konnte nicht gelesen werden');
+  try {
+    // Vom Video wird das erste Standbild genommen - so hat die Aufnahme auch
+    // dann ein Bild, wenn das Video selbst nicht abgespielt werden kann.
+    const bild = art === 'video' ? await videoStandbild(datei) : await bildVerkleinern(datei);
+    if (!bild) {
+      toast('Aus dieser Aufnahme ließ sich kein Bild gewinnen');
+      return null;
     }
-  });
+    return bild;
+  } catch {
+    toast('Aufnahme konnte nicht gelesen werden');
+    return null;
+  }
+}
 
-  feld.click();
+/** Ein fertiges Bild als eigene Story setzen. */
+function alsStorySetzen(bild) {
+  const eigene = { mediaUri: bild, aufgenommen: Date.now() };
+  eigeneStorySichern(eigene);
+
+  const s = state.stories.find((x) => x.own);
+  if (s) {
+    s.mediaUri = eigene.mediaUri;
+    s.aufgenommen = eigene.aufgenommen;
+    s.viewed = false;
+  }
+  toast('Deine Story ist online');
+  render();
+}
+
+/** Dateiauswahl oeffnen und das Ergebnis als eigene Story uebernehmen. */
+async function storyAufnehmen(art = 'photo', ausGalerie = false) {
+  const bild = await aufnahmeHolen(art, ausGalerie);
+  if (bild) alsStorySetzen(bild);
+}
+
+/*
+ * Punkt 17: die Kamera nimmt auf und fragt danach, was mit der Aufnahme
+ * geschehen soll. Vorher landete jedes Foto stillschweigend in der Story -
+ * wer es jemandem schicken wollte, musste den Umweg ueber den Chat nehmen.
+ */
+async function aufnahmeVerwenden(art = 'photo', ausGalerie = false) {
+  const bild = await aufnahmeHolen(art, ausGalerie);
+  if (bild) aufnahmeMenue(bild);
+}
+
+/** Die Frage selbst - getrennt, weil die Kamera im Overlay sie auch braucht. */
+function aufnahmeMenue(bild) {
+  const punkte = [
+    { key: 'story', label: 'Zu deiner Story hinzufügen', icon: 'camera' },
+    { key: 'chat', label: 'An einen Chat senden', icon: 'chat' },
+    { key: 'beitrag', label: 'Als Beitrag veröffentlichen', icon: 'image' },
+  ];
+
+  openSheet(
+    'Was möchtest du damit machen?',
+    `<div class="sheet__body">
+       <div class="aufnahme__vorschau" style="background-image:url(${bild})"></div>
+       ${punkte
+         .map(
+           (p) => `<button class="item" data-verwenden="${p.key}">
+             <span class="item__icon">${ICONS[p.icon]}</span>
+             <span class="item__label">${esc(p.label)}</span>
+             <span class="row__chevron">${ICONS.chevron}</span>
+           </button>`
+         )
+         .join('')}
+     </div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-verwenden]').forEach((b) =>
+        b.addEventListener('click', () => {
+          close();
+          if (b.dataset.verwenden === 'story') return alsStorySetzen(bild);
+          if (b.dataset.verwenden === 'chat') return aufnahmeAnChat(bild);
+          aufnahmeAlsBeitrag(bild);
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/** Aufnahme in einen Chat schicken - erst fragen, in welchen. */
+function aufnahmeAnChat(bild) {
+  const auswahl = state.chats.filter((c) => c.requestState !== 'pending');
+  if (!auswahl.length) return toast('Du hast noch keinen Chat, in den das passt');
+
+  openSheet(
+    'An welchen Chat?',
+    `<div class="sheet__body">${auswahl
+      .map(
+        (c) => `<button class="item" data-zielchat="${c.id}">
+          <span class="item__icon">${ICONS.chat}</span>
+          <span class="item__label">${esc(c.name)}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`
+      )
+      .join('')}</div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-zielchat]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          close();
+          const chat = state.chats.find((c) => c.id === b.dataset.zielchat);
+          const res = await fetch(`/api/messages/${chat.id}/anhang`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ art: 'foto' }),
+          });
+          const daten = await res.json();
+          if (!daten.ok) return toast(daten.error);
+
+          eigenesMediumSichern(daten.message.id, bild);
+          state.messages.push(daten.message);
+          toast(`An ${chat.name} gesendet`);
+          openChat(chat.id);
+        })
+      );
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/** Aufnahme als Beitrag veroeffentlichen - Beschreibung und Ort dazu. */
+function aufnahmeAlsBeitrag(bild) {
+  openFormular(
+    'Neuer Beitrag',
+    [
+      { key: 'beschreibung', label: 'Beschreibung', typ: 'mehrzeilig', pflicht: true },
+      { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
+    ],
+    async (werte) => {
+      const res = await fetch('/api/eigene/beitrag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...werte, format: 'hoch' }),
+      });
+      const daten = await res.json();
+      if (!daten.ok) return daten.error;
+
+      eigenesMediumSichern((daten.beitrag || daten.video || daten.clip).id, bild);
+      state.area = 'videos';
+      state.sub.videos = 'home';
+      await bootstrap();
+      toast('Beitrag veröffentlicht');
+    },
+    'Veröffentlichen'
+  );
 }
 
 function storyRail() {
@@ -2549,6 +2688,12 @@ function renderHomeFeed() {
       const updated = await res.json();
       const idx = state.posts.findIndex((p) => p.id === updated.id);
       state.posts[idx] = updated;
+
+      // Punkt 42: Folgen gilt der Person, nicht dem einzelnen Beitrag - alle
+      // ihre Beitraege im Feed ziehen mit, sonst widersprechen sie sich.
+      if (paction === 'follow') {
+        for (const p of state.posts) if (p.userId === updated.userId) p.following = updated.following;
+      }
 
       if (paction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (paction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
@@ -4177,7 +4322,9 @@ function renderCameraPage() {
     </div>`;
 
   $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
-  $('#camGallery').addEventListener('click', () => storyAufnehmen('photo'));
+  // Punkt 18: das Bildsymbol geht in die Galerie, nicht noch einmal in die
+  // Kamera - dafuer ist der Ausloeser in der Mitte da.
+  $('#camGallery').addEventListener('click', () => aufnahmeVerwenden(mode, true));
   $('#camSwitch').addEventListener('click', () => toast('Kamera gewechselt'));
 
   main.querySelectorAll('.camera__mode').forEach((b) =>
@@ -4189,11 +4336,11 @@ function renderCameraPage() {
 
   $('#camShutter').addEventListener('click', (e) => {
     const btn = e.currentTarget;
-    if (mode === 'photo') return storyAufnehmen('photo');
+    if (mode === 'photo') return aufnahmeVerwenden('photo');
     recording = !recording;
     btn.classList.toggle('is-rec', recording);
     if (recording) return toast('Aufnahme gestartet');
-    storyAufnehmen('video');
+    aufnahmeVerwenden('video');
   });
 }
 
@@ -5102,9 +5249,12 @@ const ERSTELLEN_VIDEOS = [
   { key: 'landscape', label: 'Querformat', icon: 'landscape' },
   { key: 'post', label: 'Beitrag', icon: 'image' },
   { key: 'story', label: 'Story', icon: 'camera' },
+  // Livestream steht direkt unter Story: beides ist im Augenblick aufgenommen
+  // und nach kurzer Zeit wieder weg. Highlight und Playlist sortieren dagegen
+  // vorhandene Beitraege und gehoeren darum weiter nach unten.
+  { key: 'livestream', label: 'Livestream', icon: 'video' },
   { key: 'highlight', label: 'Highlight', icon: 'folder' },
   { key: 'playlist', label: 'Playlist', icon: 'ebenen' },
-  { key: 'livestream', label: 'Livestream', icon: 'video' },
   { key: 'spende', label: 'Spendenaktion', icon: 'heart' },
 ];
 
@@ -6489,7 +6639,13 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
     const eingabe =
       f.typ === 'mehrzeilig'
         ? `<textarea ${gemeinsam} rows="3">${esc(f.wert || '')}</textarea>`
-        : `<input ${gemeinsam} type="${f.typ === 'zahl' ? 'number' : 'text'}" value="${esc(f.wert || '')}">`;
+        : // Punkt 38: eine Auswahl statt eines Textfelds - Musik tippt man
+          // nicht ab, man sucht sie aus dem aus, was es gibt.
+          f.typ === 'auswahl'
+          ? `<select id="f_${f.key}">${(f.auswahl || [])
+              .map((w) => `<option value="${esc(w)}" ${w === f.wert ? 'selected' : ''}>${esc(w)}</option>`)
+              .join('')}</select>`
+          : `<input ${gemeinsam} type="${f.typ === 'zahl' ? 'number' : 'text'}" value="${esc(f.wert || '')}">`;
     return `<div class="sheet__field">
       <label class="sheet__label" for="f_${f.key}">${esc(f.label)}</label>
       ${eingabe}
@@ -6501,6 +6657,7 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
     `<div class="sheet__body">${felder.map(feldHtml).join('')}</div>
      <div class="sheet__footer"><button class="prof__btn is-primary" id="formOk">${esc(knopf)}</button></div>`,
     (sheet, close) => {
+      // Eine Auswahl bekommt keinen Fokus - sonst klappt sie beim Oeffnen auf.
       const ersteseingabe = sheet.querySelector('input, textarea');
       setTimeout(() => ersteseingabe?.focus(), 80);
 
@@ -6597,6 +6754,15 @@ async function erstelle(was) {
     [
       { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true },
       { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
+      // Punkt 38: Musik zum Beitrag. Zur Wahl steht, was es an Sounds gibt -
+      // dieselbe Liste, die auch hinter den Sound-Seiten steckt.
+      {
+        key: 'music',
+        label: 'Musik',
+        typ: 'auswahl',
+        auswahl: ['Originalton', ...(state.sounds || []).map((s) => `${s.title} – ${s.artist}`)],
+        wert: 'Originalton',
+      },
     ],
     async (werte) => {
       const ziel = istBild ? '/api/eigene/beitrag' : '/api/eigene/video';
@@ -7248,13 +7414,29 @@ function renderCommunitySearch() {
           ? // Punkt 55: die Liste heisst nach dem, was drinsteht. "Kanäle"
             // ist der Name der Unterthemen INNERHALB einer Community - hier
             // stehen aber die Communitys selbst.
-            `${chans.length ? `<div class="exp__head">Communitys →</div><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
+            // Punkt 56: die beiden Ueberschriften waren tote <div>s mit einem
+            // Pfeil daran. Jetzt fuehren sie auf die Liste mit nur dieser
+            // Kategorie - derselbe Weg wie bei den Kategorien der Video-Suche.
+            `${chans.length ? `<button class="exp__head" data-csmehr="channels">Communitys →</button><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
              ${
                people.length
-                 ? `<div class="exp__head">Profile →</div><ul class="rows">${people
+                 ? `<button class="exp__head" data-csmehr="people">Profile →</button><ul class="rows">${people
                      .map((u) => {
                        const st = statusOf(u.id);
-                       const label = st === 'friend' ? 'Befreundet' : st === 'pending' ? 'Angefragt' : '+ Befreunden';
+                       /*
+                        * Punkt 57: bei einem privaten Profil geht erst eine
+                        * Anfrage raus. "+ Befreunden" waere dort ein
+                        * Versprechen, das der Knopf nicht halten kann.
+                        */
+                       const privat = (state.privateProfile || []).includes(u.id);
+                       const label =
+                         st === 'friend'
+                           ? 'Befreundet'
+                           : st === 'pending'
+                             ? 'Angefragt'
+                             : privat
+                               ? 'Anfrage senden'
+                               : '+ Befreunden';
                        return `<li><div class="row">
                           <span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>
                           <div class="row__body" data-profile="${u.id}">
@@ -7294,6 +7476,13 @@ function renderCommunitySearch() {
       renderCommunitySearch();
     })
   );
+  // Punkt 56: die Ueberschrift schaltet auf genau diese Kategorie um.
+  main.querySelectorAll('[data-csmehr]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.commSearchFilter = b.dataset.csmehr;
+      renderCommunitySearch();
+    })
+  );
   main.querySelectorAll('[data-community]').forEach((r) =>
     r.addEventListener('click', () => openChat(r.dataset.community))
   );
@@ -7310,7 +7499,10 @@ function renderCommunitySearch() {
       const result = await res.json();
       if (!result.ok) return toast(result.error);
       state.contacts.push(result.contact);
-      toast(`Anfrage an ${u.name} gesendet`);
+      if (result.chat) state.chats.unshift(result.chat);
+      // Punkt 57: die Meldung sagt, was wirklich passiert ist - bei einem
+      // privaten Profil laeuft eine Anfrage, sonst steht der Kontakt schon.
+      toast(result.privat ? `Anfrage an ${u.name} gesendet` : `${u.name} ist jetzt dein Kontakt`);
       renderCommunitySearch();
     })
   );
@@ -7778,7 +7970,8 @@ async function openChat(chatId) {
     )
   );
   $('#attach').addEventListener('click', () => openAnhang(chat));
-  $('#camBtn').addEventListener('click', openCamera);
+  // Aus dem Chat heraus steht das Ziel fest: die Aufnahme geht hierher.
+  $('#camBtn').addEventListener('click', () => openCamera(chat));
 
   const input = $('#msgInput');
   const sendBtn = $('#sendBtn');
@@ -8229,7 +8422,13 @@ function openStory(storyId) {
 }
 
 /* ---------------------------------------------------------- camera */
-function openCamera() {
+/*
+ * `zielChat` gesetzt heisst: die Kamera wurde aus einem Chat heraus geoeffnet.
+ * Dann steht das Ziel schon fest und die Aufnahme geht ohne Rueckfrage dorthin
+ * - wer aus einem Chat die Kamera aufmacht, will das Bild diesem Chat
+ * schicken, nicht erst wieder gefragt werden.
+ */
+function openCamera(zielChat = null) {
   let mode = 'photo';
   let recording = false;
 
@@ -8257,28 +8456,36 @@ function openCamera() {
     closeOverlay();
   };
 
+  /** Aufnahme fertig: entweder in den Chat, aus dem sie kam, oder zur Wahl. */
+  const aufnahmeFertig = async (bild) => {
+    if (!zielChat) {
+      closeOverlay();
+      return aufnahmeMenue(bild);
+    }
+
+    const res = await fetch(`/api/messages/${zielChat.id}/anhang`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ art: 'foto' }),
+    });
+    const daten = await res.json();
+    if (!daten.ok) return toast(daten.error);
+
+    eigenesMediumSichern(daten.message.id, bild);
+    state.messages.push(daten.message);
+    closeOverlay();
+    openChat(zielChat.id);
+    toast('Foto gesendet');
+  };
+
   $('#camClose').addEventListener('click', close);
   $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
   // Aus der Galerie statt aus der Kamera - dieselbe Aufnahme, nur ohne
   // capture-Kennzeichen, damit das Handy den Bildordner oeffnet.
   $('#camGallery').addEventListener('click', async () => {
-    const datei = await dateiWaehlen('photo', true);
-    if (!datei) return;
-    try {
-      const bild = await bildVerkleinern(datei);
-      eigeneStorySichern({ mediaUri: bild, aufgenommen: Date.now() });
-      const eigene = state.stories.find((x) => x.own);
-      if (eigene) {
-        eigene.mediaUri = bild;
-        eigene.aufgenommen = Date.now();
-        eigene.viewed = false;
-      }
-      closeOverlay();
-      toast('Deine Story ist online');
-      render();
-    } catch {
-      toast('Bild konnte nicht gelesen werden');
-    }
+    const bild = await aufnahmeHolen('photo', true);
+    if (!bild) return;
+    aufnahmeFertig(bild);
   });
   $('#camSwitch').addEventListener('click', () => toast('Kamera gewechselt'));
 
@@ -8289,15 +8496,21 @@ function openCamera() {
     })
   );
 
-  $('#camShutter').addEventListener('click', (e) => {
+  // Punkt 17: aufnehmen und danach fragen, wohin damit - statt nur einen
+  // Hinweis auszugeben, bei dem die Aufnahme nirgends ankam.
+  $('#camShutter').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     if (mode === 'photo') {
-      toast('Foto aufgenommen');
+      const bild = await aufnahmeHolen('photo');
+      if (bild) aufnahmeFertig(bild);
       return;
     }
     recording = !recording;
     btn.classList.toggle('is-rec', recording);
-    toast(recording ? 'Aufnahme gestartet' : 'Aufnahme gespeichert');
+    if (recording) return toast('Aufnahme gestartet');
+
+    const bild = await aufnahmeHolen('video');
+    if (bild) aufnahmeFertig(bild);
   });
 }
 

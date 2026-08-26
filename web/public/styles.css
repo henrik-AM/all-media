@@ -857,6 +857,27 @@ ul { margin: 0; padding: 0; list-style: none; }
 .item--danger { color: var(--danger); }
 .item--danger .item__icon { background: rgba(229,72,77,.12); color: var(--danger); }
 
+/* Kopfzeile im Optionen-Blatt eines Chats: erst zeigen, um wen es geht. */
+.coptkopf {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 4px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.coptkopf__text { min-width: 0; }
+.coptkopf__name {
+  font-size: 16.5px;
+  font-weight: 650;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coptkopf__sub { margin-top: 2px; font-size: 13px; color: var(--text-2); }
+/* Das Loeschen steht abgesetzt - es ist die einzige Aktion ohne Rueckweg. */
+.copt__trenner { height: 8px; background: var(--surface-2); }
+
 .switch {
   flex: 0 0 auto;
   width: 44px; height: 26px;
@@ -1271,6 +1292,17 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .sheet--tall { display: flex; flex-direction: column; height: 74%; padding-bottom: 0; }
 .sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 0; }
+
+/* Die eben gemachte Aufnahme steht ueber der Frage, was damit geschehen
+   soll - sonst waehlt man blind zwischen drei Zielen. */
+.aufnahme__vorschau {
+  height: 168px;
+  margin: 0 16px 12px;
+  border-radius: 14px;
+  background-color: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+}
 
 .sheet__field { padding: 12px 16px; }
 .sheet__field input {

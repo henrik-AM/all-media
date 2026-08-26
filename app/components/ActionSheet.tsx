@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
@@ -16,16 +16,22 @@ interface Props {
   visible: boolean;
   title: string;
   items: ActionSheetItem[];
+  /**
+   * Bild, um das es in diesem Blatt geht — die eben gemachte Aufnahme. Ohne
+   * sie wählt man blind zwischen den Zielen.
+   */
+  vorschauUri?: string;
   onSelect: (key: string) => void;
   onClose: () => void;
 }
 
-export const ActionSheet = ({ visible, title, items, onSelect, onClose }: Props) => (
+export const ActionSheet = ({ visible, title, items, vorschauUri, onSelect, onClose }: Props) => (
   <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
     <Druck style={styles.backdrop} onPress={onClose} />
     <View style={styles.sheet}>
       <View style={styles.handle} />
       <Text style={styles.title}>{title}</Text>
+      {vorschauUri && <Image source={{ uri: vorschauUri }} style={styles.vorschau} />}
       {items.map((item) => (
         <Druck
           key={item.key}
@@ -78,6 +84,14 @@ const styles = themenStyles((colors) => ({
     borderBottomColor: colors.border,
   },
   itemPressed: { backgroundColor: colors.surface2 },
+  vorschau: {
+    height: 168,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: 4,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface2,
+  },
   icon: {
     width: 34,
     height: 34,

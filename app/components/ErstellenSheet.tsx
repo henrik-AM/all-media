@@ -41,9 +41,12 @@ const VIDEOS: { key: ErstellenPunkt; label: string; symbol: Symbol }[] = [
   { key: 'landscape', label: 'Querformat', symbol: 'tv-outline' },
   { key: 'post', label: 'Beitrag', symbol: 'image-outline' },
   { key: 'story', label: 'Story', symbol: 'camera-outline' },
+  // Livestream steht direkt unter Story: beides ist im Augenblick
+  // aufgenommen und nach kurzer Zeit wieder weg. Highlight und Playlist
+  // sortieren dagegen vorhandene Beiträge und gehören darum weiter nach unten.
+  { key: 'livestream', label: 'Livestream', symbol: 'videocam-outline' },
   { key: 'highlight', label: 'Highlight', symbol: 'folder-outline' },
   { key: 'playlist', label: 'Playlist', symbol: 'layers-outline' },
-  { key: 'livestream', label: 'Livestream', symbol: 'videocam-outline' },
   { key: 'spende', label: 'Spendenaktion', symbol: 'heart-outline' },
 ];
 

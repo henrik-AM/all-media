@@ -5,6 +5,7 @@ import { } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { ActionSheet } from '../../components/ActionSheet';
 import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { uploadImage } from '../../lib/supabaseStorage';
 
@@ -15,13 +16,42 @@ interface Props {
   embedded?: boolean;
   onClose: () => void;
   onCaptured?: (uri: string) => void;
+  /** Aufnahme in einen Chat schicken. */
+  onAnChat?: (uri: string) => void;
+  /** Aufnahme als Beitrag veröffentlichen. */
+  onAlsBeitrag?: (uri: string) => void;
+  /**
+   * Steht das Ziel schon fest — die Kamera kam aus einem Chat —, geht die
+   * Aufnahme ohne Rückfrage dorthin.
+   */
+  direktZu?: (uri: string) => void;
   onNotice: (message: string) => void;
 }
 
-export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }: Props) => {
+/*
+ * Punkt 17: die Kamera nimmt auf und fragt danach, was mit der Aufnahme
+ * geschehen soll. Vorher landete jedes Foto stillschweigend in der Story —
+ * wer es jemandem schicken wollte, musste den Umweg über den Chat nehmen.
+ */
+const ZIELE = [
+  { key: 'story', label: 'Zu deiner Story hinzufügen', icon: 'camera-outline' as const },
+  { key: 'chat', label: 'An einen Chat senden', icon: 'chatbubble-outline' as const },
+  { key: 'beitrag', label: 'Als Beitrag veröffentlichen', icon: 'image-outline' as const },
+];
+
+export const CameraScreen = ({
+  embedded = false,
+  onClose,
+  onCaptured,
+  onAnChat,
+  onAlsBeitrag,
+  direktZu,
+  onNotice,
+}: Props) => {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('photo');
   const [busy, setBusy] = useState(false);
+  const [aufnahme, setAufnahme] = useState<string | null>(null);
 
   const pick = async (source: 'camera' | 'library') => {
     setBusy(true);
@@ -39,22 +69,38 @@ export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }
 
       if (result.canceled || !result.assets.length) return;
 
-      const asset = result.assets[0];
-      onCaptured?.(asset.uri);
-
-      const fileName = `${Date.now()}.${mode === 'photo' ? 'jpg' : 'mp4'}`;
-      const upload = await uploadImage(asset as unknown as Blob, 'stories', fileName);
-
-      onNotice(
-        upload.success
-          ? `${mode === 'photo' ? 'Foto' : 'Video'} hochgeladen`
-          : `${mode === 'photo' ? 'Foto' : 'Video'} gespeichert (kein Backend verbunden)`
-      );
+      const uri = result.assets[0].uri;
+      if (direktZu) return direktZu(uri);
+      setAufnahme(uri);
     } catch {
       onNotice('Zugriff auf Kamera oder Galerie nicht möglich');
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Story ist das einzige Ziel, das die Aufnahme auch hochlädt. */
+  const alsStory = async (uri: string) => {
+    onCaptured?.(uri);
+
+    const fileName = `${Date.now()}.${mode === 'photo' ? 'jpg' : 'mp4'}`;
+    const upload = await uploadImage({ uri } as unknown as Blob, 'stories', fileName);
+
+    onNotice(
+      upload.success
+        ? `${mode === 'photo' ? 'Foto' : 'Video'} hochgeladen`
+        : `${mode === 'photo' ? 'Foto' : 'Video'} gespeichert (kein Backend verbunden)`
+    );
+  };
+
+  const zielGewaehlt = (key: string) => {
+    const uri = aufnahme;
+    setAufnahme(null);
+    if (!uri) return;
+
+    if (key === 'story') return void alsStory(uri);
+    if (key === 'chat') return onAnChat?.(uri);
+    onAlsBeitrag?.(uri);
   };
 
   return (
@@ -117,6 +163,15 @@ export const CameraScreen = ({ embedded = false, onClose, onCaptured, onNotice }
           <Ionicons name="camera-reverse-outline" size={22} color={colors.white} />
         </Druck>
       </View>
+
+      <ActionSheet
+        visible={!!aufnahme}
+        title="Was möchtest du damit machen?"
+        items={ZIELE}
+        vorschauUri={aufnahme ?? undefined}
+        onSelect={zielGewaehlt}
+        onClose={() => setAufnahme(null)}
+      />
     </View>
   );
 };

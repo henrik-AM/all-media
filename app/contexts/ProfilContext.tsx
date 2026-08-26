@@ -89,6 +89,8 @@ interface NeuesVideo {
   ort: string;
   quer: boolean;
   mediaUri?: string;
+  /** Punkt 38: gewählte Musik, sonst Originalton. */
+  music?: string;
 }
 
 interface ProfilWert {
@@ -107,7 +109,7 @@ interface ProfilWert {
   spende: Spende | null;
   raster: RasterEintrag[];
 
-  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string }) => void;
+  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; music?: string }) => void;
   videoAnlegen: (werte: NeuesVideo) => void;
   highlightAnlegen: (name: string) => string | null;
   playlistAnlegen: (name: string) => string | null;
@@ -290,14 +292,14 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
   const nummer = () => `e${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(({ beschreibung, ort, mediaUri }) => {
+  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(({ beschreibung, ort, mediaUri, music }) => {
     const id = `p_${nummer()}`;
     setEigeneBeitraege((prev) => [
       {
         id,
         userId: 'me',
         location: ort || 'Ohne Ort',
-        music: 'Originalton',
+        music: music || 'Originalton',
         description: beschreibung,
         likedBy: '',
         likes: 0,
@@ -315,7 +317,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     setRaster((prev) => [{ id, kind: 'image', eigen: true, mediaUri }, ...prev]);
   }, []);
 
-  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(({ beschreibung, ort, quer, mediaUri }) => {
+  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(({ beschreibung, ort, quer, mediaUri, music }) => {
     const id = quer ? `q_${nummer()}` : `v_${nummer()}`;
 
     if (quer) {
@@ -330,7 +332,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           userId: 'me',
           description: beschreibung,
           location: ort || 'Ohne Ort',
-          music: 'Originalton',
+          music: music || 'Originalton',
           likes: 0,
           comments: 0,
           shares: 0,

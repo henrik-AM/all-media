@@ -46,7 +46,7 @@ import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { colors, themenStyles } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
-import { mockChats, mockClips, mockCommunities, mockContacts, mockMessages, mockPlaces, mockStories, mockUsers } from './mocks';
+import { mockChats, mockClips, mockCommunities, mockContacts, mockMessages, mockPlaces, mockSounds, mockStories, mockUsers } from './mocks';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
 
 type Overlay =
@@ -59,7 +59,12 @@ type Overlay =
    */
   | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich' }
   | { kind: 'contacts' }
-  | { kind: 'camera' }
+  /**
+   * `zielChat` gesetzt heißt: die Kamera kam aus einem Chat. Dann steht das
+   * Ziel schon fest und die Aufnahme geht ohne Rückfrage dorthin — wer aus
+   * einem Chat die Kamera aufmacht, will das Bild diesem Chat schicken.
+   */
+  | { kind: 'camera'; zielChat?: Chat }
   | { kind: 'call'; userId?: string; gruppenName?: string; teilnehmer?: string[]; art: 'audio' | 'video' }
   | { kind: 'livestream' }
   | { kind: 'explorer'; ziel: ExplorerZiel }
@@ -110,6 +115,8 @@ const Shell = () => {
   /** Abschnitt, bei dem die Einstellungen aufgehen sollen. */
   const [settingsSprung, setSettingsSprung] = useState<string | null>(null);
   const [teilenZiel, setTeilenZiel] = useState<TeilenZiel | null>(null);
+  /** Aufnahme aus der Kamera, die auf die Wahl eines Chats wartet. */
+  const [aufnahmeFuerChat, setAufnahmeFuerChat] = useState<string | null>(null);
   /*
    * Weitergeleitete Beitraege. Sie muessen die Shell ueberleben: der Chat
    * baut seine Nachrichten beim Oeffnen neu auf, ein Beitrag, den man vorher
@@ -286,6 +293,79 @@ const Shell = () => {
     setExtraNachrichten((prev) => ({ ...prev, [chat!.id]: [...(prev[chat!.id] ?? []), nachricht] }));
     profil.geteilt(ziel.id);
     setNotice(`An ${person.name} gesendet`);
+  };
+
+  /*
+   * Punkt 17: eine Aufnahme aus der Kamera in einen Chat schicken. Läuft über
+   * dieselbe Personenauswahl wie das Teilen — nur landet hier ein Bild in der
+   * Nachricht statt einer Beitragskarte.
+   */
+  const aufnahmeAnPerson = (userId: string, uri: string) => {
+    const person = mockUsers[userId];
+    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
+
+    if (!chat) {
+      chat = {
+        id: `c${Date.now()}`,
+        name: person.name,
+        userId,
+        isGroup: false,
+        preview: 'Foto',
+        time: now(),
+        unreadCount: 0,
+      };
+      setChats((prev) => [chat as Chat, ...prev]);
+    } else {
+      const id = chat.id;
+      setChats((prev) => prev.map((c) => (c.id === id ? { ...c, preview: 'Foto', time: now() } : c)));
+    }
+
+    const nachricht: Message = {
+      id: `m${Date.now()}`,
+      chatId: chat.id,
+      senderId: 'me',
+      text: 'Foto',
+      time: now(),
+      bildUri: uri,
+    };
+    setExtraNachrichten((prev) => ({ ...prev, [chat!.id]: [...(prev[chat!.id] ?? []), nachricht] }));
+    setNotice(`An ${person.name} gesendet`);
+  };
+
+  /** Aufnahme in einen schon feststehenden Chat legen und ihn wieder öffnen. */
+  const aufnahmeInChat = (chat: Chat, uri: string) => {
+    const nachricht: Message = {
+      id: `m${Date.now()}`,
+      chatId: chat.id,
+      senderId: 'me',
+      text: 'Foto',
+      time: now(),
+      bildUri: uri,
+    };
+    setExtraNachrichten((prev) => ({ ...prev, [chat.id]: [...(prev[chat.id] ?? []), nachricht] }));
+    setChats((prev) => prev.map((c) => (c.id === chat.id ? { ...c, preview: 'Foto', time: now() } : c)));
+    setOverlay({ kind: 'chat', chat });
+    setNotice('Foto gesendet');
+  };
+
+  /** Punkt 17: eine Aufnahme direkt als Beitrag veröffentlichen. */
+  const aufnahmeAlsBeitrag = (uri: string) => {
+    setOverlay(null);
+    setFormular({
+      title: 'Neuer Beitrag',
+      knopf: 'Veröffentlichen',
+      felder: [
+        { key: 'beschreibung', label: 'Beschreibung', typ: 'mehrzeilig', pflicht: true },
+        { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
+      ],
+      absenden: ({ beschreibung, ort }) => {
+        profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri });
+        setArea('videos');
+        setSubs((prev) => ({ ...prev, videos: 'home' as SubKey }));
+        setNotice('Beitrag veröffentlicht');
+        return null;
+      },
+    });
   };
 
   const createGroup = (name: string, memberIds: string[], info?: string) => {
@@ -563,10 +643,18 @@ const Shell = () => {
       felder: [
         { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true },
         { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
+        // Punkt 38: Musik zum Beitrag - dieselbe Liste wie hinter den
+        // Sound-Seiten.
+        {
+          key: 'music',
+          label: 'Musik',
+          typ: 'auswahl',
+          auswahl: ['Originalton', ...mockSounds.map((s) => `${s.title} – ${s.artist}`)],
+        },
       ],
-      absenden: ({ beschreibung, ort }) => {
-        if (istBild) profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri });
-        else profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri });
+      absenden: ({ beschreibung, ort, music }) => {
+        if (istBild) profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music });
+        else profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music });
 
         // Gleich dorthin, wo das Neue jetzt steht.
         setArea('videos');
@@ -616,7 +704,7 @@ const Shell = () => {
                 }
           )
         }
-        onCamera={() => setOverlay({ kind: 'camera' })}
+        onCamera={() => setOverlay({ kind: 'camera', zielChat: overlay.chat })}
         onOpenProfile={openProfile}
         onAcceptRequest={acceptRequest}
         contacts={contacts}
@@ -713,10 +801,18 @@ const Shell = () => {
   }
 
   if (overlay?.kind === 'camera') {
+    const zielChat = overlay.zielChat;
     return (
       <CameraScreen
+        // Kam die Kamera aus einem Chat, ist das Ziel klar - dann keine Frage.
+        direktZu={zielChat ? (uri) => aufnahmeInChat(zielChat, uri) : undefined}
         onClose={() => setOverlay(null)}
         onCaptured={storyAufgenommen}
+        onAnChat={(uri) => {
+          setOverlay(null);
+          setAufnahmeFuerChat(uri);
+        }}
+        onAlsBeitrag={aufnahmeAlsBeitrag}
         onNotice={setNotice}
       />
     );
@@ -823,6 +919,8 @@ const Shell = () => {
               storyAufgenommen(uri);
               setSub('chats');
             }}
+            onAnChat={setAufnahmeFuerChat}
+            onAlsBeitrag={aufnahmeAlsBeitrag}
             onNotice={setNotice}
           />
         );
@@ -973,6 +1071,18 @@ const Shell = () => {
         contacts={contacts}
         onClose={() => setTeilenZiel(null)}
         onSend={teileMit}
+      />
+
+      {/* Dieselbe Personenauswahl, aber für eine Aufnahme aus der Kamera. */}
+      <TeilenSheet
+        ziel={aufnahmeFuerChat ? { art: 'post', id: 'aufnahme', titel: 'Foto', autor: 'Du' } : null}
+        contacts={contacts}
+        titel="An welchen Chat?"
+        onClose={() => setAufnahmeFuerChat(null)}
+        onSend={(userId) => {
+          if (aufnahmeFuerChat) aufnahmeAnPerson(userId, aufnahmeFuerChat);
+          setAufnahmeFuerChat(null);
+        }}
       />
 
       <MitteilungenSheet

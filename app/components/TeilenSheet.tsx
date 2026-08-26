@@ -18,6 +18,8 @@ export interface TeilenZiel {
 interface Props {
   ziel: TeilenZiel | null;
   contacts: Contact[];
+  /** Überschreibt die Zeile über dem Raster — etwa für eine Aufnahme. */
+  titel?: string;
   onClose: () => void;
   /** Schickt den Beitrag in den Chat mit dieser Person. */
   onSend: (userId: string, ziel: TeilenZiel) => void;
@@ -27,7 +29,7 @@ interface Props {
  * Prototyp-Frames "Nutzer B + Beitrag teilen" und "VQ + Video teilen": ein
  * Raster aus Personen. Wen man antippt, der bekommt es in den Chat.
  */
-export const TeilenSheet = ({ ziel, contacts, onClose, onSend }: Props) => {
+export const TeilenSheet = ({ ziel, contacts, titel, onClose, onSend }: Props) => {
   const [gesendet, setGesendet] = useState<string[]>([]);
 
   if (!ziel) return null;
@@ -67,7 +69,7 @@ export const TeilenSheet = ({ ziel, contacts, onClose, onSend }: Props) => {
   return (
     <SheetRahmen
       visible
-      title={ziel.art === 'video' ? 'Video teilen' : 'Beitrag teilen'}
+      title={titel ?? (ziel.art === 'video' ? 'Video teilen' : 'Beitrag teilen')}
       onClose={() => {
         setGesendet([]);
         onClose();

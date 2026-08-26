@@ -15,9 +15,14 @@ import { colors, radius, spacing, themenStyles, typography } from '../constants/
 export interface FormularFeld {
   key: string;
   label: string;
-  typ?: 'text' | 'mehrzeilig' | 'zahl';
+  typ?: 'text' | 'mehrzeilig' | 'zahl' | 'auswahl';
   platzhalter?: string;
   pflicht?: boolean;
+  /**
+   * Bei typ 'auswahl': die möglichen Werte. Musik tippt man nicht ab, man
+   * sucht sie aus dem aus, was es gibt (Punkt 38).
+   */
+  auswahl?: string[];
 }
 
 interface Props {
@@ -56,7 +61,12 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
 
   const absenden = () => {
     const gefuellt: Record<string, string> = {};
-    for (const f of felder) gefuellt[f.key] = (werte[f.key] ?? '').trim();
+    for (const f of felder) {
+      // Eine Auswahl steht schon auf dem ersten Wert, auch ohne Antippen —
+      // sonst käme sie leer an, obwohl sichtbar etwas ausgewählt ist.
+      const stand = werte[f.key] ?? (f.typ === 'auswahl' ? f.auswahl?.[0] ?? '' : '');
+      gefuellt[f.key] = stand.trim();
+    }
 
     const fehlt = felder.find((f) => f.pflicht && !gefuellt[f.key]);
     if (fehlt) return onNotice(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
@@ -87,6 +97,25 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
           {felder.map((f, i) => (
             <View key={f.key} style={styles.feld}>
               <Text style={styles.label}>{f.label}</Text>
+              {f.typ === 'auswahl' ? (
+                // Waagerechte Reihe statt eines Aufklappmenüs: React Native
+                // hat keins, und bei einer Handvoll Sounds sieht man so gleich
+                // alles, was zur Wahl steht.
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wahlReihe}>
+                  {(f.auswahl ?? []).map((w) => {
+                    const an = (werte[f.key] ?? f.auswahl?.[0]) === w;
+                    return (
+                      <Druck
+                        key={w}
+                        style={[styles.wahl, an && styles.wahlAn]}
+                        onPress={() => setWerte((prev) => ({ ...prev, [f.key]: w }))}
+                      >
+                        <Text style={[styles.wahlText, an && styles.wahlTextAn]}>{w}</Text>
+                      </Druck>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
               <TextInput
                 style={[styles.eingabe, f.typ === 'mehrzeilig' && styles.mehrzeilig]}
                 value={werte[f.key] ?? ''}
@@ -99,6 +128,7 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
                 returnKeyType={i === felder.length - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === felder.length - 1 ? absenden : undefined}
               />
+              )}
             </View>
           ))}
         </ScrollView>
@@ -121,6 +151,19 @@ const styles = themenStyles((colors) => ({
     ...typography.body,
   },
   mehrzeilig: { minHeight: 76, textAlignVertical: 'top' },
+  wahlReihe: { gap: spacing.sm, paddingRight: spacing.lg },
+  wahl: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wahlAn: { backgroundColor: colors.brand, borderColor: colors.brand },
+  wahlText: { ...typography.small, fontWeight: '600', color: colors.text2 },
+  wahlTextAn: { color: colors.white },
   knopf: {
     height: 44,
     borderRadius: radius.md,

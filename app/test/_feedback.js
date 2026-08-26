@@ -248,6 +248,18 @@ const pruefe = (was, ok, zusatz = '') => {
   ]);
   await auswahl.setFiles(BILD);
   await page.waitForTimeout(1200);
+
+  // Punkt 17: die Aufnahme landet nicht mehr stillschweigend in der Story -
+  // erst fragt die Kamera, wohin damit.
+  pruefe('Kamera fragt, was mit der Aufnahme geschehen soll',
+         !!(await page.$('[data-verwenden="story"]')));
+  pruefe('Die Aufnahme steht als Vorschau darüber',
+         !!(await page.$('.aufnahme__vorschau')));
+  pruefe('Chat und Beitrag stehen als Ziel zur Wahl',
+         !!(await page.$('[data-verwenden="chat"]')) && !!(await page.$('[data-verwenden="beitrag"]')));
+
+  await page.click('[data-verwenden="story"]');
+  await page.waitForTimeout(900);
   pruefe('Aufnahme wird übernommen',
          /Story ist online/i.test(await page.$eval('#toast', (e) => e.textContent)));
 
