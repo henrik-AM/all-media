@@ -2741,9 +2741,19 @@ function postCard(p) {
             ${p.music ? `<button class="post__meta" data-postsound="${esc(p.music)}">${esc(p.music)}</button>` : ''}
           </div>
         </div>
-        <button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
-          ${p.following ? 'Gefolgt' : 'Folgen'}
-        </button>
+        ${/*
+            Am eigenen Beitrag stehen weder "Folgen" noch die Glocke. Vorher
+            konnte man sich selbst folgen und sich selbst benachrichtigen
+            lassen - derselbe Fehler wie bei Punkt 62, wo sich die eigene
+            Community verlassen liess.
+          */ ''}
+        ${
+          p.userId === state.currentUserId
+            ? ''
+            : `<button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
+                ${p.following ? 'Gefolgt' : 'Folgen'}
+              </button>`
+        }
         ${/*
             Punkt 22: die abgeschaltete Glocke traegt einen Strich. Vorher
             stand hier text-decoration: line-through - das wirkt auf Text und
@@ -2754,11 +2764,15 @@ function postCard(p) {
             noch das alte Blau (#0A66FF), das die App sonst nirgends mehr
             benutzt. Sie steht jetzt im CSS und folgt der Marke.
           */ ''}
-        <button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="${
-          p.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'
-        }">
-          ${p.notify ? ICONS.bell : ICONS.bellOff}
-        </button>
+        ${
+          p.userId === state.currentUserId
+            ? ''
+            : `<button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="${
+                p.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'
+              }">
+                ${p.notify ? ICONS.bell : ICONS.bellOff}
+              </button>`
+        }
       </header>
 
       <div class="post__media">${medienFlaeche(p.id, ICONS.image)}</div>
@@ -2773,9 +2787,7 @@ function postCard(p) {
         <button class="postbtn postbtn--end ${p.saved ? 'is-saved' : ''}" data-paction="save" data-pid="${p.id}" aria-label="Speichern">${ICONS.bookmark}</button>
       </div>
 
-      <div class="post__likes">
-        Gefällt <strong>${esc(p.likedBy)}</strong> und ${compactNumber(Math.max(p.likes - 1, 0))} weiteren Personen
-      </div>
+      ${p.likes ? `<div class="post__likes">${likeZeile(p.likes, p.likedBy)}</div>` : ''}
       <div class="post__desc"><strong>${esc(u.name)}</strong> ${esc(p.description)}</div>
       <button class="post__comments" data-paction="comment" data-pid="${p.id}">
         ${kommentarZeile(p.comments)}
@@ -2794,6 +2806,26 @@ function kommentarZeile(anzahl) {
   if (anzahl === 1) return '1 Kommentar ansehen';
   if (anzahl <= 3) return `${anzahl} Kommentare ansehen`;
   return `Alle ${anzahl} Kommentare ansehen`;
+}
+
+/*
+ * Dasselbe fuer die Zeile ueber der Beschreibung. Sie stand vorher fest als
+ * "Gefaellt <Name> und N weiteren Personen" - bei einem frischen Beitrag las
+ * sich das als "Gefaellt und 0 weiteren Personen": kein Name, eine Null, und
+ * ein Satz, der nicht aufgeht.
+ *
+ * Bei null Likes steht dort jetzt nichts. Das ist kein Mangel, sondern der
+ * uebliche Zustand eines gerade veroeffentlichten Beitrags.
+ */
+function likeZeile(anzahl, ersterName) {
+  if (!anzahl) return '';
+  if (!ersterName) {
+    return anzahl === 1 ? '1 Like' : `${compactNumber(anzahl)} Likes`;
+  }
+  const name = `<strong>${esc(ersterName)}</strong>`;
+  if (anzahl === 1) return `Gefällt ${name}`;
+  if (anzahl === 2) return `Gefällt ${name} und einer weiteren Person`;
+  return `Gefällt ${name} und ${compactNumber(anzahl - 1)} weiteren Personen`;
 }
 
 /* ---------------------------------------------------------- video feed */
@@ -3399,7 +3431,22 @@ function communityRow(c) {
         </div>
         <span class="row__meta">
           ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
-          <span class="joinbtn ${c.joined ? 'is-joined' : ''}" data-join="${c.id}">${c.joined ? 'Mitglied' : 'Beitreten'}</span>
+          ${/*
+              Punkt 62: an der eigenen Community steht kein Knopf. Er hiess
+              dort "Mitglied" und trug einen Klick, der aus der eigenen
+              Community austrat - die Mitgliederzahl ging um eins herunter und
+              der eigene Kanal verschwand aus "Erstellt".
+
+              Statt eines Ersatztextes steht dort nichts: der Prototyp-Frame
+              "Community - Profil" zeigt an der Stelle ebenfalls nichts, und
+              ein Hinweis wie "Deine Community" nahm dem Namen daneben so viel
+              Platz, dass er abgeschnitten wurde.
+            */ ''}
+          ${
+            c.eigen
+              ? ''
+              : `<span class="joinbtn ${c.joined ? 'is-joined' : ''}" data-join="${c.id}">${c.joined ? 'Mitglied' : 'Beitreten'}</span>`
+          }
         </span>
       </button>
     </li>`;
@@ -4528,14 +4575,18 @@ function switchBar(onClickId) {
 
 function renderMessengerProfile() {
   const me = user('me');
+  const profil = state.eigenesProfil || {};
   main.innerHTML = `
     ${switchBar('switchProfile')}
     <div class="scroll">
       <div class="mprof">
         <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
         <div class="mprof__text">
-          <div class="mprof__name">Henrik</div>
-          <div class="mprof__bio">Baue gerade All Media.</div>
+          ${/* Wie im Videos- und Community-Profil aus dem Konto, nicht fest
+                im Markup - sonst zeigt "Profil bearbeiten" hier keine
+                Wirkung. */ ''}
+          <div class="mprof__name">${esc(me.name)}</div>
+          ${profil.bio ? `<div class="mprof__bio">${esc(profil.bio)}</div>` : ''}
         </div>
       </div>
       <div class="mprof__links">
@@ -6928,7 +6979,7 @@ function ownProfileTop(handle, bereich) {
           ungelesen ? '<i class="oprof__dot"></i>' : ''
         }</button>
         <button data-oact="create" aria-label="Erstellen">${ICONS.plus}</button>
-        <button data-oact="menu" aria-label="Menü">${ICONS.settings}</button>
+        <button data-oact="menu" aria-label="Menü">${ICONS.menu}</button>
       </span>
     </div>`;
 }
@@ -7521,6 +7572,7 @@ function renderCommunitySearch() {
 // Prototyp-Frame "Community - Profil": erstellte und beigetretene Communitys.
 function renderCommunityProfile() {
   const me = user('me');
+  const profil = state.eigenesProfil || {};
   const created = state.communities.filter((c) => c.visibility === 'private' && c.joined);
   const joined = state.communities.filter((c) => c.joined && !created.includes(c));
 
@@ -7535,11 +7587,16 @@ function renderCommunityProfile() {
           <div class="prof__stat"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></div>
         </div>
       </div>
+      ${/*
+          Name, Info und Link standen hier fest im Markup. Damit zeigte das
+          Community-Profil "Henrik", waehrend im Videos-Profil der Name aus
+          dem Konto kam - und wer sein Profil bearbeitete, sah die Aenderung
+          nur an einer der beiden Stellen. Jetzt dieselbe Quelle wie dort.
+        */ ''}
       <div class="prof__about">
-        <div class="prof__name">Henrik</div>
-        <div class="prof__bio">Baue gerade All Media.</div>
-        ${/* Derselbe echte Link wie im Videos-Profil, nicht mehr ein Hinweis. */ ''}
-        ${bioLink('all-media.app')}
+        <div class="prof__name">${esc(me.name)}</div>
+        ${profil.bio ? `<div class="prof__bio">${esc(profil.bio)}</div>` : ''}
+        ${profil.link ? bioLink(profil.link) : ''}
       </div>
       ${/*
           "Profil bearbeiten" gab es nur im Videos-Profil. Hier fuehrt derselbe

@@ -89,8 +89,11 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
           {playlists.map((label) => (
             <Druck key={`pl-${label}`} style={styles.highlight} onPress={() => onNotice(`Playlist „${label}“`)}>
-              <View style={styles.ring}>
-                <Motiv id={`pl-${label}`} icon="play-outline" iconSize={22} style={{ width: 58, height: 58 }} />
+              <View style={[styles.ring, styles.ringPlaylist]}>
+                <Motiv id={`pl-${label}`} icon="play-outline" iconSize={22} style={styles.ringInhalt} />
+              </View>
+              <View style={[styles.abzeichen, styles.abzeichenPlaylist]}>
+                <Ionicons name="play" size={10} color={colors.white} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
                 {label}
@@ -99,8 +102,11 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           ))}
           {highlights.map((label) => (
             <Druck key={`hl-${label}`} style={styles.highlight} onPress={() => onNotice(`Highlight „${label}“`)}>
-              <View style={styles.ring}>
-                <Motiv id={`hl-${label}`} icon="image-outline" iconSize={22} style={{ width: 58, height: 58 }} />
+              <View style={[styles.ring, styles.ringHighlight]}>
+                <Motiv id={`hl-${label}`} icon="image-outline" iconSize={22} style={styles.ringInhalt} />
+              </View>
+              <View style={[styles.abzeichen, styles.abzeichenHighlight]}>
+                <Ionicons name="star" size={10} color={colors.white} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
                 {label}
@@ -212,22 +218,41 @@ const styles = themenStyles((colors) => ({
   highlights: { gap: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   highlight: { alignItems: 'center', gap: 6, width: 68 },
   /*
-   * Vorher trugen Playlists einen roten und Highlights einen orangen Ring —
-   * die einzigen zwei Stellen der App mit diesen Farben, und beide standen
-   * für nichts. Ein Highlight ist in Wahrheit ein Standbild, also trägt der
-   * Kreis jetzt eine Motivfläche und der Ring ist wieder neutral. Welche Art
-   * es ist, sagt das Symbol darin.
+   * Punkt 39: Playlist und Highlight muessen auseinanderzuhalten sein. Hier
+   * unterschied sie nur ein blasses Symbol im Kreis — auf einem Bildschirm
+   * nebeneinander sah man keinen Unterschied. Die Website loest es seit dem
+   * 26.08.2026 ueber die Form: eine Playlist ist ein abgerundetes Quadrat mit
+   * einem Dreieck, ein Highlight ein Kreis mit einem Stern. Dieselbe Sprache
+   * jetzt auch hier.
    */
   ring: {
     width: 62,
     height: 62,
-    borderRadius: 31,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
   },
+  ringPlaylist: { borderRadius: 18 },
+  ringHighlight: { borderRadius: 31 },
+  ringInhalt: { width: 58, height: 58 },
+  /* Das Abzeichen sitzt unten rechts auf dem Rand — deshalb absolut, mit
+     einem Rand in der Flaechenfarbe, damit es sich abhebt. */
+  abzeichen: {
+    position: 'absolute',
+    right: 2,
+    top: 44,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  abzeichenPlaylist: { backgroundColor: colors.brand },
+  abzeichenHighlight: { backgroundColor: '#F0397E' },
   highlightLabel: { ...typography.small, color: colors.text2 },
   tabs: {
     flexDirection: 'row',

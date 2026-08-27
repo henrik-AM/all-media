@@ -15,6 +15,10 @@ const ICONS = (() => {
     einklappen: wrap('<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/>'),
     /* Gestapelte Ebenen - Umschalter fuer die Kartenansicht. */
     ebenen: wrap('<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>'),
+    /* Drei Striche. Der dritte Knopf oben im eigenen Profil - im Prototyp
+       (Frame "Community - Profil") steht dort ein Menue, kein Zahnrad. Die
+       App zeigte es richtig, die Website nicht. */
+    menu: wrap('<path d="M3 6h18M3 12h18M3 18h18"/>'),
     search: wrap('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>'),
     plus: wrap('<path d="M12 5v14M5 12h14"/>'),
     back: wrap('<path d="M19 12H5M12 19l-7-7 7-7"/>'),

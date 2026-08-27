@@ -9,12 +9,7 @@ import { colors, radius, sizes, spacing, themenStyles, typography } from '../../
 import { mockUsers, mockVideos } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Video } from '../../types';
-
-const compactNumber = (n: number): string => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mio.`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace('.', ',')}k`;
-  return String(n);
-};
+import { compactNumber } from '../../lib/zahlen';
 
 interface Props {
   onOpenProfile: (userId: string) => void;

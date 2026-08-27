@@ -8,16 +8,11 @@ import { Motiv } from '../../components/Motiv';
 import { StoryRail } from '../../components/StoryRail';
 import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
-import { kommentarZeile } from '../../lib/kommentare';
+import { kommentarZeile, likeZeile } from '../../lib/kommentare';
+import { compactNumber } from '../../lib/zahlen';
 import { mockPosts, mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Post, Story } from '../../types';
-
-const compactNumber = (n: number): string => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mio.`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace('.', ',')}k`;
-  return String(n);
-};
 
 interface Props {
   stories: Story[];
@@ -95,25 +90,35 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
             <Text style={styles.name} numberOfLines={1}>
               {author?.name}
             </Text>
+            {/* Ohne Ort steht dort nur die Musik - vorher begann die Zeile
+                mit einem einsamen Mittelpunkt. */}
             <Text style={styles.sub} numberOfLines={1}>
-              {item.location} · {item.music}
+              {[item.location, item.music].filter(Boolean).join(' · ')}
             </Text>
           </Druck>
-          <Druck
-            style={[styles.follow, folgtPerson(item.userId) && styles.followActive]}
-            onPress={() => toggleFollow(item)}
-          >
-            <Text style={[styles.followText, folgtPerson(item.userId) && styles.followTextActive]}>
-              {folgtPerson(item.userId) ? 'Gefolgt' : 'Folgen'}
-            </Text>
-          </Druck>
-          <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
-            <Ionicons
-              name={item.notify ? 'notifications' : 'notifications-outline'}
-              size={19}
-              color={item.notify ? colors.brand : colors.text2}
-            />
-          </Druck>
+          {/* Am eigenen Beitrag stehen weder "Folgen" noch die Glocke. Vorher
+              konnte man sich selbst folgen und sich selbst benachrichtigen
+              lassen - derselbe Fehler wie bei Punkt 62, wo sich die eigene
+              Community verlassen liess. */}
+          {item.userId !== 'me' && (
+            <>
+              <Druck
+                style={[styles.follow, folgtPerson(item.userId) && styles.followActive]}
+                onPress={() => toggleFollow(item)}
+              >
+                <Text style={[styles.followText, folgtPerson(item.userId) && styles.followTextActive]}>
+                  {folgtPerson(item.userId) ? 'Gefolgt' : 'Folgen'}
+                </Text>
+              </Druck>
+              <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
+                <Ionicons
+                  name={item.notify ? 'notifications' : 'notifications-outline'}
+                  size={19}
+                  color={item.notify ? colors.brand : colors.text2}
+                />
+              </Druck>
+            </>
+          )}
         </View>
 
         <View style={styles.media}>
@@ -157,10 +162,9 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
           </Druck>
         </View>
 
-        <Text style={styles.likes}>
-          Gefällt <Text style={styles.bold}>{item.likedBy}</Text> und{' '}
-          {compactNumber(Math.max(item.likes - 1, 0))} weiteren Personen
-        </Text>
+        {item.likes > 0 && (
+          <Text style={styles.likes}>{likeZeile(item.likes, item.likedBy)}</Text>
+        )}
         <Text style={styles.description}>
           <Text style={styles.bold}>{author?.name}</Text> {item.description}
         </Text>

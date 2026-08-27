@@ -7,12 +7,15 @@ import { AuthContext } from '../../contexts/AuthContext';
 import { SwitchBar } from '../../components/SwitchBar';
 import { colors, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
+import { useProfil } from '../../contexts/ProfilContext';
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
   /** Oeffnet die Kontoliste (anderes eigenes Konto). */
   onSwitchAccount: () => void;
   onOpenSettings: () => void;
+  /** Fuehrt zum Formular, das Name, Info und Link aendert. */
+  onBearbeiten: () => void;
   onNotice: (message: string) => void;
 }
 
@@ -23,8 +26,16 @@ const ITEMS = ['Standort-Sichtbarkeit', 'Story-Sichtbarkeit', 'Lesebestätigung'
  * neben Name und Biografie, die beiden Profilverweise, dann der Abschnitt
  * Einstellungen.
  */
-export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSettings, onNotice }: Props) => {
+export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSettings, onBearbeiten, onNotice }: Props) => {
   const { user } = useContext(AuthContext);
+  /*
+   * Name und Info kommen aus demselben Zustand wie im Videos- und
+   * Community-Profil. Vorher stand hier "user.profile.about" - das ist der
+   * Begruessungstext des Kontos ("Hey, ich nutze All Media!"), nicht die
+   * Info, die "Profil bearbeiten" aendert. Auf diesem Bildschirm stand
+   * deshalb etwas anderes als auf den beiden anderen.
+   */
+  const { eigenesProfil } = useProfil();
 
   return (
   <View style={styles.screen}>
@@ -33,12 +44,18 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
 
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.head}>
-        <Avatar id={user?.profile.id ?? 'me'} name={user?.profile.name ?? 'Du'} size={sizes.avatarXl} />
+        <Avatar id={user?.profile.id ?? 'me'} name={eigenesProfil.name} size={sizes.avatarXl} />
         <View style={styles.headText}>
-          <Text style={styles.name}>{user?.profile.name ?? 'Henrik'}</Text>
-          <Text style={styles.bio}>{user?.profile.about ?? 'Baue gerade All Media.'}</Text>
+          <Text style={styles.name}>{eigenesProfil.name}</Text>
+          {!!eigenesProfil.bio && <Text style={styles.bio}>{eigenesProfil.bio}</Text>}
         </View>
       </View>
+
+      {/* Punkt 19: "Profil bearbeiten" gab es nur im Videos-Profil. Die
+          Website hat den Knopf laengst an allen dreien, hier fehlte er. */}
+      <Druck style={styles.bearbeiten} onPress={onBearbeiten}>
+        <Text style={styles.bearbeitenText}>Profil bearbeiten</Text>
+      </Druck>
 
       <View style={styles.links}>
         <Druck onPress={() => onSwitchArea('videos')}>
@@ -74,6 +91,19 @@ const styles = themenStyles((colors) => ({
   headText: { flex: 1 },
   name: { fontSize: 21, fontWeight: '700', color: colors.text },
   bio: { ...typography.message, color: colors.text2, marginTop: 4 },
+  /* Derselbe Knopf wie in OwnProfileHead, damit die drei Profile nicht
+     unterschiedlich aussehen. */
+  bearbeiten: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    paddingVertical: 10,
+    borderRadius: 11,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  bearbeitenText: { fontSize: 14, fontWeight: '600', color: colors.text, letterSpacing: -0.1 },
   links: { flexDirection: 'row', gap: 26, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   link: { fontSize: 15, fontWeight: '700', color: colors.text },
   sectionLink: {

@@ -10,6 +10,7 @@ import { mockProfiles, mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
 import { useKachelHoehe } from '../../lib/raster';
+import { compactNumber } from '../../lib/zahlen';
 
 type Tab = 'grid' | 'repost' | 'tagged';
 
@@ -18,11 +19,6 @@ const GRID_KINDS: ('image' | 'video')[] = [
   'video', 'image', 'video', 'image', 'video', 'image',
 ];
 
-const compactNumber = (n: number): string => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mio.`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace('.', ',')}k`;
-  return String(n);
-};
 
 interface Props {
   userId: string;

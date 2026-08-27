@@ -298,7 +298,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       {
         id,
         userId: 'me',
-        location: ort || 'Ohne Ort',
+        location: ort || '',
         music: music || 'Originalton',
         description: beschreibung,
         likedBy: '',
@@ -331,7 +331,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           id,
           userId: 'me',
           description: beschreibung,
-          location: ort || 'Ohne Ort',
+          location: ort || '',
           music: music || 'Originalton',
           likes: 0,
           comments: 0,

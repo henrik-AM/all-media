@@ -24,7 +24,13 @@ const users = {
   u4: { id: 'u4', privat: false, name: 'David König', handle: '@david', initials: 'DK', color: 'linear-gradient(135deg,#9FDD84,#419A32)', phone: '+49 171 5678901' },
   u5: { id: 'u5', privat: true, name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 172 6789012' },
   u6: { id: 'u6', privat: false, name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: 'linear-gradient(135deg,#93AEFF,#4152D8)', phone: '+49 173 7890123' },
-  me: { id: 'me', name: 'Du', handle: '@henrik', initials: 'DU', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 170 1234567' },
+  /*
+   * Der eigene Name ist "Henrik", nicht "Du". Die App sagt das seit jeher
+   * (app/mocks/index.ts), die Website sagte "Du" - und damit stand im
+   * Videos-Profil "Du", im Community-Profil aber "Henrik". Wo "Du" richtig
+   * ist, steht es ausdruecklich da: im Chat-Verlauf und an der eigenen Story.
+   */
+  me: { id: 'me', name: 'Henrik', handle: '@henrik', initials: 'H', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 170 1234567' },
   // Diese drei stehen bewusst NICHT in den Kontakten - sonst laesst sich
   // "Kontakt hinzufuegen" gar nicht ausprobieren.
   u7: { id: 'u7', privat: true, name: 'Greta Hoffmann', handle: '@greta', initials: 'GH', color: 'linear-gradient(135deg,#FBA0C4,#DC3F7C)', phone: '+49 174 8901234' },
@@ -561,7 +567,7 @@ function setzeRepost(art, id, an) {
   if (!an && stelle !== -1) reposts.splice(stelle, 1);
 }
 
-const SEED = structuredClone({ chats, contacts, posts, videos, clips, communities, messages, communityMessages, communityChats, communityChatMessages, comments, profiles, stories, mitteilungen, gridItems });
+const SEED = structuredClone({ users, chats, contacts, posts, videos, clips, communities, messages, communityMessages, communityChats, communityChatMessages, comments, profiles, stories, mitteilungen, gridItems });
 
 function resetState() {
   const restoreList = (list, seed) => {
@@ -573,6 +579,12 @@ function resetState() {
     Object.assign(map, structuredClone(seed));
   };
 
+  /*
+   * "users" fehlte hier. Der eigene Name liegt in users.me, also ueberlebte
+   * ein im Pruefdurchlauf geaenderter Profilname den Reset - beim zweiten
+   * Durchlauf stand dort noch der Name aus dem ersten.
+   */
+  restoreMap(users, SEED.users);
   restoreList(chats, SEED.chats);
   restoreList(contacts, SEED.contacts);
   restoreList(posts, SEED.posts);
@@ -629,6 +641,14 @@ app.get('/api/bootstrap', (req, res) => {
     archiviert,
     hashtags, sounds, places, friends, gefolgt, ungelesen, blockiert, stummgeschaltet,
     privateProfile,
+    /*
+     * Info und Link des eigenen Kontos. Sie lagen bisher nur hinter
+     * /api/profile/me, das allein das Videos-Profil abruft. Folge: das
+     * Bearbeiten-Formular oeffnete sich mit leeren Feldern (Punkt 2,
+     * "Bearbeitungsansicht wirkt leer"), und Messenger- und Community-Profil
+     * behalfen sich mit fest eingetragenem Text.
+     */
+    eigenesProfil: { bio: profiles.me.bio, link: profiles.me.link },
   });
 });
 
@@ -1009,7 +1029,7 @@ app.post('/api/eigene/beitrag', (req, res) => {
   const beitrag = {
     id: eigeneId('p'),
     userId: 'me',
-    location: String(req.body?.ort || '').trim() || 'Ohne Ort',
+    location: String(req.body?.ort || '').trim(),
     music: musikAus(req.body),
     description: beschreibung,
     likedBy: '',
@@ -1055,7 +1075,7 @@ app.post('/api/eigene/video', (req, res) => {
     id: eigeneId('v'),
     userId: 'me',
     description: beschreibung,
-    location: String(req.body?.ort || '').trim() || 'Ohne Ort',
+    location: String(req.body?.ort || '').trim(),
     music: musikAus(req.body),
     likes: 0,
     comments: 0,
@@ -1451,6 +1471,15 @@ app.post('/api/communities/:id/join', (req, res) => {
   const community = communities.find((c) => c.id === req.params.id);
   if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
 
+  /*
+   * Punkt 62: aus der eigenen Community kann man nicht austreten. Die
+   * Oberflaeche zeigt dort keinen Knopf mehr - der Server sagt trotzdem nein,
+   * denn eine Regel, die nur im Markup steht, ist keine.
+   */
+  if (community.eigen) {
+    return res.status(409).json({ error: 'Die eigene Community lässt sich nicht verlassen' });
+  }
+
   community.joined = !community.joined;
   community.members += community.joined ? 1 : -1;
   res.json(community);
@@ -1836,17 +1865,12 @@ app.get('/api/communities/:id/channels/:chId', (req, res) => {
 });
 
 /** Community beitreten */
-app.post('/api/communities/:id/join', (req, res) => {
-  const community = communities.find((c) => c.id === req.params.id);
-  if (community) community.joined = true;
-  res.json({ ok: true });
-});
-
-/** Community verlassen */
-app.post('/api/communities/:id/leave', (req, res) => {
-  const community = communities.find((c) => c.id === req.params.id);
-  if (community) community.joined = false;
-  res.json({ ok: true });
-});
+/*
+ * Hier standen zwei weitere Routen: ein zweites /join und ein /leave. Das
+ * zweite /join war toter Code - Express nimmt die erste passende Route, und
+ * die steht weiter oben. Es setzte ausserdem "joined = true" statt umzu-
+ * schalten und liess die Mitgliederzahl unberuehrt. /leave hat niemand
+ * aufgerufen: weder die Website noch die App kennen die Adresse.
+ */
 
 module.exports = app;

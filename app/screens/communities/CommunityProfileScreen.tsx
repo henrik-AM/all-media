@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
-import { colors, spacing, themenStyles, typography } from '../../constants/design';
+import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { mockUsers } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
@@ -33,7 +33,10 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
   const list = (items: Community[]) =>
     items.map((c) => (
       <Druck key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
-        <Avatar id={c.id} name={c.name} size={44} />
+        {/* Abgerundetes Quadrat, nicht Kreis: so unterscheidet die App eine
+            Community von einer Person, und so steht es im Prototyp-Frame
+            "Community - Profil". Hier war es als Einziges ein Kreis. */}
+        <Avatar id={c.id} name={c.name} size={44} ecke={radius.lg} />
         <View style={styles.body}>
           <Text style={styles.name}>{c.name}</Text>
           <Text style={styles.sub} numberOfLines={1}>

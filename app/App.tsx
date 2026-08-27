@@ -931,6 +931,7 @@ const Shell = () => {
             onSwitchArea={switchArea}
             onSwitchAccount={() => setSheet('konto')}
             onOpenSettings={() => setArea('settings')}
+            onBearbeiten={profilBearbeiten}
             onNotice={setNotice}
           />
         );
