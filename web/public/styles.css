@@ -1469,38 +1469,14 @@ ul { margin: 0; padding: 0; list-style: none; }
   background: var(--surface-3);
   border: 1px solid var(--border);
 }
-.map__grid {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 44px 44px;
-  opacity: .7;
-}
-.map__pin {
-  position: absolute;
-  transform: translate(-50%, -100%);
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-}
-.map__dot {
-  width: 38px; height: 38px; border-radius: 50%;
-  display: grid; place-items: center;
-  color: #fff; font-size: 13px; font-weight: 700;
-  border: 2.5px solid var(--surface);
-  box-shadow: 0 2px 8px rgba(0,0,0,.22);
-}
-.map__label {
-  font-size: 11px; font-weight: 600; color: var(--text);
-  background: var(--surface); padding: 1px 7px; border-radius: 8px;
-  border: 1px solid var(--border);
-}
-.map__me {
-  position: absolute; left: 50%; top: 46%;
-  transform: translate(-50%, -50%);
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--brand); border: 3px solid var(--surface);
-  box-shadow: 0 0 0 8px rgba(10,102,255,.18);
-}
+/*
+ * Die Karte war frueher selbst gezeichnet - Raster, Bloecke, Strassen, dazu
+ * absolut gesetzte Nadeln. Seit sie echte Kacheln von OpenStreetMap zeigt,
+ * setzt Leaflet die Nadeln selbst. `.map__pin` und `.map__me` bleiben als
+ * Namen an den Nadeln haengen, tragen aber keine Lage mehr: ein
+ * `position: absolute` darauf hat die Kreise aus der Karte geschoben.
+ */
+.map__pin.is-aktiv { filter: drop-shadow(0 0 4px rgba(255,59,48,.7)); }
 
 /* ---------- Eigene Profile (Messenger / Videos / Communitys) ---------- */
 .ownprof {
@@ -1771,51 +1747,12 @@ body:has(.camera) .toast { bottom: 132px; }
 
 /* ---------- Karte (Friend-Map) ---------- */
 /*
-  Selbst gezeichnete Karte statt echter Kacheln: laeuft ohne Kartendienst,
-  ohne Schluessel und ohne Netz. Fuer echte Kacheln spaeter ein Kartenanbieter.
+  Echte Kacheln von OpenStreetMap. Leaflet zeichnet Kacheln, Nadeln und den
+  Zoomweg selbst - die Karte braucht von hier nur die Flaeche, auf der sie
+  sitzt. Zoomen und Schieben laufen ueber Leaflet, deshalb ist `touch-action`
+  hier nicht mehr gesperrt.
 */
-.map__flaeche {
-  position: absolute;
-  inset: 0;
-  transform-origin: center;
-  transition: transform .25s ease;
-  cursor: grab;
-}
-.map__flaeche:active { cursor: grabbing; }
-.map__park {
-  position: absolute; left: 54%; top: 24%; width: 30%; height: 22%;
-  border-radius: 14px; background: #CFE0C3;
-}
-.map__fluss {
-  position: absolute; left: -10%; top: 60%; width: 130%; height: 22px;
-  background: #BBD7E8; transform: rotate(-8deg);
-}
-.map__block { position: absolute; background: #DCDFD8; border-radius: 3px; }
-.map__strasse-v { position: absolute; top: 0; bottom: 0; width: 5px; background: #FAFAF8; }
-.map__strasse-h { position: absolute; left: 0; right: 0; height: 5px; background: #FAFAF8; }
-.map { background: #E8EDE4; touch-action: none; }
-.map__pin.is-aktiv .map__dot { border-color: var(--brand); border-width: 3.5px; }
-/* Der Ursprung sitzt unten mittig, damit die Nadelspitze beim Skalieren
-   auf ihrem Punkt stehen bleibt. */
-.map__pin { transform-origin: bottom center; transition: transform .25s ease; }
-.map__me { transform-origin: center; transition: transform .25s ease; }
-
-.map__zoom {
-  position: absolute; right: 10px; top: 10px; z-index: 2;
-  border-radius: 12px; overflow: hidden; background: rgba(255,255,255,.94);
-}
-.map__zoom button {
-  display: grid; place-items: center;
-  width: 36px; height: 36px; color: var(--text);
-}
-.map__zoom button + button { border-top: 1px solid var(--border); }
-.map__zoom svg { width: 20px; height: 20px; }
-.map__reset {
-  position: absolute; left: 10px; bottom: 10px; z-index: 2;
-  padding: 7px 12px; border-radius: 999px;
-  background: rgba(255,255,255,.94);
-  font-size: 12.5px; font-weight: 600; color: var(--text);
-}
+.map__flaeche { position: absolute; inset: 0; }
 
 /* ---------- Standort-Freigabe ---------- */
 .standort { margin: 12px 16px 0; padding: 12px; border-radius: 14px; background: var(--surface-2); }
@@ -2979,21 +2916,37 @@ button.msg__sender:hover { text-decoration: underline; }
  * nach oben/unten ersetzen. Dieser oeffnet eine vergroesserte Vollbild-
  * Kartenansicht." Dazu der Umschalter fuer die Ansicht daneben.
  */
+/* z-index 500: Leaflet legt seine eigenen Ebenen auf 200 bis 400. Mit dem
+   frueheren Wert 2 lagen beide Knoepfe unter der Karte und waren weg. */
 .map__werkzeuge {
-  position: absolute; right: 10px; top: 10px; z-index: 2;
+  position: absolute; right: 10px; top: 10px; z-index: 500;
   display: flex; flex-direction: column; gap: 6px;
 }
 .map__werkzeug {
   display: grid; place-items: center;
   width: 36px; height: 36px;
   border-radius: 11px;
-  background: rgba(255,255,255,.94);
+  /* Deckend, nicht durchscheinend: auf Satellitenkacheln ging der halb
+     durchsichtige Knopf im Bild unter. */
+  background: #fff;
   color: #1a1d21;
-  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  border: 1px solid rgba(0,0,0,.1);
+  box-shadow: 0 2px 6px rgba(0,0,0,.28);
   cursor: pointer;
 }
 .map__werkzeug svg { width: 18px; height: 18px; }
-.map__werkzeug:hover { background: #fff; }
+.map__werkzeug:hover { background: #f2f3f5; }
+
+/* Das Schild sagt, in welcher Ansicht man steht - der Umschalter geht
+   reihum, ohne Menue, und ohne Beschriftung waere der Zustand unsichtbar. */
+.map__ansicht {
+  position: absolute; left: 10px; top: 10px; z-index: 500;
+  padding: 4px 9px; border-radius: 9px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.1);
+  box-shadow: 0 2px 6px rgba(0,0,0,.2);
+  font-size: 11px; font-weight: 600; color: #1a1d21;
+}
 
 /* Vollbild: die Karte fuellt den Bereich zwischen den Leisten. */
 .map--voll {
@@ -3007,31 +2960,13 @@ button.msg__sender:hover { text-decoration: underline; }
 }
 
 /*
- * Drei Ansichten. Die Karte ist selbst gezeichnet - echte Satellitenkacheln
- * braeuchten einen Kartenanbieter und damit einen Vertrag. Die Ansichten
- * unterscheiden sich deshalb in der Farbgebung, nicht im Bildmaterial.
+ * Drei Ansichten - Standard, Satellit, Gelaende. Seit die Karte echte Kacheln
+ * laedt, macht das Bildmaterial den Unterschied, nicht mehr die Farbgebung.
+ * Die Klassen bleiben trotzdem am Rahmen: sie faerben die Flaeche hinter den
+ * Kacheln, damit beim Nachladen kein weisser Blitz durchkommt.
  */
 .map--satellit { background: #1B2A20; }
-.map--satellit .map__block { background: #2E3A2C; }
-.map--satellit .map__strasse-v,
-.map--satellit .map__strasse-h { background: #3D4A3A; }
-.map--satellit .map__park { background: #2F5233; }
-.map--satellit .map__fluss { background: #1E3A4C; }
-/* Das Schild ist eine helle Flaeche mit dunklem Text. Auf der dunklen
-   Karte muss deshalb die Flaeche mitwechseln - nur die Schriftfarbe
-   umzustellen ergaebe hellen Text auf hellem Grund. */
-.map--satellit .map__label {
-  background: rgba(12,20,15,.9);
-  border-color: rgba(255,255,255,.22);
-  color: #EAF0E6;
-}
-
 .map--gelaende { background: #EFE7D8; }
-.map--gelaende .map__block { background: #E2D7C2; }
-.map--gelaende .map__strasse-v,
-.map--gelaende .map__strasse-h { background: #FBF7EF; }
-.map--gelaende .map__park { background: #C7D6A8; }
-.map--gelaende .map__fluss { background: #A9C9DC; }
 
 /* ---------- Motive: Flaeche fuer Beitraege ohne eigenes Bild ---------- */
 /*

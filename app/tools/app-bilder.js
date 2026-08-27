@@ -32,6 +32,14 @@ const { execSync, execFileSync } = require('child_process');
 const { pruefgeraet, fensterZuklappen, dialogBestaetigen, EXPO_GO_ID } = require('./pruefgeraet');
 
 const DUNKEL = process.argv.includes('dunkel');
+/*
+ * Ein Durchlauf ueber alle Bildschirme dauert rund fuenf Minuten - jeder
+ * braucht einen App-Neustart. Wer nur einen Bildschirm geaendert hat, gibt
+ * seinen Namen mit:
+ *
+ *   npm run mac:bilder karte        nur Bilder, deren Name "karte" enthaelt
+ */
+const NUR = process.argv.slice(2).filter((a) => a !== 'dunkel');
 const ZIEL = path.join(__dirname, '..', '..', 'bilder', DUNKEL ? 'app-dunkel' : 'app-hell');
 const EXPO_URL = 'exp://127.0.0.1:8081';
 /** Kennung des Pruefgeraets - wird im Ablauf gesetzt, danach ueberall statt "booted". */
@@ -175,13 +183,38 @@ function metroLaeuft() {
     process.exit(1);
   }
 
-  for (const [bereich, name] of SEITEN) {
+  /*
+   * Das Bundle einmal vorweg bauen lassen. Beim ersten Durchlauf nach einem
+   * Metro-Neustart dauert der Bau laenger als die Wartezeit je Bildschirm -
+   * dann kommt ein Bild vom Ladebalken zurueck statt vom Bildschirm.
+   */
+  log('  Bundle wird vorgewaermt ...');
+  try {
+    execSync(
+      'curl -s -o /dev/null --max-time 240 ' +
+      '"http://127.0.0.1:8081/index.bundle?platform=ios&dev=true&minify=false"'
+    );
+  } catch {
+    log('  Hinweis: Metro antwortete nicht - laeuft "npm run wlan"?');
+  }
+
+  const gewaehlt = NUR.length
+    ? SEITEN.filter(([, name]) => NUR.some((n) => name.includes(n)))
+    : SEITEN;
+  if (!gewaehlt.length) {
+    log(`  Kein Bildschirm passt auf "${NUR.join(' ')}".`);
+    process.exit(1);
+  }
+
+  for (const [bereich, name] of gewaehlt) {
     speicherSchreiben(datei, bereich);
     appNeuStarten();
-    // Expo Go braucht einen Moment zum Laden des Bundles. 14 Sekunden sind
-    // grosszuegig, aber ein zu kurzer Wert liefert ein Bild vom Ladebalken -
-    // und das faellt beim Durchsehen nicht sofort auf.
-    schlaf(14000);
+    // Expo Go braucht einen Moment zum Laden des Bundles. 14 Sekunden waren zu
+    // knapp: am 27.08.2026 kamen zwei Durchlaeufe hintereinander mit einem
+    // Bild vom Ladebalken zurueck, und das faellt beim Durchsehen nicht
+    // sofort auf. Das Bundle ist durch das Vorwaermen oben zwar gebaut, Expo
+    // Go muss es aber je Neustart neu holen und auswerten.
+    schlaf(35000);
     execFileSync('xcrun', ['simctl', 'io', GERAET, 'screenshot', path.join(ZIEL, `${name}.png`)], {
       stdio: 'ignore',
     });
@@ -196,5 +229,5 @@ function metroLaeuft() {
   fs.writeFileSync(datei, JSON.stringify(daten));
   appNeuStarten();
 
-  log(`\n  ${SEITEN.length} Bilder in bilder/${DUNKEL ? 'app-dunkel' : 'app-hell'}/`);
+  log(`\n  ${gewaehlt.length} Bilder in bilder/${DUNKEL ? 'app-dunkel' : 'app-hell'}/`);
 })();

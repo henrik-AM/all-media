@@ -4,7 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { KarteWeb, KartenSteuerung, Pin } from '../../components/KarteWeb';
-import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
+import { avatarColor, colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { mockFriendPins, mockUsers } from '../../mocks';
 
 interface Props {
@@ -53,6 +53,9 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
       name: mockUsers[pin.id].name,
       lat,
       lng,
+      // Dieselbe Farbe wie der Avatar in der Liste darunter - sonst laesst
+      // sich eine Nadel keiner Zeile zuordnen.
+      farbe: avatarColor(pin.id),
     };
   });
 
@@ -80,6 +83,12 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
         vollbild={vollbild}
         onVollbild={() => setVollbild((v) => !v)}
         hoehe={vollbild && flaeche > 0 ? flaeche : 320}
+        /* Henrik: "Standort ausschalten wird nicht beachtet - der Nutzer wird
+           noch angezeigt." Der Schalter und die Freigabe "Niemand" nehmen die
+           eigene Nadel jetzt wirklich von der Karte. */
+        eigenerStandort={
+          sichtbar && freigabe !== 'niemand' ? { lat: 52.52, lng: 13.405 } : null
+        }
       />
 
       {/* Standort-Freigabe: steht bewusst ueber der Liste, weil es die Frage

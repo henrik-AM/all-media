@@ -120,6 +120,17 @@ function user(id) {
   return state.users[id] || { name: '?', initials: '?', color: 'linear-gradient(135deg,#B4BBC7,#8C94A3)' };
 }
 
+/*
+ * Die Farbe eines Nutzers ist ein CSS-Verlauf ("linear-gradient(...)") - gut
+ * fuer einen Avatar, unbrauchbar als Fuellfarbe einer SVG-Nadel: Leaflet
+ * reicht den Wert unveraendert weiter, und ein Verlauf faellt dort auf
+ * Schwarz zurueck. Deshalb hier die erste Farbe aus dem Verlauf.
+ */
+function farbeFuerNadel(farbe) {
+  const treffer = String(farbe || '').match(/#[0-9a-f]{3,8}\b|\brgba?\([^)]+\)/i);
+  return treffer ? treffer[0] : '#0a66ff';
+}
+
 function avatarOf(chat, size = 54) {
   if (chat.isGroup) {
     return `<div class="avatar avatar--${size}" style="background:linear-gradient(135deg,#7E93C4,#4A6699)">${ICONS.people}</div>`
@@ -4052,6 +4063,40 @@ function renderSettings() {
 }
 
 /* ------------------------------------------------- Messenger: Friend-Map */
+/*
+ * Die drei Kartenansichten hinter dem Ebenen-Knopf. Henrik: "Kartenansicht-
+ * Umschalter (Satellit, etc.) - kleines Fenster neben dem Knopf, nicht
+ * Click-through."
+ *
+ * Alle drei Anbieter liefern ohne Schluessel und ohne Vertrag - es entstehen
+ * keine Kosten. Dafuer gilt bei allen dreien eine Nutzungsgrenze fuer
+ * automatisierte Zugriffe; fuer eine echte Veroeffentlichung braeuchte es
+ * einen bezahlten Anbieter. Das ist Henriks Entscheidung, nicht meine.
+ */
+const KARTEN_STILE = [
+  {
+    key: 'standard',
+    label: 'Standard',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    quelle: '© OpenStreetMap',
+    maxZoom: 19,
+  },
+  {
+    key: 'satellit',
+    label: 'Satellit',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    quelle: '© Esri',
+    maxZoom: 19,
+  },
+  {
+    key: 'gelaende',
+    label: 'Gelände',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    quelle: '© OpenTopoMap',
+    maxZoom: 17,
+  },
+];
+
 // Prototyp-Frame "Messenger - Friend-Map": Karte mit Freunden, darunter eine
 // Liste mit letztem Standort.
 function renderFriendMap() {
@@ -4069,10 +4114,23 @@ function renderFriendMap() {
     return [lat, lng];
   };
 
+  const stil = KARTEN_STILE.find((s) => s.key === state.karteStil) || KARTEN_STILE[0];
+  const voll = state.karteVollbild;
+
   main.innerHTML = `
     <div class="scroll">
-      <div id="leaflet-map" style="height: 320px; border-radius: 12px; margin: 0 16px; overflow: hidden;"></div>
+      <div id="map" class="map map--${stil.key}${voll ? ' map--voll' : ''}">
+        <div id="mapFlaeche" class="map__flaeche"></div>
+        <div class="map__ansicht">${stil.label}</div>
+        <div class="map__werkzeuge">
+          <button class="map__werkzeug" data-mapfull aria-label="${voll ? 'Vollbild verlassen' : 'Karte im Vollbild'}">${
+            voll ? ICONS.einklappen : ICONS.ausklappen
+          }</button>
+          <button class="map__werkzeug" data-mapstil aria-label="Kartenansicht: ${stil.label}">${ICONS.ebenen}</button>
+        </div>
+      </div>
 
+      ${voll ? '' : `
       <div class="standort">
         <div class="standort__kopf">
           <span class="standort__icon">${ICONS.mapPin}</span>
@@ -4118,10 +4176,11 @@ function renderFriendMap() {
           })
           .join('')}
       </ul>
+      `}
     </div>`;
 
   setTimeout(() => {
-    const mapContainer = $('#leaflet-map');
+    const mapContainer = $('#mapFlaeche');
     if (!mapContainer) return;
 
     if (state.karte.mapInstance) {
@@ -4130,13 +4189,20 @@ function renderFriendMap() {
       state.karte.markers = {};
     }
 
-    const map = L.map(mapContainer).setView([51.5, 10], 4);
+    const map = L.map(mapContainer, { zoomControl: false }).setView(
+      state.karte.mitte || [51.5, 10],
+      state.karte.zoom || 4
+    );
     state.karte.mapInstance = map;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 18,
-    }).addTo(map);
+    L.tileLayer(stil.url, { attribution: stil.quelle, maxZoom: stil.maxZoom }).addTo(map);
+
+    // Der Ausschnitt ueberlebt das Neuzeichnen - sonst springt die Karte bei
+    // jedem Umschalten von Ansicht oder Vollbild zurueck nach Mitteleuropa.
+    map.on('moveend', () => {
+      state.karte.mitte = map.getCenter();
+      state.karte.zoom = map.getZoom();
+    });
 
     state.friends.forEach((f) => {
       const u = user(f.id);
@@ -4144,11 +4210,15 @@ function renderFriendMap() {
       const isActive = state.karte.aktiv === f.id;
       const marker = L.circleMarker([lat, lng], {
         radius: isActive ? 12 : 8,
-        fillColor: isActive ? '#ff3b30' : u.color,
-        color: isActive ? '#ff3b30' : u.color,
-        weight: 2,
+        fillColor: isActive ? '#ff3b30' : farbeFuerNadel(u.color),
+        // Weisser Rand: die Nutzerfarben sind kraeftig, aber auf einer
+        // Satellitenkachel geht jede von ihnen ohne Absetzung unter.
+        color: '#fff',
+        weight: 2.5,
         opacity: 1,
-        fillOpacity: 0.8,
+        fillOpacity: 1,
+        // Der Test und das Vollbild greifen die Nadeln ueber diese Klassen.
+        className: `map__pin${isActive ? ' is-aktiv' : ''}`,
       })
         .bindPopup(`<div style="text-align: center; font-weight: 600;">${esc(u.name)}</div>`)
         .addTo(map);
@@ -4160,18 +4230,62 @@ function renderFriendMap() {
 
       state.karte.markers[f.id] = marker;
     });
+
+    // Henrik: "Standort ausschalten wird nicht beachtet - der Nutzer wird noch
+    // angezeigt." Die eigene Nadel haengt deshalb am Schalter, nicht an der
+    // Karte. Steht die Freigabe auf "Niemand", ist sie ebenfalls weg.
+    if (state.standort.an && state.standort.wer !== 'niemand') {
+      const ort = state.karte.eigenerOrt || [52.52, 13.405];
+      // Zwei Kreise: der weite blasse Ring hebt die eigene Nadel von den
+      // Kontakten ab. Mit nur einem Punkt war sie von einem blauen Kontakt
+      // nicht zu unterscheiden.
+      L.circleMarker(ort, {
+        radius: 18,
+        fillColor: '#0a84ff',
+        stroke: false,
+        fillOpacity: 0.2,
+        interactive: false,
+      }).addTo(map);
+      L.circleMarker(ort, {
+        radius: 8,
+        fillColor: '#0a84ff',
+        color: '#fff',
+        weight: 3,
+        opacity: 1,
+        fillOpacity: 1,
+        className: 'map__me',
+      })
+        .bindPopup('<div style="text-align:center;font-weight:600;">Du</div>')
+        .addTo(map);
+    }
   }, 0);
 
-  $('#standortAn').addEventListener('change', (e) => {
-    state.standort.an = e.target.checked;
-    toast(state.standort.an ? 'Standort wird geteilt' : 'Standort ist aus');
+  main.querySelector('[data-mapfull]').addEventListener('click', () => {
+    state.karteVollbild = !state.karteVollbild;
+    renderFriendMap();
   });
-  main.querySelectorAll('[data-wer]').forEach((b) =>
-    b.addEventListener('click', () => {
-      state.standort.wer = b.dataset.wer;
-      toast(`Standort sichtbar für: ${b.textContent.trim()}`);
-    })
-  );
+  main.querySelector('[data-mapstil]').addEventListener('click', () => {
+    const i = KARTEN_STILE.findIndex((s) => s.key === stil.key);
+    const naechster = KARTEN_STILE[(i + 1) % KARTEN_STILE.length];
+    state.karteStil = naechster.key;
+    toast(`Kartenansicht: ${naechster.label}`);
+    renderFriendMap();
+  });
+
+  if (!voll) {
+    $('#standortAn').addEventListener('change', (e) => {
+      state.standort.an = e.target.checked;
+      toast(state.standort.an ? 'Standort wird geteilt' : 'Standort ist aus');
+      renderFriendMap();
+    });
+    main.querySelectorAll('[data-wer]').forEach((b) =>
+      b.addEventListener('click', () => {
+        state.standort.wer = b.dataset.wer;
+        toast(`Standort sichtbar für: ${b.textContent.trim()}`);
+        renderFriendMap();
+      })
+    );
+  }
 
   main.querySelectorAll('[data-zoom]').forEach((el) =>
     el.addEventListener('click', (e) => {
