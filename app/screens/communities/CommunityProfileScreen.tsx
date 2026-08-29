@@ -19,11 +19,12 @@ interface Props {
   onAction: (key: string) => void;
   /** Fuehrt zum Formular, das Name, Info und Link aendert. */
   onBearbeiten: () => void;
+  onAvatarPress?: () => void;
   onNotice: (message: string) => void;
 }
 
 /** Prototyp-Frame "Community - Profil": Erstellt und Beigetreten. */
-export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction, onBearbeiten, onNotice }: Props) => {
+export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction, onBearbeiten, onAvatarPress, onNotice }: Props) => {
   // Die Liste kommt aus dem gemeinsamen Zustand, nicht mehr direkt aus den
   // Mock-Daten - sonst taucht ein neu erstellter Kanal hier nicht auf.
   const { communities, ungelesen, eigenesProfil } = useProfil();

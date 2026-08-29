@@ -81,7 +81,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
 
   const auswahl = contacts.filter((c) => mockUsers[c.id] && c.id !== ausserId);
 
-  const titel = { menue: 'Anhang', standort: 'Standort senden', kontakt: 'Kontakt senden' }[schritt];
+  const titel = { menue: 'Anhang', standort: 'Standort senden', kontakt: 'Kontakt senden', liveStandort: 'Live-Standort' }[schritt];
 
   return (
     <SheetRahmen visible={visible} title={titel} onClose={schliessen} hoch={schritt !== 'menue'}>
