@@ -79,7 +79,7 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {channels.length > 0 && (
-            <Druck style={styles.sectionHeadPress} onPress={() => {}}>
+            <Druck style={styles.sectionHeadPress} onPress={() => setFilter('channels')}>
               <Text style={styles.sectionHead}>Kanäle →</Text>
             </Druck>
           )}
@@ -104,7 +104,7 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
           ))}
 
           {people.length > 0 && (
-            <Druck style={styles.sectionHeadPress} onPress={() => {}}>
+            <Druck style={styles.sectionHeadPress} onPress={() => setFilter('people')}>
               <Text style={styles.sectionHead}>Profile →</Text>
             </Druck>
           )}

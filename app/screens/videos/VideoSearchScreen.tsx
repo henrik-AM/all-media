@@ -113,7 +113,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {result.reels.length > 0 && (
-            <Section title="Reels" onTitlePress={() => onNotice('Alle Reels anzeigen')}>
+            <Section title="Reels" onTitlePress={() => onOpenExplorer({ art: 'reels', wert: '' })}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reelRow}>
                 {result.reels.map((v) => (
                   <Druck key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
@@ -126,7 +126,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.clips.length > 0 && (
-            <Section title="Querformat" onTitlePress={() => onNotice('Alle Querformat-Videos')}>
+            <Section title="Querformat" onTitlePress={() => onOpenExplorer({ art: 'querformat', wert: '' })}>
               {result.clips.map((c) => (
                 <Row
                   key={c.id}
@@ -141,7 +141,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.posts.length > 0 && (
-            <Section title="Beiträge" onTitlePress={() => onNotice('Alle Beiträge')}>
+            <Section title="Beiträge" onTitlePress={() => onOpenExplorer({ art: 'beitraege', wert: '' })}>
               <View style={styles.grid}>
                 {result.posts.map((p) => (
                   <Druck key={p.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice('Beitrag öffnet im Feed')}>
@@ -153,7 +153,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.people.length > 0 && (
-            <Section title="Profile" onTitlePress={() => onNotice('Alle Profile')}>
+            <Section title="Profile" onTitlePress={() => onOpenExplorer({ art: 'profile', wert: '' })}>
               {result.people.map((u) => (
                 <Druck key={u.id} style={styles.row} onPress={() => onOpenProfile(u.id)}>
                   <Avatar id={u.id} name={u.name} size={44} />
@@ -167,7 +167,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.tags.length > 0 && (
-            <Section title="# Hashtags" onTitlePress={() => onNotice('Alle Hashtags')}>
+            <Section title="# Hashtags" onTitlePress={() => onOpenExplorer({ art: 'hashtag', wert: '#' })}>
               <View style={styles.tags}>
                 {result.tags.map((h) => (
                   <Druck key={h.tag} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: h.tag })}>
@@ -181,7 +181,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.places.length > 0 && (
-            <Section title="Standorte" onTitlePress={() => onNotice('Alle Standorte')}>
+            <Section title="Standorte" onTitlePress={() => onOpenExplorer({ art: 'standort', wert: '' })}>
               {result.places.map((p) => (
                 <Row
                   key={p.id}
@@ -195,7 +195,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.sounds.length > 0 && (
-            <Section title="Sounds" onTitlePress={() => onNotice('Alle Sounds')}>
+            <Section title="Sounds" onTitlePress={() => onOpenExplorer({ art: 'sound', wert: '' })}>
               {result.sounds.map((s) => (
                 <Row
                   key={s.id}
