@@ -83,13 +83,15 @@ export const TopSwitcher = ({ area, active, onChange, zaehler }: Props) => {
 
 const styles = themenStyles((colors) => ({
   /* Volle Breite, damit die Insel darin mittig sitzt — aber ohne Klicks
-     ausserhalb der Insel abzufangen (pointerEvents="box-none" oben). */
+     ausserhalb der Insel abzufangen (pointerEvents="box-none" oben).
+     Kein backgroundColor, damit der Content dahinter sichtbar bleibt. */
   wrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     zIndex: 15,
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   insel: {
     flexDirection: 'row',
