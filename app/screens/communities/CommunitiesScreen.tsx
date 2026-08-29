@@ -102,7 +102,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }
           onPress={() => toggleJoin(item)}
         >
           <Text style={[styles.joinText, item.joined && styles.joinTextActive]}>
-            {item.joined ? 'Mitglied' : 'Beitreten'}
+            {item.joined ? 'Gefolgt' : 'Beitreten'}
           </Text>
         </Druck>
       </View>

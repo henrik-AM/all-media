@@ -163,6 +163,14 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
 
     pins.forEach(pin => {
       const isActive = pin.id === aktivId;
+      const getInitials = (name) => {
+        return name
+          .split(' ')
+          .map(w => w[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase();
+      };
       const marker = L.circleMarker([pin.lat, pin.lng], {
         radius: isActive ? 12 : 8,
         fillColor: isActive ? '#ff3b30' : pin.farbe,
@@ -187,6 +195,34 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
         label.setContent(pin.name);
         marker.bindTooltip(label);
       }
+
+      // Initialen beim Herauszoomen anzeigen
+      marker.on('add', function() {
+        const initials = getInitials(pin.name);
+        const updateLabel = () => {
+          const zoom = map.getZoom();
+          if (zoom < 10) {
+            this.setIcon(L.divIcon({
+              html: \`<div style="
+                width: 32px; height: 32px;
+                display: flex; align-items: center; justify-content: center;
+                background-color: \${pin.farbe};
+                border: 2.5px solid white;
+                border-radius: 50%;
+                color: white;
+                font-size: 10px;
+                font-weight: 700;
+              ">\${initials}</div>\`,
+              iconSize: [32, 32],
+              className: 'pin-initials'
+            }));
+          } else {
+            this.setIcon(undefined);
+          }
+        };
+        updateLabel();
+        map.on('zoomend', updateLabel);
+      });
 
       marker.on('click', () => {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pin', id: pin.id }));

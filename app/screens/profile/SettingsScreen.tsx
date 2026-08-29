@@ -463,7 +463,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                   disabled={!!item.toggle}
                 >
                   <Ionicons name={item.icon} size={20} color={item.gefahr ? colors.danger : colors.text2} />
-                  <Text style={[styles.itemLabel, item.gefahr && styles.danger]}>{item.label}</Text>
+                  <Text style={[styles.itemLabel, item.gefahr && styles.danger]} numberOfLines={1}>{item.label}</Text>
                   {item.toggle ? (
                     <Switch
                       value={item.toggle === 'theme' ? isDark : switches[item.toggle]}
@@ -621,7 +621,7 @@ const styles = themenStyles((colors) => ({
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     height: 54,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   itemLabel: { flex: 1, ...typography.body, color: colors.text },
