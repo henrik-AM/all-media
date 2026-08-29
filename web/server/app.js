@@ -10,6 +10,7 @@ const express = require('express');
 const path = require('path');
 const supabaseApi = require('./supabase-api');
 const syncHandlers = require('./sync-handlers');
+const syncHandlersExt = require('./sync-handlers-extended');
 
 const app = express();
 
@@ -1025,8 +1026,8 @@ app.get('/api/explorer/:art/:wert', (req, res) => {
   });
 });
 
-/** Eigenen Kanal anlegen (Prototyp "CP + erstellen"). */
-app.post('/api/communities', (req, res) => {
+// Community erstellen — synced mit Supabase
+app.post('/api/communities', async (req, res) => {
   const name = String(req.body?.name || '').trim();
   const thema = String(req.body?.thema || '').trim();
   if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
@@ -1034,11 +1035,15 @@ app.post('/api/communities', (req, res) => {
     return res.json({ ok: false, error: 'Diesen Kanal gibt es schon' });
   }
 
+  // Sync zu Supabase
+  const isPrivate = req.body?.sichtbarkeit !== 'public';
+  const supabaseResult = await syncHandlersExt.handleCreateCommunity('me', name, thema || '', isPrivate);
+
   const community = {
-    id: `k${Date.now()}`,
+    id: supabaseResult?.community?.id || (`k${Date.now()}`),
     name,
     members: 1,
-    visibility: req.body?.sichtbarkeit === 'public' ? 'public' : 'private',
+    visibility: isPrivate ? 'private' : 'public',
     topic: thema || 'Ohne Beschreibung',
     joined: true,
     unread: 0,
@@ -1066,12 +1071,16 @@ const eigeneId = (praefix) => `${praefix}_e${++eigeneNummer}`;
  */
 const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
 
-app.post('/api/eigene/beitrag', (req, res) => {
+// Post erstellen — synced mit Supabase
+app.post('/api/eigene/beitrag', async (req, res) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
   if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
 
+  // Sync zu Supabase
+  const supabaseResult = await syncHandlersExt.handleCreatePost('me', beschreibung, []);
+
   const beitrag = {
-    id: eigeneId('p'),
+    id: supabaseResult?.post?.id || eigeneId('p'),
     userId: 'me',
     location: String(req.body?.ort || '').trim(),
     music: musikAus(req.body),
@@ -1093,7 +1102,8 @@ app.post('/api/eigene/beitrag', (req, res) => {
   res.json({ ok: true, beitrag });
 });
 
-app.post('/api/eigene/video', (req, res) => {
+// Video erstellen — synced mit Supabase
+app.post('/api/eigene/video', async (req, res) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
   if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
   const quer = req.body?.format === 'quer';
@@ -1115,8 +1125,11 @@ app.post('/api/eigene/video', (req, res) => {
     return res.json({ ok: true, clip });
   }
 
+  // Sync zu Supabase
+  const supabaseResult = await syncHandlersExt.handleCreateVideo('me', beschreibung, beschreibung, '');
+
   const video = {
-    id: eigeneId('v'),
+    id: supabaseResult?.video?.id || eigeneId('v'),
     userId: 'me',
     description: beschreibung,
     location: String(req.body?.ort || '').trim(),
@@ -1245,25 +1258,23 @@ app.post('/api/eigene/spende', (req, res) => {
  *
  * Nur eigene Inhalte - alles andere gehoert jemand anderem.
  */
-app.post('/api/eigene/:id/loeschen', (req, res) => {
+// Inhalte löschen — synced mit Supabase
+app.post('/api/eigene/:id/loeschen', async (req, res) => {
   const id = req.params.id;
 
   const imRaster = gridItems.me.some((g) => g.id === id);
 
-  /*
-   * Zwei Faelle. Selbst veroeffentlichte Beitraege stehen in posts, videos
-   * oder clips - die kommen dort raus. Die Kacheln, mit denen das Profil von
-   * Anfang an gefuellt ist (me_g0 …), stehen nur im Raster; sie sind
-   * trotzdem eigene Inhalte und muessen sich genauso loeschen lassen. Ohne
-   * diesen zweiten Fall waere "Löschen" auf zwoelf von zwoelf Kacheln
-   * wirkungslos gewesen.
-   */
   for (const liste of [posts, videos, clips]) {
     const stelle = liste.findIndex((e) => e.id === id);
     if (stelle === -1) continue;
     if (liste[stelle].userId !== 'me') {
       return res.json({ ok: false, error: 'Das ist nicht dein Beitrag' });
     }
+
+    // Sync zu Supabase
+    const contentType = liste === posts ? 'post' : liste === videos ? 'video' : 'clip';
+    await syncHandlersExt.handleDeleteContent(id, 'me', contentType);
+
     liste.splice(stelle, 1);
     gridItems.me = gridItems.me.filter((g) => g.id !== id);
     if (liste === posts) profiles.me.posts = Math.max(0, profiles.me.posts - 1);
@@ -1417,15 +1428,20 @@ app.get('/api/comments/:targetId', (req, res) => {
   res.json(comments[req.params.targetId] || []);
 });
 
-app.post('/api/comments/:targetId', (req, res) => {
+// Kommentar erstellen — synced mit Supabase
+app.post('/api/comments/:targetId', async (req, res) => {
   const { text } = req.body || {};
   if (!text || !text.trim()) return res.status(400).json({ error: 'Text erforderlich' });
 
   const targetId = req.params.targetId;
+
+  // Sync zu Supabase
+  const supabaseResult = await syncHandlersExt.handleCreateComment(targetId, 'me', text.trim());
+
   if (!comments[targetId]) comments[targetId] = [];
 
   const comment = {
-    id: 'cm' + Date.now(),
+    id: supabaseResult?.comment?.id || ('cm' + Date.now()),
     userId: 'me',
     text: text.trim(),
     time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
@@ -1440,41 +1456,44 @@ app.post('/api/comments/:targetId', (req, res) => {
   res.json(comment);
 });
 
-app.post('/api/comments/:targetId/:commentId/like', (req, res) => {
+// Kommentar liken — synced mit Supabase
+app.post('/api/comments/:targetId/:commentId/like', async (req, res) => {
   const list = comments[req.params.targetId] || [];
   const comment = list.find((c) => c.id === req.params.commentId);
   if (!comment) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  // Sync zu Supabase
+  await syncHandlersExt.handleLikeComment(req.params.commentId, 'me');
 
   comment.liked = !comment.liked;
   comment.likes += comment.liked ? 1 : -1;
   res.json(comment);
 });
 
-app.post('/api/posts/:id/:action', (req, res) => {
+// Post-Aktionen — alle synced mit Supabase
+app.post('/api/posts/:id/:action', async (req, res) => {
   const post = posts.find((p) => p.id === req.params.id);
   if (!post) return res.status(404).json({ error: 'Nicht gefunden' });
 
   const { action } = req.params;
+  const postId = req.params.id;
+
   if (action === 'like') {
+    await syncHandlersExt.handleLikeContent(postId, 'me', 'post');
     post.liked = !post.liked;
     post.likes += post.liked ? 1 : -1;
   } else if (action === 'save') {
+    await syncHandlersExt.handleSaveContent(postId, 'me', 'post');
     post.saved = !post.saved;
   } else if (action === 'follow') {
-    /*
-     * Punkt 42: Folgen am Beitrag war bisher ein Merkmal der einen Kachel -
-     * das Profil des Autors und die eigene "Gefolgt"-Zahl blieben davon
-     * unberuehrt, und zwei Beitraege derselben Person konnten sich
-     * widersprechen. Jetzt laeuft es ueber dasselbe Umschalten wie ueberall
-     * sonst, und alle Beitraege dieser Person ziehen mit.
-     */
     const profil = profiles[post.userId];
     const folgt = profil ? folgenUmschalten(profil) : !post.following;
     for (const p of posts) if (p.userId === post.userId) p.following = folgt;
+    if (profil) await syncHandlers.handleFollowUser('me', post.userId);
   } else if (action === 'notify') {
     post.notify = !post.notify;
   } else if (action === 'repost') {
-    // Der eigene Repost landet im Repost-Reiter des eigenen Profils.
+    await syncHandlersExt.handleRepostContent(postId, 'me', 'post');
     post.reposted = !post.reposted;
     post.reposts += post.reposted ? 1 : -1;
     setzeRepost('post', post.id, post.reposted);
@@ -1809,19 +1828,26 @@ app.post('/api/chats/:chatId/accept', (req, res) => {
   res.json({ ok: true, chat });
 });
 
-// Story liken. Der Zustand liegt beim Server, damit das Herz beim erneuten
-// Oeffnen der Story noch rot ist.
-app.post('/api/stories/:id/like', (req, res) => {
+// Story liken — synced mit Supabase
+app.post('/api/stories/:id/like', async (req, res) => {
   const story = stories.find((s) => s.id === req.params.id);
   if (!story) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  // Sync zu Supabase
+  await syncHandlersExt.handleLikeStory(req.params.id, 'me');
 
   story.liked = !story.liked;
   res.json(story);
 });
 
-app.post('/api/stories/:id/seen', (req, res) => {
+// Story als angesehen markieren — synced mit Supabase
+app.post('/api/stories/:id/seen', async (req, res) => {
   const story = stories.find((s) => s.id === req.params.id);
-  if (story) story.viewed = true;
+  if (story) {
+    story.viewed = true;
+    // Sync zu Supabase
+    await syncHandlersExt.handleViewStory(req.params.id, 'me');
+  }
   res.json({ ok: true });
 });
 
