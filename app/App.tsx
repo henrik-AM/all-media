@@ -118,6 +118,8 @@ const Shell = () => {
   const [formular, setFormular] = useState<Formular | null>(null);
   /** Abschnitt, bei dem die Einstellungen aufgehen sollen. */
   const [settingsSprung, setSettingsSprung] = useState<string | null>(null);
+  /** Bereich, von dem man zu den Settings kam (messenger/videos/communities). */
+  const [settingsVonBereich, setSettingsVonBereich] = useState<AreaKey | null>(null);
   const [teilenZiel, setTeilenZiel] = useState<TeilenZiel | null>(null);
   /** Aufnahme aus der Kamera, die auf die Wahl eines Chats wartet. */
   const [aufnahmeFuerChat, setAufnahmeFuerChat] = useState<string | null>(null);
@@ -538,6 +540,7 @@ const Shell = () => {
     if (key === 'bell') return setSheet('mitteilungen');
     if (key === 'create') return setSheet('erstellen');
     setSettingsSprung(bereich === 'communities' ? 'communitys' : 'videos');
+    setSettingsVonBereich(area);
     setArea('settings');
   };
 
@@ -549,6 +552,7 @@ const Shell = () => {
    */
   const profilBearbeiten = () => {
     setSettingsSprung('konto');
+    setSettingsVonBereich(area);
     setArea('settings');
   };
 
@@ -952,7 +956,7 @@ const Shell = () => {
           <MessengerProfileScreen
             onSwitchArea={switchArea}
             onSwitchAccount={() => setSheet('konto')}
-            onOpenSettings={() => setArea('settings')}
+            onOpenSettings={() => { setSettingsVonBereich('messenger'); setArea('settings'); }}
             onBearbeiten={profilBearbeiten}
             onAvatarPress={() => setOverlay({ kind: 'avatarViewer', userId: 'me', name: profil.eigenesProfil.name })}
             onNotice={setNotice}
@@ -1030,6 +1034,13 @@ const Shell = () => {
         onSwitchAccount={() => setSheet('konto')}
         sprung={settingsSprung}
         onSprungFertig={() => setSettingsSprung(null)}
+        onBack={() => {
+          if (settingsVonBereich) {
+            setArea(settingsVonBereich);
+            setSubs((prev) => ({ ...prev, [settingsVonBereich]: 'profile' }));
+            setSettingsVonBereich(null);
+          }
+        }}
       />
     );
   };

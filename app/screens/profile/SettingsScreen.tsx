@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -272,12 +273,15 @@ interface Props {
    */
   sprung?: string | null;
   onSprungFertig?: () => void;
+  /** Zurueck zur vorherigen Seite (Profil/Messenger). */
+  onBack?: () => void;
 }
 
-export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig }: Props) => {
+export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack }: Props) => {
   const { user, konten } = useContext(AuthContext);
   const { communities, istBlockiert, istStumm, raster, gefolgt, eigenesProfil, profilSpeichern } =
     useProfil();
+  const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
   // Der offene Punkt und die getroffenen Auswahlen. Sie gelten fuer diese
   // Sitzung - dauerhaft speichern kann erst das Backend.
@@ -398,6 +402,11 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         nehmen.
       */}
       <View style={[styles.head, { paddingTop: insets.top + spacing.sm }]}>
+        {onBack && (
+          <Druck style={styles.back} onPress={onBack} hitSlop={8}>
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </Druck>
+        )}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
           {SECTIONS.map((section) => (
             <Druck
@@ -561,7 +570,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
 const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
-  head: { paddingTop: spacing.md, paddingBottom: spacing.sm },
+  head: { paddingTop: spacing.md, paddingBottom: spacing.sm, position: 'relative' },
+  back: { position: 'absolute', left: spacing.lg, top: spacing.md + spacing.sm, zIndex: 10 },
   pills: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   pill: {
     paddingHorizontal: 14,
