@@ -80,8 +80,9 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
   // Eigene Aufnahmen sollen auch ueber die Suche zu finden sein.
   const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
   const [query, setQuery] = useState('');
+  const [filterArt, setFilterArt] = useState<'alle' | 'reels' | 'clips' | 'posts' | 'people' | 'tags' | 'places' | 'sounds'>('alle');
 
-  const result = useMemo(() => {
+  const allResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     const hit = (text: string) => !q || text.toLowerCase().includes(q);
 
@@ -95,6 +96,11 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
       sounds: mockSounds.filter((s) => hit(s.title) || hit(s.artist)),
     };
   }, [query, clips, eigeneBeitraege, eigeneVideos]);
+
+  const result = useMemo(() => {
+    if (filterArt === 'alle') return allResults;
+    return { [filterArt]: allResults[filterArt as keyof typeof allResults] };
+  }, [allResults, filterArt]);
 
   const total = Object.values(result).reduce((sum, list) => sum + list.length, 0);
 

@@ -283,7 +283,9 @@ const StandortKopf = ({
   <View style={styles.kopf}>
     <View style={styles.ortZeile}>
       <Ionicons name="location-outline" size={22} color={colors.text} />
-      <Text style={styles.titelKlein}>{platz.name}</Text>
+      <Druck onPress={onAlleFotos}>
+        <Text style={styles.titelKlein}>{platz.name}</Text>
+      </Druck>
       <Text style={styles.zahl}>{compact(platz.posts)} Beiträge</Text>
     </View>
     <Text style={styles.adresse}>{platz.adresse}</Text>
