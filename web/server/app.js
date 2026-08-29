@@ -8,6 +8,7 @@
 
 const express = require('express');
 const path = require('path');
+const supabaseApi = require('./supabase-api');
 
 const app = express();
 
@@ -612,9 +613,49 @@ app.post('/api/reset', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/bootstrap', (req, res) => {
-  // Wem man folgt, gleich mitliefern - sonst zeigt der Folgen-Knopf im
-  // Video-Feed "Folgen", obwohl man der Person laengst folgt.
+// Neue async Bootstrap-Funktion mit Supabase-Unterstützung
+async function getBootstrapData() {
+  // Versuche Supabase-Daten zu laden
+  const supabaseData = await supabaseApi.bootstrapData();
+
+  // Wenn Supabase erfolgreich: nutze echte Daten
+  if (supabaseData) {
+    const { users: supaUsers, contacts: supaContacts, chats: supaChats, stories: supaStories, videos: supaVideos } = supabaseData;
+
+    // Berechne abgeleitete Felder wie bisher
+    const gefolgt = Object.fromEntries(
+      Object.entries(supaUsers).map(([id, u]) => [id, false]) // TODO: aus Supabase laden
+    );
+    const ungelesen = { videos: 0, communities: 0 }; // TODO: aus Supabase laden
+    const blockiert = []; // TODO: aus Supabase laden
+    const stummgeschaltet = []; // TODO: aus Supabase laden
+    const privateProfile = []; // TODO: aus Supabase laden
+
+    return {
+      users: supaUsers,
+      chats: supaChats,
+      stories: supaStories,
+      contacts: supaContacts,
+      communities: communities || [], // Fallback zu Mock
+      videos: supaVideos || [],
+      posts: posts || [], // Fallback zu Mock
+      clips: clips || [], // Fallback zu Mock
+      communityChats: communityChats || [],
+      archiviert: archiviert || [],
+      hashtags: hashtags || [],
+      sounds: sounds || [],
+      places: places || [],
+      friends: friends || [],
+      gefolgt,
+      ungelesen,
+      blockiert,
+      stummgeschaltet,
+      privateProfile,
+      eigenesProfil: supaUsers.me ? { bio: supaUsers.me.bio, link: supaUsers.me.link } : { bio: '', link: '' },
+    };
+  }
+
+  // Fallback: Mock-Daten (wie bisher)
   const gefolgt = Object.fromEntries(
     Object.entries(profiles).map(([id, p]) => [id, !!p.following_me])
   );
@@ -622,18 +663,12 @@ app.get('/api/bootstrap', (req, res) => {
     videos: mitteilungen.filter((m) => m.bereich === 'videos' && !m.gelesen).length,
     communities: mitteilungen.filter((m) => m.bereich === 'communities' && !m.gelesen).length,
   };
-  // Wen man blockiert oder stummgeschaltet hat - fuer die Listen in den
-  // Einstellungen.
   const blockiert = Object.keys(profiles).filter((id) => profiles[id].blocked);
   const stummgeschaltet = Object.keys(profiles).filter((id) => profiles[id].muted);
-  // Punkt 57: wer ein privates Profil hat, bekommt eine Anfrage statt einer
-  // sofortigen Freundschaft. Die Oberflaeche muss das vorher wissen, damit
-  // der Knopf gleich richtig beschriftet ist.
   const privateProfile = Object.keys(users).filter((id) => users[id].privat);
 
-  res.json({
+  return {
     users, chats, stories, contacts, communities,
-    // Die Kommentarzahl kommt aus der echten Liste, siehe mitKommentarzahl.
     videos: mitKommentarzahl(videos),
     posts: mitFolgezustand(mitKommentarzahl(posts)),
     clips: mitKommentarzahl(clips),
@@ -641,15 +676,14 @@ app.get('/api/bootstrap', (req, res) => {
     archiviert,
     hashtags, sounds, places, friends, gefolgt, ungelesen, blockiert, stummgeschaltet,
     privateProfile,
-    /*
-     * Info und Link des eigenen Kontos. Sie lagen bisher nur hinter
-     * /api/profile/me, das allein das Videos-Profil abruft. Folge: das
-     * Bearbeiten-Formular oeffnete sich mit leeren Feldern (Punkt 2,
-     * "Bearbeitungsansicht wirkt leer"), und Messenger- und Community-Profil
-     * behalfen sich mit fest eingetragenem Text.
-     */
     eigenesProfil: { bio: profiles.me.bio, link: profiles.me.link },
-  });
+  };
+}
+
+// /api/bootstrap Endpoint — jetzt async
+app.get('/api/bootstrap', async (req, res) => {
+  const data = await getBootstrapData();
+  res.json(data);
 });
 
 /* ------------------------------------------------- Kontakteinstellungen */

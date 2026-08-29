@@ -4,7 +4,8 @@
   "private": true,
   "description": "Die dauerhaft erreichbare Fassung der All-Media-Website.",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "@supabase/supabase-js": "^2.43.0"
   },
   "scripts": {
     "start": "node server/lokal.js",
