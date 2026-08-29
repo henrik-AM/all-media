@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -24,6 +25,7 @@ const FREIGABEN: { key: Freigabe; label: string; text: string }[] = [
 
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
 export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotice }: Props) => {
+  const insets = useSafeAreaInsets();
   const karte = useRef<KartenSteuerung>(null);
   const [aktiv, setAktiv] = useState<string | null>(null);
   const [sichtbar, setSichtbar] = useState(true);
@@ -72,7 +74,7 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={[styles.content, vollbild && styles.contentVoll]}
+      contentContainerStyle={[styles.content, vollbild && styles.contentVoll, { paddingTop: vollbild ? 0 : insets.top + spacing.md }]}
       scrollEnabled={!vollbild}
       onLayout={(e) => setFlaeche(e.nativeEvent.layout.height)}
     >
