@@ -1885,7 +1885,7 @@ function openCall(ziel, art) {
         ${
           art === 'video' && zustand === 'verbunden'
             ? `<div class="anruf__video">${ICONS.video}
-                <span>Bildübertragung folgt mit dem Backend</span>
+                <span>Videoübertragung kommt bald</span>
               </div>`
             : ''
         }
@@ -3962,7 +3962,8 @@ function openEinstellung(punkt, nachher) {
     );
   }
 
-  toast(`${punkt.label} folgt mit dem Backend`);
+  // Diese Einstellung ist noch in Entwicklung
+  toast(`${punkt.label} ist noch in Entwicklung`);
 }
 
 function renderSettings() {
@@ -4106,7 +4107,12 @@ function renderSettings() {
       if (punkt) return openEinstellung(punkt);
 
       // Die zwei Punkte ganz unten stehen ausserhalb der Abschnitte.
-      if (b.dataset.setting === 'Abmelden') return toast('Abmelden folgt mit dem Backend');
+      if (b.dataset.setting === 'Abmelden') {
+        // Abmelden: Sitzung clearen (aktuell Mock-User "me")
+        localStorage.clear();
+        location.reload();
+        return;
+      }
       toast('All Media 1.0.0 — gebaut aus dem Figma-Prototypen');
     })
   );
