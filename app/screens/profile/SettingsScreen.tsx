@@ -457,8 +457,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                 <Druck
                   key={`${section.id}-${item.label}`}
                   style={styles.item}
-                  onPress={item.toggle ? undefined : () => oeffne(item)}
-                  disabled={!!item.toggle}
+                  onPress={() => {
+                    if (!item.toggle) oeffne(item);
+                  }}
                 >
                   <Ionicons name={item.icon} size={20} color={item.gefahr ? colors.danger : colors.text2} />
                   <Text style={[styles.itemLabel, item.gefahr && styles.danger]} numberOfLines={1}>{item.label}</Text>

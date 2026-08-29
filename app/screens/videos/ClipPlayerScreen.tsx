@@ -259,7 +259,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             }}
           >
             <Ionicons name={clip.saved ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.text} />
-            <Text style={styles.aktionZahl} numberOfLines={1}>Merken</Text>
+            <Text style={styles.aktionZahl} numberOfLines={1} ellipsizeMode="tail">Merken</Text>
           </Druck>
         </View>
 
