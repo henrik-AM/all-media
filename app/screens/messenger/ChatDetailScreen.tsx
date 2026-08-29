@@ -36,6 +36,7 @@ interface Props {
   /** Standort-Karte im Chat antippen. */
   onOpenStandort?: (name: string) => void;
   onOpenProfile: (userId: string) => void;
+  onOpenGroupSettings?: (chatId: string) => void;
   /** Offene Kontaktanfrage annehmen. */
   onAcceptRequest?: (chatId: string) => void;
 }
@@ -47,6 +48,7 @@ export const ChatDetailScreen = ({
   onCall,
   onCamera,
   onOpenProfile,
+  onOpenGroupSettings,
   onAcceptRequest,
   contacts = [],
   onNotice,
@@ -202,8 +204,14 @@ export const ChatDetailScreen = ({
         <Avatar id={chat.userId ?? chat.id} name={chat.name} size={sizes.avatarSm} group={chat.isGroup} />
         <Druck
           style={styles.headerBody}
-          onPress={() => chat.userId && onOpenProfile(chat.userId)}
-          disabled={!chat.userId}
+          onPress={() => {
+            if (chat.isGroup) {
+              onOpenGroupSettings?.(chat.id);
+            } else if (chat.userId) {
+              onOpenProfile(chat.userId);
+            }
+          }}
+          disabled={!chat.userId && !chat.isGroup}
         >
           <Text style={styles.headerName} numberOfLines={1}>
             {chat.name}

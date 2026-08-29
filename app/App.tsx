@@ -694,6 +694,7 @@ const Shell = () => {
         }
         onCamera={() => setOverlay({ kind: 'camera', zielChat: overlay.chat })}
         onOpenProfile={openProfile}
+        onOpenGroupSettings={(chatId) => setNotice(`Gruppeneinstellungen: ${overlay.chat.name}`)}
         onAcceptRequest={acceptRequest}
         contacts={contacts}
         onNotice={setNotice}
