@@ -46,6 +46,8 @@ import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
 import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
+import { FollowersScreen } from './screens/profile/FollowersScreen';
+import { FollowingScreen } from './screens/profile/FollowingScreen';
 import { colors, themenStyles } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
 import { mockChats, mockClips, mockCommunities, mockContacts, mockMessages, mockPlaces, mockSounds, mockStories, mockUsers } from './mocks';
@@ -79,6 +81,8 @@ type Overlay =
   | { kind: 'community'; communityId: string }
   | { kind: 'editSelectedContacts' }
   | { kind: 'avatarViewer'; userId: string; name: string }
+  | { kind: 'followers'; userId: string }
+  | { kind: 'following'; userId: string }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -261,9 +265,23 @@ const Shell = () => {
     setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])] });
 
   const openChatWith = (userId: string) => {
-    const chat = chats.find((c) => c.userId === userId);
-    if (chat) oeffneChat(chat);
-    else setNotice('Noch kein Chat mit dieser Person');
+    const person = mockUsers[userId];
+    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
+
+    if (!chat) {
+      chat = {
+        id: `c${Date.now()}`,
+        name: person.name,
+        userId,
+        isGroup: false,
+        preview: 'Chat gestartet',
+        time: now(),
+        unreadCount: 0,
+      };
+      setChats((prev) => [chat as Chat, ...prev]);
+    }
+
+    oeffneChat(chat);
   };
 
   /** Beitrag oder Video in den Chat mit dieser Person legen. */
@@ -746,6 +764,8 @@ const Shell = () => {
           const person = mockUsers[overlay.userId];
           setOverlay({ kind: 'avatarViewer', userId: overlay.userId, name: person?.name ?? 'Profil' });
         }}
+        onOpenFollowers={(userId) => setOverlay({ kind: 'followers', userId })}
+        onOpenFollowing={(userId) => setOverlay({ kind: 'following', userId })}
         onBlockiert={(userId, blockiert) => {
           // Blockieren hat Folgen: die Person faellt aus den Kontakten, beim
           // Aufheben kommt sie zurueck. Sonst waere der Knopf nur ein Wort.
@@ -936,6 +956,28 @@ const Shell = () => {
         id={overlay.userId}
         name={overlay.name}
         onBack={() => setOverlay(null)}
+      />
+    );
+  }
+
+  if (overlay?.kind === 'followers') {
+    return (
+      <FollowersScreen
+        userId={overlay.userId}
+        onBack={() => setOverlay(null)}
+        onOpenProfile={openPublicProfile}
+        onNotice={setNotice}
+      />
+    );
+  }
+
+  if (overlay?.kind === 'following') {
+    return (
+      <FollowingScreen
+        userId={overlay.userId}
+        onBack={() => setOverlay(null)}
+        onOpenProfile={openPublicProfile}
+        onNotice={setNotice}
       />
     );
   }

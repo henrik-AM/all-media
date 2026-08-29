@@ -10,7 +10,7 @@ import { mockPlaces, mockUsers } from '../mocks';
 import { Contact, Message } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-type Schritt = 'menue' | 'standort' | 'kontakt';
+type Schritt = 'menue' | 'standort' | 'kontakt' | 'liveStandort';
 
 interface Props {
   visible: boolean;
@@ -27,6 +27,7 @@ const PUNKTE: { key: string; label: string; icon: IconName }[] = [
   { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera-outline' },
   { key: 'galerie', label: 'Aus der Galerie', icon: 'image-outline' },
   { key: 'standort', label: 'Standort senden', icon: 'location-outline' },
+  { key: 'liveStandort', label: 'Live-Standort teilen', icon: 'navigate-circle-outline' },
   { key: 'kontakt', label: 'Kontakt senden', icon: 'person-outline' },
 ];
 
@@ -47,6 +48,37 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
     schliessen();
   };
 
+  const liveStandortTeilen = async () => {
+    try {
+      const location = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          reject,
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+      onAnhang({
+        text: `Mein Standort (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)})`,
+        standort: {
+          name: 'Mein Standort',
+          adresse: 'Live-Standort',
+          koordinaten: `${location.lat}, ${location.lng}`,
+          x: 50,
+          y: 50,
+        },
+      });
+      onNotice('Live-Standort gesendet');
+      schliessen();
+    } catch (error) {
+      onNotice('Standort-Zugriff verweigert oder nicht verfügbar');
+    }
+  };
+
   const auswahl = contacts.filter((c) => mockUsers[c.id] && c.id !== ausserId);
 
   const titel = { menue: 'Anhang', standort: 'Standort senden', kontakt: 'Kontakt senden' }[schritt];
@@ -62,11 +94,12 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
               onPress={() => {
                 if (p.key === 'kamera') return foto(false);
                 if (p.key === 'galerie') return foto(true);
+                if (p.key === 'liveStandort') return liveStandortTeilen();
                 setSchritt(p.key as Schritt);
               }}
             >
               <View style={styles.symbol}>
-                <Ionicons name={p.icon} size={18} color={colors.text2} />
+                <Ionicons name={p.icon} size={22} color={colors.white} />
               </View>
               <Text style={styles.label}>{p.label}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
@@ -97,7 +130,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
               }}
             >
               <View style={styles.symbol}>
-                <Ionicons name="location-outline" size={18} color={colors.text2} />
+                <Ionicons name="location-outline" size={22} color={colors.white} />
               </View>
               <Text style={styles.label}>{platz.name}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.text3} />
@@ -142,21 +175,21 @@ const styles = themenStyles((colors) => ({
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 13,
+    paddingVertical: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   gedrueckt: { backgroundColor: colors.surface2 },
   symbol: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface3,
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { flex: 1, ...typography.body, color: colors.text },
+  label: { flex: 1, ...typography.name, color: colors.text },
   leer: { ...typography.message, color: colors.text2, padding: spacing.lg },
 }));

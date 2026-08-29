@@ -27,10 +27,12 @@ interface Props {
   onAvatarPress?: () => void;
   /** Beim Blockieren: die Person aus den Kontakten nehmen. */
   onBlockiert?: (userId: string, blockiert: boolean) => void;
+  onOpenFollowers?: (userId: string) => void;
+  onOpenFollowing?: (userId: string) => void;
   onNotice: (message: string) => void;
 }
 
-export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onNotice }: Props) => {
+export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onOpenFollowers, onOpenFollowing, onNotice }: Props) => {
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
@@ -78,7 +80,11 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
               { value: profile.followers, label: 'Follower' },
               { value: profile.following, label: 'Gefolgt' },
             ].map((stat) => (
-              <Druck key={stat.label} style={styles.stat} onPress={() => onNotice(stat.label)}>
+              <Druck key={stat.label} style={styles.stat} onPress={() => {
+                if (stat.label === 'Follower') onOpenFollowers?.(userId);
+                else if (stat.label === 'Gefolgt') onOpenFollowing?.(userId);
+                else onNotice(stat.label);
+              }}>
                 <Text style={styles.statValue}>{compactNumber(stat.value)}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </Druck>
