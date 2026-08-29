@@ -26,6 +26,8 @@ export interface Message {
   bildUri?: string;
   standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number };
   kontakt?: { id: string; name: string; handle: string };
+  /** Story-Anhang (fixiert - nur horizontal swipeable). */
+  story?: { id: string; userId: string; mediaUri?: string };
 }
 
 export interface Chat {

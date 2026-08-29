@@ -13,6 +13,7 @@ import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { Motiv } from '../../components/Motiv';
 import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { antwortAuf } from '../../lib/antworten';
 import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from '../../mocks';
@@ -130,6 +131,18 @@ export const ChatDetailScreen = ({
 
         {item.bildUri ? (
           <Image source={{ uri: item.bildUri }} style={styles.anhangBild} />
+        ) : item.story ? (
+          <View style={styles.storyContainer}>
+            {item.story.mediaUri ? (
+              <Image source={{ uri: item.story.mediaUri }} style={styles.anhangBild} />
+            ) : (
+              <Motiv id={item.story.id} icon="image-outline" iconSize={20} style={styles.anhangBild} />
+            )}
+            <View style={styles.storyBadge}>
+              <Ionicons name="pin" size={14} color={colors.white} />
+              <Text style={styles.storyBadgeText}>Fixiert</Text>
+            </View>
+          </View>
         ) : item.standort ? (
           <Druck style={styles.ortKarte} onPress={() => onOpenStandort?.(item.standort!.name)}>
             <View style={styles.ortBild}>
@@ -496,4 +509,18 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   sendDisabled: { opacity: 0.4 },
+  storyContainer: { position: 'relative', marginBottom: 4 },
+  storyBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  storyBadgeText: { color: colors.white, ...typography.tiny, fontWeight: '600' },
 }));
