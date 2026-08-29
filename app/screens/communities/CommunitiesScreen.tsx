@@ -28,9 +28,11 @@ const FILTERS: { key: Filter; label: string }[] = [
 interface Props {
   onOpenCommunity: (community: Community) => void;
   onNotice: (message: string) => void;
+  /** Neuen Kanal erstellen (Plus-Button oben rechts). */
+  onCreateChannel?: () => void;
 }
 
-export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
+export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }: Props) => {
   const { communities, kanalBeitreten, kanalGelesen } = useProfil();
   /* Punkt: Nur eigene Communitys anzeigen, keine "Entdecken" */
   const filter = 'meine' as const;
@@ -115,6 +117,11 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
           onChangeText={setQuery}
           placeholder="Suche hier nach deinen Communitys..."
         />
+        {onCreateChannel && (
+          <Druck style={styles.plusButton} onPress={onCreateChannel} hitSlop={8}>
+            <Ionicons name="add-outline" size={24} color={colors.text} />
+          </Druck>
+        )}
       </View>
 
 
@@ -149,7 +156,8 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
 
 const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
-  header: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10, gap: spacing.md },
+  plusButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   title: { marginBottom: spacing.md, color: colors.text, ...typography.title },
 
 

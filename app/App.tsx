@@ -1024,7 +1024,7 @@ const Shell = () => {
           />
         );
       }
-      return <CommunitiesScreen onOpenCommunity={openCommunity} onNotice={setNotice} />;
+      return <CommunitiesScreen onOpenCommunity={openCommunity} onNotice={setNotice} onCreateChannel={() => setSheet('erstellen')} />;
     }
 
     return (

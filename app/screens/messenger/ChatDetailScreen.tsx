@@ -205,12 +205,16 @@ export const ChatDetailScreen = ({
         <Druck
           style={styles.headerBody}
           onPress={() => {
-            if (chat.isGroup) {
-              onOpenGroupSettings?.(chat.id);
-            } else if (chat.userId) {
+            if (!chat.isGroup && chat.userId) {
               onOpenProfile(chat.userId);
             }
           }}
+          onLongPress={() => {
+            if (chat.isGroup) {
+              onOpenGroupSettings?.(chat.id);
+            }
+          }}
+          delayLongPress={500}
           disabled={!chat.userId && !chat.isGroup}
         >
           <Text style={styles.headerName} numberOfLines={1}>
