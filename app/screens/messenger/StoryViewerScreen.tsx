@@ -27,6 +27,8 @@ interface Props {
   contacts?: Contact[];
   onOpenProfile?: (userId: string) => void;
   onNotice: (message: string) => void;
+  /** Wenn eine Story angesehen wird - zum Markieren als viewed. */
+  onStoryViewed?: (storyId: string) => void;
 }
 
 /*
@@ -45,6 +47,7 @@ export const StoryViewerScreen = ({
   onDelete,
   contacts = [],
   onOpenProfile,
+  onStoryViewed,
 }: Props) => {
   const [ansichtenOffen, setAnsichtenOffen] = useState(false);
   const [optionenOffen, setOptionenOffen] = useState(false);
@@ -65,7 +68,11 @@ export const StoryViewerScreen = ({
 
   useEffect(() => {
     progress.setValue(0);
-  }, [index, progress]);
+    // Markiere die aktuelle Story als viewed
+    if (!current.own) {
+      onStoryViewed?.(current.id);
+    }
+  }, [index, progress, current, onStoryViewed]);
 
   useEffect(() => {
     if (paused) {

@@ -1,7 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -368,7 +367,6 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   };
   const offsets = useRef<Record<string, number>>({});
   const { isDark, setTheme } = useContext(ThemeContext);
-  const insets = useSafeAreaInsets();
   const [switches, setSwitches] = useState<Record<string, boolean>>({
     videoPrivate: false,
     commPrivate: false,

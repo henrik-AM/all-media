@@ -766,10 +766,12 @@ const Shell = () => {
       <StoryViewerScreen
         story={overlay.story}
         alle={stories}
-        onClose={() => {
+        onStoryViewed={(storyId) => {
           setStories((prev) =>
-            prev.map((s) => s.id === overlay.story.id ? { ...s, viewed: true } : s)
+            prev.map((s) => s.id === storyId ? { ...s, viewed: true } : s)
           );
+        }}
+        onClose={() => {
           setOverlay(null);
         }}
         onDelete={() => {
