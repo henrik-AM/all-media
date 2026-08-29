@@ -180,7 +180,7 @@ const styles = themenStyles((colors) => ({
   },
 
   list: { flex: 1 },
-  comment: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, paddingHorizontal: spacing.lg, paddingVertical: 9 },
+  comment: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: spacing.lg, paddingVertical: 9 },
   commentBody: { flex: 1, minWidth: 0 },
   commentText: { color: colors.text, ...typography.message, lineHeight: 20 },
   /* Flaeche um den Griff - sie ist der Anfasspunkt zum Wegziehen. */
