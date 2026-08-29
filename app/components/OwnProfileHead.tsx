@@ -46,7 +46,7 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
           <Ionicons name="add-circle-outline" size={21} color={colors.text} />
         </Druck>
         <Druck onPress={() => onAction('menu')} hitSlop={8}>
-          <Ionicons name="menu-outline" size={21} color={colors.text} />
+          <Ionicons name="settings-outline" size={21} color={colors.text} />
         </Druck>
       </View>
     </View>

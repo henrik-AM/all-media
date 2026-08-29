@@ -78,7 +78,11 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
         <EmptyState icon="search-outline" title="Nichts gefunden" text={`Für „${query}" gibt es keinen Treffer.`} />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          {channels.length > 0 && <Text style={styles.sectionHead}>Kanäle →</Text>}
+          {channels.length > 0 && (
+            <Druck style={styles.sectionHeadPress} onPress={() => {}}>
+              <Text style={styles.sectionHead}>Kanäle →</Text>
+            </Druck>
+          )}
           {channels.map((c) => (
             <Druck key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
               <Avatar id={c.id} name={c.name} size={44} />
@@ -99,7 +103,11 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
             </Druck>
           ))}
 
-          {people.length > 0 && <Text style={styles.sectionHead}>Profile →</Text>}
+          {people.length > 0 && (
+            <Druck style={styles.sectionHeadPress} onPress={() => {}}>
+              <Text style={styles.sectionHead}>Profile →</Text>
+            </Druck>
+          )}
           {people.map((u) => {
             const status = statusOf(u.id);
             const label = status === 'friend' ? 'Befreundet' : status === 'pending' ? 'Angefragt' : '+ Befreunden';
@@ -137,12 +145,14 @@ const styles = themenStyles((colors) => ({
   pillText: { ...typography.small, fontWeight: '600', color: colors.text2 },
   pillTextActive: { color: colors.white },
   content: { paddingBottom: spacing.xl },
-  sectionHead: {
-    ...typography.h3,
-    color: colors.text,
+  sectionHeadPress: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
+  },
+  sectionHead: {
+    ...typography.h3,
+    color: colors.text,
   },
   row: {
     flexDirection: 'row',

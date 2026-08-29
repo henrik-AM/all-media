@@ -69,9 +69,17 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
           onAvatarPress={() => onNotice('Dein Profilbild')}
         />
 
-        {created.length > 0 && <Text style={styles.sectionHead}>Erstellt →</Text>}
+        {created.length > 0 && (
+          <Druck style={styles.sectionHeadPress} onPress={() => onNotice('Erstellte Communitys')}>
+            <Text style={styles.sectionHead}>Erstellt →</Text>
+          </Druck>
+        )}
         {list(created)}
-        {joined.length > 0 && <Text style={styles.sectionHead}>Beigetreten →</Text>}
+        {joined.length > 0 && (
+          <Druck style={styles.sectionHeadPress} onPress={() => onNotice('Beigetretene Communitys')}>
+            <Text style={styles.sectionHead}>Beigetreten →</Text>
+          </Druck>
+        )}
         {list(joined)}
       </ScrollView>
     </View>
@@ -81,12 +89,14 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
 const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { paddingBottom: spacing.xl },
-  sectionHead: {
-    ...typography.h3,
-    color: colors.text,
+  sectionHeadPress: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
+  },
+  sectionHead: {
+    ...typography.h3,
+    color: colors.text,
   },
   row: {
     flexDirection: 'row',

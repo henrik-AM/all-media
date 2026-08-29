@@ -92,9 +92,19 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
             </Text>
             {/* Ohne Ort steht dort nur die Musik - vorher begann die Zeile
                 mit einem einsamen Mittelpunkt. */}
-            <Text style={styles.sub} numberOfLines={1}>
-              {[item.location, item.music].filter(Boolean).join(' · ')}
-            </Text>
+            <View style={styles.subRow}>
+              {item.location && (
+                <Druck onPress={() => onNotice(`Standort: ${item.location}`)} hitSlop={4}>
+                  <Text style={styles.sub}>{item.location}</Text>
+                </Druck>
+              )}
+              {item.location && item.music && <Text style={styles.sub}> · </Text>}
+              {item.music && (
+                <Druck onPress={() => onNotice(`Music: ${item.music}`)} hitSlop={4}>
+                  <Text style={styles.sub}>{item.music}</Text>
+                </Druck>
+              )}
+            </View>
           </Druck>
           {/* Am eigenen Beitrag stehen weder "Folgen" noch die Glocke. Vorher
               konnte man sich selbst folgen und sich selbst benachrichtigen
@@ -200,7 +210,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
 };
 
 const styles = themenStyles((colors) => ({
-  repost: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  repost: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 },
   repostZahl: { color: colors.success, fontSize: 12.5, fontWeight: '600' },
 
   container: { flex: 1, backgroundColor: colors.surface },
@@ -219,7 +229,8 @@ const styles = themenStyles((colors) => ({
   ring: { padding: 2, borderRadius: 22 },
   who: { flex: 1, minWidth: 0 },
   name: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  sub: { marginTop: 1, color: colors.text2, fontSize: 11.5 },
+  subRow: { flexDirection: 'row', marginTop: 1 },
+  sub: { color: colors.text2, fontSize: 11.5 },
   follow: { paddingHorizontal: 13, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.brand },
   /* Ein erledigter Zustand ("Gefolgt") ist ruhiger als die Aufforderung
      ("Folgen") — aber als Kante, nicht als graue Fläche. */
