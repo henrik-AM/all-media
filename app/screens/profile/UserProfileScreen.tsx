@@ -77,10 +77,10 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
               { value: profile.followers, label: 'Follower' },
               { value: profile.following, label: 'Gefolgt' },
             ].map((stat) => (
-              <View key={stat.label} style={styles.stat}>
+              <Druck key={stat.label} style={styles.stat} onPress={() => onNotice(stat.label)}>
                 <Text style={styles.statValue}>{compactNumber(stat.value)}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
+              </Druck>
             ))}
           </View>
         </View>

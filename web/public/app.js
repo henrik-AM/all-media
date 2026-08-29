@@ -7647,8 +7647,8 @@ function renderCommunityProfile() {
       <div class="oprof__top">
         ${eigenerAvatarMitStory(me)}
         <div class="prof__stats">
-          <div class="prof__stat"><span>Erstellte Communitys</span><strong>${created.length}</strong></div>
-          <div class="prof__stat"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></div>
+          <button class="prof__stat" data-stat="created"><span>Erstellte Communitys</span><strong>${created.length}</strong></button>
+          <button class="prof__stat" data-stat="joined"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></button>
         </div>
       </div>
       ${/*
