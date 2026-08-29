@@ -26,6 +26,7 @@ import { ContactsScreen } from './screens/messenger/ContactsScreen';
 import { ContactProfileScreen } from './screens/messenger/ContactProfileScreen';
 import { FriendMapScreen } from './screens/messenger/FriendMapScreen';
 import { EditSelectedContactsScreen } from './screens/messenger/EditSelectedContactsScreen';
+import { AvatarViewerScreen } from './screens/AvatarViewerScreen';
 import { MessengerProfileScreen } from './screens/messenger/MessengerProfileScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
@@ -77,6 +78,7 @@ type Overlay =
    */
   | { kind: 'community'; communityId: string }
   | { kind: 'editSelectedContacts' }
+  | { kind: 'avatarViewer'; userId: string; name: string }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -736,6 +738,10 @@ const Shell = () => {
         userId={overlay.userId}
         onBack={() => setOverlay(null)}
         onMessage={openChatWith}
+        onAvatarPress={() => {
+          const person = mockUsers[overlay.userId];
+          setOverlay({ kind: 'avatarViewer', userId: overlay.userId, name: person?.name ?? 'Profil' });
+        }}
         onBlockiert={(userId, blockiert) => {
           // Blockieren hat Folgen: die Person faellt aus den Kontakten, beim
           // Aufheben kommt sie zurueck. Sonst waere der Knopf nur ein Wort.
@@ -913,6 +919,16 @@ const Shell = () => {
     );
   }
 
+  if (overlay?.kind === 'avatarViewer') {
+    return (
+      <AvatarViewerScreen
+        id={overlay.userId}
+        name={overlay.name}
+        onBack={() => setOverlay(null)}
+      />
+    );
+  }
+
   const renderContent = () => {
     if (area === 'messenger') {
       if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onEditSelectedContacts={() => setOverlay({ kind: 'editSelectedContacts' })} onNotice={setNotice} />;
@@ -938,6 +954,7 @@ const Shell = () => {
             onSwitchAccount={() => setSheet('konto')}
             onOpenSettings={() => setArea('settings')}
             onBearbeiten={profilBearbeiten}
+            onAvatarPress={() => setOverlay({ kind: 'avatarViewer', userId: 'me', name: profil.eigenesProfil.name })}
             onNotice={setNotice}
           />
         );
@@ -967,7 +984,7 @@ const Shell = () => {
             onNotice={setNotice}
           />
         );
-      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onNotice={setNotice} />;
+      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onAvatarPress={() => setOverlay({ kind: 'avatarViewer', userId: 'me', name: profil.eigenesProfil.name })} onNotice={setNotice} />;
       return (
         <HomeFeedScreen
           stories={stories}
@@ -998,6 +1015,7 @@ const Shell = () => {
             onOpenCommunity={openCommunity}
             onAction={profilAktion}
             onBearbeiten={profilBearbeiten}
+            onAvatarPress={() => setOverlay({ kind: 'avatarViewer', userId: 'me', name: profil.eigenesProfil.name })}
             onNotice={setNotice}
           />
         );

@@ -24,12 +24,13 @@ interface Props {
   userId: string;
   onBack: () => void;
   onMessage: (userId: string) => void;
+  onAvatarPress?: () => void;
   /** Beim Blockieren: die Person aus den Kontakten nehmen. */
   onBlockiert?: (userId: string, blockiert: boolean) => void;
   onNotice: (message: string) => void;
 }
 
-export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNotice }: Props) => {
+export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onNotice }: Props) => {
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
@@ -68,7 +69,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
 
       <ScrollView>
         <View style={styles.top}>
-          <Druck style={styles.ring} onPress={() => onNotice(`${person.name} — Profilbild`)}>
+          <Druck style={styles.ring} onPress={() => onAvatarPress?.()}>
             <Avatar id={userId} name={person.name} size={82} />
           </Druck>
           <View style={styles.stats}>

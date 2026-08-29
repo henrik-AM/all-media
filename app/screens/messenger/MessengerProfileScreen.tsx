@@ -16,6 +16,7 @@ interface Props {
   onOpenSettings: () => void;
   /** Fuehrt zum Formular, das Name, Info und Link aendert. */
   onBearbeiten: () => void;
+  onAvatarPress?: () => void;
   onNotice: (message: string) => void;
 }
 
@@ -26,7 +27,7 @@ const ITEMS = ['Standort-Sichtbarkeit', 'Story-Sichtbarkeit', 'Lesebestätigung'
  * neben Name und Biografie, die beiden Profilverweise, dann der Abschnitt
  * Einstellungen.
  */
-export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSettings, onBearbeiten, onNotice }: Props) => {
+export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSettings, onBearbeiten, onAvatarPress, onNotice }: Props) => {
   const { user } = useContext(AuthContext);
   /*
    * Name und Info kommen aus demselben Zustand wie im Videos- und
@@ -44,7 +45,9 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
 
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.head}>
-        <Avatar id={user?.profile.id ?? 'me'} name={eigenesProfil.name} size={sizes.avatarXl} />
+        <Druck disabled={!onAvatarPress} onPress={onAvatarPress}>
+          <Avatar id={user?.profile.id ?? 'me'} name={eigenesProfil.name} size={sizes.avatarXl} />
+        </Druck>
         <View style={styles.headText}>
           <Text style={styles.name}>{eigenesProfil.name}</Text>
           {!!eigenesProfil.bio && <Text style={styles.bio}>{eigenesProfil.bio}</Text>}
