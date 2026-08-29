@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Text, View } from 'react-native';
 import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { markenVerlauf, shadow, themenStyles } from '../constants/design';
+import { ThemeContext } from '../contexts/ThemeContext';
 import { AreaKey, SubKey, areaOf } from '../constants/navigation';
 
 interface Props {
@@ -37,12 +38,13 @@ export const INSEL_ABSTAND = 10;
 
 export const TopSwitcher = ({ area, active, onChange, zaehler }: Props) => {
   const insets = useSafeAreaInsets();
+  const { isDark } = useContext(ThemeContext);
   const subs = areaOf(area).subs;
   if (!subs.length) return null;
 
   return (
     <View style={[styles.wrap, { top: insets.top + INSEL_ABSTAND }]} pointerEvents="box-none">
-      <View style={styles.insel}>
+      <View style={[styles.insel, isDark ? styles.inselDark : styles.inselLight]}>
         {subs.map((item) => {
           const isActive = item.key === active;
           const zahl = zaehler?.[item.key] ?? 0;
@@ -64,7 +66,7 @@ export const TopSwitcher = ({ area, active, onChange, zaehler }: Props) => {
               <Ionicons
                 name={isActive ? item.iconActive : item.icon}
                 size={21}
-                color={isActive ? '#FFFFFF' : 'rgba(255,255,255,0.62)'}
+                color={isDark ? (isActive ? '#FFFFFF' : 'rgba(255,255,255,0.62)') : (isActive ? '#FFFFFF' : 'rgba(0,0,0,0.5)')}
               />
               {zahl > 0 && (
                 <View style={styles.badge}>
@@ -79,7 +81,7 @@ export const TopSwitcher = ({ area, active, onChange, zaehler }: Props) => {
   );
 };
 
-const styles = themenStyles(() => ({
+const styles = themenStyles((colors) => ({
   /* Volle Breite, damit die Insel darin mittig sitzt — aber ohne Klicks
      ausserhalb der Insel abzufangen (pointerEvents="box-none" oben). */
   wrap: {
@@ -96,9 +98,15 @@ const styles = themenStyles(() => ({
     alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1,
+    ...shadow.md,
+  },
+  inselDark: {
     borderColor: 'rgba(255,255,255,0.1)',
     backgroundColor: 'rgba(22,24,29,0.94)',
-    ...shadow.md,
+  },
+  inselLight: {
+    borderColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
   btn: {
     width: 46,
