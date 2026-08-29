@@ -142,11 +142,21 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
             </Druck>
           </View>
           <Text style={styles.description}>{item.description}</Text>
-          {item.location && (
-            <Druck onPress={() => onNotice(`Standort: ${item.location}`)} hitSlop={4}>
-              <Text style={styles.sub}>{item.location}</Text>
-            </Druck>
-          )}
+          <View style={styles.subRow}>
+            {item.location && (
+              <Druck onPress={() => onNotice(`Standort: ${item.location}`)} hitSlop={4}>
+                <Text style={styles.sub}>{item.location}</Text>
+              </Druck>
+            )}
+            {item.music && (
+              <>
+                {item.location && <Text style={styles.sub}> · </Text>}
+                <Druck onPress={() => onNotice(`Music: ${item.music}`)} hitSlop={4}>
+                  <Text style={styles.sub}>{item.music}</Text>
+                </Druck>
+              </>
+            )}
+          </View>
         </View>
       </View>
     );
