@@ -9,6 +9,7 @@
 const express = require('express');
 const path = require('path');
 const supabaseApi = require('./supabase-api');
+const syncHandlers = require('./sync-handlers');
 
 const app = express();
 
@@ -728,6 +729,9 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
   const { was } = req.params;
 
   if (was === 'archiv') {
+    // Supabase-Sync
+    syncHandlers.handleChatAction(req.params.chatId, 'me', 'archived', !archiviert.includes(chat.id));
+
     const drin = archiviert.indexOf(chat.id);
     if (drin === -1) archiviert.push(chat.id);
     else archiviert.splice(drin, 1);
@@ -739,6 +743,9 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
   }
 
   if (was === 'stumm') {
+    // Supabase-Sync
+    syncHandlers.handleChatAction(req.params.chatId, 'me', 'muted', !chat.muted);
+
     chat.muted = !chat.muted;
     return res.json({
       ok: true,
@@ -748,6 +755,9 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
   }
 
   if (was === 'gelesen') {
+    // Supabase-Sync
+    syncHandlers.handleChatAction(req.params.chatId, 'me', 'read', !chat.unread);
+
     // Ohne Gegenstueck waere "als ungelesen markieren" nicht rueckgaengig zu
     // machen - deshalb schaltet derselbe Punkt in beide Richtungen.
     chat.unread = chat.unread ? 0 : 1;
@@ -1384,12 +1394,23 @@ app.post('/api/autoren/:userId/follow', (req, res) => {
   res.json({ ok: true, following: folgt, followers: profil.followers });
 });
 
-app.post('/api/profile/:userId/follow', (req, res) => {
+app.post('/api/profile/:userId/follow', async (req, res) => {
   const profile = profiles[req.params.userId];
   if (!profile) return res.status(404).json({ error: 'Nicht gefunden' });
 
+  const userId = req.params.userId;
+
+  // Versuche auf Supabase zu speichern
+  const supabaseResult = await syncHandlers.handleFollowUser('me', userId);
+
+  // Mock-Daten aktualisieren (Fallback)
   const folgt = folgenUmschalten(profile);
-  res.json({ following_me: folgt, followers: profile.followers });
+
+  res.json({
+    following_me: supabaseResult?.followed !== false ? folgt : false,
+    followers: profile.followers,
+    synced: supabaseResult?.success || false
+  });
 });
 
 app.get('/api/comments/:targetId', (req, res) => {
@@ -1464,12 +1485,16 @@ app.post('/api/posts/:id/:action', (req, res) => {
   res.json(post);
 });
 
-app.post('/api/videos/:id/:action', (req, res) => {
+app.post('/api/videos/:id/:action', async (req, res) => {
   const video = videos.find((v) => v.id === req.params.id);
   if (!video) return res.status(404).json({ error: 'Nicht gefunden' });
 
   const { action } = req.params;
+  const videoId = req.params.id;
+
+  // Supabase-Sync für Like
   if (action === 'like') {
+    const supabaseResult = await syncHandlers.handleLikeContent(videoId, 'me', 'video');
     video.liked = !video.liked;
     video.likes += video.liked ? 1 : -1;
   } else if (action === 'save') {
@@ -1519,7 +1544,7 @@ app.post('/api/communities/:id/join', (req, res) => {
   res.json(community);
 });
 
-app.post('/api/messages/:chatId', (req, res) => {
+app.post('/api/messages/:chatId', async (req, res) => {
   const { text } = req.body || {};
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'Text erforderlich' });
@@ -1536,11 +1561,21 @@ app.post('/api/messages/:chatId', (req, res) => {
     return res.json({ ok: false, error: 'Diese Person ist blockiert' });
   }
 
+  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+  // Versuche auf Supabase zu speichern
+  const supabaseResult = await syncHandlers.handleSendMessage(chatId, 'me', text.trim());
+
+  // Mock-Daten aktualisieren (Fallback/Cache)
   const store = nachrichtenSpeicher(chatId);
   if (!store[chatId]) store[chatId] = [];
 
-  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const message = { id: 'm' + Date.now(), from: 'me', text: text.trim(), time };
+  const message = {
+    id: supabaseResult?.message?.id || ('m' + Date.now()),
+    from: 'me',
+    text: text.trim(),
+    time
+  };
   store[chatId].push(message);
 
   const chat = chats.find((c) => c.id === chatId);
