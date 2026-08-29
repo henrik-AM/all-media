@@ -345,7 +345,7 @@ const SoundKopf = ({ sound }: { sound: (typeof mockSounds)[number] }) => {
       </View>
       <Text style={styles.titel}>{sound.title}</Text>
       <Text style={styles.zahl}>
-        {sound.artist} · {compact(sound.uses)} Beiträge
+        {compact(sound.uses)} Beiträge
       </Text>
 
       <View style={styles.welle}>
