@@ -1729,9 +1729,9 @@ body:has(.camera) .toast { bottom: 132px; }
 .oprof__top .prof__stat { gap: 4px; }
 .avatar.has-status { position: relative; }
 .avatar.has-status::after {
-  content: ''; position: absolute; right: 3px; bottom: 3px;
-  width: 14px; height: 14px; border-radius: 50%;
-  background: #34C759; border: 2.5px solid var(--surface);
+  content: ''; position: absolute; right: 0px; bottom: 0px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #34C759; border: 3px solid var(--surface);
 }
 /*
   Das Motiv im Ring. Beschnitten wird die Flaeche selbst, nicht der Ring -
