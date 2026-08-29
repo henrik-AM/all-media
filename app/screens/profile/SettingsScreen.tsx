@@ -254,7 +254,7 @@ const SECTIONS: Section[] = [
       SPENDENCODE,
       { label: 'Nutzerstatus', icon: 'person-outline', wahl: STATUS, standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'commPrivate' },
-      { label: 'Nachrichtenerlaubnis', icon: 'chatbubble-outline', wahl: ['Alle', 'Mitglieder meiner Communitys', 'Niemand'], standard: 'Mitglieder meiner Communitys' },
+      { label: 'Nachrichten erlaubt von', icon: 'chatbubble-outline', wahl: ['Alle', 'Mitglieder meiner Communitys', 'Niemand'], standard: 'Mitglieder meiner Communitys' },
       { label: 'Push-to-Talk Nachricht', icon: 'mic-outline', wahl: ['An', 'Aus'], standard: 'An' },
       { label: 'Gestummte Communitys', icon: 'volume-mute-outline', liste: 'stummeKanaele' },
       { label: 'Gestummte Profile', icon: 'ban-outline', liste: 'stummeProfile' },
