@@ -228,5 +228,6 @@ const styles = themenStyles((colors) => ({
   },
   followText: { color: colors.white, fontSize: 12, fontWeight: '600' },
   description: { color: colors.white, ...typography.message, lineHeight: 20 },
+  subRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   sub: { marginTop: 6, color: 'rgba(255,255,255,0.75)', ...typography.small },
 }));

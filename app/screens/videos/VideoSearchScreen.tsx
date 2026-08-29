@@ -99,7 +99,9 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
 
   const result = useMemo(() => {
     if (filterArt === 'alle') return allResults;
-    return { [filterArt]: allResults[filterArt as keyof typeof allResults] };
+    const filtered = { reels: [], clips: [], posts: [], people: [], tags: [], places: [], sounds: [] };
+    (filtered as any)[filterArt] = allResults[filterArt as keyof typeof allResults];
+    return filtered as typeof allResults;
   }, [allResults, filterArt]);
 
   const total = Object.values(result).reduce((sum, list) => sum + list.length, 0);

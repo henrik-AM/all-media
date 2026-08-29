@@ -34,8 +34,6 @@ interface Props {
 
 export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }: Props) => {
   const { communities, kanalBeitreten, kanalGelesen } = useProfil();
-  /* Punkt: Nur eigene Communitys anzeigen, keine "Entdecken" */
-  const filter = 'meine' as const;
   const [query, setQuery] = useState('');
 
   const visible = useMemo(() => {
@@ -43,11 +41,8 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }
     const passt = (c: Community) =>
       !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
 
-    const meine = communities.filter((c) => c.joined && passt(c));
-    const entdecken = communities.filter((c) => !c.joined && passt(c));
-
-    return filter === 'entdecken' ? entdecken : meine;
-  }, [communities, filter, query]);
+    return communities.filter((c) => c.joined && passt(c));
+  }, [communities, query]);
 
   const toggleJoin = (community: Community) => {
     kanalBeitreten(community.id);
@@ -139,18 +134,12 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }
           <EmptyState
             icon="people-outline"
             title={
-              query
-                ? 'Keine Community gefunden'
-                : filter === 'entdecken'
-                  ? 'Du bist überall dabei'
-                  : 'Noch keiner Community beigetreten'
+              query ? 'Keine Community gefunden' : 'Noch keiner Community beigetreten'
             }
             text={
               query
                 ? `Für „${query}" wurde nichts gefunden.`
-                : filter === 'entdecken'
-                  ? 'Es gibt gerade nichts Neues zu entdecken.'
-                  : 'Unter „Entdecken" findest du Communitys zum Beitreten.'
+                : 'Du kannst hier später Communitys verwalten.'
             }
           />
         }
