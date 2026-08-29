@@ -66,6 +66,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
           onBearbeiten={onBearbeiten}
           onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
           onStat={(label) => onNotice(label)}
+          onAvatarPress={() => onNotice('Dein Profilbild')}
         />
 
         {created.length > 0 && <Text style={styles.sectionHead}>Erstellt →</Text>}

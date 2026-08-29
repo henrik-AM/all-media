@@ -20,6 +20,7 @@ interface Props {
   onLink: () => void;
   onStat?: (label: string) => void;
   onBearbeiten?: () => void;
+  onAvatarPress?: () => void;
   ungelesen?: number;
 }
 
@@ -28,7 +29,7 @@ interface Props {
  * Glocke/Plus/Menü, darunter Bild links neben den Zahlen, dann Name,
  * Biografie und Link linksbündig.
  */
-export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, ungelesen = 0 }: Props) => (
+export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, onAvatarPress, ungelesen = 0 }: Props) => (
   <View>
     <View style={styles.bar}>
       <Text style={styles.handle}>{handle}</Text>
@@ -51,13 +52,15 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
     </View>
 
     <View style={styles.top}>
-      <View>
-        {/* Der Name stand hier fest als "Du" - die Initiale im Kreis war
-            deshalb "D", waehrend direkt darunter "Henrik" steht. Jetzt kommt
-            der Name von aussen, wie ueberall sonst. */}
-        <Avatar id="me" name={name} size={sizes.avatarXl} />
-        <View style={styles.online} />
-      </View>
+      <Druck disabled={!onAvatarPress} onPress={onAvatarPress}>
+        <View>
+          {/* Der Name stand hier fest als "Du" - die Initiale im Kreis war
+              deshalb "D", waehrend direkt darunter "Henrik" steht. Jetzt kommt
+              der Name von aussen, wie ueberall sonst. */}
+          <Avatar id="me" name={name} size={sizes.avatarXl} />
+          <View style={styles.online} />
+        </View>
+      </Druck>
       <View style={styles.stats}>
         {stats.map((stat) => (
           <Druck

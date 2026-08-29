@@ -65,6 +65,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           onBearbeiten={onBearbeiten}
           onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
           onStat={(label) => onNotice(`${label}: ${label === 'Beiträge' ? 'Deine Posts' : label === 'Follower' ? 'Deine Follower' : 'Denen du folgst'}`)}
+          onAvatarPress={() => onNotice('Dein Profilbild')}
         />
 
         {spende && (

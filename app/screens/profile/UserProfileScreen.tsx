@@ -68,9 +68,9 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onBlockiert, onNo
 
       <ScrollView>
         <View style={styles.top}>
-          <View style={styles.ring}>
+          <Druck style={styles.ring} onPress={() => onNotice(`${person.name} — Profilbild`)}>
             <Avatar id={userId} name={person.name} size={82} />
-          </View>
+          </Druck>
           <View style={styles.stats}>
             {[
               { value: profile.posts, label: 'Beiträge' },
