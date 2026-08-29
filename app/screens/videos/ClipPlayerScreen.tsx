@@ -124,6 +124,11 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           <View style={[styles.play, laeuft && styles.playAus]}>
             <Ionicons name={laeuft ? 'pause' : 'play'} size={26} color={colors.white} />
           </View>
+          {clip.live && (
+            <View style={styles.liveBadge}>
+              <Text style={styles.liveBadgeText}>LIVE</Text>
+            </View>
+          )}
         </Druck>
 
         <View style={styles.leiste}>
@@ -392,6 +397,8 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   playAus: { opacity: 0 },
+  liveBadge: { position: 'absolute', top: 12, right: 12, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, backgroundColor: colors.danger },
+  liveBadgeText: { color: colors.white, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
   leiste: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: colors.black },
   leisteKnopf: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 
