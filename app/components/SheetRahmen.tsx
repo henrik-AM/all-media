@@ -44,8 +44,8 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
         <View style={styles.kopf} {...griff}>
           {/* Der Griff, an dem gezogen wird - er zeigt auch, dass es geht. */}
           <View style={styles.griff} />
-          <Druck style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Schließen">
-            <Ionicons name="close" size={22} color={colors.text} />
+          <Druck style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Zurück">
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
           </Druck>
           <Text style={styles.titel}>{title}</Text>
         </View>

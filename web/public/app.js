@@ -1253,7 +1253,7 @@ function openFollowerList(profile, art) {
 function sheetKopf(title, mitX) {
   return mitX
     ? `<div class="sheet__kopf">
-         <button class="sheet__x" data-sheet-close aria-label="Schließen">${ICONS.close}</button>
+         <button class="sheet__x" data-sheet-close aria-label="Zurück">${ICONS.chevron}</button>
          <div class="sheet__titel-mitte">${esc(title)}</div>
        </div>`
     : `<div class="sheet__handle"></div>
