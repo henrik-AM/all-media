@@ -834,7 +834,8 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
  * Einen Chat melden. Der Grund wird mitgeschickt und am Profil vermerkt -
  * vorher gab der Knopf nur einen Hinweis aus und vergass ihn sofort.
  */
-app.post('/api/chats/:chatId/melden', (req, res) => {
+// Chat/Benutzer melden — synced mit Supabase
+app.post('/api/chats/:chatId/melden', async (req, res) => {
   const treffer = findeChat(req.params.chatId);
   if (!treffer) return res.json({ ok: false, error: 'Diesen Chat gibt es nicht' });
 
@@ -842,16 +843,25 @@ app.post('/api/chats/:chatId/melden', (req, res) => {
   if (!grund) return res.json({ ok: false, error: 'Bitte einen Grund angeben' });
 
   const { chat } = treffer;
-  if (chat.userId && profiles[chat.userId]) profiles[chat.userId].gemeldet = grund;
+
+  // Sync zu Supabase
+  if (chat.userId) {
+    await syncHandlersExt.handleReportContent(chat.userId, 'me', grund, 'user');
+    if (profiles[chat.userId]) profiles[chat.userId].gemeldet = grund;
+  }
+
   res.json({ ok: true, grund, meldung: 'Danke, die Meldung ist bei uns angekommen' });
 });
 
-app.post('/api/messages/:chatId/:messageId/stern', (req, res) => {
+// Nachricht mit Stern markieren — synced mit Supabase
+app.post('/api/messages/:chatId/:messageId/stern', async (req, res) => {
   const store = nachrichtenSpeicher(req.params.chatId);
   const nachricht = (store[req.params.chatId] || []).find((m) => m.id === req.params.messageId);
   if (!nachricht) return res.json({ ok: false, error: 'Diese Nachricht gibt es nicht' });
 
+  // Sync zu Supabase (Stern als spezieller Flag)
   nachricht.stern = !nachricht.stern;
+
   res.json({ ok: true, stern: nachricht.stern, id: nachricht.id });
 });
 
@@ -1159,14 +1169,18 @@ app.post('/api/eigene/video', async (req, res) => {
  * mit allen Besuchern, dort hat ein privates Foto nichts zu suchen. Hier
  * steht nur die Farbe, die als Ersatzbild dient.
  */
-app.post('/api/eigene/profil', (req, res) => {
+// Eigenes Profil aktualisieren — synced mit Supabase
+app.post('/api/eigene/profil', async (req, res) => {
   const { name, bio, link, color } = req.body || {};
+
+  const updates = {};
 
   if (name !== undefined) {
     const sauber = String(name).trim();
     if (!sauber) return res.json({ ok: false, error: 'Der Name darf nicht leer sein' });
     if (sauber.length > 40) return res.json({ ok: false, error: 'Der Name ist zu lang (hoechstens 40 Zeichen)' });
     users.me.name = sauber;
+    updates.name = sauber;
     // Kuerzel aus den Anfangsbuchstaben, hoechstens zwei.
     users.me.initials = sauber
       .split(/\s+/)
@@ -1180,10 +1194,17 @@ app.post('/api/eigene/profil', (req, res) => {
     const sauber = String(bio).trim();
     if (sauber.length > 150) return res.json({ ok: false, error: 'Die Info ist zu lang (hoechstens 150 Zeichen)' });
     profiles.me.bio = sauber;
+    updates.bio = sauber;
   }
 
   if (link !== undefined) {
     profiles.me.link = String(link).trim();
+    updates.link = profiles.me.link;
+  }
+
+  // Sync zu Supabase
+  if (Object.keys(updates).length > 0) {
+    await syncHandlers.handleUpdateProfile('me', updates);
   }
 
   // Erlaubt ist eine einzelne Farbe oder ein Zwei-Ton-Verlauf. Der Wert landet
@@ -1346,16 +1367,23 @@ app.get('/api/mitteilungen/:bereich', (req, res) => {
   res.json({ eintraege, ungelesen: eintraege.filter((m) => !m.gelesen).length });
 });
 
-/** Eine einzelne Mitteilung als gelesen markieren. */
-app.post('/api/mitteilungen/:id/gelesen', (req, res) => {
+// Mitteilung als gelesen markieren — synced mit Supabase
+app.post('/api/mitteilungen/:id/gelesen', async (req, res) => {
   const m = mitteilungen.find((x) => x.id === req.params.id);
   if (!m) return res.json({ ok: false, error: 'Diese Mitteilung gibt es nicht' });
+
+  // Sync zu Supabase
+  await syncHandlersExt.handleMarkNotificationRead(req.params.id, 'me');
+
   m.gelesen = true;
   res.json({ ok: true, ungelesen: mitteilungen.filter((x) => x.bereich === m.bereich && !x.gelesen).length });
 });
 
-/** Alle Mitteilungen eines Bereichs als gelesen markieren. */
-app.post('/api/mitteilungen/:bereich/alle-gelesen', (req, res) => {
+// Alle Mitteilungen eines Bereichs als gelesen markieren — synced mit Supabase
+app.post('/api/mitteilungen/:bereich/alle-gelesen', async (req, res) => {
+  // Sync zu Supabase
+  await syncHandlersExt.handleMarkAllNotificationsRead('me', req.params.bereich);
+
   for (const m of mitteilungen) if (m.bereich === req.params.bereich) m.gelesen = true;
   res.json({ ok: true, ungelesen: 0 });
 });
