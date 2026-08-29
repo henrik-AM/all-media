@@ -852,8 +852,8 @@ ul { margin: 0; padding: 0; list-style: none; }
   display: grid; place-items: center;
 }
 .item__icon svg { width: 18px; height: 18px; }
-.item__label { flex: 1 1 auto; }
-.item__value { color: var(--text-3); font-size: 13.5px; }
+.item__label { flex: 1 1 auto; min-width: 0; }
+.item__value { color: var(--text-3); font-size: 13.5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item--danger { color: var(--danger); }
 .item--danger .item__icon { background: rgba(229,72,77,.12); color: var(--danger); }
 
