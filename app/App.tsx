@@ -25,6 +25,7 @@ import { ChatDetailScreen } from './screens/messenger/ChatDetailScreen';
 import { ContactsScreen } from './screens/messenger/ContactsScreen';
 import { ContactProfileScreen } from './screens/messenger/ContactProfileScreen';
 import { FriendMapScreen } from './screens/messenger/FriendMapScreen';
+import { EditSelectedContactsScreen } from './screens/messenger/EditSelectedContactsScreen';
 import { MessengerProfileScreen } from './screens/messenger/MessengerProfileScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
@@ -75,6 +76,7 @@ type Overlay =
    * in der App gar nicht.
    */
   | { kind: 'community'; communityId: string }
+  | { kind: 'editSelectedContacts' }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -902,9 +904,18 @@ const Shell = () => {
     );
   }
 
+  if (overlay?.kind === 'editSelectedContacts') {
+    return (
+      <EditSelectedContactsScreen
+        onBack={() => setOverlay(null)}
+        onNotice={setNotice}
+      />
+    );
+  }
+
   const renderContent = () => {
     if (area === 'messenger') {
-      if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onNotice={setNotice} />;
+      if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onEditSelectedContacts={() => setOverlay({ kind: 'editSelectedContacts' })} onNotice={setNotice} />;
       if (sub === 'camera') {
         return (
           <CameraScreen

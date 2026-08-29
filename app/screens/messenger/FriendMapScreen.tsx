@@ -9,6 +9,7 @@ import { mockFriendPins, mockUsers } from '../../mocks';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
+  onEditSelectedContacts?: () => void;
   onNotice?: (message: string) => void;
 }
 
@@ -22,7 +23,7 @@ const FREIGABEN: { key: Freigabe; label: string; text: string }[] = [
 ];
 
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
-export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
+export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotice }: Props) => {
   const karte = useRef<KartenSteuerung>(null);
   const [aktiv, setAktiv] = useState<string | null>(null);
   const [sichtbar, setSichtbar] = useState(true);
@@ -137,7 +138,7 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
       )}
 
       {!vollbild && freigabe === 'ausgewaehlt' && (
-        <Druck style={styles.bearbeitenLink} onPress={() => {/* TODO: Navigate to selected contacts editor */}}>
+        <Druck style={styles.bearbeitenLink} onPress={() => onEditSelectedContacts?.()}>
           <Text style={styles.bearbeitenLinkText}>→ Ausgewählte Kontakte bearbeiten</Text>
         </Druck>
       )}
