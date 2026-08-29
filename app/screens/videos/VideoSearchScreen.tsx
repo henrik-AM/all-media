@@ -202,15 +202,18 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
 
           {result.sounds.length > 0 && (
             <Section title="Sounds" onTitlePress={() => onOpenExplorer({ art: 'sound', wert: '' })}>
-              {result.sounds.map((s) => (
-                <Row
-                  key={s.id}
-                  icon="musical-notes-outline"
-                  title={s.title}
-                  sub={`${s.artist} · ${compact(s.uses)} Videos`}
-                  onPress={() => onOpenExplorer({ art: 'sound', wert: s.id })}
-                />
-              ))}
+              {result.sounds.map((s) => {
+                const sound = s as any;
+                return (
+                  <Row
+                    key={sound.id}
+                    icon="musical-notes-outline"
+                    title={sound.title}
+                    sub={`${sound.artist} · ${compact(sound.uses)} Videos`}
+                    onPress={() => onOpenExplorer({ art: 'sound', wert: sound.id })}
+                  />
+                );
+              })}
             </Section>
           )}
         </ScrollView>
