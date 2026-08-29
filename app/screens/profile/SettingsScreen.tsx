@@ -447,17 +447,16 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             <Text style={styles.sectionHead}>{section.title} →</Text>
             <View style={styles.group}>
               {section.items.map((item) => (
-                <View key={`${section.id}-${item.label}`} style={styles.item}>
+                <Druck
+                  key={`${section.id}-${item.label}`}
+                  style={styles.item}
+                  onPress={item.toggle ? undefined : () => oeffne(item)}
+                  disabled={!!item.toggle}
+                >
                   <Ionicons name={item.icon} size={20} color={item.gefahr ? colors.danger : colors.text2} />
                   <Text style={[styles.itemLabel, item.gefahr && styles.danger]}>{item.label}</Text>
                   {item.toggle ? (
                     <Switch
-                      /*
-                       * „Dunkles Design" ist der einzige Schalter, der echte
-                       * Wirkung hat — er hängt am ThemeContext. Vorher lag er
-                       * wie alle anderen nur im lokalen Zustand und tat
-                       * nichts, obwohl er umsprang.
-                       */
                       value={item.toggle === 'theme' ? isDark : switches[item.toggle]}
                       onValueChange={(next) => {
                         if (item.toggle === 'theme') {
@@ -469,12 +468,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       trackColor={{ true: colors.brand, false: colors.surface3 }}
                     />
                   ) : (
-                    <Druck style={styles.rechts} onPress={() => oeffne(item)} hitSlop={10}>
+                    <>
                       {!!item.wahl && <Text style={styles.itemValue}>{wert(item)}</Text>}
                       <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-                    </Druck>
+                    </>
                   )}
-                </View>
+                </Druck>
               ))}
             </View>
           </View>

@@ -58,9 +58,6 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
             { label: 'Erstellte Communitys', value: created.length },
             { label: 'Beigetretene Communitys', value: joined.length },
           ]}
-          // Name, Info und Link standen hier fest im Code - eine Aenderung
-          // im Profil waere also nie angekommen. Sie kommen jetzt aus
-          // demselben Zustand wie im Videos-Profil.
           name={eigenesProfil.name}
           bio={eigenesProfil.bio}
           link={eigenesProfil.link}
@@ -68,6 +65,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
           onAction={onAction}
           onBearbeiten={onBearbeiten}
           onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
+          onStat={(label) => onNotice(label)}
         />
 
         {created.length > 0 && <Text style={styles.sectionHead}>Erstellt →</Text>}

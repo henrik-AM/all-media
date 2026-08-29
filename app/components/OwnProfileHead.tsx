@@ -18,13 +18,8 @@ interface Props {
   link: string;
   onAction: (key: string) => void;
   onLink: () => void;
-  /*
-   * Henrik: "Profilbild, Name, Info/Bio, Link usw. ueber eine
-   * Bearbeitungseinstellung aendern koennen." Der Knopf steht hier im
-   * geteilten Kopf und erscheint damit im Videos- wie im Community-Profil.
-   */
+  onStat?: (label: string) => void;
   onBearbeiten?: () => void;
-  /** Ungelesene Mitteilungen - nur dann steht ein roter Punkt an der Glocke. */
   ungelesen?: number;
 }
 
@@ -33,7 +28,7 @@ interface Props {
  * Glocke/Plus/Menü, darunter Bild links neben den Zahlen, dann Name,
  * Biografie und Link linksbündig.
  */
-export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onBearbeiten, ungelesen = 0 }: Props) => (
+export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, ungelesen = 0 }: Props) => (
   <View>
     <View style={styles.bar}>
       <Text style={styles.handle}>{handle}</Text>
@@ -65,10 +60,15 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
       </View>
       <View style={styles.stats}>
         {stats.map((stat) => (
-          <View key={stat.label} style={styles.stat}>
+          <Druck
+            key={stat.label}
+            style={styles.stat}
+            onPress={() => onStat?.(stat.label)}
+            disabled={!onStat}
+          >
             <Text style={styles.statLabel}>{stat.label}</Text>
             <Text style={styles.statValue}>{stat.value}</Text>
-          </View>
+          </Druck>
         ))}
       </View>
     </View>

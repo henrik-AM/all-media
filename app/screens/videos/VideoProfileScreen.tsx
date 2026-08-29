@@ -55,8 +55,6 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           stats={[
             { label: 'Beiträge', value: compact(me.posts + eigeneBeitraege.length) },
             { label: 'Follower', value: compact(me.followers) },
-            // Wem man folgt, kommt aus dem gemeinsamen Zustand - sonst
-            // aendert sich die Zahl nicht, wenn man im Feed jemandem folgt.
             { label: 'Gefolgt', value: compact(gefolgt.length) },
           ]}
           name={eigenesProfil.name}
@@ -66,6 +64,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           onAction={onAction}
           onBearbeiten={onBearbeiten}
           onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
+          onStat={(label) => onNotice(`${label}: ${label === 'Beiträge' ? 'Deine Posts' : label === 'Follower' ? 'Deine Follower' : 'Denen du folgst'}`)}
         />
 
         {spende && (
