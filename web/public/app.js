@@ -8707,3 +8707,56 @@ document.addEventListener('keydown', (e) => {
 });
 
 bootstrap();
+
+// Phase 3: Pull-to-Refresh Feature
+const ptr = new PullToRefresh({
+  container: document.querySelector('.main'),
+  onRefresh: async () => {
+    try {
+      const res = await fetch('/api/bootstrap');
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+      Object.assign(state, data);
+      render();
+      showToast('Inhalte aktualisiert', 'success');
+    } catch (error) {
+      console.error('Refresh error:', error);
+      showToast('Fehler beim Aktualisieren', 'error');
+    }
+  }
+});
+
+// Phase 3: Offline Status Indicator
+function updateOfflineStatus() {
+  const indicator = document.getElementById('offlineIndicator');
+  if (navigator.onLine) {
+    indicator.hidden = true;
+  } else {
+    indicator.hidden = false;
+  }
+}
+
+window.addEventListener('online', updateOfflineStatus);
+window.addEventListener('offline', updateOfflineStatus);
+updateOfflineStatus();
+
+// Phase 3: Error Boundary — Bessere Fehlerbehandlung
+window.addEventListener('error', (e) => {
+  console.error('Global error caught:', e.error);
+  showToast('Ein Fehler ist aufgetreten — versuche erneut zu laden', 'error');
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('Unhandled promise rejection:', e.reason);
+  showToast('Verbindungsfehler — versuche es später noch einmal', 'error');
+});
+
+// Graceful fallback für API-Fehler
+const originalFetch = window.fetch;
+window.fetch = function(...args) {
+  return originalFetch.apply(this, args).catch((error) => {
+    console.error('Fetch error:', error);
+    showToast('Netzwerkfehler — überprüfe deine Verbindung', 'error');
+    return Promise.reject(error);
+  });
+};
