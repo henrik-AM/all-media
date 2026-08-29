@@ -111,11 +111,14 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
                 </Text>
               </Druck>
               <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
-                <Ionicons
-                  name={item.notify ? 'notifications' : 'notifications-outline'}
-                  size={19}
-                  color={item.notify ? colors.brand : colors.text2}
-                />
+                <View style={{ position: 'relative' }}>
+                  <Ionicons
+                    name="notifications"
+                    size={19}
+                    color={item.notify ? colors.brand : colors.text2}
+                  />
+                  {!item.notify && <View style={styles.bellStrike} />}
+                </View>
               </Druck>
             </>
           )}
@@ -224,6 +227,7 @@ const styles = themenStyles((colors) => ({
   followText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   followTextActive: { color: colors.text2 },
   bell: { width: 30, alignItems: 'center' },
+  bellStrike: { position: 'absolute', top: '50%', left: '50%', width: 22, height: 2, backgroundColor: colors.text2, transform: [{ translateX: -11 }, { translateY: -1 }, { rotate: '-20deg' }] },
 
   media: { aspectRatio: 1, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   mediaBild: { width: '100%', height: '100%' },

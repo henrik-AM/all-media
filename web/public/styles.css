@@ -1071,9 +1071,10 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-weight: 600;
 }
 .post__follow.is-on { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); box-shadow: none; }
-.post__bell { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; color: var(--text-2); border-radius: 50%; }
+.post__bell { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; color: var(--text-2); border-radius: 50%; position: relative; }
 .post__bell svg { width: 19px; height: 19px; }
 .post__bell.is-on { color: var(--brand); }
+.post__bell:not(.is-on)::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-20deg); width: 24px; height: 2px; background: var(--text-2); border-radius: 1px; }
 .post__bell:hover { background: var(--surface-2); }
 
 .post__media {

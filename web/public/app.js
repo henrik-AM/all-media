@@ -522,6 +522,9 @@ function render() {
   renderBottomNav();
   renderTopBar();
 
+  // Ausgewählte Kontakte für Standortfreigabe bearbeiten
+  if (state.ausgewaehlteKontakteEdit) return renderAusgewaehlteKontakte();
+
   /*
    * Die Seite hinter einer Playlist bzw. einem Highlight. Sie steht ganz
    * oben, weil man sie auch von einem fremden Profil aus oeffnen kann - und
@@ -4202,7 +4205,12 @@ function renderFriendMap() {
                     }</button>`
                   )
                   .join('')}
-              </div>`
+              </div>
+              ${
+                state.standort.wer === 'ausgewaehlt'
+                  ? `<button class="linkbtn" id="bearbeiteAusgewaehlt" style="margin-top:8px; padding: 0; color: var(--brand); font-weight: 600; font-size: 13px;">→ Ausgewählte Kontakte bearbeiten</button>`
+                  : ''
+              }`
             : ''
         }
       </div>
@@ -4332,6 +4340,14 @@ function renderFriendMap() {
         renderFriendMap();
       })
     );
+
+    const bearbeiteBtn = $('#bearbeiteAusgewaehlt');
+    if (bearbeiteBtn) {
+      bearbeiteBtn.addEventListener('click', () => {
+        state.ausgewaehlteKontakteEdit = true;
+        render();
+      });
+    }
   }
 
   main.querySelectorAll('[data-zoom]').forEach((el) =>
@@ -4350,6 +4366,54 @@ function renderFriendMap() {
   main.querySelectorAll('[data-friend-profil]').forEach((el) =>
     el.addEventListener('click', () => openProfile(el.dataset.friendProfil, 'kontakt'))
   );
+}
+
+/* Ausgewählte Kontakte für Standortfreigabe verwalten */
+function renderAusgewaehlteKontakte() {
+  if (!state.standortAusgewaehlt) state.standortAusgewaehlt = [];
+
+  main.innerHTML = `
+    <div class="scroll">
+      <div class="profil__kopf">
+        <button class="zurueck-pfeil" id="zurueckVonAusgewaehlt" aria-label="Zurück">${ICONS.chevron}</button>
+        <h1 class="profil__titel">Standort teilen mit</h1>
+      </div>
+
+      <ul class="rows">
+        ${state.friends
+          .map((f) => {
+            const u = user(f.id);
+            const ist = state.standortAusgewaehlt.includes(f.id);
+            return `<li><label class="row" style="cursor: pointer;">
+              <input type="checkbox" class="checkAusgewaehlt" data-id="${f.id}" ${ist ? 'checked' : ''} style="width: 18px; height: 18px;" />
+              ${avatarForUser(f.id, 44)}
+              <div class="row__body">
+                <div class="row__name">${esc(u.name)}</div>
+              </div>
+            </label></li>`;
+          })
+          .join('')}
+      </ul>
+    </div>`;
+
+  const zurueckBtn = $('#zurueckVonAusgewaehlt');
+  if (zurueckBtn) {
+    zurueckBtn.addEventListener('click', () => {
+      state.ausgewaehlteKontakteEdit = false;
+      render();
+    });
+  }
+
+  main.querySelectorAll('.checkAusgewaehlt').forEach((ch) => {
+    ch.addEventListener('change', (e) => {
+      const id = e.target.dataset.id;
+      if (e.target.checked) {
+        if (!state.standortAusgewaehlt.includes(id)) state.standortAusgewaehlt.push(id);
+      } else {
+        state.standortAusgewaehlt = state.standortAusgewaehlt.filter((x) => x !== id);
+      }
+    });
+  });
 }
 
 /* ---------------------------------------------------- Messenger: Kamera */

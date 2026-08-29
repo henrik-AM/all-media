@@ -136,6 +136,12 @@ export const FriendMapScreen = ({ onOpenProfile, onNotice }: Props) => {
       </View>
       )}
 
+      {!vollbild && freigabe === 'ausgewaehlt' && (
+        <Druck style={styles.bearbeitenLink} onPress={() => {/* TODO: Navigate to selected contacts editor */}}>
+          <Text style={styles.bearbeitenLinkText}>→ Ausgewählte Kontakte bearbeiten</Text>
+        </Druck>
+      )}
+
       {!vollbild && <Text style={styles.listHead}>IN DEINER NÄHE</Text>}
       {!vollbild && mockFriendPins.map((pin) => {
         const person = mockUsers[pin.id];
@@ -201,6 +207,15 @@ const styles = themenStyles((colors) => ({
   optionText: { color: colors.text2, fontSize: 13, fontWeight: '600' },
   optionTextAn: { color: colors.white },
 
+  bearbeitenLink: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  bearbeitenLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.brand,
+  },
   listHead: {
     ...typography.overline,
     color: colors.text3,
