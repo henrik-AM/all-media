@@ -139,7 +139,10 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
 
       {!vollbild && freigabe === 'ausgewaehlt' && (
         <Druck style={styles.bearbeitenLink} onPress={() => onEditSelectedContacts?.()}>
-          <Text style={styles.bearbeitenLinkText}>→ Ausgewählte Kontakte bearbeiten</Text>
+          <View style={styles.bearbeitenLinkContent}>
+            <Text style={styles.bearbeitenLinkText}>Ausgewählte Kontakte bearbeiten</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.brand} />
+          </View>
         </Druck>
       )}
 
@@ -209,13 +212,26 @@ const styles = themenStyles((colors) => ({
   optionTextAn: { color: colors.white },
 
   bearbeitenLink: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface2,
+    borderWidth: 1.5,
+    borderColor: colors.brand,
+  },
+  bearbeitenLinkContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   bearbeitenLinkText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.brand,
+    flex: 1,
   },
   listHead: {
     ...typography.overline,

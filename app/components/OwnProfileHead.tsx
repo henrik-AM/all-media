@@ -39,7 +39,7 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
           hitSlop={8}
           accessibilityLabel={ungelesen ? `Mitteilungen, ${ungelesen} ungelesen` : 'Mitteilungen'}
         >
-          <Ionicons name="notifications-outline" size={21} color={colors.text} />
+          <Ionicons name={ungelesen > 0 ? "notifications" : "notifications-off-outline"} size={21} color={ungelesen > 0 ? colors.text : colors.text3} />
           {ungelesen > 0 && <View style={styles.dot} />}
         </Druck>
         <Druck onPress={() => onAction('create')} hitSlop={8}>

@@ -35,7 +35,7 @@ export const Avatar = ({ id, name, size = 54, group = false, online = false, eck
   };
 
   const pair: [string, string] = group ? ['#7E93C4', '#4A6699'] : avatarPair(id);
-  const dot = Math.max(9, Math.round(size * 0.24));
+  const dot = Math.max(11, Math.round(size * 0.32));
 
   return (
     <View style={[{ width: size, height: size }, style]}>
