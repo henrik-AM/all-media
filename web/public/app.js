@@ -1451,7 +1451,7 @@ function openProfilBearbeiten(fertig) {
       </div>
     </div>
     <div class="sheet__footer">
-      <button class="btn btn--primary" id="pbSichern">Speichern</button>
+      <button class="btn btn--primary" id="pbSichern">Merken</button>
     </div>`,
     (sheet, close) => {
       let farbe = me.color;
@@ -2127,7 +2127,7 @@ async function openContactProfile(userId) {
         openContactProfile(userId);
         return null;
       },
-      'Speichern'
+      'Merken'
     )
   );
 
@@ -2787,7 +2787,7 @@ function postCard(p) {
         <button class="postbtn ${p.reposted ? 'is-reposted' : ''}" data-paction="repost" data-pid="${p.id}" aria-label="Repost">
           ${ICONS.repeat}${p.reposts ? `<span class="postbtn__zahl">${p.reposts}</span>` : ''}
         </button>
-        <button class="postbtn postbtn--end ${p.saved ? 'is-saved' : ''}" data-paction="save" data-pid="${p.id}" aria-label="Speichern">${ICONS.bookmark}</button>
+        <button class="postbtn postbtn--end ${p.saved ? 'is-saved' : ''}" data-paction="save" data-pid="${p.id}" aria-label="Merken">${ICONS.bookmark}</button>
       </div>
 
       ${p.likes ? `<div class="post__likes">${likeZeile(p.likes, p.likedBy)}</div>` : ''}
@@ -2913,9 +2913,9 @@ function videoSlide(v) {
           ${ICONS.repeat}
           <span>${v.reposted ? 'Repostet' : 'Repost'}</span>
         </button>
-        <button class="railbtn ${v.saved ? 'is-saved' : ''}" data-vaction="save" data-vid="${v.id}" aria-label="Speichern">
+        <button class="railbtn ${v.saved ? 'is-saved' : ''}" data-vaction="save" data-vid="${v.id}" aria-label="Merken">
           ${ICONS.bookmark}
-          <span>${v.saved ? 'Gespeichert' : 'Speichern'}</span>
+          <span>${v.saved ? 'Gespeichert' : 'Merken'}</span>
         </button>
       </div>
 
@@ -3861,7 +3861,7 @@ function openEinstellung(punkt, nachher) {
         toast(punkt.fertig || 'Gespeichert');
         return null;
       },
-      'Speichern'
+      'Merken'
     );
   }
 
@@ -6069,11 +6069,11 @@ function openClip(clipId) {
           </div>
 
           ${/*
-              Henrik am 26.08.2026, Punkte 28 und 29: "Speichern zu weit
+              Henrik am 26.08.2026, Punkte 28 und 29: "Merken zu weit
               entfernt; Teilen/Repost zu nah beieinander. Alle fünf sauber
               nebeneinander." Und: "Aktionsspalte verändert sich beim Liken."
 
-              Beides kam aus derselben Ecke. "Speichern" trug
+              Beides kam aus derselben Ecke. "Merken" trug
               postbtn--end (margin-left: auto) und wurde deshalb ans Ende
               geschoben, waehrend die anderen vier links zusammenklebten. Und
               weil die Zahl neben Herz und Sprechblase erst auftaucht, wenn es
@@ -6097,8 +6097,8 @@ function openClip(clipId) {
             <button class="postbtn ${clip.reposted ? 'is-reposted' : ''}" data-clipact="repost" aria-label="Repost">
               ${ICONS.repeat}<span class="postbtn__zahl">Repost</span>
             </button>
-            <button class="postbtn ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Speichern">
-              ${ICONS.bookmark}<span class="postbtn__zahl">Speichern</span>
+            <button class="postbtn ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Merken">
+              ${ICONS.bookmark}<span class="postbtn__zahl">Merken</span>
             </button>
           </div>
 
