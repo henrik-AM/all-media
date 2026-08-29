@@ -384,11 +384,7 @@ const Shell = () => {
     oeffneChat(chat);
   };
 
-  /**
-   * Kontaktanfrage. Bis zur Annahme ist genau die eine mitgeschickte Nachricht
-   * erlaubt - der Chat dazu wird gleich angelegt und als 'pending' markiert.
-   */
-  const addContact = (contact: Contact, ersteNachricht?: string) => {
+  const addContact = (contact: Contact) => {
     setContacts((prev) => [...prev, contact]);
     setSheet(null);
 
@@ -397,23 +393,15 @@ const Shell = () => {
       name: contact.name,
       userId: contact.id,
       isGroup: false,
-      preview: ersteNachricht ?? 'Anfrage gesendet',
+      preview: 'Anfrage gesendet',
       time: now(),
       unreadCount: 0,
       requestState: 'pending',
     };
     setChats((prev) => [chat, ...prev]);
-
-    if (ersteNachricht) {
-      const message: Message = {
-        id: `m${Date.now()}`,
-        chatId: chat.id,
-        senderId: 'me',
-        text: ersteNachricht,
-        time: now(),
-      };
-      oeffneChat(chat, [message]);
-    }
+    /* Punkt 5: Nach Kontakt hinzufügen direkt zum Chat leiten,
+       nicht sofort nach Nachricht fragen. */
+    oeffneChat(chat);
   };
 
   /** Anfrage angenommen: der Chat ist ab jetzt frei benutzbar. */

@@ -19,15 +19,13 @@ interface Props {
   visible: boolean;
   contacts: Contact[];
   onClose: () => void;
-  /** Die erste Nachricht darf schon vor der Annahme mitgehen. */
-  onAdd: (contact: Contact, ersteNachricht?: string) => void;
+  onAdd: (contact: Contact) => void;
   onNotice: (message: string) => void;
 }
 
 export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }: Props) => {
   const insets = useSafeAreaInsets();
   const [eingabe, setEingabe] = useState('');
-  const [nachricht, setNachricht] = useState('');
 
   const submit = () => {
     const roh = eingabe.trim();
@@ -39,18 +37,9 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
       return onNotice(`${person.name} ist bereits in deinen Kontakten`);
     }
 
-    const text = nachricht.trim();
-    onAdd(
-      { id: person.id, name: person.name, status: 'pending', about: 'Anfrage gesendet', phone: person.phone },
-      text || undefined
-    );
+    onAdd({ id: person.id, name: person.name, status: 'pending', about: 'Anfrage gesendet', phone: person.phone });
     setEingabe('');
-    setNachricht('');
-    onNotice(
-      text
-        ? `Anfrage mit Nachricht an ${person.name} gesendet`
-        : `Anfrage an ${person.name} gesendet`
-    );
+    onNotice(`Chat mit ${person.name} erstellt`);
   };
 
   return (
@@ -81,28 +70,12 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType={istNummer(eingabe) ? 'phone-pad' : 'default'}
-                returnKeyType="next"
+                returnKeyType="done"
+                onSubmitEditing={submit}
               />
               <Text style={styles.hint}>
                 Noch keine Kontakte: @greta, @hakan, @ida — oder deren Nummer,
                 z. B. +49 174 8901234
-              </Text>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.label}>Nachricht (freiwillig)</Text>
-              <TextInput
-                style={[styles.input, styles.inputMulti]}
-                value={nachricht}
-                onChangeText={setNachricht}
-                placeholder="Kurz schreiben, wer du bist …"
-                placeholderTextColor={colors.text3}
-                multiline
-                onSubmitEditing={submit}
-              />
-              <Text style={styles.hint}>
-                Diese eine Nachricht geht schon mit der Anfrage raus. Weitere
-                erst, wenn die Anfrage angenommen wurde.
               </Text>
             </View>
           </ScrollView>
