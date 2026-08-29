@@ -129,7 +129,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
         {profile.highlights.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
             {profile.highlights.map((highlight) => (
-              <View key={highlight} style={styles.highlight}>
+              <Druck key={highlight} style={styles.highlight} onPress={() => onNotice(`Highlight „${highlight}"`)}>
                 <View style={styles.highlightRing}>
                   {/*
                     Highlights sind Bilder, keine Personen. Vorher stand hier
@@ -148,7 +148,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
                 <Text style={styles.highlightLabel} numberOfLines={1}>
                   {highlight}
                 </Text>
-              </View>
+              </Druck>
             ))}
           </ScrollView>
         )}
