@@ -16,13 +16,19 @@ interface Props {
 export const CommunityChatsScreen = ({ onOpenCommunity }: Props) => {
   const { communities } = useProfil();
   const [query, setQuery] = useState('');
+  const [hideCommunitys, setHideCommunitys] = useState(false);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return communities
+    let filtered = communities
       .filter((c) => c.joined)
       .filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
-  }, [communities, query]);
+
+    if (hideCommunitys) {
+      filtered = filtered.filter((c) => c.visibility === 'private');
+    }
+    return filtered;
+  }, [communities, query, hideCommunitys]);
 
   return (
     <View style={styles.screen}>

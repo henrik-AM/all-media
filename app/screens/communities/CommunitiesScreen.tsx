@@ -118,9 +118,14 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }
           placeholder="Suche hier nach deinen Communitys..."
         />
         {onCreateChannel && (
-          <Druck style={styles.plusButton} onPress={onCreateChannel} hitSlop={8}>
-            <Ionicons name="add-outline" size={24} color={colors.text} />
-          </Druck>
+          <>
+            <Druck style={styles.plusButton} onPress={onCreateChannel} hitSlop={8}>
+              <Ionicons name="add-outline" size={24} color={colors.text} />
+            </Druck>
+            <Druck style={styles.moreButton} onPress={() => {}} hitSlop={8}>
+              <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
+            </Druck>
+          </>
         )}
       </View>
 
@@ -156,8 +161,9 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }
 
 const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10, gap: spacing.md },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 10, gap: spacing.sm },
   plusButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  moreButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   title: { marginBottom: spacing.md, color: colors.text, ...typography.title },
 
 

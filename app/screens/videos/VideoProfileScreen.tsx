@@ -130,7 +130,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
         {tab === 'grid' ? (
           <View style={styles.grid}>
             {raster.map((eintrag) => (
-              <View key={eintrag.id} style={[styles.gridItem, { height: kachelHoehe }]}>
+              <Druck key={eintrag.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice(`Beitrag: ${eintrag.id}`)}>
                 {eintrag.mediaUri ? (
                   // Selbst aufgenommen: das echte Bild statt des Platzhalters.
                   <Image source={{ uri: eintrag.mediaUri }} style={styles.gridBild} />
@@ -142,7 +142,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
                     style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
                   />
                 )}
-              </View>
+              </Druck>
             ))}
           </View>
         ) : tab === 'repost' && reposts.length > 0 ? (
@@ -150,7 +150,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           // Videos, die man selbst repostet hat.
           <View style={styles.grid}>
             {reposts.map((r) => (
-              <View key={`${r.art}-${r.id}`} style={[styles.gridItem, { height: kachelHoehe }]}>
+              <Druck key={`${r.art}-${r.id}`} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice(`Repost: ${r.id}`)}>
                 <Motiv
                   id={`${r.art}-${r.id}`}
                   icon={r.art === 'video' ? 'play-outline' : 'image-outline'}
@@ -160,7 +160,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
                 <View style={styles.repostMarke}>
                   <Ionicons name="repeat" size={12} color={colors.white} />
                 </View>
-              </View>
+              </Druck>
             ))}
           </View>
         ) : (
