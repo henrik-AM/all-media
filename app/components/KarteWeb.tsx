@@ -102,6 +102,16 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
     .leaflet-popup-content { font-size: 14px; }
     /* Die Steuerung sitzt als echter Knopf ueber der Karte, nicht hier drin. */
     .leaflet-control-attribution { font-size: 9px; }
+    .pin-label {
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: none;
+    }
+    .pin-label::before { border-top-color: rgba(0, 0, 0, 0.7); }
   </style>
 </head>
 <body>
@@ -165,6 +175,18 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
       })
         .bindPopup(pin.name)
         .addTo(map);
+
+      // Label über dem Marker anzeigen wenn aktiv
+      if (isActive) {
+        const label = L.tooltip({
+          permanent: true,
+          direction: 'top',
+          offset: [0, -20],
+          className: 'pin-label'
+        });
+        label.setContent(pin.name);
+        marker.bindTooltip(label);
+      }
 
       marker.on('click', () => {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pin', id: pin.id }));
