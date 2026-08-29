@@ -13,7 +13,7 @@ import { aufnehmen } from '../../lib/aufnehmen';
 import { Clip, Post, Video } from '../../types';
 import { useKachelHoehe } from '../../lib/raster';
 
-export type ExplorerArt = 'hashtag' | 'standort' | 'sound';
+export type ExplorerArt = 'reels' | 'querformat' | 'beitraege' | 'profile' | 'hashtag' | 'standort' | 'sound';
 
 export interface ExplorerZiel {
   art: ExplorerArt;

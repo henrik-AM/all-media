@@ -29,9 +29,11 @@ interface Props {
 const compact = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(n);
 
-const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+const Section = ({ title, children, onTitlePress }: { title: string; children: React.ReactNode; onTitlePress?: () => void }) => (
   <View style={styles.section}>
-    <Text style={styles.sectionHead}>{title} →</Text>
+    <Druck style={styles.sectionHeadPress} onPress={onTitlePress} disabled={!onTitlePress}>
+      <Text style={styles.sectionHead}>{title} →</Text>
+    </Druck>
     {children}
   </View>
 );
@@ -111,7 +113,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {result.reels.length > 0 && (
-            <Section title="Reels">
+            <Section title="Reels" onTitlePress={() => onNotice('Alle Reels anzeigen')}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reelRow}>
                 {result.reels.map((v) => (
                   <Druck key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
@@ -124,7 +126,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.clips.length > 0 && (
-            <Section title="Querformat">
+            <Section title="Querformat" onTitlePress={() => onNotice('Alle Querformat-Videos')}>
               {result.clips.map((c) => (
                 <Row
                   key={c.id}
@@ -139,7 +141,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.posts.length > 0 && (
-            <Section title="Beiträge">
+            <Section title="Beiträge" onTitlePress={() => onNotice('Alle Beiträge')}>
               <View style={styles.grid}>
                 {result.posts.map((p) => (
                   <Druck key={p.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice('Beitrag öffnet im Feed')}>
@@ -151,7 +153,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.people.length > 0 && (
-            <Section title="Profile">
+            <Section title="Profile" onTitlePress={() => onNotice('Alle Profile')}>
               {result.people.map((u) => (
                 <Druck key={u.id} style={styles.row} onPress={() => onOpenProfile(u.id)}>
                   <Avatar id={u.id} name={u.name} size={44} />
@@ -165,7 +167,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.tags.length > 0 && (
-            <Section title="# Hashtags">
+            <Section title="# Hashtags" onTitlePress={() => onNotice('Alle Hashtags')}>
               <View style={styles.tags}>
                 {result.tags.map((h) => (
                   <Druck key={h.tag} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: h.tag })}>
@@ -179,7 +181,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.places.length > 0 && (
-            <Section title="Standorte">
+            <Section title="Standorte" onTitlePress={() => onNotice('Alle Standorte')}>
               {result.places.map((p) => (
                 <Row
                   key={p.id}
@@ -193,7 +195,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
           )}
 
           {result.sounds.length > 0 && (
-            <Section title="Sounds">
+            <Section title="Sounds" onTitlePress={() => onNotice('Alle Sounds')}>
               {result.sounds.map((s) => (
                 <Row
                   key={s.id}
@@ -219,6 +221,11 @@ const styles = themenStyles((colors) => ({
   sectionHead: {
     ...typography.h3,
     color: colors.text,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  sectionHeadPress: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
