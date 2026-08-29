@@ -124,6 +124,14 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
       kacheln = L.tileLayer(url, { attribution: quelle, maxZoom: maxZoom }).addTo(map);
     };
 
+    window.zoomEin = function () {
+      map.zoomIn();
+    };
+
+    window.zoomAus = function () {
+      map.zoomOut();
+    };
+
     // Die eigene Nadel haengt am Schalter im Screen, nicht an der Karte.
     var ichNadeln = [];
     window.eigenenOrtSetzen = function (lat, lng) {
@@ -242,6 +250,22 @@ export const KarteWeb = forwardRef<KartenSteuerung, Props>(
             fuer die Kartenansicht. Beide liegen als echte Knoepfe ueber der
             WebView - in der Karte selbst wuerden sie mitzoomen. */}
         <View style={styles.werkzeuge} pointerEvents="box-none">
+          <View style={styles.zoomStack}>
+            <Druck
+              style={styles.werkzeug}
+              onPress={() => webViewRef.current?.injectJavaScript('window.zoomEin(); true;')}
+              accessibilityLabel="Hineinzoomen"
+            >
+              <Ionicons name="add-outline" size={18} color="#1a1d21" />
+            </Druck>
+            <Druck
+              style={styles.werkzeug}
+              onPress={() => webViewRef.current?.injectJavaScript('window.zoomAus(); true;')}
+              accessibilityLabel="Herauszoomen"
+            >
+              <Ionicons name="remove-outline" size={18} color="#1a1d21" />
+            </Druck>
+          </View>
           <Druck
             style={styles.werkzeug}
             onPress={onVollbild}
@@ -289,6 +313,10 @@ const styles = StyleSheet.create({
     right: 10,
     top: 10,
     gap: 6,
+    alignItems: 'center',
+  },
+  zoomStack: {
+    gap: 4,
   },
   werkzeug: {
     width: 36,
