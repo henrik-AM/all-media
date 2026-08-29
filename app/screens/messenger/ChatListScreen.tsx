@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { Druck } from '../../components/Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -9,6 +9,7 @@ import { SearchBar } from '../../components/SearchBar';
 import { StoryRail } from '../../components/StoryRail';
 import { brandGradient, colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { Chat, Story } from '../../types';
+import { haptic } from '../../lib/haptics';
 
 type Filter = 'all' | 'contacts' | 'groups';
 
@@ -32,6 +33,7 @@ interface Props {
 export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onNewChat }: Props) => {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const chats = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -42,6 +44,13 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
       return chat.name.toLowerCase().includes(q) || chat.preview.toLowerCase().includes(q);
     });
   }, [allChats, filter, query]);
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    haptic.light();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    setIsRefreshing(false);
+  };
 
   const renderChat = ({ item }: { item: Chat }) => {
     const unread = item.unreadCount > 0;
@@ -132,6 +141,7 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
             text={`Für „${query}" wurde nichts gefunden.`}
           />
         }
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       />
     </View>
   );

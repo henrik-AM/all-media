@@ -20,6 +20,7 @@ import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from 
 import { AnhangSheet } from '../../components/AnhangSheet';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Chat, Contact, Message } from '../../types';
+import { haptic } from '../../lib/haptics';
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -81,6 +82,7 @@ export const ChatDetailScreen = ({
     const text = draft.trim();
     if (!text || gesperrt) return;
 
+    haptic.success();
     const message: Message = {
       id: `m${Date.now()}`,
       chatId: chat.id,
@@ -122,6 +124,7 @@ export const ChatDetailScreen = ({
       <Druck
         style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}
         onLongPress={() => {
+          haptic.medium();
           const jetzt = markieren(item.id);
           onNotice?.(jetzt ? 'Nachricht markiert' : 'Markierung entfernt');
         }}

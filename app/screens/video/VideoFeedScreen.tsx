@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Image, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, LayoutChangeEvent, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
@@ -10,6 +10,7 @@ import { mockUsers, mockVideos } from '../../mocks';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Video } from '../../types';
 import { compactNumber } from '../../lib/zahlen';
+import { haptic } from '../../lib/haptics';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -36,21 +37,34 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   const [gefolgt, setGefolgt] = useState<Record<string, boolean>>({});
   const [slideHeight, setSlideHeight] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const measure = (event: LayoutChangeEvent) => setSlideHeight(event.nativeEvent.layout.height);
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    haptic.light();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    setVideos((prev) => [...mockVideos, ...prev]);
+    setIsRefreshing(false);
+  };
 
   const update = (id: string, change: (video: Video) => Video) =>
     setVideos((prev) => prev.map((v) => (v.id === id ? change(v) : v)));
 
-  const toggleLike = (video: Video) =>
+  const toggleLike = async (video: Video) => {
+    haptic.impact('medium');
     update(video.id, (v) => ({ ...v, liked: !v.liked, likes: v.likes + (v.liked ? -1 : 1) }));
+  };
 
-  const toggleSave = (video: Video) => {
+  const toggleSave = async (video: Video) => {
+    haptic.light();
     update(video.id, (v) => ({ ...v, saved: !v.saved }));
     onNotice(video.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
   };
 
-  const toggleRepost = (video: Video) => {
+  const toggleRepost = async (video: Video) => {
+    haptic.selection();
     const jetztAn = umschalten('video', video.id, video.description);
     update(video.id, (v) => ({
       ...v,
@@ -89,7 +103,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
             <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.likes)}</Text>
           </Druck>
 
-          <Druck style={styles.railBtn} onPress={() => setCommentsFor(item.id)}>
+          <Druck style={styles.railBtn} onPress={() => { haptic.light(); setCommentsFor(item.id); }}>
             <Ionicons name="chatbubble-outline" size={26} color={colors.white} />
             <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.comments)}</Text>
           </Druck>
@@ -171,6 +185,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
         pagingEnabled
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       />
 
       <CommentSheet
