@@ -2432,9 +2432,9 @@ async function openProfile(userId, variante) {
                  </div>`
           }
           <div class="prof__stats">
-            <div class="prof__stat"><strong>${compactNumber(profile.posts)}</strong><span>Beiträge</span></div>
-            <div class="prof__stat"><strong>${compactNumber(profile.followers)}</strong><span>Follower</span></div>
-            <div class="prof__stat"><strong>${compactNumber(profile.following)}</strong><span>Gefolgt</span></div>
+            <button class="prof__stat" data-stat="posts"><strong>${compactNumber(profile.posts)}</strong><span>Beiträge</span></button>
+            <button class="prof__stat" data-stat="followers"><strong>${compactNumber(profile.followers)}</strong><span>Follower</span></button>
+            <button class="prof__stat" data-stat="following"><strong>${compactNumber(profile.following)}</strong><span>Gefolgt</span></button>
           </div>
         </div>
 

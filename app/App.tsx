@@ -444,6 +444,12 @@ const Shell = () => {
   const openStory = (story: Story) => {
     // Eigene Story: noch leer -> aufnehmen, sonst ansehen.
     if (story.own && !story.mediaUri) return setOverlay({ kind: 'camera' });
+    /* Story als viewed markieren, wenn sie angesehen wird */
+    if (!story.viewed) {
+      setStories((prev) =>
+        prev.map((s) => (s.id === story.id ? { ...s, viewed: true } : s))
+      );
+    }
     setOverlay({ kind: 'story', story });
   };
 

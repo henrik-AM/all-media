@@ -31,10 +31,9 @@ interface Props {
 }
 
 export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
-  // Die Liste liegt im gemeinsamen Zustand: ein selbst erstellter Kanal muss
-  // hier genauso auftauchen wie im Community-Profil.
   const { communities, kanalBeitreten, kanalGelesen } = useProfil();
-  const [filter, setFilter] = useState<Filter>('meine');
+  /* Punkt: Nur eigene Communitys anzeigen, keine "Entdecken" */
+  const filter = 'meine' as const;
   const [query, setQuery] = useState('');
 
   const visible = useMemo(() => {
@@ -118,13 +117,6 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice }: Props) => {
         />
       </View>
 
-      {/*
-        Ohne Zahlen. Henrik am 26.08.2026: "Zahl bei Entdecken wird angezeigt.
-        Nur Communitys, keine Zahl." Die Zahl an einem Filter liest sich wie
-        ein Zaehler fuer Ungelesenes - hier zaehlte sie nur, wie lang die
-        Liste dahinter ist, und das sieht man ohnehin sofort.
-      */}
-      <FilterPillen pillen={FILTERS} aktiv={filter} onChange={setFilter} />
 
       <FlatList
         data={visible}
