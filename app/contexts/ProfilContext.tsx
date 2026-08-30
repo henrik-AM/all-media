@@ -339,6 +339,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           liked: false,
           saved: false,
           reposted: false,
+          notify: true,
           mediaUri,
         },
         ...prev,

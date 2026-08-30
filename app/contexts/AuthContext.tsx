@@ -1,72 +1,53 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthUser } from '../types';
-import { mockCurrentUser } from '../mocks';
+import { signUpWithEmail, signInWithEmail, signOut, resetPasswordForEmail } from '../lib/supabaseAuth';
+import { useSupabase } from './SupabaseContext';
 
-/*
- * Mehrere Konten nebeneinander, wie man es von Instagram kennt.
- *
- * Henrik meinte mit "Profil wechseln" ausdruecklich nicht den Wechsel
- * zwischen Messenger-, Video- und Community-Profil desselben Kontos, sondern
- * ein zweites eigenstaendiges Konto, auf das man umschaltet.
- *
- * Angemeldete Konten bleiben angemeldet - der Wechsel geht ohne neue
- * Passworteingabe. Nur ein zusaetzliches Konto verlangt eine Anmeldung.
- *
- * Die Sitzung ueberlebt jetzt auch das Schliessen der App. Vorher lag sie nur
- * im Arbeitsspeicher: jeder Neustart landete wieder auf dem Anmeldebildschirm.
- * Das erwartet niemand von einer Messenger-App - und in Expo Go, wo die App
- * bei jeder Codeaenderung neu laedt, war es beim Bauen jedes Mal von vorn.
- *
- * Was gespeichert wird, sind nur die Konten und welches aktiv ist. Ein
- * Passwort wird nicht abgelegt - die Mock-Anmeldung kennt gar keines, und
- * sobald die echte Anmeldung ueber Supabase laeuft, gehoert dessen Token in
- * expo-secure-store und nicht hierher.
- */
-const SPEICHER = 'all-media.sitzung.v1';
+const SPEICHER = 'all-media.sitzung.v2';
 
 export const AuthContext = createContext<{
   user: AuthUser | null;
   isLoggedIn: boolean;
-  /** Ist die gespeicherte Sitzung schon geholt? Vorher nichts anzeigen. */
   sitzungGeladen: boolean;
-  /** Alle angemeldeten Konten. */
   konten: AuthUser[];
-  login: (email: string, password: string) => void;
-  logout: () => void;
-  /** Auf ein bereits angemeldetes Konto umschalten. */
+  error: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   wechsleZu: (kontoId: string) => void;
-  /** Ein weiteres Konto anmelden und direkt dorthin wechseln. */
-  kontoHinzufuegen: (email: string, password: string, name?: string) => void;
-  /** Ein Konto abmelden. Beim letzten Konto endet die Sitzung ganz. */
-  kontoAbmelden: (kontoId: string) => void;
+  kontoHinzufuegen: (email: string, password: string, name?: string) => Promise<void>;
+  kontoAbmelden: (kontoId: string) => Promise<void>;
+  sendPasswordResetCode: (email: string) => Promise<boolean>;
 }>({
   user: null,
   isLoggedIn: false,
   sitzungGeladen: false,
   konten: [],
-  login: () => {},
-  logout: () => {},
+  error: null,
+  login: async () => {},
+  logout: async () => {},
   wechsleZu: () => {},
-  kontoHinzufuegen: () => {},
-  kontoAbmelden: () => {},
+  kontoHinzufuegen: async () => {},
+  kontoAbmelden: async () => {},
+  sendPasswordResetCode: async () => false,
 });
 
-/** Aus einer Mailadresse einen brauchbaren Anzeigenamen bauen. */
+const handleAusMail = (email: string) => {
+  const teil = email.split('@')[0].replace(/[._-]+/g, '');
+  return '@' + teil.toLowerCase();
+};
+
 const nameAusMail = (email: string) => {
   const vorn = email.split('@')[0].replace(/[._-]+/g, ' ').trim();
-  return vorn ? vorn.charAt(0).toUpperCase() + vorn.slice(1) : 'Neues Konto';
+  return vorn ? vorn.charAt(0).toUpperCase() + vorn.slice(1) : 'Konto';
 };
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const { supabase, isConfigured } = useSupabase();
   const [konten, setKonten] = useState<AuthUser[]>([]);
   const [aktivId, setAktivId] = useState<string | null>(null);
-  /*
-   * Solange die gespeicherte Sitzung noch geholt wird, darf nichts gezeigt
-   * werden. Ohne diesen Zustand blitzt der Anmeldebildschirm fuer einen
-   * Bildaufbau auf, bevor die Sitzung ankommt - das sieht aus wie ein Fehler.
-   */
   const [geladen, setGeladen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let abgebrochen = false;
@@ -77,14 +58,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const daten = JSON.parse(roh) as { konten?: AuthUser[]; aktivId?: string | null };
           if (Array.isArray(daten.konten) && daten.konten.length > 0) {
             setKonten(daten.konten);
-            // Nur uebernehmen, wenn das Konto auch wirklich noch dabei ist.
             const gueltig = daten.konten.some((k) => k.id === daten.aktivId);
             setAktivId(gueltig ? daten.aktivId! : daten.konten[0].id);
           }
         }
-      } catch {
-        // Kaputter oder alter Eintrag: dann eben anmelden. Ein Fehler beim
-        // Lesen darf die App nicht am Starten hindern.
+      } catch (e) {
+        console.warn('Fehler beim Laden der Sitzung:', e);
       } finally {
         if (!abgebrochen) setGeladen(true);
       }
@@ -94,74 +73,204 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  // Jede Aenderung sofort sichern. Erst nach dem Laden, sonst wuerde der leere
-  // Anfangszustand die gespeicherte Sitzung ueberschreiben.
   useEffect(() => {
     if (!geladen) return;
     AsyncStorage.setItem(SPEICHER, JSON.stringify({ konten, aktivId })).catch(() => {
-      // Nicht sichern zu koennen ist aergerlich, aber kein Grund abzubrechen.
+      // Ignoriert
     });
   }, [konten, aktivId, geladen]);
 
   const user = konten.find((k) => k.id === aktivId) ?? null;
 
-  const login = (_email: string, _password: string) => {
-    // Mock-Anmeldung — spaeter echte Supabase-Auth
-    setKonten([mockCurrentUser]);
-    setAktivId(mockCurrentUser.id);
-  };
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setError(null);
 
-  const logout = () => {
+      if (!isConfigured || !supabase) {
+        // Mock-Login für Testmodus
+        if (!email || !password || password.length < 6) {
+          setError('Bitte gebe E-Mail und ein Passwort (mindestens 6 Zeichen) ein');
+          return;
+        }
+
+        const userId = `user-${Date.now()}`;
+        const konto: AuthUser = {
+          id: userId,
+          email,
+          profile: {
+            id: userId,
+            name: email.split('@')[0],
+            handle: handleAusMail(email),
+            status: 'online',
+            about: '',
+          },
+        };
+
+        setKonten((prev) => {
+          const existiert = prev.find((k) => k.email.toLowerCase() === email.toLowerCase());
+          return existiert ? prev : [...prev, konto];
+        });
+        setAktivId(userId);
+        return;
+      }
+
+      const result = await signInWithEmail(email, password);
+      if (!result.success || !result.user) {
+        setError(result.error || 'Anmeldung fehlgeschlagen');
+        return;
+      }
+
+      const konto: AuthUser = {
+        id: result.user.id,
+        email: result.user.email || email,
+        profile: {
+          id: result.user.id,
+          name: email.split('@')[0],
+          handle: handleAusMail(email),
+          status: 'online',
+          about: '',
+        },
+      };
+
+      setKonten((prev) => {
+        const existiert = prev.find((k) => k.id === result.user.id);
+        return existiert ? prev : [...prev, konto];
+      });
+      setAktivId(result.user.id);
+    },
+    [supabase, isConfigured]
+  );
+
+  const logout = useCallback(async () => {
+    setError(null);
+    if (supabase) {
+      await signOut(supabase);
+    }
     setKonten([]);
     setAktivId(null);
-  };
+  }, [supabase]);
 
-  const wechsleZu = (kontoId: string) => {
-    if (konten.some((k) => k.id === kontoId)) setAktivId(kontoId);
-  };
+  const wechsleZu = useCallback((kontoId: string) => {
+    if (konten.some((k) => k.id === kontoId)) {
+      setAktivId(kontoId);
+    }
+  }, [konten]);
 
-  const kontoHinzufuegen = (email: string, _password: string, name?: string) => {
-    const vorhanden = konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
-    if (vorhanden) return setAktivId(vorhanden.id);
+  const kontoHinzufuegen = useCallback(
+    async (email: string, password: string, name?: string) => {
+      setError(null);
 
-    const id = `acc${Date.now()}`;
-    const anzeige = name?.trim() || nameAusMail(email);
-    const konto: AuthUser = {
-      id,
-      email,
-      profile: {
-        id,
-        name: anzeige,
-        handle: '@' + anzeige.toLowerCase().replace(/\s+/g, ''),
-        status: 'online',
-        about: 'Hey, ich nutze All Media!',
-      },
-    };
-    setKonten((prev) => [...prev, konto]);
-    setAktivId(id);
-  };
+      const existiert = konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
+      if (existiert) {
+        setAktivId(existiert.id);
+        return;
+      }
 
-  const kontoAbmelden = (kontoId: string) => {
-    const rest = konten.filter((k) => k.id !== kontoId);
-    setKonten(rest);
-    // War es das aktive Konto, ruecken wir auf das erste verbleibende.
-    if (aktivId === kontoId) setAktivId(rest[0]?.id ?? null);
-  };
+      if (!isConfigured || !supabase) {
+        // Mock-Registrierung für Testmodus
+        if (!email || !password || password.length < 6) {
+          setError('Bitte gebe E-Mail und ein Passwort (mindestens 6 Zeichen) ein');
+          return;
+        }
+
+        const userId = `user-${Date.now()}`;
+        const anzeige = name?.trim() || nameAusMail(email);
+        const handle = '@' + anzeige.toLowerCase().replace(/\s+/g, '');
+
+        const konto: AuthUser = {
+          id: userId,
+          email,
+          profile: {
+            id: userId,
+            name: anzeige,
+            handle,
+            status: 'online',
+            about: 'Hey, ich nutze All Media!',
+          },
+        };
+
+        setKonten((prev) => [...prev, konto]);
+        setAktivId(userId);
+        return;
+      }
+
+      const result = await signUpWithEmail(email, password);
+      if (!result.success || !result.user) {
+        setError(result.error || 'Registrierung fehlgeschlagen');
+        return;
+      }
+
+      const anzeige = name?.trim() || nameAusMail(email);
+      const handle = '@' + anzeige.toLowerCase().replace(/\s+/g, '');
+
+      // Profil mit Metadaten aktualisieren, damit es Trigger automatisch anlegt
+      try {
+        await supabase.auth.updateUser({
+          data: { name: anzeige, handle },
+        });
+      } catch (e) {
+        console.warn('Fehler beim Aktualisieren des Profils:', e);
+      }
+
+      const konto: AuthUser = {
+        id: result.user.id,
+        email: result.user.email || email,
+        profile: {
+          id: result.user.id,
+          name: anzeige,
+          handle,
+          status: 'online',
+          about: 'Hey, ich nutze All Media!',
+        },
+      };
+
+      setKonten((prev) => [...prev, konto]);
+      setAktivId(result.user.id);
+    },
+    [supabase, isConfigured, konten]
+  );
+
+  const kontoAbmelden = useCallback(
+    async (kontoId: string) => {
+      if (supabase && aktivId === kontoId) {
+        await signOut(supabase);
+      }
+      const rest = konten.filter((k) => k.id !== kontoId);
+      setKonten(rest);
+      if (aktivId === kontoId) {
+        setAktivId(rest[0]?.id ?? null);
+      }
+    },
+    [supabase, aktivId, konten]
+  );
+
+  const sendPasswordResetCode = useCallback(
+    async (email: string) => {
+      setError(null);
+      const result = await resetPasswordForEmail(email);
+      if (!result.success) {
+        setError(result.error ?? 'Fehler beim Versenden des Codes');
+        return false;
+      }
+      return true;
+    },
+    []
+  );
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        // Solange die gespeicherte Sitzung noch geholt wird, gilt niemand als
-        // angemeldet UND niemand als abgemeldet - siehe sitzungGeladen.
         isLoggedIn: !!user,
         sitzungGeladen: geladen,
         konten,
+        error,
         login,
         logout,
         wechsleZu,
         kontoHinzufuegen,
         kontoAbmelden,
+        sendPasswordResetCode,
       }}
     >
       {children}

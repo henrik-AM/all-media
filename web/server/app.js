@@ -10,9 +10,43 @@ const express = require('express');
 const path = require('path');
 const supabaseApi = require('./supabase-api');
 const syncHandlers = require('./sync-handlers');
-const syncHandlersExt = require('./sync-handlers-extended');
+const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require('./supabase');
 
 const app = express();
+
+/*
+ * Anmeldung.
+ *
+ * Die Datenbank ist durch Row Level Security geschuetzt: Regeln gelten fuer
+ * angemeldete Nutzer. Ein Server, der ohne Anmeldung anfragt, darf dort weder
+ * lesen noch schreiben. Deshalb reicht die Oberflaeche ihr Zugangstoken im
+ * Kopf "Authorization: Bearer ..." mit; hier wird daraus ein Datenbank-Client
+ * im Namen dieses Nutzers.
+ *
+ * Ist niemand angemeldet, bleibt req.db null. Jeder Handler gibt dann null
+ * zurueck und die Seite arbeitet mit den Mockdaten weiter - genau wie bisher.
+ */
+app.use('/api', async (req, _res, next) => {
+  req.db = null;
+  req.nutzerId = null;
+
+  const token = tokenAus(req);
+  if (!token) return next();
+
+  const client = clientFuer(token);
+  if (!client) return next();
+
+  try {
+    const { data, error } = await client.auth.getUser();
+    if (!error && data?.user) {
+      req.db = client;
+      req.nutzerId = data.user.id;
+    }
+  } catch {
+    // Abgelaufenes oder falsches Token: weiter als nicht angemeldet.
+  }
+  next();
+});
 
 /*
  * `privat` steuert, wie man an eine Person herankommt: bei einem oeffentlichen
@@ -616,9 +650,10 @@ app.post('/api/reset', (req, res) => {
 });
 
 // Neue async Bootstrap-Funktion mit Supabase-Unterstützung
-async function getBootstrapData() {
-  // Versuche Supabase-Daten zu laden
-  const supabaseData = await supabaseApi.bootstrapData();
+async function getBootstrapData(req) {
+  // Echte Daten nur, wenn jemand angemeldet ist — sonst greifen die Regeln
+  // der Datenbank und es kaeme ohnehin nichts zurueck.
+  const supabaseData = await supabaseApi.bootstrapData(req?.db, req?.nutzerId);
 
   // Wenn Supabase erfolgreich: nutze echte Daten
   if (supabaseData) {
@@ -684,8 +719,65 @@ async function getBootstrapData() {
 
 // /api/bootstrap Endpoint — jetzt async
 app.get('/api/bootstrap', async (req, res) => {
-  const data = await getBootstrapData();
+  const data = await getBootstrapData(req);
   res.json(data);
+});
+
+/*
+ * Zustand des Backends. Zeigt in einem Blick, ob die Website wirklich mit der
+ * Datenbank spricht oder mit den Beispieldaten arbeitet. Ohne diesen Endpunkt
+ * sieht beides von aussen gleich aus - genau das hat lange verschleiert, dass
+ * gar nichts ankam.
+ */
+app.get('/api/zustand', async (req, res) => {
+  const antwort = {
+    zeit: new Date().toISOString(),
+    supabase: {
+      konfiguriert: isConfigured(),
+      url: supabaseUrl,
+      // Aus Umgebungsvariablen oder aus den eingebauten Standardwerten?
+      quelle: process.env.SUPABASE_URL ? 'Umgebungsvariable' : 'Standardwert im Code',
+    },
+    anmeldung: {
+      angemeldet: Boolean(req.nutzerId),
+      nutzerId: req.nutzerId,
+    },
+    daten: req.nutzerId ? 'Supabase' : 'Beispieldaten',
+  };
+
+  // Antwortet die Datenbank ueberhaupt? Ein Zaehlzugriff ohne Nutzdaten.
+  if (isConfigured()) {
+    try {
+      const client = req.db;
+      if (client) {
+        const { count, error } = await client
+          .from('profiles')
+          .select('*', { count: 'exact', head: true });
+        antwort.supabase.erreichbar = !error;
+        antwort.supabase.profile = error ? null : count;
+        if (error) antwort.supabase.fehler = error.message;
+      } else {
+        antwort.supabase.erreichbar = null;
+        antwort.supabase.hinweis =
+          'Ohne Anmeldung nicht pruefbar: die Regeln der Datenbank lassen anonyme Zugriffe nicht zu.';
+      }
+    } catch (fehler) {
+      antwort.supabase.erreichbar = false;
+      antwort.supabase.fehler = fehler.message;
+    }
+  }
+
+  res.json(antwort);
+});
+
+/*
+ * Die Zugangsdaten, die die Oberflaeche braucht, um sich selbst bei Supabase
+ * anzumelden. Der Schluessel ist der oeffentliche "publishable"-Schluessel; er
+ * steckt genauso im App-Bundle. Geschuetzt wird die Datenbank durch ihre
+ * Regeln, nicht durch Geheimhaltung dieses Schluessels.
+ */
+app.get('/api/konfiguration', (_req, res) => {
+  res.json({ supabaseUrl, supabaseKey, konfiguriert: isConfigured() });
 });
 
 /* ------------------------------------------------- Kontakteinstellungen */
@@ -731,7 +823,7 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
 
   if (was === 'archiv') {
     // Supabase-Sync
-    syncHandlers.handleChatAction(req.params.chatId, 'me', 'archived', !archiviert.includes(chat.id));
+    syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'archiv', !archiviert.includes(chat.id));
 
     const drin = archiviert.indexOf(chat.id);
     if (drin === -1) archiviert.push(chat.id);
@@ -745,7 +837,7 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
 
   if (was === 'stumm') {
     // Supabase-Sync
-    syncHandlers.handleChatAction(req.params.chatId, 'me', 'muted', !chat.muted);
+    syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'stumm', !chat.muted);
 
     chat.muted = !chat.muted;
     return res.json({
@@ -757,7 +849,7 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
 
   if (was === 'gelesen') {
     // Supabase-Sync
-    syncHandlers.handleChatAction(req.params.chatId, 'me', 'read', !chat.unread);
+    syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'gelesen', !chat.unread);
 
     // Ohne Gegenstueck waere "als ungelesen markieren" nicht rueckgaengig zu
     // machen - deshalb schaltet derselbe Punkt in beide Richtungen.
@@ -846,7 +938,7 @@ app.post('/api/chats/:chatId/melden', async (req, res) => {
 
   // Sync zu Supabase
   if (chat.userId) {
-    await syncHandlersExt.handleReportContent(chat.userId, 'me', grund, 'user');
+    await syncHandlers.handleReportContent(req.db, req.nutzerId, chat.userId, grund, 'user');
     if (profiles[chat.userId]) profiles[chat.userId].gemeldet = grund;
   }
 
@@ -1047,7 +1139,7 @@ app.post('/api/communities', async (req, res) => {
 
   // Sync zu Supabase
   const isPrivate = req.body?.sichtbarkeit !== 'public';
-  const supabaseResult = await syncHandlersExt.handleCreateCommunity('me', name, thema || '', isPrivate);
+  const supabaseResult = await syncHandlers.handleCreateCommunity(req.db, req.nutzerId, name, thema || '', isPrivate);
 
   const community = {
     id: supabaseResult?.community?.id || (`k${Date.now()}`),
@@ -1087,7 +1179,7 @@ app.post('/api/eigene/beitrag', async (req, res) => {
   if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
 
   // Sync zu Supabase
-  const supabaseResult = await syncHandlersExt.handleCreatePost('me', beschreibung, []);
+  const supabaseResult = await syncHandlers.handleCreatePost(req.db, req.nutzerId, { beschreibung });
 
   const beitrag = {
     id: supabaseResult?.post?.id || eigeneId('p'),
@@ -1136,7 +1228,7 @@ app.post('/api/eigene/video', async (req, res) => {
   }
 
   // Sync zu Supabase
-  const supabaseResult = await syncHandlersExt.handleCreateVideo('me', beschreibung, beschreibung, '');
+  const supabaseResult = await syncHandlers.handleCreateVideo(req.db, req.nutzerId, { titel: beschreibung, beschreibung });
 
   const video = {
     id: supabaseResult?.video?.id || eigeneId('v'),
@@ -1204,7 +1296,7 @@ app.post('/api/eigene/profil', async (req, res) => {
 
   // Sync zu Supabase
   if (Object.keys(updates).length > 0) {
-    await syncHandlers.handleUpdateProfile('me', updates);
+    await syncHandlers.handleUpdateProfile(req.db, req.nutzerId, updates);
   }
 
   // Erlaubt ist eine einzelne Farbe oder ein Zwei-Ton-Verlauf. Der Wert landet
@@ -1294,7 +1386,7 @@ app.post('/api/eigene/:id/loeschen', async (req, res) => {
 
     // Sync zu Supabase
     const contentType = liste === posts ? 'post' : liste === videos ? 'video' : 'clip';
-    await syncHandlersExt.handleDeleteContent(id, 'me', contentType);
+    await syncHandlers.handleDeleteContent(req.db, req.nutzerId, id, contentType);
 
     liste.splice(stelle, 1);
     gridItems.me = gridItems.me.filter((g) => g.id !== id);
@@ -1373,7 +1465,7 @@ app.post('/api/mitteilungen/:id/gelesen', async (req, res) => {
   if (!m) return res.json({ ok: false, error: 'Diese Mitteilung gibt es nicht' });
 
   // Sync zu Supabase
-  await syncHandlersExt.handleMarkNotificationRead(req.params.id, 'me');
+  await syncHandlers.handleMarkNotificationRead(req.db, req.nutzerId, req.params.id);
 
   m.gelesen = true;
   res.json({ ok: true, ungelesen: mitteilungen.filter((x) => x.bereich === m.bereich && !x.gelesen).length });
@@ -1382,7 +1474,7 @@ app.post('/api/mitteilungen/:id/gelesen', async (req, res) => {
 // Alle Mitteilungen eines Bereichs als gelesen markieren — synced mit Supabase
 app.post('/api/mitteilungen/:bereich/alle-gelesen', async (req, res) => {
   // Sync zu Supabase
-  await syncHandlersExt.handleMarkAllNotificationsRead('me', req.params.bereich);
+  await syncHandlers.handleMarkAllNotificationsRead(req.db, req.nutzerId, req.params.bereich);
 
   for (const m of mitteilungen) if (m.bereich === req.params.bereich) m.gelesen = true;
   res.json({ ok: true, ungelesen: 0 });
@@ -1440,7 +1532,7 @@ app.post('/api/profile/:userId/follow', async (req, res) => {
   const userId = req.params.userId;
 
   // Versuche auf Supabase zu speichern
-  const supabaseResult = await syncHandlers.handleFollowUser('me', userId);
+  const supabaseResult = await syncHandlers.handleFollowUser(req.db, req.nutzerId, userId);
 
   // Mock-Daten aktualisieren (Fallback)
   const folgt = folgenUmschalten(profile);
@@ -1464,7 +1556,7 @@ app.post('/api/comments/:targetId', async (req, res) => {
   const targetId = req.params.targetId;
 
   // Sync zu Supabase
-  const supabaseResult = await syncHandlersExt.handleCreateComment(targetId, 'me', text.trim());
+  const supabaseResult = await syncHandlers.handleCreateComment(req.db, req.nutzerId, targetId, text.trim());
 
   if (!comments[targetId]) comments[targetId] = [];
 
@@ -1491,7 +1583,7 @@ app.post('/api/comments/:targetId/:commentId/like', async (req, res) => {
   if (!comment) return res.status(404).json({ error: 'Nicht gefunden' });
 
   // Sync zu Supabase
-  await syncHandlersExt.handleLikeComment(req.params.commentId, 'me');
+  await syncHandlers.handleLikeComment(req.db, req.nutzerId, req.params.commentId);
 
   comment.liked = !comment.liked;
   comment.likes += comment.liked ? 1 : -1;
@@ -1507,21 +1599,21 @@ app.post('/api/posts/:id/:action', async (req, res) => {
   const postId = req.params.id;
 
   if (action === 'like') {
-    await syncHandlersExt.handleLikeContent(postId, 'me', 'post');
+    await syncHandlers.handleLikeContent(req.db, req.nutzerId, postId);
     post.liked = !post.liked;
     post.likes += post.liked ? 1 : -1;
   } else if (action === 'save') {
-    await syncHandlersExt.handleSaveContent(postId, 'me', 'post');
+    await syncHandlers.handleSaveContent(req.db, req.nutzerId, postId);
     post.saved = !post.saved;
   } else if (action === 'follow') {
     const profil = profiles[post.userId];
     const folgt = profil ? folgenUmschalten(profil) : !post.following;
     for (const p of posts) if (p.userId === post.userId) p.following = folgt;
-    if (profil) await syncHandlers.handleFollowUser('me', post.userId);
+    if (profil) await syncHandlers.handleFollowUser(req.db, req.nutzerId, post.userId);
   } else if (action === 'notify') {
     post.notify = !post.notify;
   } else if (action === 'repost') {
-    await syncHandlersExt.handleRepostContent(postId, 'me', 'post');
+    await syncHandlers.handleRepostContent(req.db, req.nutzerId, postId);
     post.reposted = !post.reposted;
     post.reposts += post.reposted ? 1 : -1;
     setzeRepost('post', post.id, post.reposted);
@@ -1541,7 +1633,7 @@ app.post('/api/videos/:id/:action', async (req, res) => {
 
   // Supabase-Sync für Like
   if (action === 'like') {
-    const supabaseResult = await syncHandlers.handleLikeContent(videoId, 'me', 'video');
+    const supabaseResult = await syncHandlers.handleLikeContent(req.db, req.nutzerId, videoId);
     video.liked = !video.liked;
     video.likes += video.liked ? 1 : -1;
   } else if (action === 'save') {
@@ -1611,7 +1703,7 @@ app.post('/api/messages/:chatId', async (req, res) => {
   const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
   // Versuche auf Supabase zu speichern
-  const supabaseResult = await syncHandlers.handleSendMessage(chatId, 'me', text.trim());
+  const supabaseResult = await syncHandlers.handleSendMessage(req.db, req.nutzerId, chatId, text.trim());
 
   // Mock-Daten aktualisieren (Fallback/Cache)
   const store = nachrichtenSpeicher(chatId);
@@ -1862,7 +1954,7 @@ app.post('/api/stories/:id/like', async (req, res) => {
   if (!story) return res.status(404).json({ error: 'Nicht gefunden' });
 
   // Sync zu Supabase
-  await syncHandlersExt.handleLikeStory(req.params.id, 'me');
+  await syncHandlers.handleLikeStory(req.db, req.nutzerId, req.params.id);
 
   story.liked = !story.liked;
   res.json(story);
@@ -1874,7 +1966,7 @@ app.post('/api/stories/:id/seen', async (req, res) => {
   if (story) {
     story.viewed = true;
     // Sync zu Supabase
-    await syncHandlersExt.handleViewStory(req.params.id, 'me');
+    await syncHandlers.handleViewStory(req.db, req.nutzerId, req.params.id);
   }
   res.json({ ok: true });
 });

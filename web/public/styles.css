@@ -1372,6 +1372,13 @@ ul { margin: 0; padding: 0; list-style: none; }
 .sheet__footer:has(.btn + .btn) { display: flex; gap: 10px; }
 .sheet__footer .btn { flex: 1 1 0; }
 
+/* Steht nur ein Knopf im Fuss, nimmt er die volle Breite. .prof__btn traegt
+   flex: 1 — das wirkt aber nur in einem Flexcontainer, und der Fuss ist bei
+   einem einzelnen Knopf keiner. Ohne diese Regel schrumpft der Knopf auf die
+   Breite seiner Beschriftung, die dann ohne Innenabstand am Rand klebt.
+   Sichtbar war das am Anmelden-Knopf im Konto-Fenster. */
+.sheet__footer > .prof__btn:only-child { display: block; width: 100%; }
+
 /*
   Kopf der Chat-Einstellungen. Henrik: "Bearbeitungsansicht wirkt leer."
   Sie fing frueher direkt mit den Schaltern an und sagte nirgends, um wen

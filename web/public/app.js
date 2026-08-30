@@ -274,6 +274,13 @@ function openKontoWechsel() {
  */
 async function bootstrap() {
   let data;
+
+  // Erst klaeren, ob jemand angemeldet ist. Sonst holt der Aufruf unten die
+  // Beispieldaten, obwohl eine Sitzung vorliegt und echte Daten da waeren.
+  if (window.Anmeldung?.bereit) {
+    await window.Anmeldung.bereit.catch(() => null);
+  }
+
   try {
     const res = await fetch('/api/bootstrap');
     if (!res.ok) throw new Error('Server antwortet mit ' + res.status);
@@ -2913,9 +2920,9 @@ function videoSlide(v) {
           ${ICONS.repeat}
           <span>${v.reposted ? 'Repostet' : 'Repost'}</span>
         </button>
-        <button class="railbtn ${v.saved ? 'is-saved' : ''}" data-vaction="save" data-vid="${v.id}" aria-label="Merken">
+        <button class="railbtn ${v.saved ? 'is-saved' : ''}" data-vaction="save" data-vid="${v.id}" aria-label="Speichern">
           ${ICONS.bookmark}
-          <span>${v.saved ? 'Gespeichert' : 'Merken'}</span>
+          <span>${v.saved ? 'Gespeichert' : 'Speichern'}</span>
         </button>
       </div>
 
@@ -4561,16 +4568,57 @@ function openKontoWechsel() {
       binden();
     };
 
-    const anlegen = () => {
+    /*
+     * Echte Anmeldung bei Supabase. Klappt sie, laedt die Seite ihre Daten
+     * neu - dann steht dort dasselbe wie in der App. Ist die Anmeldung nicht
+     * eingerichtet, bleibt es beim bisherigen Verhalten: ein Konto, das nur
+     * im Browser existiert.
+     */
+    const anlegen = async () => {
       const email = ($('#kontoMail')?.value || '').trim();
       const pass = ($('#kontoPass')?.value || '').trim();
       const name = ($('#kontoName')?.value || '').trim();
+      const neuesKonto = zustand.ansicht === 'neu';
 
-      if (zustand.ansicht === 'neu' && !name) return toast('Bitte einen Namen eingeben');
+      if (neuesKonto && !name) return toast('Bitte einen Namen eingeben');
       if (!email) return toast('Bitte E-Mail eingeben');
-      if (zustand.ansicht === 'neu' && pass.length < 6) return toast('Passwort: mindestens 6 Zeichen');
+      if (neuesKonto && pass.length < 6) return toast('Passwort: mindestens 6 Zeichen');
       if (!pass) return toast('Bitte Passwort eingeben');
 
+      const knopf = sheet.querySelector('#kontoOk');
+      if (knopf) {
+        knopf.disabled = true;
+        knopf.textContent = neuesKonto ? 'Konto wird erstellt…' : 'Wird angemeldet…';
+      }
+
+      const zurueck = () => {
+        if (!knopf) return;
+        knopf.disabled = false;
+        knopf.textContent = neuesKonto ? 'Konto erstellen' : 'Anmelden';
+      };
+
+      if (window.Anmeldung) {
+        const ergebnis = neuesKonto
+          ? await window.Anmeldung.registrieren(email, pass, name)
+          : await window.Anmeldung.anmelden(email, pass);
+
+        if (!ergebnis.ok) {
+          zurueck();
+          return toast(ergebnis.fehler);
+        }
+        if (ergebnis.bestaetigen) {
+          zurueck();
+          close();
+          return toast(ergebnis.hinweis);
+        }
+
+        close();
+        toast(neuesKonto ? `Konto für ${name} erstellt` : `Angemeldet als ${email}`);
+        return bootstrap();
+      }
+
+      // Kein Supabase erreichbar: wie bisher nur im Browser merken.
+      zurueck();
       const vorhanden = state.konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
       if (vorhanden) {
         state.kontoAktiv = vorhanden.id;
@@ -4591,7 +4639,7 @@ function openKontoWechsel() {
       });
       state.kontoAktiv = id;
       close();
-      toast(zustand.ansicht === 'neu' ? `Konto für ${anzeige} erstellt` : `Angemeldet als ${email}`);
+      toast(neuesKonto ? `Konto für ${anzeige} erstellt` : `Angemeldet als ${email}`);
       render();
     };
 
@@ -4610,12 +4658,20 @@ function openKontoWechsel() {
           })
         );
         sheet.querySelectorAll('[data-konto-weg]').forEach((b) =>
-          b.addEventListener('click', () => {
+          b.addEventListener('click', async () => {
             const id = b.dataset.kontoWeg;
             const k = state.konten.find((x) => x.id === id);
             state.konten = state.konten.filter((x) => x.id !== id);
             if (state.kontoAktiv === id) state.kontoAktiv = state.konten[0]?.id || null;
             toast(`${k.name} abgemeldet`);
+
+            // Auch die echte Sitzung beenden, sonst bleibt die Seite
+            // angemeldet, obwohl das Konto aus der Liste verschwunden ist.
+            if (window.Anmeldung?.angemeldet()) {
+              await window.Anmeldung.abmelden();
+              close();
+              return bootstrap();
+            }
             neuZeichnen();
           })
         );
@@ -6103,8 +6159,8 @@ function openClip(clipId) {
             <button class="postbtn ${clip.reposted ? 'is-reposted' : ''}" data-clipact="repost" aria-label="Repost">
               ${ICONS.repeat}<span class="postbtn__zahl">Repost</span>
             </button>
-            <button class="postbtn ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Merken">
-              ${ICONS.bookmark}<span class="postbtn__zahl">Merken</span>
+            <button class="postbtn ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Speichern">
+              ${ICONS.bookmark}<span class="postbtn__zahl">${clip.saved ? 'Gespeichert' : 'Speichern'}</span>
             </button>
           </div>
 

@@ -111,6 +111,7 @@ export interface Video {
   liked: boolean;
   saved: boolean;
   reposted: boolean;
+  notify: boolean;
   /** Selbst aufgenommen: Standbild oder Datei fuer die Vorschau. */
   mediaUri?: string;
   /** Fuer die Hashtag-Seite. */

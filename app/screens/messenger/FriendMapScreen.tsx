@@ -51,9 +51,10 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
 
   const pins: Pin[] = mockFriendPins.map((pin) => {
     const [lat, lng] = percentToCoords(pin.x, pin.y);
+    const user = mockUsers[pin.id];
     return {
       id: pin.id,
-      name: mockUsers[pin.id].name,
+      name: user?.name || 'Unbekannt',
       lat,
       lng,
       // Dieselbe Farbe wie der Avatar in der Liste darunter - sonst laesst
@@ -152,15 +153,16 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
       {!vollbild && mockFriendPins.map((pin) => {
         const person = mockUsers[pin.id];
         const istAktiv = aktiv === pin.id;
+        const name = person?.name || 'Unbekannt';
         return (
           <Druck
             key={pin.id}
             style={[styles.row, istAktiv && styles.rowAktiv]}
             onPress={() => zeigeAufKarte(pin.id)}
           >
-            <Avatar id={pin.id} name={person.name} size={44} />
+            <Avatar id={pin.id} name={name} size={44} />
             <View style={styles.rowBody}>
-              <Text style={styles.rowName}>{person.name}</Text>
+              <Text style={styles.rowName}>{name}</Text>
               <Text style={styles.rowSub}>
                 {pin.place} · {pin.when}
               </Text>

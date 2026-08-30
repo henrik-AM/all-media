@@ -1,136 +1,94 @@
-// Supabase-Client für den Server
-// Verbindet die Website mit der gleichen Datenbank wie die App
+// Supabase-Anbindung des Website-Servers.
+//
+// Wichtig zum Verständnis: Die Datenbank ist durch Row Level Security
+// geschützt. Die Regeln gelten für die Rolle „authenticated" — also für einen
+// angemeldeten Nutzer. Ein Client ohne Anmeldung ist „anon" und darf nichts
+// lesen und nichts schreiben. Deshalb gibt es hier zwei Wege:
+//
+//   leseClient()      — ohne Anmeldung. Nur für Dinge, die öffentlich sind.
+//   clientFuer(token) — mit dem Zugangstoken des angemeldeten Nutzers. Nur
+//                       damit greifen die Regeln richtig und Schreibzugriffe
+//                       funktionieren.
+//
+// Der Schlüssel unten ist der „publishable"-Schlüssel. Er ist dafür gemacht,
+// öffentlich zu sein — er steckt genauso im App-Bundle. Der Schutz kommt aus
+// den Regeln in der Datenbank, nicht aus der Geheimhaltung des Schlüssels.
 
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+// Fallback, damit die Website auch dann mit der Datenbank spricht, wenn auf
+// Render keine Umgebungsvariablen gesetzt sind.
+const STANDARD_URL = 'https://ijztosbjfybdgotpdixw.supabase.co';
+const STANDARD_KEY = 'sb_publishable_sh_LhLSMkHNZrmmj7XkTtw_QFT1G9Ze';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('⚠️  Supabase nicht konfiguriert — nutze Mock-Daten');
+const supabaseUrl = process.env.SUPABASE_URL || STANDARD_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY || STANDARD_KEY;
+
+const konfiguriert = Boolean(supabaseUrl && supabaseKey);
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+  console.warn(
+    '  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.'
+  );
 }
 
-const supabase = supabaseUrl && supabaseKey
-  ? createClient(supabaseUrl, supabaseKey)
+// Client ohne Anmeldung. Sitzungen werden nicht gespeichert: Der Server
+// bedient viele Nutzer gleichzeitig, eine gemeinsame Sitzung wäre ein Leck.
+const supabase = konfiguriert
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
   : null;
 
 /**
- * Lädt alle Benutzerprofile aus Supabase
+ * Client im Namen eines angemeldeten Nutzers. Ohne Token gibt es keinen —
+ * dann greift beim Aufrufer der Rückfall auf die Beispieldaten.
  */
-async function getAllProfiles() {
-  if (!supabase) return null;
+function clientFuer(zugangstoken) {
+  if (!konfiguriert || !zugangstoken) return null;
 
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .limit(100);
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching profiles:', error);
-    return [];
-  }
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${zugangstoken}` } },
+  });
 }
 
 /**
- * Lädt ein einzelnes Profil
+ * Liest das Zugangstoken aus einer Anfrage (Header „Authorization").
  */
-async function getProfile(userId) {
-  if (!supabase) return null;
+function tokenAus(req) {
+  const kopf = req?.headers?.authorization || '';
+  return kopf.startsWith('Bearer ') ? kopf.slice(7).trim() : null;
+}
+
+/**
+ * Wer stellt diese Anfrage? Gibt das Profil des angemeldeten Nutzers zurück
+ * oder null, wenn niemand angemeldet ist.
+ */
+async function nutzerAus(req) {
+  const token = tokenAus(req);
+  const client = clientFuer(token);
+  if (!client) return null;
 
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error; // 404 ist ok
-    return data || null;
-  } catch (error) {
-    console.error('Error fetching profile:', error);
+    const { data, error } = await client.auth.getUser();
+    if (error) return null;
+    return data?.user || null;
+  } catch {
     return null;
   }
 }
 
-/**
- * Lädt alle Chats für einen Benutzer
- */
-async function getUserChats(userId) {
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('chat_members')
-      .select('chats(*)')
-      .eq('user_id', userId);
-
-    if (error) throw error;
-    return data?.map(m => m.chats).filter(Boolean) || [];
-  } catch (error) {
-    console.error('Error fetching chats:', error);
-    return [];
-  }
-}
-
-/**
- * Lädt Kontakte eines Benutzers
- */
-async function getUserContacts(userId) {
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('profiles:contact_id(*)')
-      .eq('user_id', userId)
-      .eq('status', 'friend');
-
-    if (error) throw error;
-    return data?.map(c => c.profiles).filter(Boolean) || [];
-  } catch (error) {
-    console.error('Error fetching contacts:', error);
-    return [];
-  }
-}
-
-/**
- * Lädt Nachrichten aus einem Chat
- */
-async function getChatMessages(chatId) {
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, profiles(name, handle, initials, color)')
-      .eq('chat_id', chatId)
-      .order('created_at', { ascending: true })
-      .limit(50);
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    return [];
-  }
-}
-
-/**
- * Überprüft ob Supabase konfiguriert ist
- */
 function isConfigured() {
-  return supabase !== null;
+  return konfiguriert;
 }
 
 module.exports = {
   supabase,
-  getAllProfiles,
-  getProfile,
-  getUserChats,
-  getUserContacts,
-  getChatMessages,
+  clientFuer,
+  tokenAus,
+  nutzerAus,
   isConfigured,
+  supabaseUrl,
+  supabaseKey,
 };

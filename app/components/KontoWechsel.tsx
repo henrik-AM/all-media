@@ -53,21 +53,31 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
     schliessen();
   };
 
-  const anmelden = () => {
+  const anmelden = async () => {
     if (!email.trim()) return onNotice('Bitte E-Mail eingeben');
     if (!passwort.trim()) return onNotice('Bitte Passwort eingeben');
-    kontoHinzufuegen(email.trim(), passwort);
-    onNotice(`Angemeldet als ${email.trim()}`);
-    schliessen();
+    try {
+      await kontoHinzufuegen(email.trim(), passwort);
+      onNotice(`Angemeldet als ${email.trim()}`);
+      schliessen();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Anmeldung fehlgeschlagen';
+      onNotice(msg);
+    }
   };
 
-  const neuErstellen = () => {
+  const neuErstellen = async () => {
     if (!name.trim()) return onNotice('Bitte einen Namen eingeben');
     if (!email.trim()) return onNotice('Bitte E-Mail eingeben');
     if (passwort.trim().length < 6) return onNotice('Passwort: mindestens 6 Zeichen');
-    kontoHinzufuegen(email.trim(), passwort, name.trim());
-    onNotice(`Konto für ${name.trim()} erstellt`);
-    schliessen();
+    try {
+      await kontoHinzufuegen(email.trim(), passwort, name.trim());
+      onNotice(`Konto für ${name.trim()} erstellt`);
+      schliessen();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Kontenerstellung fehlgeschlagen';
+      onNotice(msg);
+    }
   };
 
   return (
@@ -108,9 +118,13 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                     ) : (
                       <Druck
                         hitSlop={8}
-                        onPress={() => {
-                          kontoAbmelden(konto.id);
-                          onNotice(`${konto.profile.name} abgemeldet`);
+                        onPress={async () => {
+                          try {
+                            await kontoAbmelden(konto.id);
+                            onNotice(`${konto.profile.name} abgemeldet`);
+                          } catch (e) {
+                            onNotice('Fehler beim Abmelden');
+                          }
                         }}
                       >
                         <Ionicons name="close" size={20} color={colors.text3} />

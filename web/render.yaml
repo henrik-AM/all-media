@@ -10,3 +10,11 @@ services:
         value: production
       - key: PORT
         value: 3000
+      # Zugang zur Datenbank. Der Schluessel ist der oeffentliche
+      # "publishable"-Schluessel — er steckt genauso im App-Bundle. Geschuetzt
+      # wird die Datenbank durch ihre Regeln (Row Level Security), nicht durch
+      # Geheimhaltung dieses Schluessels.
+      - key: SUPABASE_URL
+        value: https://ijztosbjfybdgotpdixw.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: sb_publishable_sh_LhLSMkHNZrmmj7XkTtw_QFT1G9Ze

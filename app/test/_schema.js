@@ -1,0 +1,162 @@
+// Prueft, ob der Server-Code nur Tabellen und Spalten anspricht, die es im
+// Datenbankschema wirklich gibt.
+//
+// Warum es diesen Test gibt: Die Sync-Schicht der Website schrieb monatelang
+// in erfundene Tabellen ("videos", "likes", "saves") und erfundene Spalten
+// ("content_id", "is_archived", "creator_id"). Jeder Zugriff schlug fehl, der
+// Fehler wurde abgefangen, die Website fiel still auf Beispieldaten zurueck —
+// von aussen sah alles normal aus. Genau das faengt dieser Test ab.
+//
+// Start:  node test/_schema.js     (kein Server noetig)
+
+const fs = require('fs');
+const path = require('path');
+
+const WURZEL = path.join(__dirname, '..', '..');
+const SQL_DATEIEN = ['SUPABASE_SCHEMA.sql', 'SUPABASE_SCHEMA_2.sql'];
+const QUELLEN = ['web/server/supabase-api.js', 'web/server/sync-handlers.js'];
+
+let fehler = 0;
+const pruefe = (name, bedingung, zusatz = '') => {
+  if (!bedingung) fehler++;
+  console.log((bedingung ? 'PASS  ' : 'FAIL  ') + name + (zusatz ? '  — ' + zusatz : ''));
+};
+
+// --------------------------------------------------- Schema einlesen -----
+
+/** Liest aus den SQL-Dateien, welche Tabelle welche Spalten hat. */
+function schemaLesen() {
+  const tabellen = new Map();
+  let sql = '';
+  for (const datei of SQL_DATEIEN) {
+    sql += fs.readFileSync(path.join(WURZEL, datei), 'utf8') + '\n';
+  }
+
+  // create table [if not exists] public.name ( ... );
+  const anlegen = /create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)\s*\(([\s\S]*?)\n\)\s*;/gi;
+  let treffer;
+  while ((treffer = anlegen.exec(sql))) {
+    const [, name, koerper] = treffer;
+    const spalten = new Set();
+    for (const zeile of koerper.split('\n')) {
+      const sauber = zeile.trim();
+      // Zeilen wie "primary key (...)", "unique (...)", "constraint ..." sind
+      // keine Spalten.
+      if (!sauber || sauber.startsWith('--')) continue;
+      if (/^(primary|unique|constraint|foreign|check)\b/i.test(sauber)) continue;
+      const spalte = sauber.match(/^(\w+)\s/);
+      if (spalte) spalten.add(spalte[1]);
+    }
+    tabellen.set(name, spalten);
+  }
+
+  // alter table public.name add column if not exists spalte typ, ...
+  const erweitern = /alter\s+table\s+public\.(\w+)\s*([\s\S]*?);/gi;
+  while ((treffer = erweitern.exec(sql))) {
+    const [, name, rest] = treffer;
+    if (!tabellen.has(name)) continue;
+    const spalten = tabellen.get(name);
+    const hinzu = /add\s+column\s+(?:if\s+not\s+exists\s+)?(\w+)/gi;
+    let s;
+    while ((s = hinzu.exec(rest))) spalten.add(s[1]);
+  }
+
+  return tabellen;
+}
+
+const schema = schemaLesen();
+
+pruefe('Schema eingelesen', schema.size >= 20, schema.size + ' Tabellen');
+
+// --------------------------------------------- Quellcode durchsehen -----
+
+/**
+ * Findet je Vorkommen von .from('tabelle') den zugehoerigen Abfrage-Abschnitt
+ * und darin die verwendeten Spaltennamen.
+ */
+function verwendungen(quelltext) {
+  const gefunden = [];
+  const muster = /\.from\('(\w+)'\)/g;
+  let treffer;
+
+  while ((treffer = muster.exec(quelltext))) {
+    const tabelle = treffer[1];
+    // Der Abschnitt bis zum naechsten .from(...) oder 400 Zeichen — lang genug
+    // fuer die Kette aus select/insert/eq, kurz genug, um nicht in die
+    // naechste Abfrage zu rutschen.
+    const ab = treffer.index + treffer[0].length;
+    const naechstes = quelltext.indexOf(".from('", ab);
+    const bis = naechstes === -1 ? Math.min(ab + 400, quelltext.length) : Math.min(naechstes, ab + 400);
+    const abschnitt = quelltext.slice(ab, bis);
+
+    const spalten = new Set();
+
+    // .eq('spalte', ...) / .is(...) / .in(...) / .order('spalte'
+    for (const m of abschnitt.matchAll(/\.(?:eq|neq|is|in|gt|lt|gte|lte|order)\('(\w+)'/g)) {
+      spalten.add(m[1]);
+    }
+
+    // .insert({ spalte: ..., }) und .update({ ... }) und .upsert({ ... })
+    for (const m of abschnitt.matchAll(/\.(?:insert|update|upsert)\(\{([\s\S]*?)\}/g)) {
+      for (const f of m[1].matchAll(/(\w+)\s*:/g)) spalten.add(f[1]);
+    }
+
+    // .select('a, b, c') — verschachtelte Beziehungen wie "chats(...)" und
+    // Zaehler wie "post_likes(count)" gehoeren nicht zu dieser Tabelle.
+    const auswahl = abschnitt.match(/\.select\(\s*'([^']*)'/);
+    if (auswahl) {
+      const ohneBeziehungen = auswahl[1].replace(/\w+\s*\([^)]*\)/g, '');
+      for (const teil of ohneBeziehungen.split(',')) {
+        const name = teil.trim();
+        if (name && name !== '*' && /^\w+$/.test(name)) spalten.add(name);
+      }
+    }
+
+    gefunden.push({ tabelle, spalten, stelle: quelltext.slice(0, treffer.index).split('\n').length });
+  }
+
+  return gefunden;
+}
+
+const unbekannteTabellen = new Map();
+const unbekannteSpalten = [];
+
+for (const datei of QUELLEN) {
+  const quelltext = fs.readFileSync(path.join(WURZEL, datei), 'utf8');
+
+  for (const { tabelle, spalten, stelle } of verwendungen(quelltext)) {
+    if (!schema.has(tabelle)) {
+      if (!unbekannteTabellen.has(tabelle)) unbekannteTabellen.set(tabelle, []);
+      unbekannteTabellen.get(tabelle).push(`${datei}:${stelle}`);
+      continue;
+    }
+
+    const vorhanden = schema.get(tabelle);
+    for (const spalte of spalten) {
+      if (!vorhanden.has(spalte)) {
+        unbekannteSpalten.push(`${datei}:${stelle}  ${tabelle}.${spalte}`);
+      }
+    }
+  }
+}
+
+pruefe(
+  'Alle angesprochenen Tabellen gibt es im Schema',
+  unbekannteTabellen.size === 0,
+  [...unbekannteTabellen.entries()].map(([t, o]) => `${t} (${o.join(', ')})`).join('; ')
+);
+
+pruefe(
+  'Alle angesprochenen Spalten gibt es im Schema',
+  unbekannteSpalten.length === 0,
+  unbekannteSpalten.slice(0, 8).join(' | ')
+);
+
+// Ein paar Namen, die es bewusst NICHT geben soll — sie waren die Erfindungen
+// von damals und sollen nicht zurueckkommen.
+for (const erfindung of ['videos', 'likes', 'favorites']) {
+  pruefe(`Tabelle "${erfindung}" wird nicht mehr verwendet`, !unbekannteTabellen.has(erfindung));
+}
+
+console.log(fehler === 0 ? '\nSchema und Code passen zusammen.' : `\n${fehler} Pruefung(en) fehlgeschlagen.`);
+process.exit(fehler === 0 ? 0 : 1);

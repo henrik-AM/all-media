@@ -63,6 +63,12 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
     onNotice(video.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
   };
 
+  const toggleNotify = (video: Video) => {
+    haptic.light();
+    update(video.id, (v) => ({ ...v, notify: !v.notify }));
+    onNotice(video.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+  };
+
   const toggleRepost = async (video: Video) => {
     haptic.selection();
     const jetztAn = umschalten('video', video.id, video.description);
@@ -154,6 +160,16 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
                 {gefolgt[item.userId] ? 'Gefolgt' : 'Folgen'}
               </Text>
             </Druck>
+            <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
+              <View style={{ position: 'relative' }}>
+                <Ionicons
+                  name="notifications"
+                  size={19}
+                  color={item.notify ? colors.brand : colors.text2}
+                />
+                {!item.notify && <View style={styles.bellStrike} />}
+              </View>
+            </Druck>
           </View>
           <Text style={styles.description}>{item.description}</Text>
           <View style={styles.subRow}>
@@ -199,6 +215,8 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
 
 const styles = themenStyles((colors) => ({
   followAn: { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'transparent' },
+  bell: { width: 30, alignItems: 'center' },
+  bellStrike: { position: 'absolute', top: '50%', left: '50%', width: 22, height: 2, backgroundColor: colors.text2, transform: [{ translateX: -11 }, { translateY: -1 }, { rotate: '-20deg' }] },
 
   container: { flex: 1, backgroundColor: colors.black },
   slide: { width: '100%', justifyContent: 'flex-end' },

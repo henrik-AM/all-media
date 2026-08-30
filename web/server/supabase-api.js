@@ -1,366 +1,344 @@
 /**
- * All Media — Supabase API
+ * All Media — Lesezugriffe auf Supabase
  *
- * Diese Datei stellt alle API-Endpoints mit echten Supabase-Daten bereit.
- * Sie ersetzt die Mock-Daten aus app.js mit Abfragen der echten Datenbank.
+ * Jede Funktion bekommt den Client des angemeldeten Nutzers übergeben. Ohne
+ * Anmeldung gibt es keinen Client, dann liefern die Funktionen null und der
+ * Aufrufer bleibt bei den Beispieldaten.
  *
- * Struktur:
- * 1. Helper-Funktionen für häufige Queries
- * 2. Datenlader (profiles, chats, messages, etc.)
- * 3. Express Route Handler
+ * Die Spaltennamen hier folgen SUPABASE_SCHEMA.sql und SUPABASE_SCHEMA_2.sql.
+ * Sie frei zu erfinden führt dazu, dass jede Abfrage still fehlschlägt.
  */
 
-const { supabase, isConfigured } = require('./supabase');
-
 // ============================================================================
-// HELPER: Authentifizierung
+// Umformung: Datenbankzeile → Form, die die Oberfläche erwartet
 // ============================================================================
 
-/**
- * Holt den aktuellen User aus der Session
- * Für jetzt: nehmen wir "me" als aktuellen User (wie in Mock-Daten)
- */
-async function getCurrentUser() {
-  // TODO: Wenn echte Auth implementiert: hier den User aus der Session holen
-  // Für jetzt: Mock-User "me" (wie in den bisherigen Mock-Daten)
+function profilZuNutzer(zeile) {
+  if (!zeile) return null;
+  return {
+    id: zeile.id,
+    name: zeile.name,
+    handle: zeile.handle,
+    initials: zeile.initials || '',
+    color: zeile.color || '',
+    phone: zeile.phone || '',
+    privat: Boolean(zeile.privat),
+    bio: zeile.bio || '',
+    link: zeile.link || '',
+    status: zeile.status || 'offline',
+  };
+}
 
-  if (!supabase) return null;
+const PROFIL_SPALTEN = 'id, name, handle, initials, color, phone, privat, bio, link, status';
 
-  try {
-    // Versuche den aktuellen User aus Supabase Auth zu holen
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
-  } catch (error) {
-    // Falls keine Session: nutze Mock-User
-    console.warn('No auth session, using mock user');
-    return null;
-  }
+// ============================================================================
+// Laden
+// ============================================================================
+
+async function ladeNutzer(client) {
+  if (!client) return null;
+  const { data, error } = await client.from('profiles').select(PROFIL_SPALTEN).limit(200);
+  if (error) throw error;
+
+  const nutzer = {};
+  for (const zeile of data || []) nutzer[zeile.id] = profilZuNutzer(zeile);
+  return nutzer;
+}
+
+async function ladeProfil(client, profilId) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('profiles')
+    .select(PROFIL_SPALTEN)
+    .eq('id', profilId)
+    .maybeSingle();
+  if (error) throw error;
+  return profilZuNutzer(data);
+}
+
+async function ladeKontakte(client, nutzerId) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('contacts')
+    .select('id, contact_id, status')
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+
+  return (data || []).map((k) => ({ id: k.contact_id, status: k.status }));
 }
 
 /**
- * Holt ein User-Profil als User-Objekt (wie in Mock-Daten)
+ * Chats des Nutzers samt seiner persönlichen Einstellungen (archiviert,
+ * stumm, gelesen, Favorit) und der letzten Nachricht als Vorschau.
  */
-async function getProfileAsUser(profileId) {
-  if (!supabase) return null;
+async function ladeChats(client, nutzerId) {
+  if (!client) return null;
 
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, name, handle, bio, link, status, created_at, updated_at')
-      .eq('id', profileId)
-      .single();
+  const { data, error } = await client
+    .from('chat_members')
+    .select(
+      'chat_id, is_archived, is_muted, is_read, is_favorite, chats(id, name, is_group, created_at, updated_at)'
+    )
+    .eq('user_id', nutzerId);
+  if (error) throw error;
 
-    if (error && error.code !== 'PGRST116') throw error;
-    if (!data) return null;
+  const zeilen = (data || []).filter((z) => z.chats);
+  if (zeilen.length === 0) return [];
 
-    // Format wie Mock-Daten
+  // Letzte Nachricht je Chat in einer Abfrage holen, statt pro Chat einzeln.
+  const ids = zeilen.map((z) => z.chat_id);
+  const { data: nachrichten, error: fehlerNachrichten } = await client
+    .from('messages')
+    .select('id, chat_id, text, sender_id, created_at')
+    .in('chat_id', ids)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (fehlerNachrichten) throw fehlerNachrichten;
+
+  const letzte = new Map();
+  for (const n of nachrichten || []) {
+    if (!letzte.has(n.chat_id)) letzte.set(n.chat_id, n);
+  }
+
+  return zeilen.map((z) => {
+    const vorschau = letzte.get(z.chat_id) || null;
     return {
-      id: data.id,
-      name: data.name,
-      handle: data.handle,
-      bio: data.bio || '',
-      link: data.link || '',
-      status: data.status || 'offline',
+      id: z.chats.id,
+      name: z.chats.name,
+      isGroup: Boolean(z.chats.is_group),
+      archiviert: Boolean(z.is_archived),
+      muted: Boolean(z.is_muted),
+      unread: !z.is_read,
+      favorit: Boolean(z.is_favorite),
+      letzteNachricht: vorschau ? vorschau.text : '',
+      zeit: vorschau ? vorschau.created_at : z.chats.updated_at,
     };
-  } catch (error) {
-    console.error('Error fetching profile as user:', error);
-    return null;
-  }
+  });
+}
+
+async function ladeNachrichten(client, chatId) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('messages')
+    .select('id, chat_id, sender_id, text, media_url, media_type, created_at, read_at')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+
+  return (data || []).map((n) => ({
+    id: n.id,
+    chatId: n.chat_id,
+    userId: n.sender_id,
+    text: n.text,
+    mediaUrl: n.media_url,
+    mediaType: n.media_type,
+    zeit: n.created_at,
+    gelesen: Boolean(n.read_at),
+  }));
+}
+
+/**
+ * Aktuelle Storys. „viewed" ist keine Spalte in stories — ob jemand eine
+ * Story gesehen hat, steht in story_views.
+ */
+async function ladeStorys(client, nutzerId) {
+  if (!client) return null;
+
+  const { data, error } = await client
+    .from('stories')
+    .select('id, user_id, media_url, media_type, caption, created_at, expires_at')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+
+  const storys = data || [];
+  if (storys.length === 0) return [];
+
+  const { data: gesehen, error: fehlerGesehen } = await client
+    .from('story_views')
+    .select('story_id')
+    .eq('user_id', nutzerId)
+    .in('story_id', storys.map((s) => s.id));
+  if (fehlerGesehen) throw fehlerGesehen;
+
+  const gesehenIds = new Set((gesehen || []).map((g) => g.story_id));
+
+  return storys.map((s) => ({
+    id: s.id,
+    userId: s.user_id,
+    mediaUrl: s.media_url,
+    mediaType: s.media_type,
+    caption: s.caption || '',
+    zeit: s.created_at,
+    viewed: gesehenIds.has(s.id),
+  }));
+}
+
+/**
+ * Beiträge. Es gibt keine eigene Tabelle „videos" — ein Video ist ein Beitrag
+ * mit kind = 'reel' oder 'clip'. Die Zähler für Likes und Kommentare stehen
+ * ebenfalls nicht als Spalte in posts, sie werden mitgezählt.
+ */
+async function ladeBeitraege(client, { arten = null, limit = 50 } = {}) {
+  if (!client) return null;
+
+  let abfrage = client
+    .from('posts')
+    .select(
+      'id, user_id, kind, title, description, location, music, media_url, thumbnail_url, duration, created_at,' +
+        ' post_likes(count), comments(count)'
+    )
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (arten && arten.length > 0) abfrage = abfrage.in('kind', arten);
+
+  const { data, error } = await abfrage;
+  if (error) throw error;
+
+  return (data || []).map((b) => ({
+    id: b.id,
+    userId: b.user_id,
+    art: b.kind,
+    title: b.title || '',
+    beschreibung: b.description || '',
+    ort: b.location || '',
+    musik: b.music || '',
+    mediaUrl: b.media_url,
+    thumbnail: b.thumbnail_url,
+    dauer: b.duration,
+    zeit: b.created_at,
+    likes: b.post_likes?.[0]?.count ?? 0,
+    kommentare: b.comments?.[0]?.count ?? 0,
+  }));
+}
+
+async function ladeVideos(client) {
+  return ladeBeitraege(client, { arten: ['reel', 'clip'] });
+}
+
+async function ladeKommentare(client, beitragId) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('comments')
+    .select('id, post_id, user_id, text, created_at, comment_likes(count)')
+    .eq('post_id', beitragId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+
+  return (data || []).map((k) => ({
+    id: k.id,
+    beitragId: k.post_id,
+    userId: k.user_id,
+    text: k.text,
+    zeit: k.created_at,
+    likes: k.comment_likes?.[0]?.count ?? 0,
+  }));
+}
+
+async function ladeBenachrichtigungen(client, nutzerId, bereich = null) {
+  if (!client) return null;
+  let abfrage = client
+    .from('notifications')
+    .select('id, actor_id, art, bereich, target_type, target_id, text, read_at, created_at')
+    .eq('user_id', nutzerId)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (bereich) abfrage = abfrage.eq('bereich', bereich);
+
+  const { data, error } = await abfrage;
+  if (error) throw error;
+
+  return (data || []).map((b) => ({
+    id: b.id,
+    userId: b.actor_id,
+    art: b.art,
+    bereich: b.bereich,
+    zielTyp: b.target_type,
+    zielId: b.target_id,
+    text: b.text || '',
+    gelesen: Boolean(b.read_at),
+    zeit: b.created_at,
+  }));
+}
+
+async function ladeCommunities(client) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('communities')
+    .select('id, name, topic, visibility, created_by, created_at, community_members(count)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+
+  return (data || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    thema: c.topic || '',
+    privat: c.visibility === 'private',
+    erstelltVon: c.created_by,
+    mitglieder: c.community_members?.[0]?.count ?? 0,
+    zeit: c.created_at,
+  }));
 }
 
 // ============================================================================
-// LOADER: Alle Daten für /api/bootstrap
+// Startdaten für /api/bootstrap
 // ============================================================================
 
 /**
- * Lädt alle Users (Profile) aus Supabase
+ * Lädt alles, was die Oberfläche beim Start braucht. Gibt null zurück, wenn
+ * niemand angemeldet ist oder die Datenbank nicht antwortet — dann nutzt
+ * app.js die Beispieldaten.
  */
-async function loadUsers() {
-  if (!supabase) return {};
+async function bootstrapData(client, nutzerId) {
+  if (!client || !nutzerId) return null;
 
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, name, handle, bio, link, status');
-
-    if (error) throw error;
-
-    // Konvertiere zu Mock-Format
-    const users = {};
-    data?.forEach(profile => {
-      users[profile.id] = {
-        id: profile.id,
-        name: profile.name,
-        handle: profile.handle,
-        bio: profile.bio || '',
-        link: profile.link || '',
-        status: profile.status || 'offline',
-      };
-    });
-
-    return users;
-  } catch (error) {
-    console.error('Error loading users:', error);
-    return {};
-  }
-}
-
-/**
- * Lädt alle Kontakte des aktuellen Users
- */
-async function loadContacts(userId) {
-  if (!supabase) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('contact_id, status')
-      .eq('user_id', userId);
-
-    if (error) throw error;
-
-    return (data || []).map(c => ({
-      id: c.contact_id,
-      status: c.status,
-    }));
-  } catch (error) {
-    console.error('Error loading contacts:', error);
-    return [];
-  }
-}
-
-/**
- * Lädt alle Chats für einen User
- */
-async function loadChats(userId) {
-  if (!supabase) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('chat_members')
-      .select('chats(id, name, is_group, created_at, updated_at)')
-      .eq('user_id', userId);
-
-    if (error) throw error;
-
-    return (data || [])
-      .map(m => m.chats)
-      .filter(Boolean)
-      .map(chat => ({
-        id: chat.id,
-        name: chat.name,
-        isGroup: chat.is_group,
-      }));
-  } catch (error) {
-    console.error('Error loading chats:', error);
-    return [];
-  }
-}
-
-/**
- * Lädt die neuesten Nachrichten aus einem Chat (für Vorschau)
- */
-async function loadChatPreview(chatId) {
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, content, created_at, sender_id, profiles(name)')
-      .eq('chat_id', chatId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-    return data || null;
-  } catch (error) {
-    console.error('Error loading chat preview:', error);
-    return null;
-  }
-}
-
-/**
- * Lädt Stories für den aktuellen User
- */
-async function loadStories(userId) {
-  if (!supabase) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('stories')
-      .select('id, user_id, created_at, viewed_at')
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) throw error;
-
-    return (data || []).map(story => ({
-      id: story.id,
-      userId: story.user_id,
-      viewed: !!story.viewed_at,
-    }));
-  } catch (error) {
-    console.error('Error loading stories:', error);
-    return [];
-  }
-}
-
-/**
- * Lädt Videos für den Feed
- */
-async function loadVideos() {
-  if (!supabase) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('videos')
-      .select('id, user_id, title, description, likes, comments, shares, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) throw error;
-
-    return (data || []).map(video => ({
-      id: video.id,
-      userId: video.user_id,
-      title: video.title,
-      description: video.description,
-      likes: video.likes || 0,
-      comments: video.comments || 0,
-      shares: video.shares || 0,
-    }));
-  } catch (error) {
-    console.error('Error loading videos:', error);
-    return [];
-  }
-}
-
-// ============================================================================
-// MAIN: /api/bootstrap mit Supabase
-// ============================================================================
-
-async function bootstrapData() {
-  if (!isConfigured()) {
-    return null; // Fallback zu Mock-Daten in app.js
-  }
-
-  try {
-    // Aktueller User
-    const currentUser = await getCurrentUser();
-    const userId = currentUser?.id || 'me'; // Fallback: Mock-User "me"
-
-    // Alle Daten parallel laden
-    const [users, contacts, chats, stories, videos] = await Promise.all([
-      loadUsers(),
-      loadContacts(userId),
-      loadChats(userId),
-      loadStories(userId),
-      loadVideos(),
-    ]);
+    const [nutzer, kontakte, chats, storys, beitraege, benachrichtigungen, communities] =
+      await Promise.all([
+        ladeNutzer(client),
+        ladeKontakte(client, nutzerId),
+        ladeChats(client, nutzerId),
+        ladeStorys(client, nutzerId),
+        ladeBeitraege(client, { limit: 100 }),
+        ladeBenachrichtigungen(client, nutzerId),
+        ladeCommunities(client),
+      ]);
 
     return {
-      users,
-      contacts,
+      users: nutzer,
+      contacts: kontakte,
       chats,
-      stories,
-      videos,
-      currentUserId: userId,
+      stories: storys,
+      posts: beitraege.filter((b) => b.art === 'post'),
+      videos: beitraege.filter((b) => b.art === 'reel' || b.art === 'clip'),
+      notifications: benachrichtigungen,
+      communities,
+      currentUserId: nutzerId,
+      quelle: 'supabase',
       timestamp: new Date().toISOString(),
     };
-  } catch (error) {
-    console.error('Error bootstrapping Supabase data:', error);
-    return null; // Fallback zu Mock-Daten
-  }
-}
-
-// ============================================================================
-// MUTATION: Schreib-Operationen
-// ============================================================================
-
-/**
- * Speichert eine neue Nachricht
- */
-async function sendMessage(chatId, senderId, content) {
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        chat_id: chatId,
-        sender_id: senderId,
-        content: content,
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error sending message:', error);
-    return null;
-  }
-}
-
-/**
- * Markiert eine Nachricht als gelesen
- */
-async function markMessageAsRead(messageId, readAt = true) {
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('messages')
-      .update({ read_at: readAt ? new Date().toISOString() : null })
-      .eq('id', messageId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error marking message as read:', error);
-    return null;
-  }
-}
-
-/**
- * Aktualisiert ein Benutzerprofil
- */
-async function updateProfile(userId, updates) {
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error updating profile:', error);
+  } catch (fehler) {
+    console.error('Startdaten aus Supabase fehlgeschlagen:', fehler.message);
     return null;
   }
 }
 
 module.exports = {
+  profilZuNutzer,
+  ladeNutzer,
+  ladeProfil,
+  ladeKontakte,
+  ladeChats,
+  ladeNachrichten,
+  ladeStorys,
+  ladeBeitraege,
+  ladeVideos,
+  ladeKommentare,
+  ladeBenachrichtigungen,
+  ladeCommunities,
   bootstrapData,
-  getCurrentUser,
-  getProfileAsUser,
-  loadUsers,
-  loadContacts,
-  loadChats,
-  loadStories,
-  loadVideos,
-  sendMessage,
-  markMessageAsRead,
-  updateProfile,
 };

@@ -255,11 +255,13 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             style={styles.aktion}
             onPress={() => {
               clipUmschalten(clip.id, 'save');
-              onNotice(clip.saved ? 'Nicht mehr gemerkt' : 'Gemerkt');
+              onNotice(clip.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
             }}
           >
             <Ionicons name={clip.saved ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.text} />
-            <Text style={styles.aktionZahl} numberOfLines={1} ellipsizeMode="tail">Merken</Text>
+            <Text style={styles.aktionZahl} numberOfLines={1} ellipsizeMode="tail">
+              {clip.saved ? 'Gespeichert' : 'Speichern'}
+            </Text>
           </Druck>
         </View>
 

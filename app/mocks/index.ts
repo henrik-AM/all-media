@@ -4,75 +4,35 @@ export const CURRENT_USER_ID = 'me';
 
 export const mockUsers: Record<string, User> = {
   me: { id: 'me', name: 'Henrik', handle: '@henrik', status: 'online', about: 'Hey, ich nutze All Media!', phone: '+49 170 1234567' },
-  u1: { id: 'u1', name: 'Anna Schmidt', handle: '@anna', status: 'online', about: 'Verfügbar', phone: '+49 151 2345678' },
-  u2: { id: 'u2', name: 'Bob Müller', handle: '@bob', status: 'away', about: 'Im Meeting', phone: '+49 152 3456789' },
-  u3: { id: 'u3', name: 'Clara Weber', handle: '@clara', status: 'offline', about: 'Anfrage gesendet', phone: '+49 160 4567890' },
-  u4: { id: 'u4', name: 'David König', handle: '@david', status: 'away', about: 'Beschäftigt', phone: '+49 171 5678901' },
-  u5: { id: 'u5', name: 'Elif Yilmaz', handle: '@elif', status: 'online', about: 'Hey, ich nutze All Media!', phone: '+49 172 6789012' },
-  u6: { id: 'u6', name: 'Finn Bauer', handle: '@finn', status: 'offline', about: 'Nur dringende Anrufe', phone: '+49 173 7890123' },
-  // Diese drei stehen bewusst NICHT in den Kontakten - sonst laesst sich
-  // "Kontakt hinzufuegen" gar nicht ausprobieren.
-  u7: { id: 'u7', name: 'Greta Hoffmann', handle: '@greta', status: 'online', about: 'Hey, ich nutze All Media!', phone: '+49 174 8901234' },
-  u8: { id: 'u8', name: 'Hakan Demir', handle: '@hakan', status: 'away', about: 'Unterwegs', phone: '+49 175 9012345' },
-  u9: { id: 'u9', name: 'Ida Nowak', handle: '@ida', status: 'offline', about: 'Bin bald zurück', phone: '+49 176 0123456' },
+  // Test-Bots für die Entwicklung
+  test_u1: { id: 'test_u1', name: 'Test Bot 1', handle: '@testbot1', status: 'online', about: 'Ich bin ein Test-Bot', phone: '+49 999 0000001' },
+  test_u2: { id: 'test_u2', name: 'Test Bot 2', handle: '@testbot2', status: 'away', about: 'Auch ich teste', phone: '+49 999 0000002' },
+  // Weitere User (u1-u9) entfernt - können später hinzugefügt werden wenn nötig
 };
 
+// Test-Bots für die Entwicklung (können jederzeit gelöscht werden)
 export const mockChats: Chat[] = [
-  { id: 'c1', name: 'Anna Schmidt', userId: 'u1', isGroup: false, preview: 'Klingt gut, bis später!', time: '14:32', unreadCount: 2 },
-  { id: 'c2', name: 'Bob Müller', userId: 'u2', isGroup: false, preview: 'Schicke dir die Datei gerade', time: '13:05', unreadCount: 1 },
-  { id: 'c3', name: 'Clara Weber', userId: 'u3', isGroup: false, preview: 'Foto', previewMedia: 'image', time: '11:48', unreadCount: 0 },
-  { id: 'c4', name: 'Projekt Team', isGroup: true, memberIds: ['u1', 'u2', 'u4'], preview: 'David: Meeting verschoben auf 15 Uhr', time: 'Gestern', unreadCount: 0, muted: true },
-  { id: 'c5', name: 'David König', userId: 'u4', isGroup: false, preview: 'Alles klar', time: 'Gestern', unreadCount: 0 },
-  { id: 'c6', name: 'Elif Yilmaz', userId: 'u5', isGroup: false, preview: 'Sprachnachricht', previewMedia: 'audio', time: 'Mo', unreadCount: 0 },
-  { id: 'c7', name: 'Wochenend-Crew', isGroup: true, memberIds: ['u3', 'u5', 'u6'], preview: 'Elif: Wer ist dabei?', time: 'Mo', unreadCount: 0 },
-  { id: 'c8', name: 'Finn Bauer', userId: 'u6', isGroup: false, preview: 'Danke dir!', time: 'So', unreadCount: 0 },
+  { id: 'test_c1', name: 'Test Bot 1', userId: 'test_u1', isGroup: false, preview: 'Hallo! Ich bin ein Test-Bot', time: 'gerade eben', unreadCount: 0 },
+  { id: 'test_c2', name: 'Test Bot 2', userId: 'test_u2', isGroup: false, preview: 'Auch ich bin zum Testen da', time: 'vor 1 Min', unreadCount: 1 },
 ];
 
+// Test-Nachrichten für die Entwicklung
 export const mockMessages: Record<string, Message[]> = {
-  c1: [
-    { id: 'm1', chatId: 'c1', senderId: 'u1', text: 'Hey! Wie läuft das Projekt?', time: '14:02' },
-    { id: 'm2', chatId: 'c1', senderId: 'me', text: 'Läuft gut, bin fast fertig mit dem Design', time: '14:05', read: true },
-    { id: 'm3', chatId: 'c1', senderId: 'u1', text: 'Super, kannst du mir das nachher zeigen?', time: '14:20' },
-    { id: 'm4', chatId: 'c1', senderId: 'me', text: 'Klar, so gegen 17 Uhr?', time: '14:28', read: true },
-    { id: 'm5', chatId: 'c1', senderId: 'u1', text: 'Klingt gut, bis später!', time: '14:32' },
+  test_c1: [
+    { id: 'm1', chatId: 'test_c1', senderId: 'test_u1', text: 'Hallo! Ich bin ein Test-Bot', time: 'vor 2 Min' },
+    { id: 'm2', chatId: 'test_c1', senderId: 'me', text: 'Hi! Danke dass du da bist', time: 'vor 1 Min', read: true },
+    { id: 'm3', chatId: 'test_c1', senderId: 'test_u1', text: 'Gerne! Teste die Authentifizierung 🚀', time: 'gerade eben' },
   ],
-  c2: [
-    { id: 'm1', chatId: 'c2', senderId: 'u2', text: 'Hast du die Unterlagen schon?', time: '12:40' },
-    { id: 'm2', chatId: 'c2', senderId: 'me', text: 'Noch nicht, kannst du sie schicken?', time: '12:55', read: true },
-    { id: 'm3', chatId: 'c2', senderId: 'u2', text: 'Schicke dir die Datei gerade', time: '13:05' },
-  ],
-  c3: [
-    { id: 'm1', chatId: 'c3', senderId: 'u3', text: 'Schau mal, was ich gefunden habe', time: '11:40' },
-    { id: 'm2', chatId: 'c3', senderId: 'u3', text: 'Foto', time: '11:48', media: 'image' },
-  ],
-  c4: [
-    { id: 'm1', chatId: 'c4', senderId: 'u1', text: 'Sind alle für morgen bereit?', time: 'Gestern' },
-    { id: 'm2', chatId: 'c4', senderId: 'u2', text: 'Von meiner Seite ja', time: 'Gestern' },
-    { id: 'm3', chatId: 'c4', senderId: 'me', text: 'Ich auch', time: 'Gestern', read: true },
-    { id: 'm4', chatId: 'c4', senderId: 'u4', text: 'Meeting verschoben auf 15 Uhr', time: 'Gestern' },
-  ],
-  c5: [
-    { id: 'm1', chatId: 'c5', senderId: 'me', text: 'Ich melde mich morgen bei dir', time: 'Gestern', read: true },
-    { id: 'm2', chatId: 'c5', senderId: 'u4', text: 'Alles klar', time: 'Gestern' },
-  ],
-  c6: [{ id: 'm1', chatId: 'c6', senderId: 'u5', text: 'Sprachnachricht', time: 'Mo', media: 'audio' }],
-  c7: [
-    { id: 'm1', chatId: 'c7', senderId: 'u3', text: 'Samstag Grillen?', time: 'Mo' },
-    { id: 'm2', chatId: 'c7', senderId: 'u5', text: 'Wer ist dabei?', time: 'Mo' },
-  ],
-  c8: [
-    { id: 'm1', chatId: 'c8', senderId: 'me', text: 'Kein Problem!', time: 'So', read: true },
-    { id: 'm2', chatId: 'c8', senderId: 'u6', text: 'Danke dir!', time: 'So' },
+  test_c2: [
+    { id: 'm1', chatId: 'test_c2', senderId: 'test_u2', text: 'Auch ich bin zum Testen da', time: 'vor 1 Min' },
+    { id: 'm2', chatId: 'test_c2', senderId: 'test_u2', text: 'Teste die UI mit mehreren Chats', time: 'gerade eben' },
   ],
 };
 
+// Test-Kontakte für die Entwicklung
 export const mockContacts: Contact[] = [
-  { id: 'u1', name: 'Anna Schmidt', status: 'friend', about: 'Verfügbar' },
-  { id: 'u2', name: 'Bob Müller', status: 'friend', about: 'Im Meeting' },
-  { id: 'u3', name: 'Clara Weber', status: 'pending', about: 'Anfrage gesendet' },
-  { id: 'u4', name: 'David König', status: 'friend', about: 'Beschäftigt' },
-  { id: 'u5', name: 'Elif Yilmaz', status: 'friend', about: 'Hey, ich nutze All Media!' },
-  { id: 'u6', name: 'Finn Bauer', status: 'friend', about: 'Nur dringende Anrufe' },
+  { id: 'test_u1', name: 'Test Bot 1', status: 'friend', about: 'Ich bin ein Test-Bot' },
+  { id: 'test_u2', name: 'Test Bot 2', status: 'friend', about: 'Auch ich teste' },
 ];
 
 export const mockProfiles: Record<string, Profile> = {
@@ -156,11 +116,11 @@ const mockPostsRoh: Post[] = [
 ];
 
 const mockVideosRoh: Video[] = [
-  { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, reposted: false, liked: false, saved: false, tags: ['#sonnenaufgang'] },
-  { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, reposted: false, liked: true, saved: true, tags: ['#homeoffice', '#designsystem'] },
-  { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, reposted: false, liked: false, saved: false, tags: ['#mealprep'] },
-  { id: 'v4', userId: 'u2', description: 'Erster Laufversuch mit der neuen Kamera-Stabilisierung.', location: 'Rheinpark', music: 'Runner High – Aster', likes: 3140, comments: 74, shares: 22, reposted: false, liked: false, saved: false, tags: ['#laufen'] },
-  { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false, tags: ['#reactnative'] },
+  { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, reposted: false, liked: false, saved: false, notify: true, tags: ['#sonnenaufgang'] },
+  { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, reposted: false, liked: true, saved: true, notify: true, tags: ['#homeoffice', '#designsystem'] },
+  { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, reposted: false, liked: false, saved: false, notify: false, tags: ['#mealprep'] },
+  { id: 'v4', userId: 'u2', description: 'Erster Laufversuch mit der neuen Kamera-Stabilisierung.', location: 'Rheinpark', music: 'Runner High – Aster', likes: 3140, comments: 74, shares: 22, reposted: false, liked: false, saved: false, notify: true, tags: ['#laufen'] },
+  { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false, notify: true, tags: ['#reactnative'] },
 ];
 
 /*
@@ -200,25 +160,8 @@ export const mockCommunities: Community[] = [
   ] },
 ];
 
-export const mockCommunityMessages: Record<string, Message[]> = {
-  k1: [
-    { id: 'm1', chatId: 'k1', senderId: 'u1', text: 'Hat jemand Erfahrung mit Design Tokens in Figma Variables?', time: '09:12' },
-    { id: 'm2', chatId: 'k1', senderId: 'u4', text: 'Ja, wir nutzen das seit einem halben Jahr produktiv', time: '09:20' },
-    { id: 'm3', chatId: 'k1', senderId: 'me', text: 'Wie handhabt ihr Dark Mode dabei?', time: '09:24', read: true },
-    { id: 'm4', chatId: 'k1', senderId: 'u4', text: 'Zwei Modi in einer Collection, das reicht meistens', time: '09:31' },
-  ],
-  k2: [
-    { id: 'm1', chatId: 'k2', senderId: 'u2', text: 'Expo SDK 57 läuft bei mir stabil', time: 'Gestern' },
-    { id: 'm2', chatId: 'k2', senderId: 'u5', text: 'Bei mir auch, nur der Metro Cache zickt manchmal', time: 'Gestern' },
-  ],
-  k3: [{ id: 'm1', chatId: 'k3', senderId: 'u3', text: 'Goldene Stunde heute um 19:40', time: 'Mo' }],
-  k4: [
-    { id: 'm1', chatId: 'k4', senderId: 'u1', text: 'Sprint-Planung morgen um 10 Uhr', time: '11:02' },
-    { id: 'm2', chatId: 'k4', senderId: 'me', text: 'Bin dabei', time: '11:05', read: true },
-  ],
-  k5: [{ id: 'm1', chatId: 'k5', senderId: 'u6', text: 'Samstag 8 Uhr am Rheinpark?', time: 'So' }],
-  k6: [{ id: 'm1', chatId: 'k6', senderId: 'u5', text: 'Neuer Track ist fertig gemischt', time: 'Sa' }],
-};
+// Community-Nachrichten von Bots entfernt – nur echte User-Nachrichten
+export const mockCommunityMessages: Record<string, Message[]> = {};
 
 export const mockStories: Story[] = [
   { id: 's0', userId: 'me', name: 'Deine Story', viewed: false, own: true, liked: false },

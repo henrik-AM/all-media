@@ -1,142 +1,100 @@
-# Website ↔ Supabase Integration
+# Website ↔ Supabase
 
-**Status:** Phase 1 complete — kritische Endpoints integriert  
-**Ziel:** Website 100% mit Supabase synchronisiert (wie Expo Go App)  
-**Strategie:** Hybrid-Ansatz (Supabase + Mock-Fallback)
+**Stand:** 30.08.2026
 
----
+## Wie es funktioniert
 
-## ✅ Bereits Integriert (Phase 1)
+Die Website spricht mit derselben Datenbank wie die App. Damit das geht,
+müssen drei Dinge zusammenpassen:
 
-| Endpoint | Datei | Status | Sync-Handler |
-|----------|-------|--------|--------------|
-| `GET /api/bootstrap` | app.js:615 | ✅ Async | `bootstrapData()` |
-| `POST /api/messages/:chatId` | app.js:1522 | ✅ Sync | `handleSendMessage()` |
-| `POST /api/profile/:userId/follow` | app.js:1387 | ✅ Sync | `handleFollowUser()` |
-| `POST /api/videos/:id/:action` (like) | app.js:1467 | ✅ Sync | `handleLikeContent()` |
-| `POST /api/chats/:chatId/:was` (archiv/stumm/gelesen) | app.js:721 | ✅ Sync | `handleChatAction()` |
+1. **Zugangsdaten.** Stehen in `server/supabase.js`. Sind keine
+   Umgebungsvariablen gesetzt, greifen eingebaute Standardwerte — die Website
+   ist also auch ohne Konfiguration auf Render mit der Datenbank verbunden.
 
----
+2. **Anmeldung.** Die Datenbank ist durch Row Level Security geschützt. Die
+   Regeln gelten für die Rolle `authenticated`. Ein Server, der ohne Anmeldung
+   anfragt, ist `anon` und darf **weder lesen noch schreiben**. Deshalb meldet
+   sich die Oberfläche selbst bei Supabase an (`public/anmeldung.js`) und
+   schickt ihr Zugangstoken bei jedem Aufruf an `/api` mit. Der Server macht
+   daraus einen Datenbank-Client im Namen dieses Nutzers.
 
-## 🚧 Phase 2 — Nächste Integratoren (TODO)
+3. **Schema.** Tabellen- und Spaltennamen im Code müssen denen in
+   `SUPABASE_SCHEMA.sql` und `SUPABASE_SCHEMA_2.sql` entsprechen.
 
-### Stories
-- [ ] `POST /api/stories/:id/like` — Like einen Story
-- [ ] `POST /api/stories/:id/view` — Markiere Story als angesehen
-- [ ] `POST /api/eigene/story` — Neuer Story erstellen
-  - **Handler:** `handleCreateStory()`, `handleViewStory()`
+Fehlt eines davon, arbeitet die Website mit Beispieldaten weiter. Das ist
+Absicht — aber man muss es sehen können, siehe unten.
 
-### Comments
-- [ ] `POST /api/comments/:targetId` — Kommentar erstellen
-- [ ] `POST /api/comments/:targetId/:commentId/like` — Kommentar liken
-- [ ] `GET /api/comments/:targetId` — Kommentare laden
-  - **Handler:** `handleCreateComment()`
+## Zustand prüfen
 
-### Profile
-- [ ] `POST /api/eigene/profil` — Eigenes Profil aktualisieren (Name, Bio, Link)
-- [ ] `POST /api/profile/:userId/:was` — Andere Profile aktualisieren
-  - **Handler:** `handleUpdateProfile()`
+    GET /api/zustand
 
-### Chats (erweitert)
-- [ ] `POST /api/chats/:chatId/:was` (blockieren, mitteilungen, löschen)
-- [ ] `POST /api/chats/:chatId/accept` — Kontaktanfrage annehmen
-- [ ] `GET /api/messages/:chatId` — Messages mit Supabase laden (nicht nur lokal)
-  - **Handler:** `handleChatAction()` (erweitern)
+Zeigt in einem Blick, ob die Website wirklich mit der Datenbank spricht:
 
-### Communities
-- [ ] `POST /api/communities` — Neue Community erstellen
-- [ ] `POST /api/eigene/beitrag` — Neuen Beitrag erstellen
-- [ ] `GET /api/explorer/:art/:wert` — Explorer-Seiten mit Supabase
-  - **Handler:** TBD
+```json
+{
+  "supabase": { "konfiguriert": true, "quelle": "Standardwert im Code" },
+  "anmeldung": { "angemeldet": false, "nutzerId": null },
+  "daten": "Beispieldaten"
+}
+```
 
-### Weitere Aktionen
-- [ ] `POST /api/kontakte/:userId/favorit` — Kontakt als Favorit
-- [ ] `POST /api/eigene/video` — Video hochladen/erstellen
-- [ ] `POST /api/clips/:id/:action` — Clip-Aktionen
-- [ ] `POST /api/teilen` — Inhalte teilen
-  - **Handler:** Neue Handler schreiben
+`"daten": "Supabase"` heißt: echte Daten. `"Beispieldaten"` heißt: niemand ist
+angemeldet, es sind die Mockdaten aus `server/app.js`.
 
----
+## Was vorher nicht stimmte
 
-## 🔧 Technische Details
+Die frühere Sync-Schicht konnte nicht funktionieren, und zwar aus vier
+unabhängigen Gründen gleichzeitig:
 
-### Hybrid-Ansatz
+| Problem | Beispiel |
+|---|---|
+| Erfundene Tabellen | `videos`, `likes`, `saves`, `shares`, `reports`, `blocks`, `mutes`, `notifications`, `story_views`, `favorites`, `reposts` gab es in der Datenbank nicht |
+| Erfundene Spalten | `comments.content_id`, `posts.content`, `communities.creator_id`, `chat_members.is_archived`, `messages.content` |
+| Keine gültigen Kennungen | Es wurde `'me'` und `'u1'` als Nutzer-ID geschrieben — die Datenbank erwartet UUIDs |
+| Keine Anmeldung | Ohne angemeldeten Nutzer verbieten die Regeln jeden Zugriff |
+
+Alle Fehler wurden abgefangen und die Website fiel still auf Beispieldaten
+zurück. Von außen sah das aus wie eine funktionierende Anbindung.
+
+**Behoben durch:**
+- `SUPABASE_SCHEMA_2.sql` legt die Tabellen an, die wirklich fehlten
+- `videos` und `likes` wurden *nicht* angelegt: Videos sind Beiträge mit
+  `kind = 'reel'`/`'clip'`, Likes stehen in `post_likes`
+- `server/supabase-api.js` und `server/sync-handlers.js` neu geschrieben, an
+  das echte Schema angeglichen
+- `public/anmeldung.js` bringt die echte Anmeldung
+- `/api/zustand` macht den Zustand sichtbar
+- `app/test/_schema.js` verhindert, dass erfundene Namen zurückkommen
+
+## Vor dem Ausliefern prüfen
+
+    node app/test/_schema.js      # Code gegen Schema (kein Server nötig)
+    npm test                      # im Ordner app/, Server muss laufen
+    npm run test:alles            # alle Prüfungen
+
+## Neuen Endpunkt anbinden
 
 ```javascript
-// Pattern für jeden Endpoint:
-app.post('/api/...', async (req, res) => {
-  // 1. Versuche Supabase
-  const supabaseResult = await syncHandlers.handleXxx(...);
+app.post('/api/beispiel/:id', async (req, res) => {
+  // req.db  = Datenbank-Client des angemeldeten Nutzers (oder null)
+  // req.nutzerId = seine UUID (oder null)
+  const ergebnis = await syncHandlers.handleBeispiel(req.db, req.nutzerId, req.params.id);
 
-  // 2. Aktualisiere Mock-Daten (Fallback/Cache)
-  // ... existierende Mock-Logik ...
-
-  // 3. Gib Antwort zurück
-  res.json({...});
+  // ergebnis === null  → niemand angemeldet, Beispieldaten benutzen
+  // ergebnis.ok        → hat geklappt
+  ...
 });
 ```
 
-### Supabase Fehlerbehandlung
+Der Handler selbst gehört nach `server/sync-handlers.js` und muss sich an die
+Spaltennamen aus den Schema-Dateien halten — `app/test/_schema.js` prüft das.
 
-Wenn Supabase nicht konfiguriert (`SUPABASE_URL` / `SUPABASE_ANON_KEY` fehlen):
-- Alle `syncHandlers.handleXxx()` Funktionen geben `null` zurück
-- Website funktioniert weiter mit Mock-Daten
-- In Logs: `⚠️ Supabase nicht konfiguriert — nutze Mock-Daten`
+## Offen
 
-### Environment-Variablen (Render)
-
-Auf Render Dashboard setzen:
-```
-SUPABASE_URL=https://ijztosbjfybdgotpdixw.supabase.co
-SUPABASE_ANON_KEY=sb_publishable_sh_LhLSMkHNZrmmj7XkTtw_QFT1G9Ze
-```
-
----
-
-## 📋 Checkliste für neue Endpoints
-
-Wenn ein neuer Endpoint mit Supabase synchronisieren soll:
-
-1. **Handler schreiben** in `sync-handlers.js`
-   ```javascript
-   async function handleXxx(params) {
-     if (!supabase) return null;
-     // ... Supabase-Operation ...
-     return result;
-   }
-   ```
-
-2. **In app.js integrieren**
-   ```javascript
-   app.post('/api/...', async (req, res) => {
-     const result = await syncHandlers.handleXxx(...);
-     // ... Mock-Fallback ...
-   });
-   ```
-
-3. **Testen**
-   - Lokal mit Supabase (SUPABASE_URL gesetzt)
-   - Lokal ohne Supabase (Mock-Fallback)
-   - Auf Render nach Deploy
-
-4. **Documentieren** in dieser Datei (checklist abhaken)
-
----
-
-## 🎯 Ziel (100% Sync)
-
-Wenn alle Phase-2-Endpoints integriert sind:
-- ✅ Website = Expo Go App (funktionell identisch)
-- ✅ Benutzer sehen gleiche Daten auf beiden Plattformen
-- ✅ Alle Änderungen werden live synchronisiert
-- ✅ Hybrid-Betrieb (Supabase + Fallback) robustfehler
-
----
-
-## 📞 Notizen
-
-- **Mock-Daten:** Bleiben in `app.js` als Fallback. Nicht löschen!
-- **Authentifizierung:** Derzeit alle User als "me". Echte Auth kommt später.
-- **Performance:** Supabase-Queries sind async — können langsamer sein als Mock (ok für MVP)
-- **Testing:** Mit `npm start` lokal testen, dann `git push` für Render auto-deploy
-
+- **Die Datenbank ist leer.** Es gibt noch keine Profile, Chats oder Beiträge.
+  Solange niemand ein Konto anlegt, zeigt auch die angemeldete Website nichts.
+- **E-Mail-Bestätigung ist eingeschaltet** (`mailer_autoconfirm: false`). Nach
+  der Registrierung kommt erst eine Mail, dann geht die Anmeldung.
+- **Google- und Apple-Anmeldung sind in Supabase nicht aktiviert.** Die
+  entsprechenden Knöpfe in der App sind bisher Attrappen.
+- **Telefon-Anmeldung ist nicht aktiviert.**
