@@ -622,9 +622,34 @@ function renderChats() {
       ${
         list.length
           ? `<ul class="rows">${list.map(chatRow).join('')}</ul>`
-          : `<div class="empty">${ICONS.search}
+          : state.query
+          ? `<div class="empty">${ICONS.search}
               <div class="empty__title">Keine Treffer</div>
               <div class="empty__text">Für „${esc(state.query)}" wurde nichts gefunden.</div>
+            </div>`
+          : /*
+             * Kein Suchbegriff und trotzdem nichts da: Das ist ein frisches
+             * Konto, keine erfolglose Suche. "Keine Treffer" waere hier
+             * schlicht falsch - der Nutzer hat nichts gesucht.
+             */
+            `<div class="empty">${ICONS.chat}
+              <div class="empty__title">${
+                state.filter === 'groups'
+                  ? 'Noch keine Gruppen'
+                  : state.filter === 'contacts'
+                  ? 'Noch keine Kontakte'
+                  : 'Noch keine Chats'
+              }</div>
+              <div class="empty__text">
+                ${
+                  state.filter === 'groups'
+                    ? 'Lege eine Gruppe an und hole die Leute dazu, mit denen du gemeinsam schreiben willst.'
+                    : 'Such dir jemanden über das Plus oben rechts — dann steht hier euer Verlauf.'
+                }
+              </div>
+              <button class="prof__btn is-primary empty__knopf" id="chatLeerNeu">
+                ${state.filter === 'groups' ? 'Gruppe anlegen' : 'Person suchen'}
+              </button>
             </div>`
       }
     </div>`;
@@ -644,6 +669,8 @@ function renderChats() {
     $('#chatSearch').focus();
   });
   $('#newChat').addEventListener('click', openNewMenu);
+  // Der Knopf im leeren Zustand fuehrt an dieselbe Stelle wie das Plus oben.
+  $('#chatLeerNeu')?.addEventListener('click', openNewMenu);
   main.querySelectorAll('.pill').forEach((p) =>
     p.addEventListener('click', () => {
       state.filter = p.dataset.filter;

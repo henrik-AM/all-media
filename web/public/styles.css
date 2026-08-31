@@ -644,7 +644,16 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .empty svg { width: 42px; height: 42px; margin-bottom: 12px; }
 .empty__title { font-size: 15px; font-weight: 600; color: var(--text-2); }
-.empty__text { font-size: 13.5px; margin-top: 4px; }
+.empty__text { font-size: 13.5px; margin-top: 4px; line-height: 1.45; }
+
+/* Knopf im leeren Zustand: sagt, was als Naechstes zu tun ist. Ohne ihn steht
+   der Nutzer eines frischen Kontos vor einer leeren Flaeche. */
+.empty__knopf {
+  display: inline-block;
+  width: auto;
+  margin-top: 18px;
+  padding: 0 22px;
+}
 
 /* ---------- Chat detail ---------- */
 .overlay {
