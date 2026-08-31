@@ -308,7 +308,10 @@ export async function ladeNachrichten(
 ): Promise<Message[]> {
   const { data, error } = await client
     .from('messages')
-    .select('id, chat_id, sender_id, text, media_url, media_type, created_at, read_at')
+    .select(
+      'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
+        ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name))'
+    )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
     .limit(500);
@@ -322,6 +325,16 @@ export async function ladeNachrichten(
     time: chatZeit(n.created_at),
     media: n.media_type ?? undefined,
     read: Boolean(n.read_at),
+    // Die Karte im Chat für einen geteilten Beitrag. Gleiche Regel wie in
+    // web/server/supabase-api.js.
+    geteilt: n.posts
+      ? {
+          id: n.posts.id,
+          art: n.posts.kind === 'post' ? ('post' as const) : ('video' as const),
+          autor: n.posts.profiles?.name ?? '',
+          titel: n.posts.title || n.posts.description || '',
+        }
+      : undefined,
   }));
 }
 

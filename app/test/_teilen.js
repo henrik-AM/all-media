@@ -8,6 +8,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -67,8 +68,9 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await gehe('videos', 'home');
 
   await pruefe('Der Teilen-Knopf oeffnet das Personen-Raster', async () => {
+    await page.waitForSelector('[data-paction="share"]', { timeout: 10000 });
     await page.click('[data-paction="share"]');
-    await page.waitForSelector('.teilen', { timeout: 3000 });
+    await page.waitForSelector('.teilen', { timeout: 8000 });
     const namen = await page.$$eval('.teilen__name', (els) => els.map((e) => e.textContent));
     if (namen.length < 6) throw new Error('nur ' + namen.length + ' Personen');
     if (!namen.includes('Anna Schmidt')) throw new Error(namen.join(' | '));
@@ -81,15 +83,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Antippen markiert die Person als gesendet', async () => {
-    await page.click('[data-teilen="u1"]');
-    await page.waitForTimeout(600);
+    // "u1" war Annas feste Kennung in den Beispieldaten; jetzt steht sie in
+    // der Datenbank. Siehe test/_kennungen.js.
+    await page.click(`[data-teilen="${K.person('u1')}"]`);
+    // Das Teilen geht in die Datenbank: Nachricht anlegen, Eintrag in
+    // "shares". Eine feste Wartezeit reicht dafuer nicht.
+    await page.waitForFunction(
+      () => document.querySelectorAll('.teilen__kachel.is-gesendet').length === 1,
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const fertig = await page.$$eval('.teilen__kachel.is-gesendet', (els) => els.length);
     if (fertig !== 1) throw new Error(fertig + ' Kacheln markiert');
   });
 
   await pruefe('Zweites Antippen sendet nicht noch einmal', async () => {
-    await page.click('[data-teilen="u1"]');
-    await page.waitForTimeout(400);
+    await page.click(`[data-teilen="${K.person('u1')}"]`);
+    await page.waitForTimeout(600);
     const fertig = await page.$$eval('.teilen__kachel.is-gesendet', (els) => els.length);
     if (fertig !== 1) throw new Error(fertig + ' Kacheln markiert');
     await page.click('[data-sheet-close]');
@@ -97,16 +106,38 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Der Beitrag liegt als Karte im Chat', async () => {
     await gehe('messenger', 'chats');
-    await page.click('[data-chat="c1"]');
-    await page.waitForTimeout(800);
-    const karten = await page.$$eval('.msg__geteilt', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+    await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
+    await page.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(600);
+    /*
+     * Wer der Autor ist, haengt davon ab, welcher Beitrag im Feed oben steht —
+     * und das steht jetzt in der Datenbank. Frueher war es immer Clara Weber
+     * aus den Beispieldaten; heute kann es auch ein eigener Testbeitrag sein.
+     * Geprueft wird deshalb, dass die Karte da ist und einen Autor traegt.
+     */
+    await page.waitForSelector('.msg__geteilt', { timeout: 10000 }).catch(() => {});
+    const karten = await page.$$eval('.msg__geteilt', (els) =>
+      els.map((e) => ({
+        autor: e.querySelector('.msg__geteiltText strong')?.textContent?.trim() ?? '',
+        text: e.textContent.replace(/\s+/g, ' ').trim(),
+      }))
+    );
     if (!karten.length) throw new Error('keine Karte im Chat');
-    if (!karten[karten.length - 1].includes('Clara Weber')) throw new Error(karten.join(' | '));
+    if (!karten[karten.length - 1].autor) throw new Error('Karte ohne Autor: ' + karten[karten.length - 1].text);
   });
 
   await pruefe('Die Chatliste zeigt "Beitrag geteilt" als Vorschau', async () => {
-    await page.click('#chatBack, [data-back]').catch(() => page.goBack());
-    await page.waitForTimeout(600);
+    /*
+     * Zurueck aus dem Chat — aber nicht mit page.goBack().
+     *
+     * Die Oberflaeche ist eine einzige Seite; "zurueck" im Browser fuehrt
+     * deshalb nicht zur Chatliste, sondern aus der App heraus auf
+     * about:blank. Dort gibt es kein #main und keinen Server: die naechsten
+     * drei Pruefungen scheiterten dann an "Failed to parse URL from
+     * /api/bootstrap" und man suchte den Fehler an der falschen Stelle.
+     */
+    await page.click('#chatBack').catch(() => {});
+    await page.waitForSelector('#chatSearch', { timeout: 10000 }).catch(() => {});
     const text = await page.$eval('#main', (e) => e.textContent);
     if (!text.includes('Beitrag geteilt')) throw new Error('Vorschau fehlt');
   });
@@ -115,16 +146,17 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Auch im Video-Feed oeffnet Teilen das Raster', async () => {
     await gehe('videos', 'portrait');
+    await page.waitForSelector('[data-vaction="share"]', { timeout: 10000 });
     await page.click('[data-vaction="share"]');
-    await page.waitForSelector('.teilen', { timeout: 3000 });
+    await page.waitForSelector('.teilen', { timeout: 8000 });
     const titel = await page.$eval('.sheet__titel-mitte', (e) => e.textContent);
     if (titel !== 'Video teilen') throw new Error(titel);
   });
 
   await pruefe('Gesendetes Video zaehlt bei den Weiterleitungen mit', async () => {
     const vorher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).videos[0].shares);
-    await page.click('[data-teilen="u2"]');
-    await page.waitForTimeout(700);
+    await page.click(`[data-teilen="${K.person('u2')}"]`);
+    await page.waitForTimeout(1200);
     const nachher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).videos[0].shares);
     if (nachher !== vorher + 1) throw new Error(`${vorher} -> ${nachher}`);
     await page.click('[data-sheet-close]');

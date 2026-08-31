@@ -57,9 +57,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!abgebrochen && roh) {
           const daten = JSON.parse(roh) as { konten?: AuthUser[]; aktivId?: string | null };
           if (Array.isArray(daten.konten) && daten.konten.length > 0) {
-            setKonten(daten.konten);
-            const gueltig = daten.konten.some((k) => k.id === daten.aktivId);
-            setAktivId(gueltig ? daten.aktivId! : daten.konten[0].id);
+            /*
+             * Das gemerkte Konto zaehlt nur, wenn Supabase auch eine Sitzung
+             * dazu hat.
+             *
+             * Beides wird getrennt gespeichert: die Kontenliste hier, das
+             * Zugangstoken bei supabase-js. Laeuft das Token ab oder wurde die
+             * Sitzung anderswo beendet, sagte diese Liste weiterhin
+             * "angemeldet" — und die App zeigte eine leere Oberflaeche, weil
+             * jede Abfrage als anonymer Zugriff lief und die Regeln der
+             * Datenbank den nicht zulassen. Eine leere App ohne jede Meldung
+             * ist die schlechteste aller Antworten; besser ehrlich zurueck zur
+             * Anmeldung.
+             */
+            let sitzung = null;
+            if (supabase) {
+              const { data } = await supabase.auth.getSession();
+              sitzung = data.session;
+            }
+
+            if (!supabase || sitzung) {
+              setKonten(daten.konten);
+              const gueltig = daten.konten.some((k) => k.id === daten.aktivId);
+              setAktivId(gueltig ? daten.aktivId! : daten.konten[0].id);
+            } else {
+              await AsyncStorage.removeItem(SPEICHER);
+            }
           }
         }
       } catch (e) {
@@ -71,7 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       abgebrochen = true;
     };
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     if (!geladen) return;

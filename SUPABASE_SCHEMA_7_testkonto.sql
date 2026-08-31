@@ -575,6 +575,24 @@ create policy "Kanal anlegen" on public.community_channels
 
 
 -- ===========================================================================
+-- Eine geteilte Nachricht weiß, welcher Beitrag geteilt wurde
+-- ===========================================================================
+--
+-- Bisher stand im Chat nur der Text "Beitrag geteilt". Welcher Beitrag es war,
+-- ging verloren: die Nachricht kannte ihn nicht. Im Prototyp ist das eine
+-- Karte mit Vorschaubild, Autor und Titel, die den Beitrag öffnet — und die
+-- konnte gar nicht entstehen.
+
+alter table public.messages
+  add column if not exists shared_post_id uuid references public.posts (id) on delete set null;
+
+comment on column public.messages.shared_post_id is
+  'Der geteilte Beitrag. Die Oberfläche macht daraus die Karte im Chat.';
+
+create index if not exists messages_shared_post_idx on public.messages (shared_post_id);
+
+
+-- ===========================================================================
 -- Ablage für Bilder und Videos
 -- ===========================================================================
 --

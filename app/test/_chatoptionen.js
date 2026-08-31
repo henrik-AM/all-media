@@ -13,6 +13,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -69,7 +70,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   /** Die Chat-Einstellungen zu c2 oeffnen (langes Druecken auf die Zeile). */
   const optionen = async () => {
     await zurListe();
-    const zeile = await page.$('[data-chat="c2"]');
+    const zeile = await page.$(await K.waehlerChat(page, 'Bob Müller'));
     const kasten = await zeile.boundingBox();
     await page.mouse.move(kasten.x + kasten.width / 2, kasten.y + kasten.height / 2);
     await page.mouse.down();
@@ -125,13 +126,13 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Ein gesperrter Chat zeigt in der Liste keine Vorschau', async () => {
     await zu();
     await zurListe();
-    const zeile = await page.$eval('[data-chat="c2"]', (n) => n.textContent);
+    const zeile = await page.$eval(await K.waehlerChat(page, 'Bob Müller'), (n) => n.textContent);
     if (zeile.includes('Schicke dir die Datei')) throw new Error('die Vorschau steht weiter da');
     if (!zeile.includes('Gesperrt')) throw new Error('kein Hinweis auf die Sperre');
   });
 
   await pruefe('Ein gesperrter Chat fragt vor dem Öffnen nach', async () => {
-    await page.click('[data-chat="c2"]');
+    await page.click(await K.waehlerChat(page, 'Bob Müller'));
     await page.waitForTimeout(500);
     const nachfrage = await page.$('#nachfrageJa');
     if (!nachfrage) throw new Error('er geht ohne Nachfrage auf');
@@ -141,7 +142,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Nach „Öffnen" geht der Chat auf', async () => {
-    await page.click('[data-chat="c2"]');
+    await page.click(await K.waehlerChat(page, 'Bob Müller'));
     await page.waitForTimeout(400);
     await page.click('#nachfrageJa');
     await page.waitForTimeout(700);
@@ -156,7 +157,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(500);
     await zu();
     await zurListe();
-    const zeile = await page.$eval('[data-chat="c2"]', (n) => n.textContent);
+    const zeile = await page.$eval(await K.waehlerChat(page, 'Bob Müller'), (n) => n.textContent);
     if (zeile.includes('Gesperrt')) throw new Error('die Sperre steht noch');
   });
 

@@ -11,6 +11,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -109,7 +110,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Ein gelesener Chat nimmt beide Zahlen mit', async () => {
-    await page.click('[data-chat="c1"]');
+    await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
     await page.waitForTimeout(400);
     await page.click('#chatBack');
     await page.waitForTimeout(400);

@@ -6,6 +6,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 const fs = require('fs');
 const path = require('path');
 
@@ -71,7 +72,7 @@ if (!fs.existsSync(BILD)) {
   const imChat = async () => {
     await page.click('[data-area="messenger"]');
     await page.waitForTimeout(300);
-    await page.click('[data-chat="c1"]');
+    await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
     await page.waitForTimeout(600);
   };
 
@@ -119,7 +120,7 @@ if (!fs.existsSync(BILD)) {
   await pruefe('Kontakt landet als Karte im Chat', async () => {
     await anhangAuf('kontakt');
     await page.waitForSelector('[data-kontakt]', { timeout: 3000 });
-    await page.click('[data-kontakt="u4"]');
+    await page.click(`[data-kontakt="${K.person('u4')}"]`);
     await page.waitForTimeout(700);
     const namen = await page.$$eval('.msg__kontaktText strong', (els) => els.map((e) => e.textContent));
     if (!namen.includes('David König')) throw new Error(namen.join(' | '));
@@ -129,7 +130,7 @@ if (!fs.existsSync(BILD)) {
     await anhangAuf('kontakt');
     await page.waitForSelector('[data-kontakt]', { timeout: 3000 });
     const ids = await page.$$eval('[data-kontakt]', (els) => els.map((e) => e.dataset.kontakt));
-    if (ids.includes('u1')) throw new Error('Anna Schmidt steht in ihrem eigenen Chat zur Auswahl');
+    if (ids.includes(K.person('u1'))) throw new Error('Anna Schmidt steht in ihrem eigenen Chat zur Auswahl');
     await page.click('[data-sheet-close]');
   });
 

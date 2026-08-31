@@ -16,6 +16,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -171,7 +172,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-sub="home"]');
     await page.waitForTimeout(400);
     // u1 hat eine Story (s1).
-    await page.click('[data-profile="u1"]');
+    await page.click(`[data-profile="${K.person('u1')}"]`);
     await page.waitForSelector('#profBack');
     await page.waitForTimeout(500);
 

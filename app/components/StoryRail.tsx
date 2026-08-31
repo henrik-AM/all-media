@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -38,6 +38,26 @@ export const StoryRail = ({ stories, onPress }: Props) => {
          */
         const person = alleNutzer[story.userId];
         const vollerName = person?.name ?? story.name;
+
+        /*
+         * Im Ring steht das Bild der Story, nicht die Initialen — so ist es
+         * im Prototyp und so macht es die Website. Die App zeigte hier immer
+         * den Avatar; die eigene Story mit Bild sah deshalb genauso aus wie
+         * eine leere.
+         *
+         * Ohne Bild bleibt es beim Avatar: bei der eigenen Story ist das der
+         * Zustand "noch nichts aufgenommen", bei fremden gab es noch nie ein
+         * Vorschaubild.
+         */
+        const kern = story.mediaUri ? (
+          <Image
+            source={{ uri: story.mediaUri }}
+            style={{ width: inner - 4, height: inner - 4, borderRadius: (inner - 4) / 2 }}
+          />
+        ) : (
+          <Avatar id={story.userId} name={vollerName} size={inner - 4} />
+        );
+
         return (
           <Druck
             key={story.id}
@@ -46,9 +66,7 @@ export const StoryRail = ({ stories, onPress }: Props) => {
           >
             {story.viewed ? (
               <View style={[styles.ring, styles.ringViewed]}>
-                <View style={styles.inner}>
-                  <Avatar id={story.userId} name={vollerName} size={inner - 4} />
-                </View>
+                <View style={styles.inner}>{kern}</View>
               </View>
             ) : (
               <LinearGradient
@@ -57,9 +75,7 @@ export const StoryRail = ({ stories, onPress }: Props) => {
                 end={{ x: 0.9, y: 1 }}
                 style={styles.ring}
               >
-                <View style={styles.inner}>
-                  <Avatar id={story.userId} name={vollerName} size={inner - 4} />
-                </View>
+                <View style={styles.inner}>{kern}</View>
               </LinearGradient>
             )}
 

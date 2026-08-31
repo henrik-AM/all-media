@@ -13,6 +13,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -268,7 +269,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-area="videos"]');
     await page.click('[data-sub="home"]');
     await page.waitForTimeout(500);
-    await page.click('[data-profile="u1"]');
+    await page.click(`[data-profile="${K.person('u1')}"]`);
     await page.waitForTimeout(600);
     const knopf = await page.$('.highlight[data-sammlung]');
     if (!knopf) throw new Error('die Highlights sind keine Knoepfe');
@@ -282,7 +283,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-area="videos"]');
     await page.click('[data-sub="home"]');
     await page.waitForTimeout(500);
-    await page.click('[data-profile="u1"]');
+    await page.click(`[data-profile="${K.person('u1')}"]`);
     await page.waitForTimeout(600);
     const href = await page.$eval('.prof__link', (n) => n.getAttribute('href'));
     if (!href || !href.startsWith('http')) throw new Error('href ist „' + href + '"');

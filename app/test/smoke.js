@@ -163,10 +163,12 @@ const STRUCTURE = {
   assert('Senden-Pfeil ist nutzbar, sobald etwas dasteht',
     !(await p.$eval('#storySenden', e => e.disabled)));
   await p.click('#storySenden');
-  await p.waitForTimeout(900);
+  // Die Antwort geht als Nachricht in die Datenbank; erst danach oeffnet
+  // sich der Chat. 900 ms waren dafuer manchmal zu knapp.
+  await p.waitForSelector('.chathead__name', { timeout: 10000 }).catch(() => {});
   assert('Antwort oeffnet den Chat', (await p.$eval('.chathead__name', e => e.textContent.trim())) === 'Anna Schmidt');
   assert('Antwort steht im Chat',
-    (await p.$$eval('.msg', els => els[els.length - 1].textContent)).includes('Story-Antwort'));
+    await K.bisWahr(p, `[...document.querySelectorAll('.msg')].some((n) => n.textContent.includes('Story-Antwort'))`));
   await p.click('#chatBack');
   await p.waitForTimeout(400);
 

@@ -5,6 +5,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -60,12 +61,15 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(300);
     await page.click('[data-area="messenger"]');
     await page.waitForTimeout(300);
-    await page.click(`[data-chat="${chatId}"]`);
-    await page.waitForTimeout(600);
+    // chatId ist jetzt ein Name, kein "c1" mehr: Chats bekommen ihre
+    // Kennung beim Anlegen in der Datenbank. Siehe test/_kennungen.js.
+    await page.click(await K.waehlerChat(page, chatId));
+    await page.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(400);
   };
 
   const zurKontaktinfo = async () => {
-    await imChat('c1');
+    await imChat('Anna Schmidt');
     await page.click('.chathead__body[data-profile]');
     await page.waitForSelector('.kp__zeileText', { timeout: 3000 });
   };
@@ -126,7 +130,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Lange Drücken markiert eine Nachricht, sie erscheint in der Liste', async () => {
-    await imChat('c1');
+    await imChat('Anna Schmidt');
     const blasen = await page.$$('[data-msgid]');
     const rahmen = await blasen[1].boundingBox();
     await page.mouse.move(rahmen.x + rahmen.width / 2, rahmen.y + rahmen.height / 2);
@@ -174,7 +178,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
-    await imChat('c4');
+    await imChat('Projekt Team');
     await page.click('[data-call="audio"]');
     await page.waitForSelector('.anruf__teilnehmer', { timeout: 3000 });
     const namen = await page.$eval('.anruf__teilnehmer', (e) => e.textContent);

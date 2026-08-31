@@ -298,7 +298,10 @@ async function ladeNachrichten(client, chatId, nutzerId) {
   if (!client) return null;
   const { data, error } = await client
     .from('messages')
-    .select('id, chat_id, sender_id, text, media_url, media_type, created_at, read_at')
+    .select(
+      'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
+      ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name))'
+    )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
     .limit(500);
@@ -316,6 +319,19 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     time: chatZeit(n.created_at),
     zeitpunkt: n.created_at,
     read: Boolean(n.read_at),
+    /*
+     * Die Karte im Chat: Vorschau, Autor, Titel — im Prototyp oeffnet sie den
+     * geteilten Beitrag. Bis zum 01.09.2026 stand dort nur der Satz "Beitrag
+     * geteilt": die Nachricht wusste gar nicht, was geteilt worden war.
+     */
+    geteilt: n.posts
+      ? {
+          id: n.posts.id,
+          art: n.posts.kind === 'post' ? 'post' : 'video',
+          autor: n.posts.profiles?.name || '',
+          titel: n.posts.title || n.posts.description || '',
+        }
+      : undefined,
   }));
 }
 
@@ -412,7 +428,7 @@ const BEITRAG_SPALTEN =
   'id, user_id, kind, format, title, description, location, music, media_url,' +
   ' thumbnail_url, duration, tags, views, zuschauer, untertitel, kapitel,' +
   ' likes_basis, shares_basis, comments_basis, created_at,' +
-  ' post_likes(count), comments(count)';
+  ' post_likes(count), comments(count), shares(count)';
 
 /**
  * Ein Video ist kein eigener Tabelleneintrag, sondern ein Beitrag mit
@@ -473,7 +489,9 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
     zeitpunkt: b.created_at,
     likes: Number(b.likes_basis || 0) + (b.post_likes?.[0]?.count ?? 0),
     comments: Number(b.comments_basis || 0) + (b.comments?.[0]?.count ?? 0),
-    shares: Number(b.shares_basis || 0),
+    // Weiterleitungen werden gezaehlt wie Likes und Kommentare. Vorher stand
+    // hier nur der Sockel — jedes Teilen verpuffte, die Zahl blieb stehen.
+    shares: Number(b.shares_basis || 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),

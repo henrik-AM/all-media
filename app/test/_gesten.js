@@ -13,6 +13,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -132,7 +133,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await zumFeed();
 
   await pruefe('Die angezeigte Kommentarzahl stimmt mit der echten überein', async () => {
-    const amBeitrag = await page.$eval('.post__comments[data-pid="p1"]', (n) =>
+    const ersterPost = await K.ersterBeitrag(page);
+    const amBeitrag = await page.$eval(`.post__comments[data-pid="${ersterPost}"]`, (n) =>
       (n.textContent.match(/\d+/) || ['0'])[0]
     );
     const echt = await page.evaluate(async () => (await (await fetch('/api/comments/p1')).json()).length);
@@ -140,7 +142,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Unter jedem Kommentar steht die Zahl seiner Likes', async () => {
-    await page.click('.post__comments[data-pid="p1"]');
+    await page.click(`.post__comments[data-pid="${ersterPost}"]`);
     await page.waitForSelector('.comment');
     await page.waitForTimeout(400);
     const felder = await page.$$eval('.comment__likes', (n) => n.length);
@@ -167,7 +169,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.evaluate(() => document.querySelector('.sheet-backdrop')?.remove());
     await page.waitForTimeout(300);
     await zumFeed();
-    const amBeitrag = await page.$eval('.post__comments[data-pid="p1"]', (n) =>
+    const ersterPost = await K.ersterBeitrag(page);
+    const amBeitrag = await page.$eval(`.post__comments[data-pid="${ersterPost}"]`, (n) =>
       Number((n.textContent.match(/\d+/) || ['0'])[0])
     );
     if (amBeitrag !== inListe) throw new Error(`am Beitrag ${amBeitrag}, in der Liste ${inListe}`);
@@ -177,7 +180,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nZiehen zum Schließen');
 
   await pruefe('Ein kurzer Zug schließt das Kommentar-Blatt NICHT', async () => {
-    await page.click('.post__comments[data-pid="p1"]');
+    await page.click(`.post__comments[data-pid="${ersterPost}"]`);
     await page.waitForSelector('.comment');
     await page.waitForTimeout(400);
     await wischen('.sheet', 40, { dauer: 600 });
@@ -197,7 +200,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-area="messenger"]');
     await page.waitForSelector('#chatSearch');
     await page.waitForTimeout(300);
-    await page.click('[data-story="s1"]');
+    await page.click(await K.waehlerStory(page, 'Anna'));
     await page.waitForSelector('.viewer');
     await page.waitForTimeout(400);
   };

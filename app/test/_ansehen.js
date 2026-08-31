@@ -7,6 +7,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 const path = require('path');
 const fs = require('fs');
 
@@ -40,13 +41,20 @@ const SEITEN = [
  *
  * Jeder Eintrag: Bereich, Unterpunkt, Name, danach die Klicks bis zum Ziel.
  */
+/*
+ * Statt fester Kennungen ("c1") steht hier eine Funktion, die den Waehler zur
+ * Laufzeit sucht — an dem, was auf dem Bildschirm steht. Chats und Storys
+ * bekommen ihre Kennung beim Anlegen in der Datenbank; "c1" gibt es nicht
+ * mehr. Siehe test/_kennungen.js.
+ */
 const DETAILS = [
-  ['messenger', 'chats', 'detail-chat', ['[data-chat="c1"]']],
-  ['messenger', 'chats', 'detail-chat-gruppe', ['[data-chat="c4"]']],
-  ['messenger', 'chats', 'detail-story', ['[data-story="s1"]']],
+  ['messenger', 'chats', 'detail-chat', [(p) => K.waehlerChat(p, 'Anna Schmidt')]],
+  ['messenger', 'chats', 'detail-chat-gruppe', [(p) => K.waehlerChat(p, 'Projekt Team')]],
+  ['messenger', 'chats', 'detail-story', [(p) => K.waehlerStory(p, 'Anna')]],
   ['videos', 'profile', 'detail-erstellen', ['[data-oact="create"]']],
   ['videos', 'profile', 'detail-mitteilungen', ['[data-oact="bell"]']],
-  ['videos', 'landscape', 'detail-clip', ['[data-clip="q1"]']],
+  ['videos', 'landscape', 'detail-clip', [async (p) =>
+    `[data-clip="${await p.$eval('[data-clip]', (n) => n.getAttribute('data-clip'))}"]`]],
   // Die Uebersichtsseiten der Video-Suche. Sie kamen in keinem Bild vor,
   // obwohl Henrik dort gleich drei Punkte gemeldet hat (kein Zurueck-Pfeil,
   // fehlende Kategorien, und der Bug, der die App festsetzte).
@@ -109,7 +117,10 @@ const DETAILS = [
       await seite.waitForTimeout(250);
     }
     for (const schritt of schritte) {
-      await seite.click(schritt);
+      // Ein Schritt ist entweder ein fester Waehler oder eine Funktion, die
+      // ihn zur Laufzeit aus dem Bildschirm holt.
+      const waehler = typeof schritt === 'function' ? await schritt(seite) : schritt;
+      await seite.click(waehler);
       await seite.waitForTimeout(350);
     }
     await seite.screenshot({ path: path.join(ZIEL, `${name}.png`) });

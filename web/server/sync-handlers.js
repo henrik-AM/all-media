@@ -393,9 +393,12 @@ const handleShareToChats = handler(
     const gesendet = [];
     for (const zielId of empfaenger) {
       const chatId = await chatMit(client, nutzerId, zielId);
+      // Welcher Beitrag geteilt wurde, gehoert an die Nachricht. Sonst steht
+      // im Chat nur der Satz "Beitrag geteilt" und niemand kommt von dort aus
+      // zum Beitrag — im Prototyp ist das eine Karte, die ihn oeffnet.
       await client
         .from('messages')
-        .insert({ chat_id: chatId, sender_id: nutzerId, text: vorschau });
+        .insert({ chat_id: chatId, sender_id: nutzerId, text: vorschau, shared_post_id: beitragId });
       gesendet.push(zielId);
     }
 
