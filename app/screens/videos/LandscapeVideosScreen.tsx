@@ -91,7 +91,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
                 onPress={() => onOpenClip(item.id)}
               >
                 <View style={styles.thumb}>
-                  <Motiv id={item.id} icon="tv-outline" iconSize={32} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                  <Motiv id={item.id} bild={item.mediaUri} icon="tv-outline" iconSize={32} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                   {/* Abzeichen oben links. Ohne es waere am Ergebnis nicht zu
                       sehen, dass der Filter etwas getan hat — die Kacheln
                       saehen alle gleich aus. */}

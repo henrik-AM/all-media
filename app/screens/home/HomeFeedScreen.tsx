@@ -31,6 +31,19 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
   const { eigeneBeitraege, folgtPerson, folgenUmschalten } = useProfil();
   const [posts, setPosts] = useState<Post[]>(alleBeitraege);
 
+  /*
+   * Die Beitraege kommen aus der Datenbank, nicht mehr aus dem Quelltext.
+   *
+   * useState nimmt seinen Anfangswert nur beim allerersten Aufbau. Solange
+   * die Beispieldaten fest im Code standen, waren sie da genau da. Jetzt
+   * werden sie geladen — beim ersten Aufbau ist die Liste leer, und ohne
+   * diesen Effekt blieb sie es fuer immer. Der Feed war dauerhaft leer,
+   * obwohl die Daten Sekundenbruchteile spaeter ankamen.
+   */
+  useEffect(() => {
+    setPosts(alleBeitraege);
+  }, [alleBeitraege]);
+
   // Neue eigene Beitraege wandern in dieselbe Liste wie alle anderen. Sonst
   // wuerden Like, Speichern und Repost bei ihnen nichts tun - sie waeren
   // dann naemlich gar nicht im Zustand, den diese Knoepfe aendern.
@@ -139,7 +152,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
           {item.mediaUri ? (
             <Image source={{ uri: item.mediaUri }} style={styles.mediaBild} />
           ) : (
-            <Motiv id={item.id} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+            <Motiv id={item.id} bild={item.mediaUri} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
           )}
         </View>
 

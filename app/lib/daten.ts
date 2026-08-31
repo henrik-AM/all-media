@@ -553,6 +553,7 @@ export async function ladeBeitraege(
         liked: b.liked,
         saved: b.saved,
         reposted: b.reposted,
+        mediaUri: b.mediaUri,
       })),
   };
 }

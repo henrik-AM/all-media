@@ -194,6 +194,8 @@ export interface Clip {
   kapitel?: { bei: number; titel: string }[];
   /** Ob es Untertitel gibt - steht in den Video-Einstellungen zur Wahl. */
   untertitel?: boolean;
+  /** Vorschaubild aus der Datenbank. Fehlt es, zeichnet Motiv eine Fläche. */
+  mediaUri?: string;
   /** Damit Querformat-Videos auf den Explorer-Seiten auftauchen koennen. */
   location?: string;
   music?: string;

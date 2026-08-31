@@ -113,7 +113,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                       {v.mediaUri ? (
                         <Image source={{ uri: v.mediaUri }} style={styles.voll} />
                       ) : (
-                        <Motiv id={v.id} icon="play-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                        <Motiv id={v.id} bild={v.mediaUri} icon="play-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       )}
                       <Text style={styles.reelText} numberOfLines={2}>
                         {v.description}
@@ -130,7 +130,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 {treffer.clips.map((c: Clip) => (
                   <Druck key={c.id} style={styles.clip} onPress={() => onOpenClip(c.id)}>
                     <View style={styles.clipBild}>
-                      <Motiv id={c.id} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                      <Motiv id={c.id} bild={c.mediaUri} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       <View style={styles.clipZeit}>
                         <Text style={styles.clipZeitText}>{c.duration}</Text>
                       </View>
@@ -160,7 +160,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                       {p.mediaUri ? (
                         <Image source={{ uri: p.mediaUri }} style={styles.voll} />
                       ) : (
-                        <Motiv id={p.id} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                        <Motiv id={p.id} bild={p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       )}
                     </Druck>
                   ))}

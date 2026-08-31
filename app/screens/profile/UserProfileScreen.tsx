@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -40,6 +40,12 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
   const person = alleNutzer[userId];
   const [profile, setProfile] = useState(alleProfile[userId]);
   const [tab, setTab] = useState<Tab>('grid');
+
+  // Nachziehen, sobald das Profil aus der Datenbank da ist — und beim
+  // Wechsel auf eine andere Person. Siehe HomeFeedScreen.
+  useEffect(() => {
+    setProfile(alleProfile[userId]);
+  }, [alleProfile, userId]);
 
   if (!person || !profile) {
     return (

@@ -120,7 +120,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           {eigenesBild ? (
             <Image source={{ uri: eigenesBild }} style={styles.voll} />
           ) : (
-            <Motiv id={clip.id} icon="tv-outline" iconSize={48} dunkel style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+            <Motiv id={clip.id} bild={clip.mediaUri} icon="tv-outline" iconSize={48} dunkel style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
           )}
           <View style={[styles.play, laeuft && styles.playAus]}>
             <Ionicons name={laeuft ? 'pause' : 'play'} size={26} color={colors.white} />
@@ -282,7 +282,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         {aehnlich.map((c) => (
           <Druck key={c.id} style={styles.clip} onPress={() => wechseln(c.id)}>
             <View style={styles.clipBild}>
-              <Motiv id={c.id} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+              <Motiv id={c.id} bild={c.mediaUri} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
               <View style={styles.clipZeit}>
                 <Text style={styles.clipZeitText}>{c.duration}</Text>
               </View>

@@ -50,6 +50,8 @@ create table if not exists public.vorlage_eigene_beitraege (
   schluessel     text primary key,
   kind           text not null,
   format         text not null default 'standard',
+  media_url      text,
+  thumbnail_url  text,
   title          text default '',
   description    text default '',
   location       text default '',
@@ -63,6 +65,12 @@ create table if not exists public.vorlage_eigene_beitraege (
   minuten_zurueck integer not null default 0,
   position       integer not null default 0
 );
+
+-- Nachtraeglich dazugekommen; "create table if not exists" legt sie bei einer
+-- bereits vorhandenen Tabelle nicht mehr an.
+alter table public.vorlage_eigene_beitraege
+  add column if not exists media_url     text,
+  add column if not exists thumbnail_url text;
 
 alter table public.vorlage_eigene_beitraege enable row level security;
 
@@ -94,11 +102,14 @@ create policy "Vorlage eigene Storys lesen" on public.vorlage_eigene_storys
 -- --------------------------------------------------------------- Die Inhalte
 delete from public.vorlage_eigene_beitraege;
 insert into public.vorlage_eigene_beitraege
-  (schluessel, kind, format, title, description, location, music, duration,
-   tags, views, zuschauer, untertitel, kapitel, minuten_zurueck, position)
+  (schluessel, kind, format, media_url, thumbnail_url, title, description, location, music,
+   duration, tags, views, zuschauer, untertitel, kapitel, minuten_zurueck, position)
 values
   -- 1. Foto-Beitrag. Steht im Raster auf dem eigenen Profil ganz vorn.
-  ('eigen-foto', 'post', 'standard', '',
+  ('eigen-foto', 'post', 'standard',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-foto.png',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-foto.png',
+   '',
    'Testbeitrag: ein Foto. Damit lässt sich alles prüfen, was an einem Beitrag hängt — Gefällt mir, Kommentar, Teilen, Merken, Melden.',
    'Hamburg', 'Golden Hour – Lys', '',
    array['#hafen', '#nachtfotografie']::text[], 0, null, false, '[]'::jsonb,
@@ -106,7 +117,10 @@ values
 
   -- 2. Hochformat. Das ist der senkrechte Videokanal — eine Seite je Video,
   --    von unten nach oben gewischt.
-  ('eigen-hochformat', 'reel', 'standard', '',
+  ('eigen-hochformat', 'reel', 'standard',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-hochformat.png',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-hochformat.png',
+   '',
    'Testvideo im Hochformat. Zum Prüfen von Wischen, Ton an/aus, Doppeltippen und der Leiste an der rechten Seite.',
    'Rheinpark', 'Runner High – Aster', '0:34',
    array['#laufen', '#testvideo']::text[], 1840, null, false, '[]'::jsonb,
@@ -115,6 +129,8 @@ values
   -- 3. Querformat, Knopf „Standard" in der Filterleiste. Mit Kapiteln und
   --    Untertiteln, damit auch der Player vollständig prüfbar ist.
   ('eigen-querformat', 'clip', 'standard',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-querformat.png',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-querformat.png',
    'Testvideo im Querformat',
    'Testvideo im Querformat. Zum Prüfen von Vollbild, Fortschrittsleiste, Kapitelsprüngen, Untertiteln und Geschwindigkeit.',
    'Hamburg', 'Lo-Fi Focus – beatlab', '12:40',
@@ -124,6 +140,8 @@ values
 
   -- 4. Querformat, Knopf „360°".
   ('eigen-360', 'clip', '360',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-360.png',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-360.png',
    'Test-Rundumvideo (360°)',
    'Testvideo für den 360°-Knopf in der Filterleiste. Prüft, dass die Filterleiste wirklich trennt und nicht überall dasselbe zeigt.',
    'Zugspitze', 'Ambient Sunrise – Nora K.', '4:12',
@@ -133,6 +151,8 @@ values
   -- 5. Querformat, Knopf „Live". „zuschauer" ist die Zahl neben dem roten
   --    Punkt — nur ein Livebeitrag hat sie.
   ('eigen-live', 'clip', 'live',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-live.png',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-live.png',
    'Test-Livestream',
    'Testbeitrag für den Live-Knopf. Prüft die Zuschauerzahl, den roten Punkt und den Live-Chat.',
    'Berlin', 'Originalton', '',
@@ -140,9 +160,6 @@ values
    15, 4);
 
 
--- Das Bild liegt in der Ablage "media" und ist oeffentlich lesbar. Ohne Bild
--- gilt die eigene Story der Oberflaeche als leer: ein Tippen darauf oeffnet
--- dann die Kamera statt der Story.
 delete from public.vorlage_eigene_storys;
 insert into public.vorlage_eigene_storys (schluessel, media_type, media_url, caption, minuten_zurueck, position)
 values
@@ -308,10 +325,11 @@ begin
     end if;
 
     insert into public.posts
-      (user_id, kind, format, title, description, location, music, duration,
+      (user_id, kind, format, media_url, thumbnail_url, title, description, location, music, duration,
        tags, views, zuschauer, untertitel, kapitel, demo, created_at)
     values
-      (ziel, v_vorlage.kind, v_vorlage.format, v_vorlage.title, v_vorlage.description,
+      (ziel, v_vorlage.kind, v_vorlage.format, v_vorlage.media_url, v_vorlage.thumbnail_url,
+       v_vorlage.title, v_vorlage.description,
        v_vorlage.location, v_vorlage.music, v_vorlage.duration, v_vorlage.tags,
        v_vorlage.views, v_vorlage.zuschauer, v_vorlage.untertitel, v_vorlage.kapitel,
        true, now() - make_interval(mins => v_vorlage.minuten_zurueck));
@@ -421,6 +439,16 @@ end;
 $$;
 
 grant execute on function public.starter_inhalte(uuid) to authenticated;
+
+
+-- Testbeiträge, die vor den Bildern angelegt wurden, nachträglich versorgen.
+-- Ohne Bild steht im Feed nur ein grauer Platzhalter — und dann lässt sich
+-- gerade das nicht prüfen, wofür der Testbestand da ist.
+update public.posts b
+   set media_url     = coalesce(b.media_url, v.media_url),
+       thumbnail_url = coalesce(b.thumbnail_url, v.thumbnail_url)
+  from public.vorlage_eigene_beitraege v
+ where b.demo and b.description = v.description and b.media_url is null;
 
 
 -- ===========================================================================

@@ -199,7 +199,12 @@ const pruefe = (was, ok, zusatz = '') => {
     const eingabeGesperrt = await page.$eval('#msgInput', (e) => e.disabled);
     pruefe('Weitere Nachrichten gesperrt bis zur Annahme', eingabeGesperrt);
     await page.click('#anfrageOk');
-    await page.waitForTimeout(800);
+    // Die Annahme aendert den Kontaktstatus in der Datenbank; danach wird der
+    // Chat neu aufgebaut. 800 ms waren dafuer zu knapp.
+    await page.waitForFunction(
+      () => { const f = document.querySelector('#msgInput'); return f && !f.disabled; },
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const frei = await page.$eval('#msgInput', (e) => !e.disabled).catch(() => false);
     pruefe('Nach Annahme wieder frei', frei);
     await page.click('#chatBack').catch(() => {});

@@ -7,6 +7,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -94,8 +95,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   console.log('\nStandort-Seite');
   await pruefe('Ein Standort zeigt Adresse, Koordinaten und Karte', async () => {
-    await page.click('[data-place="pl1"]');
-    await page.waitForSelector('.exp__adresse', { timeout: 3000 });
+    // "pl1" war die feste Kennung aus den Beispieldaten. Standorte stehen
+    // jetzt in der Datenbank und bekommen ihre Kennung dort — gesucht wird
+    // deshalb am Namen. Siehe test/_kennungen.js.
+    await page.click(`[data-place="${await K.kennungNachText(page, 'data-place', 'Hamburger Hafen')}"]`);
+    await page.waitForSelector('.exp__adresse', { timeout: 8000 });
     const adresse = await page.$eval('.exp__adresse', (e) => e.textContent);
     const koord = await page.$eval('.exp__koordinaten', (e) => e.textContent);
     if (!adresse.includes('Hamburg')) throw new Error(adresse);
@@ -122,7 +126,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   console.log('\nSound-Seite');
   await pruefe('Ein Sound zeigt Cover, Produzent und Liedtext', async () => {
-    await page.click('[data-sound="so1"]');
+    await page.click(`[data-sound="${await K.kennungNachText(page, 'data-sound', 'Golden Hour')}"]`);
     await page.waitForSelector('.soundcover', { timeout: 3000 });
     const zahl = await page.$eval('.exp__zahl', (e) => e.textContent);
     if (!zahl.includes('Lys')) throw new Error(zahl);

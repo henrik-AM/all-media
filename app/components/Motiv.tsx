@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { Image, StyleSheet, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -32,6 +32,15 @@ const MOTIVE: [string, string][] = [
 interface Props {
   id: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
+  /*
+   * Das echte Bild, wenn es eines gibt.
+   *
+   * Liegt es vor, tritt die Ersatzfläche zurück — sie war immer nur der
+   * Platzhalter für den Fall ohne Bild. Weil alle Bildflächen der App über
+   * diese eine Stelle laufen, genügt hier ein Feld, statt zwanzig Bildschirme
+   * einzeln umzubauen.
+   */
+  bild?: string;
   /** Größe des Symbols. Klein halten — groß liest es sich wieder als Fehler. */
   iconSize?: number;
   /** Dunkle Fassung fürs Video-Vollbild: dort würde eine helle Fläche blenden. */
@@ -45,8 +54,12 @@ function motivVon(id: string): [string, string] {
   return MOTIVE[h % MOTIVE.length];
 }
 
-export const Motiv = ({ id, icon, iconSize = 32, dunkel = false, style }: Props) => {
+export const Motiv = ({ id, icon, iconSize = 32, dunkel = false, style, bild }: Props) => {
   const [hell, tief] = motivVon(id);
+
+  if (bild) {
+    return <Image source={{ uri: bild }} style={[styles.flaeche, style as object]} resizeMode="cover" />;
+  }
 
   return (
     <LinearGradient

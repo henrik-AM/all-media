@@ -26,6 +26,13 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   const { eigeneVideos, geteiltZaehler } = useProfil();
   const [videos, setVideos] = useState<Video[]>(alleVideos);
 
+  // Nachziehen, sobald die Videos aus der Datenbank da sind — der
+  // Anfangswert von useState gilt nur beim ersten Aufbau, und da ist die
+  // Liste noch leer. Siehe HomeFeedScreen.
+  useEffect(() => {
+    setVideos(alleVideos);
+  }, [alleVideos]);
+
   // Wie im Bild-Feed: eigene Reels kommen in dieselbe Liste, damit Like,
   // Speichern und Repost auch bei ihnen wirken.
   useEffect(() => {
