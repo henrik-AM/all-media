@@ -237,7 +237,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Ein Sound zeigt seinen Liedtext', async () => {
     await zurSuche();
-    await page.click('[data-sound="so1"]');
+    await page.click(`[data-sound="${await K.kennungNachText(page, 'data-sound', 'Golden Hour')}"]`);
     await page.waitForSelector('.exp__kopf');
     await page.waitForTimeout(500);
     const zeilen = await page.$$eval('.lyrics__zeile', (n) => n.map((x) => x.textContent));
@@ -254,7 +254,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('#expBack');
     await page.waitForTimeout(400);
     await zurSuche();
-    await page.click('[data-sound="so2"]');
+    await page.click(`[data-sound="${await K.kennungNachText(page, 'data-sound', 'Lo-Fi Focus')}"]`);
     await page.waitForSelector('.exp__kopf');
     await page.waitForTimeout(500);
     if (await page.$('.lyrics__zeile')) throw new Error('es stehen trotzdem Liedzeilen da');

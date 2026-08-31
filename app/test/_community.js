@@ -13,6 +13,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -60,16 +61,23 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     }
   };
 
-  const oeffne = async (id) => {
+  /*
+   * Eine Community am Namen oeffnen statt an "k1".
+   *
+   * Communitys bekommen ihre Kennung beim Anlegen in der Datenbank, und die
+   * privaten legt jedes Konto fuer sich an — eine feste Kennung kann es also
+   * gar nicht geben. Siehe test/_kennungen.js.
+   */
+  const oeffne = async (name) => {
     await page.click('[data-area="communities"]');
-    await page.waitForTimeout(400);
-    await page.click(`[data-community="${id}"]`);
+    await page.waitForTimeout(500);
+    await page.click(`[data-community="${await K.kennungNachText(page, 'data-community', name)}"]`);
     await page.waitForTimeout(700);
   };
 
   console.log('\nCommunitys — die Seite nach dem Prototyp');
 
-  await oeffne('k1');
+  await oeffne('React Native DE');
 
   const TEILE = [
     ['.kanal__bild', 'das grosse Kopfbild'],
@@ -122,7 +130,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nCommunitys — Name, Einstellungen, eigene Community');
 
   await pruefe('Der Gruppenname fuehrt zu den Einstellungen', async () => {
-    await oeffne('k1');
+    await oeffne('React Native DE');
     await page.click('#communityKopf');
     await page.waitForTimeout(500);
     if (!(await page.$('.sheet'))) throw new Error('es geht nichts auf');
@@ -131,7 +139,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Das „..." fuehrt zu denselben Einstellungen', async () => {
-    await oeffne('k1');
+    await oeffne('React Native DE');
     await page.click('#communityMehr');
     await page.waitForTimeout(500);
     if (!(await page.$('.sheet'))) throw new Error('es geht nichts auf');
@@ -140,7 +148,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Eine fremde Community laesst sich verlassen', async () => {
-    await oeffne('k1');
+    await oeffne('React Native DE');
     const knopf = await page.$('[data-join]');
     if (!knopf) throw new Error('kein Knopf');
     const text = await knopf.textContent();
@@ -148,14 +156,14 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Die eigene Community laesst sich NICHT verlassen', async () => {
-    await oeffne('k4');
+    await oeffne('Fotografie');
     if (await page.$('[data-join]')) throw new Error('der Verlassen-Knopf steht trotzdem da');
     const hinweis = await page.$('.kanal__eigen');
     if (!hinweis) throw new Error('kein Hinweis, dass es die eigene Community ist');
   });
 
   await pruefe('Ein neues Unterthema laesst sich anlegen', async () => {
-    await oeffne('k1');
+    await oeffne('React Native DE');
     const vorher = await page.$$eval('.kanal__thema', (n) => n.length);
     await page.click('#neuesUnterthema');
     await page.waitForSelector('#f_name');

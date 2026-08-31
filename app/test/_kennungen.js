@@ -131,8 +131,37 @@ async function bisWahr(page, bedingung, grenze = 8000) {
   }
 }
 
+/**
+ * Die Kennung eines Querformat-Videos, gesucht an einem Stueck seines Titels.
+ *
+ * "q1", "q4", "q6" waren die festen Kennungen aus den Beispieldaten. Jetzt
+ * stehen die Videos in der Datenbank; welches an welcher Stelle liegt, haengt
+ * an ihrem Alter. Ein Prueflauf, der ein Video mit Kapiteln braucht, muss
+ * deshalb genau dieses suchen — nicht das dritte von oben.
+ */
+async function clip(page, textteil) {
+  const wert = await page.$$eval(
+    '[data-clip]',
+    (knoten, teil) => {
+      const treffer = knoten.find((n) => (n.textContent || '').includes(teil));
+      return treffer ? treffer.getAttribute('data-clip') : null;
+    },
+    textteil
+  ).catch(() => null);
+
+  if (!wert) {
+    const da = await page.$$eval('[data-clip]', (n) => n.map((x) => (x.textContent || '').trim().slice(0, 50)));
+    throw new Error(`Kein Querformat-Video mit "${textteil}". Da steht: ${JSON.stringify(da)}`);
+  }
+  return wert;
+}
+
+const waehlerClip = async (page, titel) => `[data-clip="${await clip(page, titel)}"]`;
+
 module.exports = {
   bisWahr,
+  clip,
+  waehlerClip,
   PERSONEN, person,
   kennungNachText,
   chat, waehlerChat,

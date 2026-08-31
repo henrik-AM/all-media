@@ -621,6 +621,26 @@ create index if not exists messages_shared_post_idx on public.messages (shared_p
 
 
 -- ===========================================================================
+-- Standort und Kontakt als Anhang
+-- ===========================================================================
+--
+-- Dieselbe Lücke wie beim geteilten Beitrag: im Chat stand „Standort:
+-- Zugspitze" als bloßer Text. Der Prototyp zeigt eine Karte mit Nadel,
+-- Adresse und Koordinaten — beziehungsweise beim Kontakt eine Karte mit
+-- Avatar und Benutzername, die sein Profil öffnet. Beides braucht den Bezug,
+-- nicht den Satz.
+
+alter table public.messages
+  add column if not exists place_id        uuid references public.places (id) on delete set null,
+  add column if not exists contact_user_id uuid references public.profiles (id) on delete set null;
+
+comment on column public.messages.place_id is
+  'Angehängter Standort. Die Oberfläche macht daraus die Karte mit Nadel.';
+comment on column public.messages.contact_user_id is
+  'Angehängter Kontakt. Die Oberfläche macht daraus die Karte mit Avatar.';
+
+
+-- ===========================================================================
 -- Ablage für Bilder und Videos
 -- ===========================================================================
 --

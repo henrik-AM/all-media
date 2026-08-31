@@ -141,6 +141,7 @@ export async function ladeNutzer(
       status: zeile.status ?? 'offline',
       about: zeile.about ?? '',
       phone: zeile.phone ?? undefined,
+      color: zeile.color ?? undefined,
     };
 
     profile[schluessel] = {
@@ -310,7 +311,9 @@ export async function ladeNachrichten(
     .from('messages')
     .select(
       'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
-        ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name))'
+        ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name)),' +
+        ' place_id, places(id, name, adresse, koordinaten, x, y),' +
+        ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)'
     )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
@@ -334,6 +337,20 @@ export async function ladeNachrichten(
           autor: n.posts.profiles?.name ?? '',
           titel: n.posts.title || n.posts.description || '',
         }
+      : undefined,
+    // Angehängter Standort und Kontakt — gleiche Regel wie in
+    // web/server/supabase-api.js.
+    standort: n.places
+      ? {
+          name: n.places.name,
+          adresse: n.places.adresse ?? '',
+          koordinaten: n.places.koordinaten ?? '',
+          x: Number(n.places.x ?? 50),
+          y: Number(n.places.y ?? 50),
+        }
+      : undefined,
+    kontakt: n.profiles
+      ? { id: n.profiles.id, name: n.profiles.name, handle: n.profiles.handle }
       : undefined,
   }));
 }

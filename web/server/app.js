@@ -389,10 +389,12 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
     const platz = standorte.find((p) => p.id === req.body?.id) || standorte[0];
     if (!platz) return { ok: false, error: 'Diesen Standort gibt es nicht' };
     text = `Standort: ${platz.name}`;
+    medien = { standortId: platz.id };
   } else if (art === 'kontakt') {
     const person = await supabaseApi.ladeProfil(req.db, req.body?.id);
     if (!person) return { ok: false, error: 'Diese Person gibt es nicht' };
     text = `Kontakt: ${person.name}`;
+    medien = { kontaktId: person.id };
   } else {
     return { ok: false, error: 'Unbekannter Anhang' };
   }
@@ -400,9 +402,17 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
   const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, medien);
   if (!e || e.ok === false) return antwort(e);
 
+  /*
+   * Der Chat wird sofort neu gezeichnet, ohne die Nachrichten noch einmal zu
+   * holen. Die Karte muss deshalb schon hier fertig sein — sonst steht bis
+   * zum naechsten Laden nur der Satz da.
+   */
+  const frisch = await supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId);
+  const angelegt = (frisch || []).find((m) => m.id === e.nachricht.id);
+
   return {
     ok: true,
-    message: {
+    message: angelegt || {
       id: e.nachricht.id,
       from: 'me',
       text,
@@ -535,15 +545,34 @@ app.get('/api/profile/:userId', route(async (req, res) => {
   const profil = await supabaseApi.ladeProfil(req.db, id);
   if (!profil) return res.status(404).json({ error: 'Nicht gefunden' });
 
-  const [{ data: zahlen }, { count: folgeIch }, beitraege] = await Promise.all([
-    req.db.from('profile_zahlen').select('*').eq('id', id).maybeSingle(),
-    req.db
-      .from('follows')
-      .select('*', { count: 'exact', head: true })
-      .eq('follower_id', req.nutzerId)
-      .eq('followee_id', id),
-    supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 200 }),
-  ]);
+  const [{ data: zahlen }, { count: folgeIch }, beitraege, { count: istStumm }, { count: istBlockiert }] =
+    await Promise.all([
+      req.db.from('profile_zahlen').select('*').eq('id', id).maybeSingle(),
+      req.db
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', req.nutzerId)
+        .eq('followee_id', id),
+      supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 200 }),
+      /*
+       * Stumm und blockiert gehoeren auf die Profilseite: dort steht der Satz
+       * "… ist stummgeschaltet", und der Nachricht-Knopf ist gesperrt.
+       *
+       * Beides fehlte in dieser Antwort. Das Umschalten funktionierte, die
+       * Datenbank merkte es sich — nur sah man davon nichts, weil die
+       * Profilseite gar nicht danach fragte.
+       */
+      req.db
+        .from('mutes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', req.nutzerId)
+        .eq('muted_user_id', id),
+      req.db
+        .from('blocks')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', req.nutzerId)
+        .eq('blocked_user_id', id),
+    ]);
 
   const eigene = beitraege.filter((b) => b.userId === id || (id === req.nutzerId && b.userId === 'me'));
 
@@ -555,6 +584,8 @@ app.get('/api/profile/:userId', route(async (req, res) => {
     posts: Number(zahlen?.beitraege || 0),
     isFollowing: folgeIch > 0,
     following_me: folgeIch > 0,
+    muted: istStumm > 0,
+    blocked: istBlockiert > 0,
     // Das Raster zeigt, was diese Person veröffentlicht hat — nicht mehr eine
     // erfundene Kachelfolge.
     grid: eigene.map((b) => ({

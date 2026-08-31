@@ -300,7 +300,9 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     .from('messages')
     .select(
       'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
-      ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name))'
+      ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name)),' +
+      ' place_id, places(id, name, adresse, koordinaten, x, y),' +
+      ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)'
     )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
@@ -331,6 +333,21 @@ async function ladeNachrichten(client, chatId, nutzerId) {
           autor: n.posts.profiles?.name || '',
           titel: n.posts.title || n.posts.description || '',
         }
+      : undefined,
+    // Angehaengter Standort: Karte mit Nadel, Adresse und Koordinaten.
+    standort: n.places
+      ? {
+          id: n.places.id,
+          name: n.places.name,
+          adresse: n.places.adresse || '',
+          koordinaten: n.places.koordinaten || '',
+          x: Number(n.places.x ?? 50),
+          y: Number(n.places.y ?? 50),
+        }
+      : undefined,
+    // Angehaengter Kontakt: Karte mit Avatar, die sein Profil oeffnet.
+    kontakt: n.profiles
+      ? { id: n.profiles.id, name: n.profiles.name, handle: n.profiles.handle }
       : undefined,
   }));
 }

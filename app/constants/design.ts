@@ -201,9 +201,32 @@ function hashOf(id: string): number {
   return hash;
 }
 
-/** Zwei Töne für den Avatar-Verlauf, stabil pro Person. */
-export function avatarPair(id: string): [string, string] {
-  return AVATAR_PAIRS[hashOf(id) % AVATAR_PAIRS.length];
+/**
+ * Zwei Töne für den Avatar-Verlauf, stabil pro Person.
+ *
+ * `farbe` ist der Wert aus `profiles.color` — ein CSS-Verlauf, so wie ihn die
+ * Website direkt verwendet. Steht er da, zählt er: die Farbe gehört zur
+ * Person und muss in App und Website dieselbe sein. Ohne ihn wird wie bisher
+ * aus der Kennung gewürfelt, damit auch eine Person ohne Eintrag eine feste
+ * eigene Farbe hat.
+ */
+export function avatarPair(id: string, farbe?: string): [string, string] {
+  const ausDatenbank = farbe ? farbenAusVerlauf(farbe) : null;
+  return ausDatenbank ?? AVATAR_PAIRS[hashOf(id) % AVATAR_PAIRS.length];
+}
+
+/**
+ * Die beiden Farben aus "linear-gradient(135deg,#FCA2BC,#E04570)" holen.
+ *
+ * React Native kennt keine CSS-Verläufe; LinearGradient will die Farben
+ * einzeln. Steht etwas anderes in der Spalte — eine einzelne Farbe etwa —,
+ * wird sie für beide Enden genommen. Ist gar nichts zu erkennen, gibt die
+ * Funktion null und der Aufrufer würfelt.
+ */
+function farbenAusVerlauf(wert: string): [string, string] | null {
+  const treffer = wert.match(/#[0-9a-fA-F]{3,8}/g);
+  if (!treffer || treffer.length === 0) return null;
+  return [treffer[0], treffer[treffer.length - 1]];
 }
 
 /** Einzelfarbe — für Stellen, an denen kein Verlauf möglich ist. */

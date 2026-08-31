@@ -14,6 +14,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -98,8 +99,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-area="videos"]');
     await page.waitForTimeout(200);
     await page.click('[data-sub="landscape"]');
-    await page.waitForSelector('[data-clip="q1"]');
-    await page.click('[data-clip="q1"]');
+    // Ein Video mit Kapiteln und Untertiteln — daran haengen die meisten
+    // Pruefungen dieses Laufs. Gesucht am Titel statt an "q1", siehe
+    // test/_kennungen.js.
+    await page.waitForSelector('[data-clip]', { timeout: 10000 });
+    await page.click(await K.waehlerClip(page, 'Testvideo im Querformat'));
     await page.waitForSelector('.player');
     await page.waitForTimeout(400);
   };
@@ -157,7 +161,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Ein Video ohne Kapitel zeigt keine leere Überschrift', async () => {
     await page.click('#clipBack');
     await page.waitForTimeout(400);
-    await page.click('[data-clip="q6"]');
+    // Eines ohne Kapitel.
+    await page.click(await K.waehlerClip(page, 'Test-Rundumvideo'));
     await page.waitForSelector('.player');
     await page.waitForTimeout(400);
     if (await page.$('.kapitel')) throw new Error('die Überschrift steht ohne Kapitel da');
@@ -225,7 +230,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.evaluate(() => document.querySelector('.sheet-backdrop')?.remove());
     await page.click('#clipBack');
     await page.waitForTimeout(400);
-    await page.click('[data-clip="q4"]');
+    // Eines ohne Untertitel.
+    await page.click(await K.waehlerClip(page, 'Test-Livestream'));
     await page.waitForSelector('.player');
     await page.click('#clipOptionen');
     await page.waitForTimeout(500);

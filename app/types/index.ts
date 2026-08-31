@@ -10,6 +10,15 @@ export interface User {
   about?: string;
   /** Fuer das Finden ueber die Telefonnummer statt ueber den Benutzernamen. */
   phone?: string;
+  /**
+   * Die Avatarfarbe aus der Datenbank, als CSS-Verlauf
+   * ("linear-gradient(135deg,#FCA2BC,#E04570)").
+   *
+   * Sie gehoert zur Person, nicht zur Plattform: die Website las sie schon
+   * immer aus `profiles.color`, die App wuerfelte sie aus der Kennung. Anna
+   * war deshalb im Browser rosa und in der App blau.
+   */
+  color?: string;
 }
 
 export interface Message {

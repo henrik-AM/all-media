@@ -99,8 +99,14 @@ if (!fs.existsSync(BILD)) {
   await pruefe('Standort landet als Karte im Chat', async () => {
     await anhangAuf('standort');
     await page.waitForSelector('[data-ort]', { timeout: 3000 });
-    await page.click('[data-ort="pl2"]');
-    await page.waitForTimeout(700);
+    // "pl2" war die feste Kennung aus den Beispieldaten — Standorte stehen
+    // jetzt in der Datenbank. Siehe test/_kennungen.js.
+    await page.click(`[data-ort="${await K.kennungNachText(page, 'data-ort', 'Zugspitze')}"]`);
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.msg__standortName')]
+        .some((n) => n.textContent.includes('Zugspitze')),
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const namen = await page.$$eval('.msg__standortName', (els) => els.map((e) => e.textContent));
     if (!namen.includes('Zugspitze')) throw new Error(namen.join(' | '));
     const adresse = await page.$eval('.msg__standortSub', (e) => e.textContent);
@@ -121,7 +127,13 @@ if (!fs.existsSync(BILD)) {
     await anhangAuf('kontakt');
     await page.waitForSelector('[data-kontakt]', { timeout: 3000 });
     await page.click(`[data-kontakt="${K.person('u4')}"]`);
-    await page.waitForTimeout(700);
+    // Der Anhang geht jetzt in die Datenbank; danach wird der Chat neu
+    // gezeichnet. Warten statt raten.
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.msg__kontaktText strong')]
+        .some((n) => n.textContent.includes('David König')),
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const namen = await page.$$eval('.msg__kontaktText strong', (els) => els.map((e) => e.textContent));
     if (!namen.includes('David König')) throw new Error(namen.join(' | '));
   });
@@ -158,9 +170,24 @@ if (!fs.existsSync(BILD)) {
 
   await pruefe('Der Mehr-Knopf zeigt fuenf Optionen', async () => {
     await page.click('[data-area="videos"]');
+    await page.waitForTimeout(600);
+    /*
+     * Ein FREMDES Profil — nicht das erste im Feed.
+     *
+     * Seit jedes Konto eigene Testbeiträge hat, steht ganz oben der eigene.
+     * Stummschalten und Blockieren gehen bei sich selbst nicht, und die
+     * Datenbank lehnt es zu Recht ab ("mutes_nicht_selbst"). Der Prüflauf
+     * meldete daraufhin drei Fehler, die keine waren.
+     */
+    await page.waitForSelector('[data-profile]', { timeout: 10000 });
+    const fremd = await page.$$eval('.post__name[data-profile]', (n) => {
+      const treffer = n.find((x) => x.getAttribute('data-profile') !== 'me');
+      return treffer ? treffer.getAttribute('data-profile') : null;
+    });
+    if (!fremd) throw new Error('kein fremdes Profil im Feed');
+    await page.click(`.post__name[data-profile="${fremd}"]`);
+    await page.waitForSelector('.prof__name', { timeout: 10000 });
     await page.waitForTimeout(400);
-    await page.click('[data-profile]');
-    await page.waitForTimeout(700);
     await page.click('#profMore');
     await page.waitForSelector('[data-popt]', { timeout: 3000 });
     const punkte = await page.$$eval('[data-popt]', (els) => els.map((e) => e.textContent.trim()));
@@ -170,8 +197,13 @@ if (!fs.existsSync(BILD)) {
 
   await pruefe('Stummschalten wird im Profil angezeigt', async () => {
     await page.click('[data-popt="stumm"]');
-    await page.waitForTimeout(800);
-    const hinweis = await page.$eval('.prof__hinweis', (e) => e.textContent);
+    // Stummschalten geht in die Datenbank, danach wird das Profil frisch
+    // geholt — feste Wartezeiten reichen dafuer nicht.
+    await page.waitForFunction(
+      () => /stummgeschaltet/.test(document.querySelector('.prof__hinweis')?.textContent ?? ''),
+      null, { timeout: 10000 }
+    ).catch(() => {});
+    const hinweis = await page.$eval('.prof__hinweis', (e) => e.textContent).catch(() => 'kein Hinweis');
     if (!hinweis.includes('stummgeschaltet')) throw new Error(hinweis);
   });
 
@@ -180,8 +212,11 @@ if (!fs.existsSync(BILD)) {
     await page.click('#profMore');
     await page.waitForSelector('[data-popt]');
     await page.click('[data-popt="block"]');
-    await page.waitForTimeout(900);
-    const hinweis = await page.$eval('.prof__hinweis', (e) => e.textContent);
+    await page.waitForFunction(
+      () => /blockiert/.test(document.querySelector('.prof__hinweis')?.textContent ?? ''),
+      null, { timeout: 10000 }
+    ).catch(() => {});
+    const hinweis = await page.$eval('.prof__hinweis', (e) => e.textContent).catch(() => 'kein Hinweis');
     if (!hinweis.includes('blockiert')) throw new Error(hinweis);
     const nachher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).contacts.length);
     if (nachher !== vorher - 1) throw new Error(`${vorher} -> ${nachher}`);

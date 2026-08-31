@@ -19,7 +19,13 @@ interface Props {
   ausserId?: string;
   onClose: () => void;
   /** Liefert den fertigen Anhang, den der Chat dann anhaengt. */
-  onAnhang: (teil: Partial<Message> & { text: string }) => void;
+  /*
+   * `ortId` und `personId` sind die Kennungen für die Datenbank; alles andere
+   * ist nur für die Anzeige. Der Chat schreibt daraus place_id beziehungsweise
+   * contact_user_id — vorher blieb ein Anhang im Arbeitsspeicher der App und
+   * war nach dem nächsten Start weg.
+   */
+  onAnhang: (teil: Partial<Message> & { text: string; ortId?: string; personId?: string }) => void;
   onNotice: (message: string) => void;
 }
 
@@ -118,6 +124,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
               onPress={() => {
                 onAnhang({
                   text: `Standort: ${platz.name}`,
+                  ortId: platz.id,
                   standort: {
                     name: platz.name,
                     adresse: platz.adresse,
@@ -154,6 +161,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
                   onPress={() => {
                     onAnhang({
                       text: `Kontakt: ${person.name}`,
+                      personId: person.id,
                       kontakt: { id: person.id, name: person.name, handle: person.handle },
                     });
                     onNotice('Kontakt gesendet');

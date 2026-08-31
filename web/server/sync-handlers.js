@@ -518,6 +518,11 @@ const handleSendMessage = handler(
         text: text,
         media_url: medien.url || null,
         media_type: medien.typ || null,
+        // Ein angehaengter Standort oder Kontakt ist ein Bezug, kein Satz:
+        // die Oberflaeche baut daraus die Karte mit Nadel beziehungsweise
+        // mit Avatar. Ohne ihn stand im Chat nur "Standort: Zugspitze".
+        place_id: medien.standortId || null,
+        contact_user_id: medien.kontaktId || null,
       })
       .select()
       .single();

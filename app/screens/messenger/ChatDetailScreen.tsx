@@ -377,10 +377,40 @@ export const ChatDetailScreen = ({
         contacts={contacts}
         ausserId={chat.userId}
         onClose={() => setAnhangOffen(false)}
-        onAnhang={(teil) => {
+        onAnhang={async ({ ortId, personId, ...teil }) => {
+          /*
+           * Ein Anhang gehört in die Datenbank, nicht nur in den Bildschirm.
+           *
+           * Bis zum 01.09.2026 landete er ausschließlich im Arbeitsspeicher:
+           * nach dem nächsten Start war er weg, und in der Website tauchte er
+           * nie auf. Gespeichert wird der Bezug (place_id, contact_user_id) —
+           * die Karte baut die Oberfläche daraus.
+           */
+          let id = `m${Date.now()}`;
+          if (supabase && ichId) {
+            const { data, error } = await supabase
+              .from('messages')
+              .insert({
+                chat_id: chat.id,
+                sender_id: ichId,
+                text: teil.text,
+                media_type: teil.media ?? null,
+                place_id: ortId ?? null,
+                contact_user_id: personId ?? null,
+              })
+              .select('id')
+              .single();
+            if (error) {
+              console.error('Anhang senden fehlgeschlagen:', error.message);
+              onNotice?.('Der Anhang ging nicht raus');
+              return;
+            }
+            id = data.id;
+          }
+
           setMessages((prev) => [
             ...prev,
-            { id: `m${Date.now()}`, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil },
+            { id, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil },
           ]);
           scrollToEnd();
         }}
