@@ -2310,6 +2310,26 @@ comment on column public.messages.contact_user_id is
 
 
 -- ===========================================================================
+-- „Chat leeren" leert den Chat wirklich
+-- ===========================================================================
+--
+-- Bisher löschte „Chat leeren" nur die eigenen Nachrichten. Die des
+-- Gegenübers blieben stehen — der Chat war also nicht leer, sondern
+-- einseitig ausgedünnt. Das war kein Versehen: fremde Zeilen zu löschen
+-- steht niemandem zu, und die Regeln der Datenbank lassen es auch nicht zu.
+--
+-- Die Lösung ist nicht Löschen, sondern ein Strich: ab hier sehe ICH nichts
+-- mehr von vorher. Für den anderen bleibt sein Verlauf unangetastet — er hat
+-- seinen Chat schließlich nicht geleert.
+
+alter table public.chat_members
+  add column if not exists geleert_bis timestamptz;
+
+comment on column public.chat_members.geleert_bis is
+  'Nachrichten davor blendet dieser Nutzer aus. Gelöscht wird nichts — der Verlauf des Gegenübers bleibt.';
+
+
+-- ===========================================================================
 -- Was in welcher Sammlung liegt
 -- ===========================================================================
 --

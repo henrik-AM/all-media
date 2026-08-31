@@ -212,7 +212,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
   const { data, error } = await client
     .from('chat_members')
     .select(
-      'chat_id, is_archived, is_muted, is_read, is_favorite,' +
+      'chat_id, is_archived, is_muted, is_read, is_favorite, geleert_bis,' +
         ' chats(id, name, is_group, bereich, created_at, updated_at)'
     )
     .eq('user_id', nutzerId);
@@ -255,9 +255,14 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
     (kontakte || []).filter((k) => k.status === 'pending').map((k) => k.contact_id)
   );
 
+  // Wer einen Chat geleert hat, sieht in der Liste auch keine Vorschau mehr
+  // von vorher. Siehe handleClearChat().
+  const strichNach = new Map(zeilen.map((z) => [z.chat_id, z.geleert_bis || null]));
+
   const letzte = new Map();
-  const ungelesen = new Map();
   for (const n of nachrichten || []) {
+    const strich = strichNach.get(n.chat_id);
+    if (strich && new Date(n.created_at) <= new Date(strich)) continue;
     if (!letzte.has(n.chat_id)) letzte.set(n.chat_id, n);
   }
   const mitgliederNach = new Map();
@@ -296,7 +301,22 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
 
 async function ladeNachrichten(client, chatId, nutzerId) {
   if (!client) return null;
-  const { data, error } = await client
+
+  /*
+   * Wer den Chat geleert hat, sieht nichts von vorher.
+   *
+   * Gelöscht wird dabei nur, was einem selbst gehört; für den Rest steht ein
+   * Zeitstrich in chat_members.geleert_bis. Siehe handleClearChat().
+   */
+  const { data: mitgliedschaft } = await client
+    .from('chat_members')
+    .select('geleert_bis')
+    .eq('chat_id', chatId)
+    .eq('user_id', nutzerId)
+    .maybeSingle();
+  const strich = mitgliedschaft?.geleert_bis || null;
+
+  let abfrage = client
     .from('messages')
     .select(
       'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
@@ -307,6 +327,9 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
     .limit(500);
+  if (strich) abfrage = abfrage.gt('created_at', strich);
+
+  const { data, error } = await abfrage;
   if (error) throw error;
 
   return (data || []).map((n) => ({

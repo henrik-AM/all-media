@@ -180,16 +180,35 @@ const handleLeaveChat = handler('Chat löschen', async (client, nutzerId, chatId
   return { ok: true };
 });
 
-/** Chat leeren: die Unterhaltung bleibt, die Nachrichten sind weg. */
+/**
+ * Chat leeren: die Unterhaltung bleibt, der Verlauf ist für mich weg.
+ *
+ * Zwei Schritte, und beide sind nötig:
+ *
+ *   1. Die eigenen Nachrichten werden wirklich gelöscht. Sie gehören mir.
+ *   2. Für alles andere wird ein Strich gezogen — `geleert_bis`. Was davor
+ *      liegt, blende ich aus.
+ *
+ * Fremde Zeilen zu löschen steht niemandem zu, und die Regeln der Datenbank
+ * lassen es auch nicht zu. Bis zum 01.09.2026 blieb es deshalb beim ersten
+ * Schritt: der Chat war danach nicht leer, sondern einseitig ausgedünnt —
+ * die Nachrichten des Gegenübers standen weiter da.
+ */
 const handleClearChat = handler('Chat leeren', async (client, nutzerId, chatId) => {
-  // Nur die eigenen Nachrichten — fremde zu löschen steht niemandem zu, und
-  // die Regeln der Datenbank ließen es ohnehin nicht zu.
   const { error } = await client
     .from('messages')
     .delete()
     .eq('chat_id', chatId)
     .eq('sender_id', nutzerId);
   if (error) throw error;
+
+  const { error: fehlerStrich } = await client
+    .from('chat_members')
+    .update({ geleert_bis: new Date().toISOString() })
+    .eq('chat_id', chatId)
+    .eq('user_id', nutzerId);
+  if (fehlerStrich) throw fehlerStrich;
+
   return { ok: true };
 });
 

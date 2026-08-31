@@ -37,7 +37,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => localStorage.clear());
+  /*
+   * Nur die eigenen Einträge wegräumen, nicht den ganzen Speicher.
+   *
+   * Seit dem 31.08.2026 liegt dort auch das Zugangstoken von Supabase.
+   * localStorage.clear() meldete den Prüflauf deshalb ab: die Seite zeigte
+   * ab da den Anmeldebildschirm, und alle zehn Prüfungen fielen mit
+   * "waiting for [data-area=messenger]" um — ein Fehler, der nichts mit dem
+   * Geprüften zu tun hatte.
+   */
+  await page.evaluate(() => {
+    for (const schluessel of Object.keys(localStorage)) {
+      if (schluessel.startsWith('allmedia.') || schluessel.startsWith('am-')) {
+        localStorage.removeItem(schluessel);
+      }
+    }
+  });
   await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
@@ -58,6 +73,20 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     // Erst zurueck: das offene Fenster liegt sonst ueber der unteren Leiste.
     await page.click('#kpBack').catch(() => {});
     await page.click('#chatBack').catch(() => {});
+    /*
+     * Und was danach noch offen ist, wegraeumen.
+     *
+     * Die Knoepfe oben helfen nur, wenn sie da sind. Bleibt ein Blatt offen
+     * — etwa weil eine Pruefung vorher fehlschlug —, liegt seine Flaeche
+     * ueber der unteren Leiste, und der naechste Klick wartet acht Sekunden
+     * auf einen Knopf, den er nie erreicht. Der Prueflauf meldete dann
+     * lauter Folgefehler statt des einen echten.
+     */
+    await page.evaluate(() => {
+      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      const o = document.querySelector('#overlay');
+      if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+    });
     await page.waitForTimeout(300);
     await page.click('[data-area="messenger"]');
     await page.waitForTimeout(300);
@@ -167,7 +196,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Chat leeren nimmt die Nachrichten weg', async () => {
     await page.click('[data-kp-item="Chat leeren"]');
-    await page.waitForTimeout(900);
+    // Geleert wird in der Datenbank, danach holt die Seite die Zahl neu.
+    await page.waitForFunction(
+      () => (document.querySelector('[data-kp-item="Speicher verwalten"] .kp__zeileWert')?.textContent ?? '').startsWith('0'),
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const wert = await page.$eval('[data-kp-item="Speicher verwalten"] .kp__zeileWert', (e) => e.textContent);
     if (!wert.startsWith('0')) throw new Error(wert);
   });
@@ -193,7 +226,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (!/\d{2}:\d{2}/.test(status)) throw new Error(status);
   });
 
-  await page.evaluate(() => localStorage.clear());
+  /*
+   * Nur die eigenen Einträge wegräumen, nicht den ganzen Speicher.
+   *
+   * Seit dem 31.08.2026 liegt dort auch das Zugangstoken von Supabase.
+   * localStorage.clear() meldete den Prüflauf deshalb ab: die Seite zeigte
+   * ab da den Anmeldebildschirm, und alle zehn Prüfungen fielen mit
+   * "waiting for [data-area=messenger]" um — ein Fehler, der nichts mit dem
+   * Geprüften zu tun hatte.
+   */
+  await page.evaluate(() => {
+    for (const schluessel of Object.keys(localStorage)) {
+      if (schluessel.startsWith('allmedia.') || schluessel.startsWith('am-')) {
+        localStorage.removeItem(schluessel);
+      }
+    }
+  });
   await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
 
   const fehler = ergebnisse.filter((ok) => !ok).length;
