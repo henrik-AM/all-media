@@ -592,6 +592,9 @@ app.get('/api/profile/:userId', route(async (req, res) => {
       id: b.id,
       kind: b.kind === 'post' ? 'image' : 'video',
       eigen: id === req.nutzerId,
+      // Ohne die Adresse zeigt jede Kachel die Ersatzflaeche, auch wenn ein
+      // Bild da ist.
+      mediaUrl: b.mediaUrl,
     })),
   });
 }));

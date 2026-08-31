@@ -2820,7 +2820,7 @@ function postCard(p) {
         }
       </header>
 
-      <div class="post__media">${medienFlaeche(p.id, ICONS.image)}</div>
+      <div class="post__media">${medienFlaeche(p.id, ICONS.image, p.mediaUrl)}</div>
 
       <div class="post__actions">
         <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-paction="like" data-pid="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
@@ -2949,7 +2949,7 @@ function videoSlide(v) {
   const u = user(v.userId);
   return `
     <section class="slide" id="slide-${v.id}">
-      <div class="slide__stage">${medienFlaeche(v.id, ICONS.play)}</div>
+      <div class="slide__stage">${medienFlaeche(v.id, ICONS.play, v.mediaUrl)}</div>
 
       <div class="slide__rail">
         <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
@@ -5073,7 +5073,7 @@ function renderLandscapeVideos() {
                     ? `${compactNumber(c.zuschauer || 0)} sehen zu`
                     : `${compactNumber(c.views)} Aufrufe · ${esc(c.age)}`;
                 return `<article class="clip" data-clip="${c.id}">
-                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}${marke}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}${marke}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
                     <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
                     <div>
@@ -5169,7 +5169,7 @@ function renderClipsExplorer() {
     <div class="scroll">
       ${state.clips.map((c) => `
         <button class="exp__row" data-openclip="${c.id}">
-          <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape)}</span>
+          <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}</span>
           <span class="exp__text">
             <strong>${esc(c.title)}</strong>
             <small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small>
@@ -5185,7 +5185,7 @@ function renderPostsExplorer() {
     ${explorerKopf('Beiträge')}
     <div class="scroll">
       <div class="exp__grid">${state.posts.map((p) => `
-        <button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image)}</button>`).join('')}</div>
+        <button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image, p.mediaUrl)}</button>`).join('')}</div>
     </div>`;
   main.querySelectorAll('[data-openpost]').forEach(b => b.addEventListener('click', () => openPost(b.dataset.openpost)));
   explorerZurueck();
@@ -5199,7 +5199,7 @@ function renderHashtagExplorer(tag) {
     ${explorerKopf(esc(tag))}
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
-        <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${medienFlaeche(i.id, ICONS.image)}</button>`).join('')}</div>
+        <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${medienFlaeche(i.id, ICONS.image, i.mediaUrl)}</button>`).join('')}</div>
     </div>`;
   explorerZurueck();
 }
@@ -5300,7 +5300,7 @@ function renderPlaceExplorer(placeId) {
     ${explorerKopf(esc(place?.name || 'Standort'))}
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
-        <button class="griditem" data-item="${i.id}">${medienFlaeche(i.id, ICONS.image)}</button>`).join('')}</div>
+        <button class="griditem" data-item="${i.id}">${medienFlaeche(i.id, ICONS.image, i.mediaUrl)}</button>`).join('')}</div>
     </div>`;
   explorerZurueck();
 }
@@ -5322,7 +5322,7 @@ function medienKachel(eintrag, art, symbol, form) {
 
   return `
     <button class="exp__card exp__card--${form}" data-${art}="${eintrag.id}">
-      <span class="exp__card-media">${medienFlaeche(eintrag.id, symbol)}</span>
+      <span class="exp__card-media">${medienFlaeche(eintrag.id, symbol, eintrag.mediaUrl)}</span>
       <span class="exp__card-info">
         <span class="exp__card-kopf">
           <span class="exp__card-avatar" style="background:${u.color}">${esc(u.initials)}</span>
@@ -5410,7 +5410,7 @@ function renderVideoSearch() {
                 ? `<div class="exp__list">${clips
                     .map(
                       (c) => `<button class="exp__row" data-openclip="${c.id}">
-                        <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape)}</span>
+                        <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}</span>
                         <span class="exp__text"><strong>${esc(c.title)}</strong><small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small></span>
                       </button>`
                     )
@@ -6285,7 +6285,7 @@ function openClip(clipId) {
         <div class="scroll">
           <div class="player">
             <div class="player__stage" id="clipStage">
-              ${medienFlaeche(clip.id, ICONS.play)}
+              ${medienFlaeche(clip.id, ICONS.play, clip.mediaUrl)}
               <button class="player__play" id="clipPlay" aria-label="Abspielen">${ICONS.play}</button>
             </div>
             <div class="player__leiste">
@@ -6388,7 +6388,7 @@ function openClip(clipId) {
               .map((c) => {
                 const au = user(c.userId);
                 return `<article class="clip clip--klein" data-anderesclip="${c.id}">
-                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
                     <div class="avatar avatar--36" style="background:${au.color}">${esc(au.initials)}</div>
                     <div>
@@ -6625,7 +6625,7 @@ function openOrtFotos(ort, fotos) {
                       <div class="ortfoto__bild">${
                         p.mediaUri
                           ? `<img src="${esc(p.mediaUri)}" alt="" />`
-                          : medienFlaeche(p.id, ICONS.image)
+                          : medienFlaeche(p.id, ICONS.image, p.mediaUrl)
                       }</div>
                       <div class="ortfoto__zeile">
                         <span data-profile="${p.userId}">${avatarForUser(p.userId, 36)}</span>
@@ -6722,7 +6722,7 @@ async function openExplorer(art, wert) {
     ? `<div class="expreels">${reels
         .map(
           (v) => `<button class="expreel" data-openvideo="${v.id}">
-            ${medienFlaeche(v.id, ICONS.play)}
+            ${medienFlaeche(v.id, ICONS.play, v.mediaUrl)}
             <span class="expreel__text">${esc(v.description.slice(0, 40))}</span>
           </button>`
         )
@@ -6734,7 +6734,7 @@ async function openExplorer(art, wert) {
         .map((c) => {
           const u = user(c.userId);
           return `<article class="clip clip--klein" data-clip="${c.id}">
-            <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape)}<span class="clip__time">${esc(c.duration)}</span></div>
+            <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}<span class="clip__time">${esc(c.duration)}</span></div>
             <div class="clip__meta">
               <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
               <div>
@@ -6749,7 +6749,7 @@ async function openExplorer(art, wert) {
 
   const beitragRaster = beitraege.length
     ? `<div class="exp__grid">${beitraege
-        .map((p) => `<button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image)}</button>`)
+        .map((p) => `<button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image, p.mediaUrl)}</button>`)
         .join('')}</div>`
     : '';
 
@@ -6986,9 +6986,23 @@ function motivVon(id) {
   return h % MOTIVE;
 }
 
-function medienFlaeche(id, symbol) {
-  const bild = eigeneMedien()[id];
-  if (bild) return `<img class="eigenbild" src="${bild}" alt="">`;
+/**
+ * Die Bildflaeche eines Beitrags.
+ *
+ * Drei Faelle, in dieser Reihenfolge:
+ *
+ *   1. Eine Aufnahme, die auf diesem Geraet gemacht wurde. Sie liegt im
+ *      Browser, nicht auf dem Server — der teilt seinen Speicher mit allen
+ *      Besuchern.
+ *   2. Das Bild aus der Datenbank. Bis zum 01.09.2026 wurde es hier gar nicht
+ *      abgefragt: der Server liefert es als `mediaUrl`, gesucht wurde nur in
+ *      den eigenen Aufnahmen. Die Testbeitraege trugen deshalb im Browser
+ *      eine Ersatzflaeche, waehrend die App ihr Bild zeigte.
+ *   3. Sonst die Ersatzflaeche — eine ruhige Farbe, kein grauer Kasten.
+ */
+function medienFlaeche(id, symbol, adresse) {
+  const bild = eigeneMedien()[id] || adresse;
+  if (bild) return `<img class="eigenbild" src="${esc(bild)}" alt="">`;
   return `<span class="motiv motiv--${motivVon(id)}">${symbol}</span>`;
 }
 
@@ -7410,7 +7424,8 @@ function renderSammlung() {
                 (e) =>
                   `<button class="griditem" data-${istPlaylist ? 'openvideo' : 'openpost'}="${e.id}">${medienFlaeche(
                     e.id,
-                    istPlaylist ? ICONS.portrait : ICONS.image
+                    istPlaylist ? ICONS.portrait : ICONS.image,
+                    e.mediaUrl
                   )}</button>`
               )
               .join('')}</div>`
@@ -7575,7 +7590,7 @@ async function renderVideoProfile() {
               .map(
                 (g) => `<button class="griditem" data-eigen="${esc(g.id)}" data-eigenart="${
                   g.kind === 'video' ? 'video' : 'post'
-                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image)}</button>`
+                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl)}</button>`
               )
               .join('')}</div>`
           : tab === 'repost' && meineReposts.length
