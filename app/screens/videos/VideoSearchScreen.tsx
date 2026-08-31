@@ -7,14 +7,7 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
-import {
-  mockHashtags,
-  mockPlaces,
-  mockPosts,
-  mockSounds,
-  mockUsers,
-  mockVideos,
-} from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { ExplorerZiel } from './ExplorerScreen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useKachelHoehe } from '../../lib/raster';
@@ -76,6 +69,7 @@ const Row = ({
  * Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
  */
 export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: Props) => {
+  const { hashtags: alleHashtags, places: alleOrte, posts: alleBeitraege, sounds: alleSounds, users: alleNutzer, videos: alleVideos } = useDaten();
   const kachelHoehe = useKachelHoehe();
   // Eigene Aufnahmen sollen auch ueber die Suche zu finden sein.
   const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
@@ -87,13 +81,13 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
     const hit = (text: string) => !q || text.toLowerCase().includes(q);
 
     return {
-      reels: [...eigeneVideos, ...mockVideos].filter((v) => hit(v.description) || hit(mockUsers[v.userId].name)),
-      clips: clips.filter((c) => hit(c.title) || hit(mockUsers[c.userId].name)),
-      posts: [...eigeneBeitraege, ...mockPosts].filter((p) => hit(p.description) || hit(mockUsers[p.userId].name)),
-      people: Object.values(mockUsers).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
-      tags: mockHashtags.filter((h) => hit(h.tag)),
-      places: mockPlaces.filter((p) => hit(p.name)),
-      sounds: mockSounds.filter((s) => hit(s.title) || hit(s.artist)),
+      reels: [...eigeneVideos, ...alleVideos].filter((v) => hit(v.description) || hit(alleNutzer[v.userId].name)),
+      clips: clips.filter((c) => hit(c.title) || hit(alleNutzer[c.userId].name)),
+      posts: [...eigeneBeitraege, ...alleBeitraege].filter((p) => hit(p.description) || hit(alleNutzer[p.userId].name)),
+      people: Object.values(alleNutzer).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
+      tags: alleHashtags.filter((h) => hit(h.tag)),
+      places: alleOrte.filter((p) => hit(p.name)),
+      sounds: alleSounds.filter((s) => hit(s.title) || hit(s.artist)),
     };
   }, [query, clips, eigeneBeitraege, eigeneVideos]);
 
@@ -126,7 +120,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
                 {result.reels.map((v) => (
                   <Druck key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
                     <Motiv id={v.id} icon="phone-portrait-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
-                    <Text style={styles.reelName}>{mockUsers[v.userId].name}</Text>
+                    <Text style={styles.reelName}>{alleNutzer[v.userId].name}</Text>
                   </Druck>
                 ))}
               </ScrollView>
@@ -141,7 +135,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
                   id={c.id}
                   icon="tv-outline"
                   title={c.title}
-                  sub={`${mockUsers[c.userId].name} · ${c.duration}`}
+                  sub={`${alleNutzer[c.userId].name} · ${c.duration}`}
                   onPress={() => onNotice('Video öffnet im Querformat')}
                 />
               ))}

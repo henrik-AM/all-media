@@ -6,7 +6,7 @@ import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
-import { mockProfiles, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
 import { useKachelHoehe } from '../../lib/raster';
@@ -33,11 +33,12 @@ interface Props {
 }
 
 export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onOpenFollowers, onOpenFollowing, onNotice }: Props) => {
+  const { profile: alleProfile, users: alleNutzer } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
-  const person = mockUsers[userId];
-  const [profile, setProfile] = useState(mockProfiles[userId]);
+  const person = alleNutzer[userId];
+  const [profile, setProfile] = useState(alleProfile[userId]);
   const [tab, setTab] = useState<Tab>('grid');
 
   if (!person || !profile) {

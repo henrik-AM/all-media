@@ -8,7 +8,7 @@ import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
-import { mockProfiles, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useReposts } from '../../contexts/RepostContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { oeffneLink } from '../../lib/links';
@@ -38,12 +38,13 @@ const TABS: { key: Tab; icon: IconName }[] = [
 
 /** Prototyp-Frame "Videos - Profil". */
 export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNotice }: Props) => {
+  const { profile: alleProfile, users: alleNutzer } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { reposts } = useReposts();
   const { ungelesen, highlights, playlists, spende, raster, eigeneBeitraege, gefolgt, eigenesProfil } =
     useProfil();
   const [tab, setTab] = useState<Tab>('grid');
-  const me = mockProfiles.me;
+  const me = alleProfile.me;
 
   return (
     <View style={styles.screen}>
@@ -51,7 +52,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
 
       <ScrollView contentContainerStyle={styles.content}>
         <OwnProfileHead
-          handle={mockUsers.me.handle}
+          handle={alleNutzer.me.handle}
           stats={[
             { label: 'Beiträge', value: compact(me.posts + eigeneBeitraege.length) },
             { label: 'Follower', value: compact(me.followers) },

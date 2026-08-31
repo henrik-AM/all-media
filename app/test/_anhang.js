@@ -5,6 +5,7 @@
 // Start:  node test/_anhang.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
+const { anmelden } = require('./_konto');
 const fs = require('fs');
 const path = require('path');
 
@@ -32,6 +33,24 @@ if (!fs.existsSync(BILD)) {
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
   await page.goto(ZIEL, { waitUntil: 'networkidle' });
+
+  // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
+
+  // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
+
+  const angemeldet = await anmelden(page);
+  if (!angemeldet.ok) {
+
+    console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
+    console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
+
+    process.exit(1);
+
+  }
+
+  await page.reload({ waitUntil: 'networkidle' });
+
+  await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
   await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
   await page.reload({ waitUntil: 'networkidle' });

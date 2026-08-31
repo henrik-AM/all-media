@@ -1,17 +1,27 @@
 /**
  * All Media — Lesezugriffe auf Supabase
  *
- * Jede Funktion bekommt den Client des angemeldeten Nutzers übergeben. Ohne
- * Anmeldung gibt es keinen Client, dann liefern die Funktionen null und der
- * Aufrufer bleibt bei den Beispieldaten.
+ * Das ist die einzige Stelle, an der die Website Inhalte herholt. Es gibt
+ * keine Beispieldaten mehr, aus denen sie ersatzweise lesen könnte: was hier
+ * nicht ankommt, steht auch nicht in der Datenbank.
  *
- * Die Spaltennamen hier folgen SUPABASE_SCHEMA.sql und SUPABASE_SCHEMA_2.sql.
- * Sie frei zu erfinden führt dazu, dass jede Abfrage still fehlschlägt.
+ * Die App hat ihre eigene Fassung in app/lib/daten.ts. Beide fragen dasselbe
+ * ab und formen es gleich um — app/test/gleichstand.mjs vergleicht das
+ * Ergebnis beider Seiten gegeneinander und schlägt an, wenn sie auseinander
+ * laufen.
+ *
+ * Die Spaltennamen folgen SUPABASE_SCHEMA.sql bis SUPABASE_SCHEMA_6. Sie frei
+ * zu erfinden führt dazu, dass jede Abfrage still fehlschlägt — genau das war
+ * der Grund, warum die Anbindung monatelang nur so aussah, als liefe sie.
  */
 
 // ============================================================================
 // Umformung: Datenbankzeile → Form, die die Oberfläche erwartet
 // ============================================================================
+
+const PROFIL_SPALTEN =
+  'id, name, handle, initials, color, phone, privat, about, bio, link, status,' +
+  ' highlights, playlists, followers_basis, following_basis, beitraege_basis';
 
 function profilZuNutzer(zeile) {
   if (!zeile) return null;
@@ -23,25 +33,72 @@ function profilZuNutzer(zeile) {
     color: zeile.color || '',
     phone: zeile.phone || '',
     privat: Boolean(zeile.privat),
+    about: zeile.about || '',
     bio: zeile.bio || '',
     link: zeile.link || '',
     status: zeile.status || 'offline',
+    highlights: zeile.highlights || [],
+    playlists: zeile.playlists || [],
   };
 }
 
-const PROFIL_SPALTEN = 'id, name, handle, initials, color, phone, privat, bio, link, status';
+/**
+ * Aus "vor wie langer Zeit" wird der Text, den der Prototyp zeigt.
+ * Gespeichert ist immer der Zeitpunkt — sonst stünde in einem halben Jahr
+ * noch "vor 2 Tagen" an einem uralten Beitrag.
+ */
+function zeitText(zeitpunkt) {
+  if (!zeitpunkt) return '';
+  const minuten = Math.max(0, Math.floor((Date.now() - new Date(zeitpunkt).getTime()) / 60000));
+  if (minuten < 1) return 'gerade eben';
+  if (minuten < 60) return `vor ${minuten} min`;
+  const stunden = Math.floor(minuten / 60);
+  if (stunden < 24) return `vor ${stunden} h`;
+  const tage = Math.floor(stunden / 24);
+  if (tage === 1) return 'vor 1 Tag';
+  if (tage < 7) return `vor ${tage} Tagen`;
+  const wochen = Math.floor(tage / 7);
+  if (wochen < 5) return `vor ${wochen} W`;
+  return `vor ${Math.floor(tage / 30)} M`;
+}
+
+/** Uhrzeit für die Chatliste: heute "14:32", gestern "Gestern", davor "Mo". */
+function chatZeit(zeitpunkt) {
+  if (!zeitpunkt) return '';
+  const d = new Date(zeitpunkt);
+  const jetzt = new Date();
+  const tageZurueck = Math.floor((jetzt - d) / 86400000);
+  if (d.toDateString() === jetzt.toDateString()) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  if (tageZurueck < 2) return 'Gestern';
+  if (tageZurueck < 7) return ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()];
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+}
 
 // ============================================================================
-// Laden
+// Menschen
 // ============================================================================
 
-async function ladeNutzer(client) {
+async function ladeNutzer(client, nutzerId) {
   if (!client) return null;
-  const { data, error } = await client.from('profiles').select(PROFIL_SPALTEN).limit(200);
+  const [{ data, error }, { data: zahlen }] = await Promise.all([
+    client.from('profiles').select(PROFIL_SPALTEN).limit(500),
+    client.from('profile_zahlen').select('id, followers, following, beitraege'),
+  ]);
   if (error) throw error;
 
+  const zahlenNach = new Map((zahlen || []).map((z) => [z.id, z]));
   const nutzer = {};
-  for (const zeile of data || []) nutzer[zeile.id] = profilZuNutzer(zeile);
+  for (const zeile of data || []) {
+    const u = profilZuNutzer(zeile);
+    const z = zahlenNach.get(zeile.id);
+    u.followers = Number(z?.followers ?? zeile.followers_basis ?? 0);
+    u.following = Number(z?.following ?? zeile.following_basis ?? 0);
+    u.posts = Number(z?.beitraege ?? zeile.beitraege_basis ?? 0);
+    // "me" ist die Kennung, unter der die Oberfläche das eigene Profil sucht.
+    nutzer[zeile.id === nutzerId ? 'me' : zeile.id] = { ...u, id: zeile.id === nutzerId ? 'me' : zeile.id };
+  }
   return nutzer;
 }
 
@@ -60,94 +117,179 @@ async function ladeKontakte(client, nutzerId) {
   if (!client) return null;
   const { data, error } = await client
     .from('contacts')
-    .select('id, contact_id, status')
+    .select('contact_id, status, profiles!contacts_contact_id_fkey(name, about)')
     .eq('user_id', nutzerId);
   if (error) throw error;
 
-  return (data || []).map((k) => ({ id: k.contact_id, status: k.status }));
+  return (data || []).map((k) => ({
+    id: k.contact_id,
+    name: k.profiles?.name || '',
+    status: k.status,
+    about: k.profiles?.about || '',
+  }));
 }
+
+/** Wem folge ich? Ergibt die Karte, aus der die Oberfläche "Folge ich" liest. */
+async function ladeFolgen(client, nutzerId) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('follows')
+    .select('followee_id')
+    .eq('follower_id', nutzerId);
+  if (error) throw error;
+  return new Set((data || []).map((f) => f.followee_id));
+}
+
+async function ladeBlockiert(client, nutzerId) {
+  if (!client) return [];
+  const { data, error } = await client
+    .from('blocks')
+    .select('blocked_user_id')
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+  return (data || []).map((b) => b.blocked_user_id);
+}
+
+async function ladeStummgeschaltet(client, nutzerId) {
+  if (!client) return [];
+  const { data, error } = await client
+    .from('mutes')
+    .select('muted_user_id')
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+  return (data || []).map((m) => m.muted_user_id);
+}
+
+async function ladeKartenpunkte(client) {
+  if (!client) return [];
+  const { data, error } = await client
+    .from('friend_pins')
+    .select('user_id, x, y, place, updated_at');
+  if (error) throw error;
+  return (data || []).map((p) => ({
+    id: p.user_id,
+    x: Number(p.x),
+    y: Number(p.y),
+    place: p.place || '',
+    when: zeitText(p.updated_at),
+  }));
+}
+
+// ============================================================================
+// Chats
+// ============================================================================
 
 /**
  * Chats des Nutzers samt seiner persönlichen Einstellungen (archiviert,
  * stumm, gelesen, Favorit) und der letzten Nachricht als Vorschau.
+ *
+ * `bereich` trennt Messenger von Community-Chat. Henriks Unterscheidung:
+ * Messenger geht über Telefonnummer/Kontakt, der Community-Chat kommt ohne aus.
  */
-async function ladeChats(client, nutzerId) {
+async function ladeChats(client, nutzerId, bereich = 'messenger') {
   if (!client) return null;
 
   const { data, error } = await client
     .from('chat_members')
     .select(
-      'chat_id, is_archived, is_muted, is_read, is_favorite, chats(id, name, is_group, created_at, updated_at)'
+      'chat_id, is_archived, is_muted, is_read, is_favorite,' +
+        ' chats(id, name, is_group, bereich, created_at, updated_at)'
     )
     .eq('user_id', nutzerId);
   if (error) throw error;
 
-  const zeilen = (data || []).filter((z) => z.chats);
+  const zeilen = (data || []).filter((z) => z.chats && (z.chats.bereich || 'messenger') === bereich);
   if (zeilen.length === 0) return [];
 
-  // Letzte Nachricht je Chat in einer Abfrage holen, statt pro Chat einzeln.
   const ids = zeilen.map((z) => z.chat_id);
-  const { data: nachrichten, error: fehlerNachrichten } = await client
-    .from('messages')
-    .select('id, chat_id, text, sender_id, created_at')
-    .in('chat_id', ids)
-    .order('created_at', { ascending: false })
-    .limit(200);
-  if (fehlerNachrichten) throw fehlerNachrichten;
+
+  // Letzte Nachricht und Mitglieder je Chat — in zwei Abfragen statt in
+  // zweien pro Chat. Bei zwölf Chats ist das der Unterschied zwischen zwei
+  // und fünfundzwanzig Rundreisen zur Datenbank.
+  const [{ data: nachrichten, error: fN }, { data: mitglieder, error: fM }] = await Promise.all([
+    client
+      .from('messages')
+      .select('id, chat_id, text, sender_id, media_type, created_at')
+      .in('chat_id', ids)
+      .order('created_at', { ascending: false })
+      .limit(500),
+    client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
+  ]);
+  if (fN) throw fN;
+  if (fM) throw fM;
 
   const letzte = new Map();
+  const ungelesen = new Map();
   for (const n of nachrichten || []) {
     if (!letzte.has(n.chat_id)) letzte.set(n.chat_id, n);
   }
+  const mitgliederNach = new Map();
+  for (const m of mitglieder || []) {
+    if (!mitgliederNach.has(m.chat_id)) mitgliederNach.set(m.chat_id, []);
+    mitgliederNach.get(m.chat_id).push(m.user_id);
+  }
 
-  return zeilen.map((z) => {
-    const vorschau = letzte.get(z.chat_id) || null;
-    return {
-      id: z.chats.id,
-      name: z.chats.name,
-      isGroup: Boolean(z.chats.is_group),
-      archiviert: Boolean(z.is_archived),
-      muted: Boolean(z.is_muted),
-      unread: !z.is_read,
-      favorit: Boolean(z.is_favorite),
-      letzteNachricht: vorschau ? vorschau.text : '',
-      zeit: vorschau ? vorschau.created_at : z.chats.updated_at,
-    };
-  });
+  return zeilen
+    .map((z) => {
+      const vorschau = letzte.get(z.chat_id) || null;
+      const alle = mitgliederNach.get(z.chat_id) || [];
+      const andere = alle.filter((u) => u !== nutzerId);
+      return {
+        id: z.chats.id,
+        name: z.chats.name,
+        // Bei einem Zweiergespräch ist das Gegenüber die eine andere Person.
+        userId: z.chats.is_group ? null : andere[0] || null,
+        members: z.chats.is_group ? andere : undefined,
+        isGroup: Boolean(z.chats.is_group),
+        bereich: z.chats.bereich || 'messenger',
+        archiviert: Boolean(z.is_archived),
+        muted: Boolean(z.is_muted),
+        unread: z.is_read ? 0 : 1,
+        favorit: Boolean(z.is_favorite),
+        preview: vorschau ? vorschau.text : '',
+        mediaPreview: vorschau?.media_type || undefined,
+        time: chatZeit(vorschau ? vorschau.created_at : z.chats.updated_at),
+        zeitpunkt: vorschau ? vorschau.created_at : z.chats.updated_at,
+      };
+    })
+    .sort((a, b) => new Date(b.zeitpunkt || 0) - new Date(a.zeitpunkt || 0));
 }
 
-async function ladeNachrichten(client, chatId) {
+async function ladeNachrichten(client, chatId, nutzerId) {
   if (!client) return null;
   const { data, error } = await client
     .from('messages')
     .select('id, chat_id, sender_id, text, media_url, media_type, created_at, read_at')
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
-    .limit(200);
+    .limit(500);
   if (error) throw error;
 
   return (data || []).map((n) => ({
     id: n.id,
     chatId: n.chat_id,
-    userId: n.sender_id,
+    // Die Oberfläche erkennt eigene Nachrichten an der Kennung "me".
+    from: n.sender_id === nutzerId ? 'me' : n.sender_id,
+    senderId: n.sender_id,
     text: n.text,
+    media: n.media_type || undefined,
     mediaUrl: n.media_url,
-    mediaType: n.media_type,
-    zeit: n.created_at,
-    gelesen: Boolean(n.read_at),
+    time: chatZeit(n.created_at),
+    zeitpunkt: n.created_at,
+    read: Boolean(n.read_at),
   }));
 }
 
-/**
- * Aktuelle Storys. „viewed" ist keine Spalte in stories — ob jemand eine
- * Story gesehen hat, steht in story_views.
- */
+// ============================================================================
+// Storys
+// ============================================================================
+
 async function ladeStorys(client, nutzerId) {
   if (!client) return null;
 
   const { data, error } = await client
     .from('stories')
-    .select('id, user_id, media_url, media_type, caption, created_at, expires_at')
+    .select('id, user_id, media_url, media_type, caption, created_at, profiles(name)')
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;
@@ -155,70 +297,107 @@ async function ladeStorys(client, nutzerId) {
   const storys = data || [];
   if (storys.length === 0) return [];
 
-  const { data: gesehen, error: fehlerGesehen } = await client
-    .from('story_views')
-    .select('story_id')
-    .eq('user_id', nutzerId)
-    .in('story_id', storys.map((s) => s.id));
-  if (fehlerGesehen) throw fehlerGesehen;
+  const [{ data: gesehen, error: fG }, { data: gemocht, error: fL }] = await Promise.all([
+    client.from('story_views').select('story_id').eq('user_id', nutzerId),
+    client.from('story_likes').select('story_id').eq('user_id', nutzerId),
+  ]);
+  if (fG) throw fG;
+  if (fL) throw fL;
 
   const gesehenIds = new Set((gesehen || []).map((g) => g.story_id));
+  const gemochtIds = new Set((gemocht || []).map((g) => g.story_id));
 
   return storys.map((s) => ({
     id: s.id,
-    userId: s.user_id,
+    userId: s.user_id === nutzerId ? 'me' : s.user_id,
+    name: (s.profiles?.name || '').split(' ')[0],
+    own: s.user_id === nutzerId,
     mediaUrl: s.media_url,
     mediaType: s.media_type,
     caption: s.caption || '',
     zeit: s.created_at,
     viewed: gesehenIds.has(s.id),
+    liked: gemochtIds.has(s.id),
   }));
 }
 
+// ============================================================================
+// Beiträge, Videos, Clips
+// ============================================================================
+
+const BEITRAG_SPALTEN =
+  'id, user_id, kind, format, title, description, location, music, media_url,' +
+  ' thumbnail_url, duration, tags, views, zuschauer, untertitel, kapitel,' +
+  ' likes_basis, shares_basis, comments_basis, created_at,' +
+  ' post_likes(count), comments(count)';
+
 /**
- * Beiträge. Es gibt keine eigene Tabelle „videos" — ein Video ist ein Beitrag
- * mit kind = 'reel' oder 'clip'. Die Zähler für Likes und Kommentare stehen
- * ebenfalls nicht als Spalte in posts, sie werden mitgezählt.
+ * Ein Video ist kein eigener Tabelleneintrag, sondern ein Beitrag mit
+ * kind = 'reel' (Hochformat) oder 'clip' (Querformat).
+ *
+ * Likes und Kommentare werden gezählt, nicht gespeichert — auf einem Sockel,
+ * der die Zahl aus den Beispielinhalten trägt. Ein neu angelegter Beitrag hat
+ * Sockel 0, dort ist jede Zahl vollständig echt.
  */
-async function ladeBeitraege(client, { arten = null, limit = 50 } = {}) {
+async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {}) {
   if (!client) return null;
 
   let abfrage = client
     .from('posts')
-    .select(
-      'id, user_id, kind, title, description, location, music, media_url, thumbnail_url, duration, created_at,' +
-        ' post_likes(count), comments(count)'
-    )
+    .select(BEITRAG_SPALTEN)
     .order('created_at', { ascending: false })
     .limit(limit);
-
   if (arten && arten.length > 0) abfrage = abfrage.in('kind', arten);
 
   const { data, error } = await abfrage;
   if (error) throw error;
 
-  return (data || []).map((b) => ({
+  const beitraege = data || [];
+  const ids = beitraege.map((b) => b.id);
+
+  // Eigener Zustand je Beitrag: gefällt mir, gespeichert, geteilt.
+  const [{ data: likes }, { data: gespeichert }, { data: geteilt }] =
+    ids.length === 0
+      ? [{ data: [] }, { data: [] }, { data: [] }]
+      : await Promise.all([
+          client.from('post_likes').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
+          client.from('saves').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
+          client.from('reposts').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
+        ]);
+
+  const gemocht = new Set((likes || []).map((l) => l.post_id));
+  const gemerkt = new Set((gespeichert || []).map((s) => s.post_id));
+  const repostet = new Set((geteilt || []).map((r) => r.post_id));
+
+  return beitraege.map((b) => ({
     id: b.id,
-    userId: b.user_id,
-    art: b.kind,
+    userId: b.user_id === nutzerId ? 'me' : b.user_id,
+    kind: b.kind,
+    art: b.format || 'standard',
     title: b.title || '',
-    beschreibung: b.description || '',
-    ort: b.location || '',
-    musik: b.music || '',
+    description: b.description || '',
+    location: b.location || '',
+    music: b.music || '',
     mediaUrl: b.media_url,
     thumbnail: b.thumbnail_url,
-    dauer: b.duration,
-    zeit: b.created_at,
-    likes: b.post_likes?.[0]?.count ?? 0,
-    kommentare: b.comments?.[0]?.count ?? 0,
+    duration: b.duration || '',
+    tags: b.tags || [],
+    views: Number(b.views || 0),
+    zuschauer: b.zuschauer ?? undefined,
+    untertitel: Boolean(b.untertitel),
+    kapitel: b.kapitel || [],
+    age: zeitText(b.created_at),
+    zeitpunkt: b.created_at,
+    likes: Number(b.likes_basis || 0) + (b.post_likes?.[0]?.count ?? 0),
+    comments: Number(b.comments_basis || 0) + (b.comments?.[0]?.count ?? 0),
+    shares: Number(b.shares_basis || 0),
+    liked: gemocht.has(b.id),
+    saved: gemerkt.has(b.id),
+    reposted: repostet.has(b.id),
   }));
 }
 
-async function ladeVideos(client) {
-  return ladeBeitraege(client, { arten: ['reel', 'clip'] });
-}
-
-async function ladeKommentare(client, beitragId) {
+async function ladeKommentare(client, nutzerId, beitragId) {
   if (!client) return null;
   const { data, error } = await client
     .from('comments')
@@ -228,15 +407,139 @@ async function ladeKommentare(client, beitragId) {
     .limit(200);
   if (error) throw error;
 
+  const ids = (data || []).map((k) => k.id);
+  const { data: eigene } =
+    ids.length === 0
+      ? { data: [] }
+      : await client.from('comment_likes').select('comment_id').eq('user_id', nutzerId).in('comment_id', ids);
+  const gemocht = new Set((eigene || []).map((l) => l.comment_id));
+
   return (data || []).map((k) => ({
     id: k.id,
-    beitragId: k.post_id,
-    userId: k.user_id,
+    postId: k.post_id,
+    userId: k.user_id === nutzerId ? 'me' : k.user_id,
     text: k.text,
-    zeit: k.created_at,
+    time: chatZeit(k.created_at),
+    zeitpunkt: k.created_at,
     likes: k.comment_likes?.[0]?.count ?? 0,
+    liked: gemocht.has(k.id),
   }));
 }
+
+// ============================================================================
+// Communitys
+// ============================================================================
+
+async function ladeCommunities(client, nutzerId) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('communities')
+    .select(
+      'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
+        ' community_members(count), community_channels(id, slug, name, topics, position)'
+    )
+    .order('created_at', { ascending: true })
+    .limit(100);
+  if (error) throw error;
+
+  const { data: meine } = await client
+    .from('community_members')
+    .select('community_id')
+    .eq('user_id', nutzerId);
+  const beigetreten = new Set((meine || []).map((m) => m.community_id));
+
+  return (data || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    topic: c.topic || '',
+    bio: c.bio || '',
+    link: c.link || '',
+    visibility: c.visibility,
+    members: Number(c.mitglieder_basis || 0) + (c.community_members?.[0]?.count ?? 0),
+    // Eine selbst angelegte Community kann man nicht verlassen — sie stünde
+    // sonst ohne Besitzer da.
+    eigen: c.created_by === nutzerId,
+    joined: beigetreten.has(c.id),
+    unread: 0,
+    channels: (c.community_channels || [])
+      .sort((a, b) => (a.position || 0) - (b.position || 0))
+      .map((k) => ({ id: k.id, slug: k.slug, name: k.name, topics: k.topics || [] })),
+  }));
+}
+
+async function ladeKanalNachrichten(client, nutzerId, kanalId) {
+  if (!client) return null;
+  const { data, error } = await client
+    .from('community_channel_messages')
+    .select('id, channel_id, sender_id, text, created_at')
+    .eq('channel_id', kanalId)
+    .order('created_at', { ascending: true })
+    .limit(500);
+  if (error) throw error;
+
+  return (data || []).map((m) => ({
+    id: m.id,
+    from: m.sender_id === nutzerId ? 'me' : m.sender_id,
+    text: m.text,
+    time: chatZeit(m.created_at),
+    zeitpunkt: m.created_at,
+  }));
+}
+
+// ============================================================================
+// Suche: Hashtags, Sounds, Standorte
+// ============================================================================
+
+async function ladeHashtags(client) {
+  if (!client) return [];
+  const { data, error } = await client
+    .from('hashtags_mit_anzahl')
+    .select('tag, beitraege')
+    .order('beitraege', { ascending: false });
+  if (error) throw error;
+  return (data || []).map((h) => ({ tag: h.tag, posts: Number(h.beitraege) }));
+}
+
+async function ladeSounds(client) {
+  if (!client) return [];
+  const { data, error } = await client
+    .from('sounds')
+    .select('id, title, artist, uses, dauer, lyrics')
+    .order('uses', { ascending: false });
+  if (error) throw error;
+  return (data || []).map((s) => ({
+    id: s.id,
+    title: s.title,
+    artist: s.artist,
+    uses: Number(s.uses || 0),
+    dauer: s.dauer || '',
+    // null heißt: instrumental. Die Seite sagt das dann auch, statt
+    // "Instrumental" als Liedzeile auszugeben.
+    lyrics: s.lyrics,
+  }));
+}
+
+async function ladeStandorte(client) {
+  if (!client) return [];
+  const { data, error } = await client
+    .from('places')
+    .select('id, name, ort, adresse, koordinaten, x, y, beitraege_basis');
+  if (error) throw error;
+  return (data || []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    ort: p.ort || '',
+    adresse: p.adresse || '',
+    koordinaten: p.koordinaten || '',
+    x: Number(p.x),
+    y: Number(p.y),
+    posts: Number(p.beitraege_basis || 0),
+  }));
+}
+
+// ============================================================================
+// Mitteilungen
+// ============================================================================
 
 async function ladeBenachrichtigungen(client, nutzerId, bereich = null) {
   if (!client) return null;
@@ -256,89 +559,125 @@ async function ladeBenachrichtigungen(client, nutzerId, bereich = null) {
     userId: b.actor_id,
     art: b.art,
     bereich: b.bereich,
-    zielTyp: b.target_type,
-    zielId: b.target_id,
+    ziel: { art: b.target_type, id: b.target_id },
     text: b.text || '',
+    zeit: zeitText(b.created_at),
     gelesen: Boolean(b.read_at),
-    zeit: b.created_at,
-  }));
-}
-
-async function ladeCommunities(client) {
-  if (!client) return null;
-  const { data, error } = await client
-    .from('communities')
-    .select('id, name, topic, visibility, created_by, created_at, community_members(count)')
-    .order('created_at', { ascending: false })
-    .limit(100);
-  if (error) throw error;
-
-  return (data || []).map((c) => ({
-    id: c.id,
-    name: c.name,
-    thema: c.topic || '',
-    privat: c.visibility === 'private',
-    erstelltVon: c.created_by,
-    mitglieder: c.community_members?.[0]?.count ?? 0,
-    zeit: c.created_at,
   }));
 }
 
 // ============================================================================
-// Startdaten für /api/bootstrap
+// Startdaten
 // ============================================================================
 
 /**
- * Lädt alles, was die Oberfläche beim Start braucht. Gibt null zurück, wenn
- * niemand angemeldet ist oder die Datenbank nicht antwortet — dann nutzt
- * app.js die Beispieldaten.
+ * Lädt alles, was die Oberfläche beim Start braucht.
+ *
+ * Gibt null zurück, wenn niemand angemeldet ist. Das ist kein Fehler, sondern
+ * die Regel der Datenbank: ohne Anmeldung ist dort nichts sichtbar. Die
+ * Oberfläche zeigt in dem Fall die Anmeldung, nicht etwa Beispieldaten.
  */
 async function bootstrapData(client, nutzerId) {
   if (!client || !nutzerId) return null;
 
-  try {
-    const [nutzer, kontakte, chats, storys, beitraege, benachrichtigungen, communities] =
-      await Promise.all([
-        ladeNutzer(client),
-        ladeKontakte(client, nutzerId),
-        ladeChats(client, nutzerId),
-        ladeStorys(client, nutzerId),
-        ladeBeitraege(client, { limit: 100 }),
-        ladeBenachrichtigungen(client, nutzerId),
-        ladeCommunities(client),
-      ]);
+  const [
+    nutzer,
+    kontakte,
+    chats,
+    communityChats,
+    storys,
+    beitraege,
+    communities,
+    benachrichtigungen,
+    hashtags,
+    sounds,
+    standorte,
+    kartenpunkte,
+    folgen,
+    blockiert,
+    stumm,
+  ] = await Promise.all([
+    ladeNutzer(client, nutzerId),
+    ladeKontakte(client, nutzerId),
+    ladeChats(client, nutzerId, 'messenger'),
+    ladeChats(client, nutzerId, 'community'),
+    ladeStorys(client, nutzerId),
+    ladeBeitraege(client, nutzerId, { limit: 200 }),
+    ladeCommunities(client, nutzerId),
+    ladeBenachrichtigungen(client, nutzerId),
+    ladeHashtags(client),
+    ladeSounds(client),
+    ladeStandorte(client),
+    ladeKartenpunkte(client),
+    ladeFolgen(client, nutzerId),
+    ladeBlockiert(client, nutzerId),
+    ladeStummgeschaltet(client, nutzerId),
+  ]);
 
-    return {
-      users: nutzer,
-      contacts: kontakte,
-      chats,
-      stories: storys,
-      posts: beitraege.filter((b) => b.art === 'post'),
-      videos: beitraege.filter((b) => b.art === 'reel' || b.art === 'clip'),
-      notifications: benachrichtigungen,
-      communities,
-      currentUserId: nutzerId,
-      quelle: 'supabase',
-      timestamp: new Date().toISOString(),
-    };
-  } catch (fehler) {
-    console.error('Startdaten aus Supabase fehlgeschlagen:', fehler.message);
-    return null;
+  // "Folge ich dieser Person?" für jede bekannte Person.
+  const gefolgt = {};
+  for (const id of Object.keys(nutzer)) {
+    gefolgt[id] = id === 'me' ? false : folgen.has(id);
   }
+
+  const eigenes = nutzer.me || {};
+
+  return {
+    users: nutzer,
+    contacts: kontakte,
+    chats: chats.filter((c) => !c.archiviert),
+    archiviert: chats.filter((c) => c.archiviert),
+    communityChats,
+    stories: storys,
+    posts: beitraege.filter((b) => b.kind === 'post'),
+    videos: beitraege.filter((b) => b.kind === 'reel'),
+    clips: beitraege.filter((b) => b.kind === 'clip'),
+    communities,
+    hashtags,
+    sounds,
+    places: standorte,
+    friends: kartenpunkte,
+    gefolgt,
+    blockiert,
+    stummgeschaltet: stumm,
+    privateProfile: Object.values(nutzer).filter((u) => u.privat).map((u) => u.id),
+    ungelesen: {
+      videos: benachrichtigungen.filter((b) => b.bereich === 'videos' && !b.gelesen).length,
+      communities: benachrichtigungen.filter((b) => b.bereich === 'communities' && !b.gelesen).length,
+    },
+    eigenesProfil: {
+      bio: eigenes.bio || '',
+      link: eigenes.link || '',
+      highlights: eigenes.highlights || [],
+      playlists: eigenes.playlists || [],
+    },
+    currentUserId: nutzerId,
+    quelle: 'supabase',
+    timestamp: new Date().toISOString(),
+  };
 }
 
 module.exports = {
   profilZuNutzer,
+  zeitText,
+  chatZeit,
   ladeNutzer,
   ladeProfil,
   ladeKontakte,
+  ladeFolgen,
+  ladeBlockiert,
+  ladeStummgeschaltet,
+  ladeKartenpunkte,
   ladeChats,
   ladeNachrichten,
   ladeStorys,
   ladeBeitraege,
-  ladeVideos,
   ladeKommentare,
-  ladeBenachrichtigungen,
   ladeCommunities,
+  ladeKanalNachrichten,
+  ladeHashtags,
+  ladeSounds,
+  ladeStandorte,
+  ladeBenachrichtigungen,
   bootstrapData,
 };

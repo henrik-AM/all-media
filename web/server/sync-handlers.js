@@ -74,29 +74,22 @@ const handleUpdateProfile = handler('Profil ändern', async (client, nutzerId, a
 
 // -------------------------------------------------------------- Kontakte --
 
-const handleFollowUser = handler('Kontakt folgen', async (client, nutzerId, zielId) => {
-  const { count, error: fehlerLesen } = await client
-    .from('contacts')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', nutzerId)
-    .eq('contact_id', zielId);
-  if (fehlerLesen) throw fehlerLesen;
-
-  if (count > 0) {
-    const { error } = await client
-      .from('contacts')
-      .delete()
-      .eq('user_id', nutzerId)
-      .eq('contact_id', zielId);
-    if (error) throw error;
-    return { ok: true, folgt: false };
-  }
-
-  const { error } = await client
-    .from('contacts')
-    .insert({ user_id: nutzerId, contact_id: zielId, status: 'friend' });
-  if (error && error.code !== '23505') throw error;
-  return { ok: true, folgt: true };
+/**
+ * Folgen ist nicht dasselbe wie ein Kontakt.
+ *
+ * Vorher schrieb dieser Handler in `contacts` — wer jemandem folgte, landete
+ * dadurch in dessen Kontaktliste, und wer entfolgte, flog aus den Kontakten
+ * heraus. Ein Kontakt ist aber jemand aus dem Telefonbuch; folgen kann man
+ * auch einer Person, die man nie getroffen hat. Seit SUPABASE_SCHEMA_5.sql
+ * gibt es dafür `follows`.
+ */
+const handleFollowUser = handler('Folgen', async (client, nutzerId, zielId) => {
+  if (zielId === nutzerId) return { ok: false, fehler: 'Sich selbst folgen geht nicht' };
+  const gesetzt = await umschalten(client, 'follows', {
+    follower_id: nutzerId,
+    followee_id: zielId,
+  });
+  return { ok: true, folgt: gesetzt };
 });
 
 const handleAcceptContactRequest = handler(
@@ -129,12 +122,28 @@ const handleChatAction = handler(
       gelesen: 'is_read',
       read: 'is_read',
       favorit: 'is_favorite',
+      sperren: 'is_locked',
+      mitteilungen: 'notifications_off',
     };
     const spalte = spalten[was];
     if (!spalte) return { ok: false, fehler: `Unbekannte Einstellung: ${was}` };
 
-    const daten = { [spalte]: wert };
-    if (spalte === 'is_read' && wert) daten.last_read_at = new Date().toISOString();
+    // Ohne ausdrücklichen Wert wird umgeschaltet. Das ist der Normalfall: die
+    // Oberfläche weiß den alten Zustand nicht sicher, wenn zwei Geräte
+    // gleichzeitig offen sind.
+    let neu = wert;
+    if (wert === undefined || wert === null) {
+      const { data } = await client
+        .from('chat_members')
+        .select(spalte)
+        .eq('chat_id', chatId)
+        .eq('user_id', nutzerId)
+        .maybeSingle();
+      neu = !data?.[spalte];
+    }
+
+    const daten = { [spalte]: neu };
+    if (spalte === 'is_read' && neu) daten.last_read_at = new Date().toISOString();
 
     const { error } = await client
       .from('chat_members')
@@ -142,9 +151,358 @@ const handleChatAction = handler(
       .eq('chat_id', chatId)
       .eq('user_id', nutzerId);
     if (error) throw error;
-    return { ok: true, [spalte]: wert };
+    return { ok: true, [spalte]: neu, wert: neu };
   }
 );
+
+/**
+ * Chat verlassen.
+ *
+ * Gelöscht wird die eigene Mitgliedschaft, nicht der Chat. Der Chat selbst
+ * gehört auch der anderen Person — ihn zu entfernen würde ihr den Verlauf
+ * unter den Füßen wegziehen. Bleibt niemand übrig, räumt die Datenbank ihn
+ * über die Fremdschlüssel selbst ab.
+ */
+const handleLeaveChat = handler('Chat löschen', async (client, nutzerId, chatId) => {
+  const { error } = await client
+    .from('chat_members')
+    .delete()
+    .eq('chat_id', chatId)
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+
+  const { count } = await client
+    .from('chat_members')
+    .select('*', { count: 'exact', head: true })
+    .eq('chat_id', chatId);
+  if (!count) await client.from('chats').delete().eq('id', chatId);
+
+  return { ok: true };
+});
+
+/** Chat leeren: die Unterhaltung bleibt, die Nachrichten sind weg. */
+const handleClearChat = handler('Chat leeren', async (client, nutzerId, chatId) => {
+  // Nur die eigenen Nachrichten — fremde zu löschen steht niemandem zu, und
+  // die Regeln der Datenbank ließen es ohnehin nicht zu.
+  const { error } = await client
+    .from('messages')
+    .delete()
+    .eq('chat_id', chatId)
+    .eq('sender_id', nutzerId);
+  if (error) throw error;
+  return { ok: true };
+});
+
+/** Eine Nachricht mit einem Stern markieren. Der Stern gehört nur mir. */
+const handleStarMessage = handler('Nachricht markieren', async (client, nutzerId, nachrichtId) => {
+  const gesetzt = await umschalten(client, 'message_stars', {
+    message_id: nachrichtId,
+    user_id: nutzerId,
+  });
+  return { ok: true, stern: gesetzt };
+});
+
+/** Gruppe anlegen und alle Mitglieder eintragen. */
+const handleCreateGroup = handler(
+  'Gruppe anlegen',
+  async (client, nutzerId, name, mitglieder = [], bereich = 'messenger') => {
+    const { data, error } = await client
+      .from('chats')
+      .insert({ name, is_group: true, bereich, created_by: nutzerId })
+      .select()
+      .single();
+    if (error) throw error;
+
+    const alle = [...new Set([nutzerId, ...mitglieder])];
+    const { error: fehlerM } = await client
+      .from('chat_members')
+      .insert(alle.map((id) => ({ chat_id: data.id, user_id: id })));
+    if (fehlerM) throw fehlerM;
+
+    return { ok: true, chat: data, mitglieder: alle.length };
+  }
+);
+
+/**
+ * Den Chat mit einer Person finden — oder ihn anlegen.
+ *
+ * Zwei Personen sollen genau einen gemeinsamen Zweierchat haben. Ohne diese
+ * Prüfung entstünde bei jedem Teilen ein neuer, und der Verlauf zerfiele in
+ * Bruchstücke.
+ */
+async function chatMit(client, nutzerId, zielId, bereich = 'messenger') {
+  const { data: meine, error } = await client
+    .from('chat_members')
+    .select('chat_id, chats(id, is_group, bereich)')
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+
+  const zweier = (meine || []).filter((m) => m.chats && !m.chats.is_group && (m.chats.bereich || 'messenger') === bereich);
+  if (zweier.length > 0) {
+    const { data: andere } = await client
+      .from('chat_members')
+      .select('chat_id, user_id')
+      .in('chat_id', zweier.map((z) => z.chat_id))
+      .eq('user_id', zielId);
+    if (andere && andere.length > 0) return andere[0].chat_id;
+  }
+
+  const { data: person } = await client.from('profiles').select('name').eq('id', zielId).maybeSingle();
+  const { data: neu, error: fehlerNeu } = await client
+    .from('chats')
+    .insert({ name: person?.name || 'Chat', is_group: false, bereich, created_by: nutzerId })
+    .select()
+    .single();
+  if (fehlerNeu) throw fehlerNeu;
+
+  await client.from('chat_members').insert([
+    { chat_id: neu.id, user_id: nutzerId },
+    { chat_id: neu.id, user_id: zielId },
+  ]);
+  return neu.id;
+}
+
+const handleChatMit = handler('Chat finden', async (client, nutzerId, zielId, bereich) => {
+  const id = await chatMit(client, nutzerId, zielId, bereich);
+  return { ok: true, chatId: id };
+});
+
+/**
+ * Person zu einem Benutzernamen oder einer Telefonnummer nachschlagen.
+ *
+ * Henrik wollte nicht mehr an den Benutzernamen gebunden sein — es geht auch
+ * über die Nummer. Die Suche läuft in der Datenbank, damit sie in der App und
+ * auf der Website dasselbe findet.
+ */
+function nurZiffern(eingabe) {
+  let z = String(eingabe).replace(/[^\d+]/g, '').replace(/^\+/, '00');
+  if (z.startsWith('00')) z = z.slice(2);
+  else if (z.startsWith('0')) z = '49' + z.slice(1);
+  return z;
+}
+
+function istNummer(eingabe) {
+  return /^[+\d][\d\s/()-]{4,}$/.test(String(eingabe).trim());
+}
+
+const handleFindPerson = handler('Person suchen', async (client, nutzerId, eingabe) => {
+  const roh = String(eingabe || '').trim();
+  if (!roh) return { ok: false, fehler: 'Nichts eingegeben' };
+
+  const spalten = 'id, name, handle, initials, color, phone, privat, about';
+
+  if (istNummer(roh)) {
+    const gesucht = nurZiffern(roh);
+    const { data, error } = await client.from('profiles').select(spalten).not('phone', 'is', null);
+    if (error) throw error;
+    const treffer = (data || []).find((p) => p.id !== nutzerId && nurZiffern(p.phone) === gesucht);
+    return { ok: true, person: treffer || null, warNummer: true };
+  }
+
+  const name = roh.replace(/^@/, '').toLowerCase();
+  const { data, error } = await client
+    .from('profiles')
+    .select(spalten)
+    .or(`handle.eq.@${name},name.ilike.${name}`)
+    .neq('id', nutzerId)
+    .limit(1);
+  if (error) throw error;
+  return { ok: true, person: (data || [])[0] || null, warNummer: false };
+});
+
+/**
+ * Kontakt hinzufügen.
+ *
+ * Bei einem privaten Profil bleibt die Anfrage offen, bis die Person sie
+ * annimmt. Ein öffentliches Profil nimmt sofort an — dort wäre ein Warten auf
+ * eine Freigabe, die niemand geben muss, nur eine Hürde ohne Zweck.
+ */
+const handleAddContact = handler(
+  'Kontakt hinzufügen',
+  async (client, nutzerId, zielId, privat, nachricht = '') => {
+    const { count } = await client
+      .from('contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', nutzerId)
+      .eq('contact_id', zielId);
+    if (count > 0) return { ok: false, fehler: 'schon-vorhanden' };
+
+    const status = privat ? 'pending' : 'friend';
+    const { error } = await client
+      .from('contacts')
+      .insert({ user_id: nutzerId, contact_id: zielId, status });
+    if (error && error.code !== '23505') throw error;
+
+    const chatId = await chatMit(client, nutzerId, zielId);
+    if (nachricht.trim()) {
+      await client
+        .from('messages')
+        .insert({ chat_id: chatId, sender_id: nutzerId, text: nachricht.trim() });
+    }
+
+    return { ok: true, status, chatId };
+  }
+);
+
+/** Anfrage annehmen — danach ist der Chat frei benutzbar. */
+const handleAcceptRequest = handler('Anfrage annehmen', async (client, nutzerId, zielId) => {
+  const { error } = await client
+    .from('contacts')
+    .update({ status: 'friend' })
+    .eq('user_id', nutzerId)
+    .eq('contact_id', zielId);
+  if (error) throw error;
+  return { ok: true };
+});
+
+/** Kontakt als Favorit merken. */
+const handleContactFavorite = handler('Kontakt-Favorit', async (client, nutzerId, zielId) => {
+  const { data } = await client
+    .from('contacts')
+    .select('is_favorite')
+    .eq('user_id', nutzerId)
+    .eq('contact_id', zielId)
+    .maybeSingle();
+  if (!data) return { ok: false, fehler: 'Diese Person steht nicht in deinen Kontakten' };
+
+  const neu = !data.is_favorite;
+  const { error } = await client
+    .from('contacts')
+    .update({ is_favorite: neu })
+    .eq('user_id', nutzerId)
+    .eq('contact_id', zielId);
+  if (error) throw error;
+  return { ok: true, favorit: neu };
+});
+
+/** „Benachrichtige mich über neue Beiträge dieser Person." */
+const handleNotifyPost = handler('Beitragshinweis', async (client, nutzerId, beitragId) => {
+  const gesetzt = await umschalten(client, 'post_notify', {
+    post_id: beitragId,
+    user_id: nutzerId,
+  });
+  return { ok: true, notify: gesetzt };
+});
+
+/** Einen Beitrag an mehrere Personen schicken: als Nachricht in ihren Chat. */
+const handleShareToChats = handler(
+  'An Kontakte schicken',
+  async (client, nutzerId, beitragId, empfaenger = [], vorschau = 'Beitrag geteilt') => {
+    if (empfaenger.length === 0) return { ok: false, fehler: 'Bitte mindestens eine Person auswählen' };
+
+    const gesendet = [];
+    for (const zielId of empfaenger) {
+      const chatId = await chatMit(client, nutzerId, zielId);
+      await client
+        .from('messages')
+        .insert({ chat_id: chatId, sender_id: nutzerId, text: vorschau });
+      gesendet.push(zielId);
+    }
+
+    await client.from('shares').insert(
+      gesendet.map((id) => ({ post_id: beitragId, shared_by: nutzerId, shared_to: id }))
+    );
+
+    return { ok: true, gesendet };
+  }
+);
+
+/** Antwort auf eine Story landet im normalen Chat mit dieser Person. */
+const handleStoryReply = handler('Story beantworten', async (client, nutzerId, storyId, text) => {
+  const { data: story, error } = await client
+    .from('stories')
+    .select('id, user_id')
+    .eq('id', storyId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!story) return { ok: false, fehler: 'Diese Story gibt es nicht mehr' };
+
+  const chatId = await chatMit(client, nutzerId, story.user_id);
+  const { data: nachricht, error: fehlerN } = await client
+    .from('messages')
+    .insert({ chat_id: chatId, sender_id: nutzerId, text })
+    .select()
+    .single();
+  if (fehlerN) throw fehlerN;
+
+  return { ok: true, chatId, nachricht };
+});
+
+/** Neues Unterthema in einer Community. */
+const handleCreateChannel = handler(
+  'Unterthema anlegen',
+  async (client, nutzerId, communityId, name) => {
+    const slug =
+      'ch-' + name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-').replace(/^-|-$/g, '');
+
+    const { count } = await client
+      .from('community_channels')
+      .select('*', { count: 'exact', head: true })
+      .eq('community_id', communityId)
+      .ilike('name', name);
+    if (count > 0) return { ok: false, fehler: 'Dieses Unterthema gibt es schon' };
+
+    const { data, error } = await client
+      .from('community_channels')
+      .insert({ community_id: communityId, slug, name })
+      .select()
+      .single();
+    if (error) throw error;
+    return { ok: true, kanal: data };
+  }
+);
+
+const handleSendChannelMessage = handler(
+  'Im Kanal schreiben',
+  async (client, nutzerId, kanalId, text) => {
+    const { data, error } = await client
+      .from('community_channel_messages')
+      .insert({ channel_id: kanalId, sender_id: nutzerId, text })
+      .select()
+      .single();
+    if (error) throw error;
+    return { ok: true, nachricht: data };
+  }
+);
+
+/**
+ * Highlights, Playlists, Spendenziel und Livestream.
+ *
+ * Alle vier hängen am eigenen Profil. Sie lagen bisher ausschließlich im
+ * Arbeitsspeicher des Servers und waren nach jedem Neustart weg.
+ */
+const handleProfilListe = handler(
+  'Sammlung anlegen',
+  async (client, nutzerId, spalte, name) => {
+    if (!['highlights', 'playlists'].includes(spalte)) {
+      return { ok: false, fehler: 'Unbekannte Sammlung' };
+    }
+    const { data } = await client.from('profiles').select(spalte).eq('id', nutzerId).maybeSingle();
+    const bestand = data?.[spalte] || [];
+    if (bestand.includes(name)) {
+      return { ok: false, fehler: spalte === 'highlights' ? 'Dieses Highlight gibt es schon' : 'Diese Playlist gibt es schon' };
+    }
+    const neu = [...bestand, name];
+    const { error } = await client.from('profiles').update({ [spalte]: neu }).eq('id', nutzerId);
+    if (error) throw error;
+    return { ok: true, [spalte]: neu };
+  }
+);
+
+const handleSpende = handler('Spendenziel', async (client, nutzerId, spende) => {
+  const { error } = await client
+    .from('profiles')
+    .update({ spende: spende ? JSON.stringify(spende) : null })
+    .eq('id', nutzerId);
+  if (error) throw error;
+  return { ok: true, spende };
+});
+
+const handleLivestream = handler('Livestream', async (client, nutzerId, live) => {
+  const { error } = await client.from('profiles').update({ live: live || null }).eq('id', nutzerId);
+  if (error) throw error;
+  return { ok: true, live: Boolean(live) };
+});
 
 const handleSendMessage = handler(
   'Nachricht senden',
@@ -424,6 +782,24 @@ module.exports = {
   handleFollowUser,
   handleAcceptContactRequest,
   handleChatAction,
+  handleLeaveChat,
+  handleClearChat,
+  handleStarMessage,
+  handleCreateGroup,
+  handleChatMit,
+  handleFindPerson,
+  handleAddContact,
+  handleAcceptRequest,
+  handleContactFavorite,
+  handleNotifyPost,
+  handleShareToChats,
+  handleStoryReply,
+  handleCreateChannel,
+  handleSendChannelMessage,
+  handleProfilListe,
+  handleSpende,
+  handleLivestream,
+  istNummer,
   handleSendMessage,
   handleMarkMessageAsRead,
   handleCreatePost,

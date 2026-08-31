@@ -8,7 +8,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { FilterPillen } from '../../components/FilterPillen';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
-import { mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 
 interface Props {
@@ -42,6 +42,7 @@ const passtZu = (filter: ClipFilter, art: string) => filter === 'alle' || art ==
 
 /** Prototyp-Frame "Videos - Querformat": Suchleiste plus Videoliste. */
 export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
+  const { users: alleNutzer } = useDaten();
   // Eigene Aufnahmen und die Livestream-Aufzeichnung stehen im gemeinsamen
   // Zustand und sollen hier oben mit auftauchen.
   const { clips } = useProfil();
@@ -53,7 +54,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
     return clips.filter((c) => {
       if (!passtZu(filter, c.art ?? 'standard')) return false;
       if (!q) return true;
-      return c.title.toLowerCase().includes(q) || mockUsers[c.userId].name.toLowerCase().includes(q);
+      return c.title.toLowerCase().includes(q) || alleNutzer[c.userId].name.toLowerCase().includes(q);
     });
   }, [clips, query, filter]);
 
@@ -82,7 +83,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
           data={list}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            const person = mockUsers[item.userId];
+            const person = alleNutzer[item.userId];
             const art = item.art ?? 'standard';
             return (
               <Druck

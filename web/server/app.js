@@ -1,10 +1,32 @@
-// Die All-Media-Website: statische Seite aus ../public und die dazugehoerige
-// Schein-API mit den Mockdaten.
-//
-// Dieselbe Datei bedient beides:
-//   - die dauerhaft erreichbare Fassung in der Cloud (../api/index.js)
-//   - den lokalen Server auf Henriks Mac (../../app/web-app.js)
-// Beide teilen sich diesen Code, damit es keine zwei Staende gibt.
+/**
+ * Die All-Media-Website.
+ *
+ * Statische Seite aus ../public und die dazugehörige API. Dieselbe Datei
+ * bedient die Fassung in der Cloud bei Render und den lokalen Server auf
+ * Henriks Mac — beide teilen sich diesen Code, damit es keine zwei Stände
+ * gibt.
+ *
+ * WAS SICH GEÄNDERT HAT
+ *
+ * Bis zum 31.08.2026 standen hier rund fünfhundert Zeilen Beispieldaten:
+ * Anna, Bob, Clara, ihre Chats, Beiträge und Communitys. Jeder Endpunkt hat
+ * darin herumgeschrieben und das Ergebnis zurückgegeben — nebenbei ging
+ * derselbe Vorgang noch an Supabase, aber was der Browser sah, kam aus dem
+ * Arbeitsspeicher. Zwei Folgen davon:
+ *
+ *   1. Nach jedem Neustart war alles wieder auf Anfang.
+ *   2. Die App (Expo) las aus ihrer eigenen Kopie derselben Beispieldaten.
+ *      Beide Fassungen konnten gar nicht denselben Stand haben.
+ *
+ * Jetzt ist die Datenbank die einzige Quelle. Es gibt keine Beispieldaten
+ * mehr, auf die zurückgefallen werden könnte: was hier nicht aus Supabase
+ * kommt, kommt nicht. Die Inhalte selbst stehen als echte Zeilen in der
+ * Datenbank (SUPABASE_SCHEMA_6_inhalte.sql).
+ *
+ * Ohne Anmeldung ist nichts sichtbar. Das ist keine Härte, sondern die Regel
+ * der Datenbank: Row Level Security lässt anonyme Zugriffe nicht zu. Die
+ * Oberfläche zeigt in dem Fall die Anmeldung.
+ */
 
 const express = require('express');
 const path = require('path');
@@ -14,17 +36,15 @@ const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require
 
 const app = express();
 
+app.use(express.json({ limit: '2mb' }));
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
 /*
  * Anmeldung.
  *
- * Die Datenbank ist durch Row Level Security geschuetzt: Regeln gelten fuer
- * angemeldete Nutzer. Ein Server, der ohne Anmeldung anfragt, darf dort weder
- * lesen noch schreiben. Deshalb reicht die Oberflaeche ihr Zugangstoken im
- * Kopf "Authorization: Bearer ..." mit; hier wird daraus ein Datenbank-Client
- * im Namen dieses Nutzers.
- *
- * Ist niemand angemeldet, bleibt req.db null. Jeder Handler gibt dann null
- * zurueck und die Seite arbeitet mit den Mockdaten weiter - genau wie bisher.
+ * Die Oberfläche reicht ihr Zugangstoken im Kopf "Authorization: Bearer ..."
+ * mit; hier wird daraus ein Datenbank-Client im Namen dieses Nutzers. Ohne
+ * Anmeldung bleibt req.db null.
  */
 app.use('/api', async (req, _res, next) => {
   req.db = null;
@@ -48,518 +68,949 @@ app.use('/api', async (req, _res, next) => {
   next();
 });
 
-/*
- * `privat` steuert, wie man an eine Person herankommt: bei einem oeffentlichen
- * Profil ist man mit einem Tippen befreundet, bei einem privaten geht erst
- * eine Anfrage raus (Punkt 57). Es steht hier und nicht bei `profiles`, weil
- * gerade die Leute, die man neu anfragt, dort keinen Eintrag haben.
+// ============================================================================
+// Hilfsmittel
+// ============================================================================
+
+/**
+ * Umschlag für jeden Endpunkt, der die Datenbank braucht.
+ *
+ * Nimmt drei Dinge ab, die sonst zweiundfünfzig Mal dastünden: die Prüfung
+ * auf Anmeldung, das try/catch und das Protokollieren. Ein Fehler in der
+ * Datenbank wird zu einer Antwort mit Grund — nicht zu einer stillen leeren
+ * Liste. Genau dieses Verschlucken hat monatelang verborgen, dass gar nichts
+ * ankam.
  */
-const users = {
-  u1: { id: 'u1', privat: false, name: 'Anna Schmidt', handle: '@anna', initials: 'AS', color: 'linear-gradient(135deg,#FCA2BC,#E04570)', phone: '+49 151 2345678' },
-  u2: { id: 'u2', privat: true, name: 'Bob Müller', handle: '@bob', initials: 'BM', color: 'linear-gradient(135deg,#75DCF2,#1791BA)', phone: '+49 152 3456789' },
-  u3: { id: 'u3', privat: false, name: 'Clara Weber', handle: '@clara', initials: 'CW', color: 'linear-gradient(135deg,#FBD277,#D88F1C)', phone: '+49 160 4567890' },
-  u4: { id: 'u4', privat: false, name: 'David König', handle: '@david', initials: 'DK', color: 'linear-gradient(135deg,#9FDD84,#419A32)', phone: '+49 171 5678901' },
-  u5: { id: 'u5', privat: true, name: 'Elif Yilmaz', handle: '@elif', initials: 'EY', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 172 6789012' },
-  u6: { id: 'u6', privat: false, name: 'Finn Bauer', handle: '@finn', initials: 'FB', color: 'linear-gradient(135deg,#93AEFF,#4152D8)', phone: '+49 173 7890123' },
-  /*
-   * Der eigene Name ist "Henrik", nicht "Du". Die App sagt das seit jeher
-   * (app/mocks/index.ts), die Website sagte "Du" - und damit stand im
-   * Videos-Profil "Du", im Community-Profil aber "Henrik". Wo "Du" richtig
-   * ist, steht es ausdruecklich da: im Chat-Verlauf und an der eigenen Story.
-   */
-  me: { id: 'me', name: 'Henrik', handle: '@henrik', initials: 'H', color: 'linear-gradient(135deg,#FFB877,#EE5F2A)', phone: '+49 170 1234567' },
-  // Diese drei stehen bewusst NICHT in den Kontakten - sonst laesst sich
-  // "Kontakt hinzufuegen" gar nicht ausprobieren.
-  u7: { id: 'u7', privat: true, name: 'Greta Hoffmann', handle: '@greta', initials: 'GH', color: 'linear-gradient(135deg,#FBA0C4,#DC3F7C)', phone: '+49 174 8901234' },
-  u8: { id: 'u8', privat: false, name: 'Hakan Demir', handle: '@hakan', initials: 'HD', color: 'linear-gradient(135deg,#6FE2D0,#12907F)', phone: '+49 175 9012345' },
-  u9: { id: 'u9', privat: false, name: 'Ida Nowak', handle: '@ida', initials: 'IN', color: 'linear-gradient(135deg,#C4A4F7,#7C46EE)', phone: '+49 176 0123456' },
-};
-
-// --- Person finden: Benutzername ODER Telefonnummer ------------------------
-// Henrik wollte nicht mehr an den Benutzernamen gebunden sein.
-
-/** Nur Ziffern, Laendervorwahl vereinheitlicht - "+49 170..." = "0170...". */
-function normalisiereNummer(eingabe) {
-  let z = String(eingabe).replace(/[^\d+]/g, '').replace(/^\+/, '00');
-  if (z.startsWith('00')) z = z.slice(2);
-  else if (z.startsWith('0')) z = '49' + z.slice(1);
-  return z;
+function route(fn) {
+  return async (req, res) => {
+    if (!req.db || !req.nutzerId) {
+      return res.status(401).json({ ok: false, angemeldet: false, error: 'Bitte anmelden' });
+    }
+    try {
+      const ergebnis = await fn(req, res);
+      if (!res.headersSent && ergebnis !== undefined) res.json(ergebnis);
+    } catch (fehler) {
+      console.error(`${req.method} ${req.path} fehlgeschlagen:`, fehler.message);
+      if (!res.headersSent) res.status(500).json({ ok: false, error: fehler.message });
+    }
+  };
 }
 
-function istNummer(eingabe) {
-  return /^[+\d][\d\s/()-]{4,}$/.test(String(eingabe).trim());
+/** Aus dem Ergebnis eines Schreib-Handlers wird eine Antwort. */
+function antwort(ergebnis, zusatz = {}) {
+  if (!ergebnis) return { ok: false, error: 'Nicht angemeldet' };
+  if (ergebnis.ok === false) return { ok: false, error: ergebnis.fehler || 'Hat nicht geklappt' };
+  return { ok: true, ...ergebnis, ...zusatz };
 }
 
-function findePerson(eingabe) {
-  const roh = String(eingabe).trim();
-  if (!roh) return null;
-  const personen = Object.values(users).filter((u) => u.id !== 'me');
+/** Einen einzelnen Beitrag frisch aus der Datenbank holen. */
+async function beitrag(req, id) {
+  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+  return alle.find((b) => b.id === id) || null;
+}
 
-  if (istNummer(roh)) {
-    const gesucht = normalisiereNummer(roh);
-    return personen.find((u) => u.phone && normalisiereNummer(u.phone) === gesucht) || null;
+// ============================================================================
+// Zustand und Zugangsdaten
+// ============================================================================
+
+/*
+ * Zustand des Backends. Zeigt in einem Blick, ob die Website wirklich mit der
+ * Datenbank spricht. Ohne diesen Endpunkt sieht "es läuft" genauso aus wie
+ * "es kommt nichts an" — genau das hat lange verschleiert, dass nichts ankam.
+ */
+app.get('/api/zustand', async (req, res) => {
+  const ergebnis = {
+    zeit: new Date().toISOString(),
+    supabase: {
+      konfiguriert: isConfigured(),
+      url: supabaseUrl,
+      quelle: process.env.SUPABASE_URL ? 'Umgebungsvariable' : 'Standardwert im Code',
+    },
+    anmeldung: { angemeldet: Boolean(req.nutzerId), nutzerId: req.nutzerId },
+    // Es gibt keine zweite Möglichkeit mehr. Ohne Anmeldung ist die Antwort
+    // leer, nicht ersatzweise gefüllt.
+    daten: req.nutzerId ? 'Supabase' : 'keine (nicht angemeldet)',
+    beispieldaten: false,
+  };
+
+  if (isConfigured() && req.db) {
+    try {
+      const { count, error } = await req.db
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      ergebnis.supabase.erreichbar = !error;
+      ergebnis.supabase.profile = error ? null : count;
+      if (error) ergebnis.supabase.fehler = error.message;
+
+      const { count: beitraege } = await req.db
+        .from('posts')
+        .select('*', { count: 'exact', head: true });
+      ergebnis.supabase.beitraege = beitraege ?? null;
+    } catch (fehler) {
+      ergebnis.supabase.erreichbar = false;
+      ergebnis.supabase.fehler = fehler.message;
+    }
+  } else if (isConfigured()) {
+    ergebnis.supabase.erreichbar = null;
+    ergebnis.supabase.hinweis =
+      'Ohne Anmeldung nicht prüfbar: die Regeln der Datenbank lassen anonyme Zugriffe nicht zu.';
   }
-  const name = roh.replace(/^@/, '').toLowerCase();
-  return personen.find(
-    (u) => u.handle.replace('@', '').toLowerCase() === name || u.name.toLowerCase() === name
-  ) || null;
+
+  res.json(ergebnis);
+});
+
+/*
+ * Die Zugangsdaten, mit denen sich die Oberfläche selbst bei Supabase
+ * anmeldet. Der Schlüssel ist der öffentliche „publishable"-Schlüssel; er
+ * steckt genauso im App-Bundle. Geschützt wird die Datenbank durch ihre
+ * Regeln, nicht durch Geheimhaltung dieses Schlüssels.
+ */
+app.get('/api/konfiguration', (_req, res) => {
+  res.json({ supabaseUrl, supabaseKey, konfiguriert: isConfigured() });
+});
+
+/*
+ * Das eigene Konto auf den Startzustand zurücksetzen.
+ *
+ * Für die Prüfläufe: sie sollen wiederholbar sein und keine Testgruppen oder
+ * Testkommentare hinterlassen. Vorher stellte dieser Endpunkt die Beispiel-
+ * daten im Arbeitsspeicher wieder her — die gibt es nicht mehr, also räumt
+ * jetzt die Datenbank auf.
+ *
+ * Angefasst wird ausschließlich das eigene Konto. Ein Prüflauf kann damit
+ * nichts anfassen, was jemand anderem gehört.
+ */
+app.post('/api/reset', route(async (req) => {
+  const { data, error } = await req.db.rpc('zuruecksetzen', { ziel: req.nutzerId });
+  if (error) throw error;
+  return { ok: data?.ok !== false, ...(data || {}) };
+}));
+
+// ============================================================================
+// Startdaten
+// ============================================================================
+
+/*
+ * Alles, was die Oberfläche beim Start braucht.
+ *
+ * Nicht angemeldet ist kein Fehler: die Antwort sagt es und die Oberfläche
+ * zeigt die Anmeldung. Deshalb 200 und nicht 401 — sonst protokollierte der
+ * Browser bei jedem ersten Aufruf einen Ladefehler.
+ */
+app.get('/api/bootstrap', async (req, res) => {
+  if (!req.db || !req.nutzerId) {
+    return res.json({ angemeldet: false, quelle: 'keine', hinweis: 'Bitte anmelden' });
+  }
+  try {
+    const daten = await supabaseApi.bootstrapData(req.db, req.nutzerId);
+    res.json({ angemeldet: true, ...daten });
+  } catch (fehler) {
+    console.error('Startdaten fehlgeschlagen:', fehler.message);
+    res.status(500).json({ angemeldet: true, error: fehler.message });
+  }
+});
+
+// ============================================================================
+// Chats
+// ============================================================================
+
+/*
+ * Diese Route ist bewusst eng gefasst. `:was` würde sonst auch /accept, /read
+ * und alles andere unter /api/chats/... abfangen — Express nimmt die erste
+ * passende Route. Unbekanntes geht deshalb mit next() weiter.
+ */
+const CHAT_AKTIONEN = ['archiv', 'stumm', 'gelesen', 'loeschen', 'sperren', 'mitteilungen', 'blockieren', 'favorit'];
+
+app.post('/api/chats/:chatId/:was', (req, res, next) => {
+  if (!CHAT_AKTIONEN.includes(req.params.was)) return next();
+  return route(async () => {
+    const { chatId, was } = req.params;
+
+    const { data: chat } = await req.db.from('chats').select('id, name').eq('id', chatId).maybeSingle();
+    if (!chat) return { ok: false, error: 'Diesen Chat gibt es nicht' };
+
+    if (was === 'loeschen') {
+      const e = await syncHandlers.handleLeaveChat(req.db, req.nutzerId, chatId);
+      return antwort(e, { meldung: `„${chat.name}" gelöscht` });
+    }
+
+    if (was === 'blockieren') {
+      // Blockiert wird die Person, nicht der Chat. Ein Zweierchat hat genau
+      // eine andere Person; in einer Gruppe ergibt der Knopf keinen Sinn.
+      const { data: andere } = await req.db
+        .from('chat_members')
+        .select('user_id')
+        .eq('chat_id', chatId)
+        .neq('user_id', req.nutzerId);
+      const ziel = (andere || [])[0]?.user_id;
+      if (!ziel) return { ok: false, error: 'In einer Gruppe geht das nicht' };
+
+      const e = await syncHandlers.handleBlockUser(req.db, req.nutzerId, ziel);
+      return antwort(e, {
+        blocked: e?.blockiert,
+        meldung: e?.blockiert ? `„${chat.name}" blockiert` : `„${chat.name}" nicht mehr blockiert`,
+      });
+    }
+
+    if (was === 'favorit') {
+      return antwort(await syncHandlers.handleMarkChatFavorite(req.db, req.nutzerId, chatId));
+    }
+
+    const e = await syncHandlers.handleChatAction(req.db, req.nutzerId, chatId, was);
+    const meldungen = {
+      archiv: [`„${chat.name}" archiviert`, `„${chat.name}" ist wieder in der Liste`],
+      stumm: [`„${chat.name}" stummgeschaltet`, `„${chat.name}" ist nicht mehr stumm`],
+      gelesen: ['Als gelesen markiert', 'Als ungelesen markiert'],
+      sperren: [`„${chat.name}" ist gesperrt`, `„${chat.name}" ist wieder offen`],
+      mitteilungen: [`Keine Mitteilungen mehr aus „${chat.name}"`, `Mitteilungen aus „${chat.name}" wieder an`],
+    };
+    const an = Boolean(e?.wert);
+    return antwort(e, {
+      archiviert: was === 'archiv' ? an : undefined,
+      muted: was === 'stumm' ? an : undefined,
+      unread: was === 'gelesen' ? (an ? 0 : 1) : undefined,
+      gesperrt: was === 'sperren' ? an : undefined,
+      aus: was === 'mitteilungen' ? an : undefined,
+      meldung: (meldungen[was] || [])[an ? 0 : 1],
+    });
+  })(req, res);
+});
+
+app.post('/api/chats/:chatId/melden', route(async (req) => {
+  const grund = String(req.body?.grund || '').trim();
+  if (!grund) return { ok: false, error: 'Bitte einen Grund angeben' };
+
+  const { data: andere } = await req.db
+    .from('chat_members')
+    .select('user_id')
+    .eq('chat_id', req.params.chatId)
+    .neq('user_id', req.nutzerId);
+  const ziel = (andere || [])[0]?.user_id;
+  if (!ziel) return { ok: false, error: 'Diesen Chat gibt es nicht' };
+
+  await syncHandlers.handleReportContent(req.db, req.nutzerId, ziel, grund, 'user');
+  return { ok: true, grund, meldung: 'Danke, die Meldung ist bei uns angekommen' };
+}));
+
+app.post('/api/chats/:chatId/leeren', route(async (req) => {
+  const e = await syncHandlers.handleClearChat(req.db, req.nutzerId, req.params.chatId);
+  return antwort(e, { chats: await supabaseApi.ladeChats(req.db, req.nutzerId) });
+}));
+
+app.post('/api/chats/:chatId/read', route(async (req) =>
+  antwort(await syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'gelesen', true))
+));
+
+app.post('/api/chats/:chatId/accept', route(async (req) => {
+  const { data: andere } = await req.db
+    .from('chat_members')
+    .select('user_id')
+    .eq('chat_id', req.params.chatId)
+    .neq('user_id', req.nutzerId);
+  const ziel = (andere || [])[0]?.user_id;
+  if (!ziel) return { ok: false, error: 'Chat nicht gefunden' };
+
+  const e = await syncHandlers.handleAcceptRequest(req.db, req.nutzerId, ziel);
+  return antwort(e, { chatId: req.params.chatId });
+}));
+
+app.get('/api/messages/:chatId', route(async (req) =>
+  supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId)
+));
+
+app.post('/api/messages/:chatId', route(async (req) => {
+  const text = String(req.body?.text || '').trim();
+  if (!text) return { ok: false, error: 'Text erforderlich' };
+
+  const sperre = await chatGesperrt(req, req.params.chatId);
+  if (sperre) return { ok: false, error: sperre };
+
+  const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text);
+  if (!e || e.ok === false) return antwort(e);
+
+  return {
+    id: e.nachricht.id,
+    from: 'me',
+    text,
+    time: supabaseApi.chatZeit(e.nachricht.created_at),
+    zeitpunkt: e.nachricht.created_at,
+  };
+}));
+
+/**
+ * Darf in diesem Chat geschrieben werden?
+ *
+ * Zwei Gründe sprechen dagegen: die Kontaktanfrage läuft noch (bei einem
+ * privaten Profil), oder die Person ist blockiert. Beides steht in der
+ * Datenbank, nicht im Browser — eine Regel, die nur im Markup steht, ist
+ * keine.
+ */
+async function chatGesperrt(req, chatId) {
+  const { data: andere } = await req.db
+    .from('chat_members')
+    .select('user_id')
+    .eq('chat_id', chatId)
+    .neq('user_id', req.nutzerId);
+  const ziel = (andere || [])[0]?.user_id;
+  if (!ziel) return null;
+
+  const [{ data: kontakt }, { count: blockiert }] = await Promise.all([
+    req.db
+      .from('contacts')
+      .select('status')
+      .eq('user_id', req.nutzerId)
+      .eq('contact_id', ziel)
+      .maybeSingle(),
+    req.db
+      .from('blocks')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', req.nutzerId)
+      .eq('blocked_user_id', ziel),
+  ]);
+
+  if (blockiert > 0) return 'Diese Person ist blockiert';
+  if (kontakt?.status === 'pending') return 'Warte, bis die Anfrage angenommen wurde';
+  return null;
 }
 
-const chats = [
-  { id: 'c1', userId: 'u1', name: 'Anna Schmidt', preview: 'Klingt gut, bis später!', time: '14:32', unread: 2, muted: false, isGroup: false },
-  { id: 'c2', userId: 'u2', name: 'Bob Müller', preview: 'Schicke dir die Datei gerade', time: '13:05', unread: 1, muted: false, isGroup: false },
-  { id: 'c3', userId: 'u3', name: 'Clara Weber', preview: 'Foto', time: '11:48', unread: 0, muted: false, isGroup: false, mediaPreview: 'image' },
-  { id: 'c4', userId: null, name: 'Projekt Team', preview: 'David: Meeting verschoben auf 15 Uhr', time: 'Gestern', unread: 0, muted: true, isGroup: true, members: ['u1', 'u2', 'u4'] },
-  { id: 'c5', userId: 'u4', name: 'David König', preview: 'Alles klar 👍', time: 'Gestern', unread: 0, muted: false, isGroup: false },
-  { id: 'c6', userId: 'u5', name: 'Elif Yilmaz', preview: 'Sprachnachricht', time: 'Mo', unread: 0, muted: false, isGroup: false, mediaPreview: 'audio' },
-  { id: 'c7', userId: null, name: 'Wochenend-Crew', preview: 'Elif: Wer ist dabei?', time: 'Mo', unread: 0, muted: false, isGroup: true, members: ['u3', 'u5', 'u6'] },
-  { id: 'c8', userId: 'u6', name: 'Finn Bauer', preview: 'Danke dir!', time: 'So', unread: 0, muted: false, isGroup: false },
-];
+app.post('/api/messages/:chatId/anhang', route(async (req) => {
+  const art = req.body?.art;
+  const sperre = await chatGesperrt(req, req.params.chatId);
+  if (sperre) return { ok: false, error: sperre };
 
-const stories = [
-  { id: 's0', userId: 'me', name: 'Deine Story', own: true, viewed: false, liked: false },
-  { id: 's1', userId: 'u1', name: 'Anna', viewed: false, liked: false, caption: 'Erstes Licht auf 2500 Metern' },
-  { id: 's2', userId: 'u2', name: 'Bob', viewed: false, liked: false, caption: 'Neuer Build läuft durch' },
-  { id: 's3', userId: 'u3', name: 'Clara', viewed: false, liked: false, caption: 'Hafen im Nebel' },
-  { id: 's4', userId: 'u4', name: 'David', viewed: true, liked: false, caption: 'Schreibtisch neu sortiert' },
-  { id: 's5', userId: 'u5', name: 'Elif', viewed: true, liked: false, caption: 'Pasta in zehn Minuten' },
-  { id: 's6', userId: 'u6', name: 'Finn', viewed: true, liked: false, caption: '20 Kilometer geschafft' },
-];
+  let text;
+  let medien = {};
+
+  if (art === 'foto') {
+    text = 'Foto';
+    medien = { typ: 'image' };
+  } else if (art === 'standort') {
+    const standorte = await supabaseApi.ladeStandorte(req.db);
+    const platz = standorte.find((p) => p.id === req.body?.id) || standorte[0];
+    if (!platz) return { ok: false, error: 'Diesen Standort gibt es nicht' };
+    text = `Standort: ${platz.name}`;
+  } else if (art === 'kontakt') {
+    const person = await supabaseApi.ladeProfil(req.db, req.body?.id);
+    if (!person) return { ok: false, error: 'Diese Person gibt es nicht' };
+    text = `Kontakt: ${person.name}`;
+  } else {
+    return { ok: false, error: 'Unbekannter Anhang' };
+  }
+
+  const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, medien);
+  if (!e || e.ok === false) return antwort(e);
+
+  return {
+    ok: true,
+    message: {
+      id: e.nachricht.id,
+      from: 'me',
+      text,
+      media: medien.typ,
+      time: supabaseApi.chatZeit(e.nachricht.created_at),
+    },
+  };
+}));
+
+app.post('/api/messages/:chatId/:messageId/stern', route(async (req) => {
+  const e = await syncHandlers.handleStarMessage(req.db, req.nutzerId, req.params.messageId);
+  return antwort(e, { id: req.params.messageId });
+}));
+
+/** Alles, was in diesem Chat an Medien und Markiertem liegt. */
+app.get('/api/chats/:chatId/medien', route(async (req) => {
+  const alle = await supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId);
+  const { data: sterne } = await req.db
+    .from('message_stars')
+    .select('message_id')
+    .eq('user_id', req.nutzerId);
+  const markiert = new Set((sterne || []).map((s) => s.message_id));
+
+  return {
+    medien: alle.filter((m) => m.media),
+    markiert: alle.filter((m) => markiert.has(m.id)),
+    gesamt: alle.length,
+  };
+}));
+
+app.post('/api/groups', route(async (req) => {
+  const name = String(req.body?.name || '').trim();
+  const mitglieder = Array.isArray(req.body?.memberIds) ? req.body.memberIds : [];
+  if (!name) return { ok: false, error: 'Name erforderlich' };
+  if (mitglieder.length === 0) return { ok: false, error: 'Mindestens ein Mitglied erforderlich' };
+
+  const e = await syncHandlers.handleCreateGroup(req.db, req.nutzerId, name, mitglieder, req.body?.bereich);
+  if (!e || e.ok === false) return antwort(e);
+
+  const info = String(req.body?.info || '').trim();
+  if (info) await syncHandlers.handleSendMessage(req.db, req.nutzerId, e.chat.id, info);
+
+  return {
+    id: e.chat.id,
+    name: e.chat.name,
+    isGroup: true,
+    members: mitglieder,
+    preview: info || 'Gruppe erstellt',
+    time: supabaseApi.chatZeit(e.chat.created_at),
+    unread: 0,
+    muted: false,
+  };
+}));
+
+// ============================================================================
+// Kontakte
+// ============================================================================
+
+app.post('/api/personen/suche', route(async (req) => {
+  const e = await syncHandlers.handleFindPerson(req.db, req.nutzerId, req.body?.eingabe || '');
+  return { person: e?.person || null };
+}));
 
 /*
- * Querformat-Videos (Videos / Querformat im Prototyp).
- *
- * `art` entscheidet, unter welchem Knopf der Filterleiste ein Video
- * auftaucht: 'standard', '360' oder 'live'. Fehlt das Feld, gilt
- * 'standard'. Vorher gab es das Feld nicht - die Leiste zeigte deshalb
- * unter allen vier Knoepfen dieselben Videos, was Henrik am 26.08.2026
- * gemeldet hat. Dieselbe Liste steht in app/mocks/index.ts.
- *
- * Jede Art kommt mehrfach vor: mit nur einem Live-Video liesse sich nicht
- * erkennen, ob wirklich gefiltert wird.
+ * "Nicht gefunden" und "schon vorhanden" sind hier normale Ergebnisse einer
+ * Suche, keine Fehler der Anfrage. Deshalb 200 mit ok-Feld statt 404/409 —
+ * sonst protokolliert der Browser bei jeder Fehleingabe einen Ladefehler.
  */
-const clips = [
-  { id: 'q1', userId: 'u1', title: 'Zugspitze bei Sonnenaufgang – die ganze Tour', duration: '18:42', views: 128400, age: 'vor 2 Tagen', art: '360', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', tags: ['#sonnenaufgang'], description: 'Die ganze Tour von der Hütte bis zum Gipfel, ungeschnitten. Kapitel in der Beschreibung.', likes: 8420, comments: 214, liked: false, saved: false, reposted: false, kapitel: [{ bei: 0, titel: 'Aufbruch an der Hütte' }, { bei: 240, titel: 'Über das Blockfeld' }, { bei: 620, titel: 'Der Grat' }, { bei: 900, titel: 'Sonnenaufgang am Gipfel' }], untertitel: true },
-  { id: 'q2', userId: 'u4', title: 'Design Tokens sauber aufsetzen', duration: '24:10', views: 41200, age: 'vor 5 Tagen', art: 'standard', location: 'Köln', music: 'Lo-Fi Focus – beatlab', tags: ['#designsystem'], description: 'Von der ersten Farbvariable bis zum fertigen Theme — Schritt für Schritt mitgebaut.', likes: 3110, comments: 96, liked: false, saved: false, reposted: false, kapitel: [{ bei: 0, titel: 'Warum Tokens' }, { bei: 180, titel: 'Die erste Farbvariable' }, { bei: 600, titel: 'Hell und Dunkel' }, { bei: 1100, titel: 'Übergabe an den Code' }], untertitel: true },
-  { id: 'q3', userId: 'u5', title: 'Meal Prep für eine ganze Woche', duration: '11:07', views: 302900, age: 'vor 1 Woche', art: 'standard', location: 'Hamburg', music: 'Kitchen Groove – Milo', tags: ['#mealprep'], description: 'Fünf Gerichte, eine Stunde Arbeit, eine ganze Woche satt. Einkaufszettel unten.', likes: 24800, comments: 612, liked: false, saved: false, reposted: false, kapitel: [{ bei: 0, titel: 'Einkaufszettel' }, { bei: 120, titel: 'Vorbereiten' }, { bei: 400, titel: 'Kochen' }, { bei: 580, titel: 'Abfüllen' }], untertitel: true },
-  { id: 'q4', userId: 'u2', title: 'Expo SDK 57 live erklärt – Fragen willkommen', duration: 'LIVE', views: 18700, age: 'läuft gerade', art: 'live', zuschauer: 1240, location: 'Köln', music: 'Originalton', tags: ['#reactnative'], description: 'Was sich mit Expo SDK 57 ändert und worauf man beim Umstieg achten muss.', likes: 1240, comments: 58, liked: false, saved: false, reposted: false },
-  { id: 'q5', userId: 'u3', title: 'Nachtfotografie am Hafen', duration: '15:31', views: 87300, age: 'vor 2 Wochen', art: 'standard', location: 'Hamburg', music: 'Golden Hour – Lys', tags: ['#hafen', '#nachtfotografie'], description: 'Blaue Stunde am Hafen: Einstellungen, Stativ, Nachbearbeitung.', likes: 6180, comments: 143, liked: false, saved: false, reposted: false, untertitel: true },
-  { id: 'q6', userId: 'u6', title: 'Kleine Commits, klare Historie', duration: '07:44', views: 22100, age: 'vor 3 Wochen', art: 'standard', location: 'Berlin', music: 'Originalton', tags: ['#reactnative'], description: 'Warum kleine Commits das Review leichter machen — mit Beispielen aus echten Projekten.', likes: 1870, comments: 74, liked: false, saved: false, reposted: false, untertitel: true },
-  { id: 'q7', userId: 'u3', title: 'Hamburger Hafen in 360° – einmal um die Elbphilharmonie', duration: '12:20', views: 64500, age: 'vor 4 Tagen', art: '360', location: 'Hamburg', music: 'Harbour Drift – Lys', tags: ['#hafen', '#360'], description: 'Rundumblick vom Wasser aus. Zum Umsehen ziehen oder das Handy drehen.', likes: 4820, comments: 118, liked: false, saved: false, reposted: false },
-  { id: 'q8', userId: 'u5', title: 'Sonntagsküche live – wir kochen zusammen', duration: 'LIVE', views: 9400, age: 'läuft gerade', art: 'live', zuschauer: 412, location: 'Hamburg', music: 'Originalton', tags: ['#mealprep'], description: 'Zwei Gerichte, eine Pfanne, alle Fragen im Chat.', likes: 730, comments: 205, liked: false, saved: false, reposted: false },
-  { id: 'q9', userId: 'u1', title: 'Gipfelpanorama Alpen – 360° Rundflug', duration: '08:05', views: 51200, age: 'vor 1 Woche', art: '360', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', tags: ['#sonnenaufgang', '#360'], description: 'Einmal über die Gipfelkette, aufgenommen mit einer 360°-Kamera an der Drohne.', likes: 3940, comments: 87, liked: false, saved: false, reposted: false },
-];
+app.post('/api/contacts', route(async (req) => {
+  const eingabe = String(req.body?.handle || '').trim();
+  if (!eingabe) return { ok: false, error: 'Bitte Benutzername oder Telefonnummer eingeben' };
 
-// Explorer-Abschnitte (Video - Suche im Prototyp)
-const hashtags = [
-  { tag: '#sonnenaufgang', posts: 128400 },
-  { tag: '#designsystem', posts: 41200 },
-  { tag: '#mealprep', posts: 302900 },
-  { tag: '#reactnative', posts: 18700 },
-  { tag: '#hafen', posts: 87300 },
-  { tag: '#laufen', posts: 220100 },
-  { tag: '#homeoffice', posts: 64800 },
-  { tag: '#nachtfotografie', posts: 39100 },
-];
+  const gefunden = await syncHandlers.handleFindPerson(req.db, req.nutzerId, eingabe);
+  const person = gefunden?.person;
+  if (!person) {
+    return {
+      ok: false,
+      error: syncHandlers.istNummer(eingabe)
+        ? 'Zu dieser Nummer gibt es noch kein Konto'
+        : 'Niemand mit diesem Benutzernamen gefunden',
+    };
+  }
+
+  const privat = Boolean(person.privat);
+  const e = await syncHandlers.handleAddContact(
+    req.db, req.nutzerId, person.id, privat, String(req.body?.nachricht || '')
+  );
+  if (e?.fehler === 'schon-vorhanden') {
+    return { ok: false, error: `${person.name} ist bereits in deinen Kontakten` };
+  }
+  if (!e || e.ok === false) return antwort(e);
+
+  return {
+    ok: true,
+    privat,
+    contact: {
+      id: person.id,
+      name: person.name,
+      status: e.status,
+      about: privat ? 'Anfrage gesendet' : 'Kontakt',
+      phone: person.phone,
+    },
+    chat: { id: e.chatId, userId: person.id, name: person.name, isGroup: false },
+  };
+}));
+
+app.post('/api/kontakte/:userId/favorit', route(async (req) => {
+  const e = await syncHandlers.handleContactFavorite(req.db, req.nutzerId, req.params.userId);
+  return antwort(e, { contacts: await supabaseApi.ladeKontakte(req.db, req.nutzerId) });
+}));
+
+// ============================================================================
+// Profile
+// ============================================================================
+
+app.get('/api/profile/:userId', route(async (req, res) => {
+  const id = req.params.userId === 'me' ? req.nutzerId : req.params.userId;
+  const profil = await supabaseApi.ladeProfil(req.db, id);
+  if (!profil) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  const [{ data: zahlen }, { count: folgeIch }, beitraege] = await Promise.all([
+    req.db.from('profile_zahlen').select('*').eq('id', id).maybeSingle(),
+    req.db
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('follower_id', req.nutzerId)
+      .eq('followee_id', id),
+    supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 200 }),
+  ]);
+
+  const eigene = beitraege.filter((b) => b.userId === id || (id === req.nutzerId && b.userId === 'me'));
+
+  res.json({
+    ...profil,
+    userId: id,
+    followers: Number(zahlen?.followers || 0),
+    following: Number(zahlen?.following || 0),
+    posts: Number(zahlen?.beitraege || 0),
+    isFollowing: folgeIch > 0,
+    following_me: folgeIch > 0,
+    // Das Raster zeigt, was diese Person veröffentlicht hat — nicht mehr eine
+    // erfundene Kachelfolge.
+    grid: eigene.map((b) => ({
+      id: b.id,
+      kind: b.kind === 'post' ? 'image' : 'video',
+      eigen: id === req.nutzerId,
+    })),
+  });
+}));
+
+app.post('/api/profile/:userId/:was', (req, res, next) => {
+  if (!['stumm', 'block', 'melden'].includes(req.params.was)) return next();
+  return route(async () => {
+    const { userId, was } = req.params;
+
+    if (was === 'stumm') {
+      const e = await syncHandlers.handleMuteUser(req.db, req.nutzerId, userId);
+      return antwort(e, { muted: e?.stumm });
+    }
+    if (was === 'melden') {
+      const grund = String(req.body?.grund || '').trim();
+      if (!grund) return { ok: false, error: 'Bitte einen Grund auswählen' };
+      const e = await syncHandlers.handleReportContent(req.db, req.nutzerId, userId, grund, 'user');
+      return antwort(e, { gemeldet: grund });
+    }
+
+    const e = await syncHandlers.handleBlockUser(req.db, req.nutzerId, userId);
+    // Blockieren hat Folgen: die Person fliegt aus den Kontakten. Sonst wäre
+    // der Knopf nur ein Hinweis mit anderem Text.
+    if (e?.blockiert) {
+      await req.db.from('contacts').delete().eq('user_id', req.nutzerId).eq('contact_id', userId);
+      await req.db.from('follows').delete().eq('follower_id', req.nutzerId).eq('followee_id', userId);
+    }
+    return antwort(e, {
+      blocked: e?.blockiert,
+      contacts: await supabaseApi.ladeKontakte(req.db, req.nutzerId),
+    });
+  })(req, res);
+});
+
+const folgen = route(async (req) => {
+  const e = await syncHandlers.handleFollowUser(req.db, req.nutzerId, req.params.userId);
+  if (!e || e.ok === false) return antwort(e);
+
+  const { data: zahlen } = await req.db
+    .from('profile_zahlen')
+    .select('followers')
+    .eq('id', req.params.userId)
+    .maybeSingle();
+
+  return {
+    ok: true,
+    following: e.folgt,
+    following_me: e.folgt,
+    followers: Number(zahlen?.followers || 0),
+  };
+});
+
+app.post('/api/autoren/:userId/follow', folgen);
+app.post('/api/profile/:userId/follow', folgen);
+
+// ============================================================================
+// Eigenes Profil und eigene Inhalte
+// ============================================================================
+
+app.post('/api/eigene/profil', route(async (req) => {
+  const { name, bio, link, color } = req.body || {};
+  const aenderungen = {};
+
+  if (name !== undefined) {
+    const sauber = String(name).trim();
+    if (!sauber) return { ok: false, error: 'Der Name darf nicht leer sein' };
+    if (sauber.length > 40) return { ok: false, error: 'Der Name ist zu lang (höchstens 40 Zeichen)' };
+    aenderungen.name = sauber;
+    // Kürzel aus den Anfangsbuchstaben, höchstens zwei.
+    aenderungen.initials = sauber.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  }
+
+  if (bio !== undefined) {
+    const sauber = String(bio).trim();
+    if (sauber.length > 150) return { ok: false, error: 'Die Info ist zu lang (höchstens 150 Zeichen)' };
+    aenderungen.bio = sauber;
+  }
+
+  if (link !== undefined) aenderungen.link = String(link).trim();
+
+  /*
+   * Erlaubt ist eine einzelne Farbe oder ein Zwei-Ton-Verlauf. Der Wert landet
+   * ungefiltert in einem style-Attribut, deshalb wird er hier eng geprüft und
+   * nicht nur auf Länge.
+   */
+  const istFarbe = /^#[0-9a-fA-F]{6}$/.test(String(color));
+  const istVerlauf = /^linear-gradient\(135deg,#[0-9a-fA-F]{6},#[0-9a-fA-F]{6}\)$/.test(String(color));
+  if (color !== undefined && (istFarbe || istVerlauf)) aenderungen.color = color;
+
+  if (Object.keys(aenderungen).length === 0) return { ok: false, error: 'Nichts zu ändern' };
+
+  const e = await syncHandlers.handleUpdateProfile(req.db, req.nutzerId, aenderungen);
+  if (!e || e.ok === false) return antwort(e);
+
+  const profil = await supabaseApi.ladeProfil(req.db, req.nutzerId);
+  return { ok: true, profil };
+}));
+
+app.post('/api/eigene/highlight', route(async (req) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
+  return antwort(await syncHandlers.handleProfilListe(req.db, req.nutzerId, 'highlights', name));
+}));
+
+app.post('/api/eigene/playlist', route(async (req) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
+  return antwort(await syncHandlers.handleProfilListe(req.db, req.nutzerId, 'playlists', name));
+}));
+
+app.post('/api/eigene/spende', route(async (req) => {
+  const titel = String(req.body?.titel || '').trim();
+  if (!titel) return { ok: false, error: 'Bitte einen Titel eingeben' };
+
+  /*
+   * Das Ziel ist freiwillig — nicht jede Sammlung läuft auf einen Betrag zu,
+   * manche laufen einfach. Freiwillig heißt aber nicht beliebig: Text oder
+   * eine negative Zahl werden weiterhin abgelehnt.
+   */
+  const roh = String(req.body?.ziel ?? '').trim();
+  let ziel = 0;
+  if (roh) {
+    ziel = Number(roh.replace(',', '.'));
+    if (!Number.isFinite(ziel) || ziel <= 0) {
+      return { ok: false, error: 'Das Spendenziel muss eine Zahl über null sein' };
+    }
+  }
+
+  const spende = { titel, ziel, gesammelt: 0, text: String(req.body?.text || '').trim() };
+  return antwort(await syncHandlers.handleSpende(req.db, req.nutzerId, spende));
+}));
+
+const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
+
+app.post('/api/eigene/beitrag', route(async (req) => {
+  const beschreibung = String(req.body?.beschreibung || '').trim();
+  if (!beschreibung) return { ok: false, error: 'Bitte eine Beschreibung eingeben' };
+
+  const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
+    art: 'post',
+    beschreibung,
+    ort: String(req.body?.ort || '').trim(),
+    musik: musikAus(req.body),
+  });
+  if (!e || e.ok === false) return antwort(e);
+  return { ok: true, beitrag: await beitrag(req, e.beitrag.id) };
+}));
+
+app.post('/api/eigene/video', route(async (req) => {
+  const beschreibung = String(req.body?.beschreibung || '').trim();
+  if (!beschreibung) return { ok: false, error: 'Bitte eine Beschreibung eingeben' };
+  const quer = req.body?.format === 'quer';
+
+  const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
+    // Querformat ist 'clip', Hochformat 'reel'. Eine eigene Tabelle für
+    // Videos gibt es nicht.
+    art: quer ? 'clip' : 'reel',
+    titel: quer ? beschreibung : '',
+    beschreibung,
+    ort: String(req.body?.ort || '').trim(),
+    musik: musikAus(req.body),
+    dauer: quer ? String(req.body?.dauer || '00:15') : null,
+  });
+  if (!e || e.ok === false) return antwort(e);
+
+  const frisch = await beitrag(req, e.beitrag.id);
+  return quer ? { ok: true, clip: frisch } : { ok: true, video: frisch };
+}));
+
+app.post('/api/eigene/livestream', route(async (req) => {
+  if (req.body?.aktion === 'start') {
+    const e = await syncHandlers.handleLivestream(req.db, req.nutzerId, {
+      seit: Date.now(),
+      zuschauer: 0,
+    });
+    return antwort(e, { live: true });
+  }
+
+  const { data: profil } = await req.db.from('profiles').select('live').eq('id', req.nutzerId).maybeSingle();
+  const lief = profil?.live;
+  await syncHandlers.handleLivestream(req.db, req.nutzerId, null);
+  if (!lief) return { ok: true, live: false };
+
+  // Die Aufzeichnung ist ein normales Video, kein laufender Stream — sie
+  // gehört unter "Standard", nicht unter "Live".
+  const sekunden = Math.max(1, Math.round((Date.now() - lief.seit) / 1000));
+  const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
+    art: 'clip',
+    titel: String(req.body?.titel || '').trim() || 'Livestream-Aufzeichnung',
+    dauer: `${String(Math.floor(sekunden / 60)).padStart(2, '0')}:${String(sekunden % 60).padStart(2, '0')}`,
+  });
+  if (!e || e.ok === false) return antwort(e);
+
+  return { ok: true, live: false, clip: await beitrag(req, e.beitrag.id) };
+}));
+
+app.post('/api/eigene/:id/loeschen', route(async (req) => {
+  const eigener = await beitrag(req, req.params.id);
+  if (!eigener) return { ok: false, error: 'Das gibt es nicht mehr' };
+  if (eigener.userId !== 'me') return { ok: false, error: 'Das ist nicht dein Beitrag' };
+
+  const e = await syncHandlers.handleDeleteContent(req.db, req.nutzerId, req.params.id, 'post');
+  return antwort(e, { meldung: 'Gelöscht' });
+}));
+
+app.post('/api/eigene/:id/sammlung', route(async (req) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return { ok: false, error: 'Bitte eine Sammlung wählen' };
+  // Die Zuordnung Beitrag → Sammlung braucht eine eigene Tabelle; bis dahin
+  // sagt der Endpunkt das ehrlich, statt ein Gelingen vorzutäuschen.
+  return { ok: false, error: 'Sammlungen sind noch nicht angelegt' };
+}));
+
+// ============================================================================
+// Beiträge, Videos, Clips
+// ============================================================================
 
 /*
- * dauer und lyrics werden auf der Sound-Seite gebraucht.
- *
- * Prototyp-Frame "VSSo + Sound + Lyrics": Songname, Produzent/in, eine
- * Trennlinie und darunter der Liedtext ueber die ganze Seite. Henrik am
- * 26.08.2026, Punkt 11: "Sound öffnet, aber keine Lyrics-Anzeige."
- *
- * Vorher stand hier eine einzelne Zeile. Der Frame zeigt einen ganzen Text,
- * in Strophen getrennt - deshalb jetzt mehrere Zeilen je Lied. Instrumentale
- * Stuecke haben keinen Text; sie bekommen null und die Seite sagt das auch,
- * statt "Instrumental" als Liedzeile auszugeben.
+ * Ein Endpunkt für alle drei. Vorher gab es /posts, /videos und /clips mit je
+ * eigener Fassung derselben Aktionen — bei /videos fehlte "save" in Supabase,
+ * bei /clips fehlte alles. Jetzt laufen alle drei durch dieselbe Stelle und
+ * können gar nicht mehr auseinander liegen.
  */
-const sounds = [
-  {
-    id: 'so1', title: 'Golden Hour', artist: 'Lys', uses: 12400, dauer: '3:46',
-    lyrics: [
-      'And the light comes slow over the water',
-      'nobody up but the gulls and me',
-      '',
-      'Cranes in the mist like a paper drawing',
-      'the harbour holds its breath',
-      '',
-      'Golden hour, golden hour',
-      'stay a little longer now',
-      'Golden hour, golden hour',
-      'nothing here needs fixing',
-    ],
-  },
-  { id: 'so2', title: 'Lo-Fi Focus', artist: 'beatlab', uses: 8210, dauer: '2:58', lyrics: null },
-  {
-    id: 'so3', title: 'Kitchen Groove', artist: 'Milo', uses: 24800, dauer: '3:12',
-    lyrics: [
-      'Ten minutes and the table is set',
-      'onions going soft in the pan',
-      '',
-      'Nobody taught me, I just kept going',
-      'burnt a lot of Sundays learning how',
-      '',
-      'Kitchen groove, kitchen groove',
-      'dinner is an easy thing',
-    ],
-  },
-  {
-    id: 'so4', title: 'Runner High', artist: 'Aster', uses: 3140, dauer: '4:05',
-    lyrics: [
-      'One more mile, one more morning',
-      'the city still asleep behind me',
-      '',
-      'Legs remember what the head forgets',
-      'keep the rhythm, keep the rhythm',
-      '',
-      'Runner high, runner high',
-      'nothing hurts until I stop',
-    ],
-  },
-  { id: 'so5', title: 'Ambient Sunrise', artist: 'Nora K.', uses: 5670, dauer: '5:21', lyrics: null },
-];
+async function inhaltsAktion(req) {
+  const { id, action } = req.params;
+  const vorher = await beitrag(req, id);
+  if (!vorher) return { fehlt: true };
 
-// ort verbindet den Standort mit dem location-Feld der Beitraege - ohne das
-// waere die Standort-Seite immer leer. adresse und koordinaten stehen im
-// Prototyp-Frame "VSS + Standort" im Kopf.
-const places = [
-  { id: 'pl1', name: 'Hamburger Hafen', posts: 8730, ort: 'Hamburg', adresse: 'Am Sandtorkai, 20457 Hamburg, Deutschland', koordinaten: '53.5413° N, 9.9891° O', x: 44, y: 28 },
-  { id: 'pl2', name: 'Zugspitze', posts: 12400, ort: 'Zugspitze', adresse: 'Zugspitzplatt, 82475 Garmisch-Partenkirchen, Deutschland', koordinaten: '47.4211° N, 10.9853° O', x: 52, y: 78 },
-  { id: 'pl3', name: 'Rheinpark Köln', posts: 3140, ort: 'Rheinpark', adresse: 'Sachsenbergstraße, 50679 Köln, Deutschland', koordinaten: '50.9494° N, 6.9722° O', x: 30, y: 52 },
-  { id: 'pl4', name: 'Berlin Mitte', posts: 22100, ort: 'Berlin', adresse: 'Unter den Linden, 10117 Berlin, Deutschland', koordinaten: '52.5170° N, 13.3889° O', x: 70, y: 34 },
-  { id: 'pl5', name: 'Alster', posts: 5310, ort: 'Hamburg', adresse: 'An der Alster, 20099 Hamburg, Deutschland', koordinaten: '53.5586° N, 10.0011° O', x: 46, y: 25 },
-];
+  const handler = {
+    like: () => syncHandlers.handleLikeContent(req.db, req.nutzerId, id),
+    save: () => syncHandlers.handleSaveContent(req.db, req.nutzerId, id),
+    repost: () => syncHandlers.handleRepostContent(req.db, req.nutzerId, id),
+    notify: () => syncHandlers.handleNotifyPost(req.db, req.nutzerId, id),
+    share: () => syncHandlers.handleShareContent(req.db, req.nutzerId, id, req.body?.empfaenger || []),
+    follow: async () => {
+      const autor = vorher.userId === 'me' ? req.nutzerId : vorher.userId;
+      return syncHandlers.handleFollowUser(req.db, req.nutzerId, autor);
+    },
+  }[action];
 
-// Friend-Map (Messenger / Friend-Map im Prototyp)
-const friends = [
-  { id: 'u1', x: 24, y: 30, place: 'Zugspitze', when: 'vor 5 Min.' },
-  { id: 'u2', x: 62, y: 22, place: 'Köln Innenstadt', when: 'vor 12 Min.' },
-  { id: 'u3', x: 45, y: 55, place: 'Hamburger Hafen', when: 'vor 1 Std.' },
-  { id: 'u4', x: 76, y: 63, place: 'Köln Ehrenfeld', when: 'vor 2 Std.' },
-  { id: 'u5', x: 18, y: 72, place: 'Zuhause', when: 'gerade eben' },
-  { id: 'u6', x: 58, y: 82, place: 'Rheinpark', when: 'vor 20 Min.' },
-];
+  if (!handler) return { unbekannt: true };
+  const e = await handler();
+  if (e && e.ok === false) return { fehler: e.fehler };
 
-const profiles = {
-  u1: { bio: 'Bergsteigerin und Fotografin. Immer auf der Suche nach dem ersten Licht.', link: 'anna-schmidt.de', posts: 148, followers: 12400, following: 312, following_me: true, highlights: ['Alpen', 'Ausrüstung', 'Touren'] },
-  u2: { bio: 'Entwickler. Schreibt über Expo, Navigation und Performance.', link: 'bobmueller.dev', posts: 63, followers: 2140, following: 189, following_me: true, highlights: ['Talks', 'Setup'] },
-  u3: { bio: 'Hafen, Hamburg, Hochformat.', link: 'clara.photo', posts: 421, followers: 8730, following: 640, following_me: true, highlights: ['Hafen', 'Nebel', 'Nacht'] },
-  u4: { bio: 'Produktdesign und Design Systeme. Kaffee als Grundnahrungsmittel.', link: 'davidkoenig.design', posts: 97, followers: 5310, following: 274, following_me: true, highlights: ['Tokens', 'Prozess'] },
-  u5: { bio: 'Kochen ohne Schnickschnack. Rezepte unter zehn Minuten.', link: 'elif-kocht.de', posts: 289, followers: 31200, following: 128, following_me: false, highlights: ['Pasta', 'Meal Prep', 'Basics'] },
-  u6: { bio: 'Schreibt Software und läuft danach zwanzig Kilometer.', link: 'finnbauer.io', posts: 54, followers: 1180, following: 402, following_me: true, highlights: ['Laufen'] },
-  me: { bio: 'Baue gerade All Media.', link: 'all-media.app', posts: 12, followers: 340, following: 186, following_me: false, highlights: ['Projekt'], playlists: ['Beste Clips', 'Tutorials'], spende: null, live: null },
-};
-
-const gridItems = {};
-for (const id of Object.keys(profiles)) {
-  const kinds = ['image', 'video', 'image', 'video', 'image', 'image', 'video', 'image', 'video', 'image', 'video', 'image'];
-  gridItems[id] = kinds.map((kind, i) => ({ id: `${id}_g${i}`, kind }));
+  const nachher = await beitrag(req, id);
+  // Bei "notify" und "follow" ändert sich am Beitrag selbst nichts — der
+  // Zustand kommt aus dem Handler.
+  if (action === 'notify') return { ...nachher, notify: e?.notify };
+  if (action === 'follow') return { ...nachher, following: e?.folgt };
+  return nachher;
 }
 
-const comments = {
-  p1: [
-    { id: 'cm1', userId: 'u1', text: 'Das Licht ist der Wahnsinn. Welche Blende?', time: '07:12', likes: 12, liked: false },
-    { id: 'cm2', userId: 'u3', text: 'f/8, Stativ und zehn Sekunden Belichtung.', time: '07:20', likes: 4, liked: false },
-    { id: 'cm3', userId: 'u4', text: 'Da will ich auch mal hin.', time: '08:02', likes: 1, liked: false },
-  ],
-  p2: [
-    { id: 'cm1', userId: 'u2', text: 'Welche Monitore sind das?', time: 'Gestern', likes: 3, liked: false },
-    { id: 'cm2', userId: 'u5', text: 'Zwei 27 Zoll, nichts Besonderes, aber gleiche Höhe ist wichtig.', time: 'Gestern', likes: 7, liked: true },
-  ],
-  p3: [{ id: 'cm1', userId: 'u6', text: 'Respekt für den Aufstieg!', time: 'Mo', likes: 22, liked: false }],
-  p4: [{ id: 'cm1', userId: 'u1', text: 'Kann ich nur unterschreiben.', time: 'So', likes: 5, liked: false }],
-  v1: [
-    { id: 'cm1', userId: 'u4', text: 'Wie früh musstest du los?', time: '05:40', likes: 8, liked: false },
-    { id: 'cm2', userId: 'u1', text: 'Vier Uhr ab Parkplatz, dann zwei Stunden hoch.', time: '05:55', likes: 15, liked: false },
-  ],
-  v2: [{ id: 'cm1', userId: 'u6', text: 'Kurz und hilfreich, danke.', time: 'Gestern', likes: 6, liked: false }],
-  v3: [
-    { id: 'cm1', userId: 'u2', text: 'Ohne Sahne cremig? Verrate das Geheimnis.', time: 'Mo', likes: 31, liked: false },
-    { id: 'cm2', userId: 'u5', text: 'Nudelwasser. Immer Nudelwasser.', time: 'Mo', likes: 88, liked: true },
-  ],
-  v4: [],
-  v5: [{ id: 'cm1', userId: 'u3', text: 'Mache ich seit einem Jahr, will nicht mehr zurück.', time: 'Sa', likes: 9, liked: false }],
-  q1: [
-    { id: 'cm1', userId: 'u2', text: 'Die Kapitelmarken sind Gold wert.', time: 'vor 2 Tagen', likes: 14, liked: false },
-    { id: 'cm2', userId: 'u5', text: 'Wie lange wart ihr insgesamt unterwegs?', time: 'vor 2 Tagen', likes: 3, liked: false },
-    { id: 'cm3', userId: 'u1', text: 'Neun Stunden mit Pausen.', time: 'vor 1 Tag', likes: 11, liked: false },
-  ],
-  q2: [
-    { id: 'cm1', userId: 'u6', text: 'Endlich mal ohne Framework-Geplänkel erklärt.', time: 'vor 4 Tagen', likes: 22, liked: false },
-    { id: 'cm2', userId: 'u3', text: 'Teil zwei zu Dark Mode wäre super.', time: 'vor 3 Tagen', likes: 8, liked: false },
-  ],
-  q3: [
-    { id: 'cm1', userId: 'u1', text: 'Der Einkaufszettel spart mir jede Woche eine Stunde.', time: 'vor 6 Tagen', likes: 41, liked: false },
-    { id: 'cm2', userId: 'u4', text: 'Hält das wirklich fünf Tage frisch?', time: 'vor 5 Tagen', likes: 6, liked: false },
-    { id: 'cm3', userId: 'u5', text: 'Vier sicher, am fünften würde ich einfrieren.', time: 'vor 5 Tagen', likes: 19, liked: false },
-  ],
-  q4: [{ id: 'cm1', userId: 'u4', text: 'Der Hinweis zum Umstieg hat mir zwei Stunden gespart.', time: 'vor 6 Tagen', likes: 12, liked: false }],
-  q5: [
-    { id: 'cm1', userId: 'u6', text: 'Blaue Stunde ist einfach unschlagbar.', time: 'vor 2 Wochen', likes: 17, liked: false },
-    { id: 'cm2', userId: 'u2', text: 'Welches Stativ nutzt du?', time: 'vor 12 Tagen', likes: 2, liked: false },
-  ],
-  q6: [{ id: 'cm1', userId: 'u5', text: 'Mein Team hat es nach dem Video übernommen.', time: 'vor 3 Wochen', likes: 9, liked: false }],
-};
-
-/*
- * Wie viele Kommentare ein Beitrag hat, steht NICHT mehr als eigene Zahl am
- * Beitrag. Henrik hatte gemeldet, dass "Alle 28 Kommentare ansehen" dasteht,
- * obwohl es nur vier gibt - die feste Zahl und die echte Liste waren
- * auseinandergelaufen.
- *
- * Jetzt zaehlt beim Ausliefern die Liste selbst. Damit kann es nicht wieder
- * auseinanderlaufen, auch nicht nachdem jemand einen Kommentar schreibt.
- */
-function mitKommentarzahl(eintraege) {
-  return eintraege.map((e) => ({ ...e, comments: (comments[e.id] || []).length }));
-}
-
-/*
- * Punkt 42: derselbe Grund wie bei der Kommentarzahl. Ob man einer Person
- * folgt, steht im Profil - nicht am einzelnen Beitrag. Beim Ausliefern wird
- * es von dort geholt, sonst behauptet der Feed etwas anderes als das Profil.
- */
-function mitFolgezustand(eintraege) {
-  return eintraege.map((e) => ({
-    ...e,
-    following: !!(profiles[e.userId] && profiles[e.userId].following_me),
+for (const pfad of ['/api/posts/:id/:action', '/api/videos/:id/:action', '/api/clips/:id/:action']) {
+  app.post(pfad, route(async (req, res) => {
+    const ergebnis = await inhaltsAktion(req);
+    if (ergebnis?.fehlt) return res.status(404).json({ error: 'Nicht gefunden' });
+    if (ergebnis?.unbekannt) return res.status(400).json({ error: 'Unbekannte Aktion' });
+    if (ergebnis?.fehler) return res.status(500).json({ error: ergebnis.fehler });
+    res.json(ergebnis);
   }));
 }
 
-const posts = [
-  { id: 'p1', userId: 'u3', location: 'Hamburg', music: 'Golden Hour – Lys', description: 'Der Hafen um sechs Uhr morgens. Ganz ohne Menschen.', likedBy: 'Anna Schmidt', likes: 342, comments: 27, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false , tags: ['#hafen', '#nachtfotografie'] },
-  { id: 'p2', userId: 'u5', location: 'Köln', music: 'Originalton', description: 'Neues Setup steht. Zwei Monitore waren doch die richtige Entscheidung.', likedBy: 'Bob Müller', likes: 128, comments: 14, reposts: 0, reposted: false, liked: true, saved: false, following: true, notify: true , tags: ['#homeoffice', '#designsystem'] },
-  { id: 'p3', userId: 'u1', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', description: 'Oben angekommen. Der Aufstieg war jede Minute wert.', likedBy: 'David König', likes: 1204, comments: 96, reposts: 0, reposted: false, liked: false, saved: true, following: false, notify: false , tags: ['#sonnenaufgang'] },
-  { id: 'p4', userId: 'u6', location: 'Berlin', music: 'Lo-Fi Focus – beatlab', description: 'Kleine Commits, klare Historie. Mein Team dankt es mir.', likedBy: 'Elif Yilmaz', likes: 87, comments: 9, reposts: 0, reposted: false, liked: false, saved: false, following: true, notify: false , tags: ['#reactnative'] },
-];
+app.post('/api/teilen', route(async (req) => {
+  const empfaenger = Array.isArray(req.body?.empfaenger) ? req.body.empfaenger : [];
+  if (empfaenger.length === 0) return { ok: false, error: 'Bitte mindestens eine Person auswählen' };
 
-const videos = [
-  { id: 'v1', userId: 'u1', description: 'Sonnenaufgang über den Alpen. Vier Uhr aufstehen hat sich gelohnt.', location: 'Zugspitze', music: 'Ambient Sunrise – Nora K.', likes: 12400, comments: 218, shares: 96, reposted: false, liked: false, saved: false , tags: ['#sonnenaufgang'] },
-  { id: 'v2', userId: 'u4', description: 'So richtet ihr euer Home-Office in 60 Sekunden ein.', location: 'Köln', music: 'Lo-Fi Focus – beatlab', likes: 8210, comments: 143, shares: 61, reposted: false, liked: true, saved: true , tags: ['#homeoffice', '#designsystem'] },
-  { id: 'v3', userId: 'u5', description: 'Rezept: Pasta in 10 Minuten, ohne Sahne und trotzdem cremig.', location: 'Hamburg', music: 'Kitchen Groove – Milo', likes: 24800, comments: 512, shares: 340, reposted: false, liked: false, saved: false , tags: ['#mealprep'] },
-  { id: 'v4', userId: 'u2', description: 'Erster Laufversuch mit der neuen Kamera-Stabilisierung.', location: 'Rheinpark', music: 'Runner High – Aster', likes: 3140, comments: 74, shares: 22, reposted: false, liked: false, saved: false , tags: ['#laufen'] },
-  { id: 'v5', userId: 'u6', description: 'Warum kleine Commits dein Leben leichter machen.', location: 'Berlin', music: 'Originalton', likes: 5670, comments: 189, shares: 118, reposted: false, liked: false, saved: false , tags: ['#reactnative'] },
-];
+  const eintrag = await beitrag(req, req.body?.id);
+  if (!eintrag) return { ok: false, error: 'Diesen Beitrag gibt es nicht mehr' };
 
-/*
- * Communitys.
- *
- * `bio`, `link` und `eigen` kamen am 26.08.2026 dazu: die Kanalseite wird
- * nach dem Prototyp-Frame "CH + Kanal" gebaut, und dort stehen unter dem
- * Kopfbild eine Biografie und ein Link. `eigen` sagt, ob Henrik die
- * Community selbst angelegt hat - eine eigene Community kann man nicht
- * verlassen (sonst stuende sie ohne Besitzer da).
- */
-const communities = [
-  { id: 'k1', name: 'Design Systeme', members: 1284, visibility: 'public', topic: 'Komponenten, Tokens, Figma', bio: 'Alles rund um Komponenten, Tokens und den Weg von Figma in den Code. Fragen jederzeit willkommen.', link: 'designsysteme.de', eigen: false, joined: true, unread: 3, channels: ['ch-allgemein', 'ch-tokens', 'ch-figma'] },
-  { id: 'k2', name: 'React Native DE', members: 842, visibility: 'public', topic: 'Expo, Navigation, Performance', bio: 'Deutschsprachige Runde zu React Native und Expo. Von der ersten App bis zum Store-Release.', link: 'rn-de.dev', eigen: false, joined: true, unread: 0, channels: ['ch-allgemein', 'ch-expo', 'ch-navigation'] },
-  { id: 'k3', name: 'Fotografie', members: 3120, visibility: 'public', topic: 'Licht, Komposition, Nachbearbeitung', bio: 'Licht, Komposition, Nachbearbeitung. Jeden Sonntag ein gemeinsames Thema.', link: 'lichtundschatten.foto', eigen: false, joined: false, unread: 0, channels: ['ch-allgemein', 'ch-licht', 'ch-nachbearbeitung'] },
-  { id: 'k4', name: 'Team Intern', members: 12, visibility: 'private', topic: 'Nur für das Kernteam', bio: 'Interner Kanal des Kernteams. Sprintplanung, Entscheidungen, alles Kurzfristige.', link: '', eigen: true, joined: true, unread: 5, channels: ['ch-allgemein', 'ch-sprint'] },
-  { id: 'k5', name: 'Laufgruppe Köln', members: 96, visibility: 'private', topic: 'Treffpunkte und Termine', bio: 'Wir laufen dienstags und samstags. Treffpunkte und Termine stehen hier.', link: 'laufgruppe-koeln.de', eigen: true, joined: true, unread: 0, channels: ['ch-allgemein', 'ch-termine'] },
-  { id: 'k6', name: 'Musikproduktion', members: 671, visibility: 'public', topic: 'Ableton, Mixing, Sounddesign', bio: 'Ableton, Mixing, Sounddesign. Feedback-Runden am Monatsende.', link: 'musikproduktion.club', eigen: false, joined: false, unread: 0, channels: ['ch-allgemein', 'ch-ableton', 'ch-mixing'] },
-];
+  const vorschau = eintrag.kind === 'post' ? 'Beitrag geteilt' : 'Video geteilt';
+  const e = await syncHandlers.handleShareToChats(req.db, req.nutzerId, eintrag.id, empfaenger, vorschau);
+  return antwort(e, { chats: await supabaseApi.ladeChats(req.db, req.nutzerId) });
+}));
 
-const communityChannels = {
-  'ch-allgemein': { name: 'Allgemein', topics: ['Diskussionen', 'News'] },
-  'ch-tokens': { name: 'Design Tokens', topics: ['Struktur', 'Best Practices'] },
-  'ch-figma': { name: 'Figma', topics: ['Plugins', 'Workflows'] },
-  'ch-expo': { name: 'Expo', topics: ['SDK Updates', 'Debugging'] },
-  'ch-navigation': { name: 'Navigation', topics: ['React Navigation', 'Router'] },
-  'ch-licht': { name: 'Licht & Belichtung', topics: ['Goldene Stunde', 'ISO'] },
-  'ch-nachbearbeitung': { name: 'Nachbearbeitung', topics: ['Lightroom', 'Capture One'] },
-  'ch-sprint': { name: 'Sprint Planning', topics: ['Backlog', 'Reviews'] },
-  'ch-termine': { name: 'Termine', topics: ['Diese Woche', 'Nächste Woche'] },
-  'ch-ableton': { name: 'Ableton Live', topics: ['Devices', 'Workflow'] },
-  'ch-mixing': { name: 'Mixing & Mastering', topics: ['Techniken', 'Feedback'] },
-};
+app.get('/api/reposts', route(async (req) => {
+  const { data, error } = await req.db.from('reposts').select('post_id').eq('user_id', req.nutzerId);
+  if (error) throw error;
 
-/*
- * Nachrichten in den Kanaelen einer Community.
- *
- * Der Schluessel ist die KANAL-Kennung, nicht die der Community. Vorher stand
- * hier "k1", "k2" - also die Community. Der Kanal-Endpunkt sucht aber nach
- * "ch-tokens", fand deshalb nie etwas, und jeder Kanal war leer. Seit Henriks
- * Aufbau Community -> Kanal -> Thema gilt, gehoeren sie ohnehin an den Kanal:
- * eine Community hat mehrere Kanaele mit je eigenem Verlauf.
- */
-const communityMessages = {
-  'ch-tokens': [
-    { id: 'm1', from: 'u1', text: 'Hat jemand Erfahrung mit Design Tokens in Figma Variables?', time: '09:12' },
-    { id: 'm2', from: 'u4', text: 'Ja, wir nutzen das seit einem halben Jahr produktiv', time: '09:20' },
-    { id: 'm3', from: 'me', text: 'Wie handhabt ihr Dark Mode dabei?', time: '09:24' },
-    { id: 'm4', from: 'u4', text: 'Zwei Modi in einer Collection, das reicht meistens', time: '09:31' },
-  ],
-  'ch-figma': [
-    { id: 'm1', from: 'u3', text: 'Welches Plugin nutzt ihr zum Exportieren?', time: 'Gestern' },
-    { id: 'm2', from: 'u1', text: 'Wir gehen inzwischen ohne Plugin über die API', time: 'Gestern' },
-  ],
-  'ch-expo': [
-    { id: 'm1', from: 'u2', text: 'Expo SDK 57 läuft bei mir stabil', time: 'Gestern' },
-    { id: 'm2', from: 'u5', text: 'Bei mir auch, nur der Metro Cache zickt manchmal', time: 'Gestern' },
-    { id: 'm3', from: 'me', text: 'Hilft bei mir: npx expo start -c', time: 'Gestern' },
-  ],
-  'ch-navigation': [
-    { id: 'm1', from: 'u6', text: 'Router oder React Navigation für neue Projekte?', time: 'Mo' },
-    { id: 'm2', from: 'u2', text: 'Router, wenn du sowieso auf Expo setzt', time: 'Mo' },
-  ],
-  'ch-licht': [
-    { id: 'm1', from: 'u3', text: 'Goldene Stunde heute um 19:40', time: 'Mo' },
-  ],
-  'ch-nachbearbeitung': [
-    { id: 'm1', from: 'u5', text: 'Capture One für Farben, Lightroom für alles andere', time: 'Sa' },
-  ],
-  'ch-sprint': [
-    { id: 'm1', from: 'u1', text: 'Sprint-Planung morgen um 10 Uhr', time: '11:02' },
-    { id: 'm2', from: 'me', text: 'Bin dabei', time: '11:05' },
-  ],
-  'ch-termine': [
-    { id: 'm1', from: 'u6', text: 'Samstag 8 Uhr am Rheinpark?', time: 'So' },
-    { id: 'm2', from: 'u4', text: 'Passt, ich bringe Wasser mit', time: 'So' },
-  ],
-  'ch-ableton': [
-    { id: 'm1', from: 'u5', text: 'Neuer Track ist fertig gemischt', time: 'Sa' },
-  ],
-  'ch-mixing': [
-    { id: 'm1', from: 'u2', text: 'Wie laut mastert ihr für Streaming?', time: 'Fr' },
-    { id: 'm2', from: 'u5', text: '-14 LUFS integrated, dann macht keine Plattform Ärger', time: 'Fr' },
-  ],
-  'ch-allgemein': [
-    { id: 'm1', from: 'u4', text: 'Willkommen allen Neuen hier!', time: '08:30' },
-  ],
-};
+  const ids = new Set((data || []).map((r) => r.post_id));
+  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+  return alle
+    .filter((b) => ids.has(b.id))
+    .map((b) => ({ art: b.kind === 'post' ? 'post' : b.kind === 'clip' ? 'clip' : 'video', eintrag: b }));
+}));
 
-const contacts = [
-  { id: 'u1', name: 'Anna Schmidt', status: 'friend', about: 'Verfügbar' },
-  { id: 'u2', name: 'Bob Müller', status: 'friend', about: 'Im Meeting' },
-  { id: 'u3', name: 'Clara Weber', status: 'pending', about: 'Anfrage gesendet' },
-  { id: 'u4', name: 'David König', status: 'friend', about: 'Beschäftigt' },
-  { id: 'u5', name: 'Elif Yilmaz', status: 'friend', about: 'Hey, ich nutze All Media!' },
-  { id: 'u6', name: 'Finn Bauer', status: 'friend', about: 'Nur dringende Anrufe' },
-];
+// ============================================================================
+// Kommentare
+// ============================================================================
 
-/*
- * Persoenliche Chats im Community-Bereich.
- *
- * Henriks Trennung: "Messenger = Chat ueber Telefonnummer/Kontakt.
- * Community-Chat = Kommunikation ohne Telefonnummer, z. B. zum Teilen von
- * Videos oder fuer normale Nachrichten."
- *
- * Hier stehen deshalb Leute, die NICHT in den Kontakten sind - man kennt sie
- * aus einer Community, nicht aus dem Telefonbuch. Der Bereich zeigte vorher
- * die Communitys selbst; die stehen aber schon unter Home.
- */
-const communityChats = [
-  { id: 'cc1', userId: 'u7', name: 'Greta Hoffmann', preview: 'Dein Reel vom Hafen ist stark!', time: '15:04', unread: 2, muted: false, isGroup: false },
-  { id: 'cc2', userId: 'u8', name: 'Hakan Demir', preview: 'Schaust du mal in den Tokens-Kanal?', time: '12:41', unread: 0, muted: false, isGroup: false },
-  { id: 'cc3', userId: null, name: 'Design-Runde', preview: 'Ida: Donnerstag passt mir', time: 'Gestern', unread: 1, muted: false, isGroup: true, members: ['u7', 'u8', 'u9'] },
-  { id: 'cc4', userId: 'u9', name: 'Ida Nowak', preview: 'Danke für den Tipp mit dem Stativ', time: 'Mo', unread: 0, muted: false, isGroup: false },
-];
+app.get('/api/comments/:targetId', route(async (req) =>
+  supabaseApi.ladeKommentare(req.db, req.nutzerId, req.params.targetId)
+));
 
-const communityChatMessages = {
-  cc1: [
-    { id: 'm1', from: 'u7', text: 'Dein Reel vom Hafen ist stark!', time: '15:04' },
-  ],
-  cc2: [
-    { id: 'm1', from: 'u8', text: 'Schaust du mal in den Tokens-Kanal?', time: '12:41' },
-    { id: 'm2', from: 'me', text: 'Mache ich heute Abend', time: '12:52' },
-  ],
-  cc3: [
-    { id: 'm1', from: 'u8', text: 'Wann passt es euch diese Woche?', time: 'Gestern' },
-    { id: 'm2', from: 'u9', text: 'Donnerstag passt mir', time: 'Gestern' },
-  ],
-  cc4: [
-    { id: 'm1', from: 'u9', text: 'Danke für den Tipp mit dem Stativ', time: 'Mo' },
-  ],
-};
+app.post('/api/comments/:targetId', route(async (req) => {
+  const text = String(req.body?.text || '').trim();
+  if (!text) return { ok: false, error: 'Text erforderlich' };
 
-const messages = {
-  c1: [
-    { id: 'm1', from: 'u1', text: 'Hey! Wie läuft das Projekt?', time: '14:02' },
-    { id: 'm2', from: 'me', text: 'Läuft gut, bin fast fertig mit dem Design', time: '14:05' },
-    { id: 'm3', from: 'u1', text: 'Super, kannst du mir das nachher zeigen?', time: '14:20' },
-    { id: 'm4', from: 'me', text: 'Klar, so gegen 17 Uhr?', time: '14:28' },
-    { id: 'm5', from: 'u1', text: 'Klingt gut, bis später!', time: '14:32' },
-  ],
-  c2: [
-    { id: 'm1', from: 'u2', text: 'Hast du die Unterlagen schon?', time: '12:40' },
-    { id: 'm2', from: 'me', text: 'Noch nicht, kannst du sie schicken?', time: '12:55' },
-    { id: 'm3', from: 'u2', text: 'Schicke dir die Datei gerade', time: '13:05' },
-  ],
-  c3: [
-    { id: 'm1', from: 'u3', text: 'Schau mal, was ich gefunden habe', time: '11:40' },
-    { id: 'm2', from: 'u3', text: 'Foto', time: '11:48', media: 'image' },
-  ],
-  c4: [
-    { id: 'm1', from: 'u1', text: 'Sind alle für morgen bereit?', time: 'Gestern' },
-    { id: 'm2', from: 'u2', text: 'Von meiner Seite ja', time: 'Gestern' },
-    { id: 'm3', from: 'me', text: 'Ich auch', time: 'Gestern' },
-    { id: 'm4', from: 'u4', text: 'Meeting verschoben auf 15 Uhr', time: 'Gestern' },
-  ],
-  c5: [
-    { id: 'm1', from: 'me', text: 'Ich melde mich morgen bei dir', time: 'Gestern' },
-    { id: 'm2', from: 'u4', text: 'Alles klar 👍', time: 'Gestern' },
-  ],
-  c6: [{ id: 'm1', from: 'u5', text: 'Sprachnachricht', time: 'Mo', media: 'audio' }],
-  c7: [
-    { id: 'm1', from: 'u3', text: 'Samstag Grillen?', time: 'Mo' },
-    { id: 'm2', from: 'u5', text: 'Wer ist dabei?', time: 'Mo' },
-  ],
-  c8: [
-    { id: 'm1', from: 'me', text: 'Kein Problem!', time: 'So' },
-    { id: 'm2', from: 'u6', text: 'Danke dir!', time: 'So' },
-  ],
-};
+  const e = await syncHandlers.handleCreateComment(req.db, req.nutzerId, req.params.targetId, text);
+  if (!e || e.ok === false) return antwort(e);
 
-// Der Server haelt alles im Speicher. Damit der Smoke-Test nicht bei jedem Lauf
-// Testgruppen und Testkommentare hinterlaesst, wird hier ein Abzug des
-// Startzustands gemacht, den /api/reset wiederherstellt. Die Sammlungen werden
-// dabei an Ort und Stelle geleert und neu gefuellt, damit alle Handler
-// weiterhin auf dieselben Referenzen zeigen.
-// Was der Nutzer selbst repostet hat - fuellt den Repost-Reiter im eigenen
-// Profil. Ohne diese Liste blieb der Reiter immer leer.
-// --- Mitteilungen ---------------------------------------------------------
-// Prototyp-Frames "VP + Mitteilung" (Videos-Profil) und "CP + Mitteilungen"
-// (Community-Profil). Beide Bereiche haben eine eigene Liste, weil im
-// Prototyp auch beide eine eigene Glocke haben.
-//
-// Gespeichert wird nur, was passiert ist - der Satz entsteht erst beim
-// Ausliefern. Sonst muesste bei jeder Textaenderung der Bestand mitwandern.
-const mitteilungen = [
-  { id: 'n1', bereich: 'videos', art: 'like', userId: 'u1', ziel: { art: 'post', id: 'p1' }, minuten: 10, gelesen: false },
-  { id: 'n2', bereich: 'videos', art: 'follow', userId: 'u5', ziel: { art: 'profile', id: 'u5' }, minuten: 95, gelesen: false },
-  { id: 'n3', bereich: 'videos', art: 'comment', userId: 'u3', ziel: { art: 'post', id: 'p2' }, minuten: 260, gelesen: false },
-  { id: 'n4', bereich: 'videos', art: 'repost', userId: 'u4', ziel: { art: 'video', id: 'v1' }, minuten: 1500, gelesen: true },
-  { id: 'n5', bereich: 'videos', art: 'mention', userId: 'u2', ziel: { art: 'profile', id: 'u2' }, minuten: 7200, gelesen: true },
-  { id: 'n6', bereich: 'videos', art: 'story', userId: 'u6', ziel: { art: 'profile', id: 'u6' }, minuten: 11000, gelesen: true },
-  { id: 'n7', bereich: 'videos', art: 'like', userId: 'u3', ziel: { art: 'video', id: 'v2' }, minuten: 30000, gelesen: true },
-  { id: 'n8', bereich: 'videos', art: 'follow', userId: 'u7', ziel: { art: 'profile', id: 'u7' }, minuten: 46000, gelesen: true },
-
-  { id: 'c1', bereich: 'communities', art: 'kanal', userId: 'u2', ziel: { art: 'community', id: 'k1' }, minuten: 25, gelesen: false },
-  { id: 'c2', bereich: 'communities', art: 'beitritt', userId: 'u5', ziel: { art: 'community', id: 'k2' }, minuten: 180, gelesen: false },
-  { id: 'c3', bereich: 'communities', art: 'nachricht', userId: 'u1', ziel: { art: 'community', id: 'k1' }, minuten: 1400, gelesen: true },
-  { id: 'c4', bereich: 'communities', art: 'einladung', userId: 'u4', ziel: { art: 'community', id: 'k3' }, minuten: 6000, gelesen: true },
-  { id: 'c5', bereich: 'communities', art: 'beitritt', userId: 'u6', ziel: { art: 'community', id: 'k4' }, minuten: 20000, gelesen: true },
-];
-
-/** "vor 10 min", "vor 4 h", "vor 5 Tagen", "vor 3 W", "vor 2 M" - wie im Prototyp. */
-function zeitText(minuten) {
-  if (minuten < 60) return `vor ${minuten} min`;
-  const stunden = Math.floor(minuten / 60);
-  if (stunden < 24) return `vor ${stunden} h`;
-  const tage = Math.floor(stunden / 24);
-  if (tage === 1) return 'vor 1 Tag';
-  if (tage < 7) return `vor ${tage} Tagen`;
-  const wochen = Math.floor(tage / 7);
-  if (wochen < 5) return `vor ${wochen} W`;
-  return `vor ${Math.floor(tage / 30)} M`;
-}
-
-function mitteilungText(m) {
-  const name = users[m.userId]?.name || 'Jemand';
-  const community = communities.find((c) => c.id === m.ziel.id)?.name || 'einer Community';
   return {
-    like: `${name} gefällt dein ${m.ziel.art === 'video' ? 'Video' : 'Beitrag'}.`,
+    id: e.kommentar.id,
+    userId: 'me',
+    text,
+    time: supabaseApi.chatZeit(e.kommentar.created_at),
+    likes: 0,
+    liked: false,
+  };
+}));
+
+app.post('/api/comments/:targetId/:commentId/like', route(async (req) => {
+  const e = await syncHandlers.handleLikeComment(req.db, req.nutzerId, req.params.commentId);
+  if (!e || e.ok === false) return antwort(e);
+
+  const alle = await supabaseApi.ladeKommentare(req.db, req.nutzerId, req.params.targetId);
+  return alle.find((k) => k.id === req.params.commentId) || { ok: true };
+}));
+
+// ============================================================================
+// Storys
+// ============================================================================
+
+app.post('/api/stories/:id/like', route(async (req) => {
+  const e = await syncHandlers.handleLikeStory(req.db, req.nutzerId, req.params.id);
+  if (!e || e.ok === false) return antwort(e);
+  const alle = await supabaseApi.ladeStorys(req.db, req.nutzerId);
+  return alle.find((s) => s.id === req.params.id) || { ok: true };
+}));
+
+app.post('/api/stories/:id/seen', route(async (req) =>
+  antwort(await syncHandlers.handleViewStory(req.db, req.nutzerId, req.params.id))
+));
+
+app.post('/api/stories/:id/reply', route(async (req) => {
+  const text = String(req.body?.text || '').trim();
+  if (!text) return { ok: false, error: 'Bitte etwas schreiben' };
+
+  const e = await syncHandlers.handleStoryReply(req.db, req.nutzerId, req.params.id, text);
+  if (!e || e.ok === false) return antwort(e);
+
+  return {
+    ok: true,
+    chatId: e.chatId,
+    message: {
+      id: e.nachricht.id,
+      from: 'me',
+      text,
+      time: supabaseApi.chatZeit(e.nachricht.created_at),
+    },
+  };
+}));
+
+// ============================================================================
+// Communitys
+// ============================================================================
+
+app.get('/api/communities', route(async (req) => {
+  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
+  const filter = req.query.filter || 'joined';
+  return alle.filter((c) => (filter === 'discover' ? !c.joined : c.joined));
+}));
+
+app.get('/api/communities/:id', route(async (req, res) => {
+  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
+  const community = alle.find((c) => c.id === req.params.id);
+  if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
+  res.json(community);
+}));
+
+app.post('/api/communities', route(async (req) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
+
+  const { count } = await req.db
+    .from('communities')
+    .select('*', { count: 'exact', head: true })
+    .ilike('name', name);
+  if (count > 0) return { ok: false, error: 'Diesen Kanal gibt es schon' };
+
+  const privat = req.body?.sichtbarkeit !== 'public';
+  const e = await syncHandlers.handleCreateCommunity(
+    req.db, req.nutzerId, name, String(req.body?.thema || '').trim(), privat
+  );
+  if (!e || e.ok === false) return antwort(e);
+
+  // Eine Community ohne Kanal hat keine Seite, auf der etwas stehen könnte.
+  await syncHandlers.handleCreateChannel(req.db, req.nutzerId, e.community.id, 'Allgemein');
+
+  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
+  return { ok: true, community: alle.find((c) => c.id === e.community.id) };
+}));
+
+app.post('/api/communities/:id/join', route(async (req, res) => {
+  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
+  const community = alle.find((c) => c.id === req.params.id);
+  if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  /*
+   * Aus der eigenen Community kann man nicht austreten. Die Oberfläche zeigt
+   * dort keinen Knopf — der Server sagt trotzdem nein, denn eine Regel, die
+   * nur im Markup steht, ist keine.
+   */
+  if (community.eigen) {
+    return res.status(409).json({ error: 'Die eigene Community lässt sich nicht verlassen' });
+  }
+
+  await syncHandlers.handleJoinCommunity(req.db, req.nutzerId, req.params.id);
+  const frisch = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
+  res.json(frisch.find((c) => c.id === req.params.id));
+}));
+
+app.post('/api/communities/:id/channels', route(async (req) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
+  const e = await syncHandlers.handleCreateChannel(req.db, req.nutzerId, req.params.id, name);
+  if (!e || e.ok === false) return antwort(e);
+  return { ok: true, id: e.kanal.id, name: e.kanal.name };
+}));
+
+app.get('/api/communities/:id/channels/:chId', route(async (req, res) => {
+  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
+  const community = alle.find((c) => c.id === req.params.id);
+  const kanal = community?.channels.find((k) => k.id === req.params.chId || k.slug === req.params.chId);
+  if (!community || !kanal) return res.status(404).json({ error: 'Nicht gefunden' });
+
+  res.json({
+    community: community.name,
+    channel: kanal.name,
+    topics: kanal.topics,
+    messages: await supabaseApi.ladeKanalNachrichten(req.db, req.nutzerId, kanal.id),
+  });
+}));
+
+app.post('/api/communities/:id/channels/:chId/nachricht', route(async (req) => {
+  const text = String(req.body?.text || '').trim();
+  if (!text) return { ok: false, error: 'Text erforderlich' };
+  const e = await syncHandlers.handleSendChannelMessage(req.db, req.nutzerId, req.params.chId, text);
+  if (!e || e.ok === false) return antwort(e);
+  return {
+    ok: true,
+    message: {
+      id: e.nachricht.id,
+      from: 'me',
+      text,
+      time: supabaseApi.chatZeit(e.nachricht.created_at),
+    },
+  };
+}));
+
+// ============================================================================
+// Mitteilungen
+// ============================================================================
+
+/**
+ * Der Satz entsteht erst hier, gespeichert ist nur, was passiert ist. Sonst
+ * müsste bei jeder Textänderung der ganze Bestand mitwandern.
+ */
+function mitteilungText(m, namen, communityNamen) {
+  const name = namen.get(m.userId) || 'Jemand';
+  const community = communityNamen.get(m.ziel?.id) || 'einer Community';
+  return {
+    like: `${name} gefällt dein ${m.ziel?.art === 'video' ? 'Video' : 'Beitrag'}.`,
     follow: `${name} folgt dir jetzt.`,
     comment: `${name} hat deinen Beitrag kommentiert.`,
     repost: `${name} hat dein Video repostet.`,
@@ -569,1523 +1020,110 @@ function mitteilungText(m) {
     beitritt: `${name} ist „${community}" beigetreten.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
-  }[m.art];
+    share: `${name} hat etwas mit dir geteilt.`,
+    message: `${name} hat dir geschrieben.`,
+    system: m.text || 'Es gibt Neuigkeiten.',
+  }[m.art] || m.text || '';
 }
 
-/** Liste eines Bereichs, fertig fuer die Anzeige. */
-function mitteilungenFuer(bereich) {
-  return mitteilungen
-    .filter((m) => m.bereich === bereich)
-    .sort((a, b) => a.minuten - b.minuten)
-    .map((m) => ({
-      id: m.id,
-      art: m.art,
-      userId: m.userId,
-      text: mitteilungText(m),
-      zeit: zeitText(m.minuten),
-      gelesen: m.gelesen,
-      ziel: m.ziel,
-    }));
-}
+app.get('/api/mitteilungen/:bereich', route(async (req) => {
+  const [eintraege, nutzer, communities] = await Promise.all([
+    supabaseApi.ladeBenachrichtigungen(req.db, req.nutzerId, req.params.bereich),
+    supabaseApi.ladeNutzer(req.db, req.nutzerId),
+    supabaseApi.ladeCommunities(req.db, req.nutzerId),
+  ]);
 
-/** Neue Mitteilung anlegen - wird benutzt, wenn in der App etwas passiert. */
-function neueMitteilung(bereich, art, userId, ziel) {
-  const eintrag = { id: `n${Date.now()}${mitteilungen.length}`, bereich, art, userId, ziel, minuten: 0, gelesen: false };
-  mitteilungen.unshift(eintrag);
-  return eintrag;
-}
+  const namen = new Map(Object.values(nutzer).map((u) => [u.id, u.name]));
+  const communityNamen = new Map(communities.map((c) => [c.id, c.name]));
 
-const reposts = [];
+  const fertig = eintraege.map((m) => ({ ...m, text: m.text || mitteilungText(m, namen, communityNamen) }));
+  return { eintraege: fertig, ungelesen: fertig.filter((m) => !m.gelesen).length };
+}));
 
-/** Repost setzen oder zuruecknehmen. */
-function setzeRepost(art, id, an) {
-  const stelle = reposts.findIndex((r) => r.art === art && r.id === id);
-  if (an && stelle === -1) reposts.unshift({ art, id, zeit: Date.now() });
-  if (!an && stelle !== -1) reposts.splice(stelle, 1);
-}
+app.post('/api/mitteilungen/:id/gelesen', route(async (req) => {
+  const e = await syncHandlers.handleMarkNotificationRead(req.db, req.nutzerId, req.params.id);
+  if (!e || e.ok === false) return antwort(e);
 
-const SEED = structuredClone({ users, chats, contacts, posts, videos, clips, communities, messages, communityMessages, communityChats, communityChatMessages, comments, profiles, stories, mitteilungen, gridItems });
+  const { count } = await req.db
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', req.nutzerId)
+    .is('read_at', null);
+  return { ok: true, ungelesen: count ?? 0 };
+}));
 
-function resetState() {
-  const restoreList = (list, seed) => {
-    list.length = 0;
-    list.push(...structuredClone(seed));
-  };
-  const restoreMap = (map, seed) => {
-    for (const key of Object.keys(map)) delete map[key];
-    Object.assign(map, structuredClone(seed));
-  };
+app.post('/api/mitteilungen/:bereich/alle-gelesen', route(async (req) =>
+  antwort(
+    await syncHandlers.handleMarkAllNotificationsRead(req.db, req.nutzerId, req.params.bereich),
+    { ungelesen: 0 }
+  )
+));
 
-  /*
-   * "users" fehlte hier. Der eigene Name liegt in users.me, also ueberlebte
-   * ein im Pruefdurchlauf geaenderter Profilname den Reset - beim zweiten
-   * Durchlauf stand dort noch der Name aus dem ersten.
-   */
-  restoreMap(users, SEED.users);
-  restoreList(chats, SEED.chats);
-  restoreList(contacts, SEED.contacts);
-  restoreList(posts, SEED.posts);
-  restoreList(videos, SEED.videos);
-  restoreList(communities, SEED.communities);
-  restoreList(stories, SEED.stories);
-  restoreList(mitteilungen, SEED.mitteilungen);
-  restoreList(clips, SEED.clips);
-  restoreMap(gridItems, SEED.gridItems);
-  eigeneNummer = 0;
-  restoreMap(messages, SEED.messages);
-  restoreMap(communityMessages, SEED.communityMessages);
-  restoreList(communityChats, SEED.communityChats);
-  restoreMap(communityChatMessages, SEED.communityChatMessages);
-  restoreMap(comments, SEED.comments);
-  restoreMap(profiles, SEED.profiles);
-  reposts.length = 0;
-}
+// ============================================================================
+// Explorer: was hinter einem Hashtag, Standort oder Sound steckt
+// ============================================================================
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
-
-app.post('/api/reset', (req, res) => {
-  resetState();
-  res.json({ ok: true });
-});
-
-// Neue async Bootstrap-Funktion mit Supabase-Unterstützung
-async function getBootstrapData(req) {
-  // Echte Daten nur, wenn jemand angemeldet ist — sonst greifen die Regeln
-  // der Datenbank und es kaeme ohnehin nichts zurueck.
-  const supabaseData = await supabaseApi.bootstrapData(req?.db, req?.nutzerId);
-
-  // Wenn Supabase erfolgreich: nutze echte Daten
-  if (supabaseData) {
-    const { users: supaUsers, contacts: supaContacts, chats: supaChats, stories: supaStories, videos: supaVideos } = supabaseData;
-
-    // Berechne abgeleitete Felder wie bisher
-    const gefolgt = Object.fromEntries(
-      Object.entries(supaUsers).map(([id, u]) => [id, false]) // TODO: aus Supabase laden
-    );
-    const ungelesen = { videos: 0, communities: 0 }; // TODO: aus Supabase laden
-    const blockiert = []; // TODO: aus Supabase laden
-    const stummgeschaltet = []; // TODO: aus Supabase laden
-    const privateProfile = []; // TODO: aus Supabase laden
-
-    return {
-      users: supaUsers,
-      chats: supaChats,
-      stories: supaStories,
-      contacts: supaContacts,
-      communities: communities || [], // Fallback zu Mock
-      videos: supaVideos || [],
-      posts: posts || [], // Fallback zu Mock
-      clips: clips || [], // Fallback zu Mock
-      communityChats: communityChats || [],
-      archiviert: archiviert || [],
-      hashtags: hashtags || [],
-      sounds: sounds || [],
-      places: places || [],
-      friends: friends || [],
-      gefolgt,
-      ungelesen,
-      blockiert,
-      stummgeschaltet,
-      privateProfile,
-      eigenesProfil: supaUsers.me ? { bio: supaUsers.me.bio, link: supaUsers.me.link } : { bio: '', link: '' },
-    };
-  }
-
-  // Fallback: Mock-Daten (wie bisher)
-  const gefolgt = Object.fromEntries(
-    Object.entries(profiles).map(([id, p]) => [id, !!p.following_me])
-  );
-  const ungelesen = {
-    videos: mitteilungen.filter((m) => m.bereich === 'videos' && !m.gelesen).length,
-    communities: mitteilungen.filter((m) => m.bereich === 'communities' && !m.gelesen).length,
-  };
-  const blockiert = Object.keys(profiles).filter((id) => profiles[id].blocked);
-  const stummgeschaltet = Object.keys(profiles).filter((id) => profiles[id].muted);
-  const privateProfile = Object.keys(users).filter((id) => users[id].privat);
-
-  return {
-    users, chats, stories, contacts, communities,
-    videos: mitKommentarzahl(videos),
-    posts: mitFolgezustand(mitKommentarzahl(posts)),
-    clips: mitKommentarzahl(clips),
-    communityChats,
-    archiviert,
-    hashtags, sounds, places, friends, gefolgt, ungelesen, blockiert, stummgeschaltet,
-    privateProfile,
-    eigenesProfil: { bio: profiles.me.bio, link: profiles.me.link },
-  };
-}
-
-// /api/bootstrap Endpoint — jetzt async
-app.get('/api/bootstrap', async (req, res) => {
-  const data = await getBootstrapData(req);
-  res.json(data);
-});
-
-/*
- * Zustand des Backends. Zeigt in einem Blick, ob die Website wirklich mit der
- * Datenbank spricht oder mit den Beispieldaten arbeitet. Ohne diesen Endpunkt
- * sieht beides von aussen gleich aus - genau das hat lange verschleiert, dass
- * gar nichts ankam.
- */
-app.get('/api/zustand', async (req, res) => {
-  const antwort = {
-    zeit: new Date().toISOString(),
-    supabase: {
-      konfiguriert: isConfigured(),
-      url: supabaseUrl,
-      // Aus Umgebungsvariablen oder aus den eingebauten Standardwerten?
-      quelle: process.env.SUPABASE_URL ? 'Umgebungsvariable' : 'Standardwert im Code',
-    },
-    anmeldung: {
-      angemeldet: Boolean(req.nutzerId),
-      nutzerId: req.nutzerId,
-    },
-    daten: req.nutzerId ? 'Supabase' : 'Beispieldaten',
-  };
-
-  // Antwortet die Datenbank ueberhaupt? Ein Zaehlzugriff ohne Nutzdaten.
-  if (isConfigured()) {
-    try {
-      const client = req.db;
-      if (client) {
-        const { count, error } = await client
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-        antwort.supabase.erreichbar = !error;
-        antwort.supabase.profile = error ? null : count;
-        if (error) antwort.supabase.fehler = error.message;
-      } else {
-        antwort.supabase.erreichbar = null;
-        antwort.supabase.hinweis =
-          'Ohne Anmeldung nicht pruefbar: die Regeln der Datenbank lassen anonyme Zugriffe nicht zu.';
-      }
-    } catch (fehler) {
-      antwort.supabase.erreichbar = false;
-      antwort.supabase.fehler = fehler.message;
-    }
-  }
-
-  res.json(antwort);
-});
-
-/*
- * Die Zugangsdaten, die die Oberflaeche braucht, um sich selbst bei Supabase
- * anzumelden. Der Schluessel ist der oeffentliche "publishable"-Schluessel; er
- * steckt genauso im App-Bundle. Geschuetzt wird die Datenbank durch ihre
- * Regeln, nicht durch Geheimhaltung dieses Schluessels.
- */
-app.get('/api/konfiguration', (_req, res) => {
-  res.json({ supabaseUrl, supabaseKey, konfiguriert: isConfigured() });
-});
-
-/* ------------------------------------------------- Kontakteinstellungen */
-/*
- * Was der Prototyp-Frame "MC + Kontakteinstellungen" anbietet: Medien,
- * markierte Nachrichten, gemeinsame Gruppen, Chat leeren, Favorit.
- */
-
-/** Nachricht mit einem Stern markieren oder die Markierung wieder wegnehmen. */
-/*
- * Chat verwalten: archivieren, stummschalten, gelesen, loeschen.
- *
- * Henrik wollte die WhatsApp-Optionen hinter langem Druecken. Ein Chat kann
- * aus dem Messenger oder aus dem Community-Bereich kommen - beide liegen in
- * eigenen Listen, deshalb wird hier zuerst gesucht, wo er steht.
- */
-const archiviert = [];
-
-function findeChat(chatId) {
-  const imMessenger = chats.find((c) => c.id === chatId);
-  if (imMessenger) return { chat: imMessenger, liste: chats };
-  const imCommunity = communityChats.find((c) => c.id === chatId);
-  if (imCommunity) return { chat: imCommunity, liste: communityChats };
-  return null;
-}
-
-/*
- * Diese Route ist bewusst eng gefasst. `:was` wuerde sonst auch /accept
- * und alles andere unter /api/chats/... abfangen, was spaeter im Code
- * steht - Express nimmt die erste passende Route. Unbekanntes geht
- * deshalb mit next() weiter an die naechste.
- */
-const CHAT_AKTIONEN = ['archiv', 'stumm', 'gelesen', 'loeschen', 'sperren', 'mitteilungen', 'blockieren'];
-
-app.post('/api/chats/:chatId/:was', (req, res, next) => {
-  if (!CHAT_AKTIONEN.includes(req.params.was)) return next();
-
-  const treffer = findeChat(req.params.chatId);
-  if (!treffer) return res.json({ ok: false, error: 'Diesen Chat gibt es nicht' });
-
-  const { chat, liste } = treffer;
-  const { was } = req.params;
-
-  if (was === 'archiv') {
-    // Supabase-Sync
-    syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'archiv', !archiviert.includes(chat.id));
-
-    const drin = archiviert.indexOf(chat.id);
-    if (drin === -1) archiviert.push(chat.id);
-    else archiviert.splice(drin, 1);
-    return res.json({
-      ok: true,
-      archiviert: drin === -1,
-      meldung: drin === -1 ? `„${chat.name}" archiviert` : `„${chat.name}" ist wieder in der Liste`,
-    });
-  }
-
-  if (was === 'stumm') {
-    // Supabase-Sync
-    syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'stumm', !chat.muted);
-
-    chat.muted = !chat.muted;
-    return res.json({
-      ok: true,
-      muted: chat.muted,
-      meldung: chat.muted ? `„${chat.name}" stummgeschaltet` : `„${chat.name}" ist nicht mehr stumm`,
-    });
-  }
-
-  if (was === 'gelesen') {
-    // Supabase-Sync
-    syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'gelesen', !chat.unread);
-
-    // Ohne Gegenstueck waere "als ungelesen markieren" nicht rueckgaengig zu
-    // machen - deshalb schaltet derselbe Punkt in beide Richtungen.
-    chat.unread = chat.unread ? 0 : 1;
-    return res.json({
-      ok: true,
-      unread: chat.unread,
-      meldung: chat.unread ? 'Als ungelesen markiert' : 'Als gelesen markiert',
-    });
-  }
-
-  /*
-   * Chat sperren. Henrik hat am 26.08.2026 gemeldet, dass die Einstellungen
-   * der Kontaktinfo "nicht funktionsfähig" sind und "Chat sperren" darunter
-   * ausdruecklich genannt.
-   *
-   * Was es hier heisst: ein gesperrter Chat zeigt in der Liste keine
-   * Vorschau mehr, und vor dem Oeffnen wird nachgefragt. Ohne echte
-   * Anmeldung mit Face ID oder Code ist das die ehrliche Fassung - eine
-   * Abfrage, die nichts prueft, waere Theater.
-   */
-  if (was === 'sperren') {
-    chat.gesperrt = !chat.gesperrt;
-    return res.json({
-      ok: true,
-      gesperrt: chat.gesperrt,
-      meldung: chat.gesperrt ? `„${chat.name}" ist gesperrt` : `„${chat.name}" ist wieder offen`,
-    });
-  }
-
-  if (was === 'mitteilungen') {
-    // Getrennt von "stumm": stumm schaltet nur den Ton, hier gehen die
-    // Mitteilungen zu diesem Chat ganz aus.
-    chat.mitteilungenAus = !chat.mitteilungenAus;
-    return res.json({
-      ok: true,
-      aus: chat.mitteilungenAus,
-      meldung: chat.mitteilungenAus
-        ? `Keine Mitteilungen mehr aus „${chat.name}"`
-        : `Mitteilungen aus „${chat.name}" wieder an`,
-    });
-  }
-
-  /*
-   * Blockieren hat Folgen: der Chat nimmt keine Nachrichten mehr an (siehe
-   * POST /api/messages/:chatId, das `blocked` bereits abfragt) und das
-   * Profil merkt es sich. Vorher wurde die Person nur in eine Liste im
-   * Browser geschoben, die niemand ausgewertet hat.
-   */
-  if (was === 'blockieren') {
-    chat.blocked = !chat.blocked;
-    if (chat.userId && profiles[chat.userId]) profiles[chat.userId].blocked = chat.blocked;
-    return res.json({
-      ok: true,
-      blocked: chat.blocked,
-      meldung: chat.blocked ? `„${chat.name}" blockiert` : `„${chat.name}" nicht mehr blockiert`,
-    });
-  }
-
-  if (was === 'loeschen') {
-    const stelle = liste.indexOf(chat);
-    if (stelle !== -1) liste.splice(stelle, 1);
-    // Die Nachrichten gehen mit - sonst taucht der Verlauf wieder auf,
-    // sobald jemand denselben Chat neu anlegt.
-    delete nachrichtenSpeicher(chat.id)[chat.id];
-    return res.json({ ok: true, meldung: `„${chat.name}" gelöscht` });
-  }
-
-  // Hierher kommt nichts mehr: CHAT_AKTIONEN oben filtert bereits.
-  return next();
-});
-
-/*
- * Einen Chat melden. Der Grund wird mitgeschickt und am Profil vermerkt -
- * vorher gab der Knopf nur einen Hinweis aus und vergass ihn sofort.
- */
-// Chat/Benutzer melden — synced mit Supabase
-app.post('/api/chats/:chatId/melden', async (req, res) => {
-  const treffer = findeChat(req.params.chatId);
-  if (!treffer) return res.json({ ok: false, error: 'Diesen Chat gibt es nicht' });
-
-  const grund = String(req.body?.grund || '').trim();
-  if (!grund) return res.json({ ok: false, error: 'Bitte einen Grund angeben' });
-
-  const { chat } = treffer;
-
-  // Sync zu Supabase
-  if (chat.userId) {
-    await syncHandlers.handleReportContent(req.db, req.nutzerId, chat.userId, grund, 'user');
-    if (profiles[chat.userId]) profiles[chat.userId].gemeldet = grund;
-  }
-
-  res.json({ ok: true, grund, meldung: 'Danke, die Meldung ist bei uns angekommen' });
-});
-
-// Nachricht mit Stern markieren — synced mit Supabase
-app.post('/api/messages/:chatId/:messageId/stern', async (req, res) => {
-  const store = nachrichtenSpeicher(req.params.chatId);
-  const nachricht = (store[req.params.chatId] || []).find((m) => m.id === req.params.messageId);
-  if (!nachricht) return res.json({ ok: false, error: 'Diese Nachricht gibt es nicht' });
-
-  // Sync zu Supabase (Stern als spezieller Flag)
-  nachricht.stern = !nachricht.stern;
-
-  res.json({ ok: true, stern: nachricht.stern, id: nachricht.id });
-});
-
-/** Alles, was in diesem Chat an Medien und Weitergeleitetem liegt. */
-app.get('/api/chats/:chatId/medien', (req, res) => {
-  const store = nachrichtenSpeicher(req.params.chatId);
-  const alle = store[req.params.chatId] || [];
-
-  res.json({
-    medien: alle.filter((m) => m.media || m.geteilt || m.standort || m.kontakt),
-    markiert: alle.filter((m) => m.stern),
-    gesamt: alle.length,
-  });
-});
-
-/** Chat leeren - die Unterhaltung bleibt, die Nachrichten sind weg. */
-app.post('/api/chats/:chatId/leeren', (req, res) => {
-  const store = nachrichtenSpeicher(req.params.chatId);
-  store[req.params.chatId] = [];
-
-  const chat = chats.find((c) => c.id === req.params.chatId);
-  if (chat) {
-    chat.preview = 'Keine Nachrichten';
-    chat.unread = 0;
-  }
-  res.json({ ok: true, chats });
-});
-
-/** Kontakt als Favorit merken. */
-app.post('/api/kontakte/:userId/favorit', (req, res) => {
-  const kontakt = contacts.find((c) => c.id === req.params.userId);
-  if (!kontakt) return res.json({ ok: false, error: 'Diese Person steht nicht in deinen Kontakten' });
-
-  kontakt.favorit = !kontakt.favorit;
-  res.json({ ok: true, favorit: kontakt.favorit, contacts });
-});
-
-/*
- * Querformat-Player (Prototyp-Frame "VQ + Video"). Like, Merken und Repost
- * wie beim Hochformat - vorher liess sich ein Querformat-Video ueberhaupt
- * nicht oeffnen.
- */
-app.post('/api/clips/:id/:action', (req, res) => {
-  const clip = clips.find((c) => c.id === req.params.id);
-  if (!clip) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  const { action } = req.params;
-  if (action === 'like') {
-    clip.liked = !clip.liked;
-    clip.likes = Math.max(0, (clip.likes || 0) + (clip.liked ? 1 : -1));
-  } else if (action === 'save') {
-    clip.saved = !clip.saved;
-  } else if (action === 'repost') {
-    clip.reposted = !clip.reposted;
-    setzeRepost('clip', clip.id, clip.reposted);
-  } else {
-    return res.status(400).json({ error: 'Unbekannte Aktion' });
-  }
-
-  res.json(clip);
-});
-
-/* --------------------------------------- Weitere Optionen im Fremdprofil */
-/*
- * Stummschalten, Blockieren und Melden. Blockieren hat Folgen: die Person
- * fliegt aus den Kontakten, der gemeinsame Chat wird gesperrt, und sie
- * taucht in Auswahllisten nicht mehr auf. Sonst waere der Knopf nur ein
- * Hinweis mit anderem Text.
- */
-app.post('/api/profile/:userId/:was', (req, res, next) => {
-  const { userId, was } = req.params;
-  if (!['stumm', 'block', 'melden'].includes(was)) return next();
-
-  const profil = profiles[userId];
-  const person = users[userId];
-  if (!profil || !person) return res.json({ ok: false, error: 'Profil nicht gefunden' });
-
-  if (was === 'stumm') {
-    profil.muted = !profil.muted;
-    return res.json({ ok: true, muted: profil.muted });
-  }
-
-  if (was === 'melden') {
-    const grund = String(req.body?.grund || '').trim();
-    if (!grund) return res.json({ ok: false, error: 'Bitte einen Grund auswählen' });
-    profil.gemeldet = grund;
-    return res.json({ ok: true, gemeldet: grund });
-  }
-
-  profil.blocked = !profil.blocked;
-
-  const chat = chats.find((c) => !c.isGroup && c.userId === userId);
-  if (profil.blocked) {
-    const stelle = contacts.findIndex((c) => c.id === userId);
-    if (stelle !== -1) contacts.splice(stelle, 1);
-    if (chat) chat.blocked = true;
-  } else if (chat) {
-    delete chat.blocked;
-  }
-
-  res.json({ ok: true, blocked: profil.blocked, contacts, chats });
-});
-
-/* ------------------------------------------------------- Explorer-Seiten */
-/*
- * Was hinter einem Hashtag, einem Standort und einem Sound steckt.
- * Prototyp-Frames "VS# - Hashtagoptionen", "VSS + Standort" und
- * "VSSo + Sound". Alle drei sind gleich aufgebaut: ein Kopf und darunter
- * die Abschnitte Reels, Querformat und Beitraege.
- *
- * Bisher gab jeder dieser Knoepfe nur "... folgt" aus.
- */
-app.get('/api/explorer/:art/:wert', (req, res) => {
+app.get('/api/explorer/:art/:wert', route(async (req) => {
   const { art } = req.params;
   const wert = decodeURIComponent(req.params.wert);
+  const beitraege = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
 
   let passt;
   let kopf;
 
   if (art === 'hashtag') {
     const tag = wert.startsWith('#') ? wert : `#${wert}`;
+    const alle = await supabaseApi.ladeHashtags(req.db);
     passt = (e) => (e.tags || []).includes(tag);
-    kopf = { art, titel: tag, anzahl: hashtags.find((h) => h.tag === tag)?.posts || 0 };
+    kopf = { art, titel: tag, anzahl: alle.find((h) => h.tag === tag)?.posts || 0 };
   } else if (art === 'standort') {
     /*
-     * Auch nach `ort` suchen, nicht nur nach Kennung und Name.
-     *
-     * An einem Beitrag steht "Hamburg", der Standort heisst aber
-     * "Hamburger Hafen" und traegt "Hamburg" nur im Feld `ort`. Seit der
-     * Standort am Beitrag anklickbar ist, kommt genau dieser Wert hier an -
-     * vorher fuehrte der Weg nur ueber die Suche, wo der volle Name steht.
+     * Auch nach `ort` suchen, nicht nur nach Kennung und Name: an einem
+     * Beitrag steht "Hamburg", der Standort heißt aber "Hamburger Hafen" und
+     * trägt "Hamburg" nur im Feld `ort`.
      */
+    const standorte = await supabaseApi.ladeStandorte(req.db);
     const platz =
-      places.find((p) => p.id === wert || p.name === wert) ||
-      places.find((p) => p.ort === wert);
-    if (!platz) return res.json({ ok: false, error: 'Diesen Standort gibt es nicht' });
+      standorte.find((p) => p.id === wert || p.name === wert) || standorte.find((p) => p.ort === wert);
+    if (!platz) return { ok: false, error: 'Diesen Standort gibt es nicht' };
     passt = (e) => e.location === platz.ort;
-    // `id` gehoert dazu: die Fotoseite braucht sie, um von dort wieder
-    // hierher zurueckzufinden.
-    kopf = { art, id: platz.id, titel: platz.name, anzahl: platz.posts, adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y };
+    kopf = {
+      art, id: platz.id, titel: platz.name, anzahl: platz.posts,
+      adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y,
+    };
   } else if (art === 'sound') {
     /*
-     * An einem Beitrag steht "Golden Hour – Lys", der Sound heisst aber nur
-     * "Golden Hour" - der Teil hinter dem Gedankenstrich ist der Interpret.
-     * Deshalb wird der vordere Teil abgetrennt, bevor gesucht wird.
-     *
-     * "Originalton" ist kein Eintrag in der Liste und faellt bewusst in die
-     * Fehlermeldung: dahinter steckt keine Seite.
+     * An einem Beitrag steht "Golden Hour – Lys", der Sound heißt aber nur
+     * "Golden Hour" — der Teil hinter dem Gedankenstrich ist der Interpret.
+     * "Originalton" ist kein Eintrag und fällt bewusst in die Fehlermeldung:
+     * dahinter steckt keine Seite.
      */
     const titelTeil = wert.split(/\s+[–—-]\s+/)[0].trim();
+    const sounds = await supabaseApi.ladeSounds(req.db);
     const sound =
-      sounds.find((s) => s.id === wert || s.title === wert) ||
-      sounds.find((s) => s.title === titelTeil);
+      sounds.find((s) => s.id === wert || s.title === wert) || sounds.find((s) => s.title === titelTeil);
     if (!sound) {
-      return res.json({
+      return {
         ok: false,
         error: wert === 'Originalton' ? 'Originalton hat keine eigene Seite' : 'Diesen Sound gibt es nicht',
-      });
+      };
     }
     passt = (e) => typeof e.music === 'string' && e.music.startsWith(sound.title);
-    kopf = { art, titel: sound.title, produzent: sound.artist, anzahl: sound.uses, dauer: sound.dauer, lyrics: sound.lyrics };
+    kopf = {
+      art, titel: sound.title, produzent: sound.artist,
+      anzahl: sound.uses, dauer: sound.dauer, lyrics: sound.lyrics,
+    };
   } else {
-    return res.json({ ok: false, error: 'Unbekannter Bereich' });
+    return { ok: false, error: 'Unbekannter Bereich' };
   }
 
-  res.json({
+  return {
     ok: true,
     kopf,
-    reels: videos.filter(passt),
-    clips: clips.filter(passt),
-    beitraege: posts.filter(passt),
-  });
-});
-
-// Community erstellen — synced mit Supabase
-app.post('/api/communities', async (req, res) => {
-  const name = String(req.body?.name || '').trim();
-  const thema = String(req.body?.thema || '').trim();
-  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
-  if (communities.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-    return res.json({ ok: false, error: 'Diesen Kanal gibt es schon' });
-  }
-
-  // Sync zu Supabase
-  const isPrivate = req.body?.sichtbarkeit !== 'public';
-  const supabaseResult = await syncHandlers.handleCreateCommunity(req.db, req.nutzerId, name, thema || '', isPrivate);
-
-  const community = {
-    id: supabaseResult?.community?.id || (`k${Date.now()}`),
-    name,
-    members: 1,
-    visibility: isPrivate ? 'private' : 'public',
-    topic: thema || 'Ohne Beschreibung',
-    joined: true,
-    unread: 0,
-    eigen: true,
+    reels: beitraege.filter((b) => b.kind === 'reel' && passt(b)),
+    clips: beitraege.filter((b) => b.kind === 'clip' && passt(b)),
+    beitraege: beitraege.filter((b) => b.kind === 'post' && passt(b)),
   };
-  communities.unshift(community);
-  communityMessages[community.id] = [];
-  res.json({ ok: true, community });
-});
-
-/* --------------------------------------------------------- Eigene Inhalte */
-/*
- * Was der Plus-Knopf im eigenen Profil anlegt (Prototyp "VP + erstellen").
- * Das Bild selbst bleibt im Browser - der Server teilt seinen Speicher mit
- * allen Besuchern, dort haette ein privates Foto nichts zu suchen. Hier
- * steht nur der Eintrag.
- */
-let eigeneNummer = 0;
-const eigeneId = (praefix) => `${praefix}_e${++eigeneNummer}`;
-
-/*
- * Punkt 38: die Musik kommt jetzt aus dem Erstellen-Formular. Ohne Angabe
- * bleibt es beim Originalton - das ist auch, was ein Beitrag ohne gewaehlten
- * Sound wirklich hat.
- */
-const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
-
-// Post erstellen — synced mit Supabase
-app.post('/api/eigene/beitrag', async (req, res) => {
-  const beschreibung = String(req.body?.beschreibung || '').trim();
-  if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
-
-  // Sync zu Supabase
-  const supabaseResult = await syncHandlers.handleCreatePost(req.db, req.nutzerId, { beschreibung });
-
-  const beitrag = {
-    id: supabaseResult?.post?.id || eigeneId('p'),
-    userId: 'me',
-    location: String(req.body?.ort || '').trim(),
-    music: musikAus(req.body),
-    description: beschreibung,
-    likedBy: '',
-    likes: 0,
-    comments: 0,
-    reposts: 0,
-    reposted: false,
-    liked: false,
-    saved: false,
-    following: false,
-    notify: false,
-    eigen: true,
-  };
-  posts.unshift(beitrag);
-  gridItems.me.unshift({ id: beitrag.id, kind: 'image', eigen: true });
-  profiles.me.posts += 1;
-  res.json({ ok: true, beitrag });
-});
-
-// Video erstellen — synced mit Supabase
-app.post('/api/eigene/video', async (req, res) => {
-  const beschreibung = String(req.body?.beschreibung || '').trim();
-  if (!beschreibung) return res.json({ ok: false, error: 'Bitte eine Beschreibung eingeben' });
-  const quer = req.body?.format === 'quer';
-
-  if (quer) {
-    const clip = {
-      id: eigeneId('q'),
-      userId: 'me',
-      title: beschreibung,
-      duration: String(req.body?.dauer || '00:15'),
-      views: 0,
-      art: 'standard',
-      age: 'gerade eben',
-      eigen: true,
-    };
-    clips.unshift(clip);
-    gridItems.me.unshift({ id: clip.id, kind: 'video', eigen: true });
-    profiles.me.posts += 1;
-    return res.json({ ok: true, clip });
-  }
-
-  // Sync zu Supabase
-  const supabaseResult = await syncHandlers.handleCreateVideo(req.db, req.nutzerId, { titel: beschreibung, beschreibung });
-
-  const video = {
-    id: supabaseResult?.video?.id || eigeneId('v'),
-    userId: 'me',
-    description: beschreibung,
-    location: String(req.body?.ort || '').trim(),
-    music: musikAus(req.body),
-    likes: 0,
-    comments: 0,
-    shares: 0,
-    reposted: false,
-    liked: false,
-    saved: false,
-    eigen: true,
-  };
-  videos.unshift(video);
-  gridItems.me.unshift({ id: video.id, kind: 'video', eigen: true });
-  profiles.me.posts += 1;
-  res.json({ ok: true, video });
-});
-
-/*
- * Eigenes Profil bearbeiten - Henrik: "Profilbild, Name, Info/Bio, Link usw.
- * ueber eine Bearbeitungseinstellung aendern koennen."
- *
- * Name und Kuerzel stehen in `users`, Bio und Link in `profiles`. Beides
- * wird hier zusammen gepflegt, damit der Aufrufer nur einen Weg kennen muss.
- *
- * Das Profilbild selbst bleibt im Browser: der Server teilt seinen Speicher
- * mit allen Besuchern, dort hat ein privates Foto nichts zu suchen. Hier
- * steht nur die Farbe, die als Ersatzbild dient.
- */
-// Eigenes Profil aktualisieren — synced mit Supabase
-app.post('/api/eigene/profil', async (req, res) => {
-  const { name, bio, link, color } = req.body || {};
-
-  const updates = {};
-
-  if (name !== undefined) {
-    const sauber = String(name).trim();
-    if (!sauber) return res.json({ ok: false, error: 'Der Name darf nicht leer sein' });
-    if (sauber.length > 40) return res.json({ ok: false, error: 'Der Name ist zu lang (hoechstens 40 Zeichen)' });
-    users.me.name = sauber;
-    updates.name = sauber;
-    // Kuerzel aus den Anfangsbuchstaben, hoechstens zwei.
-    users.me.initials = sauber
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase();
-  }
-
-  if (bio !== undefined) {
-    const sauber = String(bio).trim();
-    if (sauber.length > 150) return res.json({ ok: false, error: 'Die Info ist zu lang (hoechstens 150 Zeichen)' });
-    profiles.me.bio = sauber;
-    updates.bio = sauber;
-  }
-
-  if (link !== undefined) {
-    profiles.me.link = String(link).trim();
-    updates.link = profiles.me.link;
-  }
-
-  // Sync zu Supabase
-  if (Object.keys(updates).length > 0) {
-    await syncHandlers.handleUpdateProfile(req.db, req.nutzerId, updates);
-  }
-
-  // Erlaubt ist eine einzelne Farbe oder ein Zwei-Ton-Verlauf. Der Wert landet
-  // ungefiltert in einem style-Attribut, deshalb wird er hier eng geprueft und
-  // nicht nur auf Laenge.
-  const istFarbe = /^#[0-9a-fA-F]{6}$/.test(String(color));
-  const istVerlauf = /^linear-gradient\(135deg,#[0-9a-fA-F]{6},#[0-9a-fA-F]{6}\)$/.test(String(color));
-  if (color !== undefined && (istFarbe || istVerlauf)) {
-    users.me.color = color;
-  }
-
-  res.json({
-    ok: true,
-    profil: {
-      name: users.me.name,
-      initials: users.me.initials,
-      color: users.me.color,
-      bio: profiles.me.bio,
-      link: profiles.me.link,
-    },
-  });
-});
-
-app.post('/api/eigene/highlight', (req, res) => {
-  const name = String(req.body?.name || '').trim();
-  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
-  if (profiles.me.highlights.includes(name)) return res.json({ ok: false, error: 'Dieses Highlight gibt es schon' });
-  profiles.me.highlights.push(name);
-  res.json({ ok: true, highlights: profiles.me.highlights });
-});
-
-app.post('/api/eigene/playlist', (req, res) => {
-  const name = String(req.body?.name || '').trim();
-  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
-  profiles.me.playlists = profiles.me.playlists || [];
-  if (profiles.me.playlists.includes(name)) return res.json({ ok: false, error: 'Diese Playlist gibt es schon' });
-  profiles.me.playlists.push(name);
-  res.json({ ok: true, playlists: profiles.me.playlists });
-});
-
-app.post('/api/eigene/spende', (req, res) => {
-  const titel = String(req.body?.titel || '').trim();
-  if (!titel) return res.json({ ok: false, error: 'Bitte einen Titel eingeben' });
-
-  /*
-   * Punkt 44: das Ziel ist freiwillig. Nicht jede Sammlung laeuft auf einen
-   * Betrag zu - manche laufen einfach. Steht keiner da, gilt 0; die Anzeige
-   * zeigt dann den gesammelten Betrag ohne Balken.
-   *
-   * Eine unsinnige Eingabe (Text, negative Zahl) wird weiterhin abgelehnt -
-   * freiwillig heisst nicht beliebig.
-   */
-  const roh = String(req.body?.ziel ?? '').trim();
-  let ziel = 0;
-  if (roh) {
-    ziel = Number(roh.replace(',', '.'));
-    if (!Number.isFinite(ziel) || ziel <= 0) {
-      return res.json({ ok: false, error: 'Das Spendenziel muss eine Zahl über null sein' });
-    }
-  }
-
-  profiles.me.spende = { titel, ziel, gesammelt: 0, text: String(req.body?.text || '').trim() };
-  res.json({ ok: true, spende: profiles.me.spende });
-});
-
-/*
- * Einen eigenen Beitrag oder ein eigenes Video loeschen.
- *
- * Henrik am 26.08.2026, Punkt 37: "Eigene Beiträge können nicht gelöscht
- * werden." Und Punkt 46 fuer die Livestream-Aufzeichnung, die als
- * Querformat-Video im Profil liegt.
- *
- * Nur eigene Inhalte - alles andere gehoert jemand anderem.
- */
-// Inhalte löschen — synced mit Supabase
-app.post('/api/eigene/:id/loeschen', async (req, res) => {
-  const id = req.params.id;
-
-  const imRaster = gridItems.me.some((g) => g.id === id);
-
-  for (const liste of [posts, videos, clips]) {
-    const stelle = liste.findIndex((e) => e.id === id);
-    if (stelle === -1) continue;
-    if (liste[stelle].userId !== 'me') {
-      return res.json({ ok: false, error: 'Das ist nicht dein Beitrag' });
-    }
-
-    // Sync zu Supabase
-    const contentType = liste === posts ? 'post' : liste === videos ? 'video' : 'clip';
-    await syncHandlers.handleDeleteContent(req.db, req.nutzerId, id, contentType);
-
-    liste.splice(stelle, 1);
-    gridItems.me = gridItems.me.filter((g) => g.id !== id);
-    if (liste === posts) profiles.me.posts = Math.max(0, profiles.me.posts - 1);
-    return res.json({ ok: true, meldung: 'Gelöscht' });
-  }
-
-  if (imRaster) {
-    gridItems.me = gridItems.me.filter((g) => g.id !== id);
-    profiles.me.posts = Math.max(0, profiles.me.posts - 1);
-    return res.json({ ok: true, meldung: 'Gelöscht' });
-  }
-
-  res.json({ ok: false, error: 'Das gibt es nicht mehr' });
-});
-
-/*
- * Einen eigenen Beitrag in eine Playlist oder ein Highlight legen.
- * Punkt 40: "Keine Möglichkeit, Inhalte zu Playlists/Highlights
- * hinzuzufügen."
- */
-app.post('/api/eigene/:id/sammlung', (req, res) => {
-  const id = req.params.id;
-  const name = String(req.body?.name || '').trim();
-  const art = req.body?.art === 'highlight' ? 'highlights' : 'playlists';
-  if (!name) return res.json({ ok: false, error: 'Bitte eine Sammlung wählen' });
-
-  profiles.me.sammlungen = profiles.me.sammlungen || {};
-  const schluessel = `${art}:${name}`;
-  const drin = profiles.me.sammlungen[schluessel] || [];
-  if (drin.includes(id)) return res.json({ ok: false, error: `Steht schon in „${name}"` });
-
-  profiles.me.sammlungen[schluessel] = [...drin, id];
-  res.json({ ok: true, meldung: `Zu „${name}" hinzugefügt` });
-});
-
-/** Livestream starten und beenden. Die Aufzeichnung bleibt im Profil. */
-app.post('/api/eigene/livestream', (req, res) => {
-  if (req.body?.aktion === 'start') {
-    profiles.me.live = { seit: Date.now(), zuschauer: 0 };
-    return res.json({ ok: true, live: true });
-  }
-
-  const lief = profiles.me.live;
-  profiles.me.live = null;
-  if (!lief) return res.json({ ok: true, live: false });
-
-  const sekunden = Math.max(1, Math.round((Date.now() - lief.seit) / 1000));
-  const clip = {
-    id: eigeneId('q'),
-    userId: 'me',
-    title: String(req.body?.titel || '').trim() || 'Livestream-Aufzeichnung',
-    duration: `${String(Math.floor(sekunden / 60)).padStart(2, '0')}:${String(sekunden % 60).padStart(2, '0')}`,
-    views: lief.zuschauer,
-    age: 'gerade eben',
-    // Die Aufzeichnung ist ein normales Video, kein laufender Stream -
-    // sie gehoert unter "Standard", nicht unter "Live".
-    art: 'standard',
-    eigen: true,
-    aufzeichnung: true,
-  };
-  clips.unshift(clip);
-  gridItems.me.unshift({ id: clip.id, kind: 'video', eigen: true });
-  res.json({ ok: true, live: false, clip });
-});
-
-/** Mitteilungen eines Bereichs ("videos" oder "communities"). */
-app.get('/api/mitteilungen/:bereich', (req, res) => {
-  const eintraege = mitteilungenFuer(req.params.bereich);
-  res.json({ eintraege, ungelesen: eintraege.filter((m) => !m.gelesen).length });
-});
-
-// Mitteilung als gelesen markieren — synced mit Supabase
-app.post('/api/mitteilungen/:id/gelesen', async (req, res) => {
-  const m = mitteilungen.find((x) => x.id === req.params.id);
-  if (!m) return res.json({ ok: false, error: 'Diese Mitteilung gibt es nicht' });
-
-  // Sync zu Supabase
-  await syncHandlers.handleMarkNotificationRead(req.db, req.nutzerId, req.params.id);
-
-  m.gelesen = true;
-  res.json({ ok: true, ungelesen: mitteilungen.filter((x) => x.bereich === m.bereich && !x.gelesen).length });
-});
-
-// Alle Mitteilungen eines Bereichs als gelesen markieren — synced mit Supabase
-app.post('/api/mitteilungen/:bereich/alle-gelesen', async (req, res) => {
-  // Sync zu Supabase
-  await syncHandlers.handleMarkAllNotificationsRead(req.db, req.nutzerId, req.params.bereich);
-
-  for (const m of mitteilungen) if (m.bereich === req.params.bereich) m.gelesen = true;
-  res.json({ ok: true, ungelesen: 0 });
-});
-
-/** Die eigenen Reposts, aufgeloest zu Beitraegen und Videos. */
-app.get('/api/reposts', (req, res) => {
-  res.json(
-    reposts
-      .map((r) =>
-        r.art === 'post'
-          ? { art: 'post', eintrag: posts.find((p) => p.id === r.id) }
-          : r.art === 'clip'
-          ? { art: 'clip', eintrag: clips.find((c) => c.id === r.id) }
-          : { art: 'video', eintrag: videos.find((v) => v.id === r.id) }
-      )
-      .filter((r) => r.eintrag)
-  );
-});
-
-app.get('/api/profile/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const profile = profiles[userId];
-  const person = users[userId];
-  if (!profile || !person) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  res.json({ ...person, ...profile, grid: gridItems[userId] || [] });
-});
-
-/*
- * Punkt 42: Folgen wirkt auf beiden Seiten. Der andere bekommt einen Follower
- * mehr - und die eigene Zahl "Gefolgt" steigt mit. Vorher stand sie fest bei
- * 186, egal wem man folgte: die Zahl im eigenen Profil war blosse Zierde.
- */
-function folgenUmschalten(profil) {
-  profil.following_me = !profil.following_me;
-  profil.followers += profil.following_me ? 1 : -1;
-  profiles.me.following += profil.following_me ? 1 : -1;
-  return profil.following_me;
-}
-
-/** Einem Video-Autor folgen oder entfolgen. */
-app.post('/api/autoren/:userId/follow', (req, res) => {
-  const profil = profiles[req.params.userId];
-  if (!profil) return res.json({ ok: false, error: 'Profil nicht gefunden' });
-
-  const folgt = folgenUmschalten(profil);
-  res.json({ ok: true, following: folgt, followers: profil.followers });
-});
-
-app.post('/api/profile/:userId/follow', async (req, res) => {
-  const profile = profiles[req.params.userId];
-  if (!profile) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  const userId = req.params.userId;
-
-  // Versuche auf Supabase zu speichern
-  const supabaseResult = await syncHandlers.handleFollowUser(req.db, req.nutzerId, userId);
-
-  // Mock-Daten aktualisieren (Fallback)
-  const folgt = folgenUmschalten(profile);
-
-  res.json({
-    following_me: supabaseResult?.followed !== false ? folgt : false,
-    followers: profile.followers,
-    synced: supabaseResult?.success || false
-  });
-});
-
-app.get('/api/comments/:targetId', (req, res) => {
-  res.json(comments[req.params.targetId] || []);
-});
-
-// Kommentar erstellen — synced mit Supabase
-app.post('/api/comments/:targetId', async (req, res) => {
-  const { text } = req.body || {};
-  if (!text || !text.trim()) return res.status(400).json({ error: 'Text erforderlich' });
-
-  const targetId = req.params.targetId;
-
-  // Sync zu Supabase
-  const supabaseResult = await syncHandlers.handleCreateComment(req.db, req.nutzerId, targetId, text.trim());
-
-  if (!comments[targetId]) comments[targetId] = [];
-
-  const comment = {
-    id: supabaseResult?.comment?.id || ('cm' + Date.now()),
-    userId: 'me',
-    text: text.trim(),
-    time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-    likes: 0,
-    liked: false,
-  };
-  comments[targetId].push(comment);
-
-  const target = posts.find((p) => p.id === targetId) || videos.find((v) => v.id === targetId);
-  if (target) target.comments += 1;
-
-  res.json(comment);
-});
-
-// Kommentar liken — synced mit Supabase
-app.post('/api/comments/:targetId/:commentId/like', async (req, res) => {
-  const list = comments[req.params.targetId] || [];
-  const comment = list.find((c) => c.id === req.params.commentId);
-  if (!comment) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  // Sync zu Supabase
-  await syncHandlers.handleLikeComment(req.db, req.nutzerId, req.params.commentId);
-
-  comment.liked = !comment.liked;
-  comment.likes += comment.liked ? 1 : -1;
-  res.json(comment);
-});
-
-// Post-Aktionen — alle synced mit Supabase
-app.post('/api/posts/:id/:action', async (req, res) => {
-  const post = posts.find((p) => p.id === req.params.id);
-  if (!post) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  const { action } = req.params;
-  const postId = req.params.id;
-
-  if (action === 'like') {
-    await syncHandlers.handleLikeContent(req.db, req.nutzerId, postId);
-    post.liked = !post.liked;
-    post.likes += post.liked ? 1 : -1;
-  } else if (action === 'save') {
-    await syncHandlers.handleSaveContent(req.db, req.nutzerId, postId);
-    post.saved = !post.saved;
-  } else if (action === 'follow') {
-    const profil = profiles[post.userId];
-    const folgt = profil ? folgenUmschalten(profil) : !post.following;
-    for (const p of posts) if (p.userId === post.userId) p.following = folgt;
-    if (profil) await syncHandlers.handleFollowUser(req.db, req.nutzerId, post.userId);
-  } else if (action === 'notify') {
-    post.notify = !post.notify;
-  } else if (action === 'repost') {
-    await syncHandlers.handleRepostContent(req.db, req.nutzerId, postId);
-    post.reposted = !post.reposted;
-    post.reposts += post.reposted ? 1 : -1;
-    setzeRepost('post', post.id, post.reposted);
-  } else {
-    return res.status(400).json({ error: 'Unbekannte Aktion' });
-  }
-
-  res.json(post);
-});
-
-app.post('/api/videos/:id/:action', async (req, res) => {
-  const video = videos.find((v) => v.id === req.params.id);
-  if (!video) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  const { action } = req.params;
-  const videoId = req.params.id;
-
-  // Supabase-Sync für Like
-  if (action === 'like') {
-    const supabaseResult = await syncHandlers.handleLikeContent(req.db, req.nutzerId, videoId);
-    video.liked = !video.liked;
-    video.likes += video.liked ? 1 : -1;
-  } else if (action === 'save') {
-    video.saved = !video.saved;
-  } else if (action === 'share') {
-    video.shares += 1;
-  } else if (action === 'repost') {
-    video.reposted = !video.reposted;
-    video.shares += video.reposted ? 1 : -1;
-    setzeRepost('video', video.id, video.reposted);
-  } else {
-    return res.status(400).json({ error: 'Unbekannte Aktion' });
-  }
-
-  res.json(video);
-});
-
-/*
- * Nachrichten eines Chats. Der Aufrufer muss nicht wissen, aus welchem
- * Bereich der Chat kommt - hier wird nachgesehen, wo er liegt.
- */
-function nachrichtenSpeicher(chatId) {
-  if (communityChatMessages[chatId]) return communityChatMessages;
-  if (communityMessages[chatId]) return communityMessages;
-  return messages;
-}
-
-app.get('/api/messages/:chatId', (req, res) => {
-  res.json(nachrichtenSpeicher(req.params.chatId)[req.params.chatId] || []);
-});
-
-app.post('/api/communities/:id/join', (req, res) => {
-  const community = communities.find((c) => c.id === req.params.id);
-  if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  /*
-   * Punkt 62: aus der eigenen Community kann man nicht austreten. Die
-   * Oberflaeche zeigt dort keinen Knopf mehr - der Server sagt trotzdem nein,
-   * denn eine Regel, die nur im Markup steht, ist keine.
-   */
-  if (community.eigen) {
-    return res.status(409).json({ error: 'Die eigene Community lässt sich nicht verlassen' });
-  }
-
-  community.joined = !community.joined;
-  community.members += community.joined ? 1 : -1;
-  res.json(community);
-});
-
-app.post('/api/messages/:chatId', async (req, res) => {
-  const { text } = req.body || {};
-  if (!text || !text.trim()) {
-    return res.status(400).json({ error: 'Text erforderlich' });
-  }
-  const chatId = req.params.chatId;
-
-  // Solange die Anfrage laeuft, bleibt es bei der einen Nachricht, die schon
-  // mit der Anfrage rausging.
-  const offen = chats.find((c) => c.id === chatId);
-  if (offen && offen.requestState === 'pending') {
-    return res.json({ ok: false, error: 'Warte, bis die Anfrage angenommen wurde' });
-  }
-  if (offen && offen.blocked) {
-    return res.json({ ok: false, error: 'Diese Person ist blockiert' });
-  }
-
-  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-
-  // Versuche auf Supabase zu speichern
-  const supabaseResult = await syncHandlers.handleSendMessage(req.db, req.nutzerId, chatId, text.trim());
-
-  // Mock-Daten aktualisieren (Fallback/Cache)
-  const store = nachrichtenSpeicher(chatId);
-  if (!store[chatId]) store[chatId] = [];
-
-  const message = {
-    id: supabaseResult?.message?.id || ('m' + Date.now()),
-    from: 'me',
-    text: text.trim(),
-    time
-  };
-  store[chatId].push(message);
-
-  const chat = chats.find((c) => c.id === chatId);
-  if (chat) {
-    chat.preview = text.trim();
-    chat.time = time;
-  }
-
-  res.json(message);
-});
-
-/*
- * Einen Beitrag oder ein Video an Kontakte schicken - Prototyp-Frames
- * "Nutzer B + Beitrag teilen" und "VQ + Video teilen". Dort steht ein Raster
- * mit Personen; wen man antippt, der bekommt es in den Chat.
- */
-app.post('/api/teilen', (req, res) => {
-  const { art, id } = req.body || {};
-  const empfaenger = Array.isArray(req.body?.empfaenger) ? req.body.empfaenger : [];
-  if (!empfaenger.length) return res.json({ ok: false, error: 'Bitte mindestens eine Person auswählen' });
-
-  const eintrag =
-    art === 'video'
-      ? videos.find((v) => v.id === id)
-      : art === 'clip'
-      ? clips.find((c) => c.id === id)
-      : posts.find((p) => p.id === id);
-  if (!eintrag) return res.json({ ok: false, error: 'Diesen Beitrag gibt es nicht mehr' });
-
-  const autor = users[eintrag.userId]?.name || 'Unbekannt';
-  const titel = eintrag.title || eintrag.description || 'Ohne Beschreibung';
-  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const vorschau = art === 'post' ? 'Beitrag geteilt' : 'Video geteilt';
-  const gesendet = [];
-
-  for (const userId of empfaenger) {
-    if (!users[userId]) continue;
-
-    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
-    if (!chat) {
-      chat = {
-        id: `c${Date.now()}${gesendet.length}`,
-        userId,
-        name: users[userId].name,
-        preview: vorschau,
-        time,
-        unread: 0,
-        muted: false,
-        isGroup: false,
-      };
-      chats.unshift(chat);
-    }
-
-    if (!messages[chat.id]) messages[chat.id] = [];
-    messages[chat.id].push({
-      id: `m${Date.now()}${gesendet.length}`,
-      from: 'me',
-      text: vorschau,
-      time,
-      geteilt: { art, id, titel, autor },
-    });
-
-    chat.preview = vorschau;
-    chat.time = time;
-    gesendet.push(userId);
-  }
-
-  if (art === 'video') eintrag.shares = (eintrag.shares || 0) + gesendet.length;
-  res.json({ ok: true, gesendet, chats });
-});
-
-/*
- * Anhang im Chat: Foto, Standort oder ein weitergereichter Kontakt.
- * Das Bild selbst bleibt im Browser - der Server merkt sich nur, dass an
- * dieser Stelle ein Foto steht. Genauso ist es bei "Deine Story" und bei
- * eigenen Beitraegen geloest.
- */
-app.post('/api/messages/:chatId/anhang', (req, res) => {
-  const chatId = req.params.chatId;
-  const art = req.body?.art;
-
-  const offen = chats.find((c) => c.id === chatId);
-  if (offen && offen.requestState === 'pending') {
-    return res.json({ ok: false, error: 'Warte, bis die Anfrage angenommen wurde' });
-  }
-  if (offen && offen.blocked) {
-    return res.json({ ok: false, error: 'Diese Person ist blockiert' });
-  }
-
-  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const message = { id: 'm' + Date.now(), from: 'me', time };
-  let vorschau;
-
-  if (art === 'foto') {
-    message.media = 'image';
-    message.text = 'Foto';
-    vorschau = 'Foto';
-  } else if (art === 'standort') {
-    const platz = places.find((p) => p.id === req.body?.id) || places[0];
-    message.standort = { name: platz.name, adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y };
-    message.text = `Standort: ${platz.name}`;
-    vorschau = 'Standort';
-  } else if (art === 'kontakt') {
-    const person = users[req.body?.id];
-    if (!person) return res.json({ ok: false, error: 'Diese Person gibt es nicht' });
-    message.kontakt = { id: person.id, name: person.name, handle: person.handle, phone: person.phone };
-    message.text = `Kontakt: ${person.name}`;
-    vorschau = 'Kontakt';
-  } else {
-    return res.json({ ok: false, error: 'Unbekannter Anhang' });
-  }
-
-  const store = nachrichtenSpeicher(chatId);
-  if (!store[chatId]) store[chatId] = [];
-  store[chatId].push(message);
-
-  const chat = chats.find((c) => c.id === chatId);
-  if (chat) {
-    chat.preview = vorschau;
-    chat.time = time;
-  }
-
-  res.json({ ok: true, message });
-});
-
-app.post('/api/groups', (req, res) => {
-  const { name, memberIds, info } = req.body || {};
-  if (!name || !name.trim()) return res.status(400).json({ error: 'Name erforderlich' });
-  if (!Array.isArray(memberIds) || memberIds.length === 0) {
-    return res.status(400).json({ error: 'Mindestens ein Mitglied erforderlich' });
-  }
-
-  const chat = {
-    id: 'c' + Date.now(),
-    userId: null,
-    name: name.trim(),
-    preview: (info && info.trim()) || 'Gruppe erstellt',
-    info: (info && info.trim()) || '',
-    time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-    unread: 0,
-    muted: false,
-    isGroup: true,
-    members: memberIds,
-  };
-  chats.unshift(chat);
-  messages[chat.id] = [];
-
-  res.json(chat);
-});
-
-// "Nicht gefunden" und "schon vorhanden" sind hier normale Ergebnisse einer
-// Suche, keine Fehler der Anfrage. Deshalb 200 mit ok-Feld statt 404/409 —
-// sonst protokolliert der Browser bei jeder Fehleingabe einen Ladefehler.
-app.post('/api/contacts', (req, res) => {
-  const { handle, nachricht } = req.body || {};
-  if (!handle || !handle.trim()) {
-    return res.json({ ok: false, error: 'Bitte Benutzername oder Telefonnummer eingeben' });
-  }
-
-  const person = findePerson(handle);
-
-  if (!person) {
-    return res.json({
-      ok: false,
-      error: istNummer(handle)
-        ? 'Zu dieser Nummer gibt es noch kein Konto'
-        : 'Niemand mit diesem Benutzernamen gefunden',
-    });
-  }
-  if (contacts.some((c) => c.id === person.id)) {
-    return res.json({ ok: false, error: `${person.name} ist bereits in deinen Kontakten` });
-  }
-
-  /*
-   * Punkt 57: bei einem privaten Profil bleibt die Anfrage offen, bis die
-   * Person sie annimmt - bis dahin ist der Chat gesperrt. Ein oeffentliches
-   * Profil nimmt sie sofort an; dort waere ein Warten auf eine Freigabe, die
-   * niemand geben muss, nur eine Huerde ohne Zweck. Der Knopf heisst darum
-   * auch verschieden: "Anfrage senden" gegen "+ Befreunden".
-   */
-  const privat = !!person.privat;
-
-  const contact = {
-    id: person.id,
-    name: person.name,
-    status: privat ? 'pending' : 'friend',
-    about: privat ? 'Anfrage gesendet' : 'Kontakt',
-    phone: person.phone,
-  };
-  contacts.push(contact);
-
-  // Chat zur Anfrage anlegen. Bis zur Annahme ist genau die eine
-  // mitgeschickte Nachricht erlaubt.
-  const text = (nachricht || '').trim();
-  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const chat = {
-    id: 'c' + Date.now(),
-    userId: person.id,
-    name: person.name,
-    preview: text || (privat ? 'Anfrage gesendet' : 'Neuer Kontakt'),
-    time,
-    unread: 0,
-    muted: false,
-    isGroup: false,
-    requestState: privat ? 'pending' : 'accepted',
-  };
-  chats.unshift(chat);
-  messages[chat.id] = text ? [{ id: 'm' + Date.now(), from: 'me', text, time }] : [];
-
-  res.json({ ok: true, contact, chat, privat });
-});
-
-/** Person zu einer Nummer oder einem Benutzernamen nachschlagen. */
-app.post('/api/personen/suche', (req, res) => {
-  const { eingabe } = req.body || {};
-  const person = findePerson(eingabe || '');
-  res.json({ person: person || null });
-});
-
-/** Anfrage annehmen - danach ist der Chat frei benutzbar. */
-app.post('/api/chats/:chatId/accept', (req, res) => {
-  const chat = chats.find((c) => c.id === req.params.chatId);
-  if (!chat) return res.json({ ok: false, error: 'Chat nicht gefunden' });
-
-  chat.requestState = 'accepted';
-  const kontakt = contacts.find((c) => c.id === chat.userId);
-  if (kontakt) {
-    kontakt.status = 'friend';
-    kontakt.about = 'Kontakt';
-  }
-  res.json({ ok: true, chat });
-});
-
-// Story liken — synced mit Supabase
-app.post('/api/stories/:id/like', async (req, res) => {
-  const story = stories.find((s) => s.id === req.params.id);
-  if (!story) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  // Sync zu Supabase
-  await syncHandlers.handleLikeStory(req.db, req.nutzerId, req.params.id);
-
-  story.liked = !story.liked;
-  res.json(story);
-});
-
-// Story als angesehen markieren — synced mit Supabase
-app.post('/api/stories/:id/seen', async (req, res) => {
-  const story = stories.find((s) => s.id === req.params.id);
-  if (story) {
-    story.viewed = true;
-    // Sync zu Supabase
-    await syncHandlers.handleViewStory(req.db, req.nutzerId, req.params.id);
-  }
-  res.json({ ok: true });
-});
-
-// Antwort auf eine Story landet im normalen Chat mit dieser Person. Gibt es
-// noch keinen, wird er angelegt — sonst waere die Antwort nirgends zu sehen.
-app.post('/api/stories/:id/reply', (req, res) => {
-  const story = stories.find((s) => s.id === req.params.id);
-  const { text } = req.body || {};
-  if (!story) return res.status(404).json({ error: 'Nicht gefunden' });
-  if (!text || !text.trim()) return res.json({ ok: false, error: 'Bitte etwas schreiben' });
-
-  let chat = chats.find((c) => !c.isGroup && c.userId === story.userId);
-  const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-
-  if (!chat) {
-    const person = users[story.userId];
-    chat = {
-      id: 'c' + Date.now(),
-      userId: story.userId,
-      name: person ? person.name : 'Unbekannt',
-      preview: '',
-      time,
-      unread: 0,
-      muted: false,
-      isGroup: false,
-    };
-    chats.unshift(chat);
-    messages[chat.id] = [];
-  }
-
-  if (!messages[chat.id]) messages[chat.id] = [];
-  const message = {
-    id: 'm' + Date.now(),
-    from: 'me',
-    text: text.trim(),
-    time,
-    replyToStory: story.name,
-  };
-  messages[chat.id].push(message);
-
-  chat.preview = text.trim();
-  chat.time = time;
-
-  res.json({ ok: true, chatId: chat.id, message });
-});
-
-app.post('/api/chats/:chatId/read', (req, res) => {
-  const chat = chats.find((c) => c.id === req.params.chatId);
-  if (chat) chat.unread = 0;
-  res.json({ ok: true });
-});
-
-/** Communities: beigetretene vs. Entdecken */
-app.get('/api/communities', (req, res) => {
-  const filter = req.query.filter || 'joined'; // joined | discover
-  const result = communities.filter((c) => filter === 'discover' ? !c.joined : c.joined);
-  res.json(result);
-});
-
-/** Community mit Kanälen */
-app.get('/api/communities/:id', (req, res) => {
-  const community = communities.find((c) => c.id === req.params.id);
-  if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  const channels = community.channels.map((chId) => ({
-    id: chId,
-    name: communityChannels[chId]?.name || chId,
-    topics: communityChannels[chId]?.topics || [],
-  }));
-
-  res.json({ ...community, channels });
-});
-
-/*
- * Neues Unterthema in einer Community anlegen.
- * Prototyp-Frame "CH + Unterthema erstellen" - auf der Kanalseite gab es
- * dafuer bis zum 26.08.2026 keinen Weg.
- */
-app.post('/api/communities/:id/channels', (req, res) => {
-  const community = communities.find((c) => c.id === req.params.id);
-  if (!community) return res.status(404).json({ ok: false, error: 'Nicht gefunden' });
-
-  const name = String(req.body?.name || '').trim();
-  if (!name) return res.json({ ok: false, error: 'Bitte einen Namen eingeben' });
-
-  const schon = community.channels.some(
-    (chId) => (communityChannels[chId]?.name || '').toLowerCase() === name.toLowerCase()
-  );
-  if (schon) return res.json({ ok: false, error: 'Dieses Unterthema gibt es schon' });
-
-  const id = 'ch-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
-  communityChannels[id] = { name, topics: [] };
-  community.channels.push(id);
-  res.json({ ok: true, id, name });
-});
-
-/** Community-Kanal öffnen (zeigt Themen oder Chat) */
-app.get('/api/communities/:id/channels/:chId', (req, res) => {
-  const community = communities.find((c) => c.id === req.params.id);
-  const channel = communityChannels[req.params.chId];
-
-  if (!community || !channel) return res.status(404).json({ error: 'Nicht gefunden' });
-
-  res.json({
-    community: community.name,
-    channel: channel.name,
-    topics: channel.topics,
-    messages: communityMessages[req.params.chId] || [],
-  });
-});
-
-/** Community beitreten */
-/*
- * Hier standen zwei weitere Routen: ein zweites /join und ein /leave. Das
- * zweite /join war toter Code - Express nimmt die erste passende Route, und
- * die steht weiter oben. Es setzte ausserdem "joined = true" statt umzu-
- * schalten und liess die Mitgliederzahl unberuehrt. /leave hat niemand
- * aufgerufen: weder die Website noch die App kennen die Adresse.
- */
+}));
 
 module.exports = app;

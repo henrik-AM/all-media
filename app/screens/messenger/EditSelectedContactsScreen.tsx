@@ -4,7 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, spacing, themenStyles, typography } from '../../constants/design';
-import { mockContacts } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { Contact } from '../../types';
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
 }
 
 export const EditSelectedContactsScreen = ({ onBack, onNotice }: Props) => {
+  const { contacts: alleKontakte } = useDaten();
   const [selected, setSelected] = useState<Set<string>>(new Set(['u2', 'u3']));
 
   const toggleContact = (contactId: string) => {
@@ -37,7 +38,7 @@ export const EditSelectedContactsScreen = ({ onBack, onNotice }: Props) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {mockContacts.map((contact) => (
+        {alleKontakte.map((contact) => (
           <Druck
             key={contact.id}
             style={styles.row}

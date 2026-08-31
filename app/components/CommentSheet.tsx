@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -13,7 +13,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { EmptyState } from './EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
-import { CURRENT_USER_ID, mockComments, mockUsers } from '../mocks';
+import { useDaten } from '../contexts/DatenContext';
+import { useSupabase } from '../contexts/SupabaseContext';
+import { ICH as CURRENT_USER_ID, ladeKommentare } from '../lib/daten';
 import { useZiehenZumSchliessen } from '../lib/ziehen';
 import { Comment } from '../types';
 
@@ -24,46 +26,82 @@ interface Props {
 }
 
 export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
+  const { users: alleNutzer, ichId } = useDaten();
+  const { supabase } = useSupabase();
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
-  if (targetId && loadedFor !== targetId) {
-    setLoadedFor(targetId);
-    setComments(mockComments[targetId] ?? []);
+  /*
+   * Kommentare werden zu dem Beitrag geholt, der gerade offen ist — nicht
+   * beim Start für alle Beiträge auf einmal. Bei zweihundert Beiträgen wäre
+   * das ein Vielfaches an Daten für etwas, das man meistens nie aufklappt.
+   */
+  useEffect(() => {
+    if (!targetId || !supabase || !ichId) {
+      setComments([]);
+      return;
+    }
+    let abgebrochen = false;
     setDraft('');
-  }
+    ladeKommentare(supabase, ichId, targetId)
+      .then((geladen) => {
+        if (!abgebrochen) setComments(geladen);
+      })
+      .catch((e) => console.error('Kommentare laden fehlgeschlagen:', e?.message ?? e));
+    return () => {
+      abgebrochen = true;
+    };
+  }, [targetId, supabase, ichId]);
 
-  const toggleLike = (comment: Comment) =>
+  const toggleLike = async (comment: Comment) => {
+    // Erst anzeigen, dann speichern: ein Herz, das eine halbe Sekunde
+    // nachhinkt, fühlt sich kaputt an.
     setComments((prev) =>
       prev.map((c) =>
         c.id === comment.id ? { ...c, liked: !c.liked, likes: c.likes + (c.liked ? -1 : 1) } : c
       )
     );
+    if (!supabase || !ichId) return;
+    if (comment.liked) {
+      await supabase.from('comment_likes').delete().eq('comment_id', comment.id).eq('user_id', ichId);
+    } else {
+      await supabase.from('comment_likes').insert({ comment_id: comment.id, user_id: ichId });
+    }
+  };
 
-  const send = () => {
+  const send = async () => {
     const text = draft.trim();
-    if (!text || !targetId) return;
+    if (!text || !targetId || !supabase || !ichId) return;
+    setDraft('');
+
+    const { data, error } = await supabase
+      .from('comments')
+      .insert({ post_id: targetId, user_id: ichId, text })
+      .select('id, created_at')
+      .single();
+    if (error) {
+      console.error('Kommentar senden fehlgeschlagen:', error.message);
+      setDraft(text);
+      return;
+    }
 
     const comment: Comment = {
-      id: `cm${Date.now()}`,
+      id: data.id,
       userId: CURRENT_USER_ID,
       text,
-      time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      time: new Date(data.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
       likes: 0,
       liked: false,
     };
-
     const next = [...comments, comment];
     setComments(next);
-    setDraft('');
     onCountChange?.(targetId, next.length);
   };
 
   const { griff, ziehStil } = useZiehenZumSchliessen(onClose);
 
   const renderComment = ({ item }: { item: Comment }) => {
-    const author = mockUsers[item.userId];
+    const author = alleNutzer[item.userId];
     return (
       <View style={styles.comment}>
         <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
@@ -129,7 +167,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
         />
 
         <View style={styles.composer}>
-          <Avatar id={CURRENT_USER_ID} name="Henrik" size={sizes.avatarSm} />
+          <Avatar id={CURRENT_USER_ID} name={alleNutzer[CURRENT_USER_ID]?.name ?? ""} size={sizes.avatarSm} />
           <View style={styles.field}>
             <TextInput
               style={styles.input}

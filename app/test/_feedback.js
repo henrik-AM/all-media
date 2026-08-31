@@ -3,6 +3,7 @@
 // Start:  node test/_feedback.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
+const { anmelden } = require('./_konto');
 const fs = require('fs');
 const path = require('path');
 
@@ -50,6 +51,16 @@ const pruefe = (was, ok, zusatz = '') => {
   // Der Server haelt alles im Speicher. Ohne Ruecksetzen waeren Kontakte und
   // Gruppen aus dem vorigen Lauf noch da und der Test schluege zu Unrecht fehl.
   await page.goto(ziel, { waitUntil: 'networkidle' });
+  // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
+  // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
+  const angemeldet = await anmelden(page);
+  if (!angemeldet.ok) {
+    console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
+    console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
+    process.exit(1);
+  }
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
   await page.evaluate(() => {
     try { localStorage.removeItem('allmedia.eigeneStory'); } catch {}

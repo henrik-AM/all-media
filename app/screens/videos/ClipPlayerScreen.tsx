@@ -6,7 +6,7 @@ import { Motiv } from '../../components/Motiv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
-import { mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useReposts } from '../../contexts/RepostContext';
 import { Clip } from '../../types';
@@ -48,6 +48,7 @@ const zeitText = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart
  * „Wiedergabe folgt mit dem Backend".
  */
 export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer, onShare, onNotice }: Props) => {
+  const { users: alleNutzer } = useDaten();
   const insets = useSafeAreaInsets();
   const { clips, clipUmschalten, raster } = useProfil();
   const { istRepostet, umschalten } = useReposts();
@@ -95,7 +96,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
     );
   }
 
-  const autor = mockUsers[clip.userId];
+  const autor = alleNutzer[clip.userId];
   const eigenesBild = raster.find((r) => r.id === clip.id)?.mediaUri;
   const aehnlich = clips.filter((c) => c.id !== clip.id).slice(0, 4);
 
@@ -287,13 +288,13 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
               </View>
             </View>
             <View style={styles.clipMeta}>
-              <Avatar id={c.userId} name={mockUsers[c.userId].name} size={sizes.avatarSm} />
+              <Avatar id={c.userId} name={alleNutzer[c.userId].name} size={sizes.avatarSm} />
               <View style={styles.clipTexte}>
                 <Text style={styles.clipTitel} numberOfLines={2}>
                   {c.title}
                 </Text>
                 <Text style={styles.clipSub}>
-                  {mockUsers[c.userId].name} · {compact(c.views)} Aufrufe
+                  {alleNutzer[c.userId].name} · {compact(c.views)} Aufrufe
                 </Text>
               </View>
             </View>

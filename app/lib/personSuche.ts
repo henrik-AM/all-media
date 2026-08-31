@@ -4,7 +4,6 @@
 // Hinzufuegen eines Kontakts und beim Zusammenstellen einer Gruppe soll auch
 // die Telefonnummer gehen, so wie man es von WhatsApp kennt.
 
-import { mockUsers } from '../mocks';
 import { User } from '../types';
 
 /**
@@ -28,14 +27,21 @@ export const istNummer = (eingabe: string): boolean => {
 };
 
 /**
- * Sucht eine Person. Gibt die Person zurueck, oder null wenn es sie nicht
- * gibt. Leere Eingabe ergibt ebenfalls null.
+ * Sucht eine Person unter den bekannten Profilen.
+ *
+ * Die Liste wird uebergeben, nicht importiert: sie kommt aus der Datenbank
+ * (useDaten().users) und ist damit bei jedem Aufruf die aktuelle. Vorher stand
+ * hier ein fester Bestand aus dem Quelltext — wer sich neu registrierte, war
+ * ueber die Suche nicht auffindbar.
  */
-export const findePerson = (eingabe: string): User | null => {
+export const findePerson = (
+  eingabe: string,
+  users: Record<string, User>
+): User | null => {
   const roh = eingabe.trim();
   if (!roh) return null;
 
-  const personen = Object.values(mockUsers).filter((u) => u.id !== 'me');
+  const personen = Object.values(users).filter((u) => u.id !== 'me');
 
   if (istNummer(roh)) {
     const gesucht = normalisiereNummer(roh);

@@ -6,7 +6,7 @@ import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { aufnehmen, ausGalerie } from '../lib/aufnehmen';
-import { mockPlaces, mockUsers } from '../mocks';
+import { useDaten } from '../contexts/DatenContext';
 import { Contact, Message } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -33,6 +33,7 @@ const PUNKTE: { key: string; label: string; icon: IconName }[] = [
 
 /** Das Plus in der Nachrichtenzeile: Foto, Standort oder Kontakt. */
 export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, onNotice }: Props) => {
+  const { places: alleOrte, users: alleNutzer } = useDaten();
   const [schritt, setSchritt] = useState<Schritt>('menue');
 
   const schliessen = () => {
@@ -79,7 +80,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
     }
   };
 
-  const auswahl = contacts.filter((c) => mockUsers[c.id] && c.id !== ausserId);
+  const auswahl = contacts.filter((c) => alleNutzer[c.id] && c.id !== ausserId);
 
   const titel = { menue: 'Anhang', standort: 'Standort senden', kontakt: 'Kontakt senden', liveStandort: 'Live-Standort' }[schritt];
 
@@ -110,7 +111,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
 
       {schritt === 'standort' && (
         <ScrollView>
-          {mockPlaces.map((platz) => (
+          {alleOrte.map((platz) => (
             <Druck
               key={platz.id}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
@@ -145,7 +146,7 @@ export const AnhangSheet = ({ visible, contacts, ausserId, onClose, onAnhang, on
         ) : (
           <ScrollView>
             {auswahl.map((c) => {
-              const person = mockUsers[c.id];
+              const person = alleNutzer[c.id];
               return (
                 <Druck
                   key={c.id}

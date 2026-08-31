@@ -13,8 +13,28 @@ const fs = require('fs');
 const path = require('path');
 
 const WURZEL = path.join(__dirname, '..', '..');
-const SQL_DATEIEN = ['SUPABASE_SCHEMA.sql', 'SUPABASE_SCHEMA_2.sql'];
-const QUELLEN = ['web/server/supabase-api.js', 'web/server/sync-handlers.js'];
+const SQL_DATEIEN = [
+  'SUPABASE_SCHEMA.sql',
+  'SUPABASE_SCHEMA_2.sql',
+  'SUPABASE_SCHEMA_3.sql',
+  'SUPABASE_SCHEMA_4.sql',
+  'SUPABASE_SCHEMA_5.sql',
+];
+/*
+ * Beide Seiten, nicht nur eine.
+ *
+ * Die Website liest ueber web/server/, die App ueber app/lib/daten.ts und ein
+ * paar Bildschirme, die selbst schreiben. Wuerde hier nur die Website stehen,
+ * kaeme ein Tippfehler im App-Code erst im Betrieb heraus - und zwar still,
+ * weil eine fehlgeschlagene Abfrage wie "es gibt nichts" aussieht.
+ */
+const QUELLEN = [
+  'web/server/supabase-api.js',
+  'web/server/sync-handlers.js',
+  'app/lib/daten.ts',
+  'app/components/CommentSheet.tsx',
+  'app/screens/messenger/ChatDetailScreen.tsx',
+];
 
 let fehler = 0;
 const pruefe = (name, bedingung, zusatz = '') => {
@@ -60,6 +80,21 @@ function schemaLesen() {
     let s;
     while ((s = hinzu.exec(rest))) spalten.add(s[1]);
   }
+
+  /*
+   * Sichten (views) zaehlen genauso: aus PostgREST-Sicht ist
+   * `hashtags_mit_anzahl` etwas, aus dem man mit .from() liest.
+   *
+   * Ihre Spalten werden hier nicht geprueft, sondern mit `null` als "alles
+   * erlaubt" hinterlegt. Grund: die Spalten einer Sicht ergeben sich aus
+   * ihrer Abfrage, und die zu zerlegen hiesse, ein Stueck SQL-Parser
+   * nachzubauen. Geprueft wird das an anderer Stelle wirksamer - die Sicht
+   * wird beim Einspielen von Postgres selbst uebersetzt, und der Prueflauf
+   * gegen ein echtes Postgres (scratchpad/pgtest) faellt um, wenn sie nicht
+   * uebersetzt.
+   */
+  const sicht = /create\s+or\s+replace\s+view\s+public\.(\w+)\s+as/gi;
+  while ((treffer = sicht.exec(sql))) tabellen.set(treffer[1], null);
 
   return tabellen;
 }
@@ -132,6 +167,8 @@ for (const datei of QUELLEN) {
     }
 
     const vorhanden = schema.get(tabelle);
+    // null = eine Sicht, deren Spalten hier nicht geprueft werden.
+    if (vorhanden === null) continue;
     for (const spalte of spalten) {
       if (!vorhanden.has(spalte)) {
         unbekannteSpalten.push(`${datei}:${stelle}  ${tabelle}.${spalte}`);

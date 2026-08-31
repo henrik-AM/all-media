@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
 import { useProfil } from '../contexts/ProfilContext';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
-import { mockUsers } from '../mocks';
+import { useDaten } from '../contexts/DatenContext';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -32,10 +32,11 @@ const GRUENDE = [
  * Stummschalten und Melden merkt sich die App.
  */
 export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBlockiert }: Props) => {
+  const { users: alleNutzer } = useDaten();
   const { istStumm, istBlockiert, stummSchalten, blockieren, melden } = useProfil();
   const [meldeSchritt, setMeldeSchritt] = useState(false);
 
-  const person = mockUsers[userId];
+  const person = alleNutzer[userId];
   if (!person) return null;
 
   const schliessen = () => {

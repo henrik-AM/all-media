@@ -3412,3 +3412,15 @@ button,
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/*
+ * Nicht angemeldet: nur der Willkommensbildschirm.
+ *
+ * Obere Leiste, untere Navigation und die Ziehen-zum-Aktualisieren-Anzeige
+ * gehoeren zu Bereichen, die es ohne Anmeldung nicht gibt.
+ */
+body.ist-abgemeldet .topbar,
+body.ist-abgemeldet .bottomnav,
+body.ist-abgemeldet .ptr-indicator {
+  display: none;
+}

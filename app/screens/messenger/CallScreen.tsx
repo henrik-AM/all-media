@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
-import { mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 
 /*
  * Die Oberflaeche eines Anrufs.
@@ -43,10 +43,11 @@ export const dauerText = (sekunden: number) => {
 };
 
 export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose, onNotice }: Props) => {
+  const { users: alleNutzer } = useDaten();
   const insets = useSafeAreaInsets();
   const gruppe = !userId && !!gruppenName;
-  const person = userId ? mockUsers[userId] : undefined;
-  const dabei = teilnehmer.filter((id) => mockUsers[id]);
+  const person = userId ? alleNutzer[userId] : undefined;
+  const dabei = teilnehmer.filter((id) => alleNutzer[id]);
 
   const [zustand, setZustand] = useState<Zustand>('klingelt');
   const [dauer, setDauer] = useState(0);
@@ -121,7 +122,7 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
           // namentlich bekannt - dann bleibt es beim einen grossen Bild.
           <View style={styles.runde}>
             {dabei.map((id) => (
-              <Avatar key={id} id={id} name={mockUsers[id].name} size={52} />
+              <Avatar key={id} id={id} name={alleNutzer[id].name} size={52} />
             ))}
           </View>
         ) : gruppe ? (
@@ -132,7 +133,7 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
           </Animated.View>
         )}
         <Text style={styles.name}>{gruppe ? gruppenName : person?.name ?? 'Unbekannt'}</Text>
-        {gruppe && <Text style={styles.dabei}>{dabei.map((id) => mockUsers[id].name.split(' ')[0]).join(', ')}</Text>}
+        {gruppe && <Text style={styles.dabei}>{dabei.map((id) => alleNutzer[id].name.split(' ')[0]).join(', ')}</Text>}
         <Text style={styles.status}>{statusText}</Text>
         {zustand === 'verbunden' && (
           <View style={styles.verschluesselt}>

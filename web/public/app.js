@@ -212,55 +212,12 @@ function toast(msg) {
 }
 
 /* ------------------------------------------------------------------ data */
-/* ----------------------------------------- Login & Profile Switching */
-function openKontoWechsel() {
-  const konten = state.profiles.map((pid) => ({
-    id: pid,
-    name: pid === 'me' ? 'Du' : `Profil ${pid}`,
-    email: `${pid}@allmedia.de`,
-    initials: pid === 'me' ? 'DU' : pid.slice(0, 2).toUpperCase(),
-  }));
-
-  const kontoList = konten
-    .map((k) => `
-      <button class="konto-item ${state.currentUserId === k.id ? 'is-aktiv' : ''}" data-konto="${k.id}">
-        <span class="avatar avatar--44" style="background:#0A66FF">${esc(k.initials)}</span>
-        <div><strong>${esc(k.name)}</strong><small>${esc(k.email)}</small></div>
-        ${state.currentUserId === k.id ? ICONS.checkDouble : ''}
-      </button>`)
-    .join('');
-
-  openSheet(
-    'Konto wechseln',
-    `<div class="sheet__body">
-      ${kontoList}
-      <button class="item" id="addKonto">
-        <span class="item__icon">${ICONS.plus}</span>
-        <span>Neues Konto hinzufügen</span>
-      </button>
-    </div>`,
-    (sheet) => {
-      sheet.querySelectorAll('[data-konto]').forEach((b) => {
-        b.addEventListener('click', () => {
-          state.currentUserId = b.dataset.konto;
-          localStorage.setItem('am-user-id', state.currentUserId);
-          toast(`Zu ${user('me').name} gewechselt`);
-          render();
-        });
-      });
-      $('#addKonto')?.addEventListener('click', () => {
-        const newId = `profile-${Date.now()}`;
-        state.profiles.push(newId);
-        localStorage.setItem('am-profiles', JSON.stringify(state.profiles));
-        state.currentUserId = newId;
-        localStorage.setItem('am-user-id', state.currentUserId);
-        toast('Neues Konto erstellt');
-        render();
-      });
-    },
-    { schliessen: true }
-  );
-}
+/*
+ * Hier stand eine zweite Fassung von openKontoWechsel(), die Schein-Konten
+ * im Browser anlegte ("Profil profile-1756…"). Sie war toter Code: weiter
+ * unten steht eine gleichnamige Funktion, und JavaScript nimmt die letzte.
+ * Mit der echten Anmeldung bei Supabase hatte sie ohnehin nichts zu tun.
+ */
 
 /*
  * Erster Aufbau. Bis hierher zeigt die Seite das Geruest aus index.html -
@@ -289,6 +246,21 @@ async function bootstrap() {
     zeigeStartfehler(fehler);
     return;
   }
+
+  /*
+   * Ohne Anmeldung gibt es keine Inhalte.
+   *
+   * Das ist keine Haerte der Oberflaeche, sondern die Regel der Datenbank:
+   * Row Level Security laesst anonyme Zugriffe nicht zu. Bis zum 31.08.2026
+   * sprang hier ersatzweise ein fester Bestand aus dem Server ein - und
+   * genau der war der Grund, warum die Seite bei jedem aussah, als liefe
+   * alles, waehrend in Wahrheit nichts ankam.
+   */
+  if (data && data.angemeldet === false) {
+    zeigeAnmeldung();
+    return;
+  }
+
   Object.assign(state, data);
 
   // Die eigene Story liegt nur im Browser - nach dem Laden wieder einsetzen.
@@ -304,6 +276,42 @@ async function bootstrap() {
   applyTheme();
   document.body.classList.remove('is-startet');
   render();
+}
+
+/**
+ * Was ein Besucher sieht, der nicht angemeldet ist.
+ *
+ * Bis zum 31.08.2026 sah er die Beispieldaten — Anna, Bob, Clara, acht Chats,
+ * achtzehn Beiträge. Alles davon lag im Server und gehörte niemandem. Wer die
+ * Seite öffnete, hatte den Eindruck einer benutzten App, ohne je ein Konto
+ * gehabt zu haben.
+ *
+ * Jetzt steht hier, was Sache ist: die Inhalte liegen in der Datenbank, und
+ * die zeigt sie nur einem angemeldeten Konto.
+ */
+function zeigeAnmeldung() {
+  document.body.classList.remove('is-startet');
+  /*
+   * Obere Leiste und untere Navigation ausblenden. Sie gehören zu Bereichen,
+   * die es ohne Anmeldung nicht gibt — die Insel oben schrumpfte sonst zu
+   * einem schmalen dunklen Balken zusammen, weil sie nichts anzuzeigen hatte.
+   */
+  document.body.classList.add('ist-abgemeldet');
+  const ziel = $('#main');
+  if (!ziel) return;
+  ziel.innerHTML = `
+    <div class="startfehler">
+      <div class="startfehler__symbol">${ICONS.person}</div>
+      <div class="startfehler__titel">Willkommen bei All Media</div>
+      <div class="startfehler__text">
+        Melde dich an, um deine Chats, Beiträge und Communitys zu sehen.
+        Noch kein Konto? Du kannst dir hier eines anlegen — den Benutzernamen
+        wählst du selbst.
+      </div>
+      <button class="btn btn--primary" id="startAnmelden">Anmelden oder Konto anlegen</button>
+    </div>`;
+
+  $('#startAnmelden').addEventListener('click', () => openKontoWechsel());
 }
 
 /*
@@ -4034,20 +4042,22 @@ function renderSettings() {
           : ''
       }
       ${(() => {
-        if (!state.konten) {
-          const me = user('me');
-          state.konten = [{ id: 'me', name: 'Henrik', email: 'henrik@allmedia.de', initials: me.initials, color: me.color }];
-          state.kontoAktiv = 'me';
-        }
-        const aktiv = state.konten.find((k) => k.id === state.kontoAktiv) || state.konten[0];
+        // Der Kopf zeigt das angemeldete Konto. Ohne Anmeldung kommt man gar
+        // nicht bis hierher - dann steht der Willkommensbildschirm da.
+        const ich = state.users?.me || {};
+        const sitzung = window.Anmeldung?.angemeldet?.() ? window.Anmeldung.nutzer() : null;
+        const aktiv = {
+          name: ich.name || sitzung?.handle || 'Ich',
+          email: sitzung?.email || '',
+          initials: ich.initials || '',
+          color: ich.color || '',
+        };
         return `
         <div class="konto__kopf" id="kontoKopf">
           <span class="avatar avatar--52" style="background:${aktiv.color}">${esc(aktiv.initials)}</span>
           <div class="konto__body">
             <div class="konto__name">${esc(aktiv.name)}</div>
-            <div class="konto__mail">${esc(aktiv.email)}${
-              state.konten.length > 1 ? `  ·  ${state.konten.length} Konten` : ''
-            }</div>
+            <div class="konto__mail">${esc(aktiv.email)}</div>
           </div>
           <span class="konto__pfeil">${ICONS.chevron}</span>
         </div>
@@ -4519,10 +4529,30 @@ function renderCameraPage() {
  * ein zweites eigenstaendiges Konto, auf das man umschaltet.
  */
 function openKontoWechsel() {
-  if (!state.konten) {
-    const me = user('me');
-    state.konten = [{ id: 'me', name: 'Henrik', email: 'henrik@allmedia.de', initials: me.initials, color: me.color }];
+  /*
+   * Die Kontoliste zeigt, wer wirklich angemeldet ist.
+   *
+   * Hier stand bis zum 31.08.2026 ein erfundener Eintrag ("Henrik,
+   * henrik@allmedia.de"), der auch dann dastand, wenn sich nie jemand
+   * angemeldet hatte. Wer die Seite zum ersten Mal oeffnete, sah ein Konto,
+   * das es nicht gab.
+   */
+  const angemeldet = window.Anmeldung?.angemeldet?.() ? window.Anmeldung.nutzer() : null;
+  if (angemeldet) {
+    const ich = state.users?.me;
+    state.konten = [
+      {
+        id: 'me',
+        name: ich?.name || angemeldet.handle || 'Ich',
+        email: angemeldet.email || '',
+        initials: ich?.initials || '',
+        color: ich?.color || '',
+      },
+    ];
     state.kontoAktiv = 'me';
+  } else {
+    state.konten = [];
+    state.kontoAktiv = null;
   }
 
   /*
@@ -8466,31 +8496,20 @@ async function sendMessage(chat) {
   state.messages.push(msg);
   paintMessages(chat);
 
-  if (!chat.isGroup) simulateReply(chat, text);
 }
 
-function simulateReply(chat, eingabe) {
-  const box = $('#messages');
-  if (!box) return;
-  const typing = document.createElement('div');
-  typing.className = 'typing';
-  typing.innerHTML = '<span></span><span></span><span></span>';
-  box.appendChild(typing);
-  box.scrollTop = box.scrollHeight;
-
-  setTimeout(() => {
-    if (state.openChatId !== chat.id) return;
-    typing.remove();
-    state.messages.push({
-      id: 'r' + Date.now(),
-      from: chat.userId,
-      // Antwort richtet sich nach dem, was geschrieben wurde (antworten.js).
-      text: antwortAuf(eingabe || '', chat.name),
-      time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-    });
-    paintMessages(chat);
-  }, 1400);
-}
+/*
+ * Hier stand bis zum 31.08.2026 eine Antwort, die sich der Chat selbst gab:
+ * nach 1,4 Sekunden schrieb „Anna" von allein zurueck (antworten.js).
+ *
+ * Das ging nur, solange der Verlauf im Browser lag. Jetzt steht er in der
+ * Datenbank, und dort kann niemand eine Nachricht in fremdem Namen einstellen
+ * - die Regeln lassen nur `sender_id = ich` zu. Das ist richtig so: Anna ist
+ * kein Mensch, der antworten koennte.
+ *
+ * Die App (Expo) hatte dieselbe Nachahmung und hat sie aus demselben Grund
+ * verloren. Beide Fassungen verhalten sich damit wieder gleich.
+ */
 
 function closeChat() {
   state.openChatId = null;

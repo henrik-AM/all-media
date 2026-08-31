@@ -7,7 +7,7 @@ import { OwnProfileHead } from '../../components/OwnProfileHead';
 import { SwitchBar } from '../../components/SwitchBar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
-import { mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { oeffneLink } from '../../lib/links';
 import { Community } from '../../types';
@@ -25,6 +25,7 @@ interface Props {
 
 /** Prototyp-Frame "Community - Profil": Erstellt und Beigetreten. */
 export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction, onBearbeiten, onAvatarPress, onNotice }: Props) => {
+  const { users: alleNutzer } = useDaten();
   // Die Liste kommt aus dem gemeinsamen Zustand, nicht mehr direkt aus den
   // Mock-Daten - sonst taucht ein neu erstellter Kanal hier nicht auf.
   const { communities, ungelesen, eigenesProfil } = useProfil();
@@ -54,7 +55,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
 
       <ScrollView contentContainerStyle={styles.content}>
         <OwnProfileHead
-          handle={mockUsers.me.handle}
+          handle={alleNutzer.me.handle}
           stats={[
             { label: 'Erstellte Communitys', value: created.length },
             { label: 'Beigetretene Communitys', value: joined.length },

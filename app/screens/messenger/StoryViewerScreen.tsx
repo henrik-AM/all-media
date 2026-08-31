@@ -7,7 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
-import { mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { StoryAnsichtenSheet, StoryOptionenSheet } from '../../components/StoryOptionenSheet';
 import { useZiehenZumSchliessen } from '../../lib/ziehen';
 import { Contact, Story } from '../../types';
@@ -49,6 +49,7 @@ export const StoryViewerScreen = ({
   onOpenProfile,
   onStoryViewed,
 }: Props) => {
+  const { users: alleNutzer } = useDaten();
   const [ansichtenOffen, setAnsichtenOffen] = useState(false);
   const [optionenOffen, setOptionenOffen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -62,7 +63,7 @@ export const StoryViewerScreen = ({
   const [paused, setPaused] = useState(false);
 
   const current = stories[index];
-  const person = mockUsers[current.userId];
+  const person = alleNutzer[current.userId];
   const istEigene = !!current.own;
   const progress = useRef(new Animated.Value(0)).current;
 

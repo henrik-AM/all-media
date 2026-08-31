@@ -16,6 +16,7 @@
 // Testkommentare in der App zurueckbleiben.
 
 const { chromium } = require('playwright-core');
+const { anmelden } = require('./_konto');
 
 let failed = 0;
 const assert = (label, cond) => {
@@ -37,9 +38,17 @@ const STRUCTURE = {
   const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
   p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
-
-  await p.request.post('http://localhost:3000/api/reset');
   await p.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+  // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
+  // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
+  const angemeldet = await anmelden(p);
+  if (!angemeldet.ok) {
+    console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
+    console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
+    process.exit(1);
+  }
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await p.waitForTimeout(400);
 
   // --- Grundstruktur ---

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   Clip,
   Community,
@@ -8,9 +8,10 @@ import {
   Post,
   RasterEintrag,
   Spende,
+  User,
   Video,
 } from '../types';
-import { mockClips, mockCommunities, mockPosts, mockProfiles, mockUsers } from '../mocks';
+import { useDaten } from '../contexts/DatenContext';
 
 /*
  * Was hinter den drei Knoepfen oben rechts im eigenen Profil steckt:
@@ -56,8 +57,12 @@ export const zeitText = (minuten: number) => {
   return `vor ${Math.floor(tage / 30)} M`;
 };
 
-const mitteilungText = (m: Mitteilung, communities: Community[]) => {
-  const name = mockUsers[m.userId]?.name ?? 'Jemand';
+const mitteilungText = (
+  m: Mitteilung,
+  communities: Community[],
+  users: Record<string, User>
+) => {
+  const name = users[m.userId]?.name ?? 'Jemand';
   const kanal = communities.find((c) => c.id === m.ziel.id)?.name ?? 'einer Community';
 
   switch (m.art) {
@@ -208,16 +213,23 @@ export const useProfil = () => {
 const zweistellig = (n: number) => String(n).padStart(2, '0');
 
 export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
-  const [alle, setAlle] = useState<Mitteilung[]>(GRUND_MITTEILUNGEN);
-  const [communities, setCommunities] = useState<Community[]>(mockCommunities);
+  /*
+   * Der Ausgangsstand kommt aus der Datenbank, nicht aus einer Liste im
+   * Quelltext. Was der Nutzer hier ändert, wird sofort angezeigt und
+   * gleichzeitig gespeichert; beim nächsten Laden kommt es von dort zurück.
+   */
+  const daten = useDaten();
+
+  const [alle, setAlle] = useState<Mitteilung[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
 
   const [eigeneBeitraege, setEigeneBeitraege] = useState<Post[]>([]);
   const [eigeneVideos, setEigeneVideos] = useState<Video[]>([]);
-  const [clips, setClips] = useState<Clip[]>(mockClips);
-  const [highlights, setHighlights] = useState<string[]>(['Projekt']);
-  const [playlists, setPlaylists] = useState<string[]>(['Beste Clips', 'Tutorials']);
+  const [clips, setClips] = useState<Clip[]>([]);
+  const [highlights, setHighlights] = useState<string[]>([]);
+  const [playlists, setPlaylists] = useState<string[]>([]);
   const [spende, setSpende] = useState<Spende | null>(null);
-  const [raster, setRaster] = useState<RasterEintrag[]>(GRUND_RASTER);
+  const [raster, setRaster] = useState<RasterEintrag[]>([]);
   const [geteiltZaehler, setGeteiltZaehler] = useState<Record<string, number>>({});
   const [stumm, setStumm] = useState<string[]>([]);
   const [blockiert, setBlockiert] = useState<string[]>([]);
@@ -230,24 +242,52 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   /*
    * Wem man folgt - eine Liste fuer die ganze App, siehe ProfilWert.
    *
-   * Der Ausgangsstand kommt aus den Beitraegen: dort stand bisher, wem man
-   * folgt. So bleibt der Stand nach dem Umbau derselbe, den Henrik kennt.
+   * Sie steht in der Tabelle `follows`. Vorher hing der Zustand am einzelnen
+   * Beitrag: wer im Feed auf "Folgen" tippte, aenderte damit nur diesen einen.
    */
-  const [gefolgt, setGefolgt] = useState<string[]>(() => [
-    ...new Set(mockPosts.filter((p) => p.following).map((p) => p.userId)),
-  ]);
+  const [gefolgt, setGefolgt] = useState<string[]>([]);
 
   const folgtPerson = useCallback((userId: string) => gefolgt.includes(userId), [gefolgt]);
 
+  const [eigenesProfil, setEigenesProfil] = useState<EigenesProfil>({
+    name: '',
+    bio: '',
+    link: '',
+  });
+
   /*
-   * Eigenes Profil. Der Ausgangsstand kommt aus den Mockdaten, damit nach
-   * dem Umbau dasselbe dasteht wie vorher.
+   * Sobald die Inhalte da sind (oder nach neuLaden()), wird alles hier
+   * uebernommen. `daten.geladen` ist der Zeitstempel des Ladevorgangs - er
+   * aendert sich bei jedem Laden und nur dann.
    */
-  const [eigenesProfil, setEigenesProfil] = useState<EigenesProfil>(() => ({
-    name: mockUsers.me.name,
-    bio: mockProfiles.me.bio,
-    link: mockProfiles.me.link,
-  }));
+  useEffect(() => {
+    if (!daten.geladen) return;
+    setAlle(daten.mitteilungen);
+    setCommunities(daten.communities);
+    setClips(daten.clips);
+    setHighlights(daten.highlights);
+    setPlaylists(daten.playlists);
+    setGefolgt(daten.gefolgt);
+    setStumm(daten.stummgeschaltet);
+    setBlockiert(daten.blockiert);
+    setMarkierte(daten.markierte);
+    setFavoriten(daten.favoriten);
+    setEigenesProfil(daten.eigenesProfil);
+    // Das Raster zeigt, was man selbst veroeffentlicht hat - nicht mehr eine
+    // erfundene Kachelfolge.
+    setRaster(
+      [...daten.posts, ...daten.videos, ...daten.clips]
+        .filter((e) => e.userId === 'me')
+        .map((e) => ({
+          id: e.id,
+          kind: daten.posts.some((p) => p.id === e.id) ? 'image' : 'video',
+          eigen: true,
+          mediaUri: (e as { mediaUri?: string }).mediaUri,
+        }))
+    );
+    setEigeneBeitraege([]);
+    setEigeneVideos([]);
+  }, [daten.geladen]);
 
   const profilSpeichern = useCallback((werte: Partial<EigenesProfil>) => {
     setEigenesProfil((vorher) => ({ ...vorher, ...werte }));
@@ -269,12 +309,12 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         .sort((a, b) => a.minuten - b.minuten)
         .map((m) => ({
           id: m.id,
-          text: mitteilungText(m, communities),
+          text: mitteilungText(m, communities, daten.users),
           zeit: zeitText(m.minuten),
           gelesen: m.gelesen,
           ziel: m.ziel,
         })),
-    [alle, communities]
+    [alle, communities, daten.users]
   );
 
   const ungelesen = useCallback(

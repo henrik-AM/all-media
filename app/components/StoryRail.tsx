@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { brandGradient, colors, sizes, spacing, storyGradient, themenStyles, typography } from '../constants/design';
-import { mockUsers } from '../mocks';
+import { useDaten } from '../contexts/DatenContext';
 import { Story } from '../types';
 
 interface Props {
@@ -21,7 +21,10 @@ const RING = sizes.storyRing;
  * Gesehene Stories bekommen einen sehr feinen grauen Ring statt gar keinem,
  * damit die Reihe optisch nicht auseinanderfällt.
  */
-export const StoryRail = ({ stories, onPress }: Props) => (
+export const StoryRail = ({ stories, onPress }: Props) => {
+  const { users: alleNutzer } = useDaten();
+
+  return (
   <View style={styles.railWrap}>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
       {stories.map((story) => {
@@ -33,7 +36,7 @@ export const StoryRail = ({ stories, onPress }: Props) => (
          * "DU" — in der Chatliste direkt darunter steht es richtig, also
          * fiel der Unterschied sofort auf.
          */
-        const person = mockUsers[story.userId];
+        const person = alleNutzer[story.userId];
         const vollerName = person?.name ?? story.name;
         return (
           <Druck
@@ -81,7 +84,8 @@ export const StoryRail = ({ stories, onPress }: Props) => (
       })}
     </ScrollView>
   </View>
-);
+  );
+};
 
 const styles = themenStyles((colors) => ({
   railWrap: {

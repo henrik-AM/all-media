@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
-import { mockUsers } from '../mocks';
+import { useDaten } from '../contexts/DatenContext';
 import { Contact } from '../types';
 
 export interface TeilenZiel {
@@ -30,12 +30,13 @@ interface Props {
  * Raster aus Personen. Wen man antippt, der bekommt es in den Chat.
  */
 export const TeilenSheet = ({ ziel, contacts, titel, onClose, onSend }: Props) => {
+  const { users: alleNutzer } = useDaten();
   const [gesendet, setGesendet] = useState<string[]>([]);
 
   if (!ziel) return null;
 
-  const kontaktIds = contacts.map((c) => c.id).filter((id) => mockUsers[id]);
-  const uebrige = Object.keys(mockUsers).filter((id) => id !== 'me' && !kontaktIds.includes(id));
+  const kontaktIds = contacts.map((c) => c.id).filter((id) => alleNutzer[id]);
+  const uebrige = Object.keys(alleNutzer).filter((id) => id !== 'me' && !kontaktIds.includes(id));
 
   const raster = (ids: string[]) => (
     <View style={styles.raster}>
@@ -51,14 +52,14 @@ export const TeilenSheet = ({ ziel, contacts, titel, onClose, onSend }: Props) =
               onSend(id, ziel);
             }}
           >
-            <Avatar id={id} name={mockUsers[id].name} size={sizes.avatarLg} />
+            <Avatar id={id} name={alleNutzer[id].name} size={sizes.avatarLg} />
             {fertig && (
               <View style={styles.haken}>
                 <Ionicons name="checkmark" size={13} color={colors.white} />
               </View>
             )}
             <Text style={styles.name} numberOfLines={1}>
-              {mockUsers[id].name}
+              {alleNutzer[id].name}
             </Text>
           </Druck>
         );

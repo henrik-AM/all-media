@@ -66,6 +66,8 @@ export interface Profile {
   following: number;
   isFollowing: boolean;
   highlights: string[];
+  /** Nur beim eigenen Profil gefüllt (Prototyp „VP + Playlists"). */
+  playlists?: string[];
 }
 
 export interface Comment {

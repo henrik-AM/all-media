@@ -9,7 +9,7 @@ import { FormularSheet } from '../../components/FormularSheet';
 import { SheetRahmen } from '../../components/SheetRahmen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
-import { mockProfiles, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { Chat, Message } from '../../types';
 
 interface Props {
@@ -65,6 +65,7 @@ export const ContactProfileScreen = ({
   onOpenPublicProfile,
   onNotice,
 }: Props) => {
+  const { profile: alleProfile, users: alleNutzer } = useDaten();
   const insets = useSafeAreaInsets();
   const {
     markierte,
@@ -85,7 +86,7 @@ export const ContactProfileScreen = ({
   const [angezeigterName, setAngezeigterName] = useState<string | null>(null);
   const [suche, setSuche] = useState('');
 
-  const person = mockUsers[userId];
+  const person = alleNutzer[userId];
 
   if (!person) {
     return (
@@ -101,7 +102,7 @@ export const ContactProfileScreen = ({
   }
 
   const name = angezeigterName ?? person.name;
-  const bio = mockProfiles[userId]?.bio;
+  const bio = alleProfile[userId]?.bio;
   const geleert = !!chat && geleerteChats.includes(chat.id);
   const verlauf = geleert ? [] : nachrichten;
   const medien = verlauf.filter((m) => m.media || m.geteilt || m.standort || m.kontakt);

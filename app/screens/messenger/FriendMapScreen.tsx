@@ -6,7 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { KarteWeb, KartenSteuerung, Pin } from '../../components/KarteWeb';
 import { avatarColor, colors, radius, spacing, themenStyles, typography } from '../../constants/design';
-import { mockFriendPins, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -25,6 +25,7 @@ const FREIGABEN: { key: Freigabe; label: string; text: string }[] = [
 
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
 export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotice }: Props) => {
+  const { friendPins: alleKartenpunkte, users: alleNutzer } = useDaten();
   const insets = useSafeAreaInsets();
   const karte = useRef<KartenSteuerung>(null);
   const [aktiv, setAktiv] = useState<string | null>(null);
@@ -49,9 +50,9 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
     return [lat, lng];
   };
 
-  const pins: Pin[] = mockFriendPins.map((pin) => {
+  const pins: Pin[] = alleKartenpunkte.map((pin) => {
     const [lat, lng] = percentToCoords(pin.x, pin.y);
-    const user = mockUsers[pin.id];
+    const user = alleNutzer[pin.id];
     return {
       id: pin.id,
       name: user?.name || 'Unbekannt',
@@ -150,8 +151,8 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
       )}
 
       {!vollbild && <Text style={styles.listHead}>IN DEINER NÄHE</Text>}
-      {!vollbild && mockFriendPins.map((pin) => {
-        const person = mockUsers[pin.id];
+      {!vollbild && alleKartenpunkte.map((pin) => {
+        const person = alleNutzer[pin.id];
         const istAktiv = aktiv === pin.id;
         const name = person?.name || 'Unbekannt';
         return (

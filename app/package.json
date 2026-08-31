@@ -49,7 +49,7 @@
     "test:anhang": "node test/_anhang.js",
     "test:insel": "node test/_insel.js",
     "test:suche": "node test/_suche.js",
-    "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang && npm run test:einstellungen && npm run test:kontaktinfo && npm run test:henrik && npm run test:insel && npm run test:suche && npm run test:profil && npm run test:community && npm run test:chatoptionen && npm run test:player && npm run test:gesten && npm run test:feinschliff && npm run test:kamera && npm run test:eigenes",
+    "test:alles": "npm test && npm run test:feedback && npm run test:erstellen && npm run test:teilen && npm run test:explorer && npm run test:anhang && npm run test:einstellungen && npm run test:kontaktinfo && npm run test:henrik && npm run test:insel && npm run test:suche && npm run test:profil && npm run test:community && npm run test:chatoptionen && npm run test:player && npm run test:gesten && npm run test:feinschliff && npm run test:kamera && npm run test:eigenes && npm run test:gleichstand",
     "test:einstellungen": "node test/_einstellungen.js",
     "test:kontaktinfo": "node test/_kontaktinfo.js",
     "wlan": "node tools/lokal.js",
@@ -63,7 +63,8 @@
     "test:gesten": "node test/_gesten.js",
     "test:feinschliff": "node test/_feinschliff.js",
     "test:kamera": "node test/_kamera.js",
-    "test:eigenes": "node test/_eigenes.js"
+    "test:eigenes": "node test/_eigenes.js",
+    "test:gleichstand": "node test/_gleichstand.js"
   },
   "private": true
 }

@@ -17,6 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { findePerson, nichtGefundenText } from '../lib/personSuche';
+import { useDaten } from '../contexts/DatenContext';
 import { Contact } from '../types';
 
 /** Jemand, der noch nicht in den Kontakten steht und ueber die Nummer dazukam. */
@@ -42,6 +43,7 @@ interface Props {
  * verdreht.
  */
 export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }: Props) => {
+  const { users } = useDaten();
   const insets = useSafeAreaInsets();
   const [schritt, setSchritt] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<string[]>([]);
@@ -90,7 +92,7 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
     const roh = nummer.trim();
     if (!roh) return onNotice('Bitte eine Telefonnummer eingeben');
 
-    const person = findePerson(roh);
+    const person = findePerson(roh, users);
 
     if (person) {
       if (selected.includes(person.id) || extern.some((e) => e.id === person.id)) {

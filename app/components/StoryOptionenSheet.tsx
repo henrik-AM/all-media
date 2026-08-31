@@ -6,7 +6,7 @@ import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { useProfil } from '../contexts/ProfilContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
-import { mockUsers } from '../mocks';
+import { useDaten } from '../contexts/DatenContext';
 import { Contact, Story } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -36,7 +36,8 @@ interface AnsichtenProps {
  * erneuten Öffnen gleich, statt bei jedem Mal zu wechseln.
  */
 export const StoryAnsichtenSheet = ({ story, contacts, onClose, onOpenProfile }: AnsichtenProps) => {
-  const bekannte = contacts.filter((c) => mockUsers[c.id]);
+  const { users: alleNutzer } = useDaten();
+  const bekannte = contacts.filter((c) => alleNutzer[c.id]);
   const wieviele = bekannte.length
     ? 1 + (Math.floor((story.aufgenommen ?? 0) / 60000) % bekannte.length)
     : 0;
@@ -54,7 +55,7 @@ export const StoryAnsichtenSheet = ({ story, contacts, onClose, onOpenProfile }:
       ) : (
         <ScrollView>
           {seher.map((c) => {
-            const person = mockUsers[c.id];
+            const person = alleNutzer[c.id];
             return (
               <Druck
                 key={c.id}
@@ -87,9 +88,10 @@ interface OptionenProps {
 }
 
 export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice }: OptionenProps) => {
+  const { users: alleNutzer } = useDaten();
   const { stummSchalten, melden } = useProfil();
   const [meldeSchritt, setMeldeSchritt] = useState(false);
-  const person = mockUsers[story.userId];
+  const person = alleNutzer[story.userId];
 
   const punkte: { key: string; label: string; icon: IconName; gefahr?: boolean }[] = eigene
     ? [

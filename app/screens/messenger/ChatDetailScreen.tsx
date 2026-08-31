@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -15,8 +15,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { Motiv } from '../../components/Motiv';
 import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
-import { antwortAuf } from '../../lib/antworten';
-import { CURRENT_USER_ID, mockCommunityMessages, mockMessages, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { ICH as CURRENT_USER_ID, chatZeit, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Chat, Contact, Message } from '../../types';
@@ -57,15 +58,46 @@ export const ChatDetailScreen = ({
   onOpenStandort,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
+  const { users: alleNutzer, ichId, communities } = useDaten();
+  const { supabase } = useSupabase();
   const { istBlockiert, markierte, markieren } = useProfil();
   const insets = useSafeAreaInsets();
-  const [messages, setMessages] = useState<Message[]>(() => [
-    ...(mockMessages[chat.id] ?? mockCommunityMessages[chat.id] ?? []),
-    ...(extraMessages ?? []),
-  ]);
+  const [messages, setMessages] = useState<Message[]>(extraMessages ?? []);
   const [draft, setDraft] = useState('');
-  const [typing, setTyping] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);
+
+  /*
+   * Der Verlauf kommt aus der Datenbank, nicht aus einer Liste im Quelltext.
+   *
+   * Ein Chat kann aus dem Messenger kommen oder ein Unterthema einer
+   * Community sein. Beide haben einen Verlauf, sie liegen nur in
+   * verschiedenen Tabellen — welche es ist, steht hier fest, damit es der
+   * Aufrufer nicht wissen muss.
+   */
+  const istKanal = communities.some((c) =>
+    (c.unterthemen ?? []).some((u) => u.id === chat.id)
+  );
+
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    let abgebrochen = false;
+    const holen = istKanal
+      ? ladeKanalNachrichten(supabase, ichId, chat.id)
+      : ladeNachrichten(supabase, chat.id, ichId);
+
+    holen
+      .then((geladen) => {
+        if (!abgebrochen) setMessages([...geladen, ...(extraMessages ?? [])]);
+      })
+      .catch((e) => console.error('Verlauf laden fehlgeschlagen:', e?.message ?? e));
+
+    return () => {
+      abgebrochen = true;
+    };
+    // extraMessages absichtlich nicht in der Liste: es ist bei jedem Aufbau
+    // ein neues Feld und würde eine Endlosschleife auslösen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, ichId, chat.id, istKanal]);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
@@ -78,45 +110,56 @@ export const ChatDetailScreen = ({
   const blockiert = !!chat.userId && istBlockiert(chat.userId);
   const gesperrt = chat.requestState === 'pending' || blockiert;
 
-  const send = () => {
+  /*
+   * Senden.
+   *
+   * Hier stand bis zum 31.08.2026 eine Antwort, die sich der Chat selbst gab:
+   * nach 1,4 Sekunden schrieb „Anna" von allein zurück (lib/antworten.ts).
+   * Das ging nur, solange der Verlauf im Arbeitsspeicher lag. Jetzt steht er
+   * in der Datenbank, und dort kann niemand eine Nachricht in fremdem Namen
+   * einstellen — die Regeln lassen nur `sender_id = ich` zu. Das ist richtig
+   * so: Anna ist kein Mensch, der antworten könnte.
+   */
+  const send = async () => {
     const text = draft.trim();
-    if (!text || gesperrt) return;
+    if (!text || gesperrt || !supabase || !ichId) return;
 
     haptic.success();
-    const message: Message = {
-      id: `m${Date.now()}`,
-      chatId: chat.id,
-      senderId: CURRENT_USER_ID,
-      text,
-      time: nowTime(),
-      read: false,
-    };
-    setMessages((prev) => [...prev, message]);
     setDraft('');
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({ chat_id: chat.id, sender_id: ichId, text })
+      .select('id, created_at')
+      .single();
+
+    if (error) {
+      console.error('Nachricht senden fehlgeschlagen:', error.message);
+      onNotice?.('Die Nachricht ging nicht raus');
+      setDraft(text);
+      return;
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: data.id,
+        chatId: chat.id,
+        senderId: CURRENT_USER_ID,
+        text,
+        time: chatZeit(data.created_at),
+        read: false,
+      },
+    ]);
     scrollToEnd();
 
-    if (chat.isGroup || !chat.userId) return;
-
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `r${Date.now()}`,
-          chatId: chat.id,
-          senderId: chat.userId!,
-          text: antwortAuf(text, chat.name),
-          time: nowTime(),
-        },
-      ]);
-      scrollToEnd();
-    }, 1400);
+    // Damit der Chat in der Liste nach oben rutscht.
+    await supabase.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chat.id);
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
     const out = item.senderId === CURRENT_USER_ID;
-    const sender = mockUsers[item.senderId];
+    const sender = alleNutzer[item.senderId];
 
     return (
       // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt
@@ -268,13 +311,6 @@ export const ChatDetailScreen = ({
             <View style={styles.dayDivider}>
               <Text style={styles.dayDividerText}>Heute</Text>
             </View>
-          }
-          ListFooterComponent={
-            typing ? (
-              <View style={[styles.bubble, styles.bubbleIn, styles.typing]}>
-                <Text style={styles.typingText}>schreibt …</Text>
-              </View>
-            ) : null
           }
         />
 

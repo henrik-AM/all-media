@@ -13,6 +13,7 @@ import { Druck } from './Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { findePerson, istNummer, nichtGefundenText } from '../lib/personSuche';
+import { useDaten } from '../contexts/DatenContext';
 import { Contact } from '../types';
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }: Props) => {
+  const { users } = useDaten();
   const insets = useSafeAreaInsets();
   const [eingabe, setEingabe] = useState('');
 
@@ -31,7 +33,7 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
     const roh = eingabe.trim();
     if (!roh) return onNotice('Bitte Benutzername oder Telefonnummer eingeben');
 
-    const person = findePerson(roh);
+    const person = findePerson(roh, users);
     if (!person) return onNotice(nichtGefundenText(roh));
     if (contacts.some((c) => c.id === person.id)) {
       return onNotice(`${person.name} ist bereits in deinen Kontakten`);

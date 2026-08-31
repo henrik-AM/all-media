@@ -5,7 +5,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, spacing, themenStyles, typography } from '../../constants/design';
-import { mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 
 interface Props {
   userId: string;
@@ -15,12 +15,13 @@ interface Props {
 }
 
 export const FollowersScreen = ({ userId, onBack, onOpenProfile, onNotice }: Props) => {
+  const { users: alleNutzer } = useDaten();
   const insets = useSafeAreaInsets();
-  const person = mockUsers[userId];
+  const person = alleNutzer[userId];
 
   // Mock-Follower-Liste
   const followers = [
-    mockUsers.u1, mockUsers.u2, mockUsers.u3, mockUsers.u4, mockUsers.u5,
+    alleNutzer.u1, alleNutzer.u2, alleNutzer.u3, alleNutzer.u4, alleNutzer.u5,
   ];
 
   if (!person) {

@@ -10,7 +10,7 @@ import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { kommentarZeile, likeZeile } from '../../lib/kommentare';
 import { compactNumber } from '../../lib/zahlen';
-import { mockPosts, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Post, Story } from '../../types';
 
@@ -24,11 +24,12 @@ interface Props {
 }
 
 export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, onNotice }: Props) => {
+  const { posts: alleBeitraege, users: alleNutzer } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
   // damit sie auch im Profilraster auftauchen.
   const { eigeneBeitraege, folgtPerson, folgenUmschalten } = useProfil();
-  const [posts, setPosts] = useState<Post[]>(mockPosts);
+  const [posts, setPosts] = useState<Post[]>(alleBeitraege);
 
   // Neue eigene Beitraege wandern in dieselbe Liste wie alle anderen. Sonst
   // wuerden Like, Speichern und Repost bei ihnen nichts tun - sie waeren
@@ -78,7 +79,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
   };
 
   const renderPost = ({ item }: { item: Post }) => {
-    const author = mockUsers[item.userId];
+    const author = alleNutzer[item.userId];
 
     return (
       <View style={styles.post}>

@@ -5,6 +5,7 @@
 //   node test/_henrik2.js
 
 const { chromium } = require('playwright-core');
+const { anmelden } = require('./_konto');
 
 const ADRESSE = process.env.AM_URL || 'http://localhost:3000';
 
@@ -29,6 +30,24 @@ function ok(name, bedingung, zusatz = '') {
   seite.on('console', (m) => m.type() === 'error' && konsole.push(m.text()));
 
   await seite.goto(ADRESSE);
+
+  // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
+
+  // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
+
+  const angemeldet = await anmelden(seite);
+  if (!angemeldet.ok) {
+
+    console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
+    console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
+
+    process.exit(1);
+
+  }
+
+  await seite.reload({ waitUntil: 'networkidle' });
+
+  await seite.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await seite.waitForSelector('.navbtn');
 
   const geheZu = async (bereich, unterpunkt) => {

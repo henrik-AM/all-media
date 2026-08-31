@@ -4,6 +4,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { ThemeContext, ThemeProvider } from './contexts/ThemeContext';
 import { SupabaseProvider } from './contexts/SupabaseContext';
+import { DatenProvider } from './contexts/DatenContext';
 import { RepostProvider } from './contexts/RepostContext';
 import { ProfilProvider, useProfil } from './contexts/ProfilContext';
 import { ActionSheet } from './components/ActionSheet';
@@ -50,7 +51,7 @@ import { FollowersScreen } from './screens/profile/FollowersScreen';
 import { FollowingScreen } from './screens/profile/FollowingScreen';
 import { colors, themenStyles } from './constants/design';
 import { aufnehmen } from './lib/aufnehmen';
-import { mockChats, mockClips, mockCommunities, mockContacts, mockMessages, mockPlaces, mockSounds, mockStories, mockUsers } from './mocks';
+import { useDaten } from './contexts/DatenContext';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
 
 type Overlay =
@@ -109,11 +110,21 @@ const Shell = () => {
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [chats, setChats] = useState<Chat[]>(mockChats);
-  const [contacts, setContacts] = useState<Contact[]>(mockContacts);
-  // Storys liegen in der Shell, damit die eigene Aufnahme in der Leiste
-  // ankommt - vorher las jeder Bildschirm direkt die Mock-Daten.
-  const [stories, setStories] = useState<Story[]>(mockStories);
+  /*
+   * Chats, Kontakte und Storys liegen in der Schale, damit eine Aenderung an
+   * einer Stelle ueberall ankommt. Ihr Ausgangsstand kommt aus der Datenbank.
+   */
+  const daten = useDaten();
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
+
+  useEffect(() => {
+    if (!daten.geladen) return;
+    setChats(daten.chats);
+    setContacts(daten.contacts);
+    setStories(daten.stories);
+  }, [daten.geladen]);
 
   // Die drei Knoepfe oben rechts im eigenen Profil gehoeren zu genau einem
   // Bereich - Videos oder Communitys. Beide haben eigene Mitteilungen und ein
@@ -206,32 +217,32 @@ const Shell = () => {
     const [art, a, b] = angabe.split(':');
     switch (art) {
       case 'chat': {
-        const chat = mockChats.find((c) => c.id === a);
+        const chat = daten.chats.find((c) => c.id === a);
         if (chat) setOverlay({ kind: 'chat', chat, extra: [] });
         break;
       }
       case 'story': {
-        const story = mockStories.find((s) => s.id === a);
+        const story = daten.stories.find((s) => s.id === a);
         if (story) setOverlay({ kind: 'story', story });
         break;
       }
       case 'profil':
-        if (mockUsers[a]) setOverlay({ kind: 'profile', userId: a, variant: 'oeffentlich' });
+        if (daten.users[a]) setOverlay({ kind: 'profile', userId: a, variant: 'oeffentlich' });
         break;
       case 'kontakt':
-        if (mockUsers[a]) setOverlay({ kind: 'profile', userId: a, variant: 'kontakt' });
+        if (daten.users[a]) setOverlay({ kind: 'profile', userId: a, variant: 'kontakt' });
         break;
       case 'kontakte':
         setOverlay({ kind: 'contacts' });
         break;
       case 'community':
-        if (mockCommunities.some((c) => c.id === a)) setOverlay({ kind: 'community', communityId: a });
+        if (daten.communities.some((c) => c.id === a)) setOverlay({ kind: 'community', communityId: a });
         break;
       case 'anruf':
-        if (mockUsers[a]) setOverlay({ kind: 'call', userId: a, art: b === 'video' ? 'video' : 'audio' });
+        if (daten.users[a]) setOverlay({ kind: 'call', userId: a, art: b === 'video' ? 'video' : 'audio' });
         break;
       case 'clip':
-        if (mockClips.some((c) => c.id === a)) setOverlay({ kind: 'clip', clipId: a });
+        if (daten.clips.some((c) => c.id === a)) setOverlay({ kind: 'clip', clipId: a });
         break;
       case 'blatt':
         if (['new', 'group', 'contact', 'konto', 'mitteilungen', 'erstellen'].includes(a)) {
@@ -258,14 +269,14 @@ const Shell = () => {
 
   /** Alle Nachrichten eines Chats - fuer Medien, Markiertes und die Suche. */
   const nachrichtenVon = (chatId?: string): Message[] =>
-    chatId ? [...(mockMessages[chatId] ?? []), ...(extraNachrichten[chatId] ?? [])] : [];
+    chatId ? [...(extraNachrichten[chatId] ?? [])] : [];
 
   /** Chat oeffnen und dabei alles mitgeben, was frueher hineingeteilt wurde. */
   const oeffneChat = (chat: Chat, zusatz?: Message[]) =>
     setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])] });
 
   const openChatWith = (userId: string) => {
-    const person = mockUsers[userId];
+    const person = daten.users[userId];
     let chat = chats.find((c) => !c.isGroup && c.userId === userId);
 
     if (!chat) {
@@ -286,7 +297,7 @@ const Shell = () => {
 
   /** Beitrag oder Video in den Chat mit dieser Person legen. */
   const teileMit = (userId: string, ziel: TeilenZiel) => {
-    const person = mockUsers[userId];
+    const person = daten.users[userId];
     let chat = chats.find((c) => !c.isGroup && c.userId === userId);
     const vorschau = ziel.art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
 
@@ -325,7 +336,7 @@ const Shell = () => {
    * Nachricht statt einer Beitragskarte.
    */
   const aufnahmeAnPerson = (userId: string, uri: string) => {
-    const person = mockUsers[userId];
+    const person = daten.users[userId];
     let chat = chats.find((c) => !c.isGroup && c.userId === userId);
 
     if (!chat) {
@@ -450,7 +461,7 @@ const Shell = () => {
   };
 
   const befriend = (userId: string) => {
-    const person = mockUsers[userId];
+    const person = daten.users[userId];
     if (contacts.some((c) => c.id === userId)) return setNotice(`${person.name} ist bereits in deinen Kontakten`);
     setContacts((prev) => [...prev, { id: userId, name: person.name, status: 'pending', about: 'Anfrage gesendet' }]);
     setNotice(`Anfrage an ${person.name} gesendet`);
@@ -493,7 +504,7 @@ const Shell = () => {
   // Antwort auf eine Story: sie landet im Chat mit dieser Person, und der Chat
   // oeffnet sich direkt — sonst waere die Antwort nirgends zu sehen.
   const replyToStory = (story: Story, text: string) => {
-    const person = mockUsers[story.userId];
+    const person = daten.users[story.userId];
     let chat = chats.find((c) => !c.isGroup && c.userId === story.userId);
 
     if (!chat) {
@@ -669,7 +680,7 @@ const Shell = () => {
           key: 'music',
           label: 'Musik',
           typ: 'auswahl',
-          auswahl: ['Originalton', ...mockSounds.map((s) => `${s.title} – ${s.artist}`)],
+          auswahl: ['Originalton', ...daten.sounds.map((s) => `${s.title} – ${s.artist}`)],
         },
       ],
       absenden: ({ beschreibung, ort, music }) => {
@@ -690,7 +701,7 @@ const Shell = () => {
       art: 'post',
       id: post.id,
       titel: post.description,
-      autor: mockUsers[post.userId]?.name ?? 'Unbekannt',
+      autor: daten.users[post.userId]?.name ?? 'Unbekannt',
     });
 
   const teileVideo = (video: Video) =>
@@ -698,7 +709,7 @@ const Shell = () => {
       art: 'video',
       id: video.id,
       titel: video.description,
-      autor: mockUsers[video.userId]?.name ?? 'Unbekannt',
+      autor: daten.users[video.userId]?.name ?? 'Unbekannt',
     });
 
   const switchArea = (next: AreaKey) => {
@@ -731,7 +742,7 @@ const Shell = () => {
         contacts={contacts}
         onNotice={setNotice}
         onOpenStandort={(name) => {
-          const platz = mockPlaces.find((p) => p.name === name);
+          const platz = daten.places.find((p) => p.name === name);
           if (platz) setOverlay({ kind: 'explorer', ziel: { art: 'standort', wert: platz.id } });
         }}
       />
@@ -761,7 +772,7 @@ const Shell = () => {
         onBack={() => setOverlay(null)}
         onMessage={openChatWith}
         onAvatarPress={() => {
-          const person = mockUsers[overlay.userId];
+          const person = daten.users[overlay.userId];
           setOverlay({ kind: 'avatarViewer', userId: overlay.userId, name: person?.name ?? 'Profil' });
         }}
         onOpenFollowers={(userId) => setOverlay({ kind: 'followers', userId })}
@@ -772,7 +783,7 @@ const Shell = () => {
           if (blockiert) {
             setContacts((prev) => prev.filter((c) => c.id !== userId));
           } else if (!contacts.some((c) => c.id === userId)) {
-            const person = mockUsers[userId];
+            const person = daten.users[userId];
             setContacts((prev) => [...prev, { id: userId, name: person.name, status: 'friend', about: 'Kontakt' }]);
           }
         }}
@@ -875,7 +886,7 @@ const Shell = () => {
             art: 'video',
             id: clip.id,
             titel: clip.title,
-            autor: mockUsers[clip.userId]?.name ?? 'Unbekannt',
+            autor: daten.users[clip.userId]?.name ?? 'Unbekannt',
           })
         }
         onNotice={setNotice}
@@ -1226,11 +1237,18 @@ const App = () => (
     <ThemeProvider>
       <SupabaseProvider>
         <AuthProvider>
-          <RepostProvider>
-            <ProfilProvider>
-              <Root />
-            </ProfilProvider>
-          </RepostProvider>
+          {/*
+            Der DatenProvider steht zwischen Anmeldung und allem anderen: er
+            braucht die Kennung des angemeldeten Nutzers, und alles darunter
+            braucht die Inhalte, die er lädt.
+          */}
+          <DatenProvider>
+            <RepostProvider>
+              <ProfilProvider>
+                <Root />
+              </ProfilProvider>
+            </RepostProvider>
+          </DatenProvider>
         </AuthProvider>
       </SupabaseProvider>
     </ThemeProvider>

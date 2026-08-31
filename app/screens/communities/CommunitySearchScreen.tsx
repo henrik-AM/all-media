@@ -6,7 +6,7 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
-import { mockCommunities, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { Community, Contact } from '../../types';
 
 type Filter = 'all' | 'channels' | 'people';
@@ -20,6 +20,7 @@ interface Props {
 
 /** Prototyp-Frame "Community - Suchen": Filter, Kanäle, Profile. */
 export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile, onBefriend }: Props) => {
+  const { communities: alleCommunities, users: alleNutzer } = useDaten();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -29,7 +30,7 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
     () =>
       filter === 'people'
         ? []
-        : mockCommunities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q)),
+        : alleCommunities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q)),
     [filter, q]
   );
 
@@ -37,7 +38,7 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
     () =>
       filter === 'channels'
         ? []
-        : Object.values(mockUsers).filter(
+        : Object.values(alleNutzer).filter(
             (u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q))
           ),
     [filter, q]

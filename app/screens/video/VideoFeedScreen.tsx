@@ -6,7 +6,7 @@ import { useReposts } from '../../contexts/RepostContext';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
-import { mockUsers, mockVideos } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Video } from '../../types';
 import { compactNumber } from '../../lib/zahlen';
@@ -20,10 +20,11 @@ interface Props {
 }
 
 export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => {
+  const { users: alleNutzer, videos: alleVideos } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Eigene Reels stehen oben im Feed.
   const { eigeneVideos, geteiltZaehler } = useProfil();
-  const [videos, setVideos] = useState<Video[]>(mockVideos);
+  const [videos, setVideos] = useState<Video[]>(alleVideos);
 
   // Wie im Bild-Feed: eigene Reels kommen in dieselbe Liste, damit Like,
   // Speichern und Repost auch bei ihnen wirken.
@@ -45,7 +46,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
     setIsRefreshing(true);
     haptic.light();
     await new Promise((resolve) => setTimeout(resolve, 800));
-    setVideos((prev) => [...mockVideos, ...prev]);
+    setVideos((prev) => [...alleVideos, ...prev]);
     setIsRefreshing(false);
   };
 
@@ -87,7 +88,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   };
 
   const renderVideo = ({ item }: { item: Video }) => {
-    const author = mockUsers[item.userId];
+    const author = alleNutzer[item.userId];
 
     return (
       <View style={[styles.slide, slideHeight > 0 && { height: slideHeight }]}>

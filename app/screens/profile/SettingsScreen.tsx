@@ -9,7 +9,7 @@ import { ThemeContext } from '../../contexts/ThemeContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet';
 import { FormularSheet } from '../../components/FormularSheet';
-import { mockChats, mockPosts, mockUsers } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -277,6 +277,7 @@ interface Props {
 }
 
 export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack }: Props) => {
+  const { chats: alleChats, posts: alleBeitraege, users: alleNutzer } = useDaten();
   const { user, konten } = useContext(AuthContext);
   const { communities, istBlockiert, istStumm, raster, gefolgt, eigenesProfil, profilSpeichern } =
     useProfil();
@@ -302,12 +303,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       };
     }
     if (art === 'blockiert') {
-      const ids = Object.keys(mockUsers).filter((id) => istBlockiert(id));
-      return { leer: 'Du hast niemanden blockiert.', zeilen: ids.map((id) => ({ text: mockUsers[id].name, neben: 'blockiert' })) };
+      const ids = Object.keys(alleNutzer).filter((id) => istBlockiert(id));
+      return { leer: 'Du hast niemanden blockiert.', zeilen: ids.map((id) => ({ text: alleNutzer[id].name, neben: 'blockiert' })) };
     }
     if (art === 'stummeProfile') {
-      const ids = Object.keys(mockUsers).filter((id) => istStumm(id));
-      return { leer: 'Kein Profil ist stummgeschaltet.', zeilen: ids.map((id) => ({ text: mockUsers[id].name, neben: 'stumm' })) };
+      const ids = Object.keys(alleNutzer).filter((id) => istStumm(id));
+      return { leer: 'Kein Profil ist stummgeschaltet.', zeilen: ids.map((id) => ({ text: alleNutzer[id].name, neben: 'stumm' })) };
     }
     if (art === 'stummeKanaele') {
       const stumm = communities.filter((c) => c.joined && c.unreadCount === 0 && c.visibility === 'private');
@@ -318,7 +319,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       return {
         leer: '',
         zeilen: [
-          { text: 'Chats', neben: `${mockChats.length} Unterhaltungen` },
+          { text: 'Chats', neben: `${alleChats.length} Unterhaltungen` },
           { text: 'Fotos und Videos', neben: `${raster.filter((r) => r.eigen).length} eigene Aufnahmen` },
           { text: 'Zwischenspeicher', neben: 'wird beim Beenden geleert' },
         ],
@@ -344,21 +345,21 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       return {
         leer: 'Du folgst noch niemandem.',
         zeilen: gefolgt.map((id) => ({
-          text: mockUsers[id]?.name ?? id,
-          neben: mockUsers[id]?.handle ?? '',
+          text: alleNutzer[id]?.name ?? id,
+          neben: alleNutzer[id]?.handle ?? '',
         })),
       };
     }
-    const mit = mockPosts.filter((p) => p.notify);
+    const mit = alleBeitraege.filter((p) => p.notify);
     return {
       leer: 'Du hast bei keinem Profil die Glocke angeschaltet.',
-      zeilen: mit.map((p) => ({ text: mockUsers[p.userId].name, neben: 'Glocke an' })),
+      zeilen: mit.map((p) => ({ text: alleNutzer[p.userId].name, neben: 'Glocke an' })),
     };
   };
 
   const oeffne = (item: Item) => {
     if (item.aktion === 'sicherung') {
-      return onNotice(`Sicherung erstellt — ${mockChats.length} Unterhaltungen gespeichert`);
+      return onNotice(`Sicherung erstellt — ${alleChats.length} Unterhaltungen gespeichert`);
     }
     if (item.aktion === 'einladen') {
       return onNotice('Einladung kopiert: all-media.app');

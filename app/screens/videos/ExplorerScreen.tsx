@@ -7,10 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
-import { mockPlaces, mockPosts, mockSounds, mockUsers, mockVideos } from '../../mocks';
+import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { aufnehmen } from '../../lib/aufnehmen';
-import { Clip, Post, Video } from '../../types';
+import { Clip, Place, Post, Sound, Video } from '../../types';
 import { useKachelHoehe } from '../../lib/raster';
 
 export type ExplorerArt = 'reels' | 'querformat' | 'beitraege' | 'profile' | 'hashtag' | 'standort' | 'sound';
@@ -39,17 +39,20 @@ const compact = (n: number) =>
  * darunter die Abschnitte Reels, Querformat und Beiträge.
  */
 export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) => {
+  const { places: alleOrte, posts: alleBeitraege, sounds: alleSounds, users: alleNutzer, videos: alleVideos } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const insets = useSafeAreaInsets();
   const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
 
   const [nurFotos, setNurFotos] = useState(false);
-  const platz = ziel.art === 'standort' ? mockPlaces.find((p) => p.id === ziel.wert) : undefined;
-  const sound = ziel.art === 'sound' ? mockSounds.find((s) => s.id === ziel.wert) : undefined;
+  const platz = ziel.art === 'standort' ? alleOrte.find((p) => p.id === ziel.wert) : undefined;
+  const sound = ziel.art === 'sound' ? alleSounds.find((s) => s.id === ziel.wert) : undefined;
 
   const treffer = useMemo(() => {
-    const alleBeitraege = [...eigeneBeitraege, ...mockPosts];
-    const alleVideos = [...eigeneVideos, ...mockVideos];
+    // Was gerade erst angelegt wurde, steht noch nicht in der geladenen Liste
+    // - es käme erst beim nächsten Laden mit. Deshalb vorne dran.
+    const beitraege = [...eigeneBeitraege, ...alleBeitraege];
+    const videos = [...eigeneVideos, ...alleVideos];
 
     const passt = (e: { tags?: string[]; location?: string; music?: string }) => {
       if (ziel.art === 'hashtag') return (e.tags ?? []).includes(ziel.wert);
@@ -58,11 +61,11 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
     };
 
     return {
-      reels: alleVideos.filter(passt),
+      reels: videos.filter(passt),
       clips: clips.filter(passt),
-      beitraege: alleBeitraege.filter(passt),
+      beitraege: beitraege.filter(passt),
     };
-  }, [ziel, platz, sound, clips, eigeneBeitraege, eigeneVideos]);
+  }, [ziel, platz, sound, clips, eigeneBeitraege, eigeneVideos, alleBeitraege, alleVideos]);
 
   const leer = !treffer.reels.length && !treffer.clips.length && !treffer.beitraege.length;
 
@@ -133,13 +136,13 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                       </View>
                     </View>
                     <View style={styles.clipMeta}>
-                      <Avatar id={c.userId} name={mockUsers[c.userId].name} size={sizes.avatarSm} />
+                      <Avatar id={c.userId} name={alleNutzer[c.userId].name} size={sizes.avatarSm} />
                       <View style={styles.clipTexte}>
                         <Text style={styles.clipTitel} numberOfLines={2}>
                           {c.title}
                         </Text>
                         <Text style={styles.clipSub}>
-                          {mockUsers[c.userId].name} · {compact(c.views)} Aufrufe
+                          {alleNutzer[c.userId].name} · {compact(c.views)} Aufrufe
                         </Text>
                       </View>
                     </View>
@@ -193,12 +196,13 @@ const OrtFotos = ({
   onBack,
   onNotice,
 }: {
-  platz: (typeof mockPlaces)[number];
+  platz: Place;
   fotos: Post[];
   onBack: () => void;
   onNotice: (message: string) => void;
 }) => {
   const insets = useSafeAreaInsets();
+  const { users: alleNutzer } = useDaten();
   const { eigeneBeitraege, beitragAnlegen, raster } = useProfil();
 
   // Selbst hinzugefuegte Fotos an diesem Ort kommen oben dazu.
@@ -238,7 +242,7 @@ const OrtFotos = ({
           />
         ) : (
           alle.map((p) => {
-            const person = mockUsers[p.userId];
+            const person = alleNutzer[p.userId];
             const eigenesBild = p.mediaUri ?? raster.find((r) => r.id === p.id)?.mediaUri;
             return (
               <View key={p.id} style={styles.ortfoto}>
@@ -277,7 +281,7 @@ const StandortKopf = ({
   platz,
   onAlleFotos,
 }: {
-  platz: (typeof mockPlaces)[number];
+  platz: Place;
   onAlleFotos: () => void;
 }) => (
   <View style={styles.kopf}>
@@ -320,7 +324,7 @@ const StandortKopf = ({
   </View>
 );
 
-const SoundKopf = ({ sound }: { sound: (typeof mockSounds)[number] }) => {
+const SoundKopf = ({ sound }: { sound: Sound }) => {
   const [laeuft, setLaeuft] = useState(false);
   const [bei, setBei] = useState(0);
   const stand = useRef(0);

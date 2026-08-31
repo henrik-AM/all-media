@@ -7,6 +7,7 @@
 // Start:  node test/_bestand.js
 
 const { chromium } = require('playwright-core');
+const { anmelden } = require('./_konto');
 
 const BEREICHE = {
   messenger: ['friendmap', 'chats', 'camera', 'profile'],
@@ -20,6 +21,24 @@ const BEREICHE = {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
 
   await page.goto(process.env.ZIEL || 'http://localhost:3000/', { waitUntil: 'networkidle' });
+
+  // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
+
+  // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
+
+  const angemeldet = await anmelden(page);
+  if (!angemeldet.ok) {
+
+    console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
+    console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
+
+    process.exit(1);
+
+  }
+
+  await page.reload({ waitUntil: 'networkidle' });
+
+  await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
