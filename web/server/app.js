@@ -800,9 +800,31 @@ app.post('/api/eigene/:id/loeschen', route(async (req) => {
 app.post('/api/eigene/:id/sammlung', route(async (req) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return { ok: false, error: 'Bitte eine Sammlung wählen' };
-  // Die Zuordnung Beitrag → Sammlung braucht eine eigene Tabelle; bis dahin
-  // sagt der Endpunkt das ehrlich, statt ein Gelingen vorzutäuschen.
-  return { ok: false, error: 'Sammlungen sind noch nicht angelegt' };
+
+  const eigener = await beitrag(req, req.params.id);
+  if (!eigener) return { ok: false, error: 'Das gibt es nicht mehr' };
+
+  /*
+   * Bis zum 01.09.2026 gab dieser Endpunkt "Sammlungen sind noch nicht
+   * angelegt" zurueck — ehrlich, aber eben auch: die Funktion gab es nicht.
+   * Jetzt steht die Zuordnung in public.sammlung_beitraege.
+   */
+  const { data: schon } = await req.db
+    .from('sammlung_beitraege')
+    .select('post_id')
+    .eq('user_id', req.nutzerId)
+    .eq('sammlung', name)
+    .eq('post_id', req.params.id)
+    .maybeSingle();
+
+  if (schon) return { ok: false, error: `„${name}" enthält das schon` };
+
+  const { error } = await req.db
+    .from('sammlung_beitraege')
+    .insert({ user_id: req.nutzerId, sammlung: name, post_id: req.params.id });
+  if (error) throw error;
+
+  return { ok: true, meldung: `Zu „${name}" hinzugefügt` };
 }));
 
 // ============================================================================

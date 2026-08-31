@@ -72,6 +72,16 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await page.click('[data-area="videos"]');
   await page.click('[data-sub="portrait"]');
   await page.waitForSelector('.slide__rail');
+  /*
+   * Erst messen, wenn die Bilder da sind.
+   *
+   * Seit die Beitraege echte Vorschaubilder tragen, kommen die aus dem Netz.
+   * Ein Bild, das mitten in der Messung ankommt, verschiebt die Reihe um ein
+   * paar Pixel — und der Prueflauf meldete "30 Knoepfe sind gewandert",
+   * obwohl am Aufbau nichts falsch war.
+   */
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForTimeout(600);
 
   await pruefe('Die Aktionsspalte bleibt beim Liken an ihrem Platz', async () => {
     const vorher = await kanten('.slide__rail .railbtn');
@@ -161,8 +171,15 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Ein Video ohne Kapitel zeigt keine leere Überschrift', async () => {
     await page.click('#clipBack');
     await page.waitForTimeout(400);
-    // Eines ohne Kapitel.
-    await page.click(await K.waehlerClip(page, 'Test-Rundumvideo'));
+    /*
+     * Eines ohne Kapitel — aber MIT Untertiteln.
+     *
+     * Der Player bleibt danach offen, und die naechsten Pruefungen sehen sich
+     * dessen Einstellungen an. Ein Video ohne Untertitel haette dort den
+     * Punkt "Untertitel" gar nicht, und der Fehler stuende an der falschen
+     * Stelle.
+     */
+    await page.click(await K.waehlerClip(page, 'Nachtfotografie am Hafen'));
     await page.waitForSelector('.player');
     await page.waitForTimeout(400);
     if (await page.$('.kapitel')) throw new Error('die Überschrift steht ohne Kapitel da');
@@ -230,8 +247,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.evaluate(() => document.querySelector('.sheet-backdrop')?.remove());
     await page.click('#clipBack');
     await page.waitForTimeout(400);
-    // Eines ohne Untertitel.
-    await page.click(await K.waehlerClip(page, 'Test-Livestream'));
+    // Eines ohne Untertitel: das Test-Rundumvideo.
+    await page.click(await K.waehlerClip(page, 'Test-Rundumvideo'));
     await page.waitForSelector('.player');
     await page.click('#clipOptionen');
     await page.waitForTimeout(500);

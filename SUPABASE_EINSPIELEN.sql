@@ -1794,7 +1794,10 @@ values
    'Testvideo im Querformat. Zum Prüfen von Vollbild, Fortschrittsleiste, Kapitelsprüngen, Untertiteln und Geschwindigkeit.',
    'Hamburg', 'Lo-Fi Focus – beatlab', '12:40',
    array['#testvideo', '#reactnative']::text[], 9420, null, true,
-   '[{"titel":"Einleitung","sekunde":0},{"titel":"Hauptteil","sekunde":180},{"titel":"Beispiel","sekunde":520},{"titel":"Fazit","sekunde":700}]'::jsonb,
+   -- Das Feld heißt "bei", nicht "sekunde" — so liest es die Oberfläche
+   -- (web/public/app.js, data-kapitel). Mit dem falschen Namen stand im
+   -- Kapitel keine Zeit und ein Klick sprang nirgendwohin.
+   '[{"titel":"Einleitung","bei":0},{"titel":"Hauptteil","bei":180},{"titel":"Beispiel","bei":520},{"titel":"Fazit","bei":700}]'::jsonb,
    360, 2),
 
   -- 4. Querformat, Knopf „360°".
@@ -2109,6 +2112,13 @@ update public.posts b
   from public.vorlage_eigene_beitraege v
  where b.demo and b.description = v.description and b.media_url is null;
 
+-- Kapitel, die noch mit dem falschen Feldnamen angelegt wurden.
+update public.posts b
+   set kapitel = v.kapitel
+  from public.vorlage_eigene_beitraege v
+ where b.demo and b.description = v.description
+   and b.kapitel::text like '%sekunde%';
+
 
 -- ===========================================================================
 -- Testinhalte sieht nur, wem sie gehören
@@ -2297,6 +2307,45 @@ comment on column public.messages.place_id is
   'Angehängter Standort. Die Oberfläche macht daraus die Karte mit Nadel.';
 comment on column public.messages.contact_user_id is
   'Angehängter Kontakt. Die Oberfläche macht daraus die Karte mit Avatar.';
+
+
+-- ===========================================================================
+-- Was in welcher Sammlung liegt
+-- ===========================================================================
+--
+-- „Highlights" und „Playlists" waren bisher nur Namen — eine Liste von
+-- Zeichenketten am Profil. Welcher Beitrag darin liegt, stand nirgends, und
+-- der Endpunkt sagte das ehrlich: „Sammlungen sind noch nicht angelegt".
+--
+-- Die Zuordnung ist eine eigene Zeile je Beitrag und Sammlung. Der Name der
+-- Sammlung steht als Text darin und nicht als Verweis: Highlights und
+-- Playlists sind selbst nur Texte in `profiles.highlights` beziehungsweise
+-- `profiles.playlists`, es gibt also nichts, worauf ein Verweis zeigen
+-- könnte.
+
+create table if not exists public.sammlung_beitraege (
+  user_id    uuid not null references public.profiles (id) on delete cascade,
+  sammlung   text not null,
+  post_id    uuid not null references public.posts (id) on delete cascade,
+  created_at timestamptz default now(),
+  primary key (user_id, sammlung, post_id)
+);
+
+alter table public.sammlung_beitraege enable row level security;
+
+-- Sammlungen sind öffentlich sichtbar — sie stehen als Reiter auf dem Profil.
+drop policy if exists "Sammlungen lesen" on public.sammlung_beitraege;
+create policy "Sammlungen lesen" on public.sammlung_beitraege
+  for select to authenticated using (true);
+
+drop policy if exists "Eigene Sammlungen fuellen" on public.sammlung_beitraege;
+create policy "Eigene Sammlungen fuellen" on public.sammlung_beitraege
+  for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index if not exists sammlung_beitraege_idx
+  on public.sammlung_beitraege (user_id, sammlung);
 
 
 -- ===========================================================================

@@ -2908,9 +2908,22 @@ function renderVideoFeed() {
       if (vaction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
 
-      const scrollTop = $('#feed').scrollTop;
+      /*
+       * Die Scrollhoehe merken, damit der Feed nach dem Neuzeichnen nicht
+       * nach oben springt.
+       *
+       * Vorher stand hier $('#feed').scrollTop ohne Pruefung. Jeder Klick,
+       * der den Bildschirm zwischendurch verlaesst — etwa weil die Antwort
+       * des Servers laenger braucht als der Wechsel — traf dann auf null und
+       * warf "Cannot read properties of null". Der Fehler landete im
+       * Auffangnetz und der Nutzer bekam eine Meldung ueber etwas, das ihn
+       * nicht betrifft.
+       */
+      const feed = $('#feed');
+      const scrollTop = feed ? feed.scrollTop : 0;
       renderVideoFeed();
-      $('#feed').scrollTop = scrollTop;
+      const neuerFeed = $('#feed');
+      if (neuerFeed) neuerFeed.scrollTop = scrollTop;
     })
   );
 

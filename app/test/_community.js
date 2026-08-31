@@ -156,14 +156,25 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Die eigene Community laesst sich NICHT verlassen', async () => {
-    await oeffne('Fotografie');
+    // "Laufgruppe Köln" legt jedes Konto beim Anlegen selbst an (private
+    // Vorlage aus SUPABASE_SCHEMA_6_inhalte.sql) — sie gehört einem also
+    // wirklich. "Fotografie" ist dagegen öffentlich und gehört Clara.
+    await oeffne('Laufgruppe Köln');
     if (await page.$('[data-join]')) throw new Error('der Verlassen-Knopf steht trotzdem da');
     const hinweis = await page.$('.kanal__eigen');
     if (!hinweis) throw new Error('kein Hinweis, dass es die eigene Community ist');
   });
 
+  /*
+   * Das Unterthema wird in der EIGENEN Community angelegt.
+   *
+   * Vorher lief das in "React Native DE" — die gehört Bob. zuruecksetzen()
+   * fasst nur an, was dem eigenen Konto gehört, der Kanal blieb also stehen,
+   * und der zweite Prüflauf scheiterte an "gibt es schon". "Laufgruppe Köln"
+   * legt jedes Konto selbst an und bekommt sie beim Zurücksetzen frisch.
+   */
   await pruefe('Ein neues Unterthema laesst sich anlegen', async () => {
-    await oeffne('React Native DE');
+    await oeffne('Laufgruppe Köln');
     const vorher = await page.$$eval('.kanal__thema', (n) => n.length);
     await page.click('#neuesUnterthema');
     await page.waitForSelector('#f_name');
