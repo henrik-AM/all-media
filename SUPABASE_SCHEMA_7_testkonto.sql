@@ -74,10 +74,15 @@ create policy "Vorlage eigene Beitraege lesen" on public.vorlage_eigene_beitraeg
 create table if not exists public.vorlage_eigene_storys (
   schluessel      text primary key,
   media_type      text not null default 'image',
+  media_url       text,
   caption         text default '',
   minuten_zurueck integer not null default 0,
   position        integer not null default 0
 );
+
+-- Nachtraeglich dazugekommen; "create table if not exists" oben legt sie bei
+-- einer bereits vorhandenen Tabelle nicht mehr an.
+alter table public.vorlage_eigene_storys add column if not exists media_url text;
 
 alter table public.vorlage_eigene_storys enable row level security;
 
@@ -135,10 +140,14 @@ values
    15, 4);
 
 
+-- Das Bild liegt in der Ablage "media" und ist oeffentlich lesbar. Ohne Bild
+-- gilt die eigene Story der Oberflaeche als leer: ein Tippen darauf oeffnet
+-- dann die Kamera statt der Story.
 delete from public.vorlage_eigene_storys;
-insert into public.vorlage_eigene_storys (schluessel, media_type, caption, minuten_zurueck, position)
+insert into public.vorlage_eigene_storys (schluessel, media_type, media_url, caption, minuten_zurueck, position)
 values
   ('eigen-story', 'image',
+   'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/beispiel/test-story.png',
    'Test-Story. Antippen, halten, weiterwischen, Herz, Antwort — alles daran prüfbar.',
    45, 0);
 
@@ -321,10 +330,10 @@ begin
       continue;
     end if;
 
-    insert into public.stories (user_id, media_type, caption, created_at, expires_at)
-    values (ziel, v_vorlage.media_type, v_vorlage.caption,
+    insert into public.stories (user_id, media_type, media_url, caption, created_at, expires_at, demo)
+    values (ziel, v_vorlage.media_type, v_vorlage.media_url, v_vorlage.caption,
             now() - make_interval(mins => v_vorlage.minuten_zurueck),
-            now() + interval '24 hours');
+            now() + interval '24 hours', true);
   end loop;
 
   -- --- Merkliste --------------------------------------------------------
@@ -415,36 +424,186 @@ grant execute on function public.starter_inhalte(uuid) to authenticated;
 
 
 -- ===========================================================================
+-- Testinhalte sieht nur, wem sie gehören
+-- ===========================================================================
+--
+-- Ohne diese Regel steht der Testbestand jedes Kontos im öffentlichen Feed.
+-- Bei sechs Konten waren das schon 27 Querformat-Videos, davon sechsmal
+-- dasselbe „Testvideo im Querformat" von sechs verschiedenen Leuten. Nach dem
+-- Start wäre es einmal je angemeldetem Nutzer — der Feed wäre unbrauchbar.
+--
+-- Sichtbar ist ein Beitrag also, wenn er
+--   * kein Testinhalt ist (das gilt für alles, was jemand selbst anlegt), oder
+--   * einem selbst gehört, oder
+--   * von einem Beispielprofil stammt (Anna, Bob, Clara — die SIND die
+--     gemeinsame Welt und sollen alle sehen).
+--
+-- Das steht in der Datenbank und nicht im Code, weil es sonst an zwei Stellen
+-- stehen müsste — einmal für die Website, einmal für die App — und eine davon
+-- irgendwann vergessen wird.
+
+create or replace function public.beitrag_sichtbar(besitzer uuid, ist_test boolean)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+  select not coalesce(ist_test, false)
+      or besitzer = auth.uid()
+      or exists (select 1 from public.profiles p where p.id = besitzer and p.demo);
+$$;
+
+grant execute on function public.beitrag_sichtbar(uuid, boolean) to authenticated;
+
+drop policy if exists "Beitraege lesen" on public.posts;
+create policy "Beitraege lesen" on public.posts
+  for select to authenticated
+  using (public.beitrag_sichtbar(user_id, demo));
+
+-- Storys brauchen dafür dieselbe Kennzeichnung wie Beiträge.
+alter table public.stories add column if not exists demo boolean default false;
+
+-- Testgeschichten, die vor dieser Spalte angelegt wurden, nachtragen —
+-- Kennzeichnung und Bild.
+update public.stories s
+   set demo      = true,
+       media_url = coalesce(s.media_url, v.media_url)
+  from public.vorlage_eigene_storys v
+ where v.caption = s.caption
+   and (not coalesce(s.demo, false) or s.media_url is null);
+
+drop policy if exists "Aktuelle Storys lesen" on public.stories;
+create policy "Aktuelle Storys lesen" on public.stories
+  for select to authenticated
+  using (expires_at > now() and public.beitrag_sichtbar(user_id, demo));
+
+
+-- ===========================================================================
+-- Einen neu angelegten Chat darf sein Ersteller auch sehen
+-- ===========================================================================
+--
+-- Eine Gruppe anzulegen schlug fehl mit
+--   new row violates row-level security policy for table "chats"
+--
+-- Die Einfügeregel war nicht das Problem — die Zeile landete in der Datenbank.
+-- Der Server bittet aber im selben Schritt um die neue Zeile zurück (er
+-- braucht die Kennung, um gleich danach die Mitglieder einzutragen), und
+-- dafür gilt die Leseregel. Die lautete: "sichtbar, wer Mitglied ist". Im
+-- Augenblick des Anlegens ist noch niemand Mitglied — auch der Ersteller
+-- nicht, seine Zeile kommt ja erst als Nächstes. Also war die frische Zeile
+-- für den unsichtbar, der sie gerade angelegt hatte, und PostgREST meldete
+-- den Fehler oben.
+--
+-- Ein Chat gehört ab jetzt auch dem, der ihn angelegt hat. Das ist keine
+-- Aufweichung: created_by kann beim Einfügen ohnehin nur das eigene Konto
+-- sein, dafür sorgt die Einfügeregel aus SUPABASE_SCHEMA.sql.
+
+drop policy if exists "Eigene Chats lesen" on public.chats;
+create policy "Eigene Chats lesen" on public.chats
+  for select to authenticated
+  using (created_by = auth.uid() or public.is_chat_member(id));
+
+-- Dasselbe eine Ebene tiefer: die Mitglieder.
+--
+-- Die Regel lautete "eintragen darf, wer sich selbst eintraegt oder schon
+-- Mitglied ist". Beim Anlegen einer Gruppe werden alle Mitglieder in einem
+-- Zug eingetragen — der Ersteller und die Eingeladenen. Waehrend dieses einen
+-- Schrittes ist der Ersteller noch nicht Mitglied (seine eigene Zeile
+-- entsteht ja gerade erst), und die Zeilen der Eingeladenen fielen durch.
+-- Ergebnis: eine Gruppe ohne Mitglieder, und eine Fehlermeldung, die aussah,
+-- als duerfte man gar keine Gruppen anlegen.
+drop policy if exists "Mitglieder hinzufuegen" on public.chat_members;
+create policy "Mitglieder hinzufuegen" on public.chat_members
+  for insert to authenticated
+  with check (
+    auth.uid() = user_id
+    or public.is_chat_member(chat_id)
+    or exists (select 1 from public.chats c where c.id = chat_id and c.created_by = auth.uid())
+  );
+
+-- Und beim Lesen: der Ersteller sieht die Mitgliederliste seiner Gruppe.
+drop policy if exists "Mitglieder lesen" on public.chat_members;
+create policy "Mitglieder lesen" on public.chat_members
+  for select to authenticated
+  using (
+    public.is_chat_member(chat_id)
+    or exists (select 1 from public.chats c where c.id = chat_id and c.created_by = auth.uid())
+  );
+
+
+-- Dasselbe bei Communitys und ihren Kanaelen.
+--
+-- Eine private Community war sichtbar, wenn man Mitglied ist. Im Augenblick
+-- des Anlegens ist man das noch nicht — der Server bittet aber im selben
+-- Schritt um die neue Zeile zurueck, um gleich danach beitreten zu koennen.
+-- "Neuen Kanal erstellen" scheiterte deshalb mit
+--   new row violates row-level security policy for table "communities"
+--
+-- Wie bei den Chats: created_by kann beim Einfuegen ohnehin nur das eigene
+-- Konto sein, die Einfuegeregel aus SUPABASE_SCHEMA.sql sorgt dafuer.
+drop policy if exists "Communitys lesen" on public.communities;
+create policy "Communitys lesen" on public.communities
+  for select to authenticated
+  using (visibility = 'public' or created_by = auth.uid() or public.is_community_member(id));
+
+-- Und die Sichtbarkeitsfunktion, an der die Kanaele haengen, zieht mit.
+create or replace function public.community_sichtbar(ziel uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+  select exists (
+    select 1 from public.communities c
+    where c.id = ziel
+      and (c.visibility = 'public'
+           or c.created_by = auth.uid()
+           or public.is_community_member(c.id))
+  );
+$$;
+
+-- Einen Kanal darf anlegen, wer Mitglied ist — oder wer die Community
+-- gegruendet hat und gerade erst dabei ist, ihr beizutreten.
+drop policy if exists "Kanal anlegen" on public.community_channels;
+create policy "Kanal anlegen" on public.community_channels
+  for insert to authenticated
+  with check (
+    public.is_community_member(community_id)
+    or exists (select 1 from public.communities c
+                where c.id = community_id and c.created_by = auth.uid())
+  );
+
+
+-- ===========================================================================
 -- Ablage für Bilder und Videos
 -- ===========================================================================
 --
 -- Die App lädt Aufnahmen in den Eimer „media" hoch (app/lib/supabaseStorage.ts).
 -- Ohne ihn scheitert jeder Upload mit „Bucket not found".
 
--- Die Regeln auf storage.objects gehoeren dem Rollennamen
--- supabase_storage_admin. Reicht das Recht hier nicht, soll deshalb nicht die
--- ganze Datei scheitern: dann bleibt eine Meldung stehen und der Eimer wird
--- im Dashboard unter Storage -> Policies freigegeben.
-do $$
-begin
-  insert into storage.buckets (id, name, public)
-  values ('media', 'media', true)
-  on conflict (id) do update set public = true;
+-- Der Eimer selbst. „public" heisst: wer die Adresse einer Datei hat, darf
+-- sie ansehen — genau das braucht ein Beitragsbild.
+insert into storage.buckets (id, name, public)
+values ('media', 'media', true)
+on conflict (id) do update set public = true;
 
-  execute 'drop policy if exists "Medien lesen" on storage.objects';
-  execute 'create policy "Medien lesen" on storage.objects
-             for select using (bucket_id = ''media'')';
+-- Wer was darf. Lesen jeder, hochladen jedes angemeldete Konto, loeschen nur,
+-- wer die Datei selbst hochgeladen hat.
+--
+-- Achtung beim Aufraeumen: aus storage.buckets oder storage.objects laesst
+-- sich nichts von Hand loeschen, ein Schutztrigger verhindert das. Dafuer
+-- gibt es die Storage-API.
+drop policy if exists "Medien lesen" on storage.objects;
+create policy "Medien lesen" on storage.objects
+  for select using (bucket_id = 'media');
 
-  execute 'drop policy if exists "Eigene Medien hochladen" on storage.objects';
-  execute 'create policy "Eigene Medien hochladen" on storage.objects
-             for insert to authenticated with check (bucket_id = ''media'')';
+drop policy if exists "Eigene Medien hochladen" on storage.objects;
+create policy "Eigene Medien hochladen" on storage.objects
+  for insert to authenticated with check (bucket_id = 'media');
 
-  execute 'drop policy if exists "Eigene Medien loeschen" on storage.objects';
-  execute 'create policy "Eigene Medien loeschen" on storage.objects
-             for delete to authenticated using (bucket_id = ''media'' and owner = auth.uid())';
-exception when insufficient_privilege or undefined_table then
-  raise notice 'Ablage "media" konnte nicht eingerichtet werden (%). Bitte im Dashboard unter Storage anlegen.', sqlerrm;
-end $$;
+drop policy if exists "Eigene Medien loeschen" on storage.objects;
+create policy "Eigene Medien loeschen" on storage.objects
+  for delete to authenticated using (bucket_id = 'media' and owner = auth.uid());
 
 
 -- ===========================================================================

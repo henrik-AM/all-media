@@ -4,6 +4,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 const fs = require('fs');
 const path = require('path');
 
@@ -78,14 +79,23 @@ const pruefe = (was, ok, zusatz = '') => {
   pruefe('Chat laesst sich oeffnen', !!(await page.$('.chathead')),
          await page.$eval('.chathead__name', (e) => e.textContent).catch(() => ''));
 
-  // Antwort richtet sich nach dem Text
+  /*
+   * Die eigene Nachricht landet im Verlauf.
+   *
+   * Hier stand bis zum 31.08.2026: "Antwort passt zur Frage nach dem Termin".
+   * Der Server antwortete automatisch, mit einem Satz, der zum Stichwort im
+   * eigenen Text passte. Das kam aus den Beispieldaten und taeuschte ein
+   * Gegenueber vor, das es nicht gab. Seit die Nachrichten in der Datenbank
+   * stehen, antwortet niemand mehr von selbst — und das ist richtig so.
+   */
+  const vorher = await page.$$eval('.msg', (n) => n.length);
   await page.fill('#msgInput', 'Wann treffen wir uns?');
   await page.click('#sendBtn');
-  await page.waitForTimeout(2200);
-  const texte = await page.$$eval('.msg--in', (n) => n.map((x) => x.textContent));
-  const letzte = texte[texte.length - 1] || '';
-  pruefe('Antwort passt zur Frage nach dem Termin',
-         /Uhr|Nachmittag|passt|flexibel/i.test(letzte), letzte.trim().slice(0, 60));
+  await page.waitForTimeout(1500);
+  const nachher = await page.$$eval('.msg', (n) => n.length);
+  const eigene = await page.$$eval('.msg--out', (n) => n.map((x) => x.textContent));
+  pruefe('Eigene Nachricht landet im Verlauf',
+         nachher > vorher && (eigene[eigene.length - 1] || '').includes('Wann treffen wir uns?'));
 
   await page.click('#chatBack');
   await page.waitForTimeout(300);
@@ -180,7 +190,9 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.fill('#contactHandle', '+49 174 8901234');   // Greta - noch kein Kontakt
   await page.fill('#contactMsg', 'Hi, hier ist Henrik!');
   await page.click('#contactAdd');
-  await page.waitForTimeout(800);
+  // Die Anfrage geht jetzt in die Datenbank — 800 ms reichten dafuer nicht
+  // zuverlaessig, und der Prueflauf meldete einen Fehler, den es nicht gab.
+  await page.waitForSelector('.anfrage', { timeout: 8000 }).catch(() => {});
   const gesperrt = await page.$('.anfrage');
   pruefe('Anfrage per Nummer angelegt', !!gesperrt);
   if (gesperrt) {
@@ -220,7 +232,8 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.click('[data-sub="profile"]').catch(() => {});
   await page.waitForTimeout(500);
   await page.click('#switchProfile').catch(() => {});
-  await page.waitForTimeout(500);
+  // Die Kontoliste kommt aus der Datenbank, nicht mehr aus dem Quelltext.
+  await page.waitForSelector('[data-konto]', { timeout: 8000 }).catch(() => {});
   const kontoDialog = await page.$('[data-konto]');
   pruefe('Profil wechseln fuehrt zur Kontoliste', !!kontoDialog);
   pruefe('Zweites Konto anlegbar', !!(await page.$('[data-konto-neu="neu"]')));
@@ -233,12 +246,31 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.click('[data-sub="home"]').catch(() => {});
   await page.waitForTimeout(600);
 
-  const vorRepost = await page.$eval('[data-paction="repost"]', (e) => e.className);
-  await page.click('[data-paction="repost"]');
-  await page.waitForTimeout(700);
-  const nachRepost = await page.$eval('[data-paction="repost"]', (e) => e.className);
-  pruefe('Repost schaltet um', vorRepost !== nachRepost && /is-reposted/.test(nachRepost));
-  pruefe('Repost meldet sich', /Repostet/i.test(await page.$eval('#toast', (e) => e.textContent)));
+  /*
+   * Einen Beitrag nehmen, der noch NICHT repostet ist.
+   *
+   * Der erste im Feed war frueher immer frisch. Jetzt bekommt jedes Konto
+   * beim Anlegen schon einen Repost mit (SUPABASE_SCHEMA_7_testkonto.sql) —
+   * war das ausgerechnet der erste, nahm der Klick den Repost zurueck, und
+   * der Prueflauf meldete einen Fehler, obwohl alles richtig lief.
+   */
+  const frisch = await page.$$eval('[data-paction="repost"]', (knoten) => {
+    const treffer = knoten.find((n) => !n.className.includes('is-reposted'));
+    return treffer ? treffer.getAttribute('data-pid') : null;
+  });
+  pruefe('Ein noch nicht repposteter Beitrag im Feed', !!frisch);
+
+  if (frisch) {
+    const waehler = `[data-paction="repost"][data-pid="${frisch}"]`;
+    await page.click(waehler);
+    await page.waitForFunction(
+      (w) => document.querySelector(w)?.classList.contains('is-reposted') === true,
+      waehler, { timeout: 8000 }
+    ).catch(() => {});
+    pruefe('Repost schaltet um',
+           /is-reposted/.test(await page.$eval(waehler, (e) => e.className)));
+    pruefe('Repost meldet sich', /Repostet/i.test(await page.$eval('#toast', (e) => e.textContent)));
+  }
 
   await page.click('[data-sub="profile"]');
   await page.waitForTimeout(800);
@@ -276,10 +308,14 @@ const pruefe = (was, ok, zusatz = '') => {
 
   await page.click('[data-sub="chats"]');
   await page.waitForTimeout(700);
-  const ring = await page.$eval('[data-story="s0"] .story__ring', (e) => e.className);
+  // "s0" war die feste Kennung der eigenen Story in den Beispieldaten. Storys
+  // bekommen ihre Kennung jetzt beim Anlegen in der Datenbank — gesucht wird
+  // deshalb an der Beschriftung. Siehe test/_kennungen.js.
+  const eigeneStory = await K.waehlerStory(page, 'Deine Story');
+  const ring = await page.$eval(`${eigeneStory} .story__ring`, (e) => e.className);
   pruefe('Eigene Story zeigt keinen Plus-Knopf mehr', !/story__add/.test(ring), ring.trim());
 
-  await page.click('[data-story="s0"]');
+  await page.click(eigeneStory);
   await page.waitForTimeout(900);
   pruefe('Eigene Story lässt sich ansehen', !!(await page.$('.viewer__bild')));
   pruefe('Ansichten statt Antwortfeld', !!(await page.$('#storyViews')) && !(await page.$('#storyReply')));
@@ -291,8 +327,9 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.waitForTimeout(500);
   await page.click('[data-sub="chats"]').catch(() => {});
   await page.waitForTimeout(500);
-  await page.click('[data-chat="c1"]');
-  await page.waitForTimeout(600);
+  await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
+  await page.waitForSelector('#messages', { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(400);
   await page.click('[data-call="audio"]');
   await page.waitForTimeout(800);
 

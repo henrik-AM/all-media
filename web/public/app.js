@@ -8966,10 +8966,10 @@ const ptr = new PullToRefresh({
       const data = await res.json();
       Object.assign(state, data);
       render();
-      showToast('Inhalte aktualisiert', 'success');
+      toast('Inhalte aktualisiert');
     } catch (error) {
       console.error('Refresh error:', error);
-      showToast('Fehler beim Aktualisieren', 'error');
+      toast('Fehler beim Aktualisieren');
     }
   }
 });
@@ -8988,15 +8988,23 @@ window.addEventListener('online', updateOfflineStatus);
 window.addEventListener('offline', updateOfflineStatus);
 updateOfflineStatus();
 
-// Phase 3: Error Boundary — Bessere Fehlerbehandlung
+/*
+ * Auffangnetz fuer Fehler, die sonst nur in der Entwicklerkonsole landen.
+ *
+ * Hier stand bis zum 31.08.2026 showToast() — eine Funktion, die es nie gab;
+ * sie heisst toast(). Das Netz riss also genau dann, wenn es gebraucht wurde:
+ * jeder aufgefangene Fehler loeste einen zweiten aus ("showToast is not
+ * defined"), und der Nutzer sah gar nichts. Aufgefallen ist es erst, als das
+ * Anlegen einer Gruppe fehlschlug und niemand sagen konnte, warum.
+ */
 window.addEventListener('error', (e) => {
   console.error('Global error caught:', e.error);
-  showToast('Ein Fehler ist aufgetreten — versuche erneut zu laden', 'error');
+  toast('Ein Fehler ist aufgetreten — versuche erneut zu laden');
 });
 
 window.addEventListener('unhandledrejection', (e) => {
   console.error('Unhandled promise rejection:', e.reason);
-  showToast('Verbindungsfehler — versuche es später noch einmal', 'error');
+  toast('Verbindungsfehler — versuche es später noch einmal');
 });
 
 // Graceful fallback für API-Fehler
@@ -9004,7 +9012,7 @@ const originalFetch = window.fetch;
 window.fetch = function(...args) {
   return originalFetch.apply(this, args).catch((error) => {
     console.error('Fetch error:', error);
-    showToast('Netzwerkfehler — überprüfe deine Verbindung', 'error');
+    toast('Netzwerkfehler — überprüfe deine Verbindung');
     return Promise.reject(error);
   });
 };

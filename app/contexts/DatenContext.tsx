@@ -46,6 +46,7 @@ const LEER: AlleDaten = {
   eigenesProfil: { name: '', bio: '', link: '' },
   highlights: [],
   playlists: [],
+  spende: null,
   ichId: '',
   geladen: '',
 };

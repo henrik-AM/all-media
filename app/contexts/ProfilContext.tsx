@@ -267,6 +267,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     setClips(daten.clips);
     setHighlights(daten.highlights);
     setPlaylists(daten.playlists);
+    // Die Spendenaktion stand bisher nur im Arbeitsspeicher der App: nach
+    // einem Neustart war sie weg, obwohl sie in der Datenbank stand.
+    setSpende(daten.spende);
     setGefolgt(daten.gefolgt);
     setStumm(daten.stummgeschaltet);
     setBlockiert(daten.blockiert);

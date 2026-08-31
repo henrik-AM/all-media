@@ -68,6 +68,8 @@ export interface Profile {
   highlights: string[];
   /** Nur beim eigenen Profil gefüllt (Prototyp „VP + Playlists"). */
   playlists?: string[];
+  /** Laufende Spendenaktion — nur beim eigenen Profil gefüllt. */
+  spende?: Spende | null;
 }
 
 export interface Comment {

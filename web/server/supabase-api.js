@@ -21,7 +21,25 @@
 
 const PROFIL_SPALTEN =
   'id, name, handle, initials, color, phone, privat, about, bio, link, status,' +
-  ' highlights, playlists, followers_basis, following_basis, beitraege_basis';
+  ' highlights, playlists, spende, live, followers_basis, following_basis, beitraege_basis';
+
+/*
+ * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
+ * sync-handlers.js. Beim Lesen muss daraus wieder ein Objekt werden, sonst
+ * greift die Oberflaeche auf spende.titel eines Strings zu und zeigt nichts.
+ *
+ * Ein kaputter Eintrag darf nicht die ganze Seite mitnehmen: dann lieber
+ * nichts als ein Absturz beim Aufbau des Profils.
+ */
+function jsonOderNull(wert) {
+  if (!wert) return null;
+  if (typeof wert === 'object') return wert;
+  try {
+    return JSON.parse(wert);
+  } catch {
+    return null;
+  }
+}
 
 function profilZuNutzer(zeile) {
   if (!zeile) return null;
@@ -39,6 +57,8 @@ function profilZuNutzer(zeile) {
     status: zeile.status || 'offline',
     highlights: zeile.highlights || [],
     playlists: zeile.playlists || [],
+    spende: jsonOderNull(zeile.spende),
+    live: jsonOderNull(zeile.live),
   };
 }
 
@@ -206,17 +226,34 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
   // Letzte Nachricht und Mitglieder je Chat — in zwei Abfragen statt in
   // zweien pro Chat. Bei zwölf Chats ist das der Unterschied zwischen zwei
   // und fünfundzwanzig Rundreisen zur Datenbank.
-  const [{ data: nachrichten, error: fN }, { data: mitglieder, error: fM }] = await Promise.all([
-    client
-      .from('messages')
-      .select('id, chat_id, text, sender_id, media_type, created_at')
-      .in('chat_id', ids)
-      .order('created_at', { ascending: false })
-      .limit(500),
-    client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
-  ]);
+  const [{ data: nachrichten, error: fN }, { data: mitglieder, error: fM }, { data: kontakte, error: fK }] =
+    await Promise.all([
+      client
+        .from('messages')
+        .select('id, chat_id, text, sender_id, media_type, created_at')
+        .in('chat_id', ids)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
+      /*
+       * Wer eine Kontaktanfrage gestellt hat, darf bis zur Annahme nur die
+       * eine Nachricht schicken, die er der Anfrage beigelegt hat. Die
+       * Oberflaeche sperrt das Eingabefeld dafuer an "requestState".
+       *
+       * Das kam bis zum 31.08.2026 aus den Beispieldaten und fiel beim Umzug
+       * in die Datenbank weg — auf beiden Seiten, Website wie App. Der Zustand
+       * steht aber laengst in der Datenbank: contacts.status ist 'pending',
+       * solange die Anfrage laeuft.
+       */
+      client.from('contacts').select('contact_id, status').eq('user_id', nutzerId),
+    ]);
   if (fN) throw fN;
   if (fM) throw fM;
+  if (fK) throw fK;
+
+  const offeneAnfrage = new Set(
+    (kontakte || []).filter((k) => k.status === 'pending').map((k) => k.contact_id)
+  );
 
   const letzte = new Map();
   const ungelesen = new Map();
@@ -234,11 +271,13 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
       const vorschau = letzte.get(z.chat_id) || null;
       const alle = mitgliederNach.get(z.chat_id) || [];
       const andere = alle.filter((u) => u !== nutzerId);
+      // Bei einem Zweiergespräch ist das Gegenüber die eine andere Person.
+      const gegenueber = z.chats.is_group ? null : andere[0] || null;
       return {
         id: z.chats.id,
         name: z.chats.name,
-        // Bei einem Zweiergespräch ist das Gegenüber die eine andere Person.
-        userId: z.chats.is_group ? null : andere[0] || null,
+        userId: gegenueber,
+        requestState: gegenueber && offeneAnfrage.has(gegenueber) ? 'pending' : 'accepted',
         members: z.chats.is_group ? andere : undefined,
         isGroup: Boolean(z.chats.is_group),
         bereich: z.chats.bereich || 'messenger',
@@ -307,18 +346,62 @@ async function ladeStorys(client, nutzerId) {
   const gesehenIds = new Set((gesehen || []).map((g) => g.story_id));
   const gemochtIds = new Set((gemocht || []).map((g) => g.story_id));
 
-  return storys.map((s) => ({
+  const liste = storys.map((s) => ({
     id: s.id,
     userId: s.user_id === nutzerId ? 'me' : s.user_id,
-    name: (s.profiles?.name || '').split(' ')[0],
+    /*
+     * Die eigene Story heisst "Deine Story", nicht wie man selbst heisst.
+     *
+     * So steht es im Prototypen, und so stand es auch in den Beispieldaten.
+     * Beim Umzug in die Datenbank ging es verloren: der Name kam ab da aus
+     * dem Profil, und auf der eigenen Kachel stand ploetzlich der eigene
+     * Vorname.
+     */
+    name: s.user_id === nutzerId ? 'Deine Story' : (s.profiles?.name || '').split(' ')[0],
     own: s.user_id === nutzerId,
     mediaUrl: s.media_url,
+    // Die Oberflaeche kennt das Feld unter dem Namen "mediaUri" — dort kommt
+    // sonst nur ein selbst aufgenommenes Bild aus dem Browserspeicher an.
+    mediaUri: s.media_url,
     mediaType: s.media_type,
     caption: s.caption || '',
     zeit: s.created_at,
     viewed: gesehenIds.has(s.id),
     liked: gemochtIds.has(s.id),
   }));
+
+  return storyleisteOrdnen(liste);
+}
+
+/*
+ * Die Storyleiste beginnt links immer mit der eigenen Kachel — so im
+ * Prototypen, und zwar auch dann, wenn man noch nichts aufgenommen hat: dann
+ * traegt sie ein Plus und oeffnet die Kamera.
+ *
+ * Ohne diese Kachel gab es keinen Weg mehr zur Kamera ueber die Storyleiste,
+ * sobald die eigene Story abgelaufen war. Storys leben 24 Stunden.
+ */
+function storyleisteOrdnen(liste) {
+  const eigene = liste.filter((s) => s.own);
+  const fremde = liste.filter((s) => !s.own);
+
+  if (eigene.length === 0) {
+    eigene.push({
+      id: 'eigene',
+      userId: 'me',
+      name: 'Deine Story',
+      own: true,
+      mediaUrl: null,
+      mediaUri: null,
+      mediaType: 'image',
+      caption: '',
+      zeit: null,
+      viewed: false,
+      liked: false,
+    });
+  }
+
+  return [...eigene, ...fremde];
 }
 
 // ============================================================================
@@ -650,6 +733,11 @@ async function bootstrapData(client, nutzerId) {
       link: eigenes.link || '',
       highlights: eigenes.highlights || [],
       playlists: eigenes.playlists || [],
+      // Spendenaktion und laufender Livestream gehoeren dazu — ohne sie
+      // zeigte das eigene Profil beides nie an, obwohl es in der Datenbank
+      // stand.
+      spende: eigenes.spende || null,
+      live: eigenes.live || null,
     },
     currentUserId: nutzerId,
     quelle: 'supabase',

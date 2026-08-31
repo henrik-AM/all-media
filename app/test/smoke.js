@@ -17,6 +17,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
+const K = require('./_kennungen');
 
 let failed = 0;
 const assert = (label, cond) => {
@@ -47,6 +48,11 @@ const STRUCTURE = {
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
     process.exit(1);
   }
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
+  // Auf den Startzustand — sonst zaehlt der zweite Lauf die Testkommentare
+  // und Testgruppen des ersten mit.
+  await p.evaluate(() => fetch('/api/reset', { method: 'POST' }).then((r) => r.json()));
   await p.reload({ waitUntil: 'networkidle' });
   await p.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await p.waitForTimeout(400);
@@ -101,25 +107,37 @@ const STRUCTURE = {
   await p.waitForTimeout(300);
 
   // --- Chat oeffnen, senden, zurueck ---
-  await p.click('[data-chat="c2"]');
+  await p.click(await K.waehlerChat(p, 'Bob Müller'));
+  // Der Verlauf kommt jetzt vom Server, nicht mehr aus dem Arbeitsspeicher —
+  // eine feste Wartezeit reicht dafuer nicht zuverlaessig.
+  await p.waitForSelector('#messages');
   await p.waitForTimeout(400);
   assert('Chat-Bereich nicht abgeschnitten', await p.$eval('#messages', e => e.clientHeight > 300));
   const before = await p.$$eval('.msg', e => e.length);
   await p.fill('#msgInput', 'Regressionstest');
   await p.click('#sendBtn');
-  await p.waitForTimeout(2200);
-  assert('Nachricht senden + Antwort', (await p.$$eval('.msg', e => e.length)) >= before + 2);
+  /*
+   * Frueher antwortete der Server automatisch, und der Test erwartete zwei
+   * neue Zeilen. Diese Antwort kam aus den Beispieldaten im Arbeitsspeicher —
+   * es gibt sie nicht mehr, und es soll sie auch nicht geben: sie taeuschte
+   * einen Gespraechspartner vor, den niemand hat. Geprueft wird jetzt, dass
+   * die eigene Nachricht in der Datenbank landet und zurueckkommt.
+   */
+  assert('Nachricht senden',
+    await K.bisWahr(p, `document.querySelectorAll('.msg').length >= ${before + 1}`));
+  assert('Nachricht steht im Verlauf',
+    (await p.$$eval('.msg', els => els[els.length - 1].textContent)).includes('Regressionstest'));
   await p.click('#chatBack');
   await p.waitForTimeout(400);
   assert('Zurueck aus Chat', !!(await p.$('#chatSearch')));
 
   // --- Story-Viewer: Henriks vier Punkte ---
-  await p.click('[data-story="s1"]');
+  await p.click(await K.waehlerStory(p, 'Anna'));
   await p.waitForTimeout(400);
   assert('Story-Viewer oeffnet', !!(await p.$('.viewer')));
   await p.click('#storyLike');
-  await p.waitForTimeout(400);
-  assert('Herz wird rot', await p.$eval('#storyLike', e => e.classList.contains('is-liked')));
+  assert('Herz wird rot',
+    await K.bisWahr(p, "document.querySelector('#storyLike')?.classList.contains('is-liked') === true"));
   await p.click('#storyNext');
   await p.waitForTimeout(400);
   assert('Rechts blaettert weiter', (await p.$eval('.viewer__name', e => e.textContent.trim())) === 'Bob Müller');
@@ -152,11 +170,28 @@ const STRUCTURE = {
   await p.click('#chatBack');
   await p.waitForTimeout(400);
 
-  // --- Kamera ueber die eigene Story ---
-  await p.click('[data-story="s0"]');
+  /*
+   * Die eigene Story.
+   *
+   * Bis zum 31.08.2026 war sie immer leer, und ein Tippen fuehrte zur Kamera.
+   * Jedes Konto bekommt jetzt eine Test-Story mit Bild
+   * (SUPABASE_SCHEMA_7_testkonto.sql) — ein Tippen oeffnet also den
+   * Betrachter, so wie bei jeder anderen Story auch. Die Kamera wird darunter
+   * ueber ihren eigenen Unterpunkt geprueft.
+   */
+  await p.click(await K.waehlerStory(p, 'Deine Story'));
+  assert('Eigene Story oeffnet den Betrachter',
+    await K.bisWahr(p, "!!document.querySelector('.viewer')"));
+  assert('Eigene Story heisst "Deine Story"',
+    (await p.$eval('.viewer__name', e => e.textContent.trim())) === 'Deine Story');
+  await p.click('#storyClose').catch(() => p.mouse.click(200, 40));
   await p.waitForTimeout(400);
-  assert('Kamera ueber eigene Story', !!(await p.$('.camera')));
-  await p.click('#camClose');
+
+  // --- Kamera ueber ihren Unterpunkt ---
+  await p.click('[data-sub="camera"]');
+  await p.waitForTimeout(500);
+  assert('Kamera oeffnet', !!(await p.$('.camera')));
+  await p.click('[data-sub="chats"]');
   await p.waitForTimeout(400);
 
   // --- Plus-Menue: Gruppe, Kontakt, Kontaktliste ---
@@ -167,9 +202,9 @@ const STRUCTURE = {
   await p.click('[data-new="group"]');
   await p.waitForTimeout(400);
   // Schritt 1: erst die Personen auswaehlen (Name kommt erst danach).
-  await p.click('[data-member="u1"]');
+  await p.click(`[data-member="${K.person('u1')}"]`);
   await p.waitForTimeout(250);
-  await p.click('[data-member="u2"]');
+  await p.click(`[data-member="${K.person('u2')}"]`);
   await p.waitForTimeout(250);
   assert('Auswahl wird gezaehlt', (await p.$eval('.sheet__title', e => e.textContent)).includes('2'));
   await p.click('#groupNext');
@@ -178,12 +213,14 @@ const STRUCTURE = {
   assert('Schritt 2 fragt den Namen', !!(await p.$('#groupName')));
   await p.fill('#groupName', 'Smoke-Test-Gruppe');
   await p.click('#groupCreate');
-  await p.waitForTimeout(800);
-  assert('Gruppe oeffnet sich als Chat', (await p.$eval('.chathead__name', e => e.textContent.trim())) === 'Smoke-Test-Gruppe');
+  // Die Gruppe wird jetzt in der Datenbank angelegt — das dauert laenger als
+  // ein Eintrag im Arbeitsspeicher.
+  assert('Gruppe oeffnet sich als Chat',
+    await K.bisWahr(p, "document.querySelector('.chathead__name')?.textContent.trim() === 'Smoke-Test-Gruppe'"));
   assert('Mitgliederzahl stimmt', (await p.$eval('.chathead__status', e => e.textContent.trim())) === '3 Mitglieder');
   await p.click('#chatBack');
-  await p.waitForTimeout(500);
-  assert('Gruppe steht in der Chatliste', (await p.$$eval('[data-chat]', e => e.length)) === chatsBefore + 1);
+  assert('Gruppe steht in der Chatliste',
+    await K.bisWahr(p, `document.querySelectorAll('[data-chat]').length === ${chatsBefore + 1}`));
 
   await p.click('#newChat');
   await p.waitForTimeout(400);
@@ -215,10 +252,13 @@ const STRUCTURE = {
   await p.click('[data-area="videos"]');
   await p.click('[data-sub="landscape"]');
   await p.waitForTimeout(400);
-  // Neun statt der frueheren sechs: die Filterleiste braucht von jeder Art
-  // (Standard, 360°, Live) mehrere Videos, sonst laesst sich nicht erkennen,
-  // ob sie wirklich filtert. Siehe test/_insel.js.
-  assert('Querformat zeigt 9 Videos', (await p.$$eval('[data-clip]', e => e.length)) === 9);
+  /*
+   * Neun geteilte Videos (die Filterleiste braucht von jeder Art — Standard,
+   * 360°, Live — mehrere, sonst laesst sich nicht erkennen, ob sie wirklich
+   * filtert, siehe test/_insel.js) plus die drei eigenen Testvideos, die
+   * jedes Konto bekommt: Querformat, 360° und Live.
+   */
+  assert('Querformat zeigt 12 Videos', (await p.$$eval('[data-clip]', e => e.length)) === 12);
   await p.fill('#clipSearch', 'pasta');
   await p.waitForTimeout(300);
   assert('Querformat-Suche ohne Treffer', !!(await p.$('.empty')));
@@ -238,28 +278,41 @@ const STRUCTURE = {
   // --- Kommentare (Bild-Feed) ---
   await p.click('[data-sub="home"]');
   await p.waitForTimeout(400);
-  await p.click('[data-paction="comment"][data-pid="p1"]');
-  await p.waitForTimeout(500);
-  assert('Kommentare oeffnen (p1 -> 3)', (await p.$$eval('.comment', e => e.length)) === 3);
+  const hafen = await K.beitrag(p, 'Hafen um sechs');
+  await p.click(`[data-paction="comment"][data-pid="${hafen}"]`);
+  await p.waitForSelector('.comment', { timeout: 8000 }).catch(() => {});
+  const kommentareVorher = await p.$$eval('.comment', e => e.length);
+  assert(`Kommentare oeffnen (${kommentareVorher})`, kommentareVorher > 0);
   await p.fill('#commentInput', 'Testkommentar');
   await p.click('#commentSend');
-  await p.waitForTimeout(600);
-  assert('Kommentar senden', (await p.$$eval('.comment', e => e.length)) === 4);
-  await p.click('[data-clike="cm1"]');
-  await p.waitForTimeout(400);
-  assert('Kommentar liken', await p.$eval('[data-clike="cm1"]', e => e.classList.contains('is-on')));
-  await p.mouse.click(200, 40);
+  assert('Kommentar senden',
+    await K.bisWahr(p, `document.querySelectorAll('.comment').length === ${kommentareVorher + 1}`));
+  const ersterKommentar = await p.$eval('[data-clike]', (e) => e.getAttribute('data-clike'));
+  await p.click(`[data-clike="${ersterKommentar}"]`);
+  assert('Kommentar liken',
+    await K.bisWahr(p, `document.querySelector('[data-clike="${ersterKommentar}"]')?.classList.contains('is-on') === true`));
+  // Das Blatt sicher schliessen — ein Klick daneben traf nicht immer.
+  await p.evaluate(() => document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove()));
   await p.waitForTimeout(400);
 
   // --- Profil aus Beitrag ---
-  await p.click('.post__name[data-profile="u3"]');
-  await p.waitForTimeout(600);
+  await p.click(`.post__name[data-profile="${K.person('u3')}"]`);
+  await p.waitForSelector('.prof__name', { timeout: 8000 }).catch(() => {});
+  /*
+   * Wie viele Kacheln Clara hat, steht in der Datenbank und nicht mehr im
+   * Quelltext — eine feste Zahl waere hier eine Wette auf den Bestand. Was
+   * zaehlt: es ist ihr Profil, und es ist nicht leer.
+   */
   assert('Profil aus Beitrag oeffnet',
     (await p.$eval('.prof__name', e => e.textContent.trim())) === 'Clara Weber' &&
-    (await p.$$eval('.griditem', e => e.length)) === 12);
+    (await p.$$eval('.griditem', e => e.length)) > 0);
+
+  // "Folgen" oder "Gefolgt" — welches von beiden dasteht, haengt davon ab, ob
+  // man ihr schon folgt. Geprueft wird deshalb der Wechsel, nicht der Wert.
+  const vorher = await p.$eval('#profFollow', e => e.textContent.trim());
   await p.click('#profFollow');
-  await p.waitForTimeout(500);
-  assert('Folgen schaltet um', (await p.$eval('#profFollow', e => e.textContent.trim())) === 'Folgen');
+  assert('Folgen schaltet um',
+    await K.bisWahr(p, `document.querySelector('#profFollow')?.textContent.trim() !== ${JSON.stringify(vorher)}`));
   await p.click('#profBack');
   await p.waitForTimeout(500);
 
@@ -283,9 +336,16 @@ const STRUCTURE = {
   await p.waitForTimeout(400);
   await p.click('[data-csfilter="people"]');
   await p.waitForTimeout(350);
-  // Neun Personen: sechs Kontakte plus drei, die noch keine sind (damit sich
-  // "Kontakt hinzufuegen" ueberhaupt ausprobieren laesst).
-  assert('Filter Kontakte zeigt nur Profile', (await p.$$eval('[data-befriend]', e => e.length)) === 9);
+  /*
+   * Mindestens die neun Beispielprofile: sechs Kontakte plus drei, die noch
+   * keine sind (damit sich "Kontakt hinzufuegen" ausprobieren laesst).
+   *
+   * Keine feste Zahl mehr: die Personensuche zeigt alle Konten der Datenbank,
+   * und mit jedem echten Nutzer werden es mehr. Eine "=== 9" wuerde nach der
+   * ersten Anmeldung eines Menschen fehlschlagen.
+   */
+  const personen = await p.$$eval('[data-befriend]', e => e.length);
+  assert(`Filter Kontakte zeigt nur Profile (${personen})`, personen >= 9);
   await p.click('[data-csfilter="channels"]');
   await p.waitForTimeout(350);
   assert('Filter Communitys zeigt nur Kanaele', (await p.$$eval('[data-community]', e => e.length)) === 6);
@@ -311,7 +371,15 @@ const STRUCTURE = {
   await p.click('[data-toggle="theme"]');
   await p.waitForTimeout(300);
 
-  await p.request.post('http://localhost:3000/api/reset');
+  /*
+   * Zum Schluss aufraeumen: Testgruppe, Testkommentar, Testnachricht.
+   *
+   * Das lief bis zum 31.08.2026 ueber p.request — einen eigenen Kanal ohne
+   * Anmeldung. Der Server nimmt den nicht mehr an: Zuruecksetzen fasst Zeilen
+   * eines Kontos an und braucht deshalb dessen Anmeldung. Also aus der Seite
+   * heraus, wo das Zugangstoken schon haengt.
+   */
+  await p.evaluate(() => fetch('/api/reset', { method: 'POST' }).then((r) => r.json()));
 
   console.log('');
   console.log(errs.length ? 'FEHLER:\n' + errs.join('\n') : 'Keine Konsolenfehler');

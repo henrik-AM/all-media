@@ -70,12 +70,30 @@ if (!fs.existsSync(BILD)) {
     }
   };
 
+  /*
+   * Zu einem Bildschirm wechseln.
+   *
+   * Feste Wartezeiten reichen hier nicht mehr: jeder Bildschirm holt seine
+   * Inhalte aus der Datenbank, und wie lange das dauert, haengt vom Netz ab.
+   * Frueher lagen die Inhalte im Arbeitsspeicher des Servers und waren
+   * sofort da. Deshalb wird gewartet, bis wirklich etwas dasteht — und ein
+   * offenes Blatt vorher weggeraeumt, sonst faengt es die Klicks ab.
+   */
   const gehe = async (area, sub) => {
+    await page.evaluate(() => {
+      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      const o = document.querySelector('#overlay');
+      if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+    });
     await page.click(`[data-area="${area}"]`);
     await page.waitForTimeout(300);
     if (sub) {
       await page.click(`[data-sub="${sub}"]`);
-      await page.waitForTimeout(400);
+      await page.waitForFunction(
+        () => (document.querySelector('#main')?.textContent || '').trim().length > 0,
+        null, { timeout: 8000 }
+      ).catch(() => {});
+      await page.waitForTimeout(300);
     }
   };
 
@@ -90,7 +108,10 @@ if (!fs.existsSync(BILD)) {
   await gehe('videos', 'profile');
 
   await pruefe('Roter Punkt zeigt ungelesene Mitteilungen', async () => {
-    if (!(await page.$('.oprof__dot'))) throw new Error('kein Punkt an der Glocke');
+    // Die Zahl der ungelesenen Mitteilungen kommt vom Server, nicht aus dem
+    // ersten Aufbau der Seite — der Punkt erscheint deshalb kurz danach.
+    await page.waitForSelector('.oprof__dot', { timeout: 8000 })
+      .catch(() => { throw new Error('kein Punkt an der Glocke'); });
   });
 
   await pruefe('Glocke oeffnet die Liste mit Text und Zeitangabe', async () => {
@@ -108,9 +129,10 @@ if (!fs.existsSync(BILD)) {
 
   await pruefe('Antippen fuehrt zum Profil, aus dem die Mitteilung stammt', async () => {
     await page.click('.mitt[data-ziel-art="profile"]');
-    await page.waitForTimeout(800);
-    const offen = await page.$eval('#overlay', (e) => !e.hidden && e.innerHTML.length > 0);
-    if (!offen) throw new Error('kein Profil geoeffnet');
+    await page.waitForFunction(
+      () => { const o = document.querySelector('#overlay'); return o && !o.hidden && o.innerHTML.length > 0; },
+      null, { timeout: 8000 }
+    ).catch(() => { throw new Error('kein Profil geoeffnet'); });
     await page.evaluate(() => {
       const o = document.querySelector('#overlay');
       o.hidden = true;
@@ -123,8 +145,8 @@ if (!fs.existsSync(BILD)) {
     await page.click('[data-oact="bell"]');
     await page.waitForSelector('.mitt-liste');
     await page.click('#mittAlle');
-    await page.waitForTimeout(600);
-    if (await page.$('.oprof__dot')) throw new Error('Punkt ist noch da');
+    await page.waitForFunction(() => !document.querySelector('.oprof__dot'), null, { timeout: 8000 })
+      .catch(() => { throw new Error('Punkt ist noch da'); });
   });
 
   /* ------------------------------------------------------------- Menue */
@@ -177,7 +199,10 @@ if (!fs.existsSync(BILD)) {
     await page.waitForSelector('#f_name');
     await page.fill('#f_name', 'Sommer');
     await page.click('#formOk');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => { const t = document.querySelector('#toast'); return t && !t.hidden && /schon/.test(t.textContent); },
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
     if (!/schon/.test(hinweis)) throw new Error('Hinweis war: ' + hinweis);
     await page.click('[data-sheet-close]');
@@ -212,8 +237,10 @@ if (!fs.existsSync(BILD)) {
     if (mitBild < 1) throw new Error('das aufgenommene Bild wird nicht angezeigt');
 
     await gehe('videos', 'profile');
-    const rasterBilder = await page.$$eval('.griditem img.eigenbild', (els) => els.length);
-    if (rasterBilder < 1) throw new Error('im eigenen Raster fehlt das Bild');
+    await page.waitForFunction(
+      () => document.querySelectorAll('.griditem img.eigenbild').length > 0,
+      null, { timeout: 10000 }
+    ).catch(() => { throw new Error('im eigenen Raster fehlt das Bild'); });
   });
 
   await pruefe('Spendenaktion erscheint mit Fortschrittsbalken im Profil', async () => {
@@ -269,9 +296,16 @@ if (!fs.existsSync(BILD)) {
     const zeit = await page.$eval('#liveZeit', (e) => e.textContent);
     if (zeit === '00:00') throw new Error('die Zeit laeuft nicht');
     await page.click('#liveStop');
-    await page.waitForTimeout(1000);
-    const titel = await page.$$eval('.clip__title', (els) => els.map((e) => e.textContent));
-    if (!titel.includes('Livestream-Aufzeichnung')) throw new Error(titel.slice(0, 3).join(' | '));
+    // Die Aufzeichnung wird als Beitrag in der Datenbank angelegt und danach
+    // frisch geladen — das dauert laenger als der fruehere Eintrag im
+    // Arbeitsspeicher des Servers.
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.clip__title')]
+        .some((e) => e.textContent.includes('Livestream-Aufzeichnung')),
+      null, { timeout: 10000 }
+    ).catch(() => {
+      throw new Error('keine Aufzeichnung im Querformat');
+    });
   });
 
   /* -------------------------------------------------------- Communitys */
@@ -293,9 +327,10 @@ if (!fs.existsSync(BILD)) {
     await page.fill('#f_name', 'Nachtschicht');
     await page.fill('#f_thema', 'Alles nach 22 Uhr');
     await page.click('#formOk');
-    await page.waitForTimeout(1000);
-    const text = await page.$eval('#main', (e) => e.textContent);
-    if (!text.includes('Nachtschicht')) throw new Error('Kanal steht nicht im Profil');
+    await page.waitForFunction(
+      () => (document.querySelector('#main')?.textContent || '').includes('Nachtschicht'),
+      null, { timeout: 10000 }
+    ).catch(() => { throw new Error('Kanal steht nicht im Profil'); });
   });
 
   await pruefe('Denselben Kanal gibt es kein zweites Mal', async () => {
@@ -304,7 +339,10 @@ if (!fs.existsSync(BILD)) {
     await page.fill('#f_name', 'Nachtschicht');
     await page.fill('#f_thema', 'Doppelt');
     await page.click('#formOk');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => { const t = document.querySelector('#toast'); return t && !t.hidden && /schon/.test(t.textContent); },
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
     if (!/schon/.test(hinweis)) throw new Error('Hinweis war: ' + hinweis);
     await page.click('[data-sheet-close]');

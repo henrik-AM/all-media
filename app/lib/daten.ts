@@ -30,6 +30,7 @@ import {
   Post,
   Profile,
   Sound,
+  Spende,
   Story,
   User,
   Video,
@@ -91,6 +92,24 @@ export function chatZeit(zeitpunkt?: string | null): string {
 // Menschen
 // ============================================================================
 
+/*
+ * "spende" steht als JSON in einer Textspalte — so schreibt es der Server
+ * (web/server/sync-handlers.js). Beim Lesen muss daraus wieder ein Objekt
+ * werden, sonst greift die Oberflaeche auf spende.titel eines Strings zu.
+ *
+ * Ein kaputter Eintrag darf nicht den ganzen Ladevorgang mitnehmen: dann
+ * lieber nichts als ein Absturz beim Aufbau des Profils.
+ */
+function jsonOderNull(wert: unknown): any {
+  if (!wert) return null;
+  if (typeof wert === 'object') return wert;
+  try {
+    return JSON.parse(String(wert));
+  } catch {
+    return null;
+  }
+}
+
 export interface PersonZahlen {
   followers: number;
   following: number;
@@ -128,6 +147,7 @@ export async function ladeNutzer(
       userId: schluessel,
       bio: zeile.bio ?? '',
       link: zeile.link ?? '',
+      spende: jsonOderNull(zeile.spende),
       posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
       followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
       following: Number(z?.following ?? zeile.following_basis ?? 0),
@@ -223,17 +243,26 @@ export async function ladeChats(
   const ids = zeilen.map((z: any) => z.chat_id);
 
   // Letzte Nachricht und Mitglieder in zwei Abfragen statt in zweien pro Chat.
-  const [{ data: nachrichten, error: fN }, { data: mitglieder, error: fM }] = await Promise.all([
-    client
-      .from('messages')
-      .select('id, chat_id, text, sender_id, media_type, created_at')
-      .in('chat_id', ids)
-      .order('created_at', { ascending: false })
-      .limit(500),
-    client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
-  ]);
+  const [{ data: nachrichten, error: fN }, { data: mitglieder, error: fM }, { data: kontakte, error: fK }] =
+    await Promise.all([
+      client
+        .from('messages')
+        .select('id, chat_id, text, sender_id, media_type, created_at')
+        .in('chat_id', ids)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
+      // Offene Kontaktanfragen sperren das Eingabefeld bis zur Annahme.
+      // Gleiche Regel wie in web/server/supabase-api.js.
+      client.from('contacts').select('contact_id, status').eq('user_id', ichId),
+    ]);
   if (fN) throw fN;
   if (fM) throw fM;
+  if (fK) throw fK;
+
+  const offeneAnfrage = new Set(
+    ((kontakte ?? []) as any[]).filter((k) => k.status === 'pending').map((k) => k.contact_id)
+  );
 
   const letzte = new Map<string, any>();
   for (const n of (nachrichten ?? []) as any[]) {
@@ -249,11 +278,13 @@ export async function ladeChats(
     .map((z: any): Chat & { zeitpunkt?: string; archiviert?: boolean } => {
       const vorschau = letzte.get(z.chat_id);
       const andere = (mitgliederNach.get(z.chat_id) ?? []).filter((u) => u !== ichId);
+      // Bei einem Zweiergespräch ist das Gegenüber die eine andere Person.
+      const gegenueber = z.chats.is_group ? undefined : andere[0];
       return {
         id: z.chats.id,
         name: z.chats.name,
-        // Bei einem Zweiergespräch ist das Gegenüber die eine andere Person.
-        userId: z.chats.is_group ? undefined : andere[0],
+        userId: gegenueber,
+        requestState: gegenueber && offeneAnfrage.has(gegenueber) ? 'pending' : 'accepted',
         isGroup: Boolean(z.chats.is_group),
         memberIds: z.chats.is_group ? andere : undefined,
         preview: vorschau?.text ?? '',
@@ -316,16 +347,42 @@ export async function ladeStorys(client: SupabaseClient, ichId: string): Promise
   const gesehenIds = new Set((gesehen ?? []).map((g: any) => g.story_id));
   const gemochtIds = new Set((gemocht ?? []).map((g: any) => g.story_id));
 
-  return storys.map((s) => ({
+  const liste: Story[] = storys.map((s) => ({
     id: s.id,
     userId: s.user_id === ichId ? ICH : s.user_id,
-    name: (s.profiles?.name ?? '').split(' ')[0],
+    // Die eigene Kachel heisst "Deine Story", nicht wie man selbst heisst —
+    // so steht es im Prototypen. Siehe web/server/supabase-api.js.
+    name: s.user_id === ichId ? 'Deine Story' : (s.profiles?.name ?? '').split(' ')[0],
     own: s.user_id === ichId,
     viewed: gesehenIds.has(s.id),
     liked: gemochtIds.has(s.id),
     caption: s.caption ?? '',
     mediaUri: s.media_url ?? undefined,
   }));
+
+  /*
+   * Links steht immer die eigene Kachel — auch ohne eigene Story. Dann traegt
+   * sie ein Plus und oeffnet die Kamera. Storys leben 24 Stunden; ohne diese
+   * Kachel waere der Weg zur Kamera danach weg.
+   * Gleiche Regel wie in web/server/supabase-api.js.
+   */
+  const eigene = liste.filter((s) => s.own);
+  const fremde = liste.filter((s) => !s.own);
+
+  if (eigene.length === 0) {
+    eigene.push({
+      id: 'eigene',
+      userId: ICH,
+      name: 'Deine Story',
+      own: true,
+      viewed: false,
+      liked: false,
+      caption: '',
+      mediaUri: undefined,
+    } as Story);
+  }
+
+  return [...eigene, ...fremde];
 }
 
 // ============================================================================
@@ -684,6 +741,8 @@ export interface AlleDaten {
   eigenesProfil: { name: string; bio: string; link: string };
   highlights: string[];
   playlists: string[];
+  /** Die eigene Spendenaktion — null, solange keine läuft. */
+  spende: Spende | null;
   ichId: string;
   geladen: string;
 }
@@ -762,6 +821,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     },
     highlights: profile[ICH]?.highlights ?? [],
     playlists: profile[ICH]?.playlists ?? [],
+    spende: (profile[ICH] as { spende?: Spende | null } | undefined)?.spende ?? null,
     ichId,
     geladen: new Date().toISOString(),
   };

@@ -505,7 +505,19 @@ app.post('/api/contacts', route(async (req) => {
       about: privat ? 'Anfrage gesendet' : 'Kontakt',
       phone: person.phone,
     },
-    chat: { id: e.chatId, userId: person.id, name: person.name, isGroup: false },
+    /*
+     * Der Chat wird gleich geoeffnet, ohne dass die Seite die Chatliste neu
+     * holt. "requestState" muss deshalb schon hier stehen — sonst bleibt das
+     * Eingabefeld offen, obwohl die Anfrage noch laeuft, und der Nutzer kann
+     * jemandem schreiben, der ihn noch gar nicht angenommen hat.
+     */
+    chat: {
+      id: e.chatId,
+      userId: person.id,
+      name: person.name,
+      isGroup: false,
+      requestState: e.status === 'pending' ? 'pending' : 'accepted',
+    },
   };
 }));
 

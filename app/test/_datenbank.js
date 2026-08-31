@@ -131,9 +131,25 @@ async function main() {
     p ? `${p.name} ${p.handle}` : 'kein Profil');
 
   // --------------------------------------------------------- Storage ------
-  const eimer = await fetch(`${URL}/storage/v1/bucket/media`, { headers: kopf }).then((r) => r.json());
-  pruefe('Ablage "media" fuer Bilder und Videos vorhanden', eimer && eimer.name === 'media',
-    eimer && eimer.message ? eimer.message : '');
+  //
+  // Nicht nachfragen, ob es den Eimer gibt — das darf nur der geheime
+  // Schluessel, ein normales Konto bekommt dort immer "Bucket not found".
+  // Stattdessen genau das tun, was die App tut: hochladen, wieder lesen,
+  // aufraeumen. Nur das beantwortet die Frage wirklich.
+  const pfad = `test/pruefung-${Date.now()}.txt`;
+  const hoch = await fetch(`${URL}/storage/v1/object/media/${pfad}`, {
+    method: 'POST',
+    headers: { ...kopf, 'Content-Type': 'text/plain' },
+    body: 'Pruefung',
+  });
+  const hochText = await hoch.text();
+  pruefe('Ablage "media": Hochladen geht', hoch.ok, hoch.ok ? '' : `${hoch.status} ${hochText}`);
+
+  if (hoch.ok) {
+    const zurueck = await fetch(`${URL}/storage/v1/object/public/media/${pfad}`);
+    pruefe('Ablage "media": Datei ist oeffentlich lesbar', zurueck.ok, zurueck.ok ? '' : String(zurueck.status));
+    await fetch(`${URL}/storage/v1/object/media/${pfad}`, { method: 'DELETE', headers: kopf });
+  }
 
   // --------------------------------------------------------- Website ------
   if (WEBSITE) {
