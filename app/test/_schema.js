@@ -19,6 +19,7 @@ const SQL_DATEIEN = [
   'SUPABASE_SCHEMA_3.sql',
   'SUPABASE_SCHEMA_4.sql',
   'SUPABASE_SCHEMA_5.sql',
+  'SUPABASE_SCHEMA_7_testkonto.sql',
 ];
 /*
  * Beide Seiten, nicht nur eine.

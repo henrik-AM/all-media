@@ -64,7 +64,8 @@
     "test:feinschliff": "node test/_feinschliff.js",
     "test:kamera": "node test/_kamera.js",
     "test:eigenes": "node test/_eigenes.js",
-    "test:gleichstand": "node test/_gleichstand.js"
+    "test:gleichstand": "node test/_gleichstand.js",
+    "test:datenbank": "node test/_datenbank.js"
   },
   "private": true
 }

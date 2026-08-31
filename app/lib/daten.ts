@@ -301,7 +301,7 @@ export async function ladeNachrichten(
 export async function ladeStorys(client: SupabaseClient, ichId: string): Promise<Story[]> {
   const { data, error } = await client
     .from('stories')
-    .select('id, user_id, media_url, media_type, caption, created_at, profiles(name)')
+    .select('id, user_id, media_url, media_type, caption, created_at, profiles!stories_user_id_fkey(name)')
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;
