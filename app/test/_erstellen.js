@@ -103,6 +103,26 @@ if (!fs.existsSync(BILD)) {
     await page.click(`[data-erstellen="${punkt}"]`);
   };
 
+  /**
+   * Den Hinweis unten abholen, den eine Aktion ausloest.
+   *
+   * Der Hinweis blendet sich nach 2,2 Sekunden selbst aus. Wer erst danach
+   * nachsieht, findet ein leeres Feld und meldet einen Fehler, den es nicht
+   * gab. Deshalb: vorher leeren, dann warten, bis etwas dasteht.
+   */
+  const hinweisNach = async (tue) => {
+    await page.evaluate(() => {
+      const t = document.querySelector('#toast');
+      if (t) { t.textContent = ''; t.hidden = true; }
+    });
+    await tue();
+    await page.waitForFunction(
+      () => { const t = document.querySelector('#toast'); return t && !t.hidden && t.textContent.trim().length > 0; },
+      null, { timeout: 10000 }
+    ).catch(() => {});
+    return page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent)).catch(() => '');
+  };
+
   /* ------------------------------------------------------------ Glocke */
   console.log('\nGlocke — Mitteilungen');
   await gehe('videos', 'profile');
@@ -203,12 +223,7 @@ if (!fs.existsSync(BILD)) {
     await erstellen('highlight');
     await page.waitForSelector('#f_name');
     await page.fill('#f_name', 'Sommer');
-    await page.click('#formOk');
-    await page.waitForFunction(
-      () => { const t = document.querySelector('#toast'); return t && !t.hidden && /schon/.test(t.textContent); },
-      null, { timeout: 10000 }
-    ).catch(() => {});
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+    const hinweis = await hinweisNach(() => page.click('#formOk'));
     if (!/schon/.test(hinweis)) throw new Error('Hinweis war: ' + hinweis);
     await page.click('[data-sheet-close]');
   });
@@ -346,12 +361,7 @@ if (!fs.existsSync(BILD)) {
     await page.waitForSelector('#f_name');
     await page.fill('#f_name', 'Nachtschicht');
     await page.fill('#f_thema', 'Doppelt');
-    await page.click('#formOk');
-    await page.waitForFunction(
-      () => { const t = document.querySelector('#toast'); return t && !t.hidden && /schon/.test(t.textContent); },
-      null, { timeout: 10000 }
-    ).catch(() => {});
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+    const hinweis = await hinweisNach(() => page.click('#formOk'));
     if (!/schon/.test(hinweis)) throw new Error('Hinweis war: ' + hinweis);
     await page.click('[data-sheet-close]');
   });
