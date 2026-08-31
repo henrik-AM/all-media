@@ -49,13 +49,20 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
       </Druck>
     ));
 
+  // Solange die Daten laden, gibt es das eigene Profil noch nicht.
+  // Gleicher Fall wie in VideoProfileScreen.
+  const ich = alleNutzer.me;
+  if (!ich) {
+    return <View style={styles.screen}><SwitchBar onPress={() => onSwitchArea('messenger')} /></View>;
+  }
+
   return (
     <View style={styles.screen}>
       <SwitchBar onPress={() => onSwitchArea('messenger')} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <OwnProfileHead
-          handle={alleNutzer.me.handle}
+          handle={ich.handle}
           stats={[
             { label: 'Erstellte Communitys', value: created.length },
             { label: 'Beigetretene Communitys', value: joined.length },

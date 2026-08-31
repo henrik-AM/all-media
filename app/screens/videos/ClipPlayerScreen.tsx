@@ -96,7 +96,12 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
     );
   }
 
-  const autor = alleNutzer[clip.userId];
+  /*
+   * Der Autor kann fehlen, solange die Personen noch geladen werden. Ein
+   * direkter Zugriff auf .name stürzte die App dann ab — siehe
+   * VideoProfileScreen.
+   */
+  const autor = alleNutzer[clip.userId] ?? { name: '', handle: '' };
   const eigenesBild = raster.find((r) => r.id === clip.id)?.mediaUri;
   const aehnlich = clips.filter((c) => c.id !== clip.id).slice(0, 4);
 
@@ -288,13 +293,13 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
               </View>
             </View>
             <View style={styles.clipMeta}>
-              <Avatar id={c.userId} name={alleNutzer[c.userId].name} size={sizes.avatarSm} />
+              <Avatar id={c.userId} name={(alleNutzer[c.userId]?.name ?? '')} size={sizes.avatarSm} />
               <View style={styles.clipTexte}>
                 <Text style={styles.clipTitel} numberOfLines={2}>
                   {c.title}
                 </Text>
                 <Text style={styles.clipSub}>
-                  {alleNutzer[c.userId].name} · {compact(c.views)} Aufrufe
+                  {(alleNutzer[c.userId]?.name ?? '')} · {compact(c.views)} Aufrufe
                 </Text>
               </View>
             </View>

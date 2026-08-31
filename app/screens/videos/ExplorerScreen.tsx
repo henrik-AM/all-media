@@ -136,13 +136,13 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                       </View>
                     </View>
                     <View style={styles.clipMeta}>
-                      <Avatar id={c.userId} name={alleNutzer[c.userId].name} size={sizes.avatarSm} />
+                      <Avatar id={c.userId} name={(alleNutzer[c.userId]?.name ?? '')} size={sizes.avatarSm} />
                       <View style={styles.clipTexte}>
                         <Text style={styles.clipTitel} numberOfLines={2}>
                           {c.title}
                         </Text>
                         <Text style={styles.clipSub}>
-                          {alleNutzer[c.userId].name} · {compact(c.views)} Aufrufe
+                          {(alleNutzer[c.userId]?.name ?? '')} · {compact(c.views)} Aufrufe
                         </Text>
                       </View>
                     </View>

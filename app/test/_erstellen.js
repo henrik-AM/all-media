@@ -189,7 +189,12 @@ if (!fs.existsSync(BILD)) {
     await page.waitForSelector('#f_name', { timeout: 3000 });
     await page.fill('#f_name', 'Sommer');
     await page.click('#formOk');
-    await page.waitForTimeout(800);
+    // Das Highlight wird in der Datenbank angelegt und das Profil danach neu
+    // geladen — 800 ms waren dafuer eine Wette.
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.highlight__label')].some((n) => n.textContent === 'Sommer'),
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const labels = await page.$$eval('.highlight__label', (els) => els.map((e) => e.textContent));
     if (!labels.includes('Sommer')) throw new Error(labels.join(' | '));
   });
@@ -213,7 +218,10 @@ if (!fs.existsSync(BILD)) {
     await page.waitForSelector('#f_name');
     await page.fill('#f_name', 'Beste Momente');
     await page.click('#formOk');
-    await page.waitForTimeout(800);
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.highlight__label')].some((n) => n.textContent === 'Beste Momente'),
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const labels = await page.$$eval('.highlight__label', (els) => els.map((e) => e.textContent));
     if (!labels.includes('Beste Momente')) throw new Error(labels.join(' | '));
   });

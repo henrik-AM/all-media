@@ -46,13 +46,28 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
   const [tab, setTab] = useState<Tab>('grid');
   const me = alleProfile.me;
 
+  /*
+   * Solange die Daten laden, gibt es das eigene Profil noch nicht.
+   *
+   * Vorher stand hier direkt `alleNutzer.me.handle` — beim ersten Aufbau ist
+   * `alleNutzer` aber ein leeres Objekt, und die App stürzte mit "Cannot read
+   * property 'handle' of undefined" ab. Aufgefallen ist das erst im
+   * Simulator: die Prüfläufe der Website kommen an diesem Bildschirm nicht
+   * vorbei, und `tsc` sieht den Fall nicht, weil ein Index-Zugriff in
+   * TypeScript als vorhanden gilt.
+   */
+  const ich = alleNutzer.me;
+  if (!ich || !me) {
+    return <View style={styles.screen}><SwitchBar onPress={() => onSwitchArea('messenger')} /></View>;
+  }
+
   return (
     <View style={styles.screen}>
       <SwitchBar onPress={() => onSwitchArea('messenger')} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <OwnProfileHead
-          handle={alleNutzer.me.handle}
+          handle={ich.handle}
           stats={[
             { label: 'Beiträge', value: compact(me.posts + eigeneBeitraege.length) },
             { label: 'Follower', value: compact(me.followers) },
