@@ -104,9 +104,47 @@
     };
   }
 
-  async function anmelden(email, passwort) {
+  /**
+   * Ist dieser Benutzername noch frei? Beantwortet die Datenbank, ohne die
+   * Profilliste preiszugeben — auch ohne Anmeldung, denn beim Registrieren
+   * ist noch niemand angemeldet.
+   */
+  async function benutzernameFrei(name) {
+    const c = await aufbauen();
+    if (!c) return { frei: false, meldung: 'Anmeldung ist nicht eingerichtet.' };
+
+    const { data, error } = await c.rpc('handle_frei', { eingabe: name });
+    if (error) {
+      console.error('Benutzername prüfen:', error.message);
+      return { frei: false, meldung: 'Der Name lässt sich gerade nicht prüfen.' };
+    }
+    return data;
+  }
+
+  /**
+   * Anmelden. Der Prototyp lässt „Benutzername, E-Mail, Telefonnummer" zu.
+   * Supabase kennt aber nur E-Mail und Telefonnummer — ein Benutzername wird
+   * deshalb vorher in die hinterlegte E-Mail übersetzt.
+   */
+  async function anmelden(kennung, passwort) {
     const c = await aufbauen();
     if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
+
+    let email = (kennung || '').trim();
+
+    if (!email.includes('@') || email.startsWith('@')) {
+      const { data, error } = await c.rpc('email_zu_handle', { eingabe: email });
+      if (error) {
+        console.error('Benutzername auflösen:', error.message);
+        return { ok: false, fehler: 'Die Anmeldung ist gerade nicht erreichbar.' };
+      }
+      if (!data) {
+        // Bewusst dieselbe Meldung wie bei falschem Passwort: Sonst könnte man
+        // durchprobieren, welche Benutzernamen es gibt.
+        return { ok: false, fehler: 'Benutzername oder Passwort stimmt nicht.' };
+      }
+      email = data;
+    }
 
     const { data, error } = await c.auth.signInWithPassword({ email, password: passwort });
     if (error) return { ok: false, fehler: uebersetze(error.message) };
@@ -116,21 +154,30 @@
     return { ok: true, nutzer: nutzer() };
   }
 
-  async function registrieren(email, passwort, name) {
+  /**
+   * Registrieren. Der Benutzername kommt vom Nutzer und wird unverändert
+   * übernommen — der Trigger in der Datenbank erzeugt ihn nicht mehr selbst.
+   */
+  async function registrieren({ benutzername, passwort, email, name }) {
     const c = await aufbauen();
     if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
+
+    // Kurz vor dem Anlegen noch einmal prüfen: Zwischen Eingabe und Absenden
+    // kann sich jemand anders denselben Namen genommen haben.
+    const pruefung = await benutzernameFrei(benutzername);
+    if (!pruefung.frei) return { ok: false, fehler: pruefung.meldung, feld: 'benutzername' };
 
     const { data, error } = await c.auth.signUp({
       email,
       password: passwort,
       options: {
         data: {
-          name: name || (email || '').split('@')[0],
-          handle: '@' + (email || '').split('@')[0].replace(/[^a-z0-9]/gi, ''),
+          handle: pruefung.handle,
+          name: name || benutzername,
         },
       },
     });
-    if (error) return { ok: false, fehler: uebersetze(error.message) };
+    if (error) return { ok: false, fehler: uebersetze(error.message), feld: 'email' };
 
     // Ohne bestaetigte E-Mail gibt Supabase keine Sitzung heraus.
     if (!data.session) {
@@ -145,6 +192,21 @@
     sitzung = data.session;
     melden();
     return { ok: true, nutzer: nutzer() };
+  }
+
+  /**
+   * Benutzernamen nachträglich ändern.
+   */
+  async function benutzernameAendern(name) {
+    const c = await aufbauen();
+    if (!c) return { ok: false, meldung: 'Anmeldung ist nicht eingerichtet.' };
+
+    const { data, error } = await c.rpc('handle_aendern', { eingabe: name });
+    if (error) {
+      console.error('Benutzername ändern:', error.message);
+      return { ok: false, meldung: 'Die Änderung ist gerade nicht möglich.' };
+    }
+    return data;
   }
 
   async function abmelden() {
@@ -170,12 +232,17 @@
   // wirklich zu sehen bekommen.
   function uebersetze(meldung) {
     const m = (meldung || '').toLowerCase();
-    if (m.includes('invalid login credentials')) return 'E-Mail oder Passwort stimmt nicht.';
+    if (m.includes('invalid login credentials')) return 'Benutzername oder Passwort stimmt nicht.';
     if (m.includes('email not confirmed')) return 'Bestätige zuerst die E-Mail, die wir dir geschickt haben.';
     if (m.includes('already registered')) return 'Für diese E-Mail gibt es schon ein Konto.';
     if (m.includes('password should be at least')) return 'Das Passwort ist zu kurz.';
     if (m.includes('rate limit') || m.includes('too many')) return 'Zu viele Versuche. Bitte kurz warten.';
     if (m.includes('unable to validate email')) return 'Diese E-Mail-Adresse sieht nicht richtig aus.';
+    if (m.includes('email address') && m.includes('invalid'))
+      return 'Diese E-Mail-Adresse wird nicht akzeptiert. Bitte prüfe sie.';
+    if (m.includes('weak password')) return 'Das Passwort ist zu einfach. Nimm eines mit mehr Zeichen.';
+    if (m.includes('signups not allowed') || m.includes('signup is disabled'))
+      return 'Neue Konten sind gerade nicht möglich.';
     return meldung || 'Es hat nicht geklappt.';
   }
 
@@ -185,6 +252,8 @@
     registrieren,
     abmelden,
     passwortVergessen,
+    benutzernameFrei,
+    benutzernameAendern,
     nutzer,
     angemeldet: () => Boolean(sitzung?.access_token),
     beiAenderung: (fn) => {

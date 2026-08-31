@@ -1379,6 +1379,57 @@ ul { margin: 0; padding: 0; list-style: none; }
    Sichtbar war das am Anmelden-Knopf im Konto-Fenster. */
 .sheet__footer > .prof__btn:only-child { display: block; width: 100%; }
 
+/* --- Anmelden und Registrieren im Konto-Fenster ------------------------- */
+
+/* Meldung unter den Feldern: was schiefging oder was geklappt hat. */
+.sheet__hinweis {
+  margin: 0 16px 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.sheet__hinweis.is-fehler {
+  background: color-mix(in srgb, var(--danger, #E5484D) 12%, transparent);
+  color: var(--danger, #E5484D);
+}
+.sheet__hinweis.is-gut {
+  background: color-mix(in srgb, var(--success, #2F9E68) 14%, transparent);
+  color: var(--success, #2F9E68);
+}
+
+/* Erklaerung ueber den Feldern, etwa im zweiten Schritt der Registrierung. */
+.sheet__erklaerung {
+  padding: 4px 16px 12px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.sheet__erklaerung strong { color: var(--text); font-weight: 600; }
+
+/* Hinweis direkt unter einem Eingabefeld, etwa die Namensregeln. */
+.sheet__fussnote {
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* Zeile fuer Nebenaktionen, etwa "Passwort vergessen?". */
+.sheet__zeile { padding: 2px 16px 10px; }
+
+/* Textknopf ohne Rahmen, liest sich wie ein Link. */
+.linkbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--brand);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.linkbtn:hover { text-decoration: underline; }
+
 /*
   Kopf der Chat-Einstellungen. Henrik: "Bearbeitungsansicht wirkt leer."
   Sie fing frueher direkt mit den Schaltern an und sagte nirgends, um wen

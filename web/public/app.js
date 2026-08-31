@@ -4498,7 +4498,27 @@ function openKontoWechsel() {
     state.kontoAktiv = 'me';
   }
 
-  const zustand = { ansicht: 'liste', name: '', email: '', passwort: '' };
+  /*
+   * Der Ablauf folgt dem Prototyp-Frame "V + VP + NP + ...":
+   *
+   *   liste      Kontoliste mit "bei bestehendem Konto anmelden" / "neues Profil erstellen"
+   *   anmelden   ein Feld "Benutzername, E-Mail, Telefonnummer" + Passwort
+   *   neu        Benutzername + Passwort -> "weiter"
+   *   neu-mail   "registriere deine E-Mail" -> "neues Konto erstellen"
+   *
+   * Der Benutzername gehoert dem Nutzer: Er gibt ihn als Erstes selbst ein,
+   * und die Datenbank uebernimmt ihn unveraendert. Frueher wurde er aus der
+   * E-Mail-Adresse abgeleitet.
+   */
+  const zustand = {
+    ansicht: 'liste',
+    benutzername: '',
+    passwort: '',
+    email: '',
+    kennung: '',
+    hinweis: '',
+    hinweisArt: '',
+  };
 
   const liste = () => `
     <div class="sheet__body">
@@ -4521,43 +4541,92 @@ function openKontoWechsel() {
 
       <button class="row" data-konto-neu="anmelden">
         <span class="konto__rund">${ICONS.person}</span>
-        <div class="row__body"><div class="konto__aktion">Bestehendes Konto hinzufügen</div></div>
+        <div class="row__body"><div class="konto__aktion">bei bestehendem Konto anmelden</div></div>
       </button>
       <button class="row" data-konto-neu="neu">
         <span class="konto__rund">${ICONS.plus}</span>
-        <div class="row__body"><div class="konto__aktion">Neues Konto erstellen</div></div>
+        <div class="row__body"><div class="konto__aktion">neues Profil erstellen</div></div>
       </button>
     </div>`;
 
-  const formular = () => `
-    ${
-      zustand.ansicht === 'neu'
-        ? `<div class="sheet__field">
-            <label class="sheet__label" for="kontoName">Name</label>
-            <input id="kontoName" placeholder="Wie sollen dich andere sehen?" value="${esc(zustand.name)}" />
-          </div>`
-        : ''
-    }
+  /* Meldung unter den Feldern: Fehler rot, Bestaetigung gruen. */
+  const hinweis = () =>
+    zustand.hinweis
+      ? `<div class="sheet__hinweis ${zustand.hinweisArt === 'gut' ? 'is-gut' : 'is-fehler'}">${esc(
+          zustand.hinweis
+        )}</div>`
+      : '';
+
+  /* Anmelden: ein Feld fuer Benutzername, E-Mail oder Telefonnummer. */
+  const formularAnmelden = () => `
     <div class="sheet__field">
-      <label class="sheet__label" for="kontoMail">E-Mail</label>
-      <input id="kontoMail" type="email" placeholder="name@beispiel.de" value="${esc(zustand.email)}" />
+      <label class="sheet__label" for="kontoKennung">Benutzername, E-Mail oder Telefonnummer</label>
+      <input id="kontoKennung" placeholder="@name oder name@beispiel.de" value="${esc(zustand.kennung)}"
+             autocapitalize="off" autocomplete="username" />
     </div>
     <div class="sheet__field">
       <label class="sheet__label" for="kontoPass">Passwort</label>
-      <input id="kontoPass" type="password" placeholder="••••••••" />
+      <input id="kontoPass" type="password" placeholder="••••••••" value="${esc(zustand.passwort)}"
+             autocomplete="current-password" />
+    </div>
+    ${hinweis()}
+    <div class="sheet__zeile">
+      <button class="linkbtn" id="kontoVergessen">Passwort vergessen?</button>
     </div>
     <div class="sheet__footer">
-      <button class="prof__btn is-primary" id="kontoOk">
-        ${zustand.ansicht === 'neu' ? 'Konto erstellen' : 'Anmelden'}
-      </button>
+      <button class="prof__btn is-primary" id="kontoOk">anmelden</button>
     </div>`;
+
+  /* Neues Profil, Schritt 1: Benutzername und Passwort. */
+  const formularNeu = () => `
+    <div class="sheet__field">
+      <label class="sheet__label" for="kontoBenutzer">Benutzername</label>
+      <input id="kontoBenutzer" placeholder="@wunschname" value="${esc(zustand.benutzername)}"
+             autocapitalize="off" autocomplete="username" />
+      <div class="sheet__fussnote">Drei bis vierundzwanzig Zeichen: Buchstaben, Ziffern, Punkt und Unterstrich.</div>
+    </div>
+    <div class="sheet__field">
+      <label class="sheet__label" for="kontoPass">Passwort</label>
+      <input id="kontoPass" type="password" placeholder="mindestens 6 Zeichen" value="${esc(zustand.passwort)}"
+             autocomplete="new-password" />
+    </div>
+    ${hinweis()}
+    <div class="sheet__footer">
+      <button class="prof__btn is-primary" id="kontoOk">weiter</button>
+    </div>`;
+
+  /* Neues Profil, Schritt 2: E-Mail. */
+  const formularNeuMail = () => `
+    <div class="sheet__erklaerung">
+      Dein Benutzername ist <strong>@${esc(zustand.benutzername.replace(/^@+/, ''))}</strong>.
+      Die E-Mail brauchen wir, um dein Konto zu bestätigen und dir bei einem
+      vergessenen Passwort zu helfen.
+    </div>
+    <div class="sheet__field">
+      <label class="sheet__label" for="kontoMail">E-Mail</label>
+      <input id="kontoMail" type="email" placeholder="name@beispiel.de" value="${esc(zustand.email)}"
+             autocapitalize="off" autocomplete="email" />
+    </div>
+    ${hinweis()}
+    <div class="sheet__footer">
+      <button class="prof__btn is-primary" id="kontoOk">neues Konto erstellen</button>
+    </div>`;
+
+  const formular = () =>
+    zustand.ansicht === 'anmelden'
+      ? formularAnmelden()
+      : zustand.ansicht === 'neu'
+      ? formularNeu()
+      : formularNeuMail();
 
   const titel = () =>
     zustand.ansicht === 'liste'
       ? 'Konto wechseln'
       : zustand.ansicht === 'anmelden'
-      ? 'Konto anmelden'
-      : 'Neues Konto';
+      ? 'bei bestehendem Konto anmelden'
+      : zustand.ansicht === 'neu'
+      ? 'neues Profil erstellen'
+      : 'registriere deine E-Mail';
 
   openSheet('Konto wechseln', liste(), (sheet, close) => {
     const neuZeichnen = () => {
@@ -4574,73 +4643,130 @@ function openKontoWechsel() {
      * eingerichtet, bleibt es beim bisherigen Verhalten: ein Konto, das nur
      * im Browser existiert.
      */
-    const anlegen = async () => {
-      const email = ($('#kontoMail')?.value || '').trim();
-      const pass = ($('#kontoPass')?.value || '').trim();
-      const name = ($('#kontoName')?.value || '').trim();
-      const neuesKonto = zustand.ansicht === 'neu';
+    /* Setzt eine Meldung unter die Felder und zeichnet neu. */
+    const meldung = (text, art = 'fehler') => {
+      zustand.hinweis = text;
+      zustand.hinweisArt = art;
+      neuZeichnen();
+    };
 
-      if (neuesKonto && !name) return toast('Bitte einen Namen eingeben');
-      if (!email) return toast('Bitte E-Mail eingeben');
-      if (neuesKonto && pass.length < 6) return toast('Passwort: mindestens 6 Zeichen');
-      if (!pass) return toast('Bitte Passwort eingeben');
-
+    /* Sperrt den Knopf waehrend eines laufenden Vorgangs. */
+    const arbeitet = (text) => {
       const knopf = sheet.querySelector('#kontoOk');
-      if (knopf) {
-        knopf.disabled = true;
-        knopf.textContent = neuesKonto ? 'Konto wird erstellt…' : 'Wird angemeldet…';
-      }
-
-      const zurueck = () => {
-        if (!knopf) return;
+      if (!knopf) return () => {};
+      const vorher = knopf.textContent;
+      knopf.disabled = true;
+      knopf.textContent = text;
+      return () => {
         knopf.disabled = false;
-        knopf.textContent = neuesKonto ? 'Konto erstellen' : 'Anmelden';
+        knopf.textContent = vorher;
       };
+    };
 
-      if (window.Anmeldung) {
-        const ergebnis = neuesKonto
-          ? await window.Anmeldung.registrieren(email, pass, name)
-          : await window.Anmeldung.anmelden(email, pass);
+    /* Felder in den Zustand uebernehmen, bevor neu gezeichnet wird. */
+    const merken = () => {
+      const k = sheet.querySelector('#kontoKennung');
+      const b = sheet.querySelector('#kontoBenutzer');
+      const m = sheet.querySelector('#kontoMail');
+      const p = sheet.querySelector('#kontoPass');
+      if (k) zustand.kennung = k.value;
+      if (b) zustand.benutzername = b.value;
+      if (m) zustand.email = m.value;
+      if (p) zustand.passwort = p.value;
+    };
 
-        if (!ergebnis.ok) {
-          zurueck();
-          return toast(ergebnis.fehler);
-        }
-        if (ergebnis.bestaetigen) {
-          zurueck();
-          close();
-          return toast(ergebnis.hinweis);
-        }
+    const anmeldenAbsenden = async () => {
+      merken();
+      const kennung = zustand.kennung.trim();
+      if (!kennung) return meldung('Bitte Benutzername, E-Mail oder Telefonnummer eingeben.');
+      if (!zustand.passwort) return meldung('Bitte Passwort eingeben.');
 
-        close();
-        toast(neuesKonto ? `Konto für ${name} erstellt` : `Angemeldet als ${email}`);
-        return bootstrap();
-      }
+      if (!window.Anmeldung) return meldung('Die Anmeldung ist gerade nicht erreichbar.');
 
-      // Kein Supabase erreichbar: wie bisher nur im Browser merken.
-      zurueck();
-      const vorhanden = state.konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
-      if (vorhanden) {
-        state.kontoAktiv = vorhanden.id;
-        close();
-        toast(`Gewechselt zu ${vorhanden.name}`);
-        return render();
-      }
+      const fertig = arbeitet('wird angemeldet…');
+      const ergebnis = await window.Anmeldung.anmelden(kennung, zustand.passwort);
+      fertig();
 
-      const anzeige = name || email.split('@')[0].replace(/[._-]+/g, ' ');
-      const farben = ['#F2A65A', '#6C8AE4', '#E4699B', '#4DB6AC', '#9575CD', '#7986CB'];
-      const id = 'acc' + Date.now();
-      state.konten.push({
-        id,
-        name: anzeige.charAt(0).toUpperCase() + anzeige.slice(1),
-        email,
-        initials: anzeige.slice(0, 2).toUpperCase(),
-        color: farben[state.konten.length % farben.length],
-      });
-      state.kontoAktiv = id;
+      if (!ergebnis.ok) return meldung(ergebnis.fehler);
+
       close();
-      toast(neuesKonto ? `Konto für ${anzeige} erstellt` : `Angemeldet als ${email}`);
-      render();
+      toast(`Angemeldet als ${ergebnis.nutzer?.handle || kennung}`);
+      return bootstrap();
+    };
+
+    /* Schritt 1: Benutzername pruefen, dann weiter zur E-Mail. */
+    const neuWeiter = async () => {
+      merken();
+      const name = zustand.benutzername.trim();
+      if (!name) return meldung('Bitte einen Benutzernamen eingeben.');
+      if (zustand.passwort.length < 6) return meldung('Das Passwort braucht mindestens 6 Zeichen.');
+
+      if (!window.Anmeldung) return meldung('Die Anmeldung ist gerade nicht erreichbar.');
+
+      const fertig = arbeitet('wird geprüft…');
+      const pruefung = await window.Anmeldung.benutzernameFrei(name);
+      fertig();
+
+      if (!pruefung.frei) return meldung(pruefung.meldung);
+
+      zustand.benutzername = pruefung.handle.replace(/^@/, '');
+      zustand.ansicht = 'neu-mail';
+      meldung('', '');
+    };
+
+    /* Schritt 2: E-Mail eingeben und Konto anlegen. */
+    const neuAnlegen = async () => {
+      merken();
+      const email = zustand.email.trim();
+      if (!email || !email.includes('@')) return meldung('Bitte eine gültige E-Mail-Adresse eingeben.');
+
+      const fertig = arbeitet('Konto wird erstellt…');
+      const ergebnis = await window.Anmeldung.registrieren({
+        benutzername: zustand.benutzername,
+        passwort: zustand.passwort,
+        email,
+      });
+      fertig();
+
+      if (!ergebnis.ok) {
+        // Ist der Name inzwischen weg, zurueck zum ersten Schritt.
+        if (ergebnis.feld === 'benutzername') {
+          zustand.ansicht = 'neu';
+          return meldung(ergebnis.fehler);
+        }
+        return meldung(ergebnis.fehler);
+      }
+
+      if (ergebnis.bestaetigen) {
+        close();
+        return toast(ergebnis.hinweis);
+      }
+
+      close();
+      toast(`Konto @${zustand.benutzername} erstellt`);
+      return bootstrap();
+    };
+
+    const anlegen = () =>
+      zustand.ansicht === 'anmelden'
+        ? anmeldenAbsenden()
+        : zustand.ansicht === 'neu'
+        ? neuWeiter()
+        : neuAnlegen();
+
+    const passwortVergessen = async () => {
+      merken();
+      const kennung = zustand.kennung.trim();
+      if (!kennung.includes('@') || kennung.startsWith('@')) {
+        return meldung('Bitte die E-Mail-Adresse eingeben, mit der du dich registriert hast.');
+      }
+      const fertig = arbeitet('wird gesendet…');
+      const ergebnis = await window.Anmeldung.passwortVergessen(kennung);
+      fertig();
+      meldung(
+        ergebnis.ok ? 'Wir haben dir eine E-Mail zum Zurücksetzen geschickt.' : ergebnis.fehler,
+        ergebnis.ok ? 'gut' : 'fehler'
+      );
     };
 
     const binden = () => {
@@ -4678,16 +4804,30 @@ function openKontoWechsel() {
         sheet.querySelectorAll('[data-konto-neu]').forEach((b) =>
           b.addEventListener('click', () => {
             zustand.ansicht = b.dataset.kontoNeu;
+            zustand.hinweis = '';
             neuZeichnen();
           })
         );
         return;
       }
 
-      sheet.querySelector('#kontoOk').addEventListener('click', anlegen);
-      sheet.querySelector('#kontoPass').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') anlegen();
-      });
+      sheet.querySelector('#kontoOk')?.addEventListener('click', anlegen);
+
+      // Eingabetaste sendet ab — in jedem Feld des jeweiligen Schritts.
+      sheet.querySelectorAll('.sheet__field input').forEach((feld) =>
+        feld.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') anlegen();
+        })
+      );
+
+      sheet.querySelector('#kontoVergessen')?.addEventListener('click', passwortVergessen);
+
+      // Der erste Schritt gehoert dem Benutzernamen: Feld gleich scharf stellen.
+      const zuerst =
+        sheet.querySelector('#kontoBenutzer') ||
+        sheet.querySelector('#kontoKennung') ||
+        sheet.querySelector('#kontoMail');
+      zuerst?.focus();
     };
 
     sheet.querySelector('.sheet').classList.add('sheet--tall');
