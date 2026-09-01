@@ -239,14 +239,30 @@ const STRUCTURE = {
   await p.waitForTimeout(400);
   await p.click('[data-new="contact"]');
   await p.waitForTimeout(400);
+  /*
+   * Den Hinweis unten abholen, bevor er sich ausblendet.
+   *
+   * Er steht 2,2 Sekunden. Seit die Suche über die Datenbank läuft, war ein
+   * festes Warten mal zu früh und mal zu spät — der Prüflauf las dann ein
+   * leeres Feld. Deshalb: leeren, auslösen, auf Text warten.
+   */
+  const hinweisNach = async (tue) => {
+    await p.evaluate(() => {
+      const t = document.querySelector('#toast');
+      if (t) { t.textContent = ''; t.hidden = true; }
+    });
+    await tue();
+    await K.bisWahr(p, "(() => { const t = document.querySelector('#toast'); return !!t && !t.hidden && t.textContent.trim().length > 0; })()");
+    return p.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+  };
+
   await p.fill('#contactHandle', '@niemand');
-  await p.click('#contactAdd');
-  await p.waitForTimeout(500);
-  assert('Unbekannter Kontakt wird abgelehnt', (await p.$eval('#toast', e => e.textContent)).includes('Niemand'));
+  const unbekannt = await hinweisNach(() => p.click('#contactAdd'));
+  assert('Unbekannter Kontakt wird abgelehnt', unbekannt.includes('Niemand'));
+
   await p.fill('#contactHandle', '@anna');
-  await p.click('#contactAdd');
-  await p.waitForTimeout(500);
-  assert('Doppelter Kontakt wird abgelehnt', (await p.$eval('#toast', e => e.textContent)).includes('bereits'));
+  const doppelt = await hinweisNach(() => p.click('#contactAdd'));
+  assert('Doppelter Kontakt wird abgelehnt', doppelt.includes('bereits'));
   await p.mouse.click(200, 40);
   await p.waitForTimeout(400);
 
