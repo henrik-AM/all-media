@@ -494,19 +494,27 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
   const beitraege = data || [];
   const ids = beitraege.map((b) => b.id);
 
-  // Eigener Zustand je Beitrag: gefällt mir, gespeichert, geteilt.
-  const [{ data: likes }, { data: gespeichert }, { data: geteilt }] =
+  // Eigener Zustand je Beitrag: gefällt mir, gespeichert, geteilt, Glocke.
+  const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: glocke }] =
     ids.length === 0
-      ? [{ data: [] }, { data: [] }, { data: [] }]
+      ? [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
       : await Promise.all([
           client.from('post_likes').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
           client.from('saves').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
           client.from('reposts').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
+          client.from('post_notify').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
         ]);
 
   const gemocht = new Set((likes || []).map((l) => l.post_id));
   const gemerkt = new Set((gespeichert || []).map((s) => s.post_id));
   const repostet = new Set((geteilt || []).map((r) => r.post_id));
+  const gemeldet = new Set((glocke || []).map((n) => n.post_id));
+
+  // "Folge ich der Person?" gehoert an den Beitrag. Vorher las die Oberflaeche
+  // p.following und p.notify - beide Felder hat der Server nie geschickt. Der
+  // Knopf stand darum immer auf "Folgen", auch bei laengst gefolgten Personen,
+  // und ein Klick nahm das Folgen in Wahrheit zurueck.
+  const folgen = (await ladeFolgen(client, nutzerId)) || new Set();
 
   return beitraege.map((b) => ({
     id: b.id,
@@ -535,6 +543,8 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
     liked: gemocht.has(b.id),
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),
+    following: b.user_id !== nutzerId && folgen.has(b.user_id),
+    notify: gemeldet.has(b.id),
   }));
 }
 

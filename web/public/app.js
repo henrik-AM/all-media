@@ -2771,6 +2771,19 @@ function renderHomeFeed() {
   );
 }
 
+/*
+ * "Ist das mein eigener Beitrag?"
+ *
+ * Die Beitraege tragen fuer die eigene Person die Kennung 'me' (so kommen sie
+ * aus /api/bootstrap), state.currentUserId ist dagegen die echte UUID aus der
+ * Datenbank. Ein Vergleich der beiden war deshalb immer falsch: am eigenen
+ * Beitrag standen "Folgen" und die Glocke, und ein Klick darauf lief in
+ * "Sich selbst folgen geht nicht" - der 500er in der Konsole.
+ */
+function istEigen(userId) {
+  return userId === 'me' || userId === state.currentUserId;
+}
+
 function postCard(p) {
   const u = user(p.userId);
   return `
@@ -2801,7 +2814,7 @@ function postCard(p) {
             Community verlassen liess.
           */ ''}
         ${
-          p.userId === state.currentUserId
+          istEigen(p.userId)
             ? ''
             : `<button class="post__follow ${p.following ? 'is-on' : ''}" data-paction="follow" data-pid="${p.id}">
                 ${p.following ? 'Gefolgt' : 'Folgen'}
@@ -2818,7 +2831,7 @@ function postCard(p) {
             benutzt. Sie steht jetzt im CSS und folgt der Marke.
           */ ''}
         ${
-          p.userId === state.currentUserId
+          istEigen(p.userId)
             ? ''
             : `<button class="post__bell ${p.notify ? 'is-on' : ''}" data-paction="notify" data-pid="${p.id}" aria-label="${
                 p.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'
