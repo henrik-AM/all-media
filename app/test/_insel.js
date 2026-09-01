@@ -97,25 +97,39 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   /* ------------------------------------------------------- Zaehler */
   console.log('\nBenachrichtigungen');
 
+  /*
+   * Die Zahl zählt Chats mit Neuem, nicht einzelne Nachrichten.
+   *
+   * Früher stand hier "3": Anna hatte zwei ungelesene Nachrichten, Bob eine.
+   * Diese Zahl kam aus den Beispieldaten und war frei gesetzt. In der
+   * Datenbank gibt es sie nicht — ein Lesestatus je Nachricht und Empfänger
+   * wäre eine eigene Tabelle. Gespeichert ist, ob ein Chat gelesen ist
+   * (`chat_members.is_read`), und daraus wird gezählt: zwei ungelesene Chats,
+   * nach dem Öffnen von Anna noch einer.
+   */
   await pruefe('Ungelesenes steht auf dem Bereich Messenger', async () => {
     await page.click('[data-area="messenger"]');
     await page.waitForTimeout(300);
     const text = await page.$eval('[data-area="messenger"] .navbtn__badge', (n) => n.textContent);
-    if (text !== '3') throw new Error('steht "' + text + '" statt "3"');
+    if (text !== '2') throw new Error('steht "' + text + '" statt "2"');
   });
 
   await pruefe('Dieselbe Zahl steht auf dem Unterpunkt Chats', async () => {
     const text = await page.$eval('[data-sub="chats"] .topbar__badge', (n) => n.textContent);
-    if (text !== '3') throw new Error('steht "' + text + '" statt "3"');
+    if (text !== '2') throw new Error('steht "' + text + '" statt "2"');
   });
 
   await pruefe('Ein gelesener Chat nimmt beide Zahlen mit', async () => {
     await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
+    await page.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(400);
     await page.click('#chatBack');
-    await page.waitForTimeout(400);
-    const oben = await page.$eval('[data-sub="chats"] .topbar__badge', (n) => n.textContent);
-    const unten = await page.$eval('[data-area="messenger"] .navbtn__badge', (n) => n.textContent);
+    await page.waitForFunction(
+      () => document.querySelector('[data-sub="chats"] .topbar__badge')?.textContent === '1',
+      null, { timeout: 10000 }
+    ).catch(() => {});
+    const oben = await page.$eval('[data-sub="chats"] .topbar__badge', (n) => n.textContent).catch(() => '—');
+    const unten = await page.$eval('[data-area="messenger"] .navbtn__badge', (n) => n.textContent).catch(() => '—');
     if (oben !== '1' || unten !== '1') throw new Error('oben "' + oben + '", unten "' + unten + '"');
   });
 
