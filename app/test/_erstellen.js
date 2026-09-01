@@ -98,6 +98,19 @@ if (!fs.existsSync(BILD)) {
   };
 
   const erstellen = async (punkt) => {
+    /*
+     * Erst wegraeumen, was noch offen ist.
+     *
+     * Schlaegt eine Pruefung fehl, bleibt ihr Blatt stehen. Seine Flaeche
+     * liegt ueber dem Plus-Knopf, und jede folgende Pruefung wartet dann
+     * dreissig Sekunden auf einen Klick, der nie ankommt - aus einem Fehler
+     * werden vier. Siehe dieselbe Stelle in test/_kontaktinfo.js.
+     */
+    await page.evaluate(() => {
+      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      const o = document.querySelector('#overlay');
+      if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+    });
     await page.click('[data-oact="create"]');
     await page.waitForSelector('.erstellen', { timeout: 3000 });
     await page.click(`[data-erstellen="${punkt}"]`);
@@ -251,7 +264,17 @@ if (!fs.existsSync(BILD)) {
     await page.fill('#f_beschreibung', 'Testbeitrag aus der Pruefung');
     await page.fill('#f_ort', 'Köln');
     await page.click('#formOk');
-    await page.waitForTimeout(1200);
+    // Der Beitrag geht erst in die Datenbank, dann wird der Feed neu gebaut.
+    // 1200 ms waren dafuer eine Wette: unter Last stand der Text noch nicht da,
+    // und der Fehlschlag liess das Blatt offen - alle folgenden Pruefungen
+    // liefen danach in einen Klick-Timeout.
+    await page
+      .waitForFunction(
+        () => [...document.querySelectorAll('.post__desc')].some((e) => e.textContent.includes('Testbeitrag aus der Pruefung')),
+        null,
+        { timeout: 15000 }
+      )
+      .catch(() => {});
 
     const texte = await page.$$eval('.post__desc', (els) => els.map((e) => e.textContent));
     if (!texte.some((t) => t.includes('Testbeitrag aus der Pruefung'))) throw new Error(texte.slice(0, 2).join(' | '));

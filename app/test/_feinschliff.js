@@ -396,7 +396,15 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-eigenaktion="loeschen"]');
     await page.waitForTimeout(400);
     await page.click('#nachfrageJa');
-    await page.waitForTimeout(1400);
+    // Geloescht wird in der Datenbank, danach wird das Raster neu geholt.
+    // 1400 ms waren dafuer eine Wette - unter Last stand die Kachel noch da.
+    await page
+      .waitForFunction(
+        (soll) => document.querySelectorAll('[data-eigen]').length === soll,
+        vorher - 1,
+        { timeout: 15000 }
+      )
+      .catch(() => {});
     const nachher = await page.$$eval('[data-eigen]', (n) => n.length);
     if (nachher !== vorher - 1) throw new Error(`${vorher} vorher, ${nachher} nachher`);
   });
