@@ -160,8 +160,16 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Ein Klick springt an die Stelle', async () => {
     const zeilen = await page.$$('[data-kapitel]');
+    if (zeilen.length < 3) throw new Error('nur ' + zeilen.length + ' Kapitel');
     await zeilen[2].click();
-    await page.waitForTimeout(300);
+    // Der Balken wird beim Klick gesetzt; 300 ms waren dafuer eine Wette.
+    await page.waitForFunction(
+      () => {
+        const b = document.querySelector('#clipFortschritt');
+        return !!b && b.style.width && b.style.width !== '0%';
+      },
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const zeit = await page.$eval('#clipZeit', (n) => n.textContent);
     if (zeit === '0:00') throw new Error('die Zeit steht weiter auf 0:00');
     const breite = await page.$eval('#clipFortschritt', (n) => n.style.width);
