@@ -144,9 +144,16 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
   /* -------------------------------------------------- Der eigene Name */
   console.log('\nDer eigene Name');
 
-  await pruefe('Das Konto heisst "Henrik", nicht "Du"', async () => {
+  /*
+   * Hier stand frueher fest "Henrik". Das war der Name des einen Kontos, mit
+   * dem damals geprueft wurde - der Lauf schlug fehl, sobald ein anderes
+   * Konto angemeldet war. Geprueft gehoert der Punkt selbst: der eigene Name
+   * ist ein echter Kontoname und nicht der Platzhalter "Du".
+   */
+  await pruefe('Das Konto traegt seinen Namen, nicht "Du"', async () => {
     const name = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).users.me.name);
-    if (name !== 'Henrik') throw new Error('der Server sagt: ' + name);
+    if (!name || !name.trim()) throw new Error('der Server nennt gar keinen Namen');
+    if (['Du', 'Ich', 'Me'].includes(name.trim())) throw new Error('der Server sagt: ' + name);
   });
 
   /*

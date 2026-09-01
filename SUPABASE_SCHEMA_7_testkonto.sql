@@ -253,10 +253,13 @@ begin
   end loop;
 
   -- --- Öffentlichen Communitys beitreten --------------------------------
+  -- Eine bleibt bewusst offen: sonst ist das Testkonto überall schon Mitglied
+  -- und "einer Community beitreten" lässt sich gar nicht mehr ausprobieren.
+  -- Genau daran scheiterte der Prüflauf _eigenes.js.
   insert into public.community_members (community_id, user_id)
   select c.id, ziel
   from public.communities c
-  where c.demo and c.visibility = 'public'
+  where c.demo and c.visibility = 'public' and c.name <> 'Musikproduktion'
   on conflict do nothing;
 
   -- --- Eigene, private Communitys ---------------------------------------
