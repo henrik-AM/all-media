@@ -208,11 +208,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('„Melden" fragt nach einem Grund statt nur zu bestätigen', async () => {
     await page.click('[data-chatopt-aktion="melden"]');
-    await page.waitForTimeout(500);
+    await page.waitForSelector('#f_grund', { timeout: 10000 }).catch(() => {});
     if (!(await page.$('#f_grund'))) throw new Error('kein Feld für den Grund');
     await page.fill('#f_grund', 'Unerwünschte Werbung');
     await page.click('#formOk');
-    await page.waitForTimeout(600);
+    // Die Meldung geht erst in die Datenbank, dann kommt der Hinweis. Nach
+    // 600 ms war er in der Kette noch nicht da - und weil er sich nach 2,2
+    // Sekunden selbst wieder ausblendet, half laenger warten auch nicht.
+    await page
+      .waitForFunction(
+        () => {
+          const t = document.querySelector('#toast');
+          return t && !t.hidden && t.textContent.includes('angekommen');
+        },
+        null, { timeout: 10000 }
+      )
+      .catch(() => {});
     const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
     if (!toast.includes('angekommen')) throw new Error('Toast sagt „' + toast + '"');
   });
