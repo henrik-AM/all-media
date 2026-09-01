@@ -302,6 +302,7 @@ export async function ladeChats(
         unreadCount: z.is_read ? 0 : 1,
         muted: Boolean(z.is_muted),
         archiviert: Boolean(z.is_archived),
+        favorit: Boolean(z.is_favorite),
         zeitpunkt: vorschau?.created_at ?? z.chats.updated_at,
       };
     })

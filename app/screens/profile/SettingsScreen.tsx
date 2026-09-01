@@ -314,7 +314,19 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       const stumm = communities.filter((c) => c.joined && c.unreadCount === 0 && c.visibility === 'private');
       return { leer: 'Keine Community ist stummgeschaltet.', zeilen: stumm.map((c) => ({ text: c.name, neben: 'stumm' })) };
     }
-    if (art === 'archiv') return { leer: 'Kein Chat ist archiviert.', zeilen: [] };
+    if (art === 'archiv') {
+      /*
+       * Hier stand fest "keine". Archiviert wird in chat_members.is_archived
+       * vermerkt, lib/daten.ts liest es mit — die Liste hat nur nie
+       * hineingesehen. Wer auf der Website einen Chat archivierte, fand ihn
+       * in der App unter "Archivierte Chats" trotzdem nicht.
+       */
+      const archiviert = alleChats.filter((c) => c.archiviert);
+      return {
+        leer: 'Kein Chat ist archiviert.',
+        zeilen: archiviert.map((c) => ({ text: c.name, neben: 'archiviert' })),
+      };
+    }
     if (art === 'speicher') {
       return {
         leer: '',

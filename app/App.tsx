@@ -119,6 +119,13 @@ const Shell = () => {
   // Alles, was die App in die Datenbank schreibt, laeuft hierueber.
   const aktion = useAktionen(setNotice);
   const [chats, setChats] = useState<Chat[]>([]);
+  /*
+   * Der Chat, dessen Optionen-Blatt offen ist. Auf der Website gibt es das
+   * Blatt seit jeher (chatOptionen in web/public/app.js); in der App fuehrte
+   * langes Druecken auf einen Chat bis zum 01.09.2026 ins Leere, und
+   * Archivieren, Als gelesen markieren und Chat loeschen gab es gar nicht.
+   */
+  const [chatOptionen, setChatOptionen] = useState<Chat | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
 
@@ -527,6 +534,53 @@ const Shell = () => {
     /* Punkt 5: Nach Kontakt hinzufügen direkt zum Chat leiten,
        nicht sofort nach Nachricht fragen. */
     oeffneChat(chat);
+  };
+
+  /**
+   * Eine Einstellung am Chat umlegen — und sie merken.
+   *
+   * Die Liste schaltet sofort um, das Schreiben laeuft nebenher. Geht es
+   * schief, wird zurueckgestellt: eine Liste, die "Archiviert" behauptet,
+   * waehrend in der Datenbank nichts steht, ist der schlechtere Fall.
+   */
+  const chatUmlegen = (chat: Chat, was: 'archiv' | 'stumm' | 'gelesen') => {
+    const felder: Record<string, Partial<Chat>> = {
+      archiv: { archiviert: !chat.archiviert },
+      stumm: { muted: !chat.muted },
+      gelesen: { unreadCount: chat.unreadCount > 0 ? 0 : 1 },
+    };
+    const neu = felder[was];
+    const alt: Partial<Chat> = {
+      archiv: { archiviert: chat.archiviert },
+      stumm: { muted: chat.muted },
+      gelesen: { unreadCount: chat.unreadCount },
+    }[was];
+
+    const setzen = (werte: Partial<Chat>) =>
+      setChats((prev) => prev.map((c) => (c.id === chat.id ? { ...c, ...werte } : c)));
+
+    setzen(neu);
+    setNotice(
+      was === 'archiv'
+        ? chat.archiviert ? 'Aus dem Archiv geholt' : 'Chat archiviert'
+        : was === 'stumm'
+          ? chat.muted ? 'Stummschaltung aufgehoben' : 'Chat stummgeschaltet'
+          : chat.unreadCount > 0 ? 'Als gelesen markiert' : 'Als ungelesen markiert'
+    );
+
+    // "gelesen" ist in der Datenbank herum: is_read true heisst gelesen,
+    // unreadCount 0 heisst dasselbe.
+    const wert =
+      was === 'archiv' ? !chat.archiviert : was === 'stumm' ? !chat.muted : chat.unreadCount > 0;
+    aktion.chatEinstellung(chat.id, was, wert, () => setzen(alt));
+  };
+
+  /** Chat verlassen — die Unterhaltung bleibt beim Gegenueber stehen. */
+  const chatLoeschen = (chat: Chat) => {
+    const vorher = chats;
+    setChats((prev) => prev.filter((c) => c.id !== chat.id));
+    setNotice('Chat gelöscht');
+    aktion.chatVerlassen(chat.id, () => setChats(vorher));
   };
 
   /** Anfrage angenommen: der Chat ist ab jetzt frei benutzbar. */
@@ -1186,6 +1240,7 @@ const Shell = () => {
           onOpenChat={(chat) => oeffneChat(chat)}
           onOpenStory={openStory}
           onNewChat={() => setSheet('new')}
+          onChatOptionen={setChatOptionen}
         />
       );
     }
@@ -1297,6 +1352,63 @@ const Shell = () => {
         }}
         onClose={() => setSheet(null)}
       />
+      {/*
+        * Die Optionen zu einem Chat. Dieselben Punkte in derselben
+        * Reihenfolge wie auf der Website, das Loeschen abgesetzt.
+        */}
+      <ActionSheet
+        visible={Boolean(chatOptionen)}
+        title={chatOptionen?.name ?? ''}
+        untertitel={
+          chatOptionen
+            ? chatOptionen.isGroup
+              ? `${(chatOptionen.memberIds?.length ?? 0) + 1} Mitglieder`
+              : chatOptionen.archiviert
+                ? 'Im Archiv'
+                : chatOptionen.muted
+                  ? 'Stummgeschaltet'
+                  : 'Online'
+            : undefined
+        }
+        items={[
+          {
+            key: 'archiv',
+            label: chatOptionen?.archiviert ? 'Aus dem Archiv holen' : 'Archivieren',
+            icon: 'archive-outline',
+          },
+          {
+            key: 'stumm',
+            label: chatOptionen?.muted ? 'Stummschaltung aufheben' : 'Stummschalten',
+            icon: 'volume-mute-outline',
+          },
+          {
+            key: 'gelesen',
+            label:
+              (chatOptionen?.unreadCount ?? 0) > 0
+                ? 'Als gelesen markieren'
+                : 'Als ungelesen markieren',
+            icon: 'checkmark-done-outline',
+          },
+          { key: 'einstellungen', label: 'Chat-Einstellungen', icon: 'settings-outline' },
+          { key: 'loeschen', label: 'Chat löschen', icon: 'trash-outline', gefahr: true },
+        ]}
+        onSelect={(key) => {
+          const chat = chatOptionen;
+          setChatOptionen(null);
+          if (!chat) return;
+
+          if (key === 'einstellungen') {
+            // Die Kontaktinfo ist die Chat-Einstellung — dort stehen
+            // Benachrichtigungen, Sperre und Chat leeren.
+            if (chat.userId) return openProfile(chat.userId);
+            return setNotice('Für Gruppen gibt es die Einstellungen noch nicht');
+          }
+          if (key === 'loeschen') return chatLoeschen(chat);
+          chatUmlegen(chat, key as 'archiv' | 'stumm' | 'gelesen');
+        }}
+        onClose={() => setChatOptionen(null)}
+      />
+
       <NewGroupSheet
         visible={sheet === 'group'}
         contacts={contacts}

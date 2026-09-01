@@ -51,6 +51,13 @@ export interface Chat {
   time: string;
   unreadCount: number;
   muted?: boolean;
+  /*
+   * Archiviert und Favorit stehen in chat_members — pro Mitglied, nicht pro
+   * Chat. lib/daten.ts liest beides seit jeher; benutzt wurde es in der App
+   * bis zum 01.09.2026 nicht, weil es hier fehlte.
+   */
+  archiviert?: boolean;
+  favorit?: boolean;
   /**
    * 'pending' = Kontaktanfrage laeuft noch. Bis zur Annahme ist genau eine
    * Nachricht erlaubt, danach ist das Eingabefeld gesperrt.

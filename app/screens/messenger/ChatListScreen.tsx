@@ -28,9 +28,23 @@ interface Props {
   onOpenChat: (chat: Chat) => void;
   onOpenStory: (story: Story) => void;
   onNewChat: () => void;
+  /*
+   * Langes Druecken auf einen Chat. Auf der Website gibt es das Blatt mit
+   * Archivieren, Stummschalten, Gelesen und Loeschen seit jeher
+   * (chatOptionen in web/public/app.js) — in der App fuehrte langes
+   * Druecken ins Leere.
+   */
+  onChatOptionen?: (chat: Chat) => void;
 }
 
-export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onNewChat }: Props) => {
+export const ChatListScreen = ({
+  allChats,
+  stories,
+  onOpenChat,
+  onOpenStory,
+  onNewChat,
+  onChatOptionen,
+}: Props) => {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -38,6 +52,9 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
   const chats = useMemo(() => {
     const q = query.trim().toLowerCase();
     return allChats.filter((chat) => {
+      // Archivierte Chats stehen nicht in der Liste — sie stehen unter
+      // Einstellungen → Archivierte Chats. Genau wie auf der Website.
+      if (chat.archiviert) return false;
       if (filter === 'contacts' && chat.isGroup) return false;
       if (filter === 'groups' && !chat.isGroup) return false;
       if (!q) return true;
@@ -60,6 +77,14 @@ export const ChatListScreen = ({ allChats, stories, onOpenChat, onOpenStory, onN
       <Druck
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         onPress={() => onOpenChat(item)}
+        onLongPress={
+          onChatOptionen
+            ? () => {
+                haptic.light();
+                onChatOptionen(item);
+              }
+            : undefined
+        }
       >
         <Avatar id={item.userId ?? item.id} name={item.name} size={sizes.avatarLg} group={item.isGroup} />
         <View style={styles.rowBody}>

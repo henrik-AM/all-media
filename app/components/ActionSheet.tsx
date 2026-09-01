@@ -10,11 +10,19 @@ export interface ActionSheetItem {
   key: string;
   label: string;
   icon: IconName;
+  /*
+   * Loeschen steht abgesetzt und in Rot. Die Website macht es genauso
+   * (chatOptionen in web/public/app.js): ein Loeschen, das aussieht wie
+   * "Stummschalten", wird irgendwann versehentlich angetippt.
+   */
+  gefahr?: boolean;
 }
 
 interface Props {
   visible: boolean;
   title: string;
+  /** Zweite Zeile unter dem Namen — "Im Archiv", "Stummgeschaltet", "8 Mitglieder". */
+  untertitel?: string;
   items: ActionSheetItem[];
   /**
    * Bild, um das es in diesem Blatt geht — die eben gemachte Aufnahme. Ohne
@@ -25,23 +33,40 @@ interface Props {
   onClose: () => void;
 }
 
-export const ActionSheet = ({ visible, title, items, vorschauUri, onSelect, onClose }: Props) => (
+export const ActionSheet = ({
+  visible,
+  title,
+  untertitel,
+  items,
+  vorschauUri,
+  onSelect,
+  onClose,
+}: Props) => (
   <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
     <Druck style={styles.backdrop} onPress={onClose} />
     <View style={styles.sheet}>
       <View style={styles.handle} />
       <Text style={styles.title}>{title}</Text>
+      {Boolean(untertitel) && <Text style={styles.untertitel}>{untertitel}</Text>}
       {vorschauUri && <Image source={{ uri: vorschauUri }} style={styles.vorschau} />}
       {items.map((item) => (
         <Druck
           key={item.key}
-          style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+          style={({ pressed }) => [
+            styles.item,
+            item.gefahr && styles.itemGefahr,
+            pressed && styles.itemPressed,
+          ]}
           onPress={() => onSelect(item.key)}
         >
           <View style={styles.icon}>
-            <Ionicons name={item.icon} size={18} color={colors.text2} />
+            <Ionicons
+              name={item.icon}
+              size={18}
+              color={item.gefahr ? colors.danger : colors.text2}
+            />
           </View>
-          <Text style={styles.label}>{item.label}</Text>
+          <Text style={[styles.label, item.gefahr && styles.labelGefahr]}>{item.label}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.text3} />
         </Druck>
       ))}
@@ -101,4 +126,14 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   label: { flex: 1, color: colors.text, ...typography.body },
+  labelGefahr: { color: colors.danger },
+  // Der abgesetzte Bereich: eine kraeftigere Linie darueber statt der duennen.
+  itemGefahr: { borderTopWidth: 6, borderTopColor: colors.surface2 },
+  untertitel: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: 8,
+    paddingBottom: 10,
+    color: colors.text3,
+    ...typography.small,
+  },
 }));
