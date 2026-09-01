@@ -29,6 +29,8 @@ interface Props {
   onNotice: (message: string) => void;
   /** Wenn eine Story angesehen wird - zum Markieren als viewed. */
   onStoryViewed?: (storyId: string) => void;
+  /** Nur fuer `npm run mac:bilder`: nicht von selbst weiterblaettern. */
+  standbild?: boolean;
 }
 
 /*
@@ -48,6 +50,7 @@ export const StoryViewerScreen = ({
   contacts = [],
   onOpenProfile,
   onStoryViewed,
+  standbild = false,
 }: Props) => {
   const { users: alleNutzer } = useDaten();
   const [ansichtenOffen, setAnsichtenOffen] = useState(false);
@@ -56,24 +59,66 @@ export const StoryViewerScreen = ({
   // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
   const stories = alle.filter((s) => !s.own || s.mediaUri);
   const [index, setIndex] = useState(() => Math.max(stories.findIndex((s) => s.id === story.id), 0));
+
+  /*
+   * Den Startpunkt nachziehen, wenn die Liste erst spaeter kommt.
+   *
+   * useState(() => ...) rechnet genau einmal - beim ersten Aufbau. Oeffnet
+   * man eine Story, bevor `alle` geladen ist, ist die Liste dabei leer, der
+   * Startpunkt wird 0, und man landet anschliessend bei irgendeiner anderen
+   * Person. Genau das war im Bild zu sehen: verlangt war Anna, zu sehen war
+   * Finn. Solange nicht selbst geblaettert wurde, wird der Startpunkt
+   * deshalb nachgezogen.
+   */
+  const selbstGeblaettert = useRef(false);
+  useEffect(() => {
+    if (selbstGeblaettert.current) return;
+    const soll = stories.findIndex((s) => s.id === story.id);
+    if (soll >= 0 && soll !== index) setIndex(soll);
+    // stories haengt an `alle` - absichtlich nur darauf hoeren.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alle, story.id]);
   const [liked, setLiked] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(stories.map((s) => [s.id, !!s.liked]))
   );
   const [reply, setReply] = useState('');
-  const [paused, setPaused] = useState(false);
+  /*
+   * standbild: der Betrachter laeuft nicht von selbst weiter.
+   *
+   * Nur fuer `npm run mac:bilder` gedacht. Ohne das blaetterte die Story
+   * waehrend der Aufnahme schon zwei weiter, und im Bild stand eine andere
+   * Person als angegeben - das Bild pruefte also nie das, was es sollte.
+   */
+  const [paused, setPaused] = useState(standbild);
 
   const current = stories[index];
   const person = alleNutzer[current.userId];
   const istEigene = !!current.own;
   const progress = useRef(new Animated.Value(0)).current;
 
+  /*
+   * Endlosschleife, die keiner sah.
+   *
+   * Vorher hingen an diesem Effekt `current` und `onStoryViewed`. Beide sind
+   * bei jedem Aufbau neu: `onStoryViewed` ist in App.tsx eine Pfeilfunktion
+   * im Markup, und `current` kommt aus `alle`, das die Meldung "gesehen"
+   * gerade neu gebaut hat. Melden → neuer Aufbau → wieder melden. React
+   * brach mit "Maximum update depth exceeded" ab.
+   *
+   * Aufgefallen ist es erst, als der Story-Betrachter wieder in den Bildern
+   * auftauchte — vorher zeigte `mac:bilder` an seiner Stelle die Chatliste.
+   */
+  const meldeGesehen = useRef(onStoryViewed);
+  meldeGesehen.current = onStoryViewed;
+  const aktuelleId = current?.id;
+  const aktuelleEigene = !!current?.own;
+
   useEffect(() => {
     progress.setValue(0);
-    // Markiere die aktuelle Story als viewed
-    if (!current.own) {
-      onStoryViewed?.(current.id);
+    if (!aktuelleEigene && aktuelleId) {
+      meldeGesehen.current?.(aktuelleId);
     }
-  }, [index, progress, current, onStoryViewed]);
+  }, [aktuelleId, aktuelleEigene, progress]);
 
   useEffect(() => {
     if (paused) {
@@ -93,7 +138,7 @@ export const StoryViewerScreen = ({
     });
     animation.start(({ finished }) => {
       if (!finished) return;
-      if (index < stories.length - 1) setIndex(index + 1);
+      if (index < stories.length - 1) { selbstGeblaettert.current = true; setIndex(index + 1); }
       else onClose();
     });
     return () => animation.stop();
@@ -101,8 +146,10 @@ export const StoryViewerScreen = ({
 
   // Solange etwas im Antwortfeld steht, steht auch die Zeit.
   useEffect(() => {
-    setPaused(reply.trim().length > 0);
-  }, [reply]);
+    // Im Standbild bleibt es angehalten - sonst hebt dieser Effekt die Pause
+    // gleich beim Aufbau wieder auf (reply ist da leer).
+    setPaused(standbild || reply.trim().length > 0);
+  }, [reply, standbild]);
 
   const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
@@ -127,6 +174,7 @@ export const StoryViewerScreen = ({
     const next = index + step;
     if (next < 0 || next >= stories.length) return onClose();
     setReply('');
+    selbstGeblaettert.current = true;
     setIndex(next);
   };
 

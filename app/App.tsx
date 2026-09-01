@@ -205,6 +205,9 @@ const Shell = () => {
    * Chat, ihre Story oder ihr Profil nicht fand.
    */
   const pruefbildGesetzt = useRef(false);
+  // Wahr, sobald der Bildschirm ueber den Pruefschalter aufgemacht wurde.
+  // Der Story-Betrachter blaettert dann nicht von selbst weiter.
+  const [pruefStandbild, setPruefStandbild] = useState(false);
   useEffect(() => {
     if (!__DEV__ || pruefbildGesetzt.current) return;
     if (daten.chats.length === 0 && Object.keys(daten.users).length === 0) return;
@@ -217,7 +220,10 @@ const Shell = () => {
         if (!NAV.some((a) => a.key === zielArea)) return;
         setArea(zielArea);
         if (zielSub) setSubs((prev) => ({ ...prev, [zielArea]: zielSub }));
-        if (ueberlagerung) pruefUeberlagerung(ueberlagerung);
+        if (ueberlagerung) {
+          setPruefStandbild(true);
+          pruefUeberlagerung(ueberlagerung);
+        }
       })
       .catch(() => {
         // Kein Schalter gesetzt oder Speicher nicht lesbar: normal starten.
@@ -245,7 +251,11 @@ const Shell = () => {
         break;
       }
       case 'story': {
-        const story = daten.stories.find((s) => s.id === a || s.name === a);
+        // Die Kachel traegt nur den Vornamen ("Anna"), gesucht wird aber
+        // gerne mit dem vollen Namen - beides zulassen.
+        const story = daten.stories.find(
+          (s) => s.id === a || s.name === a || daten.users[s.userId]?.name === a
+        );
         if (story) setOverlay({ kind: 'story', story });
         break;
       }
@@ -830,9 +840,14 @@ const Shell = () => {
       <StoryViewerScreen
         story={overlay.story}
         alle={stories}
+        standbild={pruefStandbild}
         onStoryViewed={(storyId) => {
+          // Nichts anfassen, wenn sie schon gesehen ist: sonst entsteht bei
+          // jedem Melden ein neues Feld, und der Betrachter baut sich neu auf.
           setStories((prev) =>
-            prev.map((s) => s.id === storyId ? { ...s, viewed: true } : s)
+            prev.some((s) => s.id === storyId && !s.viewed)
+              ? prev.map((s) => (s.id === storyId ? { ...s, viewed: true } : s))
+              : prev
           );
         }}
         onClose={() => {
