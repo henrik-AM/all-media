@@ -114,7 +114,10 @@ function ok(name, bedingung, zusatz = '') {
   const ersteCommunity = seite.locator('[data-community]').first();
   if (await ersteCommunity.count()) {
     await ersteCommunity.click();
-    await seite.waitForTimeout(400);
+    // Die Kanaele kommen aus der Datenbank. 400 ms waren dafuer eine Wette:
+    // in der Kette stand hier noch die Uebersicht ("MeineEntdecken"), und
+    // alle vier Punkte dieses Abschnitts fielen um.
+    await seite.waitForSelector('[data-channel]', { timeout: 10000 }).catch(() => {});
     const inhalt = await seite.locator('.main, .overlay').first().textContent();
 
     // "Beim Oeffnen einer Community muss die Seite wie im Figma-Prototyp auf
@@ -128,11 +131,11 @@ function ok(name, bedingung, zusatz = '') {
     const kanal = seite.locator('[data-channel]').nth(1);
     if (await kanal.count()) {
       await kanal.click();
-      await seite.waitForTimeout(400);
+      await seite.waitForSelector('[data-thema]', { timeout: 10000 }).catch(() => {});
       ok('Themen statt direkt Chat', (await seite.locator('[data-thema]').count()) > 0);
 
       await seite.locator('[data-thema]').first().click();
-      await seite.waitForTimeout(600);
+      await seite.waitForSelector('.msgzeile__avatar', { timeout: 10000 }).catch(() => {});
       ok('Profilbild am Absender im Kanal-Chat',
         (await seite.locator('.msgzeile__avatar').count()) > 0);
       ok('Profilbild fuehrt zum Profil',
