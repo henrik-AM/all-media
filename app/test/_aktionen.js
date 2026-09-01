@@ -410,6 +410,287 @@ const pruefe = (name, wahr, zusatz = '') => {
     return typeof e === 'string' && e.length > 0;
   })());
 
+  /* ====================================================================== *
+   *  Der zweite Teil: Chats, Kontakte, Storys, Kommentare, Communitys
+   *
+   *  Alles darueber war am 01.09.2026 schon nachgezogen. Alles hier unten
+   *  nicht: die Oberflaeche der App konnte es, geschrieben wurde nichts.
+   *  Ein archivierter Chat war nach dem Neustart wieder da, eine angelegte
+   *  Gruppe weg, eine Story-Antwort kam bei niemandem an.
+   *
+   *  Jede Pruefung hier schreibt mit dem Code der App und sieht danach ueber
+   *  /api/bootstrap nach — das ist die Website, also die zweite Meinung.
+   *  Danach wird aufgeraeumt, damit der Testbestand so bleibt, wie er war.
+   * ====================================================================== */
+
+  /** Was die Website ueber diesen Chat sagt. */
+  const chatAusWebsite = (id) =>
+    seite.evaluate(async (id) => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return [...(boot.chats || []), ...(boot.communityChats || [])].find((c) => c.id === id) || null;
+    }, id);
+
+  console.log('\nChats');
+
+  // Ein vorhandener Zweierchat aus dem Testbestand.
+  const chat = await seite.evaluate(
+    async (bob) => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.chats || []).find((c) => c.userId === bob) || (boot.chats || [])[0] || null;
+    },
+    K_BOB
+  );
+
+  if (!chat) {
+    console.error('FEHLER  Kein Chat im Testbestand — die Chat-Pruefungen wuerden nichts pruefen.');
+    process.exitCode = 1;
+  } else {
+    await pruefe('Stummschalten aus der App steht in der Datenbank', await (async () => {
+      const gesetzt = await app('chatEinstellung', chat.id, 'stumm');
+      const nach = await chatAusWebsite(chat.id);
+      const ok = gesetzt === true && nach && nach.muted === true;
+      await app('chatEinstellung', chat.id, 'stumm', false);
+      return ok;
+    })());
+
+    await pruefe('Und laesst sich auch wieder aufheben', await (async () => {
+      // Der Umschalter war auf der Website lange eine Einbahnstrasse. In der
+      // App darf das nicht wieder passieren.
+      await app('chatEinstellung', chat.id, 'stumm', true);
+      const gesetzt = await app('chatEinstellung', chat.id, 'stumm');
+      const nach = await chatAusWebsite(chat.id);
+      return gesetzt === false && nach && !nach.muted;
+    })());
+
+    await pruefe('Archivieren aus der App steht in der Datenbank', await (async () => {
+      const gesetzt = await app('chatEinstellung', chat.id, 'archiv');
+      const drin = await seite.evaluate(async (id) => {
+        const client = await window.Anmeldung.aufbauen();
+        const ich = window.Anmeldung.nutzer().id;
+        const { data } = await client
+          .from('chat_members')
+          .select('is_archived')
+          .eq('chat_id', id)
+          .eq('user_id', ich)
+          .maybeSingle();
+        return Boolean(data && data.is_archived);
+      }, chat.id);
+      await app('chatEinstellung', chat.id, 'archiv', false);
+      return gesetzt === true && drin === true;
+    })());
+
+    await pruefe('Eine Nachricht aus der App liegt danach im Chat', await (async () => {
+      const text = 'Prüflauf ' + Date.now();
+      const nachricht = await app('nachrichtSenden', chat.id, text);
+      const nach = await chatAusWebsite(chat.id);
+      return Boolean(nachricht && nachricht.id) && nach && nach.preview === text;
+    })());
+  }
+
+  await pruefe('Eine Gruppe aus der App steht danach auf der Website', await (async () => {
+    const name = 'Prüfgruppe ' + Date.now();
+    const id = await app('gruppeAnlegen', name, [K_BOB]);
+    const nach = await chatAusWebsite(id);
+    const ok = Boolean(id) && nach && nach.name === name && nach.isGroup === true;
+
+    /*
+     * Wieder abraeumen — und dabei gleich chatVerlassen mitpruefen.
+     *
+     * Bleibt die Gruppe stehen, fehlt in der Datenbank die Regel zum Loeschen
+     * auf chat_members: SUPABASE_SCHEMA_9_loeschen.sql ist dann noch nicht
+     * eingespielt. chatVerlassen meldet das seit dem 01.09.2026 als Fehler,
+     * statt Erfolg zu behaupten.
+     */
+    let weg = false;
+    try {
+      await app('chatVerlassen', id);
+      weg = (await chatAusWebsite(id)) === null;
+    } catch (e) {
+      console.log('       Grund: ' + (e.message || e));
+    }
+    return ok && weg;
+  })());
+
+  console.log('\nKontakte');
+
+  await pruefe('Ein Kontakt aus der App steht danach auf der Website', await (async () => {
+    /*
+     * Eine Person, die noch nicht in den Kontakten steht. Das Pruefkonto
+     * bringt sechs mit (SUPABASE_SCHEMA_7_testkonto.sql) — welche, steht
+     * nicht fest, also wird gesucht statt geraten.
+     */
+    const boot = await seite.evaluate(async () => (await (await fetch('/api/bootstrap')).json()));
+    const drin = new Set((boot.contacts || []).map((c) => c.id));
+    const ich = boot.ichId;
+    const frei = Object.keys(boot.users || {}).find((id) => id !== ich && id !== 'me' && !drin.has(id));
+    if (!frei) return false;
+
+    const ergebnis = await app('kontaktHinzufuegen', frei, true);
+    const nachAnfrage = await seite.evaluate(
+      async (id) => {
+        const boot = await (await fetch('/api/bootstrap')).json();
+        return (boot.contacts || []).find((c) => c.id === id) || null;
+      },
+      frei
+    );
+
+    // Und annehmen: aus "pending" wird "friend".
+    await app('anfrageAnnehmen', frei);
+    const nachAnnahme = await seite.evaluate(
+      async (id) => {
+        const boot = await (await fetch('/api/bootstrap')).json();
+        return (boot.contacts || []).find((c) => c.id === id) || null;
+      },
+      frei
+    );
+
+    return (
+      Boolean(ergebnis && ergebnis.chatId) &&
+      ergebnis.status === 'pending' &&
+      Boolean(nachAnfrage) &&
+      Boolean(nachAnnahme) &&
+      nachAnnahme.status === 'friend'
+    );
+  })());
+
+  console.log('\nStorys und Kommentare');
+
+  await pruefe('Eine Story aus der App steht danach auf der Website', await (async () => {
+    const text = 'Prüflauf ' + Date.now();
+    const id = await app('storyAnlegen', { text, mediaTyp: 'image' });
+    const nach = await seite.evaluate(async (id) => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.stories || []).find((s) => s.id === id) || null;
+    }, id);
+
+    await app('storyLoeschen', id);
+    const weg = await seite.evaluate(async (id) => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return !(boot.stories || []).some((s) => s.id === id);
+    }, id);
+
+    return Boolean(id) && Boolean(nach) && nach.caption === text && weg;
+  })());
+
+  await pruefe('Ein Story-Herz aus der App steht in der Datenbank', await (async () => {
+    const story = await seite.evaluate(async () => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.stories || []).find((s) => !s.own) || (boot.stories || [])[0] || null;
+    });
+    if (!story) return false;
+
+    const gesetzt = await app('storyLike', story.id);
+    const drin = await seite.evaluate(async (id) => {
+      const client = await window.Anmeldung.aufbauen();
+      const ich = window.Anmeldung.nutzer().id;
+      const { count } = await client
+        .from('story_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('story_id', id)
+        .eq('user_id', ich);
+      return count;
+    }, story.id);
+
+    await app('storyLike', story.id);
+    return gesetzt === true && drin === 1;
+  })());
+
+  await pruefe('Eine Story-Antwort landet im Chat mit dieser Person', await (async () => {
+    const story = await seite.evaluate(async () => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.stories || []).find((s) => !s.own && s.userId) || null;
+    });
+    if (!story) return false;
+
+    const text = 'Schöne Story ' + Date.now();
+    const chatId = await app('storyAntwort', story.id, text);
+    const nach = await chatAusWebsite(chatId);
+    return Boolean(chatId) && Boolean(nach) && nach.preview === text;
+  })());
+
+  await pruefe('Ein Kommentar aus der App steht danach am Beitrag', await (async () => {
+    const text = 'Prüflauf ' + Date.now();
+    const vor = await ausWebsite(beitrag.id);
+    const kommentar = await app('kommentarAnlegen', beitrag.id, text);
+    const nach = await ausWebsite(beitrag.id);
+    const ok = Boolean(kommentar && kommentar.id) && nach.comments === vor.comments + 1;
+
+    await app('kommentarLoeschen', kommentar.id);
+    const zurueck = await ausWebsite(beitrag.id);
+    return ok && zurueck.comments === vor.comments;
+  })());
+
+  console.log('\nCommunitys und eigenes Profil');
+
+  await pruefe('Ein Unterthema aus der App steht danach auf der Website', await (async () => {
+    const community = await seite.evaluate(async () => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.communities || []).find((c) => c.joined) || (boot.communities || [])[0] || null;
+    });
+    if (!community) return false;
+
+    const name = 'Prüfthema ' + Date.now();
+    const kanalId = await app('kanalAnlegen', community.id, name);
+    if (!kanalId) return false;
+
+    // Und wirklich hineinschreiben — genau das ging in der App nicht: sie
+    // schrieb Kanalnachrichten nach `messages` und las sie nie wieder.
+    const text = 'Prüflauf ' + Date.now();
+    const nachricht = await app('kanalNachricht', kanalId, text);
+
+    const drin = await seite.evaluate(async (id) => {
+      const client = await window.Anmeldung.aufbauen();
+      const { data } = await client
+        .from('community_channel_messages')
+        .select('text')
+        .eq('channel_id', id);
+      return (data || []).map((z) => z.text);
+    }, kanalId);
+
+    return Boolean(nachricht && nachricht.id) && drin.includes(text);
+  })());
+
+  await pruefe('Ein Highlight aus der App steht danach im eigenen Profil', await (async () => {
+    const name = 'Prüflauf ' + Date.now();
+    const liste = await app('profilListe', 'highlights', name);
+    const nach = await seite.evaluate(async () => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.eigenesProfil || {}).highlights || [];
+    });
+    return Array.isArray(liste) && liste.includes(name) && nach.includes(name);
+  })());
+
+  await pruefe('Ein Spendenziel aus der App steht danach auf der Website', await (async () => {
+    const ziel = { titel: 'Prüflauf', gesammelt: 5, ziel: 100 };
+    await app('spendeSetzen', ziel);
+    const nach = await seite.evaluate(async () => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.eigenesProfil || {}).spende || null;
+    });
+    await app('spendeSetzen', null);
+    return Boolean(nach) && nach.titel === 'Prüflauf';
+  })());
+
+  await pruefe('Ein Livestream aus der App steht danach im eigenen Profil', await (async () => {
+    await app('livestreamSetzen', 'Prüflauf');
+    const an = await seite.evaluate(async () => {
+      const client = await window.Anmeldung.aufbauen();
+      const ich = window.Anmeldung.nutzer().id;
+      const { data } = await client.from('profiles').select('live').eq('id', ich).maybeSingle();
+      return data && data.live;
+    });
+
+    await app('livestreamSetzen', null);
+    const aus = await seite.evaluate(async () => {
+      const client = await window.Anmeldung.aufbauen();
+      const ich = window.Anmeldung.nutzer().id;
+      const { data } = await client.from('profiles').select('live').eq('id', ich).maybeSingle();
+      return data && data.live;
+    });
+
+    return an === 'Prüflauf' && !aus;
+  })());
+
   await seite.evaluate(() => fetch('/api/reset', { method: 'POST' }));
 
   console.log(browserFehler.length ? '\nKonsolenfehler:\n' + browserFehler.join('\n') : '\nKonsolenfehler: keine');

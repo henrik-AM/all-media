@@ -18,6 +18,7 @@ import { useSupabase } from '../contexts/SupabaseContext';
 import { ICH as CURRENT_USER_ID, ladeKommentare } from '../lib/daten';
 import { useZiehenZumSchliessen } from '../lib/ziehen';
 import { Comment } from '../types';
+import * as Aktion from '../lib/aktionen';
 
 interface Props {
   targetId: string | null;
@@ -69,17 +70,10 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
      * Schreiben — abgelaufene Anmeldung, keine Verbindung —, blieb das Herz
      * trotzdem rot und behauptete etwas, das nirgends stand.
      */
-    const { error } = comment.liked
-      ? await supabase
-          .from('comment_likes')
-          .delete()
-          .eq('comment_id', comment.id)
-          .eq('user_id', ichId)
-      : await supabase.from('comment_likes').insert({ comment_id: comment.id, user_id: ichId });
-
-    // 23505 = die Zeile gab es schon, zweimal schnell getippt. Kein Fehler.
-    if (error && error.code !== '23505') {
-      console.error('Kommentar-Like fehlgeschlagen:', error.message);
+    try {
+      await Aktion.kommentarLike(supabase, ichId, comment.id);
+    } catch (e: any) {
+      console.error('Kommentar-Like fehlgeschlagen:', e?.message ?? e);
       setzen(comment.liked, comment.likes);
     }
   };
@@ -89,13 +83,11 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
     if (!text || !targetId || !supabase || !ichId) return;
     setDraft('');
 
-    const { data, error } = await supabase
-      .from('comments')
-      .insert({ post_id: targetId, user_id: ichId, text })
-      .select('id, created_at')
-      .single();
-    if (error) {
-      console.error('Kommentar senden fehlgeschlagen:', error.message);
+    let data;
+    try {
+      data = await Aktion.kommentarAnlegen(supabase, ichId, targetId, text);
+    } catch (e: any) {
+      console.error('Kommentar senden fehlgeschlagen:', e?.message ?? e);
       setDraft(text);
       return;
     }

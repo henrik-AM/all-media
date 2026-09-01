@@ -22,6 +22,7 @@ import { AnhangSheet } from '../../components/AnhangSheet';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Chat, Contact, Message } from '../../types';
 import { haptic } from '../../lib/haptics';
+import * as Aktion from '../../lib/aktionen';
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -127,14 +128,23 @@ export const ChatDetailScreen = ({
     haptic.success();
     setDraft('');
 
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({ chat_id: chat.id, sender_id: ichId, text })
-      .select('id, created_at')
-      .single();
-
-    if (error) {
-      console.error('Nachricht senden fehlgeschlagen:', error.message);
+    /*
+     * Geschrieben wird ueber lib/aktionen.ts. Hier stand die Abfrage frueher
+     * ausgeschrieben — und beim Anhang weiter unten ein zweites Mal, mit
+     * einer anderen Spaltenliste. Zwei Stellen, die dasselbe tun sollen,
+     * laufen irgendwann auseinander; die Website hat dafuer auch nur eine.
+     */
+    let data;
+    try {
+      // Ein Unterthema einer Community ist kein gewoehnlicher Chat: seine
+      // Nachrichten stehen in einer eigenen Tabelle. Gelesen wurde von dort
+      // schon immer (ladeKanalNachrichten oben), geschrieben bis hierher
+      // nicht — das Geschriebene war beim naechsten Oeffnen weg.
+      data = istKanal
+        ? await Aktion.kanalNachricht(supabase, ichId, chat.id, text)
+        : await Aktion.nachrichtSenden(supabase, ichId, chat.id, text);
+    } catch (e: any) {
+      console.error('Nachricht senden fehlgeschlagen:', e?.message ?? e);
       onNotice?.('Die Nachricht ging nicht raus');
       setDraft(text);
       return;
@@ -152,9 +162,6 @@ export const ChatDetailScreen = ({
       },
     ]);
     scrollToEnd();
-
-    // Damit der Chat in der Liste nach oben rutscht.
-    await supabase.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chat.id);
   };
 
   const tagTrenner = (() => {
@@ -400,24 +407,18 @@ export const ChatDetailScreen = ({
            */
           let id = `m${Date.now()}`;
           if (supabase && ichId) {
-            const { data, error } = await supabase
-              .from('messages')
-              .insert({
-                chat_id: chat.id,
-                sender_id: ichId,
-                text: teil.text,
-                media_type: teil.media ?? null,
-                place_id: ortId ?? null,
-                contact_user_id: personId ?? null,
-              })
-              .select('id')
-              .single();
-            if (error) {
-              console.error('Anhang senden fehlgeschlagen:', error.message);
+            try {
+              const data = await Aktion.nachrichtSenden(supabase, ichId, chat.id, teil.text ?? '', {
+                typ: teil.media ?? null,
+                standortId: ortId ?? null,
+                kontaktId: personId ?? null,
+              });
+              id = data.id;
+            } catch (e: any) {
+              console.error('Anhang senden fehlgeschlagen:', e?.message ?? e);
               onNotice?.('Der Anhang ging nicht raus');
               return;
             }
-            id = data.id;
           }
 
           setMessages((prev) => [

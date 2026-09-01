@@ -11,6 +11,7 @@ import { useDaten } from '../../contexts/DatenContext';
 import { StoryAnsichtenSheet, StoryOptionenSheet } from '../../components/StoryOptionenSheet';
 import { useZiehenZumSchliessen } from '../../lib/ziehen';
 import { Contact, Story } from '../../types';
+import { useAktionen } from '../../lib/useAktionen';
 
 const DURATION = 6000;
 
@@ -53,6 +54,9 @@ export const StoryViewerScreen = ({
   standbild = false,
 }: Props) => {
   const { users: alleNutzer } = useDaten();
+  // Das Herz an einer Story stand bisher nur im Bildschirm — beim naechsten
+  // Oeffnen war es wieder grau. Die Website schreibt nach story_likes.
+  const aktion = useAktionen(onNotice);
   const [ansichtenOffen, setAnsichtenOffen] = useState(false);
   const [optionenOffen, setOptionenOffen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -326,6 +330,10 @@ export const StoryViewerScreen = ({
             setLiked({ ...liked, [current.id]: next });
             current.liked = next;
             onNotice(next ? `Dir gefällt die Story von ${person?.name}` : 'Gefällt-mir entfernt');
+            aktion.storyLike(current.id, () => {
+              setLiked((prev) => ({ ...prev, [current.id]: !next }));
+              current.liked = !next;
+            });
           }}
           hitSlop={8}
         >

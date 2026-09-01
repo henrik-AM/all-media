@@ -12,6 +12,7 @@ import { colors, radius, spacing, themenStyles, typography } from '../../constan
 import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ladeNachrichten } from '../../lib/daten';
+import * as Aktion from '../../lib/aktionen';
 import { Chat, Message } from '../../types';
 
 interface Props {
@@ -94,7 +95,28 @@ export const ContactProfileScreen = ({
   const [geladen, setGeladen] = useState<Message[]>([]);
 
   const [offen, setOffen] = useState<Offen>(null);
+  /*
+   * Die Sperre kommt aus der Datenbank (chat_members.is_locked) und geht auch
+   * dorthin zurueck. Vorher war sie ein Schalter, der beim naechsten Start
+   * wieder oben stand — auf der Website war von ihr nie etwas zu sehen.
+   */
   const [gesperrt, setGesperrt] = useState(false);
+  useEffect(() => {
+    if (!supabase || !ichId || !chat) return;
+    let gilt = true;
+    supabase
+      .from('chat_members')
+      .select('is_locked')
+      .eq('chat_id', chat.id)
+      .eq('user_id', ichId)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (gilt) setGesperrt(Boolean(data?.is_locked));
+      });
+    return () => {
+      gilt = false;
+    };
+  }, [supabase, ichId, chat?.id]);
   const [wahlen, setWahlen] = useState<Record<string, string>>({});
   const [angezeigterName, setAngezeigterName] = useState<string | null>(null);
   const [suche, setSuche] = useState('');
@@ -241,18 +263,10 @@ export const ContactProfileScreen = ({
           {zeile('Benachrichtigungen', stumm ? 'Aus' : 'An', () => {
             if (!chat) return onNotice('Noch kein Chat mit dieser Person');
             const jetzt = !stumm;
+            // Das Schreiben nach chat_members.is_muted macht der Kontext —
+            // hier stand es frueher ein zweites Mal, mit eigener Spaltenliste.
             chatStummUmschalten(chat.id);
             onNotice(jetzt ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
-            // Merken, nicht nur anzeigen: sonst steht nach dem naechsten Start
-            // wieder "An". Die Website schreibt an dieselbe Stelle.
-            if (supabase && ichId) {
-              supabase
-                .from('chat_members')
-                .update({ is_muted: jetzt })
-                .eq('chat_id', chat.id)
-                .eq('user_id', ichId)
-                .then(() => undefined);
-            }
           })}
           {zeile('Chatdesign', wert('Chat-Hintergrund', 'Hell'), () =>
             setOffen({ art: 'wahl', label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' })
@@ -276,8 +290,19 @@ export const ContactProfileScreen = ({
             <Druck
               style={[styles.schalter, gesperrt && styles.schalterAn]}
               onPress={() => {
-                setGesperrt((v) => !v);
-                onNotice(gesperrt ? 'Chatsperre aufgehoben' : 'Chat gesperrt');
+                if (!chat) return onNotice('Noch kein Chat mit dieser Person');
+                const jetzt = !gesperrt;
+                setGesperrt(jetzt);
+                onNotice(jetzt ? 'Chat gesperrt' : 'Chatsperre aufgehoben');
+                if (supabase && ichId) {
+                  Aktion.chatEinstellung(supabase, ichId, chat.id, 'sperren', jetzt).catch(
+                    (e: any) => {
+                      console.error('Die Chatsperre fehlgeschlagen:', e?.message ?? e);
+                      setGesperrt(!jetzt);
+                      onNotice('Die Chatsperre hat nicht geklappt');
+                    }
+                  );
+                }
               }}
             >
               <View style={[styles.knopf, gesperrt && styles.knopfAn]} />

@@ -466,9 +466,24 @@ const Shell = () => {
     });
   };
 
-  const createGroup = (name: string, memberIds: string[], info?: string) => {
+  /*
+   * Eine Gruppe anlegen.
+   *
+   * Die Kennung kommt aus der Datenbank, nicht aus `Date.now()`. Vorher tat
+   * sie das nicht: die Gruppe stand in der Liste, aber nirgends sonst — in
+   * sie liess sich keine Nachricht schreiben, die Website sah sie nie, und
+   * nach dem naechsten Start war sie weg.
+   *
+   * Deshalb wird hier auf die Datenbank gewartet, statt die Anzeige
+   * vorlaufen zu lassen. Ein Chat, den man sofort oeffnen kann und der beim
+   * ersten Wort scheitert, ist der schlechtere Tausch.
+   */
+  const createGroup = async (name: string, memberIds: string[], info?: string) => {
+    const id = await aktion.gruppeAnlegen(name, memberIds);
+    if (!id) return;
+
     const chat: Chat = {
-      id: `c${Date.now()}`,
+      id,
       name,
       isGroup: true,
       memberIds,
@@ -482,21 +497,33 @@ const Shell = () => {
     oeffneChat(chat);
   };
 
-  const addContact = (contact: Contact) => {
+  /*
+   * Jemanden als Kontakt aufnehmen.
+   *
+   * Auch hier kommt die Kennung des Chats aus der Datenbank — und mit ihr
+   * der Chat selbst, falls es ihn schon gab. Vorher entstand bei jedem
+   * Hinzufuegen ein neuer Chat mit erfundener Kennung; der Eintrag in
+   * `contacts` fehlte ganz, und die Website wusste von der Anfrage nichts.
+   */
+  const addContact = async (contact: Contact) => {
+    const ergebnis = await aktion.kontaktHinzufuegen(contact.id, contact.status === 'pending');
+    if (!ergebnis) return;
+
     setContacts((prev) => [...prev, contact]);
     setSheet(null);
 
-    const chat: Chat = {
-      id: `c${Date.now()}`,
+    const vorhanden = chats.find((c) => c.id === ergebnis.chatId);
+    const chat: Chat = vorhanden ?? {
+      id: ergebnis.chatId,
       name: contact.name,
       userId: contact.id,
       isGroup: false,
       preview: 'Anfrage gesendet',
       time: now(),
       unreadCount: 0,
-      requestState: 'pending',
+      requestState: ergebnis.status === 'friend' ? 'accepted' : 'pending',
     };
-    setChats((prev) => [chat, ...prev]);
+    if (!vorhanden) setChats((prev) => [chat, ...prev]);
     /* Punkt 5: Nach Kontakt hinzufügen direkt zum Chat leiten,
        nicht sofort nach Nachricht fragen. */
     oeffneChat(chat);
@@ -504,6 +531,23 @@ const Shell = () => {
 
   /** Anfrage angenommen: der Chat ist ab jetzt frei benutzbar. */
   const acceptRequest = (chatId: string) => {
+    /*
+     * Und in die Datenbank: `contacts.status` geht von "pending" auf
+     * "friend". Ohne das stand der Chat nach dem naechsten Start wieder
+     * gesperrt da, und auf der Website blieb die Anfrage offen.
+     */
+    const zielId = chats.find((c) => c.id === chatId)?.userId;
+    if (zielId) {
+      aktion.anfrageAnnehmen(zielId, () => {
+        setChats((prev) =>
+          prev.map((c) => (c.id === chatId ? { ...c, requestState: 'pending' as const } : c))
+        );
+        setContacts((prev) =>
+          prev.map((c) => (c.id === zielId ? { ...c, status: 'pending' as const } : c))
+        );
+      });
+    }
+
     setChats((prev) =>
       prev.map((c) => (c.id === chatId ? { ...c, requestState: 'accepted' as const } : c))
     );
@@ -551,8 +595,15 @@ const Shell = () => {
     setOverlay({ kind: 'story', story });
   };
 
-  /** Aufnahme aus der Kamera landet in der eigenen Story. */
-  const storyAufgenommen = (uri: string) => {
+  /**
+   * Aufnahme aus der Kamera landet in der eigenen Story.
+   *
+   * „Deine Story ist online" stimmte bis hierher nicht: die Aufnahme lag im
+   * Arbeitsspeicher der App. Niemand konnte sie sehen, und nach dem naechsten
+   * Start war sie weg. Jetzt geht sie in den Speicher von Supabase und in die
+   * Tabelle `stories` — die Kennung von dort ersetzt die oertliche.
+   */
+  const storyAufgenommen = async (uri: string) => {
     setStories((prev) =>
       prev.map((s) =>
         s.own
@@ -561,41 +612,55 @@ const Shell = () => {
       )
     );
     setOverlay(null);
+
+    const id = await aktion.storyAnlegen({ mediaUrl: uri, mediaTyp: 'image' });
+    if (!id) {
+      // Die Aufnahme wieder herausnehmen: eine Story, die es nirgends gibt,
+      // soll auch im eigenen Ring nicht stehen.
+      setStories((prev) =>
+        prev.map((s) => (s.own ? { ...s, mediaUri: undefined, aufgenommen: undefined } : s))
+      );
+      return;
+    }
+    setStories((prev) => prev.map((s) => (s.own ? { ...s, id } : s)));
     setNotice('Deine Story ist online');
   };
 
   // Antwort auf eine Story: sie landet im Chat mit dieser Person, und der Chat
   // oeffnet sich direkt — sonst waere die Antwort nirgends zu sehen.
-  const replyToStory = (story: Story, text: string) => {
+  /*
+   * Auf eine Story antworten.
+   *
+   * Die Antwort ist eine ganz gewoehnliche Nachricht im Chat mit dieser
+   * Person — die Datenbank kennt keine Story-Antwort. Vorher blieb sie im
+   * Bildschirm: der Chat, den die App dafuer aufmachte, hatte eine erfundene
+   * Kennung, und beim Empfaenger kam nie etwas an.
+   */
+  const replyToStory = async (story: Story, text: string) => {
     const person = daten.users[story.userId];
-    let chat = chats.find((c) => !c.isGroup && c.userId === story.userId);
+    const chatId = await aktion.storyAntwort(story.id, text);
+    if (!chatId) return;
 
-    if (!chat) {
-      chat = {
-        id: `c${Date.now()}`,
-        name: person.name,
-        userId: story.userId,
-        isGroup: false,
-        preview: text,
-        time: now(),
-        unreadCount: 0,
-      };
-      setChats((prev) => [chat as Chat, ...prev]);
-    } else {
-      const id = chat.id;
-      setChats((prev) => prev.map((c) => (c.id === id ? { ...c, preview: text, time: now() } : c)));
-    }
-
-    const message: Message = {
-      id: `m${Date.now()}`,
-      chatId: chat.id,
-      senderId: 'me',
-      text,
-      time: now(),
-    };
+    const vorhanden = chats.find((c) => c.id === chatId);
+    const chat: Chat = vorhanden
+      ? { ...vorhanden, preview: text, time: now() }
+      : {
+          id: chatId,
+          name: person.name,
+          userId: story.userId,
+          isGroup: false,
+          preview: text,
+          time: now(),
+          unreadCount: 0,
+        };
+    setChats((prev) =>
+      vorhanden ? prev.map((c) => (c.id === chatId ? chat : c)) : [chat, ...prev]
+    );
 
     setNotice(`Antwort an ${person.name} gesendet`);
-    oeffneChat(chat, [message]);
+    // Ohne die Nachricht als Zusatz: sie steht jetzt in der Datenbank und
+    // kommt beim Oeffnen des Chats von dort — sonst staende sie doppelt da.
+    oeffneChat(chat);
   };
 
   /*
@@ -884,12 +949,21 @@ const Shell = () => {
           setOverlay(null);
         }}
         onDelete={() => {
+          const eigene = stories.find((s) => s.own);
+          const vorher = eigene ? { ...eigene } : null;
           setStories((prev) =>
             prev.map((s) =>
               s.own ? { ...s, mediaUri: undefined, aufgenommen: undefined } : s
             )
           );
           setNotice('Deine Story wurde gelöscht');
+          // Und wirklich loeschen. Vorher verschwand sie nur aus dem eigenen
+          // Ring und stand bei allen anderen weiter da.
+          if (eigene?.id) {
+            aktion.storyLoeschen(eigene.id, () =>
+              setStories((prev) => prev.map((s) => (s.own && vorher ? vorher : s)))
+            );
+          }
         }}
         onReply={replyToStory}
         contacts={contacts}
@@ -1019,7 +1093,11 @@ const Shell = () => {
   if (overlay?.kind === 'livestream') {
     return (
       <LivestreamScreen
+        onStart={() => aktion.livestream('Livestream')}
         onEnd={(sekunden, zuschauer) => {
+          // Der Stream ist vorbei — das gehoert auch ins eigene Profil,
+          // sonst steht man auf der Website ewig als "live".
+          aktion.livestream(null);
           profil.aufzeichnungAnlegen(sekunden, zuschauer);
           setOverlay(null);
           setArea('videos');

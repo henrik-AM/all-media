@@ -17,6 +17,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import * as A from './aktionen';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
+import { ladeHoch } from './supabaseStorage';
 
 /** Stellt die Anzeige wieder auf den Stand von vorher. */
 type Rueckweg = () => void;
@@ -30,6 +31,55 @@ export interface Aktionen {
   kommentarLike: (kommentarId: string, zurueck: Rueckweg) => Promise<void>;
   storyGesehen: (storyId: string, zurueck: Rueckweg) => Promise<void>;
   teilen: (beitragId: string, empfaenger: string[], vorschau?: string) => Promise<boolean>;
+
+  /*
+   * Der zweite Teil: Chats, Kontakte und Storys.
+   *
+   * Diese hier geben zurueck, was die Datenbank vergeben hat — eine Kennung
+   * oder null, wenn es nicht geklappt hat. Anders als beim Herz kann die
+   * Anzeige nicht vorlaufen: eine Gruppe ohne Kennung aus der Datenbank ist
+   * eine Gruppe, in die sich nichts schreiben laesst.
+   */
+  gruppeAnlegen: (name: string, mitglieder: string[]) => Promise<string | null>;
+  kontaktHinzufuegen: (
+    zielId: string,
+    privat?: boolean,
+    nachricht?: string
+  ) => Promise<{ status: string; chatId: string } | null>;
+  anfrageAnnehmen: (zielId: string, zurueck: Rueckweg) => Promise<void>;
+  chatEinstellung: (
+    chatId: string,
+    was: A.ChatEinstellung,
+    wert: boolean,
+    zurueck: Rueckweg
+  ) => Promise<void>;
+  chatVerlassen: (chatId: string, zurueck: Rueckweg) => Promise<void>;
+  nachrichtSenden: (
+    chatId: string,
+    text: string,
+    anhang?: A.Anhang
+  ) => Promise<{ id: string; created_at: string } | null>;
+  /**
+   * Eine eigene Story anlegen. `mediaUrl` darf ein Pfad auf diesem Geraet
+   * sein — er wird vorher hochgeladen.
+   */
+  storyAnlegen: (felder: {
+    mediaUrl?: string | null;
+    mediaTyp?: string;
+    text?: string;
+  }) => Promise<string | null>;
+  storyLoeschen: (storyId: string, zurueck: Rueckweg) => Promise<void>;
+  /** Livestream an (Titel) oder aus (null). Steht in profiles.live. */
+  livestream: (titel: string | null) => Promise<void>;
+  storyLike: (storyId: string, zurueck: Rueckweg) => Promise<void>;
+  /** Gibt den Chat zurueck, in dem die Antwort gelandet ist. */
+  storyAntwort: (storyId: string, text: string) => Promise<string | null>;
+  kommentarAnlegen: (
+    beitragId: string,
+    text: string
+  ) => Promise<{ id: string; created_at: string } | null>;
+  kommentarLoeschen: (kommentarId: string, zurueck: Rueckweg) => Promise<void>;
+
   /** Ist überhaupt jemand angemeldet? Ohne das schreibt hier nichts. */
   bereit: boolean;
 }
@@ -53,6 +103,29 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         zurueck();
         console.error(`${was} fehlgeschlagen:`, e?.message ?? e);
         melden?.(`${was} hat nicht geklappt`);
+      }
+    },
+    [supabase, ichId, melden]
+  );
+
+  /*
+   * Fuer alles, was ein Ergebnis zurueckbringt — eine Kennung aus der
+   * Datenbank. Hier kann die Anzeige nicht vorlaufen und hinterher
+   * zurueckgestellt werden; es gibt schlicht nichts anzuzeigen, solange die
+   * Kennung fehlt. Geht es schief, kommt null und eine Meldung.
+   */
+  const holen = useCallback(
+    async <T,>(was: string, tun: (c: SupabaseClient, ich: string) => Promise<T>): Promise<T | null> => {
+      if (!supabase || !ichId) {
+        melden?.('Dafür musst du angemeldet sein');
+        return null;
+      }
+      try {
+        return await tun(supabase, ichId);
+      } catch (e: any) {
+        console.error(`${was} fehlgeschlagen:`, e?.message ?? e);
+        melden?.(e?.message || `${was} hat nicht geklappt`);
+        return null;
       }
     },
     [supabase, ichId, melden]
@@ -84,6 +157,50 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           zurueck();
         }
       },
+      gruppeAnlegen: (name, mitglieder) =>
+        holen('Die Gruppe', (c, i) => A.gruppeAnlegen(c, i, name, mitglieder)),
+      kontaktHinzufuegen: (zielId, privat, nachricht) =>
+        holen('Der Kontakt', (c, i) => A.kontaktHinzufuegen(c, i, zielId, privat, nachricht)),
+      anfrageAnnehmen: (zielId, zurueck) =>
+        schreiben('Die Anfrage', (c, i) => A.anfrageAnnehmen(c, i, zielId), zurueck),
+      chatEinstellung: (chatId, was, wert, zurueck) =>
+        schreiben('Die Einstellung', (c, i) => A.chatEinstellung(c, i, chatId, was, wert), zurueck),
+      chatVerlassen: (chatId, zurueck) =>
+        schreiben('Das Löschen', (c, i) => A.chatVerlassen(c, i, chatId), zurueck),
+      nachrichtSenden: (chatId, text, anhang) =>
+        holen('Die Nachricht', (c, i) => A.nachrichtSenden(c, i, chatId, text, anhang)),
+      /*
+        * Erst hochladen, dann anlegen. Was die Kamera liefert, ist ein Pfad
+        * auf diesem Geraet („file:///var/…"): er gilt nur hier. Stuende er in
+        * der Datenbank, saehe die Website an der Stelle ein kaputtes Bild.
+        * Denselben Weg geht ProfilContext fuer Beitraege.
+        */
+      storyAnlegen: (felder) =>
+        holen('Die Story', async (c, i) => {
+          let adresse = felder.mediaUrl;
+          if (adresse && !/^https?:/i.test(adresse)) {
+            const endung = felder.mediaTyp === 'video' ? 'mp4' : 'jpg';
+            const upload = await ladeHoch(c, adresse, 'stories', `${i}-${Date.now()}.${endung}`);
+            adresse = upload.success ? upload.url ?? null : null;
+          }
+          return A.storyAnlegen(c, i, { ...felder, mediaUrl: adresse });
+        }),
+      storyLoeschen: (id, zurueck) =>
+        schreiben('Das Löschen', (c, i) => A.storyLoeschen(c, i, id), zurueck),
+      /*
+       * Ein Livestream ist in der Datenbank ein Feld am eigenen Profil. Ohne
+       * es merkte niemand ausserhalb dieses Bildschirms, dass man sendet —
+       * auf der Website blieb der Ring grau. Ein Rueckweg gibt es nicht: die
+       * Anzeige haengt am Bildschirm selbst, nicht an diesem Feld.
+       */
+      livestream: (titel) => schreiben('Der Livestream', (c, i) => A.livestreamSetzen(c, i, titel), () => {}),
+      storyLike: (id, zurueck) => schreiben('Das Like', (c, i) => A.storyLike(c, i, id), zurueck),
+      storyAntwort: (storyId, text) =>
+        holen('Die Antwort', (c, i) => A.storyAntwort(c, i, storyId, text)),
+      kommentarAnlegen: (beitragId, text) =>
+        holen('Der Kommentar', (c, i) => A.kommentarAnlegen(c, i, beitragId, text)),
+      kommentarLoeschen: (id, zurueck) =>
+        schreiben('Das Löschen', (c, i) => A.kommentarLoeschen(c, i, id), zurueck),
       teilen: async (beitragId, empfaenger, vorschau) => {
         if (!supabase || !ichId) {
           melden?.('Dafür musst du angemeldet sein');
@@ -99,6 +216,6 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         }
       },
     }),
-    [schreiben, supabase, ichId, melden]
+    [schreiben, holen, supabase, ichId, melden]
   );
 }

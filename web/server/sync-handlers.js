@@ -183,6 +183,25 @@ const handleLeaveChat = handler('Chat löschen', async (client, nutzerId, chatId
     .from('chat_members')
     .select('*', { count: 'exact', head: true })
     .eq('chat_id', chatId);
+
+  /*
+   * Nachsehen, ob wirklich etwas weg ist.
+   *
+   * Ein DELETE, das die Regeln der Datenbank nicht zulassen, wird nicht
+   * abgewiesen: es loescht null Zeilen und meldet Erfolg. Fuer chat_members
+   * gab es bis zum 01.09.2026 gar keine Regel zum Loeschen — hier stand
+   * seither { ok: true } fuer einen Chat, der geblieben ist. Behoben in
+   * SUPABASE_SCHEMA_9_loeschen.sql; die Kontrolle bleibt.
+   */
+  const { count: meine } = await client
+    .from('chat_members')
+    .select('*', { count: 'exact', head: true })
+    .eq('chat_id', chatId)
+    .eq('user_id', nutzerId);
+  if (meine > 0) {
+    return { ok: false, fehler: 'Der Chat liess sich nicht verlassen — die Datenbank hat es abgelehnt' };
+  }
+
   if (!count) await client.from('chats').delete().eq('id', chatId);
 
   return { ok: true };

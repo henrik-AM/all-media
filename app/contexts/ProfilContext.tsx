@@ -553,26 +553,51 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, [inDatenbank]);
 
+  /*
+   * Highlights und Playlists sind zwei Textlisten in der eigenen Profilzeile.
+   * Sie standen in der App nur hier im Zustand: nach dem naechsten Start
+   * waren sie weg, obwohl die Website sie laengst speicherte (handleProfilListe).
+   */
   /** Gibt einen Fehlertext zurueck, wenn es nicht geklappt hat - sonst null. */
   const highlightAnlegen = useCallback(
     (name: string) => {
       if (highlights.includes(name)) return 'Dieses Highlight gibt es schon';
       setHighlights((prev) => [...prev, name]);
+      schreiben('Das Highlight', (c, ich) => Aktion.profilListe(c, ich, 'highlights', name), () =>
+        setHighlights((prev) => prev.filter((h) => h !== name))
+      );
       return null;
     },
-    [highlights]
+    [highlights, schreiben]
   );
 
   const playlistAnlegen = useCallback(
     (name: string) => {
       if (playlists.includes(name)) return 'Diese Playlist gibt es schon';
       setPlaylists((prev) => [...prev, name]);
+      schreiben('Die Playlist', (c, ich) => Aktion.profilListe(c, ich, 'playlists', name), () =>
+        setPlaylists((prev) => prev.filter((p) => p !== name))
+      );
       return null;
     },
-    [playlists]
+    [playlists, schreiben]
   );
 
-  const spendeSetzen = useCallback((neu: Spende) => setSpende(neu), []);
+  /*
+   * Das Spendenziel wurde beim Laden aus der Datenbank geholt (siehe oben,
+   * setSpende(daten.spende)) — aber nie hineingeschrieben. Wer es in der App
+   * setzte, sah es bis zum naechsten Start und danach nie wieder.
+   */
+  const spendeSetzen = useCallback(
+    (neu: Spende) => {
+      const vorher = spende;
+      setSpende(neu);
+      schreiben('Das Spendenziel', (c, ich) => Aktion.spendeSetzen(c, ich, neu as any), () =>
+        setSpende(vorher)
+      );
+    },
+    [spende, schreiben]
+  );
 
   const aufzeichnungAnlegen = useCallback((sekunden: number, zuschauer: number) => {
     const id = `q_${nummer()}`;
@@ -673,21 +698,53 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       return 'Dieses Unterthema gibt es schon';
     }
 
+    const vorlaeufig = `${communityId}-${Date.now()}`;
     setCommunities((prev) =>
       prev.map((c) =>
         c.id === communityId
           ? {
               ...c,
-              unterthemen: [
-                ...(c.unterthemen ?? []),
-                { id: `${c.id}-${Date.now()}`, name: sauber, themen: [] },
-              ],
+              unterthemen: [...(c.unterthemen ?? []), { id: vorlaeufig, name: sauber, themen: [] }],
             }
           : c
       )
     );
+
+    /*
+     * Und wirklich anlegen. Vorher stand das Unterthema nur hier: es tauchte
+     * auf der Website nie auf, und in der App war es nach dem naechsten Start
+     * wieder verschwunden. Die Kennung aus der Datenbank wird nachgezogen —
+     * unter der vorlaeufigen liesse sich spaeter nichts hineinschreiben.
+     */
+    if (supabase && daten.ichId) {
+      Aktion.kanalAnlegen(supabase, daten.ichId, communityId, sauber)
+        .then((echt) =>
+          setCommunities((prev) =>
+            prev.map((c) =>
+              c.id === communityId
+                ? {
+                    ...c,
+                    unterthemen: (c.unterthemen ?? []).map((u) =>
+                      u.id === vorlaeufig ? { ...u, id: echt } : u
+                    ),
+                  }
+                : c
+            )
+          )
+        )
+        .catch((e: any) => {
+          console.error('Das Unterthema anlegen fehlgeschlagen:', e?.message ?? e);
+          setCommunities((prev) =>
+            prev.map((c) =>
+              c.id === communityId
+                ? { ...c, unterthemen: (c.unterthemen ?? []).filter((u) => u.id !== vorlaeufig) }
+                : c
+            )
+          );
+        });
+    }
     return null;
-  }, [communities]);
+  }, [communities, supabase, daten.ichId]);
 
   const kanalBeitreten = useCallback(
     (id: string) => {
@@ -778,11 +835,28 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     mitRueckweg(favoriten, setFavoriten, 'Der Lieblingskontakt', Aktion.kontaktFavorit),
     [favoriten, schreiben]
   );
-  const chatStummUmschalten = useCallback(umschalter(chatStumm, setChatStumm), [chatStumm]);
+  /*
+   * Stumm und Geleert gehoeren an chat_members — pro Mitglied, nicht pro
+   * Chat. Beides lief in der App nur in der Anzeige: der stummgeschaltete
+   * Chat klingelte nach dem Neustart wieder, der geleerte war wieder voll.
+   * Die Website macht es in handleChatAction und handleClearChat.
+   */
+  const chatStummUmschalten = useCallback(
+    mitRueckweg(chatStumm, setChatStumm, 'Das Stummschalten', (c, ich, id) =>
+      Aktion.chatEinstellung(c, ich, id, 'stumm')
+    ),
+    [chatStumm, schreiben]
+  );
 
-  const chatLeeren = useCallback((chatId: string) => {
-    setGeleerteChats((prev) => (prev.includes(chatId) ? prev : [...prev, chatId]));
-  }, []);
+  const chatLeeren = useCallback(
+    (chatId: string) => {
+      setGeleerteChats((prev) => (prev.includes(chatId) ? prev : [...prev, chatId]));
+      schreiben('Das Leeren', (c, ich) => Aktion.chatLeeren(c, ich, chatId), () =>
+        setGeleerteChats((prev) => prev.filter((id) => id !== chatId))
+      );
+    },
+    [schreiben]
+  );
 
   const istStumm = useCallback((id: string) => stumm.includes(id), [stumm]);
   const istBlockiert = useCallback((id: string) => blockiert.includes(id), [blockiert]);

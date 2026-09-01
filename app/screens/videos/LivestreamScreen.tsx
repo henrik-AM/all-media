@@ -8,6 +8,8 @@ import { colors, radius, spacing, themenStyles, typography } from '../../constan
 interface Props {
   /** Bekommt Dauer in Sekunden und die erreichte Zuschauerzahl. */
   onEnd: (sekunden: number, zuschauer: number) => void;
+  /** Einmal beim Aufmachen — damit im eigenen Profil steht, dass gesendet wird. */
+  onStart?: () => void;
 }
 
 const zweistellig = (n: number) => String(n).padStart(2, '0');
@@ -19,10 +21,16 @@ const zweistellig = (n: number) => String(n).padStart(2, '0');
  * echt: die Zeit laeuft mit, die Zuschauerzahl waechst, und beim Beenden
  * bleibt die Aufzeichnung im Querformat-Bereich stehen.
  */
-export const LivestreamScreen = ({ onEnd }: Props) => {
+export const LivestreamScreen = ({ onEnd, onStart }: Props) => {
   const insets = useSafeAreaInsets();
   const [sekunden, setSekunden] = useState(0);
   const [zuschauer, setZuschauer] = useState(0);
+
+  // Einmal beim Aufmachen: ab jetzt steht im eigenen Profil, dass gesendet
+  // wird. Vorher wusste das nur dieser Bildschirm.
+  useEffect(() => {
+    onStart?.();
+  }, []);
 
   // Der Endstand muss auch dann stimmen, wenn der Knopf gedrueckt wird,
   // bevor React den letzten Zustand durchgereicht hat.
