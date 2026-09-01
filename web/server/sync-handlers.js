@@ -111,9 +111,17 @@ const handleAcceptContactRequest = handler(
  * Archiviert, stumm, gelesen und Favorit hängen an chat_members — also pro
  * Mitglied. Sonst würde Annas Archivieren auch Bobs Liste verändern.
  */
+/*
+ * Eine Einstellung am Chat setzen — oder umschalten, wenn kein Wert kommt.
+ *
+ * `wert` stand hier auf `true` als Vorgabe. Damit war jeder Umschalter eine
+ * Einbahnstraße: sperren ging, entsperren nicht; stummschalten ging,
+ * lautstellen nicht. Der Kommentar unten beschrieb das Umschalten seit jeher
+ * richtig — die Vorgabe kam nie dort an.
+ */
 const handleChatAction = handler(
   'Chat-Einstellung',
-  async (client, nutzerId, chatId, was, wert = true) => {
+  async (client, nutzerId, chatId, was, wert) => {
     const spalten = {
       archiv: 'is_archived',
       archived: 'is_archived',

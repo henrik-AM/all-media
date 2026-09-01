@@ -157,7 +157,13 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(500);
     await zu();
     await zurListe();
-    const zeile = await page.$eval(await K.waehlerChat(page, 'Bob Müller'), (n) => n.textContent);
+    // Das Aufheben geht in die Datenbank; danach wird die Liste neu geholt.
+    const waehler = await K.waehlerChat(page, 'Bob Müller');
+    await page.waitForFunction(
+      (w) => !(document.querySelector(w)?.textContent ?? '').includes('Gesperrt'),
+      waehler, { timeout: 10000 }
+    ).catch(() => {});
+    const zeile = await page.$eval(waehler, (n) => n.textContent);
     if (zeile.includes('Gesperrt')) throw new Error('die Sperre steht noch');
   });
 
