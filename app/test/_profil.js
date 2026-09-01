@@ -61,11 +61,24 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     }
   };
 
+  /*
+   * Zum eigenen Profil — und warten, bis es wirklich dasteht.
+   *
+   * Das Profil holt seine Zahlen aus der Datenbank. 500 ms reichten dafuer
+   * nicht: der Prueflauf griff auf .oprof__handle zu, das es noch gar nicht
+   * gab, und meldete "Cannot read properties of null".
+   */
   const zumProfil = async (bereich) => {
+    await page.evaluate(() => {
+      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      const o = document.querySelector('#overlay');
+      if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+    });
     await page.click(`[data-area="${bereich}"]`);
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(250);
     await page.click('[data-sub="profile"]');
-    await page.waitForTimeout(500);
+    await page.waitForSelector('.oprof__handle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(400);
   };
 
   /* ------------------------------------------ Einstellungen aus dem Profil */
