@@ -125,15 +125,37 @@ function ok(name, bedingung, zusatz = '') {
     //  in den eigentlichen Chat."
     ok('Kanalliste statt direkt Chat', /Kanal|Kanäle|#/.test(inhalt), inhalt.trim().slice(0, 40));
 
-    // "Bei Nachrichten im Community-Chat links klein das Profilbild des
-    //  Absenders anzeigen. Anklicken fuehrt zum Profil."
-    // Seit dem Umbau sind es drei Ebenen: Kanal -> Thema -> Chat.
-    const kanal = seite.locator('[data-channel]').nth(1);
-    if (await kanal.count()) {
-      await kanal.click();
-      await seite.waitForSelector('[data-thema]', { timeout: 10000 }).catch(() => {});
-      ok('Themen statt direkt Chat', (await seite.locator('[data-thema]').count()) > 0);
+    /*
+     * "Bei Nachrichten im Community-Chat links klein das Profilbild des
+     *  Absenders anzeigen. Anklicken fuehrt zum Profil."
+     *
+     * Seit dem Umbau sind es drei Ebenen: Kanal -> Thema -> Chat.
+     *
+     * Gesucht wird ein Kanal, der auch Themen hat — nicht mehr blind der
+     * zweite. Am 01.09.2026 standen fuenf leere "Pruefthema …" ganz oben in
+     * der Liste; der zweite Kanal war eines davon, die Themenliste blieb leer
+     * und der Lauf brach mitten im Abschnitt ab. Ein Kanal ohne Themen ist
+     * kein Fehler — ein frisch angelegter hat noch keine.
+     */
+    const kanaele = seite.locator('[data-channel]');
+    const anzahl = await kanaele.count();
+    let themenGefunden = false;
 
+    for (let i = 0; i < anzahl; i++) {
+      await kanaele.nth(i).click();
+      await seite.waitForSelector('[data-thema]', { timeout: 4000 }).catch(() => {});
+      if ((await seite.locator('[data-thema]').count()) > 0) {
+        themenGefunden = true;
+        break;
+      }
+      // Zurueck zur Kanalliste und den naechsten versuchen.
+      await seite.goBack().catch(() => {});
+      await seite.waitForSelector('[data-channel]', { timeout: 4000 }).catch(() => {});
+    }
+
+    ok('Themen statt direkt Chat', themenGefunden, anzahl ? `${anzahl} Kanäle` : 'kein Kanal gefunden');
+
+    if (themenGefunden) {
       await seite.locator('[data-thema]').first().click();
       await seite.waitForSelector('.msgzeile__avatar', { timeout: 10000 }).catch(() => {});
       ok('Profilbild am Absender im Kanal-Chat',
@@ -141,9 +163,8 @@ function ok(name, bedingung, zusatz = '') {
       ok('Profilbild fuehrt zum Profil',
         (await seite.locator('.msgzeile__avatar[data-profile]').count()) > 0);
     } else {
-      ok('Themen statt direkt Chat', false, 'kein Kanal gefunden');
-      ok('Profilbild am Absender im Kanal-Chat', false, 'kein Kanal gefunden');
-      ok('Profilbild fuehrt zum Profil', false, 'kein Kanal gefunden');
+      ok('Profilbild am Absender im Kanal-Chat', false, 'kein Kanal mit Themen');
+      ok('Profilbild fuehrt zum Profil', false, 'kein Kanal mit Themen');
     }
   } else {
     ok('Kanalliste statt direkt Chat', false, 'keine Community gefunden');

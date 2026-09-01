@@ -8,11 +8,12 @@
 --  danach nur, wofür es eine Regel gibt — getrennt nach select, insert,
 --  update und delete.
 --
---  Für drei Tabellen gab es nie eine delete-Regel:
+--  Für vier Tabellen gab es nie eine delete-Regel:
 --
---      chat_members    "Chat verlassen"
---      messages        "Chat leeren", eine eigene Nachricht zurücknehmen
---      chats           den leeren Chat hinterher abräumen
+--      chat_members        "Chat verlassen"
+--      messages            "Chat leeren", eine eigene Nachricht zurücknehmen
+--      chats               den leeren Chat hinterher abräumen
+--      community_channels  ein Unterthema wieder entfernen
 --
 --  Und das war nicht als Fehler zu sehen. Postgres weist ein verbotenes
 --  DELETE nicht ab — es löscht null Zeilen und meldet Erfolg. Der Code auf
@@ -67,3 +68,27 @@ create policy "Leeren Chat abraeumen" on public.chats
       )
     )
   );
+
+-- ---------------------------------------------------- community_channels --
+-- Ein Unterthema anlegen ging immer, es wieder loszuwerden nie — weder in der
+-- App noch auf der Website. Fünf Unterthemen namens "Prüfthema …" standen
+-- deshalb am 01.09.2026 dauerhaft in der Community "Design Systeme": ein
+-- Prüflauf hatte sie angelegt und konnte sie nicht abräumen. Sie schoben die
+-- echten Kanäle in der Liste nach hinten, woran ein anderer Prüflauf hängen
+-- blieb.
+--
+-- Entfernen darf nur, wem die Community gehört. Ein einzelnes Mitglied könnte
+-- sonst allen anderen einen Kanal samt Verlauf wegnehmen.
+drop policy if exists "Eigenen Kanal entfernen" on public.community_channels;
+create policy "Eigenen Kanal entfernen" on public.community_channels
+  for delete to authenticated
+  using (
+    exists (
+      select 1 from public.communities c
+      where c.id = community_id and c.created_by = auth.uid()
+    )
+  );
+
+-- Und die fünf, die schon dastehen, gleich mit weg. Sie gehören keinem
+-- Menschen, sondern einem Prüflauf; test/_aktionen.js räumt seither selbst auf.
+delete from public.community_channels where name like 'Prüfthema %';

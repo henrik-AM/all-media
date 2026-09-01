@@ -633,14 +633,24 @@ const pruefe = (name, wahr, zusatz = '') => {
   console.log('\nCommunitys und eigenes Profil');
 
   await pruefe('Ein Unterthema aus der App steht danach auf der Website', await (async () => {
-    const community = await seite.evaluate(async () => {
-      const boot = await (await fetch('/api/bootstrap')).json();
-      return (boot.communities || []).find((c) => c.joined) || (boot.communities || [])[0] || null;
-    });
-    if (!community) return false;
+    /*
+     * In einer EIGENEN Community, nicht in einer fremden.
+     *
+     * Vorher nahm dieser Lauf die erste beste Community aus dem Bestand. Das
+     * Unterthema blieb danach dort stehen — löschen lässt es sich nur, wem
+     * die Community gehört, und der Prüflauf ist nicht der Eigentümer. Nach
+     * fünf Durchläufen standen fünf "Prüfthema …" in "Design Systeme",
+     * schoben die echten Kanäle nach hinten, und test:henrik2 blieb daran
+     * hängen: es klickte den zweiten Kanal an und fand darin keine Themen.
+     *
+     * Eine eigene Community räumt zuruecksetzen() am Ende mit ab — samt
+     * Kanälen, die hängen per Fremdschlüssel daran.
+     */
+    const communityId = await app('communityAnlegen', 'Prüfcommunity ' + Date.now(), 'Prüflauf', true);
+    if (!communityId) return false;
 
     const name = 'Prüfthema ' + Date.now();
-    const kanalId = await app('kanalAnlegen', community.id, name);
+    const kanalId = await app('kanalAnlegen', communityId, name);
     if (!kanalId) return false;
 
     // Und wirklich hineinschreiben — genau das ging in der App nicht: sie
