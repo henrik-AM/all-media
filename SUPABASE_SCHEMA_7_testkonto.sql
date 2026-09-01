@@ -346,8 +346,19 @@ begin
   end loop;
 
   -- --- Eigene Story -----------------------------------------------------
-  -- Storys laufen nach 24 Stunden ab. Beim Zurücksetzen wird deshalb immer
-  -- eine frische angelegt, sonst wäre der Storykreis nach einem Tag leer.
+  -- Storys laufen nach 24 Stunden ab, und die Regel zeigt nur Storys mit
+  -- expires_at > now().
+  --
+  -- Beim Zurücksetzen wird deshalb eine frische angelegt. Das reicht aber
+  -- nicht: der Testbestand soll auch dann vollständig sein, wenn einen Tag
+  -- lang niemand zurückgesetzt hat. Genau das ist am 01.09.2026 passiert —
+  -- test:datenbank meldete "Eigene Story: FAIL", und im Testkonto war der
+  -- eigene Storykreis leer, ohne dass jemand etwas gelöscht hätte.
+  --
+  -- Also dieselbe Lösung wie für die Beispielstorys in
+  -- SUPABASE_SCHEMA_6_inhalte.sql: der Bestand läuft nicht ab. Was ein Nutzer
+  -- selbst aufnimmt, bekommt weiterhin die üblichen 24 Stunden — das steuert
+  -- die Vorgabe der Spalte, nicht diese Zeile hier.
   for v_vorlage in select * from public.vorlage_eigene_storys order by position loop
     if exists (
       select 1 from public.stories
@@ -359,7 +370,7 @@ begin
     insert into public.stories (user_id, media_type, media_url, caption, created_at, expires_at, demo)
     values (ziel, v_vorlage.media_type, v_vorlage.media_url, v_vorlage.caption,
             now() - make_interval(mins => v_vorlage.minuten_zurueck),
-            now() + interval '24 hours', true);
+            now() + interval '10 years', true);
   end loop;
 
   -- --- Merkliste --------------------------------------------------------

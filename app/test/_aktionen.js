@@ -479,6 +479,16 @@ const pruefe = (name, wahr, zusatz = '') => {
       return gesetzt === true && drin === true;
     })());
 
+    await pruefe('Als gelesen markieren aus der App steht in der Datenbank', await (async () => {
+      // Der dritte Punkt aus dem Optionen-Blatt. In der Datenbank steht er
+      // andersherum: is_read true heisst gelesen.
+      await app('chatEinstellung', chat.id, 'gelesen', false);
+      const ungelesen = await chatAusWebsite(chat.id);
+      await app('chatEinstellung', chat.id, 'gelesen', true);
+      const gelesen = await chatAusWebsite(chat.id);
+      return ungelesen && ungelesen.unread === 1 && gelesen && gelesen.unread === 0;
+    })());
+
     await pruefe('Eine Nachricht aus der App liegt danach im Chat', await (async () => {
       const text = 'Prüflauf ' + Date.now();
       const nachricht = await app('nachrichtSenden', chat.id, text);
