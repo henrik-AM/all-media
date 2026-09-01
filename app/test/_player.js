@@ -86,7 +86,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Die Aktionsspalte bleibt beim Liken an ihrem Platz', async () => {
     const vorher = await kanten('.slide__rail .railbtn');
     await page.click('.slide__rail [data-vaction="like"]');
-    await page.waitForTimeout(700);
+    // Die Leiste wird nach der Antwort des Servers neu gezeichnet. Wer
+    // mittendrin misst, findet die alte Reihe und meldet eine Verschiebung,
+    // die es nicht gibt.
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForTimeout(300);
     const nachher = await kanten('.slide__rail .railbtn');
     if (vorher.length !== nachher.length) throw new Error('die Zahl der Knöpfe hat sich geändert');
     const verschoben = vorher.map((v, i) => Math.abs(v - nachher[i])).filter((d) => d > 1);
@@ -96,7 +100,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Auch ein Repost verschiebt nichts', async () => {
     const vorher = await kanten('.slide__rail .railbtn');
     await page.click('.slide__rail [data-vaction="repost"]');
-    await page.waitForTimeout(700);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForTimeout(300);
     const nachher = await kanten('.slide__rail .railbtn');
     const verschoben = vorher.map((v, i) => Math.abs(v - nachher[i])).filter((d) => d > 1);
     if (verschoben.length) throw new Error(verschoben.length + ' Knöpfe sind gewandert');
@@ -159,9 +164,13 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Ein Klick springt an die Stelle', async () => {
-    const zeilen = await page.$$('[data-kapitel]');
-    if (zeilen.length < 3) throw new Error('nur ' + zeilen.length + ' Kapitel');
-    await zeilen[2].click();
+    // Locator statt fester Verweis: die Kapitelliste wird beim Aufbau des
+    // Spielers neu gezeichnet. Ein vorher geholter Verweis zeigte dann auf
+    // ein Element, das nicht mehr im Dokument hing ("not attached to the DOM").
+    const zeilen = page.locator('[data-kapitel]');
+    const anzahl = await zeilen.count();
+    if (anzahl < 3) throw new Error('nur ' + anzahl + ' Kapitel');
+    await zeilen.nth(2).click();
     // Der Balken wird beim Klick gesetzt; 300 ms waren dafuer eine Wette.
     await page.waitForFunction(
       () => {
