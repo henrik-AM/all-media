@@ -8447,10 +8447,23 @@ async function openChat(chatId) {
   input.focus();
 }
 
+/*
+ * Die Trennzeile ueber dem Verlauf sagte immer "Heute" — auch wenn darunter
+ * jede Nachricht "Gestern" trug. Sie nimmt jetzt die Zeitangabe der ersten
+ * Nachricht: eine Uhrzeit (14:32) heisst heute, alles andere steht selbst da
+ * ("Gestern", "Mo", "12.08."). Gleiche Regel in der App, siehe
+ * app/screens/messenger/ChatDetailScreen.tsx.
+ */
+function tagTrenner(nachrichten) {
+  const erste = nachrichten[0];
+  if (!erste || !erste.time) return 'Heute';
+  return /^\d{1,2}:\d{2}$/.test(erste.time.trim()) ? 'Heute' : erste.time;
+}
+
 function paintMessages(chat) {
   const box = $('#messages');
   box.innerHTML =
-    `<div class="daydivider">Heute</div>` +
+    `<div class="daydivider">${esc(tagTrenner(state.messages))}</div>` +
     state.messages.map((m) => messageBubble(m, chat)).join('');
   box.scrollTop = box.scrollHeight;
 

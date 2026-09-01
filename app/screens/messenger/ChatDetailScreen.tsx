@@ -157,6 +157,12 @@ export const ChatDetailScreen = ({
     await supabase.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chat.id);
   };
 
+  const tagTrenner = (() => {
+    const erste = messages[0];
+    if (!erste?.time) return 'Heute';
+    return /^\d{1,2}:\d{2}$/.test(erste.time.trim()) ? 'Heute' : erste.time;
+  })();
+
   const renderMessage = ({ item }: { item: Message }) => {
     const out = item.senderId === CURRENT_USER_ID;
     const sender = alleNutzer[item.senderId];
@@ -309,7 +315,13 @@ export const ChatDetailScreen = ({
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <View style={styles.dayDivider}>
-              <Text style={styles.dayDividerText}>Heute</Text>
+              {/*
+                Stand hier immer "Heute" - auch wenn darunter jede Nachricht
+                "Gestern" trug. Jetzt aus der Zeitangabe der ersten Nachricht:
+                eine Uhrzeit heisst heute, alles andere steht selbst da.
+                Gleiche Regel auf der Website (paintMessages).
+              */}
+              <Text style={styles.dayDividerText}>{tagTrenner}</Text>
             </View>
           }
         />
