@@ -1891,7 +1891,9 @@ begin
     values (v_chat.name, v_chat.is_group, v_chat.bereich, ziel)
     returning id into v_neu;
 
-    insert into public.chat_members (chat_id, user_id) values (v_neu, ziel)
+    -- „is_read = false" macht die rote Zahl an Messenger und Chats sichtbar.
+    insert into public.chat_members (chat_id, user_id, is_read)
+    values (v_neu, ziel, not v_chat.ungelesen)
     on conflict do nothing;
 
     foreach v_person in array v_chat.mitglieder loop
@@ -2307,6 +2309,22 @@ comment on column public.messages.place_id is
   'Angehängter Standort. Die Oberfläche macht daraus die Karte mit Nadel.';
 comment on column public.messages.contact_user_id is
   'Angehängter Kontakt. Die Oberfläche macht daraus die Karte mit Avatar.';
+
+
+-- ===========================================================================
+-- Ungelesene Chats zum Prüfen
+-- ===========================================================================
+--
+-- Die roten Zahlen an „Messenger" und „Chats" gehören zum Prototyp — und
+-- ließen sich nicht prüfen, weil ein frisch angelegter Chat als gelesen gilt
+-- (`chat_members.is_read` steht auf `true`). Zum Testbestand gehört deshalb,
+-- dass zwei Chats ungelesen sind, so wie es die Beispieldaten früher zeigten:
+-- Anna und Bob.
+
+alter table public.vorlage_chats
+  add column if not exists ungelesen boolean not null default false;
+
+update public.vorlage_chats set ungelesen = (schluessel in ('c1', 'c2'));
 
 
 -- ===========================================================================

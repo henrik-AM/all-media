@@ -2740,6 +2740,10 @@ function renderHomeFeed() {
       }
       if (paction === 'share') return openTeilen('post', pid);
 
+      // Nur der zuletzt gestartete Bildaufbau darf schreiben — siehe die
+      // gleiche Stelle im Video-Feed.
+      const lauf = renderLauf;
+
       const res = await fetch(`/api/posts/${pid}/${paction}`, { method: 'POST' });
       const updated = await res.json();
       const idx = state.posts.findIndex((p) => p.id === updated.id);
@@ -2756,9 +2760,13 @@ function renderHomeFeed() {
       if (paction === 'follow') toast(updated.following ? 'Du folgst jetzt' : 'Nicht mehr gefolgt');
       if (paction === 'notify') toast(updated.notify ? 'Benachrichtigungen an' : 'Benachrichtigungen aus');
 
-      const scrollTop = $('#homeScroll').scrollTop;
+      if (lauf !== renderLauf) return;
+
+      const flaeche = $('#homeScroll');
+      const scrollTop = flaeche ? flaeche.scrollTop : 0;
       renderHomeFeed();
-      $('#homeScroll').scrollTop = scrollTop;
+      const neueFlaeche = $('#homeScroll');
+      if (neueFlaeche) neueFlaeche.scrollTop = scrollTop;
     })
   );
 }
@@ -2899,6 +2907,19 @@ function renderVideoFeed() {
 
       if (vaction === 'share') return openTeilen('video', vid);
 
+      /*
+       * Die Nummer des aktuellen Bildaufbaus merken.
+       *
+       * Der Klick geht zum Server und zurueck. Wer in dieser Zeit den
+       * Bildschirm wechselt — und das ist eine Zehntelsekunde, kein
+       * Kunststueck —, bekam den Hochformat-Feed hinterher wieder
+       * uebergestuelpt: die Navigation zeigte "Querformat", der Inhalt war
+       * der alte. Genauso beim Bild-Feed darunter.
+       *
+       * Dasselbe Mittel wie bei renderCommunityChannels: nur der zuletzt
+       * gestartete Aufbau darf schreiben.
+       */
+      const lauf = renderLauf;
 
       const res = await fetch(`/api/videos/${vid}/${vaction}`, { method: 'POST' });
       const updated = await res.json();
@@ -2908,17 +2929,10 @@ function renderVideoFeed() {
       if (vaction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
 
-      /*
-       * Die Scrollhoehe merken, damit der Feed nach dem Neuzeichnen nicht
-       * nach oben springt.
-       *
-       * Vorher stand hier $('#feed').scrollTop ohne Pruefung. Jeder Klick,
-       * der den Bildschirm zwischendurch verlaesst — etwa weil die Antwort
-       * des Servers laenger braucht als der Wechsel — traf dann auf null und
-       * warf "Cannot read properties of null". Der Fehler landete im
-       * Auffangnetz und der Nutzer bekam eine Meldung ueber etwas, das ihn
-       * nicht betrifft.
-       */
+      if (lauf !== renderLauf) return;
+
+      // Die Scrollhoehe merken, damit der Feed nach dem Neuzeichnen nicht
+      // nach oben springt.
       const feed = $('#feed');
       const scrollTop = feed ? feed.scrollTop : 0;
       renderVideoFeed();

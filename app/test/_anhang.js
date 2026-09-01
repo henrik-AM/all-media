@@ -234,10 +234,25 @@ if (!fs.existsSync(BILD)) {
     await page.waitForSelector('[data-grund]', { timeout: 3000 });
     const gruende = await page.$$eval('[data-grund]', (els) => els.length);
     if (gruende < 3) throw new Error('nur ' + gruende + ' Gruende');
+    /*
+     * Der Hinweis unten blendet sich nach 2,2 Sekunden aus.
+     *
+     * Vorher wurde erst 600 ms gewartet und dann nachgesehen. Seit die
+     * Meldung über die Datenbank läuft, war das mal zu früh und mal zu spät —
+     * der Prüflauf fand ein leeres Feld und meldete "kein Treffer". Deshalb:
+     * das Feld leeren, dann auf den Text warten.
+     */
+    await page.evaluate(() => {
+      const t = document.querySelector('#toast');
+      if (t) { t.textContent = ''; t.hidden = true; }
+    });
     await page.click('[data-grund]');
-    await page.waitForTimeout(600);
+    await page.waitForFunction(
+      () => { const t = document.querySelector('#toast'); return t && !t.hidden && t.textContent.trim().length > 0; },
+      null, { timeout: 10000 }
+    ).catch(() => {});
     const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
-    if (!hinweis.includes('Danke')) throw new Error(hinweis);
+    if (!hinweis.includes('Danke')) throw new Error(hinweis || 'kein Hinweis erschienen');
   });
 
   await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));

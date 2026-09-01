@@ -51,12 +51,29 @@ function ok(name, bedingung, zusatz = '') {
   await seite.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await seite.waitForSelector('.navbtn');
 
+  /*
+   * Zu einem Bildschirm wechseln und warten, bis er wirklich dasteht.
+   *
+   * 220 ms reichten, solange die Inhalte im Arbeitsspeicher des Servers
+   * lagen. Jetzt kommen sie aus der Datenbank — und der Prueflauf sah einen
+   * halb aufgebauten Bildschirm: kein Follower-Knopf, kein "Bearbeiten",
+   * kein Bio-Link. Lauter Fehler, die keine waren.
+   */
   const geheZu = async (bereich, unterpunkt) => {
+    await seite.evaluate(() => {
+      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      const o = document.querySelector('#overlay');
+      if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+    });
     await seite.click(`[data-area="${bereich}"]`);
-    await seite.waitForTimeout(120);
+    await seite.waitForTimeout(200);
     if (unterpunkt) {
       await seite.click(`[data-sub="${unterpunkt}"]`);
-      await seite.waitForTimeout(220);
+      await seite.waitForFunction(
+        () => (document.querySelector('#main')?.textContent || '').trim().length > 0,
+        null, { timeout: 10000 }
+      ).catch(() => {});
+      await seite.waitForTimeout(400);
     }
   };
 
@@ -68,10 +85,14 @@ function ok(name, bedingung, zusatz = '') {
   //  darf nicht 'Alle 28 Kommentare ansehen' stehen."
   const kommentarText = await seite.locator('.post__comments').first().textContent();
   const genannt = Number((kommentarText.match(/\d+/) || [0])[0]);
-  const echt = await seite.evaluate(async () => {
-    const r = await fetch('/api/comments/p1');
+  // Die Kennung des Beitrags stand hier fest als "p1" — Beiträge bekommen sie
+  // jetzt beim Anlegen in der Datenbank. Also die des ersten im Feed nehmen,
+  // denn genau dessen Zahl steht oben.
+  const beitragId = await seite.locator('.post__comments').first().getAttribute('data-pid');
+  const echt = await seite.evaluate(async (id) => {
+    const r = await fetch(`/api/comments/${id}`);
     return (await r.json()).length;
-  });
+  }, beitragId);
   ok('Kommentarzahl stimmt mit der Liste ueberein', genannt === echt, `genannt ${genannt}, echt ${echt}`);
 
   // "Der blaue Story-Kreis links oben bei Beitraegen muss anklickbar sein"
@@ -84,7 +105,11 @@ function ok(name, bedingung, zusatz = '') {
   if (await glocke.count()) {
     const vorher = await glocke.getAttribute('class');
     await glocke.click();
-    await seite.waitForTimeout(200);
+    // Das Umschalten geht in die Datenbank und kommt zurueck.
+    await seite.waitForFunction(
+      (alt) => document.querySelector('[data-paction="notify"]')?.className !== alt,
+      vorher, { timeout: 10000 }
+    ).catch(() => {});
     const nachher = await glocke.getAttribute('class');
     ok('Glocke schaltet sichtbar um', vorher !== nachher, `${vorher} -> ${nachher}`);
   }
@@ -117,10 +142,20 @@ function ok(name, bedingung, zusatz = '') {
   /* --------------------------------------------------------- Querformat */
   console.log('\nVideos — Querformat');
   await geheZu('videos', 'landscape');
-  const querText = await seite.locator('.main').textContent();
+  /*
+   * Die Filterleiste selbst ansehen, nicht den Text der ganzen Seite.
+   *
+   * Vorher wurde in `.main` nach den Wörtern gesucht. Das ging schief, sobald
+   * der Bildschirm beim Nachsehen noch nicht fertig war — und sagte auch
+   * nichts darüber, ob es wirklich Knöpfe sind: "Live" steht auch auf jeder
+   * Videokachel.
+   */
+  await seite.waitForSelector('[data-clipfilter]', { timeout: 10000 }).catch(() => {});
+  const filterKnoepfe = await seite.$$eval('[data-clipfilter]', (n) => n.map((x) => x.textContent.trim()));
   // "Zusaetzlich die Buttons 'Alle', 'Standard', '360 Grad' und 'Live'."
   for (const knopf of ['Alle', 'Standard', '360', 'Live']) {
-    ok(`Querformat-Filter "${knopf}"`, querText.includes(knopf));
+    ok(`Querformat-Filter "${knopf}"`, filterKnoepfe.some((t) => t.includes(knopf)),
+      filterKnoepfe.join(' | '));
   }
 
   /* ------------------------------------------------------------- Suche */
@@ -148,6 +183,8 @@ function ok(name, bedingung, zusatz = '') {
   await geheZu('videos', 'profile');
 
   // "Eigene Follower und Gefolgte einsehbar machen."
+  // Auf den Profilkopf warten, bevor irgendetwas darin gesucht wird.
+  await seite.waitForSelector('#followerBtn', { timeout: 10000 }).catch(() => {});
   const follower = seite.locator('#followerBtn, #followingBtn').first();
   ok('Followerzahl ist anklickbar', (await follower.count()) > 0);
 
@@ -189,12 +226,14 @@ function ok(name, bedingung, zusatz = '') {
   // "Beim Tippen auf den Namen einer Person im Chat nicht auf deren
   //  Video-Profil, sondern auf die Chat-Einstellungen."
   await seite.locator('[data-chat]').first().click();
-  await seite.waitForTimeout(300);
+  await seite.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
+  await seite.waitForTimeout(400);
   const kopf = seite.locator('.chathead__name, .chatkopf__name, [data-chatsettings]').first();
   ok('Chat-Kopf ist anklickbar', (await kopf.count()) > 0);
   if (await kopf.count()) {
     await kopf.click();
-    await seite.waitForTimeout(350);
+    await seite.waitForSelector('.kp__zeileText', { timeout: 10000 }).catch(() => {});
+    await seite.waitForTimeout(300);
     const offen = await seite.locator('.sheet, .overlay:not([hidden])').textContent().catch(() => '');
     ok('Fuehrt zu den Chat-Einstellungen', /[Ee]instellung|Benachrichtigung|Stumm/.test(offen),
       offen.trim().slice(0, 45));
