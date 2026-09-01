@@ -81,6 +81,29 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(400);
   };
 
+  /*
+   * Zu einem fremden Profil — ueber einen Beitrag im Feed.
+   *
+   * Vorher standen die beiden Fremdprofil-Pruefungen mit festen Wartewerten
+   * da und ohne aufzuraeumen. Blieb vorher ein Blatt offen, landete der Klick
+   * nicht im Feed, und die Meldung ("die Highlights sind keine Knoepfe")
+   * zeigte auf etwas, das gar nicht der Fehler war.
+   */
+  const zumFremdprofil = async (userId) => {
+    await page.evaluate(() => {
+      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      const o = document.querySelector('#overlay');
+      if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+    });
+    await page.click('[data-area="videos"]');
+    await page.waitForTimeout(250);
+    await page.click('[data-sub="home"]');
+    await page.waitForSelector(`[data-profile="${userId}"]`, { timeout: 10000 });
+    await page.click(`[data-profile="${userId}"]`);
+    await page.waitForSelector('.prof__name, .prof__link, .highlight', { timeout: 10000 });
+    await page.waitForTimeout(300);
+  };
+
   /* ------------------------------------------ Einstellungen aus dem Profil */
   console.log('\nEinstellungen aus dem Profil');
 
@@ -270,20 +293,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Eine Playlist laesst sich oeffnen und wieder schliessen', async () => {
     await page.click('.highlight[data-sammlung="playlist"]');
-    await page.waitForTimeout(400);
+    await page.waitForSelector('.pagehead__sub', { timeout: 10000 });
     const unter = await page.$eval('.pagehead__sub', (n) => n.textContent);
     if (!unter.startsWith('Playlist')) throw new Error('Kopf sagt „' + unter + '"');
     await page.click('#sammlungBack');
-    await page.waitForTimeout(500);
+    // Das eigene Profil holt seine Zahlen aus der Datenbank, bevor es steht.
+    // 500 ms waren dafuer eine Wette.
+    await page.waitForSelector('#profilBearbeiten', { timeout: 10000 }).catch(() => {});
     if (!(await page.$('#profilBearbeiten'))) throw new Error('der Pfeil fuehrt nicht zurueck');
   });
 
   await pruefe('Auf einem fremden Profil sind Highlights klickbar', async () => {
-    await page.click('[data-area="videos"]');
-    await page.click('[data-sub="home"]');
-    await page.waitForTimeout(500);
-    await page.click(`[data-profile="${K.person('u1')}"]`);
-    await page.waitForTimeout(600);
+    await zumFremdprofil(K.person('u1'));
     const knopf = await page.$('.highlight[data-sammlung]');
     if (!knopf) throw new Error('die Highlights sind keine Knoepfe');
     await knopf.click();
@@ -293,11 +314,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Der Link auf einem fremden Profil ist ein echter Link', async () => {
-    await page.click('[data-area="videos"]');
-    await page.click('[data-sub="home"]');
-    await page.waitForTimeout(500);
-    await page.click(`[data-profile="${K.person('u1')}"]`);
-    await page.waitForTimeout(600);
+    await zumFremdprofil(K.person('u1'));
     const href = await page.$eval('.prof__link', (n) => n.getAttribute('href'));
     if (!href || !href.startsWith('http')) throw new Error('href ist „' + href + '"');
     await page.click('#profBack');

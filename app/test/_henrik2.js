@@ -183,4 +183,9 @@ function ok(name, bedingung, zusatz = '') {
     offen.forEach((f) => console.log(`    - ${f}`));
   }
   console.log(konsole.length ? `\n  Konsolenfehler: ${konsole.length}` : '\n  Keine Konsolenfehler');
+
+  // Ohne diese Zeile endete der Lauf immer mit 0. In der Kette (test:alles)
+  // lief es damit weiter, obwohl hier vier Punkte offen waren - der Fehler
+  // stand im Protokoll und blieb trotzdem folgenlos.
+  process.exit(offen.length === 0 && konsole.length === 0 ? 0 : 1);
 })();
