@@ -296,7 +296,14 @@ if (!fs.existsSync(BILD)) {
     await page.fill('#f_ziel', '500');
     await page.fill('#f_text', 'Zwanzig Bäume für den Stadtpark.');
     await page.click('#formOk');
-    await page.waitForTimeout(800);
+    // Die Aktion geht erst in die Datenbank, dann wird das Profil neu geholt.
+    // Feste Wartewerte trafen in der Kette noch die vorige Spendenaktion.
+    await page
+      .waitForFunction(
+        (t) => document.querySelector('.spende__titel')?.textContent === t,
+        'Bäume für den Park', { timeout: 15000 }
+      )
+      .catch(() => {});
     const titel = await page.$eval('.spende__titel', (e) => e.textContent);
     if (titel !== 'Bäume für den Park') throw new Error(titel);
     const zahlen = await page.$eval('.spende__zahlen', (e) => e.textContent);
@@ -315,7 +322,12 @@ if (!fs.existsSync(BILD)) {
     await page.waitForSelector('#f_titel');
     await page.fill('#f_titel', 'Ohne Ziel');
     await page.click('#formOk');
-    await page.waitForTimeout(900);
+    await page
+      .waitForFunction(
+        (t) => document.querySelector('.spende__titel')?.textContent === t,
+        'Ohne Ziel', { timeout: 15000 }
+      )
+      .catch(() => {});
     const titel = await page.$eval('.spende__titel', (e) => e.textContent);
     if (titel !== 'Ohne Ziel') throw new Error('es steht „' + titel + '"');
     // Ohne Ziel gibt es keinen Balken - er haette keine Bezugsgroesse.
@@ -328,7 +340,15 @@ if (!fs.existsSync(BILD)) {
     await page.fill('#f_titel', 'Mit Unsinn');
     await page.fill('#f_ziel', '-5');
     await page.click('#formOk');
-    await page.waitForTimeout(500);
+    await page
+      .waitForFunction(
+        () => {
+          const t = document.querySelector('#toast');
+          return t && !t.hidden && t.textContent.trim();
+        },
+        null, { timeout: 10000 }
+      )
+      .catch(() => {});
     const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
     if (!hinweis) throw new Error('kein Hinweis');
     await page.click('[data-sheet-close]');
