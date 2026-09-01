@@ -113,7 +113,14 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('„Chat sperren" merkt sich seinen Stand', async () => {
     await page.click('[data-chatopt="sperren"]');
-    await page.waitForTimeout(500);
+    // Der Schalter geht erst an, wenn der Server geantwortet hat. Feste
+    // Wartewerte reichten dafuer in der Kette nicht.
+    await page
+      .waitForFunction(
+        () => document.querySelector('[data-chatopt="sperren"]')?.classList.contains('is-on'),
+        null, { timeout: 10000 }
+      )
+      .catch(() => {});
     const an = await page.$eval('[data-chatopt="sperren"]', (n) => n.classList.contains('is-on'));
     if (!an) throw new Error('der Schalter bleibt aus');
 
@@ -213,12 +220,20 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('„Blockieren" wirkt und laesst sich wieder aufheben', async () => {
     await zu();
     await optionen();
+    const wartetAuf = (soll) =>
+      page
+        .waitForFunction(
+          (s) => document.querySelector('[data-chatopt="blockieren"]')?.textContent.trim() === s,
+          soll, { timeout: 10000 }
+        )
+        .catch(() => {});
+
     await page.click('[data-chatopt="blockieren"]');
-    await page.waitForTimeout(600);
+    await wartetAuf('Blockierung aufheben');
     const text = await page.$eval('[data-chatopt="blockieren"]', (n) => n.textContent.trim());
     if (text !== 'Blockierung aufheben') throw new Error('der Knopf sagt „' + text + '"');
     await page.click('[data-chatopt="blockieren"]');
-    await page.waitForTimeout(600);
+    await wartetAuf('Blockieren');
     const zurueck = await page.$eval('[data-chatopt="blockieren"]', (n) => n.textContent.trim());
     if (zurueck !== 'Blockieren') throw new Error('der Knopf sagt „' + zurueck + '"');
     await zu();
