@@ -152,7 +152,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
           {item.mediaUri ? (
             <Image source={{ uri: item.mediaUri }} style={styles.mediaBild} />
           ) : (
-            <Motiv id={item.id} bild={item.mediaUri} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+            <Motiv id={item.id} bild={item.standbild ?? item.mediaUri} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
           )}
         </View>
 

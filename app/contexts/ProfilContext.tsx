@@ -286,6 +286,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           kind: daten.posts.some((p) => p.id === e.id) ? 'image' : 'video',
           eigen: true,
           mediaUri: (e as { mediaUri?: string }).mediaUri,
+          standbild: (e as { standbild?: string }).standbild,
         }))
     );
     setEigeneBeitraege([]);

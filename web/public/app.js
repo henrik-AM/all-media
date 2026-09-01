@@ -2851,7 +2851,7 @@ function postCard(p) {
         }
       </header>
 
-      <div class="post__media">${medienFlaeche(p.id, ICONS.image, p.mediaUrl)}</div>
+      <div class="post__media">${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}</div>
 
       <div class="post__actions">
         <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-paction="like" data-pid="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
@@ -2912,7 +2912,18 @@ function compactNumber(n) {
 }
 
 function renderVideoFeed() {
-  main.innerHTML = `<div class="feed" id="feed">${state.videos.map(videoSlide).join('')}</div>`;
+  main.innerHTML =
+    `<div class="feed" id="feed">${state.videos.map(videoSlide).join('')}</div>` +
+    `<button class="tonknopf" id="tonKnopf" aria-label="Ton an">${ICONS.tonAus}</button>`;
+  reelsBeobachten();
+
+  const tonKnopf = main.querySelector('#tonKnopf');
+  tonKnopf.addEventListener('click', () => {
+    tonAus = !tonAus;
+    main.querySelectorAll('.slide__stage video').forEach((v) => { v.muted = tonAus; });
+    tonKnopf.innerHTML = tonAus ? ICONS.tonAus : ICONS.tonAn;
+    tonKnopf.setAttribute('aria-label', tonAus ? 'Ton an' : 'Ton aus');
+  });
 
   main.querySelectorAll('[data-vaction]').forEach((btn) =>
     btn.addEventListener('click', async () => {
@@ -2982,11 +2993,58 @@ function renderVideoFeed() {
   );
 }
 
+/*
+ * Nur das Reel laufen lassen, das gerade zu sehen ist.
+ *
+ * Wuerden alle gleichzeitig spielen, laedt der Browser ein Dutzend Videos auf
+ * einmal — auf dem Handy ueber Mobilfunk ist das der Unterschied zwischen
+ * "laeuft" und "laedt ewig". Dieselbe Regel gilt in der App
+ * (VideoFeedScreen, onViewableItemsChanged).
+ *
+ * Der Ton faengt aus an. Das ist nicht nur Hoeflichkeit: Browser lassen ein
+ * Video ohne Zutun des Nutzers nur stumm starten, mit Ton wuerde die
+ * Wiedergabe abgelehnt und die Flaeche bliebe stehen.
+ */
+function reelsBeobachten() {
+  const spieler = [...main.querySelectorAll('.slide__stage video')];
+  if (!spieler.length) return;
+
+  spieler.forEach((v) => { v.muted = tonAus; });
+
+  const beobachter = new IntersectionObserver(
+    (eintraege) => {
+      eintraege.forEach((e) => {
+        const v = e.target;
+        if (e.isIntersecting && e.intersectionRatio > 0.6) {
+          v.play().catch(() => {});
+        } else {
+          v.pause();
+          v.currentTime = 0;
+        }
+      });
+    },
+    { threshold: [0, 0.6, 1] }
+  );
+  spieler.forEach((v) => beobachter.observe(v));
+
+  /* Antippen haelt an und laesst weiterlaufen. */
+  spieler.forEach((v) =>
+    v.addEventListener('click', () => (v.paused ? v.play().catch(() => {}) : v.pause()))
+  );
+}
+
+/* Ton im Reel-Kanal. Merkt sich die Wahl fuer den ganzen Besuch. */
+let tonAus = true;
+
 function videoSlide(v) {
   const u = user(v.userId);
   return `
     <section class="slide" id="slide-${v.id}">
-      <div class="slide__stage">${medienFlaeche(v.id, ICONS.play, v.mediaUrl)}</div>
+      <div class="slide__stage">${
+        istVideoAdresse(v.mediaUrl)
+          ? videoElement(`reel-${v.id}`, v.mediaUrl, v.thumbnail, 'loop muted')
+          : medienFlaeche(v.id, ICONS.play, v.mediaUrl, v.thumbnail)
+      }</div>
 
       <div class="slide__rail">
         <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
@@ -5110,7 +5168,7 @@ function renderLandscapeVideos() {
                     ? `${compactNumber(c.zuschauer || 0)} sehen zu`
                     : `${compactNumber(c.views)} Aufrufe · ${esc(c.age)}`;
                 return `<article class="clip" data-clip="${c.id}">
-                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}${marke}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}${marke}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
                     <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
                     <div>
@@ -5206,7 +5264,7 @@ function renderClipsExplorer() {
     <div class="scroll">
       ${state.clips.map((c) => `
         <button class="exp__row" data-openclip="${c.id}">
-          <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}</span>
+          <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}</span>
           <span class="exp__text">
             <strong>${esc(c.title)}</strong>
             <small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small>
@@ -5222,7 +5280,7 @@ function renderPostsExplorer() {
     ${explorerKopf('Beiträge')}
     <div class="scroll">
       <div class="exp__grid">${state.posts.map((p) => `
-        <button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image, p.mediaUrl)}</button>`).join('')}</div>
+        <button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}</button>`).join('')}</div>
     </div>`;
   main.querySelectorAll('[data-openpost]').forEach(b => b.addEventListener('click', () => openPost(b.dataset.openpost)));
   explorerZurueck();
@@ -5236,7 +5294,7 @@ function renderHashtagExplorer(tag) {
     ${explorerKopf(esc(tag))}
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
-        <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${medienFlaeche(i.id, ICONS.image, i.mediaUrl)}</button>`).join('')}</div>
+        <button class="griditem" data-item="${i.id}" data-type="${i.userId ? (i.duration ? 'video' : 'post') : 'clip'}">${medienFlaeche(i.id, ICONS.image, i.mediaUrl, i.thumbnail)}</button>`).join('')}</div>
     </div>`;
   explorerZurueck();
 }
@@ -5337,7 +5395,7 @@ function renderPlaceExplorer(placeId) {
     ${explorerKopf(esc(place?.name || 'Standort'))}
     <div class="scroll">
       <div class="exp__grid">${items.slice(0, 20).map((i) => `
-        <button class="griditem" data-item="${i.id}">${medienFlaeche(i.id, ICONS.image, i.mediaUrl)}</button>`).join('')}</div>
+        <button class="griditem" data-item="${i.id}">${medienFlaeche(i.id, ICONS.image, i.mediaUrl, i.thumbnail)}</button>`).join('')}</div>
     </div>`;
   explorerZurueck();
 }
@@ -5359,7 +5417,7 @@ function medienKachel(eintrag, art, symbol, form) {
 
   return `
     <button class="exp__card exp__card--${form}" data-${art}="${eintrag.id}">
-      <span class="exp__card-media">${medienFlaeche(eintrag.id, symbol, eintrag.mediaUrl)}</span>
+      <span class="exp__card-media">${medienFlaeche(eintrag.id, symbol, eintrag.mediaUrl, eintrag.thumbnail)}</span>
       <span class="exp__card-info">
         <span class="exp__card-kopf">
           <span class="exp__card-avatar" style="background:${u.color}">${esc(u.initials)}</span>
@@ -5447,7 +5505,7 @@ function renderVideoSearch() {
                 ? `<div class="exp__list">${clips
                     .map(
                       (c) => `<button class="exp__row" data-openclip="${c.id}">
-                        <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}</span>
+                        <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}</span>
                         <span class="exp__text"><strong>${esc(c.title)}</strong><small>${esc(user(c.userId).name)} · ${esc(c.duration)}</small></span>
                       </button>`
                     )
@@ -6282,6 +6340,10 @@ function openVideoOptionen(clip, danach) {
           if (was === 'tempo') {
             return waehlen('Geschwindigkeit', TEMPO, state.video.tempo, tempoText, (w) => {
               state.video.tempo = Number(w);
+              // Auf das laufende Video anwenden. Vorher wurde die Wahl nur
+              // gespeichert und angezeigt — am Video aenderte sich nichts.
+              const laeuft = document.querySelector('#clipVideo');
+              if (laeuft) laeuft.playbackRate = state.video.tempo;
             });
           }
           waehlen('Qualität', QUALITAET, state.video.qualitaet, (w) => w, (w) => {
@@ -6322,7 +6384,11 @@ function openClip(clipId) {
         <div class="scroll">
           <div class="player">
             <div class="player__stage" id="clipStage">
-              ${medienFlaeche(clip.id, ICONS.play, clip.mediaUrl)}
+              ${
+                istVideoAdresse(clip.mediaUrl)
+                  ? videoElement('clipVideo', clip.mediaUrl, clip.thumbnail)
+                  : medienFlaeche(clip.id, ICONS.play, clip.mediaUrl, clip.thumbnail)
+              }
               <button class="player__play" id="clipPlay" aria-label="Abspielen">${ICONS.play}</button>
             </div>
             <div class="player__leiste">
@@ -6425,7 +6491,7 @@ function openClip(clipId) {
               .map((c) => {
                 const au = user(c.userId);
                 return `<article class="clip clip--klein" data-anderesclip="${c.id}">
-                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}<span class="clip__time">${esc(c.duration)}</span></div>
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
                     <div class="avatar avatar--36" style="background:${au.color}">${esc(au.initials)}</div>
                     <div>
@@ -6445,6 +6511,10 @@ function openClip(clipId) {
 
   const schliessen = () => {
     clearInterval(uhr);
+    // Ohne das Anhalten laeuft der Ton weiter, waehrend das Fenster schon zu
+    // ist — innerHTML='' allein raeumt das Element nicht zuverlaessig ab.
+    const medium = overlay.querySelector('#clipVideo');
+    if (medium) medium.pause();
     overlay.hidden = true;
     overlay.innerHTML = '';
   };
@@ -6454,27 +6524,68 @@ function openClip(clipId) {
 
     const play = overlay.querySelector('#clipPlay');
     const stage = overlay.querySelector('#clipStage');
+    /*
+     * Das echte Videoelement — es gibt es nur, wenn zum Beitrag eine
+     * Videodatei hinterlegt ist. Sonst bleibt es beim Zaehler von vorher: es
+     * ist nichts abzuspielen, aber die Leiste soll sich bewegen.
+     */
+    const medium = overlay.querySelector('#clipVideo');
+
+    const knopfStand = (laeuft) => {
+      play.innerHTML = laeuft ? ICONS.pause : ICONS.play;
+      play.classList.toggle('is-aus', laeuft);
+    };
+
+    const leisteSetzen = () => {
+      const zeitFeld = overlay.querySelector('#clipZeit');
+      if (zeitFeld) zeitFeld.textContent = zeit(bei);
+      const balken = overlay.querySelector('#clipFortschritt');
+      if (balken) balken.style.width = `${gesamt ? (bei / gesamt) * 100 : 0}%`;
+    };
+
+    if (medium) {
+      /*
+       * Die Laufzeit aus der Datei schlaegt die aus dem Beitrag. Im Beitrag
+       * steht ein Text, den irgendwer eingetragen hat; die Datei weiss es.
+       */
+      medium.addEventListener('loadedmetadata', () => {
+        if (medium.duration && isFinite(medium.duration)) {
+          gesamt = Math.round(medium.duration);
+          leisteSetzen();
+        }
+      });
+      medium.addEventListener('timeupdate', () => {
+        bei = Math.floor(medium.currentTime);
+        leisteSetzen();
+      });
+      medium.addEventListener('play', () => knopfStand(true));
+      medium.addEventListener('pause', () => knopfStand(false));
+      medium.addEventListener('ended', () => knopfStand(false));
+      medium.playbackRate = state.video.tempo || 1;
+    }
+
     const umschalten = () => {
+      if (medium) {
+        if (medium.paused) medium.play().catch(() => {});
+        else medium.pause();
+        return;
+      }
       if (uhr) {
         clearInterval(uhr);
         uhr = null;
-        play.innerHTML = ICONS.play;
-        play.classList.remove('is-aus');
+        knopfStand(false);
         return;
       }
-      play.innerHTML = ICONS.pause;
-      play.classList.add('is-aus');
+      knopfStand(true);
       uhr = setInterval(() => {
         const zeitFeld = overlay.querySelector('#clipZeit');
         if (!zeitFeld) return clearInterval(uhr);
         bei = Math.min(gesamt, bei + 1);
-        zeitFeld.textContent = zeit(bei);
-        overlay.querySelector('#clipFortschritt').style.width = `${(bei / gesamt) * 100}%`;
+        leisteSetzen();
         if (bei >= gesamt) {
           clearInterval(uhr);
           uhr = null;
-          play.innerHTML = ICONS.play;
-          play.classList.remove('is-aus');
+          knopfStand(false);
         }
       }, 1000);
     };
@@ -6542,10 +6653,10 @@ function openClip(clipId) {
     overlay.querySelectorAll('[data-kapitel]').forEach((b) =>
       b.addEventListener('click', () => {
         bei = Math.min(gesamt, Number(b.dataset.kapitel));
-        const zeitFeld = overlay.querySelector('#clipZeit');
-        if (zeitFeld) zeitFeld.textContent = zeit(bei);
-        const balken = overlay.querySelector('#clipFortschritt');
-        if (balken) balken.style.width = `${(bei / gesamt) * 100}%`;
+        // Bis hierher wurde nur die Anzeige verstellt. Jetzt springt auch das
+        // Video — das war ja der Sinn einer Kapitelmarke.
+        if (medium) medium.currentTime = bei;
+        leisteSetzen();
         overlay.querySelectorAll('[data-kapitel]').forEach((x) => x.classList.remove('is-aktiv'));
         b.classList.add('is-aktiv');
       })
@@ -6556,8 +6667,8 @@ function openClip(clipId) {
       const kasten = e.currentTarget.getBoundingClientRect();
       const anteil = Math.min(1, Math.max(0, (e.clientX - kasten.left) / kasten.width));
       bei = Math.round(gesamt * anteil);
-      overlay.querySelector('#clipZeit').textContent = zeit(bei);
-      overlay.querySelector('#clipFortschritt').style.width = `${anteil * 100}%`;
+      if (medium) medium.currentTime = bei;
+      leisteSetzen();
     });
 
     overlay.querySelectorAll('[data-clipact]').forEach((b) =>
@@ -6662,7 +6773,7 @@ function openOrtFotos(ort, fotos) {
                       <div class="ortfoto__bild">${
                         p.mediaUri
                           ? `<img src="${esc(p.mediaUri)}" alt="" />`
-                          : medienFlaeche(p.id, ICONS.image, p.mediaUrl)
+                          : medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)
                       }</div>
                       <div class="ortfoto__zeile">
                         <span data-profile="${p.userId}">${avatarForUser(p.userId, 36)}</span>
@@ -6759,7 +6870,7 @@ async function openExplorer(art, wert) {
     ? `<div class="expreels">${reels
         .map(
           (v) => `<button class="expreel" data-openvideo="${v.id}">
-            ${medienFlaeche(v.id, ICONS.play, v.mediaUrl)}
+            ${medienFlaeche(v.id, ICONS.play, v.mediaUrl, v.thumbnail)}
             <span class="expreel__text">${esc(v.description.slice(0, 40))}</span>
           </button>`
         )
@@ -6771,7 +6882,7 @@ async function openExplorer(art, wert) {
         .map((c) => {
           const u = user(c.userId);
           return `<article class="clip clip--klein" data-clip="${c.id}">
-            <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl)}<span class="clip__time">${esc(c.duration)}</span></div>
+            <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}<span class="clip__time">${esc(c.duration)}</span></div>
             <div class="clip__meta">
               <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
               <div>
@@ -6786,7 +6897,7 @@ async function openExplorer(art, wert) {
 
   const beitragRaster = beitraege.length
     ? `<div class="exp__grid">${beitraege
-        .map((p) => `<button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image, p.mediaUrl)}</button>`)
+        .map((p) => `<button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}</button>`)
         .join('')}</div>`
     : '';
 
@@ -7037,10 +7148,33 @@ function motivVon(id) {
  *      eine Ersatzflaeche, waehrend die App ihr Bild zeigte.
  *   3. Sonst die Ersatzflaeche — eine ruhige Farbe, kein grauer Kasten.
  */
-function medienFlaeche(id, symbol, adresse) {
-  const bild = eigeneMedien()[id] || adresse;
-  if (bild) return `<img class="eigenbild" src="${esc(bild)}" alt="">`;
+function medienFlaeche(id, symbol, adresse, standbild) {
+  /*
+   * Vierter Fall, seit es echte Videos gibt: in `adresse` steht bei einem
+   * Reel oder Clip jetzt eine .mp4. Die in ein <img> zu stecken ergibt ein
+   * kaputtes Bild — dafuer gibt es das Standbild aus der Datenbank
+   * (thumbnail_url). Fehlt auch das, bleibt die Farbflaeche.
+   */
+  const bild = eigeneMedien()[id] || (istVideoAdresse(adresse) ? standbild : adresse) || standbild;
+  if (bild && !istVideoAdresse(bild)) return `<img class="eigenbild" src="${esc(bild)}" alt="">`;
   return `<span class="motiv motiv--${motivVon(id)}">${symbol}</span>`;
+}
+
+/** Adressen, die abgespielt und nicht angezeigt werden wollen. */
+function istVideoAdresse(adresse) {
+  return !!adresse && /\.(mp4|mov|m4v|webm)(\?.*)?$/i.test(adresse);
+}
+
+/*
+ * Ein echtes Videoelement. `controls` bleibt aus: die App hat ihre eigene
+ * Leiste, zwei uebereinander sehen nach Fehler aus. `playsinline` ist auf dem
+ * iPhone Pflicht — ohne das reisst Safari jedes Video ins Vollbild, sobald
+ * man auf Wiedergabe drueckt.
+ */
+function videoElement(kennung, adresse, standbild, zusatz = '') {
+  return `<video id="${kennung}" class="medienvideo" src="${esc(adresse)}"` +
+    (standbild ? ` poster="${esc(standbild)}"` : '') +
+    ` playsinline preload="metadata" ${zusatz}></video>`;
 }
 
 /* ------------------------------------------------------ Formular-Blatt */
@@ -7462,7 +7596,8 @@ function renderSammlung() {
                   `<button class="griditem" data-${istPlaylist ? 'openvideo' : 'openpost'}="${e.id}">${medienFlaeche(
                     e.id,
                     istPlaylist ? ICONS.portrait : ICONS.image,
-                    e.mediaUrl
+                    e.mediaUrl,
+                    e.thumbnail
                   )}</button>`
               )
               .join('')}</div>`
@@ -7627,7 +7762,7 @@ async function renderVideoProfile() {
               .map(
                 (g) => `<button class="griditem" data-eigen="${esc(g.id)}" data-eigenart="${
                   g.kind === 'video' ? 'video' : 'post'
-                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl)}</button>`
+                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}</button>`
               )
               .join('')}</div>`
           : tab === 'repost' && meineReposts.length

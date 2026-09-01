@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -147,17 +147,18 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           <View style={styles.grid}>
             {raster.map((eintrag) => (
               <Druck key={eintrag.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice(`Beitrag: ${eintrag.id}`)}>
-                {eintrag.mediaUri ? (
-                  // Selbst aufgenommen: das echte Bild statt des Platzhalters.
-                  <Image source={{ uri: eintrag.mediaUri }} style={styles.gridBild} />
-                ) : (
-                  <Motiv
-                    id={eintrag.id}
-                    icon={eintrag.kind === 'video' ? 'play-outline' : 'image-outline'}
-                    iconSize={20}
-                    style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-                  />
-                )}
+                {/*
+                  * Bei einem Video steht in mediaUri seit Schema 8 eine .mp4;
+                  * ins Raster gehoert das Standbild dazu. Motiv nimmt, was da
+                  * ist, und zeichnet sonst die Farbflaeche.
+                  */}
+                <Motiv
+                  id={eintrag.id}
+                  bild={eintrag.standbild ?? eintrag.mediaUri}
+                  icon={eintrag.kind === 'video' ? 'play-outline' : 'image-outline'}
+                  iconSize={20}
+                  style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+                />
               </Druck>
             ))}
           </View>
@@ -294,5 +295,4 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  gridBild: { width: '100%', height: '100%' },
 }));

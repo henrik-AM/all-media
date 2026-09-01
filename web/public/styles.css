@@ -2385,6 +2385,10 @@ body:has(.camera) .toast { bottom: 132px; }
 }
 .player__stage > svg { width: 64px; height: 64px; }
 .player__play {
+  /* z-index seit dem echten <video>: das Videoelement bildet einen eigenen
+     Stapelzusammenhang und legte sich ueber den Knopf — er war sichtbar, aber
+     ein Klick landete auf dem Video statt auf ihm. */
+  z-index: 2;
   position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%);
   width: 58px; height: 58px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -3424,3 +3428,41 @@ body.ist-abgemeldet .bottomnav,
 body.ist-abgemeldet .ptr-indicator {
   display: none;
 }
+
+
+/* ------------------------------------------------------------ Videos
+ * Echte Videowiedergabe (seit 01.09.2026). Vorher stand ueberall ein Bild
+ * mit einem Wiedergabeknopf darueber, und der Knopf startete einen Zaehler.
+ *
+ * .medienvideo fuellt seine Flaeche genauso wie .eigenbild — sonst springt
+ * das Bild in dem Moment, in dem aus dem Standbild das Video wird.
+ */
+.medienvideo { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+
+/* Im Querformat-Player gehoert das ganze Bild ins Bild, nicht ein
+   Ausschnitt davon: ein 16:9-Video in eine 16:9-Flaeche beschnitten waere
+   Zufall, sobald das Video ein anderes Verhaeltnis hat.
+
+   pointer-events: none, weil die Buehne selbst schon auf Klicks hoert
+   (stage.addEventListener('click', umschalten)). Ohne das nimmt das
+   Videoelement die Klicks entgegen und der Wiedergabeknopf in seiner Mitte
+   laesst sich je nach Browser nicht mehr treffen. */
+.player__stage .medienvideo { object-fit: contain; pointer-events: none; }
+
+/* Der Tonknopf im Reel-Kanal. Oben rechts, ueber dem Video, aber unter den
+   Blaettern (z-index der Sheets liegt hoeher). */
+.tonknopf {
+  position: fixed;
+  /* Unter die obere Leiste, nicht daneben: dort sass er in derselben Reihe
+     wie die Bereichs-Pille und die beiden draengten sich. */
+  top: calc(env(safe-area-inset-top, 0px) + 88px);
+  right: 14px;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: rgba(0,0,0,.45);
+  color: #fff;
+  cursor: pointer;
+  z-index: 30;
+}
+.tonknopf svg { width: 20px; height: 20px; }

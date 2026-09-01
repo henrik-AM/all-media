@@ -119,7 +119,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reelRow}>
                 {result.reels.map((v) => (
                   <Druck key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
-                    <Motiv id={v.id} bild={v.mediaUri} icon="phone-portrait-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                    <Motiv id={v.id} bild={v.standbild ?? v.mediaUri} icon="phone-portrait-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                     <Text style={styles.reelName}>{alleNutzer[v.userId].name}</Text>
                   </Druck>
                 ))}
@@ -147,7 +147,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
               <View style={styles.grid}>
                 {result.posts.map((p) => (
                   <Druck key={p.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice('Beitrag öffnet im Feed')}>
-                    <Motiv id={p.id} bild={p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                    <Motiv id={p.id} bild={p.standbild ?? p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                   </Druck>
                 ))}
               </View>

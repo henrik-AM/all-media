@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { FlatList, Image, LayoutChangeEvent, StyleSheet, Text, View, RefreshControl } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, LayoutChangeEvent, StyleSheet, Text, View, RefreshControl, ViewToken } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
@@ -11,6 +11,7 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { Video } from '../../types';
 import { compactNumber } from '../../lib/zahlen';
 import { haptic } from '../../lib/haptics';
+import { Videoflaeche } from '../../components/Videoflaeche';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -46,6 +47,35 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   const [slideHeight, setSlideHeight] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  /*
+   * Welches Reel gerade zu sehen ist — nur dieses eine laeuft. Wuerden alle
+   * gleichzeitig spielen, laedt das Geraet ein Dutzend Videos auf einmal und
+   * man hoert sie uebereinander.
+   */
+  const [sichtbar, setSichtbar] = useState<string | null>(null);
+  /* Angehalten durch Antippen. Beim Weiterwischen faengt das naechste an. */
+  const [pause, setPause] = useState(false);
+  /*
+   * Ton. Ein Kanal, der beim Oeffnen der App losplaerrt, ist unhoeflich —
+   * deshalb faengt er stumm an, wie in jeder anderen App auch, und der
+   * Lautsprecherknopf ueber der Leiste schaltet ihn an.
+   */
+  const [stumm, setStumm] = useState(true);
+
+  const sichtbarkeit = useRef({ itemVisiblePercentThreshold: 60 });
+  const sichtbarWechsel = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const erstes = viewableItems[0]?.item as Video | undefined;
+    if (erstes) {
+      setSichtbar(erstes.id);
+      setPause(false);
+    }
+  }, []);
+
+  // Beim ersten Aufbau ist noch nichts gescrollt, also meldet die Liste auch
+  // nichts — ohne diese Zeile bliebe das oberste Reel stehen.
+  useEffect(() => {
+    if (!sichtbar && videos.length) setSichtbar(videos[0].id);
+  }, [sichtbar, videos]);
 
   const measure = (event: LayoutChangeEvent) => setSlideHeight(event.nativeEvent.layout.height);
 
@@ -99,13 +129,36 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
 
     return (
       <View style={[styles.slide, slideHeight > 0 && { height: slideHeight }]}>
-        <View style={styles.stage}>
-          {item.mediaUri ? (
-            <Image source={{ uri: item.mediaUri }} style={styles.stageBild} />
-          ) : (
-            <Ionicons name="play" size={72} color="rgba(255,255,255,0.2)" />
+        <Druck style={styles.stage} onPress={() => setPause((p) => !p)}>
+          <Videoflaeche
+            id={item.id}
+            quelle={item.mediaUri}
+            standbild={item.standbild}
+            laeuft={sichtbar === item.id && !pause}
+            stumm={stumm}
+            /* Reels laufen in Schleife — wie im Prototyp und ueberall sonst. */
+            schleife
+            fuellen="cover"
+            icon="play-outline"
+            iconSize={72}
+            dunkel
+            style={styles.stageBild}
+          />
+          {pause && sichtbar === item.id && (
+            <View style={styles.pauseZeichen} pointerEvents="none">
+              <Ionicons name="play" size={64} color="rgba(255,255,255,0.85)" />
+            </View>
           )}
-        </View>
+        </Druck>
+
+        <Druck
+          style={styles.tonKnopf}
+          onPress={() => setStumm((t) => !t)}
+          hitSlop={10}
+          accessibilityLabel={stumm ? 'Ton an' : 'Ton aus'}
+        >
+          <Ionicons name={stumm ? 'volume-mute' : 'volume-high'} size={20} color={colors.white} />
+        </Druck>
 
         <View style={styles.rail}>
           <Druck style={styles.railBtn} onPress={() => toggleLike(item)}>
@@ -209,6 +262,8 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
         pagingEnabled
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"
+        onViewableItemsChanged={sichtbarWechsel}
+        viewabilityConfig={sichtbarkeit.current}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       />
 
@@ -229,6 +284,16 @@ const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.black },
   slide: { width: '100%', justifyContent: 'flex-end' },
   stageBild: { width: '100%', height: '100%' },
+  pauseZeichen: {
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tonKnopf: {
+    position: 'absolute', top: spacing.xl + 12, right: spacing.md,
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
   stage: {
     position: 'absolute',
     top: 0,

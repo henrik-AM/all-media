@@ -464,6 +464,7 @@ interface RohBeitrag {
   reposted: boolean;
   notify: boolean;
   mediaUri?: string;
+  standbild?: string;
 }
 
 /**
@@ -528,6 +529,7 @@ export async function ladeBeitraege(
     reposted: repostet.has(b.id),
     notify: benachrichtigt.has(b.id),
     mediaUri: b.media_url ?? undefined,
+    standbild: b.thumbnail_url ?? undefined,
   }));
 
   return {
@@ -549,6 +551,7 @@ export async function ladeBeitraege(
         reposts: b.shares,
         reposted: b.reposted,
         mediaUri: b.mediaUri,
+        standbild: b.standbild,
         tags: b.tags,
       })),
     videos: roh
@@ -567,6 +570,7 @@ export async function ladeBeitraege(
         reposted: b.reposted,
         notify: b.notify,
         mediaUri: b.mediaUri,
+        standbild: b.standbild,
         tags: b.tags,
       })),
     clips: roh
@@ -592,6 +596,7 @@ export async function ladeBeitraege(
         saved: b.saved,
         reposted: b.reposted,
         mediaUri: b.mediaUri,
+        standbild: b.standbild,
       })),
   };
 }

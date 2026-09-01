@@ -108,6 +108,12 @@ export interface Post {
   reposted: boolean;
   /** Selbst aufgenommen: die Datei, die statt des Platzhalters gezeigt wird. */
   mediaUri?: string;
+  /**
+   * Standbild zum Video. Solange `mediaUri` ein Bild war, gab es dafuer
+   * keinen Grund; jetzt liegt dort eine .mp4, und das Raster braucht etwas
+   * zum Anzeigen, bevor der Abspieler das erste Bild hat.
+   */
+  standbild?: string;
   /** Fuer die Hashtag-Seite. */
   tags?: string[];
 }
@@ -127,6 +133,12 @@ export interface Video {
   notify: boolean;
   /** Selbst aufgenommen: Standbild oder Datei fuer die Vorschau. */
   mediaUri?: string;
+  /**
+   * Standbild zum Video. Solange `mediaUri` ein Bild war, gab es dafuer
+   * keinen Grund; jetzt liegt dort eine .mp4, und das Raster braucht etwas
+   * zum Anzeigen, bevor der Abspieler das erste Bild hat.
+   */
+  standbild?: string;
   /** Fuer die Hashtag-Seite. */
   tags?: string[];
 }
@@ -205,6 +217,12 @@ export interface Clip {
   untertitel?: boolean;
   /** Vorschaubild aus der Datenbank. Fehlt es, zeichnet Motiv eine Fläche. */
   mediaUri?: string;
+  /**
+   * Standbild zum Video. Solange `mediaUri` ein Bild war, gab es dafuer
+   * keinen Grund; jetzt liegt dort eine .mp4, und das Raster braucht etwas
+   * zum Anzeigen, bevor der Abspieler das erste Bild hat.
+   */
+  standbild?: string;
   /** Damit Querformat-Videos auf den Explorer-Seiten auftauchen koennen. */
   location?: string;
   music?: string;
@@ -327,4 +345,6 @@ export interface RasterEintrag {
   /** Selbst aufgenommen - dann steht in mediaUri das Bild. */
   eigen?: boolean;
   mediaUri?: string;
+  /** Bei einem Video: das Standbild, denn mediaUri ist dann eine .mp4. */
+  standbild?: string;
 }

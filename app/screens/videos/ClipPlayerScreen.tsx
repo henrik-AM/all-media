@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
+import { istVideo, Videoflaeche, VideoSteuerung } from '../../components/Videoflaeche';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
@@ -58,6 +59,18 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   const [bei, setBei] = useState(0);
   const stand = useRef(0);
   /*
+   * Der Griff an den Abspieler. Gebraucht fuer die Kapitelmarken (springen)
+   * und fuer die Geschwindigkeit aus den Video-Einstellungen (tempo).
+   */
+  const spieler = useRef<VideoSteuerung>(null);
+  /*
+   * Die Laufzeit aus der Datei. Im Beitrag steht sie als Text ("1:00"), und
+   * bis es echte Videos gab, war dieser Text die einzige Quelle. Jetzt sagt
+   * die Datei selbst, wie lang sie ist — und die zaehlt, denn nach ihr
+   * richten sich Fortschrittsleiste und Kapitel.
+   */
+  const [dateiLaenge, setDateiLaenge] = useState(0);
+  /*
    * Vollbild (Punkt 30). In der App gibt es keine Fullscreen-API - der
    * Player legt sich stattdessen ueber den ganzen Bildschirm und die Buehne
    * nimmt die volle Hoehe. Henrik hatte "Handy quer → Video im Vollformat"
@@ -73,17 +86,32 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   const video = useVideoEinstellungen();
 
   const clip = clips.find((c) => c.id === offen);
-  const gesamt = clip ? sekundenVon(clip.duration) : 0;
+  const eigenerEintrag = raster.find((r) => r.id === offen);
+  const quelle = eigenerEintrag?.mediaUri ?? clip?.mediaUri;
+  const standbild = eigenerEintrag?.standbild ?? clip?.standbild;
+  const echtesVideo = istVideo(quelle);
+  const gesamt = dateiLaenge || (clip ? sekundenVon(clip.duration) : 0);
 
+  /*
+   * Ohne Videodatei bleibt es beim Zaehler: es gibt nichts abzuspielen, aber
+   * die Leiste soll sich bewegen, damit der Bildschirm nicht tot wirkt. Mit
+   * Videodatei meldet der Abspieler seinen Stand selbst — dann waere ein
+   * zweiter Zaehler daneben schlicht falsch.
+   */
   useEffect(() => {
-    if (!laeuft || !gesamt) return;
+    if (echtesVideo || !laeuft || !gesamt) return;
     const uhr = setInterval(() => {
       stand.current = Math.min(gesamt, stand.current + 1);
       setBei(stand.current);
       if (stand.current >= gesamt) setLaeuft(false);
     }, 1000);
     return () => clearInterval(uhr);
-  }, [laeuft, gesamt]);
+  }, [echtesVideo, laeuft, gesamt]);
+
+  /* Geschwindigkeit aus den Einstellungen an den Abspieler weiterreichen. */
+  useEffect(() => {
+    if (echtesVideo && laeuft) spieler.current?.tempo(video.werte.tempo);
+  }, [echtesVideo, laeuft, video.werte.tempo]);
 
   if (!clip) {
     return (
@@ -102,12 +130,12 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    * VideoProfileScreen.
    */
   const autor = alleNutzer[clip.userId] ?? { name: '', handle: '' };
-  const eigenesBild = raster.find((r) => r.id === clip.id)?.mediaUri;
   const aehnlich = clips.filter((c) => c.id !== clip.id).slice(0, 4);
 
   const wechseln = (id: string) => {
     stand.current = 0;
     setBei(0);
+    setDateiLaenge(0);
     setLaeuft(false);
     setOffen(id);
   };
@@ -122,11 +150,30 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
         <Druck style={[styles.buehne, vollbild && styles.buehneVoll]} onPress={() => setLaeuft((v) => !v)}>
-          {eigenesBild ? (
-            <Image source={{ uri: eigenesBild }} style={styles.voll} />
-          ) : (
-            <Motiv id={clip.id} bild={clip.mediaUri} icon="tv-outline" iconSize={48} dunkel style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
-          )}
+          <Videoflaeche
+            ref={spieler}
+            id={clip.id}
+            quelle={quelle}
+            standbild={standbild}
+            laeuft={laeuft}
+            /*
+             * Ein Querformat-Video gehoert vollstaendig ins Bild — anders als
+             * im Reel-Kanal, wo der Ausschnitt die Flaeche fuellen soll.
+             */
+            fuellen="contain"
+            /* Der Ton gehoert zum Video; wer ihn nicht will, dreht ihn am Geraet leiser. */
+            stumm={false}
+            icon="tv-outline"
+            iconSize={48}
+            dunkel
+            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+            onFortschritt={(jetzt, laenge) => {
+              stand.current = jetzt;
+              setBei(jetzt);
+              if (laenge && laenge !== dateiLaenge) setDateiLaenge(laenge);
+            }}
+            onEnde={() => setLaeuft(false)}
+          />
           <View style={[styles.play, laeuft && styles.playAus]}>
             <Ionicons name={laeuft ? 'pause' : 'play'} size={26} color={colors.white} />
           </View>
@@ -173,6 +220,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
                   onPress={() => {
                     stand.current = Math.min(gesamt, k.bei);
                     setBei(stand.current);
+                    spieler.current?.springen(stand.current);
                   }}
                 >
                   <Text style={styles.kapitelZeit}>{zeitText(k.bei)}</Text>
@@ -287,7 +335,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         {aehnlich.map((c) => (
           <Druck key={c.id} style={styles.clip} onPress={() => wechseln(c.id)}>
             <View style={styles.clipBild}>
-              <Motiv id={c.id} bild={c.mediaUri} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+              <Motiv id={c.id} bild={c.standbild ?? c.mediaUri} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
               <View style={styles.clipZeit}>
                 <Text style={styles.clipZeitText}>{c.duration}</Text>
               </View>
@@ -394,7 +442,6 @@ const styles = themenStyles((colors) => ({
   /* Im Vollbild faellt das Seitenverhaeltnis weg und die Buehne nimmt fast
      den ganzen Bildschirm. */
   buehneVoll: { aspectRatio: undefined, height: '78%' },
-  voll: { width: '100%', height: '100%' },
   play: {
     position: 'absolute',
     width: 58,

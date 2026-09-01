@@ -110,11 +110,12 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reels}>
                   {treffer.reels.map((v: Video) => (
                     <Druck key={v.id} style={styles.reel} onPress={() => onNotice(v.description)}>
-                      {v.mediaUri ? (
-                        <Image source={{ uri: v.mediaUri }} style={styles.voll} />
-                      ) : (
-                        <Motiv id={v.id} bild={v.mediaUri} icon="play-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
-                      )}
+                      {/* Motiv entscheidet selbst: Bild, wenn eines da ist,
+                          sonst die Farbflaeche. Die frueher hier stehende
+                          Abfrage auf mediaUri griff daneben, sobald dort eine
+                          .mp4 stand — dann kam ein leeres Bild statt eines
+                          Standbilds. */}
+                      <Motiv id={v.id} bild={v.standbild ?? v.mediaUri} icon="play-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       <Text style={styles.reelText} numberOfLines={2}>
                         {v.description}
                       </Text>
@@ -130,7 +131,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 {treffer.clips.map((c: Clip) => (
                   <Druck key={c.id} style={styles.clip} onPress={() => onOpenClip(c.id)}>
                     <View style={styles.clipBild}>
-                      <Motiv id={c.id} bild={c.mediaUri} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                      <Motiv id={c.id} bild={c.standbild ?? c.mediaUri} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                       <View style={styles.clipZeit}>
                         <Text style={styles.clipZeitText}>{c.duration}</Text>
                       </View>
@@ -157,11 +158,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 <View style={styles.raster}>
                   {treffer.beitraege.map((p: Post) => (
                     <Druck key={p.id} style={[styles.rasterFeld, { height: kachelHoehe }]} onPress={() => onNotice(p.description)}>
-                      {p.mediaUri ? (
-                        <Image source={{ uri: p.mediaUri }} style={styles.voll} />
-                      ) : (
-                        <Motiv id={p.id} bild={p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
-                      )}
+                      <Motiv id={p.id} bild={p.standbild ?? p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                     </Druck>
                   ))}
                 </View>

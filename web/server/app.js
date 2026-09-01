@@ -593,8 +593,10 @@ app.get('/api/profile/:userId', route(async (req, res) => {
       kind: b.kind === 'post' ? 'image' : 'video',
       eigen: id === req.nutzerId,
       // Ohne die Adresse zeigt jede Kachel die Ersatzflaeche, auch wenn ein
-      // Bild da ist.
+      // Bild da ist. Bei einem Video steht in mediaUrl eine .mp4 — dann
+      // braucht die Kachel das Standbild dazu.
       mediaUrl: b.mediaUrl,
+      thumbnail: b.thumbnail,
     })),
   });
 }));

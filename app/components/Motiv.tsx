@@ -57,8 +57,16 @@ function motivVon(id: string): [string, string] {
 export const Motiv = ({ id, icon, iconSize = 32, dunkel = false, style, bild }: Props) => {
   const [hell, tief] = motivVon(id);
 
-  if (bild) {
-    return <Image source={{ uri: bild }} style={[styles.flaeche, style as object]} resizeMode="cover" />;
+  /*
+   * Eine Videoadresse ist kein Bild. Seit es echte Videos gibt, steht in
+   * `mediaUri` bei einem Reel eine .mp4 — die als Bild zu laden ergibt eine
+   * leere Flaeche. Wer ein Video zeigen will, nimmt Videoflaeche; hier
+   * gehoert das Standbild hin.
+   */
+  const zeigbar = bild && !/\.(mp4|mov|m4v|webm)(\?.*)?$/i.test(bild) ? bild : undefined;
+
+  if (zeigbar) {
+    return <Image source={{ uri: zeigbar }} style={[styles.flaeche, style as object]} resizeMode="cover" />;
   }
 
   return (
