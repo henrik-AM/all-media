@@ -316,8 +316,13 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Der Pfeil führt zurück zum Ort', async () => {
+    /*
+     * Der Pfeil holt die Ortsseite neu vom Server. Wie lange das dauert,
+     * weiss man vorher nicht — 600 ms waren geraten und reichten nicht
+     * immer. Also auf die Seite warten, nicht auf die Uhr.
+     */
     await page.click('#fotosBack');
-    await page.waitForTimeout(600);
+    await page.waitForSelector('#expFotos', { timeout: 10000 }).catch(() => {});
     if (!(await page.$('#expFotos'))) throw new Error('man landet woanders');
   });
 
@@ -359,19 +364,49 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (namen.length < 2) throw new Error('nur ' + namen.length + ' Sammlungen');
   });
 
+  /*
+   * Auf den Hinweis warten, statt eine Wartezeit zu raten.
+   *
+   * Hier stand waitForTimeout(700). Der Hinweis erscheint aber erst, wenn
+   * der Server geantwortet hat, und er verschwindet nach 2,2 Sekunden von
+   * allein — 700 ms treffen das Fenster nur, wenn alles schnell geht. Am
+   * 01.09.2026 stand deshalb „Toast sagt ‚'" im Protokoll, obwohl der
+   * Beitrag sehr wohl in der Playlist landete: die naechste Pruefung meldete
+   * ja korrekt „ist schon drin".
+   *
+   * Vorher leeren, danach warten: sonst liest man den Hinweis von vorhin.
+   */
+  const hinweisAbwarten = async (klick) => {
+    await page.evaluate(() => {
+      const t = document.querySelector('#toast');
+      if (t) {
+        t.textContent = '';
+        t.hidden = true;
+      }
+    });
+    await klick();
+    await page
+      .waitForFunction(
+        () => {
+          const t = document.querySelector('#toast');
+          return t && !t.hidden && t.textContent.trim().length > 0;
+        },
+        null,
+        { timeout: 8000 }
+      )
+      .catch(() => {});
+    return page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
+  };
+
   await pruefe('Ein Beitrag lässt sich in eine Playlist legen', async () => {
-    await page.click('[data-sml]');
-    await page.waitForTimeout(700);
-    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
+    const toast = await hinweisAbwarten(() => page.click('[data-sml]'));
     if (!toast.includes('hinzugefügt')) throw new Error('Toast sagt „' + toast + '"');
   });
 
   await pruefe('Zweimal dieselbe Sammlung wird abgelehnt', async () => {
     await page.click('[data-eigen]', { button: 'right' });
     await page.waitForTimeout(400);
-    await page.click('[data-sml]');
-    await page.waitForTimeout(700);
-    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
+    const toast = await hinweisAbwarten(() => page.click('[data-sml]'));
     if (!toast.includes('schon')) throw new Error('Toast sagt „' + toast + '"');
   });
 

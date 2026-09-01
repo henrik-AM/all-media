@@ -1,3 +1,8 @@
+---
+name: ig-inspired-design
+description: Design-System für All Media im Instagram-Stil — Kartenlook, Typografie, Abstände, Farben und Icon-Regeln. Nutzen, wenn Oberflächen der All-Media-App gebaut oder überarbeitet werden.
+---
+
 # Instagram-inspiriertes Design für All Media
 
 Dieses Skill definiert ein konsistentes, Instagram-inspiriertes Design-System für die All-Media-App. Nicht 1:1 Instagram-Klon, sondern eine eigene Zwischenlösung: Look & Feel, Card-Stil, Typografie und Abstände orientieren sich am IG-Design, die Akzentfarbe und Icon-Details sind aber eigenständig.

@@ -180,7 +180,20 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForSelector('#f_name');
     await page.fill('#f_name', 'Ankündigungen');
     await page.click('#formOk');
-    await page.waitForTimeout(800);
+
+    /*
+     * Auf das neue Unterthema warten, nicht auf die Uhr. Es wird in der
+     * Datenbank angelegt und die Liste danach neu geholt; die 800 ms, die
+     * hier standen, waren geraten und reichten unter Last nicht — gemeldet
+     * wurde dann "2 vorher, 2 nachher", obwohl alles richtig lief.
+     */
+    await page
+      .waitForFunction(
+        (soll) => document.querySelectorAll('.kanal__thema').length >= soll,
+        vorher + 1,
+        { timeout: 15000 }
+      )
+      .catch(() => {});
     const nachher = await page.$$eval('.kanal__thema', (n) => n.length);
     if (nachher !== vorher + 1) throw new Error(`${vorher} vorher, ${nachher} nachher`);
     const namen = await page.$$eval('.kanal__thema-name', (n) => n.map((x) => x.textContent));

@@ -47,7 +47,7 @@ const BEITRAG_SPALTEN =
   'id, user_id, kind, format, title, description, location, music, media_url,' +
   ' thumbnail_url, duration, tags, views, zuschauer, untertitel, kapitel,' +
   ' likes_basis, shares_basis, comments_basis, created_at,' +
-  ' post_likes(count), comments(count)';
+  ' post_likes(count), comments(count), shares(count)';
 
 // ============================================================================
 // Zeit
@@ -523,7 +523,11 @@ export async function ladeBeitraege(
     age: zeitText(b.created_at),
     likes: Number(b.likes_basis ?? 0) + (b.post_likes?.[0]?.count ?? 0),
     comments: Number(b.comments_basis ?? 0) + (b.comments?.[0]?.count ?? 0),
-    shares: Number(b.shares_basis ?? 0),
+    // Gezaehlt wie Likes und Kommentare: Sockel plus die wirklich
+    // eingetragenen Weiterleitungen. Vorher stand hier nur der Sockel —
+    // wer in der App etwas teilte, sah die Zahl nie steigen, waehrend sie
+    // auf der Website hochging (web/server/supabase-api.js zaehlt beides).
+    shares: Number(b.shares_basis ?? 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),

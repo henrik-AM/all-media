@@ -56,16 +56,31 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
   const toggleLike = async (comment: Comment) => {
     // Erst anzeigen, dann speichern: ein Herz, das eine halbe Sekunde
     // nachhinkt, fühlt sich kaputt an.
-    setComments((prev) =>
-      prev.map((c) =>
-        c.id === comment.id ? { ...c, liked: !c.liked, likes: c.likes + (c.liked ? -1 : 1) } : c
-      )
-    );
+    const setzen = (liked: boolean, likes: number) =>
+      setComments((prev) =>
+        prev.map((c) => (c.id === comment.id ? { ...c, liked, likes } : c))
+      );
+
+    setzen(!comment.liked, comment.likes + (comment.liked ? -1 : 1));
     if (!supabase || !ichId) return;
-    if (comment.liked) {
-      await supabase.from('comment_likes').delete().eq('comment_id', comment.id).eq('user_id', ichId);
-    } else {
-      await supabase.from('comment_likes').insert({ comment_id: comment.id, user_id: ichId });
+
+    /*
+     * Das Ergebnis wurde vorher gar nicht angesehen. Scheiterte das
+     * Schreiben — abgelaufene Anmeldung, keine Verbindung —, blieb das Herz
+     * trotzdem rot und behauptete etwas, das nirgends stand.
+     */
+    const { error } = comment.liked
+      ? await supabase
+          .from('comment_likes')
+          .delete()
+          .eq('comment_id', comment.id)
+          .eq('user_id', ichId)
+      : await supabase.from('comment_likes').insert({ comment_id: comment.id, user_id: ichId });
+
+    // 23505 = die Zeile gab es schon, zweimal schnell getippt. Kein Fehler.
+    if (error && error.code !== '23505') {
+      console.error('Kommentar-Like fehlgeschlagen:', error.message);
+      setzen(comment.liked, comment.likes);
     }
   };
 

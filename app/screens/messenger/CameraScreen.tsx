@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActionSheet } from '../../components/ActionSheet';
 import { colors, spacing, themenStyles, typography } from '../../constants/design';
-import { uploadImage } from '../../lib/supabaseStorage';
+import { ladeHoch } from '../../lib/supabaseStorage';
+import { useSupabase } from '../../contexts/SupabaseContext';
 
 type Mode = 'photo' | 'video';
 
@@ -49,6 +50,9 @@ export const CameraScreen = ({
   onNotice,
 }: Props) => {
   const insets = useSafeAreaInsets();
+  // Der angemeldete Zugang. Ohne ihn laeuft ein Upload als anonymer Zugriff,
+  // und den lassen die Regeln des Speichers nicht zu.
+  const { supabase } = useSupabase();
   const [mode, setMode] = useState<Mode>('photo');
   const [busy, setBusy] = useState(false);
   const [aufnahme, setAufnahme] = useState<string | null>(null);
@@ -83,14 +87,17 @@ export const CameraScreen = ({
   const alsStory = async (uri: string) => {
     onCaptured?.(uri);
 
+    const was = mode === 'photo' ? 'Foto' : 'Video';
     const fileName = `${Date.now()}.${mode === 'photo' ? 'jpg' : 'mp4'}`;
-    const upload = await uploadImage({ uri } as unknown as Blob, 'stories', fileName);
+    const upload = await ladeHoch(supabase, uri, 'stories', fileName);
 
-    onNotice(
-      upload.success
-        ? `${mode === 'photo' ? 'Foto' : 'Video'} hochgeladen`
-        : `${mode === 'photo' ? 'Foto' : 'Video'} gespeichert (kein Backend verbunden)`
-    );
+    /*
+     * Beim Misserfolg den Grund nennen. Vorher stand hier „gespeichert (kein
+     * Backend verbunden)" — ein Satz, der nach Absicht klang, obwohl der
+     * Upload schlicht fehlschlug. Er hat monatelang verdeckt, dass gar nichts
+     * hochgeladen wurde.
+     */
+    onNotice(upload.success ? `${was} hochgeladen` : `${was} konnte nicht hochgeladen werden`);
   };
 
   const zielGewaehlt = (key: string) => {

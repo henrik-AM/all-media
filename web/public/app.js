@@ -2616,11 +2616,41 @@ async function openComments(targetId, onCountChange) {
         </form>
       </div>`;
 
+    /*
+     * Erst umschalten, dann senden.
+     *
+     * Vorher wurde auf die Antwort des Servers gewartet und erst danach neu
+     * gezeichnet. Das Herz hing damit an der Leitung: auf einer langsamen
+     * Verbindung passierte nach dem Tippen eine gute Sekunde lang nichts,
+     * und man tippte ein zweites Mal. Die App macht es seit dem 01.09.2026
+     * andersherum (app/lib/useAktionen.ts) — hier zieht die Website nach.
+     *
+     * Geht das Schreiben schief, wird zurueckgestellt statt eine Zahl stehen
+     * zu lassen, die nirgends gespeichert ist.
+     */
     sheet.querySelectorAll('[data-clike]').forEach((btn) =>
       btn.addEventListener('click', async () => {
-        const r = await fetch(`/api/comments/${targetId}/${btn.dataset.clike}/like`, { method: 'POST' });
-        const updated = await r.json();
-        list = list.map((c) => (c.id === updated.id ? updated : c));
+        const id = btn.dataset.clike;
+        const vorher = list.find((c) => c.id === id);
+        if (!vorher) return;
+
+        list = list.map((c) =>
+          c.id === id
+            ? { ...c, liked: !c.liked, likes: Math.max(0, (c.likes || 0) + (c.liked ? -1 : 1)) }
+            : c
+        );
+        paint();
+
+        try {
+          const r = await fetch(`/api/comments/${targetId}/${id}/like`, { method: 'POST' });
+          if (!r.ok) throw new Error('Server sagt ' + r.status);
+          const updated = await r.json();
+          list = list.map((c) => (c.id === updated.id ? updated : c));
+        } catch (fehler) {
+          console.error('Kommentar-Like fehlgeschlagen:', fehler.message);
+          list = list.map((c) => (c.id === id ? vorher : c));
+          toast('Das Like hat nicht geklappt');
+        }
         paint();
       })
     );

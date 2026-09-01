@@ -12,6 +12,7 @@ import { kommentarZeile, likeZeile } from '../../lib/kommentare';
 import { compactNumber } from '../../lib/zahlen';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
+import { useAktionen } from '../../lib/useAktionen';
 import { Post, Story } from '../../types';
 
 interface Props {
@@ -26,6 +27,8 @@ interface Props {
 export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, onNotice }: Props) => {
   const { posts: alleBeitraege, users: alleNutzer } = useDaten();
   const { istRepostet, umschalten } = useReposts();
+  // Was hier passiert, geht in die Datenbank — siehe lib/useAktionen.ts.
+  const aktion = useAktionen(onNotice);
   // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
   // damit sie auch im Profilraster auftauchen.
   const { eigeneBeitraege, folgtPerson, folgenUmschalten } = useProfil();
@@ -58,12 +61,27 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
   const update = (id: string, change: (post: Post) => Post) =>
     setPosts((prev) => prev.map((p) => (p.id === id ? change(p) : p)));
 
-  const toggleLike = (post: Post) =>
+  /*
+   * Umschalten und schreiben.
+   *
+   * Bis zum 01.09.2026 stand hier nur die erste Zeile: die Anzeige wechselte,
+   * und das war alles. Beim naechsten Start der App war das Herz wieder grau,
+   * und auf der Website tauchte das Like nie auf.
+   *
+   * `zurueck` stellt den alten Stand wieder her, falls das Schreiben scheitert.
+   */
+  const toggleLike = (post: Post) => {
+    const zurueck = () =>
+      update(post.id, (p) => ({ ...p, liked: post.liked, likes: post.likes }));
     update(post.id, (p) => ({ ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) }));
+    aktion.like(post.id, zurueck);
+  };
 
   const toggleSave = (post: Post) => {
+    const zurueck = () => update(post.id, (p) => ({ ...p, saved: post.saved }));
     update(post.id, (p) => ({ ...p, saved: !p.saved }));
     onNotice(post.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
+    aktion.speichern(post.id, zurueck);
   };
 
   /*
@@ -72,6 +90,9 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
    * derselben Person zeigte weiter "Folgen".
    */
   const toggleFollow = (post: Post) => {
+    // folgenUmschalten schreibt selbst in die Datenbank (ProfilContext) —
+    // hier noch einmal zu schreiben wuerde es sofort wieder rueckgaengig
+    // machen.
     const jetztAn = folgenUmschalten(post.userId);
     onNotice(jetztAn ? 'Du folgst jetzt' : 'Nicht mehr gefolgt');
   };
@@ -84,11 +105,16 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
       reposts: p.reposts + (jetztAn ? 1 : -1),
     }));
     onNotice(jetztAn ? 'Repostet' : 'Repost zurückgenommen');
+    aktion.repost(post.id, () => {
+      umschalten('post', post.id, post.description);
+      update(post.id, (p) => ({ ...p, reposted: post.reposted, reposts: post.reposts }));
+    });
   };
 
   const toggleNotify = (post: Post) => {
     update(post.id, (p) => ({ ...p, notify: !p.notify }));
     onNotice(post.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+    aktion.hinweis(post.id, () => update(post.id, (p) => ({ ...p, notify: post.notify })));
   };
 
   const renderPost = ({ item }: { item: Post }) => {

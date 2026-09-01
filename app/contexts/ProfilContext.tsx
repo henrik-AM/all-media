@@ -12,6 +12,9 @@ import {
   Video,
 } from '../types';
 import { useDaten } from '../contexts/DatenContext';
+import { useSupabase } from '../contexts/SupabaseContext';
+import * as Aktion from '../lib/aktionen';
+import { ladeHoch } from '../lib/supabaseStorage';
 
 /*
  * Was hinter den drei Knoepfen oben rechts im eigenen Profil steckt:
@@ -27,22 +30,17 @@ import { useDaten } from '../contexts/DatenContext';
  * Fassungen zeigen deshalb dieselben Mitteilungen.
  */
 
-const GRUND_MITTEILUNGEN: Mitteilung[] = [
-  { id: 'n1', bereich: 'videos', art: 'like', userId: 'u1', ziel: { art: 'post', id: 'p1' }, minuten: 10, gelesen: false },
-  { id: 'n2', bereich: 'videos', art: 'follow', userId: 'u5', ziel: { art: 'profile', id: 'u5' }, minuten: 95, gelesen: false },
-  { id: 'n3', bereich: 'videos', art: 'comment', userId: 'u3', ziel: { art: 'post', id: 'p2' }, minuten: 260, gelesen: false },
-  { id: 'n4', bereich: 'videos', art: 'repost', userId: 'u4', ziel: { art: 'video', id: 'v1' }, minuten: 1500, gelesen: true },
-  { id: 'n5', bereich: 'videos', art: 'mention', userId: 'u2', ziel: { art: 'profile', id: 'u2' }, minuten: 7200, gelesen: true },
-  { id: 'n6', bereich: 'videos', art: 'story', userId: 'u6', ziel: { art: 'profile', id: 'u6' }, minuten: 11000, gelesen: true },
-  { id: 'n7', bereich: 'videos', art: 'like', userId: 'u3', ziel: { art: 'video', id: 'v2' }, minuten: 30000, gelesen: true },
-  { id: 'n8', bereich: 'videos', art: 'follow', userId: 'u7', ziel: { art: 'profile', id: 'u7' }, minuten: 46000, gelesen: true },
-
-  { id: 'c1', bereich: 'communities', art: 'kanal', userId: 'u2', ziel: { art: 'community', id: 'k1' }, minuten: 25, gelesen: false },
-  { id: 'c2', bereich: 'communities', art: 'beitritt', userId: 'u5', ziel: { art: 'community', id: 'k2' }, minuten: 180, gelesen: false },
-  { id: 'c3', bereich: 'communities', art: 'nachricht', userId: 'u1', ziel: { art: 'community', id: 'k1' }, minuten: 1400, gelesen: true },
-  { id: 'c4', bereich: 'communities', art: 'einladung', userId: 'u4', ziel: { art: 'community', id: 'k3' }, minuten: 6000, gelesen: true },
-  { id: 'c5', bereich: 'communities', art: 'beitritt', userId: 'u6', ziel: { art: 'community', id: 'k4' }, minuten: 20000, gelesen: true },
-];
+/*
+ * Hier stand bis zum 01.09.2026 eine feste Liste aus dreizehn Mitteilungen:
+ * "Anna hat deinen Beitrag geliked", "Elif folgt dir jetzt" und so weiter,
+ * mit Kennungen wie u1 und p1, die es in der Datenbank gar nicht gibt.
+ *
+ * Sie wurde von niemandem mehr gelesen — die Mitteilungen kommen aus
+ * `daten.mitteilungen` (lib/daten.ts, ladeMitteilungen). Uebrig war ein
+ * Bestand erfundener Namen im Quelltext, der bei der naechsten Aenderung
+ * jemanden auf die falsche Faehrte gefuehrt haette. Das war der letzte Rest
+ * der alten Beispieldaten in der App.
+ */
 
 /** "vor 10 min", "vor 4 h", "vor 5 Tagen", "vor 3 W", "vor 2 M" - wie im Prototyp. */
 export const zeitText = (minuten: number) => {
@@ -219,6 +217,26 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * gleichzeitig gespeichert; beim nächsten Laden kommt es von dort zurück.
    */
   const daten = useDaten();
+  const { supabase } = useSupabase();
+
+  /*
+   * Schreiben, was hier umgeschaltet wird.
+   *
+   * Bis zum 01.09.2026 lebten Like, Speichern, Repost und Folgen nur in
+   * diesem Zustand. Nach einem Neustart der App war alles weg, und auf der
+   * Website erschien es nie. Der Zustand hier bleibt — er macht die Anzeige
+   * sofort richtig — aber er ist nicht mehr das Einzige, was passiert.
+   */
+  const schreiben = useCallback(
+    (was: string, tun: (c: any, ich: string) => Promise<unknown>, zurueck: () => void) => {
+      if (!supabase || !daten.ichId) return;
+      tun(supabase, daten.ichId).catch((e: any) => {
+        console.error(`${was} fehlgeschlagen:`, e?.message ?? e);
+        zurueck();
+      });
+    },
+    [supabase, daten.ichId]
+  );
 
   const [alle, setAlle] = useState<Mitteilung[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -293,17 +311,44 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     setEigeneVideos([]);
   }, [daten.geladen]);
 
-  const profilSpeichern = useCallback((werte: Partial<EigenesProfil>) => {
-    setEigenesProfil((vorher) => ({ ...vorher, ...werte }));
-  }, []);
+  const profilSpeichern = useCallback(
+    (werte: Partial<EigenesProfil>) => {
+      const vorherStand = eigenesProfil;
+      setEigenesProfil((vorher) => ({ ...vorher, ...werte }));
+
+      /*
+       * Und in die Datenbank. Henrik wollte ausdruecklich „Name, Info/Bio,
+       * Link ueber eine Bearbeitungseinstellung aendern koennen" — das
+       * Formular gab es, gespeichert wurde aber nichts. Nach dem naechsten
+       * Start stand wieder der alte Name da.
+       *
+       * `bildUri` bleibt draussen: das ist ein Pfad auf diesem Geraet und
+       * gehoert nicht in eine Spalte, die andere Geraete lesen.
+       */
+      const { bildUri, ...felder } = werte;
+      if (Object.keys(felder).length === 0) return;
+
+      schreiben('Das Profil', (c, ich) => Aktion.profilAendern(c, ich, felder), () =>
+        setEigenesProfil(vorherStand)
+      );
+    },
+    [eigenesProfil, schreiben]
+  );
 
   const folgenUmschalten = useCallback(
     (userId: string) => {
       const danach = !gefolgt.includes(userId);
       setGefolgt((prev) => (danach ? [...prev, userId] : prev.filter((id) => id !== userId)));
+
+      // Und in die Datenbank, damit es den App-Start ueberlebt und auf der
+      // Website ankommt. Scheitert es, wird zurueckgestellt.
+      schreiben('Das Folgen', (c, ich) => Aktion.folgen(c, ich, userId), () =>
+        setGefolgt((prev) => (danach ? prev.filter((id) => id !== userId) : [...prev, userId]))
+      );
+
       return danach;
     },
-    [gefolgt]
+    [gefolgt, schreiben]
   );
 
   const mitteilungen = useCallback(
@@ -326,15 +371,111 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [alle]
   );
 
-  const alsGelesen = useCallback((id: string) => {
-    setAlle((prev) => prev.map((m) => (m.id === id ? { ...m, gelesen: true } : m)));
-  }, []);
+  const alsGelesen = useCallback(
+    (id: string) => {
+      setAlle((prev) => prev.map((m) => (m.id === id ? { ...m, gelesen: true } : m)));
+      // Sonst steht der rote Punkt beim naechsten Start wieder da.
+      schreiben('Mitteilung als gelesen', (c, ich) => Aktion.mitteilungGelesen(c, ich, id), () =>
+        setAlle((prev) => prev.map((m) => (m.id === id ? { ...m, gelesen: false } : m)))
+      );
+    },
+    [schreiben]
+  );
 
-  const alleGelesen = useCallback((bereich: MitteilungsBereich) => {
-    setAlle((prev) => prev.map((m) => (m.bereich === bereich ? { ...m, gelesen: true } : m)));
-  }, []);
+  const alleGelesen = useCallback(
+    (bereich: MitteilungsBereich) => {
+      // Welche vorher ungelesen waren — nur die duerfen zurueckgedreht werden.
+      let vorher: string[] = [];
+      setAlle((prev) => {
+        vorher = prev.filter((m) => m.bereich === bereich && !m.gelesen).map((m) => m.id);
+        return prev.map((m) => (m.bereich === bereich ? { ...m, gelesen: true } : m));
+      });
+
+      schreiben(
+        'Alle als gelesen',
+        (c, ich) => Aktion.alleMitteilungenGelesen(c, ich, bereich),
+        () => setAlle((prev) => prev.map((m) => (vorher.includes(m.id) ? { ...m, gelesen: false } : m)))
+      );
+    },
+    [schreiben]
+  );
 
   const nummer = () => `e${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+  /*
+   * Einen angelegten Beitrag nachtraeglich auf seine echte Kennung umstellen.
+   *
+   * Die App vergibt beim Anlegen eine vorlaeufige Kennung („p_1756…"), damit
+   * die Kachel sofort dasteht. Die Datenbank vergibt ihre eigene. Solange
+   * beide auseinander liefen, zeigte auf einen frisch angelegten Beitrag
+   * weder Liken noch Kommentieren noch Loeschen — es gab ihn unter dieser
+   * Kennung nirgends.
+   */
+  const kennungTauschen = useCallback((vorlaeufig: string, echt: string) => {
+    setEigeneBeitraege((prev) => prev.map((b) => (b.id === vorlaeufig ? { ...b, id: echt } : b)));
+    setEigeneVideos((prev) => prev.map((v) => (v.id === vorlaeufig ? { ...v, id: echt } : v)));
+    setClips((prev) => prev.map((c) => (c.id === vorlaeufig ? { ...c, id: echt } : c)));
+    setRaster((prev) => prev.map((r) => (r.id === vorlaeufig ? { ...r, id: echt } : r)));
+  }, []);
+
+  /** Einen gerade angelegten Eintrag wieder wegnehmen, wenn er nicht ankam. */
+  const eintragZuruecknehmen = useCallback((id: string) => {
+    setEigeneBeitraege((prev) => prev.filter((b) => b.id !== id));
+    setEigeneVideos((prev) => prev.filter((v) => v.id !== id));
+    setClips((prev) => prev.filter((c) => c.id !== id));
+    setRaster((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  /**
+   * Den Beitrag in die Datenbank legen und die Kennung nachziehen.
+   *
+   * Die Anzeige steht schon; hier geht es nur noch darum, dass er auch
+   * wirklich existiert. Klappt das nicht, verschwindet die Kachel wieder —
+   * eine Kachel, die es nur auf diesem Bildschirm gibt, ist irrefuehrender
+   * als gar keine.
+   */
+  const inDatenbank = useCallback(
+    (vorlaeufig: string, felder: Aktion.NeuerBeitrag) => {
+      if (!supabase || !daten.ichId) return;
+
+      (async () => {
+        /*
+         * Erst die Aufnahme hochladen, dann den Beitrag anlegen.
+         *
+         * Was die Kamera liefert, ist ein Pfad auf diesem Geraet
+         * („file:///var/…"). Er gilt nur hier. Stuende er in der Datenbank,
+         * saehe die Website an dieser Stelle ein kaputtes Bild, und auf einem
+         * zweiten Geraet auch. Gespeichert wird deshalb die oeffentliche
+         * Adresse aus dem Speicher von Supabase.
+         *
+         * Klappt der Upload nicht, wird der Beitrag trotzdem angelegt — nur
+         * ohne Bild. Ein Beitrag ohne Bild ist immer noch besser als eine
+         * Kachel, die es nur auf diesem Bildschirm gibt.
+         */
+        let adresse = felder.mediaUrl;
+        if (adresse && !/^https?:/i.test(adresse)) {
+          const endung = felder.art === 'post' ? 'jpg' : 'mp4';
+          const upload = await ladeHoch(
+            supabase,
+            adresse,
+            'posts',
+            `${daten.ichId}-${Date.now()}.${endung}`
+          );
+          adresse = upload.success ? upload.url ?? undefined : undefined;
+        }
+
+        const echt = await Aktion.beitragAnlegen(supabase, daten.ichId, {
+          ...felder,
+          mediaUrl: adresse,
+        });
+        kennungTauschen(vorlaeufig, echt);
+      })().catch((e: any) => {
+        console.error('Beitrag anlegen fehlgeschlagen:', e?.message ?? e);
+        eintragZuruecknehmen(vorlaeufig);
+      });
+    },
+    [supabase, daten.ichId, kennungTauschen, eintragZuruecknehmen]
+  );
 
   const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(({ beschreibung, ort, mediaUri, music }) => {
     const id = `p_${nummer()}`;
@@ -359,7 +500,15 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       ...prev,
     ]);
     setRaster((prev) => [{ id, kind: 'image', eigen: true, mediaUri }, ...prev]);
-  }, []);
+
+    inDatenbank(id, {
+      art: 'post',
+      beschreibung,
+      ort: ort || '',
+      musik: music || 'Originalton',
+      mediaUrl: mediaUri,
+    });
+  }, [inDatenbank]);
 
   const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(({ beschreibung, ort, quer, mediaUri, music }) => {
     const id = quer ? `q_${nummer()}` : `v_${nummer()}`;
@@ -390,7 +539,19 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       ]);
     }
     setRaster((prev) => [{ id, kind: 'video', eigen: true, mediaUri }, ...prev]);
-  }, []);
+
+    // Querformat ist ein „clip", Hochformat ein „reel" — dieselbe Einteilung
+    // wie in der Datenbank und auf der Website.
+    inDatenbank(id, {
+      art: quer ? 'clip' : 'reel',
+      titel: quer ? beschreibung : '',
+      beschreibung,
+      ort: ort || '',
+      musik: music || 'Originalton',
+      mediaUrl: mediaUri,
+      dauer: quer ? '00:15' : undefined,
+    });
+  }, [inDatenbank]);
 
   /** Gibt einen Fehlertext zurueck, wenn es nicht geklappt hat - sonst null. */
   const highlightAnlegen = useCallback(
@@ -432,14 +593,44 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     setRaster((prev) => [{ id, kind: 'video', eigen: true }, ...prev]);
   }, []);
 
+  /** Die angelegte Community in die Datenbank bringen und die Kennung nachziehen. */
+  const inDatenbankCommunity = useCallback(
+    (vorlaeufig: string, name: string, thema: string) => {
+      if (!supabase || !daten.ichId) return;
+      Aktion.communityAnlegen(supabase, daten.ichId, name, thema || '', true)
+        .then((echt) =>
+          setCommunities((prev) =>
+            prev.map((c) =>
+              c.id === vorlaeufig
+                ? {
+                    ...c,
+                    id: echt,
+                    unterthemen: (c.unterthemen ?? []).map((u) => ({
+                      ...u,
+                      id: `${echt}-allgemein`,
+                    })),
+                  }
+                : c
+            )
+          )
+        )
+        .catch((e: any) => {
+          console.error('Community anlegen fehlgeschlagen:', e?.message ?? e);
+          setCommunities((prev) => prev.filter((c) => c.id !== vorlaeufig));
+        });
+    },
+    [supabase, daten.ichId]
+  );
+
   const kanalAnlegen = useCallback(
     (name: string, thema: string) => {
       if (communities.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
         return 'Diesen Kanal gibt es schon';
       }
+      const vorlaeufig = `k${Date.now()}`;
       setCommunities((prev) => [
         {
-          id: `k${Date.now()}`,
+          id: vorlaeufig,
           name,
           topic: thema || 'Ohne Beschreibung',
           members: 1,
@@ -451,13 +642,20 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           eigen: true,
           bio: thema || '',
           link: '',
-          unterthemen: [{ id: `k${Date.now()}-allgemein`, name: 'Allgemein', themen: [] }],
+          unterthemen: [{ id: `${vorlaeufig}-allgemein`, name: 'Allgemein', themen: [] }],
         },
         ...prev,
       ]);
+
+      /*
+       * Und wirklich anlegen. Vorher lebte eine selbst angelegte Community
+       * nur in diesem Zustand: nach dem naechsten Start war sie weg, und
+       * niemand sonst konnte ihr beitreten.
+       */
+      inDatenbankCommunity(vorlaeufig, name, thema);
       return null;
     },
-    [communities]
+    [communities, inDatenbankCommunity]
   );
 
   /*
@@ -491,25 +689,52 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     return null;
   }, [communities]);
 
-  const kanalBeitreten = useCallback((id: string) => {
-    setCommunities((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, joined: !c.joined, members: c.members + (c.joined ? -1 : 1) } : c))
-    );
-  }, []);
+  const kanalBeitreten = useCallback(
+    (id: string) => {
+      const drehen = () =>
+        setCommunities((prev) =>
+          prev.map((c) =>
+            c.id === id ? { ...c, joined: !c.joined, members: c.members + (c.joined ? -1 : 1) } : c
+          )
+        );
 
-  const clipUmschalten = useCallback((id: string, was: 'like' | 'save' | 'repost') => {
-    setClips((prev) =>
-      prev.map((c) => {
-        if (c.id !== id) return c;
-        if (was === 'like') {
-          const jetzt = !c.liked;
-          return { ...c, liked: jetzt, likes: Math.max(0, (c.likes ?? 0) + (jetzt ? 1 : -1)) };
-        }
-        if (was === 'save') return { ...c, saved: !c.saved };
-        return { ...c, reposted: !c.reposted };
-      })
-    );
-  }, []);
+      drehen();
+      // Und in die Datenbank — sonst ist man nach dem naechsten Start wieder
+      // draussen, und die Website sieht den Beitritt nie.
+      schreiben('Der Beitritt', (c, ich) => Aktion.communityBeitritt(c, ich, id), drehen);
+    },
+    [schreiben]
+  );
+
+  const clipUmschalten = useCallback(
+    (id: string, was: 'like' | 'save' | 'repost') => {
+      const drehen = () =>
+        setClips((prev) =>
+          prev.map((c) => {
+            if (c.id !== id) return c;
+            if (was === 'like') {
+              const jetzt = !c.liked;
+              return { ...c, liked: jetzt, likes: Math.max(0, (c.likes ?? 0) + (jetzt ? 1 : -1)) };
+            }
+            if (was === 'save') return { ...c, saved: !c.saved };
+            return { ...c, reposted: !c.reposted };
+          })
+        );
+
+      drehen();
+
+      // Dasselbe noch einmal umschalten stellt den alten Stand wieder her.
+      const tun =
+        was === 'like'
+          ? Aktion.like
+          : was === 'save'
+            ? Aktion.speichern
+            : Aktion.repost;
+      schreiben(was === 'like' ? 'Das Like' : was === 'save' ? 'Das Speichern' : 'Der Repost',
+        (c, ich) => tun(c, ich, id), drehen);
+    },
+    [schreiben]
+  );
 
   /** Umschalten. Gibt zurueck, was danach gilt. */
   const umschalter = (liste: string[], setzen: (f: (p: string[]) => string[]) => void) => (id: string) => {
@@ -518,8 +743,41 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     return danach;
   };
 
-  const markieren = useCallback(umschalter(markierte, setMarkierte), [markierte]);
-  const favoritUmschalten = useCallback(umschalter(favoriten, setFavoriten), [favoriten]);
+  /*
+   * Sterne an Nachrichten und Lieblingskontakte wurden aus der Datenbank
+   * gelesen (lib/daten.ts, ladeEigeneListen), aber nie hineingeschrieben.
+   * Ein gesetzter Stern war nach dem naechsten Start wieder weg — und weil
+   * er beim Laden aus der Datenbank kam, sah es aus, als haette die App ihn
+   * "vergessen".
+   */
+  /*
+   * Der Rueckweg wird ausgeschrieben, statt umschalter() ein zweites Mal
+   * aufzurufen: das liest `liste` aus der Umgebung von vorhin und wuerde
+   * denselben Zustand noch einmal setzen, statt ihn umzudrehen.
+   */
+  const mitRueckweg = (
+    liste: string[],
+    setzen: (f: (p: string[]) => string[]) => void,
+    was: string,
+    tun: (c: any, ich: string, id: string) => Promise<unknown>
+  ) => (id: string) => {
+    const drin = liste.includes(id);
+    setzen((prev) => (drin ? prev.filter((x) => x !== id) : [...prev, id]));
+    schreiben(was, (c, ich) => tun(c, ich, id), () =>
+      setzen((prev) => (drin ? [...prev, id] : prev.filter((x) => x !== id)))
+    );
+    return !drin;
+  };
+
+  const markieren = useCallback(
+    mitRueckweg(markierte, setMarkierte, 'Der Stern', Aktion.nachrichtMarkieren),
+    [markierte, schreiben]
+  );
+
+  const favoritUmschalten = useCallback(
+    mitRueckweg(favoriten, setFavoriten, 'Der Lieblingskontakt', Aktion.kontaktFavorit),
+    [favoriten, schreiben]
+  );
   const chatStummUmschalten = useCallback(umschalter(chatStumm, setChatStumm), [chatStumm]);
 
   const chatLeeren = useCallback((chatId: string) => {
@@ -534,23 +792,54 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     (id: string) => {
       const danach = !stumm.includes(id);
       setStumm((prev) => (danach ? [...prev, id] : prev.filter((x) => x !== id)));
+      schreiben('Das Stummschalten', (c, ich) => Aktion.stummschalten(c, ich, id), () =>
+        setStumm((prev) => (danach ? prev.filter((x) => x !== id) : [...prev, id]))
+      );
       return danach;
     },
-    [stumm]
+    [stumm, schreiben]
   );
 
   const blockieren = useCallback(
     (id: string) => {
       const danach = !blockiert.includes(id);
       setBlockiert((prev) => (danach ? [...prev, id] : prev.filter((x) => x !== id)));
+
+      /*
+       * Eine Blockierung, die nur hier steht, ist nach dem naechsten Start
+       * der App wieder weg — und die Person kann einem weiter schreiben,
+       * ohne dass man es ahnt. Deshalb geht sie in die Datenbank.
+       */
+      schreiben('Das Blockieren', (c, ich) => Aktion.blockieren(c, ich, id), () =>
+        setBlockiert((prev) => (danach ? prev.filter((x) => x !== id) : [...prev, id]))
+      );
       return danach;
     },
-    [blockiert]
+    [blockiert, schreiben]
   );
 
-  const melden = useCallback((id: string, grund: string) => {
-    setGemeldet((prev) => ({ ...prev, [id]: grund }));
-  }, []);
+  const melden = useCallback(
+    (id: string, grund: string) => {
+      setGemeldet((prev) => ({ ...prev, [id]: grund }));
+      // Eine Meldung nimmt man nicht zurueck — es gibt hier keinen Rueckweg,
+      // ausser dem Vermerk, dass gemeldet wurde.
+      /*
+       * Gemeldet wird hier immer eine Person: alle drei Aufrufer
+       * (ContactProfileScreen, ProfilOptionenSheet, StoryOptionenSheet)
+       * uebergeben eine Nutzerkennung. Stuende hier 'post', wiese die
+       * Datenbank die Zeile ab — target_id waere dann gar keine Beitrags-
+       * kennung.
+       */
+      schreiben('Das Melden', (c, ich) => Aktion.melden(c, ich, id, grund, 'user'), () =>
+        setGemeldet((prev) => {
+          const ohne = { ...prev };
+          delete ohne[id];
+          return ohne;
+        })
+      );
+    },
+    [schreiben]
+  );
 
   const geteilt = useCallback((id: string) => {
     setGeteiltZaehler((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));

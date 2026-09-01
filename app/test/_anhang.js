@@ -154,7 +154,20 @@ if (!fs.existsSync(BILD)) {
     const auswahl = await wartet;
     if (!auswahl) throw new Error('die Dateiauswahl ging nicht auf');
     await auswahl.setFiles(BILD);
-    await page.waitForTimeout(1000);
+
+    /*
+     * Auf die Blase warten, nicht auf die Uhr.
+     *
+     * Hier stand waitForTimeout(1000). Das Bild wird erst hochgeladen und der
+     * Chat danach neu gezeichnet — unter Last dauert das laenger als eine
+     * Sekunde, und dann meldete dieser Schritt "kein Bild in der Blase",
+     * obwohl das Bild Bruchteile spaeter dastand.
+     */
+    await page
+      .waitForFunction(() => document.querySelectorAll('.msg__bild').length > 0, null, {
+        timeout: 15000,
+      })
+      .catch(() => {});
     const bilder = await page.$$eval('.msg__bild', (els) => els.length);
     if (bilder < 1) throw new Error('kein Bild in der Blase');
   });

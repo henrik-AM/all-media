@@ -282,10 +282,20 @@ async function chatMit(client, nutzerId, zielId, bereich = 'messenger') {
     .single();
   if (fehlerNeu) throw fehlerNeu;
 
-  await client.from('chat_members').insert([
+  /*
+   * Die Mitglieder gehoeren zum Chat. Schlaegt das fehl, entsteht ein Chat,
+   * in dem niemand drin ist: er taucht in keiner Liste auf, nimmt aber jede
+   * Nachricht an, die dann nie jemand sieht. Deshalb wird der Fehler nicht
+   * verschluckt, und der halbe Chat wieder weggeraeumt.
+   */
+  const { error: fehlerMitglieder } = await client.from('chat_members').insert([
     { chat_id: neu.id, user_id: nutzerId },
     { chat_id: neu.id, user_id: zielId },
   ]);
+  if (fehlerMitglieder) {
+    await client.from('chats').delete().eq('id', neu.id);
+    throw fehlerMitglieder;
+  }
   return neu.id;
 }
 
@@ -362,9 +372,10 @@ const handleAddContact = handler(
 
     const chatId = await chatMit(client, nutzerId, zielId);
     if (nachricht.trim()) {
-      await client
+      const { error: fehlerNachricht } = await client
         .from('messages')
         .insert({ chat_id: chatId, sender_id: nutzerId, text: nachricht.trim() });
+      if (fehlerNachricht) throw fehlerNachricht;
     }
 
     return { ok: true, status, chatId };
@@ -423,15 +434,22 @@ const handleShareToChats = handler(
       // Welcher Beitrag geteilt wurde, gehoert an die Nachricht. Sonst steht
       // im Chat nur der Satz "Beitrag geteilt" und niemand kommt von dort aus
       // zum Beitrag — im Prototyp ist das eine Karte, die ihn oeffnet.
-      await client
+      const { error: fehlerNachricht } = await client
         .from('messages')
         .insert({ chat_id: chatId, sender_id: nutzerId, text: vorschau, shared_post_id: beitragId });
+      if (fehlerNachricht) throw fehlerNachricht;
       gesendet.push(zielId);
     }
 
-    await client.from('shares').insert(
+    /*
+     * Der Eintrag in shares ist die gezaehlte Weiterleitung. Ging er still
+     * verloren, meldete die Oberflaeche "An Bob gesendet" und die Zahl unter
+     * dem Beitrag blieb trotzdem stehen — ohne dass irgendwo etwas stand.
+     */
+    const { error: fehlerZaehler } = await client.from('shares').insert(
       gesendet.map((id) => ({ post_id: beitragId, shared_by: nutzerId, shared_to: id }))
     );
+    if (fehlerZaehler) throw fehlerZaehler;
 
     return { ok: true, gesendet };
   }
@@ -555,8 +573,17 @@ const handleSendMessage = handler(
       .single();
     if (error) throw error;
 
-    // Damit der Chat in der Liste nach oben rutscht.
-    await client.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chatId);
+    // Damit der Chat in der Liste nach oben rutscht. Klappt das nicht, ist
+    // die Nachricht trotzdem angekommen — die Liste steht nur in der alten
+    // Reihenfolge. Das ist kein Grund, das Senden scheitern zu lassen, aber
+    // auch keins, es zu verschweigen.
+    const { error: fehlerReihenfolge } = await client
+      .from('chats')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', chatId);
+    if (fehlerReihenfolge) {
+      console.warn('Chat konnte nicht nach oben sortiert werden:', fehlerReihenfolge.message);
+    }
 
     return { ok: true, nachricht: data };
   }
@@ -697,9 +724,30 @@ const handleLikeStory = handler('Story-Like', async (client, nutzerId, storyId) 
 });
 
 const handleViewStory = handler('Story gesehen', async (client, nutzerId, storyId) => {
+  /*
+   * ignoreDuplicates ist hier kein Feinschliff, sondern notwendig.
+   *
+   * Ein upsert wird bei einer schon vorhandenen Zeile zu einem UPDATE — und
+   * für UPDATE gibt es auf story_views gar keine Regel (SUPABASE_SCHEMA_2.sql
+   * kennt nur SELECT und INSERT). Die Datenbank wies das ab:
+   *
+   *   new row violates row-level security policy (USING expression)
+   *   for table "story_views"
+   *
+   * Sichtbar wurde das erst im iOS-Simulator: jede zweite Betrachtung
+   * derselben Story lief in diesen Fehler, und der Ring blieb bunt. Kein
+   * Prüflauf gegen die Website hat es gezeigt.
+   *
+   * Mit ignoreDuplicates wird daraus ein ON CONFLICT DO NOTHING. Richtig so:
+   * „gesehen" ist ein Fakt, der sich nicht ändert — der Zeitpunkt der ersten
+   * Betrachtung ist der interessante, nicht der der letzten.
+   */
   const { error } = await client
     .from('story_views')
-    .upsert({ story_id: storyId, user_id: nutzerId }, { onConflict: 'story_id,user_id' });
+    .upsert(
+      { story_id: storyId, user_id: nutzerId },
+      { onConflict: 'story_id,user_id', ignoreDuplicates: true }
+    );
   if (error) throw error;
   return { ok: true };
 });
@@ -721,8 +769,18 @@ const handleCreateCommunity = handler(
       .single();
     if (error) throw error;
 
-    // Wer eine Community anlegt, ist ihr erstes Mitglied.
-    await client.from('community_members').insert({ community_id: data.id, user_id: nutzerId });
+    /*
+     * Wer eine Community anlegt, ist ihr erstes Mitglied. Ohne diese Zeile
+     * legt man eine Community an, in der man selbst nicht drin ist — sie
+     * steht dann unter "Erstellt", aber nicht unter "Meine".
+     */
+    const { error: fehlerMitglied } = await client
+      .from('community_members')
+      .insert({ community_id: data.id, user_id: nutzerId });
+    if (fehlerMitglied) {
+      await client.from('communities').delete().eq('id', data.id);
+      throw fehlerMitglied;
+    }
 
     return { ok: true, community: data };
   }

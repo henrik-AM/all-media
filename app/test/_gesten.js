@@ -174,9 +174,25 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Ein neuer Kommentar zieht die Zahl am Beitrag mit', async () => {
+    /*
+     * Auf den neuen Kommentar warten, nicht auf die Uhr.
+     *
+     * Hier stand waitForTimeout(800). Der Kommentar geht erst in die
+     * Datenbank, die Liste wird danach neu gezeichnet — unter Last dauert das
+     * laenger. Gemessen wurde dann die alte Liste, waehrend im Feed schon die
+     * neue Zahl stand: "am Beitrag 4, in der Liste 3". Ein Fehler, den es
+     * nicht gab, aber genau so aussah wie einer.
+     */
+    const vorherZeilen = await page.$$eval('.comment', (n) => n.length);
     await page.fill('#commentInput', 'Sehr schön geworden');
     await page.click('#commentSend');
-    await page.waitForTimeout(800);
+    await page
+      .waitForFunction(
+        (soll) => document.querySelectorAll('.comment').length >= soll,
+        vorherZeilen + 1,
+        { timeout: 15000 }
+      )
+      .catch(() => {});
     const inListe = await page.$$eval('.comment', (n) => n.length);
     const imTitel = await page.$eval('.sheet__title', (n) => Number((n.textContent.match(/\d+/) || ['0'])[0]));
     if (inListe !== imTitel) throw new Error(`${inListe} Zeilen, Titel sagt ${imTitel}`);

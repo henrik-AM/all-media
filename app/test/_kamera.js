@@ -183,17 +183,35 @@ const BILD = path.join(__dirname, '_testbild.png');
   console.log('\nFolgen — Punkt 42');
 
   await pruefe('Folgen zählt die eigene Gefolgt-Zahl mit', async () => {
+    /*
+     * Auf die Seite warten, nicht auf die Uhr.
+     *
+     * gehe() wechselt den Bereich, aber das Profil wird danach erst geholt
+     * und gezeichnet. Ohne dieses Warten las der Schritt unter Last ins
+     * Leere und meldete "Failed to find element matching selector
+     * #followingBtn strong" — ein Fehler, der wie ein fehlender Knopf aussah,
+     * obwohl der Knopf nur noch nicht da war.
+     */
+    const zahl = async () => {
+      await page.waitForSelector('#followingBtn strong', { timeout: 15000 });
+      return page.$eval('#followingBtn strong', (e) => e.textContent);
+    };
+
     await gehe('videos', 'profile');
-    const vorher = await page.$eval('#followingBtn strong', (e) => e.textContent);
+    const vorher = await zahl();
 
     // Der Folgen-Knopf haengt am Beitrag im Feed, nicht am Hochformat-Player.
     await gehe('videos', 'home');
     await page.waitForSelector('[data-paction="follow"]');
     await page.click('[data-paction="follow"]');
-    await page.waitForTimeout(800);
 
-    await gehe('videos', 'profile');
-    const nachher = await page.$eval('#followingBtn strong', (e) => e.textContent);
+    // Auf die neue Zahl warten statt auf eine geratene Wartezeit.
+    let nachher = vorher;
+    for (let i = 0; i < 20 && nachher === vorher; i++) {
+      await page.waitForTimeout(500);
+      await gehe('videos', 'profile');
+      nachher = await zahl();
+    }
     if (vorher === nachher) throw new Error(`stand vorher und nachher bei ${vorher}`);
   });
 

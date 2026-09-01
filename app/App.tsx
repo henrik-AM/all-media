@@ -14,6 +14,7 @@ import { FormularFeld, FormularSheet } from './components/FormularSheet';
 import { MitteilungenSheet } from './components/MitteilungenSheet';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenSheet, TeilenZiel } from './components/TeilenSheet';
+import { useAktionen } from './lib/useAktionen';
 import { KontoWechsel } from './components/KontoWechsel';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
@@ -115,6 +116,8 @@ const Shell = () => {
    * einer Stelle ueberall ankommt. Ihr Ausgangsstand kommt aus der Datenbank.
    */
   const daten = useDaten();
+  // Alles, was die App in die Datenbank schreibt, laeuft hierueber.
+  const aktion = useAktionen(setNotice);
   const [chats, setChats] = useState<Chat[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
@@ -371,6 +374,23 @@ const Shell = () => {
     setExtraNachrichten((prev) => ({ ...prev, [chat!.id]: [...(prev[chat!.id] ?? []), nachricht] }));
     profil.geteilt(ziel.id);
     setNotice(`An ${person.name} gesendet`);
+
+    /*
+     * Und wirklich senden.
+     *
+     * Bis zum 01.09.2026 endete diese Funktion hier. Die Karte lag im Chat,
+     * die Meldung stand da — nur war beides ausschliesslich in diesem einen
+     * Bildschirm. Der Empfaenger bekam nie etwas, und beim naechsten Start
+     * war der Chat wieder leer. Die Website hat es die ganze Zeit richtig
+     * gemacht (web/server/sync-handlers.js, handleShareToChats), was den
+     * Unterschied zwischen beiden Fassungen erklaerte.
+     *
+     * Danach neu laden: die Nachricht bekommt in der Datenbank ihre eigene
+     * Kennung, und die Zahl unter dem Beitrag steigt.
+     */
+    aktion.teilen(ziel.id, [userId], vorschau).then((ok) => {
+      if (ok) daten.neuLaden();
+    });
   };
 
   /*
@@ -848,6 +868,16 @@ const Shell = () => {
             prev.some((s) => s.id === storyId && !s.viewed)
               ? prev.map((s) => (s.id === storyId ? { ...s, viewed: true } : s))
               : prev
+          );
+
+          /*
+           * Und in die Datenbank. Die App las story_views bisher nur
+           * (lib/daten.ts, ladeStorys) und schrieb nie hinein: der Ring wurde
+           * grau, solange der Betrachter offen war, und war beim naechsten
+           * Start wieder bunt.
+           */
+          aktion.storyGesehen(storyId, () =>
+            setStories((prev) => prev.map((s) => (s.id === storyId ? { ...s, viewed: false } : s)))
           );
         }}
         onClose={() => {

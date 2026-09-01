@@ -154,10 +154,34 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Gesendetes Video zaehlt bei den Weiterleitungen mit', async () => {
-    const vorher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).videos[0].shares);
+    /*
+     * Gezaehlt wird an dem Video, das gerade zu sehen ist — nicht an
+     * videos[0]. Das ist zwar meistens dasselbe, aber "meistens" ist bei
+     * einer Pruefung zu wenig.
+     *
+     * Und gewartet wird auf den neuen Stand, nicht auf die Uhr. Vorher stand
+     * hier waitForTimeout(1200): das Teilen legt eine Nachricht im Chat an,
+     * traegt die Weiterleitung ein und liest den Beitrag neu — auf einer
+     * langsamen Verbindung dauert das laenger als 1,2 Sekunden. Dann meldete
+     * dieser Schritt "0 -> 0", obwohl alles richtig lief, und weil
+     * test:alles eine &&-Kette ist, liefen die vierzehn Pruefläufe danach
+     * gar nicht mehr.
+     */
+    const vid = await page.getAttribute('[data-vaction="share"]', 'data-vid').catch(() => null);
+    const zaehler = async () => {
+      const boot = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()));
+      const v = (boot.videos || []).find((x) => x.id === vid) || boot.videos[0];
+      return v ? v.shares : null;
+    };
+
+    const vorher = await zaehler();
     await page.click(`[data-teilen="${K.person('u2')}"]`);
-    await page.waitForTimeout(1200);
-    const nachher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).videos[0].shares);
+
+    let nachher = vorher;
+    for (let i = 0; i < 20 && nachher !== vorher + 1; i++) {
+      await page.waitForTimeout(500);
+      nachher = await zaehler();
+    }
     if (nachher !== vorher + 1) throw new Error(`${vorher} -> ${nachher}`);
     await page.click('[data-sheet-close]');
   });

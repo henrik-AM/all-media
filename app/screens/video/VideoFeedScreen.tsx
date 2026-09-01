@@ -12,6 +12,7 @@ import { Video } from '../../types';
 import { compactNumber } from '../../lib/zahlen';
 import { haptic } from '../../lib/haptics';
 import { Videoflaeche } from '../../components/Videoflaeche';
+import { useAktionen } from '../../lib/useAktionen';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -23,6 +24,8 @@ interface Props {
 export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => {
   const { users: alleNutzer, videos: alleVideos } = useDaten();
   const { istRepostet, umschalten } = useReposts();
+  // Schreibt wirklich in die Datenbank — siehe lib/useAktionen.ts.
+  const aktion = useAktionen(onNotice);
   // Eigene Reels stehen oben im Feed.
   const { eigeneVideos, geteiltZaehler } = useProfil();
   const [videos, setVideos] = useState<Video[]>(alleVideos);
@@ -90,21 +93,32 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   const update = (id: string, change: (video: Video) => Video) =>
     setVideos((prev) => prev.map((v) => (v.id === id ? change(v) : v)));
 
+  /*
+   * Wie im Bild-Feed: erst umschalten, dann schreiben, bei einem Fehler
+   * zurueckstellen. Vorher blieb es beim Umschalten — das Herz war rot, die
+   * Datenbank wusste nichts davon.
+   */
   const toggleLike = async (video: Video) => {
     haptic.impact('medium');
+    const zurueck = () =>
+      update(video.id, (v) => ({ ...v, liked: video.liked, likes: video.likes }));
     update(video.id, (v) => ({ ...v, liked: !v.liked, likes: v.likes + (v.liked ? -1 : 1) }));
+    aktion.like(video.id, zurueck);
   };
 
   const toggleSave = async (video: Video) => {
     haptic.light();
+    const zurueck = () => update(video.id, (v) => ({ ...v, saved: video.saved }));
     update(video.id, (v) => ({ ...v, saved: !v.saved }));
     onNotice(video.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
+    aktion.speichern(video.id, zurueck);
   };
 
   const toggleNotify = (video: Video) => {
     haptic.light();
     update(video.id, (v) => ({ ...v, notify: !v.notify }));
     onNotice(video.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+    aktion.hinweis(video.id, () => update(video.id, (v) => ({ ...v, notify: video.notify })));
   };
 
   const toggleRepost = async (video: Video) => {
@@ -116,6 +130,10 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
       shares: v.shares + (jetztAn ? 1 : -1),
     }));
     onNotice(jetztAn ? 'Repostet' : 'Repost zurückgenommen');
+    aktion.repost(video.id, () => {
+      umschalten('video', video.id, video.description);
+      update(video.id, (v) => ({ ...v, reposted: video.reposted, shares: video.shares }));
+    });
   };
 
   const share = (video: Video) => {
