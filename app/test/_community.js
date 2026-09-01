@@ -202,10 +202,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nCommunitys — Chats');
 
   const zuDenChats = async () => {
+    // Erst wegräumen, was offen steht: ein Blatt oder ein offener Chat legt
+    // sonst seine Fläche über die untere Leiste, und der nächste Klick
+    // wartet acht Sekunden auf einen Knopf, den er nie erreicht.
+    await page.evaluate(() => {
+      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      const o = document.querySelector('#overlay');
+      if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+    });
     await page.click('[data-area="communities"]');
     await page.waitForTimeout(300);
     await page.click('[data-sub="chats"]');
-    await page.waitForSelector('#commChatSearch');
+    await page.waitForSelector('#commChatSearch', { timeout: 10000 });
   };
 
   await pruefe('Ein einzelner Chat laesst sich oeffnen', async () => {
@@ -213,7 +221,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     const zeilen = await page.$$('[data-chat]');
     if (!zeilen.length) throw new Error('die Liste ist leer');
     await zeilen[0].click();
-    await page.waitForTimeout(700);
+    // Der Verlauf kommt aus der Datenbank — erst danach steht der Chat.
+    await page.waitForSelector('#chatBack', { timeout: 10000 }).catch(() => {});
     if (!(await page.$('#chatBack'))) throw new Error('der Chat geht nicht auf');
     await page.click('#chatBack');
     await page.waitForTimeout(400);
@@ -226,7 +235,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     const zeilen = await page.$$('[data-chat]');
     if (!zeilen.length) throw new Error('keine Gruppe in der Liste');
     await zeilen[0].click();
-    await page.waitForTimeout(700);
+    await page.waitForSelector('#chatBack', { timeout: 10000 }).catch(() => {});
     if (!(await page.$('#chatBack'))) throw new Error('der Gruppenchat geht nicht auf');
     await page.click('#chatBack');
     await page.waitForTimeout(400);
