@@ -78,7 +78,27 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.mouse.up();
     await page.waitForTimeout(400);
     await page.click('[data-copt="einstellungen"]');
-    await page.waitForTimeout(500);
+    // Auf das Blatt warten statt auf die Uhr: es kommt erst, wenn die
+    // Chatdaten da sind. 500 ms waren dafuer eine Wette.
+    await page.waitForSelector('.chatopt__name', { timeout: 10000 }).catch(() => {});
+  };
+
+  /*
+   * Einen Schalter umlegen und warten, bis er wirklich umgelegt ist.
+   *
+   * Vorher stand hier ueberall waitForTimeout(500). Der Schalter geht aber
+   * erst um, wenn der Server geantwortet hat - und wer vorher das Blatt
+   * schliesst, prueft anschliessend einen Stand, der nie gespeichert wurde.
+   */
+  const schalte = async (was) => {
+    const vorher = await page.$eval(`[data-chatopt="${was}"]`, (n) => n.classList.contains('is-on'));
+    await page.click(`[data-chatopt="${was}"]`);
+    await page
+      .waitForFunction(
+        ([w, v]) => document.querySelector(`[data-chatopt="${w}"]`)?.classList.contains('is-on') !== v,
+        [was, vorher], { timeout: 10000 }
+      )
+      .catch(() => {});
   };
 
   const zu = async () => {
@@ -140,7 +160,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Ein gesperrter Chat fragt vor dem Öffnen nach', async () => {
     await page.click(await K.waehlerChat(page, 'Bob Müller'));
-    await page.waitForTimeout(500);
+    await page.waitForSelector('#nachfrageJa', { timeout: 10000 }).catch(() => {});
     const nachfrage = await page.$('#nachfrageJa');
     if (!nachfrage) throw new Error('er geht ohne Nachfrage auf');
     await page.click('#nachfrageNein');
@@ -150,18 +170,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Nach „Öffnen" geht der Chat auf', async () => {
     await page.click(await K.waehlerChat(page, 'Bob Müller'));
-    await page.waitForTimeout(400);
+    await page.waitForSelector('#nachfrageJa', { timeout: 10000 });
     await page.click('#nachfrageJa');
-    await page.waitForTimeout(700);
+    // Der Chat holt seine Nachrichten aus der Datenbank, bevor er steht.
+    await page.waitForSelector('#chatBack', { timeout: 10000 }).catch(() => {});
     if (!(await page.$('#chatBack'))) throw new Error('er bleibt zu');
     await page.click('#chatBack');
-    await page.waitForTimeout(400);
+    await page.waitForSelector('#chatSearch', { timeout: 10000 }).catch(() => {});
   });
 
   await pruefe('Die Sperre laesst sich wieder aufheben', async () => {
     await optionen();
-    await page.click('[data-chatopt="sperren"]');
-    await page.waitForTimeout(500);
+    await schalte('sperren');
     await zu();
     await zurListe();
     // Das Aufheben geht in die Datenbank; danach wird die Liste neu geholt.
@@ -176,8 +196,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('„Stumm" merkt sich seinen Stand', async () => {
     await optionen();
-    await page.click('[data-chatopt="stumm"]');
-    await page.waitForTimeout(500);
+    await schalte('stumm');
     await zu();
     await optionen();
     const an = await page.$eval('[data-chatopt="stumm"]', (n) => n.classList.contains('is-on'));
@@ -198,8 +217,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('„Mitteilungen" merkt sich seinen Stand', async () => {
     await page.locator('[data-chatopt="mitteilungen"]').scrollIntoViewIfNeeded();
-    await page.click('[data-chatopt="mitteilungen"]');
-    await page.waitForTimeout(500);
+    await schalte('mitteilungen');
     await zu();
     await optionen();
     const an = await page.$eval('[data-chatopt="mitteilungen"]', (n) => n.classList.contains('is-on'));
