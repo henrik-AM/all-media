@@ -132,12 +132,27 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await zumFeed();
 
+  /*
+   * Der Beitrag, an dem dieser Abschnitt hängt.
+   *
+   * "p1" war seine feste Kennung in den Beispieldaten; jetzt bekommt er sie
+   * beim Anlegen in der Datenbank. Einmal oben geholt, damit alle Prüfungen
+   * darunter denselben meinen.
+   *
+   * Und ausdrücklich der Hafen-Beitrag, nicht einfach der erste im Feed: der
+   * ist seit dem 01.09.2026 der eigene Testbeitrag, und der hat noch keine
+   * Kommentare. Ohne Kommentare gibt es hier nichts zu zählen.
+   */
+  const ersterPost = await K.beitrag(page, 'Hafen um sechs');
+
   await pruefe('Die angezeigte Kommentarzahl stimmt mit der echten überein', async () => {
-    const ersterPost = await K.ersterBeitrag(page);
     const amBeitrag = await page.$eval(`.post__comments[data-pid="${ersterPost}"]`, (n) =>
       (n.textContent.match(/\d+/) || ['0'])[0]
     );
-    const echt = await page.evaluate(async () => (await (await fetch('/api/comments/p1')).json()).length);
+    const echt = await page.evaluate(
+      async (id) => (await (await fetch(`/api/comments/${id}`)).json()).length,
+      ersterPost
+    );
     if (Number(amBeitrag) !== echt) throw new Error(`am Beitrag ${amBeitrag}, wirklich ${echt}`);
   });
 
@@ -169,7 +184,6 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.evaluate(() => document.querySelector('.sheet-backdrop')?.remove());
     await page.waitForTimeout(300);
     await zumFeed();
-    const ersterPost = await K.ersterBeitrag(page);
     const amBeitrag = await page.$eval(`.post__comments[data-pid="${ersterPost}"]`, (n) =>
       Number((n.textContent.match(/\d+/) || ['0'])[0])
     );

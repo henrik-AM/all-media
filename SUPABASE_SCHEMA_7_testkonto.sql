@@ -669,6 +669,25 @@ update public.vorlage_chats set ungelesen = (schluessel in ('c1', 'c2'));
 
 
 -- ===========================================================================
+-- Die Kommentarzahl zählt Kommentare
+-- ===========================================================================
+--
+-- Henrik am 26.08.2026: „Kommentaranzahl korrigieren: Wenn nur 4 Kommentare
+-- vorhanden sind, darf nicht ‚Alle 28 Kommentare ansehen' stehen."
+--
+-- Genau das war wieder da. `comments_basis` ist ein Sockel: eine historische
+-- Zahl, auf die die echten Kommentare addiert werden. Bei Likes und
+-- Weiterleitungen ist das unverfänglich — die Liste dahinter sieht niemand.
+-- Bei Kommentaren steht sie einen Fingertipp entfernt: am Beitrag stand 27,
+-- in der Liste lagen drei.
+--
+-- Der Sockel für Kommentare fällt deshalb weg. Likes und Weiterleitungen
+-- behalten ihren.
+
+update public.posts set comments_basis = 0 where coalesce(comments_basis, 0) <> 0;
+
+
+-- ===========================================================================
 -- „Chat leeren" leert den Chat wirklich
 -- ===========================================================================
 --
