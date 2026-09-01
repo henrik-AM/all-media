@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useContext, useState } from 'react';
+import React, { useEffect, useCallback, useContext, useRef, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
@@ -178,9 +178,15 @@ const Shell = () => {
    *
    * Format:  bereich/unterpunkt[#überlagerung:parameter]
    *
-   *   messenger/chats              die Chatliste
-   *   messenger/chats#chat:c1      ein offener Chat darin
-   *   videos/profile#profil:u1     ein fremdes Profil
+   *   messenger/chats                         die Chatliste
+   *   messenger/chats#chat:Anna Schmidt        ein offener Chat darin
+   *   videos/profile#profil:Anna Schmidt       ein fremdes Profil
+   *
+   * Angegeben wird der NAME, nicht die Kennung. Kennungen vergibt die
+   * Datenbank beim Anlegen; die frueheren festen Werte (c1, u1, s1, q1, k1)
+   * gab es nach dem Umzug nach Supabase nicht mehr. Die Ueberlagerung ging
+   * dann still nicht auf, und `npm run mac:bilder` legte fuer acht
+   * Detailbildschirme in Wahrheit das Bild der Einstiegsseite ab.
    *
    * Der Teil hinter der Raute kam später dazu: die vierzehn Bereiche allein
    * decken keinen einzigen Detailbildschirm ab. Ein Chat, ein Story-Betrachter
@@ -191,8 +197,18 @@ const Shell = () => {
    * `__DEV__` ist in einem veröffentlichten Build false — der Schalter
    * existiert dort also nicht, und der Schlüssel wird nie gelesen.
    */
+  /*
+   * Erst laufen lassen, wenn die Daten da sind.
+   *
+   * Vorher hing der Effekt an [] und lief einmal beim Aufbau - da war
+   * `daten` noch leer, und jede Ueberlagerung fiel durch, weil sie ihren
+   * Chat, ihre Story oder ihr Profil nicht fand.
+   */
+  const pruefbildGesetzt = useRef(false);
   useEffect(() => {
-    if (!__DEV__) return;
+    if (!__DEV__ || pruefbildGesetzt.current) return;
+    if (daten.chats.length === 0 && Object.keys(daten.users).length === 0) return;
+    pruefbildGesetzt.current = true;
     AsyncStorage.getItem('all-media.pruefbild')
       .then((roh) => {
         if (!roh) return;
@@ -206,7 +222,7 @@ const Shell = () => {
       .catch(() => {
         // Kein Schalter gesetzt oder Speicher nicht lesbar: normal starten.
       });
-  }, []);
+  }, [daten]);
 
   /**
    * Den Teil hinter der Raute in eine Überlagerung übersetzen. Bewusst
@@ -215,35 +231,52 @@ const Shell = () => {
    */
   const pruefUeberlagerung = (angabe: string) => {
     const [art, a, b] = angabe.split(':');
+    // Kennung ODER Name: die Kennungen vergibt die Datenbank, die Namen
+    // stehen in den Beispielinhalten und aendern sich nicht.
+    const nutzerId = (wert: string) =>
+      daten.users[wert]
+        ? wert
+        : Object.keys(daten.users).find((id) => daten.users[id]?.name === wert);
+
     switch (art) {
       case 'chat': {
-        const chat = daten.chats.find((c) => c.id === a);
+        const chat = daten.chats.find((c) => c.id === a || c.name === a);
         if (chat) setOverlay({ kind: 'chat', chat, extra: [] });
         break;
       }
       case 'story': {
-        const story = daten.stories.find((s) => s.id === a);
+        const story = daten.stories.find((s) => s.id === a || s.name === a);
         if (story) setOverlay({ kind: 'story', story });
         break;
       }
-      case 'profil':
-        if (daten.users[a]) setOverlay({ kind: 'profile', userId: a, variant: 'oeffentlich' });
+      case 'profil': {
+        const id = nutzerId(a);
+        if (id) setOverlay({ kind: 'profile', userId: id, variant: 'oeffentlich' });
         break;
-      case 'kontakt':
-        if (daten.users[a]) setOverlay({ kind: 'profile', userId: a, variant: 'kontakt' });
+      }
+      case 'kontakt': {
+        const id = nutzerId(a);
+        if (id) setOverlay({ kind: 'profile', userId: id, variant: 'kontakt' });
         break;
+      }
       case 'kontakte':
         setOverlay({ kind: 'contacts' });
         break;
-      case 'community':
-        if (daten.communities.some((c) => c.id === a)) setOverlay({ kind: 'community', communityId: a });
+      case 'community': {
+        const com = daten.communities.find((c) => c.id === a || c.name === a);
+        if (com) setOverlay({ kind: 'community', communityId: com.id });
         break;
-      case 'anruf':
-        if (daten.users[a]) setOverlay({ kind: 'call', userId: a, art: b === 'video' ? 'video' : 'audio' });
+      }
+      case 'anruf': {
+        const id = nutzerId(a);
+        if (id) setOverlay({ kind: 'call', userId: id, art: b === 'video' ? 'video' : 'audio' });
         break;
-      case 'clip':
-        if (daten.clips.some((c) => c.id === a)) setOverlay({ kind: 'clip', clipId: a });
+      }
+      case 'clip': {
+        const clip = daten.clips.find((c) => c.id === a || c.title === a);
+        if (clip) setOverlay({ kind: 'clip', clipId: clip.id });
         break;
+      }
       case 'blatt':
         if (['new', 'group', 'contact', 'konto', 'mitteilungen', 'erstellen'].includes(a)) {
           setSheet(a as Sheet);

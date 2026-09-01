@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
+import { ladeNachrichten } from '../../lib/daten';
 import { Chat, Message } from '../../types';
 
 interface Props {
@@ -82,11 +83,30 @@ export const ContactProfileScreen = ({
     melden,
   } = useProfil();
 
+  /*
+   * Den Verlauf selbst holen.
+   *
+   * Vorher kam ueber `nachrichten` nur, was in dieser Sitzung dazugekommen
+   * war (extraNachrichten in App.tsx). In der Kontaktinfo standen deshalb
+   * immer "0 Medien", "0 Nachrichten" und "0 Markiert" - auf der Website
+   * standen dort die echten Zahlen. Denselben Weg geht ChatDetailScreen.
+   */
+  const [geladen, setGeladen] = useState<Message[]>([]);
+
   const [offen, setOffen] = useState<Offen>(null);
   const [gesperrt, setGesperrt] = useState(false);
   const [wahlen, setWahlen] = useState<Record<string, string>>({});
   const [angezeigterName, setAngezeigterName] = useState<string | null>(null);
   const [suche, setSuche] = useState('');
+
+  useEffect(() => {
+    if (!supabase || !ichId || !chat) return;
+    let abgebrochen = false;
+    ladeNachrichten(supabase, chat.id, ichId)
+      .then((m) => { if (!abgebrochen) setGeladen(m); })
+      .catch((e) => console.error('Verlauf laden fehlgeschlagen:', e?.message ?? e));
+    return () => { abgebrochen = true; };
+  }, [supabase, ichId, chat]);
 
   const person = alleNutzer[userId];
 
@@ -106,7 +126,9 @@ export const ContactProfileScreen = ({
   const name = angezeigterName ?? person.name;
   const bio = alleProfile[userId]?.bio;
   const geleert = !!chat && geleerteChats.includes(chat.id);
-  const verlauf = geleert ? [] : nachrichten;
+  // Der geladene Verlauf plus das, was in dieser Sitzung dazukam.
+  const zusammen = [...geladen, ...nachrichten.filter((m) => !geladen.some((g) => g.id === m.id))];
+  const verlauf = geleert ? [] : zusammen;
   const medien = verlauf.filter((m) => m.media || m.geteilt || m.standort || m.kontakt);
   const mitStern = verlauf.filter((m) => markierte.includes(m.id));
   /*

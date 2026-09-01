@@ -67,18 +67,27 @@ const SEITEN = [
   // Einstiegsseiten - ein Chat, ein Story-Betrachter oder ein fremdes Profil
   // kam in keinem Bild vor, obwohl ein Nutzer dort die meiste Zeit verbringt.
   // Ein Fehler an einer Sprechblase waere nie aufgefallen.
-  ['messenger/chats#chat:c1', 'detail-chat'],
-  ['messenger/chats#chat:c4', 'detail-chat-gruppe'],
-  ['messenger/chats#story:s1', 'detail-story'],
-  ['messenger/chats#kontakt:u1', 'detail-kontaktprofil'],
+  //
+  // Angegeben wird der NAME, nicht die Kennung.
+  //
+  // Bis hierher standen feste Kennungen (c1, c4, s1, u1, q1, k1). Die gab es
+  // nach dem Umzug nach Supabase nicht mehr - die Datenbank vergibt sie beim
+  // Anlegen. Die Ueberlagerung ging still nicht auf, und dieses Skript legte
+  // fuer acht Detailbildschirme in Wahrheit das Bild der Einstiegsseite ab:
+  // ein Fehler an einer Sprechblase, im Kontaktprofil oder im Spieler waere
+  // in keinem Bild zu sehen gewesen.
+  ['messenger/chats#chat:Anna Schmidt', 'detail-chat'],
+  ['messenger/chats#chat:Projekt Team', 'detail-chat-gruppe'],
+  ['messenger/chats#story:Anna Schmidt', 'detail-story'],
+  ['messenger/chats#kontakt:Anna Schmidt', 'detail-kontaktprofil'],
   ['messenger/chats#kontakte', 'detail-kontakte'],
-  ['messenger/chats#anruf:u1:audio', 'detail-anruf'],
+  ['messenger/chats#anruf:Anna Schmidt:audio', 'detail-anruf'],
   ['messenger/chats#blatt:erstellen', 'detail-erstellen'],
-  ['videos/profile#profil:u1', 'detail-fremdprofil'],
-  ['videos/landscape#clip:q1', 'detail-clip'],
+  ['videos/profile#profil:Anna Schmidt', 'detail-fremdprofil'],
+  ['videos/landscape#clip:Testvideo im Querformat', 'detail-clip'],
   // Die Community-Seite nach dem Prototyp-Frame "CH + Kanal". Sie kam in
   // keinem Bild vor - den Bildschirm gab es bis zum 26.08.2026 nicht.
-  ['communities/home#community:k1', 'detail-community'],
+  ['communities/home#community:Design Systeme', 'detail-community'],
 ];
 
 const SITZUNG = {
