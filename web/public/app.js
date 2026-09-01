@@ -2220,7 +2220,17 @@ async function kontaktZeile(label, userId, chat, daten) {
 
   if (label === 'Benachrichtigungen') {
     if (!chat) return toast('Noch kein Chat mit dieser Person');
-    chat.muted = !chat.muted;
+    /*
+     * Frueher schaltete diese Zeile nur die Kopie im Browser um. Nach einem
+     * Neuladen stand wieder "An" - und im Chat-Blatt, das denselben Schalter
+     * am Server fuehrt, hatte sich nie etwas geaendert. Jetzt geht beides
+     * durch dieselbe Stelle wie dort.
+     */
+    const antwort = await fetch(`/api/chats/${chat.id}/stumm`, { method: 'POST' })
+      .then((r) => r.json())
+      .catch(() => ({ ok: false }));
+    if (!antwort.ok) return toast(antwort.error || 'Das hat gerade nicht geklappt');
+    chat.muted = Boolean(antwort.muted);
     toast(chat.muted ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
     return openContactProfile(userId);
   }

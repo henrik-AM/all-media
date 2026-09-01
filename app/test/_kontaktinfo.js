@@ -141,7 +141,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Benachrichtigungen lassen sich umschalten', async () => {
     const vorher = await page.$eval('[data-kp-item="Benachrichtigungen"] .kp__zeileWert', (e) => e.textContent);
     await page.click('[data-kp-item="Benachrichtigungen"]');
-    await page.waitForTimeout(800);
+    // Die Kontaktinfo wird nach dem Umschalten neu aufgebaut und holt sich
+    // dafuer Profil und Chatmedien vom Server. 800 ms waren dafuer eine
+    // Wette: mal stand der neue Wert da, mal noch der alte.
+    await page
+      .waitForFunction(
+        (alt) => {
+          const e = document.querySelector('[data-kp-item="Benachrichtigungen"] .kp__zeileWert');
+          return e && e.textContent !== alt;
+        },
+        vorher,
+        { timeout: 10000 }
+      )
+      .catch(() => {});
     const nachher = await page.$eval('[data-kp-item="Benachrichtigungen"] .kp__zeileWert', (e) => e.textContent);
     if (vorher === nachher) throw new Error(`bleibt bei ${nachher}`);
   });

@@ -10,6 +10,7 @@ import { SheetRahmen } from '../../components/SheetRahmen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
+import { useSupabase } from '../../contexts/SupabaseContext';
 import { Chat, Message } from '../../types';
 
 interface Props {
@@ -65,7 +66,8 @@ export const ContactProfileScreen = ({
   onOpenPublicProfile,
   onNotice,
 }: Props) => {
-  const { profile: alleProfile, users: alleNutzer } = useDaten();
+  const { profile: alleProfile, users: alleNutzer, ichId } = useDaten();
+  const { supabase } = useSupabase();
   const insets = useSafeAreaInsets();
   const {
     markierte,
@@ -107,7 +109,12 @@ export const ContactProfileScreen = ({
   const verlauf = geleert ? [] : nachrichten;
   const medien = verlauf.filter((m) => m.media || m.geteilt || m.standort || m.kontakt);
   const mitStern = verlauf.filter((m) => markierte.includes(m.id));
-  const stumm = !!chat && chatStumm.includes(chat.id);
+  /*
+   * Stumm kommt aus der Datenbank (chat_members.is_muted) und wird auch
+   * dorthin zurueckgeschrieben. chatStumm ist nur die Kopie im Geraet, damit
+   * die Zeile sofort umspringt - ohne den Umweg ueber ein Neuladen.
+   */
+  const stumm = !!chat && (chatStumm.includes(chat.id) ? !chat.muted : Boolean(chat.muted));
   const favorit = favoriten.includes(userId);
 
   const wert = (label: string, standard: string) => wahlen[label] ?? standard;
@@ -211,8 +218,19 @@ export const ContactProfileScreen = ({
         <View style={styles.liste}>
           {zeile('Benachrichtigungen', stumm ? 'Aus' : 'An', () => {
             if (!chat) return onNotice('Noch kein Chat mit dieser Person');
-            const jetzt = chatStummUmschalten(chat.id);
+            const jetzt = !stumm;
+            chatStummUmschalten(chat.id);
             onNotice(jetzt ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+            // Merken, nicht nur anzeigen: sonst steht nach dem naechsten Start
+            // wieder "An". Die Website schreibt an dieselbe Stelle.
+            if (supabase && ichId) {
+              supabase
+                .from('chat_members')
+                .update({ is_muted: jetzt })
+                .eq('chat_id', chat.id)
+                .eq('user_id', ichId)
+                .then(() => undefined);
+            }
           })}
           {zeile('Chatdesign', wert('Chat-Hintergrund', 'Hell'), () =>
             setOffen({ art: 'wahl', label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' })
