@@ -217,6 +217,7 @@ export const CameraScreen = ({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filterLeiste}
         contentContainerStyle={styles.filter}
       >
         {FILTER.map((f) => (
@@ -297,7 +298,22 @@ const styles = themenStyles((colors) => ({
   eckeUR: { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2 },
 
   vorschau: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  filter: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.sm },
+  /*
+   * Die Leiste darf nur so hoch sein wie ihre Pillen.
+   *
+   * Ohne `flexGrow: 0` nimmt der ScrollView den freien Platz zwischen Sucher
+   * und Auslöser ein, und ohne `alignItems` ziehen sich die Pillen auf diese
+   * ganze Höhe: aus einer Reihe flacher Knöpfe werden Säulen über das halbe
+   * Bild. Zu sehen war das in keiner Prüfung — nur im Bild aus dem
+   * Simulator.
+   */
+  filterLeiste: { flexGrow: 0, flexShrink: 0 },
+  filter: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+    alignItems: 'center',
+  },
   filterPille: {
     paddingHorizontal: 14,
     paddingVertical: 6,

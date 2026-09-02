@@ -305,6 +305,16 @@ const Shell = () => {
           setSheet(a as Sheet);
         }
         break;
+      /*
+       * Der Insight-Betrachter. Er kam bis zum 02.09.2026 in keinem Bild vor,
+       * obwohl er ein eigener Vollbildschirm ist — geprüft war nur, dass die
+       * Daten in der Datenbank ankommen, nicht wie die Ansicht aussieht.
+       */
+      case 'insights': {
+        const id = a ? nutzerId(a) || a : 'me';
+        if (id) setOverlay({ kind: 'insights', userId: id });
+        break;
+      }
     }
   };
 

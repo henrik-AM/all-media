@@ -88,6 +88,12 @@ const SEITEN = [
   // Die Community-Seite nach dem Prototyp-Frame "CH + Kanal". Sie kam in
   // keinem Bild vor - den Bildschirm gab es bis zum 26.08.2026 nicht.
   ['communities/home#community:Design Systeme', 'detail-community'],
+
+  // Die Bildschirme der Handbuch-Erweiterung vom 01./02.09.2026. Sie waren
+  // geprueft, aber nur auf die Datenbank hin: dass ein Insight ankommt, sagt
+  // nichts darueber, wie der Betrachter dafuer aussieht.
+  ['messenger/chats#insights:me', 'detail-insights'],
+  ['messenger/camera', 'handbuch-kamera-filter'],
 ];
 
 const SITZUNG = {
