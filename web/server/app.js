@@ -325,7 +325,10 @@ app.post('/api/messages/:chatId', route(async (req) => {
   const sperre = await chatGesperrt(req, req.params.chatId);
   if (sperre) return { ok: false, error: sperre };
 
-  const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text);
+  const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, {
+    antwortAuf: req.body?.antwortAuf || null,
+    zitatVon: req.body?.zitatVon || null,
+  });
   if (!e || e.ok === false) return antwort(e);
 
   return {
@@ -395,6 +398,26 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
     if (!person) return { ok: false, error: 'Diese Person gibt es nicht' };
     text = `Kontakt: ${person.name}`;
     medien = { kontaktId: person.id };
+  } else if (art === 'gif') {
+    // Gif und Sticker sind eigene Typen, keine Bilder: ein Gif darf nicht mit
+    // Abspielknopf erscheinen, ein Sticker nicht in einer Blase.
+    text = 'Gif';
+    medien = { typ: 'gif' };
+  } else if (art === 'sticker') {
+    const zeichen = String(req.body?.zeichen || '').slice(0, 8);
+    if (!zeichen) return { ok: false, error: 'Kein Sticker gewählt' };
+    text = zeichen;
+    medien = { typ: 'sticker' };
+  } else if (art === 'datei') {
+    // Ohne Name und Größe stünde im Chat nur ein graues Kästchen.
+    const name = String(req.body?.name || '').slice(0, 200);
+    if (!name) return { ok: false, error: 'Kein Dateiname' };
+    text = name;
+    medien = {
+      typ: 'file',
+      dateiName: name,
+      dateiGroesse: Number(req.body?.groesse) || 0,
+    };
   } else {
     return { ok: false, error: 'Unbekannter Anhang' };
   }
@@ -740,8 +763,16 @@ app.post('/api/eigene/beitrag', route(async (req) => {
     beschreibung,
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),
+    geplantAb: req.body?.geplantAb || null,
   });
   if (!e || e.ok === false) return antwort(e);
+
+  /*
+   * Ein geplanter Beitrag ist noch nicht sichtbar — `beitrag()` fände ihn
+   * nicht, weil ladeBeitraege ihn ausfiltert. Deshalb hier nur die Kennung.
+   */
+  if (req.body?.geplantAb) return { ok: true, beitrag: { id: e.beitrag.id }, geplant: true };
+
   return { ok: true, beitrag: await beitrag(req, e.beitrag.id) };
 }));
 
@@ -759,6 +790,8 @@ app.post('/api/eigene/video', route(async (req) => {
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),
     dauer: quer ? String(req.body?.dauer || '00:15') : null,
+    // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag zurück.
+    geplantAb: req.body?.geplantAb || null,
   });
   if (!e || e.ok === false) return antwort(e);
 
@@ -1195,5 +1228,250 @@ app.get('/api/explorer/:art/:wert', route(async (req) => {
     beitraege: beitraege.filter((b) => b.kind === 'post' && passt(b)),
   };
 }));
+
+
+// ============================================================================
+// Was das Handbuch verlangt — nachgetragen am 01.09.2026
+//
+// Die Gegenstücke in der App stehen in app/lib/useAktionen.ts.
+// ============================================================================
+
+// ------------------------------------------------------------- Insights --
+//
+//  Ein *Insight* ist ein Foto oder Video an ausgewählte Personen — das
+//  Snapchat-Äquivalent. Die *Insight Time* zählt die Tage in Folge, an denen
+//  sich beide Seiten gegenseitig einen geschickt haben. Nicht zu verwechseln
+//  mit den „Insights" im Einstellungsmenü: das ist Statistik zum Profil.
+
+app.get('/api/insights', route(async (req) => ({
+  ok: true,
+  insights: await supabaseApi.ladeInsights(req.db, req.nutzerId),
+  streaks: await supabaseApi.ladeInsightStreaks(req.db, req.nutzerId),
+  ziele: await supabaseApi.ladeInsightZiele(req.db, req.nutzerId),
+})));
+
+app.post('/api/insights', route(async (req) => {
+  const { empfaenger, ...felder } = req.body || {};
+  return antwort(await syncHandlers.handleInsightSenden(req.db, req.nutzerId, empfaenger, felder));
+}));
+
+app.post('/api/insights/:id/gesehen', route(async (req) =>
+  antwort(await syncHandlers.handleInsightGesehen(req.db, req.nutzerId, req.params.id))
+));
+
+app.post('/api/insights/:id/speichern', route(async (req) =>
+  antwort(
+    await syncHandlers.handleInsightSpeichern(
+      req.db, req.nutzerId, req.params.id, req.body?.behalten
+    )
+  )
+));
+
+app.post('/api/insights/:id/wiederholen', route(async (req) =>
+  antwort(
+    await syncHandlers.handleInsightWiederholen(
+      req.db, req.nutzerId, req.params.id, req.body?.empfaenger || []
+    )
+  )
+));
+
+app.post('/api/insights/ziele/:userId', route(async (req) =>
+  antwort(await syncHandlers.handleInsightZiel(req.db, req.nutzerId, req.params.userId))
+));
+
+// ------------------------------------------------ Nachrichten-Werkzeuge --
+
+app.post('/api/messages/:chatId/:messageId/bearbeiten', route(async (req) =>
+  antwort(
+    await syncHandlers.handleNachrichtBearbeiten(
+      req.db, req.nutzerId, req.params.messageId, req.body?.text || ''
+    )
+  )
+));
+
+app.post('/api/messages/:chatId/:messageId/zuruecknehmen', route(async (req) =>
+  antwort(
+    await syncHandlers.handleNachrichtZuruecknehmen(req.db, req.nutzerId, req.params.messageId)
+  )
+));
+
+app.post('/api/messages/:chatId/:messageId/weiterleiten', route(async (req) =>
+  antwort(
+    await syncHandlers.handleNachrichtWeiterleiten(
+      req.db, req.nutzerId, req.params.messageId, req.body?.chatIds || []
+    )
+  )
+));
+
+app.post('/api/messages/:chatId/:messageId/reaktion', route(async (req) =>
+  antwort(
+    await syncHandlers.handleNachrichtReaktion(
+      req.db, req.nutzerId, req.params.messageId, req.body?.emoji || '👍'
+    )
+  )
+));
+
+// -------------------------------------------------------------- Umfragen --
+
+app.get('/api/umfragen/:art', route(async (req) => ({
+  ok: true,
+  umfragen: await supabaseApi.ladeUmfragen(
+    req.db, req.nutzerId, req.params.art, (req.query.ids || '').split(',').filter(Boolean)
+  ),
+})));
+
+app.post('/api/umfragen/:art/:traegerId', route(async (req) =>
+  antwort(
+    await syncHandlers.handleUmfrageAnlegen(
+      req.db, req.nutzerId, req.params.art, req.params.traegerId, req.body || {}
+    )
+  )
+));
+
+app.post('/api/umfragen/:pollId/stimme/:optionId', route(async (req) =>
+  antwort(
+    await syncHandlers.handleUmfrageStimmen(
+      req.db, req.nutzerId, req.params.pollId, req.params.optionId
+    )
+  )
+));
+
+// ---------------------------------------------------- Sichtbarkeit (4x) --
+//
+//  Vier Stufen mit Ausnahmelisten. Vorher standen hier drei, und „Alle bis
+//  auf meinen Chef" ließ sich nicht ausdrücken.
+
+app.get('/api/sichtbarkeit', route(async (req) => ({
+  ok: true,
+  sichtbarkeit: await supabaseApi.ladeSichtbarkeit(req.db, req.nutzerId),
+})));
+
+app.post('/api/sichtbarkeit/:bereich', route(async (req) =>
+  antwort(
+    await syncHandlers.handleSichtbarkeit(
+      req.db, req.nutzerId, req.params.bereich, req.body?.stufe
+    )
+  )
+));
+
+app.post('/api/sichtbarkeit/:bereich/ausnahme/:userId', route(async (req) =>
+  antwort(
+    await syncHandlers.handleSichtbarkeitAusnahme(
+      req.db, req.nutzerId, req.params.bereich, req.params.userId
+    )
+  )
+));
+
+// ------------------------------------------------------- Altersschutz --
+
+app.post('/api/alter', route(async (req) =>
+  antwort(
+    await syncHandlers.handleAltersangabe(
+      req.db, req.nutzerId, req.body?.geburtsdatum, req.body?.guardian
+    )
+  )
+));
+
+app.post('/api/alter/freigabe/:kindId', route(async (req) =>
+  antwort(
+    await syncHandlers.handleFreigabe(
+      req.db, req.nutzerId, req.params.kindId, req.body?.zustimmen !== false
+    )
+  )
+));
+
+// --------------------------------------------------------- Wortfilter --
+
+app.post('/api/wortfilter', route(async (req) =>
+  antwort(await syncHandlers.handleWortfilter(req.db, req.nutzerId, req.body?.text || ''))
+));
+
+app.get('/api/banne', route(async (req) => ({
+  ok: true,
+  banne: await supabaseApi.ladeBanne(req.db, req.nutzerId),
+})));
+
+// ------------------------------------------------------- Push-to-Talk --
+
+app.get('/api/communities/:id/ptt', route(async (req) => ({
+  ok: true,
+  ptt: await supabaseApi.ladePtt(req.db, req.params.id),
+})));
+
+app.post('/api/communities/:id/ptt', route(async (req) =>
+  antwort(
+    await syncHandlers.handlePtt(
+      req.db, req.nutzerId, req.params.id,
+      req.body?.audioUrl, req.body?.dauer, req.body?.kanalId
+    )
+  )
+));
+
+// ------------------------------------------- Livestream: Kommentare, Spenden
+
+/*
+ * Einen laufenden Stream als Beitrag anlegen.
+ *
+ * Er entsteht beim Start und nicht erst am Ende, weil Kommentare und Spenden
+ * etwas brauchen, worauf sie sich beziehen können. Am Ende bleibt derselbe
+ * Beitrag als Aufzeichnung stehen — ein zweiter wäre ein Duplikat, und die
+ * Kommentare klebten am falschen.
+ */
+app.post('/api/stream/start', route(async (req) => {
+  const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
+    art: 'clip',
+    titel: 'Livestream',
+    beschreibung: 'Läuft gerade',
+  });
+  if (!e || e.ok === false) return antwort(e);
+  return { ok: true, id: e.beitrag.id };
+}));
+
+app.get('/api/stream/:postId/kommentare', route(async (req) => ({
+  ok: true,
+  kommentare: await supabaseApi.ladeStreamKommentare(req.db, req.params.postId),
+})));
+
+app.post('/api/stream/:postId/kommentare', route(async (req) =>
+  antwort(
+    await syncHandlers.handleStreamKommentar(
+      req.db, req.nutzerId, req.params.postId, req.body?.text || ''
+    )
+  )
+));
+
+app.post('/api/spenden/:userId', route(async (req) =>
+  antwort(
+    await syncHandlers.handleSpende2(
+      req.db, req.nutzerId, req.params.userId,
+      req.body?.betragCent, req.body?.postId, req.body?.nachricht
+    )
+  )
+));
+
+// ------------------------------------------------------ Standortanfrage --
+
+app.get('/api/chats/:chatId/standortanfragen', route(async (req) => ({
+  ok: true,
+  anfragen: await supabaseApi.ladeStandortanfragen(req.db, req.params.chatId),
+})));
+
+app.post('/api/chats/:chatId/standortanfrage', route(async (req) =>
+  antwort(
+    await syncHandlers.handleStandortAnfrage(
+      req.db, req.nutzerId, req.params.chatId, req.body?.zielId
+    )
+  )
+));
+
+app.post('/api/standortanfragen/:id/antwort', route(async (req) =>
+  antwort(
+    await syncHandlers.handleStandortAntwort(
+      req.db, req.nutzerId, req.params.id,
+      req.body?.annehmen !== false, req.body?.stunden
+    )
+  )
+));
+
 
 module.exports = app;

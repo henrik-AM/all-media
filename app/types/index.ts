@@ -1,6 +1,14 @@
 export type PresenceStatus = 'online' | 'away' | 'offline';
 export type ContactStatus = 'friend' | 'pending' | 'blocked';
-export type MediaType = 'image' | 'video' | 'audio';
+/*
+ * Was in einer Nachricht haengen kann.
+ *
+ * 'gif', 'sticker' und 'file' kamen am 01.09.2026 dazu — alle drei stehen im
+ * Handbuch. Sie sind bewusst eigene Typen und keine Bilder: ein Gif darf
+ * nicht mit einem Abspielknopf erscheinen, ein Sticker nicht in einer Blase,
+ * und eine Datei braucht Name und Groesse statt einer Vorschau.
+ */
+export type MediaType = 'image' | 'video' | 'audio' | 'gif' | 'sticker' | 'file';
 
 export interface User {
   id: string;
@@ -37,6 +45,76 @@ export interface Message {
   kontakt?: { id: string; name: string; handle: string };
   /** Story-Anhang (fixiert - nur horizontal swipeable). */
   story?: { id: string; userId: string; mediaUri?: string };
+
+  /*
+   * Die Nachrichten-Werkzeuge aus dem Handbuch, nachgetragen am 01.09.2026.
+   *
+   * `antwortAuf` und `zitat` sind absichtlich getrennt: eine Antwort zeigt
+   * nur den Bezug an, ein Zitat nimmt den Text mit in die eigene Nachricht.
+   * Auf einer gemeinsamen Spalte liessen sie sich in der Anzeige nicht mehr
+   * auseinanderhalten.
+   */
+  antwortAuf?: { id: string; text: string; autor: string };
+  zitat?: { id: string; text: string; autor: string };
+  /** Name dessen, von dem sie urspruenglich stammt. */
+  weitergeleitetVon?: string;
+  /** Gesetzt, sobald der Text geaendert wurde — die Blase sagt "bearbeitet". */
+  bearbeitet?: boolean;
+  /** Zurueckgenommen. Die Zeile bleibt, damit Antworten ihren Bezug behalten. */
+  zurueckgenommen?: boolean;
+  /** Emoji je Person, die reagiert hat. */
+  reaktionen?: { userId: string; emoji: string }[];
+  /** Bei einer Datei: Name und Groesse, sonst steht dort ein graues Kaestchen. */
+  datei?: { name: string; groesse: number };
+}
+
+/**
+ * Ein Insight — das Snapchat-Aequivalent aus dem Handbuch.
+ *
+ * Nicht zu verwechseln mit den "Insights" im Einstellungsmenue: das ist
+ * Statistik zum eigenen Profil. Ein Insight hier ist eine Aufnahme, die an
+ * ausgewaehlte Personen geht und fuer die Insight Time zaehlt.
+ */
+export interface Insight {
+  id: string;
+  senderId: string;
+  mediaUrl: string;
+  mediaTyp: 'image' | 'video';
+  filter: string;
+  /** Anzeigedauer in Sekunden; 0 heisst unbegrenzt ansehen. */
+  dauer: number;
+  einmal: boolean;
+  gespeichert: boolean;
+  zeit: string;
+  /** Nur bei empfangenen: schon geoeffnet? */
+  gesehen?: boolean;
+}
+
+/** Die Insight Time zu einer Person: Tage in Folge. */
+export interface InsightStreak {
+  userId: string;
+  tage: number;
+  /** Habe ich heute schon einen geschickt? */
+  heuteGesendet: boolean;
+  /** Hat die Gegenseite heute schon? Erst wenn beides stimmt, zaehlt der Tag. */
+  heuteEmpfangen: boolean;
+}
+
+/** Eine Umfrage an einem Beitrag, einer Story oder in einem Kanal. */
+export interface Umfrage {
+  id: string;
+  frage: string;
+  mehrfach: boolean;
+  endeAt?: string | null;
+  beendet: boolean;
+  antworten: { id: string; text: string; stimmen: number; gewaehlt: boolean }[];
+  gesamt: number;
+}
+
+/** Eine Sichtbarkeitsstufe mit ihrer Ausnahmeliste. */
+export interface Sichtbarkeit {
+  stufe: 'niemand' | 'niemand_bis_auf' | 'alle_bis_auf' | 'alle';
+  ausnahmen: string[];
 }
 
 export interface Chat {

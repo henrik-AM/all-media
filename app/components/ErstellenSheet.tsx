@@ -10,6 +10,7 @@ export type ErstellenPunkt =
   | 'reels'
   | 'landscape'
   | 'post'
+  | 'umfrage'
   | 'story'
   | 'highlight'
   | 'playlist'
@@ -44,7 +45,13 @@ const VIDEOS: { key: ErstellenPunkt; label: string; symbol: Symbol }[] = [
   // Livestream steht direkt unter Story: beides ist im Augenblick
   // aufgenommen und nach kurzer Zeit wieder weg. Highlight und Playlist
   // sortieren dagegen vorhandene Beiträge und gehören darum weiter nach unten.
+  //
+  // Die Umfrage stand am 01.09.2026 kurz zwischen Story und Livestream und
+  // hat damit genau diese Nachbarschaft zerrissen. Sie gehoert hinter den
+  // Livestream: eine Umfrage ist nichts Fluechtiges.
   { key: 'livestream', label: 'Livestream', symbol: 'videocam-outline' },
+  /* Umfrage — im Handbuch bei Beitraegen, Storys und Kanaelen genannt. */
+  { key: 'umfrage', label: 'Umfrage', symbol: 'bar-chart-outline' },
   { key: 'highlight', label: 'Highlight', symbol: 'folder-outline' },
   { key: 'playlist', label: 'Playlist', symbol: 'layers-outline' },
   { key: 'spende', label: 'Spendenaktion', symbol: 'heart-outline' },

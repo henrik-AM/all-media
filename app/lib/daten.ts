@@ -24,14 +24,18 @@ import {
   Contact,
   FriendPin,
   Hashtag,
+  Insight,
+  InsightStreak,
   Message,
   Mitteilung,
   Place,
   Post,
   Profile,
+  Sichtbarkeit,
   Sound,
   Spende,
   Story,
+  Umfrage,
   User,
   Video,
 } from '../types';
@@ -330,6 +334,7 @@ export async function ladeNachrichten(
     .from('messages')
     .select(
       'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
+        ' reply_to, quote_of, forwarded_from, edited_at, deleted_at, file_name, file_size,' +
         ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name)),' +
         ' place_id, places(id, name, adresse, koordinaten, x, y),' +
         ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)'
@@ -342,7 +347,67 @@ export async function ladeNachrichten(
   const { data, error } = await abfrage;
   if (error) throw error;
 
-  return (data ?? []).map((n: any) => ({
+  const zeilen = (data ?? []) as any[];
+
+  /*
+   * Bezug, Reaktionen und Namen in einem Zug nachladen.
+   *
+   * Die naheliegende Fassung waere, je Nachricht mit Bezug eine weitere
+   * Abfrage zu stellen. Bei einem Chat mit vielen Antworten waeren das
+   * hunderte — der Chat braeuchte Sekunden zum Oeffnen. Deshalb einmal alles
+   * auf einmal.
+   */
+  const bezugIds = [
+    ...new Set(
+      zeilen.flatMap((n) => [n.reply_to, n.quote_of]).filter(Boolean) as string[]
+    ),
+  ];
+  const bezugZeilen: any[] = [];
+  if (bezugIds.length) {
+    const { data: gefunden } = await client
+      .from('messages')
+      .select('id, text, sender_id')
+      .in('id', bezugIds);
+    bezugZeilen.push(...((gefunden ?? []) as any[]));
+  }
+
+  const reaktionen = new Map<string, { userId: string; emoji: string }[]>();
+  if (zeilen.length) {
+    const { data: reakZeilen } = await client
+      .from('message_reactions')
+      .select('message_id, user_id, emoji')
+      .in('message_id', zeilen.map((n) => n.id));
+    for (const r of (reakZeilen ?? []) as any[]) {
+      const liste = reaktionen.get(r.message_id) ?? [];
+      liste.push({ userId: r.user_id === ichId ? ICH : r.user_id, emoji: r.emoji });
+      reaktionen.set(r.message_id, liste);
+    }
+  }
+
+  /*
+   * Die Namen fuer beides — Bezugszeilen und Weiterleitungen — in einer
+   * einzigen Abfrage. Ein Join ueber den Fremdschluesselnamen waere kuerzer,
+   * bricht aber still, sobald der Schluessel anders heisst als vermutet: die
+   * Abfrage schlaegt fehl und der Chat sieht aus, als haette er keine
+   * Nachrichten. Diese Fassung kann das nicht.
+   */
+  const weiterIds = zeilen.map((n) => n.forwarded_from).filter(Boolean) as string[];
+  const namenIds = [...new Set([...weiterIds, ...bezugZeilen.map((b) => b.sender_id)])];
+  const namen = new Map<string, string>();
+  if (namenIds.length) {
+    const { data: profile } = await client.from('profiles').select('id, name').in('id', namenIds);
+    for (const p of (profile ?? []) as any[]) namen.set(p.id, p.name);
+  }
+
+  const bezug = new Map<string, { text: string; autor: string }>();
+  for (const b of bezugZeilen) {
+    bezug.set(b.id, {
+      text: b.text ?? '',
+      autor: b.sender_id === ichId ? 'Du' : namen.get(b.sender_id) ?? '',
+    });
+  }
+
+  return zeilen.map((n: any) => ({
     id: n.id,
     chatId: n.chat_id,
     senderId: n.sender_id === ichId ? ICH : n.sender_id,
@@ -374,6 +439,18 @@ export async function ladeNachrichten(
     kontakt: n.profiles
       ? { id: n.profiles.id, name: n.profiles.name, handle: n.profiles.handle }
       : undefined,
+    // Die Werkzeuge aus dem Handbuch — siehe Message in types/index.ts.
+    antwortAuf: n.reply_to && bezug.has(n.reply_to)
+      ? { id: n.reply_to, ...bezug.get(n.reply_to)! }
+      : undefined,
+    zitat: n.quote_of && bezug.has(n.quote_of)
+      ? { id: n.quote_of, ...bezug.get(n.quote_of)! }
+      : undefined,
+    weitergeleitetVon: n.forwarded_from ? namen.get(n.forwarded_from) : undefined,
+    bearbeitet: Boolean(n.edited_at),
+    zurueckgenommen: Boolean(n.deleted_at),
+    reaktionen: reaktionen.get(n.id),
+    datei: n.file_name ? { name: n.file_name, groesse: Number(n.file_size ?? 0) } : undefined,
   }));
 }
 
@@ -483,6 +560,12 @@ export async function ladeBeitraege(
   const { data, error } = await client
     .from('posts')
     .select(BEITRAG_SPALTEN)
+    /*
+     * "Spaeter posten": ein Beitrag mit einem Zeitpunkt in der Zukunft ist
+     * angelegt, aber noch nicht sichtbar. Ohne diesen Filter erschiene er
+     * sofort — und die ganze Einstellung waere wirkungslos.
+     */
+    .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
     .order('created_at', { ascending: false })
     .limit(300);
   if (error) throw error;
@@ -805,6 +888,19 @@ export interface AlleDaten {
   playlists: string[];
   /** Die eigene Spendenaktion — null, solange keine läuft. */
   spende: Spende | null;
+
+  /*
+   * Insight Time und was dazugehört. Nicht zu verwechseln mit den
+   * „Insights" im Einstellungsmenü — das ist Statistik zum eigenen Profil.
+   */
+  insights: Insight[];
+  /** Tage in Folge, je Person. */
+  insightStreaks: Record<string, InsightStreak>;
+  /** Die feste Empfängerliste für Insights. */
+  insightZiele: string[];
+  /** Sichtbarkeitsstufen je Bereich, mit Ausnahmelisten. */
+  sichtbarkeit: Record<string, Sichtbarkeit>;
+
   ichId: string;
   geladen: string;
 }
@@ -830,6 +926,10 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     mitteilungen,
     gefolgt,
     eigeneListen,
+    insights,
+    insightStreaks,
+    insightZiele,
+    sichtbarkeit,
   ] = await Promise.all([
     ladeNutzer(client, ichId),
     ladeKontakte(client, ichId),
@@ -845,6 +945,10 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     ladeMitteilungen(client, ichId),
     ladeGefolgt(client, ichId),
     ladeEigeneListen(client, ichId),
+    ladeInsights(client, ichId),
+    ladeInsightStreaks(client, ichId),
+    ladeInsightZiele(client, ichId),
+    ladeSichtbarkeit(client, ichId),
   ]);
 
   // „Folge ich?" gehört an die Person, nicht an den einzelnen Beitrag. Vorher
@@ -884,7 +988,312 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     highlights: profile[ICH]?.highlights ?? [],
     playlists: profile[ICH]?.playlists ?? [],
     spende: (profile[ICH] as { spende?: Spende | null } | undefined)?.spende ?? null,
+    insights,
+    insightStreaks,
+    insightZiele,
+    sichtbarkeit,
     ichId,
     geladen: new Date().toISOString(),
   };
+}
+
+// ============================================================================
+// Was das Handbuch verlangt — nachgetragen am 01.09.2026
+// ============================================================================
+
+/**
+ * Die eigenen Insight Times.
+ *
+ * Gibt je Person die Tage in Folge zurück und dazu, wer heute schon gesendet
+ * hat. Das zweite braucht die Chatliste, um die Zahl grau zu zeigen, solange
+ * der Tag noch nicht vollständig ist — sonst sieht eine Kette, die gleich
+ * reißt, genauso aus wie eine sichere.
+ */
+export async function ladeInsightStreaks(
+  client: SupabaseClient,
+  ichId: string
+): Promise<Record<string, InsightStreak>> {
+  const { data, error } = await client
+    .from('insight_streaks')
+    .select('user_a, user_b, tage, letzter_tag, a_gesendet, b_gesendet')
+    .or(`user_a.eq.${ichId},user_b.eq.${ichId}`);
+  if (error) throw error;
+
+  const heute = new Date().toISOString().slice(0, 10);
+  const raus: Record<string, InsightStreak> = {};
+
+  for (const z of (data ?? []) as any[]) {
+    const ichBinA = z.user_a === ichId;
+    const partner = ichBinA ? z.user_b : z.user_a;
+    const meins = ichBinA ? z.a_gesendet : z.b_gesendet;
+    const seins = ichBinA ? z.b_gesendet : z.a_gesendet;
+
+    /*
+     * Eine Kette, deren letzter vollständiger Tag vor gestern lag, ist
+     * gerissen — auch wenn in der Zeile noch eine Zahl steht. Die Datenbank
+     * setzt sie erst beim nächsten Senden zurück; bis dahin würde die Liste
+     * eine Zahl zeigen, die es nicht mehr gibt.
+     */
+    const gestern = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const lebt = z.letzter_tag === heute || z.letzter_tag === gestern;
+
+    raus[partner] = {
+      userId: partner,
+      tage: lebt ? z.tage ?? 0 : 0,
+      heuteGesendet: meins === heute,
+      heuteEmpfangen: seins === heute,
+    };
+  }
+  return raus;
+}
+
+/** Die feste Empfängerliste für Insights. */
+export async function ladeInsightZiele(
+  client: SupabaseClient,
+  ichId: string
+): Promise<string[]> {
+  const { data, error } = await client
+    .from('insight_targets')
+    .select('target_id')
+    .eq('user_id', ichId);
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((z) => z.target_id);
+}
+
+/**
+ * Empfangene Insights, die noch offen sind.
+ *
+ * Abgelaufene und bei Einmalansicht schon geöffnete bleiben draußen — sie
+ * wären nur eine Zeile, die beim Antippen nichts zeigt.
+ */
+export async function ladeInsights(
+  client: SupabaseClient,
+  ichId: string
+): Promise<Insight[]> {
+  const { data, error } = await client
+    .from('insight_recipients')
+    .select(
+      'insight_id, gesehen_at,' +
+        ' insights(id, sender_id, media_url, media_type, filter, dauer, einmal, gespeichert, ablauf_at, created_at)'
+    )
+    .eq('user_id', ichId)
+    .order('insight_id', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+
+  const jetzt = Date.now();
+  return ((data ?? []) as any[])
+    .filter((z) => z.insights)
+    .filter((z) => !z.insights.ablauf_at || new Date(z.insights.ablauf_at).getTime() > jetzt)
+    .filter((z) => !(z.insights.einmal && z.gesehen_at))
+    .map((z) => ({
+      id: z.insights.id,
+      senderId: z.insights.sender_id === ichId ? ICH : z.insights.sender_id,
+      mediaUrl: z.insights.media_url,
+      mediaTyp: z.insights.media_type,
+      filter: z.insights.filter ?? '',
+      dauer: z.insights.dauer ?? 0,
+      einmal: z.insights.einmal,
+      gespeichert: z.insights.gespeichert,
+      zeit: zeitText(z.insights.created_at),
+      gesehen: Boolean(z.gesehen_at),
+    }));
+}
+
+/**
+ * Die Umfragen zu einer Reihe von Trägern — Beiträge, Storys oder Kanäle.
+ *
+ * Stimmen und eigene Wahl kommen mit, weil eine Umfrage ohne beides nur eine
+ * Liste von Sätzen ist.
+ */
+export async function ladeUmfragen(
+  client: SupabaseClient,
+  ichId: string,
+  art: 'post' | 'story' | 'channel',
+  traegerIds: string[]
+): Promise<Record<string, Umfrage>> {
+  if (!traegerIds.length) return {};
+
+  const { data, error } = await client
+    .from('polls')
+    /*
+     * "!poll_id" ist noetig, nicht Zierde. poll_votes zeigt auf polls UND auf
+     * poll_options; PostgREST liest daraus einen zweiten, indirekten Weg
+     * zwischen den beiden Tabellen und weigert sich dann mit "more than one
+     * relationship was found". Der Hinweis nennt die Spalte, ueber die
+     * verbunden werden soll — die Spalte und nicht den Namen des Fremd-
+     * schluessels, denn ein umbenannter Constraint waere hier ein stiller
+     * Ausfall aller Umfragen.
+     */
+    .select('id, traeger_id, frage, mehrfach, ende_at, poll_options!poll_id(id, text, position)')
+    .eq('traeger_art', art)
+    .in('traeger_id', traegerIds);
+  if (error) throw error;
+
+  const umfragen = (data ?? []) as any[];
+  if (!umfragen.length) return {};
+
+  const { data: stimmen } = await client
+    .from('poll_votes')
+    .select('poll_id, option_id, user_id')
+    .in('poll_id', umfragen.map((u) => u.id));
+
+  const proOption = new Map<string, number>();
+  const eigene = new Set<string>();
+  for (const s of ((stimmen ?? []) as any[])) {
+    proOption.set(s.option_id, (proOption.get(s.option_id) ?? 0) + 1);
+    if (s.user_id === ichId) eigene.add(s.option_id);
+  }
+
+  const raus: Record<string, Umfrage> = {};
+  for (const u of umfragen) {
+    const antworten = (u.poll_options ?? [])
+      .slice()
+      .sort((a: any, b: any) => a.position - b.position)
+      .map((o: any) => ({
+        id: o.id,
+        text: o.text,
+        stimmen: proOption.get(o.id) ?? 0,
+        gewaehlt: eigene.has(o.id),
+      }));
+
+    raus[u.traeger_id] = {
+      id: u.id,
+      frage: u.frage,
+      mehrfach: u.mehrfach,
+      endeAt: u.ende_at,
+      beendet: Boolean(u.ende_at && new Date(u.ende_at) < new Date()),
+      antworten,
+      gesamt: antworten.reduce((s: number, a: any) => s + a.stimmen, 0),
+    };
+  }
+  return raus;
+}
+
+/**
+ * Die eigenen Sichtbarkeitsstufen samt Ausnahmelisten.
+ *
+ * Fehlt ein Bereich, gilt „alle" — so verhalten sich Bestandskonten wie
+ * vorher, statt nach dem Einspielen plötzlich alles zu verbergen.
+ */
+export async function ladeSichtbarkeit(
+  client: SupabaseClient,
+  ichId: string
+): Promise<Record<string, Sichtbarkeit>> {
+  const [{ data: stufen }, { data: ausnahmen }] = await Promise.all([
+    client.from('visibility_settings').select('bereich, stufe').eq('user_id', ichId),
+    client.from('visibility_exceptions').select('bereich, target_id').eq('user_id', ichId),
+  ]);
+
+  const raus: Record<string, Sichtbarkeit> = {};
+  for (const s of ((stufen ?? []) as any[])) {
+    raus[s.bereich] = { stufe: s.stufe, ausnahmen: [] };
+  }
+  for (const a of ((ausnahmen ?? []) as any[])) {
+    if (!raus[a.bereich]) raus[a.bereich] = { stufe: 'alle', ausnahmen: [] };
+    raus[a.bereich].ausnahmen.push(a.target_id);
+  }
+  return raus;
+}
+
+/** Der eigene Bann-Verlauf — mit Grund, wie das Handbuch es verlangt. */
+export async function ladeBanne(client: SupabaseClient, ichId: string) {
+  const { data, error } = await client
+    .from('profile_bans')
+    .select('id, bereich, grund, ausloeser, von_at, bis_at, aufgehoben')
+    .eq('user_id', ichId)
+    .order('von_at', { ascending: false });
+  if (error) throw error;
+
+  const jetzt = Date.now();
+  return ((data ?? []) as any[]).map((b) => ({
+    id: b.id,
+    bereich: b.bereich as string,
+    grund: b.grund as string,
+    ausloeser: (b.ausloeser ?? '') as string,
+    von: zeitText(b.von_at),
+    bis: b.bis_at ? zeitText(b.bis_at) : null,
+    laeuft:
+      !b.aufgehoben && (!b.bis_at || new Date(b.bis_at).getTime() > jetzt),
+  }));
+}
+
+/** Die Live-Kommentarspalte zu einem Stream. */
+export async function ladeStreamKommentare(client: SupabaseClient, postId: string) {
+  const { data, error } = await client
+    .from('stream_comments')
+    .select('id, user_id, text, created_at, profiles(id, name)')
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+
+  return ((data ?? []) as any[]).map((k) => ({
+    id: k.id,
+    userId: k.user_id,
+    name: k.profiles?.name ?? '',
+    text: k.text,
+    zeit: chatZeit(k.created_at),
+  }));
+}
+
+/** Push-to-Talk-Nachrichten einer Community, neueste zuerst. */
+export async function ladePtt(client: SupabaseClient, communityId: string) {
+  const { data, error } = await client
+    .from('ptt_messages')
+    .select('id, sender_id, audio_url, dauer, created_at, channel_id, profiles(id, name)')
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+
+  return ((data ?? []) as any[]).map((p) => ({
+    id: p.id,
+    userId: p.sender_id,
+    name: p.profiles?.name ?? '',
+    audioUrl: p.audio_url,
+    dauer: p.dauer ?? 0,
+    kanalId: p.channel_id,
+    zeit: chatZeit(p.created_at),
+  }));
+}
+
+/** Offene Standortanfragen in einem Chat. */
+export async function ladeStandortanfragen(client: SupabaseClient, chatId: string) {
+  const { data, error } = await client
+    .from('location_requests')
+    .select('id, sender_id, ziel_id, zustand, bis_at, created_at')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw error;
+
+  return ((data ?? []) as any[]).map((a) => ({
+    id: a.id,
+    senderId: a.sender_id,
+    zielId: a.ziel_id,
+    zustand: a.zustand as 'offen' | 'angenommen' | 'abgelehnt',
+    bis: a.bis_at,
+    zeit: chatZeit(a.created_at),
+  }));
+}
+
+/**
+ * Was zu einem Stream gespendet wurde, in Cent.
+ *
+ * Nur die eigene Seite sieht etwas: die Regeln der Datenbank lassen eine
+ * Spende nur den beiden Beteiligten sehen. Für den Sendenden ist das die
+ * volle Summe, für einen Zuschauer nur das, was er selbst gegeben hat — und
+ * genau so soll es sein.
+ */
+export async function ladeSpendenSumme(
+  client: SupabaseClient,
+  postId: string
+): Promise<number> {
+  const { data, error } = await client
+    .from('donations')
+    .select('betrag_cent')
+    .eq('post_id', postId);
+  if (error) throw error;
+  return ((data ?? []) as { betrag_cent: number }[]).reduce((s, z) => s + z.betrag_cent, 0);
 }

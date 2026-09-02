@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,6 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Motiv } from '../../components/Motiv';
 import { colors, markenVerlauf, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { Community, Unterthema } from '../../types';
+
+import { PushToTalk } from '../../components/PushToTalk';
+import { ladePtt } from '../../lib/daten';
+import { useSupabase } from '../../contexts/SupabaseContext';
 
 interface Props {
   community: Community;
@@ -59,6 +63,34 @@ export const CommunityDetailScreen = ({
     if (geht) Linking.openURL(ziel);
     else onNotice(community.link ?? '');
   };
+
+  /*
+   * Push-to-Talk. Das Handbuch beschreibt es als Nachricht an alle
+   * Mitglieder einer Community — gedacht fuer Gruppenanrufe und fuer
+   * Momente aussergewoehnlich hoher Aktivitaet. Bis zum 01.09.2026 gab es
+   * dafuer nur einen Schalter in den Einstellungen.
+   *
+   * Der Knopf steht nur bei Mitgliedern. Wer nicht beigetreten ist, darf
+   * nichts hineinsprechen — die Regeln der Datenbank lassen es ohnehin nicht
+   * zu, und ein Knopf, der immer scheitert, ist schlimmer als keiner.
+   */
+  const { supabase } = useSupabase();
+  const [ptt, setPtt] = useState<
+    { id: string; name: string; dauer: number; zeit: string }[]
+  >([]);
+
+  const pttHolen = useCallback(async () => {
+    if (!supabase || !(community.joined || community.eigen)) return;
+    try {
+      setPtt(await ladePtt(supabase, community.id));
+    } catch (e: any) {
+      console.error('Push-to-Talk laden fehlgeschlagen:', e?.message ?? e);
+    }
+  }, [supabase, community.id, community.joined, community.eigen]);
+
+  useEffect(() => {
+    pttHolen();
+  }, [pttHolen]);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -130,6 +162,29 @@ export const CommunityDetailScreen = ({
           </Druck>
         )}
 
+        {(community.joined || community.eigen) && (
+          <View style={styles.pttBlock}>
+            <PushToTalk
+              communityId={community.id}
+              onNotice={onNotice}
+              onGesendet={pttHolen}
+            />
+            {ptt.length > 0 && (
+              <View style={styles.pttListe}>
+                {ptt.slice(0, 5).map((p) => (
+                  <View key={p.id} style={styles.pttZeile}>
+                    <Ionicons name="volume-high-outline" size={15} color={colors.brand} />
+                    <Text style={styles.pttName}>{p.name}</Text>
+                    <Text style={styles.pttMeta}>
+                      {p.dauer}s · {p.zeit}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         <Druck style={styles.neu} onPress={onNeuesUnterthema}>
           <LinearGradient
             colors={markenVerlauf()}
@@ -162,6 +217,12 @@ export const CommunityDetailScreen = ({
 };
 
 const styles = themenStyles((colors) => ({
+  pttBlock: { paddingHorizontal: '7.2%', paddingTop: spacing.md, gap: spacing.sm },
+  pttListe: { gap: 4 },
+  pttZeile: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pttName: { flex: 1, ...typography.small, color: colors.text },
+  pttMeta: { ...typography.tiny, color: colors.text3 },
+
   screen: { flex: 1, backgroundColor: colors.surface },
 
   /* 4:3 wie im Frame (344 zu 258), mit Rand ringsum. */

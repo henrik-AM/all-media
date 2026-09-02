@@ -19,6 +19,9 @@ import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ICH as CURRENT_USER_ID, chatZeit, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
+import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
+import { WeiterleitenSheet } from '../../components/WeiterleitenSheet';
+import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Chat, Contact, Message } from '../../types';
 import { haptic } from '../../lib/haptics';
@@ -26,6 +29,20 @@ import * as Aktion from '../../lib/aktionen';
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Dateigroesse in etwas, das man lesen kann.
+ *
+ * Null Bytes heisst nicht "leere Datei", sondern "die Groesse kam nicht mit"
+ * — bei manchen Quellen liefert die Auswahl sie nicht. Dann lieber nichts
+ * behaupten als "0 B" hinschreiben.
+ */
+const groesseText = (bytes: number) => {
+  if (!bytes) return 'Datei';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+};
 
 interface Props {
   chat: Chat;
@@ -59,13 +76,29 @@ export const ChatDetailScreen = ({
   onOpenStandort,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
-  const { users: alleNutzer, ichId, communities } = useDaten();
+  const { users: alleNutzer, ichId, communities, chats: alleChats } = useDaten();
   const { supabase } = useSupabase();
   const { istBlockiert, markierte, markieren } = useProfil();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>(extraMessages ?? []);
   const [draft, setDraft] = useState('');
   const listRef = useRef<FlatList<Message>>(null);
+  const aktionen = useAktionen(onNotice);
+
+  /*
+   * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026).
+   *
+   * `gewaehlt` ist die Nachricht, auf der das Menue gerade offen ist.
+   * `bezug` haelt fest, worauf sich die naechste Nachricht bezieht — als
+   * Antwort oder als Zitat. Beides getrennt, weil eine Antwort nur den Bezug
+   * anzeigt und ein Zitat den Text mitnimmt.
+   * `bearbeitet` ist die Nachricht, deren Text gerade in der Eingabezeile
+   * steht und beim Senden ueberschrieben wird statt neu angelegt.
+   */
+  const [gewaehlt, setGewaehlt] = useState<Message | null>(null);
+  const [bezug, setBezug] = useState<{ art: 'antwort' | 'zitat'; nachricht: Message } | null>(null);
+  const [bearbeitet, setBearbeitet] = useState<Message | null>(null);
+  const [weiterleiten, setWeiterleiten] = useState<Message | null>(null);
 
   /*
    * Der Verlauf kommt aus der Datenbank, nicht aus einer Liste im Quelltext.
@@ -125,6 +158,27 @@ export const ChatDetailScreen = ({
     const text = draft.trim();
     if (!text || gesperrt || !supabase || !ichId) return;
 
+    /*
+     * Bearbeiten laeuft ueber denselben Knopf wie Senden.
+     *
+     * Ein eigener "Speichern"-Knopf waere ein zweiter Zustand der
+     * Eingabezeile, den man erst begreifen muss. Solange oben "Nachricht
+     * bearbeiten" steht, ueberschreibt der Sendeknopf — das ist die
+     * naheliegende Erwartung.
+     */
+    if (bearbeitet) {
+      const alt = bearbeitet;
+      setBearbeitet(null);
+      setDraft('');
+      setMessages((prev) =>
+        prev.map((m) => (m.id === alt.id ? { ...m, text, bearbeitet: true } : m))
+      );
+      await aktionen.nachrichtBearbeiten(alt.id, text, () =>
+        setMessages((prev) => prev.map((m) => (m.id === alt.id ? alt : m)))
+      );
+      return;
+    }
+
     haptic.success();
     setDraft('');
 
@@ -142,13 +196,27 @@ export const ChatDetailScreen = ({
       // nicht — das Geschriebene war beim naechsten Oeffnen weg.
       data = istKanal
         ? await Aktion.kanalNachricht(supabase, ichId, chat.id, text)
-        : await Aktion.nachrichtSenden(supabase, ichId, chat.id, text);
+        : await Aktion.nachrichtSenden(supabase, ichId, chat.id, text, {
+            antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
+            zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
+          });
     } catch (e: any) {
       console.error('Nachricht senden fehlgeschlagen:', e?.message ?? e);
       onNotice?.('Die Nachricht ging nicht raus');
       setDraft(text);
       return;
     }
+
+    const bezugText = bezug
+      ? {
+          id: bezug.nachricht.id,
+          text: bezug.nachricht.text,
+          autor:
+            bezug.nachricht.senderId === CURRENT_USER_ID
+              ? 'Du'
+              : alleNutzer[bezug.nachricht.senderId]?.name ?? '',
+        }
+      : undefined;
 
     setMessages((prev) => [
       ...prev,
@@ -159,9 +227,65 @@ export const ChatDetailScreen = ({
         text,
         time: chatZeit(data.created_at),
         read: false,
+        antwortAuf: bezug?.art === 'antwort' ? bezugText : undefined,
+        zitat: bezug?.art === 'zitat' ? bezugText : undefined,
       },
     ]);
+    setBezug(null);
     scrollToEnd();
+  };
+
+  /*
+   * Was das Menue an einer Nachricht ausloest.
+   *
+   * Alles laeuft ueber lib/useAktionen.ts, also mit Rueckweg: schaltet die
+   * Anzeige um und stellt sie zurueck, wenn das Schreiben scheitert. Eine
+   * Blase, die "bearbeitet" zeigt, obwohl in der Datenbank der alte Text
+   * steht, waere schlimmer als gar keine Aenderung.
+   */
+  const nachrichtAktion = async (was: NachrichtAktion) => {
+    const m = gewaehlt;
+    setGewaehlt(null);
+    if (!m) return;
+
+    if (was === 'antworten') return setBezug({ art: 'antwort', nachricht: m });
+    if (was === 'zitieren') return setBezug({ art: 'zitat', nachricht: m });
+    if (was === 'weiterleiten') return setWeiterleiten(m);
+
+    if (was === 'bearbeiten') {
+      setBearbeitet(m);
+      setDraft(m.text);
+      return;
+    }
+
+    if (was === 'markieren') {
+      const jetzt = markieren(m.id);
+      return onNotice?.(jetzt ? 'Nachricht markiert' : 'Markierung entfernt');
+    }
+
+    if (was === 'zuruecknehmen') {
+      const vorher = messages;
+      setMessages((prev) =>
+        prev.map((x) => (x.id === m.id ? { ...x, text: '', zurueckgenommen: true } : x))
+      );
+      await aktionen.nachrichtZuruecknehmen(m.id, () => setMessages(vorher));
+    }
+  };
+
+  /** Eine Reaktion setzen, wechseln oder wegnehmen. */
+  const reaktionSetzen = async (emoji: string) => {
+    const m = gewaehlt;
+    setGewaehlt(null);
+    if (!m) return;
+
+    const vorher = messages;
+    const bisher = (m.reaktionen ?? []).find((r) => r.userId === CURRENT_USER_ID)?.emoji;
+    const ohneMich = (m.reaktionen ?? []).filter((r) => r.userId !== CURRENT_USER_ID);
+    const neu =
+      bisher === emoji ? ohneMich : [...ohneMich, { userId: CURRENT_USER_ID, emoji }];
+
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reaktionen: neu } : x)));
+    await aktionen.nachrichtReaktion(m.id, emoji, () => setMessages(vorher));
   };
 
   const tagTrenner = (() => {
@@ -178,15 +302,54 @@ export const ChatDetailScreen = ({
       // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt
       // sich "Mit Stern markiert" in der Kontaktinfo wirklich.
       <Druck
-        style={[styles.bubble, out ? styles.bubbleOut : styles.bubbleIn]}
+        style={[
+          styles.bubble,
+          out ? styles.bubbleOut : styles.bubbleIn,
+          item.media === 'sticker' && styles.bubbleSticker,
+        ]}
         onLongPress={() => {
           haptic.medium();
-          const jetzt = markieren(item.id);
-          onNotice?.(jetzt ? 'Nachricht markiert' : 'Markierung entfernt');
+          // Bis zum 01.09.2026 setzte langes Druecken nur einen Stern. Jetzt
+          // steht dahinter das ganze Menue aus dem Handbuch — der Stern ist
+          // einer von sechs Punkten.
+          setGewaehlt(item);
         }}
         delayLongPress={450}
       >
         {!out && chat.isGroup && <Text style={styles.sender}>{sender?.name ?? 'Unbekannt'}</Text>}
+
+        {/* Weitergeleitet: ohne diese Zeile saehe sie aus wie selbst geschrieben. */}
+        {item.weitergeleitetVon ? (
+          <View style={styles.weiter}>
+            <Ionicons name="arrow-redo-outline" size={12} color={colors.text3} />
+            <Text style={styles.weiterText}>Weitergeleitet von {item.weitergeleitetVon}</Text>
+          </View>
+        ) : null}
+
+        {/*
+          * Antwort und Zitat sehen verschieden aus, weil sie verschiedenes
+          * sind: die Antwort zeigt nur den Bezug an (schmaler Balken, eine
+          * Zeile), das Zitat nimmt den Text mit und bleibt lesbar, auch wenn
+          * das Original zurueckgenommen wird.
+          */}
+        {item.antwortAuf ? (
+          <View style={styles.bezug}>
+            <View style={styles.bezugBalken} />
+            <View style={styles.bezugText}>
+              <Text style={styles.bezugAutor}>{item.antwortAuf.autor}</Text>
+              <Text style={styles.bezugZeile} numberOfLines={1}>
+                {item.antwortAuf.text || 'Zurückgenommen'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {item.zitat ? (
+          <View style={styles.zitat}>
+            <Text style={styles.zitatAutor}>{item.zitat.autor} schrieb:</Text>
+            <Text style={styles.zitatText}>„{item.zitat.text}"</Text>
+          </View>
+        ) : null}
 
         {item.bildUri ? (
           <Image source={{ uri: item.bildUri }} style={styles.anhangBild} />
@@ -241,26 +404,93 @@ export const ChatDetailScreen = ({
               </Text>
             </View>
           </View>
+        ) : item.media === 'sticker' ? (
+          /*
+           * Ein Sticker steht ohne Blase und ohne Rahmen da — sonst waere er
+           * nur ein sehr grosses Zeichen in einer Nachricht. Die Blase selbst
+           * wird darum in `bubble` durchsichtig geschaltet.
+           */
+          <Text style={styles.sticker}>{item.text}</Text>
+        ) : item.media === 'file' ? (
+          <View style={styles.datei}>
+            <View style={styles.dateiSymbol}>
+              <Ionicons name="document-text-outline" size={20} color={colors.white} />
+            </View>
+            <View style={styles.dateiText}>
+              <Text style={styles.dateiName} numberOfLines={1}>
+                {item.datei?.name ?? item.text}
+              </Text>
+              {/* Ohne Groesse weiss niemand, ob das Antippen zwei Sekunden
+                  oder zwei Minuten Mobilfunk kostet. */}
+              <Text style={styles.dateiGroesse}>{groesseText(item.datei?.groesse ?? 0)}</Text>
+            </View>
+          </View>
         ) : item.media ? (
           <View style={styles.media}>
             <Ionicons
-              name={item.media === 'image' ? 'image-outline' : 'mic-outline'}
+              name={
+                item.media === 'image'
+                  ? 'image-outline'
+                  : item.media === 'gif'
+                    ? 'film-outline'
+                    : item.media === 'video'
+                      ? 'videocam-outline'
+                      : 'mic-outline'
+              }
               size={18}
               color={colors.text2}
             />
             <Text style={styles.mediaText}>
-              {item.media === 'image' ? 'Foto' : 'Sprachnachricht · 0:14'}
+              {item.media === 'image'
+                ? 'Foto'
+                : item.media === 'gif'
+                  ? 'Gif'
+                  : item.media === 'video'
+                    ? 'Video'
+                    : 'Sprachnachricht · 0:14'}
             </Text>
           </View>
+        ) : item.zurueckgenommen ? (
+          /*
+           * Die Zeile bleibt stehen. Sie ganz verschwinden zu lassen waere
+           * bequemer, aber dann verloeren Antworten und Zitate ihren Bezug —
+           * und die Gegenseite fragte sich, ob sie sich das Gelesene
+           * eingebildet hat.
+           */
+          <Text style={styles.zurueck}>Diese Nachricht wurde zurückgenommen</Text>
         ) : (
           <Text style={[styles.messageText, out && styles.messageTextOut]}>{item.text}</Text>
         )}
 
         <View style={styles.bubbleFoot}>
           {markierte.includes(item.id) && <Ionicons name="star" size={12} color="#F5A524" />}
+          {/* "bearbeitet" muss dastehen. Eine stille Aenderung ist schlimmer
+              als gar keine: das Gegenueber erinnert sich an einen anderen
+              Text und findet ihn nicht wieder. */}
+          {item.bearbeitet && !item.zurueckgenommen ? (
+            <Text style={[styles.time, out && styles.timeOut]}>bearbeitet ·</Text>
+          ) : null}
           <Text style={[styles.time, out && styles.timeOut]}>{item.time}</Text>
           {out && <Ionicons name="checkmark-done" size={14} color={colors.bubbleOutMeta} />}
         </View>
+
+        {/* Reaktionen haengen unten an der Blase, nicht darin — sonst
+            waeren sie Teil des Textes. */}
+        {item.reaktionen?.length ? (
+          <View style={styles.reaktionen}>
+            {Object.entries(
+              item.reaktionen.reduce<Record<string, number>>((zaehler, r) => {
+                zaehler[r.emoji] = (zaehler[r.emoji] ?? 0) + 1;
+                return zaehler;
+              }, {})
+            ).map(([emoji, anzahl]) => (
+              <View key={emoji} style={styles.reaktion}>
+                <Text style={styles.reaktionEmoji}>{emoji}</Text>
+                {anzahl > 1 && <Text style={styles.reaktionZahl}>{anzahl}</Text>}
+              </View>
+            ))}
+          </View>
+        ) : null}
       </Druck>
     );
   };
@@ -355,6 +585,39 @@ export const ChatDetailScreen = ({
           </View>
         )}
 
+        {/*
+          * Worauf sich die naechste Nachricht bezieht — oder welche gerade
+          * bearbeitet wird. Ohne diese Zeile tippt man in eine Eingabe, die
+          * sich unsichtbar anders verhaelt als sonst.
+          */}
+        {(bezug || bearbeitet) && (
+          <View style={styles.bezugLeiste}>
+            <View style={styles.bezugBalken} />
+            <View style={styles.bezugText}>
+              <Text style={styles.bezugAutor}>
+                {bearbeitet
+                  ? 'Nachricht bearbeiten'
+                  : bezug?.art === 'zitat'
+                    ? 'Zitieren'
+                    : 'Antworten'}
+              </Text>
+              <Text style={styles.bezugZeile} numberOfLines={1}>
+                {(bearbeitet ?? bezug?.nachricht)?.text || 'Anhang'}
+              </Text>
+            </View>
+            <Druck
+              hitSlop={8}
+              onPress={() => {
+                if (bearbeitet) setDraft('');
+                setBearbeitet(null);
+                setBezug(null);
+              }}
+            >
+              <Ionicons name="close" size={20} color={colors.text2} />
+            </Druck>
+          </View>
+        )}
+
         <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
           <Druck
             style={styles.composerIcon}
@@ -391,12 +654,45 @@ export const ChatDetailScreen = ({
         </View>
       </KeyboardAvoidingView>
 
+      <NachrichtSheet
+        visible={!!gewaehlt}
+        eigene={gewaehlt?.senderId === CURRENT_USER_ID}
+        markiert={!!gewaehlt && markierte.includes(gewaehlt.id)}
+        reaktion={
+          (gewaehlt?.reaktionen ?? []).find((r) => r.userId === CURRENT_USER_ID)?.emoji ?? null
+        }
+        onAktion={nachrichtAktion}
+        onReaktion={reaktionSetzen}
+        onClose={() => setGewaehlt(null)}
+      />
+
+      <WeiterleitenSheet
+        visible={!!weiterleiten}
+        chats={alleChats}
+        ausserId={chat.id}
+        onClose={() => setWeiterleiten(null)}
+        onWeiterleiten={async (chatIds) => {
+          const m = weiterleiten;
+          setWeiterleiten(null);
+          if (!m) return;
+          const anzahl = await aktionen.nachrichtWeiterleiten(m.id, chatIds);
+          if (anzahl) {
+            onNotice?.(`An ${anzahl} ${anzahl === 1 ? 'Chat' : 'Chats'} weitergeleitet`);
+          }
+        }}
+      />
+
       <AnhangSheet
         visible={anhangOffen}
         contacts={contacts}
         ausserId={chat.userId}
         onClose={() => setAnhangOffen(false)}
-        onAnhang={async ({ ortId, personId, ...teil }) => {
+        onStandortAnfragen={async () => {
+          if (!chat.userId) return onNotice?.('In einer Gruppe geht das nicht');
+          const id = await aktionen.standortAnfragen(chat.id, chat.userId);
+          if (id) onNotice?.(`Standort bei ${chat.name} angefragt`);
+        }}
+        onAnhang={async ({ ortId, personId, dateiName, dateiGroesse, ...teil }) => {
           /*
            * Ein Anhang gehört in die Datenbank, nicht nur in den Bildschirm.
            *
@@ -412,6 +708,8 @@ export const ChatDetailScreen = ({
                 typ: teil.media ?? null,
                 standortId: ortId ?? null,
                 kontaktId: personId ?? null,
+                dateiName: dateiName ?? null,
+                dateiGroesse: dateiGroesse ?? null,
               });
               id = data.id;
             } catch (e: any) {
@@ -434,6 +732,59 @@ export const ChatDetailScreen = ({
 };
 
 const styles = themenStyles((colors) => ({
+  bubbleSticker: { backgroundColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0 },
+  sticker: { fontSize: 54, lineHeight: 62 },
+  datei: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  dateiSymbol: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.md,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateiText: { flex: 1 },
+  dateiName: { ...typography.name, color: colors.text },
+  dateiGroesse: { ...typography.tiny, color: colors.text3 },
+
+  /* --- Nachrichten-Werkzeuge, Handbuch-Abgleich 01.09.2026 --- */
+  weiter: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
+  weiterText: { ...typography.tiny, color: colors.text3, fontStyle: 'italic' },
+  bezug: { flexDirection: 'row', gap: spacing.sm, marginBottom: 5 },
+  bezugBalken: { width: 3, borderRadius: 2, backgroundColor: colors.brand },
+  bezugText: { flex: 1 },
+  bezugAutor: { ...typography.tiny, color: colors.brand },
+  bezugZeile: { ...typography.small, color: colors.text2 },
+  zitat: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.border,
+    paddingLeft: spacing.sm,
+    marginBottom: 5,
+  },
+  zitatAutor: { ...typography.tiny, color: colors.text3 },
+  zitatText: { ...typography.small, color: colors.text2, fontStyle: 'italic' },
+  zurueck: { ...typography.message, color: colors.text3, fontStyle: 'italic' },
+  reaktionen: { flexDirection: 'row', gap: 4, marginTop: 5 },
+  reaktion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface3,
+  },
+  reaktionEmoji: { fontSize: 13 },
+  reaktionZahl: { ...typography.tiny, color: colors.text2 },
+  bezugLeiste: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface2,
+  },
+
   anfrage: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,

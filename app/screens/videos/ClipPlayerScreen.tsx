@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -13,6 +13,9 @@ import { useReposts } from '../../contexts/RepostContext';
 import { Clip } from '../../types';
 import { ExplorerZiel } from './ExplorerScreen';
 import { ActionSheet } from '../../components/ActionSheet';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { useAktionen } from '../../lib/useAktionen';
+import { ladeStreamKommentare } from '../../lib/daten';
 import { EinstellungSheet } from '../../components/EinstellungSheet';
 import {
   QUALITAET_STUFEN,
@@ -83,6 +86,21 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    */
   const [optionen, setOptionen] = useState(false);
   const [wahl, setWahl] = useState<'tempo' | 'qualitaet' | null>(null);
+
+  /*
+   * Die Live-Kommentarspalte, wenn dieses Video gerade gesendet wird.
+   *
+   * Das Handbuch nennt sie unter Querformat ausdruecklich als Merkmal von
+   * Livestreams. Bei einer Aufzeichnung waere sie sinnlos — dort gibt es die
+   * gewoehnlichen Kommentare —, deshalb haengt sie an `clip.art === 'live'`.
+   */
+  const { supabase } = useSupabase();
+  const aktionen = useAktionen(onNotice);
+  const [liveKommentare, setLiveKommentare] = useState<
+    { id: string; name: string; text: string; zeit: string }[]
+  >([]);
+  const [liveEntwurf, setLiveEntwurf] = useState('');
+  const [spendeOffen, setSpendeOffen] = useState(false);
   const video = useVideoEinstellungen();
 
   const clip = clips.find((c) => c.id === offen);
@@ -91,6 +109,29 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   const standbild = eigenerEintrag?.standbild ?? clip?.standbild;
   const echtesVideo = istVideo(quelle);
   const gesamt = dateiLaenge || (clip ? sekundenVon(clip.duration) : 0);
+
+  const istLive = clip?.art === 'live';
+
+  /*
+   * Alle vier Sekunden nachladen. Ein Live-Abo waere schoener, braeuchte aber
+   * eine eigene Verbindung, die beim Verlassen wieder zugehen muss — bei
+   * einer Kommentarspalte faellt der Unterschied nicht auf.
+   */
+  const liveHolen = useCallback(async () => {
+    if (!supabase || !clip || !istLive) return;
+    try {
+      setLiveKommentare(await ladeStreamKommentare(supabase, clip.id));
+    } catch (e: any) {
+      console.error('Live-Kommentare laden fehlgeschlagen:', e?.message ?? e);
+    }
+  }, [supabase, clip, istLive]);
+
+  useEffect(() => {
+    if (!istLive) return setLiveKommentare([]);
+    liveHolen();
+    const uhr = setInterval(liveHolen, 4000);
+    return () => clearInterval(uhr);
+  }, [istLive, liveHolen]);
 
   /*
    * Ohne Videodatei bleibt es beim Zaehler: es gibt nichts abzuspielen, aber
@@ -319,6 +360,76 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           </Druck>
         </View>
 
+        {/*
+          * Die Live-Kommentarspalte samt Spendenknopf. Beides steht im
+          * Handbuch unter Querformat, beides gab es bis zum 01.09.2026 nicht.
+          */}
+        {istLive && (
+          <View style={styles.live}>
+            <View style={styles.liveKopf}>
+              <Text style={styles.liveTitel}>Live-Kommentare</Text>
+              <Druck style={styles.spendeKnopf} onPress={() => setSpendeOffen(true)}>
+                <Ionicons name="heart" size={14} color={colors.white} />
+                <Text style={styles.spendeText}>Spenden</Text>
+              </Druck>
+            </View>
+
+            {liveKommentare.length === 0 ? (
+              <Text style={styles.liveLeer}>Noch hat niemand etwas geschrieben.</Text>
+            ) : (
+              liveKommentare.slice(-30).map((k) => (
+                <View key={k.id} style={styles.liveZeile}>
+                  <Text style={styles.liveName}>{k.name}</Text>
+                  <Text style={styles.liveText}>{k.text}</Text>
+                </View>
+              ))
+            )}
+
+            <View style={styles.liveEingabe}>
+              <TextInput
+                style={styles.liveFeld}
+                value={liveEntwurf}
+                onChangeText={setLiveEntwurf}
+                placeholder="Etwas sagen …"
+                placeholderTextColor={colors.text3}
+                returnKeyType="send"
+                onSubmitEditing={async () => {
+                  const text = liveEntwurf.trim();
+                  if (!text) return;
+                  setLiveEntwurf('');
+                  if (await aktionen.streamKommentar(clip.id, text)) liveHolen();
+                }}
+              />
+            </View>
+          </View>
+        )}
+
+        {/*
+          * Spenden in festen Stufen. Ein freies Betragsfeld waere hier der
+          * falsche Weg: waehrend eines Streams tippt niemand einen Betrag,
+          * und ein Zahlendreher ist echtes Geld.
+          */}
+        <ActionSheet
+          visible={spendeOffen}
+          title={`An ${autor.name} spenden`}
+          items={[
+            { key: '100', label: '1,00 €', icon: 'heart-outline' },
+            { key: '300', label: '3,00 €', icon: 'heart-outline' },
+            { key: '500', label: '5,00 €', icon: 'heart' },
+            { key: '1000', label: '10,00 €', icon: 'heart' },
+          ]}
+          onSelect={async (cent) => {
+            setSpendeOffen(false);
+            const ok = await aktionen.spenden(clip.userId, Number(cent), clip.id);
+            if (ok) {
+              onNotice(
+                `${(Number(cent) / 100).toFixed(2).replace('.', ',')} € an ${autor.name} gespendet`
+              );
+            }
+          }}
+          onClose={() => setSpendeOffen(false)}
+        />
+
         {!!clip.description && <Text style={styles.text}>{clip.description}</Text>}
 
         {!!clip.tags?.length && (
@@ -422,6 +533,39 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
 };
 
 const styles = themenStyles((colors) => ({
+  live: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface2,
+    gap: 5,
+  },
+  liveKopf: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  liveTitel: { ...typography.name, color: colors.text },
+  spendeKnopf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+  },
+  spendeText: { ...typography.small, color: colors.white, fontWeight: '600' },
+  liveLeer: { ...typography.small, color: colors.text3, paddingVertical: 4 },
+  liveZeile: { flexDirection: 'row', gap: 6 },
+  liveName: { ...typography.small, color: colors.brand, fontWeight: '700' },
+  liveText: { flex: 1, ...typography.small, color: colors.text2 },
+  liveEingabe: { marginTop: 6 },
+  liveFeld: {
+    height: 36,
+    borderRadius: radius.pill,
+    paddingHorizontal: 13,
+    backgroundColor: colors.surface3,
+    color: colors.text,
+  },
+
   screen: { flex: 1, backgroundColor: colors.surface },
   bar: {
     height: 48,

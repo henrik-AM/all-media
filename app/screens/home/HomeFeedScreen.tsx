@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -10,6 +10,11 @@ import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { kommentarZeile, likeZeile } from '../../lib/kommentare';
 import { compactNumber } from '../../lib/zahlen';
+import { haptic } from '../../lib/haptics';
+import { UmfrageKarte } from '../../components/UmfrageKarte';
+import { ladeUmfragen } from '../../lib/daten';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { Umfrage } from '../../types';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useAktionen } from '../../lib/useAktionen';
@@ -25,7 +30,7 @@ interface Props {
 }
 
 export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, onNotice }: Props) => {
-  const { posts: alleBeitraege, users: alleNutzer } = useDaten();
+  const { posts: alleBeitraege, users: alleNutzer, ichId } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Was hier passiert, geht in die Datenbank — siehe lib/useAktionen.ts.
   const aktion = useAktionen(onNotice);
@@ -76,6 +81,65 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
     update(post.id, (p) => ({ ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) }));
     aktion.like(post.id, zurueck);
   };
+
+  /*
+   * Doppeltipp auf das Bild likt — von Henrik gewuenscht, am 01.09.2026
+   * nachgetragen. Er nimmt nie weg: wer versehentlich zweimal tippt, soll
+   * nicht sein Like verlieren. So halten es Instagram und TikTok auch.
+   *
+   * Der Tipp liegt auf dem Bild und nicht auf der ganzen Karte. Auf der
+   * Karte wuerde er beim Blaettern durch die Bildunterschrift ausloesen.
+   */
+  const letzterTipp = useRef(0);
+  const [herzAuf, setHerzAuf] = useState<string | null>(null);
+  const herz = useRef(new Animated.Value(0)).current;
+
+  const bildGetippt = useCallback(
+    (post: Post) => {
+      const jetzt = Date.now();
+      if (jetzt - letzterTipp.current >= 260) {
+        letzterTipp.current = jetzt;
+        return;
+      }
+      letzterTipp.current = 0;
+
+      setHerzAuf(post.id);
+      herz.setValue(0);
+      Animated.sequence([
+        Animated.spring(herz, { toValue: 1, useNativeDriver: true, friction: 4 }),
+        Animated.timing(herz, { toValue: 0, duration: 260, delay: 300, useNativeDriver: true }),
+      ]).start(() => setHerzAuf(null));
+
+      haptic.impact('light');
+      if (!post.liked) toggleLike(post);
+    },
+    // toggleLike haengt an update und aktion, beide sind stabil.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [herz]
+  );
+
+  /*
+   * Die Umfragen zu den Beitraegen im Feed. Sie kommen in einem Rutsch fuer
+   * alle sichtbaren Beitraege — je Beitrag eine Abfrage waeren bei zwanzig
+   * Karten zwanzig Anfragen beim Blaettern.
+   */
+  const { supabase } = useSupabase();
+  const [umfragen, setUmfragen] = useState<Record<string, Umfrage>>({});
+
+  const umfragenHolen = useCallback(async () => {
+    if (!supabase || !posts.length) return;
+    try {
+      setUmfragen(
+        await ladeUmfragen(supabase, ichId, 'post', posts.map((p) => p.id))
+      );
+    } catch (e: any) {
+      console.error('Umfragen laden fehlgeschlagen:', e?.message ?? e);
+    }
+  }, [supabase, ichId, posts]);
+
+  useEffect(() => {
+    umfragenHolen();
+  }, [umfragenHolen]);
 
   const toggleSave = (post: Post) => {
     const zurueck = () => update(post.id, (p) => ({ ...p, saved: post.saved }));
@@ -174,13 +238,45 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
           )}
         </View>
 
-        <View style={styles.media}>
+        {/*
+          * Eine Umfrage ersetzt das Bild. Ein Beitrag hat entweder ein Motiv
+          * oder eine Frage — beides uebereinander waere eine Karte, bei der
+          * man nicht weiss, worauf man tippen soll.
+          */}
+        {umfragen[item.id] ? (
+          <UmfrageKarte
+            umfrage={umfragen[item.id]}
+            onStimme={async (optionId) => {
+              await aktion.umfrageStimmen(umfragen[item.id].id, optionId, () => {});
+              umfragenHolen();
+            }}
+          />
+        ) : (
+        <Pressable style={styles.media} onPress={() => bildGetippt(item)}>
           {item.mediaUri ? (
             <Image source={{ uri: item.mediaUri }} style={styles.mediaBild} />
           ) : (
             <Motiv id={item.id} bild={item.standbild ?? item.mediaUri} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
           )}
-        </View>
+
+          {herzAuf === item.id && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.herz,
+                {
+                  opacity: herz,
+                  transform: [
+                    { scale: herz.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.1] }) },
+                  ],
+                },
+              ]}
+            >
+              <Ionicons name="heart" size={88} color="rgba(255,255,255,0.95)" />
+            </Animated.View>
+          )}
+        </Pressable>
+        )}
 
         <View style={styles.actions}>
           <Druck onPress={() => toggleLike(item)} hitSlop={6}>
@@ -241,6 +337,7 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
       />
 
       <CommentSheet
+        onNotice={onNotice}
         targetId={commentsFor}
         onClose={() => setCommentsFor(null)}
         onCountChange={(id, count) => update(id, (p) => ({ ...p, comments: count }))}
@@ -250,6 +347,8 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
 };
 
 const styles = themenStyles((colors) => ({
+  herz: { position: 'absolute', alignSelf: 'center', top: '34%' },
+
   repost: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 },
   repostZahl: { color: colors.success, fontSize: 12.5, fontWeight: '600' },
 

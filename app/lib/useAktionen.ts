@@ -80,6 +80,89 @@ export interface Aktionen {
   ) => Promise<{ id: string; created_at: string } | null>;
   kommentarLoeschen: (kommentarId: string, zurueck: Rueckweg) => Promise<void>;
 
+  /*
+   * Was das Handbuch verlangt — nachgetragen am 01.09.2026.
+   *
+   * Zur Begriffsklaerung: ein *Insight* ist eine Aufnahme, die an ausgewaehlte
+   * Personen geht. Die *Insight Time* zaehlt die Tage in Folge, an denen sich
+   * beide Seiten gegenseitig einen geschickt haben. Die "Insights" im
+   * Einstellungsmenue sind etwas anderes — Statistik zum eigenen Profil.
+   */
+  insightSenden: (
+    empfaenger: string[],
+    felder: A.NeuerInsight
+  ) => Promise<{ id: string; streaks: Record<string, number> } | null>;
+  insightGesehen: (insightId: string) => Promise<void>;
+  insightSpeichern: (insightId: string, behalten: boolean, zurueck: Rueckweg) => Promise<void>;
+  insightWiederholen: (insightId: string, empfaenger: string[]) => Promise<boolean>;
+  insightZiel: (zielId: string, zurueck: Rueckweg) => Promise<void>;
+
+  nachrichtBearbeiten: (nachrichtId: string, text: string, zurueck: Rueckweg) => Promise<void>;
+  nachrichtZuruecknehmen: (nachrichtId: string, zurueck: Rueckweg) => Promise<void>;
+  nachrichtWeiterleiten: (nachrichtId: string, chatIds: string[]) => Promise<number | null>;
+  nachrichtReaktion: (nachrichtId: string, emoji: string, zurueck: Rueckweg) => Promise<void>;
+
+  /**
+   * Einen Beitrag anlegen und seine Kennung zurueckbekommen.
+   *
+   * Der gewoehnliche Weg geht ueber ProfilContext, der den Beitrag zugleich
+   * in den Feed stellt. Hier braucht es beides getrennt: eine Umfrage muss
+   * sich an die Kennung haengen koennen, und ein geplanter Beitrag darf
+   * gerade nicht im Feed erscheinen.
+   */
+  beitragMitId: (felder: A.NeuerBeitrag) => Promise<string | null>;
+
+  umfrageAnlegen: (
+    traeger: { art: 'post' | 'story' | 'channel'; id: string },
+    felder: A.NeueUmfrage
+  ) => Promise<string | null>;
+  umfrageStimmen: (pollId: string, optionId: string, zurueck: Rueckweg) => Promise<void>;
+
+  sichtbarkeit: (
+    bereich: A.SichtbarkeitBereich,
+    stufe: A.SichtbarkeitStufe,
+    zurueck: Rueckweg
+  ) => Promise<void>;
+  sichtbarkeitAusnahme: (
+    bereich: A.SichtbarkeitBereich,
+    zielId: string,
+    zurueck: Rueckweg
+  ) => Promise<void>;
+
+  altersangabe: (
+    geburtsdatum: string,
+    guardianHandle?: string
+  ) => Promise<{ alter: number; brauchtFreigabe: boolean; guardian: string | null } | null>;
+  freigabeEntscheiden: (kindId: string, zustimmen: boolean, zurueck: Rueckweg) => Promise<void>;
+
+  /** Gibt das beanstandete Wort zurueck, oder null. */
+  wortfilter: (text: string) => Promise<{ wort: string; schwere: string } | null>;
+
+  /** Ist der Community-Name noch frei? Bei Zweifeln true — siehe unten. */
+  communityNameFrei: (name: string) => Promise<boolean>;
+
+  pttSenden: (
+    communityId: string,
+    audioUri: string,
+    dauer: number,
+    kanalId?: string | null
+  ) => Promise<string | null>;
+
+  streamKommentar: (postId: string, text: string) => Promise<string | null>;
+  spenden: (
+    empfaengerId: string,
+    betragCent: number,
+    postId?: string | null,
+    nachricht?: string
+  ) => Promise<boolean>;
+
+  standortAnfragen: (chatId: string, zielId: string) => Promise<string | null>;
+  standortAntwort: (
+    anfrageId: string,
+    annehmen: boolean,
+    stunden?: number
+  ) => Promise<boolean | null>;
+
   /** Ist überhaupt jemand angemeldet? Ohne das schreibt hier nichts. */
   bereit: boolean;
 }
@@ -201,6 +284,160 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         holen('Der Kommentar', (c, i) => A.kommentarAnlegen(c, i, beitragId, text)),
       kommentarLoeschen: (id, zurueck) =>
         schreiben('Das Löschen', (c, i) => A.kommentarLoeschen(c, i, id), zurueck),
+      // ------------------------------------------------------- Insights --
+      /*
+       * Erst hochladen, dann senden — wie bei der Story. Was die Kamera
+       * liefert, ist ein Pfad auf diesem Geraet; in der Datenbank waere er
+       * fuer die Gegenseite ein kaputtes Bild.
+       */
+      insightSenden: (empfaenger, felder) =>
+        holen('Der Insight', async (c, i) => {
+          let adresse = felder.mediaUrl;
+          if (adresse && !/^https?:/i.test(adresse)) {
+            const endung = felder.mediaTyp === 'video' ? 'mp4' : 'jpg';
+            const upload = await ladeHoch(c, adresse, 'insights', `${i}-${Date.now()}.${endung}`);
+            if (!upload.success || !upload.url) throw new Error('Die Aufnahme ging nicht durch');
+            adresse = upload.url;
+          }
+          return A.insightSenden(c, i, empfaenger, { ...felder, mediaUrl: adresse });
+        }),
+      /*
+       * Ohne Meldung, wie beim Vermerk an einer Story: das passiert beim
+       * Durchblaettern nebenbei. Ins Protokoll gehoert es trotzdem.
+       */
+      insightGesehen: async (id) => {
+        if (!supabase || !ichId) return;
+        try {
+          await A.insightGesehen(supabase, ichId, id);
+        } catch (e: any) {
+          console.error('Insight als gesehen vermerken fehlgeschlagen:', e?.message ?? e);
+        }
+      },
+      insightSpeichern: (id, behalten, zurueck) =>
+        schreiben('Das Speichern', (c, i) => A.insightSpeichern(c, i, id, behalten), zurueck),
+      insightWiederholen: async (id, empfaenger) => {
+        const ergebnis = await holen('Das Wiederholen', (c, i) =>
+          A.insightWiederholen(c, i, id, empfaenger)
+        );
+        return Boolean(ergebnis);
+      },
+      insightZiel: (zielId, zurueck) =>
+        schreiben('Die Empfängerliste', (c, i) => A.insightZiel(c, i, zielId), zurueck),
+
+      // -------------------------------------------- Nachrichten-Werkzeuge --
+      nachrichtBearbeiten: (id, text, zurueck) =>
+        schreiben('Das Bearbeiten', (c, i) => A.nachrichtBearbeiten(c, i, id, text), zurueck),
+      nachrichtZuruecknehmen: (id, zurueck) =>
+        schreiben('Das Zurücknehmen', (c, i) => A.nachrichtZuruecknehmen(c, i, id), zurueck),
+      nachrichtWeiterleiten: (id, chatIds) =>
+        holen('Das Weiterleiten', (c, i) => A.nachrichtWeiterleiten(c, i, id, chatIds)),
+      nachrichtReaktion: (id, emoji, zurueck) =>
+        schreiben('Die Reaktion', (c, i) => A.nachrichtReaktion(c, i, id, emoji), zurueck),
+
+      beitragMitId: (felder) =>
+        holen('Der Beitrag', async (c, i) => {
+          let adresse = felder.mediaUrl;
+          if (adresse && !/^https?:/i.test(adresse)) {
+            const endung = felder.art === 'post' ? 'jpg' : 'mp4';
+            const upload = await ladeHoch(c, adresse, 'posts', `${i}-${Date.now()}.${endung}`);
+            adresse = upload.success ? upload.url ?? undefined : undefined;
+          }
+          return A.beitragAnlegen(c, i, { ...felder, mediaUrl: adresse });
+        }),
+
+      // -------------------------------------------------------- Umfragen --
+      umfrageAnlegen: (traeger, felder) =>
+        holen('Die Umfrage', (c, i) => A.umfrageAnlegen(c, i, traeger, felder)),
+      umfrageStimmen: (pollId, optionId, zurueck) =>
+        schreiben('Die Stimme', (c, i) => A.umfrageStimmen(c, i, pollId, optionId), zurueck),
+
+      // ---------------------------------------------------- Sichtbarkeit --
+      sichtbarkeit: (bereich, stufe, zurueck) =>
+        schreiben('Die Einstellung', (c, i) => A.sichtbarkeitSetzen(c, i, bereich, stufe), zurueck),
+      sichtbarkeitAusnahme: (bereich, zielId, zurueck) =>
+        schreiben(
+          'Die Ausnahme',
+          (c, i) => A.sichtbarkeitAusnahme(c, i, bereich, zielId),
+          zurueck
+        ),
+
+      // ---------------------------------------------------- Altersschutz --
+      altersangabe: (geburtsdatum, guardianHandle) =>
+        holen('Die Altersangabe', (c, i) => A.altersangabe(c, i, geburtsdatum, guardianHandle)),
+      freigabeEntscheiden: (kindId, zustimmen, zurueck) =>
+        schreiben(
+          'Die Entscheidung',
+          (c, i) => A.freigabeEntscheiden(c, i, kindId, zustimmen),
+          zurueck
+        ),
+
+      /*
+       * Der Wortfilter meldet nichts von sich aus — er gibt nur zurueck, was
+       * er gefunden hat. Was daraus folgt, entscheidet der Bildschirm: im
+       * Chat ein Hinweis, beim Beitrag eine Ablehnung.
+       */
+      wortfilter: async (text) => {
+        if (!supabase) return null;
+        try {
+          return await A.wortfilter(supabase, ichId, text);
+        } catch (e: any) {
+          console.error('Wortfilter fehlgeschlagen:', e?.message ?? e);
+          return null;
+        }
+      },
+
+      /*
+       * Bei einem Fehler gilt der Name als frei. Andersherum waere es
+       * schlimmer: eine Stoerung der Verbindung wuerde dann jedes Anlegen
+       * verhindern, mit der Begruendung, es gebe die Community schon.
+       */
+      communityNameFrei: async (name) => {
+        if (!supabase) return true;
+        try {
+          return await A.communityNameFrei(supabase, name);
+        } catch (e: any) {
+          console.error('Namensprüfung fehlgeschlagen:', e?.message ?? e);
+          return true;
+        }
+      },
+
+      // ----------------------------------------------------- Push-to-Talk --
+      pttSenden: (communityId, audioUri, dauer, kanalId) =>
+        holen('Die Sprachnachricht', async (c, i) => {
+          let adresse = audioUri;
+          if (adresse && !/^https?:/i.test(adresse)) {
+            const upload = await ladeHoch(c, adresse, 'ptt', `${i}-${Date.now()}.m4a`);
+            if (!upload.success || !upload.url) throw new Error('Die Aufnahme ging nicht durch');
+            adresse = upload.url;
+          }
+          const zeile = await A.pttSenden(c, i, communityId, adresse, dauer, kanalId);
+          return zeile.id;
+        }),
+
+      // ------------------------------------------------------- Livestream --
+      streamKommentar: async (postId, text) => {
+        const zeile = await holen('Der Kommentar', (c, i) =>
+          A.streamKommentar(c, i, postId, text)
+        );
+        return zeile?.id ?? null;
+      },
+      spenden: async (empfaengerId, betragCent, postId, nachricht) => {
+        const zeile = await holen('Die Spende', (c, i) =>
+          A.spenden(c, i, empfaengerId, betragCent, postId, nachricht)
+        );
+        return Boolean(zeile);
+      },
+
+      // ---------------------------------------------------- Standortanfrage --
+      standortAnfragen: async (chatId, zielId) => {
+        const zeile = await holen('Die Anfrage', (c, i) =>
+          A.standortAnfragen(c, i, chatId, zielId)
+        );
+        return zeile?.id ?? null;
+      },
+      standortAntwort: (anfrageId, annehmen, stunden) =>
+        holen('Die Antwort', (c, i) => A.standortAntwort(c, i, anfrageId, annehmen, stunden)),
+
       teilen: async (beitragId, empfaenger, vorschau) => {
         if (!supabase || !ichId) {
           melden?.('Dafür musst du angemeldet sein');

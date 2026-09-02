@@ -234,6 +234,11 @@ export interface NeuerBeitrag {
   mediaUrl?: string;
   thumbnail?: string;
   dauer?: string;
+  /**
+   * "Spaeter posten": Zeitpunkt, ab dem der Beitrag sichtbar ist.
+   * Leer heisst sofort. Steht in posts.publish_at.
+   */
+  geplantAb?: string | null;
 }
 
 /**
@@ -263,6 +268,7 @@ export async function beitragAnlegen(
       media_url: felder.mediaUrl || null,
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,
+      publish_at: felder.geplantAb || null,
     })
     .select('id')
     .single();
@@ -631,6 +637,12 @@ export interface Anhang {
   typ?: string | null;
   standortId?: string | null;
   kontaktId?: string | null;
+  /** Bezug: eine Antwort zeigt ihn an, ein Zitat nimmt den Text mit. */
+  antwortAuf?: string | null;
+  zitatVon?: string | null;
+  /** Bei einer Datei: ohne Name und Groesse steht dort ein graues Kaestchen. */
+  dateiName?: string | null;
+  dateiGroesse?: number | null;
 }
 
 /**
@@ -657,6 +669,10 @@ export async function nachrichtSenden(
       media_type: anhang.typ || null,
       place_id: anhang.standortId || null,
       contact_user_id: anhang.kontaktId || null,
+      reply_to: anhang.antwortAuf || null,
+      quote_of: anhang.zitatVon || null,
+      file_name: anhang.dateiName || null,
+      file_size: anhang.dateiGroesse || null,
     })
     .select('id, created_at')
     .single();
@@ -960,4 +976,731 @@ export async function livestreamSetzen(
   const { error } = await client.from('profiles').update({ live: live || null }).eq('id', ichId);
   if (error) throw error;
   return Boolean(live);
+}
+
+// ===========================================================================
+//  Was das Handbuch verlangt — nachgetragen am 01.09.2026
+//
+//  Der Abgleich mit `All-Media Handbuch.pdf` ergab ein gutes Dutzend
+//  beschriebener, nie gebauter Funktionen. Die Gegenstücke auf der Website
+//  stehen in web/server/sync-handlers.js unter derselben Überschrift.
+// ===========================================================================
+
+// ------------------------------------------------------------- Insights --
+//
+//  Zur Begriffsklärung, weil sie im Code schon einmal schiefging: ein
+//  *Insight* ist ein Foto oder Video, das an ausgewählte Personen geht — das
+//  Snapchat-Äquivalent. Die *Insight Time* zählt die Tage in Folge, an denen
+//  sich beide Seiten gegenseitig einen geschickt haben. Die *Insights* im
+//  Einstellungsmenü sind etwas völlig anderes: Statistik zum eigenen Profil.
+
+export interface NeuerInsight {
+  mediaUrl: string;
+  mediaTyp?: 'image' | 'video';
+  filter?: string;
+  /** Anzeigedauer in Sekunden; 0 heißt unbegrenzt ansehen. */
+  dauer?: number;
+  /** Nach dem ersten Öffnen verschwunden. */
+  einmal?: boolean;
+  /** Selbstlöschend: nach so vielen Stunden ist die Aufnahme ganz weg. */
+  loeschtNachStunden?: number;
+  /** Bei sich selbst behalten. */
+  gespeichert?: boolean;
+}
+
+/**
+ * Einen Insight an mehrere Personen schicken und die Ketten fortschreiben.
+ *
+ * Die Kette rechnet die Datenbank aus (`insight_streak_fortschreiben`), nicht
+ * die App. Sonst stünde die Regel „Tage in Folge, an denen beide gesendet
+ * haben" zweimal da — hier und in der Website — und liefe beim ersten
+ * Zahlendreher auseinander.
+ */
+export async function insightSenden(
+  client: SupabaseClient,
+  ichId: string,
+  empfaenger: string[],
+  felder: NeuerInsight
+): Promise<{ id: string; streaks: Record<string, number> }> {
+  if (!empfaenger.length) throw new Error('Ohne Empfänger geht kein Insight raus');
+
+  const ablauf = felder.loeschtNachStunden
+    ? new Date(Date.now() + felder.loeschtNachStunden * 3600_000).toISOString()
+    : null;
+
+  const { data, error } = await client
+    .from('insights')
+    .insert({
+      sender_id: ichId,
+      media_url: felder.mediaUrl,
+      media_type: felder.mediaTyp || 'image',
+      filter: felder.filter || '',
+      dauer: felder.dauer ?? 0,
+      einmal: felder.einmal ?? true,
+      ablauf_at: ablauf,
+      gespeichert: felder.gespeichert ?? false,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+
+  const id = (data as { id: string }).id;
+
+  const { error: fehlerEmpfaenger } = await client
+    .from('insight_recipients')
+    .insert(empfaenger.map((user_id) => ({ insight_id: id, user_id })));
+  if (fehlerEmpfaenger) throw fehlerEmpfaenger;
+
+  // Für jeden Empfänger die Kette fortschreiben. Schlägt eine fehl, ist der
+  // Insight trotzdem angekommen — die Zahl daneben ist dann nur eine Weile
+  // veraltet. Das Senden daran scheitern zu lassen wäre die schlechtere Wahl.
+  const streaks: Record<string, number> = {};
+  for (const partner of empfaenger) {
+    const { data: tage, error: fehlerStreak } = await client.rpc(
+      'insight_streak_fortschreiben',
+      { partner }
+    );
+    if (fehlerStreak) {
+      console.warn('Insight Time nicht fortgeschrieben:', fehlerStreak.message);
+      continue;
+    }
+    streaks[partner] = (tage as number) ?? 0;
+  }
+
+  return { id, streaks };
+}
+
+/**
+ * Einen empfangenen Insight als gesehen vermerken.
+ *
+ * Bei Einmalansicht ist er danach vorbei — deshalb wird der Zeitpunkt
+ * gesetzt und nicht nur ein Schalter umgelegt: so lässt sich später sagen,
+ * wann er verbraucht wurde, ohne die Zeile zu löschen.
+ */
+export async function insightGesehen(
+  client: SupabaseClient,
+  ichId: string,
+  insightId: string
+) {
+  const { error } = await client
+    .from('insight_recipients')
+    .update({ gesehen_at: new Date().toISOString() })
+    .eq('insight_id', insightId)
+    .eq('user_id', ichId);
+  if (error) throw error;
+  return true;
+}
+
+/** Einen eigenen Insight behalten oder das Behalten zurücknehmen. */
+export async function insightSpeichern(
+  client: SupabaseClient,
+  ichId: string,
+  insightId: string,
+  behalten: boolean
+) {
+  const { error } = await client
+    .from('insights')
+    .update({ gespeichert: behalten })
+    .eq('id', insightId)
+    .eq('sender_id', ichId);
+  if (error) throw error;
+  return behalten;
+}
+
+/**
+ * Einen Insight noch einmal schicken — an dieselben oder an andere.
+ *
+ * Das Handbuch nennt das „Insights wiederholen". Es wird bewusst ein neuer
+ * Insight angelegt und nicht die Empfängerliste des alten erweitert: sonst
+ * bekäme jemand eine Aufnahme, deren Einmalansicht ein anderer schon
+ * verbraucht hat.
+ */
+export async function insightWiederholen(
+  client: SupabaseClient,
+  ichId: string,
+  insightId: string,
+  empfaenger: string[]
+) {
+  const { data, error } = await client
+    .from('insights')
+    .select('media_url, media_type, filter, dauer, einmal')
+    .eq('id', insightId)
+    .eq('sender_id', ichId)
+    .single();
+  if (error) throw error;
+
+  const alt = data as {
+    media_url: string;
+    media_type: 'image' | 'video';
+    filter: string;
+    dauer: number;
+    einmal: boolean;
+  };
+
+  return insightSenden(client, ichId, empfaenger, {
+    mediaUrl: alt.media_url,
+    mediaTyp: alt.media_type,
+    filter: alt.filter,
+    dauer: alt.dauer,
+    einmal: alt.einmal,
+  });
+}
+
+/** Jemanden in die feste Empfängerliste aufnehmen — oder wieder heraus. */
+export function insightZiel(client: SupabaseClient, ichId: string, zielId: string) {
+  return umschalten(client, 'insight_targets', { user_id: ichId, target_id: zielId });
+}
+
+// ------------------------------------------------ Nachrichten-Werkzeuge --
+
+/**
+ * Eine eigene Nachricht ändern.
+ *
+ * `edited_at` wird mitgesetzt, damit in der Blase „bearbeitet" stehen kann.
+ * Eine stille Änderung wäre schlimmer als gar keine: das Gegenüber erinnert
+ * sich an einen anderen Text und findet ihn nicht wieder.
+ */
+export async function nachrichtBearbeiten(
+  client: SupabaseClient,
+  ichId: string,
+  nachrichtId: string,
+  text: string
+) {
+  const { error } = await client
+    .from('messages')
+    .update({ text, edited_at: new Date().toISOString() })
+    .eq('id', nachrichtId)
+    .eq('sender_id', ichId);
+  if (error) throw error;
+  return true;
+}
+
+/**
+ * Eine eigene Nachricht zurücknehmen.
+ *
+ * Die Zeile bleibt stehen und bekommt nur `deleted_at`. Würde sie gelöscht,
+ * verlören Antworten und Zitate ihren Bezug und stünden ohne Anlass da.
+ */
+export async function nachrichtZuruecknehmen(
+  client: SupabaseClient,
+  ichId: string,
+  nachrichtId: string
+) {
+  const { error } = await client
+    .from('messages')
+    .update({ deleted_at: new Date().toISOString(), text: '' })
+    .eq('id', nachrichtId)
+    .eq('sender_id', ichId);
+  if (error) throw error;
+  return true;
+}
+
+/**
+ * Eine Nachricht in andere Chats weiterleiten.
+ *
+ * `forwarded_from` merkt sich, von wem sie ursprünglich stammt — ohne das
+ * sähe eine weitergeleitete Nachricht aus wie eine selbst geschriebene.
+ */
+export async function nachrichtWeiterleiten(
+  client: SupabaseClient,
+  ichId: string,
+  nachrichtId: string,
+  chatIds: string[]
+) {
+  if (!chatIds.length) throw new Error('Kein Ziel gewählt');
+
+  const { data, error } = await client
+    .from('messages')
+    .select('text, media_url, media_type, file_name, file_size, sender_id')
+    .eq('id', nachrichtId)
+    .single();
+  if (error) throw error;
+
+  const alt = data as {
+    text: string;
+    media_url: string | null;
+    media_type: string | null;
+    file_name: string | null;
+    file_size: number | null;
+    sender_id: string;
+  };
+
+  const { error: fehler } = await client.from('messages').insert(
+    chatIds.map((chat_id) => ({
+      chat_id,
+      sender_id: ichId,
+      text: alt.text,
+      media_url: alt.media_url,
+      media_type: alt.media_type,
+      file_name: alt.file_name,
+      file_size: alt.file_size,
+      forwarded_from: alt.sender_id,
+    }))
+  );
+  if (fehler) throw fehler;
+
+  // Damit die Chats in der Liste nach oben rutschen.
+  await client
+    .from('chats')
+    .update({ updated_at: new Date().toISOString() })
+    .in('id', chatIds);
+
+  return chatIds.length;
+}
+
+/**
+ * Eine Reaktion setzen, wechseln oder wegnehmen.
+ *
+ * Eine Person hat je Nachricht genau eine Reaktion — daher der
+ * Primärschlüssel ohne Emoji. Wer dasselbe Emoji noch einmal antippt, nimmt
+ * es weg; ein anderes ersetzt das alte.
+ */
+export async function nachrichtReaktion(
+  client: SupabaseClient,
+  ichId: string,
+  nachrichtId: string,
+  emoji: string
+): Promise<string | null> {
+  const { data, error } = await client
+    .from('message_reactions')
+    .select('emoji')
+    .eq('message_id', nachrichtId)
+    .eq('user_id', ichId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const bisher = (data as { emoji: string } | null)?.emoji ?? null;
+
+  if (bisher === emoji) {
+    const { error: fehler } = await client
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', nachrichtId)
+      .eq('user_id', ichId);
+    if (fehler) throw fehler;
+    return null;
+  }
+
+  const { error: fehler } = await client
+    .from('message_reactions')
+    .upsert({ message_id: nachrichtId, user_id: ichId, emoji });
+  if (fehler) throw fehler;
+  return emoji;
+}
+
+// -------------------------------------------------------------- Umfragen --
+
+export interface NeueUmfrage {
+  frage: string;
+  antworten: string[];
+  mehrfach?: boolean;
+  /** Läuft nach so vielen Stunden aus; leer heißt ohne Ende. */
+  endetNachStunden?: number;
+}
+
+/** Eine Umfrage an einen Beitrag, eine Story oder einen Kanal hängen. */
+export async function umfrageAnlegen(
+  client: SupabaseClient,
+  ichId: string,
+  traeger: { art: 'post' | 'story' | 'channel'; id: string },
+  felder: NeueUmfrage
+): Promise<string> {
+  const antworten = felder.antworten.map((t) => t.trim()).filter(Boolean);
+  if (!felder.frage.trim()) throw new Error('Die Frage fehlt');
+  if (antworten.length < 2) throw new Error('Eine Umfrage braucht mindestens zwei Antworten');
+
+  const { data, error } = await client
+    .from('polls')
+    .insert({
+      user_id: ichId,
+      traeger_art: traeger.art,
+      traeger_id: traeger.id,
+      frage: felder.frage.trim(),
+      mehrfach: felder.mehrfach ?? false,
+      ende_at: felder.endetNachStunden
+        ? new Date(Date.now() + felder.endetNachStunden * 3600_000).toISOString()
+        : null,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+
+  const id = (data as { id: string }).id;
+
+  const { error: fehler } = await client
+    .from('poll_options')
+    .insert(antworten.map((text, position) => ({ poll_id: id, text, position })));
+  if (fehler) throw fehler;
+
+  return id;
+}
+
+/**
+ * Abstimmen.
+ *
+ * Bei einfacher Wahl ersetzt die neue Stimme die alte — sonst könnte jemand
+ * für zwei Antworten gleichzeitig stimmen und die Summe wäre größer als die
+ * Zahl der Teilnehmer.
+ */
+export async function umfrageStimmen(
+  client: SupabaseClient,
+  ichId: string,
+  pollId: string,
+  optionId: string
+) {
+  const { data, error } = await client
+    .from('polls')
+    .select('mehrfach, ende_at')
+    .eq('id', pollId)
+    .single();
+  if (error) throw error;
+
+  const umfrage = data as { mehrfach: boolean; ende_at: string | null };
+  if (umfrage.ende_at && new Date(umfrage.ende_at) < new Date()) {
+    throw new Error('Diese Umfrage ist beendet');
+  }
+
+  if (!umfrage.mehrfach) {
+    const { error: fehlerAlt } = await client
+      .from('poll_votes')
+      .delete()
+      .eq('poll_id', pollId)
+      .eq('user_id', ichId)
+      .neq('option_id', optionId);
+    if (fehlerAlt) throw fehlerAlt;
+  }
+
+  return umschalten(client, 'poll_votes', {
+    poll_id: pollId,
+    option_id: optionId,
+    user_id: ichId,
+  });
+}
+
+// --------------------------------------------------- Sichtbarkeit (4x) --
+
+export type SichtbarkeitBereich =
+  | 'standort'
+  | 'story'
+  | 'repost'
+  | 'onlinestatus'
+  | 'ptt'
+  | 'likes'
+  | 'download'
+  | 'dm';
+
+export type SichtbarkeitStufe = 'niemand' | 'niemand_bis_auf' | 'alle_bis_auf' | 'alle';
+
+/**
+ * Eine Sichtbarkeitsstufe setzen.
+ *
+ * Vier Stufen, nicht drei. Bis zum 01.09.2026 stand in App und Website
+ * überall „Alle / Meine Kontakte / Niemand" — die beiden mittleren Stufen
+ * des Handbuchs fehlten, und mit ihnen die Ausnahmelisten. „Alle bis auf
+ * meinen Chef" ließ sich schlicht nicht ausdrücken.
+ */
+export async function sichtbarkeitSetzen(
+  client: SupabaseClient,
+  ichId: string,
+  bereich: SichtbarkeitBereich,
+  stufe: SichtbarkeitStufe
+) {
+  const { error } = await client
+    .from('visibility_settings')
+    .upsert(
+      { user_id: ichId, bereich, stufe, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,bereich' }
+    );
+  if (error) throw error;
+
+  // Ohne Ausnahme ist „bis auf" sinnlos, aber die Liste bleibt trotzdem
+  // stehen: wer von „Alle bis auf" auf „Alle" und wieder zurück schaltet,
+  // will seine mühsam zusammengesuchten Namen wiederfinden.
+  return stufe;
+}
+
+/** Jemanden auf die Ausnahmeliste setzen — oder herunternehmen. */
+export function sichtbarkeitAusnahme(
+  client: SupabaseClient,
+  ichId: string,
+  bereich: SichtbarkeitBereich,
+  zielId: string
+) {
+  return umschalten(client, 'visibility_exceptions', {
+    user_id: ichId,
+    bereich,
+    target_id: zielId,
+  });
+}
+
+// ------------------------------------------------------- Altersschutz --
+
+/**
+ * Geburtsdatum setzen und, falls nötig, den Erziehungsberechtigten anfragen.
+ *
+ * Das Handbuch: unter 16 nur mit Zustimmung eines Erziehungsberechtigten,
+ * und der muss selbst einen All-Media-Account besitzen. Genau deshalb wird
+ * hier eine Profil-Kennung verlangt und keine E-Mail-Adresse — eine Adresse
+ * kann jeder erfinden.
+ */
+export async function altersangabe(
+  client: SupabaseClient,
+  ichId: string,
+  geburtsdatum: string,
+  guardianHandle?: string
+): Promise<{ alter: number; brauchtFreigabe: boolean; guardian: string | null }> {
+  const geboren = new Date(geburtsdatum);
+  if (Number.isNaN(geboren.getTime())) throw new Error('Das Geburtsdatum ist ungültig');
+
+  const jetzt = new Date();
+  let alter = jetzt.getFullYear() - geboren.getFullYear();
+  const monat = jetzt.getMonth() - geboren.getMonth();
+  if (monat < 0 || (monat === 0 && jetzt.getDate() < geboren.getDate())) alter--;
+
+  if (alter < 0 || alter > 120) throw new Error('Das Geburtsdatum ist unglaubwürdig');
+
+  const brauchtFreigabe = alter < 16;
+  let guardianId: string | null = null;
+
+  if (brauchtFreigabe) {
+    if (!guardianHandle) {
+      throw new Error(
+        'Unter 16 braucht es einen Erziehungsberechtigten mit eigenem All-Media-Konto'
+      );
+    }
+    const { data, error } = await client
+      .from('profiles')
+      .select('id')
+      .eq('handle', guardianHandle.replace(/^@/, ''))
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Zu diesem Nutzernamen gibt es kein All-Media-Konto');
+    guardianId = (data as { id: string }).id;
+    if (guardianId === ichId) throw new Error('Das eigene Konto geht nicht');
+  }
+
+  const { error } = await client
+    .from('profiles')
+    .update({
+      geburtsdatum,
+      guardian_id: guardianId,
+      guardian_status: brauchtFreigabe ? 'angefragt' : 'keiner',
+    })
+    .eq('id', ichId);
+  if (error) throw error;
+
+  return { alter, brauchtFreigabe, guardian: guardianId };
+}
+
+/** Als Erziehungsberechtigte(r) zustimmen oder ablehnen. */
+export async function freigabeEntscheiden(
+  client: SupabaseClient,
+  ichId: string,
+  kindId: string,
+  zustimmen: boolean
+) {
+  const { error } = await client
+    .from('profiles')
+    .update({ guardian_status: zustimmen ? 'bestaetigt' : 'abgelehnt' })
+    .eq('id', kindId)
+    .eq('guardian_id', ichId);
+  if (error) throw error;
+  return zustimmen;
+}
+
+// --------------------------------------------------------- Wortfilter --
+
+/**
+ * Enthält der Text ein Wort von der Filterliste?
+ *
+ * Gibt das gefundene Wort und die Schwere zurück, oder null. Die Liste steht
+ * in der Datenbank, damit sie sich ändern lässt, ohne App und Website neu
+ * auszurollen.
+ *
+ * Die Prüfung läuft auf Wortgrenzen. Ohne das würde „Spastik" als Verstoß
+ * gelten und ein medizinischer Beitrag ließe sich nicht schreiben.
+ */
+/*
+ * `_ichId` wird nicht gebraucht — der Filter gilt für alle gleich. Der
+ * Platzhalter steht trotzdem da, weil jede andere der einundsechzig Aktionen
+ * in dieser Datei (client, ichId, …) heißt. Als einzige Ausnahme war das eine
+ * Falle: der erste Prüflauf, der sie aufrief, schob ihr die Nutzerkennung als
+ * zu prüfenden Text unter und meldete brav „kein Treffer".
+ */
+export async function wortfilter(
+  client: SupabaseClient,
+  _ichId: string,
+  text: string
+): Promise<{ wort: string; schwere: string } | null> {
+  if (!text.trim()) return null;
+
+  const { data, error } = await client.from('filter_words').select('wort, schwere');
+  if (error) throw error;
+
+  const woerter = (data as { wort: string; schwere: string }[]) || [];
+  const klein = text.toLowerCase();
+
+  for (const eintrag of woerter) {
+    const muster = new RegExp(
+      `(^|[^a-zäöüß])${eintrag.wort.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-zäöüß]|$)`,
+      'i'
+    );
+    if (muster.test(klein)) return eintrag;
+  }
+  return null;
+}
+
+// ------------------------------------------------------- Push-to-Talk --
+
+/**
+ * Eine Push-to-Talk-Nachricht an eine Community schicken.
+ *
+ * Bis zum 01.09.2026 war Push-to-Talk ein Ein/Aus-Schalter in den
+ * Einstellungen — geschickt wurde damit nie etwas. Im Handbuch ist es eine
+ * Funktion: eine Sprachnachricht an alle Mitglieder, gedacht für
+ * Gruppenanrufe und für Momente außergewöhnlich hoher Aktivität.
+ */
+export async function pttSenden(
+  client: SupabaseClient,
+  ichId: string,
+  communityId: string,
+  audioUrl: string,
+  dauer: number,
+  channelId?: string | null
+) {
+  const { data, error } = await client
+    .from('ptt_messages')
+    .insert({
+      community_id: communityId,
+      channel_id: channelId || null,
+      sender_id: ichId,
+      audio_url: audioUrl,
+      dauer: Math.max(0, Math.round(dauer)),
+    })
+    .select('id, created_at')
+    .single();
+  if (error) throw error;
+  return data as { id: string; created_at: string };
+}
+
+// -------------------------------------------- Livestream: Kommentare ----
+
+/** Einen Kommentar in die Live-Spalte schreiben. */
+export async function streamKommentar(
+  client: SupabaseClient,
+  ichId: string,
+  postId: string,
+  text: string
+) {
+  if (!text.trim()) throw new Error('Leerer Kommentar');
+  const { data, error } = await client
+    .from('stream_comments')
+    .insert({ post_id: postId, user_id: ichId, text: text.trim() })
+    .select('id, created_at')
+    .single();
+  if (error) throw error;
+  return data as { id: string; created_at: string };
+}
+
+/**
+ * Spenden — an ein Profil, während eines Streams oder über einen Spendenlink.
+ *
+ * Der Betrag steht in Cent, damit nichts gerundet wird. Eine echte Zahlung
+ * läuft hier nicht: der Spendencode aus den Einstellungen verweist auf
+ * Bankkarte oder PayPal, die Buchung passiert dort. Hier wird festgehalten,
+ * dass sie stattgefunden hat.
+ */
+export async function spenden(
+  client: SupabaseClient,
+  ichId: string,
+  empfaengerId: string,
+  betragCent: number,
+  postId?: string | null,
+  nachricht?: string
+) {
+  if (!Number.isFinite(betragCent) || betragCent <= 0) {
+    throw new Error('Der Betrag muss größer als null sein');
+  }
+  if (empfaengerId === ichId) throw new Error('An sich selbst geht keine Spende');
+
+  const { data, error } = await client
+    .from('donations')
+    .insert({
+      post_id: postId || null,
+      empfaenger_id: empfaengerId,
+      sender_id: ichId,
+      betrag_cent: Math.round(betragCent),
+      nachricht: nachricht || '',
+    })
+    .select('id, created_at')
+    .single();
+  if (error) throw error;
+  return data as { id: string; created_at: string };
+}
+
+// ------------------------------------------------------ Standortanfrage --
+
+/** Den Standort von jemandem anfragen — aus dem Privatchat heraus. */
+export async function standortAnfragen(
+  client: SupabaseClient,
+  ichId: string,
+  chatId: string,
+  zielId: string
+) {
+  const { data, error } = await client
+    .from('location_requests')
+    .insert({ chat_id: chatId, sender_id: ichId, ziel_id: zielId })
+    .select('id, created_at')
+    .single();
+  if (error) throw error;
+  return data as { id: string; created_at: string };
+}
+
+/**
+ * Eine Standortanfrage beantworten.
+ *
+ * `stunden` begrenzt die Freigabe. Ohne Angabe gilt sie ohne Frist — beides
+ * steht so im Handbuch („Begrenzter Live-Standort/Live-Standort ohne Frist").
+ */
+export async function standortAntwort(
+  client: SupabaseClient,
+  ichId: string,
+  anfrageId: string,
+  annehmen: boolean,
+  stunden?: number
+) {
+  const { error } = await client
+    .from('location_requests')
+    .update({
+      zustand: annehmen ? 'angenommen' : 'abgelehnt',
+      bis_at: annehmen && stunden ? new Date(Date.now() + stunden * 3600_000).toISOString() : null,
+    })
+    .eq('id', anfrageId)
+    .eq('ziel_id', ichId);
+  if (error) throw error;
+  return annehmen;
+}
+
+/**
+ * Gibt es eine Community mit diesem Namen schon — irgendwo?
+ *
+ * Das Handbuch verlangt einen „Filter gegen Erstellung an Communitys, die
+ * schon vorhanden sind". Bis zum 01.09.2026 prüfte die App nur die eigenen:
+ * wer einer Community nicht beigetreten war, legte sie fröhlich ein zweites
+ * Mal an, und beide standen danach nebeneinander in der Suche.
+ *
+ * Verglichen wird ohne Rücksicht auf Groß- und Kleinschreibung. „Kochen" und
+ * „kochen" sind für jeden, der sucht, dieselbe Community.
+ */
+export async function communityNameFrei(
+  client: SupabaseClient,
+  name: string
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('communities')
+    .select('id')
+    .ilike('name', name.trim())
+    .limit(1);
+  if (error) throw error;
+  return ((data ?? []) as unknown[]).length === 0;
 }

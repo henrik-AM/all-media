@@ -47,6 +47,10 @@ const LEER: AlleDaten = {
   highlights: [],
   playlists: [],
   spende: null,
+  insights: [],
+  insightStreaks: {},
+  insightZiele: [],
+  sichtbarkeit: {},
   ichId: '',
   geladen: '',
 };

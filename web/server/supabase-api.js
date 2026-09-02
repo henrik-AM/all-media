@@ -320,6 +320,7 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     .from('messages')
     .select(
       'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
+      ' reply_to, quote_of, forwarded_from, edited_at, deleted_at, file_name, file_size,' +
       ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name)),' +
       ' place_id, places(id, name, adresse, koordinaten, x, y),' +
       ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)'
@@ -332,7 +333,54 @@ async function ladeNachrichten(client, chatId, nutzerId) {
   const { data, error } = await abfrage;
   if (error) throw error;
 
-  return (data || []).map((n) => ({
+  const zeilen = data || [];
+
+  /*
+   * Bezug, Reaktionen und Namen in einem Zug nachladen — gleiche Regel wie in
+   * app/lib/daten.ts. Je Nachricht eine eigene Abfrage waeren bei einem Chat
+   * mit vielen Antworten hunderte, und das Oeffnen dauerte Sekunden.
+   */
+  const bezugIds = [...new Set(zeilen.flatMap((n) => [n.reply_to, n.quote_of]).filter(Boolean))];
+  let bezugZeilen = [];
+  if (bezugIds.length) {
+    const { data: gefunden } = await client
+      .from('messages')
+      .select('id, text, sender_id')
+      .in('id', bezugIds);
+    bezugZeilen = gefunden || [];
+  }
+
+  const reaktionen = new Map();
+  if (zeilen.length) {
+    const { data: reakZeilen } = await client
+      .from('message_reactions')
+      .select('message_id, user_id, emoji')
+      .in('message_id', zeilen.map((n) => n.id));
+    for (const r of reakZeilen || []) {
+      const liste = reaktionen.get(r.message_id) || [];
+      liste.push({ userId: r.user_id === nutzerId ? 'me' : r.user_id, emoji: r.emoji });
+      reaktionen.set(r.message_id, liste);
+    }
+  }
+
+  const weiterIds = zeilen.map((n) => n.forwarded_from).filter(Boolean);
+  const namenIds = [...new Set([...weiterIds, ...bezugZeilen.map((b) => b.sender_id)])];
+  const namen = new Map();
+  if (namenIds.length) {
+    const { data: profile } = await client.from('profiles').select('id, name').in('id', namenIds);
+    for (const p of profile || []) namen.set(p.id, p.name);
+  }
+
+  const bezug = new Map();
+  for (const b of bezugZeilen) {
+    bezug.set(b.id, {
+      id: b.id,
+      text: b.text || '',
+      autor: b.sender_id === nutzerId ? 'Du' : namen.get(b.sender_id) || '',
+    });
+  }
+
+  return zeilen.map((n) => ({
     id: n.id,
     chatId: n.chat_id,
     // Die Oberfläche erkennt eigene Nachrichten an der Kennung "me".
@@ -372,6 +420,18 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     kontakt: n.profiles
       ? { id: n.profiles.id, name: n.profiles.name, handle: n.profiles.handle }
       : undefined,
+    /*
+     * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026). Antwort und
+     * Zitat sind getrennt: eine Antwort zeigt nur den Bezug, ein Zitat nimmt
+     * den Text mit. Auf einer Spalte liessen sie sich nicht unterscheiden.
+     */
+    antwortAuf: n.reply_to ? bezug.get(n.reply_to) : undefined,
+    zitat: n.quote_of ? bezug.get(n.quote_of) : undefined,
+    weitergeleitetVon: n.forwarded_from ? namen.get(n.forwarded_from) : undefined,
+    bearbeitet: Boolean(n.edited_at),
+    zurueckgenommen: Boolean(n.deleted_at),
+    reaktionen: reaktionen.get(n.id),
+    datei: n.file_name ? { name: n.file_name, groesse: Number(n.file_size || 0) } : undefined,
   }));
 }
 
@@ -484,6 +544,9 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
   let abfrage = client
     .from('posts')
     .select(BEITRAG_SPALTEN)
+    // Geplante Beiträge ("später posten") bleiben draußen, bis ihr Zeitpunkt
+    // erreicht ist. Gleiche Regel wie in app/lib/daten.ts.
+    .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (arten && arten.length > 0) abfrage = abfrage.in('kind', arten);
@@ -747,6 +810,10 @@ async function bootstrapData(client, nutzerId) {
     folgen,
     blockiert,
     stumm,
+    insights,
+    insightStreaks,
+    insightZiele,
+    sichtbarkeit,
   ] = await Promise.all([
     ladeNutzer(client, nutzerId),
     ladeKontakte(client, nutzerId),
@@ -763,6 +830,10 @@ async function bootstrapData(client, nutzerId) {
     ladeFolgen(client, nutzerId),
     ladeBlockiert(client, nutzerId),
     ladeStummgeschaltet(client, nutzerId),
+    ladeInsights(client, nutzerId),
+    ladeInsightStreaks(client, nutzerId),
+    ladeInsightZiele(client, nutzerId),
+    ladeSichtbarkeit(client, nutzerId),
   ]);
 
   // "Folge ich dieser Person?" für jede bekannte Person.
@@ -791,6 +862,15 @@ async function bootstrapData(client, nutzerId) {
     gefolgt,
     blockiert,
     stummgeschaltet: stumm,
+    /*
+     * Insight Time und was dazugehört (Handbuch-Abgleich 01.09.2026).
+     * Nicht zu verwechseln mit den „Insights" im Einstellungsmenü — das ist
+     * Statistik zum eigenen Profil.
+     */
+    insights,
+    insightStreaks,
+    insightZiele,
+    sichtbarkeit,
     privateProfile: Object.values(nutzer).filter((u) => u.privat).map((u) => u.id),
     ungelesen: {
       videos: benachrichtigungen.filter((b) => b.bereich === 'videos' && !b.gelesen).length,
@@ -811,6 +891,260 @@ async function bootstrapData(client, nutzerId) {
     quelle: 'supabase',
     timestamp: new Date().toISOString(),
   };
+}
+
+
+// ============================================================================
+// Was das Handbuch verlangt — nachgetragen am 01.09.2026
+//
+// Die Gegenstücke in der App stehen in app/lib/daten.ts.
+// ============================================================================
+
+/**
+ * Die eigenen Insight Times: Tage in Folge, je Person.
+ *
+ * `heuteGesendet` und `heuteEmpfangen` kommen mit, damit die Chatliste die
+ * Zahl grau zeigen kann, solange der Tag noch nicht vollständig ist — sonst
+ * sähe eine Kette, die gleich reißt, aus wie eine sichere.
+ */
+async function ladeInsightStreaks(client, nutzerId) {
+  const { data, error } = await client
+    .from('insight_streaks')
+    .select('user_a, user_b, tage, letzter_tag, a_gesendet, b_gesendet')
+    .or(`user_a.eq.${nutzerId},user_b.eq.${nutzerId}`);
+  if (error) throw error;
+
+  const heute = new Date().toISOString().slice(0, 10);
+  const gestern = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const raus = {};
+
+  for (const z of data || []) {
+    const ichBinA = z.user_a === nutzerId;
+    const partner = ichBinA ? z.user_b : z.user_a;
+    const meins = ichBinA ? z.a_gesendet : z.b_gesendet;
+    const seins = ichBinA ? z.b_gesendet : z.a_gesendet;
+
+    // Liegt der letzte vollständige Tag vor gestern, ist die Kette gerissen —
+    // auch wenn in der Zeile noch eine Zahl steht. Zurückgesetzt wird sie
+    // erst beim nächsten Senden.
+    const lebt = z.letzter_tag === heute || z.letzter_tag === gestern;
+
+    raus[partner] = {
+      userId: partner,
+      tage: lebt ? z.tage || 0 : 0,
+      heuteGesendet: meins === heute,
+      heuteEmpfangen: seins === heute,
+    };
+  }
+  return raus;
+}
+
+/** Die feste Empfängerliste für Insights. */
+async function ladeInsightZiele(client, nutzerId) {
+  const { data, error } = await client
+    .from('insight_targets')
+    .select('target_id')
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+  return (data || []).map((z) => z.target_id);
+}
+
+/**
+ * Empfangene Insights, die noch offen sind.
+ *
+ * Abgelaufene und bei Einmalansicht schon geöffnete bleiben draußen — sie
+ * wären nur eine Zeile, die beim Antippen nichts zeigt.
+ */
+async function ladeInsights(client, nutzerId) {
+  const { data, error } = await client
+    .from('insight_recipients')
+    .select(
+      'insight_id, gesehen_at,' +
+      ' insights(id, sender_id, media_url, media_type, filter, dauer, einmal, gespeichert, ablauf_at, created_at)'
+    )
+    .eq('user_id', nutzerId)
+    .limit(200);
+  if (error) throw error;
+
+  const jetzt = Date.now();
+  return (data || [])
+    .filter((z) => z.insights)
+    .filter((z) => !z.insights.ablauf_at || new Date(z.insights.ablauf_at).getTime() > jetzt)
+    .filter((z) => !(z.insights.einmal && z.gesehen_at))
+    .map((z) => ({
+      id: z.insights.id,
+      senderId: z.insights.sender_id === nutzerId ? 'me' : z.insights.sender_id,
+      mediaUrl: z.insights.media_url,
+      mediaTyp: z.insights.media_type,
+      filter: z.insights.filter || '',
+      dauer: z.insights.dauer || 0,
+      einmal: z.insights.einmal,
+      gespeichert: z.insights.gespeichert,
+      zeit: zeitText(z.insights.created_at),
+      gesehen: Boolean(z.gesehen_at),
+    }));
+}
+
+/** Umfragen zu Beiträgen, Storys oder Kanälen — mit Stimmen und eigener Wahl. */
+async function ladeUmfragen(client, nutzerId, art, traegerIds) {
+  if (!traegerIds || !traegerIds.length) return {};
+
+  const { data, error } = await client
+    .from('polls')
+    /*
+     * "!poll_id" ist noetig, nicht Zierde. poll_votes zeigt auf polls UND auf
+     * poll_options; PostgREST liest daraus einen zweiten, indirekten Weg
+     * zwischen den beiden Tabellen und weigert sich dann mit "more than one
+     * relationship was found". Der Hinweis nennt die Spalte, ueber die
+     * verbunden werden soll — die Spalte und nicht den Namen des Fremd-
+     * schluessels, denn ein umbenannter Constraint waere hier ein stiller
+     * Ausfall aller Umfragen.
+     */
+    .select('id, traeger_id, frage, mehrfach, ende_at, poll_options!poll_id(id, text, position)')
+    .eq('traeger_art', art)
+    .in('traeger_id', traegerIds);
+  if (error) throw error;
+
+  const umfragen = data || [];
+  if (!umfragen.length) return {};
+
+  const { data: stimmen } = await client
+    .from('poll_votes')
+    .select('poll_id, option_id, user_id')
+    .in('poll_id', umfragen.map((u) => u.id));
+
+  const proOption = new Map();
+  const eigene = new Set();
+  for (const st of stimmen || []) {
+    proOption.set(st.option_id, (proOption.get(st.option_id) || 0) + 1);
+    if (st.user_id === nutzerId) eigene.add(st.option_id);
+  }
+
+  const raus = {};
+  for (const u of umfragen) {
+    const antworten = (u.poll_options || [])
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((o) => ({
+        id: o.id,
+        text: o.text,
+        stimmen: proOption.get(o.id) || 0,
+        gewaehlt: eigene.has(o.id),
+      }));
+
+    raus[u.traeger_id] = {
+      id: u.id,
+      frage: u.frage,
+      mehrfach: u.mehrfach,
+      endeAt: u.ende_at,
+      beendet: Boolean(u.ende_at && new Date(u.ende_at) < new Date()),
+      antworten,
+      gesamt: antworten.reduce((sum, a) => sum + a.stimmen, 0),
+    };
+  }
+  return raus;
+}
+
+/**
+ * Die eigenen Sichtbarkeitsstufen samt Ausnahmelisten.
+ *
+ * Fehlt ein Bereich, gilt „alle" — so verhalten sich Bestandskonten wie
+ * vorher, statt nach dem Einspielen plötzlich alles zu verbergen.
+ */
+async function ladeSichtbarkeit(client, nutzerId) {
+  const [{ data: stufen }, { data: ausnahmen }] = await Promise.all([
+    client.from('visibility_settings').select('bereich, stufe').eq('user_id', nutzerId),
+    client.from('visibility_exceptions').select('bereich, target_id').eq('user_id', nutzerId),
+  ]);
+
+  const raus = {};
+  for (const st of stufen || []) raus[st.bereich] = { stufe: st.stufe, ausnahmen: [] };
+  for (const a of ausnahmen || []) {
+    if (!raus[a.bereich]) raus[a.bereich] = { stufe: 'alle', ausnahmen: [] };
+    raus[a.bereich].ausnahmen.push(a.target_id);
+  }
+  return raus;
+}
+
+/** Der eigene Bann-Verlauf — mit Grund, wie das Handbuch es verlangt. */
+async function ladeBanne(client, nutzerId) {
+  const { data, error } = await client
+    .from('profile_bans')
+    .select('id, bereich, grund, ausloeser, von_at, bis_at, aufgehoben')
+    .eq('user_id', nutzerId)
+    .order('von_at', { ascending: false });
+  if (error) throw error;
+
+  const jetzt = Date.now();
+  return (data || []).map((b) => ({
+    id: b.id,
+    bereich: b.bereich,
+    grund: b.grund,
+    ausloeser: b.ausloeser || '',
+    von: zeitText(b.von_at),
+    bis: b.bis_at ? zeitText(b.bis_at) : null,
+    laeuft: !b.aufgehoben && (!b.bis_at || new Date(b.bis_at).getTime() > jetzt),
+  }));
+}
+
+/** Die Live-Kommentarspalte zu einem Stream. */
+async function ladeStreamKommentare(client, postId) {
+  const { data, error } = await client
+    .from('stream_comments')
+    .select('id, user_id, text, created_at, profiles(id, name)')
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+
+  return (data || []).map((k) => ({
+    id: k.id,
+    userId: k.user_id,
+    name: k.profiles?.name || '',
+    text: k.text,
+    zeit: chatZeit(k.created_at),
+  }));
+}
+
+/** Push-to-Talk-Nachrichten einer Community, neueste zuerst. */
+async function ladePtt(client, communityId) {
+  const { data, error } = await client
+    .from('ptt_messages')
+    .select('id, sender_id, audio_url, dauer, created_at, channel_id, profiles(id, name)')
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+
+  return (data || []).map((p) => ({
+    id: p.id,
+    userId: p.sender_id,
+    name: p.profiles?.name || '',
+    audioUrl: p.audio_url,
+    dauer: p.dauer || 0,
+    kanalId: p.channel_id,
+    zeit: chatZeit(p.created_at),
+  }));
+}
+
+/** Standortanfragen in einem Chat. */
+async function ladeStandortanfragen(client, chatId) {
+  const { data, error } = await client
+    .from('location_requests')
+    .select('id, sender_id, ziel_id, zustand, bis_at, created_at')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw error;
+
+  return (data || []).map((a) => ({
+    id: a.id,
+    senderId: a.sender_id,
+    zielId: a.ziel_id,
+    zustand: a.zustand,
+    bis: a.bis_at,
+    zeit: chatZeit(a.created_at),
+  }));
 }
 
 module.exports = {
@@ -836,4 +1170,15 @@ module.exports = {
   ladeStandorte,
   ladeBenachrichtigungen,
   bootstrapData,
+
+  // Handbuch-Abgleich 01.09.2026
+  ladeInsights,
+  ladeInsightStreaks,
+  ladeInsightZiele,
+  ladeUmfragen,
+  ladeSichtbarkeit,
+  ladeBanne,
+  ladeStreamKommentare,
+  ladePtt,
+  ladeStandortanfragen,
 };

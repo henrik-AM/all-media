@@ -24,7 +24,14 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 const EIMER = 'media';
 
-export type Ordner = 'messages' | 'stories' | 'avatars' | 'posts';
+/*
+ * Die Ablagen im Eimer `media`. `insights` und `ptt` kamen am 01.09.2026
+ * dazu: ein Insight ist weder Nachricht noch Story, und eine
+ * Push-to-Talk-Aufnahme gehoert zu einer Community, nicht zu einem Chat.
+ * Getrennte Ordner, damit sich Aufraeumen und Ablauffristen spaeter je
+ * Gattung regeln lassen.
+ */
+export type Ordner = 'messages' | 'stories' | 'avatars' | 'posts' | 'insights' | 'ptt';
 
 export interface UploadErgebnis {
   success: boolean;

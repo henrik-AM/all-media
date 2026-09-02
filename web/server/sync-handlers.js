@@ -587,6 +587,13 @@ const handleSendMessage = handler(
         // mit Avatar. Ohne ihn stand im Chat nur "Standort: Zugspitze".
         place_id: medien.standortId || null,
         contact_user_id: medien.kontaktId || null,
+        // Bezug und Dateiangaben — Handbuch-Abgleich 01.09.2026. Eine Antwort
+        // zeigt den Bezug nur an, ein Zitat nimmt den Text mit; deshalb zwei
+        // Spalten und nicht eine.
+        reply_to: medien.antwortAuf || null,
+        quote_of: medien.zitatVon || null,
+        file_name: medien.dateiName || null,
+        file_size: medien.dateiGroesse || null,
       })
       .select()
       .single();
@@ -632,6 +639,9 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       media_url: felder.mediaUrl || null,
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,
+      // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag
+      // zurück, bis er erreicht ist (ladeBeitraege filtert danach).
+      publish_at: felder.geplantAb || null,
     })
     .select()
     .single();
@@ -889,6 +899,560 @@ const handleMarkChatFavorite = handler('Chat-Favorit', async (client, nutzerId, 
   return { ok: true, favorit: neu };
 });
 
+
+// ===========================================================================
+//  Was das Handbuch verlangt — nachgetragen am 01.09.2026
+//
+//  Die Gegenstücke in der App stehen in app/lib/aktionen.ts unter derselben
+//  Überschrift. Gleiche Tabellen, gleiche Spalten, gleiche Regeln — wer hier
+//  etwas ändert, muss dort nachsehen.
+// ===========================================================================
+
+// ------------------------------------------------------------- Insights --
+//
+//  Zur Begriffsklärung: ein *Insight* ist ein Foto oder Video, das an
+//  ausgewählte Personen geht — das Snapchat-Äquivalent. Die *Insight Time*
+//  zählt die Tage in Folge, an denen sich beide Seiten gegenseitig einen
+//  geschickt haben. Die „Insights" im Einstellungsmenü sind etwas anderes:
+//  Statistik zum eigenen Profil.
+
+const handleInsightSenden = handler(
+  'Insight senden',
+  async (client, nutzerId, empfaenger, felder = {}) => {
+    if (!Array.isArray(empfaenger) || !empfaenger.length) {
+      return { ok: false, fehler: 'Ohne Empfänger geht kein Insight raus' };
+    }
+
+    const ablauf = felder.loeschtNachStunden
+      ? new Date(Date.now() + felder.loeschtNachStunden * 3600000).toISOString()
+      : null;
+
+    const { data, error } = await client
+      .from('insights')
+      .insert({
+        sender_id: nutzerId,
+        media_url: felder.mediaUrl,
+        media_type: felder.mediaTyp || 'image',
+        filter: felder.filter || '',
+        dauer: felder.dauer || 0,
+        einmal: felder.einmal !== false,
+        ablauf_at: ablauf,
+        gespeichert: Boolean(felder.gespeichert),
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+
+    const { error: fehlerEmpfaenger } = await client
+      .from('insight_recipients')
+      .insert(empfaenger.map((user_id) => ({ insight_id: data.id, user_id })));
+    if (fehlerEmpfaenger) throw fehlerEmpfaenger;
+
+    // Die Kette rechnet die Datenbank aus, damit die Regel nicht zweimal
+    // dasteht. Scheitert sie, ist der Insight trotzdem angekommen.
+    const streaks = {};
+    for (const partner of empfaenger) {
+      const { data: tage, error: fehlerStreak } = await client.rpc(
+        'insight_streak_fortschreiben',
+        { partner }
+      );
+      if (fehlerStreak) {
+        console.warn('Insight Time nicht fortgeschrieben:', fehlerStreak.message);
+        continue;
+      }
+      streaks[partner] = tage || 0;
+    }
+
+    return { ok: true, id: data.id, streaks };
+  }
+);
+
+const handleInsightGesehen = handler('Insight ansehen', async (client, nutzerId, insightId) => {
+  const { error } = await client
+    .from('insight_recipients')
+    .update({ gesehen_at: new Date().toISOString() })
+    .eq('insight_id', insightId)
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+  return { ok: true };
+});
+
+const handleInsightSpeichern = handler(
+  'Insight behalten',
+  async (client, nutzerId, insightId, behalten) => {
+    const { error } = await client
+      .from('insights')
+      .update({ gespeichert: Boolean(behalten) })
+      .eq('id', insightId)
+      .eq('sender_id', nutzerId);
+    if (error) throw error;
+    return { ok: true, gespeichert: Boolean(behalten) };
+  }
+);
+
+/*
+ * „Insights wiederholen" aus dem Handbuch. Es wird bewusst ein neuer Insight
+ * angelegt und nicht die Empfängerliste des alten erweitert — sonst bekäme
+ * jemand eine Aufnahme, deren Einmalansicht ein anderer schon verbraucht hat.
+ */
+const handleInsightWiederholen = handler(
+  'Insight wiederholen',
+  async (client, nutzerId, insightId, empfaenger) => {
+    const { data, error } = await client
+      .from('insights')
+      .select('media_url, media_type, filter, dauer, einmal')
+      .eq('id', insightId)
+      .eq('sender_id', nutzerId)
+      .single();
+    if (error) throw error;
+
+    return handleInsightSenden(client, nutzerId, empfaenger, {
+      mediaUrl: data.media_url,
+      mediaTyp: data.media_type,
+      filter: data.filter,
+      dauer: data.dauer,
+      einmal: data.einmal,
+    });
+  }
+);
+
+const handleInsightZiel = handler('Empfängerliste', async (client, nutzerId, zielId) => {
+  const drin = await umschalten(client, 'insight_targets', {
+    user_id: nutzerId,
+    target_id: zielId,
+  });
+  return { ok: true, drin };
+});
+
+// ------------------------------------------------ Nachrichten-Werkzeuge --
+
+const handleNachrichtBearbeiten = handler(
+  'Nachricht bearbeiten',
+  async (client, nutzerId, nachrichtId, text) => {
+    const { error } = await client
+      .from('messages')
+      .update({ text, edited_at: new Date().toISOString() })
+      .eq('id', nachrichtId)
+      .eq('sender_id', nutzerId);
+    if (error) throw error;
+    return { ok: true };
+  }
+);
+
+/*
+ * Zurücknehmen heißt: die Zeile bleibt stehen und bekommt deleted_at. Würde
+ * sie gelöscht, verlören Antworten und Zitate ihren Bezug.
+ */
+const handleNachrichtZuruecknehmen = handler(
+  'Nachricht zurücknehmen',
+  async (client, nutzerId, nachrichtId) => {
+    const { error } = await client
+      .from('messages')
+      .update({ deleted_at: new Date().toISOString(), text: '' })
+      .eq('id', nachrichtId)
+      .eq('sender_id', nutzerId);
+    if (error) throw error;
+    return { ok: true };
+  }
+);
+
+const handleNachrichtWeiterleiten = handler(
+  'Weiterleiten',
+  async (client, nutzerId, nachrichtId, chatIds) => {
+    if (!Array.isArray(chatIds) || !chatIds.length) {
+      return { ok: false, fehler: 'Kein Ziel gewählt' };
+    }
+
+    const { data, error } = await client
+      .from('messages')
+      .select('text, media_url, media_type, file_name, file_size, sender_id')
+      .eq('id', nachrichtId)
+      .single();
+    if (error) throw error;
+
+    const { error: fehler } = await client.from('messages').insert(
+      chatIds.map((chat_id) => ({
+        chat_id,
+        sender_id: nutzerId,
+        text: data.text,
+        media_url: data.media_url,
+        media_type: data.media_type,
+        file_name: data.file_name,
+        file_size: data.file_size,
+        forwarded_from: data.sender_id,
+      }))
+    );
+    if (fehler) throw fehler;
+
+    await client
+      .from('chats')
+      .update({ updated_at: new Date().toISOString() })
+      .in('id', chatIds);
+
+    return { ok: true, anzahl: chatIds.length };
+  }
+);
+
+/*
+ * Eine Person hat je Nachricht genau eine Reaktion. Dasselbe Emoji noch
+ * einmal nimmt es weg, ein anderes ersetzt das alte.
+ */
+const handleNachrichtReaktion = handler(
+  'Reaktion',
+  async (client, nutzerId, nachrichtId, emoji) => {
+    const { data, error } = await client
+      .from('message_reactions')
+      .select('emoji')
+      .eq('message_id', nachrichtId)
+      .eq('user_id', nutzerId)
+      .maybeSingle();
+    if (error) throw error;
+
+    if (data && data.emoji === emoji) {
+      const { error: fehler } = await client
+        .from('message_reactions')
+        .delete()
+        .eq('message_id', nachrichtId)
+        .eq('user_id', nutzerId);
+      if (fehler) throw fehler;
+      return { ok: true, emoji: null };
+    }
+
+    const { error: fehler } = await client
+      .from('message_reactions')
+      .upsert({ message_id: nachrichtId, user_id: nutzerId, emoji });
+    if (fehler) throw fehler;
+    return { ok: true, emoji };
+  }
+);
+
+// -------------------------------------------------------------- Umfragen --
+
+const handleUmfrageAnlegen = handler(
+  'Umfrage anlegen',
+  async (client, nutzerId, traegerArt, traegerId, felder = {}) => {
+    const antworten = (felder.antworten || []).map((t) => String(t).trim()).filter(Boolean);
+    if (!felder.frage || !String(felder.frage).trim()) {
+      return { ok: false, fehler: 'Die Frage fehlt' };
+    }
+    if (antworten.length < 2) {
+      return { ok: false, fehler: 'Eine Umfrage braucht mindestens zwei Antworten' };
+    }
+
+    const { data, error } = await client
+      .from('polls')
+      .insert({
+        user_id: nutzerId,
+        traeger_art: traegerArt,
+        traeger_id: traegerId,
+        frage: String(felder.frage).trim(),
+        mehrfach: Boolean(felder.mehrfach),
+        ende_at: felder.endetNachStunden
+          ? new Date(Date.now() + felder.endetNachStunden * 3600000).toISOString()
+          : null,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+
+    const { error: fehler } = await client
+      .from('poll_options')
+      .insert(antworten.map((text, position) => ({ poll_id: data.id, text, position })));
+    if (fehler) throw fehler;
+
+    return { ok: true, id: data.id };
+  }
+);
+
+const handleUmfrageStimmen = handler(
+  'Abstimmen',
+  async (client, nutzerId, pollId, optionId) => {
+    const { data, error } = await client
+      .from('polls')
+      .select('mehrfach, ende_at')
+      .eq('id', pollId)
+      .single();
+    if (error) throw error;
+
+    if (data.ende_at && new Date(data.ende_at) < new Date()) {
+      return { ok: false, fehler: 'Diese Umfrage ist beendet' };
+    }
+
+    // Bei einfacher Wahl ersetzt die neue Stimme die alte — sonst wäre die
+    // Summe größer als die Zahl der Teilnehmer.
+    if (!data.mehrfach) {
+      const { error: fehlerAlt } = await client
+        .from('poll_votes')
+        .delete()
+        .eq('poll_id', pollId)
+        .eq('user_id', nutzerId)
+        .neq('option_id', optionId);
+      if (fehlerAlt) throw fehlerAlt;
+    }
+
+    const gewaehlt = await umschalten(client, 'poll_votes', {
+      poll_id: pollId,
+      option_id: optionId,
+      user_id: nutzerId,
+    });
+    return { ok: true, gewaehlt };
+  }
+);
+
+// ---------------------------------------------------- Sichtbarkeit (4x) --
+//
+//  Vier Stufen, nicht drei: Niemand · Niemand bis auf … · Alle bis auf … ·
+//  Alle. Die beiden mittleren brauchen je eine Ausnahmeliste. Bis zum
+//  01.09.2026 stand hier überall nur „Alle / Meine Kontakte / Niemand", und
+//  „Alle bis auf meinen Chef" ließ sich nicht ausdrücken.
+
+const STUFEN = ['niemand', 'niemand_bis_auf', 'alle_bis_auf', 'alle'];
+const BEREICHE = [
+  'standort',
+  'story',
+  'repost',
+  'onlinestatus',
+  'ptt',
+  'likes',
+  'download',
+  'dm',
+];
+
+const handleSichtbarkeit = handler(
+  'Sichtbarkeit setzen',
+  async (client, nutzerId, bereich, stufe) => {
+    if (!BEREICHE.includes(bereich)) return { ok: false, fehler: 'Unbekannter Bereich' };
+    if (!STUFEN.includes(stufe)) return { ok: false, fehler: 'Unbekannte Stufe' };
+
+    const { error } = await client
+      .from('visibility_settings')
+      .upsert(
+        { user_id: nutzerId, bereich, stufe, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,bereich' }
+      );
+    if (error) throw error;
+    return { ok: true, stufe };
+  }
+);
+
+const handleSichtbarkeitAusnahme = handler(
+  'Ausnahme',
+  async (client, nutzerId, bereich, zielId) => {
+    if (!BEREICHE.includes(bereich)) return { ok: false, fehler: 'Unbekannter Bereich' };
+    const drin = await umschalten(client, 'visibility_exceptions', {
+      user_id: nutzerId,
+      bereich,
+      target_id: zielId,
+    });
+    return { ok: true, drin };
+  }
+);
+
+// ------------------------------------------------------- Altersschutz --
+//
+//  Unter 16 nur mit Zustimmung eines Erziehungsberechtigten, und der muss
+//  selbst einen All-Media-Account besitzen. Deshalb ein Nutzername und keine
+//  E-Mail-Adresse — eine Adresse kann jeder erfinden.
+
+const handleAltersangabe = handler(
+  'Altersangabe',
+  async (client, nutzerId, geburtsdatum, guardianHandle) => {
+    const geboren = new Date(geburtsdatum);
+    if (Number.isNaN(geboren.getTime())) {
+      return { ok: false, fehler: 'Das Geburtsdatum ist ungültig' };
+    }
+
+    const jetzt = new Date();
+    let alter = jetzt.getFullYear() - geboren.getFullYear();
+    const monat = jetzt.getMonth() - geboren.getMonth();
+    if (monat < 0 || (monat === 0 && jetzt.getDate() < geboren.getDate())) alter--;
+
+    if (alter < 0 || alter > 120) {
+      return { ok: false, fehler: 'Das Geburtsdatum ist unglaubwürdig' };
+    }
+
+    const brauchtFreigabe = alter < 16;
+    let guardianId = null;
+
+    if (brauchtFreigabe) {
+      if (!guardianHandle) {
+        return {
+          ok: false,
+          fehler: 'Unter 16 braucht es einen Erziehungsberechtigten mit eigenem All-Media-Konto',
+        };
+      }
+      const { data, error } = await client
+        .from('profiles')
+        .select('id')
+        .eq('handle', String(guardianHandle).replace(/^@/, ''))
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return { ok: false, fehler: 'Zu diesem Nutzernamen gibt es kein All-Media-Konto' };
+      if (data.id === nutzerId) return { ok: false, fehler: 'Das eigene Konto geht nicht' };
+      guardianId = data.id;
+    }
+
+    const { error } = await client
+      .from('profiles')
+      .update({
+        geburtsdatum,
+        guardian_id: guardianId,
+        guardian_status: brauchtFreigabe ? 'angefragt' : 'keiner',
+      })
+      .eq('id', nutzerId);
+    if (error) throw error;
+
+    return { ok: true, alter, brauchtFreigabe, guardian: guardianId };
+  }
+);
+
+const handleFreigabe = handler(
+  'Freigabe',
+  async (client, nutzerId, kindId, zustimmen) => {
+    const { error } = await client
+      .from('profiles')
+      .update({ guardian_status: zustimmen ? 'bestaetigt' : 'abgelehnt' })
+      .eq('id', kindId)
+      .eq('guardian_id', nutzerId);
+    if (error) throw error;
+    return { ok: true, zustimmen: Boolean(zustimmen) };
+  }
+);
+
+// --------------------------------------------------------- Wortfilter --
+//
+//  Die Liste steht in der Datenbank, damit sie sich ändern lässt, ohne App
+//  und Website neu auszurollen. Die Prüfung läuft auf Wortgrenzen: sonst
+//  gälte „Spastik" als Verstoß und ein medizinischer Beitrag ließe sich
+//  nicht schreiben.
+
+const handleWortfilter = handler('Wortfilter', async (client, _nutzerId, text) => {
+  if (!text || !String(text).trim()) return { ok: true, treffer: null };
+
+  const { data, error } = await client.from('filter_words').select('wort, schwere');
+  if (error) throw error;
+
+  const klein = String(text).toLowerCase();
+  for (const eintrag of data || []) {
+    const muster = new RegExp(
+      `(^|[^a-zäöüß])${eintrag.wort.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-zäöüß]|$)`,
+      'i'
+    );
+    if (muster.test(klein)) return { ok: true, treffer: eintrag };
+  }
+  return { ok: true, treffer: null };
+});
+
+// ------------------------------------------------------- Push-to-Talk --
+//
+//  Bis zum 01.09.2026 war das ein Ein/Aus-Schalter in den Einstellungen —
+//  geschickt wurde damit nie etwas. Im Handbuch ist es eine Funktion: eine
+//  Sprachnachricht an alle Mitglieder einer Community.
+
+const handlePtt = handler(
+  'Push-to-Talk',
+  async (client, nutzerId, communityId, audioUrl, dauer, channelId) => {
+    const { data, error } = await client
+      .from('ptt_messages')
+      .insert({
+        community_id: communityId,
+        channel_id: channelId || null,
+        sender_id: nutzerId,
+        audio_url: audioUrl,
+        dauer: Math.max(0, Math.round(Number(dauer) || 0)),
+      })
+      .select('id, created_at')
+      .single();
+    if (error) throw error;
+    return { ok: true, id: data.id, zeit: data.created_at };
+  }
+);
+
+// ------------------------------------------- Livestream: Kommentare, Spenden
+
+const handleStreamKommentar = handler(
+  'Streamkommentar',
+  async (client, nutzerId, postId, text) => {
+    if (!text || !String(text).trim()) return { ok: false, fehler: 'Leerer Kommentar' };
+    const { data, error } = await client
+      .from('stream_comments')
+      .insert({ post_id: postId, user_id: nutzerId, text: String(text).trim() })
+      .select('id, created_at')
+      .single();
+    if (error) throw error;
+    return { ok: true, id: data.id, zeit: data.created_at };
+  }
+);
+
+/*
+ * Der Betrag steht in Cent, damit nichts gerundet wird. Eine echte Zahlung
+ * läuft hier nicht: der Spendencode verweist auf Bankkarte oder PayPal, die
+ * Buchung passiert dort. Hier wird festgehalten, dass sie stattfand.
+ */
+const handleSpende2 = handler(
+  'Spende',
+  async (client, nutzerId, empfaengerId, betragCent, postId, nachricht) => {
+    const betrag = Math.round(Number(betragCent));
+    if (!Number.isFinite(betrag) || betrag <= 0) {
+      return { ok: false, fehler: 'Der Betrag muss größer als null sein' };
+    }
+    if (empfaengerId === nutzerId) return { ok: false, fehler: 'An sich selbst geht keine Spende' };
+
+    const { data, error } = await client
+      .from('donations')
+      .insert({
+        post_id: postId || null,
+        empfaenger_id: empfaengerId,
+        sender_id: nutzerId,
+        betrag_cent: betrag,
+        nachricht: nachricht || '',
+      })
+      .select('id, created_at')
+      .single();
+    if (error) throw error;
+    return { ok: true, id: data.id };
+  }
+);
+
+// ------------------------------------------------------ Standortanfrage --
+
+const handleStandortAnfrage = handler(
+  'Standortanfrage',
+  async (client, nutzerId, chatId, zielId) => {
+    const { data, error } = await client
+      .from('location_requests')
+      .insert({ chat_id: chatId, sender_id: nutzerId, ziel_id: zielId })
+      .select('id, created_at')
+      .single();
+    if (error) throw error;
+    return { ok: true, id: data.id };
+  }
+);
+
+/*
+ * `stunden` begrenzt die Freigabe. Ohne Angabe gilt sie ohne Frist — beides
+ * steht so im Handbuch.
+ */
+const handleStandortAntwort = handler(
+  'Standortantwort',
+  async (client, nutzerId, anfrageId, annehmen, stunden) => {
+    const { error } = await client
+      .from('location_requests')
+      .update({
+        zustand: annehmen ? 'angenommen' : 'abgelehnt',
+        bis_at:
+          annehmen && stunden
+            ? new Date(Date.now() + Number(stunden) * 3600000).toISOString()
+            : null,
+      })
+      .eq('id', anfrageId)
+      .eq('ziel_id', nutzerId);
+    if (error) throw error;
+    return { ok: true, angenommen: Boolean(annehmen) };
+  }
+);
+
+
 module.exports = {
   handleUpdateProfile,
   handleFollowUser,
@@ -935,4 +1499,27 @@ module.exports = {
   handleMarkNotificationRead,
   handleMarkAllNotificationsRead,
   handleMarkChatFavorite,
+
+  // Handbuch-Abgleich 01.09.2026
+  handleInsightSenden,
+  handleInsightGesehen,
+  handleInsightSpeichern,
+  handleInsightWiederholen,
+  handleInsightZiel,
+  handleNachrichtBearbeiten,
+  handleNachrichtZuruecknehmen,
+  handleNachrichtWeiterleiten,
+  handleNachrichtReaktion,
+  handleUmfrageAnlegen,
+  handleUmfrageStimmen,
+  handleSichtbarkeit,
+  handleSichtbarkeitAusnahme,
+  handleAltersangabe,
+  handleFreigabe,
+  handleWortfilter,
+  handlePtt,
+  handleStreamKommentar,
+  handleSpende2,
+  handleStandortAnfrage,
+  handleStandortAntwort,
 };

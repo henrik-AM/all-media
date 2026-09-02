@@ -31,6 +31,7 @@ import { EditSelectedContactsScreen } from './screens/messenger/EditSelectedCont
 import { AvatarViewerScreen } from './screens/AvatarViewerScreen';
 import { MessengerProfileScreen } from './screens/messenger/MessengerProfileScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
+import { InsightViewerScreen } from './screens/messenger/InsightViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
 import { CallScreen } from './screens/messenger/CallScreen';
 import { CommunitiesScreen } from './screens/communities/CommunitiesScreen';
@@ -73,6 +74,8 @@ type Overlay =
   | { kind: 'camera'; zielChat?: Chat }
   | { kind: 'call'; userId?: string; gruppenName?: string; teilnehmer?: string[]; art: 'audio' | 'video' }
   | { kind: 'livestream' }
+  /* Die offenen Insights einer Person ansehen — Handbuch-Abgleich 01.09.2026. */
+  | { kind: 'insights'; userId: string }
   | { kind: 'explorer'; ziel: ExplorerZiel }
   | { kind: 'clip'; clipId: string }
   /**
@@ -778,6 +781,35 @@ const Shell = () => {
     setSubs((prev) => ({ ...prev, videos: ziel.art === 'post' ? 'home' : 'portrait' }));
   };
 
+  /**
+   * Aus der Wahl im Formular ein Datum machen — oder null fuer sofort.
+   *
+   * Liegt "Heute Abend" schon hinter uns, wird daraus der naechste Abend.
+   * Ohne diese Pruefung waere der geplante Zeitpunkt in der Vergangenheit,
+   * und der Beitrag erschiene sofort — das Gegenteil dessen, was gewaehlt
+   * wurde.
+   */
+  const geplantAb = (wahl?: string): string | null => {
+    if (!wahl || wahl === 'Sofort') return null;
+    const wann = new Date();
+
+    if (wahl === 'In einer Stunde') {
+      wann.setHours(wann.getHours() + 1);
+      return wann.toISOString();
+    }
+    if (wahl === 'Heute Abend') {
+      wann.setHours(19, 0, 0, 0);
+      if (wann <= new Date()) wann.setDate(wann.getDate() + 1);
+      return wann.toISOString();
+    }
+    // Morgen frueh
+    wann.setDate(wann.getDate() + 1);
+    wann.setHours(8, 0, 0, 0);
+    return wann.toISOString();
+  };
+
+  const zeitpunktText = (wahl?: string) => (wahl ?? 'später').toLowerCase();
+
   const erstelle = async (punkt: ErstellenPunkt) => {
     setSheet(null);
 
@@ -825,6 +857,61 @@ const Shell = () => {
       });
     }
 
+    /*
+     * Umfragen. Das Handbuch nennt sie an drei Stellen — bei Beitraegen, bei
+     * Storys und in Community-Kanaelen —, in der App gab es sie bis zum
+     * 01.09.2026 an keiner.
+     *
+     * Eine Umfrage ist hier ein Beitrag ohne Bild, an dem eine Umfrage
+     * haengt. Das ist bewusst so: sonst braeuchte sie einen eigenen Platz im
+     * Feed, eine eigene Kachel im Profil und eine eigene Zeile in der Suche.
+     */
+    if (punkt === 'umfrage') {
+      return setFormular({
+        title: 'Neue Umfrage',
+        knopf: 'Veröffentlichen',
+        felder: [
+          { key: 'frage', label: 'Deine Frage', typ: 'mehrzeilig', pflicht: true },
+          { key: 'a1', label: 'Antwort 1', pflicht: true },
+          { key: 'a2', label: 'Antwort 2', pflicht: true },
+          { key: 'a3', label: 'Antwort 3 (freiwillig)' },
+          { key: 'a4', label: 'Antwort 4 (freiwillig)' },
+          {
+            key: 'ende',
+            label: 'Läuft',
+            typ: 'auswahl',
+            auswahl: ['Ohne Ende', '24 Stunden', '3 Tage', '7 Tage'],
+          },
+        ],
+        absenden: ({ frage, a1, a2, a3, a4, ende }) => {
+          const stunden = { 'Ohne Ende': 0, '24 Stunden': 24, '3 Tage': 72, '7 Tage': 168 }[
+            ende ?? 'Ohne Ende'
+          ];
+
+          void (async () => {
+            const beitragId = await aktion.beitragMitId({ beschreibung: frage, ort: '' });
+            if (!beitragId) return;
+
+            const umfrageId = await aktion.umfrageAnlegen(
+              { art: 'post', id: beitragId },
+              {
+                frage,
+                antworten: [a1, a2, a3, a4].filter(Boolean),
+                endetNachStunden: stunden || undefined,
+              }
+            );
+            if (!umfrageId) return;
+
+            await daten.neuLaden();
+            setArea('videos');
+            setSubs((prev) => ({ ...prev, videos: 'home' }));
+            setNotice('Umfrage veröffentlicht');
+          })();
+          return null;
+        },
+      });
+    }
+
     if (punkt === 'kanal') {
       return setFormular({
         title: 'Neuen Kanal erstellen',
@@ -834,9 +921,27 @@ const Shell = () => {
           { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
         ],
         absenden: ({ name, thema }) => {
+          /*
+           * Der Duplikatfilter aus dem Handbuch prueft jetzt gegen alle
+           * Communitys, nicht nur gegen die eigenen. Vorher konnte man eine
+           * Community, der man nicht beigetreten war, ein zweites Mal
+           * anlegen — danach standen beide nebeneinander in der Suche.
+           *
+           * Die Pruefung laeuft nach dem Schliessen des Formulars, weil sie
+           * die Datenbank fragt. Ergibt sie einen Treffer, wird das eben
+           * Angelegte wieder entfernt und der Grund genannt.
+           */
           const fehler = profil.kanalAnlegen(name, thema);
           if (fehler) return fehler;
-          setNotice(`„${name}“ erstellt`);
+
+          void (async () => {
+            const frei = await aktion.communityNameFrei(name);
+            if (!frei) {
+              profil.kanalEntfernenNachName(name);
+              return setNotice(`„${name}“ gibt es schon — such sie in der Community-Suche`);
+            }
+            setNotice(`„${name}“ erstellt`);
+          })();
           return null;
         },
       });
@@ -864,8 +969,42 @@ const Shell = () => {
           typ: 'auswahl',
           auswahl: ['Originalton', ...daten.sounds.map((s) => `${s.title} – ${s.artist}`)],
         },
+        /*
+         * "Spaeter posten" aus dem Handbuch: ein vorab eingestellter Beitrag
+         * wird zum geplanten Zeitpunkt hochgeladen. In der Datenbank ist das
+         * `posts.publish_at`; ein Beitrag mit einem Zeitpunkt in der Zukunft
+         * ist angelegt, aber noch nicht sichtbar.
+         */
+        {
+          key: 'zeitpunkt',
+          label: 'Veröffentlichen',
+          typ: 'auswahl',
+          auswahl: ['Sofort', 'In einer Stunde', 'Heute Abend', 'Morgen früh'],
+        },
       ],
-      absenden: ({ beschreibung, ort, music }) => {
+      absenden: ({ beschreibung, ort, music, zeitpunkt }) => {
+        const spaeter = geplantAb(zeitpunkt);
+
+        if (spaeter) {
+          /*
+           * Geplante Beitraege kommen nicht in den Feed. Sie dort schon zu
+           * zeigen waere die naheliegende Abkuerzung und genau falsch: man
+           * saehe einen Beitrag, den ausser einem selbst niemand hat.
+           */
+          void (async () => {
+            const id = await aktion.beitragMitId({
+              beschreibung,
+              ort,
+              musik: music,
+              mediaUrl: uri,
+              art: istBild ? 'post' : quer ? 'clip' : 'reel',
+              geplantAb: spaeter,
+            });
+            if (id) setNotice(`Geplant für ${zeitpunktText(zeitpunkt)}`);
+          })();
+          return null;
+        }
+
         if (istBild) profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music });
         else profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music });
 
@@ -1144,9 +1283,36 @@ const Shell = () => {
     }
   }
 
+  if (overlay?.kind === 'insights') {
+    /*
+     * Die offenen Insights einer Person, aelteste zuerst. Ist keiner mehr
+     * uebrig — weil er inzwischen abgelaufen ist —, gibt der Betrachter
+     * null zurueck und wir schliessen gleich wieder.
+     */
+    const offene = daten.insights
+      .filter((i) => i.senderId === overlay.userId && !i.gesehen)
+      .slice()
+      .reverse();
+
+    /*
+     * Ist keiner mehr uebrig, wird nicht waehrend des Zeichnens der Zustand
+     * geaendert — das ist in React ein Fehler und fuehrt zu einer Warnung
+     * oder einer Schleife. Stattdessen zeigt der Betrachter selbst, dass
+     * nichts mehr da ist, und schliesst auf Tippen.
+     */
+    return (
+      <InsightViewerScreen
+        insights={offene}
+        onClose={() => setOverlay(null)}
+        onNotice={setNotice}
+      />
+    );
+  }
+
   if (overlay?.kind === 'livestream') {
     return (
       <LivestreamScreen
+        onNotice={setNotice}
         onStart={() => aktion.livestream('Livestream')}
         onEnd={(sekunden, zuschauer) => {
           // Der Stream ist vorbei — das gehoert auch ins eigene Profil,
@@ -1241,6 +1407,7 @@ const Shell = () => {
           onOpenStory={openStory}
           onNewChat={() => setSheet('new')}
           onChatOptionen={setChatOptionen}
+          onOpenInsights={(userId) => setOverlay({ kind: 'insights', userId })}
         />
       );
     }

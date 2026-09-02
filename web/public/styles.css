@@ -3466,3 +3466,481 @@ body.ist-abgemeldet .ptr-indicator {
   z-index: 30;
 }
 .tonknopf svg { width: 20px; height: 20px; }
+
+/* ==========================================================================
+   Was das Handbuch verlangt — nachgetragen am 01.09.2026
+
+   Insight Time, Nachrichten-Werkzeuge, Umfragen, vierstufige Sichtbarkeit,
+   Push-to-Talk, Sticker, Dateien und die Live-Kommentarspalte. Alles
+   Neuzeichnungen zu Bausteinen, die es vorher nicht gab.
+   ========================================================================== */
+
+/* ------------------------------------------------------- Kamerafilter -- */
+
+.camera__filter {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 16px 8px;
+  scrollbar-width: none;
+}
+.camera__filter::-webkit-scrollbar { display: none; }
+
+.camera__filterpille {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  color: rgba(255,255,255,.75);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.camera__filterpille.is-active {
+  background: #fff;
+  color: #0B0B0C;
+  font-weight: 700;
+}
+
+/* Der Filter liegt als Farbschicht ueber der Buehne. Ein echter Bildfilter
+   ginge im Browser ueber `filter`, aber die App kann das nicht — und beide
+   Fassungen muessen dasselbe zeigen. */
+.camera__stage {
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: normal;
+}
+
+/* ---------------------------------------------------- Insight senden -- */
+
+.insight__vorschau {
+  height: 190px;
+  border-radius: 14px;
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 4px;
+}
+
+.insight__titel {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.insight__hinweis {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.pillen { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.pille {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.pille.is-active { background: var(--brand); color: #fff; font-weight: 600; }
+
+.insight__behalten {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.insight__person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.insight__personText { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.insight__personName { font-size: 15px; font-weight: 600; color: var(--text); }
+
+/* Der Haken ist immer da und nur unsichtbar — sonst springt die Zeile beim
+   Anhaken, weil rechts plötzlich Platz gebraucht wird. */
+.insight__haken { width: 20px; height: 20px; color: var(--brand); opacity: 0; }
+.insight__person.is-active .insight__haken { opacity: 1; }
+
+/* -------------------------------------------------------- Insight Time -- */
+
+/* „4 Tage = 📷 4" — so steht es im Handbuch. Blass, solange der Tag noch
+   nicht vollständig ist: eine Kette, bei der heute erst einer gesendet hat,
+   reißt um Mitternacht. */
+.streak {
+  flex: 0 0 auto;
+  margin-right: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--brand);
+  white-space: nowrap;
+}
+.streak--offen { color: var(--text-3); font-weight: 500; }
+
+.row__insight {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+}
+.row__insight svg { width: 14px; height: 14px; }
+.row__insight b { font-size: 10.5px; }
+
+/* ------------------------------------------------- Insight-Betrachter -- */
+
+.insight-viewer {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: #0B0B0C;
+}
+
+.insight-viewer__balken { display: flex; gap: 4px; padding: 10px 16px 0; }
+.insight-viewer__spur {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,.25);
+  overflow: hidden;
+}
+.insight-viewer__fuell { display: block; height: 3px; width: 0; background: #fff; }
+.insight-viewer__fuell.is-voll { width: 100%; }
+.insight-viewer__fuell.is-laeuft { width: 100%; animation: insightLauf linear forwards; }
+
+@keyframes insightLauf { from { width: 0; } to { width: 100%; } }
+
+.insight-viewer__kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  color: #fff;
+}
+.insight-viewer__kopf strong { display: block; font-size: 15px; }
+.insight-viewer__kopf small { font-size: 11px; color: rgba(255,255,255,.6); }
+.insight-viewer__kopf button { border: 0; background: none; color: #fff; cursor: pointer; }
+
+.insight-viewer__bild {
+  flex: 1;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.insight-viewer__fuss { display: flex; justify-content: center; padding: 14px 16px 22px; }
+.insight-viewer__marke {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  color: rgba(255,255,255,.85);
+  font-size: 12.5px;
+}
+
+/* ------------------------------------------ Nachrichten-Werkzeuge ----- */
+
+.msg__weiter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+  font-size: 10.5px;
+  font-style: italic;
+  color: var(--text-3);
+}
+.msg__weiter svg { width: 12px; height: 12px; }
+
+/* Antwort und Zitat sehen verschieden aus, weil sie verschiedenes sind: die
+   Antwort zeigt nur den Bezug, das Zitat nimmt den Text mit. */
+.msg__bezug { display: flex; gap: 8px; margin-bottom: 5px; }
+.msg__bezugBalken { width: 3px; border-radius: 2px; background: var(--brand); }
+.msg__bezugText { display: flex; flex-direction: column; min-width: 0; }
+.msg__bezugText b { font-size: 10.5px; color: var(--brand); }
+.msg__bezugText span {
+  font-size: 12.5px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg__zitat {
+  margin-bottom: 5px;
+  padding-left: 8px;
+  border-left: 3px solid var(--border);
+}
+.msg__zitat b { display: block; font-size: 10.5px; color: var(--text-3); }
+.msg__zitat span { font-size: 12.5px; font-style: italic; color: var(--text-2); }
+
+.msg__zurueck { font-style: italic; color: var(--text-3); }
+
+.msg__reaktionen { display: flex; gap: 4px; margin-top: 5px; }
+.msg__reaktion {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  font-size: 13px;
+}
+.msg__reaktion b { font-size: 10.5px; color: var(--text-2); }
+
+/* Ein Sticker steht ohne Blase da — sonst wäre er nur ein sehr großes
+   Zeichen in einer Nachricht. */
+.msg--sticker { background: none !important; box-shadow: none; padding: 0; }
+.msg__sticker { font-size: 54px; line-height: 1.1; }
+
+.msg__datei { display: flex; align-items: center; gap: 8px; }
+.msg__dateiSymbol {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+}
+.msg__dateiSymbol svg { width: 20px; height: 20px; }
+.msg__dateiText { display: flex; flex-direction: column; min-width: 0; }
+.msg__dateiText strong { font-size: 14.5px; }
+.msg__dateiText span { font-size: 10.5px; color: var(--text-3); }
+
+.msgmenue__emojis {
+  display: flex;
+  justify-content: space-around;
+  padding: 4px 16px 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.msgmenue__emoji {
+  padding: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-size: 26px;
+  cursor: pointer;
+}
+.msgmenue__emoji.is-active { background: var(--brand-soft); }
+
+/* Worauf sich die nächste Nachricht bezieht. Ohne diese Zeile tippt man in
+   eine Eingabe, die sich unsichtbar anders verhält als sonst. */
+.msgbezug {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface-2);
+}
+.msgbezug__balken { width: 3px; align-self: stretch; border-radius: 2px; background: var(--brand); }
+.msgbezug__text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.msgbezug__text b { font-size: 11px; color: var(--brand); }
+.msgbezug__text span {
+  font-size: 12.5px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msgbezug__zu { border: 0; background: none; color: var(--text-2); cursor: pointer; }
+
+/* ------------------------------------------------------------ Sticker -- */
+
+.sticker-raster { display: flex; flex-wrap: wrap; }
+.sticker-raster__z {
+  width: 20%;
+  aspect-ratio: 1;
+  border: 0;
+  background: none;
+  font-size: 34px;
+  cursor: pointer;
+}
+.sticker-raster__z:hover { background: var(--surface-2); border-radius: 10px; }
+
+/* --------------------------------------------------- Doppelklick-Herz -- */
+
+/* Das Herz blitzt auf und verschwindet wieder. Ohne diese Rückmeldung wäre
+   nicht zu erkennen, ob der zweite Klick angekommen ist. */
+.post__media, .slide__stage { position: relative; }
+
+.post__herz, .slide__herz {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 92px;
+  height: 92px;
+  transform: translate(-50%, -50%) scale(.6);
+  opacity: 0;
+  pointer-events: none;
+  color: rgba(255,255,255,.95);
+}
+.post__herz svg, .slide__herz svg { width: 100%; height: 100%; fill: currentColor; }
+
+.is-geherzt .post__herz, .is-geherzt .slide__herz { animation: herzBlitz .9s ease-out; }
+
+@keyframes herzBlitz {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+  25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Solange x2 läuft, muss es dastehen. Sonst wirkt das Video kaputt: der Ton
+   ist zu hoch und niemand weiß warum. */
+.slide__tempo {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------------- Umfragen -- */
+
+.umfrage {
+  margin: 8px 16px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.umfrage__frage { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+
+.umfrage__antwort {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-3);
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+}
+.umfrage__antwort:disabled { cursor: default; }
+.umfrage__antwort.is-gewaehlt { background: var(--brand-soft); }
+
+/* Der Balken liegt hinter dem Text, nicht daneben — so bleibt die Antwort in
+   voller Breite lesbar. */
+.umfrage__balken {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--brand-soft);
+  transition: width .25s ease;
+}
+.umfrage__text { position: relative; flex: 1; font-size: 15px; color: var(--text); }
+.umfrage__anteil {
+  position: relative;
+  font-size: 12.5px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.umfrage__haken { position: relative; width: 15px; height: 15px; color: var(--brand); }
+.umfrage__fuss { margin: 4px 0 0; font-size: 10.5px; color: var(--text-3); }
+
+/* ------------------------------------------------ Sichtbarkeit (4x) --- */
+
+.sicht__stufe .item__label { display: flex; flex-direction: column; gap: 2px; }
+.sicht__stufe .item__label small { font-size: 11.5px; color: var(--text-3); font-weight: 400; }
+.sicht__stufe.is-active .item__label b { color: var(--brand); }
+.sicht__punkt { width: 20px; height: 20px; color: var(--brand); }
+
+/* ------------------------------------------------------- Push-to-Talk -- */
+
+.ptt { padding: 12px 7.2% 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.ptt__knopf {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+.ptt__knopf.is-rec { background: var(--danger); }
+.ptt__knopf svg { width: 19px; height: 19px; }
+.ptt__hinweis { font-size: 10.5px; color: var(--text-3); }
+.ptt__liste { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+.ptt__zeile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.ptt__zeile svg { width: 15px; height: 15px; color: var(--brand); }
+.ptt__zeile span { margin-left: auto; font-size: 10.5px; color: var(--text-3); }
+
+/* --------------------------------------- Livestream: Spalte, Spenden -- */
+
+.live__spalte {
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 8px 16px 0;
+}
+.live__leer { margin: 8px 0; font-size: 12.5px; color: #6B7280; }
+.live__kommentar { margin: 3px 0; font-size: 12.5px; color: #D6D9E0; }
+.live__kommentar b { color: var(--brand-2); }
+
+.live__eingabe { display: flex; align-items: center; gap: 8px; padding: 8px 16px 0; }
+.live__eingabe input {
+  flex: 1;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  font-size: 14px;
+}
+.live__eingabe input::placeholder { color: #6B7280; }
+.live__eingabe button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 19px;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+}
+.live__eingabe button:disabled { opacity: .5; cursor: default; }
+
+.live__spenden { text-align: center; font-size: 12.5px; color: #7CE38B; }

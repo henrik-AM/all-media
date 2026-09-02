@@ -10,6 +10,7 @@ import { StoryRail } from '../../components/StoryRail';
 import { brandGradient, colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { Chat, Story } from '../../types';
 import { haptic } from '../../lib/haptics';
+import { useDaten } from '../../contexts/DatenContext';
 
 type Filter = 'all' | 'contacts' | 'groups';
 
@@ -35,6 +36,8 @@ interface Props {
    * Druecken ins Leere.
    */
   onChatOptionen?: (chat: Chat) => void;
+  /** Die offenen Insights dieser Person ansehen. */
+  onOpenInsights?: (userId: string) => void;
 }
 
 export const ChatListScreen = ({
@@ -44,7 +47,15 @@ export const ChatListScreen = ({
   onOpenStory,
   onNewChat,
   onChatOptionen,
+  onOpenInsights,
 }: Props) => {
+  /*
+   * Die Insight Times. Das Handbuch verlangt sie genau hier: "Anzeige im
+   * Chatbereich -> jeweilige(n/r) Chat/Gruppe", als Kamera-Emoji plus Zahl
+   * hinter dem eingespeicherten Namen. Bis zum 01.09.2026 gab es sie
+   * nirgends.
+   */
+  const { insightStreaks, insights } = useDaten();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -72,6 +83,19 @@ export const ChatListScreen = ({
   const renderChat = ({ item }: { item: Chat }) => {
     const unread = item.unreadCount > 0;
     const icon = mediaIcon(item.previewMedia);
+    // Nur im Zweierchat. Eine Gruppe hat mehrere Ketten, und eine Zahl fuer
+    // alle zusammen waere keine.
+    const streak = !item.isGroup && item.userId ? insightStreaks[item.userId] : undefined;
+    /*
+     * Offene Insights dieser Person. Das Handbuch verlangt die Anzeige genau
+     * hier ("Anzeige im Chatbereich -> jeweilige(n/r) Chat/Gruppe"). Ein
+     * gefuelltes Kamerasymbol heisst: da liegt etwas, das noch niemand
+     * angesehen hat.
+     */
+    const offeneInsights =
+      !item.isGroup && item.userId
+        ? insights.filter((i) => i.senderId === item.userId && !i.gesehen)
+        : [];
 
     return (
       <Druck
@@ -92,6 +116,35 @@ export const ChatListScreen = ({
             <Text style={styles.rowName} numberOfLines={1}>
               {item.name}
             </Text>
+            {/*
+              * "4 Tage = 📷 4" — so steht es im Handbuch. Die Zahl blasst ab,
+              * solange der Tag noch nicht vollstaendig ist: eine Kette, bei
+              * der heute erst einer gesendet hat, reisst um Mitternacht.
+              * Saehe sie aus wie eine sichere, waere die Anzeige eine
+              * Falschaussage mit Folgen.
+              */}
+            {offeneInsights.length > 0 && (
+              <Druck
+                hitSlop={8}
+                style={styles.insightKnopf}
+                onPress={() => onOpenInsights?.(item.userId!)}
+              >
+                <Ionicons name="camera" size={14} color={colors.white} />
+                {offeneInsights.length > 1 && (
+                  <Text style={styles.insightZahl}>{offeneInsights.length}</Text>
+                )}
+              </Druck>
+            )}
+            {streak?.tage ? (
+              <Text
+                style={[
+                  styles.streak,
+                  !(streak.heuteGesendet && streak.heuteEmpfangen) && styles.streakOffen,
+                ]}
+              >
+                📷 {streak.tage}
+              </Text>
+            ) : null}
             <Text style={[styles.rowTime, unread && styles.rowTimeUnread]}>{item.time}</Text>
           </View>
           <View style={styles.rowBottom}>
@@ -195,6 +248,19 @@ const styles = themenStyles((colors) => ({
   rowBody: { flex: 1, minWidth: 0 },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowName: { flex: 1, color: colors.text, ...typography.name },
+  streak: { ...typography.small, color: colors.brand, marginRight: 6 },
+  insightKnopf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+    marginRight: 6,
+  },
+  insightZahl: { ...typography.tiny, color: colors.white },
+  streakOffen: { color: colors.text3 },
   rowTime: { color: colors.text3, ...typography.small },
   rowTimeUnread: { color: colors.brand, fontWeight: '600' },
   rowBottom: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },

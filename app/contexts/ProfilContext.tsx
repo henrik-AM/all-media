@@ -152,6 +152,13 @@ interface ProfilWert {
   /* --- Communitys --- */
   communities: Community[];
   kanalAnlegen: (name: string, thema: string) => string | null;
+  /**
+   * Eine gerade angelegte Community wieder entfernen.
+   *
+   * Gebraucht, wenn die Namenspruefung gegen die Datenbank erst nachtraeglich
+   * zurueckkommt und ergibt, dass es sie schon gibt.
+   */
+  kanalEntfernenNachName: (name: string) => void;
   /** Unterthema in einer Community anlegen. Gibt einen Fehlertext zurueck. */
   unterthemaAnlegen: (communityId: string, name: string) => string | null;
   kanalBeitreten: (id: string) => void;
@@ -688,6 +695,10 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * Prototyp-Frame "CH + Unterthema erstellen" - auf der Community-Seite gab
    * es dafuer bis zum 26.08.2026 keinen Weg.
    */
+
+  const kanalEntfernenNachName = useCallback((name: string) => {
+    setCommunities((prev) => prev.filter((c) => c.name.toLowerCase() !== name.toLowerCase()));
+  }, []);
   const unterthemaAnlegen = useCallback((communityId: string, name: string) => {
     const sauber = name.trim();
     if (!sauber) return 'Bitte einen Namen eingeben';
@@ -961,6 +972,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       geteilt,
       communities,
       kanalAnlegen,
+      kanalEntfernenNachName,
       unterthemaAnlegen,
       kanalBeitreten,
       kanalGelesen,

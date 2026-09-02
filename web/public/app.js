@@ -50,9 +50,85 @@ const NAV = {
 
 const AREAS = ['messenger', 'videos', 'communities', 'settings'];
 
+/*
+ * Die Kamerafilter — dieselben Namen und Werte wie in
+ * app/constants/filter.ts. Der gewählte Name wird am Insight gespeichert,
+ * damit die Aufnahme beim Ansehen genauso aussieht wie beim Verschicken —
+ * und zwar auf beiden Seiten gleich.
+ *
+ * Im Browser ginge ein echter Bildfilter über CSS `filter`. Er steht hier
+ * trotzdem als Farbschicht, weil die App keinen echten Filter kann (React
+ * Native hat keinen) und beide Fassungen dasselbe zeigen müssen. Eine
+ * Aufnahme, die im Browser anders aussieht als im Handy, wäre schlimmer als
+ * eine, die überall gleich einfach ist.
+ */
+const FILTER = [
+  { key: 'keiner', label: 'Ohne', ton: '', staerke: 0, ecken: 0 },
+  { key: 'warm', label: 'Warm', ton: '#FF9A3C', staerke: 0.22, ecken: 0.18 },
+  { key: 'kalt', label: 'Kühl', ton: '#3C7DFF', staerke: 0.2, ecken: 0.14 },
+  { key: 'sw', label: 'S/W', ton: '#6E6E73', staerke: 0.55, ecken: 0 },
+  { key: 'sepia', label: 'Sepia', ton: '#A9743A', staerke: 0.35, ecken: 0.2 },
+  { key: 'kino', label: 'Kino', ton: '#0E2B4A', staerke: 0.26, ecken: 0.34 },
+  { key: 'sonne', label: 'Sonne', ton: '#FFD166', staerke: 0.24, ecken: 0 },
+  { key: 'nacht', label: 'Nacht', ton: '#101033', staerke: 0.4, ecken: 0.3 },
+];
+
+const filterZu = (key) => FILTER.find((f) => f.key === key) || FILTER[0];
+
+/**
+ * Die Farbschicht eines Filters als CSS-Hintergrund.
+ *
+ * Zwei Verläufe übereinander: der Ton über der ganzen Fläche, darüber die
+ * Abdunkelung zu den Rändern. Ohne die zweite wirken warme Filter flach,
+ * weil nur die Farbe kippt und die Bildtiefe gleich bleibt.
+ */
+function filterSchicht(key) {
+  const f = filterZu(key);
+  if (!f.staerke) return '';
+  const schichten = [`linear-gradient(${f.ton}${Math.round(f.staerke * 255).toString(16).padStart(2, '0')}, ${f.ton}${Math.round(f.staerke * 255).toString(16).padStart(2, '0')})`];
+  if (f.ecken) {
+    schichten.push(
+      `radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,${f.ecken}) 100%)`
+    );
+  }
+  return schichten.join(', ');
+}
+
+/*
+ * Die Sticker. Gleiche Liste wie app/constants/sticker.ts — es sind Zeichen
+ * und keine Grafiken, weil es noch keine gezeichneten gibt. Sie werden ohne
+ * Blase dargestellt, also genau wie ein Sticker.
+ */
+const STICKER = [
+  '👍', '👏', '🙌', '🤝', '💪', '🫶', '🙏', '👀',
+  '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '💔',
+  '😂', '🥹', '😍', '🤩', '😎', '🥳', '🤔', '😴',
+  '🔥', '✨', '🎉', '🎂', '☕️', '🍕', '⚽️', '🎧',
+  '☀️', '🌧️', '❄️', '🌈', '🌙', '⭐️', '🌍', '🚀',
+];
+
+/** Die sechs Reaktionen — dieselben wie in app/components/NachrichtSheet.tsx. */
+const REAKTIONEN = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
 const state = {
   users: {},
   chats: [],
+  /*
+   * Insight Time und was dazugehört (Handbuch-Abgleich 01.09.2026).
+   *
+   * Ein *Insight* ist ein Foto oder Video an ausgewählte Personen — das
+   * Snapchat-Äquivalent. Die *Insight Time* zählt die Tage in Folge, an
+   * denen sich beide Seiten gegenseitig einen geschickt haben. Nicht zu
+   * verwechseln mit den „Insights" im Einstellungsmenü: das ist Statistik
+   * zum eigenen Profil.
+   */
+  insights: [],
+  insightStreaks: {},
+  insightZiele: [],
+  /** Sichtbarkeitsstufen je Bereich, mit Ausnahmelisten. */
+  sichtbarkeit: {},
+  /** Der in der Kamera gewählte Filter. */
+  kameraFilter: 'keiner',
   stories: [],
   contacts: [],
   communities: [],
@@ -229,6 +305,33 @@ function toast(msg) {
  * war eine leere Flaeche. Und schlug der Aufruf fehl, blieb sie es fuer
  * immer, weil niemand den Fehler aufgefangen hat.
  */
+/**
+ * Ein Schreibzugriff auf die API.
+ *
+ * Nimmt das ab, was sonst an fünfzig Stellen dastünde: Methode, Kopfzeile,
+ * JSON und das Auspacken der Antwort. Ein Fehler wird zu `{ ok: false,
+ * error }` und nicht zu einer geworfenen Ausnahme — die Aufrufer wollen
+ * durchweg eine Meldung anzeigen, nicht abstürzen.
+ *
+ * Das Zugangstoken hängt der globale fetch-Aufsatz aus anmeldung.js an; hier
+ * steht davon nichts, damit es genau eine Stelle bleibt.
+ */
+async function api(pfad, koerper) {
+  try {
+    const res = await fetch(pfad, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(koerper || {}),
+    });
+    const daten = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: daten.error || `Server antwortet mit ${res.status}` };
+    return daten;
+  } catch (fehler) {
+    console.error(`${pfad} fehlgeschlagen:`, fehler);
+    return { ok: false, error: 'Keine Verbindung' };
+  }
+}
+
 async function bootstrap() {
   let data;
 
@@ -704,6 +807,19 @@ function renderChats() {
  * waere eine reine Wischloesung gar nicht bedienbar.
  */
 function bindChatVerwaltung() {
+  /*
+   * Das Kamerasymbol in der Zeile öffnet den Insight, nicht den Chat.
+   * Deshalb wird die Weitergabe gestoppt — sonst läge darunter der Knopf für
+   * den Chat und beide lösten zugleich aus.
+   */
+  main.querySelectorAll('[data-insight]').forEach((k) =>
+    k.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      openInsightAnsehen(k.dataset.insight);
+    })
+  );
+
   main.querySelectorAll('[data-chat]').forEach((zeile) => {
     const id = zeile.dataset.chat;
     let halten;
@@ -832,6 +948,20 @@ function chatRow(c) {
   const vorschau = c.gesperrt
     ? `<span class="row__preview row__preview--gesperrt">${ICONS.lock}Gesperrt</span>`
     : `<span class="row__preview">${mediaIcon}${esc(c.preview)}</span>`;
+  /*
+   * Insight Time und offene Insights. Das Handbuch verlangt die Anzeige
+   * genau hier ("Anzeige im Chatbereich -> jeweilige(n/r) Chat/Gruppe").
+   * Nur im Zweierchat: eine Gruppe hat mehrere Ketten, und eine Zahl für
+   * alle zusammen wäre keine.
+   */
+  const marke = !c.isGroup && c.userId ? insightMarke(c.userId) : '';
+  const offene = !c.isGroup && c.userId ? offeneInsights(c.userId) : [];
+  const insightKnopf = offene.length
+    ? `<span class="row__insight" data-insight="${c.userId}" role="button" tabindex="0" title="Insight ansehen">
+         ${ICONS.camera}${offene.length > 1 ? `<b>${offene.length}</b>` : ''}
+       </span>`
+    : '';
+
   return `
     <li>
       <button class="row ${c.unread ? 'is-unread' : ''}" data-chat="${c.id}">
@@ -839,6 +969,8 @@ function chatRow(c) {
         <div class="row__body">
           <div class="row__top">
             <span class="row__name">${esc(c.name)}</span>
+            ${insightKnopf}
+            ${marke}
             <span class="row__time">${esc(c.time)}</span>
           </div>
           <div class="row__bottom">
@@ -1028,6 +1160,13 @@ async function aufnahmeVerwenden(art = 'photo', ausGalerie = false) {
 /** Die Frage selbst - getrennt, weil die Kamera im Overlay sie auch braucht. */
 function aufnahmeMenue(bild) {
   const punkte = [
+    /*
+     * Der Insight steht oben. Er ist die Gattung, für die diese Kamera im
+     * Handbuch überhaupt da ist — eine Aufnahme an ausgewählte Personen, die
+     * für die Insight Time zählt. Bis zum 01.09.2026 gab es ihn hier nicht:
+     * die Kamera kannte nur Story, Chat und Beitrag.
+     */
+    { key: 'insight', label: 'Als Insight senden', icon: 'flash' },
     { key: 'story', label: 'Zu deiner Story hinzufügen', icon: 'camera' },
     { key: 'chat', label: 'An einen Chat senden', icon: 'chat' },
     { key: 'beitrag', label: 'Als Beitrag veröffentlichen', icon: 'image' },
@@ -1036,7 +1175,11 @@ function aufnahmeMenue(bild) {
   openSheet(
     'Was möchtest du damit machen?',
     `<div class="sheet__body">
-       <div class="aufnahme__vorschau" style="background-image:url(${bild})"></div>
+       <div class="aufnahme__vorschau" style="background-image:${
+         filterSchicht(state.kameraFilter)
+           ? filterSchicht(state.kameraFilter) + ', url(' + bild + ')'
+           : 'url(' + bild + ')'
+       }"></div>
        ${punkte
          .map(
            (p) => `<button class="item" data-verwenden="${p.key}">
@@ -1051,6 +1194,7 @@ function aufnahmeMenue(bild) {
       sheet.querySelectorAll('[data-verwenden]').forEach((b) =>
         b.addEventListener('click', () => {
           close();
+          if (b.dataset.verwenden === 'insight') return openInsightSenden(bild);
           if (b.dataset.verwenden === 'story') return alsStorySetzen(bild);
           if (b.dataset.verwenden === 'chat') return aufnahmeAnChat(bild);
           aufnahmeAlsBeitrag(bild);
@@ -2683,6 +2827,21 @@ async function openComments(targetId, onCountChange) {
       const text = input.value.trim();
       if (!text) return;
 
+      /*
+       * Der Kommentarfilter aus dem Handbuch („Inhalts-/Kommentarfilter").
+       *
+       * Er greift vor dem Absenden und nicht danach: einen Kommentar erst zu
+       * veröffentlichen und dann wieder zu entfernen hieße, dass ihn in der
+       * Zwischenzeit jemand gelesen hat. Der Entwurf bleibt stehen, damit man
+       * ihn umformulieren kann, statt ihn neu zu tippen.
+       *
+       * Geprüft wird auf Wortgrenzen — sonst wäre „Spastik" ein Verstoß.
+       */
+      const pruefung = await api('/api/wortfilter', { text });
+      if (pruefung?.treffer) {
+        return toast(`„${pruefung.treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
+      }
+
       const r = await fetch(`/api/comments/${targetId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2731,6 +2890,65 @@ function commentRow(c) {
 }
 
 /* ---------------------------------------------------------- home feed */
+/**
+ * Eine Umfrage — an einem Beitrag, einer Story oder in einem Kanal.
+ *
+ * Vor der eigenen Stimme steht nur die Antwort da, ohne Zahl und ohne
+ * Balken. Wer die Verteilung vorher sieht, stimmt nicht mehr für seine
+ * eigene Antwort, sondern für die führende — das ist bei jeder Umfrage so
+ * und der Grund, warum Instagram und Twitter es genauso halten.
+ *
+ * Bei einer beendeten Umfrage stehen die Zahlen ohne Stimme da: dort ist
+ * nichts mehr zu beeinflussen.
+ *
+ * Das Gegenstück in der App: app/components/UmfrageKarte.tsx.
+ */
+function umfrageKarte(u) {
+  const hatGestimmt = u.antworten.some((a) => a.gewaehlt);
+  const zeigeZahlen = hatGestimmt || u.beendet;
+
+  return `
+    <div class="umfrage">
+      <p class="umfrage__frage">${esc(u.frage)}</p>
+      ${u.antworten
+        .map((a) => {
+          const anteil = u.gesamt ? Math.round((a.stimmen / u.gesamt) * 100) : 0;
+          return `<button class="umfrage__antwort${a.gewaehlt ? ' is-gewaehlt' : ''}"
+                    data-umfrage="${u.id}" data-option="${a.id}"${u.beendet ? ' disabled' : ''}>
+            ${zeigeZahlen ? `<span class="umfrage__balken" style="width:${anteil}%"></span>` : ''}
+            <span class="umfrage__text">${esc(a.text)}</span>
+            ${zeigeZahlen ? `<span class="umfrage__anteil">${anteil} %</span>` : ''}
+            ${a.gewaehlt ? `<span class="umfrage__haken">${ICONS.check}</span>` : ''}
+          </button>`;
+        })
+        .join('')}
+      <p class="umfrage__fuss">
+        ${u.gesamt} ${u.gesamt === 1 ? 'Stimme' : 'Stimmen'}${
+          u.beendet ? '  ·  beendet' : u.mehrfach ? '  ·  Mehrfachauswahl' : ''
+        }${!hatGestimmt && !u.beendet ? '  ·  tippe zum Abstimmen' : ''}
+      </p>
+    </div>`;
+}
+
+/**
+ * Die Umfragen zu den Beiträgen im Feed holen.
+ *
+ * In einem Rutsch für alle sichtbaren Beiträge — je Beitrag eine Abfrage
+ * wären bei zwanzig Karten zwanzig Anfragen beim Blättern.
+ */
+async function umfragenHolen() {
+  const ids = (state.posts || []).map((p) => p.id);
+  if (!ids.length) return;
+  try {
+    const res = await fetch(`/api/umfragen/post?ids=${encodeURIComponent(ids.join(','))}`);
+    if (!res.ok) return;
+    const daten = await res.json();
+    state.umfragen = daten.umfragen || {};
+  } catch (fehler) {
+    console.error('Umfragen laden fehlgeschlagen:', fehler);
+  }
+}
+
 function renderHomeFeed() {
   main.innerHTML = `
     <div class="scroll" id="homeScroll">
@@ -2756,6 +2974,59 @@ function renderHomeFeed() {
       const story = state.stories.find((s) => s.userId === userId);
       if (story) return openStory(story.id);
       openProfile(userId);
+    })
+  );
+
+  /*
+   * Doppelklick auf das Bild likt — von Henrik gewünscht, am 01.09.2026
+   * nachgetragen.
+   *
+   * Er nimmt nie weg: wer versehentlich zweimal klickt, soll nicht sein Like
+   * verlieren. So halten es Instagram und TikTok auch.
+   *
+   * Der Griff liegt auf dem Bild und nicht auf der ganzen Karte — auf der
+   * Karte löste er beim Markieren der Bildunterschrift aus.
+   */
+  /*
+   * Umfragen nachladen und den Feed danach einmal neu zeichnen. Sie kommen
+   * nicht mit /api/bootstrap: den Start sollen sie nicht verlangsamen, und
+   * gebraucht werden sie nur hier.
+   */
+  if (!state.umfragen) {
+    state.umfragen = {};
+    umfragenHolen().then(() => {
+      if (Object.keys(state.umfragen).length) renderHomeFeed();
+    });
+  }
+
+  main.querySelectorAll('[data-umfrage]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const antwort = await api(`/api/umfragen/${b.dataset.umfrage}/stimme/${b.dataset.option}`, {});
+      if (!antwort?.ok) return toast(antwort?.error || 'Die Stimme ging nicht durch');
+      await umfragenHolen();
+
+      const flaeche = $('#homeScroll');
+      const stand = flaeche ? flaeche.scrollTop : 0;
+      renderHomeFeed();
+      const neu = $('#homeScroll');
+      if (neu) neu.scrollTop = stand;
+    })
+  );
+
+  main.querySelectorAll('[data-doppelklick]').forEach((flaeche) =>
+    flaeche.addEventListener('dblclick', () => {
+      const pid = flaeche.dataset.doppelklick;
+      const beitrag = state.posts.find((x) => x.id === pid);
+
+      // Das Herz blitzt immer auf — ohne Rückmeldung wäre nicht zu erkennen,
+      // ob der zweite Klick angekommen ist.
+      flaeche.classList.remove('is-geherzt');
+      void flaeche.offsetWidth; // Neustart der Animation erzwingen
+      flaeche.classList.add('is-geherzt');
+
+      if (beitrag && !beitrag.liked) {
+        main.querySelector(`.postbtn[data-paction="like"][data-pid="${pid}"]`)?.click();
+      }
     })
   );
 
@@ -2881,7 +3152,19 @@ function postCard(p) {
         }
       </header>
 
-      <div class="post__media">${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}</div>
+      ${
+        /*
+         * Eine Umfrage ersetzt das Bild. Ein Beitrag hat entweder ein Motiv
+         * oder eine Frage — beides übereinander wäre eine Karte, bei der man
+         * nicht weiß, worauf man klicken soll.
+         */
+        state.umfragen?.[p.id]
+          ? umfrageKarte(state.umfragen[p.id])
+          : `<div class="post__media" data-doppelklick="${p.id}">
+               ${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}
+               <span class="post__herz" aria-hidden="true">${ICONS.heart}</span>
+             </div>`
+      }
 
       <div class="post__actions">
         <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-paction="like" data-pid="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
@@ -2953,6 +3236,82 @@ function renderVideoFeed() {
     main.querySelectorAll('.slide__stage video').forEach((v) => { v.muted = tonAus; });
     tonKnopf.innerHTML = tonAus ? ICONS.tonAus : ICONS.tonAn;
     tonKnopf.setAttribute('aria-label', tonAus ? 'Ton an' : 'Ton aus');
+  });
+
+  /*
+   * Die drei Gesten auf der Reel-Fläche.
+   *
+   *   doppelt tippen        -> Like       (von Henrik gewünscht)
+   *   rechte Hälfte halten  -> x2         (Handbuch)
+   *   einmal tippen         -> pausieren  (Handbuch)
+   *
+   * Alle drei hängen an derselben Fläche, deshalb steht die Unterscheidung
+   * hier und nicht in drei übereinandergelegten Schaltflächen: übereinander
+   * schluckte die oberste alle Klicks, und die beiden darunter wären tot.
+   */
+  main.querySelectorAll('[data-reelflaeche]').forEach((flaeche) => {
+    const vid = flaeche.dataset.reelflaeche;
+    const video = flaeche.querySelector('video');
+    const marke = flaeche.querySelector('.slide__tempo');
+    let letzterKlick = 0;
+    let einzeln = null;
+    let halten = null;
+    let schnell = false;
+
+    flaeche.addEventListener('click', () => {
+      const jetzt = Date.now();
+
+      if (jetzt - letzterKlick < 280) {
+        // Doppelklick: das Herz blitzt auf, das Like wird nie weggenommen.
+        letzterKlick = 0;
+        if (einzeln) clearTimeout(einzeln);
+        einzeln = null;
+
+        flaeche.classList.remove('is-geherzt');
+        void flaeche.offsetWidth;
+        flaeche.classList.add('is-geherzt');
+
+        const v = state.videos.find((x) => x.id === vid);
+        if (v && !v.liked) {
+          main.querySelector(`.railbtn[data-vaction="like"][data-vid="${vid}"]`)?.click();
+        }
+        return;
+      }
+
+      // Der einzelne Klick wartet 280 ms ab: kommt in der Zeit ein zweiter,
+      // war es keiner. Ohne diese Wartezeit pausierte jeder Doppelklick
+      // nebenbei auch das Video.
+      letzterKlick = jetzt;
+      einzeln = setTimeout(() => {
+        if (video) (video.paused ? video.play() : video.pause());
+        einzeln = null;
+      }, 280);
+    });
+
+    flaeche.addEventListener('pointerdown', (e) => {
+      const rechts = e.clientX > flaeche.getBoundingClientRect().left + flaeche.clientWidth / 2;
+      if (!rechts) return;
+      halten = setTimeout(() => {
+        schnell = true;
+        if (video) video.playbackRate = 2;
+        // Solange x2 läuft, muss es dastehen. Sonst wirkt das Video kaputt:
+        // der Ton ist zu hoch und niemand weiß warum.
+        if (marke) marke.hidden = false;
+      }, 250);
+    });
+
+    const loslassen = () => {
+      if (halten) clearTimeout(halten);
+      halten = null;
+      if (!schnell) return;
+      schnell = false;
+      if (video) video.playbackRate = 1;
+      if (marke) marke.hidden = true;
+    };
+
+    flaeche.addEventListener('pointerup', loslassen);
+    flaeche.addEventListener('pointerleave', loslassen);
+    flaeche.addEventListener('pointercancel', loslassen);
   });
 
   main.querySelectorAll('[data-vaction]').forEach((btn) =>
@@ -3070,11 +3429,14 @@ function videoSlide(v) {
   const u = user(v.userId);
   return `
     <section class="slide" id="slide-${v.id}">
-      <div class="slide__stage">${
+      <div class="slide__stage" data-reelflaeche="${v.id}">${
         istVideoAdresse(v.mediaUrl)
           ? videoElement(`reel-${v.id}`, v.mediaUrl, v.thumbnail, 'loop muted')
           : medienFlaeche(v.id, ICONS.play, v.mediaUrl, v.thumbnail)
-      }</div>
+      }
+        <span class="slide__herz" aria-hidden="true">${ICONS.heart}</span>
+        <span class="slide__tempo" hidden>2×</span>
+      </div>
 
       <div class="slide__rail">
         <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
@@ -3155,6 +3517,109 @@ function communityAvatar(c, size = 52) {
  * einen Platzhalter-Chat. Die echten Kanaele und ihre Themen liegen auf dem
  * Server.
  */
+
+/* ==========================================================================
+ * Push-to-Talk im Browser.
+ *
+ * Aufgenommen wird mit der MediaRecorder-Schnittstelle, die jeder aktuelle
+ * Browser hat. Die Aufnahme geht als Datenadresse an den Server — für einen
+ * eigenen Speicherplatz bräuchte es einen Upload-Weg, den die Website noch
+ * nicht hat; die App legt sie dagegen in den Supabase-Speicher.
+ *
+ * Kürzer als 0,8 Sekunden ist ein Verdrücker und wird nicht geschickt.
+ *
+ * Das Gegenstück in der App: app/components/PushToTalk.tsx.
+ * ========================================================================== */
+
+const PTT_MINDESTDAUER = 800;
+
+async function pttListeLaden(communityId) {
+  const liste = $('#pttListe');
+  if (!liste) return;
+  try {
+    const res = await fetch(`/api/communities/${communityId}/ptt`);
+    if (!res.ok) return;
+    const daten = await res.json();
+    liste.innerHTML = (daten.ptt || [])
+      .slice(0, 5)
+      .map(
+        (p) => `<p class="ptt__zeile">${ICONS.mic}<b>${esc(p.name)}</b><span>${p.dauer}s · ${esc(p.zeit)}</span></p>`
+      )
+      .join('');
+  } catch (fehler) {
+    console.error('Push-to-Talk laden fehlgeschlagen:', fehler);
+  }
+}
+
+function pttEinhaengen(communityId) {
+  const knopf = $('#pttKnopf');
+  if (!knopf) return;
+
+  pttListeLaden(communityId);
+
+  let aufnahme = null;
+  let stuecke = [];
+  let beginn = 0;
+
+  const start = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return toast('Dieser Browser kann nicht aufnehmen');
+    }
+    try {
+      const spur = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stuecke = [];
+      aufnahme = new MediaRecorder(spur);
+      aufnahme.addEventListener('dataavailable', (e) => stuecke.push(e.data));
+
+      aufnahme.addEventListener('stop', async () => {
+        // Das Mikrofon wieder freigeben — sonst bleibt der rote Punkt im Tab
+        // stehen, obwohl längst nichts mehr aufgenommen wird.
+        spur.getTracks().forEach((t) => t.stop());
+
+        const dauerMs = Date.now() - beginn;
+        if (dauerMs < PTT_MINDESTDAUER) return toast('Zu kurz — halte den Knopf gedrückt');
+
+        const blob = new Blob(stuecke, { type: 'audio/webm' });
+        const adresse = await new Promise((fertig) => {
+          const leser = new FileReader();
+          leser.onload = () => fertig(leser.result);
+          leser.readAsDataURL(blob);
+        });
+
+        const antwort = await api(`/api/communities/${communityId}/ptt`, {
+          audioUrl: adresse,
+          dauer: Math.round(dauerMs / 1000),
+        });
+        if (!antwort?.ok) return toast(antwort?.error || 'Die Aufnahme ging nicht raus');
+        toast('Push-to-Talk gesendet');
+        pttListeLaden(communityId);
+      });
+
+      aufnahme.start();
+      beginn = Date.now();
+      knopf.classList.add('is-rec');
+      knopf.querySelector('span').textContent = 'Aufnahme …';
+    } catch (fehler) {
+      console.error('Push-to-Talk starten fehlgeschlagen:', fehler);
+      toast('Ohne Mikrofonzugriff geht das nicht');
+    }
+  };
+
+  const stop = () => {
+    knopf.classList.remove('is-rec');
+    knopf.querySelector('span').textContent = 'Push-to-Talk';
+    if (aufnahme && aufnahme.state === 'recording') aufnahme.stop();
+    aufnahme = null;
+  };
+
+  knopf.addEventListener('pointerdown', start);
+  knopf.addEventListener('pointerup', stop);
+  knopf.addEventListener('pointerleave', stop);
+  knopf.addEventListener('pointercancel', stop);
+  // Ohne das öffnet sich auf dem Handy beim Halten das Systemmenü.
+  knopf.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
 async function renderCommunityChannels(communityId) {
   const lauf = ++renderLauf;
   const daten = await fetch(`/api/communities/${communityId}`).then((r) => r.json());
@@ -3226,6 +3691,30 @@ async function renderCommunityChannels(communityId) {
       ${daten.bio ? `<div class="kanal__bio">${esc(daten.bio)}</div>` : ''}
       ${daten.link ? `<div class="kanal__link">${bioLink(daten.link)}</div>` : ''}
 
+      ${/*
+          Push-to-Talk. Das Handbuch beschreibt es als Nachricht an alle
+          Mitglieder einer Community — gedacht für Gruppenanrufe und für
+          Momente außergewöhnlich hoher Aktivität. Bis zum 01.09.2026 gab es
+          dafür nur einen Schalter in den Einstellungen.
+
+          Der Knopf steht nur bei Mitgliedern: wer nicht beigetreten ist,
+          darf nichts hineinsprechen, und ein Knopf, der immer scheitert, ist
+          schlimmer als keiner.
+
+          Gedrückt halten, nicht klicken — das ist nicht nur der Name: eine
+          Aufnahme, die nach dem ersten Klick weiterläuft, läuft irgendwann
+          in der Hosentasche weiter.
+        */ ''}
+      ${
+        daten.joined || eigen
+          ? `<div class="ptt">
+               <button class="ptt__knopf" id="pttKnopf">${ICONS.mic}<span>Push-to-Talk</span></button>
+               <span class="ptt__hinweis">gedrückt halten</span>
+               <div class="ptt__liste" id="pttListe"></div>
+             </div>`
+          : ''
+      }
+
       <button class="kanal__neu" id="neuesUnterthema">
         <span class="kanal__neu-kreis">${ICONS.plus}</span>
         <span>neues Unterthema erstellen</span>
@@ -3256,6 +3745,8 @@ async function renderCommunityChannels(communityId) {
   $('#communityMehr').addEventListener('click', einstellungen);
 
   $('#neuesUnterthema').addEventListener('click', () => neuesUnterthema(daten));
+
+  if ($('#pttKnopf')) pttEinhaengen(daten.id);
 
   main.querySelectorAll('[data-join]').forEach((b) =>
     b.addEventListener('click', async () => {
@@ -3662,13 +4153,24 @@ const SETTINGS = [
     title: 'Allgemein',
     items: [
       {
-        label: 'Erziehungsberechtigte/r',
+        label: 'Alter und Erziehungsberechtigte/r',
         icon: 'shield',
+        /*
+         * Geburtsdatum statt Name und E-Mail.
+         *
+         * Das Handbuch verlangt: unter 16 nur mit Zustimmung eines
+         * Erziehungsberechtigten, „der einen All Media Account besitzen"
+         * muss. Vorher stand hier ein Formular für Name und E-Mail, an dem
+         * gar nichts hing — kein Geburtsdatum, keine Prüfung, keine
+         * Verknüpfung. Ein Nutzername lässt sich in der Datenbank
+         * nachschlagen, eine E-Mail-Adresse kann jeder erfinden.
+         */
         eingabe: [
-          { key: 'name', label: 'Name', platzhalter: 'Vor- und Nachname', pflicht: true },
-          { key: 'mail', label: 'E-Mail-Adresse', platzhalter: 'name@beispiel.de', pflicht: true },
+          { key: 'geburtsdatum', label: 'Geburtsdatum', platzhalter: 'JJJJ-MM-TT, z. B. 2012-04-19', pflicht: true },
+          { key: 'guardian', label: 'Nutzername des/der Erziehungsberechtigten (nur unter 16)', platzhalter: '@nutzername' },
         ],
-        fertig: 'Einladung verschickt — die Verknüpfung gilt, sobald sie bestätigt wurde',
+        aktion: 'alter',
+        fertig: 'Gespeichert',
       },
       {
         label: 'Spendencode',
@@ -3766,9 +4268,9 @@ const SETTINGS = [
     title: 'Messenger',
     items: [
       { label: 'Lesebestätigung', icon: 'checkDouble', toggle: 'lesebestaetigung' },
-      { label: 'Standort-Sichtbarkeit', icon: 'mapPin', wahl: ['Alle Kontakte', 'Ausgewählte Kontakte', 'Niemand'], standard: 'Alle Kontakte' },
-      { label: 'Story-Sichtbarkeit', icon: 'eye', wahl: ['Alle', 'Meine Kontakte', 'Enge Freunde'], standard: 'Meine Kontakte' },
-      { label: 'Zuletzt online', icon: 'eye', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Standort-Sichtbarkeit', icon: 'mapPin', sichtbar: 'standort' },
+      { label: 'Story-Sichtbarkeit', icon: 'eye', sichtbar: 'story' },
+      { label: 'Zuletzt online', icon: 'eye', sichtbar: 'onlinestatus' },
       { label: 'Mit Enter senden', icon: 'send', toggle: 'entersenden' },
       { label: 'Chat-Hintergrund', icon: 'image', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
       { label: 'Schriftgröße', icon: 'info', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
@@ -3834,11 +4336,18 @@ const SETTINGS = [
       { label: 'Insights', icon: 'compass', liste: 'insights' },
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
-      { label: 'Repost-Sichtbarkeit', icon: 'repeat', wahl: ['Alle', 'Meine Follower', 'Niemand'], standard: 'Alle' },
-      { label: 'Likes-Sichtbarkeit', icon: 'heart', wahl: ['Alle', 'Nur ich'], standard: 'Alle' },
-      { label: 'Downloadeinstellungen', icon: 'image', wahl: ['Erlaubt', 'Nur Follower', 'Aus'], standard: 'Erlaubt' },
-      { label: 'Story-Sichtbarkeit', icon: 'eye', wahl: ['Alle', 'Meine Kontakte', 'Enge Freunde'], standard: 'Meine Kontakte' },
+      { label: 'Repost-Sichtbarkeit', icon: 'repeat', sichtbar: 'repost' },
+      { label: 'Likes-Sichtbarkeit', icon: 'heart', sichtbar: 'likes' },
+      { label: 'Downloadeinstellungen', icon: 'image', sichtbar: 'download' },
+      { label: 'Story-Sichtbarkeit (Videos)', icon: 'eye', sichtbar: 'story' },
       { label: 'Nutzerstatus', icon: 'person', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
+      /*
+       * „Nutzerstatus -> immer offline für …" aus dem Handbuch. Es ist keine
+       * eigene Einstellung, sondern der Onlinestatus in der Stufe „Alle bis
+       * auf …" — deshalb steht hier derselbe Bereich.
+       */
+      { label: 'Immer offline für …', icon: 'eye', sichtbar: 'onlinestatus' },
+      { label: 'Profilbann-Verlauf', icon: 'shield', liste: 'banne' },
       { label: 'Profilbanner', icon: 'landscape', wahl: ['Ohne', 'Farbverlauf', 'Eigenes Bild'], standard: 'Ohne' },
     ],
   },
@@ -3854,8 +4363,8 @@ const SETTINGS = [
       },
       { label: 'Nutzerstatus', icon: 'person', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock', toggle: 'commPrivate' },
-      { label: 'Nachrichtenerlaubnis', icon: 'chat', wahl: ['Alle', 'Mitglieder meiner Communitys', 'Niemand'], standard: 'Mitglieder meiner Communitys' },
-      { label: 'Push-to-Talk Nachricht', icon: 'mic', wahl: ['An', 'Aus'], standard: 'An' },
+      { label: 'Nachrichtenerlaubnis', icon: 'chat', sichtbar: 'dm' },
+      { label: 'Push-to-Talk Benachrichtigung', icon: 'mic', sichtbar: 'ptt' },
       { label: 'Gestummte Communitys', icon: 'mute', liste: 'stummeKanaele' },
       { label: 'Gestummte Profile', icon: 'block', liste: 'stummeProfile' },
     ],
@@ -3892,6 +4401,145 @@ function einstellungenLaden() {
   } catch {
     return {};
   }
+}
+
+/*
+ * Sichtbarkeit in den vier Stufen des Handbuchs.
+ *
+ *     Niemand · Niemand bis auf … · Alle bis auf … · Alle
+ *
+ * Bis zum 01.09.2026 stand hier überall nur „Alle / Meine Kontakte /
+ * Niemand". Die beiden mittleren Stufen sind aber der eigentliche Punkt: sie
+ * brauchen je eine Ausnahmeliste, und „Alle bis auf meinen Chef" ließ sich
+ * vorher nicht ausdrücken.
+ *
+ * Das Gegenstück in der App: app/components/SichtbarkeitSheet.tsx.
+ */
+const SICHT_STUFEN = [
+  { key: 'niemand', label: 'Niemand', hinweis: 'Niemand sieht es.' },
+  { key: 'niemand_bis_auf', label: 'Niemand bis auf …', hinweis: 'Nur die Personen, die du unten einträgst.' },
+  { key: 'alle_bis_auf', label: 'Alle bis auf …', hinweis: 'Alle außer den Personen, die du unten einträgst.' },
+  { key: 'alle', label: 'Alle', hinweis: 'Jeder, der dich sehen darf.' },
+];
+
+/** Stufe und Ausnahmen zu einem Bereich — ohne Eintrag gilt „alle". */
+function sicht(bereich) {
+  return state.sichtbarkeit?.[bereich] || { stufe: 'alle', ausnahmen: [] };
+}
+
+/** Was rechts neben dem Punkt steht. */
+function sichtText(bereich) {
+  const s = sicht(bereich);
+  const name = SICHT_STUFEN.find((x) => x.key === s.stufe)?.label || 'Alle';
+  // Bei den „bis auf"-Stufen die Zahl dazu. Ohne sie sieht eine leere
+  // Ausnahmeliste genauso aus wie eine mit zwölf Namen.
+  const zahl = (s.ausnahmen || []).length;
+  return zahl && s.stufe !== 'alle' && s.stufe !== 'niemand' ? `${name} (${zahl})` : name;
+}
+
+/** Die eigenen Sichtbarkeitsstufen frisch holen. */
+async function sichtbarkeitNeuLaden() {
+  try {
+    const res = await fetch('/api/sichtbarkeit');
+    if (!res.ok) return;
+    const daten = await res.json();
+    state.sichtbarkeit = daten.sichtbarkeit || {};
+  } catch (fehler) {
+    console.error('Sichtbarkeit laden fehlgeschlagen:', fehler);
+  }
+}
+
+/**
+ * Das Blatt zu einer Sichtbarkeitseinstellung.
+ *
+ * Die Ausnahmeliste erscheint erst, wenn eine der beiden „bis auf"-Stufen
+ * gewählt ist — eine Stufe „Alle bis auf …" ohne die Liste daneben ist eine
+ * Einstellung, die nichts tut. Die Einträge bleiben aber erhalten: wer
+ * zwischen den Stufen hin und her schaltet, will seine mühsam
+ * zusammengesuchten Namen wiederfinden.
+ */
+function openSichtbarkeit(punkt) {
+  const bereich = punkt.sichtbar;
+
+  const zeichne = (sheet) => {
+    const jetzt = sicht(bereich);
+    const brauchtListe = jetzt.stufe === 'niemand_bis_auf' || jetzt.stufe === 'alle_bis_auf';
+
+    const personen = (state.contacts || [])
+      .filter((k) => state.users[k.id])
+      .map((k) => ({ id: k.id, name: state.users[k.id].name }))
+      .sort((a, b) => {
+        const ad = jetzt.ausnahmen.includes(a.id) ? 0 : 1;
+        const bd = jetzt.ausnahmen.includes(b.id) ? 0 : 1;
+        return ad !== bd ? ad - bd : a.name.localeCompare(b.name);
+      });
+
+    sheet.querySelector('.sheet').innerHTML =
+      sheetKopf(punkt.label, true) +
+      `<div class="sheet__body">
+         ${SICHT_STUFEN.map(
+           (st) => `<button class="item sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" data-stufe="${st.key}">
+             <span class="item__label">
+               <b>${esc(st.label)}</b>
+               <small>${esc(st.hinweis)}</small>
+             </span>
+             <span class="sicht__punkt">${st.key === jetzt.stufe ? ICONS.check : ''}</span>
+           </button>`
+         ).join('')}
+
+         ${
+           brauchtListe
+             ? `<div class="listhead">${
+                 jetzt.stufe === 'alle_bis_auf' ? 'Diese Personen nicht' : 'Nur diese Personen'
+               }${jetzt.ausnahmen.length ? `  ·  ${jetzt.ausnahmen.length}` : ''}</div>
+                ${
+                  personen.length
+                    ? personen
+                        .map(
+                          (p) => `<button class="insight__person${
+                            jetzt.ausnahmen.includes(p.id) ? ' is-active' : ''
+                          }" data-ausnahme="${p.id}">
+                            ${avatarForUser(p.id, 36)}
+                            <span class="insight__personText"><span class="insight__personName">${esc(p.name)}</span></span>
+                            <span class="insight__haken">${ICONS.check}</span>
+                          </button>`
+                        )
+                        .join('')
+                    : '<div class="sheet__hint">Du hast noch keine Kontakte, die du hier eintragen könntest.</div>'
+                }`
+             : ''
+         }
+       </div>`;
+
+    binde(sheet);
+  };
+
+  const binde = (sheet) => {
+    sheet.querySelector('.sheet__x')?.addEventListener('click', () => sheet.remove());
+
+    sheet.querySelectorAll('[data-stufe]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const antwort = await api(`/api/sichtbarkeit/${bereich}`, { stufe: b.dataset.stufe });
+        if (!antwort?.ok) return toast(antwort?.error || 'Das hat nicht geklappt');
+        await sichtbarkeitNeuLaden();
+        zeichne(sheet);
+      })
+    );
+
+    sheet.querySelectorAll('[data-ausnahme]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const antwort = await api(`/api/sichtbarkeit/${bereich}/ausnahme/${b.dataset.ausnahme}`, {});
+        if (!antwort?.ok) return toast(antwort?.error || 'Das hat nicht geklappt');
+        await sichtbarkeitNeuLaden();
+        zeichne(sheet);
+      })
+    );
+  };
+
+  openSheet(punkt.label, '<div class="sheet__body"></div>', (sheet) => zeichne(sheet), {
+    schliessen: true,
+    hoch: true,
+  });
 }
 
 function einstellung(punkt) {
@@ -3951,6 +4599,20 @@ function einstellungsListe(art) {
       ],
     };
   }
+  /*
+   * Der Bann-Verlauf. Das Handbuch verlangt ihn ausdrücklich „mit Grund" —
+   * ohne Begründung ist eine Sperre nicht nachvollziehbar und nicht
+   * anfechtbar. Er wird beim Öffnen der Einstellungen geholt (renderSettings).
+   */
+  if (art === 'banne') {
+    return {
+      leer: 'Gegen dein Profil liegt nichts vor.',
+      zeilen: (state.banne || []).map((b) => ({
+        text: `${b.grund} (${b.bereich})`,
+        neben: b.laeuft ? `läuft seit ${b.von}` : `beendet · ${b.von}`,
+      })),
+    };
+  }
   if (art === 'insights') {
     const eigene = state.posts.filter((p) => p.userId === 'me');
     return {
@@ -4000,6 +4662,9 @@ function einstellungsListe(art) {
 /** `nachher` wird gerufen, wenn sich etwas geaendert hat - damit die
  *  aufrufende Seite ihren neuen Stand zeigen kann. */
 function openEinstellung(punkt, nachher) {
+  // Sichtbarkeit hat ein eigenes Blatt: vier Stufen plus Ausnahmeliste.
+  if (punkt.sichtbar) return openSichtbarkeit(punkt);
+
   if (punkt.wahl) {
     const jetzt = einstellung(punkt);
     return openSheet(
@@ -4037,6 +4702,33 @@ function openEinstellung(punkt, nachher) {
       (werte) => {
         const fehler = punkt.pruefen?.(werte);
         if (fehler) return fehler;
+
+        /*
+         * Die Altersangabe geht wirklich in die Datenbank. Vorher stand hier
+         * ein Formular, an dem gar nichts hing: man trug einen
+         * Erziehungsberechtigten ein und es passierte nichts.
+         *
+         * Das Ergebnis wird nicht abgewartet, weil das Blatt sonst hängen
+         * bliebe — die Meldung kommt hinterher, und bei einem Fehler
+         * (unbekannter Nutzername, unglaubwürdiges Datum) nennt sie den
+         * Grund.
+         */
+        if (punkt.aktion === 'alter') {
+          (async () => {
+            const antwort = await api('/api/alter', {
+              geburtsdatum: (werte.geburtsdatum || '').trim(),
+              guardian: (werte.guardian || '').trim() || undefined,
+            });
+            if (!antwort?.ok) return toast(antwort?.error || 'Die Altersangabe ging nicht durch');
+            toast(
+              antwort.brauchtFreigabe
+                ? `${antwort.alter} Jahre — die Freigabe ist angefragt`
+                : `${antwort.alter} Jahre — keine Freigabe nötig`
+            );
+          })();
+          return null;
+        }
+
         einstellungSetzen(punkt, werte[punkt.eingabe[0].key]);
         toast(punkt.fertig || 'Gespeichert');
         return null;
@@ -4147,6 +4839,20 @@ function openEinstellung(punkt, nachher) {
 }
 
 function renderSettings() {
+  /*
+   * Bann-Verlauf und Sichtbarkeit nachladen. Beides steckt nicht im
+   * bootstrap-Aufruf der Startseite — es wird nur hier gebraucht, und der
+   * Start soll davon nicht langsamer werden.
+   */
+  if (!state.banne) {
+    fetch('/api/banne')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        state.banne = d?.banne || [];
+      })
+      .catch((fehler) => console.error('Bann-Verlauf laden fehlgeschlagen:', fehler));
+  }
+
   const itemHtml = (it, sektionId) => {
     if (it.toggle) {
       const on = it.toggle === 'theme' ? state.theme === 'dark' : toggles[it.toggle];
@@ -4158,7 +4864,7 @@ function renderSettings() {
     }
     // Bei einer Auswahl steht rechts, was gerade gilt - sonst muesste man
     // jeden Punkt aufmachen, um den Stand zu sehen.
-    const wert = it.wahl ? einstellung(it) : '';
+    const wert = it.wahl ? einstellung(it) : it.sichtbar ? sichtText(it.sichtbar) : '';
     return `<button class="item ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
       <span class="item__icon">${ICONS[it.icon]}</span>
       <span class="item__label">${esc(it.label)}</span>
@@ -4607,6 +5313,293 @@ function renderAusgewaehlteKontakte() {
 /* ---------------------------------------------------- Messenger: Kamera */
 // Prototyp-Frame "Messenger - Kamera". Als Seite, nicht als Overlay, weil die
 // Kamera im Prototyp ein eigener Unterpunkt der oberen Leiste ist.
+
+/* ==========================================================================
+ * Insight Time — Handbuch-Abgleich 01.09.2026
+ *
+ * Ein *Insight* ist ein Foto oder Video, das an ausgewählte Personen geht —
+ * das Snapchat-Äquivalent aus dem Handbuch. Die *Insight Time* zählt die
+ * Tage in Folge, an denen sich beide Seiten gegenseitig einen geschickt
+ * haben, und steht als Kamera-Emoji plus Zahl hinter dem Namen.
+ *
+ * Nicht zu verwechseln mit den „Insights" im Einstellungsmenü: das ist
+ * Statistik zum eigenen Profil. Die Verwechslung ist der Grund, warum diese
+ * Funktion so lange fehlte — das Wort stand im Code, aber in der anderen
+ * Bedeutung.
+ *
+ * Die Gegenstücke in der App: app/components/InsightSheet.tsx und
+ * app/screens/messenger/InsightViewerScreen.tsx.
+ * ========================================================================== */
+
+/** Die Insight Time zu einer Person, fertig für die Anzeige. */
+function insightMarke(userId) {
+  const st = state.insightStreaks?.[userId];
+  if (!st || !st.tage) return '';
+  // Blass, solange der Tag noch nicht vollständig ist: eine Kette, bei der
+  // heute erst einer gesendet hat, reißt um Mitternacht. Sähe sie aus wie
+  // eine sichere, wäre die Anzeige eine Falschaussage mit Folgen.
+  const voll = st.heuteGesendet && st.heuteEmpfangen;
+  return `<span class="streak${voll ? '' : ' streak--offen'}">📷 ${st.tage}</span>`;
+}
+
+/** Offene, noch nicht angesehene Insights dieser Person. */
+function offeneInsights(userId) {
+  return (state.insights || []).filter((i) => i.senderId === userId && !i.gesehen);
+}
+
+/**
+ * Einen Insight verschicken.
+ *
+ * Die feste Empfängerliste ist beim Öffnen angehakt — das Handbuch nennt sie
+ * ausdrücklich und daneben die Möglichkeit, manuell auszuwählen. Ohne die
+ * Vorauswahl müsste man vor jedem Insight dieselben acht Namen neu antippen
+ * und schickt ihn dann irgendwann gar nicht mehr.
+ */
+function openInsightSenden(bild) {
+  const gewaehlt = new Set(state.insightZiele || []);
+
+  // Wer eine laufende Insight Time hat, steht oben. Eine Kette, die heute
+  // noch nicht bedient wurde, reißt um Mitternacht — die Person dafür in
+  // einer alphabetischen Liste zu suchen wäre genau verkehrt herum.
+  const personen = (state.contacts || [])
+    .filter((k) => state.users[k.id])
+    .map((k) => ({ id: k.id, name: state.users[k.id].name, tage: state.insightStreaks?.[k.id]?.tage || 0 }))
+    .sort((a, b) => (b.tage - a.tage) || a.name.localeCompare(b.name));
+
+  const schicht = filterSchicht(state.kameraFilter);
+
+  const pillen = (name, punkte, aktiv) =>
+    punkte
+      .map(
+        (p) =>
+          `<button class="pille${p.wert === aktiv ? ' is-active' : ''}" data-${name}="${p.wert}">${esc(p.text)}</button>`
+      )
+      .join('');
+
+  openSheet(
+    'Insight senden',
+    `<div class="sheet__body insight-senden">
+       <div class="insight__vorschau" style="background-image:${schicht ? schicht + ', url(' + bild + ')' : 'url(' + bild + ')'}"></div>
+
+       <p class="insight__titel">Wie lange sichtbar</p>
+       <div class="pillen" id="insDauer">
+         ${pillen('dauer', [{ wert: 3, text: '3 s' }, { wert: 5, text: '5 s' }, { wert: 10, text: '10 s' }, { wert: 0, text: 'Unbegrenzt' }], 5)}
+       </div>
+
+       <p class="insight__titel">Ansicht</p>
+       <div class="pillen" id="insEinmal">
+         ${pillen('einmal', [{ wert: 1, text: 'Einmalansicht' }, { wert: 0, text: 'Mehrfach ansehbar' }], 1)}
+       </div>
+       <p class="insight__hinweis" id="insHinweis">Nach dem Öffnen ist er weg — auch bei dir in der Übersicht.</p>
+
+       <p class="insight__titel">Selbstlöschend</p>
+       <div class="pillen" id="insLoeschen">
+         ${pillen('loeschen', [{ wert: 0, text: 'Nie' }, { wert: 24, text: 'Nach 24 h' }, { wert: 168, text: 'Nach 7 Tagen' }], 24)}
+       </div>
+
+       <label class="insight__behalten"><input type="checkbox" id="insBehalten"> Bei mir behalten</label>
+
+       <p class="insight__titel">An wen</p>
+       ${
+         personen.length
+           ? personen
+               .map(
+                 (p) => `<button class="insight__person${gewaehlt.has(p.id) ? ' is-active' : ''}" data-person="${p.id}">
+                   ${avatarForUser(p.id, 38)}
+                   <span class="insight__personText">
+                     <span class="insight__personName">${esc(p.name)}</span>
+                     ${p.tage ? `<span class="streak">📷 ${p.tage}</span>` : ''}
+                   </span>
+                   <span class="insight__haken">${ICONS.check}</span>
+                 </button>`
+               )
+               .join('')
+           : '<p class="insight__hinweis">Du hast noch keine Kontakte. Insights gehen nur an Personen, die du gespeichert hast.</p>'
+       }
+
+       <button class="btn btn--breit" id="insSenden" disabled>Wähle mindestens eine Person</button>
+     </div>`,
+    (sheet, close) => {
+      let dauer = 5;
+      let einmal = 1;
+      let loeschen = 24;
+
+      const knopf = sheet.querySelector('#insSenden');
+      const stand = () => {
+        knopf.disabled = gewaehlt.size === 0;
+        knopf.textContent = gewaehlt.size
+          ? `An ${gewaehlt.size} ${gewaehlt.size === 1 ? 'Person' : 'Personen'} senden`
+          : 'Wähle mindestens eine Person';
+      };
+      stand();
+
+      const gruppe = (id, setzen) =>
+        sheet.querySelectorAll(`#${id} .pille`).forEach((b) =>
+          b.addEventListener('click', () => {
+            sheet.querySelectorAll(`#${id} .pille`).forEach((x) => x.classList.toggle('is-active', x === b));
+            setzen(Number(b.dataset.dauer ?? b.dataset.einmal ?? b.dataset.loeschen));
+          })
+        );
+
+      gruppe('insDauer', (w) => (dauer = w));
+      gruppe('insEinmal', (w) => {
+        einmal = w;
+        sheet.querySelector('#insHinweis').textContent = w
+          ? 'Nach dem Öffnen ist er weg — auch bei dir in der Übersicht.'
+          : 'Bleibt offen, bis er sich selbst löscht.';
+      });
+      gruppe('insLoeschen', (w) => (loeschen = w));
+
+      sheet.querySelectorAll('[data-person]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const id = b.dataset.person;
+          if (gewaehlt.has(id)) gewaehlt.delete(id);
+          else gewaehlt.add(id);
+          b.classList.toggle('is-active', gewaehlt.has(id));
+          stand();
+        })
+      );
+
+      knopf.addEventListener('click', async () => {
+        knopf.disabled = true;
+        knopf.textContent = 'Wird gesendet …';
+
+        const antwort = await api('/api/insights', {
+          empfaenger: [...gewaehlt],
+          mediaUrl: bild,
+          mediaTyp: 'image',
+          filter: state.kameraFilter,
+          dauer,
+          einmal: Boolean(einmal),
+          loeschtNachStunden: loeschen || undefined,
+          gespeichert: sheet.querySelector('#insBehalten').checked,
+        });
+
+        if (!antwort?.ok) {
+          knopf.disabled = false;
+          stand();
+          return toast(antwort?.error || 'Der Insight ging nicht raus');
+        }
+
+        close();
+
+        /*
+         * Die Rückmeldung nennt die neue Insight Time. Ohne sie bliebe
+         * unklar, ob der Tag gezählt hat — und genau darum geht es bei dieser
+         * Gattung. Steht die Kette noch offen, weil die Gegenseite heute
+         * nichts geschickt hat, sagt die Meldung das ebenfalls.
+         */
+        const gezaehlt = Object.entries(antwort.streaks || {}).filter(([, t]) => t > 0);
+        if (gezaehlt.length === 1) {
+          const [id, tage] = gezaehlt[0];
+          toast(`Insight gesendet — 📷 ${tage} mit ${state.users[id]?.name || 'dieser Person'}`);
+        } else if (gezaehlt.length > 1) {
+          toast(`Insight an ${gewaehlt.size} gesendet — ${gezaehlt.length} Ketten laufen`);
+        } else {
+          toast('Insight gesendet — die Kette zählt, sobald zurückgeschickt wird');
+        }
+
+        await insightsNeuLaden();
+        render();
+      });
+    },
+    { hoch: true, schliessen: true }
+  );
+}
+
+/** Insights, Ketten und Empfängerliste frisch holen. */
+async function insightsNeuLaden() {
+  try {
+    const res = await fetch('/api/insights');
+    if (!res.ok) return;
+    const daten = await res.json();
+    state.insights = daten.insights || [];
+    state.insightStreaks = daten.streaks || {};
+    state.insightZiele = daten.ziele || [];
+  } catch (fehler) {
+    console.error('Insights laden fehlgeschlagen:', fehler);
+  }
+}
+
+/**
+ * Die offenen Insights einer Person ansehen.
+ *
+ * „Gesehen" wird beim Öffnen vermerkt, nicht beim Schließen. Bei
+ * Einmalansicht ist das der Unterschied zwischen „einmal" und „mindestens
+ * einmal": wer den Tab schließt, während der Insight offen steht, bekäme ihn
+ * sonst beim nächsten Laden noch einmal — und die Zusage wäre gebrochen.
+ */
+function openInsightAnsehen(userId) {
+  const offene = offeneInsights(userId).slice().reverse();
+  if (!offene.length) return toast('Dieser Insight ist nicht mehr da');
+
+  let nummer = 0;
+  let uhr = null;
+
+  const flaeche = document.createElement('div');
+  flaeche.className = 'insight-viewer';
+  document.querySelector('.app').appendChild(flaeche);
+
+  const zumachen = async () => {
+    if (uhr) clearTimeout(uhr);
+    flaeche.remove();
+    await insightsNeuLaden();
+    render();
+  };
+
+  const zeichnen = () => {
+    const i = offene[nummer];
+    if (!i) return zumachen();
+
+    const schicht = filterSchicht(i.filter);
+    const st = state.insightStreaks?.[userId];
+
+    flaeche.innerHTML = `
+      <div class="insight-viewer__balken">
+        ${offene
+          .map(
+            (_, n) =>
+              `<span class="insight-viewer__spur"><span class="insight-viewer__fuell${
+                n < nummer ? ' is-voll' : n === nummer ? ' is-laeuft' : ''
+              }" style="${n === nummer && i.dauer ? `animation-duration:${i.dauer}s` : ''}"></span></span>`
+          )
+          .join('')}
+      </div>
+      <div class="insight-viewer__kopf">
+        <span>
+          <strong>${esc(state.users[userId]?.name || 'Unbekannt')}</strong>
+          <small>${esc(i.zeit)}${st?.tage ? `  ·  📷 ${st.tage}` : ''}</small>
+        </span>
+        <button id="insZu" aria-label="Schließen">${ICONS.close}</button>
+      </div>
+      <div class="insight-viewer__bild" style="background-image:${
+        schicht ? schicht + ', url(' + i.mediaUrl + ')' : 'url(' + i.mediaUrl + ')'
+      }"></div>
+      <div class="insight-viewer__fuss">
+        <span class="insight-viewer__marke">
+          ${i.einmal ? 'Einmalansicht' : 'Mehrfach ansehbar'}${i.dauer ? `  ·  ${i.dauer} s` : '  ·  unbegrenzt'}
+        </span>
+      </div>`;
+
+    flaeche.querySelector('#insZu').addEventListener('click', zumachen);
+    flaeche.querySelector('.insight-viewer__bild').addEventListener('click', weiter);
+
+    // Beim Öffnen vermerken, nicht beim Weiterblättern.
+    api(`/api/insights/${i.id}/gesehen`, {});
+
+    if (uhr) clearTimeout(uhr);
+    if (i.dauer) uhr = setTimeout(weiter, i.dauer * 1000);
+  };
+
+  const weiter = () => {
+    nummer += 1;
+    if (nummer >= offene.length) return zumachen();
+    zeichnen();
+  };
+
+  zeichnen();
+}
+
 function renderCameraPage() {
   let mode = 'photo';
   let recording = false;
@@ -4617,7 +5610,15 @@ function renderCameraPage() {
         <span></span>
         <button id="camFlash" aria-label="Blitz">${ICONS.flash}</button>
       </div>
-      <div class="camera__stage">${ICONS.camera}<span class="camera__sucher"><span></span><span></span><span></span><span></span></span></div>
+      <div class="camera__stage" id="camStage">${ICONS.camera}<span class="camera__sucher"><span></span><span></span><span></span><span></span></span></div>
+      <div class="camera__filter" id="camFilter">
+        ${FILTER.map(
+          (f) =>
+            `<button class="camera__filterpille${
+              f.key === state.kameraFilter ? ' is-active' : ''
+            }" data-filter="${f.key}">${esc(f.label)}</button>`
+        ).join('')}
+      </div>
       <div class="camera__modes">
         <button class="camera__mode is-active" data-mode="photo">FOTO</button>
         <button class="camera__mode" data-mode="video">VIDEO</button>
@@ -4630,6 +5631,22 @@ function renderCameraPage() {
     </div>`;
 
   $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
+
+  /*
+   * Die Filterwahl. Sie liegt im Zustand und nicht in einer Variablen dieser
+   * Funktion: die Kamera wird bei jedem Wechsel neu gezeichnet, und der eben
+   * gewählte Filter soll dabei stehen bleiben.
+   */
+  main.querySelectorAll('[data-filter]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.kameraFilter = b.dataset.filter;
+      main
+        .querySelectorAll('[data-filter]')
+        .forEach((x) => x.classList.toggle('is-active', x === b));
+      const buehne = $('#camStage');
+      if (buehne) buehne.style.backgroundImage = filterSchicht(state.kameraFilter);
+    })
+  );
   // Punkt 18: das Bildsymbol geht in die Galerie, nicht noch einmal in die
   // Kamera - dafuer ist der Ausloeser in der Mitte da.
   $('#camGallery').addEventListener('click', () => aufnahmeVerwenden(mode, true));
@@ -5773,7 +6790,13 @@ const ERSTELLEN_VIDEOS = [
   // Livestream steht direkt unter Story: beides ist im Augenblick aufgenommen
   // und nach kurzer Zeit wieder weg. Highlight und Playlist sortieren dagegen
   // vorhandene Beitraege und gehoeren darum weiter nach unten.
+  //
+  // Die Umfrage stand am 01.09.2026 kurz zwischen Story und Livestream und
+  // hat damit genau diese Nachbarschaft zerrissen. Sie gehoert hinter den
+  // Livestream: eine Umfrage ist nichts Fluechtiges.
   { key: 'livestream', label: 'Livestream', icon: 'video' },
+  /* Umfrage — im Handbuch bei Beiträgen, Storys und Kanälen genannt. */
+  { key: 'umfrage', label: 'Umfrage', icon: 'poll' },
   { key: 'highlight', label: 'Highlight', icon: 'folder' },
   { key: 'playlist', label: 'Playlist', icon: 'ebenen' },
   { key: 'spende', label: 'Spendenaktion', icon: 'heart' },
@@ -5972,7 +6995,16 @@ function openAnhang(chat) {
   const punkte = [
     { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera' },
     { key: 'galerie', label: 'Aus der Galerie', icon: 'image' },
+    /*
+     * Datei, Gif, Sticker und Standortanfrage kamen am 01.09.2026 dazu. Alle
+     * vier stehen im Handbuch ("Dateien/Dokumente", "Gifs", "Sticker",
+     * "Standortanfrage"); im Anhang-Menü gab es sie nicht.
+     */
+    { key: 'datei', label: 'Datei senden', icon: 'document' },
+    { key: 'gif', label: 'Gif senden', icon: 'film' },
+    { key: 'sticker', label: 'Sticker', icon: 'sticker' },
     { key: 'standort', label: 'Standort senden', icon: 'mapPin' },
+    { key: 'standortAnfragen', label: 'Standort anfragen', icon: 'standortAnfrage' },
     { key: 'kontakt', label: 'Kontakt senden', icon: 'person' },
   ];
 
@@ -6031,6 +7063,84 @@ async function anhangSenden(chat, art) {
     state.messages.push(nachricht);
     paintMessages(chat);
     return toast('Foto gesendet');
+  }
+
+  /*
+   * Eine Datei. Der Browser kann sie direkt auswählen; die App braucht dafür
+   * expo-document-picker. Beide schicken dasselbe an den Server: Name und
+   * Größe, damit im Chat mehr steht als ein graues Kästchen.
+   */
+  if (art === 'datei') {
+    const feld = document.createElement('input');
+    feld.type = 'file';
+    const datei = await new Promise((fertig) => {
+      feld.addEventListener('change', () => fertig(feld.files?.[0] || null));
+      feld.click();
+    });
+    if (!datei) return;
+
+    const nachricht = await senden({ art: 'datei', name: datei.name, groesse: datei.size });
+    if (!nachricht) return;
+    state.messages.push(nachricht);
+    paintMessages(chat);
+    return toast('Datei gesendet');
+  }
+
+  /*
+   * Ein Gif kommt aus der eigenen Auswahl. Eine Suche bei einem Gif-Dienst
+   * bräuchte einen fremden Zugang und würde jede Suchanfrage dorthin
+   * schicken — für eine App, die mit Ende-zu-Ende wirbt, der falsche Weg.
+   */
+  if (art === 'gif') {
+    const datei = await dateiWaehlen('photo', true);
+    if (!datei) return;
+
+    let bild;
+    try {
+      bild = await bildVerkleinern(datei);
+    } catch {
+      return toast('Gif konnte nicht gelesen werden');
+    }
+
+    const nachricht = await senden({ art: 'gif' });
+    if (!nachricht) return;
+    eigenesMediumSichern(nachricht.id, bild);
+    state.messages.push(nachricht);
+    paintMessages(chat);
+    return toast('Gif gesendet');
+  }
+
+  if (art === 'sticker') {
+    return openSheet(
+      'Sticker',
+      `<div class="sheet__body sticker-raster">
+         ${STICKER.map((z) => `<button class="sticker-raster__z" data-sticker="${z}">${z}</button>`).join('')}
+       </div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-sticker]').forEach((b) =>
+          b.addEventListener('click', async () => {
+            close();
+            const nachricht = await senden({ art: 'sticker', zeichen: b.dataset.sticker });
+            if (!nachricht) return;
+            state.messages.push(nachricht);
+            paintMessages(chat);
+          })
+        );
+      },
+      { schliessen: true, hoch: true }
+    );
+  }
+
+  /*
+   * Den Standort der Gegenseite anfragen. Das Handbuch nennt es ausdrücklich
+   * ("Live-Standort Anfrage (im Privatchat)"); bis zum 01.09.2026 gab es nur
+   * die Freigabe, also die eine Richtung.
+   */
+  if (art === 'standortAnfragen') {
+    if (!chat.userId) return toast('In einer Gruppe geht das nicht');
+    const antwort = await api(`/api/chats/${chat.id}/standortanfrage`, { zielId: chat.userId });
+    if (!antwort?.ok) return toast(antwort?.error || 'Die Anfrage ging nicht raus');
+    return toast(`Standort bei ${chat.name} angefragt`);
   }
 
   if (art === 'standort') {
@@ -6199,11 +7309,10 @@ function openStoryOptionen(story, danach) {
 
           if (was === 'sichtbar') {
             danach?.();
-            return openEinstellung({
-              label: 'Story-Sichtbarkeit',
-              wahl: ['Alle', 'Meine Kontakte', 'Enge Freunde'],
-              standard: 'Meine Kontakte',
-            });
+            // Dieselben vier Stufen wie in den Einstellungen. Hier stand bis
+            // zum 01.09.2026 eine eigene Dreier-Wahl — zwei Orte, an denen
+            // dasselbe eingestellt wird, mit unterschiedlichen Antworten.
+            return openEinstellung({ label: 'Story-Sichtbarkeit', icon: 'eye', sichtbar: 'story' });
           }
 
           if (was === 'link') {
@@ -7296,6 +8405,33 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
 }
 
 /* --------------------------------------------- Was der Plus-Knopf anlegt */
+/**
+ * Aus der Wahl im Formular ein Datum machen — oder null für sofort.
+ *
+ * Liegt „Heute Abend" schon hinter uns, wird daraus der nächste Abend. Ohne
+ * diese Prüfung wäre der geplante Zeitpunkt in der Vergangenheit und der
+ * Beitrag erschiene sofort — das Gegenteil dessen, was gewählt wurde.
+ * Gleiche Regel wie in app/App.tsx.
+ */
+function geplantAb(wahl) {
+  if (!wahl || wahl === 'Sofort') return null;
+  const wann = new Date();
+
+  if (wahl === 'In einer Stunde') {
+    wann.setHours(wann.getHours() + 1);
+    return wann.toISOString();
+  }
+  if (wahl === 'Heute Abend') {
+    wann.setHours(19, 0, 0, 0);
+    if (wann <= new Date()) wann.setDate(wann.getDate() + 1);
+    return wann.toISOString();
+  }
+  // Morgen früh
+  wann.setDate(wann.getDate() + 1);
+  wann.setHours(8, 0, 0, 0);
+  return wann.toISOString();
+}
+
 async function erstelle(was) {
   if (was === 'story') return storyAufnehmen('photo');
   if (was === 'kanal') return openKanalErstellen();
@@ -7347,6 +8483,55 @@ async function erstelle(was) {
 
   if (was === 'livestream') return openLivestream();
 
+  /*
+   * Umfragen. Das Handbuch nennt sie an drei Stellen — bei Beiträgen, bei
+   * Storys und in Community-Kanälen —, in App und Website gab es sie bis zum
+   * 01.09.2026 an keiner.
+   *
+   * Eine Umfrage ist hier ein Beitrag ohne Bild, an dem eine Umfrage hängt.
+   * Das ist bewusst so: sonst bräuchte sie einen eigenen Platz im Feed, eine
+   * eigene Kachel im Profil und eine eigene Zeile in der Suche.
+   */
+  if (was === 'umfrage') {
+    return openFormular(
+      'Neue Umfrage',
+      [
+        { key: 'frage', label: 'Deine Frage', typ: 'mehrzeilig', pflicht: true },
+        { key: 'a1', label: 'Antwort 1', pflicht: true },
+        { key: 'a2', label: 'Antwort 2', pflicht: true },
+        { key: 'a3', label: 'Antwort 3 (freiwillig)' },
+        { key: 'a4', label: 'Antwort 4 (freiwillig)' },
+        {
+          key: 'ende',
+          label: 'Läuft',
+          typ: 'auswahl',
+          auswahl: ['Ohne Ende', '24 Stunden', '3 Tage', '7 Tage'],
+          wert: 'Ohne Ende',
+        },
+      ],
+      async ({ frage, a1, a2, a3, a4, ende }) => {
+        const stunden = { 'Ohne Ende': 0, '24 Stunden': 24, '3 Tage': 72, '7 Tage': 168 }[ende] || 0;
+
+        const beitrag = await api('/api/eigene/beitrag', { beschreibung: frage, ort: '' });
+        if (!beitrag?.ok) return beitrag?.error || 'Der Beitrag ging nicht durch';
+
+        const id = beitrag.beitrag?.id;
+        const umfrage = await api(`/api/umfragen/post/${id}`, {
+          frage,
+          antworten: [a1, a2, a3, a4].filter(Boolean),
+          endetNachStunden: stunden || undefined,
+        });
+        if (!umfrage?.ok) return umfrage?.error || 'Die Umfrage ging nicht durch';
+
+        state.area = 'videos';
+        state.sub.videos = 'home';
+        await bootstrap();
+        toast('Umfrage veröffentlicht');
+      },
+      'Veröffentlichen'
+    );
+  }
+
   // Beitrag, Reels und Querformat: erst aufnehmen, dann beschreiben.
   const istBild = was === 'post';
   const datei = await dateiWaehlen(istBild ? 'photo' : 'video');
@@ -7374,16 +8559,40 @@ async function erstelle(was) {
         auswahl: ['Originalton', ...(state.sounds || []).map((s) => `${s.title} – ${s.artist}`)],
         wert: 'Originalton',
       },
+      /*
+       * „Später posten" aus dem Handbuch: ein vorab eingestellter Beitrag
+       * wird zum geplanten Zeitpunkt hochgeladen. In der Datenbank ist das
+       * `posts.publish_at`; ein Beitrag mit einem Zeitpunkt in der Zukunft
+       * ist angelegt, aber noch nicht sichtbar.
+       */
+      {
+        key: 'zeitpunkt',
+        label: 'Veröffentlichen',
+        typ: 'auswahl',
+        auswahl: ['Sofort', 'In einer Stunde', 'Heute Abend', 'Morgen früh'],
+        wert: 'Sofort',
+      },
     ],
     async (werte) => {
+      const spaeter = geplantAb(werte.zeitpunkt);
       const ziel = istBild ? '/api/eigene/beitrag' : '/api/eigene/video';
       const res = await fetch(ziel, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...werte, format: quer ? 'quer' : 'hoch' }),
+        body: JSON.stringify({ ...werte, geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
       });
       const daten = await res.json();
       if (!daten.ok) return daten.error;
+
+      /*
+       * Geplante Beiträge kommen nicht in den Feed. Sie dort schon zu zeigen
+       * wäre die naheliegende Abkürzung und genau falsch: man sähe einen
+       * Beitrag, den außer einem selbst niemand hat.
+       */
+      if (spaeter) {
+        toast(`Geplant für ${(werte.zeitpunkt || 'später').toLowerCase()}`);
+        return;
+      }
 
       const eintrag = daten.beitrag || daten.video || daten.clip;
       eigenesMediumSichern(eintrag.id, bild);
@@ -7435,8 +8644,24 @@ function openLivestream() {
         <div class="live__marke"><span class="live__punkt"></span>LIVE</div>
         <div class="live__zeit" id="liveZeit">00:00</div>
       </div>
+      ${/*
+          Die Live-Kommentarspalte aus dem Handbuch. Sie steht über der
+          Leiste und nicht in einem Blatt: während einer Sendung ist sie das
+          Gegenüber, und etwas, das man erst aufklappen muss, liest niemand.
+
+          Damit Kommentare und Spenden irgendwo hingehören können, wird der
+          Stream beim Start als Beitrag angelegt und nicht erst am Ende.
+        */ ''}
+      <div class="live__spalte" id="liveSpalte">
+        <p class="live__leer">Kommentarspalte wird geöffnet …</p>
+      </div>
+      <div class="live__eingabe">
+        <input id="liveText" placeholder="Etwas sagen …" disabled>
+        <button id="liveSenden" disabled aria-label="Senden">${ICONS.send}</button>
+      </div>
       <div class="live__leiste">
         <div class="live__zuschauer" id="liveZuschauer">0 Zuschauer</div>
+        <div class="live__spenden" id="liveSpenden" hidden></div>
         <button class="prof__btn is-primary" id="liveStop">Livestream beenden</button>
         ${/*
             Punkt 46: "Keine Lösch-Option. Löschen möglich (neben Beenden)."
@@ -7454,6 +8679,77 @@ function openLivestream() {
     body: JSON.stringify({ aktion: 'start' }),
   });
 
+  /*
+   * Der Beitrag zum laufenden Stream. Erst mit ihm gibt es etwas, worauf
+   * sich Kommentare und Spenden beziehen können; vorher gab es während der
+   * Sendung nichts dergleichen, obwohl der Spendencode in den Einstellungen
+   * genau dafür da ist.
+   *
+   * Scheitert das Anlegen, läuft der Stream trotzdem — nur ohne Spalte. Das
+   * ist schlechter, aber kein Grund, gar nicht erst zu senden.
+   */
+  let streamId = null;
+  let spaltenUhr = null;
+
+  api('/api/stream/start', {})
+    .then((antwort) => {
+      if (!antwort?.ok || !antwort.id) {
+        const leer = overlay.querySelector('.live__leer');
+        if (leer) leer.textContent = 'Die Kommentarspalte konnte nicht geöffnet werden.';
+        return;
+      }
+      streamId = antwort.id;
+
+      const feld = overlay.querySelector('#liveText');
+      const knopf = overlay.querySelector('#liveSenden');
+      if (feld) feld.disabled = false;
+      if (knopf) knopf.disabled = false;
+
+      /*
+       * Alle vier Sekunden nachladen. Ein Live-Abo wäre schöner, bräuchte
+       * aber eine eigene Verbindung, die beim Verlassen sauber zugehen muss
+       * — bei einer Kommentarspalte fällt der Unterschied nicht auf.
+       */
+      const holen = async () => {
+        const spalte = overlay.querySelector('#liveSpalte');
+        if (!spalte) return clearInterval(spaltenUhr);
+        try {
+          const res = await fetch(`/api/stream/${streamId}/kommentare`);
+          if (!res.ok) return;
+          const daten = await res.json();
+          const zeilen = daten.kommentare || [];
+          spalte.innerHTML = zeilen.length
+            ? zeilen
+                .slice(-30)
+                .map(
+                  (k) => `<p class="live__kommentar"><b>${esc(k.name)}</b> ${esc(k.text)}</p>`
+                )
+                .join('')
+            : '<p class="live__leer">Noch keine Kommentare.</p>';
+          spalte.scrollTop = spalte.scrollHeight;
+        } catch (fehler) {
+          console.error('Streamkommentare laden fehlgeschlagen:', fehler);
+        }
+      };
+
+      holen();
+      spaltenUhr = setInterval(holen, 4000);
+
+      const senden = async () => {
+        const text = feld.value.trim();
+        if (!text) return;
+        feld.value = '';
+        const antwortK = await api(`/api/stream/${streamId}/kommentare`, { text });
+        if (!antwortK?.ok) return toast(antwortK?.error || 'Der Kommentar ging nicht durch');
+        holen();
+      };
+
+      knopf?.addEventListener('click', senden);
+      feld?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') senden();
+      });
+    });
+
   // Die Zuschauerzahl waechst langsam - sonst sieht der Bildschirm tot aus.
   let zuschauer = 0;
   const uhr = setInterval(() => {
@@ -7469,6 +8765,7 @@ function openLivestream() {
 
   overlay.querySelector('#liveStop').addEventListener('click', async () => {
     clearInterval(uhr);
+    if (spaltenUhr) clearInterval(spaltenUhr);
     await fetch('/api/eigene/livestream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -7483,6 +8780,7 @@ function openLivestream() {
   });
 
   overlay.querySelector('#liveWeg').addEventListener('click', async () => {
+    if (spaltenUhr) clearInterval(spaltenUhr);
     const sicher = await bestaetigen(
       'Livestream verwerfen',
       'Der Stream endet und es bleibt keine Aufzeichnung zurück.',
@@ -8638,15 +9936,15 @@ function paintMessages(chat) {
   // "Mit Stern markiert" in der Kontaktinfo wirklich.
   box.querySelectorAll('[data-msgid]').forEach((el) => {
     let halten;
+    /*
+     * Bis zum 01.09.2026 setzte langes Drücken nur einen Stern. Jetzt steht
+     * dahinter das ganze Menü aus dem Handbuch — der Stern ist einer von
+     * sechs Punkten.
+     */
     const start = () => {
-      halten = setTimeout(async () => {
-        const res = await fetch(`/api/messages/${chat.id}/${el.dataset.msgid}/stern`, { method: 'POST' });
-        const daten = await res.json();
-        if (!daten.ok) return toast(daten.error);
-        const m = state.messages.find((x) => x.id === daten.id);
-        if (m) m.stern = daten.stern;
-        paintMessages(chat);
-        toast(daten.stern ? 'Nachricht markiert' : 'Markierung entfernt');
+      halten = setTimeout(() => {
+        const m = state.messages.find((x) => x.id === el.dataset.msgid);
+        if (m) openNachrichtMenue(m, chat);
       }, 500);
     };
     const ende = () => clearTimeout(halten);
@@ -8702,23 +10000,311 @@ function messageBubble(m, chat) {
          </span>
        </button>`
     : '';
+  /*
+   * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026).
+   *
+   * Antwort und Zitat sehen verschieden aus, weil sie verschiedenes sind:
+   * die Antwort zeigt nur den Bezug (schmaler Balken, eine Zeile), das Zitat
+   * nimmt den Text mit und bleibt lesbar, auch wenn das Original
+   * zurückgenommen wird.
+   */
+  const antwortAuf = m.antwortAuf
+    ? `<div class="msg__bezug">
+         <span class="msg__bezugBalken"></span>
+         <span class="msg__bezugText">
+           <b>${esc(m.antwortAuf.autor)}</b>
+           <span>${esc(m.antwortAuf.text || 'Zurückgenommen')}</span>
+         </span>
+       </div>`
+    : '';
+
+  const zitat = m.zitat
+    ? `<div class="msg__zitat">
+         <b>${esc(m.zitat.autor)} schrieb:</b>
+         <span>„${esc(m.zitat.text)}"</span>
+       </div>`
+    : '';
+
+  // Ohne diese Zeile sähe eine weitergeleitete Nachricht aus wie eine selbst
+  // geschriebene.
+  const weiter = m.weitergeleitetVon
+    ? `<div class="msg__weiter">${ICONS.weiterleiten} Weitergeleitet von ${esc(m.weitergeleitetVon)}</div>`
+    : '';
+
+  // Reaktionen hängen unten an der Blase, nicht darin — sonst wären sie Teil
+  // des Textes.
+  const zaehler = {};
+  for (const r of m.reaktionen || []) zaehler[r.emoji] = (zaehler[r.emoji] || 0) + 1;
+  const reaktionen = Object.keys(zaehler).length
+    ? `<div class="msg__reaktionen">${Object.entries(zaehler)
+        .map(([e, n]) => `<span class="msg__reaktion">${e}${n > 1 ? `<b>${n}</b>` : ''}</span>`)
+        .join('')}</div>`
+    : '';
+
+  const datei = m.datei
+    ? `<div class="msg__datei">
+         <span class="msg__dateiSymbol">${ICONS.document}</span>
+         <span class="msg__dateiText">
+           <strong>${esc(m.datei.name)}</strong>
+           <span>${groesseText(m.datei.groesse)}</span>
+         </span>
+       </div>`
+    : '';
+
+  const sticker = m.media === 'sticker' ? `<span class="msg__sticker">${esc(m.text)}</span>` : '';
+  const gif = m.media === 'gif' ? `<div class="msg__media">${ICONS.film} Gif</div>` : '';
+
+  /*
+   * Zurückgenommen: die Zeile bleibt stehen. Sie verschwinden zu lassen wäre
+   * bequemer, aber dann verlören Antworten und Zitate ihren Bezug — und die
+   * Gegenseite fragte sich, ob sie sich das Gelesene eingebildet hat.
+   */
+  const inhalt = m.zurueckgenommen
+    ? '<span class="msg__zurueck">Diese Nachricht wurde zurückgenommen</span>'
+    : m.geteilt
+    ? `<div class="msg__geteilt">
+         <span class="msg__geteiltBild">${m.geteilt.art === 'video' ? ICONS.play : ICONS.image}</span>
+         <span class="msg__geteiltText">
+           <strong>${esc(m.geteilt.autor)}</strong>
+           <span>${esc(m.geteilt.titel)}</span>
+         </span>
+       </div>`
+    : sticker || datei || gif || standort || kontakt || media || esc(m.text);
+
   return `
-    <div class="msg msg--${out ? 'out' : 'in'}" data-msgid="${esc(m.id)}">
+    <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}" data-msgid="${esc(m.id)}">
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
       ${m.replyToStory ? `<div class="msg__reply">Antwort auf die Story von ${esc(m.replyToStory)}</div>` : ''}
-      ${
-        m.geteilt
-          ? `<div class="msg__geteilt">
-               <span class="msg__geteiltBild">${m.geteilt.art === 'video' ? ICONS.play : ICONS.image}</span>
-               <span class="msg__geteiltText">
-                 <strong>${esc(m.geteilt.autor)}</strong>
-                 <span>${esc(m.geteilt.titel)}</span>
-               </span>
-             </div>`
-          : standort || kontakt || media || esc(m.text)
-      }
-      <div class="msg__foot">${m.stern ? `<span class="msg__stern">${ICONS.star}</span>` : ''}${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
+      ${weiter}${antwortAuf}${zitat}
+      ${inhalt}
+      <div class="msg__foot">${m.stern ? `<span class="msg__stern">${ICONS.star}</span>` : ''}${
+        m.bearbeitet && !m.zurueckgenommen ? 'bearbeitet · ' : ''
+      }${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
+      ${reaktionen}
     </div>`;
+}
+
+/**
+ * Dateigröße in etwas, das man lesen kann.
+ *
+ * Null Bytes heißt nicht „leere Datei", sondern „die Größe kam nicht mit".
+ * Dann lieber nichts behaupten als „0 B" hinschreiben.
+ */
+function groesseText(bytes) {
+  if (!bytes) return 'Datei';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+}
+
+
+/* ==========================================================================
+ * Was man mit einer einzelnen Nachricht machen kann.
+ *
+ * Das Handbuch listet unter „Nachrichten/Chats → Features": bearbeiten,
+ * antworten, zitieren, weiterleiten, Gifs, Sprachnachricht-Geschwindigkeit
+ * und Kontakte teilen. Bis zum 01.09.2026 konnte der Chat davon keinen
+ * einzigen — langes Drücken setzte einen Stern, und das war alles.
+ *
+ * Das Gegenstück in der App: app/components/NachrichtSheet.tsx.
+ * ========================================================================== */
+
+/** Worauf sich die nächste Nachricht bezieht, bzw. welche bearbeitet wird. */
+let msgBezug = null;
+let msgBearbeitet = null;
+
+function openNachrichtMenue(m, chat) {
+  const eigene = m.from === 'me';
+  const meine = (m.reaktionen || []).find((r) => r.userId === 'me')?.emoji || null;
+
+  const punkte = [
+    { key: 'antworten', label: 'Antworten', icon: 'antwort' },
+    { key: 'zitieren', label: 'Zitieren', icon: 'zitat' },
+    { key: 'weiterleiten', label: 'Weiterleiten', icon: 'weiterleiten' },
+    ...(eigene ? [{ key: 'bearbeiten', label: 'Bearbeiten', icon: 'bearbeiten' }] : []),
+    { key: 'markieren', label: m.stern ? 'Markierung entfernen' : 'Mit Stern markieren', icon: 'star' },
+    ...(eigene ? [{ key: 'zuruecknehmen', label: 'Zurücknehmen', icon: 'trash', gefahr: true }] : []),
+  ];
+
+  openSheet(
+    'Nachricht',
+    `<div class="sheet__body">
+       <div class="msgmenue__emojis">
+         ${REAKTIONEN.map(
+           (e) => `<button class="msgmenue__emoji${meine === e ? ' is-active' : ''}" data-reaktion="${e}">${e}</button>`
+         ).join('')}
+       </div>
+       ${punkte
+         .map(
+           (p) => `<button class="item${p.gefahr ? ' item--danger' : ''}" data-msgaktion="${p.key}">
+             <span class="item__icon">${ICONS[p.icon]}</span>
+             <span class="item__label">${esc(p.label)}</span>
+           </button>`
+         )
+         .join('')}
+     </div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-reaktion]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          close();
+          const antwort = await api(`/api/messages/${chat.id}/${m.id}/reaktion`, {
+            emoji: b.dataset.reaktion,
+          });
+          if (!antwort?.ok) return toast(antwort?.error || 'Die Reaktion ging nicht durch');
+
+          // Eine Person hat je Nachricht genau eine Reaktion: die alte wird
+          // ersetzt, dasselbe Emoji noch einmal nimmt sie weg.
+          const ohneMich = (m.reaktionen || []).filter((r) => r.userId !== 'me');
+          m.reaktionen = antwort.emoji ? [...ohneMich, { userId: 'me', emoji: antwort.emoji }] : ohneMich;
+          paintMessages(chat);
+        })
+      );
+
+      sheet.querySelectorAll('[data-msgaktion]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const was = b.dataset.msgaktion;
+          close();
+
+          if (was === 'antworten' || was === 'zitieren') {
+            msgBezug = { art: was === 'zitieren' ? 'zitat' : 'antwort', nachricht: m };
+            msgBearbeitet = null;
+            return zeigeBezugLeiste(chat);
+          }
+
+          if (was === 'bearbeiten') {
+            msgBearbeitet = m;
+            msgBezug = null;
+            const feld = $('#msgInput');
+            if (feld) {
+              feld.value = m.text;
+              feld.focus();
+              $('#sendBtn').disabled = false;
+            }
+            return zeigeBezugLeiste(chat);
+          }
+
+          if (was === 'weiterleiten') return openWeiterleiten(m, chat);
+
+          if (was === 'markieren') {
+            const res = await fetch(`/api/messages/${chat.id}/${m.id}/stern`, { method: 'POST' });
+            const daten = await res.json();
+            if (!daten.ok) return toast(daten.error);
+            m.stern = daten.stern;
+            paintMessages(chat);
+            return toast(daten.stern ? 'Nachricht markiert' : 'Markierung entfernt');
+          }
+
+          if (was === 'zuruecknehmen') {
+            const antwort = await api(`/api/messages/${chat.id}/${m.id}/zuruecknehmen`, {});
+            if (!antwort?.ok) return toast(antwort?.error || 'Das hat nicht geklappt');
+            m.zurueckgenommen = true;
+            m.text = '';
+            paintMessages(chat);
+          }
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/**
+ * Die Zeile über der Eingabe: worauf sich die nächste Nachricht bezieht.
+ *
+ * Ohne sie tippt man in eine Eingabe, die sich unsichtbar anders verhält als
+ * sonst — der Sendeknopf überschreibt plötzlich statt zu senden.
+ */
+function zeigeBezugLeiste(chat) {
+  const alt = document.querySelector('.msgbezug');
+  if (alt) alt.remove();
+  if (!msgBezug && !msgBearbeitet) return;
+
+  const quelle = msgBearbeitet || msgBezug.nachricht;
+  const titel = msgBearbeitet
+    ? 'Nachricht bearbeiten'
+    : msgBezug.art === 'zitat'
+    ? 'Zitieren'
+    : 'Antworten';
+
+  const leiste = document.createElement('div');
+  leiste.className = 'msgbezug';
+  leiste.innerHTML = `
+    <span class="msgbezug__balken"></span>
+    <span class="msgbezug__text"><b>${esc(titel)}</b><span>${esc(quelle.text || 'Anhang')}</span></span>
+    <button class="msgbezug__zu" aria-label="Abbrechen">${ICONS.close}</button>`;
+
+  const composer = document.querySelector('.composer');
+  if (composer) composer.parentNode.insertBefore(leiste, composer);
+
+  leiste.querySelector('.msgbezug__zu').addEventListener('click', () => {
+    if (msgBearbeitet) {
+      const feld = $('#msgInput');
+      if (feld) feld.value = '';
+    }
+    msgBezug = null;
+    msgBearbeitet = null;
+    leiste.remove();
+  });
+}
+
+/**
+ * Eine Nachricht in andere Chats weiterleiten.
+ *
+ * Gewählt werden Chats, nicht Personen: eine Gruppe ist ein gültiges Ziel,
+ * und an sie ließe sich über eine Personenliste gar nicht weiterleiten.
+ * Mehrere auf einmal, weil Weiterleiten fast immer heißt: dasselbe an zwei
+ * oder drei Stellen.
+ */
+function openWeiterleiten(m, chat) {
+  const ziele = state.chats.filter((c) => c.id !== chat.id);
+  if (!ziele.length) return toast('Es gibt keinen anderen Chat, in den das gehen könnte');
+
+  const gewaehlt = new Set();
+
+  openSheet(
+    'Weiterleiten',
+    `<div class="sheet__body">
+       ${ziele
+         .map(
+           (c) => `<button class="insight__person" data-ziel="${c.id}">
+             ${avatarOf(c, 38)}
+             <span class="insight__personText"><span class="insight__personName">${esc(c.name)}</span></span>
+             <span class="insight__haken">${ICONS.check}</span>
+           </button>`
+         )
+         .join('')}
+       <button class="btn btn--breit" id="wlSenden" disabled>Wähle mindestens einen Chat</button>
+     </div>`,
+    (sheet, close) => {
+      const knopf = sheet.querySelector('#wlSenden');
+      const stand = () => {
+        knopf.disabled = gewaehlt.size === 0;
+        knopf.textContent = gewaehlt.size
+          ? `An ${gewaehlt.size} ${gewaehlt.size === 1 ? 'Chat' : 'Chats'} weiterleiten`
+          : 'Wähle mindestens einen Chat';
+      };
+
+      sheet.querySelectorAll('[data-ziel]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const id = b.dataset.ziel;
+          if (gewaehlt.has(id)) gewaehlt.delete(id);
+          else gewaehlt.add(id);
+          b.classList.toggle('is-active', gewaehlt.has(id));
+          stand();
+        })
+      );
+
+      knopf.addEventListener('click', async () => {
+        const antwort = await api(`/api/messages/${chat.id}/${m.id}/weiterleiten`, {
+          chatIds: [...gewaehlt],
+        });
+        close();
+        if (!antwort?.ok) return toast(antwort?.error || 'Das Weiterleiten hat nicht geklappt');
+        toast(`An ${antwort.anzahl} ${antwort.anzahl === 1 ? 'Chat' : 'Chats'} weitergeleitet`);
+      });
+    },
+    { hoch: true, schliessen: true }
+  );
 }
 
 async function sendMessage(chat) {
@@ -8730,12 +10316,57 @@ async function sendMessage(chat) {
   input.style.height = 'auto';
   $('#sendBtn').disabled = true;
 
+  /*
+   * Bearbeiten läuft über denselben Knopf wie Senden.
+   *
+   * Ein eigener „Speichern"-Knopf wäre ein zweiter Zustand der Eingabezeile,
+   * den man erst begreifen muss. Solange oben „Nachricht bearbeiten" steht,
+   * überschreibt der Sendeknopf — das ist die naheliegende Erwartung.
+   */
+  if (msgBearbeitet) {
+    const alt = msgBearbeitet;
+    msgBearbeitet = null;
+    document.querySelector('.msgbezug')?.remove();
+
+    const antwort = await api(`/api/messages/${chat.id}/${alt.id}/bearbeiten`, { text });
+    if (!antwort?.ok) return toast(antwort?.error || 'Das Bearbeiten hat nicht geklappt');
+
+    const m = state.messages.find((x) => x.id === alt.id);
+    if (m) {
+      m.text = text;
+      m.bearbeitet = true;
+    }
+    paintMessages(chat);
+    return;
+  }
+
+  const bezug = msgBezug;
+  msgBezug = null;
+  document.querySelector('.msgbezug')?.remove();
+
   const res = await fetch(`/api/messages/${chat.id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text,
+      antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
+      zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
+    }),
   });
   const msg = await res.json();
+
+  // Bezug gleich mitzeichnen, statt auf das nächste Laden zu warten — sonst
+  // erschiene die eigene Antwort einen Moment lang ohne ihren Anlass.
+  if (bezug) {
+    const kopf = {
+      id: bezug.nachricht.id,
+      text: bezug.nachricht.text,
+      autor: bezug.nachricht.from === 'me' ? 'Du' : user(bezug.nachricht.from).name,
+    };
+    if (bezug.art === 'antwort') msg.antwortAuf = kopf;
+    else msg.zitat = kopf;
+  }
+
   state.messages.push(msg);
   paintMessages(chat);
 

@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, LayoutChangeEvent, StyleSheet, Text, View, RefreshControl, ViewToken } from 'react-native';
+import {
+  Animated,
+  Dimensions,
+  FlatList,
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  RefreshControl,
+  ViewToken,
+} from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
@@ -11,7 +23,7 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { Video } from '../../types';
 import { compactNumber } from '../../lib/zahlen';
 import { haptic } from '../../lib/haptics';
-import { Videoflaeche } from '../../components/Videoflaeche';
+import { Videoflaeche, VideoSteuerung } from '../../components/Videoflaeche';
 import { useAktionen } from '../../lib/useAktionen';
 
 interface Props {
@@ -58,6 +70,35 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   const [sichtbar, setSichtbar] = useState<string | null>(null);
   /* Angehalten durch Antippen. Beim Weiterwischen faengt das naechste an. */
   const [pause, setPause] = useState(false);
+
+  /*
+   * Die beiden Gesten aus dem Handbuch, plus die von Henrik gewuenschte
+   * dritte:
+   *
+   *   in die Mitte tippen        -> pausieren        (war schon da)
+   *   rechte Haelfte halten      -> Geschwindigkeit x2
+   *   doppelt tippen             -> Like
+   *
+   * Alle drei haengen an derselben Flaeche, deshalb steht die Unterscheidung
+   * hier und nicht in drei uebereinandergelegten Schaltflaechen. Uebereinander
+   * gelegt wuerde die oberste alle Beruehrungen schlucken, und die beiden
+   * darunter waeren tot.
+   */
+  const spieler = useRef<Record<string, VideoSteuerung | null>>({});
+  const letzterTipp = useRef(0);
+  const tippZeitgeber = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const halten = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [schnell, setSchnell] = useState(false);
+  /** Das Herz, das beim Doppeltipp kurz aufblitzt. */
+  const herz = useRef(new Animated.Value(0)).current;
+
+  const herzZeigen = useCallback(() => {
+    herz.setValue(0);
+    Animated.sequence([
+      Animated.spring(herz, { toValue: 1, useNativeDriver: true, friction: 4 }),
+      Animated.timing(herz, { toValue: 0, duration: 260, delay: 320, useNativeDriver: true }),
+    ]).start();
+  }, [herz]);
   /*
    * Ton. Ein Kanal, der beim Oeffnen der App losplaerrt, ist unhoeflich —
    * deshalb faengt er stumm an, wie in jeder anderen App auch, und der
@@ -142,13 +183,81 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
     onShare(video);
   };
 
+  /**
+   * Ein Tipp auf die Flaeche.
+   *
+   * Zwei Tipps kurz hintereinander sind ein Like, ein einzelner pausiert.
+   * Deshalb wartet der einzelne Tipp 260 ms ab: kommt in der Zeit ein
+   * zweiter, war es keiner. Ohne diese Wartezeit wuerde jeder Doppeltipp
+   * nebenbei auch pausieren.
+   */
+  const flaecheGetippt = (item: Video) => {
+    const jetzt = Date.now();
+    if (jetzt - letzterTipp.current < 260) {
+      letzterTipp.current = 0;
+      if (tippZeitgeber.current) clearTimeout(tippZeitgeber.current);
+      tippZeitgeber.current = null;
+
+      // Doppeltipp likt, nimmt aber nie weg. Wer versehentlich zweimal
+      // tippt, soll nicht sein Like verlieren — auf Instagram und TikTok
+      // ist es genauso.
+      herzZeigen();
+      if (!item.liked) toggleLike(item);
+      else haptic.impact('light');
+      return;
+    }
+
+    letzterTipp.current = jetzt;
+    tippZeitgeber.current = setTimeout(() => {
+      setPause((p) => !p);
+      tippZeitgeber.current = null;
+    }, 260);
+  };
+
+  /**
+   * Gedrueckt halten auf der rechten Haelfte: Geschwindigkeit x2.
+   *
+   * Die Grenze liegt bei der halben Bildschirmbreite. Sie am Bildschirm zu
+   * messen statt an der Flaeche ist genau genug — das Reel fuellt die volle
+   * Breite.
+   */
+  const gedruecktAb = (item: Video) => (e: GestureResponderEvent) => {
+    const rechts = e.nativeEvent.pageX > Dimensions.get('window').width / 2;
+    if (!rechts) return;
+
+    halten.current = setTimeout(() => {
+      setSchnell(true);
+      haptic.impact('light');
+      spieler.current[item.id]?.tempo(2);
+    }, 250);
+  };
+
+  const losgelassen = (item: Video) => () => {
+    if (halten.current) {
+      clearTimeout(halten.current);
+      halten.current = null;
+    }
+    if (schnell) {
+      setSchnell(false);
+      spieler.current[item.id]?.tempo(1);
+    }
+  };
+
   const renderVideo = ({ item }: { item: Video }) => {
     const author = alleNutzer[item.userId];
 
     return (
       <View style={[styles.slide, slideHeight > 0 && { height: slideHeight }]}>
-        <Druck style={styles.stage} onPress={() => setPause((p) => !p)}>
+        <Pressable
+          style={styles.stage}
+          onPress={() => flaecheGetippt(item)}
+          onPressIn={gedruecktAb(item)}
+          onPressOut={losgelassen(item)}
+        >
           <Videoflaeche
+            ref={(r) => {
+              spieler.current[item.id] = r;
+            }}
             id={item.id}
             quelle={item.mediaUri}
             standbild={item.standbild}
@@ -167,7 +276,29 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
               <Ionicons name="play" size={64} color="rgba(255,255,255,0.85)" />
             </View>
           )}
-        </Druck>
+
+          {/* Das Herz beim Doppeltipp. Ohne diese Rueckmeldung waere nicht zu
+              erkennen, ob der zweite Tipp angekommen ist — die Zahl an der
+              Seite ist zu klein und zu weit weg. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.herz,
+              { opacity: herz, transform: [{ scale: herz.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.15] }) }] },
+            ]}
+          >
+            <Ionicons name="heart" size={96} color="rgba(255,77,109,0.92)" />
+          </Animated.View>
+
+          {/* Solange x2 laeuft, muss es dastehen. Sonst wirkt das Video
+              kaputt: der Ton ist zu hoch und niemand weiss warum. */}
+          {schnell && sichtbar === item.id && (
+            <View style={styles.tempoMarke} pointerEvents="none">
+              <Ionicons name="play-forward" size={14} color={colors.white} />
+              <Text style={styles.tempoText}>2×</Text>
+            </View>
+          )}
+        </Pressable>
 
         <Druck
           style={styles.tonKnopf}
@@ -286,6 +417,7 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
       />
 
       <CommentSheet
+        onNotice={onNotice}
         targetId={commentsFor}
         onClose={() => setCommentsFor(null)}
         onCountChange={(id, count) => update(id, (v) => ({ ...v, comments: count }))}
@@ -295,6 +427,21 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
 };
 
 const styles = themenStyles((colors) => ({
+  herz: { position: 'absolute', alignSelf: 'center', top: '38%' },
+  tempoMarke: {
+    position: 'absolute',
+    top: 14,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  tempoText: { ...typography.small, color: colors.white, fontWeight: '700' },
+
   followAn: { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'transparent' },
   bell: { width: 30, alignItems: 'center' },
   bellStrike: { position: 'absolute', top: '50%', left: '50%', width: 22, height: 2, backgroundColor: colors.text2, transform: [{ translateX: -11 }, { translateY: -1 }, { rotate: '-20deg' }] },

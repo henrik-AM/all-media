@@ -11,6 +11,11 @@ import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet
 import { FormularSheet } from '../../components/FormularSheet';
 import { useDaten } from '../../contexts/DatenContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
+import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
+import { useAktionen } from '../../lib/useAktionen';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { ladeBanne } from '../../lib/daten';
+import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -43,9 +48,15 @@ interface Item {
   pruefen?: (werte: Record<string, string>) => string | null;
   fertig?: string;
   liste?: string;
+  /*
+   * Sichtbarkeit in den vier Stufen des Handbuchs, mit Ausnahmeliste.
+   * Der Wert ist der Bereich in der Datenbank — standort, story, repost,
+   * onlinestatus, ptt, likes, download, dm.
+   */
+  sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen';
+  aktion?: 'sicherung' | 'einladen' | 'alter';
   gefahr?: boolean;
 }
 
@@ -61,7 +72,6 @@ interface Section {
  */
 // Mehrfach gebrauchte Auswahlen - einmal benannt statt viermal getippt.
 const WER = ['Alle', 'Meine Kontakte', 'Niemand'];
-const STORY = ['Alle', 'Meine Kontakte', 'Enge Freunde'];
 const STATUS = ['Aktiv', 'Beschäftigt', 'Unsichtbar'];
 
 const SPENDENCODE: Item = {
@@ -77,13 +87,33 @@ const SECTIONS: Section[] = [
     title: 'Allgemein',
     items: [
       {
-        label: 'Erziehungsberechtigte/r',
+        label: 'Alter und Erziehungsberechtigte/r',
         icon: 'shield-outline',
         eingabe: [
-          { key: 'name', label: 'Name', platzhalter: 'Vor- und Nachname', pflicht: true },
-          { key: 'mail', label: 'E-Mail-Adresse', platzhalter: 'name@beispiel.de', pflicht: true },
+          /*
+           * Geburtsdatum statt Name und E-Mail.
+           *
+           * Das Handbuch verlangt: unter 16 nur mit Zustimmung eines
+           * Erziehungsberechtigten, "der einen All Media Account besitzen"
+           * muss. Vorher stand hier ein Formular fuer Name und E-Mail, an
+           * dem gar nichts hing — kein Geburtsdatum, keine Pruefung, keine
+           * Verknuepfung. Ein Nutzername laesst sich in der Datenbank
+           * nachschlagen, eine E-Mail-Adresse kann jeder erfinden.
+           */
+          {
+            key: 'geburtsdatum',
+            label: 'Geburtsdatum',
+            platzhalter: 'JJJJ-MM-TT, z. B. 2012-04-19',
+            pflicht: true,
+          },
+          {
+            key: 'guardian',
+            label: 'Nutzername des/der Erziehungsberechtigten (nur unter 16)',
+            platzhalter: '@nutzername',
+          },
         ],
-        fertig: 'Einladung verschickt — die Verknüpfung gilt, sobald sie bestätigt wurde',
+        aktion: 'alter',
+        fertig: 'Gespeichert',
       },
       SPENDENCODE,
       {
@@ -176,9 +206,9 @@ const SECTIONS: Section[] = [
     title: 'Messenger',
     items: [
       { label: 'Lesebestätigung', icon: 'checkmark-done-outline', toggle: 'lesebestaetigung' },
-      { label: 'Standort-Sichtbarkeit', icon: 'location-outline', wahl: ['Alle Kontakte', 'Ausgewählte Kontakte', 'Niemand'], standard: 'Alle Kontakte' },
-      { label: 'Story-Sichtbarkeit', icon: 'eye-outline', wahl: STORY, standard: 'Meine Kontakte' },
-      { label: 'Zuletzt online', icon: 'eye-outline', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Standort-Sichtbarkeit', icon: 'location-outline', sichtbar: 'standort' },
+      { label: 'Story-Sichtbarkeit', icon: 'eye-outline', sichtbar: 'story' },
+      { label: 'Zuletzt online', icon: 'eye-outline', sichtbar: 'onlinestatus' },
       { label: 'Mit Enter senden', icon: 'return-down-back-outline', toggle: 'entersenden' },
       { label: 'Chat-Hintergrund', icon: 'color-palette-outline', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
       { label: 'Schriftgröße', icon: 'text-outline', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
@@ -207,11 +237,18 @@ const SECTIONS: Section[] = [
       { label: 'Insights', icon: 'compass-outline', liste: 'insights' },
       { label: 'Wem ich folge', icon: 'person-outline', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
-      { label: 'Repost-Sichtbarkeit', icon: 'repeat-outline', wahl: ['Alle', 'Meine Follower', 'Niemand'], standard: 'Alle' },
-      { label: 'Likes-Sichtbarkeit', icon: 'heart-outline', wahl: ['Alle', 'Nur ich'], standard: 'Alle' },
-      { label: 'Downloadeinstellungen', icon: 'image-outline', wahl: ['Erlaubt', 'Nur Follower', 'Aus'], standard: 'Erlaubt' },
-      { label: 'Story-Sichtbarkeit', icon: 'eye-outline', wahl: STORY, standard: 'Meine Kontakte' },
+      { label: 'Repost-Sichtbarkeit', icon: 'repeat-outline', sichtbar: 'repost' },
+      { label: 'Likes-Sichtbarkeit', icon: 'heart-outline', sichtbar: 'likes' },
+      { label: 'Downloadeinstellungen', icon: 'image-outline', sichtbar: 'download' },
+      { label: 'Story-Sichtbarkeit (Videos)', icon: 'eye-outline', sichtbar: 'story' },
       { label: 'Nutzerstatus', icon: 'person-outline', wahl: STATUS, standard: 'Aktiv' },
+      /*
+       * "Nutzerstatus -> immer offline fuer ..." aus dem Handbuch. Es ist
+       * keine eigene Einstellung, sondern der Onlinestatus in der Stufe
+       * "Alle bis auf ..." — deshalb steht hier derselbe Bereich.
+       */
+      { label: 'Immer offline für …', icon: 'eye-off-outline', sichtbar: 'onlinestatus' },
+      { label: 'Profilbann-Verlauf', icon: 'warning-outline', liste: 'banne' },
       { label: 'Profilbanner', icon: 'tv-outline', wahl: ['Ohne', 'Farbverlauf', 'Eigenes Bild'], standard: 'Ohne' },
     ],
   },
@@ -253,8 +290,8 @@ const SECTIONS: Section[] = [
       SPENDENCODE,
       { label: 'Nutzerstatus', icon: 'person-outline', wahl: STATUS, standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'commPrivate' },
-      { label: 'Nachrichten erlaubt von', icon: 'chatbubble-outline', wahl: ['Alle', 'Mitglieder meiner Communitys', 'Niemand'], standard: 'Mitglieder meiner Communitys' },
-      { label: 'Push-to-Talk Nachricht', icon: 'mic-outline', wahl: ['An', 'Aus'], standard: 'An' },
+      { label: 'Nachrichten erlaubt von', icon: 'chatbubble-outline', sichtbar: 'dm' },
+      { label: 'Push-to-Talk Benachrichtigung', icon: 'mic-outline', sichtbar: 'ptt' },
       { label: 'Gestummte Communitys', icon: 'volume-mute-outline', liste: 'stummeKanaele' },
       { label: 'Gestummte Profile', icon: 'ban-outline', liste: 'stummeProfile' },
     ],
@@ -337,6 +374,20 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         ],
       };
     }
+    /*
+     * Der Bann-Verlauf. Das Handbuch verlangt ihn ausdruecklich "mit Grund" —
+     * ohne Begruendung ist eine Sperre nicht nachvollziehbar und nicht
+     * anfechtbar.
+     */
+    if (art === 'banne') {
+      return {
+        leer: 'Gegen dein Profil liegt nichts vor.',
+        zeilen: banne.map((b) => ({
+          text: `${b.grund} (${b.bereich})`,
+          neben: b.laeuft ? `läuft seit ${b.von}` : `beendet · ${b.von}`,
+        })),
+      };
+    }
     if (art === 'insights') {
       return {
         leer: '',
@@ -379,6 +430,49 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     setOffen(item);
   };
   const offsets = useRef<Record<string, number>>({});
+
+  /*
+   * Sichtbarkeit und Bann-Verlauf, nachgetragen am 01.09.2026.
+   *
+   * Die Stufen kommen aus der Datenbank (DatenContext) und werden hier nur
+   * angezeigt und geaendert. Ein zweiter Stand im Bildschirm waere genau der
+   * Weg, auf dem Anzeige und Wirklichkeit auseinanderlaufen.
+   */
+  const { sichtbarkeit, ichId, neuLaden } = useDaten();
+  const { supabase } = useSupabase();
+  const aktionen = useAktionen(onNotice);
+  const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
+  const [banne, setBanne] = useState<
+    { id: string; bereich: string; grund: string; von: string; laeuft: boolean }[]
+  >([]);
+
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    ladeBanne(supabase, ichId)
+      .then(setBanne)
+      .catch((e: any) => console.error('Bann-Verlauf laden fehlgeschlagen:', e?.message ?? e));
+  }, [supabase, ichId]);
+
+  /** Stufe und Ausnahmen zu einem Bereich — ohne Eintrag gilt „alle". */
+  const sicht = (bereich?: SichtbarkeitBereich) =>
+    (bereich && sichtbarkeit[bereich]) || { stufe: 'alle' as SichtbarkeitStufe, ausnahmen: [] };
+
+  /** Was rechts neben dem Punkt steht. */
+  const sichtText = (bereich?: SichtbarkeitBereich) => {
+    const s = sicht(bereich);
+    const namen: Record<string, string> = {
+      niemand: 'Niemand',
+      niemand_bis_auf: 'Niemand bis auf …',
+      alle_bis_auf: 'Alle bis auf …',
+      alle: 'Alle',
+    };
+    // Bei den "bis auf"-Stufen die Zahl dazu. Ohne sie sieht eine leere
+    // Ausnahmeliste genauso aus wie eine mit zwölf Namen.
+    const zahl = s.ausnahmen.length;
+    return zahl && s.stufe !== 'alle' && s.stufe !== 'niemand'
+      ? `${namen[s.stufe]} (${zahl})`
+      : namen[s.stufe];
+  };
   const { isDark, setTheme } = useContext(ThemeContext);
   const [switches, setSwitches] = useState<Record<string, boolean>>({
     videoPrivate: false,
@@ -471,7 +565,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                   key={`${section.id}-${item.label}`}
                   style={styles.item}
                   onPress={() => {
-                    if (!item.toggle) oeffne(item);
+                    if (item.toggle) return;
+                    if (item.sichtbar) return setSichtOffen(item);
+                    oeffne(item);
                   }}
                 >
                   <Ionicons name={item.icon} size={20} color={item.gefahr ? colors.danger : colors.text2} />
@@ -491,6 +587,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                   ) : (
                     <>
                       {!!item.wahl && <Text style={styles.itemValue}>{wert(item)}</Text>}
+                      {!!item.sichtbar && (
+                        <Text style={styles.itemValue}>{sichtText(item.sichtbar)}</Text>
+                      )}
                       <Ionicons name="chevron-forward" size={18} color={colors.text3} />
                     </>
                   )}
@@ -512,6 +611,29 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           </Druck>
         </View>
       </ScrollView>
+
+      {/*
+        * Sichtbarkeit in vier Stufen mit Ausnahmeliste. Die Aenderung geht
+        * sofort in die Datenbank; scheitert sie, stellt useAktionen den
+        * alten Stand wieder her und sagt warum.
+        */}
+      {sichtOffen?.sichtbar && (
+        <SichtbarkeitSheet
+          visible
+          titel={sichtOffen.label}
+          stufe={sicht(sichtOffen.sichtbar).stufe}
+          ausnahmen={sicht(sichtOffen.sichtbar).ausnahmen}
+          onStufe={async (stufe) => {
+            await aktionen.sichtbarkeit(sichtOffen.sichtbar!, stufe, () => {});
+            await neuLaden();
+          }}
+          onAusnahme={async (userId) => {
+            await aktionen.sichtbarkeitAusnahme(sichtOffen.sichtbar!, userId, () => {});
+            await neuLaden();
+          }}
+          onClose={() => setSichtOffen(null)}
+        />
+      )}
 
       {offen?.eingabe && (
         <FormularSheet
@@ -540,6 +662,34 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                 link: werte.link ?? eigenesProfil.link,
               });
             }
+            /*
+             * Die Altersangabe geht wirklich in die Datenbank. Vorher stand
+             * hier ein Formular, an dem gar nichts hing: man trug einen
+             * Erziehungsberechtigten ein und es passierte nichts.
+             *
+             * Das Ergebnis wird nicht abgewartet, weil das Blatt sonst
+             * haengen bliebe — die Meldung kommt hinterher, und bei einem
+             * Fehler (unbekannter Nutzername, unglaubwuerdiges Datum) nennt
+             * sie den Grund.
+             */
+            if (offen.aktion === 'alter') {
+              void (async () => {
+                const ergebnis = await aktionen.altersangabe(
+                  werte.geburtsdatum?.trim() ?? '',
+                  werte.guardian?.trim() || undefined
+                );
+                if (!ergebnis) return;
+                await neuLaden();
+                onNotice(
+                  ergebnis.brauchtFreigabe
+                    ? `${ergebnis.alter} Jahre — die Freigabe ist angefragt`
+                    : `${ergebnis.alter} Jahre — keine Freigabe nötig`
+                );
+              })();
+              setOffen(null);
+              return null;
+            }
+
             setGewaehlt((prev) => ({ ...prev, [offen.label]: werte[offen.eingabe![0].key] }));
             onNotice(offen.fertig ?? 'Gespeichert');
             return null;

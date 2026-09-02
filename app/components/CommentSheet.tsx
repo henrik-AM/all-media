@@ -19,16 +19,20 @@ import { ICH as CURRENT_USER_ID, ladeKommentare } from '../lib/daten';
 import { useZiehenZumSchliessen } from '../lib/ziehen';
 import { Comment } from '../types';
 import * as Aktion from '../lib/aktionen';
+import { useAktionen } from '../lib/useAktionen';
 
 interface Props {
   targetId: string | null;
   onClose: () => void;
   onCountChange?: (targetId: string, count: number) => void;
+  /** Fuer die Rueckmeldung des Wortfilters. */
+  onNotice?: (text: string) => void;
 }
 
-export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
+export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Props) => {
   const { users: alleNutzer, ichId } = useDaten();
   const { supabase } = useSupabase();
+  const aktionen = useAktionen(onNotice);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
 
@@ -81,6 +85,23 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
   const send = async () => {
     const text = draft.trim();
     if (!text || !targetId || !supabase || !ichId) return;
+
+    /*
+     * Der Kommentarfilter aus dem Handbuch ("Inhalts-/Kommentarfilter").
+     *
+     * Er greift vor dem Absenden und nicht danach: einen Kommentar erst zu
+     * veroeffentlichen und dann wieder zu entfernen hiesse, dass ihn in der
+     * Zwischenzeit jemand gelesen hat. Der Entwurf bleibt stehen, damit man
+     * ihn umformulieren kann, statt ihn neu zu tippen.
+     *
+     * Geprueft wird auf Wortgrenzen — sonst waere "Spastik" ein Verstoss.
+     */
+    const treffer = await aktionen.wortfilter(text);
+    if (treffer) {
+      onNotice?.(`„${treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
+      return;
+    }
+
     setDraft('');
 
     let data;
