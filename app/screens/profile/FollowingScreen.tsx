@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
@@ -6,6 +6,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { ladeFolgeListe } from '../../lib/daten';
 
 interface Props {
   userId: string;
@@ -15,14 +17,34 @@ interface Props {
 }
 
 export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Props) => {
-  const { users: alleNutzer } = useDaten();
+  const { users: alleNutzer, ichId } = useDaten();
+  const { supabase } = useSupabase();
   const insets = useSafeAreaInsets();
   const person = alleNutzer[userId];
 
-  // Mock-Following-Liste
-  const following = [
-    alleNutzer.u2, alleNutzer.u3, alleNutzer.u4, alleNutzer.u5, alleNutzer.u6,
-  ];
+  /*
+   * Gegenstueck zu FollowersScreen: hier stand u2 bis u6 fest im Code. Die
+   * Liste kommt jetzt aus `follows`, damit sie zu der Zahl passt, die auf
+   * dem Profil daruebersteht, und zu dem, was die Website zeigt.
+   */
+  const [ids, setIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    let gilt = true;
+    ladeFolgeListe(supabase, ichId, userId, 'gefolgt')
+      .then((liste) => gilt && setIds(liste))
+      .catch((e: any) => {
+        console.error('Gefolgte laden fehlgeschlagen:', e?.message ?? e);
+        if (gilt) setIds([]);
+        onNotice('Die Liste konnte nicht geladen werden.');
+      });
+    return () => {
+      gilt = false;
+    };
+  }, [supabase, ichId, userId]);
+
+  const following = (ids ?? []).map((id) => alleNutzer[id]).filter(Boolean);
 
   if (!person) {
     return (
@@ -43,6 +65,11 @@ export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Pro
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl + insets.bottom }}>
+        {ids !== null && following.length === 0 && (
+          <Text style={styles.leer}>
+            {userId === 'me' ? 'Du folgst noch niemandem.' : `${person.name} folgt noch niemandem.`}
+          </Text>
+        )}
         {following.map((user) => (
           <Druck
             key={user.id}

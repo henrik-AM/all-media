@@ -160,6 +160,60 @@ async function ladeFolgen(client, nutzerId) {
   return new Set((data || []).map((f) => f.followee_id));
 }
 
+/**
+ * Wer folgt dieser Person — und wem folgt sie?
+ *
+ * Gegenstueck zu ladeFolgeListe() in app/lib/daten.ts. Die Oberflaeche las
+ * bis zum 02.09.2026 `state.users.followers` — eine Eigenschaft, die nie
+ * jemand gesetzt hat. Die Liste war deshalb immer leer, waehrend die Zahl
+ * darueber aus `profile_zahlen` kam und stimmte.
+ */
+async function ladeFolgeListe(client, nutzerId, userId, art) {
+  if (!client) return [];
+  const ziel = userId === 'me' ? nutzerId : userId;
+  const [gesucht, gegeben] =
+    art === 'follower' ? ['follower_id', 'followee_id'] : ['followee_id', 'follower_id'];
+
+  const { data, error } = await client.from('follows').select(gesucht).eq(gegeben, ziel);
+  if (error) throw error;
+  return (data || []).map((f) => (f[gesucht] === nutzerId ? 'me' : f[gesucht]));
+}
+
+/**
+ * Die „Insights" aus den Einstellungen — Statistik zum eigenen Content.
+ *
+ * Gegenstueck zu ladeStatistik() in app/lib/daten.ts. Bis zum 02.09.2026
+ * standen die vier Zahlen auf beiden Seiten fest im Code (340 / 1.284 / 46)
+ * und waren bei jedem Konto gleich.
+ *
+ * `posts.views` ist ein Zaehlerstand ohne Verlauf — deshalb „Aufrufe gesamt"
+ * statt „Aufrufe (30 Tage)". Die neuen Follower dagegen lassen sich ueber
+ * `follows.created_at` wirklich auf dreissig Tage eingrenzen.
+ */
+async function ladeStatistik(client, nutzerId) {
+  if (!client) return null;
+  const vor30Tagen = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+
+  const [{ data: zahlen }, { data: beitraege, error: fehlerBeitraege }, { count: neue }] =
+    await Promise.all([
+      client.from('profile_zahlen').select('followers, beitraege').eq('id', nutzerId).maybeSingle(),
+      client.from('posts').select('views').eq('user_id', nutzerId),
+      client
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('followee_id', nutzerId)
+        .gte('created_at', vor30Tagen),
+    ]);
+  if (fehlerBeitraege) throw fehlerBeitraege;
+
+  return {
+    beitraege: Number(zahlen?.beitraege || 0),
+    follower: Number(zahlen?.followers || 0),
+    aufrufe: (beitraege || []).reduce((summe, b) => summe + Number(b.views || 0), 0),
+    neueFollower: Number(neue || 0),
+  };
+}
+
 async function ladeBlockiert(client, nutzerId) {
   if (!client) return [];
   const { data, error } = await client
@@ -658,9 +712,11 @@ async function ladeCommunities(client, nutzerId) {
 
   const { data: meine } = await client
     .from('community_members')
-    .select('community_id')
+    .select('community_id, is_muted')
     .eq('user_id', nutzerId);
   const beigetreten = new Set((meine || []).map((m) => m.community_id));
+  // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
+  const stumme = new Set((meine || []).filter((m) => m.is_muted).map((m) => m.community_id));
 
   return (data || []).map((c) => ({
     id: c.id,
@@ -674,6 +730,7 @@ async function ladeCommunities(client, nutzerId) {
     // sonst ohne Besitzer da.
     eigen: c.created_by === nutzerId,
     joined: beigetreten.has(c.id),
+    stumm: stumme.has(c.id),
     unread: 0,
     channels: (c.community_channels || [])
       .sort((a, b) => (a.position || 0) - (b.position || 0))
@@ -1155,6 +1212,8 @@ module.exports = {
   ladeProfil,
   ladeKontakte,
   ladeFolgen,
+  ladeFolgeListe,
+  ladeStatistik,
   ladeBlockiert,
   ladeStummgeschaltet,
   ladeKartenpunkte,

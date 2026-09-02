@@ -823,6 +823,35 @@ const handleJoinCommunity = handler('Community beitreten', async (client, nutzer
   return { ok: true, mitglied: gesetzt };
 });
 
+/**
+ * Eine Community stummschalten oder wieder hoerbar machen.
+ *
+ * Gegenstueck zu communityStumm() in app/lib/aktionen.ts. Kein umschalten():
+ * stumm ist eine Spalte der Mitgliedschaft, keine eigene Zeile.
+ */
+const handleCommunityStumm = handler(
+  'Community stummschalten',
+  async (client, nutzerId, communityId) => {
+    const { data: zeile, error: fehlerLesen } = await client
+      .from('community_members')
+      .select('is_muted')
+      .eq('community_id', communityId)
+      .eq('user_id', nutzerId)
+      .maybeSingle();
+    if (fehlerLesen) throw fehlerLesen;
+    if (!zeile) return { ok: false, error: 'Du bist in dieser Community nicht Mitglied.' };
+
+    const neu = !zeile.is_muted;
+    const { error } = await client
+      .from('community_members')
+      .update({ is_muted: neu })
+      .eq('community_id', communityId)
+      .eq('user_id', nutzerId);
+    if (error) throw error;
+    return { ok: true, stumm: neu };
+  }
+);
+
 // ------------------------------------------------- Melden, Blocken, Stumm --
 
 const handleReportContent = handler(
@@ -1493,6 +1522,7 @@ module.exports = {
   handleViewStory,
   handleCreateCommunity,
   handleJoinCommunity,
+  handleCommunityStumm,
   handleReportContent,
   handleBlockUser,
   handleMuteUser,

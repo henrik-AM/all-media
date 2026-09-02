@@ -24,6 +24,13 @@ interface Props {
   /** Fuehrt zum Formular, das Name, Info und Link aendert. */
   onBearbeiten: () => void;
   onNotice: (message: string) => void;
+  /*
+   * Die Zahlen ueber dem Namen gaben bis zum 02.09.2026 nur einen Hinweistext
+   * aus ("Deine Follower"), obwohl es die beiden Listenbildschirme laengst
+   * gab und die Website sie an derselben Stelle oeffnet.
+   */
+  onOpenFollowers?: () => void;
+  onOpenFollowing?: () => void;
 }
 
 const compact = (n: number) =>
@@ -37,7 +44,7 @@ const TABS: { key: Tab; icon: IconName }[] = [
 ];
 
 /** Prototyp-Frame "Videos - Profil". */
-export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNotice }: Props) => {
+export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNotice, onOpenFollowers, onOpenFollowing }: Props) => {
   const { profile: alleProfile, users: alleNutzer } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { reposts } = useReposts();
@@ -80,7 +87,11 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           onAction={onAction}
           onBearbeiten={onBearbeiten}
           onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
-          onStat={(label) => onNotice(`${label}: ${label === 'Beiträge' ? 'Deine Posts' : label === 'Follower' ? 'Deine Follower' : 'Denen du folgst'}`)}
+          onStat={(label) => {
+            if (label === 'Follower') return onOpenFollowers?.();
+            if (label === 'Gefolgt') return onOpenFollowing?.();
+            onNotice('Deine Beiträge stehen darunter.');
+          }}
           onAvatarPress={() => onNotice('Dein Profilbild')}
         />
 

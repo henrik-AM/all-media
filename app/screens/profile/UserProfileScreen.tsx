@@ -7,6 +7,7 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
+import { oeffneLink } from '../../lib/links';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
 import { useKachelHoehe } from '../../lib/raster';
@@ -102,9 +103,17 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
         <View style={styles.about}>
           <Text style={styles.name}>{person.name}</Text>
           <Text style={styles.bio}>{profile.bio}</Text>
-          <Druck onPress={() => onNotice(profile.link)}>
-            <Text style={styles.link}>{profile.link}</Text>
-          </Druck>
+          {/*
+            Henrik: "Links in Profilbeschreibungen muessen anklickbar sein."
+            Im eigenen Profil und auf der Website ging der Link laengst auf;
+            hier, auf einem fremden Profil, blendete er bis zum 02.09.2026 nur
+            seine eigene Adresse als Hinweis ein.
+          */}
+          {!!profile.link && (
+            <Druck onPress={() => oeffneLink(profile.link, onNotice)}>
+              <Text style={styles.link}>{profile.link}</Text>
+            </Druck>
+          )}
         </View>
 
         {istBlockiert(userId) ? (

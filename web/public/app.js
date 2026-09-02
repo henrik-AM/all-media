@@ -1391,12 +1391,37 @@ function renderContacts() {
   );
 }
 
-/** Follower/Gefolgte Listen */
-function openFollowerList(profile, art) {
-  const liste = art === 'follower'
-    ? (state.users.followers || []).map(id => user(id))
-    : (state.users.following || []).map(id => user(id));
+/**
+ * Follower- und Gefolgt-Liste einer Person.
+ *
+ * Bis zum 02.09.2026 las diese Funktion `state.users.followers` und
+ * `state.users.following`. `state.users` ist die Karte aller Nutzer nach
+ * Kennung — die beiden Eigenschaften hat nie jemand gesetzt, die Liste war
+ * also immer leer. Auffaellig war das nicht, weil daneben die echte Zahl aus
+ * `profile_zahlen` stand: 340 Follower, und darunter „Noch niemand".
+ *
+ * Die App hatte den umgekehrten Fehler — dort standen fuenf feste Kennungen
+ * im Code. Beide Seiten lesen jetzt dieselbe Tabelle `follows`, die App ueber
+ * ladeFolgeListe() in app/lib/daten.ts, die Website hierueber.
+ *
+ * Ein Klick auf einen Namen ging frueher immer auf das eigene Profil, egal
+ * wen man angetippt hat. Jetzt oeffnet er das Profil dieser Person.
+ */
+async function openFollowerList(profile, art) {
+  const wessen = profile?.userId || profile?.id || 'me';
+  const schluessel = art === 'follower' ? 'follower' : 'gefolgt';
 
+  let ids = [];
+  try {
+    const res = await fetch(`/api/profile/${wessen}/folge/${schluessel}`);
+    if (res.ok) ids = (await res.json()).ids || [];
+    else toast('Die Liste konnte nicht geladen werden.');
+  } catch (fehler) {
+    console.error('Folgeliste fehlgeschlagen:', fehler);
+    toast('Keine Verbindung');
+  }
+
+  const liste = ids.map((id) => user(id)).filter(Boolean);
   const titel = art === 'follower' ? 'Follower' : 'Gefolgt';
   openSheet(
     titel,
@@ -1414,9 +1439,7 @@ function openFollowerList(profile, art) {
       sheet.querySelectorAll('[data-uid]').forEach(b =>
         b.addEventListener('click', () => {
           close();
-          state.area = 'videos';
-          state.sub.videos = 'profile';
-          render();
+          openProfile(b.dataset.uid, 'oeffentlich');
         })
       );
     },
@@ -2716,6 +2739,19 @@ async function openProfile(userId, variante) {
       else toast('Noch kein Chat mit dieser Person');
     });
 
+    /*
+     * Die drei Zahlen ueber dem Namen waren Knoepfe, an denen nichts hing —
+     * ein Klick tat nichts. Follower und Gefolgt oeffnen jetzt die Liste
+     * dieser Person; "Beitraege" bleibt ohne Ziel, das Raster steht ohnehin
+     * darunter.
+     */
+    overlay.querySelectorAll('.prof__stat[data-stat]').forEach((b) =>
+      b.addEventListener('click', () => {
+        if (b.dataset.stat === 'followers') openFollowerList(profile, 'follower');
+        if (b.dataset.stat === 'following') openFollowerList(profile, 'following');
+      })
+    );
+
     overlay.querySelectorAll('[data-ptab]').forEach((b) =>
       b.addEventListener('click', () => {
         tab = b.dataset.ptab;
@@ -3930,17 +3966,24 @@ function openCommunityEinstellungen(community) {
           <span class="item__sub">${community.members.toLocaleString('de-DE')} in dieser Community</span>
         </div>
       </div>
+      ${/* Ein Schloss neben "Öffentlich" widerspricht sich selbst. */ ''}
       <div class="item">
-        <span class="item__icon">${ICONS.lock}</span>
+        <span class="item__icon">${community.visibility === 'private' ? ICONS.lock : ICONS.people}</span>
         <div class="item__body">
           <span class="item__label">Sichtbarkeit</span>
           <span class="item__sub">${community.visibility === 'private' ? 'Privat — nur auf Anfrage' : 'Öffentlich'}</span>
         </div>
       </div>
+      ${/*
+          Der Schalter stand hier bis zum 02.09.2026 immer auf „an" und legte
+          beim Antippen nur eine CSS-Klasse um — beim naechsten Oeffnen des
+          Blattes war er wieder an. Er haengt jetzt an
+          community_members.is_muted, derselben Spalte, aus der die App liest.
+        */ ''}
       <div class="item">
         <span class="item__icon">${ICONS.bell}</span>
         <span class="item__label">Benachrichtigungen</span>
-        <button class="switch is-on" data-commtoggle="mitteilungen" aria-label="Benachrichtigungen"><span class="switch__knob"></span></button>
+        <button class="switch ${community.stumm ? '' : 'is-on'}" data-commtoggle="mitteilungen" aria-label="Benachrichtigungen"><span class="switch__knob"></span></button>
       </div>
       <button class="item item--danger" data-commaction="verlassen">
         <span class="item__icon">${ICONS.close}</span>
@@ -3948,9 +3991,23 @@ function openCommunityEinstellungen(community) {
       </button>
     </div>`,
     (sheet, close) => {
-      sheet.querySelector('[data-commtoggle]')?.addEventListener('click', (e) => {
-        e.currentTarget.classList.toggle('is-on');
-        toast(e.currentTarget.classList.contains('is-on') ? 'Benachrichtigungen an' : 'Benachrichtigungen aus');
+      sheet.querySelector('[data-commtoggle]')?.addEventListener('click', async (e) => {
+        const knopf = e.currentTarget;
+        // Sofort umlegen, damit es sich nicht zaeh anfuehlt — und
+        // zurueckdrehen, wenn die Datenbank nein sagt.
+        const warAn = knopf.classList.contains('is-on');
+        knopf.classList.toggle('is-on', !warAn);
+
+        const r = await api(`/api/communities/${community.id}/stumm`);
+        if (!r?.ok) {
+          knopf.classList.toggle('is-on', warAn);
+          return toast(r?.error || 'Nicht gespeichert');
+        }
+        community.stumm = r.stumm;
+        const inListe = state.communities.find((c) => c.id === community.id);
+        if (inListe) inListe.stumm = r.stumm;
+        knopf.classList.toggle('is-on', !r.stumm);
+        toast(r.stumm ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
       });
       sheet.querySelector('[data-commaction="verlassen"]')?.addEventListener('click', async () => {
         close();
@@ -4613,15 +4670,24 @@ function einstellungsListe(art) {
       })),
     };
   }
+  /*
+   * Die Statistik zum eigenen Content. Vier Zahlen, die bis zum 02.09.2026
+   * erfunden waren und bei jedem Konto gleich standen. „Aufrufe gesamt" statt
+   * „(30 Tage)", weil `posts.views` ein Zaehlerstand ohne Verlauf ist — die
+   * neuen Follower dagegen lassen sich ueber `follows.created_at` wirklich
+   * eingrenzen.
+   */
   if (art === 'insights') {
-    const eigene = state.posts.filter((p) => p.userId === 'me');
+    const st = state.statistik;
+    if (!st) return { leer: 'Wird geladen …', zeilen: [] };
     return {
       leer: '',
       zeilen: [
-        { text: 'Eigene Beiträge', neben: String(eigene.length) },
-        { text: 'Follower', neben: '340' },
-        { text: 'Aufrufe (30 Tage)', neben: '1.284' },
-        { text: 'Neue Follower (30 Tage)', neben: '46' },
+        // Mit Tausenderpunkt — 14570 liest sich sonst schlechter als 14.570.
+        { text: 'Eigene Beiträge', neben: st.beitraege.toLocaleString('de-DE') },
+        { text: 'Follower', neben: st.follower.toLocaleString('de-DE') },
+        { text: 'Aufrufe gesamt', neben: st.aufrufe.toLocaleString('de-DE') },
+        { text: 'Neue Follower (30 Tage)', neben: st.neueFollower.toLocaleString('de-DE') },
       ],
     };
   }
@@ -4645,8 +4711,14 @@ function einstellungsListe(art) {
       zeilen: ids.map((id) => ({ text: user(id).name, neben: user(id).handle })),
     };
   }
+  /*
+   * Hier standen Gruppen*chats* — `state.chats.filter(c => c.isGroup &&
+   * c.muted)`. Das ist etwas anderes als eine Community, und die App zeigte
+   * an derselben Stelle wieder etwas Drittes. Beide lesen jetzt
+   * community_members.is_muted.
+   */
   if (art === 'stummeKanaele') {
-    const stumm = state.chats.filter((c) => c.isGroup && c.muted);
+    const stumm = state.communities.filter((c) => c.stumm);
     return {
       leer: 'Keine Community ist stummgeschaltet.',
       zeilen: stumm.map((c) => ({ text: c.name, neben: 'stumm' })),
@@ -4851,6 +4923,19 @@ function renderSettings() {
         state.banne = d?.banne || [];
       })
       .catch((fehler) => console.error('Bann-Verlauf laden fehlgeschlagen:', fehler));
+  }
+
+  /*
+   * Dasselbe fuer die Statistik hinter "Insights". Sie stand bis zum
+   * 02.09.2026 fest im Code — 340 Follower und 1.284 Aufrufe bei jedem Konto.
+   */
+  if (!state.statistik) {
+    fetch('/api/statistik')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        state.statistik = d?.statistik || null;
+      })
+      .catch((fehler) => console.error('Statistik laden fehlgeschlagen:', fehler));
   }
 
   const itemHtml = (it, sektionId) => {
@@ -6498,9 +6583,20 @@ function renderVideoSearch() {
   const q = state.videoSearchQuery.trim().toLowerCase();
   const hit = (t) => !q || String(t).toLowerCase().includes(q);
 
-  const reels = state.videos.filter((v) => hit(v.description) || hit(user(v.userId).name));
+  /*
+   * Handbuch: gesucht wird auch nach Musik und Titel, nicht nur nach
+   * Beschreibung und Name. Ein Reel mit dem Sound „Sommerhit" war bis zum
+   * 02.09.2026 nur ueber den Sound-Abschnitt zu finden, nicht ueber die
+   * Suche selbst — obwohl die Musik unter jedem Reel steht.
+   *
+   * Untertitel bleiben aussen vor, und zwar nicht aus Nachlaessigkeit:
+   * `posts.untertitel` ist ein Ja/Nein, kein Text. Nach etwas zu suchen, das
+   * nirgends gespeichert ist, ginge nicht — dafuer braeuchte es erst
+   * Untertiteltexte in der Datenbank.
+   */
+  const reels = state.videos.filter((v) => hit(v.description) || hit(v.music || '') || hit(user(v.userId).name));
   const clips = state.clips.filter((c) => hit(c.title) || hit(user(c.userId).name));
-  const posts = state.posts.filter((p) => hit(p.description) || hit(user(p.userId).name));
+  const posts = state.posts.filter((p) => hit(p.description) || hit(p.music || '') || hit(user(p.userId).name));
   const people = Object.values(state.users).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle)));
   const tags = state.hashtags.filter((h) => hit(h.tag));
   const places = state.places.filter((pl) => hit(pl.name));
@@ -6529,7 +6625,7 @@ function renderVideoSearch() {
       <div class="searchrow">
         <label class="searchbox">
           ${ICONS.search}
-          <input id="videoSearch" type="search" placeholder="Suche nach Videos, Profilen, #Hashtags" value="${esc(state.videoSearchQuery)}" autocomplete="off" />
+          <input id="videoSearch" type="search" placeholder="Suche nach Videos, Musik, Profilen, #Hashtags" value="${esc(state.videoSearchQuery)}" autocomplete="off" />
           ${state.videoSearchQuery ? `<button class="searchbox__clear" id="videoSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
         </label>
       </div>
@@ -9424,8 +9520,13 @@ function renderCommunitySearch() {
 function renderCommunityProfile() {
   const me = user('me');
   const profil = state.eigenesProfil || {};
-  const created = state.communities.filter((c) => c.visibility === 'private' && c.joined);
-  const joined = state.communities.filter((c) => c.joined && !created.includes(c));
+  /*
+   * "Erstellt" heisst: von mir angelegt. Hier stand bis zum 02.09.2026
+   * `visibility === 'private' && joined` — dieselbe falsche Weiche wie in der
+   * App. `c.eigen` kommt aus `communities.created_by`.
+   */
+  const created = state.communities.filter((c) => c.eigen);
+  const joined = state.communities.filter((c) => c.joined && !c.eigen);
 
   main.innerHTML = `
     ${switchBar('switchProfile')}
@@ -9498,8 +9599,13 @@ function renderCommunityProfile() {
  */
 function renderCommunityListe() {
   const erstellt = state.commProfilView === 'erstellt';
-  const created = state.communities.filter((c) => c.visibility === 'private' && c.joined);
-  const joined = state.communities.filter((c) => c.joined && !created.includes(c));
+  /*
+   * "Erstellt" heisst: von mir angelegt. Hier stand bis zum 02.09.2026
+   * `visibility === 'private' && joined` — dieselbe falsche Weiche wie in der
+   * App. `c.eigen` kommt aus `communities.created_by`.
+   */
+  const created = state.communities.filter((c) => c.eigen);
+  const joined = state.communities.filter((c) => c.joined && !c.eigen);
   const liste = erstellt ? created : joined;
 
   main.innerHTML = `

@@ -14,7 +14,7 @@ import { colors, radius, sizes, spacing, themenStyles, typography } from '../../
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSupabase } from '../../contexts/SupabaseContext';
-import { ladeBanne } from '../../lib/daten';
+import { ladeBanne, ladeStatistik, Statistik } from '../../lib/daten';
 import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -347,8 +347,16 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       const ids = Object.keys(alleNutzer).filter((id) => istStumm(id));
       return { leer: 'Kein Profil ist stummgeschaltet.', zeilen: ids.map((id) => ({ text: alleNutzer[id].name, neben: 'stumm' })) };
     }
+    /*
+     * Hier stand `joined && unreadCount === 0 && visibility === 'private'`.
+     * `unreadCount` steht in lib/daten.ts fest auf 0, die Bedingung war also
+     * immer erfuellt: die Liste zeigte jede private Community, in der man
+     * Mitglied ist — als waeren sie alle stummgeschaltet. Die Website zeigte
+     * an derselben Stelle Gruppen*chats*. Beide lesen jetzt
+     * community_members.is_muted.
+     */
     if (art === 'stummeKanaele') {
-      const stumm = communities.filter((c) => c.joined && c.unreadCount === 0 && c.visibility === 'private');
+      const stumm = communities.filter((c) => c.stumm);
       return { leer: 'Keine Community ist stummgeschaltet.', zeilen: stumm.map((c) => ({ text: c.name, neben: 'stumm' })) };
     }
     if (art === 'archiv') {
@@ -389,13 +397,17 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       };
     }
     if (art === 'insights') {
+      if (!statistik) return { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: '',
         zeilen: [
-          { text: 'Eigene Beiträge', neben: String(raster.filter((r) => r.eigen).length) },
-          { text: 'Follower', neben: '340' },
-          { text: 'Aufrufe (30 Tage)', neben: '1.284' },
-          { text: 'Neue Follower (30 Tage)', neben: '46' },
+          // Mit Tausenderpunkt — 14570 liest sich sonst schlechter als 14.570.
+          { text: 'Eigene Beiträge', neben: statistik.beitraege.toLocaleString('de-DE') },
+          { text: 'Follower', neben: statistik.follower.toLocaleString('de-DE') },
+          // "gesamt" und nicht "(30 Tage)": posts.views ist ein Zaehlerstand
+          // ohne Verlauf. Die neuen Follower dagegen kommen aus created_at.
+          { text: 'Aufrufe gesamt', neben: statistik.aufrufe.toLocaleString('de-DE') },
+          { text: 'Neue Follower (30 Tage)', neben: statistik.neueFollower.toLocaleString('de-DE') },
         ],
       };
     }
@@ -446,11 +458,20 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     { id: string; bereich: string; grund: string; von: string; laeuft: boolean }[]
   >([]);
 
+  /*
+   * Die Statistik hinter "Insights". Sie stand bis zum 02.09.2026 in App und
+   * Website als dieselben vier erfundenen Zahlen im Code.
+   */
+  const [statistik, setStatistik] = useState<Statistik | null>(null);
+
   useEffect(() => {
     if (!supabase || !ichId) return;
     ladeBanne(supabase, ichId)
       .then(setBanne)
       .catch((e: any) => console.error('Bann-Verlauf laden fehlgeschlagen:', e?.message ?? e));
+    ladeStatistik(supabase, ichId)
+      .then(setStatistik)
+      .catch((e: any) => console.error('Statistik laden fehlgeschlagen:', e?.message ?? e));
   }, [supabase, ichId]);
 
   /** Stufe und Ausnahmen zu einem Bereich — ohne Eintrag gilt „alle". */

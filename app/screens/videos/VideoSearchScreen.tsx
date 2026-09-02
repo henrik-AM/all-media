@@ -16,6 +16,21 @@ interface Props {
   onOpenProfile: (userId: string) => void;
   /** Oeffnet die Seite zu einem Hashtag, Standort oder Sound. */
   onOpenExplorer: (ziel: ExplorerZiel) => void;
+  /**
+   * Einen Treffer oeffnen.
+   *
+   * Bis zum 02.09.2026 gab jede Kachel hier nur einen Hinweistext aus —
+   * „Reel oeffnet im Hochformat", „Beitrag oeffnet im Feed" — und nichts
+   * oeffnete sich. Auf der Website fuehrten dieselben Kacheln laengst
+   * irgendwohin (`data-openvideo`, `data-openpost`).
+   *
+   * Ein Querformat-Video hat einen eigenen Bildschirm und laesst sich direkt
+   * ansteuern; Reels und Beitraege leben in ihren Feeds. Deshalb dieselbe
+   * Weiche wie bei einer Mitteilung: der Bereich wird gewechselt, nicht ein
+   * einzelner Eintrag aufgeschlagen.
+   */
+  onOpenEintrag: (art: 'reel' | 'clip' | 'beitrag', id: string) => void;
+
   onNotice: (message: string) => void;
 }
 
@@ -68,7 +83,7 @@ const Row = ({
  * Prototyp-Frame "Video - Suche": Explorer mit den Abschnitten Reels,
  * Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
  */
-export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: Props) => {
+export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag, onNotice }: Props) => {
   const { hashtags: alleHashtags, places: alleOrte, posts: alleBeitraege, sounds: alleSounds, users: alleNutzer, videos: alleVideos } = useDaten();
   const kachelHoehe = useKachelHoehe();
   // Eigene Aufnahmen sollen auch ueber die Suche zu finden sein.
@@ -80,10 +95,25 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
     const q = query.trim().toLowerCase();
     const hit = (text: string) => !q || text.toLowerCase().includes(q);
 
+  /*
+   * Handbuch: gesucht wird auch nach Musik und Titel, nicht nur nach
+   * Beschreibung und Name. Ein Reel mit dem Sound „Sommerhit" war bis zum
+   * 02.09.2026 nur ueber den Sound-Abschnitt zu finden, nicht ueber die
+   * Suche selbst — obwohl die Musik unter jedem Reel steht.
+   *
+   * Untertitel bleiben aussen vor, und zwar nicht aus Nachlaessigkeit:
+   * `posts.untertitel` ist ein Ja/Nein, kein Text. Nach etwas zu suchen, das
+   * nirgends gespeichert ist, ginge nicht — dafuer braeuchte es erst
+   * Untertiteltexte in der Datenbank.
+   */
     return {
-      reels: [...eigeneVideos, ...alleVideos].filter((v) => hit(v.description) || hit(alleNutzer[v.userId].name)),
-      clips: clips.filter((c) => hit(c.title) || hit(alleNutzer[c.userId].name)),
-      posts: [...eigeneBeitraege, ...alleBeitraege].filter((p) => hit(p.description) || hit(alleNutzer[p.userId].name)),
+      reels: [...eigeneVideos, ...alleVideos].filter(
+        (v) => hit(v.description) || hit(v.music ?? '') || hit(alleNutzer[v.userId]?.name ?? '')
+      ),
+      clips: clips.filter((c) => hit(c.title) || hit(alleNutzer[c.userId]?.name ?? '')),
+      posts: [...eigeneBeitraege, ...alleBeitraege].filter(
+        (p) => hit(p.description) || hit(p.music ?? '') || hit(alleNutzer[p.userId]?.name ?? '')
+      ),
       people: Object.values(alleNutzer).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
       tags: alleHashtags.filter((h) => hit(h.tag)),
       places: alleOrte.filter((p) => hit(p.name)),
@@ -106,7 +136,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
         <SearchBar
           value={query}
           onChangeText={setQuery}
-          placeholder="Suche nach Videos, Profilen, #Hashtags"
+          placeholder="Suche nach Videos, Musik, Profilen, #Hashtags"
         />
       </View>
 
@@ -118,7 +148,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
             <Section title="Reels" onTitlePress={() => onOpenExplorer({ art: 'reels', wert: '' })}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reelRow}>
                 {result.reels.map((v) => (
-                  <Druck key={v.id} style={styles.reel} onPress={() => onNotice('Reel öffnet im Hochformat')}>
+                  <Druck key={v.id} style={styles.reel} onPress={() => onOpenEintrag('reel', v.id)}>
                     <Motiv id={v.id} bild={v.standbild ?? v.mediaUri} icon="phone-portrait-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                     <Text style={styles.reelName}>{alleNutzer[v.userId].name}</Text>
                   </Druck>
@@ -136,7 +166,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
                   icon="tv-outline"
                   title={c.title}
                   sub={`${alleNutzer[c.userId].name} · ${c.duration}`}
-                  onPress={() => onNotice('Video öffnet im Querformat')}
+                  onPress={() => onOpenEintrag('clip', c.id)}
                 />
               ))}
             </Section>
@@ -146,7 +176,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onNotice }: P
             <Section title="Beiträge" onTitlePress={() => onOpenExplorer({ art: 'beitraege', wert: '' })}>
               <View style={styles.grid}>
                 {result.posts.map((p) => (
-                  <Druck key={p.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice('Beitrag öffnet im Feed')}>
+                  <Druck key={p.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onOpenEintrag('beitrag', p.id)}>
                     <Motiv id={p.id} bild={p.standbild ?? p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                   </Druck>
                 ))}

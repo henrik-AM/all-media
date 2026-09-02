@@ -83,7 +83,13 @@ type Overlay =
    * eine Community direkt in einen Gruppenchat; die Seite dazwischen gab es
    * in der App gar nicht.
    */
-  | { kind: 'community'; communityId: string }
+  /*
+   * `optionen` oeffnet das Mehr-Menue gleich mit. Nur der Pruefschalter
+   * setzt das — sonst kaeme man an ein Blatt, das erst hinter zwei Tipps
+   * liegt, in keinem Bild vorbei. Genau so ist die feste Follower-Liste
+   * jahrelang unbemerkt geblieben.
+   */
+  | { kind: 'community'; communityId: string; optionen?: boolean }
   | { kind: 'editSelectedContacts' }
   | { kind: 'avatarViewer'; userId: string; name: string }
   | { kind: 'followers'; userId: string }
@@ -287,12 +293,22 @@ const Shell = () => {
         break;
       case 'community': {
         const com = daten.communities.find((c) => c.id === a || c.name === a);
-        if (com) setOverlay({ kind: 'community', communityId: com.id });
+        if (com) setOverlay({ kind: 'community', communityId: com.id, optionen: b === 'optionen' });
         break;
       }
       case 'anruf': {
         const id = nutzerId(a);
         if (id) setOverlay({ kind: 'call', userId: id, art: b === 'video' ? 'video' : 'audio' });
+        break;
+      }
+      /*
+       * Die Follower- und Gefolgt-Liste. Sie kam in keinem Bild vor — und
+       * genau dort stand bis zum 02.09.2026 eine feste Namensliste im Code.
+       * Was nie fotografiert wird, faellt auch nicht auf.
+       */
+      case 'folge': {
+        const id = a ? nutzerId(a) || a : 'me';
+        setOverlay({ kind: b === 'gefolgt' ? 'following' : 'followers', userId: id });
         break;
       }
       case 'clip': {
@@ -780,6 +796,20 @@ const Shell = () => {
     setArea('settings');
   };
 
+  /**
+   * Einen Treffer aus Suche oder Explorer oeffnen.
+   *
+   * Ein Querformat-Video hat einen eigenen Bildschirm. Reels und Beitraege
+   * haben keinen — sie leben in ihren Feeds, und dorthin geht es, genau wie
+   * bei einer Mitteilung. Vorher gaben alle drei nur einen Hinweistext aus.
+   */
+  const eintragOeffnen = (art: 'reel' | 'clip' | 'beitrag', id: string) => {
+    if (art === 'clip') return setOverlay({ kind: 'clip', clipId: id });
+    setOverlay(null);
+    setArea('videos');
+    setSubs((prev) => ({ ...prev, videos: art === 'beitrag' ? 'home' : 'portrait' }));
+  };
+
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
   const mitteilungOeffnen = (ziel: MitteilungsZiel) => {
     if (ziel.art === 'profile') return openPublicProfile(ziel.id);
@@ -1224,6 +1254,7 @@ const Shell = () => {
         ziel={overlay.ziel}
         onBack={() => setOverlay(null)}
         onOpenClip={(clipId) => setOverlay({ kind: 'clip', clipId })}
+        onOpenEintrag={eintragOeffnen}
         onNotice={setNotice}
       />
     );
@@ -1262,7 +1293,10 @@ const Shell = () => {
           community={community}
           onBack={() => setOverlay(null)}
           onOpenUnterthema={(ut) => oeffneUnterthema(community, ut)}
-          onEinstellungen={() => setNotice(`Einstellungen zu „${community.name}“`)}
+          // Das Blatt oeffnet der Bildschirm selbst; hier bleibt nur der
+          // Anschluss nach aussen.
+          onEinstellungen={() => {}}
+          optionenOffenStart={overlay.optionen}
           onBeitreten={() => {
             profil.kanalBeitreten(community.id);
             setNotice(community.joined ? `„${community.name}“ verlassen` : `„${community.name}“ beigetreten`);
@@ -1433,10 +1467,11 @@ const Shell = () => {
           <VideoSearchScreen
             onOpenProfile={openPublicProfile}
             onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
+            onOpenEintrag={eintragOeffnen}
             onNotice={setNotice}
           />
         );
-      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onNotice={setNotice} />;
+      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onNotice={setNotice} onOpenFollowers={() => setOverlay({ kind: 'followers', userId: 'me' })} onOpenFollowing={() => setOverlay({ kind: 'following', userId: 'me' })} />;
       return (
         <HomeFeedScreen
           stories={stories}

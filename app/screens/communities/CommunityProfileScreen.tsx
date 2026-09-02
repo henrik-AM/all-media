@@ -29,8 +29,16 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
   // Die Liste kommt aus dem gemeinsamen Zustand, nicht mehr direkt aus den
   // Mock-Daten - sonst taucht ein neu erstellter Kanal hier nicht auf.
   const { communities, ungelesen, eigenesProfil } = useProfil();
-  const created = communities.filter((c) => c.visibility === 'private' && c.joined);
-  const joined = communities.filter((c) => c.joined && !created.includes(c));
+  /*
+   * "Erstellt" heisst: von mir angelegt. Bis zum 02.09.2026 stand hier
+   * `visibility === 'private' && joined` — auf beiden Seiten dieselbe Weiche,
+   * und auf beiden falsch. Eine selbst angelegte oeffentliche Community stand
+   * damit unter "Beigetreten", eine fremde private unter "Erstellt". Die
+   * Datenbank weiss es genau: `communities.created_by`, in beiden Ladewegen
+   * bereits als `eigen` mitgeliefert.
+   */
+  const created = communities.filter((c) => c.eigen);
+  const joined = communities.filter((c) => c.joined && !c.eigen);
 
   const list = (items: Community[]) =>
     items.map((c) => (

@@ -9,6 +9,8 @@ import { colors, markenVerlauf, radius, spacing, themenStyles, typography } from
 import { Community, Unterthema } from '../../types';
 
 import { PushToTalk } from '../../components/PushToTalk';
+import { CommunityOptionenSheet } from '../../components/CommunityOptionenSheet';
+import { useProfil } from '../../contexts/ProfilContext';
 import { ladePtt } from '../../lib/daten';
 import { useSupabase } from '../../contexts/SupabaseContext';
 
@@ -17,11 +19,27 @@ interface Props {
   onBack: () => void;
   /** Oeffnet den Chat eines Unterthemas. */
   onOpenUnterthema: (unterthema: Unterthema) => void;
-  /** Der Name und das "..." fuehren beide hierhin. */
+  /**
+   * Der Name und das "..." fuehren beide hierhin.
+   *
+   * Bis zum 02.09.2026 gab das nur einen Hinweistext aus, der die
+   * Einstellungen ankuendigte und dann verschwand. Jetzt oeffnet der
+   * Bildschirm sein eigenes Blatt — dasselbe, das die Website unter
+   * openCommunityEinstellungen zeigt. Die Weiche nach aussen bleibt
+   * trotzdem, damit App.tsx den Aufruf mitbekommt.
+   */
   onEinstellungen: () => void;
   onBeitreten: () => void;
   onNeuesUnterthema: () => void;
   onNotice: (message: string) => void;
+  /**
+   * Das Mehr-Menue gleich beim Aufbau offen.
+   *
+   * Nur der Pruefschalter aus App.tsx setzt das, damit sich das Blatt
+   * fotografieren laesst. Sonst liegt es hinter zwei Tipps und kommt in
+   * keinem Bild vor.
+   */
+  optionenOffenStart?: boolean;
 }
 
 /**
@@ -53,9 +71,17 @@ export const CommunityDetailScreen = ({
   onBeitreten,
   onNeuesUnterthema,
   onNotice,
+  optionenOffenStart,
 }: Props) => {
   const insets = useSafeAreaInsets();
   const unterthemen = community.unterthemen ?? [];
+  const { kanalStummSetzen } = useProfil();
+  const [optionenOffen, setOptionenOffen] = useState(Boolean(optionenOffenStart));
+
+  const einstellungenOeffnen = () => {
+    setOptionenOffen(true);
+    onEinstellungen();
+  };
 
   const linkOeffnen = async () => {
     const ziel = /^https?:\/\//i.test(community.link ?? '') ? community.link! : `https://${community.link}`;
@@ -116,7 +142,7 @@ export const CommunityDetailScreen = ({
             Echte Namen wie "Design Systeme" wurden nebeneinander
             abgeschnitten, und das ist schlimmer als eine zweite Zeile.
           */}
-          <Druck style={styles.titel} onPress={onEinstellungen}>
+          <Druck style={styles.titel} onPress={einstellungenOeffnen}>
             <Text style={styles.name} numberOfLines={1}>
               {community.name}
             </Text>
@@ -150,7 +176,7 @@ export const CommunityDetailScreen = ({
             </Druck>
           )}
 
-          <Druck style={styles.mehr} onPress={onEinstellungen} accessibilityLabel="Mehr" hitSlop={8}>
+          <Druck style={styles.mehr} onPress={einstellungenOeffnen} accessibilityLabel="Mehr" hitSlop={8}>
             <Ionicons name="ellipsis-horizontal" size={20} color={colors.text3} />
           </Druck>
         </View>
@@ -212,6 +238,16 @@ export const CommunityDetailScreen = ({
           ))}
         </View>
       </ScrollView>
+
+      {optionenOffen && (
+        <CommunityOptionenSheet
+          community={community}
+          onClose={() => setOptionenOffen(false)}
+          onVerlassen={onBeitreten}
+          onStumm={(stumm) => kanalStummSetzen(community.id, stumm)}
+          onNotice={onNotice}
+        />
+      )}
     </View>
   );
 };

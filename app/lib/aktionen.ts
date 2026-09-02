@@ -100,6 +100,42 @@ export function communityBeitritt(client: SupabaseClient, ichId: string, communi
 }
 
 /**
+ * Eine Community stummschalten oder wieder hoerbar machen.
+ *
+ * Kein umschalten(): stumm ist keine Zeile, die es gibt oder nicht, sondern
+ * eine Spalte der Mitgliedschaft. Wer nicht Mitglied ist, kann auch nichts
+ * stummschalten — dann trifft das UPDATE keine Zeile, und das ist der
+ * richtige Ausgang, kein Fehler. Zurueck kommt der Zustand danach.
+ *
+ * Der Einstellungspunkt „Gestummte Communitys" stand in App und Website,
+ * seit es die Einstellungen gibt. Gespeichert wurde bis zum 02.09.2026
+ * nichts; die App zeigte dort schlicht alle privaten Communitys.
+ */
+export async function communityStumm(
+  client: SupabaseClient,
+  ichId: string,
+  communityId: string
+): Promise<boolean> {
+  const { data: zeile, error: fehlerLesen } = await client
+    .from('community_members')
+    .select('is_muted')
+    .eq('community_id', communityId)
+    .eq('user_id', ichId)
+    .maybeSingle();
+  if (fehlerLesen) throw fehlerLesen;
+  if (!zeile) throw new Error('Du bist in dieser Community nicht Mitglied.');
+
+  const neu = !zeile.is_muted;
+  const { error } = await client
+    .from('community_members')
+    .update({ is_muted: neu })
+    .eq('community_id', communityId)
+    .eq('user_id', ichId);
+  if (error) throw error;
+  return neu;
+}
+
+/**
  * Jemanden blockieren oder die Blockierung aufheben.
  *
  * Das hier war der schwerste Fall der alten Bauweise: eine Blockierung, die

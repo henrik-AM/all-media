@@ -675,6 +675,32 @@ const folgen = route(async (req) => {
 app.post('/api/autoren/:userId/follow', folgen);
 app.post('/api/profile/:userId/follow', folgen);
 
+/*
+ * Die Namen hinter den Zahlen "Follower" und "Gefolgt". Die Zahlen kamen
+ * schon immer aus `profile_zahlen`; die Listen darunter kamen aus dem
+ * Nichts — auf der Website aus einer nie gesetzten Eigenschaft, in der App
+ * aus fuenf fest eingetragenen Kennungen. Beide lesen jetzt `follows`.
+ */
+/*
+ * Die Statistik hinter dem Einstellungspunkt "Insights". Bewusst nicht unter
+ * /api/insights — dort liegt das Snapchat-Aequivalent, ein voellig anderes
+ * Ding mit demselben Namen im Handbuch.
+ */
+app.get('/api/statistik', route(async (req) => ({
+  ok: true,
+  statistik: await supabaseApi.ladeStatistik(req.db, req.nutzerId),
+})));
+
+app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
+  ok: true,
+  ids: await supabaseApi.ladeFolgeListe(
+    req.db,
+    req.nutzerId,
+    req.params.userId,
+    req.params.art === 'follower' ? 'follower' : 'gefolgt'
+  ),
+})));
+
 // ============================================================================
 // Eigenes Profil und eigene Inhalte
 // ============================================================================
@@ -1062,6 +1088,14 @@ app.post('/api/communities/:id/join', route(async (req, res) => {
   const frisch = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
   res.json(frisch.find((c) => c.id === req.params.id));
 }));
+
+/*
+ * Eine Community stummschalten. Der Schalter „Benachrichtigungen" im
+ * Community-Blatt legte bis zum 02.09.2026 nur eine CSS-Klasse um.
+ */
+app.post('/api/communities/:id/stumm', route(async (req) =>
+  antwort(await syncHandlers.handleCommunityStumm(req.db, req.nutzerId, req.params.id))
+));
 
 app.post('/api/communities/:id/channels', route(async (req) => {
   const name = String(req.body?.name || '').trim();

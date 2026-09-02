@@ -26,6 +26,13 @@ interface Props {
   onBack: () => void;
   /** Oeffnet den Querformat-Player. */
   onOpenClip: (clipId: string) => void;
+  /**
+   * Ein Reel oder ein Beitrag von dieser Seite aus.
+   *
+   * Beide gaben bis zum 02.09.2026 nur die Beschreibung als Hinweistext aus.
+   * Der Querformat-Player war der einzige Treffer, der wirklich aufging.
+   */
+  onOpenEintrag: (art: 'reel' | 'beitrag', id: string) => void;
   onNotice: (message: string) => void;
 }
 
@@ -38,7 +45,7 @@ const compact = (n: number) =>
  * "VSSo + Sound". Alle drei sind gleich aufgebaut: ein eigener Kopf und
  * darunter die Abschnitte Reels, Querformat und Beiträge.
  */
-export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) => {
+export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onOpenEintrag, onNotice }: Props) => {
   const { places: alleOrte, posts: alleBeitraege, sounds: alleSounds, users: alleNutzer, videos: alleVideos } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const insets = useSafeAreaInsets();
@@ -109,7 +116,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 <Text style={styles.abschnitt}>Reels →</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reels}>
                   {treffer.reels.map((v: Video) => (
-                    <Druck key={v.id} style={styles.reel} onPress={() => onNotice(v.description)}>
+                    <Druck key={v.id} style={styles.reel} onPress={() => onOpenEintrag('reel', v.id)}>
                       {/* Motiv entscheidet selbst: Bild, wenn eines da ist,
                           sonst die Farbflaeche. Die frueher hier stehende
                           Abfrage auf mediaUri griff daneben, sobald dort eine
@@ -157,7 +164,7 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onNotice }: Props) =>
                 <Text style={styles.abschnitt}>Beiträge →</Text>
                 <View style={styles.raster}>
                   {treffer.beitraege.map((p: Post) => (
-                    <Druck key={p.id} style={[styles.rasterFeld, { height: kachelHoehe }]} onPress={() => onNotice(p.description)}>
+                    <Druck key={p.id} style={[styles.rasterFeld, { height: kachelHoehe }]} onPress={() => onOpenEintrag('beitrag', p.id)}>
                       <Motiv id={p.id} bild={p.standbild ?? p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                     </Druck>
                   ))}

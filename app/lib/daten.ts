@@ -171,6 +171,37 @@ export async function ladeGefolgt(client: SupabaseClient, ichId: string): Promis
   return (data ?? []).map((f: any) => f.followee_id);
 }
 
+/**
+ * Wer folgt dieser Person — und wem folgt sie?
+ *
+ * Bis zum 02.09.2026 stand in `FollowersScreen` und `FollowingScreen` eine
+ * feste Liste im Code: u1 bis u5 als Follower, u2 bis u6 als Gefolgte, bei
+ * jeder Person dieselben. Auf der Website war es das Gegenstück davon —
+ * `openFollowerList` las `state.users.followers`, eine Eigenschaft, die
+ * niemand je gesetzt hat, und zeigte deshalb immer „Noch niemand". Die Zahl
+ * über der Liste kam aus `profile_zahlen` und war echt; nur die Namen
+ * darunter hatten damit nichts zu tun.
+ *
+ * `follows` ist für alle Angemeldeten lesbar, die Liste braucht also keinen
+ * Umweg. Die eigene Kennung kommt als `ICH` zurück, weil die Bildschirme
+ * ihre Nutzer unter diesem Schlüssel führen.
+ */
+export async function ladeFolgeListe(
+  client: SupabaseClient,
+  ichId: string,
+  userId: string,
+  art: 'follower' | 'gefolgt'
+): Promise<string[]> {
+  const ziel = userId === ICH ? ichId : userId;
+  const [gesucht, gegeben] =
+    art === 'follower' ? ['follower_id', 'followee_id'] : ['followee_id', 'follower_id'];
+
+  const { data, error } = await client.from('follows').select(gesucht).eq(gegeben, ziel);
+  if (error) throw error;
+
+  return (data ?? []).map((f: any) => (f[gesucht] === ichId ? ICH : f[gesucht]));
+}
+
 export async function ladeKontakte(client: SupabaseClient, ichId: string): Promise<Contact[]> {
   const { data, error } = await client
     .from('contacts')
@@ -736,9 +767,11 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
 
   const { data: meine } = await client
     .from('community_members')
-    .select('community_id')
+    .select('community_id, is_muted')
     .eq('user_id', ichId);
   const beigetreten = new Set((meine ?? []).map((m: any) => m.community_id));
+  // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
+  const stumme = new Set((meine ?? []).filter((m: any) => m.is_muted).map((m: any) => m.community_id));
 
   return (data ?? []).map((c: any) => ({
     id: c.id,
@@ -749,6 +782,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     visibility: c.visibility,
     members: Number(c.mitglieder_basis ?? 0) + (c.community_members?.[0]?.count ?? 0),
     joined: beigetreten.has(c.id),
+    stumm: stumme.has(c.id),
     unreadCount: 0,
     // Eine selbst angelegte Community lässt sich nicht verlassen — sie stünde
     // sonst ohne Besitzer da.
@@ -1194,6 +1228,57 @@ export async function ladeSichtbarkeit(
     raus[a.bereich].ausnahmen.push(a.target_id);
   }
   return raus;
+}
+
+/**
+ * Die „Insights" aus den Einstellungen — Statistik zum eigenen Content.
+ *
+ * Nicht zu verwechseln mit einem *Insight* (Foto an ausgewaehlte Personen).
+ * Das Handbuch nennt beides so; hier ist die Statistik gemeint: Aufrufe und
+ * Reichweite, nur fuer einen selbst sichtbar.
+ *
+ * Bis zum 02.09.2026 standen hier in App und Website dieselben vier
+ * erfundenen Zahlen im Code — 340 Follower, 1.284 Aufrufe, 46 neue Follower.
+ * Sie standen unter einer Ueberschrift, die Auskunft verspricht, und waren
+ * bei jedem Konto gleich. Jetzt kommt jede der vier aus der Datenbank.
+ *
+ * „Neue Follower (30 Tage)" liest `follows.created_at`; die Aufrufe sind die
+ * Summe ueber die eigenen Beitraege. Ein Zeitfenster gibt es dort nicht —
+ * `posts.views` ist ein Zaehlerstand, kein Verlauf. Deshalb heisst die Zeile
+ * „Aufrufe gesamt" und nicht mehr „Aufrufe (30 Tage)": lieber eine ehrliche
+ * Zahl als eine, die einen Zeitraum behauptet, den niemand misst.
+ */
+export interface Statistik {
+  beitraege: number;
+  follower: number;
+  aufrufe: number;
+  neueFollower: number;
+}
+
+export async function ladeStatistik(
+  client: SupabaseClient,
+  ichId: string
+): Promise<Statistik> {
+  const vor30Tagen = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+
+  const [{ data: zahlen }, { data: beitraege, error: fehlerBeitraege }, { count: neue }] =
+    await Promise.all([
+      client.from('profile_zahlen').select('followers, beitraege').eq('id', ichId).maybeSingle(),
+      client.from('posts').select('views').eq('user_id', ichId),
+      client
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('followee_id', ichId)
+        .gte('created_at', vor30Tagen),
+    ]);
+  if (fehlerBeitraege) throw fehlerBeitraege;
+
+  return {
+    beitraege: Number(zahlen?.beitraege ?? 0),
+    follower: Number(zahlen?.followers ?? 0),
+    aufrufe: ((beitraege ?? []) as any[]).reduce((summe, b) => summe + Number(b.views || 0), 0),
+    neueFollower: Number(neue ?? 0),
+  };
 }
 
 /** Der eigene Bann-Verlauf — mit Grund, wie das Handbuch es verlangt. */

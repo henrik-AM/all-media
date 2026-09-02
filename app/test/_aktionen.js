@@ -90,6 +90,54 @@ const pruefe = (name, wahr, zusatz = '') => {
   const quelltext = fs.readFileSync(datei, 'utf8');
   fs.rmSync(bauOrdner, { recursive: true, force: true });
 
+  /*
+   * Dasselbe fuer lib/daten.ts — den Lese-Teil.
+   *
+   * Bis zum 02.09.2026 pruefte dieser Lauf nur, ob Geschriebenes ankommt.
+   * Dass eine Liste beim *Lesen* gar nicht erst nachfragt und fuenf feste
+   * Kennungen zeigt, konnte er deshalb nicht sehen.
+   */
+  const bauOrdnerD = fs.mkdtempSync(path.join(os.tmpdir(), 'all-media-daten-'));
+  execFileSync(
+    process.execPath,
+    [
+      path.join(__dirname, '..', 'node_modules', 'typescript', 'bin', 'tsc'),
+      path.join(__dirname, '..', 'lib', 'daten.ts'),
+      '--ignoreConfig', '--target', 'es2020', '--module', 'es2020',
+      '--skipLibCheck', '--outDir', bauOrdnerD,
+    ],
+    { stdio: 'pipe' }
+  );
+  const findeD = (ordner) =>
+    fs.readdirSync(ordner, { withFileTypes: true }).flatMap((e) => {
+      const voll = path.join(ordner, e.name);
+      return e.isDirectory() ? findeD(voll) : e.name === 'daten.js' ? [voll] : [];
+    });
+  const [dateiD] = findeD(bauOrdnerD);
+  if (!dateiD) {
+    console.error('FEHLER  daten.ts liess sich nicht uebersetzen.');
+    await browser.close();
+    process.exit(1);
+  }
+  const quelltextD = fs.readFileSync(dateiD, 'utf8');
+  fs.rmSync(bauOrdnerD, { recursive: true, force: true });
+
+  /** Führt eine Funktion aus daten.ts im Browser aus. */
+  const appDaten = (name, ...args) =>
+    seite.evaluate(
+      async ({ quelltext, name, args }) => {
+        if (!window.__daten) {
+          const url = URL.createObjectURL(new Blob([quelltext], { type: 'text/javascript' }));
+          window.__daten = await import(url);
+          URL.revokeObjectURL(url);
+        }
+        const client = await window.Anmeldung.aufbauen();
+        const ich = window.Anmeldung.nutzer().id;
+        return window.__daten[name](client, ich, ...args);
+      },
+      { quelltext: quelltextD, name, args }
+    );
+
   /** Führt eine Funktion aus aktionen.ts im Browser aus. */
   const app = (name, ...args) =>
     seite.evaluate(
@@ -709,6 +757,84 @@ const pruefe = (name, wahr, zusatz = '') => {
     });
 
     return an === 'Prüflauf' && !aus;
+  })());
+
+  /*
+   * Die Anzeigen, die bis zum 02.09.2026 nichts mit der Datenbank zu tun
+   * hatten — feste Namenslisten, erfundene Zahlen, ein Einstellungspunkt
+   * ohne Grundlage. Sie sind hier, damit sie nicht wieder unbemerkt
+   * abrutschen: an einer Liste, die nie jemand mit ihrer eigenen
+   * Ueberschrift vergleicht, faellt das nicht auf.
+   */
+  console.log('\nAnzeigen mit Datenbankbezug');
+
+  await pruefe('Die Gefolgt-Liste der App stimmt mit der Tabelle ueberein', await (async () => {
+    const ausApp = await appDaten('ladeFolgeListe', 'me', 'gefolgt');
+    const ausDb = await seite.evaluate(async () => {
+      const client = await window.Anmeldung.aufbauen();
+      const ich = window.Anmeldung.nutzer().id;
+      const { data } = await client.from('follows').select('followee_id').eq('follower_id', ich);
+      return (data || []).map((f) => f.followee_id);
+    });
+    return Array.isArray(ausApp) && ausApp.length === ausDb.length;
+  })());
+
+  await pruefe('App und Website nennen dieselben Gefolgten', await (async () => {
+    const ausApp = await appDaten('ladeFolgeListe', 'me', 'gefolgt');
+    const ausWeb = await seite.evaluate(async () => {
+      const r = await fetch('/api/profile/me/folge/gefolgt');
+      return r.ok ? (await r.json()).ids || [] : null;
+    });
+    if (!Array.isArray(ausApp) || !Array.isArray(ausWeb)) return false;
+    return [...ausApp].sort().join(',') === [...ausWeb].sort().join(',');
+  })());
+
+  await pruefe('Die Statistik kommt aus der Datenbank, nicht aus dem Code', await (async () => {
+    const ausApp = await appDaten('ladeStatistik');
+    const ausWeb = await seite.evaluate(async () => {
+      const r = await fetch('/api/statistik');
+      return r.ok ? (await r.json()).statistik : null;
+    });
+    if (!ausApp || !ausWeb) return false;
+    // Die alten Festwerte waren 340 Follower und 1284 Aufrufe.
+    if (ausApp.follower === 340 && ausApp.aufrufe === 1284) return false;
+    return (
+      ausApp.follower === ausWeb.follower &&
+      ausApp.beitraege === ausWeb.beitraege &&
+      ausApp.aufrufe === ausWeb.aufrufe
+    );
+  })());
+
+  await pruefe('Eine Community stummschalten steht danach in der Datenbank', await (async () => {
+    const id = await seite.evaluate(async () => {
+      const client = await window.Anmeldung.aufbauen();
+      const ich = window.Anmeldung.nutzer().id;
+      const { data } = await client
+        .from('community_members')
+        .select('community_id')
+        .eq('user_id', ich)
+        .limit(1);
+      return data && data[0] ? data[0].community_id : null;
+    });
+    if (!id) return false;
+
+    const an = await app('communityStumm', id);
+    const inDb = await seite.evaluate(async (cid) => {
+      const client = await window.Anmeldung.aufbauen();
+      const ich = window.Anmeldung.nutzer().id;
+      const { data } = await client
+        .from('community_members')
+        .select('is_muted')
+        .eq('user_id', ich)
+        .eq('community_id', cid)
+        .maybeSingle();
+      return data ? data.is_muted : null;
+    }, id);
+
+    // Wieder abraeumen — ein Umschalter, den niemand zurueckdreht, kippt den
+    // naechsten Lauf. Siehe "Einzeln gruen, gesamt rot".
+    const aus = await app('communityStumm', id);
+    return an === true && inDb === true && aus === false;
   })());
 
   await zuruecksetzen(seite);

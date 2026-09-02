@@ -253,6 +253,14 @@ export interface Community {
   link?: string;
   /** Selbst angelegt. Eine eigene Community laesst sich nicht verlassen. */
   eigen?: boolean;
+  /**
+   * Diese Community schickt mir keine Mitteilungen.
+   *
+   * Bis zum 02.09.2026 gab es das Feld nicht, obwohl in den Einstellungen
+   * „Gestummte Communitys" stand. Die Liste dort behalf sich mit
+   * `visibility === 'private'` und zeigte damit etwas voellig anderes an.
+   */
+  stumm?: boolean;
   unterthemen?: Unterthema[];
 }
 

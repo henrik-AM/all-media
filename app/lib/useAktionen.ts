@@ -140,6 +140,8 @@ export interface Aktionen {
 
   /** Ist der Community-Name noch frei? Bei Zweifeln true — siehe unten. */
   communityNameFrei: (name: string) => Promise<boolean>;
+  /** Community stumm/laut. Gibt den Zustand danach zurueck, oder null. */
+  communityStumm: (communityId: string) => Promise<boolean | null>;
 
   pttSenden: (
     communityId: string,
@@ -391,6 +393,9 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
        * schlimmer: eine Stoerung der Verbindung wuerde dann jedes Anlegen
        * verhindern, mit der Begruendung, es gebe die Community schon.
        */
+      communityStumm: (communityId) =>
+        holen('Das Stummschalten', (c, i) => A.communityStumm(c, i, communityId)),
+
       communityNameFrei: async (name) => {
         if (!supabase) return true;
         try {

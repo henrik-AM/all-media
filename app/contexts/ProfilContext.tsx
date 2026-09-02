@@ -162,6 +162,14 @@ interface ProfilWert {
   /** Unterthema in einer Community anlegen. Gibt einen Fehlertext zurueck. */
   unterthemaAnlegen: (communityId: string, name: string) => string | null;
   kanalBeitreten: (id: string) => void;
+  /**
+   * Den Stumm-Zustand einer Community im Bildschirmstand nachziehen.
+   *
+   * Geschrieben wird im Blatt selbst (useAktionen.communityStumm); hier geht
+   * es nur darum, dass die Einstellungsliste „Gestummte Communitys" und der
+   * Schalter dasselbe zeigen, ohne dass alles neu geladen werden muss.
+   */
+  kanalStummSetzen: (id: string, stumm: boolean) => void;
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
 
@@ -774,6 +782,10 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [schreiben]
   );
 
+  const kanalStummSetzen = useCallback((id: string, stumm: boolean) => {
+    setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, stumm } : c)));
+  }, []);
+
   const clipUmschalten = useCallback(
     (id: string, was: 'like' | 'save' | 'repost') => {
       const drehen = () =>
@@ -975,6 +987,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       kanalEntfernenNachName,
       unterthemaAnlegen,
       kanalBeitreten,
+      kanalStummSetzen,
       kanalGelesen,
       gefolgt,
       folgtPerson,
@@ -987,7 +1000,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       aufzeichnungAnlegen, clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalGelesen,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]
   );

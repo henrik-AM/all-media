@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
@@ -6,6 +6,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { ladeFolgeListe } from '../../lib/daten';
 
 interface Props {
   userId: string;
@@ -15,14 +17,35 @@ interface Props {
 }
 
 export const FollowersScreen = ({ userId, onBack, onOpenProfile, onNotice }: Props) => {
-  const { users: alleNutzer } = useDaten();
+  const { users: alleNutzer, ichId } = useDaten();
+  const { supabase } = useSupabase();
   const insets = useSafeAreaInsets();
   const person = alleNutzer[userId];
 
-  // Mock-Follower-Liste
-  const followers = [
-    alleNutzer.u1, alleNutzer.u2, alleNutzer.u3, alleNutzer.u4, alleNutzer.u5,
-  ];
+  /*
+   * Hier stand bis zum 02.09.2026 eine feste Liste: u1 bis u5, bei jeder
+   * Person dieselbe. Sie sah nur deshalb plausibel aus, weil die Zahl
+   * darüber aus `profile_zahlen` kommt und echt ist — die Namen darunter
+   * hatten damit nie etwas zu tun. Jetzt kommen beide aus `follows`.
+   */
+  const [ids, setIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    let gilt = true;
+    ladeFolgeListe(supabase, ichId, userId, 'follower')
+      .then((liste) => gilt && setIds(liste))
+      .catch((e: any) => {
+        console.error('Follower laden fehlgeschlagen:', e?.message ?? e);
+        if (gilt) setIds([]);
+        onNotice('Die Follower konnten nicht geladen werden.');
+      });
+    return () => {
+      gilt = false;
+    };
+  }, [supabase, ichId, userId]);
+
+  const followers = (ids ?? []).map((id) => alleNutzer[id]).filter(Boolean);
 
   if (!person) {
     return (
@@ -43,6 +66,11 @@ export const FollowersScreen = ({ userId, onBack, onOpenProfile, onNotice }: Pro
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl + insets.bottom }}>
+        {ids !== null && followers.length === 0 && (
+          <Text style={styles.leer}>
+            {userId === 'me' ? 'Dir folgt noch niemand.' : `Noch niemand folgt ${person.name}.`}
+          </Text>
+        )}
         {followers.map((follower) => (
           <Druck
             key={follower.id}
