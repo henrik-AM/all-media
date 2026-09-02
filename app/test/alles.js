@@ -52,6 +52,7 @@ const LAEUFE = [
   ['datenbank', '_datenbank.js'],
   ['aktionen', '_aktionen.js'],
   ['gleichstand', '_gleichstand.js'],
+  ['handbuch', '_handbuch.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */

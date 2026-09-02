@@ -109,6 +109,18 @@ const DETAILS = [
     console.log(`  ${name}.png`);
   }
 
+  /**
+   * Wartet, bis nichts mehr nachgeladen wird.
+   *
+   * Zwei Dinge: der Netzverkehr muss zur Ruhe kommen (die Daten kommen aus
+   * der Datenbank, nicht aus der Seite), und danach braucht das Zeichnen
+   * noch einen Bilddurchlauf.
+   */
+  const ruhe = async (s) => {
+    await s.waitForLoadState('networkidle').catch(() => {});
+    await s.waitForTimeout(250);
+  };
+
   for (const [bereich, unterpunkt, name, schritte] of DETAILS) {
     await seite.click(`[data-area="${bereich}"]`);
     await seite.waitForTimeout(150);
@@ -123,6 +135,20 @@ const DETAILS = [
       await seite.click(waehler);
       await seite.waitForTimeout(350);
     }
+
+    /*
+     * Warten, bis die Seite wirklich steht — sonst wird ein Bild von der
+     * Liste gemacht, die man gerade verlaesst.
+     *
+     * Genau das ist am 02.09.2026 passiert: `detail-chat.png` zeigte die
+     * Chatliste mit hervorgehobener Zeile, nicht den Chat. Die 350
+     * Millisekunden oben reichten nicht mehr, seit das Laden der
+     * Nachrichten Bezuege, Reaktionen und Namen mitholt (~800 ms). Ein Bild,
+     * das den falschen Bildschirm zeigt, ist schlimmer als gar keins: man
+     * sieht es sich an und haelt die Sache fuer geprueft.
+     */
+    await ruhe(seite);
+
     await seite.screenshot({ path: path.join(ZIEL, `${name}.png`) });
     console.log(`  ${name}.png`);
     /*

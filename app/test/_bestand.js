@@ -7,7 +7,7 @@
 // Start:  node test/_bestand.js
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 
 const BEREICHE = {
   messenger: ['friendmap', 'chats', 'camera', 'profile'],
@@ -39,7 +39,7 @@ const BEREICHE = {
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
 
@@ -119,6 +119,6 @@ const BEREICHE = {
     for (const o of b.offen.slice(0, 4)) console.log(`              offen: ${o}`);
   }
 
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await browser.close();
 })();

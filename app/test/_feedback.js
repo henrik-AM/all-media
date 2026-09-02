@@ -3,11 +3,12 @@
 // Start:  node test/_feedback.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 const fs = require('fs');
 const path = require('path');
 
+const { chatOffen } = require('./_warten');
 // Kleines Testbild fuer die Story-Aufnahme.
 const BILD = path.join(__dirname, '_teststory.png');
 if (!fs.existsSync(BILD)) {
@@ -62,7 +63,7 @@ const pruefe = (was, ok, zusatz = '') => {
   }
   await page.reload({ waitUntil: 'networkidle' });
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.evaluate(() => {
     try { localStorage.removeItem('allmedia.eigeneStory'); } catch {}
   });
@@ -75,7 +76,10 @@ const pruefe = (was, ok, zusatz = '') => {
   pruefe('Chatliste hat Eintraege', zeilen.length > 0, `${zeilen.length} Zeilen`);
 
   await zeilen[0].click();
-  await page.waitForTimeout(500);
+  // Auf den Chatkopf warten statt auf die Uhr: eine halbe Sekunde reichte,
+  // solange der Lauf allein lief, und nicht mehr, sobald ein voller
+  // Durchgang davor lag.
+  await page.waitForSelector('.chathead', { timeout: 8000 }).catch(() => null);
   pruefe('Chat laesst sich oeffnen', !!(await page.$('.chathead')),
          await page.$eval('.chathead__name', (e) => e.textContent).catch(() => ''));
 
@@ -333,8 +337,7 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.click('[data-sub="chats"]').catch(() => {});
   await page.waitForTimeout(500);
   await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
-  await page.waitForSelector('#messages', { timeout: 8000 }).catch(() => {});
-  await page.waitForTimeout(400);
+  await chatOffen(page, 8000);
   await page.click('[data-call="audio"]');
   await page.waitForTimeout(800);
 
@@ -363,7 +366,7 @@ const pruefe = (was, ok, zusatz = '') => {
   if (konsolenfehler.length) fehlgeschlagen++;
 
   // Aufraeumen, damit der naechste Lauf sauber startet.
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.evaluate(() => {
     try { localStorage.removeItem('allmedia.eigeneStory'); } catch {}
   });

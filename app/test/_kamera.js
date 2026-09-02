@@ -14,7 +14,7 @@
 
 const path = require('path');
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const BILD = path.join(__dirname, '_testbild.png');
@@ -47,7 +47,7 @@ const BILD = path.join(__dirname, '_testbild.png');
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('#topbar button');
 
@@ -68,7 +68,22 @@ const BILD = path.join(__dirname, '_testbild.png');
     await page.waitForTimeout(250);
   };
 
+  /*
+   * Die Meldung unten legt sich ueber die Fussleiste und faengt Klicks ab.
+   * Wer direkt nach einer Aktion weiternavigiert, klickt sonst gegen den
+   * Toast und bekommt einen Zeitablauf gemeldet, der wie ein kaputter
+   * Knopf aussieht.
+   */
+  const ohneToast = async () => {
+    await page
+      .waitForFunction(() => !document.querySelector('#toast:not([hidden])'), null, {
+        timeout: 6000,
+      })
+      .catch(() => null);
+  };
+
   const gehe = async (bereich, unter) => {
+    await ohneToast();
     await page.click(`[data-area="${bereich}"]`);
     await page.waitForTimeout(300);
     if (unter) {
@@ -108,11 +123,19 @@ const BILD = path.join(__dirname, '_testbild.png');
 
     const erster = await page.$eval('[data-zielchat]', (e) => e.dataset.zielchat);
     await page.click(`[data-zielchat="${erster}"]`);
-    await page.waitForTimeout(1200);
 
-    const gesendet = await page.$eval('#toast', (e) => e.textContent);
-    if (!/gesendet/i.test(gesendet)) throw new Error('Meldung war: ' + gesendet);
-    if (!(await page.$('#messages'))) throw new Error('der Chat ist nicht aufgegangen');
+    /*
+     * Auf die Meldung warten, nicht auf die Uhr. Das Bild geht seit dem
+     * Handbuch-Abgleich erst in den Speicher und dann in die Datenbank —
+     * eine feste Wartezeit von 1,2 Sekunden traf mal, mal nicht, und dann
+     * stand hier "Meldung war:" mit leerem Text hinterher.
+     */
+    await page.waitForFunction(
+      () => /gesendet/i.test(document.querySelector('#toast')?.textContent || ''),
+      null,
+      { timeout: 10000 }
+    );
+    await page.waitForSelector('#messages', { timeout: 5000 });
   });
 
   await pruefe('Im Chat steht das Kamerasymbol', async () => {
@@ -171,7 +194,22 @@ const BILD = path.join(__dirname, '_testbild.png');
     await page.selectOption('#f_music', wahl[1]);
     await page.fill('#f_beschreibung', 'Beitrag mit Musik');
     await page.click('#formOk');
-    await page.waitForTimeout(1400);
+    /*
+     * Auf den Beitrag warten, nicht auf die Uhr: Anlegen, Hochladen und das
+     * Neuladen des Feeds hängen aneinander, und 1400 ms waren dafür eine
+     * Wette, die im vollen Durchgang nicht mehr aufging.
+     */
+    const gesucht = wahl[1].split(' – ')[0];
+    await page
+      .waitForFunction(
+        (name) =>
+          Array.from(document.querySelectorAll('[data-postsound]')).some((e) =>
+            (e.textContent || '').includes(name)
+          ),
+        gesucht,
+        { timeout: 12000 }
+      )
+      .catch(() => {});
 
     const musik = await page.$$eval('[data-postsound]', (n) => n.map((e) => e.textContent));
     if (!musik.some((m) => m.includes(wahl[1].split(' – ')[0]))) {

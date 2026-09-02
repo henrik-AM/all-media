@@ -10,9 +10,10 @@
 // Start:  node test/_insel.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
+const { chatOffen } = require('./_warten');
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
 (async () => {
@@ -43,7 +44,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('#topbar button');
 
@@ -121,8 +122,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Ein gelesener Chat nimmt beide Zahlen mit', async () => {
     await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
-    await page.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(400);
+    await chatOffen(page);
     await page.click('#chatBack');
     await page.waitForFunction(
       () => document.querySelector('[data-sub="chats"] .topbar__badge')?.textContent === '1',

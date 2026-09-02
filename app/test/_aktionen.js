@@ -20,7 +20,7 @@
  */
 
 const { chromium } = require('playwright-core');
-const { anmelden, MAIL } = require('./_konto');
+const { anmelden, MAIL, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
@@ -46,7 +46,7 @@ const pruefe = (name, wahr, zusatz = '') => {
     await browser.close();
     process.exit(1);
   }
-  await seite.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(seite);
 
   /*
    * app/lib/aktionen.ts ist TypeScript und läuft sonst in Expo. Hier wird es
@@ -711,7 +711,7 @@ const pruefe = (name, wahr, zusatz = '') => {
     return an === 'Prüflauf' && !aus;
   })());
 
-  await seite.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(seite);
 
   console.log(browserFehler.length ? '\nKonsolenfehler:\n' + browserFehler.join('\n') : '\nKonsolenfehler: keine');
   console.log(

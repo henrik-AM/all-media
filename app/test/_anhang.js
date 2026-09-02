@@ -5,7 +5,7 @@
 // Start:  node test/_anhang.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 const fs = require('fs');
 const path = require('path');
@@ -53,7 +53,7 @@ if (!fs.existsSync(BILD)) {
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
 
@@ -85,15 +85,34 @@ if (!fs.existsSync(BILD)) {
   console.log('\nAnhang im Chat');
   await imChat();
 
-  await pruefe('Das Plus zeigt vier Anhang-Arten', async () => {
-    await page.click('#attach');
-    await page.waitForSelector('[data-anhang]', { timeout: 3000 });
-    const punkte = await page.$$eval('[data-anhang]', (els) => els.map((e) => e.textContent.trim()));
-    const soll = ['Foto aufnehmen', 'Aus der Galerie', 'Standort senden', 'Kontakt senden'];
-    if (JSON.stringify(punkte) !== JSON.stringify(soll)) throw new Error(punkte.join(' | '));
-    // Das Anhang-Menue schliesst wie das Neu-Menue: Tippen daneben.
-    await page.mouse.click(195, 60);
-    await page.waitForTimeout(300);
+  // Seit dem Handbuch-Abgleich am 01.09.2026 haengen vier weitere Arten
+  // darin: Datei, Gif, Sticker und "Standort anfragen". Die Liste wird hier
+  // vollstaendig geprueft, weil ein verschwundener Punkt sonst niemandem
+  // auffaellt.
+  await pruefe('Das Plus zeigt alle Anhang-Arten', async () => {
+    try {
+      await page.click('#attach');
+      await page.waitForSelector('[data-anhang]', { timeout: 3000 });
+      const punkte = await page.$$eval('[data-anhang]', (els) => els.map((e) => e.textContent.trim()));
+      const soll = [
+        'Foto aufnehmen',
+        'Aus der Galerie',
+        'Datei senden',
+        'Gif senden',
+        'Sticker',
+        'Standort senden',
+        'Standort anfragen',
+        'Kontakt senden',
+      ];
+      if (JSON.stringify(punkte) !== JSON.stringify(soll)) throw new Error(punkte.join(' | '));
+    } finally {
+      // Das Anhang-Menue schliesst wie das Neu-Menue: Tippen daneben. Das
+      // muss auch nach einem Fehlschlag passieren — ein offenes Blatt legt
+      // sonst jede folgende Pruefung lahm, und dann sieht es aus, als waere
+      // alles kaputt statt nur diese eine Sache.
+      await page.mouse.click(195, 60);
+      await page.waitForTimeout(300);
+    }
   });
 
   await pruefe('Standort landet als Karte im Chat', async () => {
@@ -268,7 +287,7 @@ if (!fs.existsSync(BILD)) {
     if (!hinweis.includes('Danke')) throw new Error(hinweis || 'kein Hinweis erschienen');
   });
 
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
 
   const fehler = ergebnisse.filter((ok) => !ok).length;

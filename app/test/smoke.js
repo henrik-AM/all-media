@@ -16,9 +16,10 @@
 // Testkommentare in der App zurueckbleiben.
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
+const { chatOffen } = require('./_warten');
 let failed = 0;
 const assert = (label, cond) => {
   if (!cond) failed++;
@@ -52,7 +53,7 @@ const STRUCTURE = {
   await p.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   // Auf den Startzustand — sonst zaehlt der zweite Lauf die Testkommentare
   // und Testgruppen des ersten mit.
-  await p.evaluate(() => fetch('/api/reset', { method: 'POST' }).then((r) => r.json()));
+  await zuruecksetzen(p);
   await p.reload({ waitUntil: 'networkidle' });
   await p.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await p.waitForTimeout(400);
@@ -110,8 +111,7 @@ const STRUCTURE = {
   await p.click(await K.waehlerChat(p, 'Bob Müller'));
   // Der Verlauf kommt jetzt vom Server, nicht mehr aus dem Arbeitsspeicher —
   // eine feste Wartezeit reicht dafuer nicht zuverlaessig.
-  await p.waitForSelector('#messages');
-  await p.waitForTimeout(400);
+  await chatOffen(p);
   assert('Chat-Bereich nicht abgeschnitten', await p.$eval('#messages', e => e.clientHeight > 300));
   const before = await p.$$eval('.msg', e => e.length);
   await p.fill('#msgInput', 'Regressionstest');
@@ -397,7 +397,7 @@ const STRUCTURE = {
    * eines Kontos an und braucht deshalb dessen Anmeldung. Also aus der Seite
    * heraus, wo das Zugangstoken schon haengt.
    */
-  await p.evaluate(() => fetch('/api/reset', { method: 'POST' }).then((r) => r.json()));
+  await zuruecksetzen(p);
 
   console.log('');
   console.log(errs.length ? 'FEHLER:\n' + errs.join('\n') : 'Keine Konsolenfehler');

@@ -15,7 +15,7 @@
 // Start:  node test/_feinschliff.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -48,7 +48,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('#topbar button');
 

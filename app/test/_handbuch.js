@@ -30,7 +30,7 @@
  */
 
 const { chromium } = require('playwright-core');
-const { anmelden, MAIL } = require('./_konto');
+const { anmelden, MAIL, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
@@ -57,7 +57,7 @@ const pruefe = (name, wahr, zusatz = '') => {
     await browser.close();
     process.exit(1);
   }
-  await seite.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(seite);
 
   // --- app/lib/aktionen.ts übersetzen und im Browser laden ----------------
   const fs = require('fs');
@@ -273,13 +273,27 @@ const pruefe = (name, wahr, zusatz = '') => {
   // ============================================================ Umfragen ==
   console.log('\nUmfragen');
 
-  const beitrag = await seite.evaluate(async () => {
-    const boot = await (await fetch('/api/bootstrap')).json();
-    return (boot.posts || [])[0] || null;
+  /*
+   * Ein eigener Beitrag, kein fremder.
+   *
+   * Vorher nahm der Lauf den neuesten Beitrag aus dem Bootstrap. Einzeln ging
+   * das gut, im Gesamtlauf nicht: dort steht an der Stelle, was ein früherer
+   * Lauf hinterlassen hat — und was dessen Aufräumen gleich wieder mitnimmt.
+   * Die Umfrage merkte davon nichts (polls.traeger_id hat bewusst keinen
+   * Fremdschlüssel, weil sie auch an Storys und Kanälen hängen kann), aber
+   * Streamkommentar und Spende zeigen auf public.posts und fielen mit einer
+   * Fremdschlüsselverletzung um. Ein selbst angelegter Beitrag gehört diesem
+   * Lauf, existiert sicher, und `zuruecksetzen()` räumt ihn mit ab.
+   */
+  const eigeneId = await app('beitragAnlegen', {
+    titel: 'Prüfbeitrag Handbuch',
+    beschreibung: 'Träger für Umfrage, Streamkommentar und Spende',
+    art: 'post',
   });
+  const beitrag = eigeneId.ok && eigeneId.wert ? { id: eigeneId.wert } : null;
 
   if (!beitrag) {
-    console.error('FEHLER  Kein Beitrag im Testbestand — die Umfrage-Prüfungen fielen aus.');
+    console.error('FEHLER  Der Prüfbeitrag ließ sich nicht anlegen — die Umfrage-Prüfungen fielen aus.');
     fehler++;
   } else {
     const umfrage = await app(
@@ -402,7 +416,7 @@ const pruefe = (name, wahr, zusatz = '') => {
     pruefe('Eine Spende an eine Person', spende.ok, spende.ok ? '' : spende.fehler);
   }
 
-  await seite.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(seite);
 
   console.log(
     browserFehler.length ? '\nKonsolenfehler:\n' + browserFehler.join('\n') : '\nKonsolenfehler: keine'

@@ -12,7 +12,7 @@
 // Start:  node test/_profil.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -45,7 +45,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('#topbar button');
 
@@ -111,10 +111,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await zumProfil('messenger');
     await page.click('[data-mact="story"]');
     await page.waitForTimeout(600);
-    // Das Auswahl-Blatt des Punktes muss offen sein.
-    const wahl = await page.$$eval('[data-wahl]', (n) => n.map((x) => x.dataset.wahl));
-    if (!wahl.length) throw new Error('kein Auswahl-Blatt — man landet wieder in der Liste');
-    if (!wahl.includes('Enge Freunde')) throw new Error('falscher Punkt: ' + wahl.join(' | '));
+    /*
+     * Das Auswahl-Blatt des Punktes muss offen sein. Die Story-Sichtbarkeit
+     * ist seit dem Handbuch-Abgleich am 01.09.2026 kein Dreier-Wahlblatt
+     * mehr ("Alle / Meine Kontakte / Enge Freunde"), sondern die vier Stufen
+     * des Handbuchs — deshalb steht hier data-stufe und nicht data-wahl.
+     */
+    const stufen = await page.$$eval('[data-stufe]', (n) => n.map((x) => x.dataset.stufe));
+    if (!stufen.length) throw new Error('kein Auswahl-Blatt — man landet wieder in der Liste');
+    const soll = ['niemand', 'niemand_bis_auf', 'alle_bis_auf', 'alle'];
+    if (JSON.stringify(stufen) !== JSON.stringify(soll)) {
+      throw new Error('falscher Punkt: ' + stufen.join(' | '));
+    }
   });
 
   await pruefe('Der Pfeil oben links fuehrt zurueck ins Profil', async () => {

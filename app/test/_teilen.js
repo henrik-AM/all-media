@@ -7,9 +7,10 @@
 // Start:  node test/_teilen.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
+const { chatOffen } = require('./_warten');
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
 (async () => {
@@ -39,7 +40,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
 
@@ -107,8 +108,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Der Beitrag liegt als Karte im Chat', async () => {
     await gehe('messenger', 'chats');
     await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
-    await page.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(600);
+    await chatOffen(page);
     /*
      * Wer der Autor ist, haengt davon ab, welcher Beitrag im Feed oben steht —
      * und das steht jetzt in der Datenbank. Frueher war es immer Clara Weber
@@ -186,7 +186,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-sheet-close]');
   });
 
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
 
   const fehler = ergebnisse.filter((ok) => !ok).length;
   const eindeutig = [...new Set(browserFehler)];

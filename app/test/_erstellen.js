@@ -8,7 +8,7 @@
 //         ZIEL=https://all-media-website.onrender.com node test/_erstellen.js
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const fs = require('fs');
 const path = require('path');
 
@@ -54,7 +54,7 @@ if (!fs.existsSync(BILD)) {
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
 
@@ -205,14 +205,17 @@ if (!fs.existsSync(BILD)) {
   console.log('\nPlus — Erstellen');
   await gehe('videos', 'profile');
 
-  await pruefe('Die acht Punkte stehen wie im Prototyp', async () => {
+  await pruefe('Die neun Punkte stehen wie im Prototyp', async () => {
     await page.click('[data-oact="create"]');
     await page.waitForSelector('.erstellen', { timeout: 3000 });
     const punkte = await page.$$eval('.erstellen__punkt', (els) => els.map((e) => e.textContent.trim()));
     // Punkt 45: Livestream steht direkt unter Story - beides ist im
     // Augenblick aufgenommen. Highlight und Playlist sortieren dagegen
     // vorhandene Beitraege und stehen darum darunter.
-    const soll = ['Reels', 'Querformat', 'Beitrag', 'Story', 'Livestream', 'Highlight', 'Playlist', 'Spendenaktion'];
+    // Die Umfrage kam am 01.09.2026 aus dem Handbuch dazu und steht hinter
+    // dem Livestream — sie darf die Nachbarschaft Story/Livestream nicht
+    // zerreissen.
+    const soll = ['Reels', 'Querformat', 'Beitrag', 'Story', 'Livestream', 'Umfrage', 'Highlight', 'Playlist', 'Spendenaktion'];
     if (JSON.stringify(punkte) !== JSON.stringify(soll)) throw new Error(punkte.join(' | '));
     await page.click('[data-sheet-close]');
   });
@@ -410,7 +413,7 @@ if (!fs.existsSync(BILD)) {
   });
 
   /* ---------------------------------------------------------- Abschluss */
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
 
   const fehlgeschlagen = ergebnisse.filter((e) => !e.ok);

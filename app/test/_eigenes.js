@@ -14,7 +14,7 @@
 // Start:  node test/_eigenes.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 
 const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
 
@@ -56,7 +56,7 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('#topbar button');
 

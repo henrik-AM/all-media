@@ -6,6 +6,7 @@
 const { chromium } = require('playwright-core');
 const { anmelden } = require('./_konto');
 
+const { chatOffen } = require('./_warten');
 const ADRESSE = process.env.AM_URL || 'http://localhost:3000';
 
 let bestanden = 0;
@@ -226,8 +227,7 @@ function ok(name, bedingung, zusatz = '') {
   // "Beim Tippen auf den Namen einer Person im Chat nicht auf deren
   //  Video-Profil, sondern auf die Chat-Einstellungen."
   await seite.locator('[data-chat]').first().click();
-  await seite.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
-  await seite.waitForTimeout(400);
+  await chatOffen(seite);
   const kopf = seite.locator('.chathead__name, .chatkopf__name, [data-chatsettings]').first();
   ok('Chat-Kopf ist anklickbar', (await kopf.count()) > 0);
   if (await kopf.count()) {

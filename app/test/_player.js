@@ -13,7 +13,7 @@
 // Start:  node test/_player.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -46,7 +46,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await page.reload({ waitUntil: 'networkidle' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('#topbar button');
 
@@ -198,7 +198,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
      */
     await page.click(await K.waehlerClip(page, 'Nachtfotografie am Hafen'));
     await page.waitForSelector('.player');
-    await page.waitForTimeout(400);
+    /*
+     * Auf das Verschwinden warten, nicht auf die Uhr. Der Player baut die
+     * Kapitelliste beim Videowechsel neu auf; bis dahin steht noch die des
+     * vorigen Videos da. Vierhundert Millisekunden trafen das im Einzellauf
+     * und verfehlten es im vollen Durchgang.
+     *
+     * Bleibt die Überschrift auch nach acht Sekunden stehen, ist es kein
+     * Timing mehr, sondern der Fehler, den diese Prüfung sucht.
+     */
+    await page
+      .waitForFunction(() => !document.querySelector('.kapitel'), null, { timeout: 8000 })
+      .catch(() => {});
     if (await page.$('.kapitel')) throw new Error('die Überschrift steht ohne Kapitel da');
   });
 

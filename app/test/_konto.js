@@ -100,9 +100,33 @@ async function vorbereiten(page, basis = 'http://localhost:3000') {
   return true;
 }
 
-/** Nur zurücksetzen — für Prüfläufe, die zwischendurch aufräumen. */
+/**
+ * Nur zurücksetzen — für Prüfläufe, die zwischendurch aufräumen.
+ *
+ * Die Antwort wird gelesen und geprüft, und das ist der ganze Punkt. Bis zum
+ * 02.09.2026 riefen dreiunddreißig Stellen `fetch('/api/reset')` auf, ohne
+ * hinzusehen. Ein Zurücksetzen, das `{ ok: false }` meldete — etwa weil es
+ * auf ein Beispielprofil traf —, sah dann genauso aus wie ein gelungenes.
+ * Der Lauf begann auf einem Bestand, den er für frisch hielt, und fiel
+ * irgendwo weiter hinten mit einer Meldung um, die mit der Ursache nichts
+ * mehr zu tun hatte.
+ *
+ * Darum hier laut statt still: wer nicht aufräumen konnte, soll es an der
+ * Stelle erfahren, an der es passiert ist.
+ */
 async function zuruecksetzen(page) {
-  return page.evaluate(() => fetch('/api/reset', { method: 'POST' }).then((r) => r.json()));
+  const antwort = await page.evaluate(() =>
+    fetch('/api/reset', { method: 'POST' })
+      .then((r) => r.json())
+      .catch((f) => ({ ok: false, grund: String(f) }))
+  );
+  if (!antwort || antwort.ok === false) {
+    throw new Error(
+      'Der Testbestand liess sich nicht zuruecksetzen: ' +
+        (antwort?.grund || antwort?.error || JSON.stringify(antwort))
+    );
+  }
+  return antwort;
 }
 
 module.exports = { anmelden, vorbereiten, zuruecksetzen, MAIL, PASS, NAME };

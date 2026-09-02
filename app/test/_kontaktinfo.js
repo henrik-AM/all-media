@@ -4,9 +4,10 @@
 // Start:  node test/_kontaktinfo.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
+const { chatOffen } = require('./_warten');
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
 (async () => {
@@ -53,7 +54,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
       }
     }
   });
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
 
@@ -93,8 +94,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     // chatId ist jetzt ein Name, kein "c1" mehr: Chats bekommen ihre
     // Kennung beim Anlegen in der Datenbank. Siehe test/_kennungen.js.
     await page.click(await K.waehlerChat(page, chatId));
-    await page.waitForSelector('#messages', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(400);
+    await chatOffen(page);
   };
 
   const zurKontaktinfo = async () => {
@@ -178,7 +178,17 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.mouse.down();
     await page.waitForTimeout(750);
     await page.mouse.up();
-    await page.waitForTimeout(600);
+
+    /*
+     * Seit dem Handbuch-Abgleich am 01.09.2026 setzt langes Druecken nicht
+     * mehr sofort einen Stern, sondern oeffnet das Nachrichtenmenue. Der
+     * Stern ist dort ein Punkt unter sieben. Das ist kein Umweg, sondern der
+     * Grund fuer das Menue: bearbeiten, antworten, zitieren, weiterleiten
+     * und zuruecknehmen brauchen alle denselben Griff.
+     */
+    await page.waitForSelector('[data-msgaktion="markieren"]', { timeout: 4000 });
+    await page.click('[data-msgaktion="markieren"]');
+    await page.waitForTimeout(800);
 
     const sterne = await page.$$eval('.msg__stern', (els) => els.length);
     if (sterne !== 1) throw new Error(sterne + ' Sterne');
@@ -220,7 +230,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nGruppenanruf');
 
   await pruefe('Eine Gruppe lässt sich anrufen, alle Mitglieder stehen da', async () => {
-    await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+    await zuruecksetzen(page);
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
     await imChat('Projekt Team');
@@ -254,7 +264,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
       }
     }
   });
-  await page.evaluate(() => fetch('/api/reset', { method: 'POST' }));
+  await zuruecksetzen(page);
 
   const fehler = ergebnisse.filter((ok) => !ok).length;
   const eindeutig = [...new Set(browserFehler)];
