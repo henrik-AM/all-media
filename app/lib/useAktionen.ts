@@ -18,6 +18,11 @@ import * as A from './aktionen';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
 import { ladeHoch } from './supabaseStorage';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+/** JJJJ-MM-TT fuer den Dateinamen. */
+const heute = () => new Date().toISOString().slice(0, 10);
 
 /** Stellt die Anzeige wieder auf den Stand von vorher. */
 type Rueckweg = () => void;
@@ -142,6 +147,22 @@ export interface Aktionen {
   communityNameFrei: (name: string) => Promise<boolean>;
   /** Community stumm/laut. Gibt den Zustand danach zurueck, oder null. */
   communityStumm: (communityId: string) => Promise<boolean | null>;
+
+  /**
+   * Eine Einstellung setzen. Gibt den Wert zurueck, oder null bei Fehler —
+   * dann stellt der Bildschirm den Schalter wieder zurueck.
+   */
+  einstellung: (schluessel: string, wert: string) => Promise<string | null>;
+  /** Einen fremden Profilaufruf vermerken. Meldet nichts. */
+  profilAufruf: (profilId: string) => Promise<void>;
+  /**
+   * Die eigenen Daten als Datei — Artikel 15 DSGVO.
+   *
+   * Gibt zurueck, ob es geklappt hat. Auf dem Telefon gibt es keinen
+   * Download-Ordner wie im Browser; die Datei landet im Zwischenspeicher
+   * und geht von dort ueber das Systemblatt weiter.
+   */
+  datenauskunft: () => Promise<boolean>;
 
   pttSenden: (
     communityId: string,
@@ -395,6 +416,56 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
        */
       communityStumm: (communityId) =>
         holen('Das Stummschalten', (c, i) => A.communityStumm(c, i, communityId)),
+
+      datenauskunft: async () => {
+        if (!supabase || !ichId) {
+          melden?.('Dafür musst du angemeldet sein');
+          return false;
+        }
+        try {
+          const daten = await A.meineDaten(supabase, ichId);
+          const text = JSON.stringify(daten, null, 2);
+
+          const datei = new File(Paths.cache, `all-media-daten-${heute()}.json`);
+          // Ein zweiter Aufruf am selben Tag soll die Datei ersetzen, nicht
+          // an einer bestehenden scheitern.
+          if (datei.exists) datei.delete();
+          datei.create();
+          datei.write(text);
+
+          if (!(await Sharing.isAvailableAsync())) {
+            melden?.('Auf diesem Gerät lässt sich die Datei nicht weitergeben');
+            return false;
+          }
+          await Sharing.shareAsync(datei.uri, {
+            mimeType: 'application/json',
+            dialogTitle: 'Deine All-Media-Daten',
+          });
+          return true;
+        } catch (e: any) {
+          console.error('Datenauskunft fehlgeschlagen:', e?.message ?? e);
+          melden?.(e?.message || 'Die Auskunft hat nicht geklappt');
+          return false;
+        }
+      },
+
+      einstellung: (schluessel, wert) =>
+        holen('Die Einstellung', (c, i) => A.einstellungSetzen(c, i, schluessel, wert)),
+
+      /*
+       * Ohne Meldung. Ein Profilaufruf wird nebenbei vermerkt, waehrend man
+       * ein Profil oeffnet — ein Hinweis darueber, dass die Zaehlung nicht
+       * geklappt hat, waere dort nur im Weg. Gleiches Vorgehen wie bei
+       * storyGesehen.
+       */
+      profilAufruf: async (profilId) => {
+        if (!supabase || !ichId) return;
+        try {
+          await A.profilAufrufVermerken(supabase, ichId, profilId);
+        } catch (e: any) {
+          console.error('Profilaufruf nicht vermerkt:', e?.message ?? e);
+        }
+      },
 
       communityNameFrei: async (name) => {
         if (!supabase) return true;

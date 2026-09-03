@@ -14,7 +14,7 @@ import { colors, radius, sizes, spacing, themenStyles, typography } from '../../
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSupabase } from '../../contexts/SupabaseContext';
-import { ladeBanne, ladeStatistik, Statistik } from '../../lib/daten';
+import { ladeBanne, ladeEinstellungen, ladeStatistik, Statistik } from '../../lib/daten';
 import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -43,6 +43,16 @@ interface Item {
   icon: IconName;
   toggle?: string;
   wahl?: string[];
+  /*
+   * Der Schluessel, unter dem die Wahl in `user_settings` liegt.
+   *
+   * Bewusst nicht die Beschriftung: die ist Text fuer Menschen und wird
+   * umformuliert — dann waere die Einstellung verloren. Zwei Punkte duerfen
+   * denselben Schluessel tragen; "Wer darf mich zu Gruppen hinzufuegen"
+   * steht unter Datenschutz und unter Messenger und meint beide Male
+   * dasselbe. Ein Schluessel, ein Wert, und beide zeigen dasselbe.
+   */
+  wahlKey?: string;
   standard?: string;
   eingabe?: EingabeFeld[];
   pruefen?: (werte: Record<string, string>) => string | null;
@@ -56,7 +66,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter';
+  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft';
   gefahr?: boolean;
 }
 
@@ -171,7 +181,14 @@ const SECTIONS: Section[] = [
             : null,
         fertig: 'Passwort geändert',
       },
-      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield-checkmark-outline', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
+      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield-checkmark-outline', wahlKey: 'zweiFaktor', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
+      /*
+       * Artikel 15 und 20 DSGVO: jeder darf seine Daten sehen und
+       * mitnehmen. Fuer eine App, die live gehen soll, ist das keine
+       * Zusatzfunktion — und es fehlte, obwohl die Datenschutzerklaerung
+       * daneben stand.
+       */
+      { label: 'Meine Daten herunterladen', icon: 'download-outline', aktion: 'datenauskunft' },
       { label: 'Konto löschen', icon: 'trash-outline', gefahr: true, bestaetigen: 'Konto endgültig löschen?' },
     ],
   },
@@ -179,11 +196,11 @@ const SECTIONS: Section[] = [
     id: 'datenschutz',
     title: 'Datenschutz',
     items: [
-      { label: 'Zuletzt online', icon: 'time-outline', wahl: WER, standard: 'Meine Kontakte' },
-      { label: 'Profilbild sichtbar für', icon: 'image-outline', wahl: WER, standard: 'Alle' },
-      { label: 'Info sichtbar für', icon: 'information-circle-outline', wahl: WER, standard: 'Meine Kontakte' },
+      { label: 'Zuletzt online', icon: 'time-outline', wahlKey: 'zuletztOnline', wahl: WER, standard: 'Meine Kontakte' },
+      { label: 'Profilbild sichtbar für', icon: 'image-outline', wahlKey: 'profilbildSichtbar', wahl: WER, standard: 'Alle' },
+      { label: 'Info sichtbar für', icon: 'information-circle-outline', wahlKey: 'infoSichtbar', wahl: WER, standard: 'Meine Kontakte' },
       { label: 'Blockierte Kontakte', icon: 'ban-outline', liste: 'blockiert' },
-      { label: 'Gruppen: wer darf hinzufügen', icon: 'people-outline', wahl: WER, standard: 'Meine Kontakte' },
+      { label: 'Gruppen: wer darf hinzufügen', icon: 'people-outline', wahlKey: 'gruppenHinzufuegen', wahl: WER, standard: 'Meine Kontakte' },
       { label: 'Bildschirmsperre', icon: 'finger-print-outline', toggle: 'bildschirmsperre' },
     ],
   },
@@ -194,8 +211,8 @@ const SECTIONS: Section[] = [
       { label: 'Nachrichten-Töne', icon: 'notifications-outline', toggle: 'toene' },
       { label: 'Vibration', icon: 'phone-portrait-outline', toggle: 'vibration' },
       { label: 'Vorschau anzeigen', icon: 'eye-outline', toggle: 'vorschau' },
-      { label: 'Gruppen-Mitteilungen', icon: 'people-circle-outline', wahl: ['Alle Nachrichten', 'Nur Erwähnungen', 'Aus'], standard: 'Alle Nachrichten' },
-      { label: 'Ruhezeiten', icon: 'moon-outline', wahl: ['Aus', '22 – 7 Uhr', '23 – 8 Uhr', '0 – 9 Uhr'], standard: 'Aus' },
+      { label: 'Gruppen-Mitteilungen', icon: 'people-circle-outline', wahlKey: 'gruppenMitteilungen', wahl: ['Alle Nachrichten', 'Nur Erwähnungen', 'Aus'], standard: 'Alle Nachrichten' },
+      { label: 'Ruhezeiten', icon: 'moon-outline', wahlKey: 'ruhezeiten', wahl: ['Aus', '22 – 7 Uhr', '23 – 8 Uhr', '0 – 9 Uhr'], standard: 'Aus' },
     ],
   },
   {
@@ -206,14 +223,21 @@ const SECTIONS: Section[] = [
     title: 'Messenger',
     items: [
       { label: 'Lesebestätigung', icon: 'checkmark-done-outline', toggle: 'lesebestaetigung' },
+      /*
+       * Steht auch unter Datenschutz. Absichtlich zweimal: wer jemanden
+       * blockiert hat, sucht die Liste im Messenger und nicht unter einer
+       * Ueberschrift, die er sich erst uebersetzen muss. Die Website hat
+       * beide Orte laengst.
+       */
+      { label: 'Blockierte Kontakte', icon: 'ban-outline', liste: 'blockiert' },
       { label: 'Standort-Sichtbarkeit', icon: 'location-outline', sichtbar: 'standort' },
       { label: 'Story-Sichtbarkeit', icon: 'eye-outline', sichtbar: 'story' },
       { label: 'Zuletzt online', icon: 'eye-outline', sichtbar: 'onlinestatus' },
       { label: 'Mit Enter senden', icon: 'return-down-back-outline', toggle: 'entersenden' },
-      { label: 'Chat-Hintergrund', icon: 'color-palette-outline', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
-      { label: 'Schriftgröße', icon: 'text-outline', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
-      { label: 'Wer darf mich zu Gruppen hinzufügen', icon: 'people-outline', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
-      { label: 'Selbstlöschende Nachrichten', icon: 'time-outline', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen', 'Nach 90 Tagen'], standard: 'Aus' },
+      { label: 'Chat-Hintergrund', icon: 'color-palette-outline', wahlKey: 'chatHintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
+      { label: 'Schriftgröße', icon: 'text-outline', wahlKey: 'schriftgroesse', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
+      { label: 'Wer darf mich zu Gruppen hinzufügen', icon: 'people-outline', wahlKey: 'gruppenHinzufuegen', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Selbstlöschende Nachrichten', icon: 'time-outline', wahlKey: 'selbstloeschend', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen', 'Nach 90 Tagen'], standard: 'Aus' },
       { label: 'Chat-Verlauf sichern', icon: 'cloud-upload-outline', aktion: 'sicherung' },
       { label: 'Archivierte Chats', icon: 'archive-outline', liste: 'archiv' },
     ],
@@ -222,10 +246,10 @@ const SECTIONS: Section[] = [
     id: 'speicher',
     title: 'Speicher',
     items: [
-      { label: 'Automatischer Download', icon: 'download-outline', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
+      { label: 'Automatischer Download', icon: 'download-outline', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
       { label: 'Speicher verwalten', icon: 'pie-chart-outline', liste: 'speicher' },
       { label: 'Datensparmodus', icon: 'cellular-outline', toggle: 'datensparen' },
-      { label: 'Medienqualität', icon: 'options-outline', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
+      { label: 'Medienqualität', icon: 'options-outline', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
     ],
   },
   {
@@ -239,9 +263,12 @@ const SECTIONS: Section[] = [
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
       { label: 'Repost-Sichtbarkeit', icon: 'repeat-outline', sichtbar: 'repost' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart-outline', sichtbar: 'likes' },
+      // Die beiden ueblichen Wege, auf denen Fremde an einem vorbeikommen.
+      { label: 'Wer darf kommentieren', icon: 'chatbubble-ellipses-outline', sichtbar: 'kommentare' },
+      { label: 'Wer darf mich markieren', icon: 'pricetag-outline', sichtbar: 'markierung' },
       { label: 'Downloadeinstellungen', icon: 'image-outline', sichtbar: 'download' },
       { label: 'Story-Sichtbarkeit (Videos)', icon: 'eye-outline', sichtbar: 'story' },
-      { label: 'Nutzerstatus', icon: 'person-outline', wahl: STATUS, standard: 'Aktiv' },
+      { label: 'Nutzerstatus', icon: 'person-outline', wahlKey: 'nutzerstatus', wahl: STATUS, standard: 'Aktiv' },
       /*
        * "Nutzerstatus -> immer offline fuer ..." aus dem Handbuch. Es ist
        * keine eigene Einstellung, sondern der Onlinestatus in der Stufe
@@ -249,7 +276,7 @@ const SECTIONS: Section[] = [
        */
       { label: 'Immer offline für …', icon: 'eye-off-outline', sichtbar: 'onlinestatus' },
       { label: 'Profilbann-Verlauf', icon: 'warning-outline', liste: 'banne' },
-      { label: 'Profilbanner', icon: 'tv-outline', wahl: ['Ohne', 'Farbverlauf', 'Eigenes Bild'], standard: 'Ohne' },
+      { label: 'Profilbanner', icon: 'tv-outline', wahlKey: 'profilbanner', wahl: ['Ohne', 'Farbverlauf', 'Eigenes Bild'], standard: 'Ohne' },
     ],
   },
   {
@@ -288,7 +315,7 @@ const SECTIONS: Section[] = [
     title: 'Communitys',
     items: [
       SPENDENCODE,
-      { label: 'Nutzerstatus', icon: 'person-outline', wahl: STATUS, standard: 'Aktiv' },
+      { label: 'Nutzerstatus', icon: 'person-outline', wahlKey: 'nutzerstatus', wahl: STATUS, standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'commPrivate' },
       { label: 'Nachrichten erlaubt von', icon: 'chatbubble-outline', sichtbar: 'dm' },
       { label: 'Push-to-Talk Benachrichtigung', icon: 'mic-outline', sichtbar: 'ptt' },
@@ -320,12 +347,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     useProfil();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
-  // Der offene Punkt und die getroffenen Auswahlen. Sie gelten fuer diese
-  // Sitzung - dauerhaft speichern kann erst das Backend.
   const [offen, setOffen] = useState<Item | null>(null);
-  const [gewaehlt, setGewaehlt] = useState<Record<string, string>>({});
-
-  const wert = (item: Item) => gewaehlt[item.label] ?? item.standard ?? '';
 
   /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
   const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string; knopf?: string } => {
@@ -396,18 +418,47 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         })),
       };
     }
+    /*
+     * Die Statistik zum eigenen Profil.
+     *
+     * Henrik: "man kann dann sehen wie viele Aufrufe hat mein Profil gehabt
+     * in den letzten Wochen". Das ging vorher nicht — nicht, weil es niemand
+     * angezeigt haette, sondern weil nichts gemessen wurde. `posts.views`
+     * ist ein Zaehlerstand ohne Verlauf: der Stand von heute laesst sich
+     * lesen, der von letzter Woche nie.
+     *
+     * Seit Schema 16 vermerkt `profile_views` jeden fremden Profilaufruf mit
+     * Zeitpunkt. Die Zeitraeume kommen aus der Sicht `profil_statistik`,
+     * damit App und Website nicht zwei Rechnungen fuehren.
+     *
+     * Aufgeteilt in drei Blöcke, weil eine Liste aus neun gleich aussehenden
+     * Zeilen niemand liest.
+     */
     if (art === 'insights') {
       if (!statistik) return { leer: 'Wird geladen …', zeilen: [] };
+      const z = (n: number) => n.toLocaleString('de-DE');
       return {
         leer: '',
         zeilen: [
-          // Mit Tausenderpunkt — 14570 liest sich sonst schlechter als 14.570.
-          { text: 'Eigene Beiträge', neben: statistik.beitraege.toLocaleString('de-DE') },
-          { text: 'Follower', neben: statistik.follower.toLocaleString('de-DE') },
+          { text: 'Profil', kopf: true },
+          { text: 'Profilaufrufe (7 Tage)', neben: z(statistik.profilaufrufe7) },
+          { text: 'Profilaufrufe (30 Tage)', neben: z(statistik.profilaufrufe30) },
+          // Wie viele Menschen, nicht wie oft: zwanzig Aufrufe von einer
+          // Person sind etwas anderes als zwanzig von zwanzig.
+          { text: 'Verschiedene Besucher (30 Tage)', neben: z(statistik.besucher30) },
+          { text: 'Profilaufrufe gesamt', neben: z(statistik.profilaufrufe) },
+
+          { text: 'Follower', kopf: true },
+          { text: 'Neue Follower (7 Tage)', neben: z(statistik.follower7) },
+          { text: 'Neue Follower (30 Tage)', neben: z(statistik.follower30) },
+          { text: 'Follower gesamt', neben: z(statistik.follower) },
+
+          { text: 'Inhalte', kopf: true },
+          { text: 'Eigene Beiträge', neben: z(statistik.beitraege) },
           // "gesamt" und nicht "(30 Tage)": posts.views ist ein Zaehlerstand
-          // ohne Verlauf. Die neuen Follower dagegen kommen aus created_at.
-          { text: 'Aufrufe gesamt', neben: statistik.aufrufe.toLocaleString('de-DE') },
-          { text: 'Neue Follower (30 Tage)', neben: statistik.neueFollower.toLocaleString('de-DE') },
+          // ohne Verlauf. Einen Zeitraum zu behaupten, den niemand misst,
+          // waere derselbe Fehler wie die erfundenen Zahlen davor.
+          { text: 'Aufrufe der Beiträge gesamt', neben: z(statistik.aufrufe) },
         ],
       };
     }
@@ -439,6 +490,20 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (item.aktion === 'einladen') {
       return onNotice('Einladung kopiert: all-media.app');
     }
+    /*
+     * Die Datenauskunft. Auf dem Telefon gibt es keinen "Download"-Ordner
+     * wie im Browser — deshalb legt die App die Datei ab und teilt sie ueber
+     * das Systemblatt. Wer sie in die Cloud, in eine Mail oder in seine
+     * Dateien legen will, entscheidet dort.
+     */
+    if (item.aktion === 'datenauskunft') {
+      void (async () => {
+        onNotice('Deine Daten werden zusammengestellt …');
+        const datei = await aktionen.datenauskunft();
+        if (datei) onNotice('Auskunft fertig — bitte einen Ort zum Sichern wählen');
+      })();
+      return;
+    }
     setOffen(item);
   };
   const offsets = useRef<Record<string, number>>({});
@@ -453,6 +518,56 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const { sichtbarkeit, ichId, neuLaden } = useDaten();
   const { supabase } = useSupabase();
   const aktionen = useAktionen(onNotice);
+
+  /*
+   * Die getroffenen Auswahlen und Schalter.
+   *
+   * Hier stand bis zum 03.09.2026: "Sie gelten fuer diese Sitzung -
+   * dauerhaft speichern kann erst das Backend." Neun Schalter und achtzehn
+   * Auswahlen lagen damit im Bildschirmzustand und waren beim naechsten
+   * Start wieder weg — darunter "Privates Profil" und "Lesebestaetigung",
+   * also Zusagen an den Nutzer, die nichts taten.
+   *
+   * Jetzt kommt beides aus `user_settings`. `null` heisst "noch nicht
+   * geladen"; erst danach steht fest, was der Nutzer gewaehlt hat, und
+   * vorher waere jeder Schalter eine Behauptung.
+   */
+  const [einstellungen, setEinstellungen] = useState<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    ladeEinstellungen(supabase, ichId)
+      .then(setEinstellungen)
+      .catch((e: any) => {
+        console.error('Einstellungen laden fehlgeschlagen:', e?.message ?? e);
+        setEinstellungen({});
+      });
+  }, [supabase, ichId]);
+
+  const wert = (item: Item) =>
+    (item.wahlKey ? einstellungen?.[item.wahlKey] : undefined) ?? item.standard ?? '';
+
+  /**
+   * Eine Einstellung umstellen: sofort anzeigen, dann schreiben — und bei
+   * einem Fehler zurueckdrehen. Dasselbe Vorgehen wie beim Herz.
+   */
+  const einstellungSetzen = async (schluessel: string, neuerWert: string) => {
+    const vorher = einstellungen?.[schluessel];
+    setEinstellungen((prev) => ({ ...(prev ?? {}), [schluessel]: neuerWert }));
+
+    const gespeichert = await aktionen.einstellung(schluessel, neuerWert);
+    if (gespeichert === null) {
+      setEinstellungen((prev) => {
+        const kopie = { ...(prev ?? {}) };
+        if (vorher === undefined) delete kopie[schluessel];
+        else kopie[schluessel] = vorher;
+        return kopie;
+      });
+      return false;
+    }
+    return true;
+  };
+
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
   const [banne, setBanne] = useState<
     { id: string; bereich: string; grund: string; von: string; laeuft: boolean }[]
@@ -495,7 +610,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       : namen[s.stufe];
   };
   const { isDark, setTheme } = useContext(ThemeContext);
-  const [switches, setSwitches] = useState<Record<string, boolean>>({
+  /*
+   * Der Auslieferungszustand jedes Schalters. Was in `user_settings` steht,
+   * sticht ihn; was fehlt, gilt als dieser Wert. So braucht eine neue
+   * Einstellung keine Nachtraege fuer bestehende Konten.
+   */
+  const SCHALTER_STANDARD: Record<string, boolean> = {
     videoPrivate: false,
     commPrivate: false,
     bildschirmsperre: false,
@@ -505,7 +625,13 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     lesebestaetigung: true,
     entersenden: false,
     datensparen: false,
-  });
+  };
+
+  const schalter = (schluessel: string) => {
+    const gespeichert = einstellungen?.[schluessel];
+    if (gespeichert === undefined) return SCHALTER_STANDARD[schluessel] ?? false;
+    return gespeichert === 'an';
+  };
 
   // Die Abstaende stehen erst nach dem ersten Zeichnen fest, deshalb der
   // kurze Aufschub - vorher waere offsets.current noch leer.
@@ -595,13 +721,15 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                   <Text style={[styles.itemLabel, item.gefahr && styles.danger]} numberOfLines={1}>{item.label}</Text>
                   {item.toggle ? (
                     <Switch
-                      value={item.toggle === 'theme' ? isDark : switches[item.toggle]}
+                      value={item.toggle === 'theme' ? isDark : schalter(item.toggle)}
                       onValueChange={(next) => {
                         if (item.toggle === 'theme') {
                           setTheme(next ? 'dark' : 'light');
                           return;
                         }
-                        setSwitches({ ...switches, [item.toggle as string]: next });
+                        // 'an'/'aus' statt true/false: der Wert ist Text in
+                        // der Datenbank, und beide Seiten schreiben dasselbe.
+                        void einstellungSetzen(item.toggle as string, next ? 'an' : 'aus');
                       }}
                       trackColor={{ true: colors.brand, false: colors.surface3 }}
                     />
@@ -711,7 +839,6 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
               return null;
             }
 
-            setGewaehlt((prev) => ({ ...prev, [offen.label]: werte[offen.eingabe![0].key] }));
             onNotice(offen.fertig ?? 'Gespeichert');
             return null;
           }}
@@ -725,9 +852,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           wahl={offen.wahl}
           aktuell={wert(offen)}
           onWahl={(w) => {
-            setGewaehlt((prev) => ({ ...prev, [offen.label]: w }));
             setOffen(null);
-            onNotice(`${offen.label}: ${w}`);
+            if (!offen.wahlKey) return onNotice(`${offen.label}: ${w}`);
+            void (async () => {
+              const ok = await einstellungSetzen(offen.wahlKey as string, w);
+              if (ok) onNotice(`${offen.label}: ${w}`);
+            })();
           }}
           zeilen={offen.liste ? listeVon(offen.liste).zeilen : undefined}
           leer={offen.liste ? listeVon(offen.liste).leer : undefined}

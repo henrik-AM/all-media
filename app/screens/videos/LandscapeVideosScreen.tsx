@@ -97,7 +97,16 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
                       saehen alle gleich aus. */}
                   {art === 'live' && <Text style={[styles.art, styles.artLive]}>LIVE</Text>}
                   {art === '360' && <Text style={[styles.art, styles.art360]}>360°</Text>}
-                  <Text style={styles.duration}>{item.duration}</Text>
+                  {/*
+                    Unten rechts steht die Laufzeit. Bei einem Livestream
+                    gibt es keine — dort stand bis zum 03.09.2026 ebenfalls
+                    "LIVE", und zwar zusaetzlich zum roten Abzeichen oben
+                    links. Zweimal dasselbe Wort auf einem Bild liest sich
+                    wie ein Fehler. Jetzt bleibt die Stelle bei Live leer.
+                  */}
+                  {art !== 'live' && !!item.duration && (
+                    <Text style={styles.duration}>{item.duration}</Text>
+                  )}
                 </View>
                 <View style={styles.meta}>
                   <Avatar id={item.userId} name={person.name} size={36} />

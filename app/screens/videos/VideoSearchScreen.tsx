@@ -150,7 +150,16 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
                 {result.reels.map((v) => (
                   <Druck key={v.id} style={styles.reel} onPress={() => onOpenEintrag('reel', v.id)}>
                     <Motiv id={v.id} bild={v.standbild ?? v.mediaUri} icon="phone-portrait-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
-                    <Text style={styles.reelName}>{alleNutzer[v.userId].name}</Text>
+                    {/*
+                      Der Name gehoert unten auf eine dunkle Leiste, nicht
+                      mittig aufs Bild. Graue Schrift auf einem hellen Foto
+                      war nicht zu lesen — und mitten auf dem Motiv verdeckte
+                      sie genau das, was die Kachel zeigen soll. Der Explorer
+                      macht es an derselben Stelle schon so.
+                    */}
+                    <Text style={styles.reelName} numberOfLines={1}>
+                      {alleNutzer[v.userId]?.name ?? ''}
+                    </Text>
                   </Druck>
                 ))}
               </ScrollView>
@@ -165,7 +174,11 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
                   id={c.id}
                   icon="tv-outline"
                   title={c.title}
-                  sub={`${alleNutzer[c.userId].name} · ${c.duration}`}
+                  // Ohne Laufzeit kein Trennpunkt. Bei einem Livestream stand
+                  // dort "Test Nutzer ·" und dahinter nichts.
+                  sub={[alleNutzer[c.userId]?.name, c.art === 'live' ? 'LIVE' : c.duration]
+                    .filter(Boolean)
+                    .join(' · ')}
                   onPress={() => onOpenEintrag('clip', c.id)}
                 />
               ))}
@@ -276,7 +289,16 @@ const styles = themenStyles((colors) => ({
     gap: spacing.sm,
     overflow: 'hidden',
   },
-  reelName: { ...typography.small, color: colors.text2 },
+  reelName: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 7,
+    ...typography.tiny,
+    color: colors.white,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

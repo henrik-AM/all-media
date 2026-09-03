@@ -1376,6 +1376,18 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .composer__field textarea:disabled { opacity: .6; cursor: not-allowed; }
 .sheet__hint { padding: 0 16px 8px; font-size: 12.5px; color: var(--text-3); }
+/*
+ * Zwischenueberschrift in einem Listen-Blatt. Dieselbe Schrift wie die
+ * Abschnitte der Einstellungsseite selbst, damit die Statistik nicht wie
+ * ein fremdes Element wirkt. Der erste Kopf braucht oben weniger Luft — er
+ * steht direkt unter dem Blattkopf.
+ */
+.sheet__gruppe {
+  padding: 18px 16px 6px;
+  font-size: 12px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.sheet__gruppe:first-child { padding-top: 8px; }
 .sheet__footer { padding: 10px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
 /* Nachfrage mit zwei Knoepfen: Abbrechen links, die Antwort rechts. */
 .sheet__footer:has(.btn + .btn) { display: flex; gap: 10px; }
@@ -1839,18 +1851,20 @@ body:has(.camera) .toast { bottom: 132px; }
   nach unten. Drei gleiche Spalten passen immer; ist eine Beschriftung zu
   lang, wird sie gekuerzt statt umzubrechen.
 */
-.standort__optionen {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 12px;
+/*
+ * Die Zeile "Sichtbar für …" unter dem Schalter. Sie ersetzt die drei
+ * Pillen: vier Stufen samt Ausnahmeliste passen nicht nebeneinander, und an
+ * dieser Stelle will man ohnehin nur wissen, was gerade gilt.
+ */
+.standort__stufe {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  margin-top: 12px; padding: 12px 0 0;
+  border: 0; border-top: 1px solid var(--border);
+  background: none; text-align: left; cursor: pointer;
+  font: inherit; color: inherit;
 }
-.standort__optionen .pill {
-  min-width: 0;
-  padding-left: 8px; padding-right: 8px;
-  justify-content: center;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+.standort__stufeLabel { flex: 1; font-size: 15px; color: var(--text); }
+.standort__stufeWert { font-size: 15px; color: var(--text-2); }
 
 .schalter { position: relative; display: inline-block; width: 46px; height: 28px; flex: 0 0 auto; }
 .schalter input { opacity: 0; width: 0; height: 0; }

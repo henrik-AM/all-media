@@ -192,26 +192,45 @@ async function ladeFolgeListe(client, nutzerId, userId, art) {
  */
 async function ladeStatistik(client, nutzerId) {
   if (!client) return null;
-  const vor30Tagen = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const { data, error } = await client
+    .from('profil_statistik')
+    .select('*')
+    .eq('id', nutzerId)
+    .maybeSingle();
+  if (error) throw error;
 
-  const [{ data: zahlen }, { data: beitraege, error: fehlerBeitraege }, { count: neue }] =
-    await Promise.all([
-      client.from('profile_zahlen').select('followers, beitraege').eq('id', nutzerId).maybeSingle(),
-      client.from('posts').select('views').eq('user_id', nutzerId),
-      client
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('followee_id', nutzerId)
-        .gte('created_at', vor30Tagen),
-    ]);
-  if (fehlerBeitraege) throw fehlerBeitraege;
-
+  const z = (wert) => Number(wert || 0);
   return {
-    beitraege: Number(zahlen?.beitraege || 0),
-    follower: Number(zahlen?.followers || 0),
-    aufrufe: (beitraege || []).reduce((summe, b) => summe + Number(b.views || 0), 0),
-    neueFollower: Number(neue || 0),
+    beitraege: z(data?.beitraege),
+    follower: z(data?.follower),
+    aufrufe: z(data?.aufrufe_beitraege),
+    follower30: z(data?.follower_30),
+    follower7: z(data?.follower_7),
+    profilaufrufe: z(data?.profilaufrufe),
+    profilaufrufe30: z(data?.profilaufrufe_30),
+    profilaufrufe7: z(data?.profilaufrufe_7),
+    besucher30: z(data?.besucher_30),
   };
+}
+
+/**
+ * Schalter und Auswahlen aus den Einstellungen.
+ *
+ * Gegenstueck zu ladeEinstellungen() in app/lib/daten.ts. Bis zum 03.09.2026
+ * lagen sie hier in einem Modul-Objekt (`const toggles = {…}`) und damit nur
+ * bis zum naechsten Neuladen der Seite.
+ */
+async function ladeEinstellungen(client, nutzerId) {
+  if (!client) return {};
+  const { data, error } = await client
+    .from('user_settings')
+    .select('schluessel, wert')
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+
+  const raus = {};
+  for (const zeile of data || []) raus[zeile.schluessel] = zeile.wert;
+  return raus;
 }
 
 async function ladeBlockiert(client, nutzerId) {
@@ -1214,6 +1233,7 @@ module.exports = {
   ladeFolgen,
   ladeFolgeListe,
   ladeStatistik,
+  ladeEinstellungen,
   ladeBlockiert,
   ladeStummgeschaltet,
   ladeKartenpunkte,

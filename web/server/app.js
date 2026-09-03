@@ -691,6 +691,47 @@ app.get('/api/statistik', route(async (req) => ({
   statistik: await supabaseApi.ladeStatistik(req.db, req.nutzerId),
 })));
 
+/*
+ * Schalter und Auswahlen aus den Einstellungen. Bis zum 03.09.2026 lagen sie
+ * im Browser bzw. im Bildschirmzustand der App und waren beim naechsten
+ * Start wieder weg — darunter "Privates Profil".
+ */
+/*
+ * Die Datenauskunft nach Artikel 15 DSGVO. Die Zusammenstellung macht die
+ * Datenbank (`meine_daten()`), damit an einer Stelle steht, was „meine
+ * Daten" sind — und nicht zweimal, hier und in der App.
+ */
+app.get('/api/meine-daten', route(async (req, res) => {
+  const { data, error } = await req.db.rpc('meine_daten');
+  if (error) throw error;
+  // Als Anhang, nicht als Seite: der Browser soll sie sichern, nicht anzeigen.
+  const name = `all-media-daten-${new Date().toISOString().slice(0, 10)}.json`;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  res.send(JSON.stringify(data, null, 2));
+}));
+
+app.get('/api/einstellungen', route(async (req) => ({
+  ok: true,
+  einstellungen: await supabaseApi.ladeEinstellungen(req.db, req.nutzerId),
+})));
+
+app.post('/api/einstellungen/:schluessel', route(async (req) =>
+  antwort(
+    await syncHandlers.handleEinstellung(
+      req.db, req.nutzerId, req.params.schluessel, req.body?.wert
+    )
+  )
+));
+
+/*
+ * Ein Aufruf eines fremden Profils. Ohne das bleibt die Profilstatistik
+ * dauerhaft bei null: sie kann nur zaehlen, was jemand aufschreibt.
+ */
+app.post('/api/profile/:userId/aufruf', route(async (req) =>
+  antwort(await syncHandlers.handleProfilAufruf(req.db, req.nutzerId, req.params.userId))
+));
+
 app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
   ok: true,
   ids: await supabaseApi.ladeFolgeListe(

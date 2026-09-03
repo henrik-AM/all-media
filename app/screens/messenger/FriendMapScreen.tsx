@@ -7,6 +7,9 @@ import { Avatar } from '../../components/Avatar';
 import { KarteWeb, KartenSteuerung, Pin } from '../../components/KarteWeb';
 import { avatarColor, colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
+import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
+import { useAktionen } from '../../lib/useAktionen';
+import { SichtbarkeitStufe } from '../../lib/aktionen';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -14,23 +17,58 @@ interface Props {
   onNotice?: (message: string) => void;
 }
 
-/** Wem der eigene Standort gezeigt wird. */
-type Freigabe = 'niemand' | 'kontakte' | 'ausgewaehlt';
+/*
+ * Wem der eigene Standort gezeigt wird.
+ *
+ * Hier standen bis zum 03.09.2026 drei eigene Stufen — „Niemand / Alle
+ * Kontakte / Ausgewählte" — in einem `useState`, der nichts speicherte.
+ * Unter Einstellungen → Messenger → Standort-Sichtbarkeit standen zur selben
+ * Sache vier Stufen mit Ausnahmeliste, und die gingen in die Datenbank.
+ *
+ * Zwei Wahlen für dieselbe Frage, die voneinander nichts wussten: wer hier
+ * „Ausgewählte" einstellte, fand das in den Einstellungen nicht wieder, und
+ * umgekehrt. Jetzt ist es eine Einstellung, an zwei Orten bedienbar —
+ * dieselbe wie überall, `visibility_settings` mit Bereich `standort`.
+ */
+const STUFEN_TEXT: Record<SichtbarkeitStufe, string> = {
+  niemand: 'Dein Standort bleibt privat',
+  niemand_bis_auf: 'Nur wen du freigibst',
+  alle_bis_auf: 'Alle deine Kontakte bis auf die, die du ausnimmst',
+  alle: 'Alle deine Kontakte sehen dich',
+};
 
-const FREIGABEN: { key: Freigabe; label: string; text: string }[] = [
-  { key: 'niemand', label: 'Niemand', text: 'Dein Standort bleibt privat' },
-  { key: 'kontakte', label: 'Alle Kontakte', text: 'Alle deine Kontakte sehen dich' },
-  { key: 'ausgewaehlt', label: 'Ausgewählte', text: 'Nur wen du freigibst' },
-];
+const STUFEN_NAME: Record<SichtbarkeitStufe, string> = {
+  niemand: 'Niemand',
+  niemand_bis_auf: 'Niemand bis auf …',
+  alle_bis_auf: 'Alle bis auf …',
+  alle: 'Alle',
+};
 
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
 export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotice }: Props) => {
-  const { friendPins: alleKartenpunkte, users: alleNutzer } = useDaten();
+  const { friendPins: alleKartenpunkte, users: alleNutzer, neuLaden } = useDaten();
   const insets = useSafeAreaInsets();
   const karte = useRef<KartenSteuerung>(null);
   const [aktiv, setAktiv] = useState<string | null>(null);
-  const [sichtbar, setSichtbar] = useState(true);
-  const [freigabe, setFreigabe] = useState<Freigabe>('kontakte');
+  const { sichtbarkeit } = useDaten();
+  const aktionen = useAktionen(onNotice);
+  const [sichtOffen, setSichtOffen] = useState(false);
+
+  const sicht = sichtbarkeit.standort ?? { stufe: 'alle' as SichtbarkeitStufe, ausnahmen: [] };
+  const sichtbar = sicht.stufe !== 'niemand';
+
+  /*
+   * Der Schalter ist die schnelle Geste: aus heißt „Niemand", an holt die
+   * weiteste Stufe zurück. Er ist kein zweiter Speicher — sonst stünde der
+   * Schalter auf „an" und die Stufe auf „Niemand", und beide hätten recht.
+   */
+  const schalten = (an: boolean) => {
+    void (async () => {
+      await aktionen.sichtbarkeit('standort', an ? 'alle' : 'niemand', () => {});
+      await neuLaden();
+    })();
+    onNotice?.(an ? 'Standort wird geteilt' : 'Standort ist aus');
+  };
   /*
    * Vollbild: die Karte füllt den Bereich, Freigabe und Liste treten zurück.
    * Henrik hatte das für die Website gefordert („Vollbild-Pfeil statt
@@ -76,7 +114,14 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={[styles.content, vollbild && styles.contentVoll, { paddingTop: vollbild ? 0 : insets.top + spacing.md }]}
+      /*
+       * Hier stand `insets.top + spacing.md`. Den Platz fuer die Insel und
+       * die Statusleiste macht aber schon App.tsx frei (`inselPlatz`) — der
+       * Abstand wurde also zweimal gezaehlt, und ueber der Karte klaffte ein
+       * Streifen von knapp achtzig Punkten. Kein anderer Bildschirm rechnet
+       * hier mit `insets`.
+       */
+      contentContainerStyle={[styles.content, vollbild && styles.contentVoll, { paddingTop: vollbild ? 0 : spacing.md }]}
       scrollEnabled={!vollbild}
       onLayout={(e) => setFlaeche(e.nativeEvent.layout.height)}
     >
@@ -91,9 +136,7 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
         /* Henrik: "Standort ausschalten wird nicht beachtet - der Nutzer wird
            noch angezeigt." Der Schalter und die Freigabe "Niemand" nehmen die
            eigene Nadel jetzt wirklich von der Karte. */
-        eigenerStandort={
-          sichtbar && freigabe !== 'niemand' ? { lat: 52.52, lng: 13.405 } : null
-        }
+        eigenerStandort={sichtbar ? { lat: 52.52, lng: 13.405 } : null}
       />
 
       {/* Standort-Freigabe: steht bewusst ueber der Liste, weil es die Frage
@@ -105,49 +148,31 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
           <Ionicons name="location-outline" size={19} color={colors.brand} />
           <View style={styles.freigabeText}>
             <Text style={styles.freigabeTitel}>Deinen Standort teilen</Text>
-            <Text style={styles.freigabeSub}>
-              {sichtbar ? FREIGABEN.find((f) => f.key === freigabe)?.text : 'Standort ist aus'}
-            </Text>
+            <Text style={styles.freigabeSub}>{STUFEN_TEXT[sicht.stufe]}</Text>
           </View>
           <Switch
             value={sichtbar}
-            onValueChange={(an) => {
-              setSichtbar(an);
-              onNotice?.(an ? 'Standort wird geteilt' : 'Standort ist aus');
-            }}
+            onValueChange={schalten}
             trackColor={{ true: colors.brand, false: colors.surface3 }}
           />
         </View>
 
-        {sichtbar && (
-          <View style={styles.optionen}>
-            {FREIGABEN.map((f) => {
-              const an = freigabe === f.key;
-              return (
-                <Druck
-                  key={f.key}
-                  style={[styles.option, an && styles.optionAn]}
-                  onPress={() => {
-                    setFreigabe(f.key);
-                    onNotice?.(`Standort sichtbar für: ${f.label}`);
-                  }}
-                >
-                  <Text style={[styles.optionText, an && styles.optionTextAn]}>{f.label}</Text>
-                </Druck>
-              );
-            })}
-          </View>
-        )}
-      </View>
-      )}
-
-      {!vollbild && freigabe === 'ausgewaehlt' && (
-        <Druck style={styles.bearbeitenLink} onPress={() => onEditSelectedContacts?.()}>
-          <View style={styles.bearbeitenLinkContent}>
-            <Text style={styles.bearbeitenLinkText}>Ausgewählte Kontakte bearbeiten</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.brand} />
-          </View>
+        {/*
+          Eine Zeile statt drei Knöpfen. Vier Stufen samt Ausnahmeliste
+          passen nicht nebeneinander, und der Prototyp will hier ohnehin
+          keine Wahlleiste — er will wissen, was gerade gilt.
+        */}
+        <Druck style={styles.stufeZeile} onPress={() => setSichtOffen(true)}>
+          <Text style={styles.stufeLabel}>Sichtbar für</Text>
+          <Text style={styles.stufeWert}>
+            {STUFEN_NAME[sicht.stufe]}
+            {sicht.ausnahmen.length > 0 && sicht.stufe !== 'alle' && sicht.stufe !== 'niemand'
+              ? ` (${sicht.ausnahmen.length})`
+              : ''}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.text3} />
         </Druck>
+      </View>
       )}
 
       {!vollbild && <Text style={styles.listHead}>IN DEINER NÄHE</Text>}
@@ -180,6 +205,29 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
           </Druck>
         );
       })}
+
+      {/*
+        Dasselbe Blatt wie in den Einstellungen — vier Stufen samt
+        Ausnahmeliste. Wer hier etwas umstellt, findet es unter
+        Einstellungen → Messenger → Standort-Sichtbarkeit wieder, und
+        umgekehrt. Vorher waren es zwei Wahlen, die voneinander nichts
+        wussten.
+      */}
+      <SichtbarkeitSheet
+        visible={sichtOffen}
+        titel="Standort sichtbar für"
+        stufe={sicht.stufe}
+        ausnahmen={sicht.ausnahmen}
+        onStufe={async (stufe) => {
+          await aktionen.sichtbarkeit('standort', stufe, () => {});
+          await neuLaden();
+        }}
+        onAusnahme={async (userId) => {
+          await aktionen.sichtbarkeitAusnahme('standort', userId, () => {});
+          await neuLaden();
+        }}
+        onClose={() => setSichtOffen(false)}
+      />
     </ScrollView>
   );
 };
@@ -189,6 +237,19 @@ const styles = themenStyles((colors) => ({
   content: { paddingTop: spacing.lg, paddingBottom: spacing.xl },
   /* Im Vollbild fuellt die Karte den Bereich - kein Rand, kein Scrollen. */
   contentVoll: { flexGrow: 1, paddingTop: 0, paddingBottom: 0 },
+
+  /* Die Zeile "Sichtbar für …" unter dem Schalter. */
+  stufeZeile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    marginTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  stufeLabel: { flex: 1, ...typography.body, color: colors.text },
+  stufeWert: { ...typography.body, color: colors.text2 },
 
   freigabe: {
     marginHorizontal: spacing.lg,

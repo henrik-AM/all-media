@@ -13,18 +13,26 @@ const fs = require('fs');
 const path = require('path');
 
 const WURZEL = path.join(__dirname, '..', '..');
-const SQL_DATEIEN = [
-  'SUPABASE_SCHEMA.sql',
-  'SUPABASE_SCHEMA_2.sql',
-  'SUPABASE_SCHEMA_3.sql',
-  'SUPABASE_SCHEMA_4.sql',
-  'SUPABASE_SCHEMA_5.sql',
-  'SUPABASE_SCHEMA_7_testkonto.sql',
-  // Handbuch-Abgleich 01.09.2026: Insight Time, Umfragen, Sichtbarkeit,
-  // Altersschutz, Wortfilter, Push-to-Talk, Streamkommentare, Spenden.
-  'SUPABASE_SCHEMA_11_handbuch.sql',
-];
 /*
+ * Alle Schemadateien, und zwar von selbst gefunden.
+ *
+ * Hier stand bis zum 03.09.2026 eine Liste von Hand. Sie endete bei Schema
+ * 11, waehrend die Datenbank bei 18 stand — die Dateien 6, 8, 9, 10 und 12
+ * bis 18 waren dem Lauf unbekannt. Das faellt in beide Richtungen aus: eine
+ * Tabelle aus Schema 15 galt als "gibt es nicht", und umgekehrt haette eine
+ * dort geloeschte Spalte niemandem gefehlt.
+ *
+ * Eine handgepflegte Liste neben einer wachsenden Menge von Dateien wird
+ * immer hinterherhinken. Also lieber lesen, was da ist.
+ *
+ * `SUPABASE_EINSPIELEN.sql` und die Reparaturdateien sind Sammlungen aus
+ * denselben Anweisungen; doppelt gelesen schadet nicht, weil am Ende nur
+ * eine Menge von Tabellen und Spalten herauskommt.
+ */
+const SQL_DATEIEN = fs
+  .readdirSync(WURZEL)
+  .filter((n) => n.startsWith('SUPABASE_') && n.endsWith('.sql'))
+  .sort();/*
  * Beide Seiten, nicht nur eine.
  *
  * Die Website liest ueber web/server/, die App ueber app/lib/daten.ts und ein

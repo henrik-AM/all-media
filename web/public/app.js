@@ -2620,6 +2620,14 @@ async function openProfile(userId, variante) {
   let profile = await res.json();
   let tab = 'grid';
 
+  /*
+   * Den Aufruf vermerken. Ohne das bleibt die Profilstatistik in den
+   * Einstellungen dauerhaft bei null: sie kann nur zaehlen, was jemand
+   * aufschreibt. Nicht abgewartet — das Profil soll deswegen nicht spaeter
+   * erscheinen. Das eigene Profil zaehlt nicht mit.
+   */
+  void api(`/api/profile/${userId}/aufruf`);
+
   overlay.hidden = false;
 
   const paint = () => {
@@ -4290,7 +4298,14 @@ const SETTINGS = [
             : null,
         fertig: 'Passwort geändert',
       },
-      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
+      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield', wahlKey: 'zweiFaktor', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
+      /*
+       * Artikel 15 und 20 DSGVO: jeder darf seine Daten sehen und
+       * mitnehmen. Fuer eine App, die live gehen soll, ist das keine
+       * Zusatzfunktion — und es fehlte, obwohl die Datenschutzerklaerung
+       * daneben stand.
+       */
+      { label: 'Meine Daten herunterladen', icon: 'image', aktion: 'datenauskunft' },
       { label: 'Konto löschen', icon: 'block', gefahr: true, bestaetigen: 'Konto endgültig löschen?' },
     ],
   },
@@ -4298,11 +4313,11 @@ const SETTINGS = [
     id: 'datenschutz',
     title: 'Datenschutz',
     items: [
-      { label: 'Zuletzt online', icon: 'clock', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
-      { label: 'Profilbild sichtbar für', icon: 'image', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Alle' },
-      { label: 'Info sichtbar für', icon: 'info', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Zuletzt online', icon: 'clock', wahlKey: 'zuletztOnline', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Profilbild sichtbar für', icon: 'image', wahlKey: 'profilbildSichtbar', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Alle' },
+      { label: 'Info sichtbar für', icon: 'info', wahlKey: 'infoSichtbar', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
       { label: 'Blockierte Kontakte', icon: 'block', liste: 'blockiert' },
-      { label: 'Gruppen: wer darf hinzufügen', icon: 'people', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Gruppen: wer darf hinzufügen', icon: 'people', wahlKey: 'gruppenHinzufuegen', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
       { label: 'Bildschirmsperre', icon: 'lock', toggle: 'bildschirmsperre' },
     ],
   },
@@ -4313,8 +4328,8 @@ const SETTINGS = [
       { label: 'Nachrichten-Töne', icon: 'bell', toggle: 'toene' },
       { label: 'Vibration', icon: 'portrait', toggle: 'vibration' },
       { label: 'Vorschau anzeigen', icon: 'eye', toggle: 'vorschau' },
-      { label: 'Gruppen-Mitteilungen', icon: 'people', wahl: ['Alle Nachrichten', 'Nur Erwähnungen', 'Aus'], standard: 'Alle Nachrichten' },
-      { label: 'Ruhezeiten', icon: 'moon', wahl: ['Aus', '22 – 7 Uhr', '23 – 8 Uhr', '0 – 9 Uhr'], standard: 'Aus' },
+      { label: 'Gruppen-Mitteilungen', icon: 'people', wahlKey: 'gruppenMitteilungen', wahl: ['Alle Nachrichten', 'Nur Erwähnungen', 'Aus'], standard: 'Alle Nachrichten' },
+      { label: 'Ruhezeiten', icon: 'moon', wahlKey: 'ruhezeiten', wahl: ['Aus', '22 – 7 Uhr', '23 – 8 Uhr', '0 – 9 Uhr'], standard: 'Aus' },
     ],
   },
   {
@@ -4329,10 +4344,10 @@ const SETTINGS = [
       { label: 'Story-Sichtbarkeit', icon: 'eye', sichtbar: 'story' },
       { label: 'Zuletzt online', icon: 'eye', sichtbar: 'onlinestatus' },
       { label: 'Mit Enter senden', icon: 'send', toggle: 'entersenden' },
-      { label: 'Chat-Hintergrund', icon: 'image', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
-      { label: 'Schriftgröße', icon: 'info', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
-      { label: 'Wer darf mich zu Gruppen hinzufügen', icon: 'people', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
-      { label: 'Selbstlöschende Nachrichten', icon: 'clock', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen', 'Nach 90 Tagen'], standard: 'Aus' },
+      { label: 'Chat-Hintergrund', icon: 'image', wahlKey: 'chatHintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' },
+      { label: 'Schriftgröße', icon: 'info', wahlKey: 'schriftgroesse', wahl: ['Klein', 'Mittel', 'Groß'], standard: 'Mittel' },
+      { label: 'Wer darf mich zu Gruppen hinzufügen', icon: 'people', wahlKey: 'gruppenHinzufuegen', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      { label: 'Selbstlöschende Nachrichten', icon: 'clock', wahlKey: 'selbstloeschend', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen', 'Nach 90 Tagen'], standard: 'Aus' },
       { label: 'Chat-Verlauf sichern', icon: 'bookmark', aktion: 'sicherung' },
       { label: 'Archivierte Chats', icon: 'bookmark', liste: 'archiv' },
       { label: 'Blockierte Kontakte', icon: 'shield', liste: 'blockiert' },
@@ -4342,10 +4357,10 @@ const SETTINGS = [
     id: 'speicher',
     title: 'Speicher',
     items: [
-      { label: 'Automatischer Download', icon: 'image', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
+      { label: 'Automatischer Download', icon: 'image', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
       { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
       { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
-      { label: 'Medienqualität', icon: 'image', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
+      { label: 'Medienqualität', icon: 'image', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
     ],
   },
   {
@@ -4394,10 +4409,13 @@ const SETTINGS = [
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
       { label: 'Repost-Sichtbarkeit', icon: 'repeat', sichtbar: 'repost' },
+      // Die beiden ueblichen Wege, auf denen Fremde an einem vorbeikommen.
+      { label: 'Wer darf kommentieren', icon: 'comment', sichtbar: 'kommentare' },
+      { label: 'Wer darf mich markieren', icon: 'person', sichtbar: 'markierung' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart', sichtbar: 'likes' },
       { label: 'Downloadeinstellungen', icon: 'image', sichtbar: 'download' },
       { label: 'Story-Sichtbarkeit (Videos)', icon: 'eye', sichtbar: 'story' },
-      { label: 'Nutzerstatus', icon: 'person', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
+      { label: 'Nutzerstatus', icon: 'person', wahlKey: 'nutzerstatus', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
       /*
        * „Nutzerstatus -> immer offline für …" aus dem Handbuch. Es ist keine
        * eigene Einstellung, sondern der Onlinestatus in der Stufe „Alle bis
@@ -4405,7 +4423,7 @@ const SETTINGS = [
        */
       { label: 'Immer offline für …', icon: 'eye', sichtbar: 'onlinestatus' },
       { label: 'Profilbann-Verlauf', icon: 'shield', liste: 'banne' },
-      { label: 'Profilbanner', icon: 'landscape', wahl: ['Ohne', 'Farbverlauf', 'Eigenes Bild'], standard: 'Ohne' },
+      { label: 'Profilbanner', icon: 'landscape', wahlKey: 'profilbanner', wahl: ['Ohne', 'Farbverlauf', 'Eigenes Bild'], standard: 'Ohne' },
     ],
   },
   {
@@ -4418,9 +4436,9 @@ const SETTINGS = [
         eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
         fertig: 'Spendencode gespeichert',
       },
-      { label: 'Nutzerstatus', icon: 'person', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
+      { label: 'Nutzerstatus', icon: 'person', wahlKey: 'nutzerstatus', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock', toggle: 'commPrivate' },
-      { label: 'Nachrichtenerlaubnis', icon: 'chat', sichtbar: 'dm' },
+      { label: 'Nachrichten erlaubt von', icon: 'chat', sichtbar: 'dm' },
       { label: 'Push-to-Talk Benachrichtigung', icon: 'mic', sichtbar: 'ptt' },
       { label: 'Gestummte Communitys', icon: 'mute', liste: 'stummeKanaele' },
       { label: 'Gestummte Profile', icon: 'block', liste: 'stummeProfile' },
@@ -4428,7 +4446,17 @@ const SETTINGS = [
   },
 ];
 
-const toggles = {
+/*
+ * Der Auslieferungszustand jedes Schalters.
+ *
+ * Bis zum 03.09.2026 war dieses Objekt der ganze Speicher: `toggles[key] =
+ * !toggles[key]` und fertig. Beim naechsten Neuladen stand alles wieder auf
+ * diesen Werten — auch "Privates Profil", eine Zusage an den Nutzer, die
+ * damit nichts tat. Jetzt sticht `user_settings`, und was dort fehlt, gilt
+ * als der Wert hier. So braucht eine neue Einstellung keine Nachtraege fuer
+ * bestehende Konten.
+ */
+const SCHALTER_STANDARD = {
   videoPrivate: false,
   commPrivate: false,
   bildschirmsperre: false,
@@ -4438,6 +4466,12 @@ const toggles = {
   lesebestaetigung: true,
   entersenden: false,
   datensparen: false,
+};
+
+const schalterAn = (schluessel) => {
+  const gespeichert = einstellungenLaden()[schluessel];
+  if (gespeichert === undefined) return Boolean(SCHALTER_STANDARD[schluessel]);
+  return gespeichert === 'an';
 };
 
 /* ---------------------------------------------- Ein Einstellungspunkt */
@@ -4452,11 +4486,51 @@ const toggles = {
  */
 const EINSTELLUNGEN_SPEICHER = 'am-einstellungen';
 
+/**
+ * Die gespeicherten Einstellungen.
+ *
+ * Bis zum 03.09.2026 lagen sie im localStorage — also je Browser, nicht je
+ * Konto. Wer auf dem Rechner "Privates Profil" anschaltete, hatte es auf dem
+ * Handy und in der App nicht. Neun Schalter lagen sogar nur in einem
+ * Modul-Objekt und waren beim naechsten Neuladen wieder weg.
+ *
+ * Jetzt kommen sie aus `user_settings` und stehen in `state.einstellungen`.
+ * Der localStorage bleibt als Rueckfall fuer den Moment vor dem ersten
+ * Laden — sonst springt jeder Schalter beim Seitenaufbau einmal.
+ */
 function einstellungenLaden() {
+  if (state.einstellungen) return state.einstellungen;
   try {
     return JSON.parse(localStorage.getItem(EINSTELLUNGEN_SPEICHER) || '{}');
   } catch {
     return {};
+  }
+}
+
+/** Holt sie vom Server. Wird beim Aufbau der Einstellungsseite gerufen. */
+async function einstellungenHolen() {
+  /*
+   * Am Ende steht `state.einstellungen` in JEDEM Fall — auch wenn der Server
+   * nicht antwortet. Sonst dreht sich renderSettings() im Kreis: es holt,
+   * wenn nichts da ist, und zeichnet danach neu.
+   */
+  try {
+    const r = await fetch('/api/einstellungen');
+    if (!r.ok) {
+      state.einstellungen = state.einstellungen || {};
+      return;
+    }
+    const d = await r.json();
+    state.einstellungen = d.einstellungen || {};
+    // Der Rueckfall fuer den naechsten Seitenaufbau.
+    try {
+      localStorage.setItem(EINSTELLUNGEN_SPEICHER, JSON.stringify(state.einstellungen));
+    } catch {
+      /* Speicher gesperrt — dann eben ohne Rueckfall. */
+    }
+  } catch (fehler) {
+    console.error('Einstellungen laden fehlgeschlagen:', fehler);
+    state.einstellungen = state.einstellungen || {};
   }
 }
 
@@ -4478,6 +4552,24 @@ const SICHT_STUFEN = [
   { key: 'alle_bis_auf', label: 'Alle bis auf …', hinweis: 'Alle außer den Personen, die du unten einträgst.' },
   { key: 'alle', label: 'Alle', hinweis: 'Jeder, der dich sehen darf.' },
 ];
+
+/*
+ * Der Standort auf der Friend-Map. Beide lesen dieselbe Sichtbarkeit wie die
+ * Einstellungen; `state.standort` mit eigenen drei Stufen gibt es nicht mehr.
+ */
+function standortAn() {
+  return sicht('standort').stufe !== 'niemand';
+}
+
+function standortText() {
+  const stufe = sicht('standort').stufe;
+  return {
+    niemand: 'Dein Standort bleibt privat',
+    niemand_bis_auf: 'Nur wen du freigibst',
+    alle_bis_auf: 'Alle deine Kontakte bis auf die, die du ausnimmst',
+    alle: 'Alle deine Kontakte sehen dich',
+  }[stufe] || 'Alle deine Kontakte sehen dich';
+}
 
 /** Stufe und Ausnahmen zu einem Bereich — ohne Eintrag gilt „alle". */
 function sicht(bereich) {
@@ -4599,19 +4691,44 @@ function openSichtbarkeit(punkt) {
   });
 }
 
+/*
+ * Der Schluessel, unter dem die Wahl liegt.
+ *
+ * `wahlKey` und nicht die Beschriftung: die ist Text fuer Menschen und wird
+ * umformuliert — dann waere die Einstellung verloren. Punkte ohne eigenen
+ * Schluessel behalten ihr Label, damit sie beim Umbau nicht herausfallen.
+ * Beide Seiten muessen denselben Schluessel benutzen, sonst zeigt die App
+ * etwas anderes als die Website.
+ */
+const einstellungsSchluessel = (punkt) => punkt.wahlKey || punkt.label;
+
 function einstellung(punkt) {
-  const gespeichert = einstellungenLaden()[punkt.label];
+  const gespeichert = einstellungenLaden()[einstellungsSchluessel(punkt)];
   return gespeichert && (!punkt.wahl || punkt.wahl.includes(gespeichert)) ? gespeichert : punkt.standard || '';
 }
 
-function einstellungSetzen(punkt, wert) {
-  try {
-    const alle = einstellungenLaden();
-    alle[punkt.label] = wert;
-    localStorage.setItem(EINSTELLUNGEN_SPEICHER, JSON.stringify(alle));
-  } catch {
-    /* Speicher gesperrt - dann gilt die Wahl nur fuer diese Sitzung */
+async function einstellungSetzen(punkt, wert) {
+  const schluessel = einstellungsSchluessel(punkt);
+  const vorher = state.einstellungen ? state.einstellungen[schluessel] : undefined;
+
+  // Sofort umlegen, damit es sich nicht zaeh anfuehlt.
+  state.einstellungen = { ...(state.einstellungen || {}), [schluessel]: wert };
+
+  const antwort = await api(`/api/einstellungen/${encodeURIComponent(schluessel)}`, { wert });
+  if (!antwort?.ok) {
+    // Zurueckdrehen. Eine Einstellung, die anders aussieht, als sie
+    // gespeichert ist, ist schlimmer als eine, die sich nicht setzen laesst.
+    if (vorher === undefined) delete state.einstellungen[schluessel];
+    else state.einstellungen[schluessel] = vorher;
+    toast(antwort?.error || 'Nicht gespeichert');
+    return false;
   }
+  try {
+    localStorage.setItem(EINSTELLUNGEN_SPEICHER, JSON.stringify(state.einstellungen));
+  } catch {
+    /* Speicher gesperrt — dann eben ohne Rueckfall. */
+  }
+  return true;
 }
 
 /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
@@ -4677,17 +4794,42 @@ function einstellungsListe(art) {
    * neuen Follower dagegen lassen sich ueber `follows.created_at` wirklich
    * eingrenzen.
    */
+  /*
+   * Die Statistik zum eigenen Profil.
+   *
+   * Henrik: "man kann dann sehen wie viele Aufrufe hat mein Profil gehabt in
+   * den letzten Wochen". Das ging vorher nicht — nicht, weil es niemand
+   * angezeigt haette, sondern weil nichts gemessen wurde. Seit Schema 16
+   * vermerkt `profile_views` jeden fremden Profilaufruf mit Zeitpunkt.
+   *
+   * Aufgeteilt in drei Bloecke: eine Liste aus zwoelf gleich aussehenden
+   * Zeilen liest niemand.
+   */
   if (art === 'insights') {
     const st = state.statistik;
     if (!st) return { leer: 'Wird geladen …', zeilen: [] };
+    const z = (n) => Number(n || 0).toLocaleString('de-DE');
     return {
       leer: '',
       zeilen: [
-        // Mit Tausenderpunkt — 14570 liest sich sonst schlechter als 14.570.
-        { text: 'Eigene Beiträge', neben: st.beitraege.toLocaleString('de-DE') },
-        { text: 'Follower', neben: st.follower.toLocaleString('de-DE') },
-        { text: 'Aufrufe gesamt', neben: st.aufrufe.toLocaleString('de-DE') },
-        { text: 'Neue Follower (30 Tage)', neben: st.neueFollower.toLocaleString('de-DE') },
+        { text: 'Profil', kopf: true },
+        { text: 'Profilaufrufe (7 Tage)', neben: z(st.profilaufrufe7) },
+        { text: 'Profilaufrufe (30 Tage)', neben: z(st.profilaufrufe30) },
+        // Wie viele Menschen, nicht wie oft: zwanzig Aufrufe von einer
+        // Person sind etwas anderes als zwanzig von zwanzig.
+        { text: 'Verschiedene Besucher (30 Tage)', neben: z(st.besucher30) },
+        { text: 'Profilaufrufe gesamt', neben: z(st.profilaufrufe) },
+
+        { text: 'Follower', kopf: true },
+        { text: 'Neue Follower (7 Tage)', neben: z(st.follower7) },
+        { text: 'Neue Follower (30 Tage)', neben: z(st.follower30) },
+        { text: 'Follower gesamt', neben: z(st.follower) },
+
+        { text: 'Inhalte', kopf: true },
+        { text: 'Eigene Beiträge', neben: z(st.beitraege) },
+        // "gesamt" und nicht "(30 Tage)": posts.views ist ein Zaehlerstand
+        // ohne Verlauf.
+        { text: 'Aufrufe der Beiträge gesamt', neben: z(st.aufrufe) },
       ],
     };
   }
@@ -4820,10 +4962,18 @@ function openEinstellung(punkt, nachher) {
          ${
            zeilen.length
              ? zeilen
-                 .map(
-                   (z) => `<div class="item">
+                 .map((z) =>
+                   /*
+                    * Zwischenueberschrift statt Eintrag. Die Profilstatistik
+                    * hat zwoelf Zeilen; ohne Gliederung sieht "Profilaufrufe
+                    * (7 Tage)" so wichtig aus wie "Follower gesamt", obwohl
+                    * das eine eine Entwicklung ist und das andere ein Stand.
+                    */
+                   z.kopf
+                     ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
+                     : `<div class="item">
                      <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value">${esc(z.neben)}</span>
+                     <span class="item__value">${esc(z.neben || '')}</span>
                    </div>`
                  )
                  .join('')
@@ -4865,6 +5015,36 @@ function openEinstellung(punkt, nachher) {
       },
       { schliessen: true }
     );
+  }
+
+  /*
+   * Die Datenauskunft. Ueber fetch und nicht als schlichter Link: die
+   * Anmeldung haengt am Zugangstoken, das der globale fetch-Aufsatz
+   * anhaengt (web/public/anmeldung.js). Ein <a href> ginge ohne Token los
+   * und bekaeme 401.
+   */
+  if (punkt.aktion === 'datenauskunft') {
+    toast('Deine Daten werden zusammengestellt …');
+    return (async () => {
+      try {
+        const r = await fetch('/api/meine-daten');
+        if (!r.ok) return toast('Die Auskunft hat nicht geklappt');
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `all-media-daten-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        // Erst freigeben, wenn der Browser den Download begonnen hat.
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        toast('Auskunft heruntergeladen');
+      } catch (fehler) {
+        console.error('Datenauskunft fehlgeschlagen:', fehler);
+        toast('Die Auskunft hat nicht geklappt');
+      }
+    })();
   }
 
   if (punkt.aktion === 'sicherung') {
@@ -4929,6 +5109,9 @@ function renderSettings() {
    * Dasselbe fuer die Statistik hinter "Insights". Sie stand bis zum
    * 02.09.2026 fest im Code — 340 Follower und 1.284 Aufrufe bei jedem Konto.
    */
+  // Einstellungen einmal je Sitzung holen; danach steht state.einstellungen.
+  if (!state.einstellungen) void einstellungenHolen().then(() => renderSettings());
+
   if (!state.statistik) {
     fetch('/api/statistik')
       .then((r) => (r.ok ? r.json() : null))
@@ -4940,7 +5123,7 @@ function renderSettings() {
 
   const itemHtml = (it, sektionId) => {
     if (it.toggle) {
-      const on = it.toggle === 'theme' ? state.theme === 'dark' : toggles[it.toggle];
+      const on = it.toggle === 'theme' ? state.theme === 'dark' : schalterAn(it.toggle);
       return `<div class="item">
         <span class="item__icon">${ICONS[it.icon]}</span>
         <span class="item__label">${esc(it.label)}</span>
@@ -5066,10 +5249,18 @@ function renderSettings() {
         state.theme = state.theme === 'dark' ? 'light' : 'dark';
         localStorage.setItem('am-theme', state.theme);
         applyTheme();
-      } else {
-        toggles[key] = !toggles[key];
+        b.classList.toggle('is-on');
+        return;
       }
-      b.classList.toggle('is-on');
+
+      // 'an'/'aus' statt true/false: der Wert ist Text in der Datenbank, und
+      // beide Seiten schreiben dasselbe.
+      const neu = !schalterAn(key);
+      b.classList.toggle('is-on', neu);
+      void (async () => {
+        const ok = await einstellungSetzen({ label: key, wahlKey: key }, neu ? 'an' : 'aus');
+        if (!ok) b.classList.toggle('is-on', !neu);
+      })();
     })
   );
 
@@ -5129,12 +5320,6 @@ const KARTEN_STILE = [
 // Prototyp-Frame "Messenger - Friend-Map": Karte mit Freunden, darunter eine
 // Liste mit letztem Standort.
 function renderFriendMap() {
-  const freigabeTexte = {
-    niemand: 'Dein Standort bleibt privat',
-    kontakte: 'Alle deine Kontakte sehen dich',
-    ausgewaehlt: 'Nur wen du freigibst',
-  };
-  if (state.standort === undefined) state.standort = { an: true, wer: 'kontakte' };
   if (!state.karte) state.karte = { aktiv: null, mapInstance: null, markers: {} };
 
   const percentToCoords = (x, y) => {
@@ -5159,39 +5344,35 @@ function renderFriendMap() {
         </div>
       </div>
 
+      ${/*
+          Hier standen bis zum 03.09.2026 drei eigene Stufen — „Niemand /
+          Alle Kontakte / Ausgewählte" — in `state.standort`, das nichts
+          speicherte. Unter Einstellungen → Messenger → Standort-Sichtbarkeit
+          standen zur selben Sache vier Stufen mit Ausnahmeliste, und die
+          gingen in die Datenbank. Zwei Wahlen für dieselbe Frage, die
+          voneinander nichts wussten.
+
+          Jetzt ist es eine Einstellung, an zwei Orten bedienbar:
+          `visibility_settings` mit Bereich `standort`.
+        */ ''}
       ${voll ? '' : `
       <div class="standort">
         <div class="standort__kopf">
           <span class="standort__icon">${ICONS.mapPin}</span>
           <div class="standort__text">
             <div class="standort__titel">Deinen Standort teilen</div>
-            <div class="standort__sub">${
-              state.standort.an ? freigabeTexte[state.standort.wer] : 'Standort ist aus'
-            }</div>
+            <div class="standort__sub">${esc(standortText())}</div>
           </div>
           <label class="schalter">
-            <input type="checkbox" id="standortAn" ${state.standort.an ? 'checked' : ''} />
+            <input type="checkbox" id="standortAn" ${standortAn() ? 'checked' : ''} />
             <span></span>
           </label>
         </div>
-        ${
-          state.standort.an
-            ? `<div class="standort__optionen">
-                ${['niemand', 'kontakte', 'ausgewaehlt']
-                  .map(
-                    (w) => `<button class="pill ${state.standort.wer === w ? 'is-active' : ''}" data-wer="${w}">${
-                      { niemand: 'Niemand', kontakte: 'Alle Kontakte', ausgewaehlt: 'Ausgewählte' }[w]
-                    }</button>`
-                  )
-                  .join('')}
-              </div>
-              ${
-                state.standort.wer === 'ausgewaehlt'
-                  ? `<button class="linkbtn" id="bearbeiteAusgewaehlt" style="margin-top:8px; padding: 0; color: var(--brand); font-weight: 600; font-size: 13px;">→ Ausgewählte Kontakte bearbeiten</button>`
-                  : ''
-              }`
-            : ''
-        }
+        <button class="standort__stufe" id="standortStufe">
+          <span class="standort__stufeLabel">Sichtbar für</span>
+          <span class="standort__stufeWert">${esc(sichtText('standort'))}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>
       </div>
 
       <div class="listhead">In deiner Nähe</div>
@@ -5266,9 +5447,9 @@ function renderFriendMap() {
     });
 
     // Henrik: "Standort ausschalten wird nicht beachtet - der Nutzer wird noch
-    // angezeigt." Die eigene Nadel haengt deshalb am Schalter, nicht an der
-    // Karte. Steht die Freigabe auf "Niemand", ist sie ebenfalls weg.
-    if (state.standort.an && state.standort.wer !== 'niemand') {
+    // angezeigt." Die eigene Nadel haengt an der Sichtbarkeitsstufe: steht
+    // sie auf "Niemand", ist die Nadel weg.
+    if (standortAn()) {
       const ort = state.karte.eigenerOrt || [52.52, 13.405];
       // Zwei Kreise: der weite blasse Ring hebt die eigene Nadel von den
       // Kontakten ab. Mit nur einem Punkt war sie von einem blauen Kontakt
@@ -5307,26 +5488,28 @@ function renderFriendMap() {
   });
 
   if (!voll) {
-    $('#standortAn').addEventListener('change', (e) => {
-      state.standort.an = e.target.checked;
-      toast(state.standort.an ? 'Standort wird geteilt' : 'Standort ist aus');
+    /*
+     * Der Schalter ist die schnelle Geste: aus heisst „Niemand", an holt die
+     * weiteste Stufe zurueck. Er ist kein zweiter Speicher — sonst stuende
+     * der Schalter auf „an" und die Stufe auf „Niemand", und beide haetten
+     * recht.
+     */
+    $('#standortAn').addEventListener('change', async (e) => {
+      const an = e.target.checked;
+      const r = await api('/api/sichtbarkeit/standort', { stufe: an ? 'alle' : 'niemand' });
+      if (!r?.ok) {
+        e.target.checked = !an;
+        return toast(r?.error || 'Nicht gespeichert');
+      }
+      await sichtbarkeitNeuLaden();
+      toast(an ? 'Standort wird geteilt' : 'Standort ist aus');
       renderFriendMap();
     });
-    main.querySelectorAll('[data-wer]').forEach((b) =>
-      b.addEventListener('click', () => {
-        state.standort.wer = b.dataset.wer;
-        toast(`Standort sichtbar für: ${b.textContent.trim()}`);
-        renderFriendMap();
-      })
-    );
 
-    const bearbeiteBtn = $('#bearbeiteAusgewaehlt');
-    if (bearbeiteBtn) {
-      bearbeiteBtn.addEventListener('click', () => {
-        state.ausgewaehlteKontakteEdit = true;
-        render();
-      });
-    }
+    // Dasselbe Blatt wie in den Einstellungen: vier Stufen plus Ausnahmen.
+    $('#standortStufe')?.addEventListener('click', () =>
+      openSichtbarkeit({ label: 'Standort sichtbar für', sichtbar: 'standort' })
+    );
   }
 
   main.querySelectorAll('[data-zoom]').forEach((el) =>
@@ -6300,7 +6483,16 @@ function renderLandscapeVideos() {
                     ? `${compactNumber(c.zuschauer || 0)} sehen zu`
                     : `${compactNumber(c.views)} Aufrufe · ${esc(c.age)}`;
                 return `<article class="clip" data-clip="${c.id}">
-                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}${marke}<span class="clip__time">${esc(c.duration)}</span></div>
+                  ${/*
+                      Unten rechts steht die Laufzeit. Bei einem Livestream
+                      gibt es keine — dort stand bis zum 03.09.2026 ebenfalls
+                      "LIVE", zusaetzlich zum roten Abzeichen oben links.
+                      Zweimal dasselbe Wort auf einem Bild liest sich wie ein
+                      Fehler.
+                    */ ''}
+                  <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}${marke}${
+                    art !== 'live' && c.duration ? `<span class="clip__time">${esc(c.duration)}</span>` : ''
+                  }</div>
                   <div class="clip__meta">
                     <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
                     <div>

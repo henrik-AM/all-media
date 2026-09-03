@@ -1423,6 +1423,13 @@ export type SichtbarkeitBereich =
   | 'ptt'
   | 'likes'
   | 'download'
+  /*
+   * Zwei Bereiche, die bis zum 03.09.2026 fehlten — und es sind die beiden,
+   * wegen derer man so eine Einstellung ueberhaupt aufmacht. Ohne sie blieb
+   * einem nur, das ganze Profil privat zu stellen.
+   */
+  | 'kommentare'
+  | 'markierung'
   | 'dm';
 
 export type SichtbarkeitStufe = 'niemand' | 'niemand_bis_auf' | 'alle_bis_auf' | 'alle';
@@ -1542,6 +1549,96 @@ export async function freigabeEntscheiden(
     .eq('guardian_id', ichId);
   if (error) throw error;
   return zustimmen;
+}
+
+// ---------------------------------------------------- Datenauskunft --
+
+/**
+ * Alles, was zu diesem Konto gespeichert ist — Artikel 15 DSGVO.
+ *
+ * Die Zusammenstellung macht die Datenbank (`meine_daten()`), nicht der
+ * Client. So steht an einer Stelle, was „meine Daten" sind, und eine neue
+ * Tabelle wird dort ergänzt statt in App und Website getrennt.
+ *
+ * Nicht enthalten sind fremde Inhalte. Ein Chat gehört zwei Menschen; die
+ * Nachrichten des Gegenübers sind dessen Daten, nicht die eigenen.
+ */
+export async function meineDaten(
+  client: SupabaseClient,
+  _ichId: string
+): Promise<unknown> {
+  const { data, error } = await client.rpc('meine_daten');
+  if (error) throw error;
+  return data;
+}
+
+// ------------------------------------------------------ Einstellungen --
+
+/**
+ * Eine Einstellung setzen.
+ *
+ * Bis zum 03.09.2026 gab es das nicht. Neun Schalter und achtzehn Auswahlen
+ * lagen im Bildschirmzustand der App und in einem Modul-Objekt der Website —
+ * „Privates Profil" war beim nächsten Start wieder aus.
+ *
+ * Ein `upsert` und kein `umschalten()`: eine Einstellung ist kein Zustand,
+ * den es gibt oder nicht, sondern einer mit einem Wert. Der Wert ist immer
+ * Text; ein Schalter ist `'an'` oder `'aus'`. Zahlen und Wahrheitswerte
+ * wären drei Spalten für dieselbe Sache, und die Oberfläche weiß ohnehin,
+ * was sie geschrieben hat.
+ */
+export async function einstellungSetzen(
+  client: SupabaseClient,
+  ichId: string,
+  schluessel: string,
+  wert: string
+): Promise<string> {
+  const { error } = await client
+    .from('user_settings')
+    .upsert(
+      { user_id: ichId, schluessel, wert, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,schluessel' }
+    );
+  if (error) throw error;
+
+  /*
+   * Zwei Einstellungen haben über die Liste hinaus Bedeutung für die
+   * Datenbank selbst und stehen deshalb zusätzlich in `profiles`: das
+   * private Profil steuert, wer die Inhalte sieht, und der Nutzerstatus
+   * steht in der Chatliste hinter dem Namen. Ohne diese Zeilen wäre der
+   * Schalter zwar gespeichert — nur eben ohne Wirkung.
+   */
+  if (schluessel === 'videoPrivate' || schluessel === 'commPrivate') {
+    const { error: fehler } = await client
+      .from('profiles')
+      .update({ privat: wert === 'an' })
+      .eq('id', ichId);
+    if (fehler) throw fehler;
+  }
+
+  return wert;
+}
+
+/**
+ * Einen fremden Profilaufruf vermerken.
+ *
+ * „Wie viele Aufrufe hatte mein Profil in den letzten Wochen?" ließ sich
+ * bisher nicht beantworten, weil nichts gemessen wurde. Das eigene Profil
+ * zählt nicht mit — die Datenbank lehnt es über eine Prüfregel ab, und ein
+ * Fehler daraus wäre hier nur Lärm.
+ */
+export async function profilAufrufVermerken(
+  client: SupabaseClient,
+  ichId: string,
+  profilId: string
+): Promise<void> {
+  if (!profilId || profilId === ichId) return;
+  const { error } = await client
+    .from('profile_views')
+    .insert({ profile_id: profilId, viewer_id: ichId });
+  // Ein nicht gezählter Aufruf ist ärgerlich, aber kein Grund, dem Nutzer
+  // das Profil nicht zu zeigen.
+  if (error) console.error('Profilaufruf nicht vermerkt:', error.message);
 }
 
 // --------------------------------------------------------- Wortfilter --

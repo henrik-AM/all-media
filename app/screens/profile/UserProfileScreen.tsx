@@ -8,6 +8,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { oeffneLink } from '../../lib/links';
+import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
 import { useKachelHoehe } from '../../lib/raster';
@@ -47,6 +48,21 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
   useEffect(() => {
     setProfile(alleProfile[userId]);
   }, [alleProfile, userId]);
+
+  /*
+   * Den Aufruf vermerken — einmal je geoeffnetem Profil.
+   *
+   * Ohne das bleibt die Profilstatistik in den Einstellungen dauerhaft bei
+   * null: sie kann nur zaehlen, was jemand aufschreibt. Das eigene Profil
+   * zaehlt nicht mit, darum kuemmert sich `profilAufrufVermerken`.
+   */
+  const aktionen = useAktionen(onNotice);
+  useEffect(() => {
+    void aktionen.profilAufruf(userId);
+    // Absichtlich nur an `userId` haengend: `aktionen` wird bei jedem
+    // Zeichnen neu gebaut, und dann zaehlte ein Scrollen als Aufruf.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   if (!person || !profile) {
     return (

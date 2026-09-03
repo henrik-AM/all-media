@@ -1251,34 +1251,67 @@ export async function ladeSichtbarkeit(
 export interface Statistik {
   beitraege: number;
   follower: number;
+  /** Summe der Aufrufe über alle eigenen Beiträge. Ein Zählerstand. */
   aufrufe: number;
-  neueFollower: number;
+  follower30: number;
+  follower7: number;
+  /** Wie oft das eigene Profil aufgerufen wurde — mit Verlauf. */
+  profilaufrufe: number;
+  profilaufrufe30: number;
+  profilaufrufe7: number;
+  /** Wie viele verschiedene Menschen in dreißig Tagen. */
+  besucher30: number;
 }
 
 export async function ladeStatistik(
   client: SupabaseClient,
   ichId: string
 ): Promise<Statistik> {
-  const vor30Tagen = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const { data, error } = await client
+    .from('profil_statistik')
+    .select('*')
+    .eq('id', ichId)
+    .maybeSingle();
+  if (error) throw error;
 
-  const [{ data: zahlen }, { data: beitraege, error: fehlerBeitraege }, { count: neue }] =
-    await Promise.all([
-      client.from('profile_zahlen').select('followers, beitraege').eq('id', ichId).maybeSingle(),
-      client.from('posts').select('views').eq('user_id', ichId),
-      client
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('followee_id', ichId)
-        .gte('created_at', vor30Tagen),
-    ]);
-  if (fehlerBeitraege) throw fehlerBeitraege;
-
+  const z = (wert: unknown) => Number(wert ?? 0);
   return {
-    beitraege: Number(zahlen?.beitraege ?? 0),
-    follower: Number(zahlen?.followers ?? 0),
-    aufrufe: ((beitraege ?? []) as any[]).reduce((summe, b) => summe + Number(b.views || 0), 0),
-    neueFollower: Number(neue ?? 0),
+    beitraege: z((data as any)?.beitraege),
+    follower: z((data as any)?.follower),
+    aufrufe: z((data as any)?.aufrufe_beitraege),
+    follower30: z((data as any)?.follower_30),
+    follower7: z((data as any)?.follower_7),
+    profilaufrufe: z((data as any)?.profilaufrufe),
+    profilaufrufe30: z((data as any)?.profilaufrufe_30),
+    profilaufrufe7: z((data as any)?.profilaufrufe_7),
+    besucher30: z((data as any)?.besucher_30),
   };
+}
+
+/**
+ * Schalter und Auswahlen aus den Einstellungen.
+ *
+ * Bis zum 03.09.2026 lagen sie im Bildschirmzustand — neun Schalter und
+ * achtzehn Auswahlen, weg beim nächsten Start. Im Code stand sogar der
+ * Grund: „dauerhaft speichern kann erst das Backend". Das gibt es jetzt.
+ *
+ * Zurück kommt nur, was wirklich gesetzt wurde. Was fehlt, gilt als
+ * Auslieferungszustand — sonst müsste jede neue Einstellung erst für alle
+ * bestehenden Konten nachgetragen werden.
+ */
+export async function ladeEinstellungen(
+  client: SupabaseClient,
+  ichId: string
+): Promise<Record<string, string>> {
+  const { data, error } = await client
+    .from('user_settings')
+    .select('schluessel, wert')
+    .eq('user_id', ichId);
+  if (error) throw error;
+
+  const raus: Record<string, string> = {};
+  for (const zeile of (data ?? []) as any[]) raus[zeile.schluessel] = zeile.wert;
+  return raus;
 }
 
 /** Der eigene Bann-Verlauf — mit Grund, wie das Handbuch es verlangt. */

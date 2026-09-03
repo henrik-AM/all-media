@@ -852,6 +852,62 @@ const handleCommunityStumm = handler(
   }
 );
 
+/**
+ * Eine Einstellung setzen.
+ *
+ * Gegenstueck zu einstellungSetzen() in app/lib/aktionen.ts — inklusive der
+ * beiden Sonderfaelle, die ueber die Liste hinaus Bedeutung haben.
+ */
+const handleEinstellung = handler(
+  'Einstellung',
+  async (client, nutzerId, schluessel, wert) => {
+    const name = String(schluessel || '').trim();
+    if (!name || name.length > 60) return { ok: false, error: 'Unbekannte Einstellung' };
+    const inhalt = String(wert ?? '');
+
+    const { error } = await client
+      .from('user_settings')
+      .upsert(
+        { user_id: nutzerId, schluessel: name, wert: inhalt, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,schluessel' }
+      );
+    if (error) throw error;
+
+    if (name === 'videoPrivate' || name === 'commPrivate') {
+      const { error: fehler } = await client
+        .from('profiles')
+        .update({ privat: inhalt === 'an' })
+        .eq('id', nutzerId);
+      if (fehler) throw fehler;
+    }
+
+    return { ok: true, schluessel: name, wert: inhalt };
+  }
+);
+
+/**
+ * Einen fremden Profilaufruf vermerken.
+ *
+ * Gegenstueck zu profilAufrufVermerken() in app/lib/aktionen.ts. Das eigene
+ * Profil zaehlt nicht — die Datenbank lehnt es ueber eine Pruefregel ab.
+ */
+const handleProfilAufruf = handler(
+  'Profilaufruf',
+  async (client, nutzerId, profilId) => {
+    if (!profilId || profilId === nutzerId || profilId === 'me') return { ok: true, gezaehlt: false };
+    const { error } = await client
+      .from('profile_views')
+      .insert({ profile_id: profilId, viewer_id: nutzerId });
+    if (error) {
+      // Ein nicht gezaehlter Aufruf ist aergerlich, aber kein Grund, dem
+      // Nutzer das Profil nicht zu zeigen.
+      console.error('Profilaufruf nicht vermerkt:', error.message);
+      return { ok: true, gezaehlt: false };
+    }
+    return { ok: true, gezaehlt: true };
+  }
+);
+
 // ------------------------------------------------- Melden, Blocken, Stumm --
 
 const handleReportContent = handler(
@@ -1523,6 +1579,8 @@ module.exports = {
   handleCreateCommunity,
   handleJoinCommunity,
   handleCommunityStumm,
+  handleEinstellung,
+  handleProfilAufruf,
   handleReportContent,
   handleBlockUser,
   handleMuteUser,

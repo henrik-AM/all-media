@@ -111,17 +111,34 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   /* ------------------------------------------------ Friend-Map */
   console.log('\nMessenger — Friend-Map');
 
-  await pruefe('Die drei Freigabe-Stufen stehen nebeneinander', async () => {
+  /*
+   * Hier stand bis zum 03.09.2026: "Die drei Freigabe-Stufen stehen
+   * nebeneinander." Drei waren es aber nur, weil die Karte eine eigene Wahl
+   * fuehrte — „Niemand / Alle Kontakte / Ausgewaehlte" —, die nichts
+   * speicherte und mit den vier Stufen unter Einstellungen → Messenger →
+   * Standort-Sichtbarkeit nichts zu tun hatte. Zwei Wahlen fuer dieselbe
+   * Frage.
+   *
+   * Der Lauf prueft jetzt das Gegenteil: dass es eben nur noch eine gibt.
+   */
+  await pruefe('Die Standort-Sichtbarkeit fuehrt zu denselben vier Stufen', async () => {
     await page.click('#contactsBack').catch(() => {});
     await page.waitForTimeout(300);
     await page.click('[data-sub="friendmap"]');
-    await page.waitForSelector('.standort__optionen');
+    await page.waitForSelector('#standortStufe');
+
+    const alteWahl = await page.$$('.standort__optionen .pill');
+    if (alteWahl.length) throw new Error('die alte Dreier-Wahl steht noch da');
+
+    await page.click('#standortStufe');
+    await page.waitForSelector('[data-stufe]');
+    const stufen = await page.$$eval('[data-stufe]', (n) => n.map((x) => x.dataset.stufe));
+    const erwartet = ['niemand', 'niemand_bis_auf', 'alle_bis_auf', 'alle'];
+    for (const e of erwartet) {
+      if (!stufen.includes(e)) throw new Error('Stufe fehlt: ' + e);
+    }
+    await page.click('.sheet-backdrop', { position: { x: 5, y: 5 } }).catch(() => {});
     await page.waitForTimeout(300);
-    const kanten = await page.$$eval('.standort__optionen .pill', (n) =>
-      n.map((x) => Math.round(x.getBoundingClientRect().top))
-    );
-    if (kanten.length < 3) throw new Error('nur ' + kanten.length + ' Stufen');
-    if (new Set(kanten).size !== 1) throw new Error('sie stehen in ' + new Set(kanten).size + ' Zeilen');
   });
 
   /* ------------------------------------------------ Videos-Home */

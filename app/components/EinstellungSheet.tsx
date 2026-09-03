@@ -7,7 +7,15 @@ import { colors, radius, spacing, themenStyles, typography } from '../constants/
 
 export interface ListenZeile {
   text: string;
-  neben: string;
+  neben?: string;
+  /**
+   * Zwischenüberschrift statt Eintrag.
+   *
+   * Die Profilstatistik hat zwölf Zeilen. Ohne Gliederung liest sie niemand:
+   * „Profilaufrufe (7 Tage)" und „Follower gesamt" sehen dann gleich wichtig
+   * aus, obwohl das eine eine Entwicklung ist und das andere ein Stand.
+   */
+  kopf?: boolean;
 }
 
 interface Props {
@@ -84,12 +92,18 @@ export const EinstellungSheet = ({
         <Text style={styles.hinweis}>{leer}</Text>
       ) : (
         <ScrollView>
-          {zeilen.map((z) => (
-            <View key={z.text} style={styles.zeile}>
-              <Text style={styles.label}>{z.text}</Text>
-              <Text style={styles.neben}>{z.neben}</Text>
-            </View>
-          ))}
+          {zeilen.map((z) =>
+            z.kopf ? (
+              <Text key={z.text} style={styles.gruppe}>
+                {z.text}
+              </Text>
+            ) : (
+              <View key={z.text} style={styles.zeile}>
+                <Text style={styles.label}>{z.text}</Text>
+                <Text style={styles.neben}>{z.neben}</Text>
+              </View>
+            )
+          )}
         </ScrollView>
       ))}
 
@@ -116,6 +130,16 @@ const styles = themenStyles((colors) => ({
   gedrueckt: { backgroundColor: colors.surface2 },
   label: { flex: 1, ...typography.body, color: colors.text },
   neben: { ...typography.preview, color: colors.text3 },
+  /* Wie die Abschnittsüberschriften der Einstellungsseite selbst. */
+  gruppe: {
+    ...typography.tiny,
+    color: colors.text3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
+  },
   hinweis: { ...typography.message, color: colors.text2, padding: spacing.lg },
   text: { ...typography.message, color: colors.text, padding: spacing.lg, lineHeight: 21 },
   knopf: {
