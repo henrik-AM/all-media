@@ -241,11 +241,23 @@ export async function ladeEigeneListen(client: SupabaseClient, ichId: string) {
   };
 }
 
-export async function ladeKartenpunkte(client: SupabaseClient): Promise<FriendPin[]> {
+/**
+ * Die Nadeln auf der Karte.
+ *
+ * `ichId` ist nicht optional, auch wenn es hier nur einer Umbenennung dient:
+ * die Bildschirme fuehren ihre Nutzer unter dem Schluessel `ICH`, und der
+ * eigene Pin kam mit der echten Kennung. Er fand deshalb kein Profil und
+ * stand am 03.09.2026 als „Unbekannt" in der Liste — mit leerem Namen, an
+ * dem die App absturzte.
+ */
+export async function ladeKartenpunkte(
+  client: SupabaseClient,
+  ichId?: string
+): Promise<FriendPin[]> {
   const { data, error } = await client.from('friend_pins').select('user_id, x, y, place, updated_at');
   if (error) throw error;
   return (data ?? []).map((p: any) => ({
-    id: p.user_id,
+    id: ichId && p.user_id === ichId ? ICH : p.user_id,
     x: Number(p.x),
     y: Number(p.y),
     place: p.place ?? '',
@@ -975,7 +987,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     ladeHashtags(client),
     ladeSounds(client),
     ladeStandorte(client),
-    ladeKartenpunkte(client),
+    ladeKartenpunkte(client, ichId),
     ladeMitteilungen(client, ichId),
     ladeGefolgt(client, ichId),
     ladeEigeneListen(client, ichId),

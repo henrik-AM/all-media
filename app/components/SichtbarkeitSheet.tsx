@@ -79,7 +79,9 @@ export const SichtbarkeitSheet = ({
    */
   const liste = contacts
     .filter((k) => users[k.id])
-    .map((k) => ({ id: k.id, name: users[k.id]?.name ?? k.name }))
+    // `?? ''` am Ende: steht in `contacts` kein Name, war `name` hier null —
+    // und der Avatar darunter nahm die ganze Seite mit.
+    .map((k) => ({ id: k.id, name: users[k.id]?.name ?? k.name ?? '' }))
     .filter((k) => !suche || k.name.toLowerCase().includes(suche.toLowerCase()))
     .sort((a, b) => {
       const ad = ausnahmen.includes(a.id) ? 0 : 1;

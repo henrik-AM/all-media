@@ -234,8 +234,32 @@ export function avatarColor(id: string): string {
   return avatarPair(id)[1];
 }
 
-export function initialsOf(name: string): string {
-  return name
+/*
+ * Die Initialen zu einem Namen.
+ *
+ * `name` ist nachsichtig angenommen und nicht als Pflicht: am 03.09.2026
+ * stuerzte die App mit "Cannot read property 'trim' of null" ab, weil ein
+ * Kontakt ohne Namen in einer Liste stand. Eine Hilfsfunktion, die den
+ * ganzen Bildschirm mitnimmt, wenn ein Feld leer ist, ist eine Falle — der
+ * Aufrufer kann nicht an jeder der vierzig Stellen daran denken.
+ *
+ * Ein leerer Name ergibt einen leeren Kreis. Das sieht man, und es ist
+ * besser als ein roter Bildschirm.
+ */
+/**
+ * Dieselbe Farbe, nur durchsichtig — fuer das offene Ende eines Verlaufs.
+ *
+ * Nicht `'transparent'` nehmen: das ist rgba(0,0,0,0), und iOS blendet dann
+ * ueber Schwarz. Aus einem Auslauf auf weissem Grund wird so ein Grauschleier.
+ * Die Farbe muss dieselbe sein, nur mit Alpha 0.
+ */
+export function verlaufAus(farbe: string): string {
+  const hex = farbe.trim();
+  return /^#[0-9a-f]{6}$/i.test(hex) ? `${hex}00` : 'rgba(255,255,255,0)';
+}
+
+export function initialsOf(name?: string | null): string {
+  return String(name ?? '')
     .trim()
     .split(/\s+/)
     .slice(0, 2)

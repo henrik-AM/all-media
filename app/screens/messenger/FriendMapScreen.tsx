@@ -213,8 +213,9 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
         umgekehrt. Vorher waren es zwei Wahlen, die voneinander nichts
         wussten.
       */}
+      {sichtOffen && (
       <SichtbarkeitSheet
-        visible={sichtOffen}
+        visible
         titel="Standort sichtbar für"
         stufe={sicht.stufe}
         ausnahmen={sicht.ausnahmen}
@@ -228,6 +229,7 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
         }}
         onClose={() => setSichtOffen(false)}
       />
+      )}
     </ScrollView>
   );
 };

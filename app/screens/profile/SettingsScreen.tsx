@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Avatar } from '../../components/Avatar';
 import { AuthContext } from '../../contexts/AuthContext';
 import { ThemeContext } from '../../contexts/ThemeContext';
@@ -10,7 +11,7 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet';
 import { FormularSheet } from '../../components/FormularSheet';
 import { useDaten } from '../../contexts/DatenContext';
-import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
+import { colors, radius, sizes, spacing, themenStyles, typography, verlaufAus } from '../../constants/design';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSupabase } from '../../contexts/SupabaseContext';
@@ -670,6 +671,22 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             </Druck>
           ))}
         </ScrollView>
+
+        {/*
+          Ein weicher Auslauf an der rechten Kante.
+          Die Reiterreihe ist breiter als der Bildschirm — die vierte Pille
+          wurde bis zum 03.09.2026 mitten im Wort gekappt, und ein halbes „M"
+          liest sich wie ein Layoutfehler, nicht wie „hier geht es weiter".
+          Der Verlauf nimmt keinen Platz weg und faengt keine Tipps ab
+          (`pointerEvents="none"`).
+        */}
+        <LinearGradient
+          colors={[verlaufAus(colors.surface), colors.surface]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.auslauf}
+          pointerEvents="none"
+        />
       </View>
 
       <ScrollView ref={scroll} contentContainerStyle={styles.content}>
@@ -886,6 +903,7 @@ const styles = themenStyles((colors) => ({
   head: { paddingTop: spacing.md, paddingBottom: spacing.sm, position: 'relative' },
   back: { position: 'absolute', left: spacing.lg, top: spacing.md + spacing.sm, zIndex: 10 },
   pills: { gap: spacing.sm, paddingHorizontal: spacing.lg },
+  auslauf: { position: 'absolute', right: 0, bottom: 0, width: 28, top: 0 },
   pill: {
     paddingHorizontal: 14,
     paddingVertical: 7,

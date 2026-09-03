@@ -253,14 +253,21 @@ async function ladeStummgeschaltet(client, nutzerId) {
   return (data || []).map((m) => m.muted_user_id);
 }
 
-async function ladeKartenpunkte(client) {
+/**
+ * Die Nadeln auf der Karte.
+ *
+ * Gegenstueck zu ladeKartenpunkte() in app/lib/daten.ts. Der eigene Pin kam
+ * mit der echten Kennung, waehrend die Oberflaeche das eigene Profil unter
+ * `me` fuehrt — er fand deshalb kein Profil und hiess „Unbekannt".
+ */
+async function ladeKartenpunkte(client, nutzerId) {
   if (!client) return [];
   const { data, error } = await client
     .from('friend_pins')
     .select('user_id, x, y, place, updated_at');
   if (error) throw error;
   return (data || []).map((p) => ({
-    id: p.user_id,
+    id: nutzerId && p.user_id === nutzerId ? 'me' : p.user_id,
     x: Number(p.x),
     y: Number(p.y),
     place: p.place || '',
@@ -902,7 +909,7 @@ async function bootstrapData(client, nutzerId) {
     ladeHashtags(client),
     ladeSounds(client),
     ladeStandorte(client),
-    ladeKartenpunkte(client),
+    ladeKartenpunkte(client, nutzerId),
     ladeFolgen(client, nutzerId),
     ladeBlockiert(client, nutzerId),
     ladeStummgeschaltet(client, nutzerId),
