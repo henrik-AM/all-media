@@ -349,6 +349,25 @@ export const KarteWeb = forwardRef<KartenSteuerung, Props>(
             }
           }}
           scrollEnabled={false}
+          /*
+           * Sicherheitspruefung 03.09.2026, Fund 16.
+           *
+           * Ohne diese beiden Angaben darf die WebView zu jeder Adresse
+           * weiternavigieren, die der angezeigte Inhalt vorgibt. Die Karte
+           * traegt Pin-Namen und -Farben aus der Datenbank — also Text, den
+           * andere Nutzer geschrieben haben. Ein Link darin haette die
+           * WebView bisher auf eine fremde Seite fuehren koennen, die dann
+           * innerhalb der App steht und ueber `postMessage` mit ihr redet.
+           *
+           * Die Karte selbst wird als HTML uebergeben (Quelle `about:blank`)
+           * und navigiert nie irgendwohin; Kacheln, Leaflet und Bilder sind
+           * Unterressourcen und von der Sperre nicht betroffen. Deshalb ist
+           * es richtig, jede Navigation ausser der ersten abzulehnen.
+           */
+          originWhitelist={['about:blank']}
+          onShouldStartLoadWithRequest={(anfrage) =>
+            anfrage.url === 'about:blank' || anfrage.url.startsWith('about:')
+          }
         />
 
         {/* Henrik: "Plus/Minus entfernen und durch einen diagonalen Pfeil
