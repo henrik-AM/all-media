@@ -21,6 +21,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { signiereEine } from './medien';
 
 const EIMER = 'media';
 
@@ -36,7 +37,19 @@ export type Ordner = 'messages' | 'stories' | 'avatars' | 'posts' | 'insights' |
 export interface UploadErgebnis {
   success: boolean;
   error: string | null;
+  /**
+   * Die Adresse, die in die DATENBANK gehoert — in der bestaendigen Form
+   * `.../object/public/media/<pfad>`.
+   *
+   * Sie ist seit Fund 4 nicht mehr direkt abrufbar; sie ist der Schluessel,
+   * aus dem beim Anzeigen eine unterschriebene Adresse gemacht wird
+   * (lib/medien.ts). Wichtig: hier darf NICHT die unterschriebene stehen —
+   * die laeuft nach vier Stunden ab, und in der Datenbank waere sie danach
+   * dauerhaft tot. Genau dieser Fehler ist beim Umbau zuerst passiert.
+   */
   url: string | null;
+  /** Zum sofortigen Anzeigen, bevor die Zeile neu geladen wird. Vier Stunden. */
+  anzeige: string | null;
 }
 
 /** Aus dem Dateinamen den Inhaltstyp ableiten. */
@@ -62,7 +75,7 @@ export async function ladeHoch(
   dateiname: string
 ): Promise<UploadErgebnis> {
   if (!client) {
-    return { success: false, error: 'Nicht angemeldet', url: null };
+    return { success: false, error: 'Nicht angemeldet', url: null, anzeige: null };
   }
 
   try {
@@ -70,7 +83,22 @@ export async function ladeHoch(
     if (!antwort.ok) throw new Error(`Die Aufnahme ließ sich nicht lesen (${antwort.status})`);
     const inhalt = await antwort.arrayBuffer();
 
-    const pfad = `${ordner}/${dateiname}`;
+    /*
+     * Fund 4, Nachtrag: die Dateinamen der Aufrufer sind
+     * `<kennung>-<zeitstempel>.jpg` — wer die Kennung kennt, muss nur noch
+     * die Millisekunde raten. Solange der Eimer oeffentlich war, war das der
+     * Unterschied zwischen "schwer" und "unmoeglich"; jetzt braucht es dafuer
+     * zusaetzlich eine gueltige Anmeldung. Ein Zufallsteil macht den Pfad
+     * trotzdem unratbar, und er kostet nichts.
+     */
+    const zufall = Math.random().toString(36).slice(2, 10);
+    const punkt = dateiname.lastIndexOf('.');
+    const gestreut =
+      punkt === -1
+        ? `${dateiname}-${zufall}`
+        : `${dateiname.slice(0, punkt)}-${zufall}${dateiname.slice(punkt)}`;
+
+    const pfad = `${ordner}/${gestreut}`;
     const { error } = await client.storage.from(EIMER).upload(pfad, inhalt, {
       cacheControl: '3600',
       contentType: typVon(dateiname),
@@ -78,13 +106,25 @@ export async function ladeHoch(
     });
     if (error) throw error;
 
+    /*
+     * Zwei Adressen, und die Unterscheidung ist der Kern von Fund 4:
+     *
+     *   url      die bestaendige Form. Sie wandert in die Datenbank. Abrufbar
+     *            ist sie nicht mehr — der Eimer ist geschlossen —, aber sie
+     *            ueberlebt jeden Ablauf und laesst sich jederzeit neu
+     *            unterschreiben.
+     *   anzeige  die unterschriebene. Vier Stunden gueltig, gut fuer das Bild,
+     *            das sofort erscheinen soll. In die Datenbank gehoert sie
+     *            nicht.
+     */
     const { data } = client.storage.from(EIMER).getPublicUrl(pfad);
-    return { success: true, error: null, url: data.publicUrl };
+    const anzeige = await signiereEine(client, pfad);
+    return { success: true, error: null, url: data.publicUrl, anzeige };
   } catch (fehler: any) {
     // Sichtbar machen, nicht verschlucken: genau das Verschweigen hat
     // verborgen, dass nie etwas ankam.
     console.error('Upload fehlgeschlagen:', fehler?.message ?? fehler);
-    return { success: false, error: fehler?.message ?? 'Upload fehlgeschlagen', url: null };
+    return { success: false, error: fehler?.message ?? 'Upload fehlgeschlagen', url: null, anzeige: null };
   }
 }
 
@@ -101,12 +141,18 @@ export async function loesche(client: SupabaseClient | null, pfad: string) {
   }
 }
 
-/** Die öffentliche Adresse einer bereits hochgeladenen Datei. */
-export function oeffentlicheAdresse(
+/**
+ * Die Adresse einer bereits hochgeladenen Datei.
+ *
+ * Fund 4: heisst nicht mehr `oeffentlicheAdresse`, weil sie es nicht mehr
+ * ist. Die Adresse ist vier Stunden gueltig und danach wertlos — genau das
+ * ist der Punkt: eine weitergereichte Adresse oeffnet kein fremdes Bild mehr.
+ */
+export async function adresseVon(
   client: SupabaseClient | null,
   ordner: Ordner,
   dateiname: string
-): string {
+): Promise<string> {
   if (!client) return '';
-  return client.storage.from(EIMER).getPublicUrl(`${ordner}/${dateiname}`).data.publicUrl;
+  return (await signiereEine(client, `${ordner}/${dateiname}`)) ?? '';
 }

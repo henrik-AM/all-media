@@ -30,14 +30,105 @@
 
 const express = require('express');
 const path = require('path');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
 const syncHandlers = require('./sync-handlers');
+const { signiereMedien } = require('./medien');
 const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require('./supabase');
 
 const app = express();
 
+/*
+ * Sicherheitspruefung 04.09.2026 (Fund 10).
+ *
+ * Die Seite ging bis heute ohne einen einzigen Sicherheits-Header online.
+ * Nachgeprueft mit `curl -I`: keine Content-Security-Policy, kein
+ * X-Content-Type-Options, kein HSTS, kein Schutz gegen Einbetten in einen
+ * fremden Rahmen — dafuer `x-powered-by: Express`, das freundlich mitteilt,
+ * womit man es zu tun hat.
+ *
+ * Das Escaping in public/app.js ist sauber (esc() an 311 Stellen), aber es
+ * war die einzige Verteidigungslinie. Eine CSP ist die zweite: selbst wenn
+ * irgendwo ein Zeichen durchrutscht, laedt der Browser kein fremdes Skript.
+ *
+ * ZUR CSP IM EINZELNEN
+ *
+ * `scriptSrc` erlaubt bewusst 'unsafe-inline' NICHT. Geprueft vor dem
+ * Einschalten: index.html hat keinen einzigen Inline-Block und weder app.js
+ * noch index.html ein onclick=/onload=-Attribut. Fremd geladen wird nur
+ * Leaflet von cdnjs, und das steht namentlich in der Liste.
+ *
+ * `styleSrc` erlaubt 'unsafe-inline', weil die Oberflaeche Farben und
+ * Hintergruende ueber style-Attribute setzt (Avatare, Verlaeufe). Das ist
+ * vertretbar: farbe() in public/app.js laesst nur Hex, rgb() und Verlaeufe
+ * durch und weist alles mit <>"'`;\ ab, bevor es in ein Attribut geht.
+ *
+ * `connectSrc` und `imgSrc` brauchen Supabase — dort liegen Datenbank und
+ * Medien. `frameAncestors: none` verbietet das Einbetten.
+ */
+app.disable('x-powered-by');
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        /*
+         * Eine einzige fremde Quelle, namentlich statt pauschal:
+         *   cdnjs — Leaflet fuer die Karte (index.html)
+         *
+         * jsdelivr stand hier bis zum 04.09.2026 fuer supabase-js. Die
+         * Bibliothek liegt jetzt unter public/lib/ und wird von uns selbst
+         * ausgeliefert (anmeldung.js), damit fuer die Anmeldung — und damit
+         * fuer die Sitzung jedes angemeldeten Nutzers — kein Dritter mehr
+         * Code beisteuern kann.
+         */
+        scriptSrc: ["'self'", 'https://cdnjs.cloudflare.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        // Kartenkacheln: OpenStreetMap und die Satellitenansicht (public/app.js).
+        imgSrc: ["'self'", 'data:', 'blob:', supabaseUrl,
+          'https://*.tile.openstreetmap.org', 'https://server.arcgisonline.com'],
+        mediaSrc: ["'self'", 'data:', 'blob:', supabaseUrl],
+        connectSrc: ["'self'", supabaseUrl, supabaseUrl.replace('https://', 'wss://')],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+    // Render terminiert TLS davor; ein Jahr HSTS ist dort der Normalfall.
+    hsts: { maxAge: 31536000, includeSubDomains: true },
+    // Bilder und Medien aus dem Supabase-Speicher liegen auf einer anderen
+    // Herkunft. Mit der strengen Voreinstellung laedt der Browser sie nicht.
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+/*
+ * Fund 10, zweiter Teil: ohne Bremse liefen Anmeldeversuche und teure
+ * Endpunkte ungehindert. Supabase bremst seine eigenen Auth-Aufrufe, die
+ * Express-Routen davor aber nicht.
+ *
+ * 300 Anfragen je Minute und Herkunft sind fuer eine Oberflaeche, die beim
+ * Start ein Buendel Endpunkte zieht, reichlich bemessen — und fuer das
+ * Durchprobieren von Nummern oder Kennungen zu wenig.
+ */
+app.set('trust proxy', 1);
+app.use(
+  '/api',
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { ok: false, error: 'Zu viele Anfragen. Bitte kurz warten.' },
+  })
+);
 
 /*
  * Anmeldung.
@@ -86,12 +177,57 @@ function route(fn) {
     if (!req.db || !req.nutzerId) {
       return res.status(401).json({ ok: false, angemeldet: false, error: 'Bitte anmelden' });
     }
+    /*
+     * Fund 4: der Medieneimer ist nicht mehr oeffentlich. Jede Adresse, die
+     * diese API herausgibt, wird unterschrieben — an einer Stelle, statt in
+     * jedem der rund fuenfzig Umformer einzeln. Was der Aufrufer nicht lesen
+     * darf, steht gar nicht erst in der Antwort.
+     *
+     * Warum `res.json` ueberschrieben wird und nicht nur der Rueckgabewert
+     * behandelt: ein Teil der Handler nimmt `res` entgegen und antwortet
+     * selbst (die Community-Endpunkte etwa). Die waeren sonst uebersehen —
+     * und ein uebersehener Endpunkt liefert tote Bilder.
+     */
+    const jsonOriginal = res.json.bind(res);
+    /*
+     * ACHTUNG, hier steckt eine Falle, in die diese Aenderung zuerst
+     * hineingelaufen ist: das Unterschreiben ist ein Netzaufruf, `res.json`
+     * antwortet also nicht mehr sofort. `res.headersSent` bleibt einen
+     * Moment lang `false`, obwohl die Antwort schon unterwegs ist. Die
+     * Pruefung unten haette danach ein ZWEITES Mal geantwortet — und weil
+     * `res.json(...)` jetzt `res` zurueckgibt, waere das Objekt `res` selbst
+     * als Antwortkoerper verschickt worden.
+     *
+     * Deshalb ein eigener Merker, der synchron gesetzt wird.
+     */
+    let schonGeantwortet = false;
+    res.json = (koerper) => {
+      if (schonGeantwortet) return res;
+      schonGeantwortet = true;
+      signiereMedien(req.db, koerper)
+        .then(jsonOriginal)
+        .catch((fehler) => {
+          console.error('Antwort konnte nicht unterschrieben werden:', fehler.message);
+          jsonOriginal(koerper);
+        });
+      return res;
+    };
+
     try {
       const ergebnis = await fn(req, res);
-      if (!res.headersSent && ergebnis !== undefined) res.json(ergebnis);
+      if (!schonGeantwortet && !res.headersSent && ergebnis !== undefined) res.json(ergebnis);
     } catch (fehler) {
+      /*
+       * Fund 14: hier stand `error: fehler.message`. Postgres nennt in seinen
+       * Meldungen Tabellen-, Spalten- und Constraint-Namen — die gehoeren ins
+       * Protokoll, nicht in die Antwort. Im Protokoll steht sie weiterhin
+       * vollstaendig; das Verschlucken von Fehlern war ja der urspruengliche
+       * Grund fuer diesen Umschlag und bleibt ausgeschlossen.
+       */
       console.error(`${req.method} ${req.path} fehlgeschlagen:`, fehler.message);
-      if (!res.headersSent) res.status(500).json({ ok: false, error: fehler.message });
+      if (!res.headersSent) {
+        res.status(500).json({ ok: false, error: 'Das hat nicht geklappt. Bitte noch einmal versuchen.' });
+      }
     }
   };
 }
@@ -203,10 +339,12 @@ app.get('/api/bootstrap', async (req, res) => {
   }
   try {
     const daten = await supabaseApi.bootstrapData(req.db, req.nutzerId);
-    res.json({ angemeldet: true, ...daten });
+    // Fund 4: bootstrap geht an `route()` vorbei und braucht denselben Schritt.
+    res.json(await signiereMedien(req.db, { angemeldet: true, ...daten }));
   } catch (fehler) {
+    // Fund 14: Grund ins Protokoll, nicht in die Antwort.
     console.error('Startdaten fehlgeschlagen:', fehler.message);
-    res.status(500).json({ angemeldet: true, error: fehler.message });
+    res.status(500).json({ angemeldet: true, error: 'Die Startdaten liessen sich nicht laden.' });
   }
 });
 
@@ -301,17 +439,14 @@ app.post('/api/chats/:chatId/read', route(async (req) =>
   antwort(await syncHandlers.handleChatAction(req.db, req.nutzerId, req.params.chatId, 'gelesen', true))
 ));
 
+/*
+ * Über eine eingegangene Chat-Anfrage entscheiden. Ohne Angabe: annehmen —
+ * so hieß die Route vorher, und die App ruft sie weiterhin so auf.
+ */
 app.post('/api/chats/:chatId/accept', route(async (req) => {
-  const { data: andere } = await req.db
-    .from('chat_members')
-    .select('user_id')
-    .eq('chat_id', req.params.chatId)
-    .neq('user_id', req.nutzerId);
-  const ziel = (andere || [])[0]?.user_id;
-  if (!ziel) return { ok: false, error: 'Chat nicht gefunden' };
-
-  const e = await syncHandlers.handleAcceptRequest(req.db, req.nutzerId, ziel);
-  return antwort(e, { chatId: req.params.chatId });
+  const annehmen = req.body?.annehmen !== false;
+  const e = await syncHandlers.handleAcceptRequest(req.db, req.nutzerId, req.params.chatId, annehmen);
+  return antwort(e, { chatId: req.params.chatId, zustand: e?.zustand });
 }));
 
 app.get('/api/messages/:chatId', route(async (req) =>
@@ -376,11 +511,18 @@ async function chatGesperrt(req, chatId) {
   return null;
 }
 
-app.post('/api/messages/:chatId/anhang', route(async (req) => {
-  const art = req.body?.art;
-  const sperre = await chatGesperrt(req, req.params.chatId);
-  if (sperre) return { ok: false, error: sperre };
-
+/**
+ * Aus „art" wird Text und Medienbezug.
+ *
+ * Stand bis zum 04.09.2026 ausgeschrieben in der Chat-Route. Seit die
+ * Community-Kanaele dieselben Anhaenge annehmen (Schema 25), brauchen zwei
+ * Routen dieselbe Uebersetzung — und zwei Abschriften davon liefen
+ * garantiert irgendwann auseinander: der Kanal zeigte dann ein Gif mit
+ * Abspielknopf, der Chat ohne.
+ *
+ * Gibt entweder { text, medien } zurueck oder { error }.
+ */
+async function anhangDeuten(req, art) {
   let text;
   let medien = {};
 
@@ -419,8 +561,19 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
       dateiGroesse: Number(req.body?.groesse) || 0,
     };
   } else {
-    return { ok: false, error: 'Unbekannter Anhang' };
+    return { error: 'Unbekannter Anhang' };
   }
+
+  return { text, medien };
+}
+
+app.post('/api/messages/:chatId/anhang', route(async (req) => {
+  const sperre = await chatGesperrt(req, req.params.chatId);
+  if (sperre) return { ok: false, error: sperre };
+
+  const gedeutet = await anhangDeuten(req, req.body?.art);
+  if (gedeutet.error) return { ok: false, error: gedeutet.error };
+  const { text, medien } = gedeutet;
 
   const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, medien);
   if (!e || e.ok === false) return antwort(e);
@@ -536,23 +689,42 @@ app.post('/api/contacts', route(async (req) => {
       name: person.name,
       status: e.status,
       about: privat ? 'Anfrage gesendet' : 'Kontakt',
-      phone: person.phone,
+      // Fund 1: die Suche gibt keine Nummer mehr heraus. Wer ueber eine
+      // Nummer gesucht hat, kennt sie ohnehin — die Oberflaeche setzt sie
+      // aus der Eingabe. Sonst bleibt sie leer, bis beide Seiten Kontakt sind.
+      phone: person.phone || '',
     },
     /*
      * Der Chat wird gleich geoeffnet, ohne dass die Seite die Chatliste neu
      * holt. "requestState" muss deshalb schon hier stehen — sonst bleibt das
      * Eingabefeld offen, obwohl die Anfrage noch laeuft, und der Nutzer kann
      * jemandem schreiben, der ihn noch gar nicht angenommen hat.
+     *
+     * Gefragt wird der Chat selbst, nicht `contacts.status`. Seit Schema 21
+     * entscheidet ein Auslöser in der Datenbank, ob dieser Chat eine Anfrage
+     * ist — und der sagt bei einer Figur aus dem Testbestand ausdrücklich
+     * nein. Stünde hier weiterhin die Vermutung aus dem Kontaktstatus, sperrte
+     * die Seite ein Eingabefeld, das die Datenbank längst freigegeben hat.
      */
     chat: {
       id: e.chatId,
       userId: person.id,
       name: person.name,
       isGroup: false,
-      requestState: e.status === 'pending' ? 'pending' : 'accepted',
+      requestState: await anfrageZustandVon(req.db, e.chatId, req.nutzerId),
     },
   };
 }));
+
+/** Den Anfragezustand eines einzelnen Chats holen — siehe supabase-api.js. */
+async function anfrageZustandVon(client, chatId, nutzerId) {
+  const { data } = await client
+    .from('chats')
+    .select('anfrage_zustand, anfrage_von')
+    .eq('id', chatId)
+    .maybeSingle();
+  return data ? supabaseApi.anfrageZustand(data, nutzerId) : 'accepted';
+}
 
 app.post('/api/kontakte/:userId/favorit', route(async (req) => {
   const e = await syncHandlers.handleContactFavorite(req.db, req.nutzerId, req.params.userId);
@@ -731,6 +903,67 @@ app.post('/api/einstellungen/:schluessel', route(async (req) =>
 app.post('/api/profile/:userId/aufruf', route(async (req) =>
   antwort(await syncHandlers.handleProfilAufruf(req.db, req.nutzerId, req.params.userId))
 ));
+
+/*
+ * Anwesenheit — "zuletzt online".
+ *
+ * Bis zum 03.09.2026 stand im Chatkopf fest das Wort "Online", bei jedem
+ * Menschen, zu jeder Zeit. Es gab keine Spalte, die das haette wissen
+ * koennen. Jetzt gibt es `presence`, und wer den Status verbirgt, hat dort
+ * keine fuer andere lesbare Zeile: die Antwort ist dann `null` — ununter-
+ * scheidbar von "war noch nie da". Das ist Absicht, ein "verborgen" waere
+ * selbst eine Auskunft.
+ */
+app.post('/api/praesenz', route(async (req) => {
+  const { error } = await req.db.rpc('hier_bin_ich');
+  return error ? { ok: false, error: error.message } : { ok: true };
+}));
+
+/*
+ * Darf ich die Inhalte dieser Person auf mein Geraet holen?
+ *
+ * Die Einstellung "Downloadeinstellungen" gab es seit dem 01.09.2026 in den
+ * Einstellungen; gefragt hat sie nie jemand — es gab ueberhaupt keinen Weg,
+ * einen fremden Inhalt zu sichern. Beides ist jetzt da: der Weg und die
+ * Frage davor.
+ *
+ * Was das nicht kann: ein Bildschirmfoto verhindern. Wer etwas sehen darf,
+ * hat es geladen. Die Einstellung nimmt den Knopf weg — mehr verspricht sie
+ * nicht.
+ */
+app.get('/api/download-erlaubt/:userId', route(async (req) => {
+  const { data } = await req.db.rpc('darf_herunterladen', {
+    inhaber: req.params.userId,
+    wer: req.nutzerId,
+  });
+  return { ok: true, erlaubt: data !== false };
+}));
+
+/**
+ * Darf ich dieser Person schreiben? — "Nachrichten senden deaktivieren".
+ *
+ * Der Sichtbarkeitsbereich `dm`. Seit Schema 19 weist die Datenbank die
+ * Nachricht ab, seit Schema 22 schon den Chat. Diese Auskunft steht davor,
+ * damit der Knopf "Nachricht" gar nicht erst anklickbar ist.
+ *
+ * Gegenstueck in der App: Aktion.darfAngeschriebenWerden().
+ */
+app.get('/api/dm-erlaubt/:userId', route(async (req) => {
+  const { data } = await req.db.rpc('darf_angeschrieben_werden', {
+    inhaber: req.params.userId,
+    wer: req.nutzerId,
+  });
+  return { ok: true, erlaubt: data !== false };
+}));
+
+app.get('/api/praesenz/:userId', route(async (req) => {
+  const { data } = await req.db
+    .from('presence')
+    .select('last_seen')
+    .eq('user_id', req.params.userId)
+    .maybeSingle();
+  return { ok: true, zuletzt: data?.last_seen || null };
+}));
 
 app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
   ok: true,
@@ -993,11 +1226,49 @@ app.post('/api/teilen', route(async (req) => {
   return antwort(e, { chats: await supabaseApi.ladeChats(req.db, req.nutzerId) });
 }));
 
+/*
+ * Der Reiter "Reposts".
+ *
+ * Ohne `?user=` die eigenen. Mit `?user=` die einer anderen Person — der
+ * Reiter im fremden Profil stand bis zum 03.09.2026 fest auf "Keine
+ * Reposts", ganz gleich, wie viele es waren.
+ *
+ * Die Repost-Sichtbarkeit steht nicht hier, sondern als Leseregel auf
+ * `reposts` (Schema 20): wer sie verbirgt, liefert keine Zeilen. Der Reiter
+ * ist dann leer, und die Oberflaeche verraet nichts ueber die Einstellung.
+ */
 app.get('/api/reposts', route(async (req) => {
-  const { data, error } = await req.db.from('reposts').select('post_id').eq('user_id', req.nutzerId);
+  const wessen = req.query.user ? String(req.query.user) : req.nutzerId;
+  const { data, error } = await req.db.from('reposts').select('post_id').eq('user_id', wessen);
   if (error) throw error;
 
   const ids = new Set((data || []).map((r) => r.post_id));
+  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+  return alle
+    .filter((b) => ids.has(b.id))
+    .map((b) => ({ art: b.kind === 'post' ? 'post' : b.kind === 'clip' ? 'clip' : 'video', eintrag: b }));
+}));
+
+/*
+ * Der Reiter "Markiert" im Profil.
+ *
+ * Er war bei jedem Menschen leer — nicht, weil niemand markiert war, sondern
+ * weil es Markierungen gar nicht gab. Seit dem 03.09.2026 gibt es
+ * `post_tags`; markiert wird ueber die @-Namen in der Beschreibung.
+ */
+app.get('/api/markierungen', route(async (req) => {
+  // Wie bei den Reposts: ohne `?user=` die eigenen Markierungen.
+  const wessen = req.query.user ? String(req.query.user) : req.nutzerId;
+  const { data, error } = await req.db
+    .from('post_tags')
+    .select('post_id, created_at')
+    .eq('user_id', wessen)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const ids = new Set((data || []).map((z) => z.post_id));
+  if (ids.size === 0) return [];
+
   const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
   return alle
     .filter((b) => ids.has(b.id))
@@ -1171,6 +1442,47 @@ app.post('/api/communities/:id/channels/:chId/nachricht', route(async (req) => {
       id: e.nachricht.id,
       from: 'me',
       text,
+      time: supabaseApi.chatZeit(e.nachricht.created_at),
+    },
+  };
+}));
+
+/**
+ * Ein Anhang im Unterthema — Handbuch-Abgleich 01.09.2026, letzter Punkt
+ * („Sticker innerhalb von Community-Kanaelen"; im Privatchat gibt es sie).
+ *
+ * Dieselbe Uebersetzung wie im Chat (anhangDeuten), nur die Ablage ist eine
+ * andere. Die Spalten dafuer stehen seit SUPABASE_SCHEMA_25_kanal_anhang.sql.
+ *
+ * „Standort anfragen" fehlt hier mit Absicht: die Anfrage richtet sich an
+ * eine bestimmte Person, und ein Kanal hat kein Gegenueber. Im Handbuch
+ * steht sie ausdruecklich unter „im Privatchat".
+ */
+app.post('/api/communities/:id/channels/:chId/anhang', route(async (req) => {
+  const gedeutet = await anhangDeuten(req, req.body?.art);
+  if (gedeutet.error) return { ok: false, error: gedeutet.error };
+  const { text, medien } = gedeutet;
+
+  const e = await syncHandlers.handleSendChannelMessage(
+    req.db, req.nutzerId, req.params.chId, text, medien
+  );
+  if (!e || e.ok === false) return antwort(e);
+
+  /*
+   * Die fertige Karte zurueckgeben, nicht nur den Satz: die Seite zeichnet
+   * sofort neu, ohne den Kanal noch einmal zu holen. Ohne diesen Schritt
+   * stuende bis zum naechsten Laden „Standort: Zugspitze" statt der Karte.
+   */
+  const frisch = await supabaseApi.ladeKanalNachrichten(req.db, req.nutzerId, req.params.chId);
+  const angelegt = (frisch || []).find((m) => m.id === e.nachricht.id);
+
+  return {
+    ok: true,
+    message: angelegt || {
+      id: e.nachricht.id,
+      from: 'me',
+      text,
+      media: medien.typ,
       time: supabaseApi.chatZeit(e.nachricht.created_at),
     },
   };

@@ -54,6 +54,10 @@ const LAEUFE = [
   ['gleichstand', '_gleichstand.js'],
   ['handbuch', '_handbuch.js'],
   ['sichtbarkeit', '_sichtbarkeit.js'],
+  ['fremdprofil', '_fremdprofil.js'],
+  ['chatanfrage', '_chatanfrage.js'],
+  ['dmsperre', '_dmsperre.js'],
+  ['kanal', '_kanal.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */

@@ -43,6 +43,15 @@ interface Props {
    * die Freigabe, also die eine Richtung.
    */
   onStandortAnfragen?: () => void;
+  /**
+   * Anhang-Arten, die es hier nicht gibt.
+   *
+   * Im Unterthema einer Community faellt "Standort anfragen" weg: die Anfrage
+   * richtet sich an eine bestimmte Person, und ein Kanal hat kein Gegenueber.
+   * Der Punkt stand dort und antwortete mit "In einer Gruppe geht das nicht" —
+   * ein Knopf, dessen einzige Wirkung eine Absage ist, gehoert weg.
+   */
+  ohne?: string[];
   onNotice: (message: string) => void;
 }
 
@@ -71,6 +80,7 @@ export const AnhangSheet = ({
   onClose,
   onAnhang,
   onStandortAnfragen,
+  ohne = [],
   onNotice,
 }: Props) => {
   const { places: alleOrte, users: alleNutzer } = useDaten();
@@ -173,7 +183,7 @@ export const AnhangSheet = ({
     <SheetRahmen visible={visible} title={titel} onClose={schliessen} hoch={schritt !== 'menue'}>
       {schritt === 'menue' && (
         <View>
-          {PUNKTE.map((p) => (
+          {PUNKTE.filter((p) => !ohne.includes(p.key)).map((p) => (
             <Druck
               key={p.key}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}

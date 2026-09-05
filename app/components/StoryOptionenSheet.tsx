@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,6 +7,10 @@ import { SheetRahmen } from './SheetRahmen';
 import { useProfil } from '../contexts/ProfilContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
+import { useSupabase } from '../contexts/SupabaseContext';
+import { AuthContext } from '../contexts/AuthContext';
+import { useAktionen } from '../lib/useAktionen';
+import * as Aktion from '../lib/aktionen';
 import { Contact, Story } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -90,8 +94,37 @@ interface OptionenProps {
 export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice }: OptionenProps) => {
   const { users: alleNutzer } = useDaten();
   const { stummSchalten, melden } = useProfil();
+  const { supabase } = useSupabase();
+  const { user } = useContext(AuthContext);
+  const nutzerId = user?.id ?? '';
+  const { medienSichern } = useAktionen();
   const [meldeSchritt, setMeldeSchritt] = useState(false);
   const person = alleNutzer[story.userId];
+
+  /*
+   * "Auf dem Geraet sichern" stand nur bei der eigenen Story. Die
+   * Einstellung "Downloadeinstellungen" hatte damit nichts, worueber sie
+   * haette entscheiden koennen.
+   *
+   * Jetzt steht der Punkt auch bei fremden Storys — aber nur, wenn die
+   * Person es zulaesst. Gefragt wird, bevor das Blatt gezeichnet ist: ein
+   * Knopf, der beim Antippen "darfst du nicht" sagt, ist die schlechtere
+   * Antwort als einer, der gar nicht erst dasteht.
+   */
+  const [darfSichern, setDarfSichern] = useState(eigene);
+
+  useEffect(() => {
+    if (eigene || !supabase || !nutzerId || !story.mediaUri) return;
+    let abgebrochen = false;
+    Aktion.darfHerunterladen(supabase, story.userId, nutzerId)
+      .then((erlaubt) => {
+        if (!abgebrochen) setDarfSichern(erlaubt);
+      })
+      .catch(() => setDarfSichern(false));
+    return () => {
+      abgebrochen = true;
+    };
+  }, [eigene, supabase, nutzerId, story.userId, story.mediaUri]);
 
   const punkte: { key: string; label: string; icon: IconName; gefahr?: boolean }[] = eigene
     ? [
@@ -101,8 +134,11 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
       ]
     : [
         { key: 'link', label: 'Link kopieren', icon: 'link-outline' },
-        { key: 'stumm', label: `${person?.name ?? 'Diese Person'} stummschalten`, icon: 'volume-mute-outline' },
-        { key: 'melden', label: 'Story melden', icon: 'shield-outline', gefahr: true },
+        ...(darfSichern
+          ? [{ key: 'sichern', label: 'Auf dem Gerät sichern', icon: 'bookmark-outline' as IconName }]
+          : []),
+        { key: 'stumm', label: `${person?.name ?? 'Diese Person'} stummschalten`, icon: 'volume-mute-outline' as IconName },
+        { key: 'melden', label: 'Story melden', icon: 'shield-outline' as IconName, gefahr: true },
       ];
 
   const waehlen = (key: string) => {
@@ -111,8 +147,17 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
       return onClose();
     }
     if (key === 'sichern') {
-      onNotice(story.mediaUri ? 'Story gesichert' : 'Diese Story hat noch kein Bild');
-      return onClose();
+      // Hier stand die Meldung "Story gesichert" — und sonst nichts. Kein
+      // Herunterladen, keine Datei. Jetzt wird wirklich gesichert.
+      if (!story.mediaUri) {
+        onNotice('Diese Story hat noch kein Bild');
+        return onClose();
+      }
+      onClose();
+      medienSichern(story.mediaUri, `all-media-story-${story.id}.jpg`).then((ok) => {
+        if (ok) onNotice('Story gesichert');
+      });
+      return;
     }
     if (key === 'sichtbar') {
       onNotice('Story-Sichtbarkeit steht in den Einstellungen unter „Chats“');

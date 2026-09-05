@@ -1,0 +1,23 @@
+Fix fuer den 500er auf all-media-website.onrender.com
+=====================================================
+
+Ursache: Seit Schema 23 hat die Rolle `authenticated` kein Leserecht mehr
+auf profiles.phone. Der auf Render laufende Stand (origin/main, 8037f0d)
+fragt die Spalte weiterhin mit ab. PostgREST antwortet darauf mit 403
+"permission denied for table profiles" (Code 42501) - und zwar fuer die
+GANZE Abfrage, nicht nur fuer die eine Spalte. /api/bootstrap macht daraus
+einen 500, die Oberflaeche zeigt "All Media ist gerade nicht erreichbar".
+
+Nachgewiesen direkt an der Datenbank:
+  select=id,name,phone  -> HTTP 403  permission denied for table profiles
+  select=id,name        -> HTTP 200
+
+Der Fix liegt im Arbeitsbaum bereits vor, ist aber nie committet worden.
+
+--- a/web/server/supabase-api.js
++++ b/web/server/supabase-api.js
+@@ -22,3 +22,3 @@
+ const PROFIL_SPALTEN =
+-  'id, name, handle, initials, color, phone, privat, about, bio, link, status,' +
++  'id, name, handle, initials, color, privat, about, bio, link, status,' +
+   ' highlights, playlists, spende, live, followers_basis, following_basis, beitraege_basis';

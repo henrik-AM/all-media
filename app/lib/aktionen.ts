@@ -25,6 +25,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { signiereMedien } from './medien';
 
 /**
  * Eine Zeile, die es entweder gibt oder nicht — Like, Speichern, Folgen.
@@ -455,6 +456,18 @@ export async function chatMit(
     if (andere && andere.length > 0) return andere[0].chat_id;
   }
 
+  /*
+   * Vor dem Anlegen fragen, nicht danach.
+   *
+   * Die Regel aus Schema 22 wuerde das Eintragen des zweiten Mitglieds
+   * ohnehin abweisen — aber erst, nachdem die Chatzeile schon steht. Uebrig
+   * bliebe ein Chat ohne Gegenueber und eine Fehlermeldung aus der Datenbank.
+   * Die Frage vorweg kostet einen Aufruf und spart beides.
+   */
+  if (!(await darfAngeschriebenWerden(client, zielId, ichId))) {
+    throw new Error('Diese Person empfängt keine Nachrichten.');
+  }
+
   const { data: person } = await client
     .from('profiles')
     .select('name')
@@ -784,13 +797,27 @@ export async function kontaktHinzufuegen(
   return { status, chatId };
 }
 
-/** Eine Kontaktanfrage annehmen — danach ist der Chat frei benutzbar. */
-export async function anfrageAnnehmen(client: SupabaseClient, ichId: string, zielId: string) {
+/**
+ * Über eine Chat-Anfrage entscheiden — annehmen oder ablehnen.
+ *
+ * Hier stand bis zum 03.09.2026 `anfrageAnnehmen`, und die schrieb
+ * `contacts.status = 'friend'` in die Zeile des ABSENDERS. Damit nahm der
+ * Absender seine eigene Anfrage an. Der Knopf dazu hieß im Chat ehrlich
+ * „Annahme simulieren" — nur stand er beim Falschen und wirkte echt.
+ *
+ * Jetzt geht es an den Chat, den beide sehen. Wer nicht entscheiden darf,
+ * kommt am Auslöser in Schema 21 nicht vorbei; die Meldung von dort ist
+ * verständlich genug, um sie durchzureichen.
+ */
+export async function anfrageEntscheiden(
+  client: SupabaseClient,
+  chatId: string,
+  annehmen: boolean
+) {
   const { error } = await client
-    .from('contacts')
-    .update({ status: 'friend' })
-    .eq('user_id', ichId)
-    .eq('contact_id', zielId);
+    .from('chats')
+    .update({ anfrage_zustand: annehmen ? 'angenommen' : 'abgelehnt' })
+    .eq('id', chatId);
   if (error) throw error;
   return true;
 }
@@ -927,21 +954,41 @@ export async function kanalAnlegen(
 }
 
 /**
- * Eine Nachricht in einem Community-Kanal.
+ * Eine Nachricht in einem Community-Kanal — mit oder ohne Anhang.
  *
  * Kanaele haben eine eigene Tabelle. Der ChatDetailScreen las von dort
  * (ladeKanalNachrichten), schrieb aber nach `messages` — was man in einem
  * Unterthema schrieb, war beim naechsten Oeffnen spurlos weg.
+ *
+ * Der ANHANG kam am 04.09.2026 dazu, und mit ihm faellt eine zweite Luecke
+ * weg: Foto, Gif, Sticker, Datei, Standort und Kontakt gingen im Kanal
+ * ausnahmslos ueber `nachrichtSenden()` nach `messages`. Dort verlangt die
+ * Regel „Nachricht senden" eine Mitgliedschaft im Chat mit dieser Kennung —
+ * eine Kanal-Kennung ist keine, und die Datenbank wies den Datensatz mit
+ * 42501 ab. Auf dem Bildschirm stand „Der Anhang ging nicht raus", und im
+ * Kanal blieb es leer. Die Spalten dafuer stehen seit
+ * SUPABASE_SCHEMA_25_kanal_anhang.sql.
  */
 export async function kanalNachricht(
   client: SupabaseClient,
   ichId: string,
   kanalId: string,
-  text: string
+  text: string,
+  anhang: Anhang = {}
 ): Promise<{ id: string; created_at: string }> {
   const { data, error } = await client
     .from('community_channel_messages')
-    .insert({ channel_id: kanalId, sender_id: ichId, text })
+    .insert({
+      channel_id: kanalId,
+      sender_id: ichId,
+      text,
+      media_url: anhang.url || null,
+      media_type: anhang.typ || null,
+      place_id: anhang.standortId || null,
+      contact_user_id: anhang.kontaktId || null,
+      file_name: anhang.dateiName || null,
+      file_size: anhang.dateiGroesse || null,
+    })
     .select('id, created_at')
     .single();
   if (error) throw error;
@@ -1836,4 +1883,266 @@ export async function communityNameFrei(
     .limit(1);
   if (error) throw error;
   return ((data ?? []) as unknown[]).length === 0;
+}
+
+// ------------------------------------------------------- Anwesenheit --
+//
+// "Zuletzt online" — bis zum 03.09.2026 gab es dazu keine einzige Angabe in
+// der Datenbank. Im Chatkopf stand fest das Wort "Online", bei jedem
+// Menschen, zu jeder Zeit.
+
+/**
+ * „Ich bin da." Der Zeitpunkt kommt aus der Datenbank, nicht vom Gerät —
+ * eine Uhr auf einem Telefon kann falsch gehen, und „zuletzt online in vier
+ * Stunden" wäre schwer zu erklären.
+ */
+export async function hierBinIch(client: SupabaseClient): Promise<void> {
+  const { error } = await client.rpc('hier_bin_ich');
+  // Ein nicht vermerkter Besuch ist kein Grund, die App anzuhalten.
+  if (error) console.error('Anwesenheit nicht vermerkt:', error.message);
+}
+
+/**
+ * Wann war diese Person zuletzt da? `null`, wenn sie ihren Status verbirgt —
+ * die Leseregel auf `presence` gibt dann keine Zeile heraus. Für den
+ * Betrachter sieht das aus wie „war noch nie da", und das ist Absicht: ein
+ * „verborgen" wäre selbst die Auskunft, die die Einstellung verhindert.
+ */
+export async function praesenzLesen(
+  client: SupabaseClient,
+  profilId: string
+): Promise<string | null> {
+  if (!profilId) return null;
+  const { data } = await client
+    .from('presence')
+    .select('last_seen')
+    .eq('user_id', profilId)
+    .maybeSingle();
+  return (data as { last_seen?: string } | null)?.last_seen ?? null;
+}
+
+/**
+ * „Online", „zuletzt online vor 12 Min." oder gar nichts.
+ *
+ * Dieselben Schwellen wie `praesenzText()` in web/public/app.js. Laufen die
+ * beiden auseinander, zeigt dieselbe Person in App und Browser einen anderen
+ * Zustand.
+ */
+export function praesenzText(iso: string | null): string {
+  if (!iso) return '';
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 3) return 'Online';
+  if (min < 60) return `zuletzt online vor ${min} Min.`;
+  const std = Math.floor(min / 60);
+  if (std < 24) return `zuletzt online vor ${std} Std.`;
+  const tage = Math.floor(std / 24);
+  if (tage === 1) return 'zuletzt online gestern';
+  if (tage < 7) return `zuletzt online vor ${tage} Tagen`;
+  return 'zuletzt online vor längerer Zeit';
+}
+
+/**
+ * Darf ich die Inhalte dieser Person auf mein Gerät holen?
+ *
+ * Die „Downloadeinstellungen" standen seit dem 01.09.2026 in den
+ * Einstellungen und wurden nie gefragt — es gab überhaupt keinen Weg, einen
+ * fremden Inhalt zu sichern, also auch nichts zu erlauben.
+ *
+ * Was das nicht kann: ein Bildschirmfoto verhindern. Wer etwas sehen darf,
+ * hat es geladen. Die Einstellung nimmt den Knopf weg, mehr verspricht sie
+ * nicht — deshalb steht sie in der Datenbank auch als Funktion und nicht als
+ * Regel.
+ */
+export async function darfHerunterladen(
+  client: SupabaseClient,
+  inhaberId: string,
+  ichId: string
+): Promise<boolean> {
+  if (!inhaberId || inhaberId === ichId) return true;
+  const { data, error } = await client.rpc('darf_herunterladen', {
+    inhaber: inhaberId,
+    wer: ichId,
+  });
+  // Im Zweifel nein: ein Knopf, der bei einer Stoerung erscheint, waere
+  // genau der Fall, den die Einstellung ausschliessen soll.
+  if (error) return false;
+  return data === true;
+}
+
+/**
+ * Darf ich dieser Person überhaupt schreiben?
+ *
+ * Der Sichtbarkeitsbereich `dm` — „Nachrichten senden deaktivieren" aus dem
+ * Handbuch. Seit Schema 19 lehnt die Datenbank die Nachricht ab; der Chat
+ * entstand trotzdem, und in der Liste der angeschriebenen Person stand ein
+ * leerer Eintrag. Seit Schema 22 sperrt die Regel schon das Eintragen als
+ * Mitglied — diese Funktion ist die Auskunft davor, damit der Knopf gar nicht
+ * erst erscheint.
+ *
+ * Gegenstueck auf der Website: GET /api/dm-erlaubt/:userId.
+ */
+export async function darfAngeschriebenWerden(
+  client: SupabaseClient,
+  zielId: string,
+  ichId: string
+): Promise<boolean> {
+  if (!zielId || zielId === ichId) return true;
+  const { data, error } = await client.rpc('darf_angeschrieben_werden', {
+    inhaber: zielId,
+    wer: ichId,
+  });
+  // Im Zweifel nein — dieselbe Richtung wie oben. Ein Eingabefeld, das bei
+  // einer Stoerung aufgeht, fuehrt genau in die abgewiesene Nachricht.
+  if (error) return false;
+  return data === true;
+}
+
+// -------------------------------------------------------- Markierungen --
+//
+// „Wer darf mich markieren" stand in den Einstellungen, und der Reiter
+// „Markiert" stand im Profil. Dazwischen war nichts: keine Tabelle, kein
+// Weg, jemanden zu markieren, und folglich ein Reiter, der bei jedem
+// Menschen leer war. Zwei Anzeigen, die zusammen so aussahen, als gaebe es
+// die Funktion.
+
+/** Die @-Namen aus einem Text, ohne das Zeichen und ohne Doppelte. */
+export function erwaehnungen(text: string): string[] {
+  const treffer = String(text || '').match(/@[A-Za-z0-9_.]{2,30}/g) || [];
+  return [...new Set(treffer.map((t) => t.slice(1).toLowerCase()))];
+}
+
+/**
+ * Markiert die in der Beschreibung erwähnten Personen.
+ *
+ * Warum aus dem Text und nicht über eine eigene Auswahl: die @-Markierung
+ * gibt es in der Beschreibung längst, sie steht so auch im Handbuch, und ein
+ * zweiter Weg zum selben Ziel wäre genau der Fehler, den Henrik am
+ * Standort-Blatt beanstandet hat — zwei Orte, dieselbe Sache.
+ *
+ * Jede Markierung wird einzeln eingetragen. Wer sie nicht zulässt, lehnt sie
+ * über die Regel ab; das darf die übrigen nicht mitreißen. Und es wird
+ * absichtlich **nicht** gemeldet, wer abgelehnt hat: „X lässt sich nicht
+ * markieren" wäre selbst die Auskunft, die die Einstellung verhindern soll.
+ *
+ * Gibt die Namen zurück, die wirklich angekommen sind.
+ */
+export async function markierungenSetzen(
+  client: SupabaseClient,
+  beitragId: string,
+  beschreibung: string
+): Promise<string[]> {
+  const namen = erwaehnungen(beschreibung);
+  if (namen.length === 0) return [];
+
+  const { data: profile } = await client
+    .from('profiles')
+    .select('id, name, handle')
+    .in('handle', namen.map((n) => '@' + n));
+
+  const gesetzt: string[] = [];
+  for (const p of (profile ?? []) as { id: string; name: string }[]) {
+    const { error } = await client
+      .from('post_tags')
+      .insert({ post_id: beitragId, user_id: p.id });
+    if (!error) gesetzt.push(p.name);
+  }
+  return gesetzt;
+}
+
+/**
+ * Eine Kachel im Profilraster — für alle drei Reiter dieselbe Form.
+ */
+export interface Rasterkachel {
+  id: string;
+  kind: string;
+  mediaUrl: string | null;
+  thumbnail: string | null;
+}
+
+/** Aus einer `posts`-Zeile eine Kachel machen. */
+function kachel(b: any): Rasterkachel {
+  return {
+    id: b.id,
+    kind: b.kind,
+    mediaUrl: b.media_url ?? null,
+    thumbnail: b.thumbnail_url ?? null,
+  };
+}
+
+/**
+ * Die Beiträge einer Person — der erste Reiter im Profil.
+ *
+ * Bis zum 03.09.2026 zeichnete `UserProfileScreen` hier zwölf feste Kacheln
+ * aus einer Konstanten: bei jedem Menschen dieselben zwölf, unabhängig davon,
+ * ob er drei Beiträge hatte oder keinen. Darüber stand gleichzeitig die
+ * echte Zahl aus `profile_zahlen` — die Anzeige widersprach sich also selbst.
+ *
+ * `publish_at` in der Zukunft bleibt draußen; sonst zeigte das fremde Profil
+ * einen Beitrag, den „später posten" gerade zurückhält.
+ */
+export async function beitraegeVon(
+  client: SupabaseClient,
+  profilId: string
+): Promise<Rasterkachel[]> {
+  const { data, error } = await client
+    .from('posts')
+    .select('id, kind, media_url, thumbnail_url, created_at')
+    .eq('user_id', profilId)
+    .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  // Fund 4: Kachelbilder brauchen unterschriebene Adressen (lib/medien.ts).
+  return signiereMedien(client, ((data ?? []) as any[]).map(kachel));
+}
+
+/**
+ * Was eine Person repostet hat — der Reiter „Reposts".
+ *
+ * Die Repost-Sichtbarkeit steckt nicht hier, sondern als Leseregel auf
+ * `reposts` (Schema 20). Wer seine Reposts verbirgt, liefert hier schlicht
+ * keine Zeilen — der Reiter ist dann leer, ohne dass die Oberfläche etwas
+ * über die Einstellung verrät.
+ */
+export async function repostsVon(
+  client: SupabaseClient,
+  profilId: string
+): Promise<Rasterkachel[]> {
+  const { data, error } = await client
+    .from('reposts')
+    .select('post_id, created_at, posts!post_id(id, kind, media_url, thumbnail_url)')
+    .eq('user_id', profilId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  // Fund 4: Kachelbilder brauchen unterschriebene Adressen (lib/medien.ts).
+  return signiereMedien(
+    client,
+    ((data ?? []) as any[])
+      .map((z) => z.posts)
+      .filter(Boolean)
+      .map(kachel)
+  );
+}
+
+/** Die Beiträge, in denen jemand markiert wurde — der Reiter „Markiert". */
+export async function markierteBeitraege(
+  client: SupabaseClient,
+  profilId: string
+): Promise<Rasterkachel[]> {
+  const { data, error } = await client
+    .from('post_tags')
+    .select('post_id, created_at, posts!post_id(id, kind, media_url, thumbnail_url)')
+    .eq('user_id', profilId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  // Fund 4: Kachelbilder brauchen unterschriebene Adressen (lib/medien.ts).
+  return signiereMedien(
+    client,
+    ((data ?? []) as any[])
+      .map((z) => z.posts)
+      .filter(Boolean)
+      .map(kachel)
+  );
 }

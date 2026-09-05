@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -13,6 +13,9 @@ import { useReposts } from '../../contexts/RepostContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { oeffneLink } from '../../lib/links';
 import { useKachelHoehe } from '../../lib/raster';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { AuthContext } from '../../contexts/AuthContext';
+import * as Aktion from '../../lib/aktionen';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Tab = 'grid' | 'repost' | 'tagged' | 'saved';
@@ -52,6 +55,57 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
     useProfil();
   const [tab, setTab] = useState<Tab>('grid');
   const me = alleProfile.me;
+
+  /*
+   * Der Reiter "Markiert" war bei jedem Menschen leer — nicht, weil niemand
+   * markiert war, sondern weil es Markierungen ueberhaupt nicht gab. Die
+   * Tabelle `post_tags` und die Einstellung "Wer darf mich markieren"
+   * stehen seit dem 03.09.2026; markiert wird ueber die @-Namen in der
+   * Beschreibung eines Beitrags.
+   */
+  const { supabase } = useSupabase();
+  const { user } = useContext(AuthContext);
+  const [markiert, setMarkiert] = useState<Aktion.Rasterkachel[]>([]);
+
+  useEffect(() => {
+    if (!supabase || !user?.id || tab !== 'tagged') return;
+    let abgebrochen = false;
+    Aktion.markierteBeitraege(supabase, user.id)
+      .then((liste) => {
+        if (!abgebrochen) setMarkiert(liste);
+      })
+      .catch((e) => console.error('Markierungen laden fehlgeschlagen:', e?.message ?? e));
+    return () => {
+      abgebrochen = true;
+    };
+  }, [supabase, user?.id, tab]);
+
+  /*
+   * Die eigenen Reposts — aus der Datenbank, nicht aus dem Sitzungsspeicher.
+   *
+   * `RepostContext` haelt nur fest, was man in DIESER Sitzung umgeschaltet
+   * hat. Nach dem Neustart der App war der Reiter darum wieder leer, waehrend
+   * die Website an derselben Stelle ueber `/api/reposts` die echten Zeilen
+   * zeigte — derselbe Bildschirm, zwei verschiedene Antworten.
+   *
+   * Der Kontext bleibt trotzdem: er faerbt den Knopf im Feed sofort. Er steht
+   * hier nur in der Abhaengigkeitsliste, damit ein Umschalten den Reiter
+   * nachzieht.
+   */
+  const [meineReposts, setMeineReposts] = useState<Aktion.Rasterkachel[]>([]);
+
+  useEffect(() => {
+    if (!supabase || !user?.id || tab !== 'repost') return;
+    let abgebrochen = false;
+    Aktion.repostsVon(supabase, user.id)
+      .then((liste) => {
+        if (!abgebrochen) setMeineReposts(liste);
+      })
+      .catch((e) => console.error('Reposts laden fehlgeschlagen:', e?.message ?? e));
+    return () => {
+      abgebrochen = true;
+    };
+  }, [supabase, user?.id, tab, reposts]);
 
   /*
    * Solange die Daten laden, gibt es das eigene Profil noch nicht.
@@ -173,15 +227,17 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
               </Druck>
             ))}
           </View>
-        ) : tab === 'repost' && reposts.length > 0 ? (
+        ) : tab === 'repost' && meineReposts.length > 0 ? (
           // Der Reiter war immer leer. Jetzt stehen hier die Beitraege und
-          // Videos, die man selbst repostet hat.
+          // Videos, die man selbst repostet hat — und zwar die aus der
+          // Datenbank, nicht nur die dieser Sitzung.
           <View style={styles.grid}>
-            {reposts.map((r) => (
-              <Druck key={`${r.art}-${r.id}`} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice(`Repost: ${r.id}`)}>
+            {meineReposts.map((r) => (
+              <Druck key={r.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice(`Repost: ${r.id}`)}>
                 <Motiv
-                  id={`${r.art}-${r.id}`}
-                  icon={r.art === 'video' ? 'play-outline' : 'image-outline'}
+                  id={r.id}
+                  bild={r.thumbnail ?? r.mediaUrl ?? undefined}
+                  icon={r.kind === 'post' ? 'image-outline' : 'play-outline'}
                   iconSize={20}
                   style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
                 />
@@ -191,14 +247,43 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
               </Druck>
             ))}
           </View>
+        ) : tab === 'tagged' && markiert.length > 0 ? (
+          <View style={styles.grid}>
+            {markiert.map((m) => (
+              <Druck
+                key={m.id}
+                style={[styles.gridItem, { height: kachelHoehe }]}
+                onPress={() => onNotice(`Markiert in: ${m.id}`)}
+              >
+                <Motiv
+                  id={m.id}
+                  bild={m.thumbnail ?? m.mediaUrl ?? undefined}
+                  icon={m.kind === 'post' ? 'image-outline' : 'play-outline'}
+                  iconSize={20}
+                  style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+                />
+                <View style={styles.repostMarke}>
+                  <Ionicons name="person" size={12} color={colors.white} />
+                </View>
+              </Druck>
+            ))}
+          </View>
         ) : (
           <EmptyState
             icon={TABS.find((t) => t.key === tab)!.icon}
-            title={tab === 'repost' ? 'Noch nichts repostet' : 'Noch nichts hier'}
+            title={
+              tab === 'repost'
+                ? 'Noch nichts repostet'
+                : tab === 'tagged'
+                  ? 'Keine Markierungen'
+                  : 'Noch nichts hier'
+            }
             text={
               tab === 'repost'
                 ? 'Tippe im Feed auf den Repost-Knopf, dann erscheint es hier.'
-                : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
+                : tab === 'tagged'
+                  ? 'Wer dich mit @ in einer Beschreibung nennt, markiert dich — dann steht der Beitrag hier.'
+                  : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
             }
           />
         )}

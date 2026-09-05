@@ -77,14 +77,51 @@ interface Props {
   eigenerStandort?: { lat: number; lng: number } | null;
 }
 
+/*
+ * Eine Farbe aus den Daten, bevor sie in die Karte geht. Dieselbe Ueberlegung
+ * wie in web/public/app.js: `profiles.color` darf jeder fuer sich selbst frei
+ * setzen, also darf hier nur durch, was wirklich eine Farbe ist.
+ */
+const FARBE_STANDARD = '#007AFF';
+function farbePruefen(wert?: string | null): string {
+  const text = String(wert ?? '').trim();
+  if (!text || text.length > 200) return FARBE_STANDARD;
+  if (/[<>"'`;\\]/.test(text)) return FARBE_STANDARD;
+  if (/^#[0-9a-f]{3,8}$/i.test(text)) return text;
+  if (/^rgba?\(\s*[0-9.\s%,/]+\)$/i.test(text)) return text;
+  if (/^(linear|radial)-gradient\(\s*[#0-9a-z.,()%\s-]+\)$/i.test(text)) return text;
+  return FARBE_STANDARD;
+}
+
+/*
+ * Werte in das Skript der WebView geben — als Daten, nicht als Quelltext.
+ *
+ * WARUM: Bis zum 03.09.2026 wurden die Nadeln hier als JavaScript-Text
+ * zusammengesetzt (`name: '${p.name}'`). Ein einziger Apostroph im Namen
+ * eines Kontakts brach aus dem String aus, und alles danach lief als Code in
+ * der WebView — die ueber `window.ReactNativeWebView.postMessage` in die App
+ * hineinreicht und in deren Skript die Standorte aller Kartenkontakte des
+ * Opfers stehen.
+ *
+ * JSON.stringify erzeugt gueltige Daten. Das `<` wird zusaetzlich maskiert,
+ * weil ein `</script>` im Wert sonst den Block beenden wuerde — JSON allein
+ * schuetzt davor nicht.
+ */
+const alsDaten = (wert: unknown): string =>
+  JSON.stringify(wert).replace(/</g, '\\u003c').replace(/\u2028|\u2029/g, m =>
+    m === '\u2028' ? '\\u2028' : '\\u2029'
+  );
+
 const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
-  const pinJsons = pins
-    .map(
-      p =>
-        `{ id: '${p.id}', name: '${p.name}', lat: ${p.lat}, lng: ${p.lng}, ` +
-        `farbe: '${p.farbe || '#007AFF'}' }`
-    )
-    .join(',');
+  const pinDaten = alsDaten(
+    pins.map(p => ({
+      id: String(p.id ?? ''),
+      name: String(p.name ?? ''),
+      lat: Number(p.lat),
+      lng: Number(p.lng),
+      farbe: farbePruefen(p.farbe),
+    }))
+  );
   const stil = KARTEN_STILE[0];
 
   return `
@@ -117,8 +154,19 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
 <body>
   <div id="map"></div>
   <script>
-    const pins = [${pinJsons}];
-    const aktivId = '${aktivId || ''}';
+    const pins = ${pinDaten};
+    const aktivId = ${alsDaten(aktivId || '')};
+
+    /*
+     * Text bleibt Text. Popup und Tooltip von Leaflet nehmen auch HTML
+     * entgegen; ein Name wie <img src=x onerror=...> wuerde dort ausgefuehrt.
+     * Darum immer ueber ein Element mit textContent.
+     */
+    function textKnoten(text) {
+      const el = document.createElement('span');
+      el.textContent = String(text == null ? '' : text);
+      return el;
+    }
 
     const map = L.map('map', { zoomControl: false }).setView([51.5, 10], 4);
 
@@ -181,7 +229,7 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
         opacity: 1,
         fillOpacity: 1
       })
-        .bindPopup(pin.name)
+        .bindPopup(textKnoten(pin.name))
         .addTo(map);
 
       // Label über dem Marker anzeigen wenn aktiv
@@ -192,7 +240,7 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
           offset: [0, -20],
           className: 'pin-label'
         });
-        label.setContent(pin.name);
+        label.setContent(textKnoten(pin.name));
         marker.bindTooltip(label);
       }
 
@@ -202,17 +250,17 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
         const updateLabel = () => {
           const zoom = map.getZoom();
           if (zoom < 10) {
+            // Auch hier kein zusammengesetztes HTML: die Initialen kommen aus
+            // dem Namen und gehen deshalb ueber textContent hinein.
+            const knopf = document.createElement('div');
+            knopf.setAttribute('style',
+              'width:32px;height:32px;display:flex;align-items:center;' +
+              'justify-content:center;border:2.5px solid white;' +
+              'border-radius:50%;color:white;font-size:10px;font-weight:700');
+            knopf.style.backgroundColor = pin.farbe;
+            knopf.textContent = initials;
             this.setIcon(L.divIcon({
-              html: \`<div style="
-                width: 32px; height: 32px;
-                display: flex; align-items: center; justify-content: center;
-                background-color: \${pin.farbe};
-                border: 2.5px solid white;
-                border-radius: 50%;
-                color: white;
-                font-size: 10px;
-                font-weight: 700;
-              ">\${initials}</div>\`,
+              html: knopf,
               iconSize: [32, 32],
               className: 'pin-initials'
             }));

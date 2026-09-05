@@ -16,6 +16,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { signiereMedien } from './medien';
 import {
   Chat,
   Clip,
@@ -43,8 +44,20 @@ import {
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
 export const ICH = 'me';
 
+/*
+ * Sicherheitspruefung 04.09.2026 (Fund 1): `phone` steht hier NICHT mehr.
+ *
+ * Diese Liste laedt die Profile in einem Rutsch. Solange `phone` darin stand,
+ * war jeder App-Start ein vollstaendiger Abzug aller Telefonnummern. Die
+ * Datenbank gibt die Spalte inzwischen gar nicht mehr heraus
+ * (SUPABASE_SCHEMA_23_audit.sql entzieht `authenticated` das Leserecht) —
+ * eine Abfrage mit `phone` darin wuerde jetzt mit einem Fehler abbrechen.
+ *
+ * Die eigene Nummer kommt aus `mein_profil()`, die der Kontakte aus
+ * `meine_kontaktnummern()`, und nur bei beidseitiger Kontaktschaft.
+ */
 const PROFIL_SPALTEN =
-  'id, name, handle, initials, color, phone, privat, about, bio, link, status,' +
+  'id, name, handle, initials, color, privat, about, bio, link, status,' +
   ' highlights, playlists, spende, live, followers_basis, following_basis, beitraege_basis';
 
 const BEITRAG_SPALTEN =
@@ -124,11 +137,18 @@ export async function ladeNutzer(
   client: SupabaseClient,
   ichId: string
 ): Promise<{ users: Record<string, User>; profile: Record<string, Profile> }> {
-  const [{ data, error }, { data: zahlen }] = await Promise.all([
+  // Fund 1: die Nummern kommen getrennt — die eigene aus `mein_profil()`, die
+  // der Kontakte aus `meine_kontaktnummern()` (nur beidseitige Kontakte).
+  const [{ data, error }, { data: zahlen }, { data: ich }, { data: nummern }] = await Promise.all([
     client.from('profiles').select(PROFIL_SPALTEN).limit(500),
     client.from('profile_zahlen').select('id, followers, following, beitraege'),
+    client.rpc('mein_profil'),
+    client.rpc('meine_kontaktnummern'),
   ]);
   if (error) throw error;
+
+  const nummerVon = (id: string): string | undefined =>
+    (id === ichId ? (ich as any)?.phone : (nummern as any)?.[id]) || undefined;
 
   const zahlenNach = new Map((zahlen ?? []).map((z: any) => [z.id, z]));
   const users: Record<string, User> = {};
@@ -144,7 +164,7 @@ export async function ladeNutzer(
       handle: zeile.handle,
       status: zeile.status ?? 'offline',
       about: zeile.about ?? '',
-      phone: zeile.phone ?? undefined,
+      phone: nummerVon(zeile.id),
       color: zeile.color ?? undefined,
     };
 
@@ -205,16 +225,24 @@ export async function ladeFolgeListe(
 export async function ladeKontakte(client: SupabaseClient, ichId: string): Promise<Contact[]> {
   const { data, error } = await client
     .from('contacts')
-    .select('contact_id, status, is_favorite, profiles!contacts_contact_id_fkey(name, about, phone)')
+    .select('contact_id, status, is_favorite, profiles!contacts_contact_id_fkey(name, about)')
     .eq('user_id', ichId);
   if (error) throw error;
+
+  /*
+   * Fund 1: `phone` laesst sich hier nicht mehr mitlesen — die Einbettung
+   * greift auf `profiles` zu, und die Spalte ist fuer `authenticated`
+   * gesperrt. Die Nummern kommen aus `meine_kontaktnummern()`, das nur die
+   * beidseitigen Kontakte herausgibt.
+   */
+  const { data: nummern } = await client.rpc('meine_kontaktnummern');
 
   return (data ?? []).map((k: any) => ({
     id: k.contact_id,
     name: k.profiles?.name ?? '',
     status: k.status,
     about: k.profiles?.about ?? '',
-    phone: k.profiles?.phone ?? undefined,
+    phone: (nummern ?? {})[k.contact_id] ?? undefined,
   }));
 }
 
@@ -269,6 +297,23 @@ export async function ladeKartenpunkte(
 // Chats
 // ============================================================================
 
+/**
+ * Der Anfragezustand aus der Sicht des Lesenden.
+ *
+ * Dieselbe Umrechnung steht in web/server/supabase-api.js. Wer eine aendert,
+ * aendert beide — sonst sperrt die eine Oberflaeche das Eingabefeld und die
+ * andere nicht.
+ */
+export function anfrageZustand(
+  chat: { anfrage_zustand?: string | null; anfrage_von?: string | null },
+  ichId: string
+): 'pending' | 'accepted' | 'incoming' | 'declined' {
+  const zustand = chat.anfrage_zustand ?? 'offen';
+  if (zustand === 'wartet') return chat.anfrage_von === ichId ? 'pending' : 'incoming';
+  if (zustand === 'abgelehnt' && chat.anfrage_von === ichId) return 'declined';
+  return 'accepted';
+}
+
 export async function ladeChats(
   client: SupabaseClient,
   ichId: string,
@@ -278,7 +323,7 @@ export async function ladeChats(
     .from('chat_members')
     .select(
       'chat_id, is_archived, is_muted, is_read, is_favorite, is_locked, notifications_off, geleert_bis,' +
-        ' chats(id, name, is_group, bereich, created_at, updated_at)'
+        ' chats(id, name, is_group, bereich, created_at, updated_at, anfrage_zustand, anfrage_von)'
     )
     .eq('user_id', ichId);
   if (error) throw error;
@@ -300,17 +345,13 @@ export async function ladeChats(
         .order('created_at', { ascending: false })
         .limit(500),
       client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
-      // Offene Kontaktanfragen sperren das Eingabefeld bis zur Annahme.
-      // Gleiche Regel wie in web/server/supabase-api.js.
       client.from('contacts').select('contact_id, status').eq('user_id', ichId),
     ]);
   if (fN) throw fN;
   if (fM) throw fM;
   if (fK) throw fK;
 
-  const offeneAnfrage = new Set(
-    ((kontakte ?? []) as any[]).filter((k) => k.status === 'pending').map((k) => k.contact_id)
-  );
+  void kontakte; // Der Anfragezustand steht seit dem 03.09.2026 am Chat.
 
   // Ein geleerter Chat zeigt auch in der Liste keine Vorschau von vorher.
   // Gleiche Regel wie in web/server/supabase-api.js.
@@ -340,7 +381,7 @@ export async function ladeChats(
         id: z.chats.id,
         name: z.chats.name,
         userId: gegenueber,
-        requestState: gegenueber && offeneAnfrage.has(gegenueber) ? 'pending' : 'accepted',
+        requestState: anfrageZustand(z.chats, ichId),
         isGroup: Boolean(z.chats.is_group),
         memberIds: z.chats.is_group ? andere : undefined,
         preview: vorschau?.text ?? '',
@@ -450,7 +491,8 @@ export async function ladeNachrichten(
     });
   }
 
-  return zeilen.map((n: any) => ({
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, zeilen.map((n: any) => ({
     id: n.id,
     chatId: n.chat_id,
     senderId: n.sender_id === ichId ? ICH : n.sender_id,
@@ -494,7 +536,7 @@ export async function ladeNachrichten(
     zurueckgenommen: Boolean(n.deleted_at),
     reaktionen: reaktionen.get(n.id),
     datei: n.file_name ? { name: n.file_name, groesse: Number(n.file_size ?? 0) } : undefined,
-  }));
+  })));
 }
 
 // ============================================================================
@@ -554,7 +596,8 @@ export async function ladeStorys(client: SupabaseClient, ichId: string): Promise
     } as Story);
   }
 
-  return [...eigene, ...fremde];
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, [...eigene, ...fremde]);
 }
 
 // ============================================================================
@@ -581,6 +624,7 @@ interface RohBeitrag {
   comments: number;
   shares: number;
   liked: boolean;
+  likedBy: string;
   saved: boolean;
   reposted: boolean;
   notify: boolean;
@@ -627,6 +671,23 @@ export async function ladeBeitraege(
           client.from('post_notify').select('post_id').eq('user_id', ichId).in('post_id', ids),
         ]);
 
+  /*
+   * Der Name unter dem Beitrag — "Gefaellt Anna und 14 weiteren Personen".
+   * Hier stand bis zum 03.09.2026 fest `likedBy: ''`, also nie ein Name.
+   *
+   * Er kommt aus `liker_namen()` und nicht aus post_likes, weil er der
+   * Likes-Sichtbarkeit des Likenden unterliegt. Die Zahl bleibt unberuehrt:
+   * sie gehoert dem Beitrag, der Name dem Menschen.
+   */
+  const likerNamen = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: namen } = await client.rpc('liker_namen', {
+      beitraege: ids,
+      wer: ichId,
+    });
+    for (const z of (namen ?? []) as any[]) if (z.name) likerNamen.set(z.post_id, z.name);
+  }
+
   const gemocht = new Set((likes ?? []).map((l: any) => l.post_id));
   const gemerkt = new Set((gespeichert ?? []).map((s: any) => s.post_id));
   const repostet = new Set((geteilt ?? []).map((r: any) => r.post_id));
@@ -656,6 +717,7 @@ export async function ladeBeitraege(
     // auf der Website hochging (web/server/supabase-api.js zaehlt beides).
     shares: Number(b.shares_basis ?? 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
+    likedBy: likerNamen.get(b.id) ?? '',
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),
     notify: benachrichtigt.has(b.id),
@@ -663,7 +725,8 @@ export async function ladeBeitraege(
     standbild: b.thumbnail_url ?? undefined,
   }));
 
-  return {
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, {
     posts: roh
       .filter((b) => b.kind === 'post')
       .map((b) => ({
@@ -672,7 +735,7 @@ export async function ladeBeitraege(
         location: b.location,
         music: b.music,
         description: b.description,
-        likedBy: '',
+        likedBy: b.likedBy,
         likes: b.likes,
         comments: b.comments,
         liked: b.liked,
@@ -729,7 +792,7 @@ export async function ladeBeitraege(
         mediaUri: b.mediaUri,
         standbild: b.standbild,
       })),
-  };
+  });
 }
 
 export async function ladeKommentare(
@@ -785,7 +848,8 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine ?? []).filter((m: any) => m.is_muted).map((m: any) => m.community_id));
 
-  return (data ?? []).map((c: any) => ({
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, (data ?? []).map((c: any) => ({
     id: c.id,
     name: c.name,
     topic: c.topic ?? '',
@@ -802,7 +866,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     unterthemen: (c.community_channels ?? [])
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
       .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [] })),
-  }));
+  })));
 }
 
 export async function ladeKanalNachrichten(
@@ -810,21 +874,53 @@ export async function ladeKanalNachrichten(
   ichId: string,
   kanalId: string
 ): Promise<Message[]> {
+  /*
+   * Die Anhang-Spalten kamen am 04.09.2026 dazu (Schema 25). Die Einbettung
+   * von Standort und Kontakt laeuft ueber die SPALTE (`places!place_id`),
+   * nicht ueber den Namen des Fremdschluessels: ein umbenannter Constraint
+   * waere sonst ein stiller Ausfall der ganzen Kanalansicht.
+   */
   const { data, error } = await client
     .from('community_channel_messages')
-    .select('id, channel_id, sender_id, text, created_at')
+    .select(
+      'id, channel_id, sender_id, text, created_at,' +
+        ' media_url, media_type, file_name, file_size,' +
+        ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
+        ' contact_user_id, profiles!contact_user_id(id, name, handle)'
+    )
     .eq('channel_id', kanalId)
     .order('created_at', { ascending: true })
     .limit(500);
   if (error) throw error;
 
-  return (data ?? []).map((m: any) => ({
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, (data ?? []).map((m: any) => ({
     id: m.id,
     chatId: m.channel_id,
     senderId: m.sender_id === ichId ? ICH : m.sender_id,
-    text: m.text,
+    text: m.text ?? '',
     time: chatZeit(m.created_at),
-  }));
+    media: m.media_type ?? undefined,
+    // `bildUri`, nicht `mediaUrl`: so heisst das Feld in types/index.ts, und
+    // die Blase liest genau dieses (ChatDetailScreen.tsx:424).
+    bildUri: m.media_url ?? undefined,
+    // Gleiche Abbildung wie in ladeNachrichten — dieselbe Blase, dieselben
+    // Felder. Weichen sie ab, zeigt der Kanal denselben Anhang anders als
+    // der Chat.
+    standort: m.places
+      ? {
+          name: m.places.name,
+          adresse: m.places.adresse ?? '',
+          koordinaten: m.places.koordinaten ?? '',
+          x: Number(m.places.x ?? 50),
+          y: Number(m.places.y ?? 50),
+        }
+      : undefined,
+    kontakt: m.profiles
+      ? { id: m.profiles.id, name: m.profiles.name, handle: m.profiles.handle }
+      : undefined,
+    datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size ?? 0) } : undefined,
+  })));
 }
 
 // ============================================================================
@@ -1007,7 +1103,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
 
   const alleChats = chats as (Chat & { archiviert?: boolean })[];
 
-  return {
+  const alles: AlleDaten = {
     users,
     profile,
     contacts,
@@ -1041,6 +1137,15 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     ichId,
     geladen: new Date().toISOString(),
   };
+
+  /*
+   * Fund 4 (Sicherheitspruefung 04.09.2026): der Medieneimer ist nicht mehr
+   * oeffentlich. Hier, an der Stelle, an der alles zusammenlaeuft, werden
+   * saemtliche Adressen gegen unterschriebene getauscht. Die Einzellader
+   * unten machen dasselbe fuer sich — der Aufruf ist wiederholbar, eine
+   * bereits unterschriebene Adresse wird nicht noch einmal angefasst.
+   */
+  return signiereMedien(client, alles);
 }
 
 // ============================================================================
@@ -1128,7 +1233,8 @@ export async function ladeInsights(
   if (error) throw error;
 
   const jetzt = Date.now();
-  return ((data ?? []) as any[])
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, ((data ?? []) as any[])
     .filter((z) => z.insights)
     .filter((z) => !z.insights.ablauf_at || new Date(z.insights.ablauf_at).getTime() > jetzt)
     .filter((z) => !(z.insights.einmal && z.gesehen_at))
@@ -1143,7 +1249,7 @@ export async function ladeInsights(
       gespeichert: z.insights.gespeichert,
       zeit: zeitText(z.insights.created_at),
       gesehen: Boolean(z.gesehen_at),
-    }));
+    })));
 }
 
 /**
@@ -1358,13 +1464,14 @@ export async function ladeStreamKommentare(client: SupabaseClient, postId: strin
     .limit(200);
   if (error) throw error;
 
-  return ((data ?? []) as any[]).map((k) => ({
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, ((data ?? []) as any[]).map((k) => ({
     id: k.id,
     userId: k.user_id,
     name: k.profiles?.name ?? '',
     text: k.text,
     zeit: chatZeit(k.created_at),
-  }));
+  })));
 }
 
 /** Push-to-Talk-Nachrichten einer Community, neueste zuerst. */
@@ -1377,7 +1484,8 @@ export async function ladePtt(client: SupabaseClient, communityId: string) {
     .limit(50);
   if (error) throw error;
 
-  return ((data ?? []) as any[]).map((p) => ({
+  // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
+  return signiereMedien(client, ((data ?? []) as any[]).map((p) => ({
     id: p.id,
     userId: p.sender_id,
     name: p.profiles?.name ?? '',
@@ -1385,7 +1493,7 @@ export async function ladePtt(client: SupabaseClient, communityId: string) {
     dauer: p.dauer ?? 0,
     kanalId: p.channel_id,
     zeit: chatZeit(p.created_at),
-  }));
+  })));
 }
 
 /** Offene Standortanfragen in einem Chat. */

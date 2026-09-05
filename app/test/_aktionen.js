@@ -20,6 +20,7 @@
  */
 
 const { chromium } = require('playwright-core');
+const { zusammengelegt } = require('./_modulquelle');
 const { anmelden, MAIL, zuruecksetzen } = require('./_konto');
 const K = require('./_kennungen');
 
@@ -34,7 +35,23 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 (async () => {
   const browser = await chromium.launch();
-  const seite = await browser.newPage({ viewport: { width: 400, height: 860 } });
+  /*
+   * `bypassCSP` — seit der Sicherheitspruefung vom 04.09.2026 noetig.
+   *
+   * Die Website liefert jetzt eine Content-Security-Policy aus, und die
+   * erlaubt Skripte nur aus /public sowie von zwei namentlich genannten
+   * Quellen. Dieser Prueflauf laedt aber Quelltext aus aktionen.ts ueber eine
+   * `blob:`-Adresse in die Seite — genau das verbietet die Regel, und zwar
+   * zu Recht: `blob:` im Skript-Verzeichnis ist einer der ueblichen Wege,
+   * ueber die aus einem XSS ein ausgefuehrtes Skript wird.
+   *
+   * Die Regel deswegen aufzuweichen waere der falsche Tausch — dann waere die
+   * Luecke in der echten Seite offen, damit ein Prueflauf laeuft. Stattdessen
+   * schaltet nur dieser Browser die Durchsetzung ab. Ob die Regel im Betrieb
+   * stimmt, prueft `_ansehen.js`/`smoke.js` weiterhin gegen die echte Seite:
+   * dort faellt ein CSP-Fehler als Konsolenfehler auf.
+   */
+  const seite = await browser.newPage({ viewport: { width: 400, height: 860 }, bypassCSP: true });
 
   const browserFehler = [];
   seite.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
@@ -87,7 +104,8 @@ const pruefe = (name, wahr, zusatz = '') => {
     await browser.close();
     process.exit(1);
   }
-  const quelltext = fs.readFileSync(datei, 'utf8');
+  // Mit medien.js verschmelzen — sonst scheitert der Import im blob-Modul.
+  const quelltext = zusammengelegt(bauOrdner, 'aktionen.js');
   fs.rmSync(bauOrdner, { recursive: true, force: true });
 
   /*
@@ -119,7 +137,7 @@ const pruefe = (name, wahr, zusatz = '') => {
     await browser.close();
     process.exit(1);
   }
-  const quelltextD = fs.readFileSync(dateiD, 'utf8');
+  const quelltextD = zusammengelegt(bauOrdnerD, 'daten.js');
   fs.rmSync(bauOrdnerD, { recursive: true, force: true });
 
   /** Führt eine Funktion aus daten.ts im Browser aus. */
@@ -592,22 +610,29 @@ const pruefe = (name, wahr, zusatz = '') => {
       frei
     );
 
-    // Und annehmen: aus "pending" wird "friend".
-    await app('anfrageAnnehmen', frei);
-    const nachAnnahme = await seite.evaluate(
-      async (id) => {
-        const boot = await (await fetch('/api/bootstrap')).json();
-        return (boot.contacts || []).find((c) => c.id === id) || null;
-      },
-      frei
-    );
+    /*
+     * Hier stand bis zum 03.09.2026 `await app('anfrageAnnehmen', frei)` —
+     * und danach die Erwartung, der Status stehe auf "friend".
+     *
+     * Die Funktion gibt es nicht mehr, und der Prüflauf brach an dieser
+     * Stelle mit "window.__aktionen[name] is not a function" ab; alles
+     * danach lief gar nicht. Sie schrieb `contacts.status = 'friend'` in die
+     * Zeile des ABSENDERS: er nahm seine eigene Anfrage an. Genau das ist am
+     * 03.09.2026 abgeschafft worden.
+     *
+     * Über eine Anfrage entscheidet jetzt die angeschriebene Person, am Chat
+     * (`anfrageEntscheiden`). Mit einem Konto lässt sich das nicht prüfen —
+     * es steht mit zwei Konten in `_chatanfrage.js`. Hier bleibt, was hier
+     * wirklich zu prüfen ist: die Anfrage geht raus und steht als solche da.
+     */
+    const derChat = await chatAusWebsite(ergebnis.chatId);
 
     return (
       Boolean(ergebnis && ergebnis.chatId) &&
       ergebnis.status === 'pending' &&
       Boolean(nachAnfrage) &&
-      Boolean(nachAnnahme) &&
-      nachAnnahme.status === 'friend'
+      nachAnfrage.status === 'pending' &&
+      Boolean(derChat)
     );
   })());
 

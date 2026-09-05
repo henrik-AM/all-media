@@ -296,6 +296,20 @@ const Shell = () => {
         if (com) setOverlay({ kind: 'community', communityId: com.id, optionen: b === 'optionen' });
         break;
       }
+      /*
+       * Das Unterthema einer Community — "kanal:Design Systeme:Allgemein".
+       *
+       * Nachgetragen am 04.09.2026: dieser Bildschirm kam in keinem Pruefbild
+       * vor, obwohl er ein eigener Chat mit eigener Ablage ist. Genau dort
+       * fiel der Anhang bis heute lautlos durch (Schema 25), und kein Bild
+       * haette es gezeigt.
+       */
+      case 'kanal': {
+        const com = daten.communities.find((c) => c.id === a || c.name === a);
+        const ut = (com?.unterthemen ?? []).find((u) => u.id === b || u.name === b);
+        if (com && ut) oeffneUnterthema(com, ut);
+        break;
+      }
       case 'anruf': {
         const id = nutzerId(a);
         if (id) setOverlay({ kind: 'call', userId: id, art: b === 'video' ? 'video' : 'audio' });
@@ -557,6 +571,12 @@ const Shell = () => {
       preview: 'Anfrage gesendet',
       time: now(),
       unreadCount: 0,
+      /*
+       * Beim Anlegen des Chats setzt die Datenbank den Anfragezustand selbst
+       * (Schema 21). Bis der naechste Ladelauf ihn bringt, steht hier die
+       * Erwartung: wer nicht ohnehin schon Kontakt ist, hat gerade eine
+       * Anfrage gestellt.
+       */
       requestState: ergebnis.status === 'friend' ? 'accepted' : 'pending',
     };
     if (!vorhanden) setChats((prev) => [chat, ...prev]);
@@ -612,42 +632,51 @@ const Shell = () => {
     aktion.chatVerlassen(chat.id, () => setChats(vorher));
   };
 
-  /** Anfrage angenommen: der Chat ist ab jetzt frei benutzbar. */
-  const acceptRequest = (chatId: string) => {
-    /*
-     * Und in die Datenbank: `contacts.status` geht von "pending" auf
-     * "friend". Ohne das stand der Chat nach dem naechsten Start wieder
-     * gesperrt da, und auf der Website blieb die Anfrage offen.
-     */
-    const zielId = chats.find((c) => c.id === chatId)?.userId;
-    if (zielId) {
-      aktion.anfrageAnnehmen(zielId, () => {
-        setChats((prev) =>
-          prev.map((c) => (c.id === chatId ? { ...c, requestState: 'pending' as const } : c))
-        );
-        setContacts((prev) =>
-          prev.map((c) => (c.id === zielId ? { ...c, status: 'pending' as const } : c))
-        );
-      });
-    }
+  /**
+   * Über eine eingegangene Chat-Anfrage entscheiden.
+   *
+   * Hier stand bis zum 03.09.2026 `acceptRequest`, und die nahm die eigene
+   * Anfrage an: der Knopf saß im Chat des Absenders und hieß „Annahme
+   * simulieren". Jetzt entscheidet nur, wer angeschrieben wurde — die
+   * Datenbank lässt seit Schema 21 nichts anderes zu.
+   */
+  const anfrageEntscheiden = (chatId: string, annehmen: boolean) => {
+    const vorher = chats;
+    const neuerZustand = annehmen ? ('accepted' as const) : ('declined' as const);
 
     setChats((prev) =>
-      prev.map((c) => (c.id === chatId ? { ...c, requestState: 'accepted' as const } : c))
+      prev.map((c) => (c.id === chatId ? { ...c, requestState: neuerZustand } : c))
     );
     setOverlay((prev) =>
       prev?.kind === 'chat' && prev.chat.id === chatId
-        ? { ...prev, chat: { ...prev.chat, requestState: 'accepted' as const } }
+        ? { ...prev, chat: { ...prev.chat, requestState: neuerZustand } }
         : prev
     );
-    setContacts((prev) =>
-      prev.map((c) => {
-        const chat = chats.find((x) => x.id === chatId);
-        return chat && c.id === chat.userId
-          ? { ...c, status: 'friend' as const, about: 'Kontakt' }
-          : c;
-      })
-    );
-    setNotice('Anfrage angenommen');
+
+    aktion.anfrageEntscheiden(chatId, annehmen, () => {
+      // Ging es nicht durch, steht wieder da, was vorher galt. Sonst sähe
+      // die Oberfläche eine Annahme, die es in der Datenbank nicht gibt.
+      setChats(vorher);
+      setOverlay((prev) =>
+        prev?.kind === 'chat' && prev.chat.id === chatId
+          ? { ...prev, chat: vorher.find((c) => c.id === chatId) ?? prev.chat }
+          : prev
+      );
+    });
+
+    // Wer annimmt, hat die Person damit auch in den Kontakten.
+    if (annehmen) {
+      const chat = chats.find((x) => x.id === chatId);
+      if (chat?.userId) {
+        setContacts((prev) =>
+          prev.map((c) =>
+            c.id === chat.userId ? { ...c, status: 'friend' as const, about: 'Kontakt' } : c
+          )
+        );
+      }
+    }
+
+    setNotice(annehmen ? 'Anfrage angenommen' : 'Anfrage abgelehnt');
   };
 
   const befriend = (userId: string) => {
@@ -1099,7 +1128,7 @@ const Shell = () => {
         onCamera={() => setOverlay({ kind: 'camera', zielChat: overlay.chat })}
         onOpenProfile={openProfile}
         onOpenGroupSettings={(chatId) => setNotice(`Gruppeneinstellungen: ${overlay.chat.name}`)}
-        onAcceptRequest={acceptRequest}
+        onAnfrageEntscheiden={anfrageEntscheiden}
         contacts={contacts}
         onNotice={setNotice}
         onOpenStandort={(name) => {

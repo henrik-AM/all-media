@@ -20,6 +20,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { AlleDaten, ladeAlles } from '../lib/daten';
 import { AuthContext } from './AuthContext';
 import { useSupabase } from './SupabaseContext';
+import * as Aktion from '../lib/aktionen';
 
 const LEER: AlleDaten = {
   users: {},
@@ -106,6 +107,20 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     laden();
   }, [laden]);
+
+  /*
+   * "Ich bin da" — beim Start und danach alle zwei Minuten.
+   *
+   * Ohne diesen Vermerk bliebe `presence` leer, und "zuletzt online" waere
+   * eine Anzeige ohne Daten. Genau das war es bis zum 03.09.2026: im
+   * Chatkopf stand fest "Online".
+   */
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    Aktion.hierBinIch(supabase);
+    const uhr = setInterval(() => Aktion.hierBinIch(supabase), 120000);
+    return () => clearInterval(uhr);
+  }, [supabase, ichId]);
 
   const wert = useMemo<DatenWert>(
     () => ({ ...daten, laedt, fehler, neuLaden: laden }),
