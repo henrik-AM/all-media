@@ -78,14 +78,25 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (werte.length < 10) throw new Error('nur ' + werte.length + ' Werte');
   });
 
+  /*
+   * Hier stand bis zum 03.09.2026 "Zuletzt online" — und der Lauf sicherte
+   * damit einen Fehler ab: die Einstellung gab es zweimal. Unter Datenschutz
+   * als Dreier-Wahl, die nur im Bildschirmzustand lag, und unter Messenger
+   * als vier Stufen mit Ausnahmeliste, die in die Datenbank gingen. Zwei
+   * Orte, dieselbe Frage, verschiedene Antworten. Geprueft wird die
+   * Dreier-Wahl deshalb jetzt an einem Punkt, der wirklich einer ist.
+   */
   await pruefe('Eine Auswahl lässt sich ändern und bleibt stehen', async () => {
-    await page.click('[data-setting="Zuletzt online"]');
+    await page.click('[data-setting="Profilbild sichtbar für"]');
     await page.waitForSelector('[data-wahl]');
     const moeglich = await page.$$eval('[data-wahl]', (els) => els.map((e) => e.dataset.wahl));
     if (moeglich.length !== 3) throw new Error(moeglich.join(' | '));
     await page.click('[data-wahl="Niemand"]');
     await page.waitForTimeout(700);
-    const jetzt = await page.$eval('[data-setting="Zuletzt online"] .item__value', (e) => e.textContent);
+    const jetzt = await page.$eval(
+      '[data-setting="Profilbild sichtbar für"] .item__value',
+      (e) => e.textContent
+    );
     if (jetzt !== 'Niemand') throw new Error(jetzt);
   });
 
@@ -93,8 +104,30 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
     await zuDenEinstellungen();
-    const jetzt = await page.$eval('[data-setting="Zuletzt online"] .item__value', (e) => e.textContent);
+    const jetzt = await page.$eval(
+      '[data-setting="Profilbild sichtbar für"] .item__value',
+      (e) => e.textContent
+    );
     if (jetzt !== 'Niemand') throw new Error(jetzt);
+  });
+
+  /*
+   * Und die Gegenprobe zum aufgeloesten Doppel: "Zuletzt online" fuehrt
+   * jetzt ueberall auf dieselben vier Stufen mit Ausnahmeliste, nicht mehr
+   * auf eine eigene Dreier-Wahl.
+   */
+  await pruefe('„Zuletzt online" führt auf die vier Sichtbarkeitsstufen', async () => {
+    await page.click('[data-setting="Zuletzt online"] >> nth=0');
+    await page.waitForSelector('[data-stufe]');
+    const stufen = await page.$$eval('[data-stufe]', (els) => els.map((e) => e.dataset.stufe));
+    if (stufen.length !== 4) throw new Error(stufen.join(' | '));
+    const wahl = await page.$$eval('[data-wahl]', (els) => els.length);
+    if (wahl !== 0) throw new Error('daneben steht noch eine eigene Wahl');
+    // Wie ueberall sonst in diesem Lauf: ueber den Zurueck-Knopf des Blattes.
+    // Escape schliesst es nicht, und das offene Blatt faengt danach jeden
+    // Klick der folgenden Pruefungen ab.
+    await page.click('[data-sheet-close]').catch(() => {});
+    await page.waitForTimeout(400);
   });
 
   await pruefe('Ein Formular prüft seine Eingaben', async () => {

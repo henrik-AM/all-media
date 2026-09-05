@@ -19,8 +19,20 @@
 // Umformung: Datenbankzeile → Form, die die Oberfläche erwartet
 // ============================================================================
 
+/*
+ * Sicherheitspruefung 04.09.2026 (Fund 1): `phone` steht hier NICHT mehr.
+ *
+ * Diese Spaltenliste laedt bis zu 500 Profile auf einmal. Solange `phone`
+ * darin stand, war jeder Start der Oberflaeche ein vollstaendiger Abzug
+ * aller Telefonnummern — nachgewiesen mit einem einzigen Testkonto.
+ *
+ * Die eigene Nummer kommt aus `mein_profil()`, die der Kontakte aus
+ * `meine_kontaktnummern()` (nur bei beidseitiger Kontaktschaft). Die
+ * Datenbank gibt die Spalte ueber diesen Weg gar nicht mehr heraus:
+ * SUPABASE_SCHEMA_23_audit.sql entzieht `authenticated` das Leserecht.
+ */
 const PROFIL_SPALTEN =
-  'id, name, handle, initials, color, phone, privat, about, bio, link, status,' +
+  'id, name, handle, initials, color, privat, about, bio, link, status,' +
   ' highlights, playlists, spende, live, followers_basis, following_basis, beitraege_basis';
 
 /*
@@ -49,6 +61,7 @@ function profilZuNutzer(zeile) {
     handle: zeile.handle,
     initials: zeile.initials || '',
     color: zeile.color || '',
+    // phone wird nachtraeglich aus meine_kontaktnummern() ergaenzt (Fund 1).
     phone: zeile.phone || '',
     privat: Boolean(zeile.privat),
     about: zeile.about || '',
@@ -102,16 +115,28 @@ function chatZeit(zeitpunkt) {
 
 async function ladeNutzer(client, nutzerId) {
   if (!client) return null;
-  const [{ data, error }, { data: zahlen }] = await Promise.all([
+  /*
+   * Sicherheitspruefung 04.09.2026 (Fund 1): die Nummern kommen nicht mehr
+   * aus der Profilliste, sondern aus zwei eigenen Aufrufen — die eigene aus
+   * `mein_profil()`, die der Kontakte aus `meine_kontaktnummern()`. Letztere
+   * gibt nur heraus, wo sich beide Seiten als Kontakt fuehren.
+   */
+  const [{ data, error }, { data: zahlen }, { data: ich }, { data: nummern }] = await Promise.all([
     client.from('profiles').select(PROFIL_SPALTEN).limit(500),
     client.from('profile_zahlen').select('id, followers, following, beitraege'),
+    client.rpc('mein_profil'),
+    client.rpc('meine_kontaktnummern'),
   ]);
   if (error) throw error;
+
+  const nummerVon = (id) =>
+    (id === nutzerId ? ich?.phone : (nummern || {})[id]) || '';
 
   const zahlenNach = new Map((zahlen || []).map((z) => [z.id, z]));
   const nutzer = {};
   for (const zeile of data || []) {
     const u = profilZuNutzer(zeile);
+    u.phone = nummerVon(zeile.id);
     const z = zahlenNach.get(zeile.id);
     u.followers = Number(z?.followers ?? zeile.followers_basis ?? 0);
     u.following = Number(z?.following ?? zeile.following_basis ?? 0);
@@ -286,6 +311,20 @@ async function ladeKartenpunkte(client, nutzerId) {
  * `bereich` trennt Messenger von Community-Chat. Henriks Unterscheidung:
  * Messenger geht über Telefonnummer/Kontakt, der Community-Chat kommt ohne aus.
  */
+/**
+ * Der Anfragezustand aus der Sicht des Lesenden.
+ *
+ * Dieselbe Umrechnung steht in app/lib/daten.ts als `anfrageZustand`. Wer
+ * eine ändert, ändert beide — sonst sperrt die eine Oberfläche das
+ * Eingabefeld und die andere nicht.
+ */
+function anfrageZustand(chat, nutzerId) {
+  const zustand = chat.anfrage_zustand || 'offen';
+  if (zustand === 'wartet') return chat.anfrage_von === nutzerId ? 'pending' : 'incoming';
+  if (zustand === 'abgelehnt' && chat.anfrage_von === nutzerId) return 'declined';
+  return 'accepted';
+}
+
 async function ladeChats(client, nutzerId, bereich = 'messenger') {
   if (!client) return null;
 
@@ -293,7 +332,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
     .from('chat_members')
     .select(
       'chat_id, is_archived, is_muted, is_read, is_favorite, geleert_bis,' +
-        ' chats(id, name, is_group, bereich, created_at, updated_at)'
+        ' chats(id, name, is_group, bereich, created_at, updated_at, anfrage_zustand, anfrage_von)'
     )
     .eq('user_id', nutzerId);
   if (error) throw error;
@@ -315,25 +354,13 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
         .order('created_at', { ascending: false })
         .limit(500),
       client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
-      /*
-       * Wer eine Kontaktanfrage gestellt hat, darf bis zur Annahme nur die
-       * eine Nachricht schicken, die er der Anfrage beigelegt hat. Die
-       * Oberflaeche sperrt das Eingabefeld dafuer an "requestState".
-       *
-       * Das kam bis zum 31.08.2026 aus den Beispieldaten und fiel beim Umzug
-       * in die Datenbank weg — auf beiden Seiten, Website wie App. Der Zustand
-       * steht aber laengst in der Datenbank: contacts.status ist 'pending',
-       * solange die Anfrage laeuft.
-       */
       client.from('contacts').select('contact_id, status').eq('user_id', nutzerId),
     ]);
   if (fN) throw fN;
   if (fM) throw fM;
   if (fK) throw fK;
 
-  const offeneAnfrage = new Set(
-    (kontakte || []).filter((k) => k.status === 'pending').map((k) => k.contact_id)
-  );
+  void kontakte; // Der Anfragezustand steht seit dem 03.09.2026 am Chat.
 
   // Wer einen Chat geleert hat, sieht in der Liste auch keine Vorschau mehr
   // von vorher. Siehe handleClearChat().
@@ -362,7 +389,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
         id: z.chats.id,
         name: z.chats.name,
         userId: gegenueber,
-        requestState: gegenueber && offeneAnfrage.has(gegenueber) ? 'pending' : 'accepted',
+        requestState: anfrageZustand(z.chats, nutzerId),
         members: z.chats.is_group ? andere : undefined,
         isGroup: Boolean(z.chats.is_group),
         bereich: z.chats.bereich || 'messenger',
@@ -653,6 +680,25 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
   const repostet = new Set((geteilt || []).map((r) => r.post_id));
   const gemeldet = new Set((glocke || []).map((n) => n.post_id));
 
+  /*
+   * "Gefaellt Anna und 14 weiteren Personen" — der Name stand nie da. Die
+   * Zeile fiel immer auf "15 Likes" zurueck, weil niemand den Namen
+   * mitgeschickt hat.
+   *
+   * Er kommt aus einer Datenbankfunktion und nicht aus einer Abfrage auf
+   * post_likes, weil er der Likes-Sichtbarkeit des Likenden unterliegt: wer
+   * seine Likes verbirgt, taucht hier nicht auf. Die *Zahl* bleibt davon
+   * unberuehrt — sie ist eine Tatsache ueber den Beitrag.
+   */
+  const likerNamen = new Map();
+  if (ids.length > 0) {
+    const { data: namen } = await client.rpc('liker_namen', {
+      beitraege: ids,
+      wer: nutzerId,
+    });
+    for (const z of namen || []) if (z.name) likerNamen.set(z.post_id, z.name);
+  }
+
   // "Folge ich der Person?" gehoert an den Beitrag. Vorher las die Oberflaeche
   // p.following und p.notify - beide Felder hat der Server nie geschickt. Der
   // Knopf stand darum immer auf "Folgen", auch bei laengst gefolgten Personen,
@@ -684,6 +730,7 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
     // hier nur der Sockel — jedes Teilen verpuffte, die Zahl blieb stehen.
     shares: Number(b.shares_basis || 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
+    likedBy: likerNamen.get(b.id) || '',
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),
     following: b.user_id !== nutzerId && folgen.has(b.user_id),
@@ -766,20 +813,51 @@ async function ladeCommunities(client, nutzerId) {
 
 async function ladeKanalNachrichten(client, nutzerId, kanalId) {
   if (!client) return null;
+  /*
+   * Die Anhang-Spalten kamen am 04.09.2026 dazu (Schema 25). Standort und
+   * Kontakt werden ueber die SPALTE eingebettet (`places!place_id`), nicht
+   * ueber den Namen des Fremdschluessels: `profiles` haengt an dieser Tabelle
+   * zweimal (sender_id und contact_user_id), und ohne die Angabe kann
+   * PostgREST den Weg nicht waehlen — die Abfrage schluege mit „more than one
+   * relationship was found" fehl, und der Kanal saehe leer aus.
+   */
   const { data, error } = await client
     .from('community_channel_messages')
-    .select('id, channel_id, sender_id, text, created_at')
+    .select(
+      'id, channel_id, sender_id, text, created_at,' +
+        ' media_url, media_type, file_name, file_size,' +
+        ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
+        ' contact_user_id, profiles!contact_user_id(id, name, handle)'
+    )
     .eq('channel_id', kanalId)
     .order('created_at', { ascending: true })
     .limit(500);
   if (error) throw error;
 
+  // Dieselben Feldnamen wie in ladeNachrichten — die Blase im Kanal wird aus
+  // denselben Bausteinen gebaut wie die im Chat.
   return (data || []).map((m) => ({
     id: m.id,
     from: m.sender_id === nutzerId ? 'me' : m.sender_id,
-    text: m.text,
+    text: m.text || '',
+    media: m.media_type || undefined,
+    mediaUrl: m.media_url || undefined,
     time: chatZeit(m.created_at),
     zeitpunkt: m.created_at,
+    standort: m.places
+      ? {
+          id: m.places.id,
+          name: m.places.name,
+          adresse: m.places.adresse || '',
+          koordinaten: m.places.koordinaten || '',
+          x: Number(m.places.x ?? 50),
+          y: Number(m.places.y ?? 50),
+        }
+      : undefined,
+    kontakt: m.profiles
+      ? { id: m.profiles.id, name: m.profiles.name, handle: m.profiles.handle }
+      : undefined,
+    datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size || 0) } : undefined,
   }));
 }
 
@@ -1244,6 +1322,7 @@ module.exports = {
   ladeBlockiert,
   ladeStummgeschaltet,
   ladeKartenpunkte,
+  anfrageZustand,
   ladeChats,
   ladeNachrichten,
   ladeStorys,

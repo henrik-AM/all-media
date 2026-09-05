@@ -137,10 +137,21 @@ export interface Chat {
   archiviert?: boolean;
   favorit?: boolean;
   /**
-   * 'pending' = Kontaktanfrage laeuft noch. Bis zur Annahme ist genau eine
-   * Nachricht erlaubt, danach ist das Eingabefeld gesperrt.
+   * Der Zustand der Chat-Anfrage — aus `chats.anfrage_zustand`.
+   *
+   * 'pending'  = ich habe angeschrieben und warte. Genau eine Nachricht ist
+   *              raus, das Eingabefeld bleibt bis zur Antwort zu.
+   * 'incoming' = jemand hat MICH angeschrieben. Ich entscheide: annehmen
+   *              oder ablehnen. (Zurueckschreiben nimmt sie ebenfalls an.)
+   * 'declined' = ich habe angeschrieben und wurde abgelehnt. Endgueltig.
+   * 'accepted' = alles offen.
+   *
+   * Bis zum 03.09.2026 kam der Zustand aus `contacts.status` des Absenders —
+   * also aus einer Zeile, die dem Absender gehoert. Er konnte sie selbst auf
+   * 'friend' setzen ("Annahme simulieren"), und damit war die Anfrage eine
+   * Zusage an sich selbst. Jetzt steht sie am Chat, wo beide sie sehen.
    */
-  requestState?: 'pending' | 'accepted';
+  requestState?: 'pending' | 'accepted' | 'incoming' | 'declined';
 }
 
 export interface Contact {

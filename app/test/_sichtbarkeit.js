@@ -64,12 +64,14 @@ async function anmelden(zugang) {
   const fremder = await anmelden(FREMDER);
 
   /** Eine Stufe setzen und warten, bis sie steht. */
-  const stufe = async (bereich, wert) => {
-    const { error } = await eigner.client
+  const stufeFuer = async (konto, bereich, wert) => {
+    const { error } = await konto.client
       .from('visibility_settings')
-      .upsert({ user_id: eigner.id, bereich, stufe: wert }, { onConflict: 'user_id,bereich' });
+      .upsert({ user_id: konto.id, bereich, stufe: wert }, { onConflict: 'user_id,bereich' });
     if (error) throw error;
   };
+
+  const stufe = (bereich, wert) => stufeFuer(eigner, bereich, wert);
 
   const ausnahme = async (bereich, zielId, setzen) => {
     if (setzen) {
@@ -93,17 +95,26 @@ async function anmelden(zugang) {
    * hier wuerde er sogar das Testkonto unbrauchbar machen, weil dann
    * niemand mehr seine Storys saehe.
    */
+  const BEREICHE = [
+    'story', 'standort', 'dm', 'kommentare',
+    'repost', 'likes', 'download', 'ptt', 'onlinestatus', 'markierung',
+  ];
+
   const aufraeumen = async () => {
-    await eigner.client
-      .from('visibility_settings')
-      .delete()
-      .eq('user_id', eigner.id)
-      .in('bereich', ['story', 'standort', 'dm', 'kommentare']);
-    await eigner.client
-      .from('visibility_exceptions')
-      .delete()
-      .eq('user_id', eigner.id)
-      .in('bereich', ['story', 'standort', 'dm', 'kommentare']);
+    // Beide Konten: seit dem 03.09.2026 stellt auch das Pruefkonto etwas ein
+    // (Markierung und Likes gehoeren der markierten bzw. likenden Person).
+    for (const konto of [eigner, fremder]) {
+      await konto.client
+        .from('visibility_settings')
+        .delete()
+        .eq('user_id', konto.id)
+        .in('bereich', BEREICHE);
+      await konto.client
+        .from('visibility_exceptions')
+        .delete()
+        .eq('user_id', konto.id)
+        .in('bereich', BEREICHE);
+    }
   };
 
   /*
@@ -114,7 +125,7 @@ async function anmelden(zugang) {
    * meldete deshalb „keine Story im Bestand" und prüfte nichts. Ein Test,
    * der sich an fremde Daten hängt, prüft irgendwann gar nichts mehr.
    */
-  const eigenes = { storyId: null, chatId: null };
+  const eigenes = { storyId: null, chatId: null, communityId: null };
 
   const bestandAnlegen = async () => {
     const { data: story, error: f1 } = await eigner.client
@@ -143,10 +154,33 @@ async function anmelden(zugang) {
     if (f3) throw f3;
   };
 
+  /*
+   * NACHGEZAEHLT WIRD IMMER — auch beim Aufraeumen.
+   *
+   * Am 04.09.2026 standen fuenfzehn Communitys "Prüflauf PTT" im Bestand,
+   * angelegt von diesem Lauf ueber zwei Tage hinweg. Die Zeile unten hat sie
+   * jedes Mal geloescht und jedes Mal nichts getroffen: auf `communities`
+   * gab es keine DELETE-Regel, und ein von Row Level Security abgelehntes
+   * DELETE meldet keinen Fehler — es trifft nur keine Zeile.
+   *
+   * Die Regel steht seit SUPABASE_SCHEMA_26_community_loeschen.sql. Damit
+   * ein solcher Rest nicht wieder unbemerkt liegen bleibt, wird hier
+   * nachgesehen statt gehofft.
+   */
   const bestandAbraeumen = async () => {
     if (eigenes.storyId) await eigner.client.from('stories').delete().eq('id', eigenes.storyId);
     // Der Chat nimmt Mitglieder und Nachrichten ueber `on delete cascade` mit.
     if (eigenes.chatId) await eigner.client.from('chats').delete().eq('id', eigenes.chatId);
+    // Ebenso die Community: Mitglieder und PTT-Nachrichten haengen daran.
+    if (eigenes.communityId) {
+      await eigner.client.from('communities').delete().eq('id', eigenes.communityId);
+      const { data: rest } = await eigner.client
+        .from('communities')
+        .select('id')
+        .eq('id', eigenes.communityId);
+      pruefe('Die Pruefcommunity ist danach wirklich weg', (rest || []).length === 0,
+        `${(rest || []).length} Zeile(n) geblieben`);
+    }
   };
 
   try {
@@ -300,6 +334,256 @@ async function anmelden(zugang) {
         .maybeSingle();
       pruefe('Selbst schreiben geht weiterhin', !e3 && Boolean(m3), e3 ? e3.message : '');
       if (m3) await eigner.client.from('messages').delete().eq('id', m3.id);
+    }
+    /* =====================================================================
+     * Die sechs Bereiche, die bis zum 03.09.2026 gespeichert, aber ohne
+     * Wirkung waren. Schema 20 holt sie nach.
+     * ===================================================================== */
+
+    // Ein eigener Beitrag traegt die Faelle Repost, Likes und Markierung.
+    const { data: eigenerBeitrag } = await eigner.client
+      .from('posts')
+      .select('id')
+      .eq('user_id', eigner.id)
+      .limit(1)
+      .maybeSingle();
+
+    console.log('\nRepost-Sichtbarkeit');
+
+    if (!eigenerBeitrag) {
+      pruefe('Ein eigener Beitrag zum Pruefen', false, 'das Testkonto hat keinen');
+    } else {
+      await eigner.client
+        .from('reposts')
+        .upsert({ user_id: eigner.id, post_id: eigenerBeitrag.id });
+
+      await stufe('repost', 'alle');
+      const { data: rAn } = await fremder.client
+        .from('reposts')
+        .select('post_id')
+        .eq('user_id', eigner.id);
+      pruefe('Bei „Alle" sieht das andere Konto die Reposts', (rAn || []).length > 0,
+        `${(rAn || []).length} sichtbar`);
+
+      await stufe('repost', 'niemand');
+      const { data: rAus } = await fremder.client
+        .from('reposts')
+        .select('post_id')
+        .eq('user_id', eigner.id);
+      pruefe('Bei „Niemand" sieht es keine mehr', (rAus || []).length === 0,
+        `${(rAus || []).length} sichtbar`);
+
+      const { data: rSelbst } = await eigner.client
+        .from('reposts')
+        .select('post_id')
+        .eq('user_id', eigner.id);
+      pruefe('Die eigenen Reposts bleiben einem selbst sichtbar',
+        (rSelbst || []).length > 0, `${(rSelbst || []).length} sichtbar`);
+
+      await eigner.client
+        .from('reposts')
+        .delete()
+        .eq('user_id', eigner.id)
+        .eq('post_id', eigenerBeitrag.id);
+    }
+
+    console.log('\nZuletzt online');
+
+    const { error: eHier } = await eigner.client.rpc('hier_bin_ich');
+    pruefe('„Ich bin da" laesst sich vermerken', !eHier, eHier ? eHier.message : '');
+
+    await stufe('onlinestatus', 'alle');
+    const { data: pAn } = await fremder.client
+      .from('presence')
+      .select('last_seen')
+      .eq('user_id', eigner.id);
+    pruefe('Bei „Alle" sieht das andere Konto den Zeitpunkt', (pAn || []).length > 0,
+      `${(pAn || []).length} Zeile(n)`);
+
+    await stufe('onlinestatus', 'niemand');
+    const { data: pAus } = await fremder.client
+      .from('presence')
+      .select('last_seen')
+      .eq('user_id', eigner.id);
+    pruefe('Bei „Niemand" ist er weg — nicht „verborgen", sondern gar nicht da',
+      (pAus || []).length === 0, `${(pAus || []).length} Zeile(n)`);
+
+    const { data: pSelbst } = await eigner.client
+      .from('presence')
+      .select('last_seen')
+      .eq('user_id', eigner.id);
+    pruefe('Man selbst sieht seinen eigenen Zeitpunkt weiterhin',
+      (pSelbst || []).length > 0, `${(pSelbst || []).length} Zeile(n)`);
+
+    console.log('\nWer darf mich markieren');
+
+    if (eigenerBeitrag) {
+      // Die Einstellung gehoert der markierten Person, nicht dem Verfasser:
+      // hier stellt also das Pruefkonto ein und der Eigner versucht es.
+      await stufeFuer(fremder, 'markierung', 'alle');
+      const { data: t1, error: g1 } = await eigner.client
+        .from('post_tags')
+        .insert({ post_id: eigenerBeitrag.id, user_id: fremder.id })
+        .select('post_id')
+        .maybeSingle();
+      pruefe('Bei „Alle" laesst sich die Person markieren', !g1 && Boolean(t1),
+        g1 ? g1.message : '');
+      if (t1) {
+        await eigner.client
+          .from('post_tags')
+          .delete()
+          .eq('post_id', eigenerBeitrag.id)
+          .eq('user_id', fremder.id);
+      }
+
+      await stufeFuer(fremder, 'markierung', 'niemand');
+      const { error: g2 } = await eigner.client
+        .from('post_tags')
+        .insert({ post_id: eigenerBeitrag.id, user_id: fremder.id })
+        .select('post_id')
+        .maybeSingle();
+      pruefe('Bei „Niemand" wird die Markierung abgelehnt', Boolean(g2),
+        g2 ? g2.code : 'ging trotzdem durch');
+
+      // Markieren darf nur der Verfasser des Beitrags.
+      const { error: g3 } = await fremder.client
+        .from('post_tags')
+        .insert({ post_id: eigenerBeitrag.id, user_id: eigner.id })
+        .select('post_id')
+        .maybeSingle();
+      pruefe('In einem fremden Beitrag darf niemand markieren', Boolean(g3),
+        g3 ? g3.code : 'ging trotzdem durch');
+
+      // Und die markierte Person kommt allein wieder heraus.
+      await stufeFuer(fremder, 'markierung', 'alle');
+      await eigner.client
+        .from('post_tags')
+        .insert({ post_id: eigenerBeitrag.id, user_id: fremder.id });
+      const { error: g4 } = await fremder.client
+        .from('post_tags')
+        .delete()
+        .eq('post_id', eigenerBeitrag.id)
+        .eq('user_id', fremder.id);
+      const { data: rest } = await fremder.client
+        .from('post_tags')
+        .select('post_id')
+        .eq('post_id', eigenerBeitrag.id)
+        .eq('user_id', fremder.id);
+      // Ein abgelehntes DELETE meldet unter RLS keinen Fehler, sondern
+      // loescht null Zeilen. Deshalb wird nachgesehen, nicht nur der
+      // Fehlercode gelesen.
+      pruefe('Wer markiert wurde, kann sich selbst wieder austragen',
+        !g4 && (rest || []).length === 0, `${(rest || []).length} uebrig`);
+    }
+
+    console.log('\nLikes-Sichtbarkeit');
+
+    if (eigenerBeitrag) {
+      await fremder.client
+        .from('post_likes')
+        .upsert({ post_id: eigenerBeitrag.id, user_id: fremder.id });
+
+      const zaehler = async () => {
+        const { data } = await eigner.client
+          .from('posts')
+          .select('id, post_likes(count)')
+          .eq('id', eigenerBeitrag.id)
+          .maybeSingle();
+        return data?.post_likes?.[0]?.count ?? 0;
+      };
+
+      await stufeFuer(fremder, 'likes', 'alle');
+      const zAn = await zaehler();
+      const { data: nAn } = await eigner.client
+        .rpc('liker_namen', { beitraege: [eigenerBeitrag.id], wer: eigner.id });
+      pruefe('Bei „Alle" steht ein Name unter dem Beitrag',
+        Boolean((nAn || [])[0]?.name), (nAn || [])[0]?.name || 'kein Name');
+
+      await stufeFuer(fremder, 'likes', 'niemand');
+      const { data: nAus } = await eigner.client
+        .rpc('liker_namen', { beitraege: [eigenerBeitrag.id], wer: eigner.id });
+      pruefe('Bei „Niemand" verschwindet der Name',
+        !((nAus || [])[0]?.name), (nAus || [])[0]?.name || '');
+
+      // Der wichtigste Punkt: die Zahl bleibt. Sie ist eine Tatsache ueber
+      // den Beitrag, nicht eine Auskunft ueber den Menschen — haette sie
+      // sich mit verborgen, haette derselbe Beitrag je nach Betrachter
+      // verschiedene Like-Zahlen.
+      const zAus = await zaehler();
+      pruefe('Die Like-Zahl bleibt davon unberuehrt', zAn === zAus && zAn > 0,
+        `${zAn} → ${zAus}`);
+
+      await fremder.client
+        .from('post_likes')
+        .delete()
+        .eq('post_id', eigenerBeitrag.id)
+        .eq('user_id', fremder.id);
+    }
+
+    console.log('\nDownload');
+
+    await stufe('download', 'alle');
+    const { data: dAn } = await fremder.client
+      .rpc('darf_herunterladen', { inhaber: eigner.id, wer: fremder.id });
+    pruefe('Bei „Alle" ist der Download erlaubt', dAn === true, String(dAn));
+
+    await stufe('download', 'niemand');
+    const { data: dAus } = await fremder.client
+      .rpc('darf_herunterladen', { inhaber: eigner.id, wer: fremder.id });
+    pruefe('Bei „Niemand" nicht mehr', dAus === false, String(dAus));
+
+    console.log('\nPush-to-Talk');
+
+    // Anders als ueberall sonst gehoert die Einstellung hier dem Empfaenger:
+    // eine PTT-Nachricht geht an eine ganze Community und hat keinen
+    // einzelnen Adressaten.
+    const { data: gemeinschaft, error: cErr } = await eigner.client
+      .from('communities')
+      .insert({ name: 'Prüflauf PTT', created_by: eigner.id, visibility: 'private' })
+      .select('id')
+      .maybeSingle();
+
+    if (cErr || !gemeinschaft) {
+      pruefe('Eine Community zum Pruefen', false, cErr ? cErr.message : 'keine angelegt');
+    } else {
+      eigenes.communityId = gemeinschaft.id;
+      await eigner.client
+        .from('community_members')
+        .insert({ community_id: gemeinschaft.id, user_id: eigner.id });
+      await fremder.client
+        .from('community_members')
+        .insert({ community_id: gemeinschaft.id, user_id: fremder.id });
+
+      const { error: sErr } = await eigner.client.from('ptt_messages').insert({
+        community_id: gemeinschaft.id,
+        sender_id: eigner.id,
+        audio_url: 'https://example.invalid/pruef.m4a',
+        dauer: 2,
+      });
+      pruefe('Eine PTT-Nachricht laesst sich senden', !sErr, sErr ? sErr.message : '');
+
+      await stufeFuer(fremder, 'ptt', 'alle');
+      const { data: ptAn } = await fremder.client
+        .from('ptt_messages')
+        .select('id')
+        .eq('community_id', gemeinschaft.id);
+      pruefe('Bei „Alle" hoert das andere Konto sie', (ptAn || []).length > 0,
+        `${(ptAn || []).length} sichtbar`);
+
+      await stufeFuer(fremder, 'ptt', 'niemand');
+      const { data: ptAus } = await fremder.client
+        .from('ptt_messages')
+        .select('id')
+        .eq('community_id', gemeinschaft.id);
+      pruefe('Bei „Niemand" erreicht sie ihn nicht mehr', (ptAus || []).length === 0,
+        `${(ptAus || []).length} sichtbar`);
+
+      const { data: ptSelbst } = await eigner.client
+        .from('ptt_messages')
+        .select('id')
+        .eq('community_id', gemeinschaft.id);
+      pruefe('Die eigene Nachricht bleibt einem selbst sichtbar',
+        (ptSelbst || []).length > 0, `${(ptSelbst || []).length} sichtbar`);
     }
   } finally {
     await aufraeumen();

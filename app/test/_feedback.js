@@ -202,15 +202,20 @@ const pruefe = (was, ok, zusatz = '') => {
   if (gesperrt) {
     const eingabeGesperrt = await page.$eval('#msgInput', (e) => e.disabled);
     pruefe('Weitere Nachrichten gesperrt bis zur Annahme', eingabeGesperrt);
-    await page.click('#anfrageOk');
-    // Die Annahme aendert den Kontaktstatus in der Datenbank; danach wird der
-    // Chat neu aufgebaut. 800 ms waren dafuer zu knapp.
-    await page.waitForFunction(
-      () => { const f = document.querySelector('#msgInput'); return f && !f.disabled; },
-      null, { timeout: 10000 }
-    ).catch(() => {});
-    const frei = await page.$eval('#msgInput', (e) => !e.disabled).catch(() => false);
-    pruefe('Nach Annahme wieder frei', frei);
+
+    /*
+     * Hier stand bis zum 03.09.2026 ein Klick auf „#anfrageOk" — den Knopf
+     * „Annahme simulieren". Er saß im Chat des ABSENDERS und nahm dessen
+     * eigene Anfrage an. Der Prüflauf hat damit bestätigt, dass etwas
+     * funktioniert, das gar nicht funktionieren darf.
+     *
+     * Jetzt wird das Gegenteil geprüft: der Absender hat hier keine Wahl.
+     * Dass die angeschriebene Person eine hat, prüft `_chatanfrage.js` mit
+     * zwei Konten — im Browser ist immer nur eines angemeldet.
+     */
+    const eigeneWahl = await page.$('[data-anfrage]');
+    pruefe('Der Absender kann seine Anfrage nicht selbst annehmen', !eigeneWahl);
+
     await page.click('#chatBack').catch(() => {});
     await page.waitForTimeout(400);
   }

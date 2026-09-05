@@ -51,7 +51,8 @@ export interface Aktionen {
     privat?: boolean,
     nachricht?: string
   ) => Promise<{ status: string; chatId: string } | null>;
-  anfrageAnnehmen: (zielId: string, zurueck: Rueckweg) => Promise<void>;
+  /** Über eine Chat-Anfrage entscheiden. Nur die angeschriebene Person darf das. */
+  anfrageEntscheiden: (chatId: string, annehmen: boolean, zurueck: Rueckweg) => Promise<void>;
   chatEinstellung: (
     chatId: string,
     was: A.ChatEinstellung,
@@ -164,6 +165,16 @@ export interface Aktionen {
    */
   datenauskunft: () => Promise<boolean>;
 
+  /**
+   * Ein Bild oder Video auf das Geraet holen — die Story eines anderen etwa.
+   *
+   * Die App meldete hier bis zum 03.09.2026 "Story gesichert" und tat
+   * nichts: kein Herunterladen, keine Datei, nur die Meldung. Jetzt landet
+   * die Datei im Zwischenspeicher und geht ueber das Systemblatt weiter,
+   * genau wie die Datenauskunft.
+   */
+  medienSichern: (url: string, name: string) => Promise<boolean>;
+
   pttSenden: (
     communityId: string,
     audioUri: string,
@@ -267,8 +278,8 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         holen('Die Gruppe', (c, i) => A.gruppeAnlegen(c, i, name, mitglieder)),
       kontaktHinzufuegen: (zielId, privat, nachricht) =>
         holen('Der Kontakt', (c, i) => A.kontaktHinzufuegen(c, i, zielId, privat, nachricht)),
-      anfrageAnnehmen: (zielId, zurueck) =>
-        schreiben('Die Anfrage', (c, i) => A.anfrageAnnehmen(c, i, zielId), zurueck),
+      anfrageEntscheiden: (chatId, annehmen, zurueck) =>
+        schreiben('Die Anfrage', (c) => A.anfrageEntscheiden(c, chatId, annehmen), zurueck),
       chatEinstellung: (chatId, was, wert, zurueck) =>
         schreiben('Die Einstellung', (c, i) => A.chatEinstellung(c, i, chatId, was, wert), zurueck),
       chatVerlassen: (chatId, zurueck) =>
@@ -365,7 +376,20 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
             const upload = await ladeHoch(c, adresse, 'posts', `${i}-${Date.now()}.${endung}`);
             adresse = upload.success ? upload.url ?? undefined : undefined;
           }
-          return A.beitragAnlegen(c, i, { ...felder, mediaUrl: adresse });
+          const id = await A.beitragAnlegen(c, i, { ...felder, mediaUrl: adresse });
+
+          /*
+           * @-Namen aus der Beschreibung werden zu Markierungen. Wer sie
+           * nicht zulaesst, wird von der Regel abgelehnt — still, denn "X
+           * laesst sich nicht markieren" waere selbst die Auskunft, die die
+           * Einstellung verhindern soll. Der Beitrag steht davon unabhaengig.
+           */
+          try {
+            await A.markierungenSetzen(c, id, felder.beschreibung ?? '');
+          } catch (e: any) {
+            console.error('Markierungen nicht gesetzt:', e?.message ?? e);
+          }
+          return id;
         }),
 
       // -------------------------------------------------------- Umfragen --
@@ -416,6 +440,34 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
        */
       communityStumm: (communityId) =>
         holen('Das Stummschalten', (c, i) => A.communityStumm(c, i, communityId)),
+
+      medienSichern: async (url, name) => {
+        if (!url) {
+          melden?.('Dazu gibt es noch kein Bild');
+          return false;
+        }
+        try {
+          const antwort = await fetch(url);
+          if (!antwort.ok) throw new Error('Der Server antwortet mit ' + antwort.status);
+          const bytes = new Uint8Array(await antwort.arrayBuffer());
+
+          const datei = new File(Paths.cache, name);
+          if (datei.exists) datei.delete();
+          datei.create();
+          datei.write(bytes);
+
+          if (!(await Sharing.isAvailableAsync())) {
+            melden?.('Auf diesem Gerät lässt sich die Datei nicht weitergeben');
+            return false;
+          }
+          await Sharing.shareAsync(datei.uri, { dialogTitle: 'Sichern' });
+          return true;
+        } catch (e: any) {
+          console.error('Sichern fehlgeschlagen:', e?.message ?? e);
+          melden?.(e?.message || 'Das Sichern hat nicht geklappt');
+          return false;
+        }
+      },
 
       datenauskunft: async () => {
         if (!supabase || !ichId) {

@@ -88,6 +88,13 @@ const SEITEN = [
   // Die Community-Seite nach dem Prototyp-Frame "CH + Kanal". Sie kam in
   // keinem Bild vor - den Bildschirm gab es bis zum 26.08.2026 nicht.
   ['communities/home#community:Design Systeme', 'detail-community'],
+  /*
+   * Das Unterthema selbst — ein eigener Chat mit eigener Ablage, der bis zum
+   * 04.09.2026 in keinem Bild vorkam. Genau dort fiel jeder Anhang lautlos
+   * durch (siehe SUPABASE_SCHEMA_25_kanal_anhang.sql); kein Bild haette es
+   * gezeigt.
+   */
+  ['communities/home#kanal:Design Systeme:Allgemein', 'detail-kanal'],
 
   // Die Bildschirme der Handbuch-Erweiterung vom 01./02.09.2026. Sie waren
   // geprueft, aber nur auf die Datenbank hin: dass ein Insight ankommt, sagt
@@ -96,23 +103,52 @@ const SEITEN = [
   ['messenger/camera', 'handbuch-kamera-filter'],
 ];
 
-const SITZUNG = {
-  konten: [
-    {
-      id: 'me',
-      email: 'henrik@example.com',
-      profile: {
-        id: 'me',
-        name: 'Henrik',
-        handle: '@henrik',
-        status: 'online',
-        about: 'Hey, ich nutze All Media!',
-        phone: '+49 170 1234567',
-      },
-    },
-  ],
-  aktivId: 'me',
-};
+/*
+ * ANGEMELDET WIRD ECHT — seit dem 04.09.2026.
+ *
+ * Hier stand eine erfundene Sitzung: ein Konto mit der Kennung "me" unter dem
+ * Schluessel `all-media.sitzung.v1`. Aus der Zeit vor Supabase, als die App
+ * ihre Daten aus dem Quelltext nahm.
+ *
+ * Seither liest die App `all-media.sitzung.v2` und braucht dazu ein echtes
+ * Zugangstoken. Der erfundene Eintrag wurde nur noch ignoriert — und dieses
+ * Werkzeug legte, ohne sich zu beschweren, von jedem Bildschirm ein Bild des
+ * ANMELDEBILDSCHIRMS ab. "1 Bilder in bilder/app-hell/" stand trotzdem da.
+ * Aufgefallen ist es erst, als jemand die Bilder wirklich angesehen hat.
+ *
+ * Angemeldet wird deshalb ueber `tools/app-anmelden.js` — dieselbe Anmeldung,
+ * die auch `tools/bildschirm.js` voraussetzt, mit einem echten Token.
+ */
+function anmelden() {
+  log('  Anmeldung am Testkonto ...');
+  execFileSync(process.execPath, [path.join(__dirname, 'app-anmelden.js')], { stdio: 'inherit' });
+}
+
+/**
+ * Steht die Anmeldung wirklich da, wo die App sie sucht?
+ *
+ * Nicht ueber die Bildgroesse geraten — ein leerer Kanal ist genauso klein
+ * wie die Anmeldemaske, und eine Warnung, die falsch anschlaegt, liest nach
+ * dem dritten Mal niemand mehr. Geprueft wird stattdessen genau der Fehler,
+ * der passiert ist: die Sitzung lag unter einem Schluessel, den die App gar
+ * nicht mehr liest.
+ *
+ * `all-media.sitzung.v2`   die Kontenliste (contexts/AuthContext.tsx)
+ * `sb-<projekt>-auth-token` die Sitzung von supabase-js
+ */
+function anmeldungPruefen(datei) {
+  let daten = {};
+  try { daten = JSON.parse(fs.readFileSync(datei, 'utf8')); } catch { /* leer */ }
+
+  const konten = daten['all-media.sitzung.v2'];
+  const token = Object.keys(daten).find((k) => /^sb-.+-auth-token$/.test(k));
+
+  if (!konten || !token) {
+    log('  Die App ist nicht angemeldet — jedes Bild zeigte sonst die Anmeldemaske.');
+    log(`  Fehlt: ${!konten ? 'all-media.sitzung.v2 ' : ''}${!token ? 'sb-…-auth-token' : ''}`);
+    process.exit(1);
+  }
+}
 
 function log(zeile) { process.stdout.write(zeile + '\n'); }
 function sh(befehl) { return execSync(befehl, { encoding: 'utf8' }); }
@@ -141,7 +177,8 @@ function speicherDatei() {
 function speicherSchreiben(datei, bereich) {
   let daten = {};
   try { daten = JSON.parse(fs.readFileSync(datei, 'utf8')); } catch { /* neu anlegen */ }
-  daten['all-media.sitzung.v1'] = JSON.stringify(SITZUNG);
+  // Die Sitzung steht schon drin — sie kommt aus anmelden() und wird hier
+  // ausdruecklich nicht ueberschrieben.
   daten['all-media.pruefbild'] = bereich;
   // Thema ausdruecklich setzen statt auf die Simulator-Einstellung zu bauen:
   // die wirkt nur, wenn app.json userInterfaceStyle "automatic" sagt, und
@@ -212,6 +249,9 @@ function metroLaeuft() {
   } catch {
     log('  Hinweis: Metro antwortete nicht - laeuft "npm run wlan"?');
   }
+
+  anmelden();
+  anmeldungPruefen(datei);
 
   const gewaehlt = NUR.length
     ? SEITEN.filter(([, name]) => NUR.some((n) => name.includes(n)))

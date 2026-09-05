@@ -13,13 +13,10 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
 import { useKachelHoehe } from '../../lib/raster';
 import { compactNumber } from '../../lib/zahlen';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import * as Aktion from '../../lib/aktionen';
 
 type Tab = 'grid' | 'repost' | 'tagged';
-
-const GRID_KINDS: ('image' | 'video')[] = [
-  'image', 'video', 'image', 'video', 'image', 'image',
-  'video', 'image', 'video', 'image', 'video', 'image',
-];
 
 
 interface Props {
@@ -35,7 +32,7 @@ interface Props {
 }
 
 export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onOpenFollowers, onOpenFollowing, onNotice }: Props) => {
-  const { profile: alleProfile, users: alleNutzer } = useDaten();
+  const { profile: alleProfile, users: alleNutzer, ichId } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
@@ -56,6 +53,76 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
    * null: sie kann nur zaehlen, was jemand aufschreibt. Das eigene Profil
    * zaehlt nicht mit, darum kuemmert sich `profilAufrufVermerken`.
    */
+  /*
+   * Die drei Reiter, aus der Datenbank.
+   *
+   * Bis zum 03.09.2026 stand im ersten Reiter eine Konstante mit zwoelf
+   * Kacheln — bei jedem Menschen dieselben zwoelf, ob er nun drei Beitraege
+   * hatte oder gar keinen. Direkt darueber stand die echte Zahl aus
+   * `profile_zahlen`; die Anzeige widersprach sich also selbst. Die beiden
+   * anderen Reiter waren fest leer, obwohl es `reposts` und `post_tags`
+   * inzwischen gibt.
+   *
+   * Geladen wird erst beim Oeffnen des jeweiligen Reiters: das Raster sieht
+   * jeder sofort, Reposts und Markierungen sieht kaum jemand an.
+   */
+  const { supabase } = useSupabase();
+  const [kacheln, setKacheln] = useState<Record<Tab, Aktion.Rasterkachel[] | null>>({
+    grid: null,
+    repost: null,
+    tagged: null,
+  });
+
+  useEffect(() => {
+    setKacheln({ grid: null, repost: null, tagged: null });
+  }, [userId]);
+
+  useEffect(() => {
+    if (!supabase || kacheln[tab] !== null) return;
+    let abgebrochen = false;
+    const holen =
+      tab === 'grid'
+        ? Aktion.beitraegeVon
+        : tab === 'repost'
+          ? Aktion.repostsVon
+          : Aktion.markierteBeitraege;
+    holen(supabase, userId)
+      .then((liste) => {
+        if (!abgebrochen) setKacheln((vorher) => ({ ...vorher, [tab]: liste }));
+      })
+      .catch((e) => console.error('Profilraster laden fehlgeschlagen:', e?.message ?? e));
+    return () => {
+      abgebrochen = true;
+    };
+  }, [supabase, userId, tab, kacheln]);
+
+  /*
+   * "Nachrichten senden deaktivieren" — Sichtbarkeitsbereich `dm`.
+   *
+   * Gefragt wird, bevor der Knopf dasteht. Dasselbe Argument wie bei
+   * "Auf dem Geraet sichern" in StoryOptionenSheet: ein Knopf, der beim
+   * Antippen "darfst du nicht" sagt, ist die schlechtere Antwort als einer,
+   * der von vornherein gesperrt ist und den Grund danebenschreibt.
+   *
+   * Anfangswert `true` — sonst blitzt der Knopf bei jedem Profil kurz
+   * gesperrt auf, waehrend die Antwort noch unterwegs ist. Schreiben kann
+   * ohnehin nur, wen die Datenbank laesst (Schema 22).
+   */
+  const [darfSchreiben, setDarfSchreiben] = useState(true);
+
+  useEffect(() => {
+    if (!supabase || !ichId || userId === ichId) return;
+    let abgebrochen = false;
+    Aktion.darfAngeschriebenWerden(supabase, userId, ichId)
+      .then((erlaubt) => {
+        if (!abgebrochen) setDarfSchreiben(erlaubt);
+      })
+      .catch(() => setDarfSchreiben(false));
+    return () => {
+      abgebrochen = true;
+    };
+  }, [supabase, ichId, userId]);
+
   const aktionen = useAktionen(onNotice);
   useEffect(() => {
     void aktionen.profilAufruf(userId);
@@ -139,6 +206,22 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
               {person.name} ist blockiert. Ihr könnt euch keine Nachrichten schreiben.
             </Text>
           </View>
+        ) : !darfSchreiben ? (
+          /*
+            Der dritte Grund, aus dem hier kein Chat zustande kommt — und der
+            einzige, der nicht von mir ausgeht: die Person hat "Nachrichten
+            senden" fuer mich abgeschaltet (Sichtbarkeitsbereich `dm`).
+
+            Bewusst ohne Angabe, welche Stufe dahintersteckt. Ob "Niemand"
+            oder "Alle bis auf dich" — das zu unterscheiden waere eine
+            Auskunft ueber eine Liste, die absichtlich privat ist.
+          */
+          <View style={styles.hinweis}>
+            <Ionicons name="chatbubble-ellipses-outline" size={17} color={colors.text2} />
+            <Text style={styles.hinweisText}>
+              {person.name} empfängt keine Nachrichten.
+            </Text>
+          </View>
         ) : istStumm(userId) ? (
           <View style={styles.hinweis}>
             <Ionicons name="volume-mute-outline" size={17} color={colors.text2} />
@@ -156,8 +239,8 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
             </Text>
           </Druck>
           <Druck
-            style={[styles.button, istBlockiert(userId) && styles.buttonAus]}
-            disabled={istBlockiert(userId)}
+            style={[styles.button, (istBlockiert(userId) || !darfSchreiben) && styles.buttonAus]}
+            disabled={istBlockiert(userId) || !darfSchreiben}
             onPress={() => onMessage(userId)}
           >
             <Text style={styles.buttonText}>Nachricht</Text>
@@ -211,24 +294,57 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
           ))}
         </View>
 
-        {tab === 'grid' ? (
+        {(kacheln[tab] ?? []).length > 0 ? (
           <View style={styles.grid}>
-            {GRID_KINDS.map((kind, index) => (
-              <View key={index} style={[styles.gridItem, { height: kachelHoehe }]}>
-                <Motiv id={`grid-${index}`} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
-                {kind === 'video' && (
+            {(kacheln[tab] ?? []).map((eintrag) => (
+              <Druck
+                key={`${tab}-${eintrag.id}`}
+                style={[styles.gridItem, { height: kachelHoehe }]}
+                onPress={() => onNotice(`Beitrag: ${eintrag.id}`)}
+              >
+                {/*
+                  Bei einem Video steht in mediaUrl eine .mp4 — ins Raster
+                  gehoert das Standbild dazu. Motiv nimmt, was da ist, und
+                  zeichnet sonst die Farbflaeche.
+                */}
+                <Motiv
+                  id={eintrag.id}
+                  bild={eintrag.thumbnail ?? eintrag.mediaUrl ?? undefined}
+                  icon={eintrag.kind === 'post' ? 'image-outline' : 'play-outline'}
+                  iconSize={20}
+                  style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+                />
+                {eintrag.kind !== 'post' && (
                   <View style={styles.gridBadge}>
                     <Ionicons name="play" size={13} color={colors.white} />
                   </View>
                 )}
-              </View>
+                {tab !== 'grid' && (
+                  <View style={styles.gridMarke}>
+                    <Ionicons name={tab === 'repost' ? 'repeat' : 'person'} size={12} color={colors.white} />
+                  </View>
+                )}
+              </Druck>
             ))}
           </View>
         ) : (
           <EmptyState
-            icon={tab === 'repost' ? 'repeat' : 'person-outline'}
-            title={tab === 'repost' ? 'Keine Reposts' : 'Keine Markierungen'}
-            text="Hier ist noch nichts."
+            icon={tab === 'grid' ? 'image-outline' : tab === 'repost' ? 'repeat' : 'person-outline'}
+            title={
+              kacheln[tab] === null
+                ? 'Wird geladen …'
+                : tab === 'grid'
+                  ? 'Noch keine Beiträge'
+                  : tab === 'repost'
+                    ? 'Keine Reposts'
+                    : 'Keine Markierungen'
+            }
+            /*
+              Bei Reposts und Markierungen sagt „nichts da" absichtlich nicht,
+              ob es nichts gibt oder ob die Person es verbirgt. Ein „verborgen"
+              waere selbst die Auskunft, die die Einstellung verhindern soll.
+            */
+            text={kacheln[tab] === null ? '' : 'Hier ist noch nichts.'}
           />
         )}
       </ScrollView>
@@ -333,4 +449,15 @@ const styles = themenStyles((colors) => ({
     overflow: 'hidden',
   },
   gridBadge: { position: 'absolute', top: 6, right: 6 },
+  gridMarke: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 }));

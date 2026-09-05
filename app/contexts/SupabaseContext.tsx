@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
+import { sitzungsspeicher } from '../lib/sitzungsspeicher';
 import { SUPABASE_CONFIG, isSupabaseConfigured } from '../constants/supabase';
 
 interface SupabaseContextValue {
@@ -32,10 +32,14 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
        *
        * detectSessionInUrl gehoert zum Anmelden ueber eine Weiterleitung im
        * Browser; in einer App gibt es keine solche Adresse.
+       *
+       * Sicherheitspruefung 04.09.2026 (Fund 12): der Speicher ist nicht mehr
+       * AsyncStorage, sondern der Schluesselbund des Geraets. Warum und mit
+       * welcher Falle, steht in lib/sitzungsspeicher.ts.
        */
       supabase: createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
         auth: {
-          storage: AsyncStorage,
+          storage: sitzungsspeicher,
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: false,

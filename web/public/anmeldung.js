@@ -18,7 +18,23 @@
 (function () {
   'use strict';
 
-  const AUSGELIEFERT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js';
+  /*
+   * Die Supabase-Bibliothek liegt bei uns selbst unter public/lib/ und wird
+   * von dort geladen — nicht mehr von einem fremden Auslieferdienst.
+   *
+   * Warum: Mit der Inhaltsrichtlinie (CSP) des Servers waere sonst eine
+   * fremde Adresse fuer Skripte zu erlauben. Wer diese Adresse einmal unter
+   * seine Kontrolle bringt, fuehrt Code auf jeder Seite aus, die angemeldet
+   * ist — samt Zugriff auf die Sitzung. Lokal ausgeliefert entfaellt das
+   * Zutrauen zu einem Dritten vollstaendig, und die Anmeldung funktioniert
+   * auch dann, wenn der Dienst gerade nicht erreichbar ist.
+   *
+   * Fassung 2.47.10. Beim Aktualisieren die Datei neu holen:
+   *   curl -o public/lib/supabase-<fassung>.js \
+   *     https://cdn.jsdelivr.net/npm/@supabase/supabase-js@<fassung>/dist/umd/supabase.js
+   * und den Pfad hier mitziehen.
+   */
+  const AUSGELIEFERT = '/lib/supabase-2.47.10.js';
 
   let client = null;
   let sitzung = null;
@@ -132,18 +148,29 @@
 
     let email = (kennung || '').trim();
 
+    /*
+     * Sicherheitspruefung 03./04.09.2026 (Fund 2): Anmelden mit `@name` geht
+     * derzeit nicht.
+     *
+     * Hier stand ein Aufruf von `email_zu_handle()`. Diese Funktion schlaegt
+     * in `auth.users` nach und gab jedem, der fragte, die E-Mail-Adresse zu
+     * einem Benutzernamen heraus — erst ohne jede Anmeldung, nach der ersten
+     * Reparatur immer noch jedem angemeldeten Konto. Da alle Benutzernamen
+     * frei lesbar sind, liess sich damit der gesamte Bestand in eine
+     * E-Mail-Liste uebersetzen. Nachgewiesen, nicht vermutet.
+     *
+     * Das Ausfuehrungsrecht ist deshalb vollstaendig entzogen
+     * (SUPABASE_SCHEMA_23_audit.sql). Ein Weg, der beides kann — Anmelden
+     * ueber den Benutzernamen, ohne die Adresse herauszugeben —, braucht
+     * einen eigenen Endpunkt hinter dem Server. Bis dahin ist die
+     * E-Mail-Adresse der einzige Weg, und das steht hier so, statt den Nutzer
+     * an einer unverstaendlichen Fehlermeldung raten zu lassen.
+     */
     if (!email.includes('@') || email.startsWith('@')) {
-      const { data, error } = await c.rpc('email_zu_handle', { eingabe: email });
-      if (error) {
-        console.error('Benutzername auflösen:', error.message);
-        return { ok: false, fehler: 'Die Anmeldung ist gerade nicht erreichbar.' };
-      }
-      if (!data) {
-        // Bewusst dieselbe Meldung wie bei falschem Passwort: Sonst könnte man
-        // durchprobieren, welche Benutzernamen es gibt.
-        return { ok: false, fehler: 'Benutzername oder Passwort stimmt nicht.' };
-      }
-      email = data;
+      return {
+        ok: false,
+        fehler: 'Bitte mit der E-Mail-Adresse anmelden — der Benutzername wird gerade umgebaut.',
+      };
     }
 
     const { data, error } = await c.auth.signInWithPassword({ email, password: passwort });

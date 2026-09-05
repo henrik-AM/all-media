@@ -1,0 +1,51 @@
+-- =====================================================================
+-- SUPABASE_SCHEMA_24_medien_auflisten.sql — 04.09.2026
+--
+-- Teilbehebung von Fund 3 der Sicherheitspruefung vom 03.09.2026
+-- (2.Gehirn.md/02 Projekte/All-Media-Sicherheitspruefung-03-09-2026.md).
+--
+-- WORUM ES GEHT
+--
+-- Fund 3 hatte zwei Haelften, und sie haengen an verschiedenen Schaltern:
+--
+--   a) Jede Datei ist abrufbar, wenn man ihre Adresse kennt.
+--   b) Der Bestand ist AUFLISTBAR — man muss die Adresse gar nicht kennen.
+--
+-- Nachgewiesen am 03.09.2026, beides ohne Anmeldung:
+--   POST /storage/v1/object/list/media           → clip-01.jpg, clip-01.mp4, …
+--   GET  /storage/v1/object/media/beispiel/…jpg  → HTTP 200, 17845 Bytes
+--
+-- WARUM HIER NUR DIE HAELFTE b) BEHOBEN WIRD
+--
+-- Der Eimer `media` ist als oeffentlich angelegt (`storage.buckets.public
+-- = true`). Bei einem oeffentlichen Eimer laeuft der Abruf ueber den Weg
+-- `/storage/v1/object/public/…` komplett an Row Level Security vorbei: die
+-- Regel unten wird dabei gar nicht gefragt. Genau diesen Weg baut die App —
+-- `app/lib/supabaseStorage.ts` gibt nach jedem Hochladen `getPublicUrl()`
+-- zurueck, und diese Adresse wird als Bild- und Videoquelle gespeichert.
+--
+-- Haelfte a) ist deshalb NICHT mit einer Regel zu schliessen. Dafuer
+-- muesste der Eimer auf privat gestellt und ueberall auf signierte Adressen
+-- umgestellt werden (`createSignedUrl`) — in beiden Codebasen, an jeder
+-- Stelle, die Medien anzeigt, samt Umstellung der bereits gespeicherten
+-- Adressen in der Datenbank. Das ist ein Umbau, kein Handgriff, und er
+-- bleibt als offener Punkt stehen.
+--
+-- Das AUFLISTEN dagegen fragt die Regel sehr wohl. Es von `public` auf
+-- `authenticated` zu ziehen kostet nichts und nimmt dem Angreifer den
+-- bequemsten Teil: Er kann den Bestand nicht mehr aufzaehlen, sondern nur
+-- noch Dateien holen, deren Adresse er bereits kennt. Das ist keine
+-- Behebung, aber eine echte Verkleinerung der Angriffsflaeche — und sie
+-- bricht nichts.
+--
+-- Alles idempotent: die Datei laesst sich mehrfach einspielen.
+-- Einspielen:
+--   SUPABASE_TOKEN=sbp_... node tools/sql-einspielen.mjs SUPABASE_SCHEMA_24_medien_auflisten.sql
+-- =====================================================================
+
+-- Vorher: `for select using (bucket_id = 'media')` — ohne Rollenangabe, und
+-- das heisst in Postgres: fuer alle, `anon` eingeschlossen.
+drop policy if exists "Medien lesen" on storage.objects;
+create policy "Medien lesen" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'media');

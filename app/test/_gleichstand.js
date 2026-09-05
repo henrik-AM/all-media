@@ -17,6 +17,7 @@
  */
 
 const { chromium } = require('playwright-core');
+const { zusammengelegt } = require('./_modulquelle');
 const { anmelden, MAIL, PASS } = require('./_konto');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
@@ -72,7 +73,23 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chromium-headless-shell' });
-  const seite = await browser.newPage({ viewport: { width: 400, height: 860 } });
+  /*
+   * `bypassCSP` — seit der Sicherheitspruefung vom 04.09.2026 noetig.
+   *
+   * Die Website liefert jetzt eine Content-Security-Policy aus, und die
+   * erlaubt Skripte nur aus /public sowie von zwei namentlich genannten
+   * Quellen. Dieser Prueflauf laedt aber Quelltext aus aktionen.ts ueber eine
+   * `blob:`-Adresse in die Seite — genau das verbietet die Regel, und zwar
+   * zu Recht: `blob:` im Skript-Verzeichnis ist einer der ueblichen Wege,
+   * ueber die aus einem XSS ein ausgefuehrtes Skript wird.
+   *
+   * Die Regel deswegen aufzuweichen waere der falsche Tausch — dann waere die
+   * Luecke in der echten Seite offen, damit ein Prueflauf laeuft. Stattdessen
+   * schaltet nur dieser Browser die Durchsetzung ab. Ob die Regel im Betrieb
+   * stimmt, prueft `_ansehen.js`/`smoke.js` weiterhin gegen die echte Seite:
+   * dort faellt ein CSP-Fehler als Konsolenfehler auf.
+   */
+  const seite = await browser.newPage({ viewport: { width: 400, height: 860 }, bypassCSP: true });
 
   await seite.goto(BASIS, { waitUntil: 'networkidle' });
   const an = await anmelden(seite);
@@ -95,8 +112,11 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
    * demselben Zugangstoken. Damit wird wirklich der Code der App geprüft und
    * nicht eine Nachbildung davon.
    *
-   * Ein Bündler ist dafür nicht nötig: daten.ts importiert nur Typen, und die
-   * verschwinden beim Übersetzen. Übrig bleibt eine Datei ohne jeden Import.
+   * Ein Bündler ist dafür nicht nötig. Bis zum 04.09.2026 galt: daten.ts
+   * importiert nur Typen, und die verschwinden beim Übersetzen. Seit der
+   * Sicherheitsprüfung kommt `signiereMedien` aus ./medien dazu — ein echter
+   * Wert. Ein blob-Modul kann einen relativen Pfad nicht auflösen, deshalb
+   * legt `zusammengelegt()` beide Dateien zu einer ohne Importe zusammen.
    */
   const os = require('os');
   const fs = require('fs');
@@ -115,7 +135,8 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
     { stdio: 'pipe' }
   );
 
-  const uebersetzt = fs.readFileSync(path.join(bauOrdner, 'lib', 'daten.js'), 'utf8');
+  // Mit medien.js verschmelzen — sonst scheitert der Import im blob-Modul.
+  const uebersetzt = zusammengelegt(bauOrdner, 'daten.js');
   fs.rmSync(bauOrdner, { recursive: true, force: true });
 
   const app = await seite.evaluate(async (quelltext) => {

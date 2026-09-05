@@ -59,7 +59,8 @@ interface Props {
   onOpenProfile: (userId: string) => void;
   onOpenGroupSettings?: (chatId: string) => void;
   /** Offene Kontaktanfrage annehmen. */
-  onAcceptRequest?: (chatId: string) => void;
+  /** Über eine eingegangene Anfrage entscheiden — annehmen oder ablehnen. */
+  onAnfrageEntscheiden?: (chatId: string, annehmen: boolean) => void;
 }
 
 export const ChatDetailScreen = ({
@@ -70,7 +71,7 @@ export const ChatDetailScreen = ({
   onCamera,
   onOpenProfile,
   onOpenGroupSettings,
-  onAcceptRequest,
+  onAnfrageEntscheiden,
   contacts = [],
   onNotice,
   onOpenStandort,
@@ -112,6 +113,33 @@ export const ChatDetailScreen = ({
     (c.unterthemen ?? []).some((u) => u.id === chat.id)
   );
 
+  /*
+   * "Zuletzt online". Hier stand bis zum 03.09.2026 fest das Wort "Online" —
+   * bei jedem Menschen, zu jeder Zeit, ohne dass irgendwo festgehalten war,
+   * wann jemand zuletzt da war.
+   *
+   * Bleibt leer, wenn die Person ihren Status verbirgt: die Leseregel auf
+   * `presence` gibt dann keine Zeile heraus. Das sieht aus wie "war noch nie
+   * da", und das ist Absicht.
+   */
+  const [praesenz, setPraesenz] = useState('');
+
+  useEffect(() => {
+    setPraesenz('');
+    if (!supabase || chat.isGroup || !chat.userId) return;
+    let abgebrochen = false;
+    Aktion.praesenzLesen(supabase, chat.userId)
+      .then((zeit) => {
+        if (!abgebrochen) setPraesenz(Aktion.praesenzText(zeit));
+      })
+      .catch(() => {
+        /* Kein Status ist besser als ein falscher. */
+      });
+    return () => {
+      abgebrochen = true;
+    };
+  }, [supabase, chat.userId, chat.isGroup]);
+
   useEffect(() => {
     if (!supabase || !ichId) return;
     let abgebrochen = false;
@@ -142,7 +170,49 @@ export const ChatDetailScreen = ({
   // Gesperrt ist der Chat aus zwei Gruenden: die Anfrage laeuft noch, oder
   // die Person ist blockiert.
   const blockiert = !!chat.userId && istBlockiert(chat.userId);
-  const gesperrt = chat.requestState === 'pending' || blockiert;
+  /*
+   * Gesperrt ist das Eingabefeld aus vier Gruenden: die eigene Anfrage
+   * laeuft noch ('pending'), sie wurde abgelehnt ('declined'), die Person
+   * ist blockiert, oder sie empfaengt gar keine Nachrichten. Eine
+   * EINGEGANGENE Anfrage ('incoming') sperrt nicht — zurueckschreiben ist
+   * erlaubt und nimmt sie damit an.
+   */
+  /*
+   * Der vierte Grund, und der einzige, der schon beim Betreten feststeht:
+   * die Person hat "Nachrichten senden" abgeschaltet (Sichtbarkeitsbereich
+   * `dm`, Schema 22). Neue Chats kommen damit gar nicht erst zustande — aber
+   * ein Chat, der schon da war, bleibt in der Liste stehen, und die
+   * Einstellung kann jederzeit nachtraeglich gesetzt werden.
+   *
+   * Ohne diese Abfrage stuende ein offenes Eingabefeld da, und erst das
+   * Senden liefe in eine Ablehnung aus der Datenbank.
+   *
+   * In Gruppen und Kanaelen gilt die Einstellung nicht (`chat.userId` ist
+   * dort leer) — dasselbe wie in `darf_schreiben()`.
+   */
+  const [dmGesperrt, setDmGesperrt] = useState(false);
+
+  useEffect(() => {
+    if (!supabase || !ichId || !chat.userId || chat.userId === ichId) return;
+    let abgebrochen = false;
+    Aktion.darfAngeschriebenWerden(supabase, chat.userId, ichId)
+      .then((erlaubt) => {
+        if (!abgebrochen) setDmGesperrt(!erlaubt);
+      })
+      .catch(() => {
+        /* Im Zweifel offen lassen: die Datenbank weist ohnehin ab, und ein
+           gesperrtes Feld nach einem Netzfehler waere nicht erklaerbar. */
+      });
+    return () => {
+      abgebrochen = true;
+    };
+  }, [supabase, ichId, chat.userId]);
+
+  const gesperrt =
+    chat.requestState === 'pending' ||
+    chat.requestState === 'declined' ||
+    blockiert ||
+    dmGesperrt;
 
   /*
    * Senden.
@@ -525,7 +595,7 @@ export const ChatDetailScreen = ({
           <Text style={[styles.headerStatus, chat.isGroup && styles.headerStatusMuted]}>
             {chat.isGroup
               ? `${((chat.memberIds?.length ?? 0) + 1).toLocaleString('de-DE')} Mitglieder`
-              : 'Online'}
+              : praesenz}
           </Text>
         </Druck>
         <Druck style={styles.headerAction} onPress={() => onCall('video')} hitSlop={4}>
@@ -571,17 +641,60 @@ export const ChatDetailScreen = ({
           </View>
         )}
 
-        {gesperrt && !blockiert && (
+        {dmGesperrt && !blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              {chat.name} empfängt keine Nachrichten. Was hier steht, bleibt
+              lesbar — schreiben kannst du nicht mehr.
+            </Text>
+          </View>
+        )}
+
+        {/*
+          * Die drei Zustaende einer Chat-Anfrage.
+          *
+          * Hier stand bis zum 03.09.2026 ein Knopf „Annahme simulieren" — im
+          * Chat des ABSENDERS. Er nahm die eigene Anfrage an. Wer
+          * angeschrieben wurde, sah davon nichts und hatte keine Wahl.
+          */}
+        {chat.requestState === 'pending' && !blockiert && (
           <View style={styles.anfrage}>
             <Text style={styles.anfrageText}>
               Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
               sobald {chat.name} sie angenommen hat.
             </Text>
-            {/* In der Demo nimmt der Knopf die Anfrage stellvertretend an,
-                damit sich der weitere Ablauf ausprobieren laesst. */}
-            <Druck style={styles.anfrageBtn} onPress={() => onAcceptRequest?.(chat.id)}>
-              <Text style={styles.anfrageBtnText}>Annahme simulieren</Text>
-            </Druck>
+          </View>
+        )}
+
+        {chat.requestState === 'declined' && !blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              {chat.name} hat deine Anfrage abgelehnt. In diesem Chat kannst du
+              nicht mehr schreiben.
+            </Text>
+          </View>
+        )}
+
+        {chat.requestState === 'incoming' && !blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              {chat.name} möchte dir schreiben. Bis du entscheidest, bleibt es
+              bei dieser einen Nachricht.
+            </Text>
+            <View style={styles.anfrageKnoepfe}>
+              <Druck
+                style={styles.anfrageBtn}
+                onPress={() => onAnfrageEntscheiden?.(chat.id, true)}
+              >
+                <Text style={styles.anfrageBtnText}>Annehmen</Text>
+              </Druck>
+              <Druck
+                style={[styles.anfrageBtn, styles.anfrageBtnAus]}
+                onPress={() => onAnfrageEntscheiden?.(chat.id, false)}
+              >
+                <Text style={[styles.anfrageBtnText, styles.anfrageBtnTextAus]}>Ablehnen</Text>
+              </Druck>
+            </View>
           </View>
         )}
 
@@ -623,7 +736,13 @@ export const ChatDetailScreen = ({
             style={styles.composerIcon}
             onPress={() =>
               gesperrt
-                ? onNotice?.(blockiert ? 'Diese Person ist blockiert' : 'Warte, bis die Anfrage angenommen wurde')
+                ? onNotice?.(
+                    blockiert
+                      ? 'Diese Person ist blockiert'
+                      : dmGesperrt
+                        ? `${chat.name} empfängt keine Nachrichten`
+                        : 'Warte, bis die Anfrage angenommen wurde'
+                  )
                 : setAnhangOffen(true)
             }
             hitSlop={4}
@@ -635,7 +754,15 @@ export const ChatDetailScreen = ({
               style={styles.composerInput}
               value={draft}
               onChangeText={setDraft}
-              placeholder={blockiert ? 'Blockiert' : gesperrt ? 'Warten auf Annahme …' : 'Nachricht'}
+              placeholder={
+                blockiert
+                  ? 'Blockiert'
+                  : dmGesperrt
+                    ? 'Empfängt keine Nachrichten'
+                    : gesperrt
+                      ? 'Warten auf Annahme …'
+                      : 'Nachricht'
+              }
               placeholderTextColor={colors.text3}
               editable={!gesperrt}
               multiline
@@ -686,6 +813,7 @@ export const ChatDetailScreen = ({
         visible={anhangOffen}
         contacts={contacts}
         ausserId={chat.userId}
+        ohne={istKanal ? ['standortAnfragen'] : []}
         onClose={() => setAnhangOffen(false)}
         onStandortAnfragen={async () => {
           if (!chat.userId) return onNotice?.('In einer Gruppe geht das nicht');
@@ -704,13 +832,26 @@ export const ChatDetailScreen = ({
           let id = `m${Date.now()}`;
           if (supabase && ichId) {
             try {
-              const data = await Aktion.nachrichtSenden(supabase, ichId, chat.id, teil.text ?? '', {
+              /*
+               * Im Unterthema einer Community fuehrt derselbe Weg ins Leere.
+               *
+               * `messages.chat_id` zeigt auf `chats`; eine Kanal-Kennung
+               * steht dort nicht, und die Regel „Nachricht senden" verlangt
+               * eine Mitgliedschaft in genau diesem Chat. Bis zum 04.09.2026
+               * ging deshalb jeder Anhang im Kanal mit 42501 zurueck — der
+               * Text nahm die richtige Abzweigung (kanalNachricht), der
+               * Anhang nicht.
+               */
+              const anhang = {
                 typ: teil.media ?? null,
                 standortId: ortId ?? null,
                 kontaktId: personId ?? null,
                 dateiName: dateiName ?? null,
                 dateiGroesse: dateiGroesse ?? null,
-              });
+              };
+              const data = istKanal
+                ? await Aktion.kanalNachricht(supabase, ichId, chat.id, teil.text ?? '', anhang)
+                : await Aktion.nachrichtSenden(supabase, ichId, chat.id, teil.text ?? '', anhang);
               id = data.id;
             } catch (e: any) {
               console.error('Anhang senden fehlgeschlagen:', e?.message ?? e);
@@ -802,6 +943,10 @@ const styles = themenStyles((colors) => ({
     backgroundColor: colors.brand,
   },
   anfrageBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  anfrageKnoepfe: { flexDirection: 'row', gap: spacing.sm },
+  // Ablehnen ist die stille Wahl: gleich gross, aber ohne Signalfarbe.
+  anfrageBtnAus: { backgroundColor: colors.surface3 },
+  anfrageBtnTextAus: { color: colors.text },
 
   container: { flex: 1, backgroundColor: colors.surface },
   flex: { flex: 1 },

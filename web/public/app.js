@@ -202,6 +202,37 @@ function user(id) {
  * reicht den Wert unveraendert weiter, und ein Verlauf faellt dort auf
  * Schwarz zurueck. Deshalb hier die erste Farbe aus dem Verlauf.
  */
+/*
+ * Eine Farbe aus den Daten, bevor sie in ein style-Attribut geht.
+ *
+ * WARUM: `profiles.color` darf jeder fuer sein eigenes Profil frei setzen —
+ * die Regel auf `profiles` erlaubt das Aendern der Zeile, und Postgres kann
+ * in einer RLS-Regel keine einzelne Spalte ausnehmen. Wer dort
+ * `"><img src=x onerror=...>` hineinschreibt, bricht aus dem Attribut aus,
+ * sobald irgendein anderer Nutzer ihn in einer Liste sieht. Das waere eine
+ * Kontouebernahme, denn die Sitzung liegt im Browser.
+ *
+ * `esc()` allein reicht hier nicht: es macht den Wert nur harmlos, laesst
+ * aber jeden Unsinn als CSS stehen. Darum wird gar nicht escaped, sondern
+ * geprueft — durchgelassen wird ausschliesslich, was wirklich eine Farbe
+ * ist: Hex, rgb()/rgba() und linear-gradient(). Alles andere faellt auf die
+ * Standardfarbe zurueck. Vorbild ist farbeFuerNadel() weiter unten, das fuer
+ * die Kartennadeln schon so arbeitet.
+ */
+const FARBE_STANDARD = '#0a66ff';
+function farbe(wert) {
+  const text = String(wert == null ? '' : wert).trim();
+  if (!text || text.length > 200) return FARBE_STANDARD;
+  // Keine Zeichen, mit denen sich das Attribut oder die Regel verlassen
+  // laesst — auch nicht in einem Verlauf.
+  if (/[<>"'`;\\]/.test(text)) return FARBE_STANDARD;
+  const hex = /^#[0-9a-f]{3,8}$/i;
+  const rgb = /^rgba?\(\s*[0-9.\s%,/]+\)$/i;
+  const verlauf = /^(linear|radial)-gradient\(\s*[#0-9a-z.,()%\s-]+\)$/i;
+  if (hex.test(text) || rgb.test(text) || verlauf.test(text)) return text;
+  return FARBE_STANDARD;
+}
+
 function farbeFuerNadel(farbe) {
   const treffer = String(farbe || '').match(/#[0-9a-f]{3,8}\b|\brgba?\([^)]+\)/i);
   return treffer ? treffer[0] : '#0a66ff';
@@ -213,13 +244,13 @@ function avatarOf(chat, size = 54) {
       .replace('<svg', '<svg style="width:45%;height:45%"');
   }
   const u = user(chat.userId);
-  return `<div class="avatar avatar--${size}" style="background:${u.color}">${esc(u.initials)}</div>`;
+  return `<div class="avatar avatar--${size}" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
 }
 
 function avatarForUser(id, size = 44) {
   if (id === 'me') return eigenerAvatar(state.users.me, size);
   const u = user(id);
-  return `<div class="avatar avatar--${size}" style="background:${u.color}">${esc(u.initials)}</div>`;
+  return `<div class="avatar avatar--${size}" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
 }
 
 /*
@@ -231,7 +262,7 @@ function eigenerAvatar(me, size = 44, extra = '') {
   const bild = eigenesProfilbildLaden();
   const klassen = `avatar avatar--${size}${extra ? ' ' + extra : ''}`;
   if (bild) return `<div class="${klassen}"><img src="${bild}" alt="" /></div>`;
-  return `<div class="${klassen}" style="background:${me.color}">${esc(me.initials)}</div>`;
+  return `<div class="${klassen}" style="background:${farbe(me.color)}">${esc(me.initials)}</div>`;
 }
 
 /*
@@ -378,7 +409,66 @@ async function bootstrap() {
 
   applyTheme();
   document.body.classList.remove('is-startet');
+  praesenzMelden();
   render();
+}
+
+/*
+ * "Ich bin da" — einmal beim Start und danach alle zwei Minuten.
+ *
+ * Der Zeitpunkt kommt aus der Datenbank, nicht aus dem Browser: eine Uhr auf
+ * einem Geraet kann falsch gehen, und "zuletzt online in vier Stunden" waere
+ * schwer zu erklaeren.
+ */
+let praesenzUhr = null;
+function praesenzMelden() {
+  const melden = () => fetch('/api/praesenz', { method: 'POST' }).catch(() => {});
+  melden();
+  if (praesenzUhr) clearInterval(praesenzUhr);
+  praesenzUhr = setInterval(melden, 120000);
+}
+
+/*
+ * "Online", "zuletzt online vor 12 Min.", oder gar nichts.
+ *
+ * Gar nichts ist der Fall, in dem der andere seinen Status verbirgt — dann
+ * kommt vom Server `null`, genau wie bei jemandem, der noch nie da war. Ein
+ * Wort wie "verborgen" waere selbst die Auskunft, die die Einstellung
+ * verhindern soll.
+ *
+ * Dieselben Schwellen wie praesenzText() in app/lib/aktionen.ts. Wenn die
+ * beiden Seiten hier auseinanderlaufen, zeigt dieselbe Person in App und
+ * Browser einen anderen Zustand.
+ */
+function praesenzText(iso) {
+  if (!iso) return '';
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 3) return 'Online';
+  if (min < 60) return `zuletzt online vor ${min} Min.`;
+  const std = Math.floor(min / 60);
+  if (std < 24) return `zuletzt online vor ${std} Std.`;
+  const tage = Math.floor(std / 24);
+  if (tage === 1) return 'zuletzt online gestern';
+  if (tage < 7) return `zuletzt online vor ${tage} Tagen`;
+  return 'zuletzt online vor längerer Zeit';
+}
+
+/*
+ * Holt den Status nach und traegt ihn in ein bereits gezeichnetes Element
+ * ein. Nachtraeglich, weil der Chatkopf sofort dastehen soll — auf eine
+ * zweite Abfrage zu warten, bevor der Name erscheint, waere ein Rueckschritt
+ * gegenueber dem festen Wort "Online".
+ */
+async function praesenzEintragen(userId, ziel) {
+  if (!userId || !ziel) return;
+  try {
+    const r = await fetch(`/api/praesenz/${encodeURIComponent(userId)}`);
+    const d = await r.json();
+    if (!ziel.isConnected) return;
+    ziel.textContent = praesenzText(d.zuletzt);
+  } catch {
+    /* Kein Status ist besser als ein falscher. */
+  }
 }
 
 /**
@@ -878,13 +968,19 @@ function chatOptionen(chatId) {
    * und setzt das Loeschen von den harmlosen Punkten ab. Genau das hier:
    * Kopfzeile mit Avatar, darunter die Aktionen, das Loeschen abgetrennt.
    */
+  /*
+   * Hier stand am Ende der Kette das feste Wort "Online". Es galt fuer jeden
+   * Menschen zu jeder Zeit — es gab bis zum 03.09.2026 keine Angabe, aus der
+   * sich etwas anderes haette ergeben koennen. Jetzt bleibt die Zeile leer
+   * und wird nachgetragen, sobald die Antwort da ist.
+   */
   const zustand = chat.isGroup
     ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder`
     : archiviert
       ? 'Im Archiv'
       : chat.muted
         ? 'Stummgeschaltet'
-        : 'Online';
+        : '';
 
   openSheet(
     chat.name,
@@ -918,6 +1014,9 @@ function chatOptionen(chatId) {
       <span class="item__label">Chat löschen</span>
     </button>`,
     (sheet, close) => {
+      if (!chat.isGroup && !archiviert && !chat.muted) {
+        praesenzEintragen(chat.userId, sheet.querySelector('.coptkopf__sub'));
+      }
       sheet.querySelectorAll('[data-copt]').forEach((b) =>
         b.addEventListener('click', async () => {
           const was = b.dataset.copt;
@@ -1207,7 +1306,8 @@ function aufnahmeMenue(bild) {
 
 /** Aufnahme in einen Chat schicken - erst fragen, in welchen. */
 function aufnahmeAnChat(bild) {
-  const auswahl = state.chats.filter((c) => c.requestState !== 'pending');
+  // Nicht in Chats, in denen man gerade nicht schreiben darf.
+  const auswahl = state.chats.filter((c) => !chatGesperrt(c));
   if (!auswahl.length) return toast('Du hast noch keinen Chat, in den das passt');
 
   openSheet(
@@ -1288,7 +1388,7 @@ function storyItem(s) {
           <div class="story__inner" style="${
             gefuellt
               ? `background-image:url(${s.mediaUri});background-size:cover;background-position:center`
-              : `background:${u.color}`
+              : `background:${farbe(u.color)}`
           }">${gefuellt ? '' : esc(u.initials)}</div>
           ${gefuellt ? '' : `<span class="story__add-badge">${ICONS.plus}</span>`}
         </div>
@@ -1298,7 +1398,7 @@ function storyItem(s) {
   return `
     <button class="story" data-story="${s.id}">
       <div class="story__ring ${s.viewed ? 'is-viewed' : ''}">
-        <div class="story__inner" style="background:${u.color}">${esc(u.initials)}</div>
+        <div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
       </div>
       <div class="story__name">${esc(s.name)}</div>
     </button>`;
@@ -1427,7 +1527,7 @@ async function openFollowerList(profile, art) {
     titel,
     `<div class="sheet__body">${liste.length ? liste.map(u => `
       <button class="item" data-uid="${u.id}">
-        <span class="avatar avatar--40" style="background:${u.color}">${esc(u.initials)}</span>
+        <span class="avatar avatar--40" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
         <span class="item__body">
           <div class="item__label">${esc(u.name)}</div>
           <div class="item__sub">${esc(u.handle)}</div>
@@ -1566,6 +1666,30 @@ function openSheet(title, bodyHtml, onMount, opts = {}) {
   });
   sheet.querySelector('[data-sheet-close]')?.addEventListener('click', zumachen);
 
+  /*
+   * Und mit Escape. Vierter Weg — vorher war die Taste am Blatt wirkungslos:
+   * sie schloss nur das Overlay darunter. Am 03.09.2026 hat das einen
+   * Pruefteil lahmgelegt, weil ein offen gebliebenes Blatt jeden weiteren
+   * Klick abfing. Auf dem Telefon spielt die Taste keine Rolle, am
+   * Schreibtisch erwartet sie jeder.
+   *
+   * Es schliesst immer das oberste Blatt: Blaetter koennen uebereinander
+   * liegen, und die Taste soll das schliessen, was man sieht.
+   */
+  const beiEscape = (e) => {
+    if (e.key !== 'Escape' || schonZu) return;
+    const oberstes = [...document.querySelectorAll('.sheet-backdrop')].pop();
+    if (oberstes !== sheet) return;
+    e.stopPropagation();
+    zumachen();
+  };
+  document.addEventListener('keydown', beiEscape, true);
+  const vorher = opts.beimSchliessen;
+  opts.beimSchliessen = () => {
+    document.removeEventListener('keydown', beiEscape, true);
+    vorher?.();
+  };
+
   ziehenZumSchliessen(sheet.querySelector('.sheet'), zumachen);
 
   onMount?.(sheet, zumachen);
@@ -1623,7 +1747,7 @@ function openProfilBearbeiten(fertig) {
     'Profil bearbeiten',
     `<div class="sheet__body">
       <div class="bearbeiten__bild">
-        <div class="avatar avatar--88" id="pbVorschau" style="background:${me.color}">
+        <div class="avatar avatar--88" id="pbVorschau" style="background:${farbe(me.color)}">
           ${bild ? `<img src="${bild}" alt="" />` : esc(me.initials)}
         </div>
         <div class="bearbeiten__bildaktionen">
@@ -2102,10 +2226,10 @@ function openCall(ziel, art) {
           ${
             gruppe && teilnehmer.length
               ? `<div class="anruf__runde">${teilnehmer
-                  .map((id) => `<span class="avatar avatar--52" style="background:${user(id).color}">${esc(user(id).initials)}</span>`)
+                  .map((id) => `<span class="avatar avatar--52" style="background:${farbe(user(id).color)}">${esc(user(id).initials)}</span>`)
                   .join('')}</div>`
               : `<div class="anruf__avatar ${zustand === 'klingelt' ? 'is-klingelt' : ''}"
-                   style="background:${u.color}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}</div>`
+                   style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}</div>`
           }
           <div class="anruf__name">${esc(u.name)}</div>
           ${
@@ -2621,6 +2745,50 @@ async function openProfile(userId, variante) {
   let tab = 'grid';
 
   /*
+   * Die beiden anderen Reiter, aus der Datenbank.
+   *
+   * Sie standen bis zum 03.09.2026 fest auf "Keine Reposts" bzw. "Keine
+   * Markierungen" — nicht, weil nichts da war, sondern weil niemand danach
+   * gefragt hat. Im eigenen Profil holt `renderVideoProfile` dieselben zwei
+   * Listen laengst; hier fehlte der Aufruf.
+   *
+   * `null` heisst "noch nicht geholt", `[]` heisst "wirklich nichts da".
+   * Ohne diesen Unterschied stuende beim Oeffnen kurz "Keine Reposts", und
+   * das waere eine Auskunft, die noch niemand geprueft hat.
+   */
+  const reiterListen = { repost: null, tagged: null };
+
+  /*
+   * "Nachrichten senden deaktivieren" — Sichtbarkeitsbereich `dm`.
+   *
+   * Gefragt wird vor dem Zeichnen, nicht beim Klick: ein Knopf, der beim
+   * Antippen "darfst du nicht" sagt, ist die schlechtere Antwort als einer,
+   * der von vornherein gesperrt ist und den Grund danebenschreibt. Gleicher
+   * Aufbau in der App (UserProfileScreen).
+   *
+   * Im Zweifel erlaubt: die Datenbank weist ohnehin ab (Schema 22), und ein
+   * gesperrter Knopf nach einem Netzfehler waere nicht erklaerbar.
+   */
+  let darfSchreiben = true;
+  try {
+    const r = await fetch(`/api/dm-erlaubt/${encodeURIComponent(userId)}`);
+    darfSchreiben = (await r.json()).erlaubt !== false;
+  } catch {
+    darfSchreiben = true;
+  }
+
+  const reiterLaden = async (welcher) => {
+    if (reiterListen[welcher] !== null) return;
+    const pfad = welcher === 'repost' ? '/api/reposts' : '/api/markierungen';
+    try {
+      reiterListen[welcher] = await (await fetch(`${pfad}?user=${encodeURIComponent(userId)}`)).json();
+    } catch {
+      reiterListen[welcher] = [];
+    }
+    if (tab === welcher) paint();
+  };
+
+  /*
    * Den Aufruf vermerken. Ohne das bleibt die Profilstatistik in den
    * Einstellungen dauerhaft bei null: sie kann nur zaehlen, was jemand
    * aufschreibt. Nicht abgewartet — das Profil soll deswegen nicht spaeter
@@ -2652,10 +2820,10 @@ async function openProfile(userId, variante) {
           ${
             state.stories.some((st) => st.userId === userId)
               ? `<button class="story__ring" data-profilstory="${esc(userId)}" style="width:88px;height:88px;padding:3px" aria-label="Story von ${esc(profile.name)} ansehen">
-                   <span class="story__inner" style="background:${profile.color};font-size:28px">${esc(profile.initials)}</span>
+                   <span class="story__inner" style="background:${farbe(profile.color)};font-size:28px">${esc(profile.initials)}</span>
                  </button>`
               : `<div class="story__ring is-viewed" style="width:88px;height:88px;padding:3px">
-                   <div class="story__inner" style="background:${profile.color};font-size:28px">${esc(profile.initials)}</div>
+                   <div class="story__inner" style="background:${farbe(profile.color)};font-size:28px">${esc(profile.initials)}</div>
                  </div>`
           }
           <div class="prof__stats">
@@ -2678,6 +2846,13 @@ async function openProfile(userId, variante) {
         ${
           profile.blocked
             ? `<div class="prof__hinweis">${ICONS.block} ${esc(profile.name)} ist blockiert. Ihr könnt euch keine Nachrichten schreiben.</div>`
+            : !darfSchreiben
+            ? // Der dritte Grund, aus dem hier kein Chat zustande kommt, und
+              // der einzige, der nicht von mir ausgeht. Bewusst ohne Angabe,
+              // welche Stufe dahintersteckt: ob "Niemand" oder "Alle bis auf
+              // dich" waere eine Auskunft ueber eine Liste, die absichtlich
+              // privat ist.
+              `<div class="prof__hinweis">${ICONS.chat} ${esc(profile.name)} empfängt keine Nachrichten.</div>`
             : profile.muted
             ? `<div class="prof__hinweis">${ICONS.mute} ${esc(profile.name)} ist stummgeschaltet.</div>`
             : ''
@@ -2687,7 +2862,7 @@ async function openProfile(userId, variante) {
           <button class="prof__btn ${profile.following_me ? 'is-following' : 'is-primary'}" id="profFollow">
             ${profile.following_me ? 'Gefolgt' : 'Folgen'}
           </button>
-          <button class="prof__btn" id="profMessage" ${profile.blocked ? 'disabled' : ''}>Nachricht</button>
+          <button class="prof__btn" id="profMessage" ${profile.blocked || !darfSchreiben ? 'disabled' : ''}>Nachricht</button>
         </div>
 
         ${
@@ -2704,21 +2879,7 @@ async function openProfile(userId, variante) {
           <button class="prof__tab ${tab === 'tagged' ? 'is-active' : ''}" data-ptab="tagged" aria-label="Markiert">${ICONS.person}</button>
         </div>
 
-        ${
-          tab === 'grid'
-            ? `<div class="prof__grid">${profile.grid
-                .map(
-                  (g) => `<div class="griditem">
-                    ${ICONS.image}
-                    ${g.kind === 'video' ? `<span class="griditem__badge">${ICONS.play}</span>` : ''}
-                  </div>`
-                )
-                .join('')}</div>`
-            : `<div class="empty">${tab === 'repost' ? ICONS.repeat : ICONS.person}
-                <div class="empty__title">${tab === 'repost' ? 'Keine Reposts' : 'Keine Markierungen'}</div>
-                <div class="empty__text">Hier ist noch nichts.</div>
-              </div>`
-        }
+        ${profilRaster(profile, tab, reiterListen)}
       </div>`;
 
     $('#profBack').addEventListener('click', closeOverlay);
@@ -2764,11 +2925,72 @@ async function openProfile(userId, variante) {
       b.addEventListener('click', () => {
         tab = b.dataset.ptab;
         paint();
+        // Erst beim Oeffnen holen: das Raster sieht jeder, die beiden
+        // anderen Reiter sieht kaum jemand an.
+        if (tab !== 'grid') void reiterLaden(tab);
       })
     );
   };
 
   paint();
+}
+
+/*
+ * Das Raster unter den drei Reitern eines fremden Profils.
+ *
+ * Bis zum 03.09.2026 zeichnete der erste Reiter zwar die echten Beitraege,
+ * aber jede Kachel als graues Symbol — die Bilder lagen in der Antwort und
+ * wurden nicht benutzt. Das eigene Profil zeigt sie an derselben Stelle
+ * laengst ueber `medienFlaeche`.
+ */
+function profilRaster(profile, tab, listen) {
+  if (tab === 'grid') {
+    if (!profile.grid.length) {
+      return `<div class="empty">${ICONS.image}
+        <div class="empty__title">Noch keine Beiträge</div>
+        <div class="empty__text">Hier ist noch nichts.</div>
+      </div>`;
+    }
+    return `<div class="prof__grid">${profile.grid
+      .map(
+        (g) => `<div class="griditem">
+          ${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}
+          ${g.kind === 'video' ? `<span class="griditem__badge">${ICONS.play}</span>` : ''}
+        </div>`
+      )
+      .join('')}</div>`;
+  }
+
+  const liste = listen[tab];
+  if (liste === null) {
+    return `<div class="empty">${tab === 'repost' ? ICONS.repeat : ICONS.person}
+      <div class="empty__title">Wird geladen …</div>
+    </div>`;
+  }
+  if (!liste.length) {
+    /*
+     * Absichtlich derselbe Satz, ob nun nichts da ist oder die Person es
+     * verbirgt. Ein "verborgen" waere selbst die Auskunft, die die
+     * Sichtbarkeitseinstellung verhindern soll.
+     */
+    return `<div class="empty">${tab === 'repost' ? ICONS.repeat : ICONS.person}
+      <div class="empty__title">${tab === 'repost' ? 'Keine Reposts' : 'Keine Markierungen'}</div>
+      <div class="empty__text">Hier ist noch nichts.</div>
+    </div>`;
+  }
+  return `<div class="prof__grid">${liste
+    .map(
+      (e) => `<div class="griditem" title="${esc(e.eintrag.description || '')}">
+        ${medienFlaeche(
+          e.eintrag.id,
+          e.art === 'post' ? ICONS.image : ICONS.play,
+          e.eintrag.mediaUrl,
+          e.eintrag.thumbnail
+        )}
+        <span class="griditem__badge">${tab === 'repost' ? ICONS.repeat : ICONS.person}</span>
+      </div>`
+    )
+    .join('')}</div>`;
 }
 
 /* ---------------------------------------------------------- comments */
@@ -2796,7 +3018,7 @@ async function openComments(targetId, onCountChange) {
           }
         </div>
         <form class="composer" id="commentForm">
-          <div class="avatar avatar--36" style="background:${user('me').color}">DU</div>
+          <div class="avatar avatar--36" style="background:${farbe(user('me').color)}">DU</div>
           <div class="composer__field">
             <textarea id="commentInput" rows="1" placeholder="Kommentar hinzufügen"></textarea>
           </div>
@@ -2919,7 +3141,7 @@ function commentRow(c) {
   const u = user(c.userId);
   return `
     <div class="comment">
-      <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
+      <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
       <div class="comment__body">
         <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${esc(c.text)}</div>
         <div class="comment__meta">${esc(c.time)}</div>
@@ -3152,7 +3374,7 @@ function postCard(p) {
             Klick auf ein Profilbild im Feed hat nie etwas geoeffnet.
           */ ''}
         <button class="story__ring story-ring-btn" style="width:40px;height:40px;padding:2px" data-story-user="${p.userId}">
-          <div class="story__inner" style="background:${u.color};font-size:13px">${esc(u.initials)}</div>
+          <div class="story__inner" style="background:${farbe(u.color)};font-size:13px">${esc(u.initials)}</div>
         </button>
         <div class="post__who">
           <button class="post__name" data-profile="${p.userId}">${esc(u.name)}</button>
@@ -3508,7 +3730,7 @@ function videoSlide(v) {
       <div class="slide__meta">
         <div class="slide__author">
           <button class="slide__who" data-profile="${v.userId}">
-            <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
+            <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
             <span class="slide__name">${esc(u.name)}</span>
           </button>
           <button class="slide__follow ${
@@ -3897,6 +4119,9 @@ async function renderCommunityChat(community, kanal, thema) {
       }
     </div>
     <form class="composer" id="commForm">
+      ${/* Das Plus gab es im Unterthema nicht — Handbuch-Abgleich 01.09.2026,
+           "Sticker innerhalb von Community-Kanaelen". Nachgetragen 04.09. */ ''}
+      <button type="button" class="composer__icon" id="commAttach" aria-label="Anhang">${ICONS.plus}</button>
       <div class="composer__field">
         <textarea id="commMsgInput" rows="1" placeholder="Nachricht schreiben ..."></textarea>
       </div>
@@ -3909,6 +4134,21 @@ async function renderCommunityChat(community, kanal, thema) {
   // Der Verlauf steht unten - wie in jedem Chat.
   const liste = $('#commMsgs');
   liste.scrollTop = liste.scrollHeight;
+
+  /*
+   * Angehaengter Standort und Kontakt sind Karten zum Antippen, nicht Bilder.
+   * Ohne diese beiden Zeilen saehen sie im Kanal aus wie im Chat und taeten
+   * nichts — dieselbe Bindung wie in paintMessages().
+   */
+  liste.querySelectorAll('[data-msgkontakt]').forEach((b) =>
+    b.addEventListener('click', () => openContactProfile(b.dataset.msgkontakt))
+  );
+  liste.querySelectorAll('[data-msgort]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const platz = state.places.find((p) => p.name === b.dataset.msgort);
+      if (platz) openExplorer('standort', platz.id);
+    })
+  );
 
   const feld = $('#commMsgInput');
   const sendKnopf = $('#commSend');
@@ -3923,6 +4163,23 @@ async function renderCommunityChat(community, kanal, thema) {
     }
   });
 
+  /*
+   * Der Anhang im Unterthema. Dasselbe Blatt wie im Chat, nur mit einem
+   * anderen Ziel — siehe zielChat() weiter unten.
+   *
+   * "Standort anfragen" faellt weg: die Anfrage richtet sich an eine
+   * bestimmte Person, und ein Kanal hat kein Gegenueber. Im Handbuch steht
+   * sie ausdruecklich unter "im Privatchat".
+   */
+  $('#commAttach').addEventListener('click', () =>
+    openAnhang({
+      pfad: `/api/communities/${community.id}/channels/${kanal.id}/anhang`,
+      ausserId: null,
+      ohne: ['standortAnfragen'],
+      fertig: () => renderCommunityChat(community, kanal, thema),
+    })
+  );
+
   $('#commForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = feld.value.trim();
@@ -3930,11 +4187,21 @@ async function renderCommunityChat(community, kanal, thema) {
     feld.value = '';
     sendKnopf.disabled = true;
 
-    await fetch(`/api/messages/${kanal.id}`, {
+    /*
+     * Bis zum 04.09.2026 ging das an `/api/messages/<Kanal-Id>` — die Route
+     * fuer Chats. `messages.chat_id` zeigt aber auf `chats`, und die Regel
+     * verlangt eine Mitgliedschaft in genau diesem Chat: die Datenbank wies
+     * jede Zeile mit 42501 ab. Geschrieben wurde im Unterthema also nie
+     * etwas, und weil die Seite danach neu lud, sah es nach einem
+     * Anzeigefehler aus. Die richtige Route gab es die ganze Zeit.
+     */
+    const res = await fetch(`/api/communities/${community.id}/channels/${kanal.id}/nachricht`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
+    const daten = await res.json().catch(() => ({}));
+    if (daten && daten.ok === false) toast(daten.error || 'Die Nachricht ging nicht raus');
     renderCommunityChat(community, kanal, thema);
   });
 }
@@ -3947,16 +4214,21 @@ async function renderCommunityChat(community, kanal, thema) {
  * steht kein Bild - man weiss, wer man ist.
  */
 function kanalNachricht(m) {
+  // Anhaenge seit 04.09.2026 — derselbe Inhalt wie im Chat, aus derselben
+  // Funktion. Ein Sticker steht auch hier ohne Blase (msg--sticker).
+  const inhalt = anhangInhalt(m);
+  const stickerKlasse = m.media === 'sticker' ? ' msg--sticker' : '';
+
   // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
   if (m.from === 'me') {
-    return `<div class="msg msg--out">${esc(m.text)}<div class="msg__foot">${esc(m.time)}</div></div>`;
+    return `<div class="msg msg--out${stickerKlasse}" data-msgid="${esc(m.id)}">${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
   }
   const u = user(m.from);
   return `<div class="msgzeile">
-    <button class="msgzeile__avatar" data-profile="${esc(m.from)}" style="background:${u.color}" aria-label="Profil von ${esc(u.name)}">${esc(u.initials)}</button>
-    <div class="msg msg--in">
+    <button class="msgzeile__avatar" data-profile="${esc(m.from)}" style="background:${farbe(u.color)}" aria-label="Profil von ${esc(u.name)}">${esc(u.initials)}</button>
+    <div class="msg msg--in${stickerKlasse}" data-msgid="${esc(m.id)}">
       <button class="msg__sender" data-profile="${esc(m.from)}">${esc(u.name)}</button>
-      ${esc(m.text)}
+      ${inhalt}
       <div class="msg__foot">${esc(m.time)}</div>
     </div>
   </div>`;
@@ -4313,7 +4585,14 @@ const SETTINGS = [
     id: 'datenschutz',
     title: 'Datenschutz',
     items: [
-      { label: 'Zuletzt online', icon: 'clock', wahlKey: 'zuletztOnline', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      /*
+       * Dieselbe Frage wie unter Messenger → "Zuletzt online", und deshalb
+       * auch derselbe Bereich. Hier stand bis zum 03.09.2026 eine eigene
+       * Dreier-Wahl ("Alle / Meine Kontakte / Niemand"), die nur im Browser
+       * lag; nebenan standen vier Stufen mit Ausnahmeliste, die in die
+       * Datenbank gingen. Zwei Orte, dieselbe Frage, verschiedene Antworten.
+       */
+      { label: 'Zuletzt online', icon: 'clock', sichtbar: 'onlinestatus' },
       { label: 'Profilbild sichtbar für', icon: 'image', wahlKey: 'profilbildSichtbar', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Alle' },
       { label: 'Info sichtbar für', icon: 'info', wahlKey: 'infoSichtbar', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
       { label: 'Blockierte Kontakte', icon: 'block', liste: 'blockiert' },
@@ -5061,7 +5340,7 @@ function openEinstellung(punkt, nachher) {
         .map((c) => {
           const u = user(c.id);
           return `<button class="item" data-einladen="${c.id}">
-            <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+            <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
             <span class="item__label">${esc(u.name)}</span>
             <span class="row__chevron">${ICONS.chevron}</span>
           </button>`;
@@ -5166,7 +5445,7 @@ function renderSettings() {
         };
         return `
         <div class="konto__kopf" id="kontoKopf">
-          <span class="avatar avatar--52" style="background:${aktiv.color}">${esc(aktiv.initials)}</span>
+          <span class="avatar avatar--52" style="background:${farbe(aktiv.color)}">${esc(aktiv.initials)}</span>
           <div class="konto__body">
             <div class="konto__name">${esc(aktiv.name)}</div>
             <div class="konto__mail">${esc(aktiv.email)}</div>
@@ -6005,7 +6284,7 @@ function openKontoWechsel() {
       ${state.konten
         .map(
           (k) => `<div class="row" data-konto="${k.id}">
-            <span class="avatar avatar--44" style="background:${k.color}">${esc(k.initials)}</span>
+            <span class="avatar avatar--44" style="background:${farbe(k.color)}">${esc(k.initials)}</span>
             <div class="row__body">
               <div class="row__name">${esc(k.name)}</div>
               <div class="row__sub">${esc(k.email)}</div>
@@ -6037,12 +6316,20 @@ function openKontoWechsel() {
         )}</div>`
       : '';
 
-  /* Anmelden: ein Feld fuer Benutzername, E-Mail oder Telefonnummer. */
+  /*
+   * Anmelden.
+   *
+   * Hier stand "Benutzername, E-Mail oder Telefonnummer". Seit der
+   * Sicherheitspruefung (Fund 2, siehe anmeldung.js) geht nur noch die
+   * E-Mail-Adresse: der Weg ueber den Benutzernamen lief ueber eine Funktion,
+   * die jedem die hinterlegte Adresse herausgab. Beschriftung und Platzhalter
+   * sagen das jetzt, statt etwas anzubieten, das nicht funktioniert.
+   */
   const formularAnmelden = () => `
     <div class="sheet__field">
-      <label class="sheet__label" for="kontoKennung">Benutzername, E-Mail oder Telefonnummer</label>
-      <input id="kontoKennung" placeholder="@name oder name@beispiel.de" value="${esc(zustand.kennung)}"
-             autocapitalize="off" autocomplete="username" />
+      <label class="sheet__label" for="kontoKennung">E-Mail-Adresse</label>
+      <input id="kontoKennung" placeholder="name@beispiel.de" value="${esc(zustand.kennung)}"
+             type="email" autocapitalize="off" autocomplete="username" />
     </div>
     <div class="sheet__field">
       <label class="sheet__label" for="kontoPass">Passwort</label>
@@ -6158,7 +6445,7 @@ function openKontoWechsel() {
     const anmeldenAbsenden = async () => {
       merken();
       const kennung = zustand.kennung.trim();
-      if (!kennung) return meldung('Bitte Benutzername, E-Mail oder Telefonnummer eingeben.');
+      if (!kennung) return meldung('Bitte E-Mail-Adresse eingeben.');
       if (!zustand.passwort) return meldung('Bitte Passwort eingeben.');
 
       if (!window.Anmeldung) return meldung('Die Anmeldung ist gerade nicht erreichbar.');
@@ -6326,7 +6613,7 @@ function renderMessengerProfile() {
     ${switchBar('switchProfile')}
     <div class="scroll">
       <div class="mprof">
-        <div class="avatar avatar--88" style="background:${me.color}">${esc(me.initials)}</div>
+        <div class="avatar avatar--88" style="background:${farbe(me.color)}">${esc(me.initials)}</div>
         <div class="mprof__text">
           ${/* Wie im Videos- und Community-Profil aus dem Konto, nicht fest
                 im Markup - sonst zeigt "Profil bearbeiten" hier keine
@@ -6494,7 +6781,7 @@ function renderLandscapeVideos() {
                     art !== 'live' && c.duration ? `<span class="clip__time">${esc(c.duration)}</span>` : ''
                   }</div>
                   <div class="clip__meta">
-                    <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
+                    <div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>
                     <div>
                       <div class="clip__title">${esc(c.title)}</div>
                       <div class="clip__sub">${esc(u.name)} · ${rechts}</div>
@@ -6642,7 +6929,7 @@ function renderProfileExplorer() {
       <div class="exp__list">${leute
         .map(
           (u) => `<button class="exp__row" data-profile="${u.id}">
-            <span class="avatar avatar--44" style="background:${u.color}">${esc(u.initials)}</span>
+            <span class="avatar avatar--44" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
             <span class="exp__text"><strong>${esc(u.name)}</strong><small>${esc(u.handle)}</small></span>
           </button>`
         )
@@ -6744,7 +7031,7 @@ function medienKachel(eintrag, art, symbol, form) {
       <span class="exp__card-media">${medienFlaeche(eintrag.id, symbol, eintrag.mediaUrl, eintrag.thumbnail)}</span>
       <span class="exp__card-info">
         <span class="exp__card-kopf">
-          <span class="exp__card-avatar" style="background:${u.color}">${esc(u.initials)}</span>
+          <span class="exp__card-avatar" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
           <strong>${esc(u.name)}</strong>
         </span>
         ${zusatz ? `<small>${esc(zusatz)}</small>` : ''}
@@ -6861,7 +7148,7 @@ function renderVideoSearch() {
                 ? `<div class="exp__list">${people
                     .map(
                       (u) => `<button class="exp__row" data-profile="${u.id}">
-                        <span class="avatar avatar--44" style="background:${u.color}">${esc(u.initials)}</span>
+                        <span class="avatar avatar--44" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
                         <span class="exp__text"><strong>${esc(u.name)}</strong><small>${esc(u.handle)}</small></span>
                       </button>`
                     )
@@ -7243,7 +7530,7 @@ function openProfilSenden(profile) {
       .map((c) => {
         const u = user(c.id);
         return `<button class="item" data-an="${c.id}">
-          <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+          <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
           <span class="item__label">${esc(u.name)}</span>
           <span class="row__chevron">${ICONS.chevron}</span>
         </button>`;
@@ -7276,9 +7563,43 @@ function openProfilSenden(profile) {
  * Das Plus in der Nachrichtenzeile. Foto, Standort und Kontakt - alles
  * drei landet wirklich im Chat, statt wie bisher nur einen Hinweis
  * auszugeben.
+ *
+ * ZIEL STATT CHAT (04.09.2026)
+ *
+ * Dasselbe Plus steht seit heute auch im Unterthema einer Community. Beide
+ * schicken denselben Koerper an eine andere Adresse und zeichnen danach eine
+ * andere Liste neu. Statt den ganzen Block ein zweites Mal hinzuschreiben —
+ * und die zweite Abschrift beim naechsten Anhang zu vergessen — bekommen die
+ * Funktionen ein "Ziel":
+ *
+ *   pfad      wohin gesendet wird
+ *   ausserId  wer in der Kontaktauswahl NICHT auftaucht (im Chat die
+ *             Gegenseite, im Kanal niemand)
+ *   ohne      Anhang-Arten, die es hier nicht gibt
+ *   fertig    was mit der angelegten Nachricht geschieht
  */
-function openAnhang(chat) {
-  if (chat.requestState === 'pending') return toast('Warte, bis die Anfrage angenommen wurde');
+function zielChat(chat) {
+  return {
+    pfad: `/api/messages/${chat.id}/anhang`,
+    ausserId: chat.userId,
+    ohne: [],
+    fertig: (nachricht) => {
+      state.messages.push(nachricht);
+      paintMessages(chat);
+    },
+  };
+}
+
+function openAnhang(ziel, chat) {
+  if (chat && chatGesperrt(chat)) {
+    return toast(
+      chat.dmGesperrt
+        ? `${chat.name} empfängt keine Nachrichten`
+        : chat.requestState === 'declined'
+          ? 'Die Anfrage wurde abgelehnt'
+          : 'Warte, bis die Anfrage angenommen wurde'
+    );
+  }
 
   const punkte = [
     { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera' },
@@ -7299,6 +7620,7 @@ function openAnhang(chat) {
   openSheet(
     'Anhang',
     punkte
+      .filter((p) => !(ziel.ohne || []).includes(p.key))
       .map(
         (p) => `<button class="item" data-anhang="${p.key}">
           <span class="item__icon">${ICONS[p.icon]}</span>
@@ -7311,17 +7633,17 @@ function openAnhang(chat) {
       sheet.querySelectorAll('[data-anhang]').forEach((b) =>
         b.addEventListener('click', () => {
           close();
-          anhangSenden(chat, b.dataset.anhang);
+          anhangSenden(ziel, b.dataset.anhang, chat);
         })
       );
     }
   );
 }
 
-/** Anhang wirklich verschicken und im Chat anzeigen. */
-async function anhangSenden(chat, art) {
+/** Anhang wirklich verschicken und anzeigen. */
+async function anhangSenden(ziel, art, chat) {
   const senden = async (koerper) => {
-    const res = await fetch(`/api/messages/${chat.id}/anhang`, {
+    const res = await fetch(ziel.pfad, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(koerper),
@@ -7348,8 +7670,7 @@ async function anhangSenden(chat, art) {
     const nachricht = await senden({ art: 'foto' });
     if (!nachricht) return;
     eigenesMediumSichern(nachricht.id, bild);
-    state.messages.push(nachricht);
-    paintMessages(chat);
+    ziel.fertig(nachricht);
     return toast('Foto gesendet');
   }
 
@@ -7369,8 +7690,7 @@ async function anhangSenden(chat, art) {
 
     const nachricht = await senden({ art: 'datei', name: datei.name, groesse: datei.size });
     if (!nachricht) return;
-    state.messages.push(nachricht);
-    paintMessages(chat);
+    ziel.fertig(nachricht);
     return toast('Datei gesendet');
   }
 
@@ -7393,8 +7713,7 @@ async function anhangSenden(chat, art) {
     const nachricht = await senden({ art: 'gif' });
     if (!nachricht) return;
     eigenesMediumSichern(nachricht.id, bild);
-    state.messages.push(nachricht);
-    paintMessages(chat);
+    ziel.fertig(nachricht);
     return toast('Gif gesendet');
   }
 
@@ -7410,8 +7729,7 @@ async function anhangSenden(chat, art) {
             close();
             const nachricht = await senden({ art: 'sticker', zeichen: b.dataset.sticker });
             if (!nachricht) return;
-            state.messages.push(nachricht);
-            paintMessages(chat);
+            ziel.fertig(nachricht);
           })
         );
       },
@@ -7425,7 +7743,7 @@ async function anhangSenden(chat, art) {
    * die Freigabe, also die eine Richtung.
    */
   if (art === 'standortAnfragen') {
-    if (!chat.userId) return toast('In einer Gruppe geht das nicht');
+    if (!chat?.userId) return toast('In einer Gruppe geht das nicht');
     const antwort = await api(`/api/chats/${chat.id}/standortanfrage`, { zielId: chat.userId });
     if (!antwort?.ok) return toast(antwort?.error || 'Die Anfrage ging nicht raus');
     return toast(`Standort bei ${chat.name} angefragt`);
@@ -7449,8 +7767,7 @@ async function anhangSenden(chat, art) {
             close();
             const nachricht = await senden({ art: 'standort', id: b.dataset.ort });
             if (!nachricht) return;
-            state.messages.push(nachricht);
-            paintMessages(chat);
+            ziel.fertig(nachricht);
             toast('Standort gesendet');
           })
         );
@@ -7460,7 +7777,7 @@ async function anhangSenden(chat, art) {
   }
 
   // Kontakt: nur Personen, die man auch wirklich kennt.
-  const auswahl = state.contacts.filter((c) => state.users[c.id] && c.id !== chat.userId);
+  const auswahl = state.contacts.filter((c) => state.users[c.id] && c.id !== ziel.ausserId);
   if (!auswahl.length) return toast('Du hast noch keinen Kontakt zum Weitergeben');
 
   openSheet(
@@ -7469,7 +7786,7 @@ async function anhangSenden(chat, art) {
       .map((c) => {
         const u = user(c.id);
         return `<button class="item" data-kontakt="${c.id}">
-          <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+          <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
           <span class="item__label">${esc(u.name)}</span>
           <span class="row__chevron">${ICONS.chevron}</span>
         </button>`;
@@ -7481,8 +7798,7 @@ async function anhangSenden(chat, art) {
           close();
           const nachricht = await senden({ art: 'kontakt', id: b.dataset.kontakt });
           if (!nachricht) return;
-          state.messages.push(nachricht);
-          paintMessages(chat);
+          ziel.fertig(nachricht);
           toast('Kontakt gesendet');
         })
       );
@@ -7514,7 +7830,7 @@ function openStoryAnsichten(story, danach) {
                .map((c) => {
                  const u = user(c.id);
                  return `<button class="item" data-seher="${c.id}">
-                   <span class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</span>
+                   <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
                    <span class="item__label">${esc(u.name)}</span>
                    <span class="item__value">${esc(u.handle)}</span>
                  </button>`;
@@ -7538,8 +7854,30 @@ function openStoryAnsichten(story, danach) {
   );
 }
 
-function openStoryOptionen(story, danach) {
+async function openStoryOptionen(story, danach) {
   const eigene = !!story.own;
+
+  /*
+   * "Auf dem Geraet sichern" stand nur bei der eigenen Story — und damit war
+   * die Einstellung "Downloadeinstellungen" eine Wahl ohne Gegenstand: es
+   * gab keinen Weg, einen fremden Inhalt zu sichern, also auch nichts zu
+   * erlauben oder zu verbieten.
+   *
+   * Jetzt gibt es den Punkt auch bei fremden Storys — aber nur, wenn die
+   * Person es zulaesst. Gefragt wird vor dem Zeichnen des Blattes: ein
+   * Knopf, der beim Antippen "darfst du nicht" sagt, ist die schlechtere
+   * Antwort als einer, der gar nicht erst dasteht.
+   */
+  let darfSichern = eigene;
+  if (!eigene && story.mediaUri && story.userId) {
+    try {
+      const r = await fetch(`/api/download-erlaubt/${encodeURIComponent(story.userId)}`);
+      darfSichern = (await r.json()).erlaubt === true;
+    } catch {
+      darfSichern = false;
+    }
+  }
+
   const punkte = eigene
     ? [
         { key: 'sichtbar', label: 'Wer darf sie sehen', icon: 'eye' },
@@ -7548,6 +7886,7 @@ function openStoryOptionen(story, danach) {
       ]
     : [
         { key: 'link', label: 'Link kopieren', icon: 'bookmark' },
+        ...(darfSichern ? [{ key: 'sichern', label: 'Auf dem Gerät sichern', icon: 'bookmark' }] : []),
         { key: 'stumm', label: `${user(story.userId).name} stummschalten`, icon: 'mute' },
         { key: 'melden', label: 'Story melden', icon: 'shield', gefahr: true },
       ];
@@ -7920,7 +8259,7 @@ function openClip(clipId) {
                 return `<article class="clip clip--klein" data-anderesclip="${c.id}">
                   <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
-                    <div class="avatar avatar--36" style="background:${au.color}">${esc(au.initials)}</div>
+                    <div class="avatar avatar--36" style="background:${farbe(au.color)}">${esc(au.initials)}</div>
                     <div>
                       <div class="clip__title">${esc(c.title)}</div>
                       <div class="clip__sub">${esc(au.name)} · ${compactNumber(c.views)} Aufrufe</div>
@@ -8311,7 +8650,7 @@ async function openExplorer(art, wert) {
           return `<article class="clip clip--klein" data-clip="${c.id}">
             <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}<span class="clip__time">${esc(c.duration)}</span></div>
             <div class="clip__meta">
-              <div class="avatar avatar--36" style="background:${u.color}">${esc(u.initials)}</div>
+              <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
               <div>
                 <div class="clip__title">${esc(c.title)}</div>
                 <div class="clip__sub">${esc(u.name)} · ${compactNumber(c.views)} Aufrufe</div>
@@ -8482,7 +8821,7 @@ function openTeilen(art, id) {
     const u = user(uid);
     return `<li>
       <button class="teilen__kachel" data-teilen="${uid}">
-        <span class="avatar avatar--52" style="background:${u.color}">${esc(u.initials)}</span>
+        <span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
         <span class="teilen__name">${esc(u.name)}</span>
         <span class="teilen__haken">${ICONS.check}</span>
       </button>
@@ -9320,6 +9659,10 @@ async function renderVideoProfile() {
   // Videos, die man selbst repostet hat.
   const meineReposts = tab === 'repost' ? await (await fetch('/api/reposts')).json() : [];
 
+  // Derselbe Weg fuer "Markiert". Der Reiter war bei jedem leer, weil es
+  // Markierungen gar nicht gab.
+  const meineMarkierungen = tab === 'tagged' ? await (await fetch('/api/markierungen')).json() : [];
+
   // Inzwischen wurde etwas anderes aufgebaut - dann nichts mehr schreiben.
   if (lauf !== renderLauf) return;
 
@@ -9390,12 +9733,29 @@ async function renderVideoProfile() {
                 </div>`
               )
               .join('')}</div>`
+          : tab === 'tagged' && meineMarkierungen.length
+          ? `<div class="prof__grid">${meineMarkierungen
+              .map(
+                (m) => `<div class="griditem" title="${esc(m.eintrag.description || '')}">
+                  ${medienFlaeche(m.eintrag.id, m.art === 'post' ? ICONS.image : ICONS.play, m.eintrag.mediaUrl, m.eintrag.thumbnail)}
+                  <span class="griditem__badge">${ICONS.person}</span>
+                </div>`
+              )
+              .join('')}</div>`
           : `<div class="empty">${ICONS[PROFILE_TABS.find((t) => t.id === tab).icon]}
-              <div class="empty__title">${tab === 'repost' ? 'Noch nichts repostet' : 'Noch nichts hier'}</div>
+              <div class="empty__title">${
+                tab === 'repost'
+                  ? 'Noch nichts repostet'
+                  : tab === 'tagged'
+                    ? 'Keine Markierungen'
+                    : 'Noch nichts hier'
+              }</div>
               <div class="empty__text">${
                 tab === 'repost'
                   ? 'Tippe im Feed auf den Repost-Knopf, dann erscheint es hier.'
-                  : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
+                  : tab === 'tagged'
+                    ? 'Wer dich mit @ in einer Beschreibung nennt, markiert dich — dann steht der Beitrag hier.'
+                    : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
               }</div>
             </div>`
       }
@@ -10065,6 +10425,73 @@ async function openChatSettings(chatId) {
 }
 
 /* ---------------------------------------------------------- chat detail */
+/*
+ * Die drei Zustände einer Chat-Anfrage.
+ *
+ * Bis zum 03.09.2026 gab es nur einen: „Deine Anfrage läuft noch", mit einem
+ * Knopf „Annahme simulieren" daneben — im Chat des Absenders. Wer
+ * angeschrieben wurde, sah davon nichts und hatte keine Wahl. Dieselben drei
+ * Fälle zeichnet die App in ChatDetailScreen.
+ */
+function anfrageLeiste(chat) {
+  /*
+   * Der vierte Fall, und der einzige, der nichts mit einer Anfrage zu tun
+   * hat: die Person empfängt gar keine Nachrichten (Sichtbarkeitsbereich
+   * `dm`, Schema 22). Er steht zuerst, weil er die anderen überholt — über
+   * eine Anfrage entscheidet niemand mehr, dem man nicht schreiben darf.
+   */
+  if (chat.dmGesperrt) {
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        ${esc(chat.name)} empfängt keine Nachrichten. Was hier steht, bleibt
+        lesbar — schreiben kannst du nicht mehr.
+      </div>
+    </div>`;
+  }
+  if (chat.requestState === 'pending') {
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
+        sobald ${esc(chat.name)} sie angenommen hat.
+      </div>
+    </div>`;
+  }
+  if (chat.requestState === 'declined') {
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        ${esc(chat.name)} hat deine Anfrage abgelehnt. In diesem Chat kannst du
+        nicht mehr schreiben.
+      </div>
+    </div>`;
+  }
+  if (chat.requestState === 'incoming') {
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        ${esc(chat.name)} möchte dir schreiben. Bis du entscheidest, bleibt es
+        bei dieser einen Nachricht.
+      </div>
+      <div class="anfrage__knoepfe">
+        <button class="anfrage__btn" data-anfrage="ja">Annehmen</button>
+        <button class="anfrage__btn anfrage__btn--aus" data-anfrage="nein">Ablehnen</button>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+/*
+ * Eine EINGEGANGENE Anfrage sperrt das Feld nicht: zurückschreiben ist
+ * erlaubt und nimmt sie damit an. Gesperrt ist nur, wer wartet oder
+ * abgelehnt wurde.
+ */
+function chatGesperrt(chat) {
+  return (
+    chat.requestState === 'pending' ||
+    chat.requestState === 'declined' ||
+    chat.dmGesperrt === true
+  );
+}
+
 async function openChat(chatId) {
   /*
    * Henrik am 26.08.2026: "Einzelne Chats oder Gruppenchats im
@@ -10116,6 +10543,27 @@ async function openChat(chatId) {
     fetch(`/api/chats/${chatId}/read`, { method: 'POST' });
   }
 
+  /*
+   * "Nachrichten senden deaktivieren" — Sichtbarkeitsbereich `dm`.
+   *
+   * Ein Chat, der schon steht, bleibt in der Liste; die Einstellung kann
+   * jederzeit nachträglich gesetzt werden. Ohne diese Frage stünde ein
+   * offenes Eingabefeld da, und erst das Senden liefe in eine Ablehnung aus
+   * der Datenbank. Gleicher Aufbau in der App (ChatDetailScreen).
+   *
+   * In Gruppen und Kanälen gilt die Einstellung nicht — dasselbe wie in
+   * `darf_schreiben()`.
+   */
+  chat.dmGesperrt = false;
+  if (chat.userId && !chat.isGroup) {
+    try {
+      const r = await fetch(`/api/dm-erlaubt/${encodeURIComponent(chat.userId)}`);
+      chat.dmGesperrt = (await r.json()).erlaubt === false;
+    } catch {
+      /* Im Zweifel offen lassen: die Datenbank weist ohnehin ab. */
+    }
+  }
+
   overlay.hidden = false;
   overlay.innerHTML = `
     <header class="chathead">
@@ -10123,8 +10571,8 @@ async function openChat(chatId) {
       ${avatarOf(chat, 36)}
       <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} style="${chat.userId ? 'cursor:pointer' : ''}">
         <div class="chathead__name">${esc(chat.name)}</div>
-        <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}">${
-          chat.isGroup ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder` : 'Online'
+        <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}" id="chatStatus">${
+          chat.isGroup ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder` : ''
         }</div>
       </div>
       <div class="chathead__actions">
@@ -10133,29 +10581,30 @@ async function openChat(chatId) {
       </div>
     </header>
     <div class="messages" id="messages"></div>
-    ${
-      chat.requestState === 'pending'
-        ? `<div class="anfrage">
-            <div class="anfrage__text">
-              Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
-              sobald ${esc(chat.name)} sie angenommen hat.
-            </div>
-            <button class="anfrage__btn" id="anfrageOk">Annahme simulieren</button>
-          </div>`
-        : ''
-    }
+    ${anfrageLeiste(chat)}
     <form class="composer" id="composer">
       <button type="button" class="composer__icon" id="attach" aria-label="Anhang">${ICONS.plus}</button>
       <div class="composer__field">
         <textarea id="msgInput" rows="1" placeholder="${
-          chat.requestState === 'pending' ? 'Warten auf Annahme …' : 'Nachricht'
-        }" autocomplete="off" ${chat.requestState === 'pending' ? 'disabled' : ''}></textarea>
+          chat.dmGesperrt
+            ? 'Empfängt keine Nachrichten'
+            : chat.requestState === 'pending'
+              ? 'Warten auf Annahme …'
+              : chat.requestState === 'declined'
+                ? 'Anfrage abgelehnt'
+                : 'Nachricht'
+        }" autocomplete="off" ${chatGesperrt(chat) ? 'disabled' : ''}></textarea>
         <button type="button" class="composer__icon" id="camBtn" aria-label="Kamera">${ICONS.camera}</button>
       </div>
       <button type="submit" class="composer__send" id="sendBtn" aria-label="Senden" disabled>${ICONS.send}</button>
     </form>`;
 
   paintMessages(chat);
+
+  // "Online" stand hier bis zum 03.09.2026 fest im Markup. Jetzt wird der
+  // wirkliche Stand nachgetragen — und bleibt leer, wenn die Person ihn
+  // verbirgt.
+  if (!chat.isGroup) praesenzEintragen(chat.userId, $('#chatStatus'));
 
   $('#chatBack').addEventListener('click', closeChat);
   const profileBtn = overlay.querySelector('[data-profile]');
@@ -10165,26 +10614,41 @@ async function openChat(chatId) {
       render();
     });
   }
-  $('#anfrageOk')?.addEventListener('click', async () => {
-    const res = await fetch(`/api/chats/${chat.id}/accept`, { method: 'POST' });
-    const result = await res.json();
-    if (!result.ok) return toast(result.error);
+  /*
+   * Annehmen und Ablehnen — beides nur für die angeschriebene Person, und
+   * beides über dieselbe Route. Vorher stand hier ein Knopf „Annahme
+   * simulieren" im Chat des ABSENDERS.
+   */
+  overlay.querySelectorAll('[data-anfrage]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const annehmen = b.dataset.anfrage === 'ja';
+      const res = await fetch(`/api/chats/${chat.id}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ annehmen }),
+      });
+      const result = await res.json();
+      if (!result.ok) return toast(result.error);
 
-    chat.requestState = 'accepted';
-    const inState = state.chats.find((c) => c.id === chat.id);
-    if (inState) inState.requestState = 'accepted';
-    const kontakt = state.contacts.find((c) => c.id === chat.userId);
-    if (kontakt) { kontakt.status = 'friend'; kontakt.about = 'Kontakt'; }
+      const neu = annehmen ? 'accepted' : 'declined';
+      chat.requestState = neu;
+      const inState = state.chats.find((c) => c.id === chat.id);
+      if (inState) inState.requestState = neu;
+      if (annehmen) {
+        const kontakt = state.contacts.find((c) => c.id === chat.userId);
+        if (kontakt) { kontakt.status = 'friend'; kontakt.about = 'Kontakt'; }
+      }
 
-    toast('Anfrage angenommen');
-    openChat(chat.id);
-  });
+      toast(annehmen ? 'Anfrage angenommen' : 'Anfrage abgelehnt');
+      openChat(chat.id);
+    })
+  );
   overlay.querySelectorAll('[data-call]').forEach((b) =>
     b.addEventListener('click', () =>
       openCall(chat.userId || chat, b.dataset.call === 'video' ? 'video' : 'audio')
     )
   );
-  $('#attach').addEventListener('click', () => openAnhang(chat));
+  $('#attach').addEventListener('click', () => openAnhang(zielChat(chat), chat));
   // Aus dem Chat heraus steht das Ziel fest: die Aufnahme geht hierher.
   $('#camBtn').addEventListener('click', () => openCamera(chat));
 
@@ -10266,14 +10730,27 @@ function paintMessages(chat) {
   );
 }
 
-function messageBubble(m, chat) {
-  const out = m.from === 'me';
+/**
+ * Der Inhalt einer Blase: Anhang, sonst Text.
+ *
+ * Bis zum 04.09.2026 stand das ausschliesslich in messageBubble(). Seit die
+ * Unterthemen dieselben Anhaenge annehmen (Schema 25), braucht die Blase im
+ * Kanal genau dasselbe — und eine zweite Abschrift haette bedeutet, dass ein
+ * Sticker im Chat ohne Rahmen steht und im Kanal in einer Blase.
+ *
+ * Die Reihenfolge ist nicht beliebig: der Text ist der letzte Ausweg. Bei
+ * einem Sticker IST der Text das Zeichen, bei einer Datei der Dateiname —
+ * stuende er zusaetzlich da, saehe man ihn doppelt.
+ */
+function anhangInhalt(m) {
   // Ein selbst geschicktes Foto liegt im Browser, nicht auf dem Server.
   const eigenesBild = eigeneMedien()[m.id];
   const media =
     m.media === 'image'
       ? eigenesBild
         ? `<img class="msg__bild" src="${eigenesBild}" alt="Foto">`
+        : m.mediaUrl
+        ? `<img class="msg__bild" src="${esc(m.mediaUrl)}" alt="Foto">`
         : `<div class="msg__media">${ICONS.image} Foto</div>`
       : m.media === 'audio'
       ? `<div class="msg__media">${ICONS.mic} Sprachnachricht · 0:14</div>`
@@ -10291,13 +10768,32 @@ function messageBubble(m, chat) {
 
   const kontakt = m.kontakt
     ? `<button class="msg__kontakt" data-msgkontakt="${esc(m.kontakt.id)}">
-         <span class="avatar avatar--44" style="background:${user(m.kontakt.id).color}">${esc(user(m.kontakt.id).initials)}</span>
+         <span class="avatar avatar--44" style="background:${farbe(user(m.kontakt.id).color)}">${esc(user(m.kontakt.id).initials)}</span>
          <span class="msg__kontaktText">
            <strong>${esc(m.kontakt.name)}</strong>
            <span>${esc(m.kontakt.handle)}</span>
          </span>
        </button>`
     : '';
+
+  const datei = m.datei
+    ? `<div class="msg__datei">
+         <span class="msg__dateiSymbol">${ICONS.document}</span>
+         <span class="msg__dateiText">
+           <strong>${esc(m.datei.name)}</strong>
+           <span>${groesseText(m.datei.groesse)}</span>
+         </span>
+       </div>`
+    : '';
+
+  const sticker = m.media === 'sticker' ? `<span class="msg__sticker">${esc(m.text)}</span>` : '';
+  const gif = m.media === 'gif' ? `<div class="msg__media">${ICONS.film} Gif</div>` : '';
+
+  return sticker || datei || gif || standort || kontakt || media || esc(m.text);
+}
+
+function messageBubble(m, chat) {
+  const out = m.from === 'me';
   /*
    * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026).
    *
@@ -10339,19 +10835,6 @@ function messageBubble(m, chat) {
         .join('')}</div>`
     : '';
 
-  const datei = m.datei
-    ? `<div class="msg__datei">
-         <span class="msg__dateiSymbol">${ICONS.document}</span>
-         <span class="msg__dateiText">
-           <strong>${esc(m.datei.name)}</strong>
-           <span>${groesseText(m.datei.groesse)}</span>
-         </span>
-       </div>`
-    : '';
-
-  const sticker = m.media === 'sticker' ? `<span class="msg__sticker">${esc(m.text)}</span>` : '';
-  const gif = m.media === 'gif' ? `<div class="msg__media">${ICONS.film} Gif</div>` : '';
-
   /*
    * Zurückgenommen: die Zeile bleibt stehen. Sie verschwinden zu lassen wäre
    * bequemer, aber dann verlören Antworten und Zitate ihren Bezug — und die
@@ -10367,7 +10850,7 @@ function messageBubble(m, chat) {
            <span>${esc(m.geteilt.titel)}</span>
          </span>
        </div>`
-    : sticker || datei || gif || standort || kontakt || media || esc(m.text);
+    : anhangInhalt(m);
 
   return `
     <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}" data-msgid="${esc(m.id)}">
@@ -10730,7 +11213,7 @@ function openStory(storyId) {
       </div>
       <div class="viewer__head">
         <button class="viewer__close" id="storyClose" aria-label="Zurück">${ICONS.back}</button>
-        <div class="avatar avatar--36" style="background:${u.color}" data-profile="${u.id}">${esc(u.initials)}</div>
+        <div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>
         <div class="viewer__who" ${s.own ? '' : `data-profile="${u.id}"`}>
           <div class="viewer__name">${s.own ? 'Deine Story' : esc(u.name)}</div>
           <div class="viewer__time">${esc(storyAlter(s))}</div>

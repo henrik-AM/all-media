@@ -17,6 +17,7 @@
     "expo-linear-gradient": "~15.0.7",
     "expo-notifications": "^57.0.14",
     "expo-router": "^57.0.16",
+    "expo-secure-store": "^57.0.3",
     "expo-sharing": "^57.0.17",
     "expo-status-bar": "~57.0.1",
     "expo-video": "~57.0.3",
@@ -72,7 +73,11 @@
     "test:datenbank": "node test/_datenbank.js",
     "test:aktionen": "node test/_aktionen.js",
     "test:handbuch": "node test/_handbuch.js",
-    "test:sichtbarkeit": "node test/_sichtbarkeit.js"
+    "test:sichtbarkeit": "node test/_sichtbarkeit.js",
+    "test:fremdprofil": "node test/_fremdprofil.js",
+    "test:chatanfrage": "node test/_chatanfrage.js",
+    "test:dmsperre": "node test/_dmsperre.js",
+    "test:kanal": "node test/_kanal.js"
   },
   "private": true
 }

@@ -62,11 +62,23 @@ const handleUpdateProfile = handler('Profil ändern', async (client, nutzerId, a
 
   daten.updated_at = new Date().toISOString();
 
+  /*
+   * Sicherheitspruefung 04.09.2026 (Fund 1): hier stand `.select()`, also
+   * `select *`. Seit `phone` und `geburtsdatum` spaltenweise gesperrt sind,
+   * antwortet das mit „permission denied for table profiles" — und damit
+   * schlug das Aendern von Name und Info vollstaendig fehl. Aufgefallen in
+   * test/_eigenes.js, nicht im Betrieb: deshalb steht die Spaltenliste jetzt
+   * ausgeschrieben da.
+   */
+  const RUECKGABE_SPALTEN =
+    'id, name, handle, initials, color, privat, about, bio, link, status,' +
+    ' highlights, playlists, spende, live';
+
   const { data, error } = await client
     .from('profiles')
     .update(daten)
     .eq('id', nutzerId)
-    .select()
+    .select(RUECKGABE_SPALTEN)
     .single();
   if (error) throw error;
   return { ok: true, profil: data };
@@ -276,6 +288,23 @@ const handleCreateGroup = handler(
  * Prüfung entstünde bei jedem Teilen ein neuer, und der Verlauf zerfiele in
  * Bruchstücke.
  */
+/**
+ * Darf ich dieser Person schreiben? — Sichtbarkeitsbereich `dm`.
+ *
+ * Gegenstück zu darfAngeschriebenWerden() in app/lib/aktionen.ts. Im Zweifel
+ * nein: ein Eingabefeld, das bei einer Störung aufgeht, führt genau in die
+ * Nachricht, die die Datenbank danach abweist.
+ */
+async function darfAngeschriebenWerden(client, zielId, nutzerId) {
+  if (!zielId || zielId === nutzerId) return true;
+  const { data, error } = await client.rpc('darf_angeschrieben_werden', {
+    inhaber: zielId,
+    wer: nutzerId,
+  });
+  if (error) return false;
+  return data === true;
+}
+
 async function chatMit(client, nutzerId, zielId, bereich = 'messenger') {
   const { data: meine, error } = await client
     .from('chat_members')
@@ -291,6 +320,17 @@ async function chatMit(client, nutzerId, zielId, bereich = 'messenger') {
       .in('chat_id', zweier.map((z) => z.chat_id))
       .eq('user_id', zielId);
     if (andere && andere.length > 0) return andere[0].chat_id;
+  }
+
+  /*
+   * "Nachrichten senden deaktivieren" — Sichtbarkeitsbereich `dm`.
+   *
+   * Vor dem Anlegen fragen, nicht danach: die Regel aus Schema 22 weist das
+   * zweite Mitglied ohnehin ab, aber erst, wenn die Chatzeile schon steht.
+   * Gleiche Stelle, gleicher Wortlaut in app/lib/aktionen.ts (chatMit).
+   */
+  if (!(await darfAngeschriebenWerden(client, zielId, nutzerId))) {
+    throw new Error('Diese Person empfängt keine Nachrichten.');
   }
 
   const { data: person } = await client.from('profiles').select('name').eq('id', zielId).maybeSingle();
@@ -345,14 +385,24 @@ const handleFindPerson = handler('Person suchen', async (client, nutzerId, einga
   const roh = String(eingabe || '').trim();
   if (!roh) return { ok: false, fehler: 'Nichts eingegeben' };
 
-  const spalten = 'id, name, handle, initials, color, phone, privat, about';
+  const spalten = 'id, name, handle, initials, color, privat, about';
 
+  /*
+   * Sicherheitspruefung 04.09.2026 (Fund 1).
+   *
+   * Hier stand vorher: alle Profile mit Nummer laden und die passende im
+   * Arbeitsspeicher heraussuchen. Ein Aufruf, der ganze Bestand — der
+   * Massenabzug in Reinform, und er lief mit dem Recht des ganz normalen
+   * angemeldeten Nutzers.
+   *
+   * Der Vergleich liegt jetzt in der Datenbank (`finde_per_nummer`). Wer die
+   * Nummer kennt, findet die Person; wer sie nicht kennt, bekommt nichts.
+   * Die Nummer steht nicht in der Antwort — der Suchende hat sie eingegeben.
+   */
   if (istNummer(roh)) {
-    const gesucht = nurZiffern(roh);
-    const { data, error } = await client.from('profiles').select(spalten).not('phone', 'is', null);
+    const { data, error } = await client.rpc('finde_per_nummer', { nummer: roh });
     if (error) throw error;
-    const treffer = (data || []).find((p) => p.id !== nutzerId && nurZiffern(p.phone) === gesucht);
-    return { ok: true, person: treffer || null, warNummer: true };
+    return { ok: true, person: data || null, warNummer: true };
   }
 
   const name = roh.replace(/^@/, '').toLowerCase();
@@ -402,14 +452,44 @@ const handleAddContact = handler(
 );
 
 /** Anfrage annehmen — danach ist der Chat frei benutzbar. */
-const handleAcceptRequest = handler('Anfrage annehmen', async (client, nutzerId, zielId) => {
+/*
+ * Über eine Chat-Anfrage entscheiden.
+ *
+ * Hier stand bis zum 03.09.2026 ein Update auf `contacts` — in der EIGENEN
+ * Zeile des Absenders. Damit nahm der Absender seine eigene Anfrage an, und
+ * der Knopf dazu hieß in der Oberfläche „Annahme simulieren". Wer
+ * angeschrieben wurde, kam in dem ganzen Vorgang nicht vor.
+ *
+ * Jetzt geht es an den Chat, den beide sehen. Wer nicht entscheiden darf,
+ * scheitert am Auslöser aus Schema 21; dessen Meldung ist verständlich genug,
+ * um sie durchzureichen.
+ */
+const handleAcceptRequest = handler('Anfrage', async (client, nutzerId, chatId, annehmen = true) => {
   const { error } = await client
-    .from('contacts')
-    .update({ status: 'friend' })
-    .eq('user_id', nutzerId)
-    .eq('contact_id', zielId);
-  if (error) throw error;
-  return { ok: true };
+    .from('chats')
+    .update({ anfrage_zustand: annehmen ? 'angenommen' : 'abgelehnt' })
+    .eq('id', chatId);
+  if (error) return { ok: false, fehler: error.message };
+
+  // Wer annimmt, hat die Person damit auch in den Kontakten.
+  if (annehmen) {
+    const { data: andere } = await client
+      .from('chat_members')
+      .select('user_id')
+      .eq('chat_id', chatId)
+      .neq('user_id', nutzerId);
+    const ziel = (andere || [])[0]?.user_id;
+    if (ziel) {
+      await client
+        .from('contacts')
+        .upsert(
+          { user_id: nutzerId, contact_id: ziel, status: 'friend' },
+          { onConflict: 'user_id,contact_id' }
+        );
+    }
+  }
+
+  return { ok: true, zustand: annehmen ? 'angenommen' : 'abgelehnt' };
 });
 
 /** Kontakt als Favorit merken. */
@@ -519,12 +599,29 @@ const handleCreateChannel = handler(
   }
 );
 
+/**
+ * Im Unterthema schreiben — mit oder ohne Anhang.
+ *
+ * Der Anhang kam am 04.09.2026 dazu (Schema 25). Die Spaltennamen sind
+ * absichtlich dieselben wie in `messages`: beide Tabellen zeigen dieselbe
+ * Blase, und beide Oberflaechen bauen sie aus denselben Feldern.
+ */
 const handleSendChannelMessage = handler(
   'Im Kanal schreiben',
-  async (client, nutzerId, kanalId, text) => {
+  async (client, nutzerId, kanalId, text, medien = {}) => {
     const { data, error } = await client
       .from('community_channel_messages')
-      .insert({ channel_id: kanalId, sender_id: nutzerId, text })
+      .insert({
+        channel_id: kanalId,
+        sender_id: nutzerId,
+        text,
+        media_url: medien.url || null,
+        media_type: medien.typ || null,
+        place_id: medien.standortId || null,
+        contact_user_id: medien.kontaktId || null,
+        file_name: medien.dateiName || null,
+        file_size: medien.dateiGroesse || null,
+      })
       .select()
       .single();
     if (error) throw error;
@@ -646,8 +743,50 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
     .select()
     .single();
   if (error) throw error;
+
+  /*
+   * @-Namen aus der Beschreibung werden zu Markierungen. Gleiche Regel wie
+   * in app/lib/aktionen.ts — laufen die beiden auseinander, markiert der
+   * Browser jemanden, den die App nicht markiert haette.
+   */
+  await markierungenSetzen(client, data.id, felder.beschreibung || '');
+
   return { ok: true, beitrag: data };
 });
+
+/**
+ * Die @-Namen aus einem Text, ohne das Zeichen und ohne Doppelte.
+ * Gegenstueck zu erwaehnungen() in app/lib/aktionen.ts.
+ */
+function erwaehnungen(text) {
+  const treffer = String(text || '').match(/@[A-Za-z0-9_.]{2,30}/g) || [];
+  return [...new Set(treffer.map((t) => t.slice(1).toLowerCase()))];
+}
+
+/*
+ * Markiert die erwaehnten Personen.
+ *
+ * Jede Markierung einzeln: wer sie nicht zulaesst, wird von der Regel
+ * abgelehnt, und das darf die uebrigen nicht mitreissen. Gemeldet wird
+ * absichtlich nicht, wer abgelehnt hat — "X laesst sich nicht markieren"
+ * waere selbst die Auskunft, die die Einstellung verhindern soll.
+ */
+async function markierungenSetzen(client, beitragId, beschreibung) {
+  const namen = erwaehnungen(beschreibung);
+  if (namen.length === 0) return [];
+
+  const { data: profile } = await client
+    .from('profiles')
+    .select('id, name, handle')
+    .in('handle', namen.map((n) => '@' + n));
+
+  const gesetzt = [];
+  for (const p of profile || []) {
+    const { error } = await client.from('post_tags').insert({ post_id: beitragId, user_id: p.id });
+    if (!error) gesetzt.push(p.name);
+  }
+  return gesetzt;
+}
 
 // Ein Video ist ein Beitrag mit kind = 'reel'.
 const handleCreateVideo = (client, nutzerId, felder = {}) =>

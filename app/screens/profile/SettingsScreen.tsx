@@ -197,7 +197,13 @@ const SECTIONS: Section[] = [
     id: 'datenschutz',
     title: 'Datenschutz',
     items: [
-      { label: 'Zuletzt online', icon: 'time-outline', wahlKey: 'zuletztOnline', wahl: WER, standard: 'Meine Kontakte' },
+      /*
+       * Dieselbe Frage wie unter Messenger -> "Zuletzt online", und deshalb
+       * auch derselbe Bereich. Hier stand bis zum 03.09.2026 eine eigene
+       * Dreier-Wahl; nebenan standen vier Stufen mit Ausnahmeliste. Zwei
+       * Orte, dieselbe Frage, verschiedene Antworten.
+       */
+      { label: 'Zuletzt online', icon: 'time-outline', sichtbar: 'onlinestatus' },
       { label: 'Profilbild sichtbar für', icon: 'image-outline', wahlKey: 'profilbildSichtbar', wahl: WER, standard: 'Alle' },
       { label: 'Info sichtbar für', icon: 'information-circle-outline', wahlKey: 'infoSichtbar', wahl: WER, standard: 'Meine Kontakte' },
       { label: 'Blockierte Kontakte', icon: 'ban-outline', liste: 'blockiert' },

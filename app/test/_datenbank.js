@@ -86,10 +86,22 @@ async function main() {
   const hole = (pfad) => fetch(`${URL}/rest/v1/${pfad}`, { headers: kopf }).then((r) => r.json());
 
   // ------------------------------------------------------------ Tabellen --
+  /*
+   * Sicherheitspruefung 04.09.2026 (Fund 1): `select=*` ist kein Nachweis
+   * mehr, dass es eine Tabelle nicht gibt.
+   *
+   * Seit die Telefonnummer spaltenweise gesperrt ist, antwortet `profiles`
+   * auf `select=*` mit 42501 — "permission denied for column phone". Die
+   * Tabelle gibt es also sehr wohl; nur darf man nicht alles davon lesen.
+   * Vorher las sich das hier als "Tabelle fehlt".
+   */
   const fehlend = [];
   for (const tabelle of tabellenAusCode()) {
     const antwort = await hole(`${tabelle}?select=*&limit=1`);
-    if (!Array.isArray(antwort)) fehlend.push(tabelle);
+    if (Array.isArray(antwort)) continue;
+    // 42501 = das Recht fehlt. Ein fehlendes Recht setzt eine Tabelle voraus.
+    if (antwort && antwort.code === '42501') continue;
+    fehlend.push(tabelle);
   }
   pruefe('Alle Tabellen aus dem Code gibt es in der Datenbank', fehlend.length === 0,
     fehlend.length ? 'fehlen: ' + fehlend.join(', ') : '');
@@ -136,18 +148,60 @@ async function main() {
   // Schluessel, ein normales Konto bekommt dort immer "Bucket not found".
   // Stattdessen genau das tun, was die App tut: hochladen, wieder lesen,
   // aufraeumen. Nur das beantwortet die Frage wirklich.
-  const pfad = `test/pruefung-${Date.now()}.txt`;
+  /*
+   * Sicherheitspruefung 04.09.2026 (Fund 4 und Fund 6).
+   *
+   * ZWEI DINGE HABEN SICH GEAENDERT, und beide standen hier vorher falsch:
+   *
+   * 1. Der Eimer nimmt nur noch Bild-, Video- und Tonformate an. Die alte
+   *    Pruefung lud eine .txt hoch und gilt seither als fehlgeschlagen — zu
+   *    Recht. Sie laedt jetzt ein winziges PNG, also das, was die App auch
+   *    hochlaedt.
+   *
+   * 2. Der Eimer ist nicht mehr oeffentlich. Die alte Pruefung hiess
+   *    "Datei ist oeffentlich lesbar" und war gruen, solange die Luecke
+   *    offenstand. Sie ist umgedreht: oeffentlich darf NICHT gehen,
+   *    unterschrieben MUSS gehen.
+   */
+  // Das kleinstmoegliche gueltige PNG (1x1, transparent).
+  const pngBytes = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64'
+  );
+  const pfad = `test/pruefung-${Date.now()}.png`;
   const hoch = await fetch(`${URL}/storage/v1/object/media/${pfad}`, {
     method: 'POST',
-    headers: { ...kopf, 'Content-Type': 'text/plain' },
-    body: 'Pruefung',
+    headers: { ...kopf, 'Content-Type': 'image/png' },
+    body: pngBytes,
   });
   const hochText = await hoch.text();
   pruefe('Ablage "media": Hochladen geht', hoch.ok, hoch.ok ? '' : `${hoch.status} ${hochText}`);
 
+  // Fund 6: was kein Medium ist, darf gar nicht erst hinein.
+  const verboten = await fetch(`${URL}/storage/v1/object/media/test/boese-${Date.now()}.html`, {
+    method: 'POST',
+    headers: { ...kopf, 'Content-Type': 'text/html' },
+    body: '<script>alert(1)</script>',
+  });
+  pruefe('Ablage "media": HTML wird abgewiesen', !verboten.ok,
+    verboten.ok ? 'HTML liess sich hochladen — gespeichertes XSS moeglich' : '');
+
   if (hoch.ok) {
-    const zurueck = await fetch(`${URL}/storage/v1/object/public/media/${pfad}`);
-    pruefe('Ablage "media": Datei ist oeffentlich lesbar', zurueck.ok, zurueck.ok ? '' : String(zurueck.status));
+    const offen = await fetch(`${URL}/storage/v1/object/public/media/${pfad}`);
+    pruefe('Ablage "media": NICHT oeffentlich lesbar', !offen.ok,
+      offen.ok ? 'Die Datei ist ohne Anmeldung abrufbar' : '');
+
+    const unterschrift = await fetch(`${URL}/storage/v1/object/sign/media/${pfad}`, {
+      method: 'POST',
+      headers: { ...kopf, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 3600 }),
+    });
+    const u = await unterschrift.json().catch(() => ({}));
+    let gelesen = false;
+    if (u.signedURL) gelesen = (await fetch(`${URL}/storage/v1${u.signedURL}`)).ok;
+    pruefe('Ablage "media": unterschriebene Adresse liest die Datei', gelesen,
+      gelesen ? '' : `${unterschrift.status} ${JSON.stringify(u).slice(0, 120)}`);
+
     await fetch(`${URL}/storage/v1/object/media/${pfad}`, { method: 'DELETE', headers: kopf });
   }
 
