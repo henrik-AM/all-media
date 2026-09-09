@@ -35,6 +35,24 @@
 
 const OEFFENTLICH = '/storage/v1/object/public/media/';
 
+/*
+ * Zwischenspeicher fuer unterschriebene Adressen: Pfad -> { url, ablauf }.
+ *
+ * Ohne ihn bekam jede Anfrage eine neue Unterschrift, also eine neue
+ * Adresse (der Token steht im Query-String). Fuer den Browser war das jedes
+ * Mal eine „neue" Datei, der `Cache-Control`-Header beim Hochladen (siehe
+ * `hochladen` unten) griff nie, und dasselbe Bild oder Video wurde bei jedem
+ * Neuladen komplett neu von Supabase geladen. Das Nutzungs-Dashboard zeigte
+ * 44 MB Speicher gegen 7,2 GB Egress bei 13 Testkonten — derselbe kleine
+ * Bestand, hunderte Male neu heruntergeladen.
+ *
+ * Innerhalb der Gueltigkeit bleibt die Adresse fuer denselben Pfad jetzt
+ * gleich, damit Browser und Supabase-CDN sie tatsaechlich aus dem Cache
+ * bedienen koennen.
+ */
+const zwischenspeicher = new Map();
+const PUFFER_MS = 10 * 60 * 1000;
+
 /** Steckt in diesem Wert eine Adresse aus unserem Eimer? */
 function istMedienAdresse(wert) {
   return typeof wert === 'string' && wert.includes(OEFFENTLICH);
@@ -67,18 +85,34 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
   sammle(daten, pfade);
   if (pfade.size === 0) return daten;
 
-  const liste = [...pfade];
-  let karte = new Map();
-  try {
-    const { data, error } = await client.storage.from('media').createSignedUrls(liste, sekunden);
-    if (error) throw error;
-    for (const eintrag of data || []) {
-      if (eintrag?.signedUrl && !eintrag.error) karte.set(eintrag.path, eintrag.signedUrl);
+  const karte = new Map();
+  const jetzt = Date.now();
+  const fehlend = [];
+  for (const pfad of pfade) {
+    const eintrag = zwischenspeicher.get(pfad);
+    if (eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
+      karte.set(pfad, eintrag.url);
+    } else {
+      fehlend.push(pfad);
     }
-  } catch (fehler) {
-    // Sichtbar machen, nicht verschlucken.
-    console.error('Medienadressen unterschreiben fehlgeschlagen:', fehler.message);
-    return daten;
+  }
+
+  if (fehlend.length) {
+    try {
+      const { data, error } = await client.storage.from('media').createSignedUrls(fehlend, sekunden);
+      if (error) throw error;
+      const ablauf = jetzt + sekunden * 1000;
+      for (const eintrag of data || []) {
+        if (eintrag?.signedUrl && !eintrag.error) {
+          karte.set(eintrag.path, eintrag.signedUrl);
+          zwischenspeicher.set(eintrag.path, { url: eintrag.signedUrl, ablauf });
+        }
+      }
+    } catch (fehler) {
+      // Sichtbar machen, nicht verschlucken.
+      console.error('Medienadressen unterschreiben fehlgeschlagen:', fehler.message);
+      if (karte.size === 0) return daten;
+    }
   }
 
   return ersetze(daten, karte);
