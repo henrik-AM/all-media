@@ -37,7 +37,15 @@ const pruefe = (was, ok, zusatz = '') => {
 };
 
 (async () => {
-  const browser = await chromium.launch();
+  /*
+   * Mit erfundener Kamera starten. Seit dem Kamera-Umbau vom 09.09.2026
+   * oeffnet der Ausloeser keinen Dateidialog mehr, sondern nimmt wirklich
+   * auf. Ohne Kamera kommt nur noch „Ohne Kamerazugriff geht die Aufnahme
+   * nicht" — und diese Pruefung lief in einen Timeout.
+   */
+  const browser = await chromium.launch({
+    args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+  });
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -47,27 +55,40 @@ const pruefe = (was, ok, zusatz = '') => {
   const konsolenfehler = [];
   page.on('console', (m) => { if (m.type() === 'error') konsolenfehler.push(m.text()); });
   page.on('pageerror', (e) => konsolenfehler.push('pageerror: ' + e.message));
+  /*
+   * Mit AM_NETZ=1 wird jede gescheiterte Anfrage mit Adresse protokolliert.
+   * Hilft bei Meldungen wie „Failed to load resource", die von sich aus nicht
+   * verraten, welche Adresse gemeint ist (09.09.2026).
+   */
+  if (process.env.AM_NETZ) {
+    page.on('requestfailed', (r) =>
+      console.log('NETZ', r.failure()?.errorText, r.url().slice(0, 160))
+    );
+  }
 
   const ziel = process.env.ZIEL || 'http://localhost:3000/';
 
   // Der Server haelt alles im Speicher. Ohne Ruecksetzen waeren Kontakte und
   // Gruppen aus dem vorigen Lauf noch da und der Test schluege zu Unrecht fehl.
-  await page.goto(ziel, { waitUntil: 'networkidle' });
+  await page.goto(ziel, { waitUntil: 'load' });
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
   // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
   const angemeldet = await anmelden(page);
   if (!angemeldet.ok) {
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
   }
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await zuruecksetzen(page);
   await page.evaluate(() => {
     try { localStorage.removeItem('allmedia.eigeneStory'); } catch {}
   });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(500);
 
   // ---------------------------------------------------------------- Chats
@@ -163,8 +184,22 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.waitForTimeout(500);
   pruefe('Vollbild laesst sich verlassen', !(await page.$('.map--voll')));
 
+  /*
+   * Der Umschalter tippt die Ansichten nicht mehr durch, sondern oeffnet ein
+   * Auswahlfenster — so hat Henrik es sich gewuenscht. Gewechselt wird erst
+   * mit dem Klick auf einen Eintrag darin. Diese Pruefung hat bis zum
+   * 09.09.2026 noch das alte Durchtippen erwartet und deshalb Fehlalarm
+   * gegeben.
+   */
   const vorherStil = await page.$eval('#map', (e) => e.className);
   await page.click('[data-mapstil]');
+  await page.waitForTimeout(300);
+  pruefe('Auswahlfenster fuer die Kartenansicht geht auf', !!(await page.$('[data-stilwahl]')));
+  const andere = await page.$$eval('[data-stilwahl]', (n, jetzt) =>
+    n.map((x) => x.dataset.stilwahl).filter((k) => !jetzt.includes('map--' + k)),
+    vorherStil
+  );
+  await page.click(`[data-stilwahl="${andere[0]}"]`);
   await page.waitForTimeout(400);
   pruefe('Kartenansicht wechselt', vorherStil !== (await page.$eval('#map', (e) => e.className)));
 
@@ -299,12 +334,15 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.click('[data-sub="camera"]');
   await page.waitForTimeout(600);
 
-  const [auswahl] = await Promise.all([
-    page.waitForEvent('filechooser'),
-    page.click('#camShutter'),
-  ]);
-  await auswahl.setFiles(BILD);
-  await page.waitForTimeout(1200);
+  // Auf das laufende Kamerabild warten, sonst weist der Ausloeser ab.
+  await page
+    .waitForFunction(() => {
+      const v = document.querySelector('.camera video');
+      return v && v.readyState >= 2;
+    }, null, { timeout: 15000 })
+    .catch(() => {});
+  await page.click('#camShutter');
+  await page.waitForTimeout(1500);
 
   // Punkt 17: die Aufnahme landet nicht mehr stillschweigend in der Story -
   // erst fragt die Kamera, wohin damit.
@@ -312,13 +350,49 @@ const pruefe = (was, ok, zusatz = '') => {
          !!(await page.$('[data-verwenden="story"]')));
   pruefe('Die Aufnahme steht als Vorschau darüber',
          !!(await page.$('.aufnahme__vorschau')));
-  pruefe('Chat und Beitrag stehen als Ziel zur Wahl',
-         !!(await page.$('[data-verwenden="chat"]')) && !!(await page.$('[data-verwenden="beitrag"]')));
+  pruefe('Chat und Insight stehen als Ziel zur Wahl',
+         !!(await page.$('[data-verwenden="chat"]')) && !!(await page.$('[data-verwenden="insight"]')));
+  /*
+   * „Als Beitrag veroeffentlichen" ist mit Absicht weg.
+   *
+   * Henrik, 07.09.2026: „Beitraege nur Videos, nicht Messenger — Messenger
+   * privat/nummernbasiert, Videos oeffentlich." Diese Pruefung hat den Knopf
+   * bis zum 09.09.2026 noch eingefordert. Jetzt bewacht sie die Regel:
+   * kommt er zurueck, faellt es auf.
+   */
+  pruefe('Aus der Kamera heraus wird nichts oeffentlich',
+         !(await page.$('[data-verwenden="beitrag"]')));
 
   await page.click('[data-verwenden="story"]');
-  await page.waitForTimeout(900);
-  pruefe('Aufnahme wird übernommen',
-         /Story ist online/i.test(await page.$eval('#toast', (e) => e.textContent)));
+  await page.waitForTimeout(700);
+
+  // Seit dem 09.09.2026 sind Storys getrennt: erst wird gefragt, ob sie
+  // zusaetzlich unter Videos stehen soll.
+  pruefe('Vor dem Posten wird gefragt, wo die Story stehen soll',
+         !!(await page.$('[data-wo="messenger"]')) && !!(await page.$('[data-wo="beides"]')));
+  /*
+   * Erst den alten Hinweis wegraeumen, dann auf den neuen warten.
+   *
+   * Ohne das las diese Pruefung am 09.09.2026 „Repostet" — den Hinweis aus
+   * dem Abschnitt davor. Die Story wurde laengst gepostet, ihr eigener
+   * Hinweis kam nur spaeter, weil erst das Bild hochgeladen wird.
+   */
+  await page.evaluate(() => {
+    const t = document.querySelector('#toast');
+    if (t) { t.textContent = ''; t.hidden = true; }
+  });
+  await page.click('[data-wo="beides"]');
+  await page
+    .waitForFunction(
+      () => { const t = document.querySelector('#toast'); return t && !t.hidden && t.textContent.trim(); },
+      null, { timeout: 15000 }
+    )
+    .catch(() => {});
+  // Den Hinweis mitschreiben, nicht nur pruefen: sonst steht bei einem
+  // Fehlschlag nur „nein" da und niemand weiss, was die Seite gesagt hat.
+  const storyHinweis = await page.$eval('#toast', (e) => e.textContent).catch(() => '');
+  pruefe('Aufnahme wird übernommen', /Story ist online/i.test(storyHinweis),
+         storyHinweis.trim() || 'kein Hinweis');
 
   await page.click('[data-sub="chats"]');
   await page.waitForTimeout(700);

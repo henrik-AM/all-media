@@ -26,7 +26,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
-  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.goto(ZIEL, { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -38,15 +38,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForSelector('#topbar button');
 
   const ergebnisse = [];
@@ -225,25 +228,54 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   /* --------------------------------------------- Story-Ring am Profil */
   console.log('\nStory-Ring am eigenen Profil');
 
+  /*
+   * Die eigene Story kommt seit dem 09.09.2026 aus `state.stories`, also vom
+   * Server. Vorher stand sie im Browserspeicher unter
+   * `allmedia.eigeneStory` — und genau den hat diese Pruefung bis heute
+   * geleert. Das hatte laengst keine Wirkung mehr: der Ring stand zu Recht
+   * da, weil im Pruefbestand eine echte Story liegt, und die beiden
+   * folgenden Pruefungen waren nur zufaellig gruen.
+   *
+   * Deshalb jetzt an der Quelle, die der Code wirklich liest. Ein Neuladen
+   * darf es dabei nicht geben — das holt die Storys sofort wieder.
+   */
+  const storysSetzen = (eigene) =>
+    page.evaluate((eigene) => {
+      const fremde = (state.stories || []).filter((s) => !s.own);
+      state.stories = eigene
+        ? [{ own: true, mediaUri: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' }, ...fremde]
+        : fremde;
+      render();
+    }, eigene);
+
+  /*
+   * Auf den Ring warten, nicht auf die Uhr.
+   *
+   * `renderVideoProfile` ist async und holt erst `/api/profile/me` und je nach
+   * Reiter noch Reposts und Markierungen, bevor es schreibt. Bis zum
+   * 10.09.2026 stand hier ein festes `waitForTimeout(300)` — gemessen dauert
+   * es 500 bis 800 ms, und die Pruefung las verlaesslich das alte Bild.
+   */
+  const ringWarten = (soll) =>
+    page.waitForFunction(
+      (soll) => Boolean(document.querySelector('[data-eigene-story]')) === soll,
+      soll,
+      { timeout: 10000 }
+    );
+
   await pruefe('Ohne eigene Story ist kein Ring da', async () => {
-    await page.evaluate(() => localStorage.removeItem('allmedia.eigeneStory'));
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForSelector('#topbar button');
     await zumProfil('videos');
-    if (await page.$('[data-eigene-story]')) throw new Error('der Ring steht ohne Story da');
+    await storysSetzen(false);
+    await ringWarten(false).catch(() => {
+      throw new Error('der Ring steht ohne Story da');
+    });
   });
 
   await pruefe('Mit eigener Story steht der Ring am Profilbild', async () => {
-    await page.evaluate(() =>
-      localStorage.setItem(
-        'allmedia.eigeneStory',
-        JSON.stringify({ mediaUri: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', aufgenommen: Date.now() })
-      )
-    );
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForSelector('#topbar button');
-    await zumProfil('videos');
-    if (!(await page.$('[data-eigene-story]'))) throw new Error('kein Ring');
+    await storysSetzen(true);
+    await ringWarten(true).catch(() => {
+      throw new Error('kein Ring');
+    });
   });
 
   await pruefe('Der Ring steht auch im Communitys-Profil', async () => {

@@ -15,6 +15,9 @@
  * Videos sind Beiträge mit kind = 'reel'/'clip', Likes stehen in post_likes.
  */
 
+const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
+const Telefon = require('../../gemeinsam/telefon');
+
 // Ein Umschalter (Like, Gespeichert, Repost …): Zeile da → weg, sonst → hin.
 async function umschalten(client, tabelle, schluessel) {
   let abfrage = client.from(tabelle).select('*', { count: 'exact', head: true });
@@ -24,10 +27,19 @@ async function umschalten(client, tabelle, schluessel) {
   if (fehlerLesen) throw fehlerLesen;
 
   if (count > 0) {
-    let loeschen = client.from(tabelle).delete();
+    /*
+     * `count: 'exact'` ist hier keine Zierde.
+     *
+     * Verbietet eine Regel der Datenbank das Loeschen, kommt kein Fehler
+     * zurueck — PostgREST loescht null Zeilen und meldet Erfolg. Ohne diese
+     * Zahl gaebe `umschalten` dann `false` zurueck, das Herz wuerde grau, und
+     * das Like bliebe stehen. Gleiches Vorgehen wie in app/lib/aktionen.ts.
+     */
+    let loeschen = client.from(tabelle).delete({ count: 'exact' });
     for (const [spalte, wert] of Object.entries(schluessel)) loeschen = loeschen.eq(spalte, wert);
-    const { error } = await loeschen;
+    const { error, count: geloescht } = await loeschen;
     if (error) throw error;
+    if (!geloescht) throw new Error(`Zeile in ${tabelle} liess sich nicht entfernen`);
     return false;
   }
 
@@ -62,23 +74,12 @@ const handleUpdateProfile = handler('Profil ändern', async (client, nutzerId, a
 
   daten.updated_at = new Date().toISOString();
 
-  /*
-   * Sicherheitspruefung 04.09.2026 (Fund 1): hier stand `.select()`, also
-   * `select *`. Seit `phone` und `geburtsdatum` spaltenweise gesperrt sind,
-   * antwortet das mit „permission denied for table profiles" — und damit
-   * schlug das Aendern von Name und Info vollstaendig fehl. Aufgefallen in
-   * test/_eigenes.js, nicht im Betrieb: deshalb steht die Spaltenliste jetzt
-   * ausgeschrieben da.
-   */
-  const RUECKGABE_SPALTEN =
-    'id, name, handle, initials, color, privat, about, bio, link, status,' +
-    ' highlights, playlists, spende, live';
-
+  // Warum hier keine blanke `.select()` steht, erklaert die gemeinsame Datei.
   const { data, error } = await client
     .from('profiles')
     .update(daten)
     .eq('id', nutzerId)
-    .select(RUECKGABE_SPALTEN)
+    .select(PROFIL_RUECKGABE_SPALTEN)
     .single();
   if (error) throw error;
   return { ok: true, profil: data };
@@ -370,11 +371,12 @@ const handleChatMit = handler('Chat finden', async (client, nutzerId, zielId, be
  * über die Nummer. Die Suche läuft in der Datenbank, damit sie in der App und
  * auf der Website dasselbe findet.
  */
+// Die Rechnung stand am 07.09.2026 an drei Stellen und war an einer davon
+// eine andere. Jetzt kommt sie aus gemeinsam/telefon.js — derselben Datei,
+// nach der sich seit SUPABASE_SCHEMA_24_telefon.sql auch die Datenbank
+// richtet.
 function nurZiffern(eingabe) {
-  let z = String(eingabe).replace(/[^\d+]/g, '').replace(/^\+/, '00');
-  if (z.startsWith('00')) z = z.slice(2);
-  else if (z.startsWith('0')) z = '49' + z.slice(1);
-  return z;
+  return Telefon.vergleichsform(String(eingabe));
 }
 
 function istNummer(eingabe) {
@@ -510,6 +512,65 @@ const handleContactFavorite = handler('Kontakt-Favorit', async (client, nutzerId
     .eq('contact_id', zielId);
   if (error) throw error;
   return { ok: true, favorit: neu };
+});
+
+/*
+ * Einen Anruf im Chat vermerken.
+ *
+ * Henrik 7.9.: „Anrufe sollen als Chatnachricht protokolliert werden (wie
+ * WhatsApp)." Der Eintrag ist eine gewöhnliche Nachricht mit leerem Text und
+ * gesetztem `anruf_art` (SUPABASE_SCHEMA_35_anrufe.sql).
+ *
+ * Verschlüsselt wird er nicht: Er trägt keinen Text, und was er verrät — dass
+ * angerufen wurde — weiß die Gegenseite ohnehin.
+ *
+ * Gleiche Regel in app/lib/aktionen.ts (anrufNotieren).
+ */
+const handleAnrufNotieren = handler('Anrufeintrag', async (client, nutzerId, zielId, werte) => {
+  const art = werte.art === 'video' ? 'video' : 'audio';
+  const status = ['beendet', 'verpasst', 'abgelehnt'].includes(werte.status) ? werte.status : 'beendet';
+  const chatId = await chatMit(client, nutzerId, zielId);
+
+  const { error } = await client.from('messages').insert({
+    chat_id: chatId,
+    sender_id: nutzerId,
+    text: '',
+    anruf_art: art,
+    anruf_status: status,
+    anruf_dauer: status === 'beendet' ? Math.max(0, Math.round(Number(werte.dauer) || 0)) : 0,
+  });
+  if (error) throw error;
+
+  await client.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chatId);
+  return { ok: true, chatId };
+});
+
+/*
+ * Kontaktinfo ändern — selbst vergebener Name und Notiz.
+ *
+ * Henrik 7.9.: „Kontaktinfo-Änderungen (z.B. Name) speichern/synchronisieren
+ * nicht." Vorher lief das nur über state.users im Browser und war beim nächsten
+ * Laden wieder weg. Jetzt steht es in contacts.spitzname/notiz (Schema 33).
+ *
+ * Gleiche Regel in app/lib/aktionen.ts (kontaktBearbeiten).
+ */
+const handleContactEdit = handler('Kontakt bearbeiten', async (client, nutzerId, zielId, werte) => {
+  const feld = {};
+  if (werte.spitzname !== undefined) feld.spitzname = werte.spitzname.trim() || null;
+  if (werte.notiz !== undefined) feld.notiz = werte.notiz.trim() || null;
+  if (!Object.keys(feld).length) return { ok: false, fehler: 'Nichts zu ändern' };
+
+  // .select() dazu: Ein von RLS abgelehntes UPDATE meldet keinen Fehler,
+  // sondern ändert null Zeilen. Ohne Gegenprobe hieße das fälschlich „gespeichert".
+  const { data, error } = await client
+    .from('contacts')
+    .update(feld)
+    .eq('user_id', nutzerId)
+    .eq('contact_id', zielId)
+    .select('contact_id');
+  if (error) throw error;
+  if (!data || data.length === 0) return { ok: false, fehler: 'Diese Person steht nicht in deinen Kontakten' };
+  return { ok: true };
 });
 
 /** „Benachrichtige mich über neue Beiträge dieser Person." */
@@ -691,10 +752,45 @@ const handleSendMessage = handler(
         quote_of: medien.zitatVon || null,
         file_name: medien.dateiName || null,
         file_size: medien.dateiGroesse || null,
+        /*
+         * Verschluesselung (Schema 31). Verschlossen hat der Browser, nicht
+         * dieser Server — er bekommt Chiffre und Nonce fertig und legt sie
+         * ab. `text` ist dann leer, und die Datenbank besteht darauf
+         * (`messages_krypto_stimmig`).
+         */
+        krypto: Number(medien.krypto || 0),
+        chiffre: medien.chiffre || null,
+        krypto_nonce: medien.kryptoNonce || null,
+        absender_schluessel: medien.absenderSchluessel || null,
       })
       .select()
       .single();
     if (error) throw error;
+
+    /*
+     * Die Kuverts, einer je mitlesendem Geraet.
+     *
+     * Sie kommen nach der Nachricht, weil sie auf deren Kennung zeigen. Und
+     * sie muessen ankommen: ohne Kuvert ist die Nachricht fuer niemanden zu
+     * oeffnen, auch nicht fuer den Absender. Deshalb wird die halbe
+     * Nachricht wieder weggeraeumt, statt als unlesbare Zeile stehen zu
+     * bleiben. Gleiche Regel wie in app/lib/aktionen.ts.
+     */
+    const kuverts = Array.isArray(medien.kuverts) ? medien.kuverts : [];
+    if (kuverts.length) {
+      const { error: fehlerK } = await client.from('message_keys').insert(
+        kuverts.map((k) => ({
+          message_id: data.id,
+          schluessel_id: k.schluesselId,
+          nonce: k.nonce,
+          chiffre: k.chiffre,
+        }))
+      );
+      if (fehlerK) {
+        await client.from('messages').delete().eq('id', data.id);
+        throw fehlerK;
+      }
+    }
 
     // Damit der Chat in der Liste nach oben rutscht. Klappt das nicht, ist
     // die Nachricht trotzdem angekommen — die Liste steht nur in der alten
@@ -876,6 +972,14 @@ const handleCreateStory = handler('Story anlegen', async (client, nutzerId, feld
       media_url: felder.mediaUrl || null,
       media_type: felder.mediaTyp || 'image',
       caption: felder.text || '',
+      /*
+       * Henrik am 07.09.2026: „beim Posten fragen ob uebergreifend teilen."
+       * Die Antwort gilt fuer diese eine Story (Schema 36). Ohne Angabe:
+       * nein — eine Story ist eine Messenger-Sache, und was nicht
+       * ausdruecklich in einen oeffentlichen Bereich gehoert, gehoert nicht
+       * dorthin. Gleiche Regel in app/lib/aktionen.ts.
+       */
+      in_videos: Boolean(felder.inVideos),
     })
     .select()
     .single();
@@ -1459,6 +1563,30 @@ const handleSichtbarkeit = handler(
   }
 );
 
+/**
+ * „Story auch in Videos teilen" — der Zusatz zur Stufe „Alle".
+ *
+ * Gleichlautend mit app/lib/aktionen.ts, storyInVideosSetzen(). Der Wert
+ * steht auf `profiles` und nicht in `user_settings`, weil fremde Geräte ihn
+ * lesen müssen: deren Videos-Bereich entscheidet damit, ob die Story dort
+ * erscheint (Schema 30).
+ *
+ * Dass er nur bei Stufe „Alle" gilt, setzt die Datenbank durch. Hier wird es
+ * nicht noch einmal geprüft — dieselbe Regel an zwei Orten geht irgendwann
+ * auseinander.
+ */
+const handleStoryInVideos = handler(
+  'Story in Videos',
+  async (client, nutzerId, an) => {
+    const { error } = await client
+      .from('profiles')
+      .update({ story_in_videos: Boolean(an) })
+      .eq('id', nutzerId);
+    if (error) throw error;
+    return { ok: true, an: Boolean(an) };
+  }
+);
+
 const handleSichtbarkeitAusnahme = handler(
   'Ausnahme',
   async (client, nutzerId, bereich, zielId) => {
@@ -1677,6 +1805,37 @@ const handleStandortAntwort = handler(
 );
 
 
+/**
+ * Gesehene Beitraege vermerken — die Grundlage des spaeteren Feed-Rankings.
+ *
+ * Das Gegenstueck in der App ist `impressionenVermerken()` in
+ * `app/lib/aktionen.ts`; gemessen wird auf beiden Seiten mit denselben
+ * Zahlen (60 Prozent Flaeche, mindestens eine Sekunde), damit eine Sichtung
+ * im Browser dasselbe bedeutet wie eine in der App.
+ *
+ * Der Betrachter wird nicht mitgeschickt: die Datenbankfunktion nimmt ihn
+ * aus `auth.uid()`. Wer ihn setzen duerfte, koennte sich Sichtungen unter
+ * fremdem Namen ausdenken und damit spaeter das Ranking faerben — die Lehre
+ * aus Fund 11 der Sicherheitspruefung.
+ */
+const handleImpressionen = handler('Sichtungen', async (client, nutzerId, eintraege) => {
+  const liste = Array.isArray(eintraege) ? eintraege : [];
+  const sauber = liste
+    .filter((e) => e && typeof e.beitrag === 'string')
+    .slice(0, 100)
+    .map((e) => ({
+      beitrag: e.beitrag,
+      dauer: Math.round(Number(e.dauer) || 0),
+      herkunft: typeof e.herkunft === 'string' ? e.herkunft : 'feed',
+    }));
+
+  if (sauber.length === 0) return { ok: true, vermerkt: 0 };
+
+  const { data, error } = await client.rpc('impressionen_vermerken', { eintraege: sauber });
+  if (error) throw error;
+  return { ok: true, vermerkt: Number(data ?? 0) };
+});
+
 module.exports = {
   handleUpdateProfile,
   handleFollowUser,
@@ -1691,6 +1850,8 @@ module.exports = {
   handleAddContact,
   handleAcceptRequest,
   handleContactFavorite,
+  handleContactEdit,
+  handleAnrufNotieren,
   handleNotifyPost,
   handleShareToChats,
   handleStoryReply,
@@ -1741,6 +1902,7 @@ module.exports = {
   handleUmfrageStimmen,
   handleSichtbarkeit,
   handleSichtbarkeitAusnahme,
+  handleStoryInVideos,
   handleAltersangabe,
   handleFreigabe,
   handleWortfilter,
@@ -1749,4 +1911,5 @@ module.exports = {
   handleSpende2,
   handleStandortAnfrage,
   handleStandortAntwort,
+  handleImpressionen,
 };

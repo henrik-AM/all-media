@@ -91,7 +91,7 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
    */
   const seite = await browser.newPage({ viewport: { width: 400, height: 860 }, bypassCSP: true });
 
-  await seite.goto(BASIS, { waitUntil: 'networkidle' });
+  await seite.goto(BASIS, { waitUntil: 'load' });
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);
@@ -139,16 +139,55 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
   const uebersetzt = zusammengelegt(bauOrdner, 'daten.js');
   fs.rmSync(bauOrdner, { recursive: true, force: true });
 
-  const app = await seite.evaluate(async (quelltext) => {
-    // Als Modul laden, damit `export` gilt.
-    const url = URL.createObjectURL(new Blob([quelltext], { type: 'text/javascript' }));
-    const modul = await import(url);
-    URL.revokeObjectURL(url);
+  /*
+   * Das try/catch ist nicht schmückendes Beiwerk.
+   *
+   * Am 06.09.2026 fiel dieser Lauf einmal aus, und die Meldung lautete
+   * vollständig: `page.evaluate: Object`. Supabase wirft im Fehlerfall kein
+   * Error-Objekt, sondern ein schlichtes `{ message, code, details, hint }`.
+   * Playwright kann so etwas nicht über die Browsergrenze tragen und macht
+   * daraus "Object" — Ursache weg. Deshalb wird der Fehler hier im Browser
+   * gefangen und in ein Feld gelegt, das die Grenze übersteht.
+   */
+  const antwort = await seite.evaluate(async (quelltext) => {
+    try {
+      // Als Modul laden, damit `export` gilt.
+      const url = URL.createObjectURL(new Blob([quelltext], { type: 'text/javascript' }));
+      const modul = await import(url);
+      URL.revokeObjectURL(url);
 
-    const client = await window.Anmeldung.aufbauen();
-    const ich = window.Anmeldung.nutzer().id;
-    return modul.ladeAlles(client, ich);
+      const client = await window.Anmeldung.aufbauen();
+      const ich = window.Anmeldung.nutzer().id;
+      return { daten: await modul.ladeAlles(client, ich) };
+    } catch (f) {
+      return {
+        fehler: {
+          art: Object.prototype.toString.call(f),
+          message: (f && f.message) || String(f),
+          code: f && f.code,
+          details: f && f.details,
+          hint: f && f.hint,
+          stack: f && f.stack ? String(f.stack).split('\n').slice(0, 4).join(' | ') : '',
+        },
+      };
+    }
   }, uebersetzt);
+
+  if (antwort.fehler) {
+    const f = antwort.fehler;
+    console.error(
+      `\nFEHLER  Die App konnte nicht laden.\n` +
+        `        Art:      ${f.art}\n` +
+        `        Meldung:  ${f.message}\n` +
+        (f.code ? `        Code:     ${f.code}\n` : '') +
+        (f.details ? `        Details:  ${f.details}\n` : '') +
+        (f.hint ? `        Hinweis:  ${f.hint}\n` : '') +
+        (f.stack ? `        Spur:     ${f.stack}\n` : '')
+    );
+    await browser.close();
+    process.exit(1);
+  }
+  const app = antwort.daten;
 
   pruefe('App hat Daten geladen', Boolean(app && app.geladen));
 

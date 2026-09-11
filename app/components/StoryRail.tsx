@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,17 +18,59 @@ const RING = sizes.storyRing;
 /**
  * Story-Leiste. Der Ring ist ein Verlauf, kein einfarbiger Rand — das ist der
  * eine Punkt, an dem eine Story-Leiste hochwertig oder selbstgebaut aussieht.
- * Gesehene Stories bekommen einen sehr feinen grauen Ring statt gar keinem,
- * damit die Reihe optisch nicht auseinanderfällt.
+ *
+ * WAS DER RING SAGT
+ *
+ * Henrik, 07.09.2026: "Story-Kreis-Logik (grau=gesehen, farbig=neu, ohne=keine
+ * Story) fehlerhaft." Drei Zustände, und zwei davon stimmten nicht:
+ *
+ *  * Die eigene Kachel trug auch dann den bunten Verlauf, wenn gar nichts
+ *    aufgenommen war. Bunt heißt "neu" — dort war aber nichts. Jetzt trägt sie
+ *    in diesem Fall gar keinen Ring, so wie es der dritte Zustand verlangt.
+ *
+ *  * Die Leiste zeigte eine Kachel je STORY, nicht je Person. Wer drei Storys
+ *    hatte, stand dreimal in der Reihe, und jede Kachel färbte sich für sich.
+ *    Man sah dann denselben Namen einmal grau und daneben zweimal bunt —
+ *    genau das Bild, an dem die Logik als kaputt auffällt. Eine Person ist
+ *    jetzt eine Kachel: bunt, solange auch nur eine ihrer Storys ungesehen
+ *    ist, grau erst, wenn alle gesehen sind.
+ *
+ * Getippt wird auf die erste ungesehene Story dieser Person — der Betrachter
+ * blättert von dort aus durch die restliche Liste weiter. Gleiche Regel in
+ * web/public/app.js (renderStoryRail).
  */
 export const StoryRail = ({ stories, onPress }: Props) => {
   const { users: alleNutzer } = useDaten();
 
+  const gruppen = useMemo(() => {
+    const nachPerson = new Map<string, Story[]>();
+    for (const s of stories) {
+      if (!nachPerson.has(s.userId)) nachPerson.set(s.userId, []);
+      nachPerson.get(s.userId)!.push(s);
+    }
+    // Die Map behält die Reihenfolge des Eintragens — die eigene Kachel bleibt
+    // also links, die Fremden dahinter in der Reihenfolge aus daten.ts.
+    return [...nachPerson.values()].map((eigene) => {
+      const ungesehen = eigene.find((s) => !s.viewed);
+      return {
+        story: ungesehen ?? eigene[eigene.length - 1],
+        alleGesehen: !ungesehen,
+        // Ein Vorschaubild hat die Kachel, sobald irgendeine der Storys eines
+        // hat: eine Person mit Story soll nie wie eine ohne aussehen.
+        bild: (ungesehen ?? eigene[eigene.length - 1]).mediaUri
+          ?? eigene.find((s) => s.mediaUri)?.mediaUri,
+      };
+    });
+  }, [stories]);
+
   return (
   <View style={styles.railWrap}>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
-      {stories.map((story) => {
+      {gruppen.map(({ story, alleGesehen, bild }) => {
         const inner = RING - 7;
+        // Der dritte Zustand: keine Story, kein Ring. Es gibt ihn nur bei der
+        // eigenen Kachel — fremde stehen ohne Story gar nicht in der Leiste.
+        const ohneStory = Boolean(story.own) && !bild;
         /*
          * story.name ist der kurze Name UNTER dem Ring ("Anna", "Deine
          * Story"). Die Initialen im Kreis gehören aber zur Person, sonst
@@ -49,9 +91,9 @@ export const StoryRail = ({ stories, onPress }: Props) => {
          * Zustand "noch nichts aufgenommen", bei fremden gab es noch nie ein
          * Vorschaubild.
          */
-        const kern = story.mediaUri ? (
+        const kern = bild ? (
           <Image
-            source={{ uri: story.mediaUri }}
+            source={{ uri: bild }}
             style={{ width: inner - 4, height: inner - 4, borderRadius: (inner - 4) / 2 }}
           />
         ) : (
@@ -64,8 +106,8 @@ export const StoryRail = ({ stories, onPress }: Props) => {
             style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
             onPress={() => onPress(story)}
           >
-            {story.viewed ? (
-              <View style={[styles.ring, styles.ringViewed]}>
+            {ohneStory || alleGesehen ? (
+              <View style={[styles.ring, ohneStory ? styles.ringOhne : styles.ringViewed]}>
                 <View style={styles.inner}>{kern}</View>
               </View>
             ) : (
@@ -81,7 +123,7 @@ export const StoryRail = ({ stories, onPress }: Props) => {
 
             {/* Solange die eigene Story leer ist, lädt das Plus zur Aufnahme
                 ein. Ist sie gefüllt, verhält sie sich wie jede andere. */}
-            {story.own && !story.mediaUri && (
+            {ohneStory && (
               <LinearGradient
                 colors={brandGradient}
                 start={{ x: 0, y: 0 }}
@@ -130,6 +172,11 @@ const styles = themenStyles((colors) => ({
   },
   ringViewed: {
     backgroundColor: colors.border,
+  },
+  /* Der dritte Zustand: kein Ring. Der Platz bleibt, damit die eigene Kachel
+     nicht kleiner ist als die daneben und die Reihe nicht springt. */
+  ringOhne: {
+    backgroundColor: 'transparent',
   },
   /* Der weiße Spalt zwischen Ring und Bild — ohne ihn klebt der Verlauf am
      Gesicht und der Ring wirkt wie ein Rahmen statt wie ein Signal. */

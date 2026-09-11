@@ -138,6 +138,24 @@
   }
 
   /**
+   * Gehört diese Telefonnummer schon zu einem Konto? Dieselbe Bauart wie
+   * `benutzernameFrei`: die Antwort ist ja/nein, wer dahintersteckt bleibt
+   * drin. Nötig, weil `finde_per_nummer` eine Anmeldung verlangt und beim
+   * Registrieren noch niemand angemeldet ist (Schema 34).
+   */
+  async function nummerFrei(nummer) {
+    const c = await aufbauen();
+    if (!c) return { frei: false, meldung: 'Anmeldung ist nicht eingerichtet.' };
+
+    const { data, error } = await c.rpc('nummer_frei', { eingabe: nummer });
+    if (error) {
+      console.error('Telefonnummer prüfen:', error.message);
+      return { frei: false, meldung: 'Die Nummer lässt sich gerade nicht prüfen.' };
+    }
+    return data;
+  }
+
+  /**
    * Anmelden. Der Prototyp lässt „Benutzername, E-Mail, Telefonnummer" zu.
    * Supabase kennt aber nur E-Mail und Telefonnummer — ein Benutzername wird
    * deshalb vorher in die hinterlegte E-Mail übersetzt.
@@ -185,7 +203,7 @@
    * Registrieren. Der Benutzername kommt vom Nutzer und wird unverändert
    * übernommen — der Trigger in der Datenbank erzeugt ihn nicht mehr selbst.
    */
-  async function registrieren({ benutzername, passwort, email, name }) {
+  async function registrieren({ benutzername, passwort, email, name, telefon }) {
     const c = await aufbauen();
     if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
 
@@ -194,6 +212,23 @@
     const pruefung = await benutzernameFrei(benutzername);
     if (!pruefung.frei) return { ok: false, fehler: pruefung.meldung, feld: 'benutzername' };
 
+    /*
+     * Die Telefonnummer ist Pflicht (Henrik 07.09.2026).
+     *
+     * Nicht als Formsache: „Kontakt hinzufügen" läuft über die Nummer. Ein
+     * Konto ohne sie ist für niemanden auffindbar. Die Form prüft
+     * gemeinsam/telefon.js, die Doppelvergabe die Datenbank — hier, wo es sich
+     * noch beheben lässt, und nicht erst am Eindeutigkeits-Index.
+     *
+     * Gleiche Regel in app/screens/LoginScreen.tsx (submit).
+     */
+    const grund = window.Telefon.pruefe(telefon);
+    if (grund) return { ok: false, fehler: grund, feld: 'telefon' };
+
+    const nummer = window.Telefon.speicherform(telefon);
+    const nummerPruefung = await nummerFrei(nummer);
+    if (!nummerPruefung.frei) return { ok: false, fehler: nummerPruefung.meldung, feld: 'telefon' };
+
     const { data, error } = await c.auth.signUp({
       email,
       password: passwort,
@@ -201,6 +236,8 @@
         data: {
           handle: pruefung.handle,
           name: name || benutzername,
+          // handle_new_user trägt sie in profiles.phone ein (Schema 34).
+          phone: nummer,
         },
       },
     });
@@ -255,22 +292,45 @@
     return { ok: true };
   }
 
-  // Supabase antwortet auf Englisch; hier stehen die Faelle, die Nutzer
-  // wirklich zu sehen bekommen.
+  /*
+   * Supabase antwortet auf Englisch. Die Uebersetzung stand vorher hier und
+   * seit dem 07.09.2026 in `gemeinsam/passwort.js` — damit die App dieselben
+   * Saetze zeigt. Die Fassung hier ist nur noch der Rueckfall fuer den Fall,
+   * dass das Skript nicht geladen ist.
+   */
   function uebersetze(meldung) {
-    const m = (meldung || '').toLowerCase();
-    if (m.includes('invalid login credentials')) return 'Benutzername oder Passwort stimmt nicht.';
-    if (m.includes('email not confirmed')) return 'Bestätige zuerst die E-Mail, die wir dir geschickt haben.';
-    if (m.includes('already registered')) return 'Für diese E-Mail gibt es schon ein Konto.';
-    if (m.includes('password should be at least')) return 'Das Passwort ist zu kurz.';
-    if (m.includes('rate limit') || m.includes('too many')) return 'Zu viele Versuche. Bitte kurz warten.';
-    if (m.includes('unable to validate email')) return 'Diese E-Mail-Adresse sieht nicht richtig aus.';
-    if (m.includes('email address') && m.includes('invalid'))
-      return 'Diese E-Mail-Adresse wird nicht akzeptiert. Bitte prüfe sie.';
-    if (m.includes('weak password')) return 'Das Passwort ist zu einfach. Nimm eines mit mehr Zeichen.';
-    if (m.includes('signups not allowed') || m.includes('signup is disabled'))
-      return 'Neue Konten sind gerade nicht möglich.';
+    if (window.Passwort) return window.Passwort.uebersetze(meldung);
     return meldung || 'Es hat nicht geklappt.';
+  }
+
+  /**
+   * Das eigene Passwort aendern.
+   *
+   * Bis zum 07.09.2026 gab es das nur als Formular: die Einstellungen
+   * meldeten „Passwort geändert" und schickten nichts los. Das bisherige
+   * Passwort wird gebraucht, weil Supabase seit der Sicherheitspruefung vom
+   * 04.09.2026 eine frische Anmeldung verlangt, bevor es ein neues annimmt.
+   */
+  async function passwortAendern(bisher, neu) {
+    const c = await aufbauen();
+    if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
+
+    const regel = window.Passwort ? window.Passwort.pruefe(neu) : null;
+    if (regel) return { ok: false, fehler: regel };
+    if (bisher === neu) return { ok: false, fehler: 'Das ist dein bisheriges Passwort.' };
+
+    const mail = sitzung?.user?.email;
+    if (!mail) return { ok: false, fehler: 'Bitte melde dich neu an.' };
+
+    const { error: fehlerAnmeldung } = await c.auth.signInWithPassword({
+      email: mail,
+      password: bisher,
+    });
+    if (fehlerAnmeldung) return { ok: false, fehler: 'Das bisherige Passwort stimmt nicht.' };
+
+    const { error } = await c.auth.updateUser({ password: neu });
+    if (error) return { ok: false, fehler: uebersetze(error.message) };
+    return { ok: true, fehler: null };
   }
 
   window.Anmeldung = {
@@ -279,7 +339,9 @@
     registrieren,
     abmelden,
     passwortVergessen,
+    passwortAendern,
     benutzernameFrei,
+    nummerFrei,
     benutzernameAendern,
     nutzer,
     angemeldet: () => Boolean(sitzung?.access_token),

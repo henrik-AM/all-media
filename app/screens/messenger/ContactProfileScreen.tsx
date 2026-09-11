@@ -13,6 +13,8 @@ import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ladeNachrichten } from '../../lib/daten';
 import * as Aktion from '../../lib/aktionen';
+import { useAktionen } from '../../lib/useAktionen';
+import * as Krypto from '../../lib/krypto';
 import { Chat, Message } from '../../types';
 
 interface Props {
@@ -29,6 +31,14 @@ interface Props {
   onOpenChat?: (chat: Chat) => void;
   onOpenPublicProfile?: (userId: string) => void;
   onNotice: (message: string) => void;
+  /*
+   * Nur fuer Pruefbilder: der Bildschirm beginnt um so viele Punkte weiter
+   * unten. Der Grund ist unangenehm banal — die Zeile "Verschluesselung" lag
+   * am 07.09.2026 unter dem Bildrand, das Bild sah gruen aus und zeigte sie
+   * schlicht nicht. Ein Bild, das die geaenderte Stelle nicht enthaelt,
+   * belegt nichts. Gilt nur auf iOS; Android kennt contentOffset nicht.
+   */
+  startVersatz?: number;
 }
 
 type Offen =
@@ -67,8 +77,17 @@ export const ContactProfileScreen = ({
   onOpenChat,
   onOpenPublicProfile,
   onNotice,
+  startVersatz,
 }: Props) => {
-  const { profile: alleProfile, users: alleNutzer, ichId } = useDaten();
+  const {
+    profile: alleProfile,
+    users: alleNutzer,
+    contacts: alleKontakte,
+    ichId,
+    neuLaden,
+  } = useDaten();
+  const aktionen = useAktionen(onNotice);
+  const kontakt = alleKontakte.find((k) => k.id === userId);
   const { supabase } = useSupabase();
   const insets = useSafeAreaInsets();
   const {
@@ -118,7 +137,12 @@ export const ContactProfileScreen = ({
     };
   }, [supabase, ichId, chat?.id]);
   const [wahlen, setWahlen] = useState<Record<string, string>>({});
-  const [angezeigterName, setAngezeigterName] = useState<string | null>(null);
+  /*
+   * Hier stand `angezeigterName` — der umbenannte Kontakt als Zustand im
+   * Bildschirm. Er ist am 07.09.2026 entfallen: der Name steht jetzt in der
+   * Datenbank und kommt über `users` zurück, damit er in jedem Bildschirm
+   * derselbe ist (Schema 33).
+   */
   const [suche, setSuche] = useState('');
 
   useEffect(() => {
@@ -129,6 +153,50 @@ export const ContactProfileScreen = ({
       .catch((e) => console.error('Verlauf laden fehlgeschlagen:', e?.message ?? e));
     return () => { abgebrochen = true; };
   }, [supabase, ichId, chat]);
+
+  /*
+   * Der Verschlüsselungszustand dieses Chats — nachgesehen, nicht behauptet.
+   *
+   * Bis zum 07.09.2026 stand in der Zeile unten fest „Ende-zu-Ende", ganz
+   * gleich ob etwas verschlüsselt war. Genau das war Punkt 11 des
+   * Handbuch-Abgleichs: eine Zusage an den Nutzer, die niemand einlöst.
+   *
+   * Jetzt hängt sie an zwei Tatsachen: hat das Gegenüber ein Gerät
+   * angemeldet, und ist es ein Chat zu zweit. Nur dann kann überhaupt
+   * verschlüsselt werden.
+   */
+  const [kryptoZustand, setKryptoZustand] = useState<{
+    an: boolean;
+    fingerabdruck: string | null;
+  }>({ an: false, fingerabdruck: null });
+
+  useEffect(() => {
+    if (!supabase || !ichId || !chat || chat.isGroup) return;
+    let gilt = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('krypto_schluessel')
+          .select('oeffentlich')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        const meiner = await Krypto.meinSchluessel(supabase, ichId);
+        const seiner = (data ?? [])[0]?.oeffentlich ?? null;
+        if (!gilt) return;
+        setKryptoZustand({
+          an: Boolean(meiner && seiner),
+          fingerabdruck: seiner ? Krypto.fingerabdruck(seiner) : null,
+        });
+      } catch (e) {
+        // Kein Zustand heisst: kein Schloss. Nichts behaupten ist richtig.
+        console.warn('Verschlüsselungszustand unbekannt:', (e as any)?.message ?? e);
+      }
+    })();
+    return () => {
+      gilt = false;
+    };
+  }, [supabase, ichId, chat?.id, userId]);
 
   const person = alleNutzer[userId];
 
@@ -145,7 +213,7 @@ export const ContactProfileScreen = ({
     );
   }
 
-  const name = angezeigterName ?? person.name;
+  const name = person.name;
   const bio = alleProfile[userId]?.bio;
   const geleert = !!chat && geleerteChats.includes(chat.id);
   // Der geladene Verlauf plus das, was in dieser Sitzung dazukam.
@@ -191,7 +259,10 @@ export const ContactProfileScreen = ({
         </Druck>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl + insets.bottom }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: spacing.xl + insets.bottom }}
+        contentOffset={startVersatz ? { x: 0, y: startVersatz } : undefined}
+      >
         <View style={styles.kopf}>
           <Avatar id={person.id} name={name} size={104} />
           <Text style={styles.name}>{name}</Text>
@@ -214,6 +285,20 @@ export const ContactProfileScreen = ({
         </View>
 
         <View style={styles.aktionen}>
+          {/*
+            * Henrik, 07.09.2026: "Kontaktinfo: Button zum direkten Chat-Sprung
+            * fehlt." Der Weg dorthin gab es schon — `onMessage` wird von
+            * App.tsx hereingereicht und öffnet den Chat mit dieser Person —,
+            * nur hatte ihn nie jemand an einen Knopf gehängt. Wer aus dem Chat
+            * in die Info ging, kam nur über den Zurück-Pfeil zurück; wer über
+            * die Kontaktliste kam, gar nicht.
+            *
+            * Er steht als erster: anrufen ist die seltenere Handlung.
+            */}
+          <Druck style={styles.aktion} onPress={() => onMessage(userId)}>
+            <Ionicons name="chatbubble-outline" size={21} color={colors.brand} />
+            <Text style={styles.aktionText}>Nachricht</Text>
+          </Druck>
           <Druck style={styles.aktion} onPress={() => onCall(userId, 'audio')}>
             <Ionicons name="call-outline" size={21} color={colors.brand} />
             <Text style={styles.aktionText}>Audioanruf</Text>
@@ -311,12 +396,38 @@ export const ContactProfileScreen = ({
           {zeile('Erweiterter Chat-Datenschutz', wert('Erweiterter Chat-Datenschutz', 'Aus'), () =>
             setOffen({ art: 'wahl', label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' })
           )}
-          {zeile('Verschlüsselung', 'Ende-zu-Ende', () =>
-            setOffen({
-              art: 'info',
-              titel: 'Verschlüsselung',
-              text: 'Nachrichten in diesem Chat sind Ende-zu-Ende verschlüsselt. Niemand außer euch beiden kann sie lesen — auch All Media nicht.',
-            })
+          {zeile(
+            'Verschlüsselung',
+            kryptoZustand.an ? 'Ende-zu-Ende' : 'Nicht aktiv',
+            () =>
+              setOffen({
+                art: 'info',
+                titel: 'Verschlüsselung',
+                /*
+                 * Der Text sagt, was gilt — und was nicht gilt. Der zweite
+                 * Teil ist der wichtigere: Anrufe und Anhänge sind nicht
+                 * verschlüsselt, und wer das hier nicht liest, nimmt es an.
+                 */
+                text: kryptoZustand.an
+                  ? 'Neue Textnachrichten in diesem Chat werden auf deinem Gerät ' +
+                    'verschlüsselt und erst auf dem des Gegenübers wieder geöffnet. ' +
+                    'All Media kann sie nicht lesen.\n\n' +
+                    'Nicht verschlüsselt sind: Anrufe, Bilder und Dateien, und ' +
+                    'Nachrichten von vor dem 07.09.2026. Wer mit wem schreibt, ist ' +
+                    'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
+                    'Verbindung.\n\n' +
+                    (kryptoZustand.fingerabdruck
+                      ? 'Sicherheitsnummer des Gegenübers:\n' +
+                        kryptoZustand.fingerabdruck +
+                        '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
+                        'dass niemand dazwischen sitzt.'
+                      : '')
+                  : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
+                    'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +
+                    'ohne dessen Schlüssel gibt es niemanden, für den verschlossen ' +
+                    'werden könnte.\n\nSobald es so weit ist, gilt sie für neue ' +
+                    'Nachrichten von selbst.',
+              })
           )}
         </View>
 
@@ -430,6 +541,20 @@ export const ContactProfileScreen = ({
       )}
 
       {offen?.art === 'bearbeiten' && (
+        /*
+         * Henrik, 07.09.2026: "Kontaktinfo-Änderungen (z.B. Name) speichern/
+         * synchronisieren nicht."
+         *
+         * Hier stand `setAngezeigterName(neu)` und darunter die Meldung
+         * "Kontakt gespeichert" — ein Zustand im Bildschirm und ein Satz, der
+         * etwas behauptete, das nicht stattfand. Beim nächsten Öffnen stand
+         * wieder der alte Name da, die Chatliste daneben hatte ihn nie
+         * gesehen, und die Notiz wurde gar nicht erst gelesen.
+         *
+         * Jetzt geht beides nach `contacts` (Schema 33), und danach lädt der
+         * Bestand neu: der neue Name steht damit auch in der Chatliste, im
+         * Chatkopf und in der Nutzerliste (siehe daten.ts, alleDaten).
+         */
         <FormularSheet
           visible
           title="Kontakt bearbeiten"
@@ -437,12 +562,21 @@ export const ContactProfileScreen = ({
             { key: 'name', label: 'Angezeigter Name', platzhalter: name, pflicht: true },
             { key: 'notiz', label: 'Notiz (nur für dich)' },
           ]}
+          vorbelegung={{ name, notiz: kontakt?.notiz ?? '' }}
           knopf="Speichern"
           onClose={() => setOffen(null)}
-          onSubmit={({ name: neu }) => {
-            // Nur der angezeigte Name - das Profil der anderen Person bleibt.
-            setAngezeigterName(neu);
-            onNotice('Kontakt gespeichert');
+          onSubmit={({ name: neu, notiz }) => {
+            void (async () => {
+              const ok = await aktionen.kontaktBearbeiten(userId, {
+                spitzname: neu,
+                notiz: notiz ?? '',
+              });
+              // Gemeldet wird erst, wenn es wirklich geschrieben ist.
+              // Schlug es fehl, hat useAktionen schon gesagt warum.
+              if (!ok) return;
+              await neuLaden();
+              onNotice('Kontakt gespeichert');
+            })();
             return null;
           }}
           onNotice={onNotice}

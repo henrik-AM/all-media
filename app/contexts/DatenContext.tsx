@@ -30,6 +30,7 @@ const LEER: AlleDaten = {
   archivierteChats: [],
   communityChats: [],
   stories: [],
+  storiesVideos: [],
   posts: [],
   videos: [],
   clips: [],

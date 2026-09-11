@@ -481,6 +481,14 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 :root[data-theme="dark"] .story__ring.is-viewed { background: #2C3038; }
 /*
+  Henrik, 07.09.2026: "ohne = keine Story". Der dritte Zustand — er gilt nur
+  fuer die eigene, noch leere Kachel. Vorher trug sie den grauen Ring der
+  gesehenen Story und behauptete damit, da sei etwas gewesen. Der Platz bleibt
+  stehen, damit die Kachel nicht kleiner ist als die daneben.
+  Gegenstueck in der App: StoryRail.tsx, `ringOhne`.
+*/
+.story__ring.is-ohne { background: transparent; }
+/*
   Der Story-Ring am eigenen Profilbild. Henrik am 26.08.2026: "Neue Story
   wird nicht unter dem Profilbild mit einem Kreis angezeigt."
 
@@ -695,11 +703,22 @@ ul { margin: 0; padding: 0; list-style: none; }
 .chathead__back { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--text); }
 .chathead__back:hover { background: var(--surface-2); }
 .chathead__back svg { width: 21px; height: 21px; }
-.chathead__body { flex: 1 1 auto; min-width: 0; }
+/*
+ * Henrik, 07.09.2026: "Name im Chat-Header nicht zentriert."
+ *
+ * Zentriert wird im ganzen Kopf, nicht im Rest-Platz. Das geht nur, wenn
+ * links und rechts gleich viel steht: links Zurueck (34) + Abstand (11) +
+ * Avatar (36) = 81, rechts zwei Knoepfe (2 x 36 + 2 Abstand) = 74. Die
+ * fehlenden 7 Pixel holt `chathead__actions` sich als Rand. Ohne den
+ * Ausgleich sitzt der Name sichtbar zu weit rechts — und "fast mittig" sieht
+ * schlechter aus als ehrlich linksbuendig. Gegenstueck in der App:
+ * ChatDetailScreen.tsx, `headerAusgleich`.
+ */
+.chathead__body { flex: 1 1 auto; min-width: 0; text-align: center; }
 .chathead__name { font-size: 15.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chathead__status { font-size: 12px; color: var(--success); margin-top: 1px; }
 .chathead__status.is-off { color: var(--text-3); }
-.chathead__actions { display: flex; gap: 2px; }
+.chathead__actions { display: flex; gap: 2px; padding-right: 7px; }
 .chathead__actions button { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); }
 .chathead__actions button:hover { background: var(--surface-2); color: var(--text); }
 .chathead__actions svg { width: 20px; height: 20px; }
@@ -723,6 +742,30 @@ ul { margin: 0; padding: 0; list-style: none; }
   color: var(--text-2);
   font-size: 11.5px;
   font-weight: 600;
+}
+/*
+ * Der Anrufeintrag steht mittig zwischen den Blasen (Henrik 7.9.) — wie der
+ * Tagestrenner darueber, nur mit Symbol. Gleiche Darstellung in der App
+ * (styles.anruf in app/screens/messenger/ChatDetailScreen.tsx).
+ */
+.msg__anruf {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.msg__anruf svg {
+  width: 14px;
+  height: 14px;
+}
+.msg__anruf--verpasst {
+  color: var(--danger);
 }
 .msg {
   max-width: 76%;
@@ -1779,7 +1822,9 @@ body:has(.camera) .toast { bottom: 132px; }
 .mprof { display: flex; align-items: center; gap: 18px; padding: 20px 16px 12px; }
 .mprof__text { min-width: 0; }
 .mprof__name { font-size: 21px; font-weight: 700; }
-.mprof__bio { font-size: 14.5px; color: var(--text-2); margin-top: 4px; }
+.mprof__handle { font-size: 14.5px; color: var(--text-2); margin-top: 2px; }
+/* Volle Breite unter dem Kopf statt eingezwaengt neben dem Bild (Henrik 7.9.). */
+.mprof__bio { font-size: 14.5px; color: var(--text-2); line-height: 1.45; padding: 0 16px 4px; }
 .mprof__links { display: flex; gap: 26px; padding: 4px 16px 20px; }
 .mprof__links button { font-size: 15px; font-weight: 700; color: var(--text); }
 .mprof__links button:hover { color: var(--brand); }
@@ -2013,8 +2058,6 @@ body:has(.camera) .toast { bottom: 132px; }
 @keyframes anrufPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }
 .anruf__name { margin-top: 12px; font-size: 26px; font-weight: 700; }
 .anruf__status { color: rgba(255,255,255,.65); font-size: 15px; }
-.anruf__krypto { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,.7); font-size: 12.5px; }
-.anruf__krypto svg { width: 12px; height: 12px; }
 .anruf__eigen {
   position: absolute; right: 16px; top: 110px;
   width: 92px; height: 128px; border-radius: 12px;
@@ -2174,12 +2217,57 @@ body:has(.camera) .toast { bottom: 132px; }
 .teilen__kachel.is-gesendet { opacity: .55; }
 
 /* --------------------------------------- Geteilter Beitrag im Chat */
+/*
+ * Die Karte fuer einen geteilten Beitrag (Henrik 7.9.): oben der Beitrag in
+ * derselben Groesse wie jeder andere Anhang, darunter Autor und Titel. Sie
+ * ist ein <button>, weil sie sich oeffnen laesst — vorher war sie ein
+ * stummes <div>.
+ */
 .msg__geteilt {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; flex-direction: column; gap: 6px;
   margin: 2px 0 4px; padding: 8px;
+  border: 0; text-align: left; cursor: pointer; font: inherit; color: inherit;
   border-radius: 12px; background: rgba(0,0,0,.05);
 }
 [data-theme="dark"] .msg__geteilt { background: rgba(255,255,255,.07); }
+.msg__geteiltZeile { display: flex; align-items: center; gap: 8px; }
+.msg__geteiltZeile > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--text-3); }
+
+/*
+ * Anhang und Vollformat (Henrik 7.9.). Der Anhang steht in der Blase in
+ * echter Groesse statt als Symbol; ein Video zeigt sein erstes Bild mit dem
+ * Wiedergabezeichen darauf und laeuft erst im Vollformat.
+ */
+.msg__anhang {
+  display: block; position: relative;
+  padding: 0; border: 0; background: none; cursor: pointer;
+}
+.msg__anhangPlay {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.45); color: #fff;
+}
+.msg__anhangPlay svg { width: 20px; height: 20px; }
+.vollformat {
+  position: fixed; inset: 0; z-index: 120;
+  display: flex; align-items: center; justify-content: center;
+  background: #000;
+}
+.vollformat img,
+.vollformat video {
+  max-width: 100%; max-height: 100%;
+  /* `contain`: beschnitten waere es nicht mehr das Vollformat. */
+  object-fit: contain;
+}
+.vollformat__zu {
+  position: absolute; right: 12px; top: calc(12px + env(safe-area-inset-top));
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; cursor: pointer;
+  background: rgba(0,0,0,.45); color: #fff;
+}
 .msg__geteiltBild {
   flex: 0 0 auto;
   width: 42px; height: 42px; border-radius: 9px;
@@ -2191,6 +2279,63 @@ body:has(.camera) .toast { bottom: 132px; }
 .msg__geteiltText span {
   color: var(--text-2);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ------------------------------------------------ Kontakt per QR-Code */
+/*
+  Henrik am 07.09.2026: „Kontakt hinzufügen nur über Telefonnummer/QR-Code."
+  Die zwei Knoepfe im Sheet und die Flaeche, in der der eigene Code steht.
+  Gegenstueck in der App: app/components/AddContactSheet.tsx.
+*/
+.qrReihe { display: flex; gap: 8px; margin: 4px 0 12px; }
+.qrReihe .prof__btn {
+  /* .prof__btn stand bisher nie mit Icon da und hat deshalb weder ein
+     Flex-Layout noch eine Groesse fuer das SVG — ohne beides fuellt das Icon
+     den ganzen Knopf aus. */
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.qrReihe .prof__btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.qrFlaeche {
+  display: flex; justify-content: center;
+  margin: 0 0 12px;
+}
+/*
+  Der Code kommt als SVG vom Server. Weisser Grund, auch im dunklen Modus —
+  eine Kamera liest dunkle Module auf hellem Grund, umgekehrt nicht zuverlaessig.
+*/
+.qrFlaeche svg {
+  width: 220px; height: 220px;
+  border-radius: 12px; background: #fff;
+}
+.qrScanner {
+  position: fixed; inset: 0; z-index: 130;
+  background: #000;
+}
+.qrScanner video {
+  width: 100%; height: 100%; object-fit: cover;
+}
+/* Der Sucherrahmen zeigt nur, wohin gehalten werden soll — jsQR liest das
+   ganze Bild, nicht nur diesen Ausschnitt. */
+.qrScanner__rahmen {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 240px; height: 240px;
+  border: 2px solid rgba(255,255,255,.9); border-radius: 20px;
+  pointer-events: none;
+}
+.qrScanner__titel {
+  position: absolute; left: 0; right: 0;
+  top: calc(50% + 140px);
+  margin: 0; text-align: center;
+  color: #fff; font-size: 14px;
+}
+.qrScanner__zu {
+  position: absolute; right: 12px; top: calc(12px + env(safe-area-inset-top));
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; cursor: pointer;
+  background: rgba(0,0,0,.45); color: #fff;
 }
 
 /* ------------------------------------------------------ Explorer-Seiten */
@@ -2404,7 +2549,7 @@ body:has(.camera) .toast { bottom: 132px; }
 /* ------------------------------------------------- Einstellungs-Blätter */
 .item__haken { display: flex; color: var(--brand); }
 .item__haken svg { width: 19px; height: 19px; }
-.sheet__text { padding: 4px 16px 12px; font-size: 14.5px; line-height: 1.5; color: var(--text); }
+.sheet__text { padding: 4px 16px 12px; font-size: 14.5px; line-height: 1.5; color: var(--text); white-space: pre-line; }
 .prof__btn.is-danger { background: var(--danger); color: #fff; }
 
 /* --------------------------------------------------- Querformat-Player */
@@ -3041,9 +3186,43 @@ button.msg__sender:hover { text-decoration: underline; }
 }
 .map__werkzeug svg { width: 18px; height: 18px; }
 .map__werkzeug:hover { background: #f2f3f5; }
+/* Der Ebenen-Knopf bleibt angefasst, solange sein Fenster offen steht. Ohne
+   das waere nicht zu sehen, wozu die Liste darunter gehoert. */
+.map__werkzeug.is-an { background: #dbe8ff; border-color: rgba(10,102,255,.35); }
 
-/* Das Schild sagt, in welcher Ansicht man steht - der Umschalter geht
-   reihum, ohne Menue, und ohne Beschriftung waere der Zustand unsichtbar. */
+/*
+ * Das Auswahlfenster fuer die Kartenansicht. Henrik, 07.09.2026:
+ * "Kartenstil-Button switcht direkt statt Auswahlfenster." Es haengt unter
+ * dem Knopf statt als Blatt von unten zu kommen — es gehoert zur Karte und
+ * soll sie nicht verdecken. Gegenstueck in app/components/KarteWeb.tsx.
+ */
+.map__stile {
+  align-self: flex-end;
+  min-width: 132px;
+  padding: 4px 0;
+  border-radius: 11px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,.28);
+  overflow: hidden;
+}
+.map__stil {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%;
+  padding: 8px 11px;
+  background: none;
+  border: 0;
+  font-size: 13px;
+  color: #1a1d21;
+  text-align: left;
+  cursor: pointer;
+}
+.map__stil:hover { background: #f2f3f5; }
+.map__stil.is-an { background: rgba(10,102,255,.08); color: #0a66ff; font-weight: 700; }
+.map__stil svg { width: 15px; height: 15px; flex: none; }
+
+/* Das Schild sagt, in welcher Ansicht man steht — daneben steht jetzt die
+   Wahl offen, das Schild bleibt die schnelle Auskunft ohne Klick. */
 .map__ansicht {
   position: absolute; left: 10px; top: 10px; z-index: 500;
   padding: 4px 9px; border-radius: 9px;
@@ -3904,7 +4083,32 @@ body.ist-abgemeldet .ptr-indicator {
 .sicht__stufe .item__label { display: flex; flex-direction: column; gap: 2px; }
 .sicht__stufe .item__label small { font-size: 11.5px; color: var(--text-3); font-weight: 400; }
 .sicht__stufe.is-active .item__label b { color: var(--brand); }
+
+/*
+ * Der Zusatz „Story auch in Videos teilen" steht auch bei anderen Stufen da,
+ * ist dann aber nicht bedienbar (Schema 30). Ohne diese Regel sah die
+ * gesperrte Zeile genauso aus wie die bedienbare — die App blendet sie ab
+ * (SichtbarkeitSheet.tsx, `zusatzAus`), die Website muss das auch.
+ */
+.sicht__stufe.is-aus .item__label b { color: var(--text-3); }
+.sicht__stufe.is-aus { cursor: default; }
 .sicht__punkt { width: 20px; height: 20px; color: var(--brand); }
+
+/* Die Suche ueber der Ausnahmeliste. Gegenstueck zur SearchBar der App im
+   SichtbarkeitSheet — dieselbe Hoehe, dieselbe weiche Ecke. */
+.sicht__suche { padding: 4px 16px 10px; }
+.sicht__suche input {
+  width: 100%;
+  height: 42px;
+  padding: 0 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+}
+.sicht__suche input:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
 
 /* ------------------------------------------------------- Push-to-Talk -- */
 
@@ -3977,3 +4181,42 @@ body.ist-abgemeldet .ptr-indicator {
 .live__eingabe button:disabled { opacity: .5; cursor: default; }
 
 .live__spenden { text-align: center; font-size: 12.5px; color: #7CE38B; }
+
+/* ------------------------------------------------ Kamera: echtes Bild -- */
+/* Seit dem 09.09.2026 laeuft in der Buehne ein echter Kamerastrom
+   (getUserMedia) statt eines grauen Symbols. Er fuellt die Flaeche, die
+   Farbschicht des Filters liegt darueber, der Sucher darueber. */
+.camera__video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  background: #0B0C0F;
+}
+.camera__video--gespiegelt { transform: scaleX(-1); }
+.camera__filterschicht { position: absolute; inset: 0; pointer-events: none; }
+.camera__hinweis { position: relative; margin-top: 10px; color: rgba(255,255,255,.6); font-size: 13px; text-align: center; }
+.camera__stage--leer .camera__video { display: none; }
+
+/* Das rote Schild waehrend einer Videoaufnahme. */
+.camera__rec {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 999px;
+  background: rgba(0,0,0,.55); color: #fff; font-size: 12px;
+}
+.camera__rec[hidden] { display: none; }
+.camera__rec i { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+
+/* Der Umschalter „ohne Filter / mit Filter" aus dem Figma-Entwurf. Die
+   Filterleiste erscheint erst darunter, wenn ueberhaupt gefiltert wird. */
+.camera__schalter {
+  display: flex; align-self: center; margin: 0 auto 8px;
+  padding: 3px; border-radius: 999px; background: rgba(255,255,255,.12);
+}
+.camera__schalter button {
+  padding: 6px 18px; border: 0; border-radius: 999px;
+  background: transparent; color: rgba(255,255,255,.75);
+  font-size: 12.5px; cursor: pointer;
+}
+.camera__schalter button.is-active { background: #fff; color: #0B0B0C; font-weight: 700; }
+.camera__filter[hidden] { display: none; }

@@ -38,7 +38,7 @@
 
 const { chromium } = require('playwright-core');
 const { zusammengelegt } = require('./_modulquelle');
-const { anmelden, MAIL, zuruecksetzen } = require('./_konto');
+const { anmelden, MAIL, zuruecksetzen, mitZeitgrenze } = require('./_konto');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
 
@@ -81,6 +81,9 @@ function uebersetzen(name) {
   // Seite; die Regel der echten Seite verbietet das zu Recht. Begründung
   // ausführlich in test/_aktionen.js.
   const seite = await browser.newPage({ viewport: { width: 400, height: 860 }, bypassCSP: true });
+  // Dieser Lauf ruft App-Code in der Seite auf. Bleibt der haengen, waere es
+  // ohne Zeitgrenze ein Stillstand ohne Meldung — siehe _konto.js.
+  mitZeitgrenze(seite);
 
   const browserFehler = [];
   seite.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
@@ -105,7 +108,7 @@ function uebersetzen(name) {
     (m) => m.type() === 'error' && !erwartet(m) && browserFehler.push('Konsole: ' + m.text())
   );
 
-  await seite.goto(BASIS, { waitUntil: 'networkidle' });
+  await seite.goto(BASIS, { waitUntil: 'load' });
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);
@@ -113,7 +116,7 @@ function uebersetzen(name) {
     process.exit(1);
   }
   await zuruecksetzen(seite);
-  await seite.reload({ waitUntil: 'networkidle' });
+  await seite.reload({ waitUntil: 'load' });
   await seite.waitForSelector('#topbar button');
 
   /*

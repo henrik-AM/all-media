@@ -34,8 +34,16 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
 const syncHandlers = require('./sync-handlers');
-const { signiereMedien } = require('./medien');
+const { signiereMedien, hochladen } = require('./medien');
 const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require('./supabase');
+// Dieselbe Regel wie in der App — siehe gemeinsam/telefon.js.
+const Telefon = require('../../gemeinsam/telefon');
+// Die Schreibweise des Kontakt-QR-Codes — dieselbe Datei, die auch der
+// Browser laedt (gemeinsam/qr.js).
+const QrKontakt = require('../../gemeinsam/qr');
+// Zeichnet den Code. Dasselbe Paket benutzt die App (components/QrCode.tsx);
+// zwei verschiedene Rechnungen haetten zwei verschiedene Codes ergeben.
+const QRCode = require('qrcode');
 
 const app = express();
 
@@ -87,8 +95,13 @@ app.use(
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         // Kartenkacheln: OpenStreetMap und die Satellitenansicht (public/app.js).
+        // Die drei Kartenansichten der Friend-Map: Standard (OpenStreetMap),
+        // Satellit (ArcGIS) und Gelaende (OpenTopoMap). OpenTopoMap fehlte
+        // hier bis zum 09.09.2026 — die Ansicht liess sich waehlen, blieb
+        // aber leer, weil jede Kachel an der Richtlinie scheiterte.
         imgSrc: ["'self'", 'data:', 'blob:', supabaseUrl,
-          'https://*.tile.openstreetmap.org', 'https://server.arcgisonline.com'],
+          'https://*.tile.openstreetmap.org', 'https://server.arcgisonline.com',
+          'https://*.tile.opentopomap.org'],
         mediaSrc: ["'self'", 'data:', 'blob:', supabaseUrl],
         connectSrc: ["'self'", supabaseUrl, supabaseUrl.replace('https://', 'wss://')],
         frameAncestors: ["'none'"],
@@ -110,6 +123,21 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 /*
+ * `gemeinsam/` liegt eine Ebene ueber `web/` und faellt deshalb nicht unter
+ * die Statik oben. Der Browser braucht von dort zwei Dateien: `tweetnacl.js`
+ * und `krypto.js`, dieselben, die auch die App und die Pruefläufe benutzen.
+ *
+ * Warum nicht kopieren: eine Kopie der Kryptoschicht, die von der anderen
+ * abweicht, heisst nicht „sieht anders aus", sondern „die andere Seite kann
+ * es nicht mehr lesen". Deshalb wird derselbe Ordner ausgeliefert.
+ *
+ * Auf Render geht das auf, weil `render.yaml` kein `rootDir` setzt und das
+ * ganze Verzeichnis geklont wird. Fiele das je weg, waere hier 404 — und die
+ * Website koennte keine Nachricht mehr oeffnen.
+ */
+app.use('/gemeinsam', express.static(path.join(__dirname, '..', '..', 'gemeinsam')));
+
+/*
  * Fund 10, zweiter Teil: ohne Bremse liefen Anmeldeversuche und teure
  * Endpunkte ungehindert. Supabase bremst seine eigenen Auth-Aufrufe, die
  * Express-Routen davor aber nicht.
@@ -117,6 +145,11 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
  * 300 Anfragen je Minute und Herkunft sind fuer eine Oberflaeche, die beim
  * Start ein Buendel Endpunkte zieht, reichlich bemessen — und fuer das
  * Durchprobieren von Nummern oder Kennungen zu wenig.
+ *
+ * Dass die Bremse gegriffen hat, wird protokolliert. Ohne diese Zeile ist ein
+ * 429 von aussen nicht von einem langsamen Server zu unterscheiden: die
+ * Oberflaeche bleibt einfach leer, und ein Prueflauf meldet daraufhin
+ * "waiting for locator" — also an einer Stelle, an der gar nichts kaputt ist.
  */
 app.set('trust proxy', 1);
 app.use(
@@ -127,6 +160,13 @@ app.use(
     standardHeaders: true,
     legacyHeaders: false,
     message: { ok: false, error: 'Zu viele Anfragen. Bitte kurz warten.' },
+    handler: (req, res, _next, optionen) => {
+      console.warn(
+        `[Bremse] ${new Date().toISOString()} — ${req.ip} hat mehr als ` +
+          `${optionen.max} Anfragen in einer Minute gestellt (${req.method} ${req.originalUrl})`
+      );
+      res.status(optionen.statusCode).json(optionen.message);
+    },
   })
 );
 
@@ -316,6 +356,24 @@ app.get('/api/konfiguration', (_req, res) => {
  * Angefasst wird ausschließlich das eigene Konto. Ein Prüflauf kann damit
  * nichts anfassen, was jemand anderem gehört.
  */
+/*
+ * Eine Aufnahme aus dem Browser speichern.
+ *
+ * Die Website hatte bis zum 09.09.2026 keinen Hochladeweg — jede Aufnahme
+ * blieb im `localStorage` des einen Browsers. Begruendung und Ablauf stehen
+ * bei `hochladen` in web/server/medien.js. Gegenstueck in der App:
+ * app/lib/supabaseStorage.ts.
+ *
+ * Warum ueber den Server und nicht direkt aus dem Browser in den Eimer: der
+ * Browser hat kein Supabase-SDK geladen, nur `fetch` gegen diese eigene API.
+ * Hochgeladen wird trotzdem mit dem Client des angemeldeten Nutzers
+ * (`req.db`) — die Regeln des Speichers gelten also unveraendert.
+ */
+app.post('/api/hochladen', route(async (req) => {
+  const { ordner, aufnahme } = req.body || {};
+  return hochladen(req.db, req.nutzerId, String(ordner || ''), aufnahme);
+}));
+
 app.post('/api/reset', route(async (req) => {
   const { data, error } = await req.db.rpc('zuruecksetzen', { ziel: req.nutzerId });
   if (error) throw error;
@@ -453,9 +511,104 @@ app.get('/api/messages/:chatId', route(async (req) =>
   supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId)
 ));
 
+/*
+ * Den Geraetschluessel dieses Browsers anmelden.
+ *
+ * Es kommt nur der oeffentliche Teil an. Kaeme hier je der geheime an, waere
+ * die ganze Verschluesselung wertlos — deshalb steht es auch so in
+ * `web/public/krypto.js` und in Schema 31.
+ */
+app.post('/api/krypto/schluessel', route(async (req) => {
+  const oeffentlich = String(req.body?.oeffentlich || '').trim();
+  const geraet = String(req.body?.geraet || '').trim();
+  if (!oeffentlich || !geraet) return { ok: false, error: 'Schlüssel unvollständig' };
+
+  const { data, error } = await req.db
+    .from('krypto_schluessel')
+    .upsert(
+      { user_id: req.nutzerId, geraet, art: 'web', oeffentlich },
+      { onConflict: 'user_id,geraet' }
+    )
+    .select('id')
+    .single();
+  if (error) throw error;
+  return { id: data.id };
+}));
+
+/*
+ * Die Geraete, fuer die in diesem Chat verschlossen werden darf.
+ *
+ * Die eigenen sind dabei und muessen es sein: ohne sie koennte man seine
+ * eigene Nachricht am zweiten Geraet nicht mehr lesen.
+ *
+ * `verschluesselbar` sagt, ob es ueberhaupt geht — nur ein Chat zu zweit, und
+ * nur wenn beide Seiten je ein Geraet angemeldet haben. Ist das Gegenueber
+ * nie mit einem Geraet dagewesen, gibt es niemanden, fuer den man
+ * verschliessen koennte; dann bleibt es Klartext und die Oberflaeche zeigt
+ * kein Schloss.
+ */
+app.get('/api/krypto/empfaenger/:chatId', route(async (req) => {
+  const chatId = req.params.chatId;
+
+  const { data: chat } = await req.db
+    .from('chats')
+    .select('is_group')
+    .eq('id', chatId)
+    .maybeSingle();
+  if (!chat || chat.is_group) return { verschluesselbar: false, schluessel: [] };
+
+  const { data: mitglieder } = await req.db
+    .from('chat_members')
+    .select('user_id')
+    .eq('chat_id', chatId);
+  const ids = (mitglieder || []).map((m) => m.user_id);
+  if (!ids.length) return { verschluesselbar: false, schluessel: [] };
+
+  const { data, error } = await req.db
+    .from('krypto_schluessel')
+    .select('id, user_id, oeffentlich')
+    .in('user_id', ids);
+  if (error) throw error;
+
+  const konten = new Set((data || []).map((k) => k.user_id));
+  return {
+    verschluesselbar: konten.size >= 2,
+    schluessel: (data || []).map((k) => ({ id: k.id, oeffentlich: k.oeffentlich })),
+  };
+}));
+
+/*
+ * Der oeffentliche Schluessel eines Gegenuebers — fuer das Kontaktprofil.
+ *
+ * Die Zeile "Verschluesselung" dort soll nachsehen statt behaupten, genau wie
+ * in der App. Dazu reicht die neueste angemeldete Kennung der anderen Person:
+ * gibt es keine, kann niemand fuer sie verschliessen. Die Sicherheitsregel in
+ * Schema 31 gibt fremde Schluessel ohnehin nur heraus, wenn man einen Chat
+ * teilt — hier steht deshalb kein zweiter Filter im Code.
+ */
+app.get('/api/krypto/kontakt/:userId', route(async (req) => {
+  const { data, error } = await req.db
+    .from('krypto_schluessel')
+    .select('oeffentlich')
+    .eq('user_id', req.params.userId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return { oeffentlich: (data || [])[0]?.oeffentlich || null };
+}));
+
 app.post('/api/messages/:chatId', route(async (req) => {
+  /*
+   * Zwei Formen, je nachdem ob der Browser verschliessen konnte.
+   *
+   * Verschluesselt kommt hier gar kein Text mehr an — nur Chiffre, Nonce,
+   * Absenderschluessel und die Kuverts. Das ist der Punkt der Sache: dieser
+   * Server steht bei Render und soll nicht mitlesen koennen.
+   */
+  const krypto = Number(req.body?.krypto || 0);
   const text = String(req.body?.text || '').trim();
-  if (!text) return { ok: false, error: 'Text erforderlich' };
+  if (!krypto && !text) return { ok: false, error: 'Text erforderlich' };
+  if (krypto && !req.body?.chiffre) return { ok: false, error: 'Chiffre erforderlich' };
 
   const sperre = await chatGesperrt(req, req.params.chatId);
   if (sperre) return { ok: false, error: sperre };
@@ -463,13 +616,21 @@ app.post('/api/messages/:chatId', route(async (req) => {
   const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, {
     antwortAuf: req.body?.antwortAuf || null,
     zitatVon: req.body?.zitatVon || null,
+    krypto,
+    chiffre: req.body?.chiffre || null,
+    kryptoNonce: req.body?.kryptoNonce || null,
+    absenderSchluessel: req.body?.absenderSchluessel || null,
+    kuverts: req.body?.kuverts || [],
   });
   if (!e || e.ok === false) return antwort(e);
 
   return {
     id: e.nachricht.id,
     from: 'me',
+    // Bei einer verschluesselten Nachricht ist `text` hier leer; den Klartext
+    // haelt der Browser ohnehin noch in der Hand und setzt ihn selbst ein.
     text,
+    krypto,
     time: supabaseApi.chatZeit(e.nachricht.created_at),
     zeitpunkt: e.nachricht.created_at,
   };
@@ -653,24 +814,70 @@ app.post('/api/personen/suche', route(async (req) => {
 }));
 
 /*
+ * Der eigene QR-Code als Bild.
+ *
+ * Henrik am 07.09.2026: „Kontakt hinzufügen nur über Telefonnummer/QR-Code,
+ * nicht Username." Im Code steht die eigene Telefonnummer — was genau und
+ * warum, steht in gemeinsam/qr.js.
+ *
+ * WARUM DER SERVER UND NICHT DER BROWSER
+ *
+ * Weil die Nummer sonst zweimal ueber die Leitung muesste: einmal, damit der
+ * Browser sie kennt, und einmal in den Code. Sie kommt hier aus
+ * `mein_profil()` — dieselbe Quelle, aus der auch die Kontaktinfo liest —
+ * und verlaesst den Server nur als Bild. Ein Aufrufer ohne Anmeldung bekommt
+ * gar nichts; `route()` prueft das vorher.
+ *
+ * Kein Zwischenspeicher: wer seine Nummer aendert, soll nicht noch eine
+ * Stunde lang den alten Code zeigen.
+ */
+app.get('/api/qr.svg', route(async (req, res) => {
+  const { data: ich } = await req.db.rpc('mein_profil');
+  const nummer = (ich && ich.phone) || '';
+  if (!nummer) return { ok: false, error: 'Für deinen Code brauchst du erst eine eigene Telefonnummer' };
+
+  const svg = await QRCode.toString(QrKontakt.link(nummer), {
+    type: 'svg',
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 220,
+    color: { dark: '#000000', light: '#ffffff' },
+  });
+  res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  // `res.send` statt eines Rueckgabewerts: die Antwort ist ein Bild, kein
+  // JSON. `route()` sieht an `headersSent`, dass hier schon geantwortet wurde.
+  res.send(svg);
+}));
+
+/*
  * "Nicht gefunden" und "schon vorhanden" sind hier normale Ergebnisse einer
  * Suche, keine Fehler der Anfrage. Deshalb 200 mit ok-Feld statt 404/409 —
  * sonst protokolliert der Browser bei jeder Fehleingabe einen Ladefehler.
  */
 app.post('/api/contacts', route(async (req) => {
   const eingabe = String(req.body?.handle || '').trim();
-  if (!eingabe) return { ok: false, error: 'Bitte Benutzername oder Telefonnummer eingeben' };
+  if (!eingabe) return { ok: false, error: 'Bitte eine Telefonnummer eingeben' };
+
+  /*
+   * Henrik am 07.09.2026: „Kontakt hinzufügen nur über Telefonnummer/QR-Code,
+   * nicht Username."
+   *
+   * Der Riegel steht hier und nicht nur im Eingabefeld. Ein ausgeblendetes
+   * Feld ist keine Regel — die Anfrage laesst sich von Hand stellen, und
+   * `handleFindPerson` nimmt einen Benutzernamen weiterhin an (die
+   * Personensuche im Explorer braucht ihn). Wer ueber diesen Weg einen
+   * Kontakt anlegen will, muss die Nummer kennen.
+   *
+   * Ein gescannter QR-Code landet ebenfalls hier: der Browser holt die Nummer
+   * mit `QrKontakt.nummerAus` heraus und schickt genau sie.
+   */
+  const grund = Telefon.pruefe(eingabe);
+  if (grund) return { ok: false, error: grund };
 
   const gefunden = await syncHandlers.handleFindPerson(req.db, req.nutzerId, eingabe);
   const person = gefunden?.person;
-  if (!person) {
-    return {
-      ok: false,
-      error: syncHandlers.istNummer(eingabe)
-        ? 'Zu dieser Nummer gibt es noch kein Konto'
-        : 'Niemand mit diesem Benutzernamen gefunden',
-    };
-  }
+  if (!person) return { ok: false, error: 'Zu dieser Nummer gibt es noch kein Konto' };
 
   const privat = Boolean(person.privat);
   const e = await syncHandlers.handleAddContact(
@@ -725,6 +932,35 @@ async function anfrageZustandVon(client, chatId, nutzerId) {
     .maybeSingle();
   return data ? supabaseApi.anfrageZustand(data, nutzerId) : 'accepted';
 }
+
+/*
+ * Der Eintrag zu einem beendeten Anruf (Henrik 7.9.). In der App macht das
+ * CallScreen.tsx beim Auflegen über dieselbe Regel.
+ */
+app.post('/api/kontakte/:userId/anruf', route(async (req) => {
+  const e = await syncHandlers.handleAnrufNotieren(req.db, req.nutzerId, req.params.userId, req.body || {});
+  return antwort(e);
+}));
+
+/*
+ * Den Chat mit einer Person holen — und ihn anlegen, wenn es noch keinen gibt.
+ * Für den Sprung „Nachricht" aus der Kontaktinfo (Henrik 7.9.). In der App
+ * macht das onMessage in ContactProfileScreen.tsx über dieselbe chatMit-Regel.
+ */
+app.post('/api/kontakte/:userId/chat', route(async (req) => {
+  const e = await syncHandlers.handleChatMit(req.db, req.nutzerId, req.params.userId, 'messenger');
+  return antwort(e);
+}));
+
+/*
+ * Selbst vergebener Name und Notiz zu einem Kontakt (Henrik 7.9.).
+ * Der Name schlägt auf Chatliste, Chatkopf und Profil durch, deshalb lädt die
+ * Oberfläche danach neu — siehe openContactProfile in web/public/app.js.
+ */
+app.post('/api/kontakte/:userId/bearbeiten', route(async (req) => {
+  const e = await syncHandlers.handleContactEdit(req.db, req.nutzerId, req.params.userId, req.body || {});
+  return antwort(e, { contacts: await supabaseApi.ladeKontakte(req.db, req.nutzerId) });
+}));
 
 app.post('/api/kontakte/:userId/favorit', route(async (req) => {
   const e = await syncHandlers.handleContactFavorite(req.db, req.nutzerId, req.params.userId);
@@ -1016,6 +1252,42 @@ app.post('/api/eigene/profil', route(async (req) => {
 
   const profil = await supabaseApi.ladeProfil(req.db, req.nutzerId);
   return { ok: true, profil };
+}));
+
+/*
+ * Die eigene Telefonnummer.
+ *
+ * Gegenstueck zu telefonAendern() in app/lib/aktionen.ts. Bis zum 07.09.2026
+ * meldete das Formular „Wir haben dir einen Bestätigungscode geschickt" und
+ * tat nichts — kein Code, kein Schreibvorgang. Ein Code bleibt aus, solange
+ * kein SMS-Versand eingerichtet ist; gespeichert wird die Nummer jetzt.
+ *
+ * Die Regel steht in gemeinsam/telefon.js, damit sie hier und in der App
+ * dieselbe ist. Warum die Dopplung ueber `finde_per_nummer` geprueft wird und
+ * nicht ueber den Eindeutigkeits-Index allein, steht bei telefonAendern() in
+ * app/lib/aktionen.ts.
+ */
+app.post('/api/eigene/telefon', route(async (req) => {
+  const grund = Telefon.pruefe(String(req.body?.nummer ?? ''));
+  if (grund) return { ok: false, error: grund };
+
+  const sauber = Telefon.speicherform(String(req.body.nummer));
+
+  const { data: schonDa } = await req.db.rpc('finde_per_nummer', { nummer: sauber });
+  if (schonDa) return { ok: false, error: 'Diese Nummer gehört schon zu einem anderen Konto' };
+
+  const { error } = await req.db
+    .from('profiles')
+    .update({ phone: sauber, updated_at: new Date().toISOString() })
+    .eq('id', req.nutzerId);
+
+  if (error) {
+    if (error.code === '23505') {
+      return { ok: false, error: 'Diese Nummer gehört schon zu einem anderen Konto' };
+    }
+    return { ok: false, error: 'Die Nummer ließ sich nicht speichern' };
+  }
+  return { ok: true, nummer: sauber };
 }));
 
 app.post('/api/eigene/highlight', route(async (req) => {
@@ -1312,10 +1584,121 @@ app.post('/api/comments/:targetId/:commentId/like', route(async (req) => {
 // Storys
 // ============================================================================
 
+/*
+ * Eine eigene Story anlegen.
+ *
+ * Diese Route fehlte bis zum 09.09.2026 vollstaendig. `handleCreateStory`
+ * stand seit Langem in sync-handlers.js, aber niemand rief ihn auf: die
+ * Website legte die Aufnahme in den `localStorage` und meldete „Deine Story
+ * ist online". Sie war es nie — kein anderes Geraet und kein anderes Konto
+ * hat je eine Story von der Website gesehen.
+ *
+ * Aufgefallen beim Umbau der Story-Trennung (Henrik, 07.09.2026): die Frage
+ * „auch unter Videos?" ist sinnlos, solange die Story nirgends ankommt.
+ *
+ * Zurueck geht die frisch geladene Leiste, damit die Oberflaeche nicht raten
+ * muss, wie ihre eigene Kachel jetzt aussieht.
+ */
+app.post('/api/stories', route(async (req) => {
+  const e = await syncHandlers.handleCreateStory(req.db, req.nutzerId, {
+    mediaUrl: req.body?.mediaUrl || null,
+    mediaTyp: req.body?.mediaTyp || 'image',
+    text: req.body?.text || '',
+    inVideos: Boolean(req.body?.inVideos),
+  });
+  if (!e || e.ok === false) return antwort(e);
+
+  const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
+  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos };
+}));
+
+/*
+ * Story loeschen.
+ *
+ * Vorher strich die Website die eigene Story nur aus dem Browserspeicher —
+ * in der Datenbank blieb sie stehen und war beim naechsten Laden wieder da.
+ * Seit die Website ihre Storys wirklich anlegt (siehe oben), muss sie sie
+ * auch wirklich loeschen koennen.
+ *
+ * Geprueft wird ueber die geloeschte Zeile: unter RLS meldet ein
+ * abgelehntes DELETE keinen Fehler, es trifft nur nichts.
+ */
+app.post('/api/stories/:id/loeschen', route(async (req) => {
+  const { data, error } = await req.db
+    .from('stories')
+    .delete()
+    .eq('id', req.params.id)
+    .eq('user_id', req.nutzerId)
+    .select('id');
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: 'Das ist nicht deine Story' };
+
+  const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
+  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos };
+}));
+
+/*
+ * Wer hat meine Story gesehen?
+ *
+ * Vorher erfand die Oberflaeche die Liste: sie nahm die ersten n Kontakte,
+ * n aus der Aufnahmezeit gerechnet. Die Zahl stimmte nie und die Namen
+ * schon gar nicht. Die Wahrheit steht in public.story_views (Schema 2);
+ * lesen darf sie laut RLS nur, wem die Story gehoert.
+ */
+app.get('/api/stories/:id/ansichten', route(async (req) => {
+  const { data: eigene } = await req.db
+    .from('stories')
+    .select('id')
+    .eq('id', req.params.id)
+    .eq('user_id', req.nutzerId)
+    .maybeSingle();
+  if (!eigene) return { ok: false, error: 'Das ist nicht deine Story' };
+
+  const { data, error } = await req.db
+    .from('story_views')
+    .select('user_id, viewed_at')
+    .eq('story_id', req.params.id)
+    .order('viewed_at', { ascending: false });
+  if (error) return { ok: false, error: error.message };
+
+  const ids = (data || []).map((z) => z.user_id).filter((id) => id !== req.nutzerId);
+  if (ids.length === 0) return { ok: true, seher: [] };
+
+  const { data: profile } = await req.db
+    .from('profiles')
+    .select('id, name, handle, initials, color')
+    .in('id', ids);
+  const nach = new Map((profile || []).map((p) => [p.id, p]));
+
+  return {
+    ok: true,
+    seher: ids
+      .filter((id) => nach.has(id))
+      .map((id) => {
+        const p = nach.get(id);
+        const zeile = (data || []).find((z) => z.user_id === id);
+        return {
+          id,
+          name: p.name || '',
+          handle: p.handle || '',
+          initials: p.initials || '',
+          color: p.color || '',
+          zeit: zeile?.viewed_at || null,
+        };
+      }),
+  };
+}));
+
 app.post('/api/stories/:id/like', route(async (req) => {
   const e = await syncHandlers.handleLikeStory(req.db, req.nutzerId, req.params.id);
   if (!e || e.ok === false) return antwort(e);
-  const alle = await supabaseApi.ladeStorys(req.db, req.nutzerId);
+  /*
+   * ladeStorys() liefert seit dem 07.09.2026 zwei Listen (Messenger und
+   * Videos). Gesucht wird in beiden: geliked werden kann eine Story aus
+   * jedem der beiden Bereiche.
+   */
+  const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
+  const alle = [...listen.messenger, ...listen.videos];
   return alle.find((s) => s.id === req.params.id) || { ok: true };
 }));
 
@@ -1741,6 +2124,15 @@ app.post('/api/sichtbarkeit/:bereich', route(async (req) =>
   )
 ));
 
+/*
+ * Der Zusatz „Story auch in Videos teilen". Eigene Route und kein Bereich
+ * unter /api/sichtbarkeit/: er ist keine Stufe, sondern ein Ja/Nein, und die
+ * Bereichsroute prueft gegen die Liste der zehn Bereiche.
+ */
+app.post('/api/story-in-videos', route(async (req) =>
+  antwort(await syncHandlers.handleStoryInVideos(req.db, req.nutzerId, req.body?.an))
+));
+
 app.post('/api/sichtbarkeit/:bereich/ausnahme/:userId', route(async (req) =>
   antwort(
     await syncHandlers.handleSichtbarkeitAusnahme(
@@ -1858,6 +2250,18 @@ app.post('/api/standortanfragen/:id/antwort', route(async (req) =>
       req.body?.annehmen !== false, req.body?.stunden
     )
   )
+));
+
+/*
+ * Gesehene Beitraege — gebuendelt, nicht einzeln.
+ *
+ * Wer zwei Minuten durch den Feed scrollt, hat zwanzig Sichtungen
+ * gesammelt; zwanzig Anfragen dafuer waeren zwanzig Gelegenheiten zu
+ * scheitern. Die Seite sammelt und schickt einmal — siehe
+ * web/public/impressionen.js und, wortgleich, app/lib/impressionen.ts.
+ */
+app.post('/api/impressionen', route(async (req) =>
+  antwort(await syncHandlers.handleImpressionen(req.db, req.nutzerId, req.body?.eintraege))
 ));
 
 

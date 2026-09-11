@@ -84,9 +84,35 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <!--
+    Die Kryptoschicht kommt aus /gemeinsam/ — derselbe Ordner, den auch die
+    App und die Pruefläufe benutzen. Eine Kopie hier daneben waere die eine
+    Abweichung, nach der die App nicht mehr lesen kann, was der Browser
+    geschrieben hat. Ausgeliefert wird der Ordner von web/server/app.js.
+
+    Reihenfolge: tweetnacl setzt `window.nacl`, krypto.js baut darauf
+    `window.Krypto`, und /krypto.js macht daraus `window.KryptoWeb`.
+  -->
+  <script src="/gemeinsam/tweetnacl.js"></script>
+  <script src="/gemeinsam/krypto.js"></script>
+  <!--
+    Die Passwortregel kommt aus demselben Ordner. Sie stand vorher dreimal da
+    und war dreimal falsch — sechs Zeichen hier, acht dort, zehn bei Supabase.
+    Setzt `window.Passwort`; muss vor anmeldung.js und app.js stehen.
+  -->
+  <script src="/gemeinsam/passwort.js"></script>
+  <!-- Ebenso die Telefonnummer. Setzt `window.Telefon`, gebraucht in app.js. -->
+  <script src="/gemeinsam/telefon.js"></script>
+  <!--
+    Und die Schreibweise des QR-Codes (Henrik 7.9.). Setzt `window.QrKontakt`;
+    das Bild selbst zeichnet der Server unter /api/qr.svg.
+  -->
+  <script src="/gemeinsam/qr.js"></script>
+  <script src="/krypto.js"></script>
   <script src="/anmeldung.js"></script>
   <script src="/pull-to-refresh.js"></script>
   <script src="/icons.js"></script>
+  <script src="/impressionen.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

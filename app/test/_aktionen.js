@@ -21,7 +21,7 @@
 
 const { chromium } = require('playwright-core');
 const { zusammengelegt } = require('./_modulquelle');
-const { anmelden, MAIL, zuruecksetzen } = require('./_konto');
+const { anmelden, MAIL, zuruecksetzen, mitZeitgrenze } = require('./_konto');
 const K = require('./_kennungen');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
@@ -52,11 +52,14 @@ const pruefe = (name, wahr, zusatz = '') => {
    * dort faellt ein CSP-Fehler als Konsolenfehler auf.
    */
   const seite = await browser.newPage({ viewport: { width: 400, height: 860 }, bypassCSP: true });
+  // Dieser Lauf ruft App-Code in der Seite auf. Bleibt der haengen, waere es
+  // ohne Zeitgrenze ein Stillstand ohne Meldung — siehe _konto.js.
+  mitZeitgrenze(seite);
 
   const browserFehler = [];
   seite.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
 
-  await seite.goto(BASIS, { waitUntil: 'networkidle' });
+  await seite.goto(BASIS, { waitUntil: 'load' });
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);
@@ -167,7 +170,21 @@ const pruefe = (name, wahr, zusatz = '') => {
         }
         const client = await window.Anmeldung.aufbauen();
         const ich = window.Anmeldung.nutzer().id;
-        return window.__aktionen[name](client, ich, ...args);
+        /*
+         * Fehler mit Namen weiterreichen.
+         *
+         * Ein Fehler aus supabase-js ist ein gewoehnliches Objekt, kein
+         * Error. Playwright bekommt davon nur „page.evaluate: Object" zu
+         * sehen — ohne Meldung, ohne Code, ohne den Aufruf, der es war.
+         * Genau so stand der Lauf am 07.09.2026 ohne jeden Hinweis.
+         */
+        try {
+          return await window.__aktionen[name](client, ich, ...args);
+        } catch (e) {
+          const grund = (e && (e.message || e.hint || e.details)) || '';
+          const code = (e && e.code) ? ' [' + e.code + ']' : '';
+          throw new Error(name + ': ' + (grund || JSON.stringify(e)) + code);
+        }
       },
       { quelltext, name, args }
     );

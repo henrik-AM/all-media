@@ -20,7 +20,17 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const BILD = path.join(__dirname, '_testbild.png');
 
 (async () => {
-  const browser = await chromium.launch();
+  /*
+   * Eine erfundene Kamera mitgeben.
+   *
+   * Ohne sie meldet Chrome „Requested device not found", die Seite schreibt
+   * das brav in die Konsole, und der Lauf gilt als rot — obwohl jede
+   * Pruefung bestanden hat. Mit den beiden Schaltern liefert Chrome ein
+   * Testbild und beantwortet die Nachfrage selbst; damit wird die Aufnahme
+   * wirklich geprueft statt nur der Fehlerfall.
+   */
+  const KAMERA = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'];
+  const browser = await chromium.launch({ args: KAMERA });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   page.setDefaultTimeout(8000);
 
@@ -28,7 +38,7 @@ const BILD = path.join(__dirname, '_testbild.png');
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
-  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.goto(ZIEL, { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -40,15 +50,18 @@ const BILD = path.join(__dirname, '_testbild.png');
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForSelector('#topbar button');
 
   const ergebnisse = [];

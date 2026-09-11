@@ -1,13 +1,19 @@
-import React, { useContext } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { AuthContext } from '../../contexts/AuthContext';
 import { SwitchBar } from '../../components/SwitchBar';
+import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { colors, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { AreaKey } from '../../constants/navigation';
 import { useProfil } from '../../contexts/ProfilContext';
+import { useDaten } from '../../contexts/DatenContext';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { ladeEinstellungen } from '../../lib/daten';
+import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
+import { useAktionen } from '../../lib/useAktionen';
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
@@ -19,8 +25,6 @@ interface Props {
   onAvatarPress?: () => void;
   onNotice: (message: string) => void;
 }
-
-const ITEMS = ['Standort-Sichtbarkeit', 'Story-Sichtbarkeit', 'Lesebestätigung'];
 
 /**
  * Prototyp-Frame "Messenger - Profil": Leiste „Profil wechseln", Bild links
@@ -38,33 +42,120 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
    */
   const { eigenesProfil } = useProfil();
 
+  /*
+   * DIE DREI EINSTELLUNGEN AUF DIESER SEITE (Stand 09.09.2026)
+   *
+   * Henrik am 07.09.2026: „Profilseiten-Einstellungen (nur 3) mit echter
+   * Einstellungsseite synchron halten." Vorher waren es drei Beschriftungen
+   * ohne Inhalt: rechts stand nichts, und jedes Antippen sprang nur in die
+   * Einstellungen. Ob die Standort-Sichtbarkeit gerade auf „Alle" oder auf
+   * „Niemand" stand, war hier nicht zu sehen.
+   *
+   * Jetzt lesen sie aus derselben Quelle wie die Einstellungsseite —
+   * `sichtbarkeit` aus dem DatenContext und `user_settings` — und schreiben
+   * ueber dieselben Aktionen zurueck. Es ist kein zweiter Satz Schalter,
+   * sondern derselbe an einer zweiten Stelle.
+   */
+  const { sichtbarkeit, ichId, neuLaden } = useDaten();
+  const { supabase } = useSupabase();
+  const aktionen = useAktionen(onNotice);
+  const [einstellungen, setEinstellungen] = useState<Record<string, string> | null>(null);
+  const [sichtOffen, setSichtOffen] = useState<{ bereich: SichtbarkeitBereich; titel: string } | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    let gilt = true;
+    ladeEinstellungen(supabase, ichId)
+      .then((werte) => gilt && setEinstellungen(werte))
+      .catch(() => gilt && setEinstellungen({}));
+    return () => {
+      gilt = false;
+    };
+  }, [supabase, ichId]);
+
+  const sicht = (bereich: SichtbarkeitBereich) =>
+    sichtbarkeit[bereich] || { stufe: 'alle' as SichtbarkeitStufe, ausnahmen: [] };
+
+  /** Was rechts neben dem Punkt steht — wortgleich mit den Einstellungen. */
+  const sichtText = (bereich: SichtbarkeitBereich) => {
+    const s = sicht(bereich);
+    const namen: Record<string, string> = {
+      niemand: 'Niemand',
+      niemand_bis_auf: 'Niemand bis auf …',
+      alle_bis_auf: 'Alle bis auf …',
+      alle: 'Alle',
+    };
+    const zahl = s.ausnahmen.length;
+    return zahl && s.stufe !== 'alle' && s.stufe !== 'niemand'
+      ? `${namen[s.stufe]} (${zahl})`
+      : namen[s.stufe];
+  };
+
+  // Ohne Eintrag ist die Lesebestaetigung an - derselbe Auslieferungszustand
+  // wie in SettingsScreen (SCHALTER_STANDARD).
+  const lesebestaetigung = einstellungen?.lesebestaetigung === undefined
+    ? true
+    : einstellungen.lesebestaetigung === 'an';
+
+  const lesebestaetigungSetzen = async (an: boolean) => {
+    const vorher = einstellungen?.lesebestaetigung;
+    setEinstellungen((prev) => ({ ...(prev ?? {}), lesebestaetigung: an ? 'an' : 'aus' }));
+    const gespeichert = await aktionen.einstellung('lesebestaetigung', an ? 'an' : 'aus');
+    if (gespeichert !== null) return;
+    setEinstellungen((prev) => {
+      const kopie = { ...(prev ?? {}) };
+      if (vorher === undefined) delete kopie.lesebestaetigung;
+      else kopie.lesebestaetigung = vorher;
+      return kopie;
+    });
+  };
+
   return (
   <View style={styles.screen}>
     {/* Fuehrt zur Kontoliste - hier hat Henrik den Kontowechsel gesucht. */}
     <SwitchBar onPress={onSwitchAccount} />
 
     <ScrollView contentContainerStyle={styles.content}>
+      {/*
+        * DER KOPF (Stand 09.09.2026)
+        *
+        * Henrik am 07.09.2026: „Obere Haelfte wirkt gequetscht (Vorbild
+        * Instagram/WhatsApp)." Vorher stand die Biografie in einer schmalen
+        * Spalte rechts neben dem Bild — bei drei Zeilen Text wurde daraus
+        * ein Block aus Wortfetzen, und Bild, Text und Knopf klebten
+        * aneinander.
+        *
+        * Jetzt wie bei Instagram: oben die Zeile mit Bild und Namen, darunter
+        * die Biografie ueber die volle Breite, dann der Knopf. Der Text hat
+        * die ganze Breite, und zwischen den drei Teilen ist Luft.
+        */}
       <View style={styles.head}>
         <Druck disabled={!onAvatarPress} onPress={onAvatarPress}>
           <Avatar id={user?.profile.id ?? 'me'} name={eigenesProfil.name} size={sizes.avatarXl} />
         </Druck>
         <View style={styles.headText}>
-          <Text style={styles.name}>{eigenesProfil.name}</Text>
-          {!!eigenesProfil.bio && <Text style={styles.bio}>{eigenesProfil.bio}</Text>}
+          <Text style={styles.name} numberOfLines={1}>{eigenesProfil.name}</Text>
+          {!!user?.profile.handle && (
+            <Text style={styles.handle} numberOfLines={1}>{user.profile.handle}</Text>
+          )}
         </View>
       </View>
 
+      {!!eigenesProfil.bio && <Text style={styles.bio}>{eigenesProfil.bio}</Text>}
+
       {/* Punkt 19: "Profil bearbeiten" gab es nur im Videos-Profil. Die
-          Website hat den Knopf laengst an allen dreien, hier fehlte er. */}
+          Website hat den Knopf laengst an allen dreien, hier fehlte er.
+          Seit dem 09.09.2026 oeffnet er ein kleines Blatt statt in die
+          Einstellungen zu springen (siehe App.tsx, profilBearbeiten). */}
       <Druck style={styles.bearbeiten} onPress={onBearbeiten}>
         <Text style={styles.bearbeitenText}>Profil bearbeiten</Text>
       </Druck>
 
       <View style={styles.links}>
-        <Druck onPress={() => onSwitchArea('videos')}>
+        <Druck style={styles.linkPille} onPress={() => onSwitchArea('videos')}>
           <Text style={styles.link}>@videoprofil</Text>
         </Druck>
-        <Druck onPress={() => onSwitchArea('communities')}>
+        <Druck style={styles.linkPille} onPress={() => onSwitchArea('communities')}>
           <Text style={styles.link}>@communityprofil</Text>
         </Druck>
       </View>
@@ -75,14 +166,72 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
       </Druck>
 
       <View style={styles.group}>
-        {ITEMS.map((label) => (
-          <Druck key={label} style={styles.item} onPress={onOpenSettings}>
-            <Text style={styles.itemLabel}>{label}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-          </Druck>
-        ))}
+        <Druck
+          style={styles.item}
+          onPress={() => setSichtOffen({ bereich: 'standort', titel: 'Standort-Sichtbarkeit' })}
+        >
+          <Text style={styles.itemLabel}>Standort-Sichtbarkeit</Text>
+          <Text style={styles.itemValue}>{sichtText('standort')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.text3} />
+        </Druck>
+
+        <Druck
+          style={styles.item}
+          onPress={() => setSichtOffen({ bereich: 'story', titel: 'Story-Sichtbarkeit' })}
+        >
+          <Text style={styles.itemLabel}>Story-Sichtbarkeit</Text>
+          <Text style={styles.itemValue}>{sichtText('story')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.text3} />
+        </Druck>
+
+        {/* Ein Schalter, kein Pfeil: in den Einstellungen ist es auch einer.
+            Solange die Werte noch geladen werden, bleibt er aus dem Weg —
+            ein Schalter, der gleich umspringt, ist eine Falschaussage. */}
+        <View style={styles.item}>
+          <Text style={styles.itemLabel}>Lesebestätigung</Text>
+          {einstellungen === null ? (
+            <Text style={styles.itemValue}>…</Text>
+          ) : (
+            <Switch
+              value={lesebestaetigung}
+              onValueChange={(an) => void lesebestaetigungSetzen(an)}
+              trackColor={{ false: colors.border, true: colors.brand }}
+            />
+          )}
+        </View>
       </View>
     </ScrollView>
+
+    {/*
+      * Dasselbe Blatt wie in den Einstellungen, mit denselben Aktionen —
+      * damit „synchron" nicht heisst, dass zwei Stellen dasselbe nachbauen.
+      */}
+    {sichtOffen && (
+      <SichtbarkeitSheet
+        visible
+        titel={sichtOffen.titel}
+        stufe={sicht(sichtOffen.bereich).stufe}
+        ausnahmen={sicht(sichtOffen.bereich).ausnahmen}
+        onStufe={async (stufe) => {
+          await aktionen.sichtbarkeit(sichtOffen.bereich, stufe, () => {});
+          await neuLaden();
+        }}
+        onAusnahme={async (userId) => {
+          await aktionen.sichtbarkeitAusnahme(sichtOffen.bereich, userId, () => {});
+          await neuLaden();
+        }}
+        inVideos={sichtOffen.bereich === 'story' ? sicht('story').inVideos : undefined}
+        onInVideos={
+          sichtOffen.bereich === 'story'
+            ? async (an: boolean) => {
+                await aktionen.storyInVideos(an, () => {});
+                await neuLaden();
+              }
+            : undefined
+        }
+        onClose={() => setSichtOffen(null)}
+      />
+    )}
   </View>
   );
 };
@@ -93,12 +242,15 @@ const styles = themenStyles((colors) => ({
   head: { flexDirection: 'row', alignItems: 'center', gap: 18, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md },
   headText: { flex: 1 },
   name: { fontSize: 21, fontWeight: '700', color: colors.text },
-  bio: { ...typography.message, color: colors.text2, marginTop: 4 },
+  handle: { ...typography.message, color: colors.text2, marginTop: 2 },
+  /* Die Biografie steht ueber die volle Breite unter dem Kopf, nicht mehr in
+     der schmalen Spalte daneben. */
+  bio: { ...typography.message, color: colors.text, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   /* Derselbe Knopf wie in OwnProfileHead, damit die drei Profile nicht
      unterschiedlich aussehen. */
   bearbeiten: {
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     paddingVertical: 10,
     borderRadius: 11,
     backgroundColor: colors.surface,
@@ -107,8 +259,17 @@ const styles = themenStyles((colors) => ({
     alignItems: 'center',
   },
   bearbeitenText: { fontSize: 14, fontWeight: '600', color: colors.text, letterSpacing: -0.1 },
-  links: { flexDirection: 'row', gap: 26, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  link: { fontSize: 15, fontWeight: '700', color: colors.text },
+  links: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  /* Die beiden Profilverweise waren blosser fetter Text nebeneinander — dass
+     man sie antippen kann, sah man ihnen nicht an. */
+  linkPille: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  link: { fontSize: 14, fontWeight: '700', color: colors.text },
   sectionLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -122,7 +283,7 @@ const styles = themenStyles((colors) => ({
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     height: 54,
     borderBottomWidth: 1,
@@ -130,5 +291,6 @@ const styles = themenStyles((colors) => ({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  itemLabel: { ...typography.body, color: colors.text },
+  itemLabel: { ...typography.body, color: colors.text, flex: 1 },
+  itemValue: { ...typography.body, color: colors.text2 },
 }));

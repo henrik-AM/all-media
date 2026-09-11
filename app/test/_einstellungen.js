@@ -17,7 +17,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
-  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.goto(ZIEL, { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -29,16 +29,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.evaluate(() => localStorage.removeItem('am-einstellungen'));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(500);
 
   const ergebnisse = [];
@@ -101,7 +104,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Die Auswahl übersteht einen Neustart der Seite', async () => {
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
     await page.waitForTimeout(500);
     await zuDenEinstellungen();
     const jetzt = await page.$eval(
@@ -182,6 +185,87 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(500);
     const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
     if (!hinweis.includes('vorgemerkt')) throw new Error(hinweis);
+  });
+
+  /*
+   * Die Telefonnummer.
+   *
+   * Bis zum 07.09.2026 meldete dieses Formular "Wir haben dir einen
+   * Bestaetigungscode geschickt" und tat nichts. Geprueft wird deshalb nicht
+   * die Meldung, sondern was danach in der Datenbank steht — genau der
+   * Unterschied, den die alte Fassung verwischt hat.
+   */
+  await pruefe('Die Telefonnummer kommt in der Datenbank an', async () => {
+    const nummer = '+49 151 9900110';
+    const antwort = await page.evaluate(async (n) => {
+      const res = await fetch('/api/eigene/telefon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nummer: n }),
+      });
+      return res.json();
+    }, nummer);
+    if (!antwort?.ok) throw new Error(antwort?.error || 'abgelehnt');
+    // Gespeichert wird die Eingabe, nicht eine umgeschriebene Fassung.
+    if (antwort.nummer !== nummer) throw new Error('gespeichert als ' + antwort.nummer);
+
+  });
+
+  /*
+   * Die Personensuche rechnet dieselbe Vergleichsform. Anna steht mit
+   * "+49 152 3456789" im Bestand; wer "0152 3456789" eintippt, muss sie
+   * genauso finden. Vorher fand die Datenbank nur die zeichengleiche Fassung.
+   */
+  await pruefe('Zwei Schreibweisen finden dieselbe Person', async () => {
+    const suche = (n) =>
+      page.evaluate(async (eingabe) => {
+        const res = await fetch('/api/personen/suche', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eingabe }),
+        });
+        return res.json();
+      }, n);
+
+    const mitVorwahl = await suche('+49 152 3456789');
+    const mitNull = await suche('0152 3456789');
+    if (!mitVorwahl?.person) throw new Error('mit +49 nichts gefunden');
+    if (!mitNull?.person) throw new Error('mit fuehrender 0 nichts gefunden');
+    if (mitVorwahl.person.id !== mitNull.person.id) {
+      throw new Error('zwei verschiedene Personen: ' + mitVorwahl.person.id + ' / ' + mitNull.person.id);
+    }
+  });
+
+  await pruefe('Eine zu kurze Nummer wird abgelehnt', async () => {
+    const antwort = await page.evaluate(async () => {
+      const res = await fetch('/api/eigene/telefon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nummer: '123' }),
+      });
+      return res.json();
+    });
+    if (antwort?.ok) throw new Error('durchgelassen');
+    if (!/zu kurz/i.test(antwort?.error || '')) throw new Error(antwort?.error || 'kein Grund');
+  });
+
+  /*
+   * Der eigentliche Fund vom 07.09.2026: die Datenbank rechnete eine andere
+   * Vergleichsform als die App. "0152 3456789" ging als freie Nummer durch,
+   * obwohl sie als "+49 152 3456789" schon Anna gehoerte. Seit
+   * SUPABASE_SCHEMA_24_telefon.sql rechnen beide dasselbe.
+   */
+  await pruefe('Dieselbe Nummer anders geschrieben faellt als Dopplung auf', async () => {
+    const antwort = await page.evaluate(async () => {
+      const res = await fetch('/api/eigene/telefon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nummer: '0152 3456789' }),
+      });
+      return res.json();
+    });
+    if (antwort?.ok) throw new Error('durchgelassen — die Nummer gehoert schon jemandem');
+    if (!/anderen Konto/i.test(antwort?.error || '')) throw new Error(antwort?.error || 'kein Grund');
   });
 
   await pruefe('Kein Punkt gibt mehr "folgt mit dem Backend" aus', async () => {

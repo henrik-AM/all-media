@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { AuthContext } from '../contexts/AuthContext';
+import { PASSWORT_REGEL, passwortPruefen } from '../lib/supabaseAuth';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
@@ -30,7 +31,8 @@ type Ansicht = 'liste' | 'anmelden' | 'neu';
  */
 export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
   const insets = useSafeAreaInsets();
-  const { user, konten, wechsleZu, kontoHinzufuegen, kontoAbmelden } = useContext(AuthContext);
+  const { user, konten, frueher, frueheresVergessen, wechsleZu, kontoHinzufuegen, kontoAbmelden } =
+    useContext(AuthContext);
 
   const [ansicht, setAnsicht] = useState<Ansicht>('liste');
   const [email, setEmail] = useState('');
@@ -45,10 +47,22 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
     onClose();
   };
 
-  const wechseln = (id: string) => {
+  /*
+   * Erst wechseln, dann melden.
+   *
+   * Bis zum 07.09.2026 stand die Meldung vor dem Wechsel und wechsleZu() gab
+   * nichts zurueck — „Gewechselt zu Anna" erschien also auch dann, wenn die
+   * Sitzung von Anna laengst abgelaufen war. Jetzt sagt der Wechsel, ob er
+   * geklappt hat, und das Blatt bleibt im Fehlerfall offen.
+   */
+  const wechseln = async (id: string) => {
     if (id === user?.id) return schliessen();
     const konto = konten.find((k) => k.id === id);
-    wechsleZu(id);
+    const geklappt = await wechsleZu(id);
+    if (!geklappt) {
+      onNotice(`${konto?.profile.name ?? 'Das Konto'} ist abgemeldet. Bitte neu anmelden.`);
+      return;
+    }
     onNotice(`Gewechselt zu ${konto?.profile.name ?? 'Konto'}`);
     schliessen();
   };
@@ -66,10 +80,27 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
     }
   };
 
+  /*
+   * Wer schon einmal hier angemeldet war, steht als Zeile da — ein Tipp legt
+   * die E-Mail ins Feld, es fehlt nur noch das Passwort. Konten mit lebender
+   * Sitzung stehen bereits oben, die blendet die Liste aus.
+   */
+  const offeneFrueher = frueher.filter((f) => !konten.some((k) => k.id === f.id));
+
+  const frueherWaehlen = (mail: string) => {
+    setEmail(mail);
+    setPasswort('');
+    setAnsicht('anmelden');
+  };
+
   const neuErstellen = async () => {
     if (!name.trim()) return onNotice('Bitte einen Namen eingeben');
     if (!email.trim()) return onNotice('Bitte E-Mail eingeben');
-    if (passwort.trim().length < 6) return onNotice('Passwort: mindestens 6 Zeichen');
+    // Die Regel steht in gemeinsam/passwort.js — dieselbe, die Supabase
+    // durchsetzt. Sechs Zeichen hier durchzulassen hiess bisher, den
+    // englischen Fehler von Supabase als Systemmeldung zu bekommen.
+    const schwach = passwortPruefen(passwort);
+    if (schwach) return onNotice(schwach);
     try {
       await kontoHinzufuegen(email.trim(), passwort, name.trim());
       onNotice(`Konto für ${name.trim()} erstellt`);
@@ -134,6 +165,28 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                 );
               })}
 
+              {offeneFrueher.length > 0 && (
+                <>
+                  <Text style={styles.gruppe}>Zuletzt verwendet</Text>
+                  {offeneFrueher.map((konto) => (
+                    <Druck
+                      key={konto.id}
+                      style={styles.zeile}
+                      onPress={() => frueherWaehlen(konto.email)}
+                    >
+                      <Avatar id={konto.id} name={konto.name} size={sizes.avatarMd} />
+                      <View style={styles.zeileBody}>
+                        <Text style={styles.zeileName}>{konto.name}</Text>
+                        <Text style={styles.zeileSub}>{konto.email}</Text>
+                      </View>
+                      <Druck hitSlop={8} onPress={() => frueheresVergessen(konto.id)}>
+                        <Ionicons name="close" size={20} color={colors.text3} />
+                      </Druck>
+                    </Druck>
+                  ))}
+                </>
+              )}
+
               <Druck style={styles.zeile} onPress={() => setAnsicht('anmelden')}>
                 <View style={styles.rund}>
                   <Ionicons name="person-add-outline" size={20} color={colors.brand} />
@@ -190,6 +243,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                   secureTextEntry
                   onSubmitEditing={ansicht === 'neu' ? neuErstellen : anmelden}
                 />
+                {ansicht === 'neu' && <Text style={styles.hinweis}>{PASSWORT_REGEL}.</Text>}
               </View>
 
               <View style={styles.footer}>
@@ -247,6 +301,13 @@ const styles = themenStyles((colors) => ({
     paddingHorizontal: spacing.lg,
     paddingVertical: 11,
   },
+  gruppe: {
+    ...typography.overline,
+    color: colors.text3,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
   zeileBody: { flex: 1, minWidth: 0 },
   zeileName: { color: colors.text, ...typography.name },
   zeileSub: { color: colors.text3, marginTop: 2, ...typography.small },
@@ -262,6 +323,7 @@ const styles = themenStyles((colors) => ({
 
   feld: { paddingTop: spacing.md, paddingHorizontal: spacing.lg },
   label: { color: colors.text2, marginBottom: 6, ...typography.small },
+  hinweis: { color: colors.text3, marginTop: 6, ...typography.small },
   input: {
     height: 44,
     paddingHorizontal: 14,

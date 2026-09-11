@@ -349,7 +349,6 @@ export const StoryViewerScreen = ({
       {ansichtenOffen && (
         <StoryAnsichtenSheet
           story={current}
-          contacts={contacts}
           onClose={() => {
             setAnsichtenOffen(false);
             setPaused(false);

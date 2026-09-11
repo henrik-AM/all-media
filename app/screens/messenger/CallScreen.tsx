@@ -7,6 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
+import { useAktionen } from '../../lib/useAktionen';
 
 /*
  * Die Oberflaeche eines Anrufs.
@@ -43,7 +44,8 @@ export const dauerText = (sekunden: number) => {
 };
 
 export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose, onNotice }: Props) => {
-  const { users: alleNutzer } = useDaten();
+  const { users: alleNutzer, neuLaden } = useDaten();
+  const aktionen = useAktionen(onNotice);
   const insets = useSafeAreaInsets();
   const gruppe = !userId && !!gruppenName;
   const person = userId ? alleNutzer[userId] : undefined;
@@ -86,6 +88,19 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
 
   const auflegen = () => {
     setZustand('beendet');
+    /*
+     * Henrik 07.09.2026: „Anrufe sollen als Chatnachricht protokolliert werden
+     * (wie WhatsApp)." Der Eintrag geht in den Chat mit dieser Person — bei
+     * einem Gruppenanruf gibt es keinen, deshalb nur beim Zweiergespraech.
+     * Wird nicht abgewartet: der Bildschirm soll sofort zugehen.
+     */
+    if (userId) {
+      void aktionen
+        .anrufNotieren(userId, art, dauer, dauer > 0 ? 'beendet' : 'verpasst')
+        // Erst danach neu laden, sonst steht der Eintrag zwar in der
+        // Datenbank, aber nicht im Chat, in den man gerade zurueckkehrt.
+        .then(() => neuLaden());
+    }
     onNotice(dauer > 0 ? `Anruf beendet · ${dauerText(dauer)}` : 'Anruf beendet');
     setTimeout(onClose, 700);
   };
@@ -135,12 +150,19 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
         <Text style={styles.name}>{gruppe ? gruppenName : person?.name ?? 'Unbekannt'}</Text>
         {gruppe && <Text style={styles.dabei}>{dabei.map((id) => alleNutzer[id].name.split(' ')[0]).join(', ')}</Text>}
         <Text style={styles.status}>{statusText}</Text>
-        {zustand === 'verbunden' && (
-          <View style={styles.verschluesselt}>
-            <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.verschluesseltText}>Ende-zu-Ende-verschlüsselt</Text>
-          </View>
-        )}
+        {/*
+          Hier stand bis zum 07.09.2026 „Ende-zu-Ende-verschlüsselt".
+
+          Das war unzutreffend, und zwar doppelt: verschlüsselt wurde damals
+          nichts, und ein Anruf wird es auch jetzt nicht. Seit Schema 31 sind
+          Textnachrichten in Chats zu zweit verschlüsselt — Sprache und Bild
+          nicht. Sie laufen noch nicht einmal, die Übertragung fehlt (WebRTC
+          braucht einen eigenen Build und läuft in Expo Go nicht).
+
+          Ein Schloss an dieser Stelle wäre also weiterhin eine Zusage, die
+          niemand einhält. Deshalb steht hier nichts, bis die Übertragung da
+          und verschlüsselt ist. Lieber keine Angabe als eine falsche.
+        */}
       </View>
 
       {art === 'video' && kameraAn && zustand === 'verbunden' && (
@@ -247,8 +269,6 @@ const styles = themenStyles((colors) => ({
   kopf: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   name: { marginTop: spacing.lg, color: colors.white, ...typography.title },
   status: { color: 'rgba(255,255,255,0.65)', ...typography.body },
-  verschluesselt: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.xs },
-  verschluesseltText: { color: 'rgba(255,255,255,0.7)', ...typography.small },
 
   eigenesBild: {
     position: 'absolute',

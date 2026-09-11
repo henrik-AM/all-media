@@ -3,6 +3,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -14,6 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { Motiv } from '../../components/Motiv';
+// Henrik 7.9.: Medien im Chat als Vorschau in echter Groesse, antippen fuehrt
+// ins Vollformat. Videoflaeche entscheidet an der Adresse selbst, ob ein
+// Video laeuft oder ein Standbild steht.
+import { Videoflaeche, istVideo } from '../../components/Videoflaeche';
 import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
@@ -25,6 +30,9 @@ import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Chat, Contact, Message } from '../../types';
 import { haptic } from '../../lib/haptics';
+// Dieselbe mm:ss-Schreibweise wie im Anrufbildschirm — sonst stuende im Chat
+// eine andere Dauer als waehrend des Gespraechs.
+import { dauerText } from './CallScreen';
 import * as Aktion from '../../lib/aktionen';
 
 const nowTime = () =>
@@ -100,6 +108,19 @@ export const ChatDetailScreen = ({
   const [bezug, setBezug] = useState<{ art: 'antwort' | 'zitat'; nachricht: Message } | null>(null);
   const [bearbeitet, setBearbeitet] = useState<Message | null>(null);
   const [weiterleiten, setWeiterleiten] = useState<Message | null>(null);
+
+  /*
+   * Henrik 07.09.2026: „Medien im Chat nur als Icon statt Vorschau in echter
+   * Groesse; gilt auch fuer Videos-Beitraege (aktuell gar nicht oeffenbar);
+   * antippen → Vollformat."
+   *
+   * `vollbild` haelt fest, was gerade formatfuellend zu sehen ist. Ein
+   * eigener Bildschirm dafuer waere zu viel: der Chat soll darunter stehen
+   * bleiben, damit Zuruecktippen wieder an derselben Stelle im Verlauf
+   * landet. Gleiches Verhalten auf der Website (`oeffneVollformat` in
+   * web/public/app.js).
+   */
+  const [vollbild, setVollbild] = useState<{ id: string; uri: string } | null>(null);
 
   /*
    * Der Verlauf kommt aus der Datenbank, nicht aus einer Liste im Quelltext.
@@ -367,6 +388,46 @@ export const ChatDetailScreen = ({
   const renderMessage = ({ item }: { item: Message }) => {
     const out = item.senderId === CURRENT_USER_ID;
     const sender = alleNutzer[item.senderId];
+    // Der Anhang, den es wirklich zu sehen gibt (Henrik 7.9.): frisch vom
+    // Geraet oder vom Server. Ohne Adresse bleibt es beim grauen Kaestchen —
+    // eine Sprachnachricht hat kein Bild.
+    const anhang =
+      item.bildUri ??
+      (item.mediaUrl && item.media !== 'audio' && item.media !== 'file'
+        ? item.mediaUrl
+        : undefined);
+
+    /*
+     * Henrik 07.09.2026: „Anrufe sollen als Chatnachricht protokolliert werden
+     * (wie WhatsApp)."
+     *
+     * Der Eintrag ist keine Blase, sondern eine Zeile in der Mitte — wie bei
+     * WhatsApp. Eine Sprechblase wuerde behaupten, jemand haette etwas
+     * geschrieben. Gleiche Darstellung auf der Website (paintMessages).
+     */
+    if (item.anruf) {
+      const verpasst = item.anruf.status !== 'beendet';
+      return (
+        <View style={styles.anruf}>
+          <Ionicons
+            name={item.anruf.art === 'video' ? 'videocam-outline' : 'call-outline'}
+            size={14}
+            color={verpasst ? colors.danger : colors.text2}
+          />
+          <Text style={[styles.anrufText, verpasst && styles.anrufVerpasst]}>
+            {out ? 'Ausgehender ' : ''}
+            {item.anruf.art === 'video' ? 'Videoanruf' : 'Anruf'}
+            {verpasst
+              ? item.anruf.status === 'abgelehnt'
+                ? ' · abgelehnt'
+                : ' · verpasst'
+              : ` · ${dauerText(item.anruf.dauer)}`}
+            {' · '}
+            {item.time}
+          </Text>
+        </View>
+      );
+    }
 
     return (
       // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt
@@ -421,8 +482,29 @@ export const ChatDetailScreen = ({
           </View>
         ) : null}
 
-        {item.bildUri ? (
-          <Image source={{ uri: item.bildUri }} style={styles.anhangBild} />
+        {anhang ? (
+          /*
+           * Der Anhang in echter Groesse (Henrik 7.9.). `bildUri` ist der
+           * gerade aufgenommene Anhang vom Geraet, `mediaUrl` derselbe Anhang
+           * beim naechsten Laden — beide werden gleich dargestellt, sonst
+           * saehe die eigene Nachricht nach dem Neuladen anders aus als
+           * beim Senden.
+           */
+          <Druck onPress={() => setVollbild({ id: item.id, uri: anhang })}>
+            <Videoflaeche
+              id={item.id}
+              quelle={anhang}
+              laeuft={false}
+              stumm
+              fuellen="cover"
+              style={styles.anhangBild}
+            />
+            {istVideo(anhang) ? (
+              <View style={styles.anhangPlay}>
+                <Ionicons name="play" size={20} color={colors.white} />
+              </View>
+            ) : null}
+          </Druck>
         ) : item.story ? (
           <View style={styles.storyContainer}>
             {item.story.mediaUri ? (
@@ -456,24 +538,47 @@ export const ChatDetailScreen = ({
             </View>
           </Druck>
         ) : item.geteilt ? (
-          // Weitergeleiteter Beitrag: kleine Karte statt nacktem Text.
-          <View style={styles.geteilt}>
-            <View style={styles.geteiltBild}>
+          /*
+           * Ein geteilter Beitrag (Henrik 7.9.). Bis dahin war das eine
+           * Zeile mit einem grauen Kaestchen daneben und liess sich nicht
+           * oeffnen — ein weitergeleitetes Video war damit im Chat nichts
+           * weiter als sein Titel. Jetzt steht der Beitrag selbst da und
+           * geht beim Antippen ins Vollformat.
+           */
+          <Druck
+            style={styles.geteiltKarte}
+            onPress={() =>
+              item.geteilt?.bild
+                ? setVollbild({ id: item.geteilt.id, uri: item.geteilt.bild })
+                : onNotice?.('Zu diesem Beitrag gibt es keine Datei')
+            }
+          >
+            <Videoflaeche
+              id={item.geteilt.id}
+              quelle={item.geteilt.bild}
+              laeuft={false}
+              stumm
+              icon={item.geteilt.art === 'video' ? 'play' : 'image-outline'}
+              iconSize={20}
+              fuellen="cover"
+              style={styles.anhangBild}
+            />
+            <View style={styles.geteiltZeile}>
               <Ionicons
-                name={item.geteilt.art === 'video' ? 'play' : 'image-outline'}
-                size={20}
+                name={item.geteilt.art === 'video' ? 'play-circle-outline' : 'image-outline'}
+                size={16}
                 color={colors.text3}
               />
+              <View style={styles.geteiltText}>
+                <Text style={styles.geteiltAutor} numberOfLines={1}>
+                  {item.geteilt.autor}
+                </Text>
+                <Text style={styles.geteiltTitel} numberOfLines={1}>
+                  {item.geteilt.titel}
+                </Text>
+              </View>
             </View>
-            <View style={styles.geteiltText}>
-              <Text style={styles.geteiltAutor} numberOfLines={1}>
-                {item.geteilt.autor}
-              </Text>
-              <Text style={styles.geteiltTitel} numberOfLines={1}>
-                {item.geteilt.titel}
-              </Text>
-            </View>
-          </View>
+          </Druck>
         ) : item.media === 'sticker' ? (
           /*
            * Ein Sticker steht ohne Blase und ohne Rahmen da — sonst waere er
@@ -604,6 +709,9 @@ export const ChatDetailScreen = ({
         <Druck style={styles.headerAction} onPress={() => onCall('audio')} hitSlop={4}>
           <Ionicons name="call-outline" size={20} color={colors.text2} />
         </Druck>
+        {/* Leerraum, damit der Name wirklich in der Mitte des Kopfes steht —
+            siehe headerAusgleich. */}
+        <View style={styles.headerAusgleich} pointerEvents="none" />
       </View>
 
       <KeyboardAvoidingView
@@ -868,6 +976,41 @@ export const ChatDetailScreen = ({
         }}
         onNotice={(text) => onNotice?.(text)}
       />
+
+      {/*
+        Das Vollformat (Henrik 7.9.). Ein Bild steht ganz da — `contain`, nicht
+        `cover`: beschnitten waere es nicht mehr das Vollformat. Ein Video
+        laeuft sofort und mit Ton; wer es nur kurz ansehen will, tippt auf das
+        Kreuz, und der Verlauf steht unveraendert darunter.
+      */}
+      <Modal
+        visible={!!vollbild}
+        animationType="fade"
+        transparent={false}
+        statusBarTranslucent
+        onRequestClose={() => setVollbild(null)}
+      >
+        <View style={styles.vollbild}>
+          {vollbild ? (
+            <Videoflaeche
+              id={vollbild.id}
+              quelle={vollbild.uri}
+              laeuft={istVideo(vollbild.uri)}
+              stumm={false}
+              schleife
+              fuellen="contain"
+              dunkel
+              style={styles.vollbildFlaeche}
+            />
+          ) : null}
+          <Druck
+            style={[styles.vollbildZu, { top: insets.top + spacing.sm }]}
+            onPress={() => setVollbild(null)}
+          >
+            <Ionicons name="close" size={24} color={colors.white} />
+          </Druck>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -961,14 +1104,41 @@ const styles = themenStyles((colors) => ({
     borderBottomColor: colors.border,
   },
   headerBack: { width: 30, alignItems: 'center' },
-  headerBody: { flex: 1, minWidth: 0 },
-  headerName: { color: colors.text, ...typography.name },
-  headerStatus: { marginTop: 1, color: colors.success, ...typography.small },
+  /*
+   * Henrik, 07.09.2026: "Name im Chat-Header nicht zentriert."
+   *
+   * Zentriert wird nicht im Rest-Platz, sondern im ganzen Kopf. Das geht nur,
+   * wenn links und rechts gleich viel steht: links Zurueck (30) und Avatar
+   * (sizes.avatarSm) mit den zwei Zwischenraeumen, rechts die zwei
+   * Knoepfe (2 x 34) plus ein Ausgleich. Ohne den Ausgleich sitzt der Name
+   * sichtbar zu weit rechts — und "fast mittig" sieht schlechter aus als
+   * ehrlich linksbuendig.
+   */
+  headerBody: { flex: 1, minWidth: 0, alignItems: 'center' },
+  headerName: { color: colors.text, textAlign: 'center', ...typography.name },
+  headerStatus: { marginTop: 1, color: colors.success, textAlign: 'center', ...typography.small },
   headerStatusMuted: { color: colors.text3 },
   headerAction: { width: 34, alignItems: 'center' },
+  /* 30 + 11 (Abstand) + Avatar − 2 x 34 = der Rest, der rechts fehlt. */
+  headerAusgleich: { width: Math.max(0, 30 + 11 + sizes.avatarSm - 68) },
 
   messages: { flex: 1, backgroundColor: colors.surface2 },
   messagesContent: { padding: 14, paddingBottom: spacing.sm, gap: 3 },
+
+  /* Der Anrufeintrag steht mittig zwischen den Blasen — siehe renderMessage. */
+  anruf: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface3,
+  },
+  anrufText: { color: colors.text2, ...typography.small },
+  anrufVerpasst: { color: colors.danger },
 
   dayDivider: { alignSelf: 'center', marginBottom: 10 },
   dayDividerText: {
@@ -1007,6 +1177,30 @@ const styles = themenStyles((colors) => ({
   mediaText: { color: colors.text2, ...typography.preview },
   anhangBild: { width: 210, height: 150, borderRadius: 12, marginBottom: 4 },
   ortKarte: { width: 210, borderRadius: 12, overflow: 'hidden', marginBottom: 4, backgroundColor: 'rgba(0,0,0,0.05)' },
+  /* Der Wiedergabeknopf liegt auf der Vorschau — siehe renderMessage. */
+  anhangPlay: {
+    position: 'absolute',
+    top: 55,
+    left: 85,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  vollbild: { flex: 1, backgroundColor: colors.black },
+  vollbildFlaeche: { flex: 1 },
+  vollbildZu: {
+    position: 'absolute',
+    right: spacing.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
   ortBild: { height: 96, backgroundColor: colors.surface2 },
   ortNadel: { position: 'absolute', transform: [{ translateX: -11 }, { translateY: -22 }] },
   ortName: { ...typography.small, fontWeight: '600', color: colors.text, paddingHorizontal: 10, paddingTop: 7 },
@@ -1024,23 +1218,13 @@ const styles = themenStyles((colors) => ({
   kontaktText: { flex: 1, minWidth: 0 },
   kontaktName: { ...typography.small, fontWeight: '600', color: colors.text },
   kontaktHandle: { ...typography.tiny, color: colors.text2, marginTop: 2 },
-  geteilt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 4,
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-  },
-  geteiltBild: {
-    width: 42,
-    height: 42,
-    borderRadius: 9,
-    backgroundColor: colors.surface3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  /*
+   * Die Karte fuer einen geteilten Beitrag (Henrik 7.9.): oben der Beitrag in
+   * derselben Groesse wie jeder andere Anhang, darunter eine Zeile mit Autor
+   * und Titel. Vorher war es umgekehrt — Text mit einem 42px-Kaestchen davor.
+   */
+  geteiltKarte: { marginBottom: 4 },
+  geteiltZeile: { flexDirection: 'row', alignItems: 'center', gap: 8, width: 210 },
   geteiltText: { flex: 1, minWidth: 0 },
   geteiltAutor: { ...typography.small, fontWeight: '600', color: colors.text },
   geteiltTitel: { ...typography.small, color: colors.text2, marginTop: 2 },

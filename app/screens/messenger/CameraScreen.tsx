@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import * as ImagePicker from 'expo-image-picker';
+import {
+  CameraView,
+  useCameraPermissions,
+  useMicrophonePermissions,
+  type CameraCapturedPicture,
+} from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActionSheet } from '../../components/ActionSheet';
 import { FilterBild } from '../../components/FilterBild';
 import { InsightSheet, InsightWahl } from '../../components/InsightSheet';
-import { FILTER } from '../../constants/filter';
+import { FILTER, filterZu } from '../../constants/filter';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { ladeHoch } from '../../lib/supabaseStorage';
 import { useSupabase } from '../../contexts/SupabaseContext';
@@ -23,13 +29,20 @@ interface Props {
   onCaptured?: (uri: string) => void;
   /** Aufnahme in einen Chat schicken. */
   onAnChat?: (uri: string) => void;
-  /** Aufnahme als Beitrag veröffentlichen. */
-  onAlsBeitrag?: (uri: string) => void;
   /**
    * Steht das Ziel schon fest — die Kamera kam aus einem Chat —, geht die
    * Aufnahme ohne Rückfrage dorthin.
    */
   direktZu?: (uri: string) => void;
+  /**
+   * Die Kamera kam über das Plus an der eigenen Story.
+   *
+   * Henrik, 07.09.2026: "Story-Plus-Button zeigt unnötig „Was möchtest du
+   * damit machen"-Dialog (nur bei normaler Kamera nötig)." Wer auf das Plus
+   * an der Story tippt, hat das Ziel schon genannt. Die Frage danach ist eine
+   * Rückfrage nach etwas, das gerade gesagt wurde.
+   */
+  zielStory?: boolean;
   onNotice: (message: string) => void;
 }
 
@@ -37,6 +50,19 @@ interface Props {
  * Punkt 17: die Kamera nimmt auf und fragt danach, was mit der Aufnahme
  * geschehen soll. Vorher landete jedes Foto stillschweigend in der Story —
  * wer es jemandem schicken wollte, musste den Umweg über den Chat nehmen.
+ *
+ * Gefragt wird nur noch, wenn das Ziel wirklich offen ist. Kam die Kamera aus
+ * einem Chat (`direktZu`) oder vom Plus an der eigenen Story (`zielStory`),
+ * steht es schon fest.
+ *
+ * WARUM „ALS BEITRAG VERÖFFENTLICHEN" HIER NICHT MEHR STEHT
+ *
+ * Henrik, 07.09.2026: „Beiträge nur Videos, nicht Messenger — Messenger
+ * privat/nummerbasiert, Videos öffentlich." Das ist keine Geschmacksfrage,
+ * sondern die Trennlinie zwischen den beiden Bereichen der App. Ein Knopf,
+ * der aus der privaten Kamera heraus etwas öffentlich stellt, führt genau
+ * über diese Linie — und zwar aus Versehen, denn er stand zwischen drei
+ * Zielen, die alle im Messenger bleiben. Beiträge entstehen im Videos-Bereich.
  */
 const ZIELE = [
   /*
@@ -48,7 +74,6 @@ const ZIELE = [
   { key: 'insight', label: 'Als Insight senden', icon: 'flash-outline' as const },
   { key: 'story', label: 'Zu deiner Story hinzufügen', icon: 'camera-outline' as const },
   { key: 'chat', label: 'An einen Chat senden', icon: 'chatbubble-outline' as const },
-  { key: 'beitrag', label: 'Als Beitrag veröffentlichen', icon: 'image-outline' as const },
 ];
 
 export const CameraScreen = ({
@@ -56,8 +81,8 @@ export const CameraScreen = ({
   onClose,
   onCaptured,
   onAnChat,
-  onAlsBeitrag,
   direktZu,
+  zielStory = false,
   onNotice,
 }: Props) => {
   const insets = useSafeAreaInsets();
@@ -70,6 +95,49 @@ export const CameraScreen = ({
   const [busy, setBusy] = useState(false);
   const [aufnahme, setAufnahme] = useState<string | null>(null);
   const [filter, setFilter] = useState('keiner');
+
+  /*
+   * Henrik, 07.09.2026: "Filter-UI umbauen: Toggle oben „ohne/mit Filter",
+   * Filterleiste unten nur bei „mit Filter"."
+   *
+   * Die Leiste stand vorher immer da — auch bei „keiner", wo sie nur Platz
+   * nahm und den Sucher kleiner machte. Der Schalter oben sagt jetzt, ob
+   * ueberhaupt gefiltert wird; erst dann kommt die Leiste. Wer den Schalter
+   * ausmacht, ist wieder bei „keiner" — sonst bliebe ein Filter aktiv, den
+   * man nicht mehr sieht.
+   */
+  const [mitFilter, setMitFilter] = useState(false);
+  const filterSchalten = (an: boolean) => {
+    setMitFilter(an);
+    if (!an) setFilter('keiner');
+    else if (filter === 'keiner') setFilter(FILTER[1]?.key ?? 'keiner');
+  };
+
+  /*
+   * Henrik, 07.09.2026: "Foto- und Videoaufnahme in der App funktioniert
+   * nicht (nur Galerie-Upload)" und "Alle Buttons brauchen eine echte,
+   * synchronisierte Aktion".
+   *
+   * Bis heute stand hier ein schwarzes Feld mit einem Kamerasymbol; der
+   * Ausloeser rief `ImagePicker.launchCameraAsync` auf — das ist die
+   * Kamera-App des Systems, nicht die der App. Blitz und Kamerawechsel gaben
+   * nur einen Hinweistext aus, ohne irgendetwas umzustellen.
+   *
+   * Jetzt laeuft die Vorschau in der App (`CameraView` aus expo-camera), der
+   * Ausloeser nimmt hier auf, und Blitz wie Kamerawechsel stellen die
+   * Vorschau wirklich um.
+   *
+   * Im Simulator gibt es keine Kamera. Dort bleibt die Flaeche schwarz und
+   * der Weg ueber die Galerie ist der einzige — das ist eine Eigenschaft des
+   * Simulators, kein Fehler der App.
+   */
+  const kamera = useRef<CameraView>(null);
+  const [erlaubnis, erlaubnisFragen] = useCameraPermissions();
+  const [mikro, mikroFragen] = useMicrophonePermissions();
+  const [kameraBereit, setKameraBereit] = useState(false);
+  const [richtung, setRichtung] = useState<'back' | 'front'>('back');
+  const [blitz, setBlitz] = useState<'off' | 'on' | 'auto'>('off');
+  const [laeuft, setLaeuft] = useState(false);
   /*
    * Die Aufnahme wandert vom Ziel-Blatt ins Insight-Blatt. Zwei Zustaende
    * statt einem, weil zwischendurch das erste Blatt zugeht — wuerde
@@ -77,30 +145,98 @@ export const CameraScreen = ({
    */
   const [insightBild, setInsightBild] = useState<string | null>(null);
 
-  const pick = async (source: 'camera' | 'library') => {
+  /** Was mit einer fertigen Aufnahme geschieht — einerlei woher sie kommt. */
+  const uebernehmen = (uri: string) => {
+    if (direktZu) return direktZu(uri);
+    // Das Plus an der eigenen Story: die Aufnahme geht dorthin, ohne Frage.
+    if (zielStory) {
+      setAufnahme(null);
+      return void alsStory(uri);
+    }
+    setAufnahme(uri);
+  };
+
+  /** Ein Bild oder Video aus der Galerie holen. */
+  const ausGalerie = async () => {
     setBusy(true);
     try {
-      const options: ImagePicker.ImagePickerOptions = {
+      const ergebnis = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: mode === 'photo' ? ['images'] : ['videos'],
         allowsEditing: true,
         quality: 0.8,
-      };
-
-      const result =
-        source === 'camera'
-          ? await ImagePicker.launchCameraAsync(options)
-          : await ImagePicker.launchImageLibraryAsync(options);
-
-      if (result.canceled || !result.assets.length) return;
-
-      const uri = result.assets[0].uri;
-      if (direktZu) return direktZu(uri);
-      setAufnahme(uri);
+      });
+      if (ergebnis.canceled || !ergebnis.assets.length) return;
+      uebernehmen(ergebnis.assets[0].uri);
     } catch {
-      onNotice('Zugriff auf Kamera oder Galerie nicht möglich');
+      onNotice('Zugriff auf die Galerie nicht möglich');
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * Der Ausloeser. Foto: ein Druck, ein Bild. Video: der erste Druck startet,
+   * der zweite beendet — `recordAsync` gibt die Datei erst zurueck, wenn
+   * `stopRecording` gerufen wurde.
+   */
+  const ausloesen = async () => {
+    if (!erlaubnis?.granted) {
+      const neu = await erlaubnisFragen();
+      if (!neu.granted) return onNotice('Ohne Kamerazugriff geht die Aufnahme nicht');
+    }
+    if (mode === 'video' && !mikro?.granted) {
+      // Ohne Mikrofon nimmt das Video stumm auf — gefragt wird trotzdem
+      // einmal, danach nicht wieder.
+      await mikroFragen();
+    }
+    if (!kamera.current || !kameraBereit) {
+      return onNotice('Die Kamera ist noch nicht bereit');
+    }
+
+    if (mode === 'video') {
+      if (laeuft) {
+        kamera.current.stopRecording();
+        return;
+      }
+      setLaeuft(true);
+      try {
+        const video = await kamera.current.recordAsync({ maxDuration: 60 });
+        if (video?.uri) uebernehmen(video.uri);
+      } catch {
+        onNotice('Die Aufnahme ist fehlgeschlagen');
+      } finally {
+        setLaeuft(false);
+      }
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const foto: CameraCapturedPicture | undefined = await kamera.current.takePictureAsync({
+        quality: 0.8,
+      });
+      if (foto?.uri) uebernehmen(foto.uri);
+    } catch {
+      onNotice('Das Foto ist fehlgeschlagen');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* Der Blitz geht reihum: aus, an, automatisch. Drei Zustaende, ein Knopf —
+     so wie in jeder Kamera-App. */
+  const BLITZ_NAME = { off: 'Blitz aus', on: 'Blitz an', auto: 'Blitz automatisch' } as const;
+  const BLITZ_ICON = { off: 'flash-off-outline', on: 'flash', auto: 'flash-outline' } as const;
+  const blitzWeiter = () => {
+    const naechster = blitz === 'off' ? 'on' : blitz === 'on' ? 'auto' : 'off';
+    setBlitz(naechster);
+    onNotice(BLITZ_NAME[naechster]);
+  };
+
+  const kameraWechseln = () => {
+    const neu = richtung === 'back' ? 'front' : 'back';
+    setRichtung(neu);
+    onNotice(neu === 'front' ? 'Frontkamera' : 'Rückkamera');
   };
 
   /** Story ist das einzige Ziel, das die Aufnahme auch hochlädt. */
@@ -127,8 +263,7 @@ export const CameraScreen = ({
 
     if (key === 'insight') return setInsightBild(uri);
     if (key === 'story') return void alsStory(uri);
-    if (key === 'chat') return onAnChat?.(uri);
-    onAlsBeitrag?.(uri);
+    onAnChat?.(uri);
   };
 
   /**
@@ -178,8 +313,12 @@ export const CameraScreen = ({
             <Ionicons name="close" size={26} color={colors.white} />
           </Druck>
         )}
-        <Druck onPress={() => onNotice('Blitz umgeschaltet')} hitSlop={10}>
-          <Ionicons name="flash-outline" size={24} color={colors.white} />
+        <Druck onPress={blitzWeiter} hitSlop={10}>
+          <Ionicons
+            name={BLITZ_ICON[blitz]}
+            size={24}
+            color={blitz === 'off' ? colors.white : colors.brand}
+          />
         </Druck>
       </View>
 
@@ -202,8 +341,47 @@ export const CameraScreen = ({
             </View>
             {aufnahme ? (
               <FilterBild uri={aufnahme} filter={filter} style={styles.vorschau} />
+            ) : erlaubnis?.granted ? (
+              <>
+                {/* Die Vorschau selbst. Sie liegt unter den Fokus-Ecken —
+                    deshalb kommt sie hier zuletzt und ist absolut gesetzt. */}
+                <CameraView
+                  ref={kamera}
+                  style={styles.vorschau}
+                  facing={richtung}
+                  flash={blitz}
+                  mode={mode === 'photo' ? 'picture' : 'video'}
+                  onCameraReady={() => setKameraBereit(true)}
+                />
+                {/* Der Filter liegt schon ueber dem Sucher, nicht erst ueber
+                    der fertigen Aufnahme — sonst waehlt man blind. Es ist
+                    dieselbe Rechnung wie in FilterBild. */}
+                {mitFilter && filterZu(filter).staerke > 0 && (
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.vorschau,
+                      { backgroundColor: filterZu(filter).ton, opacity: filterZu(filter).staerke },
+                    ]}
+                  />
+                )}
+                {laeuft && (
+                  <View style={styles.laeuftSchild} pointerEvents="none">
+                    <View style={styles.laeuftPunkt} />
+                    <Text style={styles.laeuftText}>Aufnahme läuft</Text>
+                  </View>
+                )}
+              </>
             ) : (
-              <Ionicons name="camera-outline" size={34} color="rgba(255,255,255,0.22)" />
+              /* Ohne Erlaubnis bleibt nur die Frage. Vorher stand hier ein
+                 graues Kamerasymbol, das nichts erklaerte. */
+              <>
+                <Ionicons name="camera-outline" size={34} color="rgba(255,255,255,0.22)" />
+                <Text style={styles.stageText}>All Media darf noch nicht auf die Kamera</Text>
+                <Druck style={styles.erlaubnisKnopf} onPress={() => void erlaubnisFragen()}>
+                  <Text style={styles.erlaubnisText}>Kamera erlauben</Text>
+                </Druck>
+              </>
             )}
           </>
         )}
@@ -214,24 +392,40 @@ export const CameraScreen = ({
         * die nichts zeigen — deshalb steht ueber ihr die letzte Aufnahme,
         * sobald es eine gibt, und sonst der Sucher.
         */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterLeiste}
-        contentContainerStyle={styles.filter}
-      >
-        {FILTER.map((f) => (
+      <View style={styles.filterSchalter}>
+        {([false, true] as const).map((an) => (
           <Druck
-            key={f.key}
-            style={[styles.filterPille, filter === f.key && styles.filterPilleAktiv]}
-            onPress={() => setFilter(f.key)}
+            key={String(an)}
+            style={[styles.schalterHaelfte, mitFilter === an && styles.schalterHaelfteAktiv]}
+            onPress={() => filterSchalten(an)}
           >
-            <Text style={[styles.filterText, filter === f.key && styles.filterTextAktiv]}>
-              {f.label}
+            <Text style={[styles.schalterText, mitFilter === an && styles.schalterTextAktiv]}>
+              {an ? 'Mit Filter' : 'Ohne Filter'}
             </Text>
           </Druck>
         ))}
-      </ScrollView>
+      </View>
+
+      {mitFilter && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterLeiste}
+          contentContainerStyle={styles.filter}
+        >
+          {FILTER.filter((f) => f.key !== 'keiner').map((f) => (
+            <Druck
+              key={f.key}
+              style={[styles.filterPille, filter === f.key && styles.filterPilleAktiv]}
+              onPress={() => setFilter(f.key)}
+            >
+              <Text style={[styles.filterText, filter === f.key && styles.filterTextAktiv]}>
+                {f.label}
+              </Text>
+            </Druck>
+          ))}
+        </ScrollView>
+      )}
 
       <View style={styles.modes}>
         {(['photo', 'video'] as Mode[]).map((m) => (
@@ -244,15 +438,15 @@ export const CameraScreen = ({
       </View>
 
       <View style={styles.bottom}>
-        <Druck style={styles.side} onPress={() => pick('library')} disabled={busy}>
+        <Druck style={styles.side} onPress={ausGalerie} disabled={busy || laeuft}>
           <Ionicons name="image-outline" size={22} color={colors.white} />
         </Druck>
 
-        <Druck style={styles.shutter} onPress={() => pick('camera')} disabled={busy}>
-          <View style={styles.shutterInner} />
+        <Druck style={styles.shutter} onPress={ausloesen} disabled={busy}>
+          <View style={[styles.shutterInner, laeuft && styles.shutterStop]} />
         </Druck>
 
-        <Druck style={styles.side} onPress={() => onNotice('Kamera gewechselt')} disabled={busy}>
+        <Druck style={styles.side} onPress={kameraWechseln} disabled={busy || laeuft}>
           <Ionicons name="camera-reverse-outline" size={22} color={colors.white} />
         </Druck>
       </View>
@@ -308,6 +502,44 @@ const styles = themenStyles((colors) => ({
    * Simulator.
    */
   filterLeiste: { flexGrow: 0, flexShrink: 0 },
+  /* Der Schalter aus dem Figma-Entwurf: zwei Haelften in einer Pille, oben
+     ueber der Leiste. Er sagt, ob ueberhaupt gefiltert wird — die Leiste
+     darunter erscheint erst danach. */
+  filterSchalter: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: radius.pill,
+    padding: 3,
+    marginBottom: spacing.sm,
+  },
+  schalterHaelfte: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: radius.pill },
+  schalterHaelfteAktiv: { backgroundColor: colors.white },
+  schalterText: { ...typography.small, color: 'rgba(255,255,255,0.75)' },
+  schalterTextAktiv: { color: '#0B0B0C', fontWeight: '700' },
+  erlaubnisKnopf: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+  },
+  erlaubnisText: { ...typography.small, color: colors.white, fontWeight: '700' },
+  /* Das rote Schild waehrend einer Videoaufnahme — sonst sieht man dem
+     Ausloeser nicht an, dass er gerade laeuft. */
+  laeuftSchild: {
+    position: 'absolute',
+    top: spacing.md,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  laeuftPunkt: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E5484D' },
+  laeuftText: { ...typography.small, color: colors.white },
   filter: {
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
@@ -363,4 +595,7 @@ const styles = themenStyles((colors) => ({
     padding: 4,
   },
   shutterInner: { flex: 1, borderRadius: 26, backgroundColor: colors.white },
+  /* Laeuft die Aufnahme, wird aus dem weissen Kreis ein rotes Quadrat: der
+     zweite Druck beendet das Video. */
+  shutterStop: { borderRadius: 8, margin: 12, backgroundColor: '#E5484D' },
 }));

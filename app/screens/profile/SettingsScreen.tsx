@@ -17,6 +17,12 @@ import { useAktionen } from '../../lib/useAktionen';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ladeBanne, ladeEinstellungen, ladeStatistik, Statistik } from '../../lib/daten';
 import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
+import { PASSWORT_REGEL, passwortAendern, passwortPruefen } from '../../lib/supabaseAuth';
+
+// Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
+const Telefon = require('../../../gemeinsam/telefon') as typeof import('../../../gemeinsam/telefon');
+const TELEFON_REGEL = Telefon.REGEL_TEXT;
+const telefonPruefen = Telefon.pruefe;
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -67,7 +73,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft';
+  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon';
   gefahr?: boolean;
 }
 
@@ -163,23 +169,30 @@ const SECTIONS: Section[] = [
       {
         label: 'Telefonnummer ändern',
         icon: 'call-outline',
-        eingabe: [{ key: 'nummer', label: 'Neue Telefonnummer', platzhalter: '+49 …', pflicht: true }],
-        fertig: 'Wir haben dir einen Bestätigungscode geschickt',
+        eingabe: [
+          { key: 'nummer', label: 'Neue Telefonnummer', platzhalter: TELEFON_REGEL, pflicht: true },
+        ],
+        pruefen: (w) => telefonPruefen(w.nummer),
+        aktion: 'telefon',
+        /*
+         * Vorher stand hier "Wir haben dir einen Bestätigungscode
+         * geschickt". Es ging keiner raus — ein SMS-Versand ist bei Supabase
+         * nicht eingerichtet — und gespeichert wurde die Nummer auch nicht.
+         */
+        fertig: 'Telefonnummer gespeichert',
       },
       {
         label: 'Passwort ändern',
         icon: 'key-outline',
         eingabe: [
           { key: 'alt', label: 'Bisheriges Passwort', pflicht: true },
-          { key: 'neu', label: 'Neues Passwort', pflicht: true },
+          { key: 'neu', label: 'Neues Passwort', platzhalter: PASSWORT_REGEL, pflicht: true },
           { key: 'wdh', label: 'Neues Passwort wiederholen', pflicht: true },
         ],
         pruefen: (w) =>
-          w.neu.length < 8
-            ? 'Das neue Passwort braucht mindestens acht Zeichen'
-            : w.neu !== w.wdh
-            ? 'Die beiden Eingaben stimmen nicht überein'
-            : null,
+          passwortPruefen(w.neu) ??
+          (w.neu !== w.wdh ? 'Die beiden Eingaben stimmen nicht überein' : null),
+        aktion: 'passwort',
         fertig: 'Passwort geändert',
       },
       { label: 'Zwei-Faktor-Anmeldung', icon: 'shield-checkmark-outline', wahlKey: 'zweiFaktor', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
@@ -343,11 +356,19 @@ interface Props {
    */
   sprung?: string | null;
   onSprungFertig?: () => void;
+  /*
+   * Nur fuer die Pruefbilder (tools/app-bilder.js): der Bereich, dessen
+   * Sichtbarkeits-Blatt beim Aufbau gleich aufgehen soll. Ein Tippen laesst
+   * sich im Simulator von aussen nicht ausloesen, und ohne das hier gaebe es
+   * von diesem Blatt kein einziges Bild — genau dort steht seit dem
+   * 07.09.2026 der Zusatz "Story auch in Videos teilen".
+   */
+  pruefSicht?: string | null;
   /** Zurueck zur vorherigen Seite (Profil/Messenger). */
   onBack?: () => void;
 }
 
-export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack }: Props) => {
+export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack, pruefSicht }: Props) => {
   const { chats: alleChats, posts: alleBeitraege, users: alleNutzer } = useDaten();
   const { user, konten } = useContext(AuthContext);
   const { communities, istBlockiert, istStumm, raster, gefolgt, eigenesProfil, profilSpeichern } =
@@ -651,6 +672,15 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     return () => clearTimeout(zeit);
   }, [sprung, onSprungFertig]);
 
+  // Siehe `pruefSicht` oben. Der Punkt wird in SECTIONS gesucht statt hier
+  // nachgebaut — sonst zeigte das Bild eine Beschriftung, die es in der App
+  // gar nicht gibt.
+  useEffect(() => {
+    if (!pruefSicht) return;
+    const punkt = SECTIONS.flatMap((s) => s.items).find((i) => i.sichtbar === pruefSicht);
+    if (punkt) setSichtOffen(punkt);
+  }, [pruefSicht]);
+
   return (
     <View style={styles.screen}>
       {/*
@@ -666,7 +696,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Druck>
         )}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.pillsBox}
+          contentContainerStyle={[styles.pills, !!onBack && styles.pillsMitPfeil]}
+        >
           {SECTIONS.map((section) => (
             <Druck
               key={section.id}
@@ -803,6 +838,19 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             await aktionen.sichtbarkeitAusnahme(sichtOffen.sichtbar!, userId, () => {});
             await neuLaden();
           }}
+          /*
+           * Den Zusatz gibt es nur bei der Story. `onInVideos` bleibt sonst
+           * undefiniert, und das Blatt laesst die Zeile dann ganz weg.
+           */
+          inVideos={sichtOffen.sichtbar === 'story' ? sicht('story').inVideos : undefined}
+          onInVideos={
+            sichtOffen.sichtbar === 'story'
+              ? async (an: boolean) => {
+                  await aktionen.storyInVideos(an, () => {});
+                  await neuLaden();
+                }
+              : undefined
+          }
           onClose={() => setSichtOffen(null)}
         />
       )}
@@ -862,6 +910,42 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
               return null;
             }
 
+            /*
+             * Das Passwort wirklich aendern.
+             *
+             * Bis zum 07.09.2026 endete dieses Formular hier mit
+             * „Passwort geändert" — und nichts davon erreichte Supabase. Beim
+             * naechsten Anmelden galt das alte weiter. Wie bei der
+             * Altersangabe wird das Ergebnis nicht abgewartet, sondern
+             * nachgereicht; anders als dort ist der Fehlerfall aber laut, denn
+             * wer sein Passwort wechselt, muss wissen, ob es gilt.
+             */
+            /*
+             * Die Telefonnummer wirklich speichern — in `profiles.phone`,
+             * woraus die Kontaktinfo im Profil liest. Der Grund eines
+             * Fehlschlags wird durchgereicht: "zu kurz" und "gehört schon zu
+             * einem anderen Konto" verlangen Verschiedenes vom Nutzer.
+             */
+            if (offen.aktion === 'telefon') {
+              void (async () => {
+                const ergebnis = await aktionen.telefon(werte.nummer ?? '');
+                onNotice(ergebnis.ok ? `Telefonnummer gespeichert: ${ergebnis.wert}` : ergebnis.wert);
+              })();
+              setOffen(null);
+              return null;
+            }
+
+            if (offen.aktion === 'passwort') {
+              const mail = user?.email ?? '';
+              if (!supabase || !mail) return 'Dafür musst du angemeldet sein';
+              void (async () => {
+                const ergebnis = await passwortAendern(supabase, mail, werte.alt, werte.neu);
+                onNotice(ergebnis.success ? 'Passwort geändert' : ergebnis.error ?? 'Das hat nicht geklappt');
+              })();
+              setOffen(null);
+              return null;
+            }
+
             onNotice(offen.fertig ?? 'Gespeichert');
             return null;
           }}
@@ -906,9 +990,22 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
 const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
-  head: { paddingTop: spacing.md, paddingBottom: spacing.sm, position: 'relative' },
-  back: { position: 'absolute', left: spacing.lg, top: spacing.md + spacing.sm, zIndex: 10 },
+  /*
+   * Kopfzeile als Reihe: erst der Zurueck-Pfeil, dann die Reiter.
+   *
+   * Bis zum 09.09.2026 lag der Pfeil `position: absolute` bei `left: 16`
+   * ueber der Reiterreihe — er verdeckte die erste Pille („Allgemein"), und
+   * sein `top` rechnete mit einem festen Abstand, waehrend die Kopfzeile
+   * seit der Notch-Korrektur `insets.top` benutzt. Henrik am 07.09.2026:
+   * „Zurueck-Pfeil dort fehlplatziert/defekt."
+   */
+  head: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm, position: 'relative' },
+  back: { paddingLeft: spacing.lg, paddingRight: spacing.xs },
+  pillsBox: { flex: 1 },
   pills: { gap: spacing.sm, paddingHorizontal: spacing.lg },
+  /* Steht der Pfeil davor, braucht die erste Pille links keinen eigenen
+     Abstand mehr - sonst klafft eine Luecke. */
+  pillsMitPfeil: { paddingLeft: 0 },
   auslauf: { position: 'absolute', right: 0, bottom: 0, width: 28, top: 0 },
   pill: {
     paddingHorizontal: 14,

@@ -41,30 +41,22 @@ import {
   Video,
 } from '../types';
 
+/*
+ * Die Spaltenlisten stehen in ../../gemeinsam/spalten.js — einmal fuer App
+ * und Website. Vorher standen sie hier und in web/server/supabase-api.js
+ * doppelt; dort ist genau deshalb `is_locked, notifications_off` verloren
+ * gegangen. Warum `phone` nicht dabei ist, steht in der gemeinsamen Datei.
+ */
+import {
+  BEITRAG_SPALTEN,
+  CHATMITGLIED_SPALTEN,
+  NACHRICHT_SPALTEN,
+  PROFIL_SPALTEN,
+} from '../../gemeinsam/spalten';
+import { aufschliessen, meinSchluessel } from './krypto';
+
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
 export const ICH = 'me';
-
-/*
- * Sicherheitspruefung 04.09.2026 (Fund 1): `phone` steht hier NICHT mehr.
- *
- * Diese Liste laedt die Profile in einem Rutsch. Solange `phone` darin stand,
- * war jeder App-Start ein vollstaendiger Abzug aller Telefonnummern. Die
- * Datenbank gibt die Spalte inzwischen gar nicht mehr heraus
- * (SUPABASE_SCHEMA_23_audit.sql entzieht `authenticated` das Leserecht) —
- * eine Abfrage mit `phone` darin wuerde jetzt mit einem Fehler abbrechen.
- *
- * Die eigene Nummer kommt aus `mein_profil()`, die der Kontakte aus
- * `meine_kontaktnummern()`, und nur bei beidseitiger Kontaktschaft.
- */
-const PROFIL_SPALTEN =
-  'id, name, handle, initials, color, privat, about, bio, link, status,' +
-  ' highlights, playlists, spende, live, followers_basis, following_basis, beitraege_basis';
-
-const BEITRAG_SPALTEN =
-  'id, user_id, kind, format, title, description, location, music, media_url,' +
-  ' thumbnail_url, duration, tags, views, zuschauer, untertitel, kapitel,' +
-  ' likes_basis, shares_basis, comments_basis, created_at,' +
-  ' post_likes(count), comments(count), shares(count)';
 
 // ============================================================================
 // Zeit
@@ -225,7 +217,10 @@ export async function ladeFolgeListe(
 export async function ladeKontakte(client: SupabaseClient, ichId: string): Promise<Contact[]> {
   const { data, error } = await client
     .from('contacts')
-    .select('contact_id, status, is_favorite, profiles!contacts_contact_id_fkey(name, about)')
+    .select(
+      'contact_id, status, is_favorite, spitzname, notiz,' +
+      ' profiles!contacts_contact_id_fkey(name, about)'
+    )
     .eq('user_id', ichId);
   if (error) throw error;
 
@@ -237,12 +232,21 @@ export async function ladeKontakte(client: SupabaseClient, ichId: string): Promi
    */
   const { data: nummern } = await client.rpc('meine_kontaktnummern');
 
+  /*
+   * Der Spitzname geht vor. Henrik, 07.09.2026: "Kontaktinfo-Änderungen (z.B.
+   * Name) speichern/synchronisieren nicht." Wer einen Kontakt umbenennt, will
+   * ihn ueberall so sehen — in der Kontaktliste, in der Chatliste und im
+   * Chatkopf. Deshalb steht die Regel hier, an der einen Stelle, an der die
+   * Kontakte entstehen, und nicht in jedem Bildschirm noch einmal.
+   * Gleiche Regel in web/server/supabase-api.js.
+   */
   return (data ?? []).map((k: any) => ({
     id: k.contact_id,
-    name: k.profiles?.name ?? '',
+    name: k.spitzname || k.profiles?.name || '',
     status: k.status,
     about: k.profiles?.about ?? '',
     phone: (nummern ?? {})[k.contact_id] ?? undefined,
+    notiz: k.notiz ?? undefined,
   }));
 }
 
@@ -321,10 +325,7 @@ export async function ladeChats(
 ): Promise<Chat[]> {
   const { data, error } = await client
     .from('chat_members')
-    .select(
-      'chat_id, is_archived, is_muted, is_read, is_favorite, is_locked, notifications_off, geleert_bis,' +
-        ' chats(id, name, is_group, bereich, created_at, updated_at, anfrage_zustand, anfrage_von)'
-    )
+    .select(CHATMITGLIED_SPALTEN)
     .eq('user_id', ichId);
   if (error) throw error;
 
@@ -335,23 +336,45 @@ export async function ladeChats(
 
   const ids = zeilen.map((z: any) => z.chat_id);
 
-  // Letzte Nachricht und Mitglieder in zwei Abfragen statt in zweien pro Chat.
+  /*
+   * Letzte Nachricht und Mitglieder in zwei Abfragen statt in zweien pro Chat.
+   *
+   * Henrik, 07.09.2026: "Kontaktsortierung falsch (älterer Chat über
+   * neuerem)" und "Chat-Vorschautext nicht synchron mit letzter echter
+   * Nachricht."
+   *
+   * Hier stand eine gewoehnliche Abfrage auf messages mit .limit(500) — ueber
+   * alle Chats zusammen. Ein vielbeschriebener Chat fuellte die Grenze allein,
+   * und jeder aeltere bekam gar keine Zeile: ohne Vorschautext und mit
+   * chats.updated_at als Sortierschluessel. Das ist genau der aeltere Chat,
+   * der ueber dem neueren steht. Die Begruendung in voller Laenge steht in
+   * SUPABASE_SCHEMA_32_letzte_nachricht.sql.
+   *
+   * `letzte_nachrichten` gibt je Chat genau die juengste Nachricht zurueck und
+   * zieht den Zeitstrich `geleert_bis` gleich mit. Gleiche Regel in
+   * web/server/supabase-api.js.
+   */
   const [{ data: nachrichten, error: fN }, { data: mitglieder, error: fM }, { data: kontakte, error: fK }] =
     await Promise.all([
-      client
-        .from('messages')
-        .select('id, chat_id, text, sender_id, media_type, created_at')
-        .in('chat_id', ids)
-        .order('created_at', { ascending: false })
-        .limit(500),
+      client.rpc('letzte_nachrichten', { chat_ids: ids }),
       client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
-      client.from('contacts').select('contact_id, status').eq('user_id', ichId),
+      client.from('contacts').select('contact_id, status, spitzname').eq('user_id', ichId),
     ]);
   if (fN) throw fN;
   if (fM) throw fM;
   if (fK) throw fK;
 
-  void kontakte; // Der Anfragezustand steht seit dem 03.09.2026 am Chat.
+  /*
+   * Der Anfragezustand steht seit dem 03.09.2026 am Chat — aus den Kontakten
+   * kommt nur noch der selbst vergebene Name (Schema 33). Er muss hier stehen
+   * und nicht erst im Bildschirm: sonst hiesse dieselbe Person in der
+   * Kontaktliste anders als in der Chatliste daneben.
+   */
+  const spitznamen = new Map<string, string>(
+    (kontakte ?? [])
+      .filter((k: any) => k.spitzname)
+      .map((k: any) => [k.contact_id, k.spitzname as string])
+  );
 
   // Ein geleerter Chat zeigt auch in der Liste keine Vorschau von vorher.
   // Gleiche Regel wie in web/server/supabase-api.js.
@@ -365,10 +388,52 @@ export async function ladeChats(
     if (strich && new Date(n.created_at) <= new Date(strich)) continue;
     if (!letzte.has(n.chat_id)) letzte.set(n.chat_id, n);
   }
+
+  /*
+   * Die Vorschau in der Chatliste muss mit aufgeschlossen werden.
+   *
+   * Ohne das stuende in der Liste bei jedem verschluesselten Chat eine leere
+   * Zeile — der Chat selbst waere lesbar, die Uebersicht darueber nicht. Das
+   * ist die Stelle, an der eine Verschluesselung sich zuerst als kaputte
+   * Oberflaeche zeigt.
+   *
+   * Aufgeschlossen wird nur die jeweils letzte Nachricht je Chat, nicht die
+   * bis zu fuenfhundert geladenen. Mehr braucht die Liste nicht.
+   */
+  const vorschauen = [...letzte.values()];
+  if (vorschauen.some((n) => Number(n?.krypto) > 0)) {
+    const meiner = await meinSchluessel(client, ichId);
+    await aufschliessen(client, vorschauen, meiner);
+  }
   const mitgliederNach = new Map<string, string[]>();
   for (const m of (mitglieder ?? []) as any[]) {
     if (!mitgliederNach.has(m.chat_id)) mitgliederNach.set(m.chat_id, []);
     mitgliederNach.get(m.chat_id)!.push(m.user_id);
+  }
+
+  /*
+   * Ein Zweiergespraech heisst wie das Gegenueber — und zwar auf beiden Seiten.
+   *
+   * chats.name wird beim Anlegen einmal festgeschrieben (chatMit in
+   * aktionen.ts). Das geht nur fuer den auf, der den Chat angefangen hat: der
+   * andere sieht seinen eigenen Namen. Aelteren Chats fehlt der Name ganz —
+   * dann stand in der Liste nur ein Kreis und eine Uhrzeit.
+   *
+   * Deshalb kommt der Name zur Anzeigezeit aus dem Profil. Gleiche Regel in
+   * web/server/supabase-api.js.
+   */
+  const gegenueberIds = [
+    ...new Set(
+      (zeilen as any[])
+        .filter((z) => !z.chats.is_group)
+        .map((z) => (mitgliederNach.get(z.chat_id) ?? []).find((u) => u !== ichId))
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const namen = new Map<string, string>();
+  if (gegenueberIds.length) {
+    const { data: profile } = await client.from('profiles').select('id, name').in('id', gegenueberIds);
+    for (const p of (profile ?? []) as any[]) namen.set(p.id, p.name);
   }
 
   return zeilen
@@ -379,12 +444,22 @@ export async function ladeChats(
       const gegenueber = z.chats.is_group ? undefined : andere[0];
       return {
         id: z.chats.id,
-        name: z.chats.name,
+        name: z.chats.is_group
+          ? z.chats.name || 'Gruppe'
+          : (gegenueber && (spitznamen.get(gegenueber) || namen.get(gegenueber))) ||
+            z.chats.name ||
+            'Chat',
         userId: gegenueber,
         requestState: anfrageZustand(z.chats, ichId),
         isGroup: Boolean(z.chats.is_group),
         memberIds: z.chats.is_group ? andere : undefined,
-        preview: vorschau?.text ?? '',
+        // Ein Anrufeintrag traegt keinen Text (Schema 35) — ohne diese Zeile
+        // stuende in der Chatliste nach einem Anruf gar nichts.
+        preview: vorschau?.anruf_art
+          ? vorschau.anruf_art === 'video'
+            ? 'Videoanruf'
+            : 'Anruf'
+          : vorschau?.text ?? '',
         previewMedia: vorschau?.media_type ?? undefined,
         time: chatZeit(vorschau?.created_at ?? z.chats.updated_at),
         unreadCount: z.is_read ? 0 : 1,
@@ -417,11 +492,7 @@ export async function ladeNachrichten(
   let abfrage = client
     .from('messages')
     .select(
-      'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
-        ' reply_to, quote_of, forwarded_from, edited_at, deleted_at, file_name, file_size,' +
-        ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name)),' +
-        ' place_id, places(id, name, adresse, koordinaten, x, y),' +
-        ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)'
+      NACHRICHT_SPALTEN
     )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
@@ -450,9 +521,31 @@ export async function ladeNachrichten(
   if (bezugIds.length) {
     const { data: gefunden } = await client
       .from('messages')
-      .select('id, text, sender_id')
+      // Die vier Kryptospalten muessen mit: eine verschluesselte Nachricht,
+      // auf die geantwortet wird, haette sonst einen leeren `text` — und im
+      // Antwortbezug staende eine leere Zeile statt des Zitierten.
+      .select('id, text, sender_id, krypto, chiffre, krypto_nonce, absender_schluessel')
       .in('id', bezugIds);
     bezugZeilen.push(...((gefunden ?? []) as any[]));
+  }
+
+  /*
+   * Aufschliessen — die Nachrichten und ihre Bezuege in einem Zug.
+   *
+   * Beide zusammen, weil `aufschliessen` alle Kuverts mit einer Abfrage
+   * holt; zweimal aufgerufen waeren es zwei. Der Gerätschlüssel wird einmal
+   * geholt und weitergereicht, damit nicht jede Chatoeffnung ihn erneut aus
+   * der Schluesselkette liest.
+   *
+   * Ab hier steht der Klartext wieder in `text`. Alles danach — Vorschau,
+   * Suche, Reaktionen, Bezuege — rechnet damit, als haette es nie eine
+   * Chiffre gegeben. Genau so soll eine Verschluesselungsschicht liegen:
+   * unten, nicht verteilt.
+   */
+  if (zeilen.some((z) => Number(z?.krypto) > 0) ||
+      bezugZeilen.some((z) => Number(z?.krypto) > 0)) {
+    const meiner = await meinSchluessel(client, ichId);
+    await aufschliessen(client, [...zeilen, ...bezugZeilen], meiner);
   }
 
   const reaktionen = new Map<string, { userId: string; emoji: string }[]>();
@@ -500,6 +593,10 @@ export async function ladeNachrichten(
     time: chatZeit(n.created_at),
     media: n.media_type ?? undefined,
     read: Boolean(n.read_at),
+    // Der Anhang selbst (Henrik 7.9.) — signiereMedien weiter unten macht
+    // daraus eine unterschriebene Adresse. Gleiche Regel in
+    // web/server/supabase-api.js.
+    mediaUrl: n.media_url ?? undefined,
     // Die Karte im Chat für einen geteilten Beitrag. Gleiche Regel wie in
     // web/server/supabase-api.js.
     geteilt: n.posts
@@ -508,6 +605,7 @@ export async function ladeNachrichten(
           art: n.posts.kind === 'post' ? ('post' as const) : ('video' as const),
           autor: n.posts.profiles?.name ?? '',
           titel: n.posts.title || n.posts.description || '',
+          bild: n.posts.thumbnail_url || n.posts.media_url || undefined,
         }
       : undefined,
     // Angehängter Standort und Kontakt — gleiche Regel wie in
@@ -536,6 +634,15 @@ export async function ladeNachrichten(
     zurueckgenommen: Boolean(n.deleted_at),
     reaktionen: reaktionen.get(n.id),
     datei: n.file_name ? { name: n.file_name, groesse: Number(n.file_size ?? 0) } : undefined,
+    // Der Anrufeintrag (Henrik 7.9., Schema 35). Gleiche Regel in
+    // web/server/supabase-api.js.
+    anruf: n.anruf_art
+      ? {
+          art: n.anruf_art as 'audio' | 'video',
+          status: (n.anruf_status ?? 'beendet') as 'beendet' | 'verpasst' | 'abgelehnt',
+          dauer: Number(n.anruf_dauer ?? 0),
+        }
+      : undefined,
   })));
 }
 
@@ -543,25 +650,59 @@ export async function ladeNachrichten(
 // Storys
 // ============================================================================
 
-export async function ladeStorys(client: SupabaseClient, ichId: string): Promise<Story[]> {
+/**
+ * Storys — getrennt nach den beiden Bereichen, in denen sie erscheinen.
+ *
+ * WARUM ZWEI LISTEN UND NICHT EINE
+ *
+ * Bis zum 07.09.2026 gab es hier genau eine Liste. Der Messenger zeigte sie,
+ * und der Videos-Bereich zeigte dieselbe noch einmal. Das Handbuch trennt
+ * beides:
+ *
+ *   Messenger — „Über Chats erscheinen Storys der Kontakte"
+ *   Videos    — „Storys der gefolgten Profile"
+ *
+ * Kontakte und Gefolgte sind nicht dasselbe. Wem man folgt, muss man nicht
+ * kennen; wen man kennt, muss man nicht abonniert haben.
+ *
+ * Dazu kommt der Zusatz aus der Story-Sichtbarkeit („Jeder -> Story auch in
+ * Videos teilen", Schema 30): in den Videos-Bereich wandert eine Story nur,
+ * wenn ihr Urheber das ausdrücklich will. Der Filter hier ist eine
+ * Anzeigeregel, keine Zugriffsregel — wer die Stufe „Alle" gewählt hat, gibt
+ * seine Story ohnehin für jeden frei, und die Regel `Aktuelle Storys lesen`
+ * lässt sie deshalb zu Recht durch. Was der Schalter entscheidet, ist allein,
+ * ob sie zusätzlich *ungefragt* im Videos-Feed auftaucht.
+ */
+export interface StoryListen {
+  messenger: Story[];
+  videos: Story[];
+}
+
+export async function ladeStorys(client: SupabaseClient, ichId: string): Promise<StoryListen> {
   const { data, error } = await client
     .from('stories')
-    .select('id, user_id, media_url, media_type, caption, created_at, profiles!stories_user_id_fkey(name)')
+    .select(
+      'id, user_id, media_url, media_type, caption, created_at, in_videos, profiles!stories_user_id_fkey(name)'
+    )
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;
 
   const storys = (data ?? []) as any[];
-  if (storys.length === 0) return [];
 
-  const [{ data: gesehen }, { data: gemocht }] = await Promise.all([
-    client.from('story_views').select('story_id').eq('user_id', ichId),
-    client.from('story_likes').select('story_id').eq('user_id', ichId),
-  ]);
+  const [{ data: gesehen }, { data: gemocht }, { data: kontakte }, { data: gefolgt }] =
+    await Promise.all([
+      client.from('story_views').select('story_id').eq('user_id', ichId),
+      client.from('story_likes').select('story_id').eq('user_id', ichId),
+      client.from('contacts').select('contact_id').eq('user_id', ichId).eq('status', 'friend'),
+      client.from('follows').select('followee_id').eq('follower_id', ichId),
+    ]);
   const gesehenIds = new Set((gesehen ?? []).map((g: any) => g.story_id));
   const gemochtIds = new Set((gemocht ?? []).map((g: any) => g.story_id));
+  const kontaktIds = new Set((kontakte ?? []).map((k: any) => k.contact_id));
+  const gefolgtIds = new Set((gefolgt ?? []).map((f: any) => f.followee_id));
 
-  const liste: Story[] = storys.map((s) => ({
+  const liste: (Story & { _urheber: string; _inVideos: boolean })[] = storys.map((s) => ({
     id: s.id,
     userId: s.user_id === ichId ? ICH : s.user_id,
     // Die eigene Kachel heisst "Deine Story", nicht wie man selbst heisst —
@@ -572,32 +713,80 @@ export async function ladeStorys(client: SupabaseClient, ichId: string): Promise
     liked: gemochtIds.has(s.id),
     caption: s.caption ?? '',
     mediaUri: s.media_url ?? undefined,
+    _urheber: s.user_id,
+    /*
+     * Henrik am 07.09.2026: „Storys nicht mehr bereichsuebergreifend
+     * (Messenger/Videos strikt getrennt); beim Posten fragen ob
+     * uebergreifend teilen."
+     *
+     * Hier stand `profiles.story_in_videos` — die Dauereinstellung. Damit
+     * war es eine Entscheidung fuer alles, was jemand je postet. Gefragt
+     * wird jetzt je Story, und die Antwort steht an der Story selbst
+     * (Schema 36). Der Schalter am Profil bleibt: er entscheidet, ob
+     * ueberhaupt gefragt wird, und ist die Vorbelegung.
+     */
+    _inVideos: Boolean(s.in_videos),
   }));
 
   /*
-   * Links steht immer die eigene Kachel — auch ohne eigene Story. Dann traegt
-   * sie ein Plus und oeffnet die Kamera. Storys leben 24 Stunden; ohne diese
-   * Kachel waere der Weg zur Kamera danach weg.
-   * Gleiche Regel wie in web/server/supabase-api.js.
+   * `ordnen` haengt links immer die eigene Kachel an. Bis zum 09.09.2026 tat
+   * es das ohne Bedingung — und damit stand die eigene Story in BEIDEN
+   * Leisten, egal was eingestellt war. Die Trennung aus Schema 30 galt nur
+   * fuer fremde Storys; die einzige, die Henrik beim Testen sicher zu sehen
+   * bekam, war seine eigene. Fuer ihn war die Trennung deshalb nicht gebaut.
+   *
+   * `eigeneNehmen` entscheidet jetzt, welche eigenen Storys in diese Leiste
+   * gehoeren. Die Plus-Kachel bleibt davon unberuehrt: sie ist der Weg zur
+   * Kamera und steht auch in einer leeren Leiste.
    */
-  const eigene = liste.filter((s) => s.own);
-  const fremde = liste.filter((s) => !s.own);
+  const ordnen = (
+    fremde: Story[],
+    eigeneNehmen: (s: { _inVideos: boolean }) => boolean = () => true
+  ): Story[] => {
+    /*
+     * Links steht immer die eigene Kachel — auch ohne eigene Story. Dann traegt
+     * sie ein Plus und oeffnet die Kamera. Storys leben 24 Stunden; ohne diese
+     * Kachel waere der Weg zur Kamera danach weg.
+     * Gleiche Regel wie in web/server/supabase-api.js.
+     */
+    const eigene = liste
+      .filter((s) => s.own && eigeneNehmen(s))
+      .map(({ _urheber, _inVideos, ...s }) => s as Story);
 
-  if (eigene.length === 0) {
-    eigene.push({
-      id: 'eigene',
-      userId: ICH,
-      name: 'Deine Story',
-      own: true,
-      viewed: false,
-      liked: false,
-      caption: '',
-      mediaUri: undefined,
-    } as Story);
-  }
+    if (eigene.length === 0) {
+      eigene.push({
+        id: 'eigene',
+        userId: ICH,
+        name: 'Deine Story',
+        own: true,
+        viewed: false,
+        liked: false,
+        caption: '',
+        mediaUri: undefined,
+      } as Story);
+    }
+
+    return [...eigene, ...fremde];
+  };
+
+  const abLegen = (s: Story & { _urheber: string; _inVideos: boolean }): Story => {
+    const { _urheber, _inVideos, ...rest } = s;
+    return rest as Story;
+  };
+
+  const fremde = liste.filter((s) => !s.own);
+  const messenger = ordnen(fremde.filter((s) => kontaktIds.has(s._urheber)).map(abLegen));
+  const videos = ordnen(
+    fremde.filter((s) => gefolgtIds.has(s._urheber) && s._inVideos).map(abLegen),
+    (s) => s._inVideos
+  );
 
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
-  return signiereMedien(client, [...eigene, ...fremde]);
+  const [mSigniert, vSigniert] = await Promise.all([
+    signiereMedien(client, messenger),
+    signiereMedien(client, videos),
+  ]);
+  return { messenger: mSigniert, videos: vSigniert };
 }
 
 // ============================================================================
@@ -1009,7 +1198,13 @@ export interface AlleDaten {
   chats: Chat[];
   archivierteChats: Chat[];
   communityChats: Chat[];
+  /*
+   * Zwei Storylisten statt einer: der Messenger zeigt die Kontakte, der
+   * Videos-Bereich die gefolgten Profile, die ihre Story dort ausdruecklich
+   * teilen. Siehe ladeStorys().
+   */
   stories: Story[];
+  storiesVideos: Story[];
   posts: Post[];
   videos: Video[];
   clips: Clip[];
@@ -1058,7 +1253,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     contacts,
     chats,
     communityChats,
-    stories,
+    storyListen,
     beitraege,
     communities,
     hashtags,
@@ -1101,6 +1296,24 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
   for (const p of Object.values(profile)) p.isFollowing = folgeIch.has(p.userId);
   for (const p of beitraege.posts) p.following = folgeIch.has(p.userId);
 
+  /*
+   * Der selbst vergebene Name schlaegt bis in die Nutzerliste durch.
+   *
+   * Henrik, 07.09.2026: "Kontaktinfo-Änderungen (z.B. Name) speichern/
+   * synchronisieren nicht." Das zweite Wort ist das schwierigere. Fast jeder
+   * Bildschirm liest den Namen aus `users` — der Chatkopf, die Storyleiste,
+   * die Mitgliederliste einer Gruppe. Stuende der Spitzname nur an `contacts`,
+   * hiesse dieselbe Person je nach Bildschirm anders. Er wird deshalb einmal
+   * hier eingesetzt, direkt nachdem beide Listen geladen sind.
+   *
+   * Nur im Messenger, nicht in Videos: dort ist der oeffentliche Name gemeint,
+   * und der gehoert der Person. `profile` bleibt darum unangetastet.
+   */
+  for (const k of contacts) {
+    const eintrag = users[k.id];
+    if (eintrag && k.name && eintrag.name !== k.name) eintrag.name = k.name;
+  }
+
   const alleChats = chats as (Chat & { archiviert?: boolean })[];
 
   const alles: AlleDaten = {
@@ -1110,7 +1323,8 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     chats: alleChats.filter((c) => !c.archiviert),
     archivierteChats: alleChats.filter((c) => c.archiviert),
     communityChats,
-    stories,
+    stories: storyListen.messenger,
+    storiesVideos: storyListen.videos,
     posts: beitraege.posts,
     videos: beitraege.videos,
     clips: beitraege.clips,
@@ -1332,9 +1546,13 @@ export async function ladeSichtbarkeit(
   client: SupabaseClient,
   ichId: string
 ): Promise<Record<string, Sichtbarkeit>> {
-  const [{ data: stufen }, { data: ausnahmen }] = await Promise.all([
+  const [{ data: stufen }, { data: ausnahmen }, { data: eigenes }] = await Promise.all([
     client.from('visibility_settings').select('bereich, stufe').eq('user_id', ichId),
     client.from('visibility_exceptions').select('bereich, target_id').eq('user_id', ichId),
+    // Der Zusatz „Story auch in Videos teilen" steht auf dem Profil, nicht in
+    // `visibility_settings` — fremde Geraete muessen ihn lesen koennen
+    // (Schema 30). Fachlich gehoert er trotzdem hierher.
+    client.from('profiles').select('story_in_videos').eq('id', ichId).maybeSingle(),
   ]);
 
   const raus: Record<string, Sichtbarkeit> = {};
@@ -1345,6 +1563,10 @@ export async function ladeSichtbarkeit(
     if (!raus[a.bereich]) raus[a.bereich] = { stufe: 'alle', ausnahmen: [] };
     raus[a.bereich].ausnahmen.push(a.target_id);
   }
+
+  if (!raus.story) raus.story = { stufe: 'alle', ausnahmen: [] };
+  raus.story.inVideos = Boolean((eigenes as any)?.story_in_videos);
+
   return raus;
 }
 

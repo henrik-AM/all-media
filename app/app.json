@@ -23,7 +23,15 @@
     },
     "plugins": [
       "expo-video",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "All Media braucht die Kamera, um Fotos und Videos aufzunehmen und QR-Codes zu lesen.",
+          "microphonePermission": "All Media braucht das Mikrofon, um Videos mit Ton aufzunehmen.",
+          "recordAudioAndroid": true
+        }
+      ]
     ]
   }
 }

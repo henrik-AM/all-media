@@ -27,7 +27,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
-  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.goto(ZIEL, { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -39,15 +39,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForSelector('#topbar button');
 
   const ergebnisse = [];
@@ -80,7 +83,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
    * paar Pixel — und der Prueflauf meldete "30 Knoepfe sind gewandert",
    * obwohl am Aufbau nichts falsch war.
    */
-  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForLoadState('load', { timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(600);
 
   await pruefe('Die Aktionsspalte bleibt beim Liken an ihrem Platz', async () => {
@@ -89,7 +92,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     // Die Leiste wird nach der Antwort des Servers neu gezeichnet. Wer
     // mittendrin misst, findet die alte Reihe und meldet eine Verschiebung,
     // die es nicht gibt.
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForLoadState('load', { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(300);
     const nachher = await kanten('.slide__rail .railbtn');
     if (vorher.length !== nachher.length) throw new Error('die Zahl der Knöpfe hat sich geändert');
@@ -100,7 +103,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Auch ein Repost verschiebt nichts', async () => {
     const vorher = await kanten('.slide__rail .railbtn');
     await page.click('.slide__rail [data-vaction="repost"]');
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForLoadState('load', { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(300);
     const nachher = await kanten('.slide__rail .railbtn');
     const verschoben = vorher.map((v, i) => Math.abs(v - nachher[i])).filter((d) => d > 1);
@@ -261,7 +264,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Untertitel merken sich ihren Stand über einen Neustart', async () => {
     await page.click('[data-vopt="untertitel"]');
     await page.waitForTimeout(400);
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
     await page.waitForSelector('#topbar button');
     await zumPlayer();
     await page.click('#clipOptionen');

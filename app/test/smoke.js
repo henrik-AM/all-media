@@ -21,9 +21,15 @@ const K = require('./_kennungen');
 
 const { chatOffen } = require('./_warten');
 let failed = 0;
-const assert = (label, cond) => {
+/*
+ * `beleg` ist freiwillig und steht nur bei einem Fehlschlag da. Ohne ihn
+ * meldet ein roter Lauf nur seine Ueberschrift, und man muss die Stelle von
+ * Hand nachstellen, um zu sehen, was die Seite tatsaechlich gesagt hat.
+ */
+const assert = (label, cond, beleg) => {
   if (!cond) failed++;
-  console.log((cond ? 'PASS  ' : 'FAIL  ') + label);
+  const zusatz = !cond && beleg ? `  — ${String(beleg).trim()}` : '';
+  console.log((cond ? 'PASS  ' : 'FAIL  ') + label + zusatz);
 };
 
 // Die Struktur ist im Prototyp festgelegt und darf nicht abweichen.
@@ -35,12 +41,22 @@ const STRUCTURE = {
 };
 
 (async () => {
-  const b = await chromium.launch({ channel: 'chromium-headless-shell' });
+  /*
+   * Eine erfundene Kamera mitgeben.
+   *
+   * Ohne sie meldet Chrome „Requested device not found", die Seite schreibt
+   * das brav in die Konsole, und der Lauf gilt als rot — obwohl jede
+   * Pruefung bestanden hat. Mit den beiden Schaltern liefert Chrome ein
+   * Testbild und beantwortet die Nachfrage selbst; damit wird die Aufnahme
+   * wirklich geprueft statt nur der Fehlerfall.
+   */
+  const KAMERA = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'];
+  const b = await chromium.launch({ channel: 'chromium-headless-shell', args: KAMERA });
   const p = await b.newPage({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 1 });
   const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
   p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
-  await p.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+  await p.goto('http://localhost:3000', { waitUntil: 'load' });
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
   // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
   const angemeldet = await anmelden(p);
@@ -49,12 +65,12 @@ const STRUCTURE = {
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
     process.exit(1);
   }
-  await p.reload({ waitUntil: 'networkidle' });
+  await p.reload({ waitUntil: 'load' });
   await p.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   // Auf den Startzustand — sonst zaehlt der zweite Lauf die Testkommentare
   // und Testgruppen des ersten mit.
   await zuruecksetzen(p);
-  await p.reload({ waitUntil: 'networkidle' });
+  await p.reload({ waitUntil: 'load' });
   await p.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await p.waitForTimeout(400);
 
@@ -256,13 +272,28 @@ const STRUCTURE = {
     return p.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
   };
 
-  await p.fill('#contactHandle', '@niemand');
+  /*
+   * Nummern, keine Kennungen.
+   *
+   * Henrik am 07.09.2026: „Kontakt hinzufuegen nur ueber Telefonnummer/QR-Code,
+   * nicht Username." Seitdem weist schon `Telefon.pruefe` jede Eingabe mit
+   * Buchstaben ab — „@niemand" kam also gar nicht mehr bis zur Suche, und
+   * diese beiden Pruefungen lasen bis zum 10.09.2026 „Eine Telefonnummer
+   * besteht aus Ziffern" statt der Antwort, um die es ihnen ging.
+   */
+  await p.fill('#contactHandle', '+49 151 0000000');
   const unbekannt = await hinweisNach(() => p.click('#contactAdd'));
-  assert('Unbekannter Kontakt wird abgelehnt', unbekannt.includes('Niemand'));
+  assert('Unbekannte Nummer wird abgelehnt', unbekannt.includes('noch kein Konto'), unbekannt);
 
-  await p.fill('#contactHandle', '@anna');
+  // Annas Nummer aus dem Testbestand (SUPABASE_SCHEMA_6_inhalte.sql).
+  await p.fill('#contactHandle', '+49 151 2345678');
   const doppelt = await hinweisNach(() => p.click('#contactAdd'));
-  assert('Doppelter Kontakt wird abgelehnt', doppelt.includes('bereits'));
+  assert('Doppelter Kontakt wird abgelehnt', doppelt.includes('bereits'), doppelt);
+
+  // Buchstaben kommen erst gar nicht durch — die Regel selbst mitpruefen.
+  await p.fill('#contactHandle', '@anna');
+  const kennung = await hinweisNach(() => p.click('#contactAdd'));
+  assert('Eine Kennung wird nicht mehr angenommen', kennung.includes('Ziffern'), kennung);
   await p.mouse.click(200, 40);
   await p.waitForTimeout(400);
 
