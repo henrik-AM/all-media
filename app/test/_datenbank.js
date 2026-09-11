@@ -85,6 +85,26 @@ async function main() {
   const kopf = { apikey: KEY, Authorization: `Bearer ${token}` };
   const hole = (pfad) => fetch(`${URL}/rest/v1/${pfad}`, { headers: kopf }).then((r) => r.json());
 
+  /*
+   * Den Startbestand herstellen, bevor er gemessen wird.
+   *
+   * Am 07.09.2026 fiel dieser Lauf im Gesamtlauf mit „Merkliste nicht leer"
+   * und „Repost vorhanden" durch und war einzeln gestartet trotzdem gruen.
+   * Das ist das Muster aus der Regel „einzeln gruen, gesamt rot": nicht der
+   * Code ist schuld, sondern der Bestand. Ein Lauf davor raeumt auf, was
+   * dieser hier voraussetzt.
+   *
+   * Alle anderen Pruefläufe stellen den Bestand zu Beginn ueber den Browser
+   * her (`zuruecksetzen(page)`). Dieser hier hat keinen Browser, also ruft er
+   * dieselbe Funktion direkt. Ohne das misst er nicht den Startbestand,
+   * sondern die Reihenfolge der Laeufe davor.
+   */
+  await fetch(`${URL}/rest/v1/rpc/zuruecksetzen`, {
+    method: 'POST',
+    headers: { ...kopf, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ziel: ichId }),
+  }).catch(() => {});
+
   // ------------------------------------------------------------ Tabellen --
   /*
    * Sicherheitspruefung 04.09.2026 (Fund 1): `select=*` ist kein Nachweis

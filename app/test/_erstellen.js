@@ -34,7 +34,7 @@ if (!fs.existsSync(BILD)) {
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
-  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.goto(ZIEL, { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -46,16 +46,19 @@ if (!fs.existsSync(BILD)) {
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.evaluate(() => localStorage.removeItem('am-eigene-medien'));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(500);
 
   const ergebnisse = [];
@@ -357,13 +360,30 @@ if (!fs.existsSync(BILD)) {
     await page.click('[data-sheet-close]');
   });
 
+  /*
+   * Warten, bis der Hinweis unten wieder weg ist.
+   *
+   * Er liegt ueber der ganzen Breite und faengt Klicks ab. Am 09.09.2026 lief
+   * der Klick auf #liveStop deshalb in einen 30-Sekunden-Timeout: darueber
+   * stand noch „Spendenaktion laeuft" aus der Pruefung davor. Allein
+   * gestartet ging dieselbe Pruefung durch — der Hinweis war dann laengst
+   * verschwunden.
+   */
+  const hinweisAbwarten = () =>
+    page.waitForFunction(
+      () => { const t = document.querySelector('#toast'); return !t || t.hidden || !t.textContent.trim(); },
+      null, { timeout: 5000 }
+    ).catch(() => {});
+
   await pruefe('Livestream laeuft und hinterlaesst die Aufzeichnung', async () => {
+    await hinweisAbwarten();
     await gehe('videos', 'profile');
     await erstellen('livestream');
     await page.waitForSelector('.live__marke', { timeout: 3000 });
     await page.waitForTimeout(1300);
     const zeit = await page.$eval('#liveZeit', (e) => e.textContent);
     if (zeit === '00:00') throw new Error('die Zeit laeuft nicht');
+    await hinweisAbwarten();
     await page.click('#liveStop');
     // Die Aufzeichnung wird als Beitrag in der Datenbank angelegt und danach
     // frisch geladen — das dauert laenger als der fruehere Eintrag im

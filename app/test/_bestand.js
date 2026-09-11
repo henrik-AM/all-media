@@ -20,7 +20,7 @@ const BEREICHE = {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
 
-  await page.goto(process.env.ZIEL || 'http://localhost:3000/', { waitUntil: 'networkidle' });
+  await page.goto(process.env.ZIEL || 'http://localhost:3000/', { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -32,15 +32,18 @@ const BEREICHE = {
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(600);
 
   const bilanz = {};

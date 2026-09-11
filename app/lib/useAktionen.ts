@@ -51,6 +51,36 @@ export interface Aktionen {
     privat?: boolean,
     nachricht?: string
   ) => Promise<{ status: string; chatId: string } | null>;
+  /**
+   * Eine Person ueber ihre Telefonnummer suchen (Henrik 7.9.).
+   *
+   * Gibt null zurueck, wenn es zu der Nummer kein Konto gibt — das ist ein
+   * normales Suchergebnis, kein Fehler, und wird deshalb nicht gemeldet. Die
+   * Nummer selbst muss stimmen, sonst kommt die Regel aus telefon.js als
+   * Meldung zurueck.
+   */
+  personPerNummer: (
+    nummer: string
+  ) => Promise<{ id: string; name: string; handle: string; privat: boolean; about?: string } | null>;
+  /**
+   * Einen Kontakt umbenennen und mit einer Notiz versehen (Schema 33).
+   * Meldet zurueck, ob es wirklich geschrieben wurde.
+   */
+  kontaktBearbeiten: (
+    zielId: string,
+    werte: { spitzname?: string; notiz?: string }
+  ) => Promise<boolean>;
+  /**
+   * Einen beendeten Anruf im Chat vermerken (Henrik 7.9., Schema 35).
+   * Still: schlaegt es fehl, soll deswegen keine Meldung ueber dem
+   * Anrufbildschirm stehen.
+   */
+  anrufNotieren: (
+    zielId: string,
+    art: 'audio' | 'video',
+    sekunden: number,
+    status?: 'beendet' | 'verpasst' | 'abgelehnt'
+  ) => Promise<void>;
   /** Über eine Chat-Anfrage entscheiden. Nur die angeschriebene Person darf das. */
   anfrageEntscheiden: (chatId: string, annehmen: boolean, zurueck: Rueckweg) => Promise<void>;
   chatEinstellung: (
@@ -73,6 +103,12 @@ export interface Aktionen {
     mediaUrl?: string | null;
     mediaTyp?: string;
     text?: string;
+    /*
+     * Die Antwort auf die Frage beim Posten: soll die Story auch unter
+     * Videos stehen? Henrik am 07.09.2026. Steht an der Story selbst
+     * (Schema 36) und nicht am Profil — dort ist es die Dauereinstellung.
+     */
+    inVideos?: boolean;
   }) => Promise<string | null>;
   storyLoeschen: (storyId: string, zurueck: Rueckweg) => Promise<void>;
   /** Livestream an (Titel) oder aus (null). Steht in profiles.live. */
@@ -134,12 +170,19 @@ export interface Aktionen {
     zielId: string,
     zurueck: Rueckweg
   ) => Promise<void>;
+  storyInVideos: (an: boolean, zurueck: Rueckweg) => Promise<void>;
 
   altersangabe: (
     geburtsdatum: string,
     guardianHandle?: string
   ) => Promise<{ alter: number; brauchtFreigabe: boolean; guardian: string | null } | null>;
   freigabeEntscheiden: (kindId: string, zustimmen: boolean, zurueck: Rueckweg) => Promise<void>;
+
+  /**
+   * Die eigene Telefonnummer speichern. Gibt die gespeicherte Schreibweise
+   * zurueck, oder den Grund, warum es nicht ging.
+   */
+  telefon: (nummer: string) => Promise<{ ok: boolean; wert: string }>;
 
   /** Gibt das beanstandete Wort zurueck, oder null. */
   wortfilter: (text: string) => Promise<{ wort: string; schwere: string } | null>;
@@ -278,6 +321,25 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         holen('Die Gruppe', (c, i) => A.gruppeAnlegen(c, i, name, mitglieder)),
       kontaktHinzufuegen: (zielId, privat, nachricht) =>
         holen('Der Kontakt', (c, i) => A.kontaktHinzufuegen(c, i, zielId, privat, nachricht)),
+      personPerNummer: (nummer) =>
+        holen('Die Suche', (c) => A.personPerNummer(c, nummer)),
+      kontaktBearbeiten: async (zielId, werte) =>
+        Boolean(
+          await holen('Der Kontakt', (c, i) => A.kontaktBearbeiten(c, i, zielId, werte))
+        ),
+      /*
+       * Wie storyGesehen ohne Meldung: der Vermerk passiert beim Auflegen,
+       * und ein Fehlerhinweis ueber dem sich schliessenden Anrufbildschirm
+       * hilft niemandem. Ins Protokoll gehoert er trotzdem.
+       */
+      anrufNotieren: async (zielId, art, sekunden, status = 'beendet') => {
+        if (!supabase || !ichId) return;
+        try {
+          await A.anrufNotieren(supabase, ichId, zielId, art, sekunden, status);
+        } catch (e: any) {
+          console.error('Anruf konnte nicht im Chat vermerkt werden:', e?.message ?? e);
+        }
+      },
       anfrageEntscheiden: (chatId, annehmen, zurueck) =>
         schreiben('Die Anfrage', (c) => A.anfrageEntscheiden(c, chatId, annehmen), zurueck),
       chatEinstellung: (chatId, was, wert, zurueck) =>
@@ -407,6 +469,8 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           (c, i) => A.sichtbarkeitAusnahme(c, i, bereich, zielId),
           zurueck
         ),
+      storyInVideos: (an, zurueck) =>
+        schreiben('Die Einstellung', (c, i) => A.storyInVideosSetzen(c, i, an), zurueck),
 
       // ---------------------------------------------------- Altersschutz --
       altersangabe: (geburtsdatum, guardianHandle) =>
@@ -417,6 +481,22 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           (c, i) => A.freigabeEntscheiden(c, i, kindId, zustimmen),
           zurueck
         ),
+
+      /*
+       * Nicht ueber `holen`: das meldet bei jedem Fehler denselben Satz
+       * („… hat nicht geklappt"). Hier zaehlt aber der Grund — „Die Nummer
+       * ist zu kurz" und „gehoert schon zu einem anderen Konto" verlangen
+       * Verschiedenes vom Nutzer.
+       */
+      telefon: async (nummer) => {
+        if (!supabase || !ichId) return { ok: false, wert: 'Dafür musst du angemeldet sein' };
+        try {
+          return { ok: true, wert: await A.telefonAendern(supabase, ichId, nummer) };
+        } catch (e: any) {
+          console.error('Die Telefonnummer fehlgeschlagen:', e?.message ?? e);
+          return { ok: false, wert: e?.message || 'Die Nummer ließ sich nicht speichern' };
+        }
+      },
 
       /*
        * Der Wortfilter meldet nichts von sich aus — er gibt nur zurueck, was

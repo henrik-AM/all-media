@@ -80,9 +80,22 @@ const SEITEN = [
   ['messenger/chats#chat:Projekt Team', 'detail-chat-gruppe'],
   ['messenger/chats#story:Anna Schmidt', 'detail-story'],
   ['messenger/chats#kontakt:Anna Schmidt', 'detail-kontaktprofil'],
+  /*
+   * Dieselbe Liste, nur weiter unten begonnen. Am 07.09.2026 kam die Zeile
+   * "Verschluesselung" dazu — und lag im Bild oben unter dem Rand. Das Bild
+   * war da und zeigte die Aenderung nicht.
+   */
+  ['messenger/chats#kontakt:Anna Schmidt:520', 'detail-kontaktprofil-unten'],
   ['messenger/chats#kontakte', 'detail-kontakte'],
   ['messenger/chats#anruf:Anna Schmidt:audio', 'detail-anruf'],
   ['messenger/chats#blatt:erstellen', 'detail-erstellen'],
+  /*
+   * „Kontakt hinzufuegen". Kam in keinem Bild vor — und genau dieses Blatt hat
+   * Henrik am 07.09.2026 beanstandet („nur ueber Telefonnummer/QR-Code, nicht
+   * Username"). Ein Blatt, das nie fotografiert wird, kann sich unbemerkt
+   * anders verhalten als seine Fassung auf der Website.
+   */
+  ['messenger/chats#blatt:contact', 'detail-kontakt-hinzufuegen'],
   ['videos/profile#profil:Anna Schmidt', 'detail-fremdprofil'],
   ['videos/landscape#clip:Testvideo im Querformat', 'detail-clip'],
   // Die Community-Seite nach dem Prototyp-Frame "CH + Kanal". Sie kam in
@@ -99,8 +112,39 @@ const SEITEN = [
   // Die Bildschirme der Handbuch-Erweiterung vom 01./02.09.2026. Sie waren
   // geprueft, aber nur auf die Datenbank hin: dass ein Insight ankommt, sagt
   // nichts darueber, wie der Betrachter dafuer aussieht.
-  ['messenger/chats#insights:me', 'detail-insights'],
+  /*
+   * Absender ist Anna Schmidt (feste Kennung aus Schema 6, siehe
+   * test/_kennungen.js). Hier stand `insights:me` — also Insights, die das
+   * Konto sich selbst geschickt hat. Die gibt es nicht und kann es nicht
+   * geben, und der Bildschirm zeigte am 06.09.2026 zuverlaessig „Dieser
+   * Insight ist nicht mehr da." Den Insight selbst legt
+   * SUPABASE_SCHEMA_29_testbestand_insight.sql an.
+   */
+  ['messenger/chats#insights:11111111-a11e-4d1a-8000-000000000001', 'detail-insights'],
   ['messenger/camera', 'handbuch-kamera-filter'],
+  /*
+   * Das Sichtbarkeits-Blatt. Es kam in keinem Bild vor, obwohl dort die vier
+   * Stufen des Handbuchs stehen — und seit dem 07.09.2026 der Zusatz "Story
+   * auch in Videos teilen", der nur bei der Stufe "Alle" bedienbar ist.
+   */
+  ['settings#sicht:story', 'detail-sichtbarkeit-story'],
+  // Die zwei Bildschirme aus Henriks Profil-Feedback vom 07.09.2026: der
+  // Zurueck-Pfeil in den Einstellungen und die Kontoliste mit den frueheren
+  // Konten. Beide kommen nur ueber einen Fingertipp zustande.
+  ['settings#aus:messenger', 'detail-einstellungen-ausProfil'],
+  ['messenger/profile#blatt:konto', 'detail-kontowechsel'],
+  /*
+   * Dieselbe Wahl fuer den Standort — sie haengt an der Friend-Map und an den
+   * Einstellungen. Henrik am 07.09.2026: "Bei „Alle bis auf"/„Niemand bis
+   * auf" fehlt Suchleiste; Liste zeigt nicht alle Messenger-Kontakte." Ohne
+   * Bild war beides nicht nachzusehen.
+   */
+  ['settings#sicht:standort', 'detail-sichtbarkeit-standort'],
+  /*
+   * Das Auswahlfenster der Kartenansichten. Henrik am 07.09.2026:
+   * "Kartenstil-Button switcht direkt statt Auswahlfenster."
+   */
+  ['messenger/friendmap#karte:stile', 'detail-kartenansichten'],
 ];
 
 /*
@@ -121,7 +165,7 @@ const SEITEN = [
  */
 function anmelden() {
   log('  Anmeldung am Testkonto ...');
-  execFileSync(process.execPath, [path.join(__dirname, 'app-anmelden.js')], { stdio: 'inherit' });
+  execFileSync(process.execPath, [path.join(__dirname, 'app-anmelden.js')], { stdio: 'inherit', timeout: 120000 });
 }
 
 /**
@@ -150,10 +194,44 @@ function anmeldungPruefen(datei) {
   }
 }
 
-function log(zeile) { process.stdout.write(zeile + '\n'); }
-function sh(befehl) { return execSync(befehl, { encoding: 'utf8' }); }
-function still(befehl) { try { return sh(befehl); } catch { return ''; } }
-function schlaf(ms) { execSync(`sleep ${ms / 1000}`); }
+/*
+ * Jede Meldung mit Uhrzeit — seit dem 06.09.2026.
+ *
+ * Am 05.09.2026 stand hier zwanzig Minuten lang nichts auf dem Schirm und der
+ * Lauf wurde abgebrochen. Ein Durchlauf ueber alle 27 Bildschirme dauert
+ * regulaer rund achtzehn Minuten (35 s je Bildschirm) — er war also womoeglich
+ * kurz vorm Ziel. Ohne Uhrzeit und ohne Zaehler ist "es tut sich nichts" von
+ * "es dauert eben" nicht zu unterscheiden, und man bricht das Falsche ab.
+ */
+function log(zeile) {
+  const uhr = new Date().toTimeString().slice(0, 8);
+  process.stdout.write(`  [${uhr}]${zeile}\n`);
+}
+/*
+ * Zeitgrenzen wie in tools/pruefgeraet.js: ein Aufruf, der ohne Grenze
+ * wartet, haelt das ganze Werkzeug stumm fest.
+ */
+const GRENZE = 60000;
+function sh(befehl, grenze = GRENZE) {
+  try {
+    return execSync(befehl, { encoding: 'utf8', timeout: grenze });
+  } catch (fehler) {
+    if (fehler.signal === 'SIGTERM' || fehler.code === 'ETIMEDOUT') {
+      throw new Error(`Nach ${grenze / 1000}s keine Antwort: ${befehl}`);
+    }
+    throw fehler;
+  }
+}
+function still(befehl, grenze = GRENZE) { try { return sh(befehl, grenze); } catch { return ''; } }
+/*
+ * Warten ohne Unterprozess. Vorher stand hier execSync('sleep 35') — das
+ * bricht ab, sobald die Umgebung ein blockierendes sleep in der Shell nicht
+ * zulaesst, und riss den ganzen Bilderlauf mit. Atomics.wait haelt denselben
+ * Thread genauso an, nur ohne /bin/sh.
+ */
+function schlaf(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
 
 /** Die manifest.json von AsyncStorage im Container von Expo Go. */
 function speicherDatei() {
@@ -189,9 +267,11 @@ function speicherSchreiben(datei, bereich) {
 }
 
 function appNeuStarten() {
-  still(`xcrun simctl terminate ${GERAET} ${EXPO_GO_ID}`);
+  // "found nothing to terminate" ist der Normalfall, wenn die App gar nicht
+  // lief - diese Meldung soll die echten nicht zudecken.
+  still(`xcrun simctl terminate ${GERAET} ${EXPO_GO_ID} 2>/dev/null`);
   schlaf(500);
-  execFileSync('xcrun', ['simctl', 'openurl', GERAET, EXPO_URL]);
+  execFileSync('xcrun', ['simctl', 'openurl', GERAET, EXPO_URL], { timeout: 60000 });
 }
 
 /**
@@ -208,7 +288,7 @@ function erstesOeffnen() {
 }
 
 function metroLaeuft() {
-  return still('curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/status').trim() === '200';
+  return still('curl -s --max-time 10 -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/status', 15000).trim() === '200';
 }
 
 (async () => {
@@ -261,6 +341,8 @@ function metroLaeuft() {
     process.exit(1);
   }
 
+  log(`  ${gewaehlt.length} Bildschirme, je rund 35 s — das dauert etwa ${Math.ceil(gewaehlt.length * 38 / 60)} Minuten.`);
+  let fertig = 0;
   for (const [bereich, name] of gewaehlt) {
     speicherSchreiben(datei, bereich);
     appNeuStarten();
@@ -272,8 +354,10 @@ function metroLaeuft() {
     schlaf(35000);
     execFileSync('xcrun', ['simctl', 'io', GERAET, 'screenshot', path.join(ZIEL, `${name}.png`)], {
       stdio: 'ignore',
+      timeout: 60000,
     });
-    log(`  ${name}.png`);
+    const groesse = fs.statSync(path.join(ZIEL, `${name}.png`)).size;
+    log(`  ${String(++fertig).padStart(2)}/${gewaehlt.length}  ${name}.png  (${Math.round(groesse / 1024)} kB)`);
     // Simulator.app klappt das Fenster beim Starten der App gern wieder auf.
     fensterZuklappen();
   }

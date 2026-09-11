@@ -38,6 +38,120 @@ const NAME = process.env.AM_TEST_NAME || 'prueflauf';
  * klaren Meldung abbrechen statt lauter Folgefehler zu melden — ein Lauf
  * gegen eine leere Seite prüft nichts und meldet trotzdem zwanzig Fehler.
  */
+/*
+ * ===================================================================
+ * Jede Seite bekommt dasselbe Geruest — egal, welcher Lauf sie oeffnet
+ * ===================================================================
+ *
+ * Zwei Dinge muss jede Seite koennen, und keines davon bringt Playwright
+ * von sich aus mit:
+ *
+ * 1. `page.evaluate` braucht eine Zeitgrenze (siehe unten).
+ * 2. Nach einem `goto` oder `reload` muss gewartet werden, bis die Seite
+ *    ihre Daten hat — nicht nur ihr Geruest.
+ *
+ * Zu 2.: Bis zum 09.09.2026 stand ueberall `waitUntil: 'networkidle'`. Das
+ * hat zufaellig beides erledigt, war aber unzuverlaessig, seit die Seite
+ * beim Start den Geraeteschluessel anmeldet — das Netz kommt dann nicht mehr
+ * verlaesslich zur Ruhe, und der Lauf lief in einen Timeout. Der Wechsel auf
+ * `load` behebt das, nimmt aber das Warten auf die Daten mit weg: die
+ * Chatliste war danach leer, weil niemand mehr auf sie gewartet hat.
+ *
+ * Also beides getrennt und ausdruecklich, statt es einem Nebeneffekt zu
+ * ueberlassen.
+ *
+ * Der Einbau haengt sich an `chromium.launch`, damit ihn kein Lauf vergessen
+ * kann. `playwright-core` ist ein Singleton — es ist gleichgueltig, ob ein
+ * Lauf diese Datei vor oder nach playwright einbindet.
+ */
+const { chromium } = require('playwright-core');
+
+/** Warten, bis die Oberflaeche steht und Daten da sind. Nie werfen. */
+async function inhaltAbwarten(page) {
+  await page.waitForSelector('[data-area]', { timeout: 15000 }).catch(() => {});
+  await page
+    .waitForFunction(
+      () => {
+        // `state` ist die Ablage der Website. Sobald irgendetwas Geladenes
+        // darin steht, hat der erste Schwung Anfragen geantwortet.
+        const s = window.state;
+        if (!s) return false;
+        return Boolean(
+          s.chats?.length || s.posts?.length || s.users?.me || s.communities?.length
+        );
+      },
+      null,
+      { timeout: 15000 }
+    )
+    .catch(() => {});
+}
+
+function geruestet(page) {
+  if (page.__geruestet) return page;
+  page.__geruestet = true;
+  mitZeitgrenze(page);
+
+  for (const name of ['goto', 'reload']) {
+    const echt = page[name].bind(page);
+    page[name] = async (...args) => {
+      const antwort = await echt(...args);
+      await inhaltAbwarten(page);
+      return antwort;
+    };
+  }
+  return page;
+}
+
+if (!chromium.__geruestet) {
+  chromium.__geruestet = true;
+  const echtStarten = chromium.launch.bind(chromium);
+  chromium.launch = async (...args) => {
+    const browser = await echtStarten(...args);
+
+    const echtSeite = browser.newPage.bind(browser);
+    browser.newPage = async (...a) => geruestet(await echtSeite(...a));
+
+    const echtKontext = browser.newContext.bind(browser);
+    browser.newContext = async (...a) => {
+      const kontext = await echtKontext(...a);
+      const echtKontextSeite = kontext.newPage.bind(kontext);
+      kontext.newPage = async (...b) => geruestet(await echtKontextSeite(...b));
+      return kontext;
+    };
+
+    return browser;
+  };
+}
+
+/*
+ * Eine Zeitgrenze um `page.evaluate` legen.
+ *
+ * Playwright setzt fuer `evaluate` — anders als fuer `click` oder
+ * `waitForSelector` — keine Zeitgrenze. Bleibt der Code in der Seite haengen,
+ * etwa weil ein Supabase-Aufruf nicht zurueckkommt, wartet der Prueflauf
+ * unbegrenzt. Am 09.09.2026 standen `kanal` und `aktionen` so je eine
+ * Viertelstunde still, obwohl inhaltlich alles durchgelaufen war.
+ *
+ * Ein Abbruch mit klarer Meldung ist immer besser als ein Lauf, der schweigt.
+ */
+function mitZeitgrenze(page, ms = 60000) {
+  if (page.__zeitgrenze) return page;
+  page.__zeitgrenze = true;
+  const echt = page.evaluate.bind(page);
+  page.evaluate = (...args) =>
+    Promise.race([
+      echt(...args),
+      new Promise((_, ablehnen) => {
+        const uhr = setTimeout(
+          () => ablehnen(new Error(`page.evaluate kam nach ${ms} ms nicht zurueck`)),
+          ms
+        );
+        if (uhr.unref) uhr.unref();
+      }),
+    ]);
+  return page;
+}
+
 async function anmelden(page) {
   // Warten, bis die Anmeldung im Browser bereitsteht.
   await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
@@ -86,7 +200,8 @@ async function anmelden(page) {
  * Prüflaufs. Danach steht die Oberfläche mit echten Daten da.
  */
 async function vorbereiten(page, basis = 'http://localhost:3000') {
-  await page.goto(basis, { waitUntil: 'networkidle' });
+  mitZeitgrenze(page);
+  await page.goto(basis, { waitUntil: 'load' });
   const an = await anmelden(page);
   if (!an.ok) {
     console.error(`\nFEHLER  Anmeldung des Prüfkontos fehlgeschlagen: ${an.fehler}`);
@@ -94,7 +209,7 @@ async function vorbereiten(page, basis = 'http://localhost:3000') {
     console.error(`        Konto: ${MAIL}  (über AM_TEST_MAIL / AM_TEST_PASS änderbar)\n`);
     return false;
   }
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await page.waitForTimeout(600);
   return true;
@@ -113,8 +228,27 @@ async function vorbereiten(page, basis = 'http://localhost:3000') {
  *
  * Darum hier laut statt still: wer nicht aufräumen konnte, soll es an der
  * Stelle erfahren, an der es passiert ist.
+ *
+ * NEU LADEN — 07.09.2026
+ *
+ * Muss der Bestand einen Chat wirklich neu anlegen (statt ihn nur
+ * vorzufinden), bekommt er eine **neue Kennung**. Die Seite hat ihre
+ * Chatliste aber beim Start geholt und holt sie nicht wieder; sie zeigt
+ * weiter die alten Kennungen. Ein Klick darauf ging dann an den Server und
+ * kam mit „Diesen Chat gibt es nicht" zurueck — im Bild sah alles normal
+ * aus, der Chat stand ja da.
+ *
+ * Das faellt fast nie auf, weil der Bestand meist unversehrt ist und die
+ * Kennungen gleich bleiben. Genau deshalb ist es gefaehrlich: es schlaegt
+ * erst zu, wenn vorher etwas anderes schiefgegangen ist.
+ *
+ * Darum laedt das Zuruecksetzen die Seite neu. `domcontentloaded` statt
+ * `networkidle` mit Absicht — auf „networkidle" zu warten hat am selben Tag
+ * vier Laeufe gekippt, seit der Geraeteschluessel beim Start angemeldet wird.
+ * Wer mitten in einer Pruefung aufraeumt und den Bildschirm behalten will,
+ * ruft `zuruecksetzen(page, { neuLaden: false })`.
  */
-async function zuruecksetzen(page) {
+async function zuruecksetzen(page, { neuLaden = true } = {}) {
   const antwort = await page.evaluate(() =>
     fetch('/api/reset', { method: 'POST' })
       .then((r) => r.json())
@@ -126,7 +260,13 @@ async function zuruecksetzen(page) {
         (antwort?.grund || antwort?.error || JSON.stringify(antwort))
     );
   }
+  if (neuLaden) {
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
+    // Auf die fertige Oberflaeche warten, nicht nur auf das Geruest: sonst
+    // klickt der naechste Schritt in eine leere Seite.
+    await page.waitForSelector('[data-area]', { timeout: 20000 }).catch(() => {});
+  }
   return antwort;
 }
 
-module.exports = { anmelden, vorbereiten, zuruecksetzen, MAIL, PASS, NAME };
+module.exports = { anmelden, vorbereiten, zuruecksetzen, mitZeitgrenze, inhaltAbwarten, MAIL, PASS, NAME };

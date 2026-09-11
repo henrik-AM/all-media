@@ -30,3 +30,6 @@ Thumbs.db
 
 # Zwischenablage der Testmedien (tools/testmedien.js)
 .medien-cache/
+
+# Sperre des Gesamtlaufs (app/test/alles.js)
+.gesamtlauf-laeuft.json

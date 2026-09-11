@@ -25,6 +25,7 @@ import { compactNumber } from '../../lib/zahlen';
 import { haptic } from '../../lib/haptics';
 import { Videoflaeche, VideoSteuerung } from '../../components/Videoflaeche';
 import { useAktionen } from '../../lib/useAktionen';
+import { useImpressionen } from '../../lib/useImpressionen';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -107,13 +108,25 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   const [stumm, setStumm] = useState(true);
 
   const sichtbarkeit = useRef({ itemVisiblePercentThreshold: 60 });
-  const sichtbarWechsel = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    const erstes = viewableItems[0]?.item as Video | undefined;
-    if (erstes) {
-      setSichtbar(erstes.id);
-      setPause(false);
-    }
-  }, []);
+
+  /*
+   * Dieselbe Meldung, zwei Aufgaben: das sichtbare Reel laeuft an, und die
+   * Sichtung wird mitgeschrieben. Die Schwelle ist bewusst dieselbe — was
+   * anlaeuft, gilt als gesehen, sonst gaebe es zwei Wahrheiten darueber,
+   * was "zu sehen" heisst. Siehe lib/impressionen.ts.
+   */
+  const { sichtbarWechsel: impressionWechsel } = useImpressionen('reels');
+  const sichtbarWechsel = useCallback(
+    (info: { viewableItems: ViewToken[] }) => {
+      const erstes = info.viewableItems[0]?.item as Video | undefined;
+      if (erstes) {
+        setSichtbar(erstes.id);
+        setPause(false);
+      }
+      impressionWechsel(info);
+    },
+    [impressionWechsel]
+  );
 
   // Beim ersten Aufbau ist noch nichts gescrollt, also meldet die Liste auch
   // nichts — ohne diese Zeile bliebe das oberste Reel stehen.

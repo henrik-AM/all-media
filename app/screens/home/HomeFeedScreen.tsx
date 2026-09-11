@@ -18,6 +18,7 @@ import { Umfrage } from '../../types';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useAktionen } from '../../lib/useAktionen';
+import { useImpressionen } from '../../lib/useImpressionen';
 import { Post, Story } from '../../types';
 
 interface Props {
@@ -34,6 +35,8 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
   const { istRepostet, umschalten } = useReposts();
   // Was hier passiert, geht in die Datenbank — siehe lib/useAktionen.ts.
   const aktion = useAktionen(onNotice);
+  // Und was gesehen wird, ebenfalls — siehe lib/useImpressionen.ts.
+  const { sichtbarWechsel, sichtbarkeit } = useImpressionen('feed');
   // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
   // damit sie auch im Profilraster auftauchen.
   const { eigeneBeitraege, folgtPerson, folgenUmschalten } = useProfil();
@@ -334,6 +337,13 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={<StoryRail stories={stories} onPress={onOpenStory} />}
+        /*
+         * Mitschreiben, was tatsaechlich gesehen wurde — die Grundlage des
+         * spaeteren Feed-Rankings. Sichtbar heisst hier 60 Prozent der
+         * Flaeche und mindestens eine Sekunde; siehe lib/impressionen.ts.
+         */
+        onViewableItemsChanged={sichtbarWechsel}
+        viewabilityConfig={sichtbarkeit}
       />
 
       <CommentSheet

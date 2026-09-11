@@ -11,6 +11,23 @@
  *   Communitys  -> Home | Chats | Suchen | Profil
  *   Einstellungen hat im Prototyp keine obere Leiste.
  */
+/*
+ * Die Passwortregel kommt aus gemeinsam/passwort.js — derselben Datei, die
+ * die App benutzt. Sie stand vorher dreimal im Code und war dreimal falsch:
+ * sechs Zeichen beim Anlegen, acht beim Ändern, zehn bei Supabase.
+ *
+ * Der Rückfall greift nur, wenn das Skript nicht geladen ist; dann prüft
+ * immer noch Supabase, nur eben mit einer englischen Meldung.
+ */
+const PASSWORT_REGEL = window.Passwort
+  ? window.Passwort.REGEL_TEXT
+  : 'Mindestens 10 Zeichen, davon ein kleiner, ein großer Buchstabe und eine Ziffer';
+const passwortPruefen = (wert) => (window.Passwort ? window.Passwort.pruefe(wert) : null);
+
+// Dasselbe für die Telefonnummer — gemeinsam/telefon.js, siehe index.html.
+const TELEFON_REGEL = window.Telefon ? window.Telefon.REGEL_TEXT : 'Zum Beispiel +49 151 2345678';
+const telefonPruefen = (wert) => (window.Telefon ? window.Telefon.pruefe(wert) : null);
+
 const NAV = {
   messenger: {
     label: 'Messenger',
@@ -130,6 +147,12 @@ const state = {
   /** Der in der Kamera gewählte Filter. */
   kameraFilter: 'keiner',
   stories: [],
+  /*
+   * Die Storyleiste des Videos-Bereichs. Sie zeigt die gefolgten Profile,
+   * `stories` die Kontakte — so trennt es das Handbuch. Bis zum 07.09.2026
+   * stand in beiden Bereichen dieselbe Liste.
+   */
+  storiesVideos: [],
   contacts: [],
   communities: [],
   videos: [],
@@ -277,7 +300,10 @@ function eigenerAvatar(me, size = 44, extra = '') {
  * nichts mehr aus.
  */
 function eigenerAvatarMitStory(me, size = 88) {
-  const story = eigeneStoryLaden();
+  // Ob eine eigene Story laeuft, steht in der geladenen Leiste — bis zum
+  // 09.09.2026 stand es im Browserspeicher, und der wusste nichts von
+  // Storys, die auf dem Handy entstanden oder abgelaufen waren.
+  const story = (state.stories || []).find((s) => s.own);
   if (!story?.mediaUri) return eigenerAvatar(me, size, 'has-status');
 
   return `<button class="profilstory" data-eigene-story aria-label="Deine Story ansehen">
@@ -363,6 +389,71 @@ async function api(pfad, koerper) {
   }
 }
 
+/*
+ * Den Verlauf eines Chats holen — und aufschliessen, was verschluesselt ist.
+ *
+ * Es gibt diesen Helfer, weil der Verlauf an vier Stellen geholt wird: beim
+ * Oeffnen des Chats, bei der Suche darin, beim Export und in den
+ * Chateinstellungen. Ohne ihn haette man das Aufschliessen viermal
+ * hingeschrieben und beim fuenften Mal vergessen — und dort staende dann
+ * „Auf diesem Geraet nicht lesbar" an einer Nachricht, die sehr wohl lesbar
+ * ist.
+ *
+ * Ab hier steht der Klartext wieder in `text`. Alles danach — Blasen,
+ * Vorschau, Suche, Export — rechnet damit, als haette es nie eine Chiffre
+ * gegeben.
+ */
+/*
+ * Die Vorschauen der Chatliste aufschliessen.
+ *
+ * Der Server schickt sie leer mit — er hat den geheimen Schluessel nicht.
+ * Ohne diesen Schritt stuende in der Liste bei jedem verschluesselten Chat
+ * eine leere Zeile.
+ */
+function vorschauenOeffnen(chats) {
+  if (!window.KryptoWeb) return chats;
+  for (const c of chats || []) {
+    if (!c.previewKrypto || !Number(c.previewKrypto.krypto)) continue;
+    // Schon geoeffnet: `filteredChats` laeuft bei jedem Zeichnen, und
+    // zweimal dasselbe zu entschluesseln waere Arbeit ohne Ergebnis.
+    if (c._vorschauOffen) continue;
+    /*
+     * Ohne Schluessel gaebe `oeffnen` hier „Auf diesem Geraet nicht lesbar"
+     * zurueck — und mit dem Merker davor waere das der Endstand, obwohl der
+     * Schluessel eine Sekunde spaeter da ist. Also erst merken, wenn er da
+     * ist; bis dahin bleibt die Vorschau, wie sie war.
+     */
+    if (!window.KryptoWeb.bereit()) continue;
+    c._vorschauOffen = true;
+    const gedeutet = window.KryptoWeb.oeffnen({ ...c.previewKrypto, text: '' });
+    c.preview = gedeutet.text;
+    // Das Schloss in der Chatliste haengt daran, nicht an einer Vermutung.
+    c.verschluesselt = true;
+  }
+  return chats;
+}
+
+async function nachrichtenHolen(chatId) {
+  const res = await fetch(`/api/messages/${chatId}`);
+  const verlauf = await res.json();
+  return window.KryptoWeb ? window.KryptoWeb.stapelOeffnen(verlauf) : verlauf;
+}
+
+/*
+ * Einen Text fuer einen Chat verschliessen und den Koerper der Sendeanfrage
+ * bauen.
+ *
+ * Geht es nicht — Gruppe, Gegenueber ohne Geraet, kein Schluessel —, steht
+ * der Klartext im Koerper wie vor Schema 31. Das ist kein Fehlerfall: die
+ * Nachricht kommt an, und die Oberflaeche behauptet dann auch nichts ueber
+ * Verschluesselung.
+ */
+async function sendeKoerper(chatId, text, weiteres = {}) {
+  const paket = window.KryptoWeb ? await window.KryptoWeb.verschliessen(chatId, text) : null;
+  if (!paket) return { text, ...weiteres };
+  return { text: '', ...paket, ...weiteres };
+}
+
 async function bootstrap() {
   let data;
 
@@ -395,17 +486,25 @@ async function bootstrap() {
     return;
   }
 
-  Object.assign(state, data);
+  /*
+   * Den Geraetschluessel dieses Browsers anmelden — vor `Object.assign`,
+   * weil `vorschauenOeffnen` gleich darunter ihn schon braucht.
+   *
+   * Am 07.09.2026 stand hier kurz die scheinbar bessere Fassung: die
+   * Anmeldung nicht abwarten und nachtraeglich neu zeichnen. Der Gedanke war
+   * richtig — der Schluessel wird erst beim Lesen gebraucht, nicht damit die
+   * Seite aufgeht —, die Folge war es nicht. Der Rundlauf lief dann in das
+   * Fenster, in dem die Pruefläufe auf „networkidle" warten, und vier Laeufe
+   * kippten mit Zeitueberschreitung. Erwartet man ihn hier, ist er vorher
+   * fertig.
+   *
+   * Geht es nicht, laeuft alles weiter wie vor Schema 31: im Klartext, ohne
+   * Schloss. Eine Seite, die wegen der Verschluesselung gar nicht erst
+   * aufgeht, waere der schlechtere Zustand.
+   */
+  if (window.KryptoWeb) await window.KryptoWeb.anmelden();
 
-  // Die eigene Story liegt nur im Browser - nach dem Laden wieder einsetzen.
-  const eigene = eigeneStoryLaden();
-  if (eigene) {
-    const s = state.stories.find((x) => x.own);
-    if (s) {
-      s.mediaUri = eigene.mediaUri;
-      s.aufgenommen = eigene.aufgenommen;
-    }
-  }
+  Object.assign(state, data);
 
   applyTheme();
   document.body.classList.remove('is-startet');
@@ -702,6 +801,14 @@ function verlasseExplorer() {
    */
   state.settingsAus = null;
   state.settingsPunkt = null;
+  /*
+   * Auch der Sprung zum Abschnitt. Henrik am 07.09.2026: "danach normaler
+   * Einstellungen-Eintritt soll Standardseite laden (aktuell manchmal noch
+   * alter Messenger-Screen)." Genau das war der Grund — settingsSprung
+   * ueberlebte den Ausstieg ueber die untere Leiste und liess die
+   * Einstellungen beim naechsten Oeffnen wieder beim Messenger anfangen.
+   */
+  state.settingsSprung = null;
   state.commProfilView = null;
   state.sammlung = null;
   /*
@@ -727,6 +834,9 @@ let renderLauf = 0;
 
 function render() {
   renderLauf++;
+  // Die Kamera laeuft weiter, solange niemand sie abschaltet — auch dann,
+  // wenn ihre Seite laengst weggezeichnet ist. Am Handy bliebe das Licht an.
+  kameraStromStoppen();
   renderBottomNav();
   renderTopBar();
 
@@ -783,6 +893,14 @@ function render() {
 
 /* ---------------------------------------------------------- chats view */
 function filteredChats() {
+  /*
+   * Hier und nicht an den sechs Stellen, an denen `state.chats` neu gesetzt
+   * wird. Dort haette man es beim siebten Mal vergessen — und dann stuende
+   * in genau einem Zustand der Oberflaeche eine leere Vorschau, ohne dass
+   * ein Pruefaluf etwas zu melden haette.
+   */
+  vorschauenOeffnen(state.chats);
+
   const q = state.query.trim().toLowerCase();
   const weg = state.archiviert || [];
   return state.chats.filter((c) => {
@@ -1092,29 +1210,11 @@ function chatRow(c) {
  * braucht es keinen Kamerazugriff ueber getUserMedia und keine Berechtigung
  * im Voraus.
  *
- * Die Aufnahme bleibt im Browser (localStorage), nicht auf dem Server: sie
- * gehoert nur diesem einen Nutzer, und der Server teilt seinen Speicher mit
- * allen. Vorher auf 1200 Pixel verkleinert, sonst sprengt sie den Platz.
+ * Die Aufnahme geht seit dem 09.09.2026 an den Server (/api/hochladen) und
+ * von dort in die Datenbank. Vorher lag sie nur im Browserspeicher: sie war
+ * auf dem Handy nie zu sehen, ueberlebte jedes Loeschen und stand nach dem
+ * naechsten Start wieder da. Vor dem Hochladen auf 1200 Pixel verkleinert.
  */
-const STORY_SPEICHER = 'allmedia.eigeneStory';
-
-function eigeneStoryLaden() {
-  try {
-    const roh = localStorage.getItem(STORY_SPEICHER);
-    return roh ? JSON.parse(roh) : null;
-  } catch {
-    return null;
-  }
-}
-
-function eigeneStorySichern(daten) {
-  try {
-    if (daten) localStorage.setItem(STORY_SPEICHER, JSON.stringify(daten));
-    else localStorage.removeItem(STORY_SPEICHER);
-  } catch {
-    /* Speicher voll oder gesperrt - die Story gilt dann nur fuer diese Sitzung */
-  }
-}
 
 /** Bild auf hoechstens 1200 Pixel bringen und als Datenadresse zurueckgeben. */
 function bildVerkleinern(datei) {
@@ -1225,18 +1325,111 @@ async function aufnahmeHolen(art = 'photo', ausGalerie = false) {
   }
 }
 
-/** Ein fertiges Bild als eigene Story setzen. */
+/*
+ * Ein fertiges Bild als eigene Story setzen.
+ *
+ * ZWEI DINGE WAREN HIER FALSCH (bis 09.09.2026)
+ *
+ * 1. Die Story kam nie in der Datenbank an. Sie ging in den `localStorage`
+ *    dieses einen Browsers, und darueber stand „Deine Story ist online".
+ *    Niemand sonst konnte sie sehen. Denselben Fehler hatte die App bis zum
+ *    01.09.2026; dort wurde er behoben, hier nicht.
+ *
+ * 2. Sie erschien in beiden Leisten — Messenger und Videos —, weil die
+ *    eigene Kachel ueberall unbesehen vorne dranhing.
+ *
+ * Henrik am 07.09.2026: „Storys nicht mehr bereichsuebergreifend
+ * (Messenger/Videos strikt getrennt); beim Posten fragen ob uebergreifend
+ * teilen." Gefragt wird jetzt — aber nur, wenn es etwas zu entscheiden gibt:
+ * steht die Story-Sichtbarkeit nicht auf „Alle", kann sie ohnehin nicht in
+ * einen Bereich, in dem einem auch Fremde folgen. Eine Frage mit nur einer
+ * moeglichen Antwort ist keine Frage.
+ *
+ * Gleiche Regel in App.tsx (`storyAufgenommen` / `storyPosten`).
+ */
 function alsStorySetzen(bild) {
-  const eigene = { mediaUri: bild, aufgenommen: Date.now() };
-  eigeneStorySichern(eigene);
+  if (sicht('story').stufe !== 'alle') return storyPosten(bild, false);
 
-  const s = state.stories.find((x) => x.own);
-  if (s) {
-    s.mediaUri = eigene.mediaUri;
-    s.aufgenommen = eigene.aufgenommen;
-    s.viewed = false;
-  }
-  toast('Deine Story ist online');
+  openSheet(
+    'Wo soll die Story stehen?',
+    `<div class="sheet__body">
+       <div class="aufnahme__vorschau" style="background-image:url(${bild})"></div>
+       <div class="sheet__hint">
+         Im Messenger sehen sie deine Kontakte, unter Videos alle, die dir folgen.
+       </div>
+       <button class="item" data-wo="messenger">
+         <span class="item__icon">${ICONS.chat}</span>
+         <span class="item__label">Nur im Messenger</span>
+         <span class="row__chevron">${ICONS.chevron}</span>
+       </button>
+       <button class="item" data-wo="beides">
+         <span class="item__icon">${ICONS.play}</span>
+         <span class="item__label">Auch unter Videos</span>
+         <span class="row__chevron">${ICONS.chevron}</span>
+       </button>
+     </div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-wo]').forEach((b) =>
+        b.addEventListener('click', () => {
+          close();
+          storyPosten(bild, b.dataset.wo === 'beides');
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/**
+ * Die Story wirklich abschicken: erst die Aufnahme in den Speicher, dann die
+ * Zeile in die Datenbank.
+ *
+ * Erst hochladen, dann anlegen — genau wie `storyAnlegen` in
+ * app/lib/useAktionen.ts. Was hier vorliegt, ist eine Datenadresse
+ * (`data:image/jpeg;base64,…`) aus `bildVerkleinern`. Stuende die in der
+ * Datenbank, waere die Zeile ein halbes Megabyte gross und die App saehe an
+ * der Stelle nichts.
+ */
+async function storyPosten(bild, inVideos) {
+  const hoch = await api('/api/hochladen', { ordner: 'stories', aufnahme: bild });
+  if (!hoch.ok) return toast(hoch.error || 'Die Aufnahme ließ sich nicht speichern');
+
+  const antwort = await api('/api/stories', {
+    mediaUrl: hoch.url,
+    mediaTyp: 'image',
+    inVideos,
+  });
+  if (!antwort.ok) return toast(antwort.error || 'Die Story ließ sich nicht anlegen');
+
+  /*
+   * Der Server schickt beide Leisten frisch zurueck. Sie zu uebernehmen ist
+   * kuerzer als zu raten, wie die eigene Kachel jetzt aussieht — und es ist
+   * der einzige Weg, an dem sich die Trennung ablesen laesst: unter Videos
+   * steht die Story nur, wenn eben „Auch unter Videos" gewaehlt wurde.
+   */
+  state.stories = antwort.stories || state.stories;
+  state.storiesVideos = antwort.storiesVideos || state.storiesVideos;
+
+  toast(inVideos ? 'Deine Story ist online — auch unter Videos' : 'Deine Story ist online');
+  render();
+}
+
+/*
+ * Eigene Story loeschen — in der Datenbank, nicht nur auf dem Bildschirm.
+ *
+ * Die Plus-Kachel ohne Bild hat keine Story dahinter; da gibt es nichts zu
+ * loeschen. Nach dem Loeschen kommen beide Leisten frisch vom Server, sonst
+ * bliebe die Kachel unter Videos stehen.
+ */
+async function storyLoeschen(id) {
+  if (!id || id === 'eigene') return;
+
+  const antwort = await api(`/api/stories/${encodeURIComponent(id)}/loeschen`, {});
+  if (!antwort.ok) return toast(antwort.error || 'Die Story ließ sich nicht löschen');
+
+  state.stories = antwort.stories || state.stories;
+  state.storiesVideos = antwort.storiesVideos || state.storiesVideos;
+  toast('Deine Story wurde gelöscht');
   render();
 }
 
@@ -1268,7 +1461,17 @@ function aufnahmeMenue(bild) {
     { key: 'insight', label: 'Als Insight senden', icon: 'flash' },
     { key: 'story', label: 'Zu deiner Story hinzufügen', icon: 'camera' },
     { key: 'chat', label: 'An einen Chat senden', icon: 'chat' },
-    { key: 'beitrag', label: 'Als Beitrag veröffentlichen', icon: 'image' },
+    /*
+     * Hier stand "Als Beitrag veröffentlichen".
+     *
+     * Henrik, 07.09.2026: "Beiträge nur Videos, nicht Messenger — Messenger
+     * privat/nummerbasiert, Videos öffentlich." Das ist die Trennlinie
+     * zwischen den beiden Bereichen. Ein Knopf, der aus der privaten Kamera
+     * heraus etwas öffentlich stellt, führt über diese Linie, und zwar aus
+     * Versehen: er stand zwischen drei Zielen, die alle im Messenger bleiben.
+     * Beiträge entstehen im Videos-Bereich über das Erstellen-Blatt.
+     * Gleiche Regel in app/screens/messenger/CameraScreen.tsx.
+     */
   ];
 
   openSheet(
@@ -1295,8 +1498,7 @@ function aufnahmeMenue(bild) {
           close();
           if (b.dataset.verwenden === 'insight') return openInsightSenden(bild);
           if (b.dataset.verwenden === 'story') return alsStorySetzen(bild);
-          if (b.dataset.verwenden === 'chat') return aufnahmeAnChat(bild);
-          aufnahmeAlsBeitrag(bild);
+          aufnahmeAnChat(bild);
         })
       );
     },
@@ -1345,61 +1547,86 @@ function aufnahmeAnChat(bild) {
   );
 }
 
-/** Aufnahme als Beitrag veroeffentlichen - Beschreibung und Ort dazu. */
-function aufnahmeAlsBeitrag(bild) {
-  openFormular(
-    'Neuer Beitrag',
-    [
-      { key: 'beschreibung', label: 'Beschreibung', typ: 'mehrzeilig', pflicht: true },
-      { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
-    ],
-    async (werte) => {
-      const res = await fetch('/api/eigene/beitrag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...werte, format: 'hoch' }),
-      });
-      const daten = await res.json();
-      if (!daten.ok) return daten.error;
+/*
+ * Hier stand `aufnahmeAlsBeitrag` — der Weg von der Messenger-Kamera in einen
+ * öffentlichen Beitrag. Er ist am 07.09.2026 entfallen; die Begründung steht
+ * oben bei `aufnahmeMenue`. Beiträge entstehen im Videos-Bereich.
+ */
 
-      eigenesMediumSichern((daten.beitrag || daten.video || daten.clip).id, bild);
-      state.area = 'videos';
-      state.sub.videos = 'home';
-      await bootstrap();
-      toast('Beitrag veröffentlicht');
-    },
-    'Veröffentlichen'
-  );
+/*
+ * Beide Leisten zusammen, ohne Doppelte. Wer sowohl Kontakt ist als auch
+ * gefolgt wird, steht in beiden Listen — gesucht wird eine Story aber nur
+ * einmal.
+ */
+function alleStorys() {
+  const raus = [];
+  const gesehen = new Set();
+  for (const s of [...state.stories, ...state.storiesVideos]) {
+    if (gesehen.has(s.id)) continue;
+    gesehen.add(s.id);
+    raus.push(s);
+  }
+  return raus;
 }
 
-function storyRail() {
-  return `<div class="storyrail">${state.stories.map(storyItem).join('')}</div>`;
+/*
+ * Die Story-Leiste — eine Kachel je PERSON, nicht je Story.
+ *
+ * Henrik, 07.09.2026: "Story-Kreis-Logik (grau=gesehen, farbig=neu, ohne=keine
+ * Story) fehlerhaft." Drei Zustände, und keiner davon stimmte hier ganz:
+ *
+ *  * Wer drei Storys hatte, stand dreimal in der Reihe, und jede Kachel färbte
+ *    sich für sich. Derselbe Name einmal grau, daneben zweimal bunt — daran
+ *    fällt die Logik als kaputt auf. Jetzt: bunt, solange auch nur eine Story
+ *    der Person ungesehen ist, grau erst, wenn alle gesehen sind.
+ *
+ *  * Die eigene, leere Kachel trug den grauen Ring der gesehenen Story. Grau
+ *    heißt "schon angesehen"; da war aber nie etwas. Der dritte Zustand
+ *    verlangt gar keinen Ring, und den bekommt sie jetzt.
+ *
+ *  * Fremde Kacheln zeigten immer die Initialen. In der App steht dort das
+ *    Bild der Story — dieselbe Leiste sah in App und Website verschieden aus.
+ *
+ * Gleiche Regel in app/components/StoryRail.tsx.
+ */
+function storyRail(liste) {
+  const nachPerson = new Map();
+  for (const s of liste || state.stories) {
+    if (!nachPerson.has(s.userId)) nachPerson.set(s.userId, []);
+    nachPerson.get(s.userId).push(s);
+  }
+  // Die Map behält die Reihenfolge des Eintragens: die eigene Kachel bleibt
+  // links, die fremden dahinter so, wie der Server sie geliefert hat.
+  return `<div class="storyrail">${[...nachPerson.values()].map(storyItem).join('')}</div>`;
 }
 
-function storyItem(s) {
+function storyItem(storys) {
+  const ungesehen = storys.find((x) => !x.viewed);
+  const s = ungesehen || storys[storys.length - 1];
   const u = user(s.userId);
-  if (s.own) {
-    // Solange nichts aufgenommen ist, laedt das Plus dazu ein. Danach
-    // verhaelt sich die eigene Story wie jede andere.
-    const gefuellt = !!s.mediaUri;
+  // Ein Bild hat die Kachel, sobald irgendeine der Storys eines hat — eine
+  // Person mit Story soll nie aussehen wie eine ohne.
+  const bild = s.mediaUri || (storys.find((x) => x.mediaUri) || {}).mediaUri;
+  const kern = bild
+    ? `<div class="story__inner" style="background-image:url(${bild});background-size:cover;background-position:center"></div>`
+    : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
+
+  // Der dritte Zustand: keine Story, kein Ring. Es gibt ihn nur bei der
+  // eigenen Kachel — fremde ohne Story stehen gar nicht erst in der Leiste.
+  if (s.own && !bild) {
     return `
       <button class="story" data-story="${s.id}">
-        <div class="story__ring ${gefuellt ? '' : 'is-viewed story__add'}">
-          <div class="story__inner" style="${
-            gefuellt
-              ? `background-image:url(${s.mediaUri});background-size:cover;background-position:center`
-              : `background:${farbe(u.color)}`
-          }">${gefuellt ? '' : esc(u.initials)}</div>
-          ${gefuellt ? '' : `<span class="story__add-badge">${ICONS.plus}</span>`}
+        <div class="story__ring is-ohne story__add">
+          ${kern}
+          <span class="story__add-badge">${ICONS.plus}</span>
         </div>
         <div class="story__name">${esc(s.name)}</div>
       </button>`;
   }
+
   return `
     <button class="story" data-story="${s.id}">
-      <div class="story__ring ${s.viewed ? 'is-viewed' : ''}">
-        <div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
-      </div>
+      <div class="story__ring ${ungesehen ? '' : 'is-viewed'}">${kern}</div>
       <div class="story__name">${esc(s.name)}</div>
     </button>`;
 }
@@ -1407,8 +1634,15 @@ function storyItem(s) {
 function bindStoryRail() {
   main.querySelectorAll('[data-story]').forEach((el) =>
     el.addEventListener('click', () => {
-      const s = state.stories.find((x) => x.id === el.dataset.story);
-      if (s.own && !s.mediaUri) return openCamera();
+      const s = alleStorys().find((x) => x.id === el.dataset.story);
+      /*
+       * Henrik, 07.09.2026: "Story-Plus-Button zeigt unnötig „Was möchtest du
+       * damit machen"-Dialog (nur bei normaler Kamera nötig)." Wer auf das
+       * Plus an der eigenen Story tippt, hat das Ziel schon genannt — die
+       * Kamera fragt danach nicht noch einmal.
+       * Gleiche Regel in app/App.tsx (`zielStory`).
+       */
+      if (s.own && !s.mediaUri) return openCamera(null, { zielStory: true });
       openStory(s.id);
     })
   );
@@ -2103,13 +2337,33 @@ function openNewGroup() {
   });
 }
 
+/*
+ * Kontakt hinzufuegen — Telefonnummer oder QR-Code.
+ *
+ * Henrik am 07.09.2026: „Kontakt hinzufügen nur über Telefonnummer/QR-Code,
+ * nicht Username."
+ *
+ * Der Benutzername ist damit als Weg raus. Er stand hier gleichberechtigt
+ * daneben („@greta"): jeder war ueber einen Namen auffindbar, den er sich
+ * selbst gibt und der in seinem Profil steht. Eine Nummer kennt nur, wem man
+ * sie gegeben hat.
+ *
+ * Das Feld allein waere aber keine Regel — der Riegel steht im Server
+ * (`/api/contacts` in web/server/app.js). Gleiche Regel in der App:
+ * app/components/AddContactSheet.tsx.
+ */
 function openAddContact() {
   openSheet(
     'Kontakt hinzufügen',
     `<div class="sheet__field">
-      <input id="contactHandle" placeholder="Benutzername oder Telefonnummer" autocomplete="off" />
+      <input id="contactHandle" placeholder="Telefonnummer" inputmode="tel" autocomplete="off" />
     </div>
-    <div class="sheet__hint">Noch keine Kontakte: @greta, @hakan, @ida — oder deren Nummer, z. B. +49 174 8901234</div>
+    <div class="sheet__hint">${esc(window.Telefon.REGEL_TEXT)}</div>
+    <div class="qrReihe">
+      <button class="prof__btn" id="contactQrZeigen">${ICONS.qr} Mein Code</button>
+      <button class="prof__btn" id="contactQrScannen">${ICONS.scan} Code scannen</button>
+    </div>
+    <div class="qrFlaeche" id="contactQrFlaeche" hidden></div>
     <div class="sheet__field">
       <label class="sheet__label" for="contactMsg">Nachricht (freiwillig)</label>
       <textarea id="contactMsg" rows="3" placeholder="Kurz schreiben, wer du bist …"></textarea>
@@ -2124,11 +2378,16 @@ function openAddContact() {
     (sheet, close) => {
       const input = sheet.querySelector('#contactHandle');
       const msg = sheet.querySelector('#contactMsg');
+      const flaeche = sheet.querySelector('#contactQrFlaeche');
       input.focus();
 
       const submit = async () => {
         const handle = input.value.trim();
-        if (!handle) return toast('Bitte Benutzername oder Telefonnummer eingeben');
+        if (!handle) return toast('Bitte eine Telefonnummer eingeben');
+
+        // Dieselbe Regel wie in der App und im Server — gemeinsam/telefon.js.
+        const grund = window.Telefon.pruefe(handle);
+        if (grund) return toast(grund);
 
         const nachricht = msg.value.trim();
         const res = await fetch('/api/contacts', {
@@ -2152,12 +2411,154 @@ function openAddContact() {
         else if (result.chat) openChat(result.chat.id);
       };
 
+      /*
+       * Der eigene Code. Das Bild zeichnet der Server (/api/qr.svg) — die
+       * Nummer steht dort schon und muss dafuer nicht erst in den Browser.
+       * Bleibt das <img> leer, hat der Server einen Grund geschickt; ihn
+       * unsichtbar zu verschlucken hiesse, dass ein weisses Feld dasteht.
+       */
+      sheet.querySelector('#contactQrZeigen').addEventListener('click', async () => {
+        if (!flaeche.hidden) {
+          flaeche.hidden = true;
+          flaeche.innerHTML = '';
+          return;
+        }
+        const res = await fetch('/api/qr.svg');
+        if (!res.ok || !(res.headers.get('content-type') || '').includes('svg')) {
+          const grund = await res.json().catch(() => null);
+          return toast((grund && grund.error) || 'Dein Code lässt sich gerade nicht zeigen');
+        }
+        flaeche.innerHTML = await res.text();
+        flaeche.hidden = false;
+      });
+
+      sheet.querySelector('#contactQrScannen').addEventListener('click', async () => {
+        const text = await qrScannerOeffnen();
+        if (!text) return;
+        const nummer = window.QrKontakt.nummerAus(text);
+        // Ein fremder Code — Fahrkarte, Werbeplakat — ist kein Fehler des
+        // Nutzers, nur der falsche Code.
+        if (!nummer) return toast('Das ist kein All-Media-Code');
+        input.value = nummer;
+        submit();
+      });
+
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') msg.focus();
       });
       sheet.querySelector('#contactAdd').addEventListener('click', submit);
     }
   );
+}
+
+/*
+ * Einen QR-Code mit der Kamera lesen. Gibt den Inhalt zurueck, oder null,
+ * wenn abgebrochen wurde.
+ *
+ * WARUM jsQR UND NICHT BarcodeDetector
+ *
+ * `BarcodeDetector` steht im Browser bereit und koennte das ohne jede
+ * Bibliothek — aber nur in Chrome. Safari kennt ihn nicht, und Henrik prueft
+ * die Website auf dem iPhone. Ein Weg, der auf dem Geraet des Nutzers nicht
+ * funktioniert, ist kein Weg. jsQR (Apache-2.0, liegt als public/jsQR.js
+ * daneben) rechnet es selbst und laeuft ueberall.
+ *
+ * Die 250 KB werden erst geladen, wenn wirklich gescannt wird — sie beim
+ * Seitenstart mitzuschicken hiesse, dass jeder Aufruf der Startseite einen
+ * Decoder mitbringt, den fast niemand braucht.
+ *
+ * Gegenstueck in der App: app/components/QrScanner.tsx, dort macht das
+ * `expo-camera` selbst.
+ */
+let jsQrGeladen;
+
+function jsQrLaden() {
+  if (jsQrGeladen) return jsQrGeladen;
+  jsQrGeladen = new Promise((fertig, fehlgeschlagen) => {
+    if (window.jsQR) return fertig(window.jsQR);
+    const s = document.createElement('script');
+    s.src = '/jsQR.js';
+    s.onload = () => fertig(window.jsQR);
+    s.onerror = () => {
+      // Sonst haengt ein zweiter Versuch fuer immer an der kaputten Zusage.
+      jsQrGeladen = null;
+      fehlgeschlagen(new Error('jsQR konnte nicht geladen werden'));
+    };
+    document.head.appendChild(s);
+  });
+  return jsQrGeladen;
+}
+
+function qrScannerOeffnen() {
+  return new Promise(async (fertig) => {
+    let jsQR;
+    try {
+      jsQR = await jsQrLaden();
+    } catch (fehler) {
+      console.error('QR-Scanner:', fehler.message);
+      toast('Der Scanner lässt sich gerade nicht laden');
+      return fertig(null);
+    }
+
+    let strom = null;
+    let bild = 0;
+
+    const schicht = document.createElement('div');
+    schicht.className = 'qrScanner';
+    schicht.innerHTML =
+      '<video playsinline muted></video>' +
+      '<div class="qrScanner__rahmen"></div>' +
+      '<p class="qrScanner__titel">QR-Code der anderen Person scannen</p>' +
+      `<button class="qrScanner__zu" aria-label="Schließen">${ICONS.close}</button>`;
+    document.body.appendChild(schicht);
+
+    const video = schicht.querySelector('video');
+    const leinwand = document.createElement('canvas');
+    const stift = leinwand.getContext('2d', { willReadFrequently: true });
+
+    const beenden = (ergebnis) => {
+      cancelAnimationFrame(bild);
+      if (strom) strom.getTracks().forEach((spur) => spur.stop());
+      schicht.remove();
+      document.removeEventListener('keydown', taste);
+      fertig(ergebnis);
+    };
+    const taste = (e) => {
+      if (e.key === 'Escape') beenden(null);
+    };
+    document.addEventListener('keydown', taste);
+    schicht.querySelector('.qrScanner__zu').addEventListener('click', () => beenden(null));
+
+    try {
+      // `facingMode: environment` ist die Rueckkamera. Ohne die Angabe nimmt
+      // das Handy die Frontkamera, und man scannt sich selbst.
+      strom = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+    } catch (fehler) {
+      console.error('Kamera:', fehler.message);
+      toast('Ohne Kamerazugriff geht das Scannen nicht');
+      return beenden(null);
+    }
+
+    video.srcObject = strom;
+    await video.play().catch(() => {});
+
+    const schauen = () => {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        leinwand.width = video.videoWidth;
+        leinwand.height = video.videoHeight;
+        stift.drawImage(video, 0, 0, leinwand.width, leinwand.height);
+        const daten = stift.getImageData(0, 0, leinwand.width, leinwand.height);
+        const treffer = jsQR(daten.data, daten.width, daten.height, {
+          inversionAttempts: 'dontInvert',
+        });
+        if (treffer && treffer.data) return beenden(treffer.data);
+      }
+      bild = requestAnimationFrame(schauen);
+    };
+    bild = requestAnimationFrame(schauen);
+  });
 }
 
 /* ------------------------------------------------------------- Anruf */
@@ -2238,11 +2639,14 @@ function openCall(ziel, art) {
               : ''
           }
           <div class="anruf__status" id="anrufStatus">${esc(status)}</div>
-          ${
-            zustand === 'verbunden'
-              ? `<div class="anruf__krypto">${ICONS.lock}<span>Ende-zu-Ende-verschlüsselt</span></div>`
-              : ''
-          }
+          <!--
+            Hier stand bis zum 07.09.2026 "Ende-zu-Ende-verschlüsselt". Das war
+            unzutreffend, und zwar doppelt: verschlüsselt wurde damals nichts,
+            und ein Anruf wird es auch jetzt nicht — Schema 31 nimmt Anrufe
+            ausdrücklich aus. Es gibt an dieser Stelle nicht einmal eine
+            Übertragung. Ein Schloss, das nichts verschließt, ist schlimmer als
+            gar keins, weil sich jemand darauf verlässt.
+          -->
         </div>
 
         ${
@@ -2281,6 +2685,25 @@ function openCall(ziel, art) {
     zustand = 'beendet';
     toast(dauer > 0 ? `Anruf beendet · ${dauerText(dauer)}` : 'Anruf beendet');
     zeichnen();
+
+    /*
+     * Henrik 7.9.: „Anrufe sollen als Chatnachricht protokolliert werden (wie
+     * WhatsApp)." Bei einem Gruppenanruf gibt es keinen Chat zu zweit, deshalb
+     * nur beim Zweiergespräch. Gleiche Stelle in der App: CallScreen.tsx,
+     * `auflegen`.
+     */
+    if (userId) {
+      fetch(`/api/kontakte/${userId}/anruf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ art, dauer, status: dauer > 0 ? 'beendet' : 'verpasst' }),
+      })
+        // Erst danach neu laden, sonst steht der Eintrag zwar in der
+        // Datenbank, aber nicht im Chat, in den man zurückkehrt.
+        .then(() => bootstrap())
+        .catch((f) => console.error('Anruf konnte nicht im Chat vermerkt werden:', f));
+    }
+
     setTimeout(() => {
       overlay.hidden = true;
       overlay.innerHTML = '';
@@ -2333,6 +2756,34 @@ function openCall(ziel, art) {
  *
  * Vorher gaben fast alle Zeilen hier nur "... folgt" aus.
  */
+/*
+ * Der Verschluesselungszustand eines Chats zu zweit — nachgesehen, nicht
+ * behauptet.
+ *
+ * Bis zum 07.09.2026 stand im Kontaktprofil fest "Ende-zu-Ende", ganz gleich
+ * ob etwas verschluesselt war. Genau das war Punkt 11 des Handbuch-Abgleichs:
+ * eine Zusage an den Nutzer, die niemand einloest.
+ *
+ * Jetzt haengt sie an zwei Tatsachen: hat das Gegenueber ein Geraet
+ * angemeldet, und ist es ein Chat zu zweit. Nur dann kann ueberhaupt
+ * verschlossen werden. Geht die Abfrage schief, bleibt es bei "Nicht aktiv" —
+ * nichts zu behaupten ist hier die richtige Antwort auf einen Fehler.
+ */
+async function kryptoZustand(userId, chat) {
+  if (!chat || chat.isGroup || !window.KryptoWeb) return { an: false, fingerabdruck: null };
+  try {
+    const { oeffentlich } = await (await fetch(`/api/krypto/kontakt/${userId}`)).json();
+    const meiner = await window.KryptoWeb.anmelden();
+    return {
+      an: Boolean(meiner && oeffentlich),
+      fingerabdruck: oeffentlich ? window.KryptoWeb.fingerabdruck(oeffentlich) : null,
+    };
+  } catch (fehler) {
+    console.warn('Verschlüsselungszustand unbekannt:', fehler.message);
+    return { an: false, fingerabdruck: null };
+  }
+}
+
 async function openContactProfile(userId) {
   const u = user(userId);
   if (!u) return toast('Diese Person gibt es nicht');
@@ -2341,6 +2792,7 @@ async function openContactProfile(userId) {
   const profil = await (await fetch(`/api/profile/${userId}`)).json().catch(() => ({}));
   let daten = { medien: [], markiert: [], gesamt: 0 };
   if (chat) daten = await (await fetch(`/api/chats/${chat.id}/medien`)).json();
+  const krypto = await kryptoZustand(userId, chat);
 
   const kontakt = state.contacts.find((c) => c.id === userId);
   const gemeinsameGruppen = state.chats.filter((c) => c.isGroup && (c.members || []).includes(userId));
@@ -2375,6 +2827,9 @@ async function openContactProfile(userId) {
       </div>
 
       <div class="kp__aktionen">
+        <!-- Henrik 7.9.: „Kontaktinfo: Button zum direkten Chat-Sprung fehlt."
+             Gleiche Schaltfläche in app/screens/messenger/ContactProfileScreen.tsx. -->
+        <button data-kp="chat">${ICONS.chat}<span>Nachricht</span></button>
         <button data-kp="audio">${ICONS.phone}<span>Audioanruf</span></button>
         <button data-kp="video">${ICONS.video}<span>Videoanruf</span></button>
         <button data-kp="search">${ICONS.search}<span>Suchen</span></button>
@@ -2399,7 +2854,7 @@ async function openContactProfile(userId) {
           <button class="switch ${state.chatGesperrt?.[userId] ? 'is-on' : ''}" id="kpSperre" aria-label="Chat sperren"><span class="switch__knob"></span></button>
         </div>
         ${zeile('Erweiterter Chat-Datenschutz', einstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' }))}
-        ${zeile('Verschlüsselung', 'Ende-zu-Ende')}
+        ${zeile('Verschlüsselung', krypto.an ? 'Ende-zu-Ende' : 'Nicht aktiv')}
       </div>
 
       <div class="kp__liste">
@@ -2449,18 +2904,41 @@ async function openContactProfile(userId) {
       'Kontakt bearbeiten',
       [
         { key: 'name', label: 'Angezeigter Name', wert: u.name, pflicht: true },
-        { key: 'notiz', label: 'Notiz (nur für dich)' },
+        {
+          key: 'notiz',
+          label: 'Notiz (nur für dich)',
+          wert: (state.contacts || []).find((k) => k.id === userId)?.notiz || '',
+        },
       ],
-      ({ name }) => {
-        // Der angezeigte Name gilt nur hier - er aendert nichts am Profil
-        // der anderen Person.
-        state.users[userId] = { ...u, name };
-        state.chats = state.chats.map((c) => (c.userId === userId ? { ...c, name } : c));
-        toast('Kontakt gespeichert');
-        openContactProfile(userId);
+      ({ name, notiz }) => {
+        /*
+         * Henrik 7.9.: „Kontaktinfo-Änderungen (z.B. Name) speichern/
+         * synchronisieren nicht."
+         *
+         * Hier standen zwei Zuweisungen auf state — der Name war nach dem
+         * naechsten Laden wieder weg und auf dem Telefon nie da. Jetzt geht er
+         * nach contacts.spitzname (Schema 33) und kommt beim naechsten
+         * Bootstrap fuer jedes Geraet zurueck. Der angezeigte Name gilt weiter
+         * nur fuer mich - am Profil der anderen Person aendert er nichts.
+         *
+         * Gleiche Regel in app/screens/messenger/ContactProfileScreen.tsx.
+         */
+        void (async () => {
+          const res = await fetch(`/api/kontakte/${userId}/bearbeiten`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ spitzname: name, notiz: notiz || '' }),
+          });
+          const antwort = await res.json();
+          if (!antwort.ok) return toast(antwort.error);
+          // Neu laden, weil der Name auch in Chatliste und Chatkopf steht.
+          await bootstrap();
+          toast('Kontakt gespeichert');
+          openContactProfile(userId);
+        })();
         return null;
       },
-      'Merken'
+      'Speichern'
     )
   );
 
@@ -2472,10 +2950,21 @@ async function openContactProfile(userId) {
   });
 
   overlay.querySelectorAll('[data-kp]').forEach((b) =>
-    b.addEventListener('click', () => {
+    b.addEventListener('click', async () => {
       const was = b.dataset.kp;
       if (was === 'audio' || was === 'video') return openCall(userId, was);
       if (was === 'search') return openChatSuche(chat);
+      // Sprung in den Chat. Gibt es noch keinen, legt der Server ihn an —
+      // dieselbe chatMit-Regel wie in der App.
+      if (was === 'chat') {
+        schliessen();
+        if (chat) return openChat(chat.id);
+        const res = await fetch(`/api/kontakte/${userId}/chat`, { method: 'POST' });
+        const antwort = await res.json();
+        if (!antwort.ok) return toast(antwort.error);
+        await bootstrap();
+        return openChat(antwort.chatId);
+      }
       schliessen();
       openProfile(userId, 'oeffentlich');
     })
@@ -2546,9 +3035,34 @@ async function kontaktZeile(label, userId, chat, daten) {
     return openEinstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' }, () => openContactProfile(userId));
   }
   if (label === 'Verschlüsselung') {
+    const krypto = await kryptoZustand(userId, chat);
+    /*
+     * Der Text sagt, was gilt — und was nicht gilt. Der zweite Teil ist der
+     * wichtigere: Anrufe und Anhaenge sind nicht verschluesselt, und wer das
+     * hier nicht liest, nimmt es an. Wortgleich mit der App, weil derselbe
+     * Satz auf beiden Seiten dasselbe heissen muss.
+     */
     return openEinstellung({
       label: 'Verschlüsselung',
-      info: 'Nachrichten in diesem Chat sind Ende-zu-Ende verschlüsselt. Niemand außer euch beiden kann sie lesen — auch All Media nicht.',
+      info: krypto.an
+        ? 'Neue Textnachrichten in diesem Chat werden auf deinem Gerät ' +
+          'verschlüsselt und erst auf dem des Gegenübers wieder geöffnet. ' +
+          'All Media kann sie nicht lesen.\n\n' +
+          'Nicht verschlüsselt sind: Anrufe, Bilder und Dateien, und ' +
+          'Nachrichten von vor dem 07.09.2026. Wer mit wem schreibt, ist ' +
+          'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
+          'Verbindung.\n\n' +
+          (krypto.fingerabdruck
+            ? 'Sicherheitsnummer des Gegenübers:\n' +
+              krypto.fingerabdruck +
+              '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
+              'dass niemand dazwischen sitzt.'
+            : '')
+        : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
+          'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +
+          'ohne dessen Schlüssel gibt es niemanden, für den verschlossen ' +
+          'werden könnte.\n\nSobald es so weit ist, gilt sie für neue ' +
+          'Nachrichten von selbst.',
     });
   }
   if (label === 'Kontaktdetails') {
@@ -2576,7 +3090,7 @@ async function kontaktZeile(label, userId, chat, daten) {
 
   if (label === 'Chat exportieren') {
     if (!chat) return toast('Noch kein Chat mit dieser Person');
-    const verlauf = await (await fetch(`/api/messages/${chat.id}`)).json();
+    const verlauf = await nachrichtenHolen(chat.id);
     const text = verlauf
       .map((m) => `[${m.time}] ${m.from === 'me' ? 'Du' : user(m.from).name}: ${m.text || ''}`)
       .join('\n');
@@ -2681,7 +3195,7 @@ function openChatMedien(chat, liste, titel) {
 /** Nachrichten dieses Chats durchsuchen. */
 async function openChatSuche(chat) {
   if (!chat) return toast('Noch kein Chat mit dieser Person');
-  const verlauf = await (await fetch(`/api/messages/${chat.id}`)).json();
+  const verlauf = await nachrichtenHolen(chat.id);
 
   openSheet(
     'Im Chat suchen',
@@ -2818,7 +3332,7 @@ async function openProfile(userId, variante) {
               hat; sonst bliebe der Ring ein Versprechen ohne Inhalt.
             */ ''}
           ${
-            state.stories.some((st) => st.userId === userId)
+            alleStorys().some((st) => st.userId === userId)
               ? `<button class="story__ring" data-profilstory="${esc(userId)}" style="width:88px;height:88px;padding:3px" aria-label="Story von ${esc(profile.name)} ansehen">
                    <span class="story__inner" style="background:${farbe(profile.color)};font-size:28px">${esc(profile.initials)}</span>
                  </button>`
@@ -2888,7 +3402,7 @@ async function openProfile(userId, variante) {
 
     // Punkt 12: der Story-Ring auf einem fremden Profil oeffnet die Story.
     overlay.querySelector('[data-profilstory]')?.addEventListener('click', () => {
-      const story = state.stories.find((st) => st.userId === userId);
+      const story = alleStorys().find((st) => st.userId === userId);
       if (!story) return;
       closeOverlay();
       openStory(story.id);
@@ -3218,11 +3732,17 @@ async function umfragenHolen() {
 function renderHomeFeed() {
   main.innerHTML = `
     <div class="scroll" id="homeScroll">
-      ${storyRail()}
+      ${storyRail(state.storiesVideos)}
       <div class="postlist">${state.posts.map(postCard).join('')}</div>
     </div>`;
 
   bindStoryRail();
+  /*
+   * Mitschreiben, was tatsaechlich gesehen wurde — die Grundlage des
+   * spaeteren Feed-Rankings. Muss nach jedem Neuzeichnen erneut aufgerufen
+   * werden: die Elemente von eben gibt es nach `innerHTML =` nicht mehr.
+   */
+  window.Impressionen?.beobachten();
 
   // Story-Ringe anklickbar
   /*
@@ -3237,7 +3757,7 @@ function renderHomeFeed() {
   main.querySelectorAll('[data-story-user]').forEach((btn) =>
     btn.addEventListener('click', () => {
       const userId = btn.dataset.storyUser;
-      const story = state.stories.find((s) => s.userId === userId);
+      const story = alleStorys().find((s) => s.userId === userId);
       if (story) return openStory(story.id);
       openProfile(userId);
     })
@@ -3364,7 +3884,7 @@ function istEigen(userId) {
 function postCard(p) {
   const u = user(p.userId);
   return `
-    <article class="post" id="post-${p.id}">
+    <article class="post" id="post-${p.id}" data-impression="${p.id}" data-impressionsquelle="feed">
       <header class="post__head">
         ${/*
             Das Attribut heisst bewusst data-story-user und nicht
@@ -3495,6 +4015,7 @@ function renderVideoFeed() {
     `<div class="feed" id="feed">${state.videos.map(videoSlide).join('')}</div>` +
     `<button class="tonknopf" id="tonKnopf" aria-label="Ton an">${ICONS.tonAus}</button>`;
   reelsBeobachten();
+  window.Impressionen?.beobachten();
 
   const tonKnopf = main.querySelector('#tonKnopf');
   tonKnopf.addEventListener('click', () => {
@@ -3694,7 +4215,7 @@ let tonAus = true;
 function videoSlide(v) {
   const u = user(v.userId);
   return `
-    <section class="slide" id="slide-${v.id}">
+    <section class="slide" id="slide-${v.id}" data-impression="${v.id}" data-impressionsquelle="reels">
       <div class="slide__stage" data-reelflaeche="${v.id}">${
         istVideoAdresse(v.mediaUrl)
           ? videoElement(`reel-${v.id}`, v.mediaUrl, v.thumbnail, 'loop muted')
@@ -4551,23 +5072,30 @@ const SETTINGS = [
       {
         label: 'Telefonnummer ändern',
         icon: 'phone',
-        eingabe: [{ key: 'nummer', label: 'Neue Telefonnummer', platzhalter: '+49 …', pflicht: true }],
-        fertig: 'Wir haben dir einen Bestätigungscode geschickt',
+        eingabe: [
+          { key: 'nummer', label: 'Neue Telefonnummer', platzhalter: TELEFON_REGEL, pflicht: true },
+        ],
+        pruefen: (w) => telefonPruefen(w.nummer),
+        aktion: 'telefon',
+        /*
+         * Vorher stand hier „Wir haben dir einen Bestätigungscode geschickt".
+         * Es ging keiner raus — ein SMS-Versand ist bei Supabase nicht
+         * eingerichtet — und gespeichert wurde die Nummer auch nicht.
+         */
+        fertig: 'Telefonnummer gespeichert',
       },
       {
         label: 'Passwort ändern',
         icon: 'lock',
         eingabe: [
           { key: 'alt', label: 'Bisheriges Passwort', pflicht: true },
-          { key: 'neu', label: 'Neues Passwort', pflicht: true },
+          { key: 'neu', label: 'Neues Passwort', platzhalter: PASSWORT_REGEL, pflicht: true },
           { key: 'wdh', label: 'Neues Passwort wiederholen', pflicht: true },
         ],
         pruefen: (w) =>
-          w.neu.length < 8
-            ? 'Das neue Passwort braucht mindestens acht Zeichen'
-            : w.neu !== w.wdh
-            ? 'Die beiden Eingaben stimmen nicht überein'
-            : null,
+          passwortPruefen(w.neu) ||
+          (w.neu !== w.wdh ? 'Die beiden Eingaben stimmen nicht überein' : null),
+        aktion: 'passwort',
         fertig: 'Passwort geändert',
       },
       { label: 'Zwei-Faktor-Anmeldung', icon: 'shield', wahlKey: 'zweiFaktor', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
@@ -4855,6 +5383,28 @@ function sicht(bereich) {
   return state.sichtbarkeit?.[bereich] || { stufe: 'alle', ausnahmen: [] };
 }
 
+/**
+ * Eine Stufe sofort in die Anzeige schreiben, bevor sie gespeichert ist.
+ *
+ * Henrik, 07.09.2026: die Sichtbarkeits-Optionen seien „zeitverzögert/buggy".
+ * Sie waren nicht kaputt, sie warteten: jede Aenderung ging erst zum Server,
+ * dann wurde der ganze Bestand neu geholt, und erst danach stimmte die
+ * Oberflaeche. Zwei Anfragen ueber das Netz, waehrend derer der alte Wert
+ * dastand.
+ *
+ * Wer das hier aufruft, muss das Ergebnis des Speicherns weiterhin pruefen
+ * und bei einem Fehlschlag den alten Wert zurueckschreiben — sonst zeigt die
+ * Oberflaeche etwas an, das in der Datenbank nicht steht.
+ */
+function sichtSofort(bereich, wert) {
+  if (!state.sichtbarkeit) state.sichtbarkeit = {};
+  state.sichtbarkeit[bereich] = {
+    stufe: wert?.stufe || 'alle',
+    ausnahmen: wert?.ausnahmen ? [...wert.ausnahmen] : [],
+    inVideos: wert?.inVideos,
+  };
+}
+
 /** Was rechts neben dem Punkt steht. */
 function sichtText(bereich) {
   const s = sicht(bereich);
@@ -4888,14 +5438,29 @@ async function sichtbarkeitNeuLaden() {
  */
 function openSichtbarkeit(punkt) {
   const bereich = punkt.sichtbar;
+  /*
+   * Der Suchtext lebt im Verschluss dieser Funktion und nicht in `state`: er
+   * gehoert zu diesem einen geoeffneten Blatt und soll beim naechsten Mal
+   * nicht noch dastehen.
+   */
+  let suche = '';
 
   const zeichne = (sheet) => {
     const jetzt = sicht(bereich);
     const brauchtListe = jetzt.stufe === 'niemand_bis_auf' || jetzt.stufe === 'alle_bis_auf';
 
+    /*
+     * Henrik, 07.09.2026: "Liste zeigt nicht alle Messenger-Kontakte."
+     *
+     * Hier stand `.filter((k) => state.users[k.id])`: wer im Kontaktbuch
+     * steht, aber kein geladenes Profil hat, fiel lautlos heraus — und das
+     * ist ausgerechnet der Kontakt, den man ausnehmen will. Jetzt bleibt
+     * jeder Kontakt drin und traegt notfalls den Namen aus dem Kontaktbuch.
+     * Gegenstueck in app/components/SichtbarkeitSheet.tsx.
+     */
     const personen = (state.contacts || [])
-      .filter((k) => state.users[k.id])
-      .map((k) => ({ id: k.id, name: state.users[k.id].name }))
+      .map((k) => ({ id: k.id, name: state.users[k.id]?.name || k.name || 'Unbenannter Kontakt' }))
+      .filter((p) => !suche || p.name.toLowerCase().includes(suche.toLowerCase()))
       .sort((a, b) => {
         const ad = jetzt.ausnahmen.includes(a.id) ? 0 : 1;
         const bd = jetzt.ausnahmen.includes(b.id) ? 0 : 1;
@@ -4916,10 +5481,46 @@ function openSichtbarkeit(punkt) {
          ).join('')}
 
          ${
+           /*
+            * Der Zusatz zur Stufe „Jeder", Handbuch: „… Jeder -> Story auch
+            * in Videos teilen". Er steht auch bei anderen Stufen da — sonst
+            * wuesste niemand, dass es ihn gibt —, ist dann aber nicht
+            * bedienbar. Zurueckgenommen wird er beim Stufenwechsel von der
+            * Datenbank selbst (Schema 30), nicht hier.
+            */
+           bereich === 'story'
+             ? `<button class="item sicht__stufe${jetzt.stufe !== 'alle' ? ' is-aus' : ''}" data-invideos="1"${
+                 jetzt.stufe !== 'alle' ? ' disabled' : ''
+               }>
+                  <span class="item__label">
+                    <b>Story auch in Videos teilen</b>
+                    <small>${
+                      jetzt.stufe === 'alle'
+                        ? 'Deine Story erscheint dann auch bei Profilen, die dir folgen.'
+                        : 'Nur bei „Alle" möglich.'
+                    }</small>
+                  </span>
+                  <span class="sicht__punkt">${
+                    jetzt.inVideos && jetzt.stufe === 'alle' ? ICONS.check : ''
+                  }</span>
+                </button>`
+             : ''
+         }
+
+         ${
            brauchtListe
              ? `<div class="listhead">${
                  jetzt.stufe === 'alle_bis_auf' ? 'Diese Personen nicht' : 'Nur diese Personen'
                }${jetzt.ausnahmen.length ? `  ·  ${jetzt.ausnahmen.length}` : ''}</div>
+                ${/*
+                    Henrik, 07.09.2026: "Bei „Alle bis auf"/„Niemand bis auf"
+                    fehlt Suchleiste." Bei einer Kontaktliste, durch die man
+                    scrollen muss, ist die Ausnahmeliste ohne Suche nicht zu
+                    bedienen.
+                  */ ''}
+                <div class="sicht__suche">
+                  <input type="search" id="sichtSuche" placeholder="Kontakt suchen …" value="${esc(suche)}" />
+                </div>
                 ${
                   personen.length
                     ? personen
@@ -4933,7 +5534,9 @@ function openSichtbarkeit(punkt) {
                           </button>`
                         )
                         .join('')
-                    : '<div class="sheet__hint">Du hast noch keine Kontakte, die du hier eintragen könntest.</div>'
+                    : suche
+                      ? `<div class="sheet__hint">Für „${esc(suche)}" ist kein Kontakt dabei.</div>`
+                      : '<div class="sheet__hint">Du hast noch keine Kontakte, die du hier eintragen könntest.</div>'
                 }`
              : ''
          }
@@ -4945,19 +5548,71 @@ function openSichtbarkeit(punkt) {
   const binde = (sheet) => {
     sheet.querySelector('.sheet__x')?.addEventListener('click', () => sheet.remove());
 
+    /*
+     * Das Feld behaelt den Schreibstand ueber das Neuzeichnen hinweg — sonst
+     * verliert es nach dem ersten Buchstaben den Fokus und man kann nur
+     * einzelne Zeichen eingeben.
+     */
+    const sucheFeld = sheet.querySelector('#sichtSuche');
+    if (sucheFeld) {
+      sucheFeld.addEventListener('input', (e) => {
+        suche = e.target.value;
+        zeichne(sheet);
+        const neu = sheet.querySelector('#sichtSuche');
+        if (neu) {
+          neu.focus();
+          neu.setSelectionRange(neu.value.length, neu.value.length);
+        }
+      });
+    }
+
+    // Die Stufe steht sofort, das Speichern laeuft danach. Siehe sichtSofort().
     sheet.querySelectorAll('[data-stufe]').forEach((b) =>
       b.addEventListener('click', async () => {
+        const vorher = sicht(bereich);
+        sichtSofort(bereich, { ...vorher, stufe: b.dataset.stufe });
+        zeichne(sheet);
+
         const antwort = await api(`/api/sichtbarkeit/${bereich}`, { stufe: b.dataset.stufe });
-        if (!antwort?.ok) return toast(antwort?.error || 'Das hat nicht geklappt');
+        if (!antwort?.ok) {
+          sichtSofort(bereich, vorher);
+          zeichne(sheet);
+          return toast(antwort?.error || 'Das hat nicht geklappt');
+        }
         await sichtbarkeitNeuLaden();
         zeichne(sheet);
       })
     );
 
+    sheet.querySelector('[data-invideos]')?.addEventListener('click', async () => {
+      const antwort = await api('/api/story-in-videos', { an: !sicht('story').inVideos });
+      if (!antwort?.ok) return toast(antwort?.error || 'Das hat nicht geklappt');
+      await sichtbarkeitNeuLaden();
+      zeichne(sheet);
+      // Die Leiste im Videos-Bereich haengt daran: sie zeigt nur Storys von
+      // Leuten, die diesen Schalter an haben.
+      await bootstrap();
+    });
+
     sheet.querySelectorAll('[data-ausnahme]').forEach((b) =>
       b.addEventListener('click', async () => {
-        const antwort = await api(`/api/sichtbarkeit/${bereich}/ausnahme/${b.dataset.ausnahme}`, {});
-        if (!antwort?.ok) return toast(antwort?.error || 'Das hat nicht geklappt');
+        const id = b.dataset.ausnahme;
+        const vorher = sicht(bereich);
+        const drauf = (vorher.ausnahmen || []).includes(id);
+        sichtSofort(bereich, {
+          ...vorher,
+          ausnahmen: drauf
+            ? (vorher.ausnahmen || []).filter((x) => x !== id)
+            : [...(vorher.ausnahmen || []), id],
+        });
+        zeichne(sheet);
+
+        const antwort = await api(`/api/sichtbarkeit/${bereich}/ausnahme/${id}`, {});
+        if (!antwort?.ok) {
+          sichtSofort(bereich, vorher);
+          zeichne(sheet);
+          return toast(antwort?.error || 'Das hat nicht geklappt');
+        }
         await sichtbarkeitNeuLaden();
         zeichne(sheet);
       })
@@ -5222,6 +5877,41 @@ function openEinstellung(punkt, nachher) {
           return null;
         }
 
+        /*
+         * Das Passwort wirklich ändern.
+         *
+         * Bis zum 07.09.2026 endete dieses Formular mit „Passwort geändert"
+         * und schickte nichts los — beim nächsten Anmelden galt das alte
+         * weiter. Der Wert darf auch nicht über einstellungSetzen laufen: das
+         * legt ihn im Browser ab, und ein Passwort hat dort nichts zu suchen.
+         */
+        /*
+         * Die Telefonnummer wirklich speichern — in `profiles.phone`, woraus
+         * die Kontaktinfo im Profil liest. Der Grund eines Fehlschlags wird
+         * durchgereicht: „zu kurz" und „gehört schon zu einem anderen Konto"
+         * verlangen Verschiedenes vom Nutzer.
+         */
+        if (punkt.aktion === 'telefon') {
+          (async () => {
+            const antwort = await api('/api/eigene/telefon', { nummer: werte.nummer || '' });
+            toast(
+              antwort?.ok
+                ? `Telefonnummer gespeichert: ${antwort.nummer}`
+                : antwort?.error || 'Die Nummer ließ sich nicht speichern'
+            );
+          })();
+          return null;
+        }
+
+        if (punkt.aktion === 'passwort') {
+          if (!window.Anmeldung?.passwortAendern) return 'Die Anmeldung ist gerade nicht erreichbar.';
+          (async () => {
+            const antwort = await window.Anmeldung.passwortAendern(werte.alt, werte.neu);
+            toast(antwort.ok ? 'Passwort geändert' : antwort.fehler || 'Das hat nicht geklappt');
+          })();
+          return null;
+        }
+
         einstellungSetzen(punkt, werte[punkt.eingabe[0].key]);
         toast(punkt.fertig || 'Gespeichert');
         return null;
@@ -5355,7 +6045,9 @@ function openEinstellung(punkt, nachher) {
             await fetch(`/api/messages/${chat.id}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: 'Komm zu All Media: all-media.app' }),
+              body: JSON.stringify(
+                await sendeKoerper(chat.id, 'Komm zu All Media: all-media.app')
+              ),
             });
             toast(`Einladung an ${user(b.dataset.einladen).name} gesendet`);
           })
@@ -5388,8 +6080,21 @@ function renderSettings() {
    * Dasselbe fuer die Statistik hinter "Insights". Sie stand bis zum
    * 02.09.2026 fest im Code — 340 Follower und 1.284 Aufrufe bei jedem Konto.
    */
-  // Einstellungen einmal je Sitzung holen; danach steht state.einstellungen.
-  if (!state.einstellungen) void einstellungenHolen().then(() => renderSettings());
+  /*
+   * Einstellungen einmal je Sitzung holen; danach steht state.einstellungen.
+   *
+   * Die Abfrage auf `state.area` ist der Kern: bis zum 10.09.2026 hat die
+   * spaete Antwort die Seite blind neu gezeichnet. Wer die Einstellungen
+   * oeffnete und gleich weiter in den Messenger tippte, sah dort wieder die
+   * Einstellungsseite — die untere Leiste stand auf Messenger, der Inhalt
+   * nicht. Genau so, wie es Zeile 5836 fuer den Sichtbarkeits-Nachschlag
+   * schon macht.
+   */
+  if (!state.einstellungen) {
+    void einstellungenHolen().then(() => {
+      if (state.area === 'settings') renderSettings();
+    });
+  }
 
   if (!state.statistik) {
     fetch('/api/statistik')
@@ -5610,6 +6315,18 @@ function renderFriendMap() {
   const stil = KARTEN_STILE.find((s) => s.key === state.karteStil) || KARTEN_STILE[0];
   const voll = state.karteVollbild;
 
+  /*
+   * Henrik, 07.09.2026: "„In deiner Nähe" soll nur Personen mit einsehbarem
+   * Standort zeigen."
+   *
+   * Wer einsehbar ist, entscheidet die Datenbank (Regel „Pins lesen", Schema
+   * 19) — was der Server liefert, ist bereits gefiltert. Zwei Eintraege kamen
+   * trotzdem durch: der eigene Pin (er kommt als `me`) stand als Person in
+   * der eigenen Naehe, und Nadeln ohne geladenes Profil standen namenlos da.
+   * Gegenstueck in app/screens/messenger/FriendMapScreen.tsx.
+   */
+  const nadeln = (state.friends || []).filter((f) => f.id !== 'me' && state.users[f.id]);
+
   main.innerHTML = `
     <div class="scroll">
       <div id="map" class="map map--${stil.key}${voll ? ' map--voll' : ''}">
@@ -5619,7 +6336,26 @@ function renderFriendMap() {
           <button class="map__werkzeug" data-mapfull aria-label="${voll ? 'Vollbild verlassen' : 'Karte im Vollbild'}">${
             voll ? ICONS.einklappen : ICONS.ausklappen
           }</button>
-          <button class="map__werkzeug" data-mapstil aria-label="Kartenansicht: ${stil.label}">${ICONS.ebenen}</button>
+          <button class="map__werkzeug${state.karteStilOffen ? ' is-an' : ''}" data-mapstil aria-label="Kartenansicht wählen, gerade ${stil.label}">${ICONS.ebenen}</button>
+          ${/*
+              Henrik, 07.09.2026: "Kartenstil-Button switcht direkt statt
+              Auswahlfenster (Standard/Satellit/Gelände)." Wer von Standard
+              auf Gelaende wollte, musste durch Satellit hindurch und sah
+              dabei jedes Mal die Kacheln neu laden. Gegenstueck in
+              app/components/KarteWeb.tsx.
+            */ ''}
+          ${
+            state.karteStilOffen
+              ? `<div class="map__stile">
+                   ${KARTEN_STILE.map(
+                     (s) => `<button class="map__stil${s.key === stil.key ? ' is-an' : ''}" data-stilwahl="${s.key}">
+                       <span>${esc(s.label)}</span>
+                       ${s.key === stil.key ? ICONS.check : ''}
+                     </button>`
+                   ).join('')}
+                 </div>`
+              : ''
+          }
         </div>
       </div>
 
@@ -5655,8 +6391,13 @@ function renderFriendMap() {
       </div>
 
       <div class="listhead">In deiner Nähe</div>
+      ${
+        nadeln.length
+          ? ''
+          : '<div class="sheet__hint">Gerade gibt niemand aus deinen Kontakten seinen Standort für dich frei.</div>'
+      }
       <ul class="rows">
-        ${state.friends
+        ${nadeln
           .map((f) => {
             const u = user(f.id);
             return `<li><div class="row ${state.karte.aktiv === f.id ? 'is-aktiv' : ''}" data-zoom="${f.id}">
@@ -5683,7 +6424,18 @@ function renderFriendMap() {
       state.karte.markers = {};
     }
 
-    const map = L.map(mapContainer, { zoomControl: false }).setView(
+    /*
+     * Dieselben Angaben wie in der App (app/components/KarteWeb.tsx): Zoomen
+     * mit zwei Fingern soll der Bewegung folgen und nicht in ganze Stufen
+     * einrasten. Ohne `zoomSnap: 0` springt die Karte waehrend der Geste.
+     */
+    const map = L.map(mapContainer, {
+      zoomControl: false,
+      touchZoom: true,
+      bounceAtZoomLimits: false,
+      zoomSnap: 0,
+      zoomDelta: 0.6,
+    }).setView(
       state.karte.mitte || [51.5, 10],
       state.karte.zoom || 4
     );
@@ -5698,7 +6450,7 @@ function renderFriendMap() {
       state.karte.zoom = map.getZoom();
     });
 
-    state.friends.forEach((f) => {
+    nadeln.forEach((f) => {
       const u = user(f.id);
       const [lat, lng] = percentToCoords(f.x, f.y);
       const isActive = state.karte.aktiv === f.id;
@@ -5759,12 +6511,17 @@ function renderFriendMap() {
     renderFriendMap();
   });
   main.querySelector('[data-mapstil]').addEventListener('click', () => {
-    const i = KARTEN_STILE.findIndex((s) => s.key === stil.key);
-    const naechster = KARTEN_STILE[(i + 1) % KARTEN_STILE.length];
-    state.karteStil = naechster.key;
-    toast(`Kartenansicht: ${naechster.label}`);
+    state.karteStilOffen = !state.karteStilOffen;
     renderFriendMap();
   });
+  main.querySelectorAll('[data-stilwahl]').forEach((el) =>
+    el.addEventListener('click', () => {
+      const gewaehlt = KARTEN_STILE.find((s) => s.key === el.dataset.stilwahl);
+      state.karteStil = gewaehlt.key;
+      state.karteStilOffen = false;
+      renderFriendMap();
+    })
+  );
 
   if (!voll) {
     /*
@@ -5773,15 +6530,33 @@ function renderFriendMap() {
      * der Schalter auf „an" und die Stufe auf „Niemand", und beide haetten
      * recht.
      */
+    /*
+     * Henrik, 07.09.2026: "„Standort teilen" + alle „Sichtbar für"-Optionen
+     * zeitverzögert/buggy."
+     *
+     * Der Weg war: speichern, den ganzen Sichtbarkeitsbestand neu holen, dann
+     * die Seite neu zeichnen. Erst danach stimmte die Beschriftung unter dem
+     * Schalter. Bis dahin — zwei Anfragen ueber das Netz — stand dort noch
+     * der alte Text, und wer in der Zeit ein zweites Mal umlegte, sah beides
+     * hin und her springen.
+     *
+     * Jetzt wird die Anzeige sofort auf den neuen Stand gesetzt und erst
+     * danach gespeichert. Geht das Speichern schief, wird zurueckgenommen.
+     */
     $('#standortAn').addEventListener('change', async (e) => {
       const an = e.target.checked;
+      const vorher = sicht('standort');
+      sichtSofort('standort', { stufe: an ? 'alle' : 'niemand' });
+      toast(an ? 'Standort wird geteilt' : 'Standort ist aus');
+      renderFriendMap();
+
       const r = await api('/api/sichtbarkeit/standort', { stufe: an ? 'alle' : 'niemand' });
       if (!r?.ok) {
-        e.target.checked = !an;
+        sichtSofort('standort', vorher);
+        renderFriendMap();
         return toast(r?.error || 'Nicht gespeichert');
       }
       await sichtbarkeitNeuLaden();
-      toast(an ? 'Standort wird geteilt' : 'Standort ist aus');
       renderFriendMap();
     });
 
@@ -5796,12 +6571,29 @@ function renderFriendMap() {
       if (e.target.closest('[data-friend-profil]')) return;
       const id = el.dataset.zoom;
       state.karte.aktiv = id;
-      const f = state.friends.find((x) => x.id === id);
-      if (f && state.karte.mapInstance) {
+      const f = nadeln.find((x) => x.id === id);
+      if (f) {
         const [lat, lng] = percentToCoords(f.x, f.y);
-        state.karte.mapInstance.setView([lat, lng], 10, { animate: true });
+        /*
+         * Henrik, 07.09.2026: "Kontakt in „In deiner Nähe" antippen → soll
+         * zur Karte hochscrollen + nah heranzoomen (Straßenebene)."
+         *
+         * Der Ausschnitt wird in `state` gesetzt und NICHT ueber
+         * `mapInstance.setView`. Grund: gleich danach zeichnet
+         * renderFriendMap() neu, baut die Karte ab und aus `state.karte.mitte`
+         * wieder auf. Ein setView mit `animate: true` meldet seinen neuen
+         * Stand erst beim `moveend` — also nach dem Neuaufbau. Der frisch
+         * gesetzte Ausschnitt wurde damit jedes Mal vom alten ueberschrieben,
+         * und der Sprung zum Kontakt passierte sichtbar gar nicht.
+         *
+         * Zoomstufe 16 statt 10: bei 10 sieht man das halbe Bundesland.
+         */
+        state.karte.mitte = [lat, lng];
+        state.karte.zoom = 16;
       }
       renderFriendMap();
+      const blatt = main.querySelector('.scroll');
+      if (blatt) blatt.scrollTo({ top: 0, behavior: 'smooth' });
     })
   );
   main.querySelectorAll('[data-friend-profil]').forEach((el) =>
@@ -6147,9 +6939,204 @@ function openInsightAnsehen(userId) {
   zeichnen();
 }
 
-function renderCameraPage() {
+/*
+ * Die Kamera der Website.
+ *
+ * Bis zum 09.09.2026 war das eine Attrappe: die Buehne zeigte ein graues
+ * Kamerasymbol, Blitz und Kameraseite warfen nur eine Meldung, und der
+ * Ausloeser oeffnete die Dateiauswahl des Betriebssystems.
+ *
+ * Henrik am 07.09.2026: „Alle Buttons brauchen eine echte, synchrone
+ * Aktion" und „Foto/Video-Aufnahme in der App selbst". Jetzt laeuft hier
+ * ein echter Kamerastrom (`getUserMedia`), der Ausloeser schneidet das Bild
+ * aus dem laufenden Strom (Foto) bzw. nimmt ueber den `MediaRecorder` auf
+ * (Video), der Wechselknopf stellt auf die andere Kameraseite um, und der
+ * Blitz schaltet die Leuchte, wo das Geraet sie hergibt.
+ *
+ * Dieselbe Bedienung wie in app/screens/messenger/CameraScreen.tsx.
+ */
+
+/** Der laufende Kamerastrom - genau einer, oder keiner. */
+let kameraStrom = null;
+
+/** Strom und Aufnahme beenden. Wird bei jedem render() gerufen. */
+function kameraStromStoppen() {
+  if (!kameraStrom) return;
+  try {
+    kameraStrom.getTracks().forEach((spur) => spur.stop());
+  } catch {
+    /* Der Strom war schon zu. */
+  }
+  kameraStrom = null;
+}
+
+/** Das Markup der Buehne - in beiden Kameras gleich. */
+function kameraBuehne() {
+  return `<div class="camera__stage" id="camStage">
+      <video id="camVideo" class="camera__video" playsinline muted autoplay></video>
+      <span class="camera__filterschicht" id="camFilterSchicht"></span>
+      <span class="camera__sucher"><span></span><span></span><span></span><span></span></span>
+      <span class="camera__rec" id="camRec" hidden><i></i>Aufnahme läuft</span>
+    </div>`;
+}
+
+/**
+ * Die Bedienung der Kamera: Strom oeffnen, Blitz, Seitenwechsel, Foto- und
+ * Videoaufnahme. Steht einmal hier, weil es die Kamera zweimal gibt - als
+ * eigene Seite und als Overlay ueber einem Chat.
+ *
+ * `wurzel` ist der Kasten mit dem Markup, `fertig(bild)` bekommt die
+ * Aufnahme als Datenadresse.
+ */
+function kameraLaufwerk(wurzel, fertig) {
+  const q = (auswahl) => wurzel.querySelector(auswahl);
+  const video = q('#camVideo');
+  const buehne = q('#camStage');
   let mode = 'photo';
   let recording = false;
+  let seite = 'environment';
+  let blitz = false;
+  let aufnehmer = null;
+  let stuecke = [];
+
+  /** Kamerastrom oeffnen - je nach gewaehlter Seite und Betriebsart. */
+  const stromOeffnen = async () => {
+    kameraStromStoppen();
+    try {
+      kameraStrom = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: seite },
+        // Ton nur beim Video: sonst fragt der Browser beim Fotografieren
+        // nach dem Mikrofon, und das erklaert niemandem etwas.
+        audio: mode === 'video',
+      });
+    } catch (fehler) {
+      console.error('Kamera:', fehler.message);
+      buehne.classList.add('camera__stage--leer');
+      if (!q('.camera__hinweis')) {
+        buehne.insertAdjacentHTML(
+          'beforeend',
+          `${ICONS.camera}<p class="camera__hinweis">Ohne Kamerazugriff geht die Aufnahme nicht</p>`
+        );
+      }
+      return false;
+    }
+    buehne.classList.remove('camera__stage--leer');
+    video.srcObject = kameraStrom;
+    // Die Frontkamera wird gespiegelt gezeigt - man sieht sich sonst
+    // seitenverkehrt und greift in die falsche Richtung.
+    video.classList.toggle('camera__video--gespiegelt', seite === 'user');
+    await video.play().catch(() => {});
+    return true;
+  };
+  void stromOeffnen();
+
+  /*
+   * Der Blitz. Am Rechner gibt es keinen; am Handy ist es die Leuchte der
+   * Rueckkamera, die ueber `torch` dauerhaft angeht. Kann das Geraet das
+   * nicht, sagt die Meldung das - statt so zu tun, als waere geschaltet.
+   */
+  q('#camFlash').addEventListener('click', async () => {
+    const spur = kameraStrom && kameraStrom.getVideoTracks()[0];
+    const kann = spur && spur.getCapabilities && spur.getCapabilities().torch;
+    if (!kann) return toast('Dieses Gerät hat kein schaltbares Licht');
+    blitz = !blitz;
+    try {
+      await spur.applyConstraints({ advanced: [{ torch: blitz }] });
+      q('#camFlash').classList.toggle('is-active', blitz);
+      toast(blitz ? 'Licht an' : 'Licht aus');
+    } catch {
+      toast('Das Licht ließ sich nicht schalten');
+    }
+  });
+
+  q('#camSwitch').addEventListener('click', async () => {
+    if (recording) return toast('Erst die Aufnahme beenden');
+    seite = seite === 'environment' ? 'user' : 'environment';
+    blitz = false;
+    q('#camFlash').classList.remove('is-active');
+    if (await stromOeffnen()) toast(seite === 'user' ? 'Frontkamera' : 'Rückkamera');
+  });
+
+  wurzel.querySelectorAll('.camera__mode').forEach((b) =>
+    b.addEventListener('click', async () => {
+      if (recording) return toast('Erst die Aufnahme beenden');
+      mode = b.dataset.mode;
+      wurzel
+        .querySelectorAll('.camera__mode')
+        .forEach((x) => x.classList.toggle('is-active', x === b));
+      // Der Ton kommt erst mit der Betriebsart Video dazu, also muss der
+      // Strom dafuer neu geoeffnet werden.
+      await stromOeffnen();
+    })
+  );
+
+  /** Das laufende Bild als Datenadresse. */
+  const standbild = () => {
+    const flaeche = document.createElement('canvas');
+    flaeche.width = video.videoWidth || 720;
+    flaeche.height = video.videoHeight || 1280;
+    const stift = flaeche.getContext('2d');
+    if (seite === 'user') {
+      // Gespiegelt gezeigt, gespiegelt gespeichert - sonst steht auf dem
+      // Bild eine andere Welt als im Sucher.
+      stift.translate(flaeche.width, 0);
+      stift.scale(-1, 1);
+    }
+    stift.drawImage(video, 0, 0, flaeche.width, flaeche.height);
+    return flaeche.toDataURL('image/jpeg', 0.82);
+  };
+
+  q('#camShutter').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    if (!kameraStrom) return toast('Ohne Kamerazugriff geht die Aufnahme nicht');
+
+    if (mode === 'photo') return fertig(standbild());
+
+    if (recording) {
+      recording = false;
+      btn.classList.remove('is-rec');
+      q('#camRec').hidden = true;
+      if (aufnehmer) aufnehmer.stop();
+      return;
+    }
+
+    if (typeof MediaRecorder === 'undefined') {
+      return toast('Dieser Browser kann keine Videos aufnehmen');
+    }
+    stuecke = [];
+    try {
+      aufnehmer = new MediaRecorder(kameraStrom);
+    } catch {
+      return toast('Die Videoaufnahme ließ sich nicht starten');
+    }
+    aufnehmer.ondataavailable = (ereignis) => {
+      if (ereignis.data && ereignis.data.size) stuecke.push(ereignis.data);
+    };
+    aufnehmer.onstop = async () => {
+      const datei = new Blob(stuecke, { type: aufnehmer.mimeType || 'video/webm' });
+      // Weiterverarbeitet wird - wie bei einer Videodatei aus der Galerie -
+      // das erste Standbild. Bewegt gespeichert wird spaeter beim Hochladen.
+      const bild = await videoStandbild(datei).catch(() => null);
+      if (!bild) return toast('Aus dieser Aufnahme ließ sich kein Bild gewinnen');
+      fertig(bild);
+    };
+    aufnehmer.start();
+    recording = true;
+    btn.classList.add('is-rec');
+    q('#camRec').hidden = false;
+  });
+}
+
+function renderCameraPage() {
+  /*
+   * Der Filterschalter aus dem Figma-Entwurf.
+   *
+   * Henrik am 07.09.2026: oben ein Umschalter „ohne Filter / mit Filter",
+   * die Filterleiste erst darunter und nur dann, wenn gefiltert wird.
+   * Vorher stand die Leiste immer da - auch mit „keiner" ganz links, was
+   * dieselbe Aussage doppelt traf.
+   */
+  const mitFilter = () => state.kameraFilter && state.kameraFilter !== 'keiner';
 
   main.innerHTML = `
     <div class="camera camera--page">
@@ -6157,14 +7144,20 @@ function renderCameraPage() {
         <span></span>
         <button id="camFlash" aria-label="Blitz">${ICONS.flash}</button>
       </div>
-      <div class="camera__stage" id="camStage">${ICONS.camera}<span class="camera__sucher"><span></span><span></span><span></span><span></span></span></div>
-      <div class="camera__filter" id="camFilter">
-        ${FILTER.map(
-          (f) =>
-            `<button class="camera__filterpille${
-              f.key === state.kameraFilter ? ' is-active' : ''
-            }" data-filter="${f.key}">${esc(f.label)}</button>`
-        ).join('')}
+      ${kameraBuehne()}
+      <div class="camera__schalter" id="camSchalter">
+        <button data-mitfilter="0" class="${mitFilter() ? '' : 'is-active'}">Ohne Filter</button>
+        <button data-mitfilter="1" class="${mitFilter() ? 'is-active' : ''}">Mit Filter</button>
+      </div>
+      <div class="camera__filter" id="camFilter"${mitFilter() ? '' : ' hidden'}>
+        ${FILTER.filter((f) => f.key !== 'keiner')
+          .map(
+            (f) =>
+              `<button class="camera__filterpille${
+                f.key === state.kameraFilter ? ' is-active' : ''
+              }" data-filter="${f.key}">${esc(f.label)}</button>`
+          )
+          .join('')}
       </div>
       <div class="camera__modes">
         <button class="camera__mode is-active" data-mode="photo">FOTO</button>
@@ -6177,7 +7170,33 @@ function renderCameraPage() {
       </div>
     </div>`;
 
-  $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
+  /* Die Farbschicht liegt ueber dem Bild, nicht dahinter: seit hier ein
+     echtes Kamerabild laeuft, waere ein Hintergrund der Buehne verdeckt. */
+  const filterLegen = () => {
+    const schicht = $('#camFilterSchicht');
+    if (schicht) schicht.style.backgroundImage = mitFilter() ? filterSchicht(state.kameraFilter) : '';
+  };
+  filterLegen();
+
+  kameraLaufwerk(main.querySelector('.camera'), (bild) => aufnahmeMenue(bild));
+
+  $('#camSchalter')
+    .querySelectorAll('[data-mitfilter]')
+    .forEach((b) =>
+      b.addEventListener('click', () => {
+        const an = b.dataset.mitfilter === '1';
+        const erste = FILTER.find((f) => f.key !== 'keiner');
+        state.kameraFilter = an ? (mitFilter() ? state.kameraFilter : erste && erste.key) : 'keiner';
+        $('#camSchalter')
+          .querySelectorAll('[data-mitfilter]')
+          .forEach((x) => x.classList.toggle('is-active', x === b));
+        $('#camFilter').hidden = !an;
+        main
+          .querySelectorAll('[data-filter]')
+          .forEach((x) => x.classList.toggle('is-active', x.dataset.filter === state.kameraFilter));
+        filterLegen();
+      })
+    );
 
   /*
    * Die Filterwahl. Sie liegt im Zustand und nicht in einer Variablen dieser
@@ -6190,30 +7209,13 @@ function renderCameraPage() {
       main
         .querySelectorAll('[data-filter]')
         .forEach((x) => x.classList.toggle('is-active', x === b));
-      const buehne = $('#camStage');
-      if (buehne) buehne.style.backgroundImage = filterSchicht(state.kameraFilter);
+      filterLegen();
     })
   );
+
   // Punkt 18: das Bildsymbol geht in die Galerie, nicht noch einmal in die
   // Kamera - dafuer ist der Ausloeser in der Mitte da.
-  $('#camGallery').addEventListener('click', () => aufnahmeVerwenden(mode, true));
-  $('#camSwitch').addEventListener('click', () => toast('Kamera gewechselt'));
-
-  main.querySelectorAll('.camera__mode').forEach((b) =>
-    b.addEventListener('click', () => {
-      mode = b.dataset.mode;
-      main.querySelectorAll('.camera__mode').forEach((x) => x.classList.toggle('is-active', x === b));
-    })
-  );
-
-  $('#camShutter').addEventListener('click', (e) => {
-    const btn = e.currentTarget;
-    if (mode === 'photo') return aufnahmeVerwenden('photo');
-    recording = !recording;
-    btn.classList.toggle('is-rec', recording);
-    if (recording) return toast('Aufnahme gestartet');
-    aufnahmeVerwenden('video');
-  });
+  $('#camGallery').addEventListener('click', () => aufnahmeVerwenden('photo', true));
 }
 
 /* ---------------------------------------------------- Messenger: Profil */
@@ -6230,6 +7232,57 @@ function renderCameraPage() {
  * zwischen Messenger-, Video- und Community-Profil desselben Kontos, sondern
  * ein zweites eigenstaendiges Konto, auf das man umschaltet.
  */
+/*
+ * Wer war auf diesem Geraet schon einmal angemeldet?
+ *
+ * Henrik am 07.09.2026: "Fruehere Accounts sollen beim Kontowechsel als
+ * Ein-Klick-Option erscheinen (wie Instagram)." Bisher zeigte die Liste nur
+ * die eine laufende Sitzung — war man abgemeldet, war sie leer und man musste
+ * E-Mail *und* Passwort neu tippen. Gespeichert wird bewusst kein Passwort
+ * und kein Token, nur Kennung, Name und E-Mail: genug fuer die Zeile und um
+ * die E-Mail vorzubelegen. Dieselbe Liste fuehrt die App in
+ * app/contexts/AuthContext.tsx unter demselben Schluessel.
+ */
+const FRUEHER_KEY = 'all-media.fruehereKonten.v1';
+
+function fruehereKonten() {
+  try {
+    const liste = JSON.parse(localStorage.getItem(FRUEHER_KEY) || '[]');
+    return Array.isArray(liste) ? liste : [];
+  } catch {
+    return [];
+  }
+}
+
+function fruehereMerken(nutzer) {
+  if (!nutzer?.id || !nutzer.email) return;
+  const eintrag = { id: nutzer.id, email: nutzer.email, name: nutzer.name || nutzer.handle || nutzer.email };
+  const neu = [eintrag, ...fruehereKonten().filter((k) => k.id !== eintrag.id)].slice(0, 8);
+  try {
+    localStorage.setItem(FRUEHER_KEY, JSON.stringify(neu));
+  } catch {
+    /* Privater Modus ohne Speicher — dann gibt es die Bequemlichkeit eben nicht. */
+  }
+}
+
+/** Zwei Buchstaben fuer den Kreis links — wie beim Avatar der Kontoliste. */
+function fruehereInitialen(name) {
+  return (name || '?')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0] || '')
+    .join('')
+    .toUpperCase();
+}
+
+function fruehereVergessen(id) {
+  try {
+    localStorage.setItem(FRUEHER_KEY, JSON.stringify(fruehereKonten().filter((k) => k.id !== id)));
+  } catch {
+    /* siehe oben */
+  }
+}
+
 function openKontoWechsel() {
   /*
    * Die Kontoliste zeigt, wer wirklich angemeldet ist.
@@ -6274,13 +7327,20 @@ function openKontoWechsel() {
     benutzername: '',
     passwort: '',
     email: '',
+    // Pflicht beim Anlegen (Henrik 7.9.) — siehe formularNeuMail().
+    telefon: '',
     kennung: '',
     hinweis: '',
     hinweisArt: '',
   };
 
+  /* Nur die, die nicht ohnehin schon oben in der Kontoliste stehen. */
+  const offeneFrueher = () =>
+    fruehereKonten().filter((f) => !state.konten.some((k) => k.email && k.email === f.email));
+
   const liste = () => `
     <div class="sheet__body">
+      ${offeneFrueher().length ? '<div class="sheet__gruppe">zuletzt verwendet</div>' : ''}
       ${state.konten
         .map(
           (k) => `<div class="row" data-konto="${k.id}">
@@ -6294,6 +7354,19 @@ function openKontoWechsel() {
                 ? `<span class="konto__aktiv">${ICONS.check}</span>`
                 : `<button class="iconbtn" data-konto-weg="${k.id}" aria-label="Abmelden">${ICONS.close}</button>`
             }
+          </div>`
+        )
+        .join('')}
+
+      ${offeneFrueher()
+        .map(
+          (k) => `<div class="row" data-frueher="${esc(k.email)}" data-frueher-id="${esc(k.id)}">
+            <span class="avatar avatar--44" style="background:${farbe(k.id)}">${esc(fruehereInitialen(k.name))}</span>
+            <div class="row__body">
+              <div class="row__name">${esc(k.name)}</div>
+              <div class="row__sub">${esc(k.email)}</div>
+            </div>
+            <button class="iconbtn" data-frueher-weg="${esc(k.id)}" aria-label="Aus der Liste nehmen">${ICONS.close}</button>
           </div>`
         )
         .join('')}
@@ -6354,25 +7427,34 @@ function openKontoWechsel() {
     </div>
     <div class="sheet__field">
       <label class="sheet__label" for="kontoPass">Passwort</label>
-      <input id="kontoPass" type="password" placeholder="mindestens 6 Zeichen" value="${esc(zustand.passwort)}"
+      <input id="kontoPass" type="password" placeholder="${esc(PASSWORT_REGEL)}" value="${esc(zustand.passwort)}"
              autocomplete="new-password" />
+      <div class="sheet__fussnote">${esc(PASSWORT_REGEL)}.</div>
     </div>
     ${hinweis()}
     <div class="sheet__footer">
       <button class="prof__btn is-primary" id="kontoOk">weiter</button>
     </div>`;
 
-  /* Neues Profil, Schritt 2: E-Mail. */
+  /* Neues Profil, Schritt 2: E-Mail und Telefonnummer. */
   const formularNeuMail = () => `
     <div class="sheet__erklaerung">
       Dein Benutzername ist <strong>@${esc(zustand.benutzername.replace(/^@+/, ''))}</strong>.
       Die E-Mail brauchen wir, um dein Konto zu bestätigen und dir bei einem
-      vergessenen Passwort zu helfen.
+      vergessenen Passwort zu helfen. Über die Telefonnummer finden dich deine
+      Kontakte.
     </div>
     <div class="sheet__field">
       <label class="sheet__label" for="kontoMail">E-Mail</label>
       <input id="kontoMail" type="email" placeholder="name@beispiel.de" value="${esc(zustand.email)}"
              autocapitalize="off" autocomplete="email" />
+    </div>
+    <!-- Pflichtfeld (Henrik 7.9.). Gleiches Feld in app/screens/LoginScreen.tsx. -->
+    <div class="sheet__field">
+      <label class="sheet__label" for="kontoTelefon">Telefonnummer</label>
+      <input id="kontoTelefon" type="tel" placeholder="+49 151 2345678" value="${esc(zustand.telefon)}"
+             autocapitalize="off" autocomplete="tel" />
+      <div class="sheet__fussnote">${esc(window.Telefon.REGEL_TEXT)}.</div>
     </div>
     ${hinweis()}
     <div class="sheet__footer">
@@ -6436,10 +7518,12 @@ function openKontoWechsel() {
       const b = sheet.querySelector('#kontoBenutzer');
       const m = sheet.querySelector('#kontoMail');
       const p = sheet.querySelector('#kontoPass');
+      const t = sheet.querySelector('#kontoTelefon');
       if (k) zustand.kennung = k.value;
       if (b) zustand.benutzername = b.value;
       if (m) zustand.email = m.value;
       if (p) zustand.passwort = p.value;
+      if (t) zustand.telefon = t.value;
     };
 
     const anmeldenAbsenden = async () => {
@@ -6456,6 +7540,7 @@ function openKontoWechsel() {
 
       if (!ergebnis.ok) return meldung(ergebnis.fehler);
 
+      fruehereMerken(ergebnis.nutzer);
       close();
       toast(`Angemeldet als ${ergebnis.nutzer?.handle || kennung}`);
       return bootstrap();
@@ -6466,7 +7551,11 @@ function openKontoWechsel() {
       merken();
       const name = zustand.benutzername.trim();
       if (!name) return meldung('Bitte einen Benutzernamen eingeben.');
-      if (zustand.passwort.length < 6) return meldung('Das Passwort braucht mindestens 6 Zeichen.');
+      // Die Regel steht in gemeinsam/passwort.js — dieselbe, die Supabase
+      // durchsetzt und die die App anzeigt. Sechs Zeichen durchzulassen hiess
+      // bisher, den englischen Fehler von Supabase weiterzureichen.
+      const zuSchwach = passwortPruefen(zustand.passwort);
+      if (zuSchwach) return meldung(zuSchwach + '.');
 
       if (!window.Anmeldung) return meldung('Die Anmeldung ist gerade nicht erreichbar.');
 
@@ -6487,11 +7576,17 @@ function openKontoWechsel() {
       const email = zustand.email.trim();
       if (!email || !email.includes('@')) return meldung('Bitte eine gültige E-Mail-Adresse eingeben.');
 
+      // Die Nummer ist Pflicht — die Form prüft gemeinsam/telefon.js, die
+      // Doppelvergabe die Datenbank in registrieren().
+      const grundTelefon = window.Telefon.pruefe(zustand.telefon);
+      if (grundTelefon) return meldung(grundTelefon + '.');
+
       const fertig = arbeitet('Konto wird erstellt…');
       const ergebnis = await window.Anmeldung.registrieren({
         benutzername: zustand.benutzername,
         passwort: zustand.passwort,
         email,
+        telefon: zustand.telefon,
       });
       fertig();
 
@@ -6509,6 +7604,7 @@ function openKontoWechsel() {
         return toast(ergebnis.hinweis);
       }
 
+      fruehereMerken(ergebnis.nutzer);
       close();
       toast(`Konto @${zustand.benutzername} erstellt`);
       return bootstrap();
@@ -6562,9 +7658,30 @@ function openKontoWechsel() {
             // angemeldet, obwohl das Konto aus der Liste verschwunden ist.
             if (window.Anmeldung?.angemeldet()) {
               await window.Anmeldung.abmelden();
+              // Den Geraeteschluessel aus dem Speicher dieser Seite werfen.
+              // Der geheime Teil bleibt in localStorage — sonst waeren beim
+              // naechsten Anmelden alle alten Nachrichten unlesbar.
+              window.KryptoWeb?.vergessen();
               close();
               return bootstrap();
             }
+            neuZeichnen();
+          })
+        );
+        // Ein Tipp legt die E-Mail ins Anmeldefeld — es fehlt nur das Passwort.
+        sheet.querySelectorAll('[data-frueher]').forEach((el) =>
+          el.addEventListener('click', (e) => {
+            if (e.target.closest('[data-frueher-weg]')) return;
+            zustand.kennung = el.dataset.frueher;
+            zustand.passwort = '';
+            zustand.hinweis = '';
+            zustand.ansicht = 'anmelden';
+            neuZeichnen();
+          })
+        );
+        sheet.querySelectorAll('[data-frueher-weg]').forEach((b) =>
+          b.addEventListener('click', () => {
+            fruehereVergessen(b.dataset.frueherWeg);
             neuZeichnen();
           })
         );
@@ -6612,6 +7729,14 @@ function renderMessengerProfile() {
   main.innerHTML = `
     ${switchBar('switchProfile')}
     <div class="scroll">
+      ${/*
+          Henrik am 07.09.2026: "Obere Haelfte wirkt gequetscht (Vorbild
+          Instagram/WhatsApp)." Die Biografie stand in der schmalen Spalte
+          neben dem Bild und brach dort in drei Zeilen um. Instagram und
+          WhatsApp setzen neben das Bild nur Name und Kennung und die
+          Biografie darunter ueber die volle Breite — genau so steht es
+          jetzt hier und in app/screens/messenger/MessengerProfileScreen.tsx.
+        */ ''}
       <div class="mprof">
         <div class="avatar avatar--88" style="background:${farbe(me.color)}">${esc(me.initials)}</div>
         <div class="mprof__text">
@@ -6619,9 +7744,10 @@ function renderMessengerProfile() {
                 im Markup - sonst zeigt "Profil bearbeiten" hier keine
                 Wirkung. */ ''}
           <div class="mprof__name">${esc(me.name)}</div>
-          ${profil.bio ? `<div class="mprof__bio">${esc(profil.bio)}</div>` : ''}
+          ${me.handle ? `<div class="mprof__handle">${esc(me.handle)}</div>` : ''}
         </div>
       </div>
+      ${profil.bio ? `<div class="mprof__bio">${esc(profil.bio)}</div>` : ''}
       <div class="mprof__links">
         <button data-switch="videos">@videoprofil</button>
         <button data-switch="communities">@communityprofil</button>
@@ -6638,24 +7764,68 @@ function renderMessengerProfile() {
       </div>
 
       <button class="sectionlink" data-mact="settings">Einstellungen <span>${ICONS.chevron}</span></button>
+      ${/*
+          Henrik am 07.09.2026: "Profilseiten-Einstellungen (nur 3) mit echter
+          Einstellungsseite synchron halten." Die drei standen hier ohne Wert
+          da — man sah dem Profil nicht an, was gilt, und musste jedes Mal in
+          die Einstellungen. Jetzt lesen sie dieselben Quellen wie dort
+          (sichtText aus /api/sichtbarkeit, schalterAn aus /api/einstellungen)
+          und die Lesebestaetigung ist derselbe Schalter, nicht ein Verweis.
+        */ ''}
       <div class="group">
         <button class="item" data-mact="location">
           <span class="item__label">Standort-Sichtbarkeit</span>
+          <span class="item__value">${esc(sichtText('standort'))}</span>
           <span class="row__chevron">${ICONS.chevron}</span>
         </button>
         <button class="item" data-mact="story">
           <span class="item__label">Story-Sichtbarkeit</span>
+          <span class="item__value">${esc(sichtText('story'))}</span>
           <span class="row__chevron">${ICONS.chevron}</span>
         </button>
-        <button class="item" data-mact="read">
+        <div class="item">
           <span class="item__label">Lesebestätigung</span>
-          <span class="row__chevron">${ICONS.chevron}</span>
-        </button>
+          <button class="switch ${schalterAn('lesebestaetigung') ? 'is-on' : ''}" id="mprofLesen"
+                  aria-label="Lesebestätigung"><span class="switch__knob"></span></button>
+        </div>
       </div>
     </div>`;
 
+  /*
+   * Die Werte stehen erst nach dem ersten Holen richtig da — dann einmal neu
+   * zeichnen. Nur wenn das Holen wirklich etwas gebracht hat, sonst dreht
+   * sich die Seite bei einem Serverfehler im Kreis.
+   */
+  if (!state.einstellungen) {
+    void einstellungenHolen().then(() => {
+      if (state.einstellungen && state.area === 'messenger' && state.sub.messenger === 'profile') {
+        renderMessengerProfile();
+      }
+    });
+  }
+  if (!state.sichtbarkeit) {
+    void sichtbarkeitNeuLaden().then(() => {
+      if (state.sichtbarkeit && state.area === 'messenger' && state.sub.messenger === 'profile') {
+        renderMessengerProfile();
+      }
+    });
+  }
+
   // Fuehrt zur Kontoliste - hier hat Henrik den Kontowechsel gesucht.
   $('#switchProfile').addEventListener('click', openKontoWechsel);
+
+  $('#mprofLesen')?.addEventListener('click', (e) => {
+    const knopf = e.currentTarget;
+    const neu = !schalterAn('lesebestaetigung');
+    knopf.classList.toggle('is-on', neu);
+    void (async () => {
+      const ok = await einstellungSetzen(
+        { label: 'lesebestaetigung', wahlKey: 'lesebestaetigung' },
+        neu ? 'an' : 'aus'
+      );
+      if (!ok) knopf.classList.toggle('is-on', !neu);
+    })();
+  });
   $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderMessengerProfile));
   main.querySelectorAll('[data-switch]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -6679,7 +7849,6 @@ function renderMessengerProfile() {
       const punkte = {
         location: 'Standort-Sichtbarkeit',
         story: 'Story-Sichtbarkeit',
-        read: 'Lesebestätigung',
       };
       zuDenEinstellungen('messenger', punkte[b.dataset.mact]);
     })
@@ -7813,13 +8982,23 @@ async function anhangSenden(ziel, art, chat) {
  * haben. Wer die eigene Story gesehen hat, steht jetzt namentlich da; das
  * Mehr-Menue unterscheidet zwischen eigener und fremder Story.
  */
-function openStoryAnsichten(story, danach) {
-  // Wer die Story gesehen hat: die eigenen Kontakte, in fester Reihenfolge
-  // abhaengig von der Aufnahmezeit - sonst wechselt die Liste bei jedem
-  // Oeffnen und wirkt zufaellig.
-  const kontakte = state.contacts.filter((c) => state.users[c.id]);
-  const wieviele = Math.min(kontakte.length, 1 + (Math.floor((story.aufgenommen || 0) / 60000) % kontakte.length));
-  const seher = kontakte.slice(0, wieviele);
+async function openStoryAnsichten(story, danach) {
+  /*
+   * Wer die Story gesehen hat, steht in public.story_views.
+   *
+   * Bis zum 09.09.2026 stand hier eine Rechnung statt einer Abfrage: die
+   * ersten n eigenen Kontakte, n aus der Aufnahmezeit. Die Namen waren
+   * erfunden und die Zahl daneben auch — sie stieg mit dem Alter der Story,
+   * nicht mit den Zuschauern.
+   */
+  let seher = [];
+  try {
+    const r = await fetch(`/api/stories/${encodeURIComponent(story.id)}/ansichten`);
+    const daten = await r.json().catch(() => ({}));
+    if (daten.ok) seher = daten.seher || [];
+  } catch (fehler) {
+    console.error('Story-Ansichten fehlgeschlagen:', fehler);
+  }
 
   openSheet(
     `${seher.length} ${seher.length === 1 ? 'Ansicht' : 'Ansichten'}`,
@@ -7827,12 +9006,14 @@ function openStoryAnsichten(story, danach) {
        ${
          seher.length
            ? seher
-               .map((c) => {
-                 const u = user(c.id);
-                 return `<button class="item" data-seher="${c.id}">
-                   <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
-                   <span class="item__label">${esc(u.name)}</span>
-                   <span class="item__value">${esc(u.handle)}</span>
+               .map((v) => {
+                 // Bekannte Person: Name und Farbe aus dem geladenen Bestand,
+                 // sonst das, was der Server mitgeschickt hat.
+                 const u = state.users[v.id] || v;
+                 return `<button class="item" data-seher="${esc(v.id)}">
+                   <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials || '')}</span>
+                   <span class="item__label">${esc(u.name || 'Unbekannt')}</span>
+                   <span class="item__value">${esc(u.handle || '')}</span>
                  </button>`;
                })
                .join('')
@@ -7913,15 +9094,9 @@ async function openStoryOptionen(story, danach) {
           close();
 
           if (was === 'loeschen') {
-            eigeneStorySichern(null);
-            const meine = state.stories.find((x) => x.own);
-            if (meine) {
-              delete meine.mediaUri;
-              delete meine.aufgenommen;
-            }
             closeOverlay();
-            toast('Deine Story wurde gelöscht');
-            return render();
+            await storyLoeschen(story.id);
+            return;
           }
 
           if (was === 'sichern') {
@@ -9821,7 +10996,7 @@ async function renderVideoProfile() {
  */
 function renderCommunityChats() {
   const q = state.commSearchQuery.trim().toLowerCase();
-  const alle = state.communityChats || [];
+  const alle = vorschauenOeffnen(state.communityChats || []);
 
   const list = alle.filter((c) => {
     if (state.commChatFilter === 'chats' && c.isGroup) return false;
@@ -10363,7 +11538,7 @@ async function openChatSettings(chatId) {
            * steht nur, was gerade offen ist. Vorher exportierte der Knopf
            * bei einem Chat, den man nicht offen hatte, eine leere Datei.
            */
-          const verlauf = await (await fetch(`/api/messages/${chatId}`)).json();
+          const verlauf = await nachrichtenHolen(chatId);
           const text = verlauf
             .map((m) => `${m.from === 'me' ? 'Du' : user(m.from).name} (${m.time}): ${m.text || ''}`)
             .join('\n');
@@ -10535,8 +11710,7 @@ async function openChat(chatId) {
 
   state.openChatId = chatId;
 
-  const res = await fetch(`/api/messages/${chatId}`);
-  state.messages = await res.json();
+  state.messages = await nachrichtenHolen(chatId);
 
   if (chat.unread) {
     chat.unread = 0;
@@ -10728,6 +11902,45 @@ function paintMessages(chat) {
       if (platz) openExplorer('standort', platz.id);
     })
   );
+
+  // Anhang antippen → Vollformat (Henrik 7.9.).
+  box.querySelectorAll('[data-voll]').forEach((b) =>
+    b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
+  );
+}
+
+/*
+ * Das Vollformat (Henrik 07.09.2026: „antippen → Vollformat").
+ *
+ * Bewusst kein neuer Bildschirm, sondern eine Schicht darueber: der Chat
+ * bleibt stehen, Schliessen fuehrt an dieselbe Stelle im Verlauf zurueck.
+ * Ein Video bekommt hier `controls` — anders als in der Blase, wo es nur
+ * Standbild ist. Gleiches Verhalten in der App (`vollbild` in
+ * app/screens/messenger/ChatDetailScreen.tsx).
+ */
+function oeffneVollformat(adresse) {
+  if (!adresse) return;
+  const schicht = document.createElement('div');
+  schicht.className = 'vollformat';
+  schicht.innerHTML =
+    (istVideoAdresse(adresse)
+      ? `<video src="${esc(adresse)}" controls autoplay playsinline loop></video>`
+      : `<img src="${esc(adresse)}" alt="">`) +
+    `<button class="vollformat__zu" aria-label="Schließen">${ICONS.close}</button>`;
+
+  const zu = () => {
+    document.removeEventListener('keydown', taste);
+    schicht.remove();
+  };
+  const taste = (e) => {
+    if (e.key === 'Escape') zu();
+  };
+  // Auch der Grund neben dem Bild schliesst — sonst sucht man den Knopf.
+  schicht.addEventListener('click', (e) => {
+    if (e.target === schicht || e.target.closest('.vollformat__zu')) zu();
+  });
+  document.addEventListener('keydown', taste);
+  document.body.appendChild(schicht);
 }
 
 /**
@@ -10745,16 +11958,34 @@ function paintMessages(chat) {
 function anhangInhalt(m) {
   // Ein selbst geschicktes Foto liegt im Browser, nicht auf dem Server.
   const eigenesBild = eigeneMedien()[m.id];
-  const media =
-    m.media === 'image'
-      ? eigenesBild
-        ? `<img class="msg__bild" src="${eigenesBild}" alt="Foto">`
-        : m.mediaUrl
-        ? `<img class="msg__bild" src="${esc(m.mediaUrl)}" alt="Foto">`
-        : `<div class="msg__media">${ICONS.image} Foto</div>`
-      : m.media === 'audio'
-      ? `<div class="msg__media">${ICONS.mic} Sprachnachricht · 0:14</div>`
-      : '';
+  /*
+   * Henrik 07.09.2026: „Medien im Chat nur als Icon statt Vorschau in echter
+   * Groesse; antippen → Vollformat."
+   *
+   * Bild UND Video werden hier gleich behandelt: beide stehen in der Groesse
+   * da, in der sie geschickt wurden, und beide oeffnen beim Klick das
+   * Vollformat (`oeffneVollformat`). Ein Video zeigt vorher sein Standbild
+   * mit einem Wiedergabezeichen darauf — es soll nicht schon in der Blase
+   * loslaufen. Gleiche Regel in der App (renderMessage in
+   * app/screens/messenger/ChatDetailScreen.tsx).
+   */
+  const anhang = eigenesBild || (m.media !== 'audio' && m.media !== 'file' ? m.mediaUrl : '');
+  const media = anhang
+    ? istVideoAdresse(anhang)
+      ? `<button class="msg__anhang" data-voll="${esc(anhang)}">
+           <video class="msg__bild" src="${esc(anhang)}" muted playsinline preload="metadata"></video>
+           <span class="msg__anhangPlay">${ICONS.play}</span>
+         </button>`
+      : `<button class="msg__anhang" data-voll="${esc(anhang)}">
+           <img class="msg__bild" src="${esc(anhang)}" alt="Anhang">
+         </button>`
+    : m.media === 'image'
+    ? `<div class="msg__media">${ICONS.image} Foto</div>`
+    : m.media === 'video'
+    ? `<div class="msg__media">${ICONS.video} Video</div>`
+    : m.media === 'audio'
+    ? `<div class="msg__media">${ICONS.mic} Sprachnachricht · 0:14</div>`
+    : '';
 
   const standort = m.standort
     ? `<button class="msg__standort" data-msgort="${esc(m.standort.name)}">
@@ -10787,13 +12018,41 @@ function anhangInhalt(m) {
     : '';
 
   const sticker = m.media === 'sticker' ? `<span class="msg__sticker">${esc(m.text)}</span>` : '';
-  const gif = m.media === 'gif' ? `<div class="msg__media">${ICONS.film} Gif</div>` : '';
+  // Ein Gif mit Adresse ist ein Anhang wie jeder andere und steht oben schon
+  // als Vorschau; ohne Adresse bleibt es bei der Zeile.
+  const gif = m.media === 'gif' && !anhang ? `<div class="msg__media">${ICONS.film} Gif</div>` : '';
 
   return sticker || datei || gif || standort || kontakt || media || esc(m.text);
 }
 
 function messageBubble(m, chat) {
   const out = m.from === 'me';
+
+  /*
+   * Henrik 07.09.2026: „Anrufe sollen als Chatnachricht protokolliert werden
+   * (wie WhatsApp)."
+   *
+   * Der Eintrag ist keine Blase, sondern eine Zeile in der Mitte. Eine
+   * Sprechblase wuerde behaupten, jemand haette etwas geschrieben — der Anruf
+   * hat aber keinen Text. Gleiche Darstellung in der App (renderMessage in
+   * app/screens/messenger/ChatDetailScreen.tsx).
+   */
+  if (m.anruf) {
+    const verpasst = m.anruf.status !== 'beendet';
+    const ausgang =
+      verpasst
+        ? m.anruf.status === 'abgelehnt'
+          ? ' · abgelehnt'
+          : ' · verpasst'
+        : ` · ${dauerText(m.anruf.dauer)}`;
+    return `<div class="msg__anruf${verpasst ? ' msg__anruf--verpasst' : ''}">
+              ${m.anruf.art === 'video' ? ICONS.video : ICONS.phone}
+              <span>${out ? 'Ausgehender ' : ''}${
+      m.anruf.art === 'video' ? 'Videoanruf' : 'Anruf'
+    }${ausgang} · ${esc(m.time || '')}</span>
+            </div>`;
+  }
+
   /*
    * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026).
    *
@@ -10843,13 +12102,36 @@ function messageBubble(m, chat) {
   const inhalt = m.zurueckgenommen
     ? '<span class="msg__zurueck">Diese Nachricht wurde zurückgenommen</span>'
     : m.geteilt
-    ? `<div class="msg__geteilt">
-         <span class="msg__geteiltBild">${m.geteilt.art === 'video' ? ICONS.play : ICONS.image}</span>
-         <span class="msg__geteiltText">
-           <strong>${esc(m.geteilt.autor)}</strong>
-           <span>${esc(m.geteilt.titel)}</span>
+    ? /*
+       * Ein geteilter Beitrag (Henrik 7.9.). Vorher: eine Zeile mit einem
+       * grauen 42px-Kaestchen davor, nicht zu oeffnen — ein weitergeleitetes
+       * Video war im Chat also nur sein Titel. Jetzt steht der Beitrag selbst
+       * da und geht beim Klick ins Vollformat. Gleiche Regel in der App.
+       */
+      `<button class="msg__geteilt" ${
+        m.geteilt.bild ? `data-voll="${esc(m.geteilt.bild)}"` : ''
+      }>
+         ${
+           m.geteilt.bild && !istVideoAdresse(m.geteilt.bild)
+             ? `<img class="msg__bild" src="${esc(m.geteilt.bild)}" alt="">`
+             : m.geteilt.bild
+             ? `<span class="msg__anhang"><video class="msg__bild" src="${esc(
+                 m.geteilt.bild
+               )}" muted playsinline preload="metadata"></video><span class="msg__anhangPlay">${
+                 ICONS.play
+               }</span></span>`
+             : `<span class="msg__geteiltBild">${
+                 m.geteilt.art === 'video' ? ICONS.play : ICONS.image
+               }</span>`
+         }
+         <span class="msg__geteiltZeile">
+           ${m.geteilt.art === 'video' ? ICONS.play : ICONS.image}
+           <span class="msg__geteiltText">
+             <strong>${esc(m.geteilt.autor)}</strong>
+             <span>${esc(m.geteilt.titel)}</span>
+           </span>
          </span>
-       </div>`
+       </button>`
     : anhangInhalt(m);
 
   return `
@@ -11128,13 +12410,21 @@ async function sendMessage(chat) {
   const res = await fetch(`/api/messages/${chat.id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
-      zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
-    }),
+    body: JSON.stringify(
+      await sendeKoerper(chat.id, text, {
+        antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
+        zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
+      })
+    ),
   });
   const msg = await res.json();
+
+  /*
+   * Der Server schickt bei einer verschluesselten Nachricht keinen Text
+   * zurueck — er hat ihn nie gehabt. Ohne diese Zeile erschiene die eigene
+   * Nachricht als leere Blase und waere erst nach dem naechsten Laden da.
+   */
+  if (Number(msg.krypto) > 0) msg.text = text;
 
   // Bezug gleich mitzeichnen, statt auf das nächste Laden zu warten — sonst
   // erschiene die eigene Antwort einen Moment lang ohne ihren Anlass.
@@ -11183,8 +12473,12 @@ function closeChat() {
  */
 /** "vor 3 Min." aus dem Aufnahmezeitpunkt. */
 function storyAlter(s) {
-  if (!s.aufgenommen) return s.time || 'vor 2 Std.';
-  const min = Math.floor((Date.now() - s.aufgenommen) / 60000);
+  // `zeit` ist der Anlagezeitpunkt aus der Datenbank. Bis zum 09.09.2026
+  // stand hier `aufgenommen` — ein Feld, das nur die im Browser gespeicherte
+  // eigene Story hatte; fuer alle anderen Storys stand dauerhaft "vor 2 Std."
+  const wann = s.aufgenommen || (s.zeit ? Date.parse(s.zeit) : NaN);
+  if (!wann || Number.isNaN(wann)) return s.time || 'vor 2 Std.';
+  const min = Math.floor((Date.now() - wann) / 60000);
   if (min < 1) return 'gerade eben';
   if (min < 60) return `vor ${min} Min.`;
   return `vor ${Math.floor(min / 60)} Std.`;
@@ -11196,7 +12490,7 @@ const STORY_STEP = 60;
 
 function openStory(storyId) {
   // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
-  const list = state.stories.filter((s) => !s.own || s.mediaUri);
+  const list = alleStorys().filter((s) => !s.own || s.mediaUri);
   const idx = list.findIndex((s) => s.id === storyId);
   if (idx < 0) return;
 
@@ -11371,17 +12665,10 @@ function openStory(storyId) {
       pause();
       openStoryAnsichten(s, resume);
     });
-    $('#storyDelete').addEventListener('click', () => {
-      eigeneStorySichern(null);
-      const eigene = state.stories.find((x) => x.own);
-      if (eigene) {
-        delete eigene.mediaUri;
-        delete eigene.aufgenommen;
-      }
+    $('#storyDelete').addEventListener('click', async () => {
       stop();
       closeOverlay();
-      toast('Deine Story wurde gelöscht');
-      render();
+      await storyLoeschen(s.id);
     });
     return;
   }
@@ -11461,10 +12748,7 @@ function openStory(storyId) {
  * - wer aus einem Chat die Kamera aufmacht, will das Bild diesem Chat
  * schicken, nicht erst wieder gefragt werden.
  */
-function openCamera(zielChat = null) {
-  let mode = 'photo';
-  let recording = false;
-
+function openCamera(zielChat = null, { zielStory = false } = {}) {
   overlay.hidden = false;
   overlay.innerHTML = `
     <div class="camera">
@@ -11472,7 +12756,7 @@ function openCamera(zielChat = null) {
         <button id="camClose" aria-label="Schließen">${ICONS.close}</button>
         <button id="camFlash" aria-label="Blitz">${ICONS.flash}</button>
       </div>
-      <div class="camera__stage">${ICONS.camera}<span class="camera__sucher"><span></span><span></span><span></span><span></span></span></div>
+      ${kameraBuehne()}
       <div class="camera__modes">
         <button class="camera__mode is-active" data-mode="photo">FOTO</button>
         <button class="camera__mode" data-mode="video">VIDEO</button>
@@ -11489,8 +12773,13 @@ function openCamera(zielChat = null) {
     closeOverlay();
   };
 
-  /** Aufnahme fertig: entweder in den Chat, aus dem sie kam, oder zur Wahl. */
+  /** Aufnahme fertig: entweder ans genannte Ziel oder zur Wahl. */
   const aufnahmeFertig = async (bild) => {
+    // Kam die Kamera vom Plus an der eigenen Story, steht das Ziel fest.
+    if (zielStory) {
+      closeOverlay();
+      return alsStorySetzen(bild);
+    }
     if (!zielChat) {
       closeOverlay();
       return aufnahmeMenue(bild);
@@ -11512,38 +12801,16 @@ function openCamera(zielChat = null) {
   };
 
   $('#camClose').addEventListener('click', close);
-  $('#camFlash').addEventListener('click', () => toast('Blitz umgeschaltet'));
+
+  // Blitz, Kameraseite, Betriebsart und Ausloeser kommen aus demselben
+  // Laufwerk wie auf der Kameraseite - eine Bedienung, zwei Orte.
+  kameraLaufwerk(overlay.querySelector('.camera'), (bild) => aufnahmeFertig(bild));
   // Aus der Galerie statt aus der Kamera - dieselbe Aufnahme, nur ohne
   // capture-Kennzeichen, damit das Handy den Bildordner oeffnet.
   $('#camGallery').addEventListener('click', async () => {
     const bild = await aufnahmeHolen('photo', true);
     if (!bild) return;
     aufnahmeFertig(bild);
-  });
-  $('#camSwitch').addEventListener('click', () => toast('Kamera gewechselt'));
-
-  overlay.querySelectorAll('.camera__mode').forEach((b) =>
-    b.addEventListener('click', () => {
-      mode = b.dataset.mode;
-      overlay.querySelectorAll('.camera__mode').forEach((x) => x.classList.toggle('is-active', x === b));
-    })
-  );
-
-  // Punkt 17: aufnehmen und danach fragen, wohin damit - statt nur einen
-  // Hinweis auszugeben, bei dem die Aufnahme nirgends ankam.
-  $('#camShutter').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
-    if (mode === 'photo') {
-      const bild = await aufnahmeHolen('photo');
-      if (bild) aufnahmeFertig(bild);
-      return;
-    }
-    recording = !recording;
-    btn.classList.toggle('is-rec', recording);
-    if (recording) return toast('Aufnahme gestartet');
-
-    const bild = await aufnahmeHolen('video');
-    if (bild) aufnahmeFertig(bild);
   });
 }
 

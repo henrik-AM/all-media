@@ -123,11 +123,32 @@ All-Media/
 │   ├── lib/                 Supabase, Aufnahme, Personensuche, Antworten
 │   ├── test/                Alle Prüfreihen (siehe unten)
 │   ├── tools/               up.js (Tunnel starten), links.js
+│   ├── metro.config.js      Nimmt `gemeinsam/` für den Bundler dazu
 │   └── web-app.js           Nur die Weiterleitung an Metro für Expo Go
+├── gemeinsam/               Was App UND Website benutzen — bisher die
+│   └── spalten.js           Spaltenlisten der Datenbank. Eine Aenderung hier
+│                            gilt sofort für beide Seiten; vorher stand das
+│                            doppelt da und ist auseinandergelaufen.
+├── berichte/                Ältere Prüf- und Abschlussberichte (kein Code)
 ├── SUPABASE_SCHEMA.sql      Das gültige Schema, mit Row Level Security
 ├── SUPABASE_SETUP.md        Anleitung dazu
 └── VIDEO_CALLS_SETUP.md     Konzept für Anrufe mit echter Übertragung
 ```
+
+### Der Ordner `gemeinsam/`
+
+Alles darin wird von **beiden** Seiten geladen: der Node-Server per `require`,
+die App über Metro (`app/metro.config.js` nimmt den Ordner in `watchFolders`
+auf). Deshalb gilt dort:
+
+- **CommonJS** (`module.exports`), kein TypeScript — der Server hat keinen
+  Übersetzungsschritt, und ein solcher wäre die Stelle, an der ein Deployment
+  bei Render scheitert. Typen liefert eine `.d.ts`-Datei daneben.
+- **Keine Logik**, nur Werte. Sonst wäre diese Ablage selbst ein möglicher
+  Grund, warum App und Website sich unterschiedlich verhalten.
+- Wer eine Datei ergänzt, muss auch `app/test/_modulquelle.js` ansehen: die
+  Prüfläufe führen App-Code im Browser aus und müssen den Import auflösen
+  können.
 
 ## Design
 
@@ -155,6 +176,34 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 **Die Datenbank ist noch leer.** Einmalig `SUPABASE_SCHEMA.sql` im
 SQL-Editor von Supabase ausführen. Details in `SUPABASE_SETUP.md`.
 
+Die Schemadateien bauen aufeinander auf; `SUPABASE_SCHEMA_31_verschluesselung.sql`
+ist die jüngste.
+
+## Verschlüsselung
+
+Textnachrichten in Chats **zu zweit** sind Ende-zu-Ende verschlüsselt: sie
+werden auf dem Gerät verschlossen und erst auf dem Gerät des Gegenübers wieder
+geöffnet. Weder Supabase noch der eigene Node-Server bei Render sehen den
+Klartext.
+
+**Nicht verschlüsselt sind** Anrufe, Bilder und Dateien, Gruppen,
+Community-Kanäle und alles von vor dem 07.09.2026. Wer mit wem schreibt, ist
+ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die Verbindung. Es
+gibt keine Forward Secrecy, und ein neues Gerät kann alte Nachrichten nicht
+lesen. Die Oberfläche sagt das an Ort und Stelle; wo nichts verschlüsselt ist,
+steht auch kein Schloss.
+
+| Datei | Rolle |
+|---|---|
+| `gemeinsam/krypto.js` | Die Rechnung, gemeinsam für App und Website |
+| `gemeinsam/tweetnacl.js` | tweetnacl 1.0.3, unverändert eingekopiert |
+| `app/lib/krypto.ts` | Schlüssel im SecureStore des Handys |
+| `web/public/krypto.js` | Schlüssel im localStorage des Browsers |
+
+Ein Schlüsselpaar **je Gerät**, ein Kuvert je mitlesendem Gerät — App und
+Website sind zwei Geräte derselben Person, und kein geheimer Schlüssel wandert
+zwischen ihnen.
+
 ## Prüfen
 
 ```bash
@@ -173,6 +222,7 @@ npm run test:alles        # alle acht Prüfreihen (Server muss laufen)
 | `npm run test:anhang` | Anhänge im Chat, Optionen im fremden Profil | 12 |
 | `npm run test:einstellungen` | Jeder Punkt in den Einstellungen | 11 |
 | `npm run test:kontaktinfo` | Kontaktinfo und Gruppenanruf | 10 |
+| `npm run test:krypto` | Ende-zu-Ende-Verschlüsselung, Rechnung und Regeln | 23 |
 
 Dazu zwei Werkzeuge:
 

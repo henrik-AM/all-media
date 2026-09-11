@@ -89,11 +89,14 @@ const DETAILS = [
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await seite.reload({ waitUntil: 'networkidle' });
+  await seite.reload({ waitUntil: 'load' });
 
   await seite.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await seite.waitForSelector('.navbtn');
@@ -117,7 +120,7 @@ const DETAILS = [
    * noch einen Bilddurchlauf.
    */
   const ruhe = async (s) => {
-    await s.waitForLoadState('networkidle').catch(() => {});
+    await s.waitForLoadState('load', { timeout: 8000 }).catch(() => {});
     await s.waitForTimeout(250);
   };
 

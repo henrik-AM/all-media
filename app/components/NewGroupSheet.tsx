@@ -16,7 +16,10 @@ import * as ImagePicker from 'expo-image-picker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
-import { findePerson, nichtGefundenText } from '../lib/personSuche';
+import { useAktionen } from '../lib/useAktionen';
+
+// Dieselbe Regel wie ueberall sonst — siehe gemeinsam/telefon.js.
+const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
 import { useDaten } from '../contexts/DatenContext';
 import { Contact } from '../types';
 
@@ -44,6 +47,7 @@ interface Props {
  */
 export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }: Props) => {
   const { users } = useDaten();
+  const aktionen = useAktionen(onNotice);
   const insets = useSafeAreaInsets();
   const [schritt, setSchritt] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<string[]>([]);
@@ -87,18 +91,33 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
   const toggle = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  /** Jemanden ueber die Telefonnummer dazunehmen, auch ohne Kontakt zu sein. */
-  const nummerHinzufuegen = () => {
+  /*
+   * Jemanden ueber die Telefonnummer dazunehmen, auch ohne Kontakt zu sein.
+   *
+   * Gesucht wird ueber `finde_per_nummer` (Schema 24) und nicht mehr in der
+   * geladenen Liste: dort steht die Nummer nur von beidseitigen Kontakten
+   * (Fund 1), und genau die stehen ohnehin schon in der Auswahl darueber.
+   * Wer jemand Neues eintippte, landete deshalb immer bei „wird eingeladen",
+   * auch wenn die Person laengst ein Konto hatte.
+   *
+   * Der Benutzername ist als Weg raus (Henrik 7.9.) — `findePerson` haette
+   * ihn hier weiter angenommen, sobald die Eingabe nicht nach Nummer aussah.
+   */
+  const nummerHinzufuegen = async () => {
     const roh = nummer.trim();
     if (!roh) return onNotice('Bitte eine Telefonnummer eingeben');
 
-    const person = findePerson(roh, users);
+    const grund = Telefon.pruefe(roh);
+    if (grund) return onNotice(grund);
+
+    const person = await aktionen.personPerNummer(roh);
 
     if (person) {
       if (selected.includes(person.id) || extern.some((e) => e.id === person.id)) {
         return onNotice(`${person.name} ist schon dabei`);
       }
-      setExtern((prev) => [...prev, { id: person.id, name: person.name, phone: person.phone }]);
+      // Die Nummer kommt aus der Eingabe: die Suche gibt keine fremden heraus.
+      setExtern((prev) => [...prev, { id: person.id, name: person.name, phone: roh }]);
       setNummer('');
       return onNotice(`${person.name} hinzugefügt`);
     }

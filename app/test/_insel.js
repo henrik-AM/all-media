@@ -25,7 +25,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
-  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.goto(ZIEL, { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -37,15 +37,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForSelector('#topbar button');
 
   const ergebnisse = [];
@@ -208,6 +211,33 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(300);
     const aktiv = await page.$eval('#topbar .is-active', (n) => n.dataset.sub);
     if (aktiv !== 'chats') throw new Error('startet bei „' + aktiv + '"');
+  });
+
+  /*
+   * Der Wettlauf zwischen Einstellungen und Bereichswechsel.
+   *
+   * Die Einstellungen holen ihre Werte beim ersten Oeffnen nach. Bis zum
+   * 10.09.2026 zeichnete die spaete Antwort die Seite blind neu — wer gleich
+   * weiter in den Messenger tippte, sah dort die Einstellungsseite, waehrend
+   * die untere Leiste „Messenger" anzeigte. Aufgefallen ist es nur, weil die
+   * Chatliste in diesem Lauf ploetzlich leer war.
+   *
+   * Nachgestellt wird es, indem die gemerkten Einstellungen weggeraeumt
+   * werden: dann laeuft das Nachholen wieder los.
+   */
+  await pruefe('Ein schneller Weg aus den Einstellungen laesst sie nicht stehen', async () => {
+    await page.evaluate(() => {
+      state.einstellungen = null;
+    });
+    await page.click('[data-area="settings"]');
+    // Ohne Wartezeit — genau darum geht es.
+    await page.click('[data-area="messenger"]');
+    await page.waitForTimeout(1500);
+    const chats = await page.$$eval('[data-chat]', (n) => n.length);
+    if (!chats) {
+      const anfang = await page.$eval('#main', (n) => n.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
+      throw new Error('keine Chatliste, stattdessen: „' + anfang + '"');
+    }
   });
 
   const erfuellt = ergebnisse.filter(Boolean).length;

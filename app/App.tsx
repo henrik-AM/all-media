@@ -64,14 +64,14 @@ type Overlay =
    * Kontaktprofil (Nummer, Medien, Blockieren), sonst das oeffentliche
    * Profil mit Beitraegen.
    */
-  | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich' }
+  | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich'; versatz?: number }
   | { kind: 'contacts' }
   /**
    * `zielChat` gesetzt heißt: die Kamera kam aus einem Chat. Dann steht das
    * Ziel schon fest und die Aufnahme geht ohne Rückfrage dorthin — wer aus
    * einem Chat die Kamera aufmacht, will das Bild diesem Chat schicken.
    */
-  | { kind: 'camera'; zielChat?: Chat }
+  | { kind: 'camera'; zielChat?: Chat; zielStory?: boolean }
   | { kind: 'call'; userId?: string; gruppenName?: string; teilnehmer?: string[]; art: 'audio' | 'video' }
   | { kind: 'livestream' }
   /* Die offenen Insights einer Person ansehen — Handbuch-Abgleich 01.09.2026. */
@@ -103,6 +103,8 @@ interface Formular {
   title: string;
   felder: FormularFeld[];
   knopf: string;
+  /** Was schon in den Feldern steht, wenn das Blatt aufgeht. */
+  vorbelegung?: Record<string, string>;
   absenden: (werte: Record<string, string>) => string | null;
 }
 
@@ -137,12 +139,25 @@ const Shell = () => {
   const [chatOptionen, setChatOptionen] = useState<Chat | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
+  /*
+   * Der Videos-Bereich hat seit dem 07.09.2026 seine eigene Storyleiste:
+   * dort stehen die gefolgten Profile, im Messenger die Kontakte. Beide
+   * Listen koennen dieselbe Story enthalten — wer jemanden kennt UND ihm
+   * folgt, sieht sie zweimal. Deshalb fasst `storysAendern` immer beide an;
+   * sonst waere eine Story im einen Bereich gesehen und im anderen nicht.
+   */
+  const [storiesVideos, setStoriesVideos] = useState<Story[]>([]);
+  const storysAendern = (f: (prev: Story[]) => Story[]) => {
+    setStories(f);
+    setStoriesVideos(f);
+  };
 
   useEffect(() => {
     if (!daten.geladen) return;
     setChats(daten.chats);
     setContacts(daten.contacts);
     setStories(daten.stories);
+    setStoriesVideos(daten.storiesVideos);
   }, [daten.geladen]);
 
   // Die drei Knoepfe oben rechts im eigenen Profil gehoeren zu genau einem
@@ -180,6 +195,21 @@ const Shell = () => {
   const wechsleBereich = (next: AreaKey) => {
     setArea(next);
     setSubs((prev) => ({ ...prev, [next]: defaultSub[next] }));
+    /*
+     * Und die Einstellungen faengt wieder oben an.
+     *
+     * Henrik am 07.09.2026: „danach normaler Einstellungen-Eintritt soll
+     * Standardseite laden (aktuell manchmal noch alter Messenger-Screen)."
+     * Der Grund: wer ueber „Profil → Einstellungen" hereinkam, setzte
+     * `settingsVonBereich` und `settingsSprung`. Verliess er die
+     * Einstellungen dann nicht ueber den Zurueck-Pfeil, sondern unten ueber
+     * die Leiste, blieben beide stehen — beim naechsten Mal sprang es wieder
+     * zum Messenger-Abschnitt und der Pfeil stand da, der nirgends hinfuehrt.
+     */
+    if (next === 'settings') {
+      setSettingsSprung(null);
+      setSettingsVonBereich(null);
+    }
   };
 
   /*
@@ -227,6 +257,16 @@ const Shell = () => {
   // Wahr, sobald der Bildschirm ueber den Pruefschalter aufgemacht wurde.
   // Der Story-Betrachter blaettert dann nicht von selbst weiter.
   const [pruefStandbild, setPruefStandbild] = useState(false);
+  // Der Bereich, dessen Sichtbarkeits-Blatt in den Einstellungen aufgehen
+  // soll — "settings#sicht:story". Ebenfalls nur fuer die Pruefbilder.
+  const [pruefSicht, setPruefSicht] = useState<string | null>(null);
+  /*
+   * Das Auswahlfenster der Kartenansichten (Standard/Satellit/Gelaende).
+   * Es liegt in der Karte selbst, und die ist eine WebView — von aussen ist
+   * im Simulator nichts anzutippen. Ohne diesen Schalter kaeme das Fenster
+   * in keinem Bild vor. Aufruf: `messenger/friendmap#karte:stile`.
+   */
+  const [pruefKarteStile, setPruefKarteStile] = useState(false);
   useEffect(() => {
     if (!__DEV__ || pruefbildGesetzt.current) return;
     if (daten.chats.length === 0 && Object.keys(daten.users).length === 0) return;
@@ -285,7 +325,17 @@ const Shell = () => {
       }
       case 'kontakt': {
         const id = nutzerId(a);
-        if (id) setOverlay({ kind: 'profile', userId: id, variant: 'kontakt' });
+        // Dritter Teil, nur fuer Pruefbilder: "kontakt:Anna Schmidt:520" faengt
+        // 520 Punkte weiter unten an. Ohne das fotografiert man immer nur den
+        // oberen Rand der Liste.
+        const versatz = Number(b);
+        if (id)
+          setOverlay({
+            kind: 'profile',
+            userId: id,
+            variant: 'kontakt',
+            versatz: Number.isFinite(versatz) && versatz > 0 ? versatz : undefined,
+          });
         break;
       }
       case 'kontakte':
@@ -340,6 +390,29 @@ const Shell = () => {
        * obwohl er ein eigener Vollbildschirm ist — geprüft war nur, dass die
        * Daten in der Datenbank ankommen, nicht wie die Ansicht aussieht.
        */
+      /*
+       * Das Sichtbarkeits-Blatt der Einstellungen — "sicht:story". Es kam in
+       * keinem Bild vor, obwohl dort seit dem 07.09.2026 der Zusatz "Story
+       * auch in Videos teilen" steht und die vier Stufen daran haengen.
+       */
+      case 'sicht':
+        if (a) setPruefSicht(a);
+        break;
+      /*
+       * Der Weg "Profil → Einstellungen" — "settings#aus:messenger". Nur so
+       * ist der Zurueck-Pfeil oben links fotografierbar: er haengt an
+       * settingsVonBereich, und das setzt sonst nur ein Fingertipp im Profil.
+       * Henrik hatte am 07.09.2026 genau diesen Pfeil gemeldet.
+       */
+      case 'aus':
+        if (NAV.some((n) => n.key === a)) {
+          setSettingsSprung(a);
+          setSettingsVonBereich(a as AreaKey);
+        }
+        break;
+      case 'karte':
+        if (a === 'stile') setPruefKarteStile(true);
+        break;
       case 'insights': {
         const id = a ? nutzerId(a) || a : 'me';
         if (id) setOverlay({ kind: 'insights', userId: id });
@@ -496,25 +569,16 @@ const Shell = () => {
     setNotice('Foto gesendet');
   };
 
-  /** Punkt 17: eine Aufnahme direkt als Beitrag veröffentlichen. */
-  const aufnahmeAlsBeitrag = (uri: string) => {
-    setOverlay(null);
-    setFormular({
-      title: 'Neuer Beitrag',
-      knopf: 'Veröffentlichen',
-      felder: [
-        { key: 'beschreibung', label: 'Beschreibung', typ: 'mehrzeilig', pflicht: true },
-        { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
-      ],
-      absenden: ({ beschreibung, ort }) => {
-        profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri });
-        setArea('videos');
-        setSubs((prev) => ({ ...prev, videos: 'home' as SubKey }));
-        setNotice('Beitrag veröffentlicht');
-        return null;
-      },
-    });
-  };
+  /*
+   * Hier stand `aufnahmeAlsBeitrag` — der Weg von der Messenger-Kamera in
+   * einen öffentlichen Beitrag.
+   *
+   * Henrik, 07.09.2026: "Beiträge nur Videos, nicht Messenger — Messenger
+   * privat/nummerbasiert, Videos öffentlich." Beiträge entstehen im
+   * Videos-Bereich über das Erstellen-Blatt (`punkt === 'post'`); dieser
+   * zweite Weg aus der privaten Kamera heraus führte über die Trennlinie
+   * zwischen beiden Bereichen und ist deshalb entfallen.
+   */
 
   /*
    * Eine Gruppe anlegen.
@@ -697,10 +761,12 @@ const Shell = () => {
 
   const openStory = (story: Story) => {
     // Eigene Story: noch leer -> aufnehmen, sonst ansehen.
-    if (story.own && !story.mediaUri) return setOverlay({ kind: 'camera' });
+    // Das Plus an der eigenen Story nennt das Ziel schon — die Kamera fragt
+    // danach nicht noch einmal nach (Henrik, 07.09.2026).
+    if (story.own && !story.mediaUri) return setOverlay({ kind: 'camera', zielStory: true });
     /* Story als viewed markieren, wenn sie angesehen wird */
     if (!story.viewed) {
-      setStories((prev) =>
+      storysAendern((prev) =>
         prev.map((s) => (s.id === story.id ? { ...s, viewed: true } : s))
       );
     }
@@ -715,8 +781,35 @@ const Shell = () => {
    * Start war sie weg. Jetzt geht sie in den Speicher von Supabase und in die
    * Tabelle `stories` — die Kennung von dort ersetzt die oertliche.
    */
-  const storyAufgenommen = async (uri: string) => {
-    setStories((prev) =>
+  /*
+   * Beim Posten wird gefragt, ob die Story auch unter Videos stehen soll.
+   *
+   * Henrik am 07.09.2026: „Storys nicht mehr bereichsuebergreifend
+   * (Messenger/Videos strikt getrennt); beim Posten fragen ob uebergreifend
+   * teilen."
+   *
+   * Gefragt wird nur, wenn es etwas zu entscheiden gibt. Die Story-
+   * Sichtbarkeit unter „Alle" heisst: die Story geht an Kontakte. Unter
+   * Videos folgen einem auch Fremde — dorthin kann sie dann gar nicht,
+   * und eine Frage mit nur einer moeglichen Antwort ist keine Frage,
+   * sondern ein zusaetzlicher Tastendruck. Dieselbe Bindung steht in
+   * Schema 30/36 und in der Datenbank, nicht nur hier.
+   */
+  const [storyFrage, setStoryFrage] = useState<string | null>(null);
+  const storySichtbarkeit = daten.sichtbarkeit.story;
+  const darfInVideos = (storySichtbarkeit?.stufe ?? 'alle') === 'alle';
+
+  const storyAufgenommen = (uri: string) => {
+    if (darfInVideos) {
+      setOverlay(null);
+      setStoryFrage(uri);
+      return;
+    }
+    storyPosten(uri, false);
+  };
+
+  const storyPosten = async (uri: string, inVideos: boolean) => {
+    storysAendern((prev) =>
       prev.map((s) =>
         s.own
           ? { ...s, mediaUri: uri, aufgenommen: Date.now(), viewed: false, name: 'Deine Story' }
@@ -725,17 +818,22 @@ const Shell = () => {
     );
     setOverlay(null);
 
-    const id = await aktion.storyAnlegen({ mediaUrl: uri, mediaTyp: 'image' });
+    const id = await aktion.storyAnlegen({ mediaUrl: uri, mediaTyp: 'image', inVideos });
     if (!id) {
       // Die Aufnahme wieder herausnehmen: eine Story, die es nirgends gibt,
       // soll auch im eigenen Ring nicht stehen.
-      setStories((prev) =>
+      storysAendern((prev) =>
         prev.map((s) => (s.own ? { ...s, mediaUri: undefined, aufgenommen: undefined } : s))
       );
       return;
     }
-    setStories((prev) => prev.map((s) => (s.own ? { ...s, id } : s)));
-    setNotice('Deine Story ist online');
+    storysAendern((prev) => prev.map((s) => (s.own ? { ...s, id } : s)));
+    // Was gerade entschieden wurde, gehoert in die Rueckmeldung — sonst
+    // erfaehrt man erst beim naechsten Blick in den Videos-Bereich, was die
+    // Antwort bewirkt hat.
+    setNotice(
+      inVideos ? 'Deine Story ist online — auch unter Videos' : 'Deine Story ist online'
+    );
   };
 
   // Antwort auf eine Story: sie landet im Chat mit dieser Person, und der Chat
@@ -814,15 +912,43 @@ const Shell = () => {
   };
 
   /*
-   * "Profil bearbeiten" fuehrt in die Einstellungen zum Abschnitt Konto -
-   * dort steht das Formular, das Name, Info und Link wirklich aendert.
-   * Ein eigenes Blatt im Profil waere ein zweites Formular fuer dieselben
-   * Felder; so gibt es nur eine Stelle, an der sich das Profil aendert.
+   * "Profil bearbeiten" oeffnet ein kleines Blatt ueber dem Profil.
+   *
+   * Bis zum 09.09.2026 sprang der Knopf in die Einstellungen zum Abschnitt
+   * Konto. Henrik am 07.09.2026: „Profil bearbeiten soll kleines Popup
+   * oeffnen, nicht zu Einstellungen leiten." Er hat recht — man will drei
+   * Felder aendern und wieder da sein, wo man war; stattdessen landete man
+   * in einem fremden Bereich und musste sich zurueckarbeiten.
+   *
+   * Es ist trotzdem nur ein Formular: dieselben Felder wie in den
+   * Einstellungen, derselbe Weg in die Datenbank (`profilSpeichern`). Die
+   * Website macht es seit laengerem so (`openProfilBearbeiten`).
    */
   const profilBearbeiten = () => {
-    setSettingsSprung('konto');
-    setSettingsVonBereich(area);
-    setArea('settings');
+    setFormular({
+      title: 'Profil bearbeiten',
+      felder: [
+        { key: 'name', label: 'Name', pflicht: true },
+        { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
+        { key: 'link', label: 'Link' },
+      ],
+      knopf: 'Speichern',
+      vorbelegung: {
+        name: profil.eigenesProfil.name,
+        bio: profil.eigenesProfil.bio,
+        link: profil.eigenesProfil.link,
+      },
+      absenden: (werte) => {
+        profil.profilSpeichern({
+          name: werte.name?.trim() || profil.eigenesProfil.name,
+          bio: werte.bio ?? profil.eigenesProfil.bio,
+          link: werte.link ?? profil.eigenesProfil.link,
+        });
+        setFormular(null);
+        setNotice('Profil gespeichert');
+        return null;
+      },
+    });
   };
 
   /**
@@ -882,7 +1008,8 @@ const Shell = () => {
   const erstelle = async (punkt: ErstellenPunkt) => {
     setSheet(null);
 
-    if (punkt === 'story') return setOverlay({ kind: 'camera' });
+    // „Story" im Erstellen-Blatt ist ebenfalls ein genanntes Ziel.
+    if (punkt === 'story') return setOverlay({ kind: 'camera', zielStory: true });
     if (punkt === 'livestream') return setOverlay({ kind: 'livestream' });
 
     if (punkt === 'highlight' || punkt === 'playlist') {
@@ -1153,6 +1280,7 @@ const Shell = () => {
           onOpenChat={oeffneChat}
           onOpenPublicProfile={openPublicProfile}
           onNotice={setNotice}
+          startVersatz={overlay.versatz}
         />
       );
     }
@@ -1186,12 +1314,17 @@ const Shell = () => {
     return (
       <StoryViewerScreen
         story={overlay.story}
-        alle={stories}
+        /*
+         * Weitergeblaettert wird in der Leiste, aus der die Story geoeffnet
+         * wurde — im Videos-Bereich also durch die gefolgten Profile, nicht
+         * durch die Kontakte.
+         */
+        alle={area === 'videos' ? storiesVideos : stories}
         standbild={pruefStandbild}
         onStoryViewed={(storyId) => {
           // Nichts anfassen, wenn sie schon gesehen ist: sonst entsteht bei
           // jedem Melden ein neues Feld, und der Betrachter baut sich neu auf.
-          setStories((prev) =>
+          storysAendern((prev) =>
             prev.some((s) => s.id === storyId && !s.viewed)
               ? prev.map((s) => (s.id === storyId ? { ...s, viewed: true } : s))
               : prev
@@ -1204,7 +1337,7 @@ const Shell = () => {
            * Start wieder bunt.
            */
           aktion.storyGesehen(storyId, () =>
-            setStories((prev) => prev.map((s) => (s.id === storyId ? { ...s, viewed: false } : s)))
+            storysAendern((prev) => prev.map((s) => (s.id === storyId ? { ...s, viewed: false } : s)))
           );
         }}
         onClose={() => {
@@ -1213,7 +1346,7 @@ const Shell = () => {
         onDelete={() => {
           const eigene = stories.find((s) => s.own);
           const vorher = eigene ? { ...eigene } : null;
-          setStories((prev) =>
+          storysAendern((prev) =>
             prev.map((s) =>
               s.own ? { ...s, mediaUri: undefined, aufgenommen: undefined } : s
             )
@@ -1223,7 +1356,7 @@ const Shell = () => {
           // Ring und stand bei allen anderen weiter da.
           if (eigene?.id) {
             aktion.storyLoeschen(eigene.id, () =>
-              setStories((prev) => prev.map((s) => (s.own && vorher ? vorher : s)))
+              storysAendern((prev) => prev.map((s) => (s.own && vorher ? vorher : s)))
             );
           }
         }}
@@ -1265,13 +1398,13 @@ const Shell = () => {
       <CameraScreen
         // Kam die Kamera aus einem Chat, ist das Ziel klar - dann keine Frage.
         direktZu={zielChat ? (uri) => aufnahmeInChat(zielChat, uri) : undefined}
+        zielStory={overlay.zielStory}
         onClose={() => setOverlay(null)}
         onCaptured={storyAufgenommen}
         onAnChat={(uri) => {
           setOverlay(null);
           setAufnahmeFuerChat(uri);
         }}
-        onAlsBeitrag={aufnahmeAlsBeitrag}
         onNotice={setNotice}
       />
     );
@@ -1444,7 +1577,7 @@ const Shell = () => {
 
   const renderContent = () => {
     if (area === 'messenger') {
-      if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onEditSelectedContacts={() => setOverlay({ kind: 'editSelectedContacts' })} onNotice={setNotice} />;
+      if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onEditSelectedContacts={() => setOverlay({ kind: 'editSelectedContacts' })} onNotice={setNotice} pruefStilOffen={pruefKarteStile} />;
       if (sub === 'camera') {
         return (
           <CameraScreen
@@ -1455,7 +1588,6 @@ const Shell = () => {
               setSub('chats');
             }}
             onAnChat={setAufnahmeFuerChat}
-            onAlsBeitrag={aufnahmeAlsBeitrag}
             onNotice={setNotice}
           />
         );
@@ -1465,7 +1597,17 @@ const Shell = () => {
           <MessengerProfileScreen
             onSwitchArea={switchArea}
             onSwitchAccount={() => setSheet('konto')}
-            onOpenSettings={() => { setSettingsVonBereich('messenger'); setArea('settings'); }}
+            /*
+             * Henrik am 07.09.2026: „Einstellungen auf der Profilseite soll
+             * direkt zu den Messenger-Untereinstellungen fuehren." Vorher
+             * landete man ganz oben bei „Allgemein" und musste den Abschnitt
+             * suchen.
+             */
+            onOpenSettings={() => {
+              setSettingsVonBereich('messenger');
+              setSettingsSprung('messenger');
+              setArea('settings');
+            }}
             onBearbeiten={profilBearbeiten}
             onAvatarPress={() => setOverlay({ kind: 'avatarViewer', userId: 'me', name: profil.eigenesProfil.name })}
             onNotice={setNotice}
@@ -1503,7 +1645,7 @@ const Shell = () => {
       if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onNotice={setNotice} onOpenFollowers={() => setOverlay({ kind: 'followers', userId: 'me' })} onOpenFollowing={() => setOverlay({ kind: 'following', userId: 'me' })} />;
       return (
         <HomeFeedScreen
-          stories={stories}
+          stories={storiesVideos}
           onOpenStory={openStory}
           onOpenProfile={openPublicProfile}
           onShare={teileBeitrag}
@@ -1546,13 +1688,25 @@ const Shell = () => {
         onSwitchAccount={() => setSheet('konto')}
         sprung={settingsSprung}
         onSprungFertig={() => setSettingsSprung(null)}
-        onBack={() => {
-          if (settingsVonBereich) {
-            setArea(settingsVonBereich);
-            setSubs((prev) => ({ ...prev, [settingsVonBereich]: 'profile' }));
-            setSettingsVonBereich(null);
-          }
-        }}
+        pruefSicht={pruefSicht}
+        /*
+         * Den Zurueck-Pfeil gibt es nur, wenn es ein Zurueck gibt.
+         *
+         * Vorher wurde hier immer eine Funktion uebergeben — der Pfeil stand
+         * also auch dann in der Kopfzeile, wenn man die Einstellungen unten
+         * ueber die Leiste geoeffnet hatte, und tat beim Antippen nichts.
+         * Genau das meinte Henrik mit „Zurueck-Pfeil fehlplatziert/defekt".
+         */
+        onBack={
+          settingsVonBereich
+            ? () => {
+                setArea(settingsVonBereich);
+                setSubs((prev) => ({ ...prev, [settingsVonBereich]: 'profile' }));
+                setSettingsVonBereich(null);
+                setSettingsSprung(null);
+              }
+            : undefined
+        }
       />
     );
   };
@@ -1574,6 +1728,38 @@ const Shell = () => {
       <View style={[styles.content, hatInsel && { paddingTop: inselPlatz }]}>{renderContent()}</View>
       <TopSwitcher area={area} active={sub} onChange={setSub} zaehler={inselZaehler} />
       <TabBar active={area} onChange={wechsleBereich} unreadCount={unreadCount} />
+
+      {/*
+        * Die Frage beim Posten einer Story. Vorbelegt ist nichts — beide
+        * Wege stehen gleichberechtigt da, weil beide etwas anderes
+        * bedeuten: der Messenger ist privat und nummernbasiert, Videos ist
+        * oeffentlich.
+        */}
+      <ActionSheet
+        visible={Boolean(storyFrage)}
+        title="Wo soll die Story stehen?"
+        untertitel={
+          storySichtbarkeit?.inVideos
+            ? 'Deine Einstellung erlaubt beides.'
+            : 'Im Messenger sehen sie deine Kontakte, unter Videos alle, die dir folgen.'
+        }
+        vorschauUri={storyFrage ?? undefined}
+        items={[
+          { key: 'messenger', label: 'Nur im Messenger', icon: 'chatbubble-outline' },
+          { key: 'beides', label: 'Auch unter Videos', icon: 'play-circle-outline' },
+        ]}
+        onSelect={(key) => {
+          const uri = storyFrage;
+          setStoryFrage(null);
+          if (uri) storyPosten(uri, key === 'beides');
+        }}
+        onClose={() => {
+          // Wegtippen heisst hier abbrechen — die Aufnahme geht nirgendwohin.
+          // Das muss dastehen: sonst sieht es aus wie „gepostet".
+          setStoryFrage(null);
+          setNotice('Story verworfen');
+        }}
+      />
 
       <ActionSheet
         visible={sheet === 'new'}
@@ -1709,6 +1895,7 @@ const Shell = () => {
           title={formular.title}
           felder={formular.felder}
           knopf={formular.knopf}
+          vorbelegung={formular.vorbelegung}
           onClose={() => setFormular(null)}
           onSubmit={formular.absenden}
           onNotice={setNotice}

@@ -26,6 +26,17 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien } from './medien';
+import type { Impression } from './impressionen';
+import {
+  aufschliessen,
+  fuerChatVerschliessen,
+  meinSchluessel,
+  NICHT_LESBAR,
+  offen,
+} from './krypto';
+
+// Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
+const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
 
 /**
  * Eine Zeile, die es entweder gibt oder nicht — Like, Speichern, Folgen.
@@ -45,10 +56,20 @@ async function umschalten(
   if (fehlerLesen) throw fehlerLesen;
 
   if ((count ?? 0) > 0) {
-    let loeschen = client.from(tabelle).delete();
+    /*
+     * `count: 'exact'` ist hier keine Zierde.
+     *
+     * Verbietet eine Regel der Datenbank das Loeschen, kommt kein Fehler
+     * zurueck — PostgREST loescht null Zeilen und meldet Erfolg. Ohne diese
+     * Zahl gaebe `umschalten` dann `false` zurueck, das Herz wuerde grau, und
+     * das Like bliebe stehen. Beim naechsten Laden waere es wieder rot, ohne
+     * dass irgendwo ein Fehler stuende.
+     */
+    let loeschen = client.from(tabelle).delete({ count: 'exact' });
     for (const [spalte, wert] of Object.entries(schluessel)) loeschen = loeschen.eq(spalte, wert);
-    const { error } = await loeschen;
+    const { error, count: geloescht } = await loeschen;
     if (error) throw error;
+    if ((geloescht ?? 0) === 0) throw new Error(`Zeile in ${tabelle} liess sich nicht entfernen`);
     return false;
   }
 
@@ -215,6 +236,48 @@ export function nachrichtMarkieren(client: SupabaseClient, ichId: string, nachri
 }
 
 /**
+ * Einen Kontakt umbenennen und mit einer Notiz versehen.
+ *
+ * Henrik, 07.09.2026: "Kontaktinfo-Änderungen (z.B. Name) speichern/
+ * synchronisieren nicht." Das Blatt "Kontakt bearbeiten" schrieb bis heute
+ * nirgendwohin — der neue Name lag in einem Zustand im Bildschirm und war
+ * beim naechsten Oeffnen weg, die Notiz wurde gar nicht erst gelesen.
+ *
+ * Geschrieben wird an `contacts`, nicht an `profiles`: wie jemand heisst,
+ * entscheidet die Person selbst; wie ich sie in meiner Liste nenne, ich
+ * (Schema 33). Ein leeres Feld nimmt den Spitznamen wieder zurueck — sonst
+ * gaebe es keinen Weg zurueck zum echten Namen.
+ */
+export async function kontaktBearbeiten(
+  client: SupabaseClient,
+  ichId: string,
+  zielId: string,
+  werte: { spitzname?: string; notiz?: string }
+) {
+  const felder: { spitzname?: string | null; notiz?: string | null } = {};
+  if (werte.spitzname !== undefined) felder.spitzname = werte.spitzname.trim() || null;
+  if (werte.notiz !== undefined) felder.notiz = werte.notiz.trim() || null;
+
+  const { data, error } = await client
+    .from('contacts')
+    .update(felder)
+    .eq('user_id', ichId)
+    .eq('contact_id', zielId)
+    .select('contact_id');
+  if (error) throw error;
+  /*
+   * Gegengeprueft, nicht geglaubt: unter den Zeilenregeln liefert ein
+   * abgelehntes UPDATE null Zeilen und keinen Fehler. Ohne diese Pruefung
+   * meldete die Oberflaeche wieder "gespeichert", und wieder waere nichts
+   * gespeichert — genau der Fehler, den dieser Punkt behebt.
+   */
+  if (!data || data.length === 0) {
+    throw new Error('Diese Person steht nicht in deinen Kontakten');
+  }
+  return true;
+}
+
+/**
  * Einen Kontakt zum Liebling machen oder nicht mehr.
  *
  * Anders als die übrigen: es gibt keine eigene Tabelle, sondern eine Spalte
@@ -259,6 +322,31 @@ export async function storyGesehen(client: SupabaseClient, ichId: string, storyI
     );
   if (error) throw error;
   return true;
+}
+
+/**
+ * Gesehene Beitraege vermerken — die Grundlage des spaeteren Feed-Rankings.
+ *
+ * Gebuendelt, nicht einzeln: wer zwei Minuten scrollt, hat zwanzig
+ * Sichtungen gesammelt, und zwanzig Rundreisen ueber das Mobilfunknetz sind
+ * zwanzig Gelegenheiten zu scheitern. Gemessen wird in
+ * `lib/impressionen.ts`, geschrieben wird hier.
+ *
+ * Der Betrachter kommt aus `auth.uid()` in der Datenbank und wird bewusst
+ * nicht mitgeschickt — die Lehre aus Fund 11 der Sicherheitspruefung.
+ * Andernfalls koennte sich jeder Sichtungen unter fremdem Namen ausdenken
+ * und damit spaeter das Ranking faerben.
+ *
+ * Die Website macht dasselbe in `web/server/sync-handlers.js`.
+ */
+export async function impressionenVermerken(
+  client: SupabaseClient,
+  eintraege: Impression[]
+): Promise<number> {
+  if (eintraege.length === 0) return 0;
+  const { data, error } = await client.rpc('impressionen_vermerken', { eintraege });
+  if (error) throw error;
+  return Number(data ?? 0);
 }
 
 export interface NeuerBeitrag {
@@ -344,6 +432,99 @@ export async function profilAendern(
   const { error } = await client.from('profiles').update(felder).eq('id', ichId);
   if (error) throw error;
   return true;
+}
+
+/**
+ * Eine Person ueber ihre Telefonnummer suchen.
+ *
+ * Henrik am 07.09.2026: „Kontakt hinzufügen nur über Telefonnummer/QR-Code,
+ * nicht Username."
+ *
+ * WARUM DIE DATENBANK UND NICHT DIE GELADENE LISTE
+ *
+ * `AddContactSheet` suchte bis dahin in `useDaten().users`. Dort steht die
+ * Nummer aber nur von Leuten, mit denen man schon beidseitig Kontakt ist
+ * (Sicherheitspruefung 04.09.2026, Fund 1 — `meine_kontaktnummern()`). Wer
+ * jemand Neues ueber die Nummer suchte, bekam also „Zu dieser Nummer gibt es
+ * noch kein Konto", obwohl es das Konto gab. Genau der Weg, den Henrik als
+ * einzigen behalten will, war der einzige, der nicht funktionierte.
+ *
+ * `finde_per_nummer` (Schema 24) rechnet dieselbe Vergleichsform wie
+ * gemeinsam/telefon.js und gibt nur die eine passende Zeile heraus — wer die
+ * Nummer kennt, findet die Person, wer sie nicht kennt, bekommt nichts. Die
+ * Website nimmt denselben Weg (`handleFindPerson` in
+ * web/server/sync-handlers.js).
+ */
+export async function personPerNummer(
+  client: SupabaseClient,
+  nummer: string
+): Promise<{ id: string; name: string; handle: string; privat: boolean; about?: string } | null> {
+  const grund = Telefon.pruefe(nummer);
+  if (grund) throw new Error(grund);
+
+  const { data, error } = await client.rpc('finde_per_nummer', {
+    nummer: Telefon.speicherform(nummer),
+  });
+  if (error) throw error;
+  if (!data) return null;
+
+  const p = data as any;
+  return {
+    id: p.id,
+    name: p.name,
+    handle: p.handle,
+    privat: Boolean(p.privat),
+    about: p.about ?? '',
+  };
+}
+
+/**
+ * Die eigene Telefonnummer ändern.
+ *
+ * Bis zum 07.09.2026 stand hinter „Telefonnummer ändern" ein Formular, das
+ * „Wir haben dir einen Bestätigungscode geschickt" meldete und nichts tat.
+ * Beides war falsch: es ging kein Code raus, und die Nummer wurde nirgends
+ * gespeichert — obwohl `profiles.phone` seit SUPABASE_SCHEMA_2.sql da ist und
+ * die Kontaktinfo im Profil daraus liest.
+ *
+ * Ein Bestätigungscode bleibt aus, solange kein SMS-Versand eingerichtet ist.
+ * Die Nummer wird deshalb gespeichert und die Meldung sagt genau das.
+ *
+ * DIE DOPPLUNGSPRÜFUNG
+ *
+ * `profiles_phone_einmalig` aus SUPABASE_SCHEMA_11_handbuch.sql lässt
+ * dieselbe Nummer nur einmal zu — aber nur zeichengleich. „0151 2345678" und
+ * „+49 151 2345678" sind für den Index zwei verschiedene Werte. Gefragt wird
+ * deshalb vorher `finde_per_nummer`: dieselbe Funktion, mit der die App auch
+ * Personen über ihre Nummer sucht, und sie vergleicht auf reine Ziffern.
+ *
+ * Der Index bleibt trotzdem der letzte Riegel — zwischen Frage und Schreiben
+ * kann sich etwas ändern. Postgres meldet ihn als 23505; ohne Übersetzung
+ * stünde dort „duplicate key value violates unique constraint".
+ */
+export async function telefonAendern(
+  client: SupabaseClient,
+  ichId: string,
+  nummer: string
+): Promise<string> {
+  const grund = Telefon.pruefe(nummer);
+  if (grund) throw new Error(grund);
+
+  const sauber = Telefon.speicherform(nummer);
+
+  const { data: schonDa } = await client.rpc('finde_per_nummer', { nummer: sauber });
+  if (schonDa) throw new Error('Diese Nummer gehört schon zu einem anderen Konto');
+
+  const { error } = await client
+    .from('profiles')
+    .update({ phone: sauber, updated_at: new Date().toISOString() })
+    .eq('id', ichId);
+
+  if (error) {
+    if (error.code === '23505') throw new Error('Diese Nummer gehört schon zu einem anderen Konto');
+    throw error;
+  }
+  return sauber;
 }
 
 /**
@@ -700,6 +881,12 @@ export interface Anhang {
  * Der ChatDetailScreen schrieb bisher selbst in `messages` — an zwei Stellen,
  * jede mit einer eigenen Spaltenliste. Hier steht es einmal, gleichlautend
  * mit handleSendMessage.
+ *
+ * Seit Schema 31 geht der Text durch `fuerChatVerschliessen`. In einem Chat
+ * zu zweit, in dem beide Seiten ein Gerät angemeldet haben, steht danach in
+ * `text` nichts mehr und in `chiffre` alles. In jedem anderen Fall — Gruppe,
+ * Gegenüber ohne Gerät, kein Zufall verfügbar — bleibt es beim Klartext von
+ * vorher. Der Aufrufer merkt davon nichts; das ist der Zweck.
  */
 export async function nachrichtSenden(
   client: SupabaseClient,
@@ -708,12 +895,14 @@ export async function nachrichtSenden(
   text: string,
   anhang: Anhang = {}
 ): Promise<{ id: string; created_at: string }> {
+  const paket = await fuerChatVerschliessen(client, chatId, ichId, text);
+
   const { data, error } = await client
     .from('messages')
     .insert({
       chat_id: chatId,
       sender_id: ichId,
-      text,
+      ...paket.spalten,
       media_url: anhang.url || null,
       media_type: anhang.typ || null,
       place_id: anhang.standortId || null,
@@ -727,6 +916,30 @@ export async function nachrichtSenden(
     .single();
   if (error) throw error;
 
+  /*
+   * Die Kuverts, einer je mitlesendem Gerät.
+   *
+   * Sie müssen nach der Nachricht kommen — sie zeigen auf deren Kennung, die
+   * es vorher nicht gibt. Und sie müssen ankommen: ohne Kuvert ist die
+   * Nachricht für niemanden zu öffnen, auch nicht für den Absender. Deshalb
+   * wird hier geworfen und die halbe Nachricht wieder weggeräumt, statt sie
+   * als unlesbare Zeile stehen zu lassen.
+   */
+  if (paket.kuverts.length) {
+    const { error: fehlerK } = await client.from('message_keys').insert(
+      paket.kuverts.map((k) => ({
+        message_id: (data as any).id,
+        schluessel_id: k.schluesselId,
+        nonce: k.nonce,
+        chiffre: k.chiffre,
+      }))
+    );
+    if (fehlerK) {
+      await client.from('messages').delete().eq('id', (data as any).id);
+      throw fehlerK;
+    }
+  }
+
   // Damit der Chat in der Liste nach oben rutscht. Klappt das nicht, ist die
   // Nachricht trotzdem angekommen — kein Grund, das Senden scheitern zu
   // lassen, aber auch keiner, es zu verschweigen.
@@ -739,6 +952,48 @@ export async function nachrichtSenden(
   }
 
   return data as { id: string; created_at: string };
+}
+
+/**
+ * Einen Anruf im Chat vermerken.
+ *
+ * Henrik 07.09.2026: „Anrufe sollen als Chatnachricht protokolliert werden
+ * (wie WhatsApp)." Vorher ging der Anrufbildschirm auf und wieder zu, und
+ * danach war nirgends mehr festzustellen, dass es ihn gab.
+ *
+ * Der Eintrag ist eine gewoehnliche Nachricht mit leerem Text und gesetztem
+ * `anruf_art` (SUPABASE_SCHEMA_35_anrufe.sql) — deshalb steht er in der
+ * richtigen Reihenfolge, zaehlt fuer die Vorschau in der Chatliste und
+ * unterliegt denselben Leserechten wie jede andere Zeile.
+ *
+ * Verschluesselt wird er nicht: Er traegt keinen Text, und er soll auch dann
+ * lesbar bleiben, wenn ein Geraet den Chatschluessel nicht hat. Was er verraet
+ * — dass angerufen wurde —, weiss die Gegenseite ohnehin.
+ *
+ * Gleiche Regel in web/server/sync-handlers.js (handleAnrufNotieren).
+ */
+export async function anrufNotieren(
+  client: SupabaseClient,
+  ichId: string,
+  zielId: string,
+  art: 'audio' | 'video',
+  sekunden: number,
+  status: 'beendet' | 'verpasst' | 'abgelehnt' = 'beendet'
+): Promise<boolean> {
+  const chatId = await chatMit(client, ichId, zielId);
+
+  const { error } = await client.from('messages').insert({
+    chat_id: chatId,
+    sender_id: ichId,
+    text: '',
+    anruf_art: art,
+    anruf_status: status,
+    anruf_dauer: status === 'beendet' ? Math.max(0, Math.round(sekunden)) : 0,
+  });
+  if (error) throw error;
+
+  await client.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chatId);
+  return true;
 }
 
 /** Eine Nachricht als gelesen vermerken. */
@@ -828,7 +1083,18 @@ export async function anfrageEntscheiden(
 export async function storyAnlegen(
   client: SupabaseClient,
   ichId: string,
-  felder: { mediaUrl?: string | null; mediaTyp?: string; text?: string } = {}
+  felder: {
+    mediaUrl?: string | null;
+    mediaTyp?: string;
+    text?: string;
+    /*
+     * Henrik am 07.09.2026: „beim Posten fragen ob uebergreifend teilen."
+     * Die Antwort gilt fuer diese eine Story (Schema 36). Ohne Angabe:
+     * nein — eine Story ist eine Messenger-Sache, und was nicht ausdruecklich
+     * in einen oeffentlichen Bereich gehoert, gehoert nicht dorthin.
+     */
+    inVideos?: boolean;
+  } = {}
 ): Promise<string> {
   const { data, error } = await client
     .from('stories')
@@ -837,6 +1103,7 @@ export async function storyAnlegen(
       media_url: felder.mediaUrl || null,
       media_type: felder.mediaTyp || 'image',
       caption: felder.text || '',
+      in_videos: Boolean(felder.inVideos),
     })
     .select('id')
     .single();
@@ -1249,12 +1516,47 @@ export async function nachrichtBearbeiten(
   nachrichtId: string,
   text: string
 ) {
+  /*
+   * Eine verschlüsselte Nachricht wird neu verschlossen, nicht überschrieben.
+   * Der naheliegende Weg — einfach `text` setzen — hätte den geänderten Text
+   * im Klartext neben die alte Chiffre gelegt. Die Datenbank weist das seit
+   * Schema 31 zurück (`messages_krypto_stimmig`), und das ist gut so: sonst
+   * wäre ausgerechnet die bearbeitete Fassung die lesbare.
+   *
+   * Die alten Kuverts bleiben stehen und passen weiter — sie tragen den
+   * Sitzungsschlüssel, und der wird beim Neuverschließen ersetzt. Deshalb
+   * werden sie ausgetauscht, nicht ergänzt.
+   */
+  const { data: alt } = await client
+    .from('messages')
+    .select('chat_id, krypto')
+    .eq('id', nachrichtId)
+    .maybeSingle();
+
+  const paket =
+    alt && Number((alt as any).krypto) > 0
+      ? await fuerChatVerschliessen(client, (alt as any).chat_id, ichId, text)
+      : offen(text);
+
   const { error } = await client
     .from('messages')
-    .update({ text, edited_at: new Date().toISOString() })
+    .update({ ...paket.spalten, edited_at: new Date().toISOString() })
     .eq('id', nachrichtId)
     .eq('sender_id', ichId);
   if (error) throw error;
+
+  if (paket.kuverts.length) {
+    await client.from('message_keys').delete().eq('message_id', nachrichtId);
+    const { error: fehlerK } = await client.from('message_keys').insert(
+      paket.kuverts.map((k) => ({
+        message_id: nachrichtId,
+        schluessel_id: k.schluesselId,
+        nonce: k.nonce,
+        chiffre: k.chiffre,
+      }))
+    );
+    if (fehlerK) throw fehlerK;
+  }
   return true;
 }
 
@@ -1271,7 +1573,17 @@ export async function nachrichtZuruecknehmen(
 ) {
   const { error } = await client
     .from('messages')
-    .update({ deleted_at: new Date().toISOString(), text: '' })
+    .update({
+      deleted_at: new Date().toISOString(),
+      text: '',
+      // Die Chiffre muss mit weg, nicht nur der Text. Bliebe sie stehen,
+      // wäre die zurückgenommene Nachricht die einzige, die noch da ist —
+      // und `messages_krypto_stimmig` ließe die Änderung ohnehin nicht zu.
+      krypto: 0,
+      chiffre: null,
+      krypto_nonce: null,
+      absender_schluessel: null,
+    })
     .eq('id', nachrichtId)
     .eq('sender_id', ichId);
   if (error) throw error;
@@ -1294,33 +1606,74 @@ export async function nachrichtWeiterleiten(
 
   const { data, error } = await client
     .from('messages')
-    .select('text, media_url, media_type, file_name, file_size, sender_id')
+    .select(
+      'id, text, media_url, media_type, file_name, file_size, sender_id,' +
+      ' krypto, chiffre, krypto_nonce, absender_schluessel'
+    )
     .eq('id', nachrichtId)
     .single();
   if (error) throw error;
 
-  const alt = data as {
-    text: string;
-    media_url: string | null;
-    media_type: string | null;
-    file_name: string | null;
-    file_size: number | null;
-    sender_id: string;
-  };
+  const alt = data as any;
 
-  const { error: fehler } = await client.from('messages').insert(
-    chatIds.map((chat_id) => ({
-      chat_id,
-      sender_id: ichId,
-      text: alt.text,
-      media_url: alt.media_url,
-      media_type: alt.media_type,
-      file_name: alt.file_name,
-      file_size: alt.file_size,
-      forwarded_from: alt.sender_id,
-    }))
-  );
-  if (fehler) throw fehler;
+  /*
+   * Eine verschlüsselte Nachricht steht mit leerem `text` da. Ohne diesen
+   * Schritt wäre das Weitergeleitete eine leere Blase gewesen — der Fehler,
+   * den man beim Einbau einer Verschlüsselung genau an solchen Nebenwegen
+   * macht. Sie wird deshalb erst geöffnet und dann für jedes Ziel neu
+   * verschlossen.
+   *
+   * Neu verschlossen, nicht mitgenommen: die Kuverts des Ursprungschats sind
+   * für dessen Geräte bestimmt und passen im Zielchat auf niemanden.
+   */
+  let text = alt.text as string;
+  if (Number(alt.krypto) > 0) {
+    const meiner = await meinSchluessel(client, ichId);
+    const [geoeffnet] = await aufschliessen(client, [{ ...alt }], meiner);
+    text = geoeffnet.text;
+    if (text === NICHT_LESBAR) {
+      throw new Error('Diese Nachricht lässt sich auf diesem Gerät nicht weiterleiten');
+    }
+  }
+
+  /*
+   * Ein Ziel nach dem anderen statt eines gemeinsamen Inserts: jeder Chat
+   * hat seine eigenen Geräte und bekommt damit eine eigene Chiffre. Ein
+   * Insert über alle Ziele könnte nur eine einzige tragen.
+   */
+  for (const chat_id of chatIds) {
+    const paket = await fuerChatVerschliessen(client, chat_id, ichId, text);
+    const { data: neue, error: fehler } = await client
+      .from('messages')
+      .insert({
+        chat_id,
+        sender_id: ichId,
+        ...paket.spalten,
+        media_url: alt.media_url,
+        media_type: alt.media_type,
+        file_name: alt.file_name,
+        file_size: alt.file_size,
+        forwarded_from: alt.sender_id,
+      })
+      .select('id')
+      .single();
+    if (fehler) throw fehler;
+
+    if (paket.kuverts.length) {
+      const { error: fehlerK } = await client.from('message_keys').insert(
+        paket.kuverts.map((k) => ({
+          message_id: (neue as any).id,
+          schluessel_id: k.schluesselId,
+          nonce: k.nonce,
+          chiffre: k.chiffre,
+        }))
+      );
+      if (fehlerK) {
+        await client.from('messages').delete().eq('id', (neue as any).id);
+        throw fehlerK;
+      }
+    }
+  }
 
   // Damit die Chats in der Liste nach oben rutschen.
   await client
@@ -1507,6 +1860,32 @@ export async function sichtbarkeitSetzen(
   // stehen: wer von „Alle bis auf" auf „Alle" und wieder zurück schaltet,
   // will seine mühsam zusammengesuchten Namen wiederfinden.
   return stufe;
+}
+
+/**
+ * „Story auch in Videos teilen" — der Zusatz zur Stufe „Alle".
+ *
+ * Das Handbuch führt ihn nicht als eigene Einstellung, sondern als Anhängsel
+ * der Story-Sichtbarkeit: „… Jeder -> Story auch in Videos teilen". Er
+ * entscheidet, ob die eigene Story zusätzlich im Videos-Bereich der Leute
+ * erscheint, die einem folgen — Kontakte sehen sie ohnehin.
+ *
+ * Der Wert steht auf `profiles` und nicht in `user_settings`, weil fremde
+ * Geräte ihn lesen müssen (Schema 30). Dass er nur bei Stufe „Alle" gilt,
+ * setzt die Datenbank durch; hier wird es nicht noch einmal geprüft, sonst
+ * stünde dieselbe Regel an drei Stellen.
+ */
+export async function storyInVideosSetzen(
+  client: SupabaseClient,
+  ichId: string,
+  an: boolean
+) {
+  const { error } = await client
+    .from('profiles')
+    .update({ story_in_videos: an })
+    .eq('id', ichId);
+  if (error) throw error;
+  return an;
 }
 
 /** Jemanden auf die Ausnahmeliste setzen — oder herunternehmen. */
@@ -1898,8 +2277,8 @@ export async function communityNameFrei(
  */
 export async function hierBinIch(client: SupabaseClient): Promise<void> {
   const { error } = await client.rpc('hier_bin_ich');
-  // Ein nicht vermerkter Besuch ist kein Grund, die App anzuhalten.
-  if (error) console.error('Anwesenheit nicht vermerkt:', error.message);
+  // Ein nicht vermerkter Besuch ist kein Grund, das zu melden — es lädt die
+  // Oberfläche nicht, und jede Meldung eines stillen Fehlers irritiert mehr.
 }
 
 /**
@@ -1967,6 +2346,45 @@ export async function darfHerunterladen(
   // genau der Fall, den die Einstellung ausschliessen soll.
   if (error) return false;
   return data === true;
+}
+
+/**
+ * Wer hat meine Story gesehen?
+ *
+ * Steht in public.story_views (Schema 2); lesen darf die Liste laut RLS nur,
+ * wem die Story gehört. Bis zum 09.09.2026 rechnete das Sheet sie sich
+ * stattdessen aus den eigenen Kontakten aus — die Namen waren erfunden und
+ * die Zahl stieg mit dem Alter der Story statt mit den Zuschauern.
+ *
+ * Gegenstück auf der Website: GET /api/stories/:id/ansichten.
+ */
+export interface StorySeher {
+  id: string;
+  name: string;
+  handle: string;
+  zeit: string | null;
+}
+
+export async function storyAnsichten(
+  client: SupabaseClient,
+  storyId: string,
+  ichId: string
+): Promise<StorySeher[]> {
+  const { data, error } = await client
+    .from('story_views')
+    .select('user_id, viewed_at, profiles!user_id(name, handle)')
+    .eq('story_id', storyId)
+    .order('viewed_at', { ascending: false });
+  if (error || !data) return [];
+
+  return data
+    .filter((z: any) => z.user_id !== ichId)
+    .map((z: any) => ({
+      id: z.user_id as string,
+      name: (z.profiles?.name as string) || 'Unbekannt',
+      handle: (z.profiles?.handle as string) || '',
+      zeit: (z.viewed_at as string) ?? null,
+    }));
 }
 
 /**

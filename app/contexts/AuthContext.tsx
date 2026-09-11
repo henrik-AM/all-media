@@ -1,21 +1,92 @@
+/**
+ * Wer angemeldet ist — und unter welchem Konto die Datenbank arbeitet.
+ *
+ * WAS AM 07.09.2026 GEÄNDERT WURDE
+ *
+ * Drei Dinge, die alle dasselbe Muster hatten: die Anzeige sagte etwas, das
+ * in der Datenbank nicht galt.
+ *
+ * 1. Die Anmeldung ging über einen eigenen Supabase-Client (siehe
+ *    lib/supabaseAuth.ts). Die Sitzung landete dort und nie in dem Client,
+ *    mit dem die App liest und schreibt.
+ * 2. Ein fehlgeschlagenes Anmelden setzte nur `error` und kehrte zurück. Der
+ *    Aufrufer wartete auf eine Ausnahme, bekam keine — und meldete
+ *    „Konto erstellt", während unten der englische Fehler von Supabase
+ *    stand. Jetzt wird geworfen.
+ * 3. `wechsleZu` setzte eine andere Kennung als aktiv und sonst nichts. Die
+ *    Sitzung blieb die alte. Wie das jetzt geht, steht in
+ *    lib/kontenspeicher.ts.
+ */
+
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthUser } from '../types';
-import { signUpWithEmail, signInWithEmail, signOut, resetPasswordForEmail } from '../lib/supabaseAuth';
+import {
+  signUpWithEmail,
+  signInWithEmail,
+  signOut,
+  resetPasswordForEmail,
+  passwortPruefen,
+} from '../lib/supabaseAuth';
+import {
+  alleVergessen,
+  sitzungSichern,
+  sitzungVergessen,
+  sitzungWechseln,
+  werIstAngemeldet,
+} from '../lib/kontenspeicher';
 import { useSupabase } from './SupabaseContext';
 
+// Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
+const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
+
 const SPEICHER = 'all-media.sitzung.v2';
+
+/*
+ * FRUEHERE KONTEN (Stand 09.09.2026)
+ *
+ * Henrik am 07.09.2026: „Fruehere Accounts sollen beim Kontowechsel als
+ * Ein-Klick-Option erscheinen (wie Instagram)."
+ *
+ * Was vorher passierte: `konten` sind nur die Konten mit gueltiger Sitzung im
+ * Schluesselbund. Meldete man eines ab — oder lief seine Sitzung aus —,
+ * verschwand es restlos. Beim naechsten Mal musste man E-Mail *und* Passwort
+ * neu tippen, obwohl man dieses Konto auf diesem Geraet schon benutzt hatte.
+ *
+ * Instagram merkt sich stattdessen, wer hier schon einmal angemeldet war,
+ * zeigt Bild und Namen und fragt beim Antippen nur noch das Passwort. Genau
+ * das steht jetzt hier. Gespeichert wird bewusst *kein* Passwort und kein
+ * Token — nur Kennung, Name und E-Mail, damit die Zeile etwas anzuzeigen hat
+ * und die E-Mail vorbelegt werden kann.
+ */
+const FRUEHER = 'all-media.fruehereKonten.v1';
+
+export interface FruehesKonto {
+  id: string;
+  email: string;
+  name: string;
+}
 
 export const AuthContext = createContext<{
   user: AuthUser | null;
   isLoggedIn: boolean;
   sitzungGeladen: boolean;
   konten: AuthUser[];
+  /** Wer auf diesem Geraet schon einmal angemeldet war — ohne Sitzung. */
+  frueher: FruehesKonto[];
+  /** Ein frueheres Konto aus der Liste nehmen. */
+  frueheresVergessen: (kontoId: string) => void;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  wechsleZu: (kontoId: string) => void;
-  kontoHinzufuegen: (email: string, password: string, name?: string) => Promise<void>;
+  /** Gibt zurueck, ob der Wechsel geklappt hat. Bei false ist neu anzumelden. */
+  wechsleZu: (kontoId: string) => Promise<boolean>;
+  /**
+   * `telefon` ist beim Anlegen eines neuen Kontos Pflicht (Henrik 07.09.2026).
+   * Beim Dazunehmen eines bestehenden Kontos wird sie nicht gebraucht — dort
+   * steht sie schon im Profil.
+   */
+  kontoHinzufuegen: (email: string, password: string, name?: string, telefon?: string) => Promise<void>;
   kontoAbmelden: (kontoId: string) => Promise<void>;
   sendPasswordResetCode: (email: string) => Promise<boolean>;
 }>({
@@ -23,10 +94,12 @@ export const AuthContext = createContext<{
   isLoggedIn: false,
   sitzungGeladen: false,
   konten: [],
+  frueher: [],
+  frueheresVergessen: () => {},
   error: null,
   login: async () => {},
   logout: async () => {},
-  wechsleZu: () => {},
+  wechsleZu: async () => false,
   kontoHinzufuegen: async () => {},
   kontoAbmelden: async () => {},
   sendPasswordResetCode: async () => false,
@@ -45,9 +118,40 @@ const nameAusMail = (email: string) => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { supabase, isConfigured } = useSupabase();
   const [konten, setKonten] = useState<AuthUser[]>([]);
+  const [frueher, setFrueher] = useState<FruehesKonto[]>([]);
   const [aktivId, setAktivId] = useState<string | null>(null);
   const [geladen, setGeladen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Die Merkliste steht in einem eigenen Schluessel: sie soll das Abmelden
+  // ueberleben, `all-media.sitzung.v2` wird dabei geloescht.
+  useEffect(() => {
+    AsyncStorage.getItem(FRUEHER)
+      .then((roh) => {
+        if (!roh) return;
+        const liste = JSON.parse(roh);
+        if (Array.isArray(liste)) setFrueher(liste);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  /** Ein Konto in die Merkliste aufnehmen — jung zuerst, ohne Doppelte. */
+  const merken = useCallback((konto: AuthUser) => {
+    setFrueher((prev) => {
+      const eintrag: FruehesKonto = { id: konto.id, email: konto.email, name: konto.profile.name };
+      const neu = [eintrag, ...prev.filter((k) => k.id !== konto.id)].slice(0, 8);
+      AsyncStorage.setItem(FRUEHER, JSON.stringify(neu)).catch(() => undefined);
+      return neu;
+    });
+  }, []);
+
+  const frueheresVergessen = useCallback((kontoId: string) => {
+    setFrueher((prev) => {
+      const neu = prev.filter((k) => k.id !== kontoId);
+      AsyncStorage.setItem(FRUEHER, JSON.stringify(neu)).catch(() => undefined);
+      return neu;
+    });
+  }, []);
 
   useEffect(() => {
     let abgebrochen = false;
@@ -70,18 +174,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
              * ist die schlechteste aller Antworten; besser ehrlich zurueck zur
              * Anmeldung.
              */
-            let sitzung = null;
-            if (supabase) {
-              const { data } = await supabase.auth.getSession();
-              sitzung = data.session;
-            }
+            let angemeldetId: string | null = null;
+            if (supabase) angemeldetId = await werIstAngemeldet(supabase);
 
-            if (!supabase || sitzung) {
+            if (!supabase || angemeldetId) {
               setKonten(daten.konten);
-              const gueltig = daten.konten.some((k) => k.id === daten.aktivId);
-              setAktivId(gueltig ? daten.aktivId! : daten.konten[0].id);
+
+              /*
+               * Aktiv ist, wer wirklich in der Sitzung steckt.
+               *
+               * Vorher wurde die gemerkte Kennung genommen, ohne nachzusehen.
+               * Stand dort ein anderes Konto als in der Sitzung, zeigte die
+               * App dessen Namen und schrieb unter dem anderen — der stille
+               * Fall, den niemand bemerkt, weil beides plausibel aussieht.
+               */
+              const gemerkt = daten.konten.some((k) => k.id === daten.aktivId)
+                ? daten.aktivId!
+                : daten.konten[0].id;
+
+              if (!angemeldetId || angemeldetId === gemerkt) {
+                setAktivId(gemerkt);
+              } else if (daten.konten.some((k) => k.id === angemeldetId)) {
+                setAktivId(angemeldetId);
+              } else {
+                // Die Sitzung gehoert zu einem Konto, das die Liste nicht
+                // kennt. Dann gilt die Sitzung, nicht die Liste.
+                setKonten([]);
+                setAktivId(null);
+                await AsyncStorage.removeItem(SPEICHER);
+              }
+
+              // Die laufende Sitzung gehoert in den Kontenspeicher, sonst ist
+              // der Rueckweg nach dem ersten Wechsel zu.
+              if (supabase) await sitzungSichern(supabase).catch(() => null);
             } else {
               await AsyncStorage.removeItem(SPEICHER);
+              await alleVergessen().catch(() => undefined);
             }
           }
         }
@@ -96,6 +224,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [supabase]);
 
+  /*
+   * Jede neue Sitzung sofort in den Kontenspeicher.
+   *
+   * supabase-js tauscht das Erneuerungstoken im Betrieb aus — etwa stuendlich
+   * beim Auffrischen und nach jeder Passwortaenderung. Das alte ist danach
+   * verbraucht; Supabase gibt jedes nur einmal her. Ohne diesen Zuhoerer
+   * stuende im Kontenspeicher irgendwann ein Token, mit dem sich nicht mehr
+   * zurueckwechseln laesst — und der Wechsel scheiterte scheinbar grundlos.
+   *
+   * Deshalb an einer Stelle statt nach jedem einzelnen Aufruf: die
+   * Auffrischung passiert von selbst, ohne dass hier jemand etwas aufruft.
+   */
+  useEffect(() => {
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange((ereignis) => {
+      if (ereignis === 'SIGNED_IN' || ereignis === 'TOKEN_REFRESHED' || ereignis === 'USER_UPDATED') {
+        void sitzungSichern(supabase).catch(() => null);
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [supabase]);
+
   useEffect(() => {
     if (!geladen) return;
     AsyncStorage.setItem(SPEICHER, JSON.stringify({ konten, aktivId })).catch(() => {
@@ -105,16 +255,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const user = konten.find((k) => k.id === aktivId) ?? null;
 
+  /**
+   * Meldet den Fehler an beiden Wegen: als `error` fuer Bildschirme, die ihn
+   * aus dem Context lesen, und als Ausnahme fuer die, die `await` benutzen.
+   *
+   * Nur `error` zu setzen war die Ursache fuer „Konto erstellt" ueber einem
+   * fehlgeschlagenen Anlegen — KontoWechsel wartete auf eine Ausnahme, die nie
+   * kam.
+   */
+  const scheitern = (grund: string): never => {
+    setError(grund);
+    throw new Error(grund);
+  };
+
   const login = useCallback(
     async (email: string, password: string) => {
       setError(null);
 
       if (!isConfigured || !supabase) {
         // Mock-Login für Testmodus
-        if (!email || !password || password.length < 6) {
-          setError('Bitte gebe E-Mail und ein Passwort (mindestens 6 Zeichen) ein');
-          return;
-        }
+        if (!email) scheitern('Bitte gebe eine E-Mail-Adresse ein');
+        const schwach = passwortPruefen(password);
+        if (schwach) scheitern(schwach);
 
         const userId = `user-${Date.now()}`;
         const konto: AuthUser = {
@@ -137,17 +299,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      const result = await signInWithEmail(email, password);
+      const result = await signInWithEmail(supabase, email, password);
       if (!result.success || !result.user) {
-        setError(result.error || 'Anmeldung fehlgeschlagen');
-        return;
+        scheitern(result.error || 'Anmeldung fehlgeschlagen');
       }
 
+      const angemeldet = result.user!;
       const konto: AuthUser = {
-        id: result.user.id,
-        email: result.user.email || email,
+        id: angemeldet.id,
+        email: angemeldet.email || email,
         profile: {
-          id: result.user.id,
+          id: angemeldet.id,
           name: email.split('@')[0],
           handle: handleAusMail(email),
           status: 'online',
@@ -155,13 +317,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         },
       };
 
+      await sitzungSichern(supabase).catch(() => null);
+
       setKonten((prev) => {
-        const existiert = prev.find((k) => k.id === result.user.id);
+        const existiert = prev.find((k) => k.id === angemeldet.id);
         return existiert ? prev : [...prev, konto];
       });
-      setAktivId(result.user.id);
+      merken(konto);
+      setAktivId(angemeldet.id);
     },
-    [supabase, isConfigured]
+    [supabase, isConfigured, merken]
   );
 
   const logout = useCallback(async () => {
@@ -169,32 +334,62 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (supabase) {
       await signOut(supabase);
     }
+    await alleVergessen().catch(() => undefined);
     setKonten([]);
     setAktivId(null);
   }, [supabase]);
 
-  const wechsleZu = useCallback((kontoId: string) => {
-    if (konten.some((k) => k.id === kontoId)) {
+  /**
+   * Auf ein anderes eigenes Konto umschalten — samt Sitzung.
+   *
+   * Klappt der Wechsel der Sitzung nicht (abgelaufen, anderswo beendet),
+   * bleibt die Anzeige, wo sie war, und das Konto fliegt aus der Liste. Ein
+   * Konto, unter dem sich nichts lesen laesst, in der Liste stehen zu lassen,
+   * hiesse es beim naechsten Antippen wieder zu versuchen.
+   */
+  const wechsleZu = useCallback(
+    async (kontoId: string) => {
+      if (!konten.some((k) => k.id === kontoId)) return false;
+      if (kontoId === aktivId) return true;
+
+      if (!supabase) {
+        setAktivId(kontoId);
+        return true;
+      }
+
+      const geklappt = await sitzungWechseln(supabase, kontoId);
+      if (!geklappt) {
+        setKonten((prev) => prev.filter((k) => k.id !== kontoId));
+        setError('Die Anmeldung dieses Kontos ist abgelaufen. Bitte melde es neu an.');
+        return false;
+      }
+
       setAktivId(kontoId);
-    }
-  }, [konten]);
+      return true;
+    },
+    [supabase, konten, aktivId]
+  );
 
   const kontoHinzufuegen = useCallback(
-    async (email: string, password: string, name?: string) => {
+    async (email: string, password: string, name?: string, telefon?: string) => {
       setError(null);
 
       const existiert = konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
       if (existiert) {
+        // Schon in der Liste — dann ist das ein Wechsel, keine Anmeldung.
+        if (supabase && !(await sitzungWechseln(supabase, existiert.id))) {
+          scheitern('Die Anmeldung dieses Kontos ist abgelaufen. Bitte melde es neu an.');
+        }
         setAktivId(existiert.id);
         return;
       }
 
+      const schwach = passwortPruefen(password);
+      if (schwach) scheitern(schwach);
+
       if (!isConfigured || !supabase) {
         // Mock-Registrierung für Testmodus
-        if (!email || !password || password.length < 6) {
-          setError('Bitte gebe E-Mail und ein Passwort (mindestens 6 Zeichen) ein');
-          return;
-        }
+        if (!email) scheitern('Bitte gebe eine E-Mail-Adresse ein');
 
         const userId = `user-${Date.now()}`;
         const anzeige = name?.trim() || nameAusMail(email);
@@ -217,29 +412,65 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      const result = await signUpWithEmail(email, password);
-      if (!result.success || !result.user) {
-        setError(result.error || 'Registrierung fehlgeschlagen');
-        return;
-      }
+      /*
+       * Das laufende Konto sichern, bevor die Anmeldung seine Sitzung
+       * ueberschreibt. Ohne diesen Schritt war das erste Konto in dem
+       * Augenblick verloren, in dem ein zweites dazukam — und der Wechsel
+       * zurueck fuehrte in eine leere App.
+       */
+      await sitzungSichern(supabase).catch(() => null);
 
       const anzeige = name?.trim() || nameAusMail(email);
       const handle = '@' + anzeige.toLowerCase().replace(/\s+/g, '');
 
+      /*
+       * Erst anmelden, dann registrieren.
+       *
+       * „Konto hinzufuegen" heisst im Blatt zweierlei: ein bestehendes
+       * dazunehmen oder ein neues anlegen. Fuer das bestehende war bisher
+       * signUp der einzige Weg — und der antwortet fuer ein Konto, das es
+       * schon gibt, mit „already registered". Deshalb zuerst der Versuch
+       * anzumelden; nur wenn es dieses Konto nicht gibt, wird eines angelegt.
+       */
+      /*
+       * Die Telefonnummer geht als Registrierungsdatum mit — handle_new_user
+       * traegt sie in profiles.phone ein (SUPABASE_SCHEMA_34_telefon_pflicht.sql).
+       * Beim blossen Anmelden eines bestehenden Kontos bleibt sie aussen vor:
+       * dort steht sie schon im Profil, und ein leeres Feld wuerde sie loeschen.
+       */
+      let result = await signInWithEmail(supabase, email, password);
+      if (!result.success) {
+        const nummer = telefon ? Telefon.speicherform(telefon) : '';
+        const neu = await signUpWithEmail(supabase, email, password, {
+          name: anzeige,
+          handle,
+          ...(nummer ? { phone: nummer } : {}),
+        });
+        if (!neu.success || !neu.user) {
+          // Zurueck auf das Konto, das vorher lief — sonst steht die App nach
+          // einem Tippfehler ohne Sitzung da.
+          if (aktivId) await sitzungWechseln(supabase, aktivId).catch(() => false);
+          scheitern(neu.error || result.error || 'Registrierung fehlgeschlagen');
+        }
+        result = neu;
+      }
+
+      const angemeldet = result.user!;
+
       // Profil mit Metadaten aktualisieren, damit es Trigger automatisch anlegt
       try {
-        await supabase.auth.updateUser({
-          data: { name: anzeige, handle },
-        });
+        await supabase.auth.updateUser({ data: { name: anzeige, handle } });
       } catch (e) {
         console.warn('Fehler beim Aktualisieren des Profils:', e);
       }
 
+      await sitzungSichern(supabase).catch(() => null);
+
       const konto: AuthUser = {
-        id: result.user.id,
-        email: result.user.email || email,
+        id: angemeldet.id,
+        email: angemeldet.email || email,
         profile: {
-          id: result.user.id,
+          id: angemeldet.id,
           name: anzeige,
           handle,
           status: 'online',
@@ -247,22 +478,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         },
       };
 
-      setKonten((prev) => [...prev, konto]);
-      setAktivId(result.user.id);
+      setKonten((prev) => (prev.some((k) => k.id === konto.id) ? prev : [...prev, konto]));
+      merken(konto);
+      setAktivId(angemeldet.id);
     },
-    [supabase, isConfigured, konten]
+    [supabase, isConfigured, konten, aktivId, merken]
   );
 
   const kontoAbmelden = useCallback(
     async (kontoId: string) => {
+      const rest = konten.filter((k) => k.id !== kontoId);
+
       if (supabase && aktivId === kontoId) {
         await signOut(supabase);
+        await sitzungVergessen(kontoId);
+        /*
+         * Auf das naechste Konto der Liste weiterschalten — mitsamt Sitzung.
+         * Klappt das nicht, ist niemand mehr angemeldet, und die Liste muss
+         * das auch sagen.
+         */
+        const naechstes = rest[0];
+        if (naechstes && supabase) {
+          const geklappt = await sitzungWechseln(supabase, naechstes.id);
+          setKonten(geklappt ? rest : []);
+          setAktivId(geklappt ? naechstes.id : null);
+          return;
+        }
+        setKonten(rest);
+        setAktivId(null);
+        return;
       }
-      const rest = konten.filter((k) => k.id !== kontoId);
+
+      await sitzungVergessen(kontoId);
       setKonten(rest);
-      if (aktivId === kontoId) {
-        setAktivId(rest[0]?.id ?? null);
-      }
     },
     [supabase, aktivId, konten]
   );
@@ -270,14 +518,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const sendPasswordResetCode = useCallback(
     async (email: string) => {
       setError(null);
-      const result = await resetPasswordForEmail(email);
+      const result = await resetPasswordForEmail(supabase, email);
       if (!result.success) {
         setError(result.error ?? 'Fehler beim Versenden des Codes');
         return false;
       }
       return true;
     },
-    []
+    [supabase]
   );
 
   return (
@@ -287,6 +535,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         isLoggedIn: !!user,
         sitzungGeladen: geladen,
         konten,
+        frueher,
+        frueheresVergessen,
         error,
         login,
         logout,

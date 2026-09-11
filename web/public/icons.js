@@ -23,6 +23,9 @@ const ICONS = (() => {
     plus: wrap('<path d="M12 5v14M5 12h14"/>'),
     back: wrap('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
     close: wrap('<path d="M18 6 6 18M6 6l12 12"/>'),
+    /* QR-Code und Scan-Rahmen — Kontakt hinzufuegen, siehe openAddContact. */
+    qr: wrap('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M18 18h3v3h-3z"/>'),
+    scan: wrap('<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M3 12h18"/>'),
     minus: wrap('<path d="M5 12h14"/>'),
     pause: wrap('<path d="M9 5v14M15 5v14"/>', { sw: 2.2 }),
     /* Lautsprecher fuer den Reel-Kanal. Reels starten stumm — Browser

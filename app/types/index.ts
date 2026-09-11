@@ -38,9 +38,18 @@ export interface Message {
   media?: MediaType;
   read?: boolean;
   /** Weitergeleiteter Beitrag oder weitergeleitetes Video. */
-  geteilt?: { art: 'post' | 'video'; id: string; titel: string; autor: string };
+  geteilt?: { art: 'post' | 'video'; id: string; titel: string; autor: string; bild?: string };
   /** Anhang aus dem Plus in der Nachrichtenzeile. */
   bildUri?: string;
+  /**
+   * Die Adresse des Anhangs auf dem Server (Henrik 7.9.).
+   *
+   * Bis dahin wurde `media_url` beim Laden weggeworfen; im Chat stand darum
+   * nur „Foto" mit einem Symbol daneben. Wer ein Bild schickt, will das Bild
+   * sehen. `bildUri` ist der frisch aufgenommene Anhang, der noch auf dem
+   * Geraet liegt — beim naechsten Laden kommt derselbe Anhang hierueber.
+   */
+  mediaUrl?: string;
   standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number };
   kontakt?: { id: string; name: string; handle: string };
   /** Story-Anhang (fixiert - nur horizontal swipeable). */
@@ -66,6 +75,12 @@ export interface Message {
   reaktionen?: { userId: string; emoji: string }[];
   /** Bei einer Datei: Name und Groesse, sonst steht dort ein graues Kaestchen. */
   datei?: { name: string; groesse: number };
+  /**
+   * Der Eintrag zu einem Anruf (Henrik 7.9., Schema 35). Gesetzt heisst: diese
+   * Zeile ist keine Nachricht, sondern die Notiz „Videoanruf · 02:14". Der
+   * Text bleibt leer; was dasteht, entscheidet die Anzeige.
+   */
+  anruf?: { art: 'audio' | 'video'; status: 'beendet' | 'verpasst' | 'abgelehnt'; dauer: number };
 }
 
 /**
@@ -115,6 +130,12 @@ export interface Umfrage {
 export interface Sichtbarkeit {
   stufe: 'niemand' | 'niemand_bis_auf' | 'alle_bis_auf' | 'alle';
   ausnahmen: string[];
+  /*
+   * Nur beim Bereich `story` belegt: der Zusatz „Jeder -> Story auch in
+   * Videos teilen" aus dem Handbuch. Er haengt an der Stufe „alle" und
+   * faellt mit ihr (Schema 30).
+   */
+  inVideos?: boolean;
 }
 
 export interface Chat {
@@ -156,10 +177,16 @@ export interface Chat {
 
 export interface Contact {
   id: string;
+  /**
+   * Wie die Person hier heisst — der Spitzname aus `contacts`, wenn einer
+   * gesetzt ist, sonst der Name aus ihrem Profil (Schema 33).
+   */
   name: string;
   status: ContactStatus;
   about: string;
   phone?: string;
+  /** Freie Notiz zum Kontakt. Nur fuer mich, die andere Seite sieht sie nie. */
+  notiz?: string;
 }
 
 export interface Profile {

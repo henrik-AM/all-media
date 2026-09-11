@@ -29,6 +29,7 @@ import { ScrollView, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { Druck } from './Druck';
+import { SearchBar } from './SearchBar';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
@@ -57,6 +58,14 @@ interface Props {
   onStufe: (stufe: SichtbarkeitStufe) => void;
   onAusnahme: (userId: string) => void;
   onClose: () => void;
+  /*
+   * Nur bei der Story-Sichtbarkeit gesetzt. Das Handbuch haengt den Zusatz
+   * „Jeder -> Story auch in Videos teilen" ausdruecklich an die Stufe
+   * „Jeder" — deshalb steht er hier unter der Wahl und nicht als eigene
+   * Zeile in den Einstellungen: dort waere nicht zu sehen, wovon er abhaengt.
+   */
+  inVideos?: boolean;
+  onInVideos?: (an: boolean) => void;
 }
 
 export const SichtbarkeitSheet = ({
@@ -67,6 +76,8 @@ export const SichtbarkeitSheet = ({
   onStufe,
   onAusnahme,
   onClose,
+  inVideos,
+  onInVideos,
 }: Props) => {
   const { contacts, users } = useDaten();
   const [suche, setSuche] = useState('');
@@ -76,12 +87,18 @@ export const SichtbarkeitSheet = ({
   /*
    * Wer schon auf der Liste steht, steht oben. Sonst müsste man in einer
    * Kontaktliste mit hundert Namen suchen, wen man vorhin eingetragen hat.
+   *
+   * Henrik, 07.09.2026: "Liste zeigt nicht alle Messenger-Kontakte."
+   *
+   * Hier stand `.filter((k) => users[k.id])`: wer im Kontaktbuch steht, aber
+   * kein geladenes Profil hat, fiel lautlos heraus. Genau das passiert bei
+   * jedem, dessen Profil die Sichtbarkeitsregeln nicht herausgeben — ein
+   * Kontakt, den man vom Standort ausnehmen WILL, war deshalb der, den man
+   * hier nicht fand. Jetzt bleibt jeder Kontakt in der Liste; fehlt das
+   * Profil, traegt die Zeile den Namen aus dem Kontaktbuch.
    */
   const liste = contacts
-    .filter((k) => users[k.id])
-    // `?? ''` am Ende: steht in `contacts` kein Name, war `name` hier null —
-    // und der Avatar darunter nahm die ganze Seite mit.
-    .map((k) => ({ id: k.id, name: users[k.id]?.name ?? k.name ?? '' }))
+    .map((k) => ({ id: k.id, name: users[k.id]?.name ?? k.name ?? 'Unbenannter Kontakt' }))
     .filter((k) => !suche || k.name.toLowerCase().includes(suche.toLowerCase()))
     .sort((a, b) => {
       const ad = ausnahmen.includes(a.id) ? 0 : 1;
@@ -109,6 +126,35 @@ export const SichtbarkeitSheet = ({
           );
         })}
 
+        {/*
+          * Der Zusatz zur Stufe „Jeder". Er steht auch dann da, wenn eine
+          * andere Stufe gewaehlt ist — sonst wuesste niemand, dass es ihn
+          * gibt —, ist dann aber abgeblendet und nicht bedienbar. Die
+          * Datenbank nimmt ihn beim Stufenwechsel selbst zurueck (Schema 30).
+          */}
+        {onInVideos && (
+          <Druck
+            style={styles.zusatz}
+            onPress={() => stufe === 'alle' && onInVideos(!inVideos)}
+          >
+            <View style={styles.stufeText}>
+              <Text style={[styles.stufeLabel, stufe !== 'alle' && styles.zusatzAus]}>
+                Story auch in Videos teilen
+              </Text>
+              <Text style={styles.stufeHinweis}>
+                {stufe === 'alle'
+                  ? 'Deine Story erscheint dann auch bei Profilen, die dir folgen.'
+                  : 'Nur bei „Alle" möglich.'}
+              </Text>
+            </View>
+            <Ionicons
+              name={inVideos && stufe === 'alle' ? 'checkbox' : 'square-outline'}
+              size={21}
+              color={stufe === 'alle' ? (inVideos ? colors.brand : colors.border) : colors.border}
+            />
+          </Druck>
+        )}
+
         {brauchtListe && (
           <>
             <Text style={styles.listeTitel}>
@@ -116,9 +162,26 @@ export const SichtbarkeitSheet = ({
               {ausnahmen.length ? `  ·  ${ausnahmen.length}` : ''}
             </Text>
 
+            {/*
+              * Henrik, 07.09.2026: "Bei „Alle bis auf"/„Niemand bis auf" fehlt
+              * Suchleiste." Der Filter darunter gab es schon — `suche` wurde
+              * gelesen und angewandt —, nur hatte niemand je ein Feld
+              * bekommen, in das er etwas haette tippen koennen. Der Zustand
+              * stand seit jeher auf dem leeren Text.
+              */}
+            <View style={styles.sucheFeld}>
+              <SearchBar
+                value={suche}
+                onChangeText={setSuche}
+                placeholder="Kontakt suchen …"
+              />
+            </View>
+
             {liste.length === 0 && (
               <Text style={styles.leer}>
-                Du hast noch keine Kontakte, die du hier eintragen könntest.
+                {suche
+                  ? `Für „${suche}" ist kein Kontakt dabei.`
+                  : 'Du hast noch keine Kontakte, die du hier eintragen könntest.'}
               </Text>
             )}
 
@@ -152,12 +215,23 @@ const styles = themenStyles((colors) => ({
   stufeLabel: { ...typography.body, color: colors.text },
   stufeLabelAn: { fontWeight: '600', color: colors.brand },
   stufeHinweis: { ...typography.tiny, color: colors.text3 },
+  zusatz: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 11,
+    marginTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  zusatzAus: { color: colors.text3 },
   listeTitel: {
     ...typography.small,
     color: colors.text2,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
   },
+  sucheFeld: { marginBottom: spacing.sm },
   leer: { ...typography.small, color: colors.text3 },
   person: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 8 },
   personName: { flex: 1, ...typography.name, color: colors.text },

@@ -10,11 +10,40 @@ import {
   View,
 } from 'react-native';
 import { Druck } from './Druck';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
-import { findePerson, istNummer, nichtGefundenText } from '../lib/personSuche';
 import { useDaten } from '../contexts/DatenContext';
+import { useAktionen } from '../lib/useAktionen';
+import { QrCode } from './QrCode';
+import { QrScanner } from './QrScanner';
+import { ICH } from '../lib/daten';
 import { Contact } from '../types';
+
+// Dieselbe Regel und dieselbe Schreibweise wie auf der Website.
+const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
+const QrKontakt = require('../../gemeinsam/qr') as typeof import('../../gemeinsam/qr');
+
+/*
+ * Kontakt hinzufuegen — Telefonnummer oder QR-Code.
+ *
+ * Henrik am 07.09.2026: „Kontakt hinzufügen nur über Telefonnummer/QR-Code,
+ * nicht Username."
+ *
+ * WARUM DER BENUTZERNAME RAUS IST
+ *
+ * Er stand bis dahin gleichberechtigt daneben („@greta"). Beides zugleich
+ * heisst: jeder ist ueber einen Namen auffindbar, den er sich selbst gibt und
+ * der in seinem Profil steht. Eine Nummer kennt nur, wem man sie gegeben hat.
+ * Genau darin liegt der Unterschied, und deshalb ist der Benutzername hier
+ * nicht nur ausgeblendet, sondern als Weg entfernt: `personPerNummer` fragt
+ * die Datenbank ausschliesslich nach Nummern.
+ *
+ * Gefunden wird ueber `finde_per_nummer` (Schema 24), nicht in der geladenen
+ * Liste — Begruendung in lib/aktionen.ts.
+ *
+ * Gleiche Regel auf der Website: `openAddContact` in web/public/app.js.
+ */
 
 interface Props {
   visible: boolean;
@@ -26,22 +55,46 @@ interface Props {
 
 export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }: Props) => {
   const { users } = useDaten();
+  const aktionen = useAktionen(onNotice);
   const insets = useSafeAreaInsets();
   const [eingabe, setEingabe] = useState('');
+  const [laeuft, setLaeuft] = useState(false);
+  const [scannen, setScannen] = useState(false);
+  const [eigenerCode, setEigenerCode] = useState(false);
 
-  const submit = () => {
-    const roh = eingabe.trim();
-    if (!roh) return onNotice('Bitte Benutzername oder Telefonnummer eingeben');
+  const eigeneNummer = users[ICH]?.phone ?? '';
 
-    const person = findePerson(roh, users);
-    if (!person) return onNotice(nichtGefundenText(roh));
+  /*
+   * Ein Weg fuer beide Eingaben: getippte Nummer und gescannter Code enden
+   * hier. Sonst gaebe es zwei Fassungen derselben Pruefung, und eine davon
+   * wuerde irgendwann anders entscheiden als die andere.
+   */
+  const suchen = async (nummer: string) => {
+    const roh = nummer.trim();
+    if (!roh) return onNotice('Bitte eine Telefonnummer eingeben');
+
+    const grund = Telefon.pruefe(roh);
+    if (grund) return onNotice(grund);
+
+    setLaeuft(true);
+    const person = await aktionen.personPerNummer(roh);
+    setLaeuft(false);
+    if (!person) return onNotice('Zu dieser Nummer gibt es noch kein Konto');
+
     if (contacts.some((c) => c.id === person.id)) {
       return onNotice(`${person.name} ist bereits in deinen Kontakten`);
     }
 
-    onAdd({ id: person.id, name: person.name, status: 'pending', about: 'Anfrage gesendet', phone: person.phone });
+    onAdd({
+      id: person.id,
+      name: person.name,
+      status: person.privat ? 'pending' : 'friend',
+      about: person.privat ? 'Anfrage gesendet' : 'Kontakt',
+      // Die Nummer kommt aus der Eingabe, nicht aus der Antwort: die Suche
+      // gibt keine fremden Nummern heraus (Fund 1).
+      phone: Telefon.speicherform(roh),
+    });
     setEingabe('');
-    onNotice(`Chat mit ${person.name} erstellt`);
   };
 
   return (
@@ -67,28 +120,69 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
                 style={styles.input}
                 value={eingabe}
                 onChangeText={setEingabe}
-                placeholder="Benutzername oder Telefonnummer"
+                placeholder="Telefonnummer"
                 placeholderTextColor={colors.text3}
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType={istNummer(eingabe) ? 'phone-pad' : 'default'}
+                keyboardType="phone-pad"
                 returnKeyType="done"
-                onSubmitEditing={submit}
+                onSubmitEditing={() => suchen(eingabe)}
               />
-              <Text style={styles.hint}>
-                Noch keine Kontakte: @greta, @hakan, @ida — oder deren Nummer,
-                z. B. +49 174 8901234
-              </Text>
+              <Text style={styles.hint}>{Telefon.REGEL_TEXT}</Text>
+
+              {/*
+                Der zweite Weg. „Mein Code" und „Scannen" stehen nebeneinander,
+                weil sie zusammengehoeren: einer zeigt, einer liest.
+              */}
+              <View style={styles.qrReihe}>
+                <Druck
+                  style={styles.qrKnopf}
+                  onPress={() => {
+                    if (!eigeneNummer) {
+                      return onNotice('Für deinen Code brauchst du erst eine eigene Telefonnummer');
+                    }
+                    setEigenerCode((a) => !a);
+                  }}
+                >
+                  <Ionicons name="qr-code-outline" size={18} color={colors.text} />
+                  <Text style={styles.qrText}>{eigenerCode ? 'Code ausblenden' : 'Mein Code'}</Text>
+                </Druck>
+                <Druck style={styles.qrKnopf} onPress={() => setScannen(true)}>
+                  <Ionicons name="scan-outline" size={18} color={colors.text} />
+                  <Text style={styles.qrText}>Code scannen</Text>
+                </Druck>
+              </View>
+
+              {eigenerCode && eigeneNummer ? (
+                <View style={styles.qrFlaeche}>
+                  <QrCode text={QrKontakt.link(eigeneNummer)} groesse={200} />
+                  <Text style={styles.qrNummer}>{eigeneNummer}</Text>
+                </View>
+              ) : null}
             </View>
           </ScrollView>
 
           <View style={styles.footer}>
-            <Druck style={styles.button} onPress={submit}>
-              <Text style={styles.buttonText}>Anfrage senden</Text>
+            <Druck style={styles.button} onPress={() => suchen(eingabe)} disabled={laeuft}>
+              <Text style={styles.buttonText}>{laeuft ? 'Wird gesucht …' : 'Anfrage senden'}</Text>
             </Druck>
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <QrScanner
+        visible={scannen}
+        onClose={() => setScannen(false)}
+        onCode={(text) => {
+          setScannen(false);
+          const nummer = QrKontakt.nummerAus(text);
+          // Ein fremder Code — Fahrkarte, Werbeplakat — ist kein Fehler des
+          // Nutzers, nur der falsche Code. Deshalb ein Satz und kein Alarm.
+          if (!nummer) return onNotice('Das ist kein All-Media-Code');
+          setEingabe(nummer);
+          void suchen(nummer);
+        }}
+      />
     </Modal>
   );
 };
@@ -121,7 +215,6 @@ const styles = themenStyles((colors) => ({
   },
 
   field: { paddingTop: spacing.md, paddingHorizontal: spacing.lg },
-  label: { color: colors.text2, marginBottom: 6, ...typography.small },
   input: {
     height: 44,
     paddingHorizontal: 14,
@@ -130,8 +223,22 @@ const styles = themenStyles((colors) => ({
     color: colors.text,
     ...typography.body,
   },
-  inputMulti: { height: 80, paddingTop: 12, textAlignVertical: 'top' },
   hint: { paddingTop: 6, color: colors.text3, ...typography.small },
+
+  qrReihe: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.md },
+  qrKnopf: {
+    flex: 1,
+    height: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface3,
+  },
+  qrText: { color: colors.text, ...typography.small, fontWeight: '600' },
+  qrFlaeche: { alignItems: 'center', gap: 8, paddingTop: spacing.md },
+  qrNummer: { color: colors.text2, ...typography.small },
 
   footer: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   button: {

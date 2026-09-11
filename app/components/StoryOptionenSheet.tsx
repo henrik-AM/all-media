@@ -4,6 +4,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
+import { SichtbarkeitSheet } from './SichtbarkeitSheet';
 import { useProfil } from '../contexts/ProfilContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
@@ -11,7 +12,7 @@ import { useSupabase } from '../contexts/SupabaseContext';
 import { AuthContext } from '../contexts/AuthContext';
 import { useAktionen } from '../lib/useAktionen';
 import * as Aktion from '../lib/aktionen';
-import { Contact, Story } from '../types';
+import { Story } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -27,7 +28,6 @@ const GRUENDE = [
 
 interface AnsichtenProps {
   story: Story;
-  contacts: Contact[];
   onClose: () => void;
   onOpenProfile: (userId: string) => void;
 }
@@ -36,42 +36,67 @@ interface AnsichtenProps {
  * Prototyp: bei der eigenen Story steht unten „Ansichten" statt eines
  * Antwortfelds. Vorher kam dort nur ein Hinweis.
  *
- * Wer sie gesehen hat, hängt an der Aufnahmezeit — so bleibt die Liste beim
- * erneuten Öffnen gleich, statt bei jedem Mal zu wechseln.
+ * Wer sie gesehen hat, kommt seit dem 09.09.2026 aus public.story_views.
+ * Davor rechnete das Sheet die Liste aus den eigenen Kontakten und der
+ * Aufnahmezeit aus: die Namen waren erfunden, und die Zahl wuchs mit dem
+ * Alter der Story statt mit den Zuschauern.
  */
-export const StoryAnsichtenSheet = ({ story, contacts, onClose, onOpenProfile }: AnsichtenProps) => {
+export const StoryAnsichtenSheet = ({ story, onClose, onOpenProfile }: AnsichtenProps) => {
   const { users: alleNutzer } = useDaten();
-  const bekannte = contacts.filter((c) => alleNutzer[c.id]);
-  const wieviele = bekannte.length
-    ? 1 + (Math.floor((story.aufgenommen ?? 0) / 60000) % bekannte.length)
-    : 0;
-  const seher = bekannte.slice(0, wieviele);
+  const { supabase } = useSupabase();
+  const { user } = useContext(AuthContext);
+  const nutzerId = user?.id ?? '';
+  const [seher, setSeher] = useState<Aktion.StorySeher[]>([]);
+  const [laedt, setLaedt] = useState(true);
+
+  useEffect(() => {
+    let gilt = true;
+    if (!supabase || !story.id) return;
+    setLaedt(true);
+    Aktion.storyAnsichten(supabase, story.id, nutzerId)
+      .then((liste) => {
+        if (!gilt) return;
+        setSeher(liste);
+        setLaedt(false);
+      })
+      .catch(() => {
+        if (gilt) setLaedt(false);
+      });
+    return () => {
+      gilt = false;
+    };
+  }, [supabase, story.id, nutzerId]);
 
   return (
     <SheetRahmen
       visible
-      title={`${seher.length} ${seher.length === 1 ? 'Ansicht' : 'Ansichten'}`}
+      title={laedt ? 'Ansichten' : `${seher.length} ${seher.length === 1 ? 'Ansicht' : 'Ansichten'}`}
       onClose={onClose}
       hoch={seher.length > 5}
     >
-      {seher.length === 0 ? (
+      {laedt ? (
+        <Text style={styles.hinweis}>Wird geladen …</Text>
+      ) : seher.length === 0 ? (
         <Text style={styles.hinweis}>Noch hat niemand deine Story gesehen.</Text>
       ) : (
         <ScrollView>
-          {seher.map((c) => {
-            const person = alleNutzer[c.id];
+          {seher.map((v) => {
+            // Bekannte Person mit ihrem Namen aus dem Bestand, sonst mit dem,
+            // was an der Ansicht steht.
+            const person = alleNutzer[v.id];
+            const name = person?.name || v.name;
             return (
               <Druck
-                key={c.id}
+                key={v.id}
                 style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
                 onPress={() => {
                   onClose();
-                  onOpenProfile(c.id);
+                  onOpenProfile(v.id);
                 }}
               >
-                <Avatar id={c.id} name={person.name} size={sizes.avatarSm} />
-                <Text style={styles.label}>{person.name}</Text>
-                <Text style={styles.neben}>{person.handle}</Text>
+                <Avatar id={v.id} name={name} size={sizes.avatarSm} />
+                <Text style={styles.label}>{name}</Text>
+                <Text style={styles.neben}>{person?.handle || v.handle}</Text>
               </Druck>
             );
           })}
@@ -92,13 +117,25 @@ interface OptionenProps {
 }
 
 export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice }: OptionenProps) => {
-  const { users: alleNutzer } = useDaten();
+  const { users: alleNutzer, sichtbarkeit, neuLaden } = useDaten();
   const { stummSchalten, melden } = useProfil();
   const { supabase } = useSupabase();
   const { user } = useContext(AuthContext);
   const nutzerId = user?.id ?? '';
-  const { medienSichern } = useAktionen();
+  const aktionen = useAktionen(onNotice);
+  const { medienSichern } = aktionen;
   const [meldeSchritt, setMeldeSchritt] = useState(false);
+  /*
+   * Henrik, 07.09.2026: "Eigene-Story-Menü (3 Punkte) ohne Funktion."
+   *
+   * Von den drei Punkten war einer eine Sackgasse: „Wer darf sie sehen"
+   * meldete nur „steht in den Einstellungen unter Chats" und schloss sich
+   * wieder. Ein Menüpunkt, der einem sagt, wo man selbst nachsehen soll, ist
+   * kein Menüpunkt. Er öffnet jetzt dieselbe Sichtbarkeitswahl, die auch in
+   * den Einstellungen steht — vier Stufen, Ausnahmeliste, und der Zusatz
+   * „Story auch in Videos teilen" (Schema 30).
+   */
+  const [sichtOffen, setSichtOffen] = useState(false);
   const person = alleNutzer[story.userId];
 
   /*
@@ -159,10 +196,7 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
       });
       return;
     }
-    if (key === 'sichtbar') {
-      onNotice('Story-Sichtbarkeit steht in den Einstellungen unter „Chats“');
-      return onClose();
-    }
+    if (key === 'sichtbar') return setSichtOffen(true);
     if (key === 'link') {
       onNotice(`all-media.app/story/${story.id}`);
       return onClose();
@@ -174,6 +208,38 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
     }
     setMeldeSchritt(true);
   };
+
+  /*
+   * Die Sichtbarkeit der eigenen Story — dieselbe Wahl wie in den
+   * Einstellungen, nur an der Stelle, an der man sie braucht. Sie liegt über
+   * dem Menü, nicht daneben: das Menü bleibt offen, damit man danach noch
+   * löschen oder sichern kann.
+   */
+  const sicht = sichtbarkeit.story || { stufe: 'alle' as const, ausnahmen: [] };
+  if (sichtOffen) {
+    return (
+      <SichtbarkeitSheet
+        visible
+        titel="Wer darf deine Story sehen"
+        stufe={sicht.stufe}
+        ausnahmen={sicht.ausnahmen}
+        onStufe={async (stufe) => {
+          await aktionen.sichtbarkeit('story', stufe, () => {});
+          await neuLaden();
+        }}
+        onAusnahme={async (userId) => {
+          await aktionen.sichtbarkeitAusnahme('story', userId, () => {});
+          await neuLaden();
+        }}
+        inVideos={sicht.inVideos}
+        onInVideos={async (an) => {
+          await aktionen.storyInVideos(an, () => {});
+          await neuLaden();
+        }}
+        onClose={() => setSichtOffen(false)}
+      />
+    );
+  }
 
   return (
     <SheetRahmen

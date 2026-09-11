@@ -37,7 +37,7 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
     browserFehler.push('Konsole: ' + m.text());
   });
 
-  await page.goto(ZIEL, { waitUntil: 'networkidle' });
+  await page.goto(ZIEL, { waitUntil: 'load' });
 
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
 
@@ -49,15 +49,18 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     console.error('Ohne Anmeldung ist die Seite leer — dieser Lauf würde nichts prüfen.');
 
+    // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
+    // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
+    await browser.close().catch(() => {});
     process.exit(1);
 
   }
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await page.waitForSelector('#topbar button');
 
   const ergebnisse = [];
@@ -96,7 +99,7 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nDer eigene Beitrag im Feed');
 
   await eigenenBeitragAnlegen('');
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await gehe('videos', 'home');
   await page.waitForSelector('.post');
 
@@ -179,7 +182,7 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
     if (!antwort.ok) throw new Error('der Server sagt: ' + (antwort.error || 'nichts'));
   });
 
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
 
   for (const [bereich, unter, wo] of [
     ['videos', 'profile', 'Videos-Profil'],

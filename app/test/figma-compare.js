@@ -67,7 +67,7 @@ async function figmaImages(nodes) {
   const browser = await chromium.launch({ channel: 'chromium-headless-shell' });
   const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
   await page.request.post('http://localhost:3000/api/reset');
-  await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:3000', { waitUntil: 'load' });
   await page.waitForTimeout(500);
 
   for (const screen of SCREENS) {

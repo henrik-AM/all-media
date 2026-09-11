@@ -136,10 +136,12 @@ async function anmelden(zugang) {
     if (f1) throw f1;
     eigenes.storyId = story.id;
 
-    // Ein Zweierchat zwischen beiden Konten.
+    // Ein Zweierchat zwischen beiden Konten. Mit Namen: ein namenloser Chat
+    // ist im Bestand von nichts zu unterscheiden und war deshalb am
+    // 06.09.2026 nicht als Rest dieses Laufs zu erkennen.
     const { data: chat, error: f2 } = await eigner.client
       .from('chats')
-      .insert({ is_group: false, created_by: eigner.id })
+      .insert({ name: 'Prüflauf Sichtbarkeit', is_group: false, created_by: eigner.id })
       .select('id')
       .maybeSingle();
     if (f2) throw f2;
@@ -169,8 +171,40 @@ async function anmelden(zugang) {
    */
   const bestandAbraeumen = async () => {
     if (eigenes.storyId) await eigner.client.from('stories').delete().eq('id', eigenes.storyId);
-    // Der Chat nimmt Mitglieder und Nachrichten ueber `on delete cascade` mit.
-    if (eigenes.chatId) await eigner.client.from('chats').delete().eq('id', eigenes.chatId);
+
+    /*
+     * Der Chat geht erst, wenn sonst niemand mehr drin ist.
+     *
+     * Die Regel "Leeren Chat abraeumen" (SUPABASE_SCHEMA_9_loeschen.sql)
+     * laesst das Loeschen nur zu, solange ausser einem selbst kein Mitglied
+     * mehr eingetragen ist. Hier standen beide Konten im Chat — das DELETE
+     * traf keine Zeile und meldete keinen Fehler. So blieb bei jedem Lauf
+     * genau ein namenloser Chat stehen; am 06.09.2026 waren es
+     * vierundzwanzig, und in der Chatliste der App standen vierundzwanzig
+     * Zeilen mit nichts als einem Kreis und einer Uhrzeit.
+     *
+     * Reihenfolge wie in `_dmsperre.js`: aus `chat_members` nimmt jedes
+     * Konto seine eigene Zeile, dann erst faellt der Chat.
+     */
+    if (eigenes.chatId) {
+      await fremder.client
+        .from('chat_members')
+        .delete()
+        .eq('chat_id', eigenes.chatId)
+        .eq('user_id', fremder.id);
+      await eigner.client
+        .from('chat_members')
+        .delete()
+        .eq('chat_id', eigenes.chatId)
+        .eq('user_id', eigner.id);
+      await eigner.client.from('chats').delete().eq('id', eigenes.chatId);
+
+      const { count } = await eigner.client
+        .from('chats')
+        .select('*', { count: 'exact', head: true })
+        .eq('id', eigenes.chatId);
+      pruefe('Der Pruefchat ist danach wirklich weg', !count, `${count} Zeile(n) geblieben`);
+    }
     // Ebenso die Community: Mitglieder und PTT-Nachrichten haengen daran.
     if (eigenes.communityId) {
       await eigner.client.from('communities').delete().eq('id', eigenes.communityId);

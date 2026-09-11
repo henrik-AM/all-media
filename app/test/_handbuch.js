@@ -67,7 +67,7 @@ const pruefe = (name, wahr, zusatz = '') => {
   const browserFehler = [];
   seite.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
 
-  await seite.goto(BASIS, { waitUntil: 'networkidle' });
+  await seite.goto(BASIS, { waitUntil: 'load' });
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);

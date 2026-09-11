@@ -13,6 +13,11 @@ import { Druck } from '../components/Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AuthContext } from '../contexts/AuthContext';
+import { useSupabase } from '../contexts/SupabaseContext';
+import { PASSWORT_REGEL, passwortPruefen } from '../lib/supabaseAuth';
+
+// Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
+const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
 import { brandGradient, colors, radius, shadow, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
@@ -36,6 +41,7 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { login, kontoHinzufuegen, sendPasswordResetCode } = useContext(AuthContext);
+  const { supabase } = useSupabase();
 
   // Social login handler
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
@@ -112,9 +118,8 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
         if (!newPassword.trim()) {
           return setError('Bitte neues Passwort eingeben');
         }
-        if (newPassword.length < 6) {
-          return setError('Das Passwort muss mindestens 6 Zeichen lang sein');
-        }
+        const zuSchwach = passwortPruefen(newPassword);
+        if (zuSchwach) return setError(zuSchwach);
         if (newPassword !== newPasswordConfirm) {
           return setError('Die Passwörter stimmen nicht überein');
         }
@@ -144,7 +149,32 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
     if (currentMethod === 'phone' && !/^\+?[0-9\s\-()]{9,}$/.test(identifier)) {
       return setError('Bitte eine gültige Telefonnummer eingeben');
     }
-    if (password.length < 6) return setError('Das Passwort braucht mindestens 6 Zeichen');
+    /*
+     * Beim Anlegen gilt die volle Regel aus gemeinsam/passwort.js — dieselbe,
+     * die Supabase durchsetzt. Beim Anmelden nicht: wer ein aelteres, kuerzeres
+     * Passwort hat, soll sich damit anmelden koennen und nicht an einer Regel
+     * scheitern, die es zur Zeit seiner Registrierung noch nicht gab.
+     */
+    if (mode === 'register') {
+      const zuSchwach = passwortPruefen(password);
+      if (zuSchwach) return setError(zuSchwach);
+    } else if (!password) {
+      return setError('Bitte Passwort eingeben');
+    }
+
+    /*
+     * Die Telefonnummer ist beim Anlegen Pflicht (Henrik 07.09.2026).
+     *
+     * Nicht als Formsache: „Kontakt hinzufügen" läuft über die Nummer. Ein
+     * Konto ohne sie ist für niemanden auffindbar — und niemand merkt es,
+     * weil nichts fehlt, was man sehen könnte. Die Nummer selbst prüft
+     * gemeinsam/telefon.js, ob sie schon vergeben ist, die Datenbank
+     * (nummer_frei, Schema 34). Gleiche Regel in web/public/anmeldung.js.
+     */
+    if (mode === 'register') {
+      const grund = Telefon.pruefe(phone);
+      if (grund) return setError(grund);
+    }
 
     setError(null);
     setLoading(true);
@@ -152,7 +182,14 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
       if (mode === 'login') {
         await login(identifier.trim(), password);
       } else {
-        await kontoHinzufuegen(identifier.trim(), password);
+        if (supabase) {
+          const { data: frei } = await supabase.rpc('nummer_frei', { eingabe: phone });
+          if (frei && frei.frei === false) {
+            setLoading(false);
+            return setError(frei.meldung || 'Diese Telefonnummer gehört schon zu einem Konto.');
+          }
+        }
+        await kontoHinzufuegen(identifier.trim(), password, undefined, phone);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Fehler bei der Authentifizierung';
@@ -305,6 +342,24 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
             </View>
           )}
 
+          {/* Beim Anlegen über E-Mail kommt die Nummer dazu — sie ist Pflicht,
+              siehe submit(). Beim Weg über „Telefon" steht sie schon oben. */}
+          {mode === 'register' && currentMethod === 'email' && (
+            <View style={styles.field}>
+              <Ionicons name="call-outline" size={19} color={colors.text3} />
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Telefonnummer"
+                placeholderTextColor={colors.text3}
+                autoCapitalize="none"
+                keyboardType="phone-pad"
+                editable={!loading}
+              />
+            </View>
+          )}
+
           {mode !== 'reset' && (currentMethod === 'email' || currentMethod === 'phone') && (
             <View style={styles.field}>
               <Ionicons name="lock-closed-outline" size={19} color={colors.text3} />
@@ -326,6 +381,13 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
                 />
               </Druck>
             </View>
+          )}
+
+          {/* Beim Anlegen die Regel nennen, statt sie erst beim Absenden zu verraten. */}
+          {mode === 'register' && (currentMethod === 'email' || currentMethod === 'phone') && (
+            <Text style={styles.regelHinweis}>
+              {PASSWORT_REGEL}. Telefonnummer: {Telefon.REGEL_TEXT}.
+            </Text>
           )}
 
           {mode === 'reset' && resetStage === 'code' && (
@@ -598,6 +660,7 @@ const styles = themenStyles((colors) => ({
     minHeight: 120,
   },
   socialLoginLabel: { color: colors.text2, ...typography.body },
+  regelHinweis: { color: colors.text3, marginTop: -4, marginBottom: 4, ...typography.small },
 
   switch: { alignItems: 'center', paddingVertical: spacing.md },
   switchText: { color: colors.brand, ...typography.body },

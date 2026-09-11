@@ -10,11 +10,14 @@ import { useDaten } from '../../contexts/DatenContext';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { SichtbarkeitStufe } from '../../lib/aktionen';
+import { ICH } from '../../lib/daten';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
   onEditSelectedContacts?: () => void;
   onNotice?: (message: string) => void;
+  /** Nur fuer die Prueflaeufe — siehe `pruefStilOffen` in KarteWeb. */
+  pruefStilOffen?: boolean;
 }
 
 /*
@@ -45,16 +48,48 @@ const STUFEN_NAME: Record<SichtbarkeitStufe, string> = {
 };
 
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
-export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotice }: Props) => {
-  const { friendPins: alleKartenpunkte, users: alleNutzer, neuLaden } = useDaten();
+export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotice, pruefStilOffen }: Props) => {
+  const { friendPins: alleNadeln, users: alleNutzer, neuLaden } = useDaten();
   const insets = useSafeAreaInsets();
   const karte = useRef<KartenSteuerung>(null);
+  const blatt = useRef<ScrollView>(null);
   const [aktiv, setAktiv] = useState<string | null>(null);
   const { sichtbarkeit } = useDaten();
   const aktionen = useAktionen(onNotice);
   const [sichtOffen, setSichtOffen] = useState(false);
 
-  const sicht = sichtbarkeit.standort ?? { stufe: 'alle' as SichtbarkeitStufe, ausnahmen: [] };
+  /*
+   * Henrik, 07.09.2026: "„In deiner Nähe" soll nur Personen mit einsehbarem
+   * Standort zeigen."
+   *
+   * Wessen Standort man sehen darf, entscheidet die Datenbank (Regel „Pins
+   * lesen", Schema 19) — was hier ankommt, ist also bereits gefiltert. Was
+   * nicht gefiltert war: der eigene Pin. Der kommt als `ICH` mit und stand
+   * damit als erster Eintrag unter „In deiner Nähe" — man selbst in der Liste
+   * der Leute in der eigenen Naehe.
+   *
+   * Ebenfalls raus: Nadeln ohne Profil dahinter. Sie standen als „Unbekannt"
+   * da und liessen sich weder oeffnen noch zuordnen.
+   */
+  const alleKartenpunkte = alleNadeln.filter(
+    (pin) => pin.id !== ICH && Boolean(alleNutzer[pin.id])
+  );
+
+  /*
+   * Die Stufe wird beim Umschalten sofort hier festgehalten und erst danach
+   * gespeichert. Henrik, 07.09.2026: "„Standort teilen" + alle „Sichtbar
+   * für"-Optionen zeitverzögert/buggy."
+   *
+   * Der Grund war nicht die Datenbank, sondern der Weg dorthin: jede Aenderung
+   * loeste `neuLaden()` aus, und das laedt den gesamten Bestand der App neu —
+   * Chats, Beitraege, Storys, alles. Bis der zurueck war, stand der Schalter
+   * noch auf dem alten Wert und sprang dann verspaetet um. Wer zweimal
+   * hintereinander tippte, sah ihn hin und her springen.
+   */
+  const [sofort, setSofort] = useState<{ stufe: SichtbarkeitStufe; ausnahmen: string[] } | null>(null);
+
+  const gespeichert = sichtbarkeit.standort ?? { stufe: 'alle' as SichtbarkeitStufe, ausnahmen: [] };
+  const sicht = sofort ?? gespeichert;
   const sichtbar = sicht.stufe !== 'niemand';
 
   /*
@@ -62,12 +97,18 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
    * weiteste Stufe zurück. Er ist kein zweiter Speicher — sonst stünde der
    * Schalter auf „an" und die Stufe auf „Niemand", und beide hätten recht.
    */
+  const stufeSetzen = async (stufe: SichtbarkeitStufe) => {
+    setSofort({ stufe, ausnahmen: sicht.ausnahmen });
+    await aktionen.sichtbarkeit('standort', stufe, () => {});
+    await neuLaden();
+    // Ab hier steht der gespeicherte Wert wieder zur Verfuegung; die
+    // Zwischenanzeige wird nicht mehr gebraucht und darf ihn nicht ueberdecken.
+    setSofort(null);
+  };
+
   const schalten = (an: boolean) => {
-    void (async () => {
-      await aktionen.sichtbarkeit('standort', an ? 'alle' : 'niemand', () => {});
-      await neuLaden();
-    })();
     onNotice?.(an ? 'Standort wird geteilt' : 'Standort ist aus');
+    void stufeSetzen(an ? 'alle' : 'niemand');
   };
   /*
    * Vollbild: die Karte füllt den Bereich, Freigabe und Liste treten zurück.
@@ -105,14 +146,22 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
   /**
    * Tippen auf einen Kontakt zoomt auf der Karte zu ihm - vorher landete man
    * im Bereich Videos, was aus der Karte heraus nicht passt.
+   *
+   * Henrik, 07.09.2026: "Kontakt in „In deiner Nähe" antippen → soll zur
+   * Karte hochscrollen + nah heranzoomen (Straßenebene)." Der Zoom lief
+   * vorher schon, nur sah ihn niemand: die Liste steht unter der Karte, und
+   * wer weit unten tippt, hat die Karte gar nicht im Bild. Die Bewegung
+   * passierte ausserhalb des Sichtfelds.
    */
   const zeigeAufKarte = (id: string) => {
     setAktiv(id);
+    blatt.current?.scrollTo({ y: 0, animated: true });
     karte.current?.zoomAuf(id);
   };
 
   return (
     <ScrollView
+      ref={blatt}
       style={styles.screen}
       /*
        * Hier stand `insets.top + spacing.md`. Den Platz fuer die Insel und
@@ -132,6 +181,7 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
         onPinPress={zeigeAufKarte}
         vollbild={vollbild}
         onVollbild={() => setVollbild((v) => !v)}
+        pruefStilOffen={pruefStilOffen}
         hoehe={vollbild && flaeche > 0 ? flaeche : 320}
         /* Henrik: "Standort ausschalten wird nicht beachtet - der Nutzer wird
            noch angezeigt." Der Schalter und die Freigabe "Niemand" nehmen die
@@ -176,6 +226,11 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
       )}
 
       {!vollbild && <Text style={styles.listHead}>IN DEINER NÄHE</Text>}
+      {!vollbild && alleKartenpunkte.length === 0 && (
+        <Text style={styles.leer}>
+          Gerade gibt niemand aus deinen Kontakten seinen Standort für dich frei.
+        </Text>
+      )}
       {!vollbild && alleKartenpunkte.map((pin) => {
         const person = alleNutzer[pin.id];
         const istAktiv = aktiv === pin.id;
@@ -219,13 +274,19 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
         titel="Standort sichtbar für"
         stufe={sicht.stufe}
         ausnahmen={sicht.ausnahmen}
-        onStufe={async (stufe) => {
-          await aktionen.sichtbarkeit('standort', stufe, () => {});
-          await neuLaden();
-        }}
+        onStufe={stufeSetzen}
         onAusnahme={async (userId) => {
+          // Auch hier zuerst die Anzeige, dann der Weg in die Datenbank.
+          const drauf = sicht.ausnahmen.includes(userId);
+          setSofort({
+            stufe: sicht.stufe,
+            ausnahmen: drauf
+              ? sicht.ausnahmen.filter((x) => x !== userId)
+              : [...sicht.ausnahmen, userId],
+          });
           await aktionen.sichtbarkeitAusnahme('standort', userId, () => {});
           await neuLaden();
+          setSofort(null);
         }}
         onClose={() => setSichtOffen(false)}
       />
@@ -314,6 +375,12 @@ const styles = themenStyles((colors) => ({
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: 9,
+  },
+  leer: {
+    ...typography.small,
+    color: colors.text3,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   rowAktiv: { backgroundColor: colors.brandSoft },
   rowBody: { flex: 1 },

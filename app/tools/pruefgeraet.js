@@ -21,9 +21,34 @@ const NAME = 'All-Media Test';
 const EXPO_GO_ID = 'host.exp.Exponent';
 const ROOT = path.join(__dirname, '..');
 
-function sh(befehl) { return execSync(befehl, { encoding: 'utf8' }); }
-function still(befehl) { try { return sh(befehl); } catch { return ''; } }
-function schlaf(ms) { execSync(`sleep ${ms / 1000}`); }
+/*
+ * JEDER Aufruf nach draussen bekommt eine Zeitgrenze — seit dem 06.09.2026.
+ *
+ * Am 05.09.2026 lief "npm run mac:bilder" ueber zwanzig Minuten ohne eine
+ * Zeile Ausgabe und wurde abgebrochen. Kein Aufruf hier hatte eine Grenze:
+ * ein "xcrun simctl", das auf einen haengenden CoreSimulator wartet, und
+ * ebenso ein "osascript", das ohne Bedienungshilfen-Freigabe auf eine
+ * Rueckfrage wartet, die im Hintergrund niemand sieht, halten execSync
+ * beliebig lange fest. Der Ereignisschleife wird dabei nichts zugestellt,
+ * also steht auch keine Meldung mehr auf dem Schirm.
+ *
+ * Mit Grenze bricht der Aufruf ab und sagt, WELCHER Befehl gestanden hat.
+ * Lieber ein Abbruch mit Begruendung als ein Werkzeug, das schweigt.
+ */
+const GRENZE = 60000;
+
+function sh(befehl, grenze = GRENZE) {
+  try {
+    return execSync(befehl, { encoding: 'utf8', timeout: grenze });
+  } catch (fehler) {
+    if (fehler.signal === 'SIGTERM' || fehler.code === 'ETIMEDOUT') {
+      throw new Error(`Nach ${grenze / 1000}s keine Antwort: ${befehl}`);
+    }
+    throw fehler;
+  }
+}
+function still(befehl, grenze = GRENZE) { try { return sh(befehl, grenze); } catch { return ''; } }
+function schlaf(ms) { execSync(`sleep ${ms / 1000}`, { timeout: ms + 5000 }); }
 function log(zeile) { process.stdout.write(zeile + '\n'); }
 
 /** Alle Geraete als flache Liste, unabhaengig von der iOS-Fassung. */
@@ -54,9 +79,12 @@ function anlegen() {
  * eben offen. Deshalb kein Abbruch.
  */
 function fensterZuklappen() {
+  // Zehn Sekunden: ohne Bedienungshilfen-Freigabe wartet System Events sonst
+  // auf eine Rueckfrage, die niemand zu sehen bekommt.
   still(
     `osascript -e 'tell application "System Events" to tell process "Simulator" ` +
-    `to set value of attribute "AXMinimized" of (first window whose name starts with "${NAME}") to true'`
+    `to set value of attribute "AXMinimized" of (first window whose name starts with "${NAME}") to true'`,
+    10000
   );
 }
 
@@ -83,7 +111,7 @@ function dialogBestaetigen() {
     'tell application "System Events" to key code 36',   // Eingabetaste
   ];
   try {
-    execFileSync('osascript', skript.flatMap((zeile) => ['-e', zeile]), { stdio: 'ignore' });
+    execFileSync('osascript', skript.flatMap((zeile) => ['-e', zeile]), { stdio: 'ignore', timeout: 30000 });
   } catch {
     log('  Hinweis: Der Dialog "In Expo Go oeffnen?" liess sich nicht bestaetigen.');
     log('  Einmal von Hand im Fenster "' + NAME + '" auf "Oeffnen" tippen.');
@@ -109,22 +137,22 @@ function expoGoSichern(kennung) {
     const bundle = still(`xcrun simctl get_app_container ${geraet.udid} ${EXPO_GO_ID} app`).trim();
     if (bundle && fs.existsSync(bundle)) {
       log('  Expo Go wird vom anderen Simulator uebernommen ...');
-      execFileSync('xcrun', ['simctl', 'install', kennung, bundle]);
+      execFileSync('xcrun', ['simctl', 'install', kennung, bundle], { timeout: 180000 });
       return;
     }
   }
 
   const sdk = sdkVersion();
   log(`  Expo Go fehlt - wird fuer SDK ${sdk} geladen (ca. 140 MB) ...`);
-  const url = JSON.parse(sh('curl -s https://api.expo.dev/v2/versions/latest')).data.sdkVersions[sdk]?.iosClientUrl;
+  const url = JSON.parse(sh('curl -s --max-time 30 https://api.expo.dev/v2/versions/latest')).data.sdkVersions[sdk]?.iosClientUrl;
   if (!url) throw new Error(`Keine Expo-Go-Version fuer SDK ${sdk} gefunden.`);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'expo-go-'));
   const archiv = path.join(tmp, 'expo-go.tar.gz');
   const bundle = path.join(tmp, 'Expo Go.app');
-  execFileSync('curl', ['-sL', '-o', archiv, url]);
+  execFileSync('curl', ['-sL', '--max-time', '600', '-o', archiv, url]);
   fs.mkdirSync(bundle);
-  execFileSync('tar', ['-xzf', archiv, '-C', bundle]);
-  execFileSync('xcrun', ['simctl', 'install', kennung, bundle]);
+  execFileSync('tar', ['-xzf', archiv, '-C', bundle], { timeout: 180000 });
+  execFileSync('xcrun', ['simctl', 'install', kennung, bundle], { timeout: 180000 });
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
@@ -136,7 +164,7 @@ function pruefgeraet() {
   let geraet = kennungSuchen() ?? anlegen();
   if (geraet.state !== 'Booted') {
     log(`  Pruefgeraet "${NAME}" wird gestartet ...`);
-    still(`xcrun simctl boot ${geraet.udid}`);
+    still(`xcrun simctl boot ${geraet.udid}`, 120000);
     schlaf(8000);
   }
   // Simulator.app oeffnet fuer jedes gestartete Geraet ein Fenster. Es klaut

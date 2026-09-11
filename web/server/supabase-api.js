@@ -20,20 +20,17 @@
 // ============================================================================
 
 /*
- * Sicherheitspruefung 04.09.2026 (Fund 1): `phone` steht hier NICHT mehr.
- *
- * Diese Spaltenliste laedt bis zu 500 Profile auf einmal. Solange `phone`
- * darin stand, war jeder Start der Oberflaeche ein vollstaendiger Abzug
- * aller Telefonnummern — nachgewiesen mit einem einzigen Testkonto.
- *
- * Die eigene Nummer kommt aus `mein_profil()`, die der Kontakte aus
- * `meine_kontaktnummern()` (nur bei beidseitiger Kontaktschaft). Die
- * Datenbank gibt die Spalte ueber diesen Weg gar nicht mehr heraus:
- * SUPABASE_SCHEMA_23_audit.sql entzieht `authenticated` das Leserecht.
+ * Die Spaltenlisten stehen in ../../gemeinsam/spalten.js — einmal fuer
+ * Website und App. Vorher standen sie hier und in app/lib/daten.ts doppelt;
+ * genau dabei sind `is_locked` und `notifications_off` hier verloren
+ * gegangen. Warum `phone` nicht dabei ist, steht in der gemeinsamen Datei.
  */
-const PROFIL_SPALTEN =
-  'id, name, handle, initials, color, privat, about, bio, link, status,' +
-  ' highlights, playlists, spende, live, followers_basis, following_basis, beitraege_basis';
+const {
+  PROFIL_SPALTEN,
+  BEITRAG_SPALTEN,
+  CHATMITGLIED_SPALTEN,
+  NACHRICHT_SPALTEN,
+} = require('../../gemeinsam/spalten');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -162,15 +159,19 @@ async function ladeKontakte(client, nutzerId) {
   if (!client) return null;
   const { data, error } = await client
     .from('contacts')
-    .select('contact_id, status, profiles!contacts_contact_id_fkey(name, about)')
+    .select('contact_id, status, spitzname, notiz, profiles!contacts_contact_id_fkey(name, about)')
     .eq('user_id', nutzerId);
   if (error) throw error;
 
+  // Henrik 7.9.: „Kontaktinfo-Änderungen (z.B. Name) speichern/synchronisieren nicht."
+  // Der selbst vergebene Name liegt seit Schema 33 in contacts.spitzname und geht dem
+  // Profilnamen vor. Gleiche Regel in app/lib/daten.ts (ladeKontakte).
   return (data || []).map((k) => ({
     id: k.contact_id,
-    name: k.profiles?.name || '',
+    name: k.spitzname || k.profiles?.name || '',
     status: k.status,
     about: k.profiles?.about || '',
+    notiz: k.notiz || '',
   }));
 }
 
@@ -330,10 +331,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
 
   const { data, error } = await client
     .from('chat_members')
-    .select(
-      'chat_id, is_archived, is_muted, is_read, is_favorite, geleert_bis,' +
-        ' chats(id, name, is_group, bereich, created_at, updated_at, anfrage_zustand, anfrage_von)'
-    )
+    .select(CHATMITGLIED_SPALTEN)
     .eq('user_id', nutzerId);
   if (error) throw error;
 
@@ -342,25 +340,37 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
 
   const ids = zeilen.map((z) => z.chat_id);
 
-  // Letzte Nachricht und Mitglieder je Chat — in zwei Abfragen statt in
-  // zweien pro Chat. Bei zwölf Chats ist das der Unterschied zwischen zwei
-  // und fünfundzwanzig Rundreisen zur Datenbank.
+  /*
+   * Letzte Nachricht und Mitglieder je Chat — in zwei Abfragen statt in
+   * zweien pro Chat. Bei zwölf Chats ist das der Unterschied zwischen zwei
+   * und fünfundzwanzig Rundreisen zur Datenbank.
+   *
+   * Henrik, 07.09.2026: "Kontaktsortierung falsch (älterer Chat über
+   * neuerem)" und "Chat-Vorschautext nicht synchron mit letzter echter
+   * Nachricht."
+   *
+   * Hier stand eine Abfrage auf messages mit .limit(500) — über alle Chats
+   * zusammen, nicht je Chat. Ein vielbeschriebener Chat füllte die Grenze
+   * allein; jeder ältere bekam gar keine Zeile und fiel damit auf
+   * chats.updated_at als Sortierschlüssel zurück, ohne Vorschautext. Genau
+   * der ältere Chat über dem neueren. Ausführlich in
+   * SUPABASE_SCHEMA_32_letzte_nachricht.sql.
+   *
+   * Gleiche Regel in app/lib/daten.ts (ladeChats).
+   */
   const [{ data: nachrichten, error: fN }, { data: mitglieder, error: fM }, { data: kontakte, error: fK }] =
     await Promise.all([
-      client
-        .from('messages')
-        .select('id, chat_id, text, sender_id, media_type, created_at')
-        .in('chat_id', ids)
-        .order('created_at', { ascending: false })
-        .limit(500),
+      client.rpc('letzte_nachrichten', { chat_ids: ids }),
       client.from('chat_members').select('chat_id, user_id').in('chat_id', ids),
-      client.from('contacts').select('contact_id, status').eq('user_id', nutzerId),
+      client.from('contacts').select('contact_id, status, spitzname').eq('user_id', nutzerId),
     ]);
   if (fN) throw fN;
   if (fM) throw fM;
   if (fK) throw fK;
 
-  void kontakte; // Der Anfragezustand steht seit dem 03.09.2026 am Chat.
+  // Der Anfragezustand steht seit dem 03.09.2026 am Chat. Aus den Kontakten
+  // kommt nur noch der selbst vergebene Name (Schema 33, Henrik 7.9.).
+  const spitznamen = new Map((kontakte || []).filter((k) => k.spitzname).map((k) => [k.contact_id, k.spitzname]));
 
   // Wer einen Chat geleert hat, sieht in der Liste auch keine Vorschau mehr
   // von vorher. Siehe handleClearChat().
@@ -378,6 +388,51 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
     mitgliederNach.get(m.chat_id).push(m.user_id);
   }
 
+  /*
+   * Ein Zweiergespräch heißt wie das Gegenüber — und zwar auf beiden Seiten.
+   *
+   * chats.name wird beim Anlegen einmal festgeschrieben (chatMit in
+   * sync-handlers.js). Das geht nur für den auf, der den Chat angefangen hat:
+   * der andere sähe seinen eigenen Namen. Älteren Chats fehlt der Name ganz.
+   * Deshalb kommt er zur Anzeigezeit aus dem Profil.
+   *
+   * Gleiche Regel in app/lib/daten.ts (ladeChats). Wer eine ändert, ändert
+   * beide — sonst heißt derselbe Chat in App und Website verschieden.
+   */
+  const gegenueberIds = [
+    ...new Set(
+      zeilen
+        .filter((z) => !z.chats.is_group)
+        .map((z) => (mitgliederNach.get(z.chat_id) || []).find((u) => u !== nutzerId))
+        .filter(Boolean)
+    ),
+  ];
+  const namen = new Map();
+  if (gegenueberIds.length) {
+    const { data: profile } = await client.from('profiles').select('id, name').in('id', gegenueberIds);
+    for (const p of profile || []) namen.set(p.id, p.name);
+  }
+
+  /*
+   * Die Kuverts zu den Vorschauen — eine Abfrage, nicht eine je Chat.
+   *
+   * Gefiltert wird nicht nach dem eigenen Schluessel: die Regel „Eigene
+   * Kuverts lesen" aus Schema 31 gibt ohnehin nur die eigenen heraus.
+   */
+  const vorschauKuverts = new Map();
+  const vorschauIds = [...letzte.values()]
+    .filter((n) => Number(n.krypto) > 0)
+    .map((n) => n.id);
+  if (vorschauIds.length) {
+    const { data: kZeilen } = await client
+      .from('message_keys')
+      .select('message_id, nonce, chiffre')
+      .in('message_id', vorschauIds);
+    for (const k of kZeilen || []) {
+      vorschauKuverts.set(k.message_id, { nonce: k.nonce, chiffre: k.chiffre });
+    }
+  }
+
   return zeilen
     .map((z) => {
       const vorschau = letzte.get(z.chat_id) || null;
@@ -387,7 +442,9 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
       const gegenueber = z.chats.is_group ? null : andere[0] || null;
       return {
         id: z.chats.id,
-        name: z.chats.name,
+        name: z.chats.is_group
+          ? z.chats.name || 'Gruppe'
+          : (gegenueber && (spitznamen.get(gegenueber) || namen.get(gegenueber))) || z.chats.name || 'Chat',
         userId: gegenueber,
         requestState: anfrageZustand(z.chats, nutzerId),
         members: z.chats.is_group ? andere : undefined,
@@ -397,7 +454,35 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
         muted: Boolean(z.is_muted),
         unread: z.is_read ? 0 : 1,
         favorit: Boolean(z.is_favorite),
-        preview: vorschau ? vorschau.text : '',
+        // Ein Anruf steht als Eintrag im Chat (Henrik 7.9., Schema 35) und hat
+        // keinen Text — die Vorschau benennt ihn. Gleiche Regel in
+        // app/lib/daten.ts (ladeChats).
+        preview: vorschau
+          ? vorschau.anruf_art
+            ? vorschau.anruf_art === 'video'
+              ? 'Videoanruf'
+              : 'Anruf'
+            : vorschau.text
+          : '',
+        /*
+         * Die Vorschau einer verschluesselten Nachricht ist hier leer — der
+         * Server kann sie nicht oeffnen. Er reicht das Noetige durch, und der
+         * Browser setzt den Text ein (`vorschauenOeffnen` in public/app.js).
+         *
+         * Ohne das staende in der Chatliste bei jedem verschluesselten Chat
+         * eine leere Zeile: der Chat selbst waere lesbar, die Uebersicht
+         * darueber nicht. So zeigt sich eine Verschluesselung zuerst als
+         * kaputte Oberflaeche.
+         */
+        previewKrypto: vorschau
+          ? {
+              krypto: Number(vorschau.krypto || 0),
+              chiffre: vorschau.chiffre || null,
+              kryptoNonce: vorschau.krypto_nonce || null,
+              absenderSchluessel: vorschau.absender_schluessel || null,
+              kuvert: vorschauKuverts.get(vorschau.id) || null,
+            }
+          : undefined,
         mediaPreview: vorschau?.media_type || undefined,
         time: chatZeit(vorschau ? vorschau.created_at : z.chats.updated_at),
         zeitpunkt: vorschau ? vorschau.created_at : z.chats.updated_at,
@@ -426,11 +511,7 @@ async function ladeNachrichten(client, chatId, nutzerId) {
   let abfrage = client
     .from('messages')
     .select(
-      'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
-      ' reply_to, quote_of, forwarded_from, edited_at, deleted_at, file_name, file_size,' +
-      ' shared_post_id, posts(id, kind, title, description, profiles!posts_user_id_fkey(name)),' +
-      ' place_id, places(id, name, adresse, koordinaten, x, y),' +
-      ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)'
+      NACHRICHT_SPALTEN
     )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: true })
@@ -452,7 +533,10 @@ async function ladeNachrichten(client, chatId, nutzerId) {
   if (bezugIds.length) {
     const { data: gefunden } = await client
       .from('messages')
-      .select('id, text, sender_id')
+      // Die vier Kryptospalten muessen mit: eine verschluesselte Nachricht,
+      // auf die geantwortet wird, haette sonst einen leeren Text — und im
+      // Antwortbezug staende eine leere Zeile statt des Zitierten.
+      .select('id, text, sender_id, krypto, chiffre, krypto_nonce, absender_schluessel')
       .in('id', bezugIds);
     bezugZeilen = gefunden || [];
   }
@@ -478,12 +562,43 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     for (const p of profile || []) namen.set(p.id, p.name);
   }
 
+  /*
+   * Die Kuverts fuer dieses Konto — in einer Abfrage, nicht je Nachricht.
+   *
+   * Gefiltert wird hier absichtlich nicht nach dem eigenen Schluessel: die
+   * Regel „Eigene Kuverts lesen" aus Schema 31 gibt ohnehin nur die eigenen
+   * heraus. Ein Filter im Code daneben waere eine zweite Wahrheit ueber
+   * dieselbe Sache — und wenn sie auseinanderlaufen, gewinnt die falsche.
+   *
+   * Geoeffnet wird hier nichts. Dieser Server steht bei Render und hat den
+   * geheimen Schluessel nicht; das Oeffnen macht der Browser in
+   * public/krypto.js.
+   */
+  const kuverts = new Map();
+  const verschlossenIds = [...zeilen, ...bezugZeilen]
+    .filter((n) => Number(n.krypto) > 0)
+    .map((n) => n.id);
+  if (verschlossenIds.length) {
+    const { data: kZeilen } = await client
+      .from('message_keys')
+      .select('message_id, nonce, chiffre')
+      .in('message_id', verschlossenIds);
+    for (const k of kZeilen || []) {
+      kuverts.set(k.message_id, { nonce: k.nonce, chiffre: k.chiffre });
+    }
+  }
+
   const bezug = new Map();
   for (const b of bezugZeilen) {
     bezug.set(b.id, {
       id: b.id,
       text: b.text || '',
       autor: b.sender_id === nutzerId ? 'Du' : namen.get(b.sender_id) || '',
+      krypto: Number(b.krypto || 0),
+      chiffre: b.chiffre || null,
+      kryptoNonce: b.krypto_nonce || null,
+      absenderSchluessel: b.absender_schluessel || null,
+      kuvert: kuverts.get(b.id) || null,
     });
   }
 
@@ -508,6 +623,10 @@ async function ladeNachrichten(client, chatId, nutzerId) {
       ? {
           id: n.posts.id,
           art: n.posts.kind === 'post' ? 'post' : 'video',
+          // Das Bild des Beitrags (Henrik 7.9.) — ohne das war die Karte ein
+          // graues Kaestchen und liess sich nicht oeffnen. Gleiche Regel in
+          // app/lib/daten.ts.
+          bild: n.posts.thumbnail_url || n.posts.media_url || undefined,
           autor: n.posts.profiles?.name || '',
           titel: n.posts.title || n.posts.description || '',
         }
@@ -539,6 +658,25 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     zurueckgenommen: Boolean(n.deleted_at),
     reaktionen: reaktionen.get(n.id),
     datei: n.file_name ? { name: n.file_name, groesse: Number(n.file_size || 0) } : undefined,
+    // Der Anrufeintrag (Henrik 7.9., Schema 35). Gleiche Regel in
+    // app/lib/daten.ts (ladeNachrichten).
+    anruf: n.anruf_art
+      ? {
+          art: n.anruf_art,
+          status: n.anruf_status || 'beendet',
+          dauer: Number(n.anruf_dauer || 0),
+        }
+      : undefined,
+    /*
+     * Verschluesselung (Schema 31). `text` ist bei krypto > 0 leer — den
+     * Klartext setzt der Browser ein, nachdem er das Kuvert geoeffnet hat.
+     * Alle vier Felder gehoeren zusammen; fehlt eins, geht nichts auf.
+     */
+    krypto: Number(n.krypto || 0),
+    chiffre: n.chiffre || null,
+    kryptoNonce: n.krypto_nonce || null,
+    absenderSchluessel: n.absender_schluessel || null,
+    kuvert: kuverts.get(n.id) || null,
   }));
 }
 
@@ -546,28 +684,54 @@ async function ladeNachrichten(client, chatId, nutzerId) {
 // Storys
 // ============================================================================
 
+/**
+ * Storys — getrennt nach den beiden Bereichen, in denen sie erscheinen.
+ *
+ * Gleichlautend mit app/lib/daten.ts, ladeStorys(). Das Handbuch trennt:
+ * im Messenger stehen die Storys der Kontakte, im Videos-Bereich die der
+ * gefolgten Profile — und dorthin kommt eine Story nur, wenn ihr Urheber
+ * den Zusatz „Jeder -> Story auch in Videos teilen" angeschaltet hat
+ * (Schema 30). Bis zum 07.09.2026 gab es hier eine einzige Liste, die
+ * beide Bereiche zeigten.
+ *
+ * Der Filter ist eine Anzeigeregel, keine Zugriffsregel: wer die Stufe
+ * „Alle" gewählt hat, gibt seine Story ohnehin frei. Entschieden wird
+ * allein, ob sie zusätzlich ungefragt im Videos-Feed auftaucht.
+ */
 async function ladeStorys(client, nutzerId) {
   if (!client) return null;
 
   const { data, error } = await client
     .from('stories')
-    .select('id, user_id, media_url, media_type, caption, created_at, profiles!stories_user_id_fkey(name)')
+    .select(
+      'id, user_id, media_url, media_type, caption, created_at, in_videos, profiles!stories_user_id_fkey(name)'
+    )
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;
 
   const storys = data || [];
-  if (storys.length === 0) return [];
 
-  const [{ data: gesehen, error: fG }, { data: gemocht, error: fL }] = await Promise.all([
+  const [
+    { data: gesehen, error: fG },
+    { data: gemocht, error: fL },
+    { data: kontakte, error: fK },
+    { data: gefolgt, error: fF },
+  ] = await Promise.all([
     client.from('story_views').select('story_id').eq('user_id', nutzerId),
     client.from('story_likes').select('story_id').eq('user_id', nutzerId),
+    client.from('contacts').select('contact_id').eq('user_id', nutzerId).eq('status', 'friend'),
+    client.from('follows').select('followee_id').eq('follower_id', nutzerId),
   ]);
   if (fG) throw fG;
   if (fL) throw fL;
+  if (fK) throw fK;
+  if (fF) throw fF;
 
   const gesehenIds = new Set((gesehen || []).map((g) => g.story_id));
   const gemochtIds = new Set((gemocht || []).map((g) => g.story_id));
+  const kontaktIds = new Set((kontakte || []).map((k) => k.contact_id));
+  const gefolgtIds = new Set((gefolgt || []).map((f) => f.followee_id));
 
   const liste = storys.map((s) => ({
     id: s.id,
@@ -591,9 +755,51 @@ async function ladeStorys(client, nutzerId) {
     zeit: s.created_at,
     viewed: gesehenIds.has(s.id),
     liked: gemochtIds.has(s.id),
+    _urheber: s.user_id,
+    /*
+     * Henrik am 07.09.2026: „Storys nicht mehr bereichsuebergreifend
+     * (Messenger/Videos strikt getrennt); beim Posten fragen ob
+     * uebergreifend teilen."
+     *
+     * Hier stand `profiles.story_in_videos` — die Dauereinstellung, also
+     * eine Entscheidung fuer alles, was jemand je postet. Gefragt wird
+     * jetzt je Story, und die Antwort steht an der Story selbst (Schema
+     * 36). Der Schalter am Profil bleibt: er entscheidet, ob ueberhaupt
+     * gefragt wird, und ist die Vorbelegung. Gleiche Regel in
+     * app/lib/daten.ts.
+     */
+    _inVideos: Boolean(s.in_videos),
   }));
 
-  return storyleisteOrdnen(liste);
+  const ohneHilfsfelder = (s) => {
+    const kopie = { ...s };
+    delete kopie._urheber;
+    delete kopie._inVideos;
+    return kopie;
+  };
+
+  const eigene = liste.filter((s) => s.own);
+  const fremde = liste.filter((s) => !s.own);
+
+  /*
+   * Die eigene Story hing bis zum 09.09.2026 unbesehen in BEIDEN Leisten.
+   * Die Trennung aus Schema 30 galt nur fuer fremde Storys — und die eine
+   * Story, die man beim Testen sicher zu Gesicht bekommt, ist die eigene.
+   * Fuer Henrik war die Trennung deshalb nicht gebaut.
+   *
+   * Die Plus-Kachel bleibt davon unberuehrt: `storyleisteOrdnen` haengt sie
+   * an, wenn keine eigene Story dasteht, und sie ist der Weg zur Kamera.
+   */
+  return {
+    messenger: storyleisteOrdnen([
+      ...eigene.map(ohneHilfsfelder),
+      ...fremde.filter((s) => kontaktIds.has(s._urheber)).map(ohneHilfsfelder),
+    ]),
+    videos: storyleisteOrdnen([
+      ...eigene.filter((s) => s._inVideos).map(ohneHilfsfelder),
+      ...fremde.filter((s) => gefolgtIds.has(s._urheber) && s._inVideos).map(ohneHilfsfelder),
+    ]),
+  };
 }
 
 /*
@@ -630,12 +836,6 @@ function storyleisteOrdnen(liste) {
 // ============================================================================
 // Beiträge, Videos, Clips
 // ============================================================================
-
-const BEITRAG_SPALTEN =
-  'id, user_id, kind, format, title, description, location, music, media_url,' +
-  ' thumbnail_url, duration, tags, views, zuschauer, untertitel, kapitel,' +
-  ' likes_basis, shares_basis, comments_basis, created_at,' +
-  ' post_likes(count), comments(count), shares(count)';
 
 /**
  * Ein Video ist kein eigener Tabelleneintrag, sondern ein Beitrag mit
@@ -997,6 +1197,13 @@ async function bootstrapData(client, nutzerId) {
     ladeSichtbarkeit(client, nutzerId),
   ]);
 
+  // Der selbst vergebene Kontaktname gilt überall, wo diese Person auftaucht —
+  // Chatkopf, Listen, Profil. Gleiche Regel in app/lib/daten.ts (alleDaten).
+  for (const k of kontakte || []) {
+    const eintrag = nutzer[k.id];
+    if (eintrag && k.name && eintrag.name !== k.name) eintrag.name = k.name;
+  }
+
   // "Folge ich dieser Person?" für jede bekannte Person.
   const gefolgt = {};
   for (const id of Object.keys(nutzer)) {
@@ -1011,7 +1218,8 @@ async function bootstrapData(client, nutzerId) {
     chats: chats.filter((c) => !c.archiviert),
     archiviert: chats.filter((c) => c.archiviert),
     communityChats,
-    stories: storys,
+    stories: storys.messenger,
+    storiesVideos: storys.videos,
     posts: beitraege.filter((b) => b.kind === 'post'),
     videos: beitraege.filter((b) => b.kind === 'reel'),
     clips: beitraege.filter((b) => b.kind === 'clip'),
@@ -1213,9 +1421,13 @@ async function ladeUmfragen(client, nutzerId, art, traegerIds) {
  * vorher, statt nach dem Einspielen plötzlich alles zu verbergen.
  */
 async function ladeSichtbarkeit(client, nutzerId) {
-  const [{ data: stufen }, { data: ausnahmen }] = await Promise.all([
+  const [{ data: stufen }, { data: ausnahmen }, { data: eigenes }] = await Promise.all([
     client.from('visibility_settings').select('bereich, stufe').eq('user_id', nutzerId),
     client.from('visibility_exceptions').select('bereich, target_id').eq('user_id', nutzerId),
+    // Der Zusatz „Story auch in Videos teilen" steht auf dem Profil, nicht in
+    // `visibility_settings` — fremde Geraete muessen ihn lesen koennen
+    // (Schema 30). Fachlich gehoert er trotzdem hierher.
+    client.from('profiles').select('story_in_videos').eq('id', nutzerId).maybeSingle(),
   ]);
 
   const raus = {};
@@ -1224,6 +1436,10 @@ async function ladeSichtbarkeit(client, nutzerId) {
     if (!raus[a.bereich]) raus[a.bereich] = { stufe: 'alle', ausnahmen: [] };
     raus[a.bereich].ausnahmen.push(a.target_id);
   }
+
+  if (!raus.story) raus.story = { stufe: 'alle', ausnahmen: [] };
+  raus.story.inVideos = Boolean(eigenes && eigenes.story_in_videos);
+
   return raus;
 }
 

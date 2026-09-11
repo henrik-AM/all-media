@@ -40,7 +40,138 @@ function finde(ordner, name) {
 }
 
 /**
- * Den Quelltext einer übersetzten Datei holen, mit `medien.js` verschmolzen.
+ * Die gemeinsamen Spaltenlisten als Deklarationen ohne `module.exports`.
+ *
+ * `gemeinsam/spalten.js` benutzen App und Website zusammen. Die Datei ist
+ * CommonJS, damit der Node-Server sie ohne Uebersetzungsschritt laden kann —
+ * im blob:-Modul des Browsers gibt es aber weder `module` noch einen Pfad,
+ * an dem `../../gemeinsam/spalten` haengen koennte. Uebrig bleiben soll nur
+ * das, was die Datei ohnehin ist: ein paar `const`-Zeilen.
+ *
+ * Ohne das schlagen _gleichstand und _aktionen mit
+ * „Failed to resolve module specifier" fehl — und zwar mitten im Lauf, nach
+ * ein paar bestandenen Pruefungen. Genau so ist es beim Zusammenlegen der
+ * Spaltenlisten passiert.
+ */
+function gemeinsameSpalten() {
+  const datei = path.join(__dirname, '..', '..', 'gemeinsam', 'spalten.js');
+  if (!fs.existsSync(datei)) return '';
+  return fs
+    .readFileSync(datei, 'utf8')
+    // Der Exportblock am Ende faellt weg, die Deklarationen bleiben stehen.
+    .replace(/module\.exports\s*=\s*\{[\s\S]*?\};?\s*$/m, '');
+}
+
+/**
+ * Die uebrigen gemeinsamen Bausteine aus `gemeinsam/` beilegen.
+ *
+ * `telefon.js` und `passwort.js` sind — wie `krypto.js` — UMD: unter Node
+ * setzen sie `module.exports`, im Browser `globalThis.<Name>`. Im blob:-Modul
+ * gibt es kein `module`, also greift von selbst der Browser-Zweig; nur der
+ * `require(...)`-Aufruf im uebersetzten App-Code muss noch auf das Ergebnis
+ * zeigen.
+ *
+ * Nachgetragen am 07.09.2026, nachdem `aktionen.ts` und `personSuche.ts` die
+ * Telefonregel aus `gemeinsam/telefon.js` holten. Drei Laeufe (_aktionen,
+ * _handbuch, _kanal) kippten daraufhin mit „require is not defined" — und
+ * zwar mitten im Lauf, nach ein paar bestandenen Pruefungen. Wer hier einen
+ * neuen gemeinsamen Baustein einfuehrt, muss ihn in diese Liste eintragen.
+ */
+const UMD_BAUSTEINE = [
+  ['telefon', 'Telefon'],
+  ['passwort', 'Passwort'],
+];
+
+function umdTeile() {
+  const gemeinsam = path.join(__dirname, '..', '..', 'gemeinsam');
+  return UMD_BAUSTEINE.map(([datei]) => {
+    const voll = path.join(gemeinsam, `${datei}.js`);
+    return fs.existsSync(voll) ? fs.readFileSync(voll, 'utf8') : '';
+  })
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** Aus `require('../../gemeinsam/telefon')` wird `globalThis.Telefon`. */
+function umdAufloesen(quelltext) {
+  return UMD_BAUSTEINE.reduce(
+    (text, [datei, name]) =>
+      text.replace(
+        new RegExp(`require\\(['"][^'"]*gemeinsam/${datei}(?:\\.js)?['"]\\)`, 'g'),
+        `globalThis.${name}`
+      ),
+    quelltext
+  );
+}
+
+/**
+ * Die Verschluesselung so einbauen, dass sie im Browser wirklich rechnet.
+ *
+ * WARUM NICHT EINFACH EINE ATTRAPPE
+ *
+ * Seit dem 07.09.2026 laufen `aktionen.ts` und `daten.ts` durch
+ * `lib/krypto.ts`. Man koennte das hier durch eine Huelle ersetzen, die alles
+ * im Klartext durchreicht — dann liefen die Pruefungen wieder, und geprueft
+ * waere weniger als vorher. Genau die Sorte gruener Zahl, die nichts beweist.
+ *
+ * Stattdessen kommt die echte Rechnung mit: `gemeinsam/tweetnacl.js` und
+ * `gemeinsam/krypto.js` sind reines JavaScript und laufen im Browser wie auf
+ * dem Geraet. Ersetzt werden nur die drei Stellen, die es im Browser nicht
+ * gibt:
+ *
+ *   - `expo-secure-store`  → `localStorage`. Im Browser gibt es keine
+ *     Schluesselkette; der Pruefschluessel liegt unter einem eigenen Namen,
+ *     damit er nicht mit dem der Website zusammenfaellt.
+ *   - `expo-crypto`        → `crypto.getRandomValues`. Derselbe Zufall, nur
+ *     ein anderer Name davor.
+ *   - `require(...)`       → die globalen Namen, die die beiden UMD-Dateien
+ *     oben ohnehin setzen. Ein blob:-Modul hat kein `require`.
+ *
+ * WAS DAMIT TROTZDEM NICHT GEPRUEFT IST
+ *
+ * Die Chats dieser Pruefläufe laufen gegen Demoprofile, und ein Demoprofil hat
+ * kein Geraet und damit keinen Schluessel. `fuerChatVerschliessen` steigt
+ * deshalb aus und schickt Klartext — richtig so, aber es heisst: geprueft ist
+ * hier nur, dass der Krypto-Pfad *durchlaeuft*, nicht dass er verschliesst.
+ * Wer sich auf eine gruene Zahl von hier beruft, beruft sich auf zu wenig.
+ *
+ * Dass wirklich verschlossen wird, weist `test/_krypto.js` nach — dort mit
+ * zwei echten Konten, aber ohne App-Code. Der App-Code *mit* zwei echten
+ * Konten im Browser fehlt noch.
+ */
+function kryptoteil(bauOrdner) {
+  const datei = finde(bauOrdner, 'krypto.js');
+  if (!datei) return '';
+
+  const gemeinsam = path.join(__dirname, '..', '..', 'gemeinsam');
+  const nacl = fs.readFileSync(path.join(gemeinsam, 'tweetnacl.js'), 'utf8');
+  const rechnung = fs.readFileSync(path.join(gemeinsam, 'krypto.js'), 'utf8');
+
+  const attrappen = `
+const SecureStore = {
+  getItemAsync: async (k) => localStorage.getItem('prueflauf.' + k),
+  setItemAsync: async (k, v) => localStorage.setItem('prueflauf.' + k, v),
+};
+const ExpoCrypto = {
+  getRandomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
+  randomUUID: () => crypto.randomUUID(),
+};
+`;
+
+  const app = fs
+    .readFileSync(datei, 'utf8')
+    .replace(/^\s*import\s+\*\s+as\s+\w+\s+from\s+['"]expo-[\w-]+['"];?\s*$/gm, '')
+    .replace(/require\(['"][^'"]*gemeinsam\/tweetnacl['"]\)/g, 'globalThis.nacl')
+    .replace(/require\(['"][^'"]*gemeinsam\/krypto['"]\)/g, 'globalThis.Krypto')
+    // Im Blob gibt es nur ein Modul — aus `export const x` wird `const x`.
+    .replace(/^export\s+/gm, '');
+
+  return `${nacl}\n${rechnung}\n${attrappen}\n${app}\n`;
+}
+
+/**
+ * Den Quelltext einer übersetzten Datei holen, mit `medien.js` und den
+ * gemeinsamen Spaltenlisten verschmolzen.
  *
  * @param {string} bauOrdner  Ausgabeordner von tsc
  * @param {string} name       etwa 'aktionen.js' oder 'daten.js'
@@ -50,13 +181,30 @@ function zusammengelegt(bauOrdner, name) {
   const haupt = finde(bauOrdner, name);
   if (!haupt) return null;
 
-  let quelltext = fs.readFileSync(haupt, 'utf8');
+  let quelltext = umdAufloesen(fs.readFileSync(haupt, 'utf8'));
+
+  // Der Import der gemeinsamen Spaltenlisten faellt weg; ihr Inhalt kommt
+  // stattdessen vorne dazu.
+  quelltext = quelltext.replace(
+    /^\s*import\s*\{[^}]*\}\s*from\s*['"][./]*gemeinsam\/spalten(?:\.js)?['"];?\s*$/gm,
+    ''
+  );
+  const spaltenteil = gemeinsameSpalten();
+
+  // Der Import der Verschluesselung faellt ebenso weg; sie kommt vorne dazu.
+  quelltext = quelltext.replace(
+    /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\/krypto(?:\.js)?['"];?\s*$/gm,
+    ''
+  );
+  const kryptoQuelle = kryptoteil(bauOrdner);
+
+  const bausteine = umdTeile();
 
   const medien = finde(bauOrdner, 'medien.js');
-  if (!medien) return quelltext; // Nichts zu verschmelzen.
+  if (!medien) return `${spaltenteil}\n${bausteine}\n${kryptoQuelle}\n${quelltext}`; // Ohne medien.js.
 
   // Aus `export function x` wird `function x` — im Blob gibt es nur ein Modul.
-  const hilfsteil = fs.readFileSync(medien, 'utf8').replace(/^export\s+/gm, '');
+  const hilfsteil = umdAufloesen(fs.readFileSync(medien, 'utf8')).replace(/^export\s+/gm, '');
 
   // Die Importzeile fliegt raus, egal ob mit oder ohne Strichpunkt.
   quelltext = quelltext.replace(
@@ -64,7 +212,7 @@ function zusammengelegt(bauOrdner, name) {
     ''
   );
 
-  return `${hilfsteil}\n${quelltext}`;
+  return `${spaltenteil}\n${bausteine}\n${kryptoQuelle}\n${hilfsteil}\n${quelltext}`;
 }
 
 module.exports = { zusammengelegt, finde };

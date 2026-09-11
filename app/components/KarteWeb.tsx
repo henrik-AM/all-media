@@ -75,6 +75,14 @@ interface Props {
    * ausschalten wird nicht beachtet - der Nutzer wird noch angezeigt."
    */
   eigenerStandort?: { lat: number; lng: number } | null;
+  /**
+   * Nur fuer die Prueflaeufe: das Auswahlfenster der Kartenansichten steht
+   * schon beim Aufbau offen. Ohne das kommt es in keinem Bild vor — der
+   * Simulator laesst sich von aussen nicht antippen, und was nie fotografiert
+   * wird, faellt auch nicht auf. Gegenstueck: `pruefSicht` im
+   * Einstellungsbildschirm, Schalter `messenger/friendmap#karte:stile`.
+   */
+  pruefStilOffen?: boolean;
 }
 
 /*
@@ -129,12 +137,22 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    "user-scalable=no" ist hier die Bedingung dafuer, dass Zoomen mit zwei
+    Fingern ueberhaupt ankommt. Ohne die Angabe nimmt die WebView selbst die
+    Kneifgeste entgegen und vergroessert die ganze Seite — Leaflet sieht davon
+    nichts, und auf der Karte passiert nichts. Genau das war Henriks Befund
+    vom 07.09.2026: "Pinch-Zoom fehlt (nur +/-)."
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    /* Dasselbe noch einmal auf der Ebene des Browsers: iOS zoomt sonst die
+       Seite, sobald zwei Finger aufliegen, und die Karte bleibt stehen. */
+    html, body { touch-action: none; -webkit-text-size-adjust: 100%; }
     #map { width: 100%; height: 100vh; }
     .leaflet-popup-content { font-size: 14px; }
     /* Die Steuerung sitzt als echter Knopf ueber der Karte, nicht hier drin. */
@@ -168,7 +186,19 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
       return el;
     }
 
-    const map = L.map('map', { zoomControl: false }).setView([51.5, 10], 4);
+    /*
+     * touchZoom und zoomSnap: 0 gehoeren zusammen. Ohne zoomSnap rastet
+     * Leaflet waehrend der Kneifgeste auf ganze Stufen ein — die Karte
+     * ruckelt dann in Spruengen statt der Bewegung zu folgen, und es sieht
+     * aus, als reagiere sie nicht.
+     */
+    const map = L.map('map', {
+      zoomControl: false,
+      touchZoom: true,
+      bounceAtZoomLimits: false,
+      zoomSnap: 0,
+      zoomDelta: 0.6,
+    }).setView([51.5, 10], 4);
 
     // Die Kachelschicht wird beim Umschalten der Ansicht ausgetauscht, statt
     // die Seite neu zu laden - sonst springt der Ausschnitt jedes Mal zurueck.
@@ -182,12 +212,14 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
       kacheln = L.tileLayer(url, { attribution: quelle, maxZoom: maxZoom }).addTo(map);
     };
 
+    // Die Knoepfe gehen weiterhin in ganzen Stufen. zoomDelta gilt nur der
+    // Kneifgeste; ein Tippen auf Plus soll eine sichtbare Stufe bewegen.
     window.zoomEin = function () {
-      map.zoomIn();
+      map.zoomIn(1);
     };
 
     window.zoomAus = function () {
-      map.zoomOut();
+      map.zoomOut(1);
     };
 
     // Die eigene Nadel haengt am Schalter im Screen, nicht an der Karte.
@@ -283,9 +315,16 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
 };
 
 export const KarteWeb = forwardRef<KartenSteuerung, Props>(
-  ({ pins, aktiv, onPinPress, hoehe = 320, vollbild, onVollbild, eigenerStandort }, ref) => {
+  ({ pins, aktiv, onPinPress, hoehe = 320, vollbild, onVollbild, eigenerStandort, pruefStilOffen }, ref) => {
     const webViewRef = useRef<WebViewRoh>(null);
     const [stilIndex, setStilIndex] = useState(0);
+    /*
+     * Henrik, 07.09.2026: "Kartenstil-Button switcht direkt statt
+     * Auswahlfenster (Standard/Satellit/Gelände)." Wer von Standard auf
+     * Gelaende will, musste vorher durch Satellit hindurch — und sah dabei
+     * jedes Mal, wie die Kacheln neu luden. Jetzt liegt die Wahl offen.
+     */
+    const [stilOffen, setStilOffen] = useState(Boolean(pruefStilOffen));
     const stil = KARTEN_STILE[stilIndex];
 
     /*
@@ -302,21 +341,27 @@ export const KarteWeb = forwardRef<KartenSteuerung, Props>(
 
     React.useEffect(ortHineinreichen, [eigenerStandort?.lat ?? null, eigenerStandort?.lng ?? null]);
 
-    const stilWeiterschalten = () => {
-      const naechster = (stilIndex + 1) % KARTEN_STILE.length;
-      const s = KARTEN_STILE[naechster];
-      setStilIndex(naechster);
+    const stilWaehlen = (index: number) => {
+      const s = KARTEN_STILE[index];
+      setStilIndex(index);
+      setStilOffen(false);
       webViewRef.current?.injectJavaScript(
         `window.stilSetzen('${s.url}', '${s.quelle}', ${s.maxZoom}); true;`
       );
     };
 
     useImperativeHandle(ref, () => ({
+      /*
+       * Zoomstufe 16 statt 10. Henrik, 07.09.2026: der Sprung soll "nah
+       * heranzoomen (Straßenebene)". Bei 10 sieht man das halbe Bundesland —
+       * die Nadel steht dann irgendwo in einer Flaeche ohne Strassennamen,
+       * und die Bewegung wirkt wie ein Fehlgriff.
+       */
       zoomAuf: (pinId: string) => {
         const pin = pins.find(p => p.id === pinId);
         if (pin && webViewRef.current) {
           webViewRef.current.injectJavaScript(`
-            map.setView([${pin.lat}, ${pin.lng}], 10, { animate: true });
+            map.setView([${pin.lat}, ${pin.lng}], 16, { animate: true });
             true;
           `);
         }
@@ -399,16 +444,38 @@ export const KarteWeb = forwardRef<KartenSteuerung, Props>(
             <Ionicons name={vollbild ? 'contract-outline' : 'expand-outline'} size={18} color="#1a1d21" />
           </Druck>
           <Druck
-            style={styles.werkzeug}
-            onPress={stilWeiterschalten}
-            accessibilityLabel={`Kartenansicht: ${stil.label}`}
+            style={[styles.werkzeug, stilOffen && styles.werkzeugAn]}
+            onPress={() => setStilOffen((o) => !o)}
+            accessibilityLabel={`Kartenansicht wählen, gerade ${stil.label}`}
           >
             <Ionicons name="layers-outline" size={18} color="#1a1d21" />
           </Druck>
+
+          {/* Das Auswahlfenster haengt unter dem Knopf, nicht als Blatt von
+              unten: es gehoert zur Karte und soll sie nicht verdecken. */}
+          {stilOffen && (
+            <View style={styles.stilFenster}>
+              {KARTEN_STILE.map((s, i) => {
+                const an = i === stilIndex;
+                return (
+                  <Druck
+                    key={s.key}
+                    style={[styles.stilZeile, an && styles.stilZeileAn]}
+                    onPress={() => stilWaehlen(i)}
+                    accessibilityLabel={s.label}
+                  >
+                    <Text style={[styles.stilText, an && styles.stilTextAn]}>{s.label}</Text>
+                    {an && <Ionicons name="checkmark" size={15} color="#0a66ff" />}
+                  </Druck>
+                );
+              })}
+            </View>
+          )}
         </View>
 
-        {/* Ein Schild statt eines Menues: der Umschalter geht reihum, und das
-            Schild sagt, wo man gerade steht. */}
+        {/* Das Schild sagt, welche Ansicht gerade gilt — der Knopf daneben
+            oeffnet die Wahl. Bis zum 07.09.2026 gab es nur den Knopf, und der
+            schaltete reihum weiter. */}
         <View style={styles.schild} pointerEvents="none">
           <Text style={styles.schildText}>{stil.label}</Text>
         </View>
@@ -455,6 +522,32 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
   },
+  werkzeugAn: { backgroundColor: '#dbe8ff' },
+  stilFenster: {
+    /* Rechtsbuendig unter dem Ebenen-Knopf. `alignSelf` haelt es am rechten
+       Rand, auch wenn der Text der drei Zeilen unterschiedlich breit ist. */
+    alignSelf: 'flex-end',
+    minWidth: 132,
+    borderRadius: 11,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  stilZeile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+  },
+  stilZeileAn: { backgroundColor: 'rgba(10,102,255,0.08)' },
+  stilText: { fontSize: 13, color: '#1a1d21' },
+  stilTextAn: { fontWeight: '700', color: '#0a66ff' },
+
   schild: {
     position: 'absolute',
     left: 10,
