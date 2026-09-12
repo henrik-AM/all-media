@@ -38,6 +38,8 @@ const { signiereMedien, hochladen } = require('./medien');
 const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require('./supabase');
 // Dieselbe Regel wie in der App — siehe gemeinsam/telefon.js.
 const Telefon = require('../../gemeinsam/telefon');
+// Welcher Stand läuft hier? Einmal beim Start ermittelt, siehe version.js.
+const VERSION = require('./version');
 // Die Schreibweise des Kontakt-QR-Codes — dieselbe Datei, die auch der
 // Browser laedt (gemeinsam/qr.js).
 const QrKontakt = require('../../gemeinsam/qr');
@@ -302,6 +304,7 @@ app.get('/api/zustand', async (req, res) => {
       url: supabaseUrl,
       quelle: process.env.SUPABASE_URL ? 'Umgebungsvariable' : 'Standardwert im Code',
     },
+    version: VERSION,
     anmeldung: { angemeldet: Boolean(req.nutzerId), nutzerId: req.nutzerId },
     // Es gibt keine zweite Möglichkeit mehr. Ohne Anmeldung ist die Antwort
     // leer, nicht ersatzweise gefüllt.
@@ -333,6 +336,22 @@ app.get('/api/zustand', async (req, res) => {
   }
 
   res.json(ergebnis);
+});
+
+/*
+ * Welcher Stand läuft hier gerade — ohne Anmeldung abrufbar.
+ *
+ * Bewusst ein eigener Endpunkt neben /api/zustand: die Frage "ist mein
+ * Commit live?" muss sich beantworten lassen, bevor man sich anmeldet, und
+ * ohne dass dafür die Datenbank befragt wird. Ein Aufruf von außen genügt:
+ *
+ *     curl https://all-media-website.onrender.com/api/version
+ *
+ * Steht dort ein anderer Commit als `git rev-parse --short HEAD` im Ordner,
+ * hinkt der Deploy hinterher — oder es wurde nie committet.
+ */
+app.get('/api/version', (_req, res) => {
+  res.json(VERSION);
 });
 
 /*

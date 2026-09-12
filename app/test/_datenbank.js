@@ -227,12 +227,39 @@ async function main() {
 
   // --------------------------------------------------------- Website ------
   if (WEBSITE) {
-    const r = await fetch(`${WEBSITE.replace(/\/$/, '')}/api/bootstrap`, {
+    const adresse = WEBSITE.replace(/\/$/, '');
+    const r = await fetch(`${adresse}/api/bootstrap`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const daten = await r.json().catch(() => ({}));
     pruefe(`Website ${WEBSITE} liefert Inhalte`, r.status === 200 && daten.angemeldet === true,
       r.status !== 200 ? `${r.status}: ${daten.error || ''}` : '');
+
+    /*
+     * Welcher Stand laeuft dort? Am 11.09.2026 lagen zwei Arbeitstage als nie
+     * committete Arbeitskopie im Ordner — die Website sah dabei genauso aus
+     * wie eine, die aktuell ist. Diese Pruefung vergleicht den Stempel der
+     * Website mit dem Commit im Ordner und macht den Unterschied sichtbar.
+     *
+     * Ein Unterschied ist kein Fehler im Code: er bedeutet, dass der Deploy
+     * hinterherhinkt oder gar nicht committet wurde. Genau das soll er sagen.
+     */
+    const vAntwort = await fetch(`${adresse}/api/version`);
+    const v = await vAntwort.json().catch(() => ({}));
+    pruefe(`Website ${WEBSITE} nennt ihren Stand`,
+      vAntwort.status === 200 && typeof v.commit === 'string' && v.commit.length > 0,
+      vAntwort.status !== 200 ? `${vAntwort.status} — Endpunkt /api/version fehlt` : '');
+
+    let hier = '';
+    try {
+      hier = require('child_process')
+        .execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: WURZEL, encoding: 'utf8' })
+        .trim();
+    } catch { /* kein git — dann wird nicht verglichen */ }
+    if (hier && v.commit && v.commit !== 'unbekannt') {
+      pruefe(`Website laeuft auf dem Stand des Ordners (${hier})`, v.commit === hier,
+        v.commit === hier ? '' : `dort ${v.commit}, hier ${hier} — Deploy hinkt hinterher`);
+    }
   }
 
   console.log('');

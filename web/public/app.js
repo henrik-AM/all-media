@@ -6261,7 +6261,18 @@ function renderSettings() {
         location.reload();
         return;
       }
-      toast('All Media 1.0.0 — gebaut aus dem Figma-Prototypen');
+      // "Über All Media" sagt jetzt, welcher Stand ausgeliefert wird. Bis
+      // zum 11.09.2026 war die Frage "ist das wirklich live?" nur dadurch zu
+      // beantworten, dass man eine gerade erst angelegte Datei abrief.
+      void (async () => {
+        try {
+          const r = await fetch('/api/version');
+          const v = await r.json();
+          toast(`All Media ${v.version} — Stand ${v.commit}`);
+        } catch {
+          toast('All Media 1.0.0 — Stand nicht abrufbar');
+        }
+      })();
     })
   );
 }
