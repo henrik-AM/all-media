@@ -619,8 +619,12 @@ const Shell = () => {
    * Hinzufuegen ein neuer Chat mit erfundener Kennung; der Eintrag in
    * `contacts` fehlte ganz, und die Website wusste von der Anfrage nichts.
    */
-  const addContact = async (contact: Contact) => {
-    const ergebnis = await aktion.kontaktHinzufuegen(contact.id, contact.status === 'pending');
+  const addContact = async (contact: Contact, nachricht = '') => {
+    const ergebnis = await aktion.kontaktHinzufuegen(
+      contact.id,
+      contact.status === 'pending',
+      nachricht
+    );
     if (!ergebnis) return;
 
     setContacts((prev) => [...prev, contact]);

@@ -49,7 +49,7 @@ interface Props {
   visible: boolean;
   contacts: Contact[];
   onClose: () => void;
-  onAdd: (contact: Contact) => void;
+  onAdd: (contact: Contact, nachricht: string) => void;
   onNotice: (message: string) => void;
 }
 
@@ -58,6 +58,9 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
   const aktionen = useAktionen(onNotice);
   const insets = useSafeAreaInsets();
   const [eingabe, setEingabe] = useState('');
+  // Die eine Nachricht, die schon mit der Anfrage rausgeht. Auf der Website
+  // gab es sie seit jeher, in der App nicht — siehe den Hinweis unten.
+  const [nachricht, setNachricht] = useState('');
   const [laeuft, setLaeuft] = useState(false);
   const [scannen, setScannen] = useState(false);
   const [eigenerCode, setEigenerCode] = useState(false);
@@ -93,8 +96,9 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
       // Die Nummer kommt aus der Eingabe, nicht aus der Antwort: die Suche
       // gibt keine fremden Nummern heraus (Fund 1).
       phone: Telefon.speicherform(roh),
-    });
+    }, nachricht.trim());
     setEingabe('');
+    setNachricht('');
   };
 
   return (
@@ -159,6 +163,28 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
                   <Text style={styles.qrNummer}>{eigeneNummer}</Text>
                 </View>
               ) : null}
+
+              {/*
+                Wortgleich mit `openAddContact` in web/public/app.js. Bis zum
+                13.09.2026 fragte nur die Website danach — die App legte den
+                Kontakt stumm an, obwohl `kontaktHinzufuegen` die Nachricht
+                schon immer entgegennahm und in den Chat schrieb.
+              */}
+              <Text style={styles.label}>Nachricht (freiwillig)</Text>
+              <TextInput
+                style={styles.textarea}
+                value={nachricht}
+                onChangeText={setNachricht}
+                placeholder="Kurz schreiben, wer du bist …"
+                placeholderTextColor={colors.text3}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+              <Text style={styles.hint}>
+                Diese eine Nachricht geht schon mit der Anfrage raus. Weitere erst,
+                wenn die Anfrage angenommen wurde.
+              </Text>
             </View>
           </ScrollView>
 
@@ -224,6 +250,17 @@ const styles = themenStyles((colors) => ({
     ...typography.body,
   },
   hint: { paddingTop: 6, color: colors.text3, ...typography.small },
+  label: { paddingTop: spacing.md, paddingBottom: 6, color: colors.text2, ...typography.small },
+  textarea: {
+    minHeight: 76,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface3,
+    color: colors.text,
+    ...typography.body,
+  },
 
   qrReihe: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.md },
   qrKnopf: {
