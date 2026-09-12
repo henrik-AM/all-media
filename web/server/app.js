@@ -105,7 +105,15 @@ app.use(
           'https://*.tile.openstreetmap.org', 'https://server.arcgisonline.com',
           'https://*.tile.opentopomap.org'],
         mediaSrc: ["'self'", 'data:', 'blob:', supabaseUrl],
-        connectSrc: ["'self'", supabaseUrl, supabaseUrl.replace('https://', 'wss://')],
+        /*
+         * `api.pwnedpasswords.com` kam am 13.09.2026 dazu: dort fragt
+         * `gemeinsam/passwort.js` nach, ob ein gewähltes Passwort in einem
+         * bekannten Datenleck steht. Verschickt werden nur die ersten fünf
+         * Zeichen des SHA-1-Werts, nie das Passwort — die Begründung steht in
+         * der Datei.
+         */
+        connectSrc: ["'self'", supabaseUrl, supabaseUrl.replace('https://', 'wss://'),
+          'https://api.pwnedpasswords.com'],
         frameAncestors: ["'none'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
@@ -1292,7 +1300,27 @@ app.post('/api/eigene/telefon', route(async (req) => {
 
   const sauber = Telefon.speicherform(String(req.body.nummer));
 
-  const { data: schonDa } = await req.db.rpc('finde_per_nummer', { nummer: sauber });
+  /*
+   * Der Fehlerwert wird ausgewertet, nicht weggeworfen — Begruendung bei
+   * telefonAendern() in app/lib/aktionen.ts: seit Schema 38 bremst
+   * `finde_per_nummer`, und ein uebersehener Fehler haette die
+   * Dopplungspruefung still uebersprungen.
+   *
+   * 54000 ist der Code der Bremse; deren Text ist fuer Menschen geschrieben
+   * und darf raus. Jede andere Datenbankmeldung bleibt drin.
+   */
+  const { data: schonDa, error: pruefFehler } = await req.db.rpc('finde_per_nummer', {
+    nummer: sauber,
+  });
+  if (pruefFehler) {
+    return {
+      ok: false,
+      error:
+        pruefFehler.code === '54000'
+          ? pruefFehler.message
+          : 'Die Nummer ließ sich gerade nicht prüfen',
+    };
+  }
   if (schonDa) return { ok: false, error: 'Diese Nummer gehört schon zu einem anderen Konto' };
 
   const { error } = await req.db

@@ -512,7 +512,19 @@ export async function telefonAendern(
 
   const sauber = Telefon.speicherform(nummer);
 
-  const { data: schonDa } = await client.rpc('finde_per_nummer', { nummer: sauber });
+  /*
+   * Der Fehlerwert wird hier ausgewertet und nicht weggeworfen.
+   *
+   * Seit Schema 38 hat `finde_per_nummer` eine Bremse (40 Nachschlaege je
+   * Stunde). Loest sie aus, kommt ein Fehler statt einer Person — und mit dem
+   * alten `const { data: schonDa } = …` waere `schonDa` dann null gewesen und
+   * die Dopplungspruefung stillschweigend uebersprungen. Die Bremse haette
+   * also ausgerechnet das Loch aufgemacht, das der Index darunter zuhaelt.
+   */
+  const { data: schonDa, error: pruefFehler } = await client.rpc('finde_per_nummer', {
+    nummer: sauber,
+  });
+  if (pruefFehler) throw pruefFehler;
   if (schonDa) throw new Error('Diese Nummer gehört schon zu einem anderen Konto');
 
   const { error } = await client
