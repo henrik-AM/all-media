@@ -127,7 +127,19 @@ export const Karte = forwardRef<KartenSteuerung, Props>(
     const pan = useMemo(
       () =>
         PanResponder.create({
-          onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
+          /*
+           * Zwei Finger muessen den Responder auch dann setzen, wenn der
+           * Schwerpunkt stehen bleibt.
+           *
+           * g.dx und g.dy messen genau diesen Schwerpunkt. Bei einer sauberen
+           * Kneifgeste ziehen beide Finger gegeneinander, der Mittelpunkt
+           * bewegt sich kaum — die Bedingung blieb unter drei Pixeln, der
+           * Responder startete nie, und das Zoomen unten kam gar nicht erst
+           * zum Zug. Wer schief aufzog, verschob den Schwerpunkt genug und sah
+           * es wirken; das hat den Fehler so zaeh gemacht.
+           */
+          onMoveShouldSetPanResponder: (e, g) =>
+            e.nativeEvent.touches.length >= 2 || Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
           onPanResponderGrant: () => {
             abstandStart.current = 0;
             zoomStart.current = stand.current.zoom;
