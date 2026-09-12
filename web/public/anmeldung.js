@@ -40,6 +40,35 @@
   let sitzung = null;
   const zuhoerer = new Set();
 
+  /*
+   * SHA-1 fuer die Leck-Pruefung des Passworts (gemeinsam/passwort.js).
+   *
+   * `crypto.subtle` gibt es nur auf https und auf localhost. Fehlt es, gibt
+   * die Funktion einen leeren Wert zurueck und die Pruefung faellt aus —
+   * dieselbe Haltung wie bei einem Netzfehler: im Zweifel durchlassen, statt
+   * eine Registrierung an einer Nebensache scheitern zu lassen.
+   */
+  async function sha1Hex(wert) {
+    if (!window.crypto?.subtle) return '';
+    const bytes = new TextEncoder().encode(wert);
+    const summe = await window.crypto.subtle.digest('SHA-1', bytes);
+    return [...new Uint8Array(summe)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
+   * Passwort gegen beide Regeln: die eigene Form und die Leck-Datenbank.
+   * Gibt null zurueck, wenn es passt, sonst den Grund auf Deutsch.
+   */
+  async function passwortPruefen(passwort) {
+    if (!window.Passwort) return null;
+
+    const regel = window.Passwort.pruefe(passwort);
+    if (regel) return regel;
+
+    const steht = await window.Passwort.geleakt(passwort, sha1Hex);
+    return steht ? window.Passwort.GELEAKT_TEXT : null;
+  }
+
   // ------------------------------------------------------------- Aufbau --
 
   function skriptLaden(pfad) {
@@ -229,6 +258,14 @@
     const nummerPruefung = await nummerFrei(nummer);
     if (!nummerPruefung.frei) return { ok: false, fehler: nummerPruefung.meldung, feld: 'telefon' };
 
+    /*
+     * Erst hier, nicht weiter oben: die Leck-Pruefung fragt einen fremden
+     * Dienst und kostet eine knappe Sekunde. Wer ohnehin an Benutzername oder
+     * Nummer scheitert, soll darauf nicht warten.
+     */
+    const passwortGrund = await passwortPruefen(passwort);
+    if (passwortGrund) return { ok: false, fehler: passwortGrund, feld: 'passwort' };
+
     const { data, error } = await c.auth.signUp({
       email,
       password: passwort,
@@ -315,7 +352,7 @@
     const c = await aufbauen();
     if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
 
-    const regel = window.Passwort ? window.Passwort.pruefe(neu) : null;
+    const regel = await passwortPruefen(neu);
     if (regel) return { ok: false, fehler: regel };
     if (bisher === neu) return { ok: false, fehler: 'Das ist dein bisheriges Passwort.' };
 

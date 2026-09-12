@@ -76,6 +76,94 @@
   }
 
   /**
+   * Steht dieses Passwort in einem bekannten Datenleck?
+   *
+   * WARUM ES DAS GIBT (13.09.2026)
+   *
+   * Die Regel oben prüft die Form: zehn Zeichen, groß, klein, Ziffer.
+   * `Passwort123` erfüllt sie vollständig — und steht in jeder Wortliste, die
+   * für einen Angriff benutzt wird. Der häufigste Weg in ein fremdes Konto ist
+   * nicht das Raten, sondern das Nachschlagen: Adresse und Passwort aus einem
+   * fremden Leck durchprobieren, weil die meisten Menschen dasselbe Passwort
+   * mehrfach benutzen.
+   *
+   * Supabase kann das selbst prüfen (Leaked Password Protection gegen
+   * HaveIBeenPwned), aber nur im kostenpflichtigen Pro-Tarif — nachgeprüft am
+   * 13.09.2026, die Einstellung antwortet mit HTTP 402. Dieselbe Prüfung über
+   * dieselbe Datenbank kostet an dieser Stelle nichts.
+   *
+   * DAS PASSWORT VERLÄSST DAS GERÄT NICHT
+   *
+   * Verschickt werden die ersten FÜNF Zeichen des SHA-1-Werts. Zurück kommen
+   * alle Endungen, die mit diesem Anfang beginnen — meist einige hundert. Ob
+   * die eigene darunter ist, entscheidet das Gerät. Der Dienst erfährt weder
+   * das Passwort noch seinen vollständigen Hash noch, wer gefragt hat
+   * (k-Anonymität).
+   *
+   * IM ZWEIFEL DURCHLASSEN
+   *
+   * Antwortet der Dienst nicht, gibt die Funktion `false` zurück. Eine
+   * Registrierung, die scheitert, weil ein fremder Server gerade langsam ist,
+   * wäre der schlechtere Tausch — die Formregel und Supabase prüfen ohnehin
+   * weiter.
+   *
+   * @param passwort Das zu prüfende Passwort.
+   * @param sha1 Funktion, die daraus den SHA-1-Wert in Hex macht. Muss der
+   *   Aufrufer stellen, weil Browser (crypto.subtle) und App (expo-crypto)
+   *   verschiedene Wege haben und diese Datei beide bedient.
+   * @returns true, wenn das Passwort in einem Leck steht.
+   */
+  function geleakt(passwort, sha1) {
+    var p = typeof passwort === 'string' ? passwort : '';
+    if (!p || typeof sha1 !== 'function') return Promise.resolve(false);
+
+    return Promise.resolve()
+      .then(function () {
+        return sha1(p);
+      })
+      .then(function (hex) {
+        var voll = String(hex || '').toUpperCase();
+        if (voll.length !== 40) return false;
+
+        var anfang = voll.slice(0, 5);
+        var rest = voll.slice(5);
+
+        // Eine Zeitgrenze, damit eine hängende Anfrage nicht die Anmeldung
+        // anhält. Drei Sekunden reichen; danach gilt "nicht geleakt".
+        var abbruch = typeof AbortController === 'function' ? new AbortController() : null;
+        var uhr = setTimeout(function () {
+          if (abbruch) abbruch.abort();
+        }, 3000);
+
+        return fetch('https://api.pwnedpasswords.com/range/' + anfang, {
+          signal: abbruch ? abbruch.signal : undefined,
+        })
+          .then(function (antwort) {
+            clearTimeout(uhr);
+            if (!antwort.ok) return false;
+            return antwort.text();
+          })
+          .then(function (text) {
+            if (!text) return false;
+            // Jede Zeile: "<Endung>:<Anzahl der Funde>".
+            var zeilen = String(text).split('\n');
+            for (var i = 0; i < zeilen.length; i++) {
+              if (zeilen[i].slice(0, 35).toUpperCase() === rest) return true;
+            }
+            return false;
+          });
+      })
+      .catch(function () {
+        return false;
+      });
+  }
+
+  /** Der Satz, den ein Nutzer sieht, wenn sein Passwort in einem Leck steht. */
+  var GELEAKT_TEXT =
+    'Dieses Passwort steht in einem bekannten Datenleck. Bitte nimm ein anderes — ' +
+    'auch wenn es die Regel erfüllt, wird genau dieses durchprobiert.';
+
+  /**
    * Eine englische Meldung aus Supabase auf Deutsch.
    *
    * Nur die Fälle, die Nutzer wirklich zu sehen bekommen. Was nicht dabei ist,
@@ -121,7 +209,9 @@
   return {
     MINDESTLAENGE: MINDESTLAENGE,
     REGEL_TEXT: REGEL_TEXT,
+    GELEAKT_TEXT: GELEAKT_TEXT,
     pruefe: pruefe,
+    geleakt: geleakt,
     uebersetze: uebersetze,
   };
 });

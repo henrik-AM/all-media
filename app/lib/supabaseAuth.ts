@@ -33,6 +33,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import * as Crypto from 'expo-crypto';
 import { SUPABASE_CONFIG } from '../constants/supabase';
 
 const Passwort = require('../../gemeinsam/passwort') as typeof import('../../gemeinsam/passwort');
@@ -42,6 +43,34 @@ export const PASSWORT_REGEL = Passwort.REGEL_TEXT;
 
 /** Gibt null zurueck, wenn das Passwort passt, sonst den Grund auf Deutsch. */
 export const passwortPruefen = Passwort.pruefe;
+
+/*
+ * SHA-1 fuer die Leck-Pruefung (gemeinsam/passwort.js). React Native hat kein
+ * `crypto.subtle`; expo-crypto rechnet es nativ. Dieselbe Pruefung macht die
+ * Website mit `crypto.subtle` — die Regel selbst steht nur einmal, in der
+ * gemeinsamen Datei.
+ */
+async function sha1Hex(wert: string): Promise<string> {
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA1, wert, {
+    encoding: Crypto.CryptoEncoding.HEX,
+  });
+}
+
+/**
+ * Passwort gegen beide Regeln: die eigene Form und die Leck-Datenbank.
+ *
+ * Gibt null zurueck, wenn es passt. Warum das ueberhaupt hier steht und nicht
+ * bei Supabase: dessen eigener Leck-Schutz gehoert zum Pro-Tarif (geprueft am
+ * 13.09.2026, HTTP 402). Diese Pruefung kostet nichts und schickt das
+ * Passwort nirgendwohin.
+ */
+export async function passwortVollPruefen(passwort: string): Promise<string | null> {
+  const regel = Passwort.pruefe(passwort);
+  if (regel) return regel;
+
+  const steht = await Passwort.geleakt(passwort, sha1Hex);
+  return steht ? Passwort.GELEAKT_TEXT : null;
+}
 
 /** Eine englische Meldung aus Supabase auf Deutsch. */
 export const uebersetzeFehler = Passwort.uebersetze;
@@ -67,7 +96,7 @@ export async function signUpWithEmail(
    * abcdefghijklmnopqrstuvwxyz, …". Das ist richtig und für niemanden
    * lesbar.
    */
-  const zuSchwach = Passwort.pruefe(password);
+  const zuSchwach = await passwortVollPruefen(password);
   if (zuSchwach) return { success: false, user: null, error: zuSchwach };
 
   try {
@@ -197,7 +226,7 @@ export async function passwortAendern(
   bisher: string,
   neu: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const zuSchwach = Passwort.pruefe(neu);
+  const zuSchwach = await passwortVollPruefen(neu);
   if (zuSchwach) return { success: false, error: zuSchwach };
   if (bisher === neu) return { success: false, error: 'Das ist dein bisheriges Passwort.' };
 
