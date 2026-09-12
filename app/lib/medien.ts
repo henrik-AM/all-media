@@ -21,6 +21,21 @@ import { SupabaseClient } from '@supabase/supabase-js';
 const OEFFENTLICH = '/storage/v1/object/public/media/';
 const GUELTIG = 4 * 60 * 60;
 
+/*
+ * Zwischenspeicher fuer unterschriebene Adressen: Pfad -> { url, ablauf }.
+ *
+ * Gegenstueck zu web/server/medien.js. Ohne ihn bekam jeder Screenaufruf eine
+ * neue Unterschrift, also eine neue Adresse (der Token steht im Query-String).
+ * Fuer das CDN war das jedes Mal eine „neue" Datei, und dasselbe Bild wurde
+ * bei jedem Oeffnen komplett neu von Supabase geladen. Auf der Website hat
+ * genau das aus 44 MB Speicher 7,2 GB Egress gemacht.
+ *
+ * Innerhalb der Gueltigkeit bleibt die Adresse fuer denselben Pfad jetzt
+ * gleich, damit das Supabase-CDN sie tatsaechlich aus dem Cache bedienen kann.
+ */
+const zwischenspeicher = new Map<string, { url: string; ablauf: number }>();
+const PUFFER_MS = 10 * 60 * 1000;
+
 function istMedienAdresse(wert: unknown): wert is string {
   return typeof wert === 'string' && wert.includes(OEFFENTLICH);
 }
@@ -78,21 +93,37 @@ export async function signiereMedien<T>(client: SupabaseClient | null, daten: T)
   sammle(daten, pfade);
   if (pfade.size === 0) return daten;
 
-  try {
-    const { data, error } = await client.storage
-      .from('media')
-      .createSignedUrls([...pfade], GUELTIG);
-    if (error) throw error;
-
-    const karte = new Map<string, string>();
-    for (const eintrag of data ?? []) {
-      if (eintrag?.signedUrl && !eintrag.error) karte.set(eintrag.path as string, eintrag.signedUrl);
+  const karte = new Map<string, string>();
+  const jetzt = Date.now();
+  const fehlend: string[] = [];
+  for (const pfad of pfade) {
+    const eintrag = zwischenspeicher.get(pfad);
+    if (eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
+      karte.set(pfad, eintrag.url);
+    } else {
+      fehlend.push(pfad);
     }
-    return ersetze(daten, karte);
-  } catch (fehler: any) {
-    console.error('Medienadressen unterschreiben fehlgeschlagen:', fehler?.message ?? fehler);
-    return daten;
   }
+
+  if (fehlend.length) {
+    try {
+      const { data, error } = await client.storage.from('media').createSignedUrls(fehlend, GUELTIG);
+      if (error) throw error;
+
+      const ablauf = jetzt + GUELTIG * 1000;
+      for (const eintrag of data ?? []) {
+        if (eintrag?.signedUrl && !eintrag.error) {
+          karte.set(eintrag.path as string, eintrag.signedUrl);
+          zwischenspeicher.set(eintrag.path as string, { url: eintrag.signedUrl, ablauf });
+        }
+      }
+    } catch (fehler: any) {
+      console.error('Medienadressen unterschreiben fehlgeschlagen:', fehler?.message ?? fehler);
+      if (karte.size === 0) return daten;
+    }
+  }
+
+  return ersetze(daten, karte);
 }
 
 /** Eine einzelne Adresse unterschreiben — fuer frisch hochgeladene Dateien. */
@@ -101,9 +132,16 @@ export async function signiereEine(
   pfad: string
 ): Promise<string | null> {
   if (!client) return null;
+
+  const eintrag = zwischenspeicher.get(pfad);
+  if (eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;
+
   try {
     const { data, error } = await client.storage.from('media').createSignedUrl(pfad, GUELTIG);
     if (error) throw error;
+    if (data?.signedUrl) {
+      zwischenspeicher.set(pfad, { url: data.signedUrl, ablauf: Date.now() + GUELTIG * 1000 });
+    }
     return data?.signedUrl ?? null;
   } catch (fehler: any) {
     console.error('Adresse unterschreiben fehlgeschlagen:', fehler?.message ?? fehler);
