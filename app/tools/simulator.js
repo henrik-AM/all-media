@@ -25,6 +25,10 @@ const EXPO_GO_ID = 'host.exp.Exponent';
 const GERAET = process.env.SIM_GERAET || 'iPhone 17 Pro';
 const EXPO_URL = `exp://127.0.0.1:${FEST.expoPort}`;
 
+// Die UDID des Geraets, auf dem gearbeitet wird. Steht erst nach
+// simulatorStarten() fest - siehe die Begruendung dort.
+let ZIEL = 'booted';
+
 function log(zeile) { process.stdout.write(zeile + '\n'); }
 function sh(befehl) { return execSync(befehl, { encoding: 'utf8' }); }
 function still(befehl) { try { return sh(befehl); } catch { return ''; } }
@@ -37,13 +41,29 @@ function serverLaeuft() {
 }
 
 // --- 2. Simulator starten ---------------------------------------------------
+//
+// Am 13.09.2026 lief die Pruefung auf dem falschen Geraet. Gefragt wurde hier
+// nur, ob IRGENDEIN Simulator gebootet ist - Henriks lief, also galt die Lage
+// als erledigt und SIM_GERAET wurde nie gestartet. Die Meldung "Simulator
+// laeuft bereits" klang dabei voellig richtig.
+//
+// Darum zwei Aenderungen: gesucht wird genau das gewuenschte Geraet, und alle
+// simctl-Aufrufe sprechen es ueber seine UDID an. "booted" ist mehrdeutig,
+// sobald zwei Simulatoren laufen, und simctl bricht dann ab.
 function simulatorStarten() {
-  const laufend = still('xcrun simctl list devices booted');
-  if (laufend.includes('(Booted)')) {
-    log('  Simulator laeuft bereits.');
+  const zeile = still('xcrun simctl list devices')
+    .split('\n')
+    .find((z) => z.trim().startsWith(GERAET + ' ('));
+  if (!zeile) {
+    throw new Error(`Simulator "${GERAET}" gibt es nicht - "xcrun simctl list devices" zeigt die vorhandenen.`);
+  }
+  ZIEL = zeile.match(/\(([0-9A-Fa-f-]{36})\)/)[1];
+
+  if (zeile.includes('(Booted)')) {
+    log(`  Simulator "${GERAET}" laeuft bereits.`);
   } else {
     log(`  Simulator "${GERAET}" wird gestartet ...`);
-    still(`xcrun simctl boot "${GERAET}"`);
+    still(`xcrun simctl boot ${ZIEL}`);
   }
   still('open -a Simulator');
   schlaf(6000);
@@ -57,7 +77,7 @@ function sdkVersion() {
 }
 
 function expoGoInstallieren() {
-  if (still(`xcrun simctl listapps booted`).includes(EXPO_GO_ID)) {
+  if (still(`xcrun simctl listapps ${ZIEL}`).includes(EXPO_GO_ID)) {
     log('  Expo Go ist im Simulator vorhanden.');
     return;
   }
@@ -75,7 +95,7 @@ function expoGoInstallieren() {
   execFileSync('curl', ['-sL', '-o', archiv, url], { stdio: 'inherit' });
   fs.mkdirSync(bundle);
   execFileSync('tar', ['-xzf', archiv, '-C', bundle]);
-  execFileSync('xcrun', ['simctl', 'install', 'booted', bundle]);
+  execFileSync('xcrun', ['simctl', 'install', ZIEL, bundle]);
   fs.rmSync(archiv, { force: true });
   log('  Expo Go installiert.');
 }
@@ -83,13 +103,13 @@ function expoGoInstallieren() {
 // --- 4. App oeffnen ---------------------------------------------------------
 function appOeffnen() {
   log('  App wird geladen ...');
-  still(`xcrun simctl terminate booted ${EXPO_GO_ID}`);
+  still(`xcrun simctl terminate ${ZIEL} ${EXPO_GO_ID}`);
   schlaf(2000);
   // Erster Start macht das Ziel bei iOS bekannt, damit der Bestaetigungsdialog
   // beim zweiten Aufruf ausbleibt.
-  still(`xcrun simctl launch booted ${EXPO_GO_ID} "${EXPO_URL}"`);
+  still(`xcrun simctl launch ${ZIEL} ${EXPO_GO_ID} "${EXPO_URL}"`);
   schlaf(8000);
-  still(`xcrun simctl openurl booted "${EXPO_URL}"`);
+  still(`xcrun simctl openurl ${ZIEL} "${EXPO_URL}"`);
   schlaf(12000);
 }
 
@@ -106,5 +126,5 @@ expoGoInstallieren();
 appOeffnen();
 log('');
 log('  Fertig - die App ist im Simulator offen.');
-log(`  Screenshot bei Bedarf:  xcrun simctl io booted screenshot bild.png`);
+log(`  Screenshot bei Bedarf:  xcrun simctl io ${ZIEL} screenshot bild.png`);
 log('');
