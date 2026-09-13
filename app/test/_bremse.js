@@ -35,8 +35,13 @@ const KONTO = { email: 'test@all-media.app', passwort: 'AllMedia2026!' };
 // Muss zur Konstanten `grenze` in Schema 38 passen.
 const GRENZE = 40;
 
+// Grenze fuer die anonymen Pruefungen, muss zu Schema 39 passen.
+const GRENZE_ANON = 30;
+
 let fehler = 0;
+let gesamt = 0;
 const pruefe = (name, bedingung, zusatz = '') => {
+  gesamt++;
   if (!bedingung) fehler++;
   console.log((bedingung ? 'PASS  ' : 'FAIL  ') + name + (zusatz ? '  — ' + zusatz : ''));
 };
@@ -71,7 +76,12 @@ async function zaehlerLeeren(nutzerId) {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      query: `delete from public.nummer_suche_takt where nutzer = '${nutzerId}';`,
+      query:
+        `delete from public.nummer_suche_takt where nutzer = '${nutzerId}';` +
+        // Der anonyme Zaehler (Schema 39) haengt an der Absender-Adresse, nicht
+        // am Konto — der Lauf kennt seine eigene nicht, also alles leeren. Die
+        // Tabelle haelt ohnehin nur eine Stunde.
+        `delete from public.anon_takt;`,
     }),
   });
   return antwort.ok;
@@ -154,6 +164,58 @@ async function main() {
     );
   }
 
+  // ------------------------------ Die anonymen Pruefungen (Schema 39) --
+  //
+  // `nummer_frei` und `handle_frei` muessen ohne Anmeldung gehen, sonst kaeme
+  // niemand durch die Registrierung. Gezaehlt wird deshalb je Absender-Adresse.
+  // Sie werfen keine Ausnahme, sondern antworten mit `frei: false` und dem
+  // Grund `zu_viele` — das ist die sichere Seite, auch wenn ein Aufrufer nur
+  // `frei` ausliest und den Grund ignoriert.
+  const anonFrei = async (funktion, eingabe) => {
+    const antwort = await fetch(`${URL}/rest/v1/rpc/${funktion}`, {
+      method: 'POST',
+      headers: { apikey: KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eingabe }),
+    });
+    return antwort.json().catch(() => null);
+  };
+
+  let anonDurch = 0;
+  let anonGebremst = false;
+  for (let i = 0; i < GRENZE_ANON + 5; i++) {
+    const daten = await anonFrei('nummer_frei', '+4916' + String(20000000 + i));
+    if (daten && daten.grund === 'zu_viele') {
+      anonGebremst = true;
+      break;
+    }
+    anonDurch++;
+  }
+
+  pruefe(
+    'nummer_frei bremst auch ohne Anmeldung',
+    anonGebremst,
+    anonGebremst ? `nach ${anonDurch} Abfragen` : `${anonDurch} liefen durch`
+  );
+  pruefe(
+    'Die anonyme Bremse haelt die Grenze ein',
+    anonDurch <= GRENZE_ANON,
+    `${anonDurch} von hoechstens ${GRENZE_ANON}`
+  );
+  pruefe(
+    'Die gebremste Antwort sperrt (frei = false)',
+    anonGebremst,
+    'frei:false blockt die Registrierung, statt sie durchzuwinken'
+  );
+
+  // Eigener Zaehler je Funktion: dass die Nummernpruefung dicht ist, darf die
+  // Namenspruefung nicht mitreissen.
+  const handleDaten = await anonFrei('handle_frei', 'pruefname' + Date.now());
+  pruefe(
+    'handle_frei zaehlt getrennt von nummer_frei',
+    handleDaten && handleDaten.grund !== 'zu_viele',
+    handleDaten ? `grund: ${handleDaten.grund ?? 'keiner'}` : 'keine Antwort'
+  );
+
   // ------------------------------------------- Der Zaehler ist nicht lesbar --
   const tabelle = await fetch(`${URL}/rest/v1/nummer_suche_takt?select=*`, {
     headers: { apikey: KEY, Authorization: `Bearer ${token}` },
@@ -168,7 +230,6 @@ async function main() {
   // Fuer den naechsten Lauf wieder freigeben, soweit moeglich.
   await zaehlerLeeren(sitzung.user.id);
 
-  const gesamt = zurueckgesetzt ? 5 : 4;
   console.log(`\n${gesamt - fehler} von ${gesamt} Pruefungen bestanden`);
   process.exit(fehler ? 1 : 0);
 }
