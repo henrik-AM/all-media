@@ -166,6 +166,7 @@ const LAEUFE = [
   ['krypto', '_krypto.js'],
   ['rechte', '_rechte.js'],
   ['bremse', '_bremse.js'],
+  ['auth', '_auth.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */
