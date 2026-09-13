@@ -78,7 +78,8 @@
     "test:kanal": "node test/_kanal.js",
     "test:krypto": "node test/_krypto.js",
     "test:rechte": "node test/_rechte.js",
-    "test:bremse": "node test/_bremse.js"
+    "test:bremse": "node test/_bremse.js",
+    "test:auth": "node test/_auth.js"
   },
   "private": true
 }
