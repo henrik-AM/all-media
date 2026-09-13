@@ -618,7 +618,15 @@ const pruefe = (name, wahr, zusatz = '') => {
     const frei = Object.keys(boot.users || {}).find((id) => id !== ich && id !== 'me' && !drin.has(id));
     if (!frei) return false;
 
-    const ergebnis = await app('kontaktHinzufuegen', frei, true);
+    /*
+     * Mit Begruessung — der fuenfte Parameter war bis zum 13.09.2026 in
+     * keinem Prueflauf belegt. kontaktHinzufuegen nahm ihn entgegen und
+     * schrieb ihn in `messages`, aber die App hat ihn nie uebergeben: das
+     * Eingabefeld dafuer gab es nur auf der Website. Ein Weg, den niemand
+     * geht, wird auch von niemandem bemerkt, wenn er kaputtgeht.
+     */
+    const gruss = 'Prüflauf Begrüßung ' + Date.now();
+    const ergebnis = await app('kontaktHinzufuegen', frei, true, gruss);
     const nachAnfrage = await seite.evaluate(
       async (id) => {
         const boot = await (await fetch('/api/bootstrap')).json();
@@ -649,7 +657,9 @@ const pruefe = (name, wahr, zusatz = '') => {
       ergebnis.status === 'pending' &&
       Boolean(nachAnfrage) &&
       nachAnfrage.status === 'pending' &&
-      Boolean(derChat)
+      Boolean(derChat) &&
+      // Die Begruessung steht im Chat — sonst ging die Anfrage stumm raus.
+      derChat.preview === gruss
     );
   })());
 
