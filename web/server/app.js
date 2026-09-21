@@ -184,6 +184,28 @@ app.use(
 );
 
 /*
+ * Keine Antwort unter /api darf zwischengespeichert werden.
+ *
+ * Bis zum 21.09.2026 schickte der Server zu diesen Listen nur ein ETag und
+ * kein Cache-Control. Ohne Cache-Control darf ein Browser eine Antwort nach
+ * eigener Schätzung wiederverwenden — bei `/api/gespeichert` oder
+ * `/api/gelikt` heißt das: ein frisch gesetzter Like taucht in der Liste
+ * nicht auf, obwohl er in der Datenbank steht. Genau das Bild, das Henrik am
+ * 18.09. gemeldet hat ("Likes ... unter Videos/Profil kann ich sie nicht
+ * sehen") — und es wäre auch nach dem Beheben der eigentlichen Ursache
+ * zeitweise zurückgekommen.
+ *
+ * Dazu kommt das Naheliegende: unter /api stehen persönliche Daten. Die
+ * gehören in keinen Zwischenspeicher, weder im Browser noch in einem Proxy.
+ * Dateien liefert keine dieser Routen aus, es geht also keine Bandbreite
+ * verloren.
+ */
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
+/*
  * Anmeldung.
  *
  * Die Oberfläche reicht ihr Zugangstoken im Kopf "Authorization: Bearer ..."

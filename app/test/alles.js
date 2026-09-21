@@ -137,6 +137,11 @@ const LAEUFE = [
   ['erstellen', '_erstellen.js'],
   ['teilen', '_teilen.js'],
   ['sync', '_sync.js'],
+  // Henriks Frage vom 21.09.2026: "wenn ich etwas like und am naechsten
+  // Morgen mich wieder anmelde, sehe ich diesen Like noch?" Meldet sich
+  // ausdruecklich ab und neu an — ein Neuladen allein behaelt die Sitzung
+  // und beweist nichts.
+  ['uebernacht', '_uebernacht.js'],
   // Braucht keinen Server — prueft die Schemadateien gegen den Code.
   ['schema', '_schema.js'],
   // Braucht ebenfalls keinen Server: spricht direkt mit PostgREST.
@@ -285,4 +290,6 @@ if (verwackelt) {
   );
 }
 
-process.exit(gescheitert.length || verwackelt ? 1 : 0);
+require('./_aufraeumen').aufraeumen().finally(() => {
+  process.exit(gescheitert.length || verwackelt ? 1 : 0);
+});
