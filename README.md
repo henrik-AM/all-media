@@ -1,5 +1,20 @@
 # All Media
 
+> **In English:** All Media is an open source social platform — messenger,
+> stories, video feed and communities — shipped as two clients with enforced
+> feature parity: a React Native / Expo mobile app and a Node.js web client,
+> both on a single Supabase backend. Roughly 110,000 lines across 407 files,
+> 49 incremental PostgreSQL migrations, every table covered by Row Level
+> Security and verified by an automated policy test suite. Direct messages
+> are end-to-end encrypted; media is served through signed URLs only.
+>
+> **The codebase is written in German** — identifiers, functions, file names
+> and documentation. That is deliberate. Open source almost universally
+> charges English fluency as the price of entry; this project shows that a
+> substantial, security-conscious full-stack application can be built and
+> documented in a contributor's native language. Pull requests in German are
+> welcome; English ones are too. Licensed under [MIT](LICENSE).
+
 Social-App mit Messenger, Storys, Video-Feed und Communitys — gebaut aus dem
 Figma-Prototypen. Es gibt sie zweimal: als **Website** im Browser und als
 **echte App** über Expo Go. Beide zeigen dasselbe; jede Änderung wird in
@@ -245,3 +260,9 @@ Alle Reihen laufen auch gegen die Live-Adresse:
 ```bash
 ZIEL=https://all-media-website.onrender.com node test/_einstellungen.js
 ```
+
+## Lizenz
+
+MIT — siehe [LICENSE](LICENSE). Das heißt: benutzen, ändern, weitergeben,
+auch gewerblich. Der Copyright-Hinweis muss mitgehen, eine Gewähr gibt es
+nicht.
