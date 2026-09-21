@@ -1,3 +1,18 @@
+-- ⚠️  ACHTUNG: DIESE DATEI ENTHÄLT EINE VOLLKOPIE VON starter_inhalte().
+--
+--  Dieselbe Funktion steht auch in SUPABASE_SCHEMA_7_testkonto.sql. Wer nur
+--  eine der beiden ändert, verliert die Änderung, sobald die andere Datei
+--  eingespielt wird — `create or replace` fragt nicht nach.
+--
+--  Am 18.09.2026 genau so passiert: die Korrektur an der Merkliste wurde in
+--  Schema 7 eingetragen und eingespielt, danach lief Schema 23 (wegen einer
+--  anderen Sache) und hat sie stillschweigend wieder überschrieben. Gemerkt
+--  hat es erst `test:sync`: „Die Merkliste liefert Beitraege — leer".
+--
+--  Beide Stellen ändern. Gegenprobe:
+--    select prosrc ilike '%join public.profiles p on p.id = b.user_id%'
+--      from pg_proc where proname = 'starter_inhalte';
+--
 -- =====================================================================
 -- SUPABASE_SCHEMA_23_sicherheit.sql — 03.09.2026
 --
@@ -421,12 +436,18 @@ begin
 
   -- --- Merkliste --------------------------------------------------------
   -- Zwei fremde Beiträge gemerkt, damit der Reiter „Gespeichert" nicht leer
-  -- ist. Welche das sind, ist gleichgültig — deshalb die zwei neuesten
-  -- Beispielbeiträge, die nicht dem Konto selbst gehören.
+  -- ist.
+  --
+  -- WELCHE das sind, ist NICHT gleichgültig — die Bedingung muss `p.demo`
+  -- mitprüfen. Warum, steht ausführlich in SUPABASE_SCHEMA_7_testkonto.sql
+  -- an derselben Stelle: Beiträge mit `demo = true`, deren Besitzer KEIN
+  -- Demoprofil ist, sieht ausschliesslich ihr Besitzer. Ohne den Join greift
+  -- die Merkliste in fremde Starterinhalte, und der Reiter bleibt leer.
   insert into public.saves (user_id, post_id)
   select ziel, b.id
   from public.posts b
-  where b.demo and b.user_id <> ziel
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel
   order by b.created_at desc
   limit 2
   on conflict do nothing;
@@ -435,7 +456,8 @@ begin
   insert into public.reposts (user_id, post_id)
   select ziel, b.id
   from public.posts b
-  where b.demo and b.user_id <> ziel and b.kind = 'reel'
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel and b.kind = 'reel'
   order by b.created_at desc
   limit 1
   on conflict do nothing;
@@ -444,15 +466,26 @@ begin
   insert into public.post_likes (user_id, post_id)
   select ziel, b.id
   from public.posts b
-  where b.demo and b.user_id <> ziel
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel
   order by b.created_at desc
   limit 3
   on conflict do nothing;
 
   -- --- Ein eigener Kommentar --------------------------------------------
+  -- `p.demo` ist Pflicht, nicht Geschmack: `b.demo` allein trifft auch die
+  -- Starterbeiträge anderer echter Konten, und die verbirgt
+  -- beitrag_sichtbar(). Der Kommentar stand dann in der Tabelle und war für
+  -- seinen eigenen Verfasser unsichtbar — dieselbe Falle wie bei Merkliste,
+  -- Repost und Likes (Schema 42), hier am 21.09.2026 nachgezogen.
+  --
+  -- ACHTUNG: Diese Funktion steht auch in SUPABASE_SCHEMA_7_testkonto.sql.
+  -- Beide Stellen tragen die Korrektur; wer nur eine ändert, verliert sie
+  -- beim nächsten Einspielen der anderen.
   select b.id into v_post
   from public.posts b
-  where b.demo and b.user_id <> ziel
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel
   order by b.created_at desc
   limit 1;
 

@@ -4,7 +4,7 @@
 // Start:  node test/_einstellungen.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -31,8 +31,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -170,6 +169,57 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await blattZu();
   });
 
+  /*
+   * Henrik am 18.09.2026: „Likes ... werden nicht synchronisiert (unter
+   * Videos/Profil kann ich sie nicht sehen)." Sie standen nirgends: post_likes
+   * wurde einzig gelesen, um das Herz im Feed rot zu faerben.
+   *
+   * Geprueft wird nicht, ob der Punkt da ist, sondern ob echte Zeilen
+   * herauskommen — die Stufe, an der „Einstellung ohne Wirkung" scheitert.
+   * „Wird geladen ..." gilt deshalb ausdruecklich NICHT als bestanden.
+   */
+  await pruefe('Gelikte Beiträge zeigen echte Zeilen', async () => {
+    await page.click('[data-setting="Gelikte Beiträge"]');
+    await page.waitForTimeout(1200);
+    const zeilen = await page.$$eval('.sheet .item__label', (els) => els.map((e) => e.textContent.trim()));
+    if (zeilen.some((z) => z.startsWith('Wird geladen'))) throw new Error('bleibt beim Ladetext stehen');
+    if (!zeilen.length) throw new Error('keine Zeile');
+    await blattZu();
+  });
+
+  /*
+   * Dieselbe Meldung, die vierte Gattung: „Kommentare ... unter Videos/Profil
+   * kann ich sie nicht sehen." Bis zum 21.09.2026 gab es dafuer nirgends eine
+   * Ansicht — weder in der App noch hier.
+   *
+   * Schaerfer als bei den Likes, und zwar mit Absicht: „irgendeine Zeile"
+   * waere auch dann erfuellt, wenn dort nur ein Datum oder ein Ersatztext
+   * staende. Verlangt wird das Muster aus gemeinsam/kommentar.js — der
+   * eigene Text UND der Beitrag, unter dem er steht. Sonst weiss man zwar,
+   * dass man etwas geschrieben hat, aber nicht wo.
+   *
+   * Gewartet wird auf die Zeile, nicht auf die Uhr: feste Wartezeiten sind in
+   * diesem Projekt schon dreimal der Grund fuer falsche Fehler gewesen.
+   */
+  await pruefe('Meine Kommentare zeigen Text und Beitrag', async () => {
+    await page.click('[data-setting="Meine Kommentare"]');
+    await page.waitForFunction(
+      () => {
+        const zeilen = [...document.querySelectorAll('.sheet .item__label')];
+        return zeilen.length > 0 && !zeilen.some((e) => e.textContent.trim().startsWith('Wird geladen'));
+      },
+      { timeout: 8000 }
+    );
+    const zeilen = await page.$$eval('.sheet .item__label', (els) => els.map((e) => e.textContent.trim()));
+    if (!zeilen.length) throw new Error('keine Zeile');
+    const mitBeitrag = zeilen.find((z) => z.startsWith('„') && z.includes('" · '));
+    if (!mitBeitrag) throw new Error('keine Zeile im Muster „Kommentar" · Beitrag: ' + zeilen.join(' | '));
+    // Der Teil hinter dem Trenner ist der Beitrag — leer waere er wertlos.
+    const beitrag = mitBeitrag.split('" · ')[1] || '';
+    if (beitrag.trim().length < 3) throw new Error('Beitrag fehlt in: ' + mitBeitrag);
+    await blattZu();
+  });
+
   await pruefe('Ein Erklärtext geht auf', async () => {
     await page.click('[data-setting="Datenschutzerklärung"]');
     await page.waitForSelector('.sheet__text');
@@ -298,6 +348,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n${ergebnisse.length - fehler} von ${ergebnisse.length} Pruefungen bestanden`);
   console.log(eindeutig.length ? 'Konsolenfehler:\n' + eindeutig.join('\n') : 'Konsolenfehler: keine');
 
-  await browser.close();
-  process.exit(fehler || eindeutig.length ? 1 : 0);
+  await beenden(browser, fehler || eindeutig.length ? 1 : 0);
 })();

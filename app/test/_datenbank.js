@@ -156,6 +156,48 @@ async function main() {
   pruefe('Mitteilungen vorhanden',      (await zaehle(`notifications?${eigen}&select=id`)) >= 1);
   pruefe('Punkt auf der Freundeskarte', (await zaehle(`friend_pins?${eigen}&select=user_id`)) >= 1);
 
+  // ------------------------------------------- Echte Medien statt Attrappe --
+  //
+  // Am 20.09.2026 zeigten 32 der 40 Starterbeitraege als `clip` oder `reel`
+  // auf eine PNG-Datei — der Abspieler bekam nichts zum Abspielen, im Raster
+  // stand die Verlaufsflaeche aus testbilder.js. Schema 8 hatte das laengst
+  // korrigiert; der Rueckschritt kam vom vollstaendigen Neueinspielen von
+  // Schema 7, das dieselbe Vorlagentabelle mit den Platzhaltern befuellt.
+  //
+  // Geprueft wird deshalb nicht, welche Datei gewonnen hat, sondern das
+  // Ergebnis: ein Video darf nie auf ein Bild zeigen.
+  const medienListe = await hole('posts?select=kind,media_url&limit=500');
+  const alleMedien = Array.isArray(medienListe) ? medienListe : [];
+  const istBild = (u) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u || '');
+  const videoAufBild = alleMedien.filter((b) => (b.kind === 'clip' || b.kind === 'reel') && istBild(b.media_url));
+  pruefe('Kein Videobeitrag zeigt auf eine Bilddatei', videoAufBild.length === 0,
+    videoAufBild.length ? `${videoAufBild.length} von ${alleMedien.length}` : `${alleMedien.length} geprueft`);
+
+  const platzhalter = alleMedien.filter((b) => /\/beispiel\/test-/.test(b.media_url || ''));
+  pruefe('Kein Beitrag haengt noch an einem Platzhalter', platzhalter.length === 0,
+    platzhalter.length ? `${platzhalter.length} Beitraege` : '');
+
+  // ------------------------------------ Der eigene Kommentar ist auffindbar --
+  //
+  // Henrik nannte am 18.09.2026 vier Gattungen, die er nirgends wiederfand.
+  // Drei hat Schema 42 an dem Tag berichtigt, die Kommentare blieben liegen:
+  // `starter_inhalte()` haengte den Testkommentar an einen Beitrag mit
+  // `b.demo and b.user_id <> ziel` — also womoeglich an einen Starterbeitrag
+  // eines anderen echten Kontos, den beitrag_sichtbar() verbirgt. Die Zeile
+  // stand in der Tabelle und war fuer ihren eigenen Verfasser unsichtbar.
+  //
+  // Geprueft wird das Ergebnis, nicht die Schema-Datei: ein Kommentar, dessen
+  // Beitrag sich nicht mitlesen laesst, faellt in jeder Liste heraus. Die
+  // Einbettung ist genau die, die App und Website benutzen.
+  const meineKommentare = await hole(
+    `comments?user_id=eq.${ichId}&select=id,text,posts!post_id(id,title,description)`
+  );
+  const kommentare = Array.isArray(meineKommentare) ? meineKommentare : [];
+  pruefe('Eigener Kommentar vorhanden', kommentare.length >= 1, `${kommentare.length} Zeilen`);
+  const ohneBeitrag = kommentare.filter((k) => !k.posts);
+  pruefe('Jeder eigene Kommentar haengt an einem lesbaren Beitrag', ohneBeitrag.length === 0,
+    ohneBeitrag.length ? `${ohneBeitrag.length} von ${kommentare.length} unsichtbar` : `${kommentare.length} geprueft`);
+
   const profil = await hole(`profiles?id=eq.${ichId}&select=name,handle,bio,highlights,playlists,spende`);
   const p = Array.isArray(profil) ? profil[0] : null;
   pruefe('Profil des Testkontos ausgefuellt',

@@ -157,6 +157,14 @@ export interface Chat {
    */
   archiviert?: boolean;
   favorit?: boolean;
+  /*
+   * Die Chatsperre (chat_members.is_locked) und "keine Mitteilungen aus
+   * diesem Chat" (notifications_off). Beide standen bis zum 17.09.2026 nur in
+   * der Datenbank: geladen wurden sie, in den Chat uebernommen nicht. Nach
+   * dem Neuladen war die Einstellung deshalb jedes Mal weg.
+   */
+  gesperrt?: boolean;
+  mitteilungenAus?: boolean;
   /**
    * Der Zustand der Chat-Anfrage — aus `chats.anfrage_zustand`.
    *
@@ -432,7 +440,10 @@ export type MitteilungArt =
   | 'kanal'
   | 'beitritt'
   | 'nachricht'
-  | 'einladung';
+  | 'einladung'
+  /** Chat-Anfrage gestellt beziehungsweise angenommen — Schema 49. */
+  | 'anfrage'
+  | 'anfrage_ok';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 

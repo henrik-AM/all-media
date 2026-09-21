@@ -20,6 +20,7 @@ import { CommentSheet } from '../../components/CommentSheet';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
+import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import { Video } from '../../types';
 import { compactNumber } from '../../lib/zahlen';
 import { haptic } from '../../lib/haptics';
@@ -31,10 +32,22 @@ interface Props {
   onOpenProfile: (userId: string) => void;
   /** Oeffnet das Teilen-Blatt mit dem Personen-Raster. */
   onShare: (video: Video) => void;
+  /**
+   * Kennung des Reels, bei dem der Feed aufgehen soll — der Weg aus dem
+   * Profilraster hierher. Gleiche Regel wie in HomeFeedScreen.
+   */
+  startBei?: string | null;
+  onStartErreicht?: () => void;
   onNotice: (message: string) => void;
 }
 
-export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => {
+export const VideoFeedScreen = ({
+  onOpenProfile,
+  onShare,
+  startBei,
+  onStartErreicht,
+  onNotice,
+}: Props) => {
   const { users: alleNutzer, videos: alleVideos } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Schreibt wirklich in die Datenbank — siehe lib/useAktionen.ts.
@@ -49,6 +62,19 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   useEffect(() => {
     setVideos(alleVideos);
   }, [alleVideos]);
+
+  /*
+   * An das Reel springen, das die Kachel im Profil gemeint hat. Siehe
+   * HomeFeedScreen — dort steht, warum der Wunsch danach geloescht wird.
+   */
+  const liste = useRef<FlatList<Video>>(null);
+  useEffect(() => {
+    if (!startBei) return;
+    const platz = videos.findIndex((v) => v.id === startBei);
+    if (platz < 0) return;
+    liste.current?.scrollToIndex({ index: platz, animated: false });
+    onStartErreicht?.();
+  }, [startBei, videos, onStartErreicht]);
 
   // Wie im Bild-Feed: eigene Reels kommen in dieselbe Liste, damit Like,
   // Speichern und Repost auch bei ihnen wirken.
@@ -71,6 +97,15 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   const [sichtbar, setSichtbar] = useState<string | null>(null);
   /* Angehalten durch Antippen. Beim Weiterwischen faengt das naechste an. */
   const [pause, setPause] = useState(false);
+  /*
+   * „Datensparen" aus den Einstellungen. Der Schalter stand seit Anfang an in
+   * der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen hat
+   * (Audit vom 17.09.2026, Befund 1). Ist er an, startet kein Video von
+   * selbst: das naechste steht angehalten da, ein Tippen laesst es laufen.
+   * Gleiche Regel in web/public/app.js (videoAutomatik).
+   */
+  const { an } = useEinstellungen();
+  const datensparen = an('datensparen');
 
   /*
    * Die beiden Gesten aus dem Handbuch, plus die von Henrik gewuenschte
@@ -121,11 +156,11 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
       const erstes = info.viewableItems[0]?.item as Video | undefined;
       if (erstes) {
         setSichtbar(erstes.id);
-        setPause(false);
+        setPause(datensparen);
       }
       impressionWechsel(info);
     },
-    [impressionWechsel]
+    [impressionWechsel, datensparen]
   );
 
   // Beim ersten Aufbau ist noch nichts gescrollt, also meldet die Liste auch
@@ -418,9 +453,13 @@ export const VideoFeedScreen = ({ onOpenProfile, onShare, onNotice }: Props) => 
   return (
     <View style={styles.container} onLayout={measure}>
       <FlatList
+        ref={liste}
         data={videos}
         renderItem={renderVideo}
         keyExtractor={(item) => item.id}
+        onScrollToIndexFailed={({ index }) => {
+          setTimeout(() => liste.current?.scrollToIndex({ index, animated: false }), 120);
+        }}
         pagingEnabled
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"

@@ -11,7 +11,7 @@ import { AreaKey } from '../../constants/navigation';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
-import { ladeEinstellungen } from '../../lib/daten';
+import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
 import { useAktionen } from '../../lib/useAktionen';
 
@@ -59,19 +59,13 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
   const { sichtbarkeit, ichId, neuLaden } = useDaten();
   const { supabase } = useSupabase();
   const aktionen = useAktionen(onNotice);
-  const [einstellungen, setEinstellungen] = useState<Record<string, string> | null>(null);
+  /*
+   * Seit dem 17.09.2026 aus dem `EinstellungenContext`. Vorher lud dieser
+   * Bildschirm dieselbe Zeile ein zweites Mal — wer die Lesebestaetigung
+   * hier umlegte, sah sie in den Einstellungen bis zum Neustart falsch.
+   */
+  const { einstellungen, an, setzen } = useEinstellungen();
   const [sichtOffen, setSichtOffen] = useState<{ bereich: SichtbarkeitBereich; titel: string } | null>(null);
-
-  useEffect(() => {
-    if (!supabase || !ichId) return;
-    let gilt = true;
-    ladeEinstellungen(supabase, ichId)
-      .then((werte) => gilt && setEinstellungen(werte))
-      .catch(() => gilt && setEinstellungen({}));
-    return () => {
-      gilt = false;
-    };
-  }, [supabase, ichId]);
 
   const sicht = (bereich: SichtbarkeitBereich) =>
     sichtbarkeit[bereich] || { stufe: 'alle' as SichtbarkeitStufe, ausnahmen: [] };
@@ -91,23 +85,13 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
       : namen[s.stufe];
   };
 
-  // Ohne Eintrag ist die Lesebestaetigung an - derselbe Auslieferungszustand
-  // wie in SettingsScreen (SCHALTER_STANDARD).
-  const lesebestaetigung = einstellungen?.lesebestaetigung === undefined
-    ? true
-    : einstellungen.lesebestaetigung === 'an';
+  // Ohne Eintrag ist die Lesebestaetigung an - der Auslieferungszustand steht
+  // in SCHALTER_STANDARD im EinstellungenContext.
+  const lesebestaetigung = an('lesebestaetigung');
 
-  const lesebestaetigungSetzen = async (an: boolean) => {
-    const vorher = einstellungen?.lesebestaetigung;
-    setEinstellungen((prev) => ({ ...(prev ?? {}), lesebestaetigung: an ? 'an' : 'aus' }));
-    const gespeichert = await aktionen.einstellung('lesebestaetigung', an ? 'an' : 'aus');
-    if (gespeichert !== null) return;
-    setEinstellungen((prev) => {
-      const kopie = { ...(prev ?? {}) };
-      if (vorher === undefined) delete kopie.lesebestaetigung;
-      else kopie.lesebestaetigung = vorher;
-      return kopie;
-    });
+  const lesebestaetigungSetzen = async (ein: boolean) => {
+    const gespeichert = await setzen('lesebestaetigung', ein ? 'an' : 'aus');
+    if (!gespeichert) onNotice?.('Einstellung konnte nicht gespeichert werden');
   };
 
   return (

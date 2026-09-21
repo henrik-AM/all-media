@@ -11,6 +11,7 @@ import { brandGradient, colors, radius, sizes, spacing, themenStyles, typography
 import { Chat, Story } from '../../types';
 import { haptic } from '../../lib/haptics';
 import { useDaten } from '../../contexts/DatenContext';
+import { useEinstellungen } from '../../contexts/EinstellungenContext';
 
 type Filter = 'all' | 'contacts' | 'groups';
 
@@ -56,6 +57,15 @@ export const ChatListScreen = ({
    * nirgends.
    */
   const { insightStreaks, insights } = useDaten();
+  /*
+   * „Vorschau anzeigen" aus den Einstellungen. Der Schalter stand seit Anfang
+   * an in der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen
+   * hat (Audit vom 17.09.2026, Befund 1). Ist er aus, steht statt des
+   * Nachrichtentextes nur „Neue Nachricht" — wer über die Schulter schaut,
+   * liest nicht mit. Gleiche Regel in web/public/app.js (chatRow).
+   */
+  const { an } = useEinstellungen();
+  const vorschauZeigen = an('vorschau', true);
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -148,9 +158,9 @@ export const ChatListScreen = ({
             <Text style={[styles.rowTime, unread && styles.rowTimeUnread]}>{item.time}</Text>
           </View>
           <View style={styles.rowBottom}>
-            {icon && <Ionicons name={icon} size={14} color={colors.text3} />}
+            {vorschauZeigen && icon && <Ionicons name={icon} size={14} color={colors.text3} />}
             <Text style={[styles.rowPreview, unread && styles.rowPreviewUnread]} numberOfLines={1}>
-              {item.preview}
+              {vorschauZeigen ? item.preview : item.preview ? 'Neue Nachricht' : ''}
             </Text>
             {item.muted && <Ionicons name="volume-mute-outline" size={15} color={colors.text3} />}
             {unread && (

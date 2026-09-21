@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright-core');
+const { schliesse } = require('./_konto');
 
 const FILE_KEY = 'URfbZmKwzfiHIPt5qtF95u';
 const TOKEN = process.env.FIGMA_TOKEN;
@@ -81,6 +82,6 @@ async function figmaImages(nodes) {
     console.log('ok', screen.name);
   }
 
-  await browser.close();
+  await schliesse(browser);
   console.log('\nBilder liegen in ' + OUT);
 })();

@@ -454,6 +454,15 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
         muted: Boolean(z.is_muted),
         unread: z.is_read ? 0 : 1,
         favorit: Boolean(z.is_favorite),
+        /*
+         * is_locked und notifications_off wurden seit jeher geladen
+         * (CHATMITGLIED_SPALTEN) und hier weggeworfen — genau das beschreibt
+         * der Kommentar am Kopf dieser Datei. Der Browser bekam die Sperre
+         * deshalb nie zu sehen, obwohl die App sie schreibt. Gleiche Regel in
+         * app/lib/daten.ts (ladeChats).
+         */
+        gesperrt: Boolean(z.is_locked),
+        mitteilungenAus: Boolean(z.notifications_off),
         // Ein Anruf steht als Eintrag im Chat (Henrik 7.9., Schema 35) und hat
         // keinen Text — die Vorschau benennt ihn. Gleiche Regel in
         // app/lib/daten.ts (ladeChats).
@@ -645,6 +654,19 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     // Angehaengter Kontakt: Karte mit Avatar, die sein Profil oeffnet.
     kontakt: n.profiles
       ? { id: n.profiles.id, name: n.profiles.name, handle: n.profiles.handle }
+      : undefined,
+    /*
+     * Die Story, auf die sich die Nachricht bezieht (Henrik 18.09., Schema
+     * 41) — ein Herz oder eine Antwort darauf. `stories` ist null, sobald die
+     * Story nach 24 Stunden weg ist; dann bleibt die Nachricht lesbar und die
+     * Vorschau fehlt. Gleiche Regel in app/lib/daten.ts.
+     */
+    story: n.stories
+      ? {
+          id: n.stories.id,
+          userId: n.stories.user_id === nutzerId ? 'me' : n.stories.user_id,
+          mediaUri: n.stories.media_url || undefined,
+        }
       : undefined,
     /*
      * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026). Antwort und

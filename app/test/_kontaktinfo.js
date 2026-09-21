@@ -4,7 +4,7 @@
 // Start:  node test/_kontaktinfo.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const { chatOffen } = require('./_warten');
@@ -33,8 +33,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -274,6 +273,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n${ergebnisse.length - fehler} von ${ergebnisse.length} Pruefungen bestanden`);
   console.log(eindeutig.length ? 'Konsolenfehler:\n' + eindeutig.join('\n') : 'Konsolenfehler: keine');
 
-  await browser.close();
-  process.exit(fehler || eindeutig.length ? 1 : 0);
+  await beenden(browser, fehler || eindeutig.length ? 1 : 0);
 })();

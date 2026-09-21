@@ -1,3 +1,16 @@
+-- ⚠️  ACHTUNG: DIESE DATEI ENTHÄLT KOPIEN VON FUNKTIONEN, DIE ANDERSWO
+--     WEITERENTWICKELT WURDEN.
+--
+--  Betroffen ist `finde_per_nummer()` — sie steht ausserdem in
+--  SUPABASE_SCHEMA_24_telefon.sql, _38_nummer_bremse.sql und
+--  _39_anonyme_bremse.sql. Die Kopie hier verglich bis zum 18.09.2026 rohe
+--  Ziffern statt der Vergleichsform und hat beim Wiedereinspielen die
+--  richtige Fassung verdraengt: „0176…" fand „+49176…" nicht mehr.
+--
+--  Gemerkt hat es `test:einstellungen` („Zwei Schreibweisen finden dieselbe
+--  Person"). Wer eine dieser Funktionen aendert, muss ALLE Fundstellen
+--  aendern:  grep -ln "function public.finde_per_nummer" SUPABASE_SCHEMA*.sql
+--
 /*
  * Reparatur der Funde aus dem Security Audit vom 03./04.09.2026.
  * Bericht: 2.Gehirn.md/02 Projekte/All-Media-Security-Audit-Skill-03-09-2026.md
@@ -28,11 +41,22 @@
 
 revoke select on public.profiles from authenticated;
 
+-- ACHTUNG: Diese Liste muss mitwachsen. Kommt eine Spalte dazu, die die
+-- Oberflaeche liest, und steht sie hier nicht, dann faellt jeder `select`
+-- auf `profiles` mit „permission denied for table profiles" um — nicht nur
+-- der auf die neue Spalte.
+--
+-- Am 18.09.2026 genau so passiert: `story_in_videos` kam mit Schema 30 dazu
+-- und wurde dort einzeln berechtigt. Als diese Datei hier erneut lief, hat
+-- das `revoke` darueber die Einzelberechtigung mit weggenommen, und
+-- `test:storyvideos` brach komplett ab.
 grant select (
   id, handle, name, bio, link, status, created_at, updated_at,
   initials, color, privat, about, highlights, playlists, demo,
   followers_basis, following_basis, beitraege_basis, spende, live,
-  guardian_status
+  guardian_status,
+  -- aus Schema 30/36
+  story_in_videos
 ) on public.profiles to authenticated;
 
 -- `update` bleibt wie es war (Policy: nur das eigene Profil), aber die
@@ -138,7 +162,11 @@ set search_path = public
 as $$
 declare
   ich     uuid := auth.uid();
-  gesucht text := regexp_replace(coalesce(nummer, ''), '[^0-9]', '', 'g');
+  -- Vergleichsform, nicht rohe Ziffern. Sonst findet „0176…" die gespeicherte
+  -- Nummer „+49176…" nicht — dieselbe Person, zwei Schreibweisen. Siehe
+  -- SUPABASE_SCHEMA_24_telefon.sql; die Kopie hier hinkte bis zum 18.09.2026
+  -- hinterher und hat beim Wiedereinspielen die richtige Fassung verdraengt.
+  gesucht text := public.nummer_vergleichsform(nummer);
 begin
   if ich is null then
     raise exception 'nicht angemeldet';
@@ -155,7 +183,7 @@ begin
               from public.profiles p
              where p.id <> ich
                and p.phone is not null
-               and regexp_replace(p.phone, '[^0-9]', '', 'g') = gesucht
+               and public.nummer_vergleichsform(p.phone) = gesucht
              limit 1) t
   );
 end;

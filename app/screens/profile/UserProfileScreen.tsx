@@ -28,10 +28,15 @@ interface Props {
   onBlockiert?: (userId: string, blockiert: boolean) => void;
   onOpenFollowers?: (userId: string) => void;
   onOpenFollowing?: (userId: string) => void;
+  /**
+   * Eine Kachel im Raster öffnen — der Beitrag selbst, nicht ein Hinweis
+   * darauf. Siehe `kachelOeffnen` in App.tsx.
+   */
+  onOpenKachel?: (kachel: { id: string; kind?: string }) => void;
   onNotice: (message: string) => void;
 }
 
-export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onOpenFollowers, onOpenFollowing, onNotice }: Props) => {
+export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onOpenFollowers, onOpenFollowing, onOpenKachel, onNotice }: Props) => {
   const { profile: alleProfile, users: alleNutzer, ichId } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
@@ -300,7 +305,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
               <Druck
                 key={`${tab}-${eintrag.id}`}
                 style={[styles.gridItem, { height: kachelHoehe }]}
-                onPress={() => onNotice(`Beitrag: ${eintrag.id}`)}
+                onPress={() => onOpenKachel?.(eintrag)}
               >
                 {/*
                   Bei einem Video steht in mediaUrl eine .mp4 — ins Raster

@@ -43,6 +43,19 @@ interface Props {
    * Rückfrage nach etwas, das gerade gesagt wurde.
    */
   zielStory?: boolean;
+  /**
+   * Womit die Kamera aufgeht — Foto oder Video.
+   *
+   * Dafür gibt es das: „Beitrag", „Reels" und „Querformat" im Erstellen-Menü
+   * liefen bis zum 18.09.2026 gar nicht über diesen Bildschirm, sondern über
+   * `ImagePicker.launchCameraAsync` — die Kamera-App des Systems. Die hat im
+   * Simulator kein Gegenstück und keinen Weg in die Galerie: wer dort einen
+   * Beitrag anlegen wollte, kam nicht weiter. Diese Kamera hat beides.
+   *
+   * Ein Reel ist ein Video, ein Beitrag ein Bild. Der Umschalter unten bleibt
+   * trotzdem bedienbar — das hier ist der Anfang, keine Sperre.
+   */
+  startModus?: Mode;
   onNotice: (message: string) => void;
 }
 
@@ -83,6 +96,7 @@ export const CameraScreen = ({
   onAnChat,
   direktZu,
   zielStory = false,
+  startModus,
   onNotice,
 }: Props) => {
   const insets = useSafeAreaInsets();
@@ -91,7 +105,7 @@ export const CameraScreen = ({
   const { supabase } = useSupabase();
   const aktionen = useAktionen(onNotice);
   const { neuLaden, users } = useDaten();
-  const [mode, setMode] = useState<Mode>('photo');
+  const [mode, setMode] = useState<Mode>(startModus ?? 'photo');
   const [busy, setBusy] = useState(false);
   const [aufnahme, setAufnahme] = useState<string | null>(null);
   const [filter, setFilter] = useState('keiner');

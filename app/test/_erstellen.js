@@ -8,7 +8,7 @@
 //         ZIEL=https://all-media-website.onrender.com node test/_erstellen.js
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const fs = require('fs');
 const path = require('path');
 
@@ -48,8 +48,7 @@ if (!fs.existsSync(BILD)) {
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -442,6 +441,5 @@ if (!fs.existsSync(BILD)) {
   console.log(`\n${ergebnisse.length - fehlgeschlagen.length} von ${ergebnisse.length} Pruefungen bestanden`);
   console.log(eindeutig.length ? 'Konsolenfehler:\n' + eindeutig.join('\n') : 'Konsolenfehler: keine');
 
-  await browser.close();
-  process.exit(fehlgeschlagen.length || eindeutig.length ? 1 : 0);
+  await beenden(browser, fehlgeschlagen.length || eindeutig.length ? 1 : 0);
 })();

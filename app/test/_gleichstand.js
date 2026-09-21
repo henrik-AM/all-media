@@ -18,7 +18,7 @@
 
 const { chromium } = require('playwright-core');
 const { zusammengelegt } = require('./_modulquelle');
-const { anmelden, MAIL, PASS } = require('./_konto');
+const { anmelden, MAIL, PASS, beenden, schliesse } = require('./_konto');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
 
@@ -95,8 +95,7 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
 
   // --- Seite 1: was die Website liefert -----------------------------------
@@ -184,8 +183,7 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
         (f.hint ? `        Hinweis:  ${f.hint}\n` : '') +
         (f.stack ? `        Spur:     ${f.stack}\n` : '')
     );
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
   const app = antwort.daten;
 
@@ -299,7 +297,7 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
     JSON.stringify(web.eigenesProfil?.highlights ?? []) === JSON.stringify(app.highlights ?? [])
   );
 
-  await browser.close();
+  await schliesse(browser);
   console.log(
     fehler === 0
       ? '\nApp und Website zeigen denselben Stand.'

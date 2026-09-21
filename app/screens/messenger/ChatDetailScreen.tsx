@@ -24,12 +24,15 @@ import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ICH as CURRENT_USER_ID, chatZeit, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
+import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
 import { WeiterleitenSheet } from '../../components/WeiterleitenSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
+import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import { Chat, Contact, Message } from '../../types';
 import { haptic } from '../../lib/haptics';
+import { nachrichtTon } from '../../lib/toene';
 // Dieselbe mm:ss-Schreibweise wie im Anrufbildschirm — sonst stuende im Chat
 // eine andere Dauer als waehrend des Gespraechs.
 import { dauerText } from './CallScreen';
@@ -85,7 +88,11 @@ export const ChatDetailScreen = ({
   onOpenStandort,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
+  const [kameraAuf, setKameraAuf] = useState(false);
   const { users: alleNutzer, ichId, communities, chats: alleChats } = useDaten();
+  // „Mit Enter senden" — siehe SCHALTER_STANDARD im EinstellungenContext.
+  const { an } = useEinstellungen();
+  const enterSendet = an('entersenden');
   const { supabase } = useSupabase();
   const { istBlockiert, markierte, markieren } = useProfil();
   const insets = useSafeAreaInsets();
@@ -182,6 +189,21 @@ export const ChatDetailScreen = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, ichId, chat.id, istKanal]);
 
+  /*
+   * Gelesen ist, was offen auf dem Bildschirm steht. Der Aufruf geht an
+   * `chat_gelesen` (Schema 40); ob daraus wirklich eine Bestaetigung wird,
+   * entscheidet die Datenbank anhand des Schalters „lesebestaetigung" des
+   * Lesers — nicht dieser Bildschirm. Genau dieselbe Zeile steht auf der
+   * Website, damit beide Seiten nicht auseinanderlaufen koennen.
+   */
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    Aktion.chatGelesen(supabase, chat.id).catch(() => {
+      /* Eine ausgebliebene Lesebestaetigung ist nichts, womit man den
+         Nutzer behelligt. */
+    });
+  }, [supabase, ichId, chat.id]);
+
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, []);
@@ -248,6 +270,13 @@ export const ChatDetailScreen = ({
   const send = async () => {
     const text = draft.trim();
     if (!text || gesperrt || !supabase || !ichId) return;
+    /*
+     * Der Sendeton. „Toene" aus den Einstellungen war bis zum 17.09.2026 ohne
+     * Wirkung, weil es ueberhaupt keinen Ton gab (Audit vom 17.09.2026,
+     * Befund 1). `lib/toene.ts` schweigt von selbst, wenn der Schalter aus
+     * ist. Gleiche Regel in web/public/app.js (sendMessage).
+     */
+    nachrichtTon();
 
     /*
      * Bearbeiten laeuft ueber denselben Knopf wie Senden.
@@ -506,16 +535,33 @@ export const ChatDetailScreen = ({
             ) : null}
           </Druck>
         ) : item.story ? (
-          <View style={styles.storyContainer}>
-            {item.story.mediaUri ? (
-              <Image source={{ uri: item.story.mediaUri }} style={styles.anhangBild} />
-            ) : (
-              <Motiv id={item.story.id} icon="image-outline" iconSize={20} style={styles.anhangBild} />
-            )}
-            <View style={styles.storyBadge}>
-              <Ionicons name="pin" size={14} color={colors.white} />
-              <Text style={styles.storyBadgeText}>Fixiert</Text>
+          /*
+           * Der Bezug auf eine Story — ein Herz darauf oder eine Antwort
+           * (Henrik 18.09., Schema 41).
+           *
+           * Der Text muss darunter stehen bleiben. Diese Kette ist
+           * ausschliessend: bis zum 18.09.2026 endete der Zweig mit dem Bild,
+           * und bei einer Story-Antwort verschwand damit genau das, was
+           * geschrieben worden war. Beim Herz waere das Emoji weggefallen und
+           * uebrig geblieben ein Bild ohne erkennbaren Grund.
+           */
+          <View>
+            <View style={styles.storyContainer}>
+              {item.story.mediaUri ? (
+                <Image source={{ uri: item.story.mediaUri }} style={styles.anhangBild} />
+              ) : (
+                <Motiv id={item.story.id} icon="image-outline" iconSize={20} style={styles.anhangBild} />
+              )}
+              <View style={styles.storyBadge}>
+                <Ionicons name="albums" size={13} color={colors.white} />
+                <Text style={styles.storyBadgeText}>Story</Text>
+              </View>
             </View>
+            {item.text ? (
+              <Text style={[styles.messageText, styles.storyText, out && styles.messageTextOut]}>
+                {item.text}
+              </Text>
+            ) : null}
           </View>
         ) : item.standort ? (
           <Druck style={styles.ortKarte} onPress={() => onOpenStandort?.(item.standort!.name)}>
@@ -646,7 +692,16 @@ export const ChatDetailScreen = ({
             <Text style={[styles.time, out && styles.timeOut]}>bearbeitet ·</Text>
           ) : null}
           <Text style={[styles.time, out && styles.timeOut]}>{item.time}</Text>
-          {out && <Ionicons name="checkmark-done" size={14} color={colors.bubbleOutMeta} />}
+          {/* Ein Haken heisst zugestellt, zwei heissen gelesen. Vorher stand
+              hier immer der doppelte — also „gelesen" fuer etwas, das nie
+              jemand gelesen hatte. */}
+          {out && (
+            <Ionicons
+              name={item.read ? 'checkmark-done' : 'checkmark'}
+              size={14}
+              color={colors.bubbleOutMeta}
+            />
+          )}
         </View>
 
         {/* Reaktionen haengen unten an der Blase, nicht darin — sonst
@@ -668,6 +723,67 @@ export const ChatDetailScreen = ({
         ) : null}
       </Druck>
     );
+  };
+
+  /**
+   * Einen Anhang wegschicken — aus dem Anhang-Blatt oder aus der Kamera.
+   *
+   * Stand bis zum 20.09.2026 mitten im JSX. Die Kamera braucht denselben
+   * Weg, und zweimal derselbe Rumpf waere zweimal dieselbe Pflege.
+   */
+  const anhangSenden = async (
+    { ortId, personId, dateiName, dateiGroesse, ...teil }: Partial<Message> & {
+      text: string;
+      ortId?: string;
+      personId?: string;
+      dateiName?: string;
+      dateiGroesse?: number;
+    }
+  ) => {
+    /*
+     * Ein Anhang gehört in die Datenbank, nicht nur in den Bildschirm.
+     *
+     * Bis zum 01.09.2026 landete er ausschließlich im Arbeitsspeicher:
+     * nach dem nächsten Start war er weg, und in der Website tauchte er
+     * nie auf. Gespeichert wird der Bezug (place_id, contact_user_id) —
+     * die Karte baut die Oberfläche daraus.
+     */
+    let id = `m${Date.now()}`;
+    if (supabase && ichId) {
+      try {
+        /*
+         * Im Unterthema einer Community fuehrt derselbe Weg ins Leere.
+         *
+         * `messages.chat_id` zeigt auf `chats`; eine Kanal-Kennung
+         * steht dort nicht, und die Regel „Nachricht senden" verlangt
+         * eine Mitgliedschaft in genau diesem Chat. Bis zum 04.09.2026
+         * ging deshalb jeder Anhang im Kanal mit 42501 zurueck — der
+         * Text nahm die richtige Abzweigung (kanalNachricht), der
+         * Anhang nicht.
+         */
+        const anhang = {
+          typ: teil.media ?? null,
+          standortId: ortId ?? null,
+          kontaktId: personId ?? null,
+          dateiName: dateiName ?? null,
+          dateiGroesse: dateiGroesse ?? null,
+        };
+        const data = istKanal
+          ? await Aktion.kanalNachricht(supabase, ichId, chat.id, teil.text ?? '', anhang)
+          : await Aktion.nachrichtSenden(supabase, ichId, chat.id, teil.text ?? '', anhang);
+        id = data.id;
+      } catch (e: any) {
+        console.error('Anhang senden fehlgeschlagen:', e?.message ?? e);
+        onNotice?.('Der Anhang ging nicht raus');
+        return;
+      }
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      { id, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil },
+    ]);
+    scrollToEnd();
   };
 
   return (
@@ -874,6 +990,17 @@ export const ChatDetailScreen = ({
               placeholderTextColor={colors.text3}
               editable={!gesperrt}
               multiline
+              /*
+               * „Mit Enter senden" aus den Einstellungen. Der Schalter war
+               * bis zum 17.09.2026 ohne Wirkung: die Eingabe kannte nur die
+               * neue Zeile (Audit vom 17.09.2026, Befund 1). Bei
+               * mehrzeiligen Feldern schickt `submitBehavior="submit"` in RN
+               * 0.86 ein Absende-Ereignis statt eines Zeilenumbruchs.
+               * Gleiche Regel in web/public/app.js (keydown am Composer).
+               */
+              submitBehavior={enterSendet ? 'submit' : 'newline'}
+              returnKeyType={enterSendet ? 'send' : 'default'}
+              onSubmitEditing={enterSendet ? () => send() : undefined}
             />
             <Druck style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
               <Ionicons name="camera-outline" size={21} color={colors.text2} />
@@ -923,59 +1050,39 @@ export const ChatDetailScreen = ({
         ausserId={chat.userId}
         ohne={istKanal ? ['standortAnfragen'] : []}
         onClose={() => setAnhangOffen(false)}
+        onKamera={() => setKameraAuf(true)}
         onStandortAnfragen={async () => {
           if (!chat.userId) return onNotice?.('In einer Gruppe geht das nicht');
           const id = await aktionen.standortAnfragen(chat.id, chat.userId);
           if (id) onNotice?.(`Standort bei ${chat.name} angefragt`);
         }}
-        onAnhang={async ({ ortId, personId, dateiName, dateiGroesse, ...teil }) => {
-          /*
-           * Ein Anhang gehört in die Datenbank, nicht nur in den Bildschirm.
-           *
-           * Bis zum 01.09.2026 landete er ausschließlich im Arbeitsspeicher:
-           * nach dem nächsten Start war er weg, und in der Website tauchte er
-           * nie auf. Gespeichert wird der Bezug (place_id, contact_user_id) —
-           * die Karte baut die Oberfläche daraus.
-           */
-          let id = `m${Date.now()}`;
-          if (supabase && ichId) {
-            try {
-              /*
-               * Im Unterthema einer Community fuehrt derselbe Weg ins Leere.
-               *
-               * `messages.chat_id` zeigt auf `chats`; eine Kanal-Kennung
-               * steht dort nicht, und die Regel „Nachricht senden" verlangt
-               * eine Mitgliedschaft in genau diesem Chat. Bis zum 04.09.2026
-               * ging deshalb jeder Anhang im Kanal mit 42501 zurueck — der
-               * Text nahm die richtige Abzweigung (kanalNachricht), der
-               * Anhang nicht.
-               */
-              const anhang = {
-                typ: teil.media ?? null,
-                standortId: ortId ?? null,
-                kontaktId: personId ?? null,
-                dateiName: dateiName ?? null,
-                dateiGroesse: dateiGroesse ?? null,
-              };
-              const data = istKanal
-                ? await Aktion.kanalNachricht(supabase, ichId, chat.id, teil.text ?? '', anhang)
-                : await Aktion.nachrichtSenden(supabase, ichId, chat.id, teil.text ?? '', anhang);
-              id = data.id;
-            } catch (e: any) {
-              console.error('Anhang senden fehlgeschlagen:', e?.message ?? e);
-              onNotice?.('Der Anhang ging nicht raus');
-              return;
-            }
-          }
-
-          setMessages((prev) => [
-            ...prev,
-            { id, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil },
-          ]);
-          scrollToEnd();
-        }}
+        onAnhang={anhangSenden}
         onNotice={(text) => onNotice?.(text)}
       />
+
+      {/*
+        Die eigene Kamera aus dem Anhang-Blatt heraus.
+
+        `direktZu` heisst: das Ziel steht fest. Wer im Chat auf "Foto
+        aufnehmen" tippt, hat gerade gesagt, wohin die Aufnahme soll — die
+        Frage "Was moechtest du damit machen" danach waere eine Rueckfrage
+        nach etwas Gesagtem.
+      */}
+      <Modal
+        visible={kameraAuf}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setKameraAuf(false)}
+      >
+        <CameraScreen
+          onClose={() => setKameraAuf(false)}
+          direktZu={(uri) => {
+            setKameraAuf(false);
+            void anhangSenden({ text: 'Foto', media: 'image', bildUri: uri });
+          }}
+          onNotice={(text) => onNotice?.(text)}
+        />
+      </Modal>
 
       {/*
         Das Vollformat (Henrik 7.9.). Ein Bild steht ganz da — `contain`, nicht
@@ -1285,4 +1392,7 @@ const styles = themenStyles((colors) => ({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   storyBadgeText: { color: colors.white, ...typography.tiny, fontWeight: '600' },
+  // Der Text unter der Story-Vorschau, nicht daneben. Ein Herz steht damit
+  // gross unter dem Bild, auf das es sich bezieht.
+  storyText: { marginTop: 6 },
 }));

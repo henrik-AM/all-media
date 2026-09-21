@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -9,7 +9,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
-import { aufnehmen } from '../../lib/aufnehmen';
+import { CameraScreen } from '../messenger/CameraScreen';
 import { Clip, Place, Post, Sound, Video } from '../../types';
 import { useKachelHoehe } from '../../lib/raster';
 
@@ -213,9 +213,16 @@ const OrtFotos = ({
   const eigene = eigeneBeitraege.filter((p) => p.location === platz.name || p.location === platz.ort);
   const alle = [...eigene.filter((p) => !fotos.some((f) => f.id === p.id)), ...fotos];
 
-  const hinzufuegen = async () => {
-    const uri = await aufnehmen('photo', onNotice);
-    if (!uri) return;
+  /*
+   * Das Plus oben rechts oeffnete bis zum 20.09.2026 die Kamera-App des
+   * Systems. Im Simulator gab es die nicht, und einen Weg in die Galerie
+   * kannte sie auch nicht — wer hier ein Foto beisteuern wollte, kam nicht
+   * weiter. Jetzt geht die eigene Kamera auf, dieselbe wie im Messenger.
+   */
+  const [kameraAuf, setKameraAuf] = useState(false);
+
+  const uebernehmen = (uri: string) => {
+    setKameraAuf(false);
     beitragAnlegen({ beschreibung: 'Aufnahme an diesem Ort', ort: platz.name, mediaUri: uri });
     onNotice('Foto hinzugefügt');
   };
@@ -228,7 +235,7 @@ const OrtFotos = ({
         </Druck>
         <Text style={styles.fotosTitel}>Alle Fotos</Text>
         {/* Punkt 10, zweiter Teil: "Möglichkeit für User, Fotos hochzuladen." */}
-        <Druck onPress={hinzufuegen} hitSlop={10} accessibilityLabel="Foto hinzufügen">
+        <Druck onPress={() => setKameraAuf(true)} hitSlop={10} accessibilityLabel="Foto hinzufügen">
           <Ionicons name="add" size={26} color={colors.text} />
         </Druck>
       </View>
@@ -277,6 +284,19 @@ const OrtFotos = ({
           })
         )}
       </ScrollView>
+
+      <Modal
+        visible={kameraAuf}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setKameraAuf(false)}
+      >
+        <CameraScreen
+          onClose={() => setKameraAuf(false)}
+          direktZu={uebernehmen}
+          onNotice={onNotice}
+        />
+      </Modal>
     </View>
   );
 };

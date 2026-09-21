@@ -4,7 +4,7 @@
 //   node test/_henrik.js
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, schliesse, beenden } = require('./_konto');
 
 const { chatOffen } = require('./_warten');
 const ADRESSE = process.env.AM_URL || 'http://localhost:3000';
@@ -45,8 +45,7 @@ function ok(name, bedingung, zusatz = '') {
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -242,7 +241,7 @@ function ok(name, bedingung, zusatz = '') {
       offen.trim().slice(0, 45));
   }
 
-  await browser.close();
+  await schliesse(browser);
 
   console.log(`\n  ${bestanden} von ${bestanden + gefallen} Punkten erfuellt`);
   if (fehlend.length) {

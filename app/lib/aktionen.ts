@@ -38,6 +38,9 @@ import {
 // Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
 const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
 
+// Wie ein eigener Kommentar in der Liste steht — gemeinsam mit der Website.
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
+
 /**
  * Eine Zeile, die es entweder gibt oder nicht — Like, Speichern, Folgen.
  *
@@ -595,13 +598,25 @@ export async function teilen(
   ichId: string,
   beitragId: string,
   empfaenger: string[],
-  vorschau = 'Beitrag geteilt'
+  vorschau = 'Beitrag geteilt',
+  bereich = 'messenger'
 ): Promise<string[]> {
   if (empfaenger.length === 0) throw new Error('Bitte mindestens eine Person auswählen');
 
   const gesendet: string[] = [];
   for (const zielId of empfaenger) {
-    const chatId = await chatMit(client, ichId, zielId);
+    /*
+     * `bereich` entscheidet, in welcher der beiden Chatlisten die Nachricht
+     * landet — Messenger oder Communitys. Hier stand bis zum 17.09.2026 ein
+     * Aufruf ohne diesen Wert, und `chatMit` nahm dann seinen Standard
+     * 'messenger'. Zusammen mit den drei anderen Aufrufern hiess das: **kein**
+     * Codepfad hat je einen Chat mit bereich='community' erzeugt. Die
+     * Community-Chatliste konnte sich durch Benutzung nie fuellen; was dort
+     * stand, kam aus dem Testbestand (vorlage_chats).
+     *
+     * Gleiche Regel in web/server/sync-handlers.js (handleShareToChats).
+     */
+    const chatId = await chatMit(client, ichId, zielId, bereich);
     const { error } = await client
       .from('messages')
       .insert({ chat_id: chatId, sender_id: ichId, text: vorschau, shared_post_id: beitragId });
@@ -885,6 +900,16 @@ export interface Anhang {
   /** Bei einer Datei: ohne Name und Groesse steht dort ein graues Kaestchen. */
   dateiName?: string | null;
   dateiGroesse?: number | null;
+  /**
+   * Die Story, auf die sich diese Nachricht bezieht — eine Antwort darauf
+   * oder ein Herz. Der Chat zeigt dann die Vorschau der Story an der Blase
+   * statt eines Satzes ohne Bezug. Siehe
+   * SUPABASE_SCHEMA_41_story_im_chat.sql.
+   *
+   * Nur bei `messages`. Ein Unterthema einer Community hat die Spalte nicht —
+   * dort wird `storyId` schlicht nicht gelesen.
+   */
+  storyId?: string | null;
 }
 
 /**
@@ -923,6 +948,7 @@ export async function nachrichtSenden(
       quote_of: anhang.zitatVon || null,
       file_name: anhang.dateiName || null,
       file_size: anhang.dateiGroesse || null,
+      reply_to_story: anhang.storyId || null,
     })
     .select('id, created_at')
     .single();
@@ -1008,18 +1034,19 @@ export async function anrufNotieren(
   return true;
 }
 
-/** Eine Nachricht als gelesen vermerken. */
-export async function nachrichtGelesen(
-  client: SupabaseClient,
-  _ichId: string,
-  nachrichtId: string
-) {
-  const { error } = await client
-    .from('messages')
-    .update({ read_at: new Date().toISOString() })
-    .eq('id', nachrichtId);
+/**
+ * Alle fremden Nachrichten eines Chats als gelesen vermerken.
+ *
+ * Die Entscheidung trifft die Datenbank (Schema 40, `chat_gelesen`): sie prüft
+ * die Mitgliedschaft und den Schalter „lesebestaetigung" des Lesers. Direkt
+ * schreiben ginge ohnehin nicht — die Regel „Eigene Nachricht aendern" lässt
+ * nur den Absender an `read_at`, und ein verbotenes UPDATE trifft still null
+ * Zeilen. Gibt die Zahl der bestätigten Nachrichten zurück.
+ */
+export async function chatGelesen(client: SupabaseClient, chatId: string) {
+  const { data, error } = await client.rpc('chat_gelesen', { p_chat: chatId });
   if (error) throw error;
-  return true;
+  return Number(data) || 0;
 }
 
 // ------------------------------------------------------------- Kontakte --
@@ -1123,9 +1150,62 @@ export async function storyAnlegen(
   return data.id as string;
 }
 
-/** Herz an einer Story. */
-export function storyLike(client: SupabaseClient, ichId: string, storyId: string) {
-  return umschalten(client, 'story_likes', { story_id: storyId, user_id: ichId });
+/**
+ * Herz an einer Story — und die Nachricht darüber an die Person.
+ *
+ * WARUM DIE NACHRICHT DAZUGEHÖRT
+ *
+ * Henrik am 18.09.2026: „Story-Like wird nicht im Chat angezeigt." Bis dahin
+ * schrieb diese Funktion eine Zeile nach `story_likes` und sonst nirgendwohin.
+ * Die Person, deren Story geliked wurde, erfuhr davon nichts — es gab keine
+ * Nachricht, keine Mitteilung, nichts. So macht es keine App, die Storys hat:
+ * ein Herz an einer Story landet immer im Chat.
+ *
+ * Die Nachricht trägt `reply_to_story`, zeigt im Chat also die Vorschau der
+ * Story und nicht nur einen Satz. Sie geht durch `nachrichtSenden` und damit
+ * durch dieselbe Verschlüsselung wie jede andere.
+ *
+ * ZWEI DINGE, DIE ABSICHTLICH NICHT GESCHEHEN
+ *
+ * Beim Zurücknehmen des Herzens wird die Nachricht NICHT gelöscht. Sie war
+ * heraus; sie stillschweigend verschwinden zu lassen, hieße, den Verlauf der
+ * Gegenseite zu verändern. Wer sie weghaben will, nimmt sie zurück wie jede
+ * andere Nachricht.
+ *
+ * An der eigenen Story entsteht keine Nachricht. Es gäbe keinen Chat dafür,
+ * und `chatMit` würde einen mit einem selbst anlegen wollen.
+ *
+ * Gleiche Regel in web/server/sync-handlers.js (handleStoryLike).
+ */
+export async function storyLike(client: SupabaseClient, ichId: string, storyId: string) {
+  const an = await umschalten(client, 'story_likes', { story_id: storyId, user_id: ichId });
+
+  // Nur beim Setzen, nicht beim Zurücknehmen.
+  if (!an) return an;
+
+  const { data: story } = await client
+    .from('stories')
+    .select('id, user_id')
+    .eq('id', storyId)
+    .maybeSingle();
+  if (!story || story.user_id === ichId) return an;
+
+  /*
+   * Das Herz darf am Chat scheitern, ohne das Like mitzunehmen.
+   *
+   * Die Gegenseite kann Nachrichten abgestellt haben (Schema 22) — dann wirft
+   * `chatMit`. Das Like ist dann trotzdem gesetzt, und genau so soll es sein:
+   * es gehört der Story, nicht dem Chat. Ein geworfener Fehler hier würde in
+   * `useAktionen` das rote Herz wieder ausschalten, obwohl es steht.
+   */
+  try {
+    const chatId = await chatMit(client, ichId, story.user_id as string);
+    await nachrichtSenden(client, ichId, chatId, '❤️', { storyId });
+  } catch (fehler: any) {
+    console.warn('Herz an der Story kam nicht in den Chat:', fehler?.message ?? fehler);
+  }
+
+  return an;
 }
 
 /**
@@ -1150,7 +1230,10 @@ export async function storyAntwort(
   if (!story) throw new Error('Diese Story gibt es nicht mehr');
 
   const chatId = await chatMit(client, ichId, story.user_id as string);
-  await nachrichtSenden(client, ichId, chatId, text);
+  // Mit Bezug auf die Story. Ohne ihn stand im Chat ein Satz wie „schönes
+  // Bild!", und niemand — auch der Schreiber nicht — wusste zwei Tage später
+  // noch, worauf er sich bezog.
+  await nachrichtSenden(client, ichId, chatId, text, { storyId });
   return chatId;
 }
 
@@ -1313,6 +1396,41 @@ export async function profilListe(
   if (fehlerSchreiben) throw fehlerSchreiben;
 
   return neu;
+}
+
+/**
+ * Gegenstueck zu profilListe: einen Namen aus der Textliste nehmen.
+ *
+ * Solange `profiles.highlights` / `.playlists` noch gelesen werden, muss der
+ * Name beim Loeschen an beiden Stellen verschwinden — sonst steht der Kreis
+ * beim naechsten Start wieder da, nur ohne id und ohne Inhalt.
+ */
+export async function profilListeOhne(
+  client: SupabaseClient,
+  ichId: string,
+  spalte: 'highlights' | 'playlists',
+  name: string
+): Promise<string[]> {
+  if (!['highlights', 'playlists'].includes(spalte)) throw new Error('Unbekannte Sammlung');
+
+  const { data, error } = await client
+    .from('profiles')
+    .select(spalte)
+    .eq('id', ichId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const bestand: string[] = ((data as Record<string, unknown> | null)?.[spalte] as string[]) || [];
+  const rest = bestand.filter((n) => n !== name);
+  if (rest.length === bestand.length) return bestand;
+
+  const { error: fehlerSchreiben } = await client
+    .from('profiles')
+    .update({ [spalte]: rest })
+    .eq('id', ichId);
+  if (fehlerSchreiben) throw fehlerSchreiben;
+
+  return rest;
 }
 
 /** Das Spendenziel setzen — oder mit `null` wieder abräumen. */
@@ -2052,6 +2170,27 @@ export async function einstellungSetzen(
       .update({ privat: wert === 'an' })
       .eq('id', ichId);
     if (fehler) throw fehler;
+
+    /*
+     * „Privates Profil" steht zweimal in den Einstellungen — einmal unter
+     * Videos, einmal unter Communitys. Beide schalten dieselbe Spalte
+     * `profiles.privat`; es gibt kein privates Videoprofil neben einem
+     * oeffentlichen Community-Profil.
+     *
+     * In `user_settings` liefen die zwei Schluessel trotzdem auseinander: wer
+     * den einen umlegte, sah den anderen unveraendert stehen, obwohl er sich
+     * mitgeaendert hatte. Ein Widerspruch auf demselben Bildschirm. Deshalb
+     * wandert der Wert immer an beide Schluessel. Gleiche Regel in
+     * web/server/sync-handlers.js.
+     */
+    const anderer = schluessel === 'videoPrivate' ? 'commPrivate' : 'videoPrivate';
+    const { error: zwilling } = await client
+      .from('user_settings')
+      .upsert(
+        { user_id: ichId, schluessel: anderer, wert, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,schluessel' }
+      );
+    if (zwilling) throw zwilling;
   }
 
   return wert;
@@ -2575,4 +2714,378 @@ export async function markierteBeitraege(
       .filter(Boolean)
       .map(kachel)
   );
+}
+
+/**
+ * Die Beiträge, die man selbst gespeichert hat — der Reiter mit dem
+ * Lesezeichen im eigenen Profil.
+ *
+ * WARUM ES DAS ERST SEIT DEM 18.09.2026 GIBT
+ *
+ * Das Lesezeichen unter einem Beitrag schreibt seit jeher nach `saves`. Was
+ * fehlte, war jede Möglichkeit, dort wieder hineinzusehen: `saves` wurde an
+ * genau einer Stelle gelesen — in `ladeBeitraege`, und zwar nur, um zu
+ * wissen, welches Lesezeichen im Feed ausgefüllt zu zeichnen ist. Eine Liste
+ * der gespeicherten Beiträge gab es weder in der App noch auf der Website.
+ *
+ * Henrik am 18.09.2026: „Gespeicherte Beiträge werden nicht synchronisiert
+ * (unter Videos/Profil kann ich sie nicht sehen)." Synchronisiert waren sie
+ * — sie waren nur nirgends abrufbar.
+ *
+ * Der Prototyp-Frame „VP + Gespeichert" zeigt den Reiter als vierten neben
+ * Raster, Repost und @; genau dort steht er jetzt.
+ *
+ * Nur für einen selbst. Was jemand speichert, geht niemanden sonst etwas an;
+ * die Leseregel auf `saves` sieht das genauso, ein fremder Aufruf käme mit
+ * leeren Händen zurück.
+ */
+export async function gespeicherteVon(
+  client: SupabaseClient,
+  profilId: string
+): Promise<Rasterkachel[]> {
+  const { data, error } = await client
+    .from('saves')
+    .select('post_id, created_at, posts!post_id(id, kind, media_url, thumbnail_url)')
+    .eq('user_id', profilId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  // Fund 4: Kachelbilder brauchen unterschriebene Adressen (lib/medien.ts).
+  return signiereMedien(
+    client,
+    ((data ?? []) as any[])
+      .map((z) => z.posts)
+      .filter(Boolean)
+      .map(kachel)
+  );
+}
+
+/** Ein Beitrag, den man selbst geliked hat — für die Liste, nicht fürs Raster. */
+export interface GelikterBeitrag {
+  id: string;
+  kind: string;
+  /** Was in der Zeile steht: Titel, sonst Beschreibung, sonst die Art. */
+  titel: string;
+  /** Wann man ihn geliked hat, als ISO-Zeitpunkt. */
+  wann: string;
+}
+
+/**
+ * Die Beiträge, die man selbst geliked hat.
+ *
+ * Dasselbe Bild wie bei den gespeicherten: `post_likes` wurde nur gelesen, um
+ * das Herz im Feed rot zu färben. Wer wissen wollte, was ihm alles gefallen
+ * hat, hatte keinen Weg dorthin. Henrik am 18.09.2026: „Likes … werden nicht
+ * synchronisiert (unter Videos/Profil kann ich sie nicht sehen)."
+ *
+ * WARUM KEIN REITER IM PROFIL
+ *
+ * Der Prototyp zeigt dort genau vier — Raster, Repost, @ und Gespeichert. Ein
+ * fünfter wäre erfunden, und erfunden wird bei All Media nichts. Die Liste
+ * steht deshalb in den Einstellungen unter „Videos", direkt neben
+ * „Likes-Sichtbarkeit", wo sie thematisch hingehört.
+ *
+ * Deshalb auch keine Kacheln: der Einstellungsbereich kennt Textzeilen. Ein
+ * Raster dort wäre eine neue Darstellungsform, die es im Prototyp nicht gibt.
+ *
+ * Nur für einen selbst — die Leseregel auf `post_likes` sieht das genauso.
+ */
+export async function gelikteVon(
+  client: SupabaseClient,
+  profilId: string
+): Promise<GelikterBeitrag[]> {
+  const { data, error } = await client
+    .from('post_likes')
+    .select('post_id, created_at, posts!post_id(id, kind, title, description)')
+    .eq('user_id', profilId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const ART: Record<string, string> = { post: 'Foto', reel: 'Video (Hochformat)', clip: 'Video' };
+
+  return ((data ?? []) as any[])
+    .filter((z) => z.posts)
+    .map((z) => {
+      const b = z.posts;
+      // Ein Beitrag ohne Titel und ohne Beschreibung ist kein Fehler — dann
+      // steht die Art dort. Ein leerer Strich waere die schlechtere Antwort.
+      const text = (b.title || b.description || '').trim();
+      return {
+        id: b.id,
+        kind: b.kind,
+        titel: text || ART[b.kind] || 'Beitrag',
+        wann: z.created_at,
+      };
+    });
+}
+
+/** Ein eigener Kommentar — für die Liste in den Einstellungen. */
+export interface EigenerKommentar {
+  /** Die Kennung des Kommentars, nicht die des Beitrags. */
+  id: string;
+  /** Der Beitrag, unter dem er steht — für den Sprung dorthin. */
+  beitragId: string;
+  kind: string;
+  /** Was man geschrieben hat. */
+  text: string;
+  /** Der Beitrag, unter dem es steht: Titel, sonst Beschreibung, sonst Art. */
+  beitrag: string;
+  wann: string;
+}
+
+/**
+ * Die eigenen Kommentare.
+ *
+ * Henrik am 18.09.2026: „Likes, Kommentare, Reposts, Gespeicherte Beiträge …
+ * werden nicht synchronisiert (unter Videos/Profil kann ich sie nicht
+ * sehen)." Drei der vier Gattungen haben ihren Ort an diesem Tag bekommen,
+ * die Kommentare nicht — sie waren die einzige, für die es nirgends eine
+ * Ansicht gab.
+ *
+ * Wie bei `gelikteVon()` kein fünfter Profilreiter: der Prototyp zeigt dort
+ * genau vier ([[Prototyp ist bindend]]). Die Liste steht in den Einstellungen
+ * unter „Videos", neben „Wer darf kommentieren".
+ *
+ * WAS DABEI AUFFIEL
+ *
+ * Der Testkommentar hing an einem Beitrag, den sein eigener Verfasser nicht
+ * lesen durfte — `starter_inhalte()` wählte ihn mit `b.demo and b.user_id <>
+ * ziel`, also derselben Bedingung, die am 18.09. schon Merkliste, Repost und
+ * Likes leer aussehen ließ. Diese Liste wäre ohne Schema 50 leer geblieben,
+ * obwohl die Zeile existiert.
+ *
+ * Deshalb wird hier auch nichts gefiltert, was nicht gefiltert werden muss:
+ * ein Kommentar ohne lesbaren Beitrag fällt heraus (er hat keinen Ort, auf
+ * den er zeigen könnte), und genau dafür gibt es jetzt die Gegenprobe in der
+ * Datenbank.
+ */
+export async function kommentierteVon(
+  client: SupabaseClient,
+  profilId: string
+): Promise<EigenerKommentar[]> {
+  const { data, error } = await client
+    .from('comments')
+    .select('id, text, created_at, post_id, posts!post_id(id, kind, title, description)')
+    .eq('user_id', profilId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  return ((data ?? []) as any[])
+    .filter((z) => z.posts)
+    .map((z) => ({
+      id: z.id,
+      beitragId: z.posts.id,
+      kind: z.posts.kind,
+      text: (z.text || '').trim(),
+      beitrag: Kommentar.beitragsName(z.posts),
+      wann: z.created_at,
+    }));
+}
+
+/** Die Zeile, wie sie auch die Website baut — siehe gemeinsam/kommentar.js. */
+export function kommentarZeile(k: EigenerKommentar): string {
+  return Kommentar.zeile(k);
+}
+
+/* ==========================================================================
+ *  Sammlungen — Playlists und Highlights
+ * ========================================================================== */
+
+/**
+ * Eine Sammlung, wie sie im Profil als Kreis erscheint.
+ *
+ * BEFUND 20.09.2026
+ *
+ * `profiles.highlights` und `profiles.playlists` waren Textlisten — nur
+ * Namen. Es gab keine Zuordnung, welcher Beitrag zu welcher Playlist gehoert
+ * und welche Story in welchem Highlight liegt. Deshalb hatte kein Kreis ein
+ * Vorschaubild: es gab nichts, wovon es das Vorschaubild gewesen waere. Und
+ * Antippen antwortete mit einer Meldung statt mit dem Inhalt.
+ *
+ * Seit Schema 46 gibt es `sammlungen` und `sammlung_inhalte`.
+ */
+export interface Sammlung {
+  id: string;
+  art: 'playlist' | 'highlight';
+  name: string;
+  /** Wie viele Beitraege beziehungsweise Storys darin liegen. */
+  anzahl: number;
+  /**
+   * Das Bild des zuletzt hinzugefuegten Stuecks — oder null.
+   *
+   * Null ist ein gueltiger Zustand, keine Panne: eine gerade angelegte
+   * Sammlung ist leer. Die Oberflaeche zeigt dann ihr Symbol, wie bisher.
+   */
+  bild: string | null;
+}
+
+/**
+ * Die Sammlungen eines Profils, je Gattung.
+ *
+ * Das Vorschaubild kommt aus derselben Abfrage — eine zweite je Kreis waere
+ * bei fuenf Kreisen fuenf Abfragen fuer fuenf Bilder.
+ */
+export async function sammlungenVon(
+  client: SupabaseClient,
+  profilId: string,
+  art: 'playlist' | 'highlight'
+): Promise<Sammlung[]> {
+  const { data, error } = await client
+    .from('sammlungen')
+    .select(
+      `id, art, name, created_at,
+       sammlung_inhalte (
+         created_at,
+         posts!post_id (thumbnail_url, media_url),
+         stories!story_id (media_url)
+       )`
+    )
+    .eq('user_id', profilId)
+    .eq('art', art)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  const sammlungen: Sammlung[] = ((data ?? []) as any[]).map((s) => {
+    const inhalte = (s.sammlung_inhalte ?? []) as any[];
+    // Das zuletzt Hinzugefuegte steht vorn — das ist das Bild, das ein
+    // Mensch als "der aktuelle Stand dieser Sammlung" liest.
+    const neueste = [...inhalte].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const treffer = neueste.find((i) => i.posts || i.stories);
+    const bild = treffer
+      ? treffer.posts?.thumbnail_url || treffer.posts?.media_url || treffer.stories?.media_url || null
+      : null;
+    return { id: s.id, art: s.art, name: s.name, anzahl: inhalte.length, bild };
+  });
+
+  // Fund 4: der Medieneimer ist nicht oeffentlich, jede Adresse wird
+  // unterschrieben. `signiereMedien` arbeitet auf `mediaUri` — deshalb der
+  // Umweg ueber eine Zwischenform statt eines zweiten Unterschreibers.
+  const unterschrieben = await signiereMedien(
+    client,
+    sammlungen.map((s) => ({ id: s.id, mediaUri: s.bild ?? undefined })) as any
+  );
+  return sammlungen.map((s, i) => ({ ...s, bild: (unterschrieben[i] as any)?.mediaUri ?? null }));
+}
+
+/** Was in einer Sammlung liegt — Beitraege bei Playlists, Storys bei Highlights. */
+export async function sammlungInhalt(
+  client: SupabaseClient,
+  sammlungId: string
+): Promise<Rasterkachel[]> {
+  const { data, error } = await client
+    .from('sammlung_inhalte')
+    .select(
+      `position, created_at,
+       posts!post_id (id, kind, media_url, thumbnail_url),
+       stories!story_id (id, media_url)`
+    )
+    .eq('sammlung_id', sammlungId)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  const stuecke = ((data ?? []) as any[])
+    .map((z) =>
+      z.posts
+        ? kachel(z.posts)
+        : z.stories
+          ? { id: z.stories.id, kind: 'story', mediaUri: z.stories.media_url }
+          : null
+    )
+    .filter(Boolean) as Rasterkachel[];
+
+  return signiereMedien(client, stuecke);
+}
+
+/**
+ * Eine Sammlung anlegen.
+ *
+ * Der Name muss neu sein. Die Datenbank sagt das ohnehin (unique auf
+ * Nutzer + Gattung + Name); hier steht es nur, damit die Meldung auf
+ * Deutsch ankommt statt als Postgres-Code.
+ */
+export async function sammlungAnlegen(
+  client: SupabaseClient,
+  ichId: string,
+  art: 'playlist' | 'highlight',
+  name: string
+): Promise<Sammlung> {
+  const sauber = name.trim();
+  if (!sauber) throw new Error('Ohne Namen geht das nicht');
+
+  const { data, error } = await client
+    .from('sammlungen')
+    .insert({ user_id: ichId, art, name: sauber })
+    .select('id, art, name')
+    .single();
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error(
+        art === 'highlight' ? 'Dieses Highlight gibt es schon' : 'Diese Playlist gibt es schon'
+      );
+    }
+    throw error;
+  }
+  return { id: data.id, art: data.art, name: data.name, anzahl: 0, bild: null };
+}
+
+/**
+ * Etwas in eine Sammlung legen.
+ *
+ * Ob Beitrag oder Story richtig ist, entscheidet die Gattung der Sammlung —
+ * geprueft im Ausloeser in der Datenbank, nicht hier. Eine zweite Pruefung
+ * an dieser Stelle waere eine zweite Wahrheit, und die beiden wuerden
+ * auseinanderlaufen.
+ */
+export async function inSammlung(
+  client: SupabaseClient,
+  sammlungId: string,
+  stueck: { postId?: string; storyId?: string }
+): Promise<void> {
+  const { error } = await client.from('sammlung_inhalte').insert({
+    sammlung_id: sammlungId,
+    post_id: stueck.postId ?? null,
+    story_id: stueck.storyId ?? null,
+  });
+  if (error) {
+    if (error.code === '23505') throw new Error('Das liegt schon in dieser Sammlung');
+    throw error;
+  }
+}
+
+/**
+ * Eine ganze Sammlung loeschen.
+ *
+ * Der Inhalt faellt per `on delete cascade` mit — die Beitraege und Storys
+ * selbst bleiben stehen, es verschwindet nur die Zuordnung.
+ */
+export async function sammlungLoeschen(
+  client: SupabaseClient,
+  sammlungId: string
+): Promise<void> {
+  // Wie in ausSammlung: unter Row Level Security loescht ein abgelehntes
+  // DELETE null Zeilen und meldet keinen Fehler. Gezaehlt wird, was weg ist.
+  const { data, error } = await client
+    .from('sammlungen')
+    .delete()
+    .eq('id', sammlungId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Diese Sammlung liess sich nicht loeschen');
+}
+
+/** Etwas wieder herausnehmen. */
+export async function ausSammlung(
+  client: SupabaseClient,
+  sammlungId: string,
+  stueck: { postId?: string; storyId?: string }
+): Promise<void> {
+  let frage = client.from('sammlung_inhalte').delete().eq('sammlung_id', sammlungId);
+  frage = stueck.postId ? frage.eq('post_id', stueck.postId) : frage.eq('story_id', stueck.storyId!);
+
+  // Bei Row Level Security loescht ein abgelehntes DELETE null Zeilen und
+  // meldet keinen Fehler. Deshalb wird zurueckgegeben, was wirklich weg ist.
+  const { data, error } = await frage.select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Das liess sich nicht herausnehmen');
 }

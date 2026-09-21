@@ -145,7 +145,19 @@ async function main() {
   }
 
   // Zweite Richtung: Tabellen. Ein Fremder darf keine Zeile sehen.
-  for (const tabelle of ['profiles', 'posts', 'messages', 'chats', 'stories', 'contacts']) {
+  for (const tabelle of [
+    'profiles',
+    'posts',
+    'messages',
+    'chats',
+    'stories',
+    'contacts',
+    // Seit Schema 46. Ihre Leseregeln lauten `to authenticated` — ein
+    // Fremder bekommt dort nichts. Geprueft wird es trotzdem: genau diese
+    // Annahme war bei `notifications` schon einmal falsch.
+    'sammlungen',
+    'sammlung_inhalte',
+  ]) {
     try {
       const antwort = await fetch(`${URL}/rest/v1/${tabelle}?select=id&limit=1`, {
         headers: { apikey: KEY },

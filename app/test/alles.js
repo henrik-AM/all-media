@@ -136,6 +136,12 @@ const LAEUFE = [
   ['feedback', '_feedback.js'],
   ['erstellen', '_erstellen.js'],
   ['teilen', '_teilen.js'],
+  ['sync', '_sync.js'],
+  // Braucht keinen Server — prueft die Schemadateien gegen den Code.
+  ['schema', '_schema.js'],
+  // Braucht ebenfalls keinen Server: spricht direkt mit PostgREST.
+  ['sammlungen', '_sammlungen.js'],
+  ['sammlungenweb', '_sammlungenweb.js'],
   ['explorer', '_explorer.js'],
   ['anhang', '_anhang.js'],
   ['einstellungen', '_einstellungen.js'],
@@ -159,7 +165,9 @@ const LAEUFE = [
   ['sichtbarkeit', '_sichtbarkeit.js'],
   ['fremdprofil', '_fremdprofil.js'],
   ['chatanfrage', '_chatanfrage.js'],
+  ['mitteilungen', '_mitteilungen.js'],
   ['dmsperre', '_dmsperre.js'],
+  ['lesebestaetigung', '_lesebestaetigung.js'],
   ['kanal', '_kanal.js'],
   ['impressionen', '_impressionen.js'],
   ['storyvideos', '_storyvideos.js'],

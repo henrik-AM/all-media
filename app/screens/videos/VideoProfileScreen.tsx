@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -26,6 +26,11 @@ interface Props {
   onAction: (key: string) => void;
   /** Fuehrt zum Formular, das Name, Info und Link aendert. */
   onBearbeiten: () => void;
+  /**
+   * Eine Kachel im Raster öffnen — der Beitrag selbst, nicht ein Hinweis
+   * darauf. Siehe `kachelOeffnen` in App.tsx.
+   */
+  onOpenKachel?: (kachel: { id: string; kind?: string }) => void;
   onNotice: (message: string) => void;
   /*
    * Die Zahlen ueber dem Namen gaben bis zum 02.09.2026 nur einen Hinweistext
@@ -47,14 +52,86 @@ const TABS: { key: Tab; icon: IconName }[] = [
 ];
 
 /** Prototyp-Frame "Videos - Profil". */
-export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNotice, onOpenFollowers, onOpenFollowing }: Props) => {
+export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpenKachel, onNotice, onOpenFollowers, onOpenFollowing }: Props) => {
   const { profile: alleProfile, users: alleNutzer } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { reposts } = useReposts();
-  const { ungelesen, highlights, playlists, spende, raster, eigeneBeitraege, gefolgt, eigenesProfil } =
-    useProfil();
+  const {
+    ungelesen,
+    highlights,
+    playlists,
+    sammlungen,
+    sammlungOeffnen,
+    sammlungLoeschen,
+    spende,
+    raster,
+    eigeneBeitraege,
+    gefolgt,
+    eigenesProfil,
+  } = useProfil();
   const [tab, setTab] = useState<Tab>('grid');
   const me = alleProfile.me;
+
+  /*
+   * Die Kreise ueber den Registern — Playlists und Highlights.
+   *
+   * Bis zum 20.09.2026 waren das reine Etiketten: `profiles.playlists` und
+   * `profiles.highlights` sind Textlisten, also nur Namen. Ein Vorschaubild
+   * konnte es gar nicht geben, weil es nichts gab, wovon es das Bild waere,
+   * und Antippen antwortete mit einer Meldung. Seit Schema 46 liegt der
+   * Inhalt in `sammlungen` / `sammlung_inhalte`.
+   *
+   * Die alten Namenslisten bleiben als Rueckfalltuer stehen: kommt die
+   * Abfrage nicht durch, stuende das Profil sonst ploetzlich ohne Kreise da
+   * — und zwar wortlos. Ein Kreis ohne `id` ist so ein Rueckfall; er laesst
+   * sich nicht oeffnen und sagt das auch.
+   */
+  const kreise = (art: 'playlist' | 'highlight'): Aktion.Sammlung[] => {
+    const vorhanden = sammlungen.filter((s) => s.art === art);
+    if (vorhanden.length) return vorhanden;
+    const namen = art === 'playlist' ? playlists : highlights;
+    return namen.map((name) => ({ id: '', art, name, anzahl: 0, bild: null }));
+  };
+
+  const [offen, setOffen] = useState<{ sammlung: Aktion.Sammlung; kacheln: Aktion.Rasterkachel[] } | null>(null);
+  const [laedt, setLaedt] = useState(false);
+
+  const oeffnen = async (s: Aktion.Sammlung) => {
+    if (!s.id) return onNotice(`„${s.name}" laesst sich gerade nicht oeffnen`);
+    setLaedt(true);
+    try {
+      setOffen({ sammlung: s, kacheln: await sammlungOeffnen(s.id) });
+    } catch (fehler: any) {
+      onNotice(fehler?.message ?? 'Die Sammlung liess sich nicht laden');
+    } finally {
+      setLaedt(false);
+    }
+  };
+
+  /*
+   * Loeschen nur mit Rueckfrage — und die Rueckfrage sagt ausdruecklich, was
+   * NICHT passiert. Sonst klickt sie niemand weg, der seine Beitraege behalten
+   * will, und wer sie wegklickt, hat womoeglich etwas anderes erwartet.
+   */
+  const loeschenFragen = (s: Aktion.Sammlung) => {
+    Alert.alert(
+      `„${s.name}" löschen?`,
+      s.art === 'playlist'
+        ? 'Die Playlist verschwindet. Die Beiträge darin bleiben erhalten — nur die Zuordnung geht weg.'
+        : 'Das Highlight verschwindet. Die Storys darin bleiben erhalten — nur die Zuordnung geht weg.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Löschen',
+          style: 'destructive',
+          onPress: () => {
+            setOffen(null);
+            sammlungLoeschen(s);
+          },
+        },
+      ]
+    );
+  };
 
   /*
    * Der Reiter "Markiert" war bei jedem Menschen leer — nicht, weil niemand
@@ -106,6 +183,34 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
       abgebrochen = true;
     };
   }, [supabase, user?.id, tab, reposts]);
+
+  /*
+   * Die gespeicherten Beitraege — der Reiter mit dem Lesezeichen.
+   *
+   * Der Reiter stand seit jeher in TABS und hat nie etwas geladen. Wer etwas
+   * gespeichert hatte, bekam trotzdem „Noch nichts hier" zu sehen: der
+   * Leerzustand war die einzige Antwort, die dieser Reiter kannte. Henrik am
+   * 18.09.2026: „Gespeicherte Beitraege werden nicht synchronisiert (unter
+   * Videos/Profil kann ich sie nicht sehen)."
+   *
+   * `null` heisst „noch nicht geladen" und ist von „geladen, nichts drin"
+   * unterscheidbar. Ohne diesen Unterschied stuende beim Oeffnen fuer einen
+   * Wimpernschlag „Noch nichts gespeichert" — also eine Falschaussage.
+   */
+  const [gespeichert, setGespeichert] = useState<Aktion.Rasterkachel[] | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !user?.id || tab !== 'saved') return;
+    let abgebrochen = false;
+    Aktion.gespeicherteVon(supabase, user.id)
+      .then((liste) => {
+        if (!abgebrochen) setGespeichert(liste);
+      })
+      .catch((e) => console.error('Gespeicherte laden fehlgeschlagen:', e?.message ?? e));
+    return () => {
+      abgebrochen = true;
+    };
+  }, [supabase, user?.id, tab]);
 
   /*
    * Solange die Daten laden, gibt es das eigene Profil noch nicht.
@@ -168,29 +273,41 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
         )}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
-          {playlists.map((label) => (
-            <Druck key={`pl-${label}`} style={styles.highlight} onPress={() => onNotice(`Playlist „${label}“`)}>
+          {kreise('playlist').map((s) => (
+            <Druck key={`pl-${s.name}`} style={styles.highlight} onPress={() => oeffnen(s)}>
               <View style={[styles.ring, styles.ringPlaylist]}>
-                <Motiv id={`pl-${label}`} icon="play-outline" iconSize={22} style={styles.ringInhalt} />
+                <Motiv
+                  id={`pl-${s.name}`}
+                  bild={s.bild ?? undefined}
+                  icon="play-outline"
+                  iconSize={22}
+                  style={styles.ringInhalt}
+                />
               </View>
               <View style={[styles.abzeichen, styles.abzeichenPlaylist]}>
                 <Ionicons name="play" size={10} color={colors.white} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
-                {label}
+                {s.name}
               </Text>
             </Druck>
           ))}
-          {highlights.map((label) => (
-            <Druck key={`hl-${label}`} style={styles.highlight} onPress={() => onNotice(`Highlight „${label}“`)}>
+          {kreise('highlight').map((s) => (
+            <Druck key={`hl-${s.name}`} style={styles.highlight} onPress={() => oeffnen(s)}>
               <View style={[styles.ring, styles.ringHighlight]}>
-                <Motiv id={`hl-${label}`} icon="image-outline" iconSize={22} style={styles.ringInhalt} />
+                <Motiv
+                  id={`hl-${s.name}`}
+                  bild={s.bild ?? undefined}
+                  icon="image-outline"
+                  iconSize={22}
+                  style={styles.ringInhalt}
+                />
               </View>
               <View style={[styles.abzeichen, styles.abzeichenHighlight]}>
                 <Ionicons name="star" size={10} color={colors.white} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
-                {label}
+                {s.name}
               </Text>
             </Druck>
           ))}
@@ -211,7 +328,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
         {tab === 'grid' ? (
           <View style={styles.grid}>
             {raster.map((eintrag) => (
-              <Druck key={eintrag.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice(`Beitrag: ${eintrag.id}`)}>
+              <Druck key={eintrag.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onOpenKachel?.(eintrag)}>
                 {/*
                   * Bei einem Video steht in mediaUri seit Schema 8 eine .mp4;
                   * ins Raster gehoert das Standbild dazu. Motiv nimmt, was da
@@ -233,7 +350,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
           // Datenbank, nicht nur die dieser Sitzung.
           <View style={styles.grid}>
             {meineReposts.map((r) => (
-              <Druck key={r.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onNotice(`Repost: ${r.id}`)}>
+              <Druck key={r.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onOpenKachel?.(r)}>
                 <Motiv
                   id={r.id}
                   bild={r.thumbnail ?? r.mediaUrl ?? undefined}
@@ -253,7 +370,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
               <Druck
                 key={m.id}
                 style={[styles.gridItem, { height: kachelHoehe }]}
-                onPress={() => onNotice(`Markiert in: ${m.id}`)}
+                onPress={() => onOpenKachel?.(m)}
               >
                 <Motiv
                   id={m.id}
@@ -268,6 +385,31 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
               </Druck>
             ))}
           </View>
+        ) : tab === 'saved' && (gespeichert ?? []).length > 0 ? (
+          /*
+           * Die gespeicherten Beitraege. Kein Abzeichen auf der Kachel: hier
+           * ist ohnehin alles gespeichert, ein Lesezeichen auf jedem Bild
+           * waere Rauschen. Bei Repost und Markierung ist es umgekehrt — dort
+           * sagt das Zeichen, warum ein fremder Beitrag im eigenen Profil
+           * steht.
+           */
+          <View style={styles.grid}>
+            {(gespeichert ?? []).map((g) => (
+              <Druck
+                key={g.id}
+                style={[styles.gridItem, { height: kachelHoehe }]}
+                onPress={() => onOpenKachel?.(g)}
+              >
+                <Motiv
+                  id={g.id}
+                  bild={g.thumbnail ?? g.mediaUrl ?? undefined}
+                  icon={g.kind === 'post' ? 'image-outline' : 'play-outline'}
+                  iconSize={20}
+                  style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+                />
+              </Druck>
+            ))}
+          </View>
         ) : (
           <EmptyState
             icon={TABS.find((t) => t.key === tab)!.icon}
@@ -276,18 +418,90 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onNot
                 ? 'Noch nichts repostet'
                 : tab === 'tagged'
                   ? 'Keine Markierungen'
-                  : 'Noch nichts hier'
+                  : tab === 'saved'
+                    ? gespeichert === null
+                      ? 'Wird geladen …'
+                      : 'Noch nichts gespeichert'
+                    : 'Noch nichts hier'
             }
             text={
               tab === 'repost'
                 ? 'Tippe im Feed auf den Repost-Knopf, dann erscheint es hier.'
                 : tab === 'tagged'
                   ? 'Wer dich mit @ in einer Beschreibung nennt, markiert dich — dann steht der Beitrag hier.'
-                  : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
+                  : tab === 'saved'
+                    ? gespeichert === null
+                      ? ''
+                      : 'Tippe unter einem Beitrag auf das Lesezeichen, dann liegt er hier.'
+                    : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
             }
           />
         )}
       </ScrollView>
+
+      {/*
+        * Der Inhalt einer Sammlung. Eine Kachel fuehrt weiter an dieselbe
+        * Stelle wie im Raster darunter — sonst waere das Oeffnen wieder nur
+        * eine Anzeige.
+        */}
+      <Modal
+        visible={offen !== null}
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setOffen(null)}
+      >
+        <View style={styles.screen}>
+          <View style={styles.sammlungKopf}>
+            <Druck onPress={() => setOffen(null)} style={styles.sammlungZurueck}>
+              <Ionicons name="chevron-back" size={24} color={colors.text} />
+            </Druck>
+            <Text style={styles.sammlungTitel} numberOfLines={1}>
+              {offen?.sammlung.name ?? ''}
+            </Text>
+            {offen ? (
+              <Druck onPress={() => loeschenFragen(offen.sammlung)} style={styles.sammlungZurueck}>
+                <Ionicons name="trash-outline" size={22} color={colors.text} />
+              </Druck>
+            ) : null}
+          </View>
+          {offen && offen.kacheln.length > 0 ? (
+            <ScrollView contentContainerStyle={styles.content}>
+              <View style={styles.grid}>
+                {offen.kacheln.map((k) => (
+                  <Druck
+                    key={k.id}
+                    style={[styles.gridItem, { height: kachelHoehe }]}
+                    onPress={() => {
+                      setOffen(null);
+                      onOpenKachel?.(k);
+                    }}
+                  >
+                    <Motiv
+                      id={k.id}
+                      bild={k.thumbnail ?? k.mediaUrl ?? undefined}
+                      icon={k.kind === 'post' ? 'image-outline' : 'play-outline'}
+                      iconSize={20}
+                      style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+                    />
+                  </Druck>
+                ))}
+              </View>
+            </ScrollView>
+          ) : (
+            <EmptyState
+              icon="albums-outline"
+              title="Noch nichts darin"
+              text={'Über das Drei-Punkte-Menü an einem Beitrag legst du ihn hier hinein.'}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {laedt && (
+        <View style={styles.laedt} pointerEvents="none">
+          <ActivityIndicator color={colors.text} />
+        </View>
+      )}
     </View>
   );
 };
@@ -306,6 +520,28 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   content: { paddingBottom: spacing.xl },
+
+  // Der Kopf ueber dem Inhalt einer Sammlung.
+  sammlungKopf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
+    paddingRight: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  sammlungZurueck: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  sammlungTitel: { ...typography.h3, color: colors.text, flex: 1 },
+  laedt: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   spende: {
     marginHorizontal: spacing.lg,

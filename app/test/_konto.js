@@ -134,6 +134,35 @@ if (!chromium.__geruestet) {
  *
  * Ein Abbruch mit klarer Meldung ist immer besser als ein Lauf, der schweigt.
  */
+/*
+ * Schliesst den Browser und beendet den Lauf — notfalls ohne ihn.
+ *
+ * `browser.close()` hat selbst keine Zeitgrenze. Kommt es nicht zurueck, wird
+ * das `process.exit()` dahinter nie erreicht: der Lauf hat seine Zahlen schon
+ * vollstaendig gedruckt und steht danach still, bis der Gesamtlauf ihn nach
+ * einer Viertelstunde abschiesst. Am 17.09.2026 traf das `insel` (17/17),
+ * `suche` und `profil` (22/22) in einem einzigen Durchgang — dreimal
+ * fuenfzehn Minuten fuer Ergebnisse, die laengst dastanden, und dreimal die
+ * Markierung ZEIT auf einem inhaltlich fehlerfreien Lauf.
+ *
+ * Fuenf Sekunden reichen zum sauberen Schliessen. Danach ist ein
+ * zurueckgelassener chrome-headless-shell das kleinere Uebel.
+ */
+async function schliesse(browser) {
+  await Promise.race([
+    browser.close().catch(() => {}),
+    new Promise((fertig) => {
+      const uhr = setTimeout(fertig, 5000);
+      if (uhr.unref) uhr.unref();
+    }),
+  ]);
+}
+
+async function beenden(browser, code) {
+  await schliesse(browser);
+  process.exit(code);
+}
+
 function mitZeitgrenze(page, ms = 60000) {
   if (page.__zeitgrenze) return page;
   page.__zeitgrenze = true;
@@ -269,4 +298,15 @@ async function zuruecksetzen(page, { neuLaden = true } = {}) {
   return antwort;
 }
 
-module.exports = { anmelden, vorbereiten, zuruecksetzen, mitZeitgrenze, inhaltAbwarten, MAIL, PASS, NAME };
+module.exports = {
+  anmelden,
+  vorbereiten,
+  zuruecksetzen,
+  mitZeitgrenze,
+  inhaltAbwarten,
+  schliesse,
+  beenden,
+  MAIL,
+  PASS,
+  NAME,
+};

@@ -3,8 +3,9 @@ import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { ThemeContext, ThemeProvider } from './contexts/ThemeContext';
-import { SupabaseProvider } from './contexts/SupabaseContext';
+import { SupabaseProvider, useSupabase } from './contexts/SupabaseContext';
 import { DatenProvider } from './contexts/DatenContext';
+import { EinstellungenProvider, useEinstellungen } from './contexts/EinstellungenContext';
 import { RepostProvider } from './contexts/RepostContext';
 import { ProfilProvider, useProfil } from './contexts/ProfilContext';
 import { ActionSheet } from './components/ActionSheet';
@@ -15,6 +16,7 @@ import { MitteilungenSheet } from './components/MitteilungenSheet';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
+import { ladeEinstellungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
@@ -52,7 +54,6 @@ import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { FollowersScreen } from './screens/profile/FollowersScreen';
 import { FollowingScreen } from './screens/profile/FollowingScreen';
 import { colors, themenStyles } from './constants/design';
-import { aufnehmen } from './lib/aufnehmen';
 import { useDaten } from './contexts/DatenContext';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
 
@@ -71,7 +72,16 @@ type Overlay =
    * Ziel schon fest und die Aufnahme geht ohne Rückfrage dorthin — wer aus
    * einem Chat die Kamera aufmacht, will das Bild diesem Chat schicken.
    */
-  | { kind: 'camera'; zielChat?: Chat; zielStory?: boolean }
+  /**
+   * `zielBeitrag` gesetzt heißt: die Kamera kam aus dem Erstellen-Menü. Die
+   * Aufnahme geht danach ins Beschreibungs-Formular, nicht in einen Chat.
+   */
+  | {
+      kind: 'camera';
+      zielChat?: Chat;
+      zielStory?: boolean;
+      zielBeitrag?: 'post' | 'reels' | 'landscape';
+    }
   | { kind: 'call'; userId?: string; gruppenName?: string; teilnehmer?: string[]; art: 'audio' | 'video' }
   | { kind: 'livestream' }
   /* Die offenen Insights einer Person ansehen — Handbuch-Abgleich 01.09.2026. */
@@ -170,6 +180,12 @@ const Shell = () => {
   /** Bereich, von dem man zu den Settings kam (messenger/videos/communities). */
   const [settingsVonBereich, setSettingsVonBereich] = useState<AreaKey | null>(null);
   const [teilenZiel, setTeilenZiel] = useState<TeilenZiel | null>(null);
+  /*
+   * Der Beitrag, bei dem der Feed aufgehen soll — gesetzt von einer Kachel im
+   * Profil oder einem Treffer aus der Suche. Der Feed loescht ihn wieder,
+   * sobald er dort ist; sonst spraenge er bei jedem Neubau zurueck.
+   */
+  const [startBeitrag, setStartBeitrag] = useState<string | null>(null);
   /** Aufnahme aus der Kamera, die auf die Wahl eines Chats wartet. */
   const [aufnahmeFuerChat, setAufnahmeFuerChat] = useState<string | null>(null);
   /*
@@ -260,6 +276,9 @@ const Shell = () => {
   // Der Bereich, dessen Sichtbarkeits-Blatt in den Einstellungen aufgehen
   // soll — "settings#sicht:story". Ebenfalls nur fuer die Pruefbilder.
   const [pruefSicht, setPruefSicht] = useState<string | null>(null);
+  // Dasselbe fuer die Listen der Einstellungen — "settings#liste:kommentiert".
+  // „Meine Kommentare" kam sonst in keinem Pruefbild vor.
+  const [pruefListe, setPruefListe] = useState<string | null>(null);
   /*
    * Das Auswahlfenster der Kartenansichten (Standard/Satellit/Gelaende).
    * Es liegt in der Karte selbst, und die ist eine WebView — von aussen ist
@@ -307,6 +326,20 @@ const Shell = () => {
       case 'chat': {
         const chat = daten.chats.find((c) => c.id === a || c.name === a);
         if (chat) setOverlay({ kind: 'chat', chat, extra: [] });
+        break;
+      }
+      /*
+       * Das Optionsblatt zu einem Chat — "communities/chats#chatopt:Greta
+       * Hoffmann". Es geht sonst nur auf langes Druecken auf, und das laesst
+       * sich im Simulator von aussen nicht ausloesen. Darin steht seit dem
+       * 18.09.2026 der Punkt „Über Messenger chatten anfragen"; ohne diesen
+       * Weg kaeme er in keinem Bild vor.
+       */
+      case 'chatopt': {
+        const chat =
+          daten.chats.find((c) => c.id === a || c.name === a) ||
+          daten.communityChats.find((c) => c.id === a || c.name === a);
+        if (chat) setChatOptionen(chat);
         break;
       }
       case 'story': {
@@ -398,6 +431,9 @@ const Shell = () => {
       case 'sicht':
         if (a) setPruefSicht(a);
         break;
+      case 'liste':
+        if (a) setPruefListe(a);
+        break;
       /*
        * Der Weg "Profil → Einstellungen" — "settings#aus:messenger". Nur so
        * ist der Zurueck-Pfeil oben links fotografierbar: er haengt an
@@ -444,31 +480,117 @@ const Shell = () => {
   const oeffneChat = (chat: Chat, zusatz?: Message[]) =>
     setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])] });
 
-  const openChatWith = (userId: string) => {
+  /**
+   * Einen Chat mit dieser Person öffnen — und ihn dabei wirklich anlegen.
+   *
+   * WAS HIER BIS ZUM 18.09.2026 GESCHAH
+   *
+   * Gab es noch keinen Chat, baute diese Funktion einen zusammen und legte
+   * ihn in `chats` ab: `id: 'c' + Date.now()`. In der Datenbank stand davon
+   * nichts. Zwei Folgen, die Henrik als getrennte Beobachtungen gemeldet hat
+   * und die dieselbe Ursache haben:
+   *
+   *   1. „Chats bleiben beim Neustart von All Media nicht erhalten."
+   *      Der Chat lebte im Arbeitsspeicher der Shell. Beim nächsten Start
+   *      wurde aus Supabase geladen, und dort war er nie gewesen.
+   *
+   *   2. Schreiben ging darin nicht. `nachrichtSenden` bekam „c1758…" als
+   *      Chatkennung — keine UUID, kein Fremdschlüssel. Die Einfügung fiel
+   *      durch, der Chat meldete „Die Nachricht ging nicht raus", und weil
+   *      die Zeile danach wieder aus der Anzeige verschwand, sah es nach
+   *      einem Aussetzer aus statt nach einem festen Fehler.
+   *
+   * Jetzt fragt `chatMit` die Datenbank nach dem vorhandenen Chat und legt
+   * sonst einen an — dieselbe Funktion, die auch das Teilen benutzt. Erst
+   * danach geht der Bildschirm auf, mit der Kennung, die wirklich gilt.
+   *
+   * `bereich` entscheidet, in welcher der beiden Listen er landet.
+   */
+  const openChatWith = async (userId: string, bereich?: 'messenger' | 'community') => {
     const person = daten.users[userId];
-    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
+    const wo = bereich ?? bereichFuer(userId);
+    const vorhanden = (wo === 'community' ? daten.communityChats : chats).find(
+      (c) => !c.isGroup && c.userId === userId
+    );
+    if (vorhanden) return oeffneChat(vorhanden);
 
-    if (!chat) {
-      chat = {
-        id: `c${Date.now()}`,
-        name: person.name,
-        userId,
-        isGroup: false,
-        preview: 'Chat gestartet',
-        time: now(),
-        unreadCount: 0,
-      };
-      setChats((prev) => [chat as Chat, ...prev]);
+    const chatId = await aktion.chatMit(userId, wo);
+    // `chatMit` hat den Grund schon gemeldet — etwa, dass diese Person keine
+    // Nachrichten empfängt. Dann bleibt der Bildschirm, wo er ist; einen
+    // Chat aufzumachen, den es nicht gibt, wäre die falsche Auskunft.
+    if (!chatId) return;
+
+    const chat: Chat = {
+      id: chatId,
+      name: person?.name ?? 'Chat',
+      userId,
+      isGroup: false,
+      preview: '',
+      time: now(),
+      unreadCount: 0,
+    };
+    if (wo === 'community') {
+      // Die Community-Liste wird nicht hier gehalten, sondern kommt aus
+      // `daten`. Neu laden ist der ehrlichere Weg als eine zweite Kopie.
+      void daten.neuLaden();
+    } else {
+      setChats((prev) => [chat, ...prev]);
     }
-
     oeffneChat(chat);
   };
 
+  /**
+   * Über welchen der beiden Bereiche diese Person erreicht wird.
+   *
+   * Bis zum 18.09.2026 entschied das allein der Bereich, in dem man gerade
+   * stand: aus den Communitys heraus ging jede Freigabe in einen
+   * Community-Chat, aus dem Messenger heraus in einen Messenger-Chat. Wer
+   * einen Beitrag aus den Videos an jemanden schickte, mit dem er nur in
+   * einer Community zu tun hat, bekam dadurch einen zweiten, leeren Chat in
+   * der anderen Liste.
+   *
+   * Der Prototyp-Frame „Nutzer B + Beitrag teilen" zeigt es anders: jede
+   * Person im Raster trägt ihr eigenes Abzeichen. Also entscheidet die
+   * Person, nicht der Bildschirm — ein vorhandener Chat schlägt alles, und
+   * erst wenn es keinen gibt, zählt der Bereich, aus dem geteilt wird.
+   */
+  const bereichFuer = useCallback(
+    (userId: string): 'messenger' | 'community' => {
+      if (chats.some((c) => !c.isGroup && c.userId === userId)) return 'messenger';
+      if (daten.communityChats.some((c) => !c.isGroup && c.userId === userId)) return 'community';
+      return area === 'communities' ? 'community' : 'messenger';
+    },
+    [chats, daten.communityChats, area]
+  );
+
   /** Beitrag oder Video in den Chat mit dieser Person legen. */
-  const teileMit = (userId: string, ziel: TeilenZiel) => {
+  const teileMit = (
+    userId: string,
+    ziel: TeilenZiel,
+    bereich: 'messenger' | 'community' = bereichFuer(userId)
+  ) => {
     const person = daten.users[userId];
-    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
+    /*
+     * `bereich` entscheidet, in welcher Chatliste die Nachricht landet.
+     * Gleiche Regel in web/public/app.js.
+     *
+     * Die Vorwegnahme unten bleibt bewusst auf der Messenger-Liste: nur die
+     * wird hier gehalten. Fuer den Community-Fall zeigt erst das Neuladen am
+     * Ende den Chat — lieber einen Wimpernschlag spaeter als in der falschen
+     * Liste.
+     */
+    let chat =
+      bereich === 'messenger' ? chats.find((c) => !c.isGroup && c.userId === userId) : undefined;
     const vorschau = ziel.art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
+
+    if (bereich === 'community') {
+      profil.geteilt(ziel.id);
+      setNotice(`An ${person.name} gesendet`);
+      aktion.teilen(ziel.id, [userId], vorschau, bereich).then((ok) => {
+        if (ok) daten.neuLaden();
+      });
+      return;
+    }
 
     if (!chat) {
       chat = {
@@ -511,7 +633,7 @@ const Shell = () => {
      * Danach neu laden: die Nachricht bekommt in der Datenbank ihre eigene
      * Kennung, und die Zahl unter dem Beitrag steigt.
      */
-    aktion.teilen(ziel.id, [userId], vorschau).then((ok) => {
+    aktion.teilen(ziel.id, [userId], vorschau, bereich).then((ok) => {
       if (ok) daten.neuLaden();
     });
   };
@@ -967,6 +1089,26 @@ const Shell = () => {
     setOverlay(null);
     setArea('videos');
     setSubs((prev) => ({ ...prev, videos: art === 'beitrag' ? 'home' : 'portrait' }));
+    // Und nicht nur in den Feed, sondern an die Stelle darin. Ohne das landet
+    // man ganz oben und sucht den Beitrag von Hand — siehe `startBei` in
+    // HomeFeedScreen.
+    setStartBeitrag(id);
+  };
+
+  /**
+   * Eine Kachel im Profilraster öffnen.
+   *
+   * Bis zum 18.09.2026 gab ein Fingertipp darauf nur „Beitrag: <kennung>" als
+   * Hinweis aus — in beiden Profilen, im eigenen wie im fremden. Das Raster
+   * sah aus wie eine Übersicht und war eine Wand.
+   *
+   * Wohin es geht, entscheidet `kind` aus der Datenbank, nicht der Reiter:
+   * unter „Reposts" steht ebenso gut ein Querformat-Video wie ein Bild.
+   */
+  const kachelOeffnen = (kachel: { id: string; kind?: string }) => {
+    // `posts.kind` kennt genau drei Werte (Schema: post, reel, clip).
+    const art = kachel.kind === 'clip' ? 'clip' : kachel.kind === 'reel' ? 'reel' : 'beitrag';
+    eintragOeffnen(art, kachel.id);
   };
 
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
@@ -1147,15 +1289,32 @@ const Shell = () => {
       });
     }
 
-    // Beitrag, Reels und Querformat: erst aufnehmen, dann beschreiben.
-    const istBild = punkt === 'post';
-    const uri = await aufnehmen(istBild ? 'photo' : 'video', setNotice);
-    if (!uri) return;
+    /*
+     * Beitrag, Reels und Querformat: erst aufnehmen, dann beschreiben.
+     *
+     * Aufgenommen wird in der Kamera der App, nicht mehr in der des Systems.
+     * Bis zum 18.09.2026 stand hier `aufnehmen()` — also
+     * `ImagePicker.launchCameraAsync`. Das öffnet die Kamera-App von iOS, und
+     * die gibt es im Simulator nicht: Henrik kam an dieser Stelle schlicht
+     * nicht weiter, ohne dass irgendetwas nach einem Fehler aussah. Die
+     * eigene Kamera hat eine Galerie daneben und kommt damit auch ohne
+     * Linse aus.
+     */
+    setOverlay({ kind: 'camera', zielBeitrag: punkt as 'post' | 'reels' | 'landscape' });
+  };
 
+  /**
+   * Das Formular unter einer Aufnahme — Beschreibung, Ort, Musik, Zeitpunkt.
+   *
+   * Steht getrennt von `erstelle`, weil es zwei Wege hierher gibt: das
+   * Erstellen-Menü und die Kamera, die ihre Aufnahme hierher weiterreicht.
+   */
+  const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string) => {
+    const istBild = punkt === 'post';
     const quer = punkt === 'landscape';
     setFormular({
       title: { post: 'Neuer Beitrag', reels: 'Neues Reel', landscape: 'Neues Querformat-Video' }[
-        punkt as 'post' | 'reels' | 'landscape'
+        punkt
       ],
       knopf: 'Veröffentlichen',
       felder: [
@@ -1299,6 +1458,7 @@ const Shell = () => {
         }}
         onOpenFollowers={(userId) => setOverlay({ kind: 'followers', userId })}
         onOpenFollowing={(userId) => setOverlay({ kind: 'following', userId })}
+        onOpenKachel={kachelOeffnen}
         onBlockiert={(userId, blockiert) => {
           // Blockieren hat Folgen: die Person faellt aus den Kontakten, beim
           // Aufheben kommt sie zurueck. Sonst waere der Knopf nur ein Wort.
@@ -1398,10 +1558,26 @@ const Shell = () => {
 
   if (overlay?.kind === 'camera') {
     const zielChat = overlay.zielChat;
+    const zielBeitrag = overlay.zielBeitrag;
     return (
       <CameraScreen
-        // Kam die Kamera aus einem Chat, ist das Ziel klar - dann keine Frage.
-        direktZu={zielChat ? (uri) => aufnahmeInChat(zielChat, uri) : undefined}
+        /*
+         * Kam die Kamera aus einem Chat oder aus dem Erstellen-Menue, ist das
+         * Ziel klar - dann keine Frage danach, was mit der Aufnahme geschehen
+         * soll.
+         */
+        direktZu={
+          zielChat
+            ? (uri) => aufnahmeInChat(zielChat, uri)
+            : zielBeitrag
+              ? (uri) => {
+                  setOverlay(null);
+                  beitragBeschreiben(zielBeitrag, uri);
+                }
+              : undefined
+        }
+        // Ein Reel und ein Querformat-Video sind Videos, ein Beitrag ist ein Bild.
+        startModus={zielBeitrag && zielBeitrag !== 'post' ? 'video' : undefined}
         zielStory={overlay.zielStory}
         onClose={() => setOverlay(null)}
         onCaptured={storyAufgenommen}
@@ -1632,7 +1808,16 @@ const Shell = () => {
     }
 
     if (area === 'videos') {
-      if (sub === 'portrait') return <VideoFeedScreen onOpenProfile={openPublicProfile} onShare={teileVideo} onNotice={setNotice} />;
+      if (sub === 'portrait')
+        return (
+          <VideoFeedScreen
+            onOpenProfile={openPublicProfile}
+            onShare={teileVideo}
+            startBei={startBeitrag}
+            onStartErreicht={() => setStartBeitrag(null)}
+            onNotice={setNotice}
+          />
+        );
       if (sub === 'landscape')
         return (
           <LandscapeVideosScreen onOpenClip={(clipId) => setOverlay({ kind: 'clip', clipId })} onNotice={setNotice} />
@@ -1646,20 +1831,29 @@ const Shell = () => {
             onNotice={setNotice}
           />
         );
-      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onNotice={setNotice} onOpenFollowers={() => setOverlay({ kind: 'followers', userId: 'me' })} onOpenFollowing={() => setOverlay({ kind: 'following', userId: 'me' })} />;
+      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onOpenKachel={kachelOeffnen} onNotice={setNotice} onOpenFollowers={() => setOverlay({ kind: 'followers', userId: 'me' })} onOpenFollowing={() => setOverlay({ kind: 'following', userId: 'me' })} />;
       return (
         <HomeFeedScreen
           stories={storiesVideos}
           onOpenStory={openStory}
           onOpenProfile={openPublicProfile}
           onShare={teileBeitrag}
+          startBei={startBeitrag}
+          onStartErreicht={() => setStartBeitrag(null)}
           onNotice={setNotice}
         />
       );
     }
 
     if (area === 'communities') {
-      if (sub === 'chats') return <CommunityChatsScreen onOpenCommunity={openCommunity} />;
+      if (sub === 'chats')
+        return (
+          <CommunityChatsScreen
+            onOpenChat={oeffneChat}
+            onNewChat={() => setSub('search')}
+            onChatOptionen={setChatOptionen}
+          />
+        );
       if (sub === 'search') {
         return (
           <CommunitySearchScreen
@@ -1693,6 +1887,7 @@ const Shell = () => {
         sprung={settingsSprung}
         onSprungFertig={() => setSettingsSprung(null)}
         pruefSicht={pruefSicht}
+        pruefListe={pruefListe}
         /*
          * Den Zurueck-Pfeil gibt es nur, wenn es ein Zurueck gibt.
          *
@@ -1821,6 +2016,38 @@ const Shell = () => {
             icon: 'checkmark-done-outline',
           },
           { key: 'einstellungen', label: 'Chat-Einstellungen', icon: 'settings-outline' },
+          /*
+           * Der Weg von der Community in den Messenger.
+           *
+           * Henrik am 18.09.2026: „in den Community-Chats eine Option
+           * einbauen, dass man den jeweils anderen User anfragen kann, über
+           * Messenger zu chatten."
+           *
+           * Das ist kein neues Zustimmungsverfahren — es gibt schon eines.
+           * Schema 21 setzt beim Eintragen des zweiten Mitglieds
+           * `chats.anfrage_zustand = 'offen'`, und die Regel auf `messages`
+           * lässt bis zur Annahme genau eine Nachricht durch. Ein
+           * Messenger-Chat anzulegen IST also die Anfrage; die Datenbank
+           * macht den Rest. Genau deshalb steht hier nichts weiter als der
+           * Aufruf.
+           *
+           * Der Punkt erscheint nur, wo er etwas bewirkt: in einem
+           * Zweierchat aus dem Bereich Communitys, zu dem es noch keinen
+           * Messenger-Chat gibt.
+           */
+          ...(chatOptionen &&
+          !chatOptionen.isGroup &&
+          chatOptionen.userId &&
+          daten.communityChats.some((c) => c.id === chatOptionen.id) &&
+          !chats.some((c) => !c.isGroup && c.userId === chatOptionen.userId)
+            ? [
+                {
+                  key: 'messenger',
+                  label: 'Über Messenger chatten anfragen',
+                  icon: 'chatbubble-ellipses-outline' as const,
+                },
+              ]
+            : []),
           { key: 'loeschen', label: 'Chat löschen', icon: 'trash-outline', gefahr: true },
         ]}
         onSelect={(key) => {
@@ -1835,6 +2062,23 @@ const Shell = () => {
             return setNotice('Für Gruppen gibt es die Einstellungen noch nicht');
           }
           if (key === 'loeschen') return chatLoeschen(chat);
+          if (key === 'messenger') {
+            if (!chat.userId) return;
+            void (async () => {
+              const neu = await aktion.chatMit(chat.userId!, 'messenger');
+              if (!neu) return;
+              await daten.neuLaden();
+              /*
+               * Bewusst nicht „gesendet" — gesendet ist noch nichts. Die
+               * Anfrage steht, sobald der Chat existiert; geschrieben wird
+               * darin einmal, danach entscheidet die Gegenseite (Schema 21).
+               */
+              setNotice(`Anfrage an ${chat.name} steht — schreib ihr eine Nachricht`);
+              setArea('messenger');
+              setSubs((prev) => ({ ...prev, messenger: 'chats' }));
+            })();
+            return;
+          }
           chatUmlegen(chat, key as 'archiv' | 'stumm' | 'gelesen');
         }}
         onClose={() => setChatOptionen(null)}
@@ -1864,6 +2108,7 @@ const Shell = () => {
       <TeilenSheet
         ziel={teilenZiel}
         contacts={contacts}
+        bereichFuer={bereichFuer}
         onClose={() => setTeilenZiel(null)}
         onSend={teileMit}
       />
@@ -1872,6 +2117,7 @@ const Shell = () => {
       <TeilenSheet
         ziel={aufnahmeFuerChat ? { art: 'post', id: 'aufnahme', titel: 'Foto', autor: 'Du' } : null}
         contacts={contacts}
+        bereichFuer={bereichFuer}
         titel="An welchen Chat?"
         onClose={() => setAufnahmeFuerChat(null)}
         onSend={(userId) => {
@@ -1928,6 +2174,33 @@ const Root = () => {
   return isLoggedIn ? <Shell /> : <LoginScreen />;
 };
 
+/**
+ * Holt das Design aus dem Konto.
+ *
+ * Bis zum 17.09.2026 lag „Dunkles Design" nur im AsyncStorage dieses Geräts
+ * und in localStorage['am-theme'] des Browsers. Wer in der App auf dunkel
+ * stellte, bekam die Website hell und ein zweites Telefon wusste von nichts.
+ * Jetzt steht der Wert zusätzlich in `user_settings` und wird von dort
+ * übernommen, sobald jemand angemeldet ist.
+ *
+ * Der Abgleich sitzt bewusst nicht im ThemeProvider: der steht ganz außen und
+ * kennt weder Supabase noch den angemeldeten Nutzer. Diese Komponente zeichnet
+ * nichts, sie trägt nur nach. Gleiche Regel in web/public/app.js (bootstrap).
+ */
+const DesignAbgleich = () => {
+  const { setTheme } = useContext(ThemeContext);
+  const { einstellungen } = useEinstellungen();
+
+  useEffect(() => {
+    // `null` heißt „noch nicht geladen" — dann bleibt es beim Wert des Geräts.
+    if (!einstellungen) return;
+    const wert = einstellungen.theme;
+    if (wert === 'light' || wert === 'dark' || wert === 'system') setTheme(wert);
+  }, [einstellungen?.theme]);
+
+  return null;
+};
+
 const App = () => (
   <SafeAreaProvider>
     {/*
@@ -1938,17 +2211,26 @@ const App = () => (
       <SupabaseProvider>
         <AuthProvider>
           {/*
-            Der DatenProvider steht zwischen Anmeldung und allem anderen: er
-            braucht die Kennung des angemeldeten Nutzers, und alles darunter
-            braucht die Inhalte, die er lädt.
+            Die Einstellungen stehen möglichst weit oben: alles darunter darf
+            sie lesen, ohne selbst zu laden. Vorher tat das jeder Bildschirm
+            für sich — drei Abfragen, drei Kopien, und wer in den Einstellungen
+            etwas umlegte, sah die Wirkung anderswo erst nach einem Neustart.
           */}
-          <DatenProvider>
-            <RepostProvider>
-              <ProfilProvider>
-                <Root />
-              </ProfilProvider>
-            </RepostProvider>
-          </DatenProvider>
+          <EinstellungenProvider>
+            <DesignAbgleich />
+            {/*
+              Der DatenProvider steht zwischen Anmeldung und allem anderen: er
+              braucht die Kennung des angemeldeten Nutzers, und alles darunter
+              braucht die Inhalte, die er lädt.
+            */}
+            <DatenProvider>
+              <RepostProvider>
+                <ProfilProvider>
+                  <Root />
+                </ProfilProvider>
+              </RepostProvider>
+            </DatenProvider>
+          </EinstellungenProvider>
         </AuthProvider>
       </SupabaseProvider>
     </ThemeProvider>

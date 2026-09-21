@@ -15,8 +15,17 @@ import { colors, radius, sizes, spacing, themenStyles, typography, verlaufAus } 
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSupabase } from '../../contexts/SupabaseContext';
-import { ladeBanne, ladeEinstellungen, ladeStatistik, Statistik } from '../../lib/daten';
-import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
+import { ladeBanne, ladeStatistik, Statistik } from '../../lib/daten';
+import { useEinstellungen } from '../../contexts/EinstellungenContext';
+import {
+  EigenerKommentar,
+  GelikterBeitrag,
+  gelikteVon,
+  kommentarZeile,
+  kommentierteVon,
+  SichtbarkeitBereich,
+  SichtbarkeitStufe,
+} from '../../lib/aktionen';
 import { PASSWORT_REGEL, passwortAendern, passwortPruefen } from '../../lib/supabaseAuth';
 
 // Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
@@ -283,6 +292,15 @@ const SECTIONS: Section[] = [
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
       { label: 'Repost-Sichtbarkeit', icon: 'repeat-outline', sichtbar: 'repost' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart-outline', sichtbar: 'likes' },
+      /*
+       * Was mir gefallen hat, war nirgends abrufbar — `post_likes` wurde nur
+       * gelesen, um das Herz im Feed rot zu faerben. Hier und nicht als
+       * fuenfter Profilreiter: der Prototyp hat dort vier.
+       */
+      { label: 'Gelikte Beiträge', icon: 'heart-outline', liste: 'gelikt' },
+      // Die vierte Gattung aus Henriks Meldung vom 18.09.2026. Sie war die
+      // einzige, die bis zum 21.09. nirgends zu sehen war.
+      { label: 'Meine Kommentare', icon: 'chatbubble-outline', liste: 'kommentiert' },
       // Die beiden ueblichen Wege, auf denen Fremde an einem vorbeikommen.
       { label: 'Wer darf kommentieren', icon: 'chatbubble-ellipses-outline', sichtbar: 'kommentare' },
       { label: 'Wer darf mich markieren', icon: 'pricetag-outline', sichtbar: 'markierung' },
@@ -364,11 +382,13 @@ interface Props {
    * 07.09.2026 der Zusatz "Story auch in Videos teilen".
    */
   pruefSicht?: string | null;
+  /** Ebenso: die Liste, die beim Aufbau gleich aufgehen soll ("kommentiert"). */
+  pruefListe?: string | null;
   /** Zurueck zur vorherigen Seite (Profil/Messenger). */
   onBack?: () => void;
 }
 
-export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack, pruefSicht }: Props) => {
+export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack, pruefSicht, pruefListe }: Props) => {
   const { chats: alleChats, posts: alleBeitraege, users: alleNutzer } = useDaten();
   const { user, konten } = useContext(AuthContext);
   const { communities, istBlockiert, istStumm, raster, gefolgt, eigenesProfil, profilSpeichern } =
@@ -495,6 +515,30 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * Die Liste kommt aus demselben Zustand wie die Folgen-Knoepfe im Feed
      * (ProfilContext), damit beide immer dasselbe zeigen.
      */
+    if (art === 'gelikt') {
+      if (!gelikt) return { leer: 'Wird geladen …', zeilen: [] };
+      return {
+        leer: 'Dir hat noch nichts gefallen.',
+        zeilen: gelikt.map((b) => ({
+          text: b.titel,
+          neben: new Date(b.wann).toLocaleDateString('de-DE'),
+        })),
+      };
+    }
+    /*
+     * Die eigenen Kommentare. Zeilentext aus gemeinsam/kommentar.js, damit
+     * die Website daneben nicht ihre eigene Fassung baut.
+     */
+    if (art === 'kommentiert') {
+      if (!kommentiert) return { leer: 'Wird geladen …', zeilen: [] };
+      return {
+        leer: 'Du hast noch nichts kommentiert.',
+        zeilen: kommentiert.map((k) => ({
+          text: kommentarZeile(k),
+          neben: new Date(k.wann).toLocaleDateString('de-DE'),
+        })),
+      };
+    }
     if (art === 'gefolgt') {
       return {
         leer: 'Du folgst noch niemandem.',
@@ -560,40 +604,26 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    * geladen"; erst danach steht fest, was der Nutzer gewaehlt hat, und
    * vorher waere jeder Schalter eine Behauptung.
    */
-  const [einstellungen, setEinstellungen] = useState<Record<string, string> | null>(null);
-
-  useEffect(() => {
-    if (!supabase || !ichId) return;
-    ladeEinstellungen(supabase, ichId)
-      .then(setEinstellungen)
-      .catch((e: any) => {
-        console.error('Einstellungen laden fehlgeschlagen:', e?.message ?? e);
-        setEinstellungen({});
-      });
-  }, [supabase, ichId]);
+  /*
+   * Seit dem 17.09.2026 kommt beides aus dem `EinstellungenContext` statt aus
+   * einem eigenen Zustand hier. Vorher lud die App an drei Stellen getrennt
+   * (hier, App.tsx, MessengerProfileScreen) — drei Kopien, und keine wusste
+   * von den anderen. Wer hier etwas umlegte, sah die Wirkung anderswo erst
+   * nach einem Neustart: gespeichert ist nicht dasselbe wie angekommen.
+   */
+  const { einstellungen, setzen, an } = useEinstellungen();
 
   const wert = (item: Item) =>
     (item.wahlKey ? einstellungen?.[item.wahlKey] : undefined) ?? item.standard ?? '';
 
   /**
-   * Eine Einstellung umstellen: sofort anzeigen, dann schreiben — und bei
-   * einem Fehler zurueckdrehen. Dasselbe Vorgehen wie beim Herz.
+   * Eine Einstellung umstellen. Der Kontext zeigt sofort an, schreibt und
+   * dreht bei einem Fehler zurueck — hier bleibt nur die Meldung.
    */
   const einstellungSetzen = async (schluessel: string, neuerWert: string) => {
-    const vorher = einstellungen?.[schluessel];
-    setEinstellungen((prev) => ({ ...(prev ?? {}), [schluessel]: neuerWert }));
-
-    const gespeichert = await aktionen.einstellung(schluessel, neuerWert);
-    if (gespeichert === null) {
-      setEinstellungen((prev) => {
-        const kopie = { ...(prev ?? {}) };
-        if (vorher === undefined) delete kopie[schluessel];
-        else kopie[schluessel] = vorher;
-        return kopie;
-      });
-      return false;
-    }
-    return true;
+    const gespeichert = await setzen(schluessel, neuerWert);
+    if (!gespeichert) onNotice?.('Einstellung konnte nicht gespeichert werden');
+    return gespeichert;
   };
 
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
@@ -607,6 +637,14 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    */
   const [statistik, setStatistik] = useState<Statistik | null>(null);
 
+  /*
+   * `null` heisst „noch nicht geladen" und ist von „geladen, nichts drin"
+   * unterscheidbar. Ohne diesen Unterschied stuende beim Oeffnen fuer einen
+   * Wimpernschlag „Du hast noch nichts geliked" — also eine Falschaussage.
+   */
+  const [gelikt, setGelikt] = useState<GelikterBeitrag[] | null>(null);
+  const [kommentiert, setKommentiert] = useState<EigenerKommentar[] | null>(null);
+
   useEffect(() => {
     if (!supabase || !ichId) return;
     ladeBanne(supabase, ichId)
@@ -615,6 +653,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     ladeStatistik(supabase, ichId)
       .then(setStatistik)
       .catch((e: any) => console.error('Statistik laden fehlgeschlagen:', e?.message ?? e));
+    gelikteVon(supabase, ichId)
+      .then(setGelikt)
+      .catch((e: any) => console.error('Gelikte Beitraege laden fehlgeschlagen:', e?.message ?? e));
+    kommentierteVon(supabase, ichId)
+      .then(setKommentiert)
+      .catch((e: any) => console.error('Eigene Kommentare laden fehlgeschlagen:', e?.message ?? e));
   }, [supabase, ichId]);
 
   /** Stufe und Ausnahmen zu einem Bereich — ohne Eintrag gilt „alle". */
@@ -639,27 +683,11 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   };
   const { isDark, setTheme } = useContext(ThemeContext);
   /*
-   * Der Auslieferungszustand jedes Schalters. Was in `user_settings` steht,
-   * sticht ihn; was fehlt, gilt als dieser Wert. So braucht eine neue
-   * Einstellung keine Nachtraege fuer bestehende Konten.
+   * Der Auslieferungszustand steht jetzt in SCHALTER_STANDARD im
+   * EinstellungenContext — dort, wo ihn auch andere Bildschirme lesen
+   * koennen. `an()` zieht ihn selbst heran.
    */
-  const SCHALTER_STANDARD: Record<string, boolean> = {
-    videoPrivate: false,
-    commPrivate: false,
-    bildschirmsperre: false,
-    toene: true,
-    vibration: true,
-    vorschau: true,
-    lesebestaetigung: true,
-    entersenden: false,
-    datensparen: false,
-  };
-
-  const schalter = (schluessel: string) => {
-    const gespeichert = einstellungen?.[schluessel];
-    if (gespeichert === undefined) return SCHALTER_STANDARD[schluessel] ?? false;
-    return gespeichert === 'an';
-  };
+  const schalter = (schluessel: string) => an(schluessel);
 
   // Die Abstaende stehen erst nach dem ersten Zeichnen fest, deshalb der
   // kurze Aufschub - vorher waere offsets.current noch leer.
@@ -680,6 +708,21 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     const punkt = SECTIONS.flatMap((s) => s.items).find((i) => i.sichtbar === pruefSicht);
     if (punkt) setSichtOffen(punkt);
   }, [pruefSicht]);
+
+  /*
+   * Dasselbe für die Listen — "settings#liste:kommentiert".
+   *
+   * „Meine Kommentare" ist am 21.09.2026 dazugekommen. Ohne diesen Weg käme
+   * die Liste in keinem Prüfbild vor: die Einstellungen zeigen nur ihre
+   * Zeilen, der Inhalt steht erst hinter einem Fingertipp — und der lässt
+   * sich im Simulator von aussen nicht auslösen. Der Punkt wird wie oben in
+   * SECTIONS gesucht, nicht hier nachgebaut.
+   */
+  useEffect(() => {
+    if (!pruefListe) return;
+    const punkt = SECTIONS.flatMap((s) => s.items).find((i) => i.liste === pruefListe);
+    if (punkt) setOffen(punkt);
+  }, [pruefListe]);
 
   return (
     <View style={styles.screen}>
@@ -783,6 +826,17 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       onValueChange={(next) => {
                         if (item.toggle === 'theme') {
                           setTheme(next ? 'dark' : 'light');
+                          /*
+                           * Zusätzlich ins Konto, damit das Design auf der
+                           * Website und einem zweiten Gerät ankommt. Der
+                           * AsyncStorage im ThemeProvider bleibt der
+                           * Sofortwert für den nächsten Start — ohne ihn
+                           * blitzte die App beim Öffnen einmal hell auf.
+                           * Der Wert ist 'dark'/'light' und nicht 'an'/'aus',
+                           * weil 'system' als dritte Möglichkeit vorgesehen
+                           * ist. Gleiche Regel in web/public/app.js.
+                           */
+                          void einstellungSetzen('theme', next ? 'dark' : 'light');
                           return;
                         }
                         // 'an'/'aus' statt true/false: der Wert ist Text in

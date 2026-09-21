@@ -1,6 +1,6 @@
 /* Friend Map auf der Website prüfen (F1-F6, 09.09.2026). */
 const { chromium } = require('playwright-core');
-const { vorbereiten } = require('./_konto');
+const { vorbereiten, schliesse } = require('./_konto');
 const BASIS = process.env.AM_BASIS || 'http://localhost:3011';
 
 (async () => {
@@ -81,5 +81,5 @@ const BASIS = process.env.AM_BASIS || 'http://localhost:3011';
     console.log('F5 nach dem Tippen:', JSON.stringify(nach));
     await page.screenshot({ path: '/tmp/f5-zoom.png' });
   }
-  await browser.close();
+  await schliesse(browser);
 })();

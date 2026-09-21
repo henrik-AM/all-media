@@ -2215,6 +2215,23 @@ body:has(.camera) .toast { bottom: 132px; }
 .teilen__haken svg { width: 13px; height: 13px; }
 .teilen__kachel.is-gesendet .teilen__haken { display: flex; }
 .teilen__kachel.is-gesendet { opacity: .55; }
+/*
+ * Das Abzeichen am Avatar — Prototyp-Frame "Nutzer B + Beitrag teilen".
+ * Es sagt, wo diese Person die Nachricht bekommt: gruene Sprechblase =
+ * Messenger, Personensymbol = Community. Der Ring in Flaechenfarbe trennt es
+ * vom Avatarverlauf darunter; ohne ihn verschwimmt Gruen auf Gruen.
+ * Gleiche Regel in app/components/TeilenSheet.tsx.
+ */
+.teilen__bild { position: relative; display: inline-flex; }
+.teilen__marke {
+  position: absolute; right: -1px; bottom: -1px;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--surface); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.teilen__marke svg { width: 10px; height: 10px; }
+.teilen__marke--messenger { background: var(--online); }
+.teilen__marke--community { background: var(--brand); }
 
 /* --------------------------------------- Geteilter Beitrag im Chat */
 /*
@@ -2275,6 +2292,20 @@ body:has(.camera) .toast { bottom: 132px; }
   background: var(--surface-3); color: var(--text-3);
 }
 .msg__geteiltBild svg { width: 20px; height: 20px; }
+
+/* ------------------------------------------ Story-Bezug in der Nachricht */
+/*
+ * Ein Herz auf eine Story oder eine Antwort darauf (Schema 41). Die Vorschau
+ * steht ueber dem Text, damit erkennbar bleibt, worauf er sich bezieht.
+ * Gleiche Regel in app/screens/messenger/ChatDetailScreen.tsx.
+ */
+.msg__story { position: relative; display: inline-block; }
+.msg__storyMarke {
+  position: absolute; left: 6px; bottom: 10px;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(0,0,0,.55); color: #fff;
+  font-size: 11px; font-weight: 600;
+}
 .msg__geteiltText { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
 .msg__geteiltText span {
   color: var(--text-2);

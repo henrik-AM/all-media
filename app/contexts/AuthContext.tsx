@@ -20,6 +20,7 @@
 
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { AuthUser } from '../types';
 import {
   signUpWithEmail,
@@ -114,6 +115,47 @@ const nameAusMail = (email: string) => {
   const vorn = email.split('@')[0].replace(/[._-]+/g, ' ').trim();
   return vorn ? vorn.charAt(0).toUpperCase() + vorn.slice(1) : 'Konto';
 };
+
+/*
+ * Das eigene, echte Profil nachladen.
+ *
+ * BUG, GEFUNDEN AM 20.09.2026
+ *
+ * `login()` und `kontoHinzufuegen()` haben den angezeigten Namen bisher nie
+ * aus `public.profiles` gelesen, sondern aus der eingegebenen E-Mail-Adresse
+ * geraten (`nameAusMail`/`handleAusMail`). Für ein bestehendes Konto ist das
+ * fast nie der wirkliche Name — Henriks Testkonto etwa heisst in der
+ * Datenbank "Tanti", angemeldet über die normale Maske (kein Namensfeld dort)
+ * wäre daraus "Tanti" durch Zufall richtig, "all.media.prueflauf@web.de"
+ * würde aber als Name "All.media.prueflauf" zeigen.
+ *
+ * Der Kontenspeicher (`all-media.sitzung.v2`) merkt sich diesen geratenen
+ * Namen dauerhaft pro Kennung und liest ihn bei jedem App-Start ungeprueft
+ * wieder ein — ein einmal falscher Name blieb also stehen, auch nachdem sich
+ * das echte Profil längst geändert hatte. Jedes Konto bekommt jetzt seinen
+ * echten, individuellen Namen direkt aus der Datenbank.
+ */
+async function profilLaden(
+  client: SupabaseClient,
+  id: string,
+  fallbackName: string,
+  fallbackHandle: string
+) {
+  try {
+    const { data } = await client
+      .from('profiles')
+      .select('name, handle')
+      .eq('id', id)
+      .maybeSingle();
+    if (data?.name && data?.handle) {
+      return { name: data.name as string, handle: data.handle as string };
+    }
+  } catch (e) {
+    console.warn('Profil liess sich nicht laden:', e);
+  }
+  // Trigger noch nicht durchgelaufen (frisch registriert) oder Netzfehler.
+  return { name: fallbackName, handle: fallbackHandle };
+}
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { supabase, isConfigured } = useSupabase();
@@ -305,13 +347,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       const angemeldet = result.user!;
+      const echt = await profilLaden(
+        supabase,
+        angemeldet.id,
+        email.split('@')[0],
+        handleAusMail(email)
+      );
       const konto: AuthUser = {
         id: angemeldet.id,
         email: angemeldet.email || email,
         profile: {
           id: angemeldet.id,
-          name: email.split('@')[0],
-          handle: handleAusMail(email),
+          name: echt.name,
+          handle: echt.handle,
           status: 'online',
           about: '',
         },
@@ -321,7 +369,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setKonten((prev) => {
         const existiert = prev.find((k) => k.id === angemeldet.id);
-        return existiert ? prev : [...prev, konto];
+        return existiert ? prev.map((k) => (k.id === angemeldet.id ? konto : k)) : [...prev, konto];
       });
       merken(konto);
       setAktivId(angemeldet.id);
@@ -365,6 +413,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setAktivId(kontoId);
+
+      /*
+       * Heilt nebenbei einen veralteten Eintrag: stand hier durch den
+       * frueheren Rateweg (siehe profilLaden) einmal ein falscher Name, zieht
+       * spaetestens der naechste Wechsel auf dieses Konto den echten nach.
+       */
+      const bisher = konten.find((k) => k.id === kontoId);
+      if (bisher) {
+        const echt = await profilLaden(supabase, kontoId, bisher.profile.name, bisher.profile.handle);
+        if (echt.name !== bisher.profile.name || echt.handle !== bisher.profile.handle) {
+          setKonten((prev) =>
+            prev.map((k) =>
+              k.id === kontoId ? { ...k, profile: { ...k.profile, name: echt.name, handle: echt.handle } } : k
+            )
+          );
+        }
+      }
+
       return true;
     },
     [supabase, konten, aktivId]
@@ -466,19 +532,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       await sitzungSichern(supabase).catch(() => null);
 
+      /*
+       * Beim Anmelden eines BESTEHENDEN Kontos (Zweig oben, "Bestehendes
+       * Konto hinzufuegen") ist `anzeige`/`handle` nur die Vorbelegung aus
+       * der E-Mail — nicht der wirkliche Name, der schon im Profil steht.
+       * Ohne diesen Abgleich zeigte der Kontowechsel dann einen geratenen
+       * statt des eigenen, individuellen Profilnamens.
+       */
+      const echt = await profilLaden(supabase, angemeldet.id, anzeige, handle);
       const konto: AuthUser = {
         id: angemeldet.id,
         email: angemeldet.email || email,
         profile: {
           id: angemeldet.id,
-          name: anzeige,
-          handle,
+          name: echt.name,
+          handle: echt.handle,
           status: 'online',
           about: 'Hey, ich nutze All Media!',
         },
       };
 
-      setKonten((prev) => (prev.some((k) => k.id === konto.id) ? prev : [...prev, konto]));
+      setKonten((prev) =>
+        prev.some((k) => k.id === konto.id) ? prev.map((k) => (k.id === konto.id ? konto : k)) : [...prev, konto]
+      );
       merken(konto);
       setAktivId(angemeldet.id);
     },

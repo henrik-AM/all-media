@@ -27,10 +27,31 @@ interface Props {
   onOpenProfile: (userId: string) => void;
   /** Oeffnet das Teilen-Blatt mit dem Personen-Raster. */
   onShare: (post: Post) => void;
+  /**
+   * Kennung des Beitrags, bei dem der Feed aufgehen soll.
+   *
+   * Dafuer gibt es ihn: eine Kachel im Profil war bis zum 18.09.2026 nicht
+   * zu oeffnen — ein Fingertipp gab nur „Beitrag: <kennung>" als Hinweis aus.
+   * Ein eigener Detailbildschirm waere die zweite Stelle, an der ein Beitrag
+   * gezeichnet wird, mit eigenem Herz, eigenem Kommentarblatt und eigenem
+   * Teilen. Der Feed kann das alles schon; er muss nur an der richtigen
+   * Stelle anfangen.
+   */
+  startBei?: string | null;
+  /** Wird gerufen, sobald dorthin gesprungen wurde — einmal, nicht bei jedem Neubau. */
+  onStartErreicht?: () => void;
   onNotice: (message: string) => void;
 }
 
-export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, onNotice }: Props) => {
+export const HomeFeedScreen = ({
+  stories,
+  onOpenStory,
+  onOpenProfile,
+  onShare,
+  startBei,
+  onStartErreicht,
+  onNotice,
+}: Props) => {
   const { posts: alleBeitraege, users: alleNutzer, ichId } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Was hier passiert, geht in die Datenbank — siehe lib/useAktionen.ts.
@@ -64,6 +85,27 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
       return neue.length ? [...neue, ...prev] : prev;
     });
   }, [eigeneBeitraege]);
+
+  /*
+   * An den Beitrag springen, den das Profilraster gemeint hat.
+   *
+   * Erst wenn er wirklich in der Liste steht — beim ersten Aufbau ist sie
+   * leer, und ein Sprung ins Leere bliebe folgenlos, ohne dass jemand es
+   * merkt. `onStartErreicht` meldet zurueck, damit der Wunsch danach
+   * geloescht wird: sonst spraenge der Feed bei jedem Neubau wieder dorthin,
+   * und man kaeme nie mehr nach oben.
+   */
+  const liste = useRef<FlatList<Post>>(null);
+  useEffect(() => {
+    if (!startBei) return;
+    const platz = posts.findIndex((p) => p.id === startBei);
+    if (platz < 0) return;
+    // `viewPosition: 0` setzt den Beitrag an den oberen Rand — so, wie man es
+    // von einer geoeffneten Kachel erwartet.
+    liste.current?.scrollToIndex({ index: platz, viewPosition: 0, animated: false });
+    onStartErreicht?.();
+  }, [startBei, posts, onStartErreicht]);
+
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
 
   const update = (id: string, change: (post: Post) => Post) =>
@@ -333,9 +375,21 @@ export const HomeFeedScreen = ({ stories, onOpenStory, onOpenProfile, onShare, o
       </View>
 
       <FlatList
+        ref={liste}
         data={posts}
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
+        /*
+         * Beitraege sind unterschiedlich hoch (Bild, Beschreibung, Umfrage),
+         * eine feste Zeilenhoehe gaebe es also nicht ehrlich. Ohne sie kann
+         * `scrollToIndex` daneben greifen, solange die Zeile noch nicht
+         * gemessen ist — dann faengt FlatList selbst noch einmal an.
+         */
+        onScrollToIndexFailed={({ index }) => {
+          setTimeout(() => {
+            liste.current?.scrollToIndex({ index, viewPosition: 0, animated: false });
+          }, 120);
+        }}
         ListHeaderComponent={<StoryRail stories={stories} onPress={onOpenStory} />}
         /*
          * Mitschreiben, was tatsaechlich gesehen wurde — die Grundlage des

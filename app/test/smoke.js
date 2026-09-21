@@ -16,7 +16,7 @@
 // Testkommentare in der App zurueckbleiben.
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const { chatOffen } = require('./_warten');
@@ -432,7 +432,5 @@ const STRUCTURE = {
 
   console.log('');
   console.log(errs.length ? 'FEHLER:\n' + errs.join('\n') : 'Keine Konsolenfehler');
-  await b.close();
-
-  process.exit(failed > 0 || errs.length > 0 ? 1 : 0);
+  await beenden(b, failed > 0 || errs.length > 0 ? 1 : 0);
 })();

@@ -27,6 +27,7 @@
 // waehrenddessen unmoeglich.
 
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 const { execSync, execFileSync } = require('child_process');
 const { pruefgeraet, fensterZuklappen, dialogBestaetigen, EXPO_GO_ID } = require('./pruefgeraet');
@@ -128,6 +129,20 @@ const SEITEN = [
    * auch in Videos teilen", der nur bei der Stufe "Alle" bedienbar ist.
    */
   ['settings#sicht:story', 'detail-sichtbarkeit-story'],
+  /*
+   * „Meine Kommentare", die vierte der Gattungen aus Henriks Rueckmeldung vom
+   * 18.09.2026. Die drei anderen (Likes, Reposts, Gespeichertes) waren am
+   * selben Tag nachgezogen worden; diese fehlte bis zum 21.09.2026 ganz. Ohne
+   * dieses Bild zeigte kein Pruefbild, ob in der Liste wirklich Zeilen stehen
+   * — die Einstellungen selbst zeigen nur ihre Ueberschrift.
+   */
+  ['settings#liste:kommentiert', 'detail-meine-kommentare'],
+  /*
+   * Das Optionsblatt eines Community-Zweierchats. Darin steht der Weg in den
+   * Messenger, den Henrik am 18.09.2026 verlangt hat — bis zum 21.09.2026 war
+   * er nur typgeprueft und in keinem Bild zu sehen.
+   */
+  ['communities/chats#chatopt:Greta Hoffmann', 'detail-chatoptionen-community'],
   // Die zwei Bildschirme aus Henriks Profil-Feedback vom 07.09.2026: der
   // Zurueck-Pfeil in den Einstellungen und die Kontoliste mit den frueheren
   // Konten. Beide kommen nur ueber einen Fingertipp zustande.
@@ -343,21 +358,97 @@ function metroLaeuft() {
 
   log(`  ${gewaehlt.length} Bildschirme, je rund 35 s — das dauert etwa ${Math.ceil(gewaehlt.length * 38 / 60)} Minuten.`);
   let fertig = 0;
+  // Bildschirme, die nie ueber den Ladebildschirm hinauskamen. Sie am Schluss
+  // zu nennen ist der ganze Zweck: ein Bild, das nichts zeigt, ist schlimmer
+  // als ein fehlendes — es sieht aus wie ein Ergebnis.
+  /** Je Bildschirm ein Fingerabdruck — die Gegenprobe steht ganz unten. */
+  const abdruecke = [];
   for (const [bereich, name] of gewaehlt) {
     speicherSchreiben(datei, bereich);
     appNeuStarten();
-    // Expo Go braucht einen Moment zum Laden des Bundles. 14 Sekunden waren zu
-    // knapp: am 27.08.2026 kamen zwei Durchlaeufe hintereinander mit einem
-    // Bild vom Ladebalken zurueck, und das faellt beim Durchsehen nicht
-    // sofort auf. Das Bundle ist durch das Vorwaermen oben zwar gebaut, Expo
-    // Go muss es aber je Neustart neu holen und auswerten.
-    schlaf(35000);
-    execFileSync('xcrun', ['simctl', 'io', GERAET, 'screenshot', path.join(ZIEL, `${name}.png`)], {
-      stdio: 'ignore',
-      timeout: 60000,
+
+    /*
+     * WARTEN, BIS DIE APP DA IST — NICHT EINE FESTE ZAHL ABSITZEN
+     *
+     * Hier stand `schlaf(35000)`, davor `schlaf(14000)`. Beides ist geraten,
+     * und beides ging schief: am 27.08.2026 kamen zwei Durchlaeufe mit einem
+     * Bild vom Ladebalken zurueck, am 18.09.2026 fuenf Bilder von
+     * „Loading project…" — und das Werkzeug meldete beide Male brav
+     * „5 Bilder in bilder/app-hell/".
+     *
+     * Eine feste Wartezeit kann gar nicht stimmen: nach einer Aenderung an
+     * einer viel benutzten Datei baut Metro das 7-MB-Bundle neu, und Expo Go
+     * muss es je Neustart erneut holen und auswerten. Mal sind es zehn
+     * Sekunden, mal neunzig.
+     *
+     * Also nicht schaetzen, sondern nachsehen. Der Ladebildschirm von Expo Go
+     * ist bis auf die Uhr in der Statusleiste immer dasselbe Bild — zwei
+     * verschiedene Bildschirme ergeben deshalb nie fast gleich grosse
+     * Dateien. Gemessen wird: solange sich die Bildgroesse von Aufnahme zu
+     * Aufnahme noch aendert, laedt die App; steht sie still, ist der
+     * Bildschirm fertig. Bleibt sie bis zum Schluss beim Startwert, war nie
+     * etwas anderes zu sehen als der Ladebildschirm — und dann sagt das
+     * Werkzeug das, statt eine Zahl zu melden.
+     */
+    /*
+     * WARTEN, BIS DIE APP DA IST — UND DAS RICHTIG MESSEN
+     *
+     * Zwei Anlaeufe davor, beide falsch:
+     *
+     *   18.09.2026  „warten, bis sich die Bildgroesse nicht mehr aendert".
+     *               Der Ladebildschirm von Expo Go steht selbst still — er
+     *               war sechzig Sekunden byteweise identisch. Stabil heisst
+     *               nicht fertig.
+     *   19.09.2026  „warten, bis das Bild anders ist als die erste Aufnahme".
+     *               Ist das Buendel warm, steht die App schon beim ersten
+     *               Foto da. Dann aendert sich nichts mehr, das Werkzeug
+     *               wartete die vollen 180 Sekunden ab und nannte am Ende
+     *               ein tadelloses App-Bild „vermutlich Ladebildschirm"
+     *               (20.09.2026, videos-profil).
+     *
+     * Beide Male wurde aus EINEM Bild geschlossen, was sich an einem
+     * einzelnen Bild gar nicht ablesen laesst. Hier wird deshalb nur noch
+     * gewartet, bis sich nichts mehr bewegt — und die Frage „ist das
+     * ueberhaupt die App?" beantwortet der Vergleich der Bildschirme
+     * UNTEREINANDER, weiter unten: der Ladebildschirm sieht auf jeder Seite
+     * gleich aus, ein echter Bildschirm nie.
+     */
+    const bild = path.join(ZIEL, `${name}.png`);
+    const knipsen = () => {
+      execFileSync('xcrun', ['simctl', 'io', GERAET, 'screenshot', bild], {
+        stdio: 'ignore',
+        timeout: 60000,
+      });
+      return fs.statSync(bild).size;
+    };
+
+    schlaf(8000);
+    let letzte = knipsen();
+    let gewartet = 8;
+
+    // Drei Minuten. Wer laenger braucht, hat ein Problem, das man sehen soll.
+    while (gewartet < 180) {
+      schlaf(6000);
+      gewartet += 6;
+      const jetzt = knipsen();
+      // Zwei Aufnahmen hintereinander praktisch gleich gross: es bewegt sich
+      // nichts mehr, der Aufbau ist durch.
+      if (Math.abs(jetzt - letzte) <= letzte / 200) {
+        letzte = jetzt;
+        break;
+      }
+      letzte = jetzt;
+    }
+
+    abdruecke.push({
+      name,
+      hash: crypto.createHash('sha256').update(fs.readFileSync(bild)).digest('hex'),
     });
-    const groesse = fs.statSync(path.join(ZIEL, `${name}.png`)).size;
-    log(`  ${String(++fertig).padStart(2)}/${gewaehlt.length}  ${name}.png  (${Math.round(groesse / 1024)} kB)`);
+
+    log(
+      `  ${String(++fertig).padStart(2)}/${gewaehlt.length}  ${name}.png  ` +
+        `(${Math.round(letzte / 1024)} kB, ${gewartet} s)`
+    );
     // Simulator.app klappt das Fenster beim Starten der App gern wieder auf.
     fensterZuklappen();
   }
@@ -368,5 +459,45 @@ function metroLaeuft() {
   fs.writeFileSync(datei, JSON.stringify(daten));
   appNeuStarten();
 
-  log(`\n  ${gewaehlt.length} Bilder in bilder/${DUNKEL ? 'app-dunkel' : 'app-hell'}/`);
+  const ordner = `bilder/${DUNKEL ? 'app-dunkel' : 'app-hell'}/`;
+
+  /*
+   * DIE GEGENPROBE: SEHEN DIE BILDSCHIRME UEBERHAUPT VERSCHIEDEN AUS?
+   *
+   * Die Zahl allein ist keine Auskunft. „5 Bilder in bilder/app-hell/" stand
+   * schon ueber fuenf Aufnahmen des Ladebildschirms — zweimal. Wer nur die
+   * Zeile liest und die Bilder nicht oeffnet, haelt das fuer ein Ergebnis.
+   *
+   * Woran sich der Ladebildschirm zuverlaessig erkennen laesst, ist nicht
+   * das einzelne Bild, sondern die Wiederholung: er sieht auf jeder Seite
+   * gleich aus. Zwei Bildschirme der App tun das nie — anderes Bild, andere
+   * Datei, anderer Fingerabdruck.
+   */
+  const nachName = new Map();
+  for (const a of abdruecke) nachName.set(a.hash, [...(nachName.get(a.hash) || []), a.name]);
+  const doppelt = [...nachName.values()].filter((n) => n.length > 1);
+
+  if (doppelt.length) {
+    log(`\n  ⚠️  GLEICHE BILDER: ${doppelt.map((n) => n.join(' = ')).join('  |  ')}`);
+    log('     Verschiedene Bildschirme koennen nicht dasselbe Bild ergeben.');
+    log('     Entweder stand ueberall der Ladebildschirm von Expo Go, oder die');
+    log('     App ist gar nicht auf den gewaehlten Bildschirm gesprungen.');
+    log('     Meist hilft es, das Buendel vorher einmal zu holen');
+    log('     (curl http://127.0.0.1:8081/index.bundle?platform=ios&dev=true)');
+    log('     und den Lauf zu wiederholen.\n');
+    process.exitCode = 1;
+    return;
+  }
+
+  if (abdruecke.length < 2) {
+    log(`\n  1 Bild in ${ordner}: ${abdruecke[0] ? abdruecke[0].name : '—'}.png`);
+    log('     Ob darauf die App steht, kann dieser Lauf NICHT sagen: dafuer');
+    log('     braeuchte er einen zweiten Bildschirm zum Vergleichen. Ansehen.\n');
+    return;
+  }
+
+  log(
+    `\n  ${gewaehlt.length} Bilder in ${ordner} — alle verschieden, also keine` +
+      ' Ladebildschirme. Wie sie aussehen, sagt nur das Ansehen.'
+  );
 })();

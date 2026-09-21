@@ -55,6 +55,18 @@ export const zeitText = (minuten: number) => {
   return `vor ${Math.floor(tage / 30)} M`;
 };
 
+/**
+ * Woran ein Herz hängen kann. Seit Schema 49 gibt es auch Herzen an
+ * Kommentaren — ohne diese Liste hieße es dort "gefällt dein Beitrag".
+ * Dieselbe Liste steht in web/server/app.js: App und Website sagen denselben
+ * Satz.
+ */
+const GEGENSTAND: Record<string, string> = {
+  video: 'Video',
+  comment: 'Kommentar',
+  post: 'Beitrag',
+};
+
 const mitteilungText = (
   m: Mitteilung,
   communities: Community[],
@@ -65,7 +77,7 @@ const mitteilungText = (
 
   switch (m.art) {
     case 'like':
-      return `${name} gefällt dein ${m.ziel.art === 'video' ? 'Video' : 'Beitrag'}.`;
+      return `${name} gefällt dein ${GEGENSTAND[m.ziel.art] ?? 'Beitrag'}.`;
     case 'follow':
       return `${name} folgt dir jetzt.`;
     case 'comment':
@@ -73,7 +85,13 @@ const mitteilungText = (
     case 'repost':
       return `${name} hat dein Video repostet.`;
     case 'mention':
-      return `${name} hat dich in einem Kommentar erwähnt.`;
+      return m.ziel.art === 'post'
+        ? `${name} hat dich in einem Beitrag markiert.`
+        : `${name} hat dich in einem Kommentar erwähnt.`;
+    case 'anfrage':
+      return `${name} möchte mit dir schreiben.`;
+    case 'anfrage_ok':
+      return `${name} hat deine Anfrage angenommen.`;
     case 'story':
       return `${name} hat auf deine Story geantwortet.`;
     case 'kanal':
@@ -109,6 +127,11 @@ interface ProfilWert {
   clips: Clip[];
   highlights: string[];
   playlists: string[];
+  /** Dieselben Sammlungen, aber mit Inhalt: Anzahl und Vorschaubild. */
+  sammlungen: Aktion.Sammlung[];
+  /** Was in einer Sammlung liegt — wird erst beim Oeffnen geholt. */
+  sammlungOeffnen: (id: string) => Promise<Aktion.Rasterkachel[]>;
+  sammlungLoeschen: (s: Aktion.Sammlung) => void;
   spende: Spende | null;
   raster: RasterEintrag[];
 
@@ -242,6 +265,23 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * Website erschien es nie. Der Zustand hier bleibt — er macht die Anzeige
    * sofort richtig — aber er ist nicht mehr das Einzige, was passiert.
    */
+  /*
+   * Die Sammlungen holen — eigenstaendig, nicht ueber DatenContext.
+   *
+   * DatenContext laedt einmal beim Start. Eine Sammlung aendert sich aber
+   * jedes Mal, wenn jemand etwas einsortiert; sie muss also nachladbar sein,
+   * ohne den gesamten Bestand neu zu ziehen.
+   */
+  const sammlungenLaden = useCallback(() => {
+    if (!supabase || !daten.ichId) return;
+    Promise.all([
+      Aktion.sammlungenVon(supabase, daten.ichId, 'playlist'),
+      Aktion.sammlungenVon(supabase, daten.ichId, 'highlight'),
+    ])
+      .then(([pl, hl]) => setSammlungen([...pl, ...hl]))
+      .catch((e: any) => console.error('Sammlungen laden fehlgeschlagen:', e?.message ?? e));
+  }, [supabase, daten.ichId]);
+
   const schreiben = useCallback(
     (was: string, tun: (c: any, ich: string) => Promise<unknown>, zurueck: () => void) => {
       if (!supabase || !daten.ichId) return;
@@ -261,6 +301,15 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const [clips, setClips] = useState<Clip[]>([]);
   const [highlights, setHighlights] = useState<string[]>([]);
   const [playlists, setPlaylists] = useState<string[]>([]);
+  /*
+   * Seit Schema 46 haben Highlights und Playlists einen Inhalt.
+   *
+   * `highlights` und `playlists` oben sind die alten Namenslisten aus
+   * `profiles`. Sie bleiben vorerst stehen, weil an ihnen noch das Anlegen
+   * haengt; gelesen wird im Profil aber aus `sammlungen` — nur dort steht,
+   * was darin liegt, und nur daraus laesst sich ein Vorschaubild bilden.
+   */
+  const [sammlungen, setSammlungen] = useState<Aktion.Sammlung[]>([]);
   const [spende, setSpende] = useState<Spende | null>(null);
   const [raster, setRaster] = useState<RasterEintrag[]>([]);
   const [geteiltZaehler, setGeteiltZaehler] = useState<Record<string, number>>({});
@@ -568,6 +617,18 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, [inDatenbank]);
 
+  useEffect(() => {
+    sammlungenLaden();
+  }, [sammlungenLaden]);
+
+  const sammlungOeffnen = useCallback(
+    async (id: string) => {
+      if (!supabase) return [];
+      return Aktion.sammlungInhalt(supabase, id);
+    },
+    [supabase]
+  );
+
   /*
    * Highlights und Playlists sind zwei Textlisten in der eigenen Profilzeile.
    * Sie standen in der App nur hier im Zustand: nach dem naechsten Start
@@ -578,24 +639,67 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     (name: string) => {
       if (highlights.includes(name)) return 'Dieses Highlight gibt es schon';
       setHighlights((prev) => [...prev, name]);
-      schreiben('Das Highlight', (c, ich) => Aktion.profilListe(c, ich, 'highlights', name), () =>
-        setHighlights((prev) => prev.filter((h) => h !== name))
+      schreiben(
+        'Das Highlight',
+        // Beides: die alte Namensliste, an der die Website noch haengt, und
+        // die Sammlung, die den Inhalt traegt. Solange die alte Liste
+        // gelesen wird, waere nur eines von beidem ein Auseinanderlaufen.
+        async (c, ich) => {
+          await Aktion.profilListe(c, ich, 'highlights', name);
+          await Aktion.sammlungAnlegen(c, ich, 'highlight', name);
+          sammlungenLaden();
+        },
+        () => setHighlights((prev) => prev.filter((h) => h !== name))
       );
       return null;
     },
-    [highlights, schreiben]
+    [highlights, schreiben, sammlungenLaden]
   );
 
   const playlistAnlegen = useCallback(
     (name: string) => {
       if (playlists.includes(name)) return 'Diese Playlist gibt es schon';
       setPlaylists((prev) => [...prev, name]);
-      schreiben('Die Playlist', (c, ich) => Aktion.profilListe(c, ich, 'playlists', name), () =>
-        setPlaylists((prev) => prev.filter((p) => p !== name))
+      schreiben(
+        'Die Playlist',
+        async (c, ich) => {
+          await Aktion.profilListe(c, ich, 'playlists', name);
+          await Aktion.sammlungAnlegen(c, ich, 'playlist', name);
+          sammlungenLaden();
+        },
+        () => setPlaylists((prev) => prev.filter((p) => p !== name))
       );
       return null;
     },
-    [playlists, schreiben]
+    [playlists, schreiben, sammlungenLaden]
+  );
+
+  /*
+   * Eine Sammlung wieder loeschen. Bis zum 20.09.2026 gab es diesen Weg
+   * nicht: anlegen ging, loeschen nicht.
+   *
+   * Der Name muss auch aus der alten Textliste heraus, sonst steht der Kreis
+   * nach dem naechsten Start wieder da — nur ohne id und ohne Inhalt.
+   * Gegenstueck zu highlightAnlegen / playlistAnlegen.
+   */
+  const sammlungLoeschen = useCallback(
+    (s: Aktion.Sammlung) => {
+      const spalte = s.art === 'highlight' ? 'highlights' : 'playlists';
+      const vorher = s.art === 'highlight' ? highlights : playlists;
+      const setzen = s.art === 'highlight' ? setHighlights : setPlaylists;
+
+      setzen((prev) => prev.filter((n) => n !== s.name));
+      schreiben(
+        s.art === 'highlight' ? 'Das Highlight' : 'Die Playlist',
+        async (c, ich) => {
+          await Aktion.sammlungLoeschen(c, s.id);
+          await Aktion.profilListeOhne(c, ich, spalte, s.name);
+          sammlungenLaden();
+        },
+        () => setzen(vorher)
+      );
+    },
+    [highlights, playlists, schreiben, sammlungenLaden]
   );
 
   /*
@@ -957,6 +1061,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       clips,
       highlights,
       playlists,
+      sammlungen,
+      sammlungOeffnen,
+      sammlungLoeschen,
       spende,
       raster,
       beitragAnlegen,
@@ -998,6 +1105,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
+      sammlungen, sammlungOeffnen, sammlungLoeschen,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       aufzeichnungAnlegen, clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
       chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,

@@ -12,7 +12,7 @@
 // Start:  node test/_profil.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -40,8 +40,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -130,11 +129,25 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Der Pfeil oben links fuehrt zurueck ins Profil', async () => {
     await page.click('[data-sheet-close]').catch(() => {});
-    await page.waitForTimeout(300);
-    const zurueck = await page.$('#settingsBack');
-    if (!zurueck) throw new Error('kein Zurueck-Pfeil');
-    await zurueck.click();
-    await page.waitForTimeout(400);
+    /*
+     * Ueber den Waehler klicken, nicht ueber einen vorher geholten Knoten.
+     *
+     * Am 21.09.2026 kippte die Pruefung im Gesamtlauf mit „Element is not
+     * attached to the DOM": zwischen dem `$('#settingsBack')` und dem Klick
+     * zeichnet die Seite ihre Kopfzeile neu, und der Knoten in der Hand ist
+     * dann ein anderer als der auf dem Bildschirm. `page.click` sucht ihn
+     * beim Klicken erneut. Einzeln lief derselbe Lauf gruen — der Unterschied
+     * war nur, wie viel sonst gerade lief.
+     */
+    await page.waitForSelector('#settingsBack', { timeout: 10000 });
+    await page.click('#settingsBack');
+    // Auf das Ziel warten statt auf die Uhr: die 400 ms waren eine Wette.
+    await page
+      .waitForFunction(
+        () => document.querySelector('.navbtn.is-active')?.dataset.area === 'messenger',
+        null, { timeout: 10000 }
+      )
+      .catch(() => {});
     const aktiv = await page.$eval('.navbtn.is-active', (n) => n.dataset.area);
     const sub = await page.$eval('#topbar .is-active', (n) => n.dataset.sub);
     if (aktiv !== 'messenger' || sub !== 'profile') throw new Error(`landet bei ${aktiv}/${sub}`);
@@ -142,7 +155,13 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Die dicke Schrift fuehrt weiterhin in die Haupt-Einstellungen', async () => {
     await page.click('[data-mact="settings"]');
-    await page.waitForTimeout(500);
+    // Dieselbe Stelle, derselbe Grund: gewartet wird, bis die Abschnitte da
+    // sind, nicht eine halbe Sekunde ins Blaue.
+    await page
+      .waitForFunction(() => document.querySelectorAll('.pill[data-jump]').length >= 9, null, {
+        timeout: 10000,
+      })
+      .catch(() => {});
     const abschnitte = await page.$$eval('.pill[data-jump]', (n) => n.length);
     if (abschnitte < 9) throw new Error('nur ' + abschnitte + ' Abschnitte');
     const blatt = await page.$('[data-wahl]');
@@ -323,12 +342,41 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (pl[0].grund === hl[0].grund) throw new Error('beide tragen denselben Verlauf');
   });
 
-  await pruefe('Zwei Playlists sind voneinander zu unterscheiden', async () => {
-    const bilder = await page.$$eval('.highlight__ring.is-playlist .motiv', (n) =>
-      n.map((x) => getComputedStyle(x).backgroundImage)
+  /*
+   * Diese Pruefung hiess bis zum 20.09.2026 „Zwei Playlists sind voneinander
+   * zu unterscheiden" und verlangte von JEDER Playlist ein eigenes Motiv. Sie
+   * war gruen — weil die Website sich die Bilder ausgedacht hat:
+   *
+   *   const bild = i % 2 === name.length % 2 ? …
+   *
+   * Ein Name entschied ueber das Bild, nicht der Inhalt. Seit die Kreise ihr
+   * echtes Titelbild tragen (SCHEMA_46), sehen zwei LEERE Playlists gleich
+   * aus, und das ist richtig: es gibt nichts, wovon ein Bild das Bild waere.
+   * Gefragt ist also nicht „alle verschieden", sondern der Unterschied, den
+   * es wirklich gibt — gefuellt traegt ein Bild, leer nicht.
+   */
+  await pruefe('Eine gefuellte Playlist traegt ihr Titelbild, eine leere nicht', async () => {
+    // Ein gefuellter Kreis traegt ein <img class="eigenbild"> mit dem
+    // unterschriebenen Titelbild, ein leerer nur die Farbflaeche .motiv.
+    const kreise = await page.$$eval('.highlight[data-sammlung="playlist"]', (n) =>
+      n.map((x) => ({
+        name: x.querySelector('.highlight__label')?.textContent?.trim() || '',
+        bild: x.querySelector('.highlight__ring img.eigenbild')?.getAttribute('src') || '',
+      }))
     );
-    if (bilder.length < 2) throw new Error('nur ' + bilder.length + ' Playlist');
-    if (new Set(bilder).size !== bilder.length) throw new Error('gleiches Motiv');
+    if (kreise.length < 2) throw new Error('nur ' + kreise.length + ' Playlist');
+
+    // Der Testbestand fuellt „Später ansehen" und laesst „Zum Prüfen" leer
+    // (SUPABASE_SCHEMA_47_sammlungen_testbestand.sql). Herum liegt es so,
+    // weil andere Laeufe selbst etwas in „Zum Prüfen" legen.
+    const voll = kreise.find((k) => k.name === 'Später ansehen');
+    const leer = kreise.find((k) => k.name === 'Zum Prüfen');
+    if (!voll || !leer) {
+      throw new Error('Testbestand fehlt, gefunden: ' + kreise.map((k) => k.name).join(', '));
+    }
+    if (!voll.bild) throw new Error('„Später ansehen" hat kein Titelbild');
+    if (!/token=/.test(voll.bild)) throw new Error('das Titelbild ist nicht unterschrieben: ' + voll.bild);
+    if (leer.bild) throw new Error('„Zum Prüfen" ist leer und zeigt trotzdem ein Bild');
   });
 
   await pruefe('Eine Playlist laesst sich oeffnen und wieder schliessen', async () => {
@@ -374,6 +422,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
 
-  await browser.close();
-  process.exit(erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
+  await beenden(browser, erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
 })();

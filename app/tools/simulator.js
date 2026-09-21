@@ -50,6 +50,22 @@ function serverLaeuft() {
 // Darum zwei Aenderungen: gesucht wird genau das gewuenschte Geraet, und alle
 // simctl-Aufrufe sprechen es ueber seine UDID an. "booted" ist mehrdeutig,
 // sobald zwei Simulatoren laufen, und simctl bricht dann ab.
+// Das sichtbare Fenster. Bis Xcode 26 hiess die App "Simulator", seit Xcode 27
+// heisst sie "DeviceHub" und liegt in Xcode.app. "open -a Simulator" lief hier
+// am 18.09.2026 ins Leere ("Unable to find application named 'Simulator'") -
+// der Simulator war gebootet, aber kein Fenster kam hoch. Ohne Fenster liefert
+// "simctl io ... screenshot" ausserdem ein eingefrorenes altes Bild.
+function fensterOeffnen() {
+  const kandidaten = [
+    '/Applications/Xcode.app/Contents/Applications/DeviceHub.app',
+    '/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app',
+  ];
+  for (const pfad of kandidaten) {
+    if (fs.existsSync(pfad)) { still(`open -a "${pfad}"`); return; }
+  }
+  log('  Kein Simulator-Fenster gefunden (weder DeviceHub noch Simulator).');
+}
+
 function simulatorStarten() {
   const zeile = still('xcrun simctl list devices')
     .split('\n')
@@ -65,7 +81,7 @@ function simulatorStarten() {
     log(`  Simulator "${GERAET}" wird gestartet ...`);
     still(`xcrun simctl boot ${ZIEL}`);
   }
-  still('open -a Simulator');
+  fensterOeffnen();
   schlaf(6000);
 }
 

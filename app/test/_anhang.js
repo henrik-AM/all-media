@@ -5,7 +5,7 @@
 // Start:  node test/_anhang.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 const fs = require('fs');
 const path = require('path');
@@ -47,8 +47,7 @@ if (!fs.existsSync(BILD)) {
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -204,8 +203,29 @@ if (!fs.existsSync(BILD)) {
   console.log('\nWeitere Optionen im Profil');
 
   await pruefe('Der Mehr-Knopf zeigt fuenf Optionen', async () => {
+    /*
+     * Erst den Hinweis abwarten, dann die Leiste anklicken.
+     *
+     * Die Prüfung davor verschickt ein Foto; der Zettel „Foto gesendet" liegt
+     * danach ueber der unteren Leiste und faengt jeden Klick ab. Im
+     * Gesamtlauf kippte die Pruefung daran (21.09.2026) — einzeln nicht, weil
+     * der Zettel dort laengst weg war. Gewartet wird auf sein Verschwinden,
+     * nicht auf eine Zahl von Millisekunden.
+     */
+    await page
+      .waitForFunction(
+        // Der Zettel wird ueber `hidden` gesteuert (toast() in
+        // web/public/app.js, 2200 ms). Eine Klasse gibt es dafuer nicht — auf
+        // sie zu pruefen waere sofort wahr und damit gar keine Pruefung.
+        () => {
+          const t = document.querySelector('#toast');
+          return !t || t.hidden;
+        },
+        null, { timeout: 10000 }
+      )
+      .catch(() => {});
     await page.click('[data-area="videos"]');
-    await page.waitForTimeout(600);
+    await page.waitForSelector('.post__name[data-profile]', { timeout: 10000 });
     /*
      * Ein FREMDES Profil — nicht das erste im Feed.
      *
@@ -298,6 +318,5 @@ if (!fs.existsSync(BILD)) {
   console.log(`\n${ergebnisse.length - fehler} von ${ergebnisse.length} Pruefungen bestanden`);
   console.log(eindeutig.length ? 'Konsolenfehler:\n' + eindeutig.join('\n') : 'Konsolenfehler: keine');
 
-  await browser.close();
-  process.exit(fehler || eindeutig.length ? 1 : 0);
+  await beenden(browser, fehler || eindeutig.length ? 1 : 0);
 })();

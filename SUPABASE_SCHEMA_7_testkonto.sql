@@ -2,6 +2,34 @@
 -- All Media — Schema 7: eigene Testinhalte für jedes Konto
 -- ===========================================================================
 --
+-- ⚠️  DIESE DATEI NICHT ALLEIN NACHTRÄGLICH EINSPIELEN.
+--
+-- Sie definiert weiter unten Regeln neu, die SPÄTERE Schemata verschärft
+-- haben. Wer sie einzeln einspielt, dreht diese Verschärfungen zurück — ohne
+-- eine einzige Fehlermeldung:
+--
+--   Zeile ~588  "Mitglieder hinzufuegen" auf chat_members
+--               -> verliert die DM-Sperre aus Schema 22
+--   Zeile ~549  "Aktuelle Storys lesen" auf stories
+--               -> verliert die Sichtbarkeitsstufen aus Schema 19/20
+--   Zeile ~801  "Medien lesen" auf storage.objects
+--               -> macht die Ablage wieder OHNE ANMELDUNG lesbar
+--               (Schema 23/24 hatten das geschlossen)
+--
+-- Am 18.09.2026 ist genau das passiert: die Fixture-Korrektur weiter unten
+-- wurde eingespielt, indem die ganze Datei noch einmal lief. Danach fielen
+-- `test:dmsperre`, `test:sichtbarkeit` und `test:datenbank` — und der
+-- Medienspeicher stand für zwanzig Minuten offen.
+--
+-- Muss etwas aus dieser Datei nachgezogen werden: nur den betroffenen Block
+-- ausführen, oder danach in dieser Reihenfolge nachziehen:
+--
+--   19_sichtbarkeit_wirkt, 20_sichtbarkeit_rest, 22_dm_sperre,
+--   23_audit, 23_sicherheit, 24_medien_auflisten, 27_sichtbarkeitspruefer
+--
+-- Die drei Prüfläufe oben fangen den Fehler zuverlässig — aber erst
+-- hinterher.
+--
 -- Wofür diese Datei da ist
 -- ------------------------
 -- Schema 6 hat die geteilte Welt gefüllt: Annas Beiträge, die Sounds, die
@@ -375,21 +403,39 @@ begin
 
   -- --- Merkliste --------------------------------------------------------
   -- Zwei fremde Beiträge gemerkt, damit der Reiter „Gespeichert" nicht leer
-  -- ist. Welche das sind, ist gleichgültig — deshalb die zwei neuesten
-  -- Beispielbeiträge, die nicht dem Konto selbst gehören.
+  -- ist.
+  --
+  -- WELCHE das sind, ist NICHT gleichgültig — das stand hier bis zum
+  -- 18.09.2026 und war der Fehler. Die Bedingung lautete nur
+  -- `b.demo and b.user_id <> ziel`, also „irgendein fremder Testbeitrag".
+  -- Diese Funktion legt aber JEDEM Konto eigene Testbeiträge an: `demo` ist
+  -- dort true, der Besitzer ist trotzdem ein echtes Profil. Und für genau
+  -- die sagt `beitrag_sichtbar()` nein — sie gehören niemandem, der ein
+  -- Demoprofil ist, und nicht dem Fragenden.
+  --
+  -- Die Merkliste griff damit fast immer in die Starterinhalte eines anderen
+  -- echten Kontos, und der Reiter „Gespeichert" blieb leer: zwei Zeilen in
+  -- `saves`, null lesbare Beiträge dahinter. Kein Fehler, keine Meldung,
+  -- nichts zu sehen.
+  --
+  -- Deshalb jetzt ausdrücklich: nur Beiträge von DEMOPROFILEN (Anna, Bob …).
+  -- Die sind für jeden sichtbar, und dafür gibt es sie.
   insert into public.saves (user_id, post_id)
   select ziel, b.id
   from public.posts b
-  where b.demo and b.user_id <> ziel
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel
   order by b.created_at desc
   limit 2
   on conflict do nothing;
 
   -- --- Repost -----------------------------------------------------------
+  -- Dieselbe Bedingung, aus demselben Grund.
   insert into public.reposts (user_id, post_id)
   select ziel, b.id
   from public.posts b
-  where b.demo and b.user_id <> ziel and b.kind = 'reel'
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel and b.kind = 'reel'
   order by b.created_at desc
   limit 1
   on conflict do nothing;
@@ -398,15 +444,22 @@ begin
   insert into public.post_likes (user_id, post_id)
   select ziel, b.id
   from public.posts b
-  where b.demo and b.user_id <> ziel
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel
   order by b.created_at desc
   limit 3
   on conflict do nothing;
 
   -- --- Ein eigener Kommentar --------------------------------------------
+  -- `p.demo` ist Pflicht, nicht Geschmack: `b.demo` allein trifft auch die
+  -- Starterbeiträge anderer echter Konten, und die verbirgt
+  -- beitrag_sichtbar(). Der Kommentar stand dann in der Tabelle und war für
+  -- seinen eigenen Verfasser unsichtbar — dieselbe Falle wie bei Merkliste,
+  -- Repost und Likes (Schema 42), hier am 21.09.2026 nachgezogen.
   select b.id into v_post
   from public.posts b
-  where b.demo and b.user_id <> ziel
+  join public.profiles p on p.id = b.user_id
+  where b.demo and p.demo and b.user_id <> ziel
   order by b.created_at desc
   limit 1;
 

@@ -436,6 +436,11 @@ function vorschauenOeffnen(chats) {
 async function nachrichtenHolen(chatId) {
   const res = await fetch(`/api/messages/${chatId}`);
   const verlauf = await res.json();
+  // Wer den Verlauf holt, hat ihn offen — also gelesen. Ob daraus eine
+  // Bestaetigung wird, entscheidet `chat_gelesen` in der Datenbank anhand des
+  // Schalters des Lesers; dieselbe Zeile steht im ChatDetailScreen der App.
+  // Ohne await: eine ausgebliebene Bestaetigung darf den Verlauf nicht aufhalten.
+  fetch(`/api/messages/${chatId}/gelesen`, { method: 'POST' }).catch(() => {});
   return window.KryptoWeb ? window.KryptoWeb.stapelOeffnen(verlauf) : verlauf;
 }
 
@@ -505,6 +510,23 @@ async function bootstrap() {
   if (window.KryptoWeb) await window.KryptoWeb.anmelden();
 
   Object.assign(state, data);
+
+  /*
+   * Das Design gehoert zum Konto, nicht zum Browser.
+   *
+   * Bis zum 17.09.2026 lag es nur in localStorage['am-theme']: wer in der App
+   * auf dunkel stellte, sah die Website hell, und ein zweites Geraet wusste
+   * von nichts. Jetzt steht es zusaetzlich in user_settings und wird hier
+   * beim Start uebernommen. Der localStorage bleibt als Sofortwert, damit die
+   * Seite nicht erst hell aufblitzt.
+   *
+   * Die Einstellungen wurden bisher erst beim Oeffnen der Einstellungsseite
+   * geholt — fuer das Design ist das zu spaet. Gleiche Regel in
+   * app/lib/theme.tsx.
+   */
+  await einstellungenHolen();
+  const design = state.einstellungen?.theme;
+  if (design === 'dark' || design === 'light' || design === 'system') state.theme = design;
 
   applyTheme();
   document.body.classList.remove('is-startet');
@@ -679,10 +701,12 @@ function geruest() {
  * am Bild geprueft und nicht nur an gruenen Pruefungen.
  */
 function ungelesen() {
-  const weg = state.archiviert || [];
+  // Der Chat traegt sein `archiviert` selbst. Hier stand
+  // `!state.archiviert.includes(c.id)` — state.archiviert sind aber
+  // Chat-Objekte, die Pruefung traf also nie zu.
   const zaehle = (liste) =>
     (liste || [])
-      .filter((c) => !weg.includes(c.id) && c.id !== state.openChatId)
+      .filter((c) => !c.archiviert && c.id !== state.openChatId)
       .reduce((summe, c) => summe + (c.unread || 0), 0);
 
   const messenger = zaehle(state.chats);
@@ -902,10 +926,11 @@ function filteredChats() {
   vorschauenOeffnen(state.chats);
 
   const q = state.query.trim().toLowerCase();
-  const weg = state.archiviert || [];
   return state.chats.filter((c) => {
     // Archivierte liegen unter Einstellungen > Messenger > Archivierte Chats.
-    if (weg.includes(c.id)) return false;
+    // Gepruft wird das Feld am Chat, nicht state.archiviert — das enthaelt
+    // Objekte, kein `includes(c.id)` hat dort je gegriffen.
+    if (c.archiviert) return false;
     if (state.filter === 'contacts' && c.isGroup) return false;
     if (state.filter === 'groups' && !c.isGroup) return false;
     if (!q) return true;
@@ -1075,10 +1100,18 @@ function bindChatVerwaltung() {
 function chatOptionen(chatId) {
   const chat =
     state.chats.find((c) => c.id === chatId) ||
-    (state.communityChats || []).find((c) => c.id === chatId);
+    (state.communityChats || []).find((c) => c.id === chatId) ||
+    // Ein archivierter Chat steht in keiner der beiden Listen — der Server
+    // haelt ihn getrennt. Ohne diese Zeile fuehrt kein Weg mehr zu seinen
+    // Optionen, und damit auch keiner zurueck aus dem Archiv.
+    (state.archiviert || []).find((c) => c.id === chatId);
   if (!chat) return;
 
-  const archiviert = (state.archiviert || []).includes(chatId);
+  // state.archiviert sind Chat-Objekte, keine Kennungen — siehe
+  // einstellungsListe('archiv'). Mit includes(chatId) stand hier immer
+  // "Archivieren", auch bei einem bereits archivierten Chat.
+  const archiviert =
+    Boolean(chat.archiviert) || (state.archiviert || []).some((c) => c.id === chatId);
 
   /*
    * Punkt 15: das Blatt sah aus wie eine nackte Liste. WhatsApp zeigt beim
@@ -1099,6 +1132,24 @@ function chatOptionen(chatId) {
       : chat.muted
         ? 'Stummgeschaltet'
         : '';
+
+  /*
+   * Der Weg von der Community in den Messenger.
+   *
+   * Henrik am 18.09.2026: „in den Community-Chats eine Option einbauen, dass
+   * man den jeweils anderen User anfragen kann, über Messenger zu chatten."
+   *
+   * Es ist kein zweites Zustimmungsverfahren: Schema 21 macht aus jedem neuen
+   * Zweierchat eine Anfrage und laesst bis zur Annahme genau eine Nachricht
+   * durch. Einen Messenger-Chat anzulegen IST die Anfrage. Der Punkt steht nur
+   * da, wo er etwas bewirkt — im Zweierchat aus den Communitys, zu dem es noch
+   * keinen Messenger-Chat gibt. Gleiche Bedingung in app/App.tsx.
+   */
+  const messengerAnfrageMoeglich =
+    !chat.isGroup &&
+    Boolean(chat.userId) &&
+    (state.communityChats || []).some((c) => c.id === chatId) &&
+    !(state.chats || []).some((c) => !c.isGroup && c.userId === chat.userId);
 
   openSheet(
     chat.name,
@@ -1126,6 +1177,12 @@ function chatOptionen(chatId) {
       <span class="item__label">Chat-Einstellungen</span>
       <span class="row__chevron">${ICONS.chevron}</span>
     </button>
+    ${messengerAnfrageMoeglich
+      ? `<button class="item" data-copt="messenger">
+      <span class="item__icon">${ICONS.chat}</span>
+      <span class="item__label">Über Messenger chatten anfragen</span>
+    </button>`
+      : ''}
     <div class="copt__trenner"></div>
     <button class="item item--danger" data-copt="loeschen">
       <span class="item__icon">${ICONS.trash || ICONS.close}</span>
@@ -1141,6 +1198,26 @@ function chatOptionen(chatId) {
           close();
 
           if (was === 'einstellungen') return openChatSettings(chatId);
+
+          if (was === 'messenger') {
+            const res = await fetch(`/api/kontakte/${chat.userId}/chat`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bereich: 'messenger' }),
+            })
+              .then((r) => r.json())
+              .catch(() => ({ ok: false, error: 'Das hat gerade nicht geklappt' }));
+            if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
+            await bootstrap();
+            /*
+             * Bewusst nicht „gesendet" — gesendet ist noch nichts. Die Anfrage
+             * steht, sobald der Chat existiert; geschrieben wird darin einmal,
+             * danach entscheidet die Gegenseite. Gleicher Satz in app/App.tsx.
+             */
+            toast(`Anfrage an ${chat.name} steht — schreib ihr eine Nachricht`);
+            state.area = 'messenger';
+            return openChat(res.chatId);
+          }
 
           const antwort = await fetch(`/api/chats/${chatId}/${was}`, { method: 'POST' })
             .then((r) => r.json())
@@ -1161,10 +1238,19 @@ function chatRow(c) {
   /*
    * Ein gesperrter Chat zeigt keine Vorschau - das ist der halbe Sinn der
    * Sperre. Statt des Textes steht dort ein Schloss.
+   *
+   * Dasselbe gilt fuer den Schalter "Vorschau anzeigen" aus den
+   * Einstellungen. Er stand seit Anfang an in der Liste und wurde
+   * gespeichert, ohne dass ihn jemals etwas gelesen hat (Audit vom
+   * 17.09.2026, Befund 1). Ist er aus, steht statt des Nachrichtentextes nur
+   * "Neue Nachricht". Gleiche Regel in app/screens/messenger/ChatListScreen.tsx.
    */
+  const vorschauZeigen = schalterAn('vorschau');
   const vorschau = c.gesperrt
     ? `<span class="row__preview row__preview--gesperrt">${ICONS.lock}Gesperrt</span>`
-    : `<span class="row__preview">${mediaIcon}${esc(c.preview)}</span>`;
+    : vorschauZeigen
+      ? `<span class="row__preview">${mediaIcon}${esc(c.preview)}</span>`
+      : `<span class="row__preview">${c.preview ? 'Neue Nachricht' : ''}</span>`;
   /*
    * Insight Time und offene Insights. Das Handbuch verlangt die Anzeige
    * genau hier ("Anzeige im Chatbereich -> jeweilige(n/r) Chat/Gruppe").
@@ -2851,7 +2937,7 @@ async function openContactProfile(userId) {
         ${zeile('Selbstlöschende Nachrichten', einstellung({ label: 'Selbstlöschende Nachrichten', wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen'], standard: 'Aus' }))}
         <div class="kp__zeile">
           <span class="kp__zeileText">Chat sperren</span>
-          <button class="switch ${state.chatGesperrt?.[userId] ? 'is-on' : ''}" id="kpSperre" aria-label="Chat sperren"><span class="switch__knob"></span></button>
+          <button class="switch ${chat?.gesperrt ? 'is-on' : ''}" id="kpSperre" aria-label="Chat sperren"><span class="switch__knob"></span></button>
         </div>
         ${zeile('Erweiterter Chat-Datenschutz', einstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' }))}
         ${zeile('Verschlüsselung', krypto.an ? 'Ende-zu-Ende' : 'Nicht aktiv')}
@@ -2942,11 +3028,32 @@ async function openContactProfile(userId) {
     )
   );
 
+  /*
+   * Hier stand nur `state.chatGesperrt[userId] = !…` — ein Wert im
+   * Arbeitsspeicher des Browsers. Er war beim naechsten Laden weg, und auf dem
+   * Telefon war von ihm nie etwas zu sehen, obwohl die App die Sperre seit
+   * jeher nach chat_members.is_locked schreibt
+   * (app/screens/messenger/ContactProfileScreen.tsx).
+   *
+   * Die Route /api/chats/:chatId/sperren gab es die ganze Zeit — sie wurde
+   * von hier aus nur nie gerufen.
+   */
   $('#kpSperre')?.addEventListener('click', (e) => {
-    state.chatGesperrt = { ...(state.chatGesperrt || {}) };
-    state.chatGesperrt[userId] = !state.chatGesperrt[userId];
-    e.currentTarget.classList.toggle('is-on');
-    toast(state.chatGesperrt[userId] ? 'Chat gesperrt' : 'Chatsperre aufgehoben');
+    if (!chat) return toast('Dafür braucht es erst einen Chat');
+    const knopf = e.currentTarget;
+    const neu = !chat.gesperrt;
+    knopf.classList.toggle('is-on', neu);
+    void (async () => {
+      const res = await fetch(`/api/chats/${chat.id}/sperren`, { method: 'POST' });
+      const antwort = await res.json();
+      if (!antwort.ok) {
+        knopf.classList.toggle('is-on', !neu);
+        return toast(antwort.error || 'Das hat nicht geklappt');
+      }
+      chat.gesperrt = Boolean(antwort.gesperrt);
+      knopf.classList.toggle('is-on', chat.gesperrt);
+      toast(antwort.meldung || (chat.gesperrt ? 'Chat gesperrt' : 'Chatsperre aufgehoben'));
+    })();
   });
 
   overlay.querySelectorAll('[data-kp]').forEach((b) =>
@@ -2959,7 +3066,14 @@ async function openContactProfile(userId) {
       if (was === 'chat') {
         schliessen();
         if (chat) return openChat(chat.id);
-        const res = await fetch(`/api/kontakte/${userId}/chat`, { method: 'POST' });
+        // Der Bereich entscheidet, in welcher Chatliste der neue Chat landet.
+        // Ohne ihn nahm der Server 'messenger' — auch aus den Communitys
+        // heraus. Gleiche Regel wie beim Teilen.
+        const res = await fetch(`/api/kontakte/${userId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bereich: state.area === 'communities' ? 'community' : 'messenger' }),
+        });
         const antwort = await res.json();
         if (!antwort.ok) return toast(antwort.error);
         await bootstrap();
@@ -3380,11 +3494,11 @@ async function openProfile(userId, variante) {
         </div>
 
         ${
-          profile.highlights.length
-            ? // Dieselbe Reihe wie im eigenen Profil - vorher standen die
-              // Highlights hier als nicht klickbare Story-Kreise.
-              sammlungenReihe(profile.id, profile.playlists, profile.highlights)
-            : ''
+          // Dieselbe Reihe wie im eigenen Profil - vorher standen die
+          // Highlights hier als nicht klickbare Story-Kreise. Ohne Bedingung:
+          // die Reihe entscheidet selbst, ob sie sichtbar ist, und sie wird
+          // gleich durch die echten Sammlungen ersetzt.
+          sammlungenReihe(profile.id, profile.playlists, profile.highlights)
         }
 
         <div class="prof__tabs">
@@ -3399,6 +3513,8 @@ async function openProfile(userId, variante) {
     $('#profBack').addEventListener('click', closeOverlay);
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
     bindSammlungen(overlay);
+    // Die echten Kreise kommen nach: Bild und Inhalt stehen in sammlungen.
+    void ladeSammlungen(profile.id, overlay);
 
     // Punkt 12: der Story-Ring auf einem fremden Profil oeffnet die Story.
     overlay.querySelector('[data-profilstory]')?.addEventListener('click', () => {
@@ -4187,12 +4303,21 @@ function reelsBeobachten() {
 
   spieler.forEach((v) => { v.muted = tonAus; });
 
+  /*
+   * „Datensparen" aus den Einstellungen. Der Schalter stand seit Anfang an in
+   * der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen hat
+   * (Audit vom 17.09.2026, Befund 1). Ist er an, startet kein Video von
+   * selbst — angetippt laeuft es weiterhin, die Wahl bleibt beim Nutzer.
+   * Gleiche Regel in app/components/Videoflaeche.tsx.
+   */
+  const vonSelbst = !schalterAn('datensparen');
+
   const beobachter = new IntersectionObserver(
     (eintraege) => {
       eintraege.forEach((e) => {
         const v = e.target;
         if (e.isIntersecting && e.intersectionRatio > 0.6) {
-          v.play().catch(() => {});
+          if (vonSelbst) v.play().catch(() => {});
         } else {
           v.pause();
           v.currentTime = 0;
@@ -4676,9 +4801,14 @@ async function renderCommunityChat(community, kanal, thema) {
   feld.addEventListener('input', () => {
     sendKnopf.disabled = !feld.value.trim();
   });
-  // Enter sendet, Umschalt+Enter macht eine neue Zeile - wie im Einzelchat.
+  /*
+   * Enter sendet, Umschalt+Enter macht eine neue Zeile - wie im Einzelchat.
+   * Wer den Schalter "Mit Enter senden" ausmacht, dreht das um: Enter setzt
+   * die Zeile, gesendet wird nur ueber den Knopf. Gleiche Regel in
+   * app/screens/messenger/ChatDetailScreen.tsx.
+   */
   feld.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && schalterAn('entersenden')) {
       e.preventDefault();
       $('#commForm').requestSubmit();
     }
@@ -5220,6 +5350,10 @@ const SETTINGS = [
       { label: 'Wer darf kommentieren', icon: 'comment', sichtbar: 'kommentare' },
       { label: 'Wer darf mich markieren', icon: 'person', sichtbar: 'markierung' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart', sichtbar: 'likes' },
+      { label: 'Gelikte Beiträge', icon: 'heart', liste: 'gelikt' },
+      // Die vierte Gattung aus Henriks Meldung vom 18.09.2026 — dieselbe
+      // Stelle wie in der App.
+      { label: 'Meine Kommentare', icon: 'comment', liste: 'kommentiert' },
       { label: 'Downloadeinstellungen', icon: 'image', sichtbar: 'download' },
       { label: 'Story-Sichtbarkeit (Videos)', icon: 'eye', sichtbar: 'story' },
       { label: 'Nutzerstatus', icon: 'person', wahlKey: 'nutzerstatus', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
@@ -5271,7 +5405,13 @@ const SCHALTER_STANDARD = {
   vibration: true,
   vorschau: true,
   lesebestaetigung: true,
-  entersenden: false,
+  /*
+   * Stand bis zum 17.09.2026 auf `false`, waehrend Enter in beiden Chats
+   * immer gesendet hat — der Schalter zeigte "aus" und meinte "an". Jetzt
+   * liest ihn die Tastenregel wirklich (siehe unten), und der
+   * Auslieferungswert beschreibt das gewohnte Verhalten.
+   */
+  entersenden: true,
   datensparen: false,
 };
 
@@ -5280,6 +5420,30 @@ const schalterAn = (schluessel) => {
   if (gespeichert === undefined) return Boolean(SCHALTER_STANDARD[schluessel]);
   return gespeichert === 'an';
 };
+
+/*
+ * Der Sendeton. „Toene" aus den Einstellungen war bis zum 17.09.2026 ohne
+ * Wirkung, weil es ueberhaupt keinen Ton gab (Audit vom 17.09.2026, Befund
+ * 1). `nachricht.wav` ist derselbe Zweiklang wie in der App
+ * (app/assets/nachricht.wav) und in `web/tools/nachrichtenton.py` aus einer
+ * Sinuswelle erzeugt — so gibt es keine Lizenzfrage.
+ *
+ * Das Audio-Objekt wird erst beim ersten Ton angelegt und dann behalten.
+ * Gleiche Regel in app/lib/toene.ts.
+ */
+let sendeTon = null;
+
+function nachrichtTon() {
+  if (!schalterAn('toene')) return;
+  try {
+    if (!sendeTon) sendeTon = new Audio('/nachricht.wav');
+    sendeTon.currentTime = 0;
+    /* Ohne Nutzergeste lehnt der Browser ab — dann eben still. */
+    void sendeTon.play().catch(() => {});
+  } catch {
+    /* Kein Ton ist kein Fehler, der jemanden aufhalten darf. */
+  }
+}
 
 /* ---------------------------------------------- Ein Einstellungspunkt */
 /*
@@ -5313,6 +5477,27 @@ function einstellungenLaden() {
     return {};
   }
 }
+
+/*
+ * Noch einmal holen, sobald der Tab wieder nach vorn kommt.
+ *
+ * Ohne das wandert eine Aenderung aus der App erst beim naechsten Neuladen
+ * auf die Website — genau die Luecke, um die es am 17.09.2026 ging:
+ * gespeichert ist nicht dasselbe wie ueberall angekommen. Ein Echtzeit-Kanal
+ * waere der saubere Weg, den gibt es im Projekt aber nirgends; der Wechsel in
+ * den Vordergrund ist der Moment, in dem es zaehlt.
+ *
+ * Gleiche Regel in app/contexts/EinstellungenContext.tsx (AppState).
+ */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!state.einstellungen) return; /* noch nie geladen — dann macht es der Start */
+  void einstellungenHolen().then(() => {
+    /* Nur neu zeichnen, wenn die Einstellungsseite offen ist: sonst reisst
+       ein Neuaufbau den Nutzer aus dem, was er gerade tut. */
+    if (state.area === 'settings') renderSettings();
+  });
+});
 
 /** Holt sie vom Server. Wird beim Aufbau der Einstellungsseite gerufen. */
 async function einstellungenHolen() {
@@ -5657,6 +5842,22 @@ async function einstellungSetzen(punkt, wert) {
     toast(antwort?.error || 'Nicht gespeichert');
     return false;
   }
+  /*
+   * "Privates Profil" steht zweimal in der Liste — unter Videos
+   * (videoPrivate) und unter Communitys (commPrivate). Beide schalten
+   * dieselbe Spalte profiles.privat, der Server schreibt deshalb immer beide
+   * Schluessel. Hier zieht die Anzeige nach, sonst stuende der zweite
+   * Schalter bis zum naechsten Laden auf dem alten Wert — ein Widerspruch auf
+   * demselben Bildschirm.
+   */
+  if (schluessel === 'videoPrivate' || schluessel === 'commPrivate') {
+    const anderer = schluessel === 'videoPrivate' ? 'commPrivate' : 'videoPrivate';
+    state.einstellungen[anderer] = wert;
+    document
+      .querySelectorAll(`[data-toggle="${anderer}"]`)
+      .forEach((b) => b.classList.toggle('is-on', wert === 'an'));
+  }
+
   try {
     localStorage.setItem(EINSTELLUNGEN_SPEICHER, JSON.stringify(state.einstellungen));
   } catch {
@@ -5686,14 +5887,25 @@ function einstellungsListe(art) {
     };
   }
   if (art === 'archiv') {
-    const ids = state.archiviert || [];
-    const alle = [...state.chats, ...(state.communityChats || [])];
+    /*
+     * `state.archiviert` kommt aus dem Bootstrap und enthaelt die Chat-
+     * OBJEKTE, nicht ihre Kennungen (supabase-api.js: `archiviert: chats
+     * .filter((c) => c.archiviert)`). Die Nachbarliste "Blockiert" darueber
+     * bekommt tatsaechlich Kennungen — daher die Verwechslung.
+     *
+     * Hier stand `ids.map((id) => alle.find((c) => c.id === id))`. Ein Objekt
+     * ist nie gleich einer Kennung, der Treffer blieb immer aus. Und selbst
+     * mit richtigen Kennungen waere nichts gefunden worden: gesucht wurde in
+     * state.chats, aus dem der Server die archivierten eine Zeile vorher
+     * herausgefiltert hat. Die Liste sagte deshalb dauerhaft "Kein Chat ist
+     * archiviert." — auch unmittelbar nach dem Archivieren.
+     *
+     * Gleiche Regel wie in app/screens/profile/SettingsScreen.tsx, wo genau
+     * dieser Fehler am 01.09.2026 fuer die App behoben wurde.
+     */
     return {
       leer: 'Kein Chat ist archiviert.',
-      zeilen: ids
-        .map((id) => alle.find((c) => c.id === id))
-        .filter(Boolean)
-        .map((c) => ({ text: c.name, neben: 'archiviert' })),
+      zeilen: (state.archiviert || []).map((c) => ({ text: c.name, neben: 'archiviert' })),
     };
   }
   if (art === 'speicher') {
@@ -5780,6 +5992,35 @@ function einstellungsListe(art) {
    * der auch die Folgen-Knoepfe im Feed ihren Zustand nehmen - damit stimmt
    * die Liste immer mit den Knoepfen ueberein.
    */
+  /*
+   * Was mir gefallen hat. Kein fuenfter Profilreiter - der Prototyp hat dort
+   * vier. Gleiche Quelle und gleiche Ersatztexte wie gelikteVon() in der App.
+   */
+  if (art === 'gelikt') {
+    if (!state.gelikt) return { leer: 'Wird geladen …', zeilen: [] };
+    return {
+      leer: 'Dir hat noch nichts gefallen.',
+      zeilen: state.gelikt.map((b) => ({
+        text: b.titel,
+        neben: new Date(b.wann).toLocaleDateString('de-DE'),
+      })),
+    };
+  }
+  /*
+   * Die eigenen Kommentare. `zeile` kommt fertig vom Server (aus
+   * gemeinsam/kommentar.js) — hier wird nichts nachgerechnet, sonst haette
+   * der Browser seine eigene Fassung der Regel.
+   */
+  if (art === 'kommentiert') {
+    if (!state.kommentiert) return { leer: 'Wird geladen …', zeilen: [] };
+    return {
+      leer: 'Du hast noch nichts kommentiert.',
+      zeilen: state.kommentiert.map((k) => ({
+        text: k.zeile,
+        neben: new Date(k.wann).toLocaleDateString('de-DE'),
+      })),
+    };
+  }
   if (art === 'gefolgt') {
     const ids = Object.keys(state.gefolgt || {}).filter((id) => state.gefolgt[id]);
     return {
@@ -6096,13 +6337,39 @@ function renderSettings() {
     });
   }
 
+  /*
+   * Nachladen und danach neu zeichnen. Ohne das zweite `renderSettings()`
+   * bliebe in der Liste „Wird geladen …" stehen, bis irgendetwas anderes
+   * einen Neuaufbau ausloest — die Zahlen waeren da und trotzdem unsichtbar.
+   */
   if (!state.statistik) {
     fetch('/api/statistik')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         state.statistik = d?.statistik || null;
+        if (state.area === 'settings') renderSettings();
       })
       .catch((fehler) => console.error('Statistik laden fehlgeschlagen:', fehler));
+  }
+
+  if (!state.gelikt) {
+    fetch('/api/gelikt')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        state.gelikt = Array.isArray(d) ? d : null;
+        if (state.area === 'settings') renderSettings();
+      })
+      .catch((fehler) => console.error('Gelikte Beitraege laden fehlgeschlagen:', fehler));
+  }
+
+  if (!state.kommentiert) {
+    fetch('/api/kommentiert')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        state.kommentiert = Array.isArray(d) ? d : null;
+        if (state.area === 'settings') renderSettings();
+      })
+      .catch((fehler) => console.error('Eigene Kommentare laden fehlgeschlagen:', fehler));
   }
 
   const itemHtml = (it, sektionId) => {
@@ -6234,6 +6501,14 @@ function renderSettings() {
         localStorage.setItem('am-theme', state.theme);
         applyTheme();
         b.classList.toggle('is-on');
+        /*
+         * Zusaetzlich ins Konto. Der localStorage bleibt der Sofortwert fuer
+         * den naechsten Seitenaufbau, aber mitwandern auf Telefon und zweites
+         * Geraet kann das Design nur ueber user_settings. Der Wert ist
+         * 'dark'/'light' und nicht 'an'/'aus', weil 'system' als dritte
+         * Moeglichkeit vorgesehen ist (applyTheme).
+         */
+        void einstellungSetzen({ label: 'theme', wahlKey: 'theme' }, state.theme);
         return;
       }
 
@@ -10000,14 +10275,38 @@ async function openExplorer(art, wert) {
  * Blatt mit einem Raster aus Personen. Wen man antippt, der bekommt den
  * Beitrag in den Chat - der Knopf gab vorher nur einen Hinweis aus.
  */
+/**
+ * Über welchen der beiden Bereiche diese Person erreicht wird.
+ *
+ * Bis zum 18.09.2026 entschied das allein der Bereich, in dem man gerade
+ * stand. Wer einen Beitrag aus den Videos an jemanden schickte, mit dem er
+ * nur in einer Community zu tun hat, bekam dadurch einen zweiten, leeren
+ * Chat in der anderen Liste.
+ *
+ * Der Prototyp-Frame „Nutzer B + Beitrag teilen" zeigt es anders: jede Person
+ * im Raster trägt ihr eigenes Abzeichen. Also entscheidet die Person, nicht
+ * der Bildschirm. Gleiche Regel in app/App.tsx (bereichFuer).
+ */
+function bereichFuer(uid) {
+  if ((state.chats || []).some((c) => !c.isGroup && c.userId === uid)) return 'messenger';
+  if ((state.communityChats || []).some((c) => !c.isGroup && c.userId === uid)) return 'community';
+  return state.area === 'communities' ? 'community' : 'messenger';
+}
+
 function openTeilen(art, id) {
   const kontakte = state.contacts.map((c) => c.id).filter((cid) => state.users[cid]);
   const uebrige = Object.keys(state.users).filter((uid) => uid !== 'me' && !kontakte.includes(uid));
   const kachel = (uid) => {
     const u = user(uid);
+    const bereich = bereichFuer(uid);
     return `<li>
-      <button class="teilen__kachel" data-teilen="${uid}">
-        <span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
+      <button class="teilen__kachel" data-teilen="${uid}" data-bereich="${bereich}">
+        <span class="teilen__bild">
+          <span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
+          <span class="teilen__marke teilen__marke--${bereich}">${
+            bereich === 'community' ? ICONS.people : ICONS.chat
+          }</span>
+        </span>
         <span class="teilen__name">${esc(u.name)}</span>
         <span class="teilen__haken">${ICONS.check}</span>
       </button>
@@ -10025,15 +10324,26 @@ function openTeilen(art, id) {
         b.addEventListener('click', async () => {
           if (b.classList.contains('is-gesendet')) return;
 
+          /*
+           * Der Bereich steht schon an der Kachel — dieselbe Angabe, die das
+           * Abzeichen darauf zeichnet. Sonst könnten Anzeige und Wirkung
+           * auseinanderlaufen: das Symbol sagt Messenger, geschrieben wird in
+           * die Community.
+           */
+          const bereich = b.dataset.bereich || 'messenger';
+
           const res = await fetch('/api/teilen', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ art, id, empfaenger: [b.dataset.teilen] }),
+            body: JSON.stringify({ art, id, empfaenger: [b.dataset.teilen], bereich }),
           });
           const daten = await res.json();
           if (!daten.ok) return toast(daten.error);
 
-          state.chats = daten.chats;
+          // In die Liste, in die wirklich geschrieben wurde — der Server sagt,
+          // welche das war.
+          if (daten.bereich === 'community') state.communityChats = daten.chats;
+          else state.chats = daten.chats;
           b.classList.add('is-gesendet');
           toast(`An ${user(b.dataset.teilen).name} gesendet`);
         })
@@ -10663,22 +10973,95 @@ function ownProfileTop(handle, bereich) {
  * `userId` wandert mit ins Attribut, damit die Seite dahinter weiss, wessen
  * Sammlung sie zeigt.
  */
-function sammlungenReihe(userId, playlists, highlights) {
-  const eintraege = [
-    ...(playlists || []).map((name) => ({ art: 'playlist', name })),
-    ...(highlights || []).map((name) => ({ art: 'highlight', name })),
-  ];
-  if (!eintraege.length) return '';
+/*
+ * Was an Sammlungen schon geladen ist, nach Profil abgelegt.
+ *
+ * Die Reihe wird mitten im Zusammenbauen einer Seite als Zeichenkette
+ * erzeugt und kann nicht warten. Sie zeichnet deshalb erst aus dem, was da
+ * ist, und `ladeSammlungen` ersetzt sie, sobald die Antwort eintrifft.
+ */
+const SAMMLUNGEN = new Map();
 
-  return `<div class="highlights">${eintraege
-    .map(({ art, name }) => {
+/*
+ * Zaehler gegen verspaetete Antworten.
+ *
+ * `ladeSammlungen` schickt seine Abfrage los und traegt das Ergebnis ein,
+ * wenn es eintrifft. Wird in der Zwischenzeit eine Sammlung geloescht, kaeme
+ * die ALTE Liste danach an, legte sich in den Zwischenspeicher und malte den
+ * geloeschten Kreis zurueck — Datenbank sauber, Bildschirm falsch, und zwar
+ * bleibend, bis jemand die Seite neu laedt.
+ *
+ * Vorsorge, kein beobachteter Fehler: der Lauf vom 20.09.2026 hat dieses
+ * Rennen nie gewonnen. Es ist nur nicht ausgeschlossen, und der Preis dafuer
+ * sind drei Zeilen. Wer etwas an den Sammlungen aendert, zaehlt hoch; eine
+ * Antwort von vorher wird dann weggeworfen.
+ */
+let sammlungenLauf = 0;
+
+function sammlungenReihe(userId, playlists, highlights) {
+  /*
+   * Die Namenslisten aus `profiles` sind nur noch die Rueckfalltuer. Kommt
+   * die Abfrage nicht durch, steht die Reihe trotzdem da — ohne Bild und
+   * ohne `id`, und ein Klick sagt dann, dass es gerade nicht geht. Frueher
+   * war das der Normalfall: es gab nur Namen.
+   */
+  const geladen = SAMMLUNGEN.get(String(userId));
+  const eintraege = geladen || [
+    ...(playlists || []).map((name) => ({ art: 'playlist', name, id: '', bild: null })),
+    ...(highlights || []).map((name) => ({ art: 'highlight', name, id: '', bild: null })),
+  ];
+  /*
+   * Auch leer bleibt die Huelle stehen — sonst haette `ladeSammlungen`
+   * nachher keine Stelle, an die es die echten Kreise haengen koennte, und
+   * ein Profil mit Sammlungen, aber ohne alte Namen, bliebe fuer immer ohne
+   * Reihe. `hidden` haelt sie solange aus dem Bild.
+   */
+  if (!eintraege.length) {
+    return `<div class="highlights" data-sammlungen-von="${esc(userId)}" hidden></div>`;
+  }
+
+  return `<div class="highlights" data-sammlungen-von="${esc(userId)}">${eintraege
+    .map(({ art, name, id, bild }) => {
       const symbol = art === 'playlist' ? ICONS.play : ICONS.image;
-      return `<button class="highlight" data-sammlung="${art}" data-sammlung-name="${esc(name)}" data-sammlung-user="${esc(userId)}">
-        <span class="highlight__ring is-${art}">${medienFlaeche(art.slice(0, 2) + '-' + name, symbol)}</span>
+      return `<button class="highlight" data-sammlung="${art}" data-sammlung-name="${esc(name)}" data-sammlung-user="${esc(userId)}" data-sammlung-id="${esc(id || '')}">
+        <span class="highlight__ring is-${art}">${medienFlaeche(art.slice(0, 2) + '-' + name, symbol, null, bild || null)}</span>
         <span class="highlight__label">${esc(name)}</span>
       </button>`;
     })
     .join('')}</div>`;
+}
+
+/*
+ * Die echten Sammlungen nachladen und die Reihe austauschen.
+ *
+ * Getauscht wird nur, wenn die Reihe noch steht und noch zu demselben Profil
+ * gehoert — sonst schriebe eine spaet eintreffende Antwort ihre Kreise in ein
+ * inzwischen anderes Profil.
+ */
+async function ladeSammlungen(userId, wurzel = main) {
+  const lauf = sammlungenLauf;
+  const frage = userId === 'me' ? '' : `&user=${encodeURIComponent(userId)}`;
+  let liste;
+  try {
+    const [pl, hl] = await Promise.all([
+      fetch(`/api/sammlungen?art=playlist${frage}`).then((r) => r.json()),
+      fetch(`/api/sammlungen?art=highlight${frage}`).then((r) => r.json()),
+    ]);
+    if (!Array.isArray(pl) || !Array.isArray(hl)) return;
+    liste = [...pl, ...hl];
+  } catch {
+    return; // Die Rueckfalltuer steht schon auf dem Bildschirm.
+  }
+
+  // Inzwischen wurde etwas geloescht - diese Antwort ist von vorher.
+  if (lauf !== sammlungenLauf) return;
+
+  SAMMLUNGEN.set(String(userId), liste);
+
+  const reihe = wurzel.querySelector(`[data-sammlungen-von="${CSS.escape(String(userId))}"]`);
+  if (!reihe) return;
+  reihe.outerHTML = sammlungenReihe(userId, [], []);
+  bindSammlungen(wurzel);
 }
 
 /*
@@ -10695,6 +11078,7 @@ function bindSammlungen(wurzel = main) {
         art: b.dataset.sammlung,
         name: b.dataset.sammlungName,
         userId: b.dataset.sammlungUser,
+        id: b.dataset.sammlungId || '',
       };
       if (wurzel !== main) closeOverlay();
       renderSammlung();
@@ -10706,23 +11090,44 @@ function bindSammlungen(wurzel = main) {
  * Was in einer Playlist oder einem Highlight steckt.
  * Prototyp-Frames "VP + Playlist" und "VP + Highlight".
  *
- * Die Zuordnung ist bewusst schlicht: eine Playlist sammelt Videos, ein
- * Highlight Beitraege. Welche genau, entscheidet sich stabil aus dem Namen -
- * es gibt im Prototyp keine echte Zuordnung, und eine erfundene waere bei
- * jedem Aufruf eine andere.
+ * BIS ZUM 20.09.2026 STAND HIER EINE ERFUNDENE LISTE:
+ *
+ *     const liste = quelle.filter((_, i) => i % 2 === (name.length % 2));
+ *
+ * Jede zweite Kachel aus dem allgemeinen Bestand, ausgewaehlt nach der
+ * Laenge des Namens. Der Kommentar daneben gab das offen zu ("es gibt im
+ * Prototyp keine echte Zuordnung"), aber auf dem Bildschirm war davon
+ * nichts zu sehen: die Seite zeigte fremde Beitraege als Inhalt einer
+ * eigenen Playlist. Seit Schema 46 gibt es die Zuordnung, und hier steht
+ * jetzt, was wirklich darin liegt — im Zweifel nichts.
  */
-function renderSammlung() {
-  const { art, name, userId } = state.sammlung;
+async function renderSammlung() {
+  const { art, name, userId, id } = state.sammlung;
   const istPlaylist = art === 'playlist';
-  const quelle = istPlaylist ? state.videos : state.posts;
-  const eigen = quelle.filter((e) => e.userId === userId);
-  const liste = (eigen.length ? eigen : quelle).filter((_, i) => i % 2 === (name.length % 2));
+
+  let liste = [];
+  if (id) {
+    try {
+      const daten = await fetch(`/api/sammlung/${encodeURIComponent(id)}`).then((r) => r.json());
+      if (Array.isArray(daten)) liste = daten;
+    } catch {
+      toast('Die Sammlung ließ sich nicht laden');
+    }
+  }
 
   main.innerHTML = `
     <div class="pagehead">
       <div class="pagehead__row">
         <button class="iconbtn" id="sammlungBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
         <h2 class="pagehead__title">${esc(name)}</h2>
+        ${
+          // Loeschen nur im EIGENEN Profil und nur, wenn die Sammlung eine
+          // echte Zeile ist. Ohne id stammt der Kreis aus der alten
+          // Namensliste — da gaebe es nichts zu loeschen.
+          userId === 'me' && id
+            ? `<button class="iconbtn" id="sammlungLoeschen" aria-label="${esc(name)} löschen">${ICONS.trash}</button>`
+            : ''
+        }
       </div>
       <div class="pagehead__sub">${istPlaylist ? 'Playlist' : 'Highlight'} · ${liste.length} ${
         liste.length === 1 ? 'Beitrag' : 'Beiträge'
@@ -10732,19 +11137,30 @@ function renderSammlung() {
       ${
         liste.length
           ? `<div class="exp__grid">${liste
-              .map(
-                (e) =>
-                  `<button class="griditem" data-${istPlaylist ? 'openvideo' : 'openpost'}="${e.id}">${medienFlaeche(
-                    e.id,
-                    istPlaylist ? ICONS.portrait : ICONS.image,
-                    e.mediaUrl,
-                    e.thumbnail
-                  )}</button>`
-              )
+              .map(({ art: gattung, eintrag: e }) => {
+                // Wohin die Kachel fuehrt, entscheidet der Eintrag, nicht die
+                // Gattung der Sammlung: in einer Playlist liegen Beitraege,
+                // Videos und Clips nebeneinander.
+                const ziel =
+                  gattung === 'story' ? 'openstory' : gattung === 'post' ? 'openpost' : 'openvideo';
+                const symbol = gattung === 'post' ? ICONS.image : ICONS.portrait;
+                return `<button class="griditem" data-${ziel}="${esc(e.id)}">${medienFlaeche(
+                  e.id,
+                  symbol,
+                  e.mediaUrl,
+                  e.thumbnail
+                )}</button>`;
+              })
               .join('')}</div>`
           : `<div class="empty">${istPlaylist ? ICONS.play : ICONS.image}
               <div class="empty__title">Noch nichts drin</div>
-              <div class="empty__text">Über das Plus oben rechts legst du etwas hinein.</div>
+              <div class="empty__text">${
+                id
+                  ? istPlaylist
+                    ? 'Über das Drei-Punkte-Menü an einem eigenen Beitrag legst du ihn hier hinein.'
+                    : 'Über das Drei-Punkte-Menü an einer eigenen Story legst du sie hier hinein.'
+                  : 'Diese Sammlung lässt sich gerade nicht öffnen — bitte die Seite neu laden.'
+              }</div>
             </div>`
       }
     </div>`;
@@ -10755,11 +11171,54 @@ function renderSammlung() {
     if (zurueck === 'me') render();
     else openProfile(zurueck);
   });
+
+  $('#sammlungLoeschen')?.addEventListener('click', async () => {
+    /*
+     * Die Rueckfrage sagt ausdruecklich, was NICHT passiert. Sonst klickt
+     * niemand sie weg, der seine Beitraege behalten will — und wer sie
+     * wegklickt, hat womoeglich etwas anderes erwartet.
+     */
+    const ja = await bestaetigen(
+      `„${name}" löschen?`,
+      istPlaylist
+        ? 'Die Playlist verschwindet. Die Beiträge darin bleiben erhalten — nur die Zuordnung geht weg.'
+        : 'Das Highlight verschwindet. Die Storys darin bleiben erhalten — nur die Zuordnung geht weg.',
+      'Löschen'
+    );
+    if (!ja) return;
+
+    const antwort = await fetch(
+      `/api/eigene/sammlung/${art}/${encodeURIComponent(name)}`,
+      { method: 'DELETE' }
+    )
+      .then((r) => r.json())
+      .catch(() => ({ ok: false, error: 'Das Löschen kam nicht durch' }));
+
+    if (!antwort.ok) return toast(antwort.error || 'Das ließ sich nicht löschen');
+
+    /*
+     * Den Zwischenspeicher leeren, sonst baut sammlungenReihe() den
+     * geloeschten Kreis aus dem alten Stand wieder auf — und er liesse sich
+     * sogar noch anklicken.
+     */
+    sammlungenLauf += 1;
+    SAMMLUNGEN.delete('me');
+    SAMMLUNGEN.delete(String(state.currentUserId || ''));
+
+    // Die Namenslisten muessen nicht von Hand nachgezogen werden: das eigene
+    // Profil holt sich `me` bei jedem Aufbau frisch vom Server.
+    state.sammlung = null;
+    toast(`„${name}" ist gelöscht`);
+    render();
+  });
   main.querySelectorAll('[data-openvideo]').forEach((b) =>
     b.addEventListener('click', () => openVideo(b.dataset.openvideo))
   );
   main.querySelectorAll('[data-openpost]').forEach((b) =>
     b.addEventListener('click', () => openPost(b.dataset.openpost))
+  );
+  main.querySelectorAll('[data-openstory]').forEach((b) =>
+    b.addEventListener('click', () => openStory(b.dataset.openstory))
   );
 }
 
@@ -10849,6 +11308,11 @@ async function renderVideoProfile() {
   // Markierungen gar nicht gab.
   const meineMarkierungen = tab === 'tagged' ? await (await fetch('/api/markierungen')).json() : [];
 
+  // Und die gespeicherten. Der Reiter stand seit jeher in PROFILE_TABS und
+  // hatte nie eine Quelle — er zeigte immer „Noch nichts hier", auch bei
+  // gefuellter Merkliste. Gleiche Regel in VideoProfileScreen.tsx.
+  const meineGespeicherten = tab === 'saved' ? await (await fetch('/api/gespeichert')).json() : [];
+
   // Inzwischen wurde etwas anderes aufgebaut - dann nichts mehr schreiben.
   if (lauf !== renderLauf) return;
 
@@ -10928,20 +11392,38 @@ async function renderVideoProfile() {
                 </div>`
               )
               .join('')}</div>`
+          : tab === 'saved' && meineGespeicherten.length
+          ? /*
+             * Kein Abzeichen auf der Kachel: hier ist ohnehin alles
+             * gespeichert. Bei Repost und Markierung sagt das Zeichen, warum
+             * ein fremder Beitrag im eigenen Profil steht — hier waere es
+             * Rauschen.
+             */
+            `<div class="prof__grid">${meineGespeicherten
+              .map(
+                (g) => `<button class="griditem" data-openpost="${esc(g.eintrag.id)}" title="${esc(g.eintrag.description || '')}">
+                  ${medienFlaeche(g.eintrag.id, g.art === 'post' ? ICONS.image : ICONS.play, g.eintrag.mediaUrl, g.eintrag.thumbnail)}
+                </button>`
+              )
+              .join('')}</div>`
           : `<div class="empty">${ICONS[PROFILE_TABS.find((t) => t.id === tab).icon]}
               <div class="empty__title">${
                 tab === 'repost'
                   ? 'Noch nichts repostet'
                   : tab === 'tagged'
                     ? 'Keine Markierungen'
-                    : 'Noch nichts hier'
+                    : tab === 'saved'
+                      ? 'Noch nichts gespeichert'
+                      : 'Noch nichts hier'
               }</div>
               <div class="empty__text">${
                 tab === 'repost'
                   ? 'Tippe im Feed auf den Repost-Knopf, dann erscheint es hier.'
                   : tab === 'tagged'
                     ? 'Wer dich mit @ in einer Beschreibung nennt, markiert dich — dann steht der Beitrag hier.'
-                    : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
+                    : tab === 'saved'
+                      ? 'Tippe unter einem Beitrag auf das Lesezeichen, dann liegt er hier.'
+                      : 'Dieser Bereich füllt sich, sobald du ihn benutzt.'
               }</div>
             </div>`
       }
@@ -10950,6 +11432,7 @@ async function renderVideoProfile() {
   $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderVideoProfile));
   bindSammlungen();
+  void ladeSammlungen("me");
   $('#followerBtn')?.addEventListener('click', () => openFollowerList(me, 'follower'));
   $('#followingBtn')?.addEventListener('click', () => openFollowerList(me, 'following'));
   /*
@@ -11844,8 +12327,9 @@ async function openChat(chatId) {
     input.style.height = Math.min(input.scrollHeight, 108) + 'px';
     sendBtn.disabled = !input.value.trim();
   });
+  // Nur wenn "Mit Enter senden" an ist — siehe SCHALTER_STANDARD.
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && schalterAn('entersenden')) {
       e.preventDefault();
       $('#composer').requestSubmit();
     }
@@ -12110,6 +12594,30 @@ function messageBubble(m, chat) {
    * bequemer, aber dann verlören Antworten und Zitate ihren Bezug — und die
    * Gegenseite fragte sich, ob sie sich das Gelesene eingebildet hat.
    */
+  /*
+   * Der Bezug auf eine Story — ein Herz darauf oder eine Antwort (Henrik
+   * 18.09., Schema 41). Vorher stand hier nur `m.replyToStory`, eine Zeile
+   * Text, die der Server nie gesetzt hat: toter Zweig.
+   *
+   * Die Vorschau steht ueber dem Text und nicht an seiner Stelle. Sonst
+   * verschwaende bei einer Story-Antwort genau das, was geschrieben wurde,
+   * und beim Herz das Emoji. Gleiche Regel in ChatDetailScreen.tsx.
+   */
+  const storyBezug = m.story
+    ? `<div class="msg__story">
+         ${
+           m.story.mediaUri && !istVideoAdresse(m.story.mediaUri)
+             ? `<img class="msg__bild" src="${esc(m.story.mediaUri)}" alt="">`
+             : m.story.mediaUri
+             ? `<video class="msg__bild" src="${esc(
+                 m.story.mediaUri
+               )}" muted playsinline preload="metadata"></video>`
+             : `<span class="msg__geteiltBild">${ICONS.image}</span>`
+         }
+         <span class="msg__storyMarke">Story</span>
+       </div>`
+    : '';
+
   const inhalt = m.zurueckgenommen
     ? '<span class="msg__zurueck">Diese Nachricht wurde zurückgenommen</span>'
     : m.geteilt
@@ -12148,12 +12656,11 @@ function messageBubble(m, chat) {
   return `
     <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}" data-msgid="${esc(m.id)}">
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
-      ${m.replyToStory ? `<div class="msg__reply">Antwort auf die Story von ${esc(m.replyToStory)}</div>` : ''}
       ${weiter}${antwortAuf}${zitat}
-      ${inhalt}
+      ${storyBezug}${inhalt}
       <div class="msg__foot">${m.stern ? `<span class="msg__stern">${ICONS.star}</span>` : ''}${
         m.bearbeitet && !m.zurueckgenommen ? 'bearbeitet · ' : ''
-      }${esc(m.time)}${out ? ICONS.checkDouble : ''}</div>
+      }${esc(m.time)}${out ? (m.read ? ICONS.checkDouble : ICONS.check) : ''}</div>
       ${reaktionen}
     </div>`;
 }
@@ -12385,6 +12892,8 @@ async function sendMessage(chat) {
   const input = $('#msgInput');
   const text = input.value.trim();
   if (!text) return;
+
+  nachrichtTon();
 
   input.value = '';
   input.style.height = 'auto';

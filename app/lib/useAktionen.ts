@@ -35,7 +35,16 @@ export interface Aktionen {
   folgen: (userId: string, zurueck: Rueckweg) => Promise<void>;
   kommentarLike: (kommentarId: string, zurueck: Rueckweg) => Promise<void>;
   storyGesehen: (storyId: string, zurueck: Rueckweg) => Promise<void>;
-  teilen: (beitragId: string, empfaenger: string[], vorschau?: string) => Promise<boolean>;
+  /**
+   * `bereich` entscheidet, in welcher Chatliste die Nachricht landet —
+   * 'messenger' (Standard) oder 'community'.
+   */
+  teilen: (
+    beitragId: string,
+    empfaenger: string[],
+    vorschau?: string,
+    bereich?: string
+  ) => Promise<boolean>;
 
   /*
    * Der zweite Teil: Chats, Kontakte und Storys.
@@ -116,6 +125,18 @@ export interface Aktionen {
   storyLike: (storyId: string, zurueck: Rueckweg) => Promise<void>;
   /** Gibt den Chat zurueck, in dem die Antwort gelandet ist. */
   storyAntwort: (storyId: string, text: string) => Promise<string | null>;
+  /**
+   * Der Chat mit dieser Person — der vorhandene, sonst ein neuer in der
+   * Datenbank. Gibt dessen Kennung zurück, `null` wenn es nicht ging.
+   *
+   * Dafür gibt es das: `openChatWith` in App.tsx legte den Chat bis zum
+   * 18.09.2026 nur im Arbeitsspeicher an, mit einer selbst gebauten Kennung
+   * wie „c1758…". Zwei Dinge folgten daraus, und Henrik hat beide gemeldet:
+   * der Chat war nach einem Neustart weg, und schreiben ließ sich darin
+   * ohnehin nichts — `nachrichtSenden` bekam eine Kennung, die es in der
+   * Datenbank nicht gibt, und die Nachricht fiel in den Fehlerzweig.
+   */
+  chatMit: (userId: string, bereich?: 'messenger' | 'community') => Promise<string | null>;
   kommentarAnlegen: (
     beitragId: string,
     text: string
@@ -376,6 +397,8 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
       storyLike: (id, zurueck) => schreiben('Das Like', (c, i) => A.storyLike(c, i, id), zurueck),
       storyAntwort: (storyId, text) =>
         holen('Die Antwort', (c, i) => A.storyAntwort(c, i, storyId, text)),
+      chatMit: (userId, bereich = 'messenger') =>
+        holen('Der Chat', (c, i) => A.chatMit(c, i, userId, bereich)),
       kommentarAnlegen: (beitragId, text) =>
         holen('Der Kommentar', (c, i) => A.kommentarAnlegen(c, i, beitragId, text)),
       kommentarLoeschen: (id, zurueck) =>
@@ -646,13 +669,13 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
       standortAntwort: (anfrageId, annehmen, stunden) =>
         holen('Die Antwort', (c, i) => A.standortAntwort(c, i, anfrageId, annehmen, stunden)),
 
-      teilen: async (beitragId, empfaenger, vorschau) => {
+      teilen: async (beitragId, empfaenger, vorschau, bereich) => {
         if (!supabase || !ichId) {
           melden?.('Dafür musst du angemeldet sein');
           return false;
         }
         try {
-          await A.teilen(supabase, ichId, beitragId, empfaenger, vorschau);
+          await A.teilen(supabase, ichId, beitragId, empfaenger, vorschau, bereich);
           return true;
         } catch (e: any) {
           console.error('Teilen fehlgeschlagen:', e?.message ?? e);

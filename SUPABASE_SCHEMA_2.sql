@@ -281,7 +281,11 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  perform public.benachrichtige(new.contact_id, new.user_id, 'follow', 'aktivitaet', 'user', new.user_id, '');
+  -- 'videos', nicht 'aktivitaet': danach filtert die Glocke im Profil
+  -- (MitteilungsBereich in app/types/index.ts). Mit 'aktivitaet' landete die
+  -- Mitteilung in der Tabelle und wurde nie angezeigt — siehe
+  -- SUPABASE_SCHEMA_44_mitteilungen.sql.
+  perform public.benachrichtige(new.contact_id, new.user_id, 'follow', 'videos', 'user', new.user_id, '');
   return new;
 end;
 $$;

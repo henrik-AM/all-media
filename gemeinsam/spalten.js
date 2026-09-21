@@ -104,6 +104,11 @@ const NACHRICHT_SPALTEN =
   ' shared_post_id, posts(id, kind, title, description, media_url, thumbnail_url,' +
   ' profiles!posts_user_id_fkey(name)),' +
   ' place_id, places(id, name, adresse, koordinaten, x, y),' +
+  // Die Story, auf die sich die Nachricht bezieht — eine Antwort darauf oder
+  // ein Herz (Henrik 18.09., Schema 41). Ueber den Spaltennamen eingebettet,
+  // nicht ueber den Constraint-Namen: `messages` zeigt nur ueber diese eine
+  // Spalte auf `stories`, damit ist es eindeutig.
+  ' reply_to_story, stories(id, user_id, media_url, media_type),' +
   ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)';
 
 module.exports = {

@@ -21,7 +21,7 @@
 
 const { chromium } = require('playwright-core');
 const { zusammengelegt } = require('./_modulquelle');
-const { anmelden, MAIL, zuruecksetzen, mitZeitgrenze } = require('./_konto');
+const { anmelden, MAIL, zuruecksetzen, mitZeitgrenze, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
@@ -63,8 +63,7 @@ const pruefe = (name, wahr, zusatz = '') => {
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
   await zuruecksetzen(seite);
 
@@ -104,8 +103,7 @@ const pruefe = (name, wahr, zusatz = '') => {
   const [datei] = finde(bauOrdner);
   if (!datei) {
     console.error('FEHLER  aktionen.ts liess sich nicht uebersetzen.');
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
   // Mit medien.js verschmelzen — sonst scheitert der Import im blob-Modul.
   const quelltext = zusammengelegt(bauOrdner, 'aktionen.js');
@@ -137,8 +135,7 @@ const pruefe = (name, wahr, zusatz = '') => {
   const [dateiD] = findeD(bauOrdnerD);
   if (!dateiD) {
     console.error('FEHLER  daten.ts liess sich nicht uebersetzen.');
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
   const quelltextD = zusammengelegt(bauOrdnerD, 'daten.js');
   fs.rmSync(bauOrdnerD, { recursive: true, force: true });
@@ -189,6 +186,36 @@ const pruefe = (name, wahr, zusatz = '') => {
       { quelltext, name, args }
     );
 
+  /*
+   * Dasselbe ohne die eigene Kennung.
+   *
+   * `app()` schiebt jedem Aufruf `ich` als zweites Argument unter — die
+   * meisten Funktionen in aktionen.ts brauchen das. Einige nicht:
+   * `sammlungLoeschen(client, sammlungId)` nimmt an zweiter Stelle die
+   * Sammlung. Ueber `app()` gerufen bekaeme sie die Nutzerkennung als
+   * Sammlungskennung, loeschte nichts und meldete brav „liess sich nicht
+   * loeschen" — eine Pruefung, die aus dem falschen Grund gruen waere.
+   */
+  const appRoh = (name, ...args) =>
+    seite.evaluate(
+      async ({ quelltext, name, args }) => {
+        if (!window.__aktionen) {
+          const url = URL.createObjectURL(new Blob([quelltext], { type: 'text/javascript' }));
+          window.__aktionen = await import(url);
+          URL.revokeObjectURL(url);
+        }
+        const client = await window.Anmeldung.aufbauen();
+        try {
+          return await window.__aktionen[name](client, ...args);
+        } catch (e) {
+          const grund = (e && (e.message || e.hint || e.details)) || '';
+          const code = e && e.code ? ' [' + e.code + ']' : '';
+          throw new Error(name + ': ' + (grund || JSON.stringify(e)) + code);
+        }
+      },
+      { quelltext, name, args }
+    );
+
   /** Was die Website über diesen Beitrag sagt — die zweite Meinung. */
   const ausWebsite = (id) =>
     seite.evaluate(async (id) => {
@@ -197,17 +224,36 @@ const pruefe = (name, wahr, zusatz = '') => {
       return alle.find((b) => b.id === id) || null;
     }, id);
 
-  // Ein Beitrag, der nicht von mir ist — an eigenen Beiträgen sagt "folgen"
-  // nichts aus.
+  /*
+   * Ein Beitrag, der nicht von mir ist — an eigenen Beiträgen sagt "folgen"
+   * nichts aus — UND an dem noch nichts gesetzt ist.
+   *
+   * Der Zusatz kam am 18.09.2026 dazu. Vorher nahm dieser Lauf schlicht den
+   * ersten fremden Beitrag und prüfte dann, ob ein Antippen das Herz
+   * EINSCHALTET. Das setzt voraus, dass es vorher aus war — eine Annahme, die
+   * nie dastand und nur zufällig stimmte, weil der Testbestand seine Likes auf
+   * Beiträge legte, die das Konto gar nicht sehen durfte (Schema 42).
+   *
+   * Seit die Merkliste auf sichtbare Beiträge zeigt, trifft sie dieselben, die
+   * hier genommen werden: das Antippen schaltete das Herz dann AUS, und zwei
+   * Prüfungen fielen um — ohne dass am Like irgendetwas kaputt gewesen wäre.
+   *
+   * Ein Umschalter lässt sich nur prüfen, wenn man seinen Anfangszustand
+   * kennt. Also einen Beitrag nehmen, an dem nichts gesetzt ist.
+   */
   const beitrag = await seite.evaluate(async () => {
     const boot = await (await fetch('/api/bootstrap')).json();
-    return (boot.posts || []).find((p) => p.userId !== 'me') || (boot.posts || [])[0];
+    const fremde = (boot.posts || []).filter((p) => p.userId !== 'me');
+    return (
+      fremde.find((p) => !p.liked && !p.saved && !p.reposted && !p.notify) ||
+      fremde[0] ||
+      (boot.posts || [])[0]
+    );
   });
 
   if (!beitrag) {
     console.error('FEHLER  Kein Beitrag in der Datenbank — der Lauf würde nichts prüfen.');
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
 
   console.log('\nWas die App schreibt, sieht die Website');
@@ -780,6 +826,102 @@ const pruefe = (name, wahr, zusatz = '') => {
     return Array.isArray(liste) && liste.includes(name) && nach.includes(name);
   })());
 
+  /*
+   * SAMMLUNGEN — ANLEGEN UND LOESCHEN
+   *
+   * Seit dem 20.09.2026 kann die App eine Sammlung nicht nur anlegen,
+   * sondern auch wieder loeschen (Papierkorb im Kopf, VideoProfileScreen).
+   *
+   * Antippen laesst sich dieser Knopf von aussen nicht: der Simulator gibt
+   * ohne die Bedienungshilfen-Freigabe kein Tippen her. Geprueft wird
+   * deshalb genau der Weg, den der Knopf nimmt — die Funktionen aus
+   * aktionen.ts — und danach die Website als zweite Meinung. Was der Knopf
+   * AUSLOEST, steht damit fest; dass er dasteht, zeigt `mac:bilder`.
+   */
+  const EIGENER_BEITRAG = await seite.evaluate(async () => {
+    const boot = await (await fetch('/api/bootstrap')).json();
+    return [...(boot.posts || []), ...(boot.videos || [])].find((b) => b.userId === 'me') || null;
+  });
+  let APP_SAMMLUNG = null;
+
+  const websiteSammlungen = (art) =>
+    seite.evaluate(async (art) => {
+      const liste = await (await fetch('/api/sammlungen?art=' + art)).json();
+      return Array.isArray(liste) ? liste.map((s) => s.name) : [];
+    }, art);
+
+  await pruefe('Eine Playlist aus der App steht danach auf der Website', await (async () => {
+    const name = 'Prüflauf App ' + Date.now();
+    const angelegt = await app('sammlungAnlegen', 'playlist', name);
+    APP_SAMMLUNG = angelegt;
+    return Boolean(angelegt?.id) && (await websiteSammlungen('playlist')).includes(name);
+  })());
+
+  await pruefe('Ein eigener Beitrag lässt sich aus der App hineinlegen', await (async () => {
+    await appRoh('inSammlung', APP_SAMMLUNG.id, { postId: EIGENER_BEITRAG.id });
+    const inhalt = await appRoh('sammlungInhalt', APP_SAMMLUNG.id);
+    return inhalt.length === 1 && inhalt[0].id === EIGENER_BEITRAG.id;
+  })());
+
+  await pruefe('Eine aus der App gelöschte Sammlung ist auch auf der Website weg', await (async () => {
+    await appRoh('sammlungLoeschen', APP_SAMMLUNG.id);
+    await app('profilListeOhne', 'playlists', APP_SAMMLUNG.name);
+    const nach = await websiteSammlungen('playlist');
+    return !nach.includes(APP_SAMMLUNG.name);
+  })());
+
+  await pruefe('Der Beitrag darin gibt es weiterhin', await (async () => {
+    // Das ist, was die Rückfrage in der App verspricht. Fällt es um, nimmt
+    // das Löschen mehr mit als die Zuordnung.
+    return Boolean(await ausWebsite(EIGENER_BEITRAG.id));
+  })());
+
+  await pruefe('Der Name steht danach auch nicht mehr in der Namensliste', await (async () => {
+    const nach = await seite.evaluate(async () => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      return (boot.eigenesProfil || {}).playlists || [];
+    });
+    return !nach.includes(APP_SAMMLUNG.name);
+  })());
+
+  await pruefe('Eine fremde Sammlung lässt die App nicht löschen', await (async () => {
+    /*
+     * Gegenprobe. Unter Row Level Security loescht ein abgelehntes DELETE
+     * null Zeilen und meldet KEINEN Fehler — ohne die Zaehlung in
+     * `sammlungLoeschen` saehe der Aufruf wie ein Erfolg aus.
+     */
+    const fremde = await seite.evaluate(async () => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      const andere = (boot.posts || []).find((p) => p.userId !== 'me');
+      if (!andere) return null;
+      const liste = await (
+        await fetch('/api/sammlungen?art=highlight&user=' + encodeURIComponent(andere.userId))
+      ).json();
+      return Array.isArray(liste) && liste[0] ? liste[0] : null;
+    });
+    if (!fremde) return false; // Ohne fremde Sammlung prueft das hier nichts.
+
+    let geklappt = false;
+    try {
+      await appRoh('sammlungLoeschen', fremde.id);
+      geklappt = true;
+    } catch {
+      /* so soll es sein */
+    }
+    if (geklappt) return false;
+
+    // Und die Zeile muss danach noch dastehen.
+    const rest = await seite.evaluate(async (id) => {
+      const boot = await (await fetch('/api/bootstrap')).json();
+      const andere = (boot.posts || []).find((p) => p.userId !== 'me');
+      const liste = await (
+        await fetch('/api/sammlungen?art=highlight&user=' + encodeURIComponent(andere.userId))
+      ).json();
+      return Array.isArray(liste) && liste.some((s) => s.id === id);
+    }, fremde.id);
+    return rest;
+  })());
+
   await pruefe('Ein Spendenziel aus der App steht danach auf der Website', await (async () => {
     const ziel = { titel: 'Prüflauf', gesammelt: 5, ziel: 100 };
     await app('spendeSetzen', ziel);
@@ -898,6 +1040,5 @@ const pruefe = (name, wahr, zusatz = '') => {
       : `${fehler} Aktionen der App kommen nicht an.`
   );
 
-  await browser.close();
-  process.exit(fehler || browserFehler.length ? 1 : 0);
+  await beenden(browser, fehler || browserFehler.length ? 1 : 0);
 })();

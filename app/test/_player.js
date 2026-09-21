@@ -13,7 +13,7 @@
 // Start:  node test/_player.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -41,8 +41,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -112,6 +111,16 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   /* ------------------------------------------------- Querformat */
   console.log('\nVideos — Querformat-Player');
+
+  /*
+   * Schliesst ein offenes Optionsblatt und raeumt seinen Vorhang weg. Bleibt
+   * er liegen, deckt er den Player ab und jeder Klick auf dessen Knoepfe geht
+   * ins Leere — ohne Fehlermeldung, der Knopf reagiert einfach nicht.
+   */
+  const schliesseBlatt = async () => {
+    await page.click('[data-sheet-close]').catch(() => {});
+    await page.evaluate(() => document.querySelector('.sheet-backdrop')?.remove());
+  };
 
   const zumPlayer = async () => {
     await page.click('[data-area="videos"]');
@@ -219,6 +228,16 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   /* ---------------------------------------- Vollbild und Einstellungen */
   console.log('\nVideos — Vollbild und Einstellungen');
 
+  /*
+   * Ein liegengebliebener Sheet-Vorhang aus den Kapitel-Pruefungen legt sich
+   * ueber den Player und schluckt jeden Klick auf seine Knoepfe. Im Einzellauf
+   * faellt das nie auf, im vollen Durchgang vom 17.09.2026 kostete es vier
+   * Punkte: der Vollbild-Knopf reagierte nicht (265px vorher wie nachher) und
+   * das Optionsblatt liess sich nicht bedienen. Weiter unten in Zeile 278
+   * raeumt diese Datei denselben Vorhang schon einmal weg — hier fehlte es.
+   */
+  await schliesseBlatt();
+
   await pruefe('Es gibt einen Vollbild-Knopf', async () => {
     if (!(await page.$('#clipVollbild'))) throw new Error('kein Knopf');
   });
@@ -226,21 +245,35 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Er legt den Player über den ganzen Bildschirm', async () => {
     const vorher = await page.$eval('.player', (n) => n.getBoundingClientRect().height);
     await page.click('#clipVollbild');
-    await page.waitForTimeout(500);
+    /*
+     * Auf die Wirkung warten, nicht auf die Uhr: unter der Last des vollen
+     * Durchgangs braucht der Umbau laenger als eine feste halbe Sekunde.
+     */
+    await page
+      .waitForFunction(
+        (h) => (document.querySelector('.player')?.getBoundingClientRect().height ?? 0) > h,
+        vorher,
+        { timeout: 8000 }
+      )
+      .catch(() => {});
     const nachher = await page.$eval('.player', (n) => n.getBoundingClientRect().height);
     if (nachher <= vorher) throw new Error(`${Math.round(vorher)}px vorher, ${Math.round(nachher)}px nachher`);
   });
 
   await pruefe('Und wieder zurück', async () => {
     await page.click('#clipVollbild');
-    await page.waitForTimeout(500);
+    await page
+      .waitForFunction(() => !document.querySelector('.player')?.classList.contains('player--voll'), null, {
+        timeout: 8000,
+      })
+      .catch(() => {});
     const voll = await page.$eval('.player', (n) => n.classList.contains('player--voll'));
     if (voll) throw new Error('der Player bleibt im Vollbild');
   });
 
   await pruefe('Es gibt Video-Einstellungen mit drei Punkten', async () => {
     await page.click('#clipOptionen');
-    await page.waitForTimeout(500);
+    await page.waitForSelector('[data-vopt="tempo"]', { timeout: 8000 }).catch(() => {});
     const punkte = await page.$$eval('[data-vopt]', (n) => n.map((x) => x.dataset.vopt));
     for (const noetig of ['tempo', 'qualitaet', 'untertitel']) {
       if (!punkte.includes(noetig)) throw new Error('„' + noetig + '" fehlt: ' + punkte.join(' | '));
@@ -256,7 +289,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(600);
 
     await page.click('#clipOptionen');
-    await page.waitForTimeout(500);
+    await page.waitForSelector('[data-vopt="tempo"] .item__value', { timeout: 8000 }).catch(() => {});
     const steht = await page.$eval('[data-vopt="tempo"] .item__value', (n) => n.textContent.trim());
     if (steht !== '1,5×') throw new Error('steht „' + steht + '"');
   });
@@ -268,21 +301,20 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForSelector('#topbar button');
     await zumPlayer();
     await page.click('#clipOptionen');
-    await page.waitForTimeout(500);
+    await page.waitForSelector('[data-vopt="untertitel"]', { timeout: 8000 }).catch(() => {});
     const an = await page.$eval('[data-vopt="untertitel"]', (n) => n.classList.contains('is-on'));
     if (!an) throw new Error('nach dem Neustart wieder aus');
   });
 
   await pruefe('Ein Video ohne Untertitel bietet den Punkt nicht an', async () => {
-    await page.click('[data-sheet-close]').catch(() => {});
-    await page.evaluate(() => document.querySelector('.sheet-backdrop')?.remove());
+    await schliesseBlatt();
     await page.click('#clipBack');
     await page.waitForTimeout(400);
     // Eines ohne Untertitel: das Test-Rundumvideo.
     await page.click(await K.waehlerClip(page, 'Test-Rundumvideo'));
     await page.waitForSelector('.player');
     await page.click('#clipOptionen');
-    await page.waitForTimeout(500);
+    await page.waitForSelector('.sheet__hint', { timeout: 8000 }).catch(() => {});
     if (await page.$('[data-vopt="untertitel"]')) throw new Error('der Punkt steht trotzdem da');
     const hinweis = await page.$eval('.sheet__hint', (n) => n.textContent);
     if (!hinweis.includes('keine Untertitel')) throw new Error('kein Hinweis, es steht „' + hinweis + '"');
@@ -292,6 +324,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
 
-  await browser.close();
-  process.exit(erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
+  await beenden(browser, erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
 })();

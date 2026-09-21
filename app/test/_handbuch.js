@@ -31,7 +31,7 @@
 
 const { chromium } = require('playwright-core');
 const { zusammengelegt } = require('./_modulquelle');
-const { anmelden, MAIL, zuruecksetzen } = require('./_konto');
+const { anmelden, MAIL, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
@@ -71,8 +71,7 @@ const pruefe = (name, wahr, zusatz = '') => {
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
   await zuruecksetzen(seite);
 
@@ -103,8 +102,7 @@ const pruefe = (name, wahr, zusatz = '') => {
   const [datei] = finde(bauOrdner);
   if (!datei) {
     console.error('FEHLER  aktionen.ts liess sich nicht uebersetzen.');
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
   // Mit medien.js verschmelzen — sonst scheitert der Import im blob-Modul.
   const quelltext = zusammengelegt(bauOrdner, 'aktionen.js');
@@ -445,6 +443,5 @@ const pruefe = (name, wahr, zusatz = '') => {
       : `${fehler} Funktionen aus dem Handbuch kommen nicht an.`
   );
 
-  await browser.close();
-  process.exit(fehler || browserFehler.length ? 1 : 0);
+  await beenden(browser, fehler || browserFehler.length ? 1 : 0);
 })();

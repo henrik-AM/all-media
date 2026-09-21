@@ -12,7 +12,7 @@
 // Start:  node test/_gesten.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -45,8 +45,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -136,6 +135,20 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await zumFeed();
 
   /*
+   * Das Kommentar-Blatt oeffnen.
+   *
+   * Erst wenn kein Blatt mehr im Weg liegt: ein halb abgeraeumtes
+   * `.sheet-backdrop` faengt den Klick ab, Playwright versucht es dann
+   * mehrfach und meldet "…intercepts pointer events". Unter Last reichten
+   * die Versuche nicht.
+   */
+  const blattAuf = async () => {
+    await page.waitForFunction(() => !document.querySelector('.sheet-backdrop'), { timeout: 15000 }).catch(() => {});
+    await page.click(`.post__comments[data-pid="${ersterPost}"]`);
+    await page.waitForSelector('.comment');
+  };
+
+  /*
    * Der Beitrag, an dem dieser Abschnitt hängt.
    *
    * "p1" war seine feste Kennung in den Beispieldaten; jetzt bekommt er sie
@@ -160,9 +173,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Unter jedem Kommentar steht die Zahl seiner Likes', async () => {
-    await page.click(`.post__comments[data-pid="${ersterPost}"]`);
-    await page.waitForSelector('.comment');
-    await page.waitForTimeout(400);
+    await blattAuf();
+    /*
+     * Auf die vollstaendige Liste warten, nicht auf die Uhr. Hier standen
+     * 400 ms; einzeln reichten sie, im Gesamtlauf vom 20.09.2026 nicht — die
+     * Zeilen waren schon da, die Zahlen darunter noch nicht, und gemeldet
+     * wurde "2 Zahlen bei 3 Kommentaren".
+     */
+    await page
+      .waitForFunction(() => {
+        const zeilen = document.querySelectorAll('.comment').length;
+        return zeilen > 0 && document.querySelectorAll('.comment__likes').length === zeilen;
+      }, { timeout: 15000 })
+      .catch(() => {});
     const felder = await page.$$eval('.comment__likes', (n) => n.length);
     const zeilen = await page.$$eval('.comment', (n) => n.length);
     if (felder !== zeilen) throw new Error(felder + ' Zahlen bei ' + zeilen + ' Kommentaren');
@@ -171,7 +194,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Ein Like erhöht die Zahl sofort', async () => {
     const vorher = await page.$eval('.comment .comment__likes', (n) => Number(n.textContent) || 0);
     await page.click('.comment .comment__like');
-    await page.waitForTimeout(700);
+    /*
+     * Auch hier auf das Ergebnis warten. 700 ms reichen fuer eine Runde zur
+     * Datenbank und zurueck — solange nebenher nichts anderes laeuft. Im
+     * Gesamtlauf las die Pruefung die alte Zahl und meldete einen Fehler,
+     * den es nicht gab.
+     */
+    await page
+      .waitForFunction(
+        (soll) => Number(document.querySelector('.comment .comment__likes')?.textContent) === soll,
+        vorher + 1,
+        { timeout: 15000 }
+      )
+      .catch(() => {});
     const nachher = await page.$eval('.comment .comment__likes', (n) => Number(n.textContent) || 0);
     if (nachher !== vorher + 1) throw new Error(`${vorher} vorher, ${nachher} nachher`);
   });
@@ -213,9 +248,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nZiehen zum Schließen');
 
   await pruefe('Ein kurzer Zug schließt das Kommentar-Blatt NICHT', async () => {
-    await page.click(`.post__comments[data-pid="${ersterPost}"]`);
-    await page.waitForSelector('.comment');
-    await page.waitForTimeout(400);
+    await blattAuf();
     await wischen('.sheet', 40, { dauer: 600 });
     if (!(await page.$('.sheet'))) throw new Error('es ist trotzdem zugegangen');
   });
@@ -258,6 +291,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
 
-  await browser.close();
-  process.exit(erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
+  await beenden(browser, erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
 })();

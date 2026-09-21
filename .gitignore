@@ -31,5 +31,20 @@ Thumbs.db
 # Zwischenablage der Testmedien (tools/testmedien.js)
 .medien-cache/
 
-# Sperre des Gesamtlaufs (app/test/alles.js)
+# Sperre und Protokolle des Gesamtlaufs (app/test/alles.js). Die .lauf-Dateien
+# raeumt der Lauf selbst wieder weg — waehrend er laeuft, liegt immer eine da.
 .gesamtlauf-laeuft.json
+.lauf-*.log
+
+# Was ein Plugin auf diesem Rechner installiert hat — kein Projektstand.
+# Die STRIX-Sicherheitsskills ziehen sich aus GitHub nach (skills-lock.json)
+# und standen bisher bei jedem "git status" als elf unversionierte Eintraege
+# dazwischen. Der projekteigene Skill .claude/skills/ig-inspired-design
+# bleibt versioniert: eine bereits getrackte Datei beruehrt .gitignore nicht.
+/.agents/
+/skills-lock.json
+/.claude/skills/
+
+# Wissensgraph von Graphify (installiert 20.09.2026). Jederzeit mit
+# "graphify update ." neu zu bauen, darum kein Projektstand.
+/graphify-out/

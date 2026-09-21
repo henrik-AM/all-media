@@ -466,6 +466,14 @@ export async function ladeChats(
         muted: Boolean(z.is_muted),
         archiviert: Boolean(z.is_archived),
         favorit: Boolean(z.is_favorite),
+        /*
+         * is_locked und notifications_off wurden seit jeher geladen
+         * (CHATMITGLIED_SPALTEN) und hier weggeworfen. Der Wert stand in der
+         * Datenbank, kam ueber die Leitung — und war nach dem naechsten Laden
+         * weg. Gleiche Regel in web/server/supabase-api.js (ladeChats).
+         */
+        gesperrt: Boolean(z.is_locked),
+        mitteilungenAus: Boolean(z.notifications_off),
         zeitpunkt: vorschau?.created_at ?? z.chats.updated_at,
       };
     })
@@ -621,6 +629,20 @@ export async function ladeNachrichten(
       : undefined,
     kontakt: n.profiles
       ? { id: n.profiles.id, name: n.profiles.name, handle: n.profiles.handle }
+      : undefined,
+    /*
+     * Die Story, auf die sich die Nachricht bezieht (Henrik 18.09., Schema
+     * 41) — ein Herz oder eine Antwort darauf. `stories` ist null, sobald die
+     * Story nach 24 Stunden verschwunden ist; dann bleibt die Nachricht
+     * lesbar und die Vorschau fehlt, was der Wahrheit entspricht.
+     * Gleiche Regel in web/server/supabase-api.js.
+     */
+    story: n.stories
+      ? {
+          id: n.stories.id,
+          userId: n.stories.user_id === ichId ? ICH : n.stories.user_id,
+          mediaUri: n.stories.media_url ?? undefined,
+        }
       : undefined,
     // Die Werkzeuge aus dem Handbuch — siehe Message in types/index.ts.
     antwortAuf: n.reply_to && bezug.has(n.reply_to)

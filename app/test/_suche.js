@@ -8,7 +8,7 @@
 // Start:  node test/_suche.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -35,8 +35,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -77,15 +76,46 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (fehlend.length) throw new Error('ohne Pfeil: ' + fehlend.join(', '));
   });
 
+  /*
+   * Die Uebersicht hat sieben Reihen mit Vorschaubildern. Solange die
+   * nachladen, wandert jede Reihe darunter nach unten — Playwright bricht den
+   * Klick dann mit „element is not stable" ab. Im Einzellauf sind die Bilder
+   * lange da, im vollen Durchgang vom 17.09.2026 traf es „posts", die dritte
+   * Reihe von oben. Deshalb erst warten, bis die Zeile zweimal hintereinander
+   * an derselben Stelle steht, und dann klicken.
+   */
+  const warteStabil = async (waehler) => {
+    // Zuruecksetzen, sonst vergleicht der erste Durchgang mit der Zeile der
+    // vorigen Kategorie und haelt einen Zufallstreffer fuer Ruhe.
+    await page.evaluate(() => {
+      window.__letzteHoehe = null;
+    });
+    await page
+      .waitForFunction(
+        (w) => {
+          const el = document.querySelector(w);
+          if (!el) return false;
+          const jetzt = Math.round(el.getBoundingClientRect().top);
+          const vorher = window.__letzteHoehe;
+          window.__letzteHoehe = jetzt;
+          return vorher === jetzt;
+        },
+        waehler,
+        { timeout: 8000, polling: 200 }
+      )
+      .catch(() => {});
+  };
+
   for (const kat of KATEGORIEN) {
     await pruefe(`„${kat}" oeffnet eine eigene Seite mit Zurueck-Pfeil`, async () => {
       await zurSuche();
+      await warteStabil(`[data-explorer="${kat}"]`);
       await page.click(`[data-explorer="${kat}"]`);
-      await page.waitForTimeout(250);
+      await page.waitForSelector('[data-explorer-back]', { timeout: 8000 }).catch(() => {});
       const zurueck = await page.$('[data-explorer-back]');
       if (!zurueck) throw new Error('kein Zurueck-Pfeil');
       await zurueck.click();
-      await page.waitForTimeout(250);
+      await page.waitForSelector('#videoSearch', { timeout: 8000 }).catch(() => {});
       const wiederSuche = await page.$('#videoSearch');
       if (!wiederSuche) throw new Error('der Pfeil fuehrt nicht zurueck zur Suche');
     });
@@ -126,6 +156,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
 
-  await browser.close();
-  process.exit(erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
+  await beenden(browser, erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
 })();

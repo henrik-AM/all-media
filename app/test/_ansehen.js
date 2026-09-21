@@ -6,7 +6,7 @@
 //   node test/_ansehen.js dunkel     dunkel
 
 const { chromium } = require('playwright-core');
-const { anmelden } = require('./_konto');
+const { anmelden, schliesse, beenden } = require('./_konto');
 const K = require('./_kennungen');
 const path = require('path');
 const fs = require('fs');
@@ -91,8 +91,7 @@ const DETAILS = [
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -163,7 +162,7 @@ const DETAILS = [
     await seite.waitForSelector('.navbtn');
   }
 
-  await browser.close();
+  await schliesse(browser);
 
   console.log(`\n  ${SEITEN.length + DETAILS.length} Bilder in bilder/${DUNKEL ? 'dunkel' : 'hell'}/`);
   if (fehler.length) {

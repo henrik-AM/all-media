@@ -38,7 +38,7 @@
 
 const { chromium } = require('playwright-core');
 const { zusammengelegt } = require('./_modulquelle');
-const { anmelden, MAIL, zuruecksetzen, mitZeitgrenze } = require('./_konto');
+const { anmelden, MAIL, zuruecksetzen, mitZeitgrenze, beenden } = require('./_konto');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
 
@@ -112,8 +112,7 @@ function uebersetzen(name) {
   const an = await anmelden(seite);
   if (!an.ok) {
     console.error(`FEHLER  Prüfkonto ${MAIL} konnte sich nicht anmelden: ${an.fehler}`);
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
   await zuruecksetzen(seite);
   await seite.reload({ waitUntil: 'load' });
@@ -134,8 +133,7 @@ function uebersetzen(name) {
 
   if (!kanalDaten) {
     console.error('FEHLER  Keine Community mit Unterthema — der Lauf würde nichts prüfen.');
-    await browser.close();
-    process.exit(1);
+    await beenden(browser, 1);
   }
 
   /** Was in diesem Unterthema wirklich steht — gefragt wird die Datenbank. */
@@ -370,6 +368,5 @@ function uebersetzen(name) {
   console.log(`\n${gesamt - fehler} von ${gesamt} Pruefungen bestanden`);
   console.log('Konsolenfehler: ' + (browserFehler.length ? browserFehler.join(' | ') : 'keine'));
 
-  await browser.close();
-  process.exit(fehler || browserFehler.length ? 1 : 0);
+  await beenden(browser, fehler || browserFehler.length ? 1 : 0);
 })();

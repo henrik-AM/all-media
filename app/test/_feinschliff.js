@@ -15,7 +15,7 @@
 // Start:  node test/_feinschliff.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -43,8 +43,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -493,6 +492,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
 
-  await browser.close();
-  process.exit(erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
+  await beenden(browser, erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
 })();

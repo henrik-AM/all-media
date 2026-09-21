@@ -585,12 +585,19 @@ const handleNotifyPost = handler('Beitragshinweis', async (client, nutzerId, bei
 /** Einen Beitrag an mehrere Personen schicken: als Nachricht in ihren Chat. */
 const handleShareToChats = handler(
   'An Kontakte schicken',
-  async (client, nutzerId, beitragId, empfaenger = [], vorschau = 'Beitrag geteilt') => {
+  async (client, nutzerId, beitragId, empfaenger = [], vorschau = 'Beitrag geteilt', bereich = 'messenger') => {
     if (empfaenger.length === 0) return { ok: false, fehler: 'Bitte mindestens eine Person auswählen' };
 
     const gesendet = [];
     for (const zielId of empfaenger) {
-      const chatId = await chatMit(client, nutzerId, zielId);
+      /*
+       * `bereich` entscheidet, in welcher der beiden Chatlisten die Nachricht
+       * landet — Messenger oder Communitys. Hier stand bis zum 17.09.2026 ein
+       * Aufruf ohne diesen Wert; zusammen mit den drei anderen Aufrufern hiess
+       * das: kein Codepfad hat je einen Chat mit bereich='community' erzeugt.
+       * Gleiche Regel in app/lib/aktionen.ts (teilen).
+       */
+      const chatId = await chatMit(client, nutzerId, zielId, bereich);
       // Welcher Beitrag geteilt wurde, gehoert an die Nachricht. Sonst steht
       // im Chat nur der Satz "Beitrag geteilt" und niemand kommt von dort aus
       // zum Beitrag — im Prototyp ist das eine Karte, die ihn oeffnet.
@@ -628,7 +635,10 @@ const handleStoryReply = handler('Story beantworten', async (client, nutzerId, s
   const chatId = await chatMit(client, nutzerId, story.user_id);
   const { data: nachricht, error: fehlerN } = await client
     .from('messages')
-    .insert({ chat_id: chatId, sender_id: nutzerId, text })
+    // Mit Bezug auf die Story (Schema 41). Ohne ihn stand im Chat ein Satz
+    // wie „schoenes Bild!", und niemand wusste zwei Tage spaeter noch, worauf
+    // er sich bezog. Gleiche Regel in app/lib/aktionen.ts (storyAntwort).
+    .insert({ chat_id: chatId, sender_id: nutzerId, text, reply_to_story: storyId })
     .select()
     .single();
   if (fehlerN) throw fehlerN;
@@ -710,7 +720,85 @@ const handleProfilListe = handler(
     const neu = [...bestand, name];
     const { error } = await client.from('profiles').update({ [spalte]: neu }).eq('id', nutzerId);
     if (error) throw error;
+
+    /*
+     * Seit Schema 46 (20.09.2026) ist die Sammlung selbst eine Zeile und
+     * nicht mehr nur ein Name in einer Textliste — nur so kann etwas darin
+     * liegen. Beides wird geschrieben, solange die Namenslisten noch
+     * gelesen werden; die App tut in ProfilContext.tsx dasselbe.
+     *
+     * Schlaegt die zweite Schreibung fehl, bleibt die erste stehen: der
+     * Name ist dann angelegt, die Sammlung noch nicht. Das ist der
+     * harmlosere der beiden Halbzustaende — sichtbar, aber leer — und er
+     * heilt, sobald derselbe Name noch einmal angelegt wird.
+     */
+    const { error: sammelFehler } = await client
+      .from('sammlungen')
+      .insert({
+        user_id: nutzerId,
+        art: spalte === 'highlights' ? 'highlight' : 'playlist',
+        name,
+      });
+    // 23505 heisst: gibt es schon. Das ist kein Fehler, sondern der
+    // Normalfall bei einem Namen, der aus der alten Liste herueberwandert.
+    if (sammelFehler && sammelFehler.code !== '23505') throw sammelFehler;
+
     return { ok: true, [spalte]: neu };
+  }
+);
+
+/**
+ * Eine Sammlung wieder loeschen.
+ *
+ * Bis zum 20.09.2026 gab es diesen Weg auf keiner der beiden Seiten: anlegen
+ * ging, loeschen nicht. Wer sich vertippt hatte, behielt den Kreis.
+ *
+ * Der Inhalt (`sammlung_inhalte`) faellt per `on delete cascade` mit — die
+ * BEITRAEGE und STORYS bleiben unberuehrt, es verschwindet nur die
+ * Zuordnung. Das ist der Unterschied, den die Rueckfrage in der Oberflaeche
+ * benennen muss.
+ */
+const handleSammlungLoeschen = handler(
+  'Sammlung löschen',
+  async (client, nutzerId, art, name) => {
+    if (!['highlight', 'playlist'].includes(art)) {
+      return { ok: false, fehler: 'Unbekannte Sammlung' };
+    }
+
+    /*
+     * `.select('id')` ist hier kein Luxus. Bei Row Level Security loescht ein
+     * abgelehntes DELETE null Zeilen und meldet KEINEN Fehler — die Antwort
+     * saehe genauso aus wie ein Erfolg. Gezaehlt wird deshalb, was wirklich
+     * weg ist.
+     */
+    const { data: weg, error } = await client
+      .from('sammlungen')
+      .delete()
+      .eq('user_id', nutzerId)
+      .eq('art', art)
+      .eq('name', name)
+      .select('id');
+    if (error) throw error;
+    if (!weg?.length) {
+      return { ok: false, fehler: `„${name}" gibt es nicht mehr` };
+    }
+
+    /*
+     * Den Namen auch aus der alten Textliste nehmen. Solange `profiles`
+     * dieselben Namen noch fuehrt und beide Seiten sie lesen, stuende der
+     * Kreis sonst weiter da — nur ohne Inhalt und ohne id. Gegenstueck zu
+     * handleProfilListe weiter oben.
+     */
+    const spalte = art === 'highlight' ? 'highlights' : 'playlists';
+    const { data } = await client.from('profiles').select(spalte).eq('id', nutzerId).maybeSingle();
+    const rest = (data?.[spalte] || []).filter((n) => n !== name);
+    const { error: listenFehler } = await client
+      .from('profiles')
+      .update({ [spalte]: rest })
+      .eq('id', nutzerId);
+    if (listenFehler) throw listenFehler;
+
+    return { ok: true, [spalte]: rest };
   }
 );
 
@@ -808,13 +896,21 @@ const handleSendMessage = handler(
   }
 );
 
-const handleMarkMessageAsRead = handler('Nachricht gelesen', async (client, nutzerId, nachrichtId) => {
-  const { error } = await client
-    .from('messages')
-    .update({ read_at: new Date().toISOString() })
-    .eq('id', nachrichtId);
+/**
+ * Alle fremden Nachrichten eines Chats als gelesen vermerken.
+ *
+ * Entschieden wird das in der Datenbank (Schema 40, `chat_gelesen`): sie
+ * prueft die Mitgliedschaft und den Schalter `lesebestaetigung` des Lesers.
+ * Frueher stand hier ein direktes UPDATE auf `messages` — das konnte gar
+ * nicht wirken, weil die Regel „Eigene Nachricht aendern" nur den ABSENDER
+ * schreiben laesst; das verbotene UPDATE traf still null Zeilen und meldete
+ * Erfolg. Die App ruft dieselbe Funktion auf, damit beide Seiten nicht
+ * auseinanderlaufen koennen.
+ */
+const handleMarkChatAsRead = handler('Chat gelesen', async (client, nutzerId, chatId) => {
+  const { data, error } = await client.rpc('chat_gelesen', { p_chat: chatId });
   if (error) throw error;
-  return { ok: true };
+  return { ok: true, bestaetigt: Number(data) || 0 };
 });
 
 // --------------------------------------------------------------- Beiträge --
@@ -987,11 +1083,50 @@ const handleCreateStory = handler('Story anlegen', async (client, nutzerId, feld
   return { ok: true, story: data };
 });
 
+/*
+ * Herz an einer Story — und die Nachricht darueber an die Person.
+ *
+ * Henrik am 18.09.2026: „Story-Like wird nicht im Chat angezeigt." Bis dahin
+ * schrieb dieser Handler eine Zeile nach `story_likes` und sonst nirgendwohin.
+ * Die Person, deren Story geliked wurde, erfuhr davon nichts.
+ *
+ * Die Nachricht traegt `reply_to_story`, zeigt im Chat also die Vorschau der
+ * Story statt eines Satzes ohne Bezug.
+ *
+ * Beim Zuruecknehmen des Herzens bleibt die Nachricht stehen: sie war heraus.
+ * An der eigenen Story entsteht keine — es gaebe keinen Chat dafuer.
+ *
+ * Gleiche Regel in app/lib/aktionen.ts (storyLike).
+ */
 const handleLikeStory = handler('Story-Like', async (client, nutzerId, storyId) => {
   const gesetzt = await umschalten(client, 'story_likes', {
     story_id: storyId,
     user_id: nutzerId,
   });
+  if (!gesetzt) return { ok: true, geliked: gesetzt };
+
+  const { data: story } = await client
+    .from('stories')
+    .select('id, user_id')
+    .eq('id', storyId)
+    .maybeSingle();
+  if (!story || story.user_id === nutzerId) return { ok: true, geliked: gesetzt };
+
+  /*
+   * Das Herz darf am Chat scheitern, ohne das Like mitzunehmen: die
+   * Gegenseite kann Nachrichten abgestellt haben (Schema 22). Das Like
+   * gehoert der Story, nicht dem Chat.
+   */
+  try {
+    const chatId = await chatMit(client, nutzerId, story.user_id);
+    const { error } = await client
+      .from('messages')
+      .insert({ chat_id: chatId, sender_id: nutzerId, text: '\u2764\ufe0f', reply_to_story: storyId });
+    if (error) throw error;
+  } catch (fehler) {
+    console.warn('Herz an der Story kam nicht in den Chat:', fehler?.message || fehler);
+  }
+
   return { ok: true, geliked: gesetzt };
 });
 
@@ -1122,6 +1257,23 @@ const handleEinstellung = handler(
         .update({ privat: inhalt === 'an' })
         .eq('id', nutzerId);
       if (fehler) throw fehler;
+
+      /*
+       * "Privates Profil" steht zweimal in den Einstellungen — unter Videos
+       * und unter Communitys — und beide schalten dieselbe Spalte
+       * profiles.privat. In user_settings liefen die zwei Schluessel
+       * auseinander: wer den einen umlegte, sah den anderen unveraendert
+       * stehen, obwohl er sich mitgeaendert hatte. Gleiche Regel in
+       * app/lib/aktionen.ts (einstellungSetzen).
+       */
+      const anderer = name === 'videoPrivate' ? 'commPrivate' : 'videoPrivate';
+      const { error: zwilling } = await client
+        .from('user_settings')
+        .upsert(
+          { user_id: nutzerId, schluessel: anderer, wert: inhalt, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,schluessel' }
+        );
+      if (zwilling) throw zwilling;
     }
 
     return { ok: true, schluessel: name, wert: inhalt };
@@ -1858,11 +2010,12 @@ module.exports = {
   handleCreateChannel,
   handleSendChannelMessage,
   handleProfilListe,
+  handleSammlungLoeschen,
   handleSpende,
   handleLivestream,
   istNummer,
   handleSendMessage,
-  handleMarkMessageAsRead,
+  handleMarkChatAsRead,
   handleCreatePost,
   handleCreateVideo,
   handleDeleteContent,

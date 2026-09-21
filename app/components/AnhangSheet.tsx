@@ -44,6 +44,19 @@ interface Props {
    */
   onStandortAnfragen?: () => void;
   /**
+   * Die eigene Kamera oeffnen statt der des Systems.
+   *
+   * Bis zum 20.09.2026 rief "Foto aufnehmen" hier `launchCameraAsync` — die
+   * Kamera-App des Systems. Die hat im Simulator kein Gegenstueck, kennt
+   * keinen Filter und keinen Weg in die Galerie. Die eigene Kamera liegt
+   * eine Ebene hoeher, weil ein Vollbild nicht in ein Blatt gehoert; dieses
+   * Blatt sagt nur Bescheid.
+   *
+   * Fehlt der Anschluss, bleibt es beim alten Weg — dann ist das Blatt in
+   * einem Zusammenhang eingebaut, der keine eigene Kamera hat.
+   */
+  onKamera?: () => void;
+  /**
    * Anhang-Arten, die es hier nicht gibt.
    *
    * Im Unterthema einer Community faellt "Standort anfragen" weg: die Anfrage
@@ -80,6 +93,7 @@ export const AnhangSheet = ({
   onClose,
   onAnhang,
   onStandortAnfragen,
+  onKamera,
   ohne = [],
   onNotice,
 }: Props) => {
@@ -92,6 +106,10 @@ export const AnhangSheet = ({
   };
 
   const foto = async (ausDerGalerie: boolean) => {
+    if (!ausDerGalerie && onKamera) {
+      schliessen();
+      return onKamera();
+    }
     const uri = ausDerGalerie ? await ausGalerie('photo', onNotice) : await aufnehmen('photo', onNotice);
     if (!uri) return schliessen();
     onAnhang({ text: 'Foto', media: 'image', bildUri: uri });

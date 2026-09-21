@@ -38,6 +38,9 @@ const { signiereMedien, hochladen } = require('./medien');
 const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require('./supabase');
 // Dieselbe Regel wie in der App — siehe gemeinsam/telefon.js.
 const Telefon = require('../../gemeinsam/telefon');
+
+// Wie ein eigener Kommentar in der Liste steht — gemeinsam mit der App.
+const Kommentar = require('../../gemeinsam/kommentar');
 // Welcher Stand läuft hier? Einmal beim Start ermittelt, siehe version.js.
 const VERSION = require('./version');
 // Die Schreibweise des Kontakt-QR-Codes — dieselbe Datei, die auch der
@@ -664,6 +667,18 @@ app.post('/api/messages/:chatId', route(async (req) => {
 }));
 
 /**
+ * Chat geöffnet — was drinsteht, gilt als gelesen.
+ *
+ * Ob daraus eine Lesebestätigung wird, entscheidet `chat_gelesen` in der
+ * Datenbank anhand des Schalters des Lesers. Die App ruft dieselbe Funktion
+ * auf; deshalb steht die Regel nirgends zweimal.
+ */
+app.post('/api/messages/:chatId/gelesen', route(async (req) => {
+  const e = await syncHandlers.handleMarkChatAsRead(req.db, req.nutzerId, req.params.chatId);
+  return antwort(e);
+}));
+
+/**
  * Darf in diesem Chat geschrieben werden?
  *
  * Zwei Gründe sprechen dagegen: die Kontaktanfrage läuft noch (bei einem
@@ -975,8 +990,16 @@ app.post('/api/kontakte/:userId/anruf', route(async (req) => {
  * macht das onMessage in ContactProfileScreen.tsx über dieselbe chatMit-Regel.
  */
 app.post('/api/kontakte/:userId/chat', route(async (req) => {
-  const e = await syncHandlers.handleChatMit(req.db, req.nutzerId, req.params.userId, 'messenger');
-  return antwort(e);
+  /*
+   * Hier stand 'messenger' fest im Code. Wer aus dem Bereich Communitys
+   * heraus auf „Nachricht" ging, landete deshalb im Messenger — und der
+   * Chat, der dabei entstand, gehoerte fuer immer in die falsche Liste.
+   * Der Browser schickt den Bereich jetzt mit; alles ausser 'community'
+   * gilt als Messenger.
+   */
+  const bereich = req.body?.bereich === 'community' ? 'community' : 'messenger';
+  const e = await syncHandlers.handleChatMit(req.db, req.nutzerId, req.params.userId, bereich);
+  return antwort(e, { bereich });
 }));
 
 /*
@@ -1349,6 +1372,19 @@ app.post('/api/eigene/playlist', route(async (req) => {
   return antwort(await syncHandlers.handleProfilListe(req.db, req.nutzerId, 'playlists', name));
 }));
 
+/*
+ * Gegenstueck zu den beiden Routen darueber. DELETE und nicht POST, weil es
+ * genau das ist — und die Gattung steht im Pfad, nicht im Rumpf: ein DELETE
+ * mit Rumpf wird von manchem Zwischenstueck stillschweigend abgeschnitten.
+ */
+app.delete('/api/eigene/sammlung/:art/:name', route(async (req) => {
+  const name = String(req.params.name || '').trim();
+  if (!name) return { ok: false, error: 'Bitte einen Namen angeben' };
+  return antwort(
+    await syncHandlers.handleSammlungLoeschen(req.db, req.nutzerId, req.params.art, name)
+  );
+}));
+
 app.post('/api/eigene/spende', route(async (req) => {
   const titel = String(req.body?.titel || '').trim();
   if (!titel) return { ok: false, error: 'Bitte einen Titel eingeben' };
@@ -1464,21 +1500,58 @@ app.post('/api/eigene/:id/sammlung', route(async (req) => {
   /*
    * Bis zum 01.09.2026 gab dieser Endpunkt "Sammlungen sind noch nicht
    * angelegt" zurueck — ehrlich, aber eben auch: die Funktion gab es nicht.
-   * Jetzt steht die Zuordnung in public.sammlung_beitraege.
+   * Danach schrieb er nach public.sammlung_beitraege.
+   *
+   * Seit dem 20.09.2026 steht die Zuordnung in sammlungen /
+   * sammlung_inhalte (Schema 46). Der Unterschied ist nicht kosmetisch:
+   *
+   *   - sammlung_beitraege kannte nur Beitraege, keine Storys — ein
+   *     Highlight liess sich also gar nicht fuellen, obwohl das Blatt es
+   *     anbot.
+   *   - Die Sammlung stand dort als Text. Wurde sie umbenannt, waren ihre
+   *     Beitraege verwaist, und niemand haette es gemerkt.
+   *   - Die App kannte die Tabelle nicht. Website und App haetten dieselbe
+   *     Playlist verschieden gefuellt.
+   *
+   * Die alte Tabelle war beim Umstellen leer — es ist nichts umgezogen und
+   * nichts verloren gegangen.
    */
-  const { data: schon } = await req.db
-    .from('sammlung_beitraege')
-    .select('post_id')
+  /*
+   * `art` gehoert in die Abfrage, nicht nur der Name. Eine Playlist und ein
+   * Highlight duerfen denselben Namen tragen (Schema 46: unique ueber
+   * user_id, art, name). Ohne `art` fand maybeSingle beide Zeilen und warf
+   * "multiple rows returned" — die Seite bekam einen Fehler 500, und der
+   * Pruefsatz "In ein Highlight kommt kein Beitrag" war trotzdem gruen,
+   * weil auch ein Absturz keine Aufnahme ist.
+   */
+  const art = req.body?.art === 'highlight' ? 'highlight' : 'playlist';
+
+  if (art !== 'playlist') {
+    return { ok: false, error: `In „${name}" gehören Storys, keine Beiträge` };
+  }
+
+  const { data: sammlung, error: suchfehler } = await req.db
+    .from('sammlungen')
+    .select('id')
     .eq('user_id', req.nutzerId)
-    .eq('sammlung', name)
+    .eq('name', name)
+    .eq('art', art)
+    .maybeSingle();
+  if (suchfehler) throw suchfehler;
+  if (!sammlung) return { ok: false, error: `„${name}" gibt es nicht mehr` };
+
+  const { data: schon } = await req.db
+    .from('sammlung_inhalte')
+    .select('id')
+    .eq('sammlung_id', sammlung.id)
     .eq('post_id', req.params.id)
     .maybeSingle();
 
   if (schon) return { ok: false, error: `„${name}" enthält das schon` };
 
   const { error } = await req.db
-    .from('sammlung_beitraege')
-    .insert({ user_id: req.nutzerId, sammlung: name, post_id: req.params.id });
+    .from('sammlung_inhalte')
+    .insert({ sammlung_id: sammlung.id, post_id: req.params.id });
   if (error) throw error;
 
   return { ok: true, meldung: `Zu „${name}" hinzugefügt` };
@@ -1541,8 +1614,27 @@ app.post('/api/teilen', route(async (req) => {
   if (!eintrag) return { ok: false, error: 'Diesen Beitrag gibt es nicht mehr' };
 
   const vorschau = eintrag.kind === 'post' ? 'Beitrag geteilt' : 'Video geteilt';
-  const e = await syncHandlers.handleShareToChats(req.db, req.nutzerId, eintrag.id, empfaenger, vorschau);
-  return antwort(e, { chats: await supabaseApi.ladeChats(req.db, req.nutzerId) });
+
+  /*
+   * Aus welchem Bereich heraus geteilt wurde. Der Browser schickt ihn mit;
+   * alles ausser 'community' gilt als Messenger, damit ein fremder Aufruf
+   * keine dritte Liste erfinden kann.
+   *
+   * Ohne diesen Wert landete jeder geteilte Beitrag im Messenger — auch der
+   * aus dem Bereich Communitys. Siehe handleShareToChats.
+   */
+  const bereich = req.body?.bereich === 'community' ? 'community' : 'messenger';
+  const e = await syncHandlers.handleShareToChats(
+    req.db,
+    req.nutzerId,
+    eintrag.id,
+    empfaenger,
+    vorschau,
+    bereich
+  );
+  // Die Antwort muss die Liste zeigen, in die tatsaechlich geschrieben wurde —
+  // sonst sucht der Browser den neuen Chat in der falschen.
+  return antwort(e, { bereich, chats: await supabaseApi.ladeChats(req.db, req.nutzerId, bereich) });
 }));
 
 /*
@@ -1556,6 +1648,217 @@ app.post('/api/teilen', route(async (req) => {
  * `reposts` (Schema 20): wer sie verbirgt, liefert keine Zeilen. Der Reiter
  * ist dann leer, und die Oberflaeche verraet nichts ueber die Einstellung.
  */
+/*
+ * Die gespeicherten Beitraege — der Reiter mit dem Lesezeichen.
+ *
+ * Henrik am 18.09.2026: „Gespeicherte Beitraege werden nicht synchronisiert
+ * (unter Videos/Profil kann ich sie nicht sehen)." Der Reiter stand in
+ * PROFILE_TABS und hatte nie eine Quelle; `saves` wurde einzig gelesen, um
+ * das Lesezeichen im Feed auszufuellen.
+ *
+ * Absichtlich OHNE `?user=` — anders als Reposts und Markierungen. Was jemand
+ * speichert, geht niemanden sonst etwas an. Gleiche Regel in
+ * app/lib/aktionen.ts (gespeicherteVon).
+ */
+/*
+ * Sammlungen — Playlists und Highlights (Schema 46).
+ *
+ * Bis zum 20.09.2026 standen die Namen in `profiles.playlists` und
+ * `profiles.highlights`, also in zwei Textlisten. Ein Kreis im Profil hatte
+ * deshalb nie ein Vorschaubild, und Antippen konnte nichts zeigen: es gab
+ * keine Zuordnung, was darin liegt.
+ *
+ * Mit `?user=` auch fuer fremde Profile — eine Playlist im fremden Profil
+ * ist Teil dieses Profils. Anders als /api/gespeichert und /api/gelikt, die
+ * absichtlich nur das eigene Konto kennen.
+ */
+app.get('/api/sammlungen', route(async (req) => {
+  const art = req.query.art === 'highlight' ? 'highlight' : 'playlist';
+  const wessen = req.query.user || req.nutzerId;
+
+  const { data, error } = await req.db
+    .from('sammlungen')
+    .select(`id, art, name, created_at,
+             sammlung_inhalte ( created_at,
+               posts!post_id (thumbnail_url, media_url),
+               stories!story_id (media_url) )`)
+    .eq('user_id', wessen)
+    .eq('art', art)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  /*
+   * Unterschreiben, bevor gerechnet wird. Der Eimer ist seit Schema 23
+   * nicht mehr oeffentlich; eine rohe media_url fuehrt ins Leere, und zwar
+   * ohne Fehlermeldung — der Kreis bliebe einfach grau, und niemand wuesste
+   * warum.
+   */
+  const signiert = await signiereMedien(req.db, data || []);
+
+  return signiert.map((s) => {
+    const inhalte = s.sammlung_inhalte || [];
+    // Das zuletzt Hinzugefuegte ist das Bild der Sammlung. Dieselbe Regel
+    // wie in app/lib/aktionen.ts (sammlungenVon) — sonst zeigten App und
+    // Website verschiedene Kreise fuer dieselbe Sammlung.
+    const neueste = [...inhalte].sort((a, b) =>
+      String(b.created_at).localeCompare(String(a.created_at)));
+    const treffer = neueste.find((i) => i.posts || i.stories);
+    return {
+      id: s.id,
+      art: s.art,
+      name: s.name,
+      anzahl: inhalte.length,
+      // Leer ist ein gueltiger Zustand, keine Panne: eine gerade angelegte
+      // Sammlung hat noch kein Bild.
+      bild: treffer
+        ? (treffer.posts?.thumbnail_url || treffer.posts?.media_url
+           || treffer.stories?.media_url || null)
+        : null,
+    };
+  });
+}));
+
+/*
+ * Was in einer Sammlung liegt.
+ *
+ * Die Beitraege kommen bewusst durch `ladeBeitraege` und nicht direkt aus
+ * der Tabelle: dort werden die Medienadressen unterschrieben und in
+ * dieselben Feldnamen gebracht, die /api/gespeichert und /api/reposts schon
+ * liefern (mediaUrl, thumbnail). Direkt gelesen hiessen sie media_url und
+ * thumbnail_url — die Kacheln blieben dann leer, und zwar lautlos.
+ */
+app.get('/api/sammlung/:id', route(async (req) => {
+  const { data, error } = await req.db
+    .from('sammlung_inhalte')
+    .select('post_id, story_id, position, created_at')
+    .eq('sammlung_id', req.params.id)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  const zeilen = data || [];
+  if (!zeilen.length) return [];
+
+  const postIds = zeilen.filter((z) => z.post_id).map((z) => z.post_id);
+  const storyIds = zeilen.filter((z) => z.story_id).map((z) => z.story_id);
+
+  const beitraege = new Map();
+  if (postIds.length) {
+    const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+    for (const b of alle) if (postIds.includes(b.id)) beitraege.set(b.id, b);
+  }
+
+  const storys = new Map();
+  if (storyIds.length) {
+    const { data: roh, error: storyFehler } = await req.db
+      .from('stories')
+      .select('id, media_url, created_at')
+      .in('id', storyIds);
+    if (storyFehler) throw storyFehler;
+    for (const s of await signiereMedien(req.db, roh || [])) {
+      storys.set(s.id, { id: s.id, mediaUrl: s.media_url, thumbnail: null, kind: 'story' });
+    }
+  }
+
+  // Die Reihenfolge der Sammlung gewinnt, nicht die der Nachfrage.
+  return zeilen
+    .map((z) => {
+      if (z.post_id) {
+        const b = beitraege.get(z.post_id);
+        return b
+          ? { art: b.kind === 'post' ? 'post' : b.kind === 'clip' ? 'clip' : 'video', eintrag: b }
+          : null;
+      }
+      const s = storys.get(z.story_id);
+      return s ? { art: 'story', eintrag: s } : null;
+    })
+    .filter(Boolean);
+}));
+
+app.get('/api/gespeichert', route(async (req) => {
+  const { data, error } = await req.db
+    .from('saves')
+    .select('post_id, created_at')
+    .eq('user_id', req.nutzerId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const ids = new Set((data || []).map((z) => z.post_id));
+  if (ids.size === 0) return [];
+
+  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+  return alle
+    .filter((b) => ids.has(b.id))
+    .map((b) => ({ art: b.kind === 'post' ? 'post' : b.kind === 'clip' ? 'clip' : 'video', eintrag: b }));
+}));
+
+/*
+ * Die gelikten Beitraege — die Liste in den Einstellungen unter „Videos".
+ *
+ * Henrik am 18.09.2026: „Likes ... werden nicht synchronisiert (unter
+ * Videos/Profil kann ich sie nicht sehen)." Synchronisiert waren sie;
+ * `post_likes` wurde nur gelesen, um das Herz im Feed rot zu faerben.
+ *
+ * KEIN fuenfter Profilreiter: der Prototyp zeigt dort genau vier. Deshalb
+ * auch nur Text und kein Raster — der Einstellungsbereich kennt Zeilen.
+ *
+ * Wie bei /api/gespeichert absichtlich ohne `?user=`. Gleiche Regel in
+ * app/lib/aktionen.ts (gelikteVon), gleiche Ersatztexte.
+ */
+app.get('/api/gelikt', route(async (req) => {
+  const { data, error } = await req.db
+    .from('post_likes')
+    .select('post_id, created_at, posts!post_id(id, kind, title, description)')
+    .eq('user_id', req.nutzerId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const ART = { post: 'Foto', reel: 'Video (Hochformat)', clip: 'Video' };
+  return (data || [])
+    .filter((z) => z.posts)
+    .map((z) => {
+      const b = z.posts;
+      const text = (b.title || b.description || '').trim();
+      return { id: b.id, kind: b.kind, titel: text || ART[b.kind] || 'Beitrag', wann: z.created_at };
+    });
+}));
+
+/*
+ * Die eigenen Kommentare — die Liste in den Einstellungen unter „Videos".
+ *
+ * Die vierte Gattung aus Henriks Meldung vom 18.09.2026 („Likes, Kommentare,
+ * Reposts, Gespeicherte ... unter Videos/Profil kann ich sie nicht sehen").
+ * Die anderen drei haben an dem Tag ihren Ort bekommen, diese hier erst am
+ * 21.09.2026 — es gab für sie nirgends eine Ansicht.
+ *
+ * Der Zeilentext kommt aus gemeinsam/kommentar.js, damit die App daneben
+ * nicht ihre eigene Fassung baut. Wie /api/gelikt absichtlich ohne `?user=`:
+ * fremde Kommentarlisten gehen niemanden etwas an.
+ */
+app.get('/api/kommentiert', route(async (req) => {
+  const { data, error } = await req.db
+    .from('comments')
+    .select('id, text, created_at, post_id, posts!post_id(id, kind, title, description)')
+    .eq('user_id', req.nutzerId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  return (data || [])
+    .filter((z) => z.posts)
+    .map((z) => {
+      const k = {
+        id: z.id,
+        beitragId: z.posts.id,
+        kind: z.posts.kind,
+        text: (z.text || '').trim(),
+        beitrag: Kommentar.beitragsName(z.posts),
+        wann: z.created_at,
+      };
+      // Fertig gerechnet, damit der Browser die Regel nicht nachbaut.
+      return { ...k, zeile: Kommentar.zeile(k) };
+    });
+}));
+
 app.get('/api/reposts', route(async (req) => {
   const wessen = req.query.user ? String(req.query.user) : req.nutzerId;
   const { data, error } = await req.db.from('reposts').select('post_id').eq('user_id', wessen);
@@ -1923,6 +2226,12 @@ app.post('/api/communities/:id/channels/:chId/anhang', route(async (req) => {
 // ============================================================================
 
 /**
+ * Woran ein Herz hängen kann. Seit Schema 49 gibt es auch Herzen an
+ * Kommentaren — ohne diese Liste hieße es dort "gefällt dein Beitrag".
+ */
+const GEGENSTAND = { video: 'Video', comment: 'Kommentar', post: 'Beitrag' };
+
+/**
  * Der Satz entsteht erst hier, gespeichert ist nur, was passiert ist. Sonst
  * müsste bei jeder Textänderung der ganze Bestand mitwandern.
  */
@@ -1930,11 +2239,15 @@ function mitteilungText(m, namen, communityNamen) {
   const name = namen.get(m.userId) || 'Jemand';
   const community = communityNamen.get(m.ziel?.id) || 'einer Community';
   return {
-    like: `${name} gefällt dein ${m.ziel?.art === 'video' ? 'Video' : 'Beitrag'}.`,
+    like: `${name} gefällt dein ${GEGENSTAND[m.ziel?.art] || 'Beitrag'}.`,
     follow: `${name} folgt dir jetzt.`,
     comment: `${name} hat deinen Beitrag kommentiert.`,
     repost: `${name} hat dein Video repostet.`,
-    mention: `${name} hat dich in einem Kommentar erwähnt.`,
+    mention: m.ziel?.art === 'post'
+      ? `${name} hat dich in einem Beitrag markiert.`
+      : `${name} hat dich in einem Kommentar erwähnt.`,
+    anfrage: `${name} möchte mit dir schreiben.`,
+    anfrage_ok: `${name} hat deine Anfrage angenommen.`,
     story: `${name} hat auf deine Story geantwortet.`,
     kanal: `${name} hat einen neuen Kanal in „${community}" erstellt.`,
     beitritt: `${name} ist „${community}" beigetreten.`,

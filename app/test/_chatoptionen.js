@@ -12,7 +12,7 @@
 // Start:  node test/_chatoptionen.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -40,8 +40,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -271,10 +270,92 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await zu();
   });
 
+  /*
+   * Der Weg von der Community in den Messenger (Henrik, 18.09.2026).
+   *
+   * Der Punkt stand bis zum 21.09.2026 nur in app/App.tsx und war dort
+   * typgeprüft, aber nie ausgelöst. Typgeprüft heisst: der Knopf ist richtig
+   * beschriftet. Ob er etwas bewirkt, sagt das nicht.
+   *
+   * Geprüft wird die Folge, nicht der Knopf: aus dem Community-Chat mit Greta
+   * Hoffmann (Vorlage cc1, kein Messenger-Chat dazu) muss danach ein
+   * Messenger-Chat entstanden sein, und der Punkt darf beim zweiten Öffnen
+   * nicht mehr angeboten werden — sonst legte er beim Draufdrücken immer neue
+   * Chats an.
+   */
+  console.log('\nVon der Community in den Messenger');
+
+  const communityOptionen = async (name) => {
+    await page.click('[data-area="communities"]');
+    // Der Bereich startet auf „Home" (STARTPUNKT in web/public/app.js) — die
+    // Chats liegen einen Reiter weiter, sonst wartet man auf Zeilen, die es
+    // auf dieser Seite gar nicht gibt.
+    await page.click('#topbar [data-sub="chats"]');
+    await page.waitForSelector('[data-chat]');
+    const zeile = await page.$(await K.waehlerChat(page, name));
+    if (!zeile) throw new Error('kein Chat „' + name + '" in den Communitys');
+    const kasten = await zeile.boundingBox();
+    await page.mouse.move(kasten.x + kasten.width / 2, kasten.y + kasten.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.waitForSelector('.coptkopf', { timeout: 10000 });
+  };
+
+  await pruefe('Der Punkt steht im Community-Zweierchat', async () => {
+    await communityOptionen('Greta Hoffmann');
+    if (!(await page.$('[data-copt="messenger"]'))) {
+      const da = await page.$$eval('.sheet .item__label', (n) => n.map((x) => x.textContent.trim()));
+      throw new Error('nicht im Blatt: ' + da.join(' | '));
+    }
+  });
+
+  await pruefe('Er legt wirklich einen Messenger-Chat an', async () => {
+    const vorher = await page.evaluate(() => (state.chats || []).length);
+    await page.click('[data-copt="messenger"]');
+    // Der Chat entsteht in der Datenbank; gewartet wird auf das Ergebnis,
+    // nicht auf die Uhr.
+    await page.waitForFunction(
+      // `state` ist ein globales const, kein Feld an window — über window
+      // gelesen wäre es undefined und die Bedingung nie wahr.
+      (v) => (state.chats || []).length > v,
+      vorher, { timeout: 15000 }
+    );
+    const neu = await page.evaluate(() =>
+      (state.chats || []).filter((c) => !c.isGroup).map((c) => c.name)
+    );
+    if (!neu.includes('Greta Hoffmann')) throw new Error('im Messenger steht: ' + neu.join(' | '));
+  });
+
+  await pruefe('Der neue Chat ist eine Anfrage, keine Zusage', async () => {
+    // Nach dem Anlegen geht der Chat auf. Das Eingabefeld ist gesperrt,
+    // solange die Gegenseite nicht geantwortet hat — genau das ist die
+    // Anfrage aus Schema 21, hier an ihrer sichtbaren Seite geprüft.
+    await page.waitForSelector('#msgInput', { timeout: 10000 });
+    const feld = await page.$eval('#msgInput', (n) => ({
+      gesperrt: n.disabled,
+      hinweis: n.getAttribute('placeholder') || '',
+    }));
+    if (!feld.gesperrt) throw new Error('das Eingabefeld ist offen — niemand wurde gefragt');
+    if (!/Annahme|Anfrage/i.test(feld.hinweis)) throw new Error('Hinweis: „' + feld.hinweis + '"');
+  });
+
+  await pruefe('Und bietet sich danach nicht noch einmal an', async () => {
+    // Erst aus dem geöffneten Chat heraus: das Overlay faengt sonst jeden
+    // Klick auf die Leiste darunter ab.
+    await page.click('#chatBack').catch(() => {});
+    await page.waitForSelector('#overlay', { state: 'hidden', timeout: 10000 }).catch(() => {});
+    await zu();
+    await communityOptionen('Greta Hoffmann');
+    if (await page.$('[data-copt="messenger"]')) {
+      throw new Error('der Punkt steht noch da — ein zweiter Druck legte einen zweiten Chat an');
+    }
+    await zu();
+  });
+
   const erfuellt = ergebnisse.filter(Boolean).length;
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
 
-  await browser.close();
-  process.exit(erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
+  await beenden(browser, erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
 })();

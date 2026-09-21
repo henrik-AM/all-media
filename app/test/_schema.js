@@ -207,5 +207,118 @@ for (const erfindung of ['videos', 'likes', 'favorites']) {
   pruefe(`Tabelle "${erfindung}" wird nicht mehr verwendet`, !unbekannteTabellen.has(erfindung));
 }
 
+
+/* ==========================================================================
+ *  Dieselbe Regel, dieselbe Funktion — in zwei Dateien
+ *
+ *  WARUM ES DAS GIBT
+ *
+ *  Am 18.09.2026 wurden nacheinander fuenf Regressionen ausgeloest, alle mit
+ *  derselben Ursache: eine Schema-Datei wurde nachtraeglich noch einmal
+ *  eingespielt, und `create or replace` beziehungsweise
+ *  `drop policy` + `create policy` hat still die neuere Fassung aus einer
+ *  ANDEREN Datei ueberschrieben.
+ *
+ *    starter_inhalte()     stand in Schema 7 UND 23_sicherheit
+ *    finde_per_nummer()    stand in 23_audit, 24_telefon, 38, 39
+ *    "Nachricht senden"    stand in SCHEMA.sql, 19 UND 21
+ *    "Mitglieder hinzufuegen"  stand in SCHEMA.sql, 7 UND 22
+ *    "Medien lesen"        stand in 7, 23_audit UND 24
+ *
+ *  Keine dieser Doppelungen meldet etwas. Die Datei laeuft durch, die
+ *  Datenbank ist danach aelter als vorher, und auffaellig wird es erst, wenn
+ *  irgendein Pruflauf an einer ganz anderen Stelle umfaellt.
+ *
+ *  Diese Pruefung findet die Doppelungen, bevor sie jemanden kostet. Sie
+ *  verbietet sie nicht — manche sind gewollt, etwa wenn SCHEMA.sql die erste
+ *  Fassung anlegt und eine spaetere Datei sie verschaerft. Sie verlangt nur,
+ *  dass die spaetere Datei es WEISS: steht im Kopf der frueheren Datei eine
+ *  Warnung, gilt die Doppelung als bekannt.
+ * ======================================================================== */
+
+const NUMMER = (name) => {
+  const treffer = name.match(/SUPABASE_SCHEMA_(\d+)/);
+  return treffer ? Number(treffer[1]) : 0;
+};
+
+const definitionen = new Map(); // "art:name" -> [Dateien]
+/*
+ * Sammeldateien bleiben draussen. `SUPABASE_EINSPIELEN.sql` und die
+ * Reparaturdateien sind absichtlich Zusammenfassungen derselben Anweisungen —
+ * dort IST jede Definition doppelt, und das ist ihr Zweck.
+ */
+const EINZELDATEIEN = SQL_DATEIEN.filter((n) => /^SUPABASE_SCHEMA/.test(n));
+
+for (const kurz of EINZELDATEIEN) {
+  const text = fs.readFileSync(path.join(WURZEL, kurz), 'utf8');
+
+  for (const treffer of text.matchAll(/create\s+or\s+replace\s+function\s+public\.(\w+)/gi)) {
+    const schluessel = `Funktion public.${treffer[1]}()`;
+    if (!definitionen.has(schluessel)) definitionen.set(schluessel, []);
+    if (!definitionen.get(schluessel).includes(kurz)) definitionen.get(schluessel).push(kurz);
+  }
+  for (const treffer of text.matchAll(/create\s+policy\s+"([^"]+)"\s+on\s+([\w.]+)/gi)) {
+    const schluessel = `Regel "${treffer[1]}" auf ${treffer[2]}`;
+    if (!definitionen.has(schluessel)) definitionen.set(schluessel, []);
+    if (!definitionen.get(schluessel).includes(kurz)) definitionen.get(schluessel).push(kurz);
+  }
+  /*
+   * Die blinde Stelle, gefunden am 20.09.2026.
+   *
+   * Bis hierher zaehlte nur, was als Funktion oder Regel DEFINIERT wird. Eine
+   * Tabelle, die in zwei Dateien unterschiedlich BEFUELLT wird, war unsichtbar
+   * — und genau das ist mit `vorlage_eigene_beitraege` passiert: Schema 8 gab
+   * den Starterbeitraegen echte Videos, Schema 7 setzte die Platzhalter-PNGs
+   * zurueck. 32 als Video deklarierte Beitraege zeigten danach auf eine
+   * PNG-Datei, ohne dass irgendeine Pruefung anschlug.
+   *
+   * Beschraenkt auf `vorlage_*`: das sind die Vorlagentabellen des
+   * Testbestands, also genau die Klasse, bei der „die letzte Datei gewinnt"
+   * ueber den Inhalt entscheidet. `posts` oder `profiles` mit aufzunehmen
+   * waere sinnlos — dort ist das Nacheinander der Zweck.
+   */
+  for (const treffer of text.matchAll(/(?:insert\s+into|update)\s+public\.(vorlage_\w+)/gi)) {
+    const schluessel = `Bestand public.${treffer[1]}`;
+    if (!definitionen.has(schluessel)) definitionen.set(schluessel, []);
+    if (!definitionen.get(schluessel).includes(kurz)) definitionen.get(schluessel).push(kurz);
+  }
+}
+
+/*
+ * Eine Doppelung gilt als bekannt, wenn die FRUEHERE Datei im Kopf eine
+ * Warnung traegt. Der Kopf sind die ersten 40 Zeilen — weiter unten liest sie
+ * niemand, bevor er die Datei einspielt.
+ */
+/*
+ * Bekannt ist, was in SUPABASE_REIHENFOLGE.md steht.
+ *
+ * Erst stand hier die Forderung, jede frueher definierende Datei muesse im
+ * Kopf eine Warnung tragen. Bei 37 Doppelungen in 14 Dateien waeren das 14
+ * Warnungen gewesen, die niemand liest — und die Frage „welche gilt denn
+ * nun?" haette keine von ihnen beantwortet.
+ *
+ * Eine Liste an einer Stelle ist besser: sie sagt fuer jedes Objekt, welche
+ * Datei zuletzt laeuft und damit gewinnt. Diese Pruefung schlaegt an, sobald
+ * eine Doppelung entsteht, die dort nicht steht.
+ */
+const REIHENFOLGE = path.join(WURZEL, 'SUPABASE_REIHENFOLGE.md');
+const bekannt = fs.existsSync(REIHENFOLGE) ? fs.readFileSync(REIHENFOLGE, 'utf8') : '';
+
+const unbekannteDoppelungen = [];
+for (const [schluessel, dateien] of definitionen) {
+  if (dateien.length < 2) continue;
+  const sortiert = [...dateien].sort((a, b) => NUMMER(a) - NUMMER(b));
+  // Steht das Objekt mit genau dieser Kette in der Liste?
+  if (!bekannt.includes(`| ${schluessel} | ${sortiert.join(' \u2192 ')} |`)) {
+    unbekannteDoppelungen.push(`${schluessel}: ${sortiert.join(' -> ')}`);
+  }
+}
+
+pruefe(
+  'Jede doppelt definierte Funktion, Regel und Vorlage steht in SUPABASE_REIHENFOLGE.md',
+  unbekannteDoppelungen.length === 0,
+  unbekannteDoppelungen.join('\n     ')
+);
+
 console.log(fehler === 0 ? '\nSchema und Code passen zusammen.' : `\n${fehler} Pruefung(en) fehlgeschlagen.`);
 process.exit(fehler === 0 ? 0 : 1);

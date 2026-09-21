@@ -12,7 +12,7 @@
 // Start:  node test/_community.js   (Server muss laufen)
 
 const { chromium } = require('playwright-core');
-const { anmelden, zuruecksetzen } = require('./_konto');
+const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
@@ -40,8 +40,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
     // Ohne diesen Schluss lebt das chrome-headless-shell weiter, haelt die
     // geerbte Ausgabe-Pipe offen und laesst den Gesamtlauf haengen (09.09.2026).
-    await browser.close().catch(() => {});
-    process.exit(1);
+    await beenden(browser, 1);
 
   }
 
@@ -224,7 +223,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForSelector('#f_name');
     await page.fill('#f_name', 'Ankündigungen');
     await page.click('#formOk');
-    await page.waitForTimeout(600);
+    /*
+     * Auf den Hinweis warten, nicht auf die Uhr. Die 600 ms, die hier
+     * standen, waren geraten: im Gesamtlauf vom 20.09.2026 war der Toast
+     * nach 600 ms noch nicht da, gemeldet wurde „Toast sagt " — als gaebe
+     * es gar keinen Hinweis. Einzeln lief dieselbe Pruefung gruen.
+     */
+    await page
+      .waitForFunction(
+        () => {
+          const t = document.querySelector('#toast');
+          return t && !t.hidden && t.textContent.trim() !== '';
+        },
+        undefined,
+        { timeout: 15000 }
+      )
+      .catch(() => {});
     const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
     if (!toast.includes('gibt es schon')) throw new Error('kein Hinweis, Toast sagt „' + toast + '"');
     await page.click('[data-sheet-close]').catch(() => {});
@@ -300,6 +314,5 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);
   console.log(browserFehler.length ? '\n  Konsolenfehler:\n   ' + browserFehler.join('\n   ') : '\n  Keine Konsolenfehler');
 
-  await browser.close();
-  process.exit(erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
+  await beenden(browser, erfuellt === ergebnisse.length && !browserFehler.length ? 0 : 1);
 })();

@@ -77,12 +77,18 @@
     "test:sichtbarkeit": "node test/_sichtbarkeit.js",
     "test:fremdprofil": "node test/_fremdprofil.js",
     "test:chatanfrage": "node test/_chatanfrage.js",
+    "test:mitteilungen": "node test/_mitteilungen.js",
     "test:dmsperre": "node test/_dmsperre.js",
+    "test:lesebestaetigung": "node test/_lesebestaetigung.js",
     "test:kanal": "node test/_kanal.js",
     "test:krypto": "node test/_krypto.js",
     "test:rechte": "node test/_rechte.js",
     "test:bremse": "node test/_bremse.js",
-    "test:auth": "node test/_auth.js"
+    "test:auth": "node test/_auth.js",
+    "test:sync": "node test/_sync.js",
+    "test:sammlungen": "node test/_sammlungen.js",
+    "test:sammlungenweb": "node test/_sammlungenweb.js",
+    "test:schema": "node test/_schema.js"
   },
   "private": true
 }

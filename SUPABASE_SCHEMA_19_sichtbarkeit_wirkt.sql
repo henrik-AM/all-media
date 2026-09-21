@@ -1,3 +1,16 @@
+-- ⚠️  DIESE DATEI DEFINIERT REGELN NEU, DIE SPAETERE SCHEMATA VERSCHAERFT HABEN.
+--
+--  Betroffen:
+--    "Nachricht senden" auf messages   -> Schema 21 haengt die Ein-Nachricht-
+--                                         Regel der Chat-Anfrage daran, Schema
+--                                         22 die DM-Sperre
+--    "Aktuelle Storys lesen" auf stories
+--
+--  Wer diese Datei nachtraeglich einzeln einspielt, verliert beides ohne
+--  Fehlermeldung. Danach 21 und 22 nachziehen. Am 18.09.2026 passiert;
+--  gemerkt hat es `test:chatanfrage` („Die zweite wird abgelehnt — kein
+--  Fehler").
+--
 -- ===========================================================================
 --  Die Sichtbarkeit war eine Einstellung ohne Wirkung
 -- ===========================================================================

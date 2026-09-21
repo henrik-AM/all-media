@@ -80,6 +80,10 @@ function gemeinsameSpalten() {
 const UMD_BAUSTEINE = [
   ['telefon', 'Telefon'],
   ['passwort', 'Passwort'],
+  // 21.09.2026: `kommentar.js` kam fuer „Meine Kommentare" dazu — und genau
+  // dieselben drei Laeufe kippten wieder. Der Hinweis oben stand da, der
+  // Eintrag fehlte trotzdem.
+  ['kommentar', 'Kommentar'],
 ];
 
 function umdTeile() {
