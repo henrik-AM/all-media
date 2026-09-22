@@ -105,8 +105,9 @@ async function main() {
         email: antwort.user.email,
         profile: {
           id: antwort.user.id,
-          name: 'Test Nutzer',
-          handle: '@test',
+          // Aus den Anmeldedaten, sonst stuende bei jedem Konto „@test".
+          name: antwort.user.user_metadata?.name || 'Test Nutzer',
+          handle: '@' + String(antwort.user.user_metadata?.handle || 'test').replace(/^@/, ''),
           status: 'online',
           about: 'Verfügbar',
         },
@@ -115,10 +116,19 @@ async function main() {
     aktivId: antwort.user.id,
   });
 
+  // Erst beenden, dann schreiben: eine laufende App schreibt beim Beenden
+  // ihren Speicher zurueck und ueberdeckt die neue Datei.
+  still(`xcrun simctl terminate ${geraet} ${EXPO_GO_ID}`);
   fs.writeFileSync(datei, JSON.stringify(daten));
   console.log('  Sitzung in den Simulator geschrieben.');
 
-  still(`xcrun simctl terminate ${geraet} ${EXPO_GO_ID}`);
+  // Die App liest die Sitzung aus dem Schluesselbund (lib/sitzungsspeicher.ts)
+  // und uebernimmt die aus AsyncStorage nur, wenn dort noch keine liegt. Ohne
+  // das Leeren bliebe es beim Kontowechsel still beim alten Konto — die
+  // Kontenliste passt dann nicht zur Sitzung, und die App meldet ab.
+  // Der Schluesselbund gehoert dem Pruefgeraet allein.
+  still(`xcrun simctl keychain ${geraet} reset`);
+  console.log('  Schluesselbund des Pruefgeraets geleert.');
   console.log('  Expo Go beendet — beim naechsten Start ist die App angemeldet.');
 }
 

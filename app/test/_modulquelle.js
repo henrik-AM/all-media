@@ -87,6 +87,10 @@ const UMD_BAUSTEINE = [
   // 21.09.2026: `rang.js` kam mit dem Feed-Algorithmus dazu (Schema 51).
   // Diesmal gleich mit dem Baustein eingetragen statt hinterher.
   ['rang', 'Rang'],
+  // 22.09.2026: Benutzername und Geburtsdatum bei der Anmeldung (Schema 52).
+  // `alter.js` liest global.Telefon — muss also nach `telefon` stehen.
+  ['benutzername', 'Benutzername'],
+  ['alter', 'Alter'],
 ];
 
 function umdTeile() {

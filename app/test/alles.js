@@ -181,6 +181,8 @@ const LAEUFE = [
   ['storyvideos', '_storyvideos.js'],
   ['krypto', '_krypto.js'],
   ['rechte', '_rechte.js'],
+  // Geburtsdatum und Zustimmung der Eltern (Schema 52); braucht SUPABASE_TOKEN wie rechte.
+  ['minderjaehrig', '_minderjaehrig.js'],
   ['bremse', '_bremse.js'],
   ['auth', '_auth.js'],
 ];

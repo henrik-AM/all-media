@@ -70,7 +70,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "Kanal anlegen" auf public.community_channels | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Medien lesen" auf storage.objects | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_medien_auflisten.sql | **SUPABASE_SCHEMA_24_medien_auflisten.sql** |
 | Regel "Mitglieder hinzufuegen" auf public.chat_members | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_22_dm_sperre.sql | **SUPABASE_SCHEMA_22_dm_sperre.sql** |
-| Regel "Mitglieder lesen" auf public.chat_members | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
+| Regel "Mitglieder lesen" auf public.chat_members | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_53_chat_schleife.sql | **SUPABASE_SCHEMA_53_chat_schleife.sql** |
 | Regel "Nachricht senden" auf public.messages | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_21_chatanfrage.sql | **SUPABASE_SCHEMA_21_chatanfrage.sql** |
 | Regel "PTT in eigenen Communitys lesen" auf public.ptt_messages | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql | **SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql** |
 | Regel "Pins lesen" auf public.friend_pins | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql | **SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql** |

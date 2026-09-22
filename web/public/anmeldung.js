@@ -232,7 +232,7 @@
    * Registrieren. Der Benutzername kommt vom Nutzer und wird unverändert
    * übernommen — der Trigger in der Datenbank erzeugt ihn nicht mehr selbst.
    */
-  async function registrieren({ benutzername, passwort, email, name, telefon }) {
+  async function registrieren({ benutzername, passwort, email, name, telefon, geburtsdatum, eltern }) {
     const c = await aufbauen();
     if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
 
@@ -259,6 +259,32 @@
     if (!nummerPruefung.frei) return { ok: false, fehler: nummerPruefung.meldung, feld: 'telefon' };
 
     /*
+     * Das Geburtsdatum ist Pflicht (Henrik 22.09.2026): jedes Land hat eine
+     * eigene Altersgrenze, das Land kommt aus der Vorwahl. Darunter braucht
+     * es einen Elternteil mit eigenem All-Media-Konto, der von dort zustimmt.
+     * Die Datenbank entscheidet selbst (Schema 52); hier steht es nur vorher.
+     * Gleiche Reihenfolge in app/lib/registrierung.ts (neuesKontoPruefen).
+     */
+    const datumGrund = window.Alter.pruefe(geburtsdatum);
+    if (datumGrund) return { ok: false, fehler: datumGrund, feld: 'geburtsdatum' };
+
+    const einordnung = window.Alter.einordnen(geburtsdatum, telefon);
+    if (einordnung.stufe === 'verboten') {
+      return { ok: false, fehler: window.Alter.hinweis(einordnung), feld: 'geburtsdatum' };
+    }
+
+    const elternName = window.Benutzername.normal(eltern || '');
+    if (einordnung.stufe === 'eltern') {
+      if (!elternName) return { ok: false, fehler: 'Bitte den Benutzernamen deines Elternteils eingeben', feld: 'eltern' };
+      if (elternName === window.Benutzername.normal(benutzername)) {
+        return { ok: false, fehler: 'Das ist dein eigener Benutzername', feld: 'eltern' };
+      }
+      // Den Elternteil gibt es, wenn sein Name „vergeben" ist.
+      const e = await benutzernameFrei(elternName);
+      if (e.frei === true) return { ok: false, fehler: `@${elternName} gibt es bei All Media nicht`, feld: 'eltern' };
+    }
+
+    /*
      * Erst hier, nicht weiter oben: die Leck-Pruefung fragt einen fremden
      * Dienst und kostet eine knappe Sekunde. Wer ohnehin an Benutzername oder
      * Nummer scheitert, soll darauf nicht warten.
@@ -275,6 +301,9 @@
           name: name || benutzername,
           // handle_new_user trägt sie in profiles.phone ein (Schema 34).
           phone: nummer,
+          // alter_bei_anmeldung liest beides (Schema 52).
+          geburtsdatum: einordnung.iso,
+          ...(einordnung.stufe === 'eltern' ? { eltern: elternName } : {}),
         },
       },
     });
@@ -309,6 +338,33 @@
     }
     return data;
   }
+
+  /*
+   * Freigabe nach dem Anlegen (Schema 52). Dieselben Aufrufe wie in
+   * app/lib/registrierung.ts.
+   */
+  async function rpc(name, argumente, rueckfall) {
+    const c = await aufbauen();
+    if (!c) return rueckfall;
+    const { data, error } = await c.rpc(name, argumente);
+    if (error) {
+      console.error(name + ':', error.message);
+      return rueckfall;
+    }
+    return data;
+  }
+
+  const kontostand = () => rpc('mein_kontostand', {}, null);
+  const elternAnfragen = (eltern) =>
+    rpc('eltern_anfragen', { p_eltern: window.Benutzername.normal(eltern) },
+      { ok: false, meldung: 'Die Anfrage ist gerade nicht möglich.' });
+  const geburtsdatumNachtragen = (datum) =>
+    rpc('geburtsdatum_nachtragen', { p_datum: window.Alter.lesen(datum), p_eltern: null },
+      { ok: false, meldung: 'Das Speichern ist gerade nicht möglich.' });
+  const einwilligungenOffen = () => rpc('einwilligungen_offen', {}, []);
+  const einwilligungEntscheiden = (kind, zustimmen) =>
+    rpc('einwilligung_entscheiden', { p_kind: kind, p_zustimmen: zustimmen },
+      { ok: false, meldung: 'Die Entscheidung ist gerade nicht möglich.' });
 
   async function abmelden() {
     const c = await aufbauen();
@@ -380,6 +436,11 @@
     benutzernameFrei,
     nummerFrei,
     benutzernameAendern,
+    kontostand,
+    elternAnfragen,
+    geburtsdatumNachtragen,
+    einwilligungenOffen,
+    einwilligungEntscheiden,
     nutzer,
     angemeldet: () => Boolean(sitzung?.access_token),
     beiAenderung: (fn) => {

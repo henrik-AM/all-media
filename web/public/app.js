@@ -492,6 +492,20 @@ async function bootstrap() {
   }
 
   /*
+   * Angemeldet heißt noch nicht freigegeben (Schema 52): ein Konto unter der
+   * Altersgrenze wartet auf die Zustimmung eines Elternteils. Die Datenbank
+   * zeigt ihm bis dahin nichts — hier steht, warum. Gleiche Tür in
+   * app/components/KontoFreigabe.tsx.
+   */
+  const kontostand = await window.Anmeldung?.kontostand?.().catch(() => null);
+  if (kontostand && kontostand.stand !== 'frei' && kontostand.stand !== 'abgemeldet') {
+    zeigeFreigabe(kontostand);
+    return;
+  }
+  clearInterval(freigabeUhr);
+  document.body.classList.remove('ist-abgemeldet');
+
+  /*
    * Den Geraetschluessel dieses Browsers anmelden — vor `Object.assign`,
    * weil `vorschauenOeffnen` gleich darunter ihn schon braucht.
    *
@@ -532,6 +546,160 @@ async function bootstrap() {
   document.body.classList.remove('is-startet');
   praesenzMelden();
   render();
+  elternfrageStarten();
+}
+
+/*
+ * Ein Kinderkonto wartet — Wartebildschirm statt einer leeren Seite.
+ *
+ *   wartet + Elternteil   „@mama muss zustimmen", erneut prüfen, anderen fragen
+ *   wartet ohne / abgelehnt   Feld für den Benutzernamen eines Elternteils
+ *   ohne_datum            Konto von vor Schema 52 ohne Datum: nachtragen
+ */
+let freigabeUhr = null;
+function zeigeFreigabe(stand, anderer = false) {
+  document.body.classList.remove('is-startet');
+  document.body.classList.add('ist-abgemeldet');
+  const ziel = $('#main');
+  if (!ziel) return;
+
+  const ohneDatum = stand.stand === 'ohne_datum';
+  const abgelehnt = stand.stand === 'abgelehnt';
+  const ohneEltern = stand.stand === 'wartet' && !stand.eltern;
+  const mitFeld = ohneDatum || abgelehnt || ohneEltern || anderer;
+
+  const titel = ohneDatum
+    ? 'Geburtsdatum fehlt'
+    : abgelehnt
+    ? 'Nicht bestätigt'
+    : ohneEltern
+    ? 'Zustimmung nötig'
+    : 'Warte auf Zustimmung';
+  const text = ohneDatum
+    ? 'Seit dem 22.09.2026 braucht jedes neue Konto ein Geburtsdatum, weil jedes Land eine eigene Altersgrenze hat. Bitte trag deines nach.'
+    : abgelehnt
+    ? `${stand.eltern || 'Dein Elternteil'} hat dein Konto nicht bestätigt. Du kannst einen anderen Elternteil fragen.`
+    : ohneEltern
+    ? `In ${stand.land || 'deinem Land'} brauchst du unter ${stand.mindestalter} Jahren die Zustimmung eines Elternteils. Gib seinen All-Media-Benutzernamen ein.`
+    : `${stand.eltern} muss dein Konto bestätigen. Dafür öffnet dein Elternteil All Media im eigenen Konto — die Anfrage erscheint dort von selbst.`;
+
+  ziel.innerHTML = `
+    <div class="startfehler" id="freigabe">
+      <div class="startfehler__symbol">${ICONS.person}</div>
+      <div class="startfehler__titel">${esc(titel)}</div>
+      <div class="startfehler__text">${esc(text)}</div>
+      ${
+        mitFeld
+          ? `<input class="freigabe__feld" id="freigabeEingabe" autocapitalize="off"
+                    ${ohneDatum ? `type="date" max="${new Date().toISOString().slice(0, 10)}"` : 'placeholder="@elternteil"'}
+                    aria-label="${ohneDatum ? 'Geburtsdatum' : 'Benutzername deines Elternteils'}" />
+             <div class="startfehler__grund is-fehler" id="freigabeMeldung" aria-live="polite"></div>
+             <button class="btn btn--primary" id="freigabeOk">${ohneDatum ? 'Speichern' : 'Anfrage senden'}</button>`
+          : `<button class="btn btn--primary" id="freigabePruefen">Erneut prüfen</button>
+             <button class="linkbtn" id="freigabeAnderer">Anderen Elternteil fragen</button>`
+      }
+      <button class="linkbtn" id="freigabeAbmelden">Abmelden</button>
+    </div>`;
+
+  $('#freigabePruefen')?.addEventListener('click', () => bootstrap());
+  $('#freigabeAnderer')?.addEventListener('click', () => zeigeFreigabe(stand, true));
+  $('#freigabeAbmelden').addEventListener('click', async () => {
+    clearInterval(freigabeUhr);
+    await window.Anmeldung.abmelden();
+    window.KryptoWeb?.vergessen();
+    bootstrap();
+  });
+  const absenden = async () => {
+    const wert = $('#freigabeEingabe').value.trim();
+    if (!wert) return;
+    const knopf = $('#freigabeOk');
+    knopf.disabled = true;
+    const antwort = ohneDatum
+      ? await window.Anmeldung.geburtsdatumNachtragen(wert)
+      : await window.Anmeldung.elternAnfragen(wert);
+    knopf.disabled = false;
+    if (!antwort.ok) {
+      $('#freigabeMeldung').textContent = antwort.meldung || 'Das hat nicht geklappt.';
+      return;
+    }
+    bootstrap();
+  };
+  $('#freigabeOk')?.addEventListener('click', absenden);
+  $('#freigabeEingabe')?.addEventListener('keydown', (e) => e.key === 'Enter' && absenden());
+
+  // Stimmt der Elternteil zu, geht die Seite von selbst auf.
+  clearInterval(freigabeUhr);
+  freigabeUhr = setInterval(async () => {
+    const neu = await window.Anmeldung.kontostand().catch(() => null);
+    if (neu && neu.stand === 'frei') {
+      clearInterval(freigabeUhr);
+      bootstrap();
+    }
+  }, 15000);
+}
+
+/*
+ * Wartet ein Kind auf meine Zustimmung? Einmal beim Start und danach jede
+ * Minute — die Anfrage soll auftauchen, ohne dass jemand irgendwo sucht.
+ * Gleiche Frage in app/components/KontoFreigabe.tsx (Elternfrage).
+ */
+let elternUhr = null;
+let elternBlattOffen = false;
+function elternfrageStarten() {
+  const fragen = async () => {
+    if (elternBlattOffen || !window.Anmeldung?.angemeldet?.()) return;
+    const offen = await window.Anmeldung.einwilligungenOffen().catch(() => []);
+    if (offen?.length) elternfrageZeigen(offen[0]);
+  };
+  clearInterval(elternUhr);
+  elternUhr = setInterval(fragen, 60000);
+  fragen();
+}
+
+function elternfrageZeigen(kind) {
+  elternBlattOffen = true;
+  const body = `
+    <div class="sheet__body">
+      <div class="sheet__erklaerung">
+        <strong>${esc(kind.name)}</strong> (${esc(kind.handle)}, ${esc(String(kind.alter))} Jahre) hat dich als
+        Elternteil angegeben. In ${esc(kind.land || 'diesem Land')} braucht ein Konto unter
+        ${esc(String(kind.mindestalter))} Jahren die Zustimmung eines Elternteils.
+      </div>
+      <div class="sheet__hint">
+        Stimmst du zu, kann ${esc(kind.handle)} All Media nutzen. Lehnst du ab, bleibt das Konto gesperrt.
+      </div>
+      <div class="sheet__hinweis is-fehler" id="elternMeldung" hidden></div>
+      <div class="sheet__footer">
+        <button class="btn" id="elternNein">Ablehnen</button>
+        <button class="btn btn--primary" id="elternJa">Zustimmen</button>
+      </div>
+    </div>`;
+  openSheet(
+    'Zustimmung als Elternteil',
+    body,
+    (sheet, close) => {
+      const entscheiden = async (zustimmen) => {
+        sheet.querySelectorAll('.sheet__footer .btn').forEach((b) => (b.disabled = true));
+        const antwort = await window.Anmeldung.einwilligungEntscheiden(kind.kind, zustimmen);
+        if (!antwort.ok) {
+          const m = sheet.querySelector('#elternMeldung');
+          m.hidden = false;
+          m.textContent = antwort.meldung || 'Das hat nicht geklappt.';
+          sheet.querySelectorAll('.sheet__footer .btn').forEach((b) => (b.disabled = false));
+          return;
+        }
+        close();
+        toast(zustimmen ? `${kind.handle} ist freigegeben` : `${kind.handle} bleibt gesperrt`);
+      };
+      sheet.querySelector('#elternJa').addEventListener('click', () => entscheiden(true));
+      sheet.querySelector('#elternNein').addEventListener('click', () => entscheiden(false));
+    },
+    {
+      beimSchliessen: () => {
+        elternBlattOffen = false;
+      },
+    }
+  );
 }
 
 /*
@@ -7615,6 +7783,11 @@ function openKontoWechsel() {
     email: '',
     // Pflicht beim Anlegen (Henrik 7.9.) — siehe formularNeuMail().
     telefon: '',
+    // Pflicht seit 22.09.2026 (Schema 52) — siehe formularNeuMail().
+    geburtsdatum: '',
+    eltern: '',
+    // Was handle_frei zuletzt über den Wunschnamen gesagt hat.
+    namensStand: { text: '', gut: true },
     kennung: '',
     hinweis: '',
     hinweisArt: '',
@@ -7709,7 +7882,11 @@ function openKontoWechsel() {
       <label class="sheet__label" for="kontoBenutzer">Benutzername</label>
       <input id="kontoBenutzer" placeholder="@wunschname" value="${esc(zustand.benutzername)}"
              autocapitalize="off" autocomplete="username" />
-      <div class="sheet__fussnote">Drei bis vierundzwanzig Zeichen: Buchstaben, Ziffern, Punkt und Unterstrich.</div>
+      <!-- „schon vergeben" beim Tippen (Henrik 22.09.2026), siehe namenPruefen(). -->
+      <div class="sheet__fussnote ${zustand.namensStand.text && !zustand.namensStand.gut ? 'is-fehler' : ''}"
+           id="kontoBenutzerStand" aria-live="polite">${esc(
+             zustand.namensStand.text || window.Benutzername.REGEL_TEXT + '.'
+           )}</div>
     </div>
     <div class="sheet__field">
       <label class="sheet__label" for="kontoPass">Passwort</label>
@@ -7741,6 +7918,19 @@ function openKontoWechsel() {
       <input id="kontoTelefon" type="tel" placeholder="+49 151 2345678" value="${esc(zustand.telefon)}"
              autocapitalize="off" autocomplete="tel" />
       <div class="sheet__fussnote">${esc(window.Telefon.REGEL_TEXT)}.</div>
+    </div>
+    <!-- Pflichtfeld (Henrik 22.09.2026): die Altersgrenze hängt am Land der
+         Nummer. Gleiche Felder in app/components/RegistrierFelder.tsx. -->
+    <div class="sheet__field">
+      <label class="sheet__label" for="kontoGeburt">Geburtsdatum</label>
+      <input id="kontoGeburt" type="date" value="${esc(zustand.geburtsdatum)}"
+             max="${new Date().toISOString().slice(0, 10)}" autocomplete="bday" />
+      <div class="sheet__fussnote" id="kontoAlterHinweis" aria-live="polite"></div>
+    </div>
+    <div class="sheet__field" id="kontoElternFeld" hidden>
+      <label class="sheet__label" for="kontoEltern">Benutzername deines Elternteils</label>
+      <input id="kontoEltern" placeholder="@elternteil" value="${esc(zustand.eltern)}" autocapitalize="off" />
+      <div class="sheet__fussnote">Bis dein Elternteil zustimmt, bleibt dein Konto gesperrt.</div>
     </div>
     ${hinweis()}
     <div class="sheet__footer">
@@ -7805,6 +7995,10 @@ function openKontoWechsel() {
       const m = sheet.querySelector('#kontoMail');
       const p = sheet.querySelector('#kontoPass');
       const t = sheet.querySelector('#kontoTelefon');
+      const g = sheet.querySelector('#kontoGeburt');
+      const e = sheet.querySelector('#kontoEltern');
+      if (g) zustand.geburtsdatum = g.value;
+      if (e) zustand.eltern = e.value;
       if (k) zustand.kennung = k.value;
       if (b) zustand.benutzername = b.value;
       if (m) zustand.email = m.value;
@@ -7873,6 +8067,8 @@ function openKontoWechsel() {
         passwort: zustand.passwort,
         email,
         telefon: zustand.telefon,
+        geburtsdatum: zustand.geburtsdatum,
+        eltern: zustand.eltern,
       });
       fertig();
 
@@ -7916,6 +8112,50 @@ function openKontoWechsel() {
         ergebnis.ok ? 'Wir haben dir eine E-Mail zum Zurücksetzen geschickt.' : ergebnis.fehler,
         ergebnis.ok ? 'gut' : 'fehler'
       );
+    };
+
+    /*
+     * Ist der Wunschname frei? Schon beim Tippen (Henrik 22.09.2026: „du musst
+     * aber anzeigen, falls dieser User Name schon vergeben ist"). Erst die
+     * Form, dann eine halbe Sekunde Ruhe, dann die Datenbank — handle_frei
+     * zählt höchstens dreißig Fragen je Stunde (Schema 39). Gleiche Regel in
+     * app/lib/registrierung.ts (useNamensStand).
+     */
+    let namensUhr = null;
+    const namenPruefen = (feld) => {
+      const zeile = sheet.querySelector('#kontoBenutzerStand');
+      const setzen = (text, gut) => {
+        zustand.namensStand = { text, gut };
+        if (!zeile) return;
+        zeile.textContent = text || window.Benutzername.REGEL_TEXT + '.';
+        zeile.classList.toggle('is-fehler', Boolean(text) && !gut);
+      };
+      clearTimeout(namensUhr);
+      const name = window.Benutzername.normal(feld.value);
+      if (!name) return setzen('', true);
+      const form = window.Benutzername.pruefe(name);
+      if (form) return setzen(form, false);
+      setzen('Wird geprüft …', true);
+      namensUhr = setTimeout(async () => {
+        const antwort = await window.Anmeldung?.benutzernameFrei(name);
+        // Inzwischen weitergetippt: die Antwort gehört zu einem alten Namen.
+        if (window.Benutzername.normal(feld.value) !== name) return;
+        if (antwort?.frei) setzen(`${antwort.handle} ist frei`, true);
+        else setzen(antwort?.meldung || 'Dieser Benutzername ist schon vergeben.', false);
+      }, 500);
+    };
+
+    /* Unter dem Datum: was es für das Land der Nummer heißt. */
+    const alterZeigen = () => {
+      const datum = sheet.querySelector('#kontoGeburt')?.value || '';
+      const telefon = sheet.querySelector('#kontoTelefon')?.value || '';
+      const zeile = sheet.querySelector('#kontoAlterHinweis');
+      const eltern = sheet.querySelector('#kontoElternFeld');
+      if (!zeile || !eltern) return;
+      const e = datum && !window.Alter.pruefe(datum) ? window.Alter.einordnen(datum, telefon) : null;
+      zeile.textContent = e ? window.Alter.hinweis(e) : '';
+      zeile.classList.toggle('is-fehler', e?.stufe === 'verboten');
+      eltern.hidden = e?.stufe !== 'eltern';
     };
 
     const binden = () => {
@@ -7991,6 +8231,13 @@ function openKontoWechsel() {
       );
 
       sheet.querySelector('#kontoVergessen')?.addEventListener('click', passwortVergessen);
+
+      const benutzer = sheet.querySelector('#kontoBenutzer');
+      benutzer?.addEventListener('input', () => namenPruefen(benutzer));
+      ['#kontoGeburt', '#kontoTelefon'].forEach((id) =>
+        sheet.querySelector(id)?.addEventListener('input', alterZeigen)
+      );
+      alterZeigen();
 
       // Der erste Schritt gehoert dem Benutzernamen: Feld gleich scharf stellen.
       const zuerst =

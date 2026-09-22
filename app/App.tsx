@@ -18,6 +18,7 @@ import { TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
 import { ladeEinstellungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
+import { KontoFreigabe } from './components/KontoFreigabe';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
@@ -2171,7 +2172,15 @@ const Root = () => {
    */
   if (!sitzungGeladen) return <View style={{ flex: 1, backgroundColor: colors.surface }} />;
 
-  return isLoggedIn ? <Shell /> : <LoginScreen />;
+  // Angemeldet heißt noch nicht freigegeben: Kinderkonten warten auf die
+  // Zustimmung eines Elternteils (Schema 52, components/KontoFreigabe.tsx).
+  return isLoggedIn ? (
+    <KontoFreigabe>
+      <Shell />
+    </KontoFreigabe>
+  ) : (
+    <LoginScreen />
+  );
 };
 
 /**

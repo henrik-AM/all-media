@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,12 +12,12 @@ import {
 import { Druck } from '../components/Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../contexts/AuthContext';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { PASSWORT_REGEL, passwortPruefen } from '../lib/supabaseAuth';
-
-// Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
-const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
+import { NeuesKonto, Telefon, neuesKontoPruefen } from '../lib/registrierung';
+import { RegistrierFelder } from '../components/RegistrierFelder';
 import { brandGradient, colors, radius, shadow, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
@@ -32,6 +32,7 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
   const [resetStage, setResetStage] = useState<'email' | 'code' | 'password'>('email');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [neu, setNeu] = useState<Omit<NeuesKonto, 'telefon'>>({ handle: '', geburtsdatum: '', eltern: '' });
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
@@ -42,6 +43,32 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
   const [loading, setLoading] = useState(false);
   const { login, kontoHinzufuegen, sendPasswordResetCode } = useContext(AuthContext);
   const { supabase } = useSupabase();
+
+  /*
+   * Prüfbild „anmeldung/neu" (nur __DEV__, wie der Schalter in App.tsx).
+   *
+   * Im Simulator lässt sich von außen nichts antippen — ohne diesen Weg käme
+   * das Registrierformular in keinem Bild vor. Vorbelegt mit einem Namen,
+   * den es schon gibt, und einem Zwölfjährigen: so zeigt ein Bild beides,
+   * „schon vergeben" und das Feld für den Elternteil.
+   */
+  useEffect(() => {
+    if (!__DEV__) return;
+    AsyncStorage.getItem('all-media.pruefbild')
+      .then((roh) => {
+        if (!roh?.startsWith('anmeldung/neu')) return;
+        const geboren = new Date();
+        geboren.setFullYear(geboren.getFullYear() - 12);
+        const tt = String(geboren.getDate()).padStart(2, '0');
+        const mm = String(geboren.getMonth() + 1).padStart(2, '0');
+        setScreen('auth');
+        setMode('register');
+        setEmail('neu@beispiel.de');
+        setPhone('+49 151 2345678');
+        setNeu({ handle: 'test', geburtsdatum: `${tt}.${mm}.${geboren.getFullYear()}`, eltern: '' });
+      })
+      .catch(() => undefined);
+  }, []);
 
   // Social login handler
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
@@ -139,14 +166,16 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
       }
     }
 
-    const identifier = currentMethod === 'phone' ? phone : email;
+    // Ein neues Konto braucht immer eine E-Mail-Adresse — Supabase meldet
+    // darüber an. Auch wer über „Telefon" kam, gibt sie beim Anlegen mit an.
+    const identifier = currentMethod === 'phone' && mode === 'login' ? phone : email;
     if (!identifier.trim()) {
-      return setError(currentMethod === 'phone' ? 'Bitte Telefonnummer eingeben' : 'Bitte E-Mail-Adresse eingeben');
+      return setError(identifier === phone ? 'Bitte Telefonnummer eingeben' : 'Bitte E-Mail-Adresse eingeben');
     }
-    if (currentMethod === 'email' && !identifier.includes('@')) {
+    if (identifier === email && !identifier.includes('@')) {
       return setError('Bitte eine gültige E-Mail-Adresse eingeben');
     }
-    if (currentMethod === 'phone' && !/^\+?[0-9\s\-()]{9,}$/.test(identifier)) {
+    if (identifier === phone && !/^\+?[0-9\s\-()]{9,}$/.test(identifier)) {
       return setError('Bitte eine gültige Telefonnummer eingeben');
     }
     /*
@@ -163,33 +192,25 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
     }
 
     /*
-     * Die Telefonnummer ist beim Anlegen Pflicht (Henrik 07.09.2026).
+     * Beim Anlegen sind Benutzername, Telefonnummer und Geburtsdatum Pflicht
+     * (Henrik 07.09. und 22.09.2026).
      *
-     * Nicht als Formsache: „Kontakt hinzufügen" läuft über die Nummer. Ein
-     * Konto ohne sie ist für niemanden auffindbar — und niemand merkt es,
-     * weil nichts fehlt, was man sehen könnte. Die Nummer selbst prüft
-     * gemeinsam/telefon.js, ob sie schon vergeben ist, die Datenbank
-     * (nummer_frei, Schema 34). Gleiche Regel in web/public/anmeldung.js.
+     * Die Nummer, weil „Kontakt hinzufügen" über sie läuft; der Name, weil er
+     * bis zum 22.09. still aus der E-Mail geraten wurde, während die Website
+     * ihn wählen ließ; das Datum wegen der Altersgrenze des Landes. Geprüft
+     * wird alles in lib/registrierung.ts — gleiche Reihenfolge wie
+     * registrieren() in web/public/anmeldung.js.
      */
-    if (mode === 'register') {
-      const grund = Telefon.pruefe(phone);
-      if (grund) return setError(grund);
-    }
-
     setError(null);
     setLoading(true);
     try {
       if (mode === 'login') {
         await login(identifier.trim(), password);
       } else {
-        if (supabase) {
-          const { data: frei } = await supabase.rpc('nummer_frei', { eingabe: phone });
-          if (frei && frei.frei === false) {
-            setLoading(false);
-            return setError(frei.meldung || 'Diese Telefonnummer gehört schon zu einem Konto.');
-          }
-        }
-        await kontoHinzufuegen(identifier.trim(), password, undefined, phone);
+        const konto: NeuesKonto = { ...neu, telefon: phone };
+        const grund = await neuesKontoPruefen(supabase, konto);
+        if (grund) return setError(grund);
+        await kontoHinzufuegen(email.trim(), password, konto);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Fehler bei der Authentifizierung';
@@ -342,22 +363,40 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
             </View>
           )}
 
-          {/* Beim Anlegen über E-Mail kommt die Nummer dazu — sie ist Pflicht,
-              siehe submit(). Beim Weg über „Telefon" steht sie schon oben. */}
-          {mode === 'register' && currentMethod === 'email' && (
+          {/* Wer über „Telefon" ein Konto anlegt, braucht trotzdem eine
+              E-Mail — über sie meldet Supabase an. Bis zum 22.09.2026 ging
+              hier die Nummer als E-Mail-Adresse an signUp. */}
+          {mode === 'register' && currentMethod === 'phone' && (
             <View style={styles.field}>
-              <Ionicons name="call-outline" size={19} color={colors.text3} />
+              <Ionicons name="mail-outline" size={19} color={colors.text3} />
               <TextInput
                 style={styles.input}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="Telefonnummer"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="E-Mail"
                 placeholderTextColor={colors.text3}
                 autoCapitalize="none"
-                keyboardType="phone-pad"
+                autoCorrect={false}
+                keyboardType="email-address"
                 editable={!loading}
               />
             </View>
+          )}
+
+          {/* Benutzername (mit „schon vergeben" beim Tippen), Nummer,
+              Geburtsdatum und — unter der Altersgrenze — der Elternteil.
+              Beim Weg über „Telefon" steht die Nummer schon oben. */}
+          {mode === 'register' && (currentMethod === 'email' || currentMethod === 'phone') && (
+            <RegistrierFelder
+              variante="anmeldung"
+              konto={{ ...neu, telefon: phone }}
+              aendern={({ telefon, ...rest }) => {
+                if (telefon !== undefined) setPhone(telefon);
+                setNeu((v) => ({ ...v, ...rest }));
+              }}
+              gesperrt={loading}
+              ohneTelefon={currentMethod === 'phone'}
+            />
           )}
 
           {mode !== 'reset' && (currentMethod === 'email' || currentMethod === 'phone') && (

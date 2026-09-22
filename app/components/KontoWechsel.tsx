@@ -15,6 +15,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { AuthContext } from '../contexts/AuthContext';
 import { PASSWORT_REGEL, passwortPruefen } from '../lib/supabaseAuth';
+import { useSupabase } from '../contexts/SupabaseContext';
+import { NeuesKonto, neuesKontoPruefen } from '../lib/registrierung';
+import { RegistrierFelder } from './RegistrierFelder';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
@@ -38,12 +41,17 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
   const [email, setEmail] = useState('');
   const [passwort, setPasswort] = useState('');
   const [name, setName] = useState('');
+  const leer: NeuesKonto = { handle: '', telefon: '', geburtsdatum: '', eltern: '' };
+  const [neu, setNeu] = useState<NeuesKonto>(leer);
+  const [arbeitet, setArbeitet] = useState(false);
+  const { supabase } = useSupabase();
 
   const schliessen = () => {
     setAnsicht('liste');
     setEmail('');
     setPasswort('');
     setName('');
+    setNeu(leer);
     onClose();
   };
 
@@ -101,13 +109,24 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
     // englischen Fehler von Supabase als Systemmeldung zu bekommen.
     const schwach = passwortPruefen(passwort);
     if (schwach) return onNotice(schwach);
+    /*
+     * Bis zum 22.09.2026 entstand hier ein Konto ohne Telefonnummer, mit
+     * einem aus dem Namen geratenen Benutzernamen und ohne Alter. Jetzt
+     * dieselben Pflichtfelder wie im Anmeldebildschirm — lib/registrierung.ts.
+     */
+    const konto: NeuesKonto = { ...neu, name: name.trim() };
+    setArbeitet(true);
     try {
-      await kontoHinzufuegen(email.trim(), passwort, name.trim());
+      const grund = await neuesKontoPruefen(supabase, konto);
+      if (grund) return onNotice(grund);
+      await kontoHinzufuegen(email.trim(), passwort, konto);
       onNotice(`Konto für ${name.trim()} erstellt`);
       schliessen();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Kontenerstellung fehlgeschlagen';
       onNotice(msg);
+    } finally {
+      setArbeitet(false);
     }
   };
 
@@ -217,6 +236,15 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                 </View>
               )}
 
+              {ansicht === 'neu' && (
+                <RegistrierFelder
+                  variante="blatt"
+                  konto={neu}
+                  aendern={(teil) => setNeu((v) => ({ ...v, ...teil }))}
+                  gesperrt={arbeitet}
+                />
+              )}
+
               <View style={styles.feld}>
                 <Text style={styles.label}>E-Mail</Text>
                 <TextInput
@@ -248,8 +276,9 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
 
               <View style={styles.footer}>
                 <Druck
-                  style={styles.button}
+                  style={[styles.button, arbeitet && { opacity: 0.6 }]}
                   onPress={ansicht === 'neu' ? neuErstellen : anmelden}
+                  disabled={arbeitet}
                 >
                   <Text style={styles.buttonText}>
                     {ansicht === 'neu' ? 'Konto erstellen' : 'Anmelden'}

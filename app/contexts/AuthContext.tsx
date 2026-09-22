@@ -38,8 +38,8 @@ import {
 } from '../lib/kontenspeicher';
 import { useSupabase } from './SupabaseContext';
 
-// Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
-const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
+// Dieselben Regeln wie auf der Website — siehe gemeinsam/ und lib/registrierung.ts.
+import { Benutzername, NeuesKonto, metadatenFuer } from '../lib/registrierung';
 
 const SPEICHER = 'all-media.sitzung.v2';
 
@@ -83,11 +83,11 @@ export const AuthContext = createContext<{
   /** Gibt zurueck, ob der Wechsel geklappt hat. Bei false ist neu anzumelden. */
   wechsleZu: (kontoId: string) => Promise<boolean>;
   /**
-   * `telefon` ist beim Anlegen eines neuen Kontos Pflicht (Henrik 07.09.2026).
-   * Beim Dazunehmen eines bestehenden Kontos wird sie nicht gebraucht — dort
-   * steht sie schon im Profil.
+   * Ohne `neu`: ein bestehendes Konto anmelden und dazunehmen.
+   * Mit `neu`: ein Konto anlegen — Benutzername, Telefon und Geburtsdatum
+   * sind dann Pflicht (Henrik 07.09. und 22.09.2026), siehe lib/registrierung.ts.
    */
-  kontoHinzufuegen: (email: string, password: string, name?: string, telefon?: string) => Promise<void>;
+  kontoHinzufuegen: (email: string, password: string, neu?: NeuesKonto) => Promise<void>;
   kontoAbmelden: (kontoId: string) => Promise<void>;
   sendPasswordResetCode: (email: string) => Promise<boolean>;
 }>({
@@ -437,7 +437,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const kontoHinzufuegen = useCallback(
-    async (email: string, password: string, name?: string, telefon?: string) => {
+    async (email: string, password: string, neu?: NeuesKonto) => {
       setError(null);
 
       const existiert = konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
@@ -458,8 +458,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!email) scheitern('Bitte gebe eine E-Mail-Adresse ein');
 
         const userId = `user-${Date.now()}`;
-        const anzeige = name?.trim() || nameAusMail(email);
-        const handle = '@' + anzeige.toLowerCase().replace(/\s+/g, '');
+        const anzeige = neu?.name?.trim() || neu?.handle || nameAusMail(email);
+        const handle = neu ? '@' + Benutzername.normal(neu.handle) : handleAusMail(email);
 
         const konto: AuthUser = {
           id: userId,
@@ -486,49 +486,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
        */
       await sitzungSichern(supabase).catch(() => null);
 
-      const anzeige = name?.trim() || nameAusMail(email);
-      const handle = '@' + anzeige.toLowerCase().replace(/\s+/g, '');
-
       /*
-       * Erst anmelden, dann registrieren.
+       * Anlegen nur, wenn wirklich ein neues Konto gewollt ist.
        *
-       * „Konto hinzufuegen" heisst im Blatt zweierlei: ein bestehendes
-       * dazunehmen oder ein neues anlegen. Fuer das bestehende war bisher
-       * signUp der einzige Weg — und der antwortet fuer ein Konto, das es
-       * schon gibt, mit „already registered". Deshalb zuerst der Versuch
-       * anzumelden; nur wenn es dieses Konto nicht gibt, wird eines angelegt.
-       */
-      /*
-       * Die Telefonnummer geht als Registrierungsdatum mit — handle_new_user
-       * traegt sie in profiles.phone ein (SUPABASE_SCHEMA_34_telefon_pflicht.sql).
-       * Beim blossen Anmelden eines bestehenden Kontos bleibt sie aussen vor:
-       * dort steht sie schon im Profil, und ein leeres Feld wuerde sie loeschen.
+       * Bis zum 22.09.2026 hiess ein fehlgeschlagenes Anmelden hier immer
+       * „dann eben registrieren" — mit einem Benutzernamen, der aus der
+       * E-Mail geraten war. Ein Tippfehler in der Adresse beim Dazunehmen
+       * eines bestehenden Kontos legte so still ein fremdes neues an, ohne
+       * Telefonnummer und Geburtsdatum. Jetzt legt nur an, wer die Felder
+       * dafuer ausgefuellt hat; alles dahinter prueft die Datenbank selbst
+       * (Schema 34 und 52).
        */
       let result = await signInWithEmail(supabase, email, password);
-      if (!result.success) {
-        const nummer = telefon ? Telefon.speicherform(telefon) : '';
-        const neu = await signUpWithEmail(supabase, email, password, {
-          name: anzeige,
-          handle,
-          ...(nummer ? { phone: nummer } : {}),
-        });
-        if (!neu.success || !neu.user) {
+      if (!result.success && neu) {
+        const angelegt = await signUpWithEmail(supabase, email, password, metadatenFuer(neu));
+        if (!angelegt.success || !angelegt.user) {
           // Zurueck auf das Konto, das vorher lief — sonst steht die App nach
           // einem Tippfehler ohne Sitzung da.
           if (aktivId) await sitzungWechseln(supabase, aktivId).catch(() => false);
-          scheitern(neu.error || result.error || 'Registrierung fehlgeschlagen');
+          scheitern(angelegt.error || result.error || 'Registrierung fehlgeschlagen');
         }
-        result = neu;
+        result = angelegt;
+      } else if (!result.success) {
+        if (aktivId) await sitzungWechseln(supabase, aktivId).catch(() => false);
+        scheitern(result.error || 'Anmeldung fehlgeschlagen');
       }
 
       const angemeldet = result.user!;
-
-      // Profil mit Metadaten aktualisieren, damit es Trigger automatisch anlegt
-      try {
-        await supabase.auth.updateUser({ data: { name: anzeige, handle } });
-      } catch (e) {
-        console.warn('Fehler beim Aktualisieren des Profils:', e);
-      }
+      const anzeige = neu?.name?.trim() || (neu ? Benutzername.normal(neu.handle) : nameAusMail(email));
+      const handle = neu ? '@' + Benutzername.normal(neu.handle) : handleAusMail(email);
 
       await sitzungSichern(supabase).catch(() => null);
 
