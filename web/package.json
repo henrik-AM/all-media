@@ -12,6 +12,6 @@
   },
   "scripts": {
     "start": "node server/lokal.js",
-    "deploy": "npx --yes vercel@latest deploy --prod --yes"
+    "deploy": "echo 'Deploy läuft über Render: nach main pushen, dann im Ordner app/ npm run deploy:pruefen'"
   }
 }

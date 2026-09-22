@@ -59,6 +59,7 @@
     "test:einstellungen": "node test/_einstellungen.js",
     "test:kontaktinfo": "node test/_kontaktinfo.js",
     "wlan": "node tools/lokal.js",
+    "deploy:pruefen": "node tools/deploy-pruefen.js",
     "test:henrik": "node test/_henrik.js && node test/_henrik2.js",
     "ansehen": "node test/_ansehen.js",
     "mac:bilder": "node tools/app-bilder.js",
