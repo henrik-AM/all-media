@@ -33,6 +33,13 @@ const {
 } = require('../../gemeinsam/spalten');
 
 /*
+ * Die Reihenfolge des Feeds — ebenfalls einmal fuer Website und App. Die
+ * Punkte rechnet `feed_rang()` (Schema 51), aus Punkten eine Reihenfolge zu
+ * machen steht in ../../gemeinsam/rang.js.
+ */
+const { neulingsliste, ordnenJeArt, punktekarte } = require('../../gemeinsam/rang');
+
+/*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
  * sync-handlers.js. Beim Lesen muss daraus wieder ein Objekt werden, sonst
  * greift die Oberflaeche auf spende.titel eines Strings zu und zeigt nichts.
@@ -927,7 +934,42 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
   // und ein Klick nahm das Folgen in Wahrheit zurueck.
   const folgen = (await ladeFolgen(client, nutzerId)) || new Set();
 
-  return beitraege.map((b) => ({
+  /*
+   * Und jetzt die Reihenfolge.
+   *
+   * Bis zum 21.09.2026 gab diese Funktion die Beiträge in zeitlicher
+   * Reihenfolge zurück und jeder sah dasselbe. `feed_rang()` bewertet die
+   * eben geholten Kandidaten (Schema 51), `ordnen()` macht daraus die
+   * Liste — Wort für Wort dieselbe Rechnung wie in app/lib/daten.ts, weil
+   * es dieselbe Datei ist.
+   *
+   * Geht das Ranking schief, bleibt es bei der zeitlichen Reihenfolge. Ein
+   * Feed ohne Algorithmus ist genau das, was All Media bis gestern hatte —
+   * kein Zustand, der jemandem einen Fehler anzeigen müsste.
+   */
+  let geordnet = beitraege;
+  if (ids.length > 0) {
+    try {
+      const { data: rang, error: rangFehler } = await client.rpc('feed_rang', {
+        beitraege: ids,
+        herkunft: 'feed',
+      });
+      if (rangFehler) throw rangFehler;
+      // Aufgefächert wird je Art: Fotos, Reels und Clips landen auf drei
+      // Bildschirmen, ein Clip darf die Reihenfolge der Fotos nicht
+      // verschieben. `ordnenJeArt` liest den Verfasser aus `userId` oder
+      // `user_id` — hier sind es noch die rohen Zeilen, also `user_id`.
+      geordnet = ordnenJeArt(beitraege, punktekarte(rang), (b) => b.kind, {
+        // Jeder vierte Platz gehört einem Beitrag, der noch keine Chance
+        // hatte — sonst kommt ein frisch gestellter Beitrag nie nach oben.
+        neulinge: neulingsliste(rang),
+      });
+    } catch (e) {
+      console.warn('[supabase] Feed-Ranking nicht verfügbar, bleibe bei created_at:', e.message);
+    }
+  }
+
+  return geordnet.map((b) => ({
     id: b.id,
     userId: b.user_id === nutzerId ? 'me' : b.user_id,
     kind: b.kind,

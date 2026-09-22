@@ -214,6 +214,42 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
     ['name', 'name'],
   ]);
 
+  /*
+   * Die REIHENFOLGE der Beiträge — nicht nur, welche es sind.
+   *
+   * `vergleicheListen` sortiert die Kennungen, bevor es sie vergleicht.
+   * Das ist für Kontakte und Communitys richtig, für den Feed aber genau
+   * die Stelle, an der ein Unterschied unsichtbar bleibt: seit dem
+   * 21.09.2026 entscheidet ein Algorithmus, was oben steht (Schema 51 und
+   * gemeinsam/rang.js). Laufen App und Website dabei auseinander, sehen
+   * beide Feeds trotzdem plausibel aus — es fällt niemandem auf.
+   *
+   * Beide Seiten müssen dieselbe Datei benutzen, also muss dasselbe
+   * herauskommen. Kommt es das nicht, rechnet eine von beiden selbst.
+   */
+  console.log('\nReihenfolge des Feeds:');
+  for (const [name, w, a] of [
+    ['Beiträge', web.posts, app.posts],
+    ['Hochformat', web.videos, app.videos],
+    ['Querformat', web.clips, app.clips],
+  ]) {
+    const webFolge = (w || []).map((e) => e.id);
+    const appFolge = (a || []).map((e) => e.id);
+    if (webFolge.length === 0) {
+      console.log(`  ----  ${name}: nichts da, nichts zu vergleichen`);
+      continue;
+    }
+    const ersteAbweichung = webFolge.findIndex((id, i) => appFolge[i] !== id);
+    pruefe(
+      `${name}: App und Website in derselben Reihenfolge`,
+      ersteAbweichung === -1,
+      ersteAbweichung === -1
+        ? `${webFolge.length} Einträge`
+        : `ab Platz ${ersteAbweichung + 1}: Website ${webFolge[ersteAbweichung]}, ` +
+          `App ${appFolge[ersteAbweichung]}`
+    );
+  }
+
   console.log('\nInhalte:');
   vergleicheListen('Beiträge', web.posts, app.posts, 'id', [
     ['description', 'description'],

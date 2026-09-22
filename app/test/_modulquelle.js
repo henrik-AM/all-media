@@ -84,6 +84,9 @@ const UMD_BAUSTEINE = [
   // dieselben drei Laeufe kippten wieder. Der Hinweis oben stand da, der
   // Eintrag fehlte trotzdem.
   ['kommentar', 'Kommentar'],
+  // 21.09.2026: `rang.js` kam mit dem Feed-Algorithmus dazu (Schema 51).
+  // Diesmal gleich mit dem Baustein eingetragen statt hinterher.
+  ['rang', 'Rang'],
 ];
 
 function umdTeile() {
@@ -96,16 +99,37 @@ function umdTeile() {
     .join('\n');
 }
 
-/** Aus `require('../../gemeinsam/telefon')` wird `globalThis.Telefon`. */
+/**
+ * Aus `require('../../gemeinsam/telefon')` wird `globalThis.Telefon`.
+ *
+ * UND aus `import { a, b } from '../../gemeinsam/rang'` wird
+ * `const { a, b } = globalThis.Rang;`.
+ *
+ * Der zweite Fall kam am 21.09.2026 dazu. `aktionen.ts` holt seine
+ * Bausteine mit `require`, `daten.ts` dagegen mit einem ESM-`import` — und
+ * den liess die Ersetzung stehen. Der Lauf kippte dann nicht mit „require
+ * is not defined", sondern mit „Failed to resolve module specifier", also
+ * mit einer anderen Meldung an derselben Stelle. Der Eintrag in
+ * UMD_BAUSTEINE war da, er griff nur fuer die halbe Datei.
+ *
+ * Fuer `gemeinsam/spalten.js` gibt es weiter unten eine eigene Behandlung:
+ * die Datei hat keine UMD-Huelle und wird als blanke Deklarationen
+ * vorangestellt.
+ */
 function umdAufloesen(quelltext) {
-  return UMD_BAUSTEINE.reduce(
-    (text, [datei, name]) =>
-      text.replace(
-        new RegExp(`require\\(['"][^'"]*gemeinsam/${datei}(?:\\.js)?['"]\\)`, 'g'),
-        `globalThis.${name}`
+  return UMD_BAUSTEINE.reduce((text, [datei, name]) => {
+    const mitRequire = text.replace(
+      new RegExp(`require\\(['"][^'"]*gemeinsam/${datei}(?:\\.js)?['"]\\)`, 'g'),
+      `globalThis.${name}`
+    );
+    return mitRequire.replace(
+      new RegExp(
+        `^\\s*import\\s*(\\{[^}]*\\})\\s*from\\s*['"][^'"]*gemeinsam/${datei}(?:\\.js)?['"];?\\s*$`,
+        'gm'
       ),
-    quelltext
-  );
+      `const $1 = globalThis.${name};`
+    );
+  }, quelltext);
 }
 
 /**

@@ -175,6 +175,9 @@ const LAEUFE = [
   ['lesebestaetigung', '_lesebestaetigung.js'],
   ['kanal', '_kanal.js'],
   ['impressionen', '_impressionen.js'],
+  // Direkt hinter den Impressionen: das eine misst, ob mitgeschrieben wird,
+  // das andere, ob aus dem Mitgeschriebenen eine Reihenfolge wird.
+  ['rang', '_rang.js'],
   ['storyvideos', '_storyvideos.js'],
   ['krypto', '_krypto.js'],
   ['rechte', '_rechte.js'],

@@ -53,6 +53,12 @@ import {
   NACHRICHT_SPALTEN,
   PROFIL_SPALTEN,
 } from '../../gemeinsam/spalten';
+/*
+ * Die Reihenfolge des Feeds — ebenfalls einmal fuer App und Website. Die
+ * Punkte rechnet `feed_rang()` (Schema 51), aus Punkten eine Reihenfolge zu
+ * machen steht in ../../gemeinsam/rang.js.
+ */
+import { neulingsliste, ordnenJeArt, punktekarte } from '../../gemeinsam/rang';
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -936,9 +942,46 @@ export async function ladeBeitraege(
     standbild: b.thumbnail_url ?? undefined,
   }));
 
+  /*
+   * Und jetzt die Reihenfolge.
+   *
+   * Bis zum 21.09.2026 endete die Funktion hier, und jeder sah dieselben
+   * Beitraege in derselben zeitlichen Reihenfolge. `feed_rang()` bewertet
+   * die eben geholten Kandidaten (Schema 51), `ordnen()` macht daraus die
+   * Liste — Verfasser aufgefaechert, damit kein Block entsteht.
+   *
+   * Bewertet wird die ganze Ausbeute auf einmal — die Punkte einer Zeile
+   * haengen nicht von den anderen ab. Aufgefaechert wird dagegen JE ART:
+   * Posts, Reels und Clips landen auf drei Bildschirmen, und ein Clip darf
+   * die Reihenfolge der Fotos nicht verschieben. Die drei Listen unten
+   * erben ihre Reihenfolge, weil sie aus `geordnet` gefiltert werden.
+   *
+   * Geht das Ranking schief, bleibt es bei der zeitlichen Reihenfolge. Ein
+   * Feed ohne Algorithmus ist genau das, was All Media bis gestern hatte —
+   * kein Zustand, der jemandem einen Fehler anzeigen muesste.
+   */
+  let geordnet = roh;
+  if (ids.length > 0) {
+    try {
+      const { data: rang, error: rangFehler } = await client.rpc('feed_rang', {
+        beitraege: ids,
+        herkunft: 'feed',
+      });
+      if (rangFehler) throw rangFehler;
+      const zeilen = (rang ?? []) as any[];
+      geordnet = ordnenJeArt(roh, punktekarte(zeilen), (b) => b.kind, {
+        // Jeder vierte Platz gehoert einem Beitrag, der noch keine Chance
+        // hatte — sonst kommt ein frisch gestellter Beitrag nie nach oben.
+        neulinge: neulingsliste(zeilen),
+      });
+    } catch (e) {
+      console.warn('[daten] Feed-Ranking nicht verfuegbar, bleibe bei created_at:', e);
+    }
+  }
+
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
   return signiereMedien(client, {
-    posts: roh
+    posts: geordnet
       .filter((b) => b.kind === 'post')
       .map((b) => ({
         id: b.id,
@@ -959,7 +1002,7 @@ export async function ladeBeitraege(
         standbild: b.standbild,
         tags: b.tags,
       })),
-    videos: roh
+    videos: geordnet
       .filter((b) => b.kind === 'reel')
       .map((b) => ({
         id: b.id,
@@ -978,7 +1021,7 @@ export async function ladeBeitraege(
         standbild: b.standbild,
         tags: b.tags,
       })),
-    clips: roh
+    clips: geordnet
       .filter((b) => b.kind === 'clip')
       .map((b) => ({
         id: b.id,

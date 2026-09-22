@@ -88,7 +88,8 @@
     "test:sync": "node test/_sync.js",
     "test:sammlungen": "node test/_sammlungen.js",
     "test:sammlungenweb": "node test/_sammlungenweb.js",
-    "test:schema": "node test/_schema.js"
+    "test:schema": "node test/_schema.js",
+    "test:rang": "node test/_rang.js"
   },
   "private": true
 }
