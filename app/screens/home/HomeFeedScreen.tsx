@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
+import { Glocke } from '../../components/Glocke';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
+import { BeitragOptionenSheet, OptionenBeitrag } from '../../components/BeitragOptionenSheet';
 import { Motiv } from '../../components/Motiv';
 import { StoryRail } from '../../components/StoryRail';
 import { useReposts } from '../../contexts/RepostContext';
@@ -19,6 +21,8 @@ import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useAktionen } from '../../lib/useAktionen';
 import { useImpressionen } from '../../lib/useImpressionen';
+import { useZielOeffnen } from '../../lib/ziele';
+import type { ExplorerZiel } from '../videos/ExplorerScreen';
 import { Post, Story } from '../../types';
 
 interface Props {
@@ -41,6 +45,8 @@ interface Props {
   /** Wird gerufen, sobald dorthin gesprungen wurde — einmal, nicht bei jedem Neubau. */
   onStartErreicht?: () => void;
   onNotice: (message: string) => void;
+  /** Ort und Sound am Beitrag fuehren auf ihre Seite (lib/ziele.ts). */
+  onOpenExplorer?: (ziel: ExplorerZiel) => void;
 }
 
 export const HomeFeedScreen = ({
@@ -51,8 +57,10 @@ export const HomeFeedScreen = ({
   startBei,
   onStartErreicht,
   onNotice,
+  onOpenExplorer,
 }: Props) => {
-  const { posts: alleBeitraege, users: alleNutzer, ichId } = useDaten();
+  const ziel = useZielOeffnen(onOpenExplorer, onNotice);
+  const { posts: alleBeitraege, users: alleNutzer, ichId, keinInteresse } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Was hier passiert, geht in die Datenbank — siehe lib/useAktionen.ts.
   const aktion = useAktionen(onNotice);
@@ -96,17 +104,28 @@ export const HomeFeedScreen = ({
    * und man kaeme nie mehr nach oben.
    */
   const liste = useRef<FlatList<Post>>(null);
+
+  /*
+   * "Kein Interesse" aus dem Drei-Punkte-Menue (Schema 55) faellt aus dem
+   * Feed - ausser man kommt ueber genau diesen Beitrag aus dem Profil.
+   */
+  const sichtbarePosts = useMemo(
+    () => posts.filter((p) => p.id === startBei || !keinInteresse.includes(p.id)),
+    [posts, keinInteresse, startBei]
+  );
+
   useEffect(() => {
     if (!startBei) return;
-    const platz = posts.findIndex((p) => p.id === startBei);
+    const platz = sichtbarePosts.findIndex((p) => p.id === startBei);
     if (platz < 0) return;
     // `viewPosition: 0` setzt den Beitrag an den oberen Rand — so, wie man es
     // von einer geoeffneten Kachel erwartet.
     liste.current?.scrollToIndex({ index: platz, viewPosition: 0, animated: false });
     onStartErreicht?.();
-  }, [startBei, posts, onStartErreicht]);
+  }, [startBei, sichtbarePosts, onStartErreicht]);
 
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [optionenFuer, setOptionenFuer] = useState<OptionenBeitrag | null>(null);
 
   const update = (id: string, change: (post: Post) => Post) =>
     setPosts((prev) => prev.map((p) => (p.id === id ? change(p) : p)));
@@ -243,13 +262,13 @@ export const HomeFeedScreen = ({
                 mit einem einsamen Mittelpunkt. */}
             <View style={styles.subRow}>
               {item.location && (
-                <Druck onPress={() => onNotice(`Standort: ${item.location}`)} hitSlop={4}>
+                <Druck onPress={() => ziel.ort(item.location)} hitSlop={4}>
                   <Text style={styles.sub}>{item.location}</Text>
                 </Druck>
               )}
               {item.location && item.music && <Text style={styles.sub}> · </Text>}
               {item.music && (
-                <Druck onPress={() => onNotice(`Music: ${item.music}`)} hitSlop={4}>
+                <Druck onPress={() => ziel.sound(item.music)} hitSlop={4}>
                   <Text style={styles.sub}>{item.music}</Text>
                 </Druck>
               )}
@@ -270,17 +289,21 @@ export const HomeFeedScreen = ({
                 </Text>
               </Druck>
               <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
-                <View style={{ position: 'relative' }}>
-                  <Ionicons
-                    name="notifications"
-                    size={19}
-                    color={item.notify ? colors.brand : colors.text2}
-                  />
-                  {!item.notify && <View style={styles.bellStrike} />}
-                </View>
+                <Glocke an={!!item.notify} grund={colors.surface} />
               </Druck>
             </>
           )}
+          {/* Drei-Punkte-Menue, Vorbild TikTok (components/BeitragOptionenSheet). */}
+          <Druck
+            style={styles.bell}
+            onPress={() =>
+              setOptionenFuer({ id: item.id, userId: item.userId, mediaUri: item.mediaUri, video: /\.(mp4|mov|m4v|webm)/i.test(item.mediaUri ?? '') })
+            }
+            hitSlop={6}
+            accessibilityLabel="Mehr"
+          >
+            <Ionicons name="ellipsis-horizontal" size={19} color={colors.text2} />
+          </Druck>
         </View>
 
         {/*
@@ -376,7 +399,7 @@ export const HomeFeedScreen = ({
 
       <FlatList
         ref={liste}
-        data={posts}
+        data={sichtbarePosts}
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
         /*
@@ -399,6 +422,8 @@ export const HomeFeedScreen = ({
         onViewableItemsChanged={sichtbarWechsel}
         viewabilityConfig={sichtbarkeit}
       />
+
+      <BeitragOptionenSheet beitrag={optionenFuer} onClose={() => setOptionenFuer(null)} onNotice={onNotice} />
 
       <CommentSheet
         onNotice={onNotice}
@@ -441,7 +466,6 @@ const styles = themenStyles((colors) => ({
   followText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   followTextActive: { color: colors.text2 },
   bell: { width: 30, alignItems: 'center' },
-  bellStrike: { position: 'absolute', top: '50%', left: '50%', width: 22, height: 2, backgroundColor: colors.text2, transform: [{ translateX: -11 }, { translateY: -1 }, { rotate: '-20deg' }] },
 
   media: { aspectRatio: 1, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   mediaBild: { width: '100%', height: '100%' },

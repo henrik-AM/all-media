@@ -89,10 +89,19 @@ const ICONS = (() => {
      * CSS durchgestrichen - text-decoration wirkt aber auf Text und nicht
      * auf ein SVG, also war da schlicht nie ein Strich.
      */
-    bellOff: wrap('<path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0 1 18 8"/><path d="M6.26 6.26A5.9 5.9 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><path d="m2 2 20 20"/>'),
+    // Glocke aus: dieselbe Glocke wie `bell`, der Strich 45° genau durch die
+    // Mitte und nicht länger als die Glocke breit ist. Die Farben kommen aus
+    // dem CSS (.ico-strich rot, .ico-strich-luecke in der Hintergrundfarbe),
+    // sonst ist der Strich so grau wie die Glocke - Henrik, 21.09.2026.
+    bellOff: wrap('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><path class="ico-strich-luecke" d="M5.2 5.2l13.6 13.6"/><path class="ico-strich" d="M5.2 5.2l13.6 13.6"/>'),
     // Das "..." aus dem Prototyp-Frame "CH + Kanal". Als gefuellte Kreise,
     // nicht als drei Punkte im Text - Satzzeichen sitzen auf der Grundlinie
     // und stehen dadurch nie mittig in einem Knopf.
+    /* Drei-Punkte-Menue am Beitrag (openBeitragOptionen). */
+    link: wrap('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'),
+    download: wrap('<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>'),
+    eyeOff: wrap('<path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.1-5.9M9.9 5.2A9.1 9.1 0 0 1 12 5c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="m2 2 20 20"/>'),
+    flag: wrap('<path d="M4 22V4"/><path d="M4 4h13l-2 4.5L17 13H4"/>'),
     dots: wrap('<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>'),
   };
 })();

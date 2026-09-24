@@ -429,6 +429,11 @@ app.post('/api/hochladen', route(async (req) => {
 app.post('/api/reset', route(async (req) => {
   const { data, error } = await req.db.rpc('zuruecksetzen', { ziel: req.nutzerId });
   if (error) throw error;
+  // "Kein Interesse" (Schema 55) kennt zuruecksetzen() nicht. Ohne diese
+  // Zeile bliebe ein einmal ausgeblendeter Beitrag fuer jeden spaeteren
+  // Prueflauf aus dem Feed verschwunden.
+  const { error: keinFehler } = await req.db.from('kein_interesse').delete().eq('user_id', req.nutzerId);
+  if (keinFehler) throw keinFehler;
   return { ok: data?.ok !== false, ...(data || {}) };
 }));
 
@@ -1246,6 +1251,46 @@ app.get('/api/download-erlaubt/:userId', route(async (req) => {
   });
   return { ok: true, erlaubt: data !== false };
 }));
+
+/*
+ * Das Drei-Punkte-Menue am Beitrag — Henrik am 21.09.2026: "Link kopieren,
+ * herunterladen, zu Story hinzufügen, melden, kein Interesse ... Vorbild
+ * TikTok." Dieselben Schreibwege wie in app/lib/aktionen.ts (beitragInStory,
+ * keinInteresse, melden).
+ */
+app.post('/api/beitraege/:id/story', route(async (req) => {
+  const { data: beitrag, error } = await req.db
+    .from('posts')
+    .select('media_url, kind')
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!beitrag?.media_url) return { ok: false, error: 'Dieser Beitrag hat kein Bild und kein Video' };
+  // Die Adresse aus der Datenbank, nicht die unterschriebene aus der
+  // Anzeige - die liefe nach einer Stunde ab.
+  const video = beitrag.kind !== 'post' || /\.(mp4|mov|m4v|webm)(\?|$)/i.test(beitrag.media_url);
+  const e = await syncHandlers.handleCreateStory(req.db, req.nutzerId, {
+    mediaUrl: beitrag.media_url,
+    mediaTyp: video ? 'video' : 'image',
+    text: '',
+    inVideos: true,
+  });
+  if (!e || e.ok === false) return antwort(e);
+  const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
+  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos };
+}));
+
+app.post('/api/beitraege/:id/kein-interesse', route(async (req) => {
+  const { error } = await req.db
+    .from('kein_interesse')
+    .upsert({ user_id: req.nutzerId, post_id: req.params.id }, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+  if (error) throw error;
+  return { ok: true };
+}));
+
+app.post('/api/beitraege/:id/melden', route(async (req) =>
+  antwort(await syncHandlers.handleReportContent(req.db, req.nutzerId, req.params.id, String(req.body?.grund || ''), 'post'))
+));
 
 /**
  * Darf ich dieser Person schreiben? — "Nachrichten senden deaktivieren".
@@ -2345,6 +2390,8 @@ app.get('/api/explorer/:art/:wert', route(async (req) => {
     kopf = {
       art, id: platz.id, titel: platz.name, anzahl: platz.posts,
       adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y,
+      // Fuer die grosse Karte: alle Orte, damit man von dort weiterspringen kann.
+      orte: standorte.map((o) => ({ id: o.id, name: o.name, koordinaten: o.koordinaten })),
     };
   } else if (art === 'sound') {
     /*
@@ -2367,6 +2414,7 @@ app.get('/api/explorer/:art/:wert', route(async (req) => {
     kopf = {
       art, titel: sound.title, produzent: sound.artist,
       anzahl: sound.uses, dauer: sound.dauer, lyrics: sound.lyrics,
+      songwriter: sound.songwriter, cover: sound.cover, audio: sound.audio,
     };
   } else {
     return { ok: false, error: 'Unbekannter Bereich' };

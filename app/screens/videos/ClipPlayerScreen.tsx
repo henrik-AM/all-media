@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StatusBar, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -13,10 +13,13 @@ import { useReposts } from '../../contexts/RepostContext';
 import { Clip } from '../../types';
 import { ExplorerZiel } from './ExplorerScreen';
 import { ActionSheet } from '../../components/ActionSheet';
+import { BeitragOptionenSheet } from '../../components/BeitragOptionenSheet';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { useAktionen } from '../../lib/useAktionen';
 import { ladeStreamKommentare } from '../../lib/daten';
 import { EinstellungSheet } from '../../components/EinstellungSheet';
+import { CommentSheet } from '../../components/CommentSheet';
+import { FormularSheet } from '../../components/FormularSheet';
 import {
   QUALITAET_STUFEN,
   TEMPO_STUFEN,
@@ -39,6 +42,16 @@ const compact = (n: number) =>
 const sekundenVon = (dauer: string) => {
   const [min, sek] = String(dauer).split(':').map(Number);
   return min * 60 + sek;
+};
+
+/*
+ * „2,50", „2.50", „3" — was man eben tippt. Unter 50 Cent lohnt keine
+ * Buchung, ueber 1.000 € ist es fast sicher ein Tippfehler.
+ */
+const betragInCent = (text: string) => {
+  const zahl = Number(String(text).replace(/\s|€/g, '').replace(',', '.'));
+  if (!Number.isFinite(zahl) || zahl < 0.5 || zahl > 1000) return null;
+  return Math.round(zahl * 100);
 };
 
 const zeitText = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -74,10 +87,8 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    */
   const [dateiLaenge, setDateiLaenge] = useState(0);
   /*
-   * Vollbild (Punkt 30). In der App gibt es keine Fullscreen-API - der
-   * Player legt sich stattdessen ueber den ganzen Bildschirm und die Buehne
-   * nimmt die volle Hoehe. Henrik hatte "Handy quer → Video im Vollformat"
-   * beschrieben; der Knopf tut dasselbe, ohne dass man drehen muss.
+   * Vollbild (Punkt 30). Henrik hatte "Handy quer → Video im Vollformat"
+   * beschrieben. Wie die Flaeche dafuer gedreht wird, steht bei `quer`.
    */
   const [vollbild, setVollbild] = useState(false);
   /*
@@ -96,11 +107,35 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    */
   const { supabase } = useSupabase();
   const aktionen = useAktionen(onNotice);
+  const [mehrOffen, setMehrOffen] = useState(false);
   const [liveKommentare, setLiveKommentare] = useState<
     { id: string; name: string; text: string; zeit: string }[]
   >([]);
   const [liveEntwurf, setLiveEntwurf] = useState('');
   const [spendeOffen, setSpendeOffen] = useState(false);
+  /*
+   * Henrik am 21.09.2026: „Spenden: eigener Betrag muss wählbar sein." Die
+   * festen Stufen bleiben als schneller Weg, dahinter ein Feld.
+   */
+  const [eigenerBetrag, setEigenerBetrag] = useState(false);
+  /*
+   * Die Live-Kommentare liegen zusammengeklappt als kleines Fenster mit den
+   * neuesten Zeilen unter dem Bild. Zum Schreiben klappt man es auf, dann
+   * werden die letzten Kommentare groesser und das Eingabefeld erscheint.
+   */
+  const [liveOffen, setLiveOffen] = useState(false);
+  /* Bis zum 21.09.2026 gab der Kommentar-Knopf nur die Anzahl als Hinweis aus. */
+  const [kommentareOffen, setKommentareOffen] = useState(false);
+  /* Neue Kommentare zaehlen sofort mit, nicht erst beim naechsten Laden. */
+  const [kommentarZahl, setKommentarZahl] = useState<Record<string, number>>({});
+  /*
+   * Wie weit der Stream schon gelaufen ist. Bei Live darf man zurueck, um
+   * Verpasstes nachzuholen, aber nie ueber diese Kante hinaus nach vorn —
+   * dahinter ist noch nichts gesendet.
+   */
+  const liveKante = useRef(0);
+  const [balkenBreite, setBalkenBreite] = useState(0);
+  const fenster = useWindowDimensions();
   const video = useVideoEinstellungen();
 
   const clip = clips.find((c) => c.id === offen);
@@ -149,10 +184,18 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
     return () => clearInterval(uhr);
   }, [echtesVideo, laeuft, gesamt]);
 
-  /* Geschwindigkeit aus den Einstellungen an den Abspieler weiterreichen. */
+  /*
+   * Geschwindigkeit aus den Einstellungen an den Abspieler weiterreichen.
+   * Ein Livestream laeuft immer in Echtzeit — schneller als gesendet geht
+   * nicht, und langsamer liesse einen hinter die Sendung fallen.
+   */
   useEffect(() => {
-    if (echtesVideo && laeuft) spieler.current?.tempo(video.werte.tempo);
-  }, [echtesVideo, laeuft, video.werte.tempo]);
+    if (echtesVideo && laeuft) spieler.current?.tempo(istLive ? 1 : video.werte.tempo);
+  }, [echtesVideo, laeuft, istLive, video.werte.tempo]);
+
+  useEffect(() => {
+    liveKante.current = Math.max(liveKante.current, bei);
+  }, [bei]);
 
   if (!clip) {
     return (
@@ -171,15 +214,75 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    * VideoProfileScreen.
    */
   const autor = alleNutzer[clip.userId] ?? { name: '', handle: '' };
-  const aehnlich = clips.filter((c) => c.id !== clip.id).slice(0, 4);
+  /*
+   * Aehnlich heisst: gemeinsame Hashtags zuerst, dann dieselbe Person, dann
+   * die meistgesehenen. Vorher waren es schlicht die ersten vier der Liste.
+   */
+  const naehe = (c: Clip) =>
+    (c.tags ?? []).filter((t) => clip.tags?.includes(t)).length * 2 + (c.userId === clip.userId ? 1 : 0);
+  const aehnlich = clips
+    .filter((c) => c.id !== clip.id)
+    .sort((a, b) => naehe(b) - naehe(a) || b.views - a.views)
+    .slice(0, 4);
+
+  /*
+   * Kapitel nur, soweit sie im Video liegen. Die Testvideos sind eine
+   * Minute lang, ihre Kapitel reichten bis Minute 11 — Henrik am 21.09.2026:
+   * „Kapitel ergeben keinen Sinn." Bei Live gibt es keine: dort steht noch
+   * nicht fest, was kommt.
+   */
+  const kapitel = istLive ? [] : (clip.kapitel ?? []).filter((k) => !gesamt || k.bei < gesamt);
 
   const wechseln = (id: string) => {
     stand.current = 0;
+    liveKante.current = 0;
     setBei(0);
     setDateiLaenge(0);
     setLaeuft(false);
     setOffen(id);
   };
+
+  /*
+   * Springen ueber die rote Leiste. Sie war bis zum 21.09.2026 nur Anzeige.
+   * Bei Live geht es nur zurueck — nach vorn endet der Weg an der Stelle,
+   * die schon gesendet ist.
+   */
+  const springen = (sekunde: number) => {
+    const grenze = istLive ? liveKante.current : gesamt;
+    const ziel = Math.max(0, Math.min(grenze, Math.round(sekunde)));
+    stand.current = ziel;
+    setBei(ziel);
+    spieler.current?.springen(ziel);
+  };
+
+  const balkenGriff = {
+    onStartShouldSetResponder: () => true,
+    onMoveShouldSetResponder: () => true,
+    onResponderGrant: (e: any) => springen((e.nativeEvent.locationX / (balkenBreite || 1)) * gesamt),
+    onResponderMove: (e: any) => springen((e.nativeEvent.locationX / (balkenBreite || 1)) * gesamt),
+  };
+
+  /*
+   * Vollbild: das Handy wird quer gehalten, das Bild dreht sich mit. Die
+   * App ist aufs Hochformat festgelegt, deshalb dreht sie die Flaeche selbst
+   * um 90 Grad und legt sie ueber den ganzen Bildschirm. Vorher wurde nur
+   * die Hoehe vergroessert — bei einem Querformat-Video hiess das: so stark
+   * hineingezoomt, dass nur ein Ausschnitt zu sehen war.
+   */
+  const quer = vollbild
+    ? {
+        position: 'absolute' as const,
+        zIndex: 10,
+        width: fenster.height,
+        height: fenster.width,
+        left: (fenster.width - fenster.height) / 2,
+        top: (fenster.height - fenster.width) / 2,
+        transform: [{ rotate: '90deg' }],
+        backgroundColor: '#000',
+        paddingLeft: insets.top,
+        paddingRight: insets.bottom,
+      }
+    : null;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -189,8 +292,15 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         </Druck>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
-        <Druck style={[styles.buehne, vollbild && styles.buehneVoll]} onPress={() => setLaeuft((v) => !v)}>
+      <StatusBar hidden={vollbild} />
+      {/*
+        Bild und Leiste stehen fest ueber der Seite und scrollen nicht mit —
+        so bleibt das Video im Blick, waehrend man Kommentare und Aehnliches
+        liest. Im Vollbild wird dieselbe Flaeche gedreht, ohne sie neu
+        aufzubauen; das Video laeuft also an derselben Stelle weiter.
+      */}
+      <View style={quer}>
+        <Druck style={vollbild ? styles.buehneQuer : styles.buehne} onPress={() => setLaeuft((v) => !v)}>
           <Videoflaeche
             ref={spieler}
             id={clip.id}
@@ -218,19 +328,26 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           <View style={[styles.play, laeuft && styles.playAus]}>
             <Ionicons name={laeuft ? 'pause' : 'play'} size={26} color={colors.white} />
           </View>
-          {clip.art === 'live' && (
-            <View style={styles.liveBadge}>
+          {istLive && (
+            /* Antippen fuehrt zurueck an die Stelle, die gerade gesendet wird. */
+            <Druck style={styles.liveBadge} onPress={() => springen(liveKante.current)} hitSlop={8}>
               <Text style={styles.liveBadgeText}>LIVE</Text>
-            </View>
+            </Druck>
           )}
         </Druck>
 
         <View style={styles.leiste}>
           <Text style={styles.zeit}>{zeitText(bei)}</Text>
-          <View style={styles.balken}>
-            <View style={[styles.fortschritt, { width: `${gesamt ? (bei / gesamt) * 100 : 0}%` }]} />
+          <View
+            style={styles.balkenFeld}
+            onLayout={(e) => setBalkenBreite(e.nativeEvent.layout.width)}
+            {...balkenGriff}
+          >
+            <View style={styles.balken} pointerEvents="none">
+              <View style={[styles.fortschritt, { width: `${gesamt ? (bei / gesamt) * 100 : 0}%` }]} />
+            </View>
           </View>
-          <Text style={styles.zeit}>{clip.duration}</Text>
+          <Text style={styles.zeit}>{istLive ? 'LIVE' : clip.duration}</Text>
           {/* Einstellungen und Vollbild - dort sucht man sie von YouTube her. */}
           <Druck style={styles.leisteKnopf} onPress={() => setOptionen(true)} hitSlop={8} accessibilityLabel="Video-Einstellungen">
             <Ionicons name="settings-outline" size={18} color="#C6CAD2" />
@@ -244,32 +361,30 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             <Ionicons name={vollbild ? 'contract-outline' : 'expand-outline'} size={18} color="#C6CAD2" />
           </Druck>
         </View>
+      </View>
 
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
         {/*
           Kapitel (Punkt 32). Nur wenn das Video welche hat - eine leere
           Ueberschrift ueber nichts waere schlechter als gar keine.
         */}
-        {!!clip.kapitel?.length && (
+        {kapitel.length > 0 && (
           <View style={styles.kapitel}>
             <Text style={styles.kapitelKopf}>KAPITEL</Text>
-            {clip.kapitel.map((k, i) => {
-              const aktiv = bei >= k.bei && (!clip.kapitel![i + 1] || bei < clip.kapitel![i + 1].bei);
+            {kapitel.map((k, i) => {
+              const aktiv = bei >= k.bei && (!kapitel[i + 1] || bei < kapitel[i + 1].bei);
               return (
                 <Druck
                   key={k.bei}
                   style={[styles.kapitelZeile, aktiv && styles.kapitelZeileAktiv]}
-                  onPress={() => {
-                    stand.current = Math.min(gesamt, k.bei);
-                    setBei(stand.current);
-                    spieler.current?.springen(stand.current);
-                  }}
+                  onPress={() => springen(k.bei)}
                 >
                   <Text style={styles.kapitelZeit}>{zeitText(k.bei)}</Text>
                   <Text style={styles.kapitelTitel} numberOfLines={1}>
                     {k.titel}
                   </Text>
                   <Text style={styles.kapitelDauer}>
-                    {zeitText((clip.kapitel![i + 1]?.bei ?? gesamt) - k.bei)}
+                    {zeitText((kapitel[i + 1]?.bei ?? gesamt) - k.bei)}
                   </Text>
                 </Druck>
               );
@@ -282,6 +397,12 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           <Text style={styles.sub}>
             {compact(clip.views)} Aufrufe · {clip.age}
           </Text>
+          {/* Drei-Punkte-Menue, Vorbild TikTok (components/BeitragOptionenSheet).
+              Neben dem Titel, nicht in der Aktionsreihe: dort stehen laut
+              Prototyp genau fuenf Knoepfe. */}
+          <Druck style={styles.mehr} onPress={() => setMehrOffen(true)} accessibilityLabel="Mehr" hitSlop={8}>
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.text2} />
+          </Druck>
         </View>
 
         <View style={styles.autor}>
@@ -318,10 +439,14 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             </Text>
           </Druck>
 
-          <Druck style={styles.aktion} onPress={() => onNotice(`${clip.comments ?? 0} Kommentare`)}>
+          <Druck
+            style={styles.aktion}
+            /* Bei Live fuehrt er in die Live-Kommentare, sonst ins gewohnte Blatt. */
+            onPress={() => (istLive ? setLiveOffen(true) : setKommentareOffen(true))}
+          >
             <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
             <Text style={styles.aktionZahl} numberOfLines={1}>
-              {clip.comments ? compact(clip.comments) : 'Kommentar'}
+              {(kommentarZahl[clip.id] ?? clip.comments) ? compact(kommentarZahl[clip.id] ?? clip.comments ?? 0) : 'Kommentar'}
             </Text>
           </Druck>
 
@@ -363,51 +488,68 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         {/*
           * Die Live-Kommentarspalte samt Spendenknopf. Beides steht im
           * Handbuch unter Querformat, beides gab es bis zum 01.09.2026 nicht.
+          *
+          * Henrik am 21.09.2026: ein kleines Fenster mit den aktuellsten
+          * Kommentaren; zum Schreiben klappt man es auf, dann werden die
+          * letzten Kommentare groesser angezeigt.
           */}
         {istLive && (
           <View style={styles.live}>
             <View style={styles.liveKopf}>
-              <Text style={styles.liveTitel}>Live-Kommentare</Text>
+              <Druck style={styles.liveKopfLinks} onPress={() => setLiveOffen((v) => !v)} hitSlop={6}>
+                <Text style={styles.liveTitel}>Live-Kommentare</Text>
+                <Ionicons name={liveOffen ? 'chevron-down' : 'chevron-up'} size={16} color={colors.text2} />
+              </Druck>
               <Druck style={styles.spendeKnopf} onPress={() => setSpendeOffen(true)}>
                 <Ionicons name="heart" size={14} color={colors.white} />
                 <Text style={styles.spendeText}>Spenden</Text>
               </Druck>
             </View>
 
-            {liveKommentare.length === 0 ? (
-              <Text style={styles.liveLeer}>Noch hat niemand etwas geschrieben.</Text>
-            ) : (
-              liveKommentare.slice(-30).map((k) => (
-                <View key={k.id} style={styles.liveZeile}>
-                  <Text style={styles.liveName}>{k.name}</Text>
-                  <Text style={styles.liveText}>{k.text}</Text>
-                </View>
-              ))
-            )}
+            <Druck onPress={() => !liveOffen && setLiveOffen(true)} disabled={liveOffen}>
+              {liveKommentare.length === 0 ? (
+                <Text style={styles.liveLeer}>Noch hat niemand etwas geschrieben.</Text>
+              ) : (
+                liveKommentare.slice(liveOffen ? -30 : -3).map((k) => (
+                  <View key={k.id} style={styles.liveZeile}>
+                    <Text style={[styles.liveName, liveOffen && styles.liveGross]}>{k.name}</Text>
+                    <Text style={[styles.liveText, liveOffen && styles.liveGross]} numberOfLines={liveOffen ? undefined : 1}>
+                      {k.text}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </Druck>
 
-            <View style={styles.liveEingabe}>
-              <TextInput
-                style={styles.liveFeld}
-                value={liveEntwurf}
-                onChangeText={setLiveEntwurf}
-                placeholder="Etwas sagen …"
-                placeholderTextColor={colors.text3}
-                returnKeyType="send"
-                onSubmitEditing={async () => {
-                  const text = liveEntwurf.trim();
-                  if (!text) return;
-                  setLiveEntwurf('');
-                  if (await aktionen.streamKommentar(clip.id, text)) liveHolen();
-                }}
-              />
-            </View>
+            {liveOffen ? (
+              <View style={styles.liveEingabe}>
+                <TextInput
+                  style={styles.liveFeld}
+                  value={liveEntwurf}
+                  onChangeText={setLiveEntwurf}
+                  placeholder="Etwas sagen …"
+                  placeholderTextColor={colors.text3}
+                  returnKeyType="send"
+                  autoFocus
+                  onSubmitEditing={async () => {
+                    const text = liveEntwurf.trim();
+                    if (!text) return;
+                    setLiveEntwurf('');
+                    if (await aktionen.streamKommentar(clip.id, text)) liveHolen();
+                  }}
+                />
+              </View>
+            ) : (
+              <Druck onPress={() => setLiveOffen(true)}>
+                <Text style={styles.liveSchreiben}>Kommentieren …</Text>
+              </Druck>
+            )}
           </View>
         )}
 
         {/*
-          * Spenden in festen Stufen. Ein freies Betragsfeld waere hier der
-          * falsche Weg: waehrend eines Streams tippt niemand einen Betrag,
-          * und ein Zahlendreher ist echtes Geld.
+          * Spenden in festen Stufen als schneller Weg. Henrik am 21.09.2026:
+          * ein eigener Betrag muss waehlbar sein — dafuer der letzte Punkt.
           */}
         <ActionSheet
           visible={spendeOffen}
@@ -417,9 +559,11 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             { key: '300', label: '3,00 €', icon: 'heart-outline' },
             { key: '500', label: '5,00 €', icon: 'heart' },
             { key: '1000', label: '10,00 €', icon: 'heart' },
+            { key: 'eigen', label: 'Eigener Betrag …', icon: 'create-outline' },
           ]}
           onSelect={async (cent) => {
             setSpendeOffen(false);
+            if (cent === 'eigen') return setEigenerBetrag(true);
             const ok = await aktionen.spenden(clip.userId, Number(cent), clip.id);
             if (ok) {
               onNotice(
@@ -428,6 +572,24 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             }
           }}
           onClose={() => setSpendeOffen(false)}
+        />
+
+        <FormularSheet
+          visible={eigenerBetrag}
+          title={`An ${autor.name} spenden`}
+          felder={[{ key: 'betrag', label: 'Betrag in Euro', typ: 'zahl', platzhalter: 'z. B. 2,50', pflicht: true }]}
+          knopf="Spenden"
+          onClose={() => setEigenerBetrag(false)}
+          onSubmit={(werte) => {
+            const cent = betragInCent(werte.betrag);
+            if (cent === null) return 'Bitte einen Betrag zwischen 0,50 € und 1.000 € eingeben';
+            setEigenerBetrag(false);
+            aktionen.spenden(clip.userId, cent, clip.id).then((ok) => {
+              if (ok) onNotice(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${autor.name} gespendet`);
+            });
+            return null;
+          }}
+          onNotice={onNotice}
         />
 
         {!!clip.description && <Text style={styles.text}>{clip.description}</Text>}
@@ -442,7 +604,10 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           </View>
         )}
 
-        <Text style={styles.abschnitt}>Ähnliche Videos →</Text>
+        {/* Bis zum 21.09.2026 nur Text. Jetzt fuehrt er zur ganzen Liste. */}
+        <Druck onPress={() => onOpenExplorer({ art: 'querformat', wert: '' })}>
+          <Text style={styles.abschnitt}>Ähnliche Videos →</Text>
+        </Druck>
         {aehnlich.map((c) => (
           <Druck key={c.id} style={styles.clip} onPress={() => wechseln(c.id)}>
             <View style={styles.clipBild}>
@@ -472,11 +637,20 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         welche hat - ein Punkt, der bei jedem zweiten Video ins Leere fuehrt,
         ist schlechter als keiner.
       */}
+      <BeitragOptionenSheet
+        beitrag={mehrOffen ? { id: clip.id, userId: clip.userId, mediaUri: quelle, video: true } : null}
+        onClose={() => setMehrOffen(false)}
+        onNotice={onNotice}
+      />
+
       <ActionSheet
         visible={optionen}
         title="Video-Einstellungen"
         items={[
-          { key: 'tempo', label: `Geschwindigkeit · ${tempoText(video.werte.tempo)}`, icon: 'time-outline' },
+          /* Bei Live gibt es keine Geschwindigkeit — gesendet wird in Echtzeit. */
+          ...(istLive
+            ? []
+            : [{ key: 'tempo', label: `Geschwindigkeit · ${tempoText(video.werte.tempo)}`, icon: 'time-outline' as const }]),
           { key: 'qualitaet', label: `Qualität · ${video.werte.qualitaet}`, icon: 'settings-outline' },
           ...(clip.untertitel
             ? [
@@ -515,6 +689,13 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         />
       )}
 
+      <CommentSheet
+        targetId={kommentareOffen ? clip.id : null}
+        onClose={() => setKommentareOffen(false)}
+        onCountChange={(id, anzahl) => setKommentarZahl((z) => ({ ...z, [id]: anzahl }))}
+        onNotice={onNotice}
+      />
+
       {wahl === 'qualitaet' && (
         <EinstellungSheet
           titel="Qualität"
@@ -542,6 +723,9 @@ const styles = themenStyles((colors) => ({
     gap: 5,
   },
   liveKopf: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  liveKopfLinks: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  liveGross: { fontSize: 15, lineHeight: 21 },
+  liveSchreiben: { ...typography.small, color: colors.text3, paddingTop: 4 },
   liveTitel: { ...typography.name, color: colors.text },
   spendeKnopf: {
     flexDirection: 'row',
@@ -585,7 +769,7 @@ const styles = themenStyles((colors) => ({
   },
   /* Im Vollbild faellt das Seitenverhaeltnis weg und die Buehne nimmt fast
      den ganzen Bildschirm. */
-  buehneVoll: { aspectRatio: undefined, height: '78%' },
+  buehneQuer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   play: {
     position: 'absolute',
     width: 58,
@@ -629,10 +813,13 @@ const styles = themenStyles((colors) => ({
   kapitelTitel: { flex: 1, ...typography.body, color: colors.text },
   kapitelDauer: { ...typography.small, color: colors.text3, fontVariant: ['tabular-nums'] },
   zeit: { ...typography.tiny, color: '#B9BDC6', fontVariant: ['tabular-nums'] },
-  balken: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' },
+  /* Die Linie ist 3 Punkte hoch, der Finger braucht mehr — deshalb das Feld drumherum. */
+  balkenFeld: { flex: 1, height: 24, justifyContent: 'center' },
+  balken: { height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' },
   fortschritt: { height: '100%', backgroundColor: colors.danger },
 
-  kopf: { paddingHorizontal: spacing.lg, paddingTop: 14, paddingBottom: 6 },
+  kopf: { paddingLeft: spacing.lg, paddingRight: 52, paddingTop: 14, paddingBottom: 6 },
+  mehr: { position: 'absolute', top: 10, right: 8, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   titel: { fontSize: 17, fontWeight: '700', color: colors.text, lineHeight: 22 },
   sub: { ...typography.small, color: colors.text2, marginTop: 3 },
 

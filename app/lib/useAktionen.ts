@@ -239,6 +239,14 @@ export interface Aktionen {
    */
   medienSichern: (url: string, name: string) => Promise<boolean>;
 
+  /*
+   * Das Drei-Punkte-Menue am Beitrag (Henrik am 21.09.2026, Vorbild TikTok).
+   * Alle drei geben zurueck, ob es wirklich in der Datenbank steht.
+   */
+  beitragInStory: (beitragId: string) => Promise<string | null>;
+  keinInteresse: (beitragId: string) => Promise<boolean | null>;
+  beitragMelden: (beitragId: string, grund: string) => Promise<boolean | null>;
+
   pttSenden: (
     communityId: string,
     audioUri: string,
@@ -543,6 +551,10 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
        */
       communityStumm: (communityId) =>
         holen('Das Stummschalten', (c, i) => A.communityStumm(c, i, communityId)),
+
+      beitragInStory: (id) => holen('Zur Story hinzufügen', (c, i) => A.beitragInStory(c, i, id)),
+      keinInteresse: (id) => holen('Kein Interesse', (c, i) => A.keinInteresse(c, i, id)),
+      beitragMelden: (id, grund) => holen('Das Melden', (c, i) => A.melden(c, i, id, grund, 'post')),
 
       medienSichern: async (url, name) => {
         if (!url) {

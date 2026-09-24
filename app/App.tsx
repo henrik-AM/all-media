@@ -9,6 +9,7 @@ import { EinstellungenProvider, useEinstellungen } from './contexts/Einstellunge
 import { RepostProvider } from './contexts/RepostContext';
 import { ProfilProvider, useProfil } from './contexts/ProfilContext';
 import { ActionSheet } from './components/ActionSheet';
+import { BeitragOptionenSheet, OptionenBeitrag } from './components/BeitragOptionenSheet';
 import { AddContactSheet } from './components/AddContactSheet';
 import { ErstellenSheet, ErstellenPunkt } from './components/ErstellenSheet';
 import { FormularFeld, FormularSheet } from './components/FormularSheet';
@@ -314,6 +315,10 @@ const Shell = () => {
    * nachsichtig: eine unbekannte Angabe lässt schlicht den Grundbildschirm
    * stehen, statt die App beim Start abstürzen zu lassen.
    */
+  // Nur fuer das Pruefbild "optionen:<Reel>" - im Betrieb oeffnet der Feed
+  // das Menue selbst.
+  const [pruefOptionen, setPruefOptionen] = useState<OptionenBeitrag | null>(null);
+
   const pruefUeberlagerung = (angabe: string) => {
     const [art, a, b] = angabe.split(':');
     // Kennung ODER Name: die Kennungen vergibt die Datenbank, die Namen
@@ -409,9 +414,35 @@ const Shell = () => {
         setOverlay({ kind: b === 'gefolgt' ? 'following' : 'followers', userId: id });
         break;
       }
+      // Das Drei-Punkte-Menue an einem Reel - "optionen:<Kennung oder Text>".
+      case 'optionen': {
+        const v = daten.videos.find((x) => x.id === a || x.description === a) ?? daten.videos.find((x) => x.userId !== 'me');
+        if (v) setPruefOptionen({ id: v.id, userId: v.userId, mediaUri: v.mediaUri, video: true });
+        break;
+      }
       case 'clip': {
         const clip = daten.clips.find((c) => c.id === a || c.title === a);
         if (clip) setOverlay({ kind: 'clip', clipId: clip.id });
+        break;
+      }
+      /*
+       * Die Seiten hinter der Suche - "explorer:reels", "explorer:hashtag:tag"
+       * (ohne Raute: "#" trennt schon den Bereich vom Pruefschalter),
+       * "explorer:standort:Hamburger Hafen", "explorer:sound:Golden Hour".
+       * Henrik am 21.09.2026: dort landete man auf einer leeren Seite, und
+       * kein Pruefbild haette es gezeigt.
+       */
+      case 'explorer': {
+        const art = a as ExplorerZiel['art'];
+        const wert =
+          art === 'standort' && b
+            ? daten.places.find((p) => p.id === b || p.name === b)?.id ?? b
+            : art === 'sound' && b
+              ? daten.sounds.find((x) => x.id === b || x.title === b)?.id ?? b
+              : art === 'hashtag'
+                ? `#${b ?? ''}`
+                : b ?? '';
+        setOverlay({ kind: 'explorer', ziel: { art, wert } });
         break;
       }
       case 'blatt':
@@ -1598,13 +1629,21 @@ const Shell = () => {
         onBack={() => setOverlay(null)}
         onOpenClip={(clipId) => setOverlay({ kind: 'clip', clipId })}
         onOpenEintrag={eintragOeffnen}
+        onOpenProfile={openPublicProfile}
         onNotice={setNotice}
       />
     );
   }
 
   if (overlay?.kind === 'clip') {
+    /*
+     * Das Teilen-Blatt haengt unten am Hauptbildschirm. Der Player ersetzt
+     * diesen ganz — bis zum 21.09.2026 setzte der Teilen-Knopf hier also ein
+     * Ziel, zu dem es kein Blatt gab, und nichts passierte. Deshalb bringt
+     * der Player sein eigenes mit.
+     */
     return (
+      <>
       <ClipPlayerScreen
         clipId={overlay.clipId}
         onBack={() => setOverlay(null)}
@@ -1620,6 +1659,14 @@ const Shell = () => {
         }
         onNotice={setNotice}
       />
+      <TeilenSheet
+        ziel={teilenZiel}
+        contacts={contacts}
+        bereichFuer={bereichFuer}
+        onClose={() => setTeilenZiel(null)}
+        onSend={teileMit}
+      />
+      </>
     );
   }
 
@@ -1817,6 +1864,7 @@ const Shell = () => {
             startBei={startBeitrag}
             onStartErreicht={() => setStartBeitrag(null)}
             onNotice={setNotice}
+            onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
           />
         );
       if (sub === 'landscape')
@@ -1842,6 +1890,7 @@ const Shell = () => {
           startBei={startBeitrag}
           onStartErreicht={() => setStartBeitrag(null)}
           onNotice={setNotice}
+          onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
         />
       );
     }
@@ -1928,6 +1977,7 @@ const Shell = () => {
       <View style={[styles.content, hatInsel && { paddingTop: inselPlatz }]}>{renderContent()}</View>
       <TopSwitcher area={area} active={sub} onChange={setSub} zaehler={inselZaehler} />
       <TabBar active={area} onChange={wechsleBereich} unreadCount={unreadCount} />
+      <BeitragOptionenSheet beitrag={pruefOptionen} onClose={() => setPruefOptionen(null)} onNotice={setNotice} />
 
       {/*
         * Die Frage beim Posten einer Story. Vorbelegt ist nichts — beide

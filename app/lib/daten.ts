@@ -17,6 +17,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien } from './medien';
+import { SUPABASE_CONFIG } from '../constants/supabase';
 import {
   Chat,
   Clip,
@@ -1193,7 +1194,7 @@ export async function ladeHashtags(client: SupabaseClient): Promise<Hashtag[]> {
 export async function ladeSounds(client: SupabaseClient): Promise<Sound[]> {
   const { data, error } = await client
     .from('sounds')
-    .select('id, title, artist, uses, dauer, lyrics')
+    .select('id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url')
     .order('uses', { ascending: false });
   if (error) throw error;
   return (data ?? []).map((s: any) => ({
@@ -1205,6 +1206,11 @@ export async function ladeSounds(client: SupabaseClient): Promise<Sound[]> {
     // null heißt instrumental. Die Seite sagt das dann auch, statt
     // „Instrumental" als Liedzeile auszugeben.
     lyrics: s.lyrics,
+    // Schema 54. Die Pfade liegen auf der Website, die App braucht die volle
+    // Adresse - dieselbe, auf die auch der Anmeldelink zeigt.
+    songwriter: s.songwriter ?? '',
+    cover: s.cover_url ? `${SUPABASE_CONFIG.redirectUrl}${s.cover_url}` : undefined,
+    audio: s.audio_url ? `${SUPABASE_CONFIG.redirectUrl}${s.audio_url}` : undefined,
   }));
 }
 
@@ -1302,9 +1308,25 @@ export interface AlleDaten {
   insightZiele: string[];
   /** Sichtbarkeitsstufen je Bereich, mit Ausnahmelisten. */
   sichtbarkeit: Record<string, Sichtbarkeit>;
+  /** Beitraege mit "Kein Interesse" — fallen aus beiden Feeds (Schema 55). */
+  keinInteresse: string[];
 
   ichId: string;
   geladen: string;
+}
+
+/**
+ * "Kein Interesse" aus dem Drei-Punkte-Menue (Schema 55). Nur fuer den Feed:
+ * Profil und Suche zeigen den Beitrag weiter. Scheitert die Abfrage, bleibt
+ * der Feed vollstaendig - ein Beitrag zu viel ist besser als kein Feed.
+ */
+async function ladeKeinInteresse(client: SupabaseClient, ichId: string): Promise<string[]> {
+  const { data, error } = await client.from('kein_interesse').select('post_id').eq('user_id', ichId);
+  if (error) {
+    console.warn('[daten] Kein-Interesse-Liste nicht verfuegbar:', error.message);
+    return [];
+  }
+  return (data ?? []).map((z: any) => z.post_id as string);
 }
 
 /**
@@ -1332,6 +1354,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     insightStreaks,
     insightZiele,
     sichtbarkeit,
+    keinInteresse,
   ] = await Promise.all([
     ladeNutzer(client, ichId),
     ladeKontakte(client, ichId),
@@ -1351,6 +1374,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     ladeInsightStreaks(client, ichId),
     ladeInsightZiele(client, ichId),
     ladeSichtbarkeit(client, ichId),
+    ladeKeinInteresse(client, ichId),
   ]);
 
   // „Folge ich?" gehört an die Person, nicht an den einzelnen Beitrag. Vorher
@@ -1413,6 +1437,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     insightStreaks,
     insightZiele,
     sichtbarkeit,
+    keinInteresse,
     ichId,
     geladen: new Date().toISOString(),
   };

@@ -53,6 +53,7 @@ const LEER: AlleDaten = {
   insightStreaks: {},
   insightZiele: [],
   sichtbarkeit: {},
+  keinInteresse: [],
   ichId: '',
   geladen: '',
 };
@@ -67,6 +68,11 @@ interface DatenWert extends AlleDaten {
    */
   fehler: string | null;
   neuLaden: () => Promise<void>;
+  /**
+   * Nimmt einen Beitrag sofort aus dem Feed, ohne alles neu zu laden. Das
+   * Schreiben in die Datenbank macht das Drei-Punkte-Menue (BeitragOptionen).
+   */
+  keinInteresseMerken: (beitragId: string) => void;
 }
 
 const DatenContext = createContext<DatenWert | null>(null);
@@ -123,9 +129,15 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(uhr);
   }, [supabase, ichId]);
 
+  const keinInteresseMerken = useCallback(
+    (beitragId: string) =>
+      setDaten((d) => (d.keinInteresse.includes(beitragId) ? d : { ...d, keinInteresse: [...d.keinInteresse, beitragId] })),
+    []
+  );
+
   const wert = useMemo<DatenWert>(
-    () => ({ ...daten, laedt, fehler, neuLaden: laden }),
-    [daten, laedt, fehler, laden]
+    () => ({ ...daten, laedt, fehler, neuLaden: laden, keinInteresseMerken }),
+    [daten, laedt, fehler, laden, keinInteresseMerken]
   );
 
   return <DatenContext.Provider value={wert}>{children}</DatenContext.Provider>;

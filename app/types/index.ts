@@ -404,6 +404,10 @@ export interface Sound {
    * Prototyp-Frame "VSSo + Sound + Lyrics", Henriks Punkt 11.
    */
   lyrics?: string[] | null;
+  /** Schema 54: wer den Song geschrieben hat, Songbild und Hoerprobe (volle Adressen). */
+  songwriter?: string;
+  cover?: string;
+  audio?: string;
 }
 
 export interface Place {

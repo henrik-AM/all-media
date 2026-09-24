@@ -1143,7 +1143,7 @@ async function ladeSounds(client) {
   if (!client) return [];
   const { data, error } = await client
     .from('sounds')
-    .select('id, title, artist, uses, dauer, lyrics')
+    .select('id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url')
     .order('uses', { ascending: false });
   if (error) throw error;
   return (data || []).map((s) => ({
@@ -1155,6 +1155,10 @@ async function ladeSounds(client) {
     // null heißt: instrumental. Die Seite sagt das dann auch, statt
     // "Instrumental" als Liedzeile auszugeben.
     lyrics: s.lyrics,
+    // Schema 54: Songwriter, Songbild und Hoerprobe (Pfade auf dieser Website).
+    songwriter: s.songwriter || '',
+    cover: s.cover_url || '',
+    audio: s.audio_url || '',
   }));
 }
 
@@ -1216,6 +1220,21 @@ async function ladeBenachrichtigungen(client, nutzerId, bereich = null) {
  * die Regel der Datenbank: ohne Anmeldung ist dort nichts sichtbar. Die
  * Oberfläche zeigt in dem Fall die Anmeldung, nicht etwa Beispieldaten.
  */
+/**
+ * "Kein Interesse" aus dem Drei-Punkte-Menue (Schema 55). Nur fuer den Feed:
+ * Profil und Suche zeigen den Beitrag weiter. Gleiche Abfrage wie
+ * ladeKeinInteresse in app/lib/daten.ts. Scheitert sie, bleibt der Feed
+ * vollstaendig - ein Beitrag zu viel ist besser als kein Feed.
+ */
+async function ladeKeinInteresse(client, nutzerId) {
+  const { data, error } = await client.from('kein_interesse').select('post_id').eq('user_id', nutzerId);
+  if (error) {
+    console.warn('[supabase] Kein-Interesse-Liste nicht verfuegbar:', error.message);
+    return [];
+  }
+  return (data || []).map((z) => z.post_id);
+}
+
 async function bootstrapData(client, nutzerId) {
   if (!client || !nutzerId) return null;
 
@@ -1239,6 +1258,7 @@ async function bootstrapData(client, nutzerId) {
     insightStreaks,
     insightZiele,
     sichtbarkeit,
+    keinInteresse,
   ] = await Promise.all([
     ladeNutzer(client, nutzerId),
     ladeKontakte(client, nutzerId),
@@ -1259,6 +1279,7 @@ async function bootstrapData(client, nutzerId) {
     ladeInsightStreaks(client, nutzerId),
     ladeInsightZiele(client, nutzerId),
     ladeSichtbarkeit(client, nutzerId),
+    ladeKeinInteresse(client, nutzerId),
   ]);
 
   // Der selbst vergebene Kontaktname gilt überall, wo diese Person auftaucht —
@@ -1295,6 +1316,8 @@ async function bootstrapData(client, nutzerId) {
     gefolgt,
     blockiert,
     stummgeschaltet: stumm,
+    // "Kein Interesse" aus dem Drei-Punkte-Menue - fallen aus beiden Feeds.
+    keinInteresse,
     /*
      * Insight Time und was dazugehört (Handbuch-Abgleich 01.09.2026).
      * Nicht zu verwechseln mit den „Insights" im Einstellungsmenü — das ist

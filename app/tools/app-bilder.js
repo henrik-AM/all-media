@@ -99,6 +99,17 @@ const SEITEN = [
   ['messenger/chats#blatt:contact', 'detail-kontakt-hinzufuegen'],
   ['videos/profile#profil:Anna Schmidt', 'detail-fremdprofil'],
   ['videos/landscape#clip:Testvideo im Querformat', 'detail-clip'],
+  // Drei-Punkte-Menue nach TikTok (Henrik, 21.09.2026).
+  ['videos/portrait#optionen', 'detail-optionen'],
+  /*
+   * Die Seiten hinter der Suche (Henrik, 21.09.2026): Uebersicht, Hashtag
+   * mit anklickbaren Abschnitten, Ort mit echter Karte, Song mit Songbild
+   * und Liedzeile.
+   */
+  ['videos/search#explorer:reels', 'detail-explorer-reels'],
+  ['videos/search#explorer:hashtag:sonnenaufgang', 'detail-explorer-hashtag'],
+  ['videos/search#explorer:standort:Hamburger Hafen', 'detail-explorer-ort'],
+  ['videos/search#explorer:sound:Golden Hour', 'detail-explorer-sound'],
   // Die Community-Seite nach dem Prototyp-Frame "CH + Kanal". Sie kam in
   // keinem Bild vor - den Bildschirm gab es bis zum 26.08.2026 nicht.
   ['communities/home#community:Design Systeme', 'detail-community'],

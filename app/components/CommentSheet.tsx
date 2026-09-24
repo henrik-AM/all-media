@@ -10,6 +10,7 @@ import {
   View, Animated } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from './Avatar';
 import { EmptyState } from './EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
@@ -35,6 +36,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Pro
   const aktionen = useAktionen(onNotice);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
+  const insets = useSafeAreaInsets();
 
   /*
    * Kommentare werden zu dem Beitrag geholt, der gerade offen ist — nicht
@@ -194,7 +196,13 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Pro
           }
         />
 
-        <View style={styles.composer}>
+        {/*
+          Henrik am 21.09.2026: Eingabefeld, Senden-Knopf und Profilbild
+          sassen zu weit unten und waren nur halb zu sehen. Das Blatt reicht
+          bis an den Bildschirmrand, und dort liegt beim iPhone die
+          Home-Leiste — ohne diesen Abstand verschwand die Zeile darunter.
+        */}
+        <View style={[styles.composer, { paddingBottom: 9 + insets.bottom }]}>
           <Avatar id={CURRENT_USER_ID} name={alleNutzer[CURRENT_USER_ID]?.name ?? ""} size={sizes.avatarSm} />
           <View style={styles.field}>
             <TextInput

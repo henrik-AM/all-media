@@ -230,6 +230,17 @@ function zusammengelegt(bauOrdner, name) {
   );
   const kryptoQuelle = kryptoteil(bauOrdner);
 
+  /*
+   * Die Zugangsdaten (constants/supabase) lesen `process.env` - das gibt es
+   * im Browser nicht. daten.ts braucht daraus nur die Website-Adresse fuer
+   * Songbild und Hoerprobe (Schema 54, 23.09.2026); im Pruefbrowser ist das
+   * die Seite selbst.
+   */
+  quelltext = quelltext.replace(
+    /^\s*import\s*\{[^}]*\}\s*from\s*['"][./]*constants\/supabase(?:\.js)?['"];?\s*$/gm,
+    'const SUPABASE_CONFIG = { redirectUrl: location.origin };'
+  );
+
   const bausteine = umdTeile();
 
   const medien = finde(bauOrdner, 'medien.js');

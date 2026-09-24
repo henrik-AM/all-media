@@ -89,6 +89,26 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (raster < 1) throw new Error('kein Beitrag');
   });
 
+  /*
+   * Henrik am 21.09.2026: "Hashtag-Detailseite: Ueberschrift nicht
+   * anklickbar, Liste nicht aufklappbar." Die Ueberschrift oeffnet jetzt
+   * denselben Hashtag nur mit diesem Abschnitt, und der Pfeil fuehrt eine
+   * Ebene zurueck, nicht aus der Seite heraus.
+   */
+  await pruefe('Eine Abschnittsueberschrift klappt die volle Liste auf', async () => {
+    const knopf = await page.$('#overlay [data-expnur]');
+    if (!knopf) throw new Error('keine anklickbare Ueberschrift');
+    const welcher = await knopf.getAttribute('data-expnur');
+    await knopf.click();
+    await page.waitForSelector('#overlay .page__title', { timeout: 4000 });
+    const titel = await page.$eval('#overlay .page__title', (e) => e.textContent);
+    if (!titel.includes('#sonnenaufgang')) throw new Error('Kopf sagt "' + titel + '"');
+    if (await page.$('#overlay [data-expnur]')) throw new Error('aufgeklappt stehen noch Ueberschriften');
+    if (await page.$('#overlay .exp__kopf')) throw new Error('der Hashtag-Kopf steht noch da');
+    await page.click('#expBack');
+    await page.waitForSelector(`#overlay [data-expnur="${welcher}"]`, { timeout: 4000 });
+  });
+
   await pruefe('Der Zurueck-Pfeil schliesst die Seite wieder', async () => {
     await zurueck();
     const versteckt = await page.$eval('#overlay', (e) => e.hidden);
@@ -106,7 +126,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     const koord = await page.$eval('.exp__koordinaten', (e) => e.textContent);
     if (!adresse.includes('Hamburg')) throw new Error(adresse);
     if (!/[NO]/.test(koord)) throw new Error(koord);
-    if (!(await page.$('.minikarte__nadel'))) throw new Error('keine Nadel auf der Karte');
+    // Seit 21.09.2026 eine echte Karte (Leaflet) statt des gezeichneten
+    // Rasters - die Nadel ist ein Kreis auf der Karte.
+    await page.waitForSelector('#expKarte .map__pin', { timeout: 5000 }).catch(() => null);
+    if (!(await page.$('#expKarte .map__pin'))) throw new Error('keine Nadel auf der Karte');
+    const kacheln = await page.$$eval('#expKarte img.leaflet-tile', (n) => n.length);
+    if (!kacheln) throw new Error('die Karte hat keine Kacheln');
+  });
+
+  await pruefe('Der Vollbild-Knopf oeffnet die grosse Karte mit allen Orten', async () => {
+    await page.click('#expKarteVoll');
+    await page.waitForSelector('#ortKarte .map__pin', { timeout: 5000 });
+    const nadeln = await page.$$eval('#ortKarte .map__pin', (n) => n.length);
+    if (nadeln < 2) throw new Error(nadeln + ' Nadel(n)');
+    await page.click('.sheet [data-sheet-close]');
+    await page.waitForTimeout(500);
+    if (await page.$('#ortKarte')) throw new Error('die grosse Karte geht nicht wieder zu');
   });
 
   /*
@@ -127,14 +162,23 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   console.log('\nSound-Seite');
-  await pruefe('Ein Sound zeigt Cover, Produzent und Liedtext', async () => {
+  /*
+   * Henrik am 21.09.2026: "Songs: Abspielen, nur die aktuell gesungene
+   * Textzeile, Songwriter-Name, offizielles Songbild." Schema 54.
+   */
+  await pruefe('Ein Sound zeigt Songbild, Interpret, Songwriter und eine Liedzeile', async () => {
     await page.click(`[data-sound="${await K.kennungNachText(page, 'data-sound', 'Golden Hour')}"]`);
     await page.waitForSelector('.soundcover', { timeout: 3000 });
-    const zahl = await page.$eval('.exp__zahl', (e) => e.textContent);
-    if (!zahl.includes('Lys')) throw new Error(zahl);
-    // Aus der einen Zeile ist ein ganzer Text geworden - Punkt 11.
-    const zeilen = await page.$$eval('.lyrics__zeile', (n) => n.length);
-    if (!zeilen) throw new Error('kein Liedtext');
+    const interpret = await page.$eval('.exp__interpret', (e) => e.textContent);
+    if (!interpret.includes('Lys')) throw new Error(interpret);
+    const zahlen = await page.$$eval('.exp__zahl', (n) => n.map((e) => e.textContent).join(' | '));
+    if (!zahlen.includes('Songwriter')) throw new Error('kein Songwriter: ' + zahlen);
+    const bild = await page.$eval('.soundcover img', (i) => i.complete && i.naturalWidth).catch(() => 0);
+    if (!bild) throw new Error('kein Songbild geladen');
+    const jetzt = await page.$eval('#lyricsJetzt', (e) => e.textContent.trim());
+    if (!jetzt) throw new Error('keine Liedzeile');
+    // Nur die aktuelle Zeile - nicht mehr der ganze Text.
+    if (await page.$('.lyrics__zeile')) throw new Error('der ganze Liedtext steht noch da');
   });
 
   await pruefe('Der Abspielknopf laesst die Zeit laufen', async () => {
@@ -148,8 +192,15 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     // wird hier nur die Zeit geprueft.
   });
 
+  await pruefe('Die Hoerprobe spielt wirklich', async () => {
+    const ton = await page.$eval('#soundTon', (a) => ({ zeit: a.currentTime, pausiert: a.paused }));
+    if (ton.pausiert || ton.zeit <= 0) throw new Error(JSON.stringify(ton));
+  });
+
   await pruefe('Noch einmal tippen haelt an', async () => {
     await page.click('#soundPlay');
+    // Das letzte timeupdate kommt kurz nach dem Anhalten noch an.
+    await page.waitForTimeout(400);
     const stand = await page.$eval('#welleZeit', (e) => e.textContent);
     await page.waitForTimeout(1600);
     const jetzt = await page.$eval('#welleZeit', (e) => e.textContent);

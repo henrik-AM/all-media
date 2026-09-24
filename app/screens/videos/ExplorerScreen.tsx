@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KarteWeb, Pin as KartenPin } from '../../components/KarteWeb';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
@@ -10,15 +12,25 @@ import { colors, radius, sizes, spacing, themenStyles, typography } from '../../
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { CameraScreen } from '../messenger/CameraScreen';
-import { Clip, Place, Post, Sound, Video } from '../../types';
+import { Clip, Hashtag, Place, Post, Sound, User, Video } from '../../types';
 import { useKachelHoehe } from '../../lib/raster';
+import { nachInteresse, VORSCHAU } from '../../lib/interesse';
+import { ortFinden, soundFinden } from '../../lib/ziele';
 
 export type ExplorerArt = 'reels' | 'querformat' | 'beitraege' | 'profile' | 'hashtag' | 'standort' | 'sound';
 
 export interface ExplorerZiel {
   art: ExplorerArt;
-  /** Hashtag mit Raute, sonst die id von Standort bzw. Sound. */
+  /**
+   * Hashtag mit Raute, sonst die id von Standort bzw. Sound. Leer (bei
+   * Hashtags nur die Raute) heisst: die Uebersicht aller Hashtags, Orte oder
+   * Sounds. Bei Reels, Querformat, Beitraegen und Profilen bleibt er leer.
+   */
   wert: string;
+  /** Suchbegriff aus der Suche, mit dem eine Uebersicht gefiltert wird. */
+  suche?: string;
+  /** Auf einer Detailseite nur dieser Abschnitt, dafuer vollstaendig. */
+  nur?: 'reels' | 'clips' | 'beitraege';
 }
 
 interface Props {
@@ -33,8 +45,19 @@ interface Props {
    * Der Querformat-Player war der einzige Treffer, der wirklich aufging.
    */
   onOpenEintrag: (art: 'reel' | 'beitrag', id: string) => void;
+  onOpenProfile?: (userId: string) => void;
   onNotice: (message: string) => void;
 }
+
+/** Wie viele Eintraege ein Abschnitt zeigt, bevor man auf die Ueberschrift tippt. */
+const ABSCHNITT_VORSCHAU = { reels: VORSCHAU, clips: 3, beitraege: 6 };
+
+const istUebersicht = (z: ExplorerZiel) =>
+  ['reels', 'querformat', 'beitraege', 'profile'].includes(z.art) ||
+  (z.art === 'hashtag' && z.wert === '#') ||
+  (z.art !== 'hashtag' && !z.wert);
+
+const fensterHoehe = Dimensions.get('window').height;
 
 const compact = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')}k` : String(n);
@@ -45,21 +68,78 @@ const compact = (n: number) =>
  * "VSSo + Sound". Alle drei sind gleich aufgebaut: ein eigener Kopf und
  * darunter die Abschnitte Reels, Querformat und Beiträge.
  */
-export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onOpenEintrag, onNotice }: Props) => {
-  const { places: alleOrte, posts: alleBeitraege, sounds: alleSounds, users: alleNutzer, videos: alleVideos } = useDaten();
+export const ExplorerScreen = (props: Props) => {
+  /*
+   * Henrik am 21.09.2026: "Ueberschrift mit Pfeil fuehrt in eine leere
+   * Seite, obwohl die Vorschau Beitraege zeigt" und "Hashtag-Detailseite:
+   * Ueberschrift nicht anklickbar, Liste nicht aufklappbar". Die Seite kannte
+   * nur einen einzelnen Hashtag, Ort oder Sound - fuer "Reels" oder "alle
+   * Hashtags" fand passt() nichts und zeigte "Noch nichts hier".
+   *
+   * Jetzt gibt es Uebersichten und Detailseiten, und von jeder fuehrt eine
+   * Ueberschrift eine Ebene tiefer. Der Stapel sorgt dafuer, dass der
+   * Zurueck-Pfeil genau eine Ebene hochgeht statt ganz aus der Suche.
+   */
+  const [stapel, setStapel] = useState<ExplorerZiel[]>([props.ziel]);
+  useEffect(() => setStapel([props.ziel]), [props.ziel]);
+  const aktuell = stapel[stapel.length - 1] ?? props.ziel;
+  return (
+    <ExplorerSeite
+      key={stapel.length}
+      {...props}
+      ziel={aktuell}
+      onBack={stapel.length > 1 ? () => setStapel((s) => s.slice(0, -1)) : props.onBack}
+      onWeiter={(z) => setStapel((s) => [...s, z])}
+    />
+  );
+};
+
+const ExplorerSeite = ({
+  ziel,
+  onBack,
+  onWeiter,
+  onOpenClip,
+  onOpenEintrag,
+  onOpenProfile,
+  onNotice,
+}: Props & { onWeiter: (ziel: ExplorerZiel) => void }) => {
+  const { hashtags: alleHashtags, places: alleOrte, posts: alleBeitraege, sounds: alleSounds, users: alleNutzer, videos: alleVideos } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const insets = useSafeAreaInsets();
-  const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
+  const { clips, eigeneBeitraege, eigeneVideos, folgtPerson } = useProfil();
+  const uebersicht = istUebersicht(ziel);
 
   const [nurFotos, setNurFotos] = useState(false);
-  const platz = ziel.art === 'standort' ? alleOrte.find((p) => p.id === ziel.wert) : undefined;
-  const sound = ziel.art === 'sound' ? alleSounds.find((s) => s.id === ziel.wert) : undefined;
+  const platz = ziel.art === 'standort' ? ortFinden(alleOrte, ziel.wert) : undefined;
+  const sound = ziel.art === 'sound' ? soundFinden(alleSounds, ziel.wert) : undefined;
 
   const treffer = useMemo(() => {
     // Was gerade erst angelegt wurde, steht noch nicht in der geladenen Liste
     // - es käme erst beim nächsten Laden mit. Deshalb vorne dran.
     const beitraege = [...eigeneBeitraege, ...alleBeitraege];
     const videos = [...eigeneVideos, ...alleVideos];
+
+    const q = (ziel.suche ?? '').trim().toLowerCase();
+    const hit = (text?: string) => !q || (text ?? '').toLowerCase().includes(q);
+    const gefolgt = (e: { userId: string }) => folgtPerson(e.userId);
+    const name = (id: string) => alleNutzer[id]?.name ?? '';
+
+    if (uebersicht) {
+      // Dieselben Suchregeln wie in VideoSearchScreen - die Uebersicht ist
+      // die volle Liste hinter der Vorschau.
+      const alle = {
+        reels: ziel.art === 'reels'
+          ? nachInteresse(videos.filter((v) => hit(v.description) || hit(v.music) || hit(name(v.userId))), (v) => v.likes, gefolgt)
+          : [],
+        clips: ziel.art === 'querformat'
+          ? nachInteresse(clips.filter((c) => hit(c.title) || hit(name(c.userId))), (c) => c.views, gefolgt)
+          : [],
+        beitraege: ziel.art === 'beitraege'
+          ? nachInteresse(beitraege.filter((p) => hit(p.description) || hit(p.music) || hit(name(p.userId))), (p) => p.likes, gefolgt)
+          : [],
+      };
+      return alle;
+    }
 
     const passt = (e: { tags?: string[]; location?: string; music?: string }) => {
       if (ziel.art === 'hashtag') return (e.tags ?? []).includes(ziel.wert);
@@ -68,13 +148,65 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onOpenEintrag, onNoti
     };
 
     return {
-      reels: videos.filter(passt),
-      clips: clips.filter(passt),
-      beitraege: beitraege.filter(passt),
+      reels: nachInteresse(videos.filter(passt), (v) => v.likes, gefolgt),
+      clips: nachInteresse(clips.filter(passt), (c) => c.views, gefolgt),
+      beitraege: nachInteresse(beitraege.filter(passt), (p) => p.likes, gefolgt),
     };
-  }, [ziel, platz, sound, clips, eigeneBeitraege, eigeneVideos, alleBeitraege, alleVideos]);
+  }, [ziel, uebersicht, platz, sound, clips, eigeneBeitraege, eigeneVideos, alleBeitraege, alleVideos, folgtPerson]);
 
-  const leer = !treffer.reels.length && !treffer.clips.length && !treffer.beitraege.length;
+  // Die Listen der Uebersichten, die keine Aufnahmen sind.
+  const liste = useMemo(() => {
+    const q = (ziel.suche ?? '').trim().toLowerCase();
+    const hit = (text?: string) => !q || (text ?? '').toLowerCase().includes(q);
+    if (!uebersicht) return null;
+    if (ziel.art === 'profile') {
+      return {
+        profile: nachInteresse(
+          Object.values(alleNutzer).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
+          () => 0,
+          (u) => folgtPerson(u.id)
+        ),
+      };
+    }
+    if (ziel.art === 'hashtag') return { hashtags: nachInteresse(alleHashtags.filter((h) => hit(h.tag)), (h) => h.posts) };
+    if (ziel.art === 'standort') return { orte: nachInteresse(alleOrte.filter((p) => hit(p.name)), (p) => p.posts) };
+    if (ziel.art === 'sound') {
+      return { sounds: nachInteresse(alleSounds.filter((x) => hit(x.title) || hit(x.artist)), (x) => x.uses) };
+    }
+    return null;
+  }, [ziel, uebersicht, alleNutzer, alleHashtags, alleOrte, alleSounds, folgtPerson]);
+
+  /*
+   * Auf einer Detailseite zeigt jeder Abschnitt nur eine Vorschau; die
+   * Ueberschrift fuehrt zur vollen Liste. Auf einer Uebersicht oder einer
+   * aufgeklappten Seite steht alles.
+   */
+  const zeigen = (art: 'reels' | 'clips' | 'beitraege') => {
+    if (ziel.nur && ziel.nur !== art) return [];
+    const alle = treffer[art] as any[];
+    return uebersicht || ziel.nur ? alle : alle.slice(0, ABSCHNITT_VORSCHAU[art]);
+  };
+  const aufklappen = (art: 'reels' | 'clips' | 'beitraege') =>
+    uebersicht || ziel.nur ? undefined : () => onWeiter({ ...ziel, nur: art });
+
+  const leer = liste
+    ? !Object.values(liste)[0].length
+    : !zeigen('reels').length && !zeigen('clips').length && !zeigen('beitraege').length;
+
+  const ABSCHNITT_NAME = { reels: 'Reels', clips: 'Querformat', beitraege: 'Beiträge' };
+  const seitenTitel = uebersicht
+    ? {
+        reels: 'Reels',
+        querformat: 'Querformat',
+        beitraege: 'Beiträge',
+        profile: 'Profile',
+        hashtag: 'Hashtags',
+        standort: 'Standorte',
+        sound: 'Sounds',
+      }[ziel.art]
+    : ziel.nur
+      ? `${ziel.art === 'hashtag' ? ziel.wert : ziel.art === 'standort' ? platz?.name ?? '' : sound?.title ?? ''} · ${ABSCHNITT_NAME[ziel.nur]}`
+      : '';
 
   /*
    * Punkt 10: die eigene Seite mit allen Fotos an diesem Ort. Sie liegt als
@@ -95,27 +227,58 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onOpenEintrag, onNoti
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Druck onPress={onBack} hitSlop={10}>
+        <Druck onPress={onBack} hitSlop={10} accessibilityLabel="Zurück">
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Druck>
+        {!!seitenTitel && (
+          <Text style={styles.barTitel} numberOfLines={1}>
+            {seitenTitel}
+          </Text>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
-        {ziel.art === 'hashtag' && <HashtagKopf tag={ziel.wert} />}
-        {ziel.art === 'standort' && platz && (
-          <StandortKopf platz={platz} onAlleFotos={() => setNurFotos(true)} />
+        {!uebersicht && !ziel.nur && ziel.art === 'hashtag' && <HashtagKopf tag={ziel.wert} />}
+        {!uebersicht && !ziel.nur && ziel.art === 'standort' && platz && (
+          <StandortKopf
+            platz={platz}
+            orte={alleOrte}
+            onAlleFotos={() => setNurFotos(true)}
+            onOrt={(id) => onWeiter({ art: 'standort', wert: id })}
+          />
         )}
-        {ziel.art === 'sound' && sound && <SoundKopf sound={sound} />}
+        {!uebersicht && !ziel.nur && ziel.art === 'sound' && sound && <SoundKopf sound={sound} />}
+        {!!ziel.suche?.trim() && uebersicht && (
+          <Text style={styles.sucheHinweis}>Treffer für „{ziel.suche.trim()}"</Text>
+        )}
 
         {leer ? (
           <EmptyState icon="search-outline" title="Noch nichts hier" text="Dazu gibt es bisher keine Beiträge." />
+        ) : liste ? (
+          <UebersichtListe liste={liste} onWeiter={onWeiter} onOpenProfile={onOpenProfile} />
         ) : (
           <>
-            {treffer.reels.length > 0 && (
+            {zeigen('reels').length > 0 && (
               <>
-                <Text style={styles.abschnitt}>Reels →</Text>
+                {!uebersicht && <Abschnitt titel="Reels" onPress={aufklappen('reels')} />}
+                {uebersicht || ziel.nur ? (
+                  <View style={styles.raster}>
+                    {zeigen('reels').map((v: Video) => (
+                      <Druck
+                        key={v.id}
+                        style={[styles.rasterFeld, { height: Math.round(kachelHoehe * 1.6) }]}
+                        onPress={() => onOpenEintrag('reel', v.id)}
+                      >
+                        <Motiv id={v.id} bild={v.standbild ?? v.mediaUri} icon="play-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+                        <Text style={styles.reelText} numberOfLines={1}>
+                          {alleNutzer[v.userId]?.name ?? ''}
+                        </Text>
+                      </Druck>
+                    ))}
+                  </View>
+                ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reels}>
-                  {treffer.reels.map((v: Video) => (
+                  {zeigen('reels').map((v: Video) => (
                     <Druck key={v.id} style={styles.reel} onPress={() => onOpenEintrag('reel', v.id)}>
                       {/* Motiv entscheidet selbst: Bild, wenn eines da ist,
                           sonst die Farbflaeche. Die frueher hier stehende
@@ -129,13 +292,14 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onOpenEintrag, onNoti
                     </Druck>
                   ))}
                 </ScrollView>
+                )}
               </>
             )}
 
-            {treffer.clips.length > 0 && (
+            {zeigen('clips').length > 0 && (
               <>
-                <Text style={styles.abschnitt}>Querformat →</Text>
-                {treffer.clips.map((c: Clip) => (
+                {!uebersicht && <Abschnitt titel="Querformat" onPress={aufklappen('clips')} />}
+                {zeigen('clips').map((c: Clip) => (
                   <Druck key={c.id} style={styles.clip} onPress={() => onOpenClip(c.id)}>
                     <View style={styles.clipBild}>
                       <Motiv id={c.id} bild={c.standbild ?? c.mediaUri} icon="tv-outline" iconSize={26} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
@@ -159,11 +323,11 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onOpenEintrag, onNoti
               </>
             )}
 
-            {treffer.beitraege.length > 0 && (
+            {zeigen('beitraege').length > 0 && (
               <>
-                <Text style={styles.abschnitt}>Beiträge →</Text>
+                {!uebersicht && <Abschnitt titel="Beiträge" onPress={aufklappen('beitraege')} />}
                 <View style={styles.raster}>
-                  {treffer.beitraege.map((p: Post) => (
+                  {zeigen('beitraege').map((p: Post) => (
                     <Druck key={p.id} style={[styles.rasterFeld, { height: kachelHoehe }]} onPress={() => onOpenEintrag('beitrag', p.id)}>
                       <Motiv id={p.id} bild={p.standbild ?? p.mediaUri} icon="image-outline" iconSize={20} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
                     </Druck>
@@ -177,6 +341,76 @@ export const ExplorerScreen = ({ ziel, onBack, onOpenClip, onOpenEintrag, onNoti
     </View>
   );
 };
+
+/**
+ * Abschnittsueberschrift. Mit Pfeil nur, wenn sie irgendwohin fuehrt - auf
+ * einer aufgeklappten Seite waere der Pfeil ein Versprechen ohne Ziel.
+ */
+const Abschnitt = ({ titel, onPress }: { titel: string; onPress?: () => void }) =>
+  onPress ? (
+    <Druck onPress={onPress} accessibilityRole="button" accessibilityLabel={`${titel}, alle anzeigen`}>
+      <Text style={styles.abschnitt}>{titel} →</Text>
+    </Druck>
+  ) : (
+    <Text style={styles.abschnitt}>{titel}</Text>
+  );
+
+const UebersichtListe = ({
+  liste,
+  onWeiter,
+  onOpenProfile,
+}: {
+  liste: { profile?: User[]; hashtags?: Hashtag[]; orte?: Place[]; sounds?: Sound[] };
+  onWeiter: (ziel: ExplorerZiel) => void;
+  onOpenProfile?: (userId: string) => void;
+}) => (
+  <View style={styles.liste}>
+    {liste.profile?.map((u) => (
+      <Druck key={u.id} style={styles.zeile} onPress={() => onOpenProfile?.(u.id)}>
+        <Avatar id={u.id} name={u.name} size={44} />
+        <View style={styles.zeileText}>
+          <Text style={styles.zeileTitel}>{u.name}</Text>
+          <Text style={styles.zeileSub}>{u.handle}</Text>
+        </View>
+      </Druck>
+    ))}
+    {liste.hashtags?.map((h) => (
+      <Druck key={h.tag} style={styles.zeile} onPress={() => onWeiter({ art: 'hashtag', wert: h.tag })}>
+        <View style={styles.zeileSymbol}>
+          <Text style={styles.zeileRaute}>#</Text>
+        </View>
+        <View style={styles.zeileText}>
+          <Text style={styles.zeileTitel}>{h.tag}</Text>
+          <Text style={styles.zeileSub}>{compact(h.posts)} Beiträge</Text>
+        </View>
+      </Druck>
+    ))}
+    {liste.orte?.map((p) => (
+      <Druck key={p.id} style={styles.zeile} onPress={() => onWeiter({ art: 'standort', wert: p.id })}>
+        <View style={styles.zeileSymbol}>
+          <Ionicons name="location-outline" size={20} color={colors.brand} />
+        </View>
+        <View style={styles.zeileText}>
+          <Text style={styles.zeileTitel}>{p.name}</Text>
+          <Text style={styles.zeileSub}>{compact(p.posts)} Beiträge</Text>
+        </View>
+      </Druck>
+    ))}
+    {liste.sounds?.map((x) => (
+      <Druck key={x.id} style={styles.zeile} onPress={() => onWeiter({ art: 'sound', wert: x.id })}>
+        <View style={styles.zeileSymbol}>
+          <Ionicons name="musical-notes-outline" size={20} color={colors.brand} />
+        </View>
+        <View style={styles.zeileText}>
+          <Text style={styles.zeileTitel}>{x.title}</Text>
+          <Text style={styles.zeileSub}>
+            {x.artist} · {compact(x.uses)} Videos
+          </Text>
+        </View>
+      </Druck>
+    ))}
+  </View>
+);
 
 /* --------------------------------------------------------------- Koepfe */
 
@@ -301,13 +535,41 @@ const OrtFotos = ({
   );
 };
 
+/** "53.5413° N, 9.9891° O" in Zahlen. Sued und West werden negativ. */
+export const koordinatenLesen = (text?: string): { lat: number; lng: number } | null => {
+  const teile = String(text ?? '').match(/(-?\d+(?:\.\d+)?)\s*°?\s*([NS])?\s*,\s*(-?\d+(?:\.\d+)?)\s*°?\s*([OEW])?/i);
+  if (!teile) return null;
+  const lat = Number(teile[1]) * (/s/i.test(teile[2] ?? '') ? -1 : 1);
+  const lng = Number(teile[3]) * (/w/i.test(teile[4] ?? '') ? -1 : 1);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+};
+
 const StandortKopf = ({
   platz,
+  orte,
   onAlleFotos,
+  onOrt,
 }: {
   platz: Place;
+  orte: Place[];
   onAlleFotos: () => void;
-}) => (
+  onOrt: (id: string) => void;
+}) => {
+  /*
+   * Henrik am 21.09.2026: "Standorte brauchen eine funktionierende Karte mit
+   * Sprung in eine Kartenansicht - wie bei der Friend-Map." Bis dahin stand
+   * hier ein gezeichnetes Raster mit einer Nadel an einer Prozentposition,
+   * das mit dem echten Ort nichts zu tun hatte. Jetzt dieselbe Karte wie in
+   * der Friend-Map, und der Vollbild-Knopf oeffnet sie mit allen Orten.
+   */
+  const [karteVoll, setKarteVoll] = useState(false);
+  const insets = useSafeAreaInsets();
+  const hier = koordinatenLesen(platz.koordinaten);
+  const pins: KartenPin[] = orte.flatMap((o) => {
+    const k = koordinatenLesen(o.koordinaten);
+    return k ? [{ id: o.id, name: o.name, ...k }] : [];
+  });
+  return (
   <View style={styles.kopf}>
     <View style={styles.ortZeile}>
       <Ionicons name="location-outline" size={22} color={colors.text} />
@@ -319,21 +581,41 @@ const StandortKopf = ({
     <Text style={styles.adresse}>{platz.adresse}</Text>
     <Text style={styles.koordinaten}>{platz.koordinaten}</Text>
 
-    {/*
-      Selbst gezeichnet, wie schon bei der Friend-Map: react-native-maps
-      braucht nativen Code und laeuft in Expo Go nicht.
-    */}
-    <View style={styles.karte}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <View key={`w${i}`} style={[styles.linie, { top: `${i * 16}%` }]} />
-      ))}
-      {[1, 2, 3, 4, 5].map((i) => (
-        <View key={`s${i}`} style={[styles.linie, styles.linieSenkrecht, { left: `${i * 16}%` }]} />
-      ))}
-      <View style={[styles.nadel, { left: `${platz.x ?? 50}%`, top: `${platz.y ?? 50}%` }]}>
-        <Ionicons name="location" size={28} color={colors.danger} />
+    {hier ? (
+      <View style={styles.karte}>
+        <KarteWeb
+          pins={pins.filter((p) => p.id === platz.id)}
+          aktiv={platz.id}
+          hoehe={170}
+          eigenerStandort={null}
+          onVollbild={() => setKarteVoll(true)}
+        />
       </View>
-    </View>
+    ) : null}
+
+    <Modal visible={karteVoll} animationType="slide" onRequestClose={() => setKarteVoll(false)}>
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <View style={styles.bar}>
+          <Druck onPress={() => setKarteVoll(false)} hitSlop={10} accessibilityLabel="Karte schließen">
+            <Ionicons name="close" size={26} color={colors.text} />
+          </Druck>
+          <Text style={styles.barTitel}>Standorte</Text>
+        </View>
+        <KarteWeb
+          pins={pins}
+          aktiv={platz.id}
+          hoehe={Math.max(300, fensterHoehe - insets.top - insets.bottom - 48)}
+          eigenerStandort={null}
+          vollbild
+          onVollbild={() => setKarteVoll(false)}
+          onPinPress={(id) => {
+            if (id === platz.id) return;
+            setKarteVoll(false);
+            onOrt(id);
+          }}
+        />
+      </View>
+    </Modal>
 
     {/*
       Punkt 10: "Alle Fotos ansehen leitet zu Videos/Beiträgen; soll nur
@@ -346,40 +628,78 @@ const StandortKopf = ({
       <Text style={styles.link}>Alle Fotos ansehen →</Text>
     </Druck>
   </View>
-);
+  );
+};
 
+/**
+ * Kopf der Sound-Seite. Henrik am 21.09.2026: "Songs: Abspielen, nur die
+ * aktuell gesungene Textzeile, Songwriter-Name, offizielles Songbild."
+ *
+ * Bis dahin liess der Abspielknopf nur eine Uhr laufen - zu hoeren war
+ * nichts - und darunter stand der ganze Liedtext auf einmal. Jetzt spielt
+ * die Hoerprobe aus Schema 54, und vom Text steht nur die Zeile da, die
+ * gerade dran ist, die naechste blass darunter. Ohne Zeitstempel im Liedtext
+ * verteilen sich die Zeilen gleichmaessig ueber die Hoerprobe.
+ *
+ * Die Lautstaerke ist die des Telefons - einen eigenen Regler gibt es nicht
+ * (Henrik, selber Tag: "die Systemlautstaerke gilt ueberall").
+ */
 const SoundKopf = ({ sound }: { sound: Sound }) => {
-  const [laeuft, setLaeuft] = useState(false);
-  const [bei, setBei] = useState(0);
-  const stand = useRef(0);
+  const spieler = useAudioPlayer(sound.audio ? { uri: sound.audio } : undefined);
+  const status = useAudioPlayerStatus(spieler);
+  const mitTon = !!sound.audio;
 
+  // Ohne Hoerprobe laeuft wie bisher nur die Uhr.
+  const [uhrLaeuft, setUhrLaeuft] = useState(false);
+  const [uhrBei, setUhrBei] = useState(0);
+  const stand = useRef(0);
   const [min, sek] = String(sound.dauer ?? '3:00').split(':').map(Number);
-  const gesamt = min * 60 + sek;
+  const dauer = min * 60 + sek || 180;
 
   useEffect(() => {
-    if (!laeuft) return;
+    if (mitTon || !uhrLaeuft) return;
     const uhr = setInterval(() => {
-      stand.current = (stand.current + 1) % (gesamt + 1);
-      setBei(stand.current);
+      stand.current = (stand.current + 1) % (dauer + 1);
+      setUhrBei(stand.current);
     }, 1000);
     return () => clearInterval(uhr);
-  }, [laeuft, gesamt]);
+  }, [mitTon, uhrLaeuft, dauer]);
+
+  const gesamt = mitTon && status.duration > 0 ? status.duration : dauer;
+  const bei = mitTon ? status.currentTime : uhrBei;
+  const laeuft = mitTon ? status.playing : uhrLaeuft;
+
+  const umschalten = () => {
+    if (!mitTon) return setUhrLaeuft((v) => !v);
+    if (status.playing) return spieler.pause();
+    // Am Ende von vorn - sonst passiert auf den zweiten Druck nichts.
+    if (status.didJustFinish || bei >= gesamt - 0.3) spieler.seekTo(0);
+    spieler.play();
+  };
 
   const balken = 40;
   const bis = Math.round((bei / gesamt) * balken);
+  const zeit = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const zeilen = (sound.lyrics ?? []).filter((z) => z.trim());
+  const nr = zeilen.length ? Math.min(zeilen.length - 1, Math.floor((bei / gesamt) * zeilen.length)) : -1;
 
   return (
     <View style={[styles.kopf, styles.kopfMitte]}>
       <View style={styles.cover}>
-        <Ionicons name="musical-notes-outline" size={52} color={colors.text3} />
+        {sound.cover ? (
+          <Image source={{ uri: sound.cover }} style={styles.voll} accessibilityLabel={`Songbild ${sound.title}`} />
+        ) : (
+          <Ionicons name="musical-notes-outline" size={52} color={colors.text3} />
+        )}
       </View>
       <Text style={styles.titel}>{sound.title}</Text>
-      <Text style={styles.zahl}>
-        {compact(sound.uses)} Beiträge
-      </Text>
+      <Text style={styles.interpret}>{sound.artist}</Text>
+      {!!sound.songwriter && <Text style={styles.zahl}>Songwriter: {sound.songwriter}</Text>}
+      <Text style={styles.zahl}>{compact(sound.uses)} Beiträge</Text>
 
       <View style={styles.welle}>
-        <Druck style={styles.play} onPress={() => setLaeuft((v) => !v)} accessibilityLabel={laeuft ? 'Pause' : 'Abspielen'}>
+        <Druck style={styles.play} onPress={umschalten} accessibilityLabel={laeuft ? 'Pause' : 'Abspielen'}>
           <Ionicons name={laeuft ? 'pause' : 'play'} size={16} color={colors.text} />
         </Druck>
         <View style={styles.wellenBalken}>
@@ -395,38 +715,23 @@ const SoundKopf = ({ sound }: { sound: Sound }) => {
           ))}
         </View>
         <Text style={styles.wellenZeit}>
-          {Math.floor(bei / 60)}:{String(bei % 60).padStart(2, '0')} / {sound.dauer}
+          {zeit(bei)} / {mitTon ? zeit(gesamt) : sound.dauer}
         </Text>
       </View>
 
-      {/*
-        Punkt 11: der Liedtext. Prototyp-Frame "VSSo + Sound + Lyrics" -
-        Songname, Produzent/in, Trennlinie, darunter der Text ueber die ganze
-        Seite. Vorher stand hier eine einzige Zeile, und bei einem
-        Instrumental das Wort "Instrumental" als waere es eine Liedzeile.
-
-        Leere Eintraege sind Strophenabstaende. Sie bekommen eine eigene
-        Hoehe statt einer leeren Textzeile - so bleibt der Abstand gleich,
-        egal wie gross die Schrift eingestellt ist.
-      */}
-      {sound.lyrics?.length ? (
-        <View style={styles.lyrics}>
-          <Text style={styles.lyricsKopf}>LIEDTEXT</Text>
-          {sound.lyrics.map((zeile, i) =>
-            zeile.trim() ? (
-              <Text key={i} style={styles.lyricsZeile}>
-                {zeile}
-              </Text>
-            ) : (
-              <View key={i} style={styles.lyricsLuecke} />
-            )
-          )}
-        </View>
-      ) : (
-        <View style={styles.lyrics}>
+      <View style={styles.lyrics}>
+        <Text style={styles.lyricsKopf}>LIEDTEXT</Text>
+        {nr >= 0 ? (
+          <>
+            <Text style={styles.lyricsJetzt} accessibilityLiveRegion="polite">
+              {zeilen[nr]}
+            </Text>
+            {nr + 1 < zeilen.length && <Text style={styles.lyricsDanach}>{zeilen[nr + 1]}</Text>}
+          </>
+        ) : (
           <Text style={styles.lyricsOhne}>Zu diesem Sound gibt es keinen Liedtext.</Text>
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 };
@@ -435,11 +740,30 @@ const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   bar: {
     height: 48,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
+
+  barTitel: { flex: 1, ...typography.h3, fontSize: 17, color: colors.text },
+  sucheHinweis: { ...typography.small, color: colors.text3, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  liste: { paddingTop: spacing.sm },
+  zeile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: 9 },
+  zeileSymbol: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zeileRaute: { fontSize: 20, fontWeight: '700', color: colors.brand },
+  zeileText: { flex: 1 },
+  zeileTitel: { ...typography.message, fontWeight: '600', color: colors.text },
+  zeileSub: { ...typography.small, color: colors.text3, marginTop: 2 },
 
   kopf: { padding: spacing.lg },
   kopfMitte: { alignItems: 'center' },
@@ -458,22 +782,14 @@ const styles = themenStyles((colors) => ({
   },
   koordinaten: { ...typography.small, color: colors.text3, marginTop: 2 },
 
-  karte: {
-    position: 'relative',
-    marginTop: spacing.md,
-    height: 150,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface2,
-    overflow: 'hidden',
-  },
-  linie: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  linieSenkrecht: { top: 0, bottom: 0, right: undefined, width: StyleSheet.hairlineWidth, height: undefined },
-  nadel: { position: 'absolute', transform: [{ translateX: -14 }, { translateY: -28 }] },
+  karte: { marginTop: spacing.md, borderRadius: radius.lg, overflow: 'hidden' },
   link: { ...typography.name, color: colors.brand, marginTop: spacing.md },
 
+  interpret: { ...typography.message, color: colors.text2, marginTop: 2 },
   cover: {
     width: 148,
     height: 148,
+    overflow: 'hidden',
     borderRadius: radius.lg,
     backgroundColor: colors.surface2,
     alignItems: 'center',
@@ -511,8 +827,8 @@ const styles = themenStyles((colors) => ({
     alignSelf: 'stretch',
   },
   lyricsKopf: { ...typography.overline, color: colors.text3, marginBottom: 10 },
-  lyricsZeile: { fontSize: 15, lineHeight: 26, color: colors.text },
-  lyricsLuecke: { height: 14 },
+  lyricsJetzt: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  lyricsDanach: { fontSize: 16, lineHeight: 24, color: colors.text3, textAlign: 'center', marginTop: 6 },
   lyricsOhne: { ...typography.preview, color: colors.text3 },
 
   abschnitt: { ...typography.h3, color: colors.text, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },

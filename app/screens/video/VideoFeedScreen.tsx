@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -13,10 +13,12 @@ import {
   ViewToken,
 } from 'react-native';
 import { Druck } from '../../components/Druck';
+import { Glocke } from '../../components/Glocke';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
 import { Avatar } from '../../components/Avatar';
 import { CommentSheet } from '../../components/CommentSheet';
+import { BeitragOptionenSheet, OptionenBeitrag } from '../../components/BeitragOptionenSheet';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
@@ -27,6 +29,8 @@ import { haptic } from '../../lib/haptics';
 import { Videoflaeche, VideoSteuerung } from '../../components/Videoflaeche';
 import { useAktionen } from '../../lib/useAktionen';
 import { useImpressionen } from '../../lib/useImpressionen';
+import { useZielOeffnen } from '../../lib/ziele';
+import type { ExplorerZiel } from '../videos/ExplorerScreen';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -39,6 +43,8 @@ interface Props {
   startBei?: string | null;
   onStartErreicht?: () => void;
   onNotice: (message: string) => void;
+  /** Ort und Sound am Beitrag fuehren auf ihre Seite (lib/ziele.ts). */
+  onOpenExplorer?: (ziel: ExplorerZiel) => void;
 }
 
 export const VideoFeedScreen = ({
@@ -47,13 +53,15 @@ export const VideoFeedScreen = ({
   startBei,
   onStartErreicht,
   onNotice,
+  onOpenExplorer,
 }: Props) => {
-  const { users: alleNutzer, videos: alleVideos } = useDaten();
+  const ziel = useZielOeffnen(onOpenExplorer, onNotice);
+  const { users: alleNutzer, videos: alleVideos, keinInteresse } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Schreibt wirklich in die Datenbank — siehe lib/useAktionen.ts.
   const aktion = useAktionen(onNotice);
   // Eigene Reels stehen oben im Feed.
-  const { eigeneVideos, geteiltZaehler } = useProfil();
+  const { eigeneVideos, geteiltZaehler, folgtPerson, folgenUmschalten } = useProfil();
   const [videos, setVideos] = useState<Video[]>(alleVideos);
 
   // Nachziehen, sobald die Videos aus der Datenbank da sind — der
@@ -68,13 +76,23 @@ export const VideoFeedScreen = ({
    * HomeFeedScreen — dort steht, warum der Wunsch danach geloescht wird.
    */
   const liste = useRef<FlatList<Video>>(null);
+
+  /*
+   * "Kein Interesse" aus dem Drei-Punkte-Menue (Schema 55) faellt aus dem
+   * Feed - ausser man kommt ueber genau diesen Beitrag aus dem Profil.
+   */
+  const sichtbareVideos = useMemo(
+    () => videos.filter((v) => v.id === startBei || !keinInteresse.includes(v.id)),
+    [videos, keinInteresse, startBei]
+  );
+
   useEffect(() => {
     if (!startBei) return;
-    const platz = videos.findIndex((v) => v.id === startBei);
+    const platz = sichtbareVideos.findIndex((v) => v.id === startBei);
     if (platz < 0) return;
     liste.current?.scrollToIndex({ index: platz, animated: false });
     onStartErreicht?.();
-  }, [startBei, videos, onStartErreicht]);
+  }, [startBei, sichtbareVideos, onStartErreicht]);
 
   // Wie im Bild-Feed: eigene Reels kommen in dieselbe Liste, damit Like,
   // Speichern und Repost auch bei ihnen wirken.
@@ -84,10 +102,9 @@ export const VideoFeedScreen = ({
       return neue.length ? [...neue, ...prev] : prev;
     });
   }, [eigeneVideos]);
-  // Wem man folgt - nach Personen-Kennung, damit es beim Blaettern bleibt.
-  const [gefolgt, setGefolgt] = useState<Record<string, boolean>>({});
   const [slideHeight, setSlideHeight] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [optionenFuer, setOptionenFuer] = useState<OptionenBeitrag | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   /*
    * Welches Reel gerade zu sehen ist — nur dieses eine laeuft. Wuerden alle
@@ -136,11 +153,11 @@ export const VideoFeedScreen = ({
     ]).start();
   }, [herz]);
   /*
-   * Ton. Ein Kanal, der beim Oeffnen der App losplaerrt, ist unhoeflich —
-   * deshalb faengt er stumm an, wie in jeder anderen App auch, und der
-   * Lautsprecherknopf ueber der Leiste schaltet ihn an.
+   * Ton. Einen eigenen Lautsprecherknopf gibt es nicht mehr - Henrik am
+   * 21.09.2026: "Ton richtet sich immer und app-uebergreifend nach der
+   * Lautstaerkeeinstellung des Handys." Leise stellt man mit den Tasten am
+   * Telefon, wie in jeder anderen App auch.
    */
-  const [stumm, setStumm] = useState(true);
 
   const sichtbarkeit = useRef({ itemVisiblePercentThreshold: 60 });
 
@@ -166,8 +183,8 @@ export const VideoFeedScreen = ({
   // Beim ersten Aufbau ist noch nichts gescrollt, also meldet die Liste auch
   // nichts — ohne diese Zeile bliebe das oberste Reel stehen.
   useEffect(() => {
-    if (!sichtbar && videos.length) setSichtbar(videos[0].id);
-  }, [sichtbar, videos]);
+    if (!sichtbar && sichtbareVideos.length) setSichtbar(sichtbareVideos[0].id);
+  }, [sichtbar, sichtbareVideos]);
 
   const measure = (event: LayoutChangeEvent) => setSlideHeight(event.nativeEvent.layout.height);
 
@@ -310,7 +327,7 @@ export const VideoFeedScreen = ({
             quelle={item.mediaUri}
             standbild={item.standbild}
             laeuft={sichtbar === item.id && !pause}
-            stumm={stumm}
+            stumm={false}
             /* Reels laufen in Schleife — wie im Prototyp und ueberall sonst. */
             schleife
             fuellen="cover"
@@ -347,15 +364,6 @@ export const VideoFeedScreen = ({
             </View>
           )}
         </Pressable>
-
-        <Druck
-          style={styles.tonKnopf}
-          onPress={() => setStumm((t) => !t)}
-          hitSlop={10}
-          accessibilityLabel={stumm ? 'Ton an' : 'Ton aus'}
-        >
-          <Ionicons name={stumm ? 'volume-mute' : 'volume-high'} size={20} color={colors.white} />
-        </Druck>
 
         <View style={styles.rail}>
           <Druck style={styles.railBtn} onPress={() => toggleLike(item)}>
@@ -396,6 +404,15 @@ export const VideoFeedScreen = ({
             />
             <Text style={styles.railLabel} numberOfLines={1}>{item.saved ? 'Gespeichert' : 'Speichern'}</Text>
           </Druck>
+
+          {/* Drei-Punkte-Menue, Vorbild TikTok (components/BeitragOptionenSheet). */}
+          <Druck
+            style={styles.railBtn}
+            onPress={() => setOptionenFuer({ id: item.id, userId: item.userId, mediaUri: item.mediaUri, video: true })}
+            accessibilityLabel="Mehr"
+          >
+            <Ionicons name="ellipsis-horizontal" size={25} color={colors.white} />
+          </Druck>
         </View>
 
         <View style={styles.meta}>
@@ -404,42 +421,45 @@ export const VideoFeedScreen = ({
               <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
               <Text style={styles.authorName}>{author?.name}</Text>
             </Druck>
-            <Druck
-              style={[styles.follow, gefolgt[item.userId] && styles.followAn]}
-              onPress={() => {
-                const jetzt = !gefolgt[item.userId];
-                setGefolgt((prev) => ({ ...prev, [item.userId]: jetzt }));
-                onNotice(
-                  jetzt ? `Du folgst ${author?.name}` : `${author?.name} nicht mehr gefolgt`
-                );
-              }}
-            >
-              <Text style={styles.followText}>
-                {gefolgt[item.userId] ? 'Gefolgt' : 'Folgen'}
-              </Text>
-            </Druck>
-            <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
-              <View style={{ position: 'relative' }}>
-                <Ionicons
-                  name="notifications"
-                  size={19}
-                  color={item.notify ? colors.brand : colors.text2}
-                />
-                {!item.notify && <View style={styles.bellStrike} />}
-              </View>
-            </Druck>
+            {/* Am eigenen Video weder "Folgen" noch die Glocke - wie in Home
+                (Punkt 62). Im Kurzformat stand beides bis zum 24.09.2026 noch
+                am eigenen Reel. */}
+            {item.userId !== 'me' && (
+              <>
+              {/* Folgen ging bis 24.09.2026 nur in einen lokalen Zustand: nichts
+                  landete in `follows`, und wem man schon folgte, stand hier
+                  trotzdem "Folgen". Jetzt dieselbe Stelle wie in Home -
+                  folgenUmschalten schreibt selbst in die Datenbank. */}
+              <Druck
+                style={[styles.follow, folgtPerson(item.userId) && styles.followAn]}
+                onPress={() => {
+                  const jetzt = folgenUmschalten(item.userId);
+                  onNotice(
+                    jetzt ? `Du folgst ${author?.name}` : `${author?.name} nicht mehr gefolgt`
+                  );
+                }}
+              >
+                <Text style={styles.followText}>
+                  {folgtPerson(item.userId) ? 'Gefolgt' : 'Folgen'}
+                </Text>
+              </Druck>
+              <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
+                <Glocke an={!!item.notify} farbeAus={colors.white} />
+              </Druck>
+              </>
+            )}
           </View>
           <Text style={styles.description}>{item.description}</Text>
           <View style={styles.subRow}>
             {item.location && (
-              <Druck onPress={() => onNotice(`Standort: ${item.location}`)} hitSlop={4}>
+              <Druck onPress={() => ziel.ort(item.location)} hitSlop={4}>
                 <Text style={styles.sub}>{item.location}</Text>
               </Druck>
             )}
             {item.music && (
               <>
                 {item.location && <Text style={styles.sub}> · </Text>}
-                <Druck onPress={() => onNotice(`Music: ${item.music}`)} hitSlop={4}>
+                <Druck onPress={() => ziel.sound(item.music)} hitSlop={4}>
                   <Text style={styles.sub}>{item.music}</Text>
                 </Druck>
               </>
@@ -454,7 +474,7 @@ export const VideoFeedScreen = ({
     <View style={styles.container} onLayout={measure}>
       <FlatList
         ref={liste}
-        data={videos}
+        data={sichtbareVideos}
         renderItem={renderVideo}
         keyExtractor={(item) => item.id}
         onScrollToIndexFailed={({ index }) => {
@@ -467,6 +487,8 @@ export const VideoFeedScreen = ({
         viewabilityConfig={sichtbarkeit.current}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       />
+
+      <BeitragOptionenSheet beitrag={optionenFuer} onClose={() => setOptionenFuer(null)} onNotice={onNotice} />
 
       <CommentSheet
         onNotice={onNotice}
@@ -496,7 +518,6 @@ const styles = themenStyles((colors) => ({
 
   followAn: { backgroundColor: 'rgba(255,255,255,0.22)', borderColor: 'transparent' },
   bell: { width: 30, alignItems: 'center' },
-  bellStrike: { position: 'absolute', top: '50%', left: '50%', width: 22, height: 2, backgroundColor: colors.text2, transform: [{ translateX: -11 }, { translateY: -1 }, { rotate: '-20deg' }] },
 
   container: { flex: 1, backgroundColor: colors.black },
   slide: { width: '100%', justifyContent: 'flex-end' },
@@ -504,12 +525,6 @@ const styles = themenStyles((colors) => ({
   pauseZeichen: {
     position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     alignItems: 'center', justifyContent: 'center',
-  },
-  tonKnopf: {
-    position: 'absolute', top: spacing.xl + 12, right: spacing.md,
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   stage: {
     position: 'absolute',

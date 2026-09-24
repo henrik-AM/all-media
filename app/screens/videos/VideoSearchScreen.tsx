@@ -11,6 +11,7 @@ import { useDaten } from '../../contexts/DatenContext';
 import { ExplorerZiel } from './ExplorerScreen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useKachelHoehe } from '../../lib/raster';
+import { nachInteresse, VORSCHAU } from '../../lib/interesse';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -87,7 +88,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
   const { hashtags: alleHashtags, places: alleOrte, posts: alleBeitraege, sounds: alleSounds, users: alleNutzer, videos: alleVideos } = useDaten();
   const kachelHoehe = useKachelHoehe();
   // Eigene Aufnahmen sollen auch ueber die Suche zu finden sein.
-  const { clips, eigeneBeitraege, eigeneVideos } = useProfil();
+  const { clips, eigeneBeitraege, eigeneVideos, folgtPerson } = useProfil();
   const [query, setQuery] = useState('');
   const [filterArt, setFilterArt] = useState<'alle' | 'reels' | 'clips' | 'posts' | 'people' | 'tags' | 'places' | 'sounds'>('alle');
 
@@ -106,23 +107,50 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
    * nirgends gespeichert ist, ginge nicht — dafuer braeuchte es erst
    * Untertiteltexte in der Datenbank.
    */
+    const gefolgt = (e: { userId: string }) => folgtPerson(e.userId);
     return {
-      reels: [...eigeneVideos, ...alleVideos].filter(
-        (v) => hit(v.description) || hit(v.music ?? '') || hit(alleNutzer[v.userId]?.name ?? '')
+      reels: nachInteresse(
+        [...eigeneVideos, ...alleVideos].filter(
+          (v) => hit(v.description) || hit(v.music ?? '') || hit(alleNutzer[v.userId]?.name ?? '')
+        ),
+        (v) => v.likes,
+        gefolgt
       ),
-      clips: clips.filter((c) => hit(c.title) || hit(alleNutzer[c.userId]?.name ?? '')),
-      posts: [...eigeneBeitraege, ...alleBeitraege].filter(
-        (p) => hit(p.description) || hit(p.music ?? '') || hit(alleNutzer[p.userId]?.name ?? '')
+      clips: nachInteresse(
+        clips.filter((c) => hit(c.title) || hit(alleNutzer[c.userId]?.name ?? '')),
+        (c) => c.views,
+        gefolgt
       ),
-      people: Object.values(alleNutzer).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
-      tags: alleHashtags.filter((h) => hit(h.tag)),
-      places: alleOrte.filter((p) => hit(p.name)),
-      sounds: alleSounds.filter((s) => hit(s.title) || hit(s.artist)),
+      posts: nachInteresse(
+        [...eigeneBeitraege, ...alleBeitraege].filter(
+          (p) => hit(p.description) || hit(p.music ?? '') || hit(alleNutzer[p.userId]?.name ?? '')
+        ),
+        (p) => p.likes,
+        gefolgt
+      ),
+      people: nachInteresse(
+        Object.values(alleNutzer).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
+        () => 0,
+        (u) => folgtPerson(u.id)
+      ),
+      tags: nachInteresse(alleHashtags.filter((h) => hit(h.tag)), (h) => h.posts),
+      places: nachInteresse(alleOrte.filter((p) => hit(p.name)), (p) => p.posts),
+      sounds: nachInteresse(alleSounds.filter((s) => hit(s.title) || hit(s.artist)), (s) => s.uses),
     };
-  }, [query, clips, eigeneBeitraege, eigeneVideos]);
+  }, [query, clips, eigeneBeitraege, eigeneVideos, folgtPerson]);
 
+  /*
+   * Die Vorschau zeigt je Kategorie nur die ersten fuenf; alles Weitere
+   * steht hinter der Ueberschrift. Gezaehlt wird trotzdem die volle Liste,
+   * sonst meldete die Seite "Nichts gefunden", wo es Treffer gibt.
+   */
+  const vorschau = (liste: any[]) => liste.slice(0, VORSCHAU);
   const result = useMemo(() => {
-    if (filterArt === 'alle') return allResults;
+    if (filterArt === 'alle') {
+      return Object.fromEntries(
+        Object.entries(allResults).map(([k, v]) => [k, vorschau(v)])
+      ) as typeof allResults;
+    }
     const filtered = { reels: [], clips: [], posts: [], people: [], tags: [], places: [], sounds: [] };
     (filtered as any)[filterArt] = allResults[filterArt as keyof typeof allResults];
     return filtered as typeof allResults;
@@ -145,7 +173,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {result.reels.length > 0 && (
-            <Section title="Reels" onTitlePress={() => onOpenExplorer({ art: 'reels', wert: '' })}>
+            <Section title="Reels" onTitlePress={() => onOpenExplorer({ art: 'reels', wert: '', suche: query })}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reelRow}>
                 {result.reels.map((v) => (
                   <Druck key={v.id} style={styles.reel} onPress={() => onOpenEintrag('reel', v.id)}>
@@ -167,7 +195,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
           )}
 
           {result.clips.length > 0 && (
-            <Section title="Querformat" onTitlePress={() => onOpenExplorer({ art: 'querformat', wert: '' })}>
+            <Section title="Querformat" onTitlePress={() => onOpenExplorer({ art: 'querformat', wert: '', suche: query })}>
               {result.clips.map((c) => (
                 <Row
                   key={c.id}
@@ -186,7 +214,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
           )}
 
           {result.posts.length > 0 && (
-            <Section title="Beiträge" onTitlePress={() => onOpenExplorer({ art: 'beitraege', wert: '' })}>
+            <Section title="Beiträge" onTitlePress={() => onOpenExplorer({ art: 'beitraege', wert: '', suche: query })}>
               <View style={styles.grid}>
                 {result.posts.map((p) => (
                   <Druck key={p.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onOpenEintrag('beitrag', p.id)}>
@@ -198,7 +226,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
           )}
 
           {result.people.length > 0 && (
-            <Section title="Profile" onTitlePress={() => onOpenExplorer({ art: 'profile', wert: '' })}>
+            <Section title="Profile" onTitlePress={() => onOpenExplorer({ art: 'profile', wert: '', suche: query })}>
               {result.people.map((u) => (
                 <Druck key={u.id} style={styles.row} onPress={() => onOpenProfile(u.id)}>
                   <Avatar id={u.id} name={u.name} size={44} />
@@ -212,7 +240,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
           )}
 
           {result.tags.length > 0 && (
-            <Section title="# Hashtags" onTitlePress={() => onOpenExplorer({ art: 'hashtag', wert: '#' })}>
+            <Section title="# Hashtags" onTitlePress={() => onOpenExplorer({ art: 'hashtag', wert: '#', suche: query })}>
               <View style={styles.tags}>
                 {result.tags.map((h) => (
                   <Druck key={h.tag} style={styles.tag} onPress={() => onOpenExplorer({ art: 'hashtag', wert: h.tag })}>
@@ -226,7 +254,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
           )}
 
           {result.places.length > 0 && (
-            <Section title="Standorte" onTitlePress={() => onOpenExplorer({ art: 'standort', wert: '' })}>
+            <Section title="Standorte" onTitlePress={() => onOpenExplorer({ art: 'standort', wert: '', suche: query })}>
               {result.places.map((p) => (
                 <Row
                   key={p.id}
@@ -240,7 +268,7 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
           )}
 
           {result.sounds.length > 0 && (
-            <Section title="Sounds" onTitlePress={() => onOpenExplorer({ art: 'sound', wert: '' })}>
+            <Section title="Sounds" onTitlePress={() => onOpenExplorer({ art: 'sound', wert: '', suche: query })}>
               {result.sounds.map((s) => {
                 const sound = s as any;
                 return (

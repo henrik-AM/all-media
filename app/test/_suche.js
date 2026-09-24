@@ -77,6 +77,44 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   /*
+   * Henrik am 21.09.2026: "Vorschau kuerzen: je Kategorie etwa fuenf
+   * Eintraege ... Die volle Auswahl kommt erst hinter der Ueberschrift mit
+   * Pfeil." Gezaehlt wird je Abschnitt, was man antippen kann.
+   */
+  await pruefe('Die Vorschau zeigt je Kategorie hoechstens fuenf Eintraege', async () => {
+    const zu_viel = await page.$$eval('.exp', (abschnitte) =>
+      abschnitte
+        .map((a) => ({
+          name: a.querySelector('[data-explorer]')?.dataset.explorer,
+          zahl: a.querySelectorAll('[data-openvideo],[data-openclip],[data-openpost],[data-profile],[data-tag],[data-place],[data-sound]').length,
+        }))
+        .filter((a) => a.zahl > 5)
+    );
+    if (zu_viel.length) throw new Error(zu_viel.map((a) => `${a.name}: ${a.zahl}`).join(', '));
+  });
+
+  /*
+   * Gegen die volle Trefferliste (suchTreffer in app.js) statt gegen eine
+   * feste Zahl: die Vorschau muss min(5, alle) zeigen, und irgendeine
+   * Kategorie mit mehr als fuenf muss hinter der Ueberschrift alle zeigen.
+   */
+  await pruefe('Hinter der Ueberschrift steht die volle Liste', async () => {
+    const WAHL = { reels: 'data-openvideo', clips: 'data-openclip', posts: 'data-openpost', profile: 'data-profile', hashtags: 'data-tag', standorte: 'data-place', sounds: 'data-sound' };
+    const SCHLUESSEL = { reels: 'reels', clips: 'clips', posts: 'posts', profile: 'people', hashtags: 'tags', standorte: 'places', sounds: 'sounds' };
+    const zahlen = await page.evaluate(() => Object.fromEntries(Object.entries(suchTreffer()).map(([k, v]) => [k, v.length])));
+    const lang = KATEGORIEN.find((k) => zahlen[SCHLUESSEL[k]] > 5);
+    if (!lang) throw new Error('keine Kategorie hat mehr als fuenf Treffer: ' + JSON.stringify(zahlen));
+    const vorschau = await page.$$eval(`.exp [${WAHL[lang]}]`, (n) => n.length);
+    if (vorschau !== 5) throw new Error(`${lang}: Vorschau ${vorschau} statt 5`);
+    await page.click(`[data-explorer="${lang}"]`);
+    await page.waitForSelector('[data-explorer-back]', { timeout: 4000 });
+    const voll = await page.$$eval(`[${WAHL[lang]}]`, (n) => n.length);
+    await page.click('[data-explorer-back]');
+    await page.waitForTimeout(400);
+    if (voll !== zahlen[SCHLUESSEL[lang]]) throw new Error(`${lang}: Uebersicht ${voll} von ${zahlen[SCHLUESSEL[lang]]}`);
+  });
+
+  /*
    * Die Uebersicht hat sieben Reihen mit Vorschaubildern. Solange die
    * nachladen, wandert jede Reihe darunter nach unten — Playwright bricht den
    * Klick dann mit „element is not stable" ab. Im Einzellauf sind die Bilder

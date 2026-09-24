@@ -546,6 +546,7 @@ async function bootstrap() {
   document.body.classList.remove('is-startet');
   praesenzMelden();
   render();
+  geteiltenBeitragOeffnen();
   elternfrageStarten();
 }
 
@@ -4017,7 +4018,7 @@ function renderHomeFeed() {
   main.innerHTML = `
     <div class="scroll" id="homeScroll">
       ${storyRail(state.storiesVideos)}
-      <div class="postlist">${state.posts.map(postCard).join('')}</div>
+      <div class="postlist">${state.posts.filter(imFeed).map(postCard).join('')}</div>
     </div>`;
 
   bindStoryRail();
@@ -4103,6 +4104,11 @@ function renderHomeFeed() {
   main.querySelectorAll('[data-paction]').forEach((btn) =>
     btn.addEventListener('click', async () => {
       const { paction, pid } = btn.dataset;
+
+      if (paction === 'mehr') {
+        const p = state.posts.find((x) => x.id === pid);
+        return openBeitragOptionen({ id: pid, userId: p?.userId, mediaUrl: p?.mediaUrl });
+      }
 
       if (paction === 'comment') {
         return openComments(pid, (count) => {
@@ -4220,6 +4226,7 @@ function postCard(p) {
                 ${p.notify ? ICONS.bell : ICONS.bellOff}
               </button>`
         }
+        <button class="post__mehr" data-paction="mehr" data-pid="${p.id}" aria-label="Mehr">${ICONS.dots}</button>
       </header>
 
       ${
@@ -4296,18 +4303,9 @@ function compactNumber(n) {
 
 function renderVideoFeed() {
   main.innerHTML =
-    `<div class="feed" id="feed">${state.videos.map(videoSlide).join('')}</div>` +
-    `<button class="tonknopf" id="tonKnopf" aria-label="Ton an">${ICONS.tonAus}</button>`;
+    `<div class="feed" id="feed">${state.videos.filter(imFeed).map(videoSlide).join('')}</div>`;
   reelsBeobachten();
   window.Impressionen?.beobachten();
-
-  const tonKnopf = main.querySelector('#tonKnopf');
-  tonKnopf.addEventListener('click', () => {
-    tonAus = !tonAus;
-    main.querySelectorAll('.slide__stage video').forEach((v) => { v.muted = tonAus; });
-    tonKnopf.innerHTML = tonAus ? ICONS.tonAus : ICONS.tonAn;
-    tonKnopf.setAttribute('aria-label', tonAus ? 'Ton an' : 'Ton aus');
-  });
 
   /*
    * Die drei Gesten auf der Reel-Fläche.
@@ -4389,6 +4387,11 @@ function renderVideoFeed() {
     btn.addEventListener('click', async () => {
       const { vaction, vid } = btn.dataset;
 
+      if (vaction === 'mehr') {
+        const v = state.videos.find((x) => x.id === vid);
+        return openBeitragOptionen({ id: vid, userId: v?.userId, mediaUrl: v?.mediaUrl, video: true });
+      }
+
       if (vaction === 'comment') {
         return openComments(vid, (count) => {
           const idx = state.videos.findIndex((x) => x.id === vid);
@@ -4422,6 +4425,7 @@ function renderVideoFeed() {
 
       if (vaction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
+      if (vaction === 'notify') toast(updated.notify ? 'Benachrichtigungen an' : 'Benachrichtigungen aus');
 
       if (lauf !== renderLauf) return;
 
@@ -4502,11 +4506,32 @@ function reelsBeobachten() {
   );
 }
 
-/* Ton im Reel-Kanal. Merkt sich die Wahl fuer den ganzen Besuch. */
+/*
+ * Ton im Reel-Kanal. Einen eigenen Knopf gibt es nicht mehr — Henrik am
+ * 21.09.2026: "Lautstärke-Button weg, Ton richtet sich nach der Lautstärke
+ * des Handys." Stumm ist ein Reel nur, bis die Person zum ersten Mal irgendwo
+ * tippt oder eine Taste drueckt: vorher liesse der Browser das Video mit Ton
+ * gar nicht anlaufen. Danach bleibt der Ton fuer den ganzen Besuch an, und
+ * wie laut, entscheidet das Geraet. Gleiche Regel in VideoFeedScreen.tsx.
+ */
 let tonAus = true;
+['pointerdown', 'keydown'].forEach((art) =>
+  document.addEventListener(
+    art,
+    () => {
+      tonAus = false;
+      document.querySelectorAll('.slide__stage video').forEach((v) => { v.muted = false; });
+    },
+    { once: true, capture: true }
+  )
+);
 
 function videoSlide(v) {
   const u = user(v.userId);
+  // Ob ich der Person folge: erst was ich in dieser Sitzung angetippt habe,
+  // sonst was der Server mitschickt. Vorher nur das Erste - wem man schon
+  // folgte, stand im Kurzformat trotzdem "Folgen".
+  const folgtReel = state.gefolgt?.[u.id] ?? !!v.following;
   return `
     <section class="slide" id="slide-${v.id}" data-impression="${v.id}" data-impressionsquelle="reels">
       <div class="slide__stage" data-reelflaeche="${v.id}">${
@@ -4539,6 +4564,9 @@ function videoSlide(v) {
           ${ICONS.bookmark}
           <span>${v.saved ? 'Gespeichert' : 'Speichern'}</span>
         </button>
+        <button class="railbtn" data-vaction="mehr" data-vid="${v.id}" aria-label="Mehr">
+          ${ICONS.dots}
+        </button>
       </div>
 
       <div class="slide__meta">
@@ -4547,9 +4575,18 @@ function videoSlide(v) {
             <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
             <span class="slide__name">${esc(u.name)}</span>
           </button>
-          <button class="slide__follow ${
-            state.gefolgt && state.gefolgt[u.id] ? 'is-gefolgt' : ''
-          }" data-vfollow="${u.id}">${state.gefolgt && state.gefolgt[u.id] ? 'Gefolgt' : 'Folgen'}</button>
+          ${/* Am eigenen Reel weder "Folgen" noch die Glocke - wie am Beitrag
+                in Home (Punkt 62), im Kurzformat bis 24.09.2026 vergessen. */ ''}
+          ${
+            istEigen(v.userId)
+              ? ''
+              : `<button class="slide__follow ${folgtReel ? 'is-gefolgt' : ''}" data-vfollow="${u.id}">${
+                  folgtReel ? 'Gefolgt' : 'Folgen'
+                }</button>
+                <button class="slide__bell ${v.notify ? 'is-on' : ''}" data-vaction="notify" data-vid="${v.id}" aria-label="${
+                  v.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'
+                }">${v.notify ? ICONS.bell : ICONS.bellOff}</button>`
+          }
         </div>
         <div class="slide__desc">${esc(v.description)}</div>
         <div class="slide__sub">
@@ -8558,7 +8595,7 @@ function renderReelsExplorer() {
   main.innerHTML = `
     ${explorerKopf('Reels')}
     <div class="scroll">
-      <div class="exp__grid">${state.videos.map((v) => `
+      <div class="exp__grid">${suchTreffer().reels.map((v) => `
         <button class="exp__card" data-openvideo="${v.id}">
           ${ICONS.portrait}
           <div class="exp__card-info">
@@ -8575,7 +8612,7 @@ function renderClipsExplorer() {
   main.innerHTML = `
     ${explorerKopf('Querformat')}
     <div class="scroll">
-      ${state.clips.map((c) => `
+      ${suchTreffer().clips.map((c) => `
         <button class="exp__row" data-openclip="${c.id}">
           <span class="exp__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}</span>
           <span class="exp__text">
@@ -8592,7 +8629,7 @@ function renderPostsExplorer() {
   main.innerHTML = `
     ${explorerKopf('Beiträge')}
     <div class="scroll">
-      <div class="exp__grid">${state.posts.map((p) => `
+      <div class="exp__grid">${suchTreffer().posts.map((p) => `
         <button class="griditem" data-openpost="${p.id}">${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}</button>`).join('')}</div>
     </div>`;
   main.querySelectorAll('[data-openpost]').forEach(b => b.addEventListener('click', () => openPost(b.dataset.openpost)));
@@ -8624,7 +8661,7 @@ function renderHashtagExplorer(tag) {
  * die Beschraenkung auf den Suchbegriff.
  */
 function renderProfileExplorer() {
-  const leute = Object.values(state.users).filter((u) => u.id !== 'me');
+  const leute = suchTreffer().people;
   main.innerHTML = `
     ${explorerKopf('Profile')}
     <div class="scroll">
@@ -8646,7 +8683,7 @@ function renderHashtagsExplorer() {
   main.innerHTML = `
     ${explorerKopf('# Hashtags')}
     <div class="scroll">
-      <div class="exp__list">${state.hashtags
+      <div class="exp__list">${suchTreffer().tags
         .map(
           (h) => `<button class="exp__row" data-tag="${esc(h.tag)}">
             <span class="exp__thumb exp__thumb--kategorie">${ICONS.hash || ICONS.search}</span>
@@ -8665,7 +8702,7 @@ function renderStandorteExplorer() {
   main.innerHTML = `
     ${explorerKopf('Standorte')}
     <div class="scroll">
-      <div class="exp__list">${state.places
+      <div class="exp__list">${suchTreffer().places
         .map(
           (pl) => `<button class="exp__row" data-place="${pl.id}">
             <span class="exp__thumb exp__thumb--kategorie">${ICONS.mapPin}</span>
@@ -8684,7 +8721,7 @@ function renderSoundsExplorer() {
   main.innerHTML = `
     ${explorerKopf('Sounds')}
     <div class="scroll">
-      <div class="exp__list">${state.sounds
+      <div class="exp__list">${suchTreffer().sounds
         .map(
           (so) => `<button class="exp__row" data-sound="${so.id}">
             <span class="exp__thumb exp__thumb--kategorie">${ICONS.music}</span>
@@ -8760,6 +8797,43 @@ function springeZu(unterpunkt, elementId) {
 /* -------------------------------------------------------- Videos: Suche */
 // Prototyp-Frame "Video - Suche": Explorer mit den Abschnitten Reels,
 // Querformat, Beiträge, Profile, Hashtags, Standorte und Sounds.
+/**
+ * Reihenfolge fuer Vorschauen: erst was von Leuten kommt, denen man folgt,
+ * dann was die meisten Reaktionen hat. Gleiche Rechnung in
+ * app/lib/interesse.ts.
+ */
+const VORSCHAU = 5;
+function nachInteresse(liste, beliebtheit, vonGefolgten = () => false) {
+  return [...liste].sort(
+    (a, b) => Number(vonGefolgten(b)) - Number(vonGefolgten(a)) || (beliebtheit(b) || 0) - (beliebtheit(a) || 0)
+  );
+}
+const vonGefolgten = (e) => !!(state.gefolgt && state.gefolgt[e.userId]);
+
+/**
+ * Alle Treffer der Video-Suche, nach Interesse geordnet. Die Vorschau nimmt
+ * davon die ersten fuenf, die Uebersichtsseiten hinter den Ueberschriften
+ * alle - mit demselben Suchbegriff, damit dort steht, was die Vorschau
+ * versprochen hat.
+ */
+function suchTreffer() {
+  const q = (state.videoSearchQuery || '').trim().toLowerCase();
+  const hit = (t) => !q || String(t).toLowerCase().includes(q);
+  return {
+    reels: nachInteresse(state.videos.filter((v) => hit(v.description) || hit(v.music || '') || hit(user(v.userId).name)), (v) => v.likes, vonGefolgten),
+    clips: nachInteresse(state.clips.filter((c) => hit(c.title) || hit(user(c.userId).name)), (c) => c.views, vonGefolgten),
+    posts: nachInteresse(state.posts.filter((p) => hit(p.description) || hit(p.music || '') || hit(user(p.userId).name)), (p) => p.likes, vonGefolgten),
+    people: nachInteresse(
+      Object.values(state.users).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
+      () => 0,
+      (u) => !!(state.gefolgt && state.gefolgt[u.id])
+    ),
+    tags: nachInteresse(state.hashtags.filter((h) => hit(h.tag)), (h) => h.posts),
+    places: nachInteresse(state.places.filter((pl) => hit(pl.name)), (pl) => pl.posts),
+    sounds: nachInteresse(state.sounds.filter((so) => hit(so.title) || hit(so.artist)), (so) => so.uses),
+  };
+}
+
 function renderVideoSearch() {
   const q = state.videoSearchQuery.trim().toLowerCase();
   const hit = (t) => !q || String(t).toLowerCase().includes(q);
@@ -8775,13 +8849,16 @@ function renderVideoSearch() {
    * nirgends gespeichert ist, ginge nicht — dafuer braeuchte es erst
    * Untertiteltexte in der Datenbank.
    */
-  const reels = state.videos.filter((v) => hit(v.description) || hit(v.music || '') || hit(user(v.userId).name));
-  const clips = state.clips.filter((c) => hit(c.title) || hit(user(c.userId).name));
-  const posts = state.posts.filter((p) => hit(p.description) || hit(p.music || '') || hit(user(p.userId).name));
-  const people = Object.values(state.users).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle)));
-  const tags = state.hashtags.filter((h) => hit(h.tag));
-  const places = state.places.filter((pl) => hit(pl.name));
-  const sounds = state.sounds.filter((so) => hit(so.title) || hit(so.artist));
+  /*
+   * Henrik am 21.09.2026: "Vorschau kuerzen: je Kategorie etwa fuenf
+   * Eintraege, ausgesucht nach Interesse. Die volle Auswahl kommt erst hinter
+   * der Ueberschrift mit Pfeil." Gezaehlt wird die volle Liste - sonst hiesse
+   * es "Nichts gefunden", wo nur die Vorschau leer waere.
+   */
+  const alle = suchTreffer();
+  const [reels, clips, posts, people, tags, places, sounds] = [
+    alle.reels, alle.clips, alle.posts, alle.people, alle.tags, alle.places, alle.sounds,
+  ].map((l) => l.slice(0, VORSCHAU));
 
   /*
    * Henrik: "Die Kategorien muessen jeweils auf eigene Uebersichtsseiten
@@ -9115,6 +9192,183 @@ function openErstellen(bereich) {
  * nimmt die Person aus den Kontakten und sperrt den gemeinsamen Chat,
  * Melden haelt den Grund fest.
  */
+/*
+ * "Kein Interesse" (Schema 55). Nur die beiden Feeds lassen den Beitrag weg;
+ * auf dem Profil und in der Suche steht er weiter. Gleiche Regel in
+ * VideoFeedScreen.tsx und HomeFeedScreen.tsx (sichtbareVideos/-Posts).
+ */
+const imFeed = (b) => !(state.keinInteresse || []).includes(b.id);
+
+/* Die Adresse eines Beitrags. bootstrap() oeffnet sie wieder (?beitrag=). */
+const beitragLink = (id) => `${location.origin}/?beitrag=${encodeURIComponent(id)}`;
+
+const BEITRAG_MELDE_GRUENDE = [
+  'Spam oder Werbung',
+  'Beleidigung oder Hass',
+  'Gewalt oder Gefahr',
+  'Nicht jugendfreie Inhalte',
+  'Falschinformation',
+  'Etwas anderes',
+];
+
+/*
+ * Drei-Punkte-Menue am Beitrag — Henrik am 21.09.2026: "Link kopieren,
+ * herunterladen, zu Story hinzufügen, melden, kein Interesse ... Vorbild
+ * TikTok. Kein 'an WhatsApp senden' oder 'Snapchat' — genau die soll All
+ * Media ersetzen." Senden geht deshalb weiter nur ueber den Teilen-Knopf.
+ *
+ * Gegenstueck in der App: components/BeitragOptionenSheet.tsx.
+ */
+async function openBeitragOptionen(beitrag) {
+  const eigener = istEigen(beitrag.userId);
+
+  // Herunterladen nur, wenn die Person es zulaesst - gefragt wird vor dem
+  // Zeichnen, wie bei den Storys.
+  let darfSichern = eigener;
+  if (!eigener && beitrag.mediaUrl && beitrag.userId) {
+    try {
+      const r = await fetch(`/api/download-erlaubt/${encodeURIComponent(beitrag.userId)}`);
+      darfSichern = (await r.json()).erlaubt === true;
+    } catch {
+      darfSichern = false;
+    }
+  }
+
+  const punkte = [
+    { key: 'link', label: 'Link kopieren', icon: 'link' },
+    ...(darfSichern && beitrag.mediaUrl ? [{ key: 'sichern', label: 'Herunterladen', icon: 'download' }] : []),
+    { key: 'story', label: 'Zu Story hinzufügen', icon: 'plus' },
+    ...(eigener
+      ? []
+      : [
+          { key: 'kein', label: 'Kein Interesse', icon: 'eyeOff' },
+          { key: 'melden', label: 'Melden', icon: 'flag', gefahr: true },
+        ]),
+  ];
+
+  const senden = async (pfad, daten = {}) => {
+    const res = await fetch(`/api/beitraege/${encodeURIComponent(beitrag.id)}/${pfad}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(daten),
+    });
+    const antwort = await res.json().catch(() => ({}));
+    if (!res.ok || antwort.ok === false) throw new Error(antwort.error || `Status ${res.status}`);
+    return antwort;
+  };
+
+  openSheet(
+    'Optionen',
+    `<div class="sheet__body">${punkte
+      .map(
+        (p) => `<button class="item ${p.gefahr ? 'item--danger' : ''}" data-beitragopt="${p.key}">
+          <span class="item__icon">${ICONS[p.icon]}</span>
+          <span class="item__label">${esc(p.label)}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </button>`
+      )
+      .join('')}</div>`,
+    (sheet, close) => {
+      sheet.querySelectorAll('[data-beitragopt]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const was = b.dataset.beitragopt;
+          close();
+
+          if (was === 'link') {
+            const adresse = beitragLink(beitrag.id);
+            try {
+              await navigator.clipboard.writeText(adresse);
+              return toast('Link kopiert');
+            } catch {
+              return toast(adresse);
+            }
+          }
+
+          if (was === 'sichern') {
+            const a = document.createElement('a');
+            a.href = beitrag.mediaUrl;
+            a.download = `all-media-${beitrag.id}.${beitrag.video ? 'mp4' : 'jpg'}`;
+            a.click();
+            return toast('Gesichert');
+          }
+
+          if (was === 'story') {
+            try {
+              const antwort = await senden('story');
+              if (antwort.stories) state.stories = antwort.stories;
+              if (antwort.storiesVideos) state.storiesVideos = antwort.storiesVideos;
+              return toast('Zu deiner Story hinzugefügt');
+            } catch (fehler) {
+              return toast(`Zur Story hinzufügen fehlgeschlagen: ${fehler.message}`);
+            }
+          }
+
+          if (was === 'kein') {
+            try {
+              await senden('kein-interesse');
+            } catch (fehler) {
+              return toast(`Kein Interesse fehlgeschlagen: ${fehler.message}`);
+            }
+            state.keinInteresse = [...(state.keinInteresse || []), beitrag.id];
+            // Aus dem Feed nehmen, ohne neu zu zeichnen - sonst springt die
+            // Liste an den Anfang.
+            document.getElementById(`post-${beitrag.id}`)?.remove();
+            document.getElementById(`slide-${beitrag.id}`)?.remove();
+            return toast('Du siehst diesen Beitrag nicht mehr im Feed');
+          }
+
+          // Melden: erst der Grund, dann an die Datenbank.
+          openSheet(
+            'Warum meldest du das?',
+            `<div class="sheet__body">${BEITRAG_MELDE_GRUENDE.map(
+              (g) => `<button class="item" data-grund="${esc(g)}">
+                <span class="item__label">${esc(g)}</span>
+                <span class="row__chevron">${ICONS.chevron}</span>
+              </button>`
+            ).join('')}</div>`,
+            (blatt, zu) => {
+              blatt.querySelectorAll('[data-grund]').forEach((g) =>
+                g.addEventListener('click', async () => {
+                  zu();
+                  try {
+                    await senden('melden', { grund: g.dataset.grund });
+                    toast('Danke, wir sehen uns das an');
+                  } catch (fehler) {
+                    toast(`Das Melden fehlgeschlagen: ${fehler.message}`);
+                  }
+                })
+              );
+            },
+            { schliessen: true }
+          );
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
+/*
+ * Ein geteilter Link (?beitrag=<id>) oeffnet den Beitrag dort, wo er
+ * hingehoert: Bild im Home-Feed, Reel im Hochformat, Video im Querformat.
+ * Danach verschwindet der Parameter, sonst oeffnete jedes Neuladen ihn wieder.
+ */
+function geteiltenBeitragOeffnen() {
+  const id = new URLSearchParams(location.search).get('beitrag');
+  if (!id) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (state.clips?.some((c) => c.id === id)) return openClip(id);
+  if (state.videos?.some((v) => v.id === id)) {
+    state.area = 'videos';
+    return springeZu('portrait', `slide-${id}`);
+  }
+  if (state.posts?.some((p) => p.id === id)) {
+    state.area = 'videos';
+    return springeZu('home', `post-${id}`);
+  }
+  toast('Diesen Beitrag gibt es nicht mehr');
+}
+
 const MELDE_GRUENDE = [
   'Spam oder Werbung',
   'Beleidigung oder Hass',
@@ -9772,16 +10026,22 @@ function openVideoOptionen(clip, danach) {
    * dieser Fassung keine.
    */
   const hatUntertitel = !!clip.untertitel;
+  // Bei Live gibt es keine Geschwindigkeit — gesendet wird in Echtzeit.
+  const mitTempo = clip.art !== 'live';
 
   openSheet(
     'Video-Einstellungen',
     `<div class="sheet__body">
-       <button class="item" data-vopt="tempo">
-         <span class="item__icon">${ICONS.clock}</span>
-         <span class="item__label">Wiedergabegeschwindigkeit</span>
-         <span class="item__value">${esc(tempoText(state.video.tempo))}</span>
-         <span class="row__chevron">${ICONS.chevron}</span>
-       </button>
+       ${
+         mitTempo
+           ? `<button class="item" data-vopt="tempo">
+                <span class="item__icon">${ICONS.clock}</span>
+                <span class="item__label">Wiedergabegeschwindigkeit</span>
+                <span class="item__value">${esc(tempoText(state.video.tempo))}</span>
+                <span class="row__chevron">${ICONS.chevron}</span>
+              </button>`
+           : ''
+       }
        <button class="item" data-vopt="qualitaet">
          <span class="item__icon">${ICONS.settings}</span>
          <span class="item__label">Qualität</span>
@@ -9830,6 +10090,61 @@ function openVideoOptionen(clip, danach) {
   );
 }
 
+/*
+ * Spenden an eine Person, waehrend eines Streams. Feste Stufen als schneller
+ * Weg, dahinter ein eigener Betrag — Henrik am 21.09.2026: „Spenden: eigener
+ * Betrag muss wählbar sein." Gleiche Grenzen wie in der App
+ * (ClipPlayerScreen, betragInCent): unter 50 Cent lohnt keine Buchung, ueber
+ * 1.000 € ist es fast sicher ein Tippfehler.
+ */
+function openSpende(empfaengerId, postId) {
+  const name = user(empfaengerId).name;
+  const buchen = async (cent) => {
+    const antwort = await api(`/api/spenden/${empfaengerId}`, { betragCent: cent, postId });
+    if (!antwort?.ok) return toast(antwort?.error || 'Die Spende ging nicht durch');
+    toast(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${name} gespendet`);
+  };
+  openSheet(
+    `An ${name} spenden`,
+    `<div class="sheet__body">
+       ${[100, 300, 500, 1000]
+         .map(
+           (cent) => `<button class="item" data-spendecent="${cent}">
+             <span class="item__icon">${ICONS.heart}</span>
+             <span class="item__label">${(cent / 100).toFixed(2).replace('.', ',')} €</span>
+           </button>`
+         )
+         .join('')}
+       <button class="item" data-spendecent="eigen">
+         <span class="item__icon">${ICONS.edit || ICONS.plus}</span>
+         <span class="item__label">Eigener Betrag …</span>
+       </button>
+     </div>`,
+    (blatt, zu) => {
+      blatt.querySelectorAll('[data-spendecent]').forEach((b) =>
+        b.addEventListener('click', () => {
+          zu();
+          if (b.dataset.spendecent !== 'eigen') return buchen(Number(b.dataset.spendecent));
+          openFormular(
+            `An ${name} spenden`,
+            [{ key: 'betrag', label: 'Betrag in Euro', platzhalter: 'z. B. 2,50', pflicht: true }],
+            async (werte) => {
+              const zahl = Number(String(werte.betrag).replace(/\s|€/g, '').replace(',', '.'));
+              if (!Number.isFinite(zahl) || zahl < 0.5 || zahl > 1000) {
+                return 'Bitte einen Betrag zwischen 0,50 € und 1.000 € eingeben';
+              }
+              await buchen(Math.round(zahl * 100));
+              return null;
+            },
+            'Spenden'
+          );
+        })
+      );
+    },
+    { schliessen: true }
+  );
+}
+
 function openClip(clipId) {
   let clip = state.clips.find((c) => c.id === clipId);
   if (!clip) return toast('Dieses Video gibt es nicht mehr');
@@ -9841,6 +10156,15 @@ function openClip(clipId) {
   let gesamt = sekunden(clip.duration);
   let bei = 0;
   let uhr = null;
+  /*
+   * Bei Live darf man zurueck, um Verpasstes nachzuholen, aber nie ueber die
+   * Stelle hinaus nach vorn, die schon gesendet ist. Gleiche Regel in
+   * app/screens/videos/ClipPlayerScreen.tsx (liveKante).
+   */
+  let liveKante = 0;
+  let liveOffen = false;
+  let liveUhr = null;
+  const istLive = () => clip.art === 'live';
 
   const zeit = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -9848,7 +10172,22 @@ function openClip(clipId) {
 
   const paint = () => {
     const u = user(clip.userId);
-    const aehnlich = state.clips.filter((c) => c.id !== clip.id).slice(0, 4);
+    /*
+     * Aehnlich heisst: gemeinsame Hashtags zuerst, dann dieselbe Person, dann
+     * die meistgesehenen. Vorher waren es schlicht die ersten vier der Liste.
+     */
+    const naehe = (c) =>
+      (c.tags || []).filter((t) => (clip.tags || []).includes(t)).length * 2 + (c.userId === clip.userId ? 1 : 0);
+    const aehnlich = state.clips
+      .filter((c) => c.id !== clip.id)
+      .sort((a, b) => naehe(b) - naehe(a) || (b.views || 0) - (a.views || 0))
+      .slice(0, 4);
+    /*
+     * Kapitel nur, soweit sie im Video liegen — die Testvideos sind eine
+     * Minute lang, ihre Kapitel reichten bis Minute 11. Bei Live gibt es
+     * keine: dort steht noch nicht fest, was kommt.
+     */
+    const kapitel = istLive() ? [] : (clip.kapitel || []).filter((k) => !gesamt || k.bei < gesamt);
 
     overlay.innerHTML = `
       <div class="page">
@@ -9864,11 +10203,12 @@ function openClip(clipId) {
                   : medienFlaeche(clip.id, ICONS.play, clip.mediaUrl, clip.thumbnail)
               }
               <button class="player__play" id="clipPlay" aria-label="Abspielen">${ICONS.play}</button>
+              ${istLive() ? '<button class="player__live" id="clipLiveKante" aria-label="Zur Live-Stelle">LIVE</button>' : ''}
             </div>
             <div class="player__leiste">
               <span class="player__zeit" id="clipZeit">${zeit(bei)}</span>
-              <span class="player__balken" id="clipBalken"><i id="clipFortschritt" style="width:0%"></i></span>
-              <span class="player__zeit">${esc(clip.duration)}</span>
+              <span class="player__balkenfeld" id="clipBalken"><span class="player__balken"><i id="clipFortschritt" style="width:0%"></i></span></span>
+              <span class="player__zeit">${istLive() ? 'LIVE' : esc(clip.duration)}</span>
               ${/*
                   Punkt 31 und 30: Einstellungen und Vollbild. Beide sitzen in
                   der Leiste unter dem Bild, dort sucht man sie von YouTube her.
@@ -9883,16 +10223,16 @@ function openClip(clipId) {
              * Kapitel (Punkt 32). Nur wenn das Video welche hat - eine leere
              * Ueberschrift ueber nichts waere schlechter als gar keine.
              */
-            clip.kapitel?.length
+            kapitel.length
               ? `<div class="kapitel">
                    <div class="kapitel__kopf">Kapitel</div>
-                   ${clip.kapitel
+                   ${kapitel
                      .map(
                        (k, i) => `<button class="kapitel__zeile" data-kapitel="${k.bei}">
                          <span class="kapitel__zeit">${zeit(k.bei)}</span>
                          <span class="kapitel__titel">${esc(k.titel)}</span>
                          <span class="kapitel__dauer">${
-                           clip.kapitel[i + 1] ? zeit(clip.kapitel[i + 1].bei - k.bei) : zeit(gesamt - k.bei)
+                           kapitel[i + 1] ? zeit(kapitel[i + 1].bei - k.bei) : zeit(gesamt - k.bei)
                          }</span>
                        </button>`
                      )
@@ -9904,6 +10244,11 @@ function openClip(clipId) {
           <div class="player__kopf">
             <div class="player__titel">${esc(clip.title)}</div>
             <div class="player__sub">${compactNumber(clip.views)} Aufrufe · ${esc(clip.age)}</div>
+            ${/*
+                Das Drei-Punkte-Menue steht neben dem Titel, nicht in der
+                Aktionsreihe: dort sind es laut Prototyp genau fuenf Knoepfe.
+              */ ''}
+            <button class="player__mehr" data-clipact="mehr" aria-label="Mehr">${ICONS.dots}</button>
           </div>
 
           <div class="player__autor">
@@ -9951,6 +10296,29 @@ function openClip(clipId) {
             </button>
           </div>
 
+          ${
+            /*
+             * Live-Kommentare und Spenden fuer Zuschauer. Die App zeigt beides
+             * seit dem 01.09.2026, die Website bis zum 21.09.2026 nur dem, der
+             * selbst sendet. Zusammengeklappt die drei neuesten Zeilen, zum
+             * Schreiben aufgeklappt groesser — Henrik am 21.09.2026.
+             */
+            istLive()
+              ? `<div class="livebox ${liveOffen ? 'is-offen' : ''}" id="liveBox">
+                   <div class="livebox__kopf">
+                     <button class="livebox__titel" id="liveKlappe">Live-Kommentare ${liveOffen ? '▾' : '▴'}</button>
+                     <button class="livebox__spende" id="liveSpende">♥ Spenden</button>
+                   </div>
+                   <div class="livebox__zeilen" id="liveZeilen"><p class="live__leer">Noch hat niemand etwas geschrieben.</p></div>
+                   ${
+                     liveOffen
+                       ? `<input class="livebox__feld" id="liveFeld" placeholder="Etwas sagen …" enterkeyhint="send" />`
+                       : `<button class="livebox__schreiben" id="liveSchreiben">Kommentieren …</button>`
+                   }
+                 </div>`
+              : ''
+          }
+
           <div class="player__text">${esc(clip.description || '')}</div>
 
           ${
@@ -9959,7 +10327,7 @@ function openClip(clipId) {
               : ''
           }
 
-          <div class="exp__head">Ähnliche Videos →</div>
+          <button class="exp__head exp__head--knopf" id="clipAehnlich">Ähnliche Videos →</button>
           <div class="expclips">
             ${aehnlich
               .map((c) => {
@@ -9985,6 +10353,7 @@ function openClip(clipId) {
 
   const schliessen = () => {
     clearInterval(uhr);
+    clearInterval(liveUhr);
     // Ohne das Anhalten laeuft der Ton weiter, waehrend das Fenster schon zu
     // ist — innerHTML='' allein raeumt das Element nicht zuverlaessig ab.
     const medium = overlay.querySelector('#clipVideo');
@@ -10011,6 +10380,7 @@ function openClip(clipId) {
     };
 
     const leisteSetzen = () => {
+      liveKante = Math.max(liveKante, bei);
       const zeitFeld = overlay.querySelector('#clipZeit');
       if (zeitFeld) zeitFeld.textContent = zeit(bei);
       const balken = overlay.querySelector('#clipFortschritt');
@@ -10026,6 +10396,10 @@ function openClip(clipId) {
         if (medium.duration && isFinite(medium.duration)) {
           gesamt = Math.round(medium.duration);
           leisteSetzen();
+          // Kapitel hinter dem Ende der Datei fallen weg.
+          overlay.querySelectorAll('[data-kapitel]').forEach((k) => {
+            if (Number(k.dataset.kapitel) >= gesamt) k.remove();
+          });
         }
       });
       medium.addEventListener('timeupdate', () => {
@@ -10035,7 +10409,8 @@ function openClip(clipId) {
       medium.addEventListener('play', () => knopfStand(true));
       medium.addEventListener('pause', () => knopfStand(false));
       medium.addEventListener('ended', () => knopfStand(false));
-      medium.playbackRate = state.video.tempo || 1;
+      // Live laeuft in Echtzeit — schneller als gesendet geht nicht.
+      medium.playbackRate = istLive() ? 1 : state.video.tempo || 1;
     }
 
     const umschalten = () => {
@@ -10081,10 +10456,20 @@ function openClip(clipId) {
 
     const vollbildAn = () => document.fullscreenElement === spieler || spieler.classList.contains('player--voll');
 
+    /*
+     * Henrik am 21.09.2026: Vollbild heisst Handy quer. Wo der Browser die
+     * Ausrichtung sperren kann (Android), dreht er selbst. Wo nicht (iPhone),
+     * dreht sich der Player per CSS um 90 Grad — `player--quer`. Am
+     * Querformat-Bildschirm eines Rechners bleibt es beim normalen Vollbild.
+     */
+    const hochkant = () => window.innerHeight > window.innerWidth;
+    const selbstDrehen = () => spieler.classList.add('player--voll', 'player--quer');
+
     const vollbildUmschalten = async () => {
       if (vollbildAn()) {
         if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-        spieler.classList.remove('player--voll');
+        screen.orientation?.unlock?.();
+        spieler.classList.remove('player--voll', 'player--quer');
         vollbildKnopf.innerHTML = ICONS.ausklappen;
         vollbildKnopf.setAttribute('aria-label', 'Vollbild');
         return;
@@ -10093,9 +10478,20 @@ function openClip(clipId) {
       if (spieler.requestFullscreen) {
         try {
           await spieler.requestFullscreen();
+          if (hochkant()) {
+            try {
+              await screen.orientation.lock('landscape');
+            } catch {
+              await document.exitFullscreen().catch(() => {});
+              selbstDrehen();
+            }
+          }
         } catch {
-          spieler.classList.add('player--voll');
+          if (hochkant()) selbstDrehen();
+          else spieler.classList.add('player--voll');
         }
+      } else if (hochkant()) {
+        selbstDrehen();
       } else {
         spieler.classList.add('player--voll');
       }
@@ -10136,19 +10532,120 @@ function openClip(clipId) {
       })
     );
 
-    /* Im Balken an eine Stelle springen - ohne das ist er nur Deko. */
-    overlay.querySelector('#clipBalken').addEventListener('click', (e) => {
-      const kasten = e.currentTarget.getBoundingClientRect();
-      const anteil = Math.min(1, Math.max(0, (e.clientX - kasten.left) / kasten.width));
-      bei = Math.round(gesamt * anteil);
+    /*
+     * Im Balken an eine Stelle springen — tippen oder ziehen. Henrik am
+     * 21.09.2026: „Rote Timeline: Vor- und Zurückspulen funktioniert nicht."
+     * Bis dahin reagierte sie nur auf einen Mausklick. Bei Live endet der
+     * Weg nach vorn an der Stelle, die schon gesendet ist.
+     */
+    const springen = (sekunde) => {
+      const grenze = istLive() ? liveKante : gesamt;
+      bei = Math.max(0, Math.min(grenze, Math.round(sekunde)));
       if (medium) medium.currentTime = bei;
       leisteSetzen();
+    };
+    const balkenFeld = overlay.querySelector('#clipBalken');
+    const balkenStelle = (e) => {
+      const kasten = balkenFeld.getBoundingClientRect();
+      springen(gesamt * Math.min(1, Math.max(0, (e.clientX - kasten.left) / kasten.width)));
+    };
+    balkenFeld.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      balkenFeld.setPointerCapture?.(e.pointerId);
+      balkenStelle(e);
+      const ziehen = (m) => balkenStelle(m);
+      const los = () => {
+        balkenFeld.removeEventListener('pointermove', ziehen);
+        balkenFeld.removeEventListener('pointerup', los);
+        balkenFeld.removeEventListener('pointercancel', los);
+      };
+      balkenFeld.addEventListener('pointermove', ziehen);
+      balkenFeld.addEventListener('pointerup', los);
+      balkenFeld.addEventListener('pointercancel', los);
     });
+
+    overlay.querySelector('#clipLiveKante')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      springen(liveKante);
+    });
+
+    overlay.querySelector('#clipAehnlich')?.addEventListener('click', () => {
+      schliessen();
+      // Die Querformat-Uebersicht der Suche - /api/explorer kennt nur Tags, Orte, Sounds.
+      state.area = 'videos';
+      state.sub.videos = 'search';
+      state.explorerView = 'clips';
+      render();
+    });
+
+    /* Live-Kommentare: alle vier Sekunden nachladen, wie in der App. */
+    if (istLive()) {
+      const holen = async () => {
+        const zeilen = overlay.querySelector('#liveZeilen');
+        if (!zeilen) return clearInterval(liveUhr);
+        try {
+          const res = await fetch(`/api/stream/${clip.id}/kommentare`);
+          if (!res.ok) return;
+          const liste = (await res.json()).kommentare || [];
+          zeilen.innerHTML = liste.length
+            ? liste
+                .slice(liveOffen ? -30 : -3)
+                .map((k) => `<p class="live__kommentar"><b>${esc(k.name)}</b> ${esc(k.text)}</p>`)
+                .join('')
+            : '<p class="live__leer">Noch hat niemand etwas geschrieben.</p>';
+          if (liveOffen) zeilen.scrollTop = zeilen.scrollHeight;
+        } catch (fehler) {
+          console.error('Live-Kommentare laden fehlgeschlagen:', fehler);
+        }
+      };
+      clearInterval(liveUhr);
+      holen();
+      liveUhr = setInterval(holen, 4000);
+
+      const aufklappen = (auf) => {
+        liveOffen = auf;
+        const stand = medium ? medium.currentTime : null;
+        const lief = medium && !medium.paused;
+        paint();
+        // paint baut das Video neu - Stelle und Wiedergabe mitnehmen.
+        const neu = overlay.querySelector('#clipVideo');
+        if (neu && stand !== null) {
+          neu.currentTime = stand;
+          if (lief) neu.play().catch(() => {});
+        }
+        if (auf) overlay.querySelector('#liveFeld')?.focus();
+      };
+      overlay.querySelector('#liveKlappe')?.addEventListener('click', () => aufklappen(!liveOffen));
+      overlay.querySelector('#liveSchreiben')?.addEventListener('click', () => aufklappen(true));
+      overlay.querySelector('#liveZeilen')?.addEventListener('click', () => !liveOffen && aufklappen(true));
+
+      const feld = overlay.querySelector('#liveFeld');
+      feld?.addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        const text = feld.value.trim();
+        if (!text) return;
+        feld.value = '';
+        const antwort = await api(`/api/stream/${clip.id}/kommentare`, { text });
+        if (!antwort?.ok) return toast(antwort?.error || 'Der Kommentar ging nicht durch');
+        holen();
+      });
+
+      overlay.querySelector('#liveSpende')?.addEventListener('click', () => openSpende(clip.userId, clip.id));
+    }
 
     overlay.querySelectorAll('[data-clipact]').forEach((b) =>
       b.addEventListener('click', async () => {
         const was = b.dataset.clipact;
 
+        if (was === 'mehr') {
+          return openBeitragOptionen({ id: clip.id, userId: clip.userId, mediaUrl: clip.mediaUrl, video: true });
+        }
+
+        // Bei Live fuehrt der Knopf in die Live-Kommentare.
+        if (was === 'comment' && istLive()) {
+          if (liveOffen) return overlay.querySelector('#liveFeld')?.focus();
+          return overlay.querySelector('#liveSchreiben')?.click();
+        }
         if (was === 'comment') {
           return openComments(clip.id, (anzahl) => {
             clip.comments = anzahl;
@@ -10330,15 +10827,80 @@ function openOrtFotos(ort, fotos) {
   zeichnen([...fotos]);
 }
 
-async function openExplorer(art, wert) {
+/** "53.5413° N, 9.9891° O" in Zahlen - wie koordinatenLesen in der App. */
+function koordinatenLesen(text) {
+  const t = String(text || '').match(/(-?\d+(?:\.\d+)?)\s*°?\s*([NS])?\s*,\s*(-?\d+(?:\.\d+)?)\s*°?\s*([OEW])?/i);
+  if (!t) return null;
+  const lat = Number(t[1]) * (/s/i.test(t[2] || '') ? -1 : 1);
+  const lng = Number(t[3]) * (/w/i.test(t[4] || '') ? -1 : 1);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+/*
+ * Henrik am 21.09.2026: "Hashtag-Detailseite: Ueberschrift nicht anklickbar,
+ * Liste nicht aufklappbar." Jeder Abschnitt zeigt jetzt eine Vorschau, und
+ * seine Ueberschrift oeffnet dieselbe Seite nur mit diesem Abschnitt,
+ * vollstaendig (`nur`). Die App macht es in ExplorerScreen genauso.
+ */
+/**
+ * Die grosse Karte zu einem Ort, mit allen Orten darauf. Ein Tipp auf einen
+ * anderen Ort oeffnet dessen Seite.
+ */
+function openOrtKarte(kopf, hier) {
+  openSheet(
+    'Standorte',
+    `<div class="ortkarte" id="ortKarte"></div>`,
+    (blatt, zu) => {
+      const stil = KARTEN_STILE[0];
+      const karte = L.map(blatt.querySelector('#ortKarte'), { zoomControl: true, zoomSnap: 0 }).setView([hier.lat, hier.lng], 6);
+      L.tileLayer(stil.url, { attribution: stil.quelle, maxZoom: stil.maxZoom }).addTo(karte);
+      (kopf.orte || []).forEach((o) => {
+        const k = koordinatenLesen(o.koordinaten);
+        if (!k) return;
+        const aktiv = o.id === kopf.id;
+        L.circleMarker([k.lat, k.lng], {
+          radius: aktiv ? 12 : 8, fillColor: aktiv ? '#ff3b30' : '#007AFF', color: '#fff', weight: 2.5, fillOpacity: 1,
+          className: `map__pin${aktiv ? ' is-aktiv' : ''}`,
+        })
+          .bindTooltip(esc(o.name))
+          .on('click', () => {
+            if (aktiv) return;
+            zu();
+            openExplorer('standort', o.id);
+          })
+          .addTo(karte);
+      });
+      // Das Blatt faehrt erst ein - danach die Groesse neu messen.
+      setTimeout(() => karte.invalidateSize(), 300);
+    },
+    { schliessen: true }
+  );
+}
+
+const EXP_VORSCHAU = { reels: VORSCHAU, clips: 3, beitraege: 6 };
+const EXP_NAME = { reels: 'Reels', clips: 'Querformat', beitraege: 'Beiträge' };
+
+async function openExplorer(art, wert, nur = null) {
   const res = await fetch(`/api/explorer/${art}/${encodeURIComponent(wert)}`);
   const daten = await res.json();
   if (!daten.ok) return toast(daten.error);
 
-  const { kopf, reels, clips, beitraege } = daten;
+  const { kopf } = daten;
+  const auswahl = (name, liste, wert) => {
+    if (nur && nur !== name) return [];
+    const sortiert = nachInteresse(liste, wert, vonGefolgten);
+    return nur ? sortiert : sortiert.slice(0, EXP_VORSCHAU[name]);
+  };
+  const reels = auswahl('reels', daten.reels, (v) => v.likes);
+  const clips = auswahl('clips', daten.clips, (c) => c.views);
+  const beitraege = auswahl('beitraege', daten.beitraege, (p) => p.likes);
 
-  const abschnitt = (titel, inhalt) =>
-    inhalt ? `<div class="exp__head">${titel} →</div>${inhalt}` : '';
+  const abschnitt = (name, inhalt) =>
+    !inhalt
+      ? ''
+      : nur
+        ? inhalt
+        : `<button class="exp__head exp__head--knopf" data-expnur="${name}">${EXP_NAME[name]} →</button>${inhalt}`;
 
   const reelsReihe = reels.length
     ? `<div class="expreels">${reels
@@ -10385,14 +10947,27 @@ async function openExplorer(art, wert) {
       </div>
       <div class="exp__adresse">${esc(kopf.adresse)}</div>
       <div class="exp__koordinaten">${esc(kopf.koordinaten)}</div>
-      <div class="minikarte">
-        <span class="minikarte__nadel" style="left:${kopf.x}%;top:${kopf.y}%">${ICONS.mapPin}</span>
-      </div>
+      ${/*
+          Henrik am 21.09.2026: "Standorte brauchen eine funktionierende Karte
+          mit Sprung in eine Kartenansicht - wie bei der Friend-Map." Vorher
+          ein gezeichnetes Raster mit einer Nadel an einer Prozentstelle.
+        */ ''}
+      ${koordinatenLesen(kopf.koordinaten)
+        ? `<div class="minikarte minikarte--echt">
+             <div class="minikarte__flaeche" id="expKarte"></div>
+             <button class="minikarte__voll" id="expKarteVoll" aria-label="Karte groß anzeigen">${ICONS.ausklappen}</button>
+           </div>`
+        : ''}
       <button class="exp__link" id="expFotos">Alle Fotos ansehen →</button>`,
 
-    sound: () => `<div class="soundcover">${ICONS.music}</div>
+    sound: () => `<div class="soundcover">${
+        kopf.cover ? `<img src="${esc(kopf.cover)}" alt="Songbild ${esc(kopf.titel)}">` : ICONS.music
+      }</div>
       <div class="exp__titel exp__titel--mitte">${esc(kopf.titel)}</div>
-      <div class="exp__zahl exp__zahl--mitte">${esc(kopf.produzent)} · ${compactNumber(kopf.anzahl)} Beiträge</div>
+      <div class="exp__interpret">${esc(kopf.produzent)}</div>
+      ${kopf.songwriter ? `<div class="exp__zahl exp__zahl--mitte">Songwriter: ${esc(kopf.songwriter)}</div>` : ''}
+      <div class="exp__zahl exp__zahl--mitte">${compactNumber(kopf.anzahl)} Beiträge</div>
+      ${kopf.audio ? `<audio id="soundTon" src="${esc(kopf.audio)}" preload="metadata"></audio>` : ''}
       <div class="welle">
         <button class="welle__play" id="soundPlay" aria-label="Abspielen">${ICONS.play}</button>
         <div class="welle__balken" id="welleBalken">
@@ -10410,17 +10985,16 @@ async function openExplorer(art, wert) {
           eine eigene Klasse, damit die Luecke im CSS steht und nicht als
           leerer Absatz im Text.
         */ ''}
+      ${/*
+          Henrik am 21.09.2026: nur die Zeile, die gerade gesungen wird. Die
+          naechste steht blass darunter. Gefuellt wird beides beim Abspielen.
+        */ ''}
       ${
-        kopf.lyrics?.length
-          ? `<div class="lyrics">
+        kopf.lyrics?.some((z) => z.trim())
+          ? `<div class="lyrics lyrics--jetzt">
                <div class="lyrics__kopf">Liedtext</div>
-               ${kopf.lyrics
-                 .map((zeile) =>
-                   zeile.trim()
-                     ? `<div class="lyrics__zeile">${esc(zeile)}</div>`
-                     : '<div class="lyrics__luecke"></div>'
-                 )
-                 .join('')}
+               <div class="lyrics__jetzt" id="lyricsJetzt" aria-live="polite"></div>
+               <div class="lyrics__danach" id="lyricsDanach"></div>
              </div>`
           : `<div class="lyrics lyrics--ohne">Zu diesem Sound gibt es keinen Liedtext.</div>`
       }`,
@@ -10431,12 +11005,13 @@ async function openExplorer(art, wert) {
     <div class="page">
       <div class="page__bar">
         <button class="seitenbtn" id="expBack" aria-label="Zurück">${ICONS.back}</button>
+        ${nur ? `<div class="page__title">${esc(kopf.titel)} · ${EXP_NAME[nur]}</div>` : ''}
       </div>
       <div class="scroll">
-        <div class="exp__kopf exp__kopf--${kopf.art}">${kopfHtml}</div>
+        ${nur ? '' : `<div class="exp__kopf exp__kopf--${kopf.art}">${kopfHtml}</div>`}
         ${
           reels.length || clips.length || beitraege.length
-            ? abschnitt('Reels', reelsReihe) + abschnitt('Querformat', clipListe) + abschnitt('Beiträge', beitragRaster)
+            ? abschnitt('reels', reelsReihe) + abschnitt('clips', clipListe) + abschnitt('beitraege', beitragRaster)
             : `<div class="empty">${ICONS.search}
                  <div class="empty__title">Noch nichts hier</div>
                  <div class="empty__text">Zu ${esc(kopf.titel)} gibt es bisher keine Beiträge.</div>
@@ -10445,10 +11020,30 @@ async function openExplorer(art, wert) {
       </div>
     </div>`;
 
+  const soundTon = overlay.querySelector('#soundTon');
   overlay.querySelector('#expBack').addEventListener('click', () => {
+    soundTon?.pause();
+    // Aus einem aufgeklappten Abschnitt eine Ebene zurueck, nicht ganz raus.
+    if (nur) return openExplorer(art, wert);
     overlay.hidden = true;
     overlay.innerHTML = '';
   });
+  overlay.querySelectorAll('[data-expnur]').forEach((b) =>
+    b.addEventListener('click', () => openExplorer(art, wert, b.dataset.expnur))
+  );
+
+  // Die Karte am Ort - dieselben Kacheln wie die Friend-Map.
+  const hier = koordinatenLesen(kopf.koordinaten);
+  const kartenFlaeche = overlay.querySelector('#expKarte');
+  if (hier && kartenFlaeche && window.L) {
+    const stil = KARTEN_STILE[0];
+    const karte = L.map(kartenFlaeche, { zoomControl: false, attributionControl: false }).setView([hier.lat, hier.lng], 14);
+    L.tileLayer(stil.url, { maxZoom: stil.maxZoom }).addTo(karte);
+    L.circleMarker([hier.lat, hier.lng], {
+      radius: 10, fillColor: '#ff3b30', color: '#fff', weight: 2.5, fillOpacity: 1, className: 'map__pin is-aktiv',
+    }).addTo(karte);
+    overlay.querySelector('#expKarteVoll')?.addEventListener('click', () => openOrtKarte(kopf, hier));
+  }
 
   /*
    * Punkt 10: "Alle Fotos ansehen bei einem Ort leitet zu Videos/Beiträgen;
@@ -10461,32 +11056,65 @@ async function openExplorer(art, wert) {
    */
   overlay.querySelector('#expFotos')?.addEventListener('click', () => openOrtFotos(kopf, beitraege));
 
-  // Wellenform: der Balken laeuft mit, solange abgespielt wird.
+  /*
+   * Wellenform und Liedzeile laufen mit, solange abgespielt wird. Mit
+   * Hoerprobe (Schema 54) gibt das <audio> den Takt vor, sonst wie bisher
+   * eine Uhr. Die Zeilen verteilen sich gleichmaessig ueber die Laenge -
+   * Zeitstempel je Zeile gibt es im Liedtext nicht.
+   */
   const play = overlay.querySelector('#soundPlay');
   if (play) {
     const [min, sek] = String(kopf.dauer).split(':').map(Number);
-    const gesamt = min * 60 + sek;
+    const dauer = min * 60 + sek || 180;
+    const zeilen = (kopf.lyrics || []).filter((z) => z.trim());
     let bei = 0;
     let uhr = null;
+    const zeit = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
 
-    play.addEventListener('click', () => {
-      if (uhr) {
-        clearInterval(uhr);
-        uhr = null;
-        play.innerHTML = ICONS.play;
-        return;
+    const zeichnen = () => {
+      const gesamt = soundTon && soundTon.duration > 0 ? soundTon.duration : dauer;
+      const jetzt = soundTon ? soundTon.currentTime : bei;
+      const zeitFeld = overlay.querySelector('#welleZeit');
+      if (!zeitFeld) return;
+      zeitFeld.textContent = `${zeit(jetzt)} / ${soundTon ? zeit(gesamt) : kopf.dauer}`;
+      const balken = overlay.querySelectorAll('#welleBalken i');
+      const bis = Math.round((jetzt / gesamt) * balken.length);
+      balken.forEach((b, i) => b.classList.toggle('is-gespielt', i < bis));
+      if (zeilen.length) {
+        const nr = Math.min(zeilen.length - 1, Math.floor((jetzt / gesamt) * zeilen.length));
+        overlay.querySelector('#lyricsJetzt').textContent = zeilen[nr];
+        overlay.querySelector('#lyricsDanach').textContent = zeilen[nr + 1] || '';
       }
-      play.innerHTML = ICONS.pause;
-      uhr = setInterval(() => {
-        const zeitFeld = overlay.querySelector('#welleZeit');
-        if (!zeitFeld) return clearInterval(uhr);
-        bei = (bei + 1) % (gesamt + 1);
-        zeitFeld.textContent = `${Math.floor(bei / 60)}:${String(bei % 60).padStart(2, '0')} / ${kopf.dauer}`;
-        const balken = overlay.querySelectorAll('#welleBalken i');
-        const bis = Math.round((bei / gesamt) * balken.length);
-        balken.forEach((b, i) => b.classList.toggle('is-gespielt', i < bis));
-      }, 1000);
-    });
+    };
+    zeichnen();
+
+    if (soundTon) {
+      soundTon.addEventListener('timeupdate', zeichnen);
+      soundTon.addEventListener('loadedmetadata', zeichnen);
+      soundTon.addEventListener('play', () => (play.innerHTML = ICONS.pause));
+      soundTon.addEventListener('pause', () => (play.innerHTML = ICONS.play));
+      soundTon.addEventListener('ended', () => (play.innerHTML = ICONS.play));
+      play.addEventListener('click', () => {
+        if (!soundTon.paused) return soundTon.pause();
+        if (soundTon.ended) soundTon.currentTime = 0;
+        soundTon.play().catch(() => toast('Abspielen ging nicht'));
+      });
+    } else {
+      play.addEventListener('click', () => {
+        if (uhr) {
+          clearInterval(uhr);
+          uhr = null;
+          play.innerHTML = ICONS.play;
+          return;
+        }
+        play.innerHTML = ICONS.pause;
+        uhr = setInterval(() => {
+          if (!overlay.querySelector('#welleZeit')) return clearInterval(uhr);
+          bei = (bei + 1) % (dauer + 1);
+          zeichnen();
+        }, 1000);
+      });
+    }
   }
 
   overlay.querySelectorAll('[data-openpost]').forEach((b) =>

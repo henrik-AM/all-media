@@ -1151,6 +1151,43 @@ export async function storyAnlegen(
 }
 
 /**
+ * Einen Beitrag als eigene Story weitergeben — "Zu Story hinzufügen" im
+ * Drei-Punkte-Menü (Henrik am 21.09.2026, Vorbild TikTok).
+ *
+ * Die Story zeigt dieselbe Datei wie der Beitrag; kopiert wird nur die
+ * Adresse aus der Datenbank, nicht die unterschriebene aus der Anzeige —
+ * die liefe nach einer Stunde ab. Sie steht auch unter Videos, weil sie
+ * von dort kommt. Gleiche Regel in web/server/app.js (/api/beitraege/:id/story).
+ */
+export async function beitragInStory(client: SupabaseClient, ichId: string, beitragId: string) {
+  const { data: beitrag, error } = await client
+    .from('posts')
+    .select('media_url, kind, description')
+    .eq('id', beitragId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!beitrag?.media_url) throw new Error('Dieser Beitrag hat kein Bild und kein Video');
+  const video = beitrag.kind !== 'post' || /\.(mp4|mov|m4v|webm)(\?|$)/i.test(beitrag.media_url);
+  return storyAnlegen(client, ichId, {
+    mediaUrl: beitrag.media_url,
+    mediaTyp: video ? 'video' : 'image',
+    inVideos: true,
+  });
+}
+
+/**
+ * "Kein Interesse" — der Beitrag faellt aus dem eigenen Feed (Schema 55).
+ * Doppelt tippen schadet nicht: die Zeile gibt es dann schon.
+ */
+export async function keinInteresse(client: SupabaseClient, ichId: string, beitragId: string) {
+  const { error } = await client
+    .from('kein_interesse')
+    .upsert({ user_id: ichId, post_id: beitragId }, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+  if (error) throw error;
+  return true;
+}
+
+/**
  * Herz an einer Story — und die Nachricht darüber an die Person.
  *
  * WARUM DIE NACHRICHT DAZUGEHÖRT

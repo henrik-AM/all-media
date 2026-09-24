@@ -155,6 +155,9 @@ const LAEUFE = [
   ['henrik2', '_henrik2.js'],
   ['insel', '_insel.js'],
   ['suche', '_suche.js'],
+  // Drei-Punkte-Menue und "Kein Interesse" (Henrik, 21.09.2026).
+  ['optionen', '_optionen.js'],
+  ['glocke', '_glocke.js'],
   ['profil', '_profil.js'],
   ['community', '_community.js'],
   ['chatoptionen', '_chatoptionen.js'],

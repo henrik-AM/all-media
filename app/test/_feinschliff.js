@@ -259,14 +259,16 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click(`[data-sound="${await K.kennungNachText(page, 'data-sound', 'Golden Hour')}"]`);
     await page.waitForSelector('.exp__kopf');
     await page.waitForTimeout(500);
-    const zeilen = await page.$$eval('.lyrics__zeile', (n) => n.map((x) => x.textContent));
-    if (zeilen.length < 4) throw new Error('nur ' + zeilen.length + ' Zeilen');
-    if (!zeilen[0].includes('light comes slow')) throw new Error('erste Zeile: „' + zeilen[0] + '"');
+    // Henrik am 21.09.2026: nur die Zeile, die gerade gesungen wird - nicht
+    // mehr der ganze Text mit Strophenabstaenden.
+    const jetzt = await page.$eval('#lyricsJetzt', (n) => n.textContent);
+    if (!jetzt.includes('light comes slow')) throw new Error('erste Zeile: „' + jetzt + '"');
+    if (await page.$('.lyrics__zeile')) throw new Error('der ganze Liedtext steht noch da');
   });
 
-  await pruefe('Die Strophen sind voneinander abgesetzt', async () => {
-    const luecken = await page.$$eval('.lyrics__luecke', (n) => n.length);
-    if (!luecken) throw new Error('keine Strophenabstände');
+  await pruefe('Die nächste Zeile steht darunter', async () => {
+    const danach = await page.$eval('#lyricsDanach', (n) => n.textContent.trim());
+    if (!danach) throw new Error('keine nächste Zeile');
   });
 
   await pruefe('Ein Instrumental sagt, dass es keinen Text gibt', async () => {
