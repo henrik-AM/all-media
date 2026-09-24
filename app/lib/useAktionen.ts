@@ -137,6 +137,12 @@ export interface Aktionen {
    * Datenbank nicht gibt, und die Nachricht fiel in den Fehlerzweig.
    */
   chatMit: (userId: string, bereich?: 'messenger' | 'community') => Promise<string | null>;
+  /** Messenger-Anfrage aus einem Community-Chat (Schema 57). */
+  messengerAnfragen: (chatId: string) => Promise<{ ok: boolean; zustand: string } | null>;
+  messengerAnfrageBeantworten: (
+    chatId: string,
+    annehmen: boolean
+  ) => Promise<{ ok: boolean; zustand: string; messengerChat?: string } | null>;
   kommentarAnlegen: (
     beitragId: string,
     text: string
@@ -407,6 +413,10 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         holen('Die Antwort', (c, i) => A.storyAntwort(c, i, storyId, text)),
       chatMit: (userId, bereich = 'messenger') =>
         holen('Der Chat', (c, i) => A.chatMit(c, i, userId, bereich)),
+      messengerAnfragen: (chatId) =>
+        holen('Die Messenger-Anfrage', (c) => A.messengerAnfragen(c, chatId)),
+      messengerAnfrageBeantworten: (chatId, annehmen) =>
+        holen('Die Antwort', (c) => A.messengerAnfrageBeantworten(c, chatId, annehmen)),
       kommentarAnlegen: (beitragId, text) =>
         holen('Der Kommentar', (c, i) => A.kommentarAnlegen(c, i, beitragId, text)),
       kommentarLoeschen: (id, zurueck) =>

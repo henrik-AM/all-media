@@ -92,6 +92,10 @@ const mitteilungText = (
       return `${name} möchte mit dir schreiben.`;
     case 'anfrage_ok':
       return `${name} hat deine Anfrage angenommen.`;
+    case 'messenger_anfrage':
+      return `${name} möchte mit dir in den Messenger wechseln.`;
+    case 'messenger_ok':
+      return `${name} ist jetzt in deinem Messenger.`;
     case 'story':
       return `${name} hat auf deine Story geantwortet.`;
     case 'kanal':

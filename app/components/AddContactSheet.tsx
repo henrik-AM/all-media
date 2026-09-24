@@ -55,7 +55,13 @@ interface Props {
 
 export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }: Props) => {
   const { users } = useDaten();
-  const aktionen = useAktionen(onNotice);
+  /*
+   * Meldungen erscheinen im Blatt selbst. `onNotice` zeichnet den Hinweis
+   * unter das Modal — bis zum 24.09.2026 sah, wer sich bei der Nummer
+   * vertippt hatte, schlicht gar nichts.
+   */
+  const [hinweis, setHinweis] = useState('');
+  const aktionen = useAktionen(setHinweis);
   const insets = useSafeAreaInsets();
   const [eingabe, setEingabe] = useState('');
   // Die eine Nachricht, die schon mit der Anfrage rausgeht. Auf der Website
@@ -74,18 +80,18 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
    */
   const suchen = async (nummer: string) => {
     const roh = nummer.trim();
-    if (!roh) return onNotice('Bitte eine Telefonnummer eingeben');
+    if (!roh) return setHinweis('Bitte eine Telefonnummer eingeben');
 
     const grund = Telefon.pruefe(roh);
-    if (grund) return onNotice(grund);
+    if (grund) return setHinweis(grund);
 
     setLaeuft(true);
     const person = await aktionen.personPerNummer(roh);
     setLaeuft(false);
-    if (!person) return onNotice('Zu dieser Nummer gibt es noch kein Konto');
+    if (!person) return setHinweis('Zu dieser Nummer gibt es noch kein Konto');
 
     if (contacts.some((c) => c.id === person.id)) {
-      return onNotice(`${person.name} ist bereits in deinen Kontakten`);
+      return setHinweis(`${person.name} ist bereits in deinen Kontakten`);
     }
 
     onAdd({
@@ -99,6 +105,7 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
     }, nachricht.trim());
     setEingabe('');
     setNachricht('');
+    setHinweis('');
   };
 
   return (
@@ -123,7 +130,10 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
               <TextInput
                 style={styles.input}
                 value={eingabe}
-                onChangeText={setEingabe}
+                onChangeText={(text) => {
+                  setEingabe(text);
+                  setHinweis('');
+                }}
                 placeholder="Telefonnummer"
                 placeholderTextColor={colors.text3}
                 autoCapitalize="none"
@@ -133,6 +143,11 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
                 onSubmitEditing={() => suchen(eingabe)}
               />
               <Text style={styles.hint}>{Telefon.REGEL_TEXT}</Text>
+              {hinweis ? (
+                <Text style={styles.fehler} accessibilityLiveRegion="polite">
+                  {hinweis}
+                </Text>
+              ) : null}
 
               {/*
                 Der zweite Weg. „Mein Code" und „Scannen" stehen nebeneinander,
@@ -143,7 +158,7 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
                   style={styles.qrKnopf}
                   onPress={() => {
                     if (!eigeneNummer) {
-                      return onNotice('Für deinen Code brauchst du erst eine eigene Telefonnummer');
+                      return setHinweis('Für deinen Code brauchst du erst eine eigene Telefonnummer');
                     }
                     setEigenerCode((a) => !a);
                   }}
@@ -204,7 +219,7 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
           const nummer = QrKontakt.nummerAus(text);
           // Ein fremder Code — Fahrkarte, Werbeplakat — ist kein Fehler des
           // Nutzers, nur der falsche Code. Deshalb ein Satz und kein Alarm.
-          if (!nummer) return onNotice('Das ist kein All-Media-Code');
+          if (!nummer) return setHinweis('Das ist kein All-Media-Code');
           setEingabe(nummer);
           void suchen(nummer);
         }}
@@ -250,6 +265,7 @@ const styles = themenStyles((colors) => ({
     ...typography.body,
   },
   hint: { paddingTop: 6, color: colors.text3, ...typography.small },
+  fehler: { paddingTop: 6, color: colors.danger, ...typography.small, fontWeight: '600' },
   label: { paddingTop: spacing.md, paddingBottom: 6, color: colors.text2, ...typography.small },
   textarea: {
     minHeight: 76,

@@ -56,7 +56,7 @@ export const VideoFeedScreen = ({
   onOpenExplorer,
 }: Props) => {
   const ziel = useZielOeffnen(onOpenExplorer, onNotice);
-  const { users: alleNutzer, videos: alleVideos, keinInteresse } = useDaten();
+  const { users: alleNutzer, videos: alleVideos, keinInteresse, neuLaden } = useDaten();
   const { istRepostet, umschalten } = useReposts();
   // Schreibt wirklich in die Datenbank — siehe lib/useAktionen.ts.
   const aktion = useAktionen(onNotice);
@@ -191,8 +191,10 @@ export const VideoFeedScreen = ({
   const onRefresh = async () => {
     setIsRefreshing(true);
     haptic.light();
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setVideos((prev) => [...alleVideos, ...prev]);
+    // Bis zum 24.09.2026 stand hier `[...alleVideos, ...prev]`: jedes
+    // Herunterziehen verdoppelte den ganzen Feed, geladen wurde nichts.
+    // Jetzt fragt es die Datenbank, der Effekt oben uebernimmt das Ergebnis.
+    await neuLaden();
     setIsRefreshing(false);
   };
 

@@ -333,7 +333,17 @@ function anfrageZustand(chat, nutzerId) {
   return 'accepted';
 }
 
-async function ladeChats(client, nutzerId, bereich = 'messenger') {
+/** Die Messenger-Anfrage aus Sicht des Lesenden (Schema 57) — wie app/lib/daten.ts. */
+function messengerAnfrageZustand(chat, nutzerId) {
+  const zustand = chat.messenger_anfrage || 'keine';
+  const vonMir = chat.messenger_anfrage_von === nutzerId;
+  if (zustand === 'wartet') return vonMir ? 'gesendet' : 'eingegangen';
+  if (zustand === 'abgelehnt') return vonMir ? 'abgelehnt' : 'keine';
+  if (zustand === 'angenommen') return 'angenommen';
+  return 'keine';
+}
+
+async function ladeChats(client, nutzerId, bereich = 'messenger', schluesselId = null) {
   if (!client) return null;
 
   const { data, error } = await client
@@ -423,18 +433,22 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
   /*
    * Die Kuverts zu den Vorschauen — eine Abfrage, nicht eine je Chat.
    *
-   * Gefiltert wird nicht nach dem eigenen Schluessel: die Regel „Eigene
-   * Kuverts lesen" aus Schema 31 gibt ohnehin nur die eigenen heraus.
+   * Gefiltert wird nach dem Schluessel dieses Browsers: die Regel „Eigene
+   * Kuverts lesen" aus Schema 31 gibt die Kuverts ALLER Geraete des Kontos
+   * heraus, und pro Nachricht blieb dann irgendeines stehen — meist das
+   * eines anderen Geraets: „Auf diesem Geraet nicht lesbar" (24.09.2026).
    */
   const vorschauKuverts = new Map();
   const vorschauIds = [...letzte.values()]
     .filter((n) => Number(n.krypto) > 0)
     .map((n) => n.id);
   if (vorschauIds.length) {
-    const { data: kZeilen } = await client
+    let abfrage = client
       .from('message_keys')
       .select('message_id, nonce, chiffre')
       .in('message_id', vorschauIds);
+    if (schluesselId) abfrage = abfrage.eq('schluessel_id', schluesselId);
+    const { data: kZeilen } = await abfrage;
     for (const k of kZeilen || []) {
       vorschauKuverts.set(k.message_id, { nonce: k.nonce, chiffre: k.chiffre });
     }
@@ -454,6 +468,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
           : (gegenueber && (spitznamen.get(gegenueber) || namen.get(gegenueber))) || z.chats.name || 'Chat',
         userId: gegenueber,
         requestState: anfrageZustand(z.chats, nutzerId),
+        messengerAnfrage: messengerAnfrageZustand(z.chats, nutzerId),
         members: z.chats.is_group ? andere : undefined,
         isGroup: Boolean(z.chats.is_group),
         bereich: z.chats.bereich || 'messenger',
@@ -507,7 +522,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger') {
     .sort((a, b) => new Date(b.zeitpunkt || 0) - new Date(a.zeitpunkt || 0));
 }
 
-async function ladeNachrichten(client, chatId, nutzerId) {
+async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
   if (!client) return null;
 
   /*
@@ -581,10 +596,12 @@ async function ladeNachrichten(client, chatId, nutzerId) {
   /*
    * Die Kuverts fuer dieses Konto — in einer Abfrage, nicht je Nachricht.
    *
-   * Gefiltert wird hier absichtlich nicht nach dem eigenen Schluessel: die
-   * Regel „Eigene Kuverts lesen" aus Schema 31 gibt ohnehin nur die eigenen
-   * heraus. Ein Filter im Code daneben waere eine zweite Wahrheit ueber
-   * dieselbe Sache — und wenn sie auseinanderlaufen, gewinnt die falsche.
+   * Gefiltert wird nach dem Schluessel dieses Browsers (Kopf
+   * X-Krypto-Schluessel). Die Regel „Eigene Kuverts lesen" aus Schema 31
+   * gibt die Kuverts ALLER Geraete des Kontos heraus; die Map unten behielt
+   * davon pro Nachricht irgendeines, meist das eines anderen Geraets, und die
+   * Nachricht war „Auf diesem Geraet nicht lesbar" (24.09.2026). Dieselbe
+   * Einschraenkung macht app/lib/krypto.ts mit `schluessel_id`.
    *
    * Geoeffnet wird hier nichts. Dieser Server steht bei Render und hat den
    * geheimen Schluessel nicht; das Oeffnen macht der Browser in
@@ -595,10 +612,12 @@ async function ladeNachrichten(client, chatId, nutzerId) {
     .filter((n) => Number(n.krypto) > 0)
     .map((n) => n.id);
   if (verschlossenIds.length) {
-    const { data: kZeilen } = await client
+    let abfrage = client
       .from('message_keys')
       .select('message_id, nonce, chiffre')
       .in('message_id', verschlossenIds);
+    if (schluesselId) abfrage = abfrage.eq('schluessel_id', schluesselId);
+    const { data: kZeilen } = await abfrage;
     for (const k of kZeilen || []) {
       kuverts.set(k.message_id, { nonce: k.nonce, chiffre: k.chiffre });
     }
@@ -1235,7 +1254,7 @@ async function ladeKeinInteresse(client, nutzerId) {
   return (data || []).map((z) => z.post_id);
 }
 
-async function bootstrapData(client, nutzerId) {
+async function bootstrapData(client, nutzerId, schluesselId = null) {
   if (!client || !nutzerId) return null;
 
   const [
@@ -1262,8 +1281,8 @@ async function bootstrapData(client, nutzerId) {
   ] = await Promise.all([
     ladeNutzer(client, nutzerId),
     ladeKontakte(client, nutzerId),
-    ladeChats(client, nutzerId, 'messenger'),
-    ladeChats(client, nutzerId, 'community'),
+    ladeChats(client, nutzerId, 'messenger', schluesselId),
+    ladeChats(client, nutzerId, 'community', schluesselId),
     ladeStorys(client, nutzerId),
     ladeBeitraege(client, nutzerId, { limit: 200 }),
     ladeCommunities(client, nutzerId),
@@ -1626,6 +1645,7 @@ module.exports = {
   ladeStummgeschaltet,
   ladeKartenpunkte,
   anfrageZustand,
+  messengerAnfrageZustand,
   ladeChats,
   ladeNachrichten,
   ladeStorys,

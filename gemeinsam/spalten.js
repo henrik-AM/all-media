@@ -62,7 +62,8 @@ const BEITRAG_SPALTEN =
 const CHATMITGLIED_SPALTEN =
   'chat_id, is_archived, is_muted, is_read, is_favorite, is_locked,' +
   ' notifications_off, geleert_bis,' +
-  ' chats(id, name, is_group, bereich, created_at, updated_at, anfrage_zustand, anfrage_von)';
+  ' chats(id, name, is_group, bereich, created_at, updated_at, anfrage_zustand, anfrage_von,' +
+  ' messenger_anfrage, messenger_anfrage_von)';
 
 /**
  * Was ein Profil zurueckgibt, nachdem es geaendert wurde.

@@ -82,6 +82,7 @@
     "test:sichtbarkeit": "node test/_sichtbarkeit.js",
     "test:fremdprofil": "node test/_fremdprofil.js",
     "test:chatanfrage": "node test/_chatanfrage.js",
+    "test:messengeranfrage": "node test/_messengeranfrage.js",
     "test:mitteilungen": "node test/_mitteilungen.js",
     "test:dmsperre": "node test/_dmsperre.js",
     "test:lesebestaetigung": "node test/_lesebestaetigung.js",

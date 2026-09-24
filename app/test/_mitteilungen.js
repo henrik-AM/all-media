@@ -182,7 +182,7 @@ async function anmelden(zugang) {
     const vorAnfrage = jetzt();
     const { data: chat, error: cFehler } = await eigner.client
       .from('chats')
-      .insert({ name: 'Prüflauf Mitteilung', is_group: false, bereich: 'messenger', created_by: eigner.id })
+      .insert({ name: 'Prüflauf Mitteilung', is_group: false, bereich: 'community' /* Fremde: Schema 57 */, created_by: eigner.id })
       .select('id')
       .single();
     if (cFehler) throw cFehler;
@@ -231,7 +231,7 @@ async function anmelden(zugang) {
      */
     const { data: chat2 } = await eigner.client
       .from('chats')
-      .insert({ name: 'Prüflauf Ablehnung', is_group: false, bereich: 'messenger', created_by: eigner.id })
+      .insert({ name: 'Prüflauf Ablehnung', is_group: false, bereich: 'community' /* Fremde: Schema 57 */, created_by: eigner.id })
       .select('id')
       .single();
     wegRaeumen.push(async () => {

@@ -325,6 +325,23 @@ export function anfrageZustand(
   return 'accepted';
 }
 
+/**
+ * Die Messenger-Anfrage aus einem Community-Chat, aus der Sicht des Lesenden
+ * (Schema 57). Wer abgelehnt hat, sieht wieder „keine" — fragen darf er
+ * später selbst. Dieselbe Umrechnung steht in web/server/supabase-api.js.
+ */
+export function messengerAnfrageZustand(
+  chat: { messenger_anfrage?: string | null; messenger_anfrage_von?: string | null },
+  ichId: string
+): 'keine' | 'gesendet' | 'eingegangen' | 'abgelehnt' | 'angenommen' {
+  const zustand = chat.messenger_anfrage ?? 'keine';
+  const vonMir = chat.messenger_anfrage_von === ichId;
+  if (zustand === 'wartet') return vonMir ? 'gesendet' : 'eingegangen';
+  if (zustand === 'abgelehnt') return vonMir ? 'abgelehnt' : 'keine';
+  if (zustand === 'angenommen') return 'angenommen';
+  return 'keine';
+}
+
 export async function ladeChats(
   client: SupabaseClient,
   ichId: string,
@@ -458,6 +475,7 @@ export async function ladeChats(
             'Chat',
         userId: gegenueber,
         requestState: anfrageZustand(z.chats, ichId),
+        messengerAnfrage: messengerAnfrageZustand(z.chats, ichId),
         isGroup: Boolean(z.chats.is_group),
         memberIds: z.chats.is_group ? andere : undefined,
         // Ein Anrufeintrag traegt keinen Text (Schema 35) — ohne diese Zeile
@@ -487,6 +505,33 @@ export async function ladeChats(
     .sort(
       (a, b) => new Date(b.zeitpunkt ?? 0).getTime() - new Date(a.zeitpunkt ?? 0).getTime()
     );
+}
+
+/**
+ * Die beiden Anfragezustände eines Chats, frisch aus der Datenbank.
+ *
+ * Die Chatliste ist ein Stand von ihrem letzten Laden. Antwortet das
+ * Gegenüber danach, hat die Datenbank die Anfrage längst angenommen
+ * (Schema 21, `chat_antwort_nimmt_an`), die geöffnete Liste aber sperrte
+ * weiter mit „Warten auf Annahme …" (24.09.2026). Deshalb holt der Chat beim
+ * Öffnen seinen Zustand selbst. Gleiche Abfrage in web/server/app.js
+ * (/api/chats/:chatId/zustand).
+ */
+export async function ladeChatZustand(
+  client: SupabaseClient,
+  chatId: string,
+  ichId: string
+): Promise<{ requestState: Chat['requestState']; messengerAnfrage: Chat['messengerAnfrage'] } | null> {
+  const { data, error } = await client
+    .from('chats')
+    .select('anfrage_zustand, anfrage_von, messenger_anfrage, messenger_anfrage_von')
+    .eq('id', chatId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    requestState: anfrageZustand(data, ichId),
+    messengerAnfrage: messengerAnfrageZustand(data, ichId),
+  };
 }
 
 export async function ladeNachrichten(

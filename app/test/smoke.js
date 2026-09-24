@@ -256,20 +256,20 @@ const STRUCTURE = {
   await p.click('[data-new="contact"]');
   await p.waitForTimeout(400);
   /*
-   * Den Hinweis unten abholen, bevor er sich ausblendet.
+   * Den Hinweis im Blatt abholen.
    *
-   * Er steht 2,2 Sekunden. Seit die Suche über die Datenbank läuft, war ein
-   * festes Warten mal zu früh und mal zu spät — der Prüflauf las dann ein
-   * leeres Feld. Deshalb: leeren, auslösen, auf Text warten.
+   * Bis zum 24.09.2026 stand er unten als Toast, halb durchsichtig über dem
+   * Knopf; jetzt steht er rot im Blatt (#contactFehler, Kasten 3). Leeren,
+   * auslösen, auf Text warten — ein festes Warten war mal zu früh, mal zu spät.
    */
   const hinweisNach = async (tue) => {
     await p.evaluate(() => {
-      const t = document.querySelector('#toast');
+      const t = document.querySelector('#contactFehler');
       if (t) { t.textContent = ''; t.hidden = true; }
     });
     await tue();
-    await K.bisWahr(p, "(() => { const t = document.querySelector('#toast'); return !!t && !t.hidden && t.textContent.trim().length > 0; })()");
-    return p.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+    await K.bisWahr(p, "(() => { const t = document.querySelector('#contactFehler'); return !!t && !t.hidden && t.textContent.trim().length > 0; })()");
+    return p.$eval('#contactFehler', (e) => (e.hidden ? '' : e.textContent));
   };
 
   /*

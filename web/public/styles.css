@@ -1446,6 +1446,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 .anfrage__btn--aus { background: var(--surface-2); color: var(--text); }
 .composer__field textarea:disabled { opacity: .6; cursor: not-allowed; }
 .sheet__hint { padding: 0 16px 8px; font-size: 12.5px; color: var(--text-3); }
+.sheet__fehler { padding: 0 16px 8px; font-size: 12.5px; font-weight: 600; color: var(--danger); }
+.sheet__fehler[hidden] { display: none; }
 /*
  * Zwischenueberschrift in einem Listen-Blatt. Dieselbe Schrift wie die
  * Abschnitte der Einstellungsseite selbst, damit die Statistik nicht wie

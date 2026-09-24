@@ -56,7 +56,7 @@ export const ChatListScreen = ({
    * hinter dem eingespeicherten Namen. Bis zum 01.09.2026 gab es sie
    * nirgends.
    */
-  const { insightStreaks, insights } = useDaten();
+  const { insightStreaks, insights, neuLaden } = useDaten();
   /*
    * „Vorschau anzeigen" aus den Einstellungen. Der Schalter stand seit Anfang
    * an in der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen
@@ -86,7 +86,10 @@ export const ChatListScreen = ({
   const onRefresh = async () => {
     setIsRefreshing(true);
     haptic.light();
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    // Bis zum 24.09.2026 drehte sich hier nur der Kreisel. Ein neuer Chat —
+    // etwa der aus einem geteilten Video (Kasten 3) — kam erst mit einem
+    // Neustart. App.tsx uebernimmt neue Chats nach jedem Neuladen.
+    await neuLaden();
     setIsRefreshing(false);
   };
 

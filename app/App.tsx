@@ -172,6 +172,26 @@ const Shell = () => {
     setStoriesVideos(daten.storiesVideos);
   }, [daten.geladen]);
 
+  /*
+   * Nach jedem Neuladen: was in der Datenbank neu ist, kommt dazu.
+   *
+   * Die beiden Listen oben werden nur beim ersten Laden übernommen, damit
+   * vorweggenommene Änderungen nicht überschrieben werden. Eine angenommene
+   * Messenger-Anfrage (Schema 57) legt aber Chat und Kontakt in der
+   * Datenbank an — ohne das hier stünden sie erst nach einem Neustart da.
+   */
+  useEffect(() => {
+    if (!daten.geladen) return;
+    setChats((prev) => {
+      const neu = daten.chats.filter((c) => !prev.some((p) => p.id === c.id));
+      return neu.length ? [...neu, ...prev] : prev;
+    });
+    setContacts((prev) => {
+      const neu = daten.contacts.filter((c) => !prev.some((p) => p.id === c.id));
+      return neu.length ? [...prev, ...neu] : prev;
+    });
+  }, [daten.chats, daten.contacts]);
+
   // Die drei Knoepfe oben rechts im eigenen Profil gehoeren zu genau einem
   // Bereich - Videos oder Communitys. Beide haben eigene Mitteilungen und ein
   // eigenes Erstellen-Menue, so wie im Prototyp.
@@ -585,14 +605,21 @@ const Shell = () => {
    * Person im Raster trägt ihr eigenes Abzeichen. Also entscheidet die
    * Person, nicht der Bildschirm — ein vorhandener Chat schlägt alles, und
    * erst wenn es keinen gibt, zählt der Bereich, aus dem geteilt wird.
+   *
+   * Seit dem 24.09.2026 zählt der Bereich nicht mehr (Feedback 21.09.,
+   * Kasten 3): der Rückfall auf 'messenger' außerhalb der Communitys hat
+   * jeden, der aus Videos teilte, in fremde Messenger-Listen geschrieben.
+   * In den Messenger kommt nur, wer Kontakt ist — per Nummer oder über eine
+   * angenommene Messenger-Anfrage. Alle anderen lernt man unter Communitys
+   * kennen. Gleiche Regel in web/public/app.js und in Schema 57.
    */
   const bereichFuer = useCallback(
     (userId: string): 'messenger' | 'community' => {
       if (chats.some((c) => !c.isGroup && c.userId === userId)) return 'messenger';
-      if (daten.communityChats.some((c) => !c.isGroup && c.userId === userId)) return 'community';
-      return area === 'communities' ? 'community' : 'messenger';
+      if (contacts.some((c) => c.id === userId)) return 'messenger';
+      return 'community';
     },
-    [chats, daten.communityChats, area]
+    [chats, contacts]
   );
 
   /** Beitrag oder Video in den Chat mit dieser Person legen. */
@@ -901,6 +928,48 @@ const Shell = () => {
     setNotice(annehmen ? 'Anfrage angenommen' : 'Anfrage abgelehnt');
   };
 
+  /*
+   * Die Messenger-Anfrage aus einem Community-Chat (Feedback 21.09., Kasten 3).
+   *
+   * Hier stand bis zum 24.09.2026 ein Aufruf von chatMit(…, 'messenger'): er
+   * legte den Messenger-Chat sofort an, und die andere Person fand den
+   * Fragenden in ihrem Messenger, bevor sie irgendetwas entschieden hatte.
+   * Jetzt bleibt bis zur Antwort alles im Community-Chat; erst Annehmen legt
+   * Kontakte und Messenger-Chat an. Die Bedingungen prüft Schema 57, deren
+   * Meldungen reicht `holen` durch. Gleicher Ablauf in web/public/app.js.
+   */
+  const messengerZustandSetzen = (chatId: string, zustand: Chat['messengerAnfrage']) =>
+    setOverlay((prev) =>
+      prev?.kind === 'chat' && prev.chat.id === chatId
+        ? { ...prev, chat: { ...prev.chat, messengerAnfrage: zustand } }
+        : prev
+    );
+
+  const messengerAnfragen = async (chat: Chat) => {
+    const ergebnis = await aktion.messengerAnfragen(chat.id);
+    if (!ergebnis) return;
+    messengerZustandSetzen(chat.id, 'gesendet');
+    setNotice(`Messenger-Anfrage an ${chat.name} gesendet`);
+    void daten.neuLaden();
+  };
+
+  const messengerAntworten = async (chat: Chat, annehmen: boolean) => {
+    const ergebnis = await aktion.messengerAnfrageBeantworten(chat.id, annehmen);
+    if (!ergebnis) return;
+    messengerZustandSetzen(chat.id, annehmen ? 'angenommen' : 'keine');
+    setNotice(annehmen ? `${chat.name} ist jetzt in deinem Messenger` : 'Ihr schreibt weiter unter Communitys');
+    await daten.neuLaden();
+  };
+
+  /** Aus dem Community-Chat zum Messenger-Chat derselben Person. */
+  const zumMessenger = (userId: string) => {
+    const chat = chats.find((c) => !c.isGroup && c.userId === userId);
+    if (chat) return oeffneChat(chat);
+    setOverlay(null);
+    setArea('messenger');
+    setSubs((prev) => ({ ...prev, messenger: 'chats' }));
+  };
+
   const befriend = (userId: string) => {
     const person = daten.users[userId];
     if (contacts.some((c) => c.id === userId)) return setNotice(`${person.name} ist bereits in deinen Kontakten`);
@@ -1146,6 +1215,11 @@ const Shell = () => {
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
   const mitteilungOeffnen = (ziel: MitteilungsZiel) => {
     if (ziel.art === 'profile') return openPublicProfile(ziel.id);
+    // Chat-Anfrage und Messenger-Anfrage führen in den Chat, um den es geht.
+    if (ziel.art === 'chat') {
+      const chat = [...chats, ...daten.communityChats].find((c) => c.id === ziel.id);
+      return chat ? oeffneChat(chat) : setNotice('Diesen Chat gibt es nicht mehr');
+    }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);
       return community ? openCommunity(community) : setNotice('Diesen Kanal gibt es nicht mehr');
@@ -1451,6 +1525,22 @@ const Shell = () => {
         onOpenProfile={openProfile}
         onOpenGroupSettings={(chatId) => setNotice(`Gruppeneinstellungen: ${overlay.chat.name}`)}
         onAnfrageEntscheiden={anfrageEntscheiden}
+        messengerAnfrageMoeglich={
+          !overlay.chat.isGroup &&
+          !!overlay.chat.userId &&
+          daten.communityChats.some((c) => c.id === overlay.chat.id) &&
+          bereichFuer(overlay.chat.userId) === 'community'
+        }
+        onMessengerAnfragen={() => messengerAnfragen(overlay.chat)}
+        onMessengerAntworten={(annehmen) => messengerAntworten(overlay.chat, annehmen)}
+        onZumMessenger={() => overlay.chat.userId && zumMessenger(overlay.chat.userId)}
+        onZustandGeladen={(zustand) => {
+          const id = overlay.chat.id;
+          setChats((prev) => prev.map((c) => (c.id === id ? { ...c, ...zustand } : c)));
+          setOverlay((prev) =>
+            prev?.kind === 'chat' && prev.chat.id === id ? { ...prev, chat: { ...prev.chat, ...zustand } } : prev
+          );
+        }}
         contacts={contacts}
         onNotice={setNotice}
         onOpenStandort={(name) => {
@@ -2072,29 +2162,27 @@ const Shell = () => {
            *
            * Henrik am 18.09.2026: „in den Community-Chats eine Option
            * einbauen, dass man den jeweils anderen User anfragen kann, über
-           * Messenger zu chatten."
+           * Messenger zu chatten." Und am 21.09.: erst nach etwas Austausch,
+           * annehmen führt in den Messenger, ablehnen lässt alles hier.
            *
-           * Das ist kein neues Zustimmungsverfahren — es gibt schon eines.
-           * Schema 21 setzt beim Eintragen des zweiten Mitglieds
-           * `chats.anfrage_zustand = 'offen'`, und die Regel auf `messages`
-           * lässt bis zur Annahme genau eine Nachricht durch. Ein
-           * Messenger-Chat anzulegen IST also die Anfrage; die Datenbank
-           * macht den Rest. Genau deshalb steht hier nichts weiter als der
-           * Aufruf.
+           * Bis zum 24.09.2026 legte der Punkt den Messenger-Chat sofort an —
+           * damit stand man beim anderen im Messenger, bevor er gefragt war.
+           * Jetzt ist es eine echte Anfrage (Schema 57, messenger_anfragen).
            *
            * Der Punkt erscheint nur, wo er etwas bewirkt: in einem
-           * Zweierchat aus dem Bereich Communitys, zu dem es noch keinen
-           * Messenger-Chat gibt.
+           * Zweierchat unter Communitys, mit jemandem, der noch kein Kontakt
+           * ist, und solange keine Anfrage läuft.
            */
           ...(chatOptionen &&
           !chatOptionen.isGroup &&
           chatOptionen.userId &&
           daten.communityChats.some((c) => c.id === chatOptionen.id) &&
-          !chats.some((c) => !c.isGroup && c.userId === chatOptionen.userId)
+          bereichFuer(chatOptionen.userId) === 'community' &&
+          (chatOptionen.messengerAnfrage ?? 'keine') === 'keine'
             ? [
                 {
                   key: 'messenger',
-                  label: 'Über Messenger chatten anfragen',
+                  label: 'Messenger-Anfrage senden',
                   icon: 'chatbubble-ellipses-outline' as const,
                 },
               ]
@@ -2113,23 +2201,7 @@ const Shell = () => {
             return setNotice('Für Gruppen gibt es die Einstellungen noch nicht');
           }
           if (key === 'loeschen') return chatLoeschen(chat);
-          if (key === 'messenger') {
-            if (!chat.userId) return;
-            void (async () => {
-              const neu = await aktion.chatMit(chat.userId!, 'messenger');
-              if (!neu) return;
-              await daten.neuLaden();
-              /*
-               * Bewusst nicht „gesendet" — gesendet ist noch nichts. Die
-               * Anfrage steht, sobald der Chat existiert; geschrieben wird
-               * darin einmal, danach entscheidet die Gegenseite (Schema 21).
-               */
-              setNotice(`Anfrage an ${chat.name} steht — schreib ihr eine Nachricht`);
-              setArea('messenger');
-              setSubs((prev) => ({ ...prev, messenger: 'chats' }));
-            })();
-            return;
-          }
+          if (key === 'messenger') return void messengerAnfragen(chat);
           chatUmlegen(chat, key as 'archiv' | 'stumm' | 'gelesen');
         }}
         onClose={() => setChatOptionen(null)}

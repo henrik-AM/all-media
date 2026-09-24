@@ -121,7 +121,7 @@ async function anmelden(zugang) {
   const chatMitNachricht = async (name) => {
     const { data: chat, error } = await absender.client
       .from('chats')
-      .insert({ name, is_group: false, bereich: 'messenger', created_by: absender.id })
+      .insert({ name, is_group: false, bereich: 'community' /* Fremde: Schema 57 */, created_by: absender.id })
       .select('id')
       .single();
     if (error) throw error;
@@ -198,7 +198,7 @@ async function anmelden(zugang) {
     await schalter('an');
     const { data: fremd, error: fehlerFremd } = await absender.client
       .from('chats')
-      .insert({ name: 'Prüflauf fremder Chat', is_group: false, bereich: 'messenger', created_by: absender.id })
+      .insert({ name: 'Prüflauf fremder Chat', is_group: false, bereich: 'community' /* Fremde: Schema 57 */, created_by: absender.id })
       .select('id')
       .single();
     if (fehlerFremd) throw fehlerFremd;

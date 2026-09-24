@@ -306,7 +306,25 @@ async function darfAngeschriebenWerden(client, zielId, nutzerId) {
   return data === true;
 }
 
+/** Darf es zwischen den beiden einen Messenger-Chat geben? (Schema 57) */
+async function messengerErlaubt(client, nutzerId, zielId) {
+  const { data, error } = await client.rpc('messenger_erlaubt', { ich: nutzerId, ziel: zielId });
+  if (error) throw error;
+  return data === true;
+}
+
 async function chatMit(client, nutzerId, zielId, bereich = 'messenger') {
+  /*
+   * Fremde lernt man unter Communitys kennen (Feedback 21.09., Kasten 3).
+   * Ein Teilen aus Videos an jemanden, der kein Kontakt ist, legte bis zum
+   * 24.09.2026 einen Messenger-Chat an — und stand damit in einer fremden
+   * Messenger-Liste. Schema 57 weist das jetzt ab; hier landet es gleich am
+   * richtigen Ort. Gleiche Regel in app/lib/aktionen.ts (chatMit).
+   */
+  if (bereich === 'messenger' && !(await messengerErlaubt(client, nutzerId, zielId))) {
+    bereich = 'community';
+  }
+
   const { data: meine, error } = await client
     .from('chat_members')
     .select('chat_id, chats(id, is_group, bereich)')
@@ -473,8 +491,14 @@ const handleAcceptRequest = handler('Anfrage', async (client, nutzerId, chatId, 
     .eq('id', chatId);
   if (error) return { ok: false, fehler: error.message };
 
-  // Wer annimmt, hat die Person damit auch in den Kontakten.
-  if (annehmen) {
+  /*
+   * Wer im Messenger annimmt, hat die Person damit auch in den Kontakten.
+   * Unter Communitys nicht: dort macht erst die Messenger-Anfrage aus einer
+   * Bekanntschaft einen Kontakt (Schema 57). Gleiche Regel in
+   * app/lib/aktionen.ts (anfrageEntscheiden).
+   */
+  const { data: derChat } = await client.from('chats').select('bereich').eq('id', chatId).maybeSingle();
+  if (annehmen && (derChat?.bereich || 'messenger') === 'messenger') {
     const { data: andere } = await client
       .from('chat_members')
       .select('user_id')
@@ -493,6 +517,30 @@ const handleAcceptRequest = handler('Anfrage', async (client, nutzerId, chatId, 
 
   return { ok: true, zustand: annehmen ? 'angenommen' : 'abgelehnt' };
 });
+
+/*
+ * Aus einem Community-Chat fragen, ob man in den Messenger wechselt — und
+ * darauf antworten. Die Bedingungen stehen in der Datenbank (Schema 57);
+ * deren Meldungen sind für den Nutzer geschrieben und werden durchgereicht.
+ * Gleiche Aufrufe in app/lib/aktionen.ts.
+ */
+const handleMessengerAnfragen = handler('Messenger-Anfrage', async (client, nutzerId, chatId) => {
+  const { data, error } = await client.rpc('messenger_anfragen', { p_chat: chatId });
+  if (error) return { ok: false, fehler: error.message };
+  return data;
+});
+
+const handleMessengerAnfrageBeantworten = handler(
+  'Messenger-Anfrage beantworten',
+  async (client, nutzerId, chatId, annehmen) => {
+    const { data, error } = await client.rpc('messenger_anfrage_beantworten', {
+      p_chat: chatId,
+      p_annehmen: annehmen,
+    });
+    if (error) return { ok: false, fehler: error.message };
+    return data;
+  }
+);
 
 /** Kontakt als Favorit merken. */
 const handleContactFavorite = handler('Kontakt-Favorit', async (client, nutzerId, zielId) => {
@@ -2001,6 +2049,8 @@ module.exports = {
   handleFindPerson,
   handleAddContact,
   handleAcceptRequest,
+  handleMessengerAnfragen,
+  handleMessengerAnfrageBeantworten,
   handleContactFavorite,
   handleContactEdit,
   handleAnrufNotieren,

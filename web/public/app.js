@@ -468,6 +468,16 @@ async function bootstrap() {
     await window.Anmeldung.bereit.catch(() => null);
   }
 
+  /*
+   * Den Geraetschluessel vor dem ersten Laden anmelden: erst dann steht seine
+   * Kennung im Kopf jeder Anfrage, und der Server gibt zu den Vorschauen das
+   * Kuvert genau dieses Browsers heraus (24.09.2026). Ohne Sitzung geht es
+   * nicht — dann holt es der Aufruf weiter unten nach.
+   */
+  if (window.KryptoWeb && window.Anmeldung?.angemeldet?.()) {
+    await window.KryptoWeb.anmelden();
+  }
+
   try {
     const res = await fetch('/api/bootstrap');
     if (!res.ok) throw new Error('Server antwortet mit ' + res.status);
@@ -1308,18 +1318,21 @@ function chatOptionen(chatId) {
    *
    * Henrik am 18.09.2026: „in den Community-Chats eine Option einbauen, dass
    * man den jeweils anderen User anfragen kann, über Messenger zu chatten."
+   * Und am 21.09.: erst nach etwas Austausch, annehmen führt in den
+   * Messenger, ablehnen lässt alles unter Communitys.
    *
-   * Es ist kein zweites Zustimmungsverfahren: Schema 21 macht aus jedem neuen
-   * Zweierchat eine Anfrage und laesst bis zur Annahme genau eine Nachricht
-   * durch. Einen Messenger-Chat anzulegen IST die Anfrage. Der Punkt steht nur
-   * da, wo er etwas bewirkt — im Zweierchat aus den Communitys, zu dem es noch
-   * keinen Messenger-Chat gibt. Gleiche Bedingung in app/App.tsx.
+   * Bis zum 24.09.2026 legte der Punkt den Messenger-Chat sofort an — damit
+   * stand man beim anderen im Messenger, bevor er gefragt war. Jetzt ist es
+   * eine echte Anfrage (Schema 57). Der Punkt steht nur, wo er etwas bewirkt:
+   * im Zweierchat unter Communitys, mit jemandem, der noch kein Kontakt ist,
+   * solange keine Anfrage läuft. Gleiche Bedingung in app/App.tsx.
    */
   const messengerAnfrageMoeglich =
     !chat.isGroup &&
     Boolean(chat.userId) &&
     (state.communityChats || []).some((c) => c.id === chatId) &&
-    !(state.chats || []).some((c) => !c.isGroup && c.userId === chat.userId);
+    bereichFuer(chat.userId) === 'community' &&
+    (chat.messengerAnfrage || 'keine') === 'keine';
 
   openSheet(
     chat.name,
@@ -1350,7 +1363,7 @@ function chatOptionen(chatId) {
     ${messengerAnfrageMoeglich
       ? `<button class="item" data-copt="messenger">
       <span class="item__icon">${ICONS.chat}</span>
-      <span class="item__label">Über Messenger chatten anfragen</span>
+      <span class="item__label">Messenger-Anfrage senden</span>
     </button>`
       : ''}
     <div class="copt__trenner"></div>
@@ -1369,25 +1382,7 @@ function chatOptionen(chatId) {
 
           if (was === 'einstellungen') return openChatSettings(chatId);
 
-          if (was === 'messenger') {
-            const res = await fetch(`/api/kontakte/${chat.userId}/chat`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ bereich: 'messenger' }),
-            })
-              .then((r) => r.json())
-              .catch(() => ({ ok: false, error: 'Das hat gerade nicht geklappt' }));
-            if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
-            await bootstrap();
-            /*
-             * Bewusst nicht „gesendet" — gesendet ist noch nichts. Die Anfrage
-             * steht, sobald der Chat existiert; geschrieben wird darin einmal,
-             * danach entscheidet die Gegenseite. Gleicher Satz in app/App.tsx.
-             */
-            toast(`Anfrage an ${chat.name} steht — schreib ihr eine Nachricht`);
-            state.area = 'messenger';
-            return openChat(res.chatId);
-          }
+          if (was === 'messenger') return messengerAnfragen(chat);
 
           const antwort = await fetch(`/api/chats/${chatId}/${was}`, { method: 'POST' })
             .then((r) => r.json())
@@ -2615,6 +2610,7 @@ function openAddContact() {
       <input id="contactHandle" placeholder="Telefonnummer" inputmode="tel" autocomplete="off" />
     </div>
     <div class="sheet__hint">${esc(window.Telefon.REGEL_TEXT)}</div>
+    <div class="sheet__fehler" id="contactFehler" role="status" hidden></div>
     <div class="qrReihe">
       <button class="prof__btn" id="contactQrZeigen">${ICONS.qr} Mein Code</button>
       <button class="prof__btn" id="contactQrScannen">${ICONS.scan} Code scannen</button>
@@ -2637,13 +2633,26 @@ function openAddContact() {
       const flaeche = sheet.querySelector('#contactQrFlaeche');
       input.focus();
 
+      /*
+       * Meldungen stehen im Blatt unter der Nummer. Als Toast lagen sie
+       * halbdurchsichtig über „Anfrage senden" und waren kaum zu lesen; die
+       * App zeigte sie bis zum 24.09.2026 gar nicht. Gleiche Stelle in
+       * app/components/AddContactSheet.tsx.
+       */
+      const fehlerFeld = sheet.querySelector('#contactFehler');
+      const melden = (text) => {
+        fehlerFeld.textContent = text || '';
+        fehlerFeld.hidden = !text;
+      };
+      input.addEventListener('input', () => melden(''));
+
       const submit = async () => {
         const handle = input.value.trim();
-        if (!handle) return toast('Bitte eine Telefonnummer eingeben');
+        if (!handle) return melden('Bitte eine Telefonnummer eingeben');
 
         // Dieselbe Regel wie in der App und im Server — gemeinsam/telefon.js.
         const grund = window.Telefon.pruefe(handle);
-        if (grund) return toast(grund);
+        if (grund) return melden(grund);
 
         const nachricht = msg.value.trim();
         const res = await fetch('/api/contacts', {
@@ -2653,7 +2662,7 @@ function openAddContact() {
         });
         const result = await res.json();
 
-        if (!result.ok) return toast(result.error);
+        if (!result.ok) return melden(result.error);
 
         state.contacts.push(result.contact);
         if (result.chat) state.chats.unshift(result.chat);
@@ -2682,7 +2691,7 @@ function openAddContact() {
         const res = await fetch('/api/qr.svg');
         if (!res.ok || !(res.headers.get('content-type') || '').includes('svg')) {
           const grund = await res.json().catch(() => null);
-          return toast((grund && grund.error) || 'Dein Code lässt sich gerade nicht zeigen');
+          return melden((grund && grund.error) || 'Dein Code lässt sich gerade nicht zeigen');
         }
         flaeche.innerHTML = await res.text();
         flaeche.hidden = false;
@@ -2694,7 +2703,7 @@ function openAddContact() {
         const nummer = window.QrKontakt.nummerAus(text);
         // Ein fremder Code — Fahrkarte, Werbeplakat — ist kein Fehler des
         // Nutzers, nur der falsche Code.
-        if (!nummer) return toast('Das ist kein All-Media-Code');
+        if (!nummer) return melden('Das ist kein All-Media-Code');
         input.value = nummer;
         submit();
       });
@@ -3236,13 +3245,13 @@ async function openContactProfile(userId) {
       if (was === 'chat') {
         schliessen();
         if (chat) return openChat(chat.id);
-        // Der Bereich entscheidet, in welcher Chatliste der neue Chat landet.
-        // Ohne ihn nahm der Server 'messenger' — auch aus den Communitys
-        // heraus. Gleiche Regel wie beim Teilen.
+        // Der Bereich entscheidet, in welcher Chatliste der neue Chat landet —
+        // nach der Person, nicht nach dem Bildschirm. Gleiche Regel wie beim
+        // Teilen (bereichFuer).
         const res = await fetch(`/api/kontakte/${userId}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bereich: state.area === 'communities' ? 'community' : 'messenger' }),
+          body: JSON.stringify({ bereich: bereichFuer(userId) }),
         });
         const antwort = await res.json();
         if (!antwort.ok) return toast(antwort.error);
@@ -9085,6 +9094,8 @@ function renderVideoSearch() {
 function mitteilungOeffnen(ziel) {
   if (ziel.art === 'profile') return openProfile(ziel.id);
   if (ziel.art === 'community') return openChat(ziel.id);
+  // Chat-Anfrage und Messenger-Anfrage führen in den Chat, um den es geht.
+  if (ziel.art === 'chat') return openChat(ziel.id);
 
   if (ziel.art === 'post') {
     state.area = 'videos';
@@ -11202,11 +11213,18 @@ async function openExplorer(art, wert, nur = null) {
  * Der Prototyp-Frame „Nutzer B + Beitrag teilen" zeigt es anders: jede Person
  * im Raster trägt ihr eigenes Abzeichen. Also entscheidet die Person, nicht
  * der Bildschirm. Gleiche Regel in app/App.tsx (bereichFuer).
+ *
+ * Seit dem 24.09.2026 zählt der Bereich gar nicht mehr (Feedback 21.09.,
+ * Kasten 3): der Rückfall auf 'messenger' außerhalb der Communitys hat jeden,
+ * der aus Videos teilte, in fremde Messenger-Listen geschrieben. In den
+ * Messenger kommt nur, wer Kontakt ist — per Nummer oder über eine
+ * angenommene Messenger-Anfrage. Alle anderen lernt man unter Communitys
+ * kennen. Dieselbe Regel steht in Schema 57.
  */
 function bereichFuer(uid) {
   if ((state.chats || []).some((c) => !c.isGroup && c.userId === uid)) return 'messenger';
-  if ((state.communityChats || []).some((c) => !c.isGroup && c.userId === uid)) return 'community';
-  return state.area === 'communities' ? 'community' : 'messenger';
+  if ((state.contacts || []).some((c) => c.id === uid)) return 'messenger';
+  return 'community';
 }
 
 function openTeilen(art, id) {
@@ -13065,6 +13083,111 @@ function anfrageLeiste(chat) {
 }
 
 /*
+ * Die Messenger-Anfrage aus einem Community-Chat (Feedback 21.09., Kasten 3).
+ *
+ * Fragen lässt sich erst, wenn beide hier geschrieben haben — „nach etwas
+ * Austausch". Dieselbe Bedingung prüft Schema 57; hier steht sie nur, damit
+ * kein Knopf erscheint, der dann abgewiesen wird. Gleiche Leiste in
+ * app/screens/messenger/ChatDetailScreen.tsx.
+ */
+function messengerLeiste(chat) {
+  if (chat.dmGesperrt || chat.isGroup || !chat.userId) return '';
+  const zustand = chat.messengerAnfrage || 'keine';
+  const imCommunityChat = (state.communityChats || []).some((c) => c.id === chat.id);
+
+  if (zustand === 'keine') {
+    const ausgetauscht =
+      (state.messages || []).some((m) => m.from === 'me') &&
+      (state.messages || []).some((m) => m.from === chat.userId);
+    if (!imCommunityChat || bereichFuer(chat.userId) !== 'community' || !ausgetauscht) return '';
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        Ihr schreibt euch unter Communitys. Möchtest du ${esc(chat.name)} fragen,
+        ob ihr in den Messenger wechselt?
+      </div>
+      <div class="anfrage__knoepfe">
+        <button class="anfrage__btn" data-messenger="fragen">Messenger-Anfrage senden</button>
+      </div>
+    </div>`;
+  }
+  if (zustand === 'gesendet') {
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        Deine Messenger-Anfrage an ${esc(chat.name)} läuft. Bis zur Antwort
+        schreibt ihr hier weiter.
+      </div>
+    </div>`;
+  }
+  if (zustand === 'eingegangen') {
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        ${esc(chat.name)} möchte mit dir in den Messenger wechseln. Lehnst du ab,
+        bleibt alles hier unter Communitys.
+      </div>
+      <div class="anfrage__knoepfe">
+        <button class="anfrage__btn" data-messenger="ja">Annehmen</button>
+        <button class="anfrage__btn anfrage__btn--aus" data-messenger="nein">Ablehnen</button>
+      </div>
+    </div>`;
+  }
+  if (zustand === 'abgelehnt') {
+    return `<div class="anfrage">
+      <div class="anfrage__text">
+        ${esc(chat.name)} bleibt lieber hier unter Communitys. Schreiben könnt
+        ihr weiter wie bisher.
+      </div>
+    </div>`;
+  }
+  return `<div class="anfrage">
+    <div class="anfrage__text">Ihr seid jetzt auch im Messenger verbunden.</div>
+    <div class="anfrage__knoepfe">
+      <button class="anfrage__btn" data-messenger="oeffnen">Zum Messenger</button>
+    </div>
+  </div>`;
+}
+
+/*
+ * Fragen und antworten. Bis zum 24.09.2026 legte „Über Messenger chatten
+ * anfragen" den Messenger-Chat sofort an — die andere Person fand den
+ * Fragenden in ihrem Messenger, bevor sie etwas entschieden hatte. Jetzt
+ * bleibt bis zur Antwort alles im Community-Chat. Gleicher Ablauf in
+ * app/App.tsx (messengerAnfragen, messengerAntworten).
+ */
+async function messengerAnfragen(chat) {
+  const res = await fetch(`/api/chats/${chat.id}/messenger-anfrage`, { method: 'POST' })
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, error: 'Das hat gerade nicht geklappt' }));
+  if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
+  await bootstrap();
+  toast(`Messenger-Anfrage an ${chat.name} gesendet`);
+  if ($('#messages')) openChat(chat.id);
+}
+
+async function messengerAntworten(chat, annehmen) {
+  const res = await fetch(`/api/chats/${chat.id}/messenger-antwort`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ annehmen }),
+  })
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, error: 'Das hat gerade nicht geklappt' }));
+  if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
+  await bootstrap();
+  toast(annehmen ? `${chat.name} ist jetzt in deinem Messenger` : 'Ihr schreibt weiter unter Communitys');
+  openChat(chat.id);
+}
+
+/** Aus dem Community-Chat zum Messenger-Chat derselben Person. */
+function zumMessenger(userId) {
+  const chat = (state.chats || []).find((c) => !c.isGroup && c.userId === userId);
+  if (chat) {
+    state.area = 'messenger';
+    return openChat(chat.id);
+  }
+  toast('Der Messenger-Chat ist noch nicht geladen');
+}
+
+/*
  * Eine EINGEGANGENE Anfrage sperrt das Feld nicht: zurückschreiben ist
  * erlaubt und nimmt sie damit an. Gesperrt ist nur, wer wartet oder
  * abgelehnt wurde.
@@ -13120,7 +13243,24 @@ async function openChat(chatId) {
 
   state.openChatId = chatId;
 
-  state.messages = await nachrichtenHolen(chatId);
+  /*
+   * Der Anfragezustand aus dem letzten Laden kann alt sein: hat das
+   * Gegenueber inzwischen geantwortet, sperrte das Eingabefeld sonst weiter
+   * (24.09.2026). Gleiches in der App (ladeChatZustand).
+   */
+  const [verlauf, zustand] = await Promise.all([
+    nachrichtenHolen(chatId),
+    chat.isGroup
+      ? null
+      : fetch(`/api/chats/${chatId}/zustand`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+  ]);
+  state.messages = verlauf;
+  if (zustand?.ok) {
+    chat.requestState = zustand.requestState;
+    chat.messengerAnfrage = zustand.messengerAnfrage;
+  }
 
   if (chat.unread) {
     chat.unread = 0;
@@ -13166,6 +13306,7 @@ async function openChat(chatId) {
     </header>
     <div class="messages" id="messages"></div>
     ${anfrageLeiste(chat)}
+    ${messengerLeiste(chat)}
     <form class="composer" id="composer">
       <button type="button" class="composer__icon" id="attach" aria-label="Anhang">${ICONS.plus}</button>
       <div class="composer__field">
@@ -13203,6 +13344,14 @@ async function openChat(chatId) {
    * beides über dieselbe Route. Vorher stand hier ein Knopf „Annahme
    * simulieren" im Chat des ABSENDERS.
    */
+  overlay.querySelectorAll('[data-messenger]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const was = b.dataset.messenger;
+      if (was === 'fragen') return messengerAnfragen(chat);
+      if (was === 'oeffnen') return zumMessenger(chat.userId);
+      return messengerAntworten(chat, was === 'ja');
+    })
+  );
   overlay.querySelectorAll('[data-anfrage]').forEach((b) =>
     b.addEventListener('click', async () => {
       const annehmen = b.dataset.anfrage === 'ja';

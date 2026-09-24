@@ -131,6 +131,10 @@
     const mit = { ...(einstellungen || {}) };
     const kopf = new Headers(mit.headers || (typeof ziel === 'object' ? ziel.headers : undefined));
     kopf.set('Authorization', 'Bearer ' + sitzung.access_token);
+    // Welcher Geräteschlüssel dieser Browser ist — der Server gibt sonst ein
+    // beliebiges Kuvert des Kontos heraus, oft das eines anderen Geräts.
+    const schluessel = window.KryptoWeb?.meinSchluessel()?.id;
+    if (schluessel) kopf.set('X-Krypto-Schluessel', schluessel);
     mit.headers = kopf;
 
     return echtesFetch(ziel, mit);

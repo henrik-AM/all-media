@@ -130,7 +130,7 @@ async function anmelden(zugang) {
       .insert({
         name: gruppe ? 'Prüflauf DM-Gruppe' : 'Prüflauf DM-Sperre',
         is_group: gruppe,
-        bereich: 'messenger',
+        bereich: 'community', // Fremde nur unter Communitys (Schema 57)
         created_by: eigner.id,
       })
       .select('id')

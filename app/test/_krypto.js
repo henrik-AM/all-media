@@ -216,7 +216,7 @@ function rechnungPruefen() {
     // --- Ein Chat zu zweit ------------------------------------------------
     const { data: chat, error: chatFehler } = await eigner.client
       .from('chats')
-      .insert({ name: 'Prüflauf Krypto', is_group: false, bereich: 'messenger', created_by: eigner.id })
+      .insert({ name: 'Prüflauf Krypto', is_group: false, bereich: 'community' /* Fremde: Schema 57 */, created_by: eigner.id })
       .select('id')
       .single();
     if (chatFehler) throw chatFehler;

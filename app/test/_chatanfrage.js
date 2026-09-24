@@ -72,10 +72,14 @@ async function anmelden(zugang) {
    * einen bestehenden Chat umwidmet, wäre beim zweiten Mal grün, ohne etwas
    * geprüft zu haben.
    */
-  const chatAnlegen = async () => {
+  /*
+   * Fremde schreiben sich seit Schema 57 unter Communitys an — im Messenger
+   * nimmt die Datenbank das zweite Mitglied nur unter Kontakten auf.
+   */
+  const chatAnlegen = async (bereich = 'community') => {
     const { data: chat, error } = await eigner.client
       .from('chats')
-      .insert({ name: 'Prüflauf Anfrage', is_group: false, bereich: 'messenger', created_by: eigner.id })
+      .insert({ name: 'Prüflauf Anfrage', is_group: false, bereich, created_by: eigner.id })
       .select('id')
       .single();
     if (error) throw error;
@@ -229,6 +233,11 @@ async function anmelden(zugang) {
       .maybeSingle();
 
     if (schonKontakt?.status !== 'friend') {
+      // Kontakt nur über die Nummer (Schema 57) — wie ein Mensch es tut.
+      const { data: treffer, error: nFehler } = await fremder.client
+        .rpc('finde_per_nummer', { nummer: '+49 151 9990001' });
+      if (nFehler) throw nFehler;
+      if (treffer?.id !== eigner.id) throw new Error('Nummer des Testkontos führt nicht zum Testkonto');
       const { error: kFehler } = await fremder.client
         .from('contacts')
         .upsert(
@@ -253,7 +262,7 @@ async function anmelden(zugang) {
       });
     }
 
-    const chat4 = await chatAnlegen();
+    const chat4 = await chatAnlegen('messenger');
     const z4 = await zustandVon(eigner, chat4);
     pruefe('Ein Chat mit einem Kontakt ist keine Anfrage',
       z4.anfrage_zustand === 'offen', String(z4.anfrage_zustand));

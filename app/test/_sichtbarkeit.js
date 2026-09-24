@@ -141,7 +141,7 @@ async function anmelden(zugang) {
     // 06.09.2026 nicht als Rest dieses Laufs zu erkennen.
     const { data: chat, error: f2 } = await eigner.client
       .from('chats')
-      .insert({ name: 'Prüflauf Sichtbarkeit', is_group: false, created_by: eigner.id })
+      .insert({ name: 'Prüflauf Sichtbarkeit', is_group: false, created_by: eigner.id, bereich: 'community' /* Fremde: Schema 57 */ })
       .select('id')
       .maybeSingle();
     if (f2) throw f2;

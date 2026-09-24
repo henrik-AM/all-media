@@ -181,6 +181,8 @@ export interface Chat {
    * Zusage an sich selbst. Jetzt steht sie am Chat, wo beide sie sehen.
    */
   requestState?: 'pending' | 'accepted' | 'incoming' | 'declined';
+  /** Messenger-Anfrage aus einem Community-Chat (Schema 57). */
+  messengerAnfrage?: 'keine' | 'gesendet' | 'eingegangen' | 'abgelehnt' | 'angenommen';
 }
 
 export interface Contact {
@@ -447,12 +449,15 @@ export type MitteilungArt =
   | 'einladung'
   /** Chat-Anfrage gestellt beziehungsweise angenommen — Schema 49. */
   | 'anfrage'
-  | 'anfrage_ok';
+  | 'anfrage_ok'
+  /** Messenger-Anfrage aus einem Community-Chat — Schema 57. */
+  | 'messenger_anfrage'
+  | 'messenger_ok';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
 export interface MitteilungsZiel {
-  art: 'post' | 'video' | 'profile' | 'community';
+  art: 'post' | 'video' | 'profile' | 'community' | 'chat';
   id: string;
 }
 

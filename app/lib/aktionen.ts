@@ -632,6 +632,13 @@ export async function teilen(
   return gesendet;
 }
 
+/** Darf es zwischen den beiden einen Messenger-Chat geben? (Schema 57) */
+export async function messengerErlaubt(client: SupabaseClient, ichId: string, zielId: string) {
+  const { data, error } = await client.rpc('messenger_erlaubt', { ich: ichId, ziel: zielId });
+  if (error) throw error;
+  return data === true;
+}
+
 /**
  * Der Zweierchat mit dieser Person — der vorhandene, sonst ein neuer.
  *
@@ -644,6 +651,17 @@ export async function chatMit(
   zielId: string,
   bereich = 'messenger'
 ): Promise<string> {
+  /*
+   * Fremde lernt man unter Communitys kennen (Feedback 21.09., Kasten 3).
+   * Ein Teilen aus Videos an jemanden, der kein Kontakt ist, legte bis zum
+   * 24.09.2026 einen Messenger-Chat an — und stand damit in einer fremden
+   * Messenger-Liste. Schema 57 weist das jetzt ab; hier landet es gleich am
+   * richtigen Ort. Gleiche Regel in web/server/sync-handlers.js (chatMit).
+   */
+  if (bereich === 'messenger' && !(await messengerErlaubt(client, ichId, zielId))) {
+    bereich = 'community';
+  }
+
   const { data: meine, error } = await client
     .from('chat_members')
     .select('chat_id, chats(id, is_group, bereich)')
@@ -1113,7 +1131,59 @@ export async function anfrageEntscheiden(
     .update({ anfrage_zustand: annehmen ? 'angenommen' : 'abgelehnt' })
     .eq('id', chatId);
   if (error) throw error;
+
+  /*
+   * Wer im Messenger annimmt, hat die Person damit auch in den Kontakten —
+   * unter Communitys nicht, dort braucht es die Messenger-Anfrage (Schema 57).
+   * Gleiche Regel in web/server/sync-handlers.js (handleAcceptRequest).
+   */
+  const { data: derChat } = await client.from('chats').select('bereich').eq('id', chatId).maybeSingle();
+  if (annehmen && (derChat?.bereich || 'messenger') === 'messenger') {
+    const { data: ich } = await client.auth.getUser();
+    const { data: andere } = await client
+      .from('chat_members')
+      .select('user_id')
+      .eq('chat_id', chatId)
+      .neq('user_id', ich.user?.id ?? '');
+    const ziel = (andere || [])[0]?.user_id;
+    if (ziel && ich.user) {
+      await client
+        .from('contacts')
+        .upsert(
+          { user_id: ich.user.id, contact_id: ziel, status: 'friend' },
+          { onConflict: 'user_id,contact_id' }
+        );
+    }
+  }
   return true;
+}
+
+/**
+ * Aus einem Community-Chat fragen, ob man in den Messenger wechselt.
+ *
+ * Henrik, Feedback 21.09.: erst nach etwas Austausch unter Communitys. Die
+ * Bedingungen stehen in der Datenbank (Schema 57, messenger_anfragen) — die
+ * Meldung von dort ist für den Nutzer geschrieben und wird durchgereicht.
+ * Gleiche Aufrufe in web/server/sync-handlers.js.
+ */
+export async function messengerAnfragen(client: SupabaseClient, chatId: string) {
+  const { data, error } = await client.rpc('messenger_anfragen', { p_chat: chatId });
+  if (error) throw error;
+  return data as { ok: boolean; zustand: string };
+}
+
+/** Annehmen legt Kontakte und Messenger-Chat an; ablehnen lässt alles unter Communitys. */
+export async function messengerAnfrageBeantworten(
+  client: SupabaseClient,
+  chatId: string,
+  annehmen: boolean
+) {
+  const { data, error } = await client.rpc('messenger_anfrage_beantworten', {
+    p_chat: chatId,
+    p_annehmen: annehmen,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; zustand: string; messengerChat?: string };
 }
 
 // --------------------------------------------------------------- Storys --

@@ -99,7 +99,17 @@ const BILDSCHIRME = [
       const el = await page.$(`[data-pfeil-nr="${p.nr}"]`) || (await pfeile(), await page.$(`[data-pfeil-nr="${p.nr}"]`));
       pruefe(`„${p.text}" ist ein Knopf`, p.knopf);
       if (!el || !p.knopf) continue;
-      await el.click();
+      try {
+        await el.click({ timeout: 5000 });
+      } catch (e) {
+        // Die Einstellungen zeichnen sich nach dem Laden noch einmal neu; das
+        // gemerkte Element haengt dann nicht mehr im DOM (24.09.2026). Also
+        // dieselbe Ueberschrift ueber ihren Text neu suchen.
+        await page.waitForTimeout(800);
+        const neu = (await pfeile()).find((q) => q.text === p.text);
+        if (!neu) throw e;
+        await page.click(`[data-pfeil-nr="${neu.nr}"]`);
+      }
       await page.waitForTimeout(1200);
       const nachher = await page.evaluate(() => ({
         stand: document.querySelector('#main').innerHTML.length + ':' + document.querySelector('#main').textContent.slice(0, 200),

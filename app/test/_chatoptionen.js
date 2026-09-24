@@ -277,11 +277,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
    * typgeprüft, aber nie ausgelöst. Typgeprüft heisst: der Knopf ist richtig
    * beschriftet. Ob er etwas bewirkt, sagt das nicht.
    *
-   * Geprüft wird die Folge, nicht der Knopf: aus dem Community-Chat mit Greta
-   * Hoffmann (Vorlage cc1, kein Messenger-Chat dazu) muss danach ein
-   * Messenger-Chat entstanden sein, und der Punkt darf beim zweiten Öffnen
-   * nicht mehr angeboten werden — sonst legte er beim Draufdrücken immer neue
-   * Chats an.
+   * Geprüft wird die Folge, nicht der Knopf — Stand seit 24.09. siehe unten.
    */
   console.log('\nVon der Community in den Messenger');
 
@@ -310,46 +306,42 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     }
   });
 
-  await pruefe('Er legt wirklich einen Messenger-Chat an', async () => {
+  /*
+   * Seit dem 24.09.2026 (Feedback 21.09., Kasten 3) legt der Punkt keinen
+   * Messenger-Chat mehr an. Er fragt — und erst wenn die andere Seite
+   * annimmt, entsteht der Chat im Messenger (Schema 57). Geprüft wird darum
+   * das Gegenteil von vorher: nach dem Druck steht Greta NICHT im Messenger.
+   *
+   * Ob die Anfrage rausgeht, hängt am Austausch im Chat („Schreibt euch erst
+   * hier ein wenig"). Beide Antworten sind richtig; falsch wäre nur eine
+   * dritte, oder ein Messenger-Chat.
+   */
+  let gesendet = false;
+  await pruefe('Er legt keinen Messenger-Chat an, sondern fragt', async () => {
     const vorher = await page.evaluate(() => (state.chats || []).length);
     await page.click('[data-copt="messenger"]');
-    // Der Chat entsteht in der Datenbank; gewartet wird auf das Ergebnis,
-    // nicht auf die Uhr.
-    await page.waitForFunction(
-      // `state` ist ein globales const, kein Feld an window — über window
-      // gelesen wäre es undefined und die Bedingung nie wahr.
-      (v) => (state.chats || []).length > v,
-      vorher, { timeout: 15000 }
-    );
-    const neu = await page.evaluate(() =>
-      (state.chats || []).filter((c) => !c.isGroup).map((c) => c.name)
-    );
-    if (!neu.includes('Greta Hoffmann')) throw new Error('im Messenger steht: ' + neu.join(' | '));
-  });
-
-  await pruefe('Der neue Chat ist eine Anfrage, keine Zusage', async () => {
-    // Nach dem Anlegen geht der Chat auf. Das Eingabefeld ist gesperrt,
-    // solange die Gegenseite nicht geantwortet hat — genau das ist die
-    // Anfrage aus Schema 21, hier an ihrer sichtbaren Seite geprüft.
-    await page.waitForSelector('#msgInput', { timeout: 10000 });
-    const feld = await page.$eval('#msgInput', (n) => ({
-      gesperrt: n.disabled,
-      hinweis: n.getAttribute('placeholder') || '',
+    await page
+      .waitForFunction(() => !document.querySelector('#toast')?.hidden, null, { timeout: 15000 })
+      .catch(() => {});
+    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
+    gesendet = /Messenger-Anfrage an .* gesendet/.test(toast);
+    if (!gesendet && !/Schreibt euch erst/.test(toast)) throw new Error('Toast sagt „' + toast + '"');
+    const danach = await page.evaluate(() => ({
+      zahl: (state.chats || []).length,
+      namen: (state.chats || []).filter((c) => !c.isGroup).map((c) => c.name),
     }));
-    if (!feld.gesperrt) throw new Error('das Eingabefeld ist offen — niemand wurde gefragt');
-    if (!/Annahme|Anfrage/i.test(feld.hinweis)) throw new Error('Hinweis: „' + feld.hinweis + '"');
+    if (danach.zahl > vorher || danach.namen.includes('Greta Hoffmann')) {
+      throw new Error('im Messenger steht: ' + danach.namen.join(' | '));
+    }
   });
 
-  await pruefe('Und bietet sich danach nicht noch einmal an', async () => {
-    // Erst aus dem geöffneten Chat heraus: das Overlay faengt sonst jeden
-    // Klick auf die Leiste darunter ab.
+  await pruefe('Eine gesendete Anfrage bietet sich nicht noch einmal an', async () => {
     await page.click('#chatBack').catch(() => {});
     await page.waitForSelector('#overlay', { state: 'hidden', timeout: 10000 }).catch(() => {});
     await zu();
     await communityOptionen('Greta Hoffmann');
-    if (await page.$('[data-copt="messenger"]')) {
-      throw new Error('der Punkt steht noch da — ein zweiter Druck legte einen zweiten Chat an');
-    }
+    const noch = Boolean(await page.$('[data-copt="messenger"]'));
+    if (gesendet && noch) throw new Error('der Punkt steht noch da — ein zweiter Druck fragte ein zweites Mal');
     await zu();
   });
 

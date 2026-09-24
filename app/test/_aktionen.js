@@ -660,8 +660,27 @@ const pruefe = (name, wahr, zusatz = '') => {
      */
     const boot = await seite.evaluate(async () => (await (await fetch('/api/bootstrap')).json()));
     const drin = new Set((boot.contacts || []).map((c) => c.id));
-    const ich = boot.ichId;
-    const frei = Object.keys(boot.users || {}).find((id) => id !== ich && id !== 'me' && !drin.has(id));
+
+    /*
+     * Seit Schema 57 (24.09.2026) nimmt die Datenbank einen Kontakt nur noch
+     * an, wenn man die Nummer vorher nachgeschlagen hat — eine beliebige
+     * Kennung aus `users` reicht nicht mehr. Also derselbe Weg wie im Blatt
+     * „Kontakt hinzufügen": erst `personPerNummer`, dann aufnehmen. Die
+     * Beispielprofile tragen feste Nummern (Schema 11).
+     */
+    const NUMMERN = ['+49 151 2345678', '+49 160 4567890', '+49 171 5678901', '+49 173 7890123', '+49 175 9012345'];
+    let frei = null;
+    for (const nummer of NUMMERN) {
+      const person = await seite.evaluate(async (nummer) => {
+        const client = await window.Anmeldung.aufbauen();
+        const { data } = await client.rpc('finde_per_nummer', { nummer });
+        return data || null;
+      }, nummer);
+      if (person && person.id && !drin.has(person.id)) {
+        frei = person.id;
+        break;
+      }
+    }
     if (!frei) return false;
 
     /*

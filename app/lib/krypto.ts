@@ -132,7 +132,7 @@ export function fingerabdruck(oeffentlich: string): string {
 export async function empfaengerSchluessel(
   client: SupabaseClient,
   chatId: string
-): Promise<{ id: string; oeffentlich: string }[]> {
+): Promise<{ id: string; oeffentlich: string; user_id: string }[]> {
   const { data: mitglieder, error: fehlerM } = await client
     .from('chat_members')
     .select('user_id')
@@ -142,13 +142,17 @@ export async function empfaengerSchluessel(
   const ids = (mitglieder ?? []).map((m: any) => m.user_id);
   if (!ids.length) return [];
 
+  // Neueste zuerst: PostgREST gibt höchstens 1000 Zeilen heraus, ohne
+  // Reihenfolge fielen die aktuellen Geräte hinten herunter (24.09.2026,
+  // gleiche Stelle in web/server/app.js).
   const { data, error } = await client
     .from('krypto_schluessel')
-    .select('id, oeffentlich')
-    .in('user_id', ids);
+    .select('id, oeffentlich, user_id')
+    .in('user_id', ids)
+    .order('created_at', { ascending: false });
   if (error) throw error;
 
-  return (data ?? []) as { id: string; oeffentlich: string }[];
+  return (data ?? []) as { id: string; oeffentlich: string; user_id: string }[];
 }
 
 /**
@@ -171,13 +175,11 @@ export async function chatVerschluesselbar(
     .maybeSingle();
   if (!chat || (chat as any).is_group) return false;
 
+  // Die Konten kommen mit den Schlüsseln. Bis zum 24.09.2026 wurden sie mit
+  // `.in('id', …)` nachgefragt — bei bis zu 1000 Schlüsseln eine Adresse, die
+  // keine Anfrage mehr durchlässt; die leere Antwort hieß dann „kein Schloss".
   const schluessel = await empfaengerSchluessel(client, chatId);
-  const konten = new Set<string>();
-  const { data: zeilen } = await client
-    .from('krypto_schluessel')
-    .select('user_id')
-    .in('id', schluessel.map((s) => s.id));
-  for (const z of zeilen ?? []) konten.add((z as any).user_id);
+  const konten = new Set(schluessel.map((s) => s.user_id));
 
   return konten.size >= 2 && konten.has(ichId);
 }
@@ -280,11 +282,10 @@ export async function fuerChatVerschliessen(
     const empfaenger = await empfaengerSchluessel(client, chatId);
     // Weniger als zwei Konten heißt: das Gegenüber war noch nie mit einem
     // Gerät da. Dann gibt es niemanden, für den man verschließen könnte.
-    const { data: konten } = await client
-      .from('krypto_schluessel')
-      .select('user_id')
-      .in('id', empfaenger.map((s) => s.id));
-    const verschieden = new Set((konten ?? []).map((k: any) => k.user_id));
+    // Die Konten stehen in der Antwort selbst — eine Nachfrage mit allen
+    // Schlüsselkennungen war zu lang und schickte still im Klartext
+    // (24.09.2026, siehe chatVerschluesselbar).
+    const verschieden = new Set(empfaenger.map((s) => s.user_id));
     if (verschieden.size < 2) return offen(text);
 
     return verschliessen(text, meiner, empfaenger);

@@ -215,6 +215,7 @@ app.use('/api', (_req, res, next) => {
 app.use('/api', async (req, _res, next) => {
   req.db = null;
   req.nutzerId = null;
+  req.schluesselId = null;
 
   const token = tokenAus(req);
   if (!token) return next();
@@ -227,6 +228,10 @@ app.use('/api', async (req, _res, next) => {
     if (!error && data?.user) {
       req.db = client;
       req.nutzerId = data.user.id;
+      // Der Geraetschluessel dieses Browsers (public/anmeldung.js), fuer die
+      // Kuverts in supabase-api.js. Nur eine UUID wird durchgelassen.
+      const schluessel = String(req.headers['x-krypto-schluessel'] || '');
+      req.schluesselId = /^[0-9a-f-]{36}$/i.test(schluessel) ? schluessel : null;
     }
   } catch {
     // Abgelaufenes oder falsches Token: weiter als nicht angemeldet.
@@ -453,7 +458,7 @@ app.get('/api/bootstrap', async (req, res) => {
     return res.json({ angemeldet: false, quelle: 'keine', hinweis: 'Bitte anmelden' });
   }
   try {
-    const daten = await supabaseApi.bootstrapData(req.db, req.nutzerId);
+    const daten = await supabaseApi.bootstrapData(req.db, req.nutzerId, req.schluesselId);
     // Fund 4: bootstrap geht an `route()` vorbei und braucht denselben Schritt.
     res.json(await signiereMedien(req.db, { angemeldet: true, ...daten }));
   } catch (fehler) {
@@ -547,7 +552,7 @@ app.post('/api/chats/:chatId/melden', route(async (req) => {
 
 app.post('/api/chats/:chatId/leeren', route(async (req) => {
   const e = await syncHandlers.handleClearChat(req.db, req.nutzerId, req.params.chatId);
-  return antwort(e, { chats: await supabaseApi.ladeChats(req.db, req.nutzerId) });
+  return antwort(e, { chats: await supabaseApi.ladeChats(req.db, req.nutzerId, 'messenger', req.schluesselId) });
 }));
 
 app.post('/api/chats/:chatId/read', route(async (req) =>
@@ -564,8 +569,48 @@ app.post('/api/chats/:chatId/accept', route(async (req) => {
   return antwort(e, { chatId: req.params.chatId, zustand: e?.zustand });
 }));
 
+/*
+ * Die Messenger-Anfrage aus einem Community-Chat (Feedback 21.09., Kasten 3).
+ * Annehmen trägt beide als Kontakt ein und öffnet den Messenger-Chat;
+ * ablehnen lässt alles unter Communitys.
+ */
+app.post('/api/chats/:chatId/messenger-anfrage', route(async (req) => {
+  const e = await syncHandlers.handleMessengerAnfragen(req.db, req.nutzerId, req.params.chatId);
+  return antwort(e, { chatId: req.params.chatId });
+}));
+
+app.post('/api/chats/:chatId/messenger-antwort', route(async (req) => {
+  const annehmen = req.body?.annehmen === true;
+  const e = await syncHandlers.handleMessengerAnfrageBeantworten(req.db, req.nutzerId, req.params.chatId, annehmen);
+  return antwort(e, { chatId: req.params.chatId });
+}));
+
+/*
+ * Die beiden Anfragezustaende eines Chats, frisch aus der Datenbank.
+ *
+ * Der Stand aus /api/bootstrap ist der vom letzten Laden. Hatte das
+ * Gegenueber inzwischen geantwortet, war die Anfrage laengst angenommen
+ * (Schema 21), das Eingabefeld aber noch gesperrt (24.09.2026). openChat in
+ * public/app.js fragt deshalb beim Oeffnen hier nach. Gleiche Abfrage in
+ * app/lib/daten.ts (ladeChatZustand).
+ */
+app.get('/api/chats/:chatId/zustand', route(async (req) => {
+  const { data, error } = await req.db
+    .from('chats')
+    .select('anfrage_zustand, anfrage_von, messenger_anfrage, messenger_anfrage_von')
+    .eq('id', req.params.chatId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false };
+  return {
+    ok: true,
+    requestState: supabaseApi.anfrageZustand(data, req.nutzerId),
+    messengerAnfrage: supabaseApi.messengerAnfrageZustand(data, req.nutzerId),
+  };
+}));
+
 app.get('/api/messages/:chatId', route(async (req) =>
-  supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId)
+  supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId, req.schluesselId)
 ));
 
 /*
@@ -621,10 +666,17 @@ app.get('/api/krypto/empfaenger/:chatId', route(async (req) => {
   const ids = (mitglieder || []).map((m) => m.user_id);
   if (!ids.length) return { verschluesselbar: false, schluessel: [] };
 
+  /*
+   * Neueste zuerst. PostgREST gibt höchstens 1000 Zeilen heraus — ohne
+   * Reihenfolge waren das die ältesten, und ein Konto mit mehr Geräten
+   * (die Prüfkonten sammeln bei jedem Lauf eines) bekam für sein aktuelles
+   * Gerät nichts mehr: „Auf diesem Gerät nicht lesbar" (24.09.2026).
+   */
   const { data, error } = await req.db
     .from('krypto_schluessel')
     .select('id, user_id, oeffentlich')
-    .in('user_id', ids);
+    .in('user_id', ids)
+    .order('created_at', { ascending: false });
   if (error) throw error;
 
   const konten = new Set((data || []).map((k) => k.user_id));
@@ -813,7 +865,7 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
    * holen. Die Karte muss deshalb schon hier fertig sein — sonst steht bis
    * zum naechsten Laden nur der Satz da.
    */
-  const frisch = await supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId);
+  const frisch = await supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId, req.schluesselId);
   const angelegt = (frisch || []).find((m) => m.id === e.nachricht.id);
 
   return {
@@ -835,7 +887,7 @@ app.post('/api/messages/:chatId/:messageId/stern', route(async (req) => {
 
 /** Alles, was in diesem Chat an Medien und Markiertem liegt. */
 app.get('/api/chats/:chatId/medien', route(async (req) => {
-  const alle = await supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId);
+  const alle = await supabaseApi.ladeNachrichten(req.db, req.params.chatId, req.nutzerId, req.schluesselId);
   const { data: sterne } = await req.db
     .from('message_stars')
     .select('message_id')
@@ -1701,7 +1753,7 @@ app.post('/api/teilen', route(async (req) => {
   );
   // Die Antwort muss die Liste zeigen, in die tatsaechlich geschrieben wurde —
   // sonst sucht der Browser den neuen Chat in der falschen.
-  return antwort(e, { bereich, chats: await supabaseApi.ladeChats(req.db, req.nutzerId, bereich) });
+  return antwort(e, { bereich, chats: await supabaseApi.ladeChats(req.db, req.nutzerId, bereich, req.schluesselId) });
 }));
 
 /*
@@ -2315,6 +2367,8 @@ function mitteilungText(m, namen, communityNamen) {
       : `${name} hat dich in einem Kommentar erwähnt.`,
     anfrage: `${name} möchte mit dir schreiben.`,
     anfrage_ok: `${name} hat deine Anfrage angenommen.`,
+    messenger_anfrage: `${name} möchte mit dir in den Messenger wechseln.`,
+    messenger_ok: `${name} ist jetzt in deinem Messenger.`,
     story: `${name} hat auf deine Story geantwortet.`,
     kanal: `${name} hat einen neuen Kanal in „${community}" erstellt.`,
     beitritt: `${name} ist „${community}" beigetreten.`,

@@ -175,6 +175,7 @@ const LAEUFE = [
   ['sichtbarkeit', '_sichtbarkeit.js'],
   ['fremdprofil', '_fremdprofil.js'],
   ['chatanfrage', '_chatanfrage.js'],
+  ['messengeranfrage', '_messengeranfrage.js'],
   ['mitteilungen', '_mitteilungen.js'],
   ['dmsperre', '_dmsperre.js'],
   ['lesebestaetigung', '_lesebestaetigung.js'],

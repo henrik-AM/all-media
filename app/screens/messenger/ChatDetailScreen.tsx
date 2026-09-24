@@ -22,7 +22,7 @@ import { Videoflaeche, istVideo } from '../../components/Videoflaeche';
 import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
-import { ICH as CURRENT_USER_ID, chatZeit, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
+import { ICH as CURRENT_USER_ID, chatZeit, ladeChatZustand, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
 import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
@@ -72,6 +72,16 @@ interface Props {
   /** Offene Kontaktanfrage annehmen. */
   /** Über eine eingegangene Anfrage entscheiden — annehmen oder ablehnen. */
   onAnfrageEntscheiden?: (chatId: string, annehmen: boolean) => void;
+  /*
+   * Die Messenger-Anfrage aus einem Community-Chat (Schema 57). Ob gefragt
+   * werden darf, weiß die Shell — sie kennt Kontakte und Chatlisten.
+   */
+  messengerAnfrageMoeglich?: boolean;
+  onMessengerAnfragen?: () => void;
+  onMessengerAntworten?: (annehmen: boolean) => void;
+  onZumMessenger?: () => void;
+  /** Der frisch geladene Anfragezustand — die Shell übernimmt ihn. */
+  onZustandGeladen?: (zustand: Pick<Chat, 'requestState' | 'messengerAnfrage'>) => void;
 }
 
 export const ChatDetailScreen = ({
@@ -83,6 +93,11 @@ export const ChatDetailScreen = ({
   onOpenProfile,
   onOpenGroupSettings,
   onAnfrageEntscheiden,
+  messengerAnfrageMoeglich = false,
+  onMessengerAnfragen,
+  onMessengerAntworten,
+  onZumMessenger,
+  onZustandGeladen,
   contacts = [],
   onNotice,
   onOpenStandort,
@@ -180,6 +195,17 @@ export const ChatDetailScreen = ({
         if (!abgebrochen) setMessages([...geladen, ...(extraMessages ?? [])]);
       })
       .catch((e) => console.error('Verlauf laden fehlgeschlagen:', e?.message ?? e));
+
+    // Der Zustand aus der Chatliste kann alt sein — siehe ladeChatZustand.
+    if (!istKanal && !chat.isGroup) {
+      ladeChatZustand(supabase, chat.id, ichId)
+        .then((zustand) => {
+          if (!abgebrochen && zustand) onZustandGeladen?.(zustand);
+        })
+        .catch(() => {
+          /* Dann bleibt der Stand der Liste. */
+        });
+    }
 
     return () => {
       abgebrochen = true;
@@ -791,7 +817,7 @@ export const ChatDetailScreen = ({
     // fuer Notch und Home-Anzeige selbst frei.
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Druck style={styles.headerBack} onPress={onBack} hitSlop={6}>
+        <Druck style={styles.headerBack} onPress={onBack} hitSlop={6} accessibilityLabel="Zurück">
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Druck>
         <Avatar id={chat.userId ?? chat.id} name={chat.name} size={sizes.avatarSm} group={chat.isGroup} />
@@ -923,6 +949,82 @@ export const ChatDetailScreen = ({
         )}
 
         {/*
+          * Die Messenger-Anfrage (Feedback 21.09., Kasten 3).
+          *
+          * Fragen lässt sich erst, wenn beide hier geschrieben haben — „nach
+          * etwas Austausch". Dieselbe Bedingung prüft Schema 57; hier steht
+          * sie nur, damit kein Knopf erscheint, der dann abgewiesen wird.
+          * Gleiche Leiste auf der Website (messengerLeiste).
+          */}
+        {!blockiert && !dmGesperrt && messengerAnfrageMoeglich &&
+          (chat.messengerAnfrage ?? 'keine') === 'keine' &&
+          messages.some((m) => m.senderId === CURRENT_USER_ID) &&
+          messages.some((m) => m.senderId !== CURRENT_USER_ID && m.senderId === chat.userId) && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              Ihr schreibt euch unter Communitys. Möchtest du {chat.name} fragen,
+              ob ihr in den Messenger wechselt?
+            </Text>
+            <View style={styles.anfrageKnoepfe}>
+              <Druck style={styles.anfrageBtn} onPress={() => onMessengerAnfragen?.()}>
+                <Text style={styles.anfrageBtnText}>Messenger-Anfrage senden</Text>
+              </Druck>
+            </View>
+          </View>
+        )}
+
+        {chat.messengerAnfrage === 'gesendet' && !blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              Deine Messenger-Anfrage an {chat.name} läuft. Bis zur Antwort
+              schreibt ihr hier weiter.
+            </Text>
+          </View>
+        )}
+
+        {chat.messengerAnfrage === 'eingegangen' && !blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              {chat.name} möchte mit dir in den Messenger wechseln. Lehnst du ab,
+              bleibt alles hier unter Communitys.
+            </Text>
+            <View style={styles.anfrageKnoepfe}>
+              <Druck style={styles.anfrageBtn} onPress={() => onMessengerAntworten?.(true)}>
+                <Text style={styles.anfrageBtnText}>Annehmen</Text>
+              </Druck>
+              <Druck
+                style={[styles.anfrageBtn, styles.anfrageBtnAus]}
+                onPress={() => onMessengerAntworten?.(false)}
+              >
+                <Text style={[styles.anfrageBtnText, styles.anfrageBtnTextAus]}>Ablehnen</Text>
+              </Druck>
+            </View>
+          </View>
+        )}
+
+        {chat.messengerAnfrage === 'abgelehnt' && !blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              {chat.name} bleibt lieber hier unter Communitys. Schreiben könnt
+              ihr weiter wie bisher.
+            </Text>
+          </View>
+        )}
+
+        {chat.messengerAnfrage === 'angenommen' && !blockiert && (
+          <View style={styles.anfrage}>
+            <Text style={styles.anfrageText}>
+              Ihr seid jetzt auch im Messenger verbunden.
+            </Text>
+            <View style={styles.anfrageKnoepfe}>
+              <Druck style={styles.anfrageBtn} onPress={() => onZumMessenger?.()}>
+                <Text style={styles.anfrageBtnText}>Zum Messenger</Text>
+              </Druck>
+            </View>
+          </View>
+        )}
+
+        {/*
           * Worauf sich die naechste Nachricht bezieht — oder welche gerade
           * bearbeitet wird. Ohne diese Zeile tippt man in eine Eingabe, die
           * sich unsichtbar anders verhaelt als sonst.
@@ -1002,7 +1104,7 @@ export const ChatDetailScreen = ({
               returnKeyType={enterSendet ? 'send' : 'default'}
               onSubmitEditing={enterSendet ? () => send() : undefined}
             />
-            <Druck style={styles.composerIcon} onPress={onCamera} hitSlop={4}>
+            <Druck style={styles.composerIcon} onPress={onCamera} hitSlop={4} accessibilityLabel="Kamera">
               <Ionicons name="camera-outline" size={21} color={colors.text2} />
             </Druck>
           </View>
@@ -1010,6 +1112,7 @@ export const ChatDetailScreen = ({
             style={[styles.send, (!draft.trim() || gesperrt) && styles.sendDisabled]}
             onPress={send}
             disabled={!draft.trim() || gesperrt}
+            accessibilityLabel="Senden"
           >
             <Ionicons name="send" size={17} color={colors.white} />
           </Druck>
