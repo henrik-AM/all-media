@@ -443,7 +443,13 @@ export const VideoFeedScreen = ({
                   {folgtPerson(item.userId) ? 'Gefolgt' : 'Folgen'}
                 </Text>
               </Druck>
-              <Druck style={styles.bell} onPress={() => toggleNotify(item)} hitSlop={6}>
+              <Druck
+                style={styles.bell}
+                onPress={() => toggleNotify(item)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={item.notify ? 'Benachrichtigungen aus' : 'Benachrichtigungen an'}
+              >
                 <Glocke an={!!item.notify} farbeAus={colors.white} />
               </Druck>
               </>
