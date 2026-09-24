@@ -18,6 +18,8 @@
 //   npm run mac:tippen -- "Videos"            tippt auf die Mitte des Treffers
 //   npm run mac:tippen -- "Videos" --nr 2     zweiter von mehreren Treffern
 //   npm run mac:tippen -- --liste [Teiltext]  zeigt, was antippbar ist
+//   npm run mac:tippen -- --runter            wischt eine halbe Seite nach unten
+//   npm run mac:tippen -- --hoch              ... und zurueck
 
 const { execFileSync } = require('child_process');
 const { pruefgeraet } = require('./pruefgeraet');
@@ -30,7 +32,9 @@ function baum(udid) {
   const laufen = (knoten) => {
     for (const k of knoten) {
       const text = [k.AXLabel, k.title, k.AXValue].filter(Boolean).join(' | ');
-      if (text && k.frame && k.frame.width > 0 && k.frame.height > 0) flach.push({ text, typ: k.type, f: k.frame });
+      // Auch Knoten ohne Beschriftung: sie sind kein Ziel, koennen aber eines
+      // verdecken (die untere Leiste hat unter ihren Knoepfen einen leeren Rand).
+      if (k.frame && k.frame.width > 0 && k.frame.height > 0) flach.push({ text, typ: k.type, f: k.frame });
       if (k.children) laufen(k.children);
     }
   };
@@ -52,6 +56,16 @@ function main() {
   const suche = args.find((a, i) => !a.startsWith('--') && (nrPos < 0 || i !== nrPos + 1));
 
   const udid = pruefgeraet();
+
+  // Wischen ist harmlos - es loest keinen Knopf aus - und braucht deshalb
+  // kein Ziel. Mitte des Bildschirms, eine halbe Seite weit.
+  if (args.includes('--runter') || args.includes('--hoch')) {
+    const [von, bis] = args.includes('--runter') ? [620, 260] : [260, 620];
+    execFileSync('axe', ['swipe', '--start-x', '200', '--start-y', String(von), '--end-x', '200', '--end-y', String(bis), '--duration', '0.4', '--udid', udid], { stdio: 'ignore' });
+    console.log(args.includes('--runter') ? 'Nach unten gewischt.' : 'Nach oben gewischt.');
+    return;
+  }
+
   const alle = baum(udid);
   // Der Anwendungsknoten beschriftet den ganzen Bildschirm - nie ein Ziel.
   // Er gibt aber die Bildschirmgroesse vor: nur was mit der Mitte darauf
@@ -65,7 +79,7 @@ function main() {
   const gesehen = new Set();
   const kandidaten = alle.filter((e) => {
     const schluessel = `${e.text}@${Math.round(e.f.x)},${Math.round(e.f.y)},${Math.round(e.f.width)},${Math.round(e.f.height)}`;
-    if (e.typ === 'Application' || !sichtbar(e.f) || gesehen.has(schluessel)) return false;
+    if (!e.text || e.typ === 'Application' || !sichtbar(e.f) || gesehen.has(schluessel)) return false;
     gesehen.add(schluessel);
     return true;
   });
@@ -94,6 +108,24 @@ function main() {
   }
   const x = Math.round(ziel.f.x + ziel.f.width / 2);
   const y = Math.round(ziel.f.y + ziel.f.height / 2);
+
+  // Liegt etwas darueber? Eine Liste meldet auch Zeilen, die unter der
+  // unteren Leiste verschwinden - dann traefe der Tipp die Leiste (24.09.2026:
+  // "Beitraege →" bei y=865, die Leiste beginnt bei 778). Was im Baum spaeter
+  // kommt, die Mitte bedeckt und nicht im Ziel selbst liegt, liegt darueber.
+  // Bildlaufleisten zaehlen nicht, sie fangen keine Tipps. Ebenso Ebenen ueber
+  // den ganzen Bildschirm (z. B. die Huelle des schwebenden Zahnrads): sie
+  // reichen Tipps durch, sonst waere nichts darunter bedienbar.
+  const ganz = (g) => g.width >= app.width && g.height >= app.height;
+  const f = ziel.f;
+  const innen = (g) => g.x >= f.x && g.y >= f.y && g.x + g.width <= f.x + f.width && g.y + g.height <= f.y + f.height;
+  const drueber = alle
+    .slice(alle.indexOf(ziel) + 1)
+    .find((e) => e.typ !== 'Slider' && !ganz(e.f) && !innen(e.f) && x >= e.f.x && x <= e.f.x + e.f.width && y >= e.f.y && y <= e.f.y + e.f.height);
+  if (drueber) {
+    console.error(`"${ziel.text}" ist verdeckt von "${drueber.text}" [${drueber.typ} ${JSON.stringify(drueber.f)}]. Erst wischen (--runter / --hoch). Nicht getippt.`);
+    process.exit(1);
+  }
   // Kein `axe tap`: dessen Tipp dauert 0 ms, und im Kurzformat kam so kein
   // einziger an (auch nicht in der Leiste oben). Ein Finger liegt etwa eine
   // Zehntelsekunde auf - mit dieser Haltezeit reagiert jeder Knopf.

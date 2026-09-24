@@ -3206,6 +3206,11 @@ button.exp__head:hover { color: var(--brand); }
   text-transform: uppercase;
   color: var(--text-3);
 }
+/* Einstellungen: die Ueberschrift mit Pfeil oeffnet den Abschnitt als eigene Seite. */
+.listhead--knopf {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 0; font-family: inherit;
+}
 
 /*
  * Nachricht mit Profilbild links.

@@ -66,6 +66,7 @@
     "mac:bilder": "node tools/app-bilder.js",
     "mac:tippen": "node tools/tippen.js",
     "test:glocke": "node test/_glocke.js",
+    "test:pfeile": "node test/_pfeile.js",
     "test:profil": "node test/_profil.js",
     "test:community": "node test/_community.js",
     "test:chatoptionen": "node test/_chatoptionen.js",

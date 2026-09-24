@@ -627,6 +627,15 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   };
 
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
+  /*
+   * Ein einzelner Abschnitt als eigene Seite - das Ziel der Ueberschrift mit
+   * Pfeil. Bis zum 24.09.2026 stand "Konto →" usw. als reiner Text da; Henrik
+   * am 21.09.: "Ueberall, wo eine Ueberschrift mit Pfeil steht, muss sie auf
+   * die volle Uebersicht fuehren." Gleiche Seite in web/public/app.js
+   * (state.settingsNur).
+   */
+  const [nurAbschnitt, setNurAbschnitt] = useState<string | null>(null);
+  const nur = SECTIONS.find((s) => s.id === nurAbschnitt) ?? null;
   const [banne, setBanne] = useState<
     { id: string; bereich: string; grund: string; von: string; laeuft: boolean }[]
   >([]);
@@ -734,6 +743,15 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         nehmen.
       */}
       <View style={[styles.head, { paddingTop: insets.top + spacing.sm }]}>
+        {nur ? (
+          <>
+            <Druck style={styles.back} onPress={() => setNurAbschnitt(null)} hitSlop={8} accessibilityLabel="Zurück zu allen Einstellungen">
+              <Ionicons name="chevron-back" size={24} color={colors.text} />
+            </Druck>
+            <Text style={styles.nurTitel} numberOfLines={1}>{nur.title}</Text>
+          </>
+        ) : (
+        <>
         {onBack && (
           <Druck style={styles.back} onPress={onBack} hitSlop={8}>
             <Ionicons name="chevron-back" size={24} color={colors.text} />
@@ -771,6 +789,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           style={styles.auslauf}
           pointerEvents="none"
         />
+        </>
+        )}
       </View>
 
       <ScrollView ref={scroll} contentContainerStyle={styles.content}>
@@ -778,6 +798,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           Der Kontowechsel gehoert nach ganz oben: Es ist die Einstellung, die
           das ganze uebrige Bild veraendert.
         */}
+        {!nur && (
+        <>
         <Druck style={styles.konto} onPress={onSwitchAccount}>
           <Avatar
             id={user?.profile.id ?? 'me'}
@@ -798,15 +820,30 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           <Ionicons name="people-outline" size={18} color={colors.brand} />
           <Text style={styles.wechselText}>Konto wechseln oder hinzufügen</Text>
         </Druck>
+        </>
+        )}
 
-        {SECTIONS.map((section) => (
+        {(nur ? [nur] : SECTIONS).map((section) => (
           <View
             key={section.id}
             onLayout={(e) => {
               offsets.current[section.id] = e.nativeEvent.layout.y;
             }}
           >
-            <Text style={styles.sectionHead}>{section.title} →</Text>
+            {nur ? (
+              <View style={styles.nurAbstand} />
+            ) : (
+              <Druck
+                onPress={() => {
+                  setNurAbschnitt(section.id);
+                  scroll.current?.scrollTo({ y: 0, animated: false });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${section.title}, alle anzeigen`}
+              >
+                <Text style={styles.sectionHead}>{section.title} →</Text>
+              </Druck>
+            )}
             <View style={styles.group}>
               {section.items.map((item) => (
                 <Druck
@@ -860,6 +897,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           </View>
         ))}
 
+        {!nur && (
         <View style={styles.group}>
           <View style={styles.item}>
             <Ionicons name="information-circle-outline" size={20} color={colors.text2} />
@@ -871,6 +909,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             <Text style={[styles.itemLabel, styles.danger]}>Abmelden</Text>
           </Druck>
         </View>
+        )}
       </ScrollView>
 
       {/*
@@ -1055,6 +1094,8 @@ const styles = themenStyles((colors) => ({
    */
   head: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm, position: 'relative' },
   back: { paddingLeft: spacing.lg, paddingRight: spacing.xs },
+  nurTitel: { flex: 1, ...typography.h3, fontSize: 17, color: colors.text, paddingLeft: spacing.sm },
+  nurAbstand: { height: spacing.md },
   pillsBox: { flex: 1 },
   pills: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   /* Steht der Pfeil davor, braucht die erste Pille links keinen eigenen

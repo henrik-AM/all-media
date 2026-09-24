@@ -1002,6 +1002,7 @@ function verlasseExplorer() {
    * Einstellungen beim naechsten Oeffnen wieder beim Messenger anfangen.
    */
   state.settingsSprung = null;
+  state.settingsNur = null;
   state.commProfilView = null;
   state.sammlung = null;
   /*
@@ -6509,6 +6510,15 @@ function openEinstellung(punkt, nachher) {
 
 function renderSettings() {
   /*
+   * Ein einzelner Abschnitt als eigene Seite - das Ziel der Ueberschrift mit
+   * Pfeil. Bis zum 24.09.2026 war "Konto →" usw. ein totes <div>; Henrik am
+   * 21.09.: "Ueberall, wo eine Ueberschrift mit Pfeil steht, muss sie auf die
+   * volle Uebersicht fuehren." Gleiche Seite in der App (nurAbschnitt in
+   * SettingsScreen.tsx).
+   */
+  const nur = SETTINGS.find((sec) => sec.id === state.settingsNur) || null;
+  if (state.settingsNur && !nur) state.settingsNur = null;
+  /*
    * Bann-Verlauf und Sichtbarkeit nachladen. Beides steckt nicht im
    * bootstrap-Aufruf der Startseite — es wird nur hier gebraucht, und der
    * Start soll davon nicht langsamer werden.
@@ -6600,9 +6610,17 @@ function renderSettings() {
   main.innerHTML = `
     <div class="pagehead">
       ${
+        nur
+          ? `<div class="pagehead__row">
+              <button class="iconbtn" id="settingsNurBack" aria-label="Zurück zu allen Einstellungen">${ICONS.back}</button>
+              <h2 class="pagehead__title">${esc(nur.title)}</h2>
+            </div>`
+          : ''
+      }
+      ${
         // Nur wenn man aus einem Profil kam - wer die Einstellungen ueber die
         // untere Leiste oeffnet, hat kein "zurueck".
-        state.settingsAus
+        !nur && state.settingsAus
           ? `<div class="pagehead__row">
               <button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
               <h2 class="pagehead__title">Einstellungen</h2>
@@ -6610,6 +6628,7 @@ function renderSettings() {
           : ''
       }
       ${(() => {
+        if (nur) return '';
         // Der Kopf zeigt das angemeldete Konto. Ohne Anmeldung kommt man gar
         // nicht bis hierher - dann steht der Willkommensbildschirm da.
         const ich = state.users?.me || {};
@@ -6633,16 +6652,24 @@ function renderSettings() {
           ${ICONS.people}<span>Konto wechseln oder hinzufügen</span>
         </button>`;
       })()}
-      <div class="pills">
+      ${
+        nur
+          ? ''
+          : `<div class="pills">
         ${SETTINGS.map((sec) => `<button class="pill" data-jump="${sec.id}">${esc(sec.title)}</button>`).join('')}
-      </div>
+      </div>`
+      }
     </div>
     <div class="scroll" id="settingsScroll">
-      ${SETTINGS.map(
-        (sec) => `<div class="listhead" id="sec-${sec.id}">${esc(sec.title)} →</div>
+      ${(nur ? [nur] : SETTINGS).map(
+        (sec) => `${
+          nur
+            ? ''
+            : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} →</button>`
+        }
           <div class="group">${sec.items.map((it) => itemHtml(it, sec.id)).join('')}</div>`
       ).join('')}
-      <div class="group">
+      ${nur ? '' : `<div class="group">
         <button class="item" data-setting="Über All Media">
           <span class="item__icon">${ICONS.info}</span>
           <span class="item__label">Über All Media</span>
@@ -6652,8 +6679,22 @@ function renderSettings() {
           <span class="item__icon">${ICONS.logout}</span>
           <span class="item__label">Abmelden</span>
         </button>
-      </div>
+      </div>`}
     </div>`;
+
+  main.querySelectorAll('[data-settingsnur]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.settingsNur = b.dataset.settingsnur;
+      renderSettings();
+      $('#settingsScroll')?.scrollTo(0, 0);
+    })
+  );
+  $('#settingsNurBack')?.addEventListener('click', () => {
+    const abschnitt = state.settingsNur;
+    state.settingsNur = null;
+    renderSettings();
+    document.getElementById('sec-' + abschnitt)?.scrollIntoView({ block: 'start' });
+  });
 
   $('#kontoKopf')?.addEventListener('click', openKontoWechsel);
   $('#kontoWechselBtn')?.addEventListener('click', openKontoWechsel);

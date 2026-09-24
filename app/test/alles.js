@@ -158,6 +158,8 @@ const LAEUFE = [
   // Drei-Punkte-Menue und "Kein Interesse" (Henrik, 21.09.2026).
   ['optionen', '_optionen.js'],
   ['glocke', '_glocke.js'],
+  // Jede Ueberschrift mit Pfeil fuehrt auf die volle Uebersicht (Kasten 2).
+  ['pfeile', '_pfeile.js'],
   ['profil', '_profil.js'],
   ['community', '_community.js'],
   ['chatoptionen', '_chatoptionen.js'],

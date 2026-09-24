@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
+import { EmptyState } from '../../components/EmptyState';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { OwnProfileHead } from '../../components/OwnProfileHead';
@@ -39,6 +40,13 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
    */
   const created = communities.filter((c) => c.eigen);
   const joined = communities.filter((c) => c.joined && !c.eigen);
+  /*
+   * Die Seite hinter "Erstellt →" bzw. "Beigetreten →". Bis zum 24.09.2026
+   * gab die Ueberschrift nur einen Hinweis aus - Henrik am 21.09.: "Ueberall,
+   * wo eine Ueberschrift mit Pfeil steht, muss sie auf die volle Uebersicht
+   * fuehren." Die Website hatte die Seite schon (renderCommunityListe).
+   */
+  const [ansicht, setAnsicht] = useState<'erstellt' | 'beigetreten' | null>(null);
 
   const list = (items: Community[]) =>
     items.map((c) => (
@@ -64,6 +72,37 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
     return <View style={styles.screen}><SwitchBar onPress={() => onSwitchArea('messenger')} /></View>;
   }
 
+  if (ansicht) {
+    const erstellt = ansicht === 'erstellt';
+    const liste = erstellt ? created : joined;
+    return (
+      <View style={styles.screen}>
+        <SwitchBar onPress={() => onSwitchArea('messenger')} />
+        <View style={styles.bar}>
+          <Druck onPress={() => setAnsicht(null)} hitSlop={10} accessibilityLabel="Zurück zum Profil">
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </Druck>
+          <Text style={styles.barTitel} numberOfLines={1}>
+            {erstellt ? 'Erstellte Communitys' : 'Beigetretene Communitys'}
+          </Text>
+        </View>
+        {liste.length ? (
+          <ScrollView contentContainerStyle={styles.content}>{list(liste)}</ScrollView>
+        ) : (
+          <EmptyState
+            icon="people-outline"
+            title={erstellt ? 'Noch nichts erstellt' : 'Noch nichts beigetreten'}
+            text={
+              erstellt
+                ? 'Über das Plus oben rechts legst du eine eigene Community an.'
+                : 'Unter „Suchen" findest du Communitys zum Beitreten.'
+            }
+          />
+        )}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <SwitchBar onPress={() => onSwitchArea('messenger')} />
@@ -87,13 +126,13 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
         />
 
         {created.length > 0 && (
-          <Druck style={styles.sectionHeadPress} onPress={() => onNotice('Erstellte Communitys')}>
+          <Druck style={styles.sectionHeadPress} onPress={() => setAnsicht('erstellt')} accessibilityRole="button" accessibilityLabel="Erstellt, alle anzeigen">
             <Text style={styles.sectionHead}>Erstellt →</Text>
           </Druck>
         )}
         {list(created)}
         {joined.length > 0 && (
-          <Druck style={styles.sectionHeadPress} onPress={() => onNotice('Beigetretene Communitys')}>
+          <Druck style={styles.sectionHeadPress} onPress={() => setAnsicht('beigetreten')} accessibilityRole="button" accessibilityLabel="Beigetreten, alle anzeigen">
             <Text style={styles.sectionHead}>Beigetreten →</Text>
           </Druck>
         )}
@@ -106,6 +145,16 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
 const styles = themenStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { paddingBottom: spacing.xl },
+  bar: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  barTitel: { flex: 1, ...typography.h3, fontSize: 17, color: colors.text },
   sectionHeadPress: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
