@@ -111,17 +111,19 @@ export const RegistrierFelder = ({ konto, aendern, variante, gesperrt, ohneTelef
       {einordnung?.stufe === 'eltern' &&
         feld(
           'people-outline',
-          'Benutzername deines Elternteils',
+          'Telefonnummer deines Elternteils',
+          // Nie über den @-Namen (Henrik 26.09.2026, Schema 58): Eltern und
+          // Kinder haben ohnehin die Nummer des anderen.
           <TextInput
             style={eingabeStil}
             value={konto.eltern || ''}
             onChangeText={(eltern) => aendern({ eltern })}
-            placeholder={variante === 'anmeldung' ? 'Benutzername deines Elternteils' : '@elternteil'}
+            placeholder={variante === 'anmeldung' ? 'Telefonnummer deines Elternteils' : '0151 2345678'}
             placeholderTextColor={colors.text3}
-            autoCapitalize="none"
+            keyboardType="phone-pad"
             autoCorrect={false}
             editable={!gesperrt}
-            accessibilityLabel="Benutzername deines Elternteils"
+            accessibilityLabel="Telefonnummer deines Elternteils"
           />,
           { text: 'Bis dein Elternteil zustimmt, bleibt dein Konto gesperrt.', gut: true }
         )}

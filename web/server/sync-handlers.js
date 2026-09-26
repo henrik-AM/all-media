@@ -1867,12 +1867,14 @@ const handleSichtbarkeitAusnahme = handler(
 // ------------------------------------------------------- Altersschutz --
 //
 //  Unter 16 nur mit Zustimmung eines Erziehungsberechtigten, und der muss
-//  selbst einen All-Media-Account besitzen. Deshalb ein Nutzername und keine
-//  E-Mail-Adresse — eine Adresse kann jeder erfinden.
+//  selbst einen All-Media-Account besitzen. Deshalb ein vorhandenes Konto und
+//  keine E-Mail-Adresse — eine Adresse kann jeder erfinden. Gefunden wird es
+//  über die Telefonnummer, nie über den @-Namen (Henrik 26.09.2026). Gleiche
+//  Stelle: altersangabe() in app/lib/aktionen.ts.
 
 const handleAltersangabe = handler(
   'Altersangabe',
-  async (client, nutzerId, geburtsdatum, guardianHandle) => {
+  async (client, nutzerId, geburtsdatum, guardianNummer) => {
     const geboren = new Date(geburtsdatum);
     if (Number.isNaN(geboren.getTime())) {
       return { ok: false, fehler: 'Das Geburtsdatum ist ungültig' };
@@ -1891,19 +1893,19 @@ const handleAltersangabe = handler(
     let guardianId = null;
 
     if (brauchtFreigabe) {
-      if (!guardianHandle) {
+      if (!guardianNummer) {
         return {
           ok: false,
           fehler: 'Unter 16 braucht es einen Erziehungsberechtigten mit eigenem All-Media-Konto',
         };
       }
-      const { data, error } = await client
-        .from('profiles')
-        .select('id')
-        .eq('handle', String(guardianHandle).replace(/^@/, ''))
-        .maybeSingle();
+      if (/[a-zA-Z@]/.test(String(guardianNummer))) {
+        return { ok: false, fehler: 'Bitte die Telefonnummer eingeben, nicht den Benutzernamen' };
+      }
+      // finde_per_nummer lässt das eigene Konto aus und ist gebremst (Schema 38).
+      const { data, error } = await client.rpc('finde_per_nummer', { nummer: String(guardianNummer) });
       if (error) throw error;
-      if (!data) return { ok: false, fehler: 'Zu diesem Nutzernamen gibt es kein All-Media-Konto' };
+      if (!data) return { ok: false, fehler: 'Zu dieser Nummer gibt es kein anderes All-Media-Konto' };
       if (data.id === nutzerId) return { ok: false, fehler: 'Das eigene Konto geht nicht' };
       guardianId = data.id;
     }

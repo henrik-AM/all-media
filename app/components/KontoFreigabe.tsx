@@ -108,7 +108,7 @@ const Wartebildschirm = ({ stand, pruefen }: { stand: Kontostand; pruefen: () =>
     : abgelehnt
     ? `${stand.eltern ?? 'Dein Elternteil'} hat dein Konto nicht bestätigt. Du kannst einen anderen Elternteil fragen.`
     : ohneEltern
-    ? `In ${stand.land ?? 'deinem Land'} brauchst du unter ${stand.mindestalter} Jahren die Zustimmung eines Elternteils. Gib seinen All-Media-Benutzernamen ein.`
+    ? `In ${stand.land ?? 'deinem Land'} brauchst du unter ${stand.mindestalter} Jahren die Zustimmung eines Elternteils. Gib die Telefonnummer ein, mit der dein Elternteil bei All Media ist.`
     : `${stand.eltern} muss dein Konto bestätigen. Dafür öffnet dein Elternteil All Media im eigenen Konto — die Anfrage erscheint dort von selbst.`;
 
   const absenden = async () => {
@@ -144,14 +144,14 @@ const Wartebildschirm = ({ stand, pruefen }: { stand: Kontostand; pruefen: () =>
               style={styles.input}
               value={eingabe}
               onChangeText={(t) => setEingabe(ohneDatum ? datumTippen(t) : t)}
-              placeholder={ohneDatum ? 'Geburtsdatum (TT.MM.JJJJ)' : 'Benutzername deines Elternteils'}
+              placeholder={ohneDatum ? 'Geburtsdatum (TT.MM.JJJJ)' : 'Telefonnummer deines Elternteils'}
               placeholderTextColor={colors.text3}
-              keyboardType={ohneDatum ? 'number-pad' : 'default'}
-              maxLength={ohneDatum ? 10 : 40}
+              keyboardType={ohneDatum ? 'number-pad' : 'phone-pad'}
+              maxLength={ohneDatum ? 10 : 24}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!arbeitet}
-              accessibilityLabel={ohneDatum ? 'Geburtsdatum' : 'Benutzername deines Elternteils'}
+              accessibilityLabel={ohneDatum ? 'Geburtsdatum' : 'Telefonnummer deines Elternteils'}
             />
           </View>
         )}
@@ -230,6 +230,7 @@ const Elternfrage = () => {
             {kind.name} ({kind.handle}, {kind.alter} Jahre) hat dich als Elternteil angegeben. In {kind.land} braucht
             ein Konto unter {kind.mindestalter} Jahren die Zustimmung eines Elternteils.
           </Text>
+          {kind.telefon ? <Text style={styles.klein}>Telefonnummer des Kontos: {kind.telefon}</Text> : null}
           <Text style={styles.klein}>
             Stimmst du zu, kann {kind.handle} All Media nutzen. Lehnst du ab, bleibt das Konto gesperrt.
           </Text>

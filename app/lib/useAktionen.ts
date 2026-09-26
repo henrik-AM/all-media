@@ -216,7 +216,7 @@ export interface Aktionen {
 
   altersangabe: (
     geburtsdatum: string,
-    guardianHandle?: string
+    guardianNummer?: string
   ) => Promise<{ alter: number; brauchtFreigabe: boolean; guardian: string | null } | null>;
   freigabeEntscheiden: (kindId: string, zustimmen: boolean, zurueck: Rueckweg) => Promise<void>;
 
@@ -529,8 +529,8 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         schreiben('Die Einstellung', (c, i) => A.storyInVideosSetzen(c, i, an), zurueck),
 
       // ---------------------------------------------------- Altersschutz --
-      altersangabe: (geburtsdatum, guardianHandle) =>
-        holen('Die Altersangabe', (c, i) => A.altersangabe(c, i, geburtsdatum, guardianHandle)),
+      altersangabe: (geburtsdatum, guardianNummer) =>
+        holen('Die Altersangabe', (c, i) => A.altersangabe(c, i, geburtsdatum, guardianNummer)),
       freigabeEntscheiden: (kindId, zustimmen, zurueck) =>
         schreiben(
           'Die Entscheidung',

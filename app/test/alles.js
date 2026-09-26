@@ -189,6 +189,8 @@ const LAEUFE = [
   ['rechte', '_rechte.js'],
   // Geburtsdatum und Zustimmung der Eltern (Schema 52); braucht SUPABASE_TOKEN wie rechte.
   ['minderjaehrig', '_minderjaehrig.js'],
+  // Dasselbe auf der Website: der Elternteil kommt über die Nummer (Schema 58).
+  ['elternnummer', '_eltern_nummer.js'],
   ['bremse', '_bremse.js'],
   ['auth', '_auth.js'],
 ];

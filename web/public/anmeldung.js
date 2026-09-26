@@ -277,15 +277,22 @@
       return { ok: false, fehler: window.Alter.hinweis(einordnung), feld: 'geburtsdatum' };
     }
 
-    const elternName = window.Benutzername.normal(eltern || '');
+    // Den Elternteil über seine Nummer, nie über den @-Namen (Henrik
+    // 26.09.2026, Schema 58). Gleiche Reihenfolge in app/lib/registrierung.ts.
+    const elternNummer = window.Telefon.speicherform(eltern || '');
     if (einordnung.stufe === 'eltern') {
-      if (!elternName) return { ok: false, fehler: 'Bitte den Benutzernamen deines Elternteils eingeben', feld: 'eltern' };
-      if (elternName === window.Benutzername.normal(benutzername)) {
-        return { ok: false, fehler: 'Das ist dein eigener Benutzername', feld: 'eltern' };
+      if (!elternNummer) return { ok: false, fehler: 'Bitte die Telefonnummer deines Elternteils eingeben', feld: 'eltern' };
+      if (/[a-zA-Z@]/.test(elternNummer)) {
+        return { ok: false, fehler: 'Bitte die Telefonnummer deines Elternteils eingeben, nicht den Benutzernamen', feld: 'eltern' };
       }
-      // Den Elternteil gibt es, wenn sein Name „vergeben" ist.
-      const e = await benutzernameFrei(elternName);
-      if (e.frei === true) return { ok: false, fehler: `@${elternName} gibt es bei All Media nicht`, feld: 'eltern' };
+      const elternForm = window.Telefon.pruefe(elternNummer);
+      if (elternForm) return { ok: false, fehler: `${elternForm} (Nummer deines Elternteils)`, feld: 'eltern' };
+      if (window.Telefon.vergleichsform(elternNummer) === window.Telefon.vergleichsform(nummer)) {
+        return { ok: false, fehler: 'Das ist deine eigene Nummer', feld: 'eltern' };
+      }
+      // Den Elternteil gibt es, wenn seine Nummer „vergeben" ist.
+      const e = await nummerFrei(elternNummer);
+      if (e.frei === true) return { ok: false, fehler: 'Zu dieser Nummer gibt es bei All Media kein Konto', feld: 'eltern' };
     }
 
     /*
@@ -307,7 +314,7 @@
           phone: nummer,
           // alter_bei_anmeldung liest beides (Schema 52).
           geburtsdatum: einordnung.iso,
-          ...(einordnung.stufe === 'eltern' ? { eltern: elternName } : {}),
+          ...(einordnung.stufe === 'eltern' ? { eltern: elternNummer } : {}),
         },
       },
     });
@@ -360,7 +367,7 @@
 
   const kontostand = () => rpc('mein_kontostand', {}, null);
   const elternAnfragen = (eltern) =>
-    rpc('eltern_anfragen', { p_eltern: window.Benutzername.normal(eltern) },
+    rpc('eltern_anfragen', { p_eltern: window.Telefon.speicherform(eltern) },
       { ok: false, meldung: 'Die Anfrage ist gerade nicht möglich.' });
   const geburtsdatumNachtragen = (datum) =>
     rpc('geburtsdatum_nachtragen', { p_datum: window.Alter.lesen(datum), p_eltern: null },

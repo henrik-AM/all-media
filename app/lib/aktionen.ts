@@ -2204,14 +2204,18 @@ export function sichtbarkeitAusnahme(
  *
  * Das Handbuch: unter 16 nur mit Zustimmung eines Erziehungsberechtigten,
  * und der muss selbst einen All-Media-Account besitzen. Genau deshalb wird
- * hier eine Profil-Kennung verlangt und keine E-Mail-Adresse — eine Adresse
- * kann jeder erfinden.
+ * hier ein vorhandenes Konto verlangt und keine E-Mail-Adresse — eine
+ * Adresse kann jeder erfinden.
+ *
+ * Gefunden wird es über die Telefonnummer, nie über den @-Namen (Henrik
+ * 26.09.2026). Bis dahin suchte diese Stelle den Namen ohne „@", gespeichert
+ * sind alle mit — sie fand nie jemanden.
  */
 export async function altersangabe(
   client: SupabaseClient,
   ichId: string,
   geburtsdatum: string,
-  guardianHandle?: string
+  guardianNummer?: string
 ): Promise<{ alter: number; brauchtFreigabe: boolean; guardian: string | null }> {
   const geboren = new Date(geburtsdatum);
   if (Number.isNaN(geboren.getTime())) throw new Error('Das Geburtsdatum ist ungültig');
@@ -2227,18 +2231,18 @@ export async function altersangabe(
   let guardianId: string | null = null;
 
   if (brauchtFreigabe) {
-    if (!guardianHandle) {
+    if (!guardianNummer) {
       throw new Error(
         'Unter 16 braucht es einen Erziehungsberechtigten mit eigenem All-Media-Konto'
       );
     }
-    const { data, error } = await client
-      .from('profiles')
-      .select('id')
-      .eq('handle', guardianHandle.replace(/^@/, ''))
-      .maybeSingle();
+    if (/[a-zA-Z@]/.test(guardianNummer)) {
+      throw new Error('Bitte die Telefonnummer eingeben, nicht den Benutzernamen');
+    }
+    // finde_per_nummer lässt das eigene Konto aus und ist gebremst (Schema 38).
+    const { data, error } = await client.rpc('finde_per_nummer', { nummer: guardianNummer });
     if (error) throw error;
-    if (!data) throw new Error('Zu diesem Nutzernamen gibt es kein All-Media-Konto');
+    if (!data) throw new Error('Zu dieser Nummer gibt es kein anderes All-Media-Konto');
     guardianId = (data as { id: string }).id;
     if (guardianId === ichId) throw new Error('Das eigene Konto geht nicht');
   }

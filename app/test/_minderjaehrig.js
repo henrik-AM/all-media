@@ -26,6 +26,11 @@
  * gäbe. Deshalb liest dasselbe Kind nach der Zustimmung noch einmal — erst
  * dann ist die leere Liste vorher ein Beweis.
  *
+ * DER ELTERNTEIL KOMMT ÜBER DIE NUMMER
+ *
+ * Seit Schema 58 (Henrik 26.09.2026): nie über den @-Namen, immer über die
+ * Telefonnummer. Geprüft wird deshalb auch, dass der @-Name nicht mehr reicht.
+ *
  * Start:  SUPABASE_TOKEN=… node test/_minderjaehrig.js
  */
 
@@ -34,6 +39,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { frage } = require('./_aufraeumen');
 const Alter = require('../../gemeinsam/alter');
+const Telefon = require('../../gemeinsam/telefon');
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -150,17 +156,20 @@ function geborenVor(jahre) {
 
     const eltern = await anmelden(ELTERN);
     const fremder = await anmelden(FREMDER);
-    const [{ handle: elternHandle }] = await frage(`select handle from public.profiles where id = ${sql(eltern.id)}`);
+    const [{ handle: elternHandle, phone: elternNummer }] = await frage(`select handle, phone from public.profiles where id = ${sql(eltern.id)}`);
+    // Dieselbe Nummer, wie man sie zu Hause eintippt: „0151 …" statt „+49 151 …".
+    const elternNational = '0' + Telefon.vergleichsform(elternNummer).replace(/^49/, '');
 
-    console.log('\nEin Kind aus Deutschland, zwölf Jahre, mit Elternteil ' + elternHandle);
+    console.log('\nEin Kind aus Deutschland, zwölf Jahre, mit der Nummer seines Elternteils ' + elternHandle);
 
     const kindHandle = 'pruefkind' + KENNUNG;
+    const kindNummer = nummer('49', 1);
     const kind = await kontoAnlegen('de', {
       handle: kindHandle,
       name: 'Prüfkind',
-      phone: nummer('49', 1),
+      phone: kindNummer,
       geburtsdatum: geborenVor(12),
-      eltern: elternHandle,
+      eltern: elternNational,
     });
     pruefe('das Konto entsteht', Boolean(kind.id), kind.fehler);
 
@@ -207,6 +216,7 @@ function geborenVor(jahre) {
     const anfrage = (offen || []).find((a) => a.kind === k.id);
     pruefe('der Elternteil sieht die Anfrage', Boolean(anfrage), JSON.stringify(offen));
     pruefe('… mit Benutzername und Alter', anfrage?.handle === '@' + kindHandle && anfrage?.alter === 12);
+    pruefe('… und der Nummer des Kindes', anfrage?.telefon === kindNummer, anfrage?.telefon);
 
     const { data: ja } = await eltern.client.rpc('einwilligung_entscheiden', { p_kind: k.id, p_zustimmen: true });
     pruefe('der Elternteil stimmt zu', ja?.ok === true && ja?.stand === 'frei', JSON.stringify(ja));
@@ -222,30 +232,41 @@ function geborenVor(jahre) {
 
     console.log('\nAbgelehnt, dann ein anderer Elternteil');
 
+    const kind2Nummer = nummer('43', 2);
     const kind2 = await kontoAnlegen('at', {
       handle: 'pruefkindat' + KENNUNG,
       name: 'Prüfkind AT',
-      phone: nummer('43', 2),
+      phone: kind2Nummer,
       geburtsdatum: geborenVor(13),
-      eltern: elternHandle,
+      eltern: elternNummer,
     });
     const k2 = await anmelden({ email: MAIL('at'), passwort: PASSWORT });
     const { data: nein } = await eltern.client.rpc('einwilligung_entscheiden', { p_kind: kind2.id, p_zustimmen: false });
     const { data: stand2 } = await k2.client.rpc('mein_kontostand');
     pruefe('abgelehnt bleibt gesperrt', nein?.ok === true && stand2?.stand === 'abgelehnt', JSON.stringify(stand2));
 
-    const { data: sichSelbst } = await k2.client.rpc('eltern_anfragen', { p_eltern: 'pruefkindat' + KENNUNG });
-    pruefe('sich selbst als Elternteil eintragen geht nicht', sichSelbst?.ok === false);
+    const { data: sichSelbst } = await k2.client.rpc('eltern_anfragen', { p_eltern: kind2Nummer });
+    pruefe('sich selbst als Elternteil eintragen geht nicht', sichSelbst?.ok === false, sichSelbst?.meldung);
 
-    const { data: minderjaehrigerElternteil } = await k2.client.rpc('eltern_anfragen', { p_eltern: kindHandle });
+    const { data: minderjaehrigerElternteil } = await k2.client.rpc('eltern_anfragen', { p_eltern: kindNummer });
     pruefe(
       'ein zwölfjähriges Konto kann nicht zustimmen, auch wenn es freigegeben ist',
       minderjaehrigerElternteil?.ok === false,
       JSON.stringify(minderjaehrigerElternteil)
     );
 
-    const [{ handle: fremderHandle }] = await frage(`select handle from public.profiles where id = ${sql(fremder.id)}`);
-    const { data: neuAngefragt } = await k2.client.rpc('eltern_anfragen', { p_eltern: fremderHandle });
+    const [{ handle: fremderHandle, phone: fremderNummer }] = await frage(`select handle, phone from public.profiles where id = ${sql(fremder.id)}`);
+    const { data: perName } = await k2.client.rpc('eltern_anfragen', { p_eltern: fremderHandle });
+    const { data: standPerName } = await k2.client.rpc('mein_kontostand');
+    pruefe(
+      'über den @-Namen lässt sich kein Elternteil anfragen',
+      perName?.ok === false && /Telefonnummer/.test(perName?.meldung || '') && standPerName?.stand === 'abgelehnt',
+      JSON.stringify(perName)
+    );
+    const { data: unbekannt } = await k2.client.rpc('eltern_anfragen', { p_eltern: '+49 1' + String(Date.now()).slice(-9) });
+    pruefe('eine Nummer ohne Konto wird genannt', unbekannt?.meldung === 'Zu dieser Nummer gibt es bei All Media kein Konto.', unbekannt?.meldung);
+
+    const { data: neuAngefragt } = await k2.client.rpc('eltern_anfragen', { p_eltern: fremderNummer });
     const { data: stand2b } = await k2.client.rpc('mein_kontostand');
     pruefe('ein anderer Elternteil lässt sich anfragen', neuAngefragt?.ok === true && stand2b?.stand === 'wartet' && stand2b?.eltern === fremderHandle, JSON.stringify(stand2b));
 
@@ -258,7 +279,7 @@ function geborenVor(jahre) {
       handle: 'pruefkindau' + KENNUNG,
       phone: nummer('61', 3),
       geburtsdatum: geborenVor(14),
-      eltern: elternHandle,
+      eltern: elternNummer,
     });
     pruefe('Australien unter 16: das Konto entsteht gar nicht', !australien.id, (australien.fehler || '').slice(0, 90));
 

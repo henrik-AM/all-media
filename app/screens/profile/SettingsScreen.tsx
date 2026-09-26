@@ -123,8 +123,9 @@ const SECTIONS: Section[] = [
            * Erziehungsberechtigten, "der einen All Media Account besitzen"
            * muss. Vorher stand hier ein Formular fuer Name und E-Mail, an
            * dem gar nichts hing — kein Geburtsdatum, keine Pruefung, keine
-           * Verknuepfung. Ein Nutzername laesst sich in der Datenbank
-           * nachschlagen, eine E-Mail-Adresse kann jeder erfinden.
+           * Verknuepfung. Eine Telefonnummer laesst sich in der Datenbank
+           * nachschlagen, eine E-Mail-Adresse kann jeder erfinden — und
+           * Eltern sucht man nie ueber den @-Namen (Henrik 26.09.2026).
            */
           {
             key: 'geburtsdatum',
@@ -134,8 +135,8 @@ const SECTIONS: Section[] = [
           },
           {
             key: 'guardian',
-            label: 'Nutzername des/der Erziehungsberechtigten (nur unter 16)',
-            platzhalter: '@nutzername',
+            label: 'Telefonnummer des/der Erziehungsberechtigten (nur unter 16)',
+            platzhalter: '0151 2345678',
           },
         ],
         aktion: 'alter',

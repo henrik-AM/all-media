@@ -591,7 +591,7 @@ function zeigeFreigabe(stand, anderer = false) {
     : abgelehnt
     ? `${stand.eltern || 'Dein Elternteil'} hat dein Konto nicht bestätigt. Du kannst einen anderen Elternteil fragen.`
     : ohneEltern
-    ? `In ${stand.land || 'deinem Land'} brauchst du unter ${stand.mindestalter} Jahren die Zustimmung eines Elternteils. Gib seinen All-Media-Benutzernamen ein.`
+    ? `In ${stand.land || 'deinem Land'} brauchst du unter ${stand.mindestalter} Jahren die Zustimmung eines Elternteils. Gib die Telefonnummer ein, mit der dein Elternteil bei All Media ist.`
     : `${stand.eltern} muss dein Konto bestätigen. Dafür öffnet dein Elternteil All Media im eigenen Konto — die Anfrage erscheint dort von selbst.`;
 
   ziel.innerHTML = `
@@ -602,8 +602,8 @@ function zeigeFreigabe(stand, anderer = false) {
       ${
         mitFeld
           ? `<input class="freigabe__feld" id="freigabeEingabe" autocapitalize="off"
-                    ${ohneDatum ? `type="date" max="${new Date().toISOString().slice(0, 10)}"` : 'placeholder="@elternteil"'}
-                    aria-label="${ohneDatum ? 'Geburtsdatum' : 'Benutzername deines Elternteils'}" />
+                    ${ohneDatum ? `type="date" max="${new Date().toISOString().slice(0, 10)}"` : 'type="tel" placeholder="Telefonnummer deines Elternteils"'}
+                    aria-label="${ohneDatum ? 'Geburtsdatum' : 'Telefonnummer deines Elternteils'}" />
              <div class="startfehler__grund is-fehler" id="freigabeMeldung" aria-live="polite"></div>
              <button class="btn btn--primary" id="freigabeOk">${ohneDatum ? 'Speichern' : 'Anfrage senden'}</button>`
           : `<button class="btn btn--primary" id="freigabePruefen">Erneut prüfen</button>
@@ -676,6 +676,7 @@ function elternfrageZeigen(kind) {
         Elternteil angegeben. In ${esc(kind.land || 'diesem Land')} braucht ein Konto unter
         ${esc(String(kind.mindestalter))} Jahren die Zustimmung eines Elternteils.
       </div>
+      ${kind.telefon ? `<div class="sheet__hint">Telefonnummer des Kontos: ${esc(kind.telefon)}</div>` : ''}
       <div class="sheet__hint">
         Stimmst du zu, kann ${esc(kind.handle)} All Media nutzen. Lehnst du ab, bleibt das Konto gesperrt.
       </div>
@@ -5365,12 +5366,13 @@ const SETTINGS = [
          * Erziehungsberechtigten, „der einen All Media Account besitzen"
          * muss. Vorher stand hier ein Formular für Name und E-Mail, an dem
          * gar nichts hing — kein Geburtsdatum, keine Prüfung, keine
-         * Verknüpfung. Ein Nutzername lässt sich in der Datenbank
-         * nachschlagen, eine E-Mail-Adresse kann jeder erfinden.
+         * Verknüpfung. Eine Telefonnummer lässt sich in der Datenbank
+         * nachschlagen, eine E-Mail-Adresse kann jeder erfinden — und
+         * Eltern sucht man nie über den @-Namen (Henrik 26.09.2026).
          */
         eingabe: [
           { key: 'geburtsdatum', label: 'Geburtsdatum', platzhalter: 'JJJJ-MM-TT, z. B. 2012-04-19', pflicht: true },
-          { key: 'guardian', label: 'Nutzername des/der Erziehungsberechtigten (nur unter 16)', platzhalter: '@nutzername' },
+          { key: 'guardian', label: 'Telefonnummer des/der Erziehungsberechtigten (nur unter 16)', platzhalter: '0151 2345678' },
         ],
         aktion: 'alter',
         fertig: 'Gespeichert',
@@ -8015,8 +8017,8 @@ function openKontoWechsel() {
       <div class="sheet__fussnote" id="kontoAlterHinweis" aria-live="polite"></div>
     </div>
     <div class="sheet__field" id="kontoElternFeld" hidden>
-      <label class="sheet__label" for="kontoEltern">Benutzername deines Elternteils</label>
-      <input id="kontoEltern" placeholder="@elternteil" value="${esc(zustand.eltern)}" autocapitalize="off" />
+      <label class="sheet__label" for="kontoEltern">Telefonnummer deines Elternteils</label>
+      <input id="kontoEltern" type="tel" placeholder="0151 2345678" value="${esc(zustand.eltern)}" autocomplete="off" />
       <div class="sheet__fussnote">Bis dein Elternteil zustimmt, bleibt dein Konto gesperrt.</div>
     </div>
     ${hinweis()}

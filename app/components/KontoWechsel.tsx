@@ -44,6 +44,9 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
   const leer: NeuesKonto = { handle: '', telefon: '', geburtsdatum: '', eltern: '' };
   const [neu, setNeu] = useState<NeuesKonto>(leer);
   const [arbeitet, setArbeitet] = useState(false);
+  // Fehler stehen im Blatt: onNotice zeigt den Toast des Hauptscreens, und
+  // der liegt hinter dem Modal (26.09.2026 im Simulator gesehen).
+  const [meldung, setMeldung] = useState('');
   const { supabase } = useSupabase();
 
   const schliessen = () => {
@@ -52,6 +55,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
     setPasswort('');
     setName('');
     setNeu(leer);
+    setMeldung('');
     onClose();
   };
 
@@ -76,15 +80,16 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
   };
 
   const anmelden = async () => {
-    if (!email.trim()) return onNotice('Bitte E-Mail eingeben');
-    if (!passwort.trim()) return onNotice('Bitte Passwort eingeben');
+    if (!email.trim()) return setMeldung('Bitte E-Mail eingeben');
+    if (!passwort.trim()) return setMeldung('Bitte Passwort eingeben');
+    setMeldung('');
     try {
       await kontoHinzufuegen(email.trim(), passwort);
       onNotice(`Angemeldet als ${email.trim()}`);
       schliessen();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Anmeldung fehlgeschlagen';
-      onNotice(msg);
+      setMeldung(msg);
     }
   };
 
@@ -102,29 +107,30 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
   };
 
   const neuErstellen = async () => {
-    if (!name.trim()) return onNotice('Bitte einen Namen eingeben');
-    if (!email.trim()) return onNotice('Bitte E-Mail eingeben');
+    if (!name.trim()) return setMeldung('Bitte einen Namen eingeben');
+    if (!email.trim()) return setMeldung('Bitte E-Mail eingeben');
     // Die Regel steht in gemeinsam/passwort.js — dieselbe, die Supabase
     // durchsetzt. Sechs Zeichen hier durchzulassen hiess bisher, den
     // englischen Fehler von Supabase als Systemmeldung zu bekommen.
     const schwach = passwortPruefen(passwort);
-    if (schwach) return onNotice(schwach);
+    if (schwach) return setMeldung(schwach);
     /*
      * Bis zum 22.09.2026 entstand hier ein Konto ohne Telefonnummer, mit
      * einem aus dem Namen geratenen Benutzernamen und ohne Alter. Jetzt
      * dieselben Pflichtfelder wie im Anmeldebildschirm — lib/registrierung.ts.
      */
+    setMeldung('');
     const konto: NeuesKonto = { ...neu, name: name.trim() };
     setArbeitet(true);
     try {
       const grund = await neuesKontoPruefen(supabase, konto);
-      if (grund) return onNotice(grund);
+      if (grund) return setMeldung(grund);
       await kontoHinzufuegen(email.trim(), passwort, konto);
       onNotice(`Konto für ${name.trim()} erstellt`);
       schliessen();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Kontenerstellung fehlgeschlagen';
-      onNotice(msg);
+      setMeldung(msg);
     } finally {
       setArbeitet(false);
     }
@@ -143,7 +149,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
 
           <View style={styles.head}>
             {ansicht !== 'liste' && (
-              <Druck onPress={() => setAnsicht('liste')} hitSlop={8} style={styles.back}>
+              <Druck onPress={() => { setAnsicht('liste'); setMeldung(''); }} hitSlop={8} style={styles.back}>
                 <Ionicons name="arrow-back" size={20} color={colors.text} />
               </Druck>
             )}
@@ -274,6 +280,12 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                 {ansicht === 'neu' && <Text style={styles.hinweis}>{PASSWORT_REGEL}.</Text>}
               </View>
 
+              {meldung ? (
+                <Text style={styles.fehler} accessibilityLiveRegion="polite">
+                  {meldung}
+                </Text>
+              ) : null}
+
               <View style={styles.footer}>
                 <Druck
                   style={[styles.button, arbeitet && { opacity: 0.6 }]}
@@ -353,6 +365,7 @@ const styles = themenStyles((colors) => ({
   feld: { paddingTop: spacing.md, paddingHorizontal: spacing.lg },
   label: { color: colors.text2, marginBottom: 6, ...typography.small },
   hinweis: { color: colors.text3, marginTop: 6, ...typography.small },
+  fehler: { color: colors.danger, textAlign: 'center', marginTop: spacing.sm, ...typography.small },
   input: {
     height: 44,
     paddingHorizontal: 14,

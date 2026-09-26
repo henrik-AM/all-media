@@ -124,10 +124,14 @@ export async function neuesKontoPruefen(
   const einordnung = Alter.einordnen(konto.geburtsdatum, konto.telefon);
   if (einordnung.stufe === 'verboten') return Alter.hinweis(einordnung);
 
-  const eltern = Benutzername.normal(konto.eltern || '');
+  // Den Elternteil über seine Nummer, nie über den @-Namen (Schema 58).
+  const eltern = Telefon.speicherform(konto.eltern || '');
   if (einordnung.stufe === 'eltern') {
-    if (!eltern) return 'Bitte den Benutzernamen deines Elternteils eingeben';
-    if (eltern === Benutzername.normal(konto.handle)) return 'Das ist dein eigener Benutzername';
+    if (!eltern) return 'Bitte die Telefonnummer deines Elternteils eingeben';
+    if (/[a-zA-Z@]/.test(eltern)) return 'Bitte die Telefonnummer deines Elternteils eingeben, nicht den Benutzernamen';
+    const elternForm = Telefon.pruefe(eltern);
+    if (elternForm) return `${elternForm} (Nummer deines Elternteils)`;
+    if (Telefon.vergleichsform(eltern) === Telefon.vergleichsform(konto.telefon)) return 'Das ist deine eigene Nummer';
   }
 
   if (!supabase) return null;
@@ -140,11 +144,11 @@ export async function neuesKontoPruefen(
   const { data: nummer } = await supabase.rpc('nummer_frei', { eingabe: Telefon.speicherform(konto.telefon) });
   if (nummer && nummer.frei === false) return nummer.meldung || 'Diese Telefonnummer gehört schon zu einem Konto.';
 
-  // Den Elternteil gibt es, wenn sein Name „vergeben" ist. Ob er zustimmen
-  // darf (volljährig, selbst freigegeben), entscheidet die Datenbank.
+  // Den Elternteil gibt es, wenn seine Nummer „vergeben" ist. Ob er
+  // zustimmen darf (volljährig, selbst freigegeben), entscheidet die Datenbank.
   if (einordnung.stufe === 'eltern') {
-    const { data: e } = await supabase.rpc('handle_frei', { eingabe: eltern });
-    if (e?.frei === true) return `@${eltern} gibt es bei All Media nicht`;
+    const { data: e } = await supabase.rpc('nummer_frei', { eingabe: eltern });
+    if (e?.frei === true) return 'Zu dieser Nummer gibt es bei All Media kein Konto';
   }
 
   return null;
@@ -159,7 +163,7 @@ export function metadatenFuer(konto: NeuesKonto): Record<string, string> {
     phone: Telefon.speicherform(konto.telefon),
     geburtsdatum: einordnung.iso,
   };
-  if (einordnung.stufe === 'eltern' && konto.eltern) daten.eltern = Benutzername.normal(konto.eltern);
+  if (einordnung.stufe === 'eltern' && konto.eltern) daten.eltern = Telefon.speicherform(konto.eltern);
   return daten;
 }
 
@@ -176,6 +180,7 @@ export interface Einwilligung {
   kind: string;
   handle: string;
   name: string;
+  telefon?: string | null;
   alter: number;
   land: string;
   mindestalter: number;
@@ -191,7 +196,7 @@ export async function kontostandLaden(supabase: SupabaseClient): Promise<Kontost
 }
 
 export async function elternAnfragen(supabase: SupabaseClient, eltern: string) {
-  const { data, error } = await supabase.rpc('eltern_anfragen', { p_eltern: Benutzername.normal(eltern) });
+  const { data, error } = await supabase.rpc('eltern_anfragen', { p_eltern: Telefon.speicherform(eltern) });
   if (error) return { ok: false, meldung: 'Die Anfrage ist gerade nicht möglich.' };
   return data as { ok: boolean; meldung?: string };
 }
@@ -199,7 +204,7 @@ export async function elternAnfragen(supabase: SupabaseClient, eltern: string) {
 export async function geburtsdatumNachtragen(supabase: SupabaseClient, datum: string, eltern?: string) {
   const { data, error } = await supabase.rpc('geburtsdatum_nachtragen', {
     p_datum: Alter.lesen(datum),
-    p_eltern: eltern ? Benutzername.normal(eltern) : null,
+    p_eltern: eltern ? Telefon.speicherform(eltern) : null,
   });
   if (error) return { ok: false, meldung: 'Das Speichern ist gerade nicht möglich.' };
   return data as { ok: boolean; meldung?: string };
