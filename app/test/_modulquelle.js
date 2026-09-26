@@ -91,6 +91,10 @@ const UMD_BAUSTEINE = [
   // `alter.js` liest global.Telefon — muss also nach `telefon` stehen.
   ['benutzername', 'Benutzername'],
   ['alter', 'Alter'],
+
+  // 26.09.2026: `teilen.js` für das Teilen-Blatt (Feedback 21.09., Kasten 4).
+
+  ['teilen', 'Teilen'],
 ];
 
 function umdTeile() {

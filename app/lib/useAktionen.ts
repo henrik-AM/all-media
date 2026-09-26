@@ -43,8 +43,23 @@ export interface Aktionen {
     beitragId: string,
     empfaenger: string[],
     vorschau?: string,
-    bereich?: string
+    bereich?: string | Record<string, string>
   ) => Promise<boolean>;
+  /**
+   * Wie `teilen`, aber mit dem Ergebnis je Person — für das Teilen-Blatt,
+   * das Fehler im Blatt zeigt statt im Toast dahinter. Null heißt: gar
+   * nichts ging raus, der Grund steht in `grund`.
+   */
+  teilenAn: (
+    beitragId: string,
+    empfaenger: string[],
+    vorschau: string,
+    bereiche: Record<string, string>
+  ) => Promise<{ gesendet: string[]; fehlgeschlagen: { id: string; grund: string }[]; grund?: string }>;
+  /** Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt. */
+  personPerNutzername: (
+    eingabe: string
+  ) => Promise<{ id: string; name: string; handle: string; initials: string; color: string } | null>;
 
   /*
    * Der zweite Teil: Chats, Kontakte und Storys.
@@ -697,12 +712,33 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           return false;
         }
         try {
-          await A.teilen(supabase, ichId, beitragId, empfaenger, vorschau, bereich);
-          return true;
+          const { gesendet, fehlgeschlagen } = await A.teilen(supabase, ichId, beitragId, empfaenger, vorschau, bereich);
+          if (fehlgeschlagen.length) melden?.(fehlgeschlagen[0].grund);
+          return gesendet.length > 0;
         } catch (e: any) {
           console.error('Teilen fehlgeschlagen:', e?.message ?? e);
           melden?.('Das Senden hat nicht geklappt');
           return false;
+        }
+      },
+      teilenAn: async (beitragId, empfaenger, vorschau, bereiche) => {
+        if (!supabase || !ichId) return { gesendet: [], fehlgeschlagen: [], grund: 'Dafür musst du angemeldet sein' };
+        try {
+          return await A.teilen(supabase, ichId, beitragId, empfaenger, vorschau, bereiche);
+        } catch (e: any) {
+          console.error('Teilen fehlgeschlagen:', e?.message ?? e);
+          return { gesendet: [], fehlgeschlagen: [], grund: 'Das Senden hat nicht geklappt' };
+        }
+      },
+      personPerNutzername: async (eingabe) => {
+        if (!supabase || !ichId) return null;
+        try {
+          return await A.personPerNutzername(supabase, ichId, eingabe);
+        } catch (e: any) {
+          // Kein Treffer ist ein normales Suchergebnis; ein Fehler wird nur
+          // protokolliert, das Blatt zeigt dann eben niemanden.
+          console.error('Nutzername suchen fehlgeschlagen:', e?.message ?? e);
+          return null;
         }
       },
     }),

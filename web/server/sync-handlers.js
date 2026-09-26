@@ -17,6 +17,8 @@
 
 const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
 const Telefon = require('../../gemeinsam/telefon');
+// Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
+const Teilen = require('../../gemeinsam/teilen');
 
 // Ein Umschalter (Like, Gespeichert, Repost …): Zeile da → weg, sonst → hin.
 async function umschalten(client, tabelle, schluessel) {
@@ -630,30 +632,70 @@ const handleNotifyPost = handler('Beitragshinweis', async (client, nutzerId, bei
   return { ok: true, notify: gesetzt };
 });
 
-/** Einen Beitrag an mehrere Personen schicken: als Nachricht in ihren Chat. */
+/**
+ * Einen Beitrag an mehrere Personen schicken: als Nachricht in ihren Chat.
+ *
+ * `bereich` ist ein Wert für alle oder ein Objekt { kennung: bereich } —
+ * seit dem Senden-Knopf (Feedback 21.09., Kasten 4) gehen Kontakte und
+ * Fremde in einem Zug raus, und die einen landen im Messenger, die anderen
+ * unter Communitys.
+ *
+ * Scheitert eine Person, gehen die anderen trotzdem raus. Bis zum 26.09.2026
+ * brach der erste Fehler die ganze Schleife ab: wer drei Leute auswählte und
+ * beim ersten an die Anfrage-Grenze stiess, schickte an keinen. Jetzt steht
+ * je gescheiterter Person der Grund in `fehlgeschlagen`.
+ *
+ * Gleiche Regel in app/lib/aktionen.ts (teilen).
+ */
 const handleShareToChats = handler(
   'An Kontakte schicken',
   async (client, nutzerId, beitragId, empfaenger = [], vorschau = 'Beitrag geteilt', bereich = 'messenger') => {
     if (empfaenger.length === 0) return { ok: false, fehler: 'Bitte mindestens eine Person auswählen' };
 
     const gesendet = [];
+    const fehlgeschlagen = [];
     for (const zielId of empfaenger) {
-      /*
-       * `bereich` entscheidet, in welcher der beiden Chatlisten die Nachricht
-       * landet — Messenger oder Communitys. Hier stand bis zum 17.09.2026 ein
-       * Aufruf ohne diesen Wert; zusammen mit den drei anderen Aufrufern hiess
-       * das: kein Codepfad hat je einen Chat mit bereich='community' erzeugt.
-       * Gleiche Regel in app/lib/aktionen.ts (teilen).
-       */
-      const chatId = await chatMit(client, nutzerId, zielId, bereich);
-      // Welcher Beitrag geteilt wurde, gehoert an die Nachricht. Sonst steht
-      // im Chat nur der Satz "Beitrag geteilt" und niemand kommt von dort aus
-      // zum Beitrag — im Prototyp ist das eine Karte, die ihn oeffnet.
-      const { error: fehlerNachricht } = await client
-        .from('messages')
-        .insert({ chat_id: chatId, sender_id: nutzerId, text: vorschau, shared_post_id: beitragId });
-      if (fehlerNachricht) throw fehlerNachricht;
-      gesendet.push(zielId);
+      try {
+        /*
+         * `bereich` entscheidet, in welcher der beiden Chatlisten die Nachricht
+         * landet — Messenger oder Communitys. Hier stand bis zum 17.09.2026 ein
+         * Aufruf ohne diesen Wert; zusammen mit den drei anderen Aufrufern hiess
+         * das: kein Codepfad hat je einen Chat mit bereich='community' erzeugt.
+         */
+        const wo = typeof bereich === 'object' && bereich ? bereich[zielId] || 'messenger' : bereich;
+        const chatId = await chatMit(client, nutzerId, zielId, wo);
+
+        /*
+         * Die Grenze „ein Beitrag bis zur Annahme" steht in der Datenbank
+         * (Schema 21) und hält auch ohne diese Zeile. Gefragt wird vorher, damit
+         * der Grund ein Satz ist und kein „violates row-level security policy".
+         */
+        const { data: darf, error: fehlerDarf } = await client.rpc('anfrage_erlaubt', {
+          ziel_chat: chatId,
+          absender: nutzerId,
+        });
+        if (fehlerDarf) throw fehlerDarf;
+        if (darf === false) {
+          const { data: chat } = await client.from('chats').select('anfrage_zustand').eq('id', chatId).maybeSingle();
+          fehlgeschlagen.push({
+            id: zielId,
+            grund: Teilen.grund(null, chat?.anfrage_zustand === 'abgelehnt' ? 'declined' : 'pending'),
+          });
+          continue;
+        }
+
+        // Welcher Beitrag geteilt wurde, gehoert an die Nachricht. Sonst steht
+        // im Chat nur der Satz "Beitrag geteilt" und niemand kommt von dort aus
+        // zum Beitrag — im Prototyp ist das eine Karte, die ihn oeffnet.
+        const { error: fehlerNachricht } = await client
+          .from('messages')
+          .insert({ chat_id: chatId, sender_id: nutzerId, text: vorschau, shared_post_id: beitragId });
+        if (fehlerNachricht) throw fehlerNachricht;
+        gesendet.push(zielId);
+      } catch (fehler) {
+        console.error('Teilen an', zielId, 'fehlgeschlagen:', fehler.message);
+        fehlgeschlagen.push({ id: zielId, grund: Teilen.grund(fehler) });
+      }
     }
 
     /*
@@ -661,14 +703,36 @@ const handleShareToChats = handler(
      * verloren, meldete die Oberflaeche "An Bob gesendet" und die Zahl unter
      * dem Beitrag blieb trotzdem stehen — ohne dass irgendwo etwas stand.
      */
-    const { error: fehlerZaehler } = await client.from('shares').insert(
-      gesendet.map((id) => ({ post_id: beitragId, shared_by: nutzerId, shared_to: id }))
-    );
-    if (fehlerZaehler) throw fehlerZaehler;
+    if (gesendet.length) {
+      const { error: fehlerZaehler } = await client.from('shares').insert(
+        gesendet.map((id) => ({ post_id: beitragId, shared_by: nutzerId, shared_to: id }))
+      );
+      if (fehlerZaehler) throw fehlerZaehler;
+    }
 
-    return { ok: true, gesendet };
+    return { ok: true, gesendet, fehlgeschlagen };
   }
 );
+
+/**
+ * Ein Profil über den genauen Nutzernamen — für Fremde im Teilen-Blatt.
+ *
+ * Absichtlich kein Teilwort und kein Name: Fremde soll nur finden, wer den
+ * Nutzernamen kennt (Henrik, 21.09.2026). Gleiche Abfrage in
+ * app/lib/aktionen.ts (personPerNutzername).
+ */
+const handlePersonPerNutzername = handler('Nutzername suchen', async (client, nutzerId, eingabe) => {
+  const handle = Teilen.nutzername(eingabe);
+  if (!handle) return { ok: true, person: null };
+  const { data, error } = await client
+    .from('profiles')
+    .select('id, name, handle, initials, color')
+    .eq('handle', handle)
+    .neq('id', nutzerId)
+    .maybeSingle();
+  if (error) throw error;
+  return { ok: true, person: data || null };
+});
 
 /** Antwort auf eine Story landet im normalen Chat mit dieser Person. */
 const handleStoryReply = handler('Story beantworten', async (client, nutzerId, storyId, text) => {
@@ -2047,6 +2111,7 @@ module.exports = {
   handleCreateGroup,
   handleChatMit,
   handleFindPerson,
+  handlePersonPerNutzername,
   handleAddContact,
   handleAcceptRequest,
   handleMessengerAnfragen,

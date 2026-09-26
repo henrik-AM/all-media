@@ -40,6 +40,8 @@ const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemei
 
 // Wie ein eigener Kommentar in der Liste steht — gemeinsam mit der Website.
 const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
+// Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der Website.
+const Teilen = require('../../gemeinsam/teilen') as typeof import('../../gemeinsam/teilen');
 
 /**
  * Eine Zeile, die es entweder gibt oder nicht — Like, Speichern, Folgen.
@@ -599,37 +601,93 @@ export async function teilen(
   beitragId: string,
   empfaenger: string[],
   vorschau = 'Beitrag geteilt',
-  bereich = 'messenger'
-): Promise<string[]> {
+  bereich: string | Record<string, string> = 'messenger'
+): Promise<{ gesendet: string[]; fehlgeschlagen: { id: string; grund: string }[] }> {
   if (empfaenger.length === 0) throw new Error('Bitte mindestens eine Person auswählen');
 
+  /*
+   * Scheitert eine Person, gehen die anderen trotzdem raus, und je
+   * gescheiterter Person steht der Grund in `fehlgeschlagen`. Bis zum
+   * 26.09.2026 brach der erste Fehler alles ab — mit dem Senden-Knopf
+   * (Feedback 21.09., Kasten 4) wählt man mehrere auf einmal, und eine
+   * offene Anfrage bei einem Fremden hätte die Kontakte mitgerissen.
+   *
+   * Gleiche Regel in web/server/sync-handlers.js (handleShareToChats).
+   */
   const gesendet: string[] = [];
+  const fehlgeschlagen: { id: string; grund: string }[] = [];
   for (const zielId of empfaenger) {
-    /*
-     * `bereich` entscheidet, in welcher der beiden Chatlisten die Nachricht
-     * landet — Messenger oder Communitys. Hier stand bis zum 17.09.2026 ein
-     * Aufruf ohne diesen Wert, und `chatMit` nahm dann seinen Standard
-     * 'messenger'. Zusammen mit den drei anderen Aufrufern hiess das: **kein**
-     * Codepfad hat je einen Chat mit bereich='community' erzeugt. Die
-     * Community-Chatliste konnte sich durch Benutzung nie fuellen; was dort
-     * stand, kam aus dem Testbestand (vorlage_chats).
-     *
-     * Gleiche Regel in web/server/sync-handlers.js (handleShareToChats).
-     */
-    const chatId = await chatMit(client, ichId, zielId, bereich);
-    const { error } = await client
-      .from('messages')
-      .insert({ chat_id: chatId, sender_id: ichId, text: vorschau, shared_post_id: beitragId });
-    if (error) throw error;
-    gesendet.push(zielId);
+    try {
+      /*
+       * `bereich` entscheidet, in welcher der beiden Chatlisten die Nachricht
+       * landet — Messenger oder Communitys. Hier stand bis zum 17.09.2026 ein
+       * Aufruf ohne diesen Wert, und `chatMit` nahm dann seinen Standard
+       * 'messenger'. Zusammen mit den drei anderen Aufrufern hiess das: **kein**
+       * Codepfad hat je einen Chat mit bereich='community' erzeugt. Die
+       * Community-Chatliste konnte sich durch Benutzung nie fuellen; was dort
+       * stand, kam aus dem Testbestand (vorlage_chats).
+       */
+      const wo = typeof bereich === 'string' ? bereich : bereich[zielId] ?? 'messenger';
+      const chatId = await chatMit(client, ichId, zielId, wo);
+
+      /*
+       * Die Grenze „ein Beitrag bis zur Annahme" steht in der Datenbank
+       * (Schema 21) und hält auch ohne diese Frage. Gefragt wird vorher, damit
+       * der Grund ein Satz ist und kein „violates row-level security policy".
+       */
+      const { data: darf, error: fehlerDarf } = await client.rpc('anfrage_erlaubt', {
+        ziel_chat: chatId,
+        absender: ichId,
+      });
+      if (fehlerDarf) throw fehlerDarf;
+      if (darf === false) {
+        const { data: chat } = await client.from('chats').select('anfrage_zustand').eq('id', chatId).maybeSingle();
+        fehlgeschlagen.push({
+          id: zielId,
+          grund: Teilen.grund(null, (chat as any)?.anfrage_zustand === 'abgelehnt' ? 'declined' : 'pending'),
+        });
+        continue;
+      }
+
+      const { error } = await client
+        .from('messages')
+        .insert({ chat_id: chatId, sender_id: ichId, text: vorschau, shared_post_id: beitragId });
+      if (error) throw error;
+      gesendet.push(zielId);
+    } catch (e: any) {
+      console.error('Teilen an', zielId, 'fehlgeschlagen:', e?.message ?? e);
+      fehlgeschlagen.push({ id: zielId, grund: Teilen.grund(e) });
+    }
   }
 
-  const { error } = await client
-    .from('shares')
-    .insert(gesendet.map((id) => ({ post_id: beitragId, shared_by: ichId, shared_to: id })));
-  if (error) throw error;
+  if (gesendet.length) {
+    const { error } = await client
+      .from('shares')
+      .insert(gesendet.map((id) => ({ post_id: beitragId, shared_by: ichId, shared_to: id })));
+    if (error) throw error;
+  }
 
-  return gesendet;
+  return { gesendet, fehlgeschlagen };
+}
+
+/**
+ * Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt.
+ *
+ * Absichtlich kein Teilwort und kein Name: Fremde soll nur finden, wer den
+ * Nutzernamen kennt (Henrik, 21.09.2026). Gleiche Abfrage in
+ * web/server/sync-handlers.js (handlePersonPerNutzername).
+ */
+export async function personPerNutzername(client: SupabaseClient, ichId: string, eingabe: string) {
+  const handle = Teilen.nutzername(eingabe);
+  if (!handle) return null;
+  const { data, error } = await client
+    .from('profiles')
+    .select('id, name, handle, initials, color')
+    .eq('handle', handle)
+    .neq('id', ichId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { id: string; name: string; handle: string; initials: string; color: string } | null) ?? null;
 }
 
 /** Darf es zwischen den beiden einen Messenger-Chat geben? (Schema 57) */

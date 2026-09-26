@@ -2232,6 +2232,18 @@ body:has(.camera) .toast { bottom: 132px; }
 .teilen__haken svg { width: 13px; height: 13px; }
 .teilen__kachel.is-gesendet .teilen__haken { display: flex; }
 .teilen__kachel.is-gesendet { opacity: .55; }
+/* Ausgewaehlt, aber noch nicht gesendet: Haken und Ring am Avatar. Gesendet
+   wird erst mit dem Knopf unten (Feedback 21.09., Kasten 4). */
+.teilen__kachel.is-gewaehlt .teilen__haken { display: flex; }
+.teilen__kachel.is-gewaehlt .avatar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand); }
+/* Fremde mit offener Anfrage: ein Beitrag ist raus, mehr geht nicht. */
+.teilen__kachel.is-gesperrt { opacity: .5; cursor: default; }
+.teilen__kachel.is-gesperrt:hover { background: none; }
+.teilen__sperre { font-size: 11px; color: var(--text-3); margin-top: -4px; }
+.teilen__suche { padding: 4px 16px 6px; }
+.teilen__suche .searchbox { flex: 1 1 auto; }
+.teilen__leer { padding: 24px 16px; text-align: center; }
+.teilen__meldung { padding: 10px 16px; font-size: 13px; color: var(--danger); border-top: 1px solid var(--border); }
 /*
  * Das Abzeichen am Avatar — Prototyp-Frame "Nutzer B + Beitrag teilen".
  * Es sagt, wo diese Person die Nachricht bekommt: gruene Sprechblase =
@@ -2938,6 +2950,7 @@ body:has(.camera) .toast { bottom: 132px; }
 .btn--breit { width: 100%; }
 .btn--primary { background: var(--brand-grad); color: #fff; box-shadow: var(--shadow-brand); }
 .btn--primary:hover { filter: brightness(1.07); }
+.btn--primary:disabled { opacity: .45; cursor: default; filter: none; }
 
 /* Formularfeld im Bottom-Sheet. */
 .feld {

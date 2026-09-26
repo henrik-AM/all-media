@@ -15,7 +15,7 @@ import { ErstellenSheet, ErstellenPunkt } from './components/ErstellenSheet';
 import { FormularFeld, FormularSheet } from './components/FormularSheet';
 import { MitteilungenSheet } from './components/MitteilungenSheet';
 import { NewGroupSheet } from './components/NewGroupSheet';
-import { TeilenSheet, TeilenZiel } from './components/TeilenSheet';
+import { TeilenBereich, TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
 import { ladeEinstellungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
@@ -622,39 +622,19 @@ const Shell = () => {
     [chats, contacts]
   );
 
-  /** Beitrag oder Video in den Chat mit dieser Person legen. */
-  const teileMit = (
-    userId: string,
-    ziel: TeilenZiel,
-    bereich: 'messenger' | 'community' = bereichFuer(userId)
-  ) => {
+  /**
+   * Was ein gesendeter Beitrag in der Messenger-Liste sofort ändert: Vorschau
+   * und Karte im Chat. Die Liste übernimmt nach dem Neuladen nur neue Chats
+   * (siehe oben) — ohne das hier stünde bei einem vorhandenen Chat weiter die
+   * alte Vorschau. Für Communitys nichts: die Liste kommt aus `daten`.
+   */
+  const geteiltVorwegnehmen = (userId: string, ziel: TeilenZiel, vorschau: string) => {
     const person = daten.users[userId];
-    /*
-     * `bereich` entscheidet, in welcher Chatliste die Nachricht landet.
-     * Gleiche Regel in web/public/app.js.
-     *
-     * Die Vorwegnahme unten bleibt bewusst auf der Messenger-Liste: nur die
-     * wird hier gehalten. Fuer den Community-Fall zeigt erst das Neuladen am
-     * Ende den Chat — lieber einen Wimpernschlag spaeter als in der falschen
-     * Liste.
-     */
-    let chat =
-      bereich === 'messenger' ? chats.find((c) => !c.isGroup && c.userId === userId) : undefined;
-    const vorschau = ziel.art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
-
-    if (bereich === 'community') {
-      profil.geteilt(ziel.id);
-      setNotice(`An ${person.name} gesendet`);
-      aktion.teilen(ziel.id, [userId], vorschau, bereich).then((ok) => {
-        if (ok) daten.neuLaden();
-      });
-      return;
-    }
-
+    let chat = chats.find((c) => !c.isGroup && c.userId === userId);
     if (!chat) {
       chat = {
         id: `c${Date.now()}`,
-        name: person.name,
+        name: person?.name ?? 'Chat',
         userId,
         isGroup: false,
         preview: vorschau,
@@ -666,9 +646,8 @@ const Shell = () => {
       const id = chat.id;
       setChats((prev) => prev.map((c) => (c.id === id ? { ...c, preview: vorschau, time: now() } : c)));
     }
-
     const nachricht: Message = {
-      id: `m${Date.now()}`,
+      id: `m${Date.now()}-${userId}`,
       chatId: chat.id,
       senderId: 'me',
       text: vorschau,
@@ -676,25 +655,41 @@ const Shell = () => {
       geteilt: ziel,
     };
     setExtraNachrichten((prev) => ({ ...prev, [chat!.id]: [...(prev[chat!.id] ?? []), nachricht] }));
-    profil.geteilt(ziel.id);
-    setNotice(`An ${person.name} gesendet`);
+  };
 
-    /*
-     * Und wirklich senden.
-     *
-     * Bis zum 01.09.2026 endete diese Funktion hier. Die Karte lag im Chat,
-     * die Meldung stand da — nur war beides ausschliesslich in diesem einen
-     * Bildschirm. Der Empfaenger bekam nie etwas, und beim naechsten Start
-     * war der Chat wieder leer. Die Website hat es die ganze Zeit richtig
-     * gemacht (web/server/sync-handlers.js, handleShareToChats), was den
-     * Unterschied zwischen beiden Fassungen erklaerte.
-     *
-     * Danach neu laden: die Nachricht bekommt in der Datenbank ihre eigene
-     * Kennung, und die Zahl unter dem Beitrag steigt.
-     */
-    aktion.teilen(ziel.id, [userId], vorschau, bereich).then((ok) => {
-      if (ok) daten.neuLaden();
-    });
+  /**
+   * Beitrag oder Video an alle Ausgewählten — der Senden-Knopf im
+   * Teilen-Blatt (Feedback 21.09., Kasten 4).
+   *
+   * Bis zum 26.09.2026 schickte schon der Tipp auf eine Kachel, einzeln, und
+   * die Meldung „An … gesendet" stand da, bevor die Datenbank geantwortet
+   * hatte. Jetzt wird erst nach der Antwort gemeldet, und was scheitert,
+   * zeigt das Blatt selbst an. Gleicher Ablauf in web/public/app.js
+   * (openTeilen).
+   *
+   * `bereiche` entscheidet je Person, in welcher Chatliste die Nachricht
+   * landet — dieselbe Angabe wie das Abzeichen auf der Kachel.
+   */
+  const teileMitAllen = async (userIds: string[], ziel: TeilenZiel, bereiche: Record<string, TeilenBereich>) => {
+    const vorschau = ziel.art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
+    const ergebnis = await aktion.teilenAn(ziel.id, userIds, vorschau, bereiche);
+    if (ergebnis.gesendet.length) {
+      profil.geteilt(ziel.id);
+      for (const id of ergebnis.gesendet) {
+        if (bereiche[id] === 'messenger') geteiltVorwegnehmen(id, ziel, vorschau);
+      }
+      /*
+       * Neu laden: die Nachricht bekommt in der Datenbank ihre eigene
+       * Kennung, die Zahl unter dem Beitrag steigt, und ein neuer
+       * Community-Chat erscheint in seiner Liste.
+       */
+      void daten.neuLaden();
+      if (!ergebnis.fehlgeschlagen.length) {
+        const namen = ergebnis.gesendet.map((id) => daten.users[id]?.name).filter(Boolean);
+        setNotice(namen.length === 1 ? `An ${namen[0]} gesendet` : `An ${ergebnis.gesendet.length} Personen gesendet`);
+      }
+    }
+    return ergebnis;
   };
 
   /*
@@ -1754,7 +1749,7 @@ const Shell = () => {
         contacts={contacts}
         bereichFuer={bereichFuer}
         onClose={() => setTeilenZiel(null)}
-        onSend={teileMit}
+        onSenden={teileMitAllen}
       />
       </>
     );
@@ -2233,7 +2228,7 @@ const Shell = () => {
         contacts={contacts}
         bereichFuer={bereichFuer}
         onClose={() => setTeilenZiel(null)}
-        onSend={teileMit}
+        onSenden={teileMitAllen}
       />
 
       {/* Dieselbe Personenauswahl, aber für eine Aufnahme aus der Kamera. */}
@@ -2243,9 +2238,10 @@ const Shell = () => {
         bereichFuer={bereichFuer}
         titel="An welchen Chat?"
         onClose={() => setAufnahmeFuerChat(null)}
-        onSend={(userId) => {
-          if (aufnahmeFuerChat) aufnahmeAnPerson(userId, aufnahmeFuerChat);
+        onSenden={async (userIds) => {
+          if (aufnahmeFuerChat) userIds.forEach((id) => aufnahmeAnPerson(id, aufnahmeFuerChat));
           setAufnahmeFuerChat(null);
+          return { gesendet: userIds, fehlgeschlagen: [] };
         }}
       />
 

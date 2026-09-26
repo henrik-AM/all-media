@@ -11227,61 +11227,184 @@ function bereichFuer(uid) {
   return 'community';
 }
 
+/*
+ * Feedback 21.09., Kasten 4: oben eine Suchleiste, unten ein Senden-Knopf.
+ * Ein Tipp auf eine Kachel wählt nur noch aus; geschickt wird erst mit dem
+ * Knopf. Wer im Blatt steht, entscheidet gemeinsam/teilen.js — dieselbe
+ * Rechnung wie in app/components/TeilenSheet.tsx.
+ */
 function openTeilen(art, id) {
-  const kontakte = state.contacts.map((c) => c.id).filter((cid) => state.users[cid]);
-  const uebrige = Object.keys(state.users).filter((uid) => uid !== 'me' && !kontakte.includes(uid));
+  const gewaehlt = new Set();
+  const gesendet = new Set();
+  // Fremde, die über den genauen Nutzernamen gefunden wurden.
+  const fremde = {};
+  let suche = '';
+  let treffer = null;
+
+  const wer = (uid) => state.users[uid] || fremde[uid] || null;
+
+  /** Der Stand der Chat-Anfrage mit dieser Person, aus beiden Listen. */
+  const anfrage = (uid) =>
+    [...(state.chats || []), ...(state.communityChats || [])].find((c) => !c.isGroup && c.userId === uid)
+      ?.requestState;
+
   const kachel = (uid) => {
-    const u = user(uid);
+    const u = wer(uid);
     const bereich = bereichFuer(uid);
+    const sperre = Teilen.sperre(anfrage(uid));
+    const klasse = [
+      'teilen__kachel',
+      gewaehlt.has(uid) ? 'is-gewaehlt' : '',
+      gesendet.has(uid) ? 'is-gesendet' : '',
+      sperre ? 'is-gesperrt' : '',
+    ].join(' ');
     return `<li>
-      <button class="teilen__kachel" data-teilen="${uid}" data-bereich="${bereich}">
+      <button class="${klasse}" data-teilen="${uid}" data-bereich="${bereich}" ${sperre || gesendet.has(uid) ? 'disabled' : ''}
+              aria-pressed="${gewaehlt.has(uid)}">
         <span class="teilen__bild">
-          <span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
+          <span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials || (u.name || '?').slice(0, 1))}</span>
           <span class="teilen__marke teilen__marke--${bereich}">${
             bereich === 'community' ? ICONS.people : ICONS.chat
           }</span>
         </span>
         <span class="teilen__name">${esc(u.name)}</span>
+        ${sperre ? `<span class="teilen__sperre">${esc(sperre)}</span>` : ''}
         <span class="teilen__haken">${ICONS.check}</span>
       </button>
     </li>`;
   };
 
   openSheet(
-    art === 'video' ? 'Video teilen' : 'Beitrag teilen',
-    `<div class="sheet__body">
-       ${kontakte.length ? `<div class="teilen__kopf">Deine Kontakte</div><ul class="teilen">${kontakte.map(kachel).join('')}</ul>` : ''}
-       ${uebrige.length ? `<div class="teilen__kopf">Weitere Vorschläge</div><ul class="teilen">${uebrige.map(kachel).join('')}</ul>` : ''}
+    art === 'post' ? 'Beitrag teilen' : 'Video teilen',
+    `<div class="searchrow teilen__suche">
+       <label class="searchbox">
+         ${ICONS.search}
+         <input id="teilenSuche" type="search" placeholder="Name oder @nutzername" autocomplete="off" />
+       </label>
+     </div>
+     <div class="sheet__body" id="teilenListe"></div>
+     <div class="teilen__meldung" id="teilenMeldung" role="alert" hidden></div>
+     <div class="sheet__footer">
+       <button class="btn btn--primary btn--breit" id="teilenSenden" disabled>${Teilen.knopf(0)}</button>
      </div>`,
-    (sheet) => {
-      sheet.querySelectorAll('[data-teilen]').forEach((b) =>
-        b.addEventListener('click', async () => {
-          if (b.classList.contains('is-gesendet')) return;
+    (sheet, zumachen) => {
+      const liste = sheet.querySelector('#teilenListe');
+      const knopf = sheet.querySelector('#teilenSenden');
+      const meldung = sheet.querySelector('#teilenMeldung');
 
-          /*
-           * Der Bereich steht schon an der Kachel — dieselbe Angabe, die das
-           * Abzeichen darauf zeichnet. Sonst könnten Anzeige und Wirkung
-           * auseinanderlaufen: das Symbol sagt Messenger, geschrieben wird in
-           * die Community.
-           */
-          const bereich = b.dataset.bereich || 'messenger';
+      const zeichnen = () => {
+        const gruppen = Teilen.gruppen({
+          kontakte: (state.contacts || []).map((c) => c.id),
+          community: (state.communityChats || []).filter((c) => !c.isGroup && c.userId).map((c) => c.userId),
+          gefolgt: Object.keys(state.gefolgt || {}).filter((k) => state.gefolgt[k]),
+          person: wer,
+          suche,
+        });
+        const drin = new Set(gruppen.flatMap((g) => g.ids));
+        // Der Fremde steht nur da, wenn er nicht schon in einer Gruppe steht.
+        if (treffer && !drin.has(treffer)) gruppen.push({ art: 'nutzername', titel: 'Nutzername', ids: [treffer] });
 
-          const res = await fetch('/api/teilen', {
+        liste.innerHTML = gruppen.length
+          ? gruppen
+              .map((g) => `<div class="teilen__kopf" data-gruppe="${g.art}">${g.titel}</div><ul class="teilen">${g.ids.map(kachel).join('')}</ul>`)
+              .join('')
+          : `<div class="sheet__hint teilen__leer">${
+              suche ? 'Niemand gefunden. Fremde findest du über den genauen @nutzernamen.' : 'Noch niemand zum Teilen da.'
+            }</div>`;
+
+        knopf.textContent = Teilen.knopf(gewaehlt.size);
+        knopf.disabled = gewaehlt.size === 0;
+      };
+
+      liste.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-teilen]');
+        if (!b || b.disabled) return;
+        const uid = b.dataset.teilen;
+        if (gewaehlt.has(uid)) gewaehlt.delete(uid);
+        else gewaehlt.add(uid);
+        meldung.hidden = true;
+        zeichnen();
+      });
+
+      /*
+       * Der genaue Nutzername geht an die Datenbank — erst nach einer kurzen
+       * Pause, sonst fragte jeder Tastendruck einzeln. Gezeigt wird nur die
+       * Antwort auf die Eingabe, die noch im Feld steht.
+       */
+      let uhr = null;
+      sheet.querySelector('#teilenSuche').addEventListener('input', (e) => {
+        suche = e.target.value;
+        treffer = null;
+        zeichnen();
+        clearTimeout(uhr);
+        const handle = Teilen.nutzername(suche);
+        if (!handle) return;
+        uhr = setTimeout(async () => {
+          const res = await fetch('/api/personen/nutzername', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ art, id, empfaenger: [b.dataset.teilen], bereich }),
-          });
-          const daten = await res.json();
-          if (!daten.ok) return toast(daten.error);
+            body: JSON.stringify({ eingabe: handle }),
+          }).catch(() => null);
+          const daten = res ? await res.json().catch(() => null) : null;
+          if (Teilen.nutzername(suche) !== handle || !daten?.person) return;
+          const p = daten.person;
+          if (!state.users[p.id]) fremde[p.id] = p;
+          treffer = p.id;
+          zeichnen();
+        }, 300);
+      });
 
-          // In die Liste, in die wirklich geschrieben wurde — der Server sagt,
-          // welche das war.
-          if (daten.bereich === 'community') state.communityChats = daten.chats;
-          else state.chats = daten.chats;
-          b.classList.add('is-gesendet');
-          toast(`An ${user(b.dataset.teilen).name} gesendet`);
-        })
-      );
+      knopf.addEventListener('click', async () => {
+        const empfaenger = [...gewaehlt];
+        if (!empfaenger.length) return;
+
+        /*
+         * Der Bereich je Person — dieselbe Angabe, die das Abzeichen auf der
+         * Kachel zeichnet. Sonst könnten Anzeige und Wirkung auseinanderlaufen:
+         * das Symbol sagt Messenger, geschrieben wird in die Community.
+         */
+        const bereiche = Object.fromEntries(empfaenger.map((uid) => [uid, bereichFuer(uid)]));
+        knopf.disabled = true;
+        knopf.textContent = 'Wird gesendet …';
+
+        const res = await fetch('/api/teilen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ art, id, empfaenger, bereiche }),
+        }).catch(() => null);
+        const daten = res ? await res.json().catch(() => null) : null;
+
+        /*
+         * Fehler stehen im Blatt, nicht im Toast: der liegt hinter dem Blatt
+         * und war dort schon einmal unsichtbar (siehe „Meldung hinter dem
+         * Modal" in der App).
+         */
+        if (!daten?.ok) {
+          meldung.textContent = daten?.error || 'Das Senden hat nicht geklappt';
+          meldung.hidden = false;
+          zeichnen();
+          return;
+        }
+        state.chats = daten.chats;
+        state.communityChats = daten.communityChats;
+        for (const uid of daten.gesendet || []) {
+          gewaehlt.delete(uid);
+          gesendet.add(uid);
+        }
+
+        const fehl = daten.fehlgeschlagen || [];
+        if (!fehl.length) {
+          zumachen();
+          const namen = (daten.gesendet || []).map((uid) => wer(uid)?.name).filter(Boolean);
+          toast(namen.length === 1 ? `An ${namen[0]} gesendet` : `An ${namen.length} Personen gesendet`);
+          return;
+        }
+        meldung.innerHTML = fehl.map((f) => `<div><b>${esc(wer(f.id)?.name || '?')}:</b> ${esc(f.grund)}</div>`).join('');
+        meldung.hidden = false;
+        zeichnen();
+      });
+
+      zeichnen();
     },
     { schliessen: true, hoch: true }
   );

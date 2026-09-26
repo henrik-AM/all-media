@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -88,32 +86,30 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
       }
     >
       {/*
-        Das KeyboardAvoidingView muss die Felder umschliessen, sonst schiebt
-        die Tastatur sie unter den Rand - derselbe Fehler wie frueher beim
-        Kontakt-Blatt.
+        Die Tastatur hebt jetzt SheetRahmen an - das ganze Blatt samt Knopf.
+        Ein zweites KeyboardAvoidingView hier innen hob doppelt.
       */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.inhalt}>
-          {felder.map((f, i) => (
-            <View key={f.key} style={styles.feld}>
-              <Text style={styles.label}>{f.label}</Text>
-              {f.typ === 'auswahl' ? (
-                // Waagerechte Reihe statt eines Aufklappmenüs: React Native
-                // hat keins, und bei einer Handvoll Sounds sieht man so gleich
-                // alles, was zur Wahl steht.
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wahlReihe}>
-                  {(f.auswahl ?? []).map((w) => {
-                    const an = (werte[f.key] ?? f.auswahl?.[0]) === w;
-                    return (
-                      <Druck
-                        key={w}
-                        style={[styles.wahl, an && styles.wahlAn]}
-                        onPress={() => setWerte((prev) => ({ ...prev, [f.key]: w }))}
-                      >
-                        <Text style={[styles.wahlText, an && styles.wahlTextAn]}>{w}</Text>
-                      </Druck>
-                    );
-                  })}
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.inhalt}>
+        {felder.map((f, i) => (
+          <View key={f.key} style={styles.feld}>
+            <Text style={styles.label}>{f.label}</Text>
+            {f.typ === 'auswahl' ? (
+              // Waagerechte Reihe statt eines Aufklappmenüs: React Native
+              // hat keins, und bei einer Handvoll Sounds sieht man so gleich
+              // alles, was zur Wahl steht.
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wahlReihe}>
+                {(f.auswahl ?? []).map((w) => {
+                  const an = (werte[f.key] ?? f.auswahl?.[0]) === w;
+                  return (
+                    <Druck
+                      key={w}
+                      style={[styles.wahl, an && styles.wahlAn]}
+                      onPress={() => setWerte((prev) => ({ ...prev, [f.key]: w }))}
+                    >
+                      <Text style={[styles.wahlText, an && styles.wahlTextAn]}>{w}</Text>
+                    </Druck>
+                  );
+                })}
                 </ScrollView>
               ) : (
               <TextInput
@@ -131,8 +127,7 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
               )}
             </View>
           ))}
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </SheetRahmen>
   );
 };

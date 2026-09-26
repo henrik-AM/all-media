@@ -1,5 +1,5 @@
 import React from 'react';
-import { Animated, Modal, StyleSheet, Text, View } from 'react-native';
+import { Animated, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,28 +32,36 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Druck style={styles.backdrop} onPress={onClose} />
-      <Animated.View
-        style={[
-          styles.sheet,
-          hoch && styles.sheetHoch,
-          { paddingBottom: fuss ? 0 : insets.bottom + spacing.md },
-          ziehStil,
-        ]}
-      >
-        <View style={styles.kopf} {...griff}>
-          {/* Der Griff, an dem gezogen wird - er zeigt auch, dass es geht. */}
-          <View style={styles.griff} />
-          <Druck style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Zurück">
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </Druck>
-          <Text style={styles.titel}>{title}</Text>
-        </View>
+      {/*
+        Die Tastatur lag über dem Fuß: wer im Teilen-Blatt nach einem Namen
+        suchte, sah den Senden-Knopf nicht mehr (26.09.2026). Wie beim
+        Kontakt-Blatt muss das KeyboardAvoidingView den ganzen Bildschirm
+        umfassen, sonst kann es das Blatt nicht anheben.
+      */}
+      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Druck style={styles.backdrop} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.sheet,
+            hoch && styles.sheetHoch,
+            { paddingBottom: fuss ? 0 : insets.bottom + spacing.md },
+            ziehStil,
+          ]}
+        >
+          <View style={styles.kopf} {...griff}>
+            {/* Der Griff, an dem gezogen wird - er zeigt auch, dass es geht. */}
+            <View style={styles.griff} />
+            <Druck style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Zurück">
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
+            </Druck>
+            <Text style={styles.titel}>{title}</Text>
+          </View>
 
-        <View style={hoch ? styles.inhaltHoch : undefined}>{children}</View>
+          <View style={hoch ? styles.inhaltHoch : undefined}>{children}</View>
 
-        {fuss ? <View style={[styles.fuss, { paddingBottom: insets.bottom + spacing.md }]}>{fuss}</View> : null}
-      </Animated.View>
+          {fuss ? <View style={[styles.fuss, { paddingBottom: insets.bottom + spacing.md }]}>{fuss}</View> : null}
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -61,6 +69,7 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
 const styles = themenStyles((colors) => ({
   /* 40 Prozent waren zu hell - die Seite darunter blieb voll lesbar und das
      Blatt wirkte aufgeklebt statt darueber. */
+  fill: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(6,8,12,0.52)' },
   sheet: {
     backgroundColor: colors.surface,

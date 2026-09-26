@@ -1743,17 +1743,39 @@ app.post('/api/teilen', route(async (req) => {
    * aus dem Bereich Communitys. Siehe handleShareToChats.
    */
   const bereich = req.body?.bereich === 'community' ? 'community' : 'messenger';
+
+  /*
+   * Seit dem Senden-Knopf (Feedback 21.09., Kasten 4) kann eine Auswahl
+   * beides enthalten: Kontakte für den Messenger, Fremde für Communitys.
+   * `bereiche` sagt es je Person; fehlt sie dort, gilt `bereich`.
+   */
+  const bereiche = {};
+  for (const id of empfaenger) {
+    bereiche[id] = req.body?.bereiche?.[id] === 'community' ? 'community' : bereich;
+  }
   const e = await syncHandlers.handleShareToChats(
     req.db,
     req.nutzerId,
     eintrag.id,
     empfaenger,
     vorschau,
-    bereich
+    bereiche
   );
-  // Die Antwort muss die Liste zeigen, in die tatsaechlich geschrieben wurde —
-  // sonst sucht der Browser den neuen Chat in der falschen.
-  return antwort(e, { bereich, chats: await supabaseApi.ladeChats(req.db, req.nutzerId, bereich, req.schluesselId) });
+  if (!e?.ok) return antwort(e, {});
+
+  // Beide Listen zurück: in welche geschrieben wurde, entscheidet je Person
+  // erst `chatMit` (Schema 57 schiebt Fremde nach Communitys).
+  const [chats, communityChats] = await Promise.all([
+    supabaseApi.ladeChats(req.db, req.nutzerId, 'messenger', req.schluesselId),
+    supabaseApi.ladeChats(req.db, req.nutzerId, 'community', req.schluesselId),
+  ]);
+  return antwort(e, { bereich, chats, communityChats, gesendet: e.gesendet, fehlgeschlagen: e.fehlgeschlagen });
+}));
+
+/** Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt. */
+app.post('/api/personen/nutzername', route(async (req) => {
+  const e = await syncHandlers.handlePersonPerNutzername(req.db, req.nutzerId, req.body?.eingabe || '');
+  return { person: e?.person || null };
 }));
 
 /*
