@@ -353,20 +353,20 @@ export const HomeFeedScreen = ({
         )}
 
         <View style={styles.actions}>
-          <Druck onPress={() => toggleLike(item)} hitSlop={6}>
+          <Druck onPress={() => toggleLike(item)} hitSlop={6} accessibilityLabel="Gefällt mir">
             <Ionicons
               name={item.liked ? 'heart' : 'heart-outline'}
               size={26}
               color={item.liked ? '#FF3040' : colors.text}
             />
           </Druck>
-          <Druck onPress={() => setCommentsFor(item.id)} hitSlop={6}>
+          <Druck onPress={() => setCommentsFor(item.id)} hitSlop={6} accessibilityLabel="Kommentieren">
             <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
           </Druck>
-          <Druck onPress={() => onShare(item)} hitSlop={6}>
+          <Druck onPress={() => onShare(item)} hitSlop={6} accessibilityLabel="Beitrag senden">
             <Ionicons name="paper-plane-outline" size={24} color={colors.text} />
           </Druck>
-          <Druck style={styles.repost} onPress={() => toggleRepost(item)} hitSlop={6}>
+          <Druck style={styles.repost} onPress={() => toggleRepost(item)} hitSlop={6} accessibilityLabel="Reposten">
             <Ionicons
               name="repeat"
               size={26}
@@ -376,7 +376,7 @@ export const HomeFeedScreen = ({
               <Text style={styles.repostZahl}>{compactNumber(item.reposts)}</Text>
             )}
           </Druck>
-          <Druck style={styles.actionEnd} onPress={() => toggleSave(item)} hitSlop={6}>
+          <Druck style={styles.actionEnd} onPress={() => toggleSave(item)} hitSlop={6} accessibilityLabel="Speichern">
             <Ionicons
               name={item.saved ? 'bookmark' : 'bookmark-outline'}
               size={24}

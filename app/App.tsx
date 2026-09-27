@@ -692,6 +692,26 @@ const Shell = () => {
     return ergebnis;
   };
 
+  /**
+   * Beitrag oder Video in ganze Communitys — Henrik am 26.09.2026: „einzelnen
+   * Personen unter Community … aber auch in eine Community mit mehreren
+   * Personen". Die Karte landet im ersten Unterthema, dort sehen sie alle
+   * Mitglieder. Gleicher Weg in web/server/sync-handlers.js
+   * (handleShareToCommunities).
+   */
+  const teileInCommunitys = async (communityIds: string[], ziel: TeilenZiel) => {
+    const vorschau = ziel.art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
+    const ergebnis = await aktion.teilenInCommunitys(ziel.id, communityIds, vorschau);
+    if (ergebnis.gesendet.length) {
+      void daten.neuLaden();
+      if (!ergebnis.fehlgeschlagen.length) {
+        const namen = ergebnis.gesendet.map((id) => daten.communities.find((c) => c.id === id)?.name).filter(Boolean);
+        setNotice(namen.length === 1 ? `In ${namen[0]} geteilt` : `In ${ergebnis.gesendet.length} Communitys geteilt`);
+      }
+    }
+    return ergebnis;
+  };
+
   /*
    * Punkt 17: eine Aufnahme aus der Kamera in einen Chat schicken. Läuft über
    * dieselbe Personenauswahl wie das Teilen — nur landet hier ein Bild in der
@@ -1750,6 +1770,7 @@ const Shell = () => {
         bereichFuer={bereichFuer}
         onClose={() => setTeilenZiel(null)}
         onSenden={teileMitAllen}
+        onCommunitys={teileInCommunitys}
       />
       </>
     );
@@ -2229,6 +2250,7 @@ const Shell = () => {
         bereichFuer={bereichFuer}
         onClose={() => setTeilenZiel(null)}
         onSenden={teileMitAllen}
+        onCommunitys={teileInCommunitys}
       />
 
       {/* Dieselbe Personenauswahl, aber für eine Aufnahme aus der Kamera. */}

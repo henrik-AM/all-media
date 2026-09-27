@@ -56,6 +56,12 @@ export interface Aktionen {
     vorschau: string,
     bereiche: Record<string, string>
   ) => Promise<{ gesendet: string[]; fehlgeschlagen: { id: string; grund: string }[]; grund?: string }>;
+  /** Einen Beitrag in ganze Communitys teilen — ins erste Unterthema. */
+  teilenInCommunitys: (
+    beitragId: string,
+    communityIds: string[],
+    vorschau: string
+  ) => Promise<{ gesendet: string[]; fehlgeschlagen: { id: string; grund: string }[]; grund?: string }>;
   /** Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt. */
   personPerNutzername: (
     eingabe: string
@@ -727,6 +733,15 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           return await A.teilen(supabase, ichId, beitragId, empfaenger, vorschau, bereiche);
         } catch (e: any) {
           console.error('Teilen fehlgeschlagen:', e?.message ?? e);
+          return { gesendet: [], fehlgeschlagen: [], grund: 'Das Senden hat nicht geklappt' };
+        }
+      },
+      teilenInCommunitys: async (beitragId, communityIds, vorschau) => {
+        if (!supabase || !ichId) return { gesendet: [], fehlgeschlagen: [], grund: 'Dafür musst du angemeldet sein' };
+        try {
+          return await A.teilenInCommunitys(supabase, ichId, beitragId, communityIds, vorschau);
+        } catch (e: any) {
+          console.error('Teilen in Community fehlgeschlagen:', e?.message ?? e);
           return { gesendet: [], fehlgeschlagen: [], grund: 'Das Senden hat nicht geklappt' };
         }
       },

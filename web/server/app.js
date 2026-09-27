@@ -1727,7 +1727,11 @@ for (const pfad of ['/api/posts/:id/:action', '/api/videos/:id/:action', '/api/c
 
 app.post('/api/teilen', route(async (req) => {
   const empfaenger = Array.isArray(req.body?.empfaenger) ? req.body.empfaenger : [];
-  if (empfaenger.length === 0) return { ok: false, error: 'Bitte mindestens eine Person auswählen' };
+  // Ganze Communitys (Henrik, 26.09.2026) — allein oder zusammen mit Personen.
+  const communitys = Array.isArray(req.body?.communitys) ? req.body.communitys.map(String) : [];
+  if (empfaenger.length === 0 && communitys.length === 0) {
+    return { ok: false, error: 'Bitte mindestens eine Person oder Community auswählen' };
+  }
 
   const eintrag = await beitrag(req, req.body?.id);
   if (!eintrag) return { ok: false, error: 'Diesen Beitrag gibt es nicht mehr' };
@@ -1753,15 +1757,17 @@ app.post('/api/teilen', route(async (req) => {
   for (const id of empfaenger) {
     bereiche[id] = req.body?.bereiche?.[id] === 'community' ? 'community' : bereich;
   }
-  const e = await syncHandlers.handleShareToChats(
-    req.db,
-    req.nutzerId,
-    eintrag.id,
-    empfaenger,
-    vorschau,
-    bereiche
-  );
-  if (!e?.ok) return antwort(e, {});
+  const [personen, inCommunitys] = await Promise.all([
+    empfaenger.length
+      ? syncHandlers.handleShareToChats(req.db, req.nutzerId, eintrag.id, empfaenger, vorschau, bereiche)
+      : { ok: true, gesendet: [], fehlgeschlagen: [] },
+    communitys.length
+      ? syncHandlers.handleShareToCommunities(req.db, req.nutzerId, eintrag.id, communitys, vorschau)
+      : { ok: true, gesendet: [], fehlgeschlagen: [] },
+  ]);
+  if (!personen?.ok) return antwort(personen, {});
+  if (!inCommunitys?.ok) return antwort(inCommunitys, {});
+  const e = personen;
 
   // Beide Listen zurück: in welche geschrieben wurde, entscheidet je Person
   // erst `chatMit` (Schema 57 schiebt Fremde nach Communitys).
@@ -1769,7 +1775,15 @@ app.post('/api/teilen', route(async (req) => {
     supabaseApi.ladeChats(req.db, req.nutzerId, 'messenger', req.schluesselId),
     supabaseApi.ladeChats(req.db, req.nutzerId, 'community', req.schluesselId),
   ]);
-  return antwort(e, { bereich, chats, communityChats, gesendet: e.gesendet, fehlgeschlagen: e.fehlgeschlagen });
+  return antwort(e, {
+    bereich,
+    chats,
+    communityChats,
+    gesendet: e.gesendet,
+    fehlgeschlagen: e.fehlgeschlagen,
+    gesendetCommunitys: inCommunitys.gesendet,
+    fehlgeschlagenCommunitys: inCommunitys.fehlgeschlagen,
+  });
 }));
 
 /** Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt. */

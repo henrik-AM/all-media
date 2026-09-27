@@ -671,6 +671,56 @@ export async function teilen(
 }
 
 /**
+ * Einen Beitrag in ganze Communitys teilen — als Karte in ihr erstes
+ * Unterthema, wo alle Mitglieder ihn sehen (Henrik, 26.09.2026; Schema 59).
+ *
+ * Das Unterthema sucht die Datenbank heraus, nicht das Blatt: so zählt die
+ * Reihenfolge, die jetzt gilt. Mitglied sein muss man; das prüft die Regel
+ * „Beitrag nur als Mitglied teilen". Gleiche Rechnung in
+ * web/server/sync-handlers.js (handleShareToCommunities).
+ */
+export async function teilenInCommunitys(
+  client: SupabaseClient,
+  ichId: string,
+  beitragId: string,
+  communityIds: string[],
+  vorschau = 'Beitrag geteilt'
+): Promise<{ gesendet: string[]; fehlgeschlagen: { id: string; grund: string }[] }> {
+  const gesendet: string[] = [];
+  const fehlgeschlagen: { id: string; grund: string }[] = [];
+  for (const communityId of communityIds) {
+    try {
+      const { data: kanal, error: fehlerKanal } = await client
+        .from('community_channels')
+        .select('id')
+        .eq('community_id', communityId)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (fehlerKanal) throw fehlerKanal;
+      if (!kanal) {
+        fehlgeschlagen.push({ id: communityId, grund: 'Diese Community hat noch kein Unterthema' });
+        continue;
+      }
+      const { error } = await client
+        .from('community_channel_messages')
+        .insert({ channel_id: (kanal as any).id, sender_id: ichId, text: vorschau, shared_post_id: beitragId });
+      if (error) throw error;
+      gesendet.push(communityId);
+    } catch (e: any) {
+      console.error('Teilen in Community', communityId, 'fehlgeschlagen:', e?.message ?? e);
+      const text = String(e?.message ?? '');
+      fehlgeschlagen.push({
+        id: communityId,
+        grund: /row-level security/i.test(text) ? 'Nur Mitglieder können hier teilen' : Teilen.grund(e),
+      });
+    }
+  }
+  return { gesendet, fehlgeschlagen };
+}
+
+/**
  * Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt.
  *
  * Absichtlich kein Teilwort und kein Name: Fremde soll nur finden, wer den

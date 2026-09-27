@@ -715,6 +715,51 @@ const handleShareToChats = handler(
 );
 
 /**
+ * Einen Beitrag in ganze Communitys teilen — als Karte in ihr erstes
+ * Unterthema, wo alle Mitglieder ihn sehen (Henrik, 26.09.2026; Schema 59).
+ *
+ * Mitglied sein muss man; das prüft die Regel „Beitrag nur als Mitglied
+ * teilen". Scheitert eine Community, gehen die anderen trotzdem raus.
+ * Gleiche Rechnung in app/lib/aktionen.ts (teilenInCommunitys).
+ */
+const handleShareToCommunities = handler(
+  'In Communitys teilen',
+  async (client, nutzerId, beitragId, communityIds = [], vorschau = 'Beitrag geteilt') => {
+    const gesendet = [];
+    const fehlgeschlagen = [];
+    for (const communityId of communityIds) {
+      try {
+        const { data: kanal, error: fehlerKanal } = await client
+          .from('community_channels')
+          .select('id')
+          .eq('community_id', communityId)
+          .order('position', { ascending: true })
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (fehlerKanal) throw fehlerKanal;
+        if (!kanal) {
+          fehlgeschlagen.push({ id: communityId, grund: 'Diese Community hat noch kein Unterthema' });
+          continue;
+        }
+        const { error } = await client
+          .from('community_channel_messages')
+          .insert({ channel_id: kanal.id, sender_id: nutzerId, text: vorschau, shared_post_id: beitragId });
+        if (error) throw error;
+        gesendet.push(communityId);
+      } catch (fehler) {
+        console.error('Teilen in Community', communityId, 'fehlgeschlagen:', fehler.message);
+        fehlgeschlagen.push({
+          id: communityId,
+          grund: /row-level security/i.test(fehler.message || '') ? 'Nur Mitglieder können hier teilen' : Teilen.grund(fehler),
+        });
+      }
+    }
+    return { ok: true, gesendet, fehlgeschlagen };
+  }
+);
+
+/**
  * Ein Profil über den genauen Nutzernamen — für Fremde im Teilen-Blatt.
  *
  * Absichtlich kein Teilwort und kein Name: Fremde soll nur finden, wer den
@@ -2123,6 +2168,7 @@ module.exports = {
   handleAnrufNotieren,
   handleNotifyPost,
   handleShareToChats,
+  handleShareToCommunities,
   handleStoryReply,
   handleCreateChannel,
   handleSendChannelMessage,

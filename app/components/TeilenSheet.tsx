@@ -49,6 +49,12 @@ interface Props {
   onClose: () => void;
   /** Schickt an alle Ausgewählten — erst mit dem Senden-Knopf. */
   onSenden: (userIds: string[], ziel: TeilenZiel, bereiche: Record<string, TeilenBereich>) => Promise<TeilenErgebnis>;
+  /**
+   * Schickt in ganze Communitys (Henrik, 26.09.2026). Ohne diese Angabe
+   * zeigt das Blatt keine Communitys — etwa für ein Foto aus der Kamera,
+   * das kein Beitrag ist.
+   */
+  onCommunitys?: (communityIds: string[], ziel: TeilenZiel) => Promise<TeilenErgebnis>;
 }
 
 interface Person {
@@ -67,8 +73,8 @@ interface Person {
  * Namen man nie gesucht hat. Jetzt wählt ein Tipp nur aus; Fremde findet nur,
  * wer den genauen @nutzernamen eingibt.
  */
-export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSenden }: Props) => {
-  const { users: alleNutzer, communityChats, chats, gefolgt } = useDaten();
+export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSenden, onCommunitys }: Props) => {
+  const { users: alleNutzer, communityChats, chats, gefolgt, communities } = useDaten();
   const aktion = useAktionen();
   const [gewaehlt, setGewaehlt] = useState<string[]>([]);
   const [gesendet, setGesendet] = useState<string[]>([]);
@@ -77,6 +83,9 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
   const [treffer, setTreffer] = useState<string | null>(null);
   const [sendet, setSendet] = useState(false);
   const [meldung, setMeldung] = useState<string[]>([]);
+  // Ganze Communitys getrennt von Personen: andere Kennungen, anderer Weg.
+  const [gewaehltC, setGewaehltC] = useState<string[]>([]);
+  const [gesendetC, setGesendetC] = useState<string[]>([]);
 
   const wer = (id: string): Person | null => (alleNutzer[id] ? { ...alleNutzer[id], id } : fremde[id] ?? null);
 
@@ -123,38 +132,97 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, communityChats, gefolgt, alleNutzer, fremde, suche, treffer]);
 
+  const ganze = useMemo(
+    () => (onCommunitys ? Teilen.communitys(communities, suche) : []),
+    [onCommunitys, communities, suche]
+  );
+
+  const abschnitte = useMemo(() => {
+    if (!ganze.length) return gruppen;
+    const block = { art: 'communitys', titel: Teilen.GRUPPEN.communitys, ids: [] as string[] };
+    const hinter = gruppen[0]?.art === 'kontakte' ? 1 : 0;
+    return [...gruppen.slice(0, hinter), block, ...gruppen.slice(hinter)];
+  }, [gruppen, ganze]);
+
   if (!ziel) return null;
 
   const schliessen = () => {
     setGewaehlt([]);
     setGesendet([]);
+    setGewaehltC([]);
+    setGesendetC([]);
     setSuche('');
     setMeldung([]);
     onClose();
   };
 
   const senden = async () => {
-    if (!gewaehlt.length || sendet) return;
+    if ((!gewaehlt.length && !gewaehltC.length) || sendet) return;
     const bereiche: Record<string, TeilenBereich> = {};
     for (const id of gewaehlt) bereiche[id] = bereichFuer?.(id) ?? 'messenger';
     setSendet(true);
     setMeldung([]);
-    const ergebnis = await onSenden(gewaehlt, ziel, bereiche);
+    const leer: TeilenErgebnis = { gesendet: [], fehlgeschlagen: [] };
+    const [ergebnis, inCommunitys] = await Promise.all([
+      gewaehlt.length ? onSenden(gewaehlt, ziel, bereiche) : leer,
+      gewaehltC.length && onCommunitys ? onCommunitys(gewaehltC, ziel) : leer,
+    ]);
     setSendet(false);
     setGesendet((g) => [...g, ...ergebnis.gesendet]);
     setGewaehlt((g) => g.filter((id) => !ergebnis.gesendet.includes(id)));
+    setGesendetC((g) => [...g, ...inCommunitys.gesendet]);
+    setGewaehltC((g) => g.filter((id) => !inCommunitys.gesendet.includes(id)));
 
-    /*
-     * Fehler stehen im Blatt, nicht im Toast: der liegt hinter dem Blatt
-     * (siehe „Meldung hinter dem Modal"). Ging alles raus, geht das Blatt zu,
-     * und die Meldung „An … gesendet" kommt vom Bildschirm dahinter.
-     */
-    if (ergebnis.grund) return setMeldung([ergebnis.grund]);
-    if (ergebnis.fehlgeschlagen.length) {
-      return setMeldung(ergebnis.fehlgeschlagen.map((f) => `${wer(f.id)?.name ?? '?'}: ${f.grund}`));
-    }
+    const nameC = (id: string) => ganze.find((c) => c.id === id)?.name ?? communities.find((c) => c.id === id)?.name ?? '?';
+    const gruende = [
+      ...(ergebnis.grund ? [ergebnis.grund] : []),
+      ...(inCommunitys.grund ? [inCommunitys.grund] : []),
+      ...ergebnis.fehlgeschlagen.map((f) => `${wer(f.id)?.name ?? '?'}: ${f.grund}`),
+      ...inCommunitys.fehlgeschlagen.map((f) => `${nameC(f.id)}: ${f.grund}`),
+    ];
+    if (gruende.length) return setMeldung(gruende);
     schliessen();
   };
+
+  /** Eine ganze Community: Kachel mit Gruppensymbol, darunter das Unterthema. */
+  const communityRaster = () => (
+    <View style={styles.raster}>
+      {ganze.map((c) => {
+        const fertig = gesendetC.includes(c.id);
+        const an = gewaehltC.includes(c.id);
+        return (
+          <Druck
+            key={c.id}
+            style={[styles.kachel, fertig && styles.kachelFertig]}
+            disabled={fertig}
+            accessibilityLabel={`Community ${c.name}`}
+            accessibilityState={{ selected: an, disabled: fertig }}
+            onPress={() => {
+              setMeldung([]);
+              setGewaehltC((prev) => (prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]));
+            }}
+          >
+            <View style={an && styles.bildGewaehlt}>
+              <View style={styles.communityBild}>
+                <Ionicons name="people" size={24} color={colors.brand} />
+              </View>
+            </View>
+            {(fertig || an) && (
+              <View style={styles.haken}>
+                <Ionicons name="checkmark" size={13} color={colors.white} />
+              </View>
+            )}
+            <Text style={styles.name} numberOfLines={1}>
+              {c.name}
+            </Text>
+            <Text style={styles.sperre} numberOfLines={1}>
+              in #{c.kanal.name}
+            </Text>
+          </Druck>
+        );
+      })}
+    </View>
+  );
 
   const raster = (ids: string[]) => (
     <View style={styles.raster}>
@@ -234,12 +302,14 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
             </View>
           )}
           <Druck
-            style={[styles.knopf, (!gewaehlt.length || sendet) && styles.knopfAus]}
-            disabled={!gewaehlt.length || sendet}
+            style={[styles.knopf, (!gewaehlt.length && !gewaehltC.length || sendet) && styles.knopfAus]}
+            disabled={(!gewaehlt.length && !gewaehltC.length) || sendet}
             onPress={senden}
             accessibilityLabel="Senden"
           >
-            <Text style={styles.knopfText}>{sendet ? 'Wird gesendet …' : Teilen.knopf(gewaehlt.length)}</Text>
+            <Text style={styles.knopfText}>
+              {sendet ? 'Wird gesendet …' : Teilen.knopf(gewaehlt.length, gewaehltC.length)}
+            </Text>
           </Druck>
         </View>
       }
@@ -248,13 +318,14 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
         <SearchBar value={suche} onChangeText={setSuche} placeholder="Name oder @nutzername" />
       </View>
       <ScrollView contentContainerStyle={styles.inhalt} keyboardShouldPersistTaps="handled">
-        {gruppen.map((g) => (
+        {/* Ganze Communitys direkt hinter den eigenen Kontakten, sonst ganz vorn. */}
+        {abschnitte.map((g) => (
           <View key={g.art}>
             <Text style={styles.kopf}>{g.titel}</Text>
-            {raster(g.ids)}
+            {g.art === 'communitys' ? communityRaster() : raster(g.ids)}
           </View>
         ))}
-        {gruppen.length === 0 && (
+        {gruppen.length === 0 && ganze.length === 0 && (
           <Text style={styles.leer}>
             {suche
               ? 'Niemand gefunden. Fremde findest du über den genauen @nutzernamen.'
@@ -313,6 +384,14 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   name: { ...typography.small, color: colors.text, maxWidth: '92%' },
+  communityBild: {
+    width: sizes.avatarLg,
+    height: sizes.avatarLg,
+    borderRadius: sizes.avatarLg / 2,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sperre: { fontSize: 11, color: colors.text3, marginTop: -4, maxWidth: '92%' },
   leer: { ...typography.small, color: colors.text2, textAlign: 'center', padding: spacing.lg },
   meldung: { paddingBottom: spacing.sm, gap: 2 },

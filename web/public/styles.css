@@ -2274,9 +2274,12 @@ body:has(.camera) .toast { bottom: 132px; }
   margin: 2px 0 4px; padding: 8px;
   border: 0; text-align: left; cursor: pointer; font: inherit; color: inherit;
   border-radius: 12px; background: rgba(0,0,0,.05);
+  /* Ein langer Titel steht einzeilig mit „…" — ohne diese Grenze schob er
+     die Karte über die Blase hinaus und den Verlauf zur Seite (26.09.2026). */
+  max-width: 100%; min-width: 0; box-sizing: border-box;
 }
 [data-theme="dark"] .msg__geteilt { background: rgba(255,255,255,.07); }
-.msg__geteiltZeile { display: flex; align-items: center; gap: 8px; }
+.msg__geteiltZeile { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .msg__geteiltZeile > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--text-3); }
 
 /*

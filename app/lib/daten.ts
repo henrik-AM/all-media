@@ -1186,7 +1186,10 @@ export async function ladeKanalNachrichten(
       'id, channel_id, sender_id, text, created_at,' +
         ' media_url, media_type, file_name, file_size,' +
         ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
-        ' contact_user_id, profiles!contact_user_id(id, name, handle)'
+        ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
+        // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
+        ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
+        ' profiles!posts_user_id_fkey(name))'
     )
     .eq('channel_id', kanalId)
     .order('created_at', { ascending: true })
@@ -1218,6 +1221,17 @@ export async function ladeKanalNachrichten(
       : undefined,
     kontakt: m.profiles
       ? { id: m.profiles.id, name: m.profiles.name, handle: m.profiles.handle }
+      : undefined,
+    // Die Karte eines in die Community geteilten Beitrags (Schema 59) —
+    // gleiche Abbildung wie in ladeNachrichten.
+    geteilt: m.posts
+      ? {
+          id: m.posts.id,
+          art: m.posts.kind === 'post' ? ('post' as const) : ('video' as const),
+          autor: m.posts.profiles?.name ?? '',
+          titel: m.posts.title || m.posts.description || '',
+          bild: m.posts.thumbnail_url || m.posts.media_url || undefined,
+        }
       : undefined,
     datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size ?? 0) } : undefined,
   })));

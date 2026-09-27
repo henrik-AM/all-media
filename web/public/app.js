@@ -5011,6 +5011,10 @@ async function renderCommunityChat(community, kanal, thema) {
       if (platz) openExplorer('standort', platz.id);
     })
   );
+  // Die Karte eines geteilten Beitrags → Vollformat, wie im Chat.
+  liste.querySelectorAll('[data-voll]').forEach((b) =>
+    b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
+  );
 
   const feld = $('#commMsgInput');
   const sendKnopf = $('#commSend');
@@ -5080,10 +5084,44 @@ async function renderCommunityChat(community, kanal, thema) {
  * Absenders anzeigen. Anklicken fuehrt zum Profil." Beim eigenen Beitrag
  * steht kein Bild - man weiss, wer man ist.
  */
+/*
+ * Ein geteilter Beitrag als Karte (Henrik 7.9.). Vorher: eine Zeile mit einem
+ * grauen 42px-Kaestchen davor, nicht zu oeffnen — ein weitergeleitetes Video
+ * war im Chat also nur sein Titel. Jetzt steht der Beitrag selbst da und geht
+ * beim Klick ins Vollformat. Seit dem 26.09.2026 auch im Unterthema einer
+ * Community (Schema 59). Gleiche Regel in der App.
+ */
+function geteiltKarte(g) {
+  return `<button class="msg__geteilt" ${
+    g.bild ? `data-voll="${esc(g.bild)}"` : ''
+  }>
+     ${
+       g.bild && !istVideoAdresse(g.bild)
+         ? `<img class="msg__bild" src="${esc(g.bild)}" alt="">`
+         : g.bild
+         ? `<span class="msg__anhang"><video class="msg__bild" src="${esc(
+             g.bild
+           )}" muted playsinline preload="metadata"></video><span class="msg__anhangPlay">${
+             ICONS.play
+           }</span></span>`
+         : `<span class="msg__geteiltBild">${
+             g.art === 'video' ? ICONS.play : ICONS.image
+           }</span>`
+     }
+     <span class="msg__geteiltZeile">
+       ${g.art === 'video' ? ICONS.play : ICONS.image}
+       <span class="msg__geteiltText">
+         <strong>${esc(g.autor)}</strong>
+         <span>${esc(g.titel)}</span>
+       </span>
+     </span>
+   </button>`;
+}
+
 function kanalNachricht(m) {
   // Anhaenge seit 04.09.2026 — derselbe Inhalt wie im Chat, aus derselben
   // Funktion. Ein Sticker steht auch hier ohne Blase (msg--sticker).
-  const inhalt = anhangInhalt(m);
+  const inhalt = m.geteilt ? geteiltKarte(m.geteilt) : anhangInhalt(m);
   const stickerKlasse = m.media === 'sticker' ? ' msg--sticker' : '';
 
   // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
@@ -11238,6 +11276,10 @@ function bereichFuer(uid) {
 function openTeilen(art, id) {
   const gewaehlt = new Set();
   const gesendet = new Set();
+  // Ganze Communitys (Henrik, 26.09.2026) — getrennt von Personen, andere
+  // Kennungen, anderer Weg. Gleiche Aufteilung in app/components/TeilenSheet.tsx.
+  const gewaehltC = new Set();
+  const gesendetC = new Set();
   // Fremde, die über den genauen Nutzernamen gefunden wurden.
   const fremde = {};
   let suche = '';
@@ -11276,6 +11318,27 @@ function openTeilen(art, id) {
     </li>`;
   };
 
+  /** Eine ganze Community: Gruppensymbol, darunter das Unterthema, in das die Karte geht. */
+  const communityKachel = (c) => {
+    const klasse = [
+      'teilen__kachel',
+      gewaehltC.has(c.id) ? 'is-gewaehlt' : '',
+      gesendetC.has(c.id) ? 'is-gesendet' : '',
+    ].join(' ');
+    return `<li>
+      <button class="${klasse}" data-teilen-community="${esc(c.id)}"
+              ${gesendetC.has(c.id) ? 'disabled' : ''} aria-pressed="${gewaehltC.has(c.id)}">
+        <span class="teilen__bild">
+          <span class="avatar avatar--52" style="background:linear-gradient(135deg,#7E93C4,#4A6699)">${ICONS.people}</span>
+        </span>
+        <span class="teilen__name">${esc(c.name)}</span>
+        <span class="teilen__sperre">in #${esc(c.kanal.name)}</span>
+        <span class="teilen__haken">${ICONS.check}</span>
+      </button>
+    </li>`;
+  };
+  const communityName = (cid) => (state.communities || []).find((c) => c.id === cid)?.name || '?';
+
   openSheet(
     art === 'post' ? 'Beitrag teilen' : 'Video teilen',
     `<div class="searchrow teilen__suche">
@@ -11306,19 +11369,39 @@ function openTeilen(art, id) {
         // Der Fremde steht nur da, wenn er nicht schon in einer Gruppe steht.
         if (treffer && !drin.has(treffer)) gruppen.push({ art: 'nutzername', titel: 'Nutzername', ids: [treffer] });
 
+        // Ganze Communitys direkt hinter den eigenen Kontakten, sonst ganz vorn.
+        const ganze = Teilen.communitys(state.communities || [], suche);
+        if (ganze.length) {
+          const hinter = gruppen[0]?.art === 'kontakte' ? 1 : 0;
+          gruppen.splice(hinter, 0, { art: 'communitys', titel: Teilen.GRUPPEN.communitys, ids: [] });
+        }
+
         liste.innerHTML = gruppen.length
           ? gruppen
-              .map((g) => `<div class="teilen__kopf" data-gruppe="${g.art}">${g.titel}</div><ul class="teilen">${g.ids.map(kachel).join('')}</ul>`)
+              .map(
+                (g) =>
+                  `<div class="teilen__kopf" data-gruppe="${g.art}">${g.titel}</div><ul class="teilen">${
+                    g.art === 'communitys' ? ganze.map(communityKachel).join('') : g.ids.map(kachel).join('')
+                  }</ul>`
+              )
               .join('')
           : `<div class="sheet__hint teilen__leer">${
               suche ? 'Niemand gefunden. Fremde findest du über den genauen @nutzernamen.' : 'Noch niemand zum Teilen da.'
             }</div>`;
 
-        knopf.textContent = Teilen.knopf(gewaehlt.size);
-        knopf.disabled = gewaehlt.size === 0;
+        knopf.textContent = Teilen.knopf(gewaehlt.size, gewaehltC.size);
+        knopf.disabled = gewaehlt.size === 0 && gewaehltC.size === 0;
       };
 
       liste.addEventListener('click', (e) => {
+        const c = e.target.closest('[data-teilen-community]');
+        if (c && !c.disabled) {
+          const cid = c.dataset.teilenCommunity;
+          if (gewaehltC.has(cid)) gewaehltC.delete(cid);
+          else gewaehltC.add(cid);
+          meldung.hidden = true;
+          return zeichnen();
+        }
         const b = e.target.closest('[data-teilen]');
         if (!b || b.disabled) return;
         const uid = b.dataset.teilen;
@@ -11358,7 +11441,8 @@ function openTeilen(art, id) {
 
       knopf.addEventListener('click', async () => {
         const empfaenger = [...gewaehlt];
-        if (!empfaenger.length) return;
+        const communitys = [...gewaehltC];
+        if (!empfaenger.length && !communitys.length) return;
 
         /*
          * Der Bereich je Person — dieselbe Angabe, die das Abzeichen auf der
@@ -11372,7 +11456,7 @@ function openTeilen(art, id) {
         const res = await fetch('/api/teilen', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ art, id, empfaenger, bereiche }),
+          body: JSON.stringify({ art, id, empfaenger, bereiche, communitys }),
         }).catch(() => null);
         const daten = res ? await res.json().catch(() => null) : null;
 
@@ -11393,15 +11477,24 @@ function openTeilen(art, id) {
           gewaehlt.delete(uid);
           gesendet.add(uid);
         }
+        for (const cid of daten.gesendetCommunitys || []) {
+          gewaehltC.delete(cid);
+          gesendetC.add(cid);
+        }
 
-        const fehl = daten.fehlgeschlagen || [];
+        const fehl = [
+          ...(daten.fehlgeschlagen || []).map((f) => ({ name: wer(f.id)?.name, grund: f.grund })),
+          ...(daten.fehlgeschlagenCommunitys || []).map((f) => ({ name: communityName(f.id), grund: f.grund })),
+        ];
         if (!fehl.length) {
           zumachen();
           const namen = (daten.gesendet || []).map((uid) => wer(uid)?.name).filter(Boolean);
-          toast(namen.length === 1 ? `An ${namen[0]} gesendet` : `An ${namen.length} Personen gesendet`);
+          const orte = (daten.gesendetCommunitys || []).map(communityName);
+          if (namen.length) toast(namen.length === 1 ? `An ${namen[0]} gesendet` : `An ${namen.length} Personen gesendet`);
+          else toast(orte.length === 1 ? `In ${orte[0]} geteilt` : `In ${orte.length} Communitys geteilt`);
           return;
         }
-        meldung.innerHTML = fehl.map((f) => `<div><b>${esc(wer(f.id)?.name || '?')}:</b> ${esc(f.grund)}</div>`).join('');
+        meldung.innerHTML = fehl.map((f) => `<div><b>${esc(f.name || '?')}:</b> ${esc(f.grund)}</div>`).join('');
         meldung.hidden = false;
         zeichnen();
       });
@@ -13811,36 +13904,7 @@ function messageBubble(m, chat) {
   const inhalt = m.zurueckgenommen
     ? '<span class="msg__zurueck">Diese Nachricht wurde zurückgenommen</span>'
     : m.geteilt
-    ? /*
-       * Ein geteilter Beitrag (Henrik 7.9.). Vorher: eine Zeile mit einem
-       * grauen 42px-Kaestchen davor, nicht zu oeffnen — ein weitergeleitetes
-       * Video war im Chat also nur sein Titel. Jetzt steht der Beitrag selbst
-       * da und geht beim Klick ins Vollformat. Gleiche Regel in der App.
-       */
-      `<button class="msg__geteilt" ${
-        m.geteilt.bild ? `data-voll="${esc(m.geteilt.bild)}"` : ''
-      }>
-         ${
-           m.geteilt.bild && !istVideoAdresse(m.geteilt.bild)
-             ? `<img class="msg__bild" src="${esc(m.geteilt.bild)}" alt="">`
-             : m.geteilt.bild
-             ? `<span class="msg__anhang"><video class="msg__bild" src="${esc(
-                 m.geteilt.bild
-               )}" muted playsinline preload="metadata"></video><span class="msg__anhangPlay">${
-                 ICONS.play
-               }</span></span>`
-             : `<span class="msg__geteiltBild">${
-                 m.geteilt.art === 'video' ? ICONS.play : ICONS.image
-               }</span>`
-         }
-         <span class="msg__geteiltZeile">
-           ${m.geteilt.art === 'video' ? ICONS.play : ICONS.image}
-           <span class="msg__geteiltText">
-             <strong>${esc(m.geteilt.autor)}</strong>
-             <span>${esc(m.geteilt.titel)}</span>
-           </span>
-         </span>
-       </button>`
+    ? geteiltKarte(m.geteilt)
     : anhangInhalt(m);
 
   return `

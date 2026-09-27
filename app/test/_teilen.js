@@ -158,10 +158,10 @@ async function abraeumen(a, b) {
     if (!(suche < liste && liste < knopf)) throw new Error(`Reihenfolge ${suche}/${liste}/${knopf}`);
   });
 
-  await pruefe('Gruppen: Kontakte zuerst, dann Communitys — keine fremden Vorschlaege', async () => {
+  await pruefe('Gruppen: Kontakte zuerst, dann ganze Communitys — keine fremden Vorschlaege', async () => {
     const koepfe = await page.$$eval('.teilen__kopf', (els) => els.map((e) => e.textContent));
     if (koepfe[0] !== 'Deine Kontakte') throw new Error(koepfe.join(' | '));
-    if (!koepfe.includes('Communitys')) throw new Error(koepfe.join(' | '));
+    if (koepfe[1] !== 'Communitys') throw new Error(koepfe.join(' | '));
     if (koepfe.includes('Weitere Vorschläge')) throw new Error('alle Profile stehen wieder drin');
     const liste = await namen();
     if (!liste.includes('Anna Schmidt')) throw new Error(liste.join(' | '));
@@ -239,6 +239,89 @@ async function abraeumen(a, b) {
     await page.waitForSelector('#chatSearch', { timeout: 10000 }).catch(() => {});
     const text = await page.$eval('#main', (e) => e.textContent);
     if (!text.includes('Beitrag geteilt')) throw new Error('Vorschau fehlt');
+  });
+
+  /*
+   * Henrik am 26.09.2026: einzelnen Personen aus Communitys schicken, „aber
+   * auch natürlich in eine Community mit mehreren Personen". Die Karte landet
+   * im ersten Unterthema.
+   *
+   * Geteilt wird in eine eigene Prüfcommunity: in den Communitys des
+   * Testbestands sind auch echte Konten Mitglied, die die Karte sähen.
+   * zuruecksetzen() löscht die Prüfcommunity samt Unterthema wieder.
+   */
+  console.log('\nGanze Communitys');
+  const MUSIK = '44444444-a11e-4d1a-8000-000000000004'; // kein Mitglied
+  const neu = await page.evaluate(async (name) =>
+    (await fetch('/api/communities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, thema: 'Prüflauf', sichtbarkeit: 'private' }),
+    })).json(), 'Prüfteilen ' + Date.now().toString(36));
+  const FOTOGRAFIE = neu.community?.id;
+  if (!FOTOGRAFIE) console.log('  FEHL Prüfcommunity nicht angelegt — ' + (neu.error || ''));
+  // Das Blatt liest state.communities — nach dem Anlegen neu laden.
+  await page.reload({ waitUntil: 'load' });
+  let geteilterBeitrag = null;
+
+  await pruefe('Nur beigetretene Communitys stehen im Blatt, mit Unterthema', async () => {
+    await gehe('videos', 'home');
+    await page.waitForSelector('[data-paction="share"]', { timeout: 10000 });
+    geteilterBeitrag = await page.getAttribute('[data-paction="share"]', 'data-pid');
+    await page.click('[data-paction="share"]');
+    await page.waitForSelector('.teilen', { timeout: 8000 });
+    const ids = await page.$$eval('[data-teilen-community]', (els) => els.map((e) => e.dataset.teilenCommunity));
+    if (!ids.includes(FOTOGRAFIE)) throw new Error('Prüfcommunity fehlt: ' + ids.join(' | '));
+    if (ids.includes(MUSIK)) throw new Error('Musikproduktion steht drin, ohne Mitgliedschaft');
+    const unter = await page.$eval(`[data-teilen-community="${FOTOGRAFIE}"] .teilen__sperre`, (e) => e.textContent);
+    if (unter !== 'in #Allgemein') throw new Error(unter);
+  });
+
+  await pruefe('Person und Community zusammen: der Knopf nennt beides', async () => {
+    await page.click(`[data-teilen="${K.person('u1')}"]`);
+    await page.click(`[data-teilen-community="${FOTOGRAFIE}"]`);
+    if ((await knopfText()) !== 'An 1 Person und 1 Community senden') throw new Error(await knopfText());
+    await page.click(`[data-teilen="${K.person('u1')}"]`);
+    if ((await knopfText()) !== 'An 1 Community senden') throw new Error(await knopfText());
+    await bild('4-community');
+  });
+
+  await pruefe('Die Suche filtert auch die Communitys', async () => {
+    await tippen('prüfteilen');
+    const ids = await page.$$eval('[data-teilen-community]', (els) => els.map((e) => e.dataset.teilenCommunity));
+    if (ids.join() !== FOTOGRAFIE) throw new Error(ids.join(' | ') || 'keine');
+    await tippen('');
+  });
+
+  await pruefe('Senden legt die Karte ins erste Unterthema', async () => {
+    await page.click('#teilenSenden');
+    await warteAufSchliessen();
+    const { data: kanal } = await pruefer.client
+      .from('community_channels').select('id').eq('community_id', FOTOGRAFIE)
+      .order('position').order('created_at').limit(1).single();
+    const antwort = await page.evaluate(
+      async ({ c, k }) => (await fetch(`/api/communities/${c}/channels/${k}`)).json(),
+      { c: FOTOGRAFIE, k: kanal.id }
+    );
+    const karte = (antwort.messages || []).filter((m) => m.geteilt).pop();
+    if (!karte) throw new Error('keine Karte im Unterthema');
+    if (karte.geteilt.id !== geteilterBeitrag) throw new Error('falscher Beitrag ' + karte.geteilt.id);
+    if (!karte.geteilt.autor) throw new Error('Karte ohne Autor');
+  });
+
+  await pruefe('Ohne Mitgliedschaft lehnt die Datenbank ab — auch am Blatt vorbei', async () => {
+    const antwort = await page.evaluate(
+      async ({ id, c }) =>
+        (await fetch('/api/teilen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ art: 'post', id, communitys: [c] }),
+        })).json(),
+      { id: geteilterBeitrag, c: MUSIK }
+    );
+    if ((antwort.gesendetCommunitys || []).length) throw new Error('ging durch');
+    const grund = (antwort.fehlgeschlagenCommunitys || [])[0]?.grund;
+    if (grund !== 'Nur Mitglieder können hier teilen') throw new Error(JSON.stringify(antwort));
   });
 
   console.log('\nFremde: ein Video bis zur Annahme');

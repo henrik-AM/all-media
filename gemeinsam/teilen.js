@@ -22,6 +22,13 @@
  *     anzeigt, damit niemand auf eine Kachel tippt, die nichts mehr senden
  *     darf.
  *
+ * Henrik am 26.09.2026: „man soll es einzelnen Personen unter Community
+ * schicken können, aber auch natürlich in eine Community mit mehreren
+ * Personen, das darf die sendende Person selber entscheiden." Deshalb gibt
+ * es zwei Gruppen: „Communitys" sind ganze Communitys, in denen man Mitglied
+ * ist — der Beitrag landet in ihrem ersten Unterthema und alle Mitglieder
+ * sehen ihn (Schema 59). „Personen aus Communitys" sind die Einzelnen.
+ *
  * Die UMD-Hülle aus demselben Grund wie in kommentar.js: die Prüfläufe
  * laden App-Code als blob:-Modul, dort gibt es kein `require`.
  */
@@ -37,7 +44,12 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var GRUPPEN = { kontakte: 'Deine Kontakte', community: 'Communitys', gefolgt: 'Gefolgt' };
+  var GRUPPEN = {
+    kontakte: 'Deine Kontakte',
+    communitys: 'Communitys',
+    community: 'Personen aus Communitys',
+    gefolgt: 'Gefolgt',
+  };
 
   /** Wie `Benutzername.normal`: ohne führendes @, klein, beschnitten. */
   function normal(text) {
@@ -92,6 +104,30 @@
   }
 
   /**
+   * Die ganzen Communitys, in die man teilen kann: beigetreten und mit
+   * mindestens einem Unterthema, gefiltert nach der Suche.
+   *
+   * Die App nennt die Unterthemen `unterthemen`, die Website `channels`;
+   * beide sind schon nach `position` sortiert. Der Beitrag geht ins erste.
+   *
+   * Rückgabe: [{ id, name, kanal: { id, name } }].
+   */
+  function communitys(liste, suche) {
+    var s = normal(suche);
+    return (liste || [])
+      .filter(function (c) {
+        return c && c.joined;
+      })
+      .map(function (c) {
+        var kanaele = c.unterthemen || c.channels || [];
+        return { id: c.id, name: c.name, kanal: kanaele[0] ? { id: kanaele[0].id, name: kanaele[0].name } : null };
+      })
+      .filter(function (c) {
+        return c.kanal && (!s || String(c.name || '').toLowerCase().indexOf(s) !== -1);
+      });
+  }
+
+  /**
    * Der Nutzername, nach dem die Datenbank gefragt wird — so, wie er in
    * `profiles.handle` steht (mit @). Null, wenn die Eingabe kein
    * Nutzername sein kann; dann wird gar nicht erst gefragt.
@@ -116,10 +152,13 @@
     return null;
   }
 
-  /** Die Beschriftung des Senden-Knopfs. */
-  function knopf(anzahl) {
-    if (!anzahl) return 'Senden';
-    return anzahl === 1 ? 'An 1 Person senden' : 'An ' + anzahl + ' Personen senden';
+  /** Die Beschriftung des Senden-Knopfs — Personen und ganze Communitys. */
+  function knopf(anzahl, communityAnzahl) {
+    var teile = [];
+    if (anzahl) teile.push(anzahl === 1 ? '1 Person' : anzahl + ' Personen');
+    if (communityAnzahl) teile.push(communityAnzahl === 1 ? '1 Community' : communityAnzahl + ' Communitys');
+    if (!teile.length) return 'Senden';
+    return 'An ' + teile.join(' und ') + ' senden';
   }
 
   /**
@@ -139,6 +178,7 @@
     GRUPPEN: GRUPPEN,
     passt: passt,
     gruppen: gruppen,
+    communitys: communitys,
     nutzername: nutzername,
     sperre: sperre,
     knopf: knopf,
