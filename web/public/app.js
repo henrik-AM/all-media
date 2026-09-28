@@ -10233,7 +10233,7 @@ function openSpende(empfaengerId, postId) {
           if (b.dataset.spendecent !== 'eigen') return buchen(Number(b.dataset.spendecent));
           openFormular(
             `An ${name} spenden`,
-            [{ key: 'betrag', label: 'Betrag in Euro', platzhalter: 'z. B. 2,50', pflicht: true }],
+            [{ key: 'betrag', label: 'Betrag in Euro', typ: 'betrag', platzhalter: 'z. B. 2,50', pflicht: true }],
             async (werte) => {
               const zahl = Number(String(werte.betrag).replace(/\s|€/g, '').replace(',', '.'));
               if (!Number.isFinite(zahl) || zahl < 0.5 || zahl > 1000) {
@@ -10293,7 +10293,9 @@ function openClip(clipId) {
      * Minute lang, ihre Kapitel reichten bis Minute 11. Bei Live gibt es
      * keine: dort steht noch nicht fest, was kommt.
      */
-    const kapitel = istLive() ? [] : (clip.kapitel || []).filter((k) => !gesamt || k.bei < gesamt);
+    const imVideo = istLive() ? [] : (clip.kapitel || []).filter((k) => !gesamt || k.bei < gesamt);
+    // Ein einziges Kapitel von 0:00 bis zum Ende teilt nichts ein (Kasten 6.4).
+    const kapitel = imVideo.length > 1 ? imVideo : [];
 
     overlay.innerHTML = `
       <div class="page">
@@ -10313,8 +10315,8 @@ function openClip(clipId) {
             </div>
             <div class="player__leiste">
               <span class="player__zeit" id="clipZeit">${zeit(bei)}</span>
-              <span class="player__balkenfeld" id="clipBalken"><span class="player__balken"><i id="clipFortschritt" style="width:0%"></i></span></span>
-              <span class="player__zeit">${istLive() ? 'LIVE' : esc(clip.duration)}</span>
+              <span class="player__balkenfeld" id="clipBalken" role="slider" tabindex="0" aria-label="Wiedergabeposition"><span class="player__balken"><i id="clipFortschritt" style="width:0%"></i></span></span>
+              <span class="player__zeit" id="clipLaenge">${istLive() ? 'LIVE' : esc(clip.duration)}</span>
               ${/*
                   Punkt 31 und 30: Einstellungen und Vollbild. Beide sitzen in
                   der Leiste unter dem Bild, dort sucht man sie von YouTube her.
@@ -10499,6 +10501,7 @@ function openClip(clipId) {
       if (zeitFeld) zeitFeld.textContent = zeit(bei);
       const balken = overlay.querySelector('#clipFortschritt');
       if (balken) balken.style.width = `${gesamt ? (bei / gesamt) * 100 : 0}%`;
+      overlay.querySelector('#clipBalken')?.setAttribute('aria-valuetext', `${zeit(bei)} von ${istLive() ? 'LIVE' : zeit(gesamt)}`);
     };
 
     if (medium) {
@@ -10510,9 +10513,21 @@ function openClip(clipId) {
         if (medium.duration && isFinite(medium.duration)) {
           gesamt = Math.round(medium.duration);
           leisteSetzen();
-          // Kapitel hinter dem Ende der Datei fallen weg.
+          // Die Leiste endet hier, also steht auch diese Laenge daneben.
+          const laenge = overlay.querySelector('#clipLaenge');
+          if (laenge && !istLive()) laenge.textContent = zeit(gesamt);
+          // Kapitel hinter dem Ende der Datei fallen weg - und mit ihnen die
+          // Liste, wenn nur eines bleibt.
           overlay.querySelectorAll('[data-kapitel]').forEach((k) => {
             if (Number(k.dataset.kapitel) >= gesamt) k.remove();
+          });
+          const bleiben = [...overlay.querySelectorAll('[data-kapitel]')];
+          if (bleiben.length < 2) overlay.querySelector('.kapitel')?.remove();
+          // Die Dauer des letzten reichte sonst bis zu einem, das es nicht mehr gibt.
+          bleiben.forEach((k, i) => {
+            const bis = bleiben[i + 1] ? Number(bleiben[i + 1].dataset.kapitel) : gesamt;
+            const dauer = k.querySelector('.kapitel__dauer');
+            if (dauer) dauer.textContent = zeit(bis - Number(k.dataset.kapitel));
           });
         }
       });
@@ -10595,8 +10610,16 @@ function openClip(clipId) {
           if (hochkant()) {
             try {
               await screen.orientation.lock('landscape');
+              /*
+               * Manche Browser sagen zu und drehen trotzdem nicht. Steht das
+               * Bild nach einem Moment noch hochkant, dreht der Player selbst
+               * - sonst bliebe es beim gestreckten Hochformat (Kasten 6.7).
+               */
+              await new Promise((r) => setTimeout(r, 400));
+              if (hochkant()) throw new Error('nicht gedreht');
             } catch {
               await document.exitFullscreen().catch(() => {});
+              screen.orientation?.unlock?.();
               selbstDrehen();
             }
           }
@@ -10659,9 +10682,17 @@ function openClip(clipId) {
       leisteSetzen();
     };
     const balkenFeld = overlay.querySelector('#clipBalken');
+    /*
+     * Im gedrehten Vollbild (player--quer) steht die Leiste senkrecht auf dem
+     * Bildschirm, ihr Anfang oben. Dann zaehlt die Hoehe, nicht die Breite —
+     * sonst sprang jeder Tipp an dieselbe Stelle (28.09.2026).
+     */
     const balkenStelle = (e) => {
       const kasten = balkenFeld.getBoundingClientRect();
-      springen(gesamt * Math.min(1, Math.max(0, (e.clientX - kasten.left) / kasten.width)));
+      const anteil = spieler.classList.contains('player--quer')
+        ? (e.clientY - kasten.top) / kasten.height
+        : (e.clientX - kasten.left) / kasten.width;
+      springen(gesamt * Math.min(1, Math.max(0, anteil)));
     };
     balkenFeld.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -10676,6 +10707,13 @@ function openClip(clipId) {
       balkenFeld.addEventListener('pointermove', ziehen);
       balkenFeld.addEventListener('pointerup', los);
       balkenFeld.addEventListener('pointercancel', los);
+    });
+    // Wie in der App fuer VoiceOver: Pfeiltasten springen zehn Sekunden.
+    balkenFeld.addEventListener('keydown', (e) => {
+      const schritt = { ArrowRight: 10, ArrowUp: 10, ArrowLeft: -10, ArrowDown: -10 }[e.key];
+      if (!schritt) return;
+      e.preventDefault();
+      springen(bei + schritt);
     });
 
     overlay.querySelector('#clipLiveKante')?.addEventListener('click', (e) => {
@@ -10812,6 +10850,10 @@ function openClip(clipId) {
         clearInterval(uhr);
         uhr = null;
         bei = 0;
+        // Die Live-Kante gehoert zum alten Video; mitgenommen liesse sie beim
+        // naechsten Stream ein Stueck nach vorn springen.
+        liveKante = 0;
+        liveOffen = false;
         clip = state.clips.find((c) => c.id === b.dataset.anderesclip);
         gesamt = sekunden(clip.duration);
         paint();
@@ -11669,7 +11711,10 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
           ? `<select id="f_${f.key}">${(f.auswahl || [])
               .map((w) => `<option value="${esc(w)}" ${w === f.wert ? 'selected' : ''}>${esc(w)}</option>`)
               .join('')}</select>`
-          : `<input ${gemeinsam} type="${f.typ === 'zahl' ? 'number' : 'text'}" value="${esc(f.wert || '')}">`;
+          : // 'betrag': Text mit Kommatastatur - "2,50" nimmt ein number-Feld nicht an.
+            `<input ${gemeinsam} type="${f.typ === 'zahl' ? 'number' : 'text'}"${
+              f.typ === 'betrag' ? ' inputmode="decimal"' : ''
+            } value="${esc(f.wert || '')}">`;
     return `<div class="sheet__field">
       <label class="sheet__label" for="f_${f.key}">${esc(f.label)}</label>
       ${eingabe}
@@ -11679,6 +11724,7 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
   openSheet(
     titel,
     `<div class="sheet__body">${felder.map(feldHtml).join('')}</div>
+     <div class="sheet__fehler" id="formFehler" role="alert" hidden></div>
      <div class="sheet__footer"><button class="prof__btn is-primary" id="formOk">${esc(knopf)}</button></div>`,
     (sheet, close) => {
       // Eine Auswahl bekommt keinen Fokus - sonst klappt sie beim Oeffnen auf.
@@ -11689,11 +11735,20 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
         const werte = {};
         for (const f of felder) werte[f.key] = sheet.querySelector('#f_' + f.key).value.trim();
 
+        /*
+         * Fehler stehen im Blatt. Als Toast lagen sie dahinter und waren
+         * nicht zu sehen (Kasten 6.5, 28.09.2026) - wie beim Kommentarblatt.
+         */
+        const melden = (text) => {
+          const feld = sheet.querySelector('#formFehler');
+          feld.textContent = text;
+          feld.hidden = false;
+        };
         const fehlt = felder.find((f) => f.pflicht && !werte[f.key]);
-        if (fehlt) return toast(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
+        if (fehlt) return melden(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
 
         const fehler = await senden(werte);
-        if (fehler) return toast(fehler);
+        if (fehler) return melden(fehler);
         close();
       };
 
@@ -11702,6 +11757,10 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
         el.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') absenden();
         })
+      );
+      // Weitertippen nimmt den Hinweis wieder weg.
+      sheet.querySelectorAll('input, textarea').forEach((el) =>
+        el.addEventListener('input', () => (sheet.querySelector('#formFehler').hidden = true))
       );
     },
     { schliessen: true }

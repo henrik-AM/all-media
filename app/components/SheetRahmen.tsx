@@ -60,6 +60,12 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
           <View style={hoch ? styles.inhaltHoch : undefined}>{children}</View>
 
           {fuss ? <View style={[styles.fuss, { paddingBottom: insets.bottom + spacing.md }]}>{fuss}</View> : null}
+          {/*
+            Das Blatt laeuft unter der Tastatur weiter. Deren Glas (iOS 26)
+            ist durchsichtig, und darunter lag bis zum 28.09.2026 die Seite -
+            hell, nicht abgedunkelt, als Streifen zwischen Blatt und Tasten.
+          */}
+          <View style={styles.unterTastatur} pointerEvents="none" />
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -85,6 +91,7 @@ const styles = themenStyles((colors) => ({
   // 74 Prozent: genug fuer eine lange Liste, aber der Bildschirm dahinter
   // bleibt sichtbar - sonst wirkt es wie eine eigene Seite.
   sheetHoch: { height: '74%' },
+  unterTastatur: { position: 'absolute', left: 0, right: 0, top: '100%', height: 600, backgroundColor: colors.surface },
   inhaltHoch: { flex: 1, minHeight: 0 },
   griff: {
     position: 'absolute',

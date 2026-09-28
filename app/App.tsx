@@ -122,7 +122,7 @@ interface Formular {
 
 const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-const Shell = () => {
+const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   const { logout } = useContext(AuthContext);
   const { isDark } = useContext(ThemeContext);
   const insets = useSafeAreaInsets();
@@ -133,7 +133,6 @@ const Shell = () => {
   const [subs, setSubs] = useState<Record<AreaKey, SubKey>>(defaultSub);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   /*
    * Chats, Kontakte und Storys liegen in der Schale, damit eine Aenderung an
    * einer Stelle ueberall ankommt. Ihr Ausgangsstand kommt aus der Datenbank.
@@ -510,7 +509,6 @@ const Shell = () => {
   };
 
   const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
-  const hideNotice = useCallback(() => setNotice(null), []);
 
   /*
    * Platz und Zaehler der Dynamic Island.
@@ -2293,13 +2291,22 @@ const Shell = () => {
         />
       )}
 
-      <Toast message={notice} onHide={hideNotice} />
     </View>
   );
 };
 
 const Root = () => {
   const { isLoggedIn, sitzungGeladen } = useContext(AuthContext);
+
+  /*
+   * Der Hinweis gehoert hierher, nicht in die Schale. Dort hing er nur unter
+   * dem Hauptbildschirm - Player, Chat, Profil, Story und die anderen
+   * Vollbild-Ansichten ersetzen diesen aber ganz. Jede Bestaetigung aus
+   * ihnen ging ins Leere: "2,50 € gespendet" wurde gebucht und nie gezeigt
+   * (28.09.2026, Kasten 6.5 im Pruefgeraet).
+   */
+  const [notice, setNotice] = useState<string | null>(null);
+  const hideNotice = useCallback(() => setNotice(null), []);
 
   /*
    * Solange die gespeicherte Sitzung noch geholt wird, zeigen wir eine leere
@@ -2316,7 +2323,10 @@ const Root = () => {
   // Zustimmung eines Elternteils (Schema 52, components/KontoFreigabe.tsx).
   return isLoggedIn ? (
     <KontoFreigabe>
-      <Shell />
+      <View style={{ flex: 1 }}>
+        <Shell setNotice={setNotice} />
+        <Toast message={notice} onHide={hideNotice} />
+      </View>
     </KontoFreigabe>
   ) : (
     <LoginScreen />

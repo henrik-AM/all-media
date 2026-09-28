@@ -98,7 +98,8 @@
     "test:rang": "node test/_rang.js",
     "test:minderjaehrig": "node test/_minderjaehrig.js",
     "test:elternnummer": "node test/_eltern_nummer.js",
-    "test:kommentare": "node test/_kommentare.js"
+    "test:kommentare": "node test/_kommentare.js",
+    "test:querformat": "node test/_querformat.js"
   },
   "private": true
 }

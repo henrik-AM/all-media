@@ -237,10 +237,18 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    * Minute lang, ihre Kapitel reichten bis Minute 11 — Henrik am 21.09.2026:
    * „Kapitel ergeben keinen Sinn." Bei Live gibt es keine: dort steht noch
    * nicht fest, was kommt.
+   *
+   * Bleibt nur eines uebrig, faellt auch das weg: ein einziges Kapitel von
+   * 0:00 bis zum Ende teilt nichts ein (28.09.2026, Kasten 6.4).
    */
-  const kapitel = istLive ? [] : (clip.kapitel ?? []).filter((k) => !gesamt || k.bei < gesamt);
+  const imVideo = istLive ? [] : (clip.kapitel ?? []).filter((k) => !gesamt || k.bei < gesamt);
+  const kapitel = imVideo.length > 1 ? imVideo : [];
 
+  const seite = useRef<ScrollView>(null);
   const wechseln = (id: string) => {
+    // Oben anfangen, beim Titel des neuen Videos - sonst blieb die Seite
+    // unten bei den aehnlichen stehen (28.09.2026).
+    seite.current?.scrollTo({ y: 0, animated: false });
     stand.current = 0;
     liveKante.current = 0;
     setBei(0);
@@ -293,7 +301,14 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.bar}>
+      {/*
+        Im Vollbild weg mit Kopfleiste und Seite: sie lagen fuer die Beruehrung
+        UEBER der gedrehten Flaeche, trotz zIndex. Kein Knopf dort reagierte,
+        nicht einmal "Vollbild beenden" — man sass fest (28.09.2026, im
+        Pruefgeraet gefunden). display:none behaelt beide eingehaengt, der
+        Scrollstand und ein angefangener Kommentar bleiben.
+      */}
+      <View style={[styles.bar, vollbild && styles.weg]}>
         <Druck onPress={onBack} hitSlop={10} accessibilityLabel="Zurück">
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Druck>
@@ -349,12 +364,24 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             style={styles.balkenFeld}
             onLayout={(e) => setBalkenBreite(e.nativeEvent.layout.width)}
             {...balkenGriff}
+            /*
+             * Ohne Beschriftung war die Leiste fuer VoiceOver nicht da.
+             * Wischen hoch/runter springt zehn Sekunden — bei Live gilt
+             * dieselbe Grenze wie beim Antippen.
+             */
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel="Wiedergabeposition"
+            accessibilityValue={{ text: `${zeitText(bei)} von ${istLive ? 'LIVE' : zeitText(gesamt)}` }}
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={(e) => springen(bei + (e.nativeEvent.actionName === 'increment' ? 10 : -10))}
           >
             <View style={styles.balken} pointerEvents="none">
               <View style={[styles.fortschritt, { width: `${gesamt ? (bei / gesamt) * 100 : 0}%` }]} />
             </View>
           </View>
-          <Text style={styles.zeit}>{istLive ? 'LIVE' : clip.duration}</Text>
+          {/* Die Laenge aus der Datei, sobald sie bekannt ist — die Leiste endet dort. */}
+          <Text style={styles.zeit}>{istLive ? 'LIVE' : dateiLaenge ? zeitText(dateiLaenge) : clip.duration}</Text>
           {/* Einstellungen und Vollbild - dort sucht man sie von YouTube her. */}
           <Druck style={styles.leisteKnopf} onPress={() => setOptionen(true)} hitSlop={8} accessibilityLabel="Video-Einstellungen">
             <Ionicons name="settings-outline" size={18} color="#C6CAD2" />
@@ -376,6 +403,8 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         schrieb blind (28.09.2026).
       */}
       <ScrollView
+        ref={seite}
+        style={vollbild && styles.weg}
         contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
@@ -791,6 +820,7 @@ const styles = themenStyles((colors) => ({
   },
 
   screen: { flex: 1, backgroundColor: colors.surface },
+  weg: { display: 'none' },
   bar: {
     height: 48,
     justifyContent: 'center',

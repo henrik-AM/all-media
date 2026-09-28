@@ -111,13 +111,35 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
     onFortschritt?.(Math.floor(currentTime), Math.floor(spieler.duration || 0));
   });
 
+  /*
+   * Die Laenge schon beim Laden melden, nicht erst beim Abspielen. Sonst
+   * richteten sich Leiste und Kapitel bis zum ersten Play nach dem Text im
+   * Beitrag ("24:10" bei einer Datei von einer Minute) — Kasten 6.4.
+   */
+  useEventListener(spieler, 'sourceLoad', ({ duration }) => {
+    if (duration > 0) onFortschritt?.(Math.floor(spieler.currentTime || 0), Math.floor(duration));
+  });
+
   useEventListener(spieler, 'playToEnd', () => {
     if (!schleife) onEnde?.();
   });
 
   useEventListener(spieler, 'statusChange', ({ status, error }) => {
     if (status === 'error' || error) setFehler(true);
+    // Beim Wechsel auf ein anderes Video entsteht ein neuer Spieler, und
+    // sourceLoad kann feuern, bevor der Horcher haengt. Dann blieb die
+    // Laenge aus dem Beitragstext stehen ("7:44" bei einer Minute).
+    if (status === 'readyToPlay' && spieler.duration > 0) {
+      onFortschritt?.(Math.floor(spieler.currentTime || 0), Math.floor(spieler.duration));
+    }
   });
+
+  // Und falls beides schon vorbei war, bevor die Horcher hingen: nachsehen.
+  // Dieser Effekt laeuft nach den useEventListener-Effekten darueber.
+  useEffect(() => {
+    if (spieler.duration > 0) onFortschritt?.(Math.floor(spieler.currentTime || 0), Math.floor(spieler.duration));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spieler]);
 
   useEffect(() => { spieler.loop = schleife; }, [spieler, schleife]);
   useEffect(() => { spieler.muted = stumm; }, [spieler, stumm]);

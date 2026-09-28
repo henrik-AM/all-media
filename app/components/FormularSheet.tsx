@@ -38,20 +38,28 @@ interface Props {
   onClose: () => void;
   /** Gibt einen Fehlertext zurueck, dann bleibt das Blatt offen. */
   onSubmit: (werte: Record<string, string>) => string | null;
-  onNotice: (message: string) => void;
+  /** Frueher fuer Fehler gebraucht, die stehen jetzt im Blatt selbst. */
+  onNotice?: (message: string) => void;
 }
 
 /**
  * Ein Blatt mit Eingabefeldern - fuer Highlight, Playlist, Spendenaktion,
  * neuen Kanal und die Beschreibung zu einer Aufnahme.
  */
-export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbelegung, onClose, onSubmit, onNotice }: Props) => {
+export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbelegung, onClose, onSubmit }: Props) => {
   const [werte, setWerte] = useState<Record<string, string>>({});
+  /*
+   * Fehler stehen im Blatt. Als Hinweis des Bildschirms lagen sie hinter dem
+   * Blatt und waren nicht zu sehen (Kasten 6.5, 28.09.2026) — wie beim
+   * Kommentarblatt in Kasten 5.
+   */
+  const [fehler, setFehler] = useState<string | null>(null);
 
   // Beim Oeffnen zuruecksetzen, sonst steht die vorige Eingabe noch drin -
   // auf die Vorbelegung, wo es eine gibt.
   useEffect(() => {
     if (visible) setWerte(vorbelegung ?? {});
+    setFehler(null);
     // vorbelegung bewusst nicht in der Liste: sie ist bei jedem Bildaufbau
     // ein neues Objekt und wuerde das Feld beim Tippen staendig zuruecksetzen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,10 +75,10 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
     }
 
     const fehlt = felder.find((f) => f.pflicht && !gefuellt[f.key]);
-    if (fehlt) return onNotice(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
+    if (fehlt) return setFehler(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
 
-    const fehler = onSubmit(gefuellt);
-    if (fehler) return onNotice(fehler);
+    const abgelehnt = onSubmit(gefuellt);
+    if (abgelehnt) return setFehler(abgelehnt);
     onClose();
   };
 
@@ -115,10 +123,14 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
               <TextInput
                 style={[styles.eingabe, f.typ === 'mehrzeilig' && styles.mehrzeilig]}
                 value={werte[f.key] ?? ''}
-                onChangeText={(t) => setWerte((prev) => ({ ...prev, [f.key]: t }))}
+                onChangeText={(t) => {
+                  setWerte((prev) => ({ ...prev, [f.key]: t }));
+                  setFehler(null);
+                }}
                 placeholder={f.platzhalter}
                 placeholderTextColor={colors.text3}
-                keyboardType={f.typ === 'zahl' ? 'number-pad' : 'default'}
+                /* Mit Komma: „2,50" liess sich auf dem Ziffernblock nicht tippen. */
+                keyboardType={f.typ === 'zahl' ? 'decimal-pad' : 'default'}
                 multiline={f.typ === 'mehrzeilig'}
                 autoFocus={i === 0}
                 returnKeyType={i === felder.length - 1 ? 'done' : 'next'}
@@ -127,6 +139,11 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
               )}
             </View>
           ))}
+        {!!fehler && (
+          <Text style={styles.fehler} accessibilityRole="alert">
+            {fehler}
+          </Text>
+        )}
       </ScrollView>
     </SheetRahmen>
   );
@@ -167,4 +184,5 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   knopfText: { ...typography.name, color: colors.white },
+  fehler: { ...typography.small, fontWeight: '600', color: colors.danger, paddingHorizontal: spacing.lg, paddingTop: 4 },
 }));
