@@ -49,7 +49,9 @@ delete from public.comments k
       and not exists (select 1 from public.profiles p where p.id = b.user_id and p.demo)
  );
 
--- 2. Für jedes echte Konto einen Kommentar an einem sichtbaren Demo-Beitrag.
+-- 2. Für die Testkonten einen Kommentar an einem sichtbaren Demo-Beitrag.
+--    Bis 28.09.2026 hieß es hier „für jedes echte Konto" — Demo-Beiträge
+--    sieht aber jeder, siehe SUPABASE_SCHEMA_60_testkommentar_nur_testkonten.sql.
 insert into public.comments (post_id, user_id, text, created_at)
 select b.id, z.id,
        'Testkommentar — zum Prüfen von Antworten, Gefällt mir und Löschen.',
@@ -64,6 +66,11 @@ select b.id, z.id,
      limit 1
   ) b
  where not z.demo
+   and exists (
+     select 1 from auth.users u
+      where u.id = z.id
+        and u.email in ('test@all-media.app', 'all.media.prueflauf@web.de')
+   )
    and not exists (
      select 1 from public.comments k
       where k.user_id = z.id and k.post_id = b.id
@@ -88,15 +95,16 @@ begin
 
   select count(*) into ohne
     from public.profiles z
-   where not z.demo
+    join auth.users u on u.id = z.id
+   where u.email in ('test@all-media.app', 'all.media.prueflauf@web.de')
      and not exists (select 1 from public.comments k where k.user_id = z.id);
 
   if unsichtbar > 0 then
     raise exception 'Noch % Kommentar(e) an einem unsichtbaren Beitrag', unsichtbar;
   end if;
   if ohne > 0 then
-    raise exception '% echte(s) Konto(en) ohne einen einzigen Kommentar', ohne;
+    raise exception '% Testkonto(en) ohne einen einzigen Kommentar', ohne;
   end if;
 
-  raise notice 'Kommentare in Ordnung: keiner unsichtbar, jedes Konto hat einen.';
+  raise notice 'Kommentare in Ordnung: keiner unsichtbar, jedes Testkonto hat einen.';
 end $$;

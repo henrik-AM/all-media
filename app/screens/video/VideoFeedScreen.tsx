@@ -368,7 +368,7 @@ export const VideoFeedScreen = ({
         </Pressable>
 
         <View style={styles.rail}>
-          <Druck style={styles.railBtn} onPress={() => toggleLike(item)}>
+          <Druck style={styles.railBtn} onPress={() => toggleLike(item)} accessibilityLabel="Gefällt mir">
             <Ionicons
               name={item.liked ? 'heart' : 'heart-outline'}
               size={28}
@@ -377,17 +377,17 @@ export const VideoFeedScreen = ({
             <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.likes)}</Text>
           </Druck>
 
-          <Druck style={styles.railBtn} onPress={() => { haptic.light(); setCommentsFor(item.id); }}>
+          <Druck style={styles.railBtn} onPress={() => { haptic.light(); setCommentsFor(item.id); }} accessibilityLabel="Kommentieren">
             <Ionicons name="chatbubble-outline" size={26} color={colors.white} />
             <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.comments)}</Text>
           </Druck>
 
-          <Druck style={styles.railBtn} onPress={() => share(item)}>
+          <Druck style={styles.railBtn} onPress={() => share(item)} accessibilityLabel="Beitrag senden">
             <Ionicons name="paper-plane-outline" size={26} color={colors.white} />
             <Text style={styles.railLabel} numberOfLines={1}>{compactNumber(item.shares + (geteiltZaehler[item.id] ?? 0))}</Text>
           </Druck>
 
-          <Druck style={styles.railBtn} onPress={() => toggleRepost(item)}>
+          <Druck style={styles.railBtn} onPress={() => toggleRepost(item)} accessibilityLabel="Reposten">
             <Ionicons
               name="repeat"
               size={28}
@@ -398,7 +398,7 @@ export const VideoFeedScreen = ({
             </Text>
           </Druck>
 
-          <Druck style={styles.railBtn} onPress={() => toggleSave(item)}>
+          <Druck style={styles.railBtn} onPress={() => toggleSave(item)} accessibilityLabel="Speichern">
             <Ionicons
               name={item.saved ? 'bookmark' : 'bookmark-outline'}
               size={25}

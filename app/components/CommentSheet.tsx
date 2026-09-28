@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -26,17 +27,37 @@ interface Props {
   targetId: string | null;
   onClose: () => void;
   onCountChange?: (targetId: string, count: number) => void;
-  /** Fuer die Rueckmeldung des Wortfilters. */
+  /** Wird nicht mehr genutzt: Meldungen stehen seit 28.09.2026 im Blatt. */
   onNotice?: (text: string) => void;
 }
 
-export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Props) => {
+export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
   const { users: alleNutzer, ichId } = useDaten();
   const { supabase } = useSupabase();
-  const aktionen = useAktionen(onNotice);
+  /*
+   * Meldungen erscheinen im Blatt selbst. `onNotice` zeichnet den Toast unter
+   * das Modal: wer ein gesperrtes Wort schrieb oder ohne Netz sendete, sah
+   * bis zum 28.09.2026 gar nichts - der Senden-Knopf wirkte kaputt.
+   */
+  const [hinweis, setHinweis] = useState('');
+  const aktionen = useAktionen(setHinweis);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
   const insets = useSafeAreaInsets();
+  /*
+   * Mit offener Tastatur liegt die Home-Leiste unter der Tastatur. Ihr
+   * Abstand blieb trotzdem stehen und liess eine leere Lücke zwischen
+   * Eingabezeile und Tastatur (28.09.2026).
+   */
+  const [tastatur, setTastatur] = useState(false);
+  useEffect(() => {
+    const an = Keyboard.addListener('keyboardWillShow', () => setTastatur(true));
+    const aus = Keyboard.addListener('keyboardWillHide', () => setTastatur(false));
+    return () => {
+      an.remove();
+      aus.remove();
+    };
+  }, []);
 
   /*
    * Kommentare werden zu dem Beitrag geholt, der gerade offen ist — nicht
@@ -50,6 +71,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Pro
     }
     let abgebrochen = false;
     setDraft('');
+    setHinweis('');
     ladeKommentare(supabase, ichId, targetId)
       .then((geladen) => {
         if (!abgebrochen) setComments(geladen);
@@ -100,10 +122,11 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Pro
      */
     const treffer = await aktionen.wortfilter(text);
     if (treffer) {
-      onNotice?.(`„${treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
+      setHinweis(`„${treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
       return;
     }
 
+    setHinweis('');
     setDraft('');
 
     let data;
@@ -112,6 +135,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Pro
     } catch (e: any) {
       console.error('Kommentar senden fehlgeschlagen:', e?.message ?? e);
       setDraft(text);
+      setHinweis('Der Kommentar ging nicht durch. Versuch es noch einmal.');
       return;
     }
 
@@ -196,19 +220,27 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Pro
           }
         />
 
+        {hinweis ? (
+          <Text style={styles.fehler} accessibilityLiveRegion="polite">
+            {hinweis}
+          </Text>
+        ) : null}
         {/*
           Henrik am 21.09.2026: Eingabefeld, Senden-Knopf und Profilbild
           sassen zu weit unten und waren nur halb zu sehen. Das Blatt reicht
           bis an den Bildschirmrand, und dort liegt beim iPhone die
           Home-Leiste — ohne diesen Abstand verschwand die Zeile darunter.
         */}
-        <View style={[styles.composer, { paddingBottom: 9 + insets.bottom }]}>
+        <View style={[styles.composer, { paddingBottom: 9 + (tastatur ? 0 : insets.bottom) }]}>
           <Avatar id={CURRENT_USER_ID} name={alleNutzer[CURRENT_USER_ID]?.name ?? ""} size={sizes.avatarSm} />
           <View style={styles.field}>
             <TextInput
               style={styles.input}
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={(t) => {
+                setDraft(t);
+                if (hinweis) setHinweis('');
+              }}
               placeholder="Kommentar hinzufügen"
               placeholderTextColor={colors.text3}
               multiline
@@ -218,6 +250,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, onNotice }: Pro
             style={[styles.send, !draft.trim() && styles.sendDisabled]}
             onPress={send}
             disabled={!draft.trim()}
+            accessibilityLabel="Senden"
           >
             <Ionicons name="send" size={17} color={colors.white} />
           </Druck>
@@ -290,4 +323,11 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   sendDisabled: { opacity: 0.4 },
+  fehler: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: 8,
+    color: colors.danger,
+    ...typography.small,
+    fontWeight: '600',
+  },
 }));

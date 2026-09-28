@@ -3827,6 +3827,7 @@ async function openComments(targetId, onCountChange) {
                 </div>`
           }
         </div>
+        <div class="sheet__fehler" id="commentHinweis" role="status" hidden></div>
         <form class="composer" id="commentForm">
           <div class="avatar avatar--36" style="background:${farbe(user('me').color)}">DU</div>
           <div class="composer__field">
@@ -3878,7 +3879,18 @@ async function openComments(targetId, onCountChange) {
     const input = sheet.querySelector('#commentInput');
     const send = sheet.querySelector('#commentSend');
 
+    /*
+     * Meldungen gehoeren ins Blatt. Als Toast lagen sie hinter dem Blatt und
+     * man sah nur, dass nichts passiert (Kasten 5, 28.09.2026).
+     */
+    const hinweis = sheet.querySelector('#commentHinweis');
+    const melden = (text) => {
+      hinweis.textContent = text;
+      hinweis.hidden = !text;
+    };
+
     input.addEventListener('input', () => {
+      melden('');
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 108) + 'px';
       send.disabled = !input.value.trim();
@@ -3915,7 +3927,7 @@ async function openComments(targetId, onCountChange) {
        */
       const pruefung = await api('/api/wortfilter', { text });
       if (pruefung?.treffer) {
-        return toast(`„${pruefung.treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
+        return melden(`„${pruefung.treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
       }
 
       const r = await fetch(`/api/comments/${targetId}`, {
@@ -3923,6 +3935,8 @@ async function openComments(targetId, onCountChange) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
+      // Ohne diese Pruefung landete die Fehlerantwort als leerer Kommentar in der Liste.
+      if (!r.ok) return melden('Der Kommentar ging nicht durch. Versuch es noch einmal.');
       list = [...list, await r.json()];
       onCountChange?.(list.length);
       paint();
@@ -10375,7 +10389,12 @@ function openClip(clipId) {
               ${ICONS.heart}<span class="postbtn__zahl">${clip.likes ? compactNumber(clip.likes) : 'Like'}</span>
             </button>
             <button class="postbtn" data-clipact="comment" aria-label="Kommentieren">
-              ${ICONS.chat}<span class="postbtn__zahl">${clip.comments ? compactNumber(clip.comments) : 'Kommentar'}</span>
+              ${ICONS.chat}<span class="postbtn__zahl" id="clipKommentarZahl">${
+                /* Bei Live fuehrt der Knopf in die Live-Kommentare und zaehlt
+                   deshalb diese, nicht die gewoehnlichen (28.09.2026) - die
+                   Zahl setzt holen() unten. */
+                !istLive() && clip.comments ? compactNumber(clip.comments) : 'Kommentar'
+              }</span>
             </button>
             <button class="postbtn" data-clipact="share" aria-label="Senden">
               ${ICONS.send}<span class="postbtn__zahl">Teilen</span>
@@ -10404,7 +10423,10 @@ function openClip(clipId) {
                    <div class="livebox__zeilen" id="liveZeilen"><p class="live__leer">Noch hat niemand etwas geschrieben.</p></div>
                    ${
                      liveOffen
-                       ? `<input class="livebox__feld" id="liveFeld" placeholder="Etwas sagen …" enterkeyhint="send" />`
+                       ? `<div class="livebox__eingabe">
+                           <input class="livebox__feld" id="liveFeld" placeholder="Etwas sagen …" enterkeyhint="send" />
+                           <button class="composer__send livebox__senden" id="liveSenden" aria-label="Senden" disabled>${ICONS.send}</button>
+                         </div>`
                        : `<button class="livebox__schreiben" id="liveSchreiben">Kommentieren …</button>`
                    }
                  </div>`
@@ -10679,6 +10701,8 @@ function openClip(clipId) {
           const res = await fetch(`/api/stream/${clip.id}/kommentare`);
           if (!res.ok) return;
           const liste = (await res.json()).kommentare || [];
+          const zahl = overlay.querySelector('#clipKommentarZahl');
+          if (zahl) zahl.textContent = liste.length ? compactNumber(liste.length) : 'Kommentar';
           zeilen.innerHTML = liste.length
             ? liste
                 .slice(liveOffen ? -30 : -3)
@@ -10712,15 +10736,20 @@ function openClip(clipId) {
       overlay.querySelector('#liveZeilen')?.addEventListener('click', () => !liveOffen && aufklappen(true));
 
       const feld = overlay.querySelector('#liveFeld');
-      feld?.addEventListener('keydown', async (e) => {
-        if (e.key !== 'Enter') return;
+      const sendenKnopf = overlay.querySelector('#liveSenden');
+      const liveSenden = async () => {
         const text = feld.value.trim();
         if (!text) return;
         feld.value = '';
+        sendenKnopf.disabled = true;
         const antwort = await api(`/api/stream/${clip.id}/kommentare`, { text });
         if (!antwort?.ok) return toast(antwort?.error || 'Der Kommentar ging nicht durch');
         holen();
-      });
+      };
+      feld?.addEventListener('keydown', (e) => e.key === 'Enter' && liveSenden());
+      // Sichtbar senden, nicht nur ueber die Eingabetaste (Kasten 5, 28.09.2026).
+      feld?.addEventListener('input', () => (sendenKnopf.disabled = !feld.value.trim()));
+      sendenKnopf?.addEventListener('click', liveSenden);
 
       overlay.querySelector('#liveSpende')?.addEventListener('click', () => openSpende(clip.userId, clip.id));
     }

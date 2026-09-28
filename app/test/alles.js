@@ -165,6 +165,7 @@ const LAEUFE = [
   ['chatoptionen', '_chatoptionen.js'],
   ['player', '_player.js'],
   ['gesten', '_gesten.js'],
+  ['kommentare', '_kommentare.js'],
   ['feinschliff', '_feinschliff.js'],
   ['kamera', '_kamera.js'],
   ['eigenes', '_eigenes.js'],

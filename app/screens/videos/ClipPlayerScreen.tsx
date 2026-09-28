@@ -168,6 +168,13 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
     return () => clearInterval(uhr);
   }, [istLive, liveHolen]);
 
+  const liveSenden = async () => {
+    const text = liveEntwurf.trim();
+    if (!text || !clip) return;
+    setLiveEntwurf('');
+    if (await aktionen.streamKommentar(clip.id, text)) liveHolen();
+  };
+
   /*
    * Ohne Videodatei bleibt es beim Zaehler: es gibt nichts abzuspielen, aber
    * die Leiste soll sich bewegen, damit der Bildschirm nicht tot wirkt. Mit
@@ -200,7 +207,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   if (!clip) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <Druck style={styles.bar} onPress={onBack}>
+        <Druck style={styles.bar} onPress={onBack} accessibilityLabel="Zurück">
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Druck>
         <Text style={styles.leer}>Dieses Video gibt es nicht mehr.</Text>
@@ -287,7 +294,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
-        <Druck onPress={onBack} hitSlop={10}>
+        <Druck onPress={onBack} hitSlop={10} accessibilityLabel="Zurück">
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Druck>
       </View>
@@ -363,7 +370,16 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
+      {/*
+        Das Feld der Live-Kommentare sitzt unter der Aktionsreihe, also dort,
+        wo die Tastatur aufgeht. Ohne angepassten Rand lag es darunter und man
+        schrieb blind (28.09.2026).
+      */}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+      >
         {/*
           Kapitel (Punkt 32). Nur wenn das Video welche hat - eine leere
           Ueberschrift ueber nichts waere schlechter als gar keine.
@@ -428,7 +444,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           Jetzt hat jeder Knopf ein Fuenftel der Breite und eine Beschriftung.
         */}
         <View style={styles.aktionen}>
-          <Druck style={styles.aktion} onPress={() => clipUmschalten(clip.id, 'like')}>
+          <Druck style={styles.aktion} onPress={() => clipUmschalten(clip.id, 'like')} accessibilityLabel="Gefällt mir">
             <Ionicons
               name={clip.liked ? 'heart' : 'heart-outline'}
               size={24}
@@ -443,20 +459,29 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             style={styles.aktion}
             /* Bei Live fuehrt er in die Live-Kommentare, sonst ins gewohnte Blatt. */
             onPress={() => (istLive ? setLiveOffen(true) : setKommentareOffen(true))}
+            accessibilityLabel="Kommentieren"
           >
             <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
             <Text style={styles.aktionZahl} numberOfLines={1}>
-              {(kommentarZahl[clip.id] ?? clip.comments) ? compact(kommentarZahl[clip.id] ?? clip.comments ?? 0) : 'Kommentar'}
+              {/* Bei Live zaehlt er die Live-Kommentare, in die er fuehrt (28.09.2026). */}
+              {istLive
+                ? liveKommentare.length
+                  ? compact(liveKommentare.length)
+                  : 'Kommentar'
+                : (kommentarZahl[clip.id] ?? clip.comments)
+                  ? compact(kommentarZahl[clip.id] ?? clip.comments ?? 0)
+                  : 'Kommentar'}
             </Text>
           </Druck>
 
-          <Druck style={styles.aktion} onPress={() => onShare(clip)}>
+          <Druck style={styles.aktion} onPress={() => onShare(clip)} accessibilityLabel="Video teilen">
             <Ionicons name="paper-plane-outline" size={22} color={colors.text} />
             <Text style={styles.aktionZahl} numberOfLines={1}>Teilen</Text>
           </Druck>
 
           <Druck
             style={styles.aktion}
+            accessibilityLabel="Reposten"
             onPress={() => {
               clipUmschalten(clip.id, 'repost');
               const jetzt = umschalten('video', clip.id, clip.title);
@@ -473,6 +498,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
 
           <Druck
             style={styles.aktion}
+            accessibilityLabel="Speichern"
             onPress={() => {
               clipUmschalten(clip.id, 'save');
               onNotice(clip.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
@@ -531,13 +557,17 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
                   placeholderTextColor={colors.text3}
                   returnKeyType="send"
                   autoFocus
-                  onSubmitEditing={async () => {
-                    const text = liveEntwurf.trim();
-                    if (!text) return;
-                    setLiveEntwurf('');
-                    if (await aktionen.streamKommentar(clip.id, text)) liveHolen();
-                  }}
+                  onSubmitEditing={liveSenden}
                 />
+                {/* Sichtbar senden, nicht nur ueber die Tastatur (Kasten 5, 28.09.2026). */}
+                <Druck
+                  style={[styles.liveSenden, !liveEntwurf.trim() && styles.liveSendenAus]}
+                  onPress={liveSenden}
+                  disabled={!liveEntwurf.trim()}
+                  accessibilityLabel="Senden"
+                >
+                  <Ionicons name="send" size={15} color={colors.white} />
+                </Druck>
               </View>
             ) : (
               <Druck onPress={() => setLiveOffen(true)}>
@@ -741,8 +771,18 @@ const styles = themenStyles((colors) => ({
   liveZeile: { flexDirection: 'row', gap: 6 },
   liveName: { ...typography.small, color: colors.brand, fontWeight: '700' },
   liveText: { flex: 1, ...typography.small, color: colors.text2 },
-  liveEingabe: { marginTop: 6 },
+  liveEingabe: { marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  liveSenden: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveSendenAus: { opacity: 0.4 },
   liveFeld: {
+    flex: 1,
     height: 36,
     borderRadius: radius.pill,
     paddingHorizontal: 13,

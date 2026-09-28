@@ -176,6 +176,21 @@ async function anmelden(zugang) {
     pruefe('Das eigene Herz am eigenen Kommentar meldet sich nicht',
       eigenes.length === 0, `${eigenes.length} Stück`);
 
+    /*
+     * Bis 28.09.2026 blieb die Mitteilung stehen, wenn das Herz wieder
+     * wegging: „X gefällt dein Kommentar" für ein Herz, das es nicht mehr
+     * gab. Schema 61 räumt sie beim Löschen mit weg.
+     */
+    await fremder.client
+      .from('comment_likes')
+      .delete()
+      .eq('comment_id', kommentar.id)
+      .eq('user_id', fremder.id);
+    const nachRuecknahme = (await neueSeit(eigner, vorHerz, 'like'))
+      .filter((m) => m.target_id === kommentar.id && m.actor_id === fremder.id);
+    pruefe('Zurückgenommenes Herz nimmt seine Mitteilung mit',
+      nachRuecknahme.length === 0, `${nachRuecknahme.length} Stück`);
+
     // -----------------------------------------------------------------------
     console.log('\nChat-Anfrage und ihre Annahme');
 

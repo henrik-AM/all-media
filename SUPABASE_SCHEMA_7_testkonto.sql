@@ -463,7 +463,13 @@ begin
   order by b.created_at desc
   limit 1;
 
-  if v_post is not null and not exists (
+  -- Nur fuer die Testkonten: Demo-Beitraege sieht jeder, und echte Konten
+  -- bleiben unangetastet (Schema 60, 28.09.2026).
+  if v_post is not null and exists (
+    select 1 from auth.users u
+     where u.id = ziel
+       and u.email in ('test@all-media.app', 'all.media.prueflauf@web.de')
+  ) and not exists (
     select 1 from public.comments where user_id = ziel and post_id = v_post
   ) then
     insert into public.comments (post_id, user_id, text, created_at)
