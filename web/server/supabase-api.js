@@ -938,13 +938,25 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
    * seine Likes verbirgt, taucht hier nicht auf. Die *Zahl* bleibt davon
    * unberuehrt — sie ist eine Tatsache ueber den Beitrag.
    */
+  /*
+   * Seit Schema 65 (Kasten 9, 28.09.2026): Name nur von Profilen, denen ich
+   * folge, und nur, wenn deren Likes-Sichtbarkeit mich zulaesst. Die Zahl
+   * kommt aus `like_zahlen()`, weil die Leseregel auf post_likes verborgene
+   * Likes nicht mehr durchlaesst und `post_likes(count)` sie sonst unterschlüge.
+   * Fehlt die Funktion noch, gilt die eingebettete Zahl. Gleiche Rechnung wie
+   * in app/lib/daten.ts.
+   */
   const likerNamen = new Map();
+  const likeZahlen = new Map();
   if (ids.length > 0) {
-    const { data: namen } = await client.rpc('liker_namen', {
-      beitraege: ids,
-      wer: nutzerId,
-    });
+    const [{ data: namen }, { data: zahlen, error: zahlFehler }] = await Promise.all([
+      client.rpc('liker_namen', { beitraege: ids, wer: nutzerId }),
+      client.rpc('like_zahlen', { beitraege: ids }),
+    ]);
     for (const z of namen || []) if (z.name) likerNamen.set(z.post_id, z.name);
+    if (!zahlFehler) {
+      for (const z of zahlen || []) likeZahlen.set(z.post_id, Number(z.anzahl || 0));
+    }
   }
 
   // "Folge ich der Person?" gehoert an den Beitrag. Vorher las die Oberflaeche
@@ -1007,7 +1019,7 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
     kapitel: b.kapitel || [],
     age: zeitText(b.created_at),
     zeitpunkt: b.created_at,
-    likes: Number(b.likes_basis || 0) + (b.post_likes?.[0]?.count ?? 0),
+    likes: Number(b.likes_basis || 0) + (likeZahlen.get(b.id) ?? b.post_likes?.[0]?.count ?? 0),
     comments: Number(b.comments_basis || 0) + (b.comments?.[0]?.count ?? 0),
     // Weiterleitungen werden gezaehlt wie Likes und Kommentare. Vorher stand
     // hier nur der Sockel — jedes Teilen verpuffte, die Zahl blieb stehen.

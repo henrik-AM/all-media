@@ -25,6 +25,7 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import { Video } from '../../types';
 import { compactNumber } from '../../lib/zahlen';
+import { gefaelltRest } from '../../lib/kommentare';
 import { haptic } from '../../lib/haptics';
 import { Videoflaeche, VideoSteuerung } from '../../components/Videoflaeche';
 import { useAktionen } from '../../lib/useAktionen';
@@ -458,6 +459,15 @@ export const VideoFeedScreen = ({
             )}
           </View>
           <Text style={styles.description}>{item.description}</Text>
+          {/* Kasten 9.3/9.4: „Gefällt Anna …“ wie bei Instagram — nur mit
+              einem echten Namen aus liker_namen() (gefolgt und freigegeben,
+              Schema 65). Ohne Namen keine Zeile; die Zahl steht rechts. */}
+          {!!item.likedBy && (
+            <Text style={styles.gefaellt} numberOfLines={1}>
+              Gefällt <Text style={styles.gefaelltName}>{item.likedBy}</Text>
+              {gefaelltRest(item.likes)}
+            </Text>
+          )}
           <View style={styles.subRow}>
             {item.location && (
               <Druck onPress={() => ziel.ort(item.location)} hitSlop={4}>
@@ -574,6 +584,8 @@ const styles = themenStyles((colors) => ({
   },
   followText: { color: colors.white, fontSize: 12, fontWeight: '600' },
   description: { color: colors.white, ...typography.message, lineHeight: 20 },
+  gefaellt: { marginTop: 4, color: colors.white, ...typography.small },
+  gefaelltName: { fontWeight: '700' },
   subRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   sub: { marginTop: 6, color: 'rgba(255,255,255,0.75)', ...typography.small },
 }));

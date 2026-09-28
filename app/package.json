@@ -80,6 +80,7 @@
     "test:aktionen": "node test/_aktionen.js",
     "test:handbuch": "node test/_handbuch.js",
     "test:sichtbarkeit": "node test/_sichtbarkeit.js",
+    "test:likes": "node test/_likes_sichtbarkeit.js",
     "test:fremdprofil": "node test/_fremdprofil.js",
     "test:chatanfrage": "node test/_chatanfrage.js",
     "test:messengeranfrage": "node test/_messengeranfrage.js",

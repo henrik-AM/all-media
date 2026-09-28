@@ -50,7 +50,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.finde_per_nummer() | SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_telefon.sql → SUPABASE_SCHEMA_38_nummer_bremse.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
 | Funktion public.handle_frei() | SUPABASE_SCHEMA_4.sql → SUPABASE_SCHEMA_39_anonyme_bremse.sql | **SUPABASE_SCHEMA_39_anonyme_bremse.sql** |
 | Funktion public.handle_new_user() | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_3.sql → SUPABASE_SCHEMA_4.sql → SUPABASE_SCHEMA_34_telefon_pflicht.sql | **SUPABASE_SCHEMA_34_telefon_pflicht.sql** |
-| Funktion public.liker_namen() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_23_audit.sql | **SUPABASE_SCHEMA_23_audit.sql** |
+| Funktion public.liker_namen() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql | **SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql** (nur noch Gefolgte, Besitzer sieht alle) |
 | Funktion public.meine_kontaktnummern() | SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
 | Funktion public.nummer_frei() | SUPABASE_SCHEMA_34_telefon_pflicht.sql → SUPABASE_SCHEMA_39_anonyme_bremse.sql | **SUPABASE_SCHEMA_39_anonyme_bremse.sql** |
 | Funktion public.on_contact() | SUPABASE_SCHEMA_2.sql → SUPABASE_SCHEMA_44_mitteilungen.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
@@ -73,6 +73,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "Empfaenger eintragen" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_12_insight_rekursion.sql | **SUPABASE_SCHEMA_12_insight_rekursion.sql** |
 | Regel "Empfaengerzeilen lesen" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_12_insight_rekursion.sql | **SUPABASE_SCHEMA_12_insight_rekursion.sql** |
 | Regel "Insight als gesehen vermerken" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
+| Regel "Likes lesen" auf public.post_likes | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql | **SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql** (vorher für alle offen; jetzt like_sichtbar()) |
 | Regel "Kanal anlegen" auf public.community_channels | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Medien lesen" auf storage.objects | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_medien_auflisten.sql | **SUPABASE_SCHEMA_24_medien_auflisten.sql** |
 | Regel "Mitglieder hinzufuegen" auf public.chat_members | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_22_dm_sperre.sql | **SUPABASE_SCHEMA_22_dm_sperre.sql** |

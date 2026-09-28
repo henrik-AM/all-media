@@ -66,6 +66,15 @@ interface Props {
    */
   inVideos?: boolean;
   onInVideos?: (an: boolean) => void;
+  /*
+   * Kasten 9.1 (28.09.2026): Personen, die zusaetzlich zu den
+   * Messenger-Kontakten zur Wahl stehen. Bei den Likes sind das Follower und
+   * Gefolgte — genau die Menschen, die „Gefällt …“ ueberhaupt zu sehen
+   * bekommen (Schema 65 zeigt den Namen nur Leuten, die einem folgen). Mit
+   * Kontakten allein liess sich ein Follower, der kein Kontakt ist, gar
+   * nicht ausnehmen.
+   */
+  weitere?: string[];
 }
 
 export const SichtbarkeitSheet = ({
@@ -78,6 +87,7 @@ export const SichtbarkeitSheet = ({
   onClose,
   inVideos,
   onInVideos,
+  weitere,
 }: Props) => {
   const { contacts, users } = useDaten();
   const [suche, setSuche] = useState('');
@@ -97,8 +107,21 @@ export const SichtbarkeitSheet = ({
    * hier nicht fand. Jetzt bleibt jeder Kontakt in der Liste; fehlt das
    * Profil, traegt die Zeile den Namen aus dem Kontaktbuch.
    */
-  const liste = contacts
-    .map((k) => ({ id: k.id, name: users[k.id]?.name ?? k.name ?? 'Unbenannter Kontakt' }))
+  const kontaktIds = new Set(contacts.map((k) => k.id));
+  const zusatz = weitere ?? [];
+  const liste = [
+    ...contacts.map((k) => ({ id: k.id, name: users[k.id]?.name ?? k.name ?? 'Unbenannter Kontakt' })),
+    // Follower und Gefolgte ohne Kontakt; ohne geladenes Profil kein Name,
+    // also auch keine Zeile — ein „Unbenannt“ ohne Kontaktbuch waere geraten.
+    ...zusatz
+      .filter((id, i) => !kontaktIds.has(id) && zusatz.indexOf(id) === i && users[id])
+      .map((id) => ({ id, name: users[id]!.name })),
+    // Wer schon auf der Liste steht, aber weder Kontakt noch Follower ist,
+    // muss trotzdem wieder heruntergenommen werden koennen.
+    ...ausnahmen
+      .filter((id) => !kontaktIds.has(id) && !zusatz.includes(id) && users[id])
+      .map((id) => ({ id, name: users[id]!.name })),
+  ]
     .filter((k) => !suche || k.name.toLowerCase().includes(suche.toLowerCase()))
     .sort((a, b) => {
       const ad = ausnahmen.includes(a.id) ? 0 : 1;
@@ -173,7 +196,7 @@ export const SichtbarkeitSheet = ({
               <SearchBar
                 value={suche}
                 onChangeText={setSuche}
-                placeholder="Kontakt suchen …"
+                placeholder={weitere ? 'Person suchen …' : 'Kontakt suchen …'}
               />
             </View>
 
@@ -181,7 +204,9 @@ export const SichtbarkeitSheet = ({
               <Text style={styles.leer}>
                 {suche
                   ? `Für „${suche}" ist kein Kontakt dabei.`
-                  : 'Du hast noch keine Kontakte, die du hier eintragen könntest.'}
+                  : weitere
+                    ? 'Noch keine Kontakte, Follower oder Gefolgten, die du hier eintragen könntest.'
+                    : 'Du hast noch keine Kontakte, die du hier eintragen könntest.'}
               </Text>
             )}
 

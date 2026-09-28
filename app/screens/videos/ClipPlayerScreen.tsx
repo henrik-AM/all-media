@@ -26,6 +26,7 @@ import {
   tempoText,
   useVideoEinstellungen,
 } from '../../lib/videoEinstellungen';
+import { gefaelltRest } from '../../lib/kommentare';
 
 interface Props {
   clipId: string;
@@ -651,6 +652,15 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           onNotice={onNotice}
         />
 
+        {/* Kasten 9.3/9.4: wie unter dem Reel — nur mit echtem Namen aus
+            liker_namen() (gefolgt und freigegeben, Schema 65). */}
+        {!!clip.likedBy && (
+          <Text style={styles.gefaellt} numberOfLines={1}>
+            Gefällt <Text style={styles.gefaelltName}>{clip.likedBy}</Text>
+            {gefaelltRest(clip.likes ?? 0)}
+          </Text>
+        )}
+
         {!!clip.description && <Text style={styles.text}>{clip.description}</Text>}
 
         {!!clip.tags?.length && (
@@ -915,6 +925,8 @@ const styles = themenStyles((colors) => ({
   aktionZahlAn: { color: colors.danger },
 
   text: { ...typography.message, color: colors.text, paddingHorizontal: spacing.lg, paddingBottom: 10, lineHeight: 20 },
+  gefaellt: { ...typography.small, color: colors.text, paddingHorizontal: spacing.lg, paddingBottom: 6 },
+  gefaelltName: { fontWeight: '700' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: spacing.lg, paddingBottom: 10 },
   tag: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.brandSoft },
   tagText: { ...typography.small, fontWeight: '600', color: colors.brand },
