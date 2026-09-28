@@ -186,6 +186,9 @@ const LAEUFE = [
   // Direkt hinter den Impressionen: das eine misst, ob mitgeschrieben wird,
   // das andere, ob aus dem Mitgeschriebenen eine Reihenfolge wird.
   ['rang', '_rang.js'],
+  // „Mein Verlauf" (Kasten 10): die fünf Aktionen im Verlauf, Schema 66.
+  // Braucht keinen Server — spricht direkt mit PostgREST, ohne /api/reset.
+  ['verlauf', '_verlauf.js'],
   ['storyvideos', '_storyvideos.js'],
   ['krypto', '_krypto.js'],
   ['rechte', '_rechte.js'],

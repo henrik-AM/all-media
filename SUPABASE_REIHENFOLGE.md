@@ -106,3 +106,24 @@ gerade der Zweck.
 Zweite, unabhängige Absicherung in `test:datenbank`: **kein Beitrag der Art
 `clip` oder `reel` darf auf eine Bilddatei zeigen.** Die Prüfung interessiert
 sich nicht dafür, welche Datei gewonnen hat, sondern nur für das Ergebnis.
+
+## Nachtrag 28.09.2026: Schema 66 entschärft alte Testbestand-Dateien
+
+`SUPABASE_SCHEMA_66_verlauf_nur_eigenes.sql` legt den Wächter
+`public.nur_eigene_aktion()` auf `saves`, `post_likes`, `reposts`, `comments`
+und `shares`. Er definiert nichts, was es schon gibt — deshalb keine Zeile in
+der Tabelle oben —, verändert aber, was ältere Dateien beim Neueinspielen
+bewirken:
+
+| Datei | schreibt ohne Anmeldung in echte Konten | seit Schema 66 |
+|---|---|---|
+| SUPABASE_SCHEMA_7_testkonto.sql, SUPABASE_SCHEMA_23_sicherheit.sql, SUPABASE_EINSPIELEN.sql (starter_inhalte ohne ist_testkonto) | Merkliste, Repost, Likes, Kommentar | übersprungen (Warnung), Registrierung läuft weiter |
+| SUPABASE_SCHEMA_42_testbestand_sichtbar.sql (Einfügen für `not z.demo`) | 2 Merkliste, 1 Repost, 3 Likes je Konto | übersprungen (Warnung) |
+| SUPABASE_SCHEMA_50_kommentar_sichtbar.sql | Testkommentar | übersprungen (Warnung) |
+
+Reihenfolge: **Schema 66 nach Schema 62** — der Wächter ruft
+`ist_testkonto()`. Die Datei prüft das vorab und bricht sonst ab.
+
+Die schon vorhandenen Seed-Einträge in echten Konten entfernt Schema 66
+NICHT. Die Aufräum-Anweisung steht auskommentiert am Ende der Datei und
+läuft nur nach Henriks Freigabe.

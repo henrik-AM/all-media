@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
@@ -25,6 +25,10 @@ import {
   kommentierteVon,
   SichtbarkeitBereich,
   SichtbarkeitStufe,
+  VerlaufEintrag,
+  verlaufVon,
+  verlaufZeile,
+  verlaufZeit,
 } from '../../lib/aktionen';
 import { PASSWORT_REGEL, passwortAendern, passwortPruefen } from '../../lib/supabaseAuth';
 
@@ -298,6 +302,14 @@ const SECTIONS: Section[] = [
        * gelesen, um das Herz im Feed rot zu faerben. Hier und nicht als
        * fuenfter Profilreiter: der Prototyp hat dort vier.
        */
+      /*
+       * Henrik am 21.09.2026 (Kasten 10.1): Like, Kommentar, Teilen, Repost
+       * und Speichern im Verlauf unter meinem Profil — mit Zeitpunkt,
+       * antippbar zum Beitrag. Kein fuenfter Profilreiter (Prototyp: vier),
+       * sondern hier, erreichbar ueber das Profilmenue. Dieselbe Liste
+       * steht auf der Website (gemeinsam/verlauf.js).
+       */
+      { label: 'Mein Verlauf', icon: 'time-outline', liste: 'verlauf' },
       { label: 'Gelikte Beiträge', icon: 'heart-outline', liste: 'gelikt' },
       // Die vierte Gattung aus Henriks Meldung vom 18.09.2026. Sie war die
       // einzige, die bis zum 21.09. nirgends zu sehen war.
@@ -387,9 +399,15 @@ interface Props {
   pruefListe?: string | null;
   /** Zurueck zur vorherigen Seite (Profil/Messenger). */
   onBack?: () => void;
+  /**
+   * Einen Beitrag aus „Mein Verlauf", „Gelikte Beiträge" oder „Meine
+   * Kommentare" öffnen — derselbe Weg wie eine Kachel im Profil
+   * (kachelOeffnen in App.tsx).
+   */
+  onOpenKachel?: (k: { id: string; kind: string }) => void;
 }
 
-export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack, pruefSicht, pruefListe }: Props) => {
+export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack, pruefSicht, pruefListe, onOpenKachel }: Props) => {
   const { chats: alleChats, posts: alleBeitraege, users: alleNutzer } = useDaten();
   const { user, konten } = useContext(AuthContext);
   const { communities, istBlockiert, istStumm, raster, gefolgt, eigenesProfil, profilSpeichern } =
@@ -516,13 +534,32 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * Die Liste kommt aus demselben Zustand wie die Folgen-Knoepfe im Feed
      * (ProfilContext), damit beide immer dasselbe zeigen.
      */
+    /*
+     * „Mein Verlauf" — alle fünf Aktionen, neueste zuerst, mit Datum und
+     * Uhrzeit. Antippen schließt das Blatt und öffnet den Beitrag.
+     */
+    if (art === 'verlauf') {
+      if (verlaufFehler) return { leer: 'Verlauf konnte nicht geladen werden.', zeilen: [] };
+      if (!verlauf) return { leer: 'Wird geladen …', zeilen: [] };
+      return {
+        leer: 'Du hast noch nichts geliked, kommentiert, geteilt, repostet oder gespeichert.',
+        zeilen: verlauf.map((e) => ({
+          schluessel: e.schluessel,
+          text: verlaufZeile(e),
+          neben: verlaufZeit(e),
+          onPress: beitragOeffnen({ id: e.beitragId, kind: e.kind }),
+        })),
+      };
+    }
     if (art === 'gelikt') {
       if (!gelikt) return { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: 'Dir hat noch nichts gefallen.',
         zeilen: gelikt.map((b) => ({
+          schluessel: b.id,
           text: b.titel,
           neben: new Date(b.wann).toLocaleDateString('de-DE'),
+          onPress: beitragOeffnen({ id: b.id, kind: b.kind }),
         })),
       };
     }
@@ -535,8 +572,10 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       return {
         leer: 'Du hast noch nichts kommentiert.',
         zeilen: kommentiert.map((k) => ({
+          schluessel: k.id,
           text: kommentarZeile(k),
           neben: new Date(k.wann).toLocaleDateString('de-DE'),
+          onPress: beitragOeffnen({ id: k.beitragId, kind: k.kind }),
         })),
       };
     }
@@ -555,6 +594,19 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       zeilen: mit.map((p) => ({ text: alleNutzer[p.userId].name, neben: 'Glocke an' })),
     };
   };
+
+  /*
+   * Antippen einer Zeile: Blatt zu, Beitrag auf. Ohne onOpenKachel (etwa in
+   * einem Prüfbild) bleibt die Zeile, wie sie war — nicht antippbar statt
+   * eines Knopfes, der nichts tut.
+   */
+  const beitragOeffnen = (k: { id: string; kind: string }) =>
+    onOpenKachel
+      ? () => {
+          setOffen(null);
+          onOpenKachel(k);
+        }
+      : undefined;
 
   const oeffne = (item: Item) => {
     if (item.aktion === 'sicherung') {
@@ -654,6 +706,29 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    */
   const [gelikt, setGelikt] = useState<GelikterBeitrag[] | null>(null);
   const [kommentiert, setKommentiert] = useState<EigenerKommentar[] | null>(null);
+  const [verlauf, setVerlauf] = useState<VerlaufEintrag[] | null>(null);
+  const [verlaufFehler, setVerlaufFehler] = useState(false);
+
+  /*
+   * Bei jedem Öffnen neu laden, nicht nur beim Aufbau: wer im Feed etwas
+   * speichert und dann hierher kommt, soll es sehen, ohne die App neu zu
+   * starten. Das Blatt zeigt solange den alten Stand statt „Wird geladen".
+   */
+  const verlaufLaden = useCallback(() => {
+    if (!supabase || !ichId) return;
+    verlaufVon(supabase, ichId)
+      .then((l) => {
+        setVerlauf(l);
+        setVerlaufFehler(false);
+      })
+      .catch((e: any) => {
+        console.error('Verlauf laden fehlgeschlagen:', e?.message ?? e);
+        setVerlaufFehler(true);
+      });
+  }, [supabase, ichId]);
+  useEffect(() => {
+    if (offen?.liste === 'verlauf') verlaufLaden();
+  }, [offen, verlaufLaden]);
 
   useEffect(() => {
     if (!supabase || !ichId) return;

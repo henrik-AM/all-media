@@ -95,6 +95,8 @@ const UMD_BAUSTEINE = [
   // 26.09.2026: `teilen.js` für das Teilen-Blatt (Feedback 21.09., Kasten 4).
 
   ['teilen', 'Teilen'],
+  // 28.09.2026: `verlauf.js` für „Mein Verlauf" (Feedback 21.09., Kasten 10).
+  ['verlauf', 'Verlauf'],
 ];
 
 function umdTeile() {

@@ -920,6 +920,9 @@ ul { margin: 0; padding: 0; list-style: none; }
 .item__icon svg { width: 18px; height: 18px; }
 .item__label { flex: 1 1 auto; min-width: 0; }
 .item__value { color: var(--text-3); font-size: 13.5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Anklickbare Listenzeile (Mein Verlauf, Kasten 10.1): Pfeil wie in der App. */
+.item__chevron { color: var(--text-3); display: grid; place-items: center; }
+.item__chevron svg { width: 16px; height: 16px; }
 .item--danger { color: var(--danger); }
 .item--danger .item__icon { background: rgba(229,72,77,.12); color: var(--danger); }
 

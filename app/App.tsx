@@ -2042,6 +2042,12 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onSprungFertig={() => setSettingsSprung(null)}
         pruefSicht={pruefSicht}
         pruefListe={pruefListe}
+        // „Mein Verlauf" (Kasten 10.1): Antippen fuehrt zum Beitrag, wie
+        // eine Kachel im Profil.
+        onOpenKachel={(k) => {
+          setSettingsVonBereich(null);
+          kachelOeffnen(k);
+        }}
         /*
          * Den Zurueck-Pfeil gibt es nur, wenn es ein Zurueck gibt.
          *

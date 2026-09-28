@@ -16,6 +16,16 @@ export interface ListenZeile {
    * aus, obwohl das eine eine Entwicklung ist und das andere ein Stand.
    */
   kopf?: boolean;
+  /**
+   * Antippen führt zum Beitrag.
+   *
+   * Seit „Mein Verlauf" (Kasten 10.1): eine Zeile, die sagt „Gespeichert ·
+   * Sonnenuntergang", ohne dass man den Sonnenuntergang öffnen kann, ist ein
+   * Protokoll, kein Verlauf. Zeilen ohne onPress bleiben, wie sie waren.
+   */
+  onPress?: () => void;
+  /** Eindeutiger Schlüssel, wenn `text` sich wiederholen kann. */
+  schluessel?: string;
 }
 
 interface Props {
@@ -97,8 +107,20 @@ export const EinstellungSheet = ({
               <Text key={z.text} style={styles.gruppe}>
                 {z.text}
               </Text>
+            ) : z.onPress ? (
+              <Druck
+                key={z.schluessel ?? z.text}
+                style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
+                onPress={z.onPress}
+                accessibilityRole="button"
+                accessibilityLabel={z.text}
+              >
+                <Text style={styles.label}>{z.text}</Text>
+                <Text style={styles.neben}>{z.neben}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.text3} />
+              </Druck>
             ) : (
-              <View key={z.text} style={styles.zeile}>
+              <View key={z.schluessel ?? z.text} style={styles.zeile}>
                 <Text style={styles.label}>{z.text}</Text>
                 <Text style={styles.neben}>{z.neben}</Text>
               </View>
