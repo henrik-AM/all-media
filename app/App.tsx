@@ -23,6 +23,7 @@ import { KontoFreigabe } from './components/KontoFreigabe';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
+import { tonModusSetzen } from './lib/tonModus';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AreaKey, NAV, SubKey, areaOf, defaultSub } from './constants/navigation';
 import { LoginScreen } from './screens/LoginScreen';
@@ -2307,6 +2308,12 @@ const Root = () => {
    */
   const [notice, setNotice] = useState<string | null>(null);
   const hideNotice = useCallback(() => setNotice(null), []);
+
+  // Ein Tonmodus für alles: Handy-Lautstärke gilt, Stummschalter egal
+  // (Kasten 8.1, Begründung in lib/tonModus.ts).
+  useEffect(() => {
+    tonModusSetzen();
+  }, []);
 
   /*
    * Solange die gespeicherte Sitzung noch geholt wird, zeigen wir eine leere

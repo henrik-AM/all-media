@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { ActionSheet, ActionSheetItem } from './ActionSheet';
+import type { ActionSheetItem } from './ActionSheet';
+import { OptionenKacheln } from './OptionenKacheln';
 import { SUPABASE_CONFIG } from '../constants/supabase';
 import { useDaten } from '../contexts/DatenContext';
 import { useSupabase } from '../contexts/SupabaseContext';
@@ -129,10 +130,12 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
     }
   };
 
+  // Kasten 8.3: TikTok-Kacheln statt Liste; die Meldegruende als Liste im
+  // selben Blatt (components/OptionenKacheln.tsx).
   return (
-    <ActionSheet
+    <OptionenKacheln
       visible
-      title={meldeSchritt ? 'Warum meldest du das?' : 'Optionen'}
+      liste={meldeSchritt ? { titel: 'Warum meldest du das?' } : null}
       items={punkte}
       onSelect={waehlen}
       onClose={onClose}

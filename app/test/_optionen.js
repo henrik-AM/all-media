@@ -59,7 +59,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   };
 
   const punkte = () =>
-    page.$$eval('[data-beitragopt] .item__label', (l) => l.map((e) => e.textContent.trim()));
+    page.$$eval('[data-beitragopt] .optkachel__text', (l) => l.map((e) => e.textContent.trim()));
 
   const toastText = async () => {
     await page.waitForTimeout(700);
@@ -99,6 +99,42 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
       if (!l.includes(soll)) throw new Error(`"${soll}" fehlt in ${JSON.stringify(l)}`);
     }
     if (l.some((x) => /whatsapp|snapchat/i.test(x))) throw new Error('fremder Messenger im Menue');
+  });
+
+  // Kasten 8.3: Henriks Reihenfolge und das Aussehen nach TikTok.
+  await pruefe('Reihenfolge wie Henriks Aufzaehlung', async () => {
+    const l = await punkte();
+    const soll = ['Link kopieren', 'Herunterladen', 'Zu Story hinzufügen', 'Melden', 'Kein Interesse'].filter((x) =>
+      l.includes(x)
+    );
+    if (JSON.stringify(l) !== JSON.stringify(soll)) throw new Error(JSON.stringify(l));
+  });
+
+  await pruefe('Aussehen wie TikTok: runde Kreise nebeneinander, kein Pfeil, Abbrechen', async () => {
+    const m = await page.evaluate(() => {
+      const k = [...document.querySelectorAll('.optkachel')];
+      const kreis = document.querySelector('.optkachel__kreis');
+      return {
+        anzahl: k.length,
+        eineZeile: new Set(k.map((x) => Math.round(x.getBoundingClientRect().top))).size === 1,
+        rund: kreis ? getComputedStyle(kreis).borderRadius : '',
+        pfeile: document.querySelectorAll('.sheet .row__chevron').length,
+        abbrechen: !!document.querySelector('[data-optabbrechen]'),
+      };
+    });
+    if (m.anzahl < 4) throw new Error('nur ' + m.anzahl + ' Kacheln');
+    if (!m.eineZeile) throw new Error('Kacheln stehen nicht nebeneinander');
+    if (m.rund !== '50%') throw new Error('Kreis nicht rund: ' + m.rund);
+    if (m.pfeile) throw new Error('Listenpfeile im Menue');
+    if (!m.abbrechen) throw new Error('Abbrechen fehlt');
+  });
+
+  await pruefe('Abbrechen schliesst das Menue', async () => {
+    await page.click('[data-optabbrechen]');
+    await page.waitForTimeout(300);
+    if (await page.$('[data-beitragopt]')) throw new Error('Menue noch offen');
+    await page.click(`[data-vaction="mehr"][data-vid="${reel}"]`);
+    await page.waitForSelector('[data-beitragopt="link"]');
   });
 
   await pruefe('Link kopieren legt die Website-Adresse ab', async () => {

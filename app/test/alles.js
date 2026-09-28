@@ -157,6 +157,8 @@ const LAEUFE = [
   ['suche', '_suche.js'],
   // Drei-Punkte-Menue und "Kein Interesse" (Henrik, 21.09.2026).
   ['optionen', '_optionen.js'],
+  // Kasten 8: kein Tonknopf, Ort/Sound im Querformat antippbar.
+  ['kasten8', '_kasten8.js'],
   ['glocke', '_glocke.js'],
   // Jede Ueberschrift mit Pfeil fuehrt auf die volle Uebersicht (Kasten 2).
   ['pfeile', '_pfeile.js'],

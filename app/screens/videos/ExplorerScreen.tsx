@@ -16,6 +16,7 @@ import { Clip, Hashtag, Place, Post, Sound, User, Video } from '../../types';
 import { useKachelHoehe } from '../../lib/raster';
 import { nachInteresse, VORSCHAU } from '../../lib/interesse';
 import { ortFinden, soundFinden } from '../../lib/ziele';
+import { OrtSoundZeile } from '../../components/OrtSoundZeile';
 
 export type ExplorerArt = 'reels' | 'querformat' | 'beitraege' | 'profile' | 'hashtag' | 'standort' | 'sound';
 
@@ -220,6 +221,7 @@ const ExplorerSeite = ({
         fotos={treffer.beitraege}
         onBack={() => setNurFotos(false)}
         onNotice={onNotice}
+        onWeiter={onWeiter}
       />
     );
   }
@@ -433,11 +435,14 @@ const OrtFotos = ({
   fotos,
   onBack,
   onNotice,
+  onWeiter,
 }: {
   platz: Place;
   fotos: Post[];
   onBack: () => void;
   onNotice: (message: string) => void;
+  /** Kasten 8.2: Ort und Sound unter dem Namen öffnen ihre Seite. */
+  onWeiter: (ziel: ExplorerZiel) => void;
 }) => {
   const insets = useSafeAreaInsets();
   const { users: alleNutzer } = useDaten();
@@ -507,10 +512,14 @@ const OrtFotos = ({
                   <Avatar id={p.userId} name={person.name} size={36} />
                   <View style={styles.ortfotoWer}>
                     <Text style={styles.ortfotoName}>{person.name}</Text>
-                    <Text style={styles.ortfotoMeta} numberOfLines={1}>
-                      {p.location}
-                      {p.music ? ` · ${p.music}` : ''}
-                    </Text>
+                    <OrtSoundZeile
+                      ort={p.location}
+                      sound={p.music}
+                      onOpenExplorer={onWeiter}
+                      onNotice={onNotice}
+                      stil={styles.ortfotoMeta}
+                      farbe={colors.text3}
+                    />
                   </View>
                 </View>
               </View>

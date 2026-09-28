@@ -99,7 +99,8 @@
     "test:minderjaehrig": "node test/_minderjaehrig.js",
     "test:elternnummer": "node test/_eltern_nummer.js",
     "test:kommentare": "node test/_kommentare.js",
-    "test:querformat": "node test/_querformat.js"
+    "test:querformat": "node test/_querformat.js",
+    "test:kasten8": "node test/_kasten8.js"
   },
   "private": true
 }
