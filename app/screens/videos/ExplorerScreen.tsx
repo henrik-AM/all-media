@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { KarteWeb, Pin as KartenPin } from '../../components/KarteWeb';
+import { KarteWeb, KartenSteuerung, Pin as KartenPin } from '../../components/KarteWeb';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { EmptyState } from '../../components/EmptyState';
@@ -17,6 +17,9 @@ import { useKachelHoehe } from '../../lib/raster';
 import { nachInteresse, VORSCHAU } from '../../lib/interesse';
 import { ortFinden, soundFinden } from '../../lib/ziele';
 import { OrtSoundZeile } from '../../components/OrtSoundZeile';
+// Gemeinsam mit der Website: welche Liedzeile gerade dran ist, und welche Orte nah liegen.
+const Liedtext = require('../../../gemeinsam/liedtext') as typeof import('../../../gemeinsam/liedtext');
+const Naehe = require('../../../gemeinsam/naehe') as typeof import('../../../gemeinsam/naehe');
 
 export type ExplorerArt = 'reels' | 'querformat' | 'beitraege' | 'profile' | 'hashtag' | 'standort' | 'sound';
 
@@ -245,6 +248,7 @@ const ExplorerSeite = ({
           <StandortKopf
             platz={platz}
             orte={alleOrte}
+            fotos={treffer.beitraege}
             onAlleFotos={() => setNurFotos(true)}
             onOrt={(id) => onWeiter({ art: 'standort', wert: id })}
           />
@@ -545,204 +549,531 @@ const OrtFotos = ({
   );
 };
 
-/** "53.5413° N, 9.9891° O" in Zahlen. Sued und West werden negativ. */
-export const koordinatenLesen = (text?: string): { lat: number; lng: number } | null => {
-  const teile = String(text ?? '').match(/(-?\d+(?:\.\d+)?)\s*°?\s*([NS])?\s*,\s*(-?\d+(?:\.\d+)?)\s*°?\s*([OEW])?/i);
-  if (!teile) return null;
-  const lat = Number(teile[1]) * (/s/i.test(teile[2] ?? '') ? -1 : 1);
-  const lng = Number(teile[3]) * (/w/i.test(teile[4] ?? '') ? -1 : 1);
-  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+/** "53.5413° N, 9.9891° O" in Zahlen. Sued und West werden negativ. Rechnung in gemeinsam/naehe.js. */
+export const koordinatenLesen = (text?: string): { lat: number; lng: number } | null =>
+  Naehe.koordinatenLesen(text);
+
+/** Ein Bild, das sich als Foto zeigen laesst — Videos nur ueber ihr Standbild. */
+const fotoVon = (p: Post): string | undefined => {
+  if (p.standbild) return p.standbild;
+  if (p.mediaUri && !/\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(p.mediaUri)) return p.mediaUri;
+  return undefined;
 };
+
+/*
+ * Das Karussell unter dem Ortskopf. Prototyp-Frame "VSS + Standort",
+ * Gruppe "B. Standortbilder": drei Seiten mit Pfeilen links und rechts und
+ * drei Punkten darunter — Satellit weit, Satellit nah, ein Foto vom Ort.
+ */
+type OrtSeite = 'weit' | 'nah' | 'foto';
 
 const StandortKopf = ({
   platz,
   orte,
+  fotos,
   onAlleFotos,
   onOrt,
 }: {
   platz: Place;
   orte: Place[];
+  fotos: Post[];
   onAlleFotos: () => void;
   onOrt: (id: string) => void;
 }) => {
   /*
-   * Henrik am 21.09.2026: "Standorte brauchen eine funktionierende Karte mit
-   * Sprung in eine Kartenansicht - wie bei der Friend-Map." Bis dahin stand
-   * hier ein gezeichnetes Raster mit einer Nadel an einer Prozentposition,
-   * das mit dem echten Ort nichts zu tun hatte. Jetzt dieselbe Karte wie in
-   * der Friend-Map, und der Vollbild-Knopf oeffnet sie mit allen Orten.
+   * Henrik am 21.09.2026 (Kasten 7.1): "Karte am Standort antippbar ->
+   * springt in Kartenansicht wie bei der Friend-Map."
+   *
+   * Befund 28.09.2026: Ein Tipp auf die Karte tat nichts, nur der kleine
+   * Vollbild-Knopf in der Ecke reagierte. Die Karte stand bei jedem Ort ueber
+   * ganz Deutschland (Stufe 4), und die Vollbildansicht war eine nackte Karte
+   * ohne die Liste, die die Friend-Map ausmacht.
+   *
+   * Jetzt: das Karussell aus dem Prototyp, jede Kartenseite als Ganzes
+   * antippbar, und dahinter eine Kartenansicht wie die Friend-Map — Karte
+   * auf den Ort, alle Orte als Nadeln, Ansichtswahl, Vollbild, und darunter
+   * die Orte in der Naehe.
    */
-  const [karteVoll, setKarteVoll] = useState(false);
-  const insets = useSafeAreaInsets();
+  const [karteAuf, setKarteAuf] = useState(false);
   const hier = koordinatenLesen(platz.koordinaten);
-  const pins: KartenPin[] = orte.flatMap((o) => {
-    const k = koordinatenLesen(o.koordinaten);
-    return k ? [{ id: o.id, name: o.name, ...k }] : [];
-  });
+  const foto = useMemo(() => fotos.map(fotoVon).find(Boolean), [fotos]);
+  const seiten: OrtSeite[] = [
+    ...(hier ? (['weit', 'nah'] as OrtSeite[]) : []),
+    ...(foto ? (['foto'] as OrtSeite[]) : []),
+  ];
+  const [nr, setNr] = useState(0);
+  const seite = seiten[Math.min(nr, seiten.length - 1)];
+  const blaettern = (schritt: number) =>
+    setNr((n) => (seiten.length ? (n + schritt + seiten.length) % seiten.length : 0));
+
+  const eigenerPin: KartenPin[] = hier ? [{ id: platz.id, name: platz.name, ...hier }] : [];
+
   return (
-  <View style={styles.kopf}>
-    <View style={styles.ortZeile}>
-      <Ionicons name="location-outline" size={22} color={colors.text} />
-      <Druck onPress={onAlleFotos}>
-        <Text style={styles.titelKlein}>{platz.name}</Text>
-      </Druck>
-      <Text style={styles.zahl}>{compact(platz.posts)} Beiträge</Text>
-    </View>
-    <Text style={styles.adresse}>{platz.adresse}</Text>
-    <Text style={styles.koordinaten}>{platz.koordinaten}</Text>
-
-    {hier ? (
-      <View style={styles.karte}>
-        <KarteWeb
-          pins={pins.filter((p) => p.id === platz.id)}
-          aktiv={platz.id}
-          hoehe={170}
-          eigenerStandort={null}
-          onVollbild={() => setKarteVoll(true)}
-        />
+    <View style={styles.kopf}>
+      <View style={styles.ortZeile}>
+        <Ionicons name="location-outline" size={22} color={colors.text} />
+        <Druck onPress={onAlleFotos}>
+          <Text style={styles.titelKlein}>{platz.name}</Text>
+        </Druck>
+        <Text style={styles.zahl}>{compact(platz.posts)} Beiträge</Text>
       </View>
-    ) : null}
+      <Text style={styles.adresse}>{platz.adresse}</Text>
+      <Text style={styles.koordinaten}>{platz.koordinaten}</Text>
 
-    <Modal visible={karteVoll} animationType="slide" onRequestClose={() => setKarteVoll(false)}>
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <View style={styles.bar}>
-          <Druck onPress={() => setKarteVoll(false)} hitSlop={10} accessibilityLabel="Karte schließen">
-            <Ionicons name="close" size={26} color={colors.text} />
-          </Druck>
-          <Text style={styles.barTitel}>Standorte</Text>
+      {!!seite && (
+        <View style={styles.karussell}>
+          <View style={styles.karte}>
+            {seite === 'foto' && foto ? (
+              <Druck onPress={onAlleFotos} accessibilityLabel={`Fotos von ${platz.name}`}>
+                <Image source={{ uri: foto }} style={styles.karussellFoto} />
+              </Druck>
+            ) : hier ? (
+              <KarteWeb
+                // Eine eigene Karte je Seite: Ausschnitt und Ansicht stehen
+                // beim Aufbau fest, und die Vorschau laesst sich ohnehin
+                // nicht verschieben.
+                key={seite}
+                pins={eigenerPin}
+                aktiv={platz.id}
+                hoehe={190}
+                eigenerStandort={null}
+                start={{ ...hier, zoom: seite === 'weit' ? 5 : 15 }}
+                stilStart={1}
+                vorschau
+                vorschauLabel="Karte öffnen"
+                onKarteTippen={() => setKarteAuf(true)}
+              />
+            ) : null}
+          </View>
+
+          {seiten.length > 1 && (
+            <>
+              <Druck
+                style={[styles.karussellPfeil, styles.karussellLinks]}
+                onPress={() => blaettern(-1)}
+                hitSlop={8}
+                accessibilityLabel="Vorheriges Standortbild"
+              >
+                <Ionicons name="chevron-back" size={18} color="#1a1d21" />
+              </Druck>
+              <Druck
+                style={[styles.karussellPfeil, styles.karussellRechts]}
+                onPress={() => blaettern(1)}
+                hitSlop={8}
+                accessibilityLabel="Nächstes Standortbild"
+              >
+                <Ionicons name="chevron-forward" size={18} color="#1a1d21" />
+              </Druck>
+              <View style={styles.punkte}>
+                {seiten.map((s, i) => (
+                  <View key={s} style={[styles.punkt, s === seite && styles.punktAn]} />
+                ))}
+              </View>
+            </>
+          )}
         </View>
-        <KarteWeb
-          pins={pins}
-          aktiv={platz.id}
-          hoehe={Math.max(300, fensterHoehe - insets.top - insets.bottom - 48)}
-          eigenerStandort={null}
-          vollbild
-          onVollbild={() => setKarteVoll(false)}
-          onPinPress={(id) => {
-            if (id === platz.id) return;
-            setKarteVoll(false);
+      )}
+
+      {/*
+        Punkt 10: "Alle Fotos ansehen leitet zu Videos/Beiträgen; soll nur
+        Fotos zeigen." Jetzt eine eigene Seite - Prototyp-Frame
+        "VSS + Standort + Alle Fotos".
+      */}
+      <Druck onPress={onAlleFotos}>
+        <Text style={styles.link}>Alle Fotos ansehen →</Text>
+      </Druck>
+
+      {hier && (
+        <OrtKarte
+          sichtbar={karteAuf}
+          platz={platz}
+          hier={hier}
+          orte={orte}
+          onZu={() => setKarteAuf(false)}
+          onOrt={(id) => {
+            setKarteAuf(false);
             onOrt(id);
           }}
         />
-      </View>
-    </Modal>
-
-    {/*
-      Punkt 10: "Alle Fotos ansehen leitet zu Videos/Beiträgen; soll nur
-      Fotos zeigen." Vorher gab der Knopf nur einen Hinweis aus und man blieb
-      in derselben Liste aus Reels, Querformat und Beitraegen, aus der man
-      kam. Jetzt fuehrt er auf eine eigene Seite - Prototyp-Frame
-      "VSS + Standort + Alle Fotos".
-    */}
-    <Druck onPress={onAlleFotos}>
-      <Text style={styles.link}>Alle Fotos ansehen →</Text>
-    </Druck>
-  </View>
+      )}
+    </View>
   );
 };
 
 /**
- * Kopf der Sound-Seite. Henrik am 21.09.2026: "Songs: Abspielen, nur die
- * aktuell gesungene Textzeile, Songwriter-Name, offizielles Songbild."
+ * Die Kartenansicht eines Ortes — aufgebaut wie die Friend-Map (Prototyp
+ * "Messenger - Friend-Map"): oben die Karte mit Ansichtswahl und
+ * Vollbild-Pfeil, darunter die Liste. Statt Kontakten stehen dort die Orte,
+ * nach Entfernung vom gerade geoeffneten Ort (gemeinsam/naehe.js, dieselbe
+ * Rechnung wie auf der Website).
  *
- * Bis dahin liess der Abspielknopf nur eine Uhr laufen - zu hoeren war
- * nichts - und darunter stand der ganze Liedtext auf einmal. Jetzt spielt
- * die Hoerprobe aus Schema 54, und vom Text steht nur die Zeile da, die
- * gerade dran ist, die naechste blass darunter. Ohne Zeitstempel im Liedtext
- * verteilen sich die Zeilen gleichmaessig ueber die Hoerprobe.
+ * Tipp auf eine Zeile oder eine Nadel: die Karte zoomt dorthin, die Zeile
+ * wird markiert. Der Pfeil am Zeilenende oeffnet den Ort. Bis zum 28.09.2026
+ * sprang ein Tipp auf eine fremde Nadel sofort weiter — wer nur schauen
+ * wollte, war raus aus der Karte.
+ */
+const OrtKarte = ({
+  sichtbar,
+  platz,
+  hier,
+  orte,
+  onZu,
+  onOrt,
+}: {
+  sichtbar: boolean;
+  platz: Place;
+  hier: { lat: number; lng: number };
+  orte: Place[];
+  onZu: () => void;
+  onOrt: (id: string) => void;
+}) => {
+  const insets = useSafeAreaInsets();
+  const karte = useRef<KartenSteuerung>(null);
+  const blatt = useRef<ScrollView>(null);
+  const [vollbild, setVollbild] = useState(false);
+  const [gewaehlt, setGewaehlt] = useState<string>(platz.id);
+
+  const naehe = useMemo(() => Naehe.sortiert(hier, orte, platz.id), [hier.lat, hier.lng, orte, platz.id]);
+  const pins: KartenPin[] = naehe.map((e) => ({ id: e.ort.id, name: e.ort.name, lat: e.lat, lng: e.lng }));
+
+  const zeigen = (id: string) => {
+    setGewaehlt(id);
+    blatt.current?.scrollTo({ y: 0, animated: true });
+    karte.current?.zoomAuf(id);
+  };
+
+  const flaeche = Math.max(300, fensterHoehe - insets.top - insets.bottom - 48);
+
+  return (
+    <Modal visible={sichtbar} animationType="slide" onRequestClose={onZu}>
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <View style={styles.bar}>
+          <Druck onPress={onZu} hitSlop={10} accessibilityLabel="Karte schließen">
+            <Ionicons name="close" size={26} color={colors.text} />
+          </Druck>
+          <Text style={styles.barTitel} numberOfLines={1}>
+            {platz.name}
+          </Text>
+        </View>
+        <ScrollView
+          ref={blatt}
+          scrollEnabled={!vollbild}
+          contentContainerStyle={{ paddingTop: vollbild ? 0 : spacing.md, paddingBottom: insets.bottom + spacing.xl }}
+        >
+          <KarteWeb
+            ref={karte}
+            pins={pins}
+            aktiv={platz.id}
+            start={{ ...hier, zoom: 13 }}
+            hoehe={vollbild ? flaeche : Math.round(fensterHoehe * 0.45)}
+            eigenerStandort={null}
+            vollbild={vollbild}
+            onVollbild={() => setVollbild((v) => !v)}
+            onPinPress={zeigen}
+          />
+
+          {!vollbild && (
+            <>
+              <Text style={styles.naeheKopf}>ORTE IN DER NÄHE</Text>
+              {naehe.map((e) => {
+                const an = e.ort.id === gewaehlt;
+                const selbst = e.ort.id === platz.id;
+                return (
+                  <View key={e.ort.id} style={[styles.naeheZeile, an && styles.naeheZeileAn]}>
+                    <Druck
+                      style={styles.naeheInhalt}
+                      onPress={() => zeigen(e.ort.id)}
+                      accessibilityLabel={`${e.ort.name} auf der Karte zeigen`}
+                    >
+                      <View style={[styles.zeileSymbol, selbst && styles.naeheSymbolHier]}>
+                        <Ionicons name="location" size={20} color={selbst ? colors.white : colors.brand} />
+                      </View>
+                      <View style={styles.zeileText}>
+                        <Text style={styles.zeileTitel} numberOfLines={1}>
+                          {e.ort.name}
+                        </Text>
+                        <Text style={styles.zeileSub} numberOfLines={1}>
+                          {[selbst ? 'Dieser Ort' : e.text, e.ort.adresse].filter(Boolean).join(' · ')}
+                        </Text>
+                      </View>
+                    </Druck>
+                    {!selbst && (
+                      <Druck
+                        onPress={() => onOrt(e.ort.id)}
+                        hitSlop={10}
+                        style={styles.naeheOeffnen}
+                        accessibilityLabel={`${e.ort.name} öffnen`}
+                      >
+                        <Ionicons name="chevron-forward" size={20} color={colors.text3} />
+                      </Druck>
+                    )}
+                  </View>
+                );
+              })}
+            </>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+};
+
+/** Sekunden als m:ss. */
+const zeitText = (s: number) => {
+  const t = Math.max(0, Math.floor(Number.isFinite(s) ? s : 0));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+};
+
+/**
+ * Kopf der Sound-Seite. Prototyp-Frame "VSSo + Sound". Henrik am 21.09.2026
+ * (Kasten 7.2–7.4): "Play spielt den Song ab", "Liedtext zeigt nur die gerade
+ * gesungene Zeile", "Songwriter und offizielles Titelbild sichtbar".
  *
- * Die Lautstaerke ist die des Telefons - einen eigenen Regler gibt es nicht
- * (Henrik, selber Tag: "die Systemlautstaerke gilt ueberall").
+ * Befund 28.09.2026:
+ * - Play spielte die Hoerprobe aus Schema 54 — aber ohne Audiomodus. Am
+ *   iPhone mit Stummschalter blieb es still, und nach einer Sprachnachricht
+ *   (PushToTalk setzt allowsRecording) kam der Ton aus der Hoermuschel.
+ * - Ohne Hoerprobe lief eine Uhr, als spiele etwas. Das war eine erfundene
+ *   Anzeige; jetzt ist der Knopf dann aus und sagt, warum.
+ * - Unter der gesungenen Zeile stand blass die naechste. "Nur die gerade
+ *   gesungene Zeile" heisst: nur die. Wann welche dran ist, steht seit
+ *   Schema 63 in der Datenbank (gemeinsam/liedtext.js).
+ * - Der ganze Text liegt, wie im Prototyp, hinter "Lyrics ansehen →"
+ *   (Frame "VSSo + Sound + Lyrics").
+ *
+ * Die Lautstaerke ist die des Telefons (Henrik: "die Systemlautstaerke gilt
+ * ueberall").
  */
 const SoundKopf = ({ sound }: { sound: Sound }) => {
+  const mitTon = !!sound.audio;
   const spieler = useAudioPlayer(sound.audio ? { uri: sound.audio } : undefined);
   const status = useAudioPlayerStatus(spieler);
-  const mitTon = !!sound.audio;
+  const [lyricsAuf, setLyricsAuf] = useState(false);
+  // Einmal Play gedrueckt: ab dann sagt die Seite, wenn die Hoerprobe nicht kommt.
+  const [versucht, setVersucht] = useState(false);
+  const [breite, setBreite] = useState(0);
 
-  // Ohne Hoerprobe laeuft wie bisher nur die Uhr.
-  const [uhrLaeuft, setUhrLaeuft] = useState(false);
-  const [uhrBei, setUhrBei] = useState(0);
-  const stand = useRef(0);
-  const [min, sek] = String(sound.dauer ?? '3:00').split(':').map(Number);
-  const dauer = min * 60 + sek || 180;
+  const gesamt = status.duration > 0 ? status.duration : 30;
+  const bei = mitTon ? status.currentTime : 0;
+  const laeuft = mitTon && status.playing;
 
-  useEffect(() => {
-    if (mitTon || !uhrLaeuft) return;
-    const uhr = setInterval(() => {
-      stand.current = (stand.current + 1) % (dauer + 1);
-      setUhrBei(stand.current);
-    }, 1000);
-    return () => clearInterval(uhr);
-  }, [mitTon, uhrLaeuft, dauer]);
-
-  const gesamt = mitTon && status.duration > 0 ? status.duration : dauer;
-  const bei = mitTon ? status.currentTime : uhrBei;
-  const laeuft = mitTon ? status.playing : uhrLaeuft;
-
-  const umschalten = () => {
-    if (!mitTon) return setUhrLaeuft((v) => !v);
+  const umschalten = async () => {
+    if (!mitTon) return;
     if (status.playing) return spieler.pause();
+    try {
+      /*
+       * Vor jedem Abspielen: auch mit Stummschalter hoerbar, und ueber den
+       * Lautsprecher. PushToTalk und die Kamera setzen allowsRecording; bleibt
+       * das stehen, spielt iOS ueber die Hoermuschel, und es klingt wie
+       * "Play geht nicht".
+       */
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+    } catch {
+      // Ohne Modus spielt es trotzdem, nur eben nach den Regeln des Systems.
+    }
+    setVersucht(true);
     // Am Ende von vorn - sonst passiert auf den zweiten Druck nichts.
     if (status.didJustFinish || bei >= gesamt - 0.3) spieler.seekTo(0);
     spieler.play();
   };
 
-  const balken = 40;
-  const bis = Math.round((bei / gesamt) * balken);
-  const zeit = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  // Tipp auf die Wellenform springt an die Stelle (Prototyp: roter Punkt).
+  const springen = (x: number) => {
+    if (!mitTon || !breite) return;
+    spieler.seekTo(Math.max(0, Math.min(1, x / breite)) * gesamt);
+  };
 
-  const zeilen = (sound.lyrics ?? []).filter((z) => z.trim());
-  const nr = zeilen.length ? Math.min(zeilen.length - 1, Math.floor((bei / gesamt) * zeilen.length)) : -1;
+  const balken = 40;
+  const anteil = Math.max(0, Math.min(1, bei / gesamt));
+  const bis = Math.round(anteil * balken);
+  const liedStand = Liedtext.stand(sound.lyrics, sound.lyricsZeiten, bei, gesamt);
 
   return (
     <View style={[styles.kopf, styles.kopfMitte]}>
-      <View style={styles.cover}>
-        {sound.cover ? (
-          <Image source={{ uri: sound.cover }} style={styles.voll} accessibilityLabel={`Songbild ${sound.title}`} />
-        ) : (
-          <Ionicons name="musical-notes-outline" size={52} color={colors.text3} />
-        )}
+      {/* Prototyp: das Songbild mit einer Schallplatte, die rechts herausschaut. */}
+      <View style={styles.coverRahmen}>
+        <View style={styles.platte}>
+          <View style={styles.platteRille} />
+          <View style={styles.platteMitte} />
+        </View>
+        <View style={styles.cover}>
+          {sound.cover ? (
+            <Image source={{ uri: sound.cover }} style={styles.voll} accessibilityLabel={`Songbild ${sound.title}`} />
+          ) : (
+            <Ionicons name="musical-notes-outline" size={52} color={colors.text3} />
+          )}
+        </View>
       </View>
       <Text style={styles.titel}>{sound.title}</Text>
       <Text style={styles.interpret}>{sound.artist}</Text>
       {!!sound.songwriter && <Text style={styles.zahl}>Songwriter: {sound.songwriter}</Text>}
       <Text style={styles.zahl}>{compact(sound.uses)} Beiträge</Text>
 
-      <View style={styles.welle}>
-        <Druck style={styles.play} onPress={umschalten} accessibilityLabel={laeuft ? 'Pause' : 'Abspielen'}>
-          <Ionicons name={laeuft ? 'pause' : 'play'} size={16} color={colors.text} />
-        </Druck>
-        <View style={styles.wellenBalken}>
-          {Array.from({ length: balken }, (_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.balken,
-                { height: `${20 + Math.round(60 * Math.abs(Math.sin(i * 1.1)))}%` },
-                i < bis && styles.balkenGespielt,
-              ]}
-            />
-          ))}
+      <View style={styles.player}>
+        <View style={styles.welle}>
+          <Druck
+            style={[styles.play, !mitTon && styles.playAus]}
+            onPress={umschalten}
+            disabled={!mitTon}
+            accessibilityLabel={!mitTon ? 'Keine Hörprobe' : laeuft ? 'Pause' : 'Abspielen'}
+          >
+            <Ionicons name={laeuft ? 'pause' : 'play'} size={16} color={colors.text} />
+          </Druck>
+          <Druck
+            style={styles.wellenFlaeche}
+            onLayout={(e) => setBreite(e.nativeEvent.layout.width)}
+            onPress={(e) => springen(e.nativeEvent.locationX)}
+            disabled={!mitTon}
+            accessibilityLabel="Stelle im Song wählen"
+          >
+            {/* pointerEvents none: sonst meldet iOS die Stelle relativ zum
+                getroffenen Balken statt zur ganzen Flaeche. */}
+            <View pointerEvents="none" style={styles.wellenBalken}>
+            {Array.from({ length: balken }, (_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.balken,
+                  // Die Form ist gezeichnet, nicht aus dem Ton gerechnet —
+                  // eine echte Wellenform braeuchte die Audiodaten.
+                  { height: `${20 + Math.round(60 * Math.abs(Math.sin(i * 1.1)))}%` },
+                  i < bis && styles.balkenGespielt,
+                ]}
+              />
+            ))}
+            {mitTon && <View style={[styles.abspielPunkt, { left: `${anteil * 100}%` }]} />}
+            </View>
+          </Druck>
+          <Text style={styles.wellenZeit}>
+            {mitTon ? `${zeitText(bei)} / ${zeitText(gesamt)}` : sound.dauer ?? ''}
+          </Text>
         </View>
-        <Text style={styles.wellenZeit}>
-          {zeit(bei)} / {mitTon ? zeit(gesamt) : sound.dauer}
-        </Text>
+
+        {!mitTon && <Text style={styles.playHinweis}>Keine Hörprobe vorhanden.</Text>}
+        {mitTon && versucht && !status.isLoaded && (
+          <Text style={styles.playHinweis}>Die Hörprobe lädt noch – oder ist nicht erreichbar.</Text>
+        )}
+
+        {/* Prototyp: im Player-Kasten links "Lyrics der jeweiligen Zeile",
+            rechts "Lyrics ansehen →". */}
+        <View style={styles.lyricsZeile}>
+          {liedStand.anzahl ? (
+            <Text style={styles.lyricsJetzt} accessibilityLiveRegion="polite" numberOfLines={2}>
+              {liedStand.jetzt || '♪'}
+            </Text>
+          ) : (
+            <Text style={styles.lyricsOhne}>Zu diesem Sound gibt es keinen Liedtext.</Text>
+          )}
+          {!!liedStand.anzahl && (
+            <Druck onPress={() => setLyricsAuf(true)} hitSlop={8} accessibilityLabel="Lyrics ansehen">
+              <Text style={styles.lyricsLink}>Lyrics ansehen →</Text>
+            </Druck>
+          )}
+        </View>
       </View>
 
-      <View style={styles.lyrics}>
-        <Text style={styles.lyricsKopf}>LIEDTEXT</Text>
-        {nr >= 0 ? (
-          <>
-            <Text style={styles.lyricsJetzt} accessibilityLiveRegion="polite">
-              {zeilen[nr]}
-            </Text>
-            {nr + 1 < zeilen.length && <Text style={styles.lyricsDanach}>{zeilen[nr + 1]}</Text>}
-          </>
-        ) : (
-          <Text style={styles.lyricsOhne}>Zu diesem Sound gibt es keinen Liedtext.</Text>
-        )}
-      </View>
+      <LyricsSeite
+        sichtbar={lyricsAuf}
+        sound={sound}
+        nr={liedStand.nr}
+        laeuft={laeuft}
+        mitTon={mitTon}
+        bei={bei}
+        gesamt={gesamt}
+        onPlay={umschalten}
+        onZu={() => setLyricsAuf(false)}
+      />
     </View>
+  );
+};
+
+/**
+ * Prototyp-Frame "VSSo + Sound + Lyrics": Songname, Produzent/in, der ganze
+ * Text mit der gesungenen Zeile hervorgehoben, unten der Player. Die Zeile
+ * scrollt mit.
+ */
+const LyricsSeite = ({
+  sichtbar,
+  sound,
+  nr,
+  laeuft,
+  mitTon,
+  bei,
+  gesamt,
+  onPlay,
+  onZu,
+}: {
+  sichtbar: boolean;
+  sound: Sound;
+  nr: number;
+  laeuft: boolean;
+  mitTon: boolean;
+  bei: number;
+  gesamt: number;
+  onPlay: () => void;
+  onZu: () => void;
+}) => {
+  const insets = useSafeAreaInsets();
+  const blatt = useRef<ScrollView>(null);
+  const lagen = useRef<Record<number, number>>({});
+  const eintraege = useMemo(() => Liedtext.eintraege(sound.lyrics), [sound.lyrics]);
+
+  useEffect(() => {
+    const y = lagen.current[nr];
+    if (sichtbar && nr >= 0 && typeof y === 'number') {
+      blatt.current?.scrollTo({ y: Math.max(0, y - 160), animated: true });
+    }
+  }, [nr, sichtbar]);
+
+  return (
+    <Modal visible={sichtbar} animationType="slide" onRequestClose={onZu}>
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <View style={styles.bar}>
+          <Druck onPress={onZu} hitSlop={10} accessibilityLabel="Zurück">
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </Druck>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.barTitel} numberOfLines={1}>
+              {sound.title}
+            </Text>
+            <Text style={styles.zeileSub} numberOfLines={1}>
+              {sound.artist}
+            </Text>
+          </View>
+        </View>
+        <ScrollView ref={blatt} contentContainerStyle={styles.lyricsVoll}>
+          {eintraege.map((e, i) =>
+            e.nr < 0 ? (
+              <View key={i} style={{ height: 18 }} />
+            ) : (
+              <Text
+                key={i}
+                onLayout={(ev) => {
+                  lagen.current[e.nr] = ev.nativeEvent.layout.y;
+                }}
+                style={[styles.lyricsVollZeile, e.nr === nr && styles.lyricsVollJetzt]}
+              >
+                {e.text}
+              </Text>
+            )
+          )}
+        </ScrollView>
+        <View style={[styles.lyricsPlayer, { paddingBottom: insets.bottom + spacing.md }]}>
+          <Druck
+            style={[styles.play, !mitTon && styles.playAus]}
+            onPress={onPlay}
+            disabled={!mitTon}
+            accessibilityLabel={!mitTon ? 'Keine Hörprobe' : laeuft ? 'Pause' : 'Abspielen'}
+          >
+            <Ionicons name={laeuft ? 'pause' : 'play'} size={16} color={colors.text} />
+          </Druck>
+          <View style={styles.lyricsFortschritt}>
+            <View style={[styles.lyricsFortschrittAn, { width: `${Math.min(100, (bei / gesamt) * 100)}%` }]} />
+          </View>
+          <Text style={styles.wellenZeit}>{mitTon ? zeitText(bei) : sound.dauer ?? ''}</Text>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
@@ -792,10 +1123,59 @@ const styles = themenStyles((colors) => ({
   },
   koordinaten: { ...typography.small, color: colors.text3, marginTop: 2 },
 
-  karte: { marginTop: spacing.md, borderRadius: radius.lg, overflow: 'hidden' },
+  karte: { borderRadius: radius.lg, overflow: 'hidden' },
+  /* Karussell "B. Standortbilder": Pfeile links und rechts, Punkte darunter. */
+  karussell: { marginTop: spacing.md },
+  karussellFoto: { width: '100%', height: 190 },
+  karussellPfeil: {
+    position: 'absolute',
+    top: 95 - 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  karussellLinks: { left: 8 },
+  karussellRechts: { right: 8 },
+  punkte: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 8 },
+  punkt: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.border },
+  punktAn: { backgroundColor: colors.text },
+
+  /* Kartenansicht eines Ortes: Liste wie "IN DER NÄHE" der Friend-Map. */
+  naeheKopf: { ...typography.overline, color: colors.text3, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  naeheZeile: { flexDirection: 'row', alignItems: 'center', paddingRight: spacing.lg },
+  naeheZeileAn: { backgroundColor: colors.brandSoft },
+  naeheInhalt: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: 9 },
+  naeheSymbolHier: { backgroundColor: '#ff3b30' },
+  naeheOeffnen: { padding: 6 },
   link: { ...typography.name, color: colors.brand, marginTop: spacing.md },
 
   interpret: { ...typography.message, color: colors.text2, marginTop: 2 },
+  /* Prototyp "VSSo + Sound": hinter dem Songbild schaut rechts eine
+     Schallplatte heraus. */
+  coverRahmen: { width: 148 + 44, height: 148, alignItems: 'flex-start' },
+  platte: {
+    position: 'absolute',
+    right: 0,
+    top: 6,
+    width: 136,
+    height: 136,
+    borderRadius: 68,
+    backgroundColor: '#15171a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  platteRille: {
+    position: 'absolute',
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  platteMitte: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#c0392b' },
   cover: {
     width: 148,
     height: 148,
@@ -805,15 +1185,18 @@ const styles = themenStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  welle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  /* Prototyp: ein Kasten mit Play, Wellenform und darunter der Zeile. */
+  player: {
     alignSelf: 'stretch',
     marginTop: spacing.md,
     padding: 10,
     borderRadius: radius.lg,
     backgroundColor: colors.surface2,
+  },
+  welle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   play: {
     width: 34,
@@ -823,23 +1206,53 @@ const styles = themenStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  wellenBalken: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2, height: 34 },
+  playAus: { opacity: 0.4 },
+  playHinweis: { ...typography.small, color: colors.text3, marginTop: 6 },
+  wellenFlaeche: { flex: 1, height: 34 },
+  wellenBalken: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  /* Der rote Abspielpunkt aus dem Prototyp. */
+  abspielPunkt: {
+    position: 'absolute',
+    top: 17 - 5,
+    width: 10,
+    height: 10,
+    marginLeft: -5,
+    borderRadius: 5,
+    backgroundColor: '#ff3b30',
+  },
   balken: { flex: 1, borderRadius: 1, backgroundColor: colors.text3, opacity: 0.45 },
   balkenGespielt: { backgroundColor: colors.brand, opacity: 1 },
   wellenZeit: { ...typography.small, color: colors.text2, fontVariant: ['tabular-nums'] },
   /* Zeilenhoehe 26 auf 15px Schrift - Liedtext liest sich mit mehr Luft als
      Fliesstext, weil jede Zeile eine eigene Einheit ist. */
-  lyrics: {
-    marginTop: spacing.lg,
-    paddingTop: spacing.lg,
+  lyricsZeile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    alignSelf: 'stretch',
   },
-  lyricsKopf: { ...typography.overline, color: colors.text3, marginBottom: 10 },
-  lyricsJetzt: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  lyricsDanach: { fontSize: 16, lineHeight: 24, color: colors.text3, textAlign: 'center', marginTop: 6 },
-  lyricsOhne: { ...typography.preview, color: colors.text3 },
+  lyricsJetzt: { flex: 1, fontSize: 16, lineHeight: 22, fontWeight: '700', color: colors.text },
+  lyricsLink: { ...typography.small, fontWeight: '600', color: colors.brand },
+  lyricsOhne: { flex: 1, ...typography.preview, color: colors.text3 },
+  /* Die Seite "Lyrics ansehen" (Prototyp "VSSo + Sound + Lyrics"). */
+  lyricsVoll: { padding: spacing.lg, paddingBottom: 120 },
+  lyricsVollZeile: { fontSize: 18, lineHeight: 28, color: colors.text3 },
+  lyricsVollJetzt: { fontWeight: '700', color: colors.text },
+  lyricsPlayer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface2,
+  },
+  lyricsFortschritt: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' },
+  lyricsFortschrittAn: { height: 4, backgroundColor: '#ff3b30' },
 
   abschnitt: { ...typography.h3, color: colors.text, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
 

@@ -2497,7 +2497,8 @@ app.get('/api/explorer/:art/:wert', route(async (req) => {
       art, id: platz.id, titel: platz.name, anzahl: platz.posts,
       adresse: platz.adresse, koordinaten: platz.koordinaten, x: platz.x, y: platz.y,
       // Fuer die grosse Karte: alle Orte, damit man von dort weiterspringen kann.
-      orte: standorte.map((o) => ({ id: o.id, name: o.name, koordinaten: o.koordinaten })),
+      // Adresse fuer die Liste unter der Karte (wie "In deiner Naehe" in der Friend-Map).
+      orte: standorte.map((o) => ({ id: o.id, name: o.name, adresse: o.adresse, koordinaten: o.koordinaten })),
     };
   } else if (art === 'sound') {
     /*
@@ -2521,6 +2522,8 @@ app.get('/api/explorer/:art/:wert', route(async (req) => {
       art, titel: sound.title, produzent: sound.artist,
       anzahl: sound.uses, dauer: sound.dauer, lyrics: sound.lyrics,
       songwriter: sound.songwriter, cover: sound.cover, audio: sound.audio,
+      // Schema 63: wann welche Zeile gesungen wird (gemeinsam/liedtext.js).
+      zeiten: sound.lyricsZeiten || null,
     };
   } else {
     return { ok: false, error: 'Unbekannter Bereich' };

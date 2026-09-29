@@ -1186,12 +1186,22 @@ async function ladeHashtags(client) {
   return (data || []).map((h) => ({ tag: h.tag, posts: Number(h.beitraege) }));
 }
 
+const SOUND_SPALTEN = 'id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url';
+
 async function ladeSounds(client) {
   if (!client) return [];
-  const { data, error } = await client
+  /*
+   * Schema 63 bringt `lyrics_zeiten`. Fehlt die Spalte noch (42703), ohne sie
+   * weiter - sonst waere die ganze Sound-Liste leer. Dieselbe Weiche in
+   * app/lib/daten.ts.
+   */
+  let { data, error } = await client
     .from('sounds')
-    .select('id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url')
+    .select(`${SOUND_SPALTEN}, lyrics_zeiten`)
     .order('uses', { ascending: false });
+  if (error && error.code === '42703') {
+    ({ data, error } = await client.from('sounds').select(SOUND_SPALTEN).order('uses', { ascending: false }));
+  }
   if (error) throw error;
   return (data || []).map((s) => ({
     id: s.id,
@@ -1206,6 +1216,8 @@ async function ladeSounds(client) {
     songwriter: s.songwriter || '',
     cover: s.cover_url || '',
     audio: s.audio_url || '',
+    // Schema 63: Sekunden je gesungener Zeile, sonst null.
+    lyricsZeiten: Array.isArray(s.lyrics_zeiten) ? s.lyrics_zeiten.map(Number) : null,
   }));
 }
 

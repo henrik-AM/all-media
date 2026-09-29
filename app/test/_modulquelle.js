@@ -97,6 +97,13 @@ const UMD_BAUSTEINE = [
   ['teilen', 'Teilen'],
   // 28.09.2026: `verlauf.js` für „Mein Verlauf" (Feedback 21.09., Kasten 10).
   ['verlauf', 'Verlauf'],
+
+  // 28.09.2026: `liedtext.js` fuer die gesungene Zeile auf der Sound-Seite
+  // (Feedback 21.09., Kasten 7, Schema 63).
+  ['liedtext', 'Liedtext'],
+  // 28.09.2026: `naehe.js` fuer die Ortsliste in der Kartenansicht eines
+  // Standorts (Feedback 21.09., Kasten 7.1).
+  ['naehe', 'Naehe'],
 ];
 
 function umdTeile() {
