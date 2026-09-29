@@ -112,7 +112,7 @@ function bereichsListen(storys, { kontaktIds, gefolgtIds, ichId }) {
   };
 
   let storyId = null;
-  /** Kasten 11 (Schema XX_storys): Messenger-Storys lesen nur Kontakte. */
+  /** Kasten 11 (Schema 68): Messenger-Storys lesen nur Kontakte. */
   let kontaktZurueck = null;
 
   const aufraeumen = async () => {

@@ -19,7 +19,7 @@ import { colors, spacing, themenStyles, typography } from '../constants/design';
  * (localStorage), andere sahen es nie.
  *
  * Jetzt: Foto aus der Mediathek (oder Kamera) → Eimer `media`, Ordner
- * `avatars` → `profiles.avatar_url` (SUPABASE_SCHEMA_XX_profilbild.sql).
+ * `avatars` → `profiles.avatar_url` (SUPABASE_SCHEMA_69_profilbild.sql).
  * Gezeigt wird es überall, wo `Avatar` steht, weil ladeNutzer die Adresse
  * an jeden Nutzer hängt und ladeAlles sie unterschreibt.
  *

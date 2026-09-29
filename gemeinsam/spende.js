@@ -26,7 +26,7 @@
  * (vor dem 29.09.2026 angelegt) zählt alle Spenden.
  *
  * Summe und Zahl der Spender liefert die Datenbank: `spendenstand()` im
- * Schema-Entwurf XX_spendenziel, weil `donations` nur für die beiden
+ * Schema 71, weil `donations` nur für die beiden
  * Beteiligten lesbar ist — ein Besucher des Profils sähe sonst nichts.
  *
  * UMD-Hülle wie in rang.js; Eintrag in UMD_BAUSTEINE

@@ -219,7 +219,7 @@
     /*
      * Wer markiert ist, sieht die Story auch ohne Kontakt oder Folgen — sonst
      * führte die Mitteilung „hat dich in einer Story markiert" ins Leere. Die
-     * Datenbank lässt sie ihn lesen (ist_story_markiert, Schema XX_storys).
+     * Datenbank lässt sie ihn lesen (ist_story_markiert, Schema 68).
      */
     const markiertMich = (s) =>
       Boolean(s.overlays && s.overlays.markiert.some((m) => m.userId === ichId));

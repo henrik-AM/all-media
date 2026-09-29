@@ -1,5 +1,5 @@
 -- ===========================================================================
---  All Media — Schema XX (ENTWURF, Kasten 11): Storys
+--  All Media — Schema 68 (ENTWURF, Kasten 11): Storys
 --  Stand 29.09.2026
 --
 --  NUMMER: wird beim Zusammenführen vergeben. Nicht in SUPABASE_REIHENFOLGE.md

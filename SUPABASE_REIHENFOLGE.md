@@ -55,12 +55,13 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.nummer_frei() | SUPABASE_SCHEMA_34_telefon_pflicht.sql → SUPABASE_SCHEMA_39_anonyme_bremse.sql | **SUPABASE_SCHEMA_39_anonyme_bremse.sql** |
 | Funktion public.on_contact() | SUPABASE_SCHEMA_2.sql → SUPABASE_SCHEMA_44_mitteilungen.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
 | Funktion public.starter_inhalte() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** (Schema 17, 60 und 62 schreiben sie am Anker um; 62 sperrt echte Konten aus) |
-| Funktion public.story_in_videos_zuruecknehmen() | SUPABASE_SCHEMA_30_story_in_videos.sql → SUPABASE_SCHEMA_36_story_getrennt.sql | **SUPABASE_SCHEMA_36_story_getrennt.sql** |
+| Funktion public.story_in_videos_zuruecknehmen() | SUPABASE_SCHEMA_30_story_in_videos.sql → SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
+| Funktion public.storys_aus_videos_nehmen() | SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.testbestand_profilaufrufe() | SUPABASE_SCHEMA_17_testbestand_statistik.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Funktion public.zuruecksetzen() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_13_zuruecksetzen_handbuch.sql → SUPABASE_SCHEMA_14_chatstau.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_47_sammlungen_testbestand.sql | **SUPABASE_SCHEMA_47_sammlungen_testbestand.sql** (Schema 62 schreibt sie am Anker um: nur Testkonten) |
 | Funktion public.zuruecksetzen_einstellungen() | SUPABASE_SCHEMA_16_einstellungen.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Regel "stories_im_highlight" auf public.stories | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql | **SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql** |
-| Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql | **SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql** |
+| Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** (Ziel entscheidet: Videos für alle Sichtbaren, Messenger nur Kontakte, Markierte) |
 | Regel "Beitraege lesen" auf public.posts | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Communitys lesen" auf public.communities | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Eigene Chats aendern" auf public.chats | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
@@ -149,3 +150,16 @@ den Auslöser `posts_sound_zuordnen` (setzt `sound_id` aus `posts.music`),
 EXECUTE nur `authenticated`) und `sounds.wellenform`, `hoerprobe_sek`,
 `cover_quelle`, `cover_link`. Neue Definitionen, keine Doppelung.
 Reihenfolge: nach Schema 54 (Spalten der Sounds).
+
+## Nachtrag 29.09.2026: Schemas 68–71 (Kästen 11 und 12)
+
+- `SUPABASE_SCHEMA_68_storys.sql` — `stories.in_messenger`/`overlays`,
+  `stories_ziel_check`, Tabelle `story_tags`, Markier-Funktionen, Mitteilung
+  bei Markierung, neue Leseregel „Aktuelle Storys lesen“ und neue Fassung von
+  `story_in_videos_zuruecknehmen()`/`storys_aus_videos_nehmen()` (beide halten
+  den Check ein). **Wer Schema 19 oder 36 neu einspielt, muss 68 nachziehen**,
+  sonst lesen wieder alle Konten Messenger-Storys.
+- `SUPABASE_SCHEMA_69_profilbild.sql` — `profiles.avatar_url` mit
+  Spaltenrecht. **Schema 23 erneut einspielen nimmt das Leserecht wieder weg.**
+- `SUPABASE_SCHEMA_70_titelbild.sql` — Titelbild von Playlist/Highlight.
+- `SUPABASE_SCHEMA_71_spendenziel.sql` — `spendenstand()`.

@@ -1746,7 +1746,7 @@ export async function spendeSetzen(
  * Der Stand eines Spendenziels: Summe und Zahl der Spender seit `seit`
  * (Kasten 12.3). Null heisst „nicht ermittelbar", nicht „nichts gespendet".
  *
- * Erst ueber `spendenstand()` aus SUPABASE_SCHEMA_XX_spendenziel.sql — die
+ * Erst ueber `spendenstand()` aus SUPABASE_SCHEMA_71_spendenziel.sql — die
  * einzige Stelle, an der ein Besucher eine Summe erfahren darf, denn
  * `donations` ist nur fuer Sender und Empfaenger lesbar. Solange der Entwurf
  * nicht eingespielt ist, rechnet das eigene Profil selbst (der Empfaenger
@@ -3414,7 +3414,7 @@ export async function sammlungenVon(
 /*
  * Die Titelbild-Wahl je Sammlung — oder nichts.
  *
- * Die drei Spalten kommen erst mit SUPABASE_SCHEMA_XX_titelbild.sql. Stuenden
+ * Die drei Spalten kommen erst mit SUPABASE_SCHEMA_70_titelbild.sql. Stuenden
  * sie in der Abfrage oben, fiele bis zum Einspielen jede Sammlungsreihe aus.
  * So faellt nur die Wahl aus. Gegenstueck: titelWahlen in web/server/app.js.
  */

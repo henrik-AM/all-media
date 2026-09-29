@@ -85,7 +85,7 @@ function profilZuNutzer(zeile) {
 /*
  * Die Profilbilder (Kasten 12.5) — getrennt und nachsichtig geladen.
  *
- * `avatar_url` kommt erst mit SUPABASE_SCHEMA_XX_profilbild.sql. Stuende die
+ * `avatar_url` kommt erst mit SUPABASE_SCHEMA_69_profilbild.sql. Stuende die
  * Spalte in PROFIL_SPALTEN, schluege bis zum Einspielen jede Profilabfrage
  * fehl (Schema 23: nicht freigegebene Spalten sind ein Fehler, kein null).
  * So fehlen hoechstens die Bilder. Unterschrieben wird die Adresse mit der

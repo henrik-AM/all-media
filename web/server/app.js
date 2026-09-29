@@ -1400,7 +1400,7 @@ app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
  * sah es, und die App kannte gar keins. Jetzt: der Browser lädt über
  * /api/hochladen in den Ordner `avatars` und schickt die beständige Adresse
  * hierher; sie landet in `profiles.avatar_url`
- * (SUPABASE_SCHEMA_XX_profilbild.sql). Dieselbe Prüfung macht die Datenbank
+ * (SUPABASE_SCHEMA_69_profilbild.sql). Dieselbe Prüfung macht die Datenbank
  * mit dem Check `profiles_avatar_url_eimer`.
  *
  * Eigene Route statt eines Felds in /api/eigene/profil: dort liest die
@@ -1553,7 +1553,7 @@ app.delete('/api/eigene/sammlung/:art/:name', route(async (req) => {
  * Wie weit ein Spendenziel ist (Kasten 12.3): Summe in Cent und Zahl der
  * Spender seit `seit` (dem Anlegen des Ziels).
  *
- * Über die Funktion spendenstand() (SUPABASE_SCHEMA_XX_spendenziel.sql):
+ * Über die Funktion spendenstand() (SUPABASE_SCHEMA_71_spendenziel.sql):
  * `donations` darf jeder nur für die eigenen Buchungen lesen, der Stand
  * eines fremden Ziels ginge sonst nicht. Fehlt die Funktion noch, rechnet
  * der Rückfall — nur fürs eigene Konto — direkt aus `donations`; fremd
@@ -1950,7 +1950,7 @@ app.get('/api/sammlungen', route(async (req) => {
 /*
  * Die Titelbild-Wahl je Sammlung — oder nichts.
  *
- * Die drei Spalten kommen erst mit SUPABASE_SCHEMA_XX_titelbild.sql. Stuenden
+ * Die drei Spalten kommen erst mit SUPABASE_SCHEMA_70_titelbild.sql. Stuenden
  * sie in der Abfrage oben, fiele bis zum Einspielen JEDE Sammlungsreihe
  * aus. So faellt nur die Wahl aus, und der Kreis zeigt wie bisher das
  * neueste Stueck.

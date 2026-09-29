@@ -20,7 +20,7 @@
  * prüft im Quelltext beider Seiten, dass die Bausteine eingebaut sind. Ob
  * das Bild wirklich erscheint, beweist er NICHT — dafür braucht es
  * Simulator und Browser, und die Datenbankfelder aus den drei
- * SUPABASE_SCHEMA_XX-Entwürfen (profilbild, titelbild, spendenziel).
+ * Schemas 69–71 (profilbild, titelbild, spendenziel).
  *
  * Start:  node test/_kasten12.js
  */
@@ -107,7 +107,7 @@ pruefe('Gewählte Story gewinnt', Sammlungen.vorschaubild({ titel_story_id: 's' 
 pruefe('Eigenes Foto gewinnt vor allem',
   Sammlungen.vorschaubild({ titelbild_url: 'F.jpg', titel_post_id: 'a' }, inhalte) === 'F.jpg');
 pruefe('Leere Sammlung ohne Foto: kein Bild', Sammlungen.vorschaubild({}, []) === null);
-const titelSchema = lies('SUPABASE_SCHEMA_XX_titelbild.sql');
+const titelSchema = lies('SUPABASE_SCHEMA_70_titelbild.sql');
 pruefe('Schema-Entwurf: Spalten, Prüfung auf Inhalt, idempotent',
   /titel_post_id/.test(titelSchema) && /titelbild_url/.test(titelSchema) &&
   /if not exists/i.test(titelSchema) && /create or replace function/i.test(titelSchema));
@@ -132,7 +132,7 @@ pruefe('Stand: erreicht, Fortschritt, Spender aus den Buchungen',
 const alt = Spende.stand({ titel: 'A', ziel: 100, frist: '2020-01-01' }, null);
 pruefe('Abgelaufene Frist wird erkannt', alt && alt.abgelaufen === true && Boolean(alt.fristText));
 pruefe('Eigener Betrag: 2,50 → 250 Cent, 0,10 abgelehnt', Spende.centAus('2,50') === 250 && Spende.centAus('0,10') === null);
-const spendeSchema = lies('SUPABASE_SCHEMA_XX_spendenziel.sql');
+const spendeSchema = lies('SUPABASE_SCHEMA_71_spendenziel.sql');
 pruefe('Schema-Entwurf: spendenstand() nur für angemeldete Nutzer',
   /function public\.spendenstand/i.test(spendeSchema) && /revoke[\s\S]*from public, anon/i.test(spendeSchema) &&
   /grant execute[\s\S]*to authenticated/i.test(spendeSchema));
@@ -146,7 +146,7 @@ pruefe('Server: GET /api/spendenstand/:userId', /app\.get\('\/api\/spendenstand\
 pruefe('Server: Spende-Formular über Spende.ausFormular', /Spende\.ausFormular\(req\.body/.test(SERVER));
 
 console.log('\n12.5  Profilbild');
-const bildSchema = lies('SUPABASE_SCHEMA_XX_profilbild.sql');
+const bildSchema = lies('SUPABASE_SCHEMA_69_profilbild.sql');
 pruefe('Schema-Entwurf: avatar_url nur aus dem Eimer media',
   /avatar_url/.test(bildSchema) && /storage\/v1\/object\/public\/media\/avatars/.test(bildSchema));
 pruefe('App: Kopf mit Mediathek, Kamera, Entfernen',

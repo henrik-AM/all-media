@@ -1,5 +1,5 @@
 -- ===========================================================================
--- Schema XX (Entwurf): Stand eines Spendenziels (29.09.2026, Kasten 12.3)
+-- Schema 71 (Entwurf): Stand eines Spendenziels (29.09.2026, Kasten 12.3)
 -- ===========================================================================
 --
 -- WORUM ES GEHT

@@ -191,7 +191,7 @@ export async function ladeNutzer(
 /*
  * Die Profilbilder (Kasten 12.5) — getrennt und nachsichtig geladen.
  *
- * `avatar_url` kommt erst mit SUPABASE_SCHEMA_XX_profilbild.sql. Stuende die
+ * `avatar_url` kommt erst mit SUPABASE_SCHEMA_69_profilbild.sql. Stuende die
  * Spalte in PROFIL_SPALTEN, schluege bis zum Einspielen jede Profilabfrage
  * fehl (Schema 23: nicht freigegebene Spalten sind ein Fehler, kein null).
  * So fehlen hoechstens die Bilder, und es bleibt bei den Initialen.
@@ -810,7 +810,7 @@ export async function ladeStorys(client: SupabaseClient, ichId: string): Promise
    * Demoprofile sind vom Anfang September; sobald 50 neuere Zeilen da waren,
    * fielen sie aus der Abfrage, bevor der Kontakt-Filter überhaupt lief
    * (Kasten 11.3). Jetzt 300 Zeilen, nur nicht abgelaufene, und die
-   * Datenbank entscheidet, was man überhaupt sieht (Schema XX_storys).
+   * Datenbank entscheidet, was man überhaupt sieht (Schema 68).
    */
   const abfrage = (spalten: string) =>
     client

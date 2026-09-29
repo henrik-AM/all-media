@@ -85,7 +85,7 @@ const mitteilungText = (
     case 'repost':
       return `${name} hat dein Video repostet.`;
     case 'mention':
-      // Kasten 11.6: Markierung in einer Story (story_tags, Schema XX).
+      // Kasten 11.6: Markierung in einer Story (story_tags, Schema 68).
       if (m.ziel.art === 'story') return `${name} hat dich in einer Story markiert.`;
       return m.ziel.art === 'post'
         ? `${name} hat dich in einem Beitrag markiert.`

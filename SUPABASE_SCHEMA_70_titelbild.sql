@@ -1,5 +1,5 @@
 -- ===========================================================================
--- Schema XX (Entwurf): Titelbild für Playlists und Highlights
+-- Schema 70 (Entwurf): Titelbild für Playlists und Highlights
 -- (29.09.2026, Kasten 12.7 und 12.8)
 -- ===========================================================================
 --

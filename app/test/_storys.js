@@ -10,7 +10,7 @@
  *    kein Markieren von Personen."
  *   „Fremde Stories fehlen: Nur die eigene ist sichtbar, keine der Test-Nutzer."
  *
- * Alles davon ist eine Regel in der Datenbank (SUPABASE_SCHEMA_XX_storys.sql)
+ * Alles davon ist eine Regel in der Datenbank (SUPABASE_SCHEMA_68_storys.sql)
  * oder in gemeinsam/story.js — und beides lässt sich nur aus zwei Perspektiven
  * widerlegen: ein Konto postet, das andere sieht nach. Kein Browser; was die
  * Oberflächen daraus machen, steht in gemeinsam/story.js und wird hier mit
@@ -20,7 +20,7 @@
  * er am Ende zurück — und zählt nach, ob es wirklich weg ist (ein verbotenes
  * DELETE meldet keinen Fehler).
  *
- * Braucht das Schema XX_storys. Fehlt es, bricht der Lauf mit genau diesem
+ * Braucht das Schema 68. Fehlt es, bricht der Lauf mit genau diesem
  * Satz ab, statt dreißig Folgefehler zu zeigen.
  *
  * Start:  node test/_storys.js
@@ -77,7 +77,7 @@ async function anmelden(zugang) {
   // ------------------------------------------------ ist das Schema da? --
   const { error: fSchema } = await eigner.client.from('stories').select('in_messenger, overlays').limit(1);
   if (fSchema) {
-    console.error('FEHLER  Schema XX_storys fehlt (stories.in_messenger/overlays): ' + fSchema.message);
+    console.error('FEHLER  Schema 68 fehlt (stories.in_messenger/overlays): ' + fSchema.message);
     process.exit(1);
   }
 

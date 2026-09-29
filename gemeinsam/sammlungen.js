@@ -18,7 +18,7 @@
  * Außerdem steht hier die Regel, WELCHES Bild im Kreis erscheint. Sie stand
  * zweimal (app/lib/aktionen.ts `sammlungenVon`, web/server/app.js
  * `/api/sammlungen`) und hat mit dem wählbaren Titelbild (Schema-Entwurf
- * XX_titelbild) eine zweite Stufe bekommen. Zwei Fassungen davon laufen
+ * Schema 70) eine zweite Stufe bekommen. Zwei Fassungen davon laufen
  * auseinander, sobald eine angefasst wird.
  *
  * WARUM DIE UMD-HÜLLE

@@ -10840,7 +10840,7 @@ function openVideoOptionen(clip, danach) {
  * Jetzt: Klick → Blatt mit Titel, Beschreibung, Erreicht, Ziel, Fortschritt,
  * Spendern und Frist; darunter „Spenden" über den bestehenden Weg
  * (openSpende). Erreichter Betrag und Spender kommen aus der Datenbank
- * (/api/spendenstand → spendenstand(), SUPABASE_SCHEMA_XX_spendenziel.sql).
+ * (/api/spendenstand → spendenstand(), SUPABASE_SCHEMA_71_spendenziel.sql).
  * Rechnung und Texte: gemeinsam/spende.js, wie in app/components/SpendeKarte.tsx.
  * Zahlungsmethode und Spenden-Code: Kasten 13.
  */
@@ -13618,7 +13618,7 @@ async function renderSammlung() {
  * Stück.
  *
  * Gespeichert wird in `sammlungen` (titel_post_id, titel_story_id,
- * titelbild_url — SUPABASE_SCHEMA_XX_titelbild.sql) über
+ * titelbild_url — SUPABASE_SCHEMA_70_titelbild.sql) über
  * POST /api/eigene/sammlung/:id/titelbild. Welches Bild daraus im Kreis
  * wird, entscheidet Sammlungen.vorschaubild() — dieselbe Regel wie in der
  * App (VideoProfileScreen, „Titelbild wählen").
