@@ -27,7 +27,8 @@
  *   AM_TEST_MAIL, AM_TEST_PASS
  */
 
-const MAIL = process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de';
+const { nurTestkonto } = require('./_nur_testkonten');
+const MAIL = nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de');
 const PASS = process.env.AM_TEST_PASS || 'PruefLauf2026!';
 const NAME = process.env.AM_TEST_NAME || 'prueflauf';
 

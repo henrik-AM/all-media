@@ -36,6 +36,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const { nurTestkonto } = require('./_nur_testkonten');
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -47,7 +48,7 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 
 const TESTKONTO = { email: 'test@all-media.app', passwort: 'AllMedia2026!', rufname: 'Testkonto' };
 const PRUEFKONTO = {
-  email: process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de',
+  email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || 'PruefLauf2026!',
   rufname: 'Prüfkonto',
 };

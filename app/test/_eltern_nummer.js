@@ -32,12 +32,13 @@ const { chromium } = require('playwright-core');
 const { frage } = require('./_aufraeumen');
 const { schliesse } = require('./_konto');
 const Telefon = require('../../gemeinsam/telefon');
+const { nurTestkonto } = require('./_nur_testkonten');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const BILDER = process.env.BILDER ? path.join(__dirname, '..', '..', 'bilder', 'eltern-nummer') : null;
 
 const PRUEFER = {
-  email: process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de',
+  email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || 'PruefLauf2026!',
 };
 

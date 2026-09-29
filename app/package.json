@@ -92,6 +92,7 @@
     "test:rechte": "node test/_rechte.js",
     "test:bremse": "node test/_bremse.js",
     "test:auth": "node test/_auth.js",
+    "test:zahlung": "node test/_zahlung.js",
     "test:sync": "node test/_sync.js",
     "test:sammlungen": "node test/_sammlungen.js",
     "test:sammlungenweb": "node test/_sammlungenweb.js",

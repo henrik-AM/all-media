@@ -8,6 +8,7 @@ import { DatenProvider } from './contexts/DatenContext';
 import { EinstellungenProvider, useEinstellungen } from './contexts/EinstellungenContext';
 import { RepostProvider } from './contexts/RepostContext';
 import { ProfilProvider, useProfil } from './contexts/ProfilContext';
+import { SpendenwegProvider } from './contexts/SpendenwegContext';
 import { ActionSheet } from './components/ActionSheet';
 import { BeitragOptionenSheet, OptionenBeitrag } from './components/BeitragOptionenSheet';
 import { AddContactSheet } from './components/AddContactSheet';
@@ -2608,7 +2609,11 @@ const App = () => (
             <DatenProvider>
               <RepostProvider>
                 <ProfilProvider>
-                  <Root />
+                  {/* Kasten 13: jede Spende läuft durch dieses Blatt
+                      (Zahlungsmethode, Spendencode). */}
+                  <SpendenwegProvider>
+                    <Root />
+                  </SpendenwegProvider>
                 </ProfilProvider>
               </RepostProvider>
             </DatenProvider>

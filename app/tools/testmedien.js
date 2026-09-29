@@ -37,6 +37,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { nurTestkonto } = require('../test/_nur_testkonten');
 
 const ROOT = path.join(__dirname, '..');
 const PROJEKT = path.join(ROOT, '..');
@@ -50,7 +51,7 @@ const wert = (n) => (UMGEBUNG.match(new RegExp('^' + n + '=(.*)$', 'm')) || [])[
 
 const ADRESSE = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const SCHLUESSEL = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
-const KONTO = process.env.TEST_EMAIL || 'test@all-media.app';
+const KONTO = nurTestkonto(process.env.TEST_EMAIL || 'test@all-media.app');
 const PASSWORT = process.env.TEST_PASSWORT || 'AllMedia2026!';
 
 const NUR_BAU = process.argv.includes('--nurbau');

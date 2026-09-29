@@ -33,6 +33,7 @@ const { chromium } = require('playwright-core');
 const { zusammengelegt } = require('./_modulquelle');
 const { anmelden, MAIL, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
+const { pruefCode, spendenwegBereit } = require('./_spendencode');
 
 const BASIS = process.env.AM_URL || 'http://localhost:3000';
 const K_BOB = K.person('u2');
@@ -414,7 +415,10 @@ const pruefe = (name, wahr, zusatz = '') => {
 
   const community = await seite.evaluate(async () => {
     const boot = await (await fetch('/api/bootstrap')).json();
-    return (boot.communities || []).find((c) => c.joined) || null;
+    // Nur eine EIGENE Community (Kasten 13.4): in den Communitys des
+    // Testbestands wie „Fotografie" sind auch echte Konten Mitglied, die
+    // die Sprachnachricht des Prüflaufs sonst hören würden.
+    return (boot.communities || []).find((c) => c.joined && c.eigen) || null;
   });
 
   if (community) {
@@ -428,8 +432,27 @@ const pruefe = (name, wahr, zusatz = '') => {
     const kommentar = await app('streamKommentar', beitrag.id, 'Prüflauf ' + Date.now());
     pruefe('Ein Kommentar am Livestream', kommentar.ok, kommentar.ok ? '' : kommentar.fehler);
 
-    const spende = await app('spenden', K_ANNA, 250, beitrag.id, 'Prüflauf');
+    /*
+     * Seit Kasten 13 (29.09.2026) geht eine Spende nur mit Zahlungsmethode
+     * und persönlichem Spendencode durch. Beides legt _spendencode.js für
+     * das Prüfkonto an, falls es fehlt; der Code steht dann als Freigabe im
+     * siebten Argument — genau das, was das Spendenblatt der App übergibt.
+     */
+    const code = pruefCode(await db((client, ich) => ich));
+    const bereit = await db(spendenwegBereit, code, false);
+    pruefe('Zahlungsmethode und Spendencode für die Spende da', bereit.ok, bereit.ok ? '' : bereit.fehler);
+    let spende = await app('spenden', K_ANNA, 250, beitrag.id, 'Prüflauf', { code });
+    if (!spende.ok && /Spendencode stimmt nicht/.test(spende.fehler || '')) {
+      // Jemand hat den Code des Prüfkontos von Hand geändert: zurück auf den Prüfcode.
+      await db(spendenwegBereit, code, true);
+      spende = await app('spenden', K_ANNA, 250, beitrag.id, 'Prüflauf', { code });
+    }
     pruefe('Eine Spende an eine Person', spende.ok, spende.ok ? '' : spende.fehler);
+    pruefe(
+      'Die Spende ist vorgemerkt, nicht bezahlt',
+      spende.ok && spende.wert?.zahlungsstatus === 'vorgemerkt',
+      spende.ok ? JSON.stringify(spende.wert) : ''
+    );
   }
 
   await zuruecksetzen(seite);

@@ -2944,14 +2944,24 @@ app.post('/api/stream/:postId/kommentare', route(async (req) =>
   )
 ));
 
-app.post('/api/spenden/:userId', route(async (req) =>
-  antwort(
-    await syncHandlers.handleSpende2(
-      req.db, req.nutzerId, req.params.userId,
-      req.body?.betragCent, req.body?.postId, req.body?.nachricht
-    )
-  )
-));
+/*
+ * Kasten 13: Code und Zahlungsmethode kommen aus dem Spendenblatt mit.
+ * `grund` wird durchgereicht — das Blatt fragt dann nach dem, was fehlt.
+ * Der Code selbst landet in keinem Protokoll.
+ */
+app.post('/api/spenden/:userId', route(async (req) => {
+  const ergebnis = await syncHandlers.handleSpende2(
+    req.db, req.nutzerId, req.params.userId,
+    req.body?.betragCent, req.body?.postId, req.body?.nachricht,
+    req.body?.code, req.body?.methodeId
+  );
+  // antwort() lässt Zusätze bei Fehlern weg — hier braucht das Blatt aber
+  // `grund`, um nach Code oder Methode zu fragen. Deshalb eigens.
+  if (ergebnis && ergebnis.ok === false) {
+    return { ok: false, error: ergebnis.fehler || 'Hat nicht geklappt', grund: ergebnis.grund, verbleibend: ergebnis.verbleibend };
+  }
+  return antwort(ergebnis);
+}));
 
 // ------------------------------------------------------ Standortanfrage --
 

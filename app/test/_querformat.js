@@ -23,6 +23,7 @@ const { chromium } = require('playwright-core');
 const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const { frage } = require('./_aufraeumen');
 const K = require('./_kennungen');
+const { pruefCode, spendenwegBereit } = require('./_spendencode');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const ORDNER = path.join(__dirname, '..', '..', 'bilder', 'kasten6');
@@ -403,6 +404,33 @@ const LANG = 'Design Tokens sauber aufsetzen';
 
   const vorher = new Date().toISOString();
 
+  /*
+   * Seit Kasten 13 (29.09.2026) fragt nach dem Betrag das Spendenwegblatt
+   * nach Zahlungsmethode und persönlichem Spendencode. Beides legt
+   * _spendencode.js vorher für das Prüfkonto an, damit das Blatt gleich bei
+   * „Bestätigen" steht.
+   */
+  const spendenCode = await page.evaluate(() => window.Anmeldung.nutzer().id).then(pruefCode);
+  const spendenwegVorbereiten = (erzwingen) =>
+    page.evaluate(
+      async ({ fn, code, erzwingen }) => {
+        const client = await window.Anmeldung.aufbauen();
+        const ich = window.Anmeldung.nutzer().id;
+        return new Function('client', 'ich', 'code', 'erzwingen', `return (${fn})(client, ich, code, erzwingen)`)(
+          client,
+          ich,
+          code,
+          erzwingen
+        );
+      },
+      { fn: spendenwegBereit.toString(), code: spendenCode, erzwingen }
+    );
+
+  await pruefe('Zahlungsmethode und Spendencode des Prüfkontos stehen', async () => {
+    const r = await spendenwegVorbereiten(false);
+    if (!r.ok) throw new Error(r.fehler);
+  });
+
   await pruefe('Das Spendenblatt bietet „Eigener Betrag" an', async () => {
     await page.click('#liveSpende');
     await page.waitForSelector('[data-spendecent="eigen"]');
@@ -424,6 +452,17 @@ const LANG = 'Design Tokens sauber aufsetzen';
   await pruefe('2,50 € gehen durch und stehen so in der Datenbank', async () => {
     await page.fill('.sheet input', '2,50');
     await page.click('.sheet button[type="submit"], .sheet .sheet__primary, .sheet button:has-text("Spenden")');
+    // Das Spendenwegblatt: erst ein falscher Code, dann der richtige.
+    await page.waitForSelector('#swCode', { timeout: 10000 });
+    await page.screenshot({ path: bild('spende-code') });
+    await page.fill('#swCode', 'FALSCH' + Date.now().toString().slice(-6));
+    await page.click('#swSpenden');
+    await page.waitForFunction(() => /Spendencode stimmt nicht/.test(document.querySelector('#swFehler')?.textContent || ''), null, {
+      timeout: 10000,
+    });
+    await page.screenshot({ path: bild('spende-code-falsch') });
+    await page.fill('#swCode', spendenCode);
+    await page.click('#swSpenden');
     await page.waitForFunction(() => /2,50 € an .* gespendet/.test(document.body.textContent), null, {
       timeout: 10000,
     });
@@ -434,6 +473,15 @@ const LANG = 'Design Tokens sauber aufsetzen';
     if (!Array.isArray(zeilen) || zeilen.length !== 1) throw new Error('Datenbank: ' + JSON.stringify(zeilen));
     if (zeilen[0].betrag_cent !== 250) throw new Error(`gebucht: ${zeilen[0].betrag_cent} Cent`);
     if (!zeilen[0].title.includes('Expo SDK 57')) throw new Error('am falschen Beitrag: ' + zeilen[0].title);
+  });
+
+  await pruefe('Die Spende ist nur vorgemerkt und trägt die Zahlungsmethode', async () => {
+    const zeilen = await frage(`select zahlungsstatus, zahlungsmethode_id from donations
+      where sender_id = (select id from auth.users where email = $KONTO) and created_at >= '${vorher}'`);
+    if (zeilen === null) return console.log('       (ohne SUPABASE_TOKEN kein Datenbank-Abgleich)');
+    if (!Array.isArray(zeilen) || zeilen.length !== 1) throw new Error('Datenbank: ' + JSON.stringify(zeilen));
+    if (zeilen[0].zahlungsstatus !== 'vorgemerkt') throw new Error('Status: ' + zeilen[0].zahlungsstatus);
+    if (!zeilen[0].zahlungsmethode_id) throw new Error('ohne Zahlungsmethode gebucht');
   });
 
   // Zurueck auf 1x, damit der naechste Lauf nicht mit 2x anfaengt.

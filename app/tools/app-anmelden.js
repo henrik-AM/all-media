@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { pruefgeraet, EXPO_GO_ID } = require('./pruefgeraet.js');
+const { nurTestkonto } = require('../test/_nur_testkonten');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -32,7 +33,7 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const ADRESSE = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-const MAIL = process.env.AM_TEST_MAIL || 'test@all-media.app';
+const MAIL = nurTestkonto(process.env.AM_TEST_MAIL || 'test@all-media.app');
 const PASS = process.env.AM_TEST_PASS || 'AllMedia2026!';
 
 /** Aus https://abc.supabase.co wird "abc" — so heisst der Speicherschluessel. */

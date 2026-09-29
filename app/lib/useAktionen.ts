@@ -12,11 +12,12 @@
  * noch den Rückweg.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useContext, useMemo } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import * as A from './aktionen';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
+import { SpendenwegContext } from '../contexts/SpendenwegContext';
 import { ladeHoch } from './supabaseStorage';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -291,11 +292,18 @@ export interface Aktionen {
   ) => Promise<string | null>;
 
   streamKommentar: (postId: string, text: string) => Promise<string | null>;
+  /**
+   * Spenden. Läuft immer durch das Spendenblatt (SpendenwegContext): fehlt
+   * eine Zahlungsmethode oder der Spendencode, fragt das Blatt danach und
+   * macht dann mit derselben Spende weiter. true erst, wenn die Datenbank
+   * die Spende angenommen hat; false bei Abbruch.
+   */
   spenden: (
     empfaengerId: string,
     betragCent: number,
     postId?: string | null,
-    nachricht?: string
+    nachricht?: string,
+    empfaengerName?: string
   ) => Promise<boolean>;
 
   standortAnfragen: (chatId: string, zielId: string) => Promise<string | null>;
@@ -312,6 +320,7 @@ export interface Aktionen {
 export function useAktionen(melden?: (text: string) => void): Aktionen {
   const { supabase } = useSupabase();
   const { ichId } = useDaten();
+  const spendenweg = useContext(SpendenwegContext);
 
   const schreiben = useCallback(
     async (was: string, tun: (c: SupabaseClient, ich: string) => Promise<unknown>, zurueck: Rueckweg) => {
@@ -705,9 +714,29 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         );
         return zeile?.id ?? null;
       },
-      spenden: async (empfaengerId, betragCent, postId, nachricht) => {
+      spenden: async (empfaengerId, betragCent, postId, nachricht, empfaengerName) => {
+        if (!supabase || !ichId) {
+          melden?.('Dafür musst du angemeldet sein');
+          return false;
+        }
+        const client = supabase;
+        const ich = ichId;
+        /*
+         * Kasten 13: jeder Aufruf geht durch das Blatt. Code und Methode
+         * bringt es in `freigabe` mit; Fehler zeigt es selbst an, deshalb
+         * hier kein melden().
+         */
+        if (spendenweg.bereit) {
+          return spendenweg.spenden({
+            empfaengerId,
+            empfaengerName,
+            betragCent,
+            ausfuehren: (freigabe) =>
+              A.spenden(client, ich, empfaengerId, betragCent, postId, nachricht, freigabe),
+          });
+        }
         const zeile = await holen('Die Spende', (c, i) =>
-          A.spenden(c, i, empfaengerId, betragCent, postId, nachricht)
+          A.spenden(c, i, empfaengerId, betragCent, postId, nachricht, null)
         );
         return Boolean(zeile);
       },
@@ -767,6 +796,6 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         }
       },
     }),
-    [schreiben, holen, supabase, ichId, melden]
+    [schreiben, holen, supabase, ichId, melden, spendenweg]
   );
 }

@@ -48,6 +48,9 @@ const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gem
 const Teilen = require('../../gemeinsam/teilen') as typeof import('../../gemeinsam/teilen');
 // Ringfarben und Vorschaubild von Playlists und Highlights (Kasten 12).
 const SammlungRegel = require('../../gemeinsam/sammlungen') as typeof import('../../gemeinsam/sammlungen');
+// Spendencode, Zahlungsmethoden und Gründe — dieselbe Regel wie die Website
+// und die Datenbank (Kasten 13, Schema XX_zahlung_spendencode).
+const Zahlung = require('../../gemeinsam/zahlung') as typeof import('../../gemeinsam/zahlung');
 
 /**
  * Eine Zeile, die es entweder gibt oder nicht — Like, Speichern, Folgen.
@@ -2723,37 +2726,210 @@ export async function streamKommentar(
 /**
  * Spenden — an ein Profil, während eines Streams oder über einen Spendenlink.
  *
- * Der Betrag steht in Cent, damit nichts gerundet wird. Eine echte Zahlung
- * läuft hier nicht: der Spendencode aus den Einstellungen verweist auf
- * Bankkarte oder PayPal, die Buchung passiert dort. Hier wird festgehalten,
- * dass sie stattgefunden hat.
+ * Seit Kasten 13 (Feedback 21.09.2026) gibt es genau einen Weg zu einer
+ * Spende: die Datenbankfunktion `spende_senden`. Sie prüft Betrag,
+ * Empfänger, Zahlungsmethode und den persönlichen Spendencode und trägt erst
+ * dann ein. Der frühere direkte INSERT in `donations` ist in der Datenbank
+ * zu (Schema XX_zahlung_spendencode) — wer ihn noch versuchte, bekäme einen
+ * Rechtefehler.
+ *
+ * `freigabe` bringt Code und gewählte Methode mit. Ohne Methode nimmt die
+ * Datenbank die Standardmethode. Den Code fragt das Spendenblatt ab
+ * (SpendenwegContext) — jeder Aufruf über useAktionen().spenden läuft dort
+ * durch.
+ *
+ * Eine echte Zahlung läuft noch nicht: die Spende steht mit
+ * `zahlungsstatus = 'vorgemerkt'` in der Datenbank, bis ein Zahlungsdienst
+ * angeschlossen ist.
  */
+export class SpendenFehler extends Error {
+  grund: string;
+  verbleibend?: number;
+  constructor(grund: string, verbleibend?: number) {
+    super(Zahlung.grundText(grund, verbleibend));
+    this.grund = grund;
+    this.verbleibend = verbleibend;
+  }
+}
+
+export interface SpendenFreigabe {
+  code: string;
+  methodeId?: string | null;
+}
+
 export async function spenden(
   client: SupabaseClient,
   ichId: string,
   empfaengerId: string,
   betragCent: number,
   postId?: string | null,
-  nachricht?: string
+  nachricht?: string,
+  freigabe?: SpendenFreigabe | null
 ) {
-  if (!Number.isFinite(betragCent) || betragCent <= 0) {
-    throw new Error('Der Betrag muss größer als null sein');
-  }
-  if (empfaengerId === ichId) throw new Error('An sich selbst geht keine Spende');
+  const betrag = Math.round(Number(betragCent));
+  const falsch = Zahlung.betragPruefe(betrag);
+  if (falsch) throw new SpendenFehler('betrag');
+  if (empfaengerId === ichId) throw new SpendenFehler('selbst');
+  if (!freigabe || !freigabe.code) throw new SpendenFehler('kein_code');
 
+  const { data, error } = await client.rpc('spende_senden', {
+    p_empfaenger: empfaengerId,
+    p_betrag_cent: betrag,
+    p_code: freigabe.code,
+    p_methode: freigabe.methodeId || null,
+    p_post: postId || null,
+    p_nachricht: nachricht || '',
+  });
+  if (error) throw error;
+  const antwort = (data || {}) as {
+    ok?: boolean; grund?: string; verbleibend?: number;
+    id?: string; created_at?: string; zahlungsstatus?: string;
+  };
+  if (!antwort.ok) throw new SpendenFehler(antwort.grund || 'ungueltig', antwort.verbleibend);
+  return { id: antwort.id as string, created_at: antwort.created_at as string, zahlungsstatus: antwort.zahlungsstatus };
+}
+
+// ------------------------------------------- Spendencode, Zahlungsmethoden --
+//
+// Kasten 13.2/13.3. Die Regeln (Codeform, Kartenangaben, PayPal-Maske)
+// stehen in gemeinsam/zahlung.js und gleich in der Datenbank. Gespeichert
+// werden nie Kartennummern oder CVC — nur Anbieter, Name, letzte vier
+// Ziffern und Ablauf bzw. die maskierte PayPal-Adresse.
+
+export interface SpendenStatus {
+  gesetzt: boolean;
+  gesperrt: boolean;
+  methoden: number;
+  standard: string | null;
+  geaendert_am?: string | null;
+}
+
+function rpcAntwort(data: unknown): { ok?: boolean; grund?: string; verbleibend?: number } & Record<string, unknown> {
+  return (data || {}) as { ok?: boolean; grund?: string; verbleibend?: number } & Record<string, unknown>;
+}
+
+/** Hat der Nutzer einen Code, ist er gesperrt, wie viele Methoden hat er? */
+export async function spendenStatus(client: SupabaseClient): Promise<SpendenStatus> {
+  const { data, error } = await client.rpc('spendencode_status');
+  if (error) throw error;
+  const a = rpcAntwort(data);
+  if (!a.ok) throw new SpendenFehler(a.grund || 'nicht_angemeldet');
+  return {
+    gesetzt: Boolean(a.gesetzt),
+    gesperrt: Boolean(a.gesperrt),
+    methoden: Number(a.methoden || 0),
+    standard: (a.standard as string) || null,
+    geaendert_am: (a.geaendert_am as string) || null,
+  };
+}
+
+/**
+ * Den eigenen Spendencode setzen oder ändern. Ist schon einer gesetzt,
+ * braucht es den bisherigen — oder `spendencodeMitPasswort`.
+ */
+export async function spendencodeSetzen(client: SupabaseClient, neu: string, bisher?: string | null) {
+  const falsch = Zahlung.codePruefe(neu);
+  if (falsch) throw new SpendenFehler('ungueltig');
+  const { data, error } = await client.rpc('spendencode_setzen', {
+    p_neu: neu,
+    p_bisher: bisher && bisher.trim() ? bisher : null,
+  });
+  if (error) throw error;
+  const a = rpcAntwort(data);
+  if (!a.ok) throw new SpendenFehler(a.grund || 'ungueltig', a.verbleibend);
+  return true;
+}
+
+/**
+ * „Code vergessen": erst mit dem Passwort frisch anmelden, dann ohne den
+ * alten Code setzen. Die Datenbank prüft selbst, ob die Anmeldung frisch ist
+ * (höchstens zehn Minuten alt, `amr` im Zugangstoken).
+ */
+export async function spendencodeMitPasswort(
+  client: SupabaseClient,
+  email: string,
+  passwort: string,
+  neu: string
+) {
+  const falsch = Zahlung.codePruefe(neu);
+  if (falsch) throw new SpendenFehler('ungueltig');
+  const { error } = await client.auth.signInWithPassword({ email, password: passwort });
+  if (error) throw new Error('Das Passwort stimmt nicht');
+  return spendencodeSetzen(client, neu, null);
+}
+
+/** Den eigenen Code entfernen — mit dem bisherigen Code. */
+export async function spendencodeEntfernen(client: SupabaseClient, bisher: string) {
+  const { data, error } = await client.rpc('spendencode_entfernen', { p_bisher: bisher });
+  if (error) throw error;
+  const a = rpcAntwort(data);
+  if (!a.ok) throw new SpendenFehler(a.grund || 'bisher_falsch', a.verbleibend);
+  return true;
+}
+
+export type Zahlungsmethode = import('../../gemeinsam/zahlung').Zahlungsmethode;
+
+const METHODE_SPALTEN =
+  'id, anbieter, anzeigename, letzte4, ablauf_monat, ablauf_jahr, paypal_maskiert, standard, created_at';
+
+/** Die eigenen Zahlungsmethoden, Standard zuerst. */
+export async function zahlungsmethoden(client: SupabaseClient): Promise<Zahlungsmethode[]> {
   const { data, error } = await client
-    .from('donations')
-    .insert({
-      post_id: postId || null,
-      empfaenger_id: empfaengerId,
-      sender_id: ichId,
-      betrag_cent: Math.round(betragCent),
-      nachricht: nachricht || '',
-    })
-    .select('id, created_at')
+    .from('zahlungsmethoden')
+    .select(METHODE_SPALTEN)
+    .order('standard', { ascending: false })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []) as Zahlungsmethode[];
+}
+
+/**
+ * Eine Zahlungsmethode anlegen. `eingabe` wird mit methodeBauen() geprüft
+ * und reduziert — was darüber hinausgeht (etwa eine ganze Kartennummer),
+ * erreicht die Datenbank nie.
+ */
+export async function zahlungsmethodeAnlegen(
+  client: SupabaseClient,
+  anbieter: string,
+  eingabe: import('../../gemeinsam/zahlung').MethodeEingabe,
+  umgebung?: import('../../gemeinsam/zahlung').Umgebung | null,
+  standard?: boolean
+): Promise<Zahlungsmethode> {
+  const gebaut = Zahlung.methodeBauen(anbieter, eingabe, umgebung || null);
+  if (!gebaut.zeile) throw new Error(gebaut.fehler || 'Angaben unvollständig');
+  const { data, error } = await client
+    .from('zahlungsmethoden')
+    .insert({ ...gebaut.zeile, standard: Boolean(standard) })
+    .select(METHODE_SPALTEN)
     .single();
   if (error) throw error;
-  return data as { id: string; created_at: string };
+  return data as Zahlungsmethode;
+}
+
+/** Eine Methode zur Standardmethode machen. Die anderen verlieren es (Auslöser). */
+export async function zahlungsmethodeStandard(client: SupabaseClient, id: string) {
+  const { data, error } = await client
+    .from('zahlungsmethoden')
+    .update({ standard: true })
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('Zahlungsmethode nicht gefunden');
+  return true;
+}
+
+/**
+ * Eine Methode löschen. Ein von RLS abgelehntes DELETE meldet keinen
+ * Fehler, sondern löscht null Zeilen — deshalb wird gezählt.
+ */
+export async function zahlungsmethodeLoeschen(client: SupabaseClient, id: string) {
+  const { error, count } = await client
+    .from('zahlungsmethoden')
+    .delete({ count: 'exact' })
+    .eq('id', id);
+  if (error) throw error;
+  if (!count) throw new Error('Zahlungsmethode nicht gefunden');
+  return true;
 }
 
 // ------------------------------------------------------ Standortanfrage --

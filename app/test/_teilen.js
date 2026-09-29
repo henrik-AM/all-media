@@ -23,6 +23,7 @@ const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
 
 const { chatOffen } = require('./_warten');
+const { nurTestkonto } = require('./_nur_testkonten');
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
@@ -34,7 +35,7 @@ const SB_KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_
 
 const FREMDER = { email: 'test@all-media.app', passwort: 'AllMedia2026!', handle: '@test' };
 const PRUEFER = {
-  email: process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de',
+  email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || 'PruefLauf2026!',
 };
 

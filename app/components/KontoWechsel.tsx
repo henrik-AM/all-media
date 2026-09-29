@@ -72,7 +72,19 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
     const konto = konten.find((k) => k.id === id);
     const geklappt = await wechsleZu(id);
     if (!geklappt) {
-      onNotice(`${konto?.profile.name ?? 'Das Konto'} ist abgemeldet. Bitte neu anmelden.`);
+      /*
+       * Kasten 13.1 (29.09.2026): die Meldung ging an onNotice, also an den
+       * Toast HINTER diesem Modal — zu sehen war nichts, das Blatt stand
+       * einfach still. Jetzt steht sie im Blatt, und die Anmeldung dieses
+       * Kontos ist schon aufgeschlagen, die E-Mail vorbelegt. Es fehlt nur
+       * das Passwort — die Sitzung ist abgelaufen oder anderswo beendet.
+       */
+      setEmail(konto?.email ?? '');
+      setPasswort('');
+      setAnsicht('anmelden');
+      setMeldung(
+        `Die Anmeldung von ${konto?.profile.name ?? 'diesem Konto'} ist abgelaufen. Bitte gib das Passwort erneut ein.`
+      );
       return;
     }
     onNotice(`Gewechselt zu ${konto?.profile.name ?? 'Konto'}`);
@@ -101,6 +113,7 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
   const offeneFrueher = frueher.filter((f) => !konten.some((k) => k.id === f.id));
 
   const frueherWaehlen = (mail: string) => {
+    setMeldung('');
     setEmail(mail);
     setPasswort('');
     setAnsicht('anmelden');
@@ -177,9 +190,9 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                         onPress={async () => {
                           try {
                             await kontoAbmelden(konto.id);
-                            onNotice(`${konto.profile.name} abgemeldet`);
+                            setMeldung(`${konto.profile.name} ist auf diesem Gerät abgemeldet`);
                           } catch (e) {
-                            onNotice('Fehler beim Abmelden');
+                            setMeldung('Fehler beim Abmelden');
                           }
                         }}
                       >
@@ -212,14 +225,20 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
                 </>
               )}
 
-              <Druck style={styles.zeile} onPress={() => setAnsicht('anmelden')}>
+              {meldung ? (
+                <Text style={styles.fehler} accessibilityLiveRegion="polite">
+                  {meldung}
+                </Text>
+              ) : null}
+
+              <Druck style={styles.zeile} onPress={() => { setMeldung(''); setAnsicht('anmelden'); }}>
                 <View style={styles.rund}>
                   <Ionicons name="person-add-outline" size={20} color={colors.brand} />
                 </View>
                 <Text style={styles.aktionText}>Bestehendes Konto hinzufügen</Text>
               </Druck>
 
-              <Druck style={styles.zeile} onPress={() => setAnsicht('neu')}>
+              <Druck style={styles.zeile} onPress={() => { setMeldung(''); setAnsicht('neu'); }}>
                 <View style={styles.rund}>
                   <Ionicons name="add" size={22} color={colors.brand} />
                 </View>

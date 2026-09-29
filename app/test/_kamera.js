@@ -15,6 +15,7 @@
 const path = require('path');
 const { chromium } = require('playwright-core');
 const { anmelden, zuruecksetzen, beenden } = require('./_konto');
+const { nurDemoBeitraege } = require('./_nur_testkonten');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const BILD = path.join(__dirname, '_testbild.png');
@@ -253,7 +254,12 @@ const BILD = path.join(__dirname, '_testbild.png');
     // Der Folgen-Knopf haengt am Beitrag im Feed, nicht am Hochformat-Player.
     await gehe('videos', 'home');
     await page.waitForSelector('[data-paction="follow"]');
-    await page.click('[data-paction="follow"]');
+    // Nur einem Demoprofil folgen (Kasten 13.4): „prueflauf folgt dir"
+    // landete sonst bei einem echten Konto, wenn dessen Beitrag oben stand.
+    const folgenKandidaten = await page.$$eval('[data-paction="follow"][data-pid]', (k) => k.map((n) => n.getAttribute('data-pid')));
+    const folgenBei = (await nurDemoBeitraege(page, folgenKandidaten))[0];
+    if (!folgenBei) throw new Error('kein Demo-Beitrag mit Folgen-Knopf im Feed — echten Konten wird nicht gefolgt');
+    await page.click(`[data-paction="follow"][data-pid="${folgenBei}"]`);
 
     // Auf die neue Zahl warten statt auf eine geratene Wartezeit.
     let nachher = vorher;

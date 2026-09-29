@@ -27,6 +27,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const { nurTestkonto } = require('./_nur_testkonten');
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -39,7 +40,7 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 // Der EIGNER schreibt an, der EMPFAENGER stellt die Sperre.
 const EIGNER = { email: 'test@all-media.app', passwort: 'AllMedia2026!' };
 const EMPFAENGER = {
-  email: process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de',
+  email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || 'PruefLauf2026!',
 };
 
