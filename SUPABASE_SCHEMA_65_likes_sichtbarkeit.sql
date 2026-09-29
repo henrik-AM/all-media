@@ -237,6 +237,9 @@ begin
     from pg_policies
    where schemaname = 'public' and tablename = 'post_likes'
      and cmd in ('SELECT', 'ALL')
+     -- RESTRICTIVE-Regeln (z. B. „nur_freigegebene“ aus Schema 52) werden
+     -- mit UND verknüpft und schränken nur ein — die zählen nicht mit.
+     and permissive = 'PERMISSIVE'
      and policyname not in ('Likes lesen', 'Eigenen Like setzen');
   if n <> 0 then
     raise exception 'Auf post_likes steht eine weitere Leseregel — sie hebt die Likes-Sichtbarkeit auf.';
