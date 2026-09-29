@@ -138,8 +138,9 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.fill('#f_code', '12');
     await page.fill('#f_wdh', '12');
     await page.click('#formOk');
-    await page.waitForTimeout(400);
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+    // Seit 28.09.2026 steht der Fehler im Blatt (#formFehler), nicht im Toast.
+    await page.waitForFunction(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })().includes('4 bis 8'), null, { timeout: 5000 }).catch(() => {});
+    const hinweis = await page.evaluate(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })());
     if (!hinweis.includes('4 bis 8')) throw new Error(hinweis);
   });
 
@@ -147,8 +148,9 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.fill('#f_code', '1234');
     await page.fill('#f_wdh', '5678');
     await page.click('#formOk');
-    await page.waitForTimeout(400);
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+    // Seit 28.09.2026 steht der Fehler im Blatt (#formFehler), nicht im Toast.
+    await page.waitForFunction(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })().includes('überein'), null, { timeout: 5000 }).catch(() => {});
+    const hinweis = await page.evaluate(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })());
     if (!hinweis.includes('überein')) throw new Error(hinweis);
   });
 

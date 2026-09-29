@@ -1176,6 +1176,8 @@ ul { margin: 0; padding: 0; list-style: none; }
   border-bottom: 1px solid var(--hairline);
   margin-top: 4px;
 }
+/* Bei Live faellt Speichern weg, es bleiben vier. */
+.post__actions--vier { grid-template-columns: repeat(4, 1fr); }
 .post__actions--fuenf .postbtn {
   flex-direction: column;
   gap: 5px;
@@ -2192,6 +2194,10 @@ body:has(.camera) .toast { bottom: 132px; }
 }
 .live__leiste { padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); display: grid; gap: 12px; }
 .live__zuschauer { font-size: 14px; color: #B9BDC6; text-align: center; }
+.live__auto { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; color: #B9BDC6; }
+.live__auto[hidden], .live__ende[hidden], .live__eingabe[hidden], #liveStop[hidden] { display: none; }
+.live__ende { display: grid; gap: 10px; }
+.live__endeText { margin: 0; text-align: center; font-size: 14px; color: #fff; }
 
 /* --------------------------------------------------------- Spendenaktion */
 .spende {
@@ -2240,6 +2246,12 @@ body:has(.camera) .toast { bottom: 132px; }
 .teilen__kachel.is-gesperrt { opacity: .5; cursor: default; }
 .teilen__kachel.is-gesperrt:hover { background: none; }
 .teilen__sperre { font-size: 11px; color: var(--text-3); margin-top: -4px; }
+/* Unterthema wählen beim Teilen in eine Community (29.09.2026). */
+.teilen__kanaele { padding: 8px 16px 0; }
+.teilen__kanalTitel { font-size: 13px; color: var(--text-2); padding-bottom: 6px; }
+.teilen__kanalChips { display: flex; gap: 8px; overflow-x: auto; }
+.teilen__kanal { flex: none; padding: 6px 12px; border-radius: 16px; border: 0; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.teilen__kanal.is-an { background: var(--brand); color: #fff; }
 .teilen__suche { padding: 4px 16px 6px; }
 .teilen__suche .searchbox { flex: 1 1 auto; }
 .teilen__leer { padding: 24px 16px; text-align: center; }

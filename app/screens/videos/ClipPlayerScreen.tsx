@@ -134,6 +134,8 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    * dahinter ist noch nichts gesendet.
    */
   const liveKante = useRef(0);
+  /* Vor dem fruehen return unten — Hooks muessen in jeder Runde gleich stehen. */
+  const seite = useRef<ScrollView>(null);
   const [balkenBreite, setBalkenBreite] = useState(0);
   const fenster = useWindowDimensions();
   const video = useVideoEinstellungen();
@@ -152,12 +154,16 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    * eine eigene Verbindung, die beim Verlassen wieder zugehen muss — bei
    * einer Kommentarspalte faellt der Unterschied nicht auf.
    */
+  const liveFehlschlaege = useRef(0);
   const liveHolen = useCallback(async () => {
     if (!supabase || !clip || !istLive) return;
     try {
       setLiveKommentare(await ladeStreamKommentare(supabase, clip.id));
+      liveFehlschlaege.current = 0;
     } catch (e: any) {
-      console.error('Live-Kommentare laden fehlgeschlagen:', e?.message ?? e);
+      // Erst drei Aussetzer hintereinander melden - wie im LivestreamScreen.
+      liveFehlschlaege.current += 1;
+      if (liveFehlschlaege.current === 3) console.warn('Live-Kommentare laden fehlgeschlagen:', e?.message ?? e);
     }
   }, [supabase, clip, istLive]);
 
@@ -204,6 +210,35 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
     liveKante.current = Math.max(liveKante.current, bei);
   }, [bei]);
 
+  /*
+   * Live beginnt an der Stelle, die gerade gesendet wird, nicht bei 0:00 —
+   * Henrik am 28.09.2026 (Kasten 6.8). Einen Streaming-Server gibt es nicht:
+   * die Datei steht fuer die Sendung, die Uhr seit Sendebeginn sagt, wo sie
+   * gerade ist. Laeuft der Stream laenger als die Datei, geht es im Kreis —
+   * sonst stuende jeder aeltere Stream am Ende still. Gleiche Rechnung in
+   * web/public/app.js (liveEinstieg).
+   */
+  const liveEinstieg = useRef<string | null>(null);
+  useEffect(() => {
+    if (!istLive || !clip || !dateiLaenge || liveEinstieg.current === clip.id) return;
+    liveEinstieg.current = clip.id;
+    const gesendet = clip.seit ? Math.max(0, Math.floor((Date.now() - new Date(clip.seit).getTime()) / 1000)) : 0;
+    const kante = gesendet % Math.max(1, Math.floor(dateiLaenge));
+    liveKante.current = kante;
+    stand.current = kante;
+    setBei(kante);
+    spieler.current?.springen(kante);
+  }, [istLive, clip, dateiLaenge]);
+
+  /* Die Sendung laeuft weiter, auch wenn man selbst anhaelt. */
+  useEffect(() => {
+    if (!istLive || !gesamt) return;
+    const uhr = setInterval(() => {
+      liveKante.current = Math.min(gesamt, liveKante.current + 1);
+    }, 1000);
+    return () => clearInterval(uhr);
+  }, [istLive, gesamt]);
+
   if (!clip) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -244,13 +279,13 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   const imVideo = istLive ? [] : (clip.kapitel ?? []).filter((k) => !gesamt || k.bei < gesamt);
   const kapitel = imVideo.length > 1 ? imVideo : [];
 
-  const seite = useRef<ScrollView>(null);
   const wechseln = (id: string) => {
     // Oben anfangen, beim Titel des neuen Videos - sonst blieb die Seite
     // unten bei den aehnlichen stehen (28.09.2026).
     seite.current?.scrollTo({ y: 0, animated: false });
     stand.current = 0;
     liveKante.current = 0;
+    liveEinstieg.current = null;
     setBei(0);
     setDateiLaenge(0);
     setLaeuft(false);
@@ -372,7 +407,12 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             accessible
             accessibilityRole="adjustable"
             accessibilityLabel="Wiedergabeposition"
-            accessibilityValue={{ text: `${zeitText(bei)} von ${istLive ? 'LIVE' : zeitText(gesamt)}` }}
+            accessibilityValue={{
+              min: 0,
+              max: Math.round(istLive ? liveKante.current : gesamt),
+              now: Math.round(bei),
+              text: `${zeitText(bei)} von ${istLive ? 'LIVE' : zeitText(gesamt)}`,
+            }}
             accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
             onAccessibilityAction={(e) => springen(bei + (e.nativeEvent.actionName === 'increment' ? 10 : -10))}
           >
@@ -440,7 +480,10 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         <View style={styles.kopf}>
           <Text style={styles.titel}>{clip.title}</Text>
           <Text style={styles.sub}>
-            {compact(clip.views)} Aufrufe · {clip.age}
+            {/* Bei Live zaehlt, wer gerade zusieht — Aufrufe sammelt erst das fertige Video. */}
+            {istLive
+              ? `${compact(clip.zuschauer ?? 0)} sehen zu · live seit ${clip.age.replace(/^vor /, '')}`
+              : `${compact(clip.views)} Aufrufe · ${clip.age}`}
           </Text>
           {/* Drei-Punkte-Menue, Vorbild TikTok (components/BeitragOptionenSheet).
               Neben dem Titel, nicht in der Aktionsreihe: dort stehen laut
@@ -525,19 +568,25 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             <Text style={styles.aktionZahl} numberOfLines={1}>Repost</Text>
           </Druck>
 
-          <Druck
-            style={styles.aktion}
-            accessibilityLabel="Speichern"
-            onPress={() => {
-              clipUmschalten(clip.id, 'save');
-              onNotice(clip.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
-            }}
-          >
-            <Ionicons name={clip.saved ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.text} />
-            <Text style={styles.aktionZahl} numberOfLines={1} ellipsizeMode="tail">
-              {clip.saved ? 'Gespeichert' : 'Speichern'}
-            </Text>
-          </Druck>
+          {/*
+            Speichern erst am fertigen Video: ein laufender Stream ist noch
+            nichts, was man sich fuer spaeter merkt (Henrik, 28.09.2026).
+          */}
+          {!istLive && (
+            <Druck
+              style={styles.aktion}
+              accessibilityLabel="Speichern"
+              onPress={() => {
+                clipUmschalten(clip.id, 'save');
+                onNotice(clip.saved ? 'Nicht mehr gespeichert' : 'Gespeichert');
+              }}
+            >
+              <Ionicons name={clip.saved ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.text} />
+              <Text style={styles.aktionZahl} numberOfLines={1} ellipsizeMode="tail">
+                {clip.saved ? 'Gespeichert' : 'Speichern'}
+              </Text>
+            </Druck>
+          )}
         </View>
 
         {/*
@@ -682,7 +731,8 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
                   {c.title}
                 </Text>
                 <Text style={styles.clipSub}>
-                  {(alleNutzer[c.userId]?.name ?? '')} · {compact(c.views)} Aufrufe
+                  {(alleNutzer[c.userId]?.name ?? '')} ·{' '}
+                  {c.art === 'live' ? `${compact(c.zuschauer ?? 0)} sehen zu` : `${compact(c.views)} Aufrufe`}
                 </Text>
               </View>
             </View>
@@ -697,7 +747,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         ist schlechter als keiner.
       */}
       <BeitragOptionenSheet
-        beitrag={mehrOffen ? { id: clip.id, userId: clip.userId, mediaUri: quelle, video: true } : null}
+        beitrag={mehrOffen ? { id: clip.id, userId: clip.userId, mediaUri: quelle, video: true, live: istLive } : null}
         onClose={() => setMehrOffen(false)}
         onNotice={onNotice}
       />

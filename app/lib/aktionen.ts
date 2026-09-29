@@ -369,6 +369,8 @@ export interface NeuerBeitrag {
    * Leer heisst sofort. Steht in posts.publish_at.
    */
   geplantAb?: string | null;
+  /** Querformat-Art: 'live' nur fuer den laufenden Stream (posts.format). */
+  format?: 'standard' | '360' | 'live';
 }
 
 /**
@@ -399,6 +401,7 @@ export async function beitragAnlegen(
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,
       publish_at: felder.geplantAb || null,
+      format: felder.format || 'standard',
     })
     .select('id')
     .single();
@@ -671,11 +674,13 @@ export async function teilen(
 }
 
 /**
- * Einen Beitrag in ganze Communitys teilen — als Karte in ihr erstes
- * Unterthema, wo alle Mitglieder ihn sehen (Henrik, 26.09.2026; Schema 59).
+ * Einen Beitrag in ganze Communitys teilen — als Karte in ein Unterthema,
+ * wo alle Mitglieder ihn sehen (Henrik, 26.09.2026; Schema 59).
  *
- * Das Unterthema sucht die Datenbank heraus, nicht das Blatt: so zählt die
- * Reihenfolge, die jetzt gilt. Mitglied sein muss man; das prüft die Regel
+ * `kanaele` ordnet einer Community das gewählte Unterthema zu (29.09.2026).
+ * Ohne Wahl sucht die Datenbank das erste heraus, nicht das Blatt: so zählt
+ * die Reihenfolge, die jetzt gilt. Eine Wahl muss zur Community gehören,
+ * sonst landete die Karte in einer fremden. Mitglied sein muss man; das prüft die Regel
  * „Beitrag nur als Mitglied teilen". Gleiche Rechnung in
  * web/server/sync-handlers.js (handleShareToCommunities).
  */
@@ -684,23 +689,26 @@ export async function teilenInCommunitys(
   ichId: string,
   beitragId: string,
   communityIds: string[],
-  vorschau = 'Beitrag geteilt'
+  vorschau = 'Beitrag geteilt',
+  kanaele: Record<string, string> = {}
 ): Promise<{ gesendet: string[]; fehlgeschlagen: { id: string; grund: string }[] }> {
   const gesendet: string[] = [];
   const fehlgeschlagen: { id: string; grund: string }[] = [];
   for (const communityId of communityIds) {
     try {
-      const { data: kanal, error: fehlerKanal } = await client
-        .from('community_channels')
-        .select('id')
-        .eq('community_id', communityId)
+      let abfrage = client.from('community_channels').select('id').eq('community_id', communityId);
+      if (kanaele[communityId]) abfrage = abfrage.eq('id', kanaele[communityId]);
+      const { data: kanal, error: fehlerKanal } = await abfrage
         .order('position', { ascending: true })
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       if (fehlerKanal) throw fehlerKanal;
       if (!kanal) {
-        fehlgeschlagen.push({ id: communityId, grund: 'Diese Community hat noch kein Unterthema' });
+        fehlgeschlagen.push({
+          id: communityId,
+          grund: kanaele[communityId] ? 'Dieses Unterthema gibt es nicht mehr' : 'Diese Community hat noch kein Unterthema',
+        });
         continue;
       }
       const { error } = await client
@@ -1521,9 +1529,19 @@ export async function kanalAnlegen(
     .ilike('name', name);
   if ((count ?? 0) > 0) throw new Error('Dieses Unterthema gibt es schon');
 
+  // Ans Ende, nicht auf 0 — sonst entschied der Zufall, welches Unterthema
+  // „das erste" ist. Gleiche Rechnung in web/server/sync-handlers.js.
+  const { data: letztes } = await client
+    .from('community_channels')
+    .select('position')
+    .eq('community_id', communityId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { data, error } = await client
     .from('community_channels')
-    .insert({ community_id: communityId, slug, name })
+    .insert({ community_id: communityId, slug, name, position: letztes ? ((letztes as any).position ?? 0) + 1 : 0 })
     .select('id')
     .single();
   if (error) throw error;
@@ -1671,6 +1689,51 @@ export async function livestreamSetzen(
   const { error } = await client.from('profiles').update({ live: live || null }).eq('id', ichId);
   if (error) throw error;
   return Boolean(live);
+}
+
+/**
+ * Einen Livestream beenden: aus dem Profil nehmen und mit dem Stream-Beitrag
+ * tun, was der Host gewaehlt hat.
+ *
+ * Henrik am 28.09.2026: "Erst wenn das Live Video beendet wurde, gibt's die
+ * Möglichkeit, dass der Administrator des Live Videos das als normales
+ * Querformat Video veröffentlicht oder es automatisch veröffentlicht wird."
+ * Veroeffentlichen macht aus demselben Beitrag ein Standard-Video — Likes und
+ * Kommentare bleiben dran. Nicht veroeffentlichen loescht ihn; Spenden
+ * ueberleben das (donations.post_id ist ON DELETE SET NULL).
+ *
+ * Gegenstueck: handleStreamEnde in web/server/sync-handlers.js.
+ */
+export async function liveBeenden(
+  client: SupabaseClient,
+  ichId: string,
+  postId: string,
+  ende: { veroeffentlichen: boolean; sekunden: number; zuschauer: number }
+) {
+  await livestreamSetzen(client, ichId, null);
+  if (!ende.veroeffentlichen) {
+    const { data, error } = await client.from('posts').delete().eq('id', postId).eq('user_id', ichId).select('id');
+    if (error) throw error;
+    // Ein abgelehntes Loeschen meldet keinen Fehler, nur null Zeilen.
+    if (!data?.length) throw new Error('Die Aufzeichnung liess sich nicht löschen');
+    return false;
+  }
+  const s = Math.max(1, Math.round(ende.sekunden));
+  const { data, error } = await client
+    .from('posts')
+    .update({
+      format: 'standard',
+      title: 'Livestream-Aufzeichnung',
+      description: '',
+      duration: `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`,
+      zuschauer: Math.max(0, Math.round(ende.zuschauer)),
+    })
+    .eq('id', postId)
+    .eq('user_id', ichId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Die Aufzeichnung liess sich nicht veröffentlichen');
+  return true;
 }
 
 // ===========================================================================

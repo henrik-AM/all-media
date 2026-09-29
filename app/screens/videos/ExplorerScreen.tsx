@@ -314,7 +314,8 @@ const ExplorerSeite = ({
                           {c.title}
                         </Text>
                         <Text style={styles.clipSub}>
-                          {(alleNutzer[c.userId]?.name ?? '')} · {compact(c.views)} Aufrufe
+                          {(alleNutzer[c.userId]?.name ?? '')} ·{' '}
+                          {c.art === 'live' ? `${compact(c.zuschauer ?? 0)} sehen zu` : `${compact(c.views)} Aufrufe`}
                         </Text>
                       </View>
                     </View>

@@ -237,7 +237,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.fill('#f_titel', 'Bäume für den Stadtpark');
     await page.click('#formOk');
     await page.waitForTimeout(900);
-    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
+    // Blatt und Toast: seit 28.09.2026 stehen Formularfehler im Blatt.
+    const toast = await page.evaluate(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })());
     if (/ziel/i.test(toast)) throw new Error('es wird trotzdem ein Ziel verlangt: „' + toast + '"');
   });
 
@@ -465,7 +466,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (nachher !== vorher - 1) throw new Error(`${vorher} vorher, ${nachher} nachher`);
   });
 
-  await pruefe('Ein Livestream lässt sich verwerfen statt zu beenden', async () => {
+  // Seit dem 28.09.2026 steht die Wahl nach dem Ende: veroeffentlichen oder loeschen.
+  await pruefe('Ein Livestream lässt sich beenden, ohne eine Aufzeichnung zu hinterlassen', async () => {
     await zumEigenenProfil();
     await page.click('[data-oact="create"]');
     await page.waitForTimeout(500);
@@ -473,13 +475,14 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForSelector('#liveStop');
     await page.waitForTimeout(600);
 
-    if (!(await page.$('#liveWeg'))) throw new Error('es gibt keine Verwerfen-Option');
-    await page.click('#liveWeg');
-    await page.waitForTimeout(500);
-    await page.click('#nachfrageJa');
+    await page.click('#liveStop');
+    await page.waitForSelector('#liveLoeschen', { state: 'visible', timeout: 3000 }).catch(() => {
+      throw new Error('es gibt keine Lösch-Option');
+    });
+    await page.click('#liveLoeschen');
     await page.waitForTimeout(1500);
 
-    // Nach dem Verwerfen darf keine Aufzeichnung im Querformat stehen.
+    // Nach dem Loeschen darf keine Aufzeichnung im Querformat stehen.
     await page.click('[data-area="videos"]');
     await page.waitForTimeout(200);
     await page.click('[data-sub="landscape"]');

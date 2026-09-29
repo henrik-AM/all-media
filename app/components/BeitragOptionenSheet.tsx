@@ -14,6 +14,12 @@ export interface OptionenBeitrag {
   mediaUri?: string;
   /** Fuer den Dateinamen beim Herunterladen. */
   video?: boolean;
+  /**
+   * Ein laufender Livestream. Herunterladen und „Zu Story“ gibt es dann
+   * nicht — Henrik am 28.09.2026: „die sind ja gerade live, die kann man
+   * nicht herunterladen“. Nach dem Ende ist es ein normales Video.
+   */
+  live?: boolean;
 }
 
 interface Props {
@@ -82,10 +88,12 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
     ? GRUENDE.map((g) => ({ key: `grund:${g}`, label: g, icon: 'flag-outline' }))
     : [
         { key: 'link', label: 'Link kopieren', icon: 'link-outline' },
-        ...(darfSichern && beitrag.mediaUri
+        ...(darfSichern && beitrag.mediaUri && !beitrag.live
           ? [{ key: 'sichern', label: 'Herunterladen', icon: 'download-outline' } as ActionSheetItem]
           : []),
-        { key: 'story', label: 'Zu Story hinzufügen', icon: 'add-circle-outline' },
+        ...(beitrag.live
+          ? []
+          : [{ key: 'story', label: 'Zu Story hinzufügen', icon: 'add-circle-outline' } as ActionSheetItem]),
         ...(eigener
           ? []
           : ([

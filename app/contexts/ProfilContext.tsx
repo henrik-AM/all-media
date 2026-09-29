@@ -144,7 +144,6 @@ interface ProfilWert {
   highlightAnlegen: (name: string) => string | null;
   playlistAnlegen: (name: string) => string | null;
   spendeSetzen: (spende: Spende) => void;
-  aufzeichnungAnlegen: (sekunden: number, zuschauer: number) => void;
 
   /** Like, Merken oder Repost bei einem Querformat-Video umschalten. */
   clipUmschalten: (id: string, was: 'like' | 'save' | 'repost') => void;
@@ -249,8 +248,6 @@ export const useProfil = () => {
   if (!wert) throw new Error('useProfil braucht den ProfilProvider');
   return wert;
 };
-
-const zweistellig = (n: number) => String(n).padStart(2, '0');
 
 export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   /*
@@ -722,25 +719,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [spende, schreiben]
   );
 
-  const aufzeichnungAnlegen = useCallback((sekunden: number, zuschauer: number) => {
-    const id = `q_${nummer()}`;
-    setClips((prev) => [
-      {
-        id,
-        userId: 'me',
-        title: 'Livestream-Aufzeichnung',
-        duration: `${zweistellig(Math.floor(sekunden / 60))}:${zweistellig(sekunden % 60)}`,
-        views: zuschauer,
-        age: 'gerade eben',
-        // Die Aufzeichnung ist ein normales Video, kein laufender Stream -
-        // sie gehoert unter "Standard", nicht unter "Live".
-        art: 'standard',
-      },
-      ...prev,
-    ]);
-    setRaster((prev) => [{ id, kind: 'video', eigen: true }, ...prev]);
-  }, []);
-
   /** Die angelegte Community in die Datenbank bringen und die Kennung nachziehen. */
   const inDatenbankCommunity = useCallback(
     (vorlaeufig: string, name: string, thema: string) => {
@@ -1075,7 +1053,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       highlightAnlegen,
       playlistAnlegen,
       spendeSetzen,
-      aufzeichnungAnlegen,
       clipUmschalten,
       markierte,
       markieren,
@@ -1111,7 +1088,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       sammlungen, sammlungOeffnen, sammlungLoeschen,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
-      aufzeichnungAnlegen, clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
+      clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
       chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]

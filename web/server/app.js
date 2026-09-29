@@ -1582,22 +1582,14 @@ app.post('/api/eigene/livestream', route(async (req) => {
     return antwort(e, { live: true });
   }
 
-  const { data: profil } = await req.db.from('profiles').select('live').eq('id', req.nutzerId).maybeSingle();
-  const lief = profil?.live;
-  await syncHandlers.handleLivestream(req.db, req.nutzerId, null);
-  if (!lief) return { ok: true, live: false };
-
-  // Die Aufzeichnung ist ein normales Video, kein laufender Stream — sie
-  // gehört unter "Standard", nicht unter "Live".
-  const sekunden = Math.max(1, Math.round((Date.now() - lief.seit) / 1000));
-  const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
-    art: 'clip',
-    titel: String(req.body?.titel || '').trim() || 'Livestream-Aufzeichnung',
-    dauer: `${String(Math.floor(sekunden / 60)).padStart(2, '0')}:${String(sekunden % 60).padStart(2, '0')}`,
-  });
-  if (!e || e.ok === false) return antwort(e);
-
-  return { ok: true, live: false, clip: await beitrag(req, e.beitrag.id) };
+  /*
+   * Bis zum 28.09.2026 legte das Beenden hier einen zweiten Beitrag
+   * "Livestream-Aufzeichnung" an — neben dem, der schon beim Start entstanden
+   * war. Was mit der Aufzeichnung geschieht, entscheidet jetzt
+   * /api/stream/:postId/ende; hier geht nur die Anzeige im Profil aus.
+   */
+  const e = await syncHandlers.handleLivestream(req.db, req.nutzerId, null);
+  return antwort(e, { live: false });
 }));
 
 app.post('/api/eigene/:id/loeschen', route(async (req) => {
@@ -1729,6 +1721,11 @@ app.post('/api/teilen', route(async (req) => {
   const empfaenger = Array.isArray(req.body?.empfaenger) ? req.body.empfaenger : [];
   // Ganze Communitys (Henrik, 26.09.2026) — allein oder zusammen mit Personen.
   const communitys = Array.isArray(req.body?.communitys) ? req.body.communitys.map(String) : [];
+  // Gewähltes Unterthema je Community (29.09.2026); fehlt es, gilt das erste.
+  const kanaele = {};
+  for (const id of communitys) {
+    if (typeof req.body?.kanaele?.[id] === 'string') kanaele[id] = req.body.kanaele[id];
+  }
   if (empfaenger.length === 0 && communitys.length === 0) {
     return { ok: false, error: 'Bitte mindestens eine Person oder Community auswählen' };
   }
@@ -1762,7 +1759,7 @@ app.post('/api/teilen', route(async (req) => {
       ? syncHandlers.handleShareToChats(req.db, req.nutzerId, eintrag.id, empfaenger, vorschau, bereiche)
       : { ok: true, gesendet: [], fehlgeschlagen: [] },
     communitys.length
-      ? syncHandlers.handleShareToCommunities(req.db, req.nutzerId, eintrag.id, communitys, vorschau)
+      ? syncHandlers.handleShareToCommunities(req.db, req.nutzerId, eintrag.id, communitys, vorschau, kanaele)
       : { ok: true, gesendet: [], fehlgeschlagen: [] },
   ]);
   if (!personen?.ok) return antwort(personen, {});
@@ -2721,10 +2718,22 @@ app.post('/api/stream/start', route(async (req) => {
     art: 'clip',
     titel: 'Livestream',
     beschreibung: 'Läuft gerade',
+    format: 'live',
   });
   if (!e || e.ok === false) return antwort(e);
   return { ok: true, id: e.beitrag.id };
 }));
+
+/* Beenden: veroeffentlichen oder loeschen — siehe handleStreamEnde. */
+app.post('/api/stream/:postId/ende', route(async (req) =>
+  antwort(
+    await syncHandlers.handleStreamEnde(req.db, req.nutzerId, req.params.postId, {
+      veroeffentlichen: req.body?.veroeffentlichen === true,
+      sekunden: req.body?.sekunden,
+      zuschauer: req.body?.zuschauer,
+    })
+  )
+));
 
 app.get('/api/stream/:postId/kommentare', route(async (req) => ({
   ok: true,

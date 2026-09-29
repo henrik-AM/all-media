@@ -229,18 +229,12 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
      * nach 600 ms noch nicht da, gemeldet wurde „Toast sagt " — als gaebe
      * es gar keinen Hinweis. Einzeln lief dieselbe Pruefung gruen.
      */
+    // Seit 28.09.2026 steht der Fehler im Blatt (#formFehler), nicht im Toast.
     await page
-      .waitForFunction(
-        () => {
-          const t = document.querySelector('#toast');
-          return t && !t.hidden && t.textContent.trim() !== '';
-        },
-        undefined,
-        { timeout: 15000 }
-      )
+      .waitForFunction(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })().trim() !== '', undefined, { timeout: 15000 })
       .catch(() => {});
-    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
-    if (!toast.includes('gibt es schon')) throw new Error('kein Hinweis, Toast sagt „' + toast + '"');
+    const toast = await page.evaluate(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })());
+    if (!toast.includes('gibt es schon')) throw new Error('kein Hinweis, Blatt sagt „' + toast + '"');
     await page.click('[data-sheet-close]').catch(() => {});
   });
 

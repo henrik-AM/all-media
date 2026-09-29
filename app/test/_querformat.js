@@ -117,6 +117,19 @@ const LANG = 'Design Tokens sauber aufsetzen';
   console.log('\n6.3 Rote Zeitleiste');
   await clipAuf(QUER);
 
+  // Gegenprobe zu den Live-Punkten unten: ein fertiges Video behaelt alles.
+  await pruefe('Ein fertiges Video hat Speichern, Aufrufe und „Zu Story" im Menü', async () => {
+    if (!(await page.$('[data-clipact="save"]'))) throw new Error('Speichern fehlt');
+    const sub = await page.$eval('.player__sub', (n) => n.textContent);
+    if (!/Aufrufe/.test(sub)) throw new Error('Unterzeile: ' + sub);
+    await page.click('[data-clipact="mehr"]');
+    await page.waitForSelector('.sheet');
+    await page.waitForTimeout(400);
+    const punkte = await page.$$eval('.sheet .item__label', (n) => n.map((x) => x.textContent.trim()));
+    if (!punkte.includes('Zu Story hinzufügen')) throw new Error('Punkte: ' + punkte.join(', '));
+    await blattZu();
+  });
+
   await pruefe('Antippen weit hinten spult vor — das Video springt mit', async () => {
     const { laenge } = await video();
     await leisteAntippen(0.75);
@@ -316,32 +329,65 @@ const LANG = 'Design Tokens sauber aufsetzen';
     await blattZu();
   });
 
-  await pruefe('Vorspulen über die gesendete Stelle hinaus geht nicht', async () => {
-    // Der Stream ist bis Sekunde 20 gelaufen.
-    await page.$eval('#clipVideo', (v) => (v.currentTime = 20));
-    // Auf die Anzeige warten, nicht auf eine feste Zeit: ist erst die Kopfzeile
-    // der Datei geladen, kommt der Sprung spaeter an — und die Live-Kante blieb
-    // bei 0 (28.09.2026, zwei rote Punkte ohne Codefehler).
-    await page.waitForFunction(() => document.querySelector('#clipZeit')?.textContent === '0:20', null, {
+  /* Die gesendete Stelle steht als aria-valuemax am Regler (seit 28.09.2026). */
+  const kante = () => page.$eval('#clipBalken', (n) => Number(n.getAttribute('aria-valuemax')));
+
+  await pruefe('Live beginnt an der Stelle, die gerade gesendet wird, nicht bei 0:00', async () => {
+    await page.waitForFunction(() => isFinite(document.querySelector('#clipVideo')?.duration), null, {
       timeout: 15000,
     });
-    await leisteAntippen(0.9);
+    await page.waitForTimeout(300);
+    // Dieselbe Rechnung wie im Player: Sekunden seit Sendebeginn, im Kreis ueber die Datei.
+    const zeile = await frage(`select created_at from posts where title like '${LIVE}%' and format = 'live' limit 1`);
+    if (!Array.isArray(zeile) || !zeile[0]) throw new Error('Sendebeginn nicht gefunden: ' + JSON.stringify(zeile));
+    const { laenge } = await video();
+    const soll = Math.floor((Date.now() - new Date(zeile[0].created_at).getTime()) / 1000) % Math.round(laenge);
+    const k = await kante();
     const { bei } = await video();
-    if (bei > 20.5) throw new Error(`das Video sprang nach vorn auf ${bei.toFixed(1)} s`);
+    if (Math.abs(k - soll) > 3) throw new Error(`Kante ${k} s statt etwa ${soll} s`);
+    if (Math.abs(bei - k) > 2) throw new Error(`Video steht bei ${bei.toFixed(1)} s, gesendet ist ${k} s`);
+  });
+
+  await pruefe('Vorspulen über die gesendete Stelle hinaus geht nicht', async () => {
+    await leisteAntippen(0.97);
+    const k = await kante();
+    const { bei, laenge } = await video();
+    if (k < laenge * 0.9 && bei > k + 1.5) throw new Error(`das Video sprang nach vorn auf ${bei.toFixed(1)} s, gesendet ist ${k} s`);
   });
 
   await pruefe('Zurückspulen geht, um Verpasstes zu sehen', async () => {
+    const k = await kante();
     const { laenge } = await video();
-    await leisteAntippen(0.1);
-    ungefaehr((await video()).bei, laenge * 0.1, 'Video steht bei');
+    const ziel = k / 2;
+    await leisteAntippen(ziel / laenge);
+    ungefaehr((await video()).bei, ziel, 'Video steht bei');
     await page.screenshot({ path: bild('live-zurueck') });
   });
 
   await pruefe('„LIVE" führt zurück an die gesendete Stelle, nicht weiter', async () => {
     await page.click('#clipLiveKante');
     await page.waitForTimeout(250);
+    const k = await kante();
     const { bei } = await video();
-    if (Math.abs(bei - 20) > 1) throw new Error(`nach „LIVE" steht das Video bei ${bei.toFixed(1)} s statt 20 s`);
+    if (Math.abs(bei - k) > 1.5) throw new Error(`nach „LIVE" steht das Video bei ${bei.toFixed(1)} s statt ${k} s`);
+  });
+
+  await pruefe('Bei Live: kein Speichern, Zuschauer statt Aufrufe', async () => {
+    if (await page.$('[data-clipact="save"]')) throw new Error('Speichern steht da');
+    const sub = await page.$eval('.player__sub', (n) => n.textContent);
+    if (!/sehen zu · live seit/.test(sub)) throw new Error('Unterzeile: ' + sub);
+    await page.screenshot({ path: bild('live-aktionen') });
+  });
+
+  await pruefe('Das Drei-Punkte-Menü bietet bei Live weder Herunterladen noch Story', async () => {
+    await page.click('[data-clipact="mehr"]');
+    await page.waitForSelector('.sheet');
+    await page.waitForTimeout(400);
+    const punkte = await page.$$eval('.sheet .item__label', (n) => n.map((x) => x.textContent.trim()));
+    if (!punkte.includes('Link kopieren')) throw new Error('Punkte: ' + punkte.join(', '));
+    if (punkte.some((p) => /Herunterladen|Story/.test(p))) throw new Error('Punkte: ' + punkte.join(', '));
+    await page.screenshot({ path: bild('live-menue') });
+    await blattZu();
   });
 
   await pruefe('Live zeigt keine Kapitel', async () => {
@@ -392,6 +438,118 @@ const LANG = 'Design Tokens sauber aufsetzen';
   await page.click('#clipOptionen');
   await page.click('.sheet .item:has-text("Geschwindigkeit")');
   await page.click('[data-vwahl="1"]');
+
+  /* ------------------------------------------------------------ 6.8 */
+  console.log('\n6.8 Livestream beenden: veröffentlichen oder löschen');
+
+  /*
+   * Henrik am 28.09.2026: "Erst wenn das Live Video beendet wurde, gibt's die
+   * Möglichkeit, dass der Administrator des Live Videos das als normales
+   * Querformat Video veröffentlicht oder es automatisch veröffentlicht wird."
+   * Alles hier laeuft auf dem Pruefkonto; was entsteht, raeumt das Ende weg.
+   */
+  const eigeneStreams = () =>
+    frage(`select id, format, title, duration from posts
+      where user_id = (select id from auth.users where email = $KONTO)
+        and title like 'Livestream%' and created_at >= '${vorher}' order by created_at`);
+
+  const liveStarten = async () => {
+    await blattZu();
+    await page.evaluate(() => document.querySelector('#clipBack')?.click());
+    await page.waitForTimeout(300);
+    await page.click('[data-area="videos"]');
+    await page.waitForTimeout(200);
+    await page.click('[data-sub="profile"]');
+    await page.waitForTimeout(400);
+    await page.click('[data-oact="create"]');
+    await page.waitForTimeout(400);
+    await page.click('[data-erstellen="livestream"]');
+    // Freigegeben wird das Eingabefeld erst, wenn der Stream-Beitrag steht.
+    await page.waitForSelector('#liveText:not([disabled])', { timeout: 10000 });
+    await page.waitForTimeout(1200);
+  };
+
+  const hinweis = (text) =>
+    page.waitForFunction((t) => (document.querySelector('#toast')?.textContent || '').includes(t), text, {
+      timeout: 10000,
+    });
+
+  let ersterStream = null;
+
+  await pruefe('Während der Sendung steht genau ein Beitrag, und zwar als Live', async () => {
+    await liveStarten();
+    const zeilen = await eigeneStreams();
+    if (zeilen === null) return console.log('       (ohne SUPABASE_TOKEN kein Datenbank-Abgleich)');
+    if (zeilen.length !== 1 || zeilen[0].format !== 'live') throw new Error(JSON.stringify(zeilen));
+    ersterStream = zeilen[0].id;
+  });
+
+  await pruefe('Beenden fragt: als Video veröffentlichen oder löschen', async () => {
+    await page.click('#liveStop');
+    await page.waitForSelector('#liveEnde:not([hidden])', { timeout: 3000 });
+    if (!(await page.isVisible('#liveVeroeffentlichen'))) throw new Error('kein Veröffentlichen');
+    if (!(await page.isVisible('#liveLoeschen'))) throw new Error('kein Löschen');
+    if (await page.isVisible('#liveStop')) throw new Error('Beenden steht noch da');
+    await page.screenshot({ path: bild('live-ende-wahl') });
+  });
+
+  await pruefe('Veröffentlichen macht denselben Beitrag zum Standard-Video, ohne Duplikat', async () => {
+    await page.click('#liveVeroeffentlichen');
+    await hinweis('steht im Querformat');
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.clip__title')].some((e) => e.textContent.includes('Livestream-Aufzeichnung')),
+      null,
+      { timeout: 10000 }
+    );
+    await page.screenshot({ path: bild('live-ende-veroeffentlicht') });
+    const zeilen = await eigeneStreams();
+    if (zeilen === null) return;
+    if (zeilen.length !== 1) throw new Error(`${zeilen.length} Beiträge: ${JSON.stringify(zeilen)}`);
+    const z = zeilen[0];
+    if (z.id !== ersterStream) throw new Error('nicht derselbe Beitrag');
+    if (z.format !== 'standard' || z.title !== 'Livestream-Aufzeichnung' || !/^\d\d:\d\d$/.test(z.duration || '')) {
+      throw new Error(JSON.stringify(z));
+    }
+    const live = await frage(`select live from profiles where id = (select id from auth.users where email = $KONTO)`);
+    if (live?.[0]?.live) throw new Error('Profil steht noch auf live');
+  });
+
+  await pruefe('Löschen lässt keinen Beitrag zurück', async () => {
+    await liveStarten();
+    const vorher2 = await eigeneStreams();
+    const neu = vorher2?.find((z) => z.format === 'live');
+    await page.click('#liveStop');
+    await page.waitForSelector('#liveEnde:not([hidden])', { timeout: 3000 });
+    await page.click('#liveLoeschen');
+    await hinweis('gelöscht');
+    if (vorher2 === null) return;
+    if (!neu) throw new Error('kein Live-Beitrag angelegt');
+    const nachher = await frage(`select id from posts where id = '${neu.id}'`);
+    if (nachher.length) throw new Error('der Beitrag steht noch');
+  });
+
+  await pruefe('Mit „automatisch veröffentlichen" endet der Stream ohne Rückfrage', async () => {
+    await liveStarten();
+    await page.click('.live__auto');
+    await page.waitForTimeout(800);
+    const gespeichert = await frage(`select wert from user_settings
+      where user_id = (select id from auth.users where email = $KONTO) and schluessel = 'liveAutoVeroeffentlichen'`);
+    if (gespeichert && gespeichert[0]?.wert !== 'an') throw new Error('Schalter nicht gespeichert: ' + JSON.stringify(gespeichert));
+    await page.screenshot({ path: bild('live-auto-schalter') });
+    await page.click('#liveStop');
+    await hinweis('steht im Querformat');
+    if (await page.$('#liveEnde:not([hidden])')) throw new Error('es wurde trotzdem gefragt');
+    const zeilen = await eigeneStreams();
+    if (zeilen === null) return;
+    const standard = zeilen.filter((z) => z.format === 'standard');
+    if (standard.length !== 2 || zeilen.some((z) => z.format === 'live')) throw new Error(JSON.stringify(zeilen));
+  });
+
+  // Was 6.8 angelegt hat, wieder weg - Beitraege und Schalter des Pruefkontos.
+  await frage(`delete from posts where user_id = (select id from auth.users where email = $KONTO)
+    and title like 'Livestream%' and created_at >= '${vorher}'`).catch(() => {});
+  await frage(`delete from user_settings where user_id = (select id from auth.users where email = $KONTO)
+    and schluessel = 'liveAutoVeroeffentlichen'`).catch(() => {});
 
   const erfuellt = ergebnisse.filter(Boolean).length;
   console.log(`\n  ${erfuellt} von ${ergebnisse.length} Punkten erfuellt`);

@@ -244,7 +244,7 @@ async function abraeumen(a, b) {
   /*
    * Henrik am 26.09.2026: einzelnen Personen aus Communitys schicken, „aber
    * auch natürlich in eine Community mit mehreren Personen". Die Karte landet
-   * im ersten Unterthema.
+   * im gewählten Unterthema, ohne Wahl im ersten (29.09.2026).
    *
    * Geteilt wird in eine eigene Prüfcommunity: in den Communitys des
    * Testbestands sind auch echte Konten Mitglied, die die Karte sähen.
@@ -260,6 +260,21 @@ async function abraeumen(a, b) {
     })).json(), 'Prüfteilen ' + Date.now().toString(36));
   const FOTOGRAFIE = neu.community?.id;
   if (!FOTOGRAFIE) console.log('  FEHL Prüfcommunity nicht angelegt — ' + (neu.error || ''));
+  // Ein zweites Unterthema, sonst gibt es nichts zu wählen.
+  const bilder = await page.evaluate(async (c) =>
+    (await fetch(`/api/communities/${c}/channels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Bilder' }),
+    })).json(), FOTOGRAFIE);
+  if (!bilder.id) console.log('  FEHL zweites Unterthema nicht angelegt — ' + (bilder.error || ''));
+  const kartenIn = async (k) => {
+    const antwort = await page.evaluate(
+      async ({ c, k }) => (await fetch(`/api/communities/${c}/channels/${k}`)).json(),
+      { c: FOTOGRAFIE, k }
+    );
+    return (antwort.messages || []).filter((m) => m.geteilt);
+  };
   // Das Blatt liest state.communities — nach dem Anlegen neu laden.
   await page.reload({ waitUntil: 'load' });
   let geteilterBeitrag = null;
@@ -293,20 +308,58 @@ async function abraeumen(a, b) {
     await tippen('');
   });
 
-  await pruefe('Senden legt die Karte ins erste Unterthema', async () => {
+  await pruefe('Das Unterthema ist wählbar, voreingestellt das erste', async () => {
+    const chips = await page.$$eval('[data-teilen-kanal]', (els) => els.map((e) => [e.textContent, e.getAttribute('aria-pressed')]));
+    if (JSON.stringify(chips) !== JSON.stringify([['#Allgemein', 'true'], ['#Bilder', 'false']])) throw new Error(JSON.stringify(chips));
+    await page.click(`[data-teilen-kanal="${bilder.id}"]`);
+    const unter = await page.$eval(`[data-teilen-community="${FOTOGRAFIE}"] .teilen__sperre`, (e) => e.textContent);
+    if (unter !== 'in #Bilder') throw new Error(unter);
+    await bild('4-unterthema');
+  });
+
+  const { data: erster } = await pruefer.client
+    .from('community_channels').select('id').eq('community_id', FOTOGRAFIE)
+    .order('position').order('created_at').limit(1).single();
+
+  await pruefe('Senden legt die Karte ins gewählte Unterthema, nicht ins erste', async () => {
     await page.click('#teilenSenden');
     await warteAufSchliessen();
-    const { data: kanal } = await pruefer.client
-      .from('community_channels').select('id').eq('community_id', FOTOGRAFIE)
-      .order('position').order('created_at').limit(1).single();
-    const antwort = await page.evaluate(
-      async ({ c, k }) => (await fetch(`/api/communities/${c}/channels/${k}`)).json(),
-      { c: FOTOGRAFIE, k: kanal.id }
-    );
-    const karte = (antwort.messages || []).filter((m) => m.geteilt).pop();
-    if (!karte) throw new Error('keine Karte im Unterthema');
+    const karte = (await kartenIn(bilder.id)).pop();
+    if (!karte) throw new Error('keine Karte in #Bilder');
     if (karte.geteilt.id !== geteilterBeitrag) throw new Error('falscher Beitrag ' + karte.geteilt.id);
     if (!karte.geteilt.autor) throw new Error('Karte ohne Autor');
+    if ((await kartenIn(erster.id)).length) throw new Error('auch in #Allgemein gelandet');
+  });
+
+  await pruefe('Ohne Wahl geht die Karte ins erste Unterthema', async () => {
+    const antwort = await page.evaluate(
+      async ({ id, c }) =>
+        (await fetch('/api/teilen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ art: 'post', id, communitys: [c] }),
+        })).json(),
+      { id: geteilterBeitrag, c: FOTOGRAFIE }
+    );
+    if ((antwort.gesendetCommunitys || []).join() !== FOTOGRAFIE) throw new Error(JSON.stringify(antwort));
+    if ((await kartenIn(erster.id)).length !== 1) throw new Error('keine Karte in #Allgemein');
+  });
+
+  await pruefe('Ein Unterthema einer anderen Community wird abgelehnt', async () => {
+    const { data: fremd } = await pruefer.client
+      .from('community_channels').select('id').eq('community_id', MUSIK).limit(1).single();
+    const antwort = await page.evaluate(
+      async ({ id, c, k }) =>
+        (await fetch('/api/teilen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ art: 'post', id, communitys: [c], kanaele: { [c]: k } }),
+        })).json(),
+      { id: geteilterBeitrag, c: FOTOGRAFIE, k: fremd.id }
+    );
+    if ((antwort.gesendetCommunitys || []).length) throw new Error('ging durch');
+    const grund = (antwort.fehlgeschlagenCommunitys || [])[0]?.grund;
+    if (grund !== 'Dieses Unterthema gibt es nicht mehr') throw new Error(JSON.stringify(antwort));
   });
 
   await pruefe('Ohne Mitgliedschaft lehnt die Datenbank ab — auch am Blatt vorbei', async () => {

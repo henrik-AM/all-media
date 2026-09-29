@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { useDaten } from '../../contexts/DatenContext';
+import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import { useAktionen } from '../../lib/useAktionen';
 import { ladeSpendenSumme, ladeStreamKommentare } from '../../lib/daten';
 import * as Aktion from '../../lib/aktionen';
 
 interface Props {
-  /** Bekommt Dauer in Sekunden und die erreichte Zuschauerzahl. */
-  onEnd: (sekunden: number, zuschauer: number) => void;
+  /** Nach dem Ende — ob die Aufzeichnung veroeffentlicht oder geloescht wurde. */
+  onEnd: (veroeffentlicht: boolean) => void;
   /** Einmal beim Aufmachen — damit im eigenen Profil steht, dass gesendet wird. */
   onStart?: () => void;
   onNotice?: (text: string) => void;
@@ -31,16 +32,20 @@ const zweistellig = (n: number) => String(n).padStart(2, '0');
  * Prototyp-Frame "VP + erstellen" -> Livestream.
  *
  * Ohne Streaming-Server gibt es kein echtes Bild. Was hier steht, ist alles
- * echt: die Zeit laeuft mit, die Zuschauerzahl waechst, und beim Beenden
- * bleibt die Aufzeichnung im Querformat-Bereich stehen.
+ * echt: die Zeit laeuft mit, die Zuschauerzahl waechst, und nach dem Ende
+ * entscheidet der Host, ob die Aufzeichnung als Querformat-Video erscheint.
  */
 export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
   const insets = useSafeAreaInsets();
   const { supabase } = useSupabase();
   const { ichId } = useDaten();
   const aktionen = useAktionen(onNotice);
+  const einstellungen = useEinstellungen();
   const [sekunden, setSekunden] = useState(0);
   const [zuschauer, setZuschauer] = useState(0);
+  /** Gesendet ist, jetzt steht die Wahl: veroeffentlichen oder loeschen. */
+  const [vorbei, setVorbei] = useState(false);
+  const [schliesst, setSchliesst] = useState(false);
 
   /*
    * Die Live-Kommentarspalte aus dem Handbuch.
@@ -70,6 +75,7 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
       art: 'clip',
       titel: 'Livestream',
       beschreibung: 'Läuft gerade',
+      format: 'live',
     })
       .then((id) => {
         if (!abgebrochen) setPostId(id);
@@ -96,6 +102,7 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
    * Sekunden sind bei einer Kommentarspalte nicht zu bemerken; die
    * Zuschauerzahl daneben laeuft ohnehin im Sekundentakt.
    */
+  const fehlschlaege = useRef(0);
   const holen = useCallback(async () => {
     if (!supabase || !postId) return;
     try {
@@ -105,8 +112,14 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
       ]);
       setKommentare(neue);
       setSpenden(summe);
+      fehlschlaege.current = 0;
     } catch (e: any) {
-      console.error('Streamkommentare laden fehlgeschlagen:', e?.message ?? e);
+      /* Ein Aussetzer im Vier-Sekunden-Takt holt die naechste Runde nach -
+         als Fehler gemeldet, deckte die LogBox die Spalte zu (28.09.2026).
+         Erst drei hintereinander sind eine Stoerung. Gleiche Regel im
+         ClipPlayerScreen und in web/public/app.js. */
+      fehlschlaege.current += 1;
+      if (fehlschlaege.current === 3) console.warn('Streamkommentare laden fehlgeschlagen:', e?.message ?? e);
     }
   }, [supabase, postId]);
 
@@ -127,10 +140,11 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
 
   // Der Endstand muss auch dann stimmen, wenn der Knopf gedrueckt wird,
   // bevor React den letzten Zustand durchgereicht hat.
-  const stand = useRef({ sekunden: 0, zuschauer: 0 });
+  const stand = useRef({ sekunden: 0, zuschauer: 0, vorbei: false });
 
   useEffect(() => {
     const uhr = setInterval(() => {
+      if (stand.current.vorbei) return;
       stand.current.sekunden += 1;
       if (stand.current.sekunden % 3 === 0) stand.current.zuschauer += 1;
       setSekunden(stand.current.sekunden);
@@ -138,6 +152,42 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
     }, 1000);
     return () => clearInterval(uhr);
   }, []);
+
+  /*
+   * Henrik am 28.09.2026: erst nach dem Ende entscheidet der Host, ob die
+   * Aufzeichnung als normales Querformat-Video erscheint — oder er stellt
+   * vorher ein, dass das ohne Rueckfrage geschieht. Gleicher Ablauf auf der
+   * Website (openLivestream).
+   */
+  const auto = einstellungen.an('liveAutoVeroeffentlichen');
+
+  const abschliessen = async (veroeffentlichen: boolean) => {
+    if (schliesst) return;
+    setSchliesst(true);
+    try {
+      if (supabase && ichId && postId) {
+        await Aktion.liveBeenden(supabase, ichId, postId, {
+          veroeffentlichen,
+          sekunden: stand.current.sekunden,
+          zuschauer: stand.current.zuschauer,
+        });
+      } else if (supabase && ichId) {
+        // Ohne Beitrag gibt es nichts zu entscheiden, nur das Profil zu leeren.
+        await Aktion.livestreamSetzen(supabase, ichId, null);
+      }
+      onEnd(veroeffentlichen && !!postId);
+    } catch (e: any) {
+      setSchliesst(false);
+      onNotice?.(e?.message ?? 'Das ging nicht durch');
+    }
+  };
+
+  const beenden = () => {
+    stand.current.vorbei = true;
+    stand.current.sekunden = Math.max(1, stand.current.sekunden);
+    if (auto) return void abschliessen(true);
+    setVorbei(true);
+  };
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -181,6 +231,7 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
         />
       </View>
 
+      {!vorbei && (
       <View style={styles.eingabe}>
         <TextInput
           style={styles.feld}
@@ -196,6 +247,7 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
           <Ionicons name="send" size={16} color={colors.white} />
         </Druck>
       </View>
+      )}
 
       <View style={[styles.leiste, { paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={styles.zahlen}>
@@ -211,12 +263,33 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
             </Text>
           )}
         </View>
-        <Druck
-          style={styles.stop}
-          onPress={() => onEnd(Math.max(1, stand.current.sekunden), stand.current.zuschauer)}
-        >
-          <Text style={styles.stopText}>Livestream beenden</Text>
-        </Druck>
+        {vorbei ? (
+          <>
+            <Text style={styles.endeText}>
+              Livestream beendet · {zweistellig(Math.floor(sekunden / 60))}:{zweistellig(sekunden % 60)} · {zuschauer} Zuschauer
+            </Text>
+            <Druck style={styles.stop} onPress={() => abschliessen(true)} disabled={schliesst}>
+              <Text style={styles.stopText}>Als Video veröffentlichen</Text>
+            </Druck>
+            <Druck style={styles.zweit} onPress={() => abschliessen(false)} disabled={schliesst}>
+              <Text style={styles.stopText}>Aufzeichnung löschen</Text>
+            </Druck>
+          </>
+        ) : (
+          <>
+            <View style={styles.auto}>
+              <Text style={styles.autoText}>Aufzeichnung automatisch veröffentlichen</Text>
+              <Switch
+                value={auto}
+                onValueChange={(an) => void einstellungen.setzen('liveAutoVeroeffentlichen', an ? 'an' : 'aus')}
+                accessibilityLabel="Aufzeichnung automatisch veröffentlichen"
+              />
+            </View>
+            <Druck style={styles.stop} onPress={beenden} disabled={schliesst}>
+              <Text style={styles.stopText}>Livestream beenden</Text>
+            </Druck>
+          </>
+        )}
       </View>
     </View>
   );
@@ -290,4 +363,14 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   stopText: { ...typography.name, color: colors.white },
+  zweit: {
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endeText: { ...typography.message, color: colors.white, textAlign: 'center' },
+  auto: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  autoText: { flex: 1, ...typography.small, color: '#B9BDC6' },
 }));

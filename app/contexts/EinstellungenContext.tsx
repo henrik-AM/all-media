@@ -46,6 +46,8 @@ export const SCHALTER_STANDARD: Record<string, boolean> = {
   lesebestaetigung: true,
   entersenden: true,
   datensparen: false,
+  // Livestream: Aufzeichnung ohne Rueckfrage veroeffentlichen (28.09.2026).
+  liveAutoVeroeffentlichen: false,
 };
 
 type EinstellungenWert = {

@@ -54,7 +54,7 @@ interface Props {
    * zeigt das Blatt keine Communitys — etwa für ein Foto aus der Kamera,
    * das kein Beitrag ist.
    */
-  onCommunitys?: (communityIds: string[], ziel: TeilenZiel) => Promise<TeilenErgebnis>;
+  onCommunitys?: (communityIds: string[], ziel: TeilenZiel, kanaele: Record<string, string>) => Promise<TeilenErgebnis>;
 }
 
 interface Person {
@@ -86,6 +86,8 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
   // Ganze Communitys getrennt von Personen: andere Kennungen, anderer Weg.
   const [gewaehltC, setGewaehltC] = useState<string[]>([]);
   const [gesendetC, setGesendetC] = useState<string[]>([]);
+  // Gewähltes Unterthema je Community; ohne Eintrag gilt das erste (29.09.2026).
+  const [kanalWahl, setKanalWahl] = useState<Record<string, string>>({});
 
   const wer = (id: string): Person | null => (alleNutzer[id] ? { ...alleNutzer[id], id } : fremde[id] ?? null);
 
@@ -165,7 +167,7 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
     const leer: TeilenErgebnis = { gesendet: [], fehlgeschlagen: [] };
     const [ergebnis, inCommunitys] = await Promise.all([
       gewaehlt.length ? onSenden(gewaehlt, ziel, bereiche) : leer,
-      gewaehltC.length && onCommunitys ? onCommunitys(gewaehltC, ziel) : leer,
+      gewaehltC.length && onCommunitys ? onCommunitys(gewaehltC, ziel, kanalWahl) : leer,
     ]);
     setSendet(false);
     setGesendet((g) => [...g, ...ergebnis.gesendet]);
@@ -186,8 +188,10 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
 
   /** Eine ganze Community: Kachel mit Gruppensymbol, darunter das Unterthema. */
   const communityRaster = () => (
+    <>
     <View style={styles.raster}>
       {ganze.map((c) => {
+        const kanal = c.kanaele.find((k) => k.id === kanalWahl[c.id]) ?? c.kanal;
         const fertig = gesendetC.includes(c.id);
         const an = gewaehltC.includes(c.id);
         return (
@@ -216,12 +220,41 @@ export const TeilenSheet = ({ ziel, contacts, titel, bereichFuer, onClose, onSen
               {c.name}
             </Text>
             <Text style={styles.sperre} numberOfLines={1}>
-              in #{c.kanal.name}
+              in #{kanal.name}
             </Text>
           </Druck>
         );
       })}
     </View>
+    {/*
+      Das Unterthema wählt die sendende Person selbst (29.09.2026) - aber erst,
+      wenn sie die Community gewählt hat und es mehr als eines gibt. Sonst
+      stünde vor jedem Teilen eine Frage, die niemand gestellt hat.
+    */}
+    {ganze
+      .filter((c) => gewaehltC.includes(c.id) && c.kanaele.length > 1)
+      .map((c) => (
+        <View key={c.id} style={styles.kanalReihe}>
+          <Text style={styles.kanalTitel}>Unterthema in {c.name}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kanalChips}>
+            {c.kanaele.map((k) => {
+              const an = (kanalWahl[c.id] ?? c.kanal.id) === k.id;
+              return (
+                <Druck
+                  key={k.id}
+                  style={[styles.kanalChip, an && styles.kanalChipAn]}
+                  accessibilityLabel={`Unterthema ${k.name}`}
+                  accessibilityState={{ selected: an }}
+                  onPress={() => setKanalWahl((w) => ({ ...w, [c.id]: k.id }))}
+                >
+                  <Text style={[styles.kanalChipText, an && styles.kanalChipTextAn]}>#{k.name}</Text>
+                </Druck>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ))}
+    </>
   );
 
   const raster = (ids: string[]) => (
@@ -393,6 +426,13 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   sperre: { fontSize: 11, color: colors.text3, marginTop: -4, maxWidth: '92%' },
+  kanalReihe: { paddingTop: spacing.sm },
+  kanalTitel: { ...typography.small, color: colors.text2, paddingHorizontal: spacing.lg, paddingBottom: 6 },
+  kanalChips: { paddingHorizontal: spacing.lg, gap: 8 },
+  kanalChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.surface2 },
+  kanalChipAn: { backgroundColor: colors.brand },
+  kanalChipText: { ...typography.small, color: colors.text },
+  kanalChipTextAn: { color: colors.white },
   leer: { ...typography.small, color: colors.text2, textAlign: 'center', padding: spacing.lg },
   meldung: { paddingBottom: spacing.sm, gap: 2 },
   meldungText: { ...typography.small, color: colors.danger },

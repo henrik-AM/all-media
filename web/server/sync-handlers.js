@@ -715,8 +715,10 @@ const handleShareToChats = handler(
 );
 
 /**
- * Einen Beitrag in ganze Communitys teilen — als Karte in ihr erstes
- * Unterthema, wo alle Mitglieder ihn sehen (Henrik, 26.09.2026; Schema 59).
+ * Einen Beitrag in ganze Communitys teilen — als Karte in ein Unterthema,
+ * wo alle Mitglieder ihn sehen (Henrik, 26.09.2026; Schema 59). `kanaele`
+ * ordnet einer Community das gewählte Unterthema zu, ohne Wahl gilt das
+ * erste (29.09.2026); eine Wahl muss zur Community gehören.
  *
  * Mitglied sein muss man; das prüft die Regel „Beitrag nur als Mitglied
  * teilen". Scheitert eine Community, gehen die anderen trotzdem raus.
@@ -724,22 +726,24 @@ const handleShareToChats = handler(
  */
 const handleShareToCommunities = handler(
   'In Communitys teilen',
-  async (client, nutzerId, beitragId, communityIds = [], vorschau = 'Beitrag geteilt') => {
+  async (client, nutzerId, beitragId, communityIds = [], vorschau = 'Beitrag geteilt', kanaele = {}) => {
     const gesendet = [];
     const fehlgeschlagen = [];
     for (const communityId of communityIds) {
       try {
-        const { data: kanal, error: fehlerKanal } = await client
-          .from('community_channels')
-          .select('id')
-          .eq('community_id', communityId)
+        let abfrage = client.from('community_channels').select('id').eq('community_id', communityId);
+        if (kanaele[communityId]) abfrage = abfrage.eq('id', kanaele[communityId]);
+        const { data: kanal, error: fehlerKanal } = await abfrage
           .order('position', { ascending: true })
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle();
         if (fehlerKanal) throw fehlerKanal;
         if (!kanal) {
-          fehlgeschlagen.push({ id: communityId, grund: 'Diese Community hat noch kein Unterthema' });
+          fehlgeschlagen.push({
+            id: communityId,
+            grund: kanaele[communityId] ? 'Dieses Unterthema gibt es nicht mehr' : 'Diese Community hat noch kein Unterthema',
+          });
           continue;
         }
         const { error } = await client
@@ -817,9 +821,20 @@ const handleCreateChannel = handler(
       .ilike('name', name);
     if (count > 0) return { ok: false, fehler: 'Dieses Unterthema gibt es schon' };
 
+    // Ans Ende, nicht auf 0: sonst stand jedes neue Unterthema gleichauf mit
+    // „Allgemein", und welches „das erste" war, entschied der Zufall
+    // (29.09.2026). Gleiche Rechnung in app/lib/aktionen.ts (kanalAnlegen).
+    const { data: letztes } = await client
+      .from('community_channels')
+      .select('position')
+      .eq('community_id', communityId)
+      .order('position', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     const { data, error } = await client
       .from('community_channels')
-      .insert({ community_id: communityId, slug, name })
+      .insert({ community_id: communityId, slug, name, position: letztes ? (letztes.position || 0) + 1 : 0 })
       .select()
       .single();
     if (error) throw error;
@@ -974,6 +989,40 @@ const handleLivestream = handler('Livestream', async (client, nutzerId, live) =>
   return { ok: true, live: Boolean(live) };
 });
 
+/*
+ * Einen Livestream beenden: aus dem Profil nehmen und mit dem Stream-Beitrag
+ * tun, was der Host gewaehlt hat — veroeffentlichen macht aus demselben
+ * Beitrag ein Standard-Video, sonst wird er geloescht (Spenden bleiben, ON
+ * DELETE SET NULL). Henrik am 28.09.2026. Gegenstueck: liveBeenden in
+ * app/lib/aktionen.ts.
+ */
+const handleStreamEnde = handler('Livestream beenden', async (client, nutzerId, postId, ende = {}) => {
+  await client.from('profiles').update({ live: null }).eq('id', nutzerId);
+  if (!ende.veroeffentlichen) {
+    const { data, error } = await client.from('posts').delete().eq('id', postId).eq('user_id', nutzerId).select('id');
+    if (error) throw error;
+    // Ein abgelehntes Loeschen meldet keinen Fehler, nur null Zeilen.
+    if (!data?.length) return { ok: false, error: 'Die Aufzeichnung ließ sich nicht löschen' };
+    return { ok: true, veroeffentlicht: false };
+  }
+  const s = Math.max(1, Math.round(Number(ende.sekunden) || 0));
+  const { data, error } = await client
+    .from('posts')
+    .update({
+      format: 'standard',
+      title: 'Livestream-Aufzeichnung',
+      description: '',
+      duration: `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`,
+      zuschauer: Math.max(0, Math.round(Number(ende.zuschauer) || 0)),
+    })
+    .eq('id', postId)
+    .eq('user_id', nutzerId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) return { ok: false, error: 'Die Aufzeichnung ließ sich nicht veröffentlichen' };
+  return { ok: true, veroeffentlicht: true };
+});
+
 const handleSendMessage = handler(
   'Nachricht senden',
   async (client, nutzerId, chatId, text, medien = {}) => {
@@ -1088,6 +1137,8 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag
       // zurück, bis er erreicht ist (ladeBeitraege filtert danach).
       publish_at: felder.geplantAb || null,
+      // 'live' nur fuer den laufenden Stream, siehe /api/stream/start.
+      format: felder.format || 'standard',
     })
     .select()
     .single();
@@ -2176,6 +2227,7 @@ module.exports = {
   handleSammlungLoeschen,
   handleSpende,
   handleLivestream,
+  handleStreamEnde,
   istNummer,
   handleSendMessage,
   handleMarkChatAsRead,

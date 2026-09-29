@@ -5682,6 +5682,8 @@ const SCHALTER_STANDARD = {
    */
   entersenden: true,
   datensparen: false,
+  // Livestream: Aufzeichnung ohne Rueckfrage veroeffentlichen (28.09.2026).
+  liveAutoVeroeffentlichen: false,
 };
 
 const schalterAn = (schluessel) => {
@@ -9342,8 +9344,10 @@ async function openBeitragOptionen(beitrag) {
 
   const punkte = [
     { key: 'link', label: 'Link kopieren', icon: 'link' },
-    ...(darfSichern && beitrag.mediaUrl ? [{ key: 'sichern', label: 'Herunterladen', icon: 'download' }] : []),
-    { key: 'story', label: 'Zu Story hinzufügen', icon: 'plus' },
+    /* Bei einem laufenden Stream weder Herunterladen noch Story — er ist ja
+       noch nicht fertig (Henrik, 28.09.2026). Gleiche Regel in der App. */
+    ...(darfSichern && beitrag.mediaUrl && !beitrag.live ? [{ key: 'sichern', label: 'Herunterladen', icon: 'download' }] : []),
+    ...(beitrag.live ? [] : [{ key: 'story', label: 'Zu Story hinzufügen', icon: 'plus' }]),
     ...(eigener
       ? []
       : [
@@ -10268,6 +10272,8 @@ function openClip(clipId) {
    * app/screens/videos/ClipPlayerScreen.tsx (liveKante).
    */
   let liveKante = 0;
+  /* Fuer welches Video der Einstieg an der Live-Stelle schon geschehen ist. */
+  let liveEinstieg = null;
   let liveOffen = false;
   let liveUhr = null;
   const istLive = () => clip.art === 'live';
@@ -10351,7 +10357,12 @@ function openClip(clipId) {
 
           <div class="player__kopf">
             <div class="player__titel">${esc(clip.title)}</div>
-            <div class="player__sub">${compactNumber(clip.views)} Aufrufe · ${esc(clip.age)}</div>
+            <div class="player__sub">${
+              /* Bei Live zaehlt, wer gerade zusieht — Aufrufe sammelt erst das fertige Video. */
+              istLive()
+                ? `${compactNumber(clip.zuschauer || 0)} sehen zu · live seit ${esc(String(clip.age || '').replace(/^vor /, ''))}`
+                : `${compactNumber(clip.views)} Aufrufe · ${esc(clip.age)}`
+            }</div>
             ${/*
                 Das Drei-Punkte-Menue steht neben dem Titel, nicht in der
                 Aktionsreihe: dort sind es laut Prototyp genau fuenf Knoepfe.
@@ -10386,7 +10397,7 @@ function openClip(clipId) {
               steht unter dem Symbol statt daneben - so aendert sie die Breite
               gar nicht mehr.
             */ ''}
-          <div class="post__actions post__actions--fuenf">
+          <div class="post__actions post__actions--fuenf ${istLive() ? 'post__actions--vier' : ''}">
             <button class="postbtn ${clip.liked ? 'is-liked' : ''}" data-clipact="like" aria-label="Gefällt mir">
               ${ICONS.heart}<span class="postbtn__zahl">${clip.likes ? compactNumber(clip.likes) : 'Like'}</span>
             </button>
@@ -10404,9 +10415,15 @@ function openClip(clipId) {
             <button class="postbtn ${clip.reposted ? 'is-reposted' : ''}" data-clipact="repost" aria-label="Repost">
               ${ICONS.repeat}<span class="postbtn__zahl">Repost</span>
             </button>
-            <button class="postbtn ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Speichern">
+            ${
+              /* Speichern erst am fertigen Video — ein laufender Stream ist
+                 noch nichts, was man sich merkt (Henrik, 28.09.2026). */
+              istLive()
+                ? ''
+                : `<button class="postbtn ${clip.saved ? 'is-saved' : ''}" data-clipact="save" aria-label="Speichern">
               ${ICONS.bookmark}<span class="postbtn__zahl">${clip.saved ? 'Gespeichert' : 'Speichern'}</span>
-            </button>
+            </button>`
+            }
           </div>
 
           ${
@@ -10454,7 +10471,7 @@ function openClip(clipId) {
                     <div class="avatar avatar--36" style="background:${farbe(au.color)}">${esc(au.initials)}</div>
                     <div>
                       <div class="clip__title">${esc(c.title)}</div>
-                      <div class="clip__sub">${esc(au.name)} · ${compactNumber(c.views)} Aufrufe</div>
+                      <div class="clip__sub">${esc(au.name)} · ${c.art === 'live' ? `${compactNumber(c.zuschauer || 0)} sehen zu` : `${compactNumber(c.views)} Aufrufe`}</div>
                     </div>
                   </div>
                 </article>`;
@@ -10467,9 +10484,16 @@ function openClip(clipId) {
     binden();
   };
 
+  /* Die Sendung laeuft weiter, auch wenn man selbst anhaelt. */
+  const kantenUhr = setInterval(() => {
+    if (!overlay.querySelector('#clipZeit')) return clearInterval(kantenUhr);
+    if (istLive() && gesamt) liveKante = Math.min(gesamt, liveKante + 1);
+  }, 1000);
+
   const schliessen = () => {
     clearInterval(uhr);
     clearInterval(liveUhr);
+    clearInterval(kantenUhr);
     // Ohne das Anhalten laeuft der Ton weiter, waehrend das Fenster schon zu
     // ist — innerHTML='' allein raeumt das Element nicht zuverlaessig ab.
     const medium = overlay.querySelector('#clipVideo');
@@ -10501,7 +10525,13 @@ function openClip(clipId) {
       if (zeitFeld) zeitFeld.textContent = zeit(bei);
       const balken = overlay.querySelector('#clipFortschritt');
       if (balken) balken.style.width = `${gesamt ? (bei / gesamt) * 100 : 0}%`;
-      overlay.querySelector('#clipBalken')?.setAttribute('aria-valuetext', `${zeit(bei)} von ${istLive() ? 'LIVE' : zeit(gesamt)}`);
+      const regler = overlay.querySelector('#clipBalken');
+      if (regler) {
+        regler.setAttribute('aria-valuetext', `${zeit(bei)} von ${istLive() ? 'LIVE' : zeit(gesamt)}`);
+        regler.setAttribute('aria-valuemin', '0');
+        regler.setAttribute('aria-valuemax', String(Math.round(istLive() ? liveKante : gesamt)));
+        regler.setAttribute('aria-valuenow', String(Math.round(bei)));
+      }
     };
 
     if (medium) {
@@ -10512,6 +10542,22 @@ function openClip(clipId) {
       medium.addEventListener('loadedmetadata', () => {
         if (medium.duration && isFinite(medium.duration)) {
           gesamt = Math.round(medium.duration);
+          /*
+           * Live beginnt an der Stelle, die gerade gesendet wird, nicht bei
+           * 0:00 (Henrik, 28.09.2026). Ohne Streaming-Server steht die Datei
+           * fuer die Sendung, die Uhr seit Sendebeginn sagt, wo sie ist;
+           * aeltere Streams laufen im Kreis. Gleiche Rechnung in
+           * app/screens/videos/ClipPlayerScreen.tsx (liveEinstieg).
+           */
+          if (istLive() && liveEinstieg !== clip.id) {
+            liveEinstieg = clip.id;
+            const gesendet = clip.zeitpunkt
+              ? Math.max(0, Math.floor((Date.now() - new Date(clip.zeitpunkt).getTime()) / 1000))
+              : 0;
+            liveKante = gesendet % Math.max(1, gesamt);
+            bei = liveKante;
+            medium.currentTime = bei;
+          }
           leisteSetzen();
           // Die Leiste endet hier, also steht auch diese Laenge daneben.
           const laenge = overlay.querySelector('#clipLaenge');
@@ -10732,12 +10778,14 @@ function openClip(clipId) {
 
     /* Live-Kommentare: alle vier Sekunden nachladen, wie in der App. */
     if (istLive()) {
+      let fehlschlaege = 0;
       const holen = async () => {
         const zeilen = overlay.querySelector('#liveZeilen');
         if (!zeilen) return clearInterval(liveUhr);
         try {
           const res = await fetch(`/api/stream/${clip.id}/kommentare`);
           if (!res.ok) return;
+          fehlschlaege = 0;
           const liste = (await res.json()).kommentare || [];
           const zahl = overlay.querySelector('#clipKommentarZahl');
           if (zahl) zahl.textContent = liste.length ? compactNumber(liste.length) : 'Kommentar';
@@ -10749,7 +10797,9 @@ function openClip(clipId) {
             : '<p class="live__leer">Noch hat niemand etwas geschrieben.</p>';
           if (liveOffen) zeilen.scrollTop = zeilen.scrollHeight;
         } catch (fehler) {
-          console.error('Live-Kommentare laden fehlgeschlagen:', fehler);
+          // Erst drei Aussetzer hintereinander melden, wie in der App.
+          fehlschlaege += 1;
+          if (fehlschlaege === 3) console.warn('Live-Kommentare laden fehlgeschlagen:', fehler);
         }
       };
       clearInterval(liveUhr);
@@ -10797,7 +10847,7 @@ function openClip(clipId) {
         const was = b.dataset.clipact;
 
         if (was === 'mehr') {
-          return openBeitragOptionen({ id: clip.id, userId: clip.userId, mediaUrl: clip.mediaUrl, video: true });
+          return openBeitragOptionen({ id: clip.id, userId: clip.userId, mediaUrl: clip.mediaUrl, video: true, live: istLive() });
         }
 
         // Bei Live fuehrt der Knopf in die Live-Kommentare.
@@ -10853,6 +10903,7 @@ function openClip(clipId) {
         // Die Live-Kante gehoert zum alten Video; mitgenommen liesse sie beim
         // naechsten Stream ein Stueck nach vorn springen.
         liveKante = 0;
+        liveEinstieg = null;
         liveOffen = false;
         clip = state.clips.find((c) => c.id === b.dataset.anderesclip);
         gesamt = sekunden(clip.duration);
@@ -11086,7 +11137,7 @@ async function openExplorer(art, wert, nur = null) {
               <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
               <div>
                 <div class="clip__title">${esc(c.title)}</div>
-                <div class="clip__sub">${esc(u.name)} · ${compactNumber(c.views)} Aufrufe</div>
+                <div class="clip__sub">${esc(u.name)} · ${c.art === 'live' ? `${compactNumber(c.zuschauer || 0)} sehen zu` : `${compactNumber(c.views)} Aufrufe`}</div>
               </div>
             </div>
           </article>`;
@@ -11351,6 +11402,9 @@ function openTeilen(art, id) {
   // Kennungen, anderer Weg. Gleiche Aufteilung in app/components/TeilenSheet.tsx.
   const gewaehltC = new Set();
   const gesendetC = new Set();
+  // Gewähltes Unterthema je Community; ohne Eintrag gilt das erste (29.09.2026).
+  const kanalWahl = {};
+  const kanalVon = (c) => c.kanaele.find((k) => k.id === kanalWahl[c.id]) || c.kanal;
   // Fremde, die über den genauen Nutzernamen gefunden wurden.
   const fremde = {};
   let suche = '';
@@ -11403,11 +11457,32 @@ function openTeilen(art, id) {
           <span class="avatar avatar--52" style="background:linear-gradient(135deg,#7E93C4,#4A6699)">${ICONS.people}</span>
         </span>
         <span class="teilen__name">${esc(c.name)}</span>
-        <span class="teilen__sperre">in #${esc(c.kanal.name)}</span>
+        <span class="teilen__sperre">in #${esc(kanalVon(c).name)}</span>
         <span class="teilen__haken">${ICONS.check}</span>
       </button>
     </li>`;
   };
+  /*
+   * Das Unterthema wählt die sendende Person selbst (29.09.2026) - aber erst,
+   * wenn sie die Community gewählt hat und es mehr als eines gibt. Gleiche
+   * Regel in app/components/TeilenSheet.tsx.
+   */
+  const kanalReihen = (ganze) =>
+    ganze
+      .filter((c) => gewaehltC.has(c.id) && c.kanaele.length > 1)
+      .map(
+        (c) => `<div class="teilen__kanaele">
+          <div class="teilen__kanalTitel">Unterthema in ${esc(c.name)}</div>
+          <div class="teilen__kanalChips">${c.kanaele
+            .map((k) => {
+              const an = kanalVon(c).id === k.id;
+              return `<button class="teilen__kanal ${an ? 'is-an' : ''}" data-teilen-kanal="${esc(k.id)}"
+                        data-community="${esc(c.id)}" aria-pressed="${an}">#${esc(k.name)}</button>`;
+            })
+            .join('')}</div>
+        </div>`
+      )
+      .join('');
   const communityName = (cid) => (state.communities || []).find((c) => c.id === cid)?.name || '?';
 
   openSheet(
@@ -11453,7 +11528,7 @@ function openTeilen(art, id) {
                 (g) =>
                   `<div class="teilen__kopf" data-gruppe="${g.art}">${g.titel}</div><ul class="teilen">${
                     g.art === 'communitys' ? ganze.map(communityKachel).join('') : g.ids.map(kachel).join('')
-                  }</ul>`
+                  }</ul>${g.art === 'communitys' ? kanalReihen(ganze) : ''}`
               )
               .join('')
           : `<div class="sheet__hint teilen__leer">${
@@ -11465,6 +11540,11 @@ function openTeilen(art, id) {
       };
 
       liste.addEventListener('click', (e) => {
+        const k = e.target.closest('[data-teilen-kanal]');
+        if (k) {
+          kanalWahl[k.dataset.community] = k.dataset.teilenKanal;
+          return zeichnen();
+        }
         const c = e.target.closest('[data-teilen-community]');
         if (c && !c.disabled) {
           const cid = c.dataset.teilenCommunity;
@@ -11527,7 +11607,7 @@ function openTeilen(art, id) {
         const res = await fetch('/api/teilen', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ art, id, empfaenger, bereiche, communitys }),
+          body: JSON.stringify({ art, id, empfaenger, bereiche, communitys, kanaele: kanalWahl }),
         }).catch(() => null);
         const daten = res ? await res.json().catch(() => null) : null;
 
@@ -12025,14 +12105,26 @@ function openLivestream() {
       <div class="live__leiste">
         <div class="live__zuschauer" id="liveZuschauer">0 Zuschauer</div>
         <div class="live__spenden" id="liveSpenden" hidden></div>
-        <button class="prof__btn is-primary" id="liveStop">Livestream beenden</button>
         ${/*
-            Punkt 46: "Keine Lösch-Option. Löschen möglich (neben Beenden)."
-            "Beenden" behaelt die Aufzeichnung und legt sie ins Querformat -
-            "Verwerfen" laesst gar nichts zurueck. Beides muss zur Wahl
-            stehen, sonst bleibt jeder Versuchsstream fuer immer im Profil.
+            Henrik am 28.09.2026: erst nach dem Ende entscheidet der Host,
+            ob die Aufzeichnung als normales Querformat-Video erscheint -
+            oder er stellt hier ein, dass das ohne Rueckfrage geschieht.
+            Loeschen (Punkt 46) ist die andere Wahl nach dem Ende; das
+            fruehere "Verwerfen" daneben waere dieselbe Wahl ein zweites Mal.
           */ ''}
-        <button class="prof__btn" id="liveWeg">Verwerfen</button>
+        <label class="live__auto">
+          <span>Aufzeichnung automatisch veröffentlichen</span>
+          <span class="schalter">
+            <input type="checkbox" id="liveAuto" ${schalterAn('liveAutoVeroeffentlichen') ? 'checked' : ''} />
+            <span></span>
+          </span>
+        </label>
+        <button class="prof__btn is-primary" id="liveStop">Livestream beenden</button>
+        <div class="live__ende" id="liveEnde" hidden>
+          <p class="live__endeText" id="liveEndeText"></p>
+          <button class="prof__btn is-primary" id="liveVeroeffentlichen">Als Video veröffentlichen</button>
+          <button class="prof__btn" id="liveLoeschen">Aufzeichnung löschen</button>
+        </div>
       </div>
     </div>`;
 
@@ -12073,12 +12165,14 @@ function openLivestream() {
        * aber eine eigene Verbindung, die beim Verlassen sauber zugehen muss
        * — bei einer Kommentarspalte fällt der Unterschied nicht auf.
        */
+      let fehlschlaege = 0;
       const holen = async () => {
         const spalte = overlay.querySelector('#liveSpalte');
         if (!spalte) return clearInterval(spaltenUhr);
         try {
           const res = await fetch(`/api/stream/${streamId}/kommentare`);
           if (!res.ok) return;
+          fehlschlaege = 0;
           const daten = await res.json();
           const zeilen = daten.kommentare || [];
           spalte.innerHTML = zeilen.length
@@ -12091,7 +12185,11 @@ function openLivestream() {
             : '<p class="live__leer">Noch keine Kommentare.</p>';
           spalte.scrollTop = spalte.scrollHeight;
         } catch (fehler) {
-          console.error('Streamkommentare laden fehlgeschlagen:', fehler);
+          /* Ein Aussetzer im Vier-Sekunden-Takt holt die naechste Runde nach;
+             erst drei hintereinander sind eine Stoerung. Gleiche Regel in der
+             App (LivestreamScreen, ClipPlayerScreen). */
+          fehlschlaege += 1;
+          if (fehlschlaege === 3) console.warn('Streamkommentare laden fehlgeschlagen:', fehler);
         }
       };
 
@@ -12126,52 +12224,56 @@ function openLivestream() {
     }
   }, 1000);
 
-  overlay.querySelector('#liveStop').addEventListener('click', async () => {
-    clearInterval(uhr);
+  overlay.querySelector('#liveAuto').addEventListener('change', (e) =>
+    einstellungSetzen({ wahlKey: 'liveAutoVeroeffentlichen' }, e.target.checked ? 'an' : 'aus')
+  );
+
+  let endeSekunden = 0;
+
+  const abschliessen = async (veroeffentlichen) => {
     if (spaltenUhr) clearInterval(spaltenUhr);
-    await fetch('/api/eigene/livestream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ aktion: 'stop' }),
-    });
+    if (streamId) {
+      const daten = await api(`/api/stream/${streamId}/ende`, {
+        veroeffentlichen,
+        sekunden: endeSekunden,
+        zuschauer,
+      });
+      if (!daten?.ok) {
+        toast(daten?.error || 'Das ging nicht durch');
+        return;
+      }
+    } else {
+      // Ohne Beitrag gibt es nichts zu entscheiden, nur das Profil zu leeren.
+      await api('/api/eigene/livestream', { aktion: 'stop' });
+    }
     overlay.hidden = true;
     overlay.innerHTML = '';
     state.area = 'videos';
     state.sub.videos = 'landscape';
     await bootstrap();
-    toast('Livestream beendet, die Aufzeichnung steht im Querformat');
-  });
-
-  overlay.querySelector('#liveWeg').addEventListener('click', async () => {
-    if (spaltenUhr) clearInterval(spaltenUhr);
-    const sicher = await bestaetigen(
-      'Livestream verwerfen',
-      'Der Stream endet und es bleibt keine Aufzeichnung zurück.',
-      'Verwerfen'
+    toast(
+      veroeffentlichen && streamId
+        ? 'Livestream beendet, die Aufzeichnung steht im Querformat'
+        : 'Livestream beendet, die Aufzeichnung ist gelöscht'
     );
-    if (!sicher) return;
+  };
 
+  overlay.querySelector('#liveStop').addEventListener('click', () => {
     clearInterval(uhr);
-    /*
-     * Erst beenden, dann die entstandene Aufzeichnung wieder loeschen. Der
-     * Server legt sie beim Beenden an - ein eigener "abbrechen"-Weg waere
-     * eine zweite Stelle, an der dieselbe Logik steht.
-     */
-    const daten = await fetch('/api/eigene/livestream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ aktion: 'stop' }),
-    }).then((r) => r.json());
+    endeSekunden = Math.max(1, Math.round((Date.now() - begonnen) / 1000));
+    if (overlay.querySelector('#liveAuto').checked) return abschliessen(true);
 
-    if (daten.clip?.id) {
-      await fetch(`/api/eigene/${daten.clip.id}/loeschen`, { method: 'POST' });
-    }
-
-    overlay.hidden = true;
-    overlay.innerHTML = '';
-    await bootstrap();
-    toast('Livestream verworfen');
+    // Die Sendung steht, jetzt die Wahl - an derselben Stelle wie der Knopf.
+    overlay.querySelector('#liveStop').hidden = true;
+    overlay.querySelector('.live__auto').hidden = true;
+    overlay.querySelector('.live__eingabe').hidden = true;
+    overlay.querySelector('#liveEndeText').textContent = `Livestream beendet · ${
+      overlay.querySelector('#liveZeit').textContent
+    } · ${zuschauer} Zuschauer`;
+    overlay.querySelector('#liveEnde').hidden = false;
   });
+  overlay.querySelector('#liveVeroeffentlichen').addEventListener('click', () => abschliessen(true));
+  overlay.querySelector('#liveLoeschen').addEventListener('click', () => abschliessen(false));
 }
 
 /* ------------------------------------------------------- Videos: Profil */

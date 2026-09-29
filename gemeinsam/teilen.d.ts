@@ -12,11 +12,11 @@ export function gruppen(e: {
   person: (id: string) => { name?: string; handle?: string } | null | undefined;
   suche: string;
 }): { art: TeilenGruppe; titel: string; ids: string[] }[];
-/** Ganze Communitys: beigetreten, mit Unterthema; der Beitrag geht ins erste. */
+/** Ganze Communitys: beigetreten, mit Unterthema; voreingestellt ist das erste, `kanaele` sind alle zur Wahl. */
 export function communitys(
   liste: { id: string; name: string; joined?: boolean; unterthemen?: { id: string; name: string }[]; channels?: { id: string; name: string }[] }[] | null | undefined,
   suche: string
-): { id: string; name: string; kanal: { id: string; name: string } }[];
+): { id: string; name: string; kanal: { id: string; name: string }; kanaele: { id: string; name: string }[] }[];
 /** '@name', so wie in profiles.handle — oder null, wenn es keiner sein kann. */
 export function nutzername(suche: string): string | null;
 export function sperre(anfrage?: string): string | null;

@@ -108,9 +108,10 @@
    * mindestens einem Unterthema, gefiltert nach der Suche.
    *
    * Die App nennt die Unterthemen `unterthemen`, die Website `channels`;
-   * beide sind schon nach `position` sortiert. Der Beitrag geht ins erste.
+   * beide sind schon nach `position` sortiert. Voreingestellt ist das
+   * erste; wählen kann die sendende Person jedes (29.09.2026).
    *
-   * Rückgabe: [{ id, name, kanal: { id, name } }].
+   * Rückgabe: [{ id, name, kanal: { id, name }, kanaele: [{ id, name }] }].
    */
   function communitys(liste, suche) {
     var s = normal(suche);
@@ -119,8 +120,10 @@
         return c && c.joined;
       })
       .map(function (c) {
-        var kanaele = c.unterthemen || c.channels || [];
-        return { id: c.id, name: c.name, kanal: kanaele[0] ? { id: kanaele[0].id, name: kanaele[0].name } : null };
+        var kanaele = (c.unterthemen || c.channels || []).map(function (k) {
+          return { id: k.id, name: k.name };
+        });
+        return { id: c.id, name: c.name, kanal: kanaele[0] || null, kanaele: kanaele };
       })
       .filter(function (c) {
         return c.kanal && (!s || String(c.name || '').toLowerCase().indexOf(s) !== -1);

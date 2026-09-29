@@ -883,6 +883,8 @@ interface RohBeitrag {
   untertitel: boolean;
   kapitel: { bei: number; titel: string }[];
   age: string;
+  /** Wann der Beitrag entstand — bei Live der Sendebeginn. */
+  zeitpunkt?: string;
   likes: number;
   comments: number;
   shares: number;
@@ -972,6 +974,7 @@ export async function ladeBeitraege(
     untertitel: Boolean(b.untertitel),
     kapitel: b.kapitel ?? [],
     age: zeitText(b.created_at),
+    zeitpunkt: b.created_at ?? undefined,
     likes: Number(b.likes_basis ?? 0) + (b.post_likes?.[0]?.count ?? 0),
     comments: Number(b.comments_basis ?? 0) + (b.comments?.[0]?.count ?? 0),
     // Gezaehlt wie Likes und Kommentare: Sockel plus die wirklich
@@ -1078,6 +1081,7 @@ export async function ladeBeitraege(
         age: b.age,
         art: b.format,
         zuschauer: b.zuschauer,
+        seit: b.zeitpunkt,
         kapitel: b.kapitel.length > 0 ? b.kapitel : undefined,
         untertitel: b.untertitel,
         location: b.location,
@@ -1134,7 +1138,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     .from('communities')
     .select(
       'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
-        ' community_members(count), community_channels(id, slug, name, topics, position)'
+        ' community_members(count), community_channels(id, slug, name, topics, position, created_at)'
     )
     .order('created_at', { ascending: true })
     .limit(100);
@@ -1163,8 +1167,10 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     // Eine selbst angelegte Community lässt sich nicht verlassen — sie stünde
     // sonst ohne Besitzer da.
     eigen: c.created_by === ichId,
+    // Bei gleicher Position das ältere zuerst — dieselbe Reihenfolge, nach
+    // der teilenInCommunitys „das erste“ Unterthema sucht (29.09.2026).
     unterthemen: (c.community_channels ?? [])
-      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0) || String(a.created_at).localeCompare(String(b.created_at)))
       .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [] })),
   })));
 }

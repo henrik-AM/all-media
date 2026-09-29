@@ -125,17 +125,19 @@ if (!fs.existsSync(BILD)) {
    * nachsieht, findet ein leeres Feld und meldet einen Fehler, den es nicht
    * gab. Deshalb: vorher leeren, dann warten, bis etwas dasteht.
    */
+  /*
+   * Fehler aus einem Formular stehen seit dem 28.09.2026 im Blatt
+   * (#formFehler), nicht mehr im Toast dahinter. Gelesen wird beides.
+   */
+  const meldung = () => page.evaluate(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })());
   const hinweisNach = async (tue) => {
     await page.evaluate(() => {
       const t = document.querySelector('#toast');
       if (t) { t.textContent = ''; t.hidden = true; }
     });
     await tue();
-    await page.waitForFunction(
-      () => { const t = document.querySelector('#toast'); return t && !t.hidden && t.textContent.trim().length > 0; },
-      null, { timeout: 10000 }
-    ).catch(() => {});
-    return page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent)).catch(() => '');
+    await page.waitForFunction(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })().trim().length > 0, null, { timeout: 10000 }).catch(() => {});
+    return meldung().catch(() => '');
   };
 
   /* ------------------------------------------------------------ Glocke */
@@ -344,18 +346,8 @@ if (!fs.existsSync(BILD)) {
     await page.waitForSelector('#f_titel');
     await page.fill('#f_titel', 'Mit Unsinn');
     await page.fill('#f_ziel', '-5');
-    await page.click('#formOk');
-    await page
-      .waitForFunction(
-        () => {
-          const t = document.querySelector('#toast');
-          return t && !t.hidden && t.textContent.trim();
-        },
-        null, { timeout: 10000 }
-      )
-      .catch(() => {});
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
-    if (!hinweis) throw new Error('kein Hinweis');
+    const hinweis = await hinweisNach(() => page.click('#formOk'));
+    if (!hinweis || /läuft/.test(hinweis)) throw new Error('Hinweis war: ' + hinweis);
     await page.click('[data-sheet-close]');
   });
 
@@ -384,6 +376,8 @@ if (!fs.existsSync(BILD)) {
     if (zeit === '00:00') throw new Error('die Zeit laeuft nicht');
     await hinweisAbwarten();
     await page.click('#liveStop');
+    // Seit dem 28.09.2026 fragt das Ende, ob die Aufzeichnung erscheint.
+    await page.click('#liveVeroeffentlichen');
     // Die Aufzeichnung wird als Beitrag in der Datenbank angelegt und danach
     // frisch geladen — das dauert laenger als der fruehere Eintrag im
     // Arbeitsspeicher des Servers.

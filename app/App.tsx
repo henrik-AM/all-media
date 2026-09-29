@@ -693,13 +693,13 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   /**
    * Beitrag oder Video in ganze Communitys — Henrik am 26.09.2026: „einzelnen
    * Personen unter Community … aber auch in eine Community mit mehreren
-   * Personen". Die Karte landet im ersten Unterthema, dort sehen sie alle
-   * Mitglieder. Gleicher Weg in web/server/sync-handlers.js
-   * (handleShareToCommunities).
+   * Personen". Die Karte landet im gewählten Unterthema, ohne Wahl im ersten;
+   * dort sehen sie alle Mitglieder. Gleicher Weg in
+   * web/server/sync-handlers.js (handleShareToCommunities).
    */
-  const teileInCommunitys = async (communityIds: string[], ziel: TeilenZiel) => {
+  const teileInCommunitys = async (communityIds: string[], ziel: TeilenZiel, kanaele?: Record<string, string>) => {
     const vorschau = ziel.art === 'video' ? 'Video geteilt' : 'Beitrag geteilt';
-    const ergebnis = await aktion.teilenInCommunitys(ziel.id, communityIds, vorschau);
+    const ergebnis = await aktion.teilenInCommunitys(ziel.id, communityIds, vorschau, kanaele);
     if (ergebnis.gesendet.length) {
       void daten.neuLaden();
       if (!ergebnis.fehlgeschlagen.length) {
@@ -1852,15 +1852,19 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <LivestreamScreen
         onNotice={setNotice}
         onStart={() => aktion.livestream('Livestream')}
-        onEnd={(sekunden, zuschauer) => {
-          // Der Stream ist vorbei — das gehoert auch ins eigene Profil,
-          // sonst steht man auf der Website ewig als "live".
-          aktion.livestream(null);
-          profil.aufzeichnungAnlegen(sekunden, zuschauer);
+        onEnd={(veroeffentlicht) => {
+          // Profil und Beitrag hat der Bildschirm schon erledigt (liveBeenden).
+          // Bis zum 28.09.2026 stand hier ein Clip nur im Arbeitsspeicher —
+          // die Aufzeichnung sah niemand sonst.
           setOverlay(null);
           setArea('videos');
           setSubs((prev) => ({ ...prev, videos: 'landscape' }));
-          setNotice('Livestream beendet, die Aufzeichnung steht im Querformat');
+          void daten.neuLaden();
+          setNotice(
+            veroeffentlicht
+              ? 'Livestream beendet, die Aufzeichnung steht im Querformat'
+              : 'Livestream beendet, die Aufzeichnung ist gelöscht'
+          );
         }}
       />
     );

@@ -1060,7 +1060,7 @@ async function ladeCommunities(client, nutzerId) {
     .from('communities')
     .select(
       'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
-        ' community_members(count), community_channels(id, slug, name, topics, position)'
+        ' community_members(count), community_channels(id, slug, name, topics, position, created_at)'
     )
     .order('created_at', { ascending: true })
     .limit(100);
@@ -1088,8 +1088,10 @@ async function ladeCommunities(client, nutzerId) {
     joined: beigetreten.has(c.id),
     stumm: stumme.has(c.id),
     unread: 0,
+    // Bei gleicher Position das ältere zuerst — dieselbe Reihenfolge, nach
+    // der handleShareToCommunities „das erste“ Unterthema sucht (29.09.2026).
     channels: (c.community_channels || [])
-      .sort((a, b) => (a.position || 0) - (b.position || 0))
+      .sort((a, b) => (a.position || 0) - (b.position || 0) || String(a.created_at).localeCompare(String(b.created_at)))
       .map((k) => ({ id: k.id, slug: k.slug, name: k.name, topics: k.topics || [] })),
   }));
 }

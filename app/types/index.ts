@@ -348,6 +348,8 @@ export interface Clip {
   art?: ClipArt;
   /** Nur bei art === 'live': wie viele gerade zusehen. */
   zuschauer?: number;
+  /** Sendebeginn bzw. Veroeffentlichung (ISO). Bei Live zaehlt die Kante daraus. */
+  seit?: string;
   /*
    * Kapitel eines langen Videos (Prototyp: "Wenn Video in Kapitel aufgeteilt,
    * anzeigen und direkt dort springen"). `bei` ist die Sekunde, an der das
