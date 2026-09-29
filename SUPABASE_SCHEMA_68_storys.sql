@@ -243,14 +243,16 @@ security definer set search_path = public
 as $$
 declare
   v_verfasser uuid;
-  v_videos boolean;
 begin
-  select user_id, in_videos into v_verfasser, v_videos
+  select user_id into v_verfasser
     from public.stories where id = new.story_id;
 
   perform public.mitteilung_anlegen(
     new.user_id, coalesce(auth.uid(), v_verfasser), 'mention',
-    case when v_videos then 'videos' else 'messenger' end,
+    -- Immer 'videos': Glocken gibt es nur in Videos und Communitys
+    -- (notifications_bereich_check kennt kein 'messenger'). Auch eine reine
+    -- Messenger-Story ist fuer die Markierte lesbar (ist_story_markiert).
+    'videos',
     'story', new.story_id
   );
   return new;
