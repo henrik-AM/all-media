@@ -4334,7 +4334,8 @@ function gefaelltZeile(anzahl, name) {
   const fett = `<strong>${esc(name)}</strong>`;
   if (anzahl <= 1) return `Gefällt ${fett}`;
   if (anzahl === 2) return `Gefällt ${fett} und einer weiteren Person`;
-  return `Gefällt ${fett} und ${compactNumber(anzahl - 1)} weiteren Personen`;
+  // Ohne Zahl wie bei Instagram — siehe gefaelltRest in app/lib/kommentare.ts.
+  return `Gefällt ${fett} und weiteren Personen`;
 }
 
 /* ---------------------------------------------------------- video feed */
@@ -6560,7 +6561,7 @@ function openEinstellung(punkt, nachher) {
                      ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
                        `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
                      <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value">${esc(z.neben || '')}</span>
+                     <span class="item__value item__value--zeit">${esc(z.neben || '')}</span>
                      <span class="item__chevron">${ICONS.chevron}</span>
                    </button>`
                      : `<div class="item">

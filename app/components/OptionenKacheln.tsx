@@ -85,7 +85,14 @@ export const OptionenKacheln = ({ visible, items, liste, onSelect, onClose }: Pr
             <View style={[styles.kreis, item.gefahr && styles.kreisGefahr]}>
               <Ionicons name={item.icon} size={24} color={item.gefahr ? colors.danger : colors.text} />
             </View>
-            <Text style={styles.text} numberOfLines={2}>
+            {/* Ein einzelnes Wort („Herunterladen") bleibt auf einer Zeile und
+                schrumpft notfalls ein wenig — sonst trennt iOS es mitten im Wort. */}
+            <Text
+              style={styles.text}
+              numberOfLines={item.label.includes(' ') ? 2 : 1}
+              adjustsFontSizeToFit={!item.label.includes(' ')}
+              minimumFontScale={0.8}
+            >
               {item.label}
             </Text>
           </Druck>
@@ -116,8 +123,9 @@ const styles = themenStyles((colors) => ({
     marginTop: 10,
     marginBottom: 14,
   },
-  reihe: { paddingHorizontal: spacing.md, gap: 4 },
-  kachel: { width: 72, alignItems: 'center', paddingVertical: 4 },
+  // Fünf Kacheln à 76 plus 2×8 Rand = 396: alle passen auf ein 402er-iPhone.
+  reihe: { paddingHorizontal: spacing.sm },
+  kachel: { width: 76, alignItems: 'center', paddingVertical: 4 },
   gedrueckt: { opacity: 0.6 },
   kreis: {
     width: 52,
@@ -129,7 +137,7 @@ const styles = themenStyles((colors) => ({
     marginBottom: 6,
   },
   kreisGefahr: { backgroundColor: colors.surface2 },
-  text: { ...typography.small, color: colors.text2, textAlign: 'center' },
+  text: { ...typography.small, fontSize: 12, color: colors.text2, textAlign: 'center' },
   abbrechen: {
     marginTop: spacing.md,
     marginHorizontal: spacing.lg,

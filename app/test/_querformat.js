@@ -99,6 +99,9 @@ const LANG = 'Design Tokens sauber aufsetzen';
 
   /** Auf die Leiste tippen, `anteil` von ihrem Anfang aus gezaehlt. */
   const leisteAntippen = async (anteil, senkrecht = false) => {
+    // Seit der Ort/Sound-Zeile (Kasten 8) liegt „Mehr" tiefer; Playwright
+    // scrollt zum Klicken hin und die Leiste stand danach oberhalb des Fensters.
+    await page.$eval('#clipBalken', (n) => n.scrollIntoView({ block: 'nearest' }));
     const k = await page.$eval('#clipBalken', (n) => {
       const r = n.getBoundingClientRect();
       return { x: r.left, y: r.top, b: r.width, h: r.height };
@@ -125,7 +128,7 @@ const LANG = 'Design Tokens sauber aufsetzen';
     await page.click('[data-clipact="mehr"]');
     await page.waitForSelector('.sheet');
     await page.waitForTimeout(400);
-    const punkte = await page.$$eval('.sheet .item__label', (n) => n.map((x) => x.textContent.trim()));
+    const punkte = await page.$$eval('.sheet .item__label, .sheet .optkachel__text', (n) => n.map((x) => x.textContent.trim()));
     if (!punkte.includes('Zu Story hinzufügen')) throw new Error('Punkte: ' + punkte.join(', '));
     await blattZu();
   });
@@ -147,6 +150,7 @@ const LANG = 'Design Tokens sauber aufsetzen';
 
   await pruefe('Ziehen über die Leiste spult mit', async () => {
     const { laenge } = await video();
+    await page.$eval('#clipBalken', (n) => n.scrollIntoView({ block: 'nearest' }));
     const k = await page.$eval('#clipBalken', (n) => n.getBoundingClientRect().toJSON());
     await page.mouse.move(k.left + k.width * 0.1, k.top + k.height / 2);
     await page.mouse.down();
@@ -321,7 +325,7 @@ const LANG = 'Design Tokens sauber aufsetzen';
   await pruefe('Die Video-Einstellungen bieten bei Live keine Geschwindigkeit an', async () => {
     await page.click('#clipOptionen');
     await page.waitForSelector('.sheet');
-    const punkte = await page.$$eval('.sheet .item__label', (n) => n.map((x) => x.textContent.trim()));
+    const punkte = await page.$$eval('.sheet .item__label, .sheet .optkachel__text', (n) => n.map((x) => x.textContent.trim()));
     if (punkte.some((p) => /geschwindigkeit/i.test(p))) throw new Error('Punkte: ' + punkte.join(', '));
     if (!punkte.length) throw new Error('das Blatt ist leer');
     await page.waitForTimeout(500); // das Blatt faehrt herein
@@ -383,7 +387,7 @@ const LANG = 'Design Tokens sauber aufsetzen';
     await page.click('[data-clipact="mehr"]');
     await page.waitForSelector('.sheet');
     await page.waitForTimeout(400);
-    const punkte = await page.$$eval('.sheet .item__label', (n) => n.map((x) => x.textContent.trim()));
+    const punkte = await page.$$eval('.sheet .item__label, .sheet .optkachel__text', (n) => n.map((x) => x.textContent.trim()));
     if (!punkte.includes('Link kopieren')) throw new Error('Punkte: ' + punkte.join(', '));
     if (punkte.some((p) => /Herunterladen|Story/.test(p))) throw new Error('Punkte: ' + punkte.join(', '));
     await page.screenshot({ path: bild('live-menue') });

@@ -52,11 +52,13 @@ export function likeZeile(anzahl: number, ersterName?: string): string {
  * Likes-Sichtbarkeit mich zulässt. Hier wird nichts erfunden.
  *
  * Zurückgegeben wird der Teil NACH dem Namen, damit der Name fett gesetzt
- * werden kann: „Gefällt <b>Anna</b>“ + „ und 14 weiteren Personen“.
+ * werden kann: „Gefällt <b>Anna</b>“ + „ und weiteren Personen“.
  * Dieselbe Regel in der Website (gefaelltZeile in web/public/app.js).
  */
 export function gefaelltRest(anzahl: number): string {
   if (anzahl <= 1) return '';
   if (anzahl === 2) return ' und einer weiteren Person';
-  return ` und ${compactNumber(anzahl - 1)} weiteren Personen`;
+  // Ohne Zahl wie bei Instagram: die steht rechts am Herz, und mit ihr lief
+  // die Zeile im Reel über den Rand („… 24,8k weiteren Pers…", 29.09.).
+  return ' und weiteren Personen';
 }
