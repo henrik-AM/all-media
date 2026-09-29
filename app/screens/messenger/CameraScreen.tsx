@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -15,8 +15,7 @@ import { FilterBild } from '../../components/FilterBild';
 import { InsightSheet, InsightWahl } from '../../components/InsightSheet';
 import { FILTER, filterZu } from '../../constants/filter';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
-import { ladeHoch } from '../../lib/supabaseStorage';
-import { useSupabase } from '../../contexts/SupabaseContext';
+import { erlaubnisSichern } from '../../lib/kameraErlaubnis';
 import { useAktionen } from '../../lib/useAktionen';
 import { useDaten } from '../../contexts/DatenContext';
 
@@ -26,7 +25,8 @@ interface Props {
   /** Als Unterpunkt der oberen Leiste, also ohne Schliessen-Schaltflaeche. */
   embedded?: boolean;
   onClose: () => void;
-  onCaptured?: (uri: string) => void;
+  /** Kasten 11.4: mit Art, damit ein Video als Video in die Story geht. */
+  onCaptured?: (uri: string, mediaTyp: 'image' | 'video') => void;
   /** Aufnahme in einen Chat schicken. */
   onAnChat?: (uri: string) => void;
   /**
@@ -100,9 +100,6 @@ export const CameraScreen = ({
   onNotice,
 }: Props) => {
   const insets = useSafeAreaInsets();
-  // Der angemeldete Zugang. Ohne ihn laeuft ein Upload als anonymer Zugriff,
-  // und den lassen die Regeln des Speichers nicht zu.
-  const { supabase } = useSupabase();
   const aktionen = useAktionen(onNotice);
   const { neuLaden, users } = useDaten();
   const [mode, setMode] = useState<Mode>(startModus ?? 'photo');
@@ -149,6 +146,27 @@ export const CameraScreen = ({
   const [erlaubnis, erlaubnisFragen] = useCameraPermissions();
   const [mikro, mikroFragen] = useMicrophonePermissions();
   const [kameraBereit, setKameraBereit] = useState(false);
+  const bereitRef = useRef(false);
+  bereitRef.current = kameraBereit;
+
+  /*
+   * Kasten 11.7: beim Öffnen gleich fragen. Vorher kam die Frage erst mit dem
+   * Auslöser — und der meldete direkt danach „Die Kamera ist noch nicht
+   * bereit", weil die Vorschau in diesem Moment erst entstand. Die Story-
+   * Aufnahme schlug so beim ersten Versuch immer fehl.
+   */
+  useEffect(() => {
+    if (erlaubnis && !erlaubnis.granted && erlaubnis.canAskAgain) void erlaubnisFragen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [erlaubnis?.status]);
+
+  /** Bis zu 3 s auf die Vorschau warten, statt sofort aufzugeben. */
+  const aufBereitWarten = async () => {
+    for (let i = 0; i < 30 && !bereitRef.current; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return bereitRef.current;
+  };
   const [richtung, setRichtung] = useState<'back' | 'front'>('back');
   const [blitz, setBlitz] = useState<'off' | 'on' | 'auto'>('off');
   const [laeuft, setLaeuft] = useState(false);
@@ -194,17 +212,17 @@ export const CameraScreen = ({
    * `stopRecording` gerufen wurde.
    */
   const ausloesen = async () => {
-    if (!erlaubnis?.granted) {
-      const neu = await erlaubnisFragen();
-      if (!neu.granted) return onNotice('Ohne Kamerazugriff geht die Aufnahme nicht');
+    // Kasten 11.7: abgelehnt heißt Hinweis mit Knopf in die Einstellungen.
+    if (!(await erlaubnisSichern('kamera', erlaubnis, erlaubnisFragen, 'für die Aufnahme'))) {
+      return onNotice('Ohne Kamerazugriff geht die Aufnahme nicht');
     }
-    if (mode === 'video' && !mikro?.granted) {
+    if (mode === 'video' && !mikro?.granted && mikro?.canAskAgain !== false) {
       // Ohne Mikrofon nimmt das Video stumm auf — gefragt wird trotzdem
       // einmal, danach nicht wieder.
       await mikroFragen();
     }
-    if (!kamera.current || !kameraBereit) {
-      return onNotice('Die Kamera ist noch nicht bereit');
+    if (!kamera.current || !(await aufBereitWarten()) || !kamera.current) {
+      return onNotice('Die Kamera startet nicht. Schließe andere Apps, die sie nutzen, und versuche es noch einmal.');
     }
 
     if (mode === 'video') {
@@ -253,21 +271,14 @@ export const CameraScreen = ({
     onNotice(neu === 'front' ? 'Frontkamera' : 'Rückkamera');
   };
 
-  /** Story ist das einzige Ziel, das die Aufnahme auch hochlädt. */
-  const alsStory = async (uri: string) => {
-    onCaptured?.(uri);
-
-    const was = mode === 'photo' ? 'Foto' : 'Video';
-    const fileName = `${Date.now()}.${mode === 'photo' ? 'jpg' : 'mp4'}`;
-    const upload = await ladeHoch(supabase, uri, 'stories', fileName);
-
-    /*
-     * Beim Misserfolg den Grund nennen. Vorher stand hier „gespeichert (kein
-     * Backend verbunden)" — ein Satz, der nach Absicht klang, obwohl der
-     * Upload schlicht fehlschlug. Er hat monatelang verdeckt, dass gar nichts
-     * hochgeladen wurde.
-     */
-    onNotice(upload.success ? `${was} hochgeladen` : `${was} konnte nicht hochgeladen werden`);
+  /*
+   * Die Aufnahme geht in die Story-Bearbeitung (Kasten 11.6); hochgeladen
+   * wird beim Posten (useAktionen.storyAnlegen). Bis zum 29.09.2026 lud die
+   * Kamera hier zusätzlich selbst hoch — jede Story lag doppelt im Speicher,
+   * und die zweite Datei gehörte zu keiner Zeile.
+   */
+  const alsStory = (uri: string) => {
+    onCaptured?.(uri, mode === 'video' ? 'video' : 'image');
   };
 
   const zielGewaehlt = (key: string) => {
@@ -391,10 +402,20 @@ export const CameraScreen = ({
                  graues Kamerasymbol, das nichts erklaerte. */
               <>
                 <Ionicons name="camera-outline" size={34} color="rgba(255,255,255,0.22)" />
-                <Text style={styles.stageText}>All Media darf noch nicht auf die Kamera</Text>
-                <Druck style={styles.erlaubnisKnopf} onPress={() => void erlaubnisFragen()}>
-                  <Text style={styles.erlaubnisText}>Kamera erlauben</Text>
-                </Druck>
+                <Text style={styles.stageText}>
+                  {erlaubnis && !erlaubnis.canAskAgain
+                    ? 'Der Kamerazugriff ist abgelehnt. Einschalten lässt er sich in den Einstellungen des Geräts.'
+                    : 'All Media darf noch nicht auf die Kamera'}
+                </Text>
+                {erlaubnis && !erlaubnis.canAskAgain ? (
+                  <Druck style={styles.erlaubnisKnopf} onPress={() => void Linking.openSettings()}>
+                    <Text style={styles.erlaubnisText}>Einstellungen öffnen</Text>
+                  </Druck>
+                ) : (
+                  <Druck style={styles.erlaubnisKnopf} onPress={() => void erlaubnisFragen()}>
+                    <Text style={styles.erlaubnisText}>Kamera erlauben</Text>
+                  </Druck>
+                )}
               </>
             )}
           </>

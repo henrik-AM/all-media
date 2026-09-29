@@ -13,6 +13,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from './Avatar';
+import { StoryAvatar } from './StoryAvatar';
 import { EmptyState } from './EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
@@ -158,7 +159,8 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
     const author = alleNutzer[item.userId];
     return (
       <View style={styles.comment}>
-        <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
+        {/* Kasten 11.1: Ring an der Person, die kommentiert hat. */}
+        <StoryAvatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm + 4} bereich="videos" />
         <View style={styles.commentBody}>
           <Text style={styles.commentText}>
             <Text style={styles.bold}>{author?.name}</Text> {item.text}

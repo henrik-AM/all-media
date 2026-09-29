@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,6 +60,8 @@ export const QrScanner = ({ visible, onClose, onCode }: Props) => {
       onShow={() => {
         gelesen.current = false;
         setZeigeHinweis(false);
+        // Kasten 11.7: beim Öffnen gleich fragen, statt erst einen Knopf zu verlangen.
+        if (erlaubnis && !erlaubnis.granted && erlaubnis.canAskAgain) void erlaubnisFragen();
       }}
     >
       <View style={styles.fill}>
@@ -76,11 +78,18 @@ export const QrScanner = ({ visible, onClose, onCode }: Props) => {
                 ? 'Zum Scannen braucht All Media die Kamera.'
                 : 'Die Kamera ist für All Media gesperrt. Das lässt sich in den Einstellungen des Geräts ändern.'}
             </Text>
+            {/* Kasten 11.7: auch nach einer Ablehnung gibt es einen Weg —
+                direkt in die Einstellungen des Geräts. Vorher stand dann
+                nur der Satz da, ohne Knopf. */}
             {erlaubnis.canAskAgain ? (
               <Druck style={styles.knopf} onPress={erlaubnisFragen}>
                 <Text style={styles.knopfText}>Kamera erlauben</Text>
               </Druck>
-            ) : null}
+            ) : (
+              <Druck style={styles.knopf} onPress={() => void Linking.openSettings()}>
+                <Text style={styles.knopfText}>Einstellungen öffnen</Text>
+              </Druck>
+            )}
           </View>
         ) : (
           <CameraView

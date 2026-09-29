@@ -193,6 +193,7 @@ const LAEUFE = [
   // Braucht keinen Server — spricht direkt mit PostgREST, ohne /api/reset.
   ['verlauf', '_verlauf.js'],
   ['storyvideos', '_storyvideos.js'],
+  ['storys', '_storys.js'],
   ['krypto', '_krypto.js'],
   ['rechte', '_rechte.js'],
   // Geburtsdatum und Zustimmung der Eltern (Schema 52); braucht SUPABASE_TOKEN wie rechte.

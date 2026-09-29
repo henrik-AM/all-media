@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import { Glocke } from '../../components/Glocke';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { BeitragOptionenSheet, OptionenBeitrag } from '../../components/BeitragOptionenSheet';
 import { Motiv } from '../../components/Motiv';
@@ -251,9 +252,15 @@ export const HomeFeedScreen = ({
     return (
       <View style={styles.post}>
         <View style={styles.head}>
-          <Druck style={styles.ring} onPress={() => onOpenProfile(item.userId)}>
-            <Avatar id={item.userId} name={author?.name ?? ''} size={36} />
-          </Druck>
+          {/* Kasten 11.1: Story-Ring am Beitragskopf — auch am eigenen Beitrag.
+              Mit Story öffnet das Bild die Story, ohne das Profil. */}
+          <StoryAvatar
+            id={item.userId}
+            name={author?.name ?? ''}
+            size={40}
+            bereich="videos"
+            onPressOhneStory={() => onOpenProfile(item.userId)}
+          />
           <Druck style={styles.who} onPress={() => onOpenProfile(item.userId)}>
             <Text style={styles.name} numberOfLines={1}>
               {author?.name}
@@ -455,12 +462,10 @@ const styles = themenStyles((colors) => ({
 
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingVertical: 10 },
   /*
-   * Der Ring um den Avatar im Beitragskopf ist weg. Er trug die Markenfarbe
-   * und sah damit aus wie ein Story-Ring — stand aber für gar nichts, denn ob
-   * jemand eine Story hat, sagt die Leiste oben. Die Website hatte ihn nie;
-   * beide Seiten sind jetzt gleich.
+   * Der Markenring um den Avatar im Beitragskopf ist weg — er stand für
+   * nichts. Seit Kasten 11.1 (29.09.2026) steht dort der echte Story-Ring
+   * (StoryAvatar), auf der Website derselbe.
    */
-  ring: { padding: 2, borderRadius: 22 },
   who: { flex: 1, minWidth: 0 },
   name: { color: colors.text, fontSize: 14, fontWeight: '700' },
   subRow: { flexDirection: 'row', marginTop: 1 },

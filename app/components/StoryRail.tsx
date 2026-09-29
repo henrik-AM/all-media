@@ -72,6 +72,12 @@ export const StoryRail = ({ stories, onPress }: Props) => {
         // eigenen Kachel — fremde stehen ohne Story gar nicht in der Leiste.
         const ohneStory = Boolean(story.own) && !bild;
         /*
+         * Die eigene Kachel mit Story ist bunt (sie ist ja nie „ungesehen"
+         * für einen selbst, aber sie IST da) — dieselbe Regel wie
+         * StoryRegeln.ringFuer, damit Leiste und Profilring übereinstimmen.
+         */
+        const grau = !story.own && alleGesehen;
+        /*
          * story.name ist der kurze Name UNTER dem Ring ("Anna", "Deine
          * Story"). Die Initialen im Kreis gehören aber zur Person, sonst
          * stand dort "A" statt "AS" und bei der eigenen Story "DS" statt
@@ -106,7 +112,7 @@ export const StoryRail = ({ stories, onPress }: Props) => {
             style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
             onPress={() => onPress(story)}
           >
-            {ohneStory || alleGesehen ? (
+            {ohneStory || grau ? (
               <View style={[styles.ring, ohneStory ? styles.ringOhne : styles.ringViewed]}>
                 <View style={styles.inner}>{kern}</View>
               </View>
@@ -121,17 +127,27 @@ export const StoryRail = ({ stories, onPress }: Props) => {
               </LinearGradient>
             )}
 
-            {/* Solange die eigene Story leer ist, lädt das Plus zur Aufnahme
-                ein. Ist sie gefüllt, verhält sie sich wie jede andere. */}
-            {ohneStory && (
-              <LinearGradient
-                colors={brandGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.addBadge}
+            {/* Kasten 11.4: das Plus bleibt IMMER an der eigenen Kachel.
+                Bis zum 29.09.2026 verschwand es, sobald eine Story da war —
+                eine zweite ließ sich dann nicht mehr hochladen (Henrik 21.09.:
+                „Nur eine Story möglich"). Die Kachel selbst öffnet die
+                vorhandenen Storys, das Plus nimmt eine weitere auf. */}
+            {story.own && (
+              <Druck
+                hitSlop={8}
+                accessibilityLabel={ohneStory ? 'Story aufnehmen' : 'Weitere Story hinzufügen'}
+                style={styles.addBadgeGriff}
+                onPress={() => onPress({ ...story, id: 'eigene', mediaUri: undefined })}
               >
-                <Ionicons name="add" size={14} color={colors.white} />
-              </LinearGradient>
+                <LinearGradient
+                  colors={brandGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.addBadge}
+                >
+                  <Ionicons name="add" size={14} color={colors.white} />
+                </LinearGradient>
+              </Druck>
             )}
 
             <Text style={[styles.name, story.own && styles.nameOwn]} numberOfLines={1}>
@@ -188,10 +204,8 @@ const styles = themenStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  addBadgeGriff: { position: 'absolute', right: -1, top: RING - 21, width: 21, height: 21 },
   addBadge: {
-    position: 'absolute',
-    right: -1,
-    top: RING - 21,
     width: 21,
     height: 21,
     borderRadius: 10.5,

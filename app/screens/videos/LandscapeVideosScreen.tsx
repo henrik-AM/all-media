@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { EmptyState } from '../../components/EmptyState';
 import { FilterPillen } from '../../components/FilterPillen';
 import { SearchBar } from '../../components/SearchBar';
@@ -109,7 +110,9 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
                   )}
                 </View>
                 <View style={styles.meta}>
-                  <Avatar id={item.userId} name={person.name} size={36} />
+                  {/* Kasten 11.1: Ring im Querformat. Nur Anzeige — die ganze
+                      Kachel öffnet schon das Video. */}
+                  <StoryAvatar id={item.userId} name={person.name} size={40} bereich="videos" tippbar={false} />
                   <View style={styles.metaText}>
                     <Text style={styles.clipTitle}>{item.title}</Text>
                     <Text style={styles.clipSub}>

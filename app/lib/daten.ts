@@ -748,21 +748,60 @@ export async function ladeNachrichten(
  * ob sie zusätzlich *ungefragt* im Videos-Feed auftaucht.
  */
 export interface StoryListen {
+  /** Leiste im Messenger: eigene (in_messenger) und die der Kontakte. */
   messenger: Story[];
+  /** Leiste im Videos-Bereich (Home): eigene (in_videos) und die der Gefolgten. */
   videos: Story[];
+  /**
+   * Alle sichtbaren Videos-Storys, auch von Nichtgefolgten. Daraus kommt der
+   * Ring an Beitragsköpfen, im Kurz- und Querformat, in Profil, Suche und
+   * Kommentaren (Kasten 11.1). Die Leiste bleibt bei den Gefolgten.
+   */
+  videosAlle: Story[];
 }
 
-export async function ladeStorys(client: SupabaseClient, ichId: string): Promise<StoryListen> {
-  const { data, error } = await client
-    .from('stories')
-    .select(
-      'id, user_id, media_url, media_type, caption, created_at, in_videos, profiles!stories_user_id_fkey(name)'
-    )
-    .order('created_at', { ascending: false })
-    .limit(50);
-  if (error) throw error;
+/*
+ * Die gemeinsame Regel — Aufteilung, Reihenfolge, Ring. Dieselbe Datei nutzt
+ * web/server/supabase-api.js. Bis zum 29.09.2026 stand die Aufteilung hier und
+ * dort je einmal, und jede Anzeige entschied danach noch einmal selbst, ob
+ * jemand „eine Story hat" (Kasten 11.1).
+ */
+const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
 
-  const storys = (data ?? []) as any[];
+/** Spalten mit und ohne die Felder aus dem Story-Schema (Kasten 11). */
+const STORY_SPALTEN_NEU =
+  'id, user_id, media_url, media_type, caption, created_at, expires_at, in_videos, in_messenger, overlays, profiles!stories_user_id_fkey(name)';
+const STORY_SPALTEN_ALT =
+  'id, user_id, media_url, media_type, caption, created_at, expires_at, in_videos, profiles!stories_user_id_fkey(name)';
+
+/** Fehlt eine Spalte, weil das Schema noch nicht eingespielt ist? */
+export const spalteFehlt = (fehler: any): boolean =>
+  Boolean(fehler) &&
+  (fehler.code === '42703' ||
+    fehler.code === 'PGRST204' ||
+    /column .* does not exist|Could not find the '.*' column/i.test(String(fehler.message ?? '')));
+
+export async function ladeStorys(client: SupabaseClient, ichId: string): Promise<StoryListen> {
+  /*
+   * Bis 29.09.2026: `.limit(50)` über ALLE lesbaren Storys, neueste zuerst.
+   * Seit Schema 19 las jeder jede Story mit Stufe „alle" — auch die der
+   * Prüfläufe und fremder Testkonten. Die sechs Beispielstorys der
+   * Demoprofile sind vom Anfang September; sobald 50 neuere Zeilen da waren,
+   * fielen sie aus der Abfrage, bevor der Kontakt-Filter überhaupt lief
+   * (Kasten 11.3). Jetzt 300 Zeilen, nur nicht abgelaufene, und die
+   * Datenbank entscheidet, was man überhaupt sieht (Schema XX_storys).
+   */
+  const abfrage = (spalten: string) =>
+    client
+      .from('stories')
+      .select(spalten)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(300);
+
+  let { data, error } = await abfrage(STORY_SPALTEN_NEU);
+  if (error && spalteFehlt(error)) ({ data, error } = await abfrage(STORY_SPALTEN_ALT));
+  if (error) throw error;
 
   const [{ data: gesehen }, { data: gemocht }, { data: kontakte }, { data: gefolgt }] =
     await Promise.all([
@@ -771,96 +810,24 @@ export async function ladeStorys(client: SupabaseClient, ichId: string): Promise
       client.from('contacts').select('contact_id').eq('user_id', ichId).eq('status', 'friend'),
       client.from('follows').select('followee_id').eq('follower_id', ichId),
     ]);
-  const gesehenIds = new Set((gesehen ?? []).map((g: any) => g.story_id));
-  const gemochtIds = new Set((gemocht ?? []).map((g: any) => g.story_id));
-  const kontaktIds = new Set((kontakte ?? []).map((k: any) => k.contact_id));
-  const gefolgtIds = new Set((gefolgt ?? []).map((f: any) => f.followee_id));
 
-  const liste: (Story & { _urheber: string; _inVideos: boolean })[] = storys.map((s) => ({
-    id: s.id,
-    userId: s.user_id === ichId ? ICH : s.user_id,
-    // Die eigene Kachel heisst "Deine Story", nicht wie man selbst heisst —
-    // so steht es im Prototypen. Siehe web/server/supabase-api.js.
-    name: s.user_id === ichId ? 'Deine Story' : (s.profiles?.name ?? '').split(' ')[0],
-    own: s.user_id === ichId,
-    viewed: gesehenIds.has(s.id),
-    liked: gemochtIds.has(s.id),
-    caption: s.caption ?? '',
-    mediaUri: s.media_url ?? undefined,
-    _urheber: s.user_id,
-    /*
-     * Henrik am 07.09.2026: „Storys nicht mehr bereichsuebergreifend
-     * (Messenger/Videos strikt getrennt); beim Posten fragen ob
-     * uebergreifend teilen."
-     *
-     * Hier stand `profiles.story_in_videos` — die Dauereinstellung. Damit
-     * war es eine Entscheidung fuer alles, was jemand je postet. Gefragt
-     * wird jetzt je Story, und die Antwort steht an der Story selbst
-     * (Schema 36). Der Schalter am Profil bleibt: er entscheidet, ob
-     * ueberhaupt gefragt wird, und ist die Vorbelegung.
-     */
-    _inVideos: Boolean(s.in_videos),
-  }));
-
-  /*
-   * `ordnen` haengt links immer die eigene Kachel an. Bis zum 09.09.2026 tat
-   * es das ohne Bedingung — und damit stand die eigene Story in BEIDEN
-   * Leisten, egal was eingestellt war. Die Trennung aus Schema 30 galt nur
-   * fuer fremde Storys; die einzige, die Henrik beim Testen sicher zu sehen
-   * bekam, war seine eigene. Fuer ihn war die Trennung deshalb nicht gebaut.
-   *
-   * `eigeneNehmen` entscheidet jetzt, welche eigenen Storys in diese Leiste
-   * gehoeren. Die Plus-Kachel bleibt davon unberuehrt: sie ist der Weg zur
-   * Kamera und steht auch in einer leeren Leiste.
-   */
-  const ordnen = (
-    fremde: Story[],
-    eigeneNehmen: (s: { _inVideos: boolean }) => boolean = () => true
-  ): Story[] => {
-    /*
-     * Links steht immer die eigene Kachel — auch ohne eigene Story. Dann traegt
-     * sie ein Plus und oeffnet die Kamera. Storys leben 24 Stunden; ohne diese
-     * Kachel waere der Weg zur Kamera danach weg.
-     * Gleiche Regel wie in web/server/supabase-api.js.
-     */
-    const eigene = liste
-      .filter((s) => s.own && eigeneNehmen(s))
-      .map(({ _urheber, _inVideos, ...s }) => s as Story);
-
-    if (eigene.length === 0) {
-      eigene.push({
-        id: 'eigene',
-        userId: ICH,
-        name: 'Deine Story',
-        own: true,
-        viewed: false,
-        liked: false,
-        caption: '',
-        mediaUri: undefined,
-      } as Story);
-    }
-
-    return [...eigene, ...fremde];
-  };
-
-  const abLegen = (s: Story & { _urheber: string; _inVideos: boolean }): Story => {
-    const { _urheber, _inVideos, ...rest } = s;
-    return rest as Story;
-  };
-
-  const fremde = liste.filter((s) => !s.own);
-  const messenger = ordnen(fremde.filter((s) => kontaktIds.has(s._urheber)).map(abLegen));
-  const videos = ordnen(
-    fremde.filter((s) => gefolgtIds.has(s._urheber) && s._inVideos).map(abLegen),
-    (s) => s._inVideos
-  );
+  const listen = StoryRegeln.listenBilden<Story & import('../../gemeinsam/story').StoryEintrag>({
+    roh: (data ?? []) as any[],
+    ichId,
+    ichKennung: ICH,
+    gesehen: new Set((gesehen ?? []).map((g: any) => g.story_id)),
+    gemocht: new Set((gemocht ?? []).map((g: any) => g.story_id)),
+    kontakte: new Set((kontakte ?? []).map((k: any) => k.contact_id)),
+    gefolgte: new Set((gefolgt ?? []).map((f: any) => f.followee_id)),
+  });
 
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
-  const [mSigniert, vSigniert] = await Promise.all([
-    signiereMedien(client, messenger),
-    signiereMedien(client, videos),
+  const [messenger, videos, videosAlle] = await Promise.all([
+    signiereMedien(client, listen.messenger as Story[]),
+    signiereMedien(client, listen.videos as Story[]),
+    signiereMedien(client, listen.videosAlle as Story[]),
   ]);
-  return { messenger: mSigniert, videos: vSigniert };
+  return { messenger, videos, videosAlle };
 }
 
 // ============================================================================
@@ -1400,6 +1367,8 @@ export interface AlleDaten {
    */
   stories: Story[];
   storiesVideos: Story[];
+  /** Kasten 11.1: alle sichtbaren Videos-Storys — Quelle des Rings im Videos-Bereich. */
+  storiesVideosAlle: Story[];
   posts: Post[];
   videos: Video[];
   clips: Clip[];
@@ -1538,6 +1507,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     communityChats,
     stories: storyListen.messenger,
     storiesVideos: storyListen.videos,
+    storiesVideosAlle: storyListen.videosAlle,
     posts: beitraege.posts,
     videos: beitraege.videos,
     clips: beitraege.clips,

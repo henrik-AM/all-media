@@ -7,6 +7,7 @@ import { Motiv } from '../../components/Motiv';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
@@ -318,7 +319,7 @@ const ExplorerSeite = ({
                       </View>
                     </View>
                     <View style={styles.clipMeta}>
-                      <Avatar id={c.userId} name={(alleNutzer[c.userId]?.name ?? '')} size={sizes.avatarSm} />
+                      <StoryAvatar id={c.userId} name={alleNutzer[c.userId]?.name ?? ''} size={sizes.avatarSm + 4} bereich="videos" tippbar={false} />
                       <View style={styles.clipTexte}>
                         <Text style={styles.clipTitel} numberOfLines={2}>
                           {c.title}
@@ -378,7 +379,8 @@ const UebersichtListe = ({
   <View style={styles.liste}>
     {liste.profile?.map((u) => (
       <Druck key={u.id} style={styles.zeile} onPress={() => onOpenProfile?.(u.id)}>
-        <Avatar id={u.id} name={u.name} size={44} />
+        {/* Kasten 11.1: Ring auch in der erweiterten Suche. */}
+        <StoryAvatar id={u.id} name={u.name} size={48} bereich="videos" onPressOhneStory={() => onOpenProfile?.(u.id)} />
         <View style={styles.zeileText}>
           <Text style={styles.zeileTitel}>{u.name}</Text>
           <Text style={styles.zeileSub}>{u.handle}</Text>
@@ -518,7 +520,7 @@ const OrtFotos = ({
                   )}
                 </View>
                 <View style={styles.ortfotoZeile}>
-                  <Avatar id={p.userId} name={person.name} size={36} />
+                  <StoryAvatar id={p.userId} name={person.name} size={40} bereich="videos" tippbar={false} />
                   <View style={styles.ortfotoWer}>
                     <Text style={styles.ortfotoName}>{person.name}</Text>
                     <OrtSoundZeile

@@ -258,12 +258,23 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
    * Deshalb jetzt an der Quelle, die der Code wirklich liest. Ein Neuladen
    * darf es dabei nicht geben — das holt die Storys sofort wieder.
    */
+  /*
+   * Seit Kasten 11.1 (29.09.2026) gilt der Ring bereichstreu: am Videos- und
+   * Communitys-Profil zaehlt eine Story mit in_videos (state.storiesVideosAlle),
+   * am Messenger-Profil eine im Messenger (state.stories). Die Pruef-Story
+   * steht deshalb in beiden Listen, mit der Kennung 'me' wie vom Server.
+   */
   const storysSetzen = (eigene) =>
     page.evaluate((eigene) => {
-      const fremde = (state.stories || []).filter((s) => !s.own);
-      state.stories = eigene
-        ? [{ own: true, mediaUri: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' }, ...fremde]
-        : fremde;
+      const story = {
+        id: 'pruef-eigene-story', userId: 'me', own: true, viewed: true, name: 'Deine Story',
+        mediaUri: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', mediaType: 'image',
+        inVideos: true, inMessenger: true, overlays: null, markiert: [],
+      };
+      for (const feld of ['stories', 'storiesVideosAlle']) {
+        const fremde = (state[feld] || []).filter((s) => !s.own);
+        state[feld] = eigene ? [story, ...fremde] : fremde;
+      }
       render();
     }, eigene);
 

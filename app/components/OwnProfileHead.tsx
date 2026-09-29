@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
+import { StoryAvatar } from './StoryAvatar';
 import { colors, sizes, spacing, themenStyles, typography } from '../constants/design';
 
 interface Stat {
@@ -21,6 +22,8 @@ interface Props {
   onStat?: (label: string) => void;
   onBearbeiten?: () => void;
   onAvatarPress?: () => void;
+  /** Kasten 11.2: Bereich, dessen eigene Story als Ring am Bild steht. */
+  storyBereich?: 'videos' | 'messenger';
   ungelesen?: number;
 }
 
@@ -29,7 +32,7 @@ interface Props {
  * Glocke/Plus/Menü, darunter Bild links neben den Zahlen, dann Name,
  * Biografie und Link linksbündig.
  */
-export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, onAvatarPress, ungelesen = 0 }: Props) => (
+export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, onAvatarPress, storyBereich, ungelesen = 0 }: Props) => (
   <View>
     <View style={styles.bar}>
       <Text style={styles.handle}>{handle}</Text>
@@ -57,7 +60,19 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
           {/* Der Name stand hier fest als "Du" - die Initiale im Kreis war
               deshalb "D", waehrend direkt darunter "Henrik" steht. Jetzt kommt
               der Name von aussen, wie ueberall sonst. */}
-          <Avatar id="me" name={name} size={sizes.avatarXl} />
+          {/* Kasten 11.2: die eigene Story als Ring am eigenen Profil. Nur
+              wenn der Bereich Storys hat (Videos); Communitys haben keine. */}
+          {storyBereich ? (
+            <StoryAvatar
+              id="me"
+              name={name}
+              size={sizes.avatarXl + 6}
+              bereich={storyBereich}
+              onPressOhneStory={onAvatarPress}
+            />
+          ) : (
+            <Avatar id="me" name={name} size={sizes.avatarXl} />
+          )}
           <View style={styles.online} />
         </View>
       </Druck>

@@ -31,6 +31,7 @@ const LEER: AlleDaten = {
   communityChats: [],
   stories: [],
   storiesVideos: [],
+  storiesVideosAlle: [],
   posts: [],
   videos: [],
   clips: [],

@@ -36,6 +36,8 @@ import { EditSelectedContactsScreen } from './screens/messenger/EditSelectedCont
 import { AvatarViewerScreen } from './screens/AvatarViewerScreen';
 import { MessengerProfileScreen } from './screens/messenger/MessengerProfileScreen';
 import { StoryViewerScreen } from './screens/messenger/StoryViewerScreen';
+import { StoryEditorScreen, StoryFertig } from './screens/messenger/StoryEditorScreen';
+import { StoryContext, StoryWert } from './contexts/StoryContext';
 import { InsightViewerScreen } from './screens/messenger/InsightViewerScreen';
 import { CameraScreen } from './screens/messenger/CameraScreen';
 import { CallScreen } from './screens/messenger/CallScreen';
@@ -61,10 +63,17 @@ import { useDaten } from './contexts/DatenContext';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
 // UMD wie in ExplorerScreen: die Prüfläufe laden App-Code als blob:-Modul.
 const SoundStellen = require('../gemeinsam/soundstellen') as typeof import('../gemeinsam/soundstellen');
+const StoryRegeln = require('../gemeinsam/story') as typeof import('../gemeinsam/story');
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
-  | { kind: 'story'; story: Story }
+  /**
+   * `liste`: durch welche Storys geblättert wird. Aus der Leiste ist es die
+   * ganze Leiste, von einem Ring am Profilbild nur diese Person (Kasten 11.1).
+   */
+  | { kind: 'story'; story: Story; liste?: Story[]; bereich?: 'messenger' | 'videos' }
+  /** Kasten 11.6: die Aufnahme bearbeiten, bevor sie Story wird. */
+  | { kind: 'storyEditor'; uri: string; mediaTyp: 'image' | 'video'; bereich: 'messenger' | 'videos' }
   /**
    * variant entscheidet, welches Profil gezeigt wird: im Messenger das
    * Kontaktprofil (Nummer, Medien, Blockieren), sonst das oeffentliche
@@ -161,9 +170,17 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * sonst waere eine Story im einen Bereich gesehen und im anderen nicht.
    */
   const [storiesVideos, setStoriesVideos] = useState<Story[]>([]);
+  /*
+   * Kasten 11.1: alle lesbaren Storys, die unter Videos stehen — auch von
+   * Profilen, denen man nicht folgt. Daraus kommt der Ring am Beitrag, im
+   * Kurzformat, in der Suche und in den Kommentaren. Die Leiste bleibt bei
+   * den gefolgten (storiesVideos).
+   */
+  const [storiesVideosAlle, setStoriesVideosAlle] = useState<Story[]>([]);
   const storysAendern = (f: (prev: Story[]) => Story[]) => {
     setStories(f);
     setStoriesVideos(f);
+    setStoriesVideosAlle(f);
   };
 
   useEffect(() => {
@@ -172,6 +189,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     setContacts(daten.contacts);
     setStories(daten.stories);
     setStoriesVideos(daten.storiesVideos);
+    setStoriesVideosAlle(daten.storiesVideosAlle);
   }, [daten.geladen]);
 
   /*
@@ -1007,13 +1025,37 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     // Das Plus an der eigenen Story nennt das Ziel schon — die Kamera fragt
     // danach nicht noch einmal nach (Henrik, 07.09.2026).
     if (story.own && !story.mediaUri) return setOverlay({ kind: 'camera', zielStory: true });
-    /* Story als viewed markieren, wenn sie angesehen wird */
-    if (!story.viewed) {
-      storysAendern((prev) =>
-        prev.map((s) => (s.id === story.id ? { ...s, viewed: true } : s))
-      );
-    }
-    setOverlay({ kind: 'story', story });
+    const bereich = area === 'videos' ? 'videos' : 'messenger';
+    const liste = bereich === 'videos' ? storiesVideos : stories;
+    /*
+     * Kasten 11.4: bei der ersten noch nicht gesehenen Story der Person
+     * anfangen — wie bei Instagram. Die Kachel in der Leiste trägt die erste
+     * Story der Person (StoryRegeln.ordnen).
+     */
+    const vonIhr = StoryRegeln.vonPerson(liste, story.userId);
+    const start = story.own ? vonIhr[0] ?? story : vonIhr.find((s) => !s.viewed) ?? vonIhr[0] ?? story;
+    setOverlay({ kind: 'story', story: start, liste, bereich });
+  };
+
+  /**
+   * Kasten 11.1: Ring am Profilbild angetippt — nur die Storys dieser Person.
+   * Im Videos-Bereich aus allen lesbaren Videos-Storys, nicht nur aus der
+   * Leiste der gefolgten: ein Ring am Beitrag eines Fremden muss auch
+   * aufgehen.
+   */
+  const storyVonPerson = (userId: string, bereich: 'messenger' | 'videos') => {
+    const quelle = bereich === 'videos' ? storiesVideosAlle : stories;
+    const liste = StoryRegeln.vonPerson(quelle, userId).filter((s) => !s.own || s.mediaUri);
+    if (!liste.length) return;
+    const start = liste.find((s) => !s.viewed) ?? liste[0];
+    setOverlay({ kind: 'story', story: start, liste, bereich });
+  };
+
+  const storyWert: StoryWert = {
+    messenger: stories,
+    videos: storiesVideos,
+    videosAlle: storiesVideosAlle,
+    oeffnen: storyVonPerson,
   };
 
   /**
@@ -1038,45 +1080,105 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * sondern ein zusaetzlicher Tastendruck. Dieselbe Bindung steht in
    * Schema 30/36 und in der Datenbank, nicht nur hier.
    */
-  const [storyFrage, setStoryFrage] = useState<string | null>(null);
   const storySichtbarkeit = daten.sichtbarkeit.story;
   const darfInVideos = (storySichtbarkeit?.stufe ?? 'alle') === 'alle';
 
-  const storyAufgenommen = (uri: string) => {
-    if (darfInVideos) {
-      setOverlay(null);
-      setStoryFrage(uri);
-      return;
-    }
-    storyPosten(uri, false);
+  /*
+   * Kasten 11.6: jede Aufnahme geht zuerst in die Bearbeitung (Text, Schrift,
+   * Farbe, Filter, Markieren). Dort steht auch die Zielwahl (11.5) — die
+   * Frage „Wo soll die Story stehen?" als eigenes Blatt ist damit weg.
+   */
+  const storyAufgenommen = (uri: string, mediaTyp: 'image' | 'video' = 'image') => {
+    setOverlay({
+      kind: 'storyEditor',
+      uri,
+      mediaTyp,
+      bereich: area === 'videos' ? 'videos' : 'messenger',
+    });
   };
 
-  const storyPosten = async (uri: string, inVideos: boolean) => {
-    storysAendern((prev) =>
-      prev.map((s) =>
-        s.own
-          ? { ...s, mediaUri: uri, aufgenommen: Date.now(), viewed: false, name: 'Deine Story' }
-          : s
-      )
-    );
+  /**
+   * Kasten 11.4: eine neue Story kommt DAZU. Bis zum 29.09.2026 überschrieb
+   * sie den einen eigenen Eintrag — eine zweite Story verdrängte die erste
+   * im eigenen Ring, obwohl beide in der Datenbank standen.
+   */
+  const storyPosten = async (uri: string, mediaTyp: 'image' | 'video', fertig: StoryFertig) => {
     setOverlay(null);
+    const vorlaeufig = `neu-${Date.now()}`;
+    const namen = new Map(fertig.overlays.markiert.map((m) => [m.userId, m.name]));
+    const neu: Story = {
+      id: vorlaeufig,
+      userId: 'me',
+      name: 'Deine Story',
+      own: true,
+      viewed: true,
+      mediaUri: uri,
+      mediaType: mediaTyp,
+      aufgenommen: new Date().toISOString(),
+      inVideos: fertig.ziel.inVideos,
+      inMessenger: fertig.ziel.inMessenger,
+      overlays: fertig.overlays,
+      markiert: fertig.markiert.map((userId) => ({ userId, name: namen.get(userId) ?? '' })),
+    };
+    // Der Platzhalter („Deine Story" ohne Bild) weicht, die neue kommt hinter
+    // die älteren eigenen — geblättert wird von alt nach neu.
+    const einfuegen = (prev: Story[]) =>
+      StoryRegeln.ordnen(
+        [...prev.filter((s) => !(s.own && !s.mediaUri)), neu],
+        'me'
+      ) as Story[];
+    setStories((prev) => (fertig.ziel.inMessenger ? einfuegen(prev) : prev));
+    setStoriesVideos((prev) => (fertig.ziel.inVideos ? einfuegen(prev) : prev));
+    setStoriesVideosAlle((prev) => (fertig.ziel.inVideos ? einfuegen(prev) : prev));
 
-    const id = await aktion.storyAnlegen({ mediaUrl: uri, mediaTyp: 'image', inVideos });
+    const id = await aktion.storyAnlegen({
+      mediaUrl: uri,
+      mediaTyp,
+      inVideos: fertig.ziel.inVideos,
+      inMessenger: fertig.ziel.inMessenger,
+      overlays: fertig.overlays,
+      markiert: fertig.markiert,
+    });
     if (!id) {
-      // Die Aufnahme wieder herausnehmen: eine Story, die es nirgends gibt,
-      // soll auch im eigenen Ring nicht stehen.
-      storysAendern((prev) =>
-        prev.map((s) => (s.own ? { ...s, mediaUri: undefined, aufgenommen: undefined } : s))
-      );
+      // Eine Story, die es nirgends gibt, soll auch im eigenen Ring nicht stehen.
+      const raus = (prev: Story[]) => {
+        const rest = prev.filter((s) => s.id !== vorlaeufig);
+        return rest.some((s) => s.own) ? rest : [StoryRegeln.platzhalter('me') as Story, ...rest];
+      };
+      setStories(raus);
+      setStoriesVideos(raus);
+      setStoriesVideosAlle(raus);
       return;
     }
-    storysAendern((prev) => prev.map((s) => (s.own ? { ...s, id } : s)));
-    // Was gerade entschieden wurde, gehoert in die Rueckmeldung — sonst
-    // erfaehrt man erst beim naechsten Blick in den Videos-Bereich, was die
-    // Antwort bewirkt hat.
+    storysAendern((prev) => prev.map((s) => (s.id === vorlaeufig ? { ...s, id } : s)));
+    // Was gerade entschieden wurde, gehört in die Rückmeldung.
     setNotice(
-      inVideos ? 'Deine Story ist online — auch unter Videos' : 'Deine Story ist online'
+      fertig.ziel.inVideos && fertig.ziel.inMessenger
+        ? 'Deine Story ist online — im Messenger und unter Videos'
+        : fertig.ziel.inVideos
+          ? 'Deine Story ist online — nur unter Videos'
+          : 'Deine Story ist online — nur im Messenger'
     );
+  };
+
+  /** Kasten 11.4: genau die gelöschte Story heraus, nicht „die eigene". */
+  const storyEntfernen = (story: Story) => {
+    const vorher = { messenger: stories, videos: storiesVideos, alle: storiesVideosAlle };
+    const raus = (prev: Story[]) => {
+      const rest = prev.filter((s) => s.id !== story.id);
+      return rest.some((s) => s.own) ? rest : [StoryRegeln.platzhalter('me') as Story, ...rest];
+    };
+    setStories(raus);
+    setStoriesVideos(raus);
+    setStoriesVideosAlle(raus);
+    setNotice('Deine Story wurde gelöscht');
+    if (story.id && !story.id.startsWith('neu-')) {
+      aktion.storyLoeschen(story.id, () => {
+        setStories(vorher.messenger);
+        setStoriesVideos(vorher.videos);
+        setStoriesVideosAlle(vorher.alle);
+      });
+    }
   };
 
   // Antwort auf eine Story: sie landet im Chat mit dieser Person, und der Chat
@@ -1235,6 +1337,16 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     if (ziel.art === 'chat') {
       const chat = [...chats, ...daten.communityChats].find((c) => c.id === ziel.id);
       return chat ? oeffneChat(chat) : setNotice('Diesen Chat gibt es nicht mehr');
+    }
+    /*
+     * Kasten 11.6: „hat dich in einer Story markiert" öffnet genau diese
+     * Story — solange sie noch läuft. Die markierte Person darf sie lesen
+     * (Regel „Aktuelle Storys lesen": ist_story_markiert), auch ohne Kontakt.
+     */
+    if (ziel.art === 'story') {
+      const story = [...stories, ...storiesVideosAlle].find((s) => s.id === ziel.id);
+      if (!story) return setNotice('Diese Story ist nicht mehr online');
+      return setOverlay({ kind: 'story', story, liste: [story] });
     }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);
@@ -1534,6 +1646,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     setSubs((prev) => ({ ...prev, [next]: 'profile' as SubKey }));
   };
 
+  const inhalt = (() => {
   if (overlay?.kind === 'chat') {
     return (
       <ChatDetailScreen
@@ -1634,9 +1747,17 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         /*
          * Weitergeblaettert wird in der Leiste, aus der die Story geoeffnet
          * wurde — im Videos-Bereich also durch die gefolgten Profile, nicht
-         * durch die Kontakte.
+         * durch die Kontakte. Vom Ring am Profilbild nur durch diese Person.
+         * Den Stand (gesehen, gelöscht) aus den aktuellen Listen nachziehen.
          */
-        alle={area === 'videos' ? storiesVideos : stories}
+        alle={(() => {
+          const aktuell = overlay.bereich === 'videos' ? storiesVideosAlle : stories;
+          const basis = overlay.liste ?? (area === 'videos' ? storiesVideos : stories);
+          return basis
+            .map((s) => aktuell.find((a) => a.id === s.id) ?? (overlay.bereich ? undefined : s))
+            .filter((s): s is Story => Boolean(s));
+        })()}
+        onWeitere={() => setOverlay({ kind: 'camera', zielStory: true })}
         standbild={pruefStandbild}
         onStoryViewed={(storyId) => {
           // Nichts anfassen, wenn sie schon gesehen ist: sonst entsteht bei
@@ -1660,26 +1781,28 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onClose={() => {
           setOverlay(null);
         }}
-        onDelete={() => {
-          const eigene = stories.find((s) => s.own);
-          const vorher = eigene ? { ...eigene } : null;
-          storysAendern((prev) =>
-            prev.map((s) =>
-              s.own ? { ...s, mediaUri: undefined, aufgenommen: undefined } : s
-            )
-          );
-          setNotice('Deine Story wurde gelöscht');
-          // Und wirklich loeschen. Vorher verschwand sie nur aus dem eigenen
-          // Ring und stand bei allen anderen weiter da.
-          if (eigene?.id) {
-            aktion.storyLoeschen(eigene.id, () =>
-              storysAendern((prev) => prev.map((s) => (s.own && vorher ? vorher : s)))
-            );
-          }
-        }}
+        onDelete={storyEntfernen}
         onReply={replyToStory}
         contacts={contacts}
         onOpenProfile={openProfile}
+        onNotice={setNotice}
+      />
+    );
+  }
+
+  if (overlay?.kind === 'storyEditor') {
+    const { uri, mediaTyp, bereich } = overlay;
+    return (
+      <StoryEditorScreen
+        uri={uri}
+        mediaTyp={mediaTyp}
+        bereich={bereich}
+        darfVideos={darfInVideos}
+        onAbbrechen={() => {
+          setOverlay(null);
+          setNotice('Story verworfen');
+        }}
+        onPosten={(fertig) => storyPosten(uri, mediaTyp, fertig)}
         onNotice={setNotice}
       />
     );
@@ -1937,9 +2060,9 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           <CameraScreen
             embedded
             onClose={() => setSub('chats')}
-            onCaptured={(uri) => {
-              storyAufgenommen(uri);
+            onCaptured={(uri, typ) => {
               setSub('chats');
+              storyAufgenommen(uri, typ);
             }}
             onAnChat={setAufnahmeFuerChat}
             onNotice={setNotice}
@@ -2110,38 +2233,6 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <TopSwitcher area={area} active={sub} onChange={setSub} zaehler={inselZaehler} />
       <TabBar active={area} onChange={wechsleBereich} unreadCount={unreadCount} />
       <BeitragOptionenSheet beitrag={pruefOptionen} onClose={() => setPruefOptionen(null)} onNotice={setNotice} />
-
-      {/*
-        * Die Frage beim Posten einer Story. Vorbelegt ist nichts — beide
-        * Wege stehen gleichberechtigt da, weil beide etwas anderes
-        * bedeuten: der Messenger ist privat und nummernbasiert, Videos ist
-        * oeffentlich.
-        */}
-      <ActionSheet
-        visible={Boolean(storyFrage)}
-        title="Wo soll die Story stehen?"
-        untertitel={
-          storySichtbarkeit?.inVideos
-            ? 'Deine Einstellung erlaubt beides.'
-            : 'Im Messenger sehen sie deine Kontakte, unter Videos alle, die dir folgen.'
-        }
-        vorschauUri={storyFrage ?? undefined}
-        items={[
-          { key: 'messenger', label: 'Nur im Messenger', icon: 'chatbubble-outline' },
-          { key: 'beides', label: 'Auch unter Videos', icon: 'play-circle-outline' },
-        ]}
-        onSelect={(key) => {
-          const uri = storyFrage;
-          setStoryFrage(null);
-          if (uri) storyPosten(uri, key === 'beides');
-        }}
-        onClose={() => {
-          // Wegtippen heisst hier abbrechen — die Aufnahme geht nirgendwohin.
-          // Das muss dastehen: sonst sieht es aus wie „gepostet".
-          setStoryFrage(null);
-          setNotice('Story verworfen');
-        }}
-      />
 
       <ActionSheet
         visible={sheet === 'new'}
@@ -2321,6 +2412,13 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
     </View>
   );
+  })();
+
+  /*
+   * Kasten 11.1: die Storylisten gehen als Kontext an jedes Profilbild
+   * (StoryAvatar) — ein Ring, eine Quelle, statt jeder Bildschirm für sich.
+   */
+  return <StoryContext.Provider value={storyWert}>{inhalt}</StoryContext.Provider>;
 };
 
 const Root = () => {

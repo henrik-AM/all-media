@@ -330,9 +330,25 @@ export interface Story {
    * Tippen zur Kamera; sobald gefuellt, oeffnet sich der Betrachter.
    */
   mediaUri?: string;
-  /** Wann sie aufgenommen wurde - fuer "vor 3 Min." im Betrachter. */
-  aufgenommen?: number;
+  /**
+   * Wann sie aufgenommen wurde - fuer "vor 3 Min." im Betrachter. ISO-Text
+   * aus `created_at`; bis 29.09.2026 kam es nie aus der Datenbank, und der
+   * Betrachter zeigte fuer jede Story „vor 2 Std.".
+   */
+  aufgenommen?: string;
+  /** Kasten 11.4: Videos spielen im Betrachter ab, statt als Standbild. */
+  mediaType?: 'image' | 'video';
+  /** Kasten 11.5: das Ziel der Story. */
+  inVideos?: boolean;
+  inMessenger?: boolean;
+  /** Kasten 11.6: Bearbeitung als Daten (Text, Schrift, Farbe, Filter). */
+  overlays?: StoryOverlays | null;
+  /** Kasten 11.6: markierte Personen. */
+  markiert?: { userId: string; name: string }[];
 }
+
+export type StoryOverlays = import('../../gemeinsam/story').StoryOverlays;
+export type StoryText = import('../../gemeinsam/story').StoryText;
 
 /** Querformat-Video aus dem Prototyp-Frame "Videos - Querformat". */
 /**
@@ -482,7 +498,8 @@ export type MitteilungArt =
 export type MitteilungsBereich = 'videos' | 'communities';
 
 export interface MitteilungsZiel {
-  art: 'post' | 'video' | 'profile' | 'community' | 'chat';
+  /** 'story' seit Kasten 11.6: Markierung in einer Story. */
+  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story';
   id: string;
 }
 

@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
@@ -229,7 +230,8 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
             <Section title="Profile" onTitlePress={() => onOpenExplorer({ art: 'profile', wert: '', suche: query })}>
               {result.people.map((u) => (
                 <Druck key={u.id} style={styles.row} onPress={() => onOpenProfile(u.id)}>
-                  <Avatar id={u.id} name={u.name} size={44} />
+                  {/* Kasten 11.1: Ring in der Suche; das Bild öffnet die Story. */}
+                  <StoryAvatar id={u.id} name={u.name} size={48} bereich="videos" onPressOhneStory={() => onOpenProfile(u.id)} />
                   <View style={styles.rowText}>
                     <Text style={styles.rowTitle}>{u.name}</Text>
                     <Text style={styles.rowSub}>{u.handle}</Text>

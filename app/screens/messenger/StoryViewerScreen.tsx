@@ -12,15 +12,29 @@ import { StoryAnsichtenSheet, StoryOptionenSheet } from '../../components/StoryO
 import { useZiehenZumSchliessen } from '../../lib/ziehen';
 import { Contact, Story } from '../../types';
 import { useAktionen } from '../../lib/useAktionen';
+import { Videoflaeche, istVideo as istVideoAdresse } from '../../components/Videoflaeche';
+import { StoryOverlaySchicht } from '../../components/StoryOverlaySchicht';
 
-const DURATION = 6000;
+const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
+
+/*
+ * Kasten 11.4: Standdauer eines Bildes und Obergrenze eines Videos stehen in
+ * gemeinsam/story.js — die Website blättert im selben Takt.
+ */
+const DURATION = StoryRegeln.DAUER_BILD;
+const VIDEO_HOECHSTENS = StoryRegeln.DAUER_VIDEO_HOECHSTENS / 1000;
 
 interface Props {
   story: Story;
   /** Alle Storys - damit auch die eigene Aufnahme blaetterbar ist. */
   alle: Story[];
-  /** Eigene Story wieder entfernen. */
-  onDelete?: () => void;
+  /**
+   * Eigene Story wieder entfernen — genau die, die gerade läuft. Bis zum
+   * 29.09.2026 löschte der Knopf immer die erste eigene, weil es nur eine gab.
+   */
+  onDelete?: (story: Story) => void;
+  /** Eine weitere eigene Story aufnehmen (Kasten 11.4). */
+  onWeitere?: () => void;
   onClose: () => void;
   /** Antwort auf die Story — landet im Chat mit dieser Person. */
   onReply: (story: Story, text: string) => void;
@@ -48,6 +62,7 @@ export const StoryViewerScreen = ({
   onReply,
   onNotice,
   onDelete,
+  onWeitere,
   contacts = [],
   onOpenProfile,
   onStoryViewed,
@@ -124,7 +139,20 @@ export const StoryViewerScreen = ({
     }
   }, [aktuelleId, aktuelleEigene, progress]);
 
+  /*
+   * Ein Video bestimmt seine Dauer selbst: der Balken folgt der Wiedergabe
+   * (onFortschritt), weiter geht es an ihrem Ende (onEnde) oder nach 30 s.
+   * Bis zum 29.09.2026 zeigte der Betrachter Videos als Standbild — die App
+   * legte jede Story als 'image' an, auch ein aufgenommenes Video.
+   */
+  const istVideoStory =
+    current?.mediaType === 'video' || (!current?.mediaType && istVideoAdresse(current?.mediaUri));
+
   useEffect(() => {
+    if (istVideoStory) {
+      progress.stopAnimation();
+      return;
+    }
     if (paused) {
       progress.stopAnimation();
       return;
@@ -146,7 +174,28 @@ export const StoryViewerScreen = ({
       else onClose();
     });
     return () => animation.stop();
-  }, [index, paused, progress, stories.length, onClose]);
+  }, [index, paused, progress, stories.length, onClose, istVideoStory]);
+
+  const videoFortschritt = (bei: number, gesamt: number) => {
+    const laenge = Math.min(gesamt || VIDEO_HOECHSTENS, VIDEO_HOECHSTENS);
+    progress.setValue(laenge > 0 ? Math.min(bei / laenge, 1) : 0);
+    if (bei >= VIDEO_HOECHSTENS) videoEnde();
+  };
+  const videoEnde = () => {
+    if (index < stories.length - 1) {
+      selbstGeblaettert.current = true;
+      setIndex(index + 1);
+    } else onClose();
+  };
+
+  /*
+   * Kasten 11.4: ein Balken je Story der Person, die gerade läuft — wie bei
+   * Instagram. Vorher gab es genau einen Balken, weil es je Person genau
+   * eine Story gab. Die Liste ist nach Person gruppiert (StoryRegeln.ordnen),
+   * darum reicht es, die Nachbarn mit derselben Person zu zählen.
+   */
+  const gruppe = stories.filter((s) => s.userId === current?.userId);
+  const stelle = gruppe.findIndex((s) => s.id === current?.id);
 
   // Solange etwas im Antwortfeld steht, steht auch die Zeit.
   useEffect(() => {
@@ -189,10 +238,11 @@ export const StoryViewerScreen = ({
     onReply(current, text);
   };
 
-  /** "vor 3 Min." aus dem Aufnahmezeitpunkt. */
+  /** "vor 3 Min." aus dem Aufnahmezeitpunkt (ISO aus created_at). */
   const alter = () => {
-    if (!current.aufgenommen) return 'vor 2 Std.';
-    const min = Math.floor((Date.now() - current.aufgenommen) / 60000);
+    const zeit = current.aufgenommen ? Date.parse(current.aufgenommen) : NaN;
+    if (!Number.isFinite(zeit)) return '';
+    const min = Math.floor((Date.now() - zeit) / 60000);
     if (min < 1) return 'gerade eben';
     if (min < 60) return `vor ${min} Min.`;
     return `vor ${Math.floor(min / 60)} Std.`;
@@ -207,11 +257,17 @@ export const StoryViewerScreen = ({
         ziehen.ziehStil,
       ]}
     >
-      {/* Ein Balken, Zurueck-Pfeil links, Mehr-Menue rechts — wie im Prototyp. */}
-      <View style={styles.bars}>
-        <View style={styles.bar}>
-          <Animated.View style={[styles.fill, { width }]} />
-        </View>
+      {/* Ein Balken je Story dieser Person, Zurueck-Pfeil links, Mehr-Menue rechts. */}
+      <View style={styles.bars} testID="story-balken">
+        {gruppe.map((s, i) => (
+          <View key={s.id} style={styles.bar} testID="story-balken-einzeln">
+            {i < stelle ? (
+              <View style={[styles.fill, { width: '100%' }]} />
+            ) : i === stelle ? (
+              <Animated.View style={[styles.fill, { width }]} />
+            ) : null}
+          </View>
+        ))}
       </View>
 
       <View style={styles.head}>
@@ -237,7 +293,19 @@ export const StoryViewerScreen = ({
       </View>
 
       <View style={styles.stage}>
-        {current.mediaUri ? (
+        {current.mediaUri && istVideoStory ? (
+          <Videoflaeche
+            key={current.id}
+            id={current.id}
+            quelle={current.mediaUri}
+            laeuft={!paused}
+            stumm={false}
+            fuellen="contain"
+            style={styles.bild}
+            onFortschritt={videoFortschritt}
+            onEnde={videoEnde}
+          />
+        ) : current.mediaUri ? (
           <Image source={{ uri: current.mediaUri }} style={styles.bild} resizeMode="contain" />
         ) : (
           <Motiv
@@ -261,6 +329,15 @@ export const StoryViewerScreen = ({
           colors={['transparent', 'rgba(0,0,0,0.6)']}
           style={styles.schleierUnten}
           pointerEvents="none"
+        />
+        {/* Kasten 11.6: Text, Filter und Markierungen — als Daten gespeichert,
+            hier gezeichnet. Dieselbe Schicht zeigt die Bearbeitung. */}
+        <StoryOverlaySchicht
+          overlays={current.overlays}
+          onMarkierung={(userId) => {
+            onClose();
+            onOpenProfile?.(userId);
+          }}
         />
         {current.caption ? <Text style={styles.caption}>{current.caption}</Text> : null}
         <Druck
@@ -289,9 +366,24 @@ export const StoryViewerScreen = ({
             <Ionicons name="eye-outline" size={20} color={colors.white} />
             <Text style={styles.ansichtenText}>Ansichten</Text>
           </Druck>
+          {onWeitere ? (
+            <Druck
+              onPress={() => {
+                onClose();
+                onWeitere();
+              }}
+              hitSlop={8}
+              accessibilityLabel="Weitere Story hinzufügen"
+              style={styles.weitere}
+            >
+              <Ionicons name="add-circle-outline" size={22} color={colors.white} />
+              <Text style={styles.ansichtenText}>Weitere</Text>
+            </Druck>
+          ) : null}
           <Druck
+            accessibilityLabel="Story löschen"
             onPress={() => {
-              onDelete?.();
+              onDelete?.(current);
               onClose();
             }}
             hitSlop={8}
@@ -369,7 +461,7 @@ export const StoryViewerScreen = ({
             setPaused(false);
           }}
           onDelete={() => {
-            onDelete?.();
+            onDelete?.(current);
             onClose();
           }}
           onNotice={onNotice}
@@ -383,6 +475,7 @@ const styles = themenStyles((colors) => ({
   bild: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   ansichten: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   ansichtenText: { color: colors.white, ...typography.body },
+  weitere: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   container: { flex: 1, backgroundColor: colors.black },
   bars: { flexDirection: 'row', gap: 4, paddingHorizontal: spacing.md, paddingTop: spacing.md },

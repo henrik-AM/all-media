@@ -112,8 +112,11 @@ function bereichsListen(storys, { kontaktIds, gefolgtIds, ichId }) {
   };
 
   let storyId = null;
+  /** Kasten 11 (Schema XX_storys): Messenger-Storys lesen nur Kontakte. */
+  let kontaktZurueck = null;
 
   const aufraeumen = async () => {
+    if (kontaktZurueck) await kontaktZurueck();
     if (storyId) {
       await eigner.client.from('stories').delete().eq('id', storyId);
       /*
@@ -170,9 +173,43 @@ function bereichsListen(storys, { kontaktIds, gefolgtIds, ichId }) {
 
     await schalter(eigner, true);
 
+    /*
+     * Seit dem Story-Schema aus Kasten 11 (29.09.2026) liest eine Story, die
+     * nur im Messenger steht, nur noch ein Kontakt — vorher las sie jedes
+     * Konto (Schema 19). Das andere Konto wird deshalb für die Dauer des
+     * Laufs Kontakt, genau wie in _chatanfrage.js: über die Nummer des
+     * Testkontos, und hinterher wieder zurück.
+     */
+    const { data: schonKontakt } = await fremder.client
+      .from('contacts')
+      .select('status')
+      .eq('user_id', fremder.id)
+      .eq('contact_id', eigner.id)
+      .maybeSingle();
+    if (schonKontakt?.status !== 'friend') {
+      const { data: treffer, error: nFehler } = await fremder.client
+        .rpc('finde_per_nummer', { nummer: '+49 151 9990001' });
+      if (nFehler) throw nFehler;
+      const gefunden = Array.isArray(treffer) ? treffer[0] : treffer;
+      if (gefunden?.id !== eigner.id) throw new Error('Nummer des Testkontos führt nicht zum Testkonto');
+      const { error: kFehler } = await fremder.client
+        .from('contacts')
+        .upsert({ user_id: fremder.id, contact_id: eigner.id, status: 'friend' }, { onConflict: 'user_id,contact_id' });
+      if (kFehler) throw kFehler;
+      kontaktZurueck = async () => {
+        if (schonKontakt) {
+          await fremder.client.from('contacts').update({ status: schonKontakt.status })
+            .eq('user_id', fremder.id).eq('contact_id', eigner.id);
+        } else {
+          await fremder.client.from('contacts').delete()
+            .eq('user_id', fremder.id).eq('contact_id', eigner.id);
+        }
+      };
+    }
+
     const { data: story, error: fStory } = await eigner.client
       .from('stories')
-      .insert({ user_id: eigner.id, caption: 'Prüflauf Story in Videos' })
+      .insert({ user_id: eigner.id, caption: 'Prüflauf Story in Videos', in_videos: true })
       .select('id')
       .maybeSingle();
     if (fStory) throw fStory;

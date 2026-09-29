@@ -154,8 +154,16 @@ const STRUCTURE = {
   await p.click('#storyLike');
   assert('Herz wird rot',
     await K.bisWahr(p, "document.querySelector('#storyLike')?.classList.contains('is-liked') === true"));
-  await p.click('#storyNext');
-  await p.waitForTimeout(400);
+  /*
+   * Seit Kasten 11.4 (29.09.2026) spielt der Betrachter ALLE Storys einer
+   * Person nacheinander — ein Balken je Story. Hat Anna zwei, kommt Bob erst
+   * nach der zweiten. Also so oft weiter, wie Anna Balken hat.
+   */
+  const annasBalken = await p.$$eval('.viewer__bar', (n) => n.length);
+  for (let i = 0; i < annasBalken; i++) {
+    await p.click('#storyNext');
+    await p.waitForTimeout(400);
+  }
   assert('Rechts blaettert weiter', (await p.$eval('.viewer__name', e => e.textContent.trim())) === 'Bob Müller');
   await p.click('#storyPrev');
   await p.waitForTimeout(400);

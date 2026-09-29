@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
@@ -167,9 +168,16 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
 
       <ScrollView>
         <View style={styles.top}>
-          <Druck style={styles.ring} onPress={() => onAvatarPress?.()}>
-            <Avatar id={userId} name={person.name} size={82} />
-          </Druck>
+          {/* Kasten 11.1: vorher ein fester Markenring, der IMMER dastand —
+              auch ohne Story. Jetzt der echte Ring; mit Story öffnet das Bild
+              die Story, ohne das große Profilbild. */}
+          <StoryAvatar
+            id={userId}
+            name={person.name}
+            size={94}
+            bereich="videos"
+            onPressOhneStory={() => onAvatarPress?.()}
+          />
           <View style={styles.stats}>
             {[
               { value: profile.posts, label: 'Beiträge' },

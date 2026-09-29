@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { erlaubnisSichern } from './kameraErlaubnis';
 
 /**
  * Kamera oeffnen und die Aufnahme zurueckgeben - oder null, wenn abgebrochen
@@ -12,8 +13,9 @@ export async function aufnehmen(
   fehler?: (text: string) => void
 ): Promise<string | null> {
   try {
-    const erlaubnis = await ImagePicker.requestCameraPermissionsAsync();
-    if (!erlaubnis.granted) {
+    // Kasten 11.7: abgelehnt heißt jetzt Hinweis mit Weg in die Einstellungen.
+    const stand = await ImagePicker.getCameraPermissionsAsync();
+    if (!(await erlaubnisSichern('kamera', stand, ImagePicker.requestCameraPermissionsAsync, 'für die Aufnahme'))) {
       fehler?.('Ohne Kamerazugriff geht das leider nicht');
       return null;
     }
@@ -38,8 +40,8 @@ export async function ausGalerie(
   fehler?: (text: string) => void
 ): Promise<string | null> {
   try {
-    const erlaubnis = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!erlaubnis.granted) {
+    const stand = await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!(await erlaubnisSichern('galerie', stand, () => ImagePicker.requestMediaLibraryPermissionsAsync(), 'für die Auswahl aus der Galerie'))) {
       fehler?.('Ohne Zugriff auf die Galerie geht das leider nicht');
       return null;
     }

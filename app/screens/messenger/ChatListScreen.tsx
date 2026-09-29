@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { StoryRail } from '../../components/StoryRail';
@@ -123,7 +124,14 @@ export const ChatListScreen = ({
             : undefined
         }
       >
-        <Avatar id={item.userId ?? item.id} name={item.name} size={sizes.avatarLg} group={item.isGroup} />
+        {/* Kasten 11.1: Ring in der Chatliste (Messenger-Storys der Person). */}
+        <StoryAvatar
+          id={item.userId ?? item.id}
+          name={item.name}
+          size={sizes.avatarLg}
+          group={item.isGroup}
+          bereich="messenger"
+        />
         <View style={styles.rowBody}>
           <View style={styles.rowTop}>
             <Text style={styles.rowName} numberOfLines={1}>

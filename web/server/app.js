@@ -1332,7 +1332,7 @@ app.post('/api/beitraege/:id/story', route(async (req) => {
   });
   if (!e || e.ok === false) return antwort(e);
   const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
-  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos };
+  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos, storiesVideosAlle: listen.videosAlle };
 }));
 
 app.post('/api/beitraege/:id/kein-interesse', route(async (req) => {
@@ -2126,16 +2126,42 @@ app.post('/api/comments/:targetId/:commentId/like', route(async (req) => {
  * muss, wie ihre eigene Kachel jetzt aussieht.
  */
 app.post('/api/stories', route(async (req) => {
-  const e = await syncHandlers.handleCreateStory(req.db, req.nutzerId, {
+  // Kasten 11.5/11.6: Ziel (inMessenger/inVideos), Bearbeitung (overlays)
+  // und markierte Personen — dieselbe Regel wie storyAnlegen() der App.
+  const e = await syncHandlers.handleCreateStoryBearbeitet(req.db, req.nutzerId, {
     mediaUrl: req.body?.mediaUrl || null,
     mediaTyp: req.body?.mediaTyp || 'image',
     text: req.body?.text || '',
     inVideos: Boolean(req.body?.inVideos),
+    inMessenger: req.body?.inMessenger === undefined ? undefined : Boolean(req.body.inMessenger),
+    overlays: req.body?.overlays || null,
+    markiert: Array.isArray(req.body?.markiert) ? req.body.markiert : [],
   });
   if (!e || e.ok === false) return antwort(e);
 
   const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
-  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos };
+  return {
+    ok: true,
+    id: e.story?.id,
+    nichtMarkiert: e.nichtMarkiert || [],
+    stories: listen.messenger,
+    storiesVideos: listen.videos,
+    storiesVideosAlle: listen.videosAlle,
+  };
+}));
+
+/*
+ * Wen darf ich in einer Story markieren? (Kasten 11.6)
+ *
+ * Die Liste kommt aus der Datenbank (story_markierbar), weil dort die
+ * Einstellung „Wer darf mich markieren" der ANDEREN Person steht. Dieselbe
+ * Funktion ruft die App (storyMarkierbar in app/lib/aktionen.ts).
+ */
+app.get('/api/story-markierbar', route(async (req) => {
+  const suche = String(req.query?.suche || '').trim().slice(0, 60);
+  const { data, error } = await req.db.rpc('story_markierbar', { suche: suche || null });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, personen: data || [] };
 }));
 
 /*
@@ -2160,7 +2186,7 @@ app.post('/api/stories/:id/loeschen', route(async (req) => {
   if (!data || data.length === 0) return { ok: false, error: 'Das ist nicht deine Story' };
 
   const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
-  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos };
+  return { ok: true, stories: listen.messenger, storiesVideos: listen.videos, storiesVideosAlle: listen.videosAlle };
 }));
 
 /*
@@ -2419,9 +2445,12 @@ function mitteilungText(m, namen, communityNamen) {
     follow: `${name} folgt dir jetzt.`,
     comment: `${name} hat deinen Beitrag kommentiert.`,
     repost: `${name} hat dein Video repostet.`,
-    mention: m.ziel?.art === 'post'
-      ? `${name} hat dich in einem Beitrag markiert.`
-      : `${name} hat dich in einem Kommentar erwähnt.`,
+    // Kasten 11.6: Markierung in einer Story — derselbe Satz wie in der App.
+    mention: m.ziel?.art === 'story'
+      ? `${name} hat dich in einer Story markiert.`
+      : m.ziel?.art === 'post'
+        ? `${name} hat dich in einem Beitrag markiert.`
+        : `${name} hat dich in einem Kommentar erwähnt.`,
     anfrage: `${name} möchte mit dir schreiben.`,
     anfrage_ok: `${name} hat deine Anfrage angenommen.`,
     messenger_anfrage: `${name} möchte mit dir in den Messenger wechseln.`,

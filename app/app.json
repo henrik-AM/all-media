@@ -25,6 +25,14 @@
       "expo-video",
       "expo-audio",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "All Media braucht Zugriff auf deine Fotos, damit du Bilder und Videos für Storys, Beiträge und Chats auswählen kannst.",
+          "cameraPermission": "All Media braucht die Kamera, um Fotos und Videos für Storys, Beiträge und Chats aufzunehmen.",
+          "microphonePermission": "All Media braucht das Mikrofon, um Videos mit Ton aufzunehmen."
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "All Media braucht die Kamera, um Fotos und Videos aufzunehmen und QR-Codes zu lesen.",

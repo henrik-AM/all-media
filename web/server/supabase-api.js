@@ -38,6 +38,7 @@ const {
  * machen steht in ../../gemeinsam/rang.js.
  */
 const { neulingsliste, ordnenJeArt, punktekarte } = require('../../gemeinsam/rang');
+const StoryRegeln = require('../../gemeinsam/story');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -749,16 +750,26 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
 async function ladeStorys(client, nutzerId) {
   if (!client) return null;
 
-  const { data, error } = await client
-    .from('stories')
-    .select(
-      'id, user_id, media_url, media_type, caption, created_at, in_videos, profiles!stories_user_id_fkey(name)'
-    )
-    .order('created_at', { ascending: false })
-    .limit(50);
+  /*
+   * Bis 29.09.2026: `.limit(50)` ueber ALLE lesbaren Storys, neueste zuerst.
+   * Die Beispielstorys der Demoprofile fielen aus der Abfrage, sobald 50
+   * neuere Zeilen (Pruefläufe, Testkonten) da waren — noch bevor der
+   * Kontakt-Filter lief (Kasten 11.3). Jetzt 300 Zeilen, nur nicht
+   * abgelaufene. Ohne das Story-Schema (in_messenger/overlays) faellt die
+   * Abfrage auf die alten Spalten zurueck. Gleich in app/lib/daten.ts.
+   */
+  const abfrage = (spalten) =>
+    client
+      .from('stories')
+      .select(spalten)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(300);
+  const basis = 'id, user_id, media_url, media_type, caption, created_at, expires_at, in_videos';
+  const name = 'profiles!stories_user_id_fkey(name)';
+  let { data, error } = await abfrage(`${basis}, in_messenger, overlays, ${name}`);
+  if (error && spalteFehlt(error)) ({ data, error } = await abfrage(`${basis}, ${name}`));
   if (error) throw error;
-
-  const storys = data || [];
 
   const [
     { data: gesehen, error: fG },
@@ -776,110 +787,46 @@ async function ladeStorys(client, nutzerId) {
   if (fK) throw fK;
   if (fF) throw fF;
 
-  const gesehenIds = new Set((gesehen || []).map((g) => g.story_id));
-  const gemochtIds = new Set((gemocht || []).map((g) => g.story_id));
-  const kontaktIds = new Set((kontakte || []).map((k) => k.contact_id));
-  const gefolgtIds = new Set((gefolgt || []).map((f) => f.followee_id));
-
-  const liste = storys.map((s) => ({
-    id: s.id,
-    userId: s.user_id === nutzerId ? 'me' : s.user_id,
-    /*
-     * Die eigene Story heisst "Deine Story", nicht wie man selbst heisst.
-     *
-     * So steht es im Prototypen, und so stand es auch in den Beispieldaten.
-     * Beim Umzug in die Datenbank ging es verloren: der Name kam ab da aus
-     * dem Profil, und auf der eigenen Kachel stand ploetzlich der eigene
-     * Vorname.
-     */
-    name: s.user_id === nutzerId ? 'Deine Story' : (s.profiles?.name || '').split(' ')[0],
-    own: s.user_id === nutzerId,
-    mediaUrl: s.media_url,
-    // Die Oberflaeche kennt das Feld unter dem Namen "mediaUri" — dort kommt
-    // sonst nur ein selbst aufgenommenes Bild aus dem Browserspeicher an.
-    mediaUri: s.media_url,
-    mediaType: s.media_type,
-    caption: s.caption || '',
-    zeit: s.created_at,
-    viewed: gesehenIds.has(s.id),
-    liked: gemochtIds.has(s.id),
-    _urheber: s.user_id,
-    /*
-     * Henrik am 07.09.2026: „Storys nicht mehr bereichsuebergreifend
-     * (Messenger/Videos strikt getrennt); beim Posten fragen ob
-     * uebergreifend teilen."
-     *
-     * Hier stand `profiles.story_in_videos` — die Dauereinstellung, also
-     * eine Entscheidung fuer alles, was jemand je postet. Gefragt wird
-     * jetzt je Story, und die Antwort steht an der Story selbst (Schema
-     * 36). Der Schalter am Profil bleibt: er entscheidet, ob ueberhaupt
-     * gefragt wird, und ist die Vorbelegung. Gleiche Regel in
-     * app/lib/daten.ts.
-     */
-    _inVideos: Boolean(s.in_videos),
-  }));
-
-  const ohneHilfsfelder = (s) => {
-    const kopie = { ...s };
-    delete kopie._urheber;
-    delete kopie._inVideos;
-    return kopie;
-  };
-
-  const eigene = liste.filter((s) => s.own);
-  const fremde = liste.filter((s) => !s.own);
-
   /*
-   * Die eigene Story hing bis zum 09.09.2026 unbesehen in BEIDEN Leisten.
-   * Die Trennung aus Schema 30 galt nur fuer fremde Storys — und die eine
-   * Story, die man beim Testen sicher zu Gesicht bekommt, ist die eigene.
-   * Fuer Henrik war die Trennung deshalb nicht gebaut.
-   *
-   * Die Plus-Kachel bleibt davon unberuehrt: `storyleisteOrdnen` haengt sie
-   * an, wenn keine eigene Story dasteht, und sie ist der Weg zur Kamera.
+   * Die eine Regel fuer Aufteilung, Reihenfolge und Ring (Kasten 11.1):
+   * gemeinsam/story.js — dieselbe Datei nutzt die App. Innerhalb einer
+   * Person stehen die Storys aelteste zuerst; der Betrachter spielt sie
+   * nacheinander ab (11.4).
    */
+  const listen = StoryRegeln.listenBilden({
+    roh: data || [],
+    ichId: nutzerId,
+    ichKennung: 'me',
+    gesehen: new Set((gesehen || []).map((g) => g.story_id)),
+    gemocht: new Set((gemocht || []).map((g) => g.story_id)),
+    kontakte: new Set((kontakte || []).map((k) => k.contact_id)),
+    gefolgte: new Set((gefolgt || []).map((f) => f.followee_id)),
+  });
+
+  // Die Website kennt zusaetzlich `mediaUrl` und `zeit`.
+  const fuerWeb = (liste) =>
+    liste.map((s) => ({ ...s, mediaUrl: s.mediaUri || null, mediaUri: s.mediaUri || null, zeit: s.aufgenommen || null }));
   return {
-    messenger: storyleisteOrdnen([
-      ...eigene.map(ohneHilfsfelder),
-      ...fremde.filter((s) => kontaktIds.has(s._urheber)).map(ohneHilfsfelder),
-    ]),
-    videos: storyleisteOrdnen([
-      ...eigene.filter((s) => s._inVideos).map(ohneHilfsfelder),
-      ...fremde.filter((s) => gefolgtIds.has(s._urheber) && s._inVideos).map(ohneHilfsfelder),
-    ]),
+    messenger: fuerWeb(listen.messenger),
+    videos: fuerWeb(listen.videos),
+    videosAlle: fuerWeb(listen.videosAlle),
   };
+}
+
+/** Fehlt eine Spalte, weil das Schema noch nicht eingespielt ist? */
+function spalteFehlt(fehler) {
+  return (
+    Boolean(fehler) &&
+    (fehler.code === '42703' ||
+      fehler.code === 'PGRST204' ||
+      /column .* does not exist|Could not find the '.*' column/i.test(String(fehler.message || '')))
+  );
 }
 
 /*
- * Die Storyleiste beginnt links immer mit der eigenen Kachel — so im
- * Prototypen, und zwar auch dann, wenn man noch nichts aufgenommen hat: dann
- * traegt sie ein Plus und oeffnet die Kamera.
- *
- * Ohne diese Kachel gab es keinen Weg mehr zur Kamera ueber die Storyleiste,
- * sobald die eigene Story abgelaufen war. Storys leben 24 Stunden.
+ * Die Plus-Kachel „Deine Story" (Weg zur Kamera) haengt jetzt
+ * StoryRegeln.ordnen an — gemeinsam/story.js, platzhalter().
  */
-function storyleisteOrdnen(liste) {
-  const eigene = liste.filter((s) => s.own);
-  const fremde = liste.filter((s) => !s.own);
-
-  if (eigene.length === 0) {
-    eigene.push({
-      id: 'eigene',
-      userId: 'me',
-      name: 'Deine Story',
-      own: true,
-      mediaUrl: null,
-      mediaUri: null,
-      mediaType: 'image',
-      caption: '',
-      zeit: null,
-      viewed: false,
-      liked: false,
-    });
-  }
-
-  return [...eigene, ...fremde];
-}
 
 // ============================================================================
 // Beiträge, Videos, Clips
@@ -1385,6 +1332,7 @@ async function bootstrapData(client, nutzerId, schluesselId = null) {
     communityChats,
     stories: storys.messenger,
     storiesVideos: storys.videos,
+    storiesVideosAlle: storys.videosAlle,
     posts: beitraege.filter((b) => b.kind === 'post'),
     videos: beitraege.filter((b) => b.kind === 'reel'),
     clips: beitraege.filter((b) => b.kind === 'clip'),

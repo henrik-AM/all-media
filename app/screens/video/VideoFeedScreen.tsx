@@ -17,6 +17,7 @@ import { Glocke } from '../../components/Glocke';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useReposts } from '../../contexts/RepostContext';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { BeitragOptionenSheet, OptionenBeitrag } from '../../components/BeitragOptionenSheet';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
@@ -420,10 +421,19 @@ export const VideoFeedScreen = ({
 
         <View style={styles.meta}>
           <View style={styles.author}>
-            <Druck style={styles.authorTap} onPress={() => onOpenProfile(item.userId)}>
-              <Avatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm} />
-              <Text style={styles.authorName}>{author?.name}</Text>
-            </Druck>
+            <View style={styles.authorTap}>
+              {/* Kasten 11.1: Story-Ring im Kurzformat, auch am eigenen Reel. */}
+              <StoryAvatar
+                id={item.userId}
+                name={author?.name ?? ''}
+                size={sizes.avatarSm + 6}
+                bereich="videos"
+                onPressOhneStory={() => onOpenProfile(item.userId)}
+              />
+              <Druck onPress={() => onOpenProfile(item.userId)}>
+                <Text style={styles.authorName}>{author?.name}</Text>
+              </Druck>
+            </View>
             {/* Am eigenen Video weder "Folgen" noch die Glocke - wie in Home
                 (Punkt 62). Im Kurzformat stand beides bis zum 24.09.2026 noch
                 am eigenen Reel. */}

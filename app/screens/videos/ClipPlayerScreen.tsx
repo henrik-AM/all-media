@@ -6,6 +6,7 @@ import { Motiv } from '../../components/Motiv';
 import { istVideo, Videoflaeche, VideoSteuerung } from '../../components/Videoflaeche';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
@@ -496,9 +497,14 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
         </View>
 
         <View style={styles.autor}>
-          <Druck onPress={() => onOpenProfile(clip.userId)}>
-            <Avatar id={clip.userId} name={autor.name} size={sizes.avatarMd} />
-          </Druck>
+          {/* Kasten 11.1: Ring am Autor des Querformat-Videos. */}
+          <StoryAvatar
+            id={clip.userId}
+            name={autor.name}
+            size={sizes.avatarMd + 4}
+            bereich="videos"
+            onPressOhneStory={() => onOpenProfile(clip.userId)}
+          />
           <Druck style={styles.autorText} onPress={() => onOpenProfile(clip.userId)}>
             <Text style={styles.autorName}>{autor.name}</Text>
             <Text style={styles.autorSub}>{autor.handle}</Text>
@@ -745,7 +751,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
               </View>
             </View>
             <View style={styles.clipMeta}>
-              <Avatar id={c.userId} name={(alleNutzer[c.userId]?.name ?? '')} size={sizes.avatarSm} />
+              <StoryAvatar id={c.userId} name={alleNutzer[c.userId]?.name ?? ''} size={sizes.avatarSm + 4} bereich="videos" tippbar={false} />
               <View style={styles.clipTexte}>
                 <Text style={styles.clipTitel} numberOfLines={2}>
                   {c.title}

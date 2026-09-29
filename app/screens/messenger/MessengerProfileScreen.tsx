@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { AuthContext } from '../../contexts/AuthContext';
 import { SwitchBar } from '../../components/SwitchBar';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
@@ -114,9 +115,15 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
         * die ganze Breite, und zwischen den drei Teilen ist Luft.
         */}
       <View style={styles.head}>
-        <Druck disabled={!onAvatarPress} onPress={onAvatarPress}>
-          <Avatar id={user?.profile.id ?? 'me'} name={eigenesProfil.name} size={sizes.avatarXl} />
-        </Druck>
+        {/* Kasten 11.2: die eigene Story am eigenen Profil (Messenger). */}
+        <StoryAvatar
+          id={user?.profile.id ?? 'me'}
+          ringId="me"
+          name={eigenesProfil.name}
+          size={sizes.avatarXl + 6}
+          bereich="messenger"
+          onPressOhneStory={onAvatarPress}
+        />
         <View style={styles.headText}>
           <Text style={styles.name} numberOfLines={1}>{eigenesProfil.name}</Text>
           {!!user?.profile.handle && (

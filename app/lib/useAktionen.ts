@@ -140,7 +140,15 @@ export interface Aktionen {
      * (Schema 36) und nicht am Profil — dort ist es die Dauereinstellung.
      */
     inVideos?: boolean;
+    /** Kasten 11.5: false heisst „Nur Videos". */
+    inMessenger?: boolean;
+    /** Kasten 11.6: Bearbeitung als Daten. */
+    overlays?: any;
+    /** Kasten 11.6: markierte Personen. */
+    markiert?: string[];
   }) => Promise<string | null>;
+  /** Kasten 11.6: wen man markieren darf — aus der Datenbank. */
+  storyMarkierbar: (suche: string) => Promise<{ id: string; name: string; handle: string }[] | null>;
   storyLoeschen: (storyId: string, zurueck: Rueckweg) => Promise<void>;
   /** Livestream an (Titel) oder aus (null). Steht in profiles.live. */
   livestream: (titel: string | null) => Promise<void>;
@@ -423,6 +431,7 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         }),
       storyLoeschen: (id, zurueck) =>
         schreiben('Das Löschen', (c, i) => A.storyLoeschen(c, i, id), zurueck),
+      storyMarkierbar: (suche) => holen('Die Personenliste', (c) => A.storyMarkierbar(c, suche)),
       /*
        * Ein Livestream ist in der Datenbank ein Feld am eigenen Profil. Ohne
        * es merkte niemand ausserhalb dieses Bildschirms, dass man sendet —

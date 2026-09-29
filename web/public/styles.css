@@ -4506,3 +4506,136 @@ body.ist-abgemeldet .ptr-indicator {
 }
 .lyricsseite__fortschritt { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
 .lyricsseite__fortschritt i { display: block; height: 100%; width: 0; background: #ff3b30; }
+
+/*
+  Kasten 11.1: der Story-Ring an jedem Profilbild — eine Regel fuer alle
+  Stellen (mitStoryRing in app.js, StoryAvatar.tsx in der App). Der Ring
+  legt sich um das vorhandene Profilbild, statt es zu ersetzen: so bleiben
+  Groesse und Bild der Stelle, wie sie waren.
+*/
+.ringava {
+  display: inline-grid; place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  padding: 2px;
+  background: var(--story-grad);
+  cursor: pointer;
+  line-height: 0;
+}
+.ringava.is-viewed { background: var(--border); }
+:root[data-theme="dark"] .ringava.is-viewed { background: #2C3038; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ringava.is-viewed { background: #2C3038; }
+}
+.ringava__innen {
+  display: grid; place-items: center;
+  border-radius: 50%;
+  padding: 2px;
+  background: var(--surface);
+}
+.ringava:active { transform: scale(.95); }
+.profilstory__ring.is-viewed { background: var(--border); }
+
+/* Die eigene Kachel in der Leiste: Plus als eigener Knopf (Kasten 11.2). */
+.story { position: relative; }
+.story__add-knopf {
+  position: absolute;
+  top: 44px; left: 44px;
+  width: 21px; height: 21px;
+  border-radius: 50%;
+  background: var(--brand-grad);
+  color: #fff;
+  border: 2.5px solid var(--surface);
+  display: grid; place-items: center;
+  z-index: 2;
+}
+.story__add-knopf svg { width: 12px; height: 12px; stroke-width: 3; }
+
+/* ---------- Story-Betrachter: Flaeche, Bearbeitung (Kasten 11.4/11.6) ---------- */
+.storyflaeche {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #000;
+}
+.storyflaeche > img, .storyflaeche > video {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+}
+.storyschicht { position: absolute; inset: 0; pointer-events: none; }
+.storyschicht__filter { position: absolute; inset: 0; }
+.storyschicht__text {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 82%;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,.45);
+}
+.storyschicht__schild {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  color: #fff;
+  font-size: 13px; font-weight: 600;
+  background: rgba(0,0,0,.6);
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.viewer__weitere {
+  height: 38px; padding: 0 14px; border-radius: 19px;
+  background: rgba(255,255,255,.14); color: #fff;
+  font-weight: 600; font-size: 13.5px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.viewer__weitere svg { width: 16px; height: 16px; }
+.viewer__ton { width: 34px; height: 34px; display: grid; place-items: center; color: #fff; }
+.viewer__ton svg { width: 20px; height: 20px; }
+
+/* ---------- Story-Bearbeitung (Kasten 11.6) ---------- */
+.storyedit {
+  position: absolute; inset: 0; z-index: 45;
+  background: #000; color: #fff;
+  display: flex; flex-direction: column;
+}
+.storyedit__kopf { display: flex; align-items: center; gap: 8px; padding: 12px; }
+.storyedit__kopf .storyedit__zu { width: 36px; height: 36px; display: grid; place-items: center; color: #fff; }
+.storyedit__kopf .storyedit__zu svg { width: 22px; height: 22px; }
+.storyedit__werkzeuge { margin-left: auto; display: flex; gap: 8px; }
+.storyedit__werkzeug {
+  min-width: 40px; height: 40px; padding: 0 10px; border-radius: 20px;
+  background: rgba(255,255,255,.14); color: #fff; font-weight: 700; font-size: 15px;
+}
+.storyedit__werkzeug.is-active { background: #fff; color: #000; }
+.storyedit__buehne { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; }
+.storyedit__buehne .storyschicht__text,
+.storyedit__buehne .storyschicht__schild { pointer-events: auto; cursor: grab; touch-action: none; user-select: none; }
+.storyedit__leiste { padding: 10px 12px; display: flex; gap: 8px; overflow-x: auto; }
+.storyedit__leiste:empty { display: none; }
+.storyedit__chip {
+  flex: 0 0 auto; height: 34px; padding: 0 12px; border-radius: 17px;
+  background: rgba(255,255,255,.14); color: #fff; font-size: 13.5px; white-space: nowrap;
+}
+.storyedit__chip.is-active { background: #fff; color: #000; }
+.storyedit__farbe { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,.6); }
+.storyedit__farbe.is-active { border-color: #fff; box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
+.storyedit__eingabe {
+  flex: 1 1 200px; min-width: 160px; height: 38px; border-radius: 19px;
+  border: 1px solid rgba(255,255,255,.4); background: rgba(0,0,0,.4); color: #fff; padding: 0 14px; outline: none;
+}
+.storyedit__personen { display: flex; flex-direction: column; gap: 4px; padding: 0 12px 8px; max-height: 30vh; overflow-y: auto; }
+.storyedit__person { display: flex; align-items: center; gap: 10px; padding: 6px 4px; color: #fff; text-align: left; }
+.storyedit__person small { opacity: .7; }
+.storyedit__hinweis { padding: 4px 12px 8px; font-size: 12.5px; opacity: .75; }
+.storyedit__ziele { display: flex; gap: 10px; padding: 12px; }
+.storyedit__ziel {
+  flex: 1 1 0; height: 46px; border-radius: 23px;
+  background: rgba(255,255,255,.16); color: #fff; font-weight: 600; font-size: 14px;
+}
+.storyedit__ziel:last-child { background: var(--brand-grad); }

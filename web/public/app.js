@@ -153,6 +153,9 @@ const state = {
    * stand in beiden Bereichen dieselbe Liste.
    */
   storiesVideos: [],
+  // Kasten 11.1: alle sichtbaren Videos-Storys, auch von Nichtgefolgten —
+  // daraus kommt der Ring an Beitragskoepfen und Profilen.
+  storiesVideosAlle: [],
   contacts: [],
   communities: [],
   videos: [],
@@ -299,18 +302,75 @@ function eigenerAvatar(me, size = 44, extra = '') {
  * Story bleibt es der schlichte Avatar; ein Ring, der immer da ist, sagt
  * nichts mehr aus.
  */
-function eigenerAvatarMitStory(me, size = 88) {
-  // Ob eine eigene Story laeuft, steht in der geladenen Leiste — bis zum
-  // 09.09.2026 stand es im Browserspeicher, und der wusste nichts von
-  // Storys, die auf dem Handy entstanden oder abgelaufen waren.
-  const story = (state.stories || []).find((s) => s.own);
-  if (!story?.mediaUri) return eigenerAvatar(me, size, 'has-status');
+function eigenerAvatarMitStory(me, size = 88, bereich = 'videos') {
+  /*
+   * Kasten 11.1: dieselbe Regel wie jeder andere Ring (storyRingVon). Bis
+   * 29.09.2026 las diese Stelle nur die Messenger-Leiste — eine Story „Nur
+   * Videos" hatte am eigenen Videos-Profil keinen Ring.
+   */
+  const ring = storyRingVon('me', bereich);
+  if (ring.status === 'keiner') return eigenerAvatar(me, size, 'has-status');
 
-  return `<button class="profilstory" data-eigene-story aria-label="Deine Story ansehen">
+  return `<button class="profilstory" data-eigene-story data-ringbereich="${bereich}" data-testid="story-ring" aria-label="Deine Story ansehen">
     <span class="profilstory__ring">
       <span class="profilstory__innen">${eigenerAvatar(me, size)}</span>
     </span>
   </button>`;
+}
+
+/* ------------------------------------------------ Story-Ring (Kasten 11.1) */
+/*
+ * Henrik am 21.09.2026: „Unter Home wird kein Story-Ring angezeigt, obwohl
+ * das Profil eine Story online hat. Henrik erwartet weitere solche Fälle."
+ *
+ * Jede Stelle entschied vorher selbst, ob jemand „eine Story hat" — der
+ * Beitragskopf zeichnete den Ring sogar immer. Jetzt gibt es genau eine
+ * Antwort: StoryRegeln.ringFuer (gemeinsam/story.js), dieselbe wie in der App
+ * (app/contexts/StoryContext.tsx, app/components/StoryAvatar.tsx).
+ *
+ *   bereich 'videos'    — Home, Kurzformat, Querformat, Profil, Suche,
+ *                         Kommentare: alle sichtbaren Videos-Storys
+ *   bereich 'messenger' — Chatliste, Chatkopf, Kontaktprofil,
+ *                         Messenger-Profil: die Messenger-Leiste
+ */
+function storyListen() {
+  return {
+    messenger: state.stories || [],
+    videos: state.storiesVideos || [],
+    videosAlle: state.storiesVideosAlle || state.storiesVideos || [],
+  };
+}
+
+/** Die eigene Person heisst in den Listen 'me' — auch unter ihrer UUID. */
+function ringKennung(userId) {
+  return istEigen(userId) ? 'me' : userId;
+}
+
+function storyRingVon(userId, bereich = 'videos') {
+  if (!userId || typeof StoryRegeln === 'undefined') return { status: 'keiner', start: null, anzahl: 0 };
+  return StoryRegeln.ringFuer(StoryRegeln.ringListe(storyListen(), bereich), ringKennung(userId));
+}
+
+/**
+ * Ein Profilbild mit Ring — nur, wenn die Person im Bereich eine Story hat.
+ * Ein <span> statt eines Knopfs: viele Profilbilder stehen schon in einem
+ * Knopf (Suchtreffer, Chatzeile), und ein Knopf im Knopf zerlegt der Browser.
+ * Der Klick laeuft ueber den Klickfaenger der App (data-ringstory).
+ */
+function mitStoryRing(userId, avatarHtml, bereich = 'videos') {
+  const ring = storyRingVon(userId, bereich);
+  if (ring.status === 'keiner') return avatarHtml;
+  return `<span class="ringava ${ring.status === 'gesehen' ? 'is-viewed' : ''}" role="button" tabindex="0"
+      data-ringstory="${esc(ringKennung(userId))}" data-ringbereich="${bereich}" data-testid="story-ring"
+      aria-label="Story ansehen"><span class="ringava__innen">${avatarHtml}</span></span>`;
+}
+
+/** Die Storys einer Person ab der ersten ungesehenen abspielen. */
+function openStoryVon(userId, bereich = 'videos') {
+  const ring = storyRingVon(userId, bereich);
+  if (!ring.start) return false;
+  openStory(ring.start, { bereich });
+  return true;
 }
 
 /*
@@ -1122,7 +1182,7 @@ function filteredChats() {
 function renderChats() {
   const list = filteredChats();
   main.innerHTML = `
-    ${storyRail()}
+    ${storyRail(state.stories, 'messenger')}
     <div class="pagehead">
       <div class="searchrow">
         <label class="searchbox">
@@ -1434,7 +1494,7 @@ function chatRow(c) {
   return `
     <li>
       <button class="row ${c.unread ? 'is-unread' : ''}" data-chat="${c.id}">
-        ${avatarOf(c, 54)}
+        ${c.isGroup ? avatarOf(c, 54) : mitStoryRing(c.userId, avatarOf(c, 54), 'messenger')}
         <div class="row__body">
           <div class="row__top">
             <span class="row__name">${esc(c.name)}</span>
@@ -1578,91 +1638,361 @@ async function aufnahmeHolen(art = 'photo', ausGalerie = false) {
 }
 
 /*
- * Ein fertiges Bild als eigene Story setzen.
+ * Ein fertiges Bild als eigene Story setzen — erst bearbeiten, dann das Ziel.
  *
- * ZWEI DINGE WAREN HIER FALSCH (bis 09.09.2026)
+ * Henrik am 21.09.2026 (Kasten 11):
+ *   11.5 „Story-Ziel: aus Videos nur Videos oder Messenger und Videos, im
+ *        Messenger umgekehrt." Bis dahin fragte dieses Blatt nur „Nur im
+ *        Messenger / Auch unter Videos" — egal, woher man kam; „nur Videos"
+ *        gab es nicht.
+ *   11.6 „Story-Bearbeitung fehlt komplett: kein Text, keine Filter, keine
+ *        Schrift, kein Markieren von Personen."
  *
- * 1. Die Story kam nie in der Datenbank an. Sie ging in den `localStorage`
- *    dieses einen Browsers, und darueber stand „Deine Story ist online".
- *    Niemand sonst konnte sie sehen. Denselben Fehler hatte die App bis zum
- *    01.09.2026; dort wurde er behoben, hier nicht.
+ * Die Zielknoepfe kommen aus StoryRegeln.zielWahl — dieselbe Wahl wie in der
+ * App (StoryEditorScreen.tsx). Steht die Story-Sichtbarkeit nicht auf
+ * „Alle", gibt es den Videos-Bereich fuer Storys nicht (Schema 30/36); dann
+ * bleibt nur „Nur Messenger".
  *
- * 2. Sie erschien in beiden Leisten — Messenger und Videos —, weil die
- *    eigene Kachel ueberall unbesehen vorne dranhing.
- *
- * Henrik am 07.09.2026: „Storys nicht mehr bereichsuebergreifend
- * (Messenger/Videos strikt getrennt); beim Posten fragen ob uebergreifend
- * teilen." Gefragt wird jetzt — aber nur, wenn es etwas zu entscheiden gibt:
- * steht die Story-Sichtbarkeit nicht auf „Alle", kann sie ohnehin nicht in
- * einen Bereich, in dem einem auch Fremde folgen. Eine Frage mit nur einer
- * moeglichen Antwort ist keine Frage.
- *
- * Gleiche Regel in App.tsx (`storyAufgenommen` / `storyPosten`).
+ * `data-wo` bleibt „messenger" und „beides" wie vorher (test/_feedback.js),
+ * neu ist „videos".
  */
-function alsStorySetzen(bild) {
-  if (sicht('story').stufe !== 'alle') return storyPosten(bild, false);
+function aktuellerStoryBereich() {
+  return state.area === 'videos' ? 'videos' : 'messenger';
+}
 
-  openSheet(
-    'Wo soll die Story stehen?',
-    `<div class="sheet__body">
-       <div class="aufnahme__vorschau" style="background-image:url(${bild})"></div>
-       <div class="sheet__hint">
-         Im Messenger sehen sie deine Kontakte, unter Videos alle, die dir folgen.
-       </div>
-       <button class="item" data-wo="messenger">
-         <span class="item__icon">${ICONS.chat}</span>
-         <span class="item__label">Nur im Messenger</span>
-         <span class="row__chevron">${ICONS.chevron}</span>
-       </button>
-       <button class="item" data-wo="beides">
-         <span class="item__icon">${ICONS.play}</span>
-         <span class="item__label">Auch unter Videos</span>
-         <span class="row__chevron">${ICONS.chevron}</span>
-       </button>
-     </div>`,
-    (sheet, close) => {
-      sheet.querySelectorAll('[data-wo]').forEach((b) =>
+function alsStorySetzen(bild, bereich = aktuellerStoryBereich(), mediaTyp = 'image') {
+  openStoryBearbeiten(bild, bereich, mediaTyp);
+}
+
+function openStoryBearbeiten(bild, bereich = 'messenger', mediaTyp = 'image') {
+  const darfVideos = sicht('story').stufe === 'alle';
+  const ziele = StoryRegeln.zielWahl(bereich, darfVideos);
+  const WO = { messenger: 'messenger', beide: 'beides', videos: 'videos' };
+
+  const o = { filter: 'keiner', texte: [], markiert: [] };
+  let werkzeug = null; // 'text' | 'filter' | 'markieren'
+  let textEntwurf = null; // { text, schrift, farbe, hintergrund, groesse, x, y, index? }
+  let sucheZeit;
+
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="storyedit" data-testid="story-editor">
+      <div class="storyedit__kopf">
+        <button class="storyedit__zu" id="storyEditZu" aria-label="Verwerfen">${ICONS.close}</button>
+        <div class="storyedit__werkzeuge">
+          <button class="storyedit__werkzeug" data-werkzeug="text" aria-label="Text">Aa</button>
+          <button class="storyedit__werkzeug" data-werkzeug="filter" aria-label="Filter">${ICONS.image}</button>
+          <button class="storyedit__werkzeug" data-werkzeug="markieren" aria-label="Personen markieren">@</button>
+        </div>
+      </div>
+      <div class="storyedit__buehne">
+        <div class="storyflaeche" id="storyEditFlaeche">
+          <img src="${bild}" alt="Deine Aufnahme" />
+          <div id="storyEditSchicht"></div>
+        </div>
+      </div>
+      <div id="storyEditWerkzeug"></div>
+      ${
+        bereich === 'videos' && !darfVideos
+          ? `<div class="storyedit__hinweis">Deine Story-Sichtbarkeit steht nicht auf „Alle" — Storys gehen deshalb nur in den Messenger.</div>`
+          : ''
+      }
+      <div class="storyedit__ziele">
+        ${ziele
+          .map(
+            (z) =>
+              `<button class="storyedit__ziel" data-wo="${WO[z.key]}" data-testid="story-ziel-${z.key}">${esc(z.label)}</button>`
+          )
+          .join('')}
+      </div>
+    </div>`;
+
+  const flaeche = $('#storyEditFlaeche');
+  const werkzeugFeld = $('#storyEditWerkzeug');
+
+  const zeichnen = () => {
+    const anzeigen = { ...o, texte: o.texte.slice() };
+    // Der Text in Arbeit steht schon da, wo er landen wird.
+    if (textEntwurf && textEntwurf.text.trim()) {
+      if (textEntwurf.index !== undefined) anzeigen.texte[textEntwurf.index] = textEntwurf;
+      else anzeigen.texte.push(textEntwurf);
+    }
+    $('#storyEditSchicht').innerHTML = storyOverlayHtml(anzeigen, { bearbeitbar: true });
+    storySchichtSkalieren(flaeche);
+    ziehbarMachen();
+    overlay.querySelectorAll('[data-werkzeug]').forEach((b) =>
+      b.classList.toggle('is-active', b.dataset.werkzeug === werkzeug)
+    );
+  };
+
+  /*
+   * Texte und Namensschilder mit dem Finger verschieben — Lage relativ zur
+   * Flaeche, damit sie auf jedem Bildschirm an derselben Stelle stehen.
+   * Ein Tippen ohne Ziehen auf einen Text oeffnet ihn zum Bearbeiten.
+   */
+  const ziehbarMachen = () => {
+    flaeche.querySelectorAll('[data-zieh]').forEach((el) => {
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const art = el.dataset.zieh;
+        const i = Number(el.dataset.index);
+        const rahmen = flaeche.getBoundingClientRect();
+        let bewegt = false;
+        el.setPointerCapture?.(e.pointerId);
+        const ziehen = (ev) => {
+          bewegt = true;
+          const x = Math.min(0.95, Math.max(0.05, (ev.clientX - rahmen.left) / rahmen.width));
+          const y = Math.min(0.95, Math.max(0.05, (ev.clientY - rahmen.top) / rahmen.height));
+          el.style.left = x * 100 + '%';
+          el.style.top = y * 100 + '%';
+          const ziel = art === 'text' ? (textEntwurf && textEntwurf.index === i ? textEntwurf : o.texte[i]) : o.markiert[i];
+          if (ziel) {
+            ziel.x = x;
+            ziel.y = y;
+          }
+        };
+        const los = () => {
+          el.removeEventListener('pointermove', ziehen);
+          el.removeEventListener('pointerup', los);
+          el.removeEventListener('pointercancel', los);
+          if (!bewegt && art === 'text' && !textEntwurf) {
+            textEntwurf = { ...o.texte[i], index: i };
+            werkzeug = 'text';
+            werkzeugZeigen();
+          }
+          if (!bewegt && art === 'markiert') {
+            // Ein Tippen auf das Schild nimmt die Markierung wieder heraus.
+            o.markiert.splice(i, 1);
+            zeichnen();
+          }
+        };
+        el.addEventListener('pointermove', ziehen);
+        el.addEventListener('pointerup', los);
+        el.addEventListener('pointercancel', los);
+      });
+    });
+  };
+
+  const werkzeugZeigen = () => {
+    if (werkzeug === 'text') {
+      if (!textEntwurf) {
+        textEntwurf = { text: '', schrift: 'klassisch', farbe: '#FFFFFF', hintergrund: false, groesse: 28, x: 0.5, y: 0.4 };
+      }
+      werkzeugFeld.innerHTML = `
+        <div class="storyedit__leiste">
+          <input class="storyedit__eingabe" id="storyTextEingabe" maxlength="${StoryRegeln.TEXT_LAENGE}"
+                 placeholder="Text eingeben" value="${esc(textEntwurf.text)}" />
+          <button class="storyedit__chip" id="storyTextKleiner" aria-label="Kleiner">A−</button>
+          <button class="storyedit__chip" id="storyTextGroesser" aria-label="Größer">A+</button>
+          <button class="storyedit__chip ${textEntwurf.hintergrund ? 'is-active' : ''}" id="storyTextGrund">Hintergrund</button>
+          <button class="storyedit__chip is-active" id="storyTextFertig">Fertig</button>
+        </div>
+        <div class="storyedit__leiste">
+          ${StoryRegeln.SCHRIFTEN.map(
+            (sch) => `<button class="storyedit__chip ${sch.key === textEntwurf.schrift ? 'is-active' : ''}" data-schrift="${sch.key}"
+               style="font-family:${esc(sch.web)};font-weight:${sch.gewicht};font-style:${sch.kursiv ? 'italic' : 'normal'}">${esc(sch.label)}</button>`
+          ).join('')}
+        </div>
+        <div class="storyedit__leiste">
+          ${StoryRegeln.FARBEN.map(
+            (f) => `<button class="storyedit__farbe ${f === textEntwurf.farbe ? 'is-active' : ''}" data-farbe="${f}" style="background:${f}" aria-label="Farbe ${f}"></button>`
+          ).join('')}
+        </div>`;
+      const eingabe = $('#storyTextEingabe');
+      eingabe.focus();
+      eingabe.addEventListener('input', () => {
+        textEntwurf.text = eingabe.value;
+        zeichnen();
+      });
+      eingabe.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          $('#storyTextFertig').click();
+        }
+      });
+      $('#storyTextKleiner').addEventListener('click', () => {
+        textEntwurf.groesse = Math.max(14, textEntwurf.groesse - 4);
+        zeichnen();
+      });
+      $('#storyTextGroesser').addEventListener('click', () => {
+        textEntwurf.groesse = Math.min(64, textEntwurf.groesse + 4);
+        zeichnen();
+      });
+      $('#storyTextGrund').addEventListener('click', (e) => {
+        textEntwurf.hintergrund = !textEntwurf.hintergrund;
+        e.currentTarget.classList.toggle('is-active', textEntwurf.hintergrund);
+        zeichnen();
+      });
+      werkzeugFeld.querySelectorAll('[data-schrift]').forEach((b) =>
         b.addEventListener('click', () => {
-          close();
-          storyPosten(bild, b.dataset.wo === 'beides');
+          textEntwurf.schrift = b.dataset.schrift;
+          werkzeugFeld.querySelectorAll('[data-schrift]').forEach((x) => x.classList.toggle('is-active', x === b));
+          zeichnen();
         })
       );
-    },
-    { schliessen: true }
+      werkzeugFeld.querySelectorAll('[data-farbe]').forEach((b) =>
+        b.addEventListener('click', () => {
+          textEntwurf.farbe = b.dataset.farbe;
+          werkzeugFeld.querySelectorAll('[data-farbe]').forEach((x) => x.classList.toggle('is-active', x === b));
+          zeichnen();
+        })
+      );
+      $('#storyTextFertig').addEventListener('click', textUebernehmen);
+    } else if (werkzeug === 'filter') {
+      werkzeugFeld.innerHTML = `<div class="storyedit__leiste">${FILTER.map(
+        (f) => `<button class="storyedit__chip ${f.key === o.filter ? 'is-active' : ''}" data-storyfilter="${f.key}">${esc(f.label)}</button>`
+      ).join('')}</div>`;
+      werkzeugFeld.querySelectorAll('[data-storyfilter]').forEach((b) =>
+        b.addEventListener('click', () => {
+          o.filter = b.dataset.storyfilter;
+          werkzeugFeld.querySelectorAll('[data-storyfilter]').forEach((x) => x.classList.toggle('is-active', x === b));
+          zeichnen();
+        })
+      );
+    } else if (werkzeug === 'markieren') {
+      werkzeugFeld.innerHTML = `
+        <div class="storyedit__leiste">
+          <input class="storyedit__eingabe" id="storyMarkSuche" placeholder="Person suchen" autocomplete="off" />
+        </div>
+        <div class="storyedit__personen" id="storyMarkListe"></div>`;
+      const suche = $('#storyMarkSuche');
+      const laden = async () => {
+        const liste = $('#storyMarkListe');
+        if (!liste) return;
+        let personen = [];
+        try {
+          const r = await (await fetch(`/api/story-markierbar?suche=${encodeURIComponent(suche.value.trim())}`)).json();
+          if (r.ok === false) throw new Error(r.error);
+          personen = r.personen || [];
+        } catch (fehler) {
+          liste.innerHTML = `<div class="storyedit__hinweis">Die Liste ließ sich nicht laden: ${esc(fehler.message || fehler)}</div>`;
+          return;
+        }
+        const schon = new Set(o.markiert.map((m) => m.userId));
+        const frei = personen.filter((p) => !schon.has(p.id));
+        /*
+         * Wer hier fehlt, hat „Wer darf mich markieren" enger gestellt — die
+         * Liste kommt aus der Datenbank (story_markierbar), die diese
+         * Einstellung der anderen Person kennt.
+         */
+        liste.innerHTML = frei.length
+          ? frei
+              .map(
+                (p) => `<button class="storyedit__person" data-markieren="${esc(p.id)}" data-name="${esc(p.name || p.handle || '')}">
+                   <strong>${esc(p.name || '')}</strong> <small>${esc(p.handle || '')}</small></button>`
+              )
+              .join('')
+          : `<div class="storyedit__hinweis">${
+              suche.value.trim().length >= 2
+                ? 'Niemand gefunden, der sich von dir markieren lässt.'
+                : 'Kontakte und Profile, denen du folgst oder die dir folgen — sofern sie Markierungen durch dich erlauben. Tippe mindestens zwei Buchstaben, um weiter zu suchen.'
+            }</div>`;
+        liste.querySelectorAll('[data-markieren]').forEach((b) =>
+          b.addEventListener('click', () => {
+            if (o.markiert.length >= StoryRegeln.MARKIERUNGEN_HOECHSTENS) return toast('Mehr Personen passen nicht in eine Story');
+            o.markiert.push({ userId: b.dataset.markieren, name: b.dataset.name, x: 0.5, y: 0.7 + (o.markiert.length % 4) * 0.06 });
+            zeichnen();
+            laden();
+          })
+        );
+      };
+      suche.addEventListener('input', () => {
+        clearTimeout(sucheZeit);
+        sucheZeit = setTimeout(laden, 250);
+      });
+      laden();
+      suche.focus();
+    } else {
+      werkzeugFeld.innerHTML = '';
+    }
+    zeichnen();
+  };
+
+  const textUebernehmen = () => {
+    if (!textEntwurf) return;
+    const t = { ...textEntwurf };
+    const index = t.index;
+    delete t.index;
+    if (index !== undefined) {
+      if (t.text.trim()) o.texte[index] = t;
+      else o.texte.splice(index, 1);
+    } else if (t.text.trim()) {
+      if (o.texte.length >= StoryRegeln.TEXTE_HOECHSTENS) toast('Mehr Texte passen nicht in eine Story');
+      else o.texte.push(t);
+    }
+    textEntwurf = null;
+    werkzeug = null;
+    werkzeugZeigen();
+  };
+
+  overlay.querySelectorAll('[data-werkzeug]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (textEntwurf) textUebernehmen();
+      werkzeug = werkzeug === b.dataset.werkzeug ? null : b.dataset.werkzeug;
+      werkzeugZeigen();
+    })
   );
+
+  $('#storyEditZu').addEventListener('click', closeOverlay);
+
+  overlay.querySelectorAll('[data-wo]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (textEntwurf) textUebernehmen();
+      const z = ziele.find((x) => WO[x.key] === b.dataset.wo) || ziele[0];
+      closeOverlay();
+      storyPosten(bild, {
+        inVideos: z.inVideos,
+        inMessenger: z.inMessenger,
+        overlays: StoryRegeln.overlaysPruefen(o),
+        mediaTyp,
+      });
+    })
+  );
+
+  zeichnen();
+  requestAnimationFrame(() => storySchichtSkalieren(flaeche));
 }
 
 /**
  * Die Story wirklich abschicken: erst die Aufnahme in den Speicher, dann die
- * Zeile in die Datenbank.
+ * Zeile in die Datenbank — mit Ziel, Bearbeitung und Markierungen.
  *
  * Erst hochladen, dann anlegen — genau wie `storyAnlegen` in
  * app/lib/useAktionen.ts. Was hier vorliegt, ist eine Datenadresse
  * (`data:image/jpeg;base64,…`) aus `bildVerkleinern`. Stuende die in der
  * Datenbank, waere die Zeile ein halbes Megabyte gross und die App saehe an
  * der Stelle nichts.
+ *
+ * Aeltere Aufrufe uebergeben nur `true/false` fuer „auch unter Videos".
  */
-async function storyPosten(bild, inVideos) {
+async function storyPosten(bild, wahl) {
+  const w = typeof wahl === 'object' && wahl ? wahl : { inVideos: Boolean(wahl), inMessenger: true };
   const hoch = await api('/api/hochladen', { ordner: 'stories', aufnahme: bild });
   if (!hoch.ok) return toast(hoch.error || 'Die Aufnahme ließ sich nicht speichern');
 
+  const overlays = w.overlays && StoryRegeln.hatOverlays(w.overlays) ? w.overlays : null;
   const antwort = await api('/api/stories', {
     mediaUrl: hoch.url,
-    mediaTyp: 'image',
-    inVideos,
+    mediaTyp: w.mediaTyp || 'image',
+    inVideos: Boolean(w.inVideos),
+    inMessenger: w.inMessenger !== false,
+    overlays,
+    markiert: overlays ? overlays.markiert.map((m) => m.userId) : [],
   });
   if (!antwort.ok) return toast(antwort.error || 'Die Story ließ sich nicht anlegen');
 
   /*
-   * Der Server schickt beide Leisten frisch zurueck. Sie zu uebernehmen ist
+   * Der Server schickt die Leisten frisch zurueck. Sie zu uebernehmen ist
    * kuerzer als zu raten, wie die eigene Kachel jetzt aussieht — und es ist
-   * der einzige Weg, an dem sich die Trennung ablesen laesst: unter Videos
-   * steht die Story nur, wenn eben „Auch unter Videos" gewaehlt wurde.
+   * der einzige Weg, an dem sich das Ziel ablesen laesst.
    */
   state.stories = antwort.stories || state.stories;
   state.storiesVideos = antwort.storiesVideos || state.storiesVideos;
+  state.storiesVideosAlle = antwort.storiesVideosAlle || state.storiesVideosAlle;
 
-  toast(inVideos ? 'Deine Story ist online — auch unter Videos' : 'Deine Story ist online');
+  const wo = w.inVideos && w.inMessenger !== false ? ' — im Messenger und unter Videos' : w.inVideos ? ' — nur unter Videos' : '';
+  const fehlt = (antwort.nichtMarkiert || []).length;
+  toast(`Deine Story ist online${wo}${fehlt ? ` (${fehlt} Markierung${fehlt === 1 ? '' : 'en'} nicht erlaubt)` : ''}`);
   render();
 }
 
@@ -1681,14 +2011,15 @@ async function storyLoeschen(id) {
 
   state.stories = antwort.stories || state.stories;
   state.storiesVideos = antwort.storiesVideos || state.storiesVideos;
+  state.storiesVideosAlle = antwort.storiesVideosAlle || state.storiesVideosAlle;
   toast('Deine Story wurde gelöscht');
   render();
 }
 
 /** Dateiauswahl oeffnen und das Ergebnis als eigene Story uebernehmen. */
-async function storyAufnehmen(art = 'photo', ausGalerie = false) {
+async function storyAufnehmen(art = 'photo', ausGalerie = false, bereich = aktuellerStoryBereich()) {
   const bild = await aufnahmeHolen(art, ausGalerie);
-  if (bild) alsStorySetzen(bild);
+  if (bild) alsStorySetzen(bild, bereich);
 }
 
 /*
@@ -1749,7 +2080,7 @@ function aufnahmeMenue(bild) {
         b.addEventListener('click', () => {
           close();
           if (b.dataset.verwenden === 'insight') return openInsightSenden(bild);
-          if (b.dataset.verwenden === 'story') return alsStorySetzen(bild);
+          if (b.dataset.verwenden === 'story') return alsStorySetzen(bild, 'messenger');
           aufnahmeAnChat(bild);
         })
       );
@@ -1813,7 +2144,7 @@ function aufnahmeAnChat(bild) {
 function alleStorys() {
   const raus = [];
   const gesehen = new Set();
-  for (const s of [...state.stories, ...state.storiesVideos]) {
+  for (const s of [...state.stories, ...state.storiesVideos, ...(state.storiesVideosAlle || [])]) {
     if (gesehen.has(s.id)) continue;
     gesehen.add(s.id);
     raus.push(s);
@@ -1841,7 +2172,8 @@ function alleStorys() {
  *
  * Gleiche Regel in app/components/StoryRail.tsx.
  */
-function storyRail(liste) {
+function storyRail(liste, bereich) {
+  const wo = bereich || (liste && liste === state.storiesVideos ? 'videos' : 'messenger');
   const nachPerson = new Map();
   for (const s of liste || state.stories) {
     if (!nachPerson.has(s.userId)) nachPerson.set(s.userId, []);
@@ -1849,7 +2181,7 @@ function storyRail(liste) {
   }
   // Die Map behält die Reihenfolge des Eintragens: die eigene Kachel bleibt
   // links, die fremden dahinter so, wie der Server sie geliefert hat.
-  return `<div class="storyrail">${[...nachPerson.values()].map(storyItem).join('')}</div>`;
+  return `<div class="storyrail" data-storybereich="${wo}">${[...nachPerson.values()].map(storyItem).join('')}</div>`;
 }
 
 function storyItem(storys) {
@@ -1859,8 +2191,10 @@ function storyItem(storys) {
   // Ein Bild hat die Kachel, sobald irgendeine der Storys eines hat — eine
   // Person mit Story soll nie aussehen wie eine ohne.
   const bild = s.mediaUri || (storys.find((x) => x.mediaUri) || {}).mediaUri;
-  const kern = bild
-    ? `<div class="story__inner" style="background-image:url(${bild});background-size:cover;background-position:center"></div>`
+  // Video-Storys: das Bild waere ein Film — als Kachel reichen die Initialen.
+  const standbild = bild && s.mediaType !== 'video' ? bild : null;
+  const kern = standbild
+    ? `<div class="story__inner" style="background-image:url(${standbild});background-size:cover;background-position:center"></div>`
     : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
 
   // Der dritte Zustand: keine Story, kein Ring. Es gibt ihn nur bei der
@@ -1876,17 +2210,34 @@ function storyItem(storys) {
       </button>`;
   }
 
+  /*
+   * Kasten 11.2: die eigene Kachel mit Story bleibt bunt (sie ist online,
+   * auch wenn man sie selbst „gesehen" hat — wie bei Instagram), und das Plus
+   * bleibt: ein eigener Knopf daneben fuehrt zur Kamera fuer die naechste
+   * Story. Bis 29.09.2026 verschwand das Plus mit der ersten Story, und eine
+   * zweite liess sich aus der Leiste nicht mehr anlegen (Kasten 11.4).
+   * Gleiche Regel in app/components/StoryRail.tsx.
+   */
+  const grau = !s.own && !ungesehen;
   return `
-    <button class="story" data-story="${s.id}">
-      <div class="story__ring ${ungesehen ? '' : 'is-viewed'}">${kern}</div>
-      <div class="story__name">${esc(s.name)}</div>
-    </button>`;
+    <div class="story">
+      <button class="story" data-story="${s.id}" style="width:100%">
+        <div class="story__ring ${grau ? 'is-viewed' : ''}">${kern}</div>
+        <div class="story__name">${esc(s.name)}</div>
+      </button>
+      ${
+        s.own
+          ? `<button class="story__add-knopf" data-story-weitere aria-label="Weitere Story hinzufügen">${ICONS.plus}</button>`
+          : ''
+      }
+    </div>`;
 }
 
 function bindStoryRail() {
   main.querySelectorAll('[data-story]').forEach((el) =>
     el.addEventListener('click', () => {
       const s = alleStorys().find((x) => x.id === el.dataset.story);
+      const bereich = el.closest('[data-storybereich]')?.dataset.storybereich || 'messenger';
       /*
        * Henrik, 07.09.2026: "Story-Plus-Button zeigt unnötig „Was möchtest du
        * damit machen"-Dialog (nur bei normaler Kamera nötig)." Wer auf das
@@ -1894,8 +2245,16 @@ function bindStoryRail() {
        * Kamera fragt danach nicht noch einmal.
        * Gleiche Regel in app/App.tsx (`zielStory`).
        */
-      if (s.own && !s.mediaUri) return openCamera(null, { zielStory: true });
-      openStory(s.id);
+      if (!s) return;
+      if (s.own && !s.mediaUri) return openCamera(null, { zielStory: true, storyBereich: bereich });
+      openStory(s.id, { bereich });
+    })
+  );
+  main.querySelectorAll('[data-story-weitere]').forEach((el) =>
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bereich = el.closest('[data-storybereich]')?.dataset.storybereich || 'messenger';
+      openCamera(null, { zielStory: true, storyBereich: bereich });
     })
   );
 }
@@ -2802,8 +3161,8 @@ function qrScannerOeffnen() {
         video: { facingMode: 'environment' },
       });
     } catch (fehler) {
-      console.error('Kamera:', fehler.message);
-      toast('Ohne Kamerazugriff geht das Scannen nicht');
+      console.error('Kamera:', fehler && fehler.message);
+      toast(kameraFehlerText(fehler));
       return beenden(null);
     }
 
@@ -3080,7 +3439,7 @@ async function openContactProfile(userId) {
 
     <div class="scroll">
       <div class="kp__kopf">
-        ${avatarForUser(userId, 104)}
+        ${mitStoryRing(userId, avatarForUser(userId, 104), 'messenger')}
         <div class="kp__name">${esc(u.name)}</div>
         ${u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
       </div>
@@ -3626,11 +3985,11 @@ async function openProfile(userId, variante) {
               hat; sonst bliebe der Ring ein Versprechen ohne Inhalt.
             */ ''}
           ${
-            alleStorys().some((st) => st.userId === userId)
-              ? `<button class="story__ring" data-profilstory="${esc(userId)}" style="width:88px;height:88px;padding:3px" aria-label="Story von ${esc(profile.name)} ansehen">
+            storyRingVon(userId, 'videos').status !== 'keiner'
+              ? `<button class="story__ring ${storyRingVon(userId, 'videos').status === 'gesehen' ? 'is-viewed' : ''}" data-profilstory="${esc(userId)}" data-testid="story-ring" style="width:88px;height:88px;padding:3px" aria-label="Story von ${esc(profile.name)} ansehen">
                    <span class="story__inner" style="background:${farbe(profile.color)};font-size:28px">${esc(profile.initials)}</span>
                  </button>`
-              : `<div class="story__ring is-viewed" style="width:88px;height:88px;padding:3px">
+              : `<div class="story__ring is-ohne" style="width:88px;height:88px;padding:3px">
                    <div class="story__inner" style="background:${farbe(profile.color)};font-size:28px">${esc(profile.initials)}</div>
                  </div>`
           }
@@ -3697,11 +4056,12 @@ async function openProfile(userId, variante) {
     void ladeSammlungen(profile.id, overlay);
 
     // Punkt 12: der Story-Ring auf einem fremden Profil oeffnet die Story.
-    overlay.querySelector('[data-profilstory]')?.addEventListener('click', () => {
-      const story = alleStorys().find((st) => st.userId === userId);
-      if (!story) return;
+    overlay.querySelector('[data-profilstory]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const ring = storyRingVon(userId, 'videos');
+      if (!ring.start) return;
       closeOverlay();
-      openStory(story.id);
+      openStory(ring.start, { bereich: 'videos' });
     });
 
     $('#profFollow').addEventListener('click', async () => {
@@ -3965,7 +4325,7 @@ function commentRow(c) {
   const u = user(c.userId);
   return `
     <div class="comment">
-      <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
+      ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
       <div class="comment__body">
         <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${esc(c.text)}</div>
         <div class="comment__meta">${esc(c.time)}</div>
@@ -4042,7 +4402,7 @@ async function umfragenHolen() {
 function renderHomeFeed() {
   main.innerHTML = `
     <div class="scroll" id="homeScroll">
-      ${storyRail(state.storiesVideos)}
+      ${storyRail(state.storiesVideos, 'videos')}
       <div class="postlist">${state.posts.filter(imFeed).map(postCard).join('')}</div>
     </div>`;
 
@@ -4067,8 +4427,7 @@ function renderHomeFeed() {
   main.querySelectorAll('[data-story-user]').forEach((btn) =>
     btn.addEventListener('click', () => {
       const userId = btn.dataset.storyUser;
-      const story = alleStorys().find((s) => s.userId === userId);
-      if (story) return openStory(story.id);
+      if (openStoryVon(userId, 'videos')) return;
       openProfile(userId);
     })
   );
@@ -4208,7 +4567,19 @@ function postCard(p) {
             data-open-story. Der Wert war deshalb immer undefined, und der
             Klick auf ein Profilbild im Feed hat nie etwas geoeffnet.
           */ ''}
-        <button class="story__ring story-ring-btn" style="width:40px;height:40px;padding:2px" data-story-user="${p.userId}">
+        ${/*
+            Kasten 11.1: Henrik am 21.09.2026 — „Unter Home wird kein
+            Story-Ring angezeigt, obwohl das Profil eine Story online hat."
+            Hier stand der Ring IMMER, mit oder ohne Story. Jetzt entscheidet
+            storyRingVon (gemeinsam/story.js) wie ueberall sonst: bunt,
+            grau oder keiner. Der Knopf bleibt — ohne Story fuehrt er zum
+            Profil.
+          */ ''}
+        <button class="story__ring story-ring-btn ${
+          { keiner: 'is-ohne', gesehen: 'is-viewed', neu: '' }[storyRingVon(p.userId, 'videos').status]
+        }" style="width:40px;height:40px;padding:2px" data-story-user="${p.userId}" ${
+          storyRingVon(p.userId, 'videos').status !== 'keiner' ? 'data-testid="story-ring"' : ''
+        }>
           <div class="story__inner" style="background:${farbe(u.color)};font-size:13px">${esc(u.initials)}</div>
         </button>
         <div class="post__who">
@@ -4616,7 +4987,7 @@ function videoSlide(v) {
       <div class="slide__meta">
         <div class="slide__author">
           <button class="slide__who" data-profile="${v.userId}">
-            <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
+            ${mitStoryRing(v.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
             <span class="slide__name">${esc(u.name)}</span>
           </button>
           ${/* Am eigenen Reel weder "Folgen" noch die Glocke - wie am Beitrag
@@ -4725,10 +5096,15 @@ function pttEinhaengen(communityId) {
 
   const start = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      return toast('Dieser Browser kann nicht aufnehmen');
+      return toast(kameraFehlerText(null, 'Mikrofon'));
+    }
+    let spur;
+    try {
+      spur = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (fehler) {
+      return toast(kameraFehlerText(fehler, 'Mikrofon'));
     }
     try {
-      const spur = await navigator.mediaDevices.getUserMedia({ audio: true });
       stuecke = [];
       aufnahme = new MediaRecorder(spur);
       aufnahme.addEventListener('dataavailable', (e) => stuecke.push(e.data));
@@ -7675,6 +8051,34 @@ function openInsightAnsehen(userId) {
 let kameraStrom = null;
 
 /** Strom und Aufnahme beenden. Wird bei jedem render() gerufen. */
+/**
+ * Kasten 11.7: Was schiefging, wenn der Browser die Kamera (oder das
+ * Mikrofon) nicht herausgibt — nach dem Fehlernamen von getUserMedia.
+ * Vorher hiess es immer nur „Ohne Kamerazugriff geht die Aufnahme nicht",
+ * auch wenn gar keine Kamera da war oder eine andere App sie belegte.
+ * Eine Webseite kann die Systemeinstellung nicht selbst oeffnen; der Text
+ * sagt deshalb, wo man den Zugriff erlaubt.
+ */
+function kameraFehlerText(fehler, geraet = 'Kamera') {
+  if (!window.isSecureContext) {
+    return `Die ${geraet} geht nur über eine sichere Verbindung (https).`;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return `Dieser Browser gibt keinen Zugriff auf die ${geraet}.`;
+  }
+  const name = fehler && fehler.name;
+  if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'PermissionDeniedError') {
+    return `Zugriff auf die ${geraet} verweigert. Erlaube ihn über das Schloss-Symbol neben der Adresse — am Mac zusätzlich unter Systemeinstellungen › Datenschutz & Sicherheit › ${geraet}.`;
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') {
+    return `Keine passende ${geraet} gefunden.`;
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') {
+    return `Die ${geraet} ist gerade belegt — schließe andere Programme, die sie benutzen, und versuche es noch einmal.`;
+  }
+  return `Ohne Zugriff auf die ${geraet} geht das nicht.`;
+}
+
 function kameraStromStoppen() {
   if (!kameraStrom) return;
   try {
@@ -7718,6 +8122,7 @@ function kameraLaufwerk(wurzel, fertig) {
   const stromOeffnen = async () => {
     kameraStromStoppen();
     try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('keine mediaDevices');
       kameraStrom = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: seite },
         // Ton nur beim Video: sonst fragt der Browser beim Fotografieren
@@ -7725,12 +8130,17 @@ function kameraLaufwerk(wurzel, fertig) {
         audio: mode === 'video',
       });
     } catch (fehler) {
-      console.error('Kamera:', fehler.message);
+      console.error('Kamera:', fehler && fehler.message);
       buehne.classList.add('camera__stage--leer');
-      if (!q('.camera__hinweis')) {
+      // Kasten 11.7: der Grund steht in der Buehne, und der Weg daneben —
+      // die Mediathek geht auch ohne Kamera.
+      const text = kameraFehlerText(fehler);
+      const da = q('.camera__hinweis');
+      if (da) da.textContent = text;
+      else {
         buehne.insertAdjacentHTML(
           'beforeend',
-          `${ICONS.camera}<p class="camera__hinweis">Ohne Kamerazugriff geht die Aufnahme nicht</p>`
+          `${ICONS.camera}<p class="camera__hinweis" data-testid="kamera-fehler">${esc(text)}</p>`
         );
       }
       return false;
@@ -8532,7 +8942,7 @@ function renderMessengerProfile() {
           jetzt hier und in app/screens/messenger/MessengerProfileScreen.tsx.
         */ ''}
       <div class="mprof">
-        <div class="avatar avatar--88" style="background:${farbe(me.color)}">${esc(me.initials)}</div>
+        ${eigenerAvatarMitStory(me, 88, 'messenger')}
         <div class="mprof__text">
           ${/* Wie im Videos- und Community-Profil aus dem Konto, nicht fest
                 im Markup - sonst zeigt "Profil bearbeiten" hier keine
@@ -8744,7 +9154,7 @@ function renderLandscapeVideos() {
                     art !== 'live' && c.duration ? `<span class="clip__time">${esc(c.duration)}</span>` : ''
                   }</div>
                   <div class="clip__meta">
-                    <div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>
+                    ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>`)}
                     <div>
                       <div class="clip__title">${esc(c.title)}</div>
                       <div class="clip__sub">${esc(u.name)} · ${rechts}</div>
@@ -8892,7 +9302,7 @@ function renderProfileExplorer() {
       <div class="exp__list">${leute
         .map(
           (u) => `<button class="exp__row" data-profile="${u.id}">
-            <span class="avatar avatar--44" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
+            ${mitStoryRing(u.id, `<span class="avatar avatar--44" style="background:${farbe(u.color)}">${esc(u.initials)}</span>`)}
             <span class="exp__text"><strong>${esc(u.name)}</strong><small>${esc(u.handle)}</small></span>
           </button>`
         )
@@ -9151,7 +9561,7 @@ function renderVideoSearch() {
                 ? `<div class="exp__list">${people
                     .map(
                       (u) => `<button class="exp__row" data-profile="${u.id}">
-                        <span class="avatar avatar--44" style="background:${farbe(u.color)}">${esc(u.initials)}</span>
+                        ${mitStoryRing(u.id, `<span class="avatar avatar--44" style="background:${farbe(u.color)}">${esc(u.initials)}</span>`)}
                         <span class="exp__text"><strong>${esc(u.name)}</strong><small>${esc(u.handle)}</small></span>
                       </button>`
                     )
@@ -9270,6 +9680,15 @@ function mitteilungOeffnen(ziel) {
   if (ziel.art === 'community') return openChat(ziel.id);
   // Chat-Anfrage und Messenger-Anfrage führen in den Chat, um den es geht.
   if (ziel.art === 'chat') return openChat(ziel.id);
+
+  // Kasten 11.6: „… hat dich in einer Story markiert". Die Story lebt 24
+  // Stunden; ist sie abgelaufen oder geloescht, sagt das die Meldung,
+  // statt still nichts zu tun.
+  if (ziel.art === 'story') {
+    const story = alleStorys().find((s) => String(s.id) === String(ziel.id));
+    if (!story) return toast('Diese Story ist nicht mehr online');
+    return openStory(story.id, { bereich: story.inMessenger === false ? 'videos' : 'messenger' });
+  }
 
   if (ziel.art === 'post') {
     state.area = 'videos';
@@ -9569,6 +9988,7 @@ async function openBeitragOptionen(beitrag) {
               const antwort = await senden('story');
               if (antwort.stories) state.stories = antwort.stories;
               if (antwort.storiesVideos) state.storiesVideos = antwort.storiesVideos;
+              if (antwort.storiesVideosAlle) state.storiesVideosAlle = antwort.storiesVideosAlle;
               return toast('Zu deiner Story hinzugefügt');
             } catch (fehler) {
               return toast(`Zur Story hinzufügen fehlgeschlagen: ${fehler.message}`);
@@ -10533,7 +10953,7 @@ function openClip(clipId) {
           </div>
 
           <div class="player__autor">
-            <span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>
+            ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
             <div class="player__autorText">
               <div data-profile="${u.id}">
                 <div class="player__autorName">${esc(u.name)}</div>
@@ -10645,7 +11065,7 @@ function openClip(clipId) {
                 return `<article class="clip clip--klein" data-anderesclip="${c.id}">
                   <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}<span class="clip__time">${esc(c.duration)}</span></div>
                   <div class="clip__meta">
-                    <div class="avatar avatar--36" style="background:${farbe(au.color)}">${esc(au.initials)}</div>
+                    ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(au.color)}">${esc(au.initials)}</div>`)}
                     <div>
                       <div class="clip__title">${esc(c.title)}</div>
                       <div class="clip__sub">${esc(au.name)} · ${c.art === 'live' ? `${compactNumber(c.zuschauer || 0)} sehen zu` : `${compactNumber(c.views)} Aufrufe`}</div>
@@ -11407,7 +11827,7 @@ async function openExplorer(art, wert, nur = null) {
           return `<article class="clip clip--klein" data-clip="${c.id}">
             <div class="clip__thumb">${medienFlaeche(c.id, ICONS.landscape, c.mediaUrl, c.thumbnail)}<span class="clip__time">${esc(c.duration)}</span></div>
             <div class="clip__meta">
-              <div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>
+              ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
               <div>
                 <div class="clip__title">${esc(c.title)}</div>
                 <div class="clip__sub">${esc(u.name)} · ${c.art === 'live' ? `${compactNumber(c.zuschauer || 0)} sehen zu` : `${compactNumber(c.views)} Aufrufe`}</div>
@@ -13483,7 +13903,7 @@ function renderCommunitySearch() {
                                ? 'Anfrage senden'
                                : '+ Befreunden';
                        return `<li><div class="row">
-                          <span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>
+                          ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
                           <div class="row__body" data-profile="${u.id}">
                             <div class="row__name">${esc(u.name)}</div>
                             <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
@@ -14175,7 +14595,7 @@ async function openChat(chatId) {
   overlay.innerHTML = `
     <header class="chathead">
       <button class="chathead__back" id="chatBack" aria-label="Zurück">${ICONS.back}</button>
-      ${avatarOf(chat, 36)}
+      ${chat.isGroup ? avatarOf(chat, 36) : mitStoryRing(chat.userId, avatarOf(chat, 36), 'messenger')}
       <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} style="${chat.userId ? 'cursor:pointer' : ''}">
         <div class="chathead__name">${esc(chat.name)}</div>
         <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}" id="chatStatus">${
@@ -14931,56 +15351,139 @@ function storyAlter(s) {
 }
 
 let storyTimer;
-const STORY_DURATION = 6000;
+// Kasten 11: dieselben Zeiten wie die App (gemeinsam/story.js).
+const STORY_DURATION = (typeof StoryRegeln !== 'undefined' && StoryRegeln.DAUER_BILD) || 6000;
+const STORY_VIDEO_HOECHSTENS = (typeof StoryRegeln !== 'undefined' && StoryRegeln.DAUER_VIDEO_HOECHSTENS) || 30000;
 const STORY_STEP = 60;
 
-function openStory(storyId) {
-  // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
-  const list = alleStorys().filter((s) => !s.own || s.mediaUri);
-  const idx = list.findIndex((s) => s.id === storyId);
+/*
+ * Die Bearbeitung einer Story als HTML (Kasten 11.6).
+ *
+ * Text, Schrift, Farbe, Filter und die Namensschilder der Markierten stehen
+ * als Daten an der Story (stories.overlays) und werden hier gezeichnet — in
+ * der App von StoryOverlaySchicht.tsx. Positionen relativ zur Flaeche; die
+ * Schriftgroesse bezieht sich auf 390 Punkte Breite und wird von
+ * storySchichtSkalieren() nachgezogen.
+ */
+const STORY_BEZUG_BREITE = 390;
+
+function storyOverlayHtml(roh, { ohneFilter = false, bearbeitbar = false } = {}) {
+  if (!roh || typeof StoryRegeln === 'undefined') return '';
+  const o = StoryRegeln.overlaysPruefen(roh);
+  const f = ohneFilter ? '' : filterSchicht(o.filter);
+  const texte = o.texte
+    .map((t, i) => {
+      const sch = StoryRegeln.schriftZu(t.schrift);
+      return `<span class="storyschicht__text" data-testid="story-text" data-groesse="${t.groesse}"
+        ${bearbeitbar ? `data-zieh="text" data-index="${i}"` : ''}
+        style="left:${t.x * 100}%;top:${t.y * 100}%;color:${esc(t.farbe)};font-family:${esc(sch.web)};font-weight:${sch.gewicht};font-style:${sch.kursiv ? 'italic' : 'normal'};${t.hintergrund ? 'background:rgba(0,0,0,.55);' : ''}font-size:${t.groesse}px">${esc(t.text)}</span>`;
+    })
+    .join('');
+  const schilder = o.markiert
+    .map(
+      (m, i) => `<button type="button" class="storyschicht__schild" data-testid="story-markierung"
+        ${bearbeitbar ? `data-zieh="markiert" data-index="${i}"` : `data-storyprofil="${esc(m.userId)}"`}
+        style="left:${m.x * 100}%;top:${m.y * 100}%">@${esc(m.name || 'Person')}</button>`
+    )
+    .join('');
+  return `<div class="storyschicht">${f ? `<span class="storyschicht__filter" style="background:${f}"></span>` : ''}${texte}${schilder}</div>`;
+}
+
+/** Schriftgroessen an die tatsaechliche Breite der Flaeche anpassen. */
+function storySchichtSkalieren(flaeche) {
+  if (!flaeche) return;
+  const faktor = (flaeche.clientWidth || STORY_BEZUG_BREITE) / STORY_BEZUG_BREITE;
+  flaeche.querySelectorAll('[data-groesse]').forEach((el) => {
+    el.style.fontSize = Number(el.dataset.groesse) * faktor + 'px';
+  });
+}
+
+/*
+ * Die Liste, in der der Betrachter blaettert: die des Bereichs, aus dem er
+ * geoeffnet wurde. Die Plus-Kachel ohne Aufnahme spielt nichts ab.
+ */
+function storyListeFuer(bereich) {
+  const l = storyListen();
+  const roh = bereich === 'messenger' ? l.messenger : bereich === 'videos' ? l.videosAlle : alleStorys();
+  return roh.filter((s) => s.id !== 'eigene' && (!s.own || s.mediaUri));
+}
+
+/*
+ * Der Viewer haelt sich an vier Regeln aus Henriks Rueckmeldung:
+ *  1. Das Herz bleibt rot, solange die Story geliked ist (Zustand im Server).
+ *  2. Sobald das Antwortfeld benutzt wird, laeuft die Zeit nicht weiter.
+ *  3. Eine Antwort landet wirklich im Chat mit dieser Person.
+ *  4. Tippen links/rechts blaettert zur vorigen/naechsten Story.
+ *
+ * Kasten 11.4 (Henrik 21.09.2026: „Nur eine Story möglich"): oben steht ein
+ * Balken je Story der Person, nicht einer fuer alles. Die Storys einer Person
+ * laufen nacheinander ab (aelteste zuerst), dann kommt die naechste Person.
+ * Video-Storys laufen als Video, so lange sie dauern (hoechstens 30 s).
+ * Gleiche Regel in app/screens/messenger/StoryViewerScreen.tsx.
+ */
+function openStory(storyId, { bereich } = {}) {
+  let wo = bereich;
+  if (!wo) {
+    wo = storyListeFuer('messenger').some((x) => x.id === storyId) ? 'messenger' : 'videos';
+  }
+  let list = storyListeFuer(wo);
+  if (!list.some((x) => x.id === storyId)) list = storyListeFuer('alle');
+  const idx = list.findIndex((x) => x.id === storyId);
   if (idx < 0) return;
 
   const s = list[idx];
-  const u = user(s.userId);
+  const u = s.own ? state.users.me || user(s.userId) : user(s.userId);
+  const gruppe = list.filter((x) => x.userId === s.userId);
+  const stelle = gruppe.findIndex((x) => x.id === s.id);
+  const istVideo = s.mediaType === 'video' && s.mediaUri;
   let paused = false;
   let elapsed = 0;
+
+  const balken = gruppe
+    .map(
+      (g, i) => `<div class="viewer__bar" data-testid="story-balken-einzeln"><div class="viewer__fill"${
+        i === stelle ? ' id="storyFill"' : ''
+      } style="width:${i < stelle ? 100 : 0}%"></div></div>`
+    )
+    .join('');
+
+  const medium = !s.mediaUri
+    ? medienFlaeche(s.id, ICONS.image)
+    : istVideo
+      ? `<video class="viewer__bild" id="storyVideo" src="${esc(s.mediaUri)}" playsinline autoplay></video>`
+      : `<img class="viewer__bild" src="${esc(s.mediaUri)}" alt="${s.own ? 'Deine Story' : 'Story'}" />`;
 
   overlay.hidden = false;
   overlay.innerHTML = `
     <div class="viewer">
-      <div class="viewer__bars">
-        <div class="viewer__bar"><div class="viewer__fill" id="storyFill" style="width:0"></div></div>
-      </div>
+      <div class="viewer__bars" data-testid="story-balken">${balken}</div>
       <div class="viewer__head">
         <button class="viewer__close" id="storyClose" aria-label="Zurück">${ICONS.back}</button>
-        <div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>
+        ${s.own ? eigenerAvatar(state.users.me, 36) : `<div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>`}
         <div class="viewer__who" ${s.own ? '' : `data-profile="${u.id}"`}>
           <div class="viewer__name">${s.own ? 'Deine Story' : esc(u.name)}</div>
           <div class="viewer__time">${esc(storyAlter(s))}</div>
         </div>
+        ${istVideo ? `<button class="viewer__ton" id="storyTon" aria-label="Ton an">${ICONS.mute || ICONS.mic}</button>` : ''}
         <button class="viewer__more" id="storyMore" aria-label="Mehr">${ICONS.settings}</button>
       </div>
       <div class="viewer__stage">
         <button class="viewer__zone viewer__zone--prev" id="storyPrev" aria-label="Vorherige Story"></button>
         <button class="viewer__zone viewer__zone--next" id="storyNext" aria-label="Nächste Story"></button>
-        <div class="viewer__media">${
-          s.mediaUri ? `<img class="viewer__bild" src="${s.mediaUri}" alt="Deine Story" />` : medienFlaeche(s.id, ICONS.image)
-        }</div>
+        <div class="viewer__media"><div class="storyflaeche" id="storyFlaeche">${medium}${storyOverlayHtml(s.overlays)}</div></div>
         ${s.caption ? `<div class="viewer__caption">${esc(s.caption)}</div>` : ''}
       </div>
       ${
         s.own
           ? // Sich selbst antwortet man nicht - stattdessen der Blick darauf,
-            // wer die Story gesehen hat.
+            // wer die Story gesehen hat, und der Weg zur naechsten Story.
             `<div class="viewer__foot">
               <button class="viewer__eigen" id="storyViews">${ICONS.eye}<span>Ansichten</span></button>
+              <button class="viewer__weitere" id="storyWeitere" aria-label="Weitere Story hinzufügen">${ICONS.plus}<span>Weitere</span></button>
               <button class="viewer__act" id="storyDelete" aria-label="Story löschen">${ICONS.trash || ICONS.close}</button>
             </div>`
           : // Henrik: "Antworten auf Stories nicht per Enter absenden.
             // Stattdessen einen kleinen Senden-Button mit Pfeil verwenden."
-            // Der Absende-Knopf war vorher versteckt (viewer__hidden), das
-            // Formular ging nur mit Enter ab - man konnte also nicht sehen,
-            // wie man abschickt.
             `<form class="viewer__foot" id="storyForm">
               <input class="viewer__reply" id="storyReply" placeholder="Antworten" autocomplete="off" />
               <button type="submit" class="viewer__senden" id="storySenden" aria-label="Antwort senden" disabled>${ICONS.send}</button>
@@ -14989,42 +15492,75 @@ function openStory(storyId) {
       }
     </div>`;
 
+  const flaeche = $('#storyFlaeche');
+  storySchichtSkalieren(flaeche);
+  requestAnimationFrame(() => storySchichtSkalieren(flaeche));
+
+  const video = $('#storyVideo');
+  // Ohne Tonfreigabe spielt der Browser kein Video mit Ton von selbst ab —
+  // dann stumm starten; der Lautsprecher-Knopf schaltet den Ton zu.
+  if (video) {
+    video.play().catch(() => {
+      video.muted = true;
+      video.play().catch(() => {});
+    });
+    $('#storyTon')?.addEventListener('click', () => {
+      video.muted = !video.muted;
+      $('#storyTon').setAttribute('aria-label', video.muted ? 'Ton an' : 'Ton aus');
+    });
+  }
+
+  const dauer = () =>
+    video && Number.isFinite(video.duration) && video.duration > 0
+      ? Math.min(video.duration * 1000, STORY_VIDEO_HOECHSTENS)
+      : istVideo
+        ? STORY_VIDEO_HOECHSTENS
+        : STORY_DURATION;
+
   const fill = $('#storyFill');
   const setFill = () => {
-    if (fill) fill.style.width = Math.min(100, (elapsed / STORY_DURATION) * 100) + '%';
+    if (fill) fill.style.width = Math.min(100, (elapsed / dauer()) * 100) + '%';
   };
 
-  const stop = () => clearInterval(storyTimer);
+  const stop = () => {
+    clearInterval(storyTimer);
+    if (video) video.pause();
+  };
   const pause = () => {
     paused = true;
+    if (video) video.pause();
     overlay.querySelector('.viewer').classList.add('is-paused');
   };
   const resume = () => {
     paused = false;
+    if (video) video.play().catch(() => {});
     overlay.querySelector('.viewer')?.classList.remove('is-paused');
   };
 
   const markSeen = () => {
     s.viewed = true;
-    fetch(`/api/stories/${s.id}/seen`, { method: 'POST' });
+    if (!s.own) fetch(`/api/stories/${s.id}/seen`, { method: 'POST' });
   };
 
   const go = (step) => {
     stop();
     markSeen();
     const next = list[idx + step];
-    if (next) openStory(next.id);
+    if (next) openStory(next.id, { bereich: wo });
     else closeOverlay();
   };
 
   stop();
   storyTimer = setInterval(() => {
     if (paused) return;
-    elapsed += STORY_STEP;
     if (!$('#storyFill')) return stop();
+    // Beim Video zaehlt die Stelle im Film, nicht die Uhr — puffert es,
+    // bleibt der Balken stehen.
+    elapsed = video && Number.isFinite(video.duration) ? video.currentTime * 1000 : elapsed + STORY_STEP;
     setFill();
-    if (elapsed >= STORY_DURATION) go(1);
+    if (elapsed >= dauer()) go(1);
   }, STORY_STEP);
+  if (video) video.addEventListener('ended', () => go(1));
 
   const storyZu = () => {
     stop();
@@ -15033,6 +15569,19 @@ function openStory(storyId) {
   };
 
   $('#storyClose').addEventListener('click', storyZu);
+
+  // Namensschild einer markierten Person: zu ihrem Profil.
+  overlay.querySelectorAll('[data-storyprofil]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wen = b.dataset.storyprofil;
+      stop();
+      markSeen();
+      closeOverlay();
+      if (istEigen(wen)) return;
+      openProfile(wen);
+    })
+  );
 
   /*
    * Punkt 5: nach unten wischen beendet den Story-Betrachter.
@@ -15111,10 +15660,17 @@ function openStory(storyId) {
       pause();
       openStoryAnsichten(s, resume);
     });
+    // Loescht genau die Story, die gerade laeuft — nicht alle eigenen.
     $('#storyDelete').addEventListener('click', async () => {
       stop();
       closeOverlay();
       await storyLoeschen(s.id);
+    });
+    // Kasten 11.4: noch eine Story dazu, ohne Umweg ueber die Leiste.
+    $('#storyWeitere').addEventListener('click', () => {
+      stop();
+      closeOverlay();
+      openCamera(null, { zielStory: true, storyBereich: wo });
     });
     return;
   }
@@ -15194,7 +15750,7 @@ function openStory(storyId) {
  * - wer aus einem Chat die Kamera aufmacht, will das Bild diesem Chat
  * schicken, nicht erst wieder gefragt werden.
  */
-function openCamera(zielChat = null, { zielStory = false } = {}) {
+function openCamera(zielChat = null, { zielStory = false, storyBereich = 'messenger' } = {}) {
   overlay.hidden = false;
   overlay.innerHTML = `
     <div class="camera">
@@ -15224,7 +15780,7 @@ function openCamera(zielChat = null, { zielStory = false } = {}) {
     // Kam die Kamera vom Plus an der eigenen Story, steht das Ziel fest.
     if (zielStory) {
       closeOverlay();
-      return alsStorySetzen(bild);
+      return alsStorySetzen(bild, storyBereich);
     }
     if (!zielChat) {
       closeOverlay();
@@ -15279,10 +15835,20 @@ document.querySelector('.app').addEventListener('click', (e) => {
    * Communitys-Profil; ueber den Klickfaenger hier gilt er in beiden, ohne
    * ihn zweimal verdrahten zu muessen.
    */
-  if (e.target.closest('[data-eigene-story]')) {
+  const eigenerRing = e.target.closest('[data-eigene-story]');
+  if (eigenerRing) {
     e.stopPropagation();
-    const eigene = state.stories.find((x) => x.own);
-    if (eigene) return openStory(eigene.id);
+    if (openStoryVon('me', eigenerRing.dataset.ringbereich || 'videos')) return;
+    if (openStoryVon('me', 'messenger')) return;
+  }
+
+  // Kasten 11.1: jeder andere Story-Ring (mitStoryRing). Vor data-profile,
+  // weil viele Ringe in einem Profil-Link stehen.
+  const ring = e.target.closest('[data-ringstory]');
+  if (ring) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (openStoryVon(ring.dataset.ringstory, ring.dataset.ringbereich || 'videos')) return;
   }
 
   // Profil

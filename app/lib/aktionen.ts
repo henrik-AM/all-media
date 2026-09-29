@@ -44,6 +44,7 @@ const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../g
 const Verlauf = require('../../gemeinsam/verlauf') as typeof import('../../gemeinsam/verlauf');
 export type VerlaufEintrag = import('../../gemeinsam/verlauf').VerlaufEintrag;
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der Website.
+const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
 const Teilen = require('../../gemeinsam/teilen') as typeof import('../../gemeinsam/teilen');
 
 /**
@@ -1311,6 +1312,12 @@ export async function messengerAnfrageBeantworten(
 
 // --------------------------------------------------------------- Storys --
 
+/** Fehlt eine Spalte oder Tabelle, weil ein Schema noch nicht eingespielt ist? */
+const schemaFehlt = (fehler: any): boolean =>
+  Boolean(fehler) &&
+  (['42703', 'PGRST204', '42P01', 'PGRST202', 'PGRST205'].includes(fehler.code) ||
+    /does not exist|Could not find/i.test(String(fehler.message ?? '')));
+
 /** Eine eigene Story anlegen. Gibt die Kennung aus der Datenbank zurueck. */
 export async function storyAnlegen(
   client: SupabaseClient,
@@ -1326,21 +1333,67 @@ export async function storyAnlegen(
      * in einen oeffentlichen Bereich gehoert, gehoert nicht dorthin.
      */
     inVideos?: boolean;
+    /**
+     * Kasten 11.5: „Nur Videos" heisst in_messenger = false. Ohne Angabe
+     * steht die Story im Messenger (so war es immer).
+     */
+    inMessenger?: boolean;
+    /** Kasten 11.6: Text, Schrift, Farbe, Filter und Lage der Markierungen. */
+    overlays?: any;
+    /** Kasten 11.6: markierte Personen (Kennungen). */
+    markiert?: string[];
   } = {}
 ): Promise<string> {
-  const { data, error } = await client
-    .from('stories')
-    .insert({
-      user_id: ichId,
-      media_url: felder.mediaUrl || null,
-      media_type: felder.mediaTyp || 'image',
-      caption: felder.text || '',
-      in_videos: Boolean(felder.inVideos),
-    })
-    .select('id')
-    .single();
+  const inVideos = Boolean(felder.inVideos);
+  // Mindestens ein Ziel — die Datenbank prueft dasselbe (stories_ziel_check).
+  const inMessenger = felder.inMessenger === undefined ? true : Boolean(felder.inMessenger) || !inVideos;
+  const overlays = felder.overlays ? StoryRegeln.overlaysPruefen(felder.overlays) : null;
+  const zeile: Record<string, any> = {
+    user_id: ichId,
+    media_url: felder.mediaUrl || null,
+    media_type: felder.mediaTyp === 'video' ? 'video' : 'image',
+    caption: felder.text || '',
+    in_videos: inVideos,
+    in_messenger: inMessenger,
+    overlays: overlays && StoryRegeln.hatOverlays(overlays) ? overlays : null,
+  };
+
+  let { data, error } = await client.from('stories').insert(zeile).select('id').single();
+  if (error && schemaFehlt(error)) {
+    // Vor dem Story-Schema (Kasten 11) gibt es in_messenger und overlays
+    // noch nicht. Dann wenigstens die Story selbst — ohne Bearbeitung.
+    console.warn('[aktionen] Story-Schema fehlt, lege Story ohne Ziel/Bearbeitung an:', error.message);
+    const { in_messenger, overlays: _o, ...alt } = zeile;
+    ({ data, error } = await client.from('stories').insert(alt).select('id').single());
+  }
   if (error) throw error;
-  return data.id as string;
+  const id = (data as any).id as string;
+
+  const markiert = [...new Set((felder.markiert ?? []).filter((k) => k && k !== ichId))];
+  // Einzeln, nicht als ein Insert: lehnt die Regel eine Person ab, fiele
+  // sonst die ganze Anweisung und damit jede Markierung weg. Nicht werfen —
+  // die Story steht schon; dann fehlt nur diese eine Markierung.
+  for (const user_id of markiert) {
+    const { error: fTag } = await client.from('story_tags').insert({ story_id: id, user_id });
+    if (fTag) console.warn('[aktionen] Markierung nicht gesetzt:', fTag.message);
+  }
+  return id;
+}
+
+/**
+ * Wen darf ich in einer Story markieren? (Kasten 11.6)
+ *
+ * Die Liste kommt aus der Datenbank (`story_markierbar`), weil dort die
+ * Einstellung „Wer darf mich markieren" der ANDEREN Person steht — die kann
+ * die App nicht lesen. Dieselbe Funktion ruft die Website.
+ */
+export async function storyMarkierbar(
+  client: SupabaseClient,
+  suche = ''
+): Promise<{ id: string; name: string; handle: string }[]> {
+  const { data, error } = await client.rpc('story_markierbar', { suche: suche || null });
+  if (error) throw error;
+  return (data ?? []) as { id: string; name: string; handle: string }[];
 }
 
 /**

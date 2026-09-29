@@ -233,6 +233,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
 
       <ScrollView contentContainerStyle={styles.content}>
         <OwnProfileHead
+          storyBereich="videos"
           handle={ich.handle}
           stats={[
             { label: 'Beiträge', value: compact(me.posts + eigeneBeitraege.length) },

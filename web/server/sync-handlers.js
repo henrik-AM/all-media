@@ -1294,6 +1294,49 @@ const handleCreateStory = handler('Story anlegen', async (client, nutzerId, feld
 });
 
 /*
+ * Kasten 11.5/11.6: Story mit Ziel, Bearbeitung und Markierungen.
+ *
+ * Eigene Funktion statt handleCreateStory umzubauen: die alte wird auch von
+ * „Zu Story hinzufuegen" (Beitrag als Story) gerufen. Dieselbe Regel wie
+ * storyAnlegen() in app/lib/aktionen.ts:
+ *   - mindestens ein Ziel (die Datenbank prueft dasselbe, stories_ziel_check)
+ *   - die Bearbeitung als Daten, vorher durch overlaysPruefen()
+ *   - Markierungen einzeln, damit eine abgelehnte nicht alle mitnimmt
+ *   - ohne Story-Schema: die Story selbst, ohne Ziel/Bearbeitung
+ */
+const handleCreateStoryBearbeitet = handler('Story anlegen', async (client, nutzerId, felder = {}) => {
+  const StoryRegeln = require('../../gemeinsam/story');
+  const inVideos = Boolean(felder.inVideos);
+  const inMessenger = felder.inMessenger === undefined ? true : Boolean(felder.inMessenger) || !inVideos;
+  const overlays = felder.overlays ? StoryRegeln.overlaysPruefen(felder.overlays) : null;
+  const zeile = {
+    user_id: nutzerId,
+    media_url: felder.mediaUrl || null,
+    media_type: felder.mediaTyp === 'video' ? 'video' : 'image',
+    caption: felder.text || '',
+    in_videos: inVideos,
+    in_messenger: inMessenger,
+    overlays: overlays && StoryRegeln.hatOverlays(overlays) ? overlays : null,
+  };
+  let { data, error } = await client.from('stories').insert(zeile).select().single();
+  if (error && (error.code === '42703' || error.code === 'PGRST204' || /column|could not find/i.test(error.message || ''))) {
+    console.warn('[story] Story-Schema fehlt, lege Story ohne Ziel/Bearbeitung an:', error.message);
+    const { in_messenger, overlays: _o, ...alt } = zeile;
+    ({ data, error } = await client.from('stories').insert(alt).select().single());
+  }
+  if (error) throw error;
+
+  const markiert = [...new Set((Array.isArray(felder.markiert) ? felder.markiert : [])
+    .filter((k) => typeof k === 'string' && k && k !== nutzerId && k !== 'me'))];
+  const nichtMarkiert = [];
+  for (const user_id of markiert) {
+    const { error: fTag } = await client.from('story_tags').insert({ story_id: data.id, user_id });
+    if (fTag) nichtMarkiert.push(user_id);
+  }
+  return { ok: true, story: data, nichtMarkiert };
+});
+
+/*
  * Herz an einer Story — und die Nachricht darueber an die Person.
  *
  * Henrik am 18.09.2026: „Story-Like wird nicht im Chat angezeigt." Bis dahin
@@ -2244,6 +2287,7 @@ module.exports = {
   handleLikeComment,
   handleDeleteComment,
   handleCreateStory,
+  handleCreateStoryBearbeitet,
   handleLikeStory,
   handleViewStory,
   handleCreateCommunity,

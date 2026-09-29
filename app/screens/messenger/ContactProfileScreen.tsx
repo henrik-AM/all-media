@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { StoryAvatar } from '../../components/StoryAvatar';
 import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet';
 import { FormularSheet } from '../../components/FormularSheet';
 import { SheetRahmen } from '../../components/SheetRahmen';
@@ -264,7 +265,8 @@ export const ContactProfileScreen = ({
         contentOffset={startVersatz ? { x: 0, y: startVersatz } : undefined}
       >
         <View style={styles.kopf}>
-          <Avatar id={person.id} name={name} size={104} />
+          {/* Kasten 11.1: Ring im Kontaktprofil (Messenger-Storys). */}
+          <StoryAvatar id={person.id} name={name} size={112} bereich="messenger" />
           <Text style={styles.name}>{name}</Text>
           {!!person.phone && <Text style={styles.nummer}>{person.phone}</Text>}
         </View>

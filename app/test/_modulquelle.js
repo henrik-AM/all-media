@@ -97,6 +97,9 @@ const UMD_BAUSTEINE = [
   ['teilen', 'Teilen'],
   // 28.09.2026: `verlauf.js` für „Mein Verlauf" (Feedback 21.09., Kasten 10).
   ['verlauf', 'Verlauf'],
+  // 29.09.2026: `story.js` — eine Story-Regel für Ring, Leiste und Bearbeitung
+  // (Feedback 21.09., Kasten 11).
+  ['story', 'StoryRegeln'],
 
   // 28.09.2026: `liedtext.js` fuer die gesungene Zeile auf der Sound-Seite
   // (Feedback 21.09., Kasten 7, Schema 63).
