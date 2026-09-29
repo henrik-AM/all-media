@@ -138,6 +138,8 @@ interface ProfilWert {
   /** Was in einer Sammlung liegt — wird erst beim Oeffnen geholt. */
   sammlungOeffnen: (id: string) => Promise<Aktion.Rasterkachel[]>;
   sammlungLoeschen: (s: Aktion.Sammlung) => void;
+  /** Die Kreise neu holen — nach einem neuen Titelbild (Kasten 12.7/12.8). */
+  sammlungenNeu: () => void;
   spende: Spende | null;
   raster: RasterEintrag[];
 
@@ -1050,6 +1052,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen,
       sammlungOeffnen,
       sammlungLoeschen,
+      sammlungenNeu: sammlungenLaden,
       spende,
       raster,
       beitragAnlegen,
@@ -1090,7 +1093,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
-      sammlungen, sammlungOeffnen, sammlungLoeschen,
+      sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
       chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,

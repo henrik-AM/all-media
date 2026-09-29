@@ -1786,31 +1786,40 @@ ul { margin: 0; padding: 0; list-style: none; }
   position: relative;
   width: 64px; height: 64px;
   display: grid; place-items: center;
-  padding: 2.5px;
-  background: var(--surface-3); color: var(--text-3);
+  /*
+    Kasten 12.9 (Henrik 21.09.2026, „Prototyp ist bindend"): beide Gattungen
+    rund, Ring als Strich in der Farbe der Gattung — Playlist #FF0A0A,
+    Highlight #FF990A, Staerke 4/45 des Durchmessers. Farbe und Staerke
+    setzt sammlungenReihe() inline aus gemeinsam/sammlungen.js, damit App und
+    Website aus derselben Quelle zeichnen. Die Werte hier sind nur der
+    Rueckfall, falls das Skript fehlt. Vorher: Playlist als weiches Quadrat
+    mit Markenverlauf, Highlight mit Story-Verlauf (Punkt 39 vom 26.08.).
+  */
+  --ring: var(--text-3);
+  border: 6px solid var(--ring);
+  border-radius: 50%;
+  padding: 2px;
+  background: transparent; color: var(--text-3);
 }
-.highlight__ring > * { width: 100%; height: 100%; }
+.highlight__ring > * { width: 100%; height: 100%; border-radius: 50%; }
 .highlight__ring svg { width: 24px; height: 24px; }
+.highlight__ring.is-playlist { --ring: #FF0A0A; }
+.highlight__ring.is-highlight { --ring: #FF990A; }
 
-.highlight__ring.is-highlight { border-radius: 50%; background: var(--story-grad); }
-.highlight__ring.is-highlight > * { border-radius: 50%; }
-
-.highlight__ring.is-playlist { border-radius: 18px; background: var(--brand-grad); }
-.highlight__ring.is-playlist > * { border-radius: 15.5px; }
-
-/* Kleines Kennzeichen unten rechts: Notenzeichen bzw. Stern. Es traegt den
-   Unterschied auch dort, wo Form und Farbe schwer zu sehen sind - etwa im
-   Dunkelmodus auf einem kleinen Bildschirm. */
+/* Kleines Kennzeichen unten rechts: Dreieck bzw. Stern, in der Ringfarbe.
+   Es traegt den Unterschied auch fuer alle, die Rot und Orange schlecht
+   auseinanderhalten. */
 .highlight__ring::after {
-  position: absolute; right: -2px; bottom: -2px;
+  position: absolute; right: -8px; bottom: -8px;
   width: 20px; height: 20px; border-radius: 50%;
   display: grid; place-items: center;
   font-size: 10px; line-height: 1;
   color: #fff;
   border: 2px solid var(--surface);
+  background: var(--ring);
 }
-.highlight__ring.is-playlist::after { content: '▶'; background: var(--brand); }
-.highlight__ring.is-highlight::after { content: '★'; background: #F0397E; }
+.highlight__ring.is-playlist::after { content: '▶'; }
+.highlight__ring.is-highlight::after { content: '★'; }
 
 .highlight__label {
   font-size: 11.5px; color: var(--text-2); max-width: 72px;
@@ -1878,7 +1887,10 @@ body:has(.camera) .toast { bottom: 132px; }
 }
 .oprof__handle {
   position: absolute;
-  left: 56px; right: 56px; top: 10px;
+  /* Symmetrisch um die Knoepfe rechts (3 × 21 px + 2 × 12 px + 16 px Rand):
+     so bleibt die Mitte die Mitte, und ein langer Name laeuft nicht unter
+     die Knoepfe (Kasten 12.2, gleiche Rechnung in OwnProfileHead.tsx). */
+  left: 108px; right: 108px; top: 10px;
   text-align: center; font-size: 17px; font-weight: 700;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   pointer-events: none;
@@ -2221,6 +2233,31 @@ body:has(.camera) .toast { bottom: 132px; }
 .spende__balken { margin-top: 9px; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
 .spende__fuellung { height: 100%; background: var(--brand-grad); }
 .spende__zahlen { margin-top: 6px; font-size: 12.5px; color: var(--text-3); }
+/* Kasten 12.3: die Karte ist ein Knopf und oeffnet die Einzelheiten. */
+button.spende { display: block; width: calc(100% - 32px); text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.spendeziel__titel { font-size: 17px; font-weight: 700; }
+.spendeziel__text { margin-top: 4px; font-size: 14px; color: var(--text-2); }
+.spendeziel__zeilen { margin-top: 12px; display: grid; gap: 6px; }
+.spendeziel__zeile { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-2); }
+.spendeziel__zeile strong { color: var(--text); font-weight: 600; }
+.spendeziel__hinweis { margin-top: 6px; font-size: 12.5px; color: var(--text-3); text-align: center; }
+#spendeKnopf[disabled] { opacity: .4; cursor: default; }
+
+/* Kasten 12.6: der gruene Punkt ist ein Knopf fuer die Online-Sichtbarkeit.
+   Den alten ::after-Punkt blendet der Rahmen aus, damit es nur einen gibt. */
+.onlinewrap { position: relative; flex: 0 0 auto; }
+.onlinewrap .avatar.has-status::after { display: none; }
+.onlinepunkt {
+  position: absolute; right: 0; bottom: 0;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #34C759; border: 3px solid var(--surface);
+  cursor: pointer; padding: 0;
+}
+.onlinepunkt.is-aus { background: var(--text-3); }
+
+/* Kasten 12.7/12.8: gewaehltes Titelbild — Rahmen in der Ringfarbe. */
+.griditem.is-titel { outline: 3px solid var(--ring, var(--brand)); outline-offset: -3px; }
+.titelwahl { margin-bottom: 8px; }
 
 /* --------------------------------------------------------------- Teilen */
 .teilen__kopf { padding: 12px 16px 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
@@ -2992,8 +3029,12 @@ body:has(.camera) .toast { bottom: 132px; }
  * ueber eine Bearbeitungseinstellung aendern koennen.")
  * ------------------------------------------------------------------ */
 
-/* Gewaehltes Profilbild fuellt den runden Rahmen. */
+/* Gewaehltes Profilbild fuellt den runden Rahmen — ueber den Initialen,
+   die darunter stehen bleiben, falls das Bild nicht laedt (Kasten 12.5). */
+.avatar { position: relative; }
 .avatar img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border-radius: 50%;

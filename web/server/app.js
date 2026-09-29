@@ -44,6 +44,10 @@ const Kommentar = require('../../gemeinsam/kommentar');
 // „Mein Verlauf" — dieselben Abfragen wie in der App (Kasten 10.1).
 const Verlauf = require('../../gemeinsam/verlauf');
 const SoundStellen = require('../../gemeinsam/soundstellen');
+// Ringfarben und Vorschaubild von Playlists und Highlights (Kasten 12).
+const Sammlungen = require('../../gemeinsam/sammlungen');
+// Spendenziel: Formular, Stand, Frist (Kasten 12.3).
+const Spende = require('../../gemeinsam/spende');
 // Welcher Stand läuft hier? Einmal beim Start ermittelt, siehe version.js.
 const VERSION = require('./version');
 // Die Schreibweise des Kontakt-QR-Codes — dieselbe Datei, die auch der
@@ -1154,6 +1158,8 @@ app.get('/api/profile/:userId', route(async (req, res) => {
     grid: eigene.map((b) => ({
       id: b.id,
       kind: b.kind === 'post' ? 'image' : 'video',
+      // posts.kind (post, reel, clip) — wohin ein Klick auf die Kachel führt (Kasten 12.1).
+      art: b.kind,
       eigen: id === req.nutzerId,
       // Ohne die Adresse zeigt jede Kachel die Ersatzflaeche, auch wenn ein
       // Bild da ist. Bei einem Video steht in mediaUrl eine .mp4 — dann
@@ -1387,6 +1393,42 @@ app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
 // Eigenes Profil und eigene Inhalte
 // ============================================================================
 
+/*
+ * Das eigene Profilbild setzen oder entfernen (Kasten 12.5).
+ *
+ * Bis hierher lag das Bild nur im localStorage des Browsers — niemand sonst
+ * sah es, und die App kannte gar keins. Jetzt: der Browser lädt über
+ * /api/hochladen in den Ordner `avatars` und schickt die beständige Adresse
+ * hierher; sie landet in `profiles.avatar_url`
+ * (SUPABASE_SCHEMA_XX_profilbild.sql). Dieselbe Prüfung macht die Datenbank
+ * mit dem Check `profiles_avatar_url_eimer`.
+ *
+ * Eigene Route statt eines Felds in /api/eigene/profil: dort liest die
+ * Antwort PROFIL_RUECKGABE_SPALTEN, und eine noch fehlende Spalte ließe dann
+ * jedes Speichern des Namens scheitern. Gegenstück in der App:
+ * profilbildSetzen() in app/lib/aktionen.ts.
+ */
+app.post('/api/eigene/profilbild', route(async (req) => {
+  const url = req.body?.url ? String(req.body.url) : null;
+  if (url && !/\/storage\/v1\/object\/public\/media\/avatars\/[A-Za-z0-9._-]+$/.test(url)) {
+    return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
+  }
+  const { data, error } = await req.db
+    .from('profiles')
+    .update({ avatar_url: url })
+    .eq('id', req.nutzerId)
+    .select('id');
+  if (error) {
+    if (['42703', 'PGRST204', '42501'].includes(error.code)) {
+      return { ok: false, error: 'Profilbilder gehen erst, wenn das Datenbank-Update eingespielt ist' };
+    }
+    return { ok: false, error: error.message };
+  }
+  // RLS: ein abgelehntes UPDATE ändert null Zeilen und meldet keinen Fehler.
+  if (!data?.length) return { ok: false, error: 'Das Profilbild ließ sich nicht speichern' };
+  return { ok: true, url };
+}));
+
 app.post('/api/eigene/profil', route(async (req) => {
   const { name, bio, link, color } = req.body || {};
   const aenderungen = {};
@@ -1507,26 +1549,52 @@ app.delete('/api/eigene/sammlung/:art/:name', route(async (req) => {
   );
 }));
 
-app.post('/api/eigene/spende', route(async (req) => {
-  const titel = String(req.body?.titel || '').trim();
-  if (!titel) return { ok: false, error: 'Bitte einen Titel eingeben' };
+/*
+ * Wie weit ein Spendenziel ist (Kasten 12.3): Summe in Cent und Zahl der
+ * Spender seit `seit` (dem Anlegen des Ziels).
+ *
+ * Über die Funktion spendenstand() (SUPABASE_SCHEMA_XX_spendenziel.sql):
+ * `donations` darf jeder nur für die eigenen Buchungen lesen, der Stand
+ * eines fremden Ziels ginge sonst nicht. Fehlt die Funktion noch, rechnet
+ * der Rückfall — nur fürs eigene Konto — direkt aus `donations`; fremd
+ * bleibt der Stand dann offen (stand: null). Gleiche Regel wie
+ * spendenstand() in app/lib/aktionen.ts.
+ */
+app.get('/api/spendenstand/:userId', route(async (req) => {
+  const empfaenger = req.params.userId === 'me' ? req.nutzerId : req.params.userId;
+  const seit = req.query.seit ? String(req.query.seit) : null;
+  if (seit && Number.isNaN(Date.parse(seit))) return { ok: false, error: 'Ungültiger Zeitpunkt' };
 
-  /*
-   * Das Ziel ist freiwillig — nicht jede Sammlung läuft auf einen Betrag zu,
-   * manche laufen einfach. Freiwillig heißt aber nicht beliebig: Text oder
-   * eine negative Zahl werden weiterhin abgelehnt.
-   */
-  const roh = String(req.body?.ziel ?? '').trim();
-  let ziel = 0;
-  if (roh) {
-    ziel = Number(roh.replace(',', '.'));
-    if (!Number.isFinite(ziel) || ziel <= 0) {
-      return { ok: false, error: 'Das Spendenziel muss eine Zahl über null sein' };
-    }
+  const { data, error } = await req.db.rpc('spendenstand', { p_empfaenger: empfaenger, p_seit: seit });
+  if (!error) {
+    const z = Array.isArray(data) ? data[0] : data;
+    return { ok: true, stand: { summe_cent: Number(z?.summe_cent || 0), spender: Number(z?.spender || 0) } };
   }
+  if (empfaenger !== req.nutzerId) return { ok: true, stand: null };
 
-  const spende = { titel, ziel, gesammelt: 0, text: String(req.body?.text || '').trim() };
-  return antwort(await syncHandlers.handleSpende(req.db, req.nutzerId, spende));
+  let frage = req.db.from('donations').select('betrag_cent, sender_id').eq('empfaenger_id', req.nutzerId);
+  if (seit) frage = frage.gte('created_at', seit);
+  const { data: zeilen, error: fehler } = await frage;
+  if (fehler) return { ok: true, stand: null };
+  return {
+    ok: true,
+    stand: {
+      summe_cent: (zeilen || []).reduce((n, z) => n + Number(z.betrag_cent || 0), 0),
+      spender: new Set((zeilen || []).map((z) => z.sender_id)).size,
+    },
+  };
+}));
+
+app.post('/api/eigene/spende', route(async (req) => {
+  /*
+   * Kasten 12.3: dieselbe Regel wie in der App (gemeinsam/spende.js).
+   * Das Ziel ist freiwillig — nicht jede Sammlung läuft auf einen Betrag zu —,
+   * Text oder eine negative Zahl werden aber abgelehnt. Neu sind Frist und
+   * `seit`: ab da zählen die Spenden für den erreichten Betrag.
+   */
+  const e = Spende.ausFormular(req.body || {});
+  if (!e.ok) return { ok: false, error: e.fehler };
+  return antwort(await syncHandlers.handleSpende(req.db, req.nutzerId, e.spende));
 }));
 
 const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
@@ -1838,7 +1906,7 @@ app.get('/api/sammlungen', route(async (req) => {
   const { data, error } = await req.db
     .from('sammlungen')
     .select(`id, art, name, created_at,
-             sammlung_inhalte ( created_at,
+             sammlung_inhalte ( created_at, post_id, story_id,
                posts!post_id (thumbnail_url, media_url),
                stories!story_id (media_url) )`)
     .eq('user_id', wessen)
@@ -1846,35 +1914,102 @@ app.get('/api/sammlungen', route(async (req) => {
     .order('created_at', { ascending: true });
   if (error) throw error;
 
+  // Das gewaehlte Titelbild (Kasten 12.7/12.8) — eigene, nachsichtige
+  // Abfrage, siehe titelWahlen().
+  const wahl = await titelWahlen(req.db, (data || []).map((s) => s.id));
+
   /*
    * Unterschreiben, bevor gerechnet wird. Der Eimer ist seit Schema 23
    * nicht mehr oeffentlich; eine rohe media_url fuehrt ins Leere, und zwar
    * ohne Fehlermeldung — der Kreis bliebe einfach grau, und niemand wuesste
    * warum.
    */
-  const signiert = await signiereMedien(req.db, data || []);
+  const signiert = await signiereMedien(
+    req.db,
+    (data || []).map((s) => ({ ...s, ...(wahl.get(s.id) || {}) }))
+  );
 
   return signiert.map((s) => {
     const inhalte = s.sammlung_inhalte || [];
-    // Das zuletzt Hinzugefuegte ist das Bild der Sammlung. Dieselbe Regel
-    // wie in app/lib/aktionen.ts (sammlungenVon) — sonst zeigten App und
-    // Website verschiedene Kreise fuer dieselbe Sammlung.
-    const neueste = [...inhalte].sort((a, b) =>
-      String(b.created_at).localeCompare(String(a.created_at)));
-    const treffer = neueste.find((i) => i.posts || i.stories);
     return {
       id: s.id,
       art: s.art,
       name: s.name,
       anzahl: inhalte.length,
-      // Leer ist ein gueltiger Zustand, keine Panne: eine gerade angelegte
-      // Sammlung hat noch kein Bild.
-      bild: treffer
-        ? (treffer.posts?.thumbnail_url || treffer.posts?.media_url
-           || treffer.stories?.media_url || null)
-        : null,
+      // Welches Bild im Kreis steht, entscheidet gemeinsam/sammlungen.js —
+      // dieselbe Regel wie in app/lib/aktionen.ts (sammlungenVon). Leer ist
+      // ein gueltiger Zustand: eine gerade angelegte Sammlung hat kein Bild.
+      bild: Sammlungen.vorschaubild(s, inhalte),
+      titelPostId: s.titel_post_id || null,
+      titelStoryId: s.titel_story_id || null,
+      eigenesTitelbild: Boolean(s.titelbild_url),
     };
   });
+}));
+
+/*
+ * Die Titelbild-Wahl je Sammlung — oder nichts.
+ *
+ * Die drei Spalten kommen erst mit SUPABASE_SCHEMA_XX_titelbild.sql. Stuenden
+ * sie in der Abfrage oben, fiele bis zum Einspielen JEDE Sammlungsreihe
+ * aus. So faellt nur die Wahl aus, und der Kreis zeigt wie bisher das
+ * neueste Stueck.
+ */
+async function titelWahlen(db, ids) {
+  const karte = new Map();
+  if (!ids.length) return karte;
+  const { data, error } = await db
+    .from('sammlungen')
+    .select('id, titel_post_id, titel_story_id, titelbild_url')
+    .in('id', ids);
+  if (error) return karte;
+  for (const z of data || []) karte.set(z.id, z);
+  return karte;
+}
+
+/*
+ * Das Titelbild einer eigenen Sammlung setzen (Kasten 12.7 und 12.8).
+ *
+ *   { postId }   Playlist: ein enthaltener Beitrag
+ *   { storyId }  Highlight: eine enthaltene Story
+ *   { bildUrl }  Highlight: ein eigenes Foto, vorher ueber /api/hochladen
+ *   {}           zurueck zur Regel „das neueste Stueck"
+ *
+ * Ob das Stueck wirklich in der Sammlung liegt und zur Gattung passt,
+ * prueft der Ausloeser sammlung_titel_pruefen in der Datenbank — sonst
+ * gaebe es zwei Regeln, die auseinanderlaufen. Wem die Sammlung gehoert,
+ * prueft die Regel sammlungen_aendern (Schema 46).
+ */
+app.post('/api/eigene/sammlung/:id/titelbild', route(async (req) => {
+  const { postId, storyId, bildUrl } = req.body || {};
+  const zeile = {
+    titel_post_id: postId || null,
+    titel_story_id: storyId || null,
+    titelbild_url: bildUrl || null,
+  };
+  if ([zeile.titel_post_id, zeile.titel_story_id, zeile.titelbild_url].filter(Boolean).length > 1) {
+    return { ok: false, error: 'Bitte nur ein Titelbild wählen' };
+  }
+  if (zeile.titelbild_url && !/\/storage\/v1\/object\/public\/media\/(stories|posts)\/[A-Za-z0-9._-]+$/.test(zeile.titelbild_url)) {
+    return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
+  }
+
+  const { data, error } = await req.db
+    .from('sammlungen')
+    .update(zeile)
+    .eq('id', req.params.id)
+    .eq('user_id', req.nutzerId)
+    .select('id');
+  if (error) {
+    // 42703: Spalte fehlt — der Schema-Entwurf ist noch nicht eingespielt.
+    if (error.code === '42703' || error.code === 'PGRST204') {
+      return { ok: false, error: 'Titelbilder gehen erst, wenn das Datenbank-Update eingespielt ist' };
+    }
+    return { ok: false, error: error.message };
+  }
+  // RLS: ein abgelehntes UPDATE aendert null Zeilen und meldet keinen Fehler.
+  if (!data?.length) return { ok: false, error: 'Diese Sammlung gehört nicht dir' };
+  return { ok: true, meldung: zeile.titel_post_id || zeile.titel_story_id || zeile.titelbild_url ? 'Titelbild gespeichert' : 'Titelbild zurückgesetzt' };
 }));
 
 /*

@@ -27,6 +27,11 @@ export interface User {
    * war deshalb im Browser rosa und in der App blau.
    */
   color?: string;
+  /**
+   * Das Profilbild (Kasten 12.5), unterschrieben — oder nichts, dann
+   * zeichnet Avatar die Initialen. Kommt aus `profiles.avatar_url`.
+   */
+  avatar?: string;
 }
 
 export interface Message {
@@ -512,6 +517,10 @@ export interface Spende {
   ziel: number;
   gesammelt: number;
   text: string;
+  /** Frist als JJJJ-MM-TT, freiwillig (Kasten 12.3). */
+  frist?: string | null;
+  /** Wann das Ziel angelegt wurde — ab da zaehlen die Spenden. */
+  seit?: string | null;
 }
 
 /** Ein Eintrag im eigenen Beitragsraster. */

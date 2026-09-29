@@ -16,12 +16,42 @@ import { useKachelHoehe } from '../../lib/raster';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { AuthContext } from '../../contexts/AuthContext';
 import * as Aktion from '../../lib/aktionen';
+import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
+import { SpendeKarte } from '../../components/SpendeKarte';
+import { ActionSheet } from '../../components/ActionSheet';
+import { useAktionen } from '../../lib/useAktionen';
+import { fotoHochladen } from '../../lib/profilbild';
+
+// Ringfarbe und -staerke je Gattung — gemeinsam mit der Website (Kasten 12.9).
+const SammlungRegel = require('../../../gemeinsam/sammlungen') as typeof import('../../../gemeinsam/sammlungen');
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-type Tab = 'grid' | 'repost' | 'tagged' | 'saved';
+export type ProfilTab = 'grid' | 'repost' | 'tagged' | 'saved';
+type Tab = ProfilTab;
+
+/** Durchmesser der Kreise fuer Playlists und Highlights. */
+const KREIS = 62;
+/** Strichstaerke des Rings und das Bild darin, mit 2 px Luft zum Ring. */
+const STRICH = SammlungRegel.ringstaerke(KREIS);
+const INNEN = KREIS - 2 * STRICH - 4;
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
+  /**
+   * Kasten 12.1: der Reiter lebt in der Shell (App.tsx), nicht hier. Oeffnet
+   * man einen Beitrag, baut die Shell diesen Bildschirm ab — ein lokaler
+   * Zustand fiel dabei jedes Mal auf „Posts" zurueck.
+   */
+  tab?: ProfilTab;
+  onTab?: (tab: ProfilTab) => void;
+  /**
+   * Kasten 12.4: „Profil wechseln" oeffnet die Kontoliste — wie im
+   * Messenger-Profil. Bis zum 29.09.2026 fuehrte die Leiste hier in den
+   * Messenger (onSwitchArea('messenger')).
+   */
+  onSwitchAccount?: () => void;
+  /** Kasten 12.5: das Profilbild aendern. */
+  onProfilbild?: () => void;
   /** Glocke, Plus und Menü oben rechts. */
   onAction: (key: string) => void;
   /** Fuehrt zum Formular, das Name, Info und Link aendert. */
@@ -52,8 +82,8 @@ const TABS: { key: Tab; icon: IconName }[] = [
 ];
 
 /** Prototyp-Frame "Videos - Profil". */
-export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpenKachel, onNotice, onOpenFollowers, onOpenFollowing }: Props) => {
-  const { profile: alleProfile, users: alleNutzer } = useDaten();
+export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onSwitchAccount, onProfilbild, onAction, onBearbeiten, onOpenKachel, onNotice, onOpenFollowers, onOpenFollowing }: Props) => {
+  const { profile: alleProfile, users: alleNutzer, sichtbarkeit, neuLaden } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { reposts } = useReposts();
   const {
@@ -63,14 +93,28 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
     sammlungen,
     sammlungOeffnen,
     sammlungLoeschen,
+    sammlungenNeu,
     spende,
     raster,
     eigeneBeitraege,
     gefolgt,
     eigenesProfil,
   } = useProfil();
-  const [tab, setTab] = useState<Tab>('grid');
+  const [tabHier, setTabHier] = useState<Tab>('grid');
+  const tab = tabVonAussen ?? tabHier;
+  const setTab = (t: Tab) => (onTab ? onTab(t) : setTabHier(t));
   const me = alleProfile.me;
+  const aktionen = useAktionen(onNotice);
+
+  /*
+   * Kasten 12.6: der gruene Punkt am Profilbild oeffnet die
+   * Online-Sichtbarkeit — dasselbe Blatt und dieselbe Einstellung
+   * (`onlinestatus`) wie im Messenger-Profil und in den Einstellungen. Die
+   * Wirkung sitzt in der Datenbank: `presence` ist nur lesbar, wenn
+   * sichtbar_fuer(…, 'onlinestatus', …) es erlaubt (Schema 20).
+   */
+  const [onlineOffen, setOnlineOffen] = useState(false);
+  const online = sichtbarkeit.onlinestatus || { stufe: 'alle' as Aktion.SichtbarkeitStufe, ausnahmen: [] };
 
   /*
    * Die Kreise ueber den Registern — Playlists und Highlights.
@@ -96,8 +140,46 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
   const [offen, setOffen] = useState<{ sammlung: Aktion.Sammlung; kacheln: Aktion.Rasterkachel[] } | null>(null);
   const [laedt, setLaedt] = useState(false);
 
+  /*
+   * Kasten 12.7/12.8: Titelbild waehlen. Im Wahlmodus fuehrt ein Tipp auf
+   * eine Kachel nicht zum Beitrag, sondern macht sie zum Titelbild.
+   */
+  const [waehlen, setWaehlen] = useState(false);
+  const [titelMenue, setTitelMenue] = useState(false);
+
+  const titelSetzen = async (wahl: { postId?: string; storyId?: string; bildUrl?: string }) => {
+    if (!supabase || !offen) return;
+    setLaedt(true);
+    try {
+      await Aktion.titelbildSetzen(supabase, offen.sammlung.id, wahl);
+      onNotice(wahl.postId || wahl.storyId || wahl.bildUrl ? 'Titelbild gespeichert' : 'Titelbild zurückgesetzt');
+      setOffen({
+        ...offen,
+        sammlung: {
+          ...offen.sammlung,
+          titelPostId: wahl.postId ?? null,
+          titelStoryId: wahl.storyId ?? null,
+          eigenesTitelbild: Boolean(wahl.bildUrl),
+        },
+      });
+      sammlungenNeu();
+    } catch (fehler: any) {
+      onNotice(fehler?.message ?? 'Das Titelbild ließ sich nicht speichern');
+    } finally {
+      setWaehlen(false);
+      setLaedt(false);
+    }
+  };
+
+  const titelFoto = async (quelle: 'galerie' | 'kamera') => {
+    if (!offen || !user?.id) return;
+    const bild = await fotoHochladen(supabase, quelle, 'stories', `titel-${offen.sammlung.id}-${Date.now()}.jpg`, onNotice);
+    if (bild) await titelSetzen({ bildUrl: bild.url });
+  };
+
   const oeffnen = async (s: Aktion.Sammlung) => {
     if (!s.id) return onNotice(`„${s.name}" laesst sich gerade nicht oeffnen`);
+    setWaehlen(false);
     setLaedt(true);
     try {
       setOffen({ sammlung: s, kacheln: await sammlungOeffnen(s.id) });
@@ -224,12 +306,12 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
    */
   const ich = alleNutzer.me;
   if (!ich || !me) {
-    return <View style={styles.screen}><SwitchBar onPress={() => onSwitchArea('messenger')} /></View>;
+    return <View style={styles.screen}><SwitchBar onPress={() => (onSwitchAccount ? onSwitchAccount() : onSwitchArea('messenger'))} /></View>;
   }
 
   return (
     <View style={styles.screen}>
-      <SwitchBar onPress={() => onSwitchArea('messenger')} />
+      <SwitchBar onPress={() => (onSwitchAccount ? onSwitchAccount() : onSwitchArea('messenger'))} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <OwnProfileHead
@@ -251,31 +333,20 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
             if (label === 'Gefolgt') return onOpenFollowing?.();
             onNotice('Deine Beiträge stehen darunter.');
           }}
-          onAvatarPress={() => onNotice('Dein Profilbild')}
+          onAvatarPress={onProfilbild ?? (() => onNotice('Dein Profilbild'))}
+          onOnlinePunkt={() => setOnlineOffen(true)}
+          onlineSichtbar={online.stufe !== 'niemand'}
         />
 
-        {spende && (
-          <View style={styles.spende}>
-            <Text style={styles.spendeTitel}>{spende.titel}</Text>
-            {!!spende.text && <Text style={styles.spendeText}>{spende.text}</Text>}
-            <View style={styles.spendeBalken}>
-              <View
-                style={[
-                  styles.spendeFuellung,
-                  { width: `${Math.min(100, Math.round((spende.gesammelt / spende.ziel) * 100))}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.spendeZahlen}>
-              {spende.gesammelt} € von {spende.ziel} € gesammelt
-            </Text>
-          </View>
-        )}
+        {/* Kasten 12.3: antippbar, mit Detailblatt und Spendenweg. */}
+        {spende && user?.id ? (
+          <SpendeKarte spende={spende} empfaengerId={user.id} name={eigenesProfil.name} onNotice={onNotice} />
+        ) : null}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
           {kreise('playlist').map((s) => (
             <Druck key={`pl-${s.name}`} style={styles.highlight} onPress={() => oeffnen(s)}>
-              <View style={[styles.ring, styles.ringPlaylist]}>
+              <View style={[styles.ring, { borderColor: SammlungRegel.ringfarbe('playlist'), borderWidth: STRICH }]}>
                 <Motiv
                   id={`pl-${s.name}`}
                   bild={s.bild ?? undefined}
@@ -284,7 +355,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
                   style={styles.ringInhalt}
                 />
               </View>
-              <View style={[styles.abzeichen, styles.abzeichenPlaylist]}>
+              <View style={[styles.abzeichen, { backgroundColor: SammlungRegel.ringfarbe('playlist') }]}>
                 <Ionicons name="play" size={10} color={colors.white} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
@@ -294,7 +365,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
           ))}
           {kreise('highlight').map((s) => (
             <Druck key={`hl-${s.name}`} style={styles.highlight} onPress={() => oeffnen(s)}>
-              <View style={[styles.ring, styles.ringHighlight]}>
+              <View style={[styles.ring, { borderColor: SammlungRegel.ringfarbe('highlight'), borderWidth: STRICH }]}>
                 <Motiv
                   id={`hl-${s.name}`}
                   bild={s.bild ?? undefined}
@@ -303,7 +374,7 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
                   style={styles.ringInhalt}
                 />
               </View>
-              <View style={[styles.abzeichen, styles.abzeichenHighlight]}>
+              <View style={[styles.abzeichen, { backgroundColor: SammlungRegel.ringfarbe('highlight') }]}>
                 <Ionicons name="star" size={10} color={colors.white} />
               </View>
               <Text style={styles.highlightLabel} numberOfLines={1}>
@@ -459,19 +530,46 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
               {offen?.sammlung.name ?? ''}
             </Text>
             {offen ? (
+              <Druck
+                onPress={() => setTitelMenue(true)}
+                style={styles.sammlungZurueck}
+                accessibilityLabel="Titelbild wählen"
+                testID="titelbild-waehlen"
+              >
+                <Ionicons name="image-outline" size={22} color={waehlen ? colors.brand : colors.text} />
+              </Druck>
+            ) : null}
+            {offen ? (
               <Druck onPress={() => loeschenFragen(offen.sammlung)} style={styles.sammlungZurueck}>
                 <Ionicons name="trash-outline" size={22} color={colors.text} />
               </Druck>
             ) : null}
           </View>
+          {waehlen ? (
+            <Text style={styles.wahlHinweis}>
+              {offen?.sammlung.art === 'playlist'
+                ? 'Tippe auf den Beitrag, der im Kreis stehen soll.'
+                : 'Tippe auf die Story, die im Kreis stehen soll.'}
+            </Text>
+          ) : null}
           {offen && offen.kacheln.length > 0 ? (
             <ScrollView contentContainerStyle={styles.content}>
               <View style={styles.grid}>
                 {offen.kacheln.map((k) => (
                   <Druck
                     key={k.id}
-                    style={[styles.gridItem, { height: kachelHoehe }]}
+                    style={[
+                      styles.gridItem,
+                      { height: kachelHoehe },
+                      (offen.sammlung.titelPostId === k.id || offen.sammlung.titelStoryId === k.id) && {
+                        borderColor: SammlungRegel.ringfarbe(offen.sammlung.art),
+                        borderWidth: 3,
+                      },
+                    ]}
                     onPress={() => {
+                      if (waehlen) {
+                        return void titelSetzen(k.kind === 'story' ? { storyId: k.id } : { postId: k.id });
+                      }
                       setOffen(null);
                       onOpenKachel?.(k);
                     }}
@@ -495,7 +593,57 @@ export const VideoProfileScreen = ({ onSwitchArea, onAction, onBearbeiten, onOpe
             />
           )}
         </View>
+
+        <ActionSheet
+          visible={titelMenue}
+          title="Titelbild"
+          untertitel={
+            offen?.sammlung.art === 'playlist'
+              ? 'Aus einem Beitrag dieser Playlist'
+              : 'Aus einer Story dieses Highlights oder ein eigenes Foto'
+          }
+          items={[
+            {
+              key: 'aus',
+              label: offen?.sammlung.art === 'playlist' ? 'Beitrag wählen' : 'Story wählen',
+              icon: 'grid-outline',
+            },
+            ...(offen?.sammlung.art === 'highlight'
+              ? [
+                  { key: 'galerie', label: 'Foto aus Mediathek', icon: 'images-outline' as const },
+                  { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera-outline' as const },
+                ]
+              : []),
+            { key: 'zurueck', label: 'Automatisch (neuestes)', icon: 'refresh-outline' },
+          ]}
+          onSelect={(key) => {
+            setTitelMenue(false);
+            if (key === 'aus') {
+              if (!offen?.kacheln.length) return onNotice('Noch nichts darin, woraus ein Titelbild werden könnte');
+              return setWaehlen(true);
+            }
+            if (key === 'galerie' || key === 'kamera') return void titelFoto(key);
+            void titelSetzen({});
+          }}
+          onClose={() => setTitelMenue(false)}
+        />
       </Modal>
+
+      <SichtbarkeitSheet
+        visible={onlineOffen}
+        titel="Online-Status"
+        stufe={online.stufe}
+        ausnahmen={online.ausnahmen}
+        onStufe={async (stufe) => {
+          await aktionen.sichtbarkeit('onlinestatus', stufe, () => {});
+          await neuLaden();
+        }}
+        onAusnahme={async (userId) => {
+          await aktionen.sichtbarkeitAusnahme('onlinestatus', userId, () => {});
+          await neuLaden();
+        }}
+        onClose={() => setOnlineOffen(false)}
+      />
 
       {laedt && (
         <View style={styles.laedt} pointerEvents="none">
@@ -543,27 +691,6 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
 
-  spende: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: 13,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface2,
-  },
-  spendeTitel: { ...typography.name, color: colors.text },
-  spendeText: { ...typography.preview, color: colors.text2, marginTop: 3 },
-  spendeBalken: {
-    marginTop: 9,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.surface3,
-    overflow: 'hidden',
-  },
-  spendeFuellung: { height: '100%', backgroundColor: colors.brand },
-  spendeZahlen: { ...typography.small, color: colors.text3, marginTop: 6 },
-
   highlights: { gap: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   highlight: { alignItems: 'center', gap: 6, width: 68 },
   /*
@@ -574,18 +701,24 @@ const styles = themenStyles((colors) => ({
    * einem Dreieck, ein Highlight ein Kreis mit einem Stern. Dieselbe Sprache
    * jetzt auch hier.
    */
+  /*
+   * Kasten 12.9 (Henrik 21.09.2026: „Prototyp ist bindend"): beide Gattungen
+   * als Kreis, unterschieden durch die Ringfarbe aus dem Prototyp —
+   * Playlist #FF0A0A, Highlight #FF990A, Strich 4 bei 45 px. Farbe und
+   * Staerke kommen aus gemeinsam/sammlungen.js, damit die Website dieselben
+   * zeichnet. Das abgerundete Quadrat fuer Playlists (Punkt 39, 26.08.)
+   * steht nicht im Prototyp; die Unterscheidung traegt jetzt die Farbe,
+   * dazu das Abzeichen.
+   */
   ring: {
-    width: 62,
-    height: 62,
+    width: KREIS,
+    height: KREIS,
+    borderRadius: KREIS / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
     overflow: 'hidden',
   },
-  ringPlaylist: { borderRadius: 18 },
-  ringHighlight: { borderRadius: 31 },
-  ringInhalt: { width: 58, height: 58 },
+  ringInhalt: { width: INNEN, height: INNEN, borderRadius: INNEN / 2, overflow: 'hidden' },
   /* Das Abzeichen sitzt unten rechts auf dem Rand — deshalb absolut, mit
      einem Rand in der Flaechenfarbe, damit es sich abhebt. */
   abzeichen: {
@@ -600,8 +733,7 @@ const styles = themenStyles((colors) => ({
     borderWidth: 2,
     borderColor: colors.surface,
   },
-  abzeichenPlaylist: { backgroundColor: colors.brand },
-  abzeichenHighlight: { backgroundColor: '#F0397E' },
+  wahlHinweis: { ...typography.small, color: colors.text2, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   highlightLabel: { ...typography.small, color: colors.text2 },
   tabs: {
     flexDirection: 'row',

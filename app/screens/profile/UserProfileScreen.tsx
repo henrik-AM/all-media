@@ -15,6 +15,13 @@ import { useKachelHoehe } from '../../lib/raster';
 import { compactNumber } from '../../lib/zahlen';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import * as Aktion from '../../lib/aktionen';
+import { SpendeKarte } from '../../components/SpendeKarte';
+
+// Ringfarbe und -stärke je Gattung — gleich in App und Website (Kasten 12.9).
+const SammlungRegel = require('../../../gemeinsam/sammlungen') as typeof import('../../../gemeinsam/sammlungen');
+const RING = sizes.storyRing;
+const RING_STRICH = SammlungRegel.ringstaerke(RING);
+const RING_INNEN = RING - 2 * RING_STRICH - 4;
 
 type Tab = 'grid' | 'repost' | 'tagged';
 
@@ -127,6 +134,31 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
       abgebrochen = true;
     };
   }, [supabase, ichId, userId]);
+
+  /*
+   * Playlists und Highlights mit ihren Titelbildern (Kasten 12.7–12.9).
+   *
+   * Bis hierher standen im fremden Profil nur die Highlight-NAMEN aus
+   * `profiles.highlights`, jeder Kreis mit demselben Platzhalter und grauem
+   * Rand; Playlists fehlten ganz. Die Website zeigt dieselbe Person mit
+   * Bildern (/api/sammlungen?user=…). Jetzt dieselbe Quelle wie das eigene
+   * Profil; kommt die Abfrage nicht durch, bleiben die Namen als Rückfall.
+   */
+  const [sammlungen, setSammlungen] = useState<Aktion.Sammlung[] | null>(null);
+  useEffect(() => {
+    setSammlungen(null);
+    if (!supabase || !person) return;
+    let abgebrochen = false;
+    Promise.all([Aktion.sammlungenVon(supabase, userId, 'playlist'), Aktion.sammlungenVon(supabase, userId, 'highlight')])
+      .then(([pl, hl]) => {
+        if (!abgebrochen) setSammlungen([...pl, ...hl]);
+      })
+      .catch(() => undefined);
+    return () => {
+      abgebrochen = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, userId]);
 
   const aktionen = useAktionen(onNotice);
   useEffect(() => {
@@ -252,27 +284,35 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
           </Druck>
         </View>
 
-        {profile.highlights.length > 0 && (
+        {/* Kasten 12.3: Spendenziel mit Einzelheiten, auch im fremden Profil. */}
+        {!!profile.spende && (
+          <SpendeKarte spende={profile.spende} empfaengerId={userId} name={person.name} onNotice={onNotice} />
+        )}
+
+        {(sammlungen ?? profile.highlights.map((name) => ({ id: '', art: 'highlight' as const, name, anzahl: 0, bild: null }))).length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
-            {profile.highlights.map((highlight) => (
-              <Druck key={highlight} style={styles.highlight} onPress={() => onNotice(`Highlight „${highlight}"`)}>
-                <View style={styles.highlightRing}>
-                  {/*
-                    Highlights sind Bilder, keine Personen. Vorher stand hier
-                    eine Flaeche in EINER Farbe (die des Profils) mit den ersten
-                    zwei Buchstaben darin - alle Highlights sahen also gleich
-                    aus. Die Website zeichnet laengst je Highlight ein eigenes
-                    Motiv; die App hatte den Wechsel nicht mitgemacht.
-                  */}
+            {(sammlungen ?? profile.highlights.map((name) => ({ id: '', art: 'highlight' as const, name, anzahl: 0, bild: null }))).map((s) => (
+              <Druck
+                key={`${s.art}-${s.id || s.name}`}
+                style={styles.highlight}
+                onPress={() => onNotice(`${s.art === 'playlist' ? 'Playlist' : 'Highlight'} „${s.name}"`)}
+                testID={`sammlung-${s.art}`}
+              >
+                {/*
+                  Rund, Rand in der Farbe der Gattung — Prototyp: Playlist
+                  #FF0A0A, Highlight #FF990A (gemeinsam/sammlungen.js).
+                */}
+                <View style={[styles.highlightRing, { borderColor: SammlungRegel.ringfarbe(s.art) }]}>
                   <Motiv
-                    id={`hl-${highlight}`}
-                    icon="image-outline"
+                    id={`${s.art.slice(0, 2)}-${s.name}`}
+                    icon={s.art === 'playlist' ? 'play' : 'image-outline'}
                     iconSize={18}
+                    bild={s.bild ?? undefined}
                     style={styles.highlightInner}
                   />
                 </View>
                 <Text style={styles.highlightLabel} numberOfLines={1}>
-                  {highlight}
+                  {s.name}
                 </Text>
               </Druck>
             ))}
@@ -408,18 +448,18 @@ const styles = themenStyles((colors) => ({
   highlights: { gap: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   highlight: { width: sizes.storyRing, alignItems: 'center' },
   highlightRing: {
-    width: sizes.storyRing,
-    height: sizes.storyRing,
-    borderRadius: sizes.storyRing / 2,
-    borderWidth: 2.5,
-    borderColor: colors.border,
+    width: RING,
+    height: RING,
+    borderRadius: RING / 2,
+    borderWidth: RING_STRICH,
     alignItems: 'center',
     justifyContent: 'center',
   },
   highlightInner: {
-    width: sizes.storyRing - 11,
-    height: sizes.storyRing - 11,
-    borderRadius: (sizes.storyRing - 11) / 2,
+    width: RING_INNEN,
+    height: RING_INNEN,
+    borderRadius: RING_INNEN / 2,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -179,6 +179,8 @@ const state = {
   clipQuery: '',
   theme: localStorage.getItem('am-theme') || 'system',
   ownProfileTab: 'grid',
+  // Aus dem eigenen Profil in einen Beitrag gegangen (Kasten 12.1).
+  profilBeitragOffen: false,
   openChatId: null,
   openChatSettingsId: null,
   openCommunityId: null,
@@ -267,25 +269,36 @@ function avatarOf(chat, size = 54) {
       .replace('<svg', '<svg style="width:45%;height:45%"');
   }
   const u = user(chat.userId);
-  return `<div class="avatar avatar--${size}" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
+  return personenAvatar(u, size);
+}
+
+/*
+ * Ein Personen-Avatar: Profilbild aus der Datenbank, sonst Initialen auf
+ * Farbe (Kasten 12.5). Das Bild liegt unter den Initialen nicht darunter,
+ * sondern statt ihrer — ein kaputtes Bild blendet sich per onerror aus und
+ * gibt die Initialen frei. Gleiche Regel in app/components/Avatar.tsx.
+ */
+function personenAvatar(u, size, extra = '') {
+  const klassen = `avatar avatar--${size}${extra ? ' ' + extra : ''}`;
+  const bild = u?.avatar;
+  return `<div class="${klassen}" style="background:${farbe(u?.color)}">${esc(u?.initials || '')}${
+    bild ? `<img src="${esc(bild)}" alt="" onerror="this.remove()" />` : ''
+  }</div>`;
 }
 
 function avatarForUser(id, size = 44) {
   if (id === 'me') return eigenerAvatar(state.users.me, size);
-  const u = user(id);
-  return `<div class="avatar avatar--${size}" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
+  return personenAvatar(user(id), size);
 }
 
 /*
- * Der eigene Avatar zeigt das selbst gewaehlte Bild, wenn eines hinterlegt
- * ist. Es liegt nur im Browser (siehe openProfilBearbeiten), deshalb wird es
- * hier und nicht ueber die Daten vom Server geholt.
+ * Der eigene Avatar zeigt das Profilbild aus der Datenbank
+ * (`profiles.avatar_url`, Kasten 12.5). Bis zum 29.09.2026 lag es nur im
+ * localStorage dieses Browsers — auf dem Handy und bei allen anderen stand
+ * weiter das Kürzel.
  */
 function eigenerAvatar(me, size = 44, extra = '') {
-  const bild = eigenesProfilbildLaden();
-  const klassen = `avatar avatar--${size}${extra ? ' ' + extra : ''}`;
-  if (bild) return `<div class="${klassen}"><img src="${bild}" alt="" /></div>`;
-  return `<div class="${klassen}" style="background:${farbe(me.color)}">${esc(me.initials)}</div>`;
+  return personenAvatar({ ...(me || {}), avatar: me?.avatar || state.users?.me?.avatar || null }, size, extra);
 }
 
 /*
@@ -939,6 +952,7 @@ function renderBottomNav() {
        * ebenfalls zurueck auf die Hauptseite - so wie in jeder App mit
        * unterer Leiste.
        */
+      profilReiterPruefen(ziel, STARTPUNKT[ziel]);
       state.area = ziel;
       state.sub[ziel] = STARTPUNKT[ziel];
       verlasseExplorer();
@@ -976,11 +990,33 @@ function renderTopBar() {
 
   bar.querySelectorAll('[data-sub]').forEach((b) =>
     b.addEventListener('click', () => {
+      profilReiterPruefen(state.area, b.dataset.sub);
       state.sub[state.area] = b.dataset.sub;
       verlasseExplorer();
       render();
     })
   );
+}
+
+/*
+ * Der Reiter im eigenen Video-Profil (Kasten 12.1).
+ *
+ * Henrik am 21.09.2026: der gewählte Tab soll bleiben, wenn man einen
+ * Beitrag öffnet und schließt, und erst beim Verlassen über die obere oder
+ * untere Leiste auf „Posts" zurückspringen. Auf der Website blieb er bis
+ * dahin IMMER stehen, auch nach einem Ausflug in einen anderen Bereich.
+ *
+ * `state.profilBeitragOffen` heißt: man ist aus dem Profil in einen Beitrag
+ * gegangen. Zurück ins Profil (oben „Profil") behält den Reiter; jedes
+ * andere Ziel über die Leisten setzt ihn zurück. Gleiche Regel in App.tsx
+ * (profilTab, profilVerlassen).
+ */
+function profilReiterPruefen(zielBereich, zielUnterpunkt) {
+  const imProfil = state.area === 'videos' && (sub() === 'profile' || state.profilBeitragOffen);
+  if (!imProfil) return;
+  state.profilBeitragOffen = false;
+  if (zielBereich === 'videos' && zielUnterpunkt === 'profile') return;
+  state.ownProfileTab = 'grid';
 }
 
 /*
@@ -1468,8 +1504,17 @@ function chatRow(c) {
  * naechsten Start wieder da. Vor dem Hochladen auf 1200 Pixel verkleinert.
  */
 
-/** Bild auf hoechstens 1200 Pixel bringen und als Datenadresse zurueckgeben. */
-function bildVerkleinern(datei) {
+/**
+ * Bild auf hoechstens `maxKante` (sonst 1200) Pixel bringen und als
+ * Datenadresse zurueckgeben.
+ *
+ * Bis zum 29.09.2026 stand weiter unten eine zweite Funktion gleichen Namens
+ * mit Pflichtangabe `maxKante` (fuers Profilbild im localStorage). In einem
+ * Skript gewinnt die spaetere Erklaerung — jeder Aufruf ohne zweite Angabe
+ * rechnete mit NaN, die Leinwand wurde 0 × 0 gross, und heraus kam „data:,".
+ * Gefunden bei Kasten 12.5; jetzt gibt es nur noch diese eine.
+ */
+function bildVerkleinern(datei, maxKante = 1200) {
   return new Promise((fertig, fehler) => {
     const leser = new FileReader();
     leser.onerror = () => fehler(new Error('Datei nicht lesbar'));
@@ -1477,7 +1522,7 @@ function bildVerkleinern(datei) {
       const bild = new Image();
       bild.onerror = () => fehler(new Error('Kein gueltiges Bild'));
       bild.onload = () => {
-        const faktor = Math.min(1, 1200 / Math.max(bild.width, bild.height));
+        const faktor = Math.min(1, maxKante / Math.max(bild.width, bild.height));
         const flaeche = document.createElement('canvas');
         flaeche.width = Math.round(bild.width * faktor);
         flaeche.height = Math.round(bild.height * faktor);
@@ -2186,27 +2231,16 @@ function openSheet(title, bodyHtml, onMount, opts = {}) {
  * Eigenes Profil bearbeiten. Henrik: "Profilbild, Name, Info/Bio, Link usw.
  * ueber eine Bearbeitungseinstellung aendern koennen."
  *
- * Das Bild bleibt im Browser - der Server teilt seinen Speicher mit allen
- * Besuchern, so wie schon bei "Deine Story". Auf dem Server steht nur die
- * Ersatzfarbe.
+ * Das Bild lag bis zum 29.09.2026 nur im Browser (localStorage). Seit
+ * Kasten 12.5 geht es wie in der App in den Eimer `media` (Ordner avatars)
+ * und nach `profiles.avatar_url` — so sehen es alle, auf jedem Geraet.
+ * Der alte Browser-Eintrag wird beim ersten Laden geraeumt, sonst hielte
+ * jemand ein Bild fuer gespeichert, das nur er selbst sieht.
  */
-const PROFILBILD_SPEICHER = 'allmedia.eigenesProfilbild';
-
-function eigenesProfilbildLaden() {
-  try {
-    return localStorage.getItem(PROFILBILD_SPEICHER) || null;
-  } catch {
-    return null;
-  }
-}
-
-function eigenesProfilbildSichern(datenUri) {
-  try {
-    if (datenUri) localStorage.setItem(PROFILBILD_SPEICHER, datenUri);
-    else localStorage.removeItem(PROFILBILD_SPEICHER);
-  } catch {
-    /* Speicher voll oder gesperrt - dann bleibt es bei den Initialen. */
-  }
+try {
+  localStorage.removeItem('allmedia.eigenesProfilbild');
+} catch {
+  /* gesperrter Speicher — dann gibt es auch nichts zu raeumen */
 }
 
 // Auswahl der Ersatzfarbe, wenn kein Bild hinterlegt ist.
@@ -2227,20 +2261,22 @@ const PROFILFARBEN = [
 function openProfilBearbeiten(fertig) {
   const me = state.users.me;
   const profil = state.eigenesProfil || {};
-  const bild = eigenesProfilbildLaden();
+  const bild = me.avatar || null;
 
   openSheet(
     'Profil bearbeiten',
     `<div class="sheet__body">
       <div class="bearbeiten__bild">
         <div class="avatar avatar--88" id="pbVorschau" style="background:${farbe(me.color)}">
-          ${bild ? `<img src="${bild}" alt="" />` : esc(me.initials)}
+          ${bild ? `<img src="${esc(bild)}" alt="" />` : esc(me.initials)}
         </div>
         <div class="bearbeiten__bildaktionen">
           <button class="pill is-active" id="pbWaehlen">Bild wählen</button>
-          ${bild ? '<button class="pill" id="pbEntfernen">Entfernen</button>' : ''}
+          <button class="pill" id="pbKamera">Foto aufnehmen</button>
+          <button class="pill" id="pbEntfernen" ${bild ? '' : 'hidden'}>Entfernen</button>
         </div>
         <input type="file" accept="image/*" id="pbDatei" hidden />
+        <input type="file" accept="image/*" capture="user" id="pbKameraDatei" hidden />
       </div>
 
       <label class="feld">
@@ -2295,20 +2331,45 @@ function openProfilBearbeiten(fertig) {
       );
 
       sheet.querySelector('#pbWaehlen').addEventListener('click', () => sheet.querySelector('#pbDatei').click());
+      sheet.querySelector('#pbKamera').addEventListener('click', () => sheet.querySelector('#pbKameraDatei').click());
 
-      sheet.querySelector('#pbDatei').addEventListener('change', async (e) => {
-        const datei = e.target.files?.[0];
-        if (!datei) return;
-        neuesBild = await bildVerkleinern(datei, 400);
-        sheet.querySelector('#pbVorschau').innerHTML = `<img src="${neuesBild}" alt="" />`;
-      });
-
-      sheet.querySelector('#pbEntfernen')?.addEventListener('click', () => {
-        neuesBild = null;
+      /*
+       * Kasten 12.5: das Bild geht sofort hoch und in die Datenbank — wie in
+       * der App. „Merken" betrifft nur Name, Info, Link und Farbe; wer ein
+       * Bild gewaehlt hat, soll es nicht verlieren, weil er das Blatt ohne
+       * Merken schliesst.
+       */
+      const bildSetzen = async (url, anzeige) => {
+        const antwort = await api('/api/eigene/profilbild', { url });
+        if (!antwort.ok) return toast(antwort.error || 'Das Profilbild ließ sich nicht speichern');
+        neuesBild = anzeige;
+        state.users.me.avatar = anzeige;
         const vorschau = sheet.querySelector('#pbVorschau');
-        vorschau.innerHTML = esc(state.users.me.initials);
-        vorschau.style.background = farbe;
-      });
+        vorschau.innerHTML = anzeige ? `<img src="${esc(anzeige)}" alt="" />` : esc(state.users.me.initials);
+        if (!anzeige) vorschau.style.background = farbe;
+        sheet.querySelector('#pbEntfernen').hidden = !anzeige;
+        toast(anzeige ? 'Profilbild gespeichert' : 'Profilbild entfernt');
+        fertig?.();
+      };
+
+      const dateiGewaehlt = async (e) => {
+        const datei = e.target.files?.[0];
+        e.target.value = '';
+        if (!datei) return;
+        let daten;
+        try {
+          daten = await bildVerkleinern(datei, 600);
+        } catch {
+          return toast('Dieses Bild lässt sich nicht lesen');
+        }
+        const hoch = await api('/api/hochladen', { ordner: 'avatars', aufnahme: daten });
+        if (!hoch.ok) return toast(hoch.error || 'Das Bild ließ sich nicht hochladen');
+        await bildSetzen(hoch.url, hoch.anzeige || daten);
+      };
+      sheet.querySelector('#pbDatei').addEventListener('change', dateiGewaehlt);
+      sheet.querySelector('#pbKameraDatei').addEventListener('change', dateiGewaehlt);
+
+      sheet.querySelector('#pbEntfernen').addEventListener('click', () => bildSetzen(null, null));
 
       sheet.querySelector('#pbSichern').addEventListener('click', async () => {
         const antwort = await fetch('/api/eigene/profil', {
@@ -2324,7 +2385,6 @@ function openProfilBearbeiten(fertig) {
 
         if (!antwort.ok) return toast(antwort.error);
 
-        eigenesProfilbildSichern(neuesBild);
         Object.assign(state.users.me, {
           name: antwort.profil.name,
           initials: antwort.profil.initials,
@@ -2339,27 +2399,6 @@ function openProfilBearbeiten(fertig) {
     },
     { schliessen: true, hoch: true }
   );
-}
-
-/* Verkleinert ein gewaehltes Bild, bevor es im Browser abgelegt wird -
-   sonst sprengt es den Platz im localStorage. */
-function bildVerkleinern(datei, maxKante) {
-  return new Promise((fertig) => {
-    const leser = new FileReader();
-    leser.onload = () => {
-      const bild = new Image();
-      bild.onload = () => {
-        const faktor = Math.min(1, maxKante / Math.max(bild.width, bild.height));
-        const flaeche = document.createElement('canvas');
-        flaeche.width = Math.round(bild.width * faktor);
-        flaeche.height = Math.round(bild.height * faktor);
-        flaeche.getContext('2d').drawImage(bild, 0, 0, flaeche.width, flaeche.height);
-        fertig(flaeche.toDataURL('image/jpeg', 0.85));
-      };
-      bild.src = leser.result;
-    };
-    leser.readAsDataURL(datei);
-  });
 }
 
 function openNewMenu() {
@@ -3674,6 +3713,12 @@ async function openProfile(userId, variante) {
         </div>
 
         ${
+          // Kasten 12.3: das Spendenziel auch im fremden Profil, mit
+          // Einzelheiten und „Spenden" — vorher stand es nur im eigenen.
+          profile.spende ? spendeKarte(profile.spende, profile.id, profile.name) : ''
+        }
+
+        ${
           // Dieselbe Reihe wie im eigenen Profil - vorher standen die
           // Highlights hier als nicht klickbare Story-Kreise. Ohne Bedingung:
           // die Reihe entscheidet selbst, ob sie sichtbar ist, und sie wird
@@ -3693,6 +3738,7 @@ async function openProfile(userId, variante) {
     $('#profBack').addEventListener('click', closeOverlay);
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
     bindSammlungen(overlay);
+    bindSpendeKarte(overlay, profile.spende);
     // Die echten Kreise kommen nach: Bild und Inhalt stehen in sammlungen.
     void ladeSammlungen(profile.id, overlay);
 
@@ -6145,6 +6191,8 @@ function openSichtbarkeit(punkt) {
   openSheet(punkt.label, '<div class="sheet__body"></div>', (sheet) => zeichne(sheet), {
     schliessen: true,
     hoch: true,
+    // Wer nach dem Schliessen neu zeichnen muss (grüner Punkt, Kasten 12.6).
+    beimSchliessen: punkt.danach,
   });
 }
 
@@ -10363,6 +10411,91 @@ function openVideoOptionen(clip, danach) {
 }
 
 /*
+ * Das Spendenziel im Profil — Karte und Einzelheiten (Kasten 12.3).
+ *
+ * Henrik am 21.09.2026: „Spendenziel lässt sich antippen, zeigt aber keine
+ * genaueren Daten." Die Karte war ein <div>; der Betrag darauf war
+ * `spende.gesammelt`, das nie jemand hochzählte.
+ *
+ * Jetzt: Klick → Blatt mit Titel, Beschreibung, Erreicht, Ziel, Fortschritt,
+ * Spendern und Frist; darunter „Spenden" über den bestehenden Weg
+ * (openSpende). Erreichter Betrag und Spender kommen aus der Datenbank
+ * (/api/spendenstand → spendenstand(), SUPABASE_SCHEMA_XX_spendenziel.sql).
+ * Rechnung und Texte: gemeinsam/spende.js, wie in app/components/SpendeKarte.tsx.
+ * Zahlungsmethode und Spenden-Code: Kasten 13.
+ */
+function spendeKarte(spende, userId, name) {
+  const stand = Spende.stand(spende, null);
+  if (!stand) return '';
+  return `<button class="spende" data-spendeziel="${esc(userId)}" data-spendename="${esc(name || '')}" aria-label="Spendenziel ${esc(stand.titel)}, Einzelheiten">
+    <div class="spende__titel">${esc(stand.titel)}</div>
+    ${stand.text ? `<div class="spende__text">${esc(stand.text)}</div>` : ''}
+    ${stand.prozent !== null ? `<div class="spende__balken"><div class="spende__fuellung" style="width:${stand.prozent}%"></div></div>` : ''}
+    <div class="spende__zahlen">${esc(stand.zahlenText)}</div>
+  </button>`;
+}
+
+function bindSpendeKarte(wurzel, spende) {
+  wurzel.querySelectorAll('[data-spendeziel]').forEach((b) =>
+    b.addEventListener('click', () => openSpendenziel(spende, b.dataset.spendeziel, b.dataset.spendename))
+  );
+}
+
+async function openSpendenziel(spende, userId, name) {
+  const eigen = userId === 'me';
+  const gespeichert = Spende.lesen(spende);
+  let buchung = null;
+  try {
+    const frage = gespeichert?.seit ? `?seit=${encodeURIComponent(gespeichert.seit)}` : '';
+    const antwort = await fetch(`/api/spendenstand/${encodeURIComponent(userId)}${frage}`).then((r) => r.json());
+    if (antwort?.ok && antwort.stand) buchung = antwort.stand;
+  } catch {
+    /* ohne Stand: die Karte zeigt, was gespeichert ist */
+  }
+  const stand = Spende.stand(spende, buchung);
+  if (!stand) return toast('Dieses Spendenziel gibt es nicht mehr');
+
+  const zeile = (label, wert) =>
+    `<div class="spendeziel__zeile"><span>${esc(label)}</span><strong>${esc(wert)}</strong></div>`;
+  const gesperrt = eigen || stand.abgelaufen;
+
+  openSheet(
+    'Spendenziel',
+    `<div class="sheet__body spendeziel" id="spendeDetails">
+       <div class="spendeziel__titel">${esc(stand.titel)}</div>
+       ${stand.text ? `<div class="spendeziel__text">${esc(stand.text)}</div>` : ''}
+       <div class="spendeziel__zeilen">
+         ${zeile('Erreicht', Spende.euro(stand.erreicht))}
+         ${zeile('Ziel', stand.ziel > 0 ? Spende.euro(stand.ziel) : 'ohne festes Ziel')}
+         ${stand.prozent !== null ? zeile('Fortschritt', `${stand.prozent} %`) : ''}
+         ${zeile('Spender', stand.spender === null ? (eigen ? '–' : 'nur für dich sichtbar') : String(stand.spender))}
+         ${zeile('Frist', stand.fristText || 'keine')}
+       </div>
+       ${stand.prozent !== null ? `<div class="spende__balken"><div class="spende__fuellung" style="width:${stand.prozent}%"></div></div>` : ''}
+       <div class="spende__zahlen">${esc(stand.spender === null ? stand.zahlenText : `${stand.zahlenText} · ${stand.spenderText}`)}</div>
+     </div>
+     <div class="sheet__footer">
+       <button class="btn btn--primary" id="spendeKnopf" ${gesperrt ? 'disabled' : ''}>Spenden</button>
+       ${
+         eigen
+           ? '<div class="spendeziel__hinweis">An dich selbst geht keine Spende — so sehen andere dein Ziel.</div>'
+           : stand.abgelaufen
+             ? '<div class="spendeziel__hinweis">Die Frist ist vorbei.</div>'
+             : ''
+       }
+     </div>`,
+    (blatt, zu) => {
+      blatt.querySelector('#spendeKnopf').addEventListener('click', () => {
+        if (gesperrt) return;
+        zu();
+        openSpende(userId);
+      });
+    },
+    { schliessen: true }
+  );
+}
+
+/*
  * Spenden an eine Person, waehrend eines Streams. Feste Stufen als schneller
  * Weg, dahinter ein eigener Betrag — Henrik am 21.09.2026: „Spenden: eigener
  * Betrag muss wählbar sein." Gleiche Grenzen wie in der App
@@ -12361,9 +12494,15 @@ async function erstelle(was) {
         // Punkt 44: das Ziel ist freiwillig. Nicht jede Sammlung hat einen
         // Betrag, auf den sie zulaeuft - manche laufen einfach.
         { key: 'ziel', label: 'Spendenziel in Euro (freiwillig)', typ: 'zahl', platzhalter: '500' },
+        // Kasten 12.3: eine Frist, wie in der App. Geprüft wird mit
+        // gemeinsam/spende.js — hier für die schnelle Meldung, auf dem
+        // Server noch einmal verbindlich.
+        { key: 'frist', label: 'Läuft bis (freiwillig)', platzhalter: 'TT.MM.JJJJ' },
         { key: 'text', label: 'Beschreibung (freiwillig)', typ: 'mehrzeilig', platzhalter: 'Worum geht es?' },
       ],
       async (werte) => {
+        const vorab = window.Spende ? Spende.ausFormular(werte) : { ok: true };
+        if (!vorab.ok) return vorab.fehler;
         const res = await fetch('/api/eigene/spende', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -12807,6 +12946,16 @@ const SAMMLUNGEN = new Map();
  */
 let sammlungenLauf = 0;
 
+/*
+ * Ringfarbe und -staerke je Gattung aus gemeinsam/sammlungen.js (Kasten 12.9)
+ * — dieselbe Quelle wie VideoProfileScreen und UserProfileScreen in der App.
+ * Der Kreis ist 64 px gross; die Staerke rechnet der Baustein.
+ */
+function ringStil(art) {
+  if (!window.Sammlungen) return '';
+  return `--ring:${Sammlungen.ringfarbe(art)};border-width:${Sammlungen.ringstaerke(64)}px`;
+}
+
 function sammlungenReihe(userId, playlists, highlights) {
   /*
    * Die Namenslisten aus `profiles` sind nur noch die Rueckfalltuer. Kommt
@@ -12833,7 +12982,7 @@ function sammlungenReihe(userId, playlists, highlights) {
     .map(({ art, name, id, bild }) => {
       const symbol = art === 'playlist' ? ICONS.play : ICONS.image;
       return `<button class="highlight" data-sammlung="${art}" data-sammlung-name="${esc(name)}" data-sammlung-user="${esc(userId)}" data-sammlung-id="${esc(id || '')}">
-        <span class="highlight__ring is-${art}">${medienFlaeche(art.slice(0, 2) + '-' + name, symbol, null, bild || null)}</span>
+        <span class="highlight__ring is-${art}" style="${ringStil(art)}">${medienFlaeche(art.slice(0, 2) + '-' + name, symbol, null, bild || null)}</span>
         <span class="highlight__label">${esc(name)}</span>
       </button>`;
     })
@@ -12913,6 +13062,8 @@ function bindSammlungen(wurzel = main) {
 async function renderSammlung() {
   const { art, name, userId, id } = state.sammlung;
   const istPlaylist = art === 'playlist';
+  // Die gespeicherte Titelwahl, wie /api/sammlungen sie liefert (Kasten 12.7/12.8).
+  const titel = (SAMMLUNGEN.get(String(userId)) || []).find((x) => x.id === id) || {};
 
   let liste = [];
   if (id) {
@@ -12934,7 +13085,8 @@ async function renderSammlung() {
           // echte Zeile ist. Ohne id stammt der Kreis aus der alten
           // Namensliste — da gaebe es nichts zu loeschen.
           userId === 'me' && id
-            ? `<button class="iconbtn" id="sammlungLoeschen" aria-label="${esc(name)} löschen">${ICONS.trash}</button>`
+            ? `<button class="iconbtn" id="titelbildWaehlen" aria-label="Titelbild wählen" title="Titelbild wählen">${ICONS.image}</button>
+               <button class="iconbtn" id="sammlungLoeschen" aria-label="${esc(name)} löschen">${ICONS.trash}</button>`
             : ''
         }
       </div>
@@ -12953,7 +13105,11 @@ async function renderSammlung() {
                 const ziel =
                   gattung === 'story' ? 'openstory' : gattung === 'post' ? 'openpost' : 'openvideo';
                 const symbol = gattung === 'post' ? ICONS.image : ICONS.portrait;
-                return `<button class="griditem" data-${ziel}="${esc(e.id)}">${medienFlaeche(
+                // Kasten 12.7/12.8: das gewählte Titelbild trägt einen Rahmen in der Ringfarbe.
+                const istTitel = gattung === 'story' ? titel.titelStoryId === e.id : titel.titelPostId === e.id;
+                return `<button class="griditem ${istTitel ? 'is-titel' : ''}" data-${ziel}="${esc(e.id)}"${
+                  istTitel ? ` style="${ringStil(art)}"` : ''
+                }>${medienFlaeche(
                   e.id,
                   symbol,
                   e.mediaUrl,
@@ -12980,6 +13136,8 @@ async function renderSammlung() {
     if (zurueck === 'me') render();
     else openProfile(zurueck);
   });
+
+  $('#titelbildWaehlen')?.addEventListener('click', () => openTitelbildWahl(art, id, name, liste, titel));
 
   $('#sammlungLoeschen')?.addEventListener('click', async () => {
     /*
@@ -13028,6 +13186,99 @@ async function renderSammlung() {
   );
   main.querySelectorAll('[data-openstory]').forEach((b) =>
     b.addEventListener('click', () => openStory(b.dataset.openstory))
+  );
+}
+
+/*
+ * Titelbild einer Playlist oder eines Highlights wählen (Kasten 12.7/12.8).
+ *
+ * Henrik am 21.09.2026: das Titelbild soll rund sein und sich aus einem
+ * enthaltenen Beitrag wählen lassen; beim Highlight auch aus einem
+ * beliebigen Foto. Bis dahin stand im Kreis immer das zuletzt hinzugefügte
+ * Stück.
+ *
+ * Gespeichert wird in `sammlungen` (titel_post_id, titel_story_id,
+ * titelbild_url — SUPABASE_SCHEMA_XX_titelbild.sql) über
+ * POST /api/eigene/sammlung/:id/titelbild. Welches Bild daraus im Kreis
+ * wird, entscheidet Sammlungen.vorschaubild() — dieselbe Regel wie in der
+ * App (VideoProfileScreen, „Titelbild wählen").
+ */
+function openTitelbildWahl(art, id, name, liste, titel) {
+  const istHighlight = art === 'highlight';
+  const speichern = async (koerper) => {
+    const antwort = await api(`/api/eigene/sammlung/${encodeURIComponent(id)}/titelbild`, koerper);
+    if (!antwort.ok) return toast(antwort.error || 'Das Titelbild ließ sich nicht speichern');
+    toast(antwort.meldung || 'Titelbild gespeichert');
+    // Alte Kreise nicht aus dem Zwischenspeicher zurückholen.
+    sammlungenLauf += 1;
+    SAMMLUNGEN.delete('me');
+    await ladeSammlungen('me');
+    if (state.sammlung?.id === id) renderSammlung();
+  };
+
+  openSheet(
+    `Titelbild für „${name}"`,
+    `<div class="sheet__body">
+       ${
+         liste.length
+           ? `<div class="listhead">Aus ${istHighlight ? 'diesem Highlight' : 'dieser Playlist'}</div>
+              <div class="exp__grid titelwahl">${liste
+                .map(({ art: gattung, eintrag: e }) => {
+                  const gewaehlt = gattung === 'story' ? titel.titelStoryId === e.id : titel.titelPostId === e.id;
+                  return `<button class="griditem ${gewaehlt ? 'is-titel' : ''}" data-titelwahl="${esc(e.id)}" data-titelgattung="${esc(gattung)}"${
+                    gewaehlt ? ` style="${ringStil(art)}"` : ''
+                  } aria-label="Als Titelbild wählen">${medienFlaeche(e.id, gattung === 'post' ? ICONS.image : ICONS.portrait, e.mediaUrl, e.thumbnail)}</button>`;
+                })
+                .join('')}</div>`
+           : `<div class="empty__text">Noch nichts drin — ${istHighlight ? 'lade ein Foto hoch oder lege erst eine Story hinein' : 'lege erst einen Beitrag hinein'}.</div>`
+       }
+       ${
+         istHighlight
+           ? `<button class="item" id="titelFoto">
+                <span class="item__icon">${ICONS.image}</span>
+                <span class="item__label">Foto aus Mediathek</span>
+              </button>
+              <button class="item" id="titelKamera">
+                <span class="item__icon">${ICONS.camera || ICONS.image}</span>
+                <span class="item__label">Foto aufnehmen</span>
+              </button>`
+           : ''
+       }
+       <button class="item" id="titelAuto">
+         <span class="item__icon">${ICONS.repeat}</span>
+         <span class="item__label">Automatisch (neuestes)</span>
+       </button>
+     </div>`,
+    (blatt, zu) => {
+      blatt.querySelectorAll('[data-titelwahl]').forEach((b) =>
+        b.addEventListener('click', () => {
+          zu();
+          const story = b.dataset.titelgattung === 'story';
+          void speichern(story ? { storyId: b.dataset.titelwahl } : { postId: b.dataset.titelwahl });
+        })
+      );
+      const foto = async (ausGalerie) => {
+        zu();
+        const datei = await dateiWaehlen('photo', ausGalerie);
+        if (!datei) return;
+        let daten;
+        try {
+          daten = await bildVerkleinern(datei, 800);
+        } catch {
+          return toast('Dieses Bild lässt sich nicht lesen');
+        }
+        const hoch = await api('/api/hochladen', { ordner: 'stories', aufnahme: daten });
+        if (!hoch.ok) return toast(hoch.error || 'Das Foto ließ sich nicht hochladen');
+        await speichern({ bildUrl: hoch.url });
+      };
+      blatt.querySelector('#titelFoto')?.addEventListener('click', () => foto(true));
+      blatt.querySelector('#titelKamera')?.addEventListener('click', () => foto(false));
+      blatt.querySelector('#titelAuto').addEventListener('click', () => {
+        zu();
+        void speichern({});
+      });
+    },
+    { schliessen: true }
   );
 }
 
@@ -13130,7 +13381,18 @@ async function renderVideoProfile() {
     <div class="scroll">
       ${ownProfileTop(me.handle, 'videos')}
       <div class="oprof__top">
-        ${eigenerAvatarMitStory(me)}
+        <div class="onlinewrap">
+          ${eigenerAvatarMitStory(me)}
+          ${
+            /*
+             * Kasten 12.6: der Punkt ist ein eigener Knopf neben dem Bild
+             * (eigenerAvatarMitStory bleibt unberührt, den Ring baut
+             * Kasten 11). Grau, wenn niemand den Online-Status sieht.
+             */
+            `<button class="onlinepunkt ${sicht('onlinestatus').stufe === 'niemand' ? 'is-aus' : ''}" id="onlinePunkt"
+              aria-label="Online-Status: wer sieht, dass du online bist"></button>`
+          }
+        </div>
         <div class="prof__stats">
           <div class="prof__stat"><span>Beiträge</span><strong>${compactNumber(me.posts)}</strong></div>
           <button class="prof__stat" id="followerBtn"><span>Follower</span><strong>${compactNumber(me.followers)}</strong></button>
@@ -13146,24 +13408,11 @@ async function renderVideoProfile() {
         <button class="btn btn--breit" id="profilBearbeiten">Profil bearbeiten</button>
       </div>
       ${
-        me.spende
-          ? // Punkt 44: das Ziel ist freiwillig. Ohne Ziel gibt es keinen
-            // Balken - er waere ohne Bezugsgroesse sinnlos, und die Rechnung
-            // gesammelt/ziel ergaebe eine Division durch null.
-            `<div class="spende">
-               <div class="spende__titel">${esc(me.spende.titel)}</div>
-               ${me.spende.text ? `<div class="spende__text">${esc(me.spende.text)}</div>` : ''}
-               ${
-                 me.spende.ziel > 0
-                   ? `<div class="spende__balken"><div class="spende__fuellung" style="width:${Math.min(
-                       100,
-                       Math.round((me.spende.gesammelt / me.spende.ziel) * 100)
-                     )}%"></div></div>
-                      <div class="spende__zahlen">${me.spende.gesammelt} € von ${me.spende.ziel} € gesammelt</div>`
-                   : `<div class="spende__zahlen">${me.spende.gesammelt} € gesammelt</div>`
-               }
-             </div>`
-          : ''
+        /*
+         * Kasten 12.3: die Karte ist antippbar und öffnet die Einzelheiten.
+         * Punkt 44 gilt weiter — das Ziel ist freiwillig, ohne Ziel kein Balken.
+         */
+        me.spende ? spendeKarte(me.spende, 'me', me.name) : ''
       }
       ${sammlungenReihe('me', me.playlists, me.highlights)}
       <div class="prof__tabs">
@@ -13178,7 +13427,7 @@ async function renderVideoProfile() {
             // Highlight legen. Vorher war die Kachel ein totes <div>.
             `<div class="prof__grid">${me.grid
               .map(
-                (g) => `<button class="griditem" data-eigen="${esc(g.id)}" data-eigenart="${
+                (g) => `<button class="griditem" data-eigen="${esc(g.id)}" data-eigenkind="${esc(g.art || '')}" data-eigenart="${
                   g.kind === 'video' ? 'video' : 'post'
                 }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}</button>`
               )
@@ -13240,6 +13489,17 @@ async function renderVideoProfile() {
 
   $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderVideoProfile));
+  bindSpendeKarte(main, me.spende);
+  /*
+   * Kasten 12.6: der grüne Punkt am Profilbild öffnet die Online-
+   * Sichtbarkeit — dieselbe Einstellung wie in den Einstellungen
+   * („Zuletzt online", Bereich onlinestatus), gespeichert in der Datenbank.
+   * Danach neu zeichnen, damit der Punkt die neue Stufe zeigt.
+   */
+  $('#onlinePunkt')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openSichtbarkeit({ label: 'Online-Status', sichtbar: 'onlinestatus', danach: () => state.area === 'videos' && sub() === 'profile' && renderVideoProfile() });
+  });
   bindSammlungen();
   void ladeSammlungen("me");
   $('#followerBtn')?.addEventListener('click', () => openFollowerList(me, 'follower'));
@@ -13259,9 +13519,27 @@ async function renderVideoProfile() {
       clearTimeout(halten);
       halten = null;
     };
+    // Wahr, sobald das lange Drücken die Optionen geöffnet hat — dann ist
+    // der folgende Klick kein Öffnen des Beitrags.
+    let gehalten = false;
     const start = () => {
-      halten = setTimeout(() => openEigenerBeitrag(kachel.dataset.eigen, kachel.dataset.eigenart, me), 500);
+      gehalten = false;
+      halten = setTimeout(() => {
+        gehalten = true;
+        openEigenerBeitrag(kachel.dataset.eigen, kachel.dataset.eigenart, me);
+      }, 500);
     };
+
+    /*
+     * Ein kurzer Klick öffnet den Beitrag (Kasten 12.1). Bis dahin tat er
+     * nichts — nur langes Drücken hatte eine Wirkung. `eigenart` ist hier
+     * post oder video (= Reel), wie bei den anderen Reitern.
+     */
+    kachel.addEventListener('click', () => {
+      if (gehalten) return (gehalten = false);
+      state.profilBeitragOffen = true;
+      beitragOeffnen(kachel.dataset.eigenkind || kachel.dataset.eigenart, kachel.dataset.eigen);
+    });
 
     kachel.addEventListener('pointerdown', start);
     kachel.addEventListener('pointerup', los);
@@ -13286,7 +13564,11 @@ async function renderVideoProfile() {
    * rief das nie definierte openPost() — ein Klick tat nichts.
    */
   main.querySelectorAll('[data-kachel-id]').forEach((b) =>
-    b.addEventListener('click', () => beitragOeffnen(b.dataset.kachelArt, b.dataset.kachelId))
+    b.addEventListener('click', () => {
+      // Kasten 12.1: der Reiter bleibt, bis man das Profil über eine Leiste verlässt.
+      state.profilBeitragOffen = true;
+      beitragOeffnen(b.dataset.kachelArt, b.dataset.kachelId);
+    })
   );
   bindProfilAktionen('videos');
 }

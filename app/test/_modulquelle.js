@@ -107,6 +107,11 @@ const UMD_BAUSTEINE = [
   // 29.09.2026: `soundstellen.js` fuer Wellenform und meist verwendete
   // Stellen auf der Sound-Seite (Feedback 21.09., Kasten 7.5, Schema 67).
   ['soundstellen', 'SoundStellen'],
+  // 29.09.2026: `sammlungen.js` fuer Ringfarben und Titelbild von Playlists
+  // und Highlights (Feedback 21.09., Kasten 12.7-12.9).
+  ['sammlungen', 'Sammlungen'],
+  // 29.09.2026: `spende.js` fuer das Spendenziel im Profil (Kasten 12.3).
+  ['spende', 'Spende'],
 ];
 
 function umdTeile() {
