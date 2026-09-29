@@ -116,7 +116,7 @@ const UMD_BAUSTEINE = [
   // 29.09.2026: `spende.js` fuer das Spendenziel im Profil (Kasten 12.3).
   ['spende', 'Spende'],
   // 29.09.2026: `zahlung.js` fuer Spendencode und Zahlungsmethoden
-  // (Feedback 21.09., Kasten 13.2/13.3, Schema XX_zahlung_spendencode).
+  // (Feedback 21.09., Kasten 13.2/13.3, Schema 72).
   ['zahlung', 'Zahlung'],
 ];
 

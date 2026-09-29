@@ -2151,7 +2151,7 @@ const handleStreamKommentar = handler(
  * Die Datenbankfunktion prüft Betrag, Empfänger, Zahlungsmethode und den
  * persönlichen Spendencode (fünf Fehlversuche → 15 Minuten Sperre) und trägt
  * erst dann ein. Der direkte INSERT in `donations` ist zu (Schema
- * XX_zahlung_spendencode). Die Antwort trägt `grund` weiter, damit das
+ * 72_zahlung_spendencode). Die Antwort trägt `grund` weiter, damit das
  * Spendenblatt weiß, ob es nach Code oder Methode fragen muss.
  *
  * Eine echte Zahlung läuft noch nicht: die Spende steht als „vorgemerkt" in

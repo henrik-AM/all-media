@@ -124,8 +124,8 @@ function regeln() {
 }
 
 function schemaEntwurf() {
-  console.log('\n2. SUPABASE_SCHEMA_XX_zahlung_spendencode.sql');
-  const sql = lies('SUPABASE_SCHEMA_XX_zahlung_spendencode.sql');
+  console.log('\n2. SUPABASE_SCHEMA_72_zahlung_spendencode.sql');
+  const sql = lies('SUPABASE_SCHEMA_72_zahlung_spendencode.sql');
   pruefe('Dieselbe Coderegel wie in JS (6–16, A–Z, Ziffern)',
     sql.includes("'^[A-Za-z0-9]{6,16}$'") && Zahlung.CODE_MIN === 6 && Zahlung.CODE_MAX === 16);
   pruefe('Leerzeichen und Bindestriche fallen auf beiden Seiten weg', sql.includes('[[:space:]-]'));
@@ -149,7 +149,7 @@ function schemaEntwurf() {
   pruefe('Spenden bleiben vorgemerkt (kein Geld fließt)', sql.includes("'vorgemerkt'"));
   pruefe('Nichts davon steht in SUPABASE_REIHENFOLGE.md', !lies('SUPABASE_REIHENFOLGE.md').includes('XX_zahlung'));
 
-  const t = lies('SUPABASE_SCHEMA_XX_testbestand_nur_testkonten.sql');
+  const t = lies('SUPABASE_SCHEMA_73_testbestand_nur_testkonten.sql');
   pruefe('Schemaentwurf 13.4 sperrt testbestand_insight und testbestand_profilaufrufe',
     t.includes('testbestand_insight(uuid) from public, anon, authenticated') &&
       t.includes('testbestand_profilaufrufe(uuid) from public, anon, authenticated') &&
@@ -234,7 +234,7 @@ async function mitNetz() {
   const db = ich.client;
 
   const st = await db.rpc('spendencode_status');
-  pruefe('Schema XX_zahlung_spendencode ist eingespielt', !st.error, st.error ? st.error.message : '');
+  pruefe('Schema 72 ist eingespielt', !st.error, st.error ? st.error.message : '');
   if (st.error) return;
 
   const meinCode = pruefCode(ich.id);

@@ -163,3 +163,9 @@ Reihenfolge: nach Schema 54 (Spalten der Sounds).
   Spaltenrecht. **Schema 23 erneut einspielen nimmt das Leserecht wieder weg.**
 - `SUPABASE_SCHEMA_70_titelbild.sql` — Titelbild von Playlist/Highlight.
 - `SUPABASE_SCHEMA_71_spendenziel.sql` — `spendenstand()`.
+
+## Nachtrag 29.09.2026: Schemas 72–73 (Kasten 13)
+
+- `SUPABASE_SCHEMA_72_zahlung_spendencode.sql` — Tabelle `zahlungsmethoden` (RLS, Anbieter-Token nicht lesbar), Spendencode als bcrypt-Hash mit HMAC-Fingerabdruck (`spendencodes`, `spendencode_pfeffer`, `spendencode_protokoll`), `spendencode_setzen/entfernen/status` und `spende_senden()` (EXECUTE nur `authenticated`). `donations` bekommt `zahlungsstatus`/`zahlungsmethode_id`. **Die Regel „Spende senden“ aus Schema 11 ist gelöscht und INSERT/UPDATE/DELETE auf `donations` entzogen** — Spenden laufen nur noch über `spende_senden()`. Wer Schema 11 neu einspielt, öffnet das direkte Eintragen wieder; danach 72 nachziehen.
+- `SUPABASE_SCHEMA_73_testbestand_nur_testkonten.sql` — `testbestand_insight()` und `testbestand_profilaufrufe()` wirken nur noch für `ist_testkonto()`, EXECUTE entzogen. Neue Fassung derselben Funktionen, Gewinner 73.
+- Gegenprobe (liest nur): `berichte/PRUEFUNG_echte_konten_seit_schema62.sql`; am 29.09. alle „test_an_echt“-Zeilen 0.

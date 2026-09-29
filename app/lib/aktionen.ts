@@ -49,7 +49,7 @@ const Teilen = require('../../gemeinsam/teilen') as typeof import('../../gemeins
 // Ringfarben und Vorschaubild von Playlists und Highlights (Kasten 12).
 const SammlungRegel = require('../../gemeinsam/sammlungen') as typeof import('../../gemeinsam/sammlungen');
 // Spendencode, Zahlungsmethoden und Gründe — dieselbe Regel wie die Website
-// und die Datenbank (Kasten 13, Schema XX_zahlung_spendencode).
+// und die Datenbank (Kasten 13, Schema 72).
 const Zahlung = require('../../gemeinsam/zahlung') as typeof import('../../gemeinsam/zahlung');
 
 /**
@@ -2730,7 +2730,7 @@ export async function streamKommentar(
  * Spende: die Datenbankfunktion `spende_senden`. Sie prüft Betrag,
  * Empfänger, Zahlungsmethode und den persönlichen Spendencode und trägt erst
  * dann ein. Der frühere direkte INSERT in `donations` ist in der Datenbank
- * zu (Schema XX_zahlung_spendencode) — wer ihn noch versuchte, bekäme einen
+ * zu (Schema 72) — wer ihn noch versuchte, bekäme einen
  * Rechtefehler.
  *
  * `freigabe` bringt Code und gewählte Methode mit. Ohne Methode nimmt die

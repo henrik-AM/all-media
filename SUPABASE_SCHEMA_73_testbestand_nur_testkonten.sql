@@ -1,5 +1,5 @@
 -- ===========================================================================
---  SUPABASE_SCHEMA_XX_testbestand_nur_testkonten.sql     (ENTWURF, Kasten 13.4)
+--  SUPABASE_SCHEMA_73_testbestand_nur_testkonten.sql     (ENTWURF, Kasten 13.4)
 --
 --  WARUM ES DAS GIBT
 --

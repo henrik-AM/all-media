@@ -26,7 +26,7 @@
  *
  * `public.spendencode_normal`, `public.spendencode_gueltig` und die
  * Prüfungen der Tabelle `zahlungsmethoden` in
- * SUPABASE_SCHEMA_XX_zahlung_spendencode.sql. Wer hier etwas ändert, ändert
+ * SUPABASE_SCHEMA_72_zahlung_spendencode.sql. Wer hier etwas ändert, ändert
  * es dort mit.
  *
  * WAS HIER BEWUSST NICHT STEHT

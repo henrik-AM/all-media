@@ -21,7 +21,7 @@
 --  Erwartet: jede Zeile mit anzahl = 0, außer der Gruppe „sperre": dort
 --  1 bei den drei Funktionen (die Sperre steht drin) und 5 beim Wächter
 --  (fünf Tabellen). testbestand_insight zeigt 0, solange
---  SUPABASE_SCHEMA_XX_testbestand_nur_testkonten.sql nicht eingespielt ist. Eine
+--  SUPABASE_SCHEMA_73_testbestand_nur_testkonten.sql nicht eingespielt ist. Eine
 --  Zeile > 0 bei „test_an_echt" oder „echt_mit_testmerkmal" ist ein
 --  Fund: `beispiel` nennt die neueste betroffene Zeile.
 -- ===========================================================================
@@ -169,7 +169,7 @@ befund (gruppe, bereich, anzahl, beispiel) as (
   select 'sperre', 'zuruecksetzen() prüft ist_testkonto',
          (pg_get_functiondef('public.zuruecksetzen'::regproc) like '%ist_testkonto(ziel)%')::int, null
   union all
-  select 'sperre', 'testbestand_insight() prüft ist_testkonto (Schema XX_testbestand_nur_testkonten)',
+  select 'sperre', 'testbestand_insight() prüft ist_testkonto (Schema 73_testbestand_nur_testkonten)',
          coalesce((pg_get_functiondef(to_regprocedure('public.testbestand_insight(uuid)')) like '%ist_testkonto(ziel)%')::int, 1), null
   union all
   select 'sperre', 'Wächter nur_eigene_aktion auf saves/post_likes/reposts/comments/shares (Schema 66)',

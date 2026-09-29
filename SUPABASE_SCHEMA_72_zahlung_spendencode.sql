@@ -1,5 +1,5 @@
 -- ===========================================================================
---  SUPABASE_SCHEMA_XX_zahlung_spendencode.sql            (ENTWURF, Kasten 13)
+--  SUPABASE_SCHEMA_72_zahlung_spendencode.sql            (ENTWURF, Kasten 13)
 --
 --  Die Nummer XX vergibt der Hauptagent beim Einspielen. Die Datei ist
 --  idempotent: zweimal eingespielt ändert sie nichts.

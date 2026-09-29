@@ -1,7 +1,7 @@
 /**
  * Spendencode und Zahlungsmethode für Prüfläufe (Kasten 13, 29.09.2026).
  *
- * Seit Schema XX_zahlung_spendencode geht eine Spende nur noch mit
+ * Seit Schema 72 geht eine Spende nur noch mit
  * persönlichem Code und hinterlegter Zahlungsmethode durch. Jeder Lauf, der
  * spendet (_handbuch, _querformat, _zahlung), braucht deshalb beides — und
  * zwar einen Code, den er kennt.
@@ -40,7 +40,7 @@ async function spendenwegBereit(client, ich, code, erzwingen) {
   if (st.error) {
     return {
       ok: false,
-      fehler: 'spendencode_status: ' + st.error.message + ' — ist SUPABASE_SCHEMA_XX_zahlung_spendencode eingespielt?',
+      fehler: 'spendencode_status: ' + st.error.message + ' — ist SUPABASE_SCHEMA_72_zahlung_spendencode eingespielt?',
     };
   }
   if (!st.data || !st.data.ok) return { ok: false, fehler: 'spendencode_status: ' + JSON.stringify(st.data) };
