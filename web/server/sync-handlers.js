@@ -1131,6 +1131,8 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       description: felder.beschreibung || '',
       location: felder.ort || '',
       music: felder.musik || '',
+      // Schema 67: welche Stelle des Sounds (sound_id setzt die Datenbank aus music).
+      sound_ab: felder.soundAb || 0,
       media_url: felder.mediaUrl || null,
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,

@@ -208,6 +208,15 @@ $$;
 --    Nur nach seinem Ja: Schritt B ausführen. B prüft selbst nach und bricht
 --    ab (alles zurück), wenn danach noch ein Fund übrig ist — ein
 --    abgelehntes DELETE meldet sonst Erfolg.
+--
+--  AUSGEFÜHRT am 29.09.2026 nach Henriks Freigabe („vervollständige bitte
+--  die noch offenen Sachen"): 33 Zeilen, Sicherung im Vault unter
+--  07 Anhänge/All-Media Seed-Sicherung 2026-09-29.json. Schritt A fand 26.
+--  Die Regel b) vergleicht nur innerhalb einer Tabelle; 7 Seed-Zeilen trugen
+--  denselben Zeitstempel nur in einer anderen Tabelle oder nur bei einem
+--  Konto (starter_inhalte() bei der ersten Anmeldung, @tanti) und kamen mit
+--  einer breiteren Suche dazu: gleiche Mikrosekunde bei mehreren Konten
+--  ODER in mehreren Tabellen. Siehe SUPABASE_REIHENFOLGE.md.
 -- ===========================================================================
 
 /*

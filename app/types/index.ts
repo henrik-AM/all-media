@@ -425,6 +425,16 @@ export interface Sound {
    * Ausgewertet in gemeinsam/liedtext.js.
    */
   lyricsZeiten?: number[] | null;
+  /**
+   * Schema 67: Lautstärke der Hörprobe in Abschnitten (0..1, aus der
+   * Tondatei, web/tools/wellenform.py) und ihre Länge in Sekunden. null =
+   * unbekannt, dann gleich hohe Balken.
+   */
+  wellenform?: number[] | null;
+  hoerprobeSek?: number | null;
+  /** 'apple' = offizielles Songbild aus der iTunes-Suche; dann Hinweis mit Link. */
+  coverQuelle?: string;
+  coverLink?: string;
 }
 
 export interface Place {

@@ -1275,17 +1275,20 @@ export async function ladeHashtags(client: SupabaseClient): Promise<Hashtag[]> {
 }
 
 const SOUND_SPALTEN = 'id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url';
+// Schema 63 (lyrics_zeiten) und 67 (Wellenform, Länge der Hörprobe, Herkunft des Covers).
+const SOUND_SPALTEN_NEU = 'lyrics_zeiten, wellenform, hoerprobe_sek, cover_quelle, cover_link';
 
 export async function ladeSounds(client: SupabaseClient): Promise<Sound[]> {
   /*
-   * Schema 63 bringt `lyrics_zeiten` (wann welche Liedzeile gesungen wird).
-   * Ist es noch nicht eingespielt, kennt die Datenbank die Spalte nicht
+   * Schema 63 bringt `lyrics_zeiten` (wann welche Liedzeile gesungen wird),
+   * Schema 67 Wellenform und Herkunft des Covers.
+   * Ist eines noch nicht eingespielt, kennt die Datenbank die Spalte nicht
    * (42703) - dann ohne sie weiter, sonst stuende die ganze Sound-Liste leer
    * da. Dieselbe Weiche in web/server/supabase-api.js.
    */
   let { data, error }: { data: any[] | null; error: any } = await client
     .from('sounds')
-    .select(`${SOUND_SPALTEN}, lyrics_zeiten`)
+    .select(`${SOUND_SPALTEN}, ${SOUND_SPALTEN_NEU}`)
     .order('uses', { ascending: false });
   if (error && error.code === '42703') {
     ({ data, error } = await client.from('sounds').select(SOUND_SPALTEN).order('uses', { ascending: false }));
@@ -1303,11 +1306,36 @@ export async function ladeSounds(client: SupabaseClient): Promise<Sound[]> {
     // Schema 54. Die Pfade liegen auf der Website, die App braucht die volle
     // Adresse - dieselbe, auf die auch der Anmeldelink zeigt.
     songwriter: s.songwriter ?? '',
-    cover: s.cover_url ? `${SUPABASE_CONFIG.redirectUrl}${s.cover_url}` : undefined,
+    // Offizielle Cover (7.4) sind volle Adressen bei Apple, keine Pfade der Website.
+    cover: s.cover_url
+      ? /^https?:/.test(s.cover_url)
+        ? s.cover_url
+        : `${SUPABASE_CONFIG.redirectUrl}${s.cover_url}`
+      : undefined,
     audio: s.audio_url ? `${SUPABASE_CONFIG.redirectUrl}${s.audio_url}` : undefined,
     // Schema 63: Sekunden je gesungener Zeile, sonst null.
     lyricsZeiten: Array.isArray(s.lyrics_zeiten) ? s.lyrics_zeiten.map(Number) : null,
+    // Schema 67: Wellenform aus der Tondatei und ihre Länge.
+    wellenform: Array.isArray(s.wellenform) ? s.wellenform.map(Number) : null,
+    hoerprobeSek: s.hoerprobe_sek ? Number(s.hoerprobe_sek) : null,
+    coverQuelle: s.cover_quelle ?? '',
+    coverLink: s.cover_link ?? '',
   }));
+}
+
+/**
+ * Schema 67: wie oft jede Stelle eines Sounds in echten Beiträgen genutzt
+ * wird ([{ ab, anzahl }], 5-Sekunden-Abschnitte). Leer, solange niemand den
+ * Sound benutzt - oder das Schema fehlt; dann bleibt nur die Markierung weg.
+ * Dieselbe Abfrage in web/server/supabase-api.js.
+ */
+export async function ladeSoundStellen(
+  client: SupabaseClient,
+  soundId: string
+): Promise<{ ab: number; anzahl: number }[]> {
+  const { data, error } = await client.rpc('sound_stellen', { p_sound: soundId });
+  if (error) return [];
+  return (data ?? []).map((x: any) => ({ ab: Number(x.ab), anzahl: Number(x.anzahl) }));
 }
 
 export async function ladeStandorte(client: SupabaseClient): Promise<Place[]> {

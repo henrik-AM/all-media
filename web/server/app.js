@@ -43,6 +43,7 @@ const Telefon = require('../../gemeinsam/telefon');
 const Kommentar = require('../../gemeinsam/kommentar');
 // „Mein Verlauf" — dieselben Abfragen wie in der App (Kasten 10.1).
 const Verlauf = require('../../gemeinsam/verlauf');
+const SoundStellen = require('../../gemeinsam/soundstellen');
 // Welcher Stand läuft hier? Einmal beim Start ermittelt, siehe version.js.
 const VERSION = require('./version');
 // Die Schreibweise des Kontakt-QR-Codes — dieselbe Datei, die auch der
@@ -1529,6 +1530,8 @@ app.post('/api/eigene/spende', route(async (req) => {
 }));
 
 const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
+// Kasten 7.5: ab welcher Sekunde der Beitrag den Sound nutzt (posts.sound_ab, Schema 67).
+const soundAbAus = (body) => SoundStellen.abAus(body?.soundAb, musikAus(body));
 
 app.post('/api/eigene/beitrag', route(async (req) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
@@ -1539,6 +1542,7 @@ app.post('/api/eigene/beitrag', route(async (req) => {
     beschreibung,
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),
+    soundAb: soundAbAus(req.body),
     geplantAb: req.body?.geplantAb || null,
   });
   if (!e || e.ok === false) return antwort(e);
@@ -1565,6 +1569,7 @@ app.post('/api/eigene/video', route(async (req) => {
     beschreibung,
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),
+    soundAb: soundAbAus(req.body),
     dauer: quer ? String(req.body?.dauer || '00:15') : null,
     // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag zurück.
     geplantAb: req.body?.geplantAb || null,
@@ -2524,6 +2529,11 @@ app.get('/api/explorer/:art/:wert', route(async (req) => {
       songwriter: sound.songwriter, cover: sound.cover, audio: sound.audio,
       // Schema 63: wann welche Zeile gesungen wird (gemeinsam/liedtext.js).
       zeiten: sound.lyricsZeiten || null,
+      // Schema 67: Wellenform, Länge der Hörprobe, meist verwendete Stellen
+      // aus echten Beiträgen (gemeinsam/soundstellen.js) und woher das Cover ist.
+      wellenform: sound.wellenform, hoerprobeSek: sound.hoerprobeSek,
+      stellen: await supabaseApi.ladeSoundStellen(req.db, sound.id),
+      coverQuelle: sound.coverQuelle, coverLink: sound.coverLink,
     };
   } else {
     return { ok: false, error: 'Unbekannter Bereich' };

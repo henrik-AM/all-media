@@ -116,6 +116,8 @@ interface NeuesVideo {
   mediaUri?: string;
   /** Punkt 38: gewählte Musik, sonst Originalton. */
   music?: string;
+  /** Kasten 7.5: ab welcher Sekunde der Sound läuft. */
+  soundAb?: number;
 }
 
 interface ProfilWert {
@@ -139,7 +141,7 @@ interface ProfilWert {
   spende: Spende | null;
   raster: RasterEintrag[];
 
-  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; music?: string }) => void;
+  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; music?: string; soundAb?: number }) => void;
   videoAnlegen: (werte: NeuesVideo) => void;
   highlightAnlegen: (name: string) => string | null;
   playlistAnlegen: (name: string) => string | null;
@@ -542,7 +544,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [supabase, daten.ichId, kennungTauschen, eintragZuruecknehmen]
   );
 
-  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(({ beschreibung, ort, mediaUri, music }) => {
+  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(({ beschreibung, ort, mediaUri, music, soundAb }) => {
     const id = `p_${nummer()}`;
     setEigeneBeitraege((prev) => [
       {
@@ -571,11 +573,12 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       beschreibung,
       ort: ort || '',
       musik: music || 'Originalton',
+      soundAb,
       mediaUrl: mediaUri,
     });
   }, [inDatenbank]);
 
-  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(({ beschreibung, ort, quer, mediaUri, music }) => {
+  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(({ beschreibung, ort, quer, mediaUri, music, soundAb }) => {
     const id = quer ? `q_${nummer()}` : `v_${nummer()}`;
 
     if (quer) {
@@ -613,6 +616,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       beschreibung,
       ort: ort || '',
       musik: music || 'Originalton',
+      soundAb,
       mediaUrl: mediaUri,
       dauer: quer ? '00:15' : undefined,
     });

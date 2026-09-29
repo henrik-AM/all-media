@@ -364,6 +364,8 @@ export interface NeuerBeitrag {
   beschreibung?: string;
   ort?: string;
   musik?: string;
+  /** Kasten 7.5: ab welcher Sekunde der Sound läuft (posts.sound_ab). */
+  soundAb?: number;
   mediaUrl?: string;
   thumbnail?: string;
   dauer?: string;
@@ -400,6 +402,8 @@ export async function beitragAnlegen(
       description: felder.beschreibung || '',
       location: felder.ort || '',
       music: felder.musik || '',
+      // Schema 67: welche Stelle des Sounds (sound_id setzt die Datenbank aus music).
+      sound_ab: felder.soundAb || 0,
       media_url: felder.mediaUrl || null,
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,

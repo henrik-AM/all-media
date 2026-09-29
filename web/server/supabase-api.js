@@ -1187,17 +1187,20 @@ async function ladeHashtags(client) {
 }
 
 const SOUND_SPALTEN = 'id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url';
+// Schema 63 (lyrics_zeiten) und 67 (Wellenform, Länge der Hörprobe, Herkunft des Covers).
+const SOUND_SPALTEN_NEU = 'lyrics_zeiten, wellenform, hoerprobe_sek, cover_quelle, cover_link';
 
 async function ladeSounds(client) {
   if (!client) return [];
   /*
-   * Schema 63 bringt `lyrics_zeiten`. Fehlt die Spalte noch (42703), ohne sie
+   * Schema 63 bringt `lyrics_zeiten`, Schema 67 die Wellenform und die
+   * Herkunft des Covers. Fehlt eine Spalte noch (42703), ohne sie
    * weiter - sonst waere die ganze Sound-Liste leer. Dieselbe Weiche in
    * app/lib/daten.ts.
    */
   let { data, error } = await client
     .from('sounds')
-    .select(`${SOUND_SPALTEN}, lyrics_zeiten`)
+    .select(`${SOUND_SPALTEN}, ${SOUND_SPALTEN_NEU}`)
     .order('uses', { ascending: false });
   if (error && error.code === '42703') {
     ({ data, error } = await client.from('sounds').select(SOUND_SPALTEN).order('uses', { ascending: false }));
@@ -1218,7 +1221,25 @@ async function ladeSounds(client) {
     audio: s.audio_url || '',
     // Schema 63: Sekunden je gesungener Zeile, sonst null.
     lyricsZeiten: Array.isArray(s.lyrics_zeiten) ? s.lyrics_zeiten.map(Number) : null,
+    // Schema 67: Wellenform aus der Tondatei (web/tools/wellenform.py) und ihre Länge.
+    wellenform: Array.isArray(s.wellenform) ? s.wellenform.map(Number) : null,
+    hoerprobeSek: s.hoerprobe_sek ? Number(s.hoerprobe_sek) : null,
+    // 'apple' = offizielles Songbild aus der iTunes-Suche (web/tools/cover-holen.mjs).
+    coverQuelle: s.cover_quelle || '',
+    coverLink: s.cover_link || '',
   }));
+}
+
+/**
+ * Schema 67: wie oft jede Stelle eines Sounds in echten Beiträgen genutzt
+ * wird ([{ ab, anzahl }], 5-Sekunden-Abschnitte). Leer, solange niemand den
+ * Sound benutzt - oder das Schema fehlt; dann bleibt nur die Markierung weg.
+ */
+async function ladeSoundStellen(client, soundId) {
+  if (!client || !soundId) return [];
+  const { data, error } = await client.rpc('sound_stellen', { p_sound: soundId });
+  if (error) return [];
+  return (data || []).map((x) => ({ ab: Number(x.ab), anzahl: Number(x.anzahl) }));
 }
 
 async function ladeStandorte(client) {
@@ -1695,6 +1716,7 @@ module.exports = {
   ladeKanalNachrichten,
   ladeHashtags,
   ladeSounds,
+  ladeSoundStellen,
   ladeStandorte,
   ladeBenachrichtigungen,
   bootstrapData,

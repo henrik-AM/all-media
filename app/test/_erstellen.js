@@ -296,6 +296,53 @@ if (!fs.existsSync(BILD)) {
     ).catch(() => { throw new Error('im eigenen Raster fehlt das Bild'); });
   });
 
+  /*
+   * Kasten 7.5: „Ausschnitt ab" beim Erstellen ist die Stelle, die die
+   * Soundseite als meist verwendet markiert (Schema 67, sound_stellen()).
+   * Henrik am 29.09.2026: Es muss nicht sofort da sein, aber sobald jemand
+   * den Sound benutzt, muss es erscheinen - genau das ist dieser Weg.
+   * Runner High, weil den sonst kaum ein Prüflauf nutzt: stehen an zwei
+   * anderen Stellen mehr Beiträge, fällt 0:25 aus den zwei Kästen.
+   */
+  await pruefe('Ausschnitt beim Erstellen wird auf der Soundseite markiert', async () => {
+    const zahl = async () => {
+      await page.evaluate(() => openExplorer('sound', 'Runner High'));
+      await page.waitForSelector('#soundZahl', { timeout: 15000 });
+      const text = await page.$eval('#soundZahl', (e) => e.textContent);
+      // „3.1k Beiträge" ist gerundet; zählen lässt sich nur die genaue Zahl.
+      const m = text.match(/([\d.,]+)(k|M)? Beiträge/) || [];
+      return m[2] ? null : Number(m[1]);
+    };
+    const vorher = await zahl();
+    await page.evaluate(() => document.querySelector('#expBack')?.click());
+
+    const wartet = page.waitForEvent('filechooser');
+    await erstellen('post');
+    await (await wartet).setFiles(BILD);
+    await page.waitForSelector('#f_soundAb', { timeout: 3000 });
+    const wahl = await page.$$eval('#f_soundAb option', (els) => els.map((e) => e.value));
+    if (wahl[0] !== '0:00' || !wahl.includes('0:25')) throw new Error('Auswahl: ' + wahl.join(' '));
+    await page.fill('#f_beschreibung', 'Pruefbeitrag Ausschnitt');
+    await page.selectOption('#f_music', { label: 'Runner High – Aster' });
+    await page.selectOption('#f_soundAb', '0:25');
+    await page.click('#formOk');
+    await page
+      .waitForFunction(
+        () => [...document.querySelectorAll('.post__desc')].some((e) => e.textContent.includes('Pruefbeitrag Ausschnitt')),
+        null, { timeout: 15000 }
+      )
+      .catch(() => {});
+
+    const nachher = await zahl();
+    const marken = await page.$$eval('#welleBalken .welle__marke', (els) => els.map((e) => e.dataset.ab));
+    if (!marken.includes('25')) throw new Error('keine Marke bei 0:25, sondern: ' + (marken.join(' ') || 'keine'));
+    if (!(await page.$('#welleLegende'))) throw new Error('Legende fehlt');
+    // Unter 1000 zeigt die Seite die genaue Zahl; darüber reicht die Marke.
+    if (vorher !== null && nachher !== vorher + 1) throw new Error(`Beiträge ${vorher} → ${nachher}`);
+    // Die folgenden Prüfungen starten im eigenen Profil.
+    await gehe('videos', 'profile');
+  });
+
   await pruefe('Spendenaktion erscheint mit Fortschrittsbalken im Profil', async () => {
     await erstellen('spende');
     await page.waitForSelector('#f_titel', { timeout: 3000 });

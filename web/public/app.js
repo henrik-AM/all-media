@@ -11432,6 +11432,9 @@ async function openExplorer(art, wert, nur = null) {
         .find((a) => a && !istVideoAdresse(a))
     : null;
   const ortSeiten = [...(ortHier ? ['weit', 'nah'] : []), ...(ortFoto ? ['foto'] : [])];
+  // Sound: die meist verwendeten Stellen als Balkenbereiche, leer ohne echte Nutzung.
+  const soundMarken =
+    kopf.art === 'sound' ? window.SoundStellen.markierungen(kopf.stellen, kopf.hoerprobeSek || 30) : [];
 
   const kopfHtml = {
     hashtag: () => `<div class="exp__titel">${esc(kopf.titel)}</div>
@@ -11474,25 +11477,46 @@ async function openExplorer(art, wert, nur = null) {
         ${/* Prototyp "VSSo + Sound": hinter dem Songbild schaut rechts eine Schallplatte heraus. */ ''}
         <span class="soundplatte" aria-hidden="true"></span>
         <div class="soundcover">${
-          kopf.cover ? `<img src="${esc(kopf.cover)}" alt="Songbild ${esc(kopf.titel)}">` : ICONS.music
+          ICONS.music + (kopf.cover ? `<img src="${esc(kopf.cover)}" alt="Songbild ${esc(kopf.titel)}">` : '')
         }</div>
       </div>
+      ${/* 7.4: Das offizielle Songbild kommt aus der iTunes-Suche
+           (web/tools/cover-holen.mjs). Apple verlangt, dass daneben steht,
+           woher es ist, und auf den Song verweist. */ ''}
+      ${kopf.coverQuelle === 'apple' && kopf.coverLink
+        ? `<a class="soundcover__quelle" id="coverQuelle" href="${esc(kopf.coverLink)}" target="_blank" rel="noopener">Cover: Apple Music ↗</a>`
+        : ''}
       <div class="exp__titel exp__titel--mitte">${esc(kopf.titel)}</div>
       <div class="exp__interpret">${esc(kopf.produzent)}</div>
       ${kopf.songwriter ? `<div class="exp__zahl exp__zahl--mitte">Songwriter: ${esc(kopf.songwriter)}</div>` : ''}
-      <div class="exp__zahl exp__zahl--mitte">${compactNumber(kopf.anzahl)} Beiträge</div>
+      ${/* Die erfundene Basis (sounds.uses) plus jeder echte Beitrag mit dem Sound (Schema 67). */ ''}
+      <div class="exp__zahl exp__zahl--mitte" id="soundZahl">${kopf.dauer ? `Länge ${esc(kopf.dauer)} · ` : ''}${compactNumber(
+        (kopf.anzahl || 0) + window.SoundStellen.nutzungen(kopf.stellen)
+      )} Beiträge</div>
       ${kopf.audio ? `<audio id="soundTon" src="${esc(kopf.audio)}" preload="metadata"></audio>` : ''}
       <div class="player">
       <div class="welle">
         <button class="welle__play" id="soundPlay" aria-label="${kopf.audio ? 'Abspielen' : 'Keine Hörprobe'}" ${kopf.audio ? '' : 'disabled'}>${ICONS.play}</button>
-        ${/* Die Form ist gezeichnet, nicht aus dem Ton gerechnet - eine echte
-             Wellenform braeuchte die Audiodaten. Klick springt an die Stelle. */ ''}
+        ${/* 7.5: 75 Balken wie im Prototyp, Höhe aus der Tondatei (Schema 67,
+             web/tools/wellenform.py); ohne Wellenform gleich hoch. Blau
+             umrandet die meist verwendeten Stellen - nur aus echten
+             Beiträgen, also erst, wenn jemand den Sound benutzt
+             (gemeinsam/soundstellen.js). Klick springt an die Stelle. */ ''}
         <div class="welle__balken" id="welleBalken" role="slider" aria-label="Stelle im Song wählen" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          ${Array.from({ length: 44 }, (_, i) => `<i style="height:${20 + Math.round(60 * Math.abs(Math.sin(i * 1.1)))}%"></i>`).join('')}
+          ${window.SoundStellen.balken(kopf.wellenform).map((h) => `<i style="height:${Math.round(h * 100)}%"></i>`).join('')}
+          ${soundMarken
+            .map(
+              (m) =>
+                `<span class="welle__marke" data-ab="${m.ab}" title="${m.anzahl} ${m.anzahl === 1 ? 'Beitrag' : 'Beiträge'} ab ${window.SoundStellen.zeit(m.ab)}" style="left:${(m.von / window.SoundStellen.BALKEN) * 100}%;width:${((m.bis - m.von) / window.SoundStellen.BALKEN) * 100}%"></span>`
+            )
+            .join('')}
           ${kopf.audio ? '<span class="welle__punkt" id="wellePunkt"></span>' : ''}
         </div>
-        <span class="welle__zeit" id="welleZeit">${kopf.audio ? '0:00 / 0:30' : esc(kopf.dauer || '')}</span>
+        <span class="welle__zeit" id="welleZeit">${kopf.audio ? `0:00 / ${window.SoundStellen.zeit(kopf.hoerprobeSek || 30)}` : esc(kopf.dauer || '')}</span>
       </div>
+      ${soundMarken.length
+        ? '<div class="welle__legende" id="welleLegende"><span class="welle__marke welle__marke--legende"></span>: meist verwendete Song-/Soundstelle</div>'
+        : ''}
       ${kopf.audio ? '<div class="player__hinweis" id="soundHinweis" hidden></div>' : '<div class="player__hinweis">Keine Hörprobe vorhanden.</div>'}
       ${/*
           Punkt 11: der Liedtext. Prototyp-Frame "VSSo + Sound + Lyrics" -
@@ -11634,7 +11658,8 @@ async function openExplorer(art, wert, nur = null) {
       const t = Math.max(0, Math.floor(Number.isFinite(x) ? x : 0));
       return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
     };
-    const gesamt = () => (soundTon.duration > 0 && Number.isFinite(soundTon.duration) ? soundTon.duration : 30);
+    const gesamt = () =>
+      soundTon.duration > 0 && Number.isFinite(soundTon.duration) ? soundTon.duration : kopf.hoerprobeSek || 30;
     const hinweis = overlay.querySelector('#soundHinweis');
     let lyricsSeite = null;
 
@@ -12430,6 +12455,19 @@ async function erstelle(was) {
         typ: 'auswahl',
         auswahl: ['Originalton', ...(state.sounds || []).map((s) => `${s.title} – ${s.artist}`)],
         wert: 'Originalton',
+      },
+      /*
+       * Kasten 7.5: welche Stelle des Songs. Daraus zählt die Soundseite die
+       * meist verwendeten Stellen (Schema 67). Bei Originalton ohne Wirkung.
+       */
+      {
+        key: 'soundAb',
+        label: 'Ausschnitt ab',
+        typ: 'auswahl',
+        auswahl: window.SoundStellen.ausschnitte(
+          Math.max(0, ...(state.sounds || []).map((s) => s.hoerprobeSek || 0)) || 30
+        ).map(window.SoundStellen.zeit),
+        wert: '0:00',
       },
       /*
        * „Später posten" aus dem Handbuch: ein vorab eingestellter Beitrag

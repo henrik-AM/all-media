@@ -85,7 +85,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "Standortanfrage beantworten" auf public.location_requests | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** || Bestand public.vorlage_chats | SUPABASE_SCHEMA_6_inhalte.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Bestand public.vorlage_eigene_beitraege | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_8_medien.sql → SUPABASE_SCHEMA_45_starter_medien.sql → SUPABASE_SCHEMA_56_querformat_kapitel.sql | **SUPABASE_SCHEMA_45_starter_medien.sql** (Medien), **SUPABASE_SCHEMA_56_querformat_kapitel.sql** (Laufzeit und Kapitel) |
 | Bestand public.vorlage_eigene_storys | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_8_medien.sql → SUPABASE_SCHEMA_45_starter_medien.sql | **SUPABASE_SCHEMA_45_starter_medien.sql** |
-| Bestand public.sounds (Test-Sounds: Liedtext, Songbild/Hörprobe, Einsätze) | SUPABASE_SCHEMA_6_inhalte.sql → SUPABASE_SCHEMA_54_songs.sql → SUPABASE_SCHEMA_63_liedzeiten.sql | **SUPABASE_SCHEMA_6_inhalte.sql** (Liedtext), **SUPABASE_SCHEMA_54_songs.sql** (Songwriter, Songbild, Hörprobe), **SUPABASE_SCHEMA_63_liedzeiten.sql** (`lyrics_zeiten`, eine Zahl je nicht-leerer Liedzeile — wer den Liedtext in Schema 6 ändert, muss die Einsätze in 63 nachziehen, sonst verteilt die Seite wieder gleichmäßig) |
+| Bestand public.sounds (Test-Sounds: Liedtext, Songbild/Hörprobe, Einsätze, Wellenform) | SUPABASE_SCHEMA_6_inhalte.sql → SUPABASE_SCHEMA_54_songs.sql → SUPABASE_SCHEMA_63_liedzeiten.sql → SUPABASE_SCHEMA_67_sound_nutzung.sql | **SUPABASE_SCHEMA_6_inhalte.sql** (Liedtext), **SUPABASE_SCHEMA_54_songs.sql** (Songwriter, Songbild, Hörprobe), **SUPABASE_SCHEMA_63_liedzeiten.sql** (`lyrics_zeiten`, eine Zahl je nicht-leerer Liedzeile — wer den Liedtext in Schema 6 ändert, muss die Einsätze in 63 nachziehen, sonst verteilt die Seite wieder gleichmäßig), **SUPABASE_SCHEMA_67_sound_nutzung.sql** (`wellenform`, `hoerprobe_sek` — Ausgabe von `web/tools/wellenform.py`; wer die Hörproben mit `web/tools/testsounds.py` neu erzeugt, muss den Block am Ende von 67 neu rechnen) |
 
 ## Nachtrag 20.09.2026: doppelt befüllte Tabellen
 
@@ -129,3 +129,23 @@ Reihenfolge: **Schema 66 nach Schema 62** — der Wächter ruft
 Die schon vorhandenen Seed-Einträge in echten Konten entfernt Schema 66
 NICHT. Die Aufräum-Anweisung steht auskommentiert am Ende der Datei und
 läuft nur nach Henriks Freigabe.
+
+**Ausgeführt am 29.09.2026** nach Henriks Freigabe: 33 Zeilen in sechs
+echten Konten gelöscht (9 Merkliste, 6 Reposts, 18 Likes, 0 Kommentare),
+vorher vollständig gesichert im Vault
+(`07 Anhänge/All-Media Seed-Sicherung 2026-09-29.json`). Schritt A fand 26;
+7 weitere trugen denselben Zeitstempel auf die Mikrosekunde, aber nur in
+einer *anderen* Tabelle bzw. nur bei einem Konto (`starter_inhalte()` bei
+der ersten Anmeldung, nicht bei der Registrierung). Gegenprobe: kein
+Eintrag eines echten Kontos mehr, dessen Zeitstempel bei mehreren Konten
+oder in mehreren Tabellen vorkommt. Follows aus `starter_inhalte()` sind
+nicht angefasst.
+
+## Nachtrag 29.09.2026: Schema 67 — Sound je Beitrag
+
+`SUPABASE_SCHEMA_67_sound_nutzung.sql` bringt `posts.sound_id`/`sound_ab`,
+den Auslöser `posts_sound_zuordnen` (setzt `sound_id` aus `posts.music`),
+`sound_stellen()` für die meist verwendeten Stellen (nur Nicht-Demo-Beiträge,
+EXECUTE nur `authenticated`) und `sounds.wellenform`, `hoerprobe_sek`,
+`cover_quelle`, `cover_link`. Neue Definitionen, keine Doppelung.
+Reihenfolge: nach Schema 54 (Spalten der Sounds).

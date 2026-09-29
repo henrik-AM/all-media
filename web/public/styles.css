@@ -4407,8 +4407,9 @@ body.ist-abgemeldet .ptr-indicator {
 .ortkarte { height: min(70vh, 560px); margin: 0 16px 16px; border-radius: 14px; overflow: hidden; }
 
 /* Songbild, Interpret und die gerade gesungene Zeile. */
-.soundcover { overflow: hidden; }
-.soundcover img { width: 100%; height: 100%; object-fit: cover; }
+.soundcover { position: relative; overflow: hidden; }
+/* Die Note liegt immer darunter, damit ein hängendes Bild keine leere Fläche lässt (wie in der App). */
+.soundcover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .exp__interpret { margin-top: 2px; font-size: 15px; color: var(--text-2); text-align: center; }
 .lyrics--jetzt { text-align: center; }
 .lyrics--jetzt .lyrics__kopf { text-align: left; }
@@ -4472,7 +4473,16 @@ body.ist-abgemeldet .ptr-indicator {
 .player { margin-top: 14px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
 .player .welle { margin-top: 0; padding: 0; background: none; }
 .welle__play:disabled { opacity: .4; cursor: default; }
-.welle__balken { position: relative; cursor: pointer; }
+.welle__balken { position: relative; cursor: pointer; gap: 1px; }
+/* 7.5 Prototyp: 75 dünne Balken, blau umrandet die meist verwendeten Stellen, Legende darunter. */
+.welle__balken i { min-width: 1px; }
+.welle__marke {
+  position: absolute; top: -3px; bottom: -3px; border: 1.5px solid #006eff; border-radius: 7px;
+  pointer-events: none;
+}
+.welle__legende { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 12.5px; color: var(--text-2); }
+.welle__marke--legende { position: static; display: inline-block; width: 22px; height: 12px; border-radius: 4px; }
+.soundcover__quelle { display: block; margin: 6px auto 0; font-size: 11.5px; color: var(--text-3); text-align: center; }
 .welle__punkt {
   position: absolute; top: 50%; left: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px;
   border-radius: 50%; background: #ff3b30; pointer-events: none;

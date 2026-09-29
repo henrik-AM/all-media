@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Linking, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KarteWeb, KartenSteuerung, Pin as KartenPin } from '../../components/KarteWeb';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -11,6 +11,8 @@ import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import { ladeSoundStellen } from '../../lib/daten';
 import { CameraScreen } from '../messenger/CameraScreen';
 import { Clip, Hashtag, Place, Post, Sound, User, Video } from '../../types';
 import { useKachelHoehe } from '../../lib/raster';
@@ -20,6 +22,8 @@ import { OrtSoundZeile } from '../../components/OrtSoundZeile';
 // Gemeinsam mit der Website: welche Liedzeile gerade dran ist, und welche Orte nah liegen.
 const Liedtext = require('../../../gemeinsam/liedtext') as typeof import('../../../gemeinsam/liedtext');
 const Naehe = require('../../../gemeinsam/naehe') as typeof import('../../../gemeinsam/naehe');
+// Wellenform und meist verwendete Stellen auf der Sound-Seite (Kasten 7.5).
+const SoundStellen = require('../../../gemeinsam/soundstellen') as typeof import('../../../gemeinsam/soundstellen');
 
 export type ExplorerArt = 'reels' | 'querformat' | 'beitraege' | 'profile' | 'hashtag' | 'standort' | 'sound';
 
@@ -852,8 +856,23 @@ const SoundKopf = ({ sound }: { sound: Sound }) => {
   // Einmal Play gedrueckt: ab dann sagt die Seite, wenn die Hoerprobe nicht kommt.
   const [versucht, setVersucht] = useState(false);
   const [breite, setBreite] = useState(0);
+  /*
+   * Kasten 7.5: wie oft jede Stelle in echten Beitraegen genutzt wird
+   * (Schema 67). Leer, solange niemand den Sound benutzt - dann gibt es
+   * keinen blauen Kasten und keine Legende. Henrik am 29.09.2026: es muss
+   * nicht sofort da sein, aber erscheinen, sobald die ersten den Sound nutzen.
+   */
+  const { supabase } = useSupabase();
+  const [stellen, setStellen] = useState<{ ab: number; anzahl: number }[]>([]);
+  useEffect(() => {
+    let aktiv = true;
+    if (supabase) void ladeSoundStellen(supabase, sound.id).then((s) => aktiv && setStellen(s));
+    return () => {
+      aktiv = false;
+    };
+  }, [supabase, sound.id]);
 
-  const gesamt = status.duration > 0 ? status.duration : 30;
+  const gesamt = status.duration > 0 ? status.duration : sound.hoerprobeSek || 30;
   const bei = mitTon ? status.currentTime : 0;
   const laeuft = mitTon && status.playing;
 
@@ -883,7 +902,10 @@ const SoundKopf = ({ sound }: { sound: Sound }) => {
     spieler.seekTo(Math.max(0, Math.min(1, x / breite)) * gesamt);
   };
 
-  const balken = 40;
+  // 75 Balken wie im Prototyp, Hoehe aus der Tondatei (Schema 67); ohne Wellenform gleich hoch.
+  const hoehen = SoundStellen.balken(sound.wellenform);
+  const balken = hoehen.length;
+  const marken = SoundStellen.markierungen(stellen, sound.hoerprobeSek || 30);
   const anteil = Math.max(0, Math.min(1, bei / gesamt));
   const bis = Math.round(anteil * balken);
   const liedStand = Liedtext.stand(sound.lyrics, sound.lyricsZeiten, bei, gesamt);
@@ -897,17 +919,34 @@ const SoundKopf = ({ sound }: { sound: Sound }) => {
           <View style={styles.platteMitte} />
         </View>
         <View style={styles.cover}>
-          {sound.cover ? (
-            <Image source={{ uri: sound.cover }} style={styles.voll} accessibilityLabel={`Songbild ${sound.title}`} />
-          ) : (
-            <Ionicons name="musical-notes-outline" size={52} color={colors.text3} />
+          {/* Die Note liegt immer darunter: hängt das Bild im Netz, steht
+              sonst eine leere Fläche da (im Prüfgerät am 29.09. zweimal). */}
+          <Ionicons name="musical-notes-outline" size={52} color={colors.text3} />
+          {!!sound.cover && (
+            <Image
+              source={{ uri: sound.cover }}
+              style={StyleSheet.absoluteFill}
+              accessibilityLabel={`Songbild ${sound.title}`}
+            />
           )}
         </View>
       </View>
+      {/* 7.4: Das offizielle Songbild kommt aus der iTunes-Suche
+          (web/tools/cover-holen.mjs). Apple verlangt, dass daneben steht,
+          woher es ist, und auf den Song verweist. */}
+      {sound.coverQuelle === 'apple' && !!sound.coverLink && (
+        <Druck onPress={() => void Linking.openURL(sound.coverLink!)} accessibilityLabel="Cover: Apple Music">
+          <Text style={styles.coverQuelle}>Cover: Apple Music ↗</Text>
+        </Druck>
+      )}
       <Text style={styles.titel}>{sound.title}</Text>
       <Text style={styles.interpret}>{sound.artist}</Text>
       {!!sound.songwriter && <Text style={styles.zahl}>Songwriter: {sound.songwriter}</Text>}
-      <Text style={styles.zahl}>{compact(sound.uses)} Beiträge</Text>
+      {/* Die erfundene Basis (sounds.uses) plus jeder echte Beitrag mit dem Sound (Schema 67). */}
+      <Text style={styles.zahl}>
+        {sound.dauer ? `Länge ${sound.dauer} · ` : ''}
+        {compact(sound.uses + SoundStellen.nutzungen(stellen))} Beiträge
+      </Text>
 
       <View style={styles.player}>
         <View style={styles.welle}>
@@ -929,15 +968,20 @@ const SoundKopf = ({ sound }: { sound: Sound }) => {
             {/* pointerEvents none: sonst meldet iOS die Stelle relativ zum
                 getroffenen Balken statt zur ganzen Flaeche. */}
             <View pointerEvents="none" style={styles.wellenBalken}>
-            {Array.from({ length: balken }, (_, i) => (
+            {hoehen.map((h, i) => (
               <View
                 key={i}
+                style={[styles.balken, { height: `${Math.round(h * 100)}%` }, i < bis && styles.balkenGespielt]}
+              />
+            ))}
+            {/* Blau umrandet: die meist verwendeten Stellen (Prototyp). */}
+            {marken.map((m) => (
+              <View
+                key={m.ab}
+                testID="welleMarke"
                 style={[
-                  styles.balken,
-                  // Die Form ist gezeichnet, nicht aus dem Ton gerechnet —
-                  // eine echte Wellenform braeuchte die Audiodaten.
-                  { height: `${20 + Math.round(60 * Math.abs(Math.sin(i * 1.1)))}%` },
-                  i < bis && styles.balkenGespielt,
+                  styles.marke,
+                  { left: `${(m.von / balken) * 100}%`, width: `${((m.bis - m.von) / balken) * 100}%` },
                 ]}
               />
             ))}
@@ -948,6 +992,12 @@ const SoundKopf = ({ sound }: { sound: Sound }) => {
             {mitTon ? `${zeitText(bei)} / ${zeitText(gesamt)}` : sound.dauer ?? ''}
           </Text>
         </View>
+        {marken.length > 0 && (
+          <View style={styles.legende}>
+            <View style={[styles.marke, styles.markeLegende]} />
+            <Text style={styles.legendeText}>: meist verwendete Song-/Soundstelle</Text>
+          </View>
+        )}
 
         {!mitTon && <Text style={styles.playHinweis}>Keine Hörprobe vorhanden.</Text>}
         {mitTon && versucht && !status.isLoaded && (
@@ -1209,7 +1259,13 @@ const styles = themenStyles((colors) => ({
   playAus: { opacity: 0.4 },
   playHinweis: { ...typography.small, color: colors.text3, marginTop: 6 },
   wellenFlaeche: { flex: 1, height: 34 },
-  wellenBalken: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  wellenBalken: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, flexDirection: 'row', alignItems: 'center', gap: 1 },
+  /* 7.5 Prototyp: blau umrandete Kaesten um die meist verwendeten Stellen, Legende darunter. */
+  marke: { position: 'absolute', top: 0, bottom: 0, borderWidth: 1.5, borderColor: '#006EFF', borderRadius: 7 },
+  markeLegende: { position: 'relative', width: 22, height: 12, borderRadius: 4 },
+  legende: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
+  legendeText: { ...typography.small, color: colors.text2 },
+  coverQuelle: { ...typography.small, fontSize: 11.5, color: colors.text3, marginTop: 6 },
   /* Der rote Abspielpunkt aus dem Prototyp. */
   abspielPunkt: {
     position: 'absolute',

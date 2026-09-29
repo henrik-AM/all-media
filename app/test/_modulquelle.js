@@ -104,6 +104,9 @@ const UMD_BAUSTEINE = [
   // 28.09.2026: `naehe.js` fuer die Ortsliste in der Kartenansicht eines
   // Standorts (Feedback 21.09., Kasten 7.1).
   ['naehe', 'Naehe'],
+  // 29.09.2026: `soundstellen.js` fuer Wellenform und meist verwendete
+  // Stellen auf der Sound-Seite (Feedback 21.09., Kasten 7.5, Schema 67).
+  ['soundstellen', 'SoundStellen'],
 ];
 
 function umdTeile() {

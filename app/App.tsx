@@ -59,6 +59,8 @@ import { FollowingScreen } from './screens/profile/FollowingScreen';
 import { colors, themenStyles } from './constants/design';
 import { useDaten } from './contexts/DatenContext';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
+// UMD wie in ExplorerScreen: die Prüfläufe laden App-Code als blob:-Modul.
+const SoundStellen = require('../gemeinsam/soundstellen') as typeof import('../gemeinsam/soundstellen');
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
@@ -1449,6 +1451,19 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           auswahl: ['Originalton', ...daten.sounds.map((s) => `${s.title} – ${s.artist}`)],
         },
         /*
+         * Kasten 7.5: welche Stelle des Songs. Daraus zaehlt die Soundseite
+         * die meist verwendeten Stellen (Schema 67). Bei Originalton ohne
+         * Wirkung. Dieselbe Wahl wie auf der Website.
+         */
+        {
+          key: 'soundAb',
+          label: 'Ausschnitt ab',
+          typ: 'auswahl',
+          auswahl: SoundStellen.ausschnitte(
+            Math.max(0, ...daten.sounds.map((s) => s.hoerprobeSek || 0)) || 30
+          ).map(SoundStellen.zeit),
+        },
+        /*
          * "Spaeter posten" aus dem Handbuch: ein vorab eingestellter Beitrag
          * wird zum geplanten Zeitpunkt hochgeladen. In der Datenbank ist das
          * `posts.publish_at`; ein Beitrag mit einem Zeitpunkt in der Zukunft
@@ -1461,8 +1476,9 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           auswahl: ['Sofort', 'In einer Stunde', 'Heute Abend', 'Morgen früh'],
         },
       ],
-      absenden: ({ beschreibung, ort, music, zeitpunkt }) => {
+      absenden: ({ beschreibung, ort, music, soundAb: abText, zeitpunkt }) => {
         const spaeter = geplantAb(zeitpunkt);
+        const soundAb = SoundStellen.abAus(abText, music);
 
         if (spaeter) {
           /*
@@ -1475,6 +1491,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
               beschreibung,
               ort,
               musik: music,
+              soundAb,
               mediaUrl: uri,
               art: istBild ? 'post' : quer ? 'clip' : 'reel',
               geplantAb: spaeter,
@@ -1484,8 +1501,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           return null;
         }
 
-        if (istBild) profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music });
-        else profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music });
+        if (istBild) profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music, soundAb });
+        else profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb });
 
         // Gleich dorthin, wo das Neue jetzt steht.
         setArea('videos');
