@@ -30,6 +30,7 @@ import { Druck } from './Druck';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { haptic } from '../lib/haptics';
 import { useAktionen } from '../lib/useAktionen';
+import { tonModusSetzen } from '../lib/tonModus';
 
 interface Props {
   communityId: string;
@@ -74,6 +75,7 @@ export const PushToTalk = ({ communityId, kanalId, onNotice, onGesendet }: Props
       );
     } catch (e: any) {
       console.error('Push-to-Talk starten fehlgeschlagen:', e?.message ?? e);
+      tonModusSetzen();
       onNotice('Die Aufnahme ließ sich nicht starten');
     }
   };
@@ -87,6 +89,9 @@ export const PushToTalk = ({ communityId, kanalId, onNotice, onGesendet }: Props
 
     try {
       await aufnahme.stop();
+      // Zurück in den Wiedergabemodus — sonst bliebe die Sitzung auf
+      // „Aufnehmen" und Videos kämen leise aus dem Hörer (Kasten 8.1).
+      await tonModusSetzen();
       const uri = aufnahme.uri;
 
       if (dauerMs < MINDESTDAUER_MS) return onNotice('Zu kurz — halte den Knopf gedrückt');

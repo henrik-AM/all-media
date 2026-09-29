@@ -14,6 +14,7 @@ import { Clip } from '../../types';
 import { ExplorerZiel } from './ExplorerScreen';
 import { ActionSheet } from '../../components/ActionSheet';
 import { BeitragOptionenSheet } from '../../components/BeitragOptionenSheet';
+import { OrtSoundZeile } from '../../components/OrtSoundZeile';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { useAktionen } from '../../lib/useAktionen';
 import { ladeStreamKommentare } from '../../lib/daten';
@@ -501,6 +502,15 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           <Druck style={styles.autorText} onPress={() => onOpenProfile(clip.userId)}>
             <Text style={styles.autorName}>{autor.name}</Text>
             <Text style={styles.autorSub}>{autor.handle}</Text>
+            {/* Kasten 8.2: Ort und Sound antippbar, auch im Querformat/Live. */}
+            <OrtSoundZeile
+              ort={clip.location}
+              sound={clip.music}
+              onOpenExplorer={onOpenExplorer}
+              onNotice={onNotice}
+              stil={styles.autorSub}
+              farbe={colors.text3}
+            />
           </Druck>
         </View>
 

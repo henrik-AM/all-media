@@ -9369,6 +9369,9 @@ const imFeed = (b) => !(state.keinInteresse || []).includes(b.id);
 /* Die Adresse eines Beitrags. bootstrap() oeffnet sie wieder (?beitrag=). */
 const beitragLink = (id) => `${location.origin}/?beitrag=${encodeURIComponent(id)}`;
 
+/* Henriks Aufzaehlung vom 21.09.2026 (Kasten 8.3). Gleiche Liste in der App. */
+const BEITRAG_OPTIONEN_REIHENFOLGE = ['link', 'sichern', 'story', 'melden', 'kein'];
+
 const BEITRAG_MELDE_GRUENDE = [
   'Spam oder Werbung',
   'Beleidigung oder Hass',
@@ -9426,18 +9429,32 @@ async function openBeitragOptionen(beitrag) {
     return antwort;
   };
 
+  /*
+   * Kasten 8.3 (28.09.2026): Aussehen wie TikTok - runde Symbolkreise mit der
+   * Beschriftung darunter, nebeneinander, unten "Abbrechen". Vorher eine
+   * Liste mit Pfeilen wie in den Einstellungen. Reihenfolge = Henriks
+   * Aufzaehlung; dieselbe Liste steht in app/components/OptionenKacheln.tsx
+   * (REIHENFOLGE).
+   */
+  const rang = (k) => {
+    const i = BEITRAG_OPTIONEN_REIHENFOLGE.indexOf(k);
+    return i < 0 ? BEITRAG_OPTIONEN_REIHENFOLGE.length : i;
+  };
+  punkte.sort((a, b) => rang(a.key) - rang(b.key));
+
   openSheet(
     'Optionen',
-    `<div class="sheet__body">${punkte
+    `<div class="sheet__body optkacheln">${punkte
       .map(
-        (p) => `<button class="item ${p.gefahr ? 'item--danger' : ''}" data-beitragopt="${p.key}">
-          <span class="item__icon">${ICONS[p.icon]}</span>
-          <span class="item__label">${esc(p.label)}</span>
-          <span class="row__chevron">${ICONS.chevron}</span>
+        (p) => `<button class="optkachel ${p.gefahr ? 'optkachel--gefahr' : ''}" data-beitragopt="${p.key}">
+          <span class="optkachel__kreis">${ICONS[p.icon]}</span>
+          <span class="optkachel__text">${esc(p.label)}</span>
         </button>`
       )
-      .join('')}</div>`,
+      .join('')}</div>
+    <button class="optkacheln__abbrechen" data-optabbrechen>Abbrechen</button>`,
     (sheet, close) => {
+      sheet.querySelector('[data-optabbrechen]')?.addEventListener('click', close);
       sheet.querySelectorAll('[data-beitragopt]').forEach((b) =>
         b.addEventListener('click', async () => {
           const was = b.dataset.beitragopt;
@@ -10431,9 +10448,23 @@ function openClip(clipId) {
 
           <div class="player__autor">
             <span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>
-            <div class="player__autorText" data-profile="${u.id}">
-              <div class="player__autorName">${esc(u.name)}</div>
-              <div class="player__autorSub">${esc(u.handle)}</div>
+            <div class="player__autorText">
+              <div data-profile="${u.id}">
+                <div class="player__autorName">${esc(u.name)}</div>
+                <div class="player__autorSub">${esc(u.handle)}</div>
+              </div>
+              ${/*
+                  Kasten 8.2 (Henrik 21.09.): „Ort und Sound/Song unter dem
+                  Profilnamen sind nicht antippbar" - im Querformat und bei
+                  Live standen sie gar nicht da. Bewusst AUSSERHALB von
+                  data-profile: der Klickfaenger prueft das Profil zuerst.
+                  Gegenstueck in der App: components/OrtSoundZeile.tsx.
+                */ ''}
+              ${clip.location || clip.music ? `<div class="player__ziele">
+                ${clip.location ? `<button class="player__ziel" data-postort="${esc(clip.location)}" aria-label="Standort ${esc(clip.location)}">${ICONS.mapPin}<span>${esc(clip.location)}</span></button>` : ''}
+                ${clip.location && clip.music ? '<span class="post__punkt">·</span>' : ''}
+                ${clip.music ? `<button class="player__ziel" data-postsound="${esc(clip.music)}" aria-label="Sound ${esc(clip.music)}">${ICONS.music}<span>${esc(clip.music)}</span></button>` : ''}
+              </div>` : ''}
             </div>
             <button class="prof__btn ${state.gefolgt?.[u.id] ? 'is-following' : 'is-primary'}" data-clipfollow="${u.id}">
               ${state.gefolgt?.[u.id] ? 'Gefolgt' : 'Folgen'}
@@ -11024,8 +11055,8 @@ function openOrtFotos(ort, fotos) {
                         <span data-profile="${p.userId}">${avatarForUser(p.userId, 36)}</span>
                         <div class="ortfoto__wer">
                           <div class="ortfoto__name" data-profile="${p.userId}">${esc(u.name)}</div>
-                          <div class="ortfoto__meta">${esc(p.location || ort.titel)}${
-                            p.music ? ` · ${esc(p.music)}` : ''
+                          <div class="ortfoto__meta">${/* Kasten 8.2: antippbar wie im Home-Feed. */ ''}<button class="post__meta" data-postort="${esc(p.location || ort.titel)}">${esc(p.location || ort.titel)}</button>${
+                            p.music ? `<span class="post__punkt">·</span><button class="post__meta" data-postsound="${esc(p.music)}">${esc(p.music)}</button>` : ''
                           }</div>
                         </div>
                         <button class="postbtn ${p.liked ? 'is-liked' : ''}" data-fotolike="${p.id}" aria-label="Gefällt mir">${ICONS.heart}</button>
@@ -13942,9 +13973,16 @@ function paintMessages(chat) {
  *
  * Bewusst kein neuer Bildschirm, sondern eine Schicht darueber: der Chat
  * bleibt stehen, Schliessen fuehrt an dieselbe Stelle im Verlauf zurueck.
- * Ein Video bekommt hier `controls` — anders als in der Blase, wo es nur
- * Standbild ist. Gleiches Verhalten in der App (`vollbild` in
+ * Ein Video laeuft hier — anders als in der Blase, wo es nur Standbild ist.
+ * Gleiches Verhalten in der App (`vollbild` in
  * app/screens/messenger/ChatDetailScreen.tsx).
+ *
+ * Bis zum 28.09.2026 hatte das Video hier `controls`. Die Browserleiste bringt
+ * aber einen eigenen Lautsprecher-/Stummknopf mit — genau den, den Henrik
+ * weghaben will (Feedback 21.09., Kasten 8.1: „Ton richtet sich immer nach
+ * der Lautstaerke des Geraets"). Die App zeigt dort ohnehin keine Leiste
+ * (`nativeControls={false}`). Der Ton ist an: geoeffnet wird die Schicht per
+ * Klick, damit erlaubt der Browser den Ton sofort.
  */
 function oeffneVollformat(adresse) {
   if (!adresse) return;
@@ -13952,7 +13990,7 @@ function oeffneVollformat(adresse) {
   schicht.className = 'vollformat';
   schicht.innerHTML =
     (istVideoAdresse(adresse)
-      ? `<video src="${esc(adresse)}" controls autoplay playsinline loop></video>`
+      ? `<video src="${esc(adresse)}" autoplay playsinline loop disablepictureinpicture></video>`
       : `<img src="${esc(adresse)}" alt="">`) +
     `<button class="vollformat__zu" aria-label="Schließen">${ICONS.close}</button>`;
 
