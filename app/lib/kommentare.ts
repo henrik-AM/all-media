@@ -40,3 +40,23 @@ export function likeZeile(anzahl: number, ersterName?: string): string {
   if (anzahl === 2) return `Gefällt ${ersterName} und einer weiteren Person`;
   return `Gefällt ${ersterName} und ${compactNumber(anzahl - 1)} weiteren Personen`;
 }
+
+/*
+ * Kasten 9.3 (Henrik, 21.09.2026): „Wer freigegeben ist, sieht unter einem
+ * Video wie bei Instagram, dass die Person es geliked hat.“
+ *
+ * Unter einem Video steht die Zahl schon an der Seitenleiste. Die Zeile
+ * darunter gibt es deshalb NUR mit Namen — ohne Namen fällt sie weg, statt
+ * die Zahl ein zweites Mal zu zeigen. Der Name kommt aus `liker_namen()`
+ * (Schema 65): nur jemand, dem ich folge, und nur, wenn dessen
+ * Likes-Sichtbarkeit mich zulässt. Hier wird nichts erfunden.
+ *
+ * Zurückgegeben wird der Teil NACH dem Namen, damit der Name fett gesetzt
+ * werden kann: „Gefällt <b>Anna</b>“ + „ und 14 weiteren Personen“.
+ * Dieselbe Regel in der Website (gefaelltZeile in web/public/app.js).
+ */
+export function gefaelltRest(anzahl: number): string {
+  if (anzahl <= 1) return '';
+  if (anzahl === 2) return ' und einer weiteren Person';
+  return ` und ${compactNumber(anzahl - 1)} weiteren Personen`;
+}

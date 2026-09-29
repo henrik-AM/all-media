@@ -4319,6 +4319,24 @@ function likeZeile(anzahl, ersterName) {
   return `Gefällt ${name} und ${compactNumber(anzahl - 1)} weiteren Personen`;
 }
 
+/*
+ * Kasten 9.3 (Henrik, 21.09.2026): „Wer freigegeben ist, sieht unter einem
+ * Video wie bei Instagram, dass die Person es geliked hat.“
+ *
+ * Unter einem Video steht die Zahl schon an der Seitenleiste. Diese Zeile
+ * gibt es deshalb NUR mit Namen. Der Name kommt aus `liker_namen()`
+ * (Schema 65): nur jemand, dem ich folge (9.4), und nur, wenn dessen
+ * Likes-Sichtbarkeit mich zulässt. Ohne Namen: leerer Text, keine Zeile.
+ * Gegenstück in der App: gefaelltRest() in app/lib/kommentare.ts.
+ */
+function gefaelltZeile(anzahl, name) {
+  if (!name) return '';
+  const fett = `<strong>${esc(name)}</strong>`;
+  if (anzahl <= 1) return `Gefällt ${fett}`;
+  if (anzahl === 2) return `Gefällt ${fett} und einer weiteren Person`;
+  return `Gefällt ${fett} und ${compactNumber(anzahl - 1)} weiteren Personen`;
+}
+
 /* ---------------------------------------------------------- video feed */
 function compactNumber(n) {
   if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.', ',') + ' Mio.';
@@ -4614,6 +4632,7 @@ function videoSlide(v) {
           }
         </div>
         <div class="slide__desc">${esc(v.description)}</div>
+        ${v.likedBy ? `<div class="slide__gefaellt">${gefaelltZeile(v.likes, v.likedBy)}</div>` : ''}
         <div class="slide__sub">
           ${v.location ? `<button class="slide__ziel" data-slideort="${esc(v.location)}">${esc(v.location)}</button>` : ''}
           ${v.location && v.music ? '<span class="slide__punkt">·</span>' : ''}
@@ -5901,7 +5920,29 @@ function openSichtbarkeit(punkt) {
    */
   let suche = '';
 
+  /*
+   * Follower und Gefolgte, nur bei den Likes. Geladen beim Oeffnen; bis sie
+   * da sind, steht die Kontaktliste allein da, danach wird neu gezeichnet.
+   */
+  let folgeLeute = null;
+  let blatt = null;
+  if (bereich === 'likes') {
+    Promise.all(
+      ['follower', 'gefolgt'].map((art) =>
+        fetch(`/api/profile/me/folge/${art}`)
+          .then((r) => (r.ok ? r.json() : { ids: [] }))
+          .then((d) => d.ids || [])
+      )
+    )
+      .then(([follower, gefolgt]) => {
+        folgeLeute = [...follower, ...gefolgt].filter((id) => id !== 'me');
+        if (blatt && document.body.contains(blatt)) zeichne(blatt);
+      })
+      .catch((fehler) => console.error('Folgeliste fehlgeschlagen:', fehler));
+  }
+
   const zeichne = (sheet) => {
+    blatt = sheet;
     const jetzt = sicht(bereich);
     const brauchtListe = jetzt.stufe === 'niemand_bis_auf' || jetzt.stufe === 'alle_bis_auf';
 
@@ -5914,8 +5955,24 @@ function openSichtbarkeit(punkt) {
      * jeder Kontakt drin und traegt notfalls den Namen aus dem Kontaktbuch.
      * Gegenstueck in app/components/SichtbarkeitSheet.tsx.
      */
-    const personen = (state.contacts || [])
-      .map((k) => ({ id: k.id, name: state.users[k.id]?.name || k.name || 'Unbenannter Kontakt' }))
+    /*
+     * Kasten 9.1 (28.09.2026): bei den Likes stehen zusaetzlich Follower
+     * und Gefolgte zur Wahl — die „Gefällt …“-Zeile sehen nur Leute, die
+     * einem folgen (Schema 65). Mit Kontakten allein liess sich ein
+     * Follower, der kein Kontakt ist, nicht ausnehmen. Gegenstueck:
+     * `weitere` in app/components/SichtbarkeitSheet.tsx.
+     */
+    const kontaktIds = new Set((state.contacts || []).map((k) => k.id));
+    const zusatz = folgeLeute || [];
+    const personen = [
+      ...(state.contacts || []).map((k) => ({ id: k.id, name: state.users[k.id]?.name || k.name || 'Unbenannter Kontakt' })),
+      ...zusatz
+        .filter((id, i) => !kontaktIds.has(id) && zusatz.indexOf(id) === i && state.users[id])
+        .map((id) => ({ id, name: state.users[id].name })),
+      ...(jetzt.ausnahmen || [])
+        .filter((id) => !kontaktIds.has(id) && !zusatz.includes(id) && state.users[id])
+        .map((id) => ({ id, name: state.users[id].name })),
+    ]
       .filter((p) => !suche || p.name.toLowerCase().includes(suche.toLowerCase()))
       .sort((a, b) => {
         const ad = jetzt.ausnahmen.includes(a.id) ? 0 : 1;
@@ -5975,7 +6032,7 @@ function openSichtbarkeit(punkt) {
                     bedienen.
                   */ ''}
                 <div class="sicht__suche">
-                  <input type="search" id="sichtSuche" placeholder="Kontakt suchen …" value="${esc(suche)}" />
+                  <input type="search" id="sichtSuche" placeholder="${bereich === 'likes' ? 'Person suchen …' : 'Kontakt suchen …'}" value="${esc(suche)}" />
                 </div>
                 ${
                   personen.length
@@ -5992,7 +6049,9 @@ function openSichtbarkeit(punkt) {
                         .join('')
                     : suche
                       ? `<div class="sheet__hint">Für „${esc(suche)}" ist kein Kontakt dabei.</div>`
-                      : '<div class="sheet__hint">Du hast noch keine Kontakte, die du hier eintragen könntest.</div>'
+                      : bereich === 'likes'
+                        ? '<div class="sheet__hint">Noch keine Kontakte, Follower oder Gefolgten, die du hier eintragen könntest.</div>'
+                        : '<div class="sheet__hint">Du hast noch keine Kontakte, die du hier eintragen könntest.</div>'
                 }`
              : ''
          }
@@ -10452,6 +10511,7 @@ function openClip(clipId) {
               : ''
           }
 
+          ${clip.likedBy ? `<div class="player__gefaellt">${gefaelltZeile(clip.likes || 0, clip.likedBy)}</div>` : ''}
           <div class="player__text">${esc(clip.description || '')}</div>
 
           ${

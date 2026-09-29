@@ -15,7 +15,7 @@ import { colors, radius, sizes, spacing, themenStyles, typography, verlaufAus } 
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSupabase } from '../../contexts/SupabaseContext';
-import { ladeBanne, ladeStatistik, Statistik } from '../../lib/daten';
+import { ladeBanne, ladeFolgeListe, ladeStatistik, Statistik } from '../../lib/daten';
 import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import {
   EigenerKommentar,
@@ -671,6 +671,24 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       .catch((e: any) => console.error('Eigene Kommentare laden fehlgeschlagen:', e?.message ?? e));
   }, [supabase, ichId]);
 
+  /*
+   * Kasten 9.1: Wer bei der Likes-Sichtbarkeit zur Wahl steht. Die
+   * „Gefällt …“-Zeile sehen nur Leute, die mir folgen (Schema 65) — also
+   * gehoeren Follower in die Liste, dazu die Gefolgten. Geladen erst beim
+   * Oeffnen des Blatts, nicht bei jedem Besuch der Einstellungen.
+   */
+  const [folgeLeute, setFolgeLeute] = useState<string[] | undefined>(undefined);
+  const likesOffen = sichtOffen?.sichtbar === 'likes';
+  useEffect(() => {
+    if (!likesOffen || !supabase || !ichId) return;
+    Promise.all([
+      ladeFolgeListe(supabase, ichId, ichId, 'follower'),
+      ladeFolgeListe(supabase, ichId, ichId, 'gefolgt'),
+    ])
+      .then(([follower, gefolgt]) => setFolgeLeute([...follower, ...gefolgt]))
+      .catch((e: any) => console.error('Folgeliste laden fehlgeschlagen:', e?.message ?? e));
+  }, [likesOffen, supabase, ichId]);
+
   /** Stufe und Ausnahmen zu einem Bereich — ohne Eintrag gilt „alle". */
   const sicht = (bereich?: SichtbarkeitBereich) =>
     (bereich && sichtbarkeit[bereich]) || { stufe: 'alle' as SichtbarkeitStufe, ausnahmen: [] };
@@ -936,6 +954,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
            * Den Zusatz gibt es nur bei der Story. `onInVideos` bleibt sonst
            * undefiniert, und das Blatt laesst die Zeile dann ganz weg.
            */
+          weitere={sichtOffen.sichtbar === 'likes' ? folgeLeute ?? [] : undefined}
           inVideos={sichtOffen.sichtbar === 'story' ? sicht('story').inVideos : undefined}
           onInVideos={
             sichtOffen.sichtbar === 'story'

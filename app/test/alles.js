@@ -175,6 +175,7 @@ const LAEUFE = [
   ['gleichstand', '_gleichstand.js'],
   ['handbuch', '_handbuch.js'],
   ['sichtbarkeit', '_sichtbarkeit.js'],
+  ['likes', '_likes_sichtbarkeit.js'],
   ['fremdprofil', '_fremdprofil.js'],
   ['chatanfrage', '_chatanfrage.js'],
   ['messengeranfrage', '_messengeranfrage.js'],

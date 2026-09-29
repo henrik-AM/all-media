@@ -944,13 +944,29 @@ export async function ladeBeitraege(
    * Likes-Sichtbarkeit des Likenden unterliegt. Die Zahl bleibt unberuehrt:
    * sie gehoert dem Beitrag, der Name dem Menschen.
    */
+  /*
+   * Seit Schema 65 (Kasten 9, 28.09.2026) gilt zusaetzlich: der Name kommt
+   * nur von Profilen, denen ich folge, und die Datenbank prueft dieselbe
+   * Likes-Sichtbarkeit wie die Leseregel auf post_likes.
+   *
+   * Die ZAHL kommt deshalb aus `like_zahlen()`: die Leseregel laesst
+   * verborgene Likes nicht mehr durch, und `post_likes(count)` zaehlte dann
+   * nur die sichtbaren — derselbe Beitrag haette je nach Betrachter
+   * verschiedene Zahlen. Fehlt die Funktion (Schema 65 noch nicht
+   * eingespielt), bleibt es bei der eingebetteten Zahl, die dann noch
+   * ungefiltert und damit richtig ist.
+   */
   const likerNamen = new Map<string, string>();
+  const likeZahlen = new Map<string, number>();
   if (ids.length > 0) {
-    const { data: namen } = await client.rpc('liker_namen', {
-      beitraege: ids,
-      wer: ichId,
-    });
+    const [{ data: namen }, { data: zahlen, error: zahlFehler }] = await Promise.all([
+      client.rpc('liker_namen', { beitraege: ids, wer: ichId }),
+      client.rpc('like_zahlen', { beitraege: ids }),
+    ]);
     for (const z of (namen ?? []) as any[]) if (z.name) likerNamen.set(z.post_id, z.name);
+    if (!zahlFehler) {
+      for (const z of (zahlen ?? []) as any[]) likeZahlen.set(z.post_id, Number(z.anzahl ?? 0));
+    }
   }
 
   const gemocht = new Set((likes ?? []).map((l: any) => l.post_id));
@@ -975,7 +991,7 @@ export async function ladeBeitraege(
     kapitel: b.kapitel ?? [],
     age: zeitText(b.created_at),
     zeitpunkt: b.created_at ?? undefined,
-    likes: Number(b.likes_basis ?? 0) + (b.post_likes?.[0]?.count ?? 0),
+    likes: Number(b.likes_basis ?? 0) + (likeZahlen.get(b.id) ?? b.post_likes?.[0]?.count ?? 0),
     comments: Number(b.comments_basis ?? 0) + (b.comments?.[0]?.count ?? 0),
     // Gezaehlt wie Likes und Kommentare: Sockel plus die wirklich
     // eingetragenen Weiterleitungen. Vorher stand hier nur der Sockel —
@@ -1060,6 +1076,7 @@ export async function ladeBeitraege(
         location: b.location,
         music: b.music,
         likes: b.likes,
+        likedBy: b.likedBy,
         comments: b.comments,
         shares: b.shares,
         liked: b.liked,
@@ -1089,6 +1106,7 @@ export async function ladeBeitraege(
         tags: b.tags,
         description: b.description,
         likes: b.likes,
+        likedBy: b.likedBy,
         comments: b.comments,
         liked: b.liked,
         saved: b.saved,

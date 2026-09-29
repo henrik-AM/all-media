@@ -526,23 +526,19 @@ async function anmelden(zugang) {
         return data?.post_likes?.[0]?.count ?? 0;
       };
 
+      /*
+       * Seit Schema 65 (28.09.2026) sieht der Besitzer eines Beitrags jedes
+       * Like darauf — wie bei Instagram, die Glocke meldet es ohnehin. Die
+       * Namenspruefung am EIGENEN Beitrag waere deshalb bei „Niemand" rot,
+       * obwohl alles richtig ist, und der Name erscheint nur noch fuer
+       * Gefolgte (Kasten 9.4). Die vier Stufen mit zwei Konten in beide
+       * Richtungen prueft jetzt test:likes (_likes_sichtbarkeit.js) an einem
+       * Beitrag, der keinem der beiden gehoert. Hier bleibt nur: die Zahl
+       * aendert sich nicht mit der Einstellung.
+       */
       await stufeFuer(fremder, 'likes', 'alle');
       const zAn = await zaehler();
-      const { data: nAn } = await eigner.client
-        .rpc('liker_namen', { beitraege: [eigenerBeitrag.id], wer: eigner.id });
-      pruefe('Bei „Alle" steht ein Name unter dem Beitrag',
-        Boolean((nAn || [])[0]?.name), (nAn || [])[0]?.name || 'kein Name');
-
       await stufeFuer(fremder, 'likes', 'niemand');
-      const { data: nAus } = await eigner.client
-        .rpc('liker_namen', { beitraege: [eigenerBeitrag.id], wer: eigner.id });
-      pruefe('Bei „Niemand" verschwindet der Name',
-        !((nAus || [])[0]?.name), (nAus || [])[0]?.name || '');
-
-      // Der wichtigste Punkt: die Zahl bleibt. Sie ist eine Tatsache ueber
-      // den Beitrag, nicht eine Auskunft ueber den Menschen — haette sie
-      // sich mit verborgen, haette derselbe Beitrag je nach Betrachter
-      // verschiedene Like-Zahlen.
       const zAus = await zaehler();
       pruefe('Die Like-Zahl bleibt davon unberuehrt', zAn === zAus && zAn > 0,
         `${zAn} → ${zAus}`);

@@ -258,6 +258,11 @@ export interface Video {
   location: string;
   music: string;
   likes: number;
+  /**
+   * „Gefällt Anna …“ unter dem Video: nur jemand, dem ich folge und dessen
+   * Likes-Sichtbarkeit mich zulässt (Schema 65). Leer = keine Zeile.
+   */
+  likedBy?: string;
   comments: number;
   shares: number;
   liked: boolean;
@@ -373,6 +378,8 @@ export interface Clip {
   /** Fuer den Querformat-Player (Prototyp-Frame "VQ + Video"). */
   description?: string;
   likes?: number;
+  /** Wie bei Video: Name fuer „Gefällt …“, nur von Gefolgten (Schema 65). */
+  likedBy?: string;
   comments?: number;
   liked?: boolean;
   saved?: boolean;
