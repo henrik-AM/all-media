@@ -145,6 +145,77 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   /*
+   * Kasten 7.1 (Henrik 21.09.2026): "Karte am Standort antippbar -> springt
+   * in Kartenansicht wie bei der Friend-Map." Bis zum 28.09.2026 reagierte
+   * nur der kleine Knopf in der Ecke; ein Klick auf die Karte tat nichts.
+   */
+  await pruefe('Ein Klick auf die Karte selbst oeffnet die Kartenansicht', async () => {
+    const r = await page.$eval('#expKarteRahmen', (e) => {
+      const b = e.getBoundingClientRect();
+      return { x: b.left + b.width * 0.3, y: b.top + b.height * 0.6 };
+    });
+    await page.mouse.click(r.x, r.y);
+    await page.waitForSelector('#ortKarte .map__pin', { timeout: 5000 });
+  });
+
+  await pruefe('Die Kartenansicht listet die Orte in der Naehe, der Ort selbst zuerst', async () => {
+    const zeilen = await page.$$eval('#ortListe [data-ortzeige]', (n) =>
+      n.map((z) => z.querySelector('.row__name').textContent.trim() + ' | ' + z.querySelector('.row__preview').textContent.trim())
+    );
+    if (zeilen.length < 2) throw new Error(zeilen.length + ' Zeile(n)');
+    if (!zeilen[0].startsWith('Hamburger Hafen')) throw new Error('erste Zeile: ' + zeilen[0]);
+    if (!zeilen[0].includes('Dieser Ort')) throw new Error('erste Zeile ohne "Dieser Ort": ' + zeilen[0]);
+    // Jede weitere Zeile nennt eine Entfernung.
+    const ohne = zeilen.slice(1).filter((z) => !/\d+(,\d)? (m|km)/.test(z));
+    if (ohne.length) throw new Error('ohne Entfernung: ' + ohne.join(' / '));
+  });
+
+  await pruefe('Die Kartenansicht hat die Ansichtswahl wie die Friend-Map', async () => {
+    await page.click('#ortKarteBlatt [data-ortstil]');
+    await page.click('#ortKarteBlatt [data-ortstilwahl="satellit"]');
+    const schild = await page.$eval('#ortKarteAnsicht', (e) => e.textContent.trim());
+    if (schild !== 'Satellit') throw new Error('Schild sagt ' + schild);
+    await page.waitForTimeout(800);
+    const esri = await page.$$eval('#ortKarte img.leaflet-tile', (n) => n.filter((i) => i.src.includes('arcgisonline')).length);
+    if (!esri) throw new Error('keine Satellitenkacheln');
+  });
+
+  await pruefe('Vollbild blendet die Liste aus und wieder ein', async () => {
+    await page.click('#ortKarteBlatt [data-ortvoll]');
+    await page.waitForTimeout(200);
+    if (await page.isVisible('#ortListe')) throw new Error('Liste steht im Vollbild noch da');
+    await page.click('#ortKarteBlatt [data-ortvoll]');
+    await page.waitForTimeout(200);
+    if (!(await page.isVisible('#ortListe'))) throw new Error('Liste kommt nicht zurueck');
+  });
+
+  await pruefe('Der Pfeil an einer Zeile oeffnet den anderen Ort', async () => {
+    const vorher = await page.$eval('.exp__adresse', (e) => e.textContent);
+    await page.click('#ortListe [data-ortoeffnen]');
+    await page.waitForTimeout(1200);
+    if (await page.$('#ortKarte')) throw new Error('Kartenansicht blieb offen');
+    const nachher = await page.$eval('.exp__adresse', (e) => e.textContent).catch(() => '');
+    if (!nachher || nachher === vorher) throw new Error('kein anderer Ort: ' + nachher);
+    // Zurueck zum Hamburger Hafen fuer die folgenden Pruefungen.
+    // Ob openExplorer eine Ebene stapelt oder ersetzt: so lange zurueck,
+    // bis die Seite zu ist.
+    for (let i = 0; i < 3 && !(await page.$eval('#overlay', (e) => e.hidden)); i++) await zurueck();
+    await zurSuche();
+    await page.click(`[data-place="${await K.kennungNachText(page, 'data-place', 'Hamburger Hafen')}"]`);
+    await page.waitForSelector('.exp__adresse', { timeout: 8000 });
+  });
+
+  await pruefe('Das Karussell blaettert zwischen den Standortbildern', async () => {
+    if (!(await page.$('#expOrtWeiter'))) throw new Error('keine Pfeile');
+    const punkte = await page.$$eval('.ortkarussell__punkte i', (n) => n.length);
+    if (punkte < 2) throw new Error(punkte + ' Punkt(e)');
+    await page.click('#expOrtWeiter');
+    const an = await page.$$eval('.ortkarussell__punkte i', (n) => n.findIndex((p) => p.classList.contains('is-an')));
+    if (an !== 1) throw new Error('Punkt ' + an + ' ist an');
+    await page.click('#expOrtZurueck');
+  });
+
+  /*
    * Frueher hiess diese Pruefung '"Alle Fotos ansehen" springt zu den
    * Beitraegen' und war zufrieden, wenn ein Hinweis erschien. Genau das hat
    * Henrik am 26.08.2026 als Punkt 10 gemeldet: der Knopf soll auf eine
@@ -195,6 +266,57 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Die Hoerprobe spielt wirklich', async () => {
     const ton = await page.$eval('#soundTon', (a) => ({ zeit: a.currentTime, pausiert: a.paused }));
     if (ton.pausiert || ton.zeit <= 0) throw new Error(JSON.stringify(ton));
+  });
+
+  /*
+   * Kasten 7.3: nur die gesungene Zeile, zu ihrem Einsatz aus Schema 63.
+   * Bei 11,2 s singt Golden Hour laut Einsaetzen die vierte Zeile ("the
+   * harbour holds its breath", Einsatz 11 s). Die alte gleichmaessige
+   * Verteilung (30 s / 8 Zeilen) stuende dort noch bei der dritten - die
+   * Pruefung unterscheidet also, ob die Einsaetze wirklich ankommen.
+   */
+  await pruefe('Die Einsaetze der Liedzeilen kommen aus der Datenbank (Schema 63)', async () => {
+    const id = await K.kennungNachText(page, 'data-sound', 'Golden Hour').catch(() => null);
+    const zeiten = await page.evaluate(async (kennung) => {
+      const r = await fetch('/api/explorer/sound/' + encodeURIComponent(kennung));
+      return (await r.json()).kopf?.zeiten || null;
+    }, id);
+    if (!Array.isArray(zeiten) || zeiten.length !== 8) throw new Error('zeiten: ' + JSON.stringify(zeiten) + ' - Schema 63 eingespielt?');
+  });
+
+  await pruefe('Bei 11,2 s steht genau die gesungene Zeile da', async () => {
+    await page.$eval('#soundTon', (a) => new Promise((ok) => {
+      a.addEventListener('seeked', ok, { once: true });
+      a.currentTime = 11.2;
+    }));
+    await page.waitForTimeout(200);
+    const jetzt = await page.$eval('#lyricsJetzt', (e) => e.textContent.trim());
+    if (jetzt !== 'the harbour holds its breath') throw new Error('es steht „' + jetzt + '"');
+    if (await page.$('#lyricsDanach')) throw new Error('die naechste Zeile steht noch darunter');
+  });
+
+  await pruefe('Ein Klick auf die Wellenform springt an die Stelle', async () => {
+    const r = await page.$eval('#welleBalken', (e) => {
+      const b = e.getBoundingClientRect();
+      return { x: b.left + b.width * 0.5, y: b.top + b.height / 2 };
+    });
+    await page.mouse.click(r.x, r.y);
+    await page.waitForTimeout(300);
+    const t = await page.$eval('#soundTon', (a) => a.currentTime);
+    if (t < 12 || t > 18) throw new Error('Stelle ' + t.toFixed(1) + ' s statt ~15 s');
+    const punkt = await page.$eval('#wellePunkt', (e) => parseFloat(e.style.left));
+    if (!(punkt > 40 && punkt < 60)) throw new Error('roter Punkt bei ' + punkt + ' %');
+  });
+
+  await pruefe('"Lyrics ansehen" zeigt den ganzen Text mit der gesungenen Zeile hervorgehoben', async () => {
+    await page.click('#lyricsAnsehen');
+    await page.waitForSelector('.lyricsseite', { timeout: 3000 });
+    const zeilen = await page.$$eval('.lyricsseite__zeile', (n) => n.length);
+    if (zeilen !== 8) throw new Error(zeilen + ' Zeilen statt 8');
+    const jetzt = await page.$$eval('.lyricsseite__zeile.is-jetzt', (n) => n.map((e) => e.textContent.trim()));
+    if (jetzt.length !== 1) throw new Error(jetzt.length + ' hervorgehobene Zeilen');
+    await page.click('.sheet [data-sheet-close]');
+    await page.waitForTimeout(400);
   });
 
   await pruefe('Noch einmal tippen haelt an', async () => {

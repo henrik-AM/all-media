@@ -1250,11 +1250,22 @@ export async function ladeHashtags(client: SupabaseClient): Promise<Hashtag[]> {
   return (data ?? []).map((h: any) => ({ tag: h.tag, posts: Number(h.beitraege) }));
 }
 
+const SOUND_SPALTEN = 'id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url';
+
 export async function ladeSounds(client: SupabaseClient): Promise<Sound[]> {
-  const { data, error } = await client
+  /*
+   * Schema 63 bringt `lyrics_zeiten` (wann welche Liedzeile gesungen wird).
+   * Ist es noch nicht eingespielt, kennt die Datenbank die Spalte nicht
+   * (42703) - dann ohne sie weiter, sonst stuende die ganze Sound-Liste leer
+   * da. Dieselbe Weiche in web/server/supabase-api.js.
+   */
+  let { data, error }: { data: any[] | null; error: any } = await client
     .from('sounds')
-    .select('id, title, artist, uses, dauer, lyrics, songwriter, cover_url, audio_url')
+    .select(`${SOUND_SPALTEN}, lyrics_zeiten`)
     .order('uses', { ascending: false });
+  if (error && error.code === '42703') {
+    ({ data, error } = await client.from('sounds').select(SOUND_SPALTEN).order('uses', { ascending: false }));
+  }
   if (error) throw error;
   return (data ?? []).map((s: any) => ({
     id: s.id,
@@ -1270,6 +1281,8 @@ export async function ladeSounds(client: SupabaseClient): Promise<Sound[]> {
     songwriter: s.songwriter ?? '',
     cover: s.cover_url ? `${SUPABASE_CONFIG.redirectUrl}${s.cover_url}` : undefined,
     audio: s.audio_url ? `${SUPABASE_CONFIG.redirectUrl}${s.audio_url}` : undefined,
+    // Schema 63: Sekunden je gesungener Zeile, sonst null.
+    lyricsZeiten: Array.isArray(s.lyrics_zeiten) ? s.lyrics_zeiten.map(Number) : null,
   }));
 }
 

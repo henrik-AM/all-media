@@ -266,9 +266,15 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (await page.$('.lyrics__zeile')) throw new Error('der ganze Liedtext steht noch da');
   });
 
-  await pruefe('Die nächste Zeile steht darunter', async () => {
-    const danach = await page.$eval('#lyricsDanach', (n) => n.textContent.trim());
-    if (!danach) throw new Error('keine nächste Zeile');
+  /*
+   * Bis zum 28.09.2026 hiess diese Pruefung "Die naechste Zeile steht
+   * darunter". Henrik wollte (Kasten 7.3) aber *nur* die gerade gesungene
+   * Zeile - die blasse Folgezeile war genau das, was er nicht wollte.
+   */
+  await pruefe('Nur die gesungene Zeile steht da, keine nächste', async () => {
+    if (await page.$('#lyricsDanach')) throw new Error('die nächste Zeile steht noch darunter');
+    const zeilen = await page.$$eval('.player .lyrics__jetzt', (n) => n.length);
+    if (zeilen !== 1) throw new Error(zeilen + ' Liedzeilen im Player');
   });
 
   await pruefe('Ein Instrumental sagt, dass es keinen Text gibt', async () => {

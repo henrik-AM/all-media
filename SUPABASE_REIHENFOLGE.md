@@ -84,6 +84,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "Standortanfrage beantworten" auf public.location_requests | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** || Bestand public.vorlage_chats | SUPABASE_SCHEMA_6_inhalte.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Bestand public.vorlage_eigene_beitraege | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_8_medien.sql → SUPABASE_SCHEMA_45_starter_medien.sql → SUPABASE_SCHEMA_56_querformat_kapitel.sql | **SUPABASE_SCHEMA_45_starter_medien.sql** (Medien), **SUPABASE_SCHEMA_56_querformat_kapitel.sql** (Laufzeit und Kapitel) |
 | Bestand public.vorlage_eigene_storys | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_8_medien.sql → SUPABASE_SCHEMA_45_starter_medien.sql | **SUPABASE_SCHEMA_45_starter_medien.sql** |
+| Bestand public.sounds (Test-Sounds: Liedtext, Songbild/Hörprobe, Einsätze) | SUPABASE_SCHEMA_6_inhalte.sql → SUPABASE_SCHEMA_54_songs.sql → SUPABASE_SCHEMA_63_liedzeiten.sql | **SUPABASE_SCHEMA_6_inhalte.sql** (Liedtext), **SUPABASE_SCHEMA_54_songs.sql** (Songwriter, Songbild, Hörprobe), **SUPABASE_SCHEMA_63_liedzeiten.sql** (`lyrics_zeiten`, eine Zahl je nicht-leerer Liedzeile — wer den Liedtext in Schema 6 ändert, muss die Einsätze in 63 nachziehen, sonst verteilt die Seite wieder gleichmäßig) |
 
 ## Nachtrag 20.09.2026: doppelt befüllte Tabellen
 

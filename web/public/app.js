@@ -10990,13 +10990,9 @@ function openOrtFotos(ort, fotos) {
   zeichnen([...fotos]);
 }
 
-/** "53.5413° N, 9.9891° O" in Zahlen - wie koordinatenLesen in der App. */
+/** "53.5413° N, 9.9891° O" in Zahlen - dieselbe Rechnung wie in der App (gemeinsam/naehe.js). */
 function koordinatenLesen(text) {
-  const t = String(text || '').match(/(-?\d+(?:\.\d+)?)\s*°?\s*([NS])?\s*,\s*(-?\d+(?:\.\d+)?)\s*°?\s*([OEW])?/i);
-  if (!t) return null;
-  const lat = Number(t[1]) * (/s/i.test(t[2] || '') ? -1 : 1);
-  const lng = Number(t[3]) * (/w/i.test(t[4] || '') ? -1 : 1);
-  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  return window.Naehe.koordinatenLesen(text);
 }
 
 /*
@@ -11006,37 +11002,137 @@ function koordinatenLesen(text) {
  * vollstaendig (`nur`). Die App macht es in ExplorerScreen genauso.
  */
 /**
- * Die grosse Karte zu einem Ort, mit allen Orten darauf. Ein Tipp auf einen
- * anderen Ort oeffnet dessen Seite.
+ * Die Kartenansicht eines Ortes — aufgebaut wie die Friend-Map (Prototyp
+ * "Messenger - Friend-Map"). Henrik am 21.09.2026 (Kasten 7.1): "Karte am
+ * Standort antippbar -> springt in Kartenansicht wie bei der Friend-Map."
+ *
+ * Bis zum 28.09.2026 war das eine nackte Karte auf Stufe 6, nur in der
+ * Standardansicht, und ein Klick auf eine fremde Nadel sprang sofort weiter.
+ * Jetzt: Ansichtswahl und Vollbild wie in der Friend-Map, darunter die Orte
+ * in der Naehe (gemeinsam/naehe.js, dieselbe Reihenfolge wie in der App).
+ * Klick auf Nadel oder Zeile zoomt dorthin; der Pfeil am Zeilenende oeffnet
+ * den Ort. Gegenstueck: OrtKarte in app/screens/videos/ExplorerScreen.tsx.
  */
 function openOrtKarte(kopf, hier) {
+  const naehe = window.Naehe.sortiert(hier, kopf.orte || [], kopf.id);
+  let stil = KARTEN_STILE[0];
+
+  const zeilen = naehe
+    .map((e) => {
+      const selbst = e.ort.id === kopf.id;
+      const unterzeile = [selbst ? 'Dieser Ort' : e.text, e.ort.adresse].filter(Boolean).join(' · ');
+      return `<li><div class="row ortzeile${selbst ? ' is-aktiv' : ''}" data-ortzeige="${esc(e.ort.id)}" role="button" tabindex="0"
+          aria-label="${esc(e.ort.name)} auf der Karte zeigen">
+        <span class="ortzeile__symbol${selbst ? ' ortzeile__symbol--hier' : ''}">${ICONS.mapPin}</span>
+        <div class="row__body">
+          <div class="row__name">${esc(e.ort.name)}</div>
+          <div class="row__bottom"><span class="row__preview">${esc(unterzeile)}</span></div>
+        </div>
+        ${selbst ? '' : `<button class="iconbtn" data-ortoeffnen="${esc(e.ort.id)}" aria-label="${esc(e.ort.name)} öffnen">${ICONS.chevron}</button>`}
+      </div></li>`;
+    })
+    .join('');
+
   openSheet(
-    'Standorte',
-    `<div class="ortkarte" id="ortKarte"></div>`,
+    kopf.titel,
+    `<div class="sheet__body ortkarte-blatt" id="ortKarteBlatt">
+       <div class="map ortkarte" id="ortKarteRahmen">
+         <div class="map__flaeche" id="ortKarte"></div>
+         <div class="map__ansicht" id="ortKarteAnsicht">${esc(stil.label)}</div>
+         <div class="map__werkzeuge">
+           <button class="map__werkzeug" data-ortvoll aria-label="Karte im Vollbild">${ICONS.ausklappen}</button>
+           <button class="map__werkzeug" data-ortstil aria-label="Kartenansicht wählen, gerade ${esc(stil.label)}">${ICONS.ebenen}</button>
+           <div class="map__stile" id="ortStile" hidden>
+             ${KARTEN_STILE.map(
+               (s) => `<button class="map__stil${s.key === stil.key ? ' is-an' : ''}" data-ortstilwahl="${s.key}">
+                 <span>${esc(s.label)}</span>${ICONS.check}
+               </button>`
+             ).join('')}
+           </div>
+         </div>
+       </div>
+       <div class="ortkarte__liste">
+         <div class="listhead">Orte in der Nähe</div>
+         <ul class="rows" id="ortListe">${zeilen}</ul>
+       </div>
+     </div>`,
     (blatt, zu) => {
-      const stil = KARTEN_STILE[0];
-      const karte = L.map(blatt.querySelector('#ortKarte'), { zoomControl: true, zoomSnap: 0 }).setView([hier.lat, hier.lng], 6);
-      L.tileLayer(stil.url, { attribution: stil.quelle, maxZoom: stil.maxZoom }).addTo(karte);
-      (kopf.orte || []).forEach((o) => {
-        const k = koordinatenLesen(o.koordinaten);
-        if (!k) return;
-        const aktiv = o.id === kopf.id;
-        L.circleMarker([k.lat, k.lng], {
+      const karte = L.map(blatt.querySelector('#ortKarte'), { zoomControl: true, zoomSnap: 0 }).setView([hier.lat, hier.lng], 13);
+      let kacheln = L.tileLayer(stil.url, { attribution: stil.quelle, maxZoom: stil.maxZoom }).addTo(karte);
+
+      const zeigen = (id, hochScrollen) => {
+        const e = naehe.find((x) => x.ort.id === id);
+        if (!e) return;
+        karte.setView([e.lat, e.lng], 16, { animate: true });
+        blatt.querySelectorAll('[data-ortzeige]').forEach((z) => z.classList.toggle('is-aktiv', z.dataset.ortzeige === id));
+        if (hochScrollen) blatt.querySelector('#ortKarteRahmen').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+
+      naehe.forEach((e) => {
+        const aktiv = e.ort.id === kopf.id;
+        L.circleMarker([e.lat, e.lng], {
           radius: aktiv ? 12 : 8, fillColor: aktiv ? '#ff3b30' : '#007AFF', color: '#fff', weight: 2.5, fillOpacity: 1,
           className: `map__pin${aktiv ? ' is-aktiv' : ''}`,
         })
-          .bindTooltip(esc(o.name))
-          .on('click', () => {
-            if (aktiv) return;
-            zu();
-            openExplorer('standort', o.id);
-          })
+          .bindTooltip(esc(e.ort.name))
+          .on('click', () => zeigen(e.ort.id, false))
           .addTo(karte);
       });
+
+      // Ansichtswahl wie in der Friend-Map: die Kachelschicht wird getauscht,
+      // der Ausschnitt bleibt stehen.
+      const stilFenster = blatt.querySelector('#ortStile');
+      const stilKnopf = blatt.querySelector('[data-ortstil]');
+      stilKnopf.addEventListener('click', () => {
+        stilFenster.hidden = !stilFenster.hidden;
+        stilKnopf.classList.toggle('is-an', !stilFenster.hidden);
+      });
+      blatt.querySelectorAll('[data-ortstilwahl]').forEach((b) =>
+        b.addEventListener('click', () => {
+          stil = KARTEN_STILE.find((s) => s.key === b.dataset.ortstilwahl) || KARTEN_STILE[0];
+          karte.removeLayer(kacheln);
+          kacheln = L.tileLayer(stil.url, { attribution: stil.quelle, maxZoom: stil.maxZoom }).addTo(karte);
+          blatt.querySelectorAll('[data-ortstilwahl]').forEach((x) => x.classList.toggle('is-an', x === b));
+          blatt.querySelector('#ortKarteAnsicht').textContent = stil.label;
+          stilKnopf.setAttribute('aria-label', `Kartenansicht wählen, gerade ${stil.label}`);
+          blatt.querySelector('#ortKarteRahmen').className = `map ortkarte map--${stil.key}`;
+          stilFenster.hidden = true;
+          stilKnopf.classList.remove('is-an');
+        })
+      );
+
+      // Vollbild: die Liste tritt zurueck, die Karte nimmt den Platz.
+      const vollKnopf = blatt.querySelector('[data-ortvoll]');
+      vollKnopf.addEventListener('click', () => {
+        const voll = blatt.querySelector('#ortKarteBlatt').classList.toggle('ortkarte-blatt--voll');
+        vollKnopf.innerHTML = voll ? ICONS.einklappen : ICONS.ausklappen;
+        vollKnopf.setAttribute('aria-label', voll ? 'Vollbild verlassen' : 'Karte im Vollbild');
+        setTimeout(() => karte.invalidateSize(), 50);
+      });
+
+      blatt.querySelectorAll('[data-ortzeige]').forEach((z) => {
+        z.addEventListener('click', (ev) => {
+          if (ev.target.closest('[data-ortoeffnen]')) return;
+          zeigen(z.dataset.ortzeige, true);
+        });
+        z.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            zeigen(z.dataset.ortzeige, true);
+          }
+        });
+      });
+      blatt.querySelectorAll('[data-ortoeffnen]').forEach((b) =>
+        b.addEventListener('click', () => {
+          zu();
+          openExplorer('standort', b.dataset.ortoeffnen);
+        })
+      );
+
       // Das Blatt faehrt erst ein - danach die Groesse neu messen.
       setTimeout(() => karte.invalidateSize(), 300);
     },
-    { schliessen: true }
+    { schliessen: true, hoch: true }
   );
 }
 
@@ -11100,6 +11196,15 @@ async function openExplorer(art, wert, nur = null) {
         .join('')}</div>`
     : '';
 
+  // Standort: welche Seiten das Karussell hat (Prototyp "B. Standortbilder").
+  const ortHier = kopf.art === 'standort' ? koordinatenLesen(kopf.koordinaten) : null;
+  const ortFoto = kopf.art === 'standort'
+    ? (daten.beitraege || [])
+        .map((p) => (istVideoAdresse(p.mediaUrl) ? p.thumbnail : p.mediaUrl || p.thumbnail))
+        .find((a) => a && !istVideoAdresse(a))
+    : null;
+  const ortSeiten = [...(ortHier ? ['weit', 'nah'] : []), ...(ortFoto ? ['foto'] : [])];
+
   const kopfHtml = {
     hashtag: () => `<div class="exp__titel">${esc(kopf.titel)}</div>
       <div class="exp__zahl">${compactNumber(kopf.anzahl)} Beiträge</div>`,
@@ -11115,29 +11220,52 @@ async function openExplorer(art, wert, nur = null) {
           mit Sprung in eine Kartenansicht - wie bei der Friend-Map." Vorher
           ein gezeichnetes Raster mit einer Nadel an einer Prozentstelle.
         */ ''}
-      ${koordinatenLesen(kopf.koordinaten)
-        ? `<div class="minikarte minikarte--echt">
-             <div class="minikarte__flaeche" id="expKarte"></div>
-             <button class="minikarte__voll" id="expKarteVoll" aria-label="Karte groß anzeigen">${ICONS.ausklappen}</button>
+      ${/*
+          Kasten 7.1 (28.09.2026): das Karussell "B. Standortbilder" aus dem
+          Prototyp - Satellit weit, Satellit nah, ein Foto vom Ort, mit
+          Pfeilen und Punkten. Die Karte ist als Ganzes anklickbar und
+          oeffnet die Kartenansicht; vorher reagierte nur der kleine Knopf.
+        */ ''}
+      ${ortSeiten.length
+        ? `<div class="ortkarussell" id="ortKarussell">
+             <div class="minikarte minikarte--echt minikarte--knopf" id="expKarteRahmen" role="button" tabindex="0" aria-label="Karte öffnen">
+               <div class="minikarte__flaeche" id="expKarte"></div>
+               <button class="minikarte__voll" id="expKarteVoll" aria-label="Karte groß anzeigen">${ICONS.ausklappen}</button>
+             </div>
+             ${ortFoto ? `<button class="ortkarussell__foto" id="expOrtFoto" hidden aria-label="Fotos von ${esc(kopf.titel)}"><img src="${esc(ortFoto)}" alt=""></button>` : ''}
+             ${ortSeiten.length > 1
+               ? `<button class="ortkarussell__pfeil ortkarussell__pfeil--links" id="expOrtZurueck" aria-label="Vorheriges Standortbild">${ICONS.back}</button>
+                  <button class="ortkarussell__pfeil ortkarussell__pfeil--rechts" id="expOrtWeiter" aria-label="Nächstes Standortbild">${ICONS.chevron}</button>
+                  <div class="ortkarussell__punkte">${ortSeiten.map((_, i) => `<i class="${i === 0 ? 'is-an' : ''}"></i>`).join('')}</div>`
+               : ''}
            </div>`
         : ''}
       <button class="exp__link" id="expFotos">Alle Fotos ansehen →</button>`,
 
-    sound: () => `<div class="soundcover">${
-        kopf.cover ? `<img src="${esc(kopf.cover)}" alt="Songbild ${esc(kopf.titel)}">` : ICONS.music
-      }</div>
+    sound: () => `<div class="soundcover-rahmen">
+        ${/* Prototyp "VSSo + Sound": hinter dem Songbild schaut rechts eine Schallplatte heraus. */ ''}
+        <span class="soundplatte" aria-hidden="true"></span>
+        <div class="soundcover">${
+          kopf.cover ? `<img src="${esc(kopf.cover)}" alt="Songbild ${esc(kopf.titel)}">` : ICONS.music
+        }</div>
+      </div>
       <div class="exp__titel exp__titel--mitte">${esc(kopf.titel)}</div>
       <div class="exp__interpret">${esc(kopf.produzent)}</div>
       ${kopf.songwriter ? `<div class="exp__zahl exp__zahl--mitte">Songwriter: ${esc(kopf.songwriter)}</div>` : ''}
       <div class="exp__zahl exp__zahl--mitte">${compactNumber(kopf.anzahl)} Beiträge</div>
       ${kopf.audio ? `<audio id="soundTon" src="${esc(kopf.audio)}" preload="metadata"></audio>` : ''}
+      <div class="player">
       <div class="welle">
-        <button class="welle__play" id="soundPlay" aria-label="Abspielen">${ICONS.play}</button>
-        <div class="welle__balken" id="welleBalken">
+        <button class="welle__play" id="soundPlay" aria-label="${kopf.audio ? 'Abspielen' : 'Keine Hörprobe'}" ${kopf.audio ? '' : 'disabled'}>${ICONS.play}</button>
+        ${/* Die Form ist gezeichnet, nicht aus dem Ton gerechnet - eine echte
+             Wellenform braeuchte die Audiodaten. Klick springt an die Stelle. */ ''}
+        <div class="welle__balken" id="welleBalken" role="slider" aria-label="Stelle im Song wählen" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           ${Array.from({ length: 44 }, (_, i) => `<i style="height:${20 + Math.round(60 * Math.abs(Math.sin(i * 1.1)))}%"></i>`).join('')}
+          ${kopf.audio ? '<span class="welle__punkt" id="wellePunkt"></span>' : ''}
         </div>
-        <span class="welle__zeit" id="welleZeit">0:00 / ${esc(kopf.dauer)}</span>
+        <span class="welle__zeit" id="welleZeit">${kopf.audio ? '0:00 / 0:30' : esc(kopf.dauer || '')}</span>
       </div>
+      ${kopf.audio ? '<div class="player__hinweis" id="soundHinweis" hidden></div>' : '<div class="player__hinweis">Keine Hörprobe vorhanden.</div>'}
       ${/*
           Punkt 11: der Liedtext. Prototyp-Frame "VSSo + Sound + Lyrics" -
           Songname, Produzent/in, Trennlinie, darunter der Text ueber die
@@ -11149,18 +11277,22 @@ async function openExplorer(art, wert, nur = null) {
           leerer Absatz im Text.
         */ ''}
       ${/*
-          Henrik am 21.09.2026: nur die Zeile, die gerade gesungen wird. Die
-          naechste steht blass darunter. Gefuellt wird beides beim Abspielen.
+          Henrik am 21.09.2026 (Kasten 7.3): nur die Zeile, die gerade
+          gesungen wird. Bis zum 28.09.2026 stand die naechste blass darunter,
+          und die Zeilen waren gleichmaessig ueber die Hoerprobe verteilt.
+          Jetzt nur die eine, zu ihrem Einsatz aus Schema 63
+          (gemeinsam/liedtext.js). Prototyp: im Player-Kasten links die
+          Zeile, rechts "Lyrics ansehen ->".
         */ ''}
       ${
         kopf.lyrics?.some((z) => z.trim())
           ? `<div class="lyrics lyrics--jetzt">
-               <div class="lyrics__kopf">Liedtext</div>
                <div class="lyrics__jetzt" id="lyricsJetzt" aria-live="polite"></div>
-               <div class="lyrics__danach" id="lyricsDanach"></div>
+               <button class="lyrics__link" id="lyricsAnsehen">Lyrics ansehen →</button>
              </div>`
           : `<div class="lyrics lyrics--ohne">Zu diesem Sound gibt es keinen Liedtext.</div>`
-      }`,
+      }
+      </div>`,
   }[kopf.art]();
 
   overlay.hidden = false;
@@ -11195,17 +11327,59 @@ async function openExplorer(art, wert, nur = null) {
     b.addEventListener('click', () => openExplorer(art, wert, b.dataset.expnur))
   );
 
-  // Die Karte am Ort - dieselben Kacheln wie die Friend-Map.
-  const hier = koordinatenLesen(kopf.koordinaten);
+  /*
+   * Das Karussell am Ort: Satellit weit (Stufe 5), Satellit nah (Stufe 15),
+   * Foto. Die Karte ist eine Vorschau - kein Ziehen, kein Zoomen; ein Klick
+   * irgendwo darauf oeffnet die Kartenansicht. Gegenstueck: StandortKopf in
+   * app/screens/videos/ExplorerScreen.tsx.
+   */
+  const hier = ortHier;
   const kartenFlaeche = overlay.querySelector('#expKarte');
+  const kartenRahmen = overlay.querySelector('#expKarteRahmen');
   if (hier && kartenFlaeche && window.L) {
-    const stil = KARTEN_STILE[0];
-    const karte = L.map(kartenFlaeche, { zoomControl: false, attributionControl: false }).setView([hier.lat, hier.lng], 14);
+    const stil = KARTEN_STILE.find((s) => s.key === 'satellit') || KARTEN_STILE[0];
+    const karte = L.map(kartenFlaeche, {
+      zoomControl: false, attributionControl: false,
+      dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false,
+    }).setView([hier.lat, hier.lng], 5);
     L.tileLayer(stil.url, { maxZoom: stil.maxZoom }).addTo(karte);
     L.circleMarker([hier.lat, hier.lng], {
       radius: 10, fillColor: '#ff3b30', color: '#fff', weight: 2.5, fillOpacity: 1, className: 'map__pin is-aktiv',
+      interactive: false,
     }).addTo(karte);
-    overlay.querySelector('#expKarteVoll')?.addEventListener('click', () => openOrtKarte(kopf, hier));
+    const aufmachen = () => openOrtKarte(kopf, hier);
+    kartenRahmen.addEventListener('click', aufmachen);
+    kartenRahmen.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        aufmachen();
+      }
+    });
+
+    let seite = 0;
+    const foto = overlay.querySelector('#expOrtFoto');
+    const zeigeSeite = (n) => {
+      seite = (n + ortSeiten.length) % ortSeiten.length;
+      const art = ortSeiten[seite];
+      kartenRahmen.hidden = art === 'foto';
+      if (foto) foto.hidden = art !== 'foto';
+      if (art !== 'foto') {
+        karte.invalidateSize();
+        karte.setView([hier.lat, hier.lng], art === 'weit' ? 5 : 15, { animate: false });
+      }
+      overlay.querySelectorAll('.ortkarussell__punkte i').forEach((p, i) => p.classList.toggle('is-an', i === seite));
+    };
+    overlay.querySelector('#expOrtZurueck')?.addEventListener('click', () => zeigeSeite(seite - 1));
+    overlay.querySelector('#expOrtWeiter')?.addEventListener('click', () => zeigeSeite(seite + 1));
+    foto?.addEventListener('click', () => openOrtFotos(kopf, beitraege));
+  } else if (ortFoto) {
+    // Ohne lesbare Koordinaten bleibt nur das Foto.
+    const foto = overlay.querySelector('#expOrtFoto');
+    if (kartenRahmen) kartenRahmen.hidden = true;
+    if (foto) {
+      foto.hidden = false;
+      foto.addEventListener('click', () => openOrtFotos(kopf, beitraege));
+    }
   }
 
   /*
@@ -11220,64 +11394,142 @@ async function openExplorer(art, wert, nur = null) {
   overlay.querySelector('#expFotos')?.addEventListener('click', () => openOrtFotos(kopf, beitraege));
 
   /*
-   * Wellenform und Liedzeile laufen mit, solange abgespielt wird. Mit
-   * Hoerprobe (Schema 54) gibt das <audio> den Takt vor, sonst wie bisher
-   * eine Uhr. Die Zeilen verteilen sich gleichmaessig ueber die Laenge -
-   * Zeitstempel je Zeile gibt es im Liedtext nicht.
+   * Kasten 7.2/7.3 (28.09.2026). Das <audio> gibt den Takt vor - die
+   * Hoerprobe aus Schema 54. Ohne Hoerprobe lief bis dahin eine Uhr, als
+   * spiele etwas; jetzt ist der Knopf dann aus und sagt, warum. Welche
+   * Liedzeile dran ist, rechnet gemeinsam/liedtext.js aus den Einsaetzen
+   * (Schema 63, `kopf.zeiten`) - dieselbe Rechnung wie in der App.
    */
   const play = overlay.querySelector('#soundPlay');
-  if (play) {
-    const [min, sek] = String(kopf.dauer).split(':').map(Number);
-    const dauer = min * 60 + sek || 180;
-    const zeilen = (kopf.lyrics || []).filter((z) => z.trim());
-    let bei = 0;
-    let uhr = null;
-    const zeit = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+  if (play && soundTon) {
+    const zeit = (x) => {
+      const t = Math.max(0, Math.floor(Number.isFinite(x) ? x : 0));
+      return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+    };
+    const gesamt = () => (soundTon.duration > 0 && Number.isFinite(soundTon.duration) ? soundTon.duration : 30);
+    const hinweis = overlay.querySelector('#soundHinweis');
+    let lyricsSeite = null;
 
     const zeichnen = () => {
-      const gesamt = soundTon && soundTon.duration > 0 ? soundTon.duration : dauer;
-      const jetzt = soundTon ? soundTon.currentTime : bei;
       const zeitFeld = overlay.querySelector('#welleZeit');
       if (!zeitFeld) return;
-      zeitFeld.textContent = `${zeit(jetzt)} / ${soundTon ? zeit(gesamt) : kopf.dauer}`;
+      const jetzt = soundTon.currentTime;
+      const g = gesamt();
+      const anteil = Math.max(0, Math.min(1, jetzt / g));
+      zeitFeld.textContent = `${zeit(jetzt)} / ${zeit(g)}`;
       const balken = overlay.querySelectorAll('#welleBalken i');
-      const bis = Math.round((jetzt / gesamt) * balken.length);
+      const bis = Math.round(anteil * balken.length);
       balken.forEach((b, i) => b.classList.toggle('is-gespielt', i < bis));
-      if (zeilen.length) {
-        const nr = Math.min(zeilen.length - 1, Math.floor((jetzt / gesamt) * zeilen.length));
-        overlay.querySelector('#lyricsJetzt').textContent = zeilen[nr];
-        overlay.querySelector('#lyricsDanach').textContent = zeilen[nr + 1] || '';
-      }
+      const punkt = overlay.querySelector('#wellePunkt');
+      if (punkt) punkt.style.left = `${anteil * 100}%`;
+      overlay.querySelector('#welleBalken')?.setAttribute('aria-valuenow', String(Math.round(anteil * 100)));
+      const stand = window.Liedtext.stand(kopf.lyrics, kopf.zeiten, jetzt, g);
+      const zeile = overlay.querySelector('#lyricsJetzt');
+      // Im Vorspiel singt noch niemand: eine Note statt einer Zeile, die erst kommt.
+      if (zeile) zeile.textContent = stand.anzahl ? stand.jetzt || '♪' : '';
+      lyricsSeite?.(stand.nr, jetzt, g);
     };
     zeichnen();
 
-    if (soundTon) {
-      soundTon.addEventListener('timeupdate', zeichnen);
-      soundTon.addEventListener('loadedmetadata', zeichnen);
-      soundTon.addEventListener('play', () => (play.innerHTML = ICONS.pause));
-      soundTon.addEventListener('pause', () => (play.innerHTML = ICONS.play));
-      soundTon.addEventListener('ended', () => (play.innerHTML = ICONS.play));
-      play.addEventListener('click', () => {
-        if (!soundTon.paused) return soundTon.pause();
-        if (soundTon.ended) soundTon.currentTime = 0;
-        soundTon.play().catch(() => toast('Abspielen ging nicht'));
+    const knopfSetzen = () => {
+      const an = !soundTon.paused && !soundTon.ended;
+      document.querySelectorAll('#soundPlay, #lyricsPlay').forEach((k) => {
+        k.innerHTML = an ? ICONS.pause : ICONS.play;
+        k.setAttribute('aria-label', an ? 'Pause' : 'Abspielen');
       });
-    } else {
-      play.addEventListener('click', () => {
-        if (uhr) {
-          clearInterval(uhr);
-          uhr = null;
-          play.innerHTML = ICONS.play;
-          return;
+    };
+    soundTon.addEventListener('timeupdate', zeichnen);
+    soundTon.addEventListener('loadedmetadata', zeichnen);
+    soundTon.addEventListener('seeked', zeichnen);
+    ['play', 'pause', 'ended'].forEach((n) => soundTon.addEventListener(n, knopfSetzen));
+    soundTon.addEventListener('canplay', () => {
+      if (hinweis) hinweis.hidden = true;
+    });
+    soundTon.addEventListener('error', () => {
+      if (!hinweis) return;
+      hinweis.textContent = 'Die Hörprobe ist gerade nicht erreichbar.';
+      hinweis.hidden = false;
+    });
+
+    const umschalten = () => {
+      if (!soundTon.paused) return soundTon.pause();
+      if (soundTon.ended) soundTon.currentTime = 0;
+      soundTon.play().catch(() => {
+        if (hinweis) {
+          hinweis.textContent = 'Abspielen ging nicht – die Hörprobe lädt nicht.';
+          hinweis.hidden = false;
         }
-        play.innerHTML = ICONS.pause;
-        uhr = setInterval(() => {
-          if (!overlay.querySelector('#welleZeit')) return clearInterval(uhr);
-          bei = (bei + 1) % (dauer + 1);
-          zeichnen();
-        }, 1000);
+        toast('Abspielen ging nicht');
       });
-    }
+    };
+    play.addEventListener('click', umschalten);
+
+    // Klick auf die Wellenform springt an die Stelle (Prototyp: roter Punkt).
+    overlay.querySelector('#welleBalken')?.addEventListener('click', (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      if (!r.width) return;
+      soundTon.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * gesamt();
+      zeichnen();
+    });
+
+    /*
+     * Prototyp-Frame "VSSo + Sound + Lyrics": der ganze Text, die gesungene
+     * Zeile hervorgehoben und mitgescrollt, unten der Player.
+     */
+    overlay.querySelector('#lyricsAnsehen')?.addEventListener('click', () => {
+      const eintraege = window.Liedtext.eintraege(kopf.lyrics);
+      openSheet(
+        kopf.titel,
+        `<div class="sheet__body lyricsseite">
+           <div class="lyricsseite__wer">${esc(kopf.produzent || '')}</div>
+           <div class="lyricsseite__text" id="lyricsVoll">
+             ${eintraege
+               .map((e) =>
+                 e.nr < 0
+                   ? '<div class="lyrics__luecke"></div>'
+                   : `<div class="lyricsseite__zeile" data-liednr="${e.nr}">${esc(e.text)}</div>`
+               )
+               .join('')}
+           </div>
+           <div class="lyricsseite__player">
+             <button class="welle__play" id="lyricsPlay" aria-label="Abspielen">${ICONS.play}</button>
+             <div class="lyricsseite__fortschritt"><i id="lyricsFortschritt"></i></div>
+             <span class="welle__zeit" id="lyricsZeit">0:00</span>
+           </div>
+         </div>`,
+        (blatt) => {
+          let zuletzt = null;
+          lyricsSeite = (nr, jetzt, g) => {
+            if (!blatt.isConnected) return (lyricsSeite = null);
+            blatt.querySelector('#lyricsZeit').textContent = zeit(jetzt);
+            blatt.querySelector('#lyricsFortschritt').style.width = `${Math.min(100, (jetzt / g) * 100)}%`;
+            if (nr === zuletzt) return;
+            zuletzt = nr;
+            blatt.querySelectorAll('[data-liednr]').forEach((z) => z.classList.toggle('is-jetzt', Number(z.dataset.liednr) === nr));
+            blatt.querySelector(`[data-liednr="${nr}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          };
+          blatt.querySelector('#lyricsPlay').addEventListener('click', umschalten);
+          knopfSetzen();
+          zeichnen();
+        },
+        { schliessen: true, hoch: true, beimSchliessen: () => (lyricsSeite = null) }
+      );
+    });
+  } else if (play) {
+    // Ohne Hoerprobe: nur die erste Zeile, Knopf aus (siehe oben).
+    const zeile = overlay.querySelector('#lyricsJetzt');
+    const stand = window.Liedtext.stand(kopf.lyrics, kopf.zeiten, 0, 30);
+    if (zeile) zeile.textContent = stand.jetzt || '♪';
+    overlay.querySelector('#lyricsAnsehen')?.addEventListener('click', () => {
+      openSheet(
+        kopf.titel,
+        `<div class="sheet__body lyricsseite"><div class="lyricsseite__text">${window.Liedtext.eintraege(kopf.lyrics)
+          .map((e) => (e.nr < 0 ? '<div class="lyrics__luecke"></div>' : `<div class="lyricsseite__zeile">${esc(e.text)}</div>`))
+          .join('')}</div></div>`,
+        null,
+        { schliessen: true, hoch: true }
+      );
+    });
   }
 
   overlay.querySelectorAll('[data-openpost]').forEach((b) =>

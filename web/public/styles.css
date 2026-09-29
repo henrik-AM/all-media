@@ -4346,3 +4346,85 @@ body.ist-abgemeldet .ptr-indicator {
 .lyrics--jetzt .lyrics__kopf { text-align: left; }
 .lyrics__jetzt { font-size: 20px; line-height: 1.4; font-weight: 700; color: var(--text); min-height: 1.4em; }
 .lyrics__danach { margin-top: 6px; font-size: 16px; line-height: 1.5; color: var(--text-3); min-height: 1.5em; }
+
+/* ==========================================================================
+   Kasten 7 (Feedback 21.09., gebaut 28.09.2026): Standort und Sound.
+   Gegenstueck: StandortKopf, OrtKarte, SoundKopf, LyricsSeite in
+   app/screens/videos/ExplorerScreen.tsx.
+   ========================================================================== */
+
+/* 7.1 Karussell "B. Standortbilder": Satellit weit, Satellit nah, Foto. */
+.ortkarussell { position: relative; margin-top: 12px; }
+.ortkarussell .minikarte { margin-top: 0; height: 190px; }
+.minikarte--knopf { cursor: pointer; }
+.minikarte--knopf .leaflet-container { cursor: pointer; }
+.ortkarussell__foto { display: block; width: 100%; height: 190px; padding: 0; border: 0; border-radius: 14px; overflow: hidden; cursor: pointer; }
+.ortkarussell__foto[hidden], .minikarte[hidden] { display: none; }
+.ortkarussell__foto img { width: 100%; height: 100%; object-fit: cover; }
+.ortkarussell__pfeil {
+  position: absolute; top: calc(95px - 16px); z-index: 600;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.9); color: #1a1d21; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.ortkarussell__pfeil svg { width: 18px; height: 18px; }
+.ortkarussell__pfeil--links { left: 8px; }
+.ortkarussell__pfeil--rechts { right: 8px; }
+.ortkarussell__punkte { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+.ortkarussell__punkte i { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+.ortkarussell__punkte i.is-an { background: var(--text); }
+
+/* 7.1 Kartenansicht eines Ortes - aufgebaut wie die Friend-Map. */
+.ortkarte-blatt .map.ortkarte { height: 45vh; margin: 0 16px 8px; border-radius: 18px; }
+.ortkarte-blatt--voll { display: flex; flex-direction: column; overflow: hidden; }
+.ortkarte-blatt--voll .map.ortkarte { flex: 1 1 auto; height: auto; }
+.ortkarte-blatt--voll .ortkarte__liste { display: none; }
+.ortkarte .map__stil:not(.is-an) svg { visibility: hidden; }
+.ortkarte .map__stile[hidden] { display: none; }
+.ortzeile { cursor: pointer; }
+.ortzeile__symbol {
+  flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--brand-soft); color: var(--brand);
+}
+.ortzeile__symbol svg { width: 20px; height: 20px; }
+.ortzeile__symbol--hier { background: #ff3b30; color: #fff; }
+
+/* 7.4 Prototyp "VSSo + Sound": Schallplatte schaut rechts hinter dem Songbild heraus. */
+.soundcover-rahmen { position: relative; width: 192px; height: 148px; margin: 0 auto; }
+.soundcover-rahmen .soundcover { position: relative; margin: 0; z-index: 1; }
+.soundplatte {
+  position: absolute; right: 0; top: 6px; width: 136px; height: 136px; border-radius: 50%;
+  background:
+    radial-gradient(circle, #c0392b 0 17px, transparent 18px),
+    repeating-radial-gradient(circle, #15171a 0 3px, #1f2226 3px 4px);
+}
+
+/* 7.2/7.3 Player-Kasten: Play, Wellenform mit rotem Punkt, darunter die Zeile. */
+.player { margin-top: 14px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.player .welle { margin-top: 0; padding: 0; background: none; }
+.welle__play:disabled { opacity: .4; cursor: default; }
+.welle__balken { position: relative; cursor: pointer; }
+.welle__punkt {
+  position: absolute; top: 50%; left: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: 50%; background: #ff3b30; pointer-events: none;
+}
+.player__hinweis { margin-top: 6px; font-size: 12.5px; color: var(--text-3); }
+.player__hinweis[hidden] { display: none; }
+.player .lyrics { margin-top: 10px; padding-top: 10px; }
+.player .lyrics--jetzt { display: flex; align-items: center; gap: 12px; text-align: left; }
+.player .lyrics__jetzt { flex: 1 1 auto; font-size: 16px; line-height: 1.4; min-height: 1.4em; }
+.lyrics__link { flex: 0 0 auto; font-size: 13px; font-weight: 600; color: var(--brand); }
+
+/* Seite "Lyrics ansehen" (Prototyp "VSSo + Sound + Lyrics"). */
+.lyricsseite { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.lyricsseite__wer { padding: 0 16px 8px; font-size: 14px; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.lyricsseite__text { flex: 1 1 auto; overflow-y: auto; padding: 16px; }
+.lyricsseite__zeile { font-size: 18px; line-height: 1.6; color: var(--text-3); transition: color .2s; }
+.lyricsseite__zeile.is-jetzt { font-weight: 700; color: var(--text); }
+.lyricsseite__player {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border); background: var(--surface-2);
+}
+.lyricsseite__fortschritt { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.lyricsseite__fortschritt i { display: block; height: 100%; width: 0; background: #ff3b30; }

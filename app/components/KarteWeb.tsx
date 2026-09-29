@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { WebView as WebViewRoh } from 'react-native-webview';
@@ -83,6 +83,26 @@ interface Props {
    * Einstellungsbildschirm, Schalter `messenger/friendmap#karte:stile`.
    */
   pruefStilOffen?: boolean;
+  /**
+   * Wo die Karte beim Aufbau steht. Ohne Angabe wie bisher Mitteleuropa
+   * (51.5/10, Stufe 4) — fuer die Friend-Map richtig, fuer einen einzelnen
+   * Ort nicht: die Standortkarte im Explorer zeigte bis zum 28.09.2026 bei
+   * jedem Ort ganz Deutschland, der Ort selbst war ein Punkt irgendwo darin.
+   */
+  start?: { lat: number; lng: number; zoom: number } | null;
+  /** Mit welcher Kartenansicht die Karte beginnt (Index in KARTEN_STILE). */
+  stilStart?: number;
+  /**
+   * Vorschau: die Karte ist nur ein Bild. Ziehen und Zoomen sind aus, die
+   * Werkzeuge fehlen, und ein Tipp irgendwo auf die Flaeche ruft
+   * `onKarteTippen`. Henrik, 21.09.2026 (Kasten 7.1): "Karte am Standort
+   * antippbar -> springt in Kartenansicht wie bei der Friend-Map." Vorher
+   * reagierte nur der kleine Vollbild-Knopf in der Ecke.
+   */
+  vorschau?: boolean;
+  onKarteTippen?: () => void;
+  /** Beschriftung der Vorschau fuer VoiceOver und `mac:tippen`. */
+  vorschauLabel?: string;
 }
 
 /*
@@ -120,7 +140,13 @@ const alsDaten = (wert: unknown): string =>
     m === '\u2028' ? '\\u2028' : '\\u2029'
   );
 
-const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
+const makeHtmlMap = (
+  pins: Pin[],
+  aktivId: string | null | undefined,
+  stilIndex: number,
+  start: { lat: number; lng: number; zoom: number } | null | undefined,
+  vorschau: boolean
+) => {
   const pinDaten = alsDaten(
     pins.map(p => ({
       id: String(p.id ?? ''),
@@ -130,7 +156,16 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
       farbe: farbePruefen(p.farbe),
     }))
   );
-  const stil = KARTEN_STILE[0];
+  /*
+   * Die gewaehlte Ansicht, nicht immer die erste. Bis zum 28.09.2026 stand
+   * hier KARTEN_STILE[0]: sobald die Karte neu aufgebaut wurde (ein anderer
+   * Pin wurde aktiv), kamen die Standard-Kacheln zurueck, waehrend das
+   * Schild oben links weiter "Satellit" sagte.
+   */
+  const stil = KARTEN_STILE[stilIndex] ?? KARTEN_STILE[0];
+  const mitte = start && Number.isFinite(start.lat) && Number.isFinite(start.lng)
+    ? { lat: Number(start.lat), lng: Number(start.lng), zoom: Number(start.zoom) || 12 }
+    : { lat: 51.5, lng: 10, zoom: 4 };
 
   return `
 <!DOCTYPE html>
@@ -192,13 +227,22 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
      * ruckelt dann in Spruengen statt der Bewegung zu folgen, und es sieht
      * aus, als reagiere sie nicht.
      */
+    const vorschau = ${vorschau ? 'true' : 'false'};
     const map = L.map('map', {
       zoomControl: false,
-      touchZoom: true,
+      touchZoom: !vorschau,
+      dragging: !vorschau,
+      doubleClickZoom: !vorschau,
+      scrollWheelZoom: !vorschau,
+      boxZoom: !vorschau,
+      keyboard: !vorschau,
       bounceAtZoomLimits: false,
       zoomSnap: 0,
       zoomDelta: 0.6,
-    }).setView([51.5, 10], 4);
+    }).setView([${mitte.lat}, ${mitte.lng}], ${mitte.zoom});
+    window.startAnsicht = function () {
+      map.setView([${mitte.lat}, ${mitte.lng}], ${mitte.zoom}, { animate: true });
+    };
 
     // Die Kachelschicht wird beim Umschalten der Ansicht ausgetauscht, statt
     // die Seite neu zu laden - sonst springt der Ausschnitt jedes Mal zurueck.
@@ -315,9 +359,20 @@ const makeHtmlMap = (pins: Pin[], aktivId?: string | null) => {
 };
 
 export const KarteWeb = forwardRef<KartenSteuerung, Props>(
-  ({ pins, aktiv, onPinPress, hoehe = 320, vollbild, onVollbild, eigenerStandort, pruefStilOffen }, ref) => {
+  (
+    {
+      pins, aktiv, onPinPress, hoehe = 320, vollbild, onVollbild, eigenerStandort, pruefStilOffen,
+      start, stilStart = 0, vorschau = false, onKarteTippen, vorschauLabel,
+    },
+    ref
+  ) => {
     const webViewRef = useRef<WebViewRoh>(null);
-    const [stilIndex, setStilIndex] = useState(0);
+    const [stilIndex, setStilIndex] = useState(stilStart);
+    // Fuer den Neuaufbau: das HTML soll die gerade gewaehlte Ansicht kennen,
+    // ohne bei jedem Wechsel neu gebaut zu werden (stilSetzen tauscht dann
+    // nur die Kachelschicht).
+    const stilRef = useRef(stilStart);
+    stilRef.current = stilIndex;
     /*
      * Henrik, 07.09.2026: "Kartenstil-Button switcht direkt statt
      * Auswahlfenster (Standard/Satellit/Gelände)." Wer von Standard auf
@@ -367,20 +422,29 @@ export const KarteWeb = forwardRef<KartenSteuerung, Props>(
         }
       },
       zuruecksetzen: () => {
-        if (webViewRef.current) {
-          webViewRef.current.injectJavaScript(`
-            map.setView([51.5, 10], 4, { animate: true });
-            true;
-          `);
-        }
+        webViewRef.current?.injectJavaScript('window.startAnsicht(); true;');
       },
     }));
+
+    /*
+     * Das HTML nur neu bauen, wenn sich wirklich etwas an den Nadeln, dem
+     * aktiven Pin oder dem Start aendert. Vorher entstand es bei jedem
+     * Rendern neu; die WebView verglich zwar den Text, aber jede kleine
+     * Aenderung (etwa der Stil) warf die Karte samt Ausschnitt zurueck.
+     */
+    const pinSchluessel = pins.map(p => `${p.id}|${p.lat}|${p.lng}|${p.name}|${p.farbe ?? ''}`).join(';');
+    const startSchluessel = start ? `${start.lat}|${start.lng}|${start.zoom}` : '';
+    const html = useMemo(
+      () => makeHtmlMap(pins, aktiv, stilRef.current, start, vorschau),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [pinSchluessel, aktiv, startSchluessel, vorschau]
+    );
 
     return (
       <View style={[styles.container, { height: hoehe }, vollbild && styles.containerVoll]}>
         <WebView
           ref={webViewRef}
-          source={{ html: makeHtmlMap(pins, aktiv) }}
+          source={{ html }}
           style={styles.webview}
           onLoadEnd={ortHineinreichen}
           onMessage={(event) => {
@@ -415,10 +479,23 @@ export const KarteWeb = forwardRef<KartenSteuerung, Props>(
           }
         />
 
+        {/* Vorschau: eine durchsichtige Flaeche ueber der ganzen Karte faengt
+            den Tipp ab. Als echter Knopf statt als Nachricht aus der WebView,
+            damit VoiceOver und `mac:tippen` ihn finden. */}
+        {vorschau && (
+          <Druck
+            style={StyleSheet.absoluteFill}
+            onPress={onKarteTippen}
+            accessibilityRole="button"
+            accessibilityLabel={vorschauLabel || 'Karte öffnen'}
+          />
+        )}
+
         {/* Henrik: "Plus/Minus entfernen und durch einen diagonalen Pfeil
             ersetzen, der die Vollbildansicht oeffnet." Daneben der Umschalter
             fuer die Kartenansicht. Beide liegen als echte Knoepfe ueber der
             WebView - in der Karte selbst wuerden sie mitzoomen. */}
+        {!vorschau && (
         <View style={styles.werkzeuge} pointerEvents="box-none">
           <View style={styles.zoomStack}>
             <Druck
@@ -472,13 +549,16 @@ export const KarteWeb = forwardRef<KartenSteuerung, Props>(
             </View>
           )}
         </View>
+        )}
 
         {/* Das Schild sagt, welche Ansicht gerade gilt — der Knopf daneben
             oeffnet die Wahl. Bis zum 07.09.2026 gab es nur den Knopf, und der
             schaltete reihum weiter. */}
-        <View style={styles.schild} pointerEvents="none">
-          <Text style={styles.schildText}>{stil.label}</Text>
-        </View>
+        {!vorschau && (
+          <View style={styles.schild} pointerEvents="none">
+            <Text style={styles.schildText}>{stil.label}</Text>
+          </View>
+        )}
       </View>
     );
   }

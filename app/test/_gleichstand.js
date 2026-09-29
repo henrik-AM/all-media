@@ -291,6 +291,8 @@ function vergleicheListen(name, ausWeb, ausApp, schluessel, felder) {
     ['artist', 'artist'],
     ['uses', 'uses'],
     ['lyrics', 'lyrics'],
+    // Schema 63: die Einsaetze der Liedzeilen muessen auf beiden Seiten gleich ankommen.
+    ['lyricsZeiten', 'lyricsZeiten'],
   ]);
   vergleicheListen('Standorte', web.places, app.places, 'id', [
     ['name', 'name'],

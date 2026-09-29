@@ -410,6 +410,12 @@ export interface Sound {
   songwriter?: string;
   cover?: string;
   audio?: string;
+  /**
+   * Schema 63: ab welcher Sekunde der Hoerprobe jede gesungene Zeile gilt
+   * (eine Zahl je nicht-leerer Zeile). null = unbekannt, dann gleichmaessig.
+   * Ausgewertet in gemeinsam/liedtext.js.
+   */
+  lyricsZeiten?: number[] | null;
 }
 
 export interface Place {
