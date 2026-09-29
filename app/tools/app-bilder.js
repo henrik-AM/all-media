@@ -42,7 +42,9 @@ const DUNKEL = process.argv.includes('dunkel');
  */
 const NUR = process.argv.slice(2).filter((a) => a !== 'dunkel');
 const ZIEL = path.join(__dirname, '..', '..', 'bilder', DUNKEL ? 'app-dunkel' : 'app-hell');
-const EXPO_URL = 'exp://127.0.0.1:8081';
+// Eigener Metro (z. B. aus einem Integrations-Worktree): METRO_PORT=8082
+const METRO_PORT = process.env.METRO_PORT || '8081';
+const EXPO_URL = `exp://127.0.0.1:${METRO_PORT}`;
 /** Kennung des Pruefgeraets - wird im Ablauf gesetzt, danach ueberall statt "booted". */
 let GERAET = null;
 
@@ -314,7 +316,7 @@ function erstesOeffnen() {
 }
 
 function metroLaeuft() {
-  return still('curl -s --max-time 10 -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/status', 15000).trim() === '200';
+  return still(`curl -s --max-time 10 -o /dev/null -w "%{http_code}" http://127.0.0.1:${METRO_PORT}/status`, 15000).trim() === '200';
 }
 
 (async () => {
@@ -350,7 +352,7 @@ function metroLaeuft() {
   try {
     execSync(
       'curl -s -o /dev/null --max-time 240 ' +
-      '"http://127.0.0.1:8081/index.bundle?platform=ios&dev=true&minify=false"'
+      `"http://127.0.0.1:${METRO_PORT}/index.bundle?platform=ios&dev=true&minify=false"`
     );
   } catch {
     log('  Hinweis: Metro antwortete nicht - laeuft "npm run wlan"?');
@@ -494,7 +496,7 @@ function metroLaeuft() {
     log('     Entweder stand ueberall der Ladebildschirm von Expo Go, oder die');
     log('     App ist gar nicht auf den gewaehlten Bildschirm gesprungen.');
     log('     Meist hilft es, das Buendel vorher einmal zu holen');
-    log('     (curl http://127.0.0.1:8081/index.bundle?platform=ios&dev=true)');
+    log(`     (curl http://127.0.0.1:${METRO_PORT}/index.bundle?platform=ios&dev=true)`);
     log('     und den Lauf zu wiederholen.\n');
     process.exitCode = 1;
     return;
