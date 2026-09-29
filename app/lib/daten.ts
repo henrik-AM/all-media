@@ -138,11 +138,12 @@ export async function ladeNutzer(
 ): Promise<{ users: Record<string, User>; profile: Record<string, Profile> }> {
   // Fund 1: die Nummern kommen getrennt — die eigene aus `mein_profil()`, die
   // der Kontakte aus `meine_kontaktnummern()` (nur beidseitige Kontakte).
-  const [{ data, error }, { data: zahlen }, { data: ich }, { data: nummern }] = await Promise.all([
+  const [{ data, error }, { data: zahlen }, { data: ich }, { data: nummern }, bilder] = await Promise.all([
     client.from('profiles').select(PROFIL_SPALTEN).limit(500),
     client.from('profile_zahlen').select('id, followers, following, beitraege'),
     client.rpc('mein_profil'),
     client.rpc('meine_kontaktnummern'),
+    ladeProfilbilder(client),
   ]);
   if (error) throw error;
 
@@ -165,6 +166,9 @@ export async function ladeNutzer(
       about: zeile.about ?? '',
       phone: nummerVon(zeile.id),
       color: zeile.color ?? undefined,
+      // Bestaendige Form; unterschrieben wird mit allem anderen unten in
+      // ladeAlles (signiereMedien).
+      avatar: bilder.get(zeile.id),
     };
 
     profile[schluessel] = {
@@ -182,6 +186,23 @@ export async function ladeNutzer(
   }
 
   return { users, profile };
+}
+
+/*
+ * Die Profilbilder (Kasten 12.5) — getrennt und nachsichtig geladen.
+ *
+ * `avatar_url` kommt erst mit SUPABASE_SCHEMA_XX_profilbild.sql. Stuende die
+ * Spalte in PROFIL_SPALTEN, schluege bis zum Einspielen jede Profilabfrage
+ * fehl (Schema 23: nicht freigegebene Spalten sind ein Fehler, kein null).
+ * So fehlen hoechstens die Bilder, und es bleibt bei den Initialen.
+ * Gegenstueck: profilbilder() in web/server/supabase-api.js.
+ */
+export async function ladeProfilbilder(client: SupabaseClient): Promise<Map<string, string>> {
+  const karte = new Map<string, string>();
+  const { data, error } = await client.from('profiles').select('id, avatar_url').not('avatar_url', 'is', null).limit(500);
+  if (error) return karte;
+  for (const z of (data ?? []) as any[]) if (z.avatar_url) karte.set(z.id, z.avatar_url);
+  return karte;
 }
 
 export async function ladeGefolgt(client: SupabaseClient, ichId: string): Promise<string[]> {

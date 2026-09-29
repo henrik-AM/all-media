@@ -51,7 +51,9 @@ import { LandscapeVideosScreen } from './screens/videos/LandscapeVideosScreen';
 import { ClipPlayerScreen } from './screens/videos/ClipPlayerScreen';
 import { ExplorerScreen, ExplorerZiel } from './screens/videos/ExplorerScreen';
 import { LivestreamScreen } from './screens/videos/LivestreamScreen';
-import { VideoProfileScreen } from './screens/videos/VideoProfileScreen';
+import { ProfilTab, VideoProfileScreen } from './screens/videos/VideoProfileScreen';
+import * as Rueckkehr from './lib/rueckkehr';
+import { ProfilbildKopf, ProfilbildSheet } from './components/ProfilbildWahl';
 import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
 import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
@@ -64,6 +66,7 @@ import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel,
 // UMD wie in ExplorerScreen: die Prüfläufe laden App-Code als blob:-Modul.
 const SoundStellen = require('../gemeinsam/soundstellen') as typeof import('../gemeinsam/soundstellen');
 const StoryRegeln = require('../gemeinsam/story') as typeof import('../gemeinsam/story');
+const Spende = require('../gemeinsam/spende') as typeof import('../gemeinsam/spende');
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
@@ -130,19 +133,52 @@ interface Formular {
   /** Was schon in den Feldern steht, wenn das Blatt aufgeht. */
   vorbelegung?: Record<string, string>;
   absenden: (werte: Record<string, string>) => string | null;
+  /** Was über den Feldern steht (Profilbild in „Profil bearbeiten"). */
+  kopf?: React.ReactNode;
 }
 
 const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
 const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
-  const { logout } = useContext(AuthContext);
+  const { logout, user } = useContext(AuthContext);
   const { isDark } = useContext(ThemeContext);
   const insets = useSafeAreaInsets();
 
+  /*
+   * Nach einem Kontowechsel dort weitermachen, wo gewechselt wurde
+   * (Kasten 12.4, Begründung in lib/rueckkehr.ts). Ohne gemerkte Stelle
+   * beginnt die App wie bisher im Messenger.
+   */
+  const [rueckkehr] = useState(() => Rueckkehr.abholen(user?.id));
+  useEffect(() => Rueckkehr.vergessen(), []);
+
   // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt — genau wie im
   // Prototyp, wo die obere Leiste zum Bereich gehoert.
-  const [area, setArea] = useState<AreaKey>('messenger');
-  const [subs, setSubs] = useState<Record<AreaKey, SubKey>>(defaultSub);
+  const [area, setArea] = useState<AreaKey>(rueckkehr?.area ?? 'messenger');
+  const [subs, setSubs] = useState<Record<AreaKey, SubKey>>(() =>
+    rueckkehr ? { ...defaultSub, [rueckkehr.area]: rueckkehr.sub } : defaultSub
+  );
+  /*
+   * Der Reiter im eigenen Video-Profil (Posts, Reposts, Markiert,
+   * Gespeichert) — Kasten 12.1.
+   *
+   * Henrik am 21.09.2026: der Tab „merkt sich nicht", wenn man einen Beitrag
+   * öffnet und wieder schließt. Der Reiter lag im Profil selbst; ein Beitrag
+   * aus dem Raster öffnet aber den Feed, das Profil wurde abgebaut und fing
+   * wieder bei „Posts" an. Jetzt liegt er hier und überlebt den Umweg.
+   *
+   * Zurück auf „Posts" geht er nur, wenn man das Profil über die obere oder
+   * untere Leiste verlässt — auch dann, wenn man zwischendurch in einem
+   * Beitrag aus dem Profil war (`profilBeitragOffen`).
+   */
+  const [profilTab, setProfilTab] = useState<ProfilTab>('grid');
+  /** Blatt „Profilbild" beim Antippen des eigenen Bilds (Kasten 12.5). */
+  const [profilbildWahl, setProfilbildWahl] = useState(false);
+  const profilBeitragOffen = useRef(false);
+  const profilVerlassen = () => {
+    setProfilTab('grid');
+    profilBeitragOffen.current = false;
+  };
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   /*
@@ -251,6 +287,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * mit unterer Leiste.
    */
   const wechsleBereich = (next: AreaKey) => {
+    // Untere Leiste verlässt das Video-Profil (oder den Beitrag daraus): Reiter zurück.
+    if (area === 'videos' && (subs.videos === 'profile' || profilBeitragOffen.current)) profilVerlassen();
     setArea(next);
     setSubs((prev) => ({ ...prev, [next]: defaultSub[next] }));
     /*
@@ -1272,6 +1310,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   const profilBearbeiten = () => {
     setFormular({
       title: 'Profil bearbeiten',
+      // Kasten 12.5: das Profilbild gehört mit hierher.
+      kopf: <ProfilbildKopf name={profil.eigenesProfil.name} onNotice={setNotice} />,
       felder: [
         { key: 'name', label: 'Name', pflicht: true },
         { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
@@ -1420,13 +1460,16 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         knopf: 'Starten',
         felder: [
           { key: 'titel', label: 'Wofür sammelst du?', platzhalter: 'z. B. Bäume für den Stadtpark', pflicht: true },
-          { key: 'ziel', label: 'Spendenziel in Euro', typ: 'zahl', platzhalter: '500', pflicht: true },
+          // Kasten 12.3: Ziel freiwillig wie auf der Website, dazu eine Frist.
+          { key: 'ziel', label: 'Spendenziel in Euro (freiwillig)', typ: 'zahl', platzhalter: '500' },
+          { key: 'frist', label: 'Läuft bis (freiwillig)', platzhalter: 'TT.MM.JJJJ' },
           { key: 'text', label: 'Beschreibung (freiwillig)', typ: 'mehrzeilig', platzhalter: 'Worum geht es?' },
         ],
-        absenden: ({ titel, ziel, text }) => {
-          const betrag = Number(ziel.replace(',', '.'));
-          if (!Number.isFinite(betrag) || betrag <= 0) return 'Bitte ein Spendenziel in Euro eingeben';
-          profil.spendeSetzen({ titel, ziel: betrag, gesammelt: 0, text });
+        absenden: (werte) => {
+          // Eine Regel für App und Website: gemeinsam/spende.js.
+          const e = Spende.ausFormular(werte);
+          if (!e.ok) return e.fehler;
+          profil.spendeSetzen(e.spende);
           setNotice('Spendenaktion läuft');
           return null;
         },
@@ -2073,7 +2116,10 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         return (
           <MessengerProfileScreen
             onSwitchArea={switchArea}
-            onSwitchAccount={() => setSheet('konto')}
+            onSwitchAccount={() => {
+              Rueckkehr.vergessen();
+              setSheet('konto');
+            }}
             /*
              * Henrik am 07.09.2026: „Einstellungen auf der Profilseite soll
              * direkt zu den Messenger-Untereinstellungen fuehren." Vorher
@@ -2129,7 +2175,32 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             onNotice={setNotice}
           />
         );
-      if (sub === 'profile') return <VideoProfileScreen onSwitchArea={switchArea} onAction={profilAktion} onBearbeiten={profilBearbeiten} onOpenKachel={kachelOeffnen} onNotice={setNotice} onOpenFollowers={() => setOverlay({ kind: 'followers', userId: 'me' })} onOpenFollowing={() => setOverlay({ kind: 'following', userId: 'me' })} />;
+      if (sub === 'profile')
+        return (
+          <VideoProfileScreen
+            onSwitchArea={switchArea}
+            tab={profilTab}
+            onTab={setProfilTab}
+            /*
+             * Kasten 12.4: „Profil wechseln" bleibt im Video-Profil. Vorher
+             * führte der Knopf über onSwitchArea in den Messenger.
+             */
+            onSwitchAccount={() => {
+              Rueckkehr.merken(user?.id, 'videos', 'profile');
+              setSheet('konto');
+            }}
+            onProfilbild={() => setProfilbildWahl(true)}
+            onAction={profilAktion}
+            onBearbeiten={profilBearbeiten}
+            onOpenKachel={(k) => {
+              profilBeitragOffen.current = true;
+              kachelOeffnen(k);
+            }}
+            onNotice={setNotice}
+            onOpenFollowers={() => setOverlay({ kind: 'followers', userId: 'me' })}
+            onOpenFollowing={() => setOverlay({ kind: 'following', userId: 'me' })}
+          />
+        );
       return (
         <HomeFeedScreen
           stories={storiesVideos}
@@ -2182,7 +2253,10 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <SettingsScreen
         onNotice={setNotice}
         onLogout={logout}
-        onSwitchAccount={() => setSheet('konto')}
+        onSwitchAccount={() => {
+              Rueckkehr.vergessen();
+              setSheet('konto');
+            }}
         sprung={settingsSprung}
         onSprungFertig={() => setSettingsSprung(null)}
         pruefSicht={pruefSicht}
@@ -2230,7 +2304,22 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         und damit auch keinen Abstand.
       */}
       <View style={[styles.content, hatInsel && { paddingTop: inselPlatz }]}>{renderContent()}</View>
-      <TopSwitcher area={area} active={sub} onChange={setSub} zaehler={inselZaehler} />
+      <TopSwitcher
+        area={area}
+        active={sub}
+        onChange={(next) => {
+          /*
+           * Obere Leiste (Kasten 12.1): zurück ins Profil behält den Reiter,
+           * jeder andere Punkt verlässt das Profil und setzt ihn zurück.
+           */
+          if (area === 'videos') {
+            if (next === 'profile') profilBeitragOffen.current = false;
+            else if (sub === 'profile' || profilBeitragOffen.current) profilVerlassen();
+          }
+          setSub(next);
+        }}
+        zaehler={inselZaehler}
+      />
       <TabBar active={area} onChange={wechsleBereich} unreadCount={unreadCount} />
       <BeitragOptionenSheet beitrag={pruefOptionen} onClose={() => setPruefOptionen(null)} onNotice={setNotice} />
 
@@ -2407,8 +2496,10 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           onClose={() => setFormular(null)}
           onSubmit={formular.absenden}
           onNotice={setNotice}
+          kopf={formular.kopf}
         />
       )}
+      <ProfilbildSheet visible={profilbildWahl} onClose={() => setProfilbildWahl(false)} onNotice={setNotice} />
 
     </View>
   );

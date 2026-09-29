@@ -46,6 +46,8 @@ export type VerlaufEintrag = import('../../gemeinsam/verlauf').VerlaufEintrag;
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der Website.
 const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
 const Teilen = require('../../gemeinsam/teilen') as typeof import('../../gemeinsam/teilen');
+// Ringfarben und Vorschaubild von Playlists und Highlights (Kasten 12).
+const SammlungRegel = require('../../gemeinsam/sammlungen') as typeof import('../../gemeinsam/sammlungen');
 
 /**
  * Eine Zeile, die es entweder gibt oder nicht — Like, Speichern, Folgen.
@@ -1740,6 +1742,70 @@ export async function spendeSetzen(
   return true;
 }
 
+/**
+ * Der Stand eines Spendenziels: Summe und Zahl der Spender seit `seit`
+ * (Kasten 12.3). Null heisst „nicht ermittelbar", nicht „nichts gespendet".
+ *
+ * Erst ueber `spendenstand()` aus SUPABASE_SCHEMA_XX_spendenziel.sql — die
+ * einzige Stelle, an der ein Besucher eine Summe erfahren darf, denn
+ * `donations` ist nur fuer Sender und Empfaenger lesbar. Solange der Entwurf
+ * nicht eingespielt ist, rechnet das eigene Profil selbst (der Empfaenger
+ * darf seine Zeilen lesen); fremde Profile bekommen dann null.
+ * Gegenstueck: GET /api/spendenstand/:userId in web/server/app.js.
+ */
+export async function spendenstand(
+  client: SupabaseClient,
+  ichId: string,
+  empfaengerId: string,
+  seit: string | null
+): Promise<{ summe_cent: number; spender: number } | null> {
+  const { data, error } = await client.rpc('spendenstand', {
+    p_empfaenger: empfaengerId,
+    p_seit: seit,
+  });
+  if (!error) {
+    const z = (Array.isArray(data) ? data[0] : data) as any;
+    return { summe_cent: Number(z?.summe_cent ?? 0), spender: Number(z?.spender ?? 0) };
+  }
+  if (empfaengerId !== ichId) return null;
+
+  let frage = client.from('donations').select('betrag_cent, sender_id').eq('empfaenger_id', ichId);
+  if (seit) frage = frage.gte('created_at', seit);
+  const { data: zeilen, error: fehler } = await frage;
+  if (fehler) return null;
+  const liste = (zeilen ?? []) as any[];
+  return {
+    summe_cent: liste.reduce((n, z) => n + Number(z.betrag_cent || 0), 0),
+    spender: new Set(liste.map((z) => z.sender_id)).size,
+  };
+}
+
+/**
+ * Das Profilbild setzen oder entfernen (Kasten 12.5).
+ *
+ * `url` ist die bestaendige Form aus `ladeHoch(…, 'avatars', …)` — nie die
+ * unterschriebene, die nach vier Stunden ablaeuft. Gegenstueck:
+ * POST /api/eigene/profilbild in web/server/app.js.
+ */
+export async function profilbildSetzen(
+  client: SupabaseClient,
+  ichId: string,
+  url: string | null
+): Promise<void> {
+  const { data, error } = await client
+    .from('profiles')
+    .update({ avatar_url: url })
+    .eq('id', ichId)
+    .select('id');
+  if (error) {
+    if (error.code === '42703' || error.code === 'PGRST204' || error.code === '42501') {
+      throw new Error('Profilbilder gehen erst, wenn das Datenbank-Update eingespielt ist');
+    }
+    throw error;
+  }
+  if (!data?.length) throw new Error('Das Profilbild ließ sich nicht speichern');
+}
+
 /** Livestream an oder aus. */
 export async function livestreamSetzen(
   client: SupabaseClient,
@@ -3275,12 +3341,20 @@ export interface Sammlung {
   /** Wie viele Beitraege beziehungsweise Storys darin liegen. */
   anzahl: number;
   /**
-   * Das Bild des zuletzt hinzugefuegten Stuecks — oder null.
+   * Das Bild im Kreis — oder null. Welches, entscheidet
+   * `vorschaubild` in gemeinsam/sammlungen.js: gewaehltes Titelbild vor dem
+   * zuletzt hinzugefuegten Stueck.
    *
    * Null ist ein gueltiger Zustand, keine Panne: eine gerade angelegte
    * Sammlung ist leer. Die Oberflaeche zeigt dann ihr Symbol, wie bisher.
    */
   bild: string | null;
+  /** Gewaehltes Titelbild einer Playlist (Kasten 12.7). */
+  titelPostId?: string | null;
+  /** Gewaehltes Titelbild eines Highlights aus seinen Storys (Kasten 12.8). */
+  titelStoryId?: string | null;
+  /** Das Highlight hat ein eigenes, hochgeladenes Foto als Titelbild. */
+  eigenesTitelbild?: boolean;
 }
 
 /**
@@ -3299,7 +3373,7 @@ export async function sammlungenVon(
     .select(
       `id, art, name, created_at,
        sammlung_inhalte (
-         created_at,
+         created_at, post_id, story_id,
          posts!post_id (thumbnail_url, media_url),
          stories!story_id (media_url)
        )`
@@ -3309,16 +3383,22 @@ export async function sammlungenVon(
     .order('created_at', { ascending: true });
   if (error) throw error;
 
+  const wahl = await titelWahlen(client, ((data ?? []) as any[]).map((s) => s.id));
+
   const sammlungen: Sammlung[] = ((data ?? []) as any[]).map((s) => {
     const inhalte = (s.sammlung_inhalte ?? []) as any[];
-    // Das zuletzt Hinzugefuegte steht vorn — das ist das Bild, das ein
-    // Mensch als "der aktuelle Stand dieser Sammlung" liest.
-    const neueste = [...inhalte].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-    const treffer = neueste.find((i) => i.posts || i.stories);
-    const bild = treffer
-      ? treffer.posts?.thumbnail_url || treffer.posts?.media_url || treffer.stories?.media_url || null
-      : null;
-    return { id: s.id, art: s.art, name: s.name, anzahl: inhalte.length, bild };
+    const w = wahl.get(s.id) ?? {};
+    return {
+      id: s.id,
+      art: s.art,
+      name: s.name,
+      anzahl: inhalte.length,
+      // Dieselbe Regel wie /api/sammlungen auf der Website.
+      bild: SammlungRegel.vorschaubild(w, inhalte),
+      titelPostId: w.titel_post_id ?? null,
+      titelStoryId: w.titel_story_id ?? null,
+      eigenesTitelbild: Boolean(w.titelbild_url),
+    };
   });
 
   // Fund 4: der Medieneimer ist nicht oeffentlich, jede Adresse wird
@@ -3329,6 +3409,58 @@ export async function sammlungenVon(
     sammlungen.map((s) => ({ id: s.id, mediaUri: s.bild ?? undefined })) as any
   );
   return sammlungen.map((s, i) => ({ ...s, bild: (unterschrieben[i] as any)?.mediaUri ?? null }));
+}
+
+/*
+ * Die Titelbild-Wahl je Sammlung — oder nichts.
+ *
+ * Die drei Spalten kommen erst mit SUPABASE_SCHEMA_XX_titelbild.sql. Stuenden
+ * sie in der Abfrage oben, fiele bis zum Einspielen jede Sammlungsreihe aus.
+ * So faellt nur die Wahl aus. Gegenstueck: titelWahlen in web/server/app.js.
+ */
+async function titelWahlen(client: SupabaseClient, ids: string[]) {
+  const karte = new Map<string, { titel_post_id?: string | null; titel_story_id?: string | null; titelbild_url?: string | null }>();
+  if (!ids.length) return karte;
+  const { data, error } = await client
+    .from('sammlungen')
+    .select('id, titel_post_id, titel_story_id, titelbild_url')
+    .in('id', ids);
+  if (error) return karte;
+  for (const z of (data ?? []) as any[]) karte.set(z.id, z);
+  return karte;
+}
+
+/**
+ * Das Titelbild einer eigenen Sammlung setzen (Kasten 12.7 und 12.8).
+ *
+ * Genau eine Quelle oder keine (dann wieder „das neueste Stueck"). Ob das
+ * Stueck in der Sammlung liegt, prueft der Ausloeser sammlung_titel_pruefen;
+ * wem sie gehoert, die Regel sammlungen_aendern. Gegenstueck:
+ * POST /api/eigene/sammlung/:id/titelbild.
+ */
+export async function titelbildSetzen(
+  client: SupabaseClient,
+  sammlungId: string,
+  wahl: { postId?: string; storyId?: string; bildUrl?: string }
+): Promise<void> {
+  const zeile = {
+    titel_post_id: wahl.postId ?? null,
+    titel_story_id: wahl.storyId ?? null,
+    titelbild_url: wahl.bildUrl ?? null,
+  };
+  const { data, error } = await client
+    .from('sammlungen')
+    .update(zeile)
+    .eq('id', sammlungId)
+    .select('id');
+  if (error) {
+    if (error.code === '42703' || error.code === 'PGRST204') {
+      throw new Error('Titelbilder gehen erst, wenn das Datenbank-Update eingespielt ist');
+    }
+    throw error;
+  }
+  // Unter RLS aendert ein abgelehntes UPDATE null Zeilen, ohne Fehler.
+  if (!data?.length) throw new Error('Diese Sammlung gehört nicht dir');
 }
 
 /** Was in einer Sammlung liegt — Beitraege bei Playlists, Storys bei Highlights. */

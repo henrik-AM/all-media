@@ -40,13 +40,19 @@ interface Props {
   onSubmit: (werte: Record<string, string>) => string | null;
   /** Frueher fuer Fehler gebraucht, die stehen jetzt im Blatt selbst. */
   onNotice?: (message: string) => void;
+  /**
+   * Was ueber den Feldern steht — beim Profil das Profilbild (Kasten 12.5).
+   * Im Blatt selbst statt als zweites Blatt: zwei Modals uebereinander
+   * zeigt iOS nicht zuverlaessig an.
+   */
+  kopf?: React.ReactNode;
 }
 
 /**
  * Ein Blatt mit Eingabefeldern - fuer Highlight, Playlist, Spendenaktion,
  * neuen Kanal und die Beschreibung zu einer Aufnahme.
  */
-export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbelegung, onClose, onSubmit }: Props) => {
+export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbelegung, onClose, onSubmit, kopf }: Props) => {
   const [werte, setWerte] = useState<Record<string, string>>({});
   /*
    * Fehler stehen im Blatt. Als Hinweis des Bildschirms lagen sie hinter dem
@@ -98,6 +104,7 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
         Ein zweites KeyboardAvoidingView hier innen hob doppelt.
       */}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.inhalt}>
+        {kopf}
         {felder.map((f, i) => (
           <View key={f.key} style={styles.feld}>
             <Text style={styles.label}>{f.label}</Text>

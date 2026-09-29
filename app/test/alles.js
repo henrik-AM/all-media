@@ -159,6 +159,9 @@ const LAEUFE = [
   ['optionen', '_optionen.js'],
   // Kasten 8: kein Tonknopf, Ort/Sound im Querformat antippbar.
   ['kasten8', '_kasten8.js'],
+  // Kasten 12: Video-Profil. Braucht keinen Server — gemeinsame Regeln
+  // nachrechnen und den Einbau auf beiden Seiten im Quelltext pruefen.
+  ['kasten12', '_kasten12.js'],
   ['glocke', '_glocke.js'],
   // Jede Ueberschrift mit Pfeil fuehrt auf die volle Uebersicht (Kasten 2).
   ['pfeile', '_pfeile.js'],

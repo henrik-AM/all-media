@@ -24,6 +24,17 @@ interface Props {
   onAvatarPress?: () => void;
   /** Kasten 11.2: Bereich, dessen eigene Story als Ring am Bild steht. */
   storyBereich?: 'videos' | 'messenger';
+  /**
+   * Der gruene Punkt am Profilbild (Kasten 12.6). Mit Handler ist er ein
+   * eigener Knopf, der das Fenster zur Online-Sichtbarkeit oeffnet.
+   */
+  onOnlinePunkt?: () => void;
+  /**
+   * Ob der Online-Status gerade fuer irgendwen sichtbar ist. `false` (Stufe
+   * „Niemand") zeichnet den Punkt grau — sonst stuende dort gruen, was
+   * niemand sieht.
+   */
+  onlineSichtbar?: boolean;
   ungelesen?: number;
 }
 
@@ -32,10 +43,18 @@ interface Props {
  * Glocke/Plus/Menü, darunter Bild links neben den Zahlen, dann Name,
  * Biografie und Link linksbündig.
  */
-export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, onAvatarPress, storyBereich, ungelesen = 0 }: Props) => (
+export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, onAvatarPress, storyBereich, onOnlinePunkt, onlineSichtbar = true, ungelesen = 0 }: Props) => (
   <View>
+    {/*
+      * Kasten 12.2: Henrik am 21.09.2026 „Nutzername sitzt waagerecht zu weit
+      * links statt mittig." Der Name stand mit flex:1 in derselben Zeile wie
+      * die drei Knoepfe — zentriert wurde er also in der Restbreite links
+      * davon, nicht im Bildschirm. Jetzt liegt er ueber die volle Breite mit
+      * gleichem Rand links und rechts; die Knoepfe liegen darueber. So macht
+      * es die Website seit jeher (.oprof__handle, position:absolute).
+      */}
     <View style={styles.bar}>
-      <Text style={styles.handle}>{handle}</Text>
+      <Text style={styles.handle} numberOfLines={1} testID="profil-handle">{handle}</Text>
       <View style={styles.actions}>
         <Druck
           onPress={() => onAction('bell')}
@@ -73,9 +92,23 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
           ) : (
             <Avatar id="me" name={name} size={sizes.avatarXl} />
           )}
-          <View style={styles.online} />
+          {onOnlinePunkt ? null : <View style={[styles.online, !onlineSichtbar && styles.onlineAus]} />}
         </View>
       </Druck>
+      {/*
+        * Der Punkt als eigener Knopf ueber dem Bild, nicht im Knopf des
+        * Bildes: sonst oeffnete ein Tipp auf den Punkt das Profilbild.
+        */}
+      {onOnlinePunkt ? (
+        <Druck
+          style={[styles.online, styles.onlineKnopf, !onlineSichtbar && styles.onlineAus]}
+          onPress={onOnlinePunkt}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={onlineSichtbar ? 'Online-Status: sichtbar. Sichtbarkeit ändern' : 'Online-Status: verborgen. Sichtbarkeit ändern'}
+          testID="online-punkt"
+        />
+      ) : null}
       <View style={styles.stats}>
         {stats.map((stat) => (
           <Druck
@@ -112,11 +145,29 @@ const styles = themenStyles((colors) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    minHeight: 30,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: 2,
   },
-  handle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.text },
+  /*
+   * Ueber die volle Breite, mit gleichem Rand links und rechts. Der Rand ist
+   * so breit wie die drei Knoepfe (3 × 21 + 2 × Abstand + Seitenrand), damit
+   * ein langer Name nicht unter sie laeuft — und weil er auf BEIDEN Seiten
+   * steht, bleibt die Mitte die Bildschirmmitte.
+   */
+  handle: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 2,
+    paddingHorizontal: spacing.lg + 3 * 21 + 2 * spacing.md + 4,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   dot: {
     position: 'absolute',
@@ -139,6 +190,14 @@ const styles = themenStyles((colors) => ({
     borderWidth: 2.5,
     borderColor: colors.surface,
   },
+  /* Das Profilbild ist sizes.avatarXl breit und sitzt am linken Rand von
+     `top` — der Knopf liegt an derselben Stelle wie der alte Punkt. */
+  onlineKnopf: {
+    left: spacing.lg + sizes.avatarXl - 3 - 18,
+    right: undefined,
+    bottom: spacing.sm + 3,
+  },
+  onlineAus: { backgroundColor: colors.text3 },
   stats: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
   stat: { alignItems: 'center', gap: 4, maxWidth: 120 },
   statLabel: { ...typography.small, color: colors.text2, textAlign: 'center' },

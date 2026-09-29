@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Image, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { avatarPair, colors, initialsOf, themenStyles } from '../constants/design';
@@ -23,6 +23,11 @@ interface Props {
    * Quadrat gezeichnet — das unterscheidet Gruppe von Person auf einen Blick.
    */
   ecke?: number;
+  /**
+   * Profilbild. Ohne Angabe schlaegt der Avatar es an der Kennung nach
+   * (`users[id].avatar`, Kasten 12.5); `null` erzwingt die Initialen.
+   */
+  bild?: string | null;
   style?: ViewStyle;
 }
 
@@ -32,7 +37,7 @@ interface Props {
  * Die Initialen liegen mit leichtem Schatten darauf, damit sie auf dem
  * helleren Ende des Verlaufs nicht wegkippen.
  */
-export const Avatar = ({ id, name, size = 54, group = false, online = false, ecke, style, farbe }: Props) => {
+export const Avatar = ({ id, name, size = 54, group = false, online = false, ecke, style, farbe, bild }: Props) => {
   const base: ViewStyle = {
     width: size,
     height: size,
@@ -54,6 +59,10 @@ export const Avatar = ({ id, name, size = 54, group = false, online = false, eck
   const ausDatenbank = farbe ?? alleNutzer[id]?.color;
   const pair: [string, string] = group ? ['#7E93C4', '#4A6699'] : avatarPair(id, ausDatenbank);
   const dot = Math.max(11, Math.round(size * 0.32));
+  // Das Profilbild liegt UEBER den Initialen, nicht statt ihrer: laedt es
+  // nicht (abgelaufene Unterschrift, haengendes Netz), bleiben die
+  // Initialen sichtbar statt einer leeren Flaeche.
+  const foto = group ? null : bild === undefined ? alleNutzer[id]?.avatar : bild;
 
   return (
     <View style={[{ width: size, height: size }, style]}>
@@ -68,6 +77,13 @@ export const Avatar = ({ id, name, size = 54, group = false, online = false, eck
         ) : (
           <Text style={[styles.initials, { fontSize: size * 0.33 }]}>{initialsOf(name)}</Text>
         )}
+        {foto ? (
+          <Image
+            source={{ uri: foto }}
+            style={[StyleSheet.absoluteFill, { borderRadius: ecke ?? size / 2 }]}
+            accessibilityLabel={`Profilbild von ${name}`}
+          />
+        ) : null}
       </LinearGradient>
       {online && (
         <View

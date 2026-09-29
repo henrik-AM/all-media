@@ -77,7 +77,30 @@ function profilZuNutzer(zeile) {
     playlists: zeile.playlists || [],
     spende: jsonOderNull(zeile.spende),
     live: jsonOderNull(zeile.live),
+    // Profilbild (Kasten 12.5) — kommt getrennt über profilbilder(), siehe dort.
+    avatar: zeile.avatar_url || null,
   };
+}
+
+/*
+ * Die Profilbilder (Kasten 12.5) — getrennt und nachsichtig geladen.
+ *
+ * `avatar_url` kommt erst mit SUPABASE_SCHEMA_XX_profilbild.sql. Stuende die
+ * Spalte in PROFIL_SPALTEN, schluege bis zum Einspielen jede Profilabfrage
+ * fehl (Schema 23: nicht freigegebene Spalten sind ein Fehler, kein null).
+ * So fehlen hoechstens die Bilder. Unterschrieben wird die Adresse mit der
+ * ganzen Antwort (res.json in app.js). Gegenstueck: ladeProfilbilder() in
+ * app/lib/daten.ts.
+ */
+async function profilbilder(client, ids) {
+  const karte = new Map();
+  if (!client) return karte;
+  let abfrage = client.from('profiles').select('id, avatar_url').not('avatar_url', 'is', null);
+  abfrage = ids ? abfrage.in('id', ids) : abfrage.limit(500);
+  const { data, error } = await abfrage;
+  if (error) return karte;
+  for (const z of data || []) if (z.avatar_url) karte.set(z.id, z.avatar_url);
+  return karte;
 }
 
 /**
@@ -126,11 +149,12 @@ async function ladeNutzer(client, nutzerId) {
    * `mein_profil()`, die der Kontakte aus `meine_kontaktnummern()`. Letztere
    * gibt nur heraus, wo sich beide Seiten als Kontakt fuehren.
    */
-  const [{ data, error }, { data: zahlen }, { data: ich }, { data: nummern }] = await Promise.all([
+  const [{ data, error }, { data: zahlen }, { data: ich }, { data: nummern }, bilder] = await Promise.all([
     client.from('profiles').select(PROFIL_SPALTEN).limit(500),
     client.from('profile_zahlen').select('id, followers, following, beitraege'),
     client.rpc('mein_profil'),
     client.rpc('meine_kontaktnummern'),
+    profilbilder(client),
   ]);
   if (error) throw error;
 
@@ -142,6 +166,7 @@ async function ladeNutzer(client, nutzerId) {
   for (const zeile of data || []) {
     const u = profilZuNutzer(zeile);
     u.phone = nummerVon(zeile.id);
+    u.avatar = bilder.get(zeile.id) || null;
     const z = zahlenNach.get(zeile.id);
     u.followers = Number(z?.followers ?? zeile.followers_basis ?? 0);
     u.following = Number(z?.following ?? zeile.following_basis ?? 0);
@@ -160,7 +185,9 @@ async function ladeProfil(client, profilId) {
     .eq('id', profilId)
     .maybeSingle();
   if (error) throw error;
-  return profilZuNutzer(data);
+  const u = profilZuNutzer(data);
+  if (u) u.avatar = (await profilbilder(client, [profilId])).get(profilId) || null;
+  return u;
 }
 
 async function ladeKontakte(client, nutzerId) {
