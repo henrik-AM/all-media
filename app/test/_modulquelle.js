@@ -107,6 +107,9 @@ const UMD_BAUSTEINE = [
   // 29.09.2026: `soundstellen.js` fuer Wellenform und meist verwendete
   // Stellen auf der Sound-Seite (Feedback 21.09., Kasten 7.5, Schema 67).
   ['soundstellen', 'SoundStellen'],
+  // 29.09.2026: `zahlung.js` fuer Spendencode und Zahlungsmethoden
+  // (Feedback 21.09., Kasten 13.2/13.3, Schema XX_zahlung_spendencode).
+  ['zahlung', 'Zahlung'],
 ];
 
 function umdTeile() {

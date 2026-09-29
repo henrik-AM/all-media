@@ -14,6 +14,7 @@ import { useDaten } from '../../contexts/DatenContext';
 import { colors, radius, sizes, spacing, themenStyles, typography, verlaufAus } from '../../constants/design';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { useAktionen } from '../../lib/useAktionen';
+import { useSpendenweg } from '../../contexts/SpendenwegContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ladeBanne, ladeFolgeListe, ladeStatistik, Statistik } from '../../lib/daten';
 import { useEinstellungen } from '../../contexts/EinstellungenContext';
@@ -86,7 +87,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon';
+  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden';
   gefahr?: boolean;
 }
 
@@ -104,11 +105,23 @@ interface Section {
 const WER = ['Alle', 'Meine Kontakte', 'Niemand'];
 const STATUS = ['Aktiv', 'Beschäftigt', 'Unsichtbar'];
 
+/*
+ * Kasten 13 (Feedback 21.09.2026): bis hierher ein Formular, das
+ * „gespeichert" meldete und nichts speicherte. Jetzt öffnet der Eintrag das
+ * Spendenblatt (SpendenwegContext): Code festlegen/ändern und — wie das
+ * Handbuch sagt, „Verknüpfung mit Bankkarte oder PayPal" — die
+ * Zahlungsmethoden gleich darunter.
+ */
 const SPENDENCODE: Item = {
   label: 'Spendencode',
   icon: 'bookmark-outline',
-  eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
-  fertig: 'Spendencode gespeichert',
+  aktion: 'spendencode',
+};
+
+const ZAHLUNGSMETHODEN: Item = {
+  label: 'Zahlungsmethoden',
+  icon: 'card-outline',
+  aktion: 'zahlungsmethoden',
 };
 
 const SECTIONS: Section[] = [
@@ -147,6 +160,7 @@ const SECTIONS: Section[] = [
         fertig: 'Gespeichert',
       },
       SPENDENCODE,
+      ZAHLUNGSMETHODEN,
       {
         label: 'Sicherheits-/Entsperrcode',
         icon: 'lock-closed-outline',
@@ -608,7 +622,10 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         }
       : undefined;
 
+  const spendenweg = useSpendenweg();
   const oeffne = (item: Item) => {
+    if (item.aktion === 'spendencode') return spendenweg.verwalten('code');
+    if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden');
     if (item.aktion === 'sicherung') {
       return onNotice(`Sicherung erstellt — ${alleChats.length} Unterhaltungen gespeichert`);
     }

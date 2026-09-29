@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { chatOffen } = require('./_warten');
+const { nurDemoBeitraege } = require('./_nur_testkonten');
 // Kleines Testbild fuer die Story-Aufnahme.
 const BILD = path.join(__dirname, '_teststory.png');
 if (!fs.existsSync(BILD)) {
@@ -302,10 +303,12 @@ const pruefe = (was, ok, zusatz = '') => {
    * war das ausgerechnet der erste, nahm der Klick den Repost zurueck, und
    * der Prueflauf meldete einen Fehler, obwohl alles richtig lief.
    */
-  const frisch = await page.$$eval('[data-paction="repost"]', (knoten) => {
-    const treffer = knoten.find((n) => !n.className.includes('is-reposted'));
-    return treffer ? treffer.getAttribute('data-pid') : null;
-  });
+  // Nur Demo-Beiträge (Kasten 13.4): ein Repost bei einem echten Konto
+  // schickte dessen Besitzer eine Mitteilung vom Prüfkonto.
+  const kandidaten = await page.$$eval('[data-paction="repost"]', (knoten) =>
+    knoten.filter((n) => !n.className.includes('is-reposted')).map((n) => n.getAttribute('data-pid'))
+  );
+  const frisch = (await nurDemoBeitraege(page, kandidaten))[0] || null;
   pruefe('Ein noch nicht repposteter Beitrag im Feed', !!frisch);
 
   if (frisch) {

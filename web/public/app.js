@@ -5449,12 +5449,10 @@ const SETTINGS = [
         aktion: 'alter',
         fertig: 'Gespeichert',
       },
-      {
-        label: 'Spendencode',
-        icon: 'bookmark',
-        eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
-        fertig: 'Spendencode gespeichert',
-      },
+      // Kasten 13: öffnet den Spendenweg (vorher meldete das Formular
+      // „gespeichert" und speicherte nichts).
+      { label: 'Spendencode', icon: 'bookmark', aktion: 'spendencode' },
+      { label: 'Zahlungsmethoden', icon: 'karte', aktion: 'zahlungsmethoden' },
       {
         label: 'Sicherheits-/Entsperrcode',
         icon: 'lock',
@@ -5625,12 +5623,7 @@ const SETTINGS = [
     title: 'Videos',
     items: [
       { label: 'Privates Profil', icon: 'lock', toggle: 'videoPrivate' },
-      {
-        label: 'Spendencode',
-        icon: 'bookmark',
-        eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
-        fertig: 'Spendencode gespeichert',
-      },
+      { label: 'Spendencode', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Insights', icon: 'compass', liste: 'insights' },
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
@@ -5667,12 +5660,7 @@ const SETTINGS = [
     id: 'communitys',
     title: 'Communitys',
     items: [
-      {
-        label: 'Spendencode',
-        icon: 'bookmark',
-        eingabe: [{ key: 'code', label: 'Dein Spendencode', platzhalter: 'z. B. HENRIK2026', pflicht: true }],
-        fertig: 'Spendencode gespeichert',
-      },
+      { label: 'Spendencode', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Nutzerstatus', icon: 'person', wahlKey: 'nutzerstatus', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock', toggle: 'commPrivate' },
       { label: 'Nachrichten erlaubt von', icon: 'chat', sichtbar: 'dm' },
@@ -6622,6 +6610,9 @@ function openEinstellung(punkt, nachher) {
    * anhaengt (web/public/anmeldung.js). Ein <a href> ginge ohne Token los
    * und bekaeme 401.
    */
+  if (punkt.aktion === 'spendencode') return spendenweg(null, 'code');
+  if (punkt.aktion === 'zahlungsmethoden') return spendenweg(null, 'methoden');
+
   if (punkt.aktion === 'datenauskunft') {
     toast('Deine Daten werden zusammengestellt …');
     return (async () => {
@@ -6960,9 +6951,26 @@ function renderSettings() {
 
       // Die zwei Punkte ganz unten stehen ausserhalb der Abschnitte.
       if (b.dataset.setting === 'Abmelden') {
-        // Abmelden: Sitzung clearen (aktuell Mock-User "me")
-        localStorage.clear();
-        location.reload();
+        /*
+         * Bis zum 29.09.2026 stand hier `localStorage.clear()` und ein
+         * Neuladen. Das beendete die Sitzung beim Server NICHT (das Token
+         * blieb gültig), warf aber den geheimen Geräteschlüssel weg — danach
+         * war jede verschlüsselte Nachricht in diesem Browser unlesbar — und
+         * dazu „zuletzt verwendet" und das Design. Jetzt wie in der App: nur
+         * dieses Konto abmelden, das nächste mit Sitzung übernimmt (Kasten 13.1).
+         */
+        void (async () => {
+          const ich = window.Anmeldung?.nutzer?.();
+          if (ich) fruehereMerken(ich);
+          const ergebnis = await window.Anmeldung?.abmelden?.();
+          window.KryptoWeb?.vergessen();
+          toast(
+            ergebnis?.weiter
+              ? `Abgemeldet — weiter als ${ergebnis.weiter.name || ergebnis.weiter.email}`
+              : 'Abgemeldet'
+          );
+          await bootstrap();
+        })();
         return;
       }
       // "Über All Media" sagt jetzt, welcher Stand ausgeliefert wird. Bis
@@ -7998,6 +8006,24 @@ function fruehereVergessen(id) {
   }
 }
 
+/**
+ * Die Sitzung auf ein anderes Konto dieses Browsers umstellen und die Seite
+ * mit dessen Daten neu aufbauen — ohne Passwort (Kasten 13.1).
+ *
+ * Eigene Funktion, damit Kasten 12 festlegen kann, wohin die Seite nach dem
+ * Wechsel springt, ohne den Wechsel selbst anzufassen. Gibt das Ergebnis
+ * von Anmeldung.wechseln zurück ({ ok, fehler, email }).
+ */
+async function kontoWechselnZu(id) {
+  if (!window.Anmeldung?.wechseln) return { ok: false, fehler: 'Die Anmeldung ist gerade nicht erreichbar.' };
+  const ergebnis = await window.Anmeldung.wechseln(id);
+  if (!ergebnis.ok) return ergebnis;
+  // Der Geräteschlüssel wird für das neue Konto neu angemeldet.
+  window.KryptoWeb?.vergessen();
+  await bootstrap();
+  return ergebnis;
+}
+
 function openKontoWechsel() {
   /*
    * Die Kontoliste zeigt, wer wirklich angemeldet ist.
@@ -8007,23 +8033,37 @@ function openKontoWechsel() {
    * angemeldet hatte. Wer die Seite zum ersten Mal oeffnete, sah ein Konto,
    * das es nicht gab.
    */
-  const angemeldet = window.Anmeldung?.angemeldet?.() ? window.Anmeldung.nutzer() : null;
-  if (angemeldet) {
+  /*
+   * Kasten 13.1 (29.09.2026): bis hierher stand in der Liste genau ein
+   * Eintrag mit der Kennung 'me', und ein Klick auf eine andere Zeile setzte
+   * nur `state.kontoAktiv` um — die Sitzung blieb dieselbe. Jetzt kommen
+   * die Konten aus Anmeldung.konten(): jedes, das in DIESEM Browser eine
+   * Sitzung hat, einmal. Ein Klick tauscht die Sitzung (kontoWechselnZu).
+   */
+  const kontenLaden = () => {
+    const angemeldet = window.Anmeldung?.angemeldet?.() ? window.Anmeldung.nutzer() : null;
     const ich = state.users?.me;
-    state.konten = [
-      {
-        id: 'me',
-        name: ich?.name || angemeldet.handle || 'Ich',
+    const liste = window.Anmeldung?.konten?.() || [];
+    state.konten = liste.map((k) => ({
+      id: k.id,
+      name: k.aktiv && ich?.name ? ich.name : k.name || k.handle || k.email,
+      email: k.email || '',
+      initials: k.aktiv && ich?.initials ? ich.initials : fruehereInitialen(k.name || k.email),
+      color: k.aktiv && ich?.color ? ich.color : k.id,
+    }));
+    // Die laufende Sitzung gehört immer dazu, auch wenn das Fach leer war.
+    if (angemeldet && !state.konten.some((k) => k.id === angemeldet.id)) {
+      state.konten.unshift({
+        id: angemeldet.id,
+        name: ich?.name || angemeldet.name || angemeldet.handle || 'Ich',
         email: angemeldet.email || '',
-        initials: ich?.initials || '',
-        color: ich?.color || '',
-      },
-    ];
-    state.kontoAktiv = 'me';
-  } else {
-    state.konten = [];
-    state.kontoAktiv = null;
-  }
+        initials: ich?.initials || fruehereInitialen(angemeldet.name),
+        color: ich?.color || angemeldet.id,
+      });
+    }
+    state.kontoAktiv = angemeldet?.id || null;
+  };
+  kontenLaden();
 
   /*
    * Der Ablauf folgt dem Prototyp-Frame "V + VP + NP + ...":
@@ -8056,11 +8096,12 @@ function openKontoWechsel() {
 
   /* Nur die, die nicht ohnehin schon oben in der Kontoliste stehen. */
   const offeneFrueher = () =>
-    fruehereKonten().filter((f) => !state.konten.some((k) => k.email && k.email === f.email));
+    fruehereKonten().filter(
+      (f) => !state.konten.some((k) => k.id === f.id || (k.email && k.email === f.email))
+    );
 
   const liste = () => `
     <div class="sheet__body">
-      ${offeneFrueher().length ? '<div class="sheet__gruppe">zuletzt verwendet</div>' : ''}
       ${state.konten
         .map(
           (k) => `<div class="row" data-konto="${k.id}">
@@ -8078,6 +8119,7 @@ function openKontoWechsel() {
         )
         .join('')}
 
+      ${offeneFrueher().length ? '<div class="sheet__gruppe">zuletzt verwendet</div>' : ''}
       ${offeneFrueher()
         .map(
           (k) => `<div class="row" data-frueher="${esc(k.email)}" data-frueher-id="${esc(k.id)}">
@@ -8090,6 +8132,8 @@ function openKontoWechsel() {
           </div>`
         )
         .join('')}
+
+      ${hinweis()}
 
       <button class="row" data-konto-neu="anmelden">
         <span class="konto__rund">${ICONS.person}</span>
@@ -8426,32 +8470,43 @@ function openKontoWechsel() {
             if (e.target.closest('[data-konto-weg]')) return;
             const id = el.dataset.konto;
             if (id === state.kontoAktiv) return close();
-            state.kontoAktiv = id;
             const k = state.konten.find((x) => x.id === id);
-            close();
-            toast(`Gewechselt zu ${k.name}`);
-            render();
+            void (async () => {
+              const ergebnis = await kontoWechselnZu(id);
+              if (ergebnis.ok) {
+                close();
+                toast(`Gewechselt zu ${k?.name || 'Konto'}`);
+                return;
+              }
+              // Abgelaufen: die Meldung steht IM Blatt, die Anmeldung dieses
+              // Kontos ist aufgeschlagen, es fehlt nur das Passwort.
+              kontenLaden();
+              zustand.kennung = ergebnis.email || k?.email || '';
+              zustand.passwort = '';
+              zustand.ansicht = 'anmelden';
+              meldung(ergebnis.fehler || 'Bitte melde dich erneut an.');
+            })();
           })
         );
         sheet.querySelectorAll('[data-konto-weg]').forEach((b) =>
           b.addEventListener('click', async () => {
             const id = b.dataset.kontoWeg;
             const k = state.konten.find((x) => x.id === id);
-            state.konten = state.konten.filter((x) => x.id !== id);
-            if (state.kontoAktiv === id) state.kontoAktiv = state.konten[0]?.id || null;
-            toast(`${k.name} abgemeldet`);
-
-            // Auch die echte Sitzung beenden, sonst bleibt die Seite
-            // angemeldet, obwohl das Konto aus der Liste verschwunden ist.
-            if (window.Anmeldung?.angemeldet()) {
-              await window.Anmeldung.abmelden();
+            if (k) fruehereMerken({ id: k.id, email: k.email, name: k.name });
+            const aktiv = id === state.kontoAktiv;
+            await window.Anmeldung?.kontoAbmelden?.(id);
+            kontenLaden();
+            if (aktiv) {
               // Den Geraeteschluessel aus dem Speicher dieser Seite werfen.
               // Der geheime Teil bleibt in localStorage — sonst waeren beim
               // naechsten Anmelden alle alten Nachrichten unlesbar.
               window.KryptoWeb?.vergessen();
               close();
+              toast(`${k?.name || 'Konto'} abgemeldet`);
               return bootstrap();
             }
+            zustand.hinweis = `${k?.name || 'Konto'} ist in diesem Browser abgemeldet`;
+            zustand.hinweisArt = 'gut';
             neuZeichnen();
           })
         );
@@ -10362,6 +10417,396 @@ function openVideoOptionen(clip, danach) {
   );
 }
 
+/* ------------------------------------------------ Spendenweg (Kasten 13) --
+ *
+ * Henrik am 21.09.2026: „Zahlungsmethode für den Spenden-Code (PayPal,
+ * Apple Pay, Google Pay, Kreditkarte o. ä.). Gespendet wird über einen
+ * personalisierten Code, den der Nutzer selbst festlegt; spätestens beim
+ * Spenden zu einem Spendenziel oder im Livestream."
+ *
+ * Wie in der App (SpendenwegContext/SpendenwegSheet) läuft JEDE Spende durch
+ * `spendenweg()`: fehlt eine Zahlungsmethode oder der Code, fragt das Blatt
+ * danach und macht dann mit derselben Spende weiter. Methoden und Code gehen
+ * über den Datenbank-Client des Browsers (RLS: nur eigene Zeilen; Code nur
+ * über die Funktionen `spendencode_*`), die Spende selbst über
+ * /api/spenden → `spende_senden`.
+ *
+ * Gespeichert werden nie Kartennummer oder CVC (Vorbehalt 13.2): gefragt
+ * wird nur nach den letzten vier Ziffern und dem Ablauf, bei PayPal nach der
+ * Adresse, die `Zahlung.methodeBauen` sofort maskiert.
+ */
+const METHODE_SPALTEN =
+  'id, anbieter, anzeigename, letzte4, ablauf_monat, ablauf_jahr, paypal_maskiert, standard, created_at';
+
+function zahlungsUmgebung() {
+  return { os: 'web', browser: Zahlung.browserErkennen(navigator.userAgent || '') };
+}
+
+async function spendenDaten() {
+  const db = await Anmeldung.aufbauen();
+  if (!db) throw new Error(Zahlung.grundText('nicht_angemeldet'));
+  const [st, liste] = await Promise.all([
+    db.rpc('spendencode_status'),
+    db
+      .from('zahlungsmethoden')
+      .select(METHODE_SPALTEN)
+      .order('standard', { ascending: false })
+      .order('created_at', { ascending: true }),
+  ]);
+  if (st.error) throw st.error;
+  if (liste.error) throw liste.error;
+  if (!st.data?.ok) throw new Error(Zahlung.grundText(st.data?.grund || 'nicht_angemeldet'));
+  return { db, status: st.data, methoden: liste.data || [] };
+}
+
+/**
+ * Das Blatt. `anfrage` = { empfaengerId, name, cent, postId } für eine
+ * Spende; ohne `anfrage` die Verwaltung aus den Einstellungen.
+ * Gibt ein Promise zurück: true, wenn die Spende steht.
+ */
+function spendenweg(anfrage, bereich) {
+  return new Promise((fertig) => {
+    let erledigt = false;
+    const ende = (ok) => {
+      if (erledigt) return;
+      erledigt = true;
+      fertig(ok);
+    };
+    const titel = anfrage
+      ? `${Zahlung.euro(anfrage.cent)} an ${anfrage.name || 'dieses Profil'}`
+      : bereich === 'methoden'
+        ? 'Zahlungsmethoden'
+        : 'Spendencode';
+
+    openSheet(
+      titel,
+      `<div class="sheet__body" id="swInhalt"><p class="sheet__hint">Lädt …</p></div>
+       <div class="sheet__fehler" id="swFehler" role="alert" hidden></div>
+       <div class="sheet__hint" id="swErfolg" hidden></div>`,
+      (blatt, zu) => {
+        const inhalt = blatt.querySelector('#swInhalt');
+        let db = null;
+        let status = null;
+        let methoden = [];
+        let gewaehlt = null;
+        let vorbelegterCode = '';
+        let loeschFrage = null;
+        let anbieter = null;
+
+        const melden = (text) => {
+          const f = blatt.querySelector('#swFehler');
+          f.textContent = text || '';
+          f.hidden = !text;
+          if (text) blatt.querySelector('#swErfolg').hidden = true;
+        };
+        const gut = (text) => {
+          const f = blatt.querySelector('#swErfolg');
+          f.textContent = text;
+          f.hidden = false;
+        };
+        const wert = (id) => blatt.querySelector('#' + id)?.value || '';
+        const feld = (id, label, { geheim, platzhalter, modus, laenge } = {}) =>
+          `<div class="sheet__field">
+             <label class="sheet__label" for="${id}">${esc(label)}</label>
+             <input id="${id}" type="${geheim ? 'password' : 'text'}" autocomplete="${geheim ? 'off' : 'off'}"
+               ${modus ? `inputmode="${modus}"` : ''} ${laenge ? `maxlength="${laenge}"` : ''}
+               placeholder="${esc(platzhalter || '')}">
+           </div>`;
+        const knopf = (id, text, leise) =>
+          `<button class="prof__btn ${leise ? '' : 'is-primary'}" id="${id}" type="button">${esc(text)}</button>`;
+
+        const laden = async () => {
+          const d = await spendenDaten();
+          db = d.db;
+          status = d.status;
+          methoden = d.methoden;
+          if (!methoden.some((m) => m.id === gewaehlt)) {
+            gewaehlt = (methoden.find((m) => m.standard) || methoden[0] || {}).id || null;
+          }
+        };
+
+        const naechste = () => {
+          if (!anfrage) return zeige('uebersicht');
+          if (!methoden.length) return zeige('methode');
+          if (!status.gesetzt) return zeige('code');
+          return zeige('bestaetigen');
+        };
+
+        const methodenHtml = (waehlen) =>
+          methoden
+            .map((m) => {
+              const an = waehlen ? gewaehlt === m.id : m.standard;
+              const alt = m.anbieter === 'karte' && Zahlung.abgelaufen(m.ablauf_monat, m.ablauf_jahr);
+              const unter = alt ? 'Abgelaufen' : m.standard ? 'Standard' : waehlen ? '' : 'Klicken, um Standard zu machen';
+              return `<div class="item" data-methode-zeile="${m.id}">
+                <button class="item" type="button" data-methode="${m.id}" aria-pressed="${an}" style="flex:1">
+                  <span class="item__icon">${an ? ICONS.check : ICONS.karte}</span>
+                  <span class="item__label">${esc(Zahlung.methodeText(m))}
+                    ${unter ? `<small class="sheet__hint" style="display:block">${esc(unter)}</small>` : ''}</span>
+                </button>
+                ${
+                  waehlen
+                    ? ''
+                    : `<button class="prof__btn" type="button" data-methode-loeschen="${m.id}" aria-label="${esc(Zahlung.methodeText(m))} löschen">${
+                        loeschFrage === m.id ? 'Wirklich löschen?' : ICONS.trash
+                      }</button>`
+                }
+              </div>`;
+            })
+            .join('');
+
+        const zeige = (ansicht) => {
+          melden('');
+          blatt.querySelector('#swErfolg').hidden = true;
+          inhalt.dataset.ansicht = ansicht;
+
+          if (ansicht === 'methode') {
+            const moeglich = Zahlung.anbieterFuer(zahlungsUmgebung());
+            inhalt.innerHTML = `
+              <p class="sheet__hint">${
+                anfrage && !methoden.length ? 'Für deine erste Spende brauchst du eine Zahlungsmethode.' : 'Neue Zahlungsmethode'
+              }</p>
+              ${moeglich
+                .map(
+                  (a) => `<button class="item" type="button" data-anbieter="${a.id}" aria-pressed="${anbieter === a.id}">
+                    <span class="item__icon">${anbieter === a.id ? ICONS.check : ICONS.karte}</span>
+                    <span class="item__label">${esc(a.name)}</span>
+                  </button>`
+                )
+                .join('')}
+              ${anbieter === 'paypal' ? feld('swMail', 'E-Mail deines PayPal-Kontos', { platzhalter: 'name@beispiel.de', modus: 'email' }) : ''}
+              ${
+                anbieter === 'karte'
+                  ? feld('swLetzte4', 'Letzte vier Ziffern der Karte', { platzhalter: '4242', modus: 'numeric', laenge: 4 }) +
+                    feld('swAblauf', 'Gültig bis (MM/JJ)', { platzhalter: '08/28', laenge: 7 })
+                  : ''
+              }
+              ${anbieter ? feld('swName', 'Name (freiwillig)', { platzhalter: 'z. B. Privatkonto', laenge: 40 }) : ''}
+              <p class="sheet__hint">Gespeichert werden nur Art, Name${
+                anbieter === 'karte' ? ', die letzten vier Ziffern und das Ablaufdatum' : ''
+              }${anbieter === 'paypal' ? ' und die gekürzte Adresse' : ''}. Keine Kartennummer, kein Prüfcode.</p>
+              <div class="sheet__footer">${knopf('swMethodeSpeichern', 'Speichern')}${
+                methoden.length ? knopf('swZurueck', 'Zurück', true) : ''
+              }</div>`;
+            inhalt.querySelectorAll('[data-anbieter]').forEach((b) =>
+              b.addEventListener('click', () => {
+                anbieter = b.dataset.anbieter;
+                zeige('methode');
+              })
+            );
+            inhalt.querySelector('#swZurueck')?.addEventListener('click', () => zeige(anfrage ? 'bestaetigen' : 'uebersicht'));
+            inhalt.querySelector('#swMethodeSpeichern').addEventListener('click', async () => {
+              if (!anbieter) return melden('Bitte eine Zahlungsart wählen');
+              const gebaut = Zahlung.methodeBauen(
+                anbieter,
+                { anzeigename: wert('swName'), email: wert('swMail'), letzte4: wert('swLetzte4'), ablauf: wert('swAblauf') },
+                zahlungsUmgebung()
+              );
+              if (!gebaut.zeile) return melden(gebaut.fehler);
+              const { data, error } = await db
+                .from('zahlungsmethoden')
+                .insert({ ...gebaut.zeile, standard: methoden.length === 0 })
+                .select(METHODE_SPALTEN)
+                .single();
+              if (error) return melden(error.message || 'Speichern hat nicht geklappt');
+              anbieter = null;
+              gewaehlt = data.id;
+              await laden();
+              if (anfrage) return zeige(status.gesetzt ? 'bestaetigen' : 'code');
+              zeige('uebersicht');
+              gut(`${Zahlung.methodeText(data)} hinterlegt`);
+            });
+            return;
+          }
+
+          if (ansicht === 'code' || ansicht === 'aendern' || ansicht === 'vergessen') {
+            const text = {
+              code: anfrage
+                ? 'Leg deinen persönlichen Spendencode fest. Du gibst ihn bei jeder Spende ein — so kann niemand ohne dich spenden.'
+                : 'Leg deinen persönlichen Spendencode fest.',
+              aendern: '',
+              vergessen: 'Bestätige dein Passwort, dann kannst du einen neuen Spendencode festlegen.',
+            }[ansicht];
+            inhalt.innerHTML = `
+              ${text ? `<p class="sheet__hint">${esc(text)}</p>` : ''}
+              ${ansicht === 'aendern' ? feld('swBisher', 'Bisheriger Spendencode', { geheim: true, laenge: 24 }) : ''}
+              ${ansicht === 'vergessen' ? feld('swPasswort', 'Passwort', { geheim: true }) : ''}
+              ${feld('swNeu', ansicht === 'code' ? 'Spendencode' : 'Neuer Spendencode', { geheim: true, laenge: 24, platzhalter: ansicht === 'code' ? 'z. B. HENRIK2026' : '' })}
+              ${feld('swNeu2', ansicht === 'code' ? 'Spendencode wiederholen' : 'Neuen Spendencode wiederholen', { geheim: true, laenge: 24 })}
+              <p class="sheet__hint">${esc(Zahlung.CODE_REGEL_TEXT)}</p>
+              <div class="sheet__footer">
+                ${knopf('swCodeOk', ansicht === 'code' ? (anfrage ? 'Festlegen und weiter' : 'Festlegen') : ansicht === 'aendern' ? 'Ändern' : 'Neuen Code speichern')}
+                ${ansicht === 'aendern' ? knopf('swVergessen', 'Code vergessen?', true) + knopf('swEntfernen', 'Code entfernen', true) : ''}
+                ${anfrage && ansicht === 'code' ? '' : knopf('swZurueck', 'Zurück', true)}
+              </div>`;
+            inhalt.querySelector('#swZurueck')?.addEventListener('click', () => zeige(anfrage ? 'bestaetigen' : 'uebersicht'));
+            inhalt.querySelector('#swVergessen')?.addEventListener('click', () => zeige('vergessen'));
+            inhalt.querySelector('#swEntfernen')?.addEventListener('click', async () => {
+              const bisher = wert('swBisher');
+              if (!bisher) return melden('Bitte deinen bisherigen Code eingeben');
+              const { data, error } = await db.rpc('spendencode_entfernen', { p_bisher: bisher });
+              if (error) return melden(error.message);
+              if (!data?.ok) return melden(Zahlung.grundText(data?.grund, data?.verbleibend));
+              await laden();
+              zeige('uebersicht');
+              gut('Spendencode entfernt');
+            });
+            inhalt.querySelector('#swCodeOk').addEventListener('click', async () => {
+              const neu = wert('swNeu');
+              const regel = Zahlung.codePruefe(neu);
+              if (regel) return melden(regel);
+              if (Zahlung.codeNormal(neu) !== Zahlung.codeNormal(wert('swNeu2'))) return melden('Die beiden Codes sind nicht gleich');
+              let bisher = null;
+              if (ansicht === 'aendern') bisher = wert('swBisher') || null;
+              if (ansicht === 'vergessen') {
+                const passwort = wert('swPasswort');
+                if (!passwort) return melden('Bitte dein Passwort eingeben');
+                // Frisch anmelden — die Datenbank prüft den Zeitpunkt (amr).
+                const email = Anmeldung.nutzer()?.email;
+                const { error } = await db.auth.signInWithPassword({ email, password: passwort });
+                if (error) return melden('Das Passwort stimmt nicht');
+              }
+              const { data, error } = await db.rpc('spendencode_setzen', { p_neu: neu, p_bisher: bisher });
+              if (error) return melden(error.message);
+              if (!data?.ok) return melden(Zahlung.grundText(data?.grund, data?.verbleibend));
+              await laden();
+              if (anfrage) {
+                vorbelegterCode = neu;
+                return zeige('bestaetigen');
+              }
+              zeige('uebersicht');
+              gut(ansicht === 'code' ? 'Spendencode gespeichert' : 'Neuer Spendencode gespeichert');
+            });
+            return;
+          }
+
+          if (ansicht === 'bestaetigen') {
+            inhalt.innerHTML = `
+              <p class="sheet__label">Bezahlen mit</p>
+              ${methodenHtml(true)}
+              <button class="item" type="button" id="swMethodeNeu">
+                <span class="item__icon">${ICONS.plus}</span>
+                <span class="item__label">Zahlungsmethode hinzufügen</span>
+              </button>
+              ${
+                status.gesperrt
+                  ? `<p class="sheet__fehler">${esc(Zahlung.grundText('gesperrt'))}</p>`
+                  : feld('swCode', 'Dein Spendencode', { geheim: true, laenge: 24 })
+              }
+              <p class="sheet__hint">Die Spende wird vorgemerkt. Abgebucht wird erst, sobald ein Zahlungsdienst angeschlossen ist.</p>
+              <div class="sheet__footer">
+                ${knopf('swSpenden', `${Zahlung.euro(anfrage.cent)} spenden`)}
+                ${knopf('swVergessen', 'Code vergessen?', true)}
+              </div>`;
+            const codeFeld = inhalt.querySelector('#swCode');
+            if (codeFeld && vorbelegterCode) codeFeld.value = vorbelegterCode;
+            inhalt.querySelectorAll('[data-methode]').forEach((b) =>
+              b.addEventListener('click', () => {
+                gewaehlt = b.dataset.methode;
+                const code = wert('swCode');
+                zeige('bestaetigen');
+                if (code) inhalt.querySelector('#swCode').value = code;
+              })
+            );
+            inhalt.querySelector('#swMethodeNeu').addEventListener('click', () => zeige('methode'));
+            inhalt.querySelector('#swVergessen').addEventListener('click', () => zeige('vergessen'));
+            const senden = async () => {
+              const code = wert('swCode');
+              if (!code) return melden('Bitte deinen Spendencode eingeben');
+              const knopfEl = inhalt.querySelector('#swSpenden');
+              knopfEl.disabled = true;
+              const antwort = await api(`/api/spenden/${anfrage.empfaengerId}`, {
+                betragCent: anfrage.cent,
+                postId: anfrage.postId,
+                code,
+                methodeId: gewaehlt,
+              });
+              knopfEl.disabled = false;
+              vorbelegterCode = '';
+              if (antwort?.ok) {
+                ende(true);
+                return zu();
+              }
+              if (antwort?.grund === 'kein_code' || antwort?.grund === 'keine_zahlungsmethode' || antwort?.grund === 'methode_unbekannt') {
+                await laden();
+                zeige(antwort.grund === 'kein_code' ? 'code' : 'methode');
+              } else if (inhalt.querySelector('#swCode')) {
+                inhalt.querySelector('#swCode').value = '';
+                if (antwort?.grund === 'gesperrt') {
+                  await laden();
+                  zeige('bestaetigen');
+                }
+              }
+              melden(antwort?.error || 'Die Spende ging nicht durch');
+            };
+            inhalt.querySelector('#swSpenden').addEventListener('click', senden);
+            codeFeld?.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') senden();
+            });
+            return;
+          }
+
+          // Übersicht aus den Einstellungen.
+          inhalt.innerHTML = `
+            <p class="sheet__label">Spendencode</p>
+            <div class="item">
+              <span class="item__icon">${ICONS.lock}</span>
+              <span class="item__label">${status.gesetzt ? 'Festgelegt' : 'Noch nicht festgelegt'}
+                <small class="sheet__hint" style="display:block">Wird vor jeder Spende abgefragt — bei Spendenzielen und im Livestream.</small></span>
+            </div>
+            <div class="sheet__footer">${knopf('swCodeBearbeiten', status.gesetzt ? 'Spendencode ändern' : 'Spendencode festlegen', true)}</div>
+            <p class="sheet__label">Zahlungsmethoden</p>
+            ${methoden.length ? '' : '<p class="sheet__hint">Noch keine Zahlungsmethode hinterlegt.</p>'}
+            ${methodenHtml(false)}
+            <button class="item" type="button" id="swMethodeNeu">
+              <span class="item__icon">${ICONS.plus}</span>
+              <span class="item__label">Zahlungsmethode hinzufügen</span>
+            </button>`;
+          inhalt.querySelector('#swCodeBearbeiten').addEventListener('click', () => zeige(status.gesetzt ? 'aendern' : 'code'));
+          inhalt.querySelector('#swMethodeNeu').addEventListener('click', () => zeige('methode'));
+          inhalt.querySelectorAll('[data-methode]').forEach((b) =>
+            b.addEventListener('click', async () => {
+              const { data, error } = await db
+                .from('zahlungsmethoden')
+                .update({ standard: true })
+                .eq('id', b.dataset.methode)
+                .select('id');
+              if (error || !data?.length) return melden('Das hat nicht geklappt');
+              await laden();
+              zeige('uebersicht');
+              gut('Standard geändert');
+            })
+          );
+          inhalt.querySelectorAll('[data-methode-loeschen]').forEach((b) =>
+            b.addEventListener('click', async () => {
+              const id = b.dataset.methodeLoeschen;
+              if (loeschFrage !== id) {
+                loeschFrage = id;
+                return zeige('uebersicht');
+              }
+              loeschFrage = null;
+              // Ein abgelehntes DELETE meldet keinen Fehler — deshalb zählen.
+              const { error, count } = await db.from('zahlungsmethoden').delete({ count: 'exact' }).eq('id', id);
+              if (error || !count) return melden('Löschen hat nicht geklappt');
+              await laden();
+              zeige('uebersicht');
+              gut('Zahlungsmethode gelöscht');
+            })
+          );
+        };
+
+        laden()
+          .then(naechste)
+          .catch((fehler) => {
+            inhalt.innerHTML = '';
+            melden(fehler?.message || 'Laden hat nicht geklappt');
+          });
+      },
+      { schliessen: true, hoch: !anfrage, beimSchliessen: () => ende(false) }
+    );
+  });
+}
+
 /*
  * Spenden an eine Person, waehrend eines Streams. Feste Stufen als schneller
  * Weg, dahinter ein eigener Betrag — Henrik am 21.09.2026: „Spenden: eigener
@@ -10371,10 +10816,10 @@ function openVideoOptionen(clip, danach) {
  */
 function openSpende(empfaengerId, postId) {
   const name = user(empfaengerId).name;
+  // Kasten 13: jede Spende läuft durch den Spendenweg (Methode, Code).
   const buchen = async (cent) => {
-    const antwort = await api(`/api/spenden/${empfaengerId}`, { betragCent: cent, postId });
-    if (!antwort?.ok) return toast(antwort?.error || 'Die Spende ging nicht durch');
-    toast(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${name} gespendet`);
+    const ok = await spendenweg({ empfaengerId, name, cent, postId });
+    if (ok) toast(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${name} gespendet`);
   };
   openSheet(
     `An ${name} spenden`,

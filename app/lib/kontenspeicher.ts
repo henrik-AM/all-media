@@ -32,6 +32,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { sitzungsspeicher } from './sitzungsspeicher';
+import { SUPABASE_CONFIG } from '../constants/supabase';
 
 const VORSATZ = 'all-media.konto.';
 
@@ -125,6 +126,63 @@ export async function sitzungWechseln(client: SupabaseClient, kontoId: string): 
 export async function sitzungVergessen(kontoId: string): Promise<void> {
   await sitzungsspeicher.removeItem(VORSATZ + kontoId);
   await listeSetzen((await liste()).filter((id) => id !== kontoId));
+}
+
+/** Zu welchen Konten liegt auf diesem Gerät eine Sitzung? */
+export async function gespeicherteKonten(): Promise<string[]> {
+  return liste();
+}
+
+/**
+ * Die Sitzung eines NICHT aktiven Kontos auch beim Server beenden.
+ *
+ * WARUM (Feedback 21.09.2026, Kasten 13.1)
+ *
+ * Bis zum 29.09.2026 warf „Abmelden" an einem zweiten Konto nur den Eintrag
+ * im Schlüsselbund weg. Beim Server lief die Sitzung weiter — das
+ * Erneuerungstoken blieb ein gültiger Dauerausweis, nur eben verwaist. Wer
+ * es vorher kopiert hätte, hätte weiter als dieses Konto schreiben können.
+ *
+ * Der Client darf dafür nicht benutzt werden: in ihm steckt das AKTIVE
+ * Konto. Also zwei nackte Aufrufe an die Auth-Schnittstelle: erst mit dem
+ * Erneuerungstoken ein frisches Zugangstoken holen (das alte kann längst
+ * abgelaufen sein), dann mit diesem `/logout?scope=local` — das beendet
+ * genau diese eine Sitzung und keine andere des Kontos.
+ *
+ * Bestmöglich: ohne Netz bleibt nur das lokale Vergessen. Das Konto ist dann
+ * trotzdem von diesem Gerät weg, und das ist, was der Nutzer verlangt hat.
+ */
+export async function sitzungWiderrufen(kontoId: string): Promise<boolean> {
+  let eintrag: GespeicherteSitzung | null = null;
+  try {
+    const roh = await sitzungsspeicher.getItem(VORSATZ + kontoId);
+    eintrag = roh ? (JSON.parse(roh) as GespeicherteSitzung) : null;
+  } catch {
+    eintrag = null;
+  }
+  let widerrufen = false;
+  if (eintrag?.refresh_token && SUPABASE_CONFIG.url) {
+    try {
+      const kopf = { apikey: SUPABASE_CONFIG.anonKey, 'Content-Type': 'application/json' };
+      const neu = await fetch(`${SUPABASE_CONFIG.url}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: kopf,
+        body: JSON.stringify({ refresh_token: eintrag.refresh_token }),
+      });
+      const daten = neu.ok ? await neu.json() : null;
+      if (daten?.access_token) {
+        const aus = await fetch(`${SUPABASE_CONFIG.url}/auth/v1/logout?scope=local`, {
+          method: 'POST',
+          headers: { ...kopf, Authorization: `Bearer ${daten.access_token}` },
+        });
+        widerrufen = aus.ok;
+      }
+    } catch (e: any) {
+      console.warn('Sitzung liess sich beim Server nicht beenden:', e?.message ?? e);
+    }
+  }
+  await sitzungVergessen(kontoId);
+  return widerrufen;
 }
 
 /** Alle Sitzungen wegwerfen — beim vollständigen Abmelden. */

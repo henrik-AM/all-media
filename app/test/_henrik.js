@@ -127,10 +127,29 @@ function ok(name, bedingung, zusatz = '') {
 
   // "Beim Druecken von Like ... darf sich die rechte Seitenleiste nicht
   //  verschieben."
-  const leiste = seite.locator('.slide__rail').first();
-  if (await leiste.count()) {
+  /*
+   * Nur an einem Demo-Beitrag liken (Kasten 13.4, 29.09.2026). Hier stand
+   * „der erste Like-Knopf" — der Feed ist gerankt, und oben kann ein
+   * öffentliches Reel eines echten Kontos stehen. Dessen Besitzer bekäme
+   * dann eine Mitteilung „prueflauf gefällt dein Beitrag".
+   */
+  const demoVid = await seite.evaluate(async () => {
+    const ids = [...document.querySelectorAll('[data-vaction="like"][data-vid]')].map((b) => b.dataset.vid);
+    if (!ids.length) return null;
+    const client = await window.Anmeldung.aufbauen();
+    const { data } = await client.from('posts').select('id, profiles!user_id(demo)').in('id', ids.slice(0, 40));
+    const demo = new Set((data || []).filter((b) => b.profiles && b.profiles.demo).map((b) => b.id));
+    return ids.find((id) => demo.has(id)) || null;
+  });
+  const leiste = demoVid
+    ? seite.locator(`#slide-${demoVid} .slide__rail`).first()
+    : seite.locator('.slide__rail').first();
+  if (!demoVid) {
+    ok('Seitenleiste bleibt beim Liken an ihrer Stelle', false, 'kein Demo-Reel im Feed — echte Konten werden nicht geliked');
+  } else if (await leiste.count()) {
+    await seite.locator(`#slide-${demoVid}`).scrollIntoViewIfNeeded();
     const vorher = await leiste.boundingBox();
-    await seite.locator('[data-vaction="like"]').first().click();
+    await seite.locator(`[data-vaction="like"][data-vid="${demoVid}"]`).first().click();
     await seite.waitForTimeout(300);
     const nachher = await leiste.boundingBox();
     ok(

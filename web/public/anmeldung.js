@@ -98,12 +98,182 @@
     const { data } = await client.auth.getSession();
     sitzung = data?.session || null;
 
-    client.auth.onAuthStateChange((_ereignis, neue) => {
+    client.auth.onAuthStateChange((ereignis, neue) => {
       sitzung = neue;
+      // Jede neue Sitzung sofort ins Kontenfach — das Erneuerungstoken wird
+      // bei jedem Auffrischen ausgetauscht, das alte ist dann verbraucht.
+      if (neue && (ereignis === 'SIGNED_IN' || ereignis === 'TOKEN_REFRESHED' || ereignis === 'USER_UPDATED' || ereignis === 'INITIAL_SESSION')) {
+        kontoSichern(neue);
+      }
       melden();
     });
+    if (sitzung) kontoSichern(sitzung);
 
     return client;
+  }
+
+  /*
+   * MEHRERE KONTEN IN EINEM BROWSER (Feedback 21.09.2026, Kasten 13.1)
+   *
+   * Die App führt seit dem 07.09.2026 eine Kontenliste mit einer Sitzung je
+   * Konto (app/lib/kontenspeicher.ts). Die Website hatte genau eine Sitzung:
+   * „Konto wechseln" zeigte ein einziges, erfundenes Konto, und ein zweites
+   * anzumelden überschrieb das erste. Jetzt dasselbe wie in der App:
+   *
+   *   - je Konto die beiden Token, dazu Name und E-Mail für die Zeile,
+   *   - beim Wechsel `setSession` mit den Token des Ziels,
+   *   - scheitert das (abgelaufen, Passwort anderswo geändert, anderswo
+   *     abgemeldet), fliegt das Konto aus der Liste und muss sein Passwort
+   *     wieder eingeben — ein Konto, das nie hier angemeldet war, steht gar
+   *     nicht erst drin.
+   *
+   * WO: in localStorage, im selben Fach-Muster wie die laufende Sitzung von
+   * supabase-js (`all-media-sitzung`). Einen sichereren Ort gibt es im
+   * Browser ohne eigenen Server-Cookie nicht; ein Erneuerungstoken für Konto
+   * B liegt damit genauso sicher wie das für Konto A, nicht schlechter.
+   * Kein Passwort — nur die Token, die supabase-js ohnehin dort ablegt.
+   */
+  const KONTEN_FACH = 'all-media.web.konten.v1';
+
+  function kontenLesen() {
+    try {
+      const roh = JSON.parse(localStorage.getItem(KONTEN_FACH) || '{}');
+      return roh && typeof roh === 'object' && !Array.isArray(roh) ? roh : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function kontenSchreiben(konten) {
+    try {
+      localStorage.setItem(KONTEN_FACH, JSON.stringify(konten));
+    } catch {
+      // Speicher voll oder gesperrt — dann gibt es eben keinen Schnellwechsel.
+    }
+  }
+
+  function kontoSichern(s) {
+    if (!s?.user?.id || !s.refresh_token) return;
+    const u = s.user;
+    const konten = kontenLesen();
+    const bisher = konten[u.id] || {};
+    konten[u.id] = {
+      id: u.id,
+      email: u.email || bisher.email || '',
+      name: u.user_metadata?.name || bisher.name || (u.email || '').split('@')[0],
+      handle: u.user_metadata?.handle || bisher.handle || '',
+      access_token: s.access_token,
+      refresh_token: s.refresh_token,
+      zuletzt: Date.now(),
+    };
+    kontenSchreiben(konten);
+  }
+
+  function kontoVergessen(id) {
+    const konten = kontenLesen();
+    delete konten[id];
+    kontenSchreiben(konten);
+  }
+
+  /** Die Konten mit Sitzung in diesem Browser — ohne Token, jedes einmal. */
+  function konten() {
+    const aktiv = sitzung?.user?.id || null;
+    return Object.values(kontenLesen())
+      .filter((k) => k && k.id && k.refresh_token)
+      .sort((a, b) => (b.zuletzt || 0) - (a.zuletzt || 0))
+      .map((k) => ({ id: k.id, email: k.email, name: k.name, handle: k.handle, aktiv: k.id === aktiv }));
+  }
+
+  /**
+   * Auf ein anderes Konto umschalten, ohne Passwort.
+   * Gibt `{ ok, fehler, email }` zurück; bei `ok: false` ist das Konto
+   * aus der Liste genommen, `email` dient zum Vorbelegen der Anmeldung.
+   */
+  async function wechseln(id) {
+    const c = await aufbauen();
+    if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
+    if (sitzung?.user?.id === id) return { ok: true };
+    if (sitzung) kontoSichern(sitzung);
+
+    const ziel = kontenLesen()[id];
+    if (!ziel?.refresh_token) return { ok: false, fehler: 'Dieses Konto ist hier nicht angemeldet.' };
+
+    const vorher = sitzung;
+    const { data, error } = await c.auth.setSession({
+      access_token: ziel.access_token,
+      refresh_token: ziel.refresh_token,
+    });
+    if (error || !data?.session || data.session.user?.id !== id) {
+      kontoVergessen(id);
+      // Zurück auf das Konto, das vorher lief — sonst steht die Seite ohne
+      // Sitzung da, nur weil ein ANDERES Konto abgelaufen war.
+      if (vorher?.refresh_token) {
+        const zurueck = kontenLesen()[vorher.user.id] || vorher;
+        await c.auth.setSession({ access_token: zurueck.access_token, refresh_token: zurueck.refresh_token }).catch(() => null);
+      }
+      return {
+        ok: false,
+        email: ziel.email,
+        fehler: `Die Anmeldung von ${ziel.name || ziel.email} ist abgelaufen. Bitte gib das Passwort erneut ein.`,
+      };
+    }
+    sitzung = data.session;
+    kontoSichern(sitzung);
+    melden();
+    return { ok: true, nutzer: nutzer() };
+  }
+
+  /**
+   * Die Sitzung eines NICHT aktiven Kontos beim Server beenden und vergessen.
+   * Der Client wird dafür nicht angefasst — in ihm steckt das aktive Konto.
+   */
+  async function widerrufen(eintrag) {
+    try {
+      const konfig = await (await fetch('/api/konfiguration')).json();
+      const kopf = { apikey: konfig.supabaseKey, 'Content-Type': 'application/json' };
+      const neu = await fetch(konfig.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: kopf,
+        body: JSON.stringify({ refresh_token: eintrag.refresh_token }),
+      });
+      const daten = neu.ok ? await neu.json() : null;
+      if (!daten?.access_token) return false;
+      const aus = await fetch(konfig.supabaseUrl + '/auth/v1/logout?scope=local', {
+        method: 'POST',
+        headers: { ...kopf, Authorization: 'Bearer ' + daten.access_token },
+      });
+      return aus.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Ein Konto aus diesem Browser abmelden. Ist es das laufende, übernimmt
+   * das nächste mit gültiger Sitzung; gibt `{ ok, weiter }` zurück —
+   * `weiter` ist das Konto, das jetzt läuft, oder null.
+   */
+  async function kontoAbmelden(id) {
+    const c = await aufbauen();
+    if (!c) return { ok: false, weiter: null };
+    if (sitzung?.user?.id !== id) {
+      const eintrag = kontenLesen()[id];
+      if (eintrag?.refresh_token) await widerrufen(eintrag);
+      kontoVergessen(id);
+      return { ok: true, weiter: nutzer() };
+    }
+
+    // `local`: nur DIESE Sitzung. Ohne Angabe beendet supabase-js jede
+    // Sitzung des Kontos auf jedem Gerät — auch die in der App.
+    await c.auth.signOut({ scope: 'local' }).catch(() => null);
+    kontoVergessen(id);
+    sitzung = null;
+    for (const naechstes of konten()) {
+      const w = await wechseln(naechstes.id);
+      if (w.ok) return { ok: true, weiter: nutzer() };
+    }
+    melden();
+    return { ok: true, weiter: null };
   }
 
   function melden() {
@@ -228,6 +398,7 @@
     if (error) return { ok: false, fehler: uebersetze(error.message) };
 
     sitzung = data.session;
+    kontoSichern(sitzung);
     melden();
     return { ok: true, nutzer: nutzer() };
   }
@@ -377,12 +548,19 @@
     rpc('einwilligung_entscheiden', { p_kind: kind, p_zustimmen: zustimmen },
       { ok: false, meldung: 'Die Entscheidung ist gerade nicht möglich.' });
 
+  /**
+   * Das laufende Konto abmelden — das nächste Konto mit Sitzung übernimmt
+   * (Kasten 13.1). Bis zum 29.09.2026 beendete das mit `signOut()` ohne
+   * scope jede Sitzung des Kontos auf JEDEM Gerät, auch in der App.
+   */
   async function abmelden() {
+    const id = sitzung?.user?.id;
+    if (id) return kontoAbmelden(id);
     const c = await aufbauen();
-    if (c) await c.auth.signOut();
+    if (c) await c.auth.signOut({ scope: 'local' }).catch(() => null);
     sitzung = null;
     melden();
-    return { ok: true };
+    return { ok: true, weiter: null };
   }
 
   async function passwortVergessen(email) {
@@ -442,6 +620,9 @@
     anmelden,
     registrieren,
     abmelden,
+    konten,
+    wechseln,
+    kontoAbmelden,
     passwortVergessen,
     passwortAendern,
     benutzernameFrei,

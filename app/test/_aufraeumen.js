@@ -36,6 +36,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { nurTestkonto } = require('./_nur_testkonten');
 
 /** Zaehlt, wie viele Mitteilungen des Pruefkontos gerade herumliegen. */
 async function zaehlen() {
@@ -64,7 +65,7 @@ function umgebung() {
   return {
     token: process.env.SUPABASE_TOKEN,
     projekt: (url.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] || '',
-    konto: process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de',
+    konto: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   };
 }
 

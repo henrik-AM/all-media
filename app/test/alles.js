@@ -201,6 +201,7 @@ const LAEUFE = [
   ['elternnummer', '_eltern_nummer.js'],
   ['bremse', '_bremse.js'],
   ['auth', '_auth.js'],
+  ['zahlung', '_zahlung.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */

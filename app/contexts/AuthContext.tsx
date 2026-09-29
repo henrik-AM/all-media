@@ -30,10 +30,11 @@ import {
   passwortPruefen,
 } from '../lib/supabaseAuth';
 import {
-  alleVergessen,
+  gespeicherteKonten,
   sitzungSichern,
   sitzungVergessen,
   sitzungWechseln,
+  sitzungWiderrufen,
   werIstAngemeldet,
 } from '../lib/kontenspeicher';
 import { useSupabase } from './SupabaseContext';
@@ -202,6 +203,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const roh = await AsyncStorage.getItem(SPEICHER);
         if (!abgebrochen && roh) {
           const daten = JSON.parse(roh) as { konten?: AuthUser[]; aktivId?: string | null };
+          /*
+           * Jedes Konto nur einmal (Kasten 13.1). Die Liste wird an vier
+           * Stellen fortgeschrieben; stand eine Kennung durch einen alten
+           * Stand doppelt drin, zeigte der Kontowechsel sie zweimal.
+           */
+          if (Array.isArray(daten.konten)) {
+            const gesehen = new Set<string>();
+            daten.konten = daten.konten.filter((k) => k?.id && !gesehen.has(k.id) && gesehen.add(k.id));
+          }
           if (Array.isArray(daten.konten) && daten.konten.length > 0) {
             /*
              * Das gemerkte Konto zaehlt nur, wenn Supabase auch eine Sitzung
@@ -218,6 +228,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
              */
             let angemeldetId: string | null = null;
             if (supabase) angemeldetId = await werIstAngemeldet(supabase);
+
+            /*
+             * Die laufende Sitzung ist weg — aber vielleicht nicht die der
+             * anderen Konten (Kasten 13.1, 29.09.2026).
+             *
+             * Bisher hiess eine abgelaufene Sitzung des AKTIVEN Kontos: alle
+             * Konten vergessen. Die gueltigen Sitzungen der uebrigen lagen
+             * noch im Schluesselbund und wurden mit weggeworfen — danach
+             * brauchte jedes Konto wieder sein Passwort, obwohl es auf diesem
+             * Geraet angemeldet war. Jetzt wird der Reihe nach versucht, ein
+             * anderes gemerktes Konto einzusetzen.
+             */
+            if (supabase && !angemeldetId) {
+              const reihenfolge = [
+                ...daten.konten.filter((k) => k.id === daten.aktivId),
+                ...daten.konten.filter((k) => k.id !== daten.aktivId),
+              ];
+              for (const kandidat of reihenfolge) {
+                if (await sitzungWechseln(supabase, kandidat.id)) {
+                  angemeldetId = kandidat.id;
+                  daten.aktivId = kandidat.id;
+                  break;
+                }
+              }
+            }
+
+            /*
+             * In der Liste steht nur, wer hier noch eine Sitzung hat. Wessen
+             * Sitzung fehlt, gehoert zu „Zuletzt verwendet" — dort fragt die
+             * App nach dem Passwort, statt beim Antippen still zu scheitern.
+             */
+            if (supabase && angemeldetId) {
+              const mitSitzung = new Set(await gespeicherteKonten().catch(() => [] as string[]));
+              mitSitzung.add(angemeldetId);
+              daten.konten = daten.konten.filter((k) => mitSitzung.has(k.id));
+            }
 
             if (!supabase || angemeldetId) {
               setKonten(daten.konten);
@@ -250,8 +296,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               // der Rueckweg nach dem ersten Wechsel zu.
               if (supabase) await sitzungSichern(supabase).catch(() => null);
             } else {
+              // Keines der gemerkten Konten hat noch eine Sitzung —
+              // sitzungWechseln hat die toten Eintraege schon weggeraeumt.
               await AsyncStorage.removeItem(SPEICHER);
-              await alleVergessen().catch(() => undefined);
             }
           }
         }
@@ -377,15 +424,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [supabase, isConfigured, merken]
   );
 
+  /**
+   * „Abmelden" in den Einstellungen — nur das Konto, das gerade laeuft.
+   *
+   * Bis zum 29.09.2026 warf das ALLE Konten vom Geraet (`alleVergessen`) und
+   * beendete dazu jede Sitzung des Kontos auf jedem Geraet (`signOut` ohne
+   * scope). Wer drei Konten eingerichtet hatte und eines abmeldete, musste
+   * danach fuer die beiden anderen wieder das Passwort tippen — genau das,
+   * was der Kontowechsel ersparen soll (Kasten 13.1). Jetzt wie bei
+   * Instagram: dieses Konto geht, das naechste mit Sitzung uebernimmt; erst
+   * wenn keines mehr bleibt, steht die Anmeldemaske da.
+   */
   const logout = useCallback(async () => {
     setError(null);
-    if (supabase) {
-      await signOut(supabase);
+    if (!supabase || !aktivId) {
+      setKonten([]);
+      setAktivId(null);
+      return;
     }
-    await alleVergessen().catch(() => undefined);
+    const weg = konten.find((k) => k.id === aktivId);
+    if (weg) merken(weg);
+    await signOut(supabase);
+    await sitzungVergessen(aktivId).catch(() => undefined);
+    let rest = konten.filter((k) => k.id !== aktivId);
+    for (const naechstes of [...rest]) {
+      if (await sitzungWechseln(supabase, naechstes.id)) {
+        setKonten(rest);
+        setAktivId(naechstes.id);
+        return;
+      }
+      rest = rest.filter((k) => k.id !== naechstes.id);
+    }
     setKonten([]);
     setAktivId(null);
-  }, [supabase]);
+  }, [supabase, aktivId, konten, merken]);
 
   /**
    * Auf ein anderes eigenes Konto umschalten — samt Sitzung.
@@ -407,6 +479,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       const geklappt = await sitzungWechseln(supabase, kontoId);
       if (!geklappt) {
+        // Das Konto wandert nach „Zuletzt verwendet": dort fragt die App
+        // nach dem Passwort, statt es spurlos zu verlieren (Kasten 13.1).
+        const tot = konten.find((k) => k.id === kontoId);
+        if (tot) merken(tot);
         setKonten((prev) => prev.filter((k) => k.id !== kontoId));
         setError('Die Anmeldung dieses Kontos ist abgelaufen. Bitte melde es neu an.');
         return false;
@@ -433,7 +509,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return true;
     },
-    [supabase, konten, aktivId]
+    [supabase, konten, aktivId, merken]
   );
 
   const kontoHinzufuegen = useCallback(
@@ -441,13 +517,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setError(null);
 
       const existiert = konten.find((k) => k.email.toLowerCase() === email.toLowerCase());
-      if (existiert) {
-        // Schon in der Liste — dann ist das ein Wechsel, keine Anmeldung.
-        if (supabase && !(await sitzungWechseln(supabase, existiert.id))) {
-          scheitern('Die Anmeldung dieses Kontos ist abgelaufen. Bitte melde es neu an.');
+      if (existiert && !neu) {
+        /*
+         * Schon in der Liste — dann ist das ein Wechsel, keine Anmeldung.
+         *
+         * Bis zum 29.09.2026 endete ein fehlgeschlagener Wechsel hier mit
+         * „Bitte melde es neu an" — obwohl der Nutzer gerade genau das tat
+         * und sein Passwort im Feld stand. Jetzt faellt der Weg bei einer
+         * abgelaufenen Sitzung auf die normale Anmeldung mit diesem Passwort
+         * durch (Kasten 13.1).
+         */
+        if (!supabase || (await sitzungWechseln(supabase, existiert.id))) {
+          setAktivId(existiert.id);
+          return;
         }
-        setAktivId(existiert.id);
-        return;
+        setKonten((prev) => prev.filter((k) => k.id !== existiert.id));
       }
 
       const schwach = passwortPruefen(password);
@@ -551,30 +635,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     async (kontoId: string) => {
       const rest = konten.filter((k) => k.id !== kontoId);
 
+      const weg = konten.find((k) => k.id === kontoId);
+      if (weg) merken(weg);
+
       if (supabase && aktivId === kontoId) {
-        await signOut(supabase);
-        await sitzungVergessen(kontoId);
-        /*
-         * Auf das naechste Konto der Liste weiterschalten — mitsamt Sitzung.
-         * Klappt das nicht, ist niemand mehr angemeldet, und die Liste muss
-         * das auch sagen.
-         */
-        const naechstes = rest[0];
-        if (naechstes && supabase) {
-          const geklappt = await sitzungWechseln(supabase, naechstes.id);
-          setKonten(geklappt ? rest : []);
-          setAktivId(geklappt ? naechstes.id : null);
-          return;
-        }
-        setKonten(rest);
-        setAktivId(null);
+        await logout();
         return;
       }
 
-      await sitzungVergessen(kontoId);
+      /*
+       * Ein Konto, das gerade NICHT laeuft, auch beim Server abmelden —
+       * bisher blieb seine Sitzung dort bestehen (Kasten 13.1).
+       */
+      if (supabase) await sitzungWiderrufen(kontoId).catch(() => false);
+      else await sitzungVergessen(kontoId);
       setKonten(rest);
     },
-    [supabase, aktivId, konten]
+    [supabase, aktivId, konten, logout, merken]
   );
 
   const sendPasswordResetCode = useCallback(

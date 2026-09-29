@@ -19,6 +19,8 @@ const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
 const Telefon = require('../../gemeinsam/telefon');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
+// Spendencode und Gründe (Kasten 13) — dieselbe Regel wie App und Datenbank.
+const Zahlung = require('../../gemeinsam/zahlung');
 
 // Ein Umschalter (Like, Gespeichert, Repost …): Zeile da → weg, sonst → hin.
 async function umschalten(client, tabelle, schluessel) {
@@ -2101,32 +2103,38 @@ const handleStreamKommentar = handler(
 );
 
 /*
- * Der Betrag steht in Cent, damit nichts gerundet wird. Eine echte Zahlung
- * läuft hier nicht: der Spendencode verweist auf Bankkarte oder PayPal, die
- * Buchung passiert dort. Hier wird festgehalten, dass sie stattfand.
+ * Eine Spende absenden — seit Kasten 13 nur noch über `spende_senden`.
+ *
+ * Die Datenbankfunktion prüft Betrag, Empfänger, Zahlungsmethode und den
+ * persönlichen Spendencode (fünf Fehlversuche → 15 Minuten Sperre) und trägt
+ * erst dann ein. Der direkte INSERT in `donations` ist zu (Schema
+ * XX_zahlung_spendencode). Die Antwort trägt `grund` weiter, damit das
+ * Spendenblatt weiß, ob es nach Code oder Methode fragen muss.
+ *
+ * Eine echte Zahlung läuft noch nicht: die Spende steht als „vorgemerkt" in
+ * der Datenbank, bis ein Zahlungsdienst angeschlossen ist.
  */
 const handleSpende2 = handler(
   'Spende',
-  async (client, nutzerId, empfaengerId, betragCent, postId, nachricht) => {
+  async (client, nutzerId, empfaengerId, betragCent, postId, nachricht, code, methodeId) => {
     const betrag = Math.round(Number(betragCent));
-    if (!Number.isFinite(betrag) || betrag <= 0) {
-      return { ok: false, fehler: 'Der Betrag muss größer als null sein' };
-    }
-    if (empfaengerId === nutzerId) return { ok: false, fehler: 'An sich selbst geht keine Spende' };
+    if (Zahlung.betragPruefe(betrag)) return { ok: false, grund: 'betrag', fehler: Zahlung.grundText('betrag') };
+    if (empfaengerId === nutzerId) return { ok: false, grund: 'selbst', fehler: Zahlung.grundText('selbst') };
+    if (!code) return { ok: false, grund: 'kein_code', fehler: Zahlung.grundText('kein_code') };
 
-    const { data, error } = await client
-      .from('donations')
-      .insert({
-        post_id: postId || null,
-        empfaenger_id: empfaengerId,
-        sender_id: nutzerId,
-        betrag_cent: betrag,
-        nachricht: nachricht || '',
-      })
-      .select('id, created_at')
-      .single();
+    const { data, error } = await client.rpc('spende_senden', {
+      p_empfaenger: empfaengerId,
+      p_betrag_cent: betrag,
+      p_code: String(code),
+      p_methode: methodeId || null,
+      p_post: postId || null,
+      p_nachricht: nachricht || '',
+    });
     if (error) throw error;
-    return { ok: true, id: data.id };
+    if (!data?.ok) {
+      return { ok: false, grund: data?.grund, verbleibend: data?.verbleibend, fehler: Zahlung.grundText(data?.grund, data?.verbleibend) };
+    }
+    return { ok: true, id: data.id, zahlungsstatus: data.zahlungsstatus };
   }
 );
 

@@ -683,7 +683,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           onSelect={async (cent) => {
             setSpendeOffen(false);
             if (cent === 'eigen') return setEigenerBetrag(true);
-            const ok = await aktionen.spenden(clip.userId, Number(cent), clip.id);
+            const ok = await aktionen.spenden(clip.userId, Number(cent), clip.id, '', autor.name);
             if (ok) {
               onNotice(
                 `${(Number(cent) / 100).toFixed(2).replace('.', ',')} € an ${autor.name} gespendet`
@@ -703,7 +703,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
             const cent = betragInCent(werte.betrag);
             if (cent === null) return 'Bitte einen Betrag zwischen 0,50 € und 1.000 € eingeben';
             setEigenerBetrag(false);
-            aktionen.spenden(clip.userId, cent, clip.id).then((ok) => {
+            aktionen.spenden(clip.userId, cent, clip.id, '', autor.name).then((ok) => {
               if (ok) onNotice(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${autor.name} gespendet`);
             });
             return null;

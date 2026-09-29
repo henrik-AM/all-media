@@ -151,9 +151,18 @@ export async function signInWithEmail(
   }
 }
 
+/**
+ * Nur DIESE Sitzung beenden.
+ *
+ * Bis zum 29.09.2026 stand hier `signOut()` ohne Angabe — und das heißt bei
+ * supabase-js `scope: 'global'`: jede Sitzung des Kontos auf JEDEM Gerät
+ * endet. Wer auf dem Handy „Abmelden" tippte, war danach auch auf der
+ * Website und in jedem zweiten Kontenspeicher abgemeldet, und dort schlug
+ * der passwortlose Kontowechsel still fehl (Feedback 21.09., Kasten 13.1).
+ */
 export async function signOut(client: SupabaseClient) {
   try {
-    await client.auth.signOut();
+    await client.auth.signOut({ scope: 'local' });
     return { success: true };
   } catch (err: any) {
     console.error('Abmeldung fehlgeschlagen:', err?.message ?? err);
