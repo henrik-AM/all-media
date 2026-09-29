@@ -335,7 +335,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
         return {
           art: x.classList.contains('is-playlist') ? 'playlist' : 'highlight',
           radius: parseFloat(s.borderTopLeftRadius),
-          grund: s.backgroundImage,
+          ring: s.borderTopColor,
         };
       })
     );
@@ -346,11 +346,12 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     const pl = alle.filter((r) => r.art === 'playlist');
     const hl = alle.filter((r) => r.art === 'highlight');
     if (!pl.length || !hl.length) throw new Error('es gibt nicht von beidem etwas');
-    // Form: das Highlight ist ein Kreis, die Playlist nicht.
-    if (pl[0].radius >= 30) throw new Error('die Playlist ist auch ein Kreis');
+    // Form: seit Kasten 12.7 (29.09.2026) sind BEIDE rund, Henrik wollte das
+    // Titelbild der Playlist rund. Den Unterschied traegt die Ringfarbe
+    // (Playlist #FF0A0A, Highlight #FF990A) und das Kennzeichen.
+    if (pl[0].radius < 30) throw new Error('die Playlist ist nicht rund');
     if (hl[0].radius < 30) throw new Error('das Highlight ist kein Kreis');
-    // Grund: zwei verschiedene Verlaeufe.
-    if (pl[0].grund === hl[0].grund) throw new Error('beide tragen denselben Verlauf');
+    if (pl[0].ring === hl[0].ring) throw new Error('beide tragen dieselbe Ringfarbe: ' + pl[0].ring);
   });
 
   /*
