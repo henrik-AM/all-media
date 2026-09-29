@@ -41,6 +41,8 @@ const Telefon = require('../../gemeinsam/telefon');
 
 // Wie ein eigener Kommentar in der Liste steht — gemeinsam mit der App.
 const Kommentar = require('../../gemeinsam/kommentar');
+// „Mein Verlauf" — dieselben Abfragen wie in der App (Kasten 10.1).
+const Verlauf = require('../../gemeinsam/verlauf');
 // Welcher Stand läuft hier? Einmal beim Start ermittelt, siehe version.js.
 const VERSION = require('./version');
 // Die Schreibweise des Kontakt-QR-Codes — dieselbe Datei, die auch der
@@ -2009,6 +2011,23 @@ app.get('/api/kommentiert', route(async (req) => {
       // Fertig gerechnet, damit der Browser die Regel nicht nachbaut.
       return { ...k, zeile: Kommentar.zeile(k) };
     });
+}));
+
+/*
+ * „Mein Verlauf" — Like, Kommentar, Teilen, Repost und Speichern in
+ * zeitlicher Folge (Henrik, Feedback 21.09.2026, Kasten 10.1).
+ *
+ * Abfragen und Zusammenführung stehen in gemeinsam/verlauf.js; die App stellt
+ * mit ihrem eigenen Client wörtlich dieselben. Die Zeile wird hier fertig
+ * mitgeliefert, die UHRZEIT nicht: der Server läuft auf Render in UTC, der
+ * Browser rechnet sie mit Verlauf.zeit() in der Zeitzone des Nutzers — wie
+ * die App auf dem Gerät.
+ *
+ * Wie /api/gelikt absichtlich ohne `?user=`.
+ */
+app.get('/api/verlauf', route(async (req) => {
+  const liste = await Verlauf.laden(req.db, req.nutzerId);
+  return liste.map((e) => ({ ...e, zeile: Verlauf.zeile(e) }));
 }));
 
 app.get('/api/reposts', route(async (req) => {

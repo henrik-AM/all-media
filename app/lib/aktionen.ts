@@ -40,6 +40,9 @@ const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemei
 
 // Wie ein eigener Kommentar in der Liste steht — gemeinsam mit der Website.
 const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
+// „Mein Verlauf" — Abfragen, Zusammenführung und Zeile gemeinsam mit der Website.
+const Verlauf = require('../../gemeinsam/verlauf') as typeof import('../../gemeinsam/verlauf');
+export type VerlaufEintrag = import('../../gemeinsam/verlauf').VerlaufEintrag;
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der Website.
 const Teilen = require('../../gemeinsam/teilen') as typeof import('../../gemeinsam/teilen');
 
@@ -3167,6 +3170,28 @@ export async function kommentierteVon(
 /** Die Zeile, wie sie auch die Website baut — siehe gemeinsam/kommentar.js. */
 export function kommentarZeile(k: EigenerKommentar): string {
   return Kommentar.zeile(k);
+}
+
+/**
+ * „Mein Verlauf" — Like, Kommentar, Teilen, Repost und Speichern in
+ * zeitlicher Folge (Feedback 21.09.2026, Kasten 10.1).
+ *
+ * Die Abfragen stehen in gemeinsam/verlauf.js, damit /api/verlauf auf der
+ * Website wörtlich dieselben stellt. Nur für einen selbst — kein Aufruf mit
+ * fremder Kennung.
+ */
+export async function verlaufVon(client: SupabaseClient, ichId: string): Promise<VerlaufEintrag[]> {
+  return Verlauf.laden(client, ichId);
+}
+
+/** `Gespeichert · Titel` — dieselbe Zeile wie auf der Website. */
+export function verlaufZeile(e: VerlaufEintrag): string {
+  return Verlauf.zeile(e);
+}
+
+/** `28.09.2026, 14:05` — dieselbe Schreibweise wie auf der Website. */
+export function verlaufZeit(e: VerlaufEintrag): string {
+  return Verlauf.zeit(e.wann);
 }
 
 /* ==========================================================================

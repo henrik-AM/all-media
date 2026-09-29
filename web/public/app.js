@@ -5638,6 +5638,13 @@ const SETTINGS = [
       { label: 'Wer darf kommentieren', icon: 'comment', sichtbar: 'kommentare' },
       { label: 'Wer darf mich markieren', icon: 'person', sichtbar: 'markierung' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart', sichtbar: 'likes' },
+      /*
+       * Henrik am 21.09.2026 (Kasten 10.1): Like, Kommentar, Teilen, Repost
+       * und Speichern im Verlauf — mit Zeitpunkt, antippbar zum Beitrag.
+       * Dieselbe Stelle und dieselbe Liste wie in der App
+       * (gemeinsam/verlauf.js). Kein fuenfter Profilreiter.
+       */
+      { label: 'Mein Verlauf', icon: 'clock', liste: 'verlauf' },
       { label: 'Gelikte Beiträge', icon: 'heart', liste: 'gelikt' },
       // Die vierte Gattung aus Henriks Meldung vom 18.09.2026 — dieselbe
       // Stelle wie in der App.
@@ -6323,6 +6330,23 @@ function einstellungsListe(art) {
    * die Liste immer mit den Knoepfen ueberein.
    */
   /*
+   * „Mein Verlauf". Die Zeile kommt fertig vom Server, die Uhrzeit rechnet
+   * der Browser mit derselben Funktion wie die App (Verlauf.zeit) — der
+   * Server steht in UTC. `ziel` macht die Zeile anklickbar.
+   */
+  if (art === 'verlauf') {
+    if (state.verlaufFehler) return { leer: 'Verlauf konnte nicht geladen werden.', zeilen: [] };
+    if (!state.verlauf) return { leer: 'Wird geladen …', zeilen: [] };
+    return {
+      leer: 'Du hast noch nichts geliked, kommentiert, geteilt, repostet oder gespeichert.',
+      zeilen: state.verlauf.map((e) => ({
+        text: e.zeile,
+        neben: window.Verlauf ? window.Verlauf.zeit(e.wann) : new Date(e.wann).toLocaleString('de-DE'),
+        ziel: { kind: e.kind, id: e.beitragId },
+      })),
+    };
+  }
+  /*
    * Was mir gefallen hat. Kein fuenfter Profilreiter - der Prototyp hat dort
    * vier. Gleiche Quelle und gleiche Ersatztexte wie gelikteVon() in der App.
    */
@@ -6333,6 +6357,7 @@ function einstellungsListe(art) {
       zeilen: state.gelikt.map((b) => ({
         text: b.titel,
         neben: new Date(b.wann).toLocaleDateString('de-DE'),
+        ziel: { kind: b.kind, id: b.id },
       })),
     };
   }
@@ -6348,6 +6373,7 @@ function einstellungsListe(art) {
       zeilen: state.kommentiert.map((k) => ({
         text: k.zeile,
         neben: new Date(k.wann).toLocaleDateString('de-DE'),
+        ziel: { kind: k.kind, id: k.beitragId },
       })),
     };
   }
@@ -6383,6 +6409,25 @@ function einstellungsListe(art) {
 function openEinstellung(punkt, nachher) {
   // Sichtbarkeit hat ein eigenes Blatt: vier Stufen plus Ausnahmeliste.
   if (punkt.sichtbar) return openSichtbarkeit(punkt);
+
+  /*
+   * „Mein Verlauf" bei jedem Oeffnen frisch holen und erst dann zeigen: wer
+   * gerade im Feed etwas gespeichert hat, soll es hier sehen, ohne die Seite
+   * neu zu laden. Ein offenes Blatt baut sich nicht von selbst neu auf.
+   */
+  if (punkt.liste === 'verlauf' && !punkt._frisch) {
+    return fetch('/api/verlauf')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+      .then((d) => {
+        state.verlauf = Array.isArray(d) ? d : [];
+        state.verlaufFehler = false;
+      })
+      .catch((fehler) => {
+        console.error('Verlauf laden fehlgeschlagen:', fehler);
+        state.verlaufFehler = true;
+      })
+      .then(() => openEinstellung({ ...punkt, _frisch: true }, nachher));
+  }
 
   if (punkt.wahl) {
     const jetzt = einstellung(punkt);
@@ -6511,6 +6556,13 @@ function openEinstellung(punkt, nachher) {
                     */
                    z.kopf
                      ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
+                     : z.ziel
+                     ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
+                       `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value">${esc(z.neben || '')}</span>
+                     <span class="item__chevron">${ICONS.chevron}</span>
+                   </button>`
                      : `<div class="item">
                      <span class="item__label">${esc(z.text)}</span>
                      <span class="item__value">${esc(z.neben || '')}</span>
@@ -6526,6 +6578,12 @@ function openEinstellung(punkt, nachher) {
           close();
           toast(knopfText);
         });
+        sheet.querySelectorAll('[data-ziel-id]').forEach((b) =>
+          b.addEventListener('click', () => {
+            close();
+            beitragOeffnen(b.dataset.zielKind, b.dataset.zielId);
+          })
+        );
       },
       { schliessen: true, hoch: zeilen.length > 4 }
     );
@@ -9225,6 +9283,33 @@ function mitteilungOeffnen(ziel) {
     render();
     setTimeout(() => document.getElementById('slide-' + ziel.id)?.scrollIntoView({ block: 'start' }), 60);
   }
+}
+
+/**
+ * Einen Beitrag nach seiner Art oeffnen — dieselben drei Ziele wie
+ * kachelOeffnen() in der App: Querformat-Video im Player, Reel im
+ * Hochformat-Feed, alles andere im Beitrags-Feed.
+ *
+ * `kind` ist posts.kind (post, reel, clip). Die Profil-Routen liefern
+ * stattdessen `art` (post, clip, video) — `video` heisst dort Reel.
+ */
+function beitragOeffnen(kind, id) {
+  if (!id) return;
+  if (kind === 'clip') return openClip(id);
+  if (kind === 'reel' || kind === 'video') return mitteilungOeffnen({ art: 'video', id });
+  return mitteilungOeffnen({ art: 'post', id });
+}
+
+/*
+ * openPost und openVideo wurden an mehreren Stellen aufgerufen (Explorer
+ * „Beiträge", Sammlungen, Gespeichert im Profil), aber nie definiert — jeder
+ * Klick warf einen ReferenceError. Gefunden am 28.09.2026 bei Kasten 10.
+ */
+function openPost(id) {
+  return beitragOeffnen('post', id);
+}
+function openVideo(id) {
+  return beitragOeffnen('reel', id);
 }
 
 async function openMitteilungen(bereich) {
@@ -12810,19 +12895,19 @@ async function renderVideoProfile() {
           : tab === 'repost' && meineReposts.length
           ? `<div class="prof__grid">${meineReposts
               .map(
-                (r) => `<div class="griditem" title="${esc(r.eintrag.description || '')}">
+                (r) => `<button class="griditem" data-kachel-art="${esc(r.art)}" data-kachel-id="${esc(r.eintrag.id)}" title="${esc(r.eintrag.description || '')}">
                   ${r.art === 'video' ? ICONS.play : ICONS.image}
                   <span class="griditem__badge">${ICONS.repeat}</span>
-                </div>`
+                </button>`
               )
               .join('')}</div>`
           : tab === 'tagged' && meineMarkierungen.length
           ? `<div class="prof__grid">${meineMarkierungen
               .map(
-                (m) => `<div class="griditem" title="${esc(m.eintrag.description || '')}">
+                (m) => `<button class="griditem" data-kachel-art="${esc(m.art)}" data-kachel-id="${esc(m.eintrag.id)}" title="${esc(m.eintrag.description || '')}">
                   ${medienFlaeche(m.eintrag.id, m.art === 'post' ? ICONS.image : ICONS.play, m.eintrag.mediaUrl, m.eintrag.thumbnail)}
                   <span class="griditem__badge">${ICONS.person}</span>
-                </div>`
+                </button>`
               )
               .join('')}</div>`
           : tab === 'saved' && meineGespeicherten.length
@@ -12834,7 +12919,7 @@ async function renderVideoProfile() {
              */
             `<div class="prof__grid">${meineGespeicherten
               .map(
-                (g) => `<button class="griditem" data-openpost="${esc(g.eintrag.id)}" title="${esc(g.eintrag.description || '')}">
+                (g) => `<button class="griditem" data-kachel-art="${esc(g.art)}" data-kachel-id="${esc(g.eintrag.id)}" title="${esc(g.eintrag.description || '')}">
                   ${medienFlaeche(g.eintrag.id, g.art === 'post' ? ICONS.image : ICONS.play, g.eintrag.mediaUrl, g.eintrag.thumbnail)}
                 </button>`
               )
@@ -12903,6 +12988,14 @@ async function renderVideoProfile() {
       state.ownProfileTab = b.dataset.otab;
       renderVideoProfile();
     })
+  );
+  /*
+   * Repost, Markiert, Gespeichert: die Kachel oeffnet den Beitrag, wie in
+   * der App. Vorher waren Repost und Markiert tote <div>, und Gespeichert
+   * rief das nie definierte openPost() — ein Klick tat nichts.
+   */
+  main.querySelectorAll('[data-kachel-id]').forEach((b) =>
+    b.addEventListener('click', () => beitragOeffnen(b.dataset.kachelArt, b.dataset.kachelId))
   );
   bindProfilAktionen('videos');
 }
