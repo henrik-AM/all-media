@@ -164,11 +164,27 @@ const STRUCTURE = {
     await p.click('#storyNext');
     await p.waitForTimeout(400);
   }
-  assert('Rechts blaettert weiter', (await p.$eval('.viewer__name', e => e.textContent.trim())) === 'Bob Müller');
+  // Wer nach Anna kommt, haengt vom Gesehen-Stand ab: ungesehene Storys
+  // stehen vorn (Kasten 11.1). Aus einem frueheren Lauf gesehen, rutscht
+  // Anna hinter Bob, und nach ihr kommt David. Also aus der Liste lesen.
+  const naechste = await p.evaluate(() => {
+    const l = storyListeFuer('messenger');
+    const i = l.map((x) => user(x.userId).name).lastIndexOf('Anna Schmidt');
+    return l[i + 1] ? user(l[i + 1].userId).name : null;
+  });
+  assert('Rechts blaettert weiter', !!naechste &&
+    await K.bisWahr(p, `document.querySelector('.viewer__name')?.textContent.trim() === ${JSON.stringify(naechste)}`));
   await p.click('#storyPrev');
-  await p.waitForTimeout(400);
-  assert('Links blaettert zurueck', (await p.$eval('.viewer__name', e => e.textContent.trim())) === 'Anna Schmidt');
-  assert('Like bleibt bestehen', await p.$eval('#storyLike', e => e.classList.contains('is-liked')));
+  assert('Links blaettert zurueck',
+    await K.bisWahr(p, "document.querySelector('.viewer__name')?.textContent.trim() === 'Anna Schmidt'"));
+  // Einen Schritt zurueck steht Annas LETZTE Story da; das Herz sitzt auf
+  // der ersten. Also bis zu ihr zurueck.
+  for (let i = 1; i < annasBalken; i++) {
+    await p.click('#storyPrev');
+    await p.waitForTimeout(400);
+  }
+  assert('Like bleibt bestehen',
+    await K.bisWahr(p, "document.querySelector('#storyLike')?.classList.contains('is-liked') === true"));
 
   await p.click('#storyReply');
   await p.fill('#storyReply', 'Story-Antwort');

@@ -172,7 +172,12 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (!ohneStory) throw new Error('kein Story-Ring im Feed');
 
     await page.click(`[data-story-user="${ohneStory}"]`);
-    await page.waitForTimeout(700);
+    // Auf das Ergebnis warten, nicht auf eine feste Zeit: /api/profile braucht
+    // 1,5–4 s. Mit 700 ms ging das Profil erst NACH der Pruefung auf und lag
+    // ueber allen folgenden Klicks (30.09.2026, zehn Folgefehler). Seit
+    // Kasten 11.5 zaehlt die Messenger-Story des Testbestands unter Videos
+    // nicht mehr, der Ring fuehrt deshalb zum Profil statt zur Story.
+    await page.waitForSelector('#profBack, .viewer', { timeout: 10000 }).catch(() => null);
     // Entweder das Profil oder der Story-Betrachter - nur ein Hinweis waere
     // falsch.
     const profil = await page.$('#profBack');
