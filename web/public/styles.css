@@ -2235,6 +2235,7 @@ body:has(.camera) .toast { bottom: 132px; }
 .spende__zahlen { margin-top: 6px; font-size: 12.5px; color: var(--text-3); }
 /* Kasten 12.3: die Karte ist ein Knopf und oeffnet die Einzelheiten. */
 button.spende { display: block; width: calc(100% - 32px); text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.sheet__body.spendeziel { padding: 12px 16px; }
 .spendeziel__titel { font-size: 17px; font-weight: 700; }
 .spendeziel__text { margin-top: 4px; font-size: 14px; color: var(--text-2); }
 .spendeziel__zeilen { margin-top: 12px; display: grid; gap: 6px; }
@@ -4680,3 +4681,16 @@ body.ist-abgemeldet .ptr-indicator {
   background: rgba(255,255,255,.16); color: #fff; font-weight: 600; font-size: 14px;
 }
 .storyedit__ziel:last-child { background: var(--brand-grad); }
+
+/* Kasten 13.2: Spendenweg-Blatt. Ohne diese Regeln klebten die Überschriften
+   am Rand, die Zeile einer Zahlungsmethode trug das Polster doppelt (Zeile und
+   Knopf sind beide .item) und der Papierkorb füllte das halbe Blatt. */
+#swInhalt .sheet__label { padding: 12px 16px 0; }
+#swInhalt .item__label .sheet__hint { padding: 0; }
+#swInhalt [data-methode-zeile] { padding: 0 16px 0 0; gap: 8px; }
+#swInhalt [data-methode-zeile] > .item { border-bottom: 0; }
+#swInhalt [data-methode-loeschen] { flex: 0 0 auto; width: auto; min-width: 40px; }
+#swInhalt [data-methode-loeschen] svg { width: 20px; height: 20px; }
+/* Mehrere Knöpfe im Fuß: gleich breit nebeneinander, bei vieren zwei Reihen. */
+#swInhalt .sheet__footer:has(.prof__btn + .prof__btn) { display: flex; flex-wrap: wrap; gap: 8px; }
+#swInhalt .sheet__footer .prof__btn { flex: 1 1 calc(50% - 4px); padding: 0 14px; }

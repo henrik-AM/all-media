@@ -16069,7 +16069,10 @@ function storyAlter(s) {
   // `zeit` ist der Anlagezeitpunkt aus der Datenbank. Bis zum 09.09.2026
   // stand hier `aufgenommen` — ein Feld, das nur die im Browser gespeicherte
   // eigene Story hatte; fuer alle anderen Storys stand dauerhaft "vor 2 Std."
-  const wann = s.aufgenommen || (s.zeit ? Date.parse(s.zeit) : NaN);
+  // Seit Kasten 11 liefert der Server `aufgenommen` als ISO-Text wie die App;
+  // nur die im Browser gespeicherte eigene Story hat eine Zahl.
+  const roh = s.aufgenommen || s.zeit;
+  const wann = typeof roh === 'number' ? roh : roh ? Date.parse(roh) : NaN;
   if (!wann || Number.isNaN(wann)) return s.time || 'vor 2 Std.';
   const min = Math.floor((Date.now() - wann) / 60000);
   if (min < 1) return 'gerade eben';
