@@ -1604,7 +1604,9 @@ function dateiWaehlen(art = 'photo', ausGalerie = false) {
   return new Promise((fertig) => {
     const feld = document.createElement('input');
     feld.type = 'file';
-    feld.accept = art === 'photo' ? 'image/*' : 'video/*';
+    // 'beides' (Kasten 15): die Story nimmt Foto oder Video — am Handy bietet
+    // die Kamera dann beide Betriebsarten an, die Galerie zeigt beides.
+    feld.accept = art === 'photo' ? 'image/*' : art === 'video' ? 'video/*' : 'image/*,video/*';
     if (!ausGalerie) feld.capture = 'environment';
     feld.style.display = 'none';
     document.body.appendChild(feld);
@@ -1682,6 +1684,133 @@ async function aufnahmeHolen(art = 'photo', ausGalerie = false) {
   }
 }
 
+/* ------------------------------------------- Video-Storys (Kasten 15) */
+/*
+ * Henrik am 01.10.2026: „Es sollen auch Video-Stories möglich sein."
+ *
+ * Bis dahin wurde aus jedem Video, das als Story gedacht war, sein erstes
+ * Standbild (aufnahmeHolen → videoStandbild): die Website konnte Storys nur
+ * als Foto posten, die App dagegen auch als Video. Jetzt bleibt das Video
+ * ein Video — dieselben Grenzen wie in der App (gemeinsam/story.js:
+ * höchstens 60 s, höchstens 50 MB, MP4/MOV/WebM), derselbe Ordner
+ * `stories/` im Eimer `media`, media_type 'video' in public.stories.
+ *
+ * Eine Video-Aufnahme ist hier ein Objekt statt einer Datenadresse:
+ *   { art: 'video', datei: Blob, typ: 'video/mp4', adresse: 'blob:…', sekunden }
+ * `adresse` ist für die Vorschau in der Bearbeitung, `datei` geht beim
+ * Posten roh an /api/hochladen/video (web/server/medien.js).
+ */
+function istVideoAufnahme(aufnahme) {
+  return Boolean(aufnahme && typeof aufnahme === 'object' && aufnahme.art === 'video' && aufnahme.datei);
+}
+
+/** Den Videotyp einer Datei — manche Browser lassen `type` bei .mov leer. */
+function videoTypVon(datei) {
+  const typ = StoryRegeln.videoTyp(datei && datei.type);
+  if (typ) return typ;
+  const name = String((datei && datei.name) || '').toLowerCase();
+  if (name.endsWith('.mov')) return 'video/quicktime';
+  if (name.endsWith('.webm')) return 'video/webm';
+  if (name.endsWith('.mp4') || name.endsWith('.m4v')) return 'video/mp4';
+  return null;
+}
+
+function istVideoDatei(datei) {
+  return Boolean(datei) && (String(datei.type || '').startsWith('video/') || Boolean(videoTypVon(datei)));
+}
+
+/**
+ * Länge eines Videos in Sekunden — oder NaN, wenn der Browser sie nicht
+ * herausgibt. Ein WebM aus dem MediaRecorder meldet zuerst `Infinity`; die
+ * echte Länge kennt er erst, wenn man ans Ende springt.
+ */
+function videoLaenge(adresse) {
+  return new Promise((fertig) => {
+    const el = document.createElement('video');
+    el.preload = 'metadata';
+    el.muted = true;
+    let erledigt = false;
+    const ende = (wert) => {
+      if (erledigt) return;
+      erledigt = true;
+      clearTimeout(uhr);
+      el.removeAttribute('src');
+      fertig(wert);
+    };
+    // Kein Video darf das Posten aufhalten: nach 8 s ohne Antwort gilt die
+    // Länge als unbekannt, dann entscheidet der Betrachter (höchstens 60 s).
+    const uhr = setTimeout(() => ende(NaN), 8000);
+    el.onerror = () => ende(NaN);
+    el.onloadedmetadata = () => {
+      if (el.duration === Infinity) {
+        el.ontimeupdate = () => {
+          el.ontimeupdate = null;
+          ende(Number.isFinite(el.duration) ? el.duration : NaN);
+        };
+        el.currentTime = 1e9;
+        return;
+      }
+      ende(el.duration);
+    };
+    el.src = adresse;
+  });
+}
+
+/**
+ * Eine Videodatei als Story-Aufnahme vorbereiten — oder null, mit dem Grund
+ * als Meldung. Geprüft wird VOR dem Hochladen: ein 3-Minuten-Video soll nicht
+ * erst 50 MB durch die Leitung schieben, um dann abgewiesen zu werden.
+ */
+async function storyVideo(datei) {
+  const typ = videoTypVon(datei);
+  const vorab = StoryRegeln.videoPruefen({ mime: typ || datei.type || 'unbekannt', bytes: datei.size });
+  if (vorab) {
+    toast(vorab);
+    return null;
+  }
+  const adresse = URL.createObjectURL(datei);
+  const sekunden = await videoLaenge(adresse);
+  const zuLang = StoryRegeln.videoPruefen({ sekunden });
+  if (zuLang) {
+    URL.revokeObjectURL(adresse);
+    toast(zuLang);
+    return null;
+  }
+  return { art: 'video', datei, typ, adresse, sekunden };
+}
+
+/**
+ * Foto ODER Video für eine Story holen (Dateiauswahl bzw. Handykamera).
+ * Liefert { aufnahme, mediaTyp } oder null.
+ */
+async function storyMediumHolen(ausGalerie = false) {
+  const datei = await dateiWaehlen('beides', ausGalerie);
+  if (!datei) return null;
+  if (istVideoDatei(datei)) {
+    const video = await storyVideo(datei);
+    return video ? { aufnahme: video, mediaTyp: 'video' } : null;
+  }
+  try {
+    return { aufnahme: await bildVerkleinern(datei), mediaTyp: 'image' };
+  } catch {
+    toast('Aufnahme konnte nicht gelesen werden');
+    return null;
+  }
+}
+
+/**
+ * Eine Aufnahme aus der Kamera als Story — das Video, wenn eins
+ * aufgenommen wurde, sonst das Foto. `extra.video` setzt kameraLaufwerk.
+ */
+async function aufnahmeAlsStory(bild, extra, bereich) {
+  if (extra && extra.video) {
+    const video = await storyVideo(extra.video);
+    if (video) alsStorySetzen(video, bereich, 'video');
+    return;
+  }
+  alsStorySetzen(bild, bereich);
+}
+
 /*
  * Ein fertiges Bild als eigene Story setzen — erst bearbeiten, dann das Ziel.
  *
@@ -1706,13 +1835,28 @@ function aktuellerStoryBereich() {
 }
 
 function alsStorySetzen(bild, bereich = aktuellerStoryBereich(), mediaTyp = 'image') {
-  openStoryBearbeiten(bild, bereich, mediaTyp);
+  openStoryBearbeiten(bild, bereich, istVideoAufnahme(bild) ? 'video' : mediaTyp);
 }
 
 function openStoryBearbeiten(bild, bereich = 'messenger', mediaTyp = 'image') {
   const darfVideos = sicht('story').stufe === 'alle';
   const ziele = StoryRegeln.zielWahl(bereich, darfVideos);
   const WO = { messenger: 'messenger', beide: 'beides', videos: 'videos' };
+  /*
+   * Kasten 15: eine Video-Story wird in derselben Bearbeitung gezeigt — als
+   * stummes, endlos laufendes Video unter Text, Filter und Markierungen.
+   * Die Bearbeitung liegt als Daten darüber (overlays), nicht im Film; so
+   * gilt sie für ein Video genauso wie für ein Foto. Gleiche Regel in
+   * app/screens/messenger/StoryEditorScreen.tsx.
+   */
+  const alsVideo = mediaTyp === 'video' && istVideoAufnahme(bild);
+  const medium = alsVideo
+    ? `<video src="${esc(bild.adresse)}" autoplay loop muted playsinline data-testid="story-editor-video"></video>`
+    : `<img src="${bild}" alt="Deine Aufnahme" />`;
+  const verwerfen = () => {
+    if (alsVideo) URL.revokeObjectURL(bild.adresse);
+    closeOverlay();
+  };
 
   const o = { filter: 'keiner', texte: [], markiert: [] };
   let werkzeug = null; // 'text' | 'filter' | 'markieren'
@@ -1732,7 +1876,7 @@ function openStoryBearbeiten(bild, bereich = 'messenger', mediaTyp = 'image') {
       </div>
       <div class="storyedit__buehne">
         <div class="storyflaeche" id="storyEditFlaeche">
-          <img src="${bild}" alt="Deine Aufnahme" />
+          ${medium}
           <div id="storyEditSchicht"></div>
         </div>
       </div>
@@ -1978,7 +2122,7 @@ function openStoryBearbeiten(bild, bereich = 'messenger', mediaTyp = 'image') {
     })
   );
 
-  $('#storyEditZu').addEventListener('click', closeOverlay);
+  $('#storyEditZu').addEventListener('click', verwerfen);
 
   overlay.querySelectorAll('[data-wo]').forEach((b) =>
     b.addEventListener('click', () => {
@@ -1989,7 +2133,7 @@ function openStoryBearbeiten(bild, bereich = 'messenger', mediaTyp = 'image') {
         inVideos: z.inVideos,
         inMessenger: z.inMessenger,
         overlays: StoryRegeln.overlaysPruefen(o),
-        mediaTyp,
+        mediaTyp: alsVideo ? 'video' : 'image',
       });
     })
   );
@@ -2012,13 +2156,27 @@ function openStoryBearbeiten(bild, bereich = 'messenger', mediaTyp = 'image') {
  */
 async function storyPosten(bild, wahl) {
   const w = typeof wahl === 'object' && wahl ? wahl : { inVideos: Boolean(wahl), inMessenger: true };
-  const hoch = await api('/api/hochladen', { ordner: 'stories', aufnahme: bild });
+  const video = istVideoAufnahme(bild);
+  /*
+   * Kasten 15: ein Video geht roh an /api/hochladen/video — als Datenadresse
+   * waere es ein Drittel groesser und bliebe an der 2-MB-Grenze von
+   * express.json haengen. Bis 50 MB dauert das; die Meldung sagt, dass
+   * etwas passiert.
+   */
+  let hoch;
+  if (video) {
+    toast('Dein Video wird hochgeladen …');
+    hoch = await videoHochladen(bild, 'stories');
+    URL.revokeObjectURL(bild.adresse);
+  } else {
+    hoch = await api('/api/hochladen', { ordner: 'stories', aufnahme: bild });
+  }
   if (!hoch.ok) return toast(hoch.error || 'Die Aufnahme ließ sich nicht speichern');
 
   const overlays = w.overlays && StoryRegeln.hatOverlays(w.overlays) ? w.overlays : null;
   const antwort = await api('/api/stories', {
     mediaUrl: hoch.url,
-    mediaTyp: w.mediaTyp || 'image',
+    mediaTyp: video ? 'video' : w.mediaTyp || 'image',
     inVideos: Boolean(w.inVideos),
     inMessenger: w.inMessenger !== false,
     overlays,
@@ -2041,6 +2199,23 @@ async function storyPosten(bild, wahl) {
   render();
 }
 
+/** Eine Video-Aufnahme roh hochladen (Kasten 15). Antwort wie /api/hochladen. */
+async function videoHochladen(aufnahme, ordner) {
+  try {
+    const res = await fetch(`/api/hochladen/video?ordner=${encodeURIComponent(ordner)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': aufnahme.typ || 'video/mp4' },
+      body: aufnahme.datei,
+    });
+    const daten = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: daten.error || `Server antwortet mit ${res.status}` };
+    return daten;
+  } catch (fehler) {
+    console.error('Video hochladen fehlgeschlagen:', fehler);
+    return { ok: false, error: 'Keine Verbindung' };
+  }
+}
+
 /*
  * Eigene Story loeschen — in der Datenbank, nicht nur auf dem Bildschirm.
  *
@@ -2061,10 +2236,13 @@ async function storyLoeschen(id) {
   render();
 }
 
-/** Dateiauswahl oeffnen und das Ergebnis als eigene Story uebernehmen. */
-async function storyAufnehmen(art = 'photo', ausGalerie = false, bereich = aktuellerStoryBereich()) {
-  const bild = await aufnahmeHolen(art, ausGalerie);
-  if (bild) alsStorySetzen(bild, bereich);
+/**
+ * Dateiauswahl oeffnen und das Ergebnis als eigene Story uebernehmen.
+ * Seit Kasten 15 Foto oder Video — `art` bleibt fuer alte Aufrufe stehen.
+ */
+async function storyAufnehmen(_art = 'beides', ausGalerie = false, bereich = aktuellerStoryBereich()) {
+  const gewaehlt = await storyMediumHolen(ausGalerie);
+  if (gewaehlt) alsStorySetzen(gewaehlt.aufnahme, bereich, gewaehlt.mediaTyp);
 }
 
 /*
@@ -2077,8 +2255,12 @@ async function aufnahmeVerwenden(art = 'photo', ausGalerie = false) {
   if (bild) aufnahmeMenue(bild);
 }
 
-/** Die Frage selbst - getrennt, weil die Kamera im Overlay sie auch braucht. */
-function aufnahmeMenue(bild) {
+/**
+ * Die Frage selbst - getrennt, weil die Kamera im Overlay sie auch braucht.
+ * `extra.video` (Kasten 15): die Kamera hat ein Video aufgenommen. Als Story
+ * geht dann das Video, an Insight und Chat weiter das Standbild.
+ */
+function aufnahmeMenue(bild, extra = null) {
   const punkte = [
     /*
      * Der Insight steht oben. Er ist die Gattung, für die diese Kamera im
@@ -2125,7 +2307,7 @@ function aufnahmeMenue(bild) {
         b.addEventListener('click', () => {
           close();
           if (b.dataset.verwenden === 'insight') return openInsightSenden(bild);
-          if (b.dataset.verwenden === 'story') return alsStorySetzen(bild, 'messenger');
+          if (b.dataset.verwenden === 'story') return aufnahmeAlsStory(bild, extra, 'messenger');
           aufnahmeAnChat(bild);
         })
       );
@@ -2237,7 +2419,9 @@ function storyItem(storys) {
   // Person mit Story soll nie aussehen wie eine ohne.
   const bild = s.mediaUri || (storys.find((x) => x.mediaUri) || {}).mediaUri;
   // Video-Storys: das Bild waere ein Film — als Kachel reichen die Initialen.
-  const standbild = bild && s.mediaType !== 'video' ? bild : null;
+  // Kasten 15: auch an der Adresse erkennen — das Bild der Kachel kann von
+  // einer anderen Story derselben Person stammen als `s`.
+  const standbild = bild && s.mediaType !== 'video' && !istVideoAdresse(bild) ? bild : null;
   const kern = standbild
     ? `<div class="story__inner" style="background-image:url(${standbild});background-size:cover;background-position:center"></div>`
     : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
@@ -8145,6 +8329,22 @@ function kameraStromStoppen() {
   kameraStrom = null;
 }
 
+/**
+ * Womit der Browser aufnimmt (Kasten 15).
+ *
+ * MP4 zuerst: ein WebM spielt das iPhone in der App nicht ab (AVPlayer kennt
+ * es nicht) — eine im Chrome aufgenommene Story waere dort schwarz. Safari
+ * nimmt ohnehin MP4 auf, Chrome seit Version 126 auch. Erst wenn der Browser
+ * gar kein MP4 kann, WebM. Die Bitrate haelt 60 s unter der Grenze des
+ * Eimers (StoryRegeln.VIDEO_BITRATE_WEB).
+ */
+function aufnahmeOptionen() {
+  const wahl = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  const kann = (t) => typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(t);
+  const mimeType = wahl.find(kann);
+  return { ...(mimeType ? { mimeType } : {}), videoBitsPerSecond: StoryRegeln.VIDEO_BITRATE_WEB };
+}
+
 /** Das Markup der Buehne - in beiden Kameras gleich. */
 function kameraBuehne() {
   return `<div class="camera__stage" id="camStage">
@@ -8173,6 +8373,7 @@ function kameraLaufwerk(wurzel, fertig) {
   let blitz = false;
   let aufnehmer = null;
   let stuecke = [];
+  let hoechstensUhr = null;
 
   /** Kamerastrom oeffnen - je nach gewaehlter Seite und Betriebsart. */
   const stromOeffnen = async () => {
@@ -8286,7 +8487,7 @@ function kameraLaufwerk(wurzel, fertig) {
     }
     stuecke = [];
     try {
-      aufnehmer = new MediaRecorder(kameraStrom);
+      aufnehmer = new MediaRecorder(kameraStrom, aufnahmeOptionen());
     } catch {
       return toast('Die Videoaufnahme ließ sich nicht starten');
     }
@@ -8294,17 +8495,31 @@ function kameraLaufwerk(wurzel, fertig) {
       if (ereignis.data && ereignis.data.size) stuecke.push(ereignis.data);
     };
     aufnehmer.onstop = async () => {
-      const datei = new Blob(stuecke, { type: aufnehmer.mimeType || 'video/webm' });
-      // Weiterverarbeitet wird - wie bei einer Videodatei aus der Galerie -
-      // das erste Standbild. Bewegt gespeichert wird spaeter beim Hochladen.
+      clearTimeout(hoechstensUhr);
+      // Der reine Typ ohne „;codecs=…" — so vergleicht ihn der Speicher
+      // (allowed_mime_types), siehe StoryRegeln.videoTyp.
+      const typ = StoryRegeln.videoTyp(aufnehmer.mimeType) || 'video/webm';
+      const datei = new Blob(stuecke, { type: typ });
+      // Das erste Standbild geht weiter an Insight und Chat. Kasten 15: das
+      // Video selbst geht mit (`extra.video`) — als Story bleibt es ein Video.
       const bild = await videoStandbild(datei).catch(() => null);
       if (!bild) return toast('Aus dieser Aufnahme ließ sich kein Bild gewinnen');
-      fertig(bild);
+      fertig(bild, { video: datei });
     };
     aufnehmer.start();
     recording = true;
     btn.classList.add('is-rec');
     q('#camRec').hidden = false;
+    /*
+     * Kasten 15: nach 60 s ist Schluss, wie in der App (recordAsync
+     * maxDuration). Ohne das liefe die Aufnahme beliebig lange, und eine
+     * Story daraus würde erst nach dem Aufnehmen abgewiesen.
+     */
+    clearTimeout(hoechstensUhr);
+    hoechstensUhr = setTimeout(() => {
+      // Kamera inzwischen zu: nichts mehr zu beenden.
+      if (recording && btn.isConnected) btn.click();
+    }, StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS * 1000);
   });
 }
 
@@ -8359,7 +8574,7 @@ function renderCameraPage() {
   };
   filterLegen();
 
-  kameraLaufwerk(main.querySelector('.camera'), (bild) => aufnahmeMenue(bild));
+  kameraLaufwerk(main.querySelector('.camera'), (bild, extra) => aufnahmeMenue(bild, extra));
 
   $('#camSchalter')
     .querySelectorAll('[data-mitfilter]')
@@ -10686,7 +10901,9 @@ async function openStoryOptionen(story, danach) {
             if (!bild) return toast('Diese Story hat noch kein Bild');
             const a = document.createElement('a');
             a.href = bild;
-            a.download = 'all-media-story.jpg';
+            // Kasten 15: ein Video heisst nicht .jpg.
+            const endung = (String(bild).match(/\.(mp4|mov|m4v|webm)(\?|$)/i) || [])[1];
+            a.download = `all-media-story.${story.mediaType === 'video' ? (endung || 'mp4').toLowerCase() : 'jpg'}`;
             a.click();
             return toast('Story gesichert');
           }
@@ -16083,7 +16300,6 @@ function storyAlter(s) {
 let storyTimer;
 // Kasten 11: dieselben Zeiten wie die App (gemeinsam/story.js).
 const STORY_DURATION = (typeof StoryRegeln !== 'undefined' && StoryRegeln.DAUER_BILD) || 6000;
-const STORY_VIDEO_HOECHSTENS = (typeof StoryRegeln !== 'undefined' && StoryRegeln.DAUER_VIDEO_HOECHSTENS) || 30000;
 const STORY_STEP = 60;
 
 /*
@@ -16148,8 +16364,17 @@ function storyListeFuer(bereich) {
  * Kasten 11.4 (Henrik 21.09.2026: „Nur eine Story möglich"): oben steht ein
  * Balken je Story der Person, nicht einer fuer alles. Die Storys einer Person
  * laufen nacheinander ab (aelteste zuerst), dann kommt die naechste Person.
- * Video-Storys laufen als Video, so lange sie dauern (hoechstens 30 s).
- * Gleiche Regel in app/screens/messenger/StoryViewerScreen.tsx.
+ * Video-Storys laufen als Video, so lange sie dauern (hoechstens 60 s,
+ * StoryRegeln.storyDauer). Gleiche Regel in
+ * app/screens/messenger/StoryViewerScreen.tsx.
+ *
+ * Kasten 15, Ton: der Browser laesst ein Video ohne vorheriges Tippen nur
+ * stumm anlaufen. Wie bei den Reels (`tonAus`, reelsBeobachten) startet es
+ * deshalb stumm, wenn noch nie getippt wurde, und das erste Tippen im
+ * Betrachter schaltet den Ton an — fuer diese und alle folgenden Storys.
+ * Einen eigenen Lautsprecher-Knopf gibt es nicht mehr (Henrik am
+ * 21.09.2026 fuer Reels: „Ton richtet sich nach der Lautstärke des Handys");
+ * die App hat auch keinen.
  */
 function openStory(storyId, { bereich } = {}) {
   let wo = bereich;
@@ -16180,7 +16405,7 @@ function openStory(storyId, { bereich } = {}) {
   const medium = !s.mediaUri
     ? medienFlaeche(s.id, ICONS.image)
     : istVideo
-      ? `<video class="viewer__bild" id="storyVideo" src="${esc(s.mediaUri)}" playsinline autoplay></video>`
+      ? `<video class="viewer__bild" id="storyVideo" src="${esc(s.mediaUri)}" playsinline autoplay${tonAus ? ' muted' : ''} data-testid="story-video"></video>`
       : `<img class="viewer__bild" src="${esc(s.mediaUri)}" alt="${s.own ? 'Deine Story' : 'Story'}" />`;
 
   overlay.hidden = false;
@@ -16194,7 +16419,6 @@ function openStory(storyId, { bereich } = {}) {
           <div class="viewer__name">${s.own ? 'Deine Story' : esc(u.name)}</div>
           <div class="viewer__time">${esc(storyAlter(s))}</div>
         </div>
-        ${istVideo ? `<button class="viewer__ton" id="storyTon" aria-label="Ton an">${ICONS.mute || ICONS.mic}</button>` : ''}
         <button class="viewer__more" id="storyMore" aria-label="Mehr">${ICONS.settings}</button>
       </div>
       <div class="viewer__stage">
@@ -16227,25 +16451,32 @@ function openStory(storyId, { bereich } = {}) {
   requestAnimationFrame(() => storySchichtSkalieren(flaeche));
 
   const video = $('#storyVideo');
-  // Ohne Tonfreigabe spielt der Browser kein Video mit Ton von selbst ab —
-  // dann stumm starten; der Lautsprecher-Knopf schaltet den Ton zu.
+  /*
+   * Laesst sich das Video nicht laden (Adresse abgelaufen, Format, das dieser
+   * Browser nicht kann), steht die Story wie ein Bild: 6 s, dann weiter.
+   * Vorher wartete der Balken auf ein Video, das nie lief — 30 s Schwarz.
+   */
+  let videoKaputt = false;
   if (video) {
+    video.muted = tonAus;
+    // Lehnt der Browser den Ton trotzdem ab, stumm weiter — das naechste
+    // Tippen schaltet ihn an (siehe unten, pointerdown am Betrachter).
     video.play().catch(() => {
       video.muted = true;
       video.play().catch(() => {});
     });
-    $('#storyTon')?.addEventListener('click', () => {
-      video.muted = !video.muted;
-      $('#storyTon').setAttribute('aria-label', video.muted ? 'Ton an' : 'Ton aus');
+    video.addEventListener('error', () => {
+      videoKaputt = true;
+      elapsed = 0;
     });
   }
 
+  // Bild: 6 s. Video: so lange wie das Video, hoechstens 60 s; solange die
+  // Laenge noch nicht bekannt ist, die Obergrenze (gemeinsam/story.js).
   const dauer = () =>
-    video && Number.isFinite(video.duration) && video.duration > 0
-      ? Math.min(video.duration * 1000, STORY_VIDEO_HOECHSTENS)
-      : istVideo
-        ? STORY_VIDEO_HOECHSTENS
-        : STORY_DURATION;
+    istVideo && !videoKaputt
+      ? StoryRegeln.storyDauer('video', video && video.duration)
+      : STORY_DURATION;
 
   const fill = $('#storyFill');
   const setFill = () => {
@@ -16272,7 +16503,15 @@ function openStory(storyId, { bereich } = {}) {
     if (!s.own) fetch(`/api/stories/${s.id}/seen`, { method: 'POST' });
   };
 
+  /*
+   * Nur einmal weiter: am Ende eines Videos melden sich Uhr und
+   * `ended` beinahe gleichzeitig. Ohne den Merker sprang der Betrachter
+   * zwei Storys weiter und liess eine aus.
+   */
+  let weg = false;
   const go = (step) => {
+    if (weg) return;
+    weg = true;
     stop();
     markSeen();
     const next = list[idx + step];
@@ -16284,9 +16523,10 @@ function openStory(storyId, { bereich } = {}) {
   storyTimer = setInterval(() => {
     if (paused) return;
     if (!$('#storyFill')) return stop();
-    // Beim Video zaehlt die Stelle im Film, nicht die Uhr — puffert es,
-    // bleibt der Balken stehen.
-    elapsed = video && Number.isFinite(video.duration) ? video.currentTime * 1000 : elapsed + STORY_STEP;
+    // Beim Video zaehlt die Stelle im Film, nicht die Uhr — puffert es oder
+    // laedt es noch, bleibt der Balken stehen (vorher lief er bis zum Laden
+    // nach der Uhr und sprang dann zurueck).
+    elapsed = video && !videoKaputt ? video.currentTime * 1000 : elapsed + STORY_STEP;
     setFill();
     if (elapsed >= dauer()) go(1);
   }, STORY_STEP);
@@ -16324,6 +16564,20 @@ function openStory(storyId, { bereich } = {}) {
    * Text, nicht zum Schliessen.
    */
   const betrachter = overlay.querySelector('.viewer');
+
+  // Kasten 15: das erste Tippen im Betrachter schaltet den Ton an — wie bei
+  // den Reels; danach bleibt er fuer den Besuch an (`tonAus`).
+  if (video) {
+    betrachter.addEventListener(
+      'pointerdown',
+      () => {
+        tonAus = false;
+        if (video.muted) video.muted = false;
+      },
+      { capture: true }
+    );
+  }
+
   let ziehStart = null;
   let ziehWeg = 0;
   let ziehZeit = 0;
@@ -16506,15 +16760,16 @@ function openCamera(zielChat = null, { zielStory = false, storyBereich = 'messen
   };
 
   /** Aufnahme fertig: entweder ans genannte Ziel oder zur Wahl. */
-  const aufnahmeFertig = async (bild) => {
+  const aufnahmeFertig = async (bild, extra = null) => {
     // Kam die Kamera vom Plus an der eigenen Story, steht das Ziel fest.
+    // Kasten 15: ein aufgenommenes Video bleibt dabei ein Video.
     if (zielStory) {
       closeOverlay();
-      return alsStorySetzen(bild, storyBereich);
+      return aufnahmeAlsStory(bild, extra, storyBereich);
     }
     if (!zielChat) {
       closeOverlay();
-      return aufnahmeMenue(bild);
+      return aufnahmeMenue(bild, extra);
     }
 
     const res = await fetch(`/api/messages/${zielChat.id}/anhang`, {
@@ -16536,10 +16791,17 @@ function openCamera(zielChat = null, { zielStory = false, storyBereich = 'messen
 
   // Blitz, Kameraseite, Betriebsart und Ausloeser kommen aus demselben
   // Laufwerk wie auf der Kameraseite - eine Bedienung, zwei Orte.
-  kameraLaufwerk(overlay.querySelector('.camera'), (bild) => aufnahmeFertig(bild));
+  kameraLaufwerk(overlay.querySelector('.camera'), (bild, extra) => aufnahmeFertig(bild, extra));
   // Aus der Galerie statt aus der Kamera - dieselbe Aufnahme, nur ohne
   // capture-Kennzeichen, damit das Handy den Bildordner oeffnet.
   $('#camGallery').addEventListener('click', async () => {
+    // Kasten 15: fuer die Story Foto oder Video aus der Galerie.
+    if (zielStory) {
+      const gewaehlt = await storyMediumHolen(true);
+      if (!gewaehlt) return;
+      closeOverlay();
+      return alsStorySetzen(gewaehlt.aufnahme, storyBereich, gewaehlt.mediaTyp);
+    }
     const bild = await aufnahmeHolen('photo', true);
     if (!bild) return;
     aufnahmeFertig(bild);

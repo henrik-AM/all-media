@@ -4,6 +4,7 @@ import { Druck } from './Druck';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
+import { istVideo } from './Videoflaeche';
 import { brandGradient, colors, sizes, spacing, storyGradient, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
 import { Story } from '../types';
@@ -97,9 +98,16 @@ export const StoryRail = ({ stories, onPress }: Props) => {
          * Zustand "noch nichts aufgenommen", bei fremden gab es noch nie ein
          * Vorschaubild.
          */
-        const kern = bild ? (
+        /*
+         * Kasten 15: eine Video-Story hat kein Bild für die Kachel — ein
+         * <Image> mit einer .mp4-Adresse blieb leer, die Kachel sah aus wie
+         * ein Loch. Dann der Avatar, wie auf der Website (storyItem).
+         */
+        const standbild =
+          bild && story.mediaType !== 'video' && !istVideo(bild) ? bild : undefined;
+        const kern = standbild ? (
           <Image
-            source={{ uri: bild }}
+            source={{ uri: standbild }}
             style={{ width: inner - 4, height: inner - 4, borderRadius: (inner - 4) / 2 }}
           />
         ) : (

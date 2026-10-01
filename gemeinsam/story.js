@@ -51,8 +51,86 @@
 
   /** Wie lange eine Bild-Story im Betrachter steht (Millisekunden). */
   const DAUER_BILD = 6000;
-  /** Obergrenze für eine Video-Story, falls das Video keine Länge meldet. */
-  const DAUER_VIDEO_HOECHSTENS = 30000;
+
+  /*
+   * Video-Storys (Kasten 15, Henrik am 01.10.2026: „Es sollen auch
+   * Video-Stories möglich sein.")
+   *
+   * Bis dahin galten drei Zahlen, die nicht zusammenpassten: die Kamera der
+   * App nahm bis 60 s auf (recordAsync maxDuration), der Betrachter beider
+   * Seiten brach nach 30 s ab, und die Website kannte gar keine Länge — sie
+   * konnte überhaupt kein Video als Story hochladen. Eine 45-s-Story lief
+   * damit in der App bis zur Hälfte und sprang dann weiter.
+   *
+   * Jetzt eine Zahl für alles: Aufnahme, Auswahl aus der Galerie, Betrachter.
+   * 60 s wie bei Instagram.
+   *
+   * Die Größe kommt aus dem Speicher: der Eimer `media` nimmt höchstens
+   * 52428800 Bytes je Datei (SUPABASE_SCHEMA_23_audit.sql, file_size_limit).
+   * Wer darüber liegt, bekommt hier einen verständlichen Satz statt eines
+   * Speicherfehlers nach langem Hochladen.
+   */
+  const VIDEO_SEKUNDEN_HOECHSTENS = 60;
+  const VIDEO_BYTES_HOECHSTENS = 52428800;
+  /** Obergrenze im Betrachter — dieselbe Zahl, in Millisekunden. */
+  const DAUER_VIDEO_HOECHSTENS = VIDEO_SEKUNDEN_HOECHSTENS * 1000;
+  /**
+   * Bitrate für die Aufnahme im Browser (MediaRecorder): 2,5 Mbit/s plus Ton
+   * ergeben gut 19 MB in 60 s — sicher unter der Grenze des Eimers.
+   */
+  const VIDEO_BITRATE_WEB = 2500000;
+
+  /*
+   * Die Videoformate, die der Eimer annimmt (allowed_mime_types, Schema 23).
+   * Ein MediaRecorder meldet seinen Typ mit Zusatz („video/webm;codecs=vp8,
+   * opus") — der Speicher vergleicht aber den reinen Typ. Darum hier ohne
+   * Zusatz.
+   */
+  const VIDEO_TYPEN = ['video/mp4', 'video/quicktime', 'video/webm'];
+
+  /** Den reinen Videotyp aus einer MIME-Angabe, oder null, wenn er nicht erlaubt ist. */
+  function videoTyp(mime) {
+    const rein = String(mime || '').split(';')[0].trim().toLowerCase();
+    return VIDEO_TYPEN.includes(rein) ? rein : null;
+  }
+
+  /** Die Dateiendung zum Videotyp — sie entscheidet in beiden Oberflächen, ob abgespielt wird. */
+  function videoEndung(mime) {
+    const typ = videoTyp(mime);
+    return typ === 'video/webm' ? 'webm' : typ === 'video/quicktime' ? 'mov' : 'mp4';
+  }
+
+  /**
+   * Darf dieses Video eine Story werden? Gibt den Grund zurück, wenn nicht,
+   * sonst null. Unbekannte Werte (null/undefined) gelten als passend — dann
+   * entscheidet die Aufnahme selbst (maxDuration) bzw. der Speicher.
+   *
+   * `sekunden` darf eine halbe Sekunde über der Grenze liegen: Kameras
+   * schneiden nicht auf das Bild genau, eine 60-s-Aufnahme meldet oft 60,2 s.
+   */
+  function videoPruefen({ sekunden, bytes, mime } = {}) {
+    if (mime !== undefined && mime !== null && mime !== '' && !videoTyp(mime)) {
+      return 'Dieses Videoformat geht nicht. Erlaubt sind MP4, MOV und WebM.';
+    }
+    if (Number.isFinite(sekunden) && sekunden > VIDEO_SEKUNDEN_HOECHSTENS + 0.5) {
+      return `Eine Video-Story darf höchstens ${VIDEO_SEKUNDEN_HOECHSTENS} Sekunden lang sein — dieses Video hat ${Math.round(sekunden)} s.`;
+    }
+    if (Number.isFinite(bytes) && bytes > VIDEO_BYTES_HOECHSTENS) {
+      return `Das Video ist zu groß (${Math.ceil(bytes / 1048576)} MB, höchstens ${Math.round(VIDEO_BYTES_HOECHSTENS / 1048576)} MB).`;
+    }
+    return null;
+  }
+
+  /**
+   * Wie lange eine Story im Betrachter läuft (Millisekunden).
+   * Bild: DAUER_BILD. Video: seine Länge, höchstens DAUER_VIDEO_HOECHSTENS;
+   * solange die Länge unbekannt ist, die Obergrenze.
+   */
+  function storyDauer(mediaType, videoSekunden) {
+    if (mediaType !== 'video') return DAUER_BILD;
+    const n = Number(videoSekunden);
+    return Number.isFinite(n) && n > 0 ? Math.min(n * 1000, DAUER_VIDEO_HOECHSTENS) : DAUER_VIDEO_HOECHSTENS;
+  }
 
   /*
    * Die Schriften der Story-Bearbeitung (Kasten 11.6). Vorbild Instagram:
@@ -324,6 +402,14 @@
   return {
     DAUER_BILD,
     DAUER_VIDEO_HOECHSTENS,
+    VIDEO_SEKUNDEN_HOECHSTENS,
+    VIDEO_BYTES_HOECHSTENS,
+    VIDEO_BITRATE_WEB,
+    VIDEO_TYPEN,
+    videoTyp,
+    videoEndung,
+    videoPruefen,
+    storyDauer,
     SCHRIFTEN,
     FARBEN,
     FILTER_SCHLUESSEL,

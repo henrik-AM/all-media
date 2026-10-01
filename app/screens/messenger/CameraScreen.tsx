@@ -19,6 +19,16 @@ import { erlaubnisSichern } from '../../lib/kameraErlaubnis';
 import { useAktionen } from '../../lib/useAktionen';
 import { useDaten } from '../../contexts/DatenContext';
 
+// Kasten 15: Länge und Größe einer Video-Story — dieselbe Datei wie die Website.
+const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
+
+/** Was über die letzte Aufnahme bekannt ist — für die Prüfung als Story. */
+interface AufnahmeArt {
+  typ: 'image' | 'video';
+  sekunden?: number | null;
+  bytes?: number | null;
+}
+
 type Mode = 'photo' | 'video';
 
 interface Props {
@@ -177,8 +187,16 @@ export const CameraScreen = ({
    */
   const [insightBild, setInsightBild] = useState<string | null>(null);
 
+  /*
+   * Kasten 15: Foto oder Video? Bis dahin las die Story das am Umschalter
+   * FOTO/VIDEO ab. Aus der Galerie kommt für die Story aber beides — dann
+   * entscheidet die gewählte Datei, nicht der Umschalter.
+   */
+  const aufnahmeArt = useRef<AufnahmeArt | null>(null);
+
   /** Was mit einer fertigen Aufnahme geschieht — einerlei woher sie kommt. */
-  const uebernehmen = (uri: string) => {
+  const uebernehmen = (uri: string, art?: AufnahmeArt) => {
+    aufnahmeArt.current = art ?? { typ: mode === 'video' ? 'video' : 'image' };
     if (direktZu) return direktZu(uri);
     // Das Plus an der eigenen Story: die Aufnahme geht dorthin, ohne Frage.
     if (zielStory) {
@@ -193,12 +211,25 @@ export const CameraScreen = ({
     setBusy(true);
     try {
       const ergebnis = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: mode === 'photo' ? ['images'] : ['videos'],
+        /*
+         * Kasten 15: für die Story Foto ODER Video, wie bei Instagram. Die
+         * Höchstlänge lässt iOS beim Zuschneiden gleich einhalten
+         * (allowsEditing + videoMaxDuration); geprüft wird trotzdem unten.
+         */
+        mediaTypes: zielStory ? ['images', 'videos'] : mode === 'photo' ? ['images'] : ['videos'],
         allowsEditing: true,
         quality: 0.8,
+        ...(zielStory ? { videoMaxDuration: StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS } : {}),
       });
       if (ergebnis.canceled || !ergebnis.assets.length) return;
-      uebernehmen(ergebnis.assets[0].uri);
+      const wahl = ergebnis.assets[0];
+      const istVideoWahl = wahl.type === 'video' || (!wahl.type && mode === 'video');
+      uebernehmen(wahl.uri, {
+        typ: istVideoWahl ? 'video' : 'image',
+        // duration kommt in Millisekunden.
+        sekunden: istVideoWahl && wahl.duration ? wahl.duration / 1000 : null,
+        bytes: wahl.fileSize ?? null,
+      });
     } catch {
       onNotice('Zugriff auf die Galerie nicht möglich');
     } finally {
@@ -232,8 +263,17 @@ export const CameraScreen = ({
       }
       setLaeuft(true);
       try {
-        const video = await kamera.current.recordAsync({ maxDuration: 60 });
-        if (video?.uri) uebernehmen(video.uri);
+        /*
+         * Kasten 15: Länge und Größe aus gemeinsam/story.js — die Website
+         * hält beim Aufnehmen dieselben Grenzen ein. maxFileSize ist die
+         * Grenze des Speichers; ohne sie scheiterte eine lange Aufnahme in
+         * hoher Auflösung erst beim Hochladen.
+         */
+        const video = await kamera.current.recordAsync({
+          maxDuration: StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS,
+          maxFileSize: StoryRegeln.VIDEO_BYTES_HOECHSTENS,
+        });
+        if (video?.uri) uebernehmen(video.uri, { typ: 'video' });
       } catch {
         onNotice('Die Aufnahme ist fehlgeschlagen');
       } finally {
@@ -247,7 +287,7 @@ export const CameraScreen = ({
       const foto: CameraCapturedPicture | undefined = await kamera.current.takePictureAsync({
         quality: 0.8,
       });
-      if (foto?.uri) uebernehmen(foto.uri);
+      if (foto?.uri) uebernehmen(foto.uri, { typ: 'image' });
     } catch {
       onNotice('Das Foto ist fehlgeschlagen');
     } finally {
@@ -278,7 +318,13 @@ export const CameraScreen = ({
    * und die zweite Datei gehörte zu keiner Zeile.
    */
   const alsStory = (uri: string) => {
-    onCaptured?.(uri, mode === 'video' ? 'video' : 'image');
+    const art = aufnahmeArt.current ?? { typ: mode === 'video' ? 'video' : 'image' };
+    if (art.typ === 'video') {
+      // Kasten 15: ein Galerie-Video über 60 s oder 50 MB wird keine Story.
+      const grund = StoryRegeln.videoPruefen({ sekunden: art.sekunden, bytes: art.bytes });
+      if (grund) return onNotice(grund);
+    }
+    onCaptured?.(uri, art.typ);
   };
 
   const zielGewaehlt = (key: string) => {

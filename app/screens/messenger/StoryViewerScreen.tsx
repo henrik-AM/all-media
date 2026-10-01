@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,10 +19,13 @@ const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../
 
 /*
  * Kasten 11.4: Standdauer eines Bildes und Obergrenze eines Videos stehen in
- * gemeinsam/story.js — die Website blättert im selben Takt.
+ * gemeinsam/story.js — die Website blättert im selben Takt. Kasten 15: die
+ * Obergrenze ist seitdem 60 s, so lang wie die Kamera aufnimmt; vorher
+ * brach der Betrachter nach 30 s ab, mitten in einer 45-s-Story.
  */
 const DURATION = StoryRegeln.DAUER_BILD;
-const VIDEO_HOECHSTENS = StoryRegeln.DAUER_VIDEO_HOECHSTENS / 1000;
+/** Wie oft Videoflaeche (genau) den Stand meldet — der Balken gleitet dazwischen. */
+const MELDETAKT = 0.25;
 
 interface Props {
   story: Story;
@@ -141,12 +144,20 @@ export const StoryViewerScreen = ({
 
   /*
    * Ein Video bestimmt seine Dauer selbst: der Balken folgt der Wiedergabe
-   * (onFortschritt), weiter geht es an ihrem Ende (onEnde) oder nach 30 s.
+   * (onFortschritt), weiter geht es an ihrem Ende (onEnde) oder nach 60 s.
    * Bis zum 29.09.2026 zeigte der Betrachter Videos als Standbild — die App
    * legte jede Story als 'image' an, auch ein aufgenommenes Video.
+   *
+   * Kasten 15: lässt sich das Video nicht abspielen, zeigt Videoflaeche das
+   * Standbild — und der Betrachter behandelt die Story ab da wie ein Bild
+   * (6 s, dann weiter). Vorher blieb er stehen: er wartete auf ein Ende,
+   * das nie kam.
    */
-  const istVideoStory =
+  const [kaputtesVideo, setKaputtesVideo] = useState<string | null>(null);
+  const istVideoMedium =
     current?.mediaType === 'video' || (!current?.mediaType && istVideoAdresse(current?.mediaUri));
+  /** Läuft die Zeit nach dem Video (true) oder nach der Uhr (false)? */
+  const istVideoStory = istVideoMedium && kaputtesVideo !== current?.id;
 
   useEffect(() => {
     if (istVideoStory) {
@@ -176,12 +187,39 @@ export const StoryViewerScreen = ({
     return () => animation.stop();
   }, [index, paused, progress, stories.length, onClose, istVideoStory]);
 
+  /*
+   * Kasten 15: der Balken dauert so lange wie das Video. Videoflaeche meldet
+   * (mit `genau`) alle 0,25 s Stand und Länge; bis zur nächsten Meldung
+   * gleitet der Balken gleichmäßig weiter. Vorher wurde auf ganze Sekunden
+   * gesprungen — eine 4-s-Story hatte vier Stufen statt eines Balkens.
+   */
   const videoFortschritt = (bei: number, gesamt: number) => {
-    const laenge = Math.min(gesamt || VIDEO_HOECHSTENS, VIDEO_HOECHSTENS);
-    progress.setValue(laenge > 0 ? Math.min(bei / laenge, 1) : 0);
-    if (bei >= VIDEO_HOECHSTENS) videoEnde();
+    const laenge = StoryRegeln.storyDauer('video', gesamt) / 1000;
+    if (paused) {
+      progress.setValue(Math.min(bei / laenge, 1));
+      return;
+    }
+    Animated.timing(progress, {
+      toValue: Math.min((bei + MELDETAKT) / laenge, 1),
+      duration: MELDETAKT * 1000,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+    if (bei >= laenge) videoEnde();
   };
+  /*
+   * Nur einmal je Story weiter: am Ende melden sich `playToEnd` und der
+   * letzte Stand beinahe gleichzeitig. Bei der letzten Story hiess das
+   * zweimal onClose().
+   */
+  const weiterVon = useRef<string | null>(null);
+  // Zurückgeblättert auf dieselbe Story: ihr Ende zählt wieder.
+  useEffect(() => {
+    weiterVon.current = null;
+  }, [aktuelleId]);
   const videoEnde = () => {
+    if (!current || weiterVon.current === current.id) return;
+    weiterVon.current = current.id;
     if (index < stories.length - 1) {
       selbstGeblaettert.current = true;
       setIndex(index + 1);
@@ -293,7 +331,7 @@ export const StoryViewerScreen = ({
       </View>
 
       <View style={styles.stage}>
-        {current.mediaUri && istVideoStory ? (
+        {current.mediaUri && istVideoMedium ? (
           <Videoflaeche
             key={current.id}
             id={current.id}
@@ -302,8 +340,10 @@ export const StoryViewerScreen = ({
             stumm={false}
             fuellen="contain"
             style={styles.bild}
+            genau
             onFortschritt={videoFortschritt}
             onEnde={videoEnde}
+            onFehler={() => setKaputtesVideo(current.id)}
           />
         ) : current.mediaUri ? (
           <Image source={{ uri: current.mediaUri }} style={styles.bild} resizeMode="contain" />

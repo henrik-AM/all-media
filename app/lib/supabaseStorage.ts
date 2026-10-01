@@ -57,6 +57,7 @@ function typVon(dateiname: string): string {
   const endung = dateiname.split('.').pop()?.toLowerCase() ?? '';
   if (endung === 'png') return 'image/png';
   if (endung === 'mp4' || endung === 'mov') return 'video/mp4';
+  if (endung === 'webm') return 'video/webm';
   if (endung === 'webp') return 'image/webp';
   return 'image/jpeg';
 }
@@ -72,7 +73,13 @@ export async function ladeHoch(
   client: SupabaseClient | null,
   quelle: string,
   ordner: Ordner,
-  dateiname: string
+  dateiname: string,
+  /**
+   * Kasten 15: Obergrenze in Bytes. Der Eimer weist größere Dateien ohnehin
+   * ab — aber erst nach dem Hochladen und mit einer Meldung, die niemand
+   * versteht. `zuGross` ist der Satz, der dann erscheint.
+   */
+  grenze?: { bytes: number; zuGross: (bytes: number) => string }
 ): Promise<UploadErgebnis> {
   if (!client) {
     return { success: false, error: 'Nicht angemeldet', url: null, anzeige: null };
@@ -82,6 +89,7 @@ export async function ladeHoch(
     const antwort = await fetch(quelle);
     if (!antwort.ok) throw new Error(`Die Aufnahme ließ sich nicht lesen (${antwort.status})`);
     const inhalt = await antwort.arrayBuffer();
+    if (grenze && inhalt.byteLength > grenze.bytes) throw new Error(grenze.zuGross(inhalt.byteLength));
 
     /*
      * Fund 4, Nachtrag: die Dateinamen der Aufrufer sind

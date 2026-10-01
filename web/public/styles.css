@@ -4637,8 +4637,6 @@ body.ist-abgemeldet .ptr-indicator {
   display: inline-flex; align-items: center; gap: 6px;
 }
 .viewer__weitere svg { width: 16px; height: 16px; }
-.viewer__ton { width: 34px; height: 34px; display: grid; place-items: center; color: #fff; }
-.viewer__ton svg { width: 20px; height: 20px; }
 
 /* ---------- Story-Bearbeitung (Kasten 11.6) ---------- */
 .storyedit {

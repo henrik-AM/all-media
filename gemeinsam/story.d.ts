@@ -67,6 +67,20 @@ export interface StoryRing {
 
 export const DAUER_BILD: number;
 export const DAUER_VIDEO_HOECHSTENS: number;
+/** Kasten 15: Höchstlänge einer Video-Story in Sekunden. */
+export const VIDEO_SEKUNDEN_HOECHSTENS: number;
+/** Kasten 15: Höchstgröße einer Video-Story in Bytes (Grenze des Eimers). */
+export const VIDEO_BYTES_HOECHSTENS: number;
+export const VIDEO_BITRATE_WEB: number;
+export const VIDEO_TYPEN: string[];
+export function videoTyp(mime?: string | null): string | null;
+export function videoEndung(mime?: string | null): 'mp4' | 'mov' | 'webm';
+export function videoPruefen(angaben?: {
+  sekunden?: number | null;
+  bytes?: number | null;
+  mime?: string | null;
+}): string | null;
+export function storyDauer(mediaType?: string | null, videoSekunden?: number | null): number;
 export const SCHRIFTEN: StorySchrift[];
 export const FARBEN: string[];
 export const FILTER_SCHLUESSEL: string[];
