@@ -13,6 +13,8 @@ declare t text;
 begin
   foreach t in array array['story_tags', 'zahlungsmethoden', 'spendencodes',
                            'spendencode_protokoll', 'spendencode_pfeffer'] loop
+    -- spendencode_pfeffer gibt es seit Schema 77 nicht mehr.
+    continue when to_regclass('public.' || t) is null;
     execute format('drop policy if exists nur_freigegebene on public.%I', t);
     execute format(
       'create policy nur_freigegebene on public.%I as restrictive for all to authenticated '

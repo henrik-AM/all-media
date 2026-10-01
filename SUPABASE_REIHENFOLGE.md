@@ -170,3 +170,19 @@ Reihenfolge: nach Schema 54 (Spalten der Sounds).
 - `SUPABASE_SCHEMA_73_testbestand_nur_testkonten.sql` — `testbestand_insight()` und `testbestand_profilaufrufe()` wirken nur noch für `ist_testkonto()`, EXECUTE entzogen. Neue Fassung derselben Funktionen, Gewinner 73.
 - Gegenprobe (liest nur): `berichte/PRUEFUNG_echte_konten_seit_schema62.sql`; am 29.09. alle „test_an_echt“-Zeilen 0.
 - `SUPABASE_SCHEMA_74_freigabe_neue_tabellen.sql` — einschränkende Regel `nur_freigegebene` (Schema 52, Teil 4) auf `story_tags`, `zahlungsmethoden`, `spendencodes`, `spendencode_protokoll`, `spendencode_pfeffer`. **Jede neue Tabelle mit RLS braucht diese Regel**, sonst schlägt `_minderjaehrig.js` an.
+
+## Nachtrag 01.10.2026: Schemas 75–77 (Kästen 16, 19, 18)
+
+- `SUPABASE_SCHEMA_75_story_markierung_im_chat.sql` — `messages.hinweis`
+  ('story_markierung'), `zweierchat()`, neue Fassung von
+  `mitteilung_bei_story_markierung()` (Gewinner 75, ersetzt 68): Hinweis in den
+  Messenger-Zweierchat, sonst Community-Zweierchat, sonst neue Community-Anfrage;
+  Glocke nur bei `in_videos`. Neu `mitteilung_weg_bei_story_markierung()`.
+  **Wer Schema 68 neu einspielt, muss 75 nachziehen.**
+- `SUPABASE_SCHEMA_76_likes_nur_follower.sql` — Stufe `nur_follower` (nur Bereich
+  `likes`), neue Fassung von `sichtbar_fuer()`. **Gewinner 76, ersetzt Schema 11.**
+  Wer Schema 11 neu einspielt, nimmt die Stufe weg; danach 76 nachziehen.
+- `SUPABASE_SCHEMA_77_spendenpin_doppelt.sql` — `spendencode_setzen()` ohne
+  „vergeben“ (Gewinner 77, ersetzt 72); Fingerabdruck-Spalte, -Funktion und
+  `spendencode_pfeffer` gelöscht. **Schema 72 nicht neu einspielen**, es legte
+  Pfeffer und Eindeutigkeit wieder an. Schema 74 überspringt die fehlende Tabelle.
