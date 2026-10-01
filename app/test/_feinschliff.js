@@ -392,9 +392,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (!(await page.$('[data-eigenaktion="loeschen"]'))) throw new Error('keine Lösch-Option');
   });
 
-  await pruefe('Die eigenen Playlists und Highlights stehen zur Wahl', async () => {
-    const namen = await page.$$eval('[data-sml]', (n) => n.map((x) => x.dataset.smlname));
-    if (namen.length < 2) throw new Error('nur ' + namen.length + ' Sammlungen');
+  /*
+   * Kasten 17.3 (01.10.2026): das Blatt bietet nicht mehr alle Playlists UND
+   * Highlights an (ein Highlight nimmt keinen Beitrag), sondern „Zu Playlist
+   * hinzufügen" — dahinter die Playlists mit Häkchen.
+   */
+  await pruefe('Die eigenen Playlists stehen zur Wahl, keine Highlights', async () => {
+    if (!(await page.$('[data-eigenaktion="playlist"]'))) throw new Error('kein „Zu Playlist hinzufügen"');
+    await page.click('[data-eigenaktion="playlist"]');
+    await page.waitForSelector('[data-testid="sammlung-zuordnen"]', { timeout: 8000 });
+    const namen = await page.$$eval('[data-zuordnen]', (n) =>
+      n.map((x) => x.querySelector('.item__label')?.textContent?.trim() || '')
+    );
+    if (namen.length < 2) throw new Error('nur ' + namen.length + ' Playlists');
+    if (namen.some((n) => ['Test', 'Reisen', 'Technik'].includes(n))) {
+      throw new Error('Highlights in der Playlist-Wahl: ' + namen.join(', '));
+    }
   });
 
   /*
@@ -431,16 +444,24 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     return page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
   };
 
+  // Eine Zeile ohne Häkchen — „Zum Prüfen" ist im Testbestand leer.
+  const freieZeile = '[data-zuordnen][aria-pressed="false"]';
+  let gewaehlt = '';
+
   await pruefe('Ein Beitrag lässt sich in eine Playlist legen', async () => {
-    const toast = await hinweisAbwarten(() => page.click('[data-sml]'));
+    gewaehlt = await page.$eval(freieZeile, (n) => n.dataset.zuordnen);
+    const toast = await hinweisAbwarten(() => page.click(freieZeile));
     if (!toast.includes('hinzugefügt')) throw new Error('Toast sagt „' + toast + '"');
+    const haken = await page.$eval(`[data-zuordnen="${gewaehlt}"]`, (n) => n.getAttribute('aria-pressed'));
+    if (haken !== 'true') throw new Error('kein Häkchen nach dem Hinzufügen');
   });
 
-  await pruefe('Zweimal dieselbe Sammlung wird abgelehnt', async () => {
-    await page.click('[data-eigen]', { button: 'right' });
-    await page.waitForTimeout(400);
-    const toast = await hinweisAbwarten(() => page.click('[data-sml]'));
-    if (!toast.includes('schon')) throw new Error('Toast sagt „' + toast + '"');
+  await pruefe('Ein zweiter Klick nimmt ihn wieder heraus', async () => {
+    const toast = await hinweisAbwarten(() => page.click(`[data-zuordnen="${gewaehlt}"]`));
+    if (!toast.includes('entfernt')) throw new Error('Toast sagt „' + toast + '"');
+    const haken = await page.$eval(`[data-zuordnen="${gewaehlt}"]`, (n) => n.getAttribute('aria-pressed'));
+    if (haken !== 'false') throw new Error('Häkchen steht noch');
+    await page.evaluate(() => document.querySelector('.sheet-backdrop')?.remove());
   });
 
   await pruefe('Löschen fragt nach und nimmt die Kachel dann weg', async () => {

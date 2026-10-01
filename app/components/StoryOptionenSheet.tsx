@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { SichtbarkeitSheet } from './SichtbarkeitSheet';
+import { SammlungZuordnen } from './SammlungZuordnen';
 import { useProfil } from '../contexts/ProfilContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
@@ -136,6 +137,12 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
    * „Story auch in Videos teilen" (Schema 30).
    */
   const [sichtOffen, setSichtOffen] = useState(false);
+  /*
+   * Kasten 17.3: „Zu Highlight hinzufügen" an der eigenen Story — wie bei
+   * Instagram. Bis zum 01.10.2026 gab es in der App keinen Weg, eine Story
+   * in ein Highlight zu legen; nur die Website kannte das Blatt.
+   */
+  const [highlightSchritt, setHighlightSchritt] = useState(false);
   const person = alleNutzer[story.userId];
 
   /*
@@ -166,6 +173,7 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
   const punkte: { key: string; label: string; icon: IconName; gefahr?: boolean }[] = eigene
     ? [
         { key: 'sichtbar', label: 'Wer darf sie sehen', icon: 'eye-outline' },
+        { key: 'highlight', label: 'Zu Highlight hinzufügen', icon: 'star-outline' },
         { key: 'sichern', label: 'Auf dem Gerät sichern', icon: 'bookmark-outline' },
         { key: 'loeschen', label: 'Story löschen', icon: 'trash-outline', gefahr: true },
       ]
@@ -197,6 +205,7 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
       return;
     }
     if (key === 'sichtbar') return setSichtOffen(true);
+    if (key === 'highlight') return setHighlightSchritt(true);
     if (key === 'link') {
       onNotice(`all-media.app/story/${story.id}`);
       return onClose();
@@ -244,10 +253,20 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
   return (
     <SheetRahmen
       visible
-      title={meldeSchritt ? 'Story melden' : eigene ? 'Deine Story' : person?.name ?? 'Story'}
+      title={
+        highlightSchritt
+          ? 'Zu Highlight hinzufügen'
+          : meldeSchritt
+            ? 'Story melden'
+            : eigene
+              ? 'Deine Story'
+              : person?.name ?? 'Story'
+      }
       onClose={onClose}
     >
-      {meldeSchritt ? (
+      {highlightSchritt ? (
+        <SammlungZuordnen art="highlight" stueck={{ storyId: story.id }} onNotice={onNotice} />
+      ) : meldeSchritt ? (
         <ScrollView>
           {GRUENDE.map((grund) => (
             <Druck

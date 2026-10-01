@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { Modal, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Druck } from './Druck';
 import type { ActionSheetItem } from './ActionSheet';
@@ -44,18 +44,29 @@ interface Props {
    * zweite oft gar nicht erscheinen.
    */
   liste?: { titel: string } | null;
+  /**
+   * Kasten 17.3: ein eigener Inhalt statt der Zeilen — die Playlist-Wahl
+   * mit Namensfeld (components/SammlungZuordnen). Steht nur zusammen mit
+   * `liste` (für die Überschrift).
+   */
+  inhalt?: React.ReactNode;
   onSelect: (key: string) => void;
   onClose: () => void;
 }
 
-export const OptionenKacheln = ({ visible, items, liste, onSelect, onClose }: Props) => (
+export const OptionenKacheln = ({ visible, items, liste, inhalt, onSelect, onClose }: Props) => (
   <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    {/* Kasten 17.3: im Blatt gibt es jetzt ein Namensfeld — die Tastatur
+        darf es nicht verdecken. Wie in SheetRahmen um den ganzen Bildschirm. */}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <Druck style={styles.backdrop} onPress={onClose} accessibilityLabel="Schließen" />
     <View style={styles.sheet}>
       <View style={styles.handle} />
       {/* Überschrift wie auf der Website (sheetKopf „Optionen"). */}
       <Text style={styles.titel}>{liste ? liste.titel : 'Optionen'}</Text>
-      {liste ? (
+      {liste && inhalt ? (
+        inhalt
+      ) : liste ? (
         <View>
           {items.map((item) => (
             <Druck
@@ -100,9 +111,10 @@ export const OptionenKacheln = ({ visible, items, liste, onSelect, onClose }: Pr
       </ScrollView>
       )}
       <Druck style={styles.abbrechen} onPress={onClose} accessibilityRole="button">
-        <Text style={styles.abbrechenText}>Abbrechen</Text>
+        <Text style={styles.abbrechenText}>{inhalt ? 'Fertig' : 'Abbrechen'}</Text>
       </Druck>
     </View>
+    </KeyboardAvoidingView>
   </Modal>
 );
 

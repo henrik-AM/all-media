@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -21,6 +21,10 @@ import { SpendeKarte } from '../../components/SpendeKarte';
 import { ActionSheet } from '../../components/ActionSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { fotoHochladen } from '../../lib/profilbild';
+import { SammlungOrdner } from '../../components/SammlungOrdner';
+import { HighlightBetrachter } from '../../components/HighlightBetrachter';
+import type { HighlightModus } from '../messenger/StoryViewerScreen';
+import { Story } from '../../types';
 
 // Ringfarbe und -staerke je Gattung — gemeinsam mit der Website (Kasten 12.9).
 const SammlungRegel = require('../../../gemeinsam/sammlungen') as typeof import('../../../gemeinsam/sammlungen');
@@ -177,8 +181,21 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
     if (bild) await titelSetzen({ bildUrl: bild.url });
   };
 
-  const oeffnen = async (s: Aktion.Sammlung) => {
-    if (!s.id) return onNotice(`„${s.name}" laesst sich gerade nicht oeffnen`);
+  /*
+   * Kasten 17.1: das offene Highlight im Story-Betrachter. Getrennt vom
+   * Ordner (`offen`), weil beide Modals sind und iOS zwei Modals, die sich
+   * im selben Augenblick ablösen, nicht zuverlässig zeigt — der Wechsel
+   * zwischen beiden geht deshalb über `spaeter`.
+   */
+  const [highlightOffen, setHighlightOffen] = useState<{
+    storys: Story[];
+    start?: string;
+    highlight: HighlightModus;
+  } | null>(null);
+  const spaeter = (tun: () => void) => setTimeout(tun, 400);
+
+  /** Der Ordner: Playlist zum Ansehen, Highlight zum Bearbeiten. */
+  const ordnerOeffnen = async (s: Aktion.Sammlung) => {
     setWaehlen(false);
     setLaedt(true);
     try {
@@ -188,6 +205,78 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
     } finally {
       setLaedt(false);
     }
+  };
+
+  /*
+   * Ein Stück aus der eigenen Sammlung nehmen (Kasten 17.3). Der Beitrag
+   * bzw. die Story bleibt bestehen — nur die Zuordnung geht.
+   */
+  const herausnehmen = (s: Aktion.Sammlung, stueck: { id: string; kind?: string }, danach?: () => void) => {
+    Alert.alert(
+      s.art === 'playlist' ? `Aus „${s.name}" entfernen?` : `Aus dem Highlight „${s.name}" entfernen?`,
+      s.art === 'playlist'
+        ? 'Der Beitrag bleibt in deinem Profil — er steht nur nicht mehr in dieser Playlist.'
+        : 'Die Story bleibt erhalten — sie steht nur nicht mehr in diesem Highlight.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Entfernen',
+          style: 'destructive',
+          onPress: async () => {
+            if (!supabase) return;
+            try {
+              await Aktion.ausSammlung(
+                supabase,
+                s.id,
+                stueck.kind === 'story' || s.art === 'highlight' ? { storyId: stueck.id } : { postId: stueck.id }
+              );
+              onNotice(`Aus „${s.name}" entfernt`);
+              sammlungenNeu();
+              danach?.();
+            } catch (fehler: any) {
+              onNotice(fehler?.message ?? 'Das liess sich nicht entfernen');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /*
+   * Kasten 17.1: ein Highlight spielt seine Storys ab, wie bei Instagram.
+   * Ein leeres Highlight hat nichts abzuspielen — dann der Ordner, in dem
+   * man ein Titelbild wählen oder es löschen kann. `start`: von einer
+   * Kachel im Ordner aus beginnt es bei genau dieser Story.
+   */
+  const highlightAbspielen = async (s: Aktion.Sammlung, start?: string) => {
+    if (!supabase || !user?.id) return;
+    setLaedt(true);
+    let storys: Story[] = [];
+    try {
+      storys = await Aktion.highlightStorys(supabase, s.id, user.id);
+    } catch (fehler: any) {
+      setLaedt(false);
+      return onNotice(fehler?.message ?? 'Das Highlight liess sich nicht laden');
+    }
+    setLaedt(false);
+    if (!storys.length) return ordnerOeffnen(s);
+    setHighlightOffen({
+      storys,
+      start,
+      highlight: {
+        name: s.name,
+        eigen: true,
+        onBearbeiten: () => spaeter(() => ordnerOeffnen(s)),
+        onEntfernen: (story) => spaeter(() => herausnehmen(s, { id: story.id, kind: 'story' })),
+        onLoeschen: () => spaeter(() => loeschenFragen(s)),
+      },
+    });
+  };
+
+  const oeffnen = async (s: Aktion.Sammlung) => {
+    if (!s.id) return onNotice(`„${s.name}" laesst sich gerade nicht oeffnen`);
+    if (s.art === 'highlight') return highlightAbspielen(s);
+    return ordnerOeffnen(s);
   };
 
   /*
@@ -512,25 +601,54 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
       </ScrollView>
 
       {/*
-        * Der Inhalt einer Sammlung. Eine Kachel fuehrt weiter an dieselbe
-        * Stelle wie im Raster darunter — sonst waere das Oeffnen wieder nur
-        * eine Anzeige.
+        * Der Inhalt einer Sammlung (Kasten 17.2): bei der Playlist der Ordner,
+        * beim Highlight die Bearbeiten-Ansicht. Eine Kachel fuehrt weiter an
+        * dieselbe Stelle wie im Raster darunter — eine Story-Kachel in den
+        * Betrachter, ab genau dieser Story.
         */}
-      <Modal
-        visible={offen !== null}
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setOffen(null)}
-      >
-        <View style={styles.screen}>
-          <View style={styles.sammlungKopf}>
-            <Druck onPress={() => setOffen(null)} style={styles.sammlungZurueck}>
-              <Ionicons name="chevron-back" size={24} color={colors.text} />
-            </Druck>
-            <Text style={styles.sammlungTitel} numberOfLines={1}>
-              {offen?.sammlung.name ?? ''}
-            </Text>
-            {offen ? (
+      <SammlungOrdner
+        offen={offen}
+        onClose={() => {
+          setOffen(null);
+          setWaehlen(false);
+        }}
+        hinweis={
+          waehlen
+            ? offen?.sammlung.art === 'playlist'
+              ? 'Tippe auf den Beitrag, der im Kreis stehen soll.'
+              : 'Tippe auf die Story, die im Kreis stehen soll.'
+            : null
+        }
+        hervorheben={(k) => offen?.sammlung.titelPostId === k.id || offen?.sammlung.titelStoryId === k.id}
+        leerText={
+          offen?.sammlung.art === 'playlist'
+            ? 'Über das Drei-Punkte-Menü an einem eigenen Beitrag legst du ihn hier hinein („Zu Playlist hinzufügen").'
+            : 'Über das Menü an einer eigenen Story legst du sie hier hinein („Zu Highlight hinzufügen").'
+        }
+        onKachel={(k) => {
+          if (!offen) return;
+          if (waehlen) {
+            return void titelSetzen(k.kind === 'story' ? { storyId: k.id } : { postId: k.id });
+          }
+          const s = offen.sammlung;
+          setOffen(null);
+          if (k.kind === 'story') return spaeter(() => void highlightAbspielen(s, k.id));
+          onOpenKachel?.(k);
+        }}
+        onLangDruck={(k) => {
+          if (!offen) return;
+          const s = offen.sammlung;
+          herausnehmen(s, k, () =>
+            setOffen((jetzt) =>
+              jetzt && jetzt.sammlung.id === s.id
+                ? { ...jetzt, kacheln: jetzt.kacheln.filter((x) => x.id !== k.id) }
+                : jetzt
+            )
+          );
+        }}
+        kopfRechts={
+          offen ? (
+            <>
               <Druck
                 onPress={() => setTitelMenue(true)}
                 style={styles.sammlungZurueck}
@@ -539,62 +657,17 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
               >
                 <Ionicons name="image-outline" size={22} color={waehlen ? colors.brand : colors.text} />
               </Druck>
-            ) : null}
-            {offen ? (
-              <Druck onPress={() => loeschenFragen(offen.sammlung)} style={styles.sammlungZurueck}>
+              <Druck
+                onPress={() => loeschenFragen(offen.sammlung)}
+                style={styles.sammlungZurueck}
+                accessibilityLabel={`${offen.sammlung.name} löschen`}
+              >
                 <Ionicons name="trash-outline" size={22} color={colors.text} />
               </Druck>
-            ) : null}
-          </View>
-          {waehlen ? (
-            <Text style={styles.wahlHinweis}>
-              {offen?.sammlung.art === 'playlist'
-                ? 'Tippe auf den Beitrag, der im Kreis stehen soll.'
-                : 'Tippe auf die Story, die im Kreis stehen soll.'}
-            </Text>
-          ) : null}
-          {offen && offen.kacheln.length > 0 ? (
-            <ScrollView contentContainerStyle={styles.content}>
-              <View style={styles.grid}>
-                {offen.kacheln.map((k) => (
-                  <Druck
-                    key={k.id}
-                    style={[
-                      styles.gridItem,
-                      { height: kachelHoehe },
-                      (offen.sammlung.titelPostId === k.id || offen.sammlung.titelStoryId === k.id) && {
-                        borderColor: SammlungRegel.ringfarbe(offen.sammlung.art),
-                        borderWidth: 3,
-                      },
-                    ]}
-                    onPress={() => {
-                      if (waehlen) {
-                        return void titelSetzen(k.kind === 'story' ? { storyId: k.id } : { postId: k.id });
-                      }
-                      setOffen(null);
-                      onOpenKachel?.(k);
-                    }}
-                  >
-                    <Motiv
-                      id={k.id}
-                      bild={k.thumbnail ?? k.mediaUrl ?? undefined}
-                      icon={k.kind === 'post' ? 'image-outline' : 'play-outline'}
-                      iconSize={20}
-                      style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-                    />
-                  </Druck>
-                ))}
-              </View>
-            </ScrollView>
-          ) : (
-            <EmptyState
-              icon="albums-outline"
-              title="Noch nichts darin"
-              text={'Über das Drei-Punkte-Menü an einem Beitrag legst du ihn hier hinein.'}
-            />
-          )}
-        </View>
-
+            </>
+          ) : null
+        }
+      >
         <ActionSheet
           visible={titelMenue}
           title="Titelbild"
@@ -628,7 +701,13 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
           }}
           onClose={() => setTitelMenue(false)}
         />
-      </Modal>
+      </SammlungOrdner>
+
+      <HighlightBetrachter
+        offen={highlightOffen}
+        onClose={() => setHighlightOffen(null)}
+        onNotice={onNotice}
+      />
 
       <SichtbarkeitSheet
         visible={onlineOffen}
@@ -670,18 +749,8 @@ const styles = themenStyles((colors) => ({
   },
   content: { paddingBottom: spacing.xl },
 
-  // Der Kopf ueber dem Inhalt einer Sammlung.
-  sammlungKopf: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.sm,
-    paddingRight: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
+  // Knopf im Kopf des Ordners (components/SammlungOrdner, Kasten 17.2).
   sammlungZurueck: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  sammlungTitel: { ...typography.h3, color: colors.text, flex: 1 },
   laedt: {
     position: 'absolute',
     top: 0,
@@ -734,7 +803,6 @@ const styles = themenStyles((colors) => ({
     borderWidth: 2,
     borderColor: colors.surface,
   },
-  wahlHinweis: { ...typography.small, color: colors.text2, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   highlightLabel: { ...typography.small, color: colors.text2 },
   tabs: {
     flexDirection: 'row',

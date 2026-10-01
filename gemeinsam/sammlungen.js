@@ -112,5 +112,94 @@
     return treffer ? bildVon(treffer) : null;
   }
 
-  return { RINGFARBEN, RINGSTAERKE_ANTEIL, ringfarbe, ringstaerke, vorschaubild };
+  /*
+   * Kasten 17 (Henrik 01.10.2026): „Die Highlights kannst du einfach komplett
+   * von Instagram übernehmen. Und Playlists, stell dir so vor wie ein Ordner
+   * mit speziellen Beiträgen." Was folgt, brauchen App und Website gleich:
+   * die Zeile unter dem Ordnertitel, das Alter einer Highlight-Story und die
+   * Form, in der eine Highlight-Story beim Betrachter ankommt.
+   */
+
+  /**
+   * Die Zeile unter dem Titel: „Playlist · 3 Beiträge", „Highlight · 1 Story".
+   * Bis Kasten 17 stand auf der Website auch beim Highlight „Beiträge" —
+   * darin liegen aber Storys.
+   */
+  function untertitel(art, anzahl) {
+    const n = Math.max(0, Number(anzahl) || 0);
+    if (art === 'playlist') return `Playlist · ${n} ${n === 1 ? 'Beitrag' : 'Beiträge'}`;
+    return `Highlight · ${n} ${n === 1 ? 'Story' : 'Storys'}`;
+  }
+
+  /**
+   * Wie alt eine Story im Highlight ist.
+   *
+   * Der normale Betrachter kennt nur Minuten und Stunden — eine laufende
+   * Story ist nie älter als 24 Stunden. Im Highlight liegen Storys von vor
+   * Wochen; „vor 1130 Std." liest niemand. Deshalb Tage, Wochen, dann das
+   * Datum, wie Instagram es zeigt.
+   */
+  function storyAlter(iso, jetzt) {
+    const wann = typeof iso === 'number' ? iso : iso ? Date.parse(iso) : NaN;
+    if (!Number.isFinite(wann)) return '';
+    const min = Math.floor(((jetzt == null ? Date.now() : jetzt) - wann) / 60000);
+    if (min < 1) return 'gerade eben';
+    if (min < 60) return `vor ${min} Min.`;
+    const std = Math.floor(min / 60);
+    if (std < 24) return `vor ${std} Std.`;
+    const tage = Math.floor(std / 24);
+    if (tage < 7) return `vor ${tage} ${tage === 1 ? 'Tag' : 'Tagen'}`;
+    if (tage < 28) {
+      const wochen = Math.floor(tage / 7);
+      return `vor ${wochen} ${wochen === 1 ? 'Woche' : 'Wochen'}`;
+    }
+    const d = new Date(wann);
+    const zwei = (z) => String(z).padStart(2, '0');
+    return `${zwei(d.getDate())}.${zwei(d.getMonth() + 1)}.${d.getFullYear()}`;
+  }
+
+  /**
+   * Eine Zeile aus `stories` (mit eingebettetem `profiles(name)`) als Story
+   * für den Betrachter — dieselben Felder, die gemeinsam/story.js
+   * (listenBilden) für die Leiste baut.
+   *
+   * Nicht über listenBilden selbst: das sortiert nach Kontakten und
+   * Gefolgten und wirft weg, was nicht in die Leiste gehört. Ein Highlight
+   * hat seine eigene Reihenfolge (sammlung_inhalte.position) und gehört
+   * genau einer Person. `viewed` ist immer wahr: ein Highlight hat keinen
+   * bunten Ring, den das Ansehen grau färben müsste.
+   *
+   * Die Bearbeitung (`overlays`) kommt roh mit; geprüft wird sie dort, wo
+   * sie gezeichnet wird (StoryOverlaySchicht, storyOverlayHtml).
+   */
+  function alsHighlightStory(zeile, optionen) {
+    const o = optionen || {};
+    const z = zeile || {};
+    const eigen = Boolean(o.ichId) && z.user_id === o.ichId;
+    const gemocht = o.gemocht;
+    return {
+      id: z.id,
+      userId: eigen ? o.ichKennung || 'me' : z.user_id,
+      name: eigen ? 'Deine Story' : String((z.profiles && z.profiles.name) || '').split(' ')[0],
+      own: eigen,
+      viewed: true,
+      liked: Boolean(gemocht && gemocht.has && gemocht.has(z.id)),
+      caption: z.caption || '',
+      mediaUri: z.media_url || undefined,
+      mediaType: z.media_type === 'video' ? 'video' : 'image',
+      aufgenommen: z.created_at || undefined,
+      overlays: z.overlays || null,
+    };
+  }
+
+  return {
+    RINGFARBEN,
+    RINGSTAERKE_ANTEIL,
+    ringfarbe,
+    ringstaerke,
+    vorschaubild,
+    untertitel,
+    storyAlter,
+    alsHighlightStory,
+  };
 });

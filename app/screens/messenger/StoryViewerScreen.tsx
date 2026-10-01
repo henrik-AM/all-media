@@ -14,8 +14,26 @@ import { Contact, Story } from '../../types';
 import { useAktionen } from '../../lib/useAktionen';
 import { Videoflaeche, istVideo as istVideoAdresse } from '../../components/Videoflaeche';
 import { StoryOverlaySchicht } from '../../components/StoryOverlaySchicht';
+import { ActionSheet } from '../../components/ActionSheet';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
+const SammlungRegel = require('../../../gemeinsam/sammlungen') as typeof import('../../../gemeinsam/sammlungen');
+
+/**
+ * Kasten 17.1: der Betrachter spielt ein Highlight ab — wie bei Instagram.
+ * Dieselbe Bedienung (Balken, Tippen links/rechts, nach unten wischen),
+ * dazu der Name des Highlights im Kopf. Beim eigenen Highlight führt das
+ * Mehr-Menü zu „Highlight bearbeiten" (Titelbild, Inhalt), „Aus Highlight
+ * entfernen" und „Highlight löschen" — dieselben Wege wie bisher im Raster.
+ */
+export interface HighlightModus {
+  name: string;
+  /** Das eigene Highlight: dann gibt es die Verwaltungspunkte. */
+  eigen: boolean;
+  onBearbeiten?: () => void;
+  onEntfernen?: (story: Story) => void;
+  onLoeschen?: () => void;
+}
 
 /*
  * Kasten 11.4: Standdauer eines Bildes und Obergrenze eines Videos stehen in
@@ -49,6 +67,8 @@ interface Props {
   onStoryViewed?: (storyId: string) => void;
   /** Nur fuer `npm run mac:bilder`: nicht von selbst weiterblaettern. */
   standbild?: boolean;
+  /** Kasten 17.1: die Storys gehoeren zu einem Highlight. */
+  highlight?: HighlightModus;
 }
 
 /*
@@ -70,6 +90,7 @@ export const StoryViewerScreen = ({
   onOpenProfile,
   onStoryViewed,
   standbild = false,
+  highlight,
 }: Props) => {
   const { users: alleNutzer } = useDaten();
   // Das Herz an einer Story stand bisher nur im Bildschirm — beim naechsten
@@ -77,6 +98,8 @@ export const StoryViewerScreen = ({
   const aktion = useAktionen(onNotice);
   const [ansichtenOffen, setAnsichtenOffen] = useState(false);
   const [optionenOffen, setOptionenOffen] = useState(false);
+  // Kasten 17.1: das Mehr-Menue des eigenen Highlights.
+  const [highlightMenue, setHighlightMenue] = useState(false);
   const insets = useSafeAreaInsets();
   // Die eigene Story ist nur dabei, wenn wirklich etwas aufgenommen wurde.
   const stories = alle.filter((s) => !s.own || s.mediaUri);
@@ -278,6 +301,8 @@ export const StoryViewerScreen = ({
 
   /** "vor 3 Min." aus dem Aufnahmezeitpunkt (ISO aus created_at). */
   const alter = () => {
+    // Im Highlight liegen Storys von vor Wochen — dort Tage, Wochen, Datum.
+    if (highlight) return SammlungRegel.storyAlter(current.aufgenommen ?? null);
     const zeit = current.aufgenommen ? Date.parse(current.aufgenommen) : NaN;
     if (!Number.isFinite(zeit)) return '';
     const min = Math.floor((Date.now() - zeit) / 60000);
@@ -314,17 +339,23 @@ export const StoryViewerScreen = ({
         </Druck>
         <Avatar id={current.userId} name={person?.name ?? current.name} size={sizes.avatarSm} />
         <View style={styles.who}>
-          <Text style={styles.name}>{istEigene ? 'Deine Story' : person?.name ?? current.name}</Text>
-          <Text style={styles.time}>{alter()}</Text>
+          <Text style={styles.name} numberOfLines={1}>
+            {istEigene ? (highlight ? 'Dein Highlight' : 'Deine Story') : person?.name ?? current.name}
+          </Text>
+          <Text style={styles.time} numberOfLines={1} testID={highlight ? 'highlight-kopf' : undefined}>
+            {highlight ? `${highlight.name} · ${alter()}` : alter()}
+          </Text>
         </View>
         <Druck
           onPress={() => {
             // Zeit anhalten, solange das Blatt offen ist - sonst laeuft die
             // Story im Hintergrund weiter.
             setPaused(true);
+            if (highlight?.eigen) return setHighlightMenue(true);
             setOptionenOffen(true);
           }}
           hitSlop={10}
+          accessibilityLabel={highlight?.eigen ? 'Highlight-Optionen' : 'Mehr'}
         >
           <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.white} />
         </Druck>
@@ -406,7 +437,23 @@ export const StoryViewerScreen = ({
             <Ionicons name="eye-outline" size={20} color={colors.white} />
             <Text style={styles.ansichtenText}>Ansichten</Text>
           </Druck>
-          {onWeitere ? (
+          {highlight?.eigen && highlight.onBearbeiten ? (
+            // Instagram: im eigenen Highlight steht unten „Bearbeiten" statt
+            // „Weitere" — wer sein Highlight ansieht, will es pflegen, nicht
+            // gleich eine neue Story aufnehmen.
+            <Druck
+              onPress={() => {
+                onClose();
+                highlight.onBearbeiten?.();
+              }}
+              hitSlop={8}
+              accessibilityLabel="Highlight bearbeiten"
+              style={styles.weitere}
+            >
+              <Ionicons name="create-outline" size={22} color={colors.white} />
+              <Text style={styles.ansichtenText}>Bearbeiten</Text>
+            </Druck>
+          ) : onWeitere && !highlight ? (
             <Druck
               onPress={() => {
                 onClose();
@@ -420,16 +467,18 @@ export const StoryViewerScreen = ({
               <Text style={styles.ansichtenText}>Weitere</Text>
             </Druck>
           ) : null}
-          <Druck
-            accessibilityLabel="Story löschen"
-            onPress={() => {
-              onDelete?.(current);
-              onClose();
-            }}
-            hitSlop={8}
-          >
-            <Ionicons name="trash-outline" size={22} color={colors.white} />
-          </Druck>
+          {highlight ? null : (
+            <Druck
+              accessibilityLabel="Story löschen"
+              onPress={() => {
+                onDelete?.(current);
+                onClose();
+              }}
+              hitSlop={8}
+            >
+              <Ionicons name="trash-outline" size={22} color={colors.white} />
+            </Druck>
+          )}
         </View>
       ) : (
       <View style={styles.foot}>
@@ -491,6 +540,41 @@ export const StoryViewerScreen = ({
           }}
         />
       )}
+
+      {/*
+        Kasten 17.1: das eigene Highlight. „Story löschen" steht hier bewusst
+        nicht — eine Story im Highlight zu löschen nimmt sie auch aus allen
+        anderen Highlights. Herausnehmen ist, was man hier meint.
+      */}
+      {highlight?.eigen ? (
+        <ActionSheet
+          visible={highlightMenue}
+          title={highlight.name}
+          untertitel="Dein Highlight"
+          items={[
+            ...(highlight.onBearbeiten
+              ? [{ key: 'bearbeiten', label: 'Highlight bearbeiten', icon: 'create-outline' as const }]
+              : []),
+            ...(highlight.onEntfernen
+              ? [{ key: 'entfernen', label: 'Aus Highlight entfernen', icon: 'remove-circle-outline' as const }]
+              : []),
+            ...(highlight.onLoeschen
+              ? [{ key: 'loeschen', label: 'Highlight löschen', icon: 'trash-outline' as const, gefahr: true }]
+              : []),
+          ]}
+          onSelect={(key) => {
+            setHighlightMenue(false);
+            onClose();
+            if (key === 'bearbeiten') return highlight.onBearbeiten?.();
+            if (key === 'entfernen') return highlight.onEntfernen?.(current);
+            if (key === 'loeschen') return highlight.onLoeschen?.();
+          }}
+          onClose={() => {
+            setHighlightMenue(false);
+            setPaused(false);
+          }}
+        />
+      ) : null}
 
       {optionenOffen && (
         <StoryOptionenSheet
