@@ -84,7 +84,7 @@ pruefe('App: Menü ohne Antworten/Zitieren/Weiterleiten bei Hinweisen',
 pruefe('Website: eigene Karte für story_markierung',
   /istMarkierungsHinweis\(m\)\) \{/.test(WEB) && /data-testid="story-markierung-karte"/.test(WEB));
 pruefe('Website: Karte öffnet die Story mit Ersatz aus der Einbettung',
-  /openStory\(m\.story\.id, \{ ersatz: m\.story \}\)/.test(WEB) && /function openStory\(storyId, \{ bereich, ersatz \} = \{\}\)/.test(WEB));
+  /openStory\(m\.story\.id, \{ ersatz: m\.story \}\)/.test(WEB) && /function openStory\(storyId, \{ bereich, ersatz[,}]/.test(WEB));
 pruefe('Website: Menü ohne Antworten/Zitieren/Weiterleiten bei Hinweisen',
   /const hinweis = window\.StoryRegeln\.istMarkierungsHinweis\(m\);/.test(WEB));
 pruefe('Website: CSS für die Karte', CSS.includes('.msg__hinweis {'));

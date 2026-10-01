@@ -100,7 +100,7 @@ pruefe('App: fremdes Profil zeigt keinen Hinweis mehr statt der Sammlung',
   !/onNotice\(`\$\{s\.art === 'playlist' \? 'Playlist' : 'Highlight'\} „\$\{s\.name\}"`\)/.test(FREMD));
 pruefe('App: Storys des Highlights über sammlung_inhalte', /export async function highlightStorys/.test(AKTION));
 pruefe('Website: Highlight-Kreis spielt ab', /if \(sml\.art === 'highlight'\) return highlightAbspielen\(sml\)/.test(WEB));
-pruefe('Website: openStory nimmt eine eigene Liste', /function openStory\(storyId, \{ bereich, liste: eigeneListe, highlight = null, danach = null \}/.test(WEB));
+pruefe('Website: openStory nimmt eine eigene Liste', /function openStory\(storyId, \{[^}]*liste: eigeneListe, highlight = null, danach = null \}/.test(WEB));
 pruefe('Website: fremdes Profil kommt nach dem Schließen zurück', /danach: eigen \? null : \(\) => openProfile\(sml\.userId, 'oeffentlich'\)/.test(WEB));
 pruefe('Website: Highlight-Optionen im Betrachter', /data-hlopt="bearbeiten"/.test(WEB) && /data-hlopt="entfernen"/.test(WEB) && /data-hlopt="loeschen"/.test(WEB));
 pruefe('Server: GET /api/sammlung/:id/storys', /app\.get\('\/api\/sammlung\/:id\/storys'/.test(SERVER));
