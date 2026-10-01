@@ -1,8 +1,6 @@
 -- ===========================================================================
 --  SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql                 (01.10.2026)
---  ENTWURF aus Kasten 17 — noch NICHT eingespielt. Nummer beim Zusammen-
---  führen prüfen (75–79 sind auf main vergeben; andere Kästen könnten 80
---  ebenfalls gewählt haben).
+--  Kasten 17, eingespielt am 01.10.2026.
 --
 --  WARUM
 --

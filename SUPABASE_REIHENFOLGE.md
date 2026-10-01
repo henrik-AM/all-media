@@ -47,6 +47,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.sichtbar_fuer() | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_76_likes_nur_follower.sql | **SUPABASE_SCHEMA_76_likes_nur_follower.sql** |
 | Funktion public.mitteilung_bei_story_markierung() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_75_story_markierung_im_chat.sql | **SUPABASE_SCHEMA_75_story_markierung_im_chat.sql** |
 | Funktion public.spendencode_setzen() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_77_spendenpin_doppelt.sql | **SUPABASE_SCHEMA_77_spendenpin_doppelt.sql** |
+| Funktion public.sammlung_inhalt_pruefen() | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql | **SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql** |
 | Funktion public.community_sichtbar() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Funktion public.darf_angeschrieben_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql | **SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql** |
 | Funktion public.darf_mitglied_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
@@ -199,3 +200,7 @@ Reihenfolge: nach Schema 54 (Spalten der Sounds).
   `messenger_anfragen()` zählt Hinweis-Nachrichten (Story-Markierung) nicht als
   Austausch. Am Anker umgeschrieben; **wer Schema 57 neu einspielt, muss 79
   nachziehen.**
+- `SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql` (Kasten 17) — neue Fassung von
+  `sammlung_inhalt_pruefen()` (**Gewinner 80**, ersetzt 46): in eine Sammlung
+  kommt nur, was dem Besitzer gehört. `starter_sammlungen()` legt nur Eigenes
+  ab und bleibt davon unberührt.
