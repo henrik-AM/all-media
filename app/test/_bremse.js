@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { TESTKONTO_PASS } = require('./_testpasswoerter');
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -30,7 +31,7 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 const PROJEKT = (URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] || '';
 
 // Das Testkonto aus SUPABASE_SCHEMA_7_testkonto.sql.
-const KONTO = { email: 'test@all-media.app', passwort: 'AllMedia2026!' };
+const KONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
 
 // Muss zur Konstanten `grenze` in Schema 38 passen.
 const GRENZE = 40;

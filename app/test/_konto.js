@@ -28,8 +28,9 @@
  */
 
 const { nurTestkonto } = require('./_nur_testkonten');
+const { PRUEFKONTO_PASS } = require('./_testpasswoerter');
 const MAIL = nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de');
-const PASS = process.env.AM_TEST_PASS || 'PruefLauf2026!';
+const PASS = process.env.AM_TEST_PASS || PRUEFKONTO_PASS;
 const NAME = process.env.AM_TEST_NAME || 'prueflauf';
 
 /**

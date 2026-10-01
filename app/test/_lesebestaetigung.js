@@ -31,6 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { nurTestkonto } = require('./_nur_testkonten');
+const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -41,10 +42,10 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 // Der ABSENDER schreibt, der LESER öffnet den Chat und stellt den Schalter.
-const ABSENDER = { email: 'test@all-media.app', passwort: 'AllMedia2026!' };
+const ABSENDER = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
 const LESER = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
-  passwort: process.env.AM_TEST_PASS || 'PruefLauf2026!',
+  passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
 };
 
 let fehler = 0;

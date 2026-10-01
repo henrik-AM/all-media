@@ -10,6 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const { PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
 const env = fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8');
 const wert = (n) => (env.match(new RegExp('^' + n + '=(.*)$', 'm')) || [])[1];
@@ -21,7 +22,7 @@ const client = createClient(wert('EXPO_PUBLIC_SUPABASE_URL'), wert('EXPO_PUBLIC_
   const [was, text] = process.argv.slice(2);
   const { data: an, error: anFehler } = await client.auth.signInWithPassword({
     email: 'all.media.prueflauf@web.de',
-    password: 'PruefLauf2026!',
+    password: PRUEFKONTO_PASS,
   });
   if (anFehler) throw anFehler;
   const ich = an.user.id;

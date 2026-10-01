@@ -15,11 +15,12 @@
 
 const path = require('path');
 const { chromium } = require('playwright-core');
+const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const BILDER = path.join(__dirname, '..', '..', 'bilder', 'kasten3');
-const F = { mail: 'all.media.prueflauf@web.de', pass: 'PruefLauf2026!' };
-const E = { mail: 'test@all-media.app', pass: 'AllMedia2026!' };
+const F = { mail: 'all.media.prueflauf@web.de', pass: PRUEFKONTO_PASS };
+const E = { mail: 'test@all-media.app', pass: TESTKONTO_PASS };
 // Feste Kennung von @test: im Teilen-Blatt stehen auch echte Konten, ein
 // Treffer über den Namen könnte daneben greifen.
 const E_ID = '3baafacd-bbdb-40fb-8ef4-a4e365ae00c4';
