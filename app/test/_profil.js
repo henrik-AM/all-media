@@ -403,14 +403,30 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (!(await page.$('#profilBearbeiten'))) throw new Error('der Pfeil fuehrt nicht zurueck');
   });
 
+  /*
+   * Kasten 17.1 (01.10.2026): ein Highlight öffnet kein Raster mehr, sondern
+   * spielt seine Storys im Story-Betrachter ab — wie bei Instagram. Ist
+   * nichts darin (oder darf man nichts davon sehen), sagt es ein Hinweis.
+   */
   await pruefe('Auf einem fremden Profil sind Highlights klickbar', async () => {
     await zumFremdprofil(K.person('u1'));
-    const knopf = await page.$('.highlight[data-sammlung]');
+    const knopf = await page.$('.highlight[data-sammlung="highlight"]');
     if (!knopf) throw new Error('die Highlights sind keine Knoepfe');
     await knopf.click();
-    await page.waitForTimeout(500);
-    const unter = await page.$eval('.pagehead__sub', (n) => n.textContent);
-    if (!unter.startsWith('Highlight')) throw new Error('Kopf sagt „' + unter + '"');
+    await page
+      .waitForFunction(
+        () =>
+          document.querySelector('.viewer [data-testid="highlight-kopf"]') ||
+          /nichts zu sehen/.test(document.querySelector('#toast')?.textContent || ''),
+        null,
+        { timeout: 10000 }
+      )
+      .catch(() => {});
+    const betrachter = await page.$('.viewer [data-testid="highlight-kopf"]');
+    const hinweis = await page.$eval('#toast', (n) => n.textContent || '').catch(() => '');
+    if (!betrachter && !/nichts zu sehen/.test(hinweis)) throw new Error('weder Betrachter noch Hinweis');
+    if (await page.$('.pagehead__sub')) throw new Error('es geht noch das alte Raster auf');
+    if (betrachter) await page.click('#storyClose');
   });
 
   await pruefe('Der Link auf einem fremden Profil ist ein echter Link', async () => {

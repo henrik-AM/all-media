@@ -10018,6 +10018,12 @@ async function openBeitragOptionen(beitrag) {
        noch nicht fertig (Henrik, 28.09.2026). Gleiche Regel in der App. */
     ...(darfSichern && beitrag.mediaUrl && !beitrag.live ? [{ key: 'sichern', label: 'Herunterladen', icon: 'download' }] : []),
     ...(beitrag.live ? [] : [{ key: 'story', label: 'Zu Story hinzufügen', icon: 'plus' }]),
+    /*
+     * Kasten 17.3 (Henrik 01.10.2026): „Der Nutzer des Accounts muss dann
+     * jedes Video selbst einordnen." Nur am eigenen Beitrag und nicht beim
+     * laufenden Stream. Gleiche Regel in app/components/BeitragOptionenSheet.tsx.
+     */
+    ...(eigener && !beitrag.live ? [{ key: 'playlist', label: 'Zu Playlist hinzufügen', icon: 'ebenen' }] : []),
     ...(eigener
       ? []
       : [
@@ -10067,6 +10073,8 @@ async function openBeitragOptionen(beitrag) {
         b.addEventListener('click', async () => {
           const was = b.dataset.beitragopt;
           close();
+
+          if (was === 'playlist') return openZuordnen({ postId: beitrag.id });
 
           if (was === 'link') {
             const adresse = beitragLink(beitrag.id);
@@ -10644,6 +10652,8 @@ async function openStoryOptionen(story, danach) {
   const punkte = eigene
     ? [
         { key: 'sichtbar', label: 'Wer darf sie sehen', icon: 'eye' },
+        // Kasten 17.3: wie bei Instagram die eigene Story in ein Highlight.
+        { key: 'highlight', label: 'Zu Highlight hinzufügen', icon: 'star' },
         { key: 'sichern', label: 'Auf dem Gerät sichern', icon: 'bookmark' },
         { key: 'loeschen', label: 'Story löschen', icon: 'trash', gefahr: true },
       ]
@@ -10680,6 +10690,9 @@ async function openStoryOptionen(story, danach) {
             await storyLoeschen(story.id);
             return;
           }
+
+          // Die Zeit steht, bis das Zuordnen-Blatt wieder zu ist.
+          if (was === 'highlight') return openZuordnen({ storyId: story.id }, { beimSchliessen: danach });
 
           if (was === 'sichern') {
             const bild = story.mediaUri;
@@ -13897,16 +13910,154 @@ async function ladeSammlungen(userId, wurzel = main) {
 function bindSammlungen(wurzel = main) {
   wurzel.querySelectorAll('[data-sammlung]').forEach((b) =>
     b.addEventListener('click', () => {
-      state.sammlung = {
+      const sml = {
         art: b.dataset.sammlung,
         name: b.dataset.sammlungName,
         userId: b.dataset.sammlungUser,
         id: b.dataset.sammlungId || '',
       };
+      /*
+       * Kasten 17.1: ein Highlight spielt seine Storys ab — wie bei
+       * Instagram, im vorhandenen Story-Betrachter. Die Playlist öffnet
+       * weiter den Ordner (17.2).
+       */
+      if (sml.art === 'highlight') return highlightAbspielen(sml);
+      state.sammlung = sml;
       if (wurzel !== main) closeOverlay();
       renderSammlung();
     })
   );
+}
+
+/*
+ * Ein Highlight im Story-Betrachter abspielen (Kasten 17.1).
+ *
+ * Henrik am 01.10.2026: „Die Highlights kannst du einfach komplett von
+ * Instagram übernehmen." Bis dahin öffnete ein Highlight dasselbe Raster
+ * wie eine Playlist. Jetzt laufen die Storys nacheinander ab — Balken oben,
+ * Tippen links/rechts, nach unten wischen. Kein zweiter Betrachter: es ist
+ * openStory() mit eigener Liste und dem Highlight als Zusatz.
+ *
+ * `startId`: von einer Kachel in der Bearbeiten-Ansicht aus beginnt es bei
+ * genau dieser Story. Ein leeres eigenes Highlight öffnet die
+ * Bearbeiten-Ansicht (Titelbild, Löschen); ein leeres fremdes nur einen
+ * Hinweis — ob es leer ist oder man nichts davon sehen darf, sagt er
+ * absichtlich nicht.
+ *
+ * Gegenstück in der App: highlightAbspielen in VideoProfileScreen.tsx und
+ * sammlungOeffnen in UserProfileScreen.tsx (components/HighlightBetrachter).
+ */
+async function highlightAbspielen(sml, startId) {
+  if (!sml.id) return toast(`„${sml.name}" lässt sich gerade nicht öffnen — bitte die Seite neu laden.`);
+  let storys = [];
+  try {
+    const daten = await fetch(`/api/sammlung/${encodeURIComponent(sml.id)}/storys`).then((r) => r.json());
+    if (Array.isArray(daten)) storys = daten;
+  } catch {
+    return toast('Das Highlight ließ sich nicht laden');
+  }
+  const eigen = sml.userId === 'me' || istEigen(sml.userId);
+
+  if (!storys.length) {
+    if (!eigen) return toast(`In „${sml.name}" ist gerade nichts zu sehen`);
+    state.sammlung = sml;
+    if (!overlay.hidden) closeOverlay();
+    return renderSammlung();
+  }
+
+  const start = storys.find((x) => x.id === startId) || storys[0];
+  openStory(start.id, {
+    liste: storys,
+    highlight: { ...sml, eigen },
+    // Aus dem fremden Profil heraus: danach wieder dorthin. Das Profil ist
+    // eine Vollbild-Ebene wie der Betrachter und wurde von ihm ersetzt.
+    danach: eigen ? null : () => openProfile(sml.userId, 'oeffentlich'),
+  });
+}
+
+/*
+ * Ein Stück aus der eigenen Sammlung nehmen (Kasten 17.3). Der Beitrag bzw.
+ * die Story bleibt bestehen — nur die Zuordnung geht. Gibt wahr zurück,
+ * wenn es wirklich weg ist.
+ */
+async function ausSammlungNehmen(sml, stueck) {
+  const istPlaylist = sml.art === 'playlist';
+  const ja = await bestaetigen(
+    istPlaylist ? `Aus „${sml.name}" entfernen?` : `Aus dem Highlight „${sml.name}" entfernen?`,
+    istPlaylist
+      ? 'Der Beitrag bleibt in deinem Profil — er steht nur nicht mehr in dieser Playlist.'
+      : 'Die Story bleibt erhalten — sie steht nur nicht mehr in diesem Highlight.',
+    'Entfernen'
+  );
+  if (!ja) return false;
+  const frage = stueck.postId ? `post=${encodeURIComponent(stueck.postId)}` : `story=${encodeURIComponent(stueck.storyId)}`;
+  const antwort = await fetch(`/api/eigene/sammlungsinhalt/${encodeURIComponent(sml.id)}?${frage}`, { method: 'DELETE' })
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, error: 'Keine Verbindung' }));
+  if (!antwort.ok) {
+    toast(antwort.error || 'Das ließ sich nicht herausnehmen');
+    return false;
+  }
+  toast(`Aus „${sml.name}" entfernt`);
+  sammlungenAufgefrischt();
+  return true;
+}
+
+/*
+ * Nach jeder Änderung an einer eigenen Sammlung: die Kreise nicht aus dem
+ * Zwischenspeicher zurückholen (sonst stünden alte Zahl und altes Bild da)
+ * und — falls das eigene Profil gerade zu sehen ist — neu laden.
+ */
+function sammlungenAufgefrischt() {
+  sammlungenLauf += 1;
+  SAMMLUNGEN.delete('me');
+  SAMMLUNGEN.delete(String(state.currentUserId || ''));
+  void ladeSammlungen('me');
+}
+
+/*
+ * Eine eigene Sammlung löschen — mit Rückfrage, die sagt, was NICHT
+ * passiert. Aus der Ordneransicht und aus dem Highlight-Betrachter
+ * („Highlight löschen"). Gibt wahr zurück, wenn sie weg ist.
+ */
+async function sammlungLoeschenFragen(art, name) {
+  const istPlaylist = art === 'playlist';
+  /*
+   * Die Rueckfrage sagt ausdruecklich, was NICHT passiert. Sonst klickt
+   * niemand sie weg, der seine Beitraege behalten will — und wer sie
+   * wegklickt, hat womoeglich etwas anderes erwartet.
+   */
+  const ja = await bestaetigen(
+    `„${name}" löschen?`,
+    istPlaylist
+      ? 'Die Playlist verschwindet. Die Beiträge darin bleiben erhalten — nur die Zuordnung geht weg.'
+      : 'Das Highlight verschwindet. Die Storys darin bleiben erhalten — nur die Zuordnung geht weg.',
+    'Löschen'
+  );
+  if (!ja) return false;
+
+  const antwort = await fetch(
+    `/api/eigene/sammlung/${art}/${encodeURIComponent(name)}`,
+    { method: 'DELETE' }
+  )
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, error: 'Das Löschen kam nicht durch' }));
+
+  if (!antwort.ok) {
+    toast(antwort.error || 'Das ließ sich nicht löschen');
+    return false;
+  }
+
+  /*
+   * Den Zwischenspeicher leeren, sonst baut sammlungenReihe() den
+   * geloeschten Kreis aus dem alten Stand wieder auf — und er liesse sich
+   * sogar noch anklicken.
+   */
+  sammlungenLauf += 1;
+  SAMMLUNGEN.delete('me');
+  SAMMLUNGEN.delete(String(state.currentUserId || ''));
+  toast(`„${name}" ist gelöscht`);
+  return true;
 }
 
 /*
@@ -13955,9 +14106,11 @@ async function renderSammlung() {
             : ''
         }
       </div>
-      <div class="pagehead__sub">${istPlaylist ? 'Playlist' : 'Highlight'} · ${liste.length} ${
-        liste.length === 1 ? 'Beitrag' : 'Beiträge'
-      }</div>
+      <div class="pagehead__sub" data-testid="sammlung-untertitel">${esc(
+        // Kasten 17.2: „Playlist · 3 Beiträge", beim Highlight „Storys" —
+        // dieselbe Zeile wie in der App (gemeinsam/sammlungen.js).
+        Sammlungen.untertitel(art, liste.length)
+      )}</div>
     </div>
     <div class="scroll">
       ${
@@ -13972,7 +14125,12 @@ async function renderSammlung() {
                 const symbol = gattung === 'post' ? ICONS.image : ICONS.portrait;
                 // Kasten 12.7/12.8: das gewählte Titelbild trägt einen Rahmen in der Ringfarbe.
                 const istTitel = gattung === 'story' ? titel.titelStoryId === e.id : titel.titelPostId === e.id;
-                return `<button class="griditem ${istTitel ? 'is-titel' : ''}" data-${ziel}="${esc(e.id)}"${
+                // Kasten 17.3: im eigenen Ordner lässt sich jedes Stück per
+                // langem Drücken (Rechtsklick) wieder herausnehmen.
+                const entfernbar = userId === 'me' && id
+                  ? ` data-entfernbar="${esc(e.id)}" data-entfernart="${gattung === 'story' ? 'story' : 'post'}"`
+                  : '';
+                return `<button class="griditem ${istTitel ? 'is-titel' : ''}" data-${ziel}="${esc(e.id)}"${entfernbar}${
                   istTitel ? ` style="${ringStil(art)}"` : ''
                 }>${medienFlaeche(
                   e.id,
@@ -13985,11 +14143,13 @@ async function renderSammlung() {
           : `<div class="empty">${istPlaylist ? ICONS.play : ICONS.image}
               <div class="empty__title">Noch nichts drin</div>
               <div class="empty__text">${
-                id
-                  ? istPlaylist
-                    ? 'Über das Drei-Punkte-Menü an einem eigenen Beitrag legst du ihn hier hinein.'
-                    : 'Über das Drei-Punkte-Menü an einer eigenen Story legst du sie hier hinein.'
-                  : 'Diese Sammlung lässt sich gerade nicht öffnen — bitte die Seite neu laden.'
+                !id
+                  ? 'Diese Sammlung lässt sich gerade nicht öffnen — bitte die Seite neu laden.'
+                  : userId !== 'me'
+                    ? 'Hier liegt noch nichts.'
+                    : istPlaylist
+                      ? 'Über das Drei-Punkte-Menü an einem eigenen Beitrag („Zu Playlist hinzufügen") legst du ihn hier hinein.'
+                      : 'Über das Menü an einer eigenen Story („Zu Highlight hinzufügen") legst du sie hier hinein.'
               }</div>
             </div>`
       }
@@ -14005,52 +14165,69 @@ async function renderSammlung() {
   $('#titelbildWaehlen')?.addEventListener('click', () => openTitelbildWahl(art, id, name, liste, titel));
 
   $('#sammlungLoeschen')?.addEventListener('click', async () => {
-    /*
-     * Die Rueckfrage sagt ausdruecklich, was NICHT passiert. Sonst klickt
-     * niemand sie weg, der seine Beitraege behalten will — und wer sie
-     * wegklickt, hat womoeglich etwas anderes erwartet.
-     */
-    const ja = await bestaetigen(
-      `„${name}" löschen?`,
-      istPlaylist
-        ? 'Die Playlist verschwindet. Die Beiträge darin bleiben erhalten — nur die Zuordnung geht weg.'
-        : 'Das Highlight verschwindet. Die Storys darin bleiben erhalten — nur die Zuordnung geht weg.',
-      'Löschen'
-    );
-    if (!ja) return;
-
-    const antwort = await fetch(
-      `/api/eigene/sammlung/${art}/${encodeURIComponent(name)}`,
-      { method: 'DELETE' }
-    )
-      .then((r) => r.json())
-      .catch(() => ({ ok: false, error: 'Das Löschen kam nicht durch' }));
-
-    if (!antwort.ok) return toast(antwort.error || 'Das ließ sich nicht löschen');
-
-    /*
-     * Den Zwischenspeicher leeren, sonst baut sammlungenReihe() den
-     * geloeschten Kreis aus dem alten Stand wieder auf — und er liesse sich
-     * sogar noch anklicken.
-     */
-    sammlungenLauf += 1;
-    SAMMLUNGEN.delete('me');
-    SAMMLUNGEN.delete(String(state.currentUserId || ''));
-
+    if (!(await sammlungLoeschenFragen(art, name))) return;
     // Die Namenslisten muessen nicht von Hand nachgezogen werden: das eigene
     // Profil holt sich `me` bei jedem Aufbau frisch vom Server.
     state.sammlung = null;
-    toast(`„${name}" ist gelöscht`);
     render();
   });
+
+  /*
+   * Kasten 17.3: langes Drücken (am Rechner Rechtsklick) auf ein Stück im
+   * eigenen Ordner nimmt es heraus. Danach zeichnet sich der Ordner neu —
+   * Zahl und Raster stimmen sofort.
+   */
+  main.querySelectorAll('[data-entfernbar]').forEach((kachel) => {
+    let halten = null;
+    let gehalten = false;
+    const los = () => {
+      clearTimeout(halten);
+      halten = null;
+    };
+    const entfernen = async () => {
+      const stueck = kachel.dataset.entfernart === 'story' ? { storyId: kachel.dataset.entfernbar } : { postId: kachel.dataset.entfernbar };
+      if (await ausSammlungNehmen({ art, name, id }, stueck)) renderSammlung();
+    };
+    kachel.addEventListener('pointerdown', () => {
+      gehalten = false;
+      halten = setTimeout(() => {
+        gehalten = true;
+        void entfernen();
+      }, 500);
+    });
+    kachel.addEventListener('pointerup', los);
+    kachel.addEventListener('pointerleave', los);
+    kachel.addEventListener('pointercancel', los);
+    kachel.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      void entfernen();
+    });
+    // Der Klick nach dem langen Drücken öffnet nichts.
+    kachel.addEventListener(
+      'click',
+      (e) => {
+        if (!gehalten) return;
+        gehalten = false;
+        e.stopImmediatePropagation();
+      },
+      true
+    );
+  });
+
   main.querySelectorAll('[data-openvideo]').forEach((b) =>
     b.addEventListener('click', () => openVideo(b.dataset.openvideo))
   );
   main.querySelectorAll('[data-openpost]').forEach((b) =>
     b.addEventListener('click', () => openPost(b.dataset.openpost))
   );
+  /*
+   * Eine Story im Ordner eines Highlights spielt das Highlight ab dieser
+   * Story ab (Kasten 17.1). Vorher openStory(id) ohne Liste: der Betrachter
+   * suchte sie in der Story-Leiste — eine abgelaufene Story steht dort nicht,
+   * und der Klick tat nichts.
+   */
   main.querySelectorAll('[data-openstory]').forEach((b) =>
-    b.addEventListener('click', () => openStory(b.dataset.openstory))
+    b.addEventListener('click', () => highlightAbspielen({ art, name, userId, id }, b.dataset.openstory))
   );
 }
 
@@ -14159,28 +14336,21 @@ const PROFILE_TABS = [
  * Henriks Punkte 37 und 40.
  */
 function openEigenerBeitrag(id, art, me) {
-  const sammlungen = [
-    ...(me.playlists || []).map((name) => ({ art: 'playlist', name })),
-    ...(me.highlights || []).map((name) => ({ art: 'highlight', name })),
-  ];
-
+  /*
+   * Kasten 17.3: bis zum 01.10.2026 standen hier alle Playlists UND
+   * Highlights als „Hinzufügen zu" — ein Highlight nimmt aber keinen
+   * Beitrag, der Klick endete in einer Fehlermeldung. Und heraus ging es
+   * nirgends. Jetzt derselbe Weg wie im Drei-Punkte-Menü: die Playlist-Wahl
+   * mit Häkchen (openZuordnen).
+   */
   openSheet(
     art === 'video' ? 'Dein Video' : 'Dein Beitrag',
     `<div class="sheet__body">
-       ${
-         sammlungen.length
-           ? `<div class="listhead">Hinzufügen zu</div>
-              ${sammlungen
-                .map(
-                  (sml) => `<button class="item" data-sml="${esc(sml.art)}" data-smlname="${esc(sml.name)}">
-                    <span class="item__icon">${sml.art === 'playlist' ? ICONS.play : ICONS.image}</span>
-                    <span class="item__label">${esc(sml.name)}</span>
-                    <span class="item__value">${sml.art === 'playlist' ? 'Playlist' : 'Highlight'}</span>
-                  </button>`
-                )
-                .join('')}`
-           : `<div class="sheet__hint">Du hast noch keine Playlist und kein Highlight. Über das Plus oben rechts legst du eine an.</div>`
-       }
+       <button class="item" data-eigenaktion="playlist">
+         <span class="item__icon">${ICONS.ebenen}</span>
+         <span class="item__label">Zu Playlist hinzufügen</span>
+         <span class="row__chevron">${ICONS.chevron}</span>
+       </button>
        <div class="listhead">Verwalten</div>
        <button class="item item--danger" data-eigenaktion="loeschen">
          <span class="item__icon">${ICONS.trash}</span>
@@ -14188,17 +14358,10 @@ function openEigenerBeitrag(id, art, me) {
        </button>
      </div>`,
     (blatt, zu) => {
-      blatt.querySelectorAll('[data-sml]').forEach((b) =>
-        b.addEventListener('click', async () => {
-          const res = await fetch(`/api/eigene/${id}/sammlung`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ art: b.dataset.sml, name: b.dataset.smlname }),
-          }).then((r) => r.json());
-          zu();
-          toast(res.ok ? res.meldung : res.error);
-        })
-      );
+      blatt.querySelector('[data-eigenaktion="playlist"]').addEventListener('click', () => {
+        zu();
+        openZuordnen({ postId: id });
+      });
 
       blatt.querySelector('[data-eigenaktion="loeschen"]').addEventListener('click', async () => {
         zu();
@@ -14216,6 +14379,112 @@ function openEigenerBeitrag(id, art, me) {
       });
     },
     { schliessen: true }
+  );
+}
+
+/*
+ * Einen eigenen Beitrag einer Playlist zuordnen — oder eine eigene Story
+ * einem Highlight (Kasten 17.3).
+ *
+ * Henrik am 01.10.2026: „Der Nutzer des Accounts muss dann jedes Video
+ * selbst einordnen." Eine Liste der eigenen Playlists bzw. Highlights mit
+ * Häkchen: Klick legt hinein oder nimmt wieder heraus. Darunter ein
+ * Namensfeld für eine neue, in die das Stück gleich hineinkommt.
+ *
+ * Gegenstück in der App: components/SammlungZuordnen.tsx.
+ */
+async function openZuordnen(stueck, { beimSchliessen } = {}) {
+  const istPlaylist = Boolean(stueck.postId);
+  const frage = istPlaylist ? `post=${encodeURIComponent(stueck.postId)}` : `story=${encodeURIComponent(stueck.storyId)}`;
+  let liste = [];
+  try {
+    const daten = await fetch(`/api/eigene/zuordnung?${frage}`).then((r) => r.json());
+    if (!daten.ok) {
+      beimSchliessen?.();
+      return toast(daten.error || 'Das ließ sich nicht laden');
+    }
+    liste = daten.sammlungen || [];
+  } catch {
+    beimSchliessen?.();
+    return toast('Keine Verbindung');
+  }
+
+  const art = istPlaylist ? 'playlist' : 'highlight';
+  const farbe = Sammlungen.ringfarbe(art);
+  const zeile = (s) => `<button class="item" data-zuordnen="${esc(s.id)}" aria-pressed="${s.enthalten ? 'true' : 'false'}">
+      <span class="item__icon zuordnen__kreis" style="border:2.5px solid ${farbe};color:${farbe};border-radius:50%">${istPlaylist ? ICONS.play : ICONS.star}</span>
+      <span class="item__label">${esc(s.name)}</span>
+      <span class="item__value zuordnen__haken" style="color:var(--brand)">${s.enthalten ? ICONS.check : ''}</span>
+    </button>`;
+  const leer = `<div class="sheet__hint">${
+    istPlaylist ? 'Du hast noch keine Playlist. Leg unten eine an.' : 'Du hast noch kein Highlight. Leg unten eins an.'
+  }</div>`;
+
+  openSheet(
+    istPlaylist ? 'Zu Playlist hinzufügen' : 'Zu Highlight hinzufügen',
+    `<div class="sheet__body" data-testid="sammlung-zuordnen">
+       <div id="zuordnenListe">${liste.length ? liste.map(zeile).join('') : leer}</div>
+       <form class="sheet__field" id="zuordnenNeu" style="display:flex;gap:8px;align-items:center">
+         <input id="zuordnenName" maxlength="60" autocomplete="off" style="flex:1"
+           placeholder="${istPlaylist ? 'Neue Playlist, z. B. Gaming' : 'Neues Highlight, z. B. Sommer'}"
+           aria-label="${istPlaylist ? 'Name der neuen Playlist' : 'Name des neuen Highlights'}" />
+         <button type="submit" class="prof__btn is-primary" id="zuordnenAnlegen">${istPlaylist ? 'Neue Playlist' : 'Neues Highlight'}</button>
+       </form>
+       <div class="sheet__fehler" id="zuordnenFehler" role="alert" hidden></div>
+     </div>`,
+    (blatt) => {
+      const fehlerFeld = blatt.querySelector('#zuordnenFehler');
+      const fehler = (text) => {
+        fehlerFeld.textContent = text || '';
+        fehlerFeld.hidden = !text;
+      };
+      let beschaeftigt = false;
+
+      // Ein Zuhörer am Container: die Zeilen werden nach jedem Klick neu
+      // gezeichnet, Zuhörer an ihnen müssten jedes Mal neu gebunden werden.
+      blatt.querySelector('#zuordnenListe').addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-zuordnen]');
+        if (!b || beschaeftigt) return;
+        const s = liste.find((x) => x.id === b.dataset.zuordnen);
+        if (!s) return;
+        beschaeftigt = true;
+        fehler('');
+        const antwort = s.enthalten
+          ? await fetch(`/api/eigene/sammlungsinhalt/${encodeURIComponent(s.id)}?${frage}`, { method: 'DELETE' })
+              .then((r) => r.json())
+              .catch(() => ({ ok: false, error: 'Keine Verbindung' }))
+          : await api(`/api/eigene/sammlungsinhalt/${encodeURIComponent(s.id)}`, stueck);
+        beschaeftigt = false;
+        // Fehler im Blatt — ein Toast läge dahinter (Kasten 6.5).
+        if (!antwort.ok) return fehler(antwort.error || 'Das ging nicht durch');
+        s.enthalten = !s.enthalten;
+        b.outerHTML = zeile(s);
+        toast(s.enthalten ? `Zu „${s.name}" hinzugefügt` : `Aus „${s.name}" entfernt`);
+        sammlungenAufgefrischt();
+      });
+
+      blatt.querySelector('#zuordnenNeu').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (beschaeftigt) return;
+        const feld = blatt.querySelector('#zuordnenName');
+        const name = feld.value.trim();
+        if (!name) return fehler('Bitte einen Namen eingeben');
+        if (liste.some((x) => x.name === name)) {
+          return fehler(istPlaylist ? 'Diese Playlist gibt es schon' : 'Dieses Highlight gibt es schon');
+        }
+        beschaeftigt = true;
+        fehler('');
+        const antwort = await api('/api/eigene/sammlung-neu', { ...stueck, name });
+        beschaeftigt = false;
+        if (!antwort.ok) return fehler(antwort.error || 'Das ließ sich nicht anlegen');
+        liste.push(antwort.sammlung);
+        blatt.querySelector('#zuordnenListe').innerHTML = liste.map(zeile).join('');
+        feld.value = '';
+        toast(antwort.meldung || `„${name}" angelegt`);
+        sammlungenAufgefrischt();
+      });
+    },
+    { schliessen: true, beimSchliessen }
   );
 }
 
@@ -16151,15 +16420,31 @@ function storyListeFuer(bereich) {
  * Video-Storys laufen als Video, so lange sie dauern (hoechstens 30 s).
  * Gleiche Regel in app/screens/messenger/StoryViewerScreen.tsx.
  */
-function openStory(storyId, { bereich } = {}) {
+/*
+ * Kasten 17.1: `liste`, `highlight` und `danach` spielen ein Highlight ab.
+ *   liste      die Storys des Highlights, in seiner Reihenfolge
+ *   highlight  { id, name, art, userId, eigen } — Name im Kopf, beim eigenen
+ *              die Verwaltung (Bearbeiten, Herausnehmen, Löschen)
+ *   danach     läuft, wenn der Betrachter zugeht — zurück ins fremde Profil
+ */
+function openStory(storyId, { bereich, liste: eigeneListe, highlight = null, danach = null } = {}) {
   let wo = bereich;
-  if (!wo) {
-    wo = storyListeFuer('messenger').some((x) => x.id === storyId) ? 'messenger' : 'videos';
+  let list;
+  if (eigeneListe) {
+    wo = wo || 'videos';
+    list = eigeneListe;
+  } else {
+    if (!wo) {
+      wo = storyListeFuer('messenger').some((x) => x.id === storyId) ? 'messenger' : 'videos';
+    }
+    list = storyListeFuer(wo);
+    if (!list.some((x) => x.id === storyId)) list = storyListeFuer('alle');
   }
-  let list = storyListeFuer(wo);
-  if (!list.some((x) => x.id === storyId)) list = storyListeFuer('alle');
   const idx = list.findIndex((x) => x.id === storyId);
   if (idx < 0) return;
+  // Beim Weiterblättern dieselben Zusätze mitgeben.
+  const weiter = eigeneListe ? { liste: eigeneListe, highlight, danach } : {};
+  const eigenesHighlight = Boolean(highlight && highlight.eigen);
 
   const s = list[idx];
   const u = s.own ? state.users.me || user(s.userId) : user(s.userId);
@@ -16191,11 +16476,14 @@ function openStory(storyId, { bereich } = {}) {
         <button class="viewer__close" id="storyClose" aria-label="Zurück">${ICONS.back}</button>
         ${s.own ? eigenerAvatar(state.users.me, 36) : `<div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>`}
         <div class="viewer__who" ${s.own ? '' : `data-profile="${u.id}"`}>
-          <div class="viewer__name">${s.own ? 'Deine Story' : esc(u.name)}</div>
-          <div class="viewer__time">${esc(storyAlter(s))}</div>
+          <div class="viewer__name">${s.own ? (highlight ? 'Dein Highlight' : 'Deine Story') : esc(u.name)}</div>
+          <div class="viewer__time"${highlight ? ' data-testid="highlight-kopf"' : ''}>${esc(
+            // Im Highlight liegen Storys von vor Wochen: Tage, Wochen, Datum.
+            highlight ? `${highlight.name} · ${Sammlungen.storyAlter(s.aufgenommen || s.zeit)}` : storyAlter(s)
+          )}</div>
         </div>
         ${istVideo ? `<button class="viewer__ton" id="storyTon" aria-label="Ton an">${ICONS.mute || ICONS.mic}</button>` : ''}
-        <button class="viewer__more" id="storyMore" aria-label="Mehr">${ICONS.settings}</button>
+        <button class="viewer__more" id="storyMore" aria-label="${eigenesHighlight ? 'Highlight-Optionen' : 'Mehr'}">${ICONS.settings}</button>
       </div>
       <div class="viewer__stage">
         <button class="viewer__zone viewer__zone--prev" id="storyPrev" aria-label="Vorherige Story"></button>
@@ -16204,7 +16492,15 @@ function openStory(storyId, { bereich } = {}) {
         ${s.caption ? `<div class="viewer__caption">${esc(s.caption)}</div>` : ''}
       </div>
       ${
-        s.own
+        s.own && highlight
+          ? // Kasten 17.1, wie Instagram: im eigenen Highlight unten
+            // „Bearbeiten" statt „Weitere" und ohne Löschen der Story —
+            // wer sein Highlight ansieht, will es pflegen.
+            `<div class="viewer__foot">
+              <button class="viewer__eigen" id="storyViews">${ICONS.eye}<span>Ansichten</span></button>
+              ${eigenesHighlight ? `<button class="viewer__weitere" id="storyHlBearbeiten" aria-label="Highlight bearbeiten">${ICONS.edit}<span>Bearbeiten</span></button>` : ''}
+            </div>`
+          : s.own
           ? // Sich selbst antwortet man nicht - stattdessen der Blick darauf,
             // wer die Story gesehen hat, und der Weg zur naechsten Story.
             `<div class="viewer__foot">
@@ -16269,15 +16565,19 @@ function openStory(storyId, { bereich } = {}) {
 
   const markSeen = () => {
     s.viewed = true;
-    if (!s.own) fetch(`/api/stories/${s.id}/seen`, { method: 'POST' });
+    // Ein Highlight hat keinen Ring, den das Ansehen grau färben müsste.
+    if (!s.own && !highlight) fetch(`/api/stories/${s.id}/seen`, { method: 'POST' });
   };
 
   const go = (step) => {
     stop();
     markSeen();
     const next = list[idx + step];
-    if (next) openStory(next.id, { bereich: wo });
-    else closeOverlay();
+    if (next) openStory(next.id, { bereich: wo, ...weiter });
+    else {
+      closeOverlay();
+      danach?.();
+    }
   };
 
   stop();
@@ -16296,6 +16596,7 @@ function openStory(storyId, { bereich } = {}) {
     stop();
     markSeen();
     closeOverlay();
+    danach?.();
   };
 
   $('#storyClose').addEventListener('click', storyZu);
@@ -16381,8 +16682,60 @@ function openStory(storyId, { bereich } = {}) {
   // im Hintergrund weiter. Genau das war schon beim Antworten das Problem.
   $('#storyMore').addEventListener('click', () => {
     pause();
+    if (eigenesHighlight) return openHighlightOptionen();
     openStoryOptionen(s, resume);
   });
+
+  /*
+   * Kasten 17.1: die Verwaltung des eigenen Highlights — dieselben Wege wie
+   * bisher in der Ordneransicht (Titelbild, Löschen), dazu das Herausnehmen
+   * genau dieser Story. „Story löschen" steht hier bewusst nicht: es nähme
+   * die Story auch aus allen anderen Highlights.
+   */
+  const hlBearbeiten = () => {
+    stop();
+    state.sammlung = { art: 'highlight', name: highlight.name, userId: 'me', id: highlight.id };
+    closeOverlay();
+  };
+  function openHighlightOptionen() {
+    // Nach einer Wahl läuft die Zeit erst weiter, wenn die Rückfrage
+    // beantwortet ist — sonst blättert die Story darunter weiter.
+    let gewaehlt = false;
+    openSheet(
+      highlight.name,
+      `<div class="sheet__body">
+        <button class="item" data-hlopt="bearbeiten"><span class="item__icon">${ICONS.edit}</span><span class="item__label">Highlight bearbeiten</span><span class="row__chevron">${ICONS.chevron}</span></button>
+        <button class="item" data-hlopt="entfernen"><span class="item__icon">${ICONS.minus}</span><span class="item__label">Aus Highlight entfernen</span><span class="row__chevron">${ICONS.chevron}</span></button>
+        <button class="item item--danger" data-hlopt="loeschen"><span class="item__icon">${ICONS.trash}</span><span class="item__label">Highlight löschen</span><span class="row__chevron">${ICONS.chevron}</span></button>
+      </div>`,
+      (blatt, zu) => {
+        blatt.querySelectorAll('[data-hlopt]').forEach((b) =>
+          b.addEventListener('click', async () => {
+            const was = b.dataset.hlopt;
+            gewaehlt = true;
+            zu();
+            if (was === 'bearbeiten') return hlBearbeiten();
+            if (was === 'entfernen') {
+              if (!(await ausSammlungNehmen(highlight, { storyId: s.id }))) return resume();
+              stop();
+              // Ohne die Story weiter — oder zu, wenn sie die letzte war.
+              const rest = list.filter((x) => x.id !== s.id);
+              const naechste = rest[Math.min(idx, rest.length - 1)];
+              if (naechste) return openStory(naechste.id, { bereich: wo, liste: rest, highlight, danach });
+              return closeOverlay();
+            }
+            if (was === 'loeschen') {
+              if (!(await sammlungLoeschenFragen('highlight', highlight.name))) return resume();
+              stop();
+              state.sammlung = null;
+              return closeOverlay();
+            }
+          })
+        );
+      },
+      { schliessen: true, beimSchliessen: () => !gewaehlt && resume() }
+    );
+  }
 
   // Bei der eigenen Story gibt es weder Herz noch Antwortfeld.
   if (s.own) {
@@ -16390,14 +16743,16 @@ function openStory(storyId, { bereich } = {}) {
       pause();
       openStoryAnsichten(s, resume);
     });
+    // Kasten 17.1: im eigenen Highlight führt „Bearbeiten" in den Ordner.
+    $('#storyHlBearbeiten')?.addEventListener('click', hlBearbeiten);
     // Loescht genau die Story, die gerade laeuft — nicht alle eigenen.
-    $('#storyDelete').addEventListener('click', async () => {
+    $('#storyDelete')?.addEventListener('click', async () => {
       stop();
       closeOverlay();
       await storyLoeschen(s.id);
     });
     // Kasten 11.4: noch eine Story dazu, ohne Umweg ueber die Leiste.
-    $('#storyWeitere').addEventListener('click', () => {
+    $('#storyWeitere')?.addEventListener('click', () => {
       stop();
       closeOverlay();
       openCamera(null, { zielStory: true, storyBereich: wo });
@@ -16466,6 +16821,12 @@ function openStory(storyId, { bereich } = {}) {
       state.chats = data.chats;
     }
 
+    // Kasten 17.1: aus einem fremden Highlight heraus bleibt man im
+    // Betrachter — wie in der App (HighlightBetrachter).
+    if (highlight) {
+      toast('Antwort gesendet');
+      return resume();
+    }
     stop();
     markSeen();
     toast(`Antwort an ${u.name} gesendet`);

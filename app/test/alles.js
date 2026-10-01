@@ -162,6 +162,9 @@ const LAEUFE = [
   // Kasten 12: Video-Profil. Braucht keinen Server — gemeinsame Regeln
   // nachrechnen und den Einbau auf beiden Seiten im Quelltext pruefen.
   ['kasten12', '_kasten12.js'],
+  // Kasten 17: Playlists als Ordner, Highlights im Story-Betrachter,
+  // selbst einordnen. Ebenfalls ohne Server (Quelltext + gemeinsame Regeln).
+  ['kasten17', '_kasten17.js'],
   ['glocke', '_glocke.js'],
   // Jede Ueberschrift mit Pfeil fuehrt auf die volle Uebersicht (Kasten 2).
   ['pfeile', '_pfeile.js'],

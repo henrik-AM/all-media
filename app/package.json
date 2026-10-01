@@ -104,7 +104,8 @@
     "test:kommentare": "node test/_kommentare.js",
     "test:querformat": "node test/_querformat.js",
     "test:kasten8": "node test/_kasten8.js",
-    "test:kasten12": "node test/_kasten12.js"
+    "test:kasten12": "node test/_kasten12.js",
+    "test:kasten17": "node test/_kasten17.js"
   },
   "private": true
 }

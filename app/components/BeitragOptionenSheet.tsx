@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import type { ActionSheetItem } from './ActionSheet';
 import { OptionenKacheln } from './OptionenKacheln';
+import { SammlungZuordnen } from './SammlungZuordnen';
 import { SUPABASE_CONFIG } from '../constants/supabase';
 import { useDaten } from '../contexts/DatenContext';
 import { useSupabase } from '../contexts/SupabaseContext';
@@ -59,6 +60,8 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
   const { supabase } = useSupabase();
   const aktion = useAktionen(onNotice);
   const [meldeSchritt, setMeldeSchritt] = useState(false);
+  // Kasten 17.3: zweiter Schritt „Zu Playlist hinzufügen".
+  const [playlistSchritt, setPlaylistSchritt] = useState(false);
   const [darfSichern, setDarfSichern] = useState(false);
 
   const eigener = beitrag?.userId === 'me' || beitrag?.userId === ichId;
@@ -70,6 +73,7 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
    */
   useEffect(() => {
     setMeldeSchritt(false);
+    setPlaylistSchritt(false);
     if (!beitrag) return;
     if (eigener) return setDarfSichern(true);
     setDarfSichern(false);
@@ -95,6 +99,17 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
         ...(beitrag.live
           ? []
           : [{ key: 'story', label: 'Zu Story hinzufügen', icon: 'add-circle-outline' } as ActionSheetItem]),
+        /*
+         * Kasten 17.3 (Henrik 01.10.2026): „Der Nutzer des Accounts muss
+         * dann jedes Video selbst einordnen." Nur am eigenen Beitrag — in
+         * eine Playlist kommt nur, was einem selbst gehört (Prüfung in
+         * sammlung_inhalte_anlegen, Schema 46: die SAMMLUNG muss einem
+         * gehören; dass der Beitrag es auch tut, sagt diese Bedingung).
+         * Nicht beim laufenden Stream: er ist noch kein fertiges Video.
+         */
+        ...(eigener && !beitrag.live
+          ? [{ key: 'playlist', label: 'Zu Playlist hinzufügen', icon: 'albums-outline' } as ActionSheetItem]
+          : []),
         ...(eigener
           ? []
           : ([
@@ -105,6 +120,7 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
 
   const waehlen = async (key: string) => {
     if (key === 'melden') return setMeldeSchritt(true);
+    if (key === 'playlist') return setPlaylistSchritt(true);
     onClose();
 
     if (key.startsWith('grund:')) {
@@ -143,7 +159,18 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
   return (
     <OptionenKacheln
       visible
-      liste={meldeSchritt ? { titel: 'Warum meldest du das?' } : null}
+      liste={
+        playlistSchritt
+          ? { titel: 'Zu Playlist hinzufügen' }
+          : meldeSchritt
+            ? { titel: 'Warum meldest du das?' }
+            : null
+      }
+      inhalt={
+        playlistSchritt ? (
+          <SammlungZuordnen art="playlist" stueck={{ postId: beitrag.id }} onNotice={onNotice} />
+        ) : undefined
+      }
       items={punkte}
       onSelect={waehlen}
       onClose={onClose}

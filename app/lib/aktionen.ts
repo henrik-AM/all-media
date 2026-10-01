@@ -27,6 +27,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien } from './medien';
 import type { Impression } from './impressionen';
+import type { Story } from '../types';
 import {
   aufschliessen,
   fuerChatVerschliessen,
@@ -3661,12 +3662,136 @@ export async function sammlungInhalt(
       z.posts
         ? kachel(z.posts)
         : z.stories
-          ? { id: z.stories.id, kind: 'story', mediaUri: z.stories.media_url }
+          ? // Bis Kasten 17 stand hier `mediaUri` — die Kachel liest aber
+            // `mediaUrl`/`thumbnail` wie bei Beitraegen; jedes Highlight-Raster
+            // zeigte darum nur Platzhalter.
+            { id: z.stories.id, kind: 'story', mediaUrl: z.stories.media_url ?? null, thumbnail: null }
           : null
     )
     .filter(Boolean) as Rasterkachel[];
 
   return signiereMedien(client, stuecke);
+}
+
+/**
+ * Die Storys eines Highlights, so wie der Story-Betrachter sie braucht
+ * (Kasten 17.1).
+ *
+ * Henrik am 01.10.2026: „Die Highlights kannst du einfach komplett von
+ * Instagram übernehmen." Bis dahin öffnete ein Highlight ein Raster aus
+ * Kacheln — im fremden Profil nur einen Hinweis. Jetzt laufen die Storys im
+ * vorhandenen Betrachter nacheinander ab; dafür reichen `sammlungInhalt`s
+ * Kacheln nicht (kein Urheber, kein Medientyp, keine Bearbeitung).
+ *
+ * Lesen darf das jeder Angemeldete, der die Story sehen darf: die zweite
+ * Leseregel `stories_im_highlight` (Schema 48) hebt den Ablauf auf, nicht
+ * die Sichtbarkeit. Was die Datenbank nicht herausgibt, kommt als null und
+ * fällt hier heraus.
+ *
+ * Gegenstück: GET /api/sammlung/:id/storys in web/server/app.js. Die Form
+ * jeder Story legt gemeinsam/sammlungen.js fest (alsHighlightStory).
+ */
+export async function highlightStorys(
+  client: SupabaseClient,
+  sammlungId: string,
+  ichId: string
+): Promise<Story[]> {
+  const abfrage = (spalten: string) =>
+    client
+      .from('sammlung_inhalte')
+      .select(`position, created_at, stories!story_id (${spalten})`)
+      .eq('sammlung_id', sammlungId)
+      .not('story_id', 'is', null)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true });
+
+  const basis = 'id, user_id, media_url, media_type, caption, created_at, profiles!stories_user_id_fkey(name)';
+  let { data, error } = await abfrage(`${basis}, overlays`);
+  // Ohne das Story-Schema (Kasten 11) fehlt `overlays` — dann ohne.
+  if (error && (error.code === '42703' || error.code === 'PGRST204' || /overlays/.test(error.message ?? ''))) {
+    ({ data, error } = await abfrage(basis));
+  }
+  if (error) throw error;
+
+  const zeilen = ((data ?? []) as any[]).map((z) => z.stories).filter(Boolean);
+  if (!zeilen.length) return [];
+
+  const { data: likes } = await client
+    .from('story_likes')
+    .select('story_id')
+    .eq('user_id', ichId)
+    .in('story_id', zeilen.map((s: any) => s.id));
+  const gemocht = new Set<string>(((likes ?? []) as any[]).map((l) => l.story_id));
+
+  const storys = zeilen.map(
+    (z: any) => SammlungRegel.alsHighlightStory(z, { ichId, ichKennung: 'me', gemocht }) as unknown as Story
+  );
+  return signiereMedien(client, storys);
+}
+
+/**
+ * Die eigenen Sammlungen einer Gattung — und ob ein bestimmtes Stück schon
+ * darin liegt (Kasten 17.3: „Zu Playlist hinzufügen" / „Zu Highlight
+ * hinzufügen" mit Häkchen).
+ *
+ * Gegenstück: GET /api/eigene/zuordnung in web/server/app.js.
+ */
+export async function sammlungenFuerStueck(
+  client: SupabaseClient,
+  ichId: string,
+  art: 'playlist' | 'highlight',
+  stueck: { postId?: string; storyId?: string }
+): Promise<{ id: string; name: string; enthalten: boolean }[]> {
+  const { data, error } = await client
+    .from('sammlungen')
+    .select('id, name')
+    .eq('user_id', ichId)
+    .eq('art', art)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const liste = (data ?? []) as { id: string; name: string }[];
+  if (!liste.length) return [];
+
+  let frage = client
+    .from('sammlung_inhalte')
+    .select('sammlung_id')
+    .in('sammlung_id', liste.map((s) => s.id));
+  frage = stueck.postId ? frage.eq('post_id', stueck.postId) : frage.eq('story_id', stueck.storyId!);
+  const { data: drin, error: fehler } = await frage;
+  if (fehler) throw fehler;
+  const enthalten = new Set(((drin ?? []) as any[]).map((z) => z.sammlung_id));
+  return liste.map((s) => ({ id: s.id, name: s.name, enthalten: enthalten.has(s.id) }));
+}
+
+/**
+ * Neue Playlist bzw. neues Highlight anlegen und das Stück gleich hineinlegen
+ * — „Neue Playlist" im Zuordnen-Blatt (Kasten 17.3).
+ *
+ * Wie ProfilContext.playlistAnlegen schreibt es beide Stellen: die alte
+ * Namensliste in `profiles` (an ihr hängt noch die Rückfalltür der Kreise)
+ * und die Zeile in `sammlungen`. Steht der Name schon in der alten Liste,
+ * aber ohne Zeile, heilt es das, statt abzubrechen.
+ */
+export async function neueSammlungMit(
+  client: SupabaseClient,
+  ichId: string,
+  art: 'playlist' | 'highlight',
+  name: string,
+  stueck: { postId?: string; storyId?: string }
+): Promise<Sammlung> {
+  const sauber = name.trim();
+  if (!sauber) throw new Error('Ohne Namen geht das nicht');
+  const spalte = art === 'highlight' ? 'highlights' : 'playlists';
+  try {
+    await profilListe(client, ichId, spalte, sauber);
+  } catch (e: any) {
+    // „gibt es schon" in der Namensliste ist hier kein Abbruch — entscheidend
+    // ist die Zeile in `sammlungen`, und die prüft sammlungAnlegen.
+    if (!/gibt es schon/.test(e?.message ?? '')) throw e;
+  }
+  const neu = await sammlungAnlegen(client, ichId, art, sauber);
+  await inSammlung(client, neu.id, stueck);
+  return { ...neu, anzahl: 1 };
 }
 
 /**

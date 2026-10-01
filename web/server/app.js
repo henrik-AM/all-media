@@ -2069,6 +2069,193 @@ app.get('/api/sammlung/:id', route(async (req) => {
     .filter(Boolean);
 }));
 
+/*
+ * Die Storys eines Highlights für den Story-Betrachter (Kasten 17.1).
+ *
+ * Henrik am 01.10.2026: „Die Highlights kannst du einfach komplett von
+ * Instagram übernehmen." Ein Highlight spielt seine Storys ab, statt ein
+ * Raster zu zeigen — dafür braucht der Betrachter mehr als eine Kachel:
+ * Urheber, Medientyp, Bearbeitung, Zeitpunkt. Die Form legt
+ * gemeinsam/sammlungen.js fest (alsHighlightStory), dieselbe wie in
+ * app/lib/aktionen.ts (highlightStorys).
+ *
+ * Lesen darf jeder Angemeldete, der die Story sehen darf: die Regel
+ * stories_im_highlight (Schema 48) hebt den Ablauf auf, nicht die
+ * Sichtbarkeit. Was die Datenbank nicht herausgibt, fällt heraus.
+ */
+app.get('/api/sammlung/:id/storys', route(async (req) => {
+  const abfrage = (spalten) =>
+    req.db
+      .from('sammlung_inhalte')
+      .select(`position, created_at, stories!story_id (${spalten})`)
+      .eq('sammlung_id', req.params.id)
+      .not('story_id', 'is', null)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true });
+  const basis = 'id, user_id, media_url, media_type, caption, created_at, profiles!stories_user_id_fkey(name)';
+  let { data, error } = await abfrage(`${basis}, overlays`);
+  // Ohne das Story-Schema (Kasten 11) fehlt `overlays`.
+  if (error && (error.code === '42703' || error.code === 'PGRST204' || /overlays/.test(String(error.message || '')))) {
+    ({ data, error } = await abfrage(basis));
+  }
+  if (error) throw error;
+
+  const zeilen = (data || []).map((z) => z.stories).filter(Boolean);
+  if (!zeilen.length) return [];
+
+  const { data: likes } = await req.db
+    .from('story_likes')
+    .select('story_id')
+    .eq('user_id', req.nutzerId)
+    .in('story_id', zeilen.map((z) => z.id));
+  const gemocht = new Set((likes || []).map((l) => l.story_id));
+
+  // Die Website kennt zusätzlich `mediaUrl` und `zeit` (wie ladeStorys).
+  return zeilen.map((z) => {
+    const s = Sammlungen.alsHighlightStory(z, { ichId: req.nutzerId, ichKennung: 'me', gemocht });
+    return { ...s, mediaUrl: s.mediaUri || null, mediaUri: s.mediaUri || null, zeit: s.aufgenommen || null };
+  });
+}));
+
+/*
+ * Kasten 17.3: einen eigenen Beitrag einer Playlist zuordnen bzw. eine
+ * eigene Story einem Highlight — und wieder herausnehmen.
+ *
+ * Henrik am 01.10.2026: „Der Nutzer des Accounts muss dann jedes Video
+ * selbst einordnen." Bis dahin ging das auf der Website nur über langes
+ * Drücken im eigenen Raster, nur hinein (nie heraus), und die Liste bot
+ * auch Highlights an — die einen Beitrag gar nicht nehmen.
+ *
+ * Dass die Sammlung einem gehört, prüft die Datenbank
+ * (sammlung_inhalte_anlegen / _loeschen, Schema 46). Dass auch das Stück
+ * einem gehört, prüft bis zum Schema-Entwurf 80 (SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql) nur diese Stelle (und die
+ * App, die den Punkt nur am eigenen Beitrag zeigt).
+ */
+async function eigenesStueck(req, stueck) {
+  if (stueck.postId) {
+    const { data } = await req.db.from('posts').select('id').eq('id', stueck.postId).eq('user_id', req.nutzerId).maybeSingle();
+    return Boolean(data);
+  }
+  if (stueck.storyId) {
+    const { data } = await req.db.from('stories').select('id').eq('id', stueck.storyId).eq('user_id', req.nutzerId).maybeSingle();
+    return Boolean(data);
+  }
+  return false;
+}
+
+/** Aus Rumpf oder Abfrage: { postId } oder { storyId }, nie beides. */
+function stueckAus(quelle) {
+  const postId = quelle?.postId || quelle?.post || null;
+  const storyId = quelle?.storyId || quelle?.story || null;
+  if (Boolean(postId) === Boolean(storyId)) return null;
+  return postId ? { postId: String(postId) } : { storyId: String(storyId) };
+}
+
+/*
+ * Die eigenen Playlists (bei ?post=) bzw. Highlights (bei ?story=), jede mit
+ * `enthalten`: liegt das Stück schon darin? Gegenstück zu
+ * sammlungenFuerStueck in app/lib/aktionen.ts.
+ */
+app.get('/api/eigene/zuordnung', route(async (req) => {
+  const stueck = stueckAus(req.query);
+  if (!stueck) return { ok: false, error: 'Bitte einen Beitrag oder eine Story angeben' };
+  const art = stueck.postId ? 'playlist' : 'highlight';
+
+  const { data, error } = await req.db
+    .from('sammlungen')
+    .select('id, name')
+    .eq('user_id', req.nutzerId)
+    .eq('art', art)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const liste = data || [];
+  if (!liste.length) return { ok: true, art, sammlungen: [] };
+
+  let frage = req.db.from('sammlung_inhalte').select('sammlung_id').in('sammlung_id', liste.map((s) => s.id));
+  frage = stueck.postId ? frage.eq('post_id', stueck.postId) : frage.eq('story_id', stueck.storyId);
+  const { data: drin, error: fehler } = await frage;
+  if (fehler) throw fehler;
+  const enthalten = new Set((drin || []).map((z) => z.sammlung_id));
+  return { ok: true, art, sammlungen: liste.map((s) => ({ id: s.id, name: s.name, enthalten: enthalten.has(s.id) })) };
+}));
+
+/*
+ * Eigener Pfad statt /api/eigene/sammlung/:id/inhalt: DELETE
+ * /api/eigene/sammlung/:art/:name steht weiter oben und hätte „inhalt" als
+ * Namen einer Sammlung gelesen — Express nimmt die erste passende Route.
+ */
+app.post('/api/eigene/sammlungsinhalt/:id', route(async (req) => {
+  const stueck = stueckAus(req.body);
+  if (!stueck) return { ok: false, error: 'Bitte einen Beitrag oder eine Story angeben' };
+  if (!(await eigenesStueck(req, stueck))) return { ok: false, error: 'Einordnen kannst du nur Eigenes' };
+
+  const { error } = await req.db.from('sammlung_inhalte').insert({
+    sammlung_id: req.params.id,
+    post_id: stueck.postId || null,
+    story_id: stueck.storyId || null,
+  });
+  if (error) {
+    if (error.code === '23505') return { ok: false, error: 'Das liegt schon darin' };
+    // 42501: Row Level Security — die Sammlung gehört jemand anderem.
+    if (error.code === '42501') return { ok: false, error: 'Diese Sammlung gehört nicht dir' };
+    // P0001: der Auslöser sammlung_inhalt_pruefen (falsche Gattung).
+    if (error.code === 'P0001') return { ok: false, error: error.message };
+    throw error;
+  }
+  return { ok: true, meldung: 'Hinzugefügt' };
+}));
+
+app.delete('/api/eigene/sammlungsinhalt/:id', route(async (req) => {
+  const stueck = stueckAus(req.query);
+  if (!stueck) return { ok: false, error: 'Bitte einen Beitrag oder eine Story angeben' };
+  let frage = req.db.from('sammlung_inhalte').delete().eq('sammlung_id', req.params.id);
+  frage = stueck.postId ? frage.eq('post_id', stueck.postId) : frage.eq('story_id', stueck.storyId);
+  // RLS: ein abgelehntes DELETE löscht null Zeilen ohne Fehler — zählen.
+  const { data, error } = await frage.select('id');
+  if (error) throw error;
+  if (!data?.length) return { ok: false, error: 'Das ließ sich nicht herausnehmen' };
+  return { ok: true, meldung: 'Entfernt' };
+}));
+
+/*
+ * „Neue Playlist" bzw. „Neues Highlight" im Zuordnen-Blatt: anlegen und das
+ * Stück gleich hineinlegen. Angelegt wird über handleProfilListe — derselbe
+ * Weg wie das Plus oben rechts, damit Namensliste und Zeile zusammen
+ * entstehen. Gegenstück: neueSammlungMit in app/lib/aktionen.ts.
+ */
+app.post('/api/eigene/sammlung-neu', route(async (req) => {
+  const stueck = stueckAus(req.body);
+  if (!stueck) return { ok: false, error: 'Bitte einen Beitrag oder eine Story angeben' };
+  const name = String(req.body?.name || '').trim();
+  if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
+  if (!(await eigenesStueck(req, stueck))) return { ok: false, error: 'Einordnen kannst du nur Eigenes' };
+  const art = stueck.postId ? 'playlist' : 'highlight';
+
+  const angelegt = await syncHandlers.handleProfilListe(req.db, req.nutzerId, art === 'playlist' ? 'playlists' : 'highlights', name);
+  // „gibt es schon" in der Namensliste heilt sich unten, wenn die Zeile fehlt.
+  if (angelegt && angelegt.ok === false && !/gibt es schon/.test(angelegt.fehler || '')) {
+    return { ok: false, error: angelegt.fehler };
+  }
+
+  const { data: sammlung, error } = await req.db
+    .from('sammlungen')
+    .select('id, name')
+    .eq('user_id', req.nutzerId)
+    .eq('art', art)
+    .eq('name', name)
+    .maybeSingle();
+  if (error) throw error;
+  if (!sammlung) return { ok: false, error: 'Das ließ sich nicht anlegen' };
+
+  const { error: rein } = await req.db.from('sammlung_inhalte').insert({
+    sammlung_id: sammlung.id,
+    post_id: stueck.postId || null,
+    story_id: stueck.storyId || null,
+  });
+  if (rein && rein.code !== '23505') throw rein;
+  return { ok: true, sammlung: { id: sammlung.id, name: sammlung.name, enthalten: true }, meldung: `„${name}" angelegt und hinzugefügt` };
+}));
+
 app.get('/api/gespeichert', route(async (req) => {
   const { data, error } = await req.db
     .from('saves')

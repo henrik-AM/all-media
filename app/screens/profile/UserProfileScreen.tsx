@@ -17,6 +17,10 @@ import { compactNumber } from '../../lib/zahlen';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import * as Aktion from '../../lib/aktionen';
 import { SpendeKarte } from '../../components/SpendeKarte';
+import { SammlungOrdner } from '../../components/SammlungOrdner';
+import { HighlightBetrachter } from '../../components/HighlightBetrachter';
+import type { HighlightModus } from '../messenger/StoryViewerScreen';
+import { Story } from '../../types';
 
 // Ringfarbe und -stärke je Gattung — gleich in App und Website (Kasten 12.9).
 const SammlungRegel = require('../../../gemeinsam/sammlungen') as typeof import('../../../gemeinsam/sammlungen');
@@ -161,6 +165,49 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, userId]);
 
+  /*
+   * Kasten 17.1/17.2: eine Sammlung im FREMDEN Profil öffnen.
+   *
+   * Bis zum 01.10.2026 antwortete ein Tipp hier mit einem Hinweis
+   * („Playlist „Gaming"") — der Kreis sah aus wie eine Tür und war eine
+   * Wand. Jetzt wie im eigenen Profil: die Playlist als Ordner, das
+   * Highlight im Story-Betrachter. Ohne Löschen und ohne Titelbild — das
+   * darf nur der Besitzer, und die Datenbank (sammlungen_aendern,
+   * Schema 46) ließe es ohnehin nicht zu.
+   *
+   * Lesen dürfen es alle Angemeldeten (sammlungen_lesen); welcher Beitrag
+   * und welche Story davon sichtbar sind, entscheiden die Regeln von posts
+   * und stories — eine Story im Highlight nur mit sichtbar_fuer (Schema 48).
+   */
+  const [ordner, setOrdner] = useState<{ sammlung: Aktion.Sammlung; kacheln: Aktion.Rasterkachel[] } | null>(null);
+  const [highlightOffen, setHighlightOffen] = useState<{
+    storys: Story[];
+    start?: string;
+    highlight: HighlightModus;
+  } | null>(null);
+  const [sammlungLaedt, setSammlungLaedt] = useState(false);
+
+  const sammlungOeffnen = async (s: Aktion.Sammlung) => {
+    if (!s.id || !supabase) return onNotice(`„${s.name}" lässt sich gerade nicht öffnen`);
+    if (sammlungLaedt) return;
+    setSammlungLaedt(true);
+    try {
+      if (s.art === 'playlist') {
+        setOrdner({ sammlung: s, kacheln: await Aktion.sammlungInhalt(supabase, s.id) });
+        return;
+      }
+      const storys = await Aktion.highlightStorys(supabase, s.id, ichId);
+      // Leer heißt hier auch: nichts davon darfst du sehen. Welches von
+      // beiden, sagt der Hinweis absichtlich nicht.
+      if (!storys.length) return onNotice(`In „${s.name}" ist gerade nichts zu sehen`);
+      setHighlightOffen({ storys, highlight: { name: s.name, eigen: false } });
+    } catch (fehler: any) {
+      onNotice(fehler?.message ?? 'Das ließ sich nicht laden');
+    } finally {
+      setSammlungLaedt(false);
+    }
+  };
+
   const aktionen = useAktionen(onNotice);
   useEffect(() => {
     void aktionen.profilAufruf(userId);
@@ -303,7 +350,8 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
               <Druck
                 key={`${s.art}-${s.id || s.name}`}
                 style={styles.highlight}
-                onPress={() => onNotice(`${s.art === 'playlist' ? 'Playlist' : 'Highlight'} „${s.name}"`)}
+                onPress={() => void sammlungOeffnen(s)}
+                accessibilityLabel={`${s.art === 'playlist' ? 'Playlist' : 'Highlight'} ${s.name}`}
                 testID={`sammlung-${s.art}`}
               >
                 {/*
@@ -401,6 +449,24 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
           />
         )}
       </ScrollView>
+
+      {/* Kasten 17.2: die Playlist als Ordner — nur ansehen, nichts verwalten. */}
+      <SammlungOrdner
+        offen={ordner}
+        onClose={() => setOrdner(null)}
+        leerText={`${person.name} hat hier noch nichts hineingelegt.`}
+        onKachel={(k) => {
+          setOrdner(null);
+          onOpenKachel?.(k);
+        }}
+      />
+
+      {/* Kasten 17.1: das Highlight im Story-Betrachter, wie bei Instagram. */}
+      <HighlightBetrachter
+        offen={highlightOffen}
+        onClose={() => setHighlightOffen(null)}
+        onNotice={onNotice}
+      />
 
       <ProfilOptionenSheet
         visible={optionenOffen}
