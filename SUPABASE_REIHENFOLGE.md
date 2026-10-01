@@ -186,3 +186,8 @@ Reihenfolge: nach Schema 54 (Spalten der Sounds).
   „vergeben“ (Gewinner 77, ersetzt 72); Fingerabdruck-Spalte, -Funktion und
   `spendencode_pfeffer` gelöscht. **Schema 72 nicht neu einspielen**, es legte
   Pfeffer und Eindeutigkeit wieder an. Schema 74 überspringt die fehlende Tabelle.
+- `SUPABASE_SCHEMA_78_stumm_mitteilungen.sql` (Kasten 20.2) — `mitteilung_stumm()`
+  neu; neue Fassungen von `mitteilung_anlegen()` (**Gewinner 78**, ersetzt 44)
+  und `benachrichtige()` (**Gewinner 78**, ersetzt 23_audit): keine Mitteilung
+  von stummgeschalteten Konten, aus stummen Communitys und Chats. Wer 44 oder
+  23_audit neu einspielt, muss 78 nachziehen.

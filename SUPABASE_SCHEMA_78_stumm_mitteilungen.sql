@@ -1,5 +1,5 @@
 -- ===========================================================================
---  SUPABASE_SCHEMA_XX_stumm_mitteilungen.sql            (ENTWURF, Kasten 20.2)
+--  SUPABASE_SCHEMA_78_stumm_mitteilungen.sql            (Kasten 20.2, 01.10.2026)
 --  Stummgeschaltete Konten, Communitys und Chats lösen keine Mitteilung aus
 -- ===========================================================================
 --
@@ -59,9 +59,9 @@
 --
 --  Idempotent: nur `create or replace` und `revoke`.
 --
---  Einspielen (NICHT vom Unteragenten, nur vom Hauptagenten):
+--  Einspielen:
 --    SUPABASE_TOKEN=... node tools/sql-einspielen.mjs \
---      SUPABASE_SCHEMA_XX_stumm_mitteilungen.sql
+--      SUPABASE_SCHEMA_78_stumm_mitteilungen.sql
 -- ===========================================================================
 
 
