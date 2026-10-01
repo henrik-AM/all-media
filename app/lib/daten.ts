@@ -505,7 +505,16 @@ export async function ladeChats(
           ? vorschau.anruf_art === 'video'
             ? 'Videoanruf'
             : 'Anruf'
-          : vorschau?.text ?? '',
+          : /*
+             * Kasten 16: die Story-Markierung hat absichtlich keinen Text
+             * (Schema 75). Ohne diesen Zweig stuende in der Chatliste — und
+             * bei einer Chat-Anfrage unter Communitys → Chats als einziger
+             * Inhalt — eine leere Zeile. Gleiche Regel in
+             * web/server/supabase-api.js.
+             */
+            StoryRegeln.istMarkierungsHinweis(vorschau)
+            ? StoryRegeln.markierungVorschau(vorschau.sender_id === ichId)
+            : vorschau?.text ?? '',
         previewMedia: vorschau?.media_type ?? undefined,
         time: chatZeit(vorschau?.created_at ?? z.chats.updated_at),
         unreadCount: z.is_read ? 0 : 1,
@@ -715,8 +724,19 @@ export async function ladeNachrichten(
           id: n.stories.id,
           userId: n.stories.user_id === ichId ? ICH : n.stories.user_id,
           mediaUri: n.stories.media_url ?? undefined,
+          // Kasten 16: die Markierungs-Karte zeigt bei einer Video-Story das
+          // Standbild und oeffnet sie im Betrachter als Video.
+          mediaType: n.stories.media_type === 'video' ? ('video' as const) : ('image' as const),
         }
       : undefined,
+    /*
+     * Kasten 16 (Schema 75): Hinweis statt Nachricht. Bei 'story_markierung'
+     * zeigt der Chat eine Karte („… hat dich in einer Story markiert“) statt
+     * einer Sprechblase. Ist die Story abgelaufen, bleibt `story` leer — die
+     * Karte sagt dann „Story nicht mehr verfügbar“. Gleiche Regel in
+     * web/server/supabase-api.js.
+     */
+    hinweis: StoryRegeln.istMarkierungsHinweis(n) ? ('story_markierung' as const) : undefined,
     // Die Werkzeuge aus dem Handbuch — siehe Message in types/index.ts.
     antwortAuf: n.reply_to && bezug.has(n.reply_to)
       ? { id: n.reply_to, ...bezug.get(n.reply_to)! }

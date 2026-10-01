@@ -110,6 +110,10 @@ const NACHRICHT_SPALTEN =
   // nicht ueber den Constraint-Namen: `messages` zeigt nur ueber diese eine
   // Spalte auf `stories`, damit ist es eindeutig.
   ' reply_to_story, stories(id, user_id, media_url, media_type),' +
+  // Kasten 16 (Schema 75): gesetzt heisst, diese Zeile ist keine Nachricht,
+  // sondern ein Hinweis — bisher nur 'story_markierung'. Die Karte dazu baut
+  // die Anzeige (gemeinsam/story.js, markierungSatz).
+  ' hinweis,' +
   ' contact_user_id, profiles!messages_contact_user_id_fkey(id, name, handle)';
 
 module.exports = {

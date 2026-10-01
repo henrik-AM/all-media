@@ -2369,7 +2369,11 @@ export type SichtbarkeitBereich =
   | 'markierung'
   | 'dm';
 
-export type SichtbarkeitStufe = 'niemand' | 'niemand_bis_auf' | 'alle_bis_auf' | 'alle';
+/*
+ * Seit Kasten 19 (01.10.2026, Schema 76) mit „nur_follower“ — erlaubt nur bei
+ * den Likes. Typ und Liste stehen in gemeinsam/sichtbarkeit.js.
+ */
+export type SichtbarkeitStufe = import('../../gemeinsam/sichtbarkeit').SichtbarkeitStufe;
 
 /**
  * Eine Sichtbarkeitsstufe setzen.

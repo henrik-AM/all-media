@@ -1941,7 +1941,13 @@ const handleUmfrageStimmen = handler(
 //  01.09.2026 stand hier überall nur „Alle / Meine Kontakte / Niemand", und
 //  „Alle bis auf meinen Chef" ließ sich nicht ausdrücken.
 
-const STUFEN = ['niemand', 'niemand_bis_auf', 'alle_bis_auf', 'alle'];
+//
+//  Seit Kasten 19 (01.10.2026, Schema 76) kommt bei den Likes „Nur Follower"
+//  dazu — nur dort. Welche Stufe in welchem Bereich erlaubt ist, steht in
+//  gemeinsam/sichtbarkeit.js; das Blatt in App und Website liest dieselbe
+//  Liste. Ein Server, der eine angebotene Stufe abweist, waere der Fehler,
+//  den diese Datei verhindern soll.
+const Sichtbarkeit = require('../../gemeinsam/sichtbarkeit');
 const BEREICHE = [
   'standort',
   'story',
@@ -1957,7 +1963,7 @@ const handleSichtbarkeit = handler(
   'Sichtbarkeit setzen',
   async (client, nutzerId, bereich, stufe) => {
     if (!BEREICHE.includes(bereich)) return { ok: false, fehler: 'Unbekannter Bereich' };
-    if (!STUFEN.includes(stufe)) return { ok: false, fehler: 'Unbekannte Stufe' };
+    if (!Sichtbarkeit.stufeErlaubt(bereich, stufe)) return { ok: false, fehler: 'Unbekannte Stufe' };
 
     const { error } = await client
       .from('visibility_settings')

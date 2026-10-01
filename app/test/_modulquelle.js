@@ -118,6 +118,9 @@ const UMD_BAUSTEINE = [
   // 29.09.2026: `zahlung.js` fuer Spendencode und Zahlungsmethoden
   // (Feedback 21.09., Kasten 13.2/13.3, Schema 72).
   ['zahlung', 'Zahlung'],
+  // 01.10.2026: `sichtbarkeit.js` fuer Stufennamen und die Stufe
+  // „Nur Follower" bei den Likes (Feedback, Kasten 19, Schema 76).
+  ['sichtbarkeit', 'Sichtbarkeit'],
 ];
 
 function umdTeile() {

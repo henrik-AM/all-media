@@ -226,6 +226,8 @@ const mitFrist = (versprechen, was, ms = 20000) =>
         ['niemand_bis_auf', true, true],
         ['alle_bis_auf', true, false],
         ['alle_bis_auf', false, true],
+        // Kasten 19 (Schema 76): der Betrachter folgt hier — also sichtbar.
+        ['nur_follower', false, true],
       ];
       for (const [st, gelistet, erwartet] of faelle) {
         await ausnahmenLeeren(liker);
@@ -244,6 +246,18 @@ const mitFrist = (versprechen, was, ms = 20000) =>
         const z = await zahl(betrachter);
         pruefe(`${etikett}: Zahl bleibt ${basis}`, z === basis, String(z));
       }
+
+      /*
+       * Kasten 19: „Nur Follower“ ohne Folgen — die Zeile muss gesperrt
+       * sein. Erst damit ist bewiesen, dass die Stufe wirklich auf das
+       * Folgen schaut und nicht bloß wie „Alle“ wirkt.
+       */
+      await ausnahmenLeeren(liker);
+      await stufe(liker, 'nur_follower');
+      await setzeFolgen(betrachter, liker, false);
+      pruefe('„nur_follower“ ohne Folgen: Zeile in post_likes gesperrt (Kasten 19)',
+        !(await zeileSichtbar(betrachter, liker)));
+      await setzeFolgen(betrachter, liker, true);
 
       // Das eigene Like sieht der Likende immer, auch bei „Niemand“.
       await ausnahmenLeeren(liker);

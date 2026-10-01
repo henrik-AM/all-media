@@ -35,6 +35,7 @@ import { PASSWORT_REGEL, passwortAendern, passwortPruefen } from '../../lib/supa
 
 // Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
 const Telefon = require('../../../gemeinsam/telefon') as typeof import('../../../gemeinsam/telefon');
+const Sichtbarkeit = require('../../../gemeinsam/sichtbarkeit') as typeof import('../../../gemeinsam/sichtbarkeit');
 const TELEFON_REGEL = Telefon.REGEL_TEXT;
 const telefonPruefen = Telefon.pruefe;
 
@@ -788,18 +789,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   /** Was rechts neben dem Punkt steht. */
   const sichtText = (bereich?: SichtbarkeitBereich) => {
     const s = sicht(bereich);
-    const namen: Record<string, string> = {
-      niemand: 'Niemand',
-      niemand_bis_auf: 'Niemand bis auf …',
-      alle_bis_auf: 'Alle bis auf …',
-      alle: 'Alle',
-    };
-    // Bei den "bis auf"-Stufen die Zahl dazu. Ohne sie sieht eine leere
-    // Ausnahmeliste genauso aus wie eine mit zwölf Namen.
-    const zahl = s.ausnahmen.length;
-    return zahl && s.stufe !== 'alle' && s.stufe !== 'niemand'
-      ? `${namen[s.stufe]} (${zahl})`
-      : namen[s.stufe];
+    // Name und Zahl aus gemeinsam/sichtbarkeit.js — dieselbe Rechnung wie auf
+    // der Website (sichtText). Seit Kasten 19 kennt sie auch „Nur Follower“.
+    return Sichtbarkeit.stufeText(s.stufe, s.ausnahmen.length);
   };
   const { isDark, setTheme } = useContext(ThemeContext);
   /*
@@ -1032,6 +1024,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         <SichtbarkeitSheet
           visible
           titel={sichtOffen.label}
+          bereich={sichtOffen.sichtbar}
           stufe={sicht(sichtOffen.sichtbar).stufe}
           ausnahmen={sicht(sichtOffen.sichtbar).ausnahmen}
           onStufe={async (stufe) => {

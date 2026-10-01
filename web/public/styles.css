@@ -2393,6 +2393,29 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
  * Gleiche Regel in app/screens/messenger/ChatDetailScreen.tsx.
  */
 .msg__story { position: relative; display: inline-block; }
+
+/*
+ * Kasten 16: die Karte einer Story-Markierung — mittig, keine Blase, wie der
+ * Anrufeintrag. Gleiche Darstellung in der App (styles.hinweisKarte in
+ * app/screens/messenger/ChatDetailScreen.tsx).
+ */
+.msg__hinweis {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  align-self: center; max-width: 260px; margin: 6px 0; padding: 8px;
+  border: 0; border-radius: 16px;
+  background: var(--surface-3); color: var(--text);
+  font: inherit; cursor: pointer;
+}
+.msg__hinweis--weg { cursor: default; }
+.msg__hinweisSatz { font-size: 12.5px; font-weight: 600; text-align: center; }
+.msg__hinweisVorschau { position: relative; display: block; }
+.msg__hinweisBild {
+  display: block; width: 120px; height: 200px;
+  border-radius: 12px; object-fit: cover; background: #000;
+}
+.msg__hinweisWeg { font-size: 12px; font-style: italic; color: var(--text-3); }
+.msg__hinweisZeit { font-size: 11px; color: var(--text-3); }
+.msg__hinweisZeit svg { width: 11px; height: 11px; vertical-align: -1px; }
 .msg__storyMarke {
   position: absolute; left: 6px; bottom: 10px;
   padding: 2px 7px; border-radius: 999px;

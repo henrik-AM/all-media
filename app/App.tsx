@@ -75,7 +75,14 @@ type Overlay =
    * `liste`: durch welche Storys geblättert wird. Aus der Leiste ist es die
    * ganze Leiste, von einem Ring am Profilbild nur diese Person (Kasten 11.1).
    */
-  | { kind: 'story'; story: Story; liste?: Story[]; bereich?: 'messenger' | 'videos' }
+  | {
+      kind: 'story';
+      story: Story;
+      liste?: Story[];
+      bereich?: 'messenger' | 'videos';
+      /** Kasten 16: aus einem Chat geöffnet — Schließen führt dorthin zurück. */
+      zurueck?: Overlay;
+    }
   /** Kasten 11.6: die Aufnahme bearbeiten, bevor sie Story wird. */
   | { kind: 'storyEditor'; uri: string; mediaTyp: 'image' | 'video'; bereich: 'messenger' | 'videos' }
   /**
@@ -1722,6 +1729,26 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onMessengerAnfragen={() => messengerAnfragen(overlay.chat)}
         onMessengerAntworten={(annehmen) => messengerAntworten(overlay.chat, annehmen)}
         onZumMessenger={() => overlay.chat.userId && zumMessenger(overlay.chat.userId)}
+        /*
+         * Kasten 16: die Story aus einer Markierungs-Karte. Erst in den
+         * Leisten suchen (dort steht der Gesehen-/Gefällt-Stand); fehlt sie
+         * — etwa die Story eines Nichtkontakts, die man als Markierter
+         * trotzdem lesen darf (ist_story_markiert) —, aus der Einbettung der
+         * Nachricht bauen. Schließen führt zurück in den Chat.
+         */
+        onOpenStory={(s) => {
+          const vorhanden = [...stories, ...storiesVideosAlle].find((x) => x.id === s.id);
+          const story: Story = vorhanden ?? {
+            id: s.id,
+            userId: s.userId,
+            name: daten.users[s.userId]?.name ?? '',
+            own: s.userId === 'me',
+            viewed: true,
+            mediaUri: s.mediaUri,
+            mediaType: s.mediaType,
+          };
+          setOverlay({ kind: 'story', story, liste: [story], zurueck: overlay });
+        }}
         onZustandGeladen={(zustand) => {
           const id = overlay.chat.id;
           setChats((prev) => prev.map((c) => (c.id === id ? { ...c, ...zustand } : c)));
@@ -1823,7 +1850,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           );
         }}
         onClose={() => {
-          setOverlay(null);
+          setOverlay(overlay.zurueck ?? null);
         }}
         onDelete={storyEntfernen}
         onReply={replyToStory}
