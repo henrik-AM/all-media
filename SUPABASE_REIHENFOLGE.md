@@ -195,3 +195,7 @@ Reihenfolge: nach Schema 54 (Spalten der Sounds).
   und `benachrichtige()` (**Gewinner 78**, ersetzt 23_audit): keine Mitteilung
   von stummgeschalteten Konten, aus stummen Communitys und Chats. Wer 44 oder
   23_audit neu einspielt, muss 78 nachziehen.
+- `SUPABASE_SCHEMA_79_hinweis_ist_kein_austausch.sql` (Kasten 16) —
+  `messenger_anfragen()` zählt Hinweis-Nachrichten (Story-Markierung) nicht als
+  Austausch. Am Anker umgeschrieben; **wer Schema 57 neu einspielt, muss 79
+  nachziehen.**

@@ -1957,6 +1957,11 @@ const BEREICHE = [
   'likes',
   'download',
   'dm',
+  // Fehlten bis 01.10.2026: beide Einstellungen gibt es auf der Website seit
+  // Schema 20/50, gespeichert wurden sie nie („Unbekannter Bereich“). Die App
+  // schreibt direkt nach Supabase und war nicht betroffen.
+  'kommentare',
+  'markierung',
 ];
 
 const handleSichtbarkeit = handler(
