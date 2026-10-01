@@ -5873,7 +5873,7 @@ const SETTINGS = [
       },
       // Kasten 13: öffnet den Spendenweg (vorher meldete das Formular
       // „gespeichert" und speicherte nichts).
-      { label: 'Spendencode', icon: 'bookmark', aktion: 'spendencode' },
+      { label: 'Spenden-PIN', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Zahlungsmethoden', icon: 'karte', aktion: 'zahlungsmethoden' },
       {
         label: 'Sicherheits-/Entsperrcode',
@@ -6045,7 +6045,7 @@ const SETTINGS = [
     title: 'Videos',
     items: [
       { label: 'Privates Profil', icon: 'lock', toggle: 'videoPrivate' },
-      { label: 'Spendencode', icon: 'bookmark', aktion: 'spendencode' },
+      { label: 'Spenden-PIN', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Insights', icon: 'compass', liste: 'insights' },
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
@@ -6082,7 +6082,7 @@ const SETTINGS = [
     id: 'communitys',
     title: 'Communitys',
     items: [
-      { label: 'Spendencode', icon: 'bookmark', aktion: 'spendencode' },
+      { label: 'Spenden-PIN', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Nutzerstatus', icon: 'person', wahlKey: 'nutzerstatus', wahl: ['Aktiv', 'Beschäftigt', 'Unsichtbar'], standard: 'Aktiv' },
       { label: 'Privates Profil', icon: 'lock', toggle: 'commPrivate' },
       { label: 'Nachrichten erlaubt von', icon: 'chat', sichtbar: 'dm' },
@@ -10944,7 +10944,7 @@ function spendenweg(anfrage, bereich) {
       ? `${Zahlung.euro(anfrage.cent)} an ${anfrage.name || 'dieses Profil'}`
       : bereich === 'methoden'
         ? 'Zahlungsmethoden'
-        : 'Spendencode';
+        : 'Spenden-PIN';
 
     openSheet(
       titel,
@@ -11088,42 +11088,42 @@ function spendenweg(anfrage, bereich) {
           }
 
           if (ansicht === 'code' || ansicht === 'aendern' || ansicht === 'vergessen') {
+            // Erklärtext aus zahlung.js — derselbe Satz wie in der App (Henrik 01.10.2026).
             const text = {
-              code: anfrage
-                ? 'Leg deinen persönlichen Spendencode fest. Du gibst ihn bei jeder Spende ein — so kann niemand ohne dich spenden.'
-                : 'Leg deinen persönlichen Spendencode fest.',
+              code: 'Leg deine Spenden-PIN fest.',
               aendern: '',
-              vergessen: 'Bestätige dein Passwort, dann kannst du einen neuen Spendencode festlegen.',
+              vergessen: 'Bestätige dein Passwort, dann kannst du eine neue Spenden-PIN festlegen.',
             }[ansicht];
             inhalt.innerHTML = `
               ${text ? `<p class="sheet__hint">${esc(text)}</p>` : ''}
-              ${ansicht === 'aendern' ? feld('swBisher', 'Bisheriger Spendencode', { geheim: true, laenge: 24 }) : ''}
+              ${ansicht === 'code' ? `<p class="sheet__hint">${esc(Zahlung.PIN_ERKLAERUNG)}</p>` : ''}
+              ${ansicht === 'aendern' ? feld('swBisher', 'Bisherige Spenden-PIN', { geheim: true, laenge: 24 }) : ''}
               ${ansicht === 'vergessen' ? feld('swPasswort', 'Passwort', { geheim: true }) : ''}
-              ${feld('swNeu', ansicht === 'code' ? 'Spendencode' : 'Neuer Spendencode', { geheim: true, laenge: 24, platzhalter: ansicht === 'code' ? 'z. B. HENRIK2026' : '' })}
-              ${feld('swNeu2', ansicht === 'code' ? 'Spendencode wiederholen' : 'Neuen Spendencode wiederholen', { geheim: true, laenge: 24 })}
+              ${feld('swNeu', ansicht === 'code' ? 'Spenden-PIN' : 'Neue Spenden-PIN', { geheim: true, laenge: 24 })}
+              ${feld('swNeu2', ansicht === 'code' ? 'Spenden-PIN wiederholen' : 'Neue Spenden-PIN wiederholen', { geheim: true, laenge: 24 })}
               <p class="sheet__hint">${esc(Zahlung.CODE_REGEL_TEXT)}</p>
               <div class="sheet__footer">
-                ${knopf('swCodeOk', ansicht === 'code' ? (anfrage ? 'Festlegen und weiter' : 'Festlegen') : ansicht === 'aendern' ? 'Ändern' : 'Neuen Code speichern')}
-                ${ansicht === 'aendern' ? knopf('swVergessen', 'Code vergessen?', true) + knopf('swEntfernen', 'Code entfernen', true) : ''}
+                ${knopf('swCodeOk', ansicht === 'code' ? (anfrage ? 'Festlegen und weiter' : 'Festlegen') : ansicht === 'aendern' ? 'Ändern' : 'Neue PIN speichern')}
+                ${ansicht === 'aendern' ? knopf('swVergessen', 'PIN vergessen?', true) + knopf('swEntfernen', 'PIN entfernen', true) : ''}
                 ${anfrage && ansicht === 'code' ? '' : knopf('swZurueck', 'Zurück', true)}
               </div>`;
             inhalt.querySelector('#swZurueck')?.addEventListener('click', () => zeige(anfrage ? 'bestaetigen' : 'uebersicht'));
             inhalt.querySelector('#swVergessen')?.addEventListener('click', () => zeige('vergessen'));
             inhalt.querySelector('#swEntfernen')?.addEventListener('click', async () => {
               const bisher = wert('swBisher');
-              if (!bisher) return melden('Bitte deinen bisherigen Code eingeben');
+              if (!bisher) return melden('Bitte deine bisherige Spenden-PIN eingeben');
               const { data, error } = await db.rpc('spendencode_entfernen', { p_bisher: bisher });
               if (error) return melden(error.message);
               if (!data?.ok) return melden(Zahlung.grundText(data?.grund, data?.verbleibend));
               await laden();
               zeige('uebersicht');
-              gut('Spendencode entfernt');
+              gut('Spenden-PIN entfernt');
             });
             inhalt.querySelector('#swCodeOk').addEventListener('click', async () => {
               const neu = wert('swNeu');
               const regel = Zahlung.codePruefe(neu);
               if (regel) return melden(regel);
-              if (Zahlung.codeNormal(neu) !== Zahlung.codeNormal(wert('swNeu2'))) return melden('Die beiden Codes sind nicht gleich');
+              if (Zahlung.codeNormal(neu) !== Zahlung.codeNormal(wert('swNeu2'))) return melden('Die beiden PINs sind nicht gleich');
               let bisher = null;
               if (ansicht === 'aendern') bisher = wert('swBisher') || null;
               if (ansicht === 'vergessen') {
@@ -11143,7 +11143,7 @@ function spendenweg(anfrage, bereich) {
                 return zeige('bestaetigen');
               }
               zeige('uebersicht');
-              gut(ansicht === 'code' ? 'Spendencode gespeichert' : 'Neuer Spendencode gespeichert');
+              gut(ansicht === 'code' ? 'Spenden-PIN gespeichert' : 'Neue Spenden-PIN gespeichert');
             });
             return;
           }
@@ -11159,12 +11159,12 @@ function spendenweg(anfrage, bereich) {
               ${
                 status.gesperrt
                   ? `<p class="sheet__fehler">${esc(Zahlung.grundText('gesperrt'))}</p>`
-                  : feld('swCode', 'Dein Spendencode', { geheim: true, laenge: 24 })
+                  : feld('swCode', 'Deine Spenden-PIN', { geheim: true, laenge: 24 })
               }
               <p class="sheet__hint">Die Spende wird vorgemerkt. Abgebucht wird erst, sobald ein Zahlungsdienst angeschlossen ist.</p>
               <div class="sheet__footer">
                 ${knopf('swSpenden', `${Zahlung.euro(anfrage.cent)} spenden`)}
-                ${knopf('swVergessen', 'Code vergessen?', true)}
+                ${knopf('swVergessen', 'PIN vergessen?', true)}
               </div>`;
             const codeFeld = inhalt.querySelector('#swCode');
             if (codeFeld && vorbelegterCode) codeFeld.value = vorbelegterCode;
@@ -11180,7 +11180,7 @@ function spendenweg(anfrage, bereich) {
             inhalt.querySelector('#swVergessen').addEventListener('click', () => zeige('vergessen'));
             const senden = async () => {
               const code = wert('swCode');
-              if (!code) return melden('Bitte deinen Spendencode eingeben');
+              if (!code) return melden('Bitte deine Spenden-PIN eingeben');
               const knopfEl = inhalt.querySelector('#swSpenden');
               knopfEl.disabled = true;
               const antwort = await api(`/api/spenden/${anfrage.empfaengerId}`, {
@@ -11216,13 +11216,13 @@ function spendenweg(anfrage, bereich) {
 
           // Übersicht aus den Einstellungen.
           inhalt.innerHTML = `
-            <p class="sheet__label">Spendencode</p>
+            <p class="sheet__label">Spenden-PIN</p>
             <div class="item">
               <span class="item__icon">${ICONS.lock}</span>
               <span class="item__label">${status.gesetzt ? 'Festgelegt' : 'Noch nicht festgelegt'}
-                <small class="sheet__hint" style="display:block">Wird vor jeder Spende abgefragt — bei Spendenzielen und im Livestream.</small></span>
+                <small class="sheet__hint" style="display:block">Geheim, nur du kennst sie. Gibt deine gespeicherte Zahlungsmethode bei jeder Spende frei — bei Spendenzielen und im Livestream.</small></span>
             </div>
-            <div class="sheet__footer">${knopf('swCodeBearbeiten', status.gesetzt ? 'Spendencode ändern' : 'Spendencode festlegen', true)}</div>
+            <div class="sheet__footer">${knopf('swCodeBearbeiten', status.gesetzt ? 'Spenden-PIN ändern' : 'Spenden-PIN festlegen', true)}</div>
             <p class="sheet__label">Zahlungsmethoden</p>
             ${methoden.length ? '' : '<p class="sheet__hint">Noch keine Zahlungsmethode hinterlegt.</p>'}
             ${methodenHtml(false)}

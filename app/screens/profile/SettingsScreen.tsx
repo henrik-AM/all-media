@@ -113,7 +113,7 @@ const STATUS = ['Aktiv', 'Beschäftigt', 'Unsichtbar'];
  * Zahlungsmethoden gleich darunter.
  */
 const SPENDENCODE: Item = {
-  label: 'Spendencode',
+  label: 'Spenden-PIN',
   icon: 'bookmark-outline',
   aktion: 'spendencode',
 };

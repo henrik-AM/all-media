@@ -302,7 +302,7 @@ export const ChatDetailScreen = ({
      * Befund 1). `lib/toene.ts` schweigt von selbst, wenn der Schalter aus
      * ist. Gleiche Regel in web/public/app.js (sendMessage).
      */
-    nachrichtTon();
+    void nachrichtTon();
 
     /*
      * Bearbeiten laeuft ueber denselben Knopf wie Senden.

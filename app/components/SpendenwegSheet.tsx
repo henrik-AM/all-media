@@ -5,11 +5,15 @@
  * Ansichten:
  *   laden        Status und Methoden holen
  *   methode      neue Zahlungsmethode anlegen
- *   code         Spendencode festlegen (erstes Mal)
- *   aendern      Spendencode ändern (bisheriger Code nötig)
- *   vergessen    Spendencode neu setzen nach Passwort
- *   bestaetigen  Spende: Methode wählen, Code eingeben, absenden
- *   uebersicht   aus den Einstellungen: Code und Methoden verwalten
+ *   code         Spenden-PIN festlegen (erstes Mal)
+ *   aendern      Spenden-PIN ändern (bisherige PIN nötig)
+ *   vergessen    Spenden-PIN neu setzen nach Passwort
+ *   bestaetigen  Spende: Methode wählen, PIN eingeben, absenden
+ *   uebersicht   aus den Einstellungen: PIN und Methoden verwalten
+ *
+ * Die Spenden-PIN (Henrik 01.10.2026) ist geheim und selbst gewählt wie ein
+ * Entsperrcode; sie muss nicht eindeutig sein. Die Zahlungsmethode wird
+ * einmal hinterlegt, jede weitere Spende fragt nur noch die PIN ab.
  *
  * Gespeichert werden nie Kartennummer oder CVC (Vorbehalt 13.2 vom
  * 24.09.2026): gefragt wird nur nach den letzten vier Ziffern und dem
@@ -196,7 +200,7 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
     if (!supabase) return;
     const regel = Zahlung.codePruefe(neu);
     if (regel) return setMeldung(regel);
-    if (Zahlung.codeNormal(neu) !== Zahlung.codeNormal(neu2)) return setMeldung('Die beiden Codes sind nicht gleich');
+    if (Zahlung.codeNormal(neu) !== Zahlung.codeNormal(neu2)) return setMeldung('Die beiden PINs sind nicht gleich');
     setArbeitet(true);
     setMeldung('');
     try {
@@ -207,12 +211,12 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
       setBisher('');
       await laden(false);
       if (anfrage) {
-        // Gleich weiter mit der Spende — der Code steht schon drin.
+        // Gleich weiter mit der Spende — die PIN steht schon drin.
         setCode(gesetzt);
         zu('bestaetigen');
       } else {
         zu('uebersicht');
-        setErfolg('Spendencode gespeichert');
+        setErfolg('Spenden-PIN gespeichert');
       }
     } catch (e: any) {
       setMeldung(e?.message || 'Speichern hat nicht geklappt');
@@ -225,7 +229,7 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
     if (!supabase || !user?.email) return setMeldung(Zahlung.grundText('nicht_angemeldet'));
     const regel = Zahlung.codePruefe(neu);
     if (regel) return setMeldung(regel);
-    if (Zahlung.codeNormal(neu) !== Zahlung.codeNormal(neu2)) return setMeldung('Die beiden Codes sind nicht gleich');
+    if (Zahlung.codeNormal(neu) !== Zahlung.codeNormal(neu2)) return setMeldung('Die beiden PINs sind nicht gleich');
     if (!passwort) return setMeldung('Bitte dein Passwort eingeben');
     setArbeitet(true);
     setMeldung('');
@@ -241,7 +245,7 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
         zu('bestaetigen');
       } else {
         zu('uebersicht');
-        setErfolg('Neuer Spendencode gespeichert');
+        setErfolg('Neue Spenden-PIN gespeichert');
       }
     } catch (e: any) {
       setMeldung(e?.message || 'Das hat nicht geklappt');
@@ -252,14 +256,14 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
 
   const codeEntfernen = async () => {
     if (!supabase) return;
-    if (!bisher) return setMeldung('Bitte deinen bisherigen Code eingeben');
+    if (!bisher) return setMeldung('Bitte deine bisherige Spenden-PIN eingeben');
     setArbeitet(true);
     try {
       await A.spendencodeEntfernen(supabase, bisher);
       setBisher('');
       await laden(false);
       zu('uebersicht');
-      setErfolg('Spendencode entfernt');
+      setErfolg('Spenden-PIN entfernt');
     } catch (e: any) {
       setMeldung(e?.message || 'Das hat nicht geklappt');
     } finally {
@@ -296,7 +300,7 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
 
   const absenden = async () => {
     if (!anfrage) return;
-    if (!code.trim()) return setMeldung('Bitte deinen Spendencode eingeben');
+    if (!code.trim()) return setMeldung('Bitte deine Spenden-PIN eingeben');
     setArbeitet(true);
     setMeldung('');
     try {
@@ -384,7 +388,7 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
     ? `${betragText} an ${anfrage.empfaengerName || 'dieses Profil'}`
     : bereich === 'methoden'
       ? 'Zahlungsmethoden'
-      : 'Spendencode';
+      : 'Spenden-PIN';
 
   let inhalt: React.ReactNode = null;
 
@@ -442,13 +446,10 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
   if (ansicht === 'code') {
     inhalt = (
       <View>
-        <Text style={styles.text}>
-          {anfrage
-            ? 'Leg deinen persönlichen Spendencode fest. Du gibst ihn bei jeder Spende ein — so kann niemand ohne dich spenden.'
-            : 'Leg deinen persönlichen Spendencode fest.'}
-        </Text>
-        <Feld label="Spendencode" wert={neu} setzen={setNeu} geheim platzhalter="z. B. HENRIK2026" laenge={24} kennung="code-neu" />
-        <Feld label="Spendencode wiederholen" wert={neu2} setzen={setNeu2} geheim laenge={24} kennung="code-neu2" />
+        <Text style={styles.text}>Leg deine Spenden-PIN fest.</Text>
+        <Text style={styles.text}>{Zahlung.PIN_ERKLAERUNG}</Text>
+        <Feld label="Spenden-PIN" wert={neu} setzen={setNeu} geheim laenge={24} kennung="code-neu" />
+        <Feld label="Spenden-PIN wiederholen" wert={neu2} setzen={setNeu2} geheim laenge={24} kennung="code-neu2" />
         <Text style={styles.hinweis}>{Zahlung.CODE_REGEL_TEXT}</Text>
         <View style={styles.fuss}>
           <Knopf text={anfrage ? 'Festlegen und weiter' : 'Festlegen'} onPress={() => codeFestlegen(false)} kennung="code-festlegen" />
@@ -461,14 +462,14 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
   if (ansicht === 'aendern') {
     inhalt = (
       <View>
-        <Feld label="Bisheriger Spendencode" wert={bisher} setzen={setBisher} geheim laenge={24} kennung="code-bisher" />
-        <Feld label="Neuer Spendencode" wert={neu} setzen={setNeu} geheim laenge={24} kennung="code-neu" />
-        <Feld label="Neuen Spendencode wiederholen" wert={neu2} setzen={setNeu2} geheim laenge={24} kennung="code-neu2" />
+        <Feld label="Bisherige Spenden-PIN" wert={bisher} setzen={setBisher} geheim laenge={24} kennung="code-bisher" />
+        <Feld label="Neue Spenden-PIN" wert={neu} setzen={setNeu} geheim laenge={24} kennung="code-neu" />
+        <Feld label="Neue Spenden-PIN wiederholen" wert={neu2} setzen={setNeu2} geheim laenge={24} kennung="code-neu2" />
         <Text style={styles.hinweis}>{Zahlung.CODE_REGEL_TEXT}</Text>
         <View style={styles.fuss}>
           <Knopf text="Ändern" onPress={() => codeFestlegen(true)} kennung="code-aendern" />
-          <Knopf leise text="Code vergessen?" onPress={() => zu('vergessen')} kennung="code-vergessen" />
-          <Knopf leise text="Code entfernen" onPress={codeEntfernen} kennung="code-entfernen" />
+          <Knopf leise text="PIN vergessen?" onPress={() => zu('vergessen')} kennung="code-vergessen" />
+          <Knopf leise text="PIN entfernen" onPress={codeEntfernen} kennung="code-entfernen" />
           <Knopf leise text="Zurück" onPress={() => zu('uebersicht')} kennung="code-zurueck" />
         </View>
       </View>
@@ -478,13 +479,13 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
   if (ansicht === 'vergessen') {
     inhalt = (
       <View>
-        <Text style={styles.text}>Bestätige dein Passwort, dann kannst du einen neuen Spendencode festlegen.</Text>
+        <Text style={styles.text}>Bestätige dein Passwort, dann kannst du eine neue Spenden-PIN festlegen.</Text>
         <Feld label="Passwort" wert={passwort} setzen={setPasswort} geheim kennung="code-passwort" />
-        <Feld label="Neuer Spendencode" wert={neu} setzen={setNeu} geheim laenge={24} kennung="code-neu" />
-        <Feld label="Neuen Spendencode wiederholen" wert={neu2} setzen={setNeu2} geheim laenge={24} kennung="code-neu2" />
+        <Feld label="Neue Spenden-PIN" wert={neu} setzen={setNeu} geheim laenge={24} kennung="code-neu" />
+        <Feld label="Neue Spenden-PIN wiederholen" wert={neu2} setzen={setNeu2} geheim laenge={24} kennung="code-neu2" />
         <Text style={styles.hinweis}>{Zahlung.CODE_REGEL_TEXT}</Text>
         <View style={styles.fuss}>
-          <Knopf text="Neuen Code speichern" onPress={codeMitPasswort} kennung="code-mit-passwort" />
+          <Knopf text="Neue PIN speichern" onPress={codeMitPasswort} kennung="code-mit-passwort" />
           <Knopf leise text="Zurück" onPress={() => zu(anfrage ? 'bestaetigen' : 'uebersicht')} kennung="code-zurueck" />
         </View>
       </View>
@@ -503,14 +504,14 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
         {status?.gesperrt ? (
           <Text style={styles.fehler}>{Zahlung.grundText('gesperrt')}</Text>
         ) : (
-          <Feld label="Dein Spendencode" wert={code} setzen={setCode} geheim laenge={24} kennung="spende-code" />
+          <Feld label="Deine Spenden-PIN" wert={code} setzen={setCode} geheim laenge={24} kennung="spende-code" />
         )}
         <Text style={styles.hinweis}>
           Die Spende wird vorgemerkt. Abgebucht wird erst, sobald ein Zahlungsdienst angeschlossen ist.
         </Text>
         <View style={styles.fuss}>
           <Knopf text={`${betragText} spenden`} onPress={absenden} kennung="spende-senden" />
-          <Knopf leise text="Code vergessen?" onPress={() => zu('vergessen')} kennung="code-vergessen" />
+          <Knopf leise text="PIN vergessen?" onPress={() => zu('vergessen')} kennung="code-vergessen" />
         </View>
       </View>
     );
@@ -519,18 +520,18 @@ export const SpendenwegSheet = ({ visible, anfrage, bereich, onFertig }: Props) 
   if (ansicht === 'uebersicht') {
     inhalt = (
       <View>
-        <Text style={styles.gruppe}>SPENDENCODE</Text>
+        <Text style={styles.gruppe}>SPENDEN-PIN</Text>
         <View style={styles.zeile}>
           <Ionicons name={status?.gesetzt ? 'lock-closed' : 'lock-open-outline'} size={20} color={colors.text2} />
           <View style={styles.zeileText}>
             <Text style={styles.zeileName}>{status?.gesetzt ? 'Festgelegt' : 'Noch nicht festgelegt'}</Text>
-            <Text style={styles.zeileSub}>Wird vor jeder Spende abgefragt — bei Spendenzielen und im Livestream.</Text>
+            <Text style={styles.zeileSub}>Geheim, nur du kennst sie. Gibt deine gespeicherte Zahlungsmethode bei jeder Spende frei — bei Spendenzielen und im Livestream.</Text>
           </View>
         </View>
         <View style={styles.fussEng}>
           <Knopf
             leise
-            text={status?.gesetzt ? 'Spendencode ändern' : 'Spendencode festlegen'}
+            text={status?.gesetzt ? 'Spenden-PIN ändern' : 'Spenden-PIN festlegen'}
             onPress={() => zu(status?.gesetzt ? 'aendern' : 'code')}
             kennung="code-bearbeiten"
           />
