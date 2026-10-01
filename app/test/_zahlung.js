@@ -29,7 +29,9 @@
  *   8. Direkter INSERT in donations ist zu; spende_senden weist falschen
  *      Code (mit Restversuchen), Betrag und Selbstspende ab und nimmt die
  *      richtige Spende als „vorgemerkt" an — an das andere TESTKONTO.
- *   9. Ein Code ist eindeutig: das zweite Konto bekommt ihn nicht.
+ *   9. Die Spenden-PIN darf doppelt sein (Henrik 01.10.2026, Schema 77):
+ *      @prueflauf übernimmt die PIN von @test, das geht durch; danach
+ *      zurück auf die eigene Prüf-PIN.
  *  10. Aufräumen mit Gegenprobe. Die Spende selbst kann nur SQL löschen
  *      (SUPABASE_TOKEN); ohne Token bleibt sie beim Testkonto stehen.
  *
@@ -121,6 +123,14 @@ function regeln() {
   pruefe('Apple Pay im Firefox wird beim Anlegen abgewiesen',
     !!Zahlung.methodeBauen('apple_pay', {}, { os: 'web', browser: 'andere' }).fehler);
   pruefe('Falscher Code nennt die Restversuche', /noch 3 Versuche/.test(Zahlung.grundText('falscher_code', 3)));
+
+  // Kasten 18 (Henrik 01.10.2026): die Spenden-PIN darf doppelt sein.
+  pruefe('Kein Grund „vergeben" mehr in zahlung.js', !/vergeben/.test(Zahlung.grundText('vergeben')) &&
+    !/\bvergeben\s*:/.test(lies('gemeinsam/zahlung.js')));
+  pruefe('Meldungen sagen „Spenden-PIN"', /Spenden-PIN/.test(Zahlung.grundText('falscher_code')) &&
+    /Spenden-PIN/.test(Zahlung.grundText('kein_code')));
+  pruefe('Erklärtext: geheim, wie ein Entsperrcode, gibt die Zahlungsmethode frei',
+    /geheim/.test(Zahlung.PIN_ERKLAERUNG) && /Entsperrcode/.test(Zahlung.PIN_ERKLAERUNG) && /Zahlungsmethode/.test(Zahlung.PIN_ERKLAERUNG));
 }
 
 function schemaEntwurf() {
@@ -168,6 +178,14 @@ function gleichauf() {
     settings.includes("aktion: 'spendencode'") && settings.includes("aktion: 'zahlungsmethoden'"));
   pruefe('Website-Einstellungen: Spendencode und Zahlungsmethoden',
     web.includes("aktion: 'spendencode'") && web.includes("aktion: 'zahlungsmethoden'"));
+  const blatt = lies('app/components/SpendenwegSheet.tsx');
+  const webBlatt = web.slice(web.indexOf('function spendenweg('), web.indexOf('function openSpendenziel('));
+  pruefe('Beide Einstellungen heißen „Spenden-PIN"',
+    settings.includes("label: 'Spenden-PIN'") && (web.match(/label: 'Spenden-PIN', icon: 'bookmark', aktion: 'spendencode'/g) || []).length === 3);
+  pruefe('Kein „Spendencode" mehr in den Blättern (App und Website)',
+    !/Spendencode/.test(blatt.replace(/\/\*[\s\S]*?\*\//g, '')) && !/Spendencode/.test(webBlatt.replace(/\/\*[\s\S]*?\*\//g, '')));
+  pruefe('Keine Sonderbehandlung für „vergeben" in den Blättern', !/vergeben/.test(blatt) && !/vergeben/.test(webBlatt));
+  pruefe('Beide Blätter zeigen denselben Erklärtext', blatt.includes('Zahlung.PIN_ERKLAERUNG') && webBlatt.includes('Zahlung.PIN_ERKLAERUNG'));
   const ua = lies('app/lib/useAktionen.ts');
   pruefe('App: jede Spende läuft durch den Spendenweg', ua.includes('spendenweg.spenden(') && ua.includes('SpendenwegContext'));
   pruefe('App: der Provider steht in App.tsx', lies('app/App.tsx').includes('<SpendenwegProvider>'));
@@ -302,9 +320,14 @@ async function mitNetz() {
         !zeile.error && zeile.data.betrag_cent === 150 && zeile.data.empfaenger_id === du.id, zeile.error && zeile.error.message);
     }
 
-    console.log('\n9. Eindeutigkeit');
+    console.log('\n9. Spenden-PIN darf doppelt sein (Schema 77)');
     const doppelt = await db.rpc('spendencode_setzen', { p_neu: deinCode, p_bisher: meinCode });
-    pruefe('Den Code des anderen Kontos gibt es nicht zweimal', doppelt.data && doppelt.data.grund === 'vergeben', JSON.stringify(doppelt.data || doppelt.error));
+    pruefe('@prueflauf darf die PIN von @test übernehmen', doppelt.data && doppelt.data.ok === true, JSON.stringify(doppelt.data || doppelt.error));
+    if (doppelt.data && doppelt.data.ok) {
+      // Zurück auf die eigene Prüf-PIN — sonst scheitern _handbuch und _querformat an „stimmt nicht".
+      const zurueck = await db.rpc('spendencode_setzen', { p_neu: meinCode, p_bisher: deinCode });
+      pruefe('… und wieder zurück auf die eigene Prüf-PIN', zurueck.data && zurueck.data.ok === true, JSON.stringify(zurueck.data || zurueck.error));
+    }
   } finally {
     console.log('\n10. Aufräumen');
     for (const id of angelegt) {

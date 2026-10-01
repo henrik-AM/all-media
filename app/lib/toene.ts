@@ -1,4 +1,5 @@
 import { createAudioPlayer } from 'expo-audio';
+import { hinweistonModus } from './tonModus';
 
 /*
  * Der Schalter „Töne" aus den Einstellungen.
@@ -33,10 +34,17 @@ export const toeneZustand = () => toeneAn;
  */
 let spieler: ReturnType<typeof createAudioPlayer> | null = null;
 
-/** Der Ton beim Senden einer Nachricht. Schweigt, wenn der Schalter aus ist. */
-export const nachrichtTon = () => {
+/**
+ * Der Ton beim Senden einer Nachricht. Schweigt, wenn der Schalter aus ist,
+ * wenn das iPhone stummgeschaltet ist (Kasten 20.1, siehe lib/tonModus.ts)
+ * und solange ein Video mit Ton oder die Hörprobe läuft.
+ */
+export const nachrichtTon = async () => {
   if (!toeneAn) return;
   try {
+    // Erst den Modus „Stummschalter gilt" herstellen — ein Video kann die
+    // Sitzung seit dem letzten Ton auf „playback" gestellt haben.
+    if (!(await hinweistonModus())) return;
     if (!spieler) {
       spieler = createAudioPlayer(require('../assets/nachricht.wav'));
     }

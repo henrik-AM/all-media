@@ -1,5 +1,5 @@
 /**
- * Spendencode und Zahlungsmethode für Prüfläufe (Kasten 13, 29.09.2026).
+ * Spenden-PIN (intern: Spendencode) und Zahlungsmethode für Prüfläufe (Kasten 13, 29.09.2026).
  *
  * Seit Schema 72 geht eine Spende nur noch mit
  * persönlichem Code und hinterlegter Zahlungsmethode durch. Jeder Lauf, der
@@ -8,9 +8,13 @@
  *
  * WARUM DER CODE AUS DER KONTO-ID KOMMT
  *
- * Codes sind eindeutig über alle Konten („vergeben"). Ein fester Code für
- * beide Testkonten ginge also nur einmal. Aus den ersten Zeichen der ID wird
- * je Konto ein eigener, fester Code.
+ * Bis Schema 77 waren Codes eindeutig über alle Konten („vergeben"), ein
+ * fester Code für beide Testkonten ging nur einmal. Seit Henrik am
+ * 01.10.2026 entschieden hat, dass die Spenden-PIN wie ein Entsperrcode
+ * doppelt vorkommen darf, wäre das kein Hindernis mehr. Der Code aus der ID
+ * bleibt trotzdem: so sind die Prüf-PINs beider Konten verschieden, und
+ * _zahlung.js kann zeigen, dass ein Konto die PIN des anderen übernehmen
+ * darf.
  *
  * WARUM NUR BEI BEDARF GESETZT WIRD
  *

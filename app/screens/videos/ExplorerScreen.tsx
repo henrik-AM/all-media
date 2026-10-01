@@ -4,7 +4,8 @@ import { KarteWeb, KartenSteuerung, Pin as KartenPin } from '../../components/Ka
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { aktiveWiedergabe, wiedergabeModusSetzen } from '../../lib/tonModus';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../../components/Avatar';
 import { StoryAvatar } from '../../components/StoryAvatar';
@@ -878,20 +879,24 @@ const SoundKopf = ({ sound }: { sound: Sound }) => {
   const bei = mitTon ? status.currentTime : 0;
   const laeuft = mitTon && status.playing;
 
+  // Solange die Hoerprobe klingt, schweigt der Nachrichtenton (lib/tonModus.ts).
+  useEffect(() => {
+    const schluessel = `hoerprobe-${sound.id}`;
+    aktiveWiedergabe(schluessel, laeuft);
+    return () => aktiveWiedergabe(schluessel, false);
+  }, [laeuft, sound.id]);
+
   const umschalten = async () => {
     if (!mitTon) return;
     if (status.playing) return spieler.pause();
-    try {
-      /*
-       * Vor jedem Abspielen: auch mit Stummschalter hoerbar, und ueber den
-       * Lautsprecher. PushToTalk und die Kamera setzen allowsRecording; bleibt
-       * das stehen, spielt iOS ueber die Hoermuschel, und es klingt wie
-       * "Play geht nicht".
-       */
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
-    } catch {
-      // Ohne Modus spielt es trotzdem, nur eben nach den Regeln des Systems.
-    }
+    /*
+     * Vor jedem Abspielen: auch mit Stummschalter hoerbar, und ueber den
+     * Lautsprecher. Die Hoerprobe tippt man selbst an — wie ein Video mit
+     * Ton. Hinweistoene folgen dagegen dem Stummschalter (Kasten 20.1,
+     * lib/tonModus.ts); der Nachrichtenton stellt den Modus vor sich selbst
+     * wieder um, ein Zuruecksetzen hier waere doppelt.
+     */
+    await wiedergabeModusSetzen();
     setVersucht(true);
     // Am Ende von vorn - sonst passiert auf den zweiten Druck nichts.
     if (status.didJustFinish || bei >= gesamt - 0.3) spieler.seekTo(0);

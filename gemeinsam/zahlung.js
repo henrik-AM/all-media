@@ -1,5 +1,5 @@
 /**
- * All Media — Spendencode und Zahlungsmethoden, wie App und Website sie
+ * All Media — Spenden-PIN und Zahlungsmethoden, wie App und Website sie
  * beide prüfen (Feedback 21.09.2026, Kasten 13.2 und 13.3).
  *
  * WARUM ES DAS GIBT
@@ -13,14 +13,27 @@
  * INSERT in `donations`, das jeder angemeldete Nutzer ohne jede Bestätigung
  * absetzen konnte.
  *
- * WAS DER CODE IST
+ * WAS DER CODE IST — DIE SPENDEN-PIN
  *
  * Das Handbuch sagt nur „Geld senden/spenden → unter Einstellungen
  * (persönlicher Code)" und „Spendencode → Profil Verknüpfung mit Bankkarte
- * oder PayPal". Offen bleibt, ob der Code eine PIN ist oder ein öffentlicher
- * Name. Gebaut ist die PIN-Lesart: der Code bestätigt jede Spende, wird vor
- * jeder Spende eingegeben und liegt in der Datenbank nur als Hash
- * (bcrypt). Die Frage steht im Bericht an Henrik.
+ * oder PayPal". Henrik hat am 01.10.2026 entschieden, was das heißt: „Es soll
+ * eine geheime PIN sein, die der Nutzer selbst festlegt. Der Vorteil: die
+ * Person muss nicht jedes Mal ihre Zahlungsmethode und Verifizierung
+ * hinterlegen, sondern das ist einmal gespeichert, und sie aktiviert es mit
+ * der PIN jedes Mal." Und: „Es darf auch Spenden-PINs doppelt geben … wie zum
+ * Beispiel ein Handy-Entsperrcode."
+ *
+ * Also: die Oberfläche sagt überall „Spenden-PIN". Sie gibt die einmal
+ * gespeicherte Zahlungsmethode für jede Spende frei, liegt in der Datenbank
+ * nur als Hash (bcrypt) und muss NICHT eindeutig sein — zwei Konten dürfen
+ * dieselbe PIN haben, so wie zwei Handys denselben Entsperrcode. Bis Schema
+ * 77 lehnte die Datenbank eine schon benutzte PIN mit „vergeben" ab; das
+ * verriet nebenbei, dass irgendein anderes Konto genau diese PIN hat. Der
+ * Grund und seine Meldung sind deshalb hier gestrichen.
+ *
+ * Die Namen im Code (codePruefe, spendencode_setzen …) bleiben, damit
+ * Datenbank, Prüfläufe und beide Oberflächen nicht auseinanderlaufen.
  *
  * WER DIESELBE REGEL KENNT
  *
@@ -47,12 +60,21 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  // ------------------------------------------------------------ Spendencode --
+  // ------------------------------------------------------------ Spenden-PIN --
 
   var CODE_MIN = 6;
   var CODE_MAX = 16;
   var CODE_REGEL_TEXT =
     'Sechs bis sechzehn Zeichen, nur Buchstaben A–Z und Ziffern. Groß- und Kleinschreibung zählt nicht.';
+
+  /*
+   * Was beim Festlegen über der Eingabe steht — in App und Website derselbe
+   * Satz (Henrik 01.10.2026: geheim, selbst festgelegt, wie ein
+   * Entsperrcode, gibt die gespeicherte Zahlungsmethode frei).
+   */
+  var PIN_ERKLAERUNG =
+    'Deine Spenden-PIN ist geheim — nur du kennst sie, wie den Entsperrcode deines Handys. ' +
+    'Sie gibt deine gespeicherte Zahlungsmethode für jede Spende frei. So hinterlegst du deine Zahlungsdaten nur einmal.';
 
   /** Leerzeichen und Bindestriche fallen weg — wie in `spendencode_normal`. */
   function roh(eingabe) {
@@ -72,7 +94,7 @@
   /** Gibt null zurück, wenn die Form passt, sonst den Grund auf Deutsch. */
   function codePruefe(eingabe) {
     var r = roh(eingabe);
-    if (!r) return 'Bitte einen Spendencode eingeben';
+    if (!r) return 'Bitte eine Spenden-PIN eingeben';
     if (!/^[A-Za-z0-9]+$/.test(r)) return 'Nur Buchstaben A–Z und Ziffern, keine Umlaute oder Sonderzeichen';
     if (r.length < CODE_MIN) return 'Mindestens ' + CODE_MIN + ' Zeichen';
     if (r.length > CODE_MAX) return 'Höchstens ' + CODE_MAX + ' Zeichen';
@@ -249,13 +271,12 @@
    */
   var GRUENDE = {
     nicht_angemeldet: 'Dafür musst du angemeldet sein',
-    kein_code: 'Du hast noch keinen Spendencode festgelegt',
-    falscher_code: 'Der Spendencode stimmt nicht',
+    kein_code: 'Du hast noch keine Spenden-PIN festgelegt',
+    falscher_code: 'Die Spenden-PIN stimmt nicht',
     gesperrt: 'Zu viele falsche Versuche — bitte in 15 Minuten erneut probieren',
     zu_viele_versuche: 'Zu viele Versuche — bitte in einer Stunde erneut probieren',
     ungueltig: CODE_REGEL_TEXT,
-    vergeben: 'Diesen Spendencode hat schon jemand gewählt — bitte einen anderen',
-    bisher_falsch: 'Der bisherige Spendencode stimmt nicht',
+    bisher_falsch: 'Die bisherige Spenden-PIN stimmt nicht',
     neu_anmelden: 'Bitte bestätige zuerst dein Passwort',
     keine_zahlungsmethode: 'Bitte zuerst eine Zahlungsmethode hinterlegen',
     methode_unbekannt: 'Diese Zahlungsmethode gibt es nicht mehr',
@@ -277,6 +298,7 @@
     CODE_MIN: CODE_MIN,
     CODE_MAX: CODE_MAX,
     CODE_REGEL_TEXT: CODE_REGEL_TEXT,
+    PIN_ERKLAERUNG: PIN_ERKLAERUNG,
     codeNormal: codeNormal,
     codePruefe: codePruefe,
     MIN_CENT: MIN_CENT,

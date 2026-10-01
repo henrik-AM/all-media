@@ -27,6 +27,8 @@ export interface MethodeEingabe {
 export const CODE_MIN: number;
 export const CODE_MAX: number;
 export const CODE_REGEL_TEXT: string;
+/** Erklärtext beim Festlegen der Spenden-PIN, in App und Website gleich. */
+export const PIN_ERKLAERUNG: string;
 /** Ohne Leerzeichen und Bindestriche, in Großbuchstaben — wie spendencode_normal. */
 export function codeNormal(eingabe: string): string;
 /** Gibt null zurueck, wenn die Form passt, sonst den Grund auf Deutsch. */

@@ -1,9 +1,10 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import React, { forwardRef, useEffect, useId, useImperativeHandle, useState } from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEventListener } from 'expo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from './Motiv';
+import { aktiveWiedergabe } from '../lib/tonModus';
 
 /*
  * Die Fläche, in der ein Video wirklich läuft.
@@ -149,6 +150,20 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
     if (laeuft) spieler.play();
     else spieler.pause();
   }, [spieler, spielbar, fehler, laeuft]);
+
+  /*
+   * Ein Video, das hörbar läuft, meldet sich in lib/tonModus.ts an. Solange
+   * es läuft, schweigt der Nachrichtenton — sonst müsste er die Audiositzung
+   * auf „Stummschalter gilt" stellen, und das laufende Video verstummte
+   * mitten im Ansehen (Kasten 20.1). Den Modus für das Video selbst setzt
+   * expo-video beim Abspielen allein.
+   */
+  const kennung = useId();
+  const hoerbar = spielbar && !fehler && laeuft && !stumm;
+  useEffect(() => {
+    aktiveWiedergabe(kennung, hoerbar);
+    return () => aktiveWiedergabe(kennung, false);
+  }, [kennung, hoerbar]);
 
   useImperativeHandle(ref, () => ({
     springen: (sekunde) => { spieler.currentTime = Math.max(0, sekunde); },

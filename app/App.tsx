@@ -2526,8 +2526,8 @@ const Root = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const hideNotice = useCallback(() => setNotice(null), []);
 
-  // Ein Tonmodus für alles: Handy-Lautstärke gilt, Stummschalter egal
-  // (Kasten 8.1, Begründung in lib/tonModus.ts).
+  // Grundzustand beim Start: Handy-Lautstärke gilt, der Stummschalter auch
+  // (Kasten 8.1 und 20.1, Begründung in lib/tonModus.ts).
   useEffect(() => {
     tonModusSetzen();
   }, []);

@@ -457,7 +457,7 @@ const LANG = 'Design Tokens sauber aufsetzen';
     await page.screenshot({ path: bild('spende-code') });
     await page.fill('#swCode', 'FALSCH' + Date.now().toString().slice(-6));
     await page.click('#swSpenden');
-    await page.waitForFunction(() => /Spendencode stimmt nicht/.test(document.querySelector('#swFehler')?.textContent || ''), null, {
+    await page.waitForFunction(() => /Spenden-PIN stimmt nicht/.test(document.querySelector('#swFehler')?.textContent || ''), null, {
       timeout: 10000,
     });
     await page.screenshot({ path: bild('spende-code-falsch') });

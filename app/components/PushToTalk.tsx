@@ -89,8 +89,9 @@ export const PushToTalk = ({ communityId, kanalId, onNotice, onGesendet }: Props
 
     try {
       await aufnahme.stop();
-      // Zurück in den Wiedergabemodus — sonst bliebe die Sitzung auf
+      // Zurück in den Grundzustand — sonst bliebe die Sitzung auf
       // „Aufnehmen" und Videos kämen leise aus dem Hörer (Kasten 8.1).
+      // Der Grundzustand lässt den Stummschalter gelten (Kasten 20.1).
       await tonModusSetzen();
       const uri = aufnahme.uri;
 

@@ -206,6 +206,8 @@ const LAEUFE = [
   ['bremse', '_bremse.js'],
   ['auth', '_auth.js'],
   ['zahlung', '_zahlung.js'],
+  // Kasten 20: Stummschalter und stumme Konten — nur Quelltext, ohne Netz.
+  ['stumm', '_stumm.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */

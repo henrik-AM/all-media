@@ -442,7 +442,7 @@ const pruefe = (name, wahr, zusatz = '') => {
     const bereit = await db(spendenwegBereit, code, false);
     pruefe('Zahlungsmethode und Spendencode für die Spende da', bereit.ok, bereit.ok ? '' : bereit.fehler);
     let spende = await app('spenden', K_ANNA, 250, beitrag.id, 'Prüflauf', { code });
-    if (!spende.ok && /Spendencode stimmt nicht/.test(spende.fehler || '')) {
+    if (!spende.ok && /Spenden-PIN stimmt nicht/.test(spende.fehler || '')) {
       // Jemand hat den Code des Prüfkontos von Hand geändert: zurück auf den Prüfcode.
       await db(spendenwegBereit, code, true);
       spende = await app('spenden', K_ANNA, 250, beitrag.id, 'Prüflauf', { code });
