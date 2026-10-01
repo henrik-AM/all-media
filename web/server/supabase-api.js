@@ -521,7 +521,12 @@ async function ladeChats(client, nutzerId, bereich = 'messenger', schluesselId =
             ? vorschau.anruf_art === 'video'
               ? 'Videoanruf'
               : 'Anruf'
-            : vorschau.text
+            : // Kasten 16: die Story-Markierung hat keinen Text (Schema 75)
+              // — ohne diesen Zweig stuende in der Liste eine leere Zeile.
+              // Gleiche Regel in app/lib/daten.ts (ladeChats).
+              StoryRegeln.istMarkierungsHinweis(vorschau)
+              ? StoryRegeln.markierungVorschau(vorschau.sender_id === nutzerId)
+              : vorschau.text
           : '',
         /*
          * Die Vorschau einer verschluesselten Nachricht ist hier leer — der
@@ -720,8 +725,16 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
           id: n.stories.id,
           userId: n.stories.user_id === nutzerId ? 'me' : n.stories.user_id,
           mediaUri: n.stories.media_url || undefined,
+          // Kasten 16: Standbild bzw. Video im Betrachter.
+          mediaType: n.stories.media_type === 'video' ? 'video' : 'image',
         }
       : undefined,
+    /*
+     * Kasten 16 (Schema 75): Hinweis statt Nachricht — bei
+     * 'story_markierung' zeichnet der Browser eine Karte statt einer Blase.
+     * Gleiche Regel in app/lib/daten.ts (ladeNachrichten).
+     */
+    hinweis: StoryRegeln.istMarkierungsHinweis(n) ? 'story_markierung' : undefined,
     /*
      * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026). Antwort und
      * Zitat sind getrennt: eine Antwort zeigt nur den Bezug, ein Zitat nimmt

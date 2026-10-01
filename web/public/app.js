@@ -4031,8 +4031,12 @@ async function kontaktZeile(label, userId, chat, daten) {
 function openChatMedien(chat, liste, titel) {
   if (!chat) return toast('Noch kein Chat mit dieser Person');
 
+  // Kasten 16: die Story-Markierung hat keinen Text — sonst stuende sie als
+  // „Foto“ da. Gleiche Regel in ContactProfileScreen der App.
   const beschreibung = (m) =>
-    m.geteilt
+    window.StoryRegeln.istMarkierungsHinweis(m)
+      ? window.StoryRegeln.markierungVorschau(m.from === 'me')
+      : m.geteilt
       ? `${m.geteilt.autor}: ${m.geteilt.titel}`
       : m.standort
       ? m.standort.name
@@ -6430,12 +6434,12 @@ async function einstellungenHolen() {
  *
  * Das Gegenstück in der App: app/components/SichtbarkeitSheet.tsx.
  */
-const SICHT_STUFEN = [
-  { key: 'niemand', label: 'Niemand', hinweis: 'Niemand sieht es.' },
-  { key: 'niemand_bis_auf', label: 'Niemand bis auf …', hinweis: 'Nur die Personen, die du unten einträgst.' },
-  { key: 'alle_bis_auf', label: 'Alle bis auf …', hinweis: 'Alle außer den Personen, die du unten einträgst.' },
-  { key: 'alle', label: 'Alle', hinweis: 'Jeder, der dich sehen darf.' },
-];
+/*
+ * Die Stufen selbst stehen seit Kasten 19 (01.10.2026) in
+ * gemeinsam/sichtbarkeit.js (`window.Sichtbarkeit`) — dieselbe Liste wie im
+ * Blatt der App und im Server. Bei den Likes kommt „Nur Follower“ dazu;
+ * welche Stufe wo steht, sagt `Sichtbarkeit.stufenFuer(bereich)`.
+ */
 
 /*
  * Der Standort auf der Friend-Map. Beide lesen dieselbe Sichtbarkeit wie die
@@ -6485,11 +6489,9 @@ function sichtSofort(bereich, wert) {
 /** Was rechts neben dem Punkt steht. */
 function sichtText(bereich) {
   const s = sicht(bereich);
-  const name = SICHT_STUFEN.find((x) => x.key === s.stufe)?.label || 'Alle';
-  // Bei den „bis auf"-Stufen die Zahl dazu. Ohne sie sieht eine leere
-  // Ausnahmeliste genauso aus wie eine mit zwölf Namen.
-  const zahl = (s.ausnahmen || []).length;
-  return zahl && s.stufe !== 'alle' && s.stufe !== 'niemand' ? `${name} (${zahl})` : name;
+  // Bei den „bis auf"-Stufen die Zahl dazu — Rechnung in
+  // gemeinsam/sichtbarkeit.js, wortgleich mit der App.
+  return window.Sichtbarkeit.stufeText(s.stufe, (s.ausnahmen || []).length);
 }
 
 /** Die eigenen Sichtbarkeitsstufen frisch holen. */
@@ -6546,7 +6548,7 @@ function openSichtbarkeit(punkt) {
   const zeichne = (sheet) => {
     blatt = sheet;
     const jetzt = sicht(bereich);
-    const brauchtListe = jetzt.stufe === 'niemand_bis_auf' || jetzt.stufe === 'alle_bis_auf';
+    const brauchtListe = window.Sichtbarkeit.brauchtListe(jetzt.stufe);
 
     /*
      * Henrik, 07.09.2026: "Liste zeigt nicht alle Messenger-Kontakte."
@@ -6585,7 +6587,19 @@ function openSichtbarkeit(punkt) {
     sheet.querySelector('.sheet').innerHTML =
       sheetKopf(punkt.label, true) +
       `<div class="sheet__body">
-         ${SICHT_STUFEN.map(
+         ${
+           /*
+            * Kasten 19.1 (Henrik, 01.10.2026): der Ersteller eines Beitrags
+            * sieht jedes Like; die Einstellung gilt nur fuer alle anderen.
+            * Steht ueber allen Stufen, damit „Niemand" nicht als „auch der
+            * Ersteller nicht" gelesen wird. Gegenstueck im SichtbarkeitSheet
+            * der App.
+            */
+           bereich === 'likes'
+             ? `<div class="sheet__hint" data-testid="likes-ersteller-hinweis">${esc(window.Sichtbarkeit.LIKES_ERSTELLER_HINWEIS)}</div>`
+             : ''
+         }
+         ${window.Sichtbarkeit.stufenFuer(bereich).map(
            (st) => `<button class="item sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" data-stufe="${st.key}">
              <span class="item__label">
                <b>${esc(st.label)}</b>
@@ -15298,11 +15312,25 @@ function anfrageLeiste(chat) {
       </div>
     </div>`;
   }
+  /*
+   * Kasten 16: ist die Anfrage aus einer Story-Markierung entstanden (Schema
+   * 75 legt dann einen Community-Zweierchat mit anfrage_zustand 'wartet'
+   * an), steht im Chat nur die Hinweis-Karte. Dann sagt die Leiste, worum es
+   * geht, statt „möchte dir schreiben“ — geschrieben hat niemand. Gleiche
+   * Regel in ChatDetailScreen (nurMarkierung).
+   */
+  const nurMarkierung =
+    (state.messages || []).length > 0 &&
+    state.messages.every((m) => window.StoryRegeln.istMarkierungsHinweis(m));
   if (chat.requestState === 'pending') {
     return `<div class="anfrage">
       <div class="anfrage__text">
-        Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
-        sobald ${esc(chat.name)} sie angenommen hat.
+        ${
+          nurMarkierung
+            ? esc(window.StoryRegeln.markierungAnfrageText(true, chat.name))
+            : `Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
+        sobald ${esc(chat.name)} sie angenommen hat.`
+        }
       </div>
     </div>`;
   }
@@ -15317,8 +15345,12 @@ function anfrageLeiste(chat) {
   if (chat.requestState === 'incoming') {
     return `<div class="anfrage">
       <div class="anfrage__text">
-        ${esc(chat.name)} möchte dir schreiben. Bis du entscheidest, bleibt es
-        bei dieser einen Nachricht.
+        ${
+          nurMarkierung
+            ? esc(window.StoryRegeln.markierungAnfrageText(false, chat.name))
+            : `${esc(chat.name)} möchte dir schreiben. Bis du entscheidest, bleibt es
+        bei dieser einen Nachricht.`
+        }
       </div>
       <div class="anfrage__knoepfe">
         <button class="anfrage__btn" data-anfrage="ja">Annehmen</button>
@@ -15714,6 +15746,17 @@ function paintMessages(chat) {
   box.querySelectorAll('[data-voll]').forEach((b) =>
     b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
   );
+
+  // Kasten 16: die Markierungs-Karte öffnet ihre Story. Fehlt sie in den
+  // Leisten (Story eines Nichtkontakts), baut openStory sie aus der
+  // Einbettung der Nachricht (`ersatz`).
+  box.querySelectorAll('[data-hinweisstory]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const m = state.messages.find((x) => x.id === b.dataset.msgid);
+      if (!m?.story) return;
+      openStory(m.story.id, { ersatz: m.story });
+    })
+  );
 }
 
 /*
@@ -15868,6 +15911,48 @@ function messageBubble(m, chat) {
   }
 
   /*
+   * Kasten 16 (Henrik, 01.10.2026): „Wenn ich im Messenger bei den Stories
+   * markiere, soll die Person im Chat zwischen den beiden Personen eine
+   * Benachrichtigung bekommen, dass sie markiert wurde."
+   *
+   * Die Zeile legt die Datenbank an (Schema 75) — keine Sprechblase, sondern
+   * eine Karte in der Mitte wie der Anrufeintrag. Klick öffnet die Story; ist
+   * sie abgelaufen oder gelöscht, steht das da, und die Karte ist kein Knopf.
+   * `data-msgid` bleibt, damit langes Drücken das (eingeschränkte) Menü
+   * öffnet. Gleiche Karte in der App (renderMessage in ChatDetailScreen.tsx),
+   * der Satz steht in gemeinsam/story.js.
+   */
+  if (window.StoryRegeln.istMarkierungsHinweis(m)) {
+    // Immer das Gegenüber: beim Absender die markierte Person, beim
+    // Empfänger die, die markiert hat. `user()` gäbe für Unbekannte „?“.
+    const gegenueber = state.users[out ? chat.userId : m.from]?.name || chat.name;
+    const satz = window.StoryRegeln.markierungSatz(out, gegenueber);
+    const s = m.story;
+    const istVid = s && (s.mediaType === 'video' || (s.mediaUri && istVideoAdresse(s.mediaUri)));
+    const vorschau = !s
+      ? `<span class="msg__hinweisWeg">${esc(window.StoryRegeln.STORY_NICHT_VERFUEGBAR)}</span>`
+      : `<span class="msg__hinweisVorschau">
+           ${
+             !s.mediaUri
+               ? `<span class="msg__geteiltBild">${ICONS.image}</span>`
+               : istVid
+               ? `<video class="msg__hinweisBild" src="${esc(s.mediaUri)}" muted playsinline preload="metadata"></video>
+                  <span class="msg__anhangPlay">${ICONS.play}</span>`
+               : `<img class="msg__hinweisBild" src="${esc(s.mediaUri)}" alt="">`
+           }
+           <span class="msg__storyMarke">Story</span>
+         </span>`;
+    const tag = s ? 'button' : 'div';
+    return `<${tag} class="msg__hinweis${s ? '' : ' msg__hinweis--weg'}" data-msgid="${esc(m.id)}"${
+      s ? ` data-hinweisstory="${esc(s.id)}"` : ''
+    } data-testid="story-markierung-karte">
+              <span class="msg__hinweisSatz">${esc(satz)}</span>
+              ${vorschau}
+              <span class="msg__hinweisZeit">${m.stern ? `${ICONS.star} ` : ''}${esc(m.time || '')}</span>
+            </${tag}>`;
+  }
+
+  /*
    * Die Nachrichten-Werkzeuge aus dem Handbuch (01.09.2026).
    *
    * Antwort und Zitat sehen verschieden aus, weil sie verschiedenes sind:
@@ -15988,11 +16073,23 @@ function openNachrichtMenue(m, chat) {
   const eigene = m.from === 'me';
   const meine = (m.reaktionen || []).find((r) => r.userId === 'me')?.emoji || null;
 
+  /*
+   * Kasten 16: eine Story-Markierung ist ein Hinweis der Datenbank, keine
+   * geschriebene Nachricht. Antworten, Zitieren, Weiterleiten und Bearbeiten
+   * fallen weg — es gibt keinen Text, und eine weitergeleitete Karte „Anna
+   * hat dich markiert“ wäre im fremden Chat falsch. Gleiche Regel im
+   * NachrichtSheet der App (`hinweis`).
+   */
+  const hinweis = window.StoryRegeln.istMarkierungsHinweis(m);
   const punkte = [
-    { key: 'antworten', label: 'Antworten', icon: 'antwort' },
-    { key: 'zitieren', label: 'Zitieren', icon: 'zitat' },
-    { key: 'weiterleiten', label: 'Weiterleiten', icon: 'weiterleiten' },
-    ...(eigene ? [{ key: 'bearbeiten', label: 'Bearbeiten', icon: 'bearbeiten' }] : []),
+    ...(hinweis
+      ? []
+      : [
+          { key: 'antworten', label: 'Antworten', icon: 'antwort' },
+          { key: 'zitieren', label: 'Zitieren', icon: 'zitat' },
+          { key: 'weiterleiten', label: 'Weiterleiten', icon: 'weiterleiten' },
+        ]),
+    ...(eigene && !hinweis ? [{ key: 'bearbeiten', label: 'Bearbeiten', icon: 'bearbeiten' }] : []),
     { key: 'markieren', label: m.stern ? 'Markierung entfernen' : 'Mit Stern markieren', icon: 'star' },
     ...(eigene ? [{ key: 'zuruecknehmen', label: 'Zurücknehmen', icon: 'trash', gefahr: true }] : []),
   ];
@@ -16376,13 +16473,30 @@ function storyListeFuer(bereich) {
  * 21.09.2026 fuer Reels: „Ton richtet sich nach der Lautstärke des Handys");
  * die App hat auch keinen.
  */
-function openStory(storyId, { bereich } = {}) {
+function openStory(storyId, { bereich, ersatz } = {}) {
   let wo = bereich;
   if (!wo) {
     wo = storyListeFuer('messenger').some((x) => x.id === storyId) ? 'messenger' : 'videos';
   }
   let list = storyListeFuer(wo);
   if (!list.some((x) => x.id === storyId)) list = storyListeFuer('alle');
+  /*
+   * Kasten 16: aus einer Markierungs-Karte im Chat. Steht die Story in
+   * keiner Leiste — etwa die eines Nichtkontakts, die man als Markierter
+   * trotzdem lesen darf (ist_story_markiert) —, läuft genau diese eine.
+   */
+  if (ersatz && !list.some((x) => x.id === storyId)) {
+    list = [
+      {
+        id: ersatz.id,
+        userId: ersatz.userId,
+        own: ersatz.userId === 'me',
+        viewed: true,
+        mediaUri: ersatz.mediaUri,
+        mediaType: ersatz.mediaType,
+      },
+    ];
+  }
   const idx = list.findIndex((x) => x.id === storyId);
   if (idx < 0) return;
 

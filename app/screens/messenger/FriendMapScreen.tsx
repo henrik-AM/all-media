@@ -33,19 +33,18 @@ interface Props {
  * umgekehrt. Jetzt ist es eine Einstellung, an zwei Orten bedienbar —
  * dieselbe wie überall, `visibility_settings` mit Bereich `standort`.
  */
-const STUFEN_TEXT: Record<SichtbarkeitStufe, string> = {
+// Record<string, …>: „nur_follower“ gibt es beim Standort nicht (Kasten 19,
+// nur bei den Likes) — ein Eintrag dafür wäre ein Satz, den niemand sieht.
+const STUFEN_TEXT: Record<string, string> = {
   niemand: 'Dein Standort bleibt privat',
   niemand_bis_auf: 'Nur wen du freigibst',
   alle_bis_auf: 'Alle deine Kontakte bis auf die, die du ausnimmst',
   alle: 'Alle deine Kontakte sehen dich',
 };
 
-const STUFEN_NAME: Record<SichtbarkeitStufe, string> = {
-  niemand: 'Niemand',
-  niemand_bis_auf: 'Niemand bis auf …',
-  alle_bis_auf: 'Alle bis auf …',
-  alle: 'Alle',
-};
+// Die Namen stehen in gemeinsam/sichtbarkeit.js — wortgleich mit Einstellungen und Website.
+const Sichtbarkeit = require('../../../gemeinsam/sichtbarkeit') as typeof import('../../../gemeinsam/sichtbarkeit');
+const STUFEN_NAME = (stufe: string) => Sichtbarkeit.stufeName(stufe);
 
 /** Prototyp-Frame "Messenger - Friend-Map": Karte plus Liste darunter. */
 export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotice, pruefStilOffen }: Props) => {
@@ -215,7 +214,7 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
         <Druck style={styles.stufeZeile} onPress={() => setSichtOffen(true)}>
           <Text style={styles.stufeLabel}>Sichtbar für</Text>
           <Text style={styles.stufeWert}>
-            {STUFEN_NAME[sicht.stufe]}
+            {STUFEN_NAME(sicht.stufe)}
             {sicht.ausnahmen.length > 0 && sicht.stufe !== 'alle' && sicht.stufe !== 'niemand'
               ? ` (${sicht.ausnahmen.length})`
               : ''}

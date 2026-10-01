@@ -38,6 +38,8 @@ import { nachrichtTon } from '../../lib/toene';
 import { dauerText } from './CallScreen';
 import * as Aktion from '../../lib/aktionen';
 
+const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
+
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
@@ -82,6 +84,12 @@ interface Props {
   onZumMessenger?: () => void;
   /** Der frisch geladene Anfragezustand — die Shell übernimmt ihn. */
   onZustandGeladen?: (zustand: Pick<Chat, 'requestState' | 'messengerAnfrage'>) => void;
+  /*
+   * Kasten 16: die Story aus einer Markierungs-Karte im Betrachter öffnen.
+   * Die Shell sucht sie in ihren Leisten; fehlt sie dort (Story eines
+   * Nichtkontakts), öffnet sie den Betrachter mit genau dieser einen Story.
+   */
+  onOpenStory?: (story: NonNullable<Message['story']>) => void;
 }
 
 export const ChatDetailScreen = ({
@@ -101,6 +109,7 @@ export const ChatDetailScreen = ({
   contacts = [],
   onNotice,
   onOpenStandort,
+  onOpenStory,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
   const [kameraAuf, setKameraAuf] = useState(false);
@@ -276,6 +285,15 @@ export const ChatDetailScreen = ({
       abgebrochen = true;
     };
   }, [supabase, ichId, chat.userId]);
+
+  /*
+   * Kasten 16: ist die Chat-Anfrage aus einer Story-Markierung entstanden
+   * (Schema 75 legt dann einen Community-Zweierchat mit anfrage_zustand
+   * 'wartet' an), steht im Chat nur die Hinweis-Karte. Die Leiste darunter
+   * sagt dann, worum es geht, statt „möchte dir schreiben“ — geschrieben
+   * hat niemand.
+   */
+  const nurMarkierung = messages.length > 0 && messages.every((m) => m.hinweis === 'story_markierung');
 
   const gesperrt =
     chat.requestState === 'pending' ||
@@ -481,6 +499,73 @@ export const ChatDetailScreen = ({
             {item.time}
           </Text>
         </View>
+      );
+    }
+
+    /*
+     * Kasten 16 (Henrik, 01.10.2026): „Wenn ich im Messenger bei den Stories
+     * markiere, soll die Person im Chat zwischen den beiden Personen eine
+     * Benachrichtigung bekommen, dass sie markiert wurde."
+     *
+     * Die Zeile legt die Datenbank an (Schema 75), niemand hat sie
+     * geschrieben — deshalb keine Sprechblase, sondern eine Karte in der
+     * Mitte wie der Anrufeintrag. Antippen öffnet die Story; ist sie
+     * abgelaufen oder gelöscht, steht das da, und die Karte tut nichts.
+     * Langes Drücken öffnet das Menü ohne Antworten/Zitieren/Weiterleiten
+     * (NachrichtSheet, `hinweis`). Gleiche Karte auf der Website
+     * (messageBubble).
+     */
+    if (item.hinweis === 'story_markierung') {
+      const gegenueber = out
+        ? (chat.userId && alleNutzer[chat.userId]?.name) || chat.name
+        : sender?.name ?? chat.name;
+      const s = item.story;
+      return (
+        <Druck
+          style={styles.hinweisKarte}
+          onPress={s && onOpenStory ? () => onOpenStory(s) : undefined}
+          disabled={!s}
+          onLongPress={() => {
+            haptic.medium();
+            setGewaehlt(item);
+          }}
+          delayLongPress={450}
+          accessibilityLabel={StoryRegeln.markierungSatz(out, gegenueber)}
+          testID="story-markierung-karte"
+        >
+          <View style={styles.hinweisKopf}>
+            <Ionicons name="at-circle-outline" size={16} color={colors.brand} />
+            <Text style={styles.hinweisSatz}>{StoryRegeln.markierungSatz(out, gegenueber)}</Text>
+          </View>
+          {s ? (
+            <View style={styles.hinweisVorschau}>
+              {s.mediaUri ? (
+                <Videoflaeche
+                  id={item.id}
+                  quelle={s.mediaUri}
+                  laeuft={false}
+                  stumm
+                  fuellen="cover"
+                  style={styles.hinweisBild}
+                />
+              ) : (
+                <Motiv id={s.id} icon="image-outline" iconSize={20} style={styles.hinweisBild} />
+              )}
+              {s.mediaType === 'video' || (s.mediaUri && istVideo(s.mediaUri)) ? (
+                <View style={styles.hinweisPlay}>
+                  <Ionicons name="play" size={20} color={colors.white} />
+                </View>
+              ) : null}
+              <View style={styles.storyBadge}>
+                <Ionicons name="albums" size={13} color={colors.white} />
+                <Text style={styles.storyBadgeText}>Story</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.hinweisWeg}>{StoryRegeln.STORY_NICHT_VERFUEGBAR}</Text>
+          )}
+          <Text style={styles.hinweisZeit}>{item.time}</Text>
+        </Druck>
       );
     }
 
@@ -910,8 +995,9 @@ export const ChatDetailScreen = ({
         {chat.requestState === 'pending' && !blockiert && (
           <View style={styles.anfrage}>
             <Text style={styles.anfrageText}>
-              Deine Anfrage läuft noch. Weitere Nachrichten sind möglich,
-              sobald {chat.name} sie angenommen hat.
+              {nurMarkierung
+                ? StoryRegeln.markierungAnfrageText(true, chat.name)
+                : `Deine Anfrage läuft noch. Weitere Nachrichten sind möglich, sobald ${chat.name} sie angenommen hat.`}
             </Text>
           </View>
         )}
@@ -928,8 +1014,9 @@ export const ChatDetailScreen = ({
         {chat.requestState === 'incoming' && !blockiert && (
           <View style={styles.anfrage}>
             <Text style={styles.anfrageText}>
-              {chat.name} möchte dir schreiben. Bis du entscheidest, bleibt es
-              bei dieser einen Nachricht.
+              {nurMarkierung
+                ? StoryRegeln.markierungAnfrageText(false, chat.name)
+                : `${chat.name} möchte dir schreiben. Bis du entscheidest, bleibt es bei dieser einen Nachricht.`}
             </Text>
             <View style={styles.anfrageKnoepfe}>
               <Druck
@@ -1122,6 +1209,7 @@ export const ChatDetailScreen = ({
       <NachrichtSheet
         visible={!!gewaehlt}
         eigene={gewaehlt?.senderId === CURRENT_USER_ID}
+        hinweis={!!gewaehlt?.hinweis}
         markiert={!!gewaehlt && markierte.includes(gewaehlt.id)}
         reaktion={
           (gewaehlt?.reaktionen ?? []).find((r) => r.userId === CURRENT_USER_ID)?.emoji ?? null
@@ -1349,6 +1437,36 @@ const styles = themenStyles((colors) => ({
   },
   anrufText: { color: colors.text2, ...typography.small },
   anrufVerpasst: { color: colors.danger },
+
+  /* Kasten 16: die Karte einer Story-Markierung — mittig, keine Blase. */
+  hinweisKarte: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: 6,
+    padding: spacing.sm,
+    maxWidth: 260,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface3,
+  },
+  hinweisKopf: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  hinweisSatz: { flexShrink: 1, color: colors.text, ...typography.small, fontWeight: '600', textAlign: 'center' },
+  hinweisVorschau: { position: 'relative' },
+  hinweisBild: { width: 120, height: 200, borderRadius: radius.md, overflow: 'hidden' },
+  // Mittig auf dem 120×200-Standbild (40er Kreis).
+  hinweisPlay: {
+    position: 'absolute',
+    top: 80,
+    left: 40,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  hinweisWeg: { color: colors.text3, ...typography.small, fontStyle: 'italic' },
+  hinweisZeit: { color: colors.text3, ...typography.tiny },
 
   dayDivider: { alignSelf: 'center', marginBottom: 10 },
   dayDividerText: {

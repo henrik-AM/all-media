@@ -58,7 +58,13 @@ export interface Message {
   standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number };
   kontakt?: { id: string; name: string; handle: string };
   /** Story-Anhang (fixiert - nur horizontal swipeable). */
-  story?: { id: string; userId: string; mediaUri?: string };
+  story?: { id: string; userId: string; mediaUri?: string; mediaType?: 'image' | 'video' };
+  /**
+   * Kasten 16 (Schema 75): gesetzt heisst, die Zeile ist keine geschriebene
+   * Nachricht, sondern ein Hinweis der Datenbank — bisher nur die
+   * Story-Markierung. Der Chat zeigt dafuer eine Karte statt einer Blase.
+   */
+  hinweis?: 'story_markierung';
 
   /*
    * Die Nachrichten-Werkzeuge aus dem Handbuch, nachgetragen am 01.09.2026.
@@ -133,7 +139,8 @@ export interface Umfrage {
 
 /** Eine Sichtbarkeitsstufe mit ihrer Ausnahmeliste. */
 export interface Sichtbarkeit {
-  stufe: 'niemand' | 'niemand_bis_auf' | 'alle_bis_auf' | 'alle';
+  /** Kasten 19: „nur_follower“ gibt es nur beim Bereich likes (Schema 76). */
+  stufe: import('../../gemeinsam/sichtbarkeit').SichtbarkeitStufe;
   ausnahmen: string[];
   /*
    * Nur beim Bereich `story` belegt: der Zusatz „Jeder -> Story auch in

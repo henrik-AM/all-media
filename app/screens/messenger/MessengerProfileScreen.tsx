@@ -16,6 +16,8 @@ import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import { SichtbarkeitBereich, SichtbarkeitStufe } from '../../lib/aktionen';
 import { useAktionen } from '../../lib/useAktionen';
 
+const Sichtbarkeit = require('../../../gemeinsam/sichtbarkeit') as typeof import('../../../gemeinsam/sichtbarkeit');
+
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
   /** Oeffnet die Kontoliste (anderes eigenes Konto). */
@@ -74,16 +76,9 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
   /** Was rechts neben dem Punkt steht — wortgleich mit den Einstellungen. */
   const sichtText = (bereich: SichtbarkeitBereich) => {
     const s = sicht(bereich);
-    const namen: Record<string, string> = {
-      niemand: 'Niemand',
-      niemand_bis_auf: 'Niemand bis auf …',
-      alle_bis_auf: 'Alle bis auf …',
-      alle: 'Alle',
-    };
-    const zahl = s.ausnahmen.length;
-    return zahl && s.stufe !== 'alle' && s.stufe !== 'niemand'
-      ? `${namen[s.stufe]} (${zahl})`
-      : namen[s.stufe];
+    // Name und Zahl aus gemeinsam/sichtbarkeit.js — dieselbe Rechnung wie auf
+    // der Website (sichtText). Seit Kasten 19 kennt sie auch „Nur Follower“.
+    return Sichtbarkeit.stufeText(s.stufe, s.ausnahmen.length);
   };
 
   // Ohne Eintrag ist die Lesebestaetigung an - der Auslieferungszustand steht
@@ -201,6 +196,7 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
       <SichtbarkeitSheet
         visible
         titel={sichtOffen.titel}
+        bereich={sichtOffen.bereich}
         stufe={sicht(sichtOffen.bereich).stufe}
         ausnahmen={sicht(sichtOffen.bereich).ausnahmen}
         onStufe={async (stufe) => {

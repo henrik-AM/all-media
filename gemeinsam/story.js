@@ -399,6 +399,62 @@
     return bereich === 'messenger' ? listen.messenger || [] : listen.videosAlle || listen.videos || [];
   }
 
+  /*
+   * Kasten 16 (Henrik, 01.10.2026): Die Story-Markierung landet im Chat.
+   *
+   * „Wenn ich im Messenger bei den Stories markiere, soll die Person im Chat
+   * zwischen den beiden Personen eine Benachrichtigung bekommen, dass sie
+   * markiert wurde." Den Eintrag legt die Datenbank selbst an (Schema 75):
+   * eine Zeile in `messages` mit `hinweis = 'story_markierung'`, leerem Text,
+   * unverschlüsselt und mit `reply_to_story` auf die Story.
+   *
+   * Diese Zeile ist keine Sprechblase — niemand hat etwas geschrieben —,
+   * sondern eine Hinweis-Karte. Die Sätze dazu stehen hier und nur hier, damit
+   * App und Website denselben Wortlaut zeigen und die Chatliste nicht auf
+   * einer Seite „Hat dich markiert" und auf der anderen eine leere Zeile.
+   */
+  const HINWEIS_STORY_MARKIERUNG = 'story_markierung';
+
+  /** Ist diese Nachricht (Rohzeile oder aufbereitet) eine Markierungs-Karte? */
+  function istMarkierungsHinweis(n) {
+    return Boolean(n) && n.hinweis === HINWEIS_STORY_MARKIERUNG;
+  }
+
+  /**
+   * Der Satz auf der Karte.
+   *   eigene: true  → „Du hast Anna in einer Story markiert" (beim Absender)
+   *   eigene: false → „Anna hat dich in einer Story markiert" (beim Empfänger)
+   * `name` ist immer das Gegenüber.
+   */
+  function markierungSatz(eigene, name) {
+    const n = String(name || '').trim();
+    return eigene
+      ? `Du hast ${n || 'jemanden'} in einer Story markiert`
+      : `${n || 'Jemand'} hat dich in einer Story markiert`;
+  }
+
+  /**
+   * Die Zeile in der Chatliste. Ohne sie stünde dort eine leere Vorschau,
+   * denn der Text der Hinweis-Nachricht ist absichtlich leer.
+   */
+  function markierungVorschau(eigene) {
+    return eigene ? 'In deiner Story markiert' : 'Hat dich in einer Story markiert';
+  }
+
+  /** Steht auf der Karte, wenn die Story abgelaufen oder gelöscht ist. */
+  const STORY_NICHT_VERFUEGBAR = 'Story nicht mehr verfügbar';
+
+  /**
+   * Der Text über den Annehmen/Ablehnen-Knöpfen, wenn eine Chat-Anfrage aus
+   * einer Story-Markierung entstanden ist. Die markierende Person hat nicht
+   * „geschrieben" — die Anfrage hat die Datenbank angelegt (Schema 75).
+   */
+  function markierungAnfrageText(eigene, name) {
+    return eigene
+      ? `${name} sieht deine Markierung als Chat-Anfrage. Schreiben kannst du hier, sobald ${name} sie angenommen hat.`
+      : `${name} hat dich in einer Story markiert. Nimmst du an, könnt ihr hier schreiben.`;
+  }
+
   return {
     DAUER_BILD,
     DAUER_VIDEO_HOECHSTENS,
@@ -426,5 +482,11 @@
     vonPerson,
     ringFuer,
     ringListe,
+    HINWEIS_STORY_MARKIERUNG,
+    STORY_NICHT_VERFUEGBAR,
+    istMarkierungsHinweis,
+    markierungSatz,
+    markierungVorschau,
+    markierungAnfrageText,
   };
 });

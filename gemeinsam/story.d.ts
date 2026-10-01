@@ -109,3 +109,11 @@ export function ringListe<T extends StoryEintrag>(
   listen: { messenger?: T[]; videos?: T[]; videosAlle?: T[] } | null | undefined,
   bereich: 'messenger' | 'videos'
 ): T[];
+
+/** Kasten 16: die Hinweis-Nachricht einer Story-Markierung (Schema 75). */
+export const HINWEIS_STORY_MARKIERUNG: 'story_markierung';
+export const STORY_NICHT_VERFUEGBAR: string;
+export function istMarkierungsHinweis(n: { hinweis?: string | null } | null | undefined): boolean;
+export function markierungSatz(eigene: boolean, name?: string | null): string;
+export function markierungVorschau(eigene: boolean): string;
+export function markierungAnfrageText(eigene: boolean, name: string): string;

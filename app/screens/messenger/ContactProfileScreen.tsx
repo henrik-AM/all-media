@@ -18,6 +18,8 @@ import { useAktionen } from '../../lib/useAktionen';
 import * as Krypto from '../../lib/krypto';
 import { Chat, Message } from '../../types';
 
+const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
+
 interface Props {
   userId: string;
   onBack: () => void;
@@ -233,8 +235,12 @@ export const ContactProfileScreen = ({
   const wert = (label: string, standard: string) => wahlen[label] ?? standard;
   const setzeWahl = (label: string, w: string) => setWahlen((prev) => ({ ...prev, [label]: w }));
 
+  // Kasten 16: die Story-Markierung hat keinen Text — ohne den ersten Zweig
+  // stuende sie unter „Mit Stern markiert“ als „Foto“.
   const beschreibung = (m: Message) =>
-    m.geteilt ? `${m.geteilt.autor}: ${m.geteilt.titel}` : m.standort ? m.standort.name : m.kontakt ? m.kontakt.name : m.text || 'Foto';
+    m.hinweis === 'story_markierung'
+      ? StoryRegeln.markierungVorschau(m.senderId === 'me')
+      : m.geteilt ? `${m.geteilt.autor}: ${m.geteilt.titel}` : m.standort ? m.standort.name : m.kontakt ? m.kontakt.name : m.text || 'Foto';
 
   const zeile = (label: string, neben: string, onPress: () => void, art?: 'gruen' | 'gefahr') => (
     <Druck key={label} style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]} onPress={onPress}>

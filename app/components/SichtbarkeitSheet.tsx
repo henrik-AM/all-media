@@ -35,24 +35,23 @@ import { colors, radius, spacing, themenStyles, typography } from '../constants/
 import { useDaten } from '../contexts/DatenContext';
 import { SichtbarkeitStufe } from '../lib/aktionen';
 
-const STUFEN: { key: SichtbarkeitStufe; label: string; hinweis: string }[] = [
-  { key: 'niemand', label: 'Niemand', hinweis: 'Niemand sieht es.' },
-  {
-    key: 'niemand_bis_auf',
-    label: 'Niemand bis auf …',
-    hinweis: 'Nur die Personen, die du unten einträgst.',
-  },
-  {
-    key: 'alle_bis_auf',
-    label: 'Alle bis auf …',
-    hinweis: 'Alle außer den Personen, die du unten einträgst.',
-  },
-  { key: 'alle', label: 'Alle', hinweis: 'Jeder, der dich sehen darf.' },
-];
+/*
+ * Die Stufen kommen aus gemeinsam/sichtbarkeit.js — die Website liest
+ * dieselbe Liste. Seit Kasten 19 (01.10.2026) gibt es bei den Likes
+ * zusätzlich „Nur Follower“; welche Stufe wo angeboten wird, entscheidet
+ * `stufenFuer(bereich)`, nicht dieses Blatt.
+ */
+const Sichtbarkeit = require('../../gemeinsam/sichtbarkeit') as typeof import('../../gemeinsam/sichtbarkeit');
 
 interface Props {
   visible: boolean;
   titel: string;
+  /*
+   * Kasten 19: der Bereich, um den es geht. Ohne ihn gäbe es nur die vier
+   * Grundstufen; mit `likes` kommt „Nur Follower“ dazu und unter jeder Stufe
+   * der Satz, dass der Ersteller das Like immer sieht.
+   */
+  bereich?: string;
   stufe: SichtbarkeitStufe;
   ausnahmen: string[];
   onStufe: (stufe: SichtbarkeitStufe) => void;
@@ -80,6 +79,7 @@ interface Props {
 export const SichtbarkeitSheet = ({
   visible,
   titel,
+  bereich,
   stufe,
   ausnahmen,
   onStufe,
@@ -92,7 +92,9 @@ export const SichtbarkeitSheet = ({
   const { contacts, users } = useDaten();
   const [suche, setSuche] = useState('');
 
-  const brauchtListe = stufe === 'niemand_bis_auf' || stufe === 'alle_bis_auf';
+  const brauchtListe = Sichtbarkeit.brauchtListe(stufe);
+  const stufen = Sichtbarkeit.stufenFuer(bereich ?? '');
+  const istLikes = bereich === 'likes';
 
   /*
    * Wer schon auf der Liste steht, steht oben. Sonst müsste man in einer
@@ -132,7 +134,16 @@ export const SichtbarkeitSheet = ({
   return (
     <SheetRahmen visible={visible} title={titel} onClose={onClose} hoch={brauchtListe}>
       <ScrollView contentContainerStyle={styles.inhalt} keyboardShouldPersistTaps="handled">
-        {STUFEN.map((st) => {
+        {/*
+          * Kasten 19.1 (Henrik, 01.10.2026): „Der Besitzer des Beitrages darf
+          * immer sehen, wer seinen Beitrag geliked hat. Die Regelung zählt nur
+          * für die Öffentlichkeit.“ Das steht hier über allen Stufen, damit
+          * „Niemand“ nicht als „auch der Ersteller nicht“ gelesen wird.
+          */}
+        {istLikes && (
+          <Text style={styles.erstellerHinweis}>{Sichtbarkeit.LIKES_ERSTELLER_HINWEIS}</Text>
+        )}
+        {stufen.map((st) => {
           const an = st.key === stufe;
           return (
             <Druck key={st.key} style={styles.stufe} onPress={() => onStufe(st.key)}>
@@ -240,6 +251,7 @@ const styles = themenStyles((colors) => ({
   stufeLabel: { ...typography.body, color: colors.text },
   stufeLabelAn: { fontWeight: '600', color: colors.brand },
   stufeHinweis: { ...typography.tiny, color: colors.text3 },
+  erstellerHinweis: { ...typography.tiny, color: colors.text2, paddingBottom: spacing.sm },
   zusatz: {
     flexDirection: 'row',
     alignItems: 'center',

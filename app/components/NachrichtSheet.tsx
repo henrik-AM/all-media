@@ -51,6 +51,14 @@ interface Props {
   eigene: boolean;
   /** Schon mit Stern markiert? Der Punkt heißt dann anders herum. */
   markiert: boolean;
+  /*
+   * Kasten 16: die Zeile ist ein Hinweis der Datenbank (Story-Markierung),
+   * keine geschriebene Nachricht. Antworten, Zitieren, Weiterleiten und
+   * Bearbeiten fallen weg — es gibt keinen Text, auf den sie sich beziehen
+   * könnten, und eine weitergeleitete Karte „Anna hat dich markiert“ wäre im
+   * fremden Chat eine Falschaussage. Reaktion, Stern und Zurücknehmen bleiben.
+   */
+  hinweis?: boolean;
   /** Die eigene Reaktion, damit sie hervorgehoben dasteht. */
   reaktion?: string | null;
   onAktion: (was: NachrichtAktion) => void;
@@ -62,15 +70,20 @@ export const NachrichtSheet = ({
   visible,
   eigene,
   markiert,
+  hinweis = false,
   reaktion,
   onAktion,
   onReaktion,
   onClose,
 }: Props) => {
   const punkte: { key: NachrichtAktion; label: string; icon: IconName; gefahr?: boolean }[] = [
-    { key: 'antworten', label: 'Antworten', icon: 'arrow-undo-outline' },
-    { key: 'zitieren', label: 'Zitieren', icon: 'chatbox-ellipses-outline' },
-    { key: 'weiterleiten', label: 'Weiterleiten', icon: 'arrow-redo-outline' },
+    ...(hinweis
+      ? []
+      : ([
+          { key: 'antworten', label: 'Antworten', icon: 'arrow-undo-outline' },
+          { key: 'zitieren', label: 'Zitieren', icon: 'chatbox-ellipses-outline' },
+          { key: 'weiterleiten', label: 'Weiterleiten', icon: 'arrow-redo-outline' },
+        ] as { key: NachrichtAktion; label: string; icon: IconName }[])),
     {
       key: 'markieren',
       label: markiert ? 'Markierung entfernen' : 'Mit Stern markieren',
@@ -81,7 +94,7 @@ export const NachrichtSheet = ({
   // Bearbeiten und Zurücknehmen nur bei eigenen. Fremde Nachrichten zu
   // ändern wäre kein Werkzeug, sondern eine Fälschung.
   if (eigene) {
-    punkte.splice(3, 0, { key: 'bearbeiten', label: 'Bearbeiten', icon: 'create-outline' });
+    if (!hinweis) punkte.splice(3, 0, { key: 'bearbeiten', label: 'Bearbeiten', icon: 'create-outline' });
     punkte.push({
       key: 'zuruecknehmen',
       label: 'Zurücknehmen',
