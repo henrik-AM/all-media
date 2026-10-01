@@ -33,13 +33,14 @@ const { frage } = require('./_aufraeumen');
 const { schliesse } = require('./_konto');
 const Telefon = require('../../gemeinsam/telefon');
 const { nurTestkonto } = require('./_nur_testkonten');
+const { PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const BILDER = process.env.BILDER ? path.join(__dirname, '..', '..', 'bilder', 'eltern-nummer') : null;
 
 const PRUEFER = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
-  passwort: process.env.AM_TEST_PASS || 'PruefLauf2026!',
+  passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
 };
 
 const KENNUNG = Date.now().toString(36);

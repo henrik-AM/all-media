@@ -41,6 +41,7 @@ const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const Rang = require('../../gemeinsam/rang');
+const { TESTKONTO_PASS } = require('./_testpasswoerter');
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -50,7 +51,7 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-const TESTKONTO = { email: 'test@all-media.app', passwort: 'AllMedia2026!' };
+const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
 
 let fehler = 0;
 const pruefe = (name, wahr, zusatz = '') => {

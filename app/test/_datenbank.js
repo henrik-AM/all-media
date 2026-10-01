@@ -18,6 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { TESTKONTO_PASS } = require('./_testpasswoerter');
 
 const WURZEL = path.join(__dirname, '..', '..');
 
@@ -32,7 +33,7 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 // Das Testkonto aus SUPABASE_SCHEMA_7_testkonto.sql.
-const KONTO = { email: 'test@all-media.app', passwort: 'AllMedia2026!' };
+const KONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
 
 const WEBSITE = process.argv[2] || '';
 

@@ -43,6 +43,7 @@ const Zahlung = require('../../gemeinsam/zahlung');
 const { pruefCode, spendenwegBereit } = require('./_spendencode');
 const { TESTKONTEN } = require('./_nur_testkonten');
 const { frage } = require('./_aufraeumen');
+const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
 const WURZEL = path.join(__dirname, '..', '..');
 const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
@@ -56,8 +57,8 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 const OFFLINE = process.argv.includes('--offline');
 
 // Fest, nicht aus der Umgebung: dieser Lauf legt Zahlungsmethoden an.
-const PRUEFKONTO = { email: 'all.media.prueflauf@web.de', passwort: 'PruefLauf2026!' };
-const TESTKONTO = { email: 'test@all-media.app', passwort: 'AllMedia2026!' };
+const PRUEFKONTO = { email: 'all.media.prueflauf@web.de', passwort: PRUEFKONTO_PASS };
+const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
 
 let fehler = 0;
 let geprueft = 0;

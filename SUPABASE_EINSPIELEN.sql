@@ -2463,7 +2463,7 @@ end $$;
 -- genau so funktionieren wie bei jedem anderen Konto:
 --
 --     E-Mail:   test@all-media.app
---     Passwort: AllMedia2026!
+--     Passwort: steht in app/.env.local (AM_TESTKONTO_PASS)
 --
 -- Hier bekommt es nur einen sprechenden Namen. Findet die Abfrage das Konto
 -- nicht, ist es noch nicht registriert — dann in der App oder auf der Website
