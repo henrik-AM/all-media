@@ -33,6 +33,9 @@
  * laeuft. Die Oberflaeche holt die Startdaten bei jedem Laden neu.
  */
 
+// Videotypen und -grenzen (Kasten 15) — dieselbe Datei wie in App und Browser.
+const StoryRegeln = require('../../gemeinsam/story');
+
 const OEFFENTLICH = '/storage/v1/object/public/media/';
 
 /*
@@ -187,9 +190,46 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
 
   const typ = treffer[1];
   const inhalt = Buffer.from(treffer[2], 'base64');
+  return ablegen(client, nutzerId, ordner, typ, inhalt);
+}
+
+/*
+ * Ein Video als rohe Bytes ablegen (Kasten 15: Video-Storys der Website).
+ *
+ * WARUM NICHT AUCH ALS DATENADRESSE
+ *
+ * Eine Datenadresse ist ein Drittel größer als die Datei, und sie geht als
+ * JSON durch `express.json` mit 2 MB Grenze. Ein Bild nach `bildVerkleinern`
+ * passt da hinein, ein 60-s-Video (bis 50 MB) nicht. Darum kommt ein Video
+ * als Körper mit seinem eigenen Inhaltstyp (express.raw in app.js) — ohne
+ * Umweg über Base64 und ohne die Grenze für alle anderen Endpunkte
+ * anzuheben.
+ *
+ * Erlaubt sind nur die Videotypen des Eimers (StoryRegeln.videoTyp); die
+ * Größe prüft express.raw, die Länge der Browser vor dem Hochladen.
+ */
+async function hochladenVideo(client, nutzerId, ordner, mime, inhalt) {
+  if (!client) return { ok: false, error: 'Nicht angemeldet' };
+  if (!ORDNER.includes(ordner)) return { ok: false, error: 'Unbekannte Ablage' };
+  const typ = StoryRegeln.videoTyp(mime);
+  if (!typ) return { ok: false, error: StoryRegeln.videoPruefen({ mime: String(mime || 'unbekannt') }) };
+  if (!Buffer.isBuffer(inhalt)) return { ok: false, error: 'Das ist keine lesbare Aufnahme' };
+  const zuGross = StoryRegeln.videoPruefen({ bytes: inhalt.length });
+  if (zuGross) return { ok: false, error: zuGross };
+  return ablegen(client, nutzerId, ordner, typ, inhalt);
+}
+
+/** Der gemeinsame Teil: Datei in den Eimer, zwei Adressen zurück. */
+async function ablegen(client, nutzerId, ordner, typ, inhalt) {
   if (!inhalt.length) return { ok: false, error: 'Die Aufnahme ist leer' };
 
-  const endung = typ === 'image/png' ? 'png' : typ === 'image/webp' ? 'webp' : typ.startsWith('video/') ? 'mp4' : 'jpg';
+  /*
+   * Die Endung entscheidet in App und Website, ob abgespielt wird
+   * (istVideo: .mp4/.mov/.m4v/.webm). Bis Kasten 15 hieß jedes Video .mp4 —
+   * auch ein WebM aus dem Browser; der Inhaltstyp stimmte, der Name nicht.
+   */
+  const endung =
+    typ === 'image/png' ? 'png' : typ === 'image/webp' ? 'webp' : typ.startsWith('video/') ? StoryRegeln.videoEndung(typ) : 'jpg';
   /*
    * Zufallsteil im Namen — dieselbe Ueberlegung wie in
    * app/lib/supabaseStorage.ts: `<kennung>-<zeitstempel>` heisst, dass man
@@ -224,4 +264,4 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
   return { ok: true, url: data.publicUrl, anzeige, pfad };
 }
 
-module.exports = { signiereMedien, istMedienAdresse, pfadAus, hochladen };
+module.exports = { signiereMedien, istMedienAdresse, pfadAus, hochladen, hochladenVideo };

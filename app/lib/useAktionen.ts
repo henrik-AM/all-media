@@ -22,6 +22,9 @@ import { ladeHoch } from './supabaseStorage';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
+// Kasten 15: Grenzen für Video-Storys — dieselbe Datei wie auf der Website.
+const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
+
 /** JJJJ-MM-TT fuer den Dateinamen. */
 const heute = () => new Date().toISOString().slice(0, 10);
 
@@ -432,9 +435,33 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         holen('Die Story', async (c, i) => {
           let adresse = felder.mediaUrl;
           if (adresse && !/^https?:/i.test(adresse)) {
-            const endung = felder.mediaTyp === 'video' ? 'mp4' : 'jpg';
-            const upload = await ladeHoch(c, adresse, 'stories', `${i}-${Date.now()}.${endung}`);
-            adresse = upload.success ? upload.url ?? null : null;
+            const video = felder.mediaTyp === 'video';
+            const endung = video ? 'mp4' : 'jpg';
+            /*
+             * Kasten 15: ein Video über der Grenze des Eimers (50 MB,
+             * gemeinsam/story.js) wird mit verständlichem Satz abgewiesen.
+             */
+            const upload = await ladeHoch(
+              c,
+              adresse,
+              'stories',
+              `${i}-${Date.now()}.${endung}`,
+              video
+                ? {
+                    bytes: StoryRegeln.VIDEO_BYTES_HOECHSTENS,
+                    zuGross: (bytes) => StoryRegeln.videoPruefen({ bytes }) ?? 'Das Video ist zu groß',
+                  }
+                : undefined
+            );
+            /*
+             * Bis Kasten 15 stand hier `adresse = null`, wenn das Hochladen
+             * scheiterte — und die Story wurde trotzdem angelegt, ohne Bild
+             * und ohne Video. Jetzt bricht es mit dem Grund ab.
+             */
+            if (!upload.success || !upload.url) {
+              throw new Error(upload.error || 'Die Aufnahme ließ sich nicht hochladen');
+            }
+            adresse = upload.url;
           }
           return A.storyAnlegen(c, i, { ...felder, mediaUrl: adresse });
         }),

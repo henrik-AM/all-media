@@ -34,7 +34,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
 const syncHandlers = require('./sync-handlers');
-const { signiereMedien, hochladen } = require('./medien');
+const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
+const StoryRegeln = require('../../gemeinsam/story');
 const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require('./supabase');
 // Dieselbe Regel wie in der App — siehe gemeinsam/telefon.js.
 const Telefon = require('../../gemeinsam/telefon');
@@ -437,6 +438,27 @@ app.post('/api/hochladen', route(async (req) => {
   const { ordner, aufnahme } = req.body || {};
   return hochladen(req.db, req.nutzerId, String(ordner || ''), aufnahme);
 }));
+
+/*
+ * Ein Video speichern — Kasten 15, Video-Storys auf der Website.
+ *
+ * Der Körper ist die Datei selbst (Content-Type video/mp4, video/quicktime
+ * oder video/webm), der Ordner steht in der Adresse. Begründung bei
+ * `hochladenVideo` in web/server/medien.js. Die Grenze von express.raw ist
+ * die des Eimers (StoryRegeln.VIDEO_BYTES_HOECHSTENS); was darüber liegt,
+ * bekommt 413 und den Satz aus videoPruefen, statt am Speicher zu scheitern.
+ */
+app.post(
+  '/api/hochladen/video',
+  // Erst die Anmeldung, dann lesen: sonst nähme der Server von jedem
+  // Fremden bis zu 50 MB entgegen, nur um danach „Bitte anmelden" zu sagen.
+  (req, res, next) =>
+    req.db && req.nutzerId ? next() : res.status(401).json({ ok: false, angemeldet: false, error: 'Bitte anmelden' }),
+  express.raw({ type: 'video/*', limit: StoryRegeln.VIDEO_BYTES_HOECHSTENS }),
+  route(async (req) =>
+    hochladenVideo(req.db, req.nutzerId, String(req.query?.ordner || ''), req.headers['content-type'], req.body)
+  )
+);
 
 app.post('/api/reset', route(async (req) => {
   const { data, error } = await req.db.rpc('zuruecksetzen', { ziel: req.nutzerId });
@@ -2999,5 +3021,27 @@ app.post('/api/impressionen', route(async (req) =>
   antwort(await syncHandlers.handleImpressionen(req.db, req.nutzerId, req.body?.eintraege))
 ));
 
+/*
+ * Zu große Körper als JSON beantworten (Kasten 15).
+ *
+ * Ohne das schickte Express bei einem zu großen Video eine HTML-Fehlerseite
+ * mit 413; `res.json()` im Browser scheiterte daran, und die Meldung lautete
+ * nur „Keine Verbindung". Jetzt steht dort der Grund.
+ */
+// eslint-disable-next-line no-unused-vars
+app.use((fehler, req, res, next) => {
+  if (fehler && (fehler.type === 'entity.too.large' || fehler.status === 413)) {
+    const video = req.path === '/api/hochladen/video';
+    return res.status(413).json({
+      ok: false,
+      error: video
+        ? StoryRegeln.videoPruefen({ bytes: Number(fehler.length) || StoryRegeln.VIDEO_BYTES_HOECHSTENS + 1 })
+        : 'Die Daten sind zu groß.',
+    });
+  }
+  console.error(`${req.method} ${req.path} fehlgeschlagen:`, fehler && fehler.message);
+  if (res.headersSent) return next(fehler);
+  return res.status(fehler && fehler.status ? fehler.status : 500).json({ ok: false, error: 'Das hat nicht geklappt. Bitte noch einmal versuchen.' });
+});
 
 module.exports = app;

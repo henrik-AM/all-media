@@ -68,6 +68,16 @@ interface Props {
   onFortschritt?: (bei: number, gesamt: number) => void;
   /** Einmal am Ende, wenn nicht in Schleife gespielt wird. */
   onEnde?: () => void;
+  /**
+   * Kasten 15: das Video lässt sich nicht abspielen. Der Story-Betrachter
+   * wartete sonst auf ein Ende, das nie kam, und blieb stehen.
+   */
+  onFehler?: () => void;
+  /**
+   * Kasten 15: Stand und Länge auf Viertelsekunden statt ganz gerundet.
+   * Der Story-Balken einer 5-s-Story sprang sonst in fünf Stufen.
+   */
+  genau?: boolean;
 }
 
 export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflaeche(
@@ -85,9 +95,13 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
     style,
     onFortschritt,
     onEnde,
+    onFehler,
+    genau = false,
   },
   ref
 ) {
+  // Ganze Sekunden für Zeitanzeigen, Viertelsekunden für den Story-Balken.
+  const runden = (wert: number) => (genau ? Math.round(wert * 4) / 4 : Math.floor(wert));
   const spielbar = istVideo(quelle);
   /*
    * Ein Video, das sich nicht laden lässt, darf nicht als schwarze Fläche
@@ -105,11 +119,11 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
   const spieler = useVideoPlayer(spielbar ? quelle! : null, (p) => {
     p.loop = schleife;
     p.muted = stumm;
-    p.timeUpdateEventInterval = 0.5;
+    p.timeUpdateEventInterval = genau ? 0.25 : 0.5;
   });
 
   useEventListener(spieler, 'timeUpdate', ({ currentTime }) => {
-    onFortschritt?.(Math.floor(currentTime), Math.floor(spieler.duration || 0));
+    onFortschritt?.(runden(currentTime), runden(spieler.duration || 0));
   });
 
   /*
@@ -118,7 +132,7 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
    * Beitrag ("24:10" bei einer Datei von einer Minute) — Kasten 6.4.
    */
   useEventListener(spieler, 'sourceLoad', ({ duration }) => {
-    if (duration > 0) onFortschritt?.(Math.floor(spieler.currentTime || 0), Math.floor(duration));
+    if (duration > 0) onFortschritt?.(runden(spieler.currentTime || 0), runden(duration));
   });
 
   useEventListener(spieler, 'playToEnd', () => {
@@ -126,19 +140,22 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
   });
 
   useEventListener(spieler, 'statusChange', ({ status, error }) => {
-    if (status === 'error' || error) setFehler(true);
+    if (status === 'error' || error) {
+      setFehler(true);
+      onFehler?.();
+    }
     // Beim Wechsel auf ein anderes Video entsteht ein neuer Spieler, und
     // sourceLoad kann feuern, bevor der Horcher haengt. Dann blieb die
     // Laenge aus dem Beitragstext stehen ("7:44" bei einer Minute).
     if (status === 'readyToPlay' && spieler.duration > 0) {
-      onFortschritt?.(Math.floor(spieler.currentTime || 0), Math.floor(spieler.duration));
+      onFortschritt?.(runden(spieler.currentTime || 0), runden(spieler.duration));
     }
   });
 
   // Und falls beides schon vorbei war, bevor die Horcher hingen: nachsehen.
   // Dieser Effekt laeuft nach den useEventListener-Effekten darueber.
   useEffect(() => {
-    if (spieler.duration > 0) onFortschritt?.(Math.floor(spieler.currentTime || 0), Math.floor(spieler.duration));
+    if (spieler.duration > 0) onFortschritt?.(runden(spieler.currentTime || 0), runden(spieler.duration));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spieler]);
 
