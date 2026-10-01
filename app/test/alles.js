@@ -208,6 +208,8 @@ const LAEUFE = [
   ['zahlung', '_zahlung.js'],
   // Kasten 20: Stummschalter und stumme Konten — nur Quelltext, ohne Netz.
   ['stumm', '_stumm.js'],
+  // Kasten 15: Regeln für Video-Storys (Länge, Größe, Format) — ohne Netz.
+  ['storyvideoregeln', '_storyvideo_regeln.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */
