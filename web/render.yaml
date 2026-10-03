@@ -1,6 +1,7 @@
 # Achtung: Render liest diese Datei NICHT. Einen Blueprint sucht Render nur in
 # der Wurzel des Repos. Der Dienst all-media-website ist im Dashboard
-# eingerichtet und baut per Auto-Deploy bei jedem Push auf main. Die Datei
+# eingerichtet und baut per Auto-Deploy bei jedem Push auf main, der etwas
+# unter web/ oder gemeinsam/ ändert (Build-Filter, seit 03.10.2026). Die Datei
 # bleibt als Beschreibung des Dienstes stehen. Ob ein Push live ist,
 # prüft im Ordner app/: npm run deploy:pruefen
 services:
