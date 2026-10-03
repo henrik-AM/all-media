@@ -58,7 +58,12 @@ async function liveStand() {
     }
     await new Promise((r) => setTimeout(r, TAKT));
   }
-  console.error(`Nach ${MINUTEN} Minuten noch nicht live. Auto-Deploy im Render-Dashboard prüfen:`);
-  console.error('Dienst all-media-website → Settings → Build & Deploy → Auto-Deploy.');
+  // Am 01.10.2026 (Repo gerade privat) startete Render für den Push gar keinen
+  // Build — Auto-Deploy war an, die Meldung von GitHub kam nur nicht an. Erst
+  // in der Deploy-Liste nachsehen, ob es überhaupt einen Versuch gab.
+  console.error(`Nach ${MINUTEN} Minuten noch nicht live. In der Deploy-Liste des Dienstes all-media-website nachsehen:`);
+  console.error('  kein Eintrag für den Commit → die Meldung von GitHub kam nicht an, Deploy manuell anstoßen');
+  console.error('  Eintrag mit Fehler           → Build-Log lesen');
+  console.error('Render-API-Schlüssel: Vault, 04 Ressourcen/Zugangsdaten/Render.md.md');
   process.exit(1);
 })();
