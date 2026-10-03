@@ -252,21 +252,38 @@ async function anmelden(zugang) {
     pruefe('Die markierte Person liest die Story auch ohne Kontakt', await lesbar(fremder, zweite));
     pruefe('Die andere Messenger-Story bleibt für sie unsichtbar', !(await lesbar(fremder, nurMessenger)));
 
+    /*
+     * Henrik am 01.10.2026 (Schema 75): Messenger und Videos bleiben getrennt.
+     * Eine Markierung in einer reinen Messenger-Story geht NICHT in die
+     * Videos-Glocke, sondern als Hinweis in den Chat der beiden (Messenger,
+     * sonst Communitys, sonst neue Anfrage unter Communitys).
+     */
     const { data: post } = await fremder.client
       .from('notifications')
       .select('art, actor_id, target_type, target_id')
       .eq('art', 'mention')
       .eq('target_type', 'story')
       .gt('created_at', seit);
-    const angekommen = (post || []).find((n) => n.target_id === zweite && n.actor_id === eigner.id);
-    pruefe('Die markierte Person bekommt die Mitteilung (mention → story)', Boolean(angekommen),
-      JSON.stringify(post));
+    const inGlocke = (post || []).some((n) => n.target_id === zweite);
+    pruefe('Messenger-Story: keine Mitteilung in der Videos-Glocke', !inGlocke, JSON.stringify(post));
+
+    const { data: hinweise } = await fremder.client
+      .from('messages')
+      .select('id, chat_id, sender_id, hinweis, reply_to_story')
+      .eq('hinweis', 'story_markierung')
+      .eq('reply_to_story', zweite);
+    const hinweis = (hinweise || []).find((m) => m.sender_id === eigner.id);
+    pruefe('Die markierte Person bekommt den Hinweis im Chat', Boolean(hinweis), JSON.stringify(hinweise));
 
     const { data: tagsFremd } = await fremder.client.from('story_tags').select('story_id').eq('story_id', zweite);
     pruefe('Die markierte Person sieht ihre eigene Markierung', (tagsFremd || []).length === 1);
     await fremder.client.from('notifications').delete().eq('target_id', zweite);
   } finally {
     // --------------------------------------------------- aufräumen --
+    // Erst die Markierungen lösen: das nimmt den Hinweis im Chat wieder weg
+    // (Schema 75). Wird zuerst die Story gelöscht, bleibt er als „Story nicht
+    // mehr verfügbar“ stehen — richtig für echte Nutzer, Ballast im Prüfbestand.
+    for (const id of storys) await eigner.client.from('story_tags').delete().eq('story_id', id);
     for (const id of storys) await eigner.client.from('stories').delete().eq('id', id);
     const { data: rest } = await eigner.client.from('stories').select('id').in('id', storys.length ? storys : ['00000000-0000-0000-0000-000000000000']);
     pruefe('Alle Prüfstorys sind hinterher weg', (rest || []).length === 0, `${(rest || []).length} geblieben`);

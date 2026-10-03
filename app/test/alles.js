@@ -213,6 +213,8 @@ const LAEUFE = [
   ['stumm', '_stumm.js'],
   // Kasten 15: Regeln für Video-Storys (Länge, Größe, Format) — ohne Netz.
   ['storyvideoregeln', '_storyvideo_regeln.js'],
+  // Kasten 16/19: Markierungs-Karte und „Nur Follower“ — Quelltext, ohne Netz.
+  ['kasten16-19', '_kasten16_19.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */
