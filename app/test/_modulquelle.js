@@ -121,6 +121,9 @@ const UMD_BAUSTEINE = [
   // 01.10.2026: `sichtbarkeit.js` fuer Stufennamen und die Stufe
   // „Nur Follower" bei den Likes (Feedback, Kasten 19, Schema 76).
   ['sichtbarkeit', 'Sichtbarkeit'],
+  // 06.10.2026: `bildschirmzeit.js` fuer die eigene Bildschirmzeit —
+  // Bereiche, Sperre, Restzeit, Uhr (Kasten 22).
+  ['bildschirmzeit', 'Bildschirmzeit'],
 ];
 
 function umdTeile() {
