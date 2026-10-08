@@ -608,6 +608,9 @@ async function bootstrap() {
 
   Object.assign(state, data);
 
+  // Kasten 27: Chatlisten ab jetzt im Takt nachsehen (listeNachsehen).
+  listeNachsehenStarten();
+
   /*
    * Das Design gehoert zum Konto, nicht zum Browser.
    *
@@ -5597,6 +5600,9 @@ function renderKanalThemen(community, kanal) {
 }
 
 /** Dritte Ebene: der Chat zu einem Thema. */
+// Kasten 27: Takt des offenen Unterthemas (renderCommunityChat).
+let kanalUhr = null;
+
 async function renderCommunityChat(community, kanal, thema) {
   const lauf = ++renderLauf;
   const daten = await fetch(`/api/communities/${community.id}/channels/${kanal.id}`)
@@ -5636,6 +5642,37 @@ async function renderCommunityChat(community, kanal, thema) {
 
   $('#backBtn').addEventListener('click', () => renderKanalThemen(community, kanal));
   $('#kanalKopf').addEventListener('click', () => openCommunityEinstellungen(community));
+
+  /*
+   * Kasten 27: das Unterthema im Takt nachsehen, wie den offenen Chat
+   * (chatNachsehenStarten). Bis hierher kam eine fremde Nachricht erst nach
+   * dem naechsten eigenen Senden. Neu gezeichnet wird nur, wenn sich der
+   * Stand aendert und niemand gerade tippt — renderCommunityChat baut die
+   * ganze Seite samt Eingabefeld neu.
+   */
+  clearInterval(kanalUhr);
+  if (/^[0-9a-f-]{36}$/i.test(String(kanal.id))) {
+    let kanalStand = null;
+    const zeichenLauf = lauf;
+    kanalUhr = setInterval(async () => {
+      if (renderLauf !== zeichenLauf || !$('#commMsgs')) return clearInterval(kanalUhr);
+      if (document.hidden) return;
+      try {
+        const r = await fetch(`/api/communities/${community.id}/channels/${kanal.id}/stand`);
+        if (!r.ok) return;
+        const { stand } = await r.json();
+        if (stand === null || stand === undefined) return;
+        const vorher = kanalStand;
+        kanalStand = stand;
+        const feldJetzt = $('#commMsgInput');
+        if (vorher !== null && vorher !== stand && !(feldJetzt && feldJetzt.value.trim())) {
+          renderCommunityChat(community, kanal, thema);
+        }
+      } catch {
+        /* Der naechste Takt fragt wieder. */
+      }
+    }, window.ChatAbgleich?.INTERVALL_CHAT_MS || 4000);
+  }
 
   // Der Verlauf steht unten - wie in jedem Chat.
   const liste = $('#commMsgs');
@@ -15790,6 +15827,15 @@ async function openChat(chatId) {
   }
 
   state.openChatId = chatId;
+  /*
+   * Kasten 27: Bearbeiten und Bezug gehoeren zu EINEM Chat. Beide standen
+   * modulweit und ueberlebten das Schliessen — wer „Bearbeiten" antippte,
+   * den Chat verliess und spaeter irgendwo etwas schrieb, ueberschrieb
+   * damit still die alte Nachricht, statt eine neue zu senden.
+   */
+  msgBezug = null;
+  msgBearbeitet = null;
+  chatNachsehenStoppen();
 
   /*
    * Der Anfragezustand aus dem letzten Laden kann alt sein: hat das
@@ -15804,6 +15850,12 @@ async function openChat(chatId) {
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null),
   ]);
+  /*
+   * Kasten 27: wurde inzwischen ein anderer Chat geoeffnet, gehoert dieser
+   * Verlauf nicht mehr auf den Bildschirm. Ohne diese Zeile stand nach zwei
+   * schnellen Klicks der Verlauf des ersten Chats im zweiten.
+   */
+  if (state.openChatId !== chatId) return;
   state.messages = verlauf;
   if (zustand?.ok) {
     chat.requestState = zustand.requestState;
@@ -15952,6 +16004,9 @@ async function openChat(chatId) {
     sendMessage(chat);
   });
   input.focus();
+
+  // Kasten 27: ab jetzt im Takt nachsehen, solange der Chat offen ist.
+  chatNachsehenStarten(chat);
 }
 
 /*
@@ -16338,6 +16393,123 @@ function groesseText(bytes) {
 let msgBezug = null;
 let msgBearbeitet = null;
 
+/*
+ * Kasten 27 (06.10.2026): den offenen Chat im Takt nachsehen.
+ *
+ * Henrik: „A schreibt ‚cxv', bei B kommt ‚cwkdew' an." Der Verlauf wurde in
+ * openChat genau einmal geholt. Was A danach schrieb, kam bei B nicht an,
+ * solange B den Chat offen hatte — B sah als letzte Nachricht eine aeltere.
+ * Jetzt fragt der Browser alle ChatAbgleich.INTERVALL_CHAT_MS den kleinen
+ * Stand (/api/messages/:id/stand) und holt den Verlauf nur, wenn der sich
+ * geaendert hat. Gleiche Regel in der App (ChatDetailScreen).
+ */
+let chatUhr = null;
+
+function chatNachsehenStoppen() {
+  clearInterval(chatUhr);
+  chatUhr = null;
+}
+
+function chatNachsehenStarten(chat) {
+  chatNachsehenStoppen();
+  const takt = window.ChatAbgleich?.INTERVALL_CHAT_MS || 4000;
+  let letzterStand = null;
+  let laeuft = false;
+
+  const nachsehen = async () => {
+    if (laeuft || document.hidden || state.openChatId !== chat.id) return;
+    laeuft = true;
+    try {
+      const r = await fetch(`/api/messages/${chat.id}/stand`);
+      if (!r.ok) return;
+      const { stand } = await r.json();
+      if (stand === null || stand === undefined || state.openChatId !== chat.id) return;
+      const vorher = letzterStand;
+      letzterStand = stand;
+      if (vorher === null || vorher === stand) return;
+
+      const frisch = await nachrichtenHolen(chat.id);
+      if (state.openChatId !== chat.id || !Array.isArray(frisch)) return;
+      const alt = state.messages;
+      const neu = window.ChatAbgleich
+        ? window.ChatAbgleich.nachrichtenAbgleichen(alt, frisch)
+        : frisch;
+      if (neu === alt) return;
+      const fremdDazu = window.ChatAbgleich
+        ? window.ChatAbgleich.neueFremde(alt, neu, (m) => m.from === 'me').length > 0
+        : true;
+      state.messages = neu;
+
+      // Wer weiter oben liest, wird nicht nach unten gerissen — ausser es
+      // kam eine fremde Nachricht dazu.
+      const box = $('#messages');
+      const amEnde = !box || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+      const oben = box ? box.scrollTop : 0;
+      paintMessages(chat);
+      if (box && !amEnde && !fremdDazu) box.scrollTop = oben;
+      // Offen heisst gelesen — auch der Punkt in der Liste.
+      if (fremdDazu) fetch(`/api/chats/${chat.id}/read`, { method: 'POST' }).catch(() => {});
+    } catch (fehler) {
+      // Ein Aussetzer ist keine Meldung wert: der naechste Takt fragt wieder.
+      console.warn('Chat nachsehen fehlgeschlagen:', fehler?.message || fehler);
+    } finally {
+      laeuft = false;
+    }
+  };
+
+  nachsehen();
+  chatUhr = setInterval(nachsehen, takt);
+}
+
+/*
+ * Kasten 27: die Chatlisten im Takt nachsehen.
+ *
+ * Bis hierher wurden sie beim Start und nach einzelnen eigenen Handlungen
+ * geholt. Schrieb A, stand bei B in der Liste weiter A's vorletzte Nachricht.
+ * Gefragt wird der kleine Stand (/api/chatstand); nur wenn er sich aendert,
+ * kommen beide Listen neu (/api/chats). Gezeichnet wird nur, wenn eine
+ * Chatliste gerade zu sehen ist und niemand in ihrem Suchfeld tippt.
+ */
+let listenUhr = null;
+let listenStand = null;
+
+async function listeNachsehen(sofort = false) {
+  if (document.hidden || !window.Anmeldung?.angemeldet?.()) return;
+  try {
+    const r = await fetch('/api/chatstand');
+    if (!r.ok) return;
+    const { stand } = await r.json();
+    if (stand === null || stand === undefined) return;
+    const vorher = listenStand;
+    listenStand = stand;
+    if (!sofort && (vorher === null || vorher === stand)) return;
+
+    const d = await (await fetch('/api/chats')).json();
+    if (!d?.ok) return;
+    state.chats = d.chats || [];
+    state.communityChats = d.communityChats || [];
+    vorschauenOeffnen(state.chats);
+    vorschauenOeffnen(state.communityChats);
+
+    const tippt = document.activeElement && main.contains(document.activeElement) &&
+      /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+    const listeSichtbar =
+      !state.openChatId &&
+      ((state.area === 'messenger' && sub() === 'chats') ||
+        (state.area === 'communities' && sub() === 'chats'));
+    if (listeSichtbar && !tippt) render();
+  } catch (fehler) {
+    console.warn('Chatliste nachsehen fehlgeschlagen:', fehler?.message || fehler);
+  }
+}
+
+function listeNachsehenStarten() {
+  clearInterval(listenUhr);
+  listenStand = null;
+  listeNachsehen();
+  listenUhr = setInterval(listeNachsehen, window.ChatAbgleich?.INTERVALL_LISTE_MS || 10000);
+}
+
 function openNachrichtMenue(m, chat) {
   const eigene = m.from === 'me';
   const meine = (m.reaktionen || []).find((r) => r.userId === 'me')?.emoji || null;
@@ -16567,10 +16739,25 @@ async function sendMessage(chat) {
     msgBearbeitet = null;
     document.querySelector('.msgbezug')?.remove();
 
-    const antwort = await api(`/api/messages/${chat.id}/${alt.id}/bearbeiten`, { text });
+    /*
+     * Kasten 27: eine verschluesselte Nachricht geht als neue Chiffre raus
+     * (KryptoWeb.umschliessen), nicht als Klartext — den wies die Datenbank
+     * bisher ab, und Bearbeiten ging dort nie. Gleicher Weg in der App.
+     */
+    let koerper = { text };
+    if (Number(alt.krypto) > 0) {
+      const paket = window.KryptoWeb?.umschliessen(alt, text);
+      if (!paket) return toast('Diese Nachricht lässt sich hier nicht bearbeiten');
+      koerper = { text: '', ...paket };
+    }
+    const antwort = await api(`/api/messages/${chat.id}/${alt.id}/bearbeiten`, koerper);
     if (!antwort?.ok) return toast(antwort?.error || 'Das Bearbeiten hat nicht geklappt');
 
     const m = state.messages.find((x) => x.id === alt.id);
+    if (m && koerper.chiffre) {
+      m.chiffre = koerper.chiffre;
+      m.kryptoNonce = koerper.kryptoNonce;
+    }
     if (m) {
       m.text = text;
       m.bearbeitet = true;
@@ -16583,17 +16770,30 @@ async function sendMessage(chat) {
   msgBezug = null;
   document.querySelector('.msgbezug')?.remove();
 
+  const koerper = await sendeKoerper(chat.id, text, {
+    antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
+    zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
+  });
   const res = await fetch(`/api/messages/${chat.id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(
-      await sendeKoerper(chat.id, text, {
-        antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
-        zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
-      })
-    ),
+    body: JSON.stringify(koerper),
   });
   const msg = await res.json();
+  if (!msg || msg.ok === false || !msg.id) {
+    input.value = text;
+    return toast(msg?.error || 'Die Nachricht ging nicht raus');
+  }
+  // Kasten 27: steht nur hier, bis das Nachsehen sie aus der Datenbank
+  // liefert — und traegt ihre Chiffre mit, damit Bearbeiten sofort geht.
+  msg.lokal = true;
+  if (koerper.chiffre) {
+    const meiner = window.KryptoWeb?.meinSchluessel();
+    msg.chiffre = koerper.chiffre;
+    msg.kryptoNonce = koerper.kryptoNonce;
+    msg.absenderSchluessel = koerper.absenderSchluessel;
+    msg.kuvert = (koerper.kuverts || []).find((k) => meiner && k.schluesselId === meiner.id) || null;
+  }
 
   /*
    * Der Server schickt bei einer verschluesselten Nachricht keinen Text
@@ -16634,6 +16834,12 @@ async function sendMessage(chat) {
 
 function closeChat() {
   state.openChatId = null;
+  // Kasten 27: Takt aus, Bearbeiten/Bezug vergessen, Liste sofort frisch —
+  // dort steht danach die letzte Nachricht, auch die eben geschriebene.
+  chatNachsehenStoppen();
+  msgBezug = null;
+  msgBearbeitet = null;
+  listeNachsehen(true);
   overlay.hidden = true;
   overlay.innerHTML = '';
   render();
