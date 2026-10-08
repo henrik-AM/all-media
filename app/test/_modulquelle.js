@@ -121,6 +121,10 @@ const UMD_BAUSTEINE = [
   // 01.10.2026: `sichtbarkeit.js` fuer Stufennamen und die Stufe
   // „Nur Follower" bei den Likes (Feedback, Kasten 19, Schema 76).
   ['sichtbarkeit', 'Sichtbarkeit'],
+  // 06.10.2026: `farbfilter.js` fuer Einstellungen → Farbfilter (Kasten 21).
+  // Heute nur von Komponenten gebraucht, nicht von aktionen.ts/daten.ts —
+  // eingetragen, damit es nicht wieder erst beim ersten Kippen auffaellt.
+  ['farbfilter', 'Farbfilter'],
 ];
 
 function umdTeile() {
