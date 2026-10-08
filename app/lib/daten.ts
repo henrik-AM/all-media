@@ -60,6 +60,16 @@ import {
  * machen steht in ../../gemeinsam/rang.js.
  */
 import { neulingsliste, ordnenJeArt, punktekarte } from '../../gemeinsam/rang';
+/*
+ * Kasten 24 „Feed steuern": die eigenen Einträge werden zu einem Faktor je
+ * Beitrag (gemeinsam/lenkung.js), rang.js legt ihn auf die Punkte. Dieselbe
+ * Rechnung in web/server/supabase-api.js.
+ */
+// Als require und nicht als import: test/_modulquelle.js setzt dafuer
+// globalThis.Lenkung ein, ein umbenannter ESM-Import („as") ueberstuende das
+// nicht. Und kein Import aus './lenkung' — das Zusammenlegen dort kennt nur
+// './medien' und './krypto'; deshalb steht ladeLenkung hier in der Datei.
+const Lenkung = require('../../gemeinsam/lenkung') as typeof import('../../gemeinsam/lenkung');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -934,14 +944,16 @@ export async function ladeBeitraege(
   const ids = zeilen.map((b) => b.id);
 
   const leer = { data: [] as any[] };
-  const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: hinweise }] =
+  const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: hinweise }, lenkung] =
     ids.length === 0
-      ? [leer, leer, leer, leer]
+      ? [leer, leer, leer, leer, []]
       : await Promise.all([
           client.from('post_likes').select('post_id').eq('user_id', ichId).in('post_id', ids),
           client.from('saves').select('post_id').eq('user_id', ichId).in('post_id', ids),
           client.from('reposts').select('post_id').eq('user_id', ichId).in('post_id', ids),
           client.from('post_notify').select('post_id').eq('user_id', ichId).in('post_id', ids),
+          // Kasten 24: die eigenen „Feed steuern"-Einträge (Schema XX).
+          ladeLenkung(client, ichId),
         ]);
 
   /*
@@ -1034,6 +1046,12 @@ export async function ladeBeitraege(
    * kein Zustand, der jemandem einen Fehler anzeigen muesste.
    */
   let geordnet = roh;
+  /*
+   * Kasten 24: Faktoren aus den rohen Zeilen, nicht aus `roh` — dort steht
+   * bei eigenen Beitraegen schon „me" statt der Kennung, und `sound_id`
+   * fehlt. Gleiche Rechnung in web/server/supabase-api.js.
+   */
+  const gelenkt = Lenkung.faktoren(zeilen, lenkung);
   if (ids.length > 0) {
     try {
       const { data: rang, error: rangFehler } = await client.rpc('feed_rang', {
@@ -1041,14 +1059,18 @@ export async function ladeBeitraege(
         herkunft: 'feed',
       });
       if (rangFehler) throw rangFehler;
-      const zeilen = (rang ?? []) as any[];
-      geordnet = ordnenJeArt(roh, punktekarte(zeilen), (b) => b.kind, {
+      const rangZeilen = (rang ?? []) as any[];
+      geordnet = ordnenJeArt(roh, punktekarte(rangZeilen), (b) => b.kind, {
         // Jeder vierte Platz gehoert einem Beitrag, der noch keine Chance
         // hatte — sonst kommt ein frisch gestellter Beitrag nie nach oben.
-        neulinge: neulingsliste(zeilen),
+        neulinge: neulingsliste(rangZeilen),
+        lenkung: gelenkt,
       });
     } catch (e) {
       console.warn('[daten] Feed-Ranking nicht verfuegbar, bleibe bei created_at:', e);
+      // Ohne Punkte wirkt die Lenkung trotzdem: „weniger davon" rutscht
+      // nach hinten, sonst bleibt die zeitliche Reihenfolge (rang.js lenken).
+      if (gelenkt.size > 0) geordnet = ordnenJeArt(roh, null, (b) => b.kind, { lenkung: gelenkt });
     }
   }
 
@@ -1447,6 +1469,27 @@ export interface AlleDaten {
 
   ichId: string;
   geladen: string;
+}
+
+/**
+ * „Feed steuern" (Kasten 24, Schema XX): die eigenen Einträge für den Rang.
+ * Gleiche Abfrage wie ladeLenkung in web/server/supabase-api.js. Scheitert
+ * sie (Schema noch nicht eingespielt, Netz weg), bleibt der Feed ungelenkt —
+ * der Stand vor Kasten 24, kein Fehlerbild.
+ */
+export async function ladeLenkung(
+  client: SupabaseClient,
+  ichId: string
+): Promise<import('../../gemeinsam/lenkung').LenkungEintrag[]> {
+  const { data, error } = await client
+    .from('feed_lenkung')
+    .select('art, wert, anzeige, richtung')
+    .eq('user_id', ichId);
+  if (error) {
+    console.warn('[daten] Feed-Lenkung nicht verfuegbar:', error.message);
+    return [];
+  }
+  return (data ?? []) as import('../../gemeinsam/lenkung').LenkungEintrag[];
 }
 
 /**

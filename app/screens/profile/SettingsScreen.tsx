@@ -13,6 +13,7 @@ import { FormularSheet } from '../../components/FormularSheet';
 import { useDaten } from '../../contexts/DatenContext';
 import { colors, radius, sizes, spacing, themenStyles, typography, verlaufAus } from '../../constants/design';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
+import { FeedLenkenSheet } from '../../components/FeedLenkenSheet';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSpendenweg } from '../../contexts/SpendenwegContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
@@ -88,7 +89,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden';
+  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung';
   gefahr?: boolean;
 }
 
@@ -310,6 +311,13 @@ const SECTIONS: Section[] = [
       { label: 'Insights', icon: 'compass-outline', liste: 'insights' },
       { label: 'Wem ich folge', icon: 'person-outline', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
+      /*
+       * Kasten 24 (Henrik, 06.10.2026): den eigenen Algorithmus lenken —
+       * #Hashtags, Sounds, Orte, Profile, Stichwörter auf „mehr“ oder
+       * „weniger“, „Kein Interesse“ zurücknehmen, Feed zurücksetzen.
+       * Gegenstück: openLenkung() in web/public/app.js.
+       */
+      { label: 'Feed steuern', icon: 'options-outline', aktion: 'lenkung' },
       { label: 'Repost-Sichtbarkeit', icon: 'repeat-outline', sichtbar: 'repost' },
       { label: 'Likes-Sichtbarkeit', icon: 'heart-outline', sichtbar: 'likes' },
       /*
@@ -430,6 +438,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
   const [offen, setOffen] = useState<Item | null>(null);
+  // Kasten 24: das Blatt „Feed steuern".
+  const [lenkenOffen, setLenkenOffen] = useState(false);
 
   /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
   const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string; knopf?: string } => {
@@ -625,6 +635,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
   const spendenweg = useSpendenweg();
   const oeffne = (item: Item) => {
+    if (item.aktion === 'lenkung') return setLenkenOffen(true);
     if (item.aktion === 'spendencode') return spendenweg.verwalten('code');
     if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden');
     if (item.aktion === 'sicherung') {
@@ -832,6 +843,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    */
   useEffect(() => {
     if (!pruefListe) return;
+    // Kasten 24: „settings#liste:lenkung" öffnet „Feed steuern" fürs Prüfbild.
+    if (pruefListe === 'lenkung') return setLenkenOffen(true);
     const punkt = SECTIONS.flatMap((s) => s.items).find((i) => i.liste === pruefListe);
     if (punkt) setOffen(punkt);
   }, [pruefListe]);
@@ -1052,6 +1065,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           onClose={() => setSichtOffen(null)}
         />
       )}
+
+      <FeedLenkenSheet visible={lenkenOffen} onClose={() => setLenkenOffen(false)} />
 
       {offen?.eingabe && (
         <FormularSheet

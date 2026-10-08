@@ -6237,6 +6237,13 @@ const SETTINGS = [
       { label: 'Insights', icon: 'compass', liste: 'insights' },
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
+      /*
+       * Kasten 24 (Henrik, 06.10.2026): den eigenen Algorithmus lenken —
+       * #Hashtags, Sounds, Orte, Profile, Stichwörter auf „mehr“ oder
+       * „weniger“, „Kein Interesse“ zurücknehmen, Feed zurücksetzen.
+       * Gegenstück: FeedLenkenSheet in der App. Texte aus gemeinsam/lenkung.js.
+       */
+      { label: 'Feed steuern', icon: 'compass', aktion: 'lenkung' },
       { label: 'Repost-Sichtbarkeit', icon: 'repeat', sichtbar: 'repost' },
       // Die beiden ueblichen Wege, auf denen Fremde an einem vorbeikommen.
       { label: 'Wer darf kommentieren', icon: 'comment', sichtbar: 'kommentare' },
@@ -6515,6 +6522,262 @@ async function sichtbarkeitNeuLaden() {
  * zwischen den Stufen hin und her schaltet, will seine mühsam
  * zusammengesuchten Namen wiederfinden.
  */
+/*
+ * „Feed steuern" — Einstellungen → Videos (Kasten 24).
+ *
+ * Henrik am 06.10.2026: „Ein Nutzer soll die Möglichkeit haben, seinen
+ * Algorithmus selbstständig in eine Richtung zu lenken … durch Eingabe von
+ * #/Sounds/Orten/Profilen/etc." Vorbilder: TikTok „Themen verwalten" und
+ * „For You zurücksetzen", Instagram „Dein Algorithmus", YouTube „Kanal nicht
+ * empfehlen".
+ *
+ * Oben die Art (Hashtag, Sound, Ort, Profil, Stichwort) und ein Feld mit
+ * Vorschlägen aus echten Daten (window.Lenkung.vorschlaege), je Vorschlag
+ * „Mehr davon" / „Weniger davon". Darunter alle Einträge, „Kein Interesse"
+ * (Schema 55) zum Zurücknehmen und „Feed zurücksetzen".
+ *
+ * Gespeichert in feed_lenkung (Schema XX) über /api/lenkung…, gewichtet beim
+ * nächsten Laden des Feeds (web/server/supabase-api.js → gemeinsam/rang.js).
+ * Gegenstück: app/components/FeedLenkenSheet.tsx — gleiche Texte, gleiche
+ * Stufen, dieselbe Tabelle.
+ *
+ * Fehler stehen IM Blatt (#lenkMeldung), nicht im Toast: der läge dahinter.
+ */
+function openLenkung() {
+  const L = window.Lenkung;
+  if (!L) return toast('Feed steuern ist gerade nicht verfügbar');
+  let art = 'hashtag';
+  let eingabe = '';
+  let stand = null;      // null = noch nicht geladen
+  let ladeFehler = '';
+  let beschaeftigt = false;
+  let blatt = null;
+
+  const quellen = () => ({
+    hashtags: state.hashtags || [],
+    sounds: state.sounds || [],
+    places: state.places || [],
+    users: state.users || {},
+    beitraege: [...(state.posts || []), ...(state.videos || []), ...(state.clips || [])],
+    ich: [state.currentUserId, 'me'],
+  });
+
+  const melde = (text, gut) => {
+    const el = blatt?.querySelector('#lenkMeldung');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('is-gut', !!gut);
+  };
+
+  /*
+   * Nach jeder Änderung den Feed neu holen — die Reihenfolge rechnet der
+   * Server beim Laden. Ohne das stünde der Feed bis zum nächsten Neuladen
+   * in der alten Reihenfolge, und die Einstellung sähe wirkungslos aus.
+   */
+  const feedNeu = async () => {
+    try {
+      const frisch = await (await fetch('/api/bootstrap')).json();
+      if (frisch && frisch.posts) {
+        state.posts = frisch.posts;
+        state.videos = frisch.videos;
+        state.clips = frisch.clips;
+        state.keinInteresse = frisch.keinInteresse || [];
+      }
+    } catch (fehler) {
+      console.error('Feed nach Lenkung neu laden fehlgeschlagen:', fehler);
+    }
+  };
+
+  const laden = async () => {
+    try {
+      const r = await fetch('/api/lenkung');
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.ok === false) throw new Error(d.error || 'Server antwortet mit ' + r.status);
+      stand = { eintraege: d.eintraege || [], keinInteresse: d.keinInteresse || [] };
+      ladeFehler = '';
+    } catch (fehler) {
+      console.error('Feed steuern laden fehlgeschlagen:', fehler);
+      ladeFehler = 'Deine Einträge konnten nicht geladen werden.';
+    }
+    zeichneListen();
+  };
+
+  /** Schreibt, übernimmt den Stand aus der Antwort, holt den Feed neu. */
+  const schreiben = async (pfad, koerper, erfolg) => {
+    if (beschaeftigt) return;
+    beschaeftigt = true;
+    melde('');
+    const d = await api(pfad, koerper);
+    beschaeftigt = false;
+    if (!d || d.ok === false) return melde((d && d.error) || 'Das hat nicht geklappt');
+    if (d.eintraege) stand = { eintraege: d.eintraege, keinInteresse: d.keinInteresse || [] };
+    zeichneVorschlaege();
+    zeichneListen();
+    melde(erfolg, true);
+    await feedNeu();
+  };
+
+  const richtungVon = (artKey, wert) =>
+    (stand?.eintraege || []).find((e) => e.art === artKey && e.wert === wert)?.richtung || null;
+
+  const zeichneVorschlaege = () => {
+    const ziel = blatt?.querySelector('#lenkVorschlaege');
+    if (!ziel) return;
+    const liste = eingabe.trim() || art === 'sound' || art === 'profil'
+      ? L.vorschlaege(art, eingabe, quellen())
+      : [];
+    blatt._vorschlaege = liste;
+    ziel.innerHTML = liste.length
+      ? liste
+          .map((v, i) => {
+            const jetzt = richtungVon(v.art, v.wert);
+            return `<div class="item lenk__zeile" data-testid="lenkung-vorschlag">
+              <span class="item__label"><b>${esc(v.anzeige)}</b>${v.zusatz ? `<small>${esc(v.zusatz)}</small>` : ''}</span>
+              <button class="pille${jetzt === 'mehr' ? ' is-active' : ''}" data-lenk-vorschlag="${i}" data-richtung="mehr">Mehr davon</button>
+              <button class="pille${jetzt === 'weniger' ? ' is-active' : ''}" data-lenk-vorschlag="${i}" data-richtung="weniger">Weniger davon</button>
+            </div>`;
+          })
+          .join('')
+      : eingabe.trim()
+        ? `<div class="sheet__hint">Für „${esc(eingabe.trim())}" gibt es keinen ${esc(L.artName(art))}-Vorschlag.</div>`
+        : '';
+    ziel.querySelectorAll('[data-lenk-vorschlag]').forEach((knopf) =>
+      knopf.addEventListener('click', () => {
+        const v = blatt._vorschlaege[Number(knopf.dataset.lenkVorschlag)];
+        if (!v) return;
+        if ((stand?.eintraege || []).length >= L.HOECHSTZAHL && !richtungVon(v.art, v.wert)) {
+          return melde(`Höchstens ${L.HOECHSTZAHL} Einträge — entferne erst einen.`);
+        }
+        schreiben(
+          '/api/lenkung',
+          { art: v.art, wert: v.wert, anzeige: v.anzeige, richtung: knopf.dataset.richtung },
+          `${v.anzeige}: ${L.richtungText(knopf.dataset.richtung)}`
+        );
+      })
+    );
+  };
+
+  const zeichneListen = () => {
+    const liste = blatt?.querySelector('#lenkListe');
+    const kein = blatt?.querySelector('#lenkKein');
+    if (!liste || !kein) return;
+    const eintraege = stand?.eintraege || [];
+    const keinListe = stand?.keinInteresse || [];
+    blatt.querySelector('#lenkListeKopf').textContent =
+      'Deine Einträge' + (eintraege.length ? `  ·  ${eintraege.length}` : '');
+    blatt.querySelector('#lenkKeinKopf').textContent =
+      L.KEIN_INTERESSE_TITEL + (keinListe.length ? `  ·  ${keinListe.length}` : '');
+
+    liste.innerHTML = ladeFehler
+      ? `<div class="sheet__hint">${esc(ladeFehler)}</div>`
+      : !stand
+        ? '<div class="sheet__hint">Wird geladen …</div>'
+        : eintraege.length === 0
+          ? `<div class="sheet__hint">${esc(L.LEER)}</div>`
+          : eintraege
+              .map((e) => {
+                const andere = e.richtung === 'mehr' ? 'weniger' : 'mehr';
+                return `<div class="item lenk__zeile" data-testid="lenkung-eintrag" data-art="${esc(e.art)}" data-wert="${esc(e.wert)}" data-richtung="${esc(e.richtung)}">
+                  <span class="item__label"><b>${esc(L.eintragText(e))}</b><small class="lenk__${e.richtung}">${esc(L.richtungText(e.richtung))}</small></span>
+                  <button class="pille" data-lenk-umstellen="${esc(e.id)}" data-richtung="${andere}">${esc(L.richtungText(andere))}</button>
+                  <button class="pille" data-lenk-entfernen="${esc(e.id)}" aria-label="${esc(L.eintragText(e))} entfernen">Entfernen</button>
+                </div>`;
+              })
+              .join('');
+
+    kein.innerHTML = !stand
+      ? ''
+      : keinListe.length === 0
+        ? `<div class="sheet__hint">${esc(L.KEIN_INTERESSE_LEER)}</div>`
+        : keinListe
+            .map((k) => `<div class="item lenk__zeile" data-testid="kein-interesse-eintrag" data-post="${esc(k.postId)}">
+                <span class="item__label"><b>${esc(k.titel)}</b><small>${esc(k.verfasser ? user(k.verfasser).name || '' : '')}</small></span>
+                <button class="pille" data-kein-zurueck="${esc(k.postId)}">Zurücknehmen</button>
+              </div>`)
+            .join('');
+
+    liste.querySelectorAll('[data-lenk-umstellen]').forEach((knopf) =>
+      knopf.addEventListener('click', () => {
+        const e = eintraege.find((x) => x.id === knopf.dataset.lenkUmstellen);
+        if (!e) return;
+        schreiben(
+          '/api/lenkung',
+          { art: e.art, wert: e.wert, anzeige: e.anzeige, richtung: knopf.dataset.richtung },
+          `${L.eintragText(e)}: ${L.richtungText(knopf.dataset.richtung)}`
+        );
+      })
+    );
+    liste.querySelectorAll('[data-lenk-entfernen]').forEach((knopf) =>
+      knopf.addEventListener('click', () => {
+        const e = eintraege.find((x) => x.id === knopf.dataset.lenkEntfernen);
+        schreiben(`/api/lenkung/${encodeURIComponent(knopf.dataset.lenkEntfernen)}/entfernen`, {},
+          `${e ? L.eintragText(e) : 'Eintrag'} entfernt`);
+      })
+    );
+    kein.querySelectorAll('[data-kein-zurueck]').forEach((knopf) =>
+      knopf.addEventListener('click', () =>
+        schreiben(`/api/beitraege/${encodeURIComponent(knopf.dataset.keinZurueck)}/kein-interesse/zuruecknehmen`, {},
+          'Der Beitrag darf wieder in deinen Feed')
+      )
+    );
+  };
+
+  const zeichneArten = () => {
+    blatt.querySelectorAll('[data-lenkart]').forEach((b) =>
+      b.classList.toggle('is-active', b.dataset.lenkart === art)
+    );
+    const feld = blatt.querySelector('#lenkEingabe');
+    feld.placeholder = (L.ARTEN.find((a) => a.key === art) || {}).platzhalter || '';
+  };
+
+  openSheet(
+    L.TITEL,
+    `<div class="sheet__body lenk">
+       <div class="sheet__hint">${esc(L.HINWEIS)}</div>
+       <div class="pills lenk__arten" role="tablist">${L.ARTEN.map(
+         (a) => `<button class="pill" role="tab" data-lenkart="${a.key}">${esc(a.label)}</button>`
+       ).join('')}</div>
+       <div class="sicht__suche">
+         <input type="search" id="lenkEingabe" data-testid="lenkung-eingabe" autocomplete="off" />
+       </div>
+       <div id="lenkVorschlaege"></div>
+       <div class="sheet__hint lenk__meldung" id="lenkMeldung" role="status" aria-live="polite"></div>
+       <div class="listhead" id="lenkListeKopf">Deine Einträge</div>
+       <div id="lenkListe"></div>
+       <div class="listhead" id="lenkKeinKopf">${esc(L.KEIN_INTERESSE_TITEL)}</div>
+       <div id="lenkKein"></div>
+       <div class="listhead">${esc(L.RESET_TITEL)}</div>
+       <div class="sheet__hint">${esc(L.RESET_TEXT)}</div>
+       <div class="lenk__reset"><button class="btn btn--breit" id="lenkReset" data-testid="feed-zuruecksetzen">${esc(L.RESET_TITEL)}</button></div>
+     </div>`,
+    (sheet) => {
+      blatt = sheet;
+      zeichneArten();
+      zeichneListen();
+      zeichneVorschlaege();
+      sheet.querySelectorAll('[data-lenkart]').forEach((b) =>
+        b.addEventListener('click', () => {
+          art = b.dataset.lenkart;
+          zeichneArten();
+          zeichneVorschlaege();
+          sheet.querySelector('#lenkEingabe').focus();
+        })
+      );
+      sheet.querySelector('#lenkEingabe').addEventListener('input', (e) => {
+        eingabe = e.target.value;
+        zeichneVorschlaege();
+      });
+      sheet.querySelector('#lenkReset').addEventListener('click', async () => {
+        const ja = await bestaetigen(L.RESET_TITEL + '?', L.RESET_TEXT, 'Zurücksetzen');
+        if (!ja) return;
+        await schreiben('/api/feed-zuruecksetzen', {}, 'Dein Feed ist zurückgesetzt und lernt ab jetzt neu');
+      });
+      laden();
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
 function openSichtbarkeit(punkt) {
   const bereich = punkt.sichtbar;
   /*
@@ -7234,6 +7497,7 @@ function openEinstellung(punkt, nachher) {
    */
   if (punkt.aktion === 'spendencode') return spendenweg(null, 'code');
   if (punkt.aktion === 'zahlungsmethoden') return spendenweg(null, 'methoden');
+  if (punkt.aktion === 'lenkung') return openLenkung();
 
   if (punkt.aktion === 'datenauskunft') {
     toast('Deine Daten werden zusammengestellt …');

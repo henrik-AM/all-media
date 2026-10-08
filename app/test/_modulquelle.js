@@ -121,6 +121,9 @@ const UMD_BAUSTEINE = [
   // 01.10.2026: `sichtbarkeit.js` fuer Stufennamen und die Stufe
   // „Nur Follower" bei den Likes (Feedback, Kasten 19, Schema 76).
   ['sichtbarkeit', 'Sichtbarkeit'],
+  // 06.10.2026: `lenkung.js` fuer „Feed steuern" (Kasten 24, Schema XX) —
+  // daten.ts und lib/lenkung.ts holen ihn. Gleich mit dem Baustein eingetragen.
+  ['lenkung', 'Lenkung'],
 ];
 
 function umdTeile() {
