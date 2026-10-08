@@ -272,7 +272,7 @@ const mitFrist = (versprechen, was, ms = 20000) =>
      * eingestellt ist. Das braucht einen Beitrag, der einem der beiden Konten
      * gehört (oben ging es bewusst um einen Dritten). Dazu Kasten 26.2: die
      * Likes auf Kommentare und Storys unterliegen derselben Einstellung
-     * (Schema 83) — Besitzer sieht, Dritte nicht, eigene immer, Zahl bleibt.
+     * (Schema 84) — Besitzer sieht, Dritte nicht, eigene immer, Zahl bleibt.
      */
     console.log('\nErsteller-Ausnahme und Kommentar-/Story-Likes (Kasten 26)');
     const eigenerBeitrag = async (k) => {

@@ -1098,7 +1098,7 @@ async function ladeKommentare(client, nutzerId, beitragId) {
       : await client.from('comment_likes').select('comment_id').eq('user_id', nutzerId).in('comment_id', ids);
   const gemocht = new Set((eigene || []).map((l) => l.comment_id));
 
-  // Schema 83 (Kasten 26): Zahl aus kommentar_like_zahlen(), nicht aus den
+  // Schema 84 (Kasten 26): Zahl aus kommentar_like_zahlen(), nicht aus den
   // sichtbaren Zeilen. Fehlt die Funktion, gilt die eingebettete Zahl.
   const zahlen = new Map();
   if (ids.length > 0) {

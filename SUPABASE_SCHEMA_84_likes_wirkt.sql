@@ -1,5 +1,5 @@
 -- ===========================================================================
---  SUPABASE_SCHEMA_83_likes_wirkt.sql
+--  SUPABASE_SCHEMA_84_likes_wirkt.sql
 --
 --  Kasten 26: „Nutzer sollen auswählen dürfen, wer ihre Likes sehen darf.“
 --
@@ -37,7 +37,7 @@
 --
 --  Einspielen:
 --    SUPABASE_TOKEN=sbp_... node tools/sql-einspielen.mjs \
---      SUPABASE_SCHEMA_83_likes_wirkt.sql
+--      SUPABASE_SCHEMA_84_likes_wirkt.sql
 --  Danach: npm run test:rechte, npm run test:likes
 --  Idempotent.
 -- ===========================================================================
@@ -142,6 +142,6 @@ begin
      and policyname in ('Kommentar-Likes lesen', 'Story-Likes lesen')
      and qual like '%_like_sichtbar%';
   if n <> 2 then
-    raise exception 'Die Leseregeln sind nicht die aus Schema 83.';
+    raise exception 'Die Leseregeln sind nicht die aus Schema 84.';
   end if;
 end $$;

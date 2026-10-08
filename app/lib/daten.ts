@@ -1235,7 +1235,7 @@ export async function ladeKommentare(
       : await client.from('comment_likes').select('comment_id').eq('user_id', ichId).in('comment_id', ids);
   const gemocht = new Set((eigene ?? []).map((l: any) => l.comment_id));
 
-  // Schema 83 (Kasten 26): die Leseregel auf comment_likes zeigt nur noch
+  // Schema 84 (Kasten 26): die Leseregel auf comment_likes zeigt nur noch
   // Zeilen, die die Likes-Sichtbarkeit zulässt; die ZAHL kommt deshalb aus
   // kommentar_like_zahlen(). Fehlt die Funktion, gilt die eingebettete Zahl.
   const zahlen = new Map<string, number>();
