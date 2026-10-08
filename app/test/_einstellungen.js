@@ -69,9 +69,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   console.log('\nEinstellungen');
 
-  await pruefe('Die Sprungleiste zeigt alle neun Abschnitte', async () => {
+  // Seit Kasten 21 (06.10.2026) zehn: „Farbfilter" steht nach „Allgemein".
+  await pruefe('Die Sprungleiste zeigt alle zehn Abschnitte', async () => {
     const pillen = await page.$$eval('.pill', (els) => els.map((e) => e.textContent));
-    if (pillen.length !== 9) throw new Error(pillen.join(' | '));
+    if (pillen.length !== 10) throw new Error(pillen.join(' | '));
+    if (pillen[1] !== 'Farbfilter') throw new Error(pillen.join(' | '));
     if (pillen[0] !== 'Allgemein') throw new Error(pillen.join(' | '));
   });
 
