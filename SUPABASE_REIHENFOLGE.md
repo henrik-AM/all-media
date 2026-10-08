@@ -48,6 +48,8 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.mitteilung_bei_story_markierung() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_75_story_markierung_im_chat.sql | **SUPABASE_SCHEMA_75_story_markierung_im_chat.sql** |
 | Funktion public.spendencode_setzen() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_77_spendenpin_doppelt.sql | **SUPABASE_SCHEMA_77_spendenpin_doppelt.sql** |
 | Funktion public.sammlung_inhalt_pruefen() | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql | **SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql** |
+| Funktion public.feed_rang() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: Nähe-Likes erst ab „Feed zurücksetzen“) |
+| Funktion public.interessenbild() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: nur eigenes Bild, Signale erst ab Neustart) |
 | Funktion public.community_sichtbar() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Funktion public.darf_angeschrieben_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql | **SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql** |
 | Funktion public.darf_mitglied_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |

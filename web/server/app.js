@@ -49,6 +49,8 @@ const SoundStellen = require('../../gemeinsam/soundstellen');
 const Sammlungen = require('../../gemeinsam/sammlungen');
 // Spendenziel: Formular, Stand, Frist (Kasten 12.3).
 const Spende = require('../../gemeinsam/spende');
+// „Feed steuern" (Kasten 24): Eingaben prüfen wie die App.
+const Lenkung = require('../../gemeinsam/lenkung');
 // Welcher Stand läuft hier? Einmal beim Start ermittelt, siehe version.js.
 const VERSION = require('./version');
 // Die Schreibweise des Kontakt-QR-Codes — dieselbe Datei, die auch der
@@ -468,6 +470,12 @@ app.post('/api/reset', route(async (req) => {
   // Prueflauf aus dem Feed verschwunden.
   const { error: keinFehler } = await req.db.from('kein_interesse').delete().eq('user_id', req.nutzerId);
   if (keinFehler) throw keinFehler;
+  // Dasselbe für „Feed steuern" (Kasten 24, Schema 82): Einträge und der
+  // Neustart-Zeitpunkt. Fehlt das Schema noch (42P01), ist nichts zu leeren.
+  for (const tabelle of ['feed_lenkung', 'feed_neustart']) {
+    const { error: lenkFehler } = await req.db.from(tabelle).delete().eq('user_id', req.nutzerId);
+    if (lenkFehler && lenkFehler.code !== '42P01' && lenkFehler.code !== 'PGRST205') throw lenkFehler;
+  }
   return { ok: data?.ok !== false, ...(data || {}) };
 }));
 
@@ -1398,6 +1406,72 @@ app.post('/api/beitraege/:id/kein-interesse', route(async (req) => {
     .upsert({ user_id: req.nutzerId, post_id: req.params.id }, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
   if (error) throw error;
   return { ok: true };
+}));
+
+/*
+ * „Feed steuern" — Einstellungen → Videos (Kasten 24, Schema 82).
+ *
+ * Dieselben Schreibwege wie app/lib/lenkung.ts: Einträge in feed_lenkung,
+ * „Kein Interesse" zurücknehmen, „Feed zurücksetzen" über die Funktion
+ * feed_zuruecksetzen(). Gewichtet wird beim nächsten Laden des Feeds in
+ * supabase-api.js (gemeinsam/lenkung.js + rang.js). Jede Antwort bringt
+ * den frischen Stand mit, damit die Seite nicht raten muss.
+ */
+app.get('/api/lenkung', route(async (req) => ({
+  ok: true,
+  ...(await supabaseApi.lenkungStand(req.db, req.nutzerId)),
+})));
+
+app.post('/api/lenkung', route(async (req) => {
+  const art = String(req.body?.art || '');
+  const richtung = String(req.body?.richtung || '');
+  const wert = Lenkung.normalisieren(art, req.body?.wert);
+  if (!wert) return { ok: false, error: `Diese Eingabe lässt sich nicht als ${Lenkung.artName(art)} verwenden` };
+  if (!Lenkung.RICHTUNGEN.includes(richtung)) return { ok: false, error: 'Unbekannte Richtung' };
+  const { error } = await req.db.from('feed_lenkung').upsert(
+    {
+      user_id: req.nutzerId,
+      art,
+      wert,
+      anzeige: String(req.body?.anzeige || wert).slice(0, 120),
+      richtung,
+    },
+    { onConflict: 'user_id,art,wert' }
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, ...(await supabaseApi.lenkungStand(req.db, req.nutzerId)) };
+}));
+
+// Ein abgelehntes DELETE meldet unter RLS Erfolg mit null Zeilen — gezählt
+// wird deshalb, was wirklich weg ist.
+app.post('/api/lenkung/:id/entfernen', route(async (req) => {
+  const { data, error } = await req.db
+    .from('feed_lenkung')
+    .delete()
+    .eq('user_id', req.nutzerId)
+    .eq('id', req.params.id)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) return { ok: false, error: 'Der Eintrag ließ sich nicht entfernen' };
+  return { ok: true, ...(await supabaseApi.lenkungStand(req.db, req.nutzerId)) };
+}));
+
+app.post('/api/beitraege/:id/kein-interesse/zuruecknehmen', route(async (req) => {
+  const { data, error } = await req.db
+    .from('kein_interesse')
+    .delete()
+    .eq('user_id', req.nutzerId)
+    .eq('post_id', req.params.id)
+    .select('post_id');
+  if (error) throw error;
+  if (!data || data.length === 0) return { ok: false, error: '„Kein Interesse" ließ sich nicht zurücknehmen' };
+  return { ok: true, ...(await supabaseApi.lenkungStand(req.db, req.nutzerId)) };
+}));
+
+app.post('/api/feed-zuruecksetzen', route(async (req) => {
+  const { data, error } = await req.db.rpc('feed_zuruecksetzen');
+  if (error) throw error;
+  return { ok: true, ergebnis: data, ...(await supabaseApi.lenkungStand(req.db, req.nutzerId)) };
 }));
 
 app.post('/api/beitraege/:id/melden', route(async (req) =>

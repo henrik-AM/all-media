@@ -1,5 +1,5 @@
 -- ===========================================================================
--- Schema XX: eine neue Nachricht macht den Chat beim Gegenüber ungelesen
+-- Schema 81: eine neue Nachricht macht den Chat beim Gegenüber ungelesen
 -- (Kasten 27, „Chats kommen verfälscht an", 06.10.2026)
 -- ===========================================================================
 --

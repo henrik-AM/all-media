@@ -4348,6 +4348,23 @@ body.ist-abgemeldet .ptr-indicator {
 }
 .sicht__suche input:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
 
+/* --------------------------------------- Feed steuern (Kasten 24) --- */
+/* Gegenstück: FeedLenkenSheet in der App. Zwei kleine Pillen je Zeile statt
+   eines Menüs — „Mehr davon“/„Weniger davon“ sind die ganze Entscheidung. */
+.lenk__arten { padding-top: 4px; }
+.lenk__zeile { gap: 8px; cursor: default; }
+.lenk__zeile:hover { background: transparent; }
+.lenk__zeile .item__label { display: flex; flex-direction: column; gap: 2px; }
+.lenk__zeile .item__label b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lenk__zeile .item__label small { font-size: 11.5px; color: var(--text-3); font-weight: 400; }
+.lenk__zeile .pille { flex: 0 0 auto; padding: 6px 11px; font-size: 12.5px; }
+.lenk__zeile small.lenk__mehr { color: var(--brand); font-weight: 600; }
+.lenk__zeile small.lenk__weniger { color: var(--danger); font-weight: 600; }
+.lenk__meldung { color: var(--danger); min-height: 0; }
+.lenk__meldung:empty { display: none; }
+.lenk__meldung.is-gut { color: var(--brand); }
+.lenk__reset { padding: 4px 16px 16px; }
+
 /* ------------------------------------------------------- Push-to-Talk -- */
 
 .ptt { padding: 12px 7.2% 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

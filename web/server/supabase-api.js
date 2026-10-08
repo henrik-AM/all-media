@@ -38,6 +38,9 @@ const {
  * machen steht in ../../gemeinsam/rang.js.
  */
 const { neulingsliste, ordnenJeArt, punktekarte } = require('../../gemeinsam/rang');
+// Kasten 24 „Feed steuern": Faktor je Beitrag aus den eigenen Einträgen.
+// Dieselbe Datei rechnet in app/lib/daten.ts.
+const Lenkung = require('../../gemeinsam/lenkung');
 const StoryRegeln = require('../../gemeinsam/story');
 // Kasten 27: Stand und Reihenfolge offener Chats — gemeinsam mit der App.
 const ChatAbgleich = require('../../gemeinsam/chatabgleich');
@@ -951,14 +954,16 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
   const ids = beitraege.map((b) => b.id);
 
   // Eigener Zustand je Beitrag: gefällt mir, gespeichert, geteilt, Glocke.
-  const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: glocke }] =
+  const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: glocke }, lenkung] =
     ids.length === 0
-      ? [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+      ? [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, []]
       : await Promise.all([
           client.from('post_likes').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
           client.from('saves').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
           client.from('reposts').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
           client.from('post_notify').select('post_id').eq('user_id', nutzerId).in('post_id', ids),
+          // Kasten 24: die eigenen „Feed steuern"-Einträge (Schema 82).
+          ladeLenkung(client, nutzerId),
         ]);
 
   const gemocht = new Set((likes || []).map((l) => l.post_id));
@@ -1017,6 +1022,8 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
    * kein Zustand, der jemandem einen Fehler anzeigen müsste.
    */
   let geordnet = beitraege;
+  // Kasten 24: aus den rohen Zeilen (user_id, sound_id) — wie in app/lib/daten.ts.
+  const gelenkt = Lenkung.faktoren(beitraege, lenkung);
   if (ids.length > 0) {
     try {
       const { data: rang, error: rangFehler } = await client.rpc('feed_rang', {
@@ -1032,9 +1039,12 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
         // Jeder vierte Platz gehört einem Beitrag, der noch keine Chance
         // hatte — sonst kommt ein frisch gestellter Beitrag nie nach oben.
         neulinge: neulingsliste(rang),
+        lenkung: gelenkt,
       });
     } catch (e) {
       console.warn('[supabase] Feed-Ranking nicht verfügbar, bleibe bei created_at:', e.message);
+      // Ohne Punkte wirkt die Lenkung trotzdem (rang.js lenken) — wie in der App.
+      if (gelenkt.size > 0) geordnet = ordnenJeArt(beitraege, null, (b) => b.kind, { lenkung: gelenkt });
     }
   }
 
@@ -1352,6 +1362,62 @@ async function ladeKeinInteresse(client, nutzerId) {
     return [];
   }
   return (data || []).map((z) => z.post_id);
+}
+
+/**
+ * „Feed steuern" (Kasten 24, Schema 82): die eigenen Einträge für den Rang.
+ * Gleiche Abfrage wie ladeLenkung in app/lib/lenkung.ts. Scheitert sie
+ * (Schema fehlt, Netz weg), bleibt der Feed ungelenkt — der Stand davor.
+ */
+async function ladeLenkung(client, nutzerId) {
+  const { data, error } = await client
+    .from('feed_lenkung')
+    .select('art, wert, anzeige, richtung')
+    .eq('user_id', nutzerId);
+  if (error) {
+    console.warn('[supabase] Feed-Lenkung nicht verfuegbar:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+function kurz(text, laenge = 60) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  return t.length > laenge ? t.slice(0, laenge - 1) + '…' : t;
+}
+
+/**
+ * Alles für die Seite „Feed steuern": Einträge und „Kein Interesse" samt
+ * Beitragstext. Gegenstück: lenkungStand in app/lib/lenkung.ts.
+ */
+async function lenkungStand(client, nutzerId) {
+  const [eintraege, kein] = await Promise.all([
+    client
+      .from('feed_lenkung')
+      .select('id, art, wert, anzeige, richtung, created_at')
+      .eq('user_id', nutzerId)
+      .order('created_at', { ascending: false }),
+    client
+      .from('kein_interesse')
+      .select('post_id, created_at, posts!post_id(id, kind, title, description, user_id)')
+      .eq('user_id', nutzerId)
+      .order('created_at', { ascending: false }),
+  ]);
+  if (eintraege.error) throw eintraege.error;
+  if (kein.error) throw kein.error;
+  return {
+    eintraege: Lenkung.sortiert(eintraege.data || []),
+    keinInteresse: (kein.data || []).map((z) => {
+      const p = Array.isArray(z.posts) ? z.posts[0] : z.posts;
+      return {
+        postId: z.post_id,
+        kind: (p && p.kind) || 'post',
+        titel: kurz((p && (p.description || p.title)) || '') || 'Beitrag nicht mehr sichtbar',
+        verfasser: p && p.user_id === nutzerId ? 'me' : (p && p.user_id) || '',
+        wann: z.created_at,
+      };
+    }),
+  };
 }
 
 async function bootstrapData(client, nutzerId, schluesselId = null) {
@@ -1763,6 +1829,9 @@ module.exports = {
   ladeStandorte,
   ladeBenachrichtigungen,
   bootstrapData,
+  // Kasten 24 „Feed steuern"
+  ladeLenkung,
+  lenkungStand,
 
   // Handbuch-Abgleich 01.09.2026
   ladeInsights,

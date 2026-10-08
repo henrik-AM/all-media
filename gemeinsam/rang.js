@@ -78,6 +78,19 @@
   const ERPROBUNG = 4;
 
   /**
+   * Ab welchem Lenkungsfaktor ein Neuling seinen Erprobungsplatz behält.
+   *
+   * Kasten 24 („Feed steuern", gemeinsam/lenkung.js): wer ein Profil oder
+   * ein Hashtag auf „weniger davon" gesetzt hat, darf einen frischen
+   * Beitrag davon nicht trotzdem auf jedem vierten Platz sehen — der
+   * Erprobungsplatz sucht über die ganze Liste und würde die Lenkung sonst
+   * genau bei neuen Beiträgen aushebeln. 0,5 liegt unter jedem „mehr" und
+   * über jedem „weniger" (0,3 bzw. 0,02); ein Beitrag mit „mehr davon"
+   * bleibt also Neuling, einer mit „weniger davon" verliert den Platz.
+   */
+  const ERPROBUNG_AB = 0.5;
+
+  /**
    * Nach Punkten sortieren, das Beste zuerst.
    *
    * `punkte` ist eine Map oder ein einfaches Objekt von Beitragskennung auf
@@ -183,10 +196,55 @@
   function ordnen(beitraege, punkte, optionen) {
     const liste = Array.isArray(beitraege) ? beitraege : [];
     if (liste.length === 0) return [];
-    if (!punkte || leer(punkte)) return liste.slice();
-    const o = optionen || {};
+    const gelenkt = lenken(liste, punkte, optionen);
+    if (!gelenkt.punkte || leer(gelenkt.punkte)) return liste.slice();
+    const o = gelenkt.optionen;
     const abstand = typeof o.abstand === 'number' ? o.abstand : ABSTAND;
-    return auffaechern(sortieren(liste, punkte), abstand, o.neulinge, o.erprobung);
+    return auffaechern(sortieren(liste, gelenkt.punkte), abstand, o.neulinge, o.erprobung);
+  }
+
+  /**
+   * Die eigene Lenkung auf die Punkte legen (Kasten 24).
+   *
+   * `optionen.lenkung` ist eine Map von Beitragskennung auf Faktor, wie
+   * `Lenkung.faktoren()` sie liefert (gemeinsam/lenkung.js). Der Faktor
+   * wird auf die fertige Punktzahl multipliziert — dieselbe Art, wie das
+   * Alter in `feed_rang()` dämpft, damit die Altersdämpfung erhalten bleibt.
+   *
+   * Zwei Sonderfälle:
+   *
+   *   - Neulinge mit einem Faktor unter ERPROBUNG_AB fallen aus der
+   *     Neulingsliste (siehe dort).
+   *   - Hat das Ranking nicht geantwortet (keine Punkte), gilt jeder
+   *     Beitrag als 1 — „weniger davon" wirkt dann trotzdem, statt still
+   *     auszufallen. Die zeitliche Reihenfolge bleibt der Gleichstand.
+   *
+   * Gibt neue Punkte und Optionen zurück, ohne die übergebenen anzufassen.
+   */
+  function lenken(liste, punkte, optionen) {
+    const o = Object.assign({}, optionen || {});
+    const faktoren = o.lenkung instanceof Map ? o.lenkung : null;
+    delete o.lenkung;
+    if (!faktoren || faktoren.size === 0) return { punkte: punkte, optionen: o };
+
+    const hole = punkte && !leer(punkte) ? holer(punkte) : () => 1;
+    const neu = new Map();
+    for (const b of liste) {
+      const p = hole(b.id);
+      if (p === null) continue; // Ohne Punkte bleibt er ohne — wie bisher.
+      const f = faktoren.has(b.id) ? Number(faktoren.get(b.id)) : 1;
+      neu.set(b.id, p * (Number.isFinite(f) ? f : 1));
+    }
+
+    if (o.neulinge instanceof Set && o.neulinge.size > 0) {
+      const bleiben = new Set();
+      for (const id of o.neulinge) {
+        const f = faktoren.has(id) ? Number(faktoren.get(id)) : 1;
+        if (!(f < ERPROBUNG_AB)) bleiben.add(id);
+      }
+      o.neulinge = bleiben;
+    }
+    return { punkte: neu, optionen: o };
   }
 
   /**
@@ -214,6 +272,12 @@
     const liste = Array.isArray(beitraege) ? beitraege : [];
     if (liste.length === 0) return [];
     const art = typeof artVon === 'function' ? artVon : (b) => b.kind;
+
+    // Die Lenkung einmal vorweg — danach rechnen alle Arten mit denselben
+    // gelenkten Punkten, und `ordnen` darunter lenkt nicht ein zweites Mal.
+    const gelenkt = lenken(liste, punkte, optionen);
+    punkte = gelenkt.punkte;
+    optionen = gelenkt.optionen;
 
     // Je Art eine eigene Warteschlange, jede für sich aufgefächert.
     const gruppen = new Map();
@@ -300,7 +364,9 @@
   return {
     ABSTAND: ABSTAND,
     ERPROBUNG: ERPROBUNG,
+    ERPROBUNG_AB: ERPROBUNG_AB,
     ordnen: ordnen,
+    lenken: lenken,
     ordnenJeArt: ordnenJeArt,
     sortieren: sortieren,
     auffaechern: auffaechern,

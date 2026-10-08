@@ -251,7 +251,7 @@ export const ChatDetailScreen = ({
     });
     /*
      * Kasten 27: den Ungelesen-Punkt der Chatliste zuruecknehmen. Seit
-     * Schema XX setzt die Datenbank ihn bei jeder neuen Nachricht
+     * Schema 81 setzt die Datenbank ihn bei jeder neuen Nachricht
      * (chat_members.is_read = false); geoeffnet heisst gelesen. Die Website
      * macht dasselbe ueber /api/chats/:id/read. Ein Kanal hat keine
      * Mitgliedschaft in chat_members.

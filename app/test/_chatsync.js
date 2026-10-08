@@ -21,7 +21,7 @@
  *   1. Ohne Netz: Krypto-Rundreise, altes gegen neues Listenverhalten,
  *      jüngste 500, Zusammenlegen — läuft immer.
  *   2. Datenbank mit zwei Testkonten: Stand ändert sich, Ungelesen-Auslöser
- *      (Schema XX), Bearbeiten einer verschlüsselten Nachricht bleibt lesbar.
+ *      (Schema 81), Bearbeiten einer verschlüsselten Nachricht bleibt lesbar.
  *   3. Website (Server auf Port 3000): B hat den Chat offen, A schreibt —
  *      die Nachricht muss OHNE Neuladen bei B erscheinen. Vor Kasten 27 rot.
  *
@@ -206,8 +206,8 @@ async function teilZwei() {
 
     const { data: mit } = await B.client.from('chat_members').select('is_read')
       .eq('chat_id', chat.id).eq('user_id', B.id).single();
-    pruefe('Schema XX: neue Nachricht macht den Chat bei B ungelesen', mit?.is_read === false,
-      'is_read = ' + mit?.is_read + (mit?.is_read ? ' (Schema XX noch nicht eingespielt?)' : ''));
+    pruefe('Schema 81: neue Nachricht macht den Chat bei B ungelesen', mit?.is_read === false,
+      'is_read = ' + mit?.is_read + (mit?.is_read ? ' (Schema 81 noch nicht eingespielt?)' : ''));
     const { data: mitA } = await A.client.from('chat_members').select('is_read')
       .eq('chat_id', chat.id).eq('user_id', A.id).single();
     pruefe('… beim Absender selbst nicht', mitA?.is_read !== false);

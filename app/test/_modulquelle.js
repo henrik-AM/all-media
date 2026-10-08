@@ -124,6 +124,9 @@ const UMD_BAUSTEINE = [
   // 06.10.2026: `chatabgleich.js` — Takt, Stand und Zusammenlegen offener
   // Chats und der Chatliste (Kasten 27, verfaelschte Chats).
   ['chatabgleich', 'ChatAbgleich'],
+  // 06.10.2026: `lenkung.js` fuer „Feed steuern" (Kasten 24, Schema 82) —
+  // daten.ts und lib/lenkung.ts holen ihn. Gleich mit dem Baustein eingetragen.
+  ['lenkung', 'Lenkung'],
 ];
 
 function umdTeile() {

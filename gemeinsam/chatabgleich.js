@@ -21,7 +21,7 @@
  *   3. Die Chatliste der Website wurde nur beim Start und nach einzelnen
  *      eigenen Handlungen neu geholt.
  *   4. Ungelesen hing an chat_members.is_read, und das setzte bei einer
- *      neuen Nachricht niemand auf false. Schema XX (Kasten 27) macht das
+ *      neuen Nachricht niemand auf false. Schema 81 (Kasten 27) macht das
  *      jetzt in der Datenbank.
  *
  * Hier steht, was beide Seiten dafür gleich rechnen müssen: wie oft gefragt

@@ -50,6 +50,9 @@ const BEITRAG_SPALTEN =
   'id, user_id, kind, format, title, description, location, music, media_url,' +
   ' thumbnail_url, duration, tags, views, zuschauer, untertitel, kapitel,' +
   ' likes_basis, shares_basis, comments_basis, created_at,' +
+  // sound_id (Schema 67): „Feed steuern" lenkt auch nach Sound (Kasten 24,
+  // gemeinsam/lenkung.js) — der Liedname in `music` allein ist nicht eindeutig.
+  ' sound_id,' +
   ' post_likes(count), comments(count), shares(count)';
 
 /**
