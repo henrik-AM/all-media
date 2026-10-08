@@ -4675,7 +4675,11 @@ function vorschlagKarte(v) {
 
 /** Der Abschnitt aus dem Zwischenstand — leer, solange es nichts gibt. */
 function vorschlaegeHtml(bereich) {
-  const liste = (vorschlaege[bereich] || []).filter((v) => !vorschlaege.erledigt.has(v.id));
+  // Wem man inzwischen anderswo gefolgt ist (Folgen-Knopf am Beitrag), der
+  // fällt sofort heraus — nicht erst beim nächsten Laden.
+  const liste = (vorschlaege[bereich] || []).filter(
+    (v) => !vorschlaege.erledigt.has(v.id) && !state.gefolgt?.[v.id] && !(state.posts || []).some((p) => p.userId === v.id && p.following)
+  );
   if (!liste.length) return `<section class="vorschlaege" data-vorschlaege="${bereich}" hidden></section>`;
   return `
     <section class="vorschlaege" data-vorschlaege="${bereich}" data-testid="vorschlaege-${bereich}">

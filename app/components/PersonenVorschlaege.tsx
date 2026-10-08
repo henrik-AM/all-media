@@ -95,7 +95,10 @@ export const PersonenVorschlaege = ({ bereich, onOpenProfile, onNotice }: Props)
     }
   };
 
-  if (!liste.length) return null;
+  // Wem man inzwischen anderswo gefolgt ist (Knopf am Beitrag), der fällt
+  // sofort heraus — nicht erst beim nächsten Laden.
+  const sichtbar = liste.filter((v) => !folgtPerson(v.id));
+  if (!sichtbar.length) return null;
 
   return (
     <View style={styles.abschnitt} testID={`vorschlaege-${bereich}`}>
@@ -105,7 +108,7 @@ export const PersonenVorschlaege = ({ bereich, onOpenProfile, onNotice }: Props)
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.reihe}
       >
-        {liste.map((v) => (
+        {sichtbar.map((v) => (
           <Druck
             key={v.id}
             style={styles.karte}
