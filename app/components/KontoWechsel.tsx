@@ -20,6 +20,7 @@ import { NeuesKonto, neuesKontoPruefen } from '../lib/registrierung';
 import { RegistrierFelder } from './RegistrierFelder';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 
+import { FarbfilterSchicht } from './Farbfilter';
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -318,6 +319,8 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
               </View>
             </ScrollView>
           )}
+          {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+          <FarbfilterSchicht radius={20} />
         </View>
       </KeyboardAvoidingView>
     </Modal>

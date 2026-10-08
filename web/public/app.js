@@ -625,6 +625,9 @@ async function bootstrap() {
    * app/lib/theme.tsx.
    */
   await einstellungenHolen();
+  // Farbfilter aus dem Konto — der Sofortwert aus dem Browser stand schon
+  // seit dem ersten Bildaufbau (farbfilter-start.js).
+  window.FarbfilterWeb?.anwenden(state.einstellungen);
   const design = state.einstellungen?.theme;
   if (design === 'dark' || design === 'light' || design === 'system') state.theme = design;
 
@@ -6119,6 +6122,19 @@ const SETTINGS = [
       { label: 'Dunkles Design', icon: 'moon', toggle: 'theme' },
     ],
   },
+  /*
+   * Kasten 21 (06.10.2026): Farbfilter wie in den Bedienungshilfen von iOS,
+   * Android und Windows — Graustufen, drei Farbsehschwächen, Warmton,
+   * Farbtönung. Ein eigener Abschnitt, damit man ihn über die Sprungleiste
+   * findet; hinter dem einen Punkt steht das Blatt mit Schalter, Filterwahl,
+   * Intensität, Vorschau und Zurücksetzen (openFarbfilter). Gleicher
+   * Abschnitt in der App (SettingsScreen.tsx).
+   */
+  {
+    id: 'farbfilter',
+    title: 'Farbfilter',
+    items: [{ label: 'Farbfilter', icon: 'palette', aktion: 'farbfilter' }],
+  },
   {
     id: 'konto',
     title: 'Konto',
@@ -6433,6 +6449,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (!state.einstellungen) return; /* noch nie geladen — dann macht es der Start */
   void einstellungenHolen().then(() => {
+    // Der Farbfilter gilt überall, nicht nur auf der Einstellungsseite.
+    window.FarbfilterWeb?.anwenden(state.einstellungen);
     /* Nur neu zeichnen, wenn die Einstellungsseite offen ist: sonst reisst
        ein Neuaufbau den Nutzer aus dem, was er gerade tut. */
     if (state.area === 'settings') renderSettings();
@@ -7058,6 +7076,181 @@ function openSichtbarkeit(punkt) {
   });
 }
 
+/* --------------------------------------------- Farbfilter (Kasten 21) */
+/*
+ * Einstellungen → Farbfilter. Henrik am 06.10.2026: „Farbfilter in All Media
+ * integrieren … schaue selbst nach, welche Farbfilter es gibt und wofür man
+ * sie braucht." Vorbild sind die Bedienungshilfen von iOS, Android und
+ * Windows; die Liste, die Sätze und die Rechnung stehen in
+ * gemeinsam/farbfilter.js (window.Farbfilter), damit App und Website
+ * wörtlich dasselbe zeigen und rechnen.
+ *
+ *   Ein/Aus         user_settings.farbfilter            'an' / 'aus'
+ *   Filter          user_settings.farbfilterArt         graustufen, …
+ *   Intensität      user_settings.farbfilterStaerke     '0' … '100'
+ *   Farbton         user_settings.farbfilterFarbton     '0' … '359'
+ *
+ * Wirksam wird es in farbfilter-start.js — ein SVG-Filter auf <html>, also
+ * über der ganzen Seite samt Blättern, Bildern und Videos. Die Regler
+ * zeigen beim Ziehen sofort, gespeichert wird beim Loslassen: sonst ginge
+ * bei jedem Pixel eine Anfrage an Supabase.
+ *
+ * Gegenstück in der App: app/components/FarbfilterSheet.tsx.
+ */
+function openFarbfilter() {
+  const F = window.Farbfilter;
+  if (!F) return toast('Farbfilter konnten nicht geladen werden');
+  const S = F.SCHLUESSEL;
+  // Was gerade gezogen wird, bevor es gespeichert ist.
+  let entwurf = {};
+
+  const werte = () => ({ ...einstellungenLaden(), ...entwurf });
+  const zustand = () => F.lesen(werte());
+  const wirken = () => window.FarbfilterWeb?.anwenden(werte());
+
+  const speichern = async (schluessel, wert) => {
+    entwurf[schluessel] = wert;
+    wirken();
+    const ok = await einstellungSetzen({ label: schluessel, wahlKey: schluessel }, wert);
+    delete entwurf[schluessel];
+    // Bei einem Fehler hat einstellungSetzen zurückgedreht — der Filter auch.
+    wirken();
+    return ok;
+  };
+
+  const html = (k) => {
+    const stifte = F.VORSCHAU.map(
+      (v) => `<span class="farbstift" style="--stift:${v.farbe}" title="${esc(v.name)}">
+        <span class="farbstift__holz"></span><span class="farbstift__name">${esc(v.name)}</span>
+      </span>`
+    ).join('');
+    const liste = F.FILTER.map(
+      (f) => `<button class="item farbfilter__wahl" data-ff-art="${f.id}" role="radio" aria-checked="${k.art === f.id}">
+        <span class="farbfilter__text">
+          <span class="item__label">${esc(f.name)}</span>
+          <span class="farbfilter__kurz">${esc(f.kurz)}</span>
+        </span>
+        ${k.art === f.id ? `<span class="item__haken">${ICONS.check}</span>` : ''}
+      </button>`
+    ).join('');
+    return `
+      <p class="farbfilter__einleitung">${esc(F.EINLEITUNG)}</p>
+      <div class="item">
+        <span class="item__icon">${ICONS.palette}</span>
+        <span class="item__label">Farbfilter</span>
+        <button class="switch ${k.an ? 'is-on' : ''}" data-ff-an aria-label="Farbfilter" role="switch" aria-checked="${k.an}"><span class="switch__knob"></span></button>
+      </div>
+
+      <div class="listhead">Vorschau</div>
+      <div class="farbfilter__vorschau" aria-label="Vorschau: Farbstifte">
+        <div class="farbfilter__stifte">${stifte}</div>
+        <div class="farbfilter__verlauf" aria-hidden="true"></div>
+        <button class="farbfilter__vergleich" data-ff-vergleich ${F.aktiv(k) ? '' : 'disabled'}>${esc(F.VERGLEICH_TEXT)}</button>
+      </div>
+
+      <div class="listhead">Filter</div>
+      <div role="radiogroup" aria-label="Filter">${liste}</div>
+
+      <div class="farbfilter__regler">
+        <label class="farbfilter__reglerkopf" for="ffStaerke"><span>Intensität</span><output id="ffStaerkeWert">${k.staerke} %</output></label>
+        <input id="ffStaerke" type="range" min="0" max="100" step="1" value="${k.staerke}" data-ff-staerke aria-label="Intensität" />
+      </div>
+      ${
+        k.art === 'farbton'
+          ? `<div class="farbfilter__regler">
+              <label class="farbfilter__reglerkopf" for="ffFarbton"><span>Farbton</span><span class="farbfilter__tonpunkt" id="ffFarbtonPunkt" style="background:${F.tonHex(k.farbton)}"></span></label>
+              <input id="ffFarbton" class="farbfilter__ton" type="range" min="0" max="359" step="1" value="${k.farbton}" data-ff-farbton aria-label="Farbton" />
+            </div>`
+          : ''
+      }
+      <button class="farbfilter__zurueck" data-ff-zurueck>Zurücksetzen</button>`;
+  };
+
+  const zeichne = (sheet) => {
+    const k = zustand();
+    const koerper = sheet.querySelector('.sheet__body');
+    const oben = koerper.scrollTop;
+    koerper.innerHTML = html(k);
+    koerper.scrollTop = oben;
+
+    koerper.querySelector('[data-ff-an]').addEventListener('click', async () => {
+      await speichern(S.an, zustand().an ? 'aus' : 'an');
+      zeichne(sheet);
+    });
+
+    koerper.querySelectorAll('[data-ff-art]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        // Wer einen Filter antippt, will ihn sehen — iOS graut die Liste aus,
+        // solange der Schalter aus ist; hier schaltet die Wahl ihn ein.
+        const vorher = zustand();
+        await speichern(S.art, b.dataset.ffArt);
+        if (!vorher.an) await speichern(S.an, 'an');
+        zeichne(sheet);
+      })
+    );
+
+    const regler = (sel, schluessel, beimZiehen) => {
+      const r = koerper.querySelector(sel);
+      if (!r) return;
+      r.addEventListener('input', () => {
+        entwurf[schluessel] = r.value;
+        beimZiehen(r.value);
+        wirken();
+      });
+      r.addEventListener('change', async () => {
+        await speichern(schluessel, r.value);
+        if (!zustand().an) {
+          await speichern(S.an, 'an');
+          zeichne(sheet);
+        }
+      });
+    };
+    regler('[data-ff-staerke]', S.staerke, (v) => {
+      koerper.querySelector('#ffStaerkeWert').textContent = v + ' %';
+    });
+    regler('[data-ff-farbton]', S.farbton, (v) => {
+      koerper.querySelector('#ffFarbtonPunkt').style.background = F.tonHex(Number(v));
+    });
+
+    // Vorher/Nachher: solange gedrückt, ist der Filter aus.
+    const vergleich = koerper.querySelector('[data-ff-vergleich]');
+    const los = () => window.FarbfilterWeb?.vergleichen(false);
+    vergleich.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      window.FarbfilterWeb?.vergleichen(true);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((n) => vergleich.addEventListener(n, los));
+    vergleich.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        window.FarbfilterWeb?.vergleichen(true);
+      }
+    });
+    vergleich.addEventListener('keyup', los);
+
+    koerper.querySelector('[data-ff-zurueck]').addEventListener('click', async () => {
+      entwurf = {};
+      let alle = true;
+      for (const [schluessel, wert] of F.ZURUECKSETZEN) {
+        alle = (await speichern(schluessel, wert)) && alle;
+      }
+      zeichne(sheet);
+      toast(alle ? 'Farbfilter zurückgesetzt' : 'Nicht alles ließ sich zurücksetzen');
+    });
+  };
+
+  openSheet('Farbfilter', '<div class="sheet__body farbfilter"></div>', (sheet) => zeichne(sheet), {
+    schliessen: true,
+    hoch: true,
+    beimSchliessen: () => {
+      window.FarbfilterWeb?.vergleichen(false);
+      entwurf = {};
+      wirken();
+      if (state.area === 'settings') renderSettings();
+    },
+  });
+}
+
 /*
  * Der Schluessel, unter dem die Wahl liegt.
  *
@@ -7532,6 +7725,7 @@ function openEinstellung(punkt, nachher) {
    * anhaengt (web/public/anmeldung.js). Ein <a href> ginge ohne Token los
    * und bekaeme 401.
    */
+  if (punkt.aktion === 'farbfilter') return openFarbfilter();
   if (punkt.aktion === 'spendencode') return spendenweg(null, 'code');
   if (punkt.aktion === 'zahlungsmethoden') return spendenweg(null, 'methoden');
   if (punkt.aktion === 'lenkung') return openLenkung();
@@ -7695,7 +7889,13 @@ function renderSettings() {
     }
     // Bei einer Auswahl steht rechts, was gerade gilt - sonst muesste man
     // jeden Punkt aufmachen, um den Stand zu sehen.
-    const wert = it.wahl ? einstellung(it) : it.sichtbar ? sichtText(it.sichtbar) : '';
+    const wert = it.wahl
+      ? einstellung(it)
+      : it.sichtbar
+      ? sichtText(it.sichtbar)
+      : it.aktion === 'farbfilter' && window.Farbfilter
+      ? window.Farbfilter.statusText(window.Farbfilter.lesen(einstellungenLaden()))
+      : '';
     return `<button class="item ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
       <span class="item__icon">${ICONS[it.icon]}</span>
       <span class="item__label">${esc(it.label)}</span>

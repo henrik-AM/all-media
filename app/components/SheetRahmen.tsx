@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, themenStyles } from '../constants/design';
 import { useZiehenZumSchliessen } from '../lib/ziehen';
+import { FarbfilterSchicht } from './Farbfilter';
 
 interface Props {
   visible: boolean;
@@ -66,6 +67,13 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
             hell, nicht abgedunkelt, als Streifen zwischen Blatt und Tasten.
           */}
           <View style={styles.unterTastatur} pointerEvents="none" />
+          {/*
+            Kasten 21: ein Modal ist ein eigenes Fenster, die Farbfilter-Fläche
+            der App liegt nicht darüber. Hier im Blatt und nicht über dem
+            ganzen Fenster — über dem durchsichtigen Schleier stünde sie auf
+            Android als eigener Farbschleier.
+          */}
+          <FarbfilterSchicht radius={22} />
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>

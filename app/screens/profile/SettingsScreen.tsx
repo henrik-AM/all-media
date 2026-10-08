@@ -14,6 +14,8 @@ import { useDaten } from '../../contexts/DatenContext';
 import { colors, radius, sizes, spacing, themenStyles, typography, verlaufAus } from '../../constants/design';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { FeedLenkenSheet } from '../../components/FeedLenkenSheet';
+import { FarbfilterSheet } from '../../components/FarbfilterSheet';
+import { useFarbfilter } from '../../components/Farbfilter';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSpendenweg } from '../../contexts/SpendenwegContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
@@ -37,6 +39,7 @@ import { PASSWORT_REGEL, passwortAendern, passwortPruefen } from '../../lib/supa
 // Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
 const Telefon = require('../../../gemeinsam/telefon') as typeof import('../../../gemeinsam/telefon');
 const Sichtbarkeit = require('../../../gemeinsam/sichtbarkeit') as typeof import('../../../gemeinsam/sichtbarkeit');
+const Farbfilter = require('../../../gemeinsam/farbfilter') as typeof import('../../../gemeinsam/farbfilter');
 const TELEFON_REGEL = Telefon.REGEL_TEXT;
 const telefonPruefen = Telefon.pruefe;
 
@@ -89,7 +92,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung';
+  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter';
   gefahr?: boolean;
 }
 
@@ -181,6 +184,18 @@ const SECTIONS: Section[] = [
       { label: 'Geräteverknüpfung', icon: 'phone-portrait-outline', liste: 'geraete' },
       { label: 'Dunkles Design', icon: 'moon-outline', toggle: 'theme' },
     ],
+  },
+  /*
+   * Kasten 21 (06.10.2026): Farbfilter wie in den Bedienungshilfen von iOS,
+   * Android und Windows. Eigener Abschnitt, damit er in der Sprungleiste
+   * steht; dahinter das Blatt mit Schalter, Filterwahl, Intensität,
+   * Vorschau und Zurücksetzen (components/FarbfilterSheet.tsx). Gleicher
+   * Abschnitt auf der Website (SETTINGS in web/public/app.js).
+   */
+  {
+    id: 'farbfilter',
+    title: 'Farbfilter',
+    items: [{ label: 'Farbfilter', icon: 'color-palette-outline', aktion: 'farbfilter' }],
   },
   {
     id: 'konto',
@@ -638,6 +653,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (item.aktion === 'lenkung') return setLenkenOffen(true);
     if (item.aktion === 'spendencode') return spendenweg.verwalten('code');
     if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden');
+    if (item.aktion === 'farbfilter') return setFarbfilterOffen(true);
     if (item.aktion === 'sicherung') {
       return onNotice(`Sicherung erstellt — ${alleChats.length} Unterhaltungen gespeichert`);
     }
@@ -709,6 +725,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   };
 
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
+  const [farbfilterOffen, setFarbfilterOffen] = useState(false);
+  const { konfig: farbfilter } = useFarbfilter();
   /*
    * Ein einzelner Abschnitt als eigene Seite - das Ziel der Ueberschrift mit
    * Pfeil. Bis zum 24.09.2026 stand "Konto →" usw. als reiner Text da; Henrik
@@ -1004,6 +1022,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       {!!item.sichtbar && (
                         <Text style={styles.itemValue}>{sichtText(item.sichtbar)}</Text>
                       )}
+                      {item.aktion === 'farbfilter' && (
+                        <Text style={styles.itemValue}>{Farbfilter.statusText(farbfilter)}</Text>
+                      )}
                       <Ionicons name="chevron-forward" size={18} color={colors.text3} />
                     </>
                   )}
@@ -1067,6 +1088,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       )}
 
       <FeedLenkenSheet visible={lenkenOffen} onClose={() => setLenkenOffen(false)} />
+      {farbfilterOffen && (
+        <FarbfilterSheet onClose={() => setFarbfilterOffen(false)} onNotice={onNotice} />
+      )}
 
       {offen?.eingabe && (
         <FormularSheet

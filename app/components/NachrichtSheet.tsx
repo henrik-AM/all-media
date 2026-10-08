@@ -29,6 +29,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Druck } from './Druck';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
+import { FarbfilterSchicht } from './Farbfilter';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /*
@@ -131,6 +132,8 @@ export const NachrichtSheet = ({
             <Text style={[styles.punktText, p.gefahr && styles.punktTextGefahr]}>{p.label}</Text>
           </Druck>
         ))}
+        {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+        <FarbfilterSchicht radius={radius.xl} />
       </View>
     </Modal>
   );

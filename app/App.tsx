@@ -9,6 +9,7 @@ import { EinstellungenProvider, useEinstellungen } from './contexts/Einstellunge
 import { RepostProvider } from './contexts/RepostContext';
 import { ProfilProvider, useProfil } from './contexts/ProfilContext';
 import { SpendenwegProvider } from './contexts/SpendenwegContext';
+import { FarbfilterProvider, FarbfilterRahmen } from './components/Farbfilter';
 import { ActionSheet } from './components/ActionSheet';
 import { BeitragOptionenSheet, OptionenBeitrag } from './components/BeitragOptionenSheet';
 import { AddContactSheet } from './components/AddContactSheet';
@@ -2639,6 +2640,12 @@ const App = () => (
             etwas umlegte, sah die Wirkung anderswo erst nach einem Neustart.
           */}
           <EinstellungenProvider>
+            {/*
+              Kasten 21: der Farbfilter liest die Einstellungen und legt
+              seine Flächen über alles darunter — siehe components/Farbfilter.tsx.
+              Der Rahmen sitzt um Root, damit auch die Anmeldung gefiltert ist.
+            */}
+            <FarbfilterProvider>
             <DesignAbgleich />
             {/*
               Der DatenProvider steht zwischen Anmeldung und allem anderen: er
@@ -2651,11 +2658,14 @@ const App = () => (
                   {/* Kasten 13: jede Spende läuft durch dieses Blatt
                       (Zahlungsmethode, Spendencode). */}
                   <SpendenwegProvider>
-                    <Root />
+                    <FarbfilterRahmen>
+                      <Root />
+                    </FarbfilterRahmen>
                   </SpendenwegProvider>
                 </ProfilProvider>
               </RepostProvider>
             </DatenProvider>
+            </FarbfilterProvider>
           </EinstellungenProvider>
         </AuthProvider>
       </SupabaseProvider>

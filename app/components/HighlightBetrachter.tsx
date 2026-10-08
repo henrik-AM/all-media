@@ -19,6 +19,7 @@ import { Modal } from 'react-native';
 import { StoryViewerScreen, HighlightModus } from '../screens/messenger/StoryViewerScreen';
 import { useAktionen } from '../lib/useAktionen';
 import { Story } from '../types';
+import { FarbfilterSchicht } from './Farbfilter';
 
 interface Props {
   /** Null: nichts offen. Die Liste ist nie leer — leere Highlights öffnen den Ordner. */
@@ -63,6 +64,8 @@ export const HighlightBetrachter = ({ offen, onClose, onNotice, onOpenProfile }:
           }}
         />
       ) : null}
+      {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+      <FarbfilterSchicht />
     </Modal>
   );
 };
