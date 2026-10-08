@@ -6533,6 +6533,11 @@ function openBildschirmzeit(ansicht) {
         ${inhalt()}
       </div>`;
     binden(blatt);
+    // Die gewählte Uhrzeit/Minute sichtbar machen — sonst steht „22:00" weit rechts außer Sicht.
+    blatt.querySelectorAll('.bzchips').forEach((reihe) => {
+      const an = reihe.querySelector('.bzchip.is-an');
+      if (an) reihe.scrollLeft = an.offsetLeft - reihe.clientWidth / 2 + an.clientWidth / 2;
+    });
   };
 
   const zu = (s) => {

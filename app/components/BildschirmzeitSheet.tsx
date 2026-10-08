@@ -17,7 +17,7 @@
  * Gleiches Blatt auf der Website: openBildschirmzeit() in web/public/app.js,
  * gleiche Texte aus gemeinsam/bildschirmzeit.js.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Switch, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -115,13 +115,7 @@ export const BildschirmzeitSheet = ({ ansicht, onClose }: Props) => {
   const kopf = (text: string) => <Text style={styles.kopf}>{text}</Text>;
 
   const chips = (werte: (number | null)[], aktuell: number | null, text: (w: number | null) => string, wahl: (w: number | null) => void) => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-      {werte.map((w) => (
-        <Druck key={String(w)} style={[styles.chip, aktuell === w && styles.chipAn]} onPress={() => wahl(w)}>
-          <Text style={[styles.chipText, aktuell === w && styles.chipTextAn]}>{text(w)}</Text>
-        </Druck>
-      ))}
-    </ScrollView>
+    <ChipReihe werte={werte} aktuell={aktuell} text={text} wahl={wahl} />
   );
 
   const inhalt = () => {
@@ -345,6 +339,54 @@ export const BildschirmzeitSheet = ({ ansicht, onClose }: Props) => {
         {inhalt()}
       </ScrollView>
     </SheetRahmen>
+  );
+};
+
+/**
+ * Eine waagerechte Auswahl. Die gewählte Zahl/Uhrzeit wird beim Aufbau in die
+ * Mitte gerollt — sonst stünde „22:00" weit rechts außer Sicht.
+ */
+const ChipReihe = ({
+  werte,
+  aktuell,
+  text,
+  wahl,
+}: {
+  werte: (number | null)[];
+  aktuell: number | null;
+  text: (w: number | null) => string;
+  wahl: (w: number | null) => void;
+}) => {
+  const ref = useRef<ScrollView>(null);
+  const breite = useRef(0);
+  const gerollt = useRef(false);
+  return (
+    <ScrollView
+      ref={ref}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chips}
+      onLayout={(e) => {
+        breite.current = e.nativeEvent.layout.width;
+      }}
+    >
+      {werte.map((w) => (
+        <Druck
+          key={String(w)}
+          style={[styles.chip, aktuell === w && styles.chipAn]}
+          onPress={() => wahl(w)}
+          onLayout={(e: any) => {
+            if (aktuell !== w || gerollt.current) return;
+            gerollt.current = true;
+            const { x, width } = e.nativeEvent.layout;
+            ref.current?.scrollTo({ x: Math.max(0, x - breite.current / 2 + width / 2), animated: false });
+          }}
+          accessibilityState={{ selected: aktuell === w }}
+        >
+          <Text style={[styles.chipText, aktuell === w && styles.chipTextAn]}>{text(w)}</Text>
+        </Druck>
+      ))}
+    </ScrollView>
   );
 };
 
