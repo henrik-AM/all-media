@@ -1293,6 +1293,68 @@ app.post('/api/einstellungen/:schluessel', route(async (req) =>
 ));
 
 /*
+ * Eigene Bildschirmzeit (Kasten 22). Alles läuft über die Funktionen aus dem
+ * Schema „bildschirmzeit" — der Server reicht nur durch. Gezählt wird mit
+ * Obergrenze in der Datenbank; ob ein Kind die Limits seiner Eltern lockern
+ * darf, entscheidet ebenfalls sie. Gegenstück in der App: lib/bildschirmzeit.ts.
+ */
+const Bildschirmzeit = require('../../gemeinsam/bildschirmzeit');
+
+async function bzRpc(req, fn, args) {
+  const { data, error } = await req.db.rpc(fn, args);
+  if (error) {
+    console.error(`${fn} fehlgeschlagen:`, error.message);
+    return { ok: false, error: 'Die Bildschirmzeit ist gerade nicht erreichbar.' };
+  }
+  return data || { ok: false };
+}
+
+app.get('/api/bildschirmzeit', route(async (req) =>
+  bzRpc(req, 'bildschirmzeit_stand', { p_ziel: req.query.kind ? String(req.query.kind) : null })
+));
+
+app.post('/api/bildschirmzeit/regeln', route(async (req) =>
+  bzRpc(req, 'bildschirmzeit_setzen', {
+    p_regeln: Bildschirmzeit.normalisieren(req.body?.regeln),
+    p_zeitzone: req.body?.zeitzone ? String(req.body.zeitzone).slice(0, 64) : null,
+    p_ziel: req.body?.kind || null,
+  })
+));
+
+app.post('/api/bildschirmzeit/zaehlen', route(async (req) =>
+  bzRpc(req, 'bildschirmzeit_zaehlen', {
+    p_stuecke: Array.isArray(req.body?.stuecke) ? req.body.stuecke.slice(0, 20) : [],
+  })
+));
+
+app.post('/api/bildschirmzeit/mehr', route(async (req) =>
+  bzRpc(req, 'bildschirmzeit_mehr', { p_ziel: String(req.body?.ziel || '') })
+));
+
+app.post('/api/bildschirmzeit/entsperren', route(async (req) =>
+  bzRpc(req, 'bildschirmzeit_entsperren', {
+    p_ziel: String(req.body?.ziel || ''),
+    p_code: String(req.body?.code || ''),
+    p_minuten: req.body?.minuten == null ? null : Number(req.body.minuten),
+  })
+));
+
+app.post('/api/bildschirmzeit/elternkontrolle-beenden', route(async (req) =>
+  bzRpc(req, 'bildschirmzeit_elternkontrolle_beenden', { p_kind: req.body?.kind || null })
+));
+
+/*
+ * Der Sicherheits-/Entsperrcode. Bis Kasten 22 legte die Website ihn im
+ * Klartext in user_settings und im localStorage ab; jetzt nur als Hash.
+ */
+app.post('/api/entsperrcode', route(async (req) =>
+  bzRpc(req, 'entsperrcode_setzen', {
+    p_neu: String(req.body?.neu || ''),
+    p_bisher: req.body?.bisher ? String(req.body.bisher) : null,
+  })
+));
+
+/*
  * Ein Aufruf eines fremden Profils. Ohne das bleibt die Profilstatistik
  * dauerhaft bei null: sie kann nur zaehlen, was jemand aufschreibt.
  */

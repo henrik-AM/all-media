@@ -1141,6 +1141,16 @@ function render() {
   renderBottomNav();
   renderTopBar();
 
+  /*
+   * Kasten 22: ist der Bereich der Hauptseite in der Bildschirmzeit zu,
+   * steht die Sperrseite statt seiner — nur er, die Leisten bleiben.
+   */
+  if (bzBereit()) {
+    const bzB = bzHauptBereich();
+    const bzSt = bzStatus(bzB);
+    if (bzB && !bzSt.offen) return renderBzSperre(bzB, bzSt);
+  }
+
   // Ausgewählte Kontakte für Standortfreigabe bearbeiten
   if (state.ausgewaehlteKontakteEdit) return renderAusgewaehlteKontakte();
 
@@ -6012,6 +6022,610 @@ function communityRow(c) {
     </li>`;
 }
 
+/* ------------------------------------------------ eigene Bildschirmzeit */
+/*
+ * Kasten 22 (Henrik 06.10.2026): eigene Limits — gesamt und je Bereich,
+ * Auszeit, Pausen-Erinnerung, „15 Min. mehr", Entsperren mit Code.
+ *
+ * MESSUNG: Gezählt wird nur, solange der Tab sichtbar ist
+ * (document.visibilityState) und ein Bereich offen ist. Welcher, sagt
+ * bzAnsicht() — aus state.area, sub() und der offenen Vollbildansicht,
+ * übersetzt von Bildschirmzeit.bereichFuer() (dieselbe Zuordnung wie die
+ * App). Alle 30 s und beim Verstecken des Tabs geht die Zeit nach Supabase
+ * (/api/bildschirmzeit/zaehlen → bildschirmzeit_zaehlen, mit Obergrenze);
+ * App und Website zählen in dieselben Zeilen.
+ *
+ * SPERRE: Ist der Bereich der Hauptseite zu, zeichnet render() die
+ * Sperrseite statt seiner — Leisten oben und unten bleiben. Ist eine
+ * Vollbildansicht (Chat, Story, Player …) zu, legt sich #bzSperre darüber.
+ *
+ * Die Rechnung steht in gemeinsam/bildschirmzeit.js. Gegenstück in der App:
+ * contexts/BildschirmzeitContext.tsx, components/BildschirmzeitSperre.tsx.
+ */
+const BZ = window.Bildschirmzeit;
+const bz = {
+  stand: null,
+  konto: null, // für wen `stand` gilt — nach einem Kontowechsel neu laden
+  uhr: BZ ? BZ.uhr() : null,
+  bereich: null,
+  takt: 0,
+  hinweisGezeigt: null,
+  pauseOffen: false,
+  hauptGesperrt: false,
+  schickt: false,
+};
+
+/*
+ * render() steht weit oben in der Datei und kann laufen, bevor `bz` hier
+ * angelegt ist (zeitliche Totzone von const). Deshalb fragen render() und
+ * renderSettings() über diese beiden Funktionen — Funktionsdeklarationen
+ * gibt es von Anfang an.
+ */
+function bzBereit() {
+  try {
+    return Boolean(BZ && bz.stand);
+  } catch {
+    return false;
+  }
+}
+function bzKinderZahl() {
+  try {
+    return (bz.stand?.kinder || []).length;
+  } catch {
+    return 0;
+  }
+}
+
+function bzAngemeldet() {
+  return Boolean(window.Anmeldung?.angemeldet?.());
+}
+
+async function bzLaden() {
+  if (!BZ || !bzAngemeldet()) {
+    bz.stand = null;
+    return;
+  }
+  try {
+    const r = await fetch('/api/bildschirmzeit');
+    const d = r.ok ? await r.json() : null;
+    if (d?.ok) {
+      bz.stand = d;
+      bz.konto = window.Anmeldung?.nutzer?.()?.id || null;
+    }
+  } catch (fehler) {
+    console.error('Bildschirmzeit laden fehlgeschlagen:', fehler);
+  }
+}
+
+/** Welche Vollbildansicht offen ist — so, wie die App sie nennt. */
+function bzOverlayArt() {
+  if (document.querySelector('.insight-viewer')) return 'insights';
+  if (overlay.hidden) return null;
+  const hat = (sel) => Boolean(overlay.querySelector(sel));
+  if (hat('.anruf')) return 'call';
+  if (hat('.viewer')) return 'story';
+  if (hat('.storyedit')) return 'storyEditor';
+  if (hat('.live')) return 'livestream';
+  if (hat('.camera')) return 'camera';
+  if (hat('#chatBack')) return 'chat';
+  if (hat('#kpBack') || hat('#profBack')) return 'profile';
+  if (hat('#clipBack')) return 'clip';
+  if (hat('#expBack') || hat('#fotosBack')) return 'explorer';
+  if (hat('#contactsBack')) return 'contacts';
+  return null;
+}
+
+/** Der Bereich der Hauptseite (ohne Vollbildansicht). */
+function bzHauptBereich() {
+  if (!BZ) return null;
+  const art = state.explorerView ? 'explorer' : state.area === 'communities' && state.openCommunityId ? 'community' : null;
+  return BZ.bereichFuer(state.area, sub(), art);
+}
+
+/** Der Bereich, der gerade wirklich zu sehen ist. */
+function bzAnsicht() {
+  if (!BZ) return null;
+  const art = bzOverlayArt();
+  if (!art) return bzHauptBereich();
+  return BZ.bereichFuer(state.area, sub(), art, art === 'camera' ? (state.openChatId ? 'chat' : 'story') : null);
+}
+
+function bzNutzungJetzt() {
+  return BZ.zusammen(bz.stand?.nutzung || {}, bz.uhr.offen(Date.now()));
+}
+
+function bzStatus(bereich) {
+  if (!BZ || !bz.stand || !bereich) return { offen: true };
+  return BZ.status(
+    {
+      regeln: bz.stand.regeln,
+      nutzung: bzNutzungJetzt(),
+      freigaben: bz.stand.freigaben,
+      jetzt: Date.now(),
+      zeitzone: bz.stand.zeitzone,
+      tag: bz.stand.tag,
+    },
+    bereich
+  );
+}
+
+async function bzSchicken(beimVerlassen = false) {
+  if (!BZ || !bzAngemeldet() || bz.schickt) return;
+  const stuecke = bz.uhr.abgeben(Date.now());
+  if (!stuecke.length) return;
+  bz.schickt = true;
+  try {
+    const r = await fetch('/api/bildschirmzeit/zaehlen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stuecke }),
+      // Beim Verstecken des Tabs soll der letzte Rest noch ankommen.
+      keepalive: beimVerlassen,
+    });
+    const d = r.ok ? await r.json() : null;
+    if (!d?.ok) {
+      bz.uhr.zuruecklegen(stuecke);
+      return;
+    }
+    if (bz.stand && d.tag === bz.stand.tag) bz.stand.nutzung = d.nutzung || bz.stand.nutzung;
+    else await bzLaden();
+  } catch {
+    bz.uhr.zuruecklegen(stuecke);
+  } finally {
+    bz.schickt = false;
+  }
+}
+
+/** Die Sperrseite — gleicher Aufbau wie components/BildschirmzeitSperre.tsx. */
+function bzSperreHtml(bereich, st, vollbild) {
+  const text = BZ.sperrText(st, bereich, bz.stand?.eltern?.name || null);
+  return `<div class="bzsperre ${vollbild ? 'bzsperre--voll' : ''}" data-bz-sperre="${esc(bereich)}" data-bz-grund="${esc(st.grund || '')}">
+    <div class="bzsperre__symbol">${st.grund === 'auszeit' ? ICONS.moon : ICONS.clock}</div>
+    <h2 class="bzsperre__titel">${esc(text.titel)}</h2>
+    <p class="bzsperre__satz">${esc(text.satz)}</p>
+    <p class="bzsperre__zahl">Heute in ${esc(BZ.bereichName(bereich))}: ${esc(BZ.dauerText(bzNutzungJetzt()[bereich] || 0))}</p>
+    ${st.mehrMoeglich ? `<button class="prof__btn is-primary" data-bz-mehr>${BZ.MEHR_MINUTEN} Min. mehr</button>` : ''}
+    <button class="prof__btn" data-bz-code-auf>Mit Entsperrcode freigeben</button>
+    <div class="bzsperre__code" data-bz-code hidden>
+      <p class="bzsperre__hinweis">${esc(text.code)}</p>
+      <input type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Entsperrcode" id="bzCode" aria-label="Entsperrcode">
+      <div class="bzsperre__wahl">
+        <button class="bzchip is-an" data-bz-min="15">15 Min.</button>
+        <button class="bzchip" data-bz-min="60">1 Std.</button>
+        <button class="bzchip" data-bz-min="">Für heute</button>
+      </div>
+      <button class="prof__btn is-primary" data-bz-freigeben>Freigeben</button>
+    </div>
+    <p class="bzsperre__meldung" data-bz-meldung role="alert" hidden></p>
+    ${vollbild ? '<button class="prof__btn" data-bz-schliessen>Schließen</button>' : ''}
+  </div>`;
+}
+
+function bzMeldungText(a) {
+  if (!a) return 'Keine Verbindung';
+  if (a.meldung) return a.meldung;
+  if (a.error) return a.error;
+  if (a.grund === 'kein_code') return a.eltern ? 'Dein Elternteil hat noch keinen Entsperrcode festgelegt.' : BZ.TEXTE.keinCode;
+  if (a.grund === 'nicht_erlaubt') return 'Das darfst du für dieses Konto nicht.';
+  return 'Das hat nicht geklappt';
+}
+
+function bzSperreBinden(wurzel, bereich, st, nachher) {
+  const ziel = st.ziel || bereich;
+  let minuten = 15;
+  const melden = (t) => {
+    const m = wurzel.querySelector('[data-bz-meldung]');
+    m.textContent = t;
+    m.hidden = !t;
+  };
+  wurzel.querySelector('[data-bz-mehr]')?.addEventListener('click', async () => {
+    await bzSchicken();
+    const a = await api('/api/bildschirmzeit/mehr', { ziel });
+    if (!a?.ok) return melden(bzMeldungText(a));
+    await bzLaden();
+    toast('15 Minuten mehr — danach ist wieder Schluss');
+    nachher();
+  });
+  wurzel.querySelector('[data-bz-code-auf]')?.addEventListener('click', (e) => {
+    e.currentTarget.hidden = true;
+    wurzel.querySelector('[data-bz-code]').hidden = false;
+    wurzel.querySelector('#bzCode')?.focus();
+  });
+  wurzel.querySelectorAll('[data-bz-min]').forEach((b) =>
+    b.addEventListener('click', () => {
+      minuten = b.dataset.bzMin ? Number(b.dataset.bzMin) : null;
+      wurzel.querySelectorAll('[data-bz-min]').forEach((x) => x.classList.toggle('is-an', x === b));
+    })
+  );
+  wurzel.querySelector('[data-bz-freigeben]')?.addEventListener('click', async () => {
+    const feld = wurzel.querySelector('#bzCode');
+    const code = (feld.value || '').replace(/\D/g, '');
+    if (!/^\d{4,8}$/.test(code)) return melden('Der Code hat 4 bis 8 Ziffern');
+    await bzSchicken();
+    const a = await api('/api/bildschirmzeit/entsperren', { ziel, code, minuten });
+    feld.value = '';
+    if (!a?.ok) return melden(bzMeldungText(a));
+    await bzLaden();
+    toast(minuten == null ? 'Für heute freigegeben' : `Für ${minuten === 60 ? '1 Std.' : minuten + ' Min.'} freigegeben`);
+    nachher();
+  });
+}
+
+/** Hauptseite gesperrt: Sperrseite statt des Bereichs (aus render()). */
+function renderBzSperre(bereich, st) {
+  main.innerHTML = `<div class="scroll">${bzSperreHtml(bereich, st, false)}</div>`;
+  bzSperreBinden(main, bereich, st, () => render());
+}
+
+/** Vollbildansicht schließen — über ihren eigenen Zurück-Knopf. */
+function bzOverlaySchliessen() {
+  const knopf = [
+    '#chatBack', '#kpBack', '#profBack', '#clipBack', '#expBack', '#fotosBack', '#contactsBack',
+    '#camClose', '#storyEditZu', '#storyClose', '[data-anruf="auflegen"]', '#liveStop',
+  ]
+    .map((s) => overlay.querySelector(s))
+    .find(Boolean) || document.querySelector('.insight-viewer #insZu');
+  if (knopf) knopf.click();
+  if (!overlay.hidden && !knopf) {
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+    render();
+  }
+}
+
+/** Die Decke über einer gesperrten Vollbildansicht. */
+function bzDecke(bereich, st) {
+  let decke = document.getElementById('bzSperre');
+  if (!st || st.offen) {
+    decke?.remove();
+    return;
+  }
+  const schluessel = `${bereich}:${st.grund}:${st.mehrMoeglich}`;
+  if (decke && decke.dataset.schluessel === schluessel) return;
+  decke?.remove();
+  decke = document.createElement('div');
+  decke.id = 'bzSperre';
+  decke.className = 'bzdecke';
+  decke.dataset.schluessel = schluessel;
+  decke.innerHTML = bzSperreHtml(bereich, st, true);
+  document.querySelector('.app').appendChild(decke);
+  bzSperreBinden(decke, bereich, st, () => bzTick());
+  decke.querySelector('[data-bz-schliessen]')?.addEventListener('click', () => {
+    decke.remove();
+    bzOverlaySchliessen();
+  });
+}
+
+function bzPauseZeigen(minuten) {
+  if (document.getElementById('bzPause')) return;
+  const karte = document.createElement('div');
+  karte.id = 'bzPause';
+  karte.className = 'bzdecke bzdecke--pause';
+  karte.innerHTML = `<div class="bzpause" role="dialog" aria-label="Pausen-Erinnerung">
+    <h2>${esc(BZ.TEXTE.pauseTitel)}</h2>
+    <p>${esc(BZ.TEXTE.pauseText(minuten))}</p>
+    <button class="prof__btn is-primary" id="bzPauseOk">Okay</button>
+  </div>`;
+  document.querySelector('.app').appendChild(karte);
+  karte.querySelector('#bzPauseOk').addEventListener('click', () => {
+    bz.uhr.stueckNeu(Date.now());
+    bz.pauseOffen = false;
+    karte.remove();
+  });
+}
+
+/** Alle 2 s: Bereich, Uhr, Sperre, Hinweis, Pause; alle 30 s schicken. */
+async function bzTick() {
+  if (!BZ) return;
+  if (!bzAngemeldet()) {
+    bz.uhr.setzen(null, false, Date.now());
+    bz.stand = null;
+    document.getElementById('bzSperre')?.remove();
+    return;
+  }
+  const konto = window.Anmeldung?.nutzer?.()?.id || null;
+  if (!bz.stand || bz.konto !== konto) {
+    bz.uhr.abgeben(Date.now()); // Zeit des alten Kontos verwerfen, nicht dem neuen anrechnen
+    await bzLaden();
+  }
+  if (!bz.stand) return;
+  if (BZ.ortszeit(Date.now(), bz.stand.zeitzone).tag !== bz.stand.tag) await bzLaden();
+
+  const sichtbar = document.visibilityState === 'visible';
+  const bereich = bzAnsicht();
+  bz.bereich = bereich;
+  bz.uhr.setzen(bereich, sichtbar, Date.now());
+
+  const art = bzOverlayArt();
+  const st = bzStatus(bereich);
+  // Vollbildansicht: Decke darüber. Hauptseite: neu zeichnen, wenn sich der Zustand dreht.
+  bzDecke(bereich, art ? st : null);
+  if (!art) {
+    const zu = Boolean(bereich) && !st.offen;
+    const zeigt = Boolean(main.querySelector('[data-bz-sperre]'));
+    if (zu !== zeigt && !document.querySelector('.sheet-backdrop')) render();
+  }
+
+  if (sichtbar && bereich && st.offen && st.hinweis) {
+    const schluessel = `${bz.stand.tag}:${bereich}:${st.restGrund}`;
+    if (bz.hinweisGezeigt !== schluessel) {
+      bz.hinweisGezeigt = schluessel;
+      toast(BZ.hinweisText(st, bereich));
+    }
+  }
+
+  const pause = BZ.normalisieren(bz.stand.regeln).pause;
+  if (pause && sichtbar && !bz.pauseOffen && bz.uhr.amStueck(Date.now()) >= pause * 60) {
+    bz.pauseOffen = true;
+    bzPauseZeigen(pause);
+  }
+
+  bz.takt += 2;
+  if (bz.takt >= BZ.TAKT_SEKUNDEN) {
+    bz.takt = 0;
+    void bzSchicken();
+  }
+}
+
+if (BZ) {
+  setInterval(() => void bzTick(), 2000);
+  document.addEventListener('visibilitychange', () => {
+    bz.uhr.setzen(bz.bereich, document.visibilityState === 'visible', Date.now());
+    if (document.visibilityState !== 'visible') void bzSchicken(true);
+    else void bzLaden().then(() => bzTick());
+  });
+}
+
+/* --- Einstellungen → Bildschirmzeit (gleiches Blatt wie BildschirmzeitSheet.tsx) --- */
+const BZ_TITEL = {
+  uebersicht: 'Heute und letzte 7 Tage',
+  gesamt: 'Tageslimit gesamt',
+  bereiche: 'Limits je Bereich',
+  auszeit: 'Auszeit',
+  pause: 'Pausen-Erinnerung',
+  kinder: 'Bildschirmzeit meiner Kinder',
+  menue: 'Bildschirmzeit',
+};
+
+function bzWertText(ansicht) {
+  if (!bzBereit()) return '';
+  if (ansicht === 'kinder') return String((bz.stand.kinder || []).length);
+  return BZ.wertText(ansicht, bz.stand.regeln, bzNutzungJetzt());
+}
+
+function openBildschirmzeit(ansicht) {
+  if (!BZ) return toast('Die Bildschirmzeit ist gerade nicht verfügbar');
+  const stapel = [ansicht];
+  let kind = null;
+  let kindStand = null;
+  let meldung = '';
+  let sheet = null;
+  let schliessen = null;
+
+  const aktuell = () => (kind ? kindStand : bz.stand);
+  const nutzung = () => (kind ? kindStand?.nutzung || {} : bzNutzungJetzt());
+
+  const kindLaden = async () => {
+    if (!kind) return;
+    const r = await fetch('/api/bildschirmzeit?kind=' + encodeURIComponent(kind.id));
+    const d = r.ok ? await r.json() : null;
+    kindStand = d?.ok ? d : null;
+  };
+
+  const aendern = async (f) => {
+    const neu = JSON.parse(JSON.stringify(BZ.normalisieren(aktuell()?.regeln)));
+    f(neu);
+    const fehler = BZ.pruefen(BZ.normalisieren(neu));
+    if (fehler) {
+      meldung = fehler;
+      return zeichnen();
+    }
+    const a = await api('/api/bildschirmzeit/regeln', { regeln: neu, zeitzone: BZ.geraetezone(), kind: kind?.id || null });
+    meldung = a?.ok ? '' : bzMeldungText(a);
+    if (a?.ok) {
+      if (kind) await kindLaden();
+      else await bzLaden();
+      renderSettingsWert();
+    }
+    zeichnen();
+  };
+
+  const zeile = (text, neben, attr = '', haken) => `<button class="item" ${attr}>
+      <span class="item__label">${esc(text)}</span>
+      ${neben ? `<span class="item__value">${esc(neben)}</span>` : ''}
+      ${haken ? `<span class="item__haken">${ICONS.check}</span>` : attr ? `<span class="row__chevron">${ICONS.chevron}</span>` : ''}
+    </button>`;
+  const chips = (werte, jetzt, text, art) =>
+    `<div class="bzchips">${werte
+      .map((w) => `<button class="bzchip ${jetzt === w ? 'is-an' : ''}" data-bz-chip="${art}" data-wert="${w == null ? '' : w}">${esc(text(w))}</button>`)
+      .join('')}</div>`;
+  const kopf = (t) => `<div class="sheet__gruppe">${esc(t)}</div>`;
+  const hinweis = (t) => `<p class="sheet__text bz__hinweis">${esc(t)}</p>`;
+
+  const inhalt = () => {
+    const st = aktuell();
+    if (!st) return hinweis('Wird geladen …');
+    const r = BZ.normalisieren(st.regeln);
+    const seite = stapel[stapel.length - 1];
+    const n = nutzung();
+
+    if (seite === 'menue') {
+      return ['uebersicht', 'gesamt', 'bereiche', 'auszeit', 'pause']
+        .map((p) => zeile(BZ_TITEL[p], BZ.wertText(p, r, n), `data-bz-zu="${p}"`))
+        .join('') + `<div class="sheet__footer"><button class="prof__btn is-danger" data-bz-beenden>Elternkontrolle beenden</button></div>`;
+    }
+    if (seite === 'kinder') {
+      const kinder = bz.stand?.kinder || [];
+      if (!kinder.length) return hinweis('Mit deinem Konto ist kein Kinderkonto verknüpft.');
+      return hinweis('Was du hier festlegst, kann dein Kind nur strenger machen. Entsperren geht mit deinem Entsperrcode.') +
+        kinder.map((k) => zeile(k.name, k.handle, `data-bz-kind="${esc(k.id)}"`)).join('');
+    }
+    if (seite === 'uebersicht') {
+      const woche = BZ.woche(st.woche, st.tag);
+      woche[6] = { ...woche[6], bereiche: { ...n }, gesamt: BZ.summe(n) };
+      const max = Math.max(60, ...woche.map((t) => t.gesamt));
+      const genutzt = BZ.BEREICHE.filter((b) => (n[b.key] || 0) > 0);
+      return kopf(`Heute · ${BZ.dauerText(BZ.summe(n))}`) +
+        (genutzt.length
+          ? genutzt.map((b) => `<div class="item"><span class="item__label">${esc(b.label)}</span><span class="item__value">${esc(BZ.dauerText(n[b.key]))}</span></div>`).join('')
+          : hinweis('Heute wurde noch nichts gemessen.')) +
+        kopf('Letzte 7 Tage') +
+        `<div class="bzbalken" aria-label="Nutzung der letzten 7 Tage">${woche
+          .map((t) => `<div class="bzbalken__spalte"><div class="bzbalken__rahmen"><div class="bzbalken__fuell" style="height:${Math.round((t.gesamt / max) * 100)}%"></div></div><span>${esc(t.wochentag)}</span></div>`)
+          .join('')}</div>` +
+        woche.slice().reverse()
+          .map((t) => `<div class="item"><span class="item__label">${esc(`${t.wochentag}, ${t.tag.slice(8, 10)}.${t.tag.slice(5, 7)}.`)}</span><span class="item__value">${esc(BZ.dauerText(t.gesamt))}</span></div>`)
+          .join('') +
+        hinweis('Gezählt wird nur, solange ein Bereich offen und im Vordergrund ist — App und Website zusammen.');
+    }
+    if (seite === 'gesamt') {
+      return hinweis('Ist es erreicht, bleiben nur Bereiche mit „Immer erlaubt" offen. Sie zählen nicht mit.') +
+        kopf('Werktags (Mo–Fr)') +
+        chips([null, ...BZ.GESAMT_MINUTEN], r.gesamt.werktag, (x) => BZ.minutenText(x), 'gw') +
+        (r.gesamt.werktag != null
+          ? kopf('Am Wochenende (Sa, So)') + chips([null, ...BZ.GESAMT_MINUTEN], r.gesamt.wochenende, (x) => (x == null ? 'Wie werktags' : BZ.minutenText(x)), 'gwe')
+          : '');
+    }
+    if (seite === 'bereiche') {
+      return hinweis('Die Bereiche tun Verschiedenes — leg für jeden fest, wie lange er offen sein darf.') +
+        BZ.BEREICHE.map((b) => zeile(b.label, BZ.bereichWertText(r, b.key), `data-bz-zu="bereich:${b.key}"`)).join('');
+    }
+    if (seite.startsWith('bereich:')) {
+      const key = seite.slice(8);
+      const b = BZ.BEREICHE.find((x) => x.key === key);
+      const modus = BZ.modusVon(r, key);
+      const e = r.bereiche[key] || {};
+      return hinweis(b.hinweis) +
+        BZ.MODI.map((m) => `<button class="item bz__modus" data-bz-modus="${m.key}" role="radio" aria-checked="${modus === m.key}">
+            <span class="item__label">${esc(m.label)}<small>${esc(m.hinweis)}</small></span>
+            ${modus === m.key ? `<span class="item__haken">${ICONS.check}</span>` : ''}
+          </button>`).join('') +
+        (modus === 'limit'
+          ? kopf('Werktags (Mo–Fr)') + chips(BZ.LIMIT_MINUTEN, e.werktag ?? null, (x) => BZ.minutenText(x), 'bw') +
+            kopf('Am Wochenende (Sa, So)') + chips([null, ...BZ.LIMIT_MINUTEN], e.wochenende ?? null, (x) => (x == null ? 'Wie werktags' : BZ.minutenText(x)), 'bwe')
+          : '');
+    }
+    if (seite === 'auszeit') {
+      const a = r.auszeit;
+      const minuten = BZ.UHRZEITEN.map(BZ.minuteAus);
+      return `<div class="item"><span class="item__label">Auszeit</span>
+          <button class="switch ${a.an ? 'is-on' : ''}" data-bz-auszeit aria-label="Auszeit"><span class="switch__knob"></span></button></div>` +
+        hinweis(BZ.TEXTE.auszeitErklaerung) +
+        kopf('Beginn') + chips(minuten, BZ.minuteAus(a.von), (x) => BZ.uhrzeit(x), 'av') +
+        kopf('Ende') + chips(minuten, BZ.minuteAus(a.bis), (x) => BZ.uhrzeit(x), 'ab');
+    }
+    return hinweis('Nach so vielen Minuten am Stück erinnert dich All Media an eine Pause. Fünf Minuten weg zählen als Pause.') +
+      BZ.PAUSE_MINUTEN.map((p) => zeile(p ? `Alle ${BZ.minutenText(p)}` : 'Aus', '', `data-bz-pause="${p}"`, r.pause === p)).join('');
+  };
+
+  const zeichnen = () => {
+    const seite = stapel[stapel.length - 1];
+    const titel = seite.startsWith('bereich:')
+      ? BZ.bereichName(seite.slice(8))
+      : kind && seite !== 'kinder' ? `${BZ_TITEL[seite]} · ${kind.name}` : BZ_TITEL[seite];
+    const eltern = !kind && bz.stand?.eltern && seite !== 'uebersicht' && seite !== 'kinder'
+      ? `<p class="bz__eltern">${esc(BZ.TEXTE.elternGesetzt(bz.stand.eltern.name))}</p>` : '';
+    const blatt = sheet.querySelector('.sheet');
+    blatt.innerHTML = `${sheetKopf(titel, true)}
+      <div class="sheet__body" data-bz-blatt="${esc(seite)}">${eltern}
+        ${meldung ? `<p class="sheet__fehler" role="alert">${esc(meldung)}</p>` : ''}
+        ${inhalt()}
+      </div>`;
+    binden(blatt);
+  };
+
+  const zu = (s) => {
+    meldung = '';
+    stapel.push(s);
+    zeichnen();
+  };
+
+  const binden = (blatt) => {
+    blatt.querySelector('[data-sheet-close]').addEventListener('click', (e) => {
+      e.stopImmediatePropagation();
+      meldung = '';
+      if (stapel.length <= 1) return schliessen();
+      if (stapel[stapel.length - 1] === 'menue') {
+        kind = null;
+        kindStand = null;
+      }
+      stapel.pop();
+      zeichnen();
+    });
+    blatt.querySelectorAll('[data-bz-zu]').forEach((b) => b.addEventListener('click', () => zu(b.dataset.bzZu)));
+    blatt.querySelectorAll('[data-bz-kind]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        kind = (bz.stand?.kinder || []).find((k) => k.id === b.dataset.bzKind) || null;
+        kindStand = null;
+        zu('menue');
+        await kindLaden();
+        zeichnen();
+      })
+    );
+    blatt.querySelector('[data-bz-beenden]')?.addEventListener('click', async () => {
+      const a = await api('/api/bildschirmzeit/elternkontrolle-beenden', { kind: kind?.id });
+      meldung = a?.ok ? `${kind.name} kann die Bildschirmzeit jetzt selbst ändern.` : bzMeldungText(a);
+      await kindLaden();
+      zeichnen();
+    });
+    const seite = stapel[stapel.length - 1];
+    const key = seite.startsWith('bereich:') ? seite.slice(8) : null;
+    blatt.querySelectorAll('[data-bz-chip]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const w = b.dataset.wert === '' ? null : Number(b.dataset.wert);
+        const art = b.dataset.bzChip;
+        void aendern((r) => {
+          if (art === 'gw') {
+            r.gesamt.werktag = w;
+            if (w == null) r.gesamt.wochenende = null;
+          } else if (art === 'gwe') r.gesamt.wochenende = w;
+          else if (art === 'bw') r.bereiche[key] = { ...r.bereiche[key], modus: 'limit', werktag: w };
+          else if (art === 'bwe') r.bereiche[key] = { ...r.bereiche[key], modus: 'limit', wochenende: w };
+          else if (art === 'av') r.auszeit.von = BZ.uhrzeit(w);
+          else if (art === 'ab') r.auszeit.bis = BZ.uhrzeit(w);
+        });
+      })
+    );
+    blatt.querySelectorAll('[data-bz-modus]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const m = b.dataset.bzModus;
+        void aendern((r) => {
+          const e = r.bereiche[key];
+          if (m === 'standard') delete r.bereiche[key];
+          else if (m === 'limit') r.bereiche[key] = { modus: 'limit', werktag: e?.werktag ?? 30, wochenende: e?.wochenende ?? null };
+          else r.bereiche[key] = { modus: m };
+        });
+      })
+    );
+    blatt.querySelector('[data-bz-auszeit]')?.addEventListener('click', () =>
+      void aendern((r) => {
+        r.auszeit.an = !r.auszeit.an;
+      })
+    );
+    blatt.querySelectorAll('[data-bz-pause]').forEach((b) =>
+      b.addEventListener('click', () =>
+        void aendern((r) => {
+          r.pause = Number(b.dataset.bzPause);
+        })
+      )
+    );
+  };
+
+  sheet = openSheet(BZ_TITEL[ansicht], '<div class="sheet__body"></div>', (s, close) => {
+    schliessen = close;
+  }, { schliessen: true, hoch: true });
+  zeichnen();
+  // Frisch holen — die App kann inzwischen gezählt oder geändert haben.
+  void bzLaden().then(zeichnen);
+}
+
+/** Nur die Werte rechts neben den Bildschirmzeit-Punkten nachziehen. */
+function renderSettingsWert() {
+  document.querySelectorAll('[data-bz-wert]').forEach((el) => {
+    el.textContent = bzWertText(el.dataset.bzWert);
+  });
+}
+
 /* ---------------------------------------------------------- settings */
 /*
  * Prototyp-Frame "Einstellungen": vier Abschnitte (Allgemein, Messenger,
@@ -6066,10 +6680,19 @@ const SETTINGS = [
       {
         label: 'Sicherheits-/Entsperrcode',
         icon: 'lock',
+        /*
+         * Kasten 22: bis hierher landete der Code im Klartext in
+         * user_settings und im localStorage. Jetzt geht er als bcrypt-Hash
+         * nach Supabase (entsperrcode_setzen) und entsperrt die
+         * Bildschirmzeit. Steht schon einer, braucht es den bisherigen —
+         * oder eine frische Anmeldung mit Passwort.
+         */
         eingabe: [
           { key: 'code', label: 'Neuer Code (4 bis 8 Ziffern)', typ: 'zahl', pflicht: true },
           { key: 'wdh', label: 'Code wiederholen', typ: 'zahl', pflicht: true },
+          { key: 'bisher', label: 'Bisheriger Code (falls schon einer gesetzt ist)', typ: 'zahl' },
         ],
+        aktion: 'entsperrcode',
         pruefen: (w) =>
           !/^\d{4,8}$/.test(w.code)
             ? 'Der Code muss aus 4 bis 8 Ziffern bestehen'
@@ -6164,6 +6787,23 @@ const SETTINGS = [
       { label: 'Vorschau anzeigen', icon: 'eye', toggle: 'vorschau' },
       { label: 'Gruppen-Mitteilungen', icon: 'people', wahlKey: 'gruppenMitteilungen', wahl: ['Alle Nachrichten', 'Nur Erwähnungen', 'Aus'], standard: 'Alle Nachrichten' },
       { label: 'Ruhezeiten', icon: 'moon', wahlKey: 'ruhezeiten', wahl: ['Aus', '22 – 7 Uhr', '23 – 8 Uhr', '0 – 9 Uhr'], standard: 'Aus' },
+    ],
+  },
+  /*
+   * Kasten 22 (Henrik 06.10.2026): eigene Bildschirmzeit. Abgegrenzt von
+   * „Ruhezeiten" unter Mitteilungen: die schalten nur Töne stumm, die
+   * Auszeit sperrt Bereiche. Gleicher Abschnitt in der App.
+   */
+  {
+    id: 'bildschirmzeit',
+    title: 'Bildschirmzeit',
+    items: [
+      { label: 'Heute und letzte 7 Tage', icon: 'eye', bz: 'uebersicht' },
+      { label: 'Tageslimit gesamt', icon: 'clock', bz: 'gesamt' },
+      { label: 'Limits je Bereich', icon: 'grid', bz: 'bereiche' },
+      { label: 'Auszeit', icon: 'moon', bz: 'auszeit' },
+      { label: 'Pausen-Erinnerung', icon: 'pause', bz: 'pause' },
+      { label: 'Bildschirmzeit meiner Kinder', icon: 'people', bz: 'kinder', nurEltern: true },
     ],
   },
   {
@@ -7020,6 +7660,8 @@ function einstellungsListe(art) {
 function openEinstellung(punkt, nachher) {
   // Sichtbarkeit hat ein eigenes Blatt: vier Stufen plus Ausnahmeliste.
   if (punkt.sichtbar) return openSichtbarkeit(punkt);
+  // Kasten 22: das Bildschirmzeit-Blatt.
+  if (punkt.bz) return openBildschirmzeit(punkt.bz);
 
   /*
    * „Mein Verlauf" bei jedem Oeffnen frisch holen und erst dann zeigen: wer
@@ -7128,6 +7770,17 @@ function openEinstellung(punkt, nachher) {
             );
           })();
           return null;
+        }
+
+        // Kasten 22: der Code geht als Hash nach Supabase. Fehler stehen im Blatt.
+        if (punkt.aktion === 'entsperrcode') {
+          return (async () => {
+            const antwort = await api('/api/entsperrcode', { neu: werte.code, bisher: werte.bisher || null });
+            if (!antwort?.ok) return bzMeldungText(antwort);
+            toast('Code gesetzt');
+            void bzLaden();
+            return null;
+          })();
         }
 
         if (punkt.aktion === 'passwort') {
@@ -7399,6 +8052,7 @@ function renderSettings() {
       <span class="item__icon">${ICONS[it.icon]}</span>
       <span class="item__label">${esc(it.label)}</span>
       ${wert ? `<span class="item__value">${esc(wert)}</span>` : ''}
+      ${it.bz ? `<span class="item__value" data-bz-wert="${esc(it.bz)}">${esc(bzWertText(it.bz))}</span>` : ''}
       <span class="row__chevron">${ICONS.chevron}</span>
     </button>`;
   };
@@ -7463,7 +8117,10 @@ function renderSettings() {
             ? ''
             : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} →</button>`
         }
-          <div class="group">${sec.items.map((it) => itemHtml(it, sec.id)).join('')}</div>`
+          <div class="group">${sec.items
+            .filter((it) => !it.nurEltern || bzKinderZahl() > 0)
+            .map((it) => itemHtml(it, sec.id))
+            .join('')}</div>`
       ).join('')}
       ${nur ? '' : `<div class="group">
         <button class="item" data-setting="Über All Media">

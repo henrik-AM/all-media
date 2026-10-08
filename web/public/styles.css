@@ -4715,3 +4715,54 @@ body.ist-abgemeldet .ptr-indicator {
 /* Mehrere Knöpfe im Fuß: gleich breit nebeneinander, bei vieren zwei Reihen. */
 #swInhalt .sheet__footer:has(.prof__btn + .prof__btn) { display: flex; flex-wrap: wrap; gap: 8px; }
 #swInhalt .sheet__footer .prof__btn { flex: 1 1 calc(50% - 4px); padding: 0 14px; }
+
+/* ---------- Eigene Bildschirmzeit (Kasten 22) ---------- */
+/* Sperrseite: steht statt genau des gesperrten Bereichs (bzSperreHtml in app.js). */
+.bzsperre {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 40px 24px 32px; text-align: center; max-width: 420px; margin: 0 auto;
+}
+.bzsperre--voll { padding-top: 72px; }
+.bzsperre .prof__btn { align-self: stretch; }
+.bzsperre__symbol {
+  width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand);
+}
+.bzsperre__symbol svg { width: 38px; height: 38px; }
+.bzsperre__titel { font-size: 20px; font-weight: 700; margin: 0; }
+.bzsperre__satz { color: var(--text-2); margin: 0; font-size: 15px; }
+.bzsperre__zahl { color: var(--text-3); margin: 0; font-size: 13px; }
+.bzsperre__code { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+.bzsperre__code[hidden] { display: none; }
+.bzsperre__hinweis { color: var(--text-2); font-size: 13px; margin: 0; }
+.bzsperre__code input {
+  font-size: 18px; letter-spacing: 4px; text-align: center; padding: 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text);
+}
+.bzsperre__wahl { display: flex; gap: 8px; justify-content: center; }
+.bzsperre__meldung { color: var(--danger); font-size: 13px; margin: 0; }
+/* Decke über einer gesperrten Vollbildansicht und die Pausen-Karte. */
+.bzdecke { position: absolute; inset: 0; z-index: 60; background: var(--surface); overflow-y: auto; }
+.bzdecke--pause { background: rgba(6, 8, 12, 0.52); display: grid; place-items: center; padding: 24px; z-index: 70; }
+.bzpause {
+  background: var(--surface); border-radius: 16px; padding: 22px; max-width: 380px; width: 100%;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.bzpause h2 { margin: 0; font-size: 18px; }
+.bzpause p { margin: 0; color: var(--text-2); }
+/* Auswahl im Blatt: Minuten und Uhrzeiten. */
+.bzchips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px 10px; scrollbar-width: none; }
+.bzchip {
+  flex: none; font-size: 13px; font-weight: 600; color: var(--text-2);
+  border: 1px solid var(--border); background: var(--surface); padding: 7px 13px; border-radius: 999px;
+}
+.bzchip.is-an { background: var(--brand); border-color: var(--brand); color: #fff; }
+.bz__hinweis { font-size: 13px; color: var(--text-2); }
+.bz__eltern { margin: 10px 16px; padding: 12px; border-radius: 12px; background: var(--brand-soft); color: var(--brand); font-size: 13px; }
+.bz__modus .item__label small { display: block; font-size: 12px; color: var(--text-3); font-weight: 400; margin-top: 2px; white-space: normal; }
+.bz__modus { height: auto; min-height: 54px; padding-top: 8px; padding-bottom: 8px; }
+.bzbalken { display: flex; gap: 8px; height: 120px; padding: 6px 16px 12px; align-items: flex-end; }
+.bzbalken__spalte { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bzbalken__spalte span { font-size: 12px; color: var(--text-3); }
+.bzbalken__rahmen { flex: 1; width: 70%; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
+.bzbalken__fuell { width: 100%; background: var(--brand); border-radius: 6px; }
