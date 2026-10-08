@@ -32,6 +32,9 @@ import {
   verlaufZeit,
 } from '../../lib/aktionen';
 import { PASSWORT_REGEL, passwortAendern, passwortPruefen } from '../../lib/supabaseAuth';
+import { BildschirmzeitSheet, BzAnsicht } from '../../components/BildschirmzeitSheet';
+import { useBildschirmzeit } from '../../contexts/BildschirmzeitContext';
+import { Bildschirmzeit, bzMeldung, entsperrcodeSetzen } from '../../lib/bildschirmzeit';
 
 // Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
 const Telefon = require('../../../gemeinsam/telefon') as typeof import('../../../gemeinsam/telefon');
@@ -88,7 +91,11 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden';
+  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'entsperrcode';
+  /** Kasten 22: öffnet das Bildschirmzeit-Blatt auf dieser Unterseite. */
+  bz?: BzAnsicht;
+  /** Nur zeigen, wenn ein Kinderkonto mit mir verknüpft ist. */
+  nurEltern?: boolean;
   gefahr?: boolean;
 }
 
@@ -165,10 +172,19 @@ const SECTIONS: Section[] = [
       {
         label: 'Sicherheits-/Entsperrcode',
         icon: 'lock-closed-outline',
+        /*
+         * Kasten 22: bis hierher meldete das Formular „Code gesetzt" und
+         * speicherte nichts. Jetzt geht der Code als bcrypt-Hash nach
+         * Supabase (entsperrcode_setzen) und entsperrt die Bildschirmzeit.
+         * Steht schon einer, braucht es den bisherigen — oder eine frische
+         * Anmeldung mit Passwort.
+         */
         eingabe: [
           { key: 'code', label: 'Neuer Code (4 bis 8 Ziffern)', typ: 'zahl', pflicht: true },
           { key: 'wdh', label: 'Code wiederholen', typ: 'zahl', pflicht: true },
+          { key: 'bisher', label: 'Bisheriger Code (falls schon einer gesetzt ist)', typ: 'zahl' },
         ],
+        aktion: 'entsperrcode',
         pruefen: (w) =>
           !/^\d{4,8}$/.test(w.code)
             ? 'Der Code muss aus 4 bis 8 Ziffern bestehen'
@@ -262,6 +278,24 @@ const SECTIONS: Section[] = [
       { label: 'Vorschau anzeigen', icon: 'eye-outline', toggle: 'vorschau' },
       { label: 'Gruppen-Mitteilungen', icon: 'people-circle-outline', wahlKey: 'gruppenMitteilungen', wahl: ['Alle Nachrichten', 'Nur Erwähnungen', 'Aus'], standard: 'Alle Nachrichten' },
       { label: 'Ruhezeiten', icon: 'moon-outline', wahlKey: 'ruhezeiten', wahl: ['Aus', '22 – 7 Uhr', '23 – 8 Uhr', '0 – 9 Uhr'], standard: 'Aus' },
+    ],
+  },
+  /*
+   * Kasten 22 (Henrik 06.10.2026): eigene Bildschirmzeit — Tageslimit,
+   * Limits je Bereich, Auszeit, Pausen-Erinnerung, Übersicht. Abgegrenzt
+   * von „Ruhezeiten" unter Mitteilungen: die schalten nur Töne stumm, die
+   * Auszeit sperrt Bereiche. Gleicher Abschnitt auf der Website.
+   */
+  {
+    id: 'bildschirmzeit',
+    title: 'Bildschirmzeit',
+    items: [
+      { label: 'Heute und letzte 7 Tage', icon: 'bar-chart-outline', bz: 'uebersicht' },
+      { label: 'Tageslimit gesamt', icon: 'hourglass-outline', bz: 'gesamt' },
+      { label: 'Limits je Bereich', icon: 'apps-outline', bz: 'bereiche' },
+      { label: 'Auszeit', icon: 'moon-outline', bz: 'auszeit' },
+      { label: 'Pausen-Erinnerung', icon: 'cafe-outline', bz: 'pause' },
+      { label: 'Bildschirmzeit meiner Kinder', icon: 'people-outline', bz: 'kinder', nurEltern: true },
     ],
   },
   {
@@ -698,6 +732,15 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   };
 
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
+  // Kasten 22: offenes Bildschirmzeit-Blatt und was rechts daneben steht.
+  const [bzOffen, setBzOffen] = useState<BzAnsicht | null>(null);
+  const bz = useBildschirmzeit();
+  const bzText = (a: BzAnsicht) =>
+    a === 'kinder'
+      ? String(bz.stand?.kinder.length ?? '')
+      : bz.stand
+        ? Bildschirmzeit.wertText(a, bz.stand.regeln, bz.nutzungJetzt())
+        : '';
   /*
    * Ein einzelner Abschnitt als eigene Seite - das Ziel der Ueberschrift mit
    * Pfeil. Bis zum 24.09.2026 stand "Konto →" usw. als reiner Text da; Henrik
@@ -948,13 +991,14 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
               </Druck>
             )}
             <View style={styles.group}>
-              {section.items.map((item) => (
+              {section.items.filter((item) => !item.nurEltern || (bz.stand?.kinder.length ?? 0) > 0).map((item) => (
                 <Druck
                   key={`${section.id}-${item.label}`}
                   style={styles.item}
                   onPress={() => {
                     if (item.toggle) return;
                     if (item.sichtbar) return setSichtOffen(item);
+                    if (item.bz) return setBzOffen(item.bz);
                     oeffne(item);
                   }}
                 >
@@ -991,6 +1035,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       {!!item.sichtbar && (
                         <Text style={styles.itemValue}>{sichtText(item.sichtbar)}</Text>
                       )}
+                      {!!item.bz && <Text style={styles.itemValue} numberOfLines={1}>{bzText(item.bz)}</Text>}
                       <Ionicons name="chevron-forward" size={18} color={colors.text3} />
                     </>
                   )}
@@ -1052,6 +1097,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           onClose={() => setSichtOffen(null)}
         />
       )}
+
+      {bzOffen && <BildschirmzeitSheet ansicht={bzOffen} onClose={() => setBzOffen(null)} />}
 
       {offen?.eingabe && (
         <FormularSheet
@@ -1128,6 +1175,17 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
               void (async () => {
                 const ergebnis = await aktionen.telefon(werte.nummer ?? '');
                 onNotice(ergebnis.ok ? `Telefonnummer gespeichert: ${ergebnis.wert}` : ergebnis.wert);
+              })();
+              setOffen(null);
+              return null;
+            }
+
+            if (offen.aktion === 'entsperrcode') {
+              if (!supabase) return 'Dafür musst du angemeldet sein';
+              void (async () => {
+                const a = await entsperrcodeSetzen(supabase, werte.code, werte.bisher?.trim());
+                onNotice(a.ok ? 'Code gesetzt' : bzMeldung(a));
+                if (a.ok) void bz.neuLaden();
               })();
               setOffen(null);
               return null;
