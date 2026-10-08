@@ -82,6 +82,8 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "Empfaengerzeilen lesen" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_12_insight_rekursion.sql | **SUPABASE_SCHEMA_12_insight_rekursion.sql** |
 | Regel "Insight als gesehen vermerken" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Regel "Likes lesen" auf public.post_likes | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql | **SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql** (vorher für alle offen; jetzt like_sichtbar()) |
+| Regel "Kommentar-Likes lesen" auf public.comment_likes | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_83_likes_wirkt.sql | **SUPABASE_SCHEMA_83_likes_wirkt.sql** (vorher für alle offen; jetzt kommentar_like_sichtbar()) |
+| Regel "Story-Likes lesen" auf public.story_likes | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_83_likes_wirkt.sql | **SUPABASE_SCHEMA_83_likes_wirkt.sql** (vorher für alle offen; jetzt story_like_sichtbar()) |
 | Regel "Kanal anlegen" auf public.community_channels | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Medien lesen" auf storage.objects | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_medien_auflisten.sql | **SUPABASE_SCHEMA_24_medien_auflisten.sql** |
 | Regel "Mitglieder hinzufuegen" auf public.chat_members | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_22_dm_sperre.sql | **SUPABASE_SCHEMA_22_dm_sperre.sql** |

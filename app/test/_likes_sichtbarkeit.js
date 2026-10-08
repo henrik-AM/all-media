@@ -266,6 +266,115 @@ const mitFrist = (versprechen, was, ms = 20000) =>
       pruefe('Der Likende sieht sein eigenes Like bei „Niemand“',
         await zeileSichtbar(liker, liker));
     }
+
+    /*
+     * Kasten 26.4 — der ERSTELLER sieht jedes Like, egal wie der Likende
+     * eingestellt ist. Das braucht einen Beitrag, der einem der beiden Konten
+     * gehört (oben ging es bewusst um einen Dritten). Dazu Kasten 26.2: die
+     * Likes auf Kommentare und Storys unterliegen derselben Einstellung
+     * (Schema 83) — Besitzer sieht, Dritte nicht, eigene immer, Zahl bleibt.
+     */
+    console.log('\nErsteller-Ausnahme und Kommentar-/Story-Likes (Kasten 26)');
+    const eigenerBeitrag = async (k) => {
+      const { data } = await k.client.from('posts').select('id').eq('user_id', k.id).limit(1);
+      return data?.[0]?.id ?? null;
+    };
+    for (const [liker, ersteller] of [[a, b], [b, a]]) {
+      await ausnahmenLeeren(liker);
+      await stufe(liker, 'niemand');
+      await setzeFolgen(ersteller, liker, true);
+      const pid = await eigenerBeitrag(ersteller);
+      if (!pid) {
+        pruefe(`${ersteller.rufname} hat einen eigenen Beitrag für die Ersteller-Prüfung`, false);
+      } else {
+        const hatte = (await liker.client.from('post_likes').select('post_id')
+          .eq('post_id', pid).eq('user_id', liker.id)).data?.length > 0;
+        if (!hatte) {
+          const { error } = await liker.client.from('post_likes').insert({ post_id: pid, user_id: liker.id });
+          if (error) throw error;
+        }
+        const { data: sieht } = await ersteller.client.from('post_likes').select('user_id')
+          .eq('post_id', pid).eq('user_id', liker.id);
+        pruefe(`Ersteller ${ersteller.rufname} sieht das Like von ${liker.rufname} trotz „Niemand“ (26.4)`,
+          (sieht || []).length === 1);
+        if (!hatte) await liker.client.from('post_likes').delete().eq('post_id', pid).eq('user_id', liker.id);
+      }
+
+      // Kommentar des Erstellers, Like des Likenden.
+      const { data: kom, error: kErr2 } = await ersteller.client.from('comments')
+        .insert({ post_id: beitrag.id, user_id: ersteller.id, text: 'Likes-Prüfung (Kasten 26)' })
+        .select('id').single();
+      if (kErr2) throw kErr2;
+      try {
+        await liker.client.from('comment_likes').insert({ comment_id: kom.id, user_id: liker.id });
+        const gesehen = async (wer) => (await wer.client.from('comment_likes').select('user_id')
+          .eq('comment_id', kom.id).eq('user_id', liker.id)).data?.length > 0;
+        pruefe(`Kommentar-Like: Ersteller ${ersteller.rufname} sieht es trotz „Niemand“ (26.4)`, await gesehen(ersteller));
+        pruefe('Kommentar-Like: der Likende sieht sein eigenes', await gesehen(liker));
+        const { data: zz } = await ersteller.client.rpc('kommentar_like_zahlen', { kommentare: [kom.id] });
+        pruefe('Kommentar-Like-Zahl: 1', Number(zz?.[0]?.anzahl) === 1, String(zz?.[0]?.anzahl));
+      } finally {
+        await ersteller.client.from('comments').delete().eq('id', kom.id);
+      }
+
+      // Kommentar des Likenden selbst, den er selbst liked; Betrachter ist ein Dritter.
+      const { data: kom2, error: kErr3 } = await liker.client.from('comments')
+        .insert({ post_id: beitrag.id, user_id: liker.id, text: 'Likes-Prüfung 2 (Kasten 26)' })
+        .select('id').single();
+      if (kErr3) throw kErr3;
+      try {
+        await liker.client.from('comment_likes').insert({ comment_id: kom2.id, user_id: liker.id });
+        const dritterSieht = async () => (await ersteller.client.from('comment_likes').select('user_id')
+          .eq('comment_id', kom2.id)).data?.length > 0;
+        // Besitzer des Kommentars ist hier der Likende selbst — er sieht es. Der
+        // Betrachter ist weder Besitzer noch Liker, also ein Dritter.
+        for (const [st, erwartet] of [['niemand', false], ['alle', true], ['nur_follower', true]]) {
+          await stufe(liker, st);
+          const sieht = await dritterSieht();
+          pruefe(`Kommentar-Like Dritter bei „${st}“: ${erwartet ? 'lesbar' : 'gesperrt'}`,
+            sieht === erwartet, sieht ? 'lesbar' : 'gesperrt');
+          const { data: zz } = await ersteller.client.rpc('kommentar_like_zahlen', { kommentare: [kom2.id] });
+          pruefe(`Kommentar-Like-Zahl bei „${st}“ bleibt 1`, Number(zz?.[0]?.anzahl) === 1, String(zz?.[0]?.anzahl));
+        }
+        await setzeFolgen(ersteller, liker, false);
+        await stufe(liker, 'nur_follower');
+        pruefe('Kommentar-Like „nur_follower“ ohne Folgen: gesperrt', !(await dritterSieht()));
+        await setzeFolgen(ersteller, liker, true);
+      } finally {
+        await liker.client.from('comments').delete().eq('id', kom2.id);
+      }
+
+      // Storys: eine Story des Erstellers, Like des Likenden, und umgekehrt.
+      const verfall = new Date(Date.now() + 3600e3).toISOString();
+      const { data: st1, error: sErr } = await ersteller.client.from('stories')
+        .insert({ user_id: ersteller.id, media_url: 'x/likespruefung.jpg', media_type: 'image', expires_at: verfall })
+        .select('id').single();
+      if (sErr) throw sErr;
+      try {
+        await stufe(liker, 'niemand');
+        await liker.client.from('story_likes').insert({ story_id: st1.id, user_id: liker.id });
+        const sl = async (wer) => (await wer.client.from('story_likes').select('user_id')
+          .eq('story_id', st1.id).eq('user_id', liker.id)).data?.length > 0;
+        pruefe(`Story-Like: Ersteller ${ersteller.rufname} sieht es trotz „Niemand“ (26.4)`, await sl(ersteller));
+        pruefe('Story-Like: der Likende sieht sein eigenes', await sl(liker));
+      } finally {
+        await ersteller.client.from('stories').delete().eq('id', st1.id);
+      }
+      const { data: st2, error: sErr2 } = await liker.client.from('stories')
+        .insert({ user_id: liker.id, media_url: 'x/likespruefung2.jpg', media_type: 'image', expires_at: verfall })
+        .select('id').single();
+      if (sErr2) throw sErr2;
+      try {
+        await liker.client.from('story_likes').insert({ story_id: st2.id, user_id: liker.id });
+        for (const [st, erwartet] of [['niemand', false], ['alle', true]]) {
+          await stufe(liker, st);
+          const sieht = (await ersteller.client.from('story_likes').select('user_id').eq('story_id', st2.id)).data?.length > 0;
+          pruefe(`Story-Like Dritter bei „${st}“: ${erwartet ? 'lesbar' : 'gesperrt'}`, sieht === erwartet);
+        }
+      } finally {
+        await liker.client.from('stories').delete().eq('id', st2.id);
+      }
+    }
   } finally {
     console.log('\nAufraeumen');
     for (const k of [a, b]) {
