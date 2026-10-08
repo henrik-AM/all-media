@@ -6333,11 +6333,12 @@ async function bzTick() {
 
   const sichtbar = document.visibilityState === 'visible';
   const bereich = bzAnsicht();
-  bz.bereich = bereich;
-  bz.uhr.setzen(bereich, sichtbar, Date.now());
-
   const art = bzOverlayArt();
   const st = bzStatus(bereich);
+  // Vor der Sperrseite wird nicht gezählt — dort nutzt niemand den Bereich.
+  bz.bereich = st.offen ? bereich : null;
+  bz.uhr.setzen(bz.bereich, sichtbar, Date.now());
+
   // Vollbildansicht: Decke darüber. Hauptseite: neu zeichnen, wenn sich der Zustand dreht.
   bzDecke(bereich, art ? st : null);
   if (!art) {

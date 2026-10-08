@@ -143,10 +143,6 @@ export const BildschirmzeitProvider = ({
     return () => horcher.remove();
   }, [schicken, neuLaden]);
 
-  // Die Uhr kennt immer den Bereich und ob er sichtbar ist.
-  useEffect(() => {
-    uhr.setzen(bereich, vordergrund && !!user?.id, Date.now());
-  }, [bereich, vordergrund, user?.id, uhr]);
 
   // Takt: 5 s rechnen, 30 s schicken.
   useEffect(() => {
@@ -187,6 +183,13 @@ export const BildschirmzeitProvider = ({
       bereich
     );
   }, [stand, bereich, jetzt, uhr]);
+
+  // Die Uhr kennt immer den Bereich und ob er sichtbar ist. Vor der
+  // Sperrseite wird nicht gezählt — dort nutzt niemand den Bereich.
+  const zaehltBereich = status.offen ? bereich : null;
+  useEffect(() => {
+    uhr.setzen(zaehltBereich, vordergrund && !!user?.id, Date.now());
+  }, [zaehltBereich, vordergrund, user?.id, uhr]);
 
   // Hinweis kurz vor der Sperre — einmal je Bereich und Grenze.
   useEffect(() => {

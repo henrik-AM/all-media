@@ -108,7 +108,9 @@
     "test:kasten8": "node test/_kasten8.js",
     "test:kasten12": "node test/_kasten12.js",
     "test:kasten16-19": "node test/_kasten16_19.js",
-    "test:kasten17": "node test/_kasten17.js"
+    "test:kasten17": "node test/_kasten17.js",
+    "test:bildschirmzeit": "node test/_bildschirmzeit_einheit.js && node test/_bildschirmzeit.js",
+    "test:bildschirmzeit-einheit": "node test/_bildschirmzeit_einheit.js"
   },
   "private": true
 }
