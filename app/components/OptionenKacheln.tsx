@@ -23,6 +23,7 @@ import { Druck } from './Druck';
 import type { ActionSheetItem } from './ActionSheet';
 import { colors, spacing, themenStyles, typography } from '../constants/design';
 
+import { FarbfilterSchicht } from './Farbfilter';
 /** Henriks Aufzählung vom 21.09.2026. Unbekannte Schlüssel kommen ans Ende. */
 export const REIHENFOLGE = ['link', 'sichern', 'story', 'melden', 'kein'];
 
@@ -113,6 +114,8 @@ export const OptionenKacheln = ({ visible, items, liste, inhalt, onSelect, onClo
       <Druck style={styles.abbrechen} onPress={onClose} accessibilityRole="button">
         <Text style={styles.abbrechenText}>{inhalt ? 'Fertig' : 'Abbrechen'}</Text>
       </Druck>
+      {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+      <FarbfilterSchicht radius={20} />
     </View>
     </KeyboardAvoidingView>
   </Modal>

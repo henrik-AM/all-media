@@ -37,6 +37,7 @@ import { nachrichtTon } from '../../lib/toene';
 // eine andere Dauer als waehrend des Gespraechs.
 import { dauerText } from './CallScreen';
 import * as Aktion from '../../lib/aktionen';
+import { FarbfilterSchicht } from '../../components/Farbfilter';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 
@@ -1273,6 +1274,8 @@ export const ChatDetailScreen = ({
           }}
           onNotice={(text) => onNotice?.(text)}
         />
+        {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+        <FarbfilterSchicht />
       </Modal>
 
       {/*
@@ -1308,6 +1311,8 @@ export const ChatDetailScreen = ({
             <Ionicons name="close" size={24} color={colors.white} />
           </Druck>
         </View>
+        {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+        <FarbfilterSchicht />
       </Modal>
     </View>
   );

@@ -17,6 +17,7 @@ import {
 } from '../lib/registrierung';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
+import { FarbfilterSchicht } from './Farbfilter';
 /** Wie oft nachgesehen wird, ob sich etwas getan hat. */
 const WARTEN_MS = 15_000;
 const ELTERN_MS = 60_000;
@@ -245,6 +246,8 @@ const Elternfrage = () => {
           <Druck style={styles.leise} onPress={() => entscheiden(false)} disabled={arbeitet}>
             <Text style={[styles.leiseText, { color: colors.danger }]}>Ablehnen</Text>
           </Druck>
+          {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+          <FarbfilterSchicht rundum={radius.xl} />
         </View>
       </View>
     </Modal>

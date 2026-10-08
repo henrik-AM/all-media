@@ -210,13 +210,18 @@ export const FarbfilterProvider = ({ children }: { children: React.ReactNode }) 
  * Die Flächen selbst. Gehört als LETZTES Kind in eine deckende Fläche —
  * alles, was vorher gezeichnet wird, mischt sich mit ihnen.
  *
- * `radius`: obere Ecken eines Blattes, damit die Fläche nicht über die
- * Rundung hinaus ins Durchsichtige ragt.
+ * `radius`: obere Ecken eines Blattes, `rundum`: alle vier Ecken einer
+ * Karte — damit die Fläche nicht über die Rundung hinaus ins Durchsichtige
+ * ragt.
  */
-export const FarbfilterSchicht = ({ radius }: { radius?: number }) => {
+export const FarbfilterSchicht = ({ radius, rundum }: { radius?: number; rundum?: number }) => {
   const { schichten } = useFarbfilter();
   if (schichten.length === 0) return null;
-  const ecken = radius ? { borderTopLeftRadius: radius, borderTopRightRadius: radius } : null;
+  const ecken = rundum
+    ? { borderRadius: rundum }
+    : radius
+    ? { borderTopLeftRadius: radius, borderTopRightRadius: radius }
+    : null;
   return (
     <>
       {schichten.map((s, i) => (

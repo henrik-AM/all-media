@@ -4,6 +4,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
+import { FarbfilterSchicht } from './Farbfilter';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export interface ActionSheetItem {
@@ -70,6 +71,8 @@ export const ActionSheet = ({
           <Ionicons name="chevron-forward" size={18} color={colors.text3} />
         </Druck>
       ))}
+      {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+      <FarbfilterSchicht radius={20} />
     </View>
   </Modal>
 );

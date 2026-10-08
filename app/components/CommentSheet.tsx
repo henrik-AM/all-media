@@ -24,6 +24,7 @@ import { Comment } from '../types';
 import * as Aktion from '../lib/aktionen';
 import { useAktionen } from '../lib/useAktionen';
 
+import { FarbfilterSchicht } from './Farbfilter';
 interface Props {
   targetId: string | null;
   onClose: () => void;
@@ -257,6 +258,8 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
             <Ionicons name="send" size={17} color={colors.white} />
           </Druck>
         </View>
+        {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+        <FarbfilterSchicht radius={20} />
       </KeyboardAvoidingView>
     </Modal>
   );

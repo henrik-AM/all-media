@@ -209,6 +209,14 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
         /* Die App hat ihre eigene Leiste; zwei übereinander sehen nach Fehler aus. */
         nativeControls={false}
         allowsPictureInPicture={false}
+        /*
+         * Kasten 21: Auf Android zeichnet expo-video sonst in eine
+         * SurfaceView — eine eigene Ebene des Systems, an der die
+         * Farbfilter-Flächen (mixBlendMode) vorbeigehen. Mit TextureView
+         * liegt das Bild im normalen Ansichtsbaum und wird mitgefiltert.
+         * Fest gesetzt, weil die Eigenschaft zur Laufzeit nicht wechseln darf.
+         */
+        surfaceType="textureView"
       />
     </View>
   );

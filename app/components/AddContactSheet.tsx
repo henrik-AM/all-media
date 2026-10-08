@@ -20,6 +20,7 @@ import { QrScanner } from './QrScanner';
 import { ICH } from '../lib/daten';
 import { Contact } from '../types';
 
+import { FarbfilterSchicht } from './Farbfilter';
 // Dieselbe Regel und dieselbe Schreibweise wie auf der Website.
 const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
 const QrKontakt = require('../../gemeinsam/qr') as typeof import('../../gemeinsam/qr');
@@ -208,6 +209,8 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
               <Text style={styles.buttonText}>{laeuft ? 'Wird gesucht …' : 'Anfrage senden'}</Text>
             </Druck>
           </View>
+          {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+          <FarbfilterSchicht radius={20} />
         </View>
       </KeyboardAvoidingView>
 
