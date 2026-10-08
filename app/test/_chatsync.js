@@ -213,6 +213,11 @@ async function teilZwei() {
     pruefe('… beim Absender selbst nicht', mitA?.is_read !== false);
 
     // Bearbeiten einer verschlüsselten Nachricht — mit eigenen Wegwerf-Schlüsseln.
+    // Der neue Chat ist eine Anfrage („wartet", Schema 21): A darf erst wieder
+    // schreiben, wenn B geantwortet hat. Die Antwort ist die Annahme.
+    const { error: eAntwort } = await B.client.from('messages')
+      .insert({ chat_id: chat.id, sender_id: B.id, text: 'ok' });
+    if (eAntwort) throw eAntwort;
     const pa = Krypto.schluesselpaarErzeugen();
     const pb = Krypto.schluesselpaarErzeugen();
     const gA = 'prueflauf-k27-' + crypto.randomUUID();
