@@ -131,6 +131,9 @@ const UMD_BAUSTEINE = [
   // Heute nur von Komponenten gebraucht, nicht von aktionen.ts/daten.ts —
   // eingetragen, damit es nicht wieder erst beim ersten Kippen auffaellt.
   ['farbfilter', 'Farbfilter'],
+  // 06.10.2026: `bildschirmzeit.js` fuer die eigene Bildschirmzeit —
+  // Bereiche, Sperre, Restzeit, Uhr (Kasten 22).
+  ['bildschirmzeit', 'Bildschirmzeit'],
 ];
 
 function umdTeile() {

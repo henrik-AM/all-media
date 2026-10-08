@@ -66,7 +66,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.storys_aus_videos_nehmen() | SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.testbestand_profilaufrufe() | SUPABASE_SCHEMA_17_testbestand_statistik.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Funktion public.zuruecksetzen() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_13_zuruecksetzen_handbuch.sql → SUPABASE_SCHEMA_14_chatstau.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_47_sammlungen_testbestand.sql | **SUPABASE_SCHEMA_47_sammlungen_testbestand.sql** (Schema 62 schreibt sie am Anker um: nur Testkonten) |
-| Funktion public.zuruecksetzen_einstellungen() | SUPABASE_SCHEMA_16_einstellungen.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
+| Funktion public.zuruecksetzen_einstellungen() | SUPABASE_SCHEMA_16_einstellungen.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_83_bildschirmzeit.sql | **SUPABASE_SCHEMA_83_bildschirmzeit.sql** |
 | Regel "stories_im_highlight" auf public.stories | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql | **SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql** |
 | Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** (Ziel entscheidet: Videos für alle Sichtbaren, Messenger nur Kontakte, Markierte) |
 | Regel "Beitraege lesen" auf public.posts | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |

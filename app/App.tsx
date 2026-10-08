@@ -25,6 +25,9 @@ import { KontoFreigabe } from './components/KontoFreigabe';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
+import { BildschirmzeitSperre } from './components/BildschirmzeitSperre';
+import { BildschirmzeitProvider, useBildschirmzeit } from './contexts/BildschirmzeitContext';
+import { Bildschirmzeit } from './lib/bildschirmzeit';
 import { tonModusSetzen } from './lib/tonModus';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AreaKey, NAV, SubKey, areaOf, defaultSub } from './constants/navigation';
@@ -1704,7 +1707,37 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     setSubs((prev) => ({ ...prev, [next]: 'profile' as SubKey }));
   };
 
+  /*
+   * Eigene Bildschirmzeit (Kasten 22): welcher Bereich gerade offen ist —
+   * aus Leiste, Unterpunkt und Vollbildansicht. Gezählt und gesperrt wird
+   * genau dieser Bereich; Einstellungen gehören zu keinem (null) und bleiben
+   * immer erreichbar. Gleiche Zuordnung auf der Website (bzAnsicht).
+   */
+  const bz = useBildschirmzeit();
+  const bzBereich = Bildschirmzeit.bereichFuer(
+    area,
+    sub,
+    overlay?.kind ?? null,
+    overlay?.kind === 'camera' ? (overlay.zielChat ? 'chat' : overlay.zielBeitrag ? 'beitrag' : 'story') : null
+  );
+  const bzSetAnsicht = bz.setAnsicht;
+  useEffect(() => {
+    bzSetAnsicht(bzBereich);
+  }, [bzBereich, bzSetAnsicht]);
+  const bzGesperrt = !!bzBereich && !bz.status.offen;
+
   const inhalt = (() => {
+  // Vollbildansicht eines gesperrten Bereichs: die Sperrseite statt ihrer.
+  if (overlay && bzGesperrt && bzBereich) {
+    return (
+      <BildschirmzeitSperre
+        bereich={bzBereich}
+        vollbild
+        onSchliessen={() => setOverlay(null)}
+        onNotice={setNotice}
+      />
+    );
+  }
   if (overlay?.kind === 'chat') {
     return (
       <ChatDetailScreen
@@ -2137,6 +2170,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   }
 
   const renderContent = () => {
+    // Gesperrter Bereich: nur er wird ersetzt, die Leisten bleiben.
+    if (bzGesperrt && bzBereich) return <BildschirmzeitSperre bereich={bzBereich} onNotice={setNotice} />;
     if (area === 'messenger') {
       if (sub === 'friendmap') return <FriendMapScreen onOpenProfile={openProfile} onEditSelectedContacts={() => setOverlay({ kind: 'editSelectedContacts' })} onNotice={setNotice} pruefStilOffen={pruefKarteStile} />;
       if (sub === 'camera') {
@@ -2588,7 +2623,10 @@ const Root = () => {
   return isLoggedIn ? (
     <KontoFreigabe>
       <View style={{ flex: 1 }}>
-        <Shell setNotice={setNotice} />
+        {/* Kasten 22: Messung und Sperre der eigenen Bildschirmzeit. */}
+        <BildschirmzeitProvider onNotice={setNotice}>
+          <Shell setNotice={setNotice} />
+        </BildschirmzeitProvider>
         <Toast message={notice} onHide={hideNotice} />
       </View>
     </KontoFreigabe>
