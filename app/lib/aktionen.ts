@@ -30,6 +30,7 @@ import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
   aufschliessen,
+  fuerBearbeitenUmschliessen,
   fuerChatVerschliessen,
   meinSchluessel,
   NICHT_LESBAR,
@@ -2061,9 +2062,13 @@ export async function nachrichtBearbeiten(
    * Schema 31 zurück (`messages_krypto_stimmig`), und das ist gut so: sonst
    * wäre ausgerechnet die bearbeitete Fassung die lesbare.
    *
-   * Die alten Kuverts bleiben stehen und passen weiter — sie tragen den
-   * Sitzungsschlüssel, und der wird beim Neuverschließen ersetzt. Deshalb
-   * werden sie ausgetauscht, nicht ergänzt.
+   * Kasten 27 (06.10.2026): bis hierher wurde mit einem NEUEN
+   * Sitzungsschlüssel verschlossen und die Kuverts „ausgetauscht". Das
+   * Löschen der alten traf still null Zeilen (auf message_keys gibt es keine
+   * Löschregel), das Einfügen der neuen scheiterte am Primärschlüssel — da
+   * war die neue Chiffre aber schon gespeichert, und die Nachricht war für
+   * alle unlesbar. Jetzt bleibt der Sitzungsschlüssel, nur der Inhalt wird
+   * neu verschlossen; die Kuverts passen weiter (fuerBearbeitenUmschliessen).
    */
   const { data: alt } = await client
     .from('messages')
@@ -2071,30 +2076,24 @@ export async function nachrichtBearbeiten(
     .eq('id', nachrichtId)
     .maybeSingle();
 
-  const paket =
-    alt && Number((alt as any).krypto) > 0
-      ? await fuerChatVerschliessen(client, (alt as any).chat_id, ichId, text)
-      : offen(text);
-
-  const { error } = await client
-    .from('messages')
-    .update({ ...paket.spalten, edited_at: new Date().toISOString() })
-    .eq('id', nachrichtId)
-    .eq('sender_id', ichId);
-  if (error) throw error;
-
-  if (paket.kuverts.length) {
-    await client.from('message_keys').delete().eq('message_id', nachrichtId);
-    const { error: fehlerK } = await client.from('message_keys').insert(
-      paket.kuverts.map((k) => ({
-        message_id: nachrichtId,
-        schluessel_id: k.schluesselId,
-        nonce: k.nonce,
-        chiffre: k.chiffre,
-      }))
-    );
-    if (fehlerK) throw fehlerK;
+  let felder: Record<string, unknown>;
+  if (alt && Number((alt as any).krypto) > 0) {
+    const neu = await fuerBearbeitenUmschliessen(client, ichId, nachrichtId, text);
+    if (!neu) throw new Error('Diese Nachricht lässt sich auf diesem Gerät nicht bearbeiten');
+    felder = { ...neu, edited_at: new Date().toISOString() };
+  } else {
+    felder = { ...offen(text).spalten, edited_at: new Date().toISOString() };
   }
+
+  const { data: getroffen, error } = await client
+    .from('messages')
+    .update(felder)
+    .eq('id', nachrichtId)
+    .eq('sender_id', ichId)
+    .select('id');
+  if (error) throw error;
+  // Ein verbotenes UPDATE trifft still null Zeilen — dann ist nichts passiert.
+  if (!getroffen || !getroffen.length) throw new Error('Die Nachricht wurde nicht geändert');
   return true;
 }
 

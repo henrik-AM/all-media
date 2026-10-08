@@ -16,11 +16,14 @@
  * auseinander laufen, ist damit zu.
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { AlleDaten, ladeAlles } from '../lib/daten';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand } from '../lib/daten';
+import { meinSchluessel } from '../lib/krypto';
 import { AuthContext } from './AuthContext';
 import { useSupabase } from './SupabaseContext';
 import * as Aktion from '../lib/aktionen';
+const ChatAbgleich = require('../../gemeinsam/chatabgleich') as typeof import('../../gemeinsam/chatabgleich');
 
 const LEER: AlleDaten = {
   users: {},
@@ -69,6 +72,12 @@ interface DatenWert extends AlleDaten {
    */
   fehler: string | null;
   neuLaden: () => Promise<void>;
+  /**
+   * Nur die Chatlisten neu holen (Kasten 27) — nach dem Zurueckkehren aus
+   * einem Chat und im Takt, wenn sich ihr Stand in der Datenbank geaendert
+   * hat. `neuLaden` holt alles und waere dafuer zu schwer.
+   */
+  chatsNeuLaden: () => Promise<void>;
   /**
    * Nimmt einen Beitrag sofort aus dem Feed, ohne alles neu zu laden. Das
    * Schreiben in die Datenbank macht das Drei-Punkte-Menue (BeitragOptionen).
@@ -130,6 +139,78 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(uhr);
   }, [supabase, ichId]);
 
+  /*
+   * Die Chatlisten im Takt nachsehen (Kasten 27, 06.10.2026).
+   *
+   * Bis hierher wurden sie genau einmal geladen — beim Anmelden. Schrieb A
+   * danach, stand bei B in der Liste weiter A's vorletzte Nachricht, ohne
+   * Ungelesen-Punkt. Henrik las das als „es kommt ein anderer Text an".
+   *
+   * Gefragt wird zuerst nur der Stand (ladeChatlistenStand, zwei kleine
+   * Abfragen). Nur wenn der sich geaendert hat, werden die Listen neu
+   * geholt. Im Hintergrund wird nicht gefragt; beim Zurueckkommen sofort.
+   */
+  const listenStand = useRef<string | null>(null);
+
+  const chatsNeuLaden = useCallback(async () => {
+    if (!supabase || !ichId) return;
+    try {
+      const listen = await ladeChatlisten(supabase, ichId);
+      setDaten((d) => (d.ichId === ichId ? { ...d, ...listen } : d));
+    } catch (e: any) {
+      console.warn('Chatliste nachladen fehlgeschlagen:', e?.message ?? e);
+    }
+  }, [supabase, ichId]);
+
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    let aus = false;
+    let laeuft = false;
+    listenStand.current = null;
+
+    const nachsehen = async () => {
+      if (aus || laeuft || AppState.currentState !== 'active') return;
+      laeuft = true;
+      try {
+        const stand = await ladeChatlistenStand(supabase, ichId);
+        if (aus || stand === null) return;
+        const vorher = listenStand.current;
+        listenStand.current = stand;
+        // Der erste Stand ist der, den ladeAlles gerade geholt hat.
+        if (vorher !== null && vorher !== stand) await chatsNeuLaden();
+      } finally {
+        laeuft = false;
+      }
+    };
+
+    nachsehen();
+    const uhr = setInterval(nachsehen, ChatAbgleich.INTERVALL_LISTE_MS);
+    const horcher = AppState.addEventListener('change', (z) => {
+      if (z === 'active') nachsehen();
+    });
+    return () => {
+      aus = true;
+      clearInterval(uhr);
+      horcher.remove();
+    };
+  }, [supabase, ichId, chatsNeuLaden]);
+
+  /*
+   * Den Geraeteschluessel gleich beim Anmelden anlegen, nicht erst beim
+   * ersten verschluesselten Chat (Kasten 27). Ein Kuvert bekommt nur, wer
+   * im Augenblick des Sendens schon einen Schluessel hat. Bis hierher legte
+   * die App ihn erst an, wenn ein Zweierchat geoeffnet wurde — am 04.10.2026
+   * vier Sekunden NACH einer eingegangenen Nachricht, die auf diesem Geraet
+   * deshalb „nicht lesbar" blieb. Die Website meldet ihren Schluessel schon
+   * beim Start an (bootstrap in web/public/app.js).
+   */
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    meinSchluessel(supabase, ichId).catch(() => {
+      /* meinSchluessel wirft nicht; ohne Schluessel bleibt es beim Klartext. */
+    });
+  }, [supabase, ichId]);
+
   const keinInteresseMerken = useCallback(
     (beitragId: string) =>
       setDaten((d) => (d.keinInteresse.includes(beitragId) ? d : { ...d, keinInteresse: [...d.keinInteresse, beitragId] })),
@@ -137,8 +218,8 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const wert = useMemo<DatenWert>(
-    () => ({ ...daten, laedt, fehler, neuLaden: laden, keinInteresseMerken }),
-    [daten, laedt, fehler, laden, keinInteresseMerken]
+    () => ({ ...daten, laedt, fehler, neuLaden: laden, chatsNeuLaden, keinInteresseMerken }),
+    [daten, laedt, fehler, laden, chatsNeuLaden, keinInteresseMerken]
   );
 
   return <DatenContext.Provider value={wert}>{children}</DatenContext.Provider>;

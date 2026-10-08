@@ -39,6 +39,8 @@ const {
  */
 const { neulingsliste, ordnenJeArt, punktekarte } = require('../../gemeinsam/rang');
 const StoryRegeln = require('../../gemeinsam/story');
+// Kasten 27: Stand und Reihenfolge offener Chats — gemeinsam mit der App.
+const ChatAbgleich = require('../../gemeinsam/chatabgleich');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -555,6 +557,50 @@ async function ladeChats(client, nutzerId, bereich = 'messenger', schluesselId =
     .sort((a, b) => new Date(b.zeitpunkt || 0) - new Date(a.zeitpunkt || 0));
 }
 
+/**
+ * Der „Stand" eines offenen Chats (Kasten 27) — gleiche Abfrage wie
+ * ladeChatStand in app/lib/daten.ts. Der Browser fragt ihn im Takt und holt
+ * den Verlauf nur, wenn er sich geaendert hat.
+ */
+async function ladeChatStand(client, chatId, istKanal = false) {
+  if (!client) return null;
+  const { data, error } = istKanal
+    ? await client
+        .from('community_channel_messages')
+        .select(ChatAbgleich.STAND_SPALTEN_KANAL)
+        .eq('channel_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(ChatAbgleich.STAND_ZEILEN)
+    : await client
+        .from('messages')
+        .select(ChatAbgleich.STAND_SPALTEN)
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(ChatAbgleich.STAND_ZEILEN);
+  if (error) throw error;
+  return ChatAbgleich.stand(data || []);
+}
+
+/**
+ * Der „Stand" der Chatliste (Kasten 27) — gleiche Abfrage wie
+ * ladeChatlistenStand in app/lib/daten.ts.
+ */
+async function ladeChatlistenStand(client, nutzerId) {
+  if (!client) return null;
+  const { data: mitglieder, error } = await client
+    .from('chat_members')
+    .select('chat_id, is_read, is_archived, is_muted, geleert_bis')
+    .eq('user_id', nutzerId);
+  if (error) throw error;
+  const ids = (mitglieder || []).map((m) => m.chat_id);
+  if (!ids.length) return ChatAbgleich.listenStand([], []);
+  const { data: letzte, error: fehlerL } = await client
+    .rpc('letzte_nachrichten', { chat_ids: ids })
+    .select('chat_id, id, edited_at, deleted_at');
+  if (fehlerL) throw fehlerL;
+  return ChatAbgleich.listenStand(mitglieder || [], letzte || []);
+}
+
 async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
   if (!client) return null;
 
@@ -572,20 +618,25 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
     .maybeSingle();
   const strich = mitgliedschaft?.geleert_bis || null;
 
+  /*
+   * Die JUENGSTEN 500, nicht die aeltesten (Kasten 27, 06.10.2026). Mit
+   * `ascending: true` und `limit(500)` kam ab der 501. Nachricht nichts
+   * Neues mehr an. Gleiche Regel in app/lib/daten.ts.
+   */
   let abfrage = client
     .from('messages')
     .select(
       NACHRICHT_SPALTEN
     )
     .eq('chat_id', chatId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(500);
   if (strich) abfrage = abfrage.gt('created_at', strich);
 
   const { data, error } = await abfrage;
   if (error) throw error;
 
-  const zeilen = data || [];
+  const zeilen = ChatAbgleich.chronologisch(data || []);
 
   /*
    * Bezug, Reaktionen und Namen in einem Zug nachladen — gleiche Regel wie in
@@ -1117,13 +1168,14 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
         ' profiles!posts_user_id_fkey(name))'
     )
     .eq('channel_id', kanalId)
-    .order('created_at', { ascending: true })
+    // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
+    .order('created_at', { ascending: false })
     .limit(500);
   if (error) throw error;
 
   // Dieselben Feldnamen wie in ladeNachrichten — die Blase im Kanal wird aus
   // denselben Bausteinen gebaut wie die im Chat.
-  return (data || []).map((m) => ({
+  return ChatAbgleich.chronologisch(data || []).map((m) => ({
     id: m.id,
     from: m.sender_id === nutzerId ? 'me' : m.sender_id,
     text: m.text || '',
@@ -1697,6 +1749,9 @@ module.exports = {
   messengerAnfrageZustand,
   ladeChats,
   ladeNachrichten,
+  // Kasten 27
+  ladeChatStand,
+  ladeChatlistenStand,
   ladeStorys,
   ladeBeitraege,
   ladeKommentare,

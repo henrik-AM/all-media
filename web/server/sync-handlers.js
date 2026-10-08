@@ -1761,15 +1761,39 @@ const handleInsightZiel = handler('Empfängerliste', async (client, nutzerId, zi
 
 // ------------------------------------------------ Nachrichten-Werkzeuge --
 
+/*
+ * Kasten 27 (06.10.2026): eine verschluesselte Nachricht kommt hier als neue
+ * Chiffre an, nicht als Text. Der Browser hat sie mit dem alten
+ * Sitzungsschluessel neu verschlossen (KryptoWeb.umschliessen), die Kuverts
+ * bleiben deshalb stehen. Bis hierher schickte der Browser immer Klartext —
+ * die Datenbank wies das bei einer verschluesselten Nachricht ab
+ * (`messages_krypto_stimmig`), und Bearbeiten ging dort nie. Gleicher Weg in
+ * app/lib/aktionen.ts (nachrichtBearbeiten).
+ *
+ * Gezaehlt wird, ob eine Zeile getroffen wurde: ein verbotenes UPDATE meldet
+ * unter RLS Erfolg mit null Zeilen.
+ */
 const handleNachrichtBearbeiten = handler(
   'Nachricht bearbeiten',
-  async (client, nutzerId, nachrichtId, text) => {
-    const { error } = await client
+  async (client, nutzerId, nachrichtId, text, krypto = {}) => {
+    const verschluesselt = Number(krypto.krypto || 0) > 0;
+    if (verschluesselt && (!krypto.chiffre || !krypto.kryptoNonce)) {
+      return { ok: false, fehler: 'Chiffre erforderlich' };
+    }
+    if (!verschluesselt && !String(text || '').trim()) {
+      return { ok: false, fehler: 'Text erforderlich' };
+    }
+    const felder = verschluesselt
+      ? { chiffre: krypto.chiffre, krypto_nonce: krypto.kryptoNonce }
+      : { text };
+    const { data, error } = await client
       .from('messages')
-      .update({ text, edited_at: new Date().toISOString() })
+      .update({ ...felder, edited_at: new Date().toISOString() })
       .eq('id', nachrichtId)
-      .eq('sender_id', nutzerId);
+      .eq('sender_id', nutzerId)
+      .select('id');
     if (error) throw error;
+    if (!data || !data.length) return { ok: false, fehler: 'Die Nachricht wurde nicht geändert' };
     return { ok: true };
   }
 );

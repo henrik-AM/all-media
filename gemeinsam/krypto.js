@@ -271,6 +271,46 @@
     }
   }
 
+  /**
+   * Eine verschlüsselte Nachricht mit neuem Text verschließen — fürs
+   * Bearbeiten (Kasten 27, 06.10.2026).
+   *
+   * Der Sitzungsschlüssel der Nachricht wird aus MEINEM Kuvert geholt und
+   * wiederverwendet, nur der Inhalt wird neu verschlossen (frische Nonce).
+   * Damit passen alle vorhandenen Kuverts weiter, und es muss keins
+   * ausgetauscht werden.
+   *
+   * Warum nicht neu verschlüsseln wie beim Senden: das ergäbe einen neuen
+   * Sitzungsschlüssel und damit neue Kuverts. Die alten lassen sich aber
+   * nicht entfernen — auf `message_keys` gibt es keine Löschregel (Schema
+   * 31), das DELETE trifft still null Zeilen, und das Einfügen der neuen
+   * scheitert dann am Primärschlüssel. Die App tat genau das: erst wurde
+   * die neue Chiffre gespeichert, dann scheiterten die Kuverts — und die
+   * bearbeitete Nachricht war für alle unlesbar.
+   *
+   * `absender` bleibt, wie er ist: die Kuverts sind mit ihm verschlossen.
+   * Gibt `{ chiffre, nonce }` zurück oder `null`, wenn mein Kuvert nicht
+   * aufgeht (dann kann dieses Gerät die Nachricht auch nicht lesen).
+   */
+  function umschliessen(text, nachricht, kuvert, meinGeheim) {
+    try {
+      if (!nachricht || !kuvert || !meinGeheim) return null;
+      if (Number(nachricht.version) !== VERSION) return null;
+      var sitzung = nacl.box.open(
+        ausBase64(kuvert.chiffre),
+        ausBase64(kuvert.nonce),
+        ausBase64(nachricht.absender),
+        ausBase64(meinGeheim)
+      );
+      if (!sitzung) return null;
+      var nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+      var chiffre = nacl.secretbox(zuBytes(text), nonce, sitzung);
+      return { chiffre: zuBase64(chiffre), nonce: zuBase64(nonce) };
+    } catch (e) {
+      return null;
+    }
+  }
+
   return {
     VERSION: VERSION,
     zufallsquelleSetzen: zufallsquelleSetzen,
@@ -279,6 +319,7 @@
     fingerabdruck: fingerabdruck,
     verschluesseln: verschluesseln,
     entschluesseln: entschluesseln,
+    umschliessen: umschliessen,
     zuBase64: zuBase64,
     ausBase64: ausBase64,
   };

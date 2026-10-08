@@ -40,6 +40,14 @@ export interface Message {
   senderId: string;
   text: string;
   time: string;
+  /**
+   * Steht nur auf diesem Geraet, die Datenbank kennt die Nachricht (noch)
+   * nicht unter dieser Kennung — die eben gesendete, waehrend eine Abfrage
+   * laeuft, oder ein beigelegter Eintrag. Das Nachsehen im Takt laesst sie
+   * stehen, bis die Datenbank sie liefert (Kasten 27,
+   * gemeinsam/chatabgleich.js).
+   */
+  lokal?: boolean;
   media?: MediaType;
   read?: boolean;
   /** Weitergeleiteter Beitrag oder weitergeleitetes Video. */

@@ -190,6 +190,25 @@
     return nachrichten;
   }
 
+  /**
+   * Eine verschlüsselte Nachricht mit neuem Text verschließen — fürs
+   * Bearbeiten (Kasten 27). Der Sitzungsschlüssel kommt aus dem Kuvert
+   * dieses Browsers; die Kuverts aller anderen passen danach weiter. Gibt
+   * `{ krypto, chiffre, kryptoNonce }` für die Bearbeiten-Route zurück oder
+   * null, wenn dieser Browser die Nachricht nicht öffnen kann. Gleicher Weg
+   * in app/lib/krypto.ts (fuerBearbeitenUmschliessen).
+   */
+  function umschliessen(nachricht, text) {
+    if (!meiner || !nachricht || !Number(nachricht.krypto) || !nachricht.kuvert) return null;
+    const neu = Krypto.umschliessen(
+      text,
+      { version: nachricht.krypto, absender: nachricht.absenderSchluessel },
+      nachricht.kuvert,
+      meiner.geheim
+    );
+    return neu ? { krypto: Number(nachricht.krypto), chiffre: neu.chiffre, kryptoNonce: neu.nonce } : null;
+  }
+
   /** Der Fingerabdruck zum Vergleichen von Hand — im Kontaktprofil sichtbar. */
   function fingerabdruck(oeffentlich) {
     return Krypto.fingerabdruck(oeffentlich);
@@ -207,6 +226,7 @@
     verschliessen,
     oeffnen,
     stapelOeffnen,
+    umschliessen,
     fingerabdruck,
     bereit,
     meinSchluessel: () => meiner,

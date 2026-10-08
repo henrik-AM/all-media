@@ -295,6 +295,47 @@ export async function fuerChatVerschliessen(
   }
 }
 
+/**
+ * Eine verschlüsselte Nachricht mit neuem Text verschließen — fürs
+ * Bearbeiten (Kasten 27).
+ *
+ * Holt Chiffre-Kopf und MEIN Kuvert der Nachricht und verschließt nur den
+ * Inhalt neu; alle Kuverts bleiben gültig (gemeinsam/krypto.js,
+ * `umschliessen`). Gibt die zwei Spalten zurück, die sich ändern, oder null,
+ * wenn dieses Gerät die Nachricht nicht öffnen kann — dann kann es sie auch
+ * nicht bearbeiten. Gleicher Weg auf der Website (KryptoWeb.umschliessen).
+ */
+export async function fuerBearbeitenUmschliessen(
+  client: SupabaseClient,
+  ichId: string,
+  nachrichtId: string,
+  text: string
+): Promise<{ chiffre: string; krypto_nonce: string } | null> {
+  const meiner = await meinSchluessel(client, ichId);
+  if (!meiner) return null;
+  const [{ data: n }, { data: kuvert }] = await Promise.all([
+    client
+      .from('messages')
+      .select('krypto, absender_schluessel')
+      .eq('id', nachrichtId)
+      .maybeSingle(),
+    client
+      .from('message_keys')
+      .select('nonce, chiffre')
+      .eq('message_id', nachrichtId)
+      .eq('schluessel_id', meiner.id)
+      .maybeSingle(),
+  ]);
+  if (!n || !kuvert) return null;
+  const neu = Krypto.umschliessen(
+    text,
+    { version: (n as any).krypto, absender: (n as any).absender_schluessel },
+    kuvert,
+    meiner.geheim
+  );
+  return neu ? { chiffre: neu.chiffre, krypto_nonce: neu.nonce } : null;
+}
+
 /** Der Platzhalter für eine Nachricht, deren Kuvert dieses Gerät nicht hat. */
 export const NICHT_LESBAR = 'Auf diesem Gerät nicht lesbar';
 

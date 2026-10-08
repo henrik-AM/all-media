@@ -643,6 +643,35 @@ app.get('/api/messages/:chatId', route(async (req) =>
 ));
 
 /*
+ * Kasten 27 (06.10.2026): offene Chats und die Chatliste im Takt nachsehen.
+ *
+ * Henrik: „A schreibt ‚cxv', bei B kommt ‚cwkdew' an." Der Browser holte den
+ * Verlauf genau einmal beim Oeffnen und die Chatliste nur beim Start — B sah
+ * deshalb eine aeltere Nachricht als die, die A gerade geschrieben hatte.
+ * Jetzt fragt der Browser alle paar Sekunden diesen kleinen Stand und holt
+ * den Verlauf nur, wenn er sich geaendert hat (gemeinsam/chatabgleich.js).
+ * Dieselben Abfragen macht die App direkt (app/lib/daten.ts).
+ */
+app.get('/api/messages/:chatId/stand', route(async (req) => ({
+  ok: true,
+  stand: await supabaseApi.ladeChatStand(req.db, req.params.chatId, false),
+})));
+
+app.get('/api/chatstand', route(async (req) => ({
+  ok: true,
+  stand: await supabaseApi.ladeChatlistenStand(req.db, req.nutzerId),
+})));
+
+/** Beide Chatlisten frisch — nur, wenn sich der Stand oben geaendert hat. */
+app.get('/api/chats', route(async (req) => {
+  const [chats, communityChats] = await Promise.all([
+    supabaseApi.ladeChats(req.db, req.nutzerId, 'messenger', req.schluesselId),
+    supabaseApi.ladeChats(req.db, req.nutzerId, 'community', req.schluesselId),
+  ]);
+  return { ok: true, chats, communityChats };
+}));
+
+/*
  * Den Geraetschluessel dieses Browsers anmelden.
  *
  * Es kommt nur der oeffentliche Teil an. Kaeme hier je der geheime an, waere
@@ -2710,6 +2739,16 @@ app.get('/api/communities/:id/channels/:chId', route(async (req, res) => {
   });
 }));
 
+/*
+ * Kasten 27: der Stand eines Unterthemas, wie /api/messages/:chatId/stand.
+ * Nur mit der Kennung des Kanals — ein Kurzname liefe ueber die schwere
+ * Community-Abfrage, und der Browser kennt die Kennung ohnehin.
+ */
+app.get('/api/communities/:id/channels/:chId/stand', route(async (req) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.chId)) return { ok: true, stand: null };
+  return { ok: true, stand: await supabaseApi.ladeChatStand(req.db, req.params.chId, true) };
+}));
+
 app.post('/api/communities/:id/channels/:chId/nachricht', route(async (req) => {
   const text = String(req.body?.text || '').trim();
   if (!text) return { ok: false, error: 'Text erforderlich' };
@@ -2976,7 +3015,13 @@ app.post('/api/insights/ziele/:userId', route(async (req) =>
 app.post('/api/messages/:chatId/:messageId/bearbeiten', route(async (req) =>
   antwort(
     await syncHandlers.handleNachrichtBearbeiten(
-      req.db, req.nutzerId, req.params.messageId, req.body?.text || ''
+      req.db, req.nutzerId, req.params.messageId, req.body?.text || '',
+      // Kasten 27: bei einer verschluesselten Nachricht die neue Chiffre.
+      {
+        krypto: req.body?.krypto,
+        chiffre: req.body?.chiffre || null,
+        kryptoNonce: req.body?.kryptoNonce || null,
+      }
     )
   )
 ));

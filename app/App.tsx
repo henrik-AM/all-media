@@ -68,6 +68,8 @@ import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel,
 const SoundStellen = require('../gemeinsam/soundstellen') as typeof import('../gemeinsam/soundstellen');
 const StoryRegeln = require('../gemeinsam/story') as typeof import('../gemeinsam/story');
 const Spende = require('../gemeinsam/spende') as typeof import('../gemeinsam/spende');
+// Kasten 27: Chatliste mit dem frischen Stand zusammenlegen — gemeinsam mit der Website.
+const ChatAbgleich = require('../gemeinsam/chatabgleich') as typeof import('../gemeinsam/chatabgleich');
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
@@ -243,13 +245,17 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * vorweggenommene Änderungen nicht überschrieben werden. Eine angenommene
    * Messenger-Anfrage (Schema 57) legt aber Chat und Kontakt in der
    * Datenbank an — ohne das hier stünden sie erst nach einem Neustart da.
+   *
+   * Kasten 27 (06.10.2026): bei den Chats kamen bis hierher NUR neue dazu.
+   * Vorschau, Uhrzeit und Ungelesen eines vorhandenen Chats blieben auf dem
+   * Stand des App-Starts — auch nach dem Herunterziehen. Schrieb A „cxv",
+   * stand bei B weiter A's vorherige Nachricht in der Liste. Jetzt gewinnt
+   * bei diesen Feldern die Datenbank; die eigenen Schalter (archiviert,
+   * stumm …) bleiben lokal, siehe gemeinsam/chatabgleich.js.
    */
   useEffect(() => {
     if (!daten.geladen) return;
-    setChats((prev) => {
-      const neu = daten.chats.filter((c) => !prev.some((p) => p.id === c.id));
-      return neu.length ? [...neu, ...prev] : prev;
-    });
+    setChats((prev) => ChatAbgleich.chatlisteAbgleichen(prev, daten.chats));
     setContacts((prev) => {
       const neu = daten.contacts.filter((c) => !prev.some((p) => p.id === c.id));
       return neu.length ? [...prev, ...neu] : prev;
@@ -1703,7 +1709,13 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <ChatDetailScreen
         chat={overlay.chat}
         extraMessages={overlay.extra}
-        onBack={() => setOverlay(null)}
+        onBack={() => {
+          setOverlay(null);
+          // Kasten 27: die Liste zeigt danach die letzte Nachricht dieses
+          // Chats — auch die eben selbst geschriebene —, nicht den Stand
+          // vom App-Start.
+          void daten.chatsNeuLaden();
+        }}
         onCall={(art) =>
           setOverlay(
             overlay.chat.userId

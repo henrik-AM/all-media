@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -22,7 +23,7 @@ import { Videoflaeche, istVideo } from '../../components/Videoflaeche';
 import { colors, radius, shadow, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
-import { ICH as CURRENT_USER_ID, chatZeit, ladeChatZustand, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
+import { ICH as CURRENT_USER_ID, chatZeit, ladeChatStand, ladeChatZustand, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
 import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
@@ -39,6 +40,8 @@ import { dauerText } from './CallScreen';
 import * as Aktion from '../../lib/aktionen';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
+// Kasten 27: offenen Chat im Takt nachsehen — gemeinsam mit der Website.
+const ChatAbgleich = require('../../../gemeinsam/chatabgleich') as typeof import('../../../gemeinsam/chatabgleich');
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -120,8 +123,15 @@ export const ChatDetailScreen = ({
   const { supabase } = useSupabase();
   const { istBlockiert, markierte, markieren } = useProfil();
   const insets = useSafeAreaInsets();
-  const [messages, setMessages] = useState<Message[]>(extraMessages ?? []);
+  // Beigelegte Eintraege (Teilen, Kamera) kennt die Datenbank nicht unter
+  // ihrer Kennung — `lokal`, damit das Nachsehen im Takt sie stehen laesst.
+  const [messages, setMessages] = useState<Message[]>(
+    (extraMessages ?? []).map((m) => ({ ...m, lokal: true }))
+  );
   const [draft, setDraft] = useState('');
+  // Der zuletzt gezeichnete Verlauf — fuer das Nachsehen im Takt (Kasten 27).
+  const messagesRef = useRef<Message[]>(messages);
+  messagesRef.current = messages;
   const listRef = useRef<FlatList<Message>>(null);
   const aktionen = useAktionen(onNotice);
 
@@ -201,7 +211,9 @@ export const ChatDetailScreen = ({
 
     holen
       .then((geladen) => {
-        if (!abgebrochen) setMessages([...geladen, ...(extraMessages ?? [])]);
+        // Zusammenlegen statt ersetzen: eine Nachricht, die waehrend dieses
+        // Ladens gesendet wurde, fehlt in `geladen` noch (Kasten 27).
+        if (!abgebrochen) setMessages((prev) => ChatAbgleich.nachrichtenAbgleichen(prev, geladen));
       })
       .catch((e) => console.error('Verlauf laden fehlgeschlagen:', e?.message ?? e));
 
@@ -237,11 +249,96 @@ export const ChatDetailScreen = ({
       /* Eine ausgebliebene Lesebestaetigung ist nichts, womit man den
          Nutzer behelligt. */
     });
-  }, [supabase, ichId, chat.id]);
+    /*
+     * Kasten 27: den Ungelesen-Punkt der Chatliste zuruecknehmen. Seit
+     * Schema XX setzt die Datenbank ihn bei jeder neuen Nachricht
+     * (chat_members.is_read = false); geoeffnet heisst gelesen. Die Website
+     * macht dasselbe ueber /api/chats/:id/read. Ein Kanal hat keine
+     * Mitgliedschaft in chat_members.
+     */
+    if (!istKanal) {
+      Aktion.chatEinstellung(supabase, ichId, chat.id, 'gelesen', true).catch(() => {});
+    }
+  }, [supabase, ichId, chat.id, istKanal]);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, []);
+
+  /*
+   * Den offenen Chat im Takt nachsehen (Kasten 27, 06.10.2026).
+   *
+   * Henrik: „A schreibt ‚cxv', bei B kommt ‚cwkdew' an." Der Verlauf wurde
+   * hier genau einmal geladen, beim Oeffnen (Effekt oben). Was A danach
+   * schrieb, kam bei B nicht an, solange B den Chat offen hatte — B sah als
+   * letzte Nachricht eine aeltere. Kein Abo, keine Abfrage im Takt, kein
+   * Neuladen beim Zurueckkehren in die App.
+   *
+   * Jetzt: alle INTERVALL_CHAT_MS der kleine Stand (ladeChatStand); nur wenn
+   * er sich aendert, der ganze Verlauf — zusammengelegt mit dem, was schon
+   * dasteht (gemeinsam/chatabgleich.js). Kommt dabei eine fremde Nachricht
+   * dazu, gilt sie als gelesen, denn der Chat ist offen. Im Hintergrund
+   * wird nicht gefragt; beim Zurueckkommen sofort. Gleiche Regel auf der
+   * Website (chatNachsehen in web/public/app.js).
+   */
+  useEffect(() => {
+    if (!supabase || !ichId) return;
+    let aus = false;
+    let laeuft = false;
+    let letzterStand: string | null = null;
+
+    const nachsehen = async () => {
+      if (aus || laeuft || AppState.currentState !== 'active') return;
+      laeuft = true;
+      try {
+        const stand = await ladeChatStand(supabase, chat.id, istKanal);
+        if (aus || stand === null) return;
+        const vorher = letzterStand;
+        letzterStand = stand;
+        if (vorher === null || vorher === stand) return;
+
+        const frisch = istKanal
+          ? await ladeKanalNachrichten(supabase, ichId, chat.id)
+          : await ladeNachrichten(supabase, chat.id, ichId);
+        if (aus) return;
+
+        // Ob eine fremde Nachricht dazukam, am letzten gezeichneten Stand
+        // ablesen — der Rechenweg in setMessages laeuft unter React 18 nicht
+        // zwingend sofort.
+        const fremdDazu =
+          ChatAbgleich.neueFremde(
+            messagesRef.current,
+            ChatAbgleich.nachrichtenAbgleichen(messagesRef.current, frisch),
+            (m) => m.senderId === CURRENT_USER_ID
+          ).length > 0;
+        setMessages((prev) => ChatAbgleich.nachrichtenAbgleichen(prev, frisch));
+        if (fremdDazu) {
+          scrollToEnd();
+          if (!istKanal) {
+            Aktion.chatGelesen(supabase, chat.id).catch(() => {});
+            Aktion.chatEinstellung(supabase, ichId, chat.id, 'gelesen', true).catch(() => {});
+          }
+        }
+      } catch (e: any) {
+        // Ein Aussetzer ist kein Grund fuer eine Meldung: der naechste Takt
+        // fragt wieder.
+        console.warn('Chat nachsehen fehlgeschlagen:', e?.message ?? e);
+      } finally {
+        laeuft = false;
+      }
+    };
+
+    nachsehen();
+    const uhr = setInterval(nachsehen, ChatAbgleich.INTERVALL_CHAT_MS);
+    const horcher = AppState.addEventListener('change', (z) => {
+      if (z === 'active') nachsehen();
+    });
+    return () => {
+      aus = true;
+      clearInterval(uhr);
+      horcher.remove();
+    };
+  }, [supabase, ichId, chat.id, istKanal, scrollToEnd]);
 
   // Bis die Anfrage angenommen ist, bleibt es bei der einen Nachricht, die
   // schon mit der Anfrage rausging.
@@ -391,6 +488,8 @@ export const ChatDetailScreen = ({
         text,
         time: chatZeit(data.created_at),
         read: false,
+        // Bis das Nachsehen sie aus der Datenbank liefert (Kasten 27).
+        lokal: true,
         antwortAuf: bezug?.art === 'antwort' ? bezugText : undefined,
         zitat: bezug?.art === 'zitat' ? bezugText : undefined,
       },
@@ -892,7 +991,7 @@ export const ChatDetailScreen = ({
 
     setMessages((prev) => [
       ...prev,
-      { id, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil },
+      { id, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil, lokal: true },
     ]);
     scrollToEnd();
   };

@@ -564,6 +564,65 @@ export async function ladeChatZustand(
   };
 }
 
+/**
+ * Der „Stand" eines offenen Chats — ein paar hundert Byte statt des ganzen
+ * Verlaufs (Kasten 27).
+ *
+ * Ein offener Chat fragt das alle INTERVALL_CHAT_MS ab und laedt den
+ * Verlauf nur, wenn sich der Stand geaendert hat. Bis zum 06.10.2026 lud er
+ * genau einmal beim Oeffnen — was danach geschrieben wurde, kam nicht an,
+ * und B sah als letzte Nachricht eine aeltere als die, die A gerade
+ * geschrieben hatte. Gleiche Abfrage in web/server/supabase-api.js
+ * (ladeChatStand).
+ *
+ * Gibt null zurueck, wenn die Abfrage scheitert: dann bleibt der Bildschirm,
+ * wie er ist, und der naechste Takt fragt wieder.
+ */
+export async function ladeChatStand(
+  client: SupabaseClient,
+  chatId: string,
+  istKanal = false
+): Promise<string | null> {
+  const { data, error } = istKanal
+    ? await client
+        .from('community_channel_messages')
+        .select(ChatAbgleich.STAND_SPALTEN_KANAL)
+        .eq('channel_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(ChatAbgleich.STAND_ZEILEN)
+    : await client
+        .from('messages')
+        .select(ChatAbgleich.STAND_SPALTEN)
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(ChatAbgleich.STAND_ZEILEN);
+  if (error) return null;
+  return ChatAbgleich.stand((data ?? []) as any[]);
+}
+
+/**
+ * Der „Stand" der Chatliste: Mitgliedschaften und je Chat die juengste
+ * Nachricht (Kasten 27). Aendert er sich, laedt die App die Chatlisten neu.
+ * Gleiche Abfrage in web/server/supabase-api.js (ladeChatlistenStand).
+ */
+export async function ladeChatlistenStand(
+  client: SupabaseClient,
+  ichId: string
+): Promise<string | null> {
+  const { data: mitglieder, error } = await client
+    .from('chat_members')
+    .select('chat_id, is_read, is_archived, is_muted, geleert_bis')
+    .eq('user_id', ichId);
+  if (error) return null;
+  const ids = (mitglieder ?? []).map((m: any) => m.chat_id);
+  if (!ids.length) return ChatAbgleich.listenStand([], []);
+  const { data: letzte, error: fehlerL } = await client
+    .rpc('letzte_nachrichten', { chat_ids: ids })
+    .select('chat_id, id, edited_at, deleted_at');
+  if (fehlerL) return null;
+  return ChatAbgleich.listenStand((mitglieder ?? []) as any[], (letzte ?? []) as any[]);
+}
+
 export async function ladeNachrichten(
   client: SupabaseClient,
   chatId: string,
@@ -579,20 +638,27 @@ export async function ladeNachrichten(
     .maybeSingle();
   const strich = (mitgliedschaft as any)?.geleert_bis ?? null;
 
+  /*
+   * Die JUENGSTEN 500, nicht die aeltesten (Kasten 27, 06.10.2026). Hier
+   * stand `ascending: true` mit `limit(500)`: ab der 501. Nachricht kam in
+   * einem Chat nichts Neues mehr an, und der Verlauf endete bei einer
+   * alten Nachricht. Absteigend holen, dann umdrehen. Gleiche Regel in
+   * web/server/supabase-api.js.
+   */
   let abfrage = client
     .from('messages')
     .select(
       NACHRICHT_SPALTEN
     )
     .eq('chat_id', chatId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(500);
   if (strich) abfrage = abfrage.gt('created_at', strich);
 
   const { data, error } = await abfrage;
   if (error) throw error;
 
-  const zeilen = (data ?? []) as any[];
+  const zeilen = ChatAbgleich.chronologisch((data ?? []) as any[]);
 
   /*
    * Bezug, Reaktionen und Namen in einem Zug nachladen.
@@ -808,6 +874,8 @@ export interface StoryListen {
  * jemand „eine Story hat" (Kasten 11.1).
  */
 const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
+// Kasten 27: Takt, Stand und Reihenfolge offener Chats — gemeinsam mit der Website.
+const ChatAbgleich = require('../../gemeinsam/chatabgleich') as typeof import('../../gemeinsam/chatabgleich');
 
 /** Spalten mit und ohne die Felder aus dem Story-Schema (Kasten 11). */
 const STORY_SPALTEN_NEU =
@@ -1224,12 +1292,13 @@ export async function ladeKanalNachrichten(
         ' profiles!posts_user_id_fkey(name))'
     )
     .eq('channel_id', kanalId)
-    .order('created_at', { ascending: true })
+    // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
+    .order('created_at', { ascending: false })
     .limit(500);
   if (error) throw error;
 
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
-  return signiereMedien(client, (data ?? []).map((m: any) => ({
+  return signiereMedien(client, ChatAbgleich.chronologisch((data ?? []) as any[]).map((m: any) => ({
     id: m.id,
     chatId: m.channel_id,
     senderId: m.sender_id === ichId ? ICH : m.sender_id,
@@ -1461,6 +1530,28 @@ async function ladeKeinInteresse(client: SupabaseClient, ichId: string): Promise
     return [];
   }
   return (data ?? []).map((z: any) => z.post_id as string);
+}
+
+/**
+ * Nur die drei Chatlisten — fuer das Nachsehen im Takt (Kasten 27).
+ *
+ * `ladeAlles` holt dreissig Dinge; die Chatliste braucht davon zwei
+ * Abfragen. Dieselbe Aufteilung in Archiv und Rest wie dort.
+ */
+export async function ladeChatlisten(
+  client: SupabaseClient,
+  ichId: string
+): Promise<Pick<AlleDaten, 'chats' | 'archivierteChats' | 'communityChats'>> {
+  const [chats, communityChats] = await Promise.all([
+    ladeChats(client, ichId, 'messenger'),
+    ladeChats(client, ichId, 'community'),
+  ]);
+  const alle = chats as (Chat & { archiviert?: boolean })[];
+  return {
+    chats: alle.filter((c) => !c.archiviert),
+    archivierteChats: alle.filter((c) => c.archiviert),
+    communityChats,
+  };
 }
 
 /**
