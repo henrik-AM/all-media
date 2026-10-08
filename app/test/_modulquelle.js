@@ -127,6 +127,9 @@ const UMD_BAUSTEINE = [
   // 06.10.2026: `lenkung.js` fuer „Feed steuern" (Kasten 24, Schema 82) —
   // daten.ts und lib/lenkung.ts holen ihn. Gleich mit dem Baustein eingetragen.
   ['lenkung', 'Lenkung'],
+  // 08.10.2026: `markierung.js` fuer @-Markierungen (Kasten 25) — aktionen.ts,
+  // MarkierungsEingabe und MarkierterText holen ihn. Gleich mit eingetragen.
+  ['markierung', 'Markierung'],
 ];
 
 function umdTeile() {
