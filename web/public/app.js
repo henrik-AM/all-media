@@ -11186,7 +11186,9 @@ function mitteilungOeffnen(ziel) {
     return openStory(story.id, { bereich: story.inMessenger === false ? 'videos' : 'messenger' });
   }
 
-  if (ziel.art === 'post') {
+  // Kommentar (Herz daran, Kasten 25: @ darin): die Mitteilung kennt nur den
+  // Kommentar, nicht den Beitrag — also in den Beitrags-Feed, wie die App.
+  if (ziel.art === 'post' || ziel.art === 'comment') {
     state.area = 'videos';
     state.sub.videos = 'home';
     render();

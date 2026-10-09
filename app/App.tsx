@@ -1425,7 +1425,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       return community ? openCommunity(community) : setNotice('Diesen Kanal gibt es nicht mehr');
     }
     setArea('videos');
-    setSubs((prev) => ({ ...prev, videos: ziel.art === 'post' ? 'home' : 'portrait' }));
+    setSubs((prev) => ({ ...prev, videos: ziel.art === 'post' || ziel.art === 'comment' ? 'home' : 'portrait' }));
   };
 
   /**

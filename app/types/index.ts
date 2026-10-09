@@ -519,7 +519,8 @@ export type MitteilungsBereich = 'videos' | 'communities';
 
 export interface MitteilungsZiel {
   /** 'story' seit Kasten 11.6: Markierung in einer Story. */
-  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story';
+  /** 'comment': Herz an einem Kommentar (Schema 49), @ im Kommentar (Kasten 25). */
+  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment';
   id: string;
 }
 

@@ -2967,6 +2967,11 @@ function mitteilungText(m, namen, communityNamen) {
     // Kasten 11.6: Markierung in einer Story — derselbe Satz wie in der App.
     mention: m.ziel?.art === 'story'
       ? `${name} hat dich in einer Story markiert.`
+      // Kasten 25: @ im Community-Chat und im Unterthema — Satz wie in der App.
+      : m.ziel?.art === 'chat'
+        ? `${name} hat dich in einem Chat erwähnt.`
+      : m.ziel?.art === 'community'
+        ? `${name} hat dich in „${community}" erwähnt.`
       : m.ziel?.art === 'post'
         ? `${name} hat dich in einem Beitrag markiert.`
         : `${name} hat dich in einem Kommentar erwähnt.`,
