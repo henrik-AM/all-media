@@ -264,7 +264,8 @@ async function teilZwei() {
 
 async function teilDrei(db) {
   const { chromium } = require('playwright-core');
-  const { anmelden, beenden } = require('./_konto');
+  const { beenden } = require('./_konto');
+  const { nurTestkonto } = require('./_nur_testkonten');
   const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nWebsite: Nachricht erscheint ohne Neuladen');
 
@@ -274,7 +275,13 @@ async function teilDrei(db) {
   page.on('pageerror', (e) => konsole.push(e.message));
   try {
     await page.goto(ZIEL, { waitUntil: 'load' });
-    const an = await anmelden(page);
+    // Ohne anmelden() aus _konto.js: das ruft /api/reset und löscht dabei
+    // genau den Prüfchat, den Teil 2 eben angelegt hat.
+    await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
+    await page.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
+    const { PRUEFKONTO_PASS: PASS } = require('./_testpasswoerter');
+    const an = await page.evaluate(({ mail, pass }) => window.Anmeldung.anmelden(mail, pass),
+      { mail: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'), pass: process.env.AM_TEST_PASS || PASS });
     if (!an.ok) { pruefe('Prüfkonto angemeldet', false, an.fehler); return; }
     await page.reload({ waitUntil: 'load' });
 
