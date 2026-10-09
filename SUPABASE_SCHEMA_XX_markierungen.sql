@@ -81,9 +81,9 @@
 --        darf_story_markieren()    Gewinner XX, ersetzt Schema 68
 --        story_markierbar()        Gewinner XX, ersetzt Schema 68
 --      Wortgleich bis auf den Aufruf von darf_markieren_person().
---  10. ist_minderjaehrig() — WORTGLEICH mit dem Entwurf aus Kasten 23
---      (SUPABASE_SCHEMA_XX_personen_vorschlaege.sql). Wer zuerst eingespielt
---      wird, ist egal; beide Fassungen rechnen dasselbe.
+--  10. ist_minderjaehrig() kommt aus SUPABASE_SCHEMA_85_personen_vorschlaege.sql
+--      (Kasten 23) und wird hier nur benutzt — Schema 85 muss vorher
+--      eingespielt sein.
 --
 --  WAS SIE NICHT ÄNDERT
 --
@@ -132,31 +132,6 @@ as $$
 $$;
 
 revoke all on function public.markierung_handles(text) from public, anon, authenticated;
-
-
--- ---------------------------------------------------------------------------
---  10. Minderjährig? (wortgleich mit Kasten 23)
--- ---------------------------------------------------------------------------
-
-create or replace function public.ist_minderjaehrig(k uuid)
-returns boolean
-language sql
-stable
-security definer set search_path = public
-as $$
-  select coalesce(
-    coalesce(
-      (select public.alter_in_jahren(ka.geburtsdatum)
-         from public.konto_alter ka
-        where ka.user_id = k and ka.geburtsdatum is not null),
-      (select public.alter_in_jahren(p.geburtsdatum)
-         from public.profiles p
-        where p.id = k and p.geburtsdatum is not null)
-    ) < 18,
-    false);
-$$;
-
-revoke all on function public.ist_minderjaehrig(uuid) from public, anon, authenticated;
 
 
 -- ---------------------------------------------------------------------------
@@ -744,6 +719,9 @@ grant execute on function public.story_markierbar(text) to authenticated;
 -- ---------------------------------------------------------------------------
 do $$
 begin
+  if to_regprocedure('public.ist_minderjaehrig(uuid)') is null then
+    raise exception 'ist_minderjaehrig fehlt — erst Schema 85 einspielen';
+  end if;
   if not exists (select 1 from pg_trigger where tgname = 'markierung_text'
                   and tgrelid = 'public.comments'::regclass) then
     raise exception 'Auslöser markierung_text auf comments fehlt';
