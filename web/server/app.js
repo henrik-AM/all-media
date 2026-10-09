@@ -476,6 +476,26 @@ app.post('/api/reset', route(async (req) => {
     const { error: lenkFehler } = await req.db.from(tabelle).delete().eq('user_id', req.nutzerId);
     if (lenkFehler && lenkFehler.code !== '42P01' && lenkFehler.code !== 'PGRST205') throw lenkFehler;
   }
+  /*
+   * Geräteschlüssel (Schema 31): jede Anmeldung eines Prüflaufs legt einen an.
+   * Bis zum 09.10.2026 hatte das Prüfkonto 2068 davon — die Leseregel mit
+   * teilt_chat() lief für jeden Chatpartner in die Zeitgrenze. Nur wenn
+   * zuruecksetzen() gegriffen hat (also ein Testkonto, Schema 73), und nur
+   * Schlüssel ohne Kuvert: die fünf jüngsten bleiben, ältere als eine Stunde gehen.
+   */
+  if (data?.ok !== false) {
+    const { data: alle } = await req.db.from('krypto_schluessel')
+      .select('id, created_at').eq('user_id', req.nutzerId).order('created_at', { ascending: false });
+    const grenze = Date.now() - 60 * 60 * 1000;
+    const alt = (alle || []).slice(5).filter((k) => new Date(k.created_at).getTime() < grenze).map((k) => k.id);
+    for (let i = 0; i < alt.length; i += 100) {
+      const stueck = alt.slice(i, i + 100);
+      const { data: mitKuvert } = await req.db.from('message_keys').select('schluessel_id').in('schluessel_id', stueck);
+      const behalten = new Set((mitKuvert || []).map((z) => z.schluessel_id));
+      const weg = stueck.filter((id) => !behalten.has(id));
+      if (weg.length) await req.db.from('krypto_schluessel').delete().in('id', weg).eq('user_id', req.nutzerId);
+    }
+  }
   return { ok: data?.ok !== false, ...(data || {}) };
 }));
 
