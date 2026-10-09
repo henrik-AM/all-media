@@ -21,6 +21,7 @@ import { useKachelHoehe } from '../../lib/raster';
 import { nachInteresse, VORSCHAU } from '../../lib/interesse';
 import { ortFinden, soundFinden } from '../../lib/ziele';
 import { OrtSoundZeile } from '../../components/OrtSoundZeile';
+import { FarbfilterSchicht } from '../../components/Farbfilter';
 // Gemeinsam mit der Website: welche Liedzeile gerade dran ist, und welche Orte nah liegen.
 const Liedtext = require('../../../gemeinsam/liedtext') as typeof import('../../../gemeinsam/liedtext');
 const Naehe = require('../../../gemeinsam/naehe') as typeof import('../../../gemeinsam/naehe');
@@ -551,6 +552,8 @@ const OrtFotos = ({
           direktZu={uebernehmen}
           onNotice={onNotice}
         />
+        {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+        <FarbfilterSchicht />
       </Modal>
     </View>
   );
@@ -821,6 +824,8 @@ const OrtKarte = ({
           )}
         </ScrollView>
       </View>
+      {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+      <FarbfilterSchicht />
     </Modal>
   );
 };
@@ -1130,6 +1135,8 @@ const LyricsSeite = ({
           <Text style={styles.wellenZeit}>{mitTon ? zeitText(bei) : sound.dauer ?? ''}</Text>
         </View>
       </View>
+      {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+      <FarbfilterSchicht />
     </Modal>
   );
 };

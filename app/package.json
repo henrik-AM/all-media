@@ -111,7 +111,11 @@
     "test:kasten17": "node test/_kasten17.js",
     "test:chatsync": "node test/_chatsync.js",
     "test:lenken": "node test/_lenken.js",
-    "test:lenkung-einheit": "node test/_lenkung_einheit.js"
+    "test:lenkung-einheit": "node test/_lenkung_einheit.js",
+    "test:farbfilter": "node test/_farbfilter.js",
+    "test:farbfilterrechnung": "node test/_farbfilter_rechnung.js",
+    "test:bildschirmzeit": "node test/_bildschirmzeit.js",
+    "test:bildschirmzeit-einheit": "node test/_bildschirmzeit_einheit.js"
   },
   "private": true
 }

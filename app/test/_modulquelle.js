@@ -127,6 +127,13 @@ const UMD_BAUSTEINE = [
   // 06.10.2026: `lenkung.js` fuer „Feed steuern" (Kasten 24, Schema 82) —
   // daten.ts und lib/lenkung.ts holen ihn. Gleich mit dem Baustein eingetragen.
   ['lenkung', 'Lenkung'],
+  // 06.10.2026: `farbfilter.js` fuer Einstellungen → Farbfilter (Kasten 21).
+  // Heute nur von Komponenten gebraucht, nicht von aktionen.ts/daten.ts —
+  // eingetragen, damit es nicht wieder erst beim ersten Kippen auffaellt.
+  ['farbfilter', 'Farbfilter'],
+  // 06.10.2026: `bildschirmzeit.js` fuer die eigene Bildschirmzeit —
+  // Bereiche, Sperre, Restzeit, Uhr (Kasten 22).
+  ['bildschirmzeit', 'Bildschirmzeit'],
   // 08.10.2026: `markierung.js` fuer @-Markierungen (Kasten 25) — aktionen.ts,
   // MarkierungsEingabe und MarkierterText holen ihn. Gleich mit eingetragen.
   ['markierung', 'Markierung'],

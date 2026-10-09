@@ -23,6 +23,7 @@ const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemei
 import { useDaten } from '../contexts/DatenContext';
 import { Contact } from '../types';
 
+import { FarbfilterSchicht } from './Farbfilter';
 /** Jemand, der noch nicht in den Kontakten steht und ueber die Nummer dazukam. */
 export interface Eingeladener {
   id: string;
@@ -289,6 +290,8 @@ export const NewGroupSheet = ({ visible, contacts, onClose, onCreate, onNotice }
               </View>
             </>
           )}
+          {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
+          <FarbfilterSchicht radius={20} />
         </View>
       </KeyboardAvoidingView>
     </Modal>

@@ -27,6 +27,7 @@ import { EmptyState } from './EmptyState';
 import { colors, spacing, themenStyles, typography } from '../constants/design';
 import { useKachelHoehe } from '../lib/raster';
 import * as Aktion from '../lib/aktionen';
+import { FarbfilterSchicht } from './Farbfilter';
 
 const SammlungRegel = require('../../gemeinsam/sammlungen') as typeof import('../../gemeinsam/sammlungen');
 
@@ -120,6 +121,8 @@ export const SammlungOrdner = ({
         )}
       </View>
       {children}
+      {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+      <FarbfilterSchicht />
     </Modal>
   );
 };

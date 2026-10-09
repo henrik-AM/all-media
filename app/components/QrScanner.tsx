@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from './Druck';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
+import { FarbfilterSchicht } from './Farbfilter';
 
 /*
  * Den QR-Code einer anderen Person lesen.
@@ -116,6 +117,8 @@ export const QrScanner = ({ visible, onClose, onCode }: Props) => {
           <Ionicons name="close" size={24} color={colors.white} />
         </Druck>
       </View>
+      {/* Kasten 21: Vollbild-Fenster — Farbfilter-Fläche als letztes Kind. */}
+      <FarbfilterSchicht />
     </Modal>
   );
 };

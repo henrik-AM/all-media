@@ -69,9 +69,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   console.log('\nEinstellungen');
 
-  await pruefe('Die Sprungleiste zeigt alle neun Abschnitte', async () => {
+  // Seit Kasten 21 (06.10.2026) zehn: „Farbfilter" steht nach „Allgemein".
+  await pruefe('Die Sprungleiste zeigt alle zehn Abschnitte', async () => {
     const pillen = await page.$$eval('.pill', (els) => els.map((e) => e.textContent));
-    if (pillen.length !== 9) throw new Error(pillen.join(' | '));
+    if (pillen.length !== 10) throw new Error(pillen.join(' | '));
+    if (pillen[1] !== 'Farbfilter') throw new Error(pillen.join(' | '));
     if (pillen[0] !== 'Allgemein') throw new Error(pillen.join(' | '));
   });
 
@@ -158,8 +160,17 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.fill('#f_code', '1234');
     await page.fill('#f_wdh', '1234');
     await page.click('#formOk');
-    await page.waitForTimeout(600);
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
+    // Seit Kasten 22 geht der Code als Hash nach Supabase (entsperrcode_setzen) —
+    // die Antwort braucht einen Rundlauf, also auf den Toast warten statt 600 ms.
+    await page
+      .waitForFunction(() => { const t = document.querySelector('#toast'); return t && !t.hidden && t.textContent === 'Code gesetzt'; }, null, { timeout: 8000 })
+      .catch(() => {});
+    const hinweis = await page.evaluate(() => {
+      const f = document.querySelector('#formFehler');
+      if (f && !f.hidden && f.textContent.trim()) return f.textContent;
+      const t = document.querySelector('#toast');
+      return t && !t.hidden ? t.textContent : '';
+    });
     if (hinweis !== 'Code gesetzt') throw new Error(hinweis);
   });
 

@@ -1235,12 +1235,21 @@ export async function ladeKommentare(
       : await client.from('comment_likes').select('comment_id').eq('user_id', ichId).in('comment_id', ids);
   const gemocht = new Set((eigene ?? []).map((l: any) => l.comment_id));
 
+  // Schema 84 (Kasten 26): die Leseregel auf comment_likes zeigt nur noch
+  // Zeilen, die die Likes-Sichtbarkeit zulässt; die ZAHL kommt deshalb aus
+  // kommentar_like_zahlen(). Fehlt die Funktion, gilt die eingebettete Zahl.
+  const zahlen = new Map<string, number>();
+  if (ids.length > 0) {
+    const { data: z, error: zFehler } = await client.rpc('kommentar_like_zahlen', { kommentare: ids });
+    if (!zFehler) for (const r of (z ?? []) as any[]) zahlen.set(r.comment_id, Number(r.anzahl ?? 0));
+  }
+
   return (data ?? []).map((k: any) => ({
     id: k.id,
     userId: k.user_id === ichId ? ICH : k.user_id,
     text: k.text,
     time: chatZeit(k.created_at),
-    likes: k.comment_likes?.[0]?.count ?? 0,
+    likes: zahlen.get(k.id) ?? k.comment_likes?.[0]?.count ?? 0,
     liked: gemocht.has(k.id),
   }));
 }

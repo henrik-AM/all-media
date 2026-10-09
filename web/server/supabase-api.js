@@ -1098,6 +1098,14 @@ async function ladeKommentare(client, nutzerId, beitragId) {
       : await client.from('comment_likes').select('comment_id').eq('user_id', nutzerId).in('comment_id', ids);
   const gemocht = new Set((eigene || []).map((l) => l.comment_id));
 
+  // Schema 84 (Kasten 26): Zahl aus kommentar_like_zahlen(), nicht aus den
+  // sichtbaren Zeilen. Fehlt die Funktion, gilt die eingebettete Zahl.
+  const zahlen = new Map();
+  if (ids.length > 0) {
+    const { data: z, error: zFehler } = await client.rpc('kommentar_like_zahlen', { kommentare: ids });
+    if (!zFehler) for (const r of z || []) zahlen.set(r.comment_id, Number(r.anzahl || 0));
+  }
+
   return (data || []).map((k) => ({
     id: k.id,
     postId: k.post_id,
@@ -1105,7 +1113,7 @@ async function ladeKommentare(client, nutzerId, beitragId) {
     text: k.text,
     time: chatZeit(k.created_at),
     zeitpunkt: k.created_at,
-    likes: k.comment_likes?.[0]?.count ?? 0,
+    likes: zahlen.get(k.id) ?? k.comment_likes?.[0]?.count ?? 0,
     liked: gemocht.has(k.id),
   }));
 }
