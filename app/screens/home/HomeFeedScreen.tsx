@@ -9,6 +9,7 @@ import { CommentSheet } from '../../components/CommentSheet';
 import { BeitragOptionenSheet, OptionenBeitrag } from '../../components/BeitragOptionenSheet';
 import { Motiv } from '../../components/Motiv';
 import { StoryRail } from '../../components/StoryRail';
+import { PersonenVorschlaege } from '../../components/PersonenVorschlaege';
 import { useReposts } from '../../contexts/RepostContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { kommentarZeile, likeZeile } from '../../lib/kommentare';
@@ -416,7 +417,28 @@ export const HomeFeedScreen = ({
       <FlatList
         ref={liste}
         data={sichtbarePosts}
-        renderItem={renderPost}
+        /*
+         * Kasten 23: „Personen, die du kennen könntest" nach dem zweiten
+         * Beitrag (bei nur einem Beitrag danach, ganz ohne Beitrag unten).
+         * Hängt an der Zeile, nicht in `data` — sonst verschöben sich die
+         * Indizes, an denen `startBei` und die Impressionen hängen.
+         * Gegenstück: renderHomeFeed() in web/public/app.js.
+         */
+        renderItem={({ item, index }) =>
+          index === Math.min(1, sichtbarePosts.length - 1) ? (
+            <>
+              {renderPost({ item })}
+              <PersonenVorschlaege bereich="videos" onOpenProfile={onOpenProfile} onNotice={onNotice} />
+            </>
+          ) : (
+            renderPost({ item })
+          )
+        }
+        ListFooterComponent={
+          sichtbarePosts.length === 0 ? (
+            <PersonenVorschlaege bereich="videos" onOpenProfile={onOpenProfile} onNotice={onNotice} />
+          ) : null
+        }
         keyExtractor={(item) => item.id}
         /*
          * Beitraege sind unterschiedlich hoch (Bild, Beschreibung, Umfrage),

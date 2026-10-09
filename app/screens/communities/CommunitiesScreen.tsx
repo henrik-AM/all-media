@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { FilterPillen } from '../../components/FilterPillen';
 import { SearchBar } from '../../components/SearchBar';
 import { Avatar } from '../../components/Avatar';
+import { PersonenVorschlaege } from '../../components/PersonenVorschlaege';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
@@ -30,9 +31,11 @@ interface Props {
   onNotice: (message: string) => void;
   /** Neuen Kanal erstellen (Plus-Button oben rechts). */
   onCreateChannel?: () => void;
+  /** Kasten 23: eine Karte unter „Personen, die du kennen könntest" angetippt. */
+  onOpenProfile?: (userId: string) => void;
 }
 
-export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }: Props) => {
+export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel, onOpenProfile }: Props) => {
   const { communities, kanalBeitreten, kanalGelesen } = useProfil();
   const [query, setQuery] = useState('');
 
@@ -130,6 +133,16 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel }
         renderItem={renderCommunity}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        /*
+         * Kasten 23: „Personen, die du kennen könntest" über den eigenen
+         * Communitys — nicht während einer Suche, die gilt den Communitys.
+         * Gegenstück: renderCommunities() in web/public/app.js.
+         */
+        ListHeaderComponent={
+          query.trim() ? null : (
+            <PersonenVorschlaege bereich="communitys" onOpenProfile={onOpenProfile} onNotice={onNotice} />
+          )
+        }
         ListEmptyComponent={
           <EmptyState
             icon="people-outline"
