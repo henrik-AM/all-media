@@ -53,6 +53,8 @@ const SammlungRegel = require('../../gemeinsam/sammlungen') as typeof import('..
 // Spendencode, Zahlungsmethoden und Gründe — dieselbe Regel wie die Website
 // und die Datenbank (Kasten 13, Schema 72).
 const Zahlung = require('../../gemeinsam/zahlung') as typeof import('../../gemeinsam/zahlung');
+// Kasten 25: @-Markierungen — dieselbe Erkennung wie Website und Datenbank.
+const MarkierungRegel = require('../../gemeinsam/markierung') as typeof import('../../gemeinsam/markierung');
 
 /**
  * Eine Zeile, die es entweder gibt oder nicht — Like, Speichern, Folgen.
@@ -3162,48 +3164,87 @@ export async function darfAngeschriebenWerden(
 // Menschen leer war. Zwei Anzeigen, die zusammen so aussahen, als gaebe es
 // die Funktion.
 
+/*
+ * Kasten 25 (08.10.2026): Markiert wird seit Schema XX von der DATENBANK —
+ * ein Auslöser auf posts, comments, messages und community_channel_messages
+ * löst die @-Namen beim Anlegen und Bearbeiten auf und legt Markierung und
+ * Mitteilung an. Bis dahin tat das hier `markierungenSetzen()` nach dem
+ * Anlegen eines Beitrags — nur dort, nicht beim Bearbeiten, und mit einer
+ * eigenen Erkennung, die es in der Website ein zweites Mal gab. Jetzt steht
+ * die Erkennung in gemeinsam/markierung.js (gleiches Muster in der
+ * Datenbank, test:markierung-einheit vergleicht beide).
+ */
+
 /** Die @-Namen aus einem Text, ohne das Zeichen und ohne Doppelte. */
 export function erwaehnungen(text: string): string[] {
-  const treffer = String(text || '').match(/@[A-Za-z0-9_.]{2,30}/g) || [];
-  return [...new Set(treffer.map((t) => t.slice(1).toLowerCase()))];
+  return MarkierungRegel.handles(text);
+}
+
+/** Ein Vorschlag beim Tippen von @ (aus `markierung_vorschlaege`). */
+export type MarkierungVorschlag = import('../../gemeinsam/markierung').MarkierungVorschlag;
+
+/**
+ * Wen kann ich an dieser Stelle markieren? (25.1)
+ *
+ * Die Liste kommt aus der Datenbank, weil dort die Regeln stehen: „Wer darf
+ * mich markieren", Blockierte in beide Richtungen, Minderjährige, Testkonten.
+ * Im Chat/Unterthema zuerst die Mitglieder (`chat` bzw. `kanal`).
+ */
+export async function markierungVorschlaege(
+  client: SupabaseClient,
+  suche: string,
+  ort: { chat?: string | null; kanal?: string | null } = {}
+): Promise<MarkierungVorschlag[]> {
+  const { data, error } = await client.rpc('markierung_vorschlaege', {
+    p_suche: suche || null,
+    p_chat: ort.chat || null,
+    p_kanal: ort.kanal || null,
+  });
+  if (error) throw error;
+  // Profilbilder liegen im privaten Eimer — unterschreiben wie überall.
+  return signiereMedien(client, (data ?? []) as MarkierungVorschlag[]);
 }
 
 /**
- * Markiert die in der Beschreibung erwähnten Personen.
- *
- * Warum aus dem Text und nicht über eine eigene Auswahl: die @-Markierung
- * gibt es in der Beschreibung längst, sie steht so auch im Handbuch, und ein
- * zweiter Weg zum selben Ziel wäre genau der Fehler, den Henrik am
- * Standort-Blatt beanstandet hat — zwei Orte, dieselbe Sache.
- *
- * Jede Markierung wird einzeln eingetragen. Wer sie nicht zulässt, lehnt sie
- * über die Regel ab; das darf die übrigen nicht mitreißen. Und es wird
- * absichtlich **nicht** gemeldet, wer abgelehnt hat: „X lässt sich nicht
- * markieren" wäre selbst die Auskunft, die die Einstellung verhindern soll.
- *
- * Gibt die Namen zurück, die wirklich angekommen sind.
+ * Verschlüsselter Zweierchat (25.6): Die Datenbank sieht den Text nicht und
+ * kann die @-Namen nicht selbst auflösen. Der Absender meldet nach dem Senden
+ * oder Bearbeiten, wen er meint — nur Mitglieder des Chats, die Datenbank
+ * prüft es noch einmal (`markierungen_melden`). Gibt die Zahl zurück.
  */
-export async function markierungenSetzen(
+export async function markierungenMelden(
   client: SupabaseClient,
-  beitragId: string,
-  beschreibung: string
-): Promise<string[]> {
-  const namen = erwaehnungen(beschreibung);
-  if (namen.length === 0) return [];
+  nachrichtId: string,
+  ids: string[]
+): Promise<number> {
+  const { data, error } = await client.rpc('markierungen_melden', {
+    p_nachricht: nachrichtId,
+    p_ids: ids,
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
 
-  const { data: profile } = await client
-    .from('profiles')
-    .select('id, name, handle')
-    .in('handle', namen.map((n) => '@' + n));
+/** Chats, in denen ich ungelesen erwähnt wurde — das „@" in der Chatliste. */
+export async function meineChatErwaehnungen(client: SupabaseClient): Promise<string[]> {
+  const { data, error } = await client.rpc('meine_chat_erwaehnungen');
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((z) => z.chat_id as string);
+}
 
-  const gesetzt: string[] = [];
-  for (const p of (profile ?? []) as { id: string; name: string }[]) {
-    const { error } = await client
-      .from('post_tags')
-      .insert({ post_id: beitragId, user_id: p.id });
-    if (!error) gesetzt.push(p.name);
-  }
-  return gesetzt;
+/**
+ * Zu @-Namen die Profile — damit nur Namen, die es gibt, zum Link werden.
+ * Liest `profiles` direkt; wartende Konten (Schema 52) gibt die Leseregel
+ * gar nicht heraus, sie bleiben also gewöhnlicher Text.
+ */
+export async function profileZuHandles(
+  client: SupabaseClient,
+  handles: string[]
+): Promise<{ id: string; handle: string; name: string }[]> {
+  const namen = [...new Set(handles.map((h) => '@' + MarkierungRegel.normal(h)))].slice(0, 100);
+  if (!namen.length) return [];
+  const { data, error } = await client.from('profiles').select('id, handle, name').in('handle', namen);
+  if (error) throw error;
+  return (data ?? []) as { id: string; handle: string; name: string }[];
 }
 
 /**

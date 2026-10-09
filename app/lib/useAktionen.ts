@@ -549,16 +549,10 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           const id = await A.beitragAnlegen(c, i, { ...felder, mediaUrl: adresse });
 
           /*
-           * @-Namen aus der Beschreibung werden zu Markierungen. Wer sie
-           * nicht zulaesst, wird von der Regel abgelehnt — still, denn "X
-           * laesst sich nicht markieren" waere selbst die Auskunft, die die
-           * Einstellung verhindern soll. Der Beitrag steht davon unabhaengig.
+           * @-Namen aus der Beschreibung markiert seit Kasten 25 die
+           * Datenbank selbst (Auslöser markierung_text, Schema XX) — beim
+           * Anlegen und beim Bearbeiten, mit allen Regeln.
            */
-          try {
-            await A.markierungenSetzen(c, id, felder.beschreibung ?? '');
-          } catch (e: any) {
-            console.error('Markierungen nicht gesetzt:', e?.message ?? e);
-          }
           return id;
         }),
 
