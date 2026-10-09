@@ -112,6 +112,8 @@
     "test:chatsync": "node test/_chatsync.js",
     "test:lenken": "node test/_lenken.js",
     "test:lenkung-einheit": "node test/_lenkung_einheit.js",
+    "test:markieren": "node test/_markieren.js",
+    "test:markierung-einheit": "node test/_markierung_einheit.js",
     "test:farbfilter": "node test/_farbfilter.js",
     "test:farbfilterrechnung": "node test/_farbfilter_rechnung.js",
     "test:bildschirmzeit": "node test/_bildschirmzeit.js",
