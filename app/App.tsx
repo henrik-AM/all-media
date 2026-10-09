@@ -16,6 +16,7 @@ import { AddContactSheet } from './components/AddContactSheet';
 import { ErstellenSheet, ErstellenPunkt } from './components/ErstellenSheet';
 import { FormularFeld, FormularSheet } from './components/FormularSheet';
 import { MitteilungenSheet } from './components/MitteilungenSheet';
+import { profilOeffnerSetzen } from './lib/markierung';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenBereich, TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
@@ -1076,6 +1077,19 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   const openPublicProfile = (userId: string) =>
     setOverlay({ kind: 'profile', userId, variant: 'oeffentlich' });
 
+  /*
+   * Kasten 25.3: ein @-Name im Text öffnet das öffentliche Profil — von
+   * jeder Stelle aus (MarkierterText kennt App.tsx nicht, lib/markierung.ts
+   * hält den Öffner). Ein offenes Blatt schließt sich dabei.
+   */
+  useEffect(() => {
+    profilOeffnerSetzen((userId) => {
+      setSheet(null);
+      openPublicProfile(userId);
+    });
+    return () => profilOeffnerSetzen(null);
+  });
+
   const openStory = (story: Story) => {
     // Eigene Story: noch leer -> aufnehmen, sonst ansehen.
     // Das Plus an der eigenen Story nennt das Ziel schon — die Kamera fragt
@@ -1613,7 +1627,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       ],
       knopf: 'Veröffentlichen',
       felder: [
-        { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true },
+        { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true, markierbar: true },
         { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
         // Punkt 38: Musik zum Beitrag - dieselbe Liste wie hinter den
         // Sound-Seiten.

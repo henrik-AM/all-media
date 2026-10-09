@@ -25,6 +25,8 @@ import * as Aktion from '../lib/aktionen';
 import { useAktionen } from '../lib/useAktionen';
 
 import { FarbfilterSchicht } from './Farbfilter';
+import { MarkierterText } from './MarkierterText';
+import { MarkierungsEingabe } from './MarkierungsEingabe';
 interface Props {
   targetId: string | null;
   onClose: () => void;
@@ -163,9 +165,12 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
         {/* Kasten 11.1: Ring an der Person, die kommentiert hat. */}
         <StoryAvatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm + 4} bereich="videos" />
         <View style={styles.commentBody}>
-          <Text style={styles.commentText}>
-            <Text style={styles.bold}>{author?.name}</Text> {item.text}
-          </Text>
+          {/* Kasten 25.3: @-Namen im Kommentar führen zum Profil. */}
+          <MarkierterText
+            style={styles.commentText}
+            davor={<><Text style={styles.bold}>{author?.name}</Text>{' '}</>}
+            text={item.text}
+          />
           <Text style={styles.commentMeta}>{item.time}</Text>
         </View>
         {/*
@@ -237,7 +242,8 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
         <View style={[styles.composer, { paddingBottom: 9 + (tastatur ? 0 : insets.bottom) }]}>
           <Avatar id={CURRENT_USER_ID} name={alleNutzer[CURRENT_USER_ID]?.name ?? ""} size={sizes.avatarSm} />
           <View style={styles.field}>
-            <TextInput
+            {/* Kasten 25.1: @ schlägt Personen vor. */}
+            <MarkierungsEingabe
               style={styles.input}
               value={draft}
               onChangeText={(t) => {

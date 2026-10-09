@@ -29,6 +29,7 @@ import {
   useVideoEinstellungen,
 } from '../../lib/videoEinstellungen';
 import { gefaelltRest } from '../../lib/kommentare';
+import { MarkierterText } from '../../components/MarkierterText';
 
 interface Props {
   clipId: string;
@@ -726,7 +727,7 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
           </Text>
         )}
 
-        {!!clip.description && <Text style={styles.text}>{clip.description}</Text>}
+        {!!clip.description && <MarkierterText style={styles.text} text={clip.description} />}
 
         {!!clip.tags?.length && (
           <View style={styles.tags}>

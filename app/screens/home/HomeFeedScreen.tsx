@@ -25,6 +25,7 @@ import { useImpressionen } from '../../lib/useImpressionen';
 import { useZielOeffnen } from '../../lib/ziele';
 import type { ExplorerZiel } from '../videos/ExplorerScreen';
 import { Post, Story } from '../../types';
+import { MarkierterText } from '../../components/MarkierterText';
 
 interface Props {
   stories: Story[];
@@ -395,9 +396,11 @@ export const HomeFeedScreen = ({
         {item.likes > 0 && (
           <Text style={styles.likes}>{likeZeile(item.likes, item.likedBy)}</Text>
         )}
-        <Text style={styles.description}>
-          <Text style={styles.bold}>{author?.name}</Text> {item.description}
-        </Text>
+        <MarkierterText
+          style={styles.description}
+          davor={<><Text style={styles.bold}>{author?.name}</Text>{' '}</>}
+          text={item.description}
+        />
         <Druck onPress={() => setCommentsFor(item.id)}>
           <Text style={styles.commentsLink}>{kommentarZeile(item.comments)}</Text>
         </Druck>

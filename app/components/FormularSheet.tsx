@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Druck } from './Druck';
 import { SheetRahmen } from './SheetRahmen';
+import { MarkierungsEingabe } from './MarkierungsEingabe';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
 export interface FormularFeld {
@@ -21,6 +22,8 @@ export interface FormularFeld {
    * sucht sie aus dem aus, was es gibt (Punkt 38).
    */
   auswahl?: string[];
+  /** Kasten 25.1: beim Tippen von @ Personen vorschlagen (Beschreibung). */
+  markierbar?: boolean;
 }
 
 interface Props {
@@ -127,6 +130,21 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
                 })}
                 </ScrollView>
               ) : (
+              f.markierbar ? (
+              <MarkierungsEingabe
+                listeUnten
+                style={[styles.eingabe, f.typ === 'mehrzeilig' && styles.mehrzeilig]}
+                value={werte[f.key] ?? ''}
+                onChangeText={(t) => {
+                  setWerte((prev) => ({ ...prev, [f.key]: t }));
+                  setFehler(null);
+                }}
+                placeholder={f.platzhalter}
+                placeholderTextColor={colors.text3}
+                multiline={f.typ === 'mehrzeilig'}
+                autoFocus={i === 0}
+              />
+              ) : (
               <TextInput
                 style={[styles.eingabe, f.typ === 'mehrzeilig' && styles.mehrzeilig]}
                 value={werte[f.key] ?? ''}
@@ -143,6 +161,7 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
                 returnKeyType={i === felder.length - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === felder.length - 1 ? absenden : undefined}
               />
+              )
               )}
             </View>
           ))}

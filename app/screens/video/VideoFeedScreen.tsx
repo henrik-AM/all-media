@@ -33,6 +33,7 @@ import { useAktionen } from '../../lib/useAktionen';
 import { useImpressionen } from '../../lib/useImpressionen';
 import { useZielOeffnen } from '../../lib/ziele';
 import type { ExplorerZiel } from '../videos/ExplorerScreen';
+import { MarkierterText } from '../../components/MarkierterText';
 
 interface Props {
   onOpenProfile: (userId: string) => void;
@@ -468,7 +469,7 @@ export const VideoFeedScreen = ({
               </>
             )}
           </View>
-          <Text style={styles.description}>{item.description}</Text>
+          <MarkierterText style={styles.description} linkStil={{ color: colors.white, fontWeight: '700' }} text={item.description} />
           {/* Kasten 9.3/9.4: „Gefällt Anna …“ wie bei Instagram — nur mit
               einem echten Namen aus liker_namen() (gefolgt und freigegeben,
               Schema 65). Ohne Namen keine Zeile; die Zahl steht rechts. */}
