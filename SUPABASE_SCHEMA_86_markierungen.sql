@@ -732,7 +732,7 @@ begin
   if has_function_privilege('anon', 'public.markierung_vorschlaege(text, uuid, uuid)', 'execute') then
     raise exception 'markierung_vorschlaege steht anon offen';
   end if;
-  if (select array_agg(h order by h) from public.markierung_handles('Hi @Anna, @ben. anna@web.de @an..na'))
+  if (select array_agg(h order by h) from public.markierung_handles('Hi @Anna, @ben. anna@web.de @an..na') as t(h))
      is distinct from array['anna', 'ben'] then
     raise exception 'markierung_handles erkennt falsch';
   end if;
