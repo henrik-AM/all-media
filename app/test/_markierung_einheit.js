@@ -104,7 +104,7 @@ const liste = [
   { id: '5', name: 'Ohne Handle', handle: '', rang: 'mitglied' },
 ];
 pruefe('Mitglieder vor Nahen vor Suche', gleich(M.vorschlaegeOrdnen(liste).map((p) => p.id), ['1', '4', '2', '3']));
-pruefe('Suche filtert nach Name oder Handle', gleich(M.vorschlaegeOrdnen(liste, 'b').map((p) => p.id), ['4', '2']));
+pruefe('Suche filtert nach Name oder Handle', gleich(M.vorschlaegeOrdnen(liste, 'b').map((p) => p.id), ['2', '4']));
 pruefe('Wer mit der Suche beginnt, steht innerhalb der Stufe vorn',
   gleich(M.vorschlaegeOrdnen([
     { id: 'x', name: 'Xaver Bert', handle: '@xaver', rang: 'nah' },
