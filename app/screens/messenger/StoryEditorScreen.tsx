@@ -50,6 +50,7 @@ import { FILTER } from '../../constants/filter';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useAktionen } from '../../lib/useAktionen';
 import { StoryOverlays, StoryText } from '../../types';
+import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 
@@ -316,7 +317,18 @@ export const StoryEditorScreen = ({
 
         {werkzeug === 'text' && (
           <View style={styles.textEbene}>
-            <TextInput
+            {/*
+              Kasten 25: @ schlägt Personen vor. Gewählt wird daraus ein
+              Namensschild (story_tags) — dieselbe Markierung wie über
+              „Markieren", mit Hinweis im Chat (Schema 75). Der @-Name im Text
+              selbst ist nur ein Link, keine zweite Markierung: sonst käme
+              dieselbe Meldung doppelt.
+            */}
+            <MarkierungsEingabe
+              listeUnten
+              onMarkiert={(p) => {
+                if (!markiert.some((m) => m.userId === p.id)) markieren({ id: p.id, name: p.name });
+              }}
               autoFocus
               multiline
               value={entwurf.text}

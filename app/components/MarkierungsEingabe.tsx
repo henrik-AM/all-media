@@ -52,10 +52,12 @@ interface Props extends TextInputProps {
   huelle?: StyleProp<ViewStyle>;
   /** Liste unter statt über dem Feld (Felder oben im Blatt). */
   listeUnten?: boolean;
+  /** Nach der Wahl einer Person — die Story macht daraus ein Namensschild. */
+  onMarkiert?: (p: Aktion.MarkierungVorschlag) => void;
 }
 
 export const MarkierungsEingabe = forwardRef<TextInput, Props>(
-  ({ value, onChangeText, chatId, kanalId, huelle, listeUnten, onSelectionChange, ...rest }, ref) => {
+  ({ value, onChangeText, chatId, kanalId, huelle, listeUnten, onMarkiert, onSelectionChange, ...rest }, ref) => {
     const { users, ichId } = useDaten();
     const { supabase } = useSupabase();
     const [cursor, setCursor] = useState<number>(value.length);
@@ -103,6 +105,7 @@ export const MarkierungsEingabe = forwardRef<TextInput, Props>(
       setCursor(neu.cursor);
       setErzwungen({ start: neu.cursor, end: neu.cursor });
       setListe([]);
+      onMarkiert?.(p);
     };
 
     const liste_ = suche !== null && liste.length > 0 && (

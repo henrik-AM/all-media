@@ -17,6 +17,8 @@ import React, { useState } from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import { filterZu } from '../constants/filter';
 import { StoryOverlays } from '../types';
+import { MarkierterText } from './MarkierterText';
+const MarkierungRegel = require('../../gemeinsam/markierung') as typeof import('../../gemeinsam/markierung');
 
 const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
 
@@ -71,10 +73,14 @@ export const StoryOverlaySchicht = ({ overlays, onMarkierung, ohneFilter, ohneTe
         o.texte.map((t, i) => (
           <View
             key={`t${i}`}
-            pointerEvents="none"
+            // Kasten 25.3: Text mit @-Namen nimmt den Tipp an (Link zum
+            // Profil); ohne @ bleibt er durchlässig für das Weitertippen.
+            pointerEvents={MarkierungRegel.handles(t.text).length ? 'box-none' : 'none'}
             style={[styles.anker, { left: `${t.x * 100}%`, top: `${t.y * 100}%` }]}
           >
-            <Text
+            <MarkierterText
+              linkStil={{ color: t.farbe, textDecorationLine: 'underline', fontWeight: '700' }}
+              text={t.text}
               testID="story-text"
               style={[
                 styles.text,
@@ -85,9 +91,7 @@ export const StoryOverlaySchicht = ({ overlays, onMarkierung, ohneFilter, ohneTe
                   backgroundColor: t.hintergrund ? 'rgba(0,0,0,0.55)' : 'transparent',
                 },
               ]}
-            >
-              {t.text}
-            </Text>
+            />
           </View>
         ))}
       {o.markiert.map((m) => (
