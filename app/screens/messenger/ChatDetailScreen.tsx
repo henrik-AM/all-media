@@ -39,6 +39,8 @@ import { nachrichtTon } from '../../lib/toene';
 import { dauerText } from './CallScreen';
 import * as Aktion from '../../lib/aktionen';
 import { FarbfilterSchicht } from '../../components/Farbfilter';
+import { MarkierterText } from '../../components/MarkierterText';
+import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 // Kasten 27: offenen Chat im Takt nachsehen — gemeinsam mit der Website.
@@ -769,9 +771,11 @@ export const ChatDetailScreen = ({
               </View>
             </View>
             {item.text ? (
-              <Text style={[styles.messageText, styles.storyText, out && styles.messageTextOut]}>
-                {item.text}
-              </Text>
+              <MarkierterText
+                style={[styles.messageText, styles.storyText, out && styles.messageTextOut]}
+                linkStil={out ? styles.markierungOut : undefined}
+                text={item.text}
+              />
             ) : null}
           </View>
         ) : item.standort ? (
@@ -891,7 +895,12 @@ export const ChatDetailScreen = ({
            */
           <Text style={styles.zurueck}>Diese Nachricht wurde zurückgenommen</Text>
         ) : (
-          <Text style={[styles.messageText, out && styles.messageTextOut]}>{item.text}</Text>
+          // Kasten 25.3: @-Namen in der Blase führen zum Profil.
+          <MarkierterText
+            style={[styles.messageText, out && styles.messageTextOut]}
+            linkStil={out ? styles.markierungOut : undefined}
+            text={item.text}
+          />
         )}
 
         <View style={styles.bubbleFoot}>
@@ -1263,7 +1272,11 @@ export const ChatDetailScreen = ({
             <Ionicons name="add" size={24} color={colors.text2} />
           </Druck>
           <View style={styles.composerField}>
-            <TextInput
+            {/* Kasten 25.1: @ schlägt zuerst die Mitglieder dieses Chats bzw. der Community vor. */}
+            <MarkierungsEingabe
+              huelle={{ flex: 1 }}
+              chatId={istKanal ? null : chat.id}
+              kanalId={istKanal ? chat.id : null}
               style={styles.composerInput}
               value={draft}
               onChangeText={setDraft}
@@ -1605,6 +1618,8 @@ const styles = themenStyles((colors) => ({
   sender: { marginBottom: 2, color: colors.brand, fontSize: 12.5, fontWeight: '700' },
   messageText: { color: colors.text, ...typography.message, lineHeight: 20 },
   messageTextOut: { color: colors.bubbleOutText },
+  // Auf der eigenen (farbigen) Blase: Link in Blasenschrift, unterstrichen.
+  markierungOut: { color: colors.bubbleOutText, textDecorationLine: 'underline' },
   media: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
   mediaText: { color: colors.text2, ...typography.preview },
   anhangBild: { width: 210, height: 150, borderRadius: 12, marginBottom: 4 },

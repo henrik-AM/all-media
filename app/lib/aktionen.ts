@@ -1129,6 +1129,11 @@ export async function nachrichtSenden(
     }
   }
 
+  // Kasten 25.6: verschlüsselt sieht die Datenbank die @-Namen nicht.
+  if (paket.kuverts.length) {
+    await verschluesseltMarkieren(client, ichId, chatId, (data as any).id, text);
+  }
+
   // Damit der Chat in der Liste nach oben rutscht. Klappt das nicht, ist die
   // Nachricht trotzdem angekommen — kein Grund, das Senden scheitern zu
   // lassen, aber auch keiner, es zu verschweigen.
@@ -2096,7 +2101,45 @@ export async function nachrichtBearbeiten(
   if (error) throw error;
   // Ein verbotenes UPDATE trifft still null Zeilen — dann ist nichts passiert.
   if (!getroffen || !getroffen.length) throw new Error('Die Nachricht wurde nicht geändert');
+  // Kasten 25.6: neu Markierte melden, Entfernte nimmt die Datenbank zurück.
+  if (alt && Number((alt as any).krypto) > 0) {
+    await verschluesseltMarkieren(client, ichId, (alt as any).chat_id, nachrichtId, text);
+  }
   return true;
+}
+
+/**
+ * Kasten 25.6 — Markieren in einem verschlüsselten Zweierchat.
+ *
+ * Der Text liegt als Chiffre in der Datenbank (Schema 31); ihr Auslöser kann
+ * die @-Namen nicht lesen. Deshalb meldet der Absender selbst, wen er meint:
+ * nur Mitglieder dieses Chats (im Zweierchat der Partner), die Datenbank
+ * prüft es in `markierungen_melden` noch einmal. Auch eine leere Liste wird
+ * gemeldet — beim Bearbeiten nimmt sie entfernte Markierungen zurück.
+ * Scheitert das Melden, steht die Nachricht trotzdem; es fehlt nur die
+ * Markierung.
+ */
+async function verschluesseltMarkieren(
+  client: SupabaseClient,
+  ichId: string,
+  chatId: string,
+  nachrichtId: string,
+  text: string
+) {
+  try {
+    let ids: string[] = [];
+    if (MarkierungRegel.handles(text).length) {
+      const { data } = await client
+        .from('chat_members')
+        .select('user_id, profiles!user_id(handle)')
+        .eq('chat_id', chatId);
+      const mitglieder = ((data ?? []) as any[]).map((z) => ({ id: z.user_id, handle: z.profiles?.handle ?? '' }));
+      ids = MarkierungRegel.markierteMitglieder(text, mitglieder, ichId);
+    }
+    await markierungenMelden(client, nachrichtId, ids);
+  } catch (e: any) {
+    console.warn('[aktionen] Markierung im verschlüsselten Chat nicht gemeldet:', e?.message ?? e);
+  }
 }
 
 /**
