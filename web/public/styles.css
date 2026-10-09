@@ -4825,3 +4825,43 @@ body.ist-abgemeldet .ptr-indicator {
 .bzbalken__spalte span { font-size: 12px; color: var(--text-3); }
 .bzbalken__rahmen { flex: 1; width: 70%; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
 .bzbalken__fuell { width: 100%; background: var(--brand); border-radius: 6px; }
+
+/* ---------------------------------------------- @-Markierungen (Kasten 25) */
+/* Ein @-Name, den es gibt, ist ein Link zum Profil (markierterText). */
+.markierung { color: var(--brand); font-weight: 600; cursor: pointer; }
+.markierung:hover, .markierung:focus-visible { text-decoration: underline; outline: none; }
+/* Auf farbigen Flächen (eigene Blase, Video, Story) in der Schrift der Fläche. */
+.msg--out .markierung, .slide__desc .markierung, .storyschicht__text .markierung {
+  color: inherit; text-decoration: underline; font-weight: 700;
+}
+/* Die Story-Schicht lässt Klicks durch — der Name selbst nimmt sie an. */
+.storyschicht__text .markierung { pointer-events: auto; }
+
+/* Vorschlagsliste beim Tippen von @ (markierungsEingabe). */
+.markierliste {
+  position: fixed;
+  z-index: 10000;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(12, 14, 20, .14);
+  padding: 4px 0;
+}
+.markierliste__zeile {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 7px 12px;
+  background: none; border: 0; text-align: left; cursor: pointer; color: inherit;
+}
+.markierliste__zeile:hover, .markierliste__zeile.is-active { background: var(--surface-3, rgba(0,0,0,.05)); }
+.markierliste__namen { display: flex; flex-direction: column; min-width: 0; }
+.markierliste__namen strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.markierliste__namen span { font-size: 12.5px; color: var(--text-3); }
+.markierliste .avatar { flex: 0 0 auto; }
+/* Das „@" in der Chatliste: ungelesen erwähnt. */
+.row__erwaehnt {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+  background: var(--brand); color: #fff; font-size: 11.5px; font-weight: 700;
+}

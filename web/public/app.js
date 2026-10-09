@@ -294,6 +294,248 @@ function avatarForUser(id, size = 44) {
   return personenAvatar(user(id), size);
 }
 
+/* ------------------------------------------------- @-Markierungen (Kasten 25) */
+/*
+ * Henrik am 06.10.2026: „Andere Personen sollen mit @ markiert werden können
+ * (All Media übergreifend)." Markiert wird von der Datenbank (Auslöser
+ * markierung_text, Schema XX); die Website zeigt die Namen als Links und
+ * schlägt beim Tippen Personen vor. Die Regeln (welches Wort, wie ersetzt,
+ * Reihenfolge) stehen in gemeinsam/markierung.js — window.Markierung, dieselbe
+ * Datei wie in der App. Gegenstück dort: MarkierterText, MarkierungsEingabe.
+ */
+
+/** handle (klein, ohne @) → Kennung, oder null für „gibt es nicht". */
+const markierungBekannt = new Map();
+const markierungWartend = new Set();
+
+function markierungKennung(handle) {
+  if (markierungBekannt.has(handle)) return markierungBekannt.get(handle);
+  for (const [id, u] of Object.entries(state.users || {})) {
+    if (u?.handle && Markierung.normal(u.handle) === handle) {
+      markierungBekannt.set(handle, id);
+      return id;
+    }
+  }
+  return undefined;
+}
+
+/*
+ * Unbekannte Namen gebündelt nachschlagen und die schon gezeichneten Stellen
+ * nachträglich zu Links machen — ohne die ganze Seite neu zu zeichnen.
+ */
+let markierungZeitgeber = null;
+function markierungNachschlagen() {
+  clearTimeout(markierungZeitgeber);
+  markierungZeitgeber = setTimeout(async () => {
+    const offen = [...markierungWartend];
+    markierungWartend.clear();
+    if (!offen.length) return;
+    try {
+      const antwort = await fetch(`/api/markierung/profile?h=${encodeURIComponent(offen.join(','))}`).then((r) => r.json());
+      if (!antwort?.ok) return;
+      const gefunden = new Map((antwort.profile || []).map((p) => [Markierung.normal(p.handle), p.id]));
+      for (const h of offen) markierungBekannt.set(h, gefunden.get(h) ?? null);
+      document.querySelectorAll('[data-mhandle]').forEach((el) => {
+        const id = markierungBekannt.get(el.dataset.mhandle);
+        if (id === undefined) return;
+        if (id) {
+          el.classList.add('markierung');
+          el.dataset.markierung = id;
+          el.setAttribute('role', 'link');
+          el.setAttribute('tabindex', '0');
+        }
+        el.removeAttribute('data-mhandle');
+      });
+    } catch {
+      // Ohne Antwort bleiben sie Text; beim nächsten Zeichnen wird neu gefragt.
+    }
+  }, 60);
+}
+
+/**
+ * Text mit @-Namen als HTML: bekannte Namen werden Links zum Profil,
+ * unbekannte bleiben Text (25.3). Alles andere wird wie mit esc() maskiert.
+ */
+function markierterText(text) {
+  const quelle = String(text ?? '');
+  if (!window.Markierung || quelle.indexOf('@') === -1) return esc(quelle);
+  return Markierung.stuecke(quelle)
+    .map((st) => {
+      if (st.art === 'text') return esc(st.text);
+      const id = markierungKennung(st.handle);
+      if (id) return `<span class="markierung" role="link" tabindex="0" data-markierung="${esc(id)}">${esc(st.text)}</span>`;
+      if (id === null) return esc(st.text);
+      markierungWartend.add(st.handle);
+      markierungNachschlagen();
+      return `<span data-mhandle="${esc(st.handle)}">${esc(st.text)}</span>`;
+    })
+    .join('');
+}
+
+// Ein Klick auf einen Namen öffnet das öffentliche Profil — von überall,
+// deshalb einmal am Dokument und vor allen anderen Klicks (Erfassungsphase).
+document.addEventListener(
+  'click',
+  (e) => {
+    const link = e.target.closest?.('[data-markierung]');
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof storyTimer !== 'undefined') clearInterval(storyTimer);
+    document.querySelector('.sheet-backdrop')?.remove();
+    openProfile(link.dataset.markierung, 'oeffentlich');
+  },
+  true
+);
+
+/**
+ * Ein Eingabefeld (input/textarea) schlägt beim Tippen von @ Personen vor
+ * (25.1). `ort.chat` / `ort.kanal`: deren Mitglieder zuerst. `ort.unten`:
+ * Liste unter statt über dem Feld. `ort.gewaehlt(person)`: nach der Wahl.
+ * Pfeiltasten, Enter und Esc bedienen die Liste; solange sie offen ist,
+ * sendet Enter nicht.
+ */
+function markierungsEingabe(feld, ort = {}) {
+  if (!feld || !window.Markierung || feld.dataset.markierbar) return;
+  feld.dataset.markierbar = '1';
+  let liste = [];
+  let aktiv = 0;
+  let box = null;
+  let lauf = 0;
+  let zeitgeber = null;
+
+  const schliessen = () => {
+    box?.remove();
+    box = null;
+    liste = [];
+  };
+
+  const zeichnen = () => {
+    if (!liste.length) return schliessen();
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'markierliste';
+      box.setAttribute('role', 'listbox');
+      box.setAttribute('aria-label', 'Personen markieren');
+      document.body.appendChild(box);
+      // Ein Klick in die Liste nimmt dem Feld nicht den Fokus.
+      box.addEventListener('mousedown', (e) => e.preventDefault());
+      box.addEventListener('click', (e) => {
+        const z = e.target.closest('[data-mwahl]');
+        if (z) waehlen(liste[Number(z.dataset.mwahl)]);
+      });
+    }
+    const r = feld.getBoundingClientRect();
+    box.style.left = `${Math.max(8, r.left)}px`;
+    box.style.width = `${Math.max(220, r.width)}px`;
+    if (ort.unten) {
+      box.style.top = `${r.bottom + 6}px`;
+      box.style.bottom = '';
+    } else {
+      box.style.bottom = `${window.innerHeight - r.top + 6}px`;
+      box.style.top = '';
+    }
+    box.innerHTML = liste
+      .map(
+        (p, i) => `<button type="button" class="markierliste__zeile${i === aktiv ? ' is-active' : ''}" role="option" data-mwahl="${i}">
+          ${personenAvatar({ avatar: p.avatar_url, color: p.color, initials: initialenVon(p.name) }, 36)}
+          <span class="markierliste__namen"><strong>${esc(p.name)}</strong><span>${esc(p.handle)}</span></span>
+        </button>`
+      )
+      .join('');
+  };
+
+  const waehlen = (p) => {
+    if (!p) return;
+    const neu = Markierung.einsetzen(feld.value, feld.selectionStart ?? feld.value.length, p.handle);
+    markierungBekannt.set(Markierung.normal(p.handle), p.id);
+    feld.value = neu.text;
+    feld.setSelectionRange(neu.cursor, neu.cursor);
+    feld.dispatchEvent(new Event('input', { bubbles: true }));
+    schliessen();
+    feld.focus();
+    ort.gewaehlt?.(p);
+  };
+
+  const pruefen = () => {
+    const wort = Markierung.aktuellesWort(feld.value, feld.selectionStart ?? feld.value.length);
+    if (!wort) return schliessen();
+    const nr = ++lauf;
+    // Sofort aus den geladenen Personen, dann aus der Datenbank.
+    const ersatz = Object.entries(state.users || {})
+      .filter(([id, u]) => id !== 'me' && u?.handle)
+      .map(([id, u]) => ({ id, name: u.name, handle: u.handle, avatar_url: u.avatar || null, color: u.color || null, rang: 'nah' }));
+    liste = Markierung.vorschlaegeOrdnen(ersatz, wort.suche).slice(0, 8);
+    aktiv = 0;
+    zeichnen();
+    clearTimeout(zeitgeber);
+    zeitgeber = setTimeout(async () => {
+      const q = new URLSearchParams({ q: wort.suche });
+      if (ort.chat) q.set('chat', ort.chat);
+      if (ort.kanal) q.set('kanal', ort.kanal);
+      try {
+        const antwort = await fetch(`/api/markierung/vorschlaege?${q}`).then((r) => r.json());
+        if (nr !== lauf || !antwort?.ok) return;
+        liste = Markierung.vorschlaegeOrdnen(antwort.personen || [], wort.suche).slice(0, 8);
+        aktiv = 0;
+        zeichnen();
+      } catch {
+        // Dann bleibt die Liste aus den geladenen Personen stehen.
+      }
+    }, 180);
+  };
+
+  feld.addEventListener('input', pruefen);
+  feld.addEventListener('click', pruefen);
+  feld.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') pruefen();
+  });
+  feld.addEventListener('blur', () => setTimeout(schliessen, 120));
+  feld.addEventListener(
+    'keydown',
+    (e) => {
+      if (!box || !liste.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        aktiv = (aktiv + (e.key === 'ArrowDown' ? 1 : liste.length - 1)) % liste.length;
+        zeichnen();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        waehlen(liste[aktiv]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        schliessen();
+      }
+    },
+    true
+  );
+}
+
+/** Initialen wie in den Profildaten — für Vorschläge ohne geladenes Profil. */
+function initialenVon(name) {
+  return String(name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((t) => t[0].toUpperCase())
+    .join('') || '?';
+}
+
+/**
+ * Verschlüsselter Zweierchat (25.6): Die Datenbank sieht den Text nicht. Der
+ * Browser meldet, wen er meint — nur den Partner dieses Chats. Auch eine leere
+ * Liste wird gemeldet (beim Bearbeiten nimmt sie Entfernte zurück). Gleicher
+ * Weg in der App (verschluesseltMarkieren in app/lib/aktionen.ts).
+ */
+async function verschluesseltMarkieren(chat, nachrichtId, text) {
+  if (!window.Markierung || !nachrichtId) return;
+  const partner = chat?.userId ? [{ id: chat.userId, handle: user(chat.userId).handle || '' }] : [];
+  const ids = Markierung.markierteMitglieder(text, partner, 'me');
+  await api('/api/markierungen/melden', { nachricht: nachrichtId, ids });
+}
+
 /*
  * Der eigene Avatar zeigt das Profilbild aus der Datenbank
  * (`profiles.avatar_url`, Kasten 12.5). Bis zum 29.09.2026 lag es nur im
@@ -1511,7 +1753,37 @@ function chatOptionen(chatId) {
   );
 }
 
+/*
+ * Kasten 25: In welchen Chats wurde ich ungelesen mit @ erwähnt? Der
+ * Messenger hat keine Glocke (strikte Trennung von Videos, Schema 75) — die
+ * Erwähnung zeigt sich als „@" vor der Zahl. Nachgesehen, wenn die Liste
+ * gezeichnet wird (höchstens alle zehn Sekunden), und in den schon
+ * gezeichneten Zeilen nachgetragen. Gleiche Anzeige in der App (ChatListScreen).
+ */
+let erwaehnteChats = new Set();
+let erwaehntGeprueft = 0;
+function erwaehnungenNachsehen() {
+  if (Date.now() - erwaehntGeprueft < 10000) return;
+  erwaehntGeprueft = Date.now();
+  fetch('/api/markierung/chats')
+    .then((r) => r.json())
+    .then((antwort) => {
+      const neu = new Set((antwort?.chats || []).map(String));
+      if (neu.size === erwaehnteChats.size && [...neu].every((k) => erwaehnteChats.has(k))) return;
+      erwaehnteChats = neu;
+      document.querySelectorAll('.row.is-unread[data-chat]').forEach((zeile) => {
+        const meta = zeile.querySelector('.row__meta');
+        const da = meta?.querySelector('.row__erwaehnt');
+        const soll = erwaehnteChats.has(String(zeile.dataset.chat));
+        if (soll && !da && meta) meta.querySelector('.badge')?.insertAdjacentHTML('beforebegin', '<span class="row__erwaehnt" aria-label="Du wurdest erwähnt">@</span>');
+        if (!soll && da) da.remove();
+      });
+    })
+    .catch(() => {});
+}
+
 function chatRow(c) {
+  erwaehnungenNachsehen();
   const mediaIcon = c.mediaPreview === 'image' ? ICONS.image : c.mediaPreview === 'audio' ? ICONS.mic : '';
   /*
    * Ein gesperrter Chat zeigt keine Vorschau - das ist der halbe Sinn der
@@ -1559,6 +1831,7 @@ function chatRow(c) {
             <span class="row__meta">
               ${c.gesperrt ? ICONS.lock : ''}
               ${c.muted ? ICONS.mute : ''}
+              ${c.unread && erwaehnteChats.has(String(c.id)) ? '<span class="row__erwaehnt" aria-label="Du wurdest erwähnt">@</span>' : ''}
               ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
             </span>
           </div>
@@ -2005,6 +2278,21 @@ function openStoryBearbeiten(bild, bereich = 'messenger', mediaTyp = 'image') {
         </div>`;
       const eingabe = $('#storyTextEingabe');
       eingabe.focus();
+      /*
+       * Kasten 25: @ schlägt Personen vor. Gewählt wird daraus ein
+       * Namensschild — dieselbe Markierung wie über „Markieren", mit Hinweis
+       * im Chat (Schema 75). Der @-Name im Text bleibt nur ein Link; eine
+       * zweite Markierung daraus käme doppelt an. Gleich in der App.
+       */
+      markierungsEingabe(eingabe, {
+        unten: true,
+        gewaehlt: (p) => {
+          if (o.markiert.some((m) => m.userId === p.id)) return;
+          if (o.markiert.length >= StoryRegeln.MARKIERUNGEN_HOECHSTENS) return toast('Mehr Personen passen nicht in eine Story');
+          o.markiert.push({ userId: p.id, name: p.name || p.handle || '', x: 0.5, y: 0.7 + (o.markiert.length % 4) * 0.06 });
+          zeichnen();
+        },
+      });
       eingabe.addEventListener('input', () => {
         textEntwurf.text = eingabe.value;
         zeichnen();
@@ -4487,6 +4775,8 @@ async function openComments(targetId, onCountChange) {
     );
 
     const input = sheet.querySelector('#commentInput');
+    // Kasten 25.1: @ schlägt Personen vor.
+    markierungsEingabe(input);
     const send = sheet.querySelector('#commentSend');
 
     /*
@@ -4577,7 +4867,7 @@ function commentRow(c) {
     <div class="comment">
       ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
       <div class="comment__body">
-        <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${esc(c.text)}</div>
+        <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${markierterText(c.text)}</div>
         <div class="comment__meta">${esc(c.time)}</div>
       </div>
       <button class="comment__like ${c.liked ? 'is-on' : ''}" data-clike="${c.id}" aria-label="${
@@ -4900,7 +5190,7 @@ function postCard(p) {
       </div>
 
       ${p.likes ? `<div class="post__likes">${likeZeile(p.likes, p.likedBy)}</div>` : ''}
-      <div class="post__desc"><strong>${esc(u.name)}</strong> ${esc(p.description)}</div>
+      <div class="post__desc"><strong>${esc(u.name)}</strong> ${markierterText(p.description)}</div>
       <button class="post__comments" data-paction="comment" data-pid="${p.id}">
         ${kommentarZeile(p.comments)}
       </button>
@@ -5253,7 +5543,7 @@ function videoSlide(v) {
                 }">${v.notify ? ICONS.bell : ICONS.bellOff}</button>`
           }
         </div>
-        <div class="slide__desc">${esc(v.description)}</div>
+        <div class="slide__desc">${markierterText(v.description)}</div>
         ${v.likedBy ? `<div class="slide__gefaellt">${gefaelltZeile(v.likes, v.likedBy)}</div>` : ''}
         <div class="slide__sub">
           ${v.location ? `<button class="slide__ziel" data-slideort="${esc(v.location)}">${esc(v.location)}</button>` : ''}
@@ -5712,6 +6002,8 @@ async function renderCommunityChat(community, kanal, thema) {
 
   const feld = $('#commMsgInput');
   const sendKnopf = $('#commSend');
+  // Kasten 25.1: @ schlägt zuerst die Mitglieder der Community vor.
+  markierungsEingabe(feld, { kanal: kanal.id });
   feld.addEventListener('input', () => {
     sendKnopf.disabled = !feld.value.trim();
   });
@@ -13037,7 +13329,7 @@ function openClip(clipId) {
           }
 
           ${clip.likedBy ? `<div class="player__gefaellt">${gefaelltZeile(clip.likes || 0, clip.likedBy)}</div>` : ''}
-          <div class="player__text">${esc(clip.description || '')}</div>
+          <div class="player__text">${markierterText(clip.description || '')}</div>
 
           ${
             clip.tags?.length
@@ -13597,7 +13889,7 @@ function openOrtFotos(ort, fotos) {
        */
       openFormular(
         'Foto an diesem Ort',
-        [{ key: 'beschreibung', label: 'Beschreibung', typ: 'mehrzeilig', pflicht: true }],
+        [{ key: 'beschreibung', label: 'Beschreibung', typ: 'mehrzeilig', pflicht: true, markierbar: true }],
         async ({ beschreibung }) => {
           const res = await fetch('/api/eigene/beitrag', {
             method: 'POST',
@@ -14672,6 +14964,8 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
       // Eine Auswahl bekommt keinen Fokus - sonst klappt sie beim Oeffnen auf.
       const ersteseingabe = sheet.querySelector('input, textarea');
       setTimeout(() => ersteseingabe?.focus(), 80);
+      // Kasten 25.1: Felder mit `markierbar` (Beschreibung) schlagen bei @ Personen vor.
+      for (const f of felder) if (f.markierbar) markierungsEingabe(sheet.querySelector('#f_' + f.key), { unten: true });
 
       const absenden = async () => {
         const werte = {};
@@ -14859,7 +15153,7 @@ async function erstelle(was) {
   openFormular(
     { post: 'Neuer Beitrag', reels: 'Neues Reel', landscape: 'Neues Querformat-Video' }[was],
     [
-      { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true },
+      { key: 'beschreibung', label: quer ? 'Titel' : 'Beschreibung', typ: quer ? 'text' : 'mehrzeilig', pflicht: true, markierbar: true },
       { key: 'ort', label: 'Ort (freiwillig)', platzhalter: 'z. B. Köln' },
       // Punkt 38: Musik zum Beitrag. Zur Wahl steht, was es an Sounds gibt -
       // dieselbe Liste, die auch hinter den Sound-Seiten steckt.
@@ -17116,6 +17410,8 @@ async function openChat(chatId) {
 
   const input = $('#msgInput');
   const sendBtn = $('#sendBtn');
+  // Kasten 25.1: @ schlägt zuerst die Mitglieder dieses Chats vor.
+  markierungsEingabe(input, { chat: chat.id });
   input.addEventListener('input', () => {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 108) + 'px';
@@ -17332,7 +17628,8 @@ function anhangInhalt(m) {
   // als Vorschau; ohne Adresse bleibt es bei der Zeile.
   const gif = m.media === 'gif' && !anhang ? `<div class="msg__media">${ICONS.film} Gif</div>` : '';
 
-  return sticker || datei || gif || standort || kontakt || media || esc(m.text);
+  // Kasten 25.3: @-Namen in Chat- und Kanalnachrichten führen zum Profil.
+  return sticker || datei || gif || standort || kontakt || media || markierterText(m.text);
 }
 
 function messageBubble(m, chat) {
@@ -17891,6 +18188,8 @@ async function sendMessage(chat) {
       m.text = text;
       m.bearbeitet = true;
     }
+    // Kasten 25.6: verschlüsselt löst die Datenbank die @-Namen nicht selbst auf.
+    if (koerper.chiffre) verschluesseltMarkieren(chat, alt.id, text);
     paintMessages(chat);
     return;
   }
@@ -17930,6 +18229,8 @@ async function sendMessage(chat) {
    * Nachricht als leere Blase und waere erst nach dem naechsten Laden da.
    */
   if (Number(msg.krypto) > 0) msg.text = text;
+  // Kasten 25.6: den Text sieht die Datenbank nicht — Markierte melden.
+  if (koerper.chiffre) verschluesseltMarkieren(chat, msg.id, text);
 
   // Bezug gleich mitzeichnen, statt auf das nächste Laden zu warten — sonst
   // erschiene die eigene Antwort einen Moment lang ohne ihren Anlass.
@@ -18023,7 +18324,7 @@ function storyOverlayHtml(roh, { ohneFilter = false, bearbeitbar = false } = {})
       const sch = StoryRegeln.schriftZu(t.schrift);
       return `<span class="storyschicht__text" data-testid="story-text" data-groesse="${t.groesse}"
         ${bearbeitbar ? `data-zieh="text" data-index="${i}"` : ''}
-        style="left:${t.x * 100}%;top:${t.y * 100}%;color:${esc(t.farbe)};font-family:${esc(sch.web)};font-weight:${sch.gewicht};font-style:${sch.kursiv ? 'italic' : 'normal'};${t.hintergrund ? 'background:rgba(0,0,0,.55);' : ''}font-size:${t.groesse}px">${esc(t.text)}</span>`;
+        style="left:${t.x * 100}%;top:${t.y * 100}%;color:${esc(t.farbe)};font-family:${esc(sch.web)};font-weight:${sch.gewicht};font-style:${sch.kursiv ? 'italic' : 'normal'};${t.hintergrund ? 'background:rgba(0,0,0,.55);' : ''}font-size:${t.groesse}px">${markierterText(t.text)}</span>`;
     })
     .join('');
   const schilder = o.markiert

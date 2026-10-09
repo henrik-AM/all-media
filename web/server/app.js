@@ -2673,6 +2673,62 @@ app.get('/api/story-markierbar', route(async (req) => {
   return { ok: true, personen: data || [] };
 }));
 
+// ============================================================================
+// @-Markierungen (Kasten 25)
+// ============================================================================
+//
+// Markiert wird von der Datenbank selbst (Auslöser markierung_text, Schema
+// XX). Hier nur, was der Browser dafür braucht — dieselben Funktionen ruft die
+// App direkt (app/lib/aktionen.ts).
+
+const UUID = /^[0-9a-f-]{36}$/i;
+
+/** Vorschläge beim Tippen von @ (markierung_vorschlaege). */
+app.get('/api/markierung/vorschlaege', route(async (req) => {
+  const suche = String(req.query?.q || '').trim().slice(0, 30);
+  const chat = UUID.test(String(req.query?.chat || '')) ? String(req.query.chat) : null;
+  const kanal = UUID.test(String(req.query?.kanal || '')) ? String(req.query.kanal) : null;
+  const { data, error } = await req.db.rpc('markierung_vorschlaege', {
+    p_suche: suche || null, p_chat: chat, p_kanal: kanal,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, personen: data || [] };
+}));
+
+/** Zu @-Namen die Profile — nur, was es gibt, wird zum Link. */
+app.get('/api/markierung/profile', route(async (req) => {
+  const namen = [...new Set(String(req.query?.h || '').split(',')
+    .map((h) => h.trim().replace(/^@+/, '').toLowerCase())
+    .filter((h) => /^[a-z0-9._]{3,24}$/.test(h)))].slice(0, 100);
+  if (!namen.length) return { ok: true, profile: [] };
+  const { data, error } = await req.db
+    .from('profiles')
+    .select('id, handle, name')
+    .in('handle', namen.map((h) => '@' + h));
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, profile: data || [] };
+}));
+
+/**
+ * Verschlüsselter Zweierchat (25.6): Der Browser meldet, wen er meint — der
+ * Server sieht den Text so wenig wie die Datenbank.
+ */
+app.post('/api/markierungen/melden', route(async (req) => {
+  const nachricht = String(req.body?.nachricht || '');
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).filter((k) => UUID.test(k)).slice(0, 20);
+  if (!UUID.test(nachricht)) return { ok: false, error: 'Keine Nachricht' };
+  const { data, error } = await req.db.rpc('markierungen_melden', { p_nachricht: nachricht, p_ids: ids });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, anzahl: Number(data || 0) };
+}));
+
+/** Chats mit ungelesener Erwähnung — das „@" in der Chatliste. */
+app.get('/api/markierung/chats', route(async (req) => {
+  const { data, error } = await req.db.rpc('meine_chat_erwaehnungen');
+  if (error) return { ok: false, chats: [] };
+  return { ok: true, chats: (data || []).map((z) => z.chat_id) };
+}));
+
 /*
  * Story loeschen.
  *

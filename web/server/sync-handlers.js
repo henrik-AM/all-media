@@ -1149,48 +1149,13 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
   if (error) throw error;
 
   /*
-   * @-Namen aus der Beschreibung werden zu Markierungen. Gleiche Regel wie
-   * in app/lib/aktionen.ts — laufen die beiden auseinander, markiert der
-   * Browser jemanden, den die App nicht markiert haette.
+   * @-Namen aus der Beschreibung markiert seit Kasten 25 die Datenbank selbst
+   * (Auslöser markierung_text, Schema XX) — beim Anlegen und Bearbeiten, mit
+   * allen Regeln, für App und Website gleich.
    */
-  await markierungenSetzen(client, data.id, felder.beschreibung || '');
 
   return { ok: true, beitrag: data };
 });
-
-/**
- * Die @-Namen aus einem Text, ohne das Zeichen und ohne Doppelte.
- * Gegenstueck zu erwaehnungen() in app/lib/aktionen.ts.
- */
-function erwaehnungen(text) {
-  const treffer = String(text || '').match(/@[A-Za-z0-9_.]{2,30}/g) || [];
-  return [...new Set(treffer.map((t) => t.slice(1).toLowerCase()))];
-}
-
-/*
- * Markiert die erwaehnten Personen.
- *
- * Jede Markierung einzeln: wer sie nicht zulaesst, wird von der Regel
- * abgelehnt, und das darf die uebrigen nicht mitreissen. Gemeldet wird
- * absichtlich nicht, wer abgelehnt hat — "X laesst sich nicht markieren"
- * waere selbst die Auskunft, die die Einstellung verhindern soll.
- */
-async function markierungenSetzen(client, beitragId, beschreibung) {
-  const namen = erwaehnungen(beschreibung);
-  if (namen.length === 0) return [];
-
-  const { data: profile } = await client
-    .from('profiles')
-    .select('id, name, handle')
-    .in('handle', namen.map((n) => '@' + n));
-
-  const gesetzt = [];
-  for (const p of profile || []) {
-    const { error } = await client.from('post_tags').insert({ post_id: beitragId, user_id: p.id });
-    if (!error) gesetzt.push(p.name);
-  }
-  return gesetzt;
-}
 
 // Ein Video ist ein Beitrag mit kind = 'reel'.
 const handleCreateVideo = (client, nutzerId, felder = {}) =>
