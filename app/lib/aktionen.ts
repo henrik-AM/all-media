@@ -3208,7 +3208,7 @@ export async function darfAngeschriebenWerden(
 // die Funktion.
 
 /*
- * Kasten 25 (08.10.2026): Markiert wird seit Schema XX von der DATENBANK —
+ * Kasten 25 (08.10.2026): Markiert wird seit Schema 86 von der DATENBANK —
  * ein Auslöser auf posts, comments, messages und community_channel_messages
  * löst die @-Namen beim Anlegen und Bearbeiten auf und legt Markierung und
  * Mitteilung an. Bis dahin tat das hier `markierungenSetzen()` nach dem

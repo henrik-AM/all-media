@@ -38,6 +38,9 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 
 | Objekt | definiert in (Reihenfolge) | gilt |
 |---|---|---|
+| Funktion public.darf_markieren() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_86_markierungen.sql | **SUPABASE_SCHEMA_86_markierungen.sql** |
+| Funktion public.darf_story_markieren() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_86_markierungen.sql | **SUPABASE_SCHEMA_86_markierungen.sql** |
+| Funktion public.story_markierbar() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_86_markierungen.sql | **SUPABASE_SCHEMA_86_markierungen.sql** |
 | Funktion public.alter_bei_anmeldung() | SUPABASE_SCHEMA_52_geburtsdatum.sql → SUPABASE_SCHEMA_58_eltern_per_nummer.sql | **SUPABASE_SCHEMA_58_eltern_per_nummer.sql** |
 | Funktion public.eltern_anfragen() | SUPABASE_SCHEMA_52_geburtsdatum.sql → SUPABASE_SCHEMA_58_eltern_per_nummer.sql | **SUPABASE_SCHEMA_58_eltern_per_nummer.sql** |
 | Funktion public.geburtsdatum_nachtragen() | SUPABASE_SCHEMA_52_geburtsdatum.sql → SUPABASE_SCHEMA_58_eltern_per_nummer.sql | **SUPABASE_SCHEMA_58_eltern_per_nummer.sql** |

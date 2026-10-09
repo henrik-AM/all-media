@@ -1150,7 +1150,7 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
 
   /*
    * @-Namen aus der Beschreibung markiert seit Kasten 25 die Datenbank selbst
-   * (Auslöser markierung_text, Schema XX) — beim Anlegen und Bearbeiten, mit
+   * (Auslöser markierung_text, Schema 86) — beim Anlegen und Bearbeiten, mit
    * allen Regeln, für App und Website gleich.
    */
 

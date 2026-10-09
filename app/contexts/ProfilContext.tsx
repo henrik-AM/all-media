@@ -87,7 +87,7 @@ const mitteilungText = (
     case 'mention':
       // Kasten 11.6: Markierung in einer Story (story_tags, Schema 68).
       if (m.ziel.art === 'story') return `${name} hat dich in einer Story markiert.`;
-      // Kasten 25: @ im Community-Chat und im Unterthema (Schema XX).
+      // Kasten 25: @ im Community-Chat und im Unterthema (Schema 86).
       if (m.ziel.art === 'chat') return `${name} hat dich in einem Chat erwähnt.`;
       if (m.ziel.art === 'community') return `${name} hat dich in „${kanal}“ erwähnt.`;
       return m.ziel.art === 'post'

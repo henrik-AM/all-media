@@ -550,7 +550,7 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
 
           /*
            * @-Namen aus der Beschreibung markiert seit Kasten 25 die
-           * Datenbank selbst (Auslöser markierung_text, Schema XX) — beim
+           * Datenbank selbst (Auslöser markierung_text, Schema 86) — beim
            * Anlegen und beim Bearbeiten, mit allen Regeln.
            */
           return id;

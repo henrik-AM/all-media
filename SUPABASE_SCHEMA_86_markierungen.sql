@@ -1,5 +1,5 @@
 -- ===========================================================================
---  SUPABASE_SCHEMA_XX_markierungen.sql      (Kasten 25, Entwurf 09.10.2026)
+--  SUPABASE_SCHEMA_86_markierungen.sql      (Kasten 25, Entwurf 09.10.2026)
 --  @-Markierungen, All Media übergreifend
 -- ===========================================================================
 --
@@ -181,7 +181,7 @@ create index if not exists markierungen_markiert_idx
 
 comment on table public.markierungen is
   'Kasten 25: @-Markierungen in Beitrag, Kommentar, Chat- und Kanalnachricht. '
-  'Nur über Auslöser und markierungen_melden() beschreibbar (Schema XX).';
+  'Nur über Auslöser und markierungen_melden() beschreibbar (Schema 86).';
 
 alter table public.markierungen enable row level security;
 

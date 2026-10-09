@@ -10,7 +10,7 @@
  * beide mit einem eigenen Muster (`[A-Za-z0-9_.]{2,30}`), das Namen erkannte,
  * die es nach `handle_gueltig` gar nicht geben kann. Hier steht die Regel
  * einmal; die Datenbank hat dieselbe in `markierung_handles()`
- * (SUPABASE_SCHEMA_XX_markierungen.sql).
+ * (SUPABASE_SCHEMA_86_markierungen.sql).
  *
  * DIE FORM EINES NAMENS
  *

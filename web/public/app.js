@@ -298,7 +298,7 @@ function avatarForUser(id, size = 44) {
 /*
  * Henrik am 06.10.2026: „Andere Personen sollen mit @ markiert werden können
  * (All Media übergreifend)." Markiert wird von der Datenbank (Auslöser
- * markierung_text, Schema XX); die Website zeigt die Namen als Links und
+ * markierung_text, Schema 86); die Website zeigt die Namen als Links und
  * schlägt beim Tippen Personen vor. Die Regeln (welches Wort, wie ersetzt,
  * Reihenfolge) stehen in gemeinsam/markierung.js — window.Markierung, dieselbe
  * Datei wie in der App. Gegenstück dort: MarkierterText, MarkierungsEingabe.
