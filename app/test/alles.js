@@ -215,6 +215,18 @@ const LAEUFE = [
   ['storyvideoregeln', '_storyvideo_regeln.js'],
   // Kasten 16/19: Markierungs-Karte und „Nur Follower“ — Quelltext, ohne Netz.
   ['kasten16-19', '_kasten16_19.js'],
+  // Kästen 21–27 (06.10.2026): Farbfilter, Bildschirmzeit, Personenvorschläge,
+  // Feed steuern, @-Markierungen, Likes-Sichtbarkeit, Chat-Abgleich.
+  ['farbfilterrechnung', '_farbfilter_rechnung.js'],
+  ['farbfilter', '_farbfilter.js'],
+  ['bildschirmzeit-einheit', '_bildschirmzeit_einheit.js'],
+  ['bildschirmzeit', '_bildschirmzeit.js'],
+  ['vorschlaege', '_vorschlaege.js'],
+  ['lenkung-einheit', '_lenkung_einheit.js'],
+  ['lenken', '_lenken.js'],
+  ['markierung-einheit', '_markierung_einheit.js'],
+  ['markieren', '_markieren.js'],
+  ['chatsync', '_chatsync.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */

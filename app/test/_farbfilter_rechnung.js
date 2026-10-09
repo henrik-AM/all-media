@@ -33,10 +33,10 @@ let schlecht = 0;
 function pruefe(name, ok, info) {
   if (ok) {
     gut++;
-    console.log('  ok    ' + name + (info ? '  (' + info + ')' : ''));
+    console.log('  OK    ' + name + (info ? '  (' + info + ')' : ''));
   } else {
     schlecht++;
-    console.log('  FEHLER ' + name + (info ? '  (' + info + ')' : ''));
+    console.log('  FEHL   ' + name + (info ? '  (' + info + ')' : ''));
   }
 }
 
