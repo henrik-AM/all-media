@@ -213,9 +213,13 @@ const gehe = (page, area, unter) =>
     pruefe('ein zweites Mal gibt es heute nicht', !a?.ok && a?.grund === 'schon_genutzt', JSON.stringify(a));
 
     // Die Website zählt selbst: 35 s sichtbar auf Querformat, dann Tab verstecken.
+    // Erst dort stehen und abgeben, was die Seite aus den Schritten davor noch
+    // hält — sonst zählt die Querformat-Zeit von oben mit (unter Last ~85 s).
+    await gehe(page, 'videos', 'landscape');
+    await page.evaluate(() => bzSchicken());
+    await page.waitForTimeout(1500);
     await taktZurueck(p.id);
     const vorher = (await rpc(p, 'bildschirmzeit_stand', { p_ziel: null })).nutzung.querformat || 0;
-    await gehe(page, 'videos', 'landscape');
     await page.waitForTimeout(35000);
     await page.evaluate(() => bzSchicken());
     await page.waitForTimeout(1500);

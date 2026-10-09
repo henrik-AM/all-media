@@ -33,6 +33,12 @@ security definer
 set search_path = public
 as $$
 begin
+  -- Beispielnachrichten des Testbestands (demo, Schema 7) legt zuruecksetzen()
+  -- NACH dem Lesestand an; sonst stuende jeder Testchat auf ungelesen.
+  if coalesce(new.demo, false) then
+    return new;
+  end if;
+
   update public.chat_members
      set is_read = false
    where chat_id = new.chat_id

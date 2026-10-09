@@ -69,10 +69,10 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   console.log('\nEinstellungen');
 
-  // Seit Kasten 21 (06.10.2026) zehn: „Farbfilter" steht nach „Allgemein".
-  await pruefe('Die Sprungleiste zeigt alle zehn Abschnitte', async () => {
+  // Seit Kasten 21 und 22 (06.10.2026) elf: „Farbfilter" nach „Allgemein", dazu „Bildschirmzeit".
+  await pruefe('Die Sprungleiste zeigt alle elf Abschnitte', async () => {
     const pillen = await page.$$eval('.pill', (els) => els.map((e) => e.textContent));
-    if (pillen.length !== 10) throw new Error(pillen.join(' | '));
+    if (pillen.length !== 11 || !pillen.includes('Bildschirmzeit')) throw new Error(pillen.join(' | '));
     if (pillen[1] !== 'Farbfilter') throw new Error(pillen.join(' | '));
     if (pillen[0] !== 'Allgemein') throw new Error(pillen.join(' | '));
   });
