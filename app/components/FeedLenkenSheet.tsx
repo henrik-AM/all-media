@@ -280,8 +280,8 @@ export const FeedLenkenSheet = ({ visible, onClose }: Props) => {
 };
 
 const styles = themenStyles((colors) => ({
-  inhalt: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  hinweis: { ...typography.tiny, color: colors.text2, paddingBottom: spacing.sm },
+  inhalt: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl },
+  hinweis: { ...typography.small, color: colors.text2, lineHeight: 19, paddingBottom: spacing.sm },
   arten: { gap: spacing.sm, paddingVertical: spacing.xs },
   art: {
     paddingHorizontal: 14,

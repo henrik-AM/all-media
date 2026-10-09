@@ -906,6 +906,10 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (!pruefListe) return;
     // Kasten 24: „settings#liste:lenkung" öffnet „Feed steuern" fürs Prüfbild.
     if (pruefListe === 'lenkung') return setLenkenOffen(true);
+    // Kasten 21/22: Farbfilter und Bildschirmzeit ebenso („liste:farbfilter",
+    // „liste:bz-bereiche", „liste:bz-uebersicht" …).
+    if (pruefListe === 'farbfilter') return setFarbfilterOffen(true);
+    if (pruefListe.startsWith('bz-')) return setBzOffen(pruefListe.slice(3) as BzAnsicht);
     const punkt = SECTIONS.flatMap((s) => s.items).find((i) => i.liste === pruefListe);
     if (punkt) setOffen(punkt);
   }, [pruefListe]);

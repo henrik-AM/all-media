@@ -231,7 +231,8 @@ export const FarbfilterSchicht = ({ radius, rundum }: { radius?: number; rundum?
           accessible={false}
           importantForAccessibility="no-hide-descendants"
           testID={i === 0 ? 'farbfilter-schicht' : undefined}
-          style={[StyleSheet.absoluteFill, ecken, { backgroundColor: s.farbe, mixBlendMode: s.modus }]}
+          // zIndex: über allem, was selbst eine Ebene hat (TopSwitcher 15, Toast …).
+          style={[StyleSheet.absoluteFill, ecken, { backgroundColor: s.farbe, mixBlendMode: s.modus, zIndex: 10000, elevation: 10000 }]}
         />
       ))}
     </>

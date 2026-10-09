@@ -91,7 +91,7 @@ export const FarbfilterSheet = ({ onClose, onNotice }: Props) => {
                 <View style={[styles.spitze, { borderBottomColor: '#E9C99B' }]} />
                 <View style={[styles.mine, { backgroundColor: v.farbe }]} />
                 <View style={[styles.schaft, { backgroundColor: v.farbe }]} />
-                <Text style={styles.stiftName} numberOfLines={1}>{v.name}</Text>
+                <Text style={styles.stiftName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{v.name}</Text>
               </View>
             ))}
           </View>
@@ -319,7 +319,7 @@ const styles = themenStyles((colors) => ({
   },
   mine: { position: 'absolute', top: 0, width: 8, height: 6, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   schaft: { width: 30, height: 48, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
-  stiftName: { fontSize: 10, color: colors.text3, marginTop: 4 },
+  stiftName: { fontSize: 10, lineHeight: 14, height: 14, color: colors.text3, marginTop: 4 },
   verlauf: { height: 14, borderRadius: 7, marginTop: spacing.md },
   vergleich: {
     marginTop: spacing.md,

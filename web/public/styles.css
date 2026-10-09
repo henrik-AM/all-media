@@ -4766,7 +4766,7 @@ body.ist-abgemeldet .ptr-indicator {
     var(--stift);
   clip-path: polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%);
 }
-.farbstift__name { font-size: 10px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.farbstift__name { font-size: 9px; letter-spacing: -0.2px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .farbfilter__verlauf {
   height: 14px; margin-top: 10px; border-radius: 7px;
   background: linear-gradient(90deg, #ff0000, #ff8000, #ffff00, #00c000, #00c0c0, #0060ff, #8000ff, #ff00a0);

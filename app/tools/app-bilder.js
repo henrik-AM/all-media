@@ -65,6 +65,11 @@ const SEITEN = [
   ['communities/search', 'community-suche'],
   ['communities/profile', 'community-profil'],
   ['settings', 'einstellungen'],
+  // Kästen 21, 22, 24 (06.10.2026)
+  ['settings#liste:farbfilter', 'detail-farbfilter'],
+  ['settings#liste:bz-bereiche', 'detail-bildschirmzeit-bereiche'],
+  ['settings#liste:bz-uebersicht', 'detail-bildschirmzeit-uebersicht'],
+  ['settings#liste:lenkung', 'detail-feed-steuern'],
 
   // Detailbildschirme. Die vierzehn Bereiche darueber sind nur die
   // Einstiegsseiten - ein Chat, ein Story-Betrachter oder ein fremdes Profil
