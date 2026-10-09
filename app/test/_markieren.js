@@ -116,11 +116,11 @@ async function teilWebsite(a) {
 
     // 2. Klick öffnet das Profil.
     await page.click('#markierprobe [data-markierung]');
-    await page.waitForTimeout(800);
-    const profilOffen = await page.evaluate((name) => {
+    // Auf das Ergebnis warten, nicht fest: openProfile holt erst zwei Antworten.
+    const profilOffen = await page.waitForFunction((name) => {
       const ov = document.getElementById('overlay');
       return Boolean(ov && !ov.hidden && ov.textContent.includes(name));
-    }, a.name);
+    }, a.name, { timeout: 15000 }).then(() => true).catch(() => false);
     pruefe('Klick auf @A öffnet das Profil von A', profilOffen);
     await page.evaluate(() => document.getElementById('markierprobe')?.remove());
     await page.keyboard.press('Escape').catch(() => {});
@@ -154,11 +154,12 @@ async function teilDatenbank(a, b) {
   const neueBei = async (konto, seit, ziel) => {
     const { data, error } = await konto.client
       .from('notifications')
-      .select('art, actor_id, target_type, target_id, created_at')
+      .select('id, art, actor_id, target_type, target_id, created_at')
       .eq('art', 'mention')
       .gt('created_at', seit);
     if (error) throw error;
-    return (data || []).filter((n) => (!ziel.typ || n.target_type === ziel.typ) && (!ziel.id || n.target_id === ziel.id));
+    return (data || []).filter((n) => (!ziel.typ || n.target_type === ziel.typ) && (!ziel.id || n.target_id === ziel.id)
+      && !(ziel.ausser && ziel.ausser.has(n.id)));
   };
   const beitrag = async (text) => {
     const { data, error } = await a.client.from('posts')
@@ -188,11 +189,14 @@ async function teilDatenbank(a, b) {
     pruefe('B hat genau eine Mitteilung „mention/post"', n.length === 1 && n[0].actor_id === a.id, `${n.length} Stück`);
 
     console.log('\nBearbeiten');
+    // Nicht nach Uhrzeit allein: jetzt() liegt eine Sekunde zurück, die
+    // Mitteilung vom Anlegen eben fiele sonst als „neu" mit hinein.
+    const schonDa = new Set(n.map((x) => x.id));
     seit = jetzt();
     const { error: eUpd } = await a.client.from('posts')
       .update({ description: `Neu: ${b.handle} immer noch dabei` }).eq('id', p1);
     pruefe('A darf die eigene Beschreibung ändern', !eUpd, eUpd?.message);
-    n = await neueBei(b, seit, { typ: 'post', id: p1 });
+    n = await neueBei(b, seit, { typ: 'post', id: p1, ausser: schonDa });
     pruefe('B bleibt markiert → keine zweite Mitteilung', n.length === 0, `${n.length} neu`);
     await a.client.from('posts').update({ description: 'Ohne Namen' }).eq('id', p1);
     pruefe('B fällt aus dem Text → Markierung weg', !(await markiertIn('post', p1)));
@@ -212,41 +216,48 @@ async function teilDatenbank(a, b) {
       pruefe('markierungen: Kommentar-Zeile für B', await markiertIn('comment', k.id));
     }
 
-    console.log('\nChat');
-    const { data: meine } = await a.client.from('chat_members').select('chat_id').eq('user_id', a.id);
-    const ids = (meine || []).map((z) => z.chat_id);
-    let gemeinsam = null;
-    if (ids.length) {
-      const { data: beide } = await b.client.from('chat_members').select('chat_id, chats!chat_id(bereich, is_group)')
-        .eq('user_id', b.id).in('chat_id', ids.slice(0, 200));
-      gemeinsam = (beide || [])[0] || null;
-    }
-    if (!gemeinsam) {
-      console.log('  --   kein gemeinsamer Chat der beiden Testkonten, Chatteil übersprungen');
-    } else {
+    // Chat: beide Bereiche mit eigenen Prüfchats, nicht „falls zufällig einer
+    // da ist" — sonst bliebe der Teil still übersprungen.
+    for (const bereich of ['community', 'messenger']) {
+      console.log(`\nChat (${bereich})`);
+      const { data: chat, error: eC } = await a.client.from('chats')
+        .insert({ name: 'Prüflauf Kasten 25', is_group: false, bereich, created_by: a.id }).select('id').single();
+      pruefe(`${bereich}-Prüfchat angelegt`, !eC, eC?.message);
+      if (!chat) continue;
+      wegRaeumen.push(async () => {
+        await a.client.from('messages').delete().eq('chat_id', chat.id).eq('sender_id', a.id);
+        await b.client.from('messages').delete().eq('chat_id', chat.id).eq('sender_id', b.id);
+        await b.client.from('chat_members').delete().eq('chat_id', chat.id).eq('user_id', b.id);
+        await a.client.from('chat_members').delete().eq('chat_id', chat.id).eq('user_id', a.id);
+        await a.client.from('chats').delete().eq('id', chat.id);
+      });
+      await a.client.from('chat_members').insert({ chat_id: chat.id, user_id: a.id });
+      // Im Messenger darf A einen Fremden nicht eintragen (Schema 57); B tritt
+      // selbst bei, wie nach einer angenommenen Anfrage.
+      const { error: eMb } = await (bereich === 'messenger' ? b : a).client
+        .from('chat_members').insert({ chat_id: chat.id, user_id: b.id });
+      pruefe('B ist Mitglied', !eMb, eMb?.message);
+      const vorhanden = new Set((await neueBei(b, new Date(Date.now() - 3600000).toISOString(), {})).map((x) => x.id));
       seit = jetzt();
       const { data: m, error: eM } = await a.client.from('messages')
-        .insert({ chat_id: gemeinsam.chat_id, sender_id: a.id, text: `Prüflauf ${b.handle} hallo` })
+        .insert({ chat_id: chat.id, sender_id: a.id, text: `Prüflauf ${b.handle} hallo` })
         .select('id').single();
       pruefe('Klartext-Nachricht angelegt', !eM, eM?.message);
-      if (m) {
-        wegRaeumen.push(() => a.client.from('messages').delete().eq('id', m.id));
-        pruefe('markierungen: Nachricht-Zeile für B', await markiertIn('message', m.id));
-        const bereich = gemeinsam.chats?.bereich || 'messenger';
-        if (bereich === 'community') {
-          n = await neueBei(b, seit, { typ: 'chat', id: gemeinsam.chat_id });
-          pruefe('Community-Chat: B hat eine Mitteilung „mention/chat"', n.length === 1, `${n.length} Stück`);
-        } else {
-          n = await neueBei(b, seit, {});
-          pruefe('Messenger: KEINE Glocke (strikte Trennung)', n.length === 0, `${n.length} Stück`);
-          const { data: chats } = await b.client.rpc('meine_chat_erwaehnungen');
-          pruefe('Messenger: „@" in der Chatliste von B', (chats || []).some((z) => z.chat_id === gemeinsam.chat_id));
-        }
-        const { error: eFremd } = await b.client.rpc('markierungen_melden', { p_nachricht: m.id, p_ids: [a.id] });
-        pruefe('markierungen_melden: Fremde Nachricht wird abgelehnt', Boolean(eFremd));
-        const { data: null0, error: eEigen } = await a.client.rpc('markierungen_melden', { p_nachricht: m.id, p_ids: [b.id] });
-        pruefe('markierungen_melden: Klartext gibt 0 (löst der Auslöser)', !eEigen && Number(null0) === 0, eEigen?.message);
+      if (!m) continue;
+      pruefe('markierungen: Nachricht-Zeile für B', await markiertIn('message', m.id));
+      if (bereich === 'community') {
+        n = await neueBei(b, seit, { typ: 'chat', id: chat.id });
+        pruefe('Community-Chat: B hat eine Mitteilung „mention/chat"', n.length === 1, `${n.length} Stück`);
+      } else {
+        n = await neueBei(b, seit, { ausser: vorhanden });
+        pruefe('Messenger: KEINE Glocke (strikte Trennung)', n.length === 0, `${n.length} Stück`);
+        const { data: chats } = await b.client.rpc('meine_chat_erwaehnungen');
+        pruefe('Messenger: „@" in der Chatliste von B', (chats || []).some((z) => z.chat_id === chat.id));
       }
+      const { error: eFremd } = await b.client.rpc('markierungen_melden', { p_nachricht: m.id, p_ids: [a.id] });
+      pruefe('markierungen_melden: Fremde Nachricht wird abgelehnt', Boolean(eFremd));
+      const { data: null0, error: eEigen } = await a.client.rpc('markierungen_melden', { p_nachricht: m.id, p_ids: [b.id] });
+      pruefe('markierungen_melden: Klartext gibt 0 (löst der Auslöser)', !eEigen && Number(null0) === 0, eEigen?.message);
     }
 
     console.log('\nSich selbst markieren');
