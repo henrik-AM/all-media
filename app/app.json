@@ -22,6 +22,12 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "All Media gleicht die Telefonnummern deiner Kontakte ab, um dir Personen vorzuschlagen, die du kennst. Die Nummern werden nur verschlüsselt (als Hash) gespeichert."
+        }
+      ],
       "expo-video",
       "expo-audio",
       [

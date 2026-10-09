@@ -8,7 +8,9 @@
  *
  * Wie bei iOS und TikTok: „15 Min. mehr" (einmal am Tag, Datenbank zählt
  * mit) und „Mit Entsperrcode freigeben" (15 Min., 1 Std., für heute). Steht
- * das Konto unter Elternkontrolle, gilt der Code des Elternteils.
+ * das Konto unter Elternkontrolle, gilt der Code des Elternteils. Seit
+ * Schema 87 ist „der Code" die Spenden-PIN, solange kein eigener
+ * Entsperrcode gesetzt ist.
  *
  * Gleiche Seite auf der Website: bzSperreHtml() in web/public/app.js.
  */
@@ -46,7 +48,9 @@ export const BildschirmzeitSperre = ({ bereich, onSchliessen, vollbild, onNotice
   const [meldung, setMeldung] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
 
-  const text = Bildschirmzeit.sperrText(status, bereich, stand?.eltern?.name ?? null);
+  const text = Bildschirmzeit.sperrText(status, bereich, stand?.eltern?.name ?? null, stand?.code_art ?? null);
+  // Schema 87: ohne eigenen Entsperrcode gilt die Spenden-PIN (6–16 Zeichen, A–Z und 0–9).
+  const spenden = stand?.code_art === 'spenden';
   const ziel = (status.ziel ?? bereich) as BzZiel;
   const heute = nutzungJetzt()[bereich] ?? 0;
 
@@ -59,7 +63,9 @@ export const BildschirmzeitSperre = ({ bereich, onSchliessen, vollbild, onNotice
   };
 
   const freigeben = async () => {
-    if (!/^\d{4,8}$/.test(code)) return setMeldung('Der Code hat 4 bis 8 Ziffern');
+    if (spenden ? !/^[A-Za-z0-9]{6,16}$/.test(code) : !/^\d{4,8}$/.test(code)) {
+      return setMeldung(spenden ? 'Die Spenden-PIN hat 6 bis 16 Zeichen' : 'Der Code hat 4 bis 8 Ziffern');
+    }
     setLaeuft(true);
     const a = await entsperren(ziel, code, minuten);
     setLaeuft(false);
@@ -92,7 +98,7 @@ export const BildschirmzeitSperre = ({ bereich, onSchliessen, vollbild, onNotice
 
       {!codeOffen ? (
         <Druck style={styles.knopfZweit} onPress={() => setCodeOffen(true)}>
-          <Text style={styles.knopfZweitText}>Mit Entsperrcode freigeben</Text>
+          <Text style={styles.knopfZweitText}>Mit {text.feld} freigeben</Text>
         </Druck>
       ) : (
         <View style={styles.codeBox}>
@@ -100,15 +106,17 @@ export const BildschirmzeitSperre = ({ bereich, onSchliessen, vollbild, onNotice
           <TextInput
             value={code}
             onChangeText={(t) => {
-              setCode(t.replace(/\D/g, '').slice(0, 8));
+              setCode(spenden ? t.replace(/[^A-Za-z0-9]/g, '').slice(0, 16) : t.replace(/\D/g, '').slice(0, 8));
               setMeldung(null);
             }}
-            placeholder="Entsperrcode"
+            placeholder={text.feld}
             placeholderTextColor={colors.text3}
-            keyboardType="number-pad"
+            keyboardType={spenden ? 'default' : 'number-pad'}
+            autoCapitalize="characters"
+            autoCorrect={false}
             secureTextEntry
             style={styles.eingabe}
-            accessibilityLabel="Entsperrcode"
+            accessibilityLabel={text.feld}
           />
           <View style={styles.reihe}>
             {CODE_WAHL.map((w) => (

@@ -117,8 +117,11 @@
       'Das ist etwas anderes als die Ruhezeiten unter Mitteilungen: die schalten nur Töne und Mitteilungen stumm.',
     elternGesetzt: (name) =>
       `Diese Limits hat ${name} als Elternteil festgelegt. Du kannst sie nur strenger machen.`,
+    // Schema 87: ohne eigenen Entsperrcode entsperrt die Spenden-PIN.
     keinCode:
-      'Es ist noch kein Entsperrcode gesetzt. Lege ihn unter Einstellungen → Allgemein → Sicherheits-/Entsperrcode fest.',
+      'Es ist noch kein Code gesetzt. Standardmäßig entsperrt deine Spenden-PIN (Einstellungen → Allgemein → Spenden-PIN); ' +
+      'einen eigenen Code legst du unter Sicherheits-/Entsperrcode fest.',
+    codeArten: ['Spenden-PIN verwenden', 'Eigener Code'],
     pauseTitel: 'Zeit für eine Pause?',
     pauseText: (min) => `Du bist seit ${dauerText(min * 60)} am Stück hier. Kurz aufstehen, etwas trinken, aus dem Fenster sehen.`,
   };
@@ -612,7 +615,7 @@
   }
 
   /** Überschrift und Satz für die Sperrseite. */
-  function sperrText(st, bereich, elternName) {
+  function sperrText(st, bereich, elternName, codeArt) {
     const name = bereichName(bereich);
     const titel =
       st.grund === 'auszeit'
@@ -630,10 +633,17 @@
           : st.grund === 'gesperrt'
             ? 'Dieser Bereich ist in deiner Bildschirmzeit gesperrt.'
             : `Dein Limit für ${name} ist für heute aufgebraucht. Die anderen Bereiche bleiben offen.`;
+    // codeArt aus bildschirmzeit_stand: 'spenden' = es gilt die Spenden-PIN (Schema 87).
+    const spenden = codeArt === 'spenden';
     const code = elternName
-      ? `Mit dem Entsperrcode von ${elternName} lässt sich der Bereich freigeben.`
-      : 'Mit deinem Entsperrcode lässt sich der Bereich freigeben.';
-    return { titel, satz, code };
+      ? spenden
+        ? `Mit der Spenden-PIN von ${elternName} lässt sich der Bereich freigeben.`
+        : `Mit dem Entsperrcode von ${elternName} lässt sich der Bereich freigeben.`
+      : spenden
+        ? 'Mit deiner Spenden-PIN lässt sich der Bereich freigeben.'
+        : 'Mit deinem Entsperrcode lässt sich der Bereich freigeben.';
+    const feld = spenden ? 'Spenden-PIN' : 'Entsperrcode';
+    return { titel, satz, code, feld };
   }
 
   /** Der Satz für den Hinweis kurz vor Ablauf. */

@@ -35,7 +35,11 @@ export interface BzStand {
   freigaben: BzFreigabe[];
   eltern: BzPerson | null;
   code_gesetzt: boolean;
+  /** Welcher Code entsperrt (Schema 87): eigener Entsperrcode oder Spenden-PIN. */
+  code_art?: 'eigen' | 'spenden' | null;
   eigener_code: boolean;
+  /** Was für das eigene Konto gilt — für die Wahl in den Einstellungen. */
+  eigene_art?: 'eigen' | 'spenden';
   kinder: BzPerson[];
 }
 
@@ -53,7 +57,7 @@ export function bzMeldung(a: BzAntwort | null | undefined): string {
   switch (a.grund) {
     case 'kein_code':
       return a.eltern
-        ? 'Dein Elternteil hat noch keinen Entsperrcode festgelegt.'
+        ? 'Dein Elternteil hat noch keine Spenden-PIN und keinen Entsperrcode festgelegt.'
         : Bildschirmzeit.TEXTE.keinCode;
     case 'nicht_erlaubt':
       return 'Das darfst du für dieses Konto nicht.';
@@ -108,4 +112,8 @@ export function bzElternkontrolleBeenden(supabase: SupabaseClient, kind: string)
 /** Den Sicherheits-/Entsperrcode setzen (Einstellungen → Allgemein). */
 export function entsperrcodeSetzen(supabase: SupabaseClient, neu: string, bisher?: string) {
   return rpc(supabase, 'entsperrcode_setzen', { p_neu: neu, p_bisher: bisher || null });
+}
+/** Den eigenen Code zurücknehmen — danach entsperrt wieder die Spenden-PIN (Schema 87). */
+export function entsperrcodeEntfernen(supabase: SupabaseClient, bisher?: string) {
+  return rpc(supabase, 'entsperrcode_entfernen', { p_bisher: bisher || null });
 }

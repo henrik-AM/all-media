@@ -26,13 +26,15 @@
  *   B  Nur mit SUPABASE_TOKEN (Management-API):
  *        10. Sicht eines ECHTEN Kontos — in einer READ-ONLY-Transaktion: kein
  *            Testkonto, kein Beispielprofil in seiner Liste.
- *        11. Minderjährige und Messenger-Kontakte — in einer Transaktion, die
- *            mit einer absichtlichen Ausnahme endet und damit vollständig
- *            ZURÜCKGEROLLT wird (es bleibt nichts, auch keine Mitteilung):
- *            @ida bekommt ein Geburtsdatum unter 18 → nie vorgeschlagen;
- *            @clara und P führen sich gegenseitig als Kontakt → „Aus deinem
- *            Messenger"; einseitig → kein Messenger-Grund; @ida selbst
- *            bekommt keine Vorschläge.
+ *        11. Minderjährige und Messenger-Kontakte, 12. Adressbuch — in einer
+ *            Transaktion, die mit einer absichtlichen Ausnahme endet und damit
+ *            vollständig ZURÜCKGEROLLT wird (es bleibt nichts, auch keine
+ *            Mitteilung): @ida bekommt ein Geburtsdatum unter 18 und wird
+ *            seit Schema 87 behandelt wie Volljährige (Henrik 09.10.2026):
+ *            als Freundin von Freunden vorgeschlagen, bekommt selbst
+ *            Vorschläge. @clara und P führen sich gegenseitig als Kontakt →
+ *            „Aus deinem Messenger"; einseitig → kein Messenger-Grund.
+ *            Adressbuch: schon einseitig „Aus deinen Kontakten".
  *
  *   C  Website (Playwright gegen Port 3000, Anmeldung als P OHNE Reset):
  *        12. Videos → Home zeigt den Abschnitt mit @greta und Begründung.
@@ -388,18 +390,43 @@ const alsKonto = (uid) => `
             on conflict (user_id, contact_id) do update set status = 'friend';
           do $$ begin ${alsKonto(P.id)} insert into erg select 'gegenseitig', ${sichtSql(P.id, 'videos')}; reset role; end $$;
           do $$ begin ${alsKonto(id['@ida'])} insert into erg select 'ida', ${sichtSql(id['@ida'], 'videos')}; reset role; end $$;
+          -- Schema 87: Minderjährige über gegenseitige Messenger-Kontakte
+          insert into public.contacts (user_id, contact_id, status, herkunft) values
+            ('${P.id}', '${id['@ida']}', 'friend', 'nummer'), ('${id['@ida']}', '${P.id}', 'friend', 'nummer')
+            on conflict (user_id, contact_id) do update set status = 'friend';
+          do $$ begin ${alsKonto(P.id)} insert into erg select 'ida_msg', ${sichtSql(P.id, 'videos')}; reset role; end $$;
+          do $$ begin ${alsKonto(id['@ida'])} insert into erg select 'ida_sieht_msg', ${sichtSql(id['@ida'], 'videos')}; reset role; end $$;
+          delete from public.contacts where (user_id, contact_id) in (('${P.id}', '${id['@ida']}'), ('${id['@ida']}', '${P.id}'));
+          -- Schema 87: Adressbuch. Nummern nur in dieser Transaktion.
+          update public.profiles set phone = '+49 170 9900011' where id = '${id['@ida']}';
+          update public.profiles set phone = '+49 170 9900022' where id = '${P.id}';
+          do $$ begin ${alsKonto(P.id)}
+            insert into erg select 'abgleich', public.kontakte_abgleichen(array['0170 990 0011', '+49 (170) 9900011', '123']);
+            insert into erg select 'tb_einseitig', ${sichtSql(P.id, 'videos')}; reset role; end $$;
+          insert into erg select 'tb_zeilen', to_jsonb((select count(*) from public.telefonbuch where user_id = '${P.id}'));
+          do $$ begin ${alsKonto(id['@ida'])} perform public.kontakte_abgleichen(array['0049 170 9900022']); reset role; end $$;
+          do $$ begin ${alsKonto(P.id)} insert into erg select 'tb_gegenseitig', ${sichtSql(P.id, 'videos')}; reset role; end $$;
+          do $$ begin ${alsKonto(id['@ida'])} insert into erg select 'ida_sieht_tb', ${sichtSql(id['@ida'], 'videos')}; reset role; end $$;
           do $$ begin raise exception 'ERGEBNIS %', (select jsonb_object_agg(k, z) from erg); end $$;`);
         const hat = (k, wer) => (erg[k] || []).find((v) => v.id === wer);
         pruefe('11 @clara als Freund von Freund da (Gegenprobe)', !!hat('vorher', id['@clara']), handles(erg.vorher || []));
-        pruefe('11 minderjährige @ida nie vorgeschlagen', !hat('vorher', id['@ida']) && !hat('gegenseitig', id['@ida']));
+        pruefe('11 minderjährige @ida wie Volljährige: als Freundin von Freunden da', !!hat('vorher', id['@ida']), handles(erg.vorher || []));
         pruefe('11 einseitiger Kontakt: kein „Aus deinem Messenger"', hat('einseitig', id['@clara'])?.grund !== 'Aus deinem Messenger', hat('einseitig', id['@clara'])?.grund);
         pruefe('11 gegenseitiger Kontakt: „Aus deinem Messenger"', hat('gegenseitig', id['@clara'])?.grund === 'Aus deinem Messenger', hat('gegenseitig', id['@clara'])?.grund);
-        pruefe('11 minderjähriges Konto selbst bekommt keine Vorschläge', (erg.ida || []).length === 0, handles(erg.ida || []));
+        pruefe('11 minderjähriges Konto bekommt Vorschläge wie Volljährige', (erg.ida || []).length > 0, handles(erg.ida || []));
+        pruefe('11 minderjährige @ida als gegenseitiger Messenger-Kontakt vorgeschlagen', hat('ida_msg', id['@ida'])?.grund === 'Aus deinem Messenger', hat('ida_msg', id['@ida'])?.grund);
+        pruefe('11 @ida sieht ihren Messenger-Kontakt', !!hat('ida_sieht_msg', P.id), handles(erg.ida_sieht_msg || []));
+        pruefe('12 Abgleich gespeichert (drei Schreibweisen → 1 Nummer, „123" verworfen)', erg.abgleich?.ok && erg.tb_zeilen === 1, JSON.stringify(erg.abgleich) + ' / ' + erg.tb_zeilen);
+        pruefe('12 Abgleich verrät keine Trefferzahl', erg.abgleich && !('treffer' in erg.abgleich));
+        pruefe('12 einseitig im Adressbuch: @ida „Aus deinen Kontakten"', hat('tb_einseitig', id['@ida'])?.grund === 'Aus deinen Kontakten', hat('tb_einseitig', id['@ida'])?.grund);
+        pruefe('12 @ida sieht P „Aus deinen Kontakten"', hat('ida_sieht_tb', P.id)?.grund === 'Aus deinen Kontakten', hat('ida_sieht_tb', P.id)?.grund);
+        pruefe('12 Antwort enthält keine Telefonnummer', !JSON.stringify(erg.tb_einseitig || []).includes('9900011'));
         // Gegenprobe: wirklich nichts geblieben
         const rest = await sql(`select (select count(*) from public.konto_alter where user_id = '${id['@ida']}') a,
-                                       (select count(*) from public.contacts where user_id = '${id['@clara']}' and contact_id = '${P.id}') b`);
+                                       (select count(*) from public.contacts where user_id = '${id['@clara']}' and contact_id = '${P.id}') b,
+                                       (select count(*) from public.telefonbuch where user_id in ('${P.id}', '${id['@ida']}')) c`);
         const z = (JSON.parse(rest.text)[0]) || {};
-        pruefe('11 Transaktion hat nichts hinterlassen', Number(z.a) === 0 && Number(z.b) === 0, rest.text);
+        pruefe('11 Transaktion hat nichts hinterlassen', Number(z.a) === 0 && Number(z.b) === 0 && Number(z.c) === 0, rest.text);
       }
     }
 

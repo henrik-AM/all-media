@@ -27,6 +27,9 @@
  *   10. B blockiert A → keine Markierung, keine Mitteilung, nicht in Vorschlägen
  *   11. B stellt „Wer darf mich markieren" auf niemand → keine Markierung
  *   12. Gelöschter Beitrag nimmt die Mitteilung mit
+ *   13. Minderjährige wie Volljährige (Schema 87): markierbar und in der
+ *       @-Liste auch über die freie Suche — zurückgerollte Transaktion über
+ *       die Management-API, nur mit SUPABASE_TOKEN
  *
  * Start:  node test/_markieren.js   (Server auf 3000 für Teil 1; ohne Server
  *         nur Teil 2 mit OHNE_WEB=1)
@@ -70,6 +73,69 @@ async function anmeldenDb(zugang) {
 }
 
 const jetzt = () => new Date(Date.now() - 1000).toISOString();
+
+const PROJEKT = (URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] || 'ijztosbjfybdgotpdixw';
+const sqlWert = (t) => `'${String(t).replace(/'/g, "''")}'`;
+
+/**
+ * Schema 87: B wird in einer Transaktion minderjährig, A markiert B. Die
+ * Transaktion endet mit einer Ausnahme, die das Ergebnis trägt — es bleibt
+ * nichts, auch keine Mitteilung.
+ */
+async function teilMinderjaehrig(a, b) {
+  console.log('\nMinderjährig (Schema 87)');
+  if (!process.env.SUPABASE_TOKEN) {
+    console.log('  übersprungen (kein SUPABASE_TOKEN)');
+    return;
+  }
+  const als = (uid) => `
+    perform set_config('request.jwt.claims', json_build_object('sub', '${uid}', 'role', 'authenticated')::text, true);
+    set local role authenticated;`;
+  const suche = sqlWert(b.handle.slice(1, 5));
+  const r = await fetch(`https://api.supabase.com/v1/projects/${PROJEKT}/database/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.SUPABASE_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: `begin;
+      create temp table erg (k text, z jsonb);
+      grant all on erg to authenticated;
+      insert into public.konto_alter (user_id, geburtsdatum, land, mindestalter, status)
+        values ('${b.id}', current_date - interval '15 years', 'DE', 16, 'frei')
+        on conflict (user_id) do update set geburtsdatum = excluded.geburtsdatum, status = 'frei';
+      delete from public.follows where (follower_id = '${a.id}' and followee_id = '${b.id}') or (follower_id = '${b.id}' and followee_id = '${a.id}');
+      delete from public.contacts where (user_id = '${a.id}' and contact_id = '${b.id}') or (user_id = '${b.id}' and contact_id = '${a.id}');
+      delete from public.blocks where (user_id = '${a.id}' and blocked_user_id = '${b.id}') or (user_id = '${b.id}' and blocked_user_id = '${a.id}');
+      delete from public.visibility_settings where user_id = '${b.id}' and bereich = 'markierung';
+      insert into erg select 'minderjaehrig', to_jsonb(public.ist_minderjaehrig('${b.id}'));
+      do $$ declare pid uuid; begin ${als(a.id)}
+        insert into public.posts (user_id, kind, description) values ('${a.id}', 'post', 'Prüflauf ' || ${sqlWert(b.handle)}) returning id into pid;
+        insert into erg select 'markiert', to_jsonb(exists (select 1 from public.markierungen m where m.quelle_id = pid and m.markiert_id = '${b.id}'));
+        insert into erg select 'suche', coalesce((select jsonb_agg(v.rang) from public.markierung_vorschlaege(${suche}) v where v.id = '${b.id}'), '[]'::jsonb);
+        insert into erg select 'story_suche', to_jsonb(exists (select 1 from public.story_markierbar(${suche}) v where v.id = '${b.id}'));
+        reset role; end $$;
+      insert into public.follows (follower_id, followee_id) values ('${a.id}', '${b.id}');
+      do $$ begin ${als(a.id)}
+        insert into erg select 'nah', coalesce((select jsonb_agg(v.rang) from public.markierung_vorschlaege(${suche}) v where v.id = '${b.id}'), '[]'::jsonb);
+        reset role; end $$;
+      do $$ begin raise exception 'ERGEBNIS %', (select jsonb_object_agg(k, z) from erg); end $$;` }),
+  });
+  const text = await r.text();
+  let meldung = text;
+  try { meldung = JSON.parse(text).message || text; } catch { /* roh lassen */ }
+  const treffer = meldung.match(/ERGEBNIS (\{[\s\S]*\})\s*(?:CONTEXT:|$)/);
+  if (!treffer) return pruefe('Transaktion lieferte ein Ergebnis', false, meldung.slice(0, 300));
+  const erg = JSON.parse(treffer[1]);
+  pruefe('B ist in der Transaktion minderjährig (Gegenprobe)', erg.minderjaehrig === true);
+  pruefe('Minderjähriges B wird markiert, obwohl A kein Kontakt ist', erg.markiert === true);
+  pruefe('@-Liste: B auch über die freie Suche', JSON.stringify(erg.suche) === '["suche"]', JSON.stringify(erg.suche));
+  pruefe('Story-Liste: B auch über die freie Suche', erg.story_suche === true);
+  pruefe('@-Liste: B, sobald A ihm folgt (Nähe)', JSON.stringify(erg.nah) === '["nah"]', JSON.stringify(erg.nah));
+  const [{ n } = {}] = JSON.parse((await (await fetch(`https://api.supabase.com/v1/projects/${PROJEKT}/database/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.SUPABASE_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: `select count(*)::int as n from public.posts where user_id = '${a.id}' and description = 'Prüflauf ' || ${sqlWert(b.handle)}` }),
+  })).text()) || '[]');
+  pruefe('Transaktion hat nichts hinterlassen', n === 0, String(n));
+}
 
 // ---------------------------------------------------------------- Teil 1 --
 async function teilWebsite(a) {
@@ -319,6 +385,7 @@ async function teilDatenbank(a, b) {
   // Website zuerst: anmelden() setzt den Bestand des Prüfkontos zurück.
   if (!process.env.OHNE_WEB) await teilWebsite(a);
   await teilDatenbank(a, b);
+  await teilMinderjaehrig(a, b);
 
   console.log(`\n${geprueft - fehler}/${geprueft} Prüfungen bestanden`);
   process.exit(fehler ? 1 : 0);

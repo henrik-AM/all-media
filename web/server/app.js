@@ -1461,6 +1461,24 @@ app.post('/api/entsperrcode', route(async (req) =>
   })
 ));
 
+// Schema 87: Schalter „Kontakte abgleichen" aus — die Nummern aus dem
+// Adressbuch des Handys löschen. Einschalten geht nur in der App.
+app.post('/api/kontakte/entfernen', route(async (req) => {
+  const { data, error } = await req.db.rpc('kontakte_entfernen');
+  if (error) {
+    console.error('kontakte_entfernen fehlgeschlagen:', error.message);
+    return { ok: false, error: 'Die abgeglichenen Kontakte ließen sich nicht löschen.' };
+  }
+  return data || { ok: false };
+}));
+
+// Schema 87: eigenen Code zurücknehmen — danach entsperrt die Spenden-PIN.
+app.post('/api/entsperrcode/entfernen', route(async (req) =>
+  bzRpc(req, 'entsperrcode_entfernen', {
+    p_bisher: req.body?.bisher ? String(req.body.bisher) : null,
+  })
+));
+
 /*
  * Ein Aufruf eines fremden Profils. Ohne das bleibt die Profilstatistik
  * dauerhaft bei null: sie kann nur zaehlen, was jemand aufschreibt.

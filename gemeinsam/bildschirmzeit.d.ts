@@ -112,6 +112,8 @@ export const TEXTE: {
   auszeitErklaerung: string;
   elternGesetzt: (name: string) => string;
   keinCode: string;
+  /** Wahl unter Sicherheits-/Entsperrcode (Schema 87). */
+  codeArten: string[];
   pauseTitel: string;
   pauseText: (minuten: number) => string;
 };
@@ -137,7 +139,12 @@ export function auszeitFrei(freigaben: BzFreigabe[], jetztMs: number): boolean;
 export function gesamtGenutzt(regeln: unknown, nutzung: Partial<Record<string, number>>): number;
 export function summe(nutzung: Partial<Record<string, number>>): number;
 export function status(eingabe: BzEingabe, bereich: BzBereich | null): BzStatus;
-export function sperrText(status: BzStatus, bereich: BzBereich, elternName?: string | null): { titel: string; satz: string; code: string };
+export function sperrText(
+  status: BzStatus,
+  bereich: BzBereich,
+  elternName?: string | null,
+  codeArt?: 'eigen' | 'spenden' | null
+): { titel: string; satz: string; code: string; feld: string };
 export function hinweisText(status: BzStatus, bereich: BzBereich): string;
 export function wertText(punkt: 'uebersicht' | 'gesamt' | 'bereiche' | 'auszeit' | 'pause', regeln: unknown, nutzung?: Partial<Record<string, number>>): string;
 export function bereichWertText(regeln: unknown, bereich: BzBereich): string;

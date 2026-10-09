@@ -51,6 +51,10 @@ const KIND_MAIL = `pruef.kind.bz.${KENNUNG}@example.com`;
 const KIND_PASS = 'KindPruef2026!';
 const ELTERN_CODE = '4711';
 const KIND_CODE = '1357';
+// Schema 87: ohne eigenen Entsperrcode entsperrt die Spenden-PIN. Getippt in
+// anderer Schreibweise als gespeichert — spendencode_normal gleicht das an.
+const SPENDEN_PIN = 'SPENDE2468';
+const SPENDEN_PIN_GETIPPT = 'spende-2468';
 
 let fehler = 0;
 let geprueft = 0;
@@ -139,6 +143,8 @@ const gehe = (page, area, unter) =>
 
   const p = await anmelden(PRUEFER.email, PRUEFER.passwort);
   await leeren(p.id);
+  // Die Spenden-PIN des Prüfkontos gehört anderen Läufen — merken, am Ende zurück.
+  const spendenVorher = (await frage(`select code_hash, geaendert_am from public.spendencodes where user_id = ${sql(p.id)}`))?.[0] || null;
   let browser = null;
 
   try {
@@ -182,7 +188,7 @@ const gehe = (page, area, unter) =>
     await page.waitForSelector('[data-bz-sperre="videos"]', { timeout: 8000 }).catch(() => {});
     const sperre = await page.locator('[data-bz-sperre="videos"]').innerText().catch(() => '');
     pruefe('Videos: Sperrseite statt des Feeds', /Limit für Videos/.test(sperre), sperre.split('\n')[0]);
-    pruefe('… mit „15 Min. mehr" und Entsperrcode', /15 Min\. mehr/.test(sperre) && /Entsperrcode/.test(sperre));
+    pruefe('… mit „15 Min. mehr" und Code', /15 Min\. mehr/.test(sperre) && /Entsperrcode|Spenden-PIN/.test(sperre));
     pruefe('… untere Leiste bleibt bedienbar', await page.locator('#bottomnav, .bottomnav, nav').first().isVisible().catch(() => false));
 
     await gehe(page, 'messenger', 'chats');
@@ -247,6 +253,17 @@ const gehe = (page, area, unter) =>
 
     console.log('\n4. Entsperrcode');
 
+    await frage(`
+      insert into public.spendencodes (user_id, code_hash, geaendert_am)
+      values (${sql(p.id)}, extensions.crypt(${sql(SPENDEN_PIN)}, extensions.gen_salt('bf', 8)), now())
+      on conflict (user_id) do update set code_hash = excluded.code_hash, geaendert_am = now()`);
+    stand = await rpc(p, 'bildschirmzeit_stand', { p_ziel: null });
+    pruefe('ohne eigenen Code gilt die Spenden-PIN', stand?.code_gesetzt && stand.code_art === 'spenden' && stand.eigene_art === 'spenden', JSON.stringify({ g: stand?.code_gesetzt, a: stand?.code_art, e: stand?.eigene_art }));
+    a = await rpc(p, 'bildschirmzeit_entsperren', { p_ziel: 'gesamt', p_code: SPENDEN_PIN_GETIPPT, p_minuten: 15 });
+    pruefe('Spenden-PIN entsperrt (andere Schreibweise)', a?.ok, JSON.stringify(a));
+    const [{ n: spendenFehl }] = await frage(`select count(*)::int as n from public.spendencode_protokoll where user_id = ${sql(p.id)} and created_at > now() - interval '1 minute'`);
+    pruefe('… ohne Eintrag im Spenden-Protokoll (sperrt nie die Spenden)', spendenFehl === 0, String(spendenFehl));
+
     a = await rpc(p, 'entsperrcode_setzen', { p_neu: ELTERN_CODE, p_bisher: null });
     pruefe('Code setzen', a?.ok, JSON.stringify(a));
     const [{ hash }] = await frage(`select code_hash as hash from public.entsperrcodes where user_id = ${sql(p.id)}`);
@@ -257,6 +274,16 @@ const gehe = (page, area, unter) =>
     pruefe('richtiger Code gibt Livestreams 15 Min. frei', a?.ok);
     stand = await rpc(p, 'bildschirmzeit_stand', { p_ziel: null });
     pruefe('… Livestreams ist jetzt offen', statusAus(stand, 'live').offen && statusAus(stand, 'live').rest > 0);
+    pruefe('mit eigenem Code: code_art „eigen"', stand?.code_art === 'eigen' && stand.eigene_art === 'eigen');
+    a = await rpc(p, 'bildschirmzeit_entsperren', { p_ziel: 'gesamt', p_code: SPENDEN_PIN, p_minuten: 15 });
+    pruefe('… und die Spenden-PIN entsperrt nicht mehr', !a?.ok && a?.grund === 'falsch', JSON.stringify(a));
+    a = await rpc(p, 'entsperrcode_entfernen', { p_bisher: '9999' });
+    pruefe('eigenen Code zurücknehmen nur mit dem richtigen', !a?.ok && a?.grund === 'bisher_falsch', JSON.stringify(a));
+    a = await rpc(p, 'entsperrcode_entfernen', { p_bisher: ELTERN_CODE });
+    stand = await rpc(p, 'bildschirmzeit_stand', { p_ziel: null });
+    pruefe('zurückgenommen: wieder die Spenden-PIN', a?.ok && stand?.code_art === 'spenden', JSON.stringify(a));
+    a = await rpc(p, 'entsperrcode_setzen', { p_neu: ELTERN_CODE, p_bisher: null });
+    pruefe('eigenen Code wieder setzen (für die Eltern-Prüfung)', a?.ok, JSON.stringify(a));
 
     console.log('\n5. Eltern');
 
@@ -300,6 +327,9 @@ const gehe = (page, area, unter) =>
     pruefe('Kind entsperrt nicht mit dem eigenen Code', !a?.ok && a?.grund === 'falsch', JSON.stringify(a));
     a = await rpc(k, 'bildschirmzeit_entsperren', { p_ziel: 'videos', p_code: ELTERN_CODE, p_minuten: 15 });
     pruefe('… aber mit dem Code des Elternteils', a?.ok, JSON.stringify(a));
+    await rpc(p, 'entsperrcode_entfernen', { p_bisher: ELTERN_CODE });
+    a = await rpc(k, 'bildschirmzeit_entsperren', { p_ziel: 'videos', p_code: SPENDEN_PIN, p_minuten: 15 });
+    pruefe('… und ohne eigenen Code des Elternteils mit dessen Spenden-PIN', a?.ok, JSON.stringify(a));
 
     console.log('\n6. lockerer(): JS und SQL gleich');
     const faelle = [
@@ -321,6 +351,9 @@ const gehe = (page, area, unter) =>
   } finally {
     if (browser) await schliesse(browser);
     await leeren(p.id);
+    await frage(spendenVorher
+      ? `update public.spendencodes set code_hash = ${sql(spendenVorher.code_hash)}, geaendert_am = ${sql(spendenVorher.geaendert_am)} where user_id = ${sql(p.id)}`
+      : `delete from public.spendencodes where user_id = ${sql(p.id)}`);
     const weg = await frage(`delete from auth.users where email = ${sql(KIND_MAIL)} returning id`);
     console.log(`\n  (Bildschirmzeit des Prüfkontos geleert, ${Array.isArray(weg) ? weg.length : 0} Kinderkonto gelöscht)`);
   }

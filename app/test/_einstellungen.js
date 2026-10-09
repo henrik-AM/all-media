@@ -137,6 +137,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Ein Formular prüft seine Eingaben', async () => {
     await page.click('[data-setting="Sicherheits-/Entsperrcode"]');
     await page.waitForSelector('#f_code');
+    // Schema 87: Vorgabe ist die Spenden-PIN — ein eigener Code ist die aktive Wahl.
+    await page.selectOption('#f_art', 'Eigener Code');
     await page.fill('#f_code', '12');
     await page.fill('#f_wdh', '12');
     await page.click('#formOk');
@@ -172,6 +174,22 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
       return t && !t.hidden ? t.textContent : '';
     });
     if (hinweis !== 'Code gesetzt') throw new Error(hinweis);
+  });
+
+  await pruefe('Zurück zur Spenden-PIN nimmt den eigenen Code weg', async () => {
+    await page.waitForFunction(() => bz.stand?.eigene_art === 'eigen', null, { timeout: 8000 }).catch(() => {});
+    await page.click('[data-setting="Sicherheits-/Entsperrcode"]');
+    await page.waitForSelector('#f_art');
+    const vorher = await page.$eval('#f_art', (el) => el.value);
+    if (vorher !== 'Eigener Code') throw new Error('vorbelegt: ' + vorher);
+    await page.selectOption('#f_art', 'Spenden-PIN verwenden');
+    await page.fill('#f_bisher', '1234');
+    await page.click('#formOk');
+    await page
+      .waitForFunction(() => { const t = document.querySelector('#toast'); return t && !t.hidden && /Spenden-PIN entsperrt/.test(t.textContent); }, null, { timeout: 8000 })
+      .catch(() => {});
+    const stand = await page.evaluate(async () => (await (await fetch('/api/bildschirmzeit')).json()).eigene_art);
+    if (stand !== 'spenden') throw new Error('eigene_art: ' + stand);
   });
 
   await pruefe('Ein Listenpunkt zeigt echte Einträge', async () => {

@@ -15,6 +15,11 @@
  *   - Karte: Profilbild, Name, @handle, Begründung, „Folgen", × (Entfernen).
  *   - Nach „Folgen" oder × verschwindet die Karte, die Liste lädt nach.
  *   - Leer → der ganze Abschnitt ist weg. Nichts Erfundenes als Ersatz.
+ *   - Schema 87: solange „Kontakte abgleichen" weder an noch aus ist, steht
+ *     vorne eine Karte mit der Frage (Erlauben / Nicht jetzt) — auch wenn
+ *     die Liste sonst leer wäre. Ist der Abgleich an, wird einmal am Tag neu
+ *     abgeglichen (lib/kontakte.ts). Die Website hat diese Karte nicht: der
+ *     Browser kann das Adressbuch nicht lesen.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -26,6 +31,12 @@ import { colors, radius, spacing, themenStyles } from '../constants/design';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
 import { useProfil } from '../contexts/ProfilContext';
+import { useEinstellungen } from '../contexts/EinstellungenContext';
+import {
+  KONTAKTE_SCHLUESSEL,
+  kontakteAbgleichenWennFaellig,
+  kontakteErlauben,
+} from '../lib/kontakte';
 import {
   ladeVorschlaege,
   vorschlagEntfernen,
@@ -46,7 +57,12 @@ export const PersonenVorschlaege = ({ bereich, onOpenProfile, onNotice }: Props)
   // neu fragen, etwa nach dem Herunterziehen.
   const { ichId, geladen } = useDaten();
   const { folgtPerson, folgenUmschalten } = useProfil();
+  const { einstellungen, wert, setzen } = useEinstellungen();
   const [liste, setListe] = useState<Vorschlag[]>([]);
+  const [fragtGerade, setFragtGerade] = useState(false);
+  // Erst fragen, wenn die Einstellungen geladen sind — sonst blitzt die Karte
+  // bei jemandem auf, der längst geantwortet hat.
+  const abgleich = einstellungen ? wert(KONTAKTE_SCHLUESSEL, '') : null;
 
   /*
    * Wen man hier schon gefolgt oder entfernt hat. Das Folgen schreibt im
@@ -64,6 +80,27 @@ export const PersonenVorschlaege = ({ bereich, onOpenProfile, onNotice }: Props)
   useEffect(() => {
     laden();
   }, [laden, geladen]);
+
+  // Abgleich an: einmal am Tag neu, danach die Liste neu holen.
+  useEffect(() => {
+    if (abgleich !== 'an' || !supabase) return;
+    void kontakteAbgleichenWennFaellig(supabase).then((neu) => {
+      if (neu) laden();
+    });
+  }, [abgleich, supabase, laden]);
+
+  const erlauben = async () => {
+    if (!supabase) return;
+    setFragtGerade(true);
+    const a = await kontakteErlauben(supabase);
+    setFragtGerade(false);
+    // Auch bei „Nein" gilt die Frage als beantwortet — sonst stünde die Karte
+    // nach jeder Ablehnung wieder da.
+    await setzen(KONTAKTE_SCHLUESSEL, a.ok ? 'an' : 'aus');
+    if (!a.ok) return onNotice(a.meldung);
+    onNotice('Kontakte abgeglichen');
+    laden();
+  };
 
   const wegnehmen = (id: string) => {
     erledigt.current.add(id);
@@ -98,7 +135,8 @@ export const PersonenVorschlaege = ({ bereich, onOpenProfile, onNotice }: Props)
   // Wem man inzwischen anderswo gefolgt ist (Knopf am Beitrag), der fällt
   // sofort heraus — nicht erst beim nächsten Laden.
   const sichtbar = liste.filter((v) => !folgtPerson(v.id));
-  if (!sichtbar.length) return null;
+  const fragen = abgleich === '';
+  if (!sichtbar.length && !fragen) return null;
 
   return (
     <View style={styles.abschnitt} testID={`vorschlaege-${bereich}`}>
@@ -108,6 +146,34 @@ export const PersonenVorschlaege = ({ bereich, onOpenProfile, onNotice }: Props)
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.reihe}
       >
+        {fragen && (
+          <View style={[styles.karte, styles.frage]} testID="vorschlag-kontakte-frage">
+            <Ionicons name="people-circle-outline" size={44} color={colors.brand} />
+            <Text style={styles.name} numberOfLines={2}>
+              Kontakte finden
+            </Text>
+            <Text style={styles.grund} numberOfLines={4}>
+              Darf All Media die Nummern in deinen Kontakten abgleichen?
+            </Text>
+            <Druck
+              style={styles.folgen}
+              onPress={erlauben}
+              disabled={fragtGerade}
+              accessibilityRole="button"
+              testID="vorschlag-kontakte-erlauben"
+            >
+              <Text style={styles.folgenText}>Erlauben</Text>
+            </Druck>
+            <Druck
+              style={styles.nichtJetzt}
+              onPress={() => void setzen(KONTAKTE_SCHLUESSEL, 'aus')}
+              accessibilityRole="button"
+              testID="vorschlag-kontakte-nicht"
+            >
+              <Text style={styles.nichtJetztText}>Nicht jetzt</Text>
+            </Druck>
+          </View>
+        )}
         {sichtbar.map((v) => (
           <Druck
             key={v.id}
@@ -172,4 +238,7 @@ const styles = themenStyles((colors) => ({
   grund: { marginTop: 4, minHeight: 30, color: colors.text3, fontSize: 11.5, textAlign: 'center' },
   folgen: { marginTop: 8, alignSelf: 'stretch', alignItems: 'center', paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.brand },
   folgenText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  frage: { paddingTop: 12, paddingBottom: 8 },
+  nichtJetzt: { marginTop: 4, alignSelf: 'stretch', alignItems: 'center', paddingVertical: 4 },
+  nichtJetztText: { color: colors.text2, fontSize: 12, fontWeight: '600' },
 }));

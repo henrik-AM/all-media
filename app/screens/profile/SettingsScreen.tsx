@@ -37,7 +37,8 @@ import {
 import { PASSWORT_REGEL, passwortAendern, passwortPruefen } from '../../lib/supabaseAuth';
 import { BildschirmzeitSheet, BzAnsicht } from '../../components/BildschirmzeitSheet';
 import { useBildschirmzeit } from '../../contexts/BildschirmzeitContext';
-import { Bildschirmzeit, bzMeldung, entsperrcodeSetzen } from '../../lib/bildschirmzeit';
+import { Bildschirmzeit, bzMeldung, entsperrcodeEntfernen, entsperrcodeSetzen } from '../../lib/bildschirmzeit';
+import { KONTAKTE_SCHLUESSEL, kontakteEntfernen, kontakteErlauben } from '../../lib/kontakte';
 
 // Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
 const Telefon = require('../../../gemeinsam/telefon') as typeof import('../../../gemeinsam/telefon');
@@ -51,7 +52,9 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 interface EingabeFeld {
   key: string;
   label: string;
-  typ?: 'text' | 'mehrzeilig' | 'zahl';
+  typ?: 'text' | 'mehrzeilig' | 'zahl' | 'auswahl';
+  /** Bei typ 'auswahl' — FormularSheet zeigt die Werte als Reihe zum Antippen. */
+  auswahl?: string[];
   platzhalter?: string;
   pflicht?: boolean;
 }
@@ -183,14 +186,29 @@ const SECTIONS: Section[] = [
          * Steht schon einer, braucht es den bisherigen — oder eine frische
          * Anmeldung mit Passwort.
          */
+        /*
+         * Schema 87 (Henrik 09.10.2026): „gleicher Code wie Spenden-Code,
+         * außer Nutzer entscheidet sich aktiv dagegen". Vorgabe ist die
+         * Spenden-PIN; „Eigener Code" ist die aktive Entscheidung dagegen.
+         * Zurück zur Spenden-PIN nimmt den eigenen Code weg
+         * (entsperrcode_entfernen). Gleiche Felder in web/public/app.js.
+         */
         eingabe: [
-          { key: 'code', label: 'Neuer Code (4 bis 8 Ziffern)', typ: 'zahl', pflicht: true },
-          { key: 'wdh', label: 'Code wiederholen', typ: 'zahl', pflicht: true },
-          { key: 'bisher', label: 'Bisheriger Code (falls schon einer gesetzt ist)', typ: 'zahl' },
+          {
+            key: 'art',
+            label: 'Welcher Code entsperrt die Bildschirmzeit?',
+            typ: 'auswahl',
+            auswahl: Bildschirmzeit.TEXTE.codeArten,
+          },
+          { key: 'code', label: 'Eigener Code (4 bis 8 Ziffern)', typ: 'zahl' },
+          { key: 'wdh', label: 'Eigenen Code wiederholen', typ: 'zahl' },
+          { key: 'bisher', label: 'Bisheriger eigener Code (falls schon einer gesetzt ist)', typ: 'zahl' },
         ],
         aktion: 'entsperrcode',
         pruefen: (w) =>
-          !/^\d{4,8}$/.test(w.code)
+          w.art !== Bildschirmzeit.TEXTE.codeArten[1]
+            ? null
+            : !/^\d{4,8}$/.test(w.code)
             ? 'Der Code muss aus 4 bis 8 Ziffern bestehen'
             : w.code !== w.wdh
             ? 'Die beiden Eingaben stimmen nicht überein'
@@ -282,6 +300,13 @@ const SECTIONS: Section[] = [
       { label: 'Info sichtbar für', icon: 'information-circle-outline', wahlKey: 'infoSichtbar', wahl: WER, standard: 'Meine Kontakte' },
       { label: 'Blockierte Kontakte', icon: 'ban-outline', liste: 'blockiert' },
       { label: 'Gruppen: wer darf hinzufügen', icon: 'people-outline', wahlKey: 'gruppenHinzufuegen', wahl: WER, standard: 'Meine Kontakte' },
+      /*
+       * Schema 87: Nummern aus dem Adressbuch für „Personen, die du kennen
+       * könntest". An fragt das Handy um Erlaubnis (lib/kontakte.ts), aus
+       * löscht die gespeicherten Nummern in Supabase. Gleicher Punkt auf der
+       * Website, die aber nur ausschalten kann.
+       */
+      { label: 'Kontakte abgleichen', icon: 'people-circle-outline', toggle: 'kontakteAbgleich' },
       { label: 'Bildschirmsperre', icon: 'finger-print-outline', toggle: 'bildschirmsperre' },
     ],
   },
@@ -1058,6 +1083,22 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                           void einstellungSetzen('theme', next ? 'dark' : 'light');
                           return;
                         }
+                        if (item.toggle === KONTAKTE_SCHLUESSEL) {
+                          if (!supabase) return;
+                          void (async () => {
+                            if (next) {
+                              const a = await kontakteErlauben(supabase);
+                              if (!a.ok) return onNotice(a.meldung);
+                              await einstellungSetzen(KONTAKTE_SCHLUESSEL, 'an');
+                              onNotice('Kontakte abgeglichen');
+                            } else {
+                              const weg = await kontakteEntfernen(supabase);
+                              await einstellungSetzen(KONTAKTE_SCHLUESSEL, 'aus');
+                              onNotice(weg ? 'Abgeglichene Nummern gelöscht' : 'Löschen hat nicht geklappt');
+                            }
+                          })();
+                          return;
+                        }
                         // 'an'/'aus' statt true/false: der Wert ist Text in
                         // der Datenbank, und beide Seiten schreiben dasselbe.
                         void einstellungSetzen(item.toggle as string, next ? 'an' : 'aus');
@@ -1069,6 +1110,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       {!!item.wahl && <Text style={styles.itemValue}>{wert(item)}</Text>}
                       {!!item.sichtbar && (
                         <Text style={styles.itemValue}>{sichtText(item.sichtbar)}</Text>
+                      )}
+                      {item.aktion === 'entsperrcode' && !!bz.stand && (
+                        <Text style={styles.itemValue}>{bz.stand.eigene_art === 'eigen' ? 'Eigener Code' : 'Spenden-PIN'}</Text>
                       )}
                       {item.aktion === 'farbfilter' && (
                         <Text style={styles.itemValue}>{Farbfilter.statusText(farbfilter)}</Text>
@@ -1151,6 +1195,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           vorbelegung={
             offen.label === 'Profil bearbeiten'
               ? { name: eigenesProfil.name, bio: eigenesProfil.bio, link: eigenesProfil.link }
+              : offen.aktion === 'entsperrcode'
+              ? { art: Bildschirmzeit.TEXTE.codeArten[bz.stand?.eigene_art === 'eigen' ? 1 : 0] }
               : undefined
           }
           onClose={() => setOffen(null)}
@@ -1225,8 +1271,13 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
             if (offen.aktion === 'entsperrcode') {
               if (!supabase) return 'Dafür musst du angemeldet sein';
               void (async () => {
-                const a = await entsperrcodeSetzen(supabase, werte.code, werte.bisher?.trim());
-                onNotice(a.ok ? 'Code gesetzt' : bzMeldung(a));
+                const eigener = werte.art === Bildschirmzeit.TEXTE.codeArten[1];
+                const a = eigener
+                  ? await entsperrcodeSetzen(supabase, werte.code, werte.bisher?.trim())
+                  : await entsperrcodeEntfernen(supabase, werte.bisher?.trim());
+                onNotice(
+                  !a.ok ? bzMeldung(a) : eigener ? 'Code gesetzt' : 'Die Spenden-PIN entsperrt jetzt die Bildschirmzeit'
+                );
                 if (a.ok) void bz.neuLaden();
               })();
               setOffen(null);

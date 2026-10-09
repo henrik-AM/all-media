@@ -6664,17 +6664,19 @@ async function bzSchicken(beimVerlassen = false) {
 
 /** Die Sperrseite — gleicher Aufbau wie components/BildschirmzeitSperre.tsx. */
 function bzSperreHtml(bereich, st, vollbild) {
-  const text = BZ.sperrText(st, bereich, bz.stand?.eltern?.name || null);
+  const text = BZ.sperrText(st, bereich, bz.stand?.eltern?.name || null, bz.stand?.code_art || null);
+  // Schema 87: ohne eigenen Entsperrcode gilt die Spenden-PIN (6–16 Zeichen, A–Z und 0–9).
+  const spenden = bz.stand?.code_art === 'spenden';
   return `<div class="bzsperre ${vollbild ? 'bzsperre--voll' : ''}" data-bz-sperre="${esc(bereich)}" data-bz-grund="${esc(st.grund || '')}">
     <div class="bzsperre__symbol">${st.grund === 'auszeit' ? ICONS.moon : ICONS.clock}</div>
     <h2 class="bzsperre__titel">${esc(text.titel)}</h2>
     <p class="bzsperre__satz">${esc(text.satz)}</p>
     <p class="bzsperre__zahl">Heute in ${esc(BZ.bereichName(bereich))}: ${esc(BZ.dauerText(bzNutzungJetzt()[bereich] || 0))}</p>
     ${st.mehrMoeglich ? `<button class="prof__btn is-primary" data-bz-mehr>${BZ.MEHR_MINUTEN} Min. mehr</button>` : ''}
-    <button class="prof__btn" data-bz-code-auf>Mit Entsperrcode freigeben</button>
+    <button class="prof__btn" data-bz-code-auf>Mit ${esc(text.feld)} freigeben</button>
     <div class="bzsperre__code" data-bz-code hidden>
       <p class="bzsperre__hinweis">${esc(text.code)}</p>
-      <input type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Entsperrcode" id="bzCode" aria-label="Entsperrcode">
+      <input type="password" ${spenden ? 'maxlength="20"' : 'inputmode="numeric" maxlength="8"'} autocomplete="off" placeholder="${esc(text.feld)}" id="bzCode" aria-label="${esc(text.feld)}" data-bz-spenden="${spenden ? '1' : ''}">
       <div class="bzsperre__wahl">
         <button class="bzchip is-an" data-bz-min="15">15 Min.</button>
         <button class="bzchip" data-bz-min="60">1 Std.</button>
@@ -6691,7 +6693,7 @@ function bzMeldungText(a) {
   if (!a) return 'Keine Verbindung';
   if (a.meldung) return a.meldung;
   if (a.error) return a.error;
-  if (a.grund === 'kein_code') return a.eltern ? 'Dein Elternteil hat noch keinen Entsperrcode festgelegt.' : BZ.TEXTE.keinCode;
+  if (a.grund === 'kein_code') return a.eltern ? 'Dein Elternteil hat noch keine Spenden-PIN und keinen Entsperrcode festgelegt.' : BZ.TEXTE.keinCode;
   if (a.grund === 'nicht_erlaubt') return 'Das darfst du für dieses Konto nicht.';
   return 'Das hat nicht geklappt';
 }
@@ -6725,8 +6727,11 @@ function bzSperreBinden(wurzel, bereich, st, nachher) {
   );
   wurzel.querySelector('[data-bz-freigeben]')?.addEventListener('click', async () => {
     const feld = wurzel.querySelector('#bzCode');
-    const code = (feld.value || '').replace(/\D/g, '');
-    if (!/^\d{4,8}$/.test(code)) return melden('Der Code hat 4 bis 8 Ziffern');
+    const spenden = feld.dataset.bzSpenden === '1';
+    const code = (feld.value || '').replace(spenden ? /[\s-]/g : /\D/g, '');
+    if (spenden ? !/^[A-Za-z0-9]{6,16}$/.test(code) : !/^\d{4,8}$/.test(code)) {
+      return melden(spenden ? 'Die Spenden-PIN hat 6 bis 16 Zeichen' : 'Der Code hat 4 bis 8 Ziffern');
+    }
     await bzSchicken();
     const a = await api('/api/bildschirmzeit/entsperren', { ziel, code, minuten });
     feld.value = '';
@@ -7179,14 +7184,33 @@ const SETTINGS = [
          * Bildschirmzeit. Steht schon einer, braucht es den bisherigen —
          * oder eine frische Anmeldung mit Passwort.
          */
+        /*
+         * Schema 87 (Henrik 09.10.2026): „gleicher Code wie Spenden-Code,
+         * außer Nutzer entscheidet sich aktiv dagegen". Vorgabe ist die
+         * Spenden-PIN; „Eigener Code" ist die aktive Entscheidung dagegen.
+         * Zurück zur Spenden-PIN nimmt den eigenen Code weg
+         * (entsperrcode_entfernen). Gleiche Felder in SettingsScreen.tsx.
+         */
         eingabe: [
-          { key: 'code', label: 'Neuer Code (4 bis 8 Ziffern)', typ: 'zahl', pflicht: true },
-          { key: 'wdh', label: 'Code wiederholen', typ: 'zahl', pflicht: true },
-          { key: 'bisher', label: 'Bisheriger Code (falls schon einer gesetzt ist)', typ: 'zahl' },
+          {
+            key: 'art',
+            label: 'Welcher Code entsperrt die Bildschirmzeit?',
+            typ: 'auswahl',
+            auswahl: BZ.TEXTE.codeArten,
+            // Erst beim Öffnen gelesen: dann steht der Stand aus Supabase schon da.
+            get wert() {
+              return BZ.TEXTE.codeArten[bz.stand?.eigene_art === 'eigen' ? 1 : 0];
+            },
+          },
+          { key: 'code', label: 'Eigener Code (4 bis 8 Ziffern)', typ: 'zahl' },
+          { key: 'wdh', label: 'Eigenen Code wiederholen', typ: 'zahl' },
+          { key: 'bisher', label: 'Bisheriger eigener Code (falls schon einer gesetzt ist)', typ: 'zahl' },
         ],
         aktion: 'entsperrcode',
         pruefen: (w) =>
-          !/^\d{4,8}$/.test(w.code)
+          w.art !== BZ.TEXTE.codeArten[1]
+            ? null
+            : !/^\d{4,8}$/.test(w.code)
             ? 'Der Code muss aus 4 bis 8 Ziffern bestehen'
             : w.code !== w.wdh
             ? 'Die beiden Eingaben stimmen nicht überein'
@@ -7280,6 +7304,13 @@ const SETTINGS = [
       { label: 'Info sichtbar für', icon: 'info', wahlKey: 'infoSichtbar', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
       { label: 'Blockierte Kontakte', icon: 'block', liste: 'blockiert' },
       { label: 'Gruppen: wer darf hinzufügen', icon: 'people', wahlKey: 'gruppenHinzufuegen', wahl: ['Alle', 'Meine Kontakte', 'Niemand'], standard: 'Meine Kontakte' },
+      /*
+       * Schema 87: Nummern aus dem Adressbuch für „Personen, die du kennen
+       * könntest". Ein Browser kann das Adressbuch nicht lesen — einschalten
+       * geht nur in der App; ausschalten löscht die abgeglichenen Nummern
+       * auch hier. Gleicher Punkt in SettingsScreen.tsx.
+       */
+      { label: 'Kontakte abgleichen', icon: 'people', toggle: 'kontakteAbgleich' },
       { label: 'Bildschirmsperre', icon: 'lock', toggle: 'bildschirmsperre' },
     ],
   },
@@ -7461,6 +7492,8 @@ const SCHALTER_STANDARD = {
   datensparen: false,
   // Livestream: Aufzeichnung ohne Rueckfrage veroeffentlichen (28.09.2026).
   liveAutoVeroeffentlichen: false,
+  // Adressbuch abgleichen (Schema 87). Leer heißt: noch nicht gefragt.
+  kontakteAbgleich: false,
 };
 
 const schalterAn = (schluessel) => {
@@ -8720,9 +8753,12 @@ function openEinstellung(punkt, nachher) {
         // Kasten 22: der Code geht als Hash nach Supabase. Fehler stehen im Blatt.
         if (punkt.aktion === 'entsperrcode') {
           return (async () => {
-            const antwort = await api('/api/entsperrcode', { neu: werte.code, bisher: werte.bisher || null });
+            const eigener = werte.art === BZ.TEXTE.codeArten[1];
+            const antwort = eigener
+              ? await api('/api/entsperrcode', { neu: werte.code, bisher: werte.bisher || null })
+              : await api('/api/entsperrcode/entfernen', { bisher: werte.bisher || null });
             if (!antwort?.ok) return bzMeldungText(antwort);
-            toast('Code gesetzt');
+            toast(eigener ? 'Code gesetzt' : 'Die Spenden-PIN entsperrt jetzt die Bildschirmzeit');
             void bzLaden();
             return null;
           })();
@@ -9000,6 +9036,8 @@ function renderSettings() {
       ? sichtText(it.sichtbar)
       : it.aktion === 'farbfilter' && window.Farbfilter
       ? window.Farbfilter.statusText(window.Farbfilter.lesen(einstellungenLaden()))
+      : it.aktion === 'entsperrcode' && bz.stand
+      ? (bz.stand.eigene_art === 'eigen' ? 'Eigener Code' : 'Spenden-PIN')
       : '';
     return `<button class="item ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
       <span class="item__icon">${ICONS[it.icon]}</span>
@@ -9161,6 +9199,18 @@ function renderSettings() {
          * Moeglichkeit vorgesehen ist (applyTheme).
          */
         void einstellungSetzen({ label: 'theme', wahlKey: 'theme' }, state.theme);
+        return;
+      }
+
+      if (key === 'kontakteAbgleich') {
+        if (!schalterAn(key)) return toast('Kontakte abgleichen geht nur in der App — ein Browser kann das Adressbuch nicht lesen');
+        b.classList.toggle('is-on', false);
+        void (async () => {
+          const antwort = await api('/api/kontakte/entfernen', {});
+          const ok = await einstellungSetzen({ label: key, wahlKey: key }, 'aus');
+          if (!ok) b.classList.toggle('is-on', true);
+          toast(antwort?.ok ? 'Abgeglichene Nummern gelöscht' : 'Löschen hat nicht geklappt');
+        })();
         return;
       }
 

@@ -48,6 +48,8 @@ export const SCHALTER_STANDARD: Record<string, boolean> = {
   datensparen: false,
   // Livestream: Aufzeichnung ohne Rueckfrage veroeffentlichen (28.09.2026).
   liveAutoVeroeffentlichen: false,
+  // Adressbuch abgleichen (Schema 87). Leer heißt: noch nicht gefragt.
+  kontakteAbgleich: false,
 };
 
 type EinstellungenWert = {
