@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { Druck } from '../../components/Druck';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +13,8 @@ import { Chat, Story } from '../../types';
 import { haptic } from '../../lib/haptics';
 import { useDaten } from '../../contexts/DatenContext';
 import { useEinstellungen } from '../../contexts/EinstellungenContext';
+import { useSupabase } from '../../contexts/SupabaseContext';
+import * as Aktion from '../../lib/aktionen';
 
 type Filter = 'all' | 'contacts' | 'groups';
 
@@ -70,6 +72,26 @@ export const ChatListScreen = ({
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  /*
+   * Kasten 25: In welchen Chats wurde ich ungelesen mit @ erwähnt? Der
+   * Messenger hat keine Glocke (strikte Trennung von Videos, Schema 75) —
+   * die Erwähnung zeigt sich deshalb hier als „@" vor der Zahl, wie bei
+   * WhatsApp. Neu gefragt, sobald sich die Chatliste ändert. Gleiche Anzeige
+   * in web/public/app.js (chatRow).
+   */
+  const { supabase } = useSupabase();
+  const [erwaehnt, setErwaehnt] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!supabase) return;
+    let aktiv = true;
+    Aktion.meineChatErwaehnungen(supabase)
+      .then((ids) => aktiv && setErwaehnt(new Set(ids)))
+      .catch(() => aktiv && setErwaehnt(new Set()));
+    return () => {
+      aktiv = false;
+    };
+  }, [supabase, allChats]);
 
   const chats = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -174,6 +196,11 @@ export const ChatListScreen = ({
               {vorschauZeigen ? item.preview : item.preview ? 'Neue Nachricht' : ''}
             </Text>
             {item.muted && <Ionicons name="volume-mute-outline" size={15} color={colors.text3} />}
+            {unread && erwaehnt.has(item.id) && (
+              <View style={styles.badge} accessibilityLabel="Du wurdest erwähnt">
+                <Text style={styles.badgeText}>@</Text>
+              </View>
+            )}
             {unread && (
               <LinearGradient
                 colors={brandGradient}
