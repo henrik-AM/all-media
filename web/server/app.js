@@ -1281,6 +1281,56 @@ app.post('/api/autoren/:userId/follow', folgen);
 app.post('/api/profile/:userId/follow', folgen);
 
 /*
+ * Kasten 23: „Personen, die du kennen könntest" — nur unter Videos und
+ * Communitys. Gerechnet wird in Supabase (personen_vorschlaege), dieselbe
+ * Funktion, die die App direkt ruft (app/lib/vorschlaege.ts). Der Server
+ * reicht nur durch: keine Nummer, kein Kontaktname, kein Geburtsdatum —
+ * die Funktion liefert sie gar nicht erst.
+ *
+ * Ohne eingespieltes Schema: leere Liste, die Seite blendet den Abschnitt
+ * dann aus.
+ */
+app.get('/api/vorschlaege/:bereich', route(async (req) => {
+  const bereich = req.params.bereich === 'communitys' ? 'communitys' : 'videos';
+  const { data, error } = await req.db.rpc('personen_vorschlaege', {
+    p_bereich: bereich,
+    p_anzahl: 12,
+  });
+  if (error) {
+    console.warn('Vorschläge nicht geladen:', error.message);
+    return { ok: true, vorschlaege: [] };
+  }
+  return {
+    ok: true,
+    vorschlaege: (data || []).map((z) => ({
+      id: z.id,
+      name: z.name || '',
+      handle: z.handle || '',
+      color: z.color || null,
+      grund: z.grund || '',
+      punkte: Number(z.punkte || 0),
+    })),
+  };
+}));
+
+// „Entfernen" (×) — dauerhaft, nur die eigene Zeile (RLS auf vorschlag_entfernt).
+app.post('/api/vorschlaege/:userId/entfernen', route(async (req) => {
+  const ziel = req.params.userId;
+  if (!ziel || ziel === req.nutzerId) return { ok: false, error: 'Ungültige Person' };
+  const { error } = await req.db
+    .from('vorschlag_entfernt')
+    .upsert({ user_id: req.nutzerId, ziel_id: ziel }, { onConflict: 'user_id,ziel_id', ignoreDuplicates: true });
+  if (error) throw error;
+  // Gegenprobe: ein abgewiesenes Schreiben meldet unter RLS nicht immer etwas.
+  const { count } = await req.db
+    .from('vorschlag_entfernt')
+    .select('ziel_id', { count: 'exact', head: true })
+    .eq('user_id', req.nutzerId)
+    .eq('ziel_id', ziel);
+  return count ? { ok: true } : { ok: false, error: 'Entfernen hat nicht geklappt' };
+}));
+
+/*
  * Die Namen hinter den Zahlen "Follower" und "Gefolgt". Die Zahlen kamen
  * schon immer aus `profile_zahlen`; die Listen darunter kamen aus dem
  * Nichts — auf der Website aus einer nie gesetzten Eigenschaft, in der App

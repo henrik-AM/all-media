@@ -2322,7 +2322,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           />
         );
       }
-      return <CommunitiesScreen onOpenCommunity={openCommunity} onNotice={setNotice} onCreateChannel={() => setSheet('erstellen')} />;
+      return <CommunitiesScreen onOpenCommunity={openCommunity} onNotice={setNotice} onCreateChannel={() => setSheet('erstellen')} onOpenProfile={openPublicProfile} />;
     }
 
     return (

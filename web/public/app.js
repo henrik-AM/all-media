@@ -4649,13 +4649,160 @@ async function umfragenHolen() {
   }
 }
 
+/* ------------------------------------- Personen, die du kennen könntest */
+/*
+ * Kasten 23 (Henrik 06.10.2026): „Der Algorithmus soll dem Nutzer (wie z. B.
+ * bei Instagram) andere Nutzer vorschlagen, die er/sie kennen könnte (nur
+ * unter Videos und Communitys)."
+ *
+ * Genau zwei Stellen: der Videos-Feed (renderHomeFeed, nach dem zweiten
+ * Beitrag) und die Communitys-Startseite (renderCommunities). Im Messenger
+ * nirgends. Gerechnet wird in Supabase (personen_vorschlaege) — die
+ * Begründung kommt wortgleich von dort, die App zeigt also denselben Satz.
+ * Gegenstück: app/components/PersonenVorschlaege.tsx.
+ *
+ * Leer → kein Abschnitt. Nach „Folgen" oder × verschwindet die Karte, und
+ * die Liste wird nachgeladen.
+ */
+const VORSCHLAG_TITEL = 'Personen, die du kennen könntest';
+// null = noch nicht geladen. `erledigt` hält Gefolgte/Entfernte fern, bis
+// die Datenbank nachgezogen hat.
+const vorschlaege = { videos: null, communitys: null, erledigt: new Set(), lauf: { videos: 0, communitys: 0 }, zeit: { videos: 0, communitys: 0 } };
+
+function vorschlagKarte(v) {
+  const u = state.users[v.id] || {
+    name: v.name,
+    initials: String(v.name || '?').split(/\s+/).map((t) => t[0] || '').join('').slice(0, 2).toUpperCase(),
+    color: v.color,
+  };
+  const handle = v.handle.startsWith('@') ? v.handle : '@' + v.handle;
+  return `
+    <div class="vorschlag" data-vorschlag="${esc(v.id)}" data-testid="vorschlag-karte">
+      <button class="vorschlag__weg" data-vorschlag-weg="${esc(v.id)}" aria-label="${esc(v.name)} entfernen" data-testid="vorschlag-entfernen">${ICONS.close}</button>
+      <button class="vorschlag__person" data-vorschlag-profil="${esc(v.id)}">
+        ${personenAvatar({ ...u, name: v.name }, 64)}
+        <span class="vorschlag__name">${esc(v.name)}</span>
+        <span class="vorschlag__handle">${esc(handle)}</span>
+        <span class="vorschlag__grund">${esc(v.grund)}</span>
+      </button>
+      <button class="vorschlag__folgen" data-vorschlag-folgen="${esc(v.id)}" data-testid="vorschlag-folgen">Folgen</button>
+    </div>`;
+}
+
+/** Der Abschnitt aus dem Zwischenstand — leer, solange es nichts gibt. */
+function vorschlaegeHtml(bereich) {
+  // Wem man inzwischen anderswo gefolgt ist (Folgen-Knopf am Beitrag), der
+  // fällt sofort heraus — nicht erst beim nächsten Laden.
+  const liste = (vorschlaege[bereich] || []).filter(
+    (v) => !vorschlaege.erledigt.has(v.id) && !state.gefolgt?.[v.id] && !(state.posts || []).some((p) => p.userId === v.id && p.following)
+  );
+  if (!liste.length) return `<section class="vorschlaege" data-vorschlaege="${bereich}" hidden></section>`;
+  return `
+    <section class="vorschlaege" data-vorschlaege="${bereich}" data-testid="vorschlaege-${bereich}">
+      <h3 class="vorschlaege__titel">${VORSCHLAG_TITEL}</h3>
+      <div class="vorschlaege__reihe">${liste.map(vorschlagKarte).join('')}</div>
+    </section>`;
+}
+
+/** Den Abschnitt an Ort und Stelle neu zeichnen — ohne den Feed (Scrollstand). */
+function vorschlaegeZeichnen(bereich) {
+  const alt = main.querySelector(`[data-vorschlaege="${bereich}"]`);
+  if (!alt) return;
+  const huelle = document.createElement('div');
+  huelle.innerHTML = vorschlaegeHtml(bereich).trim();
+  const neu = huelle.firstElementChild;
+  alt.replaceWith(neu);
+  vorschlaegeBinden(neu, bereich);
+}
+
+async function vorschlaegeLaden(bereich) {
+  const lauf = ++vorschlaege.lauf[bereich];
+  vorschlaege.zeit[bereich] = Date.now();
+  try {
+    const res = await fetch(`/api/vorschlaege/${bereich}`);
+    const daten = await res.json();
+    if (lauf !== vorschlaege.lauf[bereich]) return;
+    vorschlaege[bereich] = daten?.ok ? daten.vorschlaege || [] : [];
+  } catch {
+    if (lauf !== vorschlaege.lauf[bereich]) return;
+    vorschlaege[bereich] = [];
+  }
+  vorschlaegeZeichnen(bereich);
+}
+
+/** Nach dem Zeichnen der Seite: binden und frisch nachfragen. */
+function vorschlaegeEinhaengen(bereich) {
+  const abschnitt = main.querySelector(`[data-vorschlaege="${bereich}"]`);
+  if (!abschnitt) return;
+  vorschlaegeBinden(abschnitt, bereich);
+  // Der Feed wird nach jedem Like neu gezeichnet — nicht jedes Mal fragen.
+  if (vorschlaege[bereich] === null || Date.now() - vorschlaege.zeit[bereich] > 60000) vorschlaegeLaden(bereich);
+}
+
+function vorschlaegeBinden(abschnitt, bereich) {
+  const finde = (id) => (vorschlaege[bereich] || []).find((v) => v.id === id);
+  const wegnehmen = (id) => {
+    vorschlaege.erledigt.add(id);
+    // Auch aus dem anderen Bereich — es ist dieselbe Person.
+    vorschlaegeZeichnen(bereich);
+  };
+
+  abschnitt.querySelectorAll('[data-vorschlag-profil]').forEach((b) =>
+    b.addEventListener('click', () => openProfile(b.dataset.vorschlagProfil))
+  );
+
+  abschnitt.querySelectorAll('[data-vorschlag-folgen]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const id = b.dataset.vorschlagFolgen;
+      const v = finde(id);
+      wegnehmen(id);
+      // Die vorhandene Folgen-Route. Sie schaltet um: folgt man (auf einem
+      // anderen Gerät) schon, hätte der Klick entfolgt — dann gleich zurück.
+      let r = await fetch(`/api/profile/${id}/follow`, { method: 'POST' }).then((x) => x.json()).catch(() => null);
+      if (r?.ok && r.following === false) {
+        r = await fetch(`/api/profile/${id}/follow`, { method: 'POST' }).then((x) => x.json()).catch(() => null);
+      }
+      if (!r?.ok) {
+        vorschlaege.erledigt.delete(id);
+        toast(r?.error || 'Das Folgen hat nicht geklappt');
+        return vorschlaegeLaden(bereich);
+      }
+      state.gefolgt = state.gefolgt || {};
+      state.gefolgt[id] = true;
+      for (const p of state.posts || []) if (p.userId === id) p.following = true;
+      toast(`Du folgst ${v?.name || ''}`.trim());
+      vorschlaegeLaden(bereich);
+    })
+  );
+
+  abschnitt.querySelectorAll('[data-vorschlag-weg]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const id = b.dataset.vorschlagWeg;
+      wegnehmen(id);
+      const r = await api(`/api/vorschlaege/${id}/entfernen`, {});
+      if (!r?.ok) {
+        vorschlaege.erledigt.delete(id);
+        toast(r?.error || 'Entfernen hat nicht geklappt');
+      }
+      vorschlaegeLaden(bereich);
+    })
+  );
+}
+
 function renderHomeFeed() {
+  /*
+   * Kasten 23: „Personen, die du kennen könntest" nach dem zweiten Beitrag
+   * (bei weniger Beiträgen ans Ende) — wie in der App (HomeFeedScreen).
+   */
+  const karten = state.posts.filter(imFeed).map(postCard);
+  karten.splice(Math.min(2, karten.length), 0, vorschlaegeHtml('videos'));
   main.innerHTML = `
     <div class="scroll" id="homeScroll">
       ${storyRail(state.storiesVideos, 'videos')}
-      <div class="postlist">${state.posts.filter(imFeed).map(postCard).join('')}</div>
+      <div class="postlist">${karten.join('')}</div>
     </div>`;
 
+  vorschlaegeEinhaengen('videos');
   bindStoryRail();
   /*
    * Mitschreiben, was tatsaechlich gesehen wurde — die Grundlage des
@@ -5948,6 +6095,12 @@ function renderCommunities() {
         .join('')}
     </div>
     <div class="scroll">
+      ${/*
+          Kasten 23: „Personen, die du kennen könntest" über der Liste —
+          nicht während einer Suche, die gilt den Communitys. Wie in der App
+          (CommunitiesScreen, ListHeaderComponent).
+        */ ''}
+      ${state.communityQuery.trim() ? '' : vorschlaegeHtml('communitys')}
       ${
         list.length
           ? `<ul class="rows">${list.map(communityRow).join('')}</ul>`
@@ -6003,6 +6156,7 @@ function renderCommunities() {
   );
 
   bindJoinButtons(renderCommunities);
+  vorschlaegeEinhaengen('communitys');
 }
 
 // Beitreten/Verlassen wird an mehreren Stellen angeboten. Der Aufrufer sagt,
