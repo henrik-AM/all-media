@@ -77,9 +77,9 @@
 --      weder Markierung noch Mitteilung. Den Link wegzulassen würde selbst
 --      verraten, dass die Person das Markieren gesperrt hat.
 --   9. Neue Fassungen, die die Regel aus Punkt 2 übernehmen:
---        darf_markieren()          Gewinner XX, ersetzt Schema 20
---        darf_story_markieren()    Gewinner XX, ersetzt Schema 68
---        story_markierbar()        Gewinner XX, ersetzt Schema 68
+--        darf_markieren()          Gewinner 86, ersetzt Schema 20
+--        darf_story_markieren()    Gewinner 86, ersetzt Schema 68
+--        story_markierbar()        Gewinner 86, ersetzt Schema 68
 --      Wortgleich bis auf den Aufruf von darf_markieren_person().
 --  10. ist_minderjaehrig() kommt aus SUPABASE_SCHEMA_85_personen_vorschlaege.sql
 --      (Kasten 23) und wird hier nur benutzt — Schema 85 muss vorher
@@ -622,7 +622,7 @@ grant execute on function public.markierung_vorschlaege(text, uuid, uuid) to aut
 --  9. Vorhandene Markier-Regeln übernehmen die eine Regel
 -- ---------------------------------------------------------------------------
 
--- Gewinner XX, ersetzt Schema 20 (dort nur sichtbar_fuer).
+-- Gewinner 86, ersetzt Schema 20 (dort nur sichtbar_fuer).
 create or replace function public.darf_markieren(ziel_post uuid, wen uuid, wer uuid)
 returns boolean
 language plpgsql
@@ -647,7 +647,7 @@ $$;
 revoke all on function public.darf_markieren(uuid, uuid, uuid) from public, anon;
 grant execute on function public.darf_markieren(uuid, uuid, uuid) to authenticated;
 
--- Gewinner XX, ersetzt Schema 68.
+-- Gewinner 86, ersetzt Schema 68.
 create or replace function public.darf_story_markieren(ziel_story uuid, wen uuid, wer uuid)
 returns boolean
 language plpgsql
@@ -672,7 +672,7 @@ $$;
 revoke all on function public.darf_story_markieren(uuid, uuid, uuid) from public, anon;
 grant execute on function public.darf_story_markieren(uuid, uuid, uuid) to authenticated;
 
--- Gewinner XX, ersetzt Schema 68 (Rückgabe unverändert).
+-- Gewinner 86, ersetzt Schema 68 (Rückgabe unverändert).
 create or replace function public.story_markierbar(suche text default null)
 returns table (id uuid, name text, handle text)
 language sql
