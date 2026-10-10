@@ -450,7 +450,7 @@ if (!fs.existsSync(BILD)) {
     await page.click('[data-sheet-close]');
   });
 
-  await pruefe('Neuen Kanal erstellen legt ihn unter Erstellt an', async () => {
+  await pruefe('Neue Community erstellen legt sie unter Erstellt an', async () => {
     await erstellen('kanal');
     await page.waitForSelector('#f_name', { timeout: 3000 });
     await page.fill('#f_name', 'Nachtschicht');
@@ -459,10 +459,10 @@ if (!fs.existsSync(BILD)) {
     await page.waitForFunction(
       () => (document.querySelector('#main')?.textContent || '').includes('Nachtschicht'),
       null, { timeout: 10000 }
-    ).catch(() => { throw new Error('Kanal steht nicht im Profil'); });
+    ).catch(() => { throw new Error('Community steht nicht im Profil'); });
   });
 
-  await pruefe('Denselben Kanal gibt es kein zweites Mal', async () => {
+  await pruefe('Dieselbe Community gibt es kein zweites Mal', async () => {
     await erstellen('kanal');
     await page.waitForSelector('#f_name');
     await page.fill('#f_name', 'Nachtschicht');

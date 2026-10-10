@@ -176,6 +176,10 @@ const state = {
   communityFilter: 'meine',
   commSearchQuery: '',
   commSearchFilter: 'all',
+  // Die Seite hinter "Communitys →" bzw. "Profile →" unter Suchen
+  // (Kasten 3.1/3.2) und ihr eigenes Suchfeld.
+  commSuchSeite: null,
+  commSuchSeiteQuery: '',
   // Filter der persoenlichen Chats im Community-Bereich.
   commChatFilter: 'all',
   videoSearchQuery: '',
@@ -1342,6 +1346,8 @@ function profilReiterPruefen(zielBereich, zielUnterpunkt) {
 function verlasseExplorer() {
   state.explorerView = null;
   state.explorerParam = null;
+  // Auch die Unterseite der Community-Suche (Kasten 3.1/3.2).
+  state.commSuchSeite = null;
   /*
    * Auch der Weg zurueck ins Profil gilt nur fuer den Besuch, aus dem er kam.
    * Wer die Einstellungen ueber die untere Leiste oeffnet, soll dort keinen
@@ -1441,7 +1447,9 @@ function render() {
   if (state.area === 'communities') {
     if (v === 'home') return renderCommunities();
     if (v === 'chats') return renderCommunityChats();
-    if (v === 'search') return renderCommunitySearch();
+    // Kasten 3.1/3.2: die Unterseite hinter dem Pfeil. Wie commProfilView
+    // hier abgefragt, damit ein erneutes render() sie nicht wegwischt.
+    if (v === 'search') return state.commSuchSeite ? renderCommunitySuchSeite() : renderCommunitySearch();
     // Die Seite hinter "Erstellt"/"Beigetreten". Sie wird hier mit
     // abgefragt, damit ein erneutes render() sie nicht wegwischt - und in
     // verlasseExplorer() geleert, damit sie nicht haengen bleibt.
@@ -11823,7 +11831,7 @@ const ERSTELLEN_VIDEOS = [
 ];
 
 function openErstellen(bereich) {
-  const punkte = bereich === 'communities' ? [{ key: 'kanal', label: 'Neuen Kanal erstellen', icon: 'plus' }] : ERSTELLEN_VIDEOS;
+  const punkte = bereich === 'communities' ? [{ key: 'kanal', label: 'Neue Community erstellen', icon: 'plus' }] : ERSTELLEN_VIDEOS;
 
   openSheet(
     'Erstellen',
@@ -15429,12 +15437,16 @@ async function erstelle(was) {
   );
 }
 
-/** Neuen Kanal in einer Community anlegen (Prototyp "CP + erstellen"). */
+/**
+ * Neue Community anlegen (Prototyp "CP + erstellen"). Der Kommentar sagte
+ * "Kanal in einer Community", angelegt wird aber eine Community selbst
+ * (POST /api/communities) - Kasten 2.2 (28.09.2026) hat die Texte angepasst.
+ */
 function openKanalErstellen() {
   openFormular(
-    'Neuen Kanal erstellen',
+    'Neue Community erstellen',
     [
-      { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
+      { key: 'name', label: 'Name der Community', platzhalter: 'z. B. Fotografie', pflicht: true },
       { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
     ],
     async ({ name, thema }) => {
@@ -16733,21 +16745,78 @@ function renderCommunityChats() {
 
 /* --------------------------------------------------- Communitys: Suchen */
 // Prototyp-Frame "Community - Suchen": Filter Alle/Communitys/Kontakte, dann
-// die Abschnitte Kanäle und Profile mit Befreunden-Schaltfläche.
+// die Abschnitte Communitys und Profile mit Befreunden-Schaltfläche.
+
+/*
+ * Die Suchregel der Community-Suche. Die Hauptsuche und die Unterseiten
+ * hinter "Communitys →" / "Profile →" (Kasten 3.1/3.2) suchen damit in
+ * derselben Quelle - den geladenen Communitys bzw. Nutzern - und nach
+ * derselben Regel. Gleich in der App (passendeCommunitys/passendeProfile in
+ * CommunitySearchScreen.tsx).
+ */
+function passendeCommunitys(q) {
+  return state.communities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
+}
+function passendeProfile(q) {
+  return Object.values(state.users).filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)));
+}
+
+/** Eine Profilzeile der Community-Suche, mit Befreunden-Knopf. */
+function commProfilZeile(u) {
+  const c = state.contacts.find((x) => x.id === u.id);
+  const st = !c ? 'none' : c.status === 'pending' ? 'pending' : 'friend';
+  /*
+   * Punkt 57: bei einem privaten Profil geht erst eine
+   * Anfrage raus. "+ Befreunden" waere dort ein
+   * Versprechen, das der Knopf nicht halten kann.
+   */
+  const privat = (state.privateProfile || []).includes(u.id);
+  const label =
+    st === 'friend'
+      ? 'Befreundet'
+      : st === 'pending'
+        ? 'Angefragt'
+        : privat
+          ? 'Anfrage senden'
+          : '+ Befreunden';
+  return `<li><div class="row">
+     ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
+     <div class="row__body" data-profile="${u.id}">
+       <div class="row__name">${esc(u.name)}</div>
+       <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
+     </div>
+     <button class="joinbtn ${st === 'none' ? '' : 'is-joined'}" data-befriend="${u.id}" ${st === 'none' ? '' : 'disabled'}>${label}</button>
+   </div></li>`;
+}
+
+/** Befreunden-Knoepfe der Community-Suche verdrahten; danach `neuZeichnen`. */
+function bindBefreunden(neuZeichnen) {
+  main.querySelectorAll('[data-befriend]').forEach((b) =>
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const u = state.users[b.dataset.befriend];
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: u.handle }),
+      });
+      const result = await res.json();
+      if (!result.ok) return toast(result.error);
+      state.contacts.push(result.contact);
+      if (result.chat) state.chats.unshift(result.chat);
+      // Punkt 57: die Meldung sagt, was wirklich passiert ist - bei einem
+      // privaten Profil laeuft eine Anfrage, sonst steht der Kontakt schon.
+      toast(result.privat ? `Anfrage an ${u.name} gesendet` : `${u.name} ist jetzt dein Kontakt`);
+      neuZeichnen();
+    })
+  );
+}
+
 function renderCommunitySearch() {
   const q = state.communityQuery.trim().toLowerCase();
   const f = state.commSearchFilter;
-  const chans = f === 'people' ? [] : state.communities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
-  const people =
-    f === 'channels'
-      ? []
-      : Object.values(state.users).filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)));
-
-  const statusOf = (id) => {
-    const c = state.contacts.find((x) => x.id === id);
-    if (!c) return 'none';
-    return c.status === 'pending' ? 'pending' : 'friend';
-  };
+  const chans = f === 'people' ? [] : passendeCommunitys(q);
+  const people = f === 'channels' ? [] : passendeProfile(q);
 
   main.innerHTML = `
     <div class="pagehead">
@@ -16771,40 +16840,12 @@ function renderCommunitySearch() {
             // ist der Name der Unterthemen INNERHALB einer Community - hier
             // stehen aber die Communitys selbst.
             // Punkt 56: die beiden Ueberschriften waren tote <div>s mit einem
-            // Pfeil daran. Jetzt fuehren sie auf die Liste mit nur dieser
-            // Kategorie - derselbe Weg wie bei den Kategorien der Video-Suche.
-            `${chans.length ? `<button class="exp__head" data-csmehr="channels">Communitys →</button><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
-             ${
-               people.length
-                 ? `<button class="exp__head" data-csmehr="people">Profile →</button><ul class="rows">${people
-                     .map((u) => {
-                       const st = statusOf(u.id);
-                       /*
-                        * Punkt 57: bei einem privaten Profil geht erst eine
-                        * Anfrage raus. "+ Befreunden" waere dort ein
-                        * Versprechen, das der Knopf nicht halten kann.
-                        */
-                       const privat = (state.privateProfile || []).includes(u.id);
-                       const label =
-                         st === 'friend'
-                           ? 'Befreundet'
-                           : st === 'pending'
-                             ? 'Angefragt'
-                             : privat
-                               ? 'Anfrage senden'
-                               : '+ Befreunden';
-                       return `<li><div class="row">
-                          ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
-                          <div class="row__body" data-profile="${u.id}">
-                            <div class="row__name">${esc(u.name)}</div>
-                            <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
-                          </div>
-                          <button class="joinbtn ${st === 'none' ? '' : 'is-joined'}" data-befriend="${u.id}" ${st === 'none' ? '' : 'disabled'}>${label}</button>
-                        </div></li>`;
-                     })
-                     .join('')}</ul>`
-                 : ''
-             }`
+            // Pfeil daran. Kasten 3.1/3.2 (28.09.2026): sie oeffnen jetzt eine
+            // eigene Seite mit Zurueck-Pfeil, eigener Suchleiste und nur
+            // dieser Liste (renderCommunitySuchSeite) - vorher schalteten sie
+            // nur den Filter oben um.
+            `${chans.length ? `<button class="exp__head" data-csmehr="channels" aria-label="Alle Communitys anzeigen">Communitys →</button><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
+             ${people.length ? `<button class="exp__head" data-csmehr="people" aria-label="Alle Profile anzeigen">Profile →</button><ul class="rows">${people.map(commProfilZeile).join('')}</ul>` : ''}`
           : `<div class="empty">${ICONS.search}
               <div class="empty__title">Nichts gefunden</div>
               <div class="empty__text">Für „${esc(state.communityQuery)}" gibt es keinen Treffer.</div>
@@ -16832,36 +16873,94 @@ function renderCommunitySearch() {
       renderCommunitySearch();
     })
   );
-  // Punkt 56: die Ueberschrift schaltet auf genau diese Kategorie um.
+  // Kasten 3.1/3.2: die Ueberschrift oeffnet die eigene Seite dieser
+  // Kategorie. Was oben schon getippt war, gilt dort weiter.
   main.querySelectorAll('[data-csmehr]').forEach((b) =>
     b.addEventListener('click', () => {
-      state.commSearchFilter = b.dataset.csmehr;
-      renderCommunitySearch();
+      state.commSuchSeite = b.dataset.csmehr;
+      state.commSuchSeiteQuery = state.communityQuery;
+      renderCommunitySuchSeite();
     })
   );
   main.querySelectorAll('[data-community]').forEach((r) =>
     r.addEventListener('click', () => openChat(r.dataset.community))
   );
   bindJoinButtons(renderCommunitySearch);
-  main.querySelectorAll('[data-befriend]').forEach((b) =>
-    b.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const u = state.users[b.dataset.befriend];
-      const res = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle: u.handle }),
-      });
-      const result = await res.json();
-      if (!result.ok) return toast(result.error);
-      state.contacts.push(result.contact);
-      if (result.chat) state.chats.unshift(result.chat);
-      // Punkt 57: die Meldung sagt, was wirklich passiert ist - bei einem
-      // privaten Profil laeuft eine Anfrage, sonst steht der Kontakt schon.
-      toast(result.privat ? `Anfrage an ${u.name} gesendet` : `${u.name} ist jetzt dein Kontakt`);
-      renderCommunitySearch();
-    })
+  bindBefreunden(renderCommunitySearch);
+}
+
+/*
+ * Die Seite hinter "Communitys →" bzw. "Profile →" unter Suchen.
+ *
+ * Henrik am 28.09.2026 (Kasten 3.1/3.2, Register F-07): "Wenn ich auf die
+ * dicke schwarze Schrift mit dem Pfeil nach rechts druecke, moechte ich auf
+ * eine separate Seite weitergeleitet werden mit dann entweder nur
+ * vorgeschlagenen Profilen, auf der ich ja auch Profile suchen kann oder halt
+ * nur vorgeschlagenen Communitys, auf der ich dann auch Communitys suchen
+ * kann." Aufgebaut wie renderCommunityListe: Zurueck-Pfeil, Titel, dazu ein
+ * eigenes Suchfeld. Gesucht wird wie in der Hauptsuche (passendeCommunitys /
+ * passendeProfile).
+ */
+function renderCommunitySuchSeite() {
+  const istCommunitys = state.commSuchSeite === 'channels';
+  const roh = state.commSuchSeiteQuery;
+  const q = roh.trim().toLowerCase();
+  const liste = istCommunitys ? passendeCommunitys(q) : passendeProfile(q);
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="pagehead__row">
+        <button class="iconbtn" id="commSuchSeiteBack" aria-label="Zurück zur Suche">${ICONS.back}</button>
+        <h2 class="pagehead__title">${istCommunitys ? 'Communitys' : 'Profile'}</h2>
+      </div>
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="commSuchSeiteInput" type="search" placeholder="${istCommunitys ? 'Suche nach Communitys...' : 'Suche nach Profilen...'}" value="${esc(roh)}" autocomplete="off" />
+          ${roh ? `<button class="searchbox__clear" id="commSuchSeiteClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
+        </label>
+      </div>
+    </div>
+    <div class="scroll" data-commsuchseite="${istCommunitys ? 'channels' : 'people'}">
+      ${
+        liste.length
+          ? `<ul class="rows">${(istCommunitys ? liste.map(communityRow) : liste.map(commProfilZeile)).join('')}</ul>`
+          : `<div class="empty">${ICONS.search}
+              <div class="empty__title">Nichts gefunden</div>
+              <div class="empty__text">${
+                q
+                  ? `Für „${esc(roh)}" gibt es keinen Treffer.`
+                  : istCommunitys
+                    ? 'Es gibt gerade keine Communitys.'
+                    : 'Es gibt gerade keine Profile.'
+              }</div>
+            </div>`
+      }
+    </div>`;
+
+  $('#commSuchSeiteBack').addEventListener('click', () => {
+    state.commSuchSeite = null;
+    renderCommunitySearch();
+  });
+  const input = $('#commSuchSeiteInput');
+  input.addEventListener('input', (e) => {
+    state.commSuchSeiteQuery = e.target.value;
+    const pos = e.target.selectionStart;
+    renderCommunitySuchSeite();
+    const next = $('#commSuchSeiteInput');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  $('#commSuchSeiteClear')?.addEventListener('click', () => {
+    state.commSuchSeiteQuery = '';
+    renderCommunitySuchSeite();
+    $('#commSuchSeiteInput').focus();
+  });
+  main.querySelectorAll('[data-community]').forEach((r) =>
+    r.addEventListener('click', () => openChat(r.dataset.community))
   );
+  bindJoinButtons(renderCommunitySuchSeite);
+  bindBefreunden(renderCommunitySuchSeite);
 }
 
 /* --------------------------------------------------- Communitys: Profil */

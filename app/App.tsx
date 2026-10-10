@@ -1422,7 +1422,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);
-      return community ? openCommunity(community) : setNotice('Diesen Kanal gibt es nicht mehr');
+      return community ? openCommunity(community) : setNotice('Diese Community gibt es nicht mehr');
     }
     setArea('videos');
     setSubs((prev) => ({ ...prev, videos: ziel.art === 'post' || ziel.art === 'comment' ? 'home' : 'portrait' }));
@@ -1565,10 +1565,11 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
     if (punkt === 'kanal') {
       return setFormular({
-        title: 'Neuen Kanal erstellen',
+        // Kasten 2.2: angelegt wird eine Community, kein Kanal darin.
+        title: 'Neue Community erstellen',
         knopf: 'Erstellen',
         felder: [
-          { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
+          { key: 'name', label: 'Name der Community', platzhalter: 'z. B. Fotografie', pflicht: true },
           { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
         ],
         absenden: ({ name, thema }) => {

@@ -282,8 +282,12 @@ const BILD = path.join(__dirname, '_testbild.png');
 
     await kopf.click();
     await page.waitForTimeout(500);
-    const aktiv = await page.$eval('.pill.is-active', (e) => e.textContent.trim());
-    if (aktiv !== 'Kontakte') throw new Error('gewechselt wurde zu: ' + aktiv);
+    // Kasten 3.1 (28.09.2026): der Kopf oeffnet eine eigene Seite statt nur
+    // den Filter umzuschalten.
+    if (!(await page.$('[data-commsuchseite="people"]'))) throw new Error('keine eigene Profil-Seite');
+    if (!(await page.$('#commSuchSeiteInput'))) throw new Error('die Profil-Seite hat keine Suchleiste');
+    await page.click('#commSuchSeiteBack');
+    await page.waitForTimeout(300);
   });
 
   await pruefe('Ein privates Profil bekommt eine Anfrage, kein Befreunden', async () => {
