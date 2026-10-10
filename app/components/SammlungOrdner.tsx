@@ -21,6 +21,7 @@
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from './Druck';
 import { Motiv } from './Motiv';
 import { EmptyState } from './EmptyState';
@@ -61,12 +62,14 @@ export const SammlungOrdner = ({
   children,
 }: Props) => {
   const kachelHoehe = useKachelHoehe();
+  const insets = useSafeAreaInsets();
   const s = offen?.sammlung;
 
   return (
     <Modal visible={offen !== null} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.screen} testID="sammlung-ordner">
-        <View style={styles.kopf}>
+        {/* statusBarTranslucent: ohne insets.top lag der Titel unter der Uhrzeit. */}
+        <View style={[styles.kopf, { paddingTop: insets.top + spacing.sm }]}>
           <Druck onPress={onClose} style={styles.knopf} accessibilityLabel="Zurück zum Profil">
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Druck>
@@ -132,7 +135,6 @@ const styles = themenStyles((colors) => ({
   kopf: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: spacing.xl,
     paddingBottom: spacing.sm,
     paddingRight: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,

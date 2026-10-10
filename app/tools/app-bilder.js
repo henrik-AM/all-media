@@ -147,6 +147,8 @@ const SEITEN = [
    * auch in Videos teilen", der nur bei der Stufe "Alle" bedienbar ist.
    */
   ['settings#sicht:story', 'detail-sichtbarkeit-story'],
+  // Kasten 19: Stufe „Nur Follower“ gibt es nur bei den Likes.
+  ['settings#sicht:likes', 'detail-sichtbarkeit-likes'],
   /*
    * „Meine Kommentare", die vierte der Gattungen aus Henriks Rueckmeldung vom
    * 18.09.2026. Die drei anderen (Likes, Reposts, Gespeichertes) waren am

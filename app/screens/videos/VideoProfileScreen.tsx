@@ -488,8 +488,13 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
 
         {tab === 'grid' ? (
           <View style={styles.grid}>
-            {raster.map((eintrag) => (
-              <Druck key={eintrag.id} style={[styles.gridItem, { height: kachelHoehe }]} onPress={() => onOpenKachel?.(eintrag)}>
+            {raster.map((eintrag, i) => (
+              <Druck
+                key={eintrag.id}
+                style={[styles.gridItem, { height: kachelHoehe }]}
+                onPress={() => onOpenKachel?.(eintrag)}
+                accessibilityLabel={`Beitrag ${i + 1} öffnen`}
+              >
                 {/*
                   * Bei einem Video steht in mediaUri seit Schema 8 eine .mp4;
                   * ins Raster gehoert das Standbild dazu. Motiv nimmt, was da
