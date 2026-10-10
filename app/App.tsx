@@ -59,7 +59,7 @@ import { ExplorerScreen, ExplorerZiel } from './screens/videos/ExplorerScreen';
 import { LivestreamScreen } from './screens/videos/LivestreamScreen';
 import { ProfilTab, VideoProfileScreen } from './screens/videos/VideoProfileScreen';
 import * as Rueckkehr from './lib/rueckkehr';
-import { ProfilbildKopf, ProfilbildSheet } from './components/ProfilbildWahl';
+import { ProfilbildKopf, ProfilbildSheet, WeitereEinstellungenHinweis } from './components/ProfilbildWahl';
 import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
 import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
@@ -150,6 +150,8 @@ interface Formular {
   absenden: (werte: Record<string, string>) => string | null;
   /** Was über den Feldern steht (Profilbild in „Profil bearbeiten"). */
   kopf?: React.ReactNode;
+  /** Was unter den Feldern steht (Hinweis auf die Einstellungen, Kasten 1.3). */
+  unten?: React.ReactNode;
 }
 
 const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -1340,10 +1342,28 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Website macht es seit laengerem so (`openProfilBearbeiten`).
    */
   const profilBearbeiten = () => {
+    /*
+     * Kasten 1.3–1.5 (Feedback 28.09.2026): „Erstelle noch so ne kleine
+     * Schrift wie ‚weitere Bearbeitungen unter Einstellungen'. Wenn man da
+     * drauf drückt, kommt man in die Einstellungen … Füge diese Aktion auch
+     * unter Videos und Messenger hinzu." Das Blatt ist für alle drei Profile
+     * dasselbe, also steht der Hinweis in allen dreien. Ziel ist der
+     * vorhandene Abschnitt „Konto" (dort „Profil bearbeiten", Telefonnummer,
+     * Passwort …); der Zurück-Pfeil führt wieder ins Profil, aus dem man kam.
+     * Gleicher Text und gleiches Ziel auf der Website (openProfilBearbeiten).
+     */
+    const vonBereich = area;
+    const zuDenEinstellungen = () => {
+      setFormular(null);
+      setSettingsSprung('konto');
+      setSettingsVonBereich(vonBereich);
+      setArea('settings');
+    };
     setFormular({
       title: 'Profil bearbeiten',
       // Kasten 12.5: das Profilbild gehört mit hierher.
       kopf: <ProfilbildKopf name={profil.eigenesProfil.name} onNotice={setNotice} />,
+      unten: <WeitereEinstellungenHinweis onPress={zuDenEinstellungen} />,
       felder: [
         { key: 'name', label: 'Name', pflicht: true },
         { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
@@ -2329,6 +2349,16 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         return (
           <CommunityProfileScreen
             onSwitchArea={switchArea}
+            /*
+             * Kasten 1.1 (28.09.2026): „Profil wechseln" bleibt unter
+             * Communitys — dieselbe Lösung wie Kasten 12.4 im Video-Profil.
+             * Vorher führte die Leiste über onSwitchArea in den Messenger.
+             */
+            onSwitchAccount={() => {
+              Rueckkehr.merken(user?.id, 'communities', 'profile');
+              setSheet('konto');
+            }}
+            onProfilbild={() => setProfilbildWahl(true)}
             onOpenCommunity={openCommunity}
             onAction={profilAktion}
             onBearbeiten={profilBearbeiten}
@@ -2588,6 +2618,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           onSubmit={formular.absenden}
           onNotice={setNotice}
           kopf={formular.kopf}
+          unten={formular.unten}
         />
       )}
       <ProfilbildSheet visible={profilbildWahl} onClose={() => setProfilbildWahl(false)} onNotice={setNotice} />

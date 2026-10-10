@@ -3159,6 +3159,13 @@ function openProfilBearbeiten(fertig) {
           ).join('')}
         </div>
       </div>
+      ${/*
+          Kasten 1.3–1.5 (Feedback 28.09.2026): kleine Schrift, die in den
+          Abschnitt „Konto" der Einstellungen führt. Das Blatt ist für alle
+          drei Profile dasselbe, also steht der Hinweis in allen dreien.
+          Gleicher Text und gleiches Ziel in der App (WeitereEinstellungenHinweis).
+        */ ''}
+      <button class="bearbeiten__weiter" id="pbEinstellungen" type="button">Weitere Bearbeitungen unter Einstellungen</button>
     </div>
     <div class="sheet__footer">
       <button class="btn btn--primary" id="pbSichern">Merken</button>
@@ -3225,6 +3232,13 @@ function openProfilBearbeiten(fertig) {
       sheet.querySelector('#pbKameraDatei').addEventListener('change', dateiGewaehlt);
 
       sheet.querySelector('#pbEntfernen').addEventListener('click', () => bildSetzen(null, null));
+
+      // Zurück-Pfeil in den Einstellungen führt ins Profil, aus dem man kam
+      // (zuDenEinstellungen merkt state.area als settingsAus).
+      sheet.querySelector('#pbEinstellungen').addEventListener('click', () => {
+        close();
+        zuDenEinstellungen('konto');
+      });
 
       sheet.querySelector('#pbSichern').addEventListener('click', async () => {
         const antwort = await fetch('/api/eigene/profil', {
@@ -16981,10 +16995,16 @@ function renderCommunityProfile() {
     <div class="scroll">
       ${ownProfileTop(me.handle, 'communities')}
       <div class="oprof__top">
-        ${eigenerAvatarMitStory(me)}
+        ${/*
+            Communitys haben keine Storys — der Ring der Videos-Storys stand
+            hier trotzdem (eigenerAvatarMitStory mit Bereich 'videos'). Die
+            App zeigt im Communitys-Profil das schlichte Bild (OwnProfileHead
+            ohne storyBereich); jetzt beide gleich.
+          */ ''}
+        ${eigenerAvatar(me, 88, 'has-status')}
         <div class="prof__stats">
-          <button class="prof__stat" data-stat="created"><span>Erstellte Communitys</span><strong>${created.length}</strong></button>
-          <button class="prof__stat" data-stat="joined"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></button>
+          <button class="prof__stat" data-stat="created" data-commview="erstellt" aria-label="Erstellte Communitys: ${created.length}"><span>Erstellte Communitys</span><strong>${created.length}</strong></button>
+          <button class="prof__stat" data-stat="joined" data-commview="beigetreten" aria-label="Beigetretene Communitys: ${joined.length}"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></button>
         </div>
       </div>
       ${/*
@@ -17025,6 +17045,13 @@ function renderCommunityProfile() {
 
   $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderCommunityProfile));
+  /*
+   * Kasten 3.4/3.5 (Feedback 28.09.2026): auch die Kacheln „Erstellte" und
+   * „Beigetretene Communitys" führen über data-commview auf die eigene Seite
+   * (renderCommunityListe) — bis zum 10.10.2026 taten sie nichts. Die Seite
+   * steht auch bei null Einträgen, dann mit Leertext. Gleich in der App
+   * (CommunityProfileScreen, onStat).
+   */
   main.querySelectorAll('[data-commview]').forEach((b) =>
     b.addEventListener('click', () => {
       state.commProfilView = b.dataset.commview;

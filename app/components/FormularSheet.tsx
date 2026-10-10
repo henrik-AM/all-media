@@ -49,13 +49,15 @@ interface Props {
    * zeigt iOS nicht zuverlaessig an.
    */
   kopf?: React.ReactNode;
+  /** Was unter den Feldern steht — beim Profil der Hinweis auf die Einstellungen (Kasten 1.3). */
+  unten?: React.ReactNode;
 }
 
 /**
  * Ein Blatt mit Eingabefeldern - fuer Highlight, Playlist, Spendenaktion,
  * neuen Kanal und die Beschreibung zu einer Aufnahme.
  */
-export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbelegung, onClose, onSubmit, kopf }: Props) => {
+export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbelegung, onClose, onSubmit, kopf, unten }: Props) => {
   const [werte, setWerte] = useState<Record<string, string>>({});
   /*
    * Fehler stehen im Blatt. Als Hinweis des Bildschirms lagen sie hinter dem
@@ -165,6 +167,7 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
               )}
             </View>
           ))}
+        {unten}
         {!!fehler && (
           <Text style={styles.fehler} accessibilityRole="alert">
             {fehler}
