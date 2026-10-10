@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { NameMitPronomen, ProfilLinks } from '../../components/ProfilAngaben';
 import { StoryAvatar } from '../../components/StoryAvatar';
 import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet';
 import { FormularSheet } from '../../components/FormularSheet';
@@ -218,6 +219,9 @@ export const ContactProfileScreen = ({
 
   const name = person.name;
   const bio = alleProfile[userId]?.bio;
+  // Kasten 1.3h: Pronomen und Links auch im Kontaktprofil.
+  const pronomen = alleProfile[userId]?.pronomen;
+  const links = alleProfile[userId]?.links ?? [];
   const geleert = !!chat && geleerteChats.includes(chat.id);
   // Der geladene Verlauf plus das, was in dieser Sitzung dazukam.
   const zusammen = [...geladen, ...nachrichten.filter((m) => !geladen.some((g) => g.id === m.id))];
@@ -273,11 +277,16 @@ export const ContactProfileScreen = ({
         <View style={styles.kopf}>
           {/* Kasten 11.1: Ring im Kontaktprofil (Messenger-Storys). */}
           <StoryAvatar id={person.id} name={name} size={112} bereich="messenger" />
-          <Text style={styles.name}>{name}</Text>
+          <NameMitPronomen name={name} pronomen={pronomen} style={styles.name} zentriert />
           {!!person.phone && <Text style={styles.nummer}>{person.phone}</Text>}
         </View>
 
         {!!bio && <Text style={styles.bio}>{bio}</Text>}
+        {links.length > 0 && (
+          <View style={styles.links}>
+            <ProfilLinks links={links} onNotice={onNotice} />
+          </View>
+        )}
 
         <View style={styles.profile}>
           <Druck style={styles.profilKnopf} onPress={() => onOpenPublicProfile?.(userId)}>
@@ -643,6 +652,7 @@ const styles = themenStyles((colors) => ({
   name: { marginTop: spacing.md, color: colors.text, ...typography.h2 },
   nummer: { marginTop: 2, color: colors.text2, ...typography.body },
   bio: { backgroundColor: colors.surface, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, color: colors.text, ...typography.message, lineHeight: 20 },
+  links: { backgroundColor: colors.surface, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
 
   profile: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.surface },
   profilKnopf: { flex: 1, paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface2, alignItems: 'center' },
