@@ -11831,7 +11831,7 @@ const ERSTELLEN_VIDEOS = [
 ];
 
 function openErstellen(bereich) {
-  const punkte = bereich === 'communities' ? [{ key: 'kanal', label: 'Neuen Kanal erstellen', icon: 'plus' }] : ERSTELLEN_VIDEOS;
+  const punkte = bereich === 'communities' ? [{ key: 'kanal', label: 'Neue Community erstellen', icon: 'plus' }] : ERSTELLEN_VIDEOS;
 
   openSheet(
     'Erstellen',
@@ -15437,12 +15437,16 @@ async function erstelle(was) {
   );
 }
 
-/** Neuen Kanal in einer Community anlegen (Prototyp "CP + erstellen"). */
+/**
+ * Neue Community anlegen (Prototyp "CP + erstellen"). Der Kommentar sagte
+ * "Kanal in einer Community", angelegt wird aber eine Community selbst
+ * (POST /api/communities) - Kasten 2.2 (28.09.2026) hat die Texte angepasst.
+ */
 function openKanalErstellen() {
   openFormular(
-    'Neuen Kanal erstellen',
+    'Neue Community erstellen',
     [
-      { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
+      { key: 'name', label: 'Name der Community', platzhalter: 'z. B. Fotografie', pflicht: true },
       { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
     ],
     async ({ name, thema }) => {

@@ -762,7 +762,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const kanalAnlegen = useCallback(
     (name: string, thema: string) => {
       if (communities.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-        return 'Diesen Kanal gibt es schon';
+        return 'Diese Community gibt es schon';
       }
       const vorlaeufig = `k${Date.now()}`;
       setCommunities((prev) => [

@@ -2955,7 +2955,7 @@ app.post('/api/communities', route(async (req) => {
     .from('communities')
     .select('*', { count: 'exact', head: true })
     .ilike('name', name);
-  if (count > 0) return { ok: false, error: 'Diesen Kanal gibt es schon' };
+  if (count > 0) return { ok: false, error: 'Diese Community gibt es schon' };
 
   const privat = req.body?.sichtbarkeit !== 'public';
   const e = await syncHandlers.handleCreateCommunity(
