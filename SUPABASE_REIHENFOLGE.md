@@ -73,7 +73,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.story_in_videos_zuruecknehmen() | SUPABASE_SCHEMA_30_story_in_videos.sql → SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.storys_aus_videos_nehmen() | SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.testbestand_profilaufrufe() | SUPABASE_SCHEMA_17_testbestand_statistik.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
-| Funktion public.zuruecksetzen() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_13_zuruecksetzen_handbuch.sql → SUPABASE_SCHEMA_14_chatstau.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_47_sammlungen_testbestand.sql | **SUPABASE_SCHEMA_47_sammlungen_testbestand.sql** (Schema 62 schreibt sie am Anker um: nur Testkonten; SUPABASE_SCHEMA_85_personen_vorschlaege.sql hängt am Anker `delete from public.follows` das Leeren von vorschlag_entfernt an; SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql hängt dahinter das Leeren von telefonbuch an) |
+| Funktion public.zuruecksetzen() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_13_zuruecksetzen_handbuch.sql → SUPABASE_SCHEMA_14_chatstau.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_47_sammlungen_testbestand.sql | **SUPABASE_SCHEMA_47_sammlungen_testbestand.sql** (Schema 62 schreibt sie am Anker um: nur Testkonten; SUPABASE_SCHEMA_85_personen_vorschlaege.sql hängt am Anker `delete from public.follows` das Leeren von vorschlag_entfernt an; SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql hängt dahinter das Leeren von telefonbuch an; SUPABASE_SCHEMA_88_profilseite.sql — **Entwurf, noch nicht eingespielt (Supabase-Sperre)** — hängt am Anker `geburtsdatum = null` das Zurücksetzen von pronomen und links an) |
 | Funktion public.zuruecksetzen_einstellungen() | SUPABASE_SCHEMA_16_einstellungen.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_83_bildschirmzeit.sql | **SUPABASE_SCHEMA_83_bildschirmzeit.sql** |
 | Regel "stories_im_highlight" auf public.stories | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql | **SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql** |
 | Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** (Ziel entscheidet: Videos für alle Sichtbaren, Messenger nur Kontakte, Markierte) |
@@ -216,3 +216,15 @@ Reihenfolge: nach Schema 54 (Spalten der Sounds).
   `sammlung_inhalt_pruefen()` (**Gewinner 80**, ersetzt 46): in eine Sammlung
   kommt nur, was dem Besitzer gehört. `starter_sammlungen()` legt nur Eigenes
   ab und bleibt davon unberührt.
+
+## Nachtrag 10.10.2026: Schema 88 (Kasten 1.3, Seite „Profil bearbeiten“)
+
+- `SUPABASE_SCHEMA_88_profilseite.sql` — **Entwurf, noch nicht eingespielt (Supabase-Sperre).**
+  Neu `profiles.pronomen` (≤ 30 Zeichen, eine Zeile) und `profiles.links` (jsonb, ≤ 5 Einträge
+  `{url, titel}`, url nur http/https), `profil_links_gueltig()` (Check), Trigger
+  `profil_links_abgleichen` (hält `link` = erster Link; alte Schreiber von `link` ersetzen nur
+  den ersten Eintrag), Spaltenrechte `select/update (pronomen, links)` an `authenticated`.
+  `zuruecksetzen()` am Anker umgeschrieben (Testkonto: Pronomen und Links leer). Keine Funktion
+  als Ganzes ersetzt. **Schema 23_audit erneut einspielen nimmt die Leserechte wieder weg —
+  danach 88 nachziehen** (wie 30 und 69). App und Website laden die beiden Spalten getrennt und
+  nachsichtig; ohne Schema 88 fehlen nur Pronomen und Zusatzlinks.
