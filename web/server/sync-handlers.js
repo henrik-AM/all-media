@@ -16,6 +16,7 @@
  */
 
 const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
+const Profilfelder = require('../../gemeinsam/profilfelder');
 const Telefon = require('../../gemeinsam/telefon');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
@@ -69,7 +70,8 @@ function handler(name, fn) {
 // ---------------------------------------------------------------- Profil --
 
 const handleUpdateProfile = handler('Profil ändern', async (client, nutzerId, aenderungen) => {
-  const erlaubt = ['name', 'handle', 'bio', 'link', 'status', 'initials', 'color', 'phone', 'privat'];
+  // Kasten 1.3 (Schema 88): pronomen und links dazu.
+  const erlaubt = ['name', 'handle', 'bio', 'link', 'status', 'initials', 'color', 'phone', 'privat', 'pronomen', 'links'];
   const daten = {};
   for (const feld of erlaubt) {
     if (aenderungen[feld] !== undefined) daten[feld] = aenderungen[feld];
@@ -85,7 +87,13 @@ const handleUpdateProfile = handler('Profil ändern', async (client, nutzerId, a
     .eq('id', nutzerId)
     .select(PROFIL_RUECKGABE_SPALTEN)
     .single();
-  if (error) throw error;
+  if (error) {
+    // Spalte fehlt bzw. ist nicht freigegeben: Schema 88 noch nicht eingespielt.
+    if (('pronomen' in daten || 'links' in daten) && ['42703', 'PGRST204', '42501'].includes(error.code)) {
+      return { ok: false, fehler: Profilfelder.TEXTE.nochNichtDa };
+    }
+    throw error;
+  }
   return { ok: true, profil: data };
 });
 

@@ -63,6 +63,7 @@ import { ProfilbildKopf, ProfilbildSheet, WeitereEinstellungenHinweis } from './
 import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
 import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
+import { ProfilBearbeitenScreen } from './screens/profile/ProfilBearbeitenScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { FollowersScreen } from './screens/profile/FollowersScreen';
 import { FollowingScreen } from './screens/profile/FollowingScreen';
@@ -136,6 +137,8 @@ type Overlay =
   | { kind: 'avatarViewer'; userId: string; name: string }
   | { kind: 'followers'; userId: string }
   | { kind: 'following'; userId: string }
+  /** Kasten 1.3 (Nachtrag 10.10.2026): die Seite „Profil bearbeiten“. */
+  | { kind: 'profilBearbeiten' }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -1352,12 +1355,15 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
      * Passwort …); der Zurück-Pfeil führt wieder ins Profil, aus dem man kam.
      * Gleicher Text und gleiches Ziel auf der Website (openProfilBearbeiten).
      */
-    const vonBereich = area;
+    /*
+     * Nachtrag 10.10.2026: der Hinweis führt nicht mehr in den Abschnitt
+     * Konto, sondern direkt auf die große Seite „Profil bearbeiten“ (dort
+     * führt auch Einstellungen → Konto → „Profil bearbeiten“ hin). Der
+     * Zurück-Pfeil der Seite führt wieder ins Profil, aus dem man kam.
+     */
     const zuDenEinstellungen = () => {
       setFormular(null);
-      setSettingsSprung('konto');
-      setSettingsVonBereich(vonBereich);
-      setArea('settings');
+      setOverlay({ kind: 'profilBearbeiten' });
     };
     setFormular({
       title: 'Profil bearbeiten',
@@ -2172,6 +2178,10 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     );
   }
 
+  if (overlay?.kind === 'profilBearbeiten') {
+    return <ProfilBearbeitenScreen onBack={() => setOverlay(null)} onNotice={setNotice} />;
+  }
+
   if (overlay?.kind === 'avatarViewer') {
     return (
       <AvatarViewerScreen
@@ -2380,6 +2390,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             }}
         sprung={settingsSprung}
         onSprungFertig={() => setSettingsSprung(null)}
+        // Kasten 1.3 (Nachtrag): Konto → „Profil bearbeiten“ ist die große Seite.
+        onProfilBearbeiten={() => setOverlay({ kind: 'profilBearbeiten' })}
         pruefSicht={pruefSicht}
         pruefListe={pruefListe}
         // „Mein Verlauf" (Kasten 10.1): Antippen fuehrt zum Beitrag, wie

@@ -412,6 +412,10 @@
         case 'contacts':
         case 'editSelectedContacts':
           return 'chats';
+        // Kasten 1.3: die Seite „Profil bearbeiten“ gehört wie die
+        // Einstellungen zu keinem Bereich und bleibt immer erreichbar.
+        case 'profilBearbeiten':
+          return null;
         case 'profile':
         case 'followers':
         case 'following':

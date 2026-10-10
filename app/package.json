@@ -121,7 +121,8 @@
     "test:bildschirmzeit": "node test/_bildschirmzeit.js",
     "test:bildschirmzeit-einheit": "node test/_bildschirmzeit_einheit.js",
     "test:vorschlaege": "node test/_vorschlaege.js",
-    "test:k28-profil": "node test/k28-profil.js"
+    "test:k28-profil": "node test/k28-profil.js",
+    "test:k28-profilseite": "node test/k28-profilseite.js"
   },
   "private": true
 }

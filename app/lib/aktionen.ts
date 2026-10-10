@@ -26,6 +26,8 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien } from './medien';
+// Kasten 1.3 (Nachtrag 10.10.2026): Texte der Seite „Profil bearbeiten“.
+const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('../../gemeinsam/profilfelder');
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -445,7 +447,8 @@ export async function profilAendern(
   ichId: string,
   aenderungen: Record<string, unknown>
 ) {
-  const erlaubt = ['name', 'handle', 'bio', 'link', 'status', 'initials', 'color', 'phone', 'privat'];
+  // Kasten 1.3 (Schema 88): pronomen und links dazu.
+  const erlaubt = ['name', 'handle', 'bio', 'link', 'status', 'initials', 'color', 'phone', 'privat', 'pronomen', 'links'];
   const felder: Record<string, unknown> = {};
   for (const feld of erlaubt) {
     if (aenderungen[feld] !== undefined) felder[feld] = aenderungen[feld];
@@ -454,9 +457,35 @@ export async function profilAendern(
 
   felder.updated_at = new Date().toISOString();
 
-  const { error } = await client.from('profiles').update(felder).eq('id', ichId);
-  if (error) throw error;
+  // `.select('id')`: ein von RLS abgelehntes UPDATE meldet keinen Fehler,
+  // sondern null Zeilen — ohne Rückgabe hiesse das „gespeichert“.
+  const { data, error } = await client.from('profiles').update(felder).eq('id', ichId).select('id');
+  if (error) {
+    // Spalte fehlt bzw. ist nicht freigegeben: Schema 88 noch nicht eingespielt.
+    if (('pronomen' in felder || 'links' in felder) && ['42703', 'PGRST204', '42501'].includes(error.code)) {
+      throw new Error(Profilfelder.TEXTE.nochNichtDa);
+    }
+    throw error;
+  }
+  if (!data?.length) throw new Error('Das Profil ließ sich nicht speichern');
   return true;
+}
+
+/**
+ * Den eigenen Benutzernamen ändern (Kasten 1.3, Seite „Profil bearbeiten“).
+ *
+ * Über `handle_aendern` (Schema 4) — dieselbe Prüfung wie bei der
+ * Registrierung (Form, frei). Gibt den neuen @-Namen oder den Grund zurück.
+ * Gegenstück: Anmeldung.benutzernameAendern in web/public/anmeldung.js.
+ */
+export async function benutzernameAendern(
+  client: SupabaseClient,
+  eingabe: string
+): Promise<{ ok: true; handle: string } | { ok: false; meldung: string }> {
+  const { data, error } = await client.rpc('handle_aendern', { eingabe });
+  if (error) return { ok: false, meldung: 'Die Änderung ist gerade nicht möglich.' };
+  if (!data?.ok) return { ok: false, meldung: data?.meldung || 'Dieser Benutzername ist schon vergeben.' };
+  return { ok: true, handle: data.handle };
 }
 
 /**

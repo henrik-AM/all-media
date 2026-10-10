@@ -235,12 +235,22 @@ interface ProfilWert {
    */
   eigenesProfil: EigenesProfil;
   profilSpeichern: (werte: Partial<EigenesProfil>) => void;
+  /**
+   * Wie profilSpeichern, aber mit Ergebnis: null bei Erfolg, sonst der Grund.
+   * Für die Seite „Profil bearbeiten“ (Kasten 1.3) — dort steht ein Fehler
+   * auf der Seite, nicht in einer Meldung hinter ihr.
+   */
+  profilSpeichernWarten: (werte: Partial<EigenesProfil>) => Promise<string | null>;
 }
 
 export interface EigenesProfil {
   name: string;
   bio: string;
   link: string;
+  /** Kasten 1.3 (Schema 88). */
+  pronomen: string;
+  /** Kasten 1.3 (Schema 88): bis zu fünf; `link` ist immer der erste. */
+  links: { url: string; titel: string }[];
   /** Selbst gewaehltes Bild. Liegt nur auf diesem Geraet. */
   bildUri?: string;
 }
@@ -345,6 +355,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     name: '',
     bio: '',
     link: '',
+    pronomen: '',
+    links: [],
   });
 
   /*
@@ -388,7 +400,17 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const profilSpeichern = useCallback(
     (werte: Partial<EigenesProfil>) => {
       const vorherStand = eigenesProfil;
-      setEigenesProfil((vorher) => ({ ...vorher, ...werte }));
+      setEigenesProfil((vorher) => {
+        const neu = { ...vorher, ...werte };
+        // Das kleine Blatt kennt nur `link`: es ersetzt den ersten der Links
+        // (dieselbe Regel wie der Trigger in Schema 88), die übrigen bleiben.
+        if (werte.link !== undefined && werte.links === undefined) {
+          const einzel = werte.link.trim();
+          const rest = (vorher.links ?? []).slice(1);
+          neu.links = einzel ? [{ url: einzel, titel: '' }, ...rest] : [];
+        }
+        return neu;
+      });
 
       /*
        * Und in die Datenbank. Henrik wollte ausdruecklich „Name, Info/Bio,
@@ -407,6 +429,25 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       );
     },
     [eigenesProfil, schreiben]
+  );
+
+  const profilSpeichernWarten = useCallback(
+    async (werte: Partial<EigenesProfil>): Promise<string | null> => {
+      const { bildUri, ...felder } = werte;
+      if (Object.keys(felder).length === 0) return null;
+      if (!supabase || !daten.ichId) return 'Dafür musst du angemeldet sein';
+      // `link` wandert mit den Links: alte Leser sehen den ersten (Schema 88
+      // hält es in der Datenbank ohnehin gleich).
+      if (felder.links) felder.link = felder.links[0]?.url ?? '';
+      try {
+        await Aktion.profilAendern(supabase, daten.ichId, felder);
+      } catch (e: any) {
+        return e?.message ?? 'Das Profil ließ sich nicht speichern';
+      }
+      setEigenesProfil((vorher) => ({ ...vorher, ...felder }));
+      return null;
+    },
+    [supabase, daten.ichId]
   );
 
   const folgenUmschalten = useCallback(
@@ -1094,6 +1135,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       folgenUmschalten,
       eigenesProfil,
       profilSpeichern,
+      profilSpeichernWarten,
     }),
     [
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
@@ -1102,7 +1144,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
       chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
-      gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
+      gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern, profilSpeichernWarten,
     ]
   );
 

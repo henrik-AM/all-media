@@ -11,7 +11,6 @@ import { AreaKey } from '../../constants/navigation';
 import { useDaten } from '../../contexts/DatenContext';
 import { useReposts } from '../../contexts/RepostContext';
 import { useProfil } from '../../contexts/ProfilContext';
-import { oeffneLink } from '../../lib/links';
 import { useKachelHoehe } from '../../lib/raster';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -413,11 +412,12 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
           ]}
           name={eigenesProfil.name}
           bio={eigenesProfil.bio}
-          link={eigenesProfil.link}
+          pronomen={eigenesProfil.pronomen}
+          links={eigenesProfil.links}
+          onNotice={onNotice}
           ungelesen={ungelesen('videos')}
           onAction={onAction}
           onBearbeiten={onBearbeiten}
-          onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
           onStat={(label) => {
             if (label === 'Follower') return onOpenFollowers?.();
             if (label === 'Gefolgt') return onOpenFollowing?.();

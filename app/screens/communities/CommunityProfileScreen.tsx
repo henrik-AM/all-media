@@ -10,7 +10,6 @@ import { colors, radius, spacing, themenStyles, typography } from '../../constan
 import { AreaKey } from '../../constants/navigation';
 import { useDaten } from '../../contexts/DatenContext';
 import { useProfil } from '../../contexts/ProfilContext';
-import { oeffneLink } from '../../lib/links';
 import { Community } from '../../types';
 
 interface Props {
@@ -133,11 +132,12 @@ export const CommunityProfileScreen = ({ onSwitchArea, onSwitchAccount, onProfil
           ]}
           name={eigenesProfil.name}
           bio={eigenesProfil.bio}
-          link={eigenesProfil.link}
+          pronomen={eigenesProfil.pronomen}
+          links={eigenesProfil.links}
+          onNotice={onNotice}
           ungelesen={ungelesen('communities')}
           onAction={onAction}
           onBearbeiten={onBearbeiten}
-          onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
           /*
            * Kasten 3.4/3.5: die Kacheln „Erstellte/Beigetretene Communitys"
            * öffnen dieselbe eigene Seite wie die Überschrift mit Pfeil. Bis zum

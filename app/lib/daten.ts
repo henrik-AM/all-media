@@ -70,6 +70,8 @@ import { neulingsliste, ordnenJeArt, punktekarte } from '../../gemeinsam/rang';
 // nicht. Und kein Import aus './lenkung' — das Zusammenlegen dort kennt nur
 // './medien' und './krypto'; deshalb steht ladeLenkung hier in der Datei.
 const Lenkung = require('../../gemeinsam/lenkung') as typeof import('../../gemeinsam/lenkung');
+// Kasten 1.3 (Nachtrag 10.10.2026): Pronomen und Links — gemeinsam mit der Website.
+const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('../../gemeinsam/profilfelder');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -156,6 +158,7 @@ export async function ladeNutzer(
     ladeProfilbilder(client),
   ]);
   if (error) throw error;
+  const zusatz = await ladeProfilZusatz(client);
 
   const nummerVon = (id: string): string | undefined =>
     (id === ichId ? (ich as any)?.phone : (nummern as any)?.[id]) || undefined;
@@ -185,6 +188,9 @@ export async function ladeNutzer(
       userId: schluessel,
       bio: zeile.bio ?? '',
       link: zeile.link ?? '',
+      // Kasten 1.3: ohne Schema 88 leer bzw. nur der alte Einzellink.
+      pronomen: zusatz.get(zeile.id)?.pronomen ?? '',
+      links: Profilfelder.linksAus({ links: zusatz.get(zeile.id)?.links, link: zeile.link }),
       spende: jsonOderNull(zeile.spende),
       posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
       followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
@@ -212,6 +218,29 @@ export async function ladeProfilbilder(client: SupabaseClient): Promise<Map<stri
   const { data, error } = await client.from('profiles').select('id, avatar_url').not('avatar_url', 'is', null).limit(500);
   if (error) return karte;
   for (const z of (data ?? []) as any[]) if (z.avatar_url) karte.set(z.id, z.avatar_url);
+  return karte;
+}
+
+/*
+ * Pronomen und Links (Kasten 1.3, Nachtrag 10.10.2026) — getrennt und
+ * nachsichtig geladen, aus demselben Grund wie die Profilbilder darüber:
+ * beide Spalten kommen erst mit SUPABASE_SCHEMA_88_profilseite.sql. Stuenden
+ * sie in PROFIL_SPALTEN, fiele bis zum Einspielen das ganze Laden des Profils
+ * um (Schema 23_audit: eine ungewaehrte Spalte laesst das select scheitern).
+ * So fehlen hoechstens Pronomen und Zusatzlinks. Gegenstueck:
+ * profilZusatz() in web/server/supabase-api.js.
+ */
+export async function ladeProfilZusatz(
+  client: SupabaseClient
+): Promise<Map<string, { pronomen: string; links: unknown }>> {
+  const karte = new Map<string, { pronomen: string; links: unknown }>();
+  try {
+    const { data, error } = await client.from('profiles').select('id, pronomen, links').limit(500);
+    if (error) return karte;
+    for (const z of (data ?? []) as any[]) karte.set(z.id, { pronomen: z.pronomen ?? '', links: z.links });
+  } catch {
+    /* Netz weg — dann eben ohne */
+  }
   return karte;
 }
 
@@ -1525,7 +1554,7 @@ export interface AlleDaten {
   markierte: string[];
   favoriten: string[];
   /** Eigenes Profil, fertig für die Bearbeitungsmaske. */
-  eigenesProfil: { name: string; bio: string; link: string };
+  eigenesProfil: { name: string; bio: string; link: string; pronomen: string; links: { url: string; titel: string }[] };
   highlights: string[];
   playlists: string[];
   /** Die eigene Spendenaktion — null, solange keine läuft. */
@@ -1707,6 +1736,8 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
       name: users[ICH]?.name ?? '',
       bio: profile[ICH]?.bio ?? '',
       link: profile[ICH]?.link ?? '',
+      pronomen: profile[ICH]?.pronomen ?? '',
+      links: profile[ICH]?.links ?? [],
     },
     highlights: profile[ICH]?.highlights ?? [],
     playlists: profile[ICH]?.playlists ?? [],

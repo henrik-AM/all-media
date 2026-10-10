@@ -33,6 +33,8 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
+// Kasten 1.3: Grenzen und Link-Regel der Seite „Profil bearbeiten“ — gemeinsam mit der App.
+const Profilfelder = require('../../gemeinsam/profilfelder');
 const syncHandlers = require('./sync-handlers');
 const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
@@ -1705,13 +1707,14 @@ app.post('/api/eigene/profilbild', route(async (req) => {
 }));
 
 app.post('/api/eigene/profil', route(async (req) => {
-  const { name, bio, link, color } = req.body || {};
+  const { name, bio, link, color, pronomen, links } = req.body || {};
   const aenderungen = {};
 
   if (name !== undefined) {
     const sauber = String(name).trim();
-    if (!sauber) return { ok: false, error: 'Der Name darf nicht leer sein' };
-    if (sauber.length > 40) return { ok: false, error: 'Der Name ist zu lang (höchstens 40 Zeichen)' };
+    // Kasten 1.3: Grenzen aus gemeinsam/profilfelder.js, wie in der App.
+    const grund = Profilfelder.namePruefen(sauber);
+    if (grund) return { ok: false, error: grund };
     aenderungen.name = sauber;
     // Kürzel aus den Anfangsbuchstaben, höchstens zwei.
     aenderungen.initials = sauber.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -1719,11 +1722,31 @@ app.post('/api/eigene/profil', route(async (req) => {
 
   if (bio !== undefined) {
     const sauber = String(bio).trim();
-    if (sauber.length > 150) return { ok: false, error: 'Die Info ist zu lang (höchstens 150 Zeichen)' };
+    const grund = Profilfelder.bioPruefen(sauber);
+    if (grund) return { ok: false, error: grund };
     aenderungen.bio = sauber;
   }
 
   if (link !== undefined) aenderungen.link = String(link).trim();
+
+  /*
+   * Kasten 1.3 (Nachtrag 10.10.2026, Schema 88): Pronomen und bis zu fünf
+   * Links. Dieselbe Prüfung wie in der App (gemeinsam/profilfelder.js); die
+   * Datenbank prüft sie mit profil_links_gueltig() ein drittes Mal. `link`
+   * wandert als erster Link mit — alte Leser sehen ihn weiter.
+   */
+  if (pronomen !== undefined) {
+    const sauber = String(pronomen ?? '').trim();
+    const grund = Profilfelder.pronomenPruefen(sauber);
+    if (grund) return { ok: false, error: grund };
+    aenderungen.pronomen = sauber;
+  }
+  if (links !== undefined) {
+    const geprueft = Profilfelder.linksPruefen(Array.isArray(links) ? links : []);
+    if (geprueft.fehler) return { ok: false, error: geprueft.fehler };
+    aenderungen.links = geprueft.links;
+    aenderungen.link = geprueft.links[0]?.url || '';
+  }
 
   /*
    * Erlaubt ist eine einzelne Farbe oder ein Zwei-Ton-Verlauf. Der Wert landet

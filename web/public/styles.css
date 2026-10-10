@@ -4897,3 +4897,67 @@ body.ist-abgemeldet .ptr-indicator {
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
   background: var(--brand); color: #fff; font-size: 11.5px; font-weight: 700;
 }
+
+/* ---------------------------------------------------------------------------
+   Kasten 1.3 (Nachtrag 10.10.2026): Seite „Profil bearbeiten“, Pronomen und
+   Links im Profilkopf. Gegenstück: ProfilBearbeitenScreen.tsx, ProfilAngaben.tsx.
+   --------------------------------------------------------------------------- */
+.prof__pronomen { margin-left: 8px; font-size: 12.5px; font-weight: 400; color: var(--text-2); }
+.prof__links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 4px; }
+.prof__links .prof__link { margin-top: 0; font-weight: 600; }
+.prof__weitere { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; color: var(--text-2); cursor: pointer; }
+.prof__weitere:hover { text-decoration: underline; }
+.mprof__profillinks { padding: 0 16px 12px; }
+
+.avatar--96 { width: 96px; height: 96px; font-size: 32px; }
+.profilseite { background: var(--surface); }
+.profilseite__kopf {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr minmax(80px, auto);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.profilseite__kopf > :last-child { justify-self: end; }
+.profilseite__titel { margin: 0; text-align: center; font-size: 16px; font-weight: 600; }
+.profilseite__textknopf { background: none; border: 0; padding: 6px 4px; font: inherit; font-size: 15px; color: var(--text); cursor: pointer; }
+.profilseite__textknopf.is-fertig { color: var(--brand); font-weight: 700; }
+.profilseite__textknopf:disabled { opacity: .5; cursor: default; }
+.profilseite__bild { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 16px; }
+.profilseite__bildknopf { background: none; border: 0; padding: 4px 8px; font: inherit; font-size: 15px; font-weight: 600; color: var(--brand); cursor: pointer; }
+.profilseite__meldung { font-size: 12.5px; color: var(--text-2); text-align: center; }
+.profilseite__liste { border-top: 1px solid var(--border); }
+.profilseite__zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.profilseite__label { flex: 0 0 120px; font-size: 15px; }
+.profilseite__wert { flex: 1; min-width: 0; text-align: right; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profilseite__wert.is-leer { color: var(--text-3); }
+.profilseite__feld { display: flex; flex-direction: column; gap: 8px; padding: 16px; max-width: 640px; }
+.profilseite__eingabezeile { display: flex; align-items: center; gap: 4px; }
+.profilseite__at { font-size: 18px; color: var(--text-2); }
+.profilseite__gross { font-size: 18px; padding: 12px 14px; }
+textarea.profilseite__gross { min-height: 160px; }
+.profilseite__namensstand { font-size: 12.5px; color: var(--text-2); }
+.profilseite__namensstand.is-gut { color: var(--success); }
+.profilseite__namensstand.is-fehler { color: var(--danger); }
+.profilseite__fehler { font-size: 13px; font-weight: 600; color: var(--danger); }
+.profilseite__erklaerung { font-size: 12.5px; color: var(--text-2); }
+.profilseite__linkkarte { display: flex; flex-direction: column; gap: 6px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 12px; }
+.profilseite__linkkopf { display: flex; align-items: center; justify-content: space-between; }
+.profilseite__linkkopf .feld__label { margin: 0; }
+.profilseite__linkkopf .iconbtn { color: var(--danger); }
+.profilseite__linkneu { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: none; border: 0; padding: 8px 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--brand); cursor: pointer; }
+.profilseite__linkneu svg { width: 20px; height: 20px; }

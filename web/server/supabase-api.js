@@ -31,6 +31,8 @@ const {
   CHATMITGLIED_SPALTEN,
   NACHRICHT_SPALTEN,
 } = require('../../gemeinsam/spalten');
+// Kasten 1.3 (Nachtrag 10.10.2026): Pronomen und Links — gemeinsam mit der App.
+const Profilfelder = require('../../gemeinsam/profilfelder');
 
 /*
  * Die Reihenfolge des Feeds — ebenfalls einmal fuer Website und App. Die
@@ -77,6 +79,10 @@ function profilZuNutzer(zeile) {
     about: zeile.about || '',
     bio: zeile.bio || '',
     link: zeile.link || '',
+    // Kasten 1.3: kommen getrennt über profilZusatz() (Schema 88); bis dahin
+    // nur der alte Einzellink als Liste.
+    pronomen: zeile.pronomen || '',
+    links: Profilfelder.linksAus(zeile),
     status: zeile.status || 'offline',
     highlights: zeile.highlights || [],
     playlists: zeile.playlists || [],
@@ -106,6 +112,36 @@ async function profilbilder(client, ids) {
   if (error) return karte;
   for (const z of data || []) if (z.avatar_url) karte.set(z.id, z.avatar_url);
   return karte;
+}
+
+/*
+ * Pronomen und Links (Kasten 1.3, Nachtrag 10.10.2026) — getrennt und
+ * nachsichtig wie die Profilbilder: beide Spalten kommen erst mit
+ * SUPABASE_SCHEMA_88_profilseite.sql, und eine ungewaehrte Spalte liesse das
+ * ganze select auf `profiles` scheitern (Schema 23_audit). Gegenstueck:
+ * ladeProfilZusatz() in app/lib/daten.ts.
+ */
+async function profilZusatz(client, ids) {
+  const karte = new Map();
+  if (!client) return karte;
+  try {
+    let abfrage = client.from('profiles').select('id, pronomen, links');
+    abfrage = ids ? abfrage.in('id', ids) : abfrage.limit(500);
+    const { data, error } = await abfrage;
+    if (error) return karte;
+    for (const z of data || []) karte.set(z.id, { pronomen: z.pronomen || '', links: z.links });
+  } catch {
+    /* Netz weg — dann eben ohne */
+  }
+  return karte;
+}
+
+/** Pronomen und Links an einen Nutzer haengen; ohne Schema 88 bleibt der Einzellink. */
+function zusatzAnhaengen(u, zeile, zusatz) {
+  const z = zusatz.get(zeile.id);
+  if (!z) return;
+  u.pronomen = z.pronomen || '';
+  u.links = Profilfelder.linksAus({ links: z.links, link: zeile.link });
 }
 
 /**
@@ -162,6 +198,7 @@ async function ladeNutzer(client, nutzerId) {
     profilbilder(client),
   ]);
   if (error) throw error;
+  const zusatz = await profilZusatz(client);
 
   const nummerVon = (id) =>
     (id === nutzerId ? ich?.phone : (nummern || {})[id]) || '';
@@ -172,6 +209,7 @@ async function ladeNutzer(client, nutzerId) {
     const u = profilZuNutzer(zeile);
     u.phone = nummerVon(zeile.id);
     u.avatar = bilder.get(zeile.id) || null;
+    zusatzAnhaengen(u, zeile, zusatz);
     const z = zahlenNach.get(zeile.id);
     u.followers = Number(z?.followers ?? zeile.followers_basis ?? 0);
     u.following = Number(z?.following ?? zeile.following_basis ?? 0);
@@ -191,7 +229,11 @@ async function ladeProfil(client, profilId) {
     .maybeSingle();
   if (error) throw error;
   const u = profilZuNutzer(data);
-  if (u) u.avatar = (await profilbilder(client, [profilId])).get(profilId) || null;
+  if (u) {
+    const [bilder, zusatz] = await Promise.all([profilbilder(client, [profilId]), profilZusatz(client, [profilId])]);
+    u.avatar = bilder.get(profilId) || null;
+    zusatzAnhaengen(u, data, zusatz);
+  }
   return u;
 }
 
@@ -1529,6 +1571,9 @@ async function bootstrapData(client, nutzerId, schluesselId = null) {
     eigenesProfil: {
       bio: eigenes.bio || '',
       link: eigenes.link || '',
+      // Kasten 1.3 (Schema 88).
+      pronomen: eigenes.pronomen || '',
+      links: eigenes.links || [],
       highlights: eigenes.highlights || [],
       playlists: eigenes.playlists || [],
       // Spendenaktion und laufender Livestream gehoeren dazu — ohne sie
