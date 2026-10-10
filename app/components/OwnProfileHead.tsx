@@ -115,6 +115,8 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
             key={stat.label}
             style={styles.stat}
             onPress={() => onStat?.(stat.label)}
+            accessibilityRole="button"
+            accessibilityLabel={`${stat.label}: ${stat.value}`}
           >
             <Text style={styles.statLabel}>{stat.label}</Text>
             <Text style={styles.statValue}>{stat.value}</Text>

@@ -15,6 +15,15 @@ import { Community } from '../../types';
 
 interface Props {
   onSwitchArea: (area: AreaKey) => void;
+  /**
+   * Kasten 1.1 (Feedback 28.09.2026): „Profil wechseln" oeffnet die
+   * Kontoliste und man landet danach wieder im Communitys-Profil — wie
+   * Kasten 12.4 im Video-Profil. Bis zum 10.10.2026 fuehrte die Leiste hier
+   * ueber onSwitchArea('messenger') ins Messenger-Profil.
+   */
+  onSwitchAccount?: () => void;
+  /** Kasten 1.2: Antippen des eigenen Bilds aendert es (wie Kasten 12.5 in Videos). */
+  onProfilbild?: () => void;
   onOpenCommunity: (community: Community) => void;
   /** Glocke, Plus und Menü oben rechts. */
   onAction: (key: string) => void;
@@ -25,7 +34,9 @@ interface Props {
 }
 
 /** Prototyp-Frame "Community - Profil": Erstellt und Beigetreten. */
-export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction, onBearbeiten, onAvatarPress, onNotice }: Props) => {
+export const CommunityProfileScreen = ({ onSwitchArea, onSwitchAccount, onProfilbild, onOpenCommunity, onAction, onBearbeiten, onAvatarPress, onNotice }: Props) => {
+  // Nie mehr in den Messenger: ohne Kontoliste bleibt man hier stehen.
+  const wechseln = () => (onSwitchAccount ? onSwitchAccount() : onNotice('Die Kontoliste ist gerade nicht erreichbar'));
   const { users: alleNutzer } = useDaten();
   // Die Liste kommt aus dem gemeinsamen Zustand, nicht mehr direkt aus den
   // Mock-Daten - sonst taucht ein neu erstellter Kanal hier nicht auf.
@@ -69,15 +80,21 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
   // Gleicher Fall wie in VideoProfileScreen.
   const ich = alleNutzer.me;
   if (!ich) {
-    return <View style={styles.screen}><SwitchBar onPress={() => onSwitchArea('messenger')} /></View>;
+    return <View style={styles.screen}><SwitchBar onPress={wechseln} /></View>;
   }
 
   if (ansicht) {
     const erstellt = ansicht === 'erstellt';
     const liste = erstellt ? created : joined;
+    /*
+     * Kasten 3.3 (Feedback 28.09.2026): „Wenn ich auf die dicke schwarze
+     * Schrift mit dem Pfeil drücke … ist immer noch der Button Profil
+     * wechseln." Die Leiste gehört nur aufs Profil selbst; diese Seite ist
+     * eine eigene Seite mit Zurück-Pfeil — wie renderCommunityListe auf der
+     * Website, die nie eine Leiste hatte.
+     */
     return (
-      <View style={styles.screen}>
-        <SwitchBar onPress={() => onSwitchArea('messenger')} />
+      <View style={styles.screen} testID="community-liste">
         <View style={styles.bar}>
           <Druck onPress={() => setAnsicht(null)} hitSlop={10} accessibilityLabel="Zurück zum Profil">
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -105,7 +122,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
 
   return (
     <View style={styles.screen}>
-      <SwitchBar onPress={() => onSwitchArea('messenger')} />
+      <SwitchBar onPress={wechseln} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <OwnProfileHead
@@ -121,8 +138,15 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
           onAction={onAction}
           onBearbeiten={onBearbeiten}
           onLink={() => oeffneLink(eigenesProfil.link, onNotice)}
-          onStat={(label) => onNotice(label)}
-          onAvatarPress={() => onNotice('Dein Profilbild')}
+          /*
+           * Kasten 3.4/3.5: die Kacheln „Erstellte/Beigetretene Communitys"
+           * öffnen dieselbe eigene Seite wie die Überschrift mit Pfeil. Bis zum
+           * 10.10.2026 gaben sie nur ihre eigene Beschriftung als Hinweis aus.
+           * Die Seite steht auch bei null Einträgen (dann mit Leertext) — die
+           * Überschriften darunter gibt es dann gar nicht.
+           */
+          onStat={(label) => setAnsicht(label.startsWith('Erstellte') ? 'erstellt' : 'beigetreten')}
+          onAvatarPress={onProfilbild ?? onAvatarPress ?? (() => onNotice('Dein Profilbild'))}
         />
 
         {created.length > 0 && (
