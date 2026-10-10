@@ -128,7 +128,9 @@
     "test:vorschlaege": "node test/_vorschlaege.js",
     "test:angriffe": "node test/_angriffe.js",
     "test:recht": "node test/_rechtstexte_einheit.js",
-    "test:k28-profil": "node test/k28-profil.js"
+    "test:k28-profil": "node test/k28-profil.js",
+    "test:k28-profil": "node test/k28-profil.js",
+    "test:k28-profilseite": "node test/k28-profilseite.js"
   },
   "private": true
 }

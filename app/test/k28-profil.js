@@ -105,14 +105,16 @@ function teilA() {
     BILD.includes(`>${HINWEIS}<`) && BILD.includes(`accessibilityLabel="${HINWEIS}"`));
   pruefe('1.3 App: FormularSheet zeichnet „unten" unter den Feldern', /\{unten\}/.test(FORM));
   const bearbeiten = APP.slice(APP.indexOf('const profilBearbeiten'), APP.indexOf('const eintragOeffnen'));
-  pruefe('1.3 App: Hinweis springt in „konto" und merkt den Bereich für den Pfeil',
-    /setSettingsSprung\('konto'\)/.test(bearbeiten) && /setSettingsVonBereich\(vonBereich\)/.test(bearbeiten) &&
+  // Nachtrag 10.10.2026: der Hinweis führt auf die Seite „Profil bearbeiten“
+  // (dorthin auch Einstellungen → Konto), nicht mehr in den Abschnitt Konto.
+  pruefe('1.3 App: Hinweis öffnet die Seite „Profil bearbeiten“',
+    /setOverlay\(\{ kind: 'profilBearbeiten' \}\)/.test(bearbeiten) &&
     /unten: <WeitereEinstellungenHinweis/.test(bearbeiten));
   pruefe('1.4/1.5 App: alle drei Profile nutzen dasselbe Blatt',
     (APP.match(/onBearbeiten=\{profilBearbeiten\}/g) || []).length === 3);
 
   pruefe('1.3 Website: Hinweis im Blatt mit demselben Text', WEB.includes(`id="pbEinstellungen" type="button">${HINWEIS}<`));
-  pruefe('1.3 Website: Hinweis springt in „konto"', /#pbEinstellungen[\s\S]{0,200}zuDenEinstellungen\('konto'\)/.test(WEB));
+  pruefe('1.3 Website: Hinweis öffnet die Seite „Profil bearbeiten“', /#pbEinstellungen[\s\S]{0,200}openProfilSeite\(\)/.test(WEB));
   pruefe('3.4/3.5 Website: Kacheln tragen data-commview',
     /data-stat="created" data-commview="erstellt"/.test(WEB) && /data-stat="joined" data-commview="beigetreten"/.test(WEB));
   const liste = WEB.slice(WEB.indexOf('function renderCommunityListe'), WEB.indexOf('bindJoinButtons(renderCommunityListe)'));
@@ -176,19 +178,17 @@ async function teilBC() {
   });
 
   for (const bereich of ['communities', 'videos', 'messenger']) {
-    await pruefeAsync(`1.3–1.5 Hinweis im Bearbeiten-Blatt (${bereich}) → Einstellungen/Konto → Pfeil zurück ins Profil`, async () => {
+    await pruefeAsync(`1.3–1.5 Hinweis im Bearbeiten-Blatt (${bereich}) → Seite „Profil bearbeiten“ → Pfeil zurück ins Profil`, async () => {
       await zumProfil(bereich);
       await page.click('#profilBearbeiten');
       await page.waitForSelector('#pbEinstellungen');
       const text = await page.$eval('#pbEinstellungen', (e) => e.textContent.trim());
       if (text !== HINWEIS) throw new Error('Text: ' + text);
       await page.click('#pbEinstellungen');
-      await page.waitForSelector('#sec-konto');
+      // Nachtrag 10.10.2026: Ziel ist die Seite „Profil bearbeiten“.
+      await page.waitForSelector('[data-testid="profilseite"]');
       if (await page.$('#pbEinstellungen')) throw new Error('Blatt blieb offen');
-      await page.waitForTimeout(300);
-      const oben = await page.$eval('#sec-konto', (e) => e.getBoundingClientRect().top);
-      if (oben > 300) throw new Error(`Abschnitt Konto steht nicht oben (top=${Math.round(oben)})`);
-      await page.click('#settingsBack');
+      await page.click('#psZurueck');
       await page.waitForSelector('#profilBearbeiten');
       const jetzt = await page.evaluate(() => document.querySelector('[data-area].is-active')?.dataset.area || null);
       if (jetzt && jetzt !== bereich) throw new Error('Zurück landet in ' + jetzt);
