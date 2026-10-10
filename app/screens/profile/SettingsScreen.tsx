@@ -101,7 +101,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode' | 'problem' | 'meinemeldungen' | 'kontostatus' | 'kontoLoeschen';
+  aktion?: 'profilseite' | 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode' | 'problem' | 'meinemeldungen' | 'kontostatus' | 'kontoLoeschen';
   /** Kasten RS 1: öffnet einen Rechtstext (gemeinsam/rechtstexte.js). */
   rechtstext?: string;
   /** Kasten 22: öffnet das Bildschirmzeit-Blatt auf dieser Unterseite. */
@@ -240,16 +240,13 @@ const SECTIONS: Section[] = [
     id: 'konto',
     title: 'Konto',
     items: [
-      {
-        label: 'Profil bearbeiten',
-        icon: 'person-circle-outline',
-        eingabe: [
-          { key: 'name', label: 'Name', pflicht: true },
-          { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
-          { key: 'link', label: 'Link' },
-        ],
-        fertig: 'Profil gespeichert',
-      },
+      /*
+       * Kasten 1.3 (Nachtrag 10.10.2026): bis hierher ein Formular mit Name,
+       * Biografie, Link — dasselbe wie das kleine Blatt. Henrik wollte
+       * „deutlich mehr Freiraum“: jetzt die eigene Seite nach Instagram-
+       * Vorbild (ProfilBearbeitenScreen). Gleicher Eintrag auf der Website.
+       */
+      { label: 'Profil bearbeiten', icon: 'person-circle-outline', aktion: 'profilseite' },
       {
         label: 'Telefonnummer ändern',
         icon: 'call-outline',
@@ -497,6 +494,8 @@ interface Props {
    */
   sprung?: string | null;
   onSprungFertig?: () => void;
+  /** Kasten 1.3: Konto → „Profil bearbeiten“ öffnet die eigene Seite. */
+  onProfilBearbeiten?: () => void;
   /*
    * Nur fuer die Pruefbilder (tools/app-bilder.js): der Bereich, dessen
    * Sichtbarkeits-Blatt beim Aufbau gleich aufgehen soll. Ein Tippen laesst
@@ -517,10 +516,10 @@ interface Props {
   onOpenKachel?: (k: { id: string; kind: string }) => void;
 }
 
-export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onBack, pruefSicht, pruefListe, onOpenKachel }: Props) => {
+export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, onSprungFertig, onProfilBearbeiten, onBack, pruefSicht, pruefListe, onOpenKachel }: Props) => {
   const { chats: alleChats, posts: alleBeitraege, users: alleNutzer } = useDaten();
   const { user, konten } = useContext(AuthContext);
-  const { communities, istBlockiert, istStumm, raster, gefolgt, eigenesProfil, profilSpeichern } =
+  const { communities, istBlockiert, istStumm, raster, gefolgt } =
     useProfil();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
@@ -731,6 +730,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
   const spendenweg = useSpendenweg();
   const oeffne = (item: Item) => {
+    if (item.aktion === 'profilseite') {
+      return onProfilBearbeiten ? onProfilBearbeiten() : onNotice('Profil bearbeiten ist hier nicht verfügbar');
+    }
     if (item.aktion === 'lenkung') return setLenkenOffen(true);
     if (item.aktion === 'problem') return setProblemOffen(true);
     if (item.aktion === 'meinemeldungen') return setKontostatus('meine');
@@ -1236,9 +1238,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           felder={offen.eingabe}
           knopf="Speichern"
           vorbelegung={
-            offen.label === 'Profil bearbeiten'
-              ? { name: eigenesProfil.name, bio: eigenesProfil.bio, link: eigenesProfil.link }
-              : offen.aktion === 'entsperrcode'
+            offen.aktion === 'entsperrcode'
               ? { art: Bildschirmzeit.TEXTE.codeArten[bz.stand?.eigene_art === 'eigen' ? 1 : 0] }
               : undefined
           }
@@ -1246,18 +1246,6 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           onSubmit={(werte) => {
             const fehler = offen.pruefen?.(werte);
             if (fehler) return fehler;
-            /*
-             * "Profil bearbeiten" hat den Namen bisher nirgends
-             * hingeschrieben - es kam nur ein Hinweis. Jetzt landet er im
-             * gemeinsamen Zustand und steht damit auch im Profil.
-             */
-            if (offen.label === 'Profil bearbeiten') {
-              profilSpeichern({
-                name: werte.name?.trim() || eigenesProfil.name,
-                bio: werte.bio ?? eigenesProfil.bio,
-                link: werte.link ?? eigenesProfil.link,
-              });
-            }
             /*
              * Die Altersangabe geht wirklich in die Datenbank. Vorher stand
              * hier ein Formular, an dem gar nichts hing: man trug einen
