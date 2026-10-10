@@ -126,7 +126,26 @@ export const ProfilbildKopf = ({ name, onNotice }: { name: string; onNotice: (te
   );
 };
 
+/**
+ * Kasten 1.3–1.5 (Feedback 28.09.2026): kleine Schrift unter den Feldern von
+ * „Profil bearbeiten", die in den Abschnitt „Konto" der Einstellungen führt.
+ * Gleicher Text auf der Website (#pbEinstellungen in openProfilBearbeiten).
+ */
+export const WeitereEinstellungenHinweis = ({ onPress }: { onPress: () => void }) => (
+  <Druck
+    style={styles.hinweis}
+    onPress={onPress}
+    accessibilityRole="link"
+    accessibilityLabel="Weitere Bearbeitungen unter Einstellungen"
+    testID="profil-weitere-einstellungen"
+  >
+    <Text style={styles.hinweisText}>Weitere Bearbeitungen unter Einstellungen</Text>
+  </Druck>
+);
+
 const styles = themenStyles((colors) => ({
+  hinweis: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xs, alignItems: 'center' },
+  hinweisText: { ...typography.small, color: colors.brand, fontWeight: '600' },
   kopf: { alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
   laedt: {
     position: 'absolute',
