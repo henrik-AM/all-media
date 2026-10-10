@@ -1855,6 +1855,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         }}
         contacts={contacts}
         onNotice={setNotice}
+        // Kasten 7.3: geteilte Karte → der Beitrag selbst.
+        onOpenBeitrag={(b) => kachelOeffnen(b)}
         onOpenStandort={(name) => {
           const platz = daten.places.find((p) => p.name === name);
           if (platz) setOverlay({ kind: 'explorer', ziel: { art: 'standort', wert: platz.id } });

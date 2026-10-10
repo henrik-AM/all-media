@@ -51,7 +51,12 @@ export interface Message {
   media?: MediaType;
   read?: boolean;
   /** Weitergeleiteter Beitrag oder weitergeleitetes Video. */
-  geteilt?: { art: 'post' | 'video'; id: string; titel: string; autor: string; bild?: string };
+  /*
+   * Ein geteilter Beitrag (Kasten 7, 28.09.): Bild, Name (`titel` =
+   * posts.title, kann leer sein), Beschreibung, Konto. `weg` heisst: die
+   * Leseregel gibt ihn nicht (mehr) heraus — die Karte sagt das.
+   */
+  geteilt?: import('../../gemeinsam/chatblase').GeteilteKarte;
   /** Anhang aus dem Plus in der Nachrichtenzeile. */
   bildUri?: string;
   /**

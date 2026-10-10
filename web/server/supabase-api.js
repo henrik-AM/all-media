@@ -46,6 +46,8 @@ const Lenkung = require('../../gemeinsam/lenkung');
 const StoryRegeln = require('../../gemeinsam/story');
 // Kasten 27: Stand und Reihenfolge offener Chats — gemeinsam mit der App.
 const ChatAbgleich = require('../../gemeinsam/chatabgleich');
+// Kasten 4/7 (28.09.): Bezug im Unterthema und die Karte geteilter Beitraege.
+const Chatblase = require('../../gemeinsam/chatblase');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -783,18 +785,9 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
      * geteilten Beitrag. Bis zum 01.09.2026 stand dort nur der Satz "Beitrag
      * geteilt": die Nachricht wusste gar nicht, was geteilt worden war.
      */
-    geteilt: n.posts
-      ? {
-          id: n.posts.id,
-          art: n.posts.kind === 'post' ? 'post' : 'video',
-          // Das Bild des Beitrags (Henrik 7.9.) — ohne das war die Karte ein
-          // graues Kaestchen und liess sich nicht oeffnen. Gleiche Regel in
-          // app/lib/daten.ts.
-          bild: n.posts.thumbnail_url || n.posts.media_url || undefined,
-          autor: n.posts.profiles?.name || '',
-          titel: n.posts.title || n.posts.description || '',
-        }
-      : undefined,
+    // Kasten 7 (28.09.): Bild, Name, Beschreibung, `kind` zum Oeffnen —
+    // gleiche Abbildung wie in app/lib/daten.ts (gemeinsam/chatblase.js).
+    geteilt: Chatblase.geteiltAus(n.shared_post_id, n.posts),
     // Angehaengter Standort: Karte mit Nadel, Adresse und Koordinaten.
     standort: n.places
       ? {
@@ -1229,7 +1222,7 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
         ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
         // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
         ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
-        ' profiles!posts_user_id_fkey(name))'
+        ' profiles!posts_user_id_fkey(name, handle))'
     )
     .eq('channel_id', kanalId)
     // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
@@ -1262,15 +1255,7 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
       : undefined,
     // Die Karte eines in die Community geteilten Beitrags (Schema 59) —
     // gleiche Abbildung wie in ladeNachrichten.
-    geteilt: m.posts
-      ? {
-          id: m.posts.id,
-          art: m.posts.kind === 'post' ? 'post' : 'video',
-          autor: m.posts.profiles?.name || '',
-          titel: m.posts.title || m.posts.description || '',
-          bild: m.posts.thumbnail_url || m.posts.media_url || undefined,
-        }
-      : undefined,
+    geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts),
     datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size || 0) } : undefined,
   }));
 }

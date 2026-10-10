@@ -154,6 +154,9 @@ const UMD_BAUSTEINE = [
   // 10.10.2026: `profilfelder.js` fuer die Seite „Profil bearbeiten“ (Kasten
   // 1.3, Nachtrag) — aktionen.ts und daten.ts holen ihn. Gleich mit eingetragen.
   ['profilfelder', 'Profilfelder'],
+  // 10.10.2026: `chatblase.js` fuer Ziehen zum Antworten und die Karte eines
+  // geteilten Beitrags (Feedback 28.09., Kasten 4 und 7) — daten.ts holt ihn.
+  ['chatblase', 'Chatblase'],
 ];
 
 function umdTeile() {

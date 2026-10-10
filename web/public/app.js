@@ -4894,7 +4894,9 @@ function openChatMedien(chat, liste, titel) {
     window.StoryRegeln.istMarkierungsHinweis(m)
       ? window.StoryRegeln.markierungVorschau(m.from === 'me')
       : m.geteilt
-      ? `${m.geteilt.autor}: ${m.geteilt.titel}`
+      ? m.geteilt.weg
+        ? window.Chatblase.GETEILT_WEG
+        : `${m.geteilt.autor}: ${m.geteilt.titel || m.geteilt.beschreibung || ''}`
       : m.standort
       ? m.standort.name
       : m.kontakt
@@ -6738,7 +6740,7 @@ async function renderCommunityChat(community, kanal, thema) {
       if (platz) openExplorer('standort', platz.id);
     })
   );
-  // Die Karte eines geteilten Beitrags → Vollformat, wie im Chat.
+  // Anhang → Vollformat, wie im Chat.
   liste.querySelectorAll('[data-voll]').forEach((b) =>
     b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
   );
@@ -6764,6 +6766,8 @@ async function renderCommunityChat(community, kanal, thema) {
       kanalNachrichtMenue(el.dataset.msgid);
     });
   });
+  // Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag.
+  geteiltBinden(liste);
 
   const feld = $('#commMsgInput');
   const sendKnopf = $('#commSend');
@@ -6843,30 +6847,62 @@ async function renderCommunityChat(community, kanal, thema) {
  * Community (Schema 59). Gleiche Regel in der App.
  */
 function geteiltKarte(g) {
-  return `<button class="msg__geteilt" ${
-    g.bild ? `data-voll="${esc(g.bild)}"` : ''
-  }>
-     ${
-       g.bild && !istVideoAdresse(g.bild)
-         ? `<img class="msg__bild" src="${esc(g.bild)}" alt="">`
-         : g.bild
-         ? `<span class="msg__anhang"><video class="msg__bild" src="${esc(
-             g.bild
-           )}" muted playsinline preload="metadata"></video><span class="msg__anhangPlay">${
-             ICONS.play
-           }</span></span>`
-         : `<span class="msg__geteiltBild">${
-             g.art === 'video' ? ICONS.play : ICONS.image
-           }</span>`
-     }
-     <span class="msg__geteiltZeile">
-       ${g.art === 'video' ? ICONS.play : ICONS.image}
-       <span class="msg__geteiltText">
-         <strong>${esc(g.autor)}</strong>
-         <span>${esc(g.titel)}</span>
-       </span>
+  /*
+   * Kasten 7 (Feedback 28.09.): „Thumbnail im Großformat, darunter der Name
+   * des Beitrags und die Beschreibung" — nach Instagram/WhatsApp-Vorbild:
+   * oben klein das Konto, das Vorschaubild über die volle Breite (Video mit
+   * Zeichen oben rechts), darunter Titel (posts.title) und Beschreibung
+   * (posts.description). Klick öffnet den Beitrag selbst (beitragOeffnen),
+   * nicht mehr nur sein Bild. Abbildung in gemeinsam/chatblase.js, gleiche
+   * Karte in der App (ChatDetailScreen.tsx).
+   */
+  const C = window.Chatblase;
+  if (g.weg) {
+    return `<div class="msg__geteiltWeg" data-testid="geteilt-weg">${ICONS.eyeOff}<span>${esc(
+      C.GETEILT_WEG
+    )}</span></div>`;
+  }
+  const istVid = g.art === 'video';
+  const bild = !g.bild
+    ? `<span class="msg__geteiltLeer">${istVid ? ICONS.play : ICONS.image}</span>`
+    : istVideoAdresse(g.bild)
+    ? `<video class="msg__geteiltGross" src="${esc(g.bild)}" muted playsinline preload="metadata"></video>`
+    : `<img class="msg__geteiltGross" src="${esc(g.bild)}" alt="" loading="lazy">`;
+  const u = g.autor ? g.autor.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() : '?';
+  return `<button class="msg__geteilt" data-beitrag="${esc(g.id)}" data-beitragkind="${esc(
+    g.kind || 'post'
+  )}" aria-label="${esc(C.geteiltBeschriftung(g))}" data-testid="geteilt-karte">
+     <span class="msg__geteiltKopf">
+       <span class="msg__geteiltAvatar">${esc(u)}</span>
+       <span class="msg__geteiltAutor">${esc(g.autor || '')}</span>
      </span>
+     <span class="msg__geteiltRahmen">
+       ${bild}
+       ${istVid ? `<span class="msg__geteiltVideo">${ICONS.video}</span>` : ''}
+     </span>
+     ${
+       g.titel || g.beschreibung
+         ? `<span class="msg__geteiltText">
+              ${g.titel ? `<strong>${esc(g.titel)}</strong>` : ''}
+              ${g.beschreibung ? `<span>${esc(g.beschreibung)}</span>` : ''}
+            </span>`
+         : ''
+     }
    </button>`;
+}
+
+/**
+ * Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag — im
+ * Chat wie im Unterthema. Wird nach jedem Zeichnen an die Liste gebunden.
+ */
+function geteiltBinden(liste) {
+  liste.querySelectorAll('[data-beitrag]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      // Ein Ziehen zum Antworten endet nicht als Klick auf die Karte.
+      if (b.closest('[data-gezogen]')) return e.preventDefault();
+      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag);
+    })
+  );
 }
 
 function kanalNachricht(m) {
@@ -6874,15 +6910,16 @@ function kanalNachricht(m) {
   // Funktion. Ein Sticker steht auch hier ohne Blase (msg--sticker).
   const inhalt = m.geteilt ? geteiltKarte(m.geteilt) : anhangInhalt(m);
   const stickerKlasse = m.media === 'sticker' ? ' msg--sticker' : '';
+  const karteKlasse = m.geteilt && !m.geteilt.weg ? ' msg--karte' : '';
 
   // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
   if (m.from === 'me') {
-    return `<div class="msg msg--out${stickerKlasse}" data-msgid="${esc(m.id)}">${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
+    return `<div class="msg msg--out${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}">${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
   }
   const u = user(m.from);
   return `<div class="msgzeile">
     <button class="msgzeile__avatar" data-profile="${esc(m.from)}" style="background:${farbe(u.color)}" aria-label="Profil von ${esc(u.name)}">${esc(u.initials)}</button>
-    <div class="msg msg--in${stickerKlasse}" data-msgid="${esc(m.id)}">
+    <div class="msg msg--in${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}">
       <button class="msg__sender" data-profile="${esc(m.from)}">${esc(u.name)}</button>
       ${inhalt}
       <div class="msg__foot">${esc(m.time)}</div>
@@ -19342,6 +19379,8 @@ function paintMessages(chat) {
   box.querySelectorAll('[data-voll]').forEach((b) =>
     b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
   );
+  // Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag.
+  geteiltBinden(box);
 
   // Kasten 16: die Markierungs-Karte öffnet ihre Story. Fehlt sie in den
   // Leisten (Story eines Nichtkontakts), baut openStory sie aus der
@@ -19626,7 +19665,9 @@ function messageBubble(m, chat) {
     : anhangInhalt(m);
 
   return `
-    <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}" data-msgid="${esc(m.id)}">
+    <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}${
+      m.geteilt && !m.geteilt.weg && !m.zurueckgenommen ? ' msg--karte' : ''
+    }" data-msgid="${esc(m.id)}">
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
       ${weiter}${antwortAuf}${zitat}
       ${storyBezug}${inhalt}

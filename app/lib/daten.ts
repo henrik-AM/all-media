@@ -794,15 +794,10 @@ export async function ladeNachrichten(
     mediaUrl: n.media_url ?? undefined,
     // Die Karte im Chat für einen geteilten Beitrag. Gleiche Regel wie in
     // web/server/supabase-api.js.
-    geteilt: n.posts
-      ? {
-          id: n.posts.id,
-          art: n.posts.kind === 'post' ? ('post' as const) : ('video' as const),
-          autor: n.posts.profiles?.name ?? '',
-          titel: n.posts.title || n.posts.description || '',
-          bild: n.posts.thumbnail_url || n.posts.media_url || undefined,
-        }
-      : undefined,
+    // Kasten 7 (28.09.): Name UND Beschreibung, `kind` zum Oeffnen, und
+    // ehrlich „nicht mehr verfügbar", wenn die Leseregel ihn nicht herausgibt
+    // (gemeinsam/chatblase.js, geteiltAus).
+    geteilt: Chatblase.geteiltAus(n.shared_post_id, n.posts),
     // Angehängter Standort und Kontakt — gleiche Regel wie in
     // web/server/supabase-api.js.
     standort: n.places
@@ -915,6 +910,8 @@ export interface StoryListen {
 const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
 // Kasten 27: Takt, Stand und Reihenfolge offener Chats — gemeinsam mit der Website.
 const ChatAbgleich = require('../../gemeinsam/chatabgleich') as typeof import('../../gemeinsam/chatabgleich');
+// Kasten 4/7 (28.09.): Bezug im Unterthema und die Karte geteilter Beitraege.
+const Chatblase = require('../../gemeinsam/chatblase') as typeof import('../../gemeinsam/chatblase');
 
 /** Spalten mit und ohne die Felder aus dem Story-Schema (Kasten 11). */
 const STORY_SPALTEN_NEU =
@@ -1349,7 +1346,7 @@ export async function ladeKanalNachrichten(
         ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
         // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
         ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
-        ' profiles!posts_user_id_fkey(name))'
+        ' profiles!posts_user_id_fkey(name, handle))'
     )
     .eq('channel_id', kanalId)
     // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
@@ -1385,15 +1382,7 @@ export async function ladeKanalNachrichten(
       : undefined,
     // Die Karte eines in die Community geteilten Beitrags (Schema 59) —
     // gleiche Abbildung wie in ladeNachrichten.
-    geteilt: m.posts
-      ? {
-          id: m.posts.id,
-          art: m.posts.kind === 'post' ? ('post' as const) : ('video' as const),
-          autor: m.posts.profiles?.name ?? '',
-          titel: m.posts.title || m.posts.description || '',
-          bild: m.posts.thumbnail_url || m.posts.media_url || undefined,
-        }
-      : undefined,
+    geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts),
     datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size ?? 0) } : undefined,
   })));
 }

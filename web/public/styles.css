@@ -2349,18 +2349,48 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
  * ist ein <button>, weil sie sich oeffnen laesst — vorher war sie ein
  * stummes <div>.
  */
+/*
+ * Kasten 7 (Feedback 28.09.): die Karte eines geteilten Beitrags —
+ * Instagram/WhatsApp-Vorbild. Konto klein oben, Vorschaubild über die volle
+ * Blasenbreite, darunter Titel und Beschreibung. Gleiche Maße in der App
+ * (styles.geteiltKarte in ChatDetailScreen.tsx).
+ */
+.msg--karte { padding: 4px 4px 6px; }
 .msg__geteilt {
-  display: flex; flex-direction: column; gap: 6px;
-  margin: 2px 0 4px; padding: 8px;
-  border: 0; text-align: left; cursor: pointer; font: inherit; color: inherit;
-  border-radius: 12px; background: rgba(0,0,0,.05);
-  /* Ein langer Titel steht einzeilig mit „…" — ohne diese Grenze schob er
-     die Karte über die Blase hinaus und den Verlauf zur Seite (26.09.2026). */
-  max-width: 100%; min-width: 0; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  width: 248px; max-width: 100%; box-sizing: border-box;
+  margin: 0 0 4px; padding: 0;
+  border: 0; text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  border-radius: 14px; overflow: hidden; background: var(--surface);
 }
-[data-theme="dark"] .msg__geteilt { background: rgba(255,255,255,.07); }
-.msg__geteiltZeile { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.msg__geteiltZeile > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--text-3); }
+.msg__geteiltKopf { display: flex; align-items: center; gap: 8px; padding: 8px 10px; min-width: 0; }
+.msg__geteiltAvatar {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--brand); color: #fff; font-size: 10px; font-weight: 700;
+}
+.msg__geteiltAutor {
+  flex: 1; min-width: 0; font-size: 13px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.msg__geteiltRahmen { position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; background: var(--surface-3); }
+.msg__geteiltGross { display: block; width: 100%; height: 100%; object-fit: cover; }
+.msg__geteiltLeer {
+  display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: var(--text-3);
+}
+.msg__geteiltLeer svg { width: 28px; height: 28px; }
+.msg__geteiltVideo {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.5); color: #fff;
+}
+.msg__geteiltVideo svg { width: 16px; height: 16px; }
+.msg__geteiltWeg {
+  display: flex; align-items: center; gap: 8px;
+  width: 220px; max-width: 100%; box-sizing: border-box; padding: 12px;
+  border-radius: 12px; background: var(--surface-2); color: var(--text-3); font-size: 13px;
+}
+.msg__geteiltWeg svg { flex: 0 0 auto; width: 18px; height: 18px; }
 
 /*
  * Anhang und Vollformat (Henrik 7.9.). Der Anhang steht in der Blase in
@@ -2441,10 +2471,14 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
   background: rgba(0,0,0,.55); color: #fff;
   font-size: 11px; font-weight: 600;
 }
-.msg__geteiltText { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+.msg__geteiltText { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 8px 10px 10px; font-size: 13px; }
+.msg__geteiltText strong {
+  font-weight: 700;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .msg__geteiltText span {
   color: var(--text-2);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 
 /* ------------------------------------------------ Kontakt per QR-Code */

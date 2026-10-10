@@ -237,7 +237,7 @@ export const ContactProfileScreen = ({
   const beschreibung = (m: Message) =>
     m.hinweis === 'story_markierung'
       ? StoryRegeln.markierungVorschau(m.senderId === 'me')
-      : m.geteilt ? `${m.geteilt.autor}: ${m.geteilt.titel}` : m.standort ? m.standort.name : m.kontakt ? m.kontakt.name : m.text || 'Foto';
+      : m.geteilt ? (m.geteilt.weg ? 'Beitrag nicht mehr verfügbar' : `${m.geteilt.autor}: ${m.geteilt.titel || m.geteilt.beschreibung || ''}`) : m.standort ? m.standort.name : m.kontakt ? m.kontakt.name : m.text || 'Foto';
 
   const zeile = (label: string, neben: string, onPress: () => void, art?: 'gruen' | 'gefahr') => (
     <Druck key={label} style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]} onPress={onPress}>

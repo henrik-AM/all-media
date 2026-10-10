@@ -47,6 +47,8 @@ import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 // Kasten 27: offenen Chat im Takt nachsehen — gemeinsam mit der Website.
 const ChatAbgleich = require('../../../gemeinsam/chatabgleich') as typeof import('../../../gemeinsam/chatabgleich');
+// Kasten 4/7 (28.09.): Ziehen zum Antworten, Karte geteilter Beitraege — gemeinsam mit der Website.
+const Chatblase = require('../../../gemeinsam/chatblase') as typeof import('../../../gemeinsam/chatblase');
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -98,6 +100,12 @@ interface Props {
    * Nichtkontakts), öffnet sie den Betrachter mit genau dieser einen Story.
    */
   onOpenStory?: (story: NonNullable<Message['story']>) => void;
+  /*
+   * Kasten 7.3 (28.09.): die Karte eines geteilten Beitrags oeffnet den
+   * Beitrag selbst — Querformat im Player, Reel im Hochformat-Feed, Bild im
+   * Beitrags-Feed (kachelOeffnen in App.tsx).
+   */
+  onOpenBeitrag?: (beitrag: { id: string; kind: 'post' | 'reel' | 'clip' }) => void;
 }
 
 export const ChatDetailScreen = ({
@@ -118,6 +126,7 @@ export const ChatDetailScreen = ({
   onNotice,
   onOpenStandort,
   onOpenStory,
+  onOpenBeitrag,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
   const [kameraAuf, setKameraAuf] = useState(false);
@@ -701,6 +710,7 @@ export const ChatDetailScreen = ({
           styles.bubble,
           out ? styles.bubbleOut : styles.bubbleIn,
           item.media === 'sticker' && styles.bubbleSticker,
+          item.geteilt && !item.zurueckgenommen && styles.bubbleKarte,
         ]}
         onLongPress={() => {
           haptic.medium();
@@ -822,46 +832,81 @@ export const ChatDetailScreen = ({
           </Druck>
         ) : item.geteilt ? (
           /*
-           * Ein geteilter Beitrag (Henrik 7.9.). Bis dahin war das eine
-           * Zeile mit einem grauen Kaestchen daneben und liess sich nicht
-           * oeffnen — ein weitergeleitetes Video war damit im Chat nichts
-           * weiter als sein Titel. Jetzt steht der Beitrag selbst da und
-           * geht beim Antippen ins Vollformat.
+           * Ein geteilter Beitrag (Henrik 7.9., neu gestaltet nach Feedback
+           * 28.09., Kasten 7): „Thumbnail im Grossformat, darunter der Name
+           * des Beitrags und die Beschreibung" — nach dem Vorbild von
+           * Instagram/WhatsApp. Oben klein das Konto, dann das Vorschaubild
+           * ueber die volle Blasenbreite (bei Videos mit Video-Zeichen),
+           * darunter Titel (posts.title) und Beschreibung (posts.description).
+           * Antippen oeffnet den Beitrag selbst, nicht nur sein Bild.
+           * Abbildung in gemeinsam/chatblase.js (geteiltAus), gleiche Karte
+           * auf der Website (geteiltKarte in web/public/app.js).
            */
-          <Druck
-            style={styles.geteiltKarte}
-            onPress={() =>
-              item.geteilt?.bild
-                ? setVollbild({ id: item.geteilt.id, uri: item.geteilt.bild })
-                : onNotice?.('Zu diesem Beitrag gibt es keine Datei')
-            }
-          >
-            <Videoflaeche
-              id={item.geteilt.id}
-              quelle={item.geteilt.bild}
-              laeuft={false}
-              stumm
-              icon={item.geteilt.art === 'video' ? 'play' : 'image-outline'}
-              iconSize={20}
-              fuellen="cover"
-              style={styles.anhangBild}
-            />
-            <View style={styles.geteiltZeile}>
-              <Ionicons
-                name={item.geteilt.art === 'video' ? 'play-circle-outline' : 'image-outline'}
-                size={16}
-                color={colors.text3}
-              />
-              <View style={styles.geteiltText}>
+          item.geteilt.weg ? (
+            <View style={styles.geteiltWeg} accessibilityLabel={Chatblase.GETEILT_WEG} testID="geteilt-weg">
+              <Ionicons name="eye-off-outline" size={18} color={colors.text3} />
+              <Text style={styles.geteiltWegText}>{Chatblase.GETEILT_WEG}</Text>
+            </View>
+          ) : (
+            <Druck
+              style={styles.geteiltKarte}
+              onPress={() => {
+                const g = item.geteilt!;
+                if (onOpenBeitrag) return onOpenBeitrag({ id: g.id, kind: g.kind ?? 'post' });
+                if (g.bild) setVollbild({ id: g.id, uri: g.bild });
+              }}
+              onLongPress={() => {
+                haptic.medium();
+                setGewaehlt(item);
+              }}
+              delayLongPress={450}
+              accessibilityRole="button"
+              accessibilityLabel={Chatblase.geteiltBeschriftung(item.geteilt)}
+              testID="geteilt-karte"
+            >
+              <View style={styles.geteiltKopf}>
+                <Avatar id={item.geteilt.id} name={item.geteilt.autor || '?'} size={22} />
                 <Text style={styles.geteiltAutor} numberOfLines={1}>
                   {item.geteilt.autor}
                 </Text>
-                <Text style={styles.geteiltTitel} numberOfLines={1}>
-                  {item.geteilt.titel}
-                </Text>
               </View>
-            </View>
-          </Druck>
+              <View style={styles.geteiltBildRahmen}>
+                <Videoflaeche
+                  id={item.geteilt.id}
+                  quelle={item.geteilt.bild}
+                  laeuft={false}
+                  stumm
+                  icon={item.geteilt.art === 'video' ? 'play' : 'image-outline'}
+                  iconSize={28}
+                  fuellen="cover"
+                  style={styles.geteiltBild}
+                />
+                {item.geteilt.art === 'video' ? (
+                  <View style={styles.geteiltVideoZeichen}>
+                    <Ionicons
+                      name={item.geteilt.kind === 'clip' ? 'tv-outline' : 'film-outline'}
+                      size={16}
+                      color={colors.white}
+                    />
+                  </View>
+                ) : null}
+              </View>
+              {item.geteilt.titel || item.geteilt.beschreibung ? (
+                <View style={styles.geteiltText}>
+                  {item.geteilt.titel ? (
+                    <Text style={styles.geteiltTitel} numberOfLines={2}>
+                      {item.geteilt.titel}
+                    </Text>
+                  ) : null}
+                  {item.geteilt.beschreibung ? (
+                    <Text style={styles.geteiltBeschreibung} numberOfLines={3}>
+                      {item.geteilt.beschreibung}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </Druck>
+          )
         ) : item.media === 'sticker' ? (
           /*
            * Ein Sticker steht ohne Blase und ohne Rahmen da — sonst waere er
@@ -1694,11 +1739,44 @@ const styles = themenStyles((colors) => ({
    * derselben Groesse wie jeder andere Anhang, darunter eine Zeile mit Autor
    * und Titel. Vorher war es umgekehrt — Text mit einem 42px-Kaestchen davor.
    */
-  geteiltKarte: { marginBottom: 4 },
-  geteiltZeile: { flexDirection: 'row', alignItems: 'center', gap: 8, width: 210 },
-  geteiltText: { flex: 1, minWidth: 0 },
-  geteiltAutor: { ...typography.small, fontWeight: '600', color: colors.text },
-  geteiltTitel: { ...typography.small, color: colors.text2, marginTop: 2 },
+  /* Kasten 7 (28.09.): die Karte eines geteilten Beitrags — volle Blasenbreite. */
+  bubbleKarte: { paddingHorizontal: 4, paddingTop: 4 },
+  geteiltKarte: {
+    width: 248,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    marginBottom: 4,
+  },
+  geteiltKopf: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  geteiltAutor: { flex: 1, ...typography.small, fontWeight: '600', color: colors.text },
+  geteiltBildRahmen: { width: 248, height: 310, backgroundColor: colors.surface3 },
+  geteiltBild: { width: 248, height: 310 },
+  geteiltVideoZeichen: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  geteiltText: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10, gap: 3 },
+  geteiltTitel: { ...typography.small, fontWeight: '700', color: colors.text },
+  geteiltBeschreibung: { ...typography.small, color: colors.text2 },
+  geteiltWeg: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: 220,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.surface2,
+    marginBottom: 4,
+  },
+  geteiltWegText: { flex: 1, ...typography.small, color: colors.text3 },
   bubbleFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
   time: { color: colors.text3, ...typography.tiny },
   timeOut: { color: colors.bubbleOutMeta },
