@@ -137,6 +137,9 @@ const UMD_BAUSTEINE = [
   // 08.10.2026: `markierung.js` fuer @-Markierungen (Kasten 25) — aktionen.ts,
   // MarkierungsEingabe und MarkierterText holen ihn. Gleich mit eingetragen.
   ['markierung', 'Markierung'],
+  // 10.10.2026: `profilfelder.js` fuer die Seite „Profil bearbeiten“ (Kasten
+  // 1.3, Nachtrag) — aktionen.ts und daten.ts holen ihn. Gleich mit eingetragen.
+  ['profilfelder', 'Profilfelder'],
 ];
 
 function umdTeile() {
