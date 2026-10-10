@@ -75,6 +75,7 @@
     "test:gesten": "node test/_gesten.js",
     "test:feinschliff": "node test/_feinschliff.js",
     "test:kamera": "node test/_kamera.js",
+    "test:k28-suchen": "node test/k28-suchen.js",
     "test:storyvideo": "node test/_storyvideo_regeln.js",
     "test:eigenes": "node test/_eigenes.js",
     "test:gleichstand": "node test/_gleichstand.js",
