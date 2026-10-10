@@ -41,6 +41,8 @@ import {
 
 // Dieselbe Regel wie auf der Website — siehe gemeinsam/telefon.js.
 const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
+// Kasten 4 (28.09.): Antworten im Unterthema, solange Schema XX fehlt.
+const Chatblase = require('../../gemeinsam/chatblase') as typeof import('../../gemeinsam/chatblase');
 
 // Wie ein eigener Kommentar in der Liste steht — gemeinsam mit der Website.
 const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
@@ -1798,25 +1800,44 @@ export async function kanalNachricht(
   ichId: string,
   kanalId: string,
   text: string,
-  anhang: Anhang = {}
-): Promise<{ id: string; created_at: string }> {
-  const { data, error } = await client
+  anhang: Anhang = {},
+  /*
+   * Kasten 4.2 (Feedback 28.09.): die Nachricht, auf die geantwortet wird
+   * (`reply_to`, Schema XX). Ist das Schema noch nicht eingespielt, geht die
+   * Nachricht ohne Bezug raus und `ohneBezug` sagt das dem Bildschirm.
+   * Gleiche Weiche in web/server/sync-handlers.js (handleSendChannelMessage).
+   */
+  antwortAuf: string | null = null
+): Promise<{ id: string; created_at: string; ohneBezug?: boolean }> {
+  const zeile: Record<string, unknown> = {
+    channel_id: kanalId,
+    sender_id: ichId,
+    text,
+    media_url: anhang.url || null,
+    media_type: anhang.typ || null,
+    place_id: anhang.standortId || null,
+    contact_user_id: anhang.kontaktId || null,
+    file_name: anhang.dateiName || null,
+    file_size: anhang.dateiGroesse || null,
+  };
+  if (antwortAuf) zeile.reply_to = antwortAuf;
+  let { data, error } = await client
     .from('community_channel_messages')
-    .insert({
-      channel_id: kanalId,
-      sender_id: ichId,
-      text,
-      media_url: anhang.url || null,
-      media_type: anhang.typ || null,
-      place_id: anhang.standortId || null,
-      contact_user_id: anhang.kontaktId || null,
-      file_name: anhang.dateiName || null,
-      file_size: anhang.dateiGroesse || null,
-    })
+    .insert(zeile)
     .select('id, created_at')
     .single();
+  let ohneBezug = false;
+  if (error && antwortAuf && Chatblase.fehltSpalte(error, 'reply_to')) {
+    delete zeile.reply_to;
+    ohneBezug = true;
+    ({ data, error } = await client
+      .from('community_channel_messages')
+      .insert(zeile)
+      .select('id, created_at')
+      .single());
+  }
   if (error) throw error;
-  return data as { id: string; created_at: string };
+  return { ...(data as { id: string; created_at: string }), ...(ohneBezug ? { ohneBezug } : {}) };
 }
 
 // ---------------------------------------------------------------- Profil --

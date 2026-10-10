@@ -111,6 +111,24 @@
     };
   }
 
+  /**
+   * Kennt die Datenbank die Spalte noch nicht? `community_channel_messages.
+   * reply_to` kommt erst mit Schema XX. Bis es eingespielt ist, laeuft das
+   * Unterthema ohne Bezug weiter, statt leer dazustehen (Lesen: 42703,
+   * Schreiben: PGRST204 „Could not find the 'reply_to' column").
+   */
+  function fehltSpalte(fehler, spalte) {
+    if (!fehler) return false;
+    var code = String(fehler.code || '');
+    var text = String(fehler.message || '');
+    if (code !== '42703' && code !== 'PGRST204') return false;
+    return !spalte || text.indexOf(spalte) !== -1;
+  }
+
+  /** Steht da, wenn im Unterthema ohne Bezug gesendet werden musste. */
+  var OHNE_BEZUG =
+    'Gesendet — der Bezug fehlt, bis Antworten im Unterthema freigeschaltet ist';
+
   /* ------------------------------------------------------------------ */
   /* Geteilter Beitrag (Kasten 7)                                         */
   /* ------------------------------------------------------------------ */
@@ -176,6 +194,8 @@
     pfeilSichtbar: pfeilSichtbar,
     BEZUG_WEG: BEZUG_WEG,
     kanalBezug: kanalBezug,
+    fehltSpalte: fehltSpalte,
+    OHNE_BEZUG: OHNE_BEZUG,
     GETEILT_WEG: GETEILT_WEG,
     geteiltAus: geteiltAus,
     geteiltBeschriftung: geteiltBeschriftung,

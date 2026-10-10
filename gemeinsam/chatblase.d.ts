@@ -25,6 +25,9 @@ export function kanalBezug(
   namen: Record<string, string> | null | undefined
 ): Bezug | undefined;
 
+export function fehltSpalte(fehler: { code?: string; message?: string } | null | undefined, spalte?: string): boolean;
+export const OHNE_BEZUG: string;
+
 export const GETEILT_WEG: string;
 export interface GeteilteKarte {
   id: string;

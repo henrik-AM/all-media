@@ -43,6 +43,7 @@ import * as Aktion from '../../lib/aktionen';
 import { FarbfilterSchicht } from '../../components/Farbfilter';
 import { MarkierterText } from '../../components/MarkierterText';
 import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
+import { ZiehZumAntworten } from '../../components/ZiehZumAntworten';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 // Kasten 27: offenen Chat im Takt nachsehen — gemeinsam mit der Website.
@@ -288,6 +289,25 @@ export const ChatDetailScreen = ({
   }, []);
 
   /*
+   * Kasten 4: Zitat antippen → zur Originalnachricht. Steht sie nicht unter
+   * den geladenen (aelter als die juengsten 500), sagt das eine Meldung,
+   * statt still nichts zu tun. Die Nachricht leuchtet kurz auf.
+   */
+  const [hervor, setHervor] = useState<string | null>(null);
+  const hervorUhr = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (hervorUhr.current) clearTimeout(hervorUhr.current);
+  }, []);
+  const zuNachricht = (id: string) => {
+    const index = messagesRef.current.findIndex((m) => m.id === id);
+    if (index < 0) return onNotice?.('Die Nachricht ist nicht mehr im geladenen Verlauf');
+    listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+    setHervor(id);
+    if (hervorUhr.current) clearTimeout(hervorUhr.current);
+    hervorUhr.current = setTimeout(() => setHervor(null), 1400);
+  };
+
+  /*
    * Den offenen Chat im Takt nachsehen (Kasten 27, 06.10.2026).
    *
    * Henrik: „A schreibt ‚cxv', bei B kommt ‚cwkdew' an." Der Verlauf wurde
@@ -477,8 +497,13 @@ export const ChatDetailScreen = ({
       // Nachrichten stehen in einer eigenen Tabelle. Gelesen wurde von dort
       // schon immer (ladeKanalNachrichten oben), geschrieben bis hierher
       // nicht — das Geschriebene war beim naechsten Oeffnen weg.
+      /*
+       * Kasten 4.2: im Unterthema geht die Antwort mit (reply_to, Schema XX).
+       * Kennt die Datenbank die Spalte noch nicht, geht die Nachricht ohne
+       * Bezug raus und die Meldung sagt das — kein stiller Verlust.
+       */
       data = istKanal
-        ? await Aktion.kanalNachricht(supabase, ichId, chat.id, text)
+        ? await Aktion.kanalNachricht(supabase, ichId, chat.id, text, {}, bezug ? bezug.nachricht.id : null)
         : await Aktion.nachrichtSenden(supabase, ichId, chat.id, text, {
             antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
             zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
@@ -490,7 +515,8 @@ export const ChatDetailScreen = ({
       return;
     }
 
-    const bezugText = bezug
+    if (istKanal && (data as { ohneBezug?: boolean }).ohneBezug) onNotice?.(Chatblase.OHNE_BEZUG);
+    const bezugText = bezug && !(data as { ohneBezug?: boolean }).ohneBezug
       ? {
           id: bezug.nachricht.id,
           text: bezug.nachricht.text,
@@ -512,8 +538,10 @@ export const ChatDetailScreen = ({
         read: false,
         // Bis das Nachsehen sie aus der Datenbank liefert (Kasten 27).
         lokal: true,
-        antwortAuf: bezug?.art === 'antwort' ? bezugText : undefined,
-        zitat: bezug?.art === 'zitat' ? bezugText : undefined,
+        // Im Unterthema gibt es nur den Bezug, kein eigenes Zitat (Schema XX):
+        // dort wird ein Zitat als Antwort gezeigt — so wie es gespeichert ist.
+        antwortAuf: bezug?.art === 'antwort' || (istKanal && bezug) ? bezugText : undefined,
+        zitat: bezug?.art === 'zitat' && !istKanal ? bezugText : undefined,
       },
     ]);
     setBezug(null);
@@ -702,12 +730,28 @@ export const ChatDetailScreen = ({
       );
     }
 
+    /*
+     * Kasten 4 (Feedback 28.09.): nach rechts ziehen → Antworten. Gilt in
+     * jedem Chat, der hier gezeichnet wird: Messenger, Communitys → Chats,
+     * Unterthema (Kanal) und Chats, die aus Videos heraus geoeffnet werden.
+     * Nicht bei zurueckgenommenen Nachrichten — dort gibt es nichts, worauf
+     * man sich beziehen koennte — und nicht, solange der Chat gesperrt ist.
+     */
+    const ziehbar = !gesperrt && !item.zurueckgenommen;
     return (
-      // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt
-      // sich "Mit Stern markiert" in der Kontaktinfo wirklich.
+      <ZiehZumAntworten
+        aktiv={ziehbar}
+        onAntworten={() => {
+          setBearbeitet(null);
+          setBezug({ art: 'antwort', nachricht: item });
+        }}
+        testID={`nachricht-${item.id}`}
+      >
+      {/* Lange druecken oeffnet das Menue (Antworten, Zitieren, Stern …). */}
       <Druck
         style={[
           styles.bubble,
+          hervor === item.id && styles.bubbleHervor,
           out ? styles.bubbleOut : styles.bubbleIn,
           item.media === 'sticker' && styles.bubbleSticker,
           item.geteilt && !item.zurueckgenommen && styles.bubbleKarte,
@@ -738,15 +782,28 @@ export const ChatDetailScreen = ({
           * das Original zurueckgenommen wird.
           */}
         {item.antwortAuf ? (
-          <View style={styles.bezug}>
+          /*
+           * Kasten 4: das Zitat antippen springt zur Originalnachricht,
+           * wenn sie geladen ist, und hebt sie kurz hervor.
+           */
+          <Druck
+            style={[styles.bezug, styles.bezugInBlase, out && styles.bezugInBlaseOut]}
+            onPress={() => zuNachricht(item.antwortAuf!.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Antwort auf ${item.antwortAuf.autor || 'Nachricht'}: ${item.antwortAuf.text || ''}`}
+            testID="antwort-bezug"
+          >
             <View style={styles.bezugBalken} />
             <View style={styles.bezugText}>
-              <Text style={styles.bezugAutor}>{item.antwortAuf.autor}</Text>
-              <Text style={styles.bezugZeile} numberOfLines={1}>
-                {item.antwortAuf.text || 'Zurückgenommen'}
+              {item.antwortAuf.autor ? (
+                <Text style={styles.bezugAutor}>{item.antwortAuf.autor}</Text>
+              ) : null}
+              <Text style={styles.bezugZeile} numberOfLines={2}>
+                {item.antwortAuf.text ||
+                  ((item.antwortAuf as { fehlt?: boolean }).fehlt ? Chatblase.BEZUG_WEG : 'Zurückgenommen')}
               </Text>
             </View>
-          </View>
+          </Druck>
         ) : null}
 
         {item.zitat ? (
@@ -1009,6 +1066,7 @@ export const ChatDetailScreen = ({
           </View>
         ) : null}
       </Druck>
+      </ZiehZumAntworten>
     );
   };
 
@@ -1129,7 +1187,16 @@ export const ChatDetailScreen = ({
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
-          onContentSizeChange={scrollToEnd}
+          onContentSizeChange={hervor ? undefined : scrollToEnd}
+          // Ohne feste Hoehen kennt die Liste fernere Zeilen noch nicht:
+          // erst grob hinrollen, dann genau (Kasten 4, Zitat → Original).
+          onScrollToIndexFailed={(info) => {
+            listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(
+              () => listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.4 }),
+              80
+            );
+          }}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <View style={styles.dayDivider}>
@@ -1519,6 +1586,16 @@ const styles = themenStyles((colors) => ({
   weiter: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
   weiterText: { ...typography.tiny, color: colors.text3, fontStyle: 'italic' },
   bezug: { flexDirection: 'row', gap: spacing.sm, marginBottom: 5 },
+  /* Kasten 4: der Bezug in der Blase als abgesetzte, antippbare Flaeche. */
+  bezugInBlase: {
+    paddingVertical: 5,
+    paddingRight: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  bezugInBlaseOut: { backgroundColor: 'rgba(0,0,0,0.07)' },
+  bubbleHervor: { borderWidth: 2, borderColor: colors.brand },
   bezugBalken: { width: 3, borderRadius: 2, backgroundColor: colors.brand },
   bezugText: { flex: 1 },
   bezugAutor: { ...typography.tiny, color: colors.brand },
