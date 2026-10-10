@@ -400,7 +400,17 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const profilSpeichern = useCallback(
     (werte: Partial<EigenesProfil>) => {
       const vorherStand = eigenesProfil;
-      setEigenesProfil((vorher) => ({ ...vorher, ...werte }));
+      setEigenesProfil((vorher) => {
+        const neu = { ...vorher, ...werte };
+        // Das kleine Blatt kennt nur `link`: es ersetzt den ersten der Links
+        // (dieselbe Regel wie der Trigger in Schema 88), die übrigen bleiben.
+        if (werte.link !== undefined && werte.links === undefined) {
+          const einzel = werte.link.trim();
+          const rest = (vorher.links ?? []).slice(1);
+          neu.links = einzel ? [{ url: einzel, titel: '' }, ...rest] : [];
+        }
+        return neu;
+      });
 
       /*
        * Und in die Datenbank. Henrik wollte ausdruecklich „Name, Info/Bio,
