@@ -4,6 +4,7 @@ import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
 import { StoryAvatar } from '../../components/StoryAvatar';
+import { NameMitPronomen, ProfilLinks } from '../../components/ProfilAngaben';
 import { AuthContext } from '../../contexts/AuthContext';
 import { SwitchBar } from '../../components/SwitchBar';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
@@ -120,7 +121,7 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
           onPressOhneStory={onAvatarPress}
         />
         <View style={styles.headText}>
-          <Text style={styles.name} numberOfLines={1}>{eigenesProfil.name}</Text>
+          <NameMitPronomen name={eigenesProfil.name} pronomen={eigenesProfil.pronomen} style={styles.name} />
           {!!user?.profile.handle && (
             <Text style={styles.handle} numberOfLines={1}>{user.profile.handle}</Text>
           )}
@@ -128,6 +129,12 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
       </View>
 
       {!!eigenesProfil.bio && <Text style={styles.bio}>{eigenesProfil.bio}</Text>}
+      {/* Kasten 1.3h: Links wie in den anderen beiden Profilen. */}
+      {eigenesProfil.links?.length > 0 && (
+        <View style={styles.profilLinks}>
+          <ProfilLinks links={eigenesProfil.links} onNotice={(t) => onNotice?.(t)} />
+        </View>
+      )}
 
       {/* Punkt 19: "Profil bearbeiten" gab es nur im Videos-Profil. Die
           Website hat den Knopf laengst an allen dreien, hier fehlte er.
@@ -233,6 +240,8 @@ const styles = themenStyles((colors) => ({
   /* Die Biografie steht ueber die volle Breite unter dem Kopf, nicht mehr in
      der schmalen Spalte daneben. */
   bio: { ...typography.message, color: colors.text, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  // Unter der Biografie: deren unterer Abstand steht schon, nur der Rand fehlt.
+  profilLinks: { paddingHorizontal: spacing.lg, marginTop: -spacing.md, paddingBottom: spacing.md },
   /* Derselbe Knopf wie in OwnProfileHead, damit die drei Profile nicht
      unterschiedlich aussehen. */
   bearbeiten: {

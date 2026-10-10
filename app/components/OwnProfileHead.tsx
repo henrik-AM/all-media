@@ -4,6 +4,7 @@ import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { StoryAvatar } from './StoryAvatar';
+import { NameMitPronomen, ProfilLinks } from './ProfilAngaben';
 import { colors, sizes, spacing, themenStyles, typography } from '../constants/design';
 
 interface Stat {
@@ -16,9 +17,13 @@ interface Props {
   stats: Stat[];
   name: string;
   bio: string;
-  link: string;
+  /** Kasten 1.3e (Schema 88): klein neben dem Namen. */
+  pronomen?: string;
+  /** Kasten 1.3g: erster Link sichtbar, „und N weitere“ → Liste. */
+  links: { url: string; titel: string }[];
+  /** Für „Diese Adresse lässt sich nicht öffnen“. */
+  onNotice: (text: string) => void;
   onAction: (key: string) => void;
-  onLink: () => void;
   onStat?: (label: string) => void;
   onBearbeiten?: () => void;
   onAvatarPress?: () => void;
@@ -43,7 +48,7 @@ interface Props {
  * Glocke/Plus/Menü, darunter Bild links neben den Zahlen, dann Name,
  * Biografie und Link linksbündig.
  */
-export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLink, onStat, onBearbeiten, onAvatarPress, storyBereich, onOnlinePunkt, onlineSichtbar = true, ungelesen = 0 }: Props) => (
+export const OwnProfileHead = ({ handle, stats, name, bio, pronomen, links, onNotice, onAction, onStat, onBearbeiten, onAvatarPress, storyBereich, onOnlinePunkt, onlineSichtbar = true, ungelesen = 0 }: Props) => (
   <View>
     {/*
       * Kasten 12.2: Henrik am 21.09.2026 „Nutzername sitzt waagerecht zu weit
@@ -126,13 +131,9 @@ export const OwnProfileHead = ({ handle, stats, name, bio, link, onAction, onLin
     </View>
 
     <View style={styles.about}>
-      <Text style={styles.name}>{name}</Text>
+      <NameMitPronomen name={name} pronomen={pronomen} style={styles.name} />
       {!!bio && <Text style={styles.bio}>{bio}</Text>}
-      {!!link && (
-        <Druck onPress={onLink}>
-          <Text style={styles.link}>{link}</Text>
-        </Druck>
-      )}
+      <ProfilLinks links={links} onNotice={onNotice} />
     </View>
 
     {onBearbeiten && (
@@ -207,7 +208,6 @@ const styles = themenStyles((colors) => ({
   about: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   name: { ...typography.h2, color: colors.text },
   bio: { ...typography.message, color: colors.text, marginTop: 3 },
-  link: { ...typography.message, color: colors.brand, marginTop: 4 },
   /* Kante statt Graufüllung: eine graue Fläche über die volle Breite liest
      sich wie ein Platzhalter, eine Kante wie ein Knopf. */
   bearbeiten: {

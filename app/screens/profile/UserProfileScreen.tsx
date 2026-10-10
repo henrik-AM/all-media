@@ -8,7 +8,7 @@ import { StoryAvatar } from '../../components/StoryAvatar';
 import { EmptyState } from '../../components/EmptyState';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
-import { oeffneLink } from '../../lib/links';
+import { NameMitPronomen, ProfilLinks } from '../../components/ProfilAngaben';
 import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { ProfilOptionenSheet } from '../../components/ProfilOptionenSheet';
@@ -276,7 +276,8 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
         </View>
 
         <View style={styles.about}>
-          <Text style={styles.name}>{person.name}</Text>
+          {/* Kasten 1.3h: Pronomen und Links wie im eigenen Profil. */}
+          <NameMitPronomen name={person.name} pronomen={profile.pronomen} style={styles.name} />
           <Text style={styles.bio}>{profile.bio}</Text>
           {/*
             Henrik: "Links in Profilbeschreibungen muessen anklickbar sein."
@@ -284,11 +285,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
             hier, auf einem fremden Profil, blendete er bis zum 02.09.2026 nur
             seine eigene Adresse als Hinweis ein.
           */}
-          {!!profile.link && (
-            <Druck onPress={() => oeffneLink(profile.link, onNotice)}>
-              <Text style={styles.link}>{profile.link}</Text>
-            </Druck>
-          )}
+          <ProfilLinks links={profile.links ?? (profile.link ? [{ url: profile.link, titel: '' }] : [])} onNotice={onNotice} />
         </View>
 
         {istBlockiert(userId) ? (
@@ -504,7 +501,6 @@ const styles = themenStyles((colors) => ({
   about: { paddingHorizontal: spacing.lg, paddingBottom: 12 },
   name: { color: colors.text, fontSize: 15, fontWeight: '700' },
   bio: { marginTop: 3, color: colors.text, ...typography.message, lineHeight: 20 },
-  link: { marginTop: 4, color: colors.brand, ...typography.message },
 
   buttons: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: 14 },
   button: {
