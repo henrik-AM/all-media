@@ -646,6 +646,60 @@ function bioLink(adresse) {
   return `<a class="prof__link" href="${esc(ziel)}" target="_blank" rel="noopener noreferrer">${esc(adresse)}</a>`;
 }
 
+/*
+ * Kasten 1.3 (Nachtrag 10.10.2026): Pronomen klein neben dem Namen und die
+ * Links eines Profils — erster sichtbar, bei mehreren „und N weitere“ → Liste.
+ * In allen Profilköpfen gleich (Videos, Communitys, Messenger, fremdes
+ * Profil). Gegenstück in der App: components/ProfilAngaben.tsx. Regeln und
+ * Texte aus gemeinsam/profilfelder.js.
+ */
+function nameMitPronomen(name, pronomen) {
+  const p = String(pronomen || '').trim();
+  return `${esc(name)}${p ? `<span class="prof__pronomen" data-testid="profil-pronomen">${esc(p)}</span>` : ''}`;
+}
+
+function profilLinksHtml(links) {
+  const alle = (links || []).filter((l) => l && l.url);
+  if (!alle.length) return '';
+  const erster = alle[0];
+  const weitere = window.Profilfelder.weitereText(alle.length);
+  return `<div class="prof__links">
+    <a class="prof__link" data-testid="profil-link" href="${esc(window.Profilfelder.linkZiel(erster))}" target="_blank" rel="noopener noreferrer">${esc(window.Profilfelder.linkText(erster))}</a>
+    ${
+      weitere
+        ? `<button class="prof__weitere" type="button" data-profillinks="${esc(JSON.stringify(alle))}" data-testid="profil-links-weitere" aria-label="Alle Links: ${esc(weitere)}">${esc(weitere)}</button>`
+        : ''
+    }
+  </div>`;
+}
+
+/* Ein Klick auf „und N weitere“ — egal in welchem Profil — zeigt alle Links. */
+document.addEventListener('click', (e) => {
+  const knopf = e.target.closest?.('[data-profillinks]');
+  if (!knopf) return;
+  e.preventDefault();
+  let alle = [];
+  try {
+    alle = JSON.parse(knopf.dataset.profillinks || '[]');
+  } catch {
+    alle = [];
+  }
+  openSheet(
+    window.Profilfelder.TEXTE.linksTitel,
+    `<div class="sheet__body" data-testid="profil-links-liste">${alle
+      .map(
+        (l) => `<a class="item" href="${esc(window.Profilfelder.linkZiel(l))}" target="_blank" rel="noopener noreferrer">
+          <span class="item__icon">${ICONS.link}</span>
+          <span class="item__label">${esc(window.Profilfelder.linkText(l))}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </a>`
+      )
+      .join('')}</div>`,
+    null,
+    { schliessen: true }
+  );
+});
+
 /* ------------------------------------------------------------------ theme */
 function applyTheme() {
   const root = document.documentElement;
@@ -1348,6 +1402,8 @@ function verlasseExplorer() {
   state.explorerParam = null;
   // Auch die Unterseite der Community-Suche (Kasten 3.1/3.2).
   state.commSuchSeite = null;
+  // Kasten 1.3: die Seite „Profil bearbeiten“.
+  state.profilSeite = null;
   /*
    * Auch der Weg zurueck ins Profil gilt nur fuer den Besuch, aus dem er kam.
    * Wer die Einstellungen ueber die untere Leiste oeffnet, soll dort keinen
@@ -1394,6 +1450,14 @@ function render() {
   kameraStromStoppen();
   renderBottomNav();
   renderTopBar();
+
+  /*
+   * Kasten 1.3 (Nachtrag): die Seite „Profil bearbeiten“. Vor der
+   * Bildschirmzeit-Sperre, weil sie wie die Einstellungen zu keinem Bereich
+   * gehört (App: bereichFuer → null). Geleert von ihrem Zurück-Pfeil und von
+   * jedem Navigationsklick (verlasseExplorer).
+   */
+  if (state.profilSeite) return renderProfilSeite();
 
   /*
    * Kasten 22: ist der Bereich der Hauptseite in der Bildschirmzeit zu,
@@ -3233,11 +3297,12 @@ function openProfilBearbeiten(fertig) {
 
       sheet.querySelector('#pbEntfernen').addEventListener('click', () => bildSetzen(null, null));
 
-      // Zurück-Pfeil in den Einstellungen führt ins Profil, aus dem man kam
-      // (zuDenEinstellungen merkt state.area als settingsAus).
+      // Nachtrag 10.10.2026: der Hinweis führt direkt auf die große Seite
+      // „Profil bearbeiten“ (wie Einstellungen → Konto). Ihr Zurück-Pfeil
+      // führt wieder ins Profil, aus dem man kam.
       sheet.querySelector('#pbEinstellungen').addEventListener('click', () => {
         close();
-        zuDenEinstellungen('konto');
+        openProfilSeite();
       });
 
       sheet.querySelector('#pbSichern').addEventListener('click', async () => {
@@ -3259,7 +3324,14 @@ function openProfilBearbeiten(fertig) {
           initials: antwort.profil.initials,
           color: antwort.profil.color,
         });
-        state.eigenesProfil = { ...state.eigenesProfil, bio: antwort.profil.bio, link: antwort.profil.link };
+        state.eigenesProfil = {
+          ...state.eigenesProfil,
+          bio: antwort.profil.bio,
+          link: antwort.profil.link,
+          // Kasten 1.3: der Server liefert die Links mit (Schema 88 hält link = erster).
+          pronomen: antwort.profil.pronomen || '',
+          links: antwort.profil.links || [],
+        };
 
         close();
         toast('Profil gespeichert');
@@ -3268,6 +3340,357 @@ function openProfilBearbeiten(fertig) {
     },
     { schliessen: true, hoch: true }
   );
+}
+
+/*
+ * Die Seite „Profil bearbeiten“ (Kasten 1.3, Nachtrag 10.10.2026).
+ *
+ * Henrik: „deutlich mehr Freiraum“ als das kleine Blatt, „orientiere dich an
+ * Instagram und entscheide selbst“. Oben das große Bild mit „Bild
+ * bearbeiten“, darunter Zeilen (Beschriftung links, Wert rechts); jede Zeile
+ * öffnet eine eigene Unterseite mit großem Eingabefeld und Abbrechen/Fertig.
+ * Fehler stehen auf der Seite (#psFehler), nicht im Toast dahinter.
+ *
+ * Erreichbar über den Hinweis „Weitere Bearbeitungen unter Einstellungen“
+ * (Blatt Profil bearbeiten, alle drei Profile) und Einstellungen → Konto →
+ * „Profil bearbeiten“. Gegenstück in der App:
+ * app/screens/profile/ProfilBearbeitenScreen.tsx — dieselben Texte aus
+ * gemeinsam/profilfelder.js. Bewusst nicht: Geschlecht.
+ */
+function openProfilSeite() {
+  state.profilSeite = { feld: null, aus: state.area };
+  render();
+}
+
+function profilSeiteLinks() {
+  const profil = state.eigenesProfil || {};
+  return profil.links && profil.links.length
+    ? profil.links
+    : window.Profilfelder.linksAus({ link: profil.link });
+}
+
+/** Nach dem Speichern: was der Server zurückgibt, steht überall sofort. */
+function profilSeiteUebernehmen(p) {
+  if (!p) return;
+  Object.assign(state.users.me, {
+    name: p.name,
+    initials: p.initials,
+    color: p.color,
+    pronomen: p.pronomen || '',
+    links: p.links || [],
+  });
+  state.eigenesProfil = {
+    ...state.eigenesProfil,
+    bio: p.bio,
+    link: p.link,
+    pronomen: p.pronomen || '',
+    links: p.links || [],
+  };
+}
+
+function renderProfilSeite() {
+  const PF = window.Profilfelder;
+  const T = PF.TEXTE;
+  const seite = state.profilSeite;
+  if (seite.feld) return renderProfilSeiteFeld();
+
+  const me = state.users.me;
+  const profil = state.eigenesProfil || {};
+  const links = profilSeiteLinks();
+  const zeilen = [
+    { feld: 'name', label: T.name, wert: me.name, leer: T.leer.name },
+    { feld: 'benutzername', label: T.benutzername, wert: me.handle, leer: T.leer.benutzername },
+    { feld: 'pronomen', label: T.pronomen, wert: profil.pronomen, leer: T.leer.pronomen },
+    { feld: 'bio', label: T.bio, wert: profil.bio, leer: T.leer.bio },
+    { feld: 'links', label: T.links, wert: PF.linksZeile(links), leer: T.leer.links },
+  ];
+
+  main.innerHTML = `
+    <div class="scroll profilseite" data-testid="profilseite">
+      <div class="profilseite__kopf">
+        <button class="iconbtn" id="psZurueck" aria-label="${esc(T.zurueck)}">${ICONS.back}</button>
+        <h2 class="profilseite__titel">${esc(T.seite)}</h2>
+        <span class="profilseite__platz"></span>
+      </div>
+
+      <div class="profilseite__bild">
+        <div class="avatar avatar--96" id="psVorschau" style="background:${farbe(me.color)}">
+          ${me.avatar ? `<img src="${esc(me.avatar)}" alt="" />` : esc(me.initials)}
+        </div>
+        <button class="profilseite__bildknopf" id="psBild" type="button">${esc(T.bildBearbeiten)}</button>
+        <div class="profilseite__meldung" id="psBildMeldung" role="status" hidden></div>
+        <input type="file" accept="image/*" id="psDatei" hidden />
+        <input type="file" accept="image/*" capture="user" id="psKameraDatei" hidden />
+      </div>
+
+      <div class="profilseite__liste">
+        ${zeilen
+          .map(
+            (z) => `<button class="profilseite__zeile" type="button" data-psfeld="${z.feld}" aria-label="${esc(z.label)} bearbeiten">
+              <span class="profilseite__label">${esc(z.label)}</span>
+              <span class="profilseite__wert ${z.wert ? '' : 'is-leer'}">${esc(z.wert || z.leer)}</span>
+              <span class="row__chevron">${ICONS.chevron}</span>
+            </button>`
+          )
+          .join('')}
+      </div>
+    </div>`;
+
+  $('#psZurueck').addEventListener('click', () => {
+    state.profilSeite = null;
+    render();
+  });
+  main.querySelectorAll('[data-psfeld]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.profilSeite.feld = b.dataset.psfeld;
+      render();
+    })
+  );
+
+  // Das Bild: dieselben Wege wie im kleinen Blatt (/api/hochladen →
+  // /api/eigene/profilbild), keine eigene Medienstelle.
+  const meldung = (text) => {
+    const el = $('#psBildMeldung');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
+  };
+  const bildSetzen = async (url, anzeige) => {
+    const antwort = await api('/api/eigene/profilbild', { url });
+    if (!antwort.ok) return meldung(antwort.error || 'Das Profilbild ließ sich nicht speichern');
+    state.users.me.avatar = anzeige;
+    if (state.profilSeite && !state.profilSeite.feld) renderProfilSeite();
+    meldung(anzeige ? 'Profilbild gespeichert' : 'Profilbild entfernt');
+  };
+  const dateiGewaehlt = async (e) => {
+    const datei = e.target.files?.[0];
+    e.target.value = '';
+    if (!datei) return;
+    let daten;
+    try {
+      daten = await bildVerkleinern(datei, 600);
+    } catch {
+      return meldung('Dieses Bild lässt sich nicht lesen');
+    }
+    meldung('Wird hochgeladen …');
+    const hoch = await api('/api/hochladen', { ordner: 'avatars', aufnahme: daten });
+    if (!hoch.ok) return meldung(hoch.error || 'Das Bild ließ sich nicht hochladen');
+    await bildSetzen(hoch.url, hoch.anzeige || daten);
+  };
+  $('#psDatei').addEventListener('change', dateiGewaehlt);
+  $('#psKameraDatei').addEventListener('change', dateiGewaehlt);
+  $('#psBild').addEventListener('click', () => {
+    meldung('');
+    openSheet(
+      T.bildBearbeiten,
+      `<div class="sheet__body">
+        <button class="item" data-psbild="waehlen"><span class="item__icon">${ICONS.image}</span><span class="item__label">${esc(T.bildWaehlen)}</span></button>
+        <button class="item" data-psbild="kamera"><span class="item__icon">${ICONS.camera}</span><span class="item__label">${esc(T.bildAufnehmen)}</span></button>
+        ${
+          state.users.me.avatar
+            ? `<button class="item item--danger" data-psbild="entfernen"><span class="item__icon">${ICONS.trash}</span><span class="item__label">${esc(T.bildEntfernen)}</span></button>`
+            : ''
+        }
+      </div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-psbild]').forEach((b) =>
+          b.addEventListener('click', () => {
+            close();
+            if (b.dataset.psbild === 'waehlen') $('#psDatei')?.click();
+            else if (b.dataset.psbild === 'kamera') $('#psKameraDatei')?.click();
+            else bildSetzen(null, null);
+          })
+        );
+      },
+      { schliessen: true }
+    );
+  });
+}
+
+function renderProfilSeiteFeld() {
+  const PF = window.Profilfelder;
+  const T = PF.TEXTE;
+  const G = PF.GRENZEN;
+  const feld = state.profilSeite.feld;
+  const me = state.users.me;
+  const profil = state.eigenesProfil || {};
+  const titel = { name: T.name, benutzername: T.benutzername, pronomen: T.pronomen, bio: T.bio, links: T.links }[feld];
+  const grenze = { name: G.name, pronomen: G.pronomen, bio: G.bio }[feld];
+  const eigenerHandle = window.Benutzername.normal(me.handle || '');
+  const anfang =
+    feld === 'name' ? me.name : feld === 'benutzername' ? eigenerHandle : feld === 'pronomen' ? profil.pronomen : profil.bio;
+  // Die Links werden auf der Unterseite bearbeitet und erst mit „Fertig“ gespeichert.
+  const links = profilSeiteLinks().map((l) => ({ ...l }));
+
+  const linkKarte = (l, i) => `<div class="profilseite__linkkarte" data-pslink="${i}" data-testid="profilseite-link-${i + 1}">
+      <div class="profilseite__linkkopf">
+        <span class="feld__label">Link ${i + 1}</span>
+        <button class="iconbtn" type="button" data-psloeschen="${i}" aria-label="${esc(T.linkLoeschen)} ${i + 1}">${ICONS.trash}</button>
+      </div>
+      <input class="feld__eingabe" data-psurl="${i}" type="url" inputmode="url" autocomplete="off" value="${esc(l.url)}" maxlength="${G.adresse}" placeholder="${esc(T.adresseBeispiel)}" aria-label="${esc(T.adresse)} ${i + 1}" />
+      <input class="feld__eingabe" data-pstitel="${i}" value="${esc(l.titel)}" maxlength="${G.titel}" placeholder="${esc(T.titel)}" aria-label="${esc(T.titel)} ${i + 1}" />
+    </div>`;
+
+  main.innerHTML = `
+    <div class="scroll profilseite" data-testid="profilseite-feld-${feld}">
+      <div class="profilseite__kopf">
+        <button class="profilseite__textknopf" id="psAbbrechen" type="button">${esc(T.abbrechen)}</button>
+        <h2 class="profilseite__titel">${esc(titel)}</h2>
+        <button class="profilseite__textknopf is-fertig" id="psFertig" type="button">${esc(T.fertig)}</button>
+      </div>
+      <div class="profilseite__feld">
+        ${
+          feld === 'links'
+            ? `<div id="psLinks"></div>
+               <button class="profilseite__linkneu" id="psLinkNeu" type="button">${ICONS.plus} ${esc(T.linkHinzufuegen)}</button>
+               <div class="profilseite__erklaerung" id="psLinksVoll" hidden>${esc(T.linksVoll)}</div>`
+            : `<label class="feld__label" for="psEingabe">${esc(titel)}</label>
+               <div class="profilseite__eingabezeile">
+                 ${feld === 'benutzername' ? '<span class="profilseite__at">@</span>' : ''}
+                 ${
+                   feld === 'bio'
+                     ? `<textarea class="feld__eingabe feld__eingabe--mehrzeilig profilseite__gross" id="psEingabe" rows="6" maxlength="${grenze}" placeholder="${esc(T.leer.bio)}">${esc(anfang || '')}</textarea>`
+                     : `<input class="feld__eingabe profilseite__gross" id="psEingabe" value="${esc(anfang || '')}" ${grenze ? `maxlength="${grenze}"` : ''} placeholder="${esc(T.leer[feld])}" ${feld === 'benutzername' ? 'autocapitalize="none" autocorrect="off" spellcheck="false"' : ''} autocomplete="off" />`
+                 }
+               </div>
+               ${grenze ? `<span class="feld__zaehler" id="psZaehler" data-testid="profilseite-zaehler"></span>` : ''}
+               ${feld === 'benutzername' ? '<div class="profilseite__namensstand" id="psNamensstand" data-testid="profilseite-namensstand"></div>' : ''}`
+        }
+        <div class="profilseite__fehler" id="psFehler" role="alert" data-testid="profilseite-fehler" hidden></div>
+        <div class="profilseite__erklaerung">${esc(T.erklaerung[feld])}</div>
+      </div>
+    </div>`;
+
+  const fehler = (text) => {
+    const el = $('#psFehler');
+    el.textContent = text || '';
+    el.hidden = !text;
+  };
+  const zurueck = (toastText) => {
+    state.profilSeite.feld = null;
+    render();
+    if (toastText) toast(toastText);
+  };
+  $('#psAbbrechen').addEventListener('click', () => zurueck());
+
+  // --- Links: Karten zeichnen, hinzufügen, löschen ---
+  const linksZeichnen = () => {
+    const box = $('#psLinks');
+    if (!box) return;
+    box.innerHTML = links.length ? links.map(linkKarte).join('') : `<div class="profilseite__erklaerung">${esc(T.keineLinks)}</div>`;
+    $('#psLinkNeu').hidden = links.length >= G.links;
+    $('#psLinksVoll').hidden = links.length < G.links;
+    box.querySelectorAll('[data-psurl]').forEach((e) =>
+      e.addEventListener('input', () => {
+        links[Number(e.dataset.psurl)].url = e.value;
+        fehler('');
+      })
+    );
+    box.querySelectorAll('[data-pstitel]').forEach((e) =>
+      e.addEventListener('input', () => {
+        links[Number(e.dataset.pstitel)].titel = e.value;
+      })
+    );
+    box.querySelectorAll('[data-psloeschen]').forEach((b) =>
+      b.addEventListener('click', () => {
+        links.splice(Number(b.dataset.psloeschen), 1);
+        fehler('');
+        linksZeichnen();
+      })
+    );
+  };
+  if (feld === 'links') {
+    linksZeichnen();
+    $('#psLinkNeu').addEventListener('click', () => {
+      if (links.length >= G.links) return;
+      links.push({ url: '', titel: '' });
+      linksZeichnen();
+      $(`[data-psurl="${links.length - 1}"]`)?.focus();
+    });
+  }
+
+  // --- Ein Feld: Zähler und, beim Benutzernamen, „frei“/„vergeben“ live ---
+  const eingabe = $('#psEingabe');
+  let namensUhr = null;
+  let namensStand = { gut: true, vergeben: false };
+  const namenPruefen = () => {
+    const zeile = $('#psNamensstand');
+    const setzen = (text, gut, vergeben = false) => {
+      namensStand = { gut, vergeben };
+      zeile.textContent = text;
+      zeile.classList.toggle('is-fehler', Boolean(text) && !gut);
+      zeile.classList.toggle('is-gut', Boolean(text) && gut);
+    };
+    clearTimeout(namensUhr);
+    const name = window.Benutzername.normal(eingabe.value);
+    if (!name) return setzen('', true);
+    if (name === eigenerHandle) return setzen(T.eigenerName, true);
+    const form = window.Benutzername.pruefe(name);
+    if (form) return setzen(form, false);
+    setzen('Wird geprüft …', true);
+    // Gleiche Regel wie bei der Registrierung: halbe Sekunde Ruhe, dann handle_frei.
+    namensUhr = setTimeout(async () => {
+      const antwort = await window.Anmeldung?.benutzernameFrei(name);
+      if (!eingabe.isConnected || window.Benutzername.normal(eingabe.value) !== name) return;
+      if (antwort?.frei) setzen(`${antwort.handle} ist frei`, true);
+      else setzen(antwort?.meldung || 'Dieser Benutzername ist schon vergeben.', false, antwort?.grund === 'vergeben');
+    }, 500);
+  };
+  if (eingabe) {
+    const zaehler = $('#psZaehler');
+    const zaehlen = () => {
+      if (zaehler) zaehler.textContent = PF.zaehler(eingabe.value, grenze);
+    };
+    eingabe.addEventListener('input', () => {
+      fehler('');
+      zaehlen();
+      if (feld === 'benutzername') namenPruefen();
+    });
+    zaehlen();
+    if (feld === 'benutzername') namenPruefen();
+    eingabe.focus();
+    if (feld !== 'bio') eingabe.addEventListener('keydown', (e) => e.key === 'Enter' && $('#psFertig').click());
+  }
+
+  // --- Fertig ---
+  $('#psFertig').addEventListener('click', async () => {
+    fehler('');
+    const knopf = $('#psFertig');
+
+    if (feld === 'benutzername') {
+      const name = window.Benutzername.normal(eingabe.value);
+      if (name === eigenerHandle) return zurueck();
+      const form = window.Benutzername.pruefe(name);
+      if (form) return fehler(form);
+      if (namensStand.vergeben) return fehler('Dieser Benutzername ist schon vergeben.');
+      knopf.disabled = true;
+      const antwort = await window.Anmeldung?.benutzernameAendern(name);
+      knopf.disabled = false;
+      if (!antwort?.ok) return fehler(antwort?.meldung || 'Die Änderung ist gerade nicht möglich.');
+      state.users.me.handle = antwort.handle;
+      return zurueck(T.gespeichert);
+    }
+
+    let koerper;
+    if (feld === 'links') {
+      const geprueft = PF.linksPruefen(links);
+      if (geprueft.fehler) return fehler(geprueft.fehler);
+      koerper = { links: geprueft.links };
+    } else {
+      const wert = eingabe.value.trim();
+      const pruefer = { name: PF.namePruefen, pronomen: PF.pronomenPruefen, bio: PF.bioPruefen }[feld];
+      const grund = pruefer(wert);
+      if (grund) return fehler(grund);
+      koerper = { [feld]: wert };
+    }
+
+    knopf.disabled = true;
+    const antwort = await api('/api/eigene/profil', koerper);
+    knopf.disabled = false;
+    if (!antwort.ok) return fehler(antwort.error || 'Das Profil ließ sich nicht speichern');
+    profilSeiteUebernehmen(antwort.profil);
+    zurueck(T.gespeichert);
+  });
 }
 
 function openNewMenu() {
@@ -4554,13 +4977,14 @@ async function openProfile(userId, variante) {
         </div>
 
         <div class="prof__about">
-          <div class="prof__name">${esc(profile.name)}</div>
+          <div class="prof__name">${nameMitPronomen(profile.name, profile.pronomen)}</div>
           <div class="prof__bio">${esc(profile.bio)}</div>
           ${/* Ein echter Link, der im Browser aufgeht - vorher stand hier
                 href="#" und ein Klick gab nur die Adresse als Hinweis aus.
                 Das war Henriks Punkt 9. bioLink macht daraus dasselbe
                 target="_blank"-Element wie im eigenen Profil. */ ''}
-          ${bioLink(profile.link)}
+          ${/* Kasten 1.3h: alle Links, der erste sichtbar. */ ''}
+          ${profilLinksHtml(profile.links || (profile.link ? [{ url: profile.link, titel: '' }] : []))}
         </div>
 
         ${
@@ -7260,16 +7684,12 @@ const SETTINGS = [
     id: 'konto',
     title: 'Konto',
     items: [
-      {
-        label: 'Profil bearbeiten',
-        icon: 'person',
-        eingabe: [
-          { key: 'name', label: 'Name', pflicht: true },
-          { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
-          { key: 'link', label: 'Link' },
-        ],
-        fertig: 'Profil gespeichert',
-      },
+      /*
+       * Kasten 1.3 (Nachtrag 10.10.2026): statt des Formulars mit Name,
+       * Biografie, Link die eigene Seite „Profil bearbeiten“ nach
+       * Instagram-Vorbild (renderProfilSeite). Gleicher Eintrag in der App.
+       */
+      { label: 'Profil bearbeiten', icon: 'person', aktion: 'profilseite' },
       {
         label: 'Telefonnummer ändern',
         icon: 'phone',
@@ -8888,6 +9308,7 @@ function openEinstellung(punkt, nachher) {
    * anhaengt (web/public/anmeldung.js). Ein <a href> ginge ohne Token los
    * und bekaeme 401.
    */
+  if (punkt.aktion === 'profilseite') return openProfilSeite();
   if (punkt.aktion === 'farbfilter') return openFarbfilter();
   if (punkt.aktion === 'spendencode') return spendenweg(null, 'code');
   if (punkt.aktion === 'zahlungsmethoden') return spendenweg(null, 'methoden');
@@ -10961,11 +11382,16 @@ function renderMessengerProfile() {
           ${/* Wie im Videos- und Community-Profil aus dem Konto, nicht fest
                 im Markup - sonst zeigt "Profil bearbeiten" hier keine
                 Wirkung. */ ''}
-          <div class="mprof__name">${esc(me.name)}</div>
+          <div class="mprof__name">${nameMitPronomen(me.name, profil.pronomen)}</div>
           ${me.handle ? `<div class="mprof__handle">${esc(me.handle)}</div>` : ''}
         </div>
       </div>
       ${profil.bio ? `<div class="mprof__bio">${esc(profil.bio)}</div>` : ''}
+      ${/* Kasten 1.3h: Links wie in den anderen beiden Profilen. */ ''}
+      ${(() => {
+        const l = profilLinksHtml(profil.links || (profil.link ? [{ url: profil.link, titel: '' }] : []));
+        return l ? `<div class="mprof__profillinks">${l}</div>` : '';
+      })()}
       <div class="mprof__links">
         <button data-switch="videos">@videoprofil</button>
         <button data-switch="communities">@communityprofil</button>
@@ -16455,9 +16881,9 @@ async function renderVideoProfile() {
         </div>
       </div>
       <div class="prof__about">
-        <div class="prof__name">${esc(me.name)}</div>
+        <div class="prof__name">${nameMitPronomen(me.name, me.pronomen)}</div>
         ${me.bio ? `<div class="prof__bio">${esc(me.bio)}</div>` : ''}
-        ${me.link ? bioLink(me.link) : ''}
+        ${profilLinksHtml(me.links)}
       </div>
       <div class="prof__aktionen">
         <button class="btn btn--breit" id="profilBearbeiten">Profil bearbeiten</button>
@@ -17014,9 +17440,9 @@ function renderCommunityProfile() {
           nur an einer der beiden Stellen. Jetzt dieselbe Quelle wie dort.
         */ ''}
       <div class="prof__about">
-        <div class="prof__name">${esc(me.name)}</div>
+        <div class="prof__name">${nameMitPronomen(me.name, profil.pronomen)}</div>
         ${profil.bio ? `<div class="prof__bio">${esc(profil.bio)}</div>` : ''}
-        ${profil.link ? bioLink(profil.link) : ''}
+        ${profilLinksHtml(profil.links || (profil.link ? [{ url: profil.link, titel: '' }] : []))}
       </div>
       ${/*
           "Profil bearbeiten" gab es nur im Videos-Profil. Hier fuehrt derselbe
