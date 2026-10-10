@@ -3151,6 +3151,13 @@ function openProfilBearbeiten(fertig) {
           ).join('')}
         </div>
       </div>
+      ${/*
+          Kasten 1.3–1.5 (Feedback 28.09.2026): kleine Schrift, die in den
+          Abschnitt „Konto" der Einstellungen führt. Das Blatt ist für alle
+          drei Profile dasselbe, also steht der Hinweis in allen dreien.
+          Gleicher Text und gleiches Ziel in der App (WeitereEinstellungenHinweis).
+        */ ''}
+      <button class="bearbeiten__weiter" id="pbEinstellungen" type="button">Weitere Bearbeitungen unter Einstellungen</button>
     </div>
     <div class="sheet__footer">
       <button class="btn btn--primary" id="pbSichern">Merken</button>
@@ -3217,6 +3224,13 @@ function openProfilBearbeiten(fertig) {
       sheet.querySelector('#pbKameraDatei').addEventListener('change', dateiGewaehlt);
 
       sheet.querySelector('#pbEntfernen').addEventListener('click', () => bildSetzen(null, null));
+
+      // Zurück-Pfeil in den Einstellungen führt ins Profil, aus dem man kam
+      // (zuDenEinstellungen merkt state.area als settingsAus).
+      sheet.querySelector('#pbEinstellungen').addEventListener('click', () => {
+        close();
+        zuDenEinstellungen('konto');
+      });
 
       sheet.querySelector('#pbSichern').addEventListener('click', async () => {
         const antwort = await fetch('/api/eigene/profil', {
