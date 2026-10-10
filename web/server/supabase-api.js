@@ -1213,22 +1213,43 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
    * PostgREST den Weg nicht waehlen — die Abfrage schluege mit „more than one
    * relationship was found" fehl, und der Kanal saehe leer aus.
    */
-  const { data, error } = await client
-    .from('community_channel_messages')
-    .select(
-      'id, channel_id, sender_id, text, created_at,' +
-        ' media_url, media_type, file_name, file_size,' +
-        ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
-        ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
-        // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
-        ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
-        ' profiles!posts_user_id_fkey(name, handle))'
-    )
-    .eq('channel_id', kanalId)
-    // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
-    .order('created_at', { ascending: false })
-    .limit(500);
+  const spalten =
+    'id, channel_id, sender_id, text, created_at,' +
+    ' media_url, media_type, file_name, file_size,' +
+    ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
+    ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
+    // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
+    ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
+    ' profiles!posts_user_id_fkey(name, handle))';
+  const holen = (mitBezug) =>
+    client
+      .from('community_channel_messages')
+      // Kasten 4.2: `reply_to` (Schema XX) — fehlt die Spalte noch, ohne.
+      .select(mitBezug ? `${spalten}, reply_to` : spalten)
+      .eq('channel_id', kanalId)
+      // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
+      .order('created_at', { ascending: false })
+      .limit(500);
+  let { data, error } = await holen(true);
+  if (error && Chatblase.fehltSpalte(error, 'reply_to')) ({ data, error } = await holen(false));
   if (error) throw error;
+
+  // Kasten 4.2: Namen der Originalabsender fuer den Bezugskopf — gleiche
+  // Rechnung wie in app/lib/daten.ts (gemeinsam/chatblase.js, kanalBezug).
+  const alleZeilen = data || [];
+  const bezugAbsender = [
+    ...new Set(
+      alleZeilen
+        .filter((z) => z.reply_to)
+        .map((z) => (alleZeilen.find((o) => o.id === z.reply_to) || {}).sender_id)
+        .filter((id) => id && id !== nutzerId)
+    ),
+  ];
+  const namen = {};
+  if (bezugAbsender.length) {
+    const { data: profile } = await client.from('profiles').select('id, name').in('id', bezugAbsender);
+    for (const p of profile || []) namen[p.id] = p.name;
+  }
 
   // Dieselben Feldnamen wie in ladeNachrichten — die Blase im Kanal wird aus
   // denselben Bausteinen gebaut wie die im Chat.
@@ -1257,6 +1278,7 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
     // gleiche Abbildung wie in ladeNachrichten.
     geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts),
     datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size || 0) } : undefined,
+    antwortAuf: Chatblase.kanalBezug(m, alleZeilen, nutzerId, namen),
   }));
 }
 

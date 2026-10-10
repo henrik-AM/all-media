@@ -6650,6 +6650,12 @@ function renderKanalThemen(community, kanal) {
 /** Dritte Ebene: der Chat zu einem Thema. */
 // Kasten 27: Takt des offenen Unterthemas (renderCommunityChat).
 let kanalUhr = null;
+/*
+ * Kasten 4.2: worauf die nächste Nachricht im Unterthema antwortet — je
+ * Kanal. Liegt außerhalb von renderCommunityChat, weil das Nachsehen im Takt
+ * die Seite neu zeichnet; der Bezug soll das überstehen.
+ */
+let kanalAntwort = null; // { kanalId, nachricht }
 
 async function renderCommunityChat(community, kanal, thema) {
   const lauf = ++renderLauf;
@@ -6769,6 +6775,42 @@ async function renderCommunityChat(community, kanal, thema) {
   // Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag.
   geteiltBinden(liste);
 
+  /*
+   * Kasten 4.2/4.4: im Unterthema antworten — ziehen, Knopf beim Überfahren,
+   * Bezug → Original. Die Leiste über der Eingabe sagt, worauf geantwortet
+   * wird; das × nimmt den Bezug zurück. Gleiche Leiste wie im Chat (.msgbezug).
+   */
+  const kanalLeiste = () => {
+    document.querySelector('#commForm')?.parentNode.querySelector('.msgbezug')?.remove();
+    if (!kanalAntwort || kanalAntwort.kanalId !== kanal.id) return;
+    const q = kanalAntwort.nachricht;
+    const leiste = document.createElement('div');
+    leiste.className = 'msgbezug';
+    leiste.innerHTML = `
+      <span class="msgbezug__balken"></span>
+      <span class="msgbezug__text"><b>Antworten${q.from === 'me' ? '' : ` · ${esc(user(q.from).name)}`}</b><span>${esc(
+        q.text || 'Anhang'
+      )}</span></span>
+      <button type="button" class="msgbezug__zu" aria-label="Abbrechen">${ICONS.close}</button>`;
+    const form = $('#commForm');
+    form.parentNode.insertBefore(leiste, form);
+    leiste.querySelector('.msgbezug__zu').addEventListener('click', () => {
+      kanalAntwort = null;
+      leiste.remove();
+    });
+  };
+  if (kanalAntwort && kanalAntwort.kanalId !== kanal.id) kanalAntwort = null;
+  kanalLeiste();
+  antwortenBinden(
+    liste,
+    (id) => nachrichten.find((x) => x.id === id),
+    (m) => {
+      kanalAntwort = { kanalId: kanal.id, nachricht: m };
+      kanalLeiste();
+      $('#commMsgInput')?.focus();
+    }
+  );
+
   const feld = $('#commMsgInput');
   const sendKnopf = $('#commSend');
   // Kasten 25.1: @ schlägt zuerst die Mitglieder der Community vor.
@@ -6821,14 +6863,139 @@ async function renderCommunityChat(community, kanal, thema) {
      * etwas, und weil die Seite danach neu lud, sah es nach einem
      * Anzeigefehler aus. Die richtige Route gab es die ganze Zeit.
      */
+    // Kasten 4.2: die Antwort geht mit (reply_to, Schema XX).
+    const antwortAuf = kanalAntwort && kanalAntwort.kanalId === kanal.id ? kanalAntwort.nachricht.id : null;
     const res = await fetch(`/api/communities/${community.id}/channels/${kanal.id}/nachricht`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, antwortAuf }),
     });
     const daten = await res.json().catch(() => ({}));
-    if (daten && daten.ok === false) toast(daten.error || 'Die Nachricht ging nicht raus');
+    if (daten && daten.ok === false) {
+      toast(daten.error || 'Die Nachricht ging nicht raus');
+      // Text und Bezug bleiben, damit nichts verloren geht.
+      feld.value = text;
+      sendKnopf.disabled = false;
+      return;
+    }
+    kanalAntwort = null;
+    if (daten && daten.ohneBezug) toast(window.Chatblase.OHNE_BEZUG);
     renderCommunityChat(community, kanal, thema);
+  });
+}
+
+/* ==========================================================================
+ * Kasten 4 (Feedback 28.09.): Antworten per Ziehen — und auf der Website
+ * zusätzlich per Knopf beim Überfahren (Kasten 4.4). Gilt im Chat
+ * (paintMessages) und im Unterthema (renderCommunityChat). Schwelle und Weg
+ * aus gemeinsam/chatblase.js — dieselben Zahlen wie in der App
+ * (app/components/ZiehZumAntworten.tsx).
+ * ======================================================================== */
+
+/** Der Bezugskopf über einer Antwort — antippbar, springt zum Original. */
+function bezugHtml(a) {
+  if (!a) return '';
+  const text = a.text || (a.fehlt ? window.Chatblase.BEZUG_WEG : 'Zurückgenommen');
+  return `<button type="button" class="msg__bezug" data-bezugid="${esc(a.id)}" data-testid="antwort-bezug">
+       <span class="msg__bezugBalken"></span>
+       <span class="msg__bezugText">
+         ${a.autor ? `<b>${esc(a.autor)}</b>` : ''}
+         <span>${esc(text)}</span>
+       </span>
+     </button>`;
+}
+
+/** Der Antworten-Knopf neben der Blase — sichtbar beim Überfahren. */
+function antwortKnopfHtml() {
+  return `<button type="button" class="msg__antworten" data-antworten aria-label="Antworten" title="Antworten">${ICONS.antwort}</button>`;
+}
+
+/**
+ * Ziehen, Antworten-Knopf und Sprung zum Original an eine gezeichnete Liste
+ * binden. `finde(id)` liefert die Nachricht, `antworten(m)` setzt den Bezug.
+ */
+function antwortenBinden(liste, finde, antworten) {
+  const C = window.Chatblase;
+  liste.querySelectorAll('[data-antworten]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const m = finde(b.closest('[data-msgid]')?.dataset.msgid);
+      if (m) antworten(m);
+    })
+  );
+
+  liste.querySelectorAll('[data-bezugid]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const ziel = liste.querySelector(`[data-msgid="${CSS.escape(b.dataset.bezugid)}"]`);
+      if (!ziel) return toast('Die Nachricht ist nicht mehr im geladenen Verlauf');
+      ziel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      ziel.classList.remove('is-hervor');
+      void ziel.offsetWidth;
+      ziel.classList.add('is-hervor');
+      setTimeout(() => ziel.classList.remove('is-hervor'), 1400);
+    })
+  );
+
+  // Ziehen nach rechts — mit der Maus wie mit dem Finger (Pointer Events).
+  liste.querySelectorAll('[data-msgid][data-ziehbar]').forEach((el) => {
+    let start = null;
+    let zieht = false;
+    const zurueck = () => {
+      el.style.transition = 'transform .18s ease';
+      el.style.transform = '';
+      el.style.setProperty('--zug', '0');
+      setTimeout(() => {
+        el.style.transition = '';
+        delete el.dataset.gezogen;
+      }, 200);
+    };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      zieht = false;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!start || e.pointerId !== start.id) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (!zieht) {
+        if (!C.istZug(dx, dy)) return;
+        zieht = true;
+        el.dataset.gezogen = '1';
+        // Das lange Drücken (Menü) bricht ab, sobald gezogen wird.
+        el.dispatchEvent(new Event('ziehstart'));
+        try { el.setPointerCapture(e.pointerId); } catch { /* egal */ }
+      }
+      el.style.transform = `translateX(${C.zugWeg(dx)}px)`;
+      el.style.setProperty('--zug', String(C.pfeilSichtbar(dx)));
+    });
+    const ende = (e) => {
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const warZug = zieht;
+      start = null;
+      zieht = false;
+      if (!warZug) return;
+      zurueck();
+      if (e.type === 'pointerup' && C.ausgeloest(dx)) {
+        const m = finde(el.dataset.msgid);
+        if (m) antworten(m);
+      }
+    };
+    el.addEventListener('pointerup', ende);
+    el.addEventListener('pointercancel', ende);
+    // Ein Ziehen endet nicht als Klick auf Karte, Bild oder Bezug.
+    el.addEventListener(
+      'click',
+      (e) => {
+        if (el.dataset.gezogen) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true
+    );
   });
 }
 
@@ -6913,15 +7080,18 @@ function kanalNachricht(m) {
   const karteKlasse = m.geteilt && !m.geteilt.weg ? ' msg--karte' : '';
 
   // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
+  // Kasten 4.2: Antworten im Unterthema — Bezug oben, ziehen oder Knopf.
+  const bezug = bezugHtml(m.antwortAuf);
   if (m.from === 'me') {
-    return `<div class="msg msg--out${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}">${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
+    return `<div class="msg msg--out${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>${antwortKnopfHtml()}${bezug}${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
   }
   const u = user(m.from);
   return `<div class="msgzeile">
     <button class="msgzeile__avatar" data-profile="${esc(m.from)}" style="background:${farbe(u.color)}" aria-label="Profil von ${esc(u.name)}">${esc(u.initials)}</button>
-    <div class="msg msg--in${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}">
+    <div class="msg msg--in${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>
+      ${antwortKnopfHtml()}
       <button class="msg__sender" data-profile="${esc(m.from)}">${esc(u.name)}</button>
-      ${inhalt}
+      ${bezug}${inhalt}
       <div class="msg__foot">${esc(m.time)}</div>
     </div>
   </div>`;
@@ -19361,6 +19531,8 @@ function paintMessages(chat) {
     el.addEventListener('pointerup', ende);
     el.addEventListener('pointerleave', ende);
     el.addEventListener('pointercancel', ende);
+    // Kasten 4: wer zieht, will antworten, nicht das Menü.
+    el.addEventListener('ziehstart', ende);
     // Ohne das oeffnet sich auf dem Handy beim Halten das Systemmenue.
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   });
@@ -19381,6 +19553,18 @@ function paintMessages(chat) {
   );
   // Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag.
   geteiltBinden(box);
+
+  // Kasten 4: ziehen, Knopf beim Überfahren, Bezug → Original.
+  antwortenBinden(
+    box,
+    (id) => state.messages.find((x) => x.id === id),
+    (m) => {
+      msgBezug = { art: 'antwort', nachricht: m };
+      msgBearbeitet = null;
+      zeigeBezugLeiste(chat);
+      $('#msgInput')?.focus();
+    }
+  );
 
   // Kasten 16: die Markierungs-Karte öffnet ihre Story. Fehlt sie in den
   // Leisten (Story eines Nichtkontakts), baut openStory sie aus der
@@ -19596,15 +19780,8 @@ function messageBubble(m, chat) {
    * nimmt den Text mit und bleibt lesbar, auch wenn das Original
    * zurückgenommen wird.
    */
-  const antwortAuf = m.antwortAuf
-    ? `<div class="msg__bezug">
-         <span class="msg__bezugBalken"></span>
-         <span class="msg__bezugText">
-           <b>${esc(m.antwortAuf.autor)}</b>
-           <span>${esc(m.antwortAuf.text || 'Zurückgenommen')}</span>
-         </span>
-       </div>`
-    : '';
+  // Kasten 4: der Bezug ist antippbar und springt zum Original (bezugHtml).
+  const antwortAuf = bezugHtml(m.antwortAuf);
 
   const zitat = m.zitat
     ? `<div class="msg__zitat">
@@ -19664,10 +19841,15 @@ function messageBubble(m, chat) {
     ? geteiltKarte(m.geteilt)
     : anhangInhalt(m);
 
+  // Kasten 4: ziehen/Knopf zum Antworten — nicht bei Zurückgenommenem und
+  // nicht, solange der Chat gesperrt ist (Anfrage offen, blockiert).
+  const ziehbar = !m.zurueckgenommen && !chatGesperrt(chat);
+
   return `
     <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}${
       m.geteilt && !m.geteilt.weg && !m.zurueckgenommen ? ' msg--karte' : ''
-    }" data-msgid="${esc(m.id)}">
+    }" data-msgid="${esc(m.id)}"${ziehbar ? ' data-ziehbar' : ''}>
+      ${ziehbar ? antwortKnopfHtml() : ''}
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
       ${weiter}${antwortAuf}${zitat}
       ${storyBezug}${inhalt}

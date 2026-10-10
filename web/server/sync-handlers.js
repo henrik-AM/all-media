@@ -18,6 +18,8 @@
 const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
 const Profilfelder = require('../../gemeinsam/profilfelder');
 const Telefon = require('../../gemeinsam/telefon');
+// Kasten 4 (28.09.): Antworten im Unterthema, solange Schema XX fehlt.
+const Chatblase = require('../../gemeinsam/chatblase');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
 // Spendencode und Gründe (Kasten 13) — dieselbe Regel wie App und Datenbank.
@@ -863,24 +865,34 @@ const handleCreateChannel = handler(
  */
 const handleSendChannelMessage = handler(
   'Im Kanal schreiben',
-  async (client, nutzerId, kanalId, text, medien = {}) => {
-    const { data, error } = await client
-      .from('community_channel_messages')
-      .insert({
-        channel_id: kanalId,
-        sender_id: nutzerId,
-        text,
-        media_url: medien.url || null,
-        media_type: medien.typ || null,
-        place_id: medien.standortId || null,
-        contact_user_id: medien.kontaktId || null,
-        file_name: medien.dateiName || null,
-        file_size: medien.dateiGroesse || null,
-      })
-      .select()
-      .single();
+  async (client, nutzerId, kanalId, text, medien = {}, antwortAuf = null) => {
+    const zeile = {
+      channel_id: kanalId,
+      sender_id: nutzerId,
+      text,
+      media_url: medien.url || null,
+      media_type: medien.typ || null,
+      place_id: medien.standortId || null,
+      contact_user_id: medien.kontaktId || null,
+      file_name: medien.dateiName || null,
+      file_size: medien.dateiGroesse || null,
+    };
+    /*
+     * Kasten 4.2 (Feedback 28.09.): die Antwort im Unterthema (`reply_to`,
+     * Schema XX). Fehlt die Spalte noch, geht die Nachricht ohne Bezug raus,
+     * und `ohneBezug` sagt das der Oberflaeche. Gleiche Weiche in
+     * app/lib/aktionen.ts (kanalNachricht).
+     */
+    if (antwortAuf) zeile.reply_to = antwortAuf;
+    let { data, error } = await client.from('community_channel_messages').insert(zeile).select().single();
+    let ohneBezug = false;
+    if (error && antwortAuf && Chatblase.fehltSpalte(error, 'reply_to')) {
+      delete zeile.reply_to;
+      ohneBezug = true;
+      ({ data, error } = await client.from('community_channel_messages').insert(zeile).select().single());
+    }
     if (error) throw error;
-    return { ok: true, nachricht: data };
+    return { ok: true, nachricht: data, ohneBezug };
   }
 );
 

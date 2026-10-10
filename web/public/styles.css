@@ -4199,7 +4199,53 @@ body.ist-abgemeldet .ptr-indicator {
 
 /* Antwort und Zitat sehen verschieden aus, weil sie verschiedenes sind: die
    Antwort zeigt nur den Bezug, das Zitat nimmt den Text mit. */
-.msg__bezug { display: flex; gap: 8px; margin-bottom: 5px; }
+.msg__bezug {
+  display: flex; gap: 8px; margin-bottom: 5px;
+  /* Kasten 4: antippbar (springt zum Original), abgesetzt wie bei WhatsApp. */
+  width: 100%; box-sizing: border-box; padding: 5px 8px 5px 0;
+  border: 0; border-radius: 8px; overflow: hidden;
+  background: rgba(0,0,0,.05); font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+[data-theme="dark"] .msg__bezug { background: rgba(255,255,255,.07); }
+
+/*
+ * Kasten 4 (Feedback 28.09.): Antworten per Ziehen und per Knopf beim
+ * Überfahren. `touch-action: pan-y` lässt dem Verlauf das senkrechte Rollen
+ * und gibt das waagrechte Ziehen an die Seite. Der Pfeil links neben der
+ * Blase blendet mit dem Weg auf (--zug, 0 bis 1).
+ */
+.msg[data-ziehbar] { touch-action: pan-y; }
+/* Eine gezogene Blase schiebt den Verlauf nicht zur Seite. */
+.messages { overflow-x: hidden; }
+.msg[data-ziehbar]::before {
+  content: ''; position: absolute; left: -38px; top: 50%;
+  width: 28px; height: 28px; margin-top: -14px; border-radius: 50%;
+  background: var(--surface-3) center / 16px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666E7D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14 4 9l5-5'/%3E%3Cpath d='M4 9h10a6 6 0 0 1 6 6v5'/%3E%3C/svg%3E");
+  opacity: var(--zug, 0); pointer-events: none;
+}
+.msg__antworten {
+  position: absolute; top: 50%; margin-top: -15px;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; cursor: pointer; padding: 0;
+  background: var(--surface); color: var(--text-2);
+  box-shadow: 0 1px 3px rgba(12,14,20,.15);
+  opacity: 0; transition: opacity .12s ease;
+}
+.msg--in > .msg__antworten { right: -38px; }
+.msg--out > .msg__antworten { left: -38px; }
+.msg__antworten svg { width: 16px; height: 16px; }
+.msg:hover > .msg__antworten,
+.msg:focus-within > .msg__antworten,
+.msg__antworten:focus-visible { opacity: 1; }
+/* Ohne Maus gibt es kein Überfahren — dort zieht man. */
+@media (hover: none) { .msg__antworten { display: none; } }
+.msg.is-hervor { animation: msgHervor 1.4s ease; }
+@keyframes msgHervor {
+  0%, 60% { box-shadow: 0 0 0 2px var(--brand); }
+  100% { box-shadow: none; }
+}
 .msg__bezugBalken { width: 3px; border-radius: 2px; background: var(--brand); }
 .msg__bezugText { display: flex; flex-direction: column; min-width: 0; }
 .msg__bezugText b { font-size: 10.5px; color: var(--brand); }

@@ -3228,10 +3228,15 @@ app.get('/api/communities/:id/channels/:chId/stand', route(async (req) => {
 app.post('/api/communities/:id/channels/:chId/nachricht', route(async (req) => {
   const text = String(req.body?.text || '').trim();
   if (!text) return { ok: false, error: 'Text erforderlich' };
-  const e = await syncHandlers.handleSendChannelMessage(req.db, req.nutzerId, req.params.chId, text);
+  // Kasten 4.2: die Nachricht, auf die geantwortet wird (Schema XX).
+  const antwortAuf = /^[0-9a-f-]{36}$/i.test(String(req.body?.antwortAuf || '')) ? req.body.antwortAuf : null;
+  const e = await syncHandlers.handleSendChannelMessage(
+    req.db, req.nutzerId, req.params.chId, text, {}, antwortAuf
+  );
   if (!e || e.ok === false) return antwort(e);
   return {
     ok: true,
+    ohneBezug: Boolean(e.ohneBezug),
     message: {
       id: e.nachricht.id,
       from: 'me',
