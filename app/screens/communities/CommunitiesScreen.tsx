@@ -29,7 +29,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 interface Props {
   onOpenCommunity: (community: Community) => void;
   onNotice: (message: string) => void;
-  /** Neuen Kanal erstellen (Plus-Button oben rechts). */
+  /** Neue Community erstellen (Plus-Button oben rechts). */
   onCreateChannel?: () => void;
   /** Kasten 23: eine Karte unter „Personen, die du kennen könntest" angetippt. */
   onOpenProfile?: (userId: string) => void;
