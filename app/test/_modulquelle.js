@@ -151,6 +151,9 @@ const UMD_BAUSTEINE = [
   // 31.10.2026: `einwilligung.js` — Zustimmung mit Fassung und Eltern-Widerruf
   // (Kasten RS 7/5, Schema 106). Liest global.Rechtstexte — muss danach stehen.
   ['einwilligung', 'Einwilligung'],
+  // 10.10.2026: `profilfelder.js` fuer die Seite „Profil bearbeiten“ (Kasten
+  // 1.3, Nachtrag) — aktionen.ts und daten.ts holen ihn. Gleich mit eingetragen.
+  ['profilfelder', 'Profilfelder'],
 ];
 
 function umdTeile() {
