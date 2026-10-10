@@ -18,30 +18,48 @@ interface Props {
   onBefriend: (userId: string) => void;
 }
 
-/** Prototyp-Frame "Community - Suchen": Filter, Kanäle, Profile. */
+/*
+ * Henrik am 28.09.2026 (Kasten 3.1/3.2, Register F-07): "Wenn ich auf die
+ * dicke schwarze Schrift mit dem Pfeil nach rechts druecke, moechte ich auf
+ * eine separate Seite weitergeleitet werden mit dann entweder nur
+ * vorgeschlagenen Profilen, auf der ich ja auch Profile suchen kann oder halt
+ * nur vorgeschlagenen Communitys, auf der ich dann auch Communitys suchen
+ * kann." Bis dahin setzte der Pfeil nur den Filter oben um - man blieb auf
+ * derselben Seite. Jetzt oeffnet er eine eigene Seite mit Zurueck-Pfeil,
+ * eigener Suchleiste und nur dieser einen Liste.
+ *
+ * Gesucht wird auf beiden Seiten in derselben Quelle und mit derselben Regel
+ * (passendeCommunitys / passendeProfile): die Hauptsuche filtert die
+ * geladenen Communitys und Nutzer aus useDaten(), die Unterseite auch.
+ */
+type Seite = 'channels' | 'people';
+
+const passendeCommunitys = (alle: Community[], q: string) =>
+  alle.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
+
+const passendeProfile = <U extends { id: string; name: string; handle: string }>(alle: U[], q: string) =>
+  alle.filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)));
+
+/** Prototyp-Frame "Community - Suchen": Filter, Communitys, Profile. */
 export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile, onBefriend }: Props) => {
   const { communities: alleCommunities, users: alleNutzer } = useDaten();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  // Die Seite hinter "Communitys →" bzw. "Profile →" (Kasten 3.1/3.2).
+  const [seite, setSeite] = useState<Seite | null>(null);
+  const [seitenQuery, setSeitenQuery] = useState('');
 
   const q = query.trim().toLowerCase();
+  const sq = seitenQuery.trim().toLowerCase();
 
   const channels = useMemo(
-    () =>
-      filter === 'people'
-        ? []
-        : alleCommunities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q)),
-    [filter, q]
+    () => (filter === 'people' ? [] : passendeCommunitys(alleCommunities, q)),
+    [filter, q, alleCommunities]
   );
 
   const people = useMemo(
-    () =>
-      filter === 'channels'
-        ? []
-        : Object.values(alleNutzer).filter(
-            (u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q))
-          ),
-    [filter, q]
+    () => (filter === 'channels' ? [] : passendeProfile(Object.values(alleNutzer), q)),
+    [filter, q, alleNutzer]
   );
 
   const statusOf = (id: string) => {
@@ -49,6 +67,105 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
     if (!contact) return 'none';
     return contact.status === 'pending' ? 'pending' : 'friend';
   };
+
+  const communityZeile = (c: Community) => (
+    <Druck key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
+      <Avatar id={c.id} name={c.name} size={44} />
+      <View style={styles.body}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{c.name}</Text>
+          {c.visibility === 'private' && <Ionicons name="lock-closed" size={13} color={colors.text3} />}
+        </View>
+        <Text style={styles.sub} numberOfLines={1}>
+          {c.topic}
+        </Text>
+      </View>
+      <View style={[styles.action, c.joined && styles.actionDone]}>
+        <Text style={[styles.actionText, c.joined && styles.actionTextDone]}>
+          {c.joined ? 'Mitglied' : 'Beitreten'}
+        </Text>
+      </View>
+    </Druck>
+  );
+
+  const profilZeile = (u: { id: string; name: string; handle: string }) => {
+    const status = statusOf(u.id);
+    const label = status === 'friend' ? 'Befreundet' : status === 'pending' ? 'Angefragt' : '+ Befreunden';
+    return (
+      <View key={u.id} style={styles.row}>
+        <Druck style={styles.person} onPress={() => onOpenProfile(u.id)}>
+          <Avatar id={u.id} name={u.name} size={44} />
+          <View style={styles.body}>
+            <Text style={styles.name}>{u.name}</Text>
+            <Text style={styles.sub}>{u.handle}</Text>
+          </View>
+        </Druck>
+        <Druck
+          disabled={status !== 'none'}
+          style={[styles.action, status !== 'none' && styles.actionDone]}
+          onPress={() => onBefriend(u.id)}
+        >
+          <Text style={[styles.actionText, status !== 'none' && styles.actionTextDone]}>{label}</Text>
+        </Druck>
+      </View>
+    );
+  };
+
+  const oeffneSeite = (s: Seite) => {
+    // Was oben schon getippt war, gilt auf der Unterseite weiter.
+    setSeitenQuery(query);
+    setSeite(s);
+  };
+
+  if (seite) {
+    const istCommunitys = seite === 'channels';
+    const liste = istCommunitys
+      ? passendeCommunitys(alleCommunities, sq)
+      : passendeProfile(Object.values(alleNutzer), sq);
+    return (
+      <View style={styles.screen}>
+        <View style={styles.bar}>
+          <Druck
+            onPress={() => setSeite(null)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Zurück zur Suche"
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </Druck>
+          <Text style={styles.barTitel} numberOfLines={1} accessibilityRole="header">
+            {istCommunitys ? 'Communitys' : 'Profile'}
+          </Text>
+        </View>
+        <View style={styles.head}>
+          <SearchBar
+            value={seitenQuery}
+            onChangeText={setSeitenQuery}
+            placeholder={istCommunitys ? 'Suche nach Communitys...' : 'Suche nach Profilen...'}
+          />
+        </View>
+        {liste.length ? (
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            {istCommunitys
+              ? (liste as Community[]).map(communityZeile)
+              : (liste as { id: string; name: string; handle: string }[]).map(profilZeile)}
+          </ScrollView>
+        ) : (
+          <EmptyState
+            icon="search-outline"
+            title="Nichts gefunden"
+            text={
+              sq
+                ? `Für „${seitenQuery}" gibt es keinen Treffer.`
+                : istCommunitys
+                  ? 'Es gibt gerade keine Communitys.'
+                  : 'Es gibt gerade keine Profile.'
+            }
+          />
+        )}
+      </View>
+    );
+  }
 
   const empty = channels.length === 0 && people.length === 0;
 
@@ -80,57 +197,33 @@ export const CommunitySearchScreen = ({ contacts, onOpenCommunity, onOpenProfile
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {channels.length > 0 && (
-            <Druck style={styles.sectionHeadPress} onPress={() => setFilter('channels')}>
-              <Text style={styles.sectionHead}>Kanäle →</Text>
+            /*
+             * Punkt 55 (26.08.) und Kasten 2.1 (28.09.): hier stehen die
+             * Communitys selbst. "Kanal" ist das Unterthema INNERHALB einer
+             * Community - die Ueberschrift hiess faelschlich "Kanäle".
+             */
+            <Druck
+              style={styles.sectionHeadPress}
+              onPress={() => oeffneSeite('channels')}
+              accessibilityRole="button"
+              accessibilityLabel="Alle Communitys anzeigen"
+            >
+              <Text style={styles.sectionHead}>Communitys →</Text>
             </Druck>
           )}
-          {channels.map((c) => (
-            <Druck key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
-              <Avatar id={c.id} name={c.name} size={44} />
-              <View style={styles.body}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.name}>{c.name}</Text>
-                  {c.visibility === 'private' && <Ionicons name="lock-closed" size={13} color={colors.text3} />}
-                </View>
-                <Text style={styles.sub} numberOfLines={1}>
-                  {c.topic}
-                </Text>
-              </View>
-              <View style={[styles.action, c.joined && styles.actionDone]}>
-                <Text style={[styles.actionText, c.joined && styles.actionTextDone]}>
-                  {c.joined ? 'Mitglied' : 'Beitreten'}
-                </Text>
-              </View>
-            </Druck>
-          ))}
+          {channels.map(communityZeile)}
 
           {people.length > 0 && (
-            <Druck style={styles.sectionHeadPress} onPress={() => setFilter('people')}>
+            <Druck
+              style={styles.sectionHeadPress}
+              onPress={() => oeffneSeite('people')}
+              accessibilityRole="button"
+              accessibilityLabel="Alle Profile anzeigen"
+            >
               <Text style={styles.sectionHead}>Profile →</Text>
             </Druck>
           )}
-          {people.map((u) => {
-            const status = statusOf(u.id);
-            const label = status === 'friend' ? 'Befreundet' : status === 'pending' ? 'Angefragt' : '+ Befreunden';
-            return (
-              <View key={u.id} style={styles.row}>
-                <Druck style={styles.person} onPress={() => onOpenProfile(u.id)}>
-                  <Avatar id={u.id} name={u.name} size={44} />
-                  <View style={styles.body}>
-                    <Text style={styles.name}>{u.name}</Text>
-                    <Text style={styles.sub}>{u.handle}</Text>
-                  </View>
-                </Druck>
-                <Druck
-                  disabled={status !== 'none'}
-                  style={[styles.action, status !== 'none' && styles.actionDone]}
-                  onPress={() => onBefriend(u.id)}
-                >
-                  <Text style={[styles.actionText, status !== 'none' && styles.actionTextDone]}>{label}</Text>
-                </Druck>
-              </View>
-            );
-          })}
+          {people.map(profilZeile)}
         </ScrollView>
       )}
     </View>
@@ -146,6 +239,17 @@ const styles = themenStyles((colors) => ({
   pillText: { ...typography.small, fontWeight: '600', color: colors.text2 },
   pillTextActive: { color: colors.white },
   content: { paddingBottom: spacing.xl },
+  // Kopf der Unterseite - wie in CommunityProfileScreen (Erstellte/Beigetretene).
+  bar: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  barTitel: { flex: 1, ...typography.h3, fontSize: 17, color: colors.text },
   sectionHeadPress: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
