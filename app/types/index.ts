@@ -223,6 +223,10 @@ export interface Profile {
   userId: string;
   bio: string;
   link: string;
+  /** Kasten 1.3 (Schema 88): klein neben dem Namen. Leer, solange Schema 88 fehlt. */
+  pronomen?: string;
+  /** Kasten 1.3 (Schema 88): bis zu fünf Links; ohne Schema 88 nur der alte Einzellink. */
+  links?: { url: string; titel: string }[];
   posts: number;
   followers: number;
   following: number;
