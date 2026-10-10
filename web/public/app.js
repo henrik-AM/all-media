@@ -16882,10 +16882,16 @@ function renderCommunityProfile() {
     <div class="scroll">
       ${ownProfileTop(me.handle, 'communities')}
       <div class="oprof__top">
-        ${eigenerAvatarMitStory(me)}
+        ${/*
+            Communitys haben keine Storys — der Ring der Videos-Storys stand
+            hier trotzdem (eigenerAvatarMitStory mit Bereich 'videos'). Die
+            App zeigt im Communitys-Profil das schlichte Bild (OwnProfileHead
+            ohne storyBereich); jetzt beide gleich.
+          */ ''}
+        ${eigenerAvatar(me, 88, 'has-status')}
         <div class="prof__stats">
-          <button class="prof__stat" data-stat="created"><span>Erstellte Communitys</span><strong>${created.length}</strong></button>
-          <button class="prof__stat" data-stat="joined"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></button>
+          <button class="prof__stat" data-stat="created" data-commview="erstellt" aria-label="Erstellte Communitys: ${created.length}"><span>Erstellte Communitys</span><strong>${created.length}</strong></button>
+          <button class="prof__stat" data-stat="joined" data-commview="beigetreten" aria-label="Beigetretene Communitys: ${joined.length}"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></button>
         </div>
       </div>
       ${/*
@@ -16926,6 +16932,13 @@ function renderCommunityProfile() {
 
   $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderCommunityProfile));
+  /*
+   * Kasten 3.4/3.5 (Feedback 28.09.2026): auch die Kacheln „Erstellte" und
+   * „Beigetretene Communitys" führen über data-commview auf die eigene Seite
+   * (renderCommunityListe) — bis zum 10.10.2026 taten sie nichts. Die Seite
+   * steht auch bei null Einträgen, dann mit Leertext. Gleich in der App
+   * (CommunityProfileScreen, onStat).
+   */
   main.querySelectorAll('[data-commview]').forEach((b) =>
     b.addEventListener('click', () => {
       state.commProfilView = b.dataset.commview;
