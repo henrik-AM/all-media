@@ -130,7 +130,9 @@
     "test:recht": "node test/_rechtstexte_einheit.js",
     "test:k28-profil": "node test/k28-profil.js",
     "test:k28-profil": "node test/k28-profil.js",
-    "test:k28-profilseite": "node test/k28-profilseite.js"
+    "test:k28-profilseite": "node test/k28-profilseite.js",
+    "test:k28-profil": "node test/k28-profil.js",
+    "test:k28-chatblase": "node test/k28-chatblase.js"
   },
   "private": true
 }
