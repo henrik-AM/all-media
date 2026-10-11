@@ -1805,15 +1805,34 @@ export async function kommentarAnlegen(
   client: SupabaseClient,
   ichId: string,
   beitragId: string,
-  text: string
-): Promise<{ id: string; created_at: string }> {
-  const { data, error } = await client
-    .from('comments')
-    .insert({ post_id: beitragId, user_id: ichId, text })
-    .select('id, created_at')
-    .single();
+  text: string,
+  /*
+   * Nachtrag 4.3b (11.10.2026): Antwort auf einen Kommentar — `antwortAuf`
+   * ist die Wurzel (comments.reply_to), `antwortAn` der angesprochene
+   * Kommentar (antwort_an, bekommt die Mitteilung). Siehe
+   * gemeinsam/kommentar.js (antwortZiel). Kennt die Datenbank die Spalten
+   * noch nicht (Schema 92), geht der Kommentar ohne Faden raus und
+   * `ohneFaden` sagt das dem Blatt. Gleiche Weiche in
+   * web/server/sync-handlers.js (handleCreateComment).
+   */
+  bezug: { antwortAuf: string | null; antwortAn: string | null } | null = null
+): Promise<{ id: string; created_at: string; ohneFaden?: boolean }> {
+  const zeile: Record<string, unknown> = { post_id: beitragId, user_id: ichId, text };
+  if (bezug?.antwortAuf) {
+    zeile.reply_to = bezug.antwortAuf;
+    zeile.antwort_an = bezug.antwortAn ?? bezug.antwortAuf;
+  }
+  const anlegen = () => client.from('comments').insert(zeile).select('id, created_at').single();
+  let { data, error } = await anlegen();
+  let ohneFaden = false;
+  if (error && bezug?.antwortAuf && Kommentar.fehltSpalte(error)) {
+    delete zeile.reply_to;
+    delete zeile.antwort_an;
+    ohneFaden = true;
+    ({ data, error } = await anlegen());
+  }
   if (error) throw error;
-  return data as { id: string; created_at: string };
+  return { ...(data as { id: string; created_at: string }), ...(ohneFaden ? { ohneFaden } : {}) };
 }
 
 /** Einen eigenen Kommentar loeschen. */

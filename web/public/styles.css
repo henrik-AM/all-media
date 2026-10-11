@@ -1611,6 +1611,45 @@ ul { margin: 0; padding: 0; list-style: none; }
 .comment__like.is-on { color: #FF3040; }
 .comment__like.is-on svg { fill: #FF3040; }
 
+/*
+ * Nachtrag 4.3b (11.10.2026): Antworten auf Kommentare. „Antworten" unter
+ * dem Kommentar, Antworten eingerückt (Avatarbreite + Abstand), Klappknopf
+ * „N Antworten ansehen" mit dem Strich davor wie bei Instagram. Ziehen nach
+ * rechts wie die Chatblase (--zug aus antwortenBinden, Pfeil links).
+ */
+.avatar--28 { width: 28px; height: 28px; font-size: 11px; }
+.comment[data-ziehbar] { position: relative; touch-action: pan-y; }
+.sheet__body:has(> .comment) { overflow-x: hidden; }
+.comment[data-ziehbar]::before {
+  content: ''; position: absolute; left: -30px; top: 50%;
+  width: 26px; height: 26px; margin-top: -13px; border-radius: 50%;
+  background: var(--surface-3) center / 15px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666E7D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14 4 9l5-5'/%3E%3Cpath d='M4 9h10a6 6 0 0 1 6 6v5'/%3E%3C/svg%3E");
+  opacity: var(--zug, 0); pointer-events: none;
+}
+.comment--antwort { padding-left: 63px; padding-top: 6px; padding-bottom: 6px; }
+.comment__meta { display: flex; align-items: center; gap: 14px; }
+.comment__antworten {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-weight: 700; color: var(--text-2);
+}
+.comment__antworten:hover { color: var(--text); }
+.comment__klapp {
+  display: flex; align-items: center; gap: 8px;
+  border: 0; background: none; cursor: pointer;
+  padding: 4px 16px 6px 63px;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--text-2);
+}
+.comment__klappStrich { width: 24px; height: 1px; background: var(--text-3); }
+.comment__antwortLeiste {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; background: var(--surface-3);
+  font-size: 12px; color: var(--text-2);
+}
+.comment__antwortLeiste span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment__antwortLeiste button { border: 0; background: none; padding: 0; cursor: pointer; color: var(--text-2); display: flex; }
+.comment__antwortLeiste svg { width: 18px; height: 18px; }
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed;

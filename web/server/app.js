@@ -2890,7 +2890,11 @@ app.post('/api/comments/:targetId', route(async (req) => {
   const text = String(req.body?.text || '').trim();
   if (!text) return { ok: false, error: 'Text erforderlich' };
 
-  const e = await syncHandlers.handleCreateComment(req.db, req.nutzerId, req.params.targetId, text);
+  // Nachtrag 4.3b: Antwort auf einen Kommentar (Wurzel + angesprochener Kommentar).
+  const bezug = req.body?.antwortAuf
+    ? { antwortAuf: String(req.body.antwortAuf), antwortAn: req.body?.antwortAn ? String(req.body.antwortAn) : null }
+    : null;
+  const e = await syncHandlers.handleCreateComment(req.db, req.nutzerId, req.params.targetId, text, bezug);
   if (!e || e.ok === false) return antwort(e);
 
   return {
@@ -2900,6 +2904,9 @@ app.post('/api/comments/:targetId', route(async (req) => {
     time: supabaseApi.chatZeit(e.kommentar.created_at),
     likes: 0,
     liked: false,
+    antwortAuf: e.kommentar.reply_to || null,
+    antwortAn: e.kommentar.antwort_an || null,
+    ohneFaden: Boolean(e.ohneFaden),
   };
 }));
 
@@ -3325,7 +3332,8 @@ function mitteilungText(m, namen, communityNamen, kanalCommunity = new Map()) {
   return {
     like: `${name} gefällt dein ${GEGENSTAND[m.ziel?.art] || 'Beitrag'}.`,
     follow: `${name} folgt dir jetzt.`,
-    comment: `${name} hat deinen Beitrag kommentiert.`,
+    // Nachtrag 4.3d (Schema 92): Ziel 'comment' = Antwort auf einen Kommentar.
+    comment: m.ziel?.art === 'comment' ? Kommentar.mitteilungAntwort(name) : `${name} hat deinen Beitrag kommentiert.`,
     repost: `${name} hat dein Video repostet.`,
     // Kasten 11.6: Markierung in einer Story — derselbe Satz wie in der App.
     mention: m.ziel?.art === 'story'

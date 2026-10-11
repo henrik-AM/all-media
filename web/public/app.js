@@ -5222,12 +5222,45 @@ function profilRaster(profile, tab, listen) {
 async function openComments(targetId, onCountChange) {
   const res = await fetch(`/api/comments/${targetId}`);
   let list = await res.json();
+  if (!Array.isArray(list)) list = [];
+  const K = window.Kommentar;
+
+  /*
+   * Nachtrag 4.3b (Henrik, 11.10.2026): auf einen Kommentar antworten —
+   * „Antworten" unter dem Kommentar, nach rechts ziehen (antwortenBinden,
+   * dieselbe Geste wie in der Chatblase), „@name" vorbelegt, Antworten
+   * eingerückt darunter, „N Antworten ansehen" klappt auf. Gleiche Regeln
+   * in der App (CommentSheet.tsx), beide aus gemeinsam/kommentar.js.
+   *
+   * paint() baut das Blatt bei jedem Herz neu — Entwurf, Antwort und
+   * aufgeklappte Fäden leben deshalb hier außen.
+   */
+  let antwortAn = null; // der angesprochene Kommentar
+  const offen = new Set();
+  let entwurf = '';
+  let meldung = '';
 
   const sheet = document.createElement('div');
   sheet.className = 'sheet-backdrop';
   document.querySelector('.app').appendChild(sheet);
 
+  const fadenHtml = (f) => {
+    const auf = offen.has(f.kommentar.id);
+    const klapp = K.klappText(f.antworten.length, auf);
+    return `${commentRow(f.kommentar)}${
+      klapp
+        ? `<button type="button" class="comment__klapp" data-cklapp="${esc(f.kommentar.id)}" aria-expanded="${auf}"><span class="comment__klappStrich"></span>${esc(klapp)}</button>`
+        : ''
+    }${auf ? f.antworten.map((a) => commentRow(a, true)).join('') : ''}`;
+  };
+
   const paint = () => {
+    const faeden = K.faeden(list);
+    const leiste = antwortAn
+      ? `<div class="comment__antwortLeiste"><span>${esc(
+          K.leistenText(antwortAn.userId === 'me' ? 'dich selbst' : user(antwortAn.userId).name)
+        )}</span><button type="button" id="commentAntwortZu" aria-label="Antworten abbrechen">${ICONS.close}</button></div>`
+      : '';
     sheet.innerHTML = `
       <div class="sheet sheet--tall" role="dialog" aria-label="Kommentare">
         <div class="sheet__handle"></div>
@@ -5235,7 +5268,7 @@ async function openComments(targetId, onCountChange) {
         <div class="sheet__body">
           ${
             list.length
-              ? list.map(commentRow).join('')
+              ? faeden.map(fadenHtml).join('')
               : `<div class="empty">${ICONS.chat}
                   <div class="empty__title">Noch keine Kommentare</div>
                   <div class="empty__text">Schreib den ersten.</div>
@@ -5243,10 +5276,13 @@ async function openComments(targetId, onCountChange) {
           }
         </div>
         <div class="sheet__fehler" id="commentHinweis" role="status" hidden></div>
+        ${leiste}
         <form class="composer" id="commentForm">
           <div class="avatar avatar--36" style="background:${farbe(user('me').color)}">DU</div>
           <div class="composer__field">
-            <textarea id="commentInput" rows="1" placeholder="Kommentar hinzufügen"></textarea>
+            <textarea id="commentInput" rows="1" placeholder="${
+              antwortAn ? K.PLATZHALTER_ANTWORT : 'Kommentar hinzufügen'
+            }"></textarea>
           </div>
           <button type="submit" class="composer__send" id="commentSend" aria-label="Senden" disabled>${ICONS.send}</button>
         </form>
@@ -5295,6 +5331,9 @@ async function openComments(targetId, onCountChange) {
     // Kasten 25.1: @ schlägt Personen vor.
     markierungsEingabe(input);
     const send = sheet.querySelector('#commentSend');
+    // Nachtrag 4.3b: der Entwurf überlebt das Neuzeichnen (Herz, Aufklappen).
+    input.value = entwurf;
+    send.disabled = !entwurf.trim();
 
     /*
      * Meldungen gehoeren ins Blatt. Als Toast lagen sie hinter dem Blatt und
@@ -5302,9 +5341,44 @@ async function openComments(targetId, onCountChange) {
      */
     const hinweis = sheet.querySelector('#commentHinweis');
     const melden = (text) => {
+      meldung = text;
       hinweis.textContent = text;
       hinweis.hidden = !text;
     };
+    if (meldung) melden(meldung);
+
+    // Nachtrag 4.3b: Antworten-Knopf, Ziehen nach rechts — wie im Chat.
+    const antworten = (k) => {
+      const vor = K.vorbelegung(user(k.userId).handle, k.userId === 'me');
+      antwortAn = k;
+      meldung = '';
+      if (vor && !input.value.startsWith(vor)) entwurf = vor + input.value.replace(/^@\S+\s/, '');
+      else entwurf = input.value;
+      paint();
+      const feld = sheet.querySelector('#commentInput');
+      feld.focus();
+      feld.setSelectionRange(feld.value.length, feld.value.length);
+    };
+    antwortenBinden(
+      sheet.querySelector('.sheet__body'),
+      (id) => list.find((c) => c.id === id),
+      antworten
+    );
+    sheet.querySelectorAll('[data-cklapp]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const id = b.dataset.cklapp;
+        if (offen.has(id)) offen.delete(id);
+        else offen.add(id);
+        entwurf = input.value;
+        paint();
+      })
+    );
+    sheet.querySelector('#commentAntwortZu')?.addEventListener('click', () => {
+      const vor = antwortAn ? K.vorbelegung(user(antwortAn.userId).handle, antwortAn.userId === 'me') : '';
+      entwurf = vor && input.value.startsWith(vor) ? input.value.slice(vor.length) : input.value;
+      antwortAn = null;
+      paint();
+    });
     sheet.querySelectorAll('[data-kmelden]').forEach((b) =>
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -5313,6 +5387,7 @@ async function openComments(targetId, onCountChange) {
     );
 
     input.addEventListener('input', () => {
+      entwurf = input.value;
       melden('');
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 108) + 'px';
@@ -5353,17 +5428,30 @@ async function openComments(targetId, onCountChange) {
         return melden(`„${pruefung.treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
       }
 
+      // Nachtrag 4.3b: als Antwort — Wurzel und angesprochener Kommentar.
+      const ziel = antwortAn ? K.antwortZiel(antwortAn) : null;
       const r = await fetch(`/api/comments/${targetId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(ziel ? { text, ...ziel } : { text }),
       });
       // Ohne diese Pruefung landete die Fehlerantwort als leerer Kommentar in der Liste.
       if (!r.ok) return melden('Der Kommentar ging nicht durch. Versuch es noch einmal.');
-      list = [...list, await r.json()];
+      const neu = await r.json();
+      if (!neu || neu.ok === false || !neu.id) return melden('Der Kommentar ging nicht durch. Versuch es noch einmal.');
+      list = [...list, neu];
+      antwortAn = null;
+      entwurf = '';
+      meldung = neu.ohneFaden ? K.OHNE_FADEN : '';
+      // Die eigene Antwort soll man sehen: ihren Faden aufklappen.
+      if (neu.antwortAuf) offen.add(neu.antwortAuf);
       onCountChange?.(list.length);
       paint();
-      sheet.querySelector('.sheet__body').scrollTop = sheet.querySelector('.sheet__body').scrollHeight;
+      if (!neu.antwortAuf) {
+        sheet.querySelector('.sheet__body').scrollTop = sheet.querySelector('.sheet__body').scrollHeight;
+      } else {
+        sheet.querySelector(`[data-msgid="${CSS.escape(neu.id)}"]`)?.scrollIntoView({ block: 'nearest' });
+      }
     });
   };
 
@@ -5384,14 +5472,18 @@ async function openComments(targetId, onCountChange) {
  * Herz rechts - genau dort, wo man sie von Instagram und TikTok her erwartet,
  * und direkt neben dem Knopf, der sie veraendert.
  */
-function commentRow(c) {
+function commentRow(c, alsAntwort = false) {
   const u = user(c.userId);
+  /*
+   * Nachtrag 4.3b: `data-msgid` + `data-ziehbar` — dieselbe Zieh-Bindung wie
+   * die Chatblase (antwortenBinden); „Antworten" ist der Knopf dazu.
+   */
   return `
-    <div class="comment">
-      ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
+    <div class="comment${alsAntwort ? ' comment--antwort' : ''}" data-msgid="${esc(c.id)}" data-ziehbar>
+      ${mitStoryRing(c.userId, `<div class="avatar ${alsAntwort ? 'avatar--28' : 'avatar--36'}" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
       <div class="comment__body">
         <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${markierterText(c.text)}</div>
-        <div class="comment__meta">${esc(c.time)}${
+        <div class="comment__meta">${esc(c.time)}<button type="button" class="comment__antworten" data-antworten aria-label="Antworten an ${esc(u.name)}">Antworten</button>${
           // Kasten RS 3: fremde Kommentare melden (art 'comment'). Gleich in der App (CommentSheet).
           istEigen(c.userId) ? '' : `<button type="button" class="comment__antworten" data-kmelden="${esc(c.id)}" aria-label="Kommentar von ${esc(u.name)} melden">Melden</button>`
         }</div>

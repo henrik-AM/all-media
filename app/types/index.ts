@@ -264,6 +264,13 @@ export interface Comment {
   time: string;
   likes: number;
   liked: boolean;
+  /**
+   * Nachtrag 4.3b (11.10.2026): die Wurzel, an der diese Antwort hängt
+   * (`comments.reply_to`, Schema 92). Leer = Kommentar oben.
+   */
+  antwortAuf?: string | null;
+  /** Der Kommentar, an den sich die Antwort richtet (`antwort_an`). */
+  antwortAn?: string | null;
 }
 
 export interface Post {

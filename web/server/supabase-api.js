@@ -48,6 +48,8 @@ const StoryRegeln = require('../../gemeinsam/story');
 const ChatAbgleich = require('../../gemeinsam/chatabgleich');
 // Kasten 4/7 (28.09.): Bezug im Unterthema und die Karte geteilter Beitraege.
 const Chatblase = require('../../gemeinsam/chatblase');
+// Nachtrag 4.3b: Antworten auf Kommentare (Schema 92) — fehlende Spalten erkennen.
+const Kommentar = require('../../gemeinsam/kommentar');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -1122,12 +1124,25 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
 
 async function ladeKommentare(client, nutzerId, beitragId) {
   if (!client) return null;
-  const { data, error } = await client
-    .from('comments')
-    .select('id, post_id, user_id, text, created_at, comment_likes(count)')
-    .eq('post_id', beitragId)
-    .order('created_at', { ascending: true })
-    .limit(200);
+  /*
+   * Nachtrag 4.3b (11.10.2026): Antworten auf Kommentare (Schema 92,
+   * reply_to + antwort_an). Fehlen die Spalten noch (42703), einmal ohne —
+   * dann stehen alle Kommentare oben, statt dass die Liste leer bleibt.
+   * Gleiche Weiche in app/lib/daten.ts.
+   */
+  const abfrage = (spalten) =>
+    client
+      .from('comments')
+      .select(spalten)
+      .eq('post_id', beitragId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+  let { data, error } = await abfrage(
+    'id, post_id, user_id, text, created_at, reply_to, antwort_an, comment_likes(count)'
+  );
+  if (error && Kommentar.fehltSpalte(error)) {
+    ({ data, error } = await abfrage('id, post_id, user_id, text, created_at, comment_likes(count)'));
+  }
   if (error) throw error;
 
   const ids = (data || []).map((k) => k.id);
@@ -1154,6 +1169,8 @@ async function ladeKommentare(client, nutzerId, beitragId) {
     zeitpunkt: k.created_at,
     likes: zahlen.get(k.id) ?? k.comment_likes?.[0]?.count ?? 0,
     liked: gemocht.has(k.id),
+    antwortAuf: k.reply_to || null,
+    antwortAn: k.antwort_an || null,
   }));
 }
 

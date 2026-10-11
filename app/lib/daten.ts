@@ -72,6 +72,8 @@ import { neulingsliste, ordnenJeArt, punktekarte } from '../../gemeinsam/rang';
 const Lenkung = require('../../gemeinsam/lenkung') as typeof import('../../gemeinsam/lenkung');
 // Kasten 1.3 (Nachtrag 10.10.2026): Pronomen und Links — gemeinsam mit der Website.
 const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('../../gemeinsam/profilfelder');
+// Nachtrag 4.3b: Antworten auf Kommentare (Fäden, fehlende Spalten vor Schema 92).
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -1246,15 +1248,28 @@ export async function ladeKommentare(
   ichId: string,
   beitragId: string
 ): Promise<Comment[]> {
-  const { data, error } = await client
-    .from('comments')
-    .select('id, post_id, user_id, text, created_at, comment_likes(count)')
-    .eq('post_id', beitragId)
-    .order('created_at', { ascending: true })
-    .limit(200);
+  /*
+   * Nachtrag 4.3b (11.10.2026): Antworten auf Kommentare (Schema 92,
+   * `reply_to` + `antwort_an`). Kennt die Datenbank die Spalten noch nicht
+   * (42703), einmal ohne — dann stehen alle Kommentare oben, statt dass die
+   * Liste leer bleibt. Gleiche Weiche in web/server/supabase-api.js.
+   */
+  const abfrage = (spalten: string) =>
+    client
+      .from('comments')
+      .select(spalten)
+      .eq('post_id', beitragId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+  let { data, error } = await abfrage(
+    'id, post_id, user_id, text, created_at, reply_to, antwort_an, comment_likes(count)'
+  );
+  if (error && Kommentar.fehltSpalte(error)) {
+    ({ data, error } = await abfrage('id, post_id, user_id, text, created_at, comment_likes(count)'));
+  }
   if (error) throw error;
 
-  const ids = (data ?? []).map((k: any) => k.id);
+  const ids = ((data ?? []) as any[]).map((k: any) => k.id);
   const { data: eigene } =
     ids.length === 0
       ? { data: [] as any[] }
@@ -1270,13 +1285,15 @@ export async function ladeKommentare(
     if (!zFehler) for (const r of (z ?? []) as any[]) zahlen.set(r.comment_id, Number(r.anzahl ?? 0));
   }
 
-  return (data ?? []).map((k: any) => ({
+  return ((data ?? []) as any[]).map((k: any) => ({
     id: k.id,
     userId: k.user_id === ichId ? ICH : k.user_id,
     text: k.text,
     time: chatZeit(k.created_at),
     likes: zahlen.get(k.id) ?? k.comment_likes?.[0]?.count ?? 0,
     liked: gemocht.has(k.id),
+    antwortAuf: k.reply_to ?? null,
+    antwortAn: k.antwort_an ?? null,
   }));
 }
 

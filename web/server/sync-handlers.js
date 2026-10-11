@@ -20,6 +20,7 @@ const Profilfelder = require('../../gemeinsam/profilfelder');
 const Telefon = require('../../gemeinsam/telefon');
 // Kasten 4 (28.09.): Antworten im Unterthema, solange Schema XX fehlt.
 const Chatblase = require('../../gemeinsam/chatblase');
+const Kommentar = require('../../gemeinsam/kommentar');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
 // Spendencode und Gründe (Kasten 13) — dieselbe Regel wie App und Datenbank.
@@ -1287,14 +1288,30 @@ const handleShareContent = handler(
 
 const handleCreateComment = handler(
   'Kommentar anlegen',
-  async (client, nutzerId, beitragId, text) => {
-    const { data, error } = await client
-      .from('comments')
-      .insert({ post_id: beitragId, user_id: nutzerId, text })
-      .select()
-      .single();
+  /*
+   * Nachtrag 4.3b (11.10.2026): `bezug` = { antwortAuf (Wurzel, reply_to),
+   * antwortAn (angesprochener Kommentar, antwort_an) }. Kennt die Datenbank
+   * die Spalten noch nicht (Schema 92), geht der Kommentar ohne Faden raus
+   * und `ohneFaden` sagt das. Gleiche Weiche in app/lib/aktionen.ts
+   * (kommentarAnlegen).
+   */
+  async (client, nutzerId, beitragId, text, bezug = null) => {
+    const zeile = { post_id: beitragId, user_id: nutzerId, text };
+    if (bezug && bezug.antwortAuf) {
+      zeile.reply_to = bezug.antwortAuf;
+      zeile.antwort_an = bezug.antwortAn || bezug.antwortAuf;
+    }
+    const anlegen = () => client.from('comments').insert(zeile).select().single();
+    let { data, error } = await anlegen();
+    let ohneFaden = false;
+    if (error && zeile.reply_to && Kommentar.fehltSpalte(error)) {
+      delete zeile.reply_to;
+      delete zeile.antwort_an;
+      ohneFaden = true;
+      ({ data, error } = await anlegen());
+    }
     if (error) throw error;
-    return { ok: true, kommentar: data };
+    return { ok: true, kommentar: data, ohneFaden };
   }
 );
 

@@ -55,12 +55,16 @@ export const zeitText = (minuten: number) => {
   return `vor ${Math.floor(tage / 30)} M`;
 };
 
+// Nachtrag 4.3d: Satz „… hat auf deinen Kommentar geantwortet.“
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
+
 /**
  * Woran ein Herz hängen kann. Seit Schema 49 gibt es auch Herzen an
  * Kommentaren — ohne diese Liste hieße es dort "gefällt dein Beitrag".
  * Dieselbe Liste steht in web/server/app.js: App und Website sagen denselben
  * Satz.
  */
+
 const GEGENSTAND: Record<string, string> = {
   video: 'Video',
   comment: 'Kommentar',
@@ -89,6 +93,10 @@ const mitteilungText = (
     case 'follow':
       return `${name} folgt dir jetzt.`;
     case 'comment':
+      // Nachtrag 4.3d (Schema 92): Antwort auf einen Kommentar — Ziel ist
+      // die Antwort selbst (target_type 'comment'). Satz aus
+      // gemeinsam/kommentar.js, gleich in web/server/app.js.
+      if (m.ziel.art === 'comment') return Kommentar.mitteilungAntwort(name);
       return `${name} hat deinen Beitrag kommentiert.`;
     case 'repost':
       return `${name} hat dein Video repostet.`;
