@@ -6469,28 +6469,11 @@ async function renderCommunityChannels(communityId) {
       ${daten.link ? `<div class="kanal__link">${bioLink(daten.link)}</div>` : ''}
 
       ${/*
-          Push-to-Talk. Das Handbuch beschreibt es als Nachricht an alle
-          Mitglieder einer Community — gedacht für Gruppenanrufe und für
-          Momente außergewöhnlich hoher Aktivität. Bis zum 01.09.2026 gab es
-          dafür nur einen Schalter in den Einstellungen.
-
-          Der Knopf steht nur bei Mitgliedern: wer nicht beigetreten ist,
-          darf nichts hineinsprechen, und ein Knopf, der immer scheitert, ist
-          schlimmer als keiner.
-
-          Gedrückt halten, nicht klicken — das ist nicht nur der Name: eine
-          Aufnahme, die nach dem ersten Klick weiterläuft, läuft irgendwann
-          in der Hosentasche weiter.
+          Kasten 8.1 (Henrik 28.09.2026): kein Push-to-Talk-Knopf mehr auf der
+          Home-Seite der Community — er sitzt jetzt im Chat jedes Unterthemas
+          (renderCommunityChat). Gleiche Aenderung in der App
+          (CommunityDetailScreen).
         */ ''}
-      ${
-        daten.joined || eigen
-          ? `<div class="ptt">
-               <button class="ptt__knopf" id="pttKnopf">${ICONS.mic}<span>Push-to-Talk</span></button>
-               <span class="ptt__hinweis">gedrückt halten</span>
-               <div class="ptt__liste" id="pttListe"></div>
-             </div>`
-          : ''
-      }
 
       <button class="kanal__neu" id="neuesUnterthema">
         <span class="kanal__neu-kreis">${ICONS.plus}</span>
@@ -6530,7 +6513,6 @@ async function renderCommunityChannels(communityId) {
 
   $('#neuesUnterthema').addEventListener('click', () => neuesUnterthema(daten));
 
-  if ($('#pttKnopf')) pttEinhaengen(daten.id);
 
   main.querySelectorAll('[data-join]').forEach((b) =>
     b.addEventListener('click', async () => {
