@@ -103,6 +103,9 @@ function teilA() {
     pruefe(`6.1 Website-Blatt ohne „${weg}"`, !punkteWeb.includes(weg), punkteWeb.join(','));
   }
   pruefe('6.1 Kamera im App-Eingabefeld öffnet die eigene Kamera', /accessibilityLabel="Kamera"/.test(chat) && /wennFrei\(\(\) => setKameraAuf\(true\)\)/.test(chat));
+  // 6.4 (Henrik 11.10.2026): ausgeblendet bis zum eigenen Server — auf beiden Seiten nicht im Menü.
+  pruefe('6.4 Live-Standort steht in keinem Anhang-Menü', !/key: 'liveStandort'/.test(blatt) && !/'liveStandort'\s*:\s*\[|data-anhang="liveStandort"|\{ key: 'liveStandort'/.test(web));
+  pruefe('6.5 Ortssuche nennt den Kontakt (Website-Adresse)', /all-media-website\.onrender\.com/.test(lies('gemeinsam/ortsuche.js')));
   pruefe('6.1 Kamera im Website-Unterthema', web.includes('id="commKamera"') && web.includes("anhangSenden(kanalZiel, 'kamera')"));
 
   const farbenApp = blatt.match(/const FARBEN[^}]+\}/)?.[0] || '';

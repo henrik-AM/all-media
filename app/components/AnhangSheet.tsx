@@ -97,7 +97,13 @@ const PUNKTE: { key: string; label: string; icon: IconName }[] = [
    * und Sticker hinter dem eigenen Knopf rechts davon (GifStickerSheet).
    */
   { key: 'standort', label: 'Standort senden', icon: 'location-outline' },
-  { key: 'liveStandort', label: 'Live-Standort teilen', icon: 'navigate-circle-outline' },
+  /*
+   * „Live-Standort teilen" ist ausgeblendet (Henrik, 11.10.2026): er schlug
+   * immer fehl (navigator.geolocation gibt es in RN nicht). Kommt zurück,
+   * sobald der eigene Server steht — dann in vollem Umfang wie die
+   * Snapchat-Karte (Vault: All-Media-Offene-Punkte, 0a). Die Website hatte
+   * den Punkt nie, beide Menüs sind damit gleich.
+   */
   { key: 'standortAnfragen', label: 'Standort anfragen', icon: 'help-circle-outline' },
   { key: 'kontakt', label: 'Kontakt senden', icon: 'person-outline' },
 ];

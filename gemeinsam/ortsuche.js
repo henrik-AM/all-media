@@ -46,7 +46,8 @@
   'use strict';
 
   var ADRESSE = 'https://nominatim.openstreetmap.org';
-  var KENNUNG = 'AllMedia-App/1.0 (Chat-Standortsuche)';
+  // Kontakt fuer die Betreiber, wie die Nominatim-Regeln es wuenschen (Henrik, 11.10.2026).
+  var KENNUNG = 'AllMedia-App/1.0 (Chat-Standortsuche; https://all-media-website.onrender.com)';
   var QUELLE = '© OpenStreetMap-Mitwirkende · Suche: Nominatim';
   var ABSTAND_MS = 1100;
 
