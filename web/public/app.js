@@ -13996,7 +13996,9 @@ function zielChat(chat) {
   return {
     pfad: `/api/messages/${chat.id}/anhang`,
     ausserId: chat.userId,
-    ohne: [],
+    // Kasten 28/6.6: „Standort anfragen" nur im Chat zu zweit — gleiche
+    // Regel in ChatDetailScreen.tsx (ohne=…).
+    ohne: chat.userId ? [] : ['standortAnfragen'],
     fertig: (nachricht) => {
       state.messages.push(nachricht);
       paintMessages(chat);

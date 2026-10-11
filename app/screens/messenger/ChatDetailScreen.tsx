@@ -1542,7 +1542,11 @@ export const ChatDetailScreen = ({
         visible={anhangOffen}
         contacts={contacts}
         ausserId={chat.userId}
-        ohne={istKanal ? ['standortAnfragen'] : []}
+        // Kasten 28/6.6: „Standort anfragen" richtet sich an eine Person —
+        // in Unterthema UND Gruppe gibt es kein Gegenueber (vorher stand er in
+        // Gruppen und antwortete nur „In einer Gruppe geht das nicht").
+        // Gleiche Regel in web/public/app.js (zielChat).
+        ohne={istKanal || !chat.userId ? ['standortAnfragen'] : []}
         onClose={() => setAnhangOffen(false)}
         onStandortAnfragen={async () => {
           if (!chat.userId) return onNotice?.('In einer Gruppe geht das nicht');
