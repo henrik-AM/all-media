@@ -6823,6 +6823,13 @@ async function renderCommunityChat(community, kanal, thema) {
   const kanalZiel = {
     pfad: `/api/communities/${community.id}/channels/${kanal.id}/anhang`,
     ausserId: null,
+    // Kasten 4.3a: die Antwort im Unterthema gilt auch für den Anhang.
+    bezug: () =>
+      kanalAntwort && kanalAntwort.kanalId === kanal.id ? { antwortAuf: kanalAntwort.nachricht.id } : null,
+    bezugFertig: (daten) => {
+      kanalAntwort = null;
+      if (daten?.ohneBezug) toast(window.Chatblase.OHNE_BEZUG);
+    },
     ohne: ['standortAnfragen'],
     fertig: () => renderCommunityChat(community, kanal, thema),
     // Kasten 28/6.5: ein frei gewählter Ort geht als Text in den Kanal.
@@ -14078,6 +14085,18 @@ function zielChat(chat) {
   return {
     pfad: `/api/messages/${chat.id}/anhang`,
     ausserId: chat.userId,
+    // Kasten 4.3a: der Bezug aus dem Ziehen geht mit dem Anhang mit.
+    bezug: () =>
+      msgBezug && !msgBearbeitet
+        ? {
+            antwortAuf: msgBezug.art === 'antwort' ? msgBezug.nachricht.id : null,
+            zitatVon: msgBezug.art === 'zitat' ? msgBezug.nachricht.id : null,
+          }
+        : null,
+    bezugFertig: () => {
+      msgBezug = null;
+      document.querySelector('.msgbezug')?.remove();
+    },
     // Kasten 28/6.6: „Standort anfragen" nur im Chat zu zweit — gleiche
     // Regel in ChatDetailScreen.tsx (ohne=…).
     ohne: chat.userId ? [] : ['standortAnfragen'],
@@ -14386,16 +14405,24 @@ function openGifSticker(ziel) {
 /** Anhang wirklich verschicken und anzeigen. */
 async function anhangSenden(ziel, art, chat, zeichen) {
   const senden = async (koerper) => {
+    /*
+     * Kasten 4.3a (Nachtrag 11.10.): wer gezogen hat und dann einen Anhang
+     * schickt, antwortet damit — bis hierher ging der Anhang ohne Bezug
+     * raus und die Leiste blieb stehen. Gleiche Weiche in der App
+     * (ChatDetailScreen, anhangSenden).
+     */
+    const bezug = ziel.bezug?.() || null;
     const res = await fetch(ziel.pfad, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(koerper),
+      body: JSON.stringify(bezug ? { ...koerper, ...bezug } : koerper),
     });
     const daten = await res.json();
     if (!daten.ok) {
       toast(daten.error);
       return null;
     }
+    if (bezug) ziel.bezugFertig?.(daten);
     return daten.message;
   };
 

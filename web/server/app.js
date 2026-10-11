@@ -1038,6 +1038,9 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
   const gedeutet = await anhangDeuten(req, req.body?.art);
   if (gedeutet.error) return { ok: false, error: gedeutet.error };
   const { text, medien } = gedeutet;
+  // Kasten 4.3a: ein Anhang kann eine Antwort oder ein Zitat sein — wie Text.
+  medien.antwortAuf = req.body?.antwortAuf || null;
+  medien.zitatVon = req.body?.zitatVon || null;
 
   const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, medien);
   if (!e || e.ok === false) return antwort(e);
@@ -3275,8 +3278,9 @@ app.post('/api/communities/:id/channels/:chId/anhang', route(async (req) => {
   if (gedeutet.error) return { ok: false, error: gedeutet.error };
   const { text, medien } = gedeutet;
 
+  // Kasten 4.3a: die Antwort im Unterthema gilt auch für den Anhang (Schema 91).
   const e = await syncHandlers.handleSendChannelMessage(
-    req.db, req.nutzerId, req.params.chId, text, medien
+    req.db, req.nutzerId, req.params.chId, text, medien, req.body?.antwortAuf || null
   );
   if (!e || e.ok === false) return antwort(e);
 
@@ -3290,6 +3294,7 @@ app.post('/api/communities/:id/channels/:chId/anhang', route(async (req) => {
 
   return {
     ok: true,
+    ohneBezug: Boolean(e.ohneBezug),
     message: angelegt || {
       id: e.nachricht.id,
       from: 'me',

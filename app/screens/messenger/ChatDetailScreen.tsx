@@ -1143,6 +1143,9 @@ export const ChatDetailScreen = ({
      * die Karte baut die Oberfläche daraus.
      */
     let id = `m${Date.now()}`;
+    // Kasten 4.3a: der Bezug aus dem Ziehen gilt auch für den Anhang.
+    const anhangBezug = bezug && !bearbeitet ? bezug : null;
+    let anhangOhneBezug = false;
     if (supabase && ichId) {
       try {
         /*
@@ -1155,17 +1158,35 @@ export const ChatDetailScreen = ({
          * Text nahm die richtige Abzweigung (kanalNachricht), der
          * Anhang nicht.
          */
+        /*
+         * Kasten 4.3a (Nachtrag 11.10.): wer gezogen hat und dann ein Foto,
+         * einen Sticker oder einen Ort schickt, antwortet damit. Bis hierher
+         * ging der Anhang ohne Bezug raus und die Leiste blieb stehen — die
+         * Antwort verlor still ihren Anlass. Gleiche Weiche auf der Website
+         * (anhangSenden → antwortAuf).
+         */
         const anhang = {
           typ: teil.media ?? null,
           standortId: ortId ?? null,
           kontaktId: personId ?? null,
           dateiName: dateiName ?? null,
           dateiGroesse: dateiGroesse ?? null,
+          antwortAuf: anhangBezug?.art === 'antwort' ? anhangBezug.nachricht.id : null,
+          zitatVon: anhangBezug?.art === 'zitat' ? anhangBezug.nachricht.id : null,
         };
         const data = istKanal
-          ? await Aktion.kanalNachricht(supabase, ichId, chat.id, teil.text ?? '', anhang)
+          ? await Aktion.kanalNachricht(
+              supabase, ichId, chat.id, teil.text ?? '',
+              { ...anhang, antwortAuf: null, zitatVon: null },
+              anhangBezug ? anhangBezug.nachricht.id : null
+            )
           : await Aktion.nachrichtSenden(supabase, ichId, chat.id, teil.text ?? '', anhang);
         id = data.id;
+        if (anhangBezug) {
+          anhangOhneBezug = istKanal && !!(data as { ohneBezug?: boolean }).ohneBezug;
+          if (anhangOhneBezug) onNotice?.(Chatblase.OHNE_BEZUG);
+          setBezug(null);
+        }
       } catch (e: any) {
         console.error('Anhang senden fehlgeschlagen:', e?.message ?? e);
         onNotice?.('Der Anhang ging nicht raus');
@@ -1173,9 +1194,30 @@ export const ChatDetailScreen = ({
       }
     }
 
+    const anhangKopf =
+      anhangBezug && !anhangOhneBezug
+        ? {
+            id: anhangBezug.nachricht.id,
+            text: anhangBezug.nachricht.text,
+            autor:
+              anhangBezug.nachricht.senderId === CURRENT_USER_ID
+                ? 'Du'
+                : alleNutzer[anhangBezug.nachricht.senderId]?.name ?? '',
+          }
+        : undefined;
     setMessages((prev) => [
       ...prev,
-      { id, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil, lokal: true },
+      {
+        id,
+        chatId: chat.id,
+        senderId: CURRENT_USER_ID,
+        time: nowTime(),
+        ...teil,
+        lokal: true,
+        // Wie beim Text: im Unterthema wird ein Zitat als Antwort gezeigt.
+        antwortAuf: anhangBezug && (anhangBezug.art === 'antwort' || istKanal) ? anhangKopf : undefined,
+        zitat: anhangBezug?.art === 'zitat' && !istKanal ? anhangKopf : undefined,
+      },
     ]);
     scrollToEnd();
   };
