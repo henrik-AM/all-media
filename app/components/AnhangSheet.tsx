@@ -54,6 +54,32 @@ interface Props {
   onNotice: (message: string) => void;
 }
 
+/*
+ * Kasten 28/6.2 (Henrik 28.09.2026): „gefällt mir das Design nicht … hoch
+ * professionell … orientiere dich an WhatsApp." Statt einer Liste mit
+ * Pfeilen ein Raster runder, farbiger Symbole mit Beschriftung darunter —
+ * jede Art mit eigener Farbe, damit man sie ohne Lesen wiederfindet.
+ * Dieselben Farben in web/public/app.js (ANHANG_FARBEN) und styles.css.
+ */
+const FARBEN: Record<string, string> = {
+  galerie: '#007BFC',
+  datei: '#7F66FF',
+  standort: '#1FA855',
+  liveStandort: '#00A5A8',
+  standortAnfragen: '#FF8A00',
+  kontakt: '#009DE2',
+};
+
+/** Kurze Beschriftungen unter den Kreisen; die langen bleiben für VoiceOver. */
+const KURZ: Record<string, string> = {
+  galerie: 'Galerie',
+  datei: 'Dokument',
+  standort: 'Standort',
+  liveStandort: 'Live-Standort',
+  standortAnfragen: 'Standort anfragen',
+  kontakt: 'Kontakt',
+};
+
 const PUNKTE: { key: string; label: string; icon: IconName }[] = [
   { key: 'galerie', label: 'Aus der Galerie', icon: 'image-outline' },
   /*
@@ -169,11 +195,13 @@ export const AnhangSheet = ({
   return (
     <SheetRahmen visible={visible} title={titel} onClose={schliessen} hoch={schritt !== 'menue'}>
       {schritt === 'menue' && (
-        <View>
+        <View style={styles.raster}>
           {PUNKTE.filter((p) => !ohne.includes(p.key)).map((p) => (
             <Druck
               key={p.key}
-              style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
+              style={({ pressed }) => [styles.kachel, pressed && styles.kachelGedrueckt]}
+              accessibilityRole="button"
+              accessibilityLabel={p.label}
               onPress={() => {
                 if (p.key === 'galerie') return foto();
                 if (p.key === 'datei') return datei();
@@ -185,11 +213,12 @@ export const AnhangSheet = ({
                 setSchritt(p.key as Schritt);
               }}
             >
-              <View style={styles.symbol}>
-                <Ionicons name={p.icon} size={22} color={colors.white} />
+              <View style={[styles.kreis, { backgroundColor: FARBEN[p.key] ?? colors.brand }]}>
+                <Ionicons name={p.icon} size={26} color="#FFFFFF" />
               </View>
-              <Text style={styles.label}>{p.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.text3} />
+              <Text style={styles.kachelText} numberOfLines={2}>
+                {KURZ[p.key] ?? p.label}
+              </Text>
             </Druck>
           ))}
         </View>
@@ -261,6 +290,34 @@ export const AnhangSheet = ({
 };
 
 const styles = themenStyles((colors) => ({
+  // Kasten 28/6.2: drei Kacheln je Reihe, wie das Anhang-Blatt bei WhatsApp.
+  raster: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  kachel: {
+    width: '33.333%',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    gap: 8,
+  },
+  kachelGedrueckt: { backgroundColor: colors.surface2 },
+  kreis: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  kachelText: { ...typography.small, fontWeight: '500', color: colors.text, textAlign: 'center' },
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',

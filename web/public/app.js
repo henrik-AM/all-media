@@ -14037,18 +14037,39 @@ function openAnhang(ziel, chat) {
     { key: 'kontakt', label: 'Kontakt senden', icon: 'person' },
   ];
 
+  /*
+   * Kasten 28/6.2: Raster runder, farbiger Symbole wie bei WhatsApp statt
+   * einer Liste mit Pfeilen. Farben und Kurztexte wie in
+   * app/components/AnhangSheet.tsx (FARBEN, KURZ).
+   */
+  const ANHANG_FARBEN = {
+    galerie: '#007BFC',
+    datei: '#7F66FF',
+    standort: '#1FA855',
+    liveStandort: '#00A5A8',
+    standortAnfragen: '#FF8A00',
+    kontakt: '#009DE2',
+  };
+  const ANHANG_KURZ = {
+    galerie: 'Galerie',
+    datei: 'Dokument',
+    standort: 'Standort',
+    liveStandort: 'Live-Standort',
+    standortAnfragen: 'Standort anfragen',
+    kontakt: 'Kontakt',
+  };
+
   openSheet(
     'Anhang',
-    punkte
+    `<div class="anhangraster">${punkte
       .filter((p) => !(ziel.ohne || []).includes(p.key))
       .map(
-        (p) => `<button class="item" data-anhang="${p.key}">
-          <span class="item__icon">${ICONS[p.icon]}</span>
-          <span class="item__label">${esc(p.label)}</span>
-          <span class="row__chevron">${ICONS.chevron}</span>
+        (p) => `<button type="button" class="anhangraster__kachel" data-anhang="${p.key}" aria-label="${esc(p.label)}">
+          <span class="anhangraster__kreis" style="background:${ANHANG_FARBEN[p.key] || 'var(--brand)'}">${ICONS[p.icon]}</span>
+          <span class="anhangraster__text">${esc(ANHANG_KURZ[p.key] || p.label)}</span>
         </button>`
       )
-      .join(''),
+      .join('')}</div>`,
     (sheet, close) => {
       sheet.querySelectorAll('[data-anhang]').forEach((b) =>
         b.addEventListener('click', () => {
