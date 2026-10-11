@@ -4511,6 +4511,8 @@ body.ist-abgemeldet .ptr-indicator {
 .ptt__knopf.is-rec { background: var(--danger); }
 .ptt__knopf svg { width: 19px; height: 19px; }
 .ptt__hinweis { font-size: 10.5px; color: var(--text-3); }
+/* Kasten 8.2: im Unterthema direkt ueber der Eingabezeile. */
+.ptt--kanal { padding: 8px 16px; border-top: 1px solid var(--border); }
 .ptt__liste { width: 100%; display: flex; flex-direction: column; gap: 4px; }
 .ptt__zeile {
   display: flex;

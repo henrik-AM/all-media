@@ -6323,7 +6323,13 @@ async function pttListeLaden(communityId) {
   }
 }
 
-function pttEinhaengen(communityId) {
+/*
+ * Kasten 8.2: der Knopf sitzt im Chat eines Unterthemas (renderCommunityChat).
+ * `kanalId` geht mit, damit die Datenbank die Sitzung diesem Unterthema
+ * zuordnet (Schema 90); `nachSenden` laedt den Chat neu, damit die Zeile
+ * „Push to Talk" erscheint.
+ */
+function pttEinhaengen(communityId, kanalId = null, nachSenden = null) {
   const knopf = $('#pttKnopf');
   if (!knopf) return;
 
@@ -6366,10 +6372,12 @@ function pttEinhaengen(communityId) {
         const antwort = await api(`/api/communities/${communityId}/ptt`, {
           audioUrl: adresse,
           dauer: Math.round(dauerMs / 1000),
+          kanalId,
         });
         if (!antwort?.ok) return toast(antwort?.error || 'Die Aufnahme ging nicht raus');
         toast('Push-to-Talk gesendet');
         pttListeLaden(communityId);
+        if (nachSenden) nachSenden();
       });
 
       aufnahme.start();
@@ -6633,6 +6641,16 @@ async function renderCommunityChat(community, kanal, thema) {
             </div>`
       }
     </div>
+    ${/* Kasten 8.2: Push-to-Talk im Unterthema, nur fuer Mitglieder — wie in
+         der App (ChatDetailScreen, pttLeiste). */ ''}
+    ${
+      community.joined || community.eigen
+        ? `<div class="ptt ptt--kanal">
+             <button class="ptt__knopf" id="pttKnopf" aria-label="Push to Talk">${ICONS.mic}<span>Push-to-Talk</span></button>
+             <span class="ptt__hinweis">gedrückt halten</span>
+           </div>`
+        : ''
+    }
     <form class="composer" id="commForm">
       ${/* Das Plus gab es im Unterthema nicht — Handbuch-Abgleich 01.09.2026,
            "Sticker innerhalb von Community-Kanaelen". Nachgetragen 04.09. */ ''}
@@ -6648,6 +6666,7 @@ async function renderCommunityChat(community, kanal, thema) {
 
   $('#backBtn').addEventListener('click', () => renderKanalThemen(community, kanal));
   $('#kanalKopf').addEventListener('click', () => openCommunityEinstellungen(community));
+  if ($('#pttKnopf')) pttEinhaengen(community.id, kanal.id, () => renderCommunityChat(community, kanal, thema));
   main.querySelectorAll('[data-kanalcall]').forEach((b) =>
     b.addEventListener('click', () =>
       openCall(

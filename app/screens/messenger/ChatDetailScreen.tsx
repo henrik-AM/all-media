@@ -49,6 +49,7 @@ import { FarbfilterSchicht } from '../../components/Farbfilter';
 import { MarkierterText } from '../../components/MarkierterText';
 import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
 import { ZiehZumAntworten } from '../../components/ZiehZumAntworten';
+import { PushToTalk } from '../../components/PushToTalk';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 // Kasten 27: offenen Chat im Takt nachsehen — gemeinsam mit der Website.
@@ -206,6 +207,10 @@ export const ChatDetailScreen = ({
   const istKanal = communities.some((c) =>
     (c.unterthemen ?? []).some((u) => u.id === chat.id)
   );
+  /** Kasten 8.2: die Community dieses Unterthemas — fuer Push-to-Talk. */
+  const kanalCommunity = istKanal
+    ? communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === chat.id))
+    : undefined;
 
   /*
    * "Zuletzt online". Hier stand bis zum 03.09.2026 fest das Wort "Online" —
@@ -1431,6 +1436,29 @@ export const ChatDetailScreen = ({
           </View>
         )}
 
+        {/*
+          Kasten 8.2 (Henrik 28.09.2026): Push-to-Talk liegt nicht mehr auf
+          der Home-Seite der Community, sondern im Unterthema (#). Nur fuer
+          Mitglieder — die Regel „PTT senden" laesst nur sie zu. Die
+          Wortmeldung geht an dieses Unterthema (channel_id); die Datenbank
+          legt daraus die eine Zeile „Push to Talk" an (Schema 90).
+        */}
+        {kanalCommunity && (kanalCommunity.joined || kanalCommunity.eigen) && (
+          <View style={styles.pttLeiste}>
+            <PushToTalk
+              communityId={kanalCommunity.id}
+              kanalId={chat.id}
+              onNotice={(t) => onNotice?.(t)}
+              onGesendet={() => {
+                if (!supabase || !ichId) return;
+                ladeKanalNachrichten(supabase, ichId, chat.id)
+                  .then((frisch) => setMessages((prev) => ChatAbgleich.nachrichtenAbgleichen(prev, frisch)))
+                  .catch(() => {});
+              }}
+            />
+          </View>
+        )}
+
         <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
           <Druck
             style={styles.composerIcon}
@@ -1769,6 +1797,13 @@ const styles = themenStyles((colors) => ({
     backgroundColor: colors.surface3,
   },
   anrufText: { color: colors.text2, ...typography.small },
+  /* Kasten 8.2: Push-to-Talk ueber der Eingabezeile im Unterthema. */
+  pttLeiste: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   anrufVerpasst: { color: colors.danger },
 
   /* Kasten 16: die Karte einer Story-Markierung — mittig, keine Blase. */
