@@ -25,6 +25,7 @@ import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ICH as CURRENT_USER_ID, chatZeit, ladeChatStand, ladeChatZustand, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
+import { GifStickerSheet } from '../../components/GifStickerSheet';
 import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
 import { WeiterleitenSheet } from '../../components/WeiterleitenSheet';
@@ -130,6 +131,8 @@ export const ChatDetailScreen = ({
   onOpenBeitrag,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
+  // Kasten 28/6.3: GIFs und Sticker hinter dem Knopf rechts im Eingabefeld.
+  const [gifStickerOffen, setGifStickerOffen] = useState(false);
   const [kameraAuf, setKameraAuf] = useState(false);
   /*
    * Kasten RS 3: eine fremde Nachricht melden — im Messenger, im Community-
@@ -1452,6 +1455,15 @@ export const ChatDetailScreen = ({
               `onCamera` (App.tsx, aufnahmeInChat) legte das Foto nur lokal
               an und meldete trotzdem „Foto gesendet".
             */}
+            {/* Kasten 28/6.3: GIF | Sticker wie bei WhatsApp — Symbol innen rechts. */}
+            <Druck
+              style={styles.composerIcon}
+              onPress={() => wennFrei(() => setGifStickerOffen(true))}
+              hitSlop={4}
+              accessibilityLabel="GIFs und Sticker"
+            >
+              <Ionicons name="happy-outline" size={21} color={colors.text2} />
+            </Druck>
             <Druck
               style={styles.composerIcon}
               onPress={() => wennFrei(() => setKameraAuf(true))}
@@ -1509,7 +1521,6 @@ export const ChatDetailScreen = ({
         ausserId={chat.userId}
         ohne={istKanal ? ['standortAnfragen'] : []}
         onClose={() => setAnhangOffen(false)}
-        onKamera={() => setKameraAuf(true)}
         onStandortAnfragen={async () => {
           if (!chat.userId) return onNotice?.('In einer Gruppe geht das nicht');
           const id = await aktionen.standortAnfragen(chat.id, chat.userId);
@@ -1519,8 +1530,16 @@ export const ChatDetailScreen = ({
         onNotice={(text) => onNotice?.(text)}
       />
 
+      <GifStickerSheet
+        visible={gifStickerOffen}
+        onClose={() => setGifStickerOffen(false)}
+        onAnhang={anhangSenden}
+        onNotice={(text) => onNotice?.(text)}
+      />
+
       {/*
-        Die eigene Kamera aus dem Anhang-Blatt heraus.
+        Die eigene Kamera aus dem Eingabefeld heraus (bis Kasten 28/6.1 aus
+        dem Anhang-Blatt).
 
         `direktZu` heisst: das Ziel steht fest. Wer im Chat auf "Foto
         aufnehmen" tippt, hat gerade gesagt, wohin die Aufnahme soll — die

@@ -6690,6 +6690,9 @@ async function renderCommunityChat(community, kanal, thema) {
       <button type="button" class="composer__icon" id="commAttach" aria-label="Anhang">${ICONS.plus}</button>
       <div class="composer__field">
         <textarea id="commMsgInput" rows="1" placeholder="Nachricht schreiben ..."></textarea>
+        ${/* Kasten 28/6.1 + 6.3: Kamera und GIF/Sticker wie im Chat. */ ''}
+        <button type="button" class="composer__icon" id="commGifSticker" aria-label="GIFs und Sticker">${ICONS.sticker}</button>
+        <button type="button" class="composer__icon" id="commKamera" aria-label="Kamera">${ICONS.camera}</button>
       </div>
       <button type="submit" class="composer__send" id="commSend" aria-label="Senden" disabled>${ICONS.send}</button>
     </form>`;
@@ -6839,14 +6842,27 @@ async function renderCommunityChat(community, kanal, thema) {
    * bestimmte Person, und ein Kanal hat kein Gegenueber. Im Handbuch steht
    * sie ausdruecklich unter "im Privatchat".
    */
-  $('#commAttach').addEventListener('click', () =>
-    openAnhang({
-      pfad: `/api/communities/${community.id}/channels/${kanal.id}/anhang`,
-      ausserId: null,
-      ohne: ['standortAnfragen'],
-      fertig: () => renderCommunityChat(community, kanal, thema),
-    })
-  );
+  const kanalZiel = {
+    pfad: `/api/communities/${community.id}/channels/${kanal.id}/anhang`,
+    ausserId: null,
+    ohne: ['standortAnfragen'],
+    fertig: () => renderCommunityChat(community, kanal, thema),
+    // Kasten 28/6.5: ein frei gewählter Ort geht als Text in den Kanal.
+    textSenden: (text) =>
+      fetch(`/api/communities/${community.id}/channels/${kanal.id}/nachricht`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }).then((r) => r.json().catch(() => ({}))),
+  };
+  $('#commAttach').addEventListener('click', () => openAnhang(kanalZiel));
+  /*
+   * Die Kamera im Kanal: Aufnahme über die Kamera des Geräts (capture) und
+   * derselbe Anhang-Weg wie „Aus der Galerie". Die Chat-Kamera (openCamera)
+   * schreibt fest an /api/messages/ — für einen Kanal die falsche Ablage.
+   */
+  $('#commKamera').addEventListener('click', () => anhangSenden(kanalZiel, 'kamera'));
+  $('#commGifSticker').addEventListener('click', () => openGifSticker(kanalZiel));
 
   $('#commForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -14003,7 +14019,6 @@ function openAnhang(ziel, chat) {
   }
 
   const punkte = [
-    { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera' },
     { key: 'galerie', label: 'Aus der Galerie', icon: 'image' },
     /*
      * Datei, Gif, Sticker und Standortanfrage kamen am 01.09.2026 dazu. Alle
@@ -14011,8 +14026,12 @@ function openAnhang(ziel, chat) {
      * "Standortanfrage"); im Anhang-Menü gab es sie nicht.
      */
     { key: 'datei', label: 'Datei senden', icon: 'document' },
-    { key: 'gif', label: 'Gif senden', icon: 'film' },
-    { key: 'sticker', label: 'Sticker', icon: 'sticker' },
+    /*
+     * Kasten 28/6.1 (Henrik 28.09.2026): „Foto aufnehmen", „GIF senden" und
+     * „Sticker" stehen nicht mehr hier. Kamera im Eingabefeld, GIF und
+     * Sticker hinter dem eigenen Knopf (openGifSticker). Die Zweige in
+     * anhangSenden() bleiben — die neuen Knöpfe benutzen sie.
+     */
     { key: 'standort', label: 'Standort senden', icon: 'mapPin' },
     { key: 'standortAnfragen', label: 'Standort anfragen', icon: 'standortAnfrage' },
     { key: 'kontakt', label: 'Kontakt senden', icon: 'person' },
@@ -14041,8 +14060,71 @@ function openAnhang(ziel, chat) {
   );
 }
 
+/*
+ * GIFs und Sticker — der Knopf rechts im Eingabefeld (Kasten 28/6.3).
+ * Blatt mit Reitern GIF | Sticker wie bei WhatsApp. Gleiches Blatt in der
+ * App: app/components/GifStickerSheet.tsx.
+ *
+ * GIF: eine GIF-Suche (Giphy, Tenor) bräuchte einen Schlüssel bei einem
+ * fremden Konto und schickte jede Suche dorthin. Darum kommt das GIF aus den
+ * eigenen Dateien; der Reiter sagt das offen.
+ */
+function openGifSticker(ziel) {
+  let reiter = 'sticker';
+  openSheet(
+    'GIFs und Sticker',
+    `<div class="gifsticker">
+       <div class="gifsticker__reiter" role="tablist">
+         <button type="button" role="tab" data-reiter="gif">GIF</button>
+         <button type="button" role="tab" data-reiter="sticker">Sticker</button>
+       </div>
+       <div class="gifsticker__seite" data-seite="sticker">
+         <div class="sticker-raster">
+           ${STICKER.map((z) => `<button class="sticker-raster__z" data-sticker="${z}" aria-label="Sticker ${z}">${z}</button>`).join('')}
+         </div>
+       </div>
+       <div class="gifsticker__seite gifsticker__gif" data-seite="gif">
+         <span class="gifsticker__symbol">${ICONS.film}</span>
+         <strong>GIF aus deinen Dateien</strong>
+         <p>Eine GIF-Suche gibt es nicht: sie würde jede Suche an einen fremden Dienst schicken.</p>
+         <button type="button" class="btn btn--primary" data-gifwahl>GIF aus der Galerie wählen</button>
+       </div>
+     </div>`,
+    (sheet, close) => {
+      const zeigen = () => {
+        sheet.querySelectorAll('[data-reiter]').forEach((b) => {
+          const an = b.dataset.reiter === reiter;
+          b.classList.toggle('is-an', an);
+          b.setAttribute('aria-selected', an ? 'true' : 'false');
+        });
+        sheet.querySelectorAll('[data-seite]').forEach((s) => {
+          s.hidden = s.dataset.seite !== reiter;
+        });
+      };
+      sheet.querySelectorAll('[data-reiter]').forEach((b) =>
+        b.addEventListener('click', () => {
+          reiter = b.dataset.reiter;
+          zeigen();
+        })
+      );
+      sheet.querySelectorAll('[data-sticker]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          close();
+          await anhangSenden(ziel, 'stickerZeichen', null, b.dataset.sticker);
+        })
+      );
+      sheet.querySelector('[data-gifwahl]').addEventListener('click', () => {
+        close();
+        anhangSenden(ziel, 'gif');
+      });
+      zeigen();
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
 /** Anhang wirklich verschicken und anzeigen. */
-async function anhangSenden(ziel, art, chat) {
+async function anhangSenden(ziel, art, chat, zeichen) {
   const senden = async (koerper) => {
     const res = await fetch(ziel.pfad, {
       method: 'POST',
@@ -14116,6 +14198,13 @@ async function anhangSenden(ziel, art, chat) {
     eigenesMediumSichern(nachricht.id, bild);
     ziel.fertig(nachricht);
     return toast('Gif gesendet');
+  }
+
+  // Kasten 28/6.3: der Sticker ist im GIF/Sticker-Blatt schon gewählt.
+  if (art === 'stickerZeichen') {
+    const nachricht = await senden({ art: 'sticker', zeichen });
+    if (!nachricht) return;
+    return ziel.fertig(nachricht);
   }
 
   if (art === 'sticker') {
@@ -19396,6 +19485,7 @@ async function openChat(chatId) {
                 ? 'Anfrage abgelehnt'
                 : 'Nachricht'
         }" autocomplete="off" ${chatGesperrt(chat) ? 'disabled' : ''}></textarea>
+        <button type="button" class="composer__icon" id="gifStickerBtn" aria-label="GIFs und Sticker">${ICONS.sticker}</button>
         <button type="button" class="composer__icon" id="camBtn" aria-label="Kamera">${ICONS.camera}</button>
       </div>
       <button type="submit" class="composer__send" id="sendBtn" aria-label="Senden" disabled>${ICONS.send}</button>
@@ -19460,7 +19550,15 @@ async function openChat(chatId) {
   );
   $('#attach').addEventListener('click', () => openAnhang(zielChat(chat), chat));
   // Aus dem Chat heraus steht das Ziel fest: die Aufnahme geht hierher.
-  $('#camBtn').addEventListener('click', () => openCamera(chat));
+  $('#camBtn').addEventListener('click', () => {
+    if (chatGesperrt(chat)) return openAnhang(zielChat(chat), chat); // dieselbe Absage wie am Plus
+    openCamera(chat);
+  });
+  // Kasten 28/6.3: GIF | Sticker rechts im Eingabefeld, wie bei WhatsApp.
+  $('#gifStickerBtn').addEventListener('click', () => {
+    if (chatGesperrt(chat)) return openAnhang(zielChat(chat), chat);
+    openGifSticker(zielChat(chat));
+  });
 
   const input = $('#msgInput');
   const sendBtn = $('#sendBtn');

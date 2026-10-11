@@ -5,14 +5,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
-import { aufnehmen, ausGalerie } from '../lib/aufnehmen';
+import { ausGalerie } from '../lib/aufnehmen';
 import * as DocumentPicker from 'expo-document-picker';
-import { STICKER } from '../constants/sticker';
 import { useDaten } from '../contexts/DatenContext';
 import { Contact, Message } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-type Schritt = 'menue' | 'standort' | 'kontakt' | 'liveStandort' | 'sticker';
+type Schritt = 'menue' | 'standort' | 'kontakt' | 'liveStandort';
 
 interface Props {
   visible: boolean;
@@ -44,19 +43,6 @@ interface Props {
    */
   onStandortAnfragen?: () => void;
   /**
-   * Die eigene Kamera oeffnen statt der des Systems.
-   *
-   * Bis zum 20.09.2026 rief "Foto aufnehmen" hier `launchCameraAsync` — die
-   * Kamera-App des Systems. Die hat im Simulator kein Gegenstueck, kennt
-   * keinen Filter und keinen Weg in die Galerie. Die eigene Kamera liegt
-   * eine Ebene hoeher, weil ein Vollbild nicht in ein Blatt gehoert; dieses
-   * Blatt sagt nur Bescheid.
-   *
-   * Fehlt der Anschluss, bleibt es beim alten Weg — dann ist das Blatt in
-   * einem Zusammenhang eingebaut, der keine eigene Kamera hat.
-   */
-  onKamera?: () => void;
-  /**
    * Anhang-Arten, die es hier nicht gibt.
    *
    * Im Unterthema einer Community faellt "Standort anfragen" weg: die Anfrage
@@ -69,7 +55,6 @@ interface Props {
 }
 
 const PUNKTE: { key: string; label: string; icon: IconName }[] = [
-  { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera-outline' },
   { key: 'galerie', label: 'Aus der Galerie', icon: 'image-outline' },
   /*
    * Datei, Gif, Sticker und Standortanfrage kamen am 01.09.2026 dazu. Alle
@@ -77,8 +62,11 @@ const PUNKTE: { key: string; label: string; icon: IconName }[] = [
    * "Standortanfrage"); im Anhang-Menue gab es sie nicht.
    */
   { key: 'datei', label: 'Datei senden', icon: 'document-outline' },
-  { key: 'gif', label: 'Gif senden', icon: 'film-outline' },
-  { key: 'sticker', label: 'Sticker', icon: 'happy-outline' },
+  /*
+   * Kasten 28/6.1 (Henrik 28.09.2026): „Foto aufnehmen", „GIF senden" und
+   * „Sticker" fliegen aus der Liste. Die Kamera sitzt im Eingabefeld, GIFs
+   * und Sticker hinter dem eigenen Knopf rechts davon (GifStickerSheet).
+   */
   { key: 'standort', label: 'Standort senden', icon: 'location-outline' },
   { key: 'liveStandort', label: 'Live-Standort teilen', icon: 'navigate-circle-outline' },
   { key: 'standortAnfragen', label: 'Standort anfragen', icon: 'help-circle-outline' },
@@ -93,7 +81,6 @@ export const AnhangSheet = ({
   onClose,
   onAnhang,
   onStandortAnfragen,
-  onKamera,
   ohne = [],
   onNotice,
 }: Props) => {
@@ -105,12 +92,8 @@ export const AnhangSheet = ({
     onClose();
   };
 
-  const foto = async (ausDerGalerie: boolean) => {
-    if (!ausDerGalerie && onKamera) {
-      schliessen();
-      return onKamera();
-    }
-    const uri = ausDerGalerie ? await ausGalerie('photo', onNotice) : await aufnehmen('photo', onNotice);
+  const foto = async () => {
+    const uri = await ausGalerie('photo', onNotice);
     if (!uri) return schliessen();
     onAnhang({ text: 'Foto', media: 'image', bildUri: uri });
     onNotice('Foto gesendet');
@@ -140,19 +123,6 @@ export const AnhangSheet = ({
     } catch {
       onNotice('Auf die Datei ließ sich nicht zugreifen');
     }
-    schliessen();
-  };
-
-  /*
-   * Ein Gif kommt aus der Galerie. Eine Suche bei einem Gif-Dienst braeuchte
-   * einen fremden Zugang und wuerde jede Suchanfrage dorthin schicken — fuer
-   * eine App, die mit Ende-zu-Ende wirbt, waere das der falsche Weg.
-   */
-  const gif = async () => {
-    const uri = await ausGalerie('photo', onNotice);
-    if (!uri) return schliessen();
-    onAnhang({ text: 'Gif', media: 'gif', bildUri: uri });
-    onNotice('Gif gesendet');
     schliessen();
   };
 
@@ -194,7 +164,6 @@ export const AnhangSheet = ({
     standort: 'Standort senden',
     kontakt: 'Kontakt senden',
     liveStandort: 'Live-Standort',
-    sticker: 'Sticker',
   }[schritt];
 
   return (
@@ -206,10 +175,8 @@ export const AnhangSheet = ({
               key={p.key}
               style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
               onPress={() => {
-                if (p.key === 'kamera') return foto(false);
-                if (p.key === 'galerie') return foto(true);
+                if (p.key === 'galerie') return foto();
                 if (p.key === 'datei') return datei();
-                if (p.key === 'gif') return gif();
                 if (p.key === 'liveStandort') return liveStandortTeilen();
                 if (p.key === 'standortAnfragen') {
                   onStandortAnfragen?.();
@@ -226,23 +193,6 @@ export const AnhangSheet = ({
             </Druck>
           ))}
         </View>
-      )}
-
-      {schritt === 'sticker' && (
-        <ScrollView contentContainerStyle={styles.stickerRaster}>
-          {STICKER.map((st) => (
-            <Druck
-              key={st}
-              style={styles.sticker}
-              onPress={() => {
-                onAnhang({ text: st, media: 'sticker' });
-                schliessen();
-              }}
-            >
-              <Text style={styles.stickerZeichen}>{st}</Text>
-            </Druck>
-          ))}
-        </ScrollView>
       )}
 
       {schritt === 'standort' && (
@@ -311,15 +261,6 @@ export const AnhangSheet = ({
 };
 
 const styles = themenStyles((colors) => ({
-  stickerRaster: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  sticker: { width: '20%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  stickerZeichen: { fontSize: 40 },
-
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',
