@@ -6998,6 +6998,42 @@ function bezugHtml(a) {
      </button>`;
 }
 
+/*
+ * Nachtrag 4.3c (11.10.2026): Antworten in der Live-Kommentarspalte — wie im
+ * Chat nach rechts ziehen (oder „Antworten" beim Überfahren), über der
+ * Antwort steht klein das Zitat. Keine Fäden: die Spalte läuft durch. Gleich
+ * in der App (components/LiveAntwort.tsx), Zitat aus gemeinsam/kommentar.js.
+ */
+function liveZeileHtml(k, ziehbar) {
+  const zitat = k.antwortAuf
+    ? `<span class="live__zitat">↪ ${esc(window.Kommentar.liveZitat(k.antwortAuf))}</span>`
+    : '';
+  const knopf = ziehbar
+    ? `<button type="button" class="live__antworten" data-antworten aria-label="Antworten an ${esc(k.name)}">Antworten</button>`
+    : '';
+  return `<p class="live__kommentar"${ziehbar ? ` data-msgid="${esc(k.id)}" data-ziehbar` : ''}>${zitat}<b>${esc(
+    k.name
+  )}</b> ${esc(k.text)}${knopf}</p>`;
+}
+
+/**
+ * Die Leiste „Antwort an …" über der Eingabezeile `zeile`. `an` = der
+ * Kommentar oder null (entfernt die Leiste), `abbrechen` beim ×.
+ */
+function liveAntwortLeiste(zeile, an, abbrechen) {
+  if (!zeile) return;
+  zeile.parentNode.querySelector('.live__bezug')?.remove();
+  if (!an) return;
+  const leiste = document.createElement('div');
+  leiste.className = 'msgbezug live__bezug';
+  leiste.innerHTML = `
+    <span class="msgbezug__balken"></span>
+    <span class="msgbezug__text"><b>${esc(window.Kommentar.leistenText(an.name))}</b><span>${esc(an.text || '')}</span></span>
+    <button type="button" class="msgbezug__zu" aria-label="Antworten abbrechen">${ICONS.close}</button>`;
+  zeile.parentNode.insertBefore(leiste, zeile);
+  leiste.querySelector('.msgbezug__zu').addEventListener('click', abbrechen);
+}
+
 /** Der Antworten-Knopf neben der Blase — sichtbar beim Überfahren. */
 function antwortKnopfHtml() {
   return `<button type="button" class="msg__antworten" data-antworten aria-label="Antworten" title="Antworten">${ICONS.antwort}</button>`;
@@ -15521,6 +15557,9 @@ function openClip(clipId) {
   let liveEinstieg = null;
   let liveOffen = false;
   let liveUhr = null;
+  // Nachtrag 4.3c: der Live-Kommentar, auf den gerade geantwortet wird.
+  let liveAntwortAn = null;
+  let liveListe = [];
   const istLive = () => clip.art === 'live';
 
   const zeit = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -16047,14 +16086,29 @@ function openClip(clipId) {
           if (!res.ok) return;
           fehlschlaege = 0;
           const liste = (await res.json()).kommentare || [];
+          liveListe = liste;
           const zahl = overlay.querySelector('#clipKommentarZahl');
           if (zahl) zahl.textContent = liste.length ? compactNumber(liste.length) : 'Kommentar';
+          // Nicht mitten in einem Ziehen neu zeichnen.
+          if (zeilen.querySelector('[data-gezogen]')) return;
           zeilen.innerHTML = liste.length
             ? liste
                 .slice(liveOffen ? -30 : -3)
-                .map((k) => `<p class="live__kommentar"><b>${esc(k.name)}</b> ${esc(k.text)}</p>`)
+                .map((k) => liveZeileHtml(k, liveOffen))
                 .join('')
             : '<p class="live__leer">Noch hat niemand etwas geschrieben.</p>';
+          // Nachtrag 4.3c: aufgeklappt ziehen oder „Antworten" → Zitat.
+          if (liveOffen) {
+            antwortenBinden(
+              zeilen,
+              (id) => liveListe.find((k) => k.id === id),
+              (k) => {
+                liveAntwortAn = k;
+                zeigeLiveLeiste();
+                overlay.querySelector('#liveFeld')?.focus();
+              }
+            );
+          }
           if (liveOffen) zeilen.scrollTop = zeilen.scrollHeight;
         } catch (fehler) {
           // Erst drei Aussetzer hintereinander melden, wie in der App.
@@ -16062,6 +16116,12 @@ function openClip(clipId) {
           if (fehlschlaege === 3) console.warn('Live-Kommentare laden fehlgeschlagen:', fehler);
         }
       };
+      const zeigeLiveLeiste = () =>
+        liveAntwortLeiste(overlay.querySelector('.livebox__eingabe'), liveOffen ? liveAntwortAn : null, () => {
+          liveAntwortAn = null;
+          zeigeLiveLeiste();
+        });
+      zeigeLiveLeiste();
       clearInterval(liveUhr);
       holen();
       liveUhr = setInterval(holen, 4000);
@@ -16090,8 +16150,12 @@ function openClip(clipId) {
         if (!text) return;
         feld.value = '';
         sendenKnopf.disabled = true;
-        const antwort = await api(`/api/stream/${clip.id}/kommentare`, { text });
+        const antwortAuf = liveAntwortAn?.id || null;
+        const antwort = await api(`/api/stream/${clip.id}/kommentare`, { text, antwortAuf });
         if (!antwort?.ok) return toast(antwort?.error || 'Der Kommentar ging nicht durch');
+        liveAntwortAn = null;
+        zeigeLiveLeiste();
+        if (antwort.ohneBezug) toast(window.Kommentar.LIVE_OHNE_BEZUG);
         holen();
       };
       feld?.addEventListener('keydown', (e) => e.key === 'Enter' && liveSenden());
@@ -17728,6 +17792,9 @@ function openLivestream() {
    */
   let streamId = null;
   let spaltenUhr = null;
+  // Nachtrag 4.3c: der Live-Kommentar, auf den der Host gerade antwortet.
+  let antwortAn = null;
+  let spaltenListe = [];
 
   api('/api/stream/start', {})
     .then((antwort) => {
@@ -17758,14 +17825,25 @@ function openLivestream() {
           fehlschlaege = 0;
           const daten = await res.json();
           const zeilen = daten.kommentare || [];
+          spaltenListe = zeilen;
+          // Nicht mitten in einem Ziehen neu zeichnen.
+          if (spalte.querySelector('[data-gezogen]')) return;
           spalte.innerHTML = zeilen.length
             ? zeilen
                 .slice(-30)
-                .map(
-                  (k) => `<p class="live__kommentar"><b>${esc(k.name)}</b> ${esc(k.text)}</p>`
-                )
+                .map((k) => liveZeileHtml(k, true))
                 .join('')
             : '<p class="live__leer">Noch keine Kommentare.</p>';
+          // Nachtrag 4.3c: ziehen oder „Antworten" → Zitat über der Antwort.
+          antwortenBinden(
+            spalte,
+            (id) => spaltenListe.find((k) => k.id === id),
+            (k) => {
+              antwortAn = k;
+              zeigeLeiste();
+              feld?.focus();
+            }
+          );
           spalte.scrollTop = spalte.scrollHeight;
         } catch (fehler) {
           /* Ein Aussetzer im Vier-Sekunden-Takt holt die naechste Runde nach;
@@ -17776,6 +17854,12 @@ function openLivestream() {
         }
       };
 
+      const zeigeLeiste = () =>
+        liveAntwortLeiste(overlay.querySelector('.live__eingabe'), antwortAn, () => {
+          antwortAn = null;
+          zeigeLeiste();
+        });
+
       holen();
       spaltenUhr = setInterval(holen, 4000);
 
@@ -17783,8 +17867,12 @@ function openLivestream() {
         const text = feld.value.trim();
         if (!text) return;
         feld.value = '';
-        const antwortK = await api(`/api/stream/${streamId}/kommentare`, { text });
+        const antwortAuf = antwortAn?.id || null;
+        const antwortK = await api(`/api/stream/${streamId}/kommentare`, { text, antwortAuf });
         if (!antwortK?.ok) return toast(antwortK?.error || 'Der Kommentar ging nicht durch');
+        antwortAn = null;
+        zeigeLeiste();
+        if (antwortK.ohneBezug) toast(window.Kommentar.LIVE_OHNE_BEZUG);
         holen();
       };
 

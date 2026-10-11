@@ -3720,7 +3720,8 @@ app.get('/api/stream/:postId/kommentare', route(async (req) => ({
 app.post('/api/stream/:postId/kommentare', route(async (req) =>
   antwort(
     await syncHandlers.handleStreamKommentar(
-      req.db, req.nutzerId, req.params.postId, req.body?.text || ''
+      // Nachtrag 4.3c: Antwort auf einen Live-Kommentar (reply_to, Schema 92).
+      req.db, req.nutzerId, req.params.postId, req.body?.text || '', req.body?.antwortAuf || null
     )
   )
 ));

@@ -160,7 +160,59 @@
     return text.indexOf('reply_to') !== -1 || text.indexOf('antwort_an') !== -1;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Livestream-Kommentare (Nachtrag 4.3c)                               */
+  /* ------------------------------------------------------------------ */
+  /*
+   * In der Live-Spalte gibt es keine Fäden — sie läuft durch, und was
+   * eingeklappt ist, liest während einer Sendung niemand. Stattdessen wie im
+   * Chat: nach rechts ziehen, über der Antwort steht klein das Zitat
+   * („↪ Anna: Wo bist du gerade?"). `stream_comments.reply_to` (Schema 92)
+   * speichert nur die Kennung, nie den Text.
+   */
+
+  /** Steht da, wenn das Original nicht (mehr) in der Spalte ist. */
+  var LIVE_BEZUG_WEG = 'Kommentar nicht mehr verfügbar';
+
+  /**
+   * Den Bezug jeder Zeile aus der geladenen Spalte auflösen. `liste` sind
+   * die abgebildeten Kommentare mit `antwortAufId`; zurück kommt dieselbe
+   * Liste mit `antwortAuf = { id, name, text }` (oder `fehlt: true`).
+   */
+  function liveBezuege(liste) {
+    var alle = Array.isArray(liste) ? liste : [];
+    var nach = {};
+    var i;
+    for (i = 0; i < alle.length; i++) if (alle[i]) nach[alle[i].id] = alle[i];
+    return alle.map(function (k) {
+      if (!k || !k.antwortAufId) return k;
+      var o = nach[k.antwortAufId];
+      var kopf = o
+        ? { id: o.id, name: o.name || '', text: o.text || '' }
+        : { id: k.antwortAufId, name: '', text: '', fehlt: true };
+      var neu = {};
+      for (var s in k) if (Object.prototype.hasOwnProperty.call(k, s)) neu[s] = k[s];
+      neu.antwortAuf = kopf;
+      return neu;
+    });
+  }
+
+  /** Steht da, wenn die Live-Antwort ohne Bezug rausging (Schema 92 fehlt). */
+  var LIVE_OHNE_BEZUG =
+    'Gesendet — der Bezug fehlt, bis Antworten im Livestream freigeschaltet ist';
+
+  /** Die Zitatzeile über einer Live-Antwort. */
+  function liveZitat(kopf) {
+    if (!kopf) return '';
+    if (kopf.fehlt) return LIVE_BEZUG_WEG;
+    return (kopf.name ? kopf.name + ': ' : '') + (kopf.text || '');
+  }
+
   return {
+    LIVE_BEZUG_WEG: LIVE_BEZUG_WEG,
+    LIVE_OHNE_BEZUG: LIVE_OHNE_BEZUG,
+    liveBezuege: liveBezuege,
+    liveZitat: liveZitat,
     ART: ART,
     beitragsName: beitragsName,
     zeile: zeile,

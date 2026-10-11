@@ -2143,22 +2143,35 @@ export async function ladeBanne(client: SupabaseClient, ichId: string) {
 
 /** Die Live-Kommentarspalte zu einem Stream. */
 export async function ladeStreamKommentare(client: SupabaseClient, postId: string) {
-  const { data, error } = await client
-    .from('stream_comments')
-    .select('id, user_id, text, created_at, profiles(id, name)')
-    .eq('post_id', postId)
-    .order('created_at', { ascending: true })
-    .limit(200);
+  /*
+   * Nachtrag 4.3c (11.10.2026): `reply_to` (Schema 92) — Antwort mit Zitat
+   * wie im Chat. Fehlt die Spalte noch, einmal ohne. Die Einbettung heißt
+   * `profiles!user_id`, damit sie eindeutig bleibt, falls später eine
+   * zweite Verbindung zu profiles dazukommt. Gleich in
+   * web/server/supabase-api.js.
+   */
+  const abfrage = (spalten: string) =>
+    client
+      .from('stream_comments')
+      .select(spalten)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+  let { data, error } = await abfrage('id, user_id, text, created_at, reply_to, profiles!user_id(id, name)');
+  if (error && Kommentar.fehltSpalte(error)) {
+    ({ data, error } = await abfrage('id, user_id, text, created_at, profiles!user_id(id, name)'));
+  }
   if (error) throw error;
 
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
-  return signiereMedien(client, ((data ?? []) as any[]).map((k) => ({
-    id: k.id,
-    userId: k.user_id,
-    name: k.profiles?.name ?? '',
-    text: k.text,
+  return signiereMedien(client, Kommentar.liveBezuege(((data ?? []) as any[]).map((k) => ({
+    id: k.id as string,
+    userId: k.user_id as string,
+    name: (k.profiles?.name ?? '') as string,
+    text: k.text as string,
     zeit: chatZeit(k.created_at),
-  })));
+    antwortAufId: (k.reply_to ?? null) as string | null,
+  }))));
 }
 
 /**

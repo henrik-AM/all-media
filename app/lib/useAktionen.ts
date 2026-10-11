@@ -25,6 +25,8 @@ import * as Sharing from 'expo-sharing';
 
 // Kasten 15: Grenzen für Video-Storys — dieselbe Datei wie auf der Website.
 const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
+// Nachtrag 4.3c: Meldung, wenn eine Live-Antwort ohne Bezug rausging.
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
 
 /** JJJJ-MM-TT fuer den Dateinamen. */
 const heute = () => new Date().toISOString().slice(0, 10);
@@ -306,7 +308,8 @@ export interface Aktionen {
     kanalId?: string | null
   ) => Promise<string | null>;
 
-  streamKommentar: (postId: string, text: string) => Promise<string | null>;
+  /** Nachtrag 4.3c: `antwortAuf` = der Live-Kommentar, auf den geantwortet wird. */
+  streamKommentar: (postId: string, text: string, antwortAuf?: string | null) => Promise<string | null>;
   /**
    * Spenden. Läuft immer durch das Spendenblatt (SpendenwegContext): fehlt
    * eine Zahlungsmethode oder der Spendencode, fragt das Blatt danach und
@@ -746,10 +749,12 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         }),
 
       // ------------------------------------------------------- Livestream --
-      streamKommentar: async (postId, text) => {
+      streamKommentar: async (postId, text, antwortAuf = null) => {
         const zeile = await holen('Der Kommentar', (c, i) =>
-          A.streamKommentar(c, i, postId, text)
+          A.streamKommentar(c, i, postId, text, antwortAuf)
         );
+        // Ohne Schema 92 ging er ohne Bezug raus — das sagen, nicht verschweigen.
+        if (zeile && (zeile as { ohneBezug?: boolean }).ohneBezug) melden?.(Kommentar.LIVE_OHNE_BEZUG);
         return zeile?.id ?? null;
       },
       spenden: async (empfaengerId, betragCent, postId, nachricht, empfaengerName) => {

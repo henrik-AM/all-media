@@ -3058,16 +3058,28 @@ export async function streamKommentar(
   client: SupabaseClient,
   ichId: string,
   postId: string,
-  text: string
+  text: string,
+  /*
+   * Nachtrag 4.3c (11.10.2026): Antwort auf einen Live-Kommentar
+   * (`stream_comments.reply_to`, Schema 92). Fehlt die Spalte noch, geht der
+   * Kommentar ohne Bezug raus (`ohneBezug`). Gleiche Weiche in
+   * web/server/sync-handlers.js (handleStreamKommentar).
+   */
+  antwortAuf: string | null = null
 ) {
   if (!text.trim()) throw new Error('Leerer Kommentar');
-  const { data, error } = await client
-    .from('stream_comments')
-    .insert({ post_id: postId, user_id: ichId, text: text.trim() })
-    .select('id, created_at')
-    .single();
+  const zeile: Record<string, unknown> = { post_id: postId, user_id: ichId, text: text.trim() };
+  if (antwortAuf) zeile.reply_to = antwortAuf;
+  const anlegen = () => client.from('stream_comments').insert(zeile).select('id, created_at').single();
+  let { data, error } = await anlegen();
+  let ohneBezug = false;
+  if (error && antwortAuf && Kommentar.fehltSpalte(error)) {
+    delete zeile.reply_to;
+    ohneBezug = true;
+    ({ data, error } = await anlegen());
+  }
   if (error) throw error;
-  return data as { id: string; created_at: string };
+  return { ...(data as { id: string; created_at: string }), ...(ohneBezug ? { ohneBezug } : {}) };
 }
 
 /**

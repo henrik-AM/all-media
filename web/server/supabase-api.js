@@ -1857,21 +1857,33 @@ async function ladeBanne(client, nutzerId) {
 
 /** Die Live-Kommentarspalte zu einem Stream. */
 async function ladeStreamKommentare(client, postId) {
-  const { data, error } = await client
-    .from('stream_comments')
-    .select('id, user_id, text, created_at, profiles(id, name)')
-    .eq('post_id', postId)
-    .order('created_at', { ascending: true })
-    .limit(200);
+  /*
+   * Nachtrag 4.3c (11.10.2026): `reply_to` (Schema 92) — Antwort mit Zitat.
+   * Fehlt die Spalte noch, einmal ohne. Gleich in app/lib/daten.ts.
+   */
+  const abfrage = (spalten) =>
+    client
+      .from('stream_comments')
+      .select(spalten)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+  let { data, error } = await abfrage('id, user_id, text, created_at, reply_to, profiles!user_id(id, name)');
+  if (error && Kommentar.fehltSpalte(error)) {
+    ({ data, error } = await abfrage('id, user_id, text, created_at, profiles!user_id(id, name)'));
+  }
   if (error) throw error;
 
-  return (data || []).map((k) => ({
-    id: k.id,
-    userId: k.user_id,
-    name: k.profiles?.name || '',
-    text: k.text,
-    zeit: chatZeit(k.created_at),
-  }));
+  return Kommentar.liveBezuege(
+    (data || []).map((k) => ({
+      id: k.id,
+      userId: k.user_id,
+      name: k.profiles?.name || '',
+      text: k.text,
+      zeit: chatZeit(k.created_at),
+      antwortAufId: k.reply_to || null,
+    }))
+  );
 }
 
 /**

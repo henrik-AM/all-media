@@ -21,6 +21,7 @@ import { useAktionen } from '../../lib/useAktionen';
 import { ladeStreamKommentare } from '../../lib/daten';
 import { EinstellungSheet } from '../../components/EinstellungSheet';
 import { CommentSheet } from '../../components/CommentSheet';
+import { LiveAntwortLeiste, LiveKommentar, LiveKommentarZeile } from '../../components/LiveAntwort';
 import { FormularSheet } from '../../components/FormularSheet';
 import {
   QUALITAET_STUFEN,
@@ -112,10 +113,10 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
   const { supabase } = useSupabase();
   const aktionen = useAktionen(onNotice);
   const [mehrOffen, setMehrOffen] = useState(false);
-  const [liveKommentare, setLiveKommentare] = useState<
-    { id: string; name: string; text: string; zeit: string }[]
-  >([]);
+  const [liveKommentare, setLiveKommentare] = useState<LiveKommentar[]>([]);
   const [liveEntwurf, setLiveEntwurf] = useState('');
+  /** Nachtrag 4.3c: der Live-Kommentar, auf den gerade geantwortet wird. */
+  const [liveAntwortAn, setLiveAntwortAn] = useState<LiveKommentar | null>(null);
   const [spendeOffen, setSpendeOffen] = useState(false);
   /*
    * Henrik am 21.09.2026: „Spenden: eigener Betrag muss wählbar sein." Die
@@ -182,7 +183,9 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
     const text = liveEntwurf.trim();
     if (!text || !clip) return;
     setLiveEntwurf('');
-    if (await aktionen.streamKommentar(clip.id, text)) liveHolen();
+    const bezug = liveAntwortAn?.id ?? null;
+    setLiveAntwortAn(null);
+    if (await aktionen.streamKommentar(clip.id, text, bezug)) liveHolen();
   };
 
   /*
@@ -633,16 +636,33 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
                 <Text style={styles.liveLeer}>Noch hat niemand etwas geschrieben.</Text>
               ) : (
                 liveKommentare.slice(liveOffen ? -30 : -3).map((k) => (
-                  <View key={k.id} style={styles.liveZeile}>
-                    <Text style={[styles.liveName, liveOffen && styles.liveGross]}>{k.name}</Text>
-                    <Text style={[styles.liveText, liveOffen && styles.liveGross]} numberOfLines={liveOffen ? undefined : 1}>
-                      {k.text}
-                    </Text>
-                  </View>
+                  /*
+                   * Nachtrag 4.3c: aufgeklappt nach rechts ziehen → antworten,
+                   * mit Zitat über der Antwort. Zugeklappt ist die Spalte nur
+                   * Vorschau, dort öffnet ein Tipp sie.
+                   */
+                  <LiveKommentarZeile
+                    key={k.id}
+                    k={k}
+                    aktiv={liveOffen}
+                    einzeilig={!liveOffen}
+                    onAntworten={(z) => setLiveAntwortAn(z)}
+                    nameStil={[styles.liveName, liveOffen && styles.liveGross]}
+                    textStil={[styles.liveText, liveOffen && styles.liveGross]}
+                    zitatFarbe={colors.text3}
+                  />
                 ))
               )}
             </Druck>
 
+            {liveOffen && liveAntwortAn ? (
+              <LiveAntwortLeiste
+                an={liveAntwortAn}
+                onAbbrechen={() => setLiveAntwortAn(null)}
+                farbe={colors.text2}
+                hintergrund={colors.surface3}
+              />
+            ) : null}
             {liveOffen ? (
               <View style={styles.liveEingabe}>
                 <TextInput

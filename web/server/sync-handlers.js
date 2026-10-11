@@ -2471,15 +2471,25 @@ const handlePtt = handler(
 
 const handleStreamKommentar = handler(
   'Streamkommentar',
-  async (client, nutzerId, postId, text) => {
+  /*
+   * Nachtrag 4.3c (11.10.2026): `antwortAuf` = Live-Kommentar, auf den
+   * geantwortet wird (stream_comments.reply_to, Schema 92). Fehlt die Spalte
+   * noch, ohne Bezug und `ohneBezug`. Gleich in app/lib/aktionen.ts.
+   */
+  async (client, nutzerId, postId, text, antwortAuf = null) => {
     if (!text || !String(text).trim()) return { ok: false, fehler: 'Leerer Kommentar' };
-    const { data, error } = await client
-      .from('stream_comments')
-      .insert({ post_id: postId, user_id: nutzerId, text: String(text).trim() })
-      .select('id, created_at')
-      .single();
+    const zeile = { post_id: postId, user_id: nutzerId, text: String(text).trim() };
+    if (antwortAuf) zeile.reply_to = antwortAuf;
+    const anlegen = () => client.from('stream_comments').insert(zeile).select('id, created_at').single();
+    let { data, error } = await anlegen();
+    let ohneBezug = false;
+    if (error && antwortAuf && Kommentar.fehltSpalte(error)) {
+      delete zeile.reply_to;
+      ohneBezug = true;
+      ({ data, error } = await anlegen());
+    }
     if (error) throw error;
-    return { ok: true, id: data.id, zeit: data.created_at };
+    return { ok: true, id: data.id, zeit: data.created_at, ohneBezug };
   }
 );
 

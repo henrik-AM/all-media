@@ -40,3 +40,19 @@ export const OHNE_FADEN: string;
 export function mitteilungAntwort(name?: string | null): string;
 /** Fehlt reply_to/antwort_an noch (42703/PGRST204)? */
 export function fehltSpalte(fehler: { code?: string; message?: string } | null | undefined): boolean;
+
+/* Livestream-Kommentare (Nachtrag 4.3c) */
+export const LIVE_BEZUG_WEG: string;
+export const LIVE_OHNE_BEZUG: string;
+export interface LiveKopf {
+  id: string;
+  name: string;
+  text: string;
+  fehlt?: boolean;
+}
+/** Bezug jeder Zeile aus der geladenen Spalte auflösen (antwortAufId → antwortAuf). */
+export function liveBezuege<T extends { id: string; name?: string; text?: string; antwortAufId?: string | null }>(
+  liste: T[]
+): (T & { antwortAuf?: LiveKopf })[];
+/** „Name: Text" bzw. LIVE_BEZUG_WEG. */
+export function liveZitat(kopf: LiveKopf | null | undefined): string;
