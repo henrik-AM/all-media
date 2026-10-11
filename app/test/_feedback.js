@@ -423,12 +423,14 @@ const pruefe = (was, ok, zusatz = '') => {
   await page.waitForTimeout(800);
 
   pruefe('Anruf öffnet sich', !!(await page.$('.anruf')));
-  pruefe('Zeigt zuerst "Klingelt"',
-         /Klingelt|Videoanruf/.test(await page.$eval('#anrufStatus', (e) => e.textContent)));
-
+  // Kasten 5.1 (10.10.2026): keine simulierte Verbindung mehr — der Anruf ist
+  // „gestartet", eine Dauer zählt nicht hoch, und das sagt der Bildschirm auch.
+  pruefe('Zeigt „Sprachanruf gestartet"',
+         /Sprachanruf gestartet/.test(await page.$eval('#anrufStatus', (e) => e.textContent)));
   await page.waitForTimeout(3000);
   const laufend = await page.$eval('#anrufStatus', (e) => e.textContent);
-  pruefe('Verbindet und zählt die Dauer', /^\d{2}:\d{2}$/.test(laufend.trim()), laufend.trim());
+  pruefe('Verbindet NICHT von selbst (keine erfundene Dauer)', !/\d{2}:\d{2}/.test(laufend), laufend.trim());
+  pruefe('Sagt, dass es eine Vorschau ist', /Vorschau/.test(await page.$eval('#anrufVorschau', (e) => e.textContent)));
 
   await page.click('[data-anruf="stumm"]');
   await page.waitForTimeout(400);
@@ -437,8 +439,8 @@ const pruefe = (was, ok, zusatz = '') => {
 
   await page.click('[data-anruf="auflegen"]');
   await page.waitForTimeout(1100);
-  pruefe('Auflegen nennt die Dauer',
-         /Anruf beendet · \d{2}:\d{2}/.test(await page.$eval('#toast', (e) => e.textContent)));
+  pruefe('Auflegen ohne Dauer',
+         /^Anruf beendet$/.test((await page.$eval('#toast', (e) => e.textContent)).trim()));
   pruefe('Anruf schließt sich', !(await page.$('.anruf')));
   await page.click('#chatBack').catch(() => {});
   await page.waitForTimeout(400);

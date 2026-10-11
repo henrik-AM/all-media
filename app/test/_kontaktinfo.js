@@ -244,10 +244,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (runde < 3) throw new Error(runde + ' Bilder');
   });
 
-  await pruefe('Der Gruppenanruf verbindet und zählt die Dauer', async () => {
+  // Kasten 5.1 (10.10.2026): keine simulierte Verbindung mehr.
+  await pruefe('Der Gruppenanruf ist „gestartet" und zählt keine erfundene Dauer', async () => {
     await page.waitForTimeout(2600);
     const status = await page.$eval('#anrufStatus', (e) => e.textContent);
-    if (!/\d{2}:\d{2}/.test(status)) throw new Error(status);
+    if (!/gestartet/.test(status) || /\d{2}:\d{2}/.test(status)) throw new Error(status);
   });
 
   /*

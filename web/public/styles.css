@@ -2113,6 +2113,8 @@ body:has(.camera) .toast { bottom: 132px; }
 @keyframes anrufPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }
 .anruf__name { margin-top: 12px; font-size: 26px; font-weight: 700; }
 .anruf__status { color: rgba(255,255,255,.65); font-size: 15px; }
+/* Kasten 5.1: sagt offen, dass es (noch) eine Vorschau ist. */
+.anruf__vorschau { margin-top: 8px; max-width: 280px; text-align: center; color: rgba(255,255,255,.45); font-size: 12px; line-height: 1.45; }
 .anruf__eigen {
   position: absolute; right: 16px; top: 110px;
   width: 92px; height: 128px; border-radius: 12px;

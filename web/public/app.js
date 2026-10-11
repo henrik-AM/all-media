@@ -4292,33 +4292,31 @@ function qrScannerOeffnen() {
 /*
  * Die Oberflaeche eines Anrufs.
  *
- * Die Uebertragung selbst fehlt bewusst: dafuer braucht es WebRTC, einen
- * Signalweg und einen TURN-Server. Die Oberflaeche steht damit schon
- * vollstaendig, der Verlauf ist simuliert:
- * klingelt -> verbunden (Dauer laeuft) -> beendet.
+ * Die Uebertragung fehlt: dafuer braucht es WebRTC, einen Signalweg und einen
+ * TURN-Server. Kasten 5.1 (Henrik 28.09.2026: „nur eine Vorschau, oder kann
+ * die andere Person wirklich drangehen?"): Es ist eine Vorschau. Bis zum
+ * 10.10.2026 nahm die Gegenseite hier nach 2,6 Sekunden „von selbst ab", und
+ * die hochgezaehlte Dauer stand danach als „Anruf · 02:14" im Chat — eine
+ * erfundene Anzeige. Jetzt: gestartet -> beendet, ohne Dauer. Der Eintrag
+ * geht beim Start in den Chat (Kasten 5.2, Schema 89). Gleiche Regel in der
+ * App (CallScreen.tsx).
  */
 let anrufTimer;
 
-function zweistellig(n) {
-  return String(n).padStart(2, '0');
-}
-
-/** Sekunden als mm:ss, ab einer Stunde als h:mm:ss. */
+/** Sekunden als mm:ss, ab einer Stunde als h:mm:ss — gemeinsam/anruf.js. */
 function dauerText(sekunden) {
-  const st = Math.floor(sekunden / 3600);
-  const min = Math.floor((sekunden % 3600) / 60);
-  const sek = sekunden % 60;
-  return st > 0
-    ? `${st}:${zweistellig(min)}:${zweistellig(sek)}`
-    : `${zweistellig(min)}:${zweistellig(sek)}`;
+  return window.Anruf.dauerText(sekunden);
 }
 
 /*
  * Anruf - fuer eine Person oder fuer eine Gruppe. Bei einer Gruppe stehen
  * alle Mitglieder oben, sonst die eine Person. Prototyp-Frames
  * "MC + Sprachanruf" und "CC+ Sprachanruf".
+ *
+ * `ort` (Kasten 5.2): { chatId } oder { kanalId } — wo der Anruf im Chat
+ * steht. Ohne `ort` der Messenger-Zweierchat mit der Person.
  */
-function openCall(ziel, art) {
+function openCall(ziel, art, ort = {}) {
   // Bei einer Gruppe wird der Chat uebergeben, sonst die Kennung der Person.
   const gruppe = typeof ziel === 'object' ? ziel : null;
   const userId = gruppe ? null : ziel;
@@ -4329,35 +4327,43 @@ function openCall(ziel, art) {
     : user(userId);
   if (!u) return toast('Diese Person gibt es nicht');
 
-  let zustand = 'klingelt';
-  let dauer = 0;
+  let zustand = 'gestartet';
   const an = { stumm: false, laut: art === 'video', kamera: art === 'video' };
+  clearInterval(anrufTimer);
 
   overlay.hidden = false;
 
+  /*
+   * Kasten 5.2: der Eintrag entsteht beim Start — in Person, Gruppe,
+   * Community-Chat oder Unterthema. Die Gegenseite liest dieselbe Zeile
+   * (5.3/5.4). Erst danach neu laden, sonst fehlt er im Chat.
+   */
+  if (ort.chatId || ort.kanalId || userId) fetch('/api/anruf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ art, chatId: ort.chatId || null, kanalId: ort.kanalId || null, zielId: userId }),
+  })
+    .then((r) => r.json().catch(() => ({})))
+    .then((e) => {
+      if (e && e.ok === false) return console.error('Anruf konnte nicht im Chat vermerkt werden:', e.error);
+      if (ort.kanalId) return; // Das Unterthema laedt sich beim Zurueckkehren selbst.
+      return bootstrap();
+    })
+    .catch((f) => console.error('Anruf konnte nicht im Chat vermerkt werden:', f));
+
   const zeichnen = () => {
-    const status =
-      zustand === 'klingelt'
-        ? art === 'video' ? 'Videoanruf …' : 'Klingelt …'
-        : zustand === 'verbunden' ? dauerText(dauer) : 'Beendet';
+    const status = zustand === 'gestartet' ? `${window.Anruf.artName(art)} gestartet` : 'Beendet';
+    const wer = gruppe ? 'Die anderen sehen' : `${esc((u.name || '').split(' ')[0] || 'Die andere Person')} sieht`;
 
     overlay.innerHTML = `
       <div class="anruf">
-        ${
-          art === 'video' && zustand === 'verbunden'
-            ? `<div class="anruf__video">${ICONS.video}
-                <span>Videoübertragung kommt bald</span>
-              </div>`
-            : ''
-        }
         <div class="anruf__kopf">
           ${
             gruppe && teilnehmer.length
               ? `<div class="anruf__runde">${teilnehmer
                   .map((id) => `<span class="avatar avatar--52" style="background:${farbe(user(id).color)}">${esc(user(id).initials)}</span>`)
                   .join('')}</div>`
-              : `<div class="anruf__avatar ${zustand === 'klingelt' ? 'is-klingelt' : ''}"
-                   style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}</div>`
+              : `<div class="anruf__avatar" style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}</div>`
           }
           <div class="anruf__name">${esc(u.name)}</div>
           ${
@@ -4366,21 +4372,14 @@ function openCall(ziel, art) {
               : ''
           }
           <div class="anruf__status" id="anrufStatus">${esc(status)}</div>
+          <div class="anruf__vorschau" id="anrufVorschau">Vorschau: Sprache und Bild werden noch nicht übertragen.<br>${wer} den Anruf im Chat, annehmen geht noch nicht.</div>
           <!--
             Hier stand bis zum 07.09.2026 "Ende-zu-Ende-verschlüsselt". Das war
-            unzutreffend, und zwar doppelt: verschlüsselt wurde damals nichts,
-            und ein Anruf wird es auch jetzt nicht — Schema 31 nimmt Anrufe
-            ausdrücklich aus. Es gibt an dieser Stelle nicht einmal eine
+            unzutreffend: es gibt an dieser Stelle nicht einmal eine
             Übertragung. Ein Schloss, das nichts verschließt, ist schlimmer als
-            gar keins, weil sich jemand darauf verlässt.
+            gar keins.
           -->
         </div>
-
-        ${
-          art === 'video' && an.kamera && zustand === 'verbunden'
-            ? `<div class="anruf__eigen">${ICONS.person}</div>`
-            : ''
-        }
 
         <div class="anruf__leiste">
           <button class="anruf__knopf ${an.stumm ? 'is-an' : ''}" data-anruf="stumm">
@@ -4395,11 +4394,7 @@ function openCall(ziel, art) {
         </div>
 
         <div class="anruf__unten">
-          ${
-            zustand === 'klingelt'
-              ? `<button class="anruf__rund is-annehmen" data-anruf="annehmen" aria-label="Annehmen">${ICONS.phone}</button>`
-              : ''
-          }
+          ${/* Kein „Annehmen": wer anruft, nimmt nicht selbst ab (5.1). */ ''}
           <button class="anruf__rund is-auflegen" data-anruf="auflegen" aria-label="Auflegen">${ICONS.phone}</button>
         </div>
       </div>`;
@@ -4408,45 +4403,14 @@ function openCall(ziel, art) {
   };
 
   const beenden = () => {
-    clearInterval(anrufTimer);
     zustand = 'beendet';
-    toast(dauer > 0 ? `Anruf beendet · ${dauerText(dauer)}` : 'Anruf beendet');
+    // Es gab kein Gespraech, also auch keine Dauer.
+    toast('Anruf beendet');
     zeichnen();
-
-    /*
-     * Henrik 7.9.: „Anrufe sollen als Chatnachricht protokolliert werden (wie
-     * WhatsApp)." Bei einem Gruppenanruf gibt es keinen Chat zu zweit, deshalb
-     * nur beim Zweiergespräch. Gleiche Stelle in der App: CallScreen.tsx,
-     * `auflegen`.
-     */
-    if (userId) {
-      fetch(`/api/kontakte/${userId}/anruf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ art, dauer, status: dauer > 0 ? 'beendet' : 'verpasst' }),
-      })
-        // Erst danach neu laden, sonst steht der Eintrag zwar in der
-        // Datenbank, aber nicht im Chat, in den man zurückkehrt.
-        .then(() => bootstrap())
-        .catch((f) => console.error('Anruf konnte nicht im Chat vermerkt werden:', f));
-    }
-
     setTimeout(() => {
       overlay.hidden = true;
       overlay.innerHTML = '';
     }, 700);
-  };
-
-  const verbinden = () => {
-    if (zustand !== 'klingelt') return;
-    zustand = 'verbunden';
-    zeichnen();
-    clearInterval(anrufTimer);
-    anrufTimer = setInterval(() => {
-      dauer += 1;
-      const feld = $('#anrufStatus');
-      if (feld) feld.textContent = dauerText(dauer);
-    }, 1000);
   };
 
   const binden = () => {
@@ -4454,7 +4418,6 @@ function openCall(ziel, art) {
       b.addEventListener('click', () => {
         const was = b.dataset.anruf;
         if (was === 'auflegen') return beenden();
-        if (was === 'annehmen') return verbinden();
 
         an[was] = !an[was];
         const texte = {
@@ -4469,8 +4432,6 @@ function openCall(ziel, art) {
   };
 
   zeichnen();
-  // In der Demo nimmt die Gegenseite von selbst ab.
-  setTimeout(verbinden, 2600);
 }
 
 /* ------------------------------------------------------ contact profile */
@@ -6673,6 +6634,12 @@ async function renderCommunityChat(community, kanal, thema) {
         <span class="kanalkopf__name">${esc(thema)}</span>
         <span class="kanalkopf__sub">#${esc(kanal.name)} · ${esc(community.name)}</span>
       </button>
+      ${/* Kasten 5.2: auch eine Community laesst sich anrufen — wie in der
+           App (ChatDetailScreen, Kopf). Der Anruf steht danach hier im Verlauf. */ ''}
+      <div class="chathead__actions">
+        <button data-kanalcall="video" aria-label="Videoanruf">${ICONS.video}</button>
+        <button data-kanalcall="audio" aria-label="Anruf">${ICONS.phone}</button>
+      </div>
     </div>
     <div class="messages" id="commMsgs">
       ${
@@ -6699,6 +6666,15 @@ async function renderCommunityChat(community, kanal, thema) {
 
   $('#backBtn').addEventListener('click', () => renderKanalThemen(community, kanal));
   $('#kanalKopf').addEventListener('click', () => openCommunityEinstellungen(community));
+  main.querySelectorAll('[data-kanalcall]').forEach((b) =>
+    b.addEventListener('click', () =>
+      openCall(
+        { name: community.name, members: [] },
+        b.dataset.kanalcall === 'video' ? 'video' : 'audio',
+        { kanalId: kanal.id }
+      )
+    )
+  );
 
   /*
    * Kasten 27: das Unterthema im Takt nachsehen, wie den offenen Chat
@@ -7086,6 +7062,8 @@ function geteiltBinden(liste) {
 }
 
 function kanalNachricht(m) {
+  // Kasten 5: Anruf im Unterthema — eine Zeile in der Mitte, keine Blase.
+  if (m.anruf) return anrufZeile(m, { eigen: m.from === 'me', gruppe: true });
   // Anhaenge seit 04.09.2026 — derselbe Inhalt wie im Chat, aus derselben
   // Funktion. Ein Sticker steht auch hier ohne Blase (msg--sticker).
   const inhalt = m.geteilt ? geteiltKarte(m.geteilt) : anhangInhalt(m);
@@ -19702,7 +19680,14 @@ async function openChat(chatId) {
   );
   overlay.querySelectorAll('[data-call]').forEach((b) =>
     b.addEventListener('click', () =>
-      openCall(chat.userId || chat, b.dataset.call === 'video' ? 'video' : 'audio')
+      // Kasten 5.2: der Eintrag gehoert in GENAU diesen Chat (auch Community-Chat).
+      openCall(chat.isGroup ? chat : chat.userId || chat, b.dataset.call === 'video' ? 'video' : 'audio', {
+        // Nur ein echter Chat (Zeile in `chats`) traegt den Eintrag; die
+        // Community selbst, als Chat geoeffnet, hat keinen.
+        chatId: state.chats.some((c) => c.id === chat.id) || (state.communityChats || []).some((c) => c.id === chat.id)
+          ? chat.id
+          : null,
+      })
     )
   );
   $('#attach').addEventListener('click', () => openAnhang(zielChat(chat), chat));
@@ -19959,6 +19944,22 @@ function anhangInhalt(m) {
   return sticker || datei || gif || standort || kontakt || media || markierterText(m.text);
 }
 
+/*
+ * Kasten 5.2–5.4: der Anrufeintrag — derselbe Satz wie in der App
+ * (gemeinsam/anruf.js). Zu zweit „Ausgehender/Eingehender …", in Gruppe und
+ * Unterthema „Max hat einen Videoanruf gestartet". Ein nur gestarteter
+ * Anruf heisst nie „angenommen" (5.1).
+ */
+function anrufZeile(m, { eigen, gruppe }) {
+  const opts = { eigen, gruppe, name: eigen ? '' : (user(m.from)?.name || '').split(' ')[0] };
+  const verpasst = window.Anruf.verpasst(m.anruf, opts);
+  const satz = `${window.Anruf.text(m.anruf, opts)} · ${m.time || ''}`;
+  return `<div class="msg__anruf${verpasst ? ' msg__anruf--verpasst' : ''}" data-msgid="${esc(m.id)}" aria-label="${esc(satz)}">
+            ${m.anruf.art === 'video' ? ICONS.video : ICONS.phone}
+            <span>${esc(satz)}</span>
+          </div>`;
+}
+
 function messageBubble(m, chat) {
   const out = m.from === 'me';
 
@@ -19971,21 +19972,7 @@ function messageBubble(m, chat) {
    * hat aber keinen Text. Gleiche Darstellung in der App (renderMessage in
    * app/screens/messenger/ChatDetailScreen.tsx).
    */
-  if (m.anruf) {
-    const verpasst = m.anruf.status !== 'beendet';
-    const ausgang =
-      verpasst
-        ? m.anruf.status === 'abgelehnt'
-          ? ' · abgelehnt'
-          : ' · verpasst'
-        : ` · ${dauerText(m.anruf.dauer)}`;
-    return `<div class="msg__anruf${verpasst ? ' msg__anruf--verpasst' : ''}">
-              ${m.anruf.art === 'video' ? ICONS.video : ICONS.phone}
-              <span>${out ? 'Ausgehender ' : ''}${
-      m.anruf.art === 'video' ? 'Videoanruf' : 'Anruf'
-    }${ausgang} · ${esc(m.time || '')}</span>
-            </div>`;
-  }
+  if (m.anruf) return anrufZeile(m, { eigen: out, gruppe: Boolean(chat && chat.isGroup) });
 
   /*
    * Kasten 16 (Henrik, 01.10.2026): „Wenn ich im Messenger bei den Stories
