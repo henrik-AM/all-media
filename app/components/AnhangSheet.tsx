@@ -8,6 +8,9 @@ import { colors, radius, sizes, spacing, themenStyles, typography } from '../con
 import { ausGalerie } from '../lib/aufnehmen';
 import * as DocumentPicker from 'expo-document-picker';
 import { useDaten } from '../contexts/DatenContext';
+import { StandortWahl } from './StandortWahl';
+
+const OrtSuche = require('../../gemeinsam/ortsuche') as typeof import('../../gemeinsam/ortsuche');
 import { Contact, Message } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -110,7 +113,7 @@ export const AnhangSheet = ({
   ohne = [],
   onNotice,
 }: Props) => {
-  const { places: alleOrte, users: alleNutzer } = useDaten();
+  const { users: alleNutzer } = useDaten();
   const [schritt, setSchritt] = useState<Schritt>('menue');
 
   const schliessen = () => {
@@ -224,36 +227,24 @@ export const AnhangSheet = ({
         </View>
       )}
 
+      {/*
+        Kasten 28/6.5: Ort suchen oder auf der Karte waehlen statt der festen
+        Liste aus `places`. Der Ort geht als Text (gemeinsam/ortsuche.js,
+        alsText) — damit laeuft er im Zweierchat mit durch die
+        Verschluesselung, und es braucht kein neues Schema. Die Blase macht
+        daraus wieder die Karte (OrtSuche.ausText).
+      */}
       {schritt === 'standort' && (
-        <ScrollView>
-          {alleOrte.map((platz) => (
-            <Druck
-              key={platz.id}
-              style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
-              onPress={() => {
-                onAnhang({
-                  text: `Standort: ${platz.name}`,
-                  ortId: platz.id,
-                  standort: {
-                    name: platz.name,
-                    adresse: platz.adresse,
-                    koordinaten: platz.koordinaten,
-                    x: platz.x,
-                    y: platz.y,
-                  },
-                });
-                onNotice('Standort gesendet');
-                schliessen();
-              }}
-            >
-              <View style={styles.symbol}>
-                <Ionicons name="location-outline" size={22} color={colors.white} />
-              </View>
-              <Text style={styles.label}>{platz.name}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Druck>
-          ))}
-        </ScrollView>
+        <StandortWahl
+          onNotice={onNotice}
+          onWahl={(ort) => {
+            const text = OrtSuche.alsText(ort);
+            if (!text) return onNotice('Dieser Ort lässt sich nicht senden');
+            onAnhang({ text, standort: OrtSuche.ausText(text) ?? undefined });
+            onNotice('Standort gesendet');
+            schliessen();
+          }}
+        />
       )}
 
       {schritt === 'kontakt' &&

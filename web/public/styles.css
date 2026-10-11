@@ -5239,3 +5239,71 @@ textarea.profilseite__gross { min-height: 160px; }
 }
 .anhangraster__kreis svg { width: 26px; height: 26px; }
 .anhangraster__text { font-size: 13px; font-weight: 500; text-align: center; line-height: 1.25; }
+
+/* ---------------------------------------------------------------------------
+ * Kasten 28/6.5: Standort senden — Suche + Karte mit fester Nadel.
+ * Gleiches Blatt in der App: app/components/StandortWahl.tsx.
+ * ------------------------------------------------------------------------- */
+.ortwahl { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 16px; }
+.ortwahl__suche { display: flex; gap: 8px; }
+.ortwahl__suche input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface-3, var(--surface-2));
+  color: var(--text);
+  font: inherit;
+}
+.ortwahl__treffer { max-height: 220px; overflow-y: auto; border-radius: 12px; background: var(--surface-2); }
+.ortwahl__zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ortwahl__zeile:hover { background: var(--surface-3, rgba(0,0,0,.04)); }
+.ortwahl__punkt { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: #1FA855; color: #fff; }
+.ortwahl__punkt svg { width: 18px; height: 18px; }
+.ortwahl__text { display: flex; flex-direction: column; min-width: 0; }
+.ortwahl__text span { color: var(--text-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ortwahl__leer { padding: 12px; color: var(--text-2); }
+.ortwahl__karte { position: relative; height: 300px; border-radius: 16px; overflow: hidden; }
+.ortwahl__karte > div { width: 100%; height: 100%; }
+.ortwahl__nadel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 500;
+  transform: translate(-50%, -100%);
+  color: #E5484D;
+  pointer-events: none;
+}
+.ortwahl__nadel svg { width: 40px; height: 40px; fill: #E5484D; stroke: #fff; }
+.ortwahl__quelle { font-size: 11px; color: var(--text-3); text-align: center; }
+.ortwahl__adresse { color: var(--text); }
+.ortwahl__senden {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: #1FA855;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ortwahl__senden svg { width: 16px; height: 16px; }
+.ortwahl__senden:disabled { opacity: .6; cursor: default; }

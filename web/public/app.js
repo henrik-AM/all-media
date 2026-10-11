@@ -6744,10 +6744,7 @@ async function renderCommunityChat(community, kanal, thema) {
     b.addEventListener('click', () => openContactProfile(b.dataset.msgkontakt))
   );
   liste.querySelectorAll('[data-msgort]').forEach((b) =>
-    b.addEventListener('click', () => {
-      const platz = state.places.find((p) => p.name === b.dataset.msgort);
-      if (platz) openExplorer('standort', platz.id);
-    })
+    b.addEventListener('click', () => standortKarteOeffnen(b))
   );
   // Anhang → Vollformat, wie im Chat.
   liste.querySelectorAll('[data-voll]').forEach((b) =>
@@ -14004,6 +14001,24 @@ function zielChat(chat) {
       state.messages.push(nachricht);
       paintMessages(chat);
     },
+    /*
+     * Kasten 28/6.5: ein frei gewählter Ort geht als Text — im Zweierchat
+     * also verschlüsselt (sendeKoerper), wie jede andere Nachricht.
+     * Gibt die Nachricht zurück, so wie sie der Chat zeichnet.
+     */
+    textSenden: async (text) => {
+      const koerper = await sendeKoerper(chat.id, text);
+      const res = await fetch(`/api/messages/${chat.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(koerper),
+      });
+      const msg = await res.json().catch(() => ({}));
+      if (!msg || msg.ok === false || !msg.id) return { ok: false, error: msg?.error };
+      msg.lokal = true;
+      if (Number(msg.krypto) > 0) msg.text = text;
+      return { ok: true, message: msg };
+    },
   };
 }
 
@@ -14079,6 +14094,146 @@ function openAnhang(ziel, chat) {
       );
     }
   );
+}
+
+/*
+ * „Standort senden" — Ort suchen oder auf der Karte wählen (Kasten 28/6.5).
+ *
+ * Henrik, 28.09.2026: „kein Standort aussuchen auf der Karte oder kein
+ * Suchfenster … nur ein paar vorgeschlagene Standorte." Die Karte hat eine
+ * feste Nadel in der Mitte, man schiebt die Karte darunter. Gesucht wird
+ * über Nominatim (gemeinsam/ortsuche.js) erst auf „Suchen"/Enter — so
+ * verlangen es dessen Nutzungsregeln; der Browser schickt den Referer.
+ *
+ * Der Ort geht als Text (OrtSuche.alsText): im Zweierchat verschlüsselt,
+ * kein neues Schema. Die Blase macht daraus die Karte (anhangInhalt).
+ */
+function openStandortWahl(ziel) {
+  const O = window.OrtSuche;
+  if (!O || !window.L || !ziel.textSenden) return toast('Die Karte ist gerade nicht verfügbar');
+
+  openSheet(
+    'Standort senden',
+    `<div class="ortwahl">
+       <form class="ortwahl__suche" id="ortSuche">
+         <input type="search" id="ortSucheFeld" placeholder="Ort oder Adresse suchen" aria-label="Ort oder Adresse suchen" autocomplete="off">
+         <button type="submit" class="btn btn--primary" id="ortSucheKnopf">Suchen</button>
+       </form>
+       <div class="ortwahl__treffer" id="ortTreffer" hidden></div>
+       <div class="ortwahl__karte">
+         <div id="ortWahlKarte"></div>
+         <span class="ortwahl__nadel" aria-hidden="true">${ICONS.mapPin}</span>
+       </div>
+       <div class="ortwahl__quelle">${esc(O.QUELLE)}</div>
+       <button type="button" class="ortwahl__senden" id="ortSenden">${ICONS.send} Diesen Ort senden</button>
+     </div>`,
+    (sheet, close) => {
+      const karte = L.map(sheet.querySelector('#ortWahlKarte'), { zoomSnap: 0 }).setView([51.1657, 10.4515], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(karte);
+      // Das Blatt fährt animiert hoch; erst danach kennt Leaflet seine Größe.
+      setTimeout(() => karte.invalidateSize(), 300);
+
+      let gewaehlt = null;
+      const trefferBox = sheet.querySelector('#ortTreffer');
+      const knopf = sheet.querySelector('#ortSucheKnopf');
+
+      sheet.querySelector('#ortSuche').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = sheet.querySelector('#ortSucheFeld').value.trim();
+        if (text.length < 2) return;
+        knopf.disabled = true;
+        let liste;
+        try {
+          liste = await O.suchen(text, window.fetch.bind(window));
+        } catch {
+          knopf.disabled = false;
+          return toast('Die Ortssuche antwortet gerade nicht');
+        }
+        knopf.disabled = false;
+        trefferBox.hidden = false;
+        trefferBox.innerHTML = liste.length
+          ? liste
+              .map(
+                (t, i) => `<button type="button" class="ortwahl__zeile" data-treffer="${i}">
+                  <span class="ortwahl__punkt">${ICONS.mapPin}</span>
+                  <span class="ortwahl__text"><strong>${esc(t.name)}</strong>${t.adresse ? `<span>${esc(t.adresse)}</span>` : ''}</span>
+                </button>`
+              )
+              .join('')
+          : `<div class="ortwahl__leer">Nichts gefunden. Versuch es mit Straße und Ort.</div>`;
+        trefferBox.querySelectorAll('[data-treffer]').forEach((b) =>
+          b.addEventListener('click', () => {
+            gewaehlt = liste[Number(b.dataset.treffer)];
+            trefferBox.hidden = true;
+            karte.setView([gewaehlt.lat, gewaehlt.lng], 16);
+          })
+        );
+      });
+
+      sheet.querySelector('#ortSenden').addEventListener('click', async (e) => {
+        const b = e.currentTarget;
+        const c = karte.getCenter();
+        // Nadel noch auf dem Treffer → dessen Name; sonst die Stelle benennen.
+        const nahe = gewaehlt && Math.abs(gewaehlt.lat - c.lat) < 0.0003 && Math.abs(gewaehlt.lng - c.lng) < 0.0003;
+        b.disabled = true;
+        const ort = nahe ? gewaehlt : await O.benennen(c.lat, c.lng, window.fetch.bind(window));
+        const text = O.alsText(ort);
+        if (!text) {
+          b.disabled = false;
+          return toast('Dieser Ort lässt sich nicht senden');
+        }
+        const antwort = await ziel.textSenden(text);
+        if (!antwort || antwort.ok === false) {
+          b.disabled = false;
+          return toast(antwort?.error || 'Der Standort ging nicht raus');
+        }
+        close();
+        if (antwort.message) ziel.fertig(antwort.message);
+        else ziel.fertig();
+        toast('Standort gesendet');
+      });
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/** Karte eines frei gewählten Ortes (Kasten 28/6.5). Gegenstück: StandortAnsicht.tsx. */
+function openStandortAnsicht(ort) {
+  const O = window.OrtSuche;
+  openSheet(
+    ort.name,
+    `<div class="ortwahl">
+       <div class="ortwahl__karte"><div id="ortAnsichtKarte"></div></div>
+       ${ort.adresse ? `<div class="ortwahl__adresse">${esc(ort.adresse)}</div>` : ''}
+       <div class="ortwahl__quelle">${esc(O.koordinatenText(ort.lat, ort.lng))}</div>
+       <a class="ortwahl__senden" href="${esc(O.kartenLink(ort.lat, ort.lng))}" target="_blank" rel="noopener noreferrer">In OpenStreetMap öffnen</a>
+     </div>`,
+    (sheet) => {
+      if (!window.L) return;
+      const karte = L.map(sheet.querySelector('#ortAnsichtKarte'), { zoomSnap: 0 }).setView([ort.lat, ort.lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(karte);
+      L.circleMarker([ort.lat, ort.lng], { radius: 10, fillColor: '#E5484D', color: '#fff', weight: 3, fillOpacity: 1 }).addTo(karte);
+      setTimeout(() => karte.invalidateSize(), 300);
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/** Kasten 28/6.5: Klick auf eine Standortkarte — Explorer-Seite oder freie Karte. */
+function standortKarteOeffnen(knopf) {
+  const lat = Number(knopf.dataset.msglat);
+  const lng = Number(knopf.dataset.msglng);
+  if (knopf.dataset.msglat && Number.isFinite(lat) && Number.isFinite(lng)) {
+    return openStandortAnsicht({ name: knopf.dataset.msgort, adresse: knopf.dataset.msgadresse || '', lat, lng });
+  }
+  const platz = state.places.find((p) => p.name === knopf.dataset.msgort);
+  if (platz) openExplorer('standort', platz.id);
 }
 
 /*
@@ -14260,32 +14415,11 @@ async function anhangSenden(ziel, art, chat, zeichen) {
     return toast(`Standort bei ${chat.name} angefragt`);
   }
 
-  if (art === 'standort') {
-    return openSheet(
-      'Standort senden',
-      `<div class="sheet__body">${state.places
-        .map(
-          (p) => `<button class="item" data-ort="${p.id}">
-            <span class="item__icon">${ICONS.mapPin}</span>
-            <span class="item__label">${esc(p.name)}</span>
-            <span class="row__chevron">${ICONS.chevron}</span>
-          </button>`
-        )
-        .join('')}</div>`,
-      (sheet, close) => {
-        sheet.querySelectorAll('[data-ort]').forEach((b) =>
-          b.addEventListener('click', async () => {
-            close();
-            const nachricht = await senden({ art: 'standort', id: b.dataset.ort });
-            if (!nachricht) return;
-            ziel.fertig(nachricht);
-            toast('Standort gesendet');
-          })
-        );
-      },
-      { schliessen: true, hoch: true }
-    );
-  }
+  /*
+   * Kasten 28/6.5: Ort suchen oder auf der Karte wählen statt der festen
+   * Liste aus `places`. Gleiches Blatt in der App: StandortWahl.tsx.
+   */
+  if (art === 'standort') return openStandortWahl(ziel);
 
   // Kontakt: nur Personen, die man auch wirklich kennt.
   const auswahl = state.contacts.filter((c) => state.users[c.id] && c.id !== ziel.ausserId);
@@ -19660,10 +19794,7 @@ function paintMessages(chat) {
     b.addEventListener('click', () => openContactProfile(b.dataset.msgkontakt))
   );
   box.querySelectorAll('[data-msgort]').forEach((b) =>
-    b.addEventListener('click', () => {
-      const platz = state.places.find((p) => p.name === b.dataset.msgort);
-      if (platz) openExplorer('standort', platz.id);
-    })
+    b.addEventListener('click', () => standortKarteOeffnen(b))
   );
 
   // Anhang antippen → Vollformat (Henrik 7.9.).
@@ -19782,13 +19913,18 @@ function anhangInhalt(m) {
     ? `<div class="msg__media">${ICONS.mic} Sprachnachricht · 0:14</div>`
     : '';
 
-  const standort = m.standort
-    ? `<button class="msg__standort" data-msgort="${esc(m.standort.name)}">
+  // Kasten 28/6.5: ein frei gewählter Ort steht im (entschlüsselten) Text.
+  const ort = m.standort || (!m.media && window.OrtSuche ? window.OrtSuche.ausText(m.text) : null);
+  const frei = ort && typeof ort.lat === 'number' && typeof ort.lng === 'number';
+  const standort = ort
+    ? `<button class="msg__standort" data-msgort="${esc(ort.name)}"${
+        frei ? ` data-msglat="${ort.lat}" data-msglng="${ort.lng}" data-msgadresse="${esc(ort.adresse || '')}"` : ''
+      }>
          <span class="msg__standortKarte">
-           <i class="msg__standortNadel" style="left:${m.standort.x}%;top:${m.standort.y}%">${ICONS.mapPin}</i>
+           <i class="msg__standortNadel" style="left:${Number(ort.x ?? 50)}%;top:${Number(ort.y ?? 50)}%">${ICONS.mapPin}</i>
          </span>
-         <span class="msg__standortName">${esc(m.standort.name)}</span>
-         <span class="msg__standortSub">${esc(m.standort.adresse || m.standort.koordinaten || '')}</span>
+         <span class="msg__standortName">${esc(ort.name)}</span>
+         <span class="msg__standortSub">${esc(ort.adresse || ort.koordinaten || '')}</span>
        </button>`
     : '';
 

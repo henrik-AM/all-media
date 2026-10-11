@@ -68,7 +68,8 @@ export interface Message {
    * Geraet liegt — beim naechsten Laden kommt derselbe Anhang hierueber.
    */
   mediaUrl?: string;
-  standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number };
+  /** lat/lng nur bei frei gewählten Orten (Kasten 28/6.5, gemeinsam/ortsuche.js). */
+  standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number; lat?: number; lng?: number };
   kontakt?: { id: string; name: string; handle: string };
   /** Story-Anhang (fixiert - nur horizontal swipeable). */
   story?: { id: string; userId: string; mediaUri?: string; mediaType?: 'image' | 'video' };

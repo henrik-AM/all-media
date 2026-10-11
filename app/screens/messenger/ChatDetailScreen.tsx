@@ -26,6 +26,9 @@ import { useSupabase } from '../../contexts/SupabaseContext';
 import { ICH as CURRENT_USER_ID, chatZeit, ladeChatStand, ladeChatZustand, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
 import { GifStickerSheet } from '../../components/GifStickerSheet';
+import { StandortAnsicht } from '../../components/StandortAnsicht';
+
+const OrtSuche = require('../../../gemeinsam/ortsuche') as typeof import('../../../gemeinsam/ortsuche');
 import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
 import { WeiterleitenSheet } from '../../components/WeiterleitenSheet';
@@ -133,6 +136,8 @@ export const ChatDetailScreen = ({
   const [anhangOffen, setAnhangOffen] = useState(false);
   // Kasten 28/6.3: GIFs und Sticker hinter dem Knopf rechts im Eingabefeld.
   const [gifStickerOffen, setGifStickerOffen] = useState(false);
+  // Kasten 28/6.5: Karte eines frei gewaehlten Ortes.
+  const [ortAnsicht, setOrtAnsicht] = useState<{ name: string; adresse?: string; lat: number; lng: number } | null>(null);
   const [kameraAuf, setKameraAuf] = useState(false);
   /*
    * Kasten RS 3: eine fremde Nachricht melden — im Messenger, im Community-
@@ -624,6 +629,9 @@ export const ChatDetailScreen = ({
 
   const renderMessage = ({ item }: { item: Message }) => {
     const out = item.senderId === CURRENT_USER_ID;
+    // Kasten 28/6.5: ein frei gewaehlter Ort steht im (ggf. entschluesselten)
+    // Text — gemeinsam/ortsuche.js macht daraus dieselbe Karte.
+    const ortDerBlase = item.standort ?? (item.media ? null : OrtSuche.ausText(item.text));
     const sender = alleNutzer[item.senderId];
     // Der Anhang, den es wirklich zu sehen gibt (Henrik 7.9.): frisch vom
     // Geraet oder vom Server. Ohne Adresse bleibt es beim grauen Kaestchen —
@@ -870,16 +878,20 @@ export const ChatDetailScreen = ({
               />
             ) : null}
           </View>
-        ) : item.standort ? (
-          <Druck style={styles.ortKarte} onPress={() => onOpenStandort?.(item.standort!.name)}>
+        ) : ortDerBlase ? (
+          <Druck
+            style={styles.ortKarte}
+            onPress={() => ortOeffnen(ortDerBlase)}
+            accessibilityLabel={`Standort ${ortDerBlase.name}`}
+          >
             <View style={styles.ortBild}>
-              <View style={[styles.ortNadel, { left: `${item.standort.x ?? 50}%`, top: `${item.standort.y ?? 50}%` }]}>
+              <View style={[styles.ortNadel, { left: `${ortDerBlase.x ?? 50}%`, top: `${ortDerBlase.y ?? 50}%` }]}>
                 <Ionicons name="location" size={22} color={colors.danger} />
               </View>
             </View>
-            <Text style={styles.ortName}>{item.standort.name}</Text>
+            <Text style={styles.ortName}>{ortDerBlase.name}</Text>
             <Text style={styles.ortSub} numberOfLines={1}>
-              {item.standort.adresse ?? item.standort.koordinaten}
+              {ortDerBlase.adresse || ortDerBlase.koordinaten}
             </Text>
           </Druck>
         ) : item.kontakt ? (
@@ -1138,6 +1150,17 @@ export const ChatDetailScreen = ({
    * Kasten 28/6: Plus, Kamera und GIF/Sticker-Knopf antworten bei einem
    * gesperrten Chat mit demselben Satz — vorher stand er nur am Plus.
    */
+  /*
+   * Kasten 28/6.5: Ort aus `places` → Standortseite im Explorer (wie bisher);
+   * frei gewaehlter Ort mit Koordinaten → Karte im Blatt.
+   */
+  const ortOeffnen = (ort: NonNullable<Message['standort']>) => {
+    if (typeof ort.lat === 'number' && typeof ort.lng === 'number') {
+      return setOrtAnsicht({ name: ort.name, adresse: ort.adresse, lat: ort.lat, lng: ort.lng });
+    }
+    onOpenStandort?.(ort.name);
+  };
+
   const wennFrei = (weiter: () => void) => {
     if (!gesperrt) return weiter();
     onNotice?.(
@@ -1529,6 +1552,8 @@ export const ChatDetailScreen = ({
         onAnhang={anhangSenden}
         onNotice={(text) => onNotice?.(text)}
       />
+
+      <StandortAnsicht ort={ortAnsicht} onClose={() => setOrtAnsicht(null)} />
 
       <GifStickerSheet
         visible={gifStickerOffen}
