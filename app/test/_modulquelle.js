@@ -157,6 +157,9 @@ const UMD_BAUSTEINE = [
   // 10.10.2026: `chatblase.js` fuer Ziehen zum Antworten und die Karte eines
   // geteilten Beitrags (Feedback 28.09., Kasten 4 und 7) — daten.ts holt ihn.
   ['chatblase', 'Chatblase'],
+  // 10.10.2026: `ortsuche.js` fuer „Standort senden" mit Suche und Karte
+  // (Feedback 28.09., Kasten 6.5). AnhangSheet und ChatDetailScreen holen ihn.
+  ['ortsuche', 'OrtSuche'],
 ];
 
 function umdTeile() {

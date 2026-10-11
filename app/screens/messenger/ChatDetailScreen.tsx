@@ -1131,6 +1131,21 @@ export const ChatDetailScreen = ({
     scrollToEnd();
   };
 
+  /*
+   * Kasten 28/6: Plus, Kamera und GIF/Sticker-Knopf antworten bei einem
+   * gesperrten Chat mit demselben Satz — vorher stand er nur am Plus.
+   */
+  const wennFrei = (weiter: () => void) => {
+    if (!gesperrt) return weiter();
+    onNotice?.(
+      blockiert
+        ? 'Diese Person ist blockiert'
+        : dmGesperrt
+          ? `${chat.name} empfängt keine Nachrichten`
+          : 'Warte, bis die Anfrage angenommen wurde'
+    );
+  };
+
   return (
     // Vollbild bis in die Ecken; Kopf- und Eingabezeile halten sich den Platz
     // fuer Notch und Home-Anzeige selbst frei.
@@ -1390,18 +1405,9 @@ export const ChatDetailScreen = ({
         <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
           <Druck
             style={styles.composerIcon}
-            onPress={() =>
-              gesperrt
-                ? onNotice?.(
-                    blockiert
-                      ? 'Diese Person ist blockiert'
-                      : dmGesperrt
-                        ? `${chat.name} empfängt keine Nachrichten`
-                        : 'Warte, bis die Anfrage angenommen wurde'
-                  )
-                : setAnhangOffen(true)
-            }
+            onPress={() => wennFrei(() => setAnhangOffen(true))}
             hitSlop={4}
+            accessibilityLabel="Anhang"
           >
             <Ionicons name="add" size={24} color={colors.text2} />
           </Druck>
@@ -1438,7 +1444,20 @@ export const ChatDetailScreen = ({
               returnKeyType={enterSendet ? 'send' : 'default'}
               onSubmitEditing={enterSendet ? () => send() : undefined}
             />
-            <Druck style={styles.composerIcon} onPress={onCamera} hitSlop={4} accessibilityLabel="Kamera">
+            {/*
+              Kasten 28/6.1: die Kamera sitzt nur noch hier, nicht mehr im
+              Anhang-Blatt (WhatsApp-Vorbild). Sie oeffnet die eigene Kamera
+              mit festem Ziel (`direktZu` → anhangSenden), die wirklich in die
+              Datenbank schreibt — auch im Unterthema. Der alte Weg ueber
+              `onCamera` (App.tsx, aufnahmeInChat) legte das Foto nur lokal
+              an und meldete trotzdem „Foto gesendet".
+            */}
+            <Druck
+              style={styles.composerIcon}
+              onPress={() => wennFrei(() => setKameraAuf(true))}
+              hitSlop={4}
+              accessibilityLabel="Kamera"
+            >
               <Ionicons name="camera-outline" size={21} color={colors.text2} />
             </Druck>
           </View>
