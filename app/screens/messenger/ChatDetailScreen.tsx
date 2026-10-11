@@ -42,7 +42,8 @@ import { haptic } from '../../lib/haptics';
 import { nachrichtTon } from '../../lib/toene';
 // Dieselbe mm:ss-Schreibweise wie im Anrufbildschirm — sonst stuende im Chat
 // eine andere Dauer als waehrend des Gespraechs.
-import { dauerText } from './CallScreen';
+// Kasten 5: der Satz zum Anrufeintrag, gleich mit der Website.
+const Anruf = require('../../../gemeinsam/anruf') as typeof import('../../../gemeinsam/anruf');
 import * as Aktion from '../../lib/aktionen';
 import { FarbfilterSchicht } from '../../components/Farbfilter';
 import { MarkierterText } from '../../components/MarkierterText';
@@ -651,25 +652,27 @@ export const ChatDetailScreen = ({
      * geschrieben. Gleiche Darstellung auf der Website (paintMessages).
      */
     if (item.anruf) {
-      const verpasst = item.anruf.status !== 'beendet';
+      /*
+       * Kasten 5.2–5.4 (28.09.2026): derselbe Satz wie auf der Website, aus
+       * gemeinsam/anruf.js — zu zweit „Ausgehender/Eingehender …", in
+       * Gruppe und Unterthema „Max hat einen Videoanruf gestartet". Ein
+       * nur gestarteter Anruf heisst nie „angenommen" (5.1).
+       */
+      const anrufOpts = {
+        eigen: out,
+        gruppe: Boolean(chat.isGroup || istKanal),
+        name: sender?.name?.split(' ')[0],
+      };
+      const verpasst = Anruf.verpasst(item.anruf, anrufOpts);
+      const anrufSatz = `${Anruf.text(item.anruf, anrufOpts)} · ${item.time}`;
       return (
-        <View style={styles.anruf}>
+        <View style={styles.anruf} accessibilityLabel={anrufSatz}>
           <Ionicons
             name={item.anruf.art === 'video' ? 'videocam-outline' : 'call-outline'}
             size={14}
             color={verpasst ? colors.danger : colors.text2}
           />
-          <Text style={[styles.anrufText, verpasst && styles.anrufVerpasst]}>
-            {out ? 'Ausgehender ' : ''}
-            {item.anruf.art === 'video' ? 'Videoanruf' : 'Anruf'}
-            {verpasst
-              ? item.anruf.status === 'abgelehnt'
-                ? ' · abgelehnt'
-                : ' · verpasst'
-              : ` · ${dauerText(item.anruf.dauer)}`}
-            {' · '}
-            {item.time}
-          </Text>
+          <Text style={[styles.anrufText, verpasst && styles.anrufVerpasst]}>{anrufSatz}</Text>
         </View>
       );
     }

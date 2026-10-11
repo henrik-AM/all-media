@@ -543,7 +543,7 @@ export async function ladeChats(
         preview: vorschau?.anruf_art
           ? vorschau.anruf_art === 'video'
             ? 'Videoanruf'
-            : 'Anruf'
+            : 'Sprachanruf'
           : /*
              * Kasten 16: die Story-Markierung hat absichtlich keinen Text
              * (Schema 75). Ohne diesen Zweig stuende in der Chatliste — und
@@ -854,7 +854,7 @@ export async function ladeNachrichten(
     anruf: n.anruf_art
       ? {
           art: n.anruf_art as 'audio' | 'video',
-          status: (n.anruf_status ?? 'beendet') as 'beendet' | 'verpasst' | 'abgelehnt',
+          status: (n.anruf_status ?? 'beendet') as 'gestartet' | 'beendet' | 'verpasst' | 'abgelehnt',
           dauer: Number(n.anruf_dauer ?? 0),
         }
       : undefined,
@@ -1345,17 +1345,28 @@ export async function ladeKanalNachrichten(
     // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
     ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
     ' profiles!posts_user_id_fkey(name, handle))';
-  const holen = (mitBezug: boolean) =>
+  /*
+   * Spalten aus spaeteren Schemas: Bezug (91), Anrufeintrag (89),
+   * Push-to-Talk-Sitzung (90). Fehlt eine noch — Code vor dem Schema
+   * ausgeliefert —, faellt die Abfrage mit 42703 um und das ganze
+   * Unterthema saehe leer aus. Dann ohne genau diese Gruppe nochmal.
+   */
+  let zusatz = ['reply_to', 'anruf_art, anruf_status, anruf_dauer', 'ptt_sitzung'];
+  const holen = () =>
     client
       .from('community_channel_messages')
-      // Kasten 4.2: `reply_to` (Schema XX) — fehlt die Spalte noch, ohne.
-      .select(mitBezug ? `${spalten}, reply_to` : spalten)
+      .select([spalten, ...zusatz].join(', '))
       .eq('channel_id', kanalId)
       // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
       .order('created_at', { ascending: false })
       .limit(500);
-  let { data, error }: { data: any[] | null; error: any } = await holen(true);
-  if (error && Chatblase.fehltSpalte(error, 'reply_to')) ({ data, error } = await holen(false));
+  let { data, error }: { data: any[] | null; error: any } = await holen();
+  while (error && Chatblase.fehltSpalte(error) && zusatz.length) {
+    const fehlt = zusatz.filter((g) => !g.split(', ').some((sp) => Chatblase.fehltSpalte(error, sp)));
+    // Nennt die Meldung keine bekannte Spalte, alle Zusaetze weglassen.
+    zusatz = fehlt.length < zusatz.length ? fehlt : [];
+    ({ data, error } = await holen());
+  }
   if (error) throw error;
 
   /*
@@ -1410,6 +1421,17 @@ export async function ladeKanalNachrichten(
     geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts),
     datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size ?? 0) } : undefined,
     antwortAuf: Chatblase.kanalBezug(m, alleZeilen, ichId, namen),
+    // Kasten 5: der Anrufeintrag im Unterthema (Schema 89) — dieselbe
+    // Abbildung wie in ladeNachrichten.
+    anruf: m.anruf_art
+      ? {
+          art: m.anruf_art as 'audio' | 'video',
+          status: (m.anruf_status ?? 'gestartet') as 'gestartet' | 'beendet' | 'verpasst' | 'abgelehnt',
+          dauer: Number(m.anruf_dauer ?? 0),
+        }
+      : undefined,
+    // Kasten 8.5: die eine Zeile „Push to Talk" je Sitzung (Schema 90).
+    pttSitzung: Boolean(m.ptt_sitzung) || undefined,
   })));
 }
 

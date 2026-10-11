@@ -1348,6 +1348,72 @@ export async function anrufNotieren(
 }
 
 /**
+ * Einen Anruf beim START im Chat vermerken — Kasten 5.2–5.4 (28.09.2026).
+ *
+ * Henrik: „Wenn ich eine Person oder eine Gruppe oder eine Community, egal
+ * was, anrufe, soll das im Chat wie eine Nachricht angezeigt werden, dass
+ * ich einen Anruf gestartet habe. Andersherum bei eingehenden Anrufen
+ * genauso."
+ *
+ * Vorher entstand der Eintrag erst beim Auflegen, nur im Zweierchat, und
+ * mit der Dauer aus einer simulierten Verbindung — „Videoanruf · 02:14"
+ * fuer ein Gespraech, das nie stattfand. Jetzt:
+ *
+ *   - Zeitpunkt: beim Start, Zustand `gestartet`, Dauer 0 (Schema 89).
+ *     Eine Uebertragung gibt es nicht (Kasten 5.1); erfunden wird nichts.
+ *   - Ort: der Chat, aus dem angerufen wurde — Person, Gruppe, Community-
+ *     Chat (alle `messages`) oder Unterthema (`community_channel_messages`,
+ *     Spalten erst mit Schema 89).
+ *   - Ohne Chat (Anruf aus dem Kontaktprofil): der Zweierchat im Messenger
+ *     wie bisher (`chatMit`).
+ *
+ * Wer schreiben darf, entscheidet die Datenbank: es ist eine gewoehnliche
+ * Zeile unter „Nachricht senden" bzw. „Im Kanal schreiben". Die Gegenseite
+ * liest sie aus derselben Tabelle — deshalb steht der Eintrag bei beiden
+ * gleich (5.4).
+ *
+ * Gleiche Regel in web/server/sync-handlers.js (handleAnrufStarten).
+ */
+export async function anrufStarten(
+  client: SupabaseClient,
+  ichId: string,
+  ziel: { chatId?: string | null; kanalId?: string | null; zielId?: string | null },
+  art: 'audio' | 'video'
+): Promise<string> {
+  const zeile = {
+    sender_id: ichId,
+    text: '',
+    anruf_art: art,
+    anruf_status: 'gestartet',
+    anruf_dauer: 0,
+  };
+
+  if (ziel.kanalId) {
+    const { data, error } = await client
+      .from('community_channel_messages')
+      .insert({ ...zeile, channel_id: ziel.kanalId })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return (data as { id: string }).id;
+  }
+
+  const chatId = ziel.chatId || (ziel.zielId ? await chatMit(client, ichId, ziel.zielId) : null);
+  if (!chatId) throw new Error('Kein Chat für diesen Anruf');
+
+  const { data, error } = await client
+    .from('messages')
+    .insert({ ...zeile, chat_id: chatId })
+    .select('id')
+    .single();
+  if (error) throw error;
+
+  // Nach oben sortieren wie jede andere Nachricht.
+  await client.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chatId);
+  return (data as { id: string }).id;
+}
+
+/**
  * Alle fremden Nachrichten eines Chats als gelesen vermerken.
  *
  * Die Entscheidung trifft die Datenbank (Schema 40, `chat_gelesen`): sie prüft

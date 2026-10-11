@@ -1246,6 +1246,15 @@ app.post('/api/kontakte/:userId/anruf', route(async (req) => {
 }));
 
 /*
+ * Kasten 5.2: der Anruf beim Start, im Chat oder Unterthema, aus dem
+ * angerufen wird — { art, chatId? | kanalId? | zielId? }. Gegenstück in der
+ * App: CallScreen.tsx → anrufStarten.
+ */
+app.post('/api/anruf', route(async (req) =>
+  antwort(await syncHandlers.handleAnrufStarten(req.db, req.nutzerId, req.body || {}))
+));
+
+/*
  * Den Chat mit einer Person holen — und ihn anlegen, wenn es noch keinen gibt.
  * Für den Sprung „Nachricht" aus der Kontaktinfo (Henrik 7.9.). In der App
  * macht das onMessage in ContactProfileScreen.tsx über dieselbe chatMit-Regel.

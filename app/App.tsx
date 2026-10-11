@@ -116,7 +116,16 @@ type Overlay =
       zielStory?: boolean;
       zielBeitrag?: 'post' | 'reels' | 'landscape';
     }
-  | { kind: 'call'; userId?: string; gruppenName?: string; teilnehmer?: string[]; art: 'audio' | 'video' }
+  | {
+      kind: 'call';
+      userId?: string;
+      gruppenName?: string;
+      teilnehmer?: string[];
+      art: 'audio' | 'video';
+      /** Kasten 5.2: der Chat bzw. das Unterthema, in dem der Anruf vermerkt wird. */
+      chatId?: string;
+      kanalId?: string;
+    }
   | { kind: 'livestream' }
   /* Die offenen Insights einer Person ansehen — Handbuch-Abgleich 01.09.2026. */
   | { kind: 'insights'; userId: string }
@@ -1801,18 +1810,28 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           // vom App-Start.
           void daten.chatsNeuLaden();
         }}
-        onCall={(art) =>
+        onCall={(art) => {
+          /*
+           * Kasten 5.2: der Anruf steht in GENAU diesem Chat — auch im
+           * Community-Zweierchat (vorher landete er im Messenger-Chat mit
+           * derselben Person) und im Unterthema (vorher gar nicht).
+           */
+          const kanal = daten.communities.some((c) =>
+            (c.unterthemen ?? []).some((u) => u.id === overlay.chat.id)
+          );
+          const ort = kanal ? { kanalId: overlay.chat.id } : { chatId: overlay.chat.id };
           setOverlay(
-            overlay.chat.userId
-              ? { kind: 'call', userId: overlay.chat.userId, art }
+            overlay.chat.userId && !overlay.chat.isGroup
+              ? { kind: 'call', userId: overlay.chat.userId, art, ...ort }
               : {
                   kind: 'call',
                   gruppenName: overlay.chat.name,
                   teilnehmer: overlay.chat.memberIds ?? [],
                   art,
+                  ...ort,
                 }
-          )
-        }
+          );
+        }}
         onCamera={() => setOverlay({ kind: 'camera', zielChat: overlay.chat })}
         onOpenProfile={openProfile}
         onOpenGroupSettings={(chatId) => setNotice(`Gruppeneinstellungen: ${overlay.chat.name}`)}
@@ -1995,6 +2014,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         userId={overlay.userId}
         gruppenName={overlay.gruppenName}
         teilnehmer={overlay.teilnehmer}
+        chatId={overlay.chatId}
+        kanalId={overlay.kanalId}
         art={overlay.art}
         onClose={() => setOverlay(null)}
         onNotice={setNotice}

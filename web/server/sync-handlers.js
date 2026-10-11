@@ -610,6 +610,47 @@ const handleAnrufNotieren = handler('Anrufeintrag', async (client, nutzerId, zie
 });
 
 /*
+ * Einen Anruf beim START im Chat vermerken — Kasten 5.2–5.4 (28.09.2026).
+ *
+ * Henrik: „Wenn ich eine Person oder eine Gruppe oder eine Community, egal
+ * was, anrufe, soll das im Chat wie eine Nachricht angezeigt werden, dass ich
+ * einen Anruf gestartet habe. Andersherum bei eingehenden Anrufen genauso."
+ *
+ * Zustand `gestartet`, Dauer 0 (Schema 89) — eine Übertragung gibt es nicht
+ * (Kasten 5.1), also auch keine Dauer. Ort: der Chat, aus dem angerufen wurde
+ * (`messages`), oder das Unterthema (`community_channel_messages`). Ohne
+ * beides der Messenger-Zweierchat mit der Person.
+ *
+ * Gleiche Regel in app/lib/aktionen.ts (anrufStarten).
+ */
+const handleAnrufStarten = handler('Anrufeintrag', async (client, nutzerId, werte) => {
+  const art = werte.art === 'video' ? 'video' : 'audio';
+  const zeile = { sender_id: nutzerId, text: '', anruf_art: art, anruf_status: 'gestartet', anruf_dauer: 0 };
+
+  if (werte.kanalId) {
+    const { data, error } = await client
+      .from('community_channel_messages')
+      .insert({ ...zeile, channel_id: werte.kanalId })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return { ok: true, id: data.id, kanalId: werte.kanalId };
+  }
+
+  const chatId = werte.chatId || (werte.zielId ? await chatMit(client, nutzerId, werte.zielId) : null);
+  if (!chatId) return { ok: false, error: 'Kein Chat für diesen Anruf' };
+
+  const { data, error } = await client
+    .from('messages')
+    .insert({ ...zeile, chat_id: chatId })
+    .select('id')
+    .single();
+  if (error) throw error;
+  await client.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chatId);
+  return { ok: true, id: data.id, chatId };
+});
+
+/*
  * Kontaktinfo ändern — selbst vergebener Name und Notiz.
  *
  * Henrik 7.9.: „Kontaktinfo-Änderungen (z.B. Name) speichern/synchronisieren
@@ -2529,6 +2570,7 @@ module.exports = {
   handleContactFavorite,
   handleContactEdit,
   handleAnrufNotieren,
+  handleAnrufStarten,
   handleNotifyPost,
   handleShareToChats,
   handleShareToCommunities,

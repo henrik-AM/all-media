@@ -105,7 +105,18 @@ export interface Message {
    * Zeile ist keine Nachricht, sondern die Notiz „Videoanruf · 02:14". Der
    * Text bleibt leer; was dasteht, entscheidet die Anzeige.
    */
-  anruf?: { art: 'audio' | 'video'; status: 'beendet' | 'verpasst' | 'abgelehnt'; dauer: number };
+  /*
+   * Kasten 5 (Schema 89): `gestartet` — beim Start vermerkt, Dauer 0. Seit
+   * es den Zustand gibt, steht der Eintrag auch in Gruppen, Community-Chats
+   * und Unterthemen.
+   */
+  anruf?: { art: 'audio' | 'video'; status: 'gestartet' | 'beendet' | 'verpasst' | 'abgelehnt'; dauer: number };
+  /**
+   * Kasten 8.5 (Schema 90): diese Zeile im Unterthema ist der Beginn einer
+   * Push-to-Talk-Sitzung — „Push to Talk" mit Datum und Uhrzeit. Ihre id ist
+   * die Sitzung; antippen zeigt den Verlauf (ptt_messages.sitzung_id).
+   */
+  pttSitzung?: boolean;
 }
 
 /**

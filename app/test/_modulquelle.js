@@ -160,6 +160,9 @@ const UMD_BAUSTEINE = [
   // 10.10.2026: `ortsuche.js` fuer „Standort senden" mit Suche und Karte
   // (Feedback 28.09., Kasten 6.5). AnhangSheet und ChatDetailScreen holen ihn.
   ['ortsuche', 'OrtSuche'],
+  // 10.10.2026: `anruf.js` fuer den Anrufeintrag im Chat (Feedback 28.09.,
+  // Kasten 5, Schema 89) — ChatDetailScreen und CallScreen holen ihn.
+  ['anruf', 'Anruf'],
 ];
 
 function umdTeile() {

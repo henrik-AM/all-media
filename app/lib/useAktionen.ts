@@ -117,6 +117,15 @@ export interface Aktionen {
     sekunden: number,
     status?: 'beendet' | 'verpasst' | 'abgelehnt'
   ) => Promise<void>;
+  /**
+   * Kasten 5.2: einen Anruf beim Start im Chat vermerken (Schema 89) —
+   * Person, Gruppe, Community-Chat oder Unterthema. Still wie anrufNotieren:
+   * eine Meldung über dem Anrufbildschirm hilft niemandem.
+   */
+  anrufStarten: (
+    ziel: { chatId?: string | null; kanalId?: string | null; zielId?: string | null },
+    art: 'audio' | 'video'
+  ) => Promise<string | null>;
   /** Über eine Chat-Anfrage entscheiden. Nur die angeschriebene Person darf das. */
   anfrageEntscheiden: (chatId: string, annehmen: boolean, zurueck: Rueckweg) => Promise<void>;
   chatEinstellung: (
@@ -416,6 +425,15 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           await A.anrufNotieren(supabase, ichId, zielId, art, sekunden, status);
         } catch (e: any) {
           console.error('Anruf konnte nicht im Chat vermerkt werden:', e?.message ?? e);
+        }
+      },
+      anrufStarten: async (ziel, art) => {
+        if (!supabase || !ichId) return null;
+        try {
+          return await A.anrufStarten(supabase, ichId, ziel, art);
+        } catch (e: any) {
+          console.error('Anruf konnte nicht im Chat vermerkt werden:', e?.message ?? e);
+          return null;
         }
       },
       anfrageEntscheiden: (chatId, annehmen, zurueck) =>
