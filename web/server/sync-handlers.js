@@ -1532,6 +1532,27 @@ const handleCommunityStumm = handler(
 );
 
 /**
+ * Kasten 8.4: „Push-to-Talk-Benachrichtigung" je Community setzen
+ * (community_members.ptt_benachrichtigung, Schema 90). Mit `.select()`, weil
+ * ein ins Leere gehendes UPDATE sonst Erfolg meldet. Gegenstueck zu
+ * pttBenachrichtigungSetzen() in app/lib/aktionen.ts.
+ */
+const handlePttBenachrichtigung = handler(
+  'Push-to-Talk-Benachrichtigung',
+  async (client, nutzerId, communityId, an) => {
+    const { data, error } = await client
+      .from('community_members')
+      .update({ ptt_benachrichtigung: Boolean(an) })
+      .eq('community_id', communityId)
+      .eq('user_id', nutzerId)
+      .select('ptt_benachrichtigung');
+    if (error) throw error;
+    if (!data || data.length === 0) return { ok: false, error: 'Du bist in dieser Community nicht Mitglied.' };
+    return { ok: true, an: Boolean(data[0].ptt_benachrichtigung) };
+  }
+);
+
+/**
  * Eine Einstellung setzen.
  *
  * Gegenstueck zu einstellungSetzen() in app/lib/aktionen.ts — inklusive der
@@ -2602,6 +2623,7 @@ module.exports = {
   handleCreateCommunity,
   handleJoinCommunity,
   handleCommunityStumm,
+  handlePttBenachrichtigung,
   handleEinstellung,
   handleProfilAufruf,
   handleReportContent,

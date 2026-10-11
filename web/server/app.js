@@ -3198,6 +3198,10 @@ app.post('/api/communities/:id/join', route(async (req, res) => {
  * Eine Community stummschalten. Der Schalter „Benachrichtigungen" im
  * Community-Blatt legte bis zum 02.09.2026 nur eine CSS-Klasse um.
  */
+app.post('/api/communities/:id/ptt-benachrichtigung', route(async (req) =>
+  antwort(await syncHandlers.handlePttBenachrichtigung(req.db, req.nutzerId, req.params.id, req.body?.an))
+));
+
 app.post('/api/communities/:id/stumm', route(async (req) =>
   antwort(await syncHandlers.handleCommunityStumm(req.db, req.nutzerId, req.params.id))
 ));
@@ -3310,7 +3314,7 @@ const GEGENSTAND = { video: 'Video', comment: 'Kommentar', post: 'Beitrag' };
  * Der Satz entsteht erst hier, gespeichert ist nur, was passiert ist. Sonst
  * müsste bei jeder Textänderung der ganze Bestand mitwandern.
  */
-function mitteilungText(m, namen, communityNamen) {
+function mitteilungText(m, namen, communityNamen, kanalCommunity = new Map()) {
   const name = namen.get(m.userId) || 'Jemand';
   const community = communityNamen.get(m.ziel?.id) || 'einer Community';
   return {
@@ -3338,6 +3342,8 @@ function mitteilungText(m, namen, communityNamen) {
     beitritt: `${name} ist „${community}" beigetreten.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
+    // Kasten 8.3 (Schema 90): Ziel ist das Unterthema — Satz wie in der App.
+    ptt: `${name} spricht in „${kanalCommunity.get(m.ziel?.id) || 'einer Community'}" – Push to Talk beitreten?`,
     share: `${name} hat etwas mit dir geteilt.`,
     message: `${name} hat dir geschrieben.`,
     system: m.text || 'Es gibt Neuigkeiten.',
@@ -3353,12 +3359,14 @@ app.get('/api/mitteilungen/:bereich', route(async (req) => {
 
   const namen = new Map(Object.values(nutzer).map((u) => [u.id, u.name]));
   const communityNamen = new Map(communities.map((c) => [c.id, c.name]));
+  // Kasten 8.3: Unterthema → Name seiner Community („… spricht in X").
+  const kanalCommunity = new Map(communities.flatMap((c) => (c.channels || []).map((k) => [k.id, c.name])));
 
   const fertig = eintraege.map((m) => ({
     ...m,
     // Kasten RS 3: Rechtsmitteilung (Schema 102) — Ziel ist die Meldung.
     ziel: m.art === 'system' ? { art: 'meldung', id: m.ziel?.id || null } : m.ziel,
-    text: m.text || mitteilungText(m, namen, communityNamen),
+    text: m.text || mitteilungText(m, namen, communityNamen, kanalCommunity),
   }));
   return { eintraege: fertig, ungelesen: fertig.filter((m) => !m.gelesen).length };
 }));

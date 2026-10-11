@@ -119,6 +119,12 @@ const mitteilungText = (
       return `Neue Nachrichten in „${kanal}“.`;
     case 'einladung':
       return `${name} hat dich zu „${kanal}“ eingeladen.`;
+    // Kasten 8.3 (Schema 90): ziel = das Unterthema, in dem gesprochen wird.
+    case 'ptt': {
+      const pttCommunity =
+        communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === m.ziel.id))?.name ?? 'einer Community';
+      return `${name} spricht in „${pttCommunity}“ – Push to Talk beitreten?`;
+    }
   }
 };
 
@@ -216,6 +222,8 @@ interface ProfilWert {
    * Schalter dasselbe zeigen, ohne dass alles neu geladen werden muss.
    */
   kanalStummSetzen: (id: string, stumm: boolean) => void;
+  /** Kasten 8.4: den gespeicherten PTT-Schalter in die Liste übernehmen. */
+  kanalPttSetzen: (id: string, an: boolean) => void;
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
 
@@ -851,6 +859,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const kanalStummSetzen = useCallback((id: string, stumm: boolean) => {
     setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, stumm } : c)));
   }, []);
+  const kanalPttSetzen = useCallback((id: string, an: boolean) => {
+    setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, pttBenachrichtigung: an } : c)));
+  }, []);
 
   const clipUmschalten = useCallback(
     (id: string, was: 'like' | 'save' | 'repost') => {
@@ -1031,6 +1042,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       unterthemaAnlegen,
       kanalBeitreten,
       kanalStummSetzen,
+      kanalPttSetzen,
       kanalGelesen,
       gefolgt,
       folgtPerson,
@@ -1045,7 +1057,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalPttSetzen, kanalGelesen,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern, profilSpeichernWarten,
     ]
   );

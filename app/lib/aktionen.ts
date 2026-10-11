@@ -180,6 +180,34 @@ export async function communityStumm(
 }
 
 /**
+ * Kasten 8.4 (Henrik 28.09.2026): der Schalter „Push-to-Talk-Benachrichtigung"
+ * je Community. Er sitzt an der Mitgliedschaft (Schema 90,
+ * community_members.ptt_benachrichtigung) und wirkt in der Datenbank: der
+ * Ausloeser ptt_sitzung_zuordnen schickt „Push to Talk beitreten?" nur an
+ * Mitglieder, bei denen er an ist.
+ *
+ * Mit `.select()`: ein verbotenes oder ins Leere gehendes UPDATE meldet
+ * sonst Erfolg mit null Zeilen. Gleiche Regel in web/server/sync-handlers.js
+ * (handlePttBenachrichtigung).
+ */
+export async function pttBenachrichtigungSetzen(
+  client: SupabaseClient,
+  ichId: string,
+  communityId: string,
+  an: boolean
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('community_members')
+    .update({ ptt_benachrichtigung: an })
+    .eq('community_id', communityId)
+    .eq('user_id', ichId)
+    .select('ptt_benachrichtigung');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('Du bist in dieser Community nicht Mitglied.');
+  return Boolean((data[0] as any).ptt_benachrichtigung);
+}
+
+/**
  * Jemanden blockieren oder die Blockierung aufheben.
  *
  * Das hier war der schwerste Fall der alten Bauweise: eine Blockierung, die

@@ -1295,10 +1295,13 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     .limit(100);
   if (error) throw error;
 
-  const { data: meine } = await client
-    .from('community_members')
-    .select('community_id, is_muted')
-    .eq('user_id', ichId);
+  // Kasten 8.4: der PTT-Schalter (Schema 90). Fehlt die Spalte noch (42703),
+  // einmal ohne — sonst stuende man in keiner Community mehr als Mitglied.
+  const mitgliedschaft = (spalten: string) =>
+    client.from('community_members').select(spalten).eq('user_id', ichId);
+  let { data: meine, error: fehlerMeine } = await mitgliedschaft('community_id, is_muted, ptt_benachrichtigung');
+  if (fehlerMeine && (fehlerMeine as any).code === '42703') ({ data: meine } = await mitgliedschaft('community_id, is_muted'));
+  const pttAn = new Set(((meine ?? []) as any[]).filter((m) => m.ptt_benachrichtigung).map((m) => m.community_id));
   const beigetreten = new Set((meine ?? []).map((m: any) => m.community_id));
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine ?? []).filter((m: any) => m.is_muted).map((m: any) => m.community_id));
@@ -1314,6 +1317,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     members: Number(c.mitglieder_basis ?? 0) + (c.community_members?.[0]?.count ?? 0),
     joined: beigetreten.has(c.id),
     stumm: stumme.has(c.id),
+    pttBenachrichtigung: pttAn.has(c.id),
     unreadCount: 0,
     // Eine selbst angelegte Community lässt sich nicht verlassen — sie stünde
     // sonst ohne Besitzer da.

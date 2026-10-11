@@ -7120,6 +7120,24 @@ function openCommunityEinstellungen(community) {
         <span class="item__label">Benachrichtigungen</span>
         <button class="switch ${community.stumm ? '' : 'is-on'}" data-commtoggle="mitteilungen" aria-label="Benachrichtigungen"><span class="switch__knob"></span></button>
       </div>
+      ${/*
+          Kasten 8.4: „Push-to-Talk-Benachrichtigung" je Community, nur fuer
+          Mitglieder. Gespeichert in community_members.ptt_benachrichtigung
+          (Schema 90), wirksam im Ausloeser der Datenbank. Gleiche Zeile in der
+          App (CommunityOptionenSheet).
+        */ ''}
+      ${
+        community.joined || community.eigen
+          ? `<div class="item">
+              <span class="item__icon">${ICONS.mic}</span>
+              <div class="item__body">
+                <span class="item__label">Push-to-Talk-Benachrichtigung</span>
+                <span class="item__sub">„Push to Talk beitreten?“, wenn hier jemand zu sprechen beginnt</span>
+              </div>
+              <button class="switch ${community.pttBenachrichtigung ? 'is-on' : ''}" data-commptt aria-label="Push-to-Talk-Benachrichtigung"><span class="switch__knob"></span></button>
+            </div>`
+          : ''
+      }
       <button class="item item--danger" data-commaction="verlassen">
         <span class="item__icon">${ICONS.close}</span>
         <span class="item__label">Community verlassen</span>
@@ -7143,6 +7161,21 @@ function openCommunityEinstellungen(community) {
         if (inListe) inListe.stumm = r.stumm;
         knopf.classList.toggle('is-on', !r.stumm);
         toast(r.stumm ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+      });
+      sheet.querySelector('[data-commptt]')?.addEventListener('click', async (e) => {
+        const knopf = e.currentTarget;
+        const warAn = knopf.classList.contains('is-on');
+        knopf.classList.toggle('is-on', !warAn);
+        const r = await api(`/api/communities/${community.id}/ptt-benachrichtigung`, { an: !warAn });
+        if (!r?.ok) {
+          knopf.classList.toggle('is-on', warAn);
+          return toast(r?.error || 'Nicht gespeichert');
+        }
+        community.pttBenachrichtigung = r.an;
+        const inListe = state.communities.find((c) => c.id === community.id);
+        if (inListe) inListe.pttBenachrichtigung = r.an;
+        knopf.classList.toggle('is-on', r.an);
+        toast(r.an ? 'Push-to-Talk-Benachrichtigung an' : 'Push-to-Talk-Benachrichtigung aus');
       });
       sheet.querySelector('[data-commaction="verlassen"]')?.addEventListener('click', async () => {
         close();
@@ -12537,6 +12570,15 @@ function mitteilungOeffnen(ziel, text = '') {
   if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine');
   if (ziel.art === 'profile') return openProfile(ziel.id);
   if (ziel.art === 'community') return openChat(ziel.id);
+  // Kasten 8.3: „Push to Talk beitreten?" führt ins Unterthema — dort sitzt
+  // der Knopf (8.2). Wie in der App (mitteilungOeffnen, 'channel').
+  if (ziel.art === 'channel') {
+    const com = state.communities.find((c) => (c.channels || []).some((k) => k.id === ziel.id));
+    const kanal = com && com.channels.find((k) => k.id === ziel.id);
+    if (!com || !kanal) return toast('Dieses Unterthema gibt es nicht mehr');
+    state.openCommunityId = com.id;
+    return renderCommunityChat(com, kanal, kanal.topics?.[0] || kanal.name);
+  }
   // Chat-Anfrage und Messenger-Anfrage führen in den Chat, um den es geht.
   if (ziel.art === 'chat') return openChat(ziel.id);
 

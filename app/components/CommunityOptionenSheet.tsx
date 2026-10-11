@@ -33,6 +33,8 @@ interface Props {
   onVerlassen: () => void;
   /** Der neue Stumm-Zustand, damit die Liste außen ihn übernimmt. */
   onStumm: (stumm: boolean) => void;
+  /** Kasten 8.4: der neue PTT-Schalter, damit die Liste außen ihn übernimmt. */
+  onPtt?: (an: boolean) => void;
   onNotice: (message: string) => void;
 }
 
@@ -41,11 +43,33 @@ export const CommunityOptionenSheet = ({
   onClose,
   onVerlassen,
   onStumm,
+  onPtt,
   onNotice,
 }: Props) => {
   const aktionen = useAktionen(onNotice);
   const [stumm, setStumm] = useState(Boolean(community.stumm));
   const [laeuft, setLaeuft] = useState(false);
+  const [ptt, setPtt] = useState(Boolean(community.pttBenachrichtigung));
+  const [pttLaeuft, setPttLaeuft] = useState(false);
+
+  /*
+   * Kasten 8.4: „Push-to-Talk-Benachrichtigung" fuer genau diese Community.
+   * Gespeichert in community_members.ptt_benachrichtigung (Schema 90),
+   * wirksam im Ausloeser der Datenbank. Gleiche Zeile auf der Website
+   * (openCommunityEinstellungen).
+   */
+  const pttUmschalten = async () => {
+    if (pttLaeuft) return;
+    setPttLaeuft(true);
+    const vorher = ptt;
+    setPtt(!vorher);
+    const jetzt = await aktionen.pttBenachrichtigung(community.id, !vorher);
+    setPttLaeuft(false);
+    if (jetzt === null) return setPtt(vorher);
+    setPtt(jetzt);
+    onPtt?.(jetzt);
+    onNotice(jetzt ? 'Push-to-Talk-Benachrichtigung an' : 'Push-to-Talk-Benachrichtigung aus');
+  };
 
   const umschalten = async () => {
     if (laeuft) return;
@@ -111,6 +135,25 @@ export const CommunityOptionenSheet = ({
               value={!stumm}
               onValueChange={umschalten}
               disabled={laeuft}
+              trackColor={{ true: colors.brand, false: colors.surface3 }}
+            />
+          </View>
+        )}
+
+        {(community.joined || community.eigen) && (
+          <View style={styles.zeile}>
+            <View style={styles.symbol}>
+              <Ionicons name="mic-outline" size={18} color={colors.text2} />
+            </View>
+            <View style={styles.textBlock}>
+              <Text style={styles.label}>Push-to-Talk-Benachrichtigung</Text>
+              <Text style={styles.neben}>„Push to Talk beitreten?“, wenn hier jemand zu sprechen beginnt</Text>
+            </View>
+            <Switch
+              value={ptt}
+              onValueChange={pttUmschalten}
+              disabled={pttLaeuft}
+              accessibilityLabel="Push-to-Talk-Benachrichtigung"
               trackColor={{ true: colors.brand, false: colors.surface3 }}
             />
           </View>

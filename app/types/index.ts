@@ -355,6 +355,11 @@ export interface Community {
    * `visibility === 'private'` und zeigte damit etwas voellig anderes an.
    */
   stumm?: boolean;
+  /**
+   * Kasten 8.4 (Schema 90): „Push to Talk beitreten?" fuer diese Community
+   * bekommen — community_members.ptt_benachrichtigung, Vorgabe aus.
+   */
+  pttBenachrichtigung?: boolean;
   unterthemen?: Unterthema[];
 }
 
@@ -540,7 +545,9 @@ export type MitteilungArt =
    * Eingangsbestätigung, Entscheidung, Begründung, Widerspruch. Der Satz
    * steht fertig in `notifications.text`.
    */
-  | 'system';
+  | 'system'
+  /** Kasten 8.3: „Push to Talk beitreten?" — Schema 90. */
+  | 'ptt';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
@@ -548,7 +555,8 @@ export interface MitteilungsZiel {
   /** 'story' seit Kasten 11.6: Markierung in einer Story. */
   /** 'comment': Herz an einem Kommentar (Schema 49), @ im Kommentar (Kasten 25). */
   /** 'meldung': eine Rechtsmitteilung zu einer Meldung (Kasten RS 3, Schema 102). */
-  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung';
+  /** 'channel': ein Unterthema (Kasten 8.3, Schema 90). */
+  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung' | 'channel';
   id: string;
 }
 

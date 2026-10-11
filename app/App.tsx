@@ -1466,6 +1466,15 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       if (!story) return setNotice('Diese Story ist nicht mehr online');
       return setOverlay({ kind: 'story', story, liste: [story] });
     }
+    /*
+     * Kasten 8.3: „Push to Talk beitreten?" führt ins Unterthema, in dem
+     * gesprochen wird — dort sitzt der Knopf (8.2).
+     */
+    if (ziel.art === 'channel') {
+      const com = daten.communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === ziel.id));
+      const ut = com?.unterthemen?.find((u) => u.id === ziel.id);
+      return com && ut ? oeffneUnterthema(com, ut) : setNotice('Dieses Unterthema gibt es nicht mehr');
+    }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);
       return community ? openCommunity(community) : setNotice('Diese Community gibt es nicht mehr');

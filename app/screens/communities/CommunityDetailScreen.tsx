@@ -73,7 +73,7 @@ export const CommunityDetailScreen = ({
 }: Props) => {
   const insets = useSafeAreaInsets();
   const unterthemen = community.unterthemen ?? [];
-  const { kanalStummSetzen } = useProfil();
+  const { kanalStummSetzen, kanalPttSetzen } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(Boolean(optionenOffenStart));
   // Kasten RS 3: eine fremde Community melden (art 'community', Schema 102).
   const [melden, setMelden] = useState(false);
@@ -223,6 +223,7 @@ export const CommunityDetailScreen = ({
           onClose={() => setOptionenOffen(false)}
           onVerlassen={onBeitreten}
           onStumm={(stumm) => kanalStummSetzen(community.id, stumm)}
+          onPtt={(an) => kanalPttSetzen(community.id, an)}
           onNotice={onNotice}
         />
       )}

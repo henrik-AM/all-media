@@ -1173,10 +1173,12 @@ async function ladeCommunities(client, nutzerId) {
     .limit(100);
   if (error) throw error;
 
-  const { data: meine } = await client
-    .from('community_members')
-    .select('community_id, is_muted')
-    .eq('user_id', nutzerId);
+  // Kasten 8.4: der PTT-Schalter (Schema 90). Fehlt die Spalte noch (42703),
+  // einmal ohne. Gleiche Regel in app/lib/daten.ts (ladeCommunities).
+  const mitgliedschaft = (spalten) => client.from('community_members').select(spalten).eq('user_id', nutzerId);
+  let { data: meine, error: fehlerMeine } = await mitgliedschaft('community_id, is_muted, ptt_benachrichtigung');
+  if (fehlerMeine && fehlerMeine.code === '42703') ({ data: meine } = await mitgliedschaft('community_id, is_muted'));
+  const pttAn = new Set((meine || []).filter((m) => m.ptt_benachrichtigung).map((m) => m.community_id));
   const beigetreten = new Set((meine || []).map((m) => m.community_id));
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine || []).filter((m) => m.is_muted).map((m) => m.community_id));
@@ -1194,6 +1196,7 @@ async function ladeCommunities(client, nutzerId) {
     eigen: c.created_by === nutzerId,
     joined: beigetreten.has(c.id),
     stumm: stumme.has(c.id),
+    pttBenachrichtigung: pttAn.has(c.id),
     unread: 0,
     // Bei gleicher Position das ältere zuerst — dieselbe Reihenfolge, nach
     // der handleShareToCommunities „das erste“ Unterthema sucht (29.09.2026).

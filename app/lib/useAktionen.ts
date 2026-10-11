@@ -262,6 +262,8 @@ export interface Aktionen {
   communityNameFrei: (name: string) => Promise<boolean>;
   /** Community stumm/laut. Gibt den Zustand danach zurueck, oder null. */
   communityStumm: (communityId: string) => Promise<boolean | null>;
+  /** Kasten 8.4: Push-to-Talk-Benachrichtigung je Community (Schema 90). */
+  pttBenachrichtigung: (communityId: string, an: boolean) => Promise<boolean | null>;
 
   /**
    * Eine Einstellung setzen. Gibt den Wert zurueck, oder null bei Fehler —
@@ -635,6 +637,8 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
        */
       communityStumm: (communityId) =>
         holen('Das Stummschalten', (c, i) => A.communityStumm(c, i, communityId)),
+      pttBenachrichtigung: (communityId, an) =>
+        holen('Die Einstellung', (c, i) => A.pttBenachrichtigungSetzen(c, i, communityId, an)),
 
       beitragInStory: (id) => holen('Zur Story hinzufügen', (c, i) => A.beitragInStory(c, i, id)),
       keinInteresse: (id) => holen('Kein Interesse', (c, i) => A.keinInteresse(c, i, id)),
