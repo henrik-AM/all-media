@@ -163,6 +163,9 @@ const UMD_BAUSTEINE = [
   // 10.10.2026: `anruf.js` fuer den Anrufeintrag im Chat (Feedback 28.09.,
   // Kasten 5, Schema 89) — ChatDetailScreen und CallScreen holen ihn.
   ['anruf', 'Anruf'],
+  // 10.10.2026: `ptt.js` fuer die Zeile „Push to Talk" und den Verlauf
+  // dahinter (Kasten 8.5/8.6, Schema 90).
+  ['ptt', 'Ptt'],
 ];
 
 function umdTeile() {

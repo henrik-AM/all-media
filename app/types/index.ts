@@ -117,6 +117,8 @@ export interface Message {
    * die Sitzung; antippen zeigt den Verlauf (ptt_messages.sitzung_id).
    */
   pttSitzung?: boolean;
+  /** Zeitpunkt der Zeile (ISO) — fuer „Datum und Uhrzeit" der Sitzung. */
+  zeitpunkt?: string;
 }
 
 /**

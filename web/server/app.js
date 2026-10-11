@@ -3647,6 +3647,12 @@ app.get('/api/banne', route(async (req) => ({
 
 // ------------------------------------------------------- Push-to-Talk --
 
+// Kasten 8.6: der Verlauf hinter einer Zeile „Push to Talk" (Schema 90).
+app.get('/api/ptt/sitzung/:id', route(async (req) => ({
+  ok: true,
+  eintraege: await supabaseApi.ladePttSitzung(req.db, req.params.id),
+})));
+
 app.get('/api/communities/:id/ptt', route(async (req) => ({
   ok: true,
   ptt: await supabaseApi.ladePtt(req.db, req.params.id),

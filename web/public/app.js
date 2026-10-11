@@ -6723,6 +6723,10 @@ async function renderCommunityChat(community, kanal, thema) {
   liste.querySelectorAll('[data-msgort]').forEach((b) =>
     b.addEventListener('click', () => standortKarteOeffnen(b))
   );
+  // Kasten 8.6: Zeile „Push to Talk" → Verlauf der Sitzung.
+  liste.querySelectorAll('[data-pttsitzung]').forEach((b) =>
+    b.addEventListener('click', () => openPttVerlauf(b.dataset.pttsitzung, b.dataset.pttzeit))
+  );
   // Anhang → Vollformat, wie im Chat.
   liste.querySelectorAll('[data-voll]').forEach((b) =>
     b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
@@ -7062,9 +7066,66 @@ function geteiltBinden(liste) {
   );
 }
 
+/*
+ * Kasten 8.5 (Henrik 28.09.2026): statt aller Wortmeldungen steht im
+ * Unterthema EINE Zeile „Push to Talk" mit Datum und Uhrzeit je Sitzung
+ * (angelegt von der Datenbank, Schema 90). Klick zeigt den Verlauf (8.6).
+ * Gleiche Zeile in der App (ChatDetailScreen, pttZeile).
+ */
+function pttSitzungZeile(m) {
+  const satz = window.Ptt.zeile(m.zeitpunkt);
+  return `<button class="msg__ptt" data-pttsitzung="${esc(m.id)}" data-pttzeit="${esc(m.zeitpunkt || '')}" aria-label="${esc(satz)}">
+            ${ICONS.mic}<span>${esc(satz)}</span>${ICONS.chevron}
+          </button>`;
+}
+
+/*
+ * Kasten 8.6: der Verlauf einer Sitzung — wer, wann, was (zum Abspielen).
+ * Gleiche Ansicht in der App (PttVerlaufSheet). Leer heisst ehrlich „Keine
+ * Wortmeldungen sichtbar" (Leseregel: Mitglied + sichtbar_fuer).
+ */
+async function openPttVerlauf(sitzungId, zeitpunkt) {
+  let eintraege = null;
+  try {
+    const r = await fetch(`/api/ptt/sitzung/${encodeURIComponent(sitzungId)}`);
+    const d = await r.json();
+    if (d && d.ok) eintraege = d.eintraege || [];
+  } catch (f) {
+    console.error('Push-to-Talk-Verlauf laden fehlgeschlagen:', f);
+  }
+  openSheet(
+    window.Ptt.TITEL,
+    `<div class="sheet__body">
+      <div class="pttverlauf__kopf">${esc(window.Ptt.datumZeit(zeitpunkt))}</div>
+      ${
+        eintraege === null
+          ? '<div class="empty__text">Der Verlauf ließ sich nicht laden</div>'
+          : !eintraege.length
+          ? `<div class="empty__text">${esc(window.Ptt.LEER)}</div>`
+          : eintraege
+              .map(
+                (e) => `<div class="item pttverlauf__zeile">
+                  <span class="avatar avatar--36" style="background:${farbe(user(e.userId)?.color)}">${esc(user(e.userId)?.initials || '')}</span>
+                  <div class="item__body">
+                    <span class="item__label">${esc(e.name || 'Unbekannt')}</span>
+                    <span class="item__sub">${esc(window.Ptt.uhrzeit(e.zeitpunkt))} · ${esc(window.Ptt.dauer(e.dauer))}</span>
+                  </div>
+                  ${e.audioUrl ? `<audio controls preload="none" src="${esc(e.audioUrl)}" aria-label="Wortmeldung von ${esc(e.name || '')}"></audio>` : ''}
+                </div>`
+              )
+              .join('')
+      }
+    </div>`,
+    () => {},
+    { schliessen: true }
+  );
+}
+
 function kanalNachricht(m) {
   // Kasten 5: Anruf im Unterthema — eine Zeile in der Mitte, keine Blase.
   if (m.anruf) return anrufZeile(m, { eigen: m.from === 'me', gruppe: true });
+  // Kasten 8.5: eine Zeile „Push to Talk" je Sitzung, kein ganzer Verlauf.
+  if (m.pttSitzung) return pttSitzungZeile(m);
   // Anhaenge seit 04.09.2026 — derselbe Inhalt wie im Chat, aus derselben
   // Funktion. Ein Sticker steht auch hier ohne Blase (msg--sticker).
   const inhalt = m.geteilt ? geteiltKarte(m.geteilt) : anhangInhalt(m);

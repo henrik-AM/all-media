@@ -1857,6 +1857,29 @@ async function ladeStreamKommentare(client, postId) {
   }));
 }
 
+/**
+ * Kasten 8.6: die Wortmeldungen EINER Sitzung (Schema 90, sitzung_id), in
+ * Sprechreihenfolge — wer, wann, was. Gleiche Abfrage in app/lib/daten.ts
+ * (ladePttSitzung). Leseregel: Mitglied + sichtbar_fuer('ptt').
+ */
+async function ladePttSitzung(client, sitzungId) {
+  const { data, error } = await client
+    .from('ptt_messages')
+    .select('id, sender_id, audio_url, dauer, created_at, profiles(id, name)')
+    .eq('sitzung_id', sitzungId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  return (data || []).map((p) => ({
+    id: p.id,
+    userId: p.sender_id,
+    name: p.profiles?.name || '',
+    audioUrl: p.audio_url,
+    dauer: Number(p.dauer || 0),
+    zeitpunkt: p.created_at,
+  }));
+}
+
 /** Push-to-Talk-Nachrichten einer Community, neueste zuerst. */
 async function ladePtt(client, communityId) {
   const { data, error } = await client
@@ -1943,5 +1966,6 @@ module.exports = {
   ladeBanne,
   ladeStreamKommentare,
   ladePtt,
+  ladePttSitzung,
   ladeStandortanfragen,
 };

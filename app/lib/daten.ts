@@ -1436,6 +1436,7 @@ export async function ladeKanalNachrichten(
       : undefined,
     // Kasten 8.5: die eine Zeile „Push to Talk" je Sitzung (Schema 90).
     pttSitzung: Boolean(m.ptt_sitzung) || undefined,
+    zeitpunkt: m.ptt_sitzung ? m.created_at : undefined,
   })));
 }
 
@@ -2140,6 +2141,30 @@ export async function ladeStreamKommentare(client: SupabaseClient, postId: strin
     name: k.profiles?.name ?? '',
     text: k.text,
     zeit: chatZeit(k.created_at),
+  })));
+}
+
+/**
+ * Kasten 8.6: die Wortmeldungen EINER Sitzung (Schema 90, sitzung_id), in
+ * der Reihenfolge, in der gesprochen wurde — wer, wann, was. Gelesen wird
+ * unter der Regel „PTT in eigenen Communitys lesen" (Mitglied +
+ * sichtbar_fuer). Gleiche Abfrage in web/server/supabase-api.js.
+ */
+export async function ladePttSitzung(client: SupabaseClient, sitzungId: string) {
+  const { data, error } = await client
+    .from('ptt_messages')
+    .select('id, sender_id, audio_url, dauer, created_at, profiles(id, name)')
+    .eq('sitzung_id', sitzungId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  return signiereMedien(client, ((data ?? []) as any[]).map((p) => ({
+    id: p.id as string,
+    userId: p.sender_id as string,
+    name: (p.profiles?.name ?? '') as string,
+    audioUrl: p.audio_url as string,
+    dauer: Number(p.dauer ?? 0),
+    zeitpunkt: p.created_at as string,
   })));
 }
 

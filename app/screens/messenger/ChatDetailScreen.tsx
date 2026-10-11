@@ -50,6 +50,9 @@ import { MarkierterText } from '../../components/MarkierterText';
 import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
 import { ZiehZumAntworten } from '../../components/ZiehZumAntworten';
 import { PushToTalk } from '../../components/PushToTalk';
+import { PttVerlaufSheet } from '../../components/PttVerlaufSheet';
+// Kasten 8.5: die Zeile „Push to Talk · Datum · Uhrzeit", gleich mit der Website.
+const Ptt = require('../../../gemeinsam/ptt') as typeof import('../../../gemeinsam/ptt');
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 // Kasten 27: offenen Chat im Takt nachsehen — gemeinsam mit der Website.
@@ -207,6 +210,8 @@ export const ChatDetailScreen = ({
   const istKanal = communities.some((c) =>
     (c.unterthemen ?? []).some((u) => u.id === chat.id)
   );
+  /** Kasten 8.6: die angetippte Sitzung „Push to Talk", deren Verlauf offen ist. */
+  const [pttVerlauf, setPttVerlauf] = useState<{ id: string; zeitpunkt?: string } | null>(null);
   /** Kasten 8.2: die Community dieses Unterthemas — fuer Push-to-Talk. */
   const kanalCommunity = istKanal
     ? communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === chat.id))
@@ -656,6 +661,27 @@ export const ChatDetailScreen = ({
      * WhatsApp. Eine Sprechblase wuerde behaupten, jemand haette etwas
      * geschrieben. Gleiche Darstellung auf der Website (paintMessages).
      */
+    /*
+     * Kasten 8.5 (Henrik 28.09.2026): statt aller Wortmeldungen steht im
+     * Unterthema EINE Zeile „Push to Talk" mit Datum und Uhrzeit je Sitzung
+     * (angelegt von der Datenbank, Schema 90). Antippen zeigt den Verlauf
+     * (8.6, PttVerlaufSheet). Gleiche Zeile auf der Website (pttSitzungZeile).
+     */
+    if (item.pttSitzung) {
+      const satz = Ptt.zeile(item.zeitpunkt);
+      return (
+        <Druck
+          style={styles.pttZeile}
+          onPress={() => setPttVerlauf({ id: item.id, zeitpunkt: item.zeitpunkt })}
+          accessibilityLabel={satz}
+        >
+          <Ionicons name="mic" size={15} color={colors.brand} />
+          <Text style={styles.pttZeileText}>{satz}</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.text3} />
+        </Druck>
+      );
+    }
+
     if (item.anruf) {
       /*
        * Kasten 5.2–5.4 (28.09.2026): derselbe Satz wie auf der Website, aus
@@ -1443,6 +1469,14 @@ export const ChatDetailScreen = ({
           Wortmeldung geht an dieses Unterthema (channel_id); die Datenbank
           legt daraus die eine Zeile „Push to Talk" an (Schema 90).
         */}
+        {pttVerlauf && (
+          <PttVerlaufSheet
+            sitzungId={pttVerlauf.id}
+            zeitpunkt={pttVerlauf.zeitpunkt}
+            onClose={() => setPttVerlauf(null)}
+          />
+        )}
+
         {kanalCommunity && (kanalCommunity.joined || kanalCommunity.eigen) && (
           <View style={styles.pttLeiste}>
             <PushToTalk
@@ -1797,6 +1831,19 @@ const styles = themenStyles((colors) => ({
     backgroundColor: colors.surface3,
   },
   anrufText: { color: colors.text2, ...typography.small },
+  /* Kasten 8.5: die Zeile „Push to Talk" — mittig wie der Anrufeintrag, aber antippbar. */
+  pttZeile: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface3,
+  },
+  pttZeileText: { color: colors.text, ...typography.small, fontWeight: '600' },
   /* Kasten 8.2: Push-to-Talk ueber der Eingabezeile im Unterthema. */
   pttLeiste: {
     paddingHorizontal: spacing.md,
