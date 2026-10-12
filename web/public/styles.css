@@ -3021,6 +3021,10 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
 .kp__gruppenkopf { padding: 16px 16px 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
 .kp__zeile.is-gruen .kp__zeileText { color: var(--success); }
 .kp__zeile.is-danger .kp__zeileText { color: var(--danger); }
+/* Kasten 28/7.9: Mitgliederliste in der Gruppeninfo. */
+.gi__mitglied { padding: 10px 16px; cursor: pointer; }
+.gi__mitglied .avatar { flex: none; }
+.gi__mitglied:disabled { cursor: default; opacity: 1; }
 
 /* Markierte Nachricht */
 .msg__stern { display: inline-flex; margin-left: 4px; color: #F5A524; }

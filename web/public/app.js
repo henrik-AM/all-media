@@ -1935,7 +1935,8 @@ function chatOptionen(chatId) {
           const was = b.dataset.copt;
           close();
 
-          if (was === 'einstellungen') return openChatSettings(chatId);
+          // Kasten 28/7.9: bei Gruppen die Gruppeninfo, wie in der App.
+          if (was === 'einstellungen') return chat.isGroup ? openGruppenInfo(chatId) : openChatSettings(chatId);
 
           if (was === 'messenger') return messengerAnfragen(chat);
 
@@ -4609,7 +4610,9 @@ async function openContactProfile(userId) {
     overlay.innerHTML = '';
   };
 
-  $('#kpBack').addEventListener('click', schliessen);
+  // Kasten 28/7.9: aus der Gruppeninfo geöffnet → Zurück führt dorthin.
+  const kpZurueck = profilZurueckNehmen(userId);
+  $('#kpBack').addEventListener('click', () => (kpZurueck ? kpZurueck() : schliessen()));
 
   /*
    * Kasten 28/7.8: „Foto bearbeiten" — Mediathek, Kamera, Eigenes Foto
@@ -4776,6 +4779,204 @@ async function openContactProfile(userId) {
 
   overlay.querySelectorAll('[data-kp-item]').forEach((b) =>
     b.addEventListener('click', () => kontaktZeile(b.dataset.kpItem, userId, chat, daten))
+  );
+}
+
+/*
+ * Kasten 28/7.9 (Nachtrag 12.10.2026 (3)): Zurück aus einem Profil, das aus
+ * der Gruppeninfo geöffnet wurde, führt in die Gruppeninfo — nicht ins Leere.
+ * { userId, fn }; gilt nur für genau diese Person und nur einmal.
+ */
+let profilZurueck = null;
+function profilZurueckNehmen(userId) {
+  const z = profilZurueck;
+  profilZurueck = null;
+  return z && z.userId === userId ? z.fn : null;
+}
+
+/**
+ * Gruppeninfo (Kasten 28/7.9 und 7.10) — Aufbau nach dem Prototyp-Frame
+ * „MC + Kontakteinstellungen" (560-1471), angepasst an Gruppen: Bild, Name,
+ * „N Mitglieder", Kacheln Audio/Video/Suchen, gruppierte Zeilen, die
+ * Mitgliederliste und unten rot „Gruppe verlassen". Nur, was es wirklich
+ * gibt: kein Gruppenbild-Upload, keine Admins, kein Umbenennen.
+ *
+ * Name und Bild jedes Mitglieds kommen aus gemeinsam/gruppe.js →
+ * Kontaktbild.anzeigeFuer: in einer Messenger-Gruppe mein Spitzname und mein
+ * eigenes Kontaktbild, in einer Community-Gruppe das Profil.
+ *
+ * Gleicher Aufbau in der App: app/screens/messenger/GroupSettingsScreen.tsx.
+ */
+async function openGruppenInfo(chatId) {
+  const chat =
+    state.chats.find((c) => c.id === chatId) ||
+    (state.archiviert || []).find((c) => c.id === chatId) ||
+    (state.communityChats || []).find((c) => c.id === chatId);
+  if (!chat || !chat.isGroup) return;
+  const G = window.Gruppe;
+  const messenger = istMessengerChat(chat);
+
+  let daten = { medien: [], markiert: [], gesamt: 0 };
+  try {
+    daten = await (await fetch(`/api/chats/${chat.id}/medien`)).json();
+  } catch {
+    /* Ohne Verlauf stehen die Zahlen auf 0 — ehrlich, nichts erfunden. */
+  }
+
+  // Kasten 7.10: mein Name für Kontakte (contacts.spitzname, Schema 33).
+  const spitznamen = {};
+  (state.contacts || []).forEach((k) => {
+    if (k.id && k.name) spitznamen[k.id] = k.name;
+  });
+  const liste = G.mitglieder({
+    andere: chat.members || [],
+    ich: { name: state.users.me?.name, bild: state.users.me?.avatar },
+    // Unbekannte ohne „?“-Namen: die Liste schreibt dann „Unbekanntes Mitglied“.
+    profil: (id) => state.users[id],
+    kontaktBilder: state.kontaktBilder,
+    spitznamen,
+    messenger,
+    kontaktbild: window.Kontaktbild,
+  });
+
+  const zeile = (key, label, wert, art = '') =>
+    `<button class="kp__zeile ${art}" data-gi="${key}">
+       <span class="kp__zeileText">${esc(label)}</span>
+       ${wert ? `<span class="kp__zeileWert">${esc(wert)}</span>` : ''}
+       ${art.includes('is-danger') ? '' : `<span class="row__chevron">${ICONS.chevron}</span>`}
+     </button>`;
+
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <header class="chathead">
+      <button class="chathead__back" id="giBack" aria-label="Zurück">${ICONS.back}</button>
+      <div class="chathead__body"><div class="chathead__name">${esc(G.TITEL)}</div></div>
+    </header>
+
+    <div class="scroll">
+      <div class="kp__kopf">
+        ${avatarOf(chat, 104)}
+        <div class="kp__name">${esc(chat.name)}</div>
+        <div class="kp__nummer" data-testid="gruppe-anzahl">${esc(G.anzahlText(chat.members))}</div>
+      </div>
+
+      <div class="kp__aktionen" style="grid-template-columns:repeat(3,1fr)">
+        <button data-gi="audio">${ICONS.phone}<span>Audioanruf</span></button>
+        <button data-gi="video">${ICONS.video}<span>Videoanruf</span></button>
+        <button data-gi="suche">${ICONS.search}<span>Suchen</span></button>
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('medien', 'Medien, Links, Doks', String(daten.medien.length))}
+        ${zeile('markiert', 'Mit Stern markiert', String(daten.markiert.length))}
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('stumm', 'Benachrichtigungen', chat.muted ? 'Aus' : 'An')}
+        <div class="kp__zeile">
+          <span class="kp__zeileText">Chat sperren</span>
+          <button class="switch ${chat.gesperrt ? 'is-on' : ''}" id="giSperre" aria-label="Chat sperren"><span class="switch__knob"></span></button>
+        </div>
+      </div>
+
+      <div class="kp__gruppenkopf" data-testid="gruppe-mitglieder-kopf">${esc(G.anzahlText(chat.members))}</div>
+      <div class="kp__liste">
+        ${liste
+          .map(
+            (m) => `<button class="kp__zeile gi__mitglied" data-gi-mitglied="${esc(m.id)}" data-testid="gruppe-mitglied-${esc(m.id)}" ${m.ich ? 'disabled' : ''}>
+              ${avatarForUser(m.id, 40, messenger)}
+              <span class="kp__zeileText">${esc(m.name)}</span>
+              ${m.ich ? `<span class="kp__zeileWert">${esc(G.DU)}</span>` : `<span class="row__chevron">${ICONS.chevron}</span>`}
+            </button>`
+          )
+          .join('')}
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('leeren', 'Chat leeren', '', 'is-danger')}
+        ${zeile('verlassen', G.VERLASSEN, '', 'is-danger')}
+      </div>
+    </div>`;
+
+  const zurueckZurGruppe = () => openGruppenInfo(chat.id);
+
+  $('#giBack').addEventListener('click', () => openChat(chat.id));
+
+  $('#giSperre').addEventListener('click', async (e) => {
+    const knopf = e.currentTarget;
+    const res = await fetch(`/api/chats/${chat.id}/sperren`, { method: 'POST' })
+      .then((r) => r.json())
+      .catch(() => ({ ok: false }));
+    if (!res.ok) return toast(res.error || 'Die Chatsperre hat nicht geklappt');
+    chat.gesperrt = Boolean(res.gesperrt);
+    knopf.classList.toggle('is-on', chat.gesperrt);
+    toast(res.meldung || (chat.gesperrt ? 'Chat gesperrt' : 'Chatsperre aufgehoben'));
+  });
+
+  overlay.querySelectorAll('[data-gi-mitglied]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const id = b.dataset.giMitglied;
+      const istKontakt = (state.contacts || []).some((k) => k.id === id && (k.status || 'friend') === 'friend');
+      const ziel = G.ziel(id, { messenger, istKontakt });
+      if (ziel === 'selbst') return;
+      profilZurueck = { userId: id, fn: zurueckZurGruppe };
+      if (ziel === 'kontakt') return openContactProfile(id);
+      return openProfile(id, 'oeffentlich');
+    })
+  );
+
+  overlay.querySelectorAll('[data-gi]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const was = b.dataset.gi;
+      if (was === 'audio' || was === 'video') {
+        // Wie der Hörer im Chatkopf: der Eintrag gehört in genau diese Gruppe.
+        return openCall(chat, was, { chatId: chat.id });
+      }
+      if (was === 'suche') return openChatSuche(chat);
+      if (was === 'medien') return openChatMedien(chat, daten.medien, 'Medien, Links, Doks');
+      if (was === 'markiert') return openChatMedien(chat, daten.markiert, 'Mit Stern markiert');
+      if (was === 'stumm') {
+        const res = await fetch(`/api/chats/${chat.id}/stumm`, { method: 'POST' })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false }));
+        if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
+        chat.muted = Boolean(res.muted);
+        toast(chat.muted ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+        return zurueckZurGruppe();
+      }
+      if (was === 'leeren') {
+        const res = await (await fetch(`/api/chats/${chat.id}/leeren`, { method: 'POST' })).json();
+        if (!res.ok) return toast('Das hat gerade nicht geklappt');
+        chat.preview = 'Keine Nachrichten';
+        toast('Chat geleert');
+        return zurueckZurGruppe();
+      }
+      if (was === 'verlassen') {
+        return openSheet(
+          G.VERLASSEN,
+          `<div class="sheet__body">
+            <div class="sheet__hint">${esc(G.VERLASSEN_FRAGE)}</div>
+            <button class="item item--danger" data-gi-ja><span class="item__icon">${ICONS.trash || ICONS.close}</span><span class="item__label">${esc(G.VERLASSEN)}</span></button>
+          </div>`,
+          (sheet, close) => {
+            sheet.querySelector('[data-gi-ja]').addEventListener('click', async () => {
+              close();
+              // Dieselbe Route wie „Chat löschen": die eigene Mitgliedschaft
+              // geht (Regel „Eigene Mitgliedschaft beenden", Schema 9).
+              const res = await fetch(`/api/chats/${chat.id}/loeschen`, { method: 'POST' })
+                .then((r) => r.json())
+                .catch(() => ({ ok: false }));
+              if (!res.ok) return toast(res.error || G.VERLASSEN_FEHLER);
+              toast(G.VERLASSEN_OK);
+              state.openChatId = null;
+              closeOverlay();
+              await bootstrap();
+            });
+          },
+          { schliessen: true }
+        );
+      }
+    })
   );
 }
 
@@ -5041,6 +5242,8 @@ async function openProfile(userId, variante) {
   if (!res.ok) return toast('Profil nicht verfügbar');
   let profile = await res.json();
   let tab = 'grid';
+  // Kasten 28/7.9: einmal beim Öffnen genommen, gilt für jedes Neuzeichnen.
+  let profilZurueckVon = profilZurueckNehmen(userId);
 
   /*
    * Die beiden anderen Reiter, aus der Datenbank.
@@ -5187,7 +5390,8 @@ async function openProfile(userId, variante) {
         ${profilRaster(profile, tab, reiterListen)}
       </div>`;
 
-    $('#profBack').addEventListener('click', closeOverlay);
+    // Kasten 28/7.9: aus der Gruppeninfo geöffnet → Zurück führt dorthin.
+    $('#profBack').addEventListener('click', () => (profilZurueckVon ? profilZurueckVon() : closeOverlay()));
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
     bindSammlungen(overlay);
     bindSpendeKarte(overlay, profile.spende);
@@ -20043,12 +20247,18 @@ async function openChat(chatId) {
     }
   }
 
+  // Kasten 28/7.9: Gruppenkopf antippen öffnet die Gruppeninfo — nur bei echten
+  // Gruppen-Chats (Zeile in chats), nicht bei einer als Chat geöffneten Community.
+  const gruppeMitInfo =
+    chat.isGroup &&
+    [...(state.chats || []), ...(state.archiviert || []), ...(state.communityChats || [])].some((c) => c.id === chat.id);
+
   overlay.hidden = false;
   overlay.innerHTML = `
     <header class="chathead">
       <button class="chathead__back" id="chatBack" aria-label="Zurück">${ICONS.back}</button>
       ${chat.isGroup ? avatarOf(chat, 36) : mitStoryRing(chat.userId, avatarOf(chat, 36), 'messenger')}
-      <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} style="${chat.userId ? 'cursor:pointer' : ''}">
+      <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} ${gruppeMitInfo ? 'data-gruppeninfo' : ''} style="${chat.userId || gruppeMitInfo ? 'cursor:pointer' : ''}">
         <div class="chathead__name">${esc(chat.name)}</div>
         <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}" id="chatStatus">${
           chat.isGroup ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder` : ''
@@ -20088,6 +20298,7 @@ async function openChat(chatId) {
   if (!chat.isGroup) praesenzEintragen(chat.userId, $('#chatStatus'));
 
   $('#chatBack').addEventListener('click', closeChat);
+  overlay.querySelector('[data-gruppeninfo]')?.addEventListener('click', () => openGruppenInfo(chat.id));
   const profileBtn = overlay.querySelector('[data-profile]');
   if (profileBtn) {
     profileBtn.addEventListener('click', () => {
