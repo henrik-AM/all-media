@@ -4523,6 +4523,12 @@ async function openContactProfile(userId) {
         ${mitStoryRing(userId, avatarForUser(userId, 104, true), 'messenger')}
         <div class="kp__name">${esc(u.name)}</div>
         ${u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
+        <!-- Kasten 28/7.8: eigenes Kontaktfoto wie bei Apple Kontakte — nur ich sehe es. -->
+        <button class="kp__foto" id="kpFoto" type="button" data-testid="kontaktbild-bearbeiten">${esc(
+          window.Kontaktbild.FOTO_BEARBEITEN
+        )}</button>
+        <input type="file" accept="image/*" id="kpFotoDatei" hidden />
+        <input type="file" accept="image/*" capture="environment" id="kpFotoKamera" hidden />
       </div>
 
       ${profil.bio ? `<div class="kp__bio">${esc(profil.bio)}</div>` : ''}
@@ -4604,6 +4610,66 @@ async function openContactProfile(userId) {
   };
 
   $('#kpBack').addEventListener('click', schliessen);
+
+  /*
+   * Kasten 28/7.8: „Foto bearbeiten" — Mediathek, Kamera, Eigenes Foto
+   * entfernen. Hochladen über /api/hochladen (Ordner avatars, vorhandene
+   * Medienstelle), speichern über /api/kontaktbild (kontakt_bilder, Schema 94).
+   * Gleicher Ablauf in der App (ContactProfileScreen, fotoAendern).
+   */
+  const K = window.Kontaktbild;
+  const fotoSetzen = async (url, anzeige) => {
+    const antwort = await api('/api/kontaktbild', { kontaktId: userId, url });
+    if (!antwort.ok) return toast(antwort.error || K.NICHT_GESPEICHERT);
+    state.kontaktBilder = { ...(state.kontaktBilder || {}) };
+    if (url) state.kontaktBilder[userId] = anzeige;
+    else delete state.kontaktBilder[userId];
+    toast(url ? K.GESPEICHERT : K.ENTFERNT);
+    openContactProfile(userId);
+  };
+  const fotoGewaehlt = async (e) => {
+    const datei = e.target.files?.[0];
+    e.target.value = '';
+    if (!datei) return;
+    let bild;
+    try {
+      bild = await bildVerkleinern(datei, 600);
+    } catch {
+      return toast('Dieses Bild lässt sich nicht lesen');
+    }
+    toast('Wird hochgeladen …');
+    const hoch = await api('/api/hochladen', { ordner: 'avatars', aufnahme: bild });
+    if (!hoch.ok) return toast(hoch.error || 'Das Bild ließ sich nicht hochladen');
+    await fotoSetzen(hoch.url, hoch.anzeige || bild);
+  };
+  $('#kpFotoDatei').addEventListener('change', fotoGewaehlt);
+  $('#kpFotoKamera').addEventListener('change', fotoGewaehlt);
+  $('#kpFoto').addEventListener('click', () =>
+    openSheet(
+      K.FOTO_BEARBEITEN,
+      `<div class="sheet__body">
+        <div class="sheet__hint">${esc(K.HINWEIS)}</div>
+        <button class="item" data-kpfoto="waehlen"><span class="item__icon">${ICONS.image}</span><span class="item__label">${esc(K.AUS_MEDIATHEK)}</span></button>
+        <button class="item" data-kpfoto="kamera"><span class="item__icon">${ICONS.camera}</span><span class="item__label">${esc(K.AUFNEHMEN)}</span></button>
+        ${
+          state.kontaktBilder?.[userId]
+            ? `<button class="item item--danger" data-kpfoto="entfernen"><span class="item__icon">${ICONS.trash}</span><span class="item__label">${esc(K.ENTFERNEN)}</span></button>`
+            : ''
+        }
+      </div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-kpfoto]').forEach((b) =>
+          b.addEventListener('click', () => {
+            close();
+            if (b.dataset.kpfoto === 'waehlen') $('#kpFotoDatei')?.click();
+            else if (b.dataset.kpfoto === 'kamera') $('#kpFotoKamera')?.click();
+            else fotoSetzen(null, null);
+          })
+        );
+      },
+      { schliessen: true }
+    )
+  );
 
   $('#kpEdit').addEventListener('click', () =>
     openFormular(

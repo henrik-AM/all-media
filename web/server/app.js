@@ -35,6 +35,8 @@ const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
 // Kasten 1.3: Grenzen und Link-Regel der Seite „Profil bearbeiten“ — gemeinsam mit der App.
 const Profilfelder = require('../../gemeinsam/profilfelder');
+// Kasten 28/7.8: eigenes Kontaktbild — Prüfung und Texte gemeinsam mit der App.
+const Kontaktbild = require('../../gemeinsam/kontaktbild');
 const syncHandlers = require('./sync-handlers');
 const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
@@ -1886,6 +1888,51 @@ app.post('/api/eigene/profilbild', route(async (req) => {
   }
   // RLS: ein abgelehntes UPDATE ändert null Zeilen und meldet keinen Fehler.
   if (!data?.length) return { ok: false, error: 'Das Profilbild ließ sich nicht speichern' };
+  return { ok: true, url };
+}));
+
+/*
+ * Kasten 28/7.8 (Schema 94): mein eigenes Bild für einen Messenger-Kontakt
+ * setzen ({ kontaktId, url }) oder entfernen ({ kontaktId, url: null }).
+ * Hochgeladen hat der Browser vorher über /api/hochladen (Ordner avatars) —
+ * keine eigene Medienstelle. Nur ich sehe es (RLS nur Eigentümer).
+ * Gegenstück: kontaktBildSetzen() in app/lib/aktionen.ts.
+ */
+app.post('/api/kontaktbild', route(async (req) => {
+  const kontaktId = String(req.body?.kontaktId || '');
+  const url = req.body?.url ? String(req.body.url) : null;
+  if (!/^[0-9a-f-]{36}$/i.test(kontaktId)) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
+  if (url && !Kontaktbild.adresseGueltig(url)) {
+    return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
+  }
+  const fehltSchema = (e) =>
+    ['42P01', 'PGRST205', '42703', 'PGRST204'].includes(String(e?.code || ''));
+  if (!url) {
+    const { error } = await req.db
+      .from('kontakt_bilder')
+      .delete()
+      .eq('owner_id', req.nutzerId)
+      .eq('kontakt_id', kontaktId);
+    if (error) return { ok: false, error: fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : error.message };
+    // RLS: ein abgelehntes DELETE meldet Erfolg mit null Zeilen — nachsehen.
+    const { data: rest } = await req.db
+      .from('kontakt_bilder')
+      .select('kontakt_id')
+      .eq('owner_id', req.nutzerId)
+      .eq('kontakt_id', kontaktId);
+    if (rest?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
+    return { ok: true, url: null };
+  }
+  const { data, error } = await req.db
+    .from('kontakt_bilder')
+    .upsert({ owner_id: req.nutzerId, kontakt_id: kontaktId, media_url: url }, { onConflict: 'owner_id,kontakt_id' })
+    .select('kontakt_id');
+  if (error) {
+    if (fehltSchema(error)) return { ok: false, error: Kontaktbild.FEHLT_SCHEMA };
+    if (error.code === '42501') return { ok: false, error: 'Ein eigenes Foto geht nur für Messenger-Kontakte' };
+    return { ok: false, error: error.message };
+  }
+  if (!data?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
   return { ok: true, url };
 }));
 

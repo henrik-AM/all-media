@@ -2054,6 +2054,8 @@ body:has(.camera) .toast { bottom: 132px; }
 .kp__name { margin-top: 12px; font-size: 21px; font-weight: 700; }
 .kp__handle { font-size: 15px; color: var(--text-3); }
 .kp__nummer { margin-top: 2px; font-size: 15px; color: var(--text-2); }
+/* Kasten 28/7.8: „Foto bearbeiten" unter dem Kontaktbild. */
+.kp__foto { margin-top: 6px; padding: 2px 6px; border: 0; background: none; color: var(--brand); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .kp__aktionen {
   display: grid; grid-template-columns: repeat(4, 1fr);
   padding: 14px 0; margin-bottom: 8px;

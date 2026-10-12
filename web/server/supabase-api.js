@@ -50,6 +50,7 @@ const ChatAbgleich = require('../../gemeinsam/chatabgleich');
 const Chatblase = require('../../gemeinsam/chatblase');
 // Nachtrag 4.3b: Antworten auf Kommentare (Schema 92) — fehlende Spalten erkennen.
 const Kommentar = require('../../gemeinsam/kommentar');
+const Kontaktbild = require('../../gemeinsam/kontaktbild');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -1555,6 +1556,25 @@ async function lenkungStand(client, nutzerId) {
   };
 }
 
+/*
+ * Kasten 28/7.8: meine eigenen Kontaktbilder (Schema 94) — nachsichtig.
+ * Fehlt die Tabelle, gibt es keine, und überall bleibt das Profilbild.
+ * Unterschrieben wird mit der ganzen Antwort (res.json in app.js).
+ * Gegenstück: ladeKontaktBilder() in app/lib/daten.ts.
+ */
+async function ladeKontaktBilder(client, nutzerId) {
+  try {
+    const { data, error } = await client
+      .from('kontakt_bilder')
+      .select('kontakt_id, media_url')
+      .eq('owner_id', nutzerId);
+    if (error) return {};
+    return Kontaktbild.ausZeilen(data || []);
+  } catch {
+    return {};
+  }
+}
+
 async function bootstrapData(client, nutzerId, schluesselId = null) {
   if (!client || !nutzerId) return null;
 
@@ -1579,6 +1599,7 @@ async function bootstrapData(client, nutzerId, schluesselId = null) {
     insightZiele,
     sichtbarkeit,
     keinInteresse,
+    kontaktBilder,
   ] = await Promise.all([
     ladeNutzer(client, nutzerId),
     ladeKontakte(client, nutzerId),
@@ -1600,6 +1621,7 @@ async function bootstrapData(client, nutzerId, schluesselId = null) {
     ladeInsightZiele(client, nutzerId),
     ladeSichtbarkeit(client, nutzerId),
     ladeKeinInteresse(client, nutzerId),
+    ladeKontaktBilder(client, nutzerId),
   ]);
 
   /*
@@ -1650,6 +1672,8 @@ async function bootstrapData(client, nutzerId, schluesselId = null) {
     stummgeschaltet: stumm,
     // "Kein Interesse" aus dem Drei-Punkte-Menue - fallen aus beiden Feeds.
     keinInteresse,
+    // Kasten 28/7.8: nur meine, nur im Messenger gezeigt (gemeinsam/kontaktbild.js).
+    kontaktBilder,
     /*
      * Insight Time und was dazugehört (Handbuch-Abgleich 01.09.2026).
      * Nicht zu verwechseln mit den „Insights" im Einstellungsmenü — das ist
