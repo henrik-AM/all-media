@@ -135,6 +135,7 @@
     "test:k28-chatblase": "node test/k28-chatblase.js",
     "test:k28-profil": "node test/k28-profil.js",
     "test:k28-karte": "node test/k28-karte.js",
+    "test:k28-gruppe": "node test/k28-gruppe.js",
     "test:k28-anhaenge": "node test/k28-anhaenge.js",
     "test:ortsuche-einheit": "node test/_ortsuche_einheit.js",
     "test:k28-profil": "node test/k28-profil.js",
