@@ -3545,17 +3545,24 @@ button.exp__head:hover { color: var(--brand); }
   max-width: 88%;
 }
 .msgzeile .msg { max-width: 100%; }
-.msgzeile__avatar {
-  flex: 0 0 26px;
-  width: 26px; height: 26px;
+/*
+ * Kasten 28/11.3 (Prototyp „CH + Kanalunterthema"): eigene Blase mit eigenem
+ * Bild unten rechts; Bild als Knopf zum Community-Profil (11.4). Ohne Bild
+ * (nicht die letzte Blase einer Folge) bleibt der Platz frei, damit die Folge
+ * bündig steht. Gleiche Maße in der App (Chatblase.PROFILBILD_GROESSE).
+ */
+.msgzeile--out { align-self: flex-end; }
+.msgzeile__platz { flex: 0 0 auto; height: 1px; }
+.msgzeile__bild {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
   border-radius: 50%;
-  display: grid; place-items: center;
-  font-size: 10px;
-  font-weight: 700;
-  color: #fff;
   margin-bottom: 2px;
   cursor: pointer;
 }
+.msgzeile__bild:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 /* Der Absendername ist ein Knopf, soll aber wie eine Beschriftung wirken. */
 button.msg__sender {
   display: block;

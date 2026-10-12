@@ -7261,7 +7261,7 @@ async function renderCommunityChat(community, kanal, thema) {
     <div class="messages" id="commMsgs">
       ${
         nachrichten.length
-          ? nachrichten.map(kanalNachricht).join('')
+          ? ((absender) => nachrichten.map((m, i) => kanalNachricht(m, i, absender)).join(''))(blasenAbsenderListe(nachrichten))
           : `<div class="empty">${ICONS.chat}
               <div class="empty__title">Noch keine Nachricht</div>
               <div class="empty__text">Schreib die erste zu „${esc(thema)}".</div>
@@ -7342,6 +7342,8 @@ async function renderCommunityChat(community, kanal, thema) {
   // Der Verlauf steht unten - wie in jedem Chat.
   const liste = $('#commMsgs');
   liste.scrollTop = liste.scrollHeight;
+  // Kasten 28/11.4: Profilbild an der Blase → Community-Profil.
+  blasenBildBinden(liste);
 
   /*
    * Angehaengter Standort und Kontakt sind Karten zum Antippen, nicht Bilder.
@@ -7823,7 +7825,69 @@ async function openPttVerlauf(sitzungId, zeitpunkt) {
   );
 }
 
-function kanalNachricht(m) {
+/*
+ * Kasten 28/11.3/11.4 (Henrik 12.10.2026, Prototyp „CH + Kanalunterthema"):
+ * im Unterthema und im Gruppenchat unter Communitys → Chats steht unten an der
+ * Blase das Profilbild — fremd links, eigen rechts, nur an der letzten Blase
+ * einer Folge (davor bleibt der Platz frei). Regel in gemeinsam/chatblase.js,
+ * dieselbe wie in der App (ChatDetailScreen, blasenBild).
+ *
+ * Immer das Profilbild des Kontos (profiles.avatar_url, Schema 69) über
+ * personenAvatar — nie avatarForUser mit messenger=true: das Messenger-
+ * Kontaktbild (Schema 94) gilt hier nicht. Klick öffnet das Community-Profil
+ * (oeffneCommunityProfilVon).
+ */
+function blasenBild(id, zeigen) {
+  const groesse = window.Chatblase.PROFILBILD_GROESSE;
+  if (!zeigen) return `<span class="msgzeile__platz" style="width:${groesse}px"></span>`;
+  const u = id === 'me' ? state.users?.me || {} : user(id);
+  const name = id === 'me' ? 'Du' : u.name;
+  return `<button class="msgzeile__bild" type="button" data-commprofil="${esc(id)}" aria-label="Community-Profil von ${esc(
+    name || ''
+  )}" data-testid="blasen-profilbild">${id === 'me' ? eigenerAvatar(u, 28) : personenAvatar(u, 28)}</button>`;
+}
+
+/** Absender je Zeile für „Bild nur an der letzten Blase einer Folge". */
+function blasenAbsenderListe(nachrichten) {
+  return (nachrichten || []).map((m) => window.Chatblase.blasenAbsender(m, m.from));
+}
+
+/*
+ * Kasten 28/11.4: das Community-Profil einer Person. Ein getrenntes
+ * Community-Profil fremder Personen gibt es nicht — es ist das öffentliche
+ * Profil (wie „@name · Communitys" in der Kontaktinfo). Das eigene Bild führt
+ * in Communitys → Profil. Gleiche Weiche in der App (onOpenCommunityProfil).
+ */
+function oeffneCommunityProfilVon(id) {
+  if (id !== 'me') return openProfile(id, 'oeffentlich');
+  if (state.openChatId) closeChat();
+  profilReiterPruefen('communities', 'profile');
+  state.area = 'communities';
+  state.sub.communities = 'profile';
+  verlasseExplorer();
+  render();
+}
+
+function blasenBildBinden(wurzel) {
+  wurzel?.querySelectorAll('[data-commprofil]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      oeffneCommunityProfilVon(b.dataset.commprofil);
+    })
+  );
+}
+
+/*
+ * Eine Blase in die Bildzeile legen. `html` ist die fertige .msg; die Zeile
+ * richtet sich nach der Seite (msgzeile--out: Bild rechts).
+ */
+function inBildZeile(html, out, bild) {
+  return out
+    ? `<div class="msgzeile msgzeile--out">${html}${bild}</div>`
+    : `<div class="msgzeile">${bild}${html}</div>`;
+}
+
+function kanalNachricht(m, i, absender) {
   // Kasten 5: Anruf im Unterthema — eine Zeile in der Mitte, keine Blase.
   if (m.anruf) return anrufZeile(m, { eigen: m.from === 'me', gruppe: true });
   // Kasten 8.5: eine Zeile „Push to Talk" je Sitzung, kein ganzer Verlauf.
@@ -7837,19 +7901,26 @@ function kanalNachricht(m) {
   // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
   // Kasten 4.2: Antworten im Unterthema — Bezug oben, ziehen oder Knopf.
   const bezug = bezugHtml(m.antwortAuf);
+  // Kasten 28/11.3: Bild nur an der letzten Blase einer Folge.
+  const bild = blasenBild(m.from, window.Chatblase.profilbildAn(absender, i));
   if (m.from === 'me') {
-    return `<div class="msg msg--out${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>${antwortKnopfHtml()}${bezug}${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
+    return inBildZeile(
+      `<div class="msg msg--out${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>${antwortKnopfHtml()}${bezug}${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`,
+      true,
+      bild
+    );
   }
   const u = user(m.from);
-  return `<div class="msgzeile">
-    <button class="msgzeile__avatar" data-profile="${esc(m.from)}" style="background:${farbe(u.color)}" aria-label="Profil von ${esc(u.name)}">${esc(u.initials)}</button>
-    <div class="msg msg--in${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>
+  return inBildZeile(
+    `<div class="msg msg--in${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>
       ${antwortKnopfHtml()}
       <button class="msg__sender" data-profile="${esc(m.from)}">${esc(u.name)}</button>
       ${bezug}${inhalt}
       <div class="msg__foot">${esc(m.time)}</div>
-    </div>
-  </div>`;
+    </div>`,
+    false,
+    bild
+  );
 }
 
 /** Einstellungen einer Community - erreichbar ueber den Namen im Kopf. */
@@ -21126,8 +21197,12 @@ function paintMessages(chat) {
   const box = $('#messages');
   box.innerHTML =
     `<div class="daydivider">${esc(tagTrenner(state.messages))}</div>` +
-    state.messages.map((m) => messageBubble(m, chat)).join('');
+    ((absender) => state.messages.map((m, i) => messageBubble(m, chat, i, absender)).join(''))(
+      blasenAbsenderListe(state.messages)
+    );
   box.scrollTop = box.scrollHeight;
+  // Kasten 28/11.4: Profilbild an der Blase (Community-Gruppe) → Community-Profil.
+  blasenBildBinden(box);
 
   // Angehaengter Kontakt fuehrt zu seinem Profil, ein Standort zu der
   // Standort-Seite - sonst waeren beide Karten nur Bilder.
@@ -21341,7 +21416,7 @@ function anrufZeile(m, { eigen, gruppe }) {
           </div>`;
 }
 
-function messageBubble(m, chat) {
+function messageBubble(m, chat, i, absender) {
   const out = m.from === 'me';
 
   /*
@@ -21470,7 +21545,7 @@ function messageBubble(m, chat) {
   // nicht, solange der Chat gesperrt ist (Anfrage offen, blockiert).
   const ziehbar = !m.zurueckgenommen && !chatGesperrt(chat);
 
-  return `
+  const blase = `
     <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}${
       m.geteilt && !m.zurueckgenommen ? ' msg--karte' : ''
     }" data-msgid="${esc(m.id)}"${ziehbar ? ' data-ziehbar' : ''}>
@@ -21483,6 +21558,20 @@ function messageBubble(m, chat) {
       }${esc(m.time)}${out ? (m.read ? ICONS.checkDouble : ICONS.check) : ''}</div>
       ${reaktionen}
     </div>`;
+
+  /*
+   * Kasten 28/11.3: im Gruppenchat unter Communitys → Chats das Profilbild an
+   * der Blase wie im Unterthema (kanalNachricht). Community-Einzelchat
+   * („CC + Chat") und Messenger bleiben ohne.
+   */
+  const mitBild =
+    absender &&
+    window.Chatblase.profilbilderImChat({
+      gruppe: Boolean(chat && chat.isGroup),
+      community: (state.communityChats || []).some((c) => c.id === chat?.id),
+    });
+  if (!mitBild) return blase;
+  return inBildZeile(blase, out, blasenBild(m.from, window.Chatblase.profilbildAn(absender, i)));
 }
 
 /**

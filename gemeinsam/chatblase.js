@@ -393,7 +393,7 @@
    */
 
   /** Kantenlänge des Bildes an der Blase, in Punkten / CSS-Pixeln. */
-  var PROFILBILD_GROESSE = 26;
+  var PROFILBILD_GROESSE = 28;
 
   /**
    * Zeigt dieser Chat Profilbilder an den Blasen? Im Unterthema immer, im

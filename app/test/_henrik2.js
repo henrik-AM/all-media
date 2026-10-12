@@ -159,11 +159,13 @@ function ok(name, bedingung, zusatz = '') {
 
     if (themenGefunden) {
       await seite.locator('[data-thema]').first().click();
-      await seite.waitForSelector('.msgzeile__avatar', { timeout: 10000 }).catch(() => {});
+      // Kasten 28/11.3/11.4: das Bild heisst seit 12.10.2026 .msgzeile__bild
+      // und fuehrt per data-commprofil ins Community-Profil.
+      await seite.waitForSelector('.msgzeile__bild', { timeout: 10000 }).catch(() => {});
       ok('Profilbild am Absender im Kanal-Chat',
-        (await seite.locator('.msgzeile__avatar').count()) > 0);
+        (await seite.locator('.msgzeile__bild').count()) > 0);
       ok('Profilbild fuehrt zum Profil',
-        (await seite.locator('.msgzeile__avatar[data-profile]').count()) > 0);
+        (await seite.locator('.msgzeile__bild[data-commprofil]').count()) > 0);
     } else {
       ok('Profilbild am Absender im Kanal-Chat', false, 'kein Kanal mit Themen');
       ok('Profilbild fuehrt zum Profil', false, 'kein Kanal mit Themen');
