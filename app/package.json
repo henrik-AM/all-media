@@ -142,7 +142,11 @@
     "test:k28-mitglieder": "node test/k28-mitglieder.js",
     "test:profil-ruecknavigation": "node test/profil-ruecknavigation.cjs",
     "test:k28-erstellen": "node test/k28-erstellen.js",
-    "test:p4-entsperrcode": "node test/p4-entsperrcode.js"
+    "test:p4-entsperrcode": "node test/p4-entsperrcode.js",
+    "test:k28-commbild": "node test/k28-commbild.js",
+    "test:k28-communitys": "node test/k28-communitys.js",
+    "test:k28-kopf-offline": "node test/k28-kopf-offline.js",
+    "test:k28-filter-offline": "node test/k28-filter-offline.js"
   },
   "private": true
 }
