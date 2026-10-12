@@ -478,6 +478,14 @@ async function ladeChats(client, nutzerId, bereich = 'messenger', schluesselId =
     if (strich && new Date(n.created_at) <= new Date(strich)) continue;
     if (!letzte.has(n.chat_id)) letzte.set(n.chat_id, n);
   }
+  /*
+   * Nachtrag 11.10. (7.5): geteilte Karte als letzte Nachricht, Beitrag
+   * gelöscht (Merker, Schema 93) oder nicht sichtbar → „Beitrag nicht mehr
+   * verfügbar". Gleiche Rechnung in app/lib/daten.ts (ladeChats).
+   */
+  const geteiltSichtbar = await Chatblase.geteiltSichtbar(client, [
+    ...new Set([...letzte.values()].map((n) => n.shared_post_id).filter(Boolean)),
+  ]);
   const mitgliederNach = new Map();
   for (const m of mitglieder || []) {
     if (!mitgliederNach.has(m.chat_id)) mitgliederNach.set(m.chat_id, []);
@@ -577,7 +585,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger', schluesselId =
               // Gleiche Regel in app/lib/daten.ts (ladeChats).
               StoryRegeln.istMarkierungsHinweis(vorschau)
               ? StoryRegeln.markierungVorschau(vorschau.sender_id === nutzerId)
-              : vorschau.text
+              : Chatblase.geteiltVorschau(vorschau, geteiltSichtbar) ?? vorschau.text
           : '',
         /*
          * Die Vorschau einer verschluesselten Nachricht ist hier leer — der
@@ -705,6 +713,11 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
     bezugZeilen = gefunden || [];
   }
 
+  // Nachtrag 11.10. (7.5–7.7): Merker „gelöscht" (Schema 93, nachsichtig)
+  // und Name/Profilbild der Konten über den Karten — wie app/lib/daten.ts.
+  const geteiltWeg = zeilen.length ? await Chatblase.geteiltWegLaden(client, 'messages', 'chat_id', chatId) : {};
+  const geteiltKonten = await Chatblase.geteiltKonten(client, Chatblase.geteiltKontoIds(zeilen, geteiltWeg));
+
   const reaktionen = new Map();
   if (zeilen.length) {
     const { data: reakZeilen } = await client
@@ -789,7 +802,7 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
      */
     // Kasten 7 (28.09.): Bild, Name, Beschreibung, `kind` zum Oeffnen —
     // gleiche Abbildung wie in app/lib/daten.ts (gemeinsam/chatblase.js).
-    geteilt: Chatblase.geteiltAus(n.shared_post_id, n.posts),
+    geteilt: Chatblase.geteiltAus(n.shared_post_id, n.posts, geteiltWeg[n.id], geteiltKonten),
     // Angehaengter Standort: Karte mit Nadel, Adresse und Koordinaten.
     standort: n.places
       ? {
@@ -1297,6 +1310,12 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
     for (const p of profile || []) namen[p.id] = p.name;
   }
 
+  // Nachtrag 11.10. (7.5–7.7): wie in ladeNachrichten — Merker und Konten.
+  const geteiltWeg = alleZeilen.length
+    ? await Chatblase.geteiltWegLaden(client, 'community_channel_messages', 'channel_id', kanalId)
+    : {};
+  const geteiltKonten = await Chatblase.geteiltKonten(client, Chatblase.geteiltKontoIds(alleZeilen, geteiltWeg));
+
   // Dieselben Feldnamen wie in ladeNachrichten — die Blase im Kanal wird aus
   // denselben Bausteinen gebaut wie die im Chat.
   return ChatAbgleich.chronologisch(data || []).map((m) => ({
@@ -1322,7 +1341,7 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
       : undefined,
     // Die Karte eines in die Community geteilten Beitrags (Schema 59) —
     // gleiche Abbildung wie in ladeNachrichten.
-    geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts),
+    geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts, geteiltWeg[m.id], geteiltKonten),
     datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size || 0) } : undefined,
     antwortAuf: Chatblase.kanalBezug(m, alleZeilen, nutzerId, namen),
     // Kasten 5: Anrufeintrag im Unterthema (Schema 89).
