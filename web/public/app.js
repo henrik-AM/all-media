@@ -460,7 +460,16 @@ function markierungsEingabe(feld, ort = {}) {
     box.innerHTML = liste
       .map(
         (p, i) => `<button type="button" class="markierliste__zeile${i === aktiv ? ' is-active' : ''}" role="option" data-mwahl="${i}">
-          ${personenAvatar({ avatar: p.avatar_url, color: p.color, initials: initialenVon(p.name) }, 36)}
+          ${/* Kasten 28/7.11: im Messenger-Chat mein Kontaktbild (wie MarkierungsEingabe → Avatar). */ ''}
+          ${personenAvatar({
+            avatar: window.Kontaktbild.anzeigeFuer(p.id, {
+              profil: { avatar: p.avatar_url },
+              kontaktBilder: state.kontaktBilder,
+              messenger: Boolean(ort.chat) && istMessengerChat({ id: ort.chat }),
+            }).bild || null,
+            color: p.color,
+            initials: initialenVon(p.name),
+          }, 36)}
           <span class="markierliste__namen"><strong>${esc(p.name)}</strong><span>${esc(p.handle)}</span></span>
         </button>`
       )
@@ -2913,10 +2922,10 @@ function storyRail(liste, bereich) {
   }
   // Die Map behält die Reihenfolge des Eintragens: die eigene Kachel bleibt
   // links, die fremden dahinter so, wie der Server sie geliefert hat.
-  return `<div class="storyrail" data-storybereich="${wo}">${[...nachPerson.values()].map(storyItem).join('')}</div>`;
+  return `<div class="storyrail" data-storybereich="${wo}">${[...nachPerson.values()].map((g) => storyItem(g, wo)).join('')}</div>`;
 }
 
-function storyItem(storys) {
+function storyItem(storys, wo = 'messenger') {
   const ungesehen = storys.find((x) => !x.viewed);
   const s = ungesehen || storys[storys.length - 1];
   const u = user(s.userId);
@@ -2927,9 +2936,24 @@ function storyItem(storys) {
   // Kasten 15: auch an der Adresse erkennen — das Bild der Kachel kann von
   // einer anderen Story derselben Person stammen als `s`.
   const standbild = bild && s.mediaType !== 'video' && !istVideoAdresse(bild) ? bild : null;
+  /*
+   * Kasten 28/7.11: ohne Standbild (keine Story, Video-Story) steht das
+   * Profilbild im Ring — in der Messenger-Leiste mein eigenes Kontaktbild
+   * (gemeinsam/kontaktbild.js), wie in der App (StoryRail → Avatar). Vorher
+   * standen hier immer nur die Initialen.
+   */
+  const profilbild = s.own
+    ? state.users?.me?.avatar
+    : window.Kontaktbild.anzeigeFuer(s.userId, {
+        profil: { avatar: u.avatar },
+        kontaktBilder: state.kontaktBilder,
+        messenger: wo === 'messenger',
+      }).bild;
   const kern = standbild
     ? `<div class="story__inner" style="background-image:url(${standbild});background-size:cover;background-position:center"></div>`
-    : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
+    : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}${
+        profilbild ? `<img class="story__profilbild" src="${esc(profilbild)}" alt="" onerror="this.remove()" />` : ''
+      }</div>`;
 
   // Der dritte Zustand: keine Story, kein Ring. Es gibt ihn nur bei der
   // eigenen Kachel — fremde ohne Story stehen gar nicht erst in der Leiste.
@@ -4344,6 +4368,15 @@ function openCall(ziel, art, ort = {}) {
   const u = gruppe
     ? { name: gruppe.name, initials: '', color: '#5C6BC0' }
     : user(userId);
+  // Kasten 28/7.11: das große Bild der Person — im Messenger mein eigenes
+  // Kontaktbild (gemeinsam/kontaktbild.js), sonst ihr Profilbild.
+  const anrufBild = gruppe
+    ? null
+    : window.Kontaktbild.anzeigeFuer(userId, {
+        profil: { avatar: u.avatar },
+        kontaktBilder: state.kontaktBilder,
+        messenger: state.area === 'messenger',
+      }).bild;
   if (!u) return toast('Diese Person gibt es nicht');
 
   let zustand = 'gestartet';
@@ -4380,9 +4413,12 @@ function openCall(ziel, art, ort = {}) {
           ${
             gruppe && teilnehmer.length
               ? `<div class="anruf__runde">${teilnehmer
-                  .map((id) => `<span class="avatar avatar--52" style="background:${farbe(user(id).color)}">${esc(user(id).initials)}</span>`)
+                  // Kasten 28/7.11: Profilbild, im Messenger mein Kontaktbild (wie CallScreen → Avatar).
+                  .map((id) => avatarForUser(id, 52, state.area === 'messenger'))
                   .join('')}</div>`
-              : `<div class="anruf__avatar" style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}</div>`
+              : `<div class="anruf__avatar" style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}${
+                  anrufBild ? `<img class="anruf__bild" src="${esc(anrufBild)}" alt="" onerror="this.remove()" />` : ''
+                }</div>`
           }
           <div class="anruf__name">${esc(u.name)}</div>
           ${
@@ -9517,7 +9553,8 @@ function openSichtbarkeit(punkt) {
                           (p) => `<button class="insight__person${
                             jetzt.ausnahmen.includes(p.id) ? ' is-active' : ''
                           }" data-ausnahme="${p.id}">
-                            ${avatarForUser(p.id, 36)}
+                            ${/* Kasten 28/7.11: im Messenger mein Kontaktbild, wie SichtbarkeitSheet → Avatar. */ ''}
+                            ${avatarForUser(p.id, 36, state.area === 'messenger')}
                             <span class="insight__personText"><span class="insight__personName">${esc(p.name)}</span></span>
                             <span class="insight__haken">${ICONS.check}</span>
                           </button>`
@@ -10805,8 +10842,9 @@ function renderFriendMap() {
         ${nadeln
           .map((f) => {
             const u = user(f.id);
+            // Kasten 28/7.11: die Freundeskarte gehört zum Messenger — mein Kontaktbild (wie FriendMapScreen).
             return `<li><div class="row ${state.karte.aktiv === f.id ? 'is-aktiv' : ''}" data-zoom="${f.id}">
-              ${avatarForUser(f.id, 44)}
+              ${avatarForUser(f.id, 44, true)}
               <div class="row__body">
                 <div class="row__name">${esc(u.name)}</div>
                 <div class="row__bottom"><span class="row__preview">${esc(f.place)} · ${esc(f.when)}</span></div>
@@ -11024,7 +11062,7 @@ function renderAusgewaehlteKontakte() {
             const ist = state.standortAusgewaehlt.includes(f.id);
             return `<li><label class="row" style="cursor: pointer;">
               <input type="checkbox" class="checkAusgewaehlt" data-id="${f.id}" ${ist ? 'checked' : ''} style="width: 18px; height: 18px;" />
-              ${avatarForUser(f.id, 44)}
+              ${avatarForUser(f.id, 44, true)}
               <div class="row__body">
                 <div class="row__name">${esc(u.name)}</div>
               </div>
@@ -11149,7 +11187,8 @@ function openInsightSenden(bild) {
            ? personen
                .map(
                  (p) => `<button class="insight__person${gewaehlt.has(p.id) ? ' is-active' : ''}" data-person="${p.id}">
-                   ${avatarForUser(p.id, 38)}
+                   ${/* Kasten 28/7.11: im Messenger mein Kontaktbild, wie InsightSheet → Avatar. */ ''}
+                   ${avatarForUser(p.id, 38, state.area === 'messenger')}
                    <span class="insight__personText">
                      <span class="insight__personName">${esc(p.name)}</span>
                      ${p.tage ? `<span class="streak">📷 ${p.tage}</span>` : ''}
@@ -15073,7 +15112,10 @@ async function openStoryAnsichten(story, danach) {
                  // sonst das, was der Server mitgeschickt hat.
                  const u = state.users[v.id] || v;
                  return `<button class="item" data-seher="${esc(v.id)}">
-                   <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials || '')}</span>
+                   ${/* Kasten 28/7.11: Profilbild, in Messenger-Storys mein Kontaktbild (wie StoryOptionenSheet → Avatar). */ ''}
+                   ${state.users[v.id]
+                     ? avatarForUser(v.id, 36, state.area === 'messenger')
+                     : `<span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials || '')}</span>`}
                    <span class="item__label">${esc(u.name || 'Unbekannt')}</span>
                    <span class="item__value">${esc(u.handle || '')}</span>
                  </button>`;
@@ -17379,7 +17421,10 @@ function openTeilen(art, id) {
       <button class="${klasse}" data-teilen="${uid}" data-bereich="${bereich}" ${sperre || gesendet.has(uid) ? 'disabled' : ''}
               aria-pressed="${gewaehlt.has(uid)}">
         <span class="teilen__bild">
-          <span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials || (u.name || '?').slice(0, 1))}</span>
+          ${/* Kasten 28/7.11: Profilbild statt nur Initialen; im Messenger mein Kontaktbild (wie TeilenSheet → Avatar). */ ''}
+          ${state.users[uid]
+            ? avatarForUser(uid, 52, state.area === 'messenger')
+            : `<span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials || (u.name || '?').slice(0, 1))}</span>`}
           <span class="teilen__marke teilen__marke--${bereich}">${
             bereich === 'community' ? ICONS.people : ICONS.chat
           }</span>
@@ -21464,7 +21509,8 @@ function openStory(storyId, { bereich, ersatz, liste: eigeneListe, highlight = n
       <div class="viewer__bars" data-testid="story-balken">${balken}</div>
       <div class="viewer__head">
         <button class="viewer__close" id="storyClose" aria-label="Zurück">${ICONS.back}</button>
-        ${s.own ? eigenerAvatar(state.users.me, 36) : `<div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>`}
+        ${/* Kasten 28/7.11: Profilbild statt nur Initialen; in Messenger-Storys mein Kontaktbild (wie StoryViewerScreen → Avatar). */ ''}
+        ${s.own ? eigenerAvatar(state.users.me, 36) : avatarForUser(u.id, 36, wo === 'messenger').replace('<div class="avatar', `<div data-profile="${esc(u.id)}" class="avatar`)}
         <div class="viewer__who" ${s.own ? '' : `data-profile="${u.id}"`}>
           <div class="viewer__name">${s.own ? (highlight ? 'Dein Highlight' : 'Deine Story') : esc(u.name)}</div>
           <div class="viewer__time"${highlight ? ' data-testid="highlight-kopf"' : ''}>${esc(
