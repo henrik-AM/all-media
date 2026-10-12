@@ -327,3 +327,39 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
   als Ganzes ersetzt. **Schema 23_audit erneut einspielen nimmt die Leserechte wieder weg —
   danach 88 nachziehen** (wie 30 und 69). App und Website laden die beiden Spalten getrennt und
   nachsichtig; ohne Schema 88 fehlen nur Pronomen und Zusatzlinks.
+
+## Nachtrag 11.10.2026: Schemas 89–91 (Feedback 28.09., Kästen 4, 5, 8)
+
+Alle drei sind **Entwürfe, noch nicht eingespielt (Supabase-Sperre).** Reihenfolge 89 → 90 → 91
+(90 bricht ab, wenn 89 fehlt).
+
+- `SUPABASE_SCHEMA_89_anrufe_ueberall.sql` — Anrufzustand `gestartet` (Dauer 0 erzwungen) auf
+  `messages`; Anrufspalten auch auf `community_channel_messages`. Ersetzt die Bedingungen
+  `messages_anruf_status_check` (aus 35) und `kanalnachricht_nicht_leer` (zuletzt 59).
+- `SUPABASE_SCHEMA_90_push_to_talk.sql` — `community_members.ptt_benachrichtigung`,
+  `community_channel_messages.ptt_sitzung`, `ptt_messages.sitzung_id`; Auslöser
+  `ptt_sitzung_zuordnen` und `ptt_mitteilen` (EXECUTE entzogen); restriktive Regel
+  „Sitzungszeile nur vom Ausloeser“. Ersetzt `notifications_art_check` (zuletzt 57),
+  `notifications_target_type_check` (zuletzt 49) und `kanalnachricht_nicht_leer` (aus 89) —
+  **gilt danach: 90.** Wer später eine Mitteilungsart ergänzt, übernimmt die Liste aus 90.
+- `SUPABASE_SCHEMA_91_antworten_im_unterthema.sql` — `community_channel_messages.reply_to`
+  (on delete set null) und restriktive Regel „Antwort nur im selben Unterthema“. Ersetzt nichts.
+
+Code vor dem Schema: App (`daten.ts`) und Server (`supabase-api.js`) laden die Unterthema-
+Zusatzspalten (`reply_to` | Anrufspalten | `ptt_sitzung`) gruppenweise nachsichtig — fehlt eine
+Gruppe (42703), wird nur sie weggelassen.
+
+## Nachtrag 12.10.2026: Schema 92 (Feedback 28.09., Nachtrag 4.3)
+
+**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 89 → 90 → 91; setzt 62, 78, 86 voraus.
+
+- `SUPABASE_SCHEMA_92_kommentar_antworten.sql` — `comments.reply_to` (Wurzel, on delete cascade),
+  `comments.antwort_an` (angesprochener Kommentar, on delete set null), `stream_comments.reply_to`
+  (on delete set null); restriktive Regeln „Antwort nur im selben Beitrag“ und „Live-Antwort nur im
+  selben Stream“ (inkl. Blockieren); Auslöser `kommentar_bezug_fest`, `mitteilung_kommentar_antwort`,
+  `mitteilung_weg_kommentar_antwort`. **Ersetzt `mitteilung_bei_kommentar()` (zuletzt 44) — gilt danach: 92.**
+  Fasst `notifications_art_check`/`notifications_target_type_check` NICHT an (art 'comment' +
+  target_type 'comment' stehen schon in der Liste aus 90) — Gewinner bleibt 90.
+
+Code vor dem Schema: App (`daten.ts`, `aktionen.ts`) und Server (`supabase-api.js`, `sync-handlers.js`)
+lesen/schreiben `reply_to`/`antwort_an` nachsichtig (`Kommentar.fehltSpalte`).
