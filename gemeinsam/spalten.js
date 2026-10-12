@@ -105,7 +105,9 @@ const NACHRICHT_SPALTEN =
   // `media_url` und `thumbnail_url` des geteilten Beitrags: Henrik 7.9. —
   // ein geteilter Videos-Beitrag soll im Chat als Bild zu sehen und zu
   // oeffnen sein, nicht als graues Kaestchen mit Titel.
-  ' shared_post_id, posts(id, kind, title, description, media_url, thumbnail_url,' +
+  // Nachtrag 11.10. (7.7): `user_id` — damit die Karte das echte Profilbild
+  // des Kontos zeigt (vorher nur Initialen).
+  ' shared_post_id, posts(id, user_id, kind, title, description, media_url, thumbnail_url,' +
   // Kasten 7 (28.09.): der Nutzername klein über der Karte.
   ' profiles!posts_user_id_fkey(name, handle)),' +
   ' place_id, places(id, name, adresse, koordinaten, x, y),' +

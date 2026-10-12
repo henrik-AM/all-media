@@ -1257,7 +1257,7 @@ async function ladeKanalNachrichten(client, nutzerId, kanalId) {
     ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
     ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
     // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
-    ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
+    ' shared_post_id, posts!shared_post_id(id, user_id, kind, title, description, media_url, thumbnail_url,' +
     ' profiles!posts_user_id_fkey(name, handle))';
   // Spalten aus spaeteren Schemas: Bezug (91), Anrufeintrag (89), PTT-Sitzung
   // (90). Fehlt eine noch (42703), ohne genau diese Gruppe nochmal — sonst

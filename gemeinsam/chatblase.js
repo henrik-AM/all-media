@@ -135,6 +135,29 @@
 
   /** Steht da, wenn der Beitrag gelöscht oder nicht (mehr) sichtbar ist. */
   var GETEILT_WEG = 'Beitrag nicht mehr verfügbar';
+  /**
+   * Die zweite Zeile der Weg-Karte (Nachtrag 11.10., 7.6) — nur, wo sich der
+   * Grund ehrlich unterscheiden lässt:
+   *   gelöscht    Schema 93 hat beim Löschen den Merker `shared_post_weg`
+   *               gesetzt — das ist eine Tatsache.
+   *   unsichtbar  `shared_post_id` steht noch (der Beitrag existiert also),
+   *               aber die Leseregel gibt ihn nicht heraus: privat,
+   *               gesperrt, Minderjährigen-Freigabe. Welcher der Gründe, sagt
+   *               die Datenbank nicht — darum kein genauerer Satz.
+   */
+  var GETEILT_GELOESCHT = 'Der Beitrag wurde gelöscht';
+  var GETEILT_UNSICHTBAR = 'Für dich nicht sichtbar';
+
+  /**
+   * Spalten aus Schema 93. Getrennt geladen (geteiltWegLaden): stünden sie
+   * in NACHRICHT_SPALTEN, fiele bis zum Einspielen jeder Chat mit 42703 um.
+   */
+  var GETEILT_WEG_SPALTEN = 'id, shared_post_weg, shared_post_konto';
+
+  /** Ein Konto aus der Nachschlagetabelle von geteiltKonten — oder leer. */
+  function kontoAus(konten, id) {
+    return (id && konten && konten[id]) || {};
+  }
 
   /**
    * Aus der Einbettung `posts` einer Nachricht die Karte machen.
@@ -145,43 +168,209 @@
    * (etwa „Beitrag von …") wäre eine Anzeige, die es nicht gibt.
    *
    * `sharedPostId` gesetzt, aber `post` leer: die Leseregel gibt den Beitrag
-   * nicht heraus (privat, gesperrt, Minderjährigen-Freigabe) — die Karte sagt
-   * GETEILT_WEG. Ist der Beitrag gelöscht, setzt die Datenbank
-   * `shared_post_id` auf null (on delete set null); das ist hier nicht mehr
-   * erkennbar, die Nachricht zeigt dann ihren Vorschautext.
+   * nicht heraus (privat, gesperrt, Minderjährigen-Freigabe) — Weg-Karte,
+   * Grund „unsichtbar".
+   *
+   * Ist der Beitrag gelöscht, setzt die Datenbank `shared_post_id` auf null
+   * (on delete set null). Seit Schema 93 bleibt dabei der Merker
+   * `shared_post_weg` mit dem Konto `shared_post_konto` stehen (`zeile`, aus
+   * geteiltWegLaden) — Weg-Karte, Grund „gelöscht", mit Konto. Ohne Schema 93
+   * (oder bei Nachrichten von davor) ist ein gelöschter Beitrag nicht mehr
+   * erkennbar; die Nachricht zeigt dann ihren Vorschautext.
+   *
+   * `konten` (aus geteiltKonten): Name und echtes Profilbild des Kontos
+   * (Nachtrag 11.10., 7.7) — `autorBild` ist die beständige Adresse, die
+   * signiereMedien (App) bzw. res.json (Server) unterschreibt.
    */
-  function geteiltAus(sharedPostId, post) {
+  function geteiltAus(sharedPostId, post, zeile, konten) {
     if (!post) {
-      return sharedPostId ? { id: String(sharedPostId), weg: true } : undefined;
+      if (sharedPostId) return { id: String(sharedPostId), weg: true, grund: 'unsichtbar' };
+      if (zeile && zeile.shared_post_weg) {
+        var kontoId = zeile.shared_post_konto ? String(zeile.shared_post_konto) : '';
+        var k = kontoAus(konten, kontoId);
+        return {
+          id: '',
+          weg: true,
+          grund: 'geloescht',
+          autorId: kontoId || undefined,
+          autor: k.name || '',
+          handle: k.handle || '',
+          autorBild: k.bild || undefined,
+        };
+      }
+      return undefined;
     }
     var titel = String(post.title || '').trim();
     var beschreibung = String(post.description || '').trim();
     if (titel && beschreibung === titel) beschreibung = '';
     var kind = post.kind === 'clip' ? 'clip' : post.kind === 'reel' ? 'reel' : 'post';
     var profil = post.profiles || {};
+    var autorId = post.user_id ? String(post.user_id) : '';
     return {
       id: post.id,
       kind: kind,
       // `art` für die bisherigen Leser: Bild-Beitrag oder Video.
       art: kind === 'post' ? 'post' : 'video',
+      // 7.7: die Kennung des Kontos — damit die Karte das echte Profilbild
+      // (und im Messenger das eigene Kontaktbild, 7.8) zeigen kann.
+      autorId: autorId || undefined,
       autor: profil.name || '',
       handle: profil.handle || '',
+      autorBild: kontoAus(konten, autorId).bild || undefined,
       titel: titel,
       beschreibung: beschreibung,
       bild: post.thumbnail_url || post.media_url || undefined,
     };
   }
 
+  /** Die zweite Zeile der Weg-Karte, oder '' (Grund unbekannt). */
+  function geteiltWegGrund(g) {
+    if (!g || !g.weg) return '';
+    if (g.grund === 'geloescht') return GETEILT_GELOESCHT;
+    if (g.grund === 'unsichtbar') return GETEILT_UNSICHTBAR;
+    return '';
+  }
+
   /** Die Zeile, die eine Karte für Bildschirmleser vorliest. */
   function geteiltBeschriftung(g) {
     if (!g) return '';
-    if (g.weg) return GETEILT_WEG;
+    if (g.weg) {
+      var weg = [GETEILT_WEG];
+      if (g.autor) weg.push('von ' + g.autor);
+      var grund = geteiltWegGrund(g);
+      if (grund) weg.push(grund);
+      return weg.join(', ');
+    }
     var was = g.kind === 'post' ? 'Geteilter Beitrag' : 'Geteiltes Video';
     var teile = [was];
     if (g.autor) teile.push('von ' + g.autor);
     if (g.titel) teile.push(g.titel);
     else if (g.beschreibung) teile.push(g.beschreibung);
     return teile.join(', ');
+  }
+
+  /* ---------------------------- Nachladen (App und Server, supabase-js) */
+
+  /**
+   * Die Merker aus Schema 93 für einen Chat oder ein Unterthema —
+   * nachsichtig: fehlen die Spalten (42703) oder scheitert die Abfrage,
+   * kommt eine leere Tabelle zurück, und alles bleibt beim alten Stand.
+   * `tabelle`: 'messages' | 'community_channel_messages';
+   * `spalte`: 'chat_id' | 'channel_id'. Ergebnis: Kennung → Zeile.
+   */
+  function geteiltWegLaden(client, tabelle, spalte, wert) {
+    var leer = {};
+    if (!client || !wert) return Promise.resolve(leer);
+    try {
+      return Promise.resolve(
+        client
+          .from(tabelle)
+          .select(GETEILT_WEG_SPALTEN)
+          .eq(spalte, wert)
+          .not('shared_post_weg', 'is', null)
+          .limit(500)
+      )
+        .then(function (antwort) {
+          if (!antwort || antwort.error) return leer;
+          var karte = {};
+          (antwort.data || []).forEach(function (z) {
+            karte[z.id] = z;
+          });
+          return karte;
+        })
+        .catch(function () {
+          return leer;
+        });
+    } catch (e) {
+      return Promise.resolve(leer);
+    }
+  }
+
+  /** Die Konten, deren Bild und Name die Karten brauchen (7.7). */
+  function geteiltKontoIds(zeilen, weg) {
+    var ids = {};
+    (zeilen || []).forEach(function (z) {
+      if (z && z.posts && z.posts.user_id) ids[z.posts.user_id] = true;
+      var w = weg && z && weg[z.id];
+      if (w && w.shared_post_konto) ids[w.shared_post_konto] = true;
+    });
+    return Object.keys(ids);
+  }
+
+  /**
+   * Name, Nutzername und Profilbild dieser Konten (7.7) — nachsichtig. Ohne
+   * freigegebene Spalte `avatar_url` (Schema 69) noch einmal ohne Bild; was
+   * die Leseregel auf `profiles` nicht herausgibt, fehlt (dann Initialen).
+   * Ergebnis: Kennung → { name, handle, bild }.
+   */
+  function geteiltKonten(client, ids) {
+    var leer = {};
+    if (!client || !ids || !ids.length) return Promise.resolve(leer);
+    var holen = function (spalten) {
+      return Promise.resolve(client.from('profiles').select(spalten).in('id', ids));
+    };
+    var abbilden = function (antwort) {
+      var karte = {};
+      ((antwort && antwort.data) || []).forEach(function (p) {
+        karte[p.id] = { name: p.name || '', handle: p.handle || '', bild: p.avatar_url || undefined };
+      });
+      return karte;
+    };
+    try {
+      return holen('id, name, handle, avatar_url')
+        .then(function (antwort) {
+          if (antwort && antwort.error) {
+            return holen('id, name, handle').then(function (ohne) {
+              return ohne && ohne.error ? leer : abbilden(ohne);
+            });
+          }
+          return abbilden(antwort);
+        })
+        .catch(function () {
+          return leer;
+        });
+    } catch (e) {
+      return Promise.resolve(leer);
+    }
+  }
+
+  /**
+   * Die Vorschauzeile der Chatliste (7.5): steht dort eine geteilte Karte,
+   * deren Beitrag gelöscht (Merker, Schema 93) oder für mich nicht sichtbar
+   * ist (`sichtbar` aus geteiltSichtbar enthält ihn nicht), heißt die Zeile
+   * GETEILT_WEG statt „Beitrag geteilt". Sonst null = Vorschautext wie bisher.
+   */
+  function geteiltVorschau(zeile, sichtbar) {
+    if (!zeile) return null;
+    if (zeile.shared_post_id) {
+      return sichtbar && !sichtbar.has(String(zeile.shared_post_id)) ? GETEILT_WEG : null;
+    }
+    return zeile.shared_post_weg ? GETEILT_WEG : null;
+  }
+
+  /**
+   * Welche dieser Beiträge die Leseregel mir herausgibt (Chatliste, 7.5).
+   * Scheitert die Abfrage: null — dann bleibt die Vorschau, wie sie war,
+   * statt fälschlich „nicht mehr verfügbar" zu sagen.
+   */
+  function geteiltSichtbar(client, ids) {
+    if (!client || !ids || !ids.length) return Promise.resolve(null);
+    try {
+      return Promise.resolve(client.from('posts').select('id').in('id', ids))
+        .then(function (antwort) {
+          if (!antwort || antwort.error) return null;
+          var menge = new Set();
+          (antwort.data || []).forEach(function (p) {
+            menge.add(String(p.id));
+          });
+          return menge;
+        })
+        .catch(function () {
+          return null;
+        });
+    } catch (e) {
+      return Promise.resolve(null);
+    }
   }
 
   return {
@@ -197,7 +386,16 @@
     fehltSpalte: fehltSpalte,
     OHNE_BEZUG: OHNE_BEZUG,
     GETEILT_WEG: GETEILT_WEG,
+    GETEILT_GELOESCHT: GETEILT_GELOESCHT,
+    GETEILT_UNSICHTBAR: GETEILT_UNSICHTBAR,
+    GETEILT_WEG_SPALTEN: GETEILT_WEG_SPALTEN,
     geteiltAus: geteiltAus,
+    geteiltWegGrund: geteiltWegGrund,
     geteiltBeschriftung: geteiltBeschriftung,
+    geteiltWegLaden: geteiltWegLaden,
+    geteiltKontoIds: geteiltKontoIds,
+    geteiltKonten: geteiltKonten,
+    geteiltVorschau: geteiltVorschau,
+    geteiltSichtbar: geteiltSichtbar,
   };
 });

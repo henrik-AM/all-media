@@ -29,17 +29,57 @@ export function fehltSpalte(fehler: { code?: string; message?: string } | null |
 export const OHNE_BEZUG: string;
 
 export const GETEILT_WEG: string;
+/** Zweite Zeile der Weg-Karte: Merker aus Schema 93 (gelöscht). */
+export const GETEILT_GELOESCHT: string;
+/** Zweite Zeile der Weg-Karte: Kennung steht, Leseregel gibt ihn nicht heraus. */
+export const GETEILT_UNSICHTBAR: string;
+export const GETEILT_WEG_SPALTEN: string;
 export interface GeteilteKarte {
   id: string;
-  /** Beitrag ist gelöscht oder nicht sichtbar — dann fehlen alle anderen Felder. */
+  /** Beitrag ist gelöscht oder nicht sichtbar — dann fehlen Bild und Text. */
   weg?: boolean;
+  /** Nur bei `weg`: warum, soweit ehrlich bekannt. */
+  grund?: 'geloescht' | 'unsichtbar';
   kind?: 'post' | 'reel' | 'clip';
   art?: 'post' | 'video';
+  /** Kennung des Kontos (posts.user_id bzw. shared_post_konto) — für das Profilbild (7.7). */
+  autorId?: string;
   autor?: string;
   handle?: string;
+  /** Beständige Adresse des Profilbilds; unterschrieben wird sie beim Laden. */
+  autorBild?: string;
   titel?: string;
   beschreibung?: string;
   bild?: string;
 }
-export function geteiltAus(sharedPostId: string | null | undefined, post: any): GeteilteKarte | undefined;
+export interface GeteiltKonto {
+  name: string;
+  handle: string;
+  bild?: string;
+}
+export interface GeteiltWegZeile {
+  id: string;
+  shared_post_weg?: string | null;
+  shared_post_konto?: string | null;
+}
+export function geteiltAus(
+  sharedPostId: string | null | undefined,
+  post: any,
+  zeile?: GeteiltWegZeile | null,
+  konten?: Record<string, GeteiltKonto> | null
+): GeteilteKarte | undefined;
+export function geteiltWegGrund(g: GeteilteKarte | null | undefined): string;
 export function geteiltBeschriftung(g: GeteilteKarte | null | undefined): string;
+export function geteiltWegLaden(
+  client: any,
+  tabelle: 'messages' | 'community_channel_messages',
+  spalte: 'chat_id' | 'channel_id',
+  wert: string
+): Promise<Record<string, GeteiltWegZeile>>;
+export function geteiltKontoIds(zeilen: any[] | null | undefined, weg: Record<string, GeteiltWegZeile> | null | undefined): string[];
+export function geteiltKonten(client: any, ids: string[]): Promise<Record<string, GeteiltKonto>>;
+export function geteiltVorschau(
+  zeile: { shared_post_id?: string | null; shared_post_weg?: string | null } | null | undefined,
+  sichtbar: Set<string> | null | undefined
+): string | null;
+export function geteiltSichtbar(client: any, ids: string[]): Promise<Set<string> | null>;

@@ -491,6 +491,17 @@ export async function ladeChats(
     const meiner = await meinSchluessel(client, ichId);
     await aufschliessen(client, vorschauen, meiner);
   }
+  /*
+   * Nachtrag 11.10. (7.5): eine geteilte Karte als letzte Nachricht, deren
+   * Beitrag gelöscht (Merker, Schema 93) oder für mich nicht sichtbar ist,
+   * heißt auch in der Liste „Beitrag nicht mehr verfügbar". Gleiche Rechnung
+   * in web/server/supabase-api.js (ladeChats).
+   */
+  const geteiltSichtbar = await Chatblase.geteiltSichtbar(
+    client,
+    [...new Set(vorschauen.map((n) => n?.shared_post_id).filter(Boolean) as string[])]
+  );
+
   const mitgliederNach = new Map<string, string[]>();
   for (const m of (mitglieder ?? []) as any[]) {
     if (!mitgliederNach.has(m.chat_id)) mitgliederNach.set(m.chat_id, []);
@@ -555,7 +566,7 @@ export async function ladeChats(
              */
             StoryRegeln.istMarkierungsHinweis(vorschau)
             ? StoryRegeln.markierungVorschau(vorschau.sender_id === ichId)
-            : vorschau?.text ?? '',
+            : Chatblase.geteiltVorschau(vorschau, geteiltSichtbar) ?? vorschau?.text ?? '',
         previewMedia: vorschau?.media_type ?? undefined,
         time: chatZeit(vorschau?.created_at ?? z.chats.updated_at),
         unreadCount: z.is_read ? 0 : 1,
@@ -745,6 +756,16 @@ export async function ladeNachrichten(
     await aufschliessen(client, [...zeilen, ...bezugZeilen], meiner);
   }
 
+  /*
+   * Nachtrag 11.10. (7.5–7.7): Merker „gelöscht" (Schema 93, nachsichtig)
+   * und Name/Profilbild der Konten über den Karten. Gleiche Rechnung in
+   * web/server/supabase-api.js (ladeNachrichten).
+   */
+  const geteiltWeg = zeilen.length
+    ? await Chatblase.geteiltWegLaden(client, 'messages', 'chat_id', chatId)
+    : {};
+  const geteiltKonten = await Chatblase.geteiltKonten(client, Chatblase.geteiltKontoIds(zeilen, geteiltWeg));
+
   const reaktionen = new Map<string, { userId: string; emoji: string }[]>();
   if (zeilen.length) {
     const { data: reakZeilen } = await client
@@ -799,7 +820,7 @@ export async function ladeNachrichten(
     // Kasten 7 (28.09.): Name UND Beschreibung, `kind` zum Oeffnen, und
     // ehrlich „nicht mehr verfügbar", wenn die Leseregel ihn nicht herausgibt
     // (gemeinsam/chatblase.js, geteiltAus).
-    geteilt: Chatblase.geteiltAus(n.shared_post_id, n.posts),
+    geteilt: Chatblase.geteiltAus(n.shared_post_id, n.posts, geteiltWeg[n.id], geteiltKonten),
     // Angehängter Standort und Kontakt — gleiche Regel wie in
     // web/server/supabase-api.js.
     standort: n.places
@@ -1383,7 +1404,7 @@ export async function ladeKanalNachrichten(
     ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
     ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
     // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
-    ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
+    ' shared_post_id, posts!shared_post_id(id, user_id, kind, title, description, media_url, thumbnail_url,' +
     ' profiles!posts_user_id_fkey(name, handle))';
   /*
    * Spalten aus spaeteren Schemas: Bezug (91), Anrufeintrag (89),
@@ -1430,6 +1451,12 @@ export async function ladeKanalNachrichten(
     for (const p of (profile ?? []) as any[]) namen[p.id] = p.name;
   }
 
+  // Nachtrag 11.10. (7.5–7.7): wie in ladeNachrichten — Merker und Konten.
+  const geteiltWeg = alleZeilen.length
+    ? await Chatblase.geteiltWegLaden(client, 'community_channel_messages', 'channel_id', kanalId)
+    : {};
+  const geteiltKonten = await Chatblase.geteiltKonten(client, Chatblase.geteiltKontoIds(alleZeilen, geteiltWeg));
+
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
   return signiereMedien(client, ChatAbgleich.chronologisch((data ?? []) as any[]).map((m: any) => ({
     id: m.id,
@@ -1458,7 +1485,7 @@ export async function ladeKanalNachrichten(
       : undefined,
     // Die Karte eines in die Community geteilten Beitrags (Schema 59) —
     // gleiche Abbildung wie in ladeNachrichten.
-    geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts),
+    geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts, geteiltWeg[m.id], geteiltKonten),
     datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size ?? 0) } : undefined,
     antwortAuf: Chatblase.kanalBezug(m, alleZeilen, ichId, namen),
     // Kasten 5: der Anrufeintrag im Unterthema (Schema 89) — dieselbe
