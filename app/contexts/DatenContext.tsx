@@ -58,6 +58,7 @@ const LEER: AlleDaten = {
   insightZiele: [],
   sichtbarkeit: {},
   keinInteresse: [],
+  kontaktBilder: {},
   ichId: '',
   geladen: '',
 };

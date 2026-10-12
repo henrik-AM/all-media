@@ -28,6 +28,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien, medienAnfrage } from './medien';
 // Kasten 1.3 (Nachtrag 10.10.2026): Texte der Seite „Profil bearbeiten“.
 const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('../../gemeinsam/profilfelder');
+const Kontaktbild = require('../../gemeinsam/kontaktbild') as typeof import('../../gemeinsam/kontaktbild');
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -2105,6 +2106,48 @@ export async function profilbildSetzen(
     throw error;
   }
   if (!data?.length) throw new Error('Das Profilbild ließ sich nicht speichern');
+}
+
+/**
+ * Kasten 28/7.8 (Schema 94): mein eigenes Bild für einen Messenger-Kontakt
+ * setzen (`url`) oder entfernen (null = zurück zum Profilbild). Nur ich sehe
+ * es (RLS: nur Eigentümer). Hochgeladen wird vorher über die vorhandene
+ * Medienstelle (lib/profilbild.ts → supabaseStorage.ladeHoch, Ordner
+ * avatars). Gleicher Weg auf der Website: POST /api/kontaktbild.
+ */
+export async function kontaktBildSetzen(
+  client: SupabaseClient,
+  ichId: string,
+  kontaktId: string,
+  url: string | null
+): Promise<void> {
+  const fehltSchema = (e: any) =>
+    ['42P01', 'PGRST205', '42703', 'PGRST204'].includes(String(e?.code ?? '')) ||
+    /kontakt_bilder/.test(String(e?.message ?? '')) && /does not exist|schema cache/i.test(String(e?.message ?? ''));
+  if (url === null) {
+    const { error } = await client.from('kontakt_bilder').delete().eq('owner_id', ichId).eq('kontakt_id', kontaktId);
+    if (error) throw new Error(fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : error.message);
+    // Ein abgelehntes DELETE meldet unter RLS Erfolg mit null Zeilen —
+    // nachsehen, ob die Zeile wirklich weg ist.
+    const { data: rest } = await client
+      .from('kontakt_bilder')
+      .select('kontakt_id')
+      .eq('owner_id', ichId)
+      .eq('kontakt_id', kontaktId);
+    if (rest?.length) throw new Error(Kontaktbild.NICHT_GESPEICHERT);
+    return;
+  }
+  if (!Kontaktbild.adresseGueltig(url)) throw new Error(Kontaktbild.NICHT_GESPEICHERT);
+  const { data, error } = await client
+    .from('kontakt_bilder')
+    .upsert({ owner_id: ichId, kontakt_id: kontaktId, media_url: url }, { onConflict: 'owner_id,kontakt_id' })
+    .select('kontakt_id');
+  if (error) {
+    if (fehltSchema(error)) throw new Error(Kontaktbild.FEHLT_SCHEMA);
+    if (error.code === '42501') throw new Error('Ein eigenes Foto geht nur für Messenger-Kontakte');
+    throw error;
+  }
+  if (!data?.length) throw new Error(Kontaktbild.NICHT_GESPEICHERT);
 }
 
 /** Livestream an oder aus. */

@@ -935,6 +935,7 @@ const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gem
 const ChatAbgleich = require('../../gemeinsam/chatabgleich') as typeof import('../../gemeinsam/chatabgleich');
 // Kasten 4/7 (28.09.): Bezug im Unterthema und die Karte geteilter Beitraege.
 const Chatblase = require('../../gemeinsam/chatblase') as typeof import('../../gemeinsam/chatblase');
+const Kontaktbild = require('../../gemeinsam/kontaktbild') as typeof import('../../gemeinsam/kontaktbild');
 
 /** Spalten mit und ohne die Felder aus dem Story-Schema (Kasten 11). */
 const STORY_SPALTEN_NEU =
@@ -1680,6 +1681,12 @@ export interface AlleDaten {
   sichtbarkeit: Record<string, Sichtbarkeit>;
   /** Beitraege mit "Kein Interesse" — fallen aus beiden Feeds (Schema 55). */
   keinInteresse: string[];
+  /**
+   * Kasten 28/7.8 (Schema 94): meine eigenen Kontaktbilder, Kennung →
+   * Adresse. Nur ich sehe sie, nur im Messenger (Avatar + KontaktBildBereich,
+   * Regel in gemeinsam/kontaktbild.js).
+   */
+  kontaktBilder: Record<string, string>;
 
   ichId: string;
   geladen: string;
@@ -1747,6 +1754,26 @@ export async function ladeChatlisten(
  * fünfzehn nacheinander. Auf einem Handy im Mobilfunknetz ist das der
  * Unterschied zwischen einer und acht Sekunden.
  */
+/**
+ * Kasten 28/7.8: meine eigenen Kontaktbilder (Schema 94) — nachsichtig.
+ * Fehlt die Tabelle (Code vor dem Schema) oder scheitert die Abfrage, gibt es
+ * keine eigenen Bilder, und überall bleibt das Profilbild. Unterschrieben wird
+ * mit allem anderen in ladeAlles (signiereMedien). Gegenstück:
+ * ladeKontaktBilder in web/server/supabase-api.js.
+ */
+export async function ladeKontaktBilder(client: SupabaseClient, ichId: string): Promise<Record<string, string>> {
+  try {
+    const { data, error } = await client
+      .from('kontakt_bilder')
+      .select('kontakt_id, media_url')
+      .eq('owner_id', ichId);
+    if (error) return {};
+    return Kontaktbild.ausZeilen((data ?? []) as any[]);
+  } catch {
+    return {};
+  }
+}
+
 export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<AlleDaten> {
   const [
     { users, profile },
@@ -1768,6 +1795,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     insightZiele,
     sichtbarkeit,
     keinInteresse,
+    kontaktBilder,
   ] = await Promise.all([
     ladeNutzer(client, ichId),
     ladeKontakte(client, ichId),
@@ -1788,6 +1816,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     ladeInsightZiele(client, ichId),
     ladeSichtbarkeit(client, ichId),
     ladeKeinInteresse(client, ichId),
+    ladeKontaktBilder(client, ichId),
   ]);
 
   // „Folge ich?" gehört an die Person, nicht an den einzelnen Beitrag. Vorher
@@ -1854,6 +1883,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     insightZiele,
     sichtbarkeit,
     keinInteresse,
+    kontaktBilder,
     ichId,
     geladen: new Date().toISOString(),
   };

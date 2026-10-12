@@ -4,6 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { avatarPair, colors, initialsOf, themenStyles } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
+import { useImMessenger } from '../contexts/KontaktBildContext';
+
+const Kontaktbild = require('../../gemeinsam/kontaktbild') as typeof import('../../gemeinsam/kontaktbild');
 
 interface Props {
   id: string;
@@ -55,14 +58,28 @@ export const Avatar = ({ id, name, size = 54, group = false, online = false, eck
    * in der App blau. Für alles, was keine Person ist (eine Community, ein
    * Gruppenname), gibt es keinen Eintrag — dann wird wie bisher gewürfelt.
    */
-  const { users: alleNutzer } = useDaten();
+  const { users: alleNutzer, kontaktBilder } = useDaten();
+  const imMessenger = useImMessenger();
   const ausDatenbank = farbe ?? alleNutzer[id]?.color;
   const pair: [string, string] = group ? ['#7E93C4', '#4A6699'] : avatarPair(id, ausDatenbank);
   const dot = Math.max(11, Math.round(size * 0.32));
   // Das Profilbild liegt UEBER den Initialen, nicht statt ihrer: laedt es
   // nicht (abgelaufene Unterschrift, haengendes Netz), bleiben die
   // Initialen sichtbar statt einer leeren Flaeche.
-  const foto = group ? null : bild === undefined ? alleNutzer[id]?.avatar : bild;
+  //
+  // Kasten 28/7.8: im Messenger gewinnt mein eigenes Kontaktbild (Schema 94),
+  // sonst das Profilbild — die Regel steht in gemeinsam/kontaktbild.js
+  // (anzeigeFuer), dieselbe wie auf der Website. `bild === null` erzwingt
+  // weiter die Initialen, auch im Messenger.
+  const profilBild = bild === undefined ? alleNutzer[id]?.avatar : bild;
+  const foto =
+    group || bild === null
+      ? null
+      : Kontaktbild.anzeigeFuer(id, {
+          profil: { avatar: profilBild },
+          kontaktBilder,
+          messenger: imMessenger,
+        }).bild ?? null;
 
   return (
     <View style={[{ width: size, height: size }, style]}>

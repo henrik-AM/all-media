@@ -69,6 +69,7 @@ import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { FollowersScreen } from './screens/profile/FollowersScreen';
 import { FollowingScreen } from './screens/profile/FollowingScreen';
 import { colors, themenStyles } from './constants/design';
+import { KontaktBildBereich } from './contexts/KontaktBildContext';
 import { useDaten } from './contexts/DatenContext';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
 // UMD wie in ExplorerScreen: die Prüfläufe laden App-Code als blob:-Modul.
@@ -2705,7 +2706,34 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Kasten 11.1: die Storylisten gehen als Kontext an jedes Profilbild
    * (StoryAvatar) — ein Ring, eine Quelle, statt jeder Bildschirm für sich.
    */
-  return <StoryContext.Provider value={storyWert}>{inhalt}</StoryContext.Provider>;
+  /*
+   * Kasten 28/7.8: gehört die offene Ansicht zum Messenger? Nur dort zeigt
+   * jeder Avatar mein eigenes Kontaktbild (KontaktBildBereich). Ein Chat
+   * zählt, wenn er weder unter Communitys → Chats steht noch eine Community
+   * oder ein Unterthema ist; das Kontaktprofil (variant 'kontakt') zählt,
+   * das öffentliche Profil (Videos) nicht. Übrige Vollbilder nur, wenn sie
+   * aus dem Messenger kommen (Kontakte, Anruf, Story, Insights).
+   */
+  const imMessenger = (() => {
+    if (overlay?.kind === 'chat') {
+      const id = overlay.chat.id;
+      return !(
+        daten.communityChats.some((c) => c.id === id) ||
+        daten.communities.some((c) => c.id === id || (c.unterthemen ?? []).some((u) => u.id === id))
+      );
+    }
+    if (overlay?.kind === 'profile') return overlay.variant === 'kontakt';
+    if (overlay) {
+      return area === 'messenger' && ['contacts', 'call', 'story', 'insights', 'editSelectedContacts'].includes(overlay.kind);
+    }
+    return area === 'messenger';
+  })();
+
+  return (
+    <StoryContext.Provider value={storyWert}>
+      <KontaktBildBereich.Provider value={imMessenger}>{inhalt}</KontaktBildBereich.Provider>
+    </StoryContext.Provider>
+  );
 };
 
 const Root = () => {
