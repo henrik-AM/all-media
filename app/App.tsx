@@ -1865,6 +1865,21 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onMessengerAntworten={(annehmen) => messengerAntworten(overlay.chat, annehmen)}
         onZumMessenger={() => overlay.chat.userId && zumMessenger(overlay.chat.userId)}
         /*
+         * Kasten 28/11.4: das Bild an einer Blase im Unterthema / in der
+         * Community-Gruppe öffnet das Community-Profil. Ein getrenntes
+         * Community-Profil fremder Personen gibt es nicht — es ist das
+         * öffentliche Profil (wie „@name · Communitys" in der Kontaktinfo der
+         * Website). Das eigene Bild führt ins eigene Community-Profil.
+         */
+        onOpenCommunityProfil={(id) => {
+          if (id === 'me') {
+            setOverlay(null);
+            switchArea('communities');
+            return;
+          }
+          openPublicProfile(id);
+        }}
+        /*
          * Kasten 16: die Story aus einer Markierungs-Karte. Erst in den
          * Leisten suchen (dort steht der Gesehen-/Gefällt-Stand); fehlt sie
          * — etwa die Story eines Nichtkontakts, die man als Markierter

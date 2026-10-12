@@ -373,6 +373,65 @@
     }
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Profilbild an der Blase (Kasten 28/11.3, Nachtrag 12.10.2026)       */
+  /* ------------------------------------------------------------------ */
+
+  /*
+   * Henrik: „Ich möchte, dass im Chat eines Unterthemas unter jeder Nachricht
+   * einer Person, links unten von der Nachricht das Profilbild der Person vom
+   * Community Profil angezeigt wird. Da soll man dann auch drauf drücken
+   * können, so dass man auf das community Profile der Person kommt."
+   *
+   * Prototyp „CH + Kanalunterthema" (897-12186): fremde Blase → Bild unten
+   * links, eigene (grüne) Blase → eigenes Bild unten rechts. „CC + Chat"
+   * (926-12526, Community-Einzelchat): keine Bilder.
+   *
+   * Das Bild ist das Profilbild des Kontos (profiles.avatar_url, Schema 69) —
+   * ein eigenes Community-Profilbild gibt es nicht. NIE das Messenger-
+   * Kontaktbild (Schema 94): das gilt nur im Messenger.
+   */
+
+  /** Kantenlänge des Bildes an der Blase, in Punkten / CSS-Pixeln. */
+  var PROFILBILD_GROESSE = 26;
+
+  /**
+   * Zeigt dieser Chat Profilbilder an den Blasen? Im Unterthema immer, im
+   * Gruppenchat unter Communitys → Chats auch; im Community-Einzelchat und im
+   * ganzen Messenger nicht.
+   */
+  function profilbilderImChat(o) {
+    if (!o) return false;
+    if (o.kanal) return true;
+    return Boolean(o.gruppe && o.community);
+  }
+
+  /**
+   * Wessen Bild eine Zeile tragen kann — oder null, wenn sie keine Blase ist
+   * (Anrufzeile, „Push to Talk", Markierungskarte). Eine solche Zeile
+   * unterbricht die Folge derselben Person.
+   */
+  function blasenAbsender(m, absender) {
+    if (!m || m.anruf || m.pttSitzung || m.hinweis) return null;
+    return absender || null;
+  }
+
+  /**
+   * Steht an Zeile i das Bild? Nur an der LETZTEN Blase einer Folge derselben
+   * Person (wie WhatsApp/iMessage): das Bild steht unten und gehört zur
+   * ganzen Folge darüber; an jeder Blase wäre es bei schnellem Schreiben eine
+   * Säule aus demselben Gesicht. Der Platz bleibt an den übrigen Blasen frei,
+   * damit die Folge bündig steht.
+   *
+   * `absender`: Liste der Absender je Zeile, null für Zeilen ohne Blase
+   * (blasenAbsender).
+   */
+  function profilbildAn(absender, i) {
+    var a = absender && absender[i];
+    if (!a) return false;
+    return absender[i + 1] !== a;
+  }
+
   return {
     ZIEH_SCHWELLE: ZIEH_SCHWELLE,
     ZIEH_MAX: ZIEH_MAX,
@@ -397,5 +456,9 @@
     geteiltKonten: geteiltKonten,
     geteiltVorschau: geteiltVorschau,
     geteiltSichtbar: geteiltSichtbar,
+    PROFILBILD_GROESSE: PROFILBILD_GROESSE,
+    profilbilderImChat: profilbilderImChat,
+    blasenAbsender: blasenAbsender,
+    profilbildAn: profilbildAn,
   };
 });

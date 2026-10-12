@@ -83,3 +83,15 @@ export function geteiltVorschau(
   sichtbar: Set<string> | null | undefined
 ): string | null;
 export function geteiltSichtbar(client: any, ids: string[]): Promise<Set<string> | null>;
+
+/** Kasten 28/11.3: Kantenlänge des Profilbilds an der Blase. */
+export const PROFILBILD_GROESSE: number;
+/** Unterthema immer, Community-Gruppenchat auch, Einzelchat und Messenger nie. */
+export function profilbilderImChat(o: { kanal?: boolean; gruppe?: boolean; community?: boolean } | null | undefined): boolean;
+/** Absender einer Blase, null für Anruf-/PTT-/Hinweiszeilen. */
+export function blasenAbsender(
+  m: { anruf?: unknown; pttSitzung?: unknown; hinweis?: unknown } | null | undefined,
+  absender: string | null | undefined
+): string | null;
+/** Bild nur an der letzten Blase einer Folge derselben Person. */
+export function profilbildAn(absender: (string | null)[] | null | undefined, i: number): boolean;

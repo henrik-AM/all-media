@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   FlatList,
@@ -49,6 +49,8 @@ import { FarbfilterSchicht } from '../../components/Farbfilter';
 import { MarkierterText } from '../../components/MarkierterText';
 import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
 import { ZiehZumAntworten } from '../../components/ZiehZumAntworten';
+// Kasten 28/11.3: das Bild an der Blase ist nie das Messenger-Kontaktbild.
+import { KontaktBildBereich } from '../../contexts/KontaktBildContext';
 import { PushToTalk } from '../../components/PushToTalk';
 import { PttVerlaufSheet } from '../../components/PttVerlaufSheet';
 // Kasten 8.5: die Zeile „Push to Talk · Datum · Uhrzeit", gleich mit der Website.
@@ -90,6 +92,12 @@ interface Props {
   /** Standort-Karte im Chat antippen. */
   onOpenStandort?: (name: string) => void;
   onOpenProfile: (userId: string) => void;
+  /*
+   * Kasten 28/11.4: das Profilbild an einer Blase (Unterthema, Community-
+   * Gruppenchat) öffnet das Community-Profil der Person. Fehlt es, gilt
+   * onOpenProfile.
+   */
+  onOpenCommunityProfil?: (userId: string) => void;
   onOpenGroupSettings?: (chatId: string) => void;
   /** Kasten 28/11.2: Unterthema-Kopf öffnet seine Community. */
   onOpenCommunity?: (communityId: string) => void;
@@ -133,6 +141,7 @@ export const ChatDetailScreen = ({
   onCall,
   onCamera,
   onOpenProfile,
+  onOpenCommunityProfil,
   onOpenGroupSettings,
   onOpenCommunity,
   onOpenChatInfo,
@@ -226,6 +235,19 @@ export const ChatDetailScreen = ({
   const [pttVerlauf, setPttVerlauf] = useState<{ id: string; zeitpunkt?: string } | null>(null);
   // Nur die Anzeige kürzen; chat.name bleibt Zielname für Anruf und Teilen.
   const kanalName = kanalCommunity?.unterthemen?.find((u) => u.id === chat.id)?.name;
+  /*
+   * Kasten 28/11.3 (Henrik 12.10.2026, Prototyp „CH + Kanalunterthema"):
+   * im Unterthema und im Gruppenchat unter Communitys → Chats steht unten an
+   * der Blase das Profilbild — fremd links, eigen rechts. Der Community-
+   * Einzelchat („CC + Chat") und der Messenger bleiben ohne. Regel und
+   * „nur an der letzten Blase einer Folge" in gemeinsam/chatblase.js,
+   * dieselbe wie auf der Website (kanalNachricht, messageBubble).
+   */
+  const mitProfilbild = Chatblase.profilbilderImChat({
+    kanal: istKanal,
+    gruppe: chat.isGroup,
+    community: communityChats.some((c) => c.id === chat.id),
+  });
 
   /*
    * "Zuletzt online". Hier stand bis zum 03.09.2026 fest das Wort "Online" —
@@ -648,7 +670,42 @@ export const ChatDetailScreen = ({
     return /^\d{1,2}:\d{2}$/.test(erste.time.trim()) ? 'Heute' : erste.time;
   })();
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  /*
+   * Kasten 28/11.3/11.4: das Profilbild an einer Blase — oder der freie Platz
+   * dafür. Immer das Profilbild des Kontos (profiles.avatar_url, Schema 69),
+   * nie das eigene Messenger-Kontaktbild: der Bereich wird hier ausdrücklich
+   * auf „nicht Messenger" gestellt. Antippen öffnet das Community-Profil.
+   */
+  const blasenBild = (item: Message, index: number) => {
+    if (!Chatblase.profilbildAn(absender, index)) {
+      return <View style={styles.blasenBildPlatz} />;
+    }
+    const person = alleNutzer[item.senderId];
+    const name = person?.name ?? (item.senderId === CURRENT_USER_ID ? 'Du' : 'Unbekannt');
+    return (
+      <Druck
+        style={styles.blasenBildPlatz}
+        onPress={() => (onOpenCommunityProfil ?? onOpenProfile)(item.senderId)}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={`Community-Profil von ${name}`}
+        testID="blasen-profilbild"
+      >
+        <KontaktBildBereich.Provider value={false}>
+          <Avatar id={item.senderId} name={name} size={Chatblase.PROFILBILD_GROESSE} />
+        </KontaktBildBereich.Provider>
+      </Druck>
+    );
+  };
+
+  // Kasten 28/11.3: wer welche Blase geschrieben hat — für „Bild nur an der
+  // letzten Blase einer Folge" (Chatblase.profilbildAn).
+  const absender = useMemo(
+    () => messages.map((m) => Chatblase.blasenAbsender(m, m.senderId)),
+    [messages]
+  );
+
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const out = item.senderId === CURRENT_USER_ID;
     // Kasten 28/6.5: ein frei gewaehlter Ort steht im (ggf. entschluesselten)
     // Text — gemeinsam/ortsuche.js macht daraus dieselbe Karte.
@@ -802,6 +859,15 @@ export const ChatDetailScreen = ({
         }}
         testID={`nachricht-${item.id}`}
       >
+      {/*
+        Kasten 28/11.3: im Unterthema und im Community-Gruppenchat eine Zeile
+        um die Blase — Bild unten links (fremd) bzw. unten rechts (eigen).
+        Das Bild steht nur an der letzten Blase einer Folge; davor bleibt
+        der Platz frei, damit die Folge bündig steht. Die Zeile liegt IN
+        ZiehZumAntworten: das Bild zieht mit, die Geste bleibt dieselbe.
+      */}
+      <View style={mitProfilbild ? [styles.bildZeile, out && styles.bildZeileOut] : styles.ohneBildZeile}>
+      {mitProfilbild && !out ? blasenBild(item, index) : null}
       {/* Lange druecken oeffnet das Menue (Antworten, Zitieren, Stern …). */}
       <Druck
         style={[
@@ -810,6 +876,8 @@ export const ChatDetailScreen = ({
           out ? styles.bubbleOut : styles.bubbleIn,
           item.media === 'sticker' && styles.bubbleSticker,
           item.geteilt && !item.zurueckgenommen && styles.bubbleKarte,
+          // In der Bildzeile ist alignSelf die Senkrechte: unten wie das Bild.
+          mitProfilbild && styles.bubbleInBildZeile,
         ]}
         onLongPress={() => {
           haptic.medium();
@@ -1167,6 +1235,8 @@ export const ChatDetailScreen = ({
           </View>
         ) : null}
       </Druck>
+      {mitProfilbild && out ? blasenBild(item, index) : null}
+      </View>
       </ZiehZumAntworten>
     );
   };
@@ -2000,6 +2070,12 @@ const styles = themenStyles((colors) => ({
     overflow: 'hidden',
   },
 
+  // Kasten 28/11.3: Zeile um Blase + Profilbild (nur Unterthema/Community-Gruppe).
+  ohneBildZeile: { width: '100%' },
+  bildZeile: { width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-start', gap: 6 },
+  bildZeileOut: { justifyContent: 'flex-end' },
+  blasenBildPlatz: { width: Chatblase.PROFILBILD_GROESSE, height: Chatblase.PROFILBILD_GROESSE, marginBottom: 2 },
+  bubbleInBildZeile: { alignSelf: 'flex-end', flexShrink: 1 },
   bubble: { maxWidth: '76%', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 7, borderRadius: 18 },
   /*
    * Kein Rahmen mehr, sondern ein weicher Schatten: die Blase liegt dann auf
