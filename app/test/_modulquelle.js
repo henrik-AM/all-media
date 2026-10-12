@@ -169,6 +169,9 @@ const UMD_BAUSTEINE = [
   // 11.10.2026: `kontaktbild.js` — eigenes Kontaktbild und Anzeigename im
   // Messenger (Kasten 28/7.8, Schema 94). Avatar.tsx und daten.ts holen ihn.
   ['kontaktbild', 'Kontaktbild'],
+  // 12.10.2026: `gruppe.js` — Gruppeninfo mit Mitgliederliste (Kasten 28/7.9,
+  // 7.10). GroupSettingsScreen holt ihn.
+  ['gruppe', 'Gruppe'],
 ];
 
 function umdTeile() {

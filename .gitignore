@@ -51,3 +51,4 @@ Thumbs.db
 
 # Lokaler, auf Geheimnisse geprüfter Bunny-App-Export
 .bunny-live-bundle/
+.figma/

@@ -1304,10 +1304,14 @@ export const ChatDetailScreen = ({
           onPress={() => {
             if (!chat.isGroup && chat.userId) {
               onOpenProfile(chat.userId);
+            } else if (chat.isGroup && !istKanal) {
+              // Kasten 28/7.9: Antippen öffnet die Gruppeninfo (wie die Kontaktinfo).
+              // Ein Unterthema ist keine Gruppe — sein Kopf bleibt, wie er ist (11.1).
+              onOpenGroupSettings?.(chat.id);
             }
           }}
           onLongPress={() => {
-            if (chat.isGroup) {
+            if (chat.isGroup && !istKanal) {
               onOpenGroupSettings?.(chat.id);
             }
           }}

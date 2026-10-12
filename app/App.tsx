@@ -38,6 +38,7 @@ import { ChatListScreen } from './screens/messenger/ChatListScreen';
 import { ChatDetailScreen } from './screens/messenger/ChatDetailScreen';
 import { ContactsScreen } from './screens/messenger/ContactsScreen';
 import { ContactProfileScreen } from './screens/messenger/ContactProfileScreen';
+import { GroupSettingsScreen } from './screens/messenger/GroupSettingsScreen';
 import { FriendMapScreen } from './screens/messenger/FriendMapScreen';
 import { EditSelectedContactsScreen } from './screens/messenger/EditSelectedContactsScreen';
 import { AvatarViewerScreen } from './screens/AvatarViewerScreen';
@@ -100,7 +101,16 @@ type Overlay =
    * Kontaktprofil (Nummer, Medien, Blockieren), sonst das oeffentliche
    * Profil mit Beitraegen.
    */
-  | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich'; versatz?: number }
+  | {
+      kind: 'profile';
+      userId: string;
+      variant: 'kontakt' | 'oeffentlich';
+      versatz?: number;
+      /** Kasten 28/7.9: aus der Gruppeninfo geöffnet — Zurück führt dorthin. */
+      zurueck?: Overlay;
+    }
+  /** Kasten 28/7.9: Gruppeninfo mit Mitgliederliste; Zurück führt in den Chat. */
+  | { kind: 'gruppe'; chat: Chat; zurueck?: Overlay }
   | { kind: 'contacts' }
   /**
    * `zielChat` gesetzt heißt: die Kamera kam aus einem Chat. Dann steht das
@@ -1861,7 +1871,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         }}
         onCamera={() => setOverlay({ kind: 'camera', zielChat: overlay.chat })}
         onOpenProfile={openProfile}
-        onOpenGroupSettings={(chatId) => setNotice(`Gruppeneinstellungen: ${overlay.chat.name}`)}
+        // Kasten 28/7.9: echte Gruppeninfo statt des Hinweises „Gruppeneinstellungen: X“.
+        onOpenGroupSettings={() => setOverlay({ kind: 'gruppe', chat: overlay.chat, zurueck: overlay })}
         onAnfrageEntscheiden={anfrageEntscheiden}
         messengerAnfrageMoeglich={
           !overlay.chat.isGroup &&
@@ -1911,12 +1922,40 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     );
   }
 
+  if (overlay?.kind === 'gruppe') {
+    const g = overlay.chat;
+    return (
+      <GroupSettingsScreen
+        chat={g}
+        onBack={() => setOverlay(overlay.zurueck ?? { kind: 'chat', chat: g })}
+        onCall={(art) => {
+          const kanal = daten.communities.some((c) => (c.unterthemen ?? []).some((u) => u.id === g.id));
+          setOverlay({
+            kind: 'call',
+            gruppenName: g.name,
+            teilnehmer: g.memberIds ?? [],
+            art,
+            ...(kanal ? { kanalId: g.id } : { chatId: g.id }),
+          });
+        }}
+        onOpenMitglied={(userId, ziel) =>
+          setOverlay({ kind: 'profile', userId, variant: ziel, zurueck: overlay })
+        }
+        onVerlassen={() => {
+          setChats((prev) => prev.filter((c) => c.id !== g.id));
+          setOverlay(null);
+        }}
+        onNotice={setNotice}
+      />
+    );
+  }
+
   if (overlay?.kind === 'profile') {
     if (overlay.variant === 'kontakt') {
       return (
         <ContactProfileScreen
           userId={overlay.userId}
-          onBack={() => setOverlay(null)}
+          onBack={() => setOverlay(overlay.zurueck ?? null)}
           onMessage={openChatWith}
           onCall={(id, art) => setOverlay({ kind: 'call', userId: id, art })}
           chat={chats.find((c) => !c.isGroup && c.userId === overlay.userId)}
@@ -1932,7 +1971,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     return (
       <UserProfileScreen
         userId={overlay.userId}
-        onBack={() => setOverlay(null)}
+        onBack={() => setOverlay(overlay.zurueck ?? null)}
         onMessage={openChatWith}
         onAvatarPress={() => {
           const person = daten.users[overlay.userId];
@@ -2616,7 +2655,9 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             // Die Kontaktinfo ist die Chat-Einstellung — dort stehen
             // Benachrichtigungen, Sperre und Chat leeren.
             if (chat.userId) return openProfile(chat.userId);
-            return setNotice('Für Gruppen gibt es die Einstellungen noch nicht');
+            // Kasten 28/7.9: Gruppen haben jetzt ihre Gruppeninfo.
+            if (chat.isGroup) return setOverlay({ kind: 'gruppe', chat });
+            return setNotice('Für diesen Chat gibt es keine Einstellungen');
           }
           if (key === 'loeschen') return chatLoeschen(chat);
           if (key === 'messenger') return void messengerAnfragen(chat);
@@ -2715,7 +2756,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * aus dem Messenger kommen (Kontakte, Anruf, Story, Insights).
    */
   const imMessenger = (() => {
-    if (overlay?.kind === 'chat') {
+    // Kasten 28/7.9: die Gruppeninfo gehört dorthin, wo ihr Chat hingehört.
+    if (overlay?.kind === 'chat' || overlay?.kind === 'gruppe') {
       const id = overlay.chat.id;
       return !(
         daten.communityChats.some((c) => c.id === id) ||
