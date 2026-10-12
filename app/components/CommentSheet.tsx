@@ -39,9 +39,15 @@ interface Props {
   onCountChange?: (targetId: string, count: number) => void;
   /** Wird nicht mehr genutzt: Meldungen stehen seit 28.09.2026 im Blatt. */
   onNotice?: (text: string) => void;
+  /**
+   * Nachtrag 4.3 (12.10.2026): Kommentar aus einer Mitteilung — Faden
+   * aufklappen, hinrollen, kurz hervorheben. Gleich auf der Website
+   * (openComments, springeZu).
+   */
+  springeZu?: string | null;
 }
 
-export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
+export const CommentSheet = ({ targetId, onClose, onCountChange, springeZu }: Props) => {
   const { users: alleNutzer, ichId } = useDaten();
   const { supabase } = useSupabase();
   /*
@@ -67,6 +73,9 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
   const [antwort, setAntwort] = useState<Comment | null>(null);
   /** Aufgeklappte Fäden („N Antworten ansehen"). */
   const [offen, setOffen] = useState<Set<string>>(new Set());
+  // Nachtrag 4.3: der Kommentar aus einer Mitteilung leuchtet kurz auf.
+  const [markiert, setMarkiert] = useState<string | null>(null);
+  const liste = useRef<FlatList<{ kommentar: Comment; antworten: Comment[] }>>(null);
   const feldRef = useRef<TextInput>(null);
   const faeden = useMemo(() => Kommentar.faeden(comments), [comments]);
   const insets = useSafeAreaInsets();
@@ -102,13 +111,23 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
     setOffen(new Set());
     ladeKommentare(supabase, ichId, targetId)
       .then((geladen) => {
-        if (!abgebrochen) setComments(geladen);
+        if (abgebrochen) return;
+        setComments(geladen);
+        if (!springeZu) return;
+        const ziel = geladen.find((c) => c.id === springeZu);
+        if (!ziel) return setHinweis('Dieser Kommentar ist nicht mehr da');
+        const wurzel = ziel.antwortAuf ?? ziel.id;
+        setOffen(new Set([wurzel]));
+        setMarkiert(ziel.id);
+        setTimeout(() => setMarkiert(null), 2500);
+        const platz = Kommentar.faeden(geladen).findIndex((f) => f.kommentar.id === wurzel);
+        if (platz >= 0) setTimeout(() => liste.current?.scrollToIndex({ index: platz, viewPosition: 0.3, animated: true }), 350);
       })
       .catch((e) => console.error('Kommentare laden fehlgeschlagen:', e?.message ?? e));
     return () => {
       abgebrochen = true;
     };
-  }, [targetId, supabase, ichId]);
+  }, [targetId, supabase, ichId, springeZu]);
 
   const toggleLike = async (comment: Comment) => {
     // Erst anzeigen, dann speichern: ein Herz, das eine halbe Sekunde
@@ -217,7 +236,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
        * der Chatblase (ZiehZumAntworten, Schwelle aus gemeinsam/chatblase.js).
        */
       <ZiehZumAntworten aktiv onAntworten={() => antworten(item)} testID={`kommentar-${item.id}`}>
-      <View style={[styles.comment, alsAntwort && styles.commentAntwort]}>
+      <View style={[styles.comment, alsAntwort && styles.commentAntwort, markiert === item.id && styles.commentMarkiert]}>
         {/* Kasten 11.1: Ring an der Person, die kommentiert hat. */}
         <StoryAvatar
           id={item.userId}
@@ -327,7 +346,9 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
           data={faeden}
           renderItem={renderFaden}
           keyExtractor={(item) => item.kommentar.id}
-          extraData={offen}
+          ref={liste}
+          extraData={[offen, markiert]}
+          onScrollToIndexFailed={() => {}}
           style={styles.list}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
@@ -449,6 +470,7 @@ const styles = themenStyles((colors) => ({
   commentMeta: { color: colors.text3, ...typography.small },
   /* Nachtrag 4.3b: Antworten eingerückt unter dem Kommentar (Avatar-Breite). */
   commentAntwort: { paddingLeft: spacing.lg + sizes.avatarSm + 4 + 11, paddingVertical: 6 },
+  commentMarkiert: { backgroundColor: colors.surface3, borderRadius: 12 },
   metaZeile: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
   antwortenKnopf: { color: colors.text2, ...typography.small, fontWeight: '700' },
   klapp: {

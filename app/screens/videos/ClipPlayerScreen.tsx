@@ -34,6 +34,8 @@ import { MarkierterText } from '../../components/MarkierterText';
 
 interface Props {
   clipId: string;
+  /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
+  kommentar?: string | null;
   onBack: () => void;
   onOpenProfile: (userId: string) => void;
   onOpenExplorer: (ziel: ExplorerZiel) => void;
@@ -69,7 +71,7 @@ const zeitText = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart
  * Vorher ließ sich ein Querformat-Video gar nicht öffnen — es kam nur
  * „Wiedergabe folgt mit dem Backend".
  */
-export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer, onShare, onNotice }: Props) => {
+export const ClipPlayerScreen = ({ clipId, kommentar, onBack, onOpenProfile, onOpenExplorer, onShare, onNotice }: Props) => {
   const { users: alleNutzer } = useDaten();
   const insets = useSafeAreaInsets();
   const { clips, clipUmschalten, raster } = useProfil();
@@ -130,7 +132,8 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
    */
   const [liveOffen, setLiveOffen] = useState(false);
   /* Bis zum 21.09.2026 gab der Kommentar-Knopf nur die Anzahl als Hinweis aus. */
-  const [kommentareOffen, setKommentareOffen] = useState(false);
+  const [kommentareOffen, setKommentareOffen] = useState(!!kommentar);
+  const [springeZu, setSpringeZu] = useState<string | null>(kommentar ?? null);
   /* Neue Kommentare zaehlen sofort mit, nicht erst beim naechsten Laden. */
   const [kommentarZahl, setKommentarZahl] = useState<Record<string, number>>({});
   /*
@@ -847,7 +850,11 @@ export const ClipPlayerScreen = ({ clipId, onBack, onOpenProfile, onOpenExplorer
 
       <CommentSheet
         targetId={kommentareOffen ? clip.id : null}
-        onClose={() => setKommentareOffen(false)}
+        springeZu={springeZu}
+        onClose={() => {
+          setKommentareOffen(false);
+          setSpringeZu(null);
+        }}
         onCountChange={(id, anzahl) => setKommentarZahl((z) => ({ ...z, [id]: anzahl }))}
         onNotice={onNotice}
       />

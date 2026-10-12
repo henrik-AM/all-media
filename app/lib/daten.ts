@@ -1243,6 +1243,25 @@ export async function ladeBeitraege(
   });
 }
 
+/**
+ * Nachtrag 4.3 (Henrik, 12.10.2026): unter welchem Beitrag ein Kommentar
+ * steht — für den Tipp auf eine Mitteilung zu einem Kommentar (Antwort, Herz,
+ * @). Gleiche Abfrage in web/server/supabase-api.js (kommentarOrt).
+ * Unsichtbar oder gelöscht → null.
+ */
+export async function kommentarOrt(
+  client: SupabaseClient,
+  kommentarId: string
+): Promise<{ beitragId: string; kind: string } | null> {
+  const { data, error } = await client
+    .from('comments')
+    .select('id, post_id, posts!post_id(kind)')
+    .eq('id', kommentarId)
+    .maybeSingle();
+  if (error || !data || !(data as any).post_id) return null;
+  return { beitragId: (data as any).post_id, kind: (data as any).posts?.kind ?? 'post' };
+}
+
 export async function ladeKommentare(
   client: SupabaseClient,
   ichId: string,

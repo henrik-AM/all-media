@@ -5377,3 +5377,7 @@ textarea.profilseite__gross { min-height: 160px; }
 .pttverlauf__kopf { text-align: center; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
 .pttverlauf__zeile { flex-wrap: wrap; }
 .pttverlauf__zeile audio { width: 100%; max-width: 260px; height: 34px; }
+
+/* Nachtrag 4.3 (12.10.2026): der Kommentar aus einer Mitteilung leuchtet kurz auf. */
+.comment { transition: background-color .6s ease; }
+.comment--markiert { background: var(--surface-3); border-radius: 12px; }

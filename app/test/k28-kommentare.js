@@ -200,6 +200,19 @@ function teilA() {
   pruefe('4.3d Schema 92: Doppelte Glocke vermieden (Erwähnung + „kommentiert")',
     /art = 'mention' and target_type = 'comment' and target_id = new\.id/.test(sql) &&
     /kommentar_angesprochen\(new\.id\) = v_besitzer/.test(sql));
+
+  // Reste vom 12.10.2026 (Henrik: „ja").
+  const web2 = lies('web/public/app.js');
+  pruefe('4.3a Website: frei gewählter Ort geht mit dem Bezug raus',
+    /const antwort = await ziel\.textSenden\(text, bezug\)/.test(web2) && /textSenden: \(text, bezug\) =>/.test(web2) && /textSenden: async \(text, bezug\)/.test(web2));
+  pruefe('4.3d Mitteilung → Beitrag + Kommentarblatt beim Kommentar (App + Website, gleiche Abfrage)',
+    /kommentarOrt\(sbClient, ziel\.id\)/.test(lies('app/App.tsx')) &&
+    /springeZu=\{springeZu\}/.test(lies('app/screens/home/HomeFeedScreen.tsx')) &&
+    /springeZu=\{springeZu\}/.test(lies('app/screens/video/VideoFeedScreen.tsx')) &&
+    /springeZu=\{springeZu\}/.test(lies('app/screens/videos/ClipPlayerScreen.tsx')) &&
+    /\/api\/kommentar\/\$\{encodeURIComponent\(ziel\.id\)\}\/ort/.test(web2) &&
+    /openComments\(ort\.beitragId, null, ziel\.id\)/.test(web2) &&
+    /posts!post_id\(kind\)/.test(lies('app/lib/daten.ts')) && /posts!post_id\(kind\)/.test(lies('web/server/supabase-api.js')));
 }
 
 /* ------------------------------------------------ B Wirkung mit zwei Konten */

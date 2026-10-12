@@ -5219,7 +5219,12 @@ function profilRaster(profile, tab, listen) {
 }
 
 /* ---------------------------------------------------------- comments */
-async function openComments(targetId, onCountChange) {
+/*
+ * `springeZu` (Nachtrag 4.3, 12.10.2026): eine Kommentar-Kennung aus einer
+ * Mitteilung. Das Blatt klappt ihren Faden auf, rollt hin und hebt sie kurz
+ * hervor. Gleich in der App (CommentSheet, springeZu).
+ */
+async function openComments(targetId, onCountChange, springeZu) {
   const res = await fetch(`/api/comments/${targetId}`);
   let list = await res.json();
   if (!Array.isArray(list)) list = [];
@@ -5455,7 +5460,16 @@ async function openComments(targetId, onCountChange) {
     });
   };
 
+  const ziel = springeZu ? list.find((c) => String(c.id) === String(springeZu)) : null;
+  if (ziel) offen.add(ziel.antwortAuf || ziel.id);
   paint();
+  if (springeZu && !ziel) toast('Dieser Kommentar ist nicht mehr da');
+  if (ziel) {
+    const zeile = sheet.querySelector(`[data-msgid="${CSS.escape(String(ziel.id))}"]`);
+    zeile?.scrollIntoView({ block: 'center' });
+    zeile?.classList.add('comment--markiert');
+    setTimeout(() => zeile?.classList.remove('comment--markiert'), 2500);
+  }
 
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet) sheet.remove();
@@ -6924,12 +6938,13 @@ async function renderCommunityChat(community, kanal, thema) {
     },
     ohne: ['standortAnfragen'],
     fertig: () => renderCommunityChat(community, kanal, thema),
-    // Kasten 28/6.5: ein frei gewählter Ort geht als Text in den Kanal.
-    textSenden: (text) =>
+    // Kasten 28/6.5: ein frei gewählter Ort geht als Text in den Kanal —
+    // mit dem Bezug aus dem Ziehen (4.3a), wie jeder andere Anhang.
+    textSenden: (text, bezug) =>
       fetch(`/api/communities/${community.id}/channels/${kanal.id}/nachricht`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, antwortAuf: bezug?.antwortAuf || null }),
       }).then((r) => r.json().catch(() => ({}))),
   };
   $('#commAttach').addEventListener('click', () => openAnhang(kanalZiel));
@@ -12787,9 +12802,23 @@ function mitteilungOeffnen(ziel, text = '') {
     return openStory(story.id, { bereich: story.inMessenger === false ? 'videos' : 'messenger' });
   }
 
-  // Kommentar (Herz daran, Kasten 25: @ darin): die Mitteilung kennt nur den
-  // Kommentar, nicht den Beitrag — also in den Beitrags-Feed, wie die App.
-  if (ziel.art === 'post' || ziel.art === 'comment') {
+  /*
+   * Kommentar (Antwort, Herz daran, @ darin): die Mitteilung kennt nur den
+   * Kommentar. Bis zum 12.10.2026 ging es deshalb nur in den Beitrags-Feed.
+   * Jetzt fragt der Server, unter welchem Beitrag er steht; der Beitrag geht
+   * auf und darüber das Kommentarblatt beim Kommentar. Gleich in der App.
+   */
+  if (ziel.art === 'comment') {
+    return (async () => {
+      const ort = await fetch(`/api/kommentar/${encodeURIComponent(ziel.id)}/ort`)
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!ort || !ort.ok) return toast(ort?.error || 'Diesen Kommentar gibt es nicht mehr');
+      beitragOeffnen(ort.kind, ort.beitragId);
+      setTimeout(() => openComments(ort.beitragId, null, ziel.id), 120);
+    })();
+  }
+  if (ziel.art === 'post') {
     state.area = 'videos';
     state.sub.videos = 'home';
     render();
@@ -14237,8 +14266,8 @@ function zielChat(chat) {
      * also verschlüsselt (sendeKoerper), wie jede andere Nachricht.
      * Gibt die Nachricht zurück, so wie sie der Chat zeichnet.
      */
-    textSenden: async (text) => {
-      const koerper = await sendeKoerper(chat.id, text);
+    textSenden: async (text, bezug) => {
+      const koerper = await sendeKoerper(chat.id, text, bezug || {});
       const res = await fetch(`/api/messages/${chat.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -14416,11 +14445,14 @@ function openStandortWahl(ziel) {
           b.disabled = false;
           return toast('Dieser Ort lässt sich nicht senden');
         }
-        const antwort = await ziel.textSenden(text);
+        // Kasten 4.3a: wer gezogen hat, antwortet auch mit einem Ort.
+        const bezug = ziel.bezug?.() || null;
+        const antwort = await ziel.textSenden(text, bezug);
         if (!antwort || antwort.ok === false) {
           b.disabled = false;
           return toast(antwort?.error || 'Der Standort ging nicht raus');
         }
+        if (bezug) ziel.bezugFertig?.(antwort);
         close();
         if (antwort.message) ziel.fertig(antwort.message);
         else ziel.fertig();

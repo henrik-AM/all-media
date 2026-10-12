@@ -2886,6 +2886,12 @@ app.get('/api/comments/:targetId', route(async (req) =>
   supabaseApi.ladeKommentare(req.db, req.nutzerId, req.params.targetId)
 ));
 
+// Nachtrag 4.3: Mitteilung zu einem Kommentar → unter welchem Beitrag er steht.
+app.get('/api/kommentar/:id/ort', route(async (req) => {
+  const ort = await supabaseApi.kommentarOrt(req.db, req.params.id);
+  return ort ? { ok: true, ...ort } : { ok: false, error: 'Diesen Kommentar gibt es nicht mehr' };
+}));
+
 app.post('/api/comments/:targetId', route(async (req) => {
   const text = String(req.body?.text || '').trim();
   if (!text) return { ok: false, error: 'Text erforderlich' };

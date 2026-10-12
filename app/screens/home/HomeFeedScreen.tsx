@@ -45,6 +45,8 @@ interface Props {
    * Stelle anfangen.
    */
   startBei?: string | null;
+  /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
+  startKommentar?: { beitrag: string; kommentar: string } | null;
   /** Wird gerufen, sobald dorthin gesprungen wurde — einmal, nicht bei jedem Neubau. */
   onStartErreicht?: () => void;
   onNotice: (message: string) => void;
@@ -58,6 +60,7 @@ export const HomeFeedScreen = ({
   onOpenProfile,
   onShare,
   startBei,
+  startKommentar,
   onStartErreicht,
   onNotice,
   onOpenExplorer,
@@ -128,6 +131,13 @@ export const HomeFeedScreen = ({
   }, [startBei, sichtbarePosts, onStartErreicht]);
 
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  // Nachtrag 4.3: aus einer Mitteilung gleich ins Blatt, beim Kommentar.
+  const [springeZu, setSpringeZu] = useState<string | null>(null);
+  useEffect(() => {
+    if (!startKommentar) return;
+    setSpringeZu(startKommentar.kommentar);
+    setCommentsFor(startKommentar.beitrag);
+  }, [startKommentar]);
   const [optionenFuer, setOptionenFuer] = useState<OptionenBeitrag | null>(null);
 
   const update = (id: string, change: (post: Post) => Post) =>
@@ -466,7 +476,11 @@ export const HomeFeedScreen = ({
       <CommentSheet
         onNotice={onNotice}
         targetId={commentsFor}
-        onClose={() => setCommentsFor(null)}
+        springeZu={springeZu}
+        onClose={() => {
+          setCommentsFor(null);
+          setSpringeZu(null);
+        }}
         onCountChange={(id, count) => update(id, (p) => ({ ...p, comments: count }))}
       />
     </View>

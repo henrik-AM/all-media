@@ -45,6 +45,8 @@ interface Props {
    * Profilraster hierher. Gleiche Regel wie in HomeFeedScreen.
    */
   startBei?: string | null;
+  /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
+  startKommentar?: { beitrag: string; kommentar: string } | null;
   onStartErreicht?: () => void;
   onNotice: (message: string) => void;
   /** Ort und Sound am Beitrag fuehren auf ihre Seite (lib/ziele.ts). */
@@ -55,6 +57,7 @@ export const VideoFeedScreen = ({
   onOpenProfile,
   onShare,
   startBei,
+  startKommentar,
   onStartErreicht,
   onNotice,
   onOpenExplorer,
@@ -108,6 +111,13 @@ export const VideoFeedScreen = ({
   }, [eigeneVideos]);
   const [slideHeight, setSlideHeight] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  // Nachtrag 4.3: aus einer Mitteilung gleich ins Blatt, beim Kommentar.
+  const [springeZu, setSpringeZu] = useState<string | null>(null);
+  useEffect(() => {
+    if (!startKommentar) return;
+    setSpringeZu(startKommentar.kommentar);
+    setCommentsFor(startKommentar.beitrag);
+  }, [startKommentar]);
   const [optionenFuer, setOptionenFuer] = useState<OptionenBeitrag | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   /*
@@ -540,7 +550,11 @@ export const VideoFeedScreen = ({
       <CommentSheet
         onNotice={onNotice}
         targetId={commentsFor}
-        onClose={() => setCommentsFor(null)}
+        springeZu={springeZu}
+        onClose={() => {
+          setCommentsFor(null);
+          setSpringeZu(null);
+        }}
         onCountChange={(id, count) => update(id, (v) => ({ ...v, comments: count }))}
       />
     </View>

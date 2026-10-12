@@ -20,7 +20,7 @@ import { profilOeffnerSetzen } from './lib/markierung';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenBereich, TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
-import { ladeEinstellungen } from './lib/daten';
+import { kommentarOrt, ladeEinstellungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
 import { KontoFreigabe } from './components/KontoFreigabe';
 import { NeueBedingungen } from './components/NeueBedingungen';
@@ -130,7 +130,7 @@ type Overlay =
   /* Die offenen Insights einer Person ansehen — Handbuch-Abgleich 01.09.2026. */
   | { kind: 'insights'; userId: string }
   | { kind: 'explorer'; ziel: ExplorerZiel }
-  | { kind: 'clip'; clipId: string }
+  | { kind: 'clip'; clipId: string; kommentar?: string }
   /**
    * Die Seite einer Community — Prototyp-Frame "CH + Kanal". Vorher fuehrte
    * eine Community direkt in einen Gruppenchat; die Seite dazwischen gab es
@@ -298,6 +298,9 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * sobald er dort ist; sonst spraenge er bei jedem Neubau zurueck.
    */
   const [startBeitrag, setStartBeitrag] = useState<string | null>(null);
+  // Nachtrag 4.3: Kommentar aus einer Mitteilung — das Blatt öffnet sich dort.
+  const [startKommentar, setStartKommentar] = useState<{ beitrag: string; kommentar: string } | null>(null);
+  const { supabase: sbClient } = useSupabase();
   /** Aufnahme aus der Kamera, die auf die Wahl eines Chats wartet. */
   const [aufnahmeFuerChat, setAufnahmeFuerChat] = useState<string | null>(null);
   /*
@@ -1479,6 +1482,20 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       const community = profil.communities.find((c) => c.id === ziel.id);
       return community ? openCommunity(community) : setNotice('Diese Community gibt es nicht mehr');
     }
+    /*
+     * Kommentar (Antwort, Herz daran, @ darin): die Mitteilung kennt nur den
+     * Kommentar. Bis zum 12.10.2026 ging es deshalb nur in den Feed. Jetzt:
+     * Beitrag nachsehen, dort hin, Kommentarblatt beim Kommentar. Gleich auf
+     * der Website (mitteilungOeffnen, 'comment').
+     */
+    if (ziel.art === 'comment' && sbClient) {
+      return void kommentarOrt(sbClient, ziel.id).then((ort) => {
+        if (!ort) return setNotice('Diesen Kommentar gibt es nicht mehr');
+        if (ort.kind === 'clip') return setOverlay({ kind: 'clip', clipId: ort.beitragId, kommentar: ziel.id });
+        eintragOeffnen(ort.kind === 'reel' ? 'reel' : 'beitrag', ort.beitragId);
+        setStartKommentar({ beitrag: ort.beitragId, kommentar: ziel.id });
+      });
+    }
     setArea('videos');
     setSubs((prev) => ({ ...prev, videos: ziel.art === 'post' || ziel.art === 'comment' ? 'home' : 'portrait' }));
   };
@@ -2090,6 +2107,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <>
       <ClipPlayerScreen
         clipId={overlay.clipId}
+        kommentar={overlay.kommentar ?? null}
         onBack={() => setOverlay(null)}
         onOpenProfile={openPublicProfile}
         onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
@@ -2321,6 +2339,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             onShare={teileVideo}
             startBei={startBeitrag}
             onStartErreicht={() => setStartBeitrag(null)}
+            startKommentar={startKommentar}
             onNotice={setNotice}
             onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
           />
@@ -2372,6 +2391,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           onShare={teileBeitrag}
           startBei={startBeitrag}
           onStartErreicht={() => setStartBeitrag(null)}
+          startKommentar={startKommentar}
           onNotice={setNotice}
           onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
         />

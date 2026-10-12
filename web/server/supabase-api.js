@@ -1122,6 +1122,24 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
   }));
 }
 
+/*
+ * Nachtrag 4.3 (Henrik, 12.10.2026): eine Mitteilung zu einem Kommentar
+ * (Antwort, Herz, @) kennt nur den Kommentar. Hier steht, unter welchem
+ * Beitrag er hängt — damit der Tipp darauf den Beitrag öffnet und das
+ * Kommentarblatt genau dort. Gleiche Abfrage in app/lib/daten.ts
+ * (kommentarOrt). Unsichtbar oder gelöscht → null, die Leseregel entscheidet.
+ */
+async function kommentarOrt(client, kommentarId) {
+  if (!client || !/^[0-9a-f-]{36}$/i.test(String(kommentarId || ''))) return null;
+  const { data, error } = await client
+    .from('comments')
+    .select('id, post_id, posts!post_id(kind)')
+    .eq('id', kommentarId)
+    .maybeSingle();
+  if (error || !data || !data.post_id) return null;
+  return { beitragId: data.post_id, kind: data.posts?.kind || 'post' };
+}
+
 async function ladeKommentare(client, nutzerId, beitragId) {
   if (!client) return null;
   /*
@@ -1974,6 +1992,7 @@ module.exports = {
   ladeStorys,
   ladeBeitraege,
   ladeKommentare,
+  kommentarOrt,
   ladeCommunities,
   ladeKanalNachrichten,
   ladeHashtags,
