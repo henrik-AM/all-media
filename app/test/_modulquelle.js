@@ -166,6 +166,9 @@ const UMD_BAUSTEINE = [
   // 10.10.2026: `ptt.js` fuer die Zeile „Push to Talk" und den Verlauf
   // dahinter (Kasten 8.5/8.6, Schema 90).
   ['ptt', 'Ptt'],
+  // 11.10.2026: `kontaktbild.js` — eigenes Kontaktbild und Anzeigename im
+  // Messenger (Kasten 28/7.8, Schema 94). Avatar.tsx und daten.ts holen ihn.
+  ['kontaktbild', 'Kontaktbild'],
 ];
 
 function umdTeile() {

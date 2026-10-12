@@ -949,9 +949,45 @@ export const ChatDetailScreen = ({
            * auf der Website (geteiltKarte in web/public/app.js).
            */
           item.geteilt.weg ? (
-            <View style={styles.geteiltWeg} accessibilityLabel={Chatblase.GETEILT_WEG} testID="geteilt-weg">
-              <Ionicons name="eye-off-outline" size={18} color={colors.text3} />
-              <Text style={styles.geteiltWegText}>{Chatblase.GETEILT_WEG}</Text>
+            /*
+             * Nachtrag 11.10. (7.5/7.6): die Weg-Karte. Graue Fläche in
+             * Kartenform statt einer Fehlerzeile; gelöscht (Merker aus
+             * Schema 93) und nicht sichtbar (Kennung steht, Leseregel sagt
+             * nein) getrennt — mehr weiß die Datenbank nicht, mehr steht
+             * nicht da. Bei „gelöscht" das Konto mit Profilbild, falls es
+             * noch lesbar ist. Gleiche Karte auf der Website (geteiltKarte).
+             */
+            <View
+              style={styles.geteiltWeg}
+              accessibilityLabel={Chatblase.geteiltBeschriftung(item.geteilt)}
+              testID={item.geteilt.grund === 'geloescht' ? 'geteilt-geloescht' : 'geteilt-weg'}
+            >
+              {item.geteilt.autorId && (item.geteilt.autor || alleNutzer[item.geteilt.autorId]?.name) ? (
+                <View style={styles.geteiltWegKonto}>
+                  <Avatar
+                    id={item.geteilt.autorId}
+                    name={item.geteilt.autor || alleNutzer[item.geteilt.autorId]?.name || '?'}
+                    size={22}
+                    bild={item.geteilt.autorBild}
+                  />
+                  <Text style={styles.geteiltAutor} numberOfLines={1}>
+                    {item.geteilt.autor || alleNutzer[item.geteilt.autorId]?.name}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={styles.geteiltWegFlaeche}>
+                <View style={styles.geteiltWegSymbol}>
+                  <Ionicons
+                    name={item.geteilt.grund === 'geloescht' ? 'trash-outline' : 'eye-off-outline'}
+                    size={22}
+                    color={colors.text3}
+                  />
+                </View>
+                <Text style={styles.geteiltWegText}>{Chatblase.GETEILT_WEG}</Text>
+                {Chatblase.geteiltWegGrund(item.geteilt) ? (
+                  <Text style={styles.geteiltWegGrund}>{Chatblase.geteiltWegGrund(item.geteilt)}</Text>
+                ) : null}
+              </View>
             </View>
           ) : (
             <Druck
@@ -971,7 +1007,13 @@ export const ChatDetailScreen = ({
               testID="geteilt-karte"
             >
               <View style={styles.geteiltKopf}>
-                <Avatar id={item.geteilt.id} name={item.geteilt.autor || '?'} size={22} />
+                {/* 7.7: echtes Profilbild des Kontos (im Messenger ggf. mein eigenes Kontaktbild, 7.8). */}
+                <Avatar
+                  id={item.geteilt.autorId ?? item.geteilt.id}
+                  name={item.geteilt.autor || '?'}
+                  size={22}
+                  bild={item.geteilt.autorBild}
+                />
                 <Text style={styles.geteiltAutor} numberOfLines={1}>
                   {item.geteilt.autor}
                 </Text>
@@ -2037,17 +2079,33 @@ const styles = themenStyles((colors) => ({
   geteiltText: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10, gap: 3 },
   geteiltTitel: { ...typography.small, fontWeight: '700', color: colors.text },
   geteiltBeschreibung: { ...typography.small, color: colors.text2 },
+  /* Nachtrag 11.10. (7.6): Weg-Karte in Kartenform, nicht als Fehlerzeile. */
   geteiltWeg: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    width: 220,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: colors.surface2,
+    width: 248,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
     marginBottom: 4,
   },
-  geteiltWegText: { flex: 1, ...typography.small, color: colors.text3 },
+  geteiltWegKonto: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  geteiltWegFlaeche: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 26,
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface3,
+  },
+  geteiltWegSymbol: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface2,
+  },
+  geteiltWegText: { ...typography.small, fontWeight: '600', color: colors.text2, textAlign: 'center' },
+  geteiltWegGrund: { ...typography.small, color: colors.text3, textAlign: 'center' },
   bubbleFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
   time: { color: colors.text3, ...typography.tiny },
   timeOut: { color: colors.bubbleOutMeta },

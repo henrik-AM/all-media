@@ -270,13 +270,12 @@ function farbeFuerNadel(farbe) {
   return treffer ? treffer[0] : '#0a66ff';
 }
 
-function avatarOf(chat, size = 54) {
+function avatarOf(chat, size = 54, messenger = istMessengerChat(chat)) {
   if (chat.isGroup) {
     return `<div class="avatar avatar--${size}" style="background:linear-gradient(135deg,#7E93C4,#4A6699)">${ICONS.people}</div>`
       .replace('<svg', '<svg style="width:45%;height:45%"');
   }
-  const u = user(chat.userId);
-  return personenAvatar(u, size);
+  return avatarForUser(chat.userId, size, messenger);
 }
 
 /*
@@ -293,9 +292,28 @@ function personenAvatar(u, size, extra = '') {
   }</div>`;
 }
 
-function avatarForUser(id, size = 44) {
+/*
+ * Kasten 28/7.8 (Nachtrag 11.10.): mein eigenes Kontaktbild — nur im
+ * Messenger (`messenger` = true), nur für mich (state.kontaktBilder kommt aus
+ * kontakt_bilder, Schema 94, RLS nur Eigentümer). Die Regel steht einmal in
+ * gemeinsam/kontaktbild.js (anzeigeFuer), dieselbe wie in der App.
+ * `bild` setzt ein Profilbild, das nicht in state.users steht (Karte, 7.7).
+ */
+function avatarForUser(id, size = 44, messenger = false, bild = undefined) {
   if (id === 'me') return eigenerAvatar(state.users.me, size);
-  return personenAvatar(user(id), size);
+  const u = user(id);
+  const anzeige = window.Kontaktbild.anzeigeFuer(id, {
+    profil: { name: u.name, avatar: bild || u.avatar },
+    kontaktBilder: state.kontaktBilder,
+    messenger,
+  });
+  return personenAvatar({ ...u, avatar: anzeige.bild || null }, size);
+}
+
+/** Ist das ein Chat des Messengers (nicht Communitys → Chats, kein Unterthema)? */
+function istMessengerChat(chat) {
+  if (!chat || !chat.id) return false;
+  return [...(state.chats || []), ...(state.archiviert || [])].some((c) => c.id === chat.id);
 }
 
 /* ------------------------------------------------- @-Markierungen (Kasten 25) */
@@ -2985,7 +3003,7 @@ function renderContacts() {
 
   const item = (c) => `
     <li><button class="row" data-contact="${c.id}">
-      ${avatarForUser(c.id, 44)}
+      ${avatarForUser(c.id, 44, true)}
       <div class="row__body">
         <div class="row__name">${esc(c.name)}</div>
         <div class="row__bottom"><span class="row__preview">${esc(c.about)}</span></div>
@@ -3872,7 +3890,7 @@ function openNewGroup() {
       ${zustand.extern
         .map(
           (e) => `<div class="row">
-            ${avatarForUser(e.id, 44)}
+            ${avatarForUser(e.id, 44, true)}
             <div class="row__body">
               <div class="row__name">${esc(e.name)}</div>
               <div class="row__sub">${e.extern ? 'Wird eingeladen' : esc(e.phone || '')}</div>
@@ -3885,7 +3903,7 @@ function openNewGroup() {
         .filter((c) => c.status === 'friend')
         .map(
           (c) => `<button class="row" data-member="${c.id}">
-            ${avatarForUser(c.id, 44)}
+            ${avatarForUser(c.id, 44, true)}
             <div class="row__body"><div class="row__name">${esc(c.name)}</div></div>
             <span class="checkbox ${zustand.gewaehlt.has(c.id) ? 'is-on' : ''}">${
               zustand.gewaehlt.has(c.id) ? ICONS.check : ''
@@ -4502,7 +4520,7 @@ async function openContactProfile(userId) {
 
     <div class="scroll">
       <div class="kp__kopf">
-        ${mitStoryRing(userId, avatarForUser(userId, 104), 'messenger')}
+        ${mitStoryRing(userId, avatarForUser(userId, 104, true), 'messenger')}
         <div class="kp__name">${esc(u.name)}</div>
         ${u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
       </div>
@@ -7157,7 +7175,7 @@ function antwortenBinden(liste, finde, antworten) {
  * beim Klick ins Vollformat. Seit dem 26.09.2026 auch im Unterthema einer
  * Community (Schema 59). Gleiche Regel in der App.
  */
-function geteiltKarte(g) {
+function geteiltKarte(g, messenger = false) {
   /*
    * Kasten 7 (Feedback 28.09.): „Thumbnail im Großformat, darunter der Name
    * des Beitrags und die Beschreibung" — nach Instagram/WhatsApp-Vorbild:
@@ -7168,10 +7186,38 @@ function geteiltKarte(g) {
    * Karte in der App (ChatDetailScreen.tsx).
    */
   const C = window.Chatblase;
+  /*
+   * Nachtrag 11.10. (7.6/7.7): oben das echte Profilbild des Kontos statt
+   * Initialen auf fester Farbe; im Messenger mein eigenes Kontaktbild (7.8).
+   * `autorBild` hat der Server beim Antworten unterschrieben.
+   */
+  const kontoName = g.autor || (g.autorId ? user(g.autorId).name : '') || '';
+  const kontoBild =
+    g.autorId && state.users[g.autorId]
+      ? avatarForUser(g.autorId, 22, messenger, g.autorBild)
+      : personenAvatar({ initials: initialenVon(kontoName || '?'), avatar: g.autorBild || null }, 22);
   if (g.weg) {
-    return `<div class="msg__geteiltWeg" data-testid="geteilt-weg">${ICONS.eyeOff}<span>${esc(
-      C.GETEILT_WEG
-    )}</span></div>`;
+    /*
+     * Nachtrag 11.10. (7.5/7.6): die Weg-Karte in Kartenform statt einer
+     * Fehlerzeile. „Gelöscht" (Merker aus Schema 93) und „nicht sichtbar"
+     * (Kennung steht, Leseregel sagt nein) getrennt; mehr weiß die
+     * Datenbank nicht. Gleiche Karte in der App (ChatDetailScreen).
+     */
+    const grund = C.geteiltWegGrund(g);
+    return `<div class="msg__geteiltWeg" role="note" aria-label="${esc(C.geteiltBeschriftung(g))}" data-testid="${
+      g.grund === 'geloescht' ? 'geteilt-geloescht' : 'geteilt-weg'
+    }">
+       ${
+         g.autorId && kontoName
+           ? `<span class="msg__geteiltKopf">${kontoBild}<span class="msg__geteiltAutor">${esc(kontoName)}</span></span>`
+           : ''
+       }
+       <span class="msg__geteiltWegFlaeche">
+         <span class="msg__geteiltWegSymbol">${g.grund === 'geloescht' ? ICONS.trash : ICONS.eyeOff}</span>
+         <strong>${esc(C.GETEILT_WEG)}</strong>
+         ${grund ? `<span>${esc(grund)}</span>` : ''}
+       </span>
+     </div>`;
   }
   const istVid = g.art === 'video';
   const bild = !g.bild
@@ -7179,12 +7225,11 @@ function geteiltKarte(g) {
     : istVideoAdresse(g.bild)
     ? `<video class="msg__geteiltGross" src="${esc(g.bild)}" muted playsinline preload="metadata"></video>`
     : `<img class="msg__geteiltGross" src="${esc(g.bild)}" alt="" loading="lazy">`;
-  const u = g.autor ? g.autor.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() : '?';
   return `<button class="msg__geteilt" data-beitrag="${esc(g.id)}" data-beitragkind="${esc(
     g.kind || 'post'
   )}" aria-label="${esc(C.geteiltBeschriftung(g))}" data-testid="geteilt-karte">
      <span class="msg__geteiltKopf">
-       <span class="msg__geteiltAvatar">${esc(u)}</span>
+       ${kontoBild}
        <span class="msg__geteiltAutor">${esc(g.autor || '')}</span>
      </span>
      <span class="msg__geteiltRahmen">
@@ -7280,7 +7325,7 @@ function kanalNachricht(m) {
   // Funktion. Ein Sticker steht auch hier ohne Blase (msg--sticker).
   const inhalt = m.geteilt ? geteiltKarte(m.geteilt) : anhangInhalt(m);
   const stickerKlasse = m.media === 'sticker' ? ' msg--sticker' : '';
-  const karteKlasse = m.geteilt && !m.geteilt.weg ? ' msg--karte' : '';
+  const karteKlasse = m.geteilt ? ' msg--karte' : '';
 
   // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
   // Kasten 4.2: Antworten im Unterthema — Bezug oben, ziehen oder Knopf.
@@ -20425,7 +20470,7 @@ function messageBubble(m, chat) {
   const inhalt = m.zurueckgenommen
     ? '<span class="msg__zurueck">Diese Nachricht wurde zurückgenommen</span>'
     : m.geteilt
-    ? geteiltKarte(m.geteilt)
+    ? geteiltKarte(m.geteilt, istMessengerChat({ id: state.openChatId }))
     : anhangInhalt(m);
 
   // Kasten 4: ziehen/Knopf zum Antworten — nicht bei Zurückgenommenem und
@@ -20434,7 +20479,7 @@ function messageBubble(m, chat) {
 
   return `
     <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}${
-      m.geteilt && !m.geteilt.weg && !m.zurueckgenommen ? ' msg--karte' : ''
+      m.geteilt && !m.zurueckgenommen ? ' msg--karte' : ''
     }" data-msgid="${esc(m.id)}"${ziehbar ? ' data-ziehbar' : ''}>
       ${ziehbar ? antwortKnopfHtml() : ''}
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
