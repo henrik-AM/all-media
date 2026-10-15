@@ -2,6 +2,8 @@
 /**
  * Feedback 28.09.2026, Kästen 11.1–11.2 und 13 (bearbeitet 15.10.2026).
  *
+ *   10.1  „neues Unterthema erstellen“ öffnet das Formular sichtbar vor der
+ *         Community-Homeseite (App: Formularblatt hing unter dem Hauptbildschirm).
  *   11.1  Im Unterthema-Chat steht oben nur „# Unterthema“ — ohne
  *         Community-Name und ohne Mitgliederzahl.
  *   11.2  Die Überschrift antippen führt auf die Homeseite der Community.
@@ -61,6 +63,7 @@ function teilA() {
   const shell = lies('app/App.tsx');
   const home = lies('app/screens/communities/CommunitiesScreen.tsx');
 
+  pruefe('10.1 Formularblatt hängt außerhalb der Vollbildansichten', /\{inhalt\}\s*\{\/\*[\s\S]*?\*\/\}\s*\{formular && \(/.test(shell));
   pruefe('11.1 Kopf nimmt im Unterthema den Namen des Unterthemas', /kanalName \? `# \$\{kanalName\}` : chat\.name/.test(chat));
   pruefe('11.1 Mitgliederzahl nur außerhalb eines Unterthemas', /\{!kanalName && \(/.test(chat));
   pruefe('11.2 Kopf im Unterthema ruft onOpenCommunity', /if \(kanalCommunity\) \{[\s\S]{0,120}onOpenCommunity\?\.\(kanalCommunity\.id\)/.test(chat));
@@ -150,6 +153,19 @@ async function teilB() {
       (await seite.locator('[data-channel]').count()) > 0 && danach.includes('Fotografie') && !(await seite.$('#commMsgs')),
       danach.trim().slice(0, 80)
     );
+
+    // 10.1: das Formular „Neues Unterthema“ liegt sichtbar vor der Homeseite.
+    await seite.click('#neuesUnterthema');
+    await seite.waitForSelector('.sheet', { state: 'visible', timeout: 5000 }).catch(() => {});
+    const blatt = await seite.$('.sheet');
+    const oben = blatt && (await seite.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const mitte = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(40, r.height / 2));
+      return el.contains(mitte);
+    }, blatt));
+    pruefe('10.1 Formular „Neues Unterthema“ liegt sichtbar oben', !!oben && /Unterthema/.test(await blatt.textContent()));
+    await seite.click('[data-sheet-close]').catch(() => {});
+    await seite.waitForTimeout(300);
 
     // 14.1/14.2: Plus unter Communitys → Chats
     await seite.click('[data-sub="chats"]');
