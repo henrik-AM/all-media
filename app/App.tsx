@@ -2708,20 +2708,6 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onClose={() => setSheet(null)}
         onSelect={erstelle}
       />
-      {formular && (
-        <FormularSheet
-          visible
-          title={formular.title}
-          felder={formular.felder}
-          knopf={formular.knopf}
-          vorbelegung={formular.vorbelegung}
-          onClose={() => setFormular(null)}
-          onSubmit={formular.absenden}
-          onNotice={setNotice}
-          kopf={formular.kopf}
-          unten={formular.unten}
-        />
-      )}
       <ProfilbildSheet visible={profilbildWahl} onClose={() => setProfilbildWahl(false)} onNotice={setNotice} />
 
     </View>
@@ -2760,6 +2746,26 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     <StoryContext.Provider value={storyWert}>
       <KontaktBildBereich.Provider value={imMessenger}>
       {inhalt}
+      {/*
+       * Kasten 28/10.1: das Formularblatt hängt hier, nicht unter dem
+       * Hauptbildschirm. Dort fehlte es, sobald eine Vollbildansicht offen
+       * war (Community-Seite → „neues Unterthema erstellen“): Es öffnete
+       * sich unsichtbar und tauchte erst nach dem Verlassen auf.
+       */}
+      {formular && (
+        <FormularSheet
+          visible
+          title={formular.title}
+          felder={formular.felder}
+          knopf={formular.knopf}
+          vorbelegung={formular.vorbelegung}
+          onClose={() => setFormular(null)}
+          onSubmit={formular.absenden}
+          onNotice={setNotice}
+          kopf={formular.kopf}
+          unten={formular.unten}
+        />
+      )}
 
       {/*
        * Kästen 28/10.2 und 16: die Erstellen-Seite liegt in einem eigenen
