@@ -624,6 +624,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .row__preview svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--text-3); }
 .row.is-unread .row__preview { color: var(--text); font-weight: 500; }
+/* Kasten 28/14: Hinweis rechts in der Liste „Neuer Chat“ (wie die App). */
+.row__aktion { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; color: var(--brand); }
 .row__meta { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; color: var(--text-3); }
 .row__meta svg { width: 15px; height: 15px; }
 .badge {

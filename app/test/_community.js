@@ -286,26 +286,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(400);
   });
 
-  await pruefe('Das Plus bleibt auf der Chats-Seite', async () => {
+  /*
+   * Kasten 28/14 (15.10.2026): das Plus öffnet die Seite „Neuer Chat“ mit
+   * Profilsuche, kein Blatt mit „Kontakt hinzufügen“/„Neue Gruppe“ mehr
+   * (beide liefen über Telefonnummer und Messenger). Bereich bleibt Communitys.
+   */
+  await pruefe('Das Plus öffnet „Neuer Chat“ und bleibt unter Communitys', async () => {
     await zuDenChats();
     await page.click('#commNewChat');
-    await page.waitForTimeout(500);
-    if (!(await page.$('[data-cneu]'))) throw new Error('es geht kein Menue auf');
+    await page.waitForSelector('[data-commneuerchat]', { timeout: 5000 }).catch(() => {});
+    if (!(await page.$('[data-commneuerchat]'))) throw new Error('die Seite „Neuer Chat“ geht nicht auf');
     const aktiv = await page.$eval('#topbar .is-active', (n) => n.dataset.sub);
     if (aktiv !== 'chats') throw new Error('gesprungen nach „' + aktiv + '"');
-    await page.click('[data-sheet-close]').catch(() => {});
-    await page.waitForTimeout(300);
-  });
-
-  await pruefe('„Neue Gruppe" aus dem Menue oeffnet direkt', async () => {
-    await zuDenChats();
-    await page.click('#commNewChat');
-    await page.waitForTimeout(400);
-    await page.click('[data-cneu="gruppe"]');
-    await page.waitForTimeout(600);
-    const titel = await page.$eval('.sheet__title', (n) => n.textContent);
-    if (!titel.includes('Personen')) throw new Error('Blatt heisst „' + titel + '"');
-    await page.click('[data-sheet-close]').catch(() => {});
+    await page.click('#commNeuerChatBack');
     await page.waitForTimeout(300);
   });
 

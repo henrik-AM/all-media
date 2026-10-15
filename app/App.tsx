@@ -55,6 +55,7 @@ import { CommunityDetailScreen } from './screens/communities/CommunityDetailScre
 import { ErstellenScreen } from './screens/communities/ErstellenScreen';
 import { CommunityProfileScreen } from './screens/communities/CommunityProfileScreen';
 import { CommunitySearchScreen } from './screens/communities/CommunitySearchScreen';
+import { CommunityNeuerChatScreen } from './screens/communities/CommunityNeuerChatScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
 import { LandscapeVideosScreen } from './screens/videos/LandscapeVideosScreen';
 import { ClipPlayerScreen } from './screens/videos/ClipPlayerScreen';
@@ -157,6 +158,8 @@ type Overlay =
    * jahrelang unbemerkt geblieben.
    */
   | { kind: 'community'; communityId: string; optionen?: boolean; mitglieder?: boolean }
+  /** Kasten 28/14: das Plus unter Communitys → Chats — ein Profil suchen und anschreiben. */
+  | { kind: 'neuerCommunityChat' }
   | { kind: 'editSelectedContacts' }
   | { kind: 'avatarViewer'; userId: string; name: string }
   | { kind: 'followers'; userId: string; zurueck?: Overlay }
@@ -2146,6 +2149,16 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     );
   }
 
+  if (overlay?.kind === 'neuerCommunityChat') {
+    return (
+      <CommunityNeuerChatScreen
+        onBack={() => setOverlay(null)}
+        // Kasten 28/14.2: immer ein Community-Chat, nie der Messenger.
+        onChat={(userId) => void openChatWith(userId, 'community')}
+      />
+    );
+  }
+
   if (overlay?.kind === 'community') {
     const community = profil.communities.find((c) => c.id === overlay.communityId);
     // Sie kann verschwunden sein, wenn man sie in der Zwischenzeit verlassen
@@ -2406,7 +2419,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         return (
           <CommunityChatsScreen
             onOpenChat={oeffneChat}
-            onNewChat={() => setSub('search')}
+            // Kasten 28/14: eigene Seite statt der allgemeinen Suche.
+            onNewChat={() => setOverlay({ kind: 'neuerCommunityChat' })}
             onChatOptionen={setChatOptionen}
           />
         );

@@ -19828,40 +19828,14 @@ function renderCommunityChats() {
    * und musste sich selbst zurueckfinden. Jetzt geht ein Menue auf, genau wie
    * beim Plus in der Chatliste des Messengers.
    */
-  $('#commNewChat')?.addEventListener('click', () => {
-    openSheet(
-      'Neu',
-      `<div class="sheet__body">
-         <button class="item" data-cneu="gruppe">
-           <span class="item__icon">${ICONS.people}</span>
-           <span class="item__label">Neue Gruppe</span>
-         </button>
-         <button class="item" data-cneu="kontakt">
-           <span class="item__icon">${ICONS.userPlus}</span>
-           <span class="item__label">Kontakt hinzufügen</span>
-         </button>
-         <button class="item" data-cneu="suchen">
-           <span class="item__icon">${ICONS.search}</span>
-           <span class="item__label">In Communitys suchen</span>
-         </button>
-       </div>`,
-      (sheet, close) => {
-        sheet.querySelectorAll('[data-cneu]').forEach((b) =>
-          b.addEventListener('click', () => {
-            const was = b.dataset.cneu;
-            close();
-            if (was === 'gruppe') return openNewGroup();
-            if (was === 'kontakt') return openAddContact();
-            // Nur dieser dritte Punkt fuehrt noch in die Suche - und zwar,
-            // weil man ihn ausdruecklich gewaehlt hat.
-            state.sub.communities = 'search';
-            render();
-          })
-        );
-      },
-      { schliessen: true }
-    );
-  });
+  /*
+   * Kasten 28/14 (Henrik 28.09.2026): das Plus öffnet eine eigene Seite, auf
+   * der man ein Community-Profil sucht und anschreibt — nicht die Suche und
+   * nicht mehr das Blatt mit „Kontakt hinzufügen“ (das fragte nach einer
+   * Telefonnummer; unter Communitys bleibt die Nummer privat, Henrik
+   * 25.09.2026). Gleiche Seite in der App: CommunityNeuerChatScreen.
+   */
+  $('#commNewChat')?.addEventListener('click', () => renderCommunityNeuerChat(''));
   main.querySelectorAll('[data-ccfilter]').forEach((p) =>
     p.addEventListener('click', () => {
       state.commChatFilter = p.dataset.ccfilter;
@@ -20200,6 +20174,80 @@ function renderCommunitySuchSeite() {
   freundeLaden(nachladen);
   commDatenbankSuche(roh, nachladen);
 
+}
+
+/*
+ * Kasten 28/14: Seite „Neuer Chat“ hinter dem Plus unter Communitys → Chats.
+ * Gesucht wird nach Name und Benutzername (passendeProfile), nie nach Nummer.
+ * Ein Klick öffnet den Community-Chat mit der Person — gibt es ihn noch
+ * nicht, legt der Server ihn an (dieselbe chatMit-Regel wie in der App).
+ */
+function renderCommunityNeuerChat(roh) {
+  const q = roh.trim().toLowerCase();
+  const liste = passendeProfile(q).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const chatMit = (id) => (state.communityChats || []).find((c) => !c.isGroup && c.userId === id);
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="pagehead__row">
+        <button class="iconbtn" id="commNeuerChatBack" aria-label="Zurück">${ICONS.back}</button>
+        <h2 class="pagehead__title">Neuer Chat</h2>
+      </div>
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="commNeuerChatInput" type="search" placeholder="Community-Profil suchen..." value="${esc(roh)}" autocomplete="off" />
+        </label>
+      </div>
+    </div>
+    <div class="scroll" data-commneuerchat>
+      ${
+        liste.length
+          ? `<ul class="rows">${liste
+              .map(
+                (u) => `<li><button class="row" data-neuerchat="${esc(u.id)}" aria-label="Chat mit ${esc(u.name)}">
+                   ${avatarForUser(u.id, 44)}
+                   <div class="row__body">
+                     <div class="row__name">${esc(u.name)}</div>
+                     <div class="row__preview">${esc(u.handle)}</div>
+                   </div>
+                   <span class="row__aktion">${chatMit(u.id) ? 'Chat öffnen' : 'Schreiben'}</span>
+                 </button></li>`
+              )
+              .join('')}</ul>`
+          : `<div class="empty">${ICONS.search}
+              <div class="empty__title">Nichts gefunden</div>
+              <div class="empty__text">${q ? `Für „${esc(roh)}" gibt es kein Profil.` : 'Es gibt gerade keine Profile.'}</div>
+            </div>`
+      }
+    </div>`;
+
+  $('#commNeuerChatBack').addEventListener('click', () => renderCommunityChats());
+  const input = $('#commNeuerChatInput');
+  input.addEventListener('input', (e) => {
+    const pos = e.target.selectionStart;
+    renderCommunityNeuerChat(e.target.value);
+    const next = $('#commNeuerChatInput');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  main.querySelectorAll('[data-neuerchat]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const id = b.dataset.neuerchat;
+      const vorhanden = chatMit(id);
+      if (vorhanden) return openChat(vorhanden.id);
+      // Kasten 28/14.2: immer ein Community-Chat, nie der Messenger.
+      const res = await fetch(`/api/kontakte/${id}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bereich: 'community' }),
+      });
+      const antwort = await res.json().catch(() => ({}));
+      if (!antwort.ok) return toast(antwort.error || 'Das hat nicht geklappt');
+      await bootstrap();
+      return openChat(antwort.chatId);
+    })
+  );
 }
 
 /* --------------------------------------------------- Communitys: Profil */
