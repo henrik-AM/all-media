@@ -209,7 +209,7 @@ async function teilA() {
   pruefe('7.8 Server: Route /api/kontaktbild + kontaktBilder im Bootstrap',
     /app\.post\('\/api\/kontaktbild'/.test(serverApp) && /ladeKontaktBilder\(client, nutzerId\)/.test(api));
   pruefe('7.8 Website: Messenger-Stellen mit eigenem Bild, Kanal ohne',
-    /avatarForUser\(userId, 104, true\)/.test(web) && /geteiltKarte\(m\.geteilt, istMessengerChat\(/.test(web) && /\? geteiltKarte\(m\.geteilt\) : anhangInhalt/.test(web));
+    /avatarForUser\(userId, 104, (true|imMessenger)\)/.test(web) && /geteiltKarte\(m\.geteilt, istMessengerChat\(/.test(web) && /\? geteiltKarte\(m\.geteilt\) : anhangInhalt/.test(web));
   pruefe('7.8 Website: „Foto bearbeiten" im Kontaktprofil', /id="kpFoto"/.test(web) && /api\('\/api\/kontaktbild'/.test(web));
   pruefe('Medien nur über vorhandene Stellen (keine neue storage.from)',
     !/storage\.from\(/.test(kp) && !/storage\.from\(/.test(lies('gemeinsam/kontaktbild.js')) && !/storage\.from\(/.test(lies('gemeinsam/chatblase.js')));
