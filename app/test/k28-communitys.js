@@ -12,6 +12,13 @@
  *   13.2  Die Filter wirken: Öffentlich zeigt nur öffentliche, Privat nur
  *         private beigetretene Communitys; Alle beide. Nicht beigetretene
  *         stehen nie auf Home (die stehen unter Suchen, Kasten 3.2).
+ *   12.1  Im Einzelchat unter Communitys öffnet der Name die Chat-Einstellungen
+ *         („Chat-Info“), nicht das Profil.
+ *   12.2  Sie sehen aus wie die Kontaktinfo im Messenger — ohne Nummer, ohne
+ *         eigenes Kontaktbild, ohne Umbenennen (Communitys ohne Nummer).
+ *   12.3  Von dort zum Community- und zum Video-Profil.
+ *   12.4  „In den Messenger wechseln anfragen“ steht jederzeit dort; ob es
+ *         gilt, entscheidet die Datenbank (Schema 57).
  *   14.1  Das Plus unter Communitys → Chats öffnet eine eigene Seite „Neuer
  *         Chat“ mit Suche nach Community-Profilen (Name, Benutzername).
  *   14.2  Ein Profil antippen öffnet den Community-Chat: vorhandenen direkt,
@@ -78,6 +85,11 @@ function teilA() {
   pruefe('14.1 Seite mit Suchleiste „Community-Profil suchen…“', /placeholder="Community-Profil suchen\.\.\."/.test(neu));
   pruefe('14.1 gesucht nach Name und Benutzername, nicht nach Nummer', /u\.name\.toLowerCase\(\)\.includes\(q\) \|\| u\.handle\.toLowerCase\(\)\.includes\(q\)/.test(neu) && !/phone/.test(neu));
   pruefe('14.2 Antippen öffnet den Community-Chat', /onChat=\{\(userId\) => void openChatWith\(userId, 'community'\)\}/.test(shell));
+  const kp = lies('app/screens/messenger/ContactProfileScreen.tsx');
+  pruefe('12.1 Community-Einzelchat ruft onOpenChatInfo', /if \(onOpenChatInfo && communityChats\.some\(\(c\) => c\.id === chat\.id\)\) onOpenChatInfo\(\);/.test(chat));
+  pruefe('12.1 App.tsx öffnet ContactProfileScreen bereich="community"', /kind: 'communityChatInfo'[\s\S]*<ContactProfileScreen\s+bereich="community"/.test(shell));
+  pruefe('12.2 Nummer und Kontaktbild nur im Messenger', /\{imMessenger && !!person\.phone &&/.test(kp) && /\{imMessenger && <Druck/.test(kp));
+  pruefe('12.4 Zeile „In den Messenger wechseln anfragen“', /In den Messenger wechseln anfragen/.test(kp));
   pruefe(
     '13.2 Filterregel über beigetretenen Communitys',
     /c\.joined &&[\s\S]{0,60}\(filter === 'alle' \|\| \(filter === 'privat'\) === \(c\.visibility === 'private'\)\)/.test(home)
@@ -94,7 +106,7 @@ async function teilB() {
     users: {
       [ICH]: { id: ICH, name: 'Test Konto', handle: 'test', initials: 'TK' },
       'u-anna': { id: 'u-anna', name: 'Anna Schmidt', handle: 'anna', initials: 'AS' },
-      'u-ben': { id: 'u-ben', name: 'Ben Berg', handle: 'benno', initials: 'BB' },
+      'u-ben': { id: 'u-ben', name: 'Ben Berg', handle: 'benno', initials: 'BB', phone: '+49 151 0000000' },
     },
     communityChats: [{ id: 'cc-ben', name: 'Ben Berg', userId: 'u-ben', isGroup: false, preview: 'Hallo', time: '12:00', unread: 0 }],
     communities: [
@@ -112,6 +124,7 @@ async function teilB() {
     const aufrufe = await attrappe(seite, daten, {
       '/api/communities/c-oeff/channels/c-oeff-k1': { messages: [] },
       '/api/kontakte/u-anna/chat': { ok: true, chatId: 'cc-anna', bereich: 'community' },
+      '/api/chats/cc-ben/messenger-anfrage': { ok: false, error: 'Schreibt euch erst ein paar Nachrichten' },
     });
     await seite.goto(BASE, { waitUntil: 'domcontentloaded' });
     await seite.waitForSelector('[data-area="communities"]', { timeout: 15000 });
@@ -190,6 +203,29 @@ async function teilB() {
     await seite.waitForSelector('#chatBack', { timeout: 5000 }).catch(() => {});
     pruefe('14.2 vorhandener Chat geht direkt auf', !!(await seite.$('#chatBack')));
     pruefe('14.2 dafür kein neuer Chat beim Server', !aufrufe.slice(vorher).some((a) => a.pfad.endsWith('/chat') && a.methode === 'POST'));
+    // 12.1–12.4: Name im Community-Einzelchat → Chat-Info
+    const kopfZiel = await seite.$('.chathead__body');
+    pruefe('12.1 Name im Community-Einzelchat führt zur Chat-Info, nicht zum Profil',
+      !!(await seite.$('.chathead__body[data-chatinfo]')) && !(await seite.$('.chathead__body[data-profile]')));
+    await kopfZiel.click();
+    await seite.waitForSelector('#kpBack', { timeout: 5000 }).catch(() => {});
+    const info = (await seite.locator('#overlay').textContent()) || '';
+    pruefe('12.2 Titel „Chat-Info“', (await seite.textContent('#overlay .chathead__name')).trim() === 'Chat-Info');
+    pruefe('12.2 keine Telefonnummer', !info.includes('+49 151'), info.slice(0, 120));
+    pruefe('12.2 kein eigenes Kontaktbild, kein Bearbeiten', !(await seite.$('#kpFoto')) && !(await seite.$('#kpEdit')));
+    pruefe('12.2 keine Messenger-Gruppen, kein „Kontakt teilen“', !/gemeinsame Gruppe|Kontakt teilen|Kontaktdetails/.test(info));
+    pruefe('12.2 Aufbau wie im Messenger (Medien, Benachrichtigungen, Blockieren)', /Medien, Links, Doks/.test(info) && /Benachrichtigungen/.test(info) && /blockieren/.test(info));
+    pruefe('12.3 Community- und Video-Profil', !!(await seite.$('[data-kp="communityprofil"]')) && !!(await seite.$('[data-kp="videoprofil"]')));
+    pruefe('12.4 „In den Messenger wechseln anfragen“', !!(await seite.$('[data-kp-messenger="fragen"]')));
+    if (process.env.BILDER) await seite.waitForTimeout(900), await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-12-chatinfo.png') });
+    await seite.click('[data-kp-messenger="fragen"]');
+    await seite.waitForTimeout(600);
+    pruefe('12.4 fragt die Datenbank (POST messenger-anfrage)', aufrufe.some((a) => a.pfad === '/api/chats/cc-ben/messenger-anfrage' && a.methode === 'POST'));
+    pruefe('12.4 ihre Ablehnung steht als Meldung da', /Schreibt euch erst ein paar Nachrichten/.test(await seite.locator('body').textContent()));
+    await seite.click('#kpBack');
+    await seite.waitForSelector('#chatBack', { timeout: 5000 }).catch(() => {});
+    pruefe('12.1 Zurück führt in den Chat', !!(await seite.$('#chatBack')) && !(await seite.$('#kpBack')));
+
     // Anna hat keinen → Server legt einen Community-Chat an
     await seite.click('#chatBack');
     await seite.click('[data-sub="chats"]');

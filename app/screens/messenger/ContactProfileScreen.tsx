@@ -47,6 +47,19 @@ interface Props {
    * belegt nichts. Gilt nur auf iOS; Android kennt contentOffset nicht.
    */
   startVersatz?: number;
+  /*
+   * Kasten 28/12 (Henrik 28.09.2026): derselbe Bildschirm als Chat-Info eines
+   * Einzelchats unter Communitys. Dort bleibt die Nummer privat (Henrik
+   * 25.09.2026): keine Nummer, kein eigenes Kontaktbild, kein Umbenennen,
+   * keine Messenger-Gruppen. Dafür Community- und Video-Profil und die
+   * Messenger-Anfrage — jederzeit, nicht nur, wenn der Chat sie vorschlägt.
+   * Ob sie gilt, entscheidet messenger_anfragen() (Schema 57).
+   */
+  bereich?: 'messenger' | 'community';
+  onOpenCommunityProfil?: (userId: string) => void;
+  onMessengerAnfragen?: () => void;
+  onMessengerAntworten?: (annehmen: boolean) => void;
+  onZumMessenger?: () => void;
 }
 
 type Offen =
@@ -79,7 +92,13 @@ export const ContactProfileScreen = ({
   onOpenPublicProfile,
   onNotice,
   startVersatz,
+  bereich = 'messenger',
+  onOpenCommunityProfil,
+  onMessengerAnfragen,
+  onMessengerAntworten,
+  onZumMessenger,
 }: Props) => {
+  const imMessenger = bereich === 'messenger';
   const {
     profile: alleProfile,
     users: alleNutzer,
@@ -286,10 +305,15 @@ export const ContactProfileScreen = ({
         <Druck onPress={onBack} hitSlop={8}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Druck>
-        <Text style={styles.headerTitel}>Kontaktinfo</Text>
-        <Druck onPress={() => setOffen({ art: 'bearbeiten' })} hitSlop={8}>
-          <Text style={styles.bearbeiten}>Bearbeiten</Text>
-        </Druck>
+        <Text style={styles.headerTitel}>{imMessenger ? 'Kontaktinfo' : 'Chat-Info'}</Text>
+        {imMessenger ? (
+          <Druck onPress={() => setOffen({ art: 'bearbeiten' })} hitSlop={8}>
+            <Text style={styles.bearbeiten}>Bearbeiten</Text>
+          </Druck>
+        ) : (
+          // Platzhalter, damit der Titel in der Mitte bleibt.
+          <View style={{ width: 22 }} />
+        )}
       </View>
 
       <ScrollView
@@ -298,11 +322,12 @@ export const ContactProfileScreen = ({
       >
         <View style={styles.kopf}>
           {/* Kasten 11.1: Ring im Kontaktprofil (Messenger-Storys). */}
-          <StoryAvatar id={person.id} name={name} size={112} bereich="messenger" />
+          <StoryAvatar id={person.id} name={name} size={112} bereich={imMessenger ? 'messenger' : 'videos'} />
           <NameMitPronomen name={name} pronomen={pronomen} style={styles.name} zentriert />
-          {!!person.phone && <Text style={styles.nummer}>{person.phone}</Text>}
+          {imMessenger && !!person.phone && <Text style={styles.nummer}>{person.phone}</Text>}
+          {!imMessenger && <Text style={styles.nummer}>{person.handle}</Text>}
           {/* Kasten 28/7.8: wie Apple Kontakte — eigenes Foto, nur ich sehe es. */}
-          <Druck
+          {imMessenger && <Druck
             onPress={() => setFotoWahl(true)}
             disabled={fotoLaedt}
             hitSlop={6}
@@ -311,7 +336,7 @@ export const ContactProfileScreen = ({
             testID="kontaktbild-bearbeiten"
           >
             <Text style={styles.fotoBearbeiten}>{fotoLaedt ? 'Wird gespeichert …' : Kontaktbild.FOTO_BEARBEITEN}</Text>
-          </Druck>
+          </Druck>}
         </View>
 
         {!!bio && <Text style={styles.bio}>{bio}</Text>}
@@ -327,12 +352,37 @@ export const ContactProfileScreen = ({
               {person.handle} · Videos
             </Text>
           </Druck>
-          <Druck style={styles.profilKnopf} onPress={() => onOpenPublicProfile?.(userId)}>
+          <Druck
+            style={styles.profilKnopf}
+            onPress={() => (onOpenCommunityProfil ?? onOpenPublicProfile)?.(userId)}
+          >
             <Text style={styles.profilText} numberOfLines={1}>
               {person.handle} · Communitys
             </Text>
           </Druck>
         </View>
+
+        {!imMessenger && (
+          /*
+           * Kasten 28/12.4: die Messenger-Anfrage aus den Chat-Einstellungen.
+           * Die Zustände wie in der Leiste im Chat (ChatDetailScreen).
+           */
+          <View style={styles.liste}>
+            {chat?.messengerAnfrage === 'angenommen'
+              ? zeile('Zum Messenger-Chat', '', () => onZumMessenger?.(), 'gruen')
+              : chat?.messengerAnfrage === 'gesendet'
+                ? zeile('Messenger-Anfrage läuft', '', () => onNotice(`Deine Anfrage an ${name} läuft noch`))
+                : chat?.messengerAnfrage === 'eingegangen'
+                  ? [
+                      zeile('Messenger-Anfrage annehmen', '', () => onMessengerAntworten?.(true), 'gruen'),
+                      zeile('Messenger-Anfrage ablehnen', '', () => onMessengerAntworten?.(false), 'gefahr'),
+                    ]
+                  : zeile('In den Messenger wechseln anfragen', '', () => {
+                      if (!chat) return onNotice('Noch kein Chat mit dieser Person');
+                      onMessengerAnfragen?.();
+                    }, 'gruen')}
+          </View>
+        )}
 
         <View style={styles.aktionen}>
           {/*
@@ -482,7 +532,7 @@ export const ContactProfileScreen = ({
         </View>
 
         <View style={styles.liste}>
-          {zeile('Kontaktdetails', person.handle, () =>
+          {imMessenger && zeile('Kontaktdetails', person.handle, () =>
             setOffen({
               art: 'liste',
               titel: 'Kontaktdetails',
@@ -495,10 +545,13 @@ export const ContactProfileScreen = ({
           )}
         </View>
 
+        {/* Gemeinsame Gruppen sind Messenger-Gruppen — unter Communitys nicht. */}
+        {imMessenger && (
         <Text style={styles.gruppenKopf}>
           {gruppen.length} gemeinsame {gruppen.length === 1 ? 'Gruppe' : 'Gruppen'}
         </Text>
-        {gruppen.length === 0 ? (
+        )}
+        {!imMessenger ? null : gruppen.length === 0 ? (
           <Text style={styles.hinweis}>Ihr seid in keiner gemeinsamen Gruppe.</Text>
         ) : (
           <View style={styles.liste}>
@@ -513,8 +566,8 @@ export const ContactProfileScreen = ({
         )}
 
         <View style={styles.liste}>
-          {zeile('Kontakt teilen', '', () => onNotice(`all-media.app/${person.handle.replace('@', '')}`), 'gruen')}
-          {zeile(
+          {imMessenger && zeile('Kontakt teilen', '', () => onNotice(`all-media.app/${person.handle.replace('@', '')}`), 'gruen')}
+          {imMessenger && zeile(
             favorit ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen',
             '',
             () => {

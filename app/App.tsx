@@ -158,6 +158,8 @@ type Overlay =
    * jahrelang unbemerkt geblieben.
    */
   | { kind: 'community'; communityId: string; optionen?: boolean; mitglieder?: boolean }
+  /** Kasten 28/12: Chat-Einstellungen eines Einzelchats unter Communitys. */
+  | { kind: 'communityChatInfo'; chat: Chat; zurueck: Overlay }
   /** Kasten 28/14: das Plus unter Communitys → Chats — ein Profil suchen und anschreiben. */
   | { kind: 'neuerCommunityChat' }
   | { kind: 'editSelectedContacts' }
@@ -1077,10 +1079,11 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
   const messengerAnfragen = async (chat: Chat) => {
     const ergebnis = await aktion.messengerAnfragen(chat.id);
-    if (!ergebnis) return;
+    if (!ergebnis) return false;
     messengerZustandSetzen(chat.id, 'gesendet');
     setNotice(`Messenger-Anfrage an ${chat.name} gesendet`);
     void daten.neuLaden();
+    return true;
   };
 
   const messengerAntworten = async (chat: Chat, annehmen: boolean) => {
@@ -1847,6 +1850,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onOpenProfile={openProfile}
         // Kasten 28/7.9: echte Gruppeninfo statt des Hinweises „Gruppeneinstellungen: X“.
         onOpenGroupSettings={() => setOverlay({ kind: 'gruppe', chat: overlay.chat, zurueck: overlay })}
+        // Kasten 28/12.1: Name im Community-Einzelchat → Chat-Einstellungen.
+        onOpenChatInfo={() => setOverlay({ kind: 'communityChatInfo', chat: overlay.chat, zurueck: overlay })}
         // Kasten 28/11.2: Unterthema-Kopf öffnet dessen Community-Homeseite.
         onOpenCommunity={(communityId) => setOverlay({ kind: 'community', communityId })}
         onAnfrageEntscheiden={anfrageEntscheiden}
@@ -2146,6 +2151,38 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onCommunitys={teileInCommunitys}
       />
       </>
+    );
+  }
+
+  if (overlay?.kind === 'communityChatInfo') {
+    const chat = overlay.chat;
+    const userId = chat.userId ?? '';
+    return (
+      <ContactProfileScreen
+        bereich="community"
+        userId={userId}
+        onBack={() => setOverlay(overlay.zurueck)}
+        // „Nachricht“ führt zurück in genau diesen Chat.
+        onMessage={() => setOverlay(overlay.zurueck)}
+        onCall={(id, art) => setOverlay({ kind: 'call', userId: id, art, chatId: chat.id })}
+        chat={chat}
+        nachrichten={nachrichtenVon(chat.id)}
+        onOpenPublicProfile={openPublicProfile}
+        // Kasten 28/12.3: ein getrenntes Community-Profil fremder Personen
+        // gibt es nicht — es ist das öffentliche Profil (wie 11.4).
+        onOpenCommunityProfil={openPublicProfile}
+        onMessengerAnfragen={async () => {
+          // Die Datenbank kann ablehnen (Schema 57: erst nach Austausch) —
+          // dann steht ihr Grund in der Meldung, und die Zeile bleibt.
+          if (!(await messengerAnfragen(chat))) return;
+          setOverlay((prev) =>
+            prev?.kind === 'communityChatInfo' ? { ...prev, chat: { ...prev.chat, messengerAnfrage: 'gesendet' } } : prev
+          );
+        }}
+        onMessengerAntworten={(annehmen) => void messengerAntworten(chat, annehmen)}
+        onZumMessenger={() => zumMessenger(userId)}
+        onNotice={setNotice}
+      />
     );
   }
 

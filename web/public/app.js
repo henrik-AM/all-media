@@ -4549,18 +4549,43 @@ async function kryptoZustand(userId, chat) {
   }
 }
 
-async function openContactProfile(userId) {
+/*
+ * Kasten 28/12 (Henrik 28.09.2026): mit { bereich: 'community' } ist das die
+ * Chat-Info eines Einzelchats unter Communitys — ohne Nummer, ohne eigenes
+ * Kontaktbild, ohne Umbenennen und ohne Messenger-Gruppen (die Nummer bleibt
+ * dort privat, Henrik 25.09.2026), dafür mit der Messenger-Anfrage, die man
+ * jederzeit stellen kann. Ob sie gilt, entscheidet Schema 57. Gleiche
+ * Fassung in der App: ContactProfileScreen mit bereich 'community'.
+ */
+async function openContactProfile(userId, optionen = {}) {
   const u = user(userId);
   if (!u) return toast('Diese Person gibt es nicht');
+  const imMessenger = optionen.bereich !== 'community';
 
-  const chat = state.chats.find((c) => !c.isGroup && c.userId === userId);
+  const chat = imMessenger
+    ? state.chats.find((c) => !c.isGroup && c.userId === userId)
+    : (state.communityChats || []).find((c) => !c.isGroup && c.userId === userId);
   const profil = await (await fetch(`/api/profile/${userId}`)).json().catch(() => ({}));
   let daten = { medien: [], markiert: [], gesamt: 0 };
   if (chat) daten = await (await fetch(`/api/chats/${chat.id}/medien`)).json();
   const krypto = await kryptoZustand(userId, chat);
 
   const kontakt = state.contacts.find((c) => c.id === userId);
-  const gemeinsameGruppen = state.chats.filter((c) => c.isGroup && (c.members || []).includes(userId));
+  const gemeinsameGruppen = imMessenger
+    ? state.chats.filter((c) => c.isGroup && (c.members || []).includes(userId))
+    : [];
+  // Kasten 28/12.4: Zeilen der Messenger-Anfrage, Zustände wie messengerLeiste.
+  const anfrage = chat?.messengerAnfrage || 'keine';
+  const anfrageZeilen = imMessenger
+    ? ''
+    : anfrage === 'angenommen'
+      ? `<button class="kp__zeile is-gruen" data-kp-messenger="oeffnen"><span class="kp__zeileText">Zum Messenger-Chat</span></button>`
+      : anfrage === 'gesendet'
+        ? `<div class="kp__zeile"><span class="kp__zeileText">Messenger-Anfrage läuft</span></div>`
+        : anfrage === 'eingegangen'
+          ? `<button class="kp__zeile is-gruen" data-kp-messenger="ja"><span class="kp__zeileText">Messenger-Anfrage annehmen</span></button>
+             <button class="kp__zeile is-danger" data-kp-messenger="nein"><span class="kp__zeileText">Messenger-Anfrage ablehnen</span></button>`
+          : `<button class="kp__zeile is-gruen" data-kp-messenger="fragen"><span class="kp__zeileText">In den Messenger wechseln anfragen</span></button>`;
 
   const zeile = (label, wert, art = '') =>
     `<button class="kp__zeile ${art}" data-kp-item="${esc(label)}">
@@ -4573,21 +4598,26 @@ async function openContactProfile(userId) {
   overlay.innerHTML = `
     <header class="chathead">
       <button class="chathead__back" id="kpBack" aria-label="Zurück">${ICONS.back}</button>
-      <div class="chathead__body"><div class="chathead__name">Kontaktinfo</div></div>
-      <div class="chathead__actions"><button class="kp__bearbeiten" id="kpEdit">Bearbeiten</button></div>
+      <div class="chathead__body"><div class="chathead__name">${imMessenger ? 'Kontaktinfo' : 'Chat-Info'}</div></div>
+      <div class="chathead__actions">${imMessenger ? '<button class="kp__bearbeiten" id="kpEdit">Bearbeiten</button>' : ''}</div>
     </header>
 
     <div class="scroll">
       <div class="kp__kopf">
-        ${mitStoryRing(userId, avatarForUser(userId, 104, true), 'messenger')}
+        ${mitStoryRing(userId, avatarForUser(userId, 104, imMessenger), imMessenger ? 'messenger' : 'videos')}
         <div class="kp__name">${esc(u.name)}</div>
-        ${u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
-        <!-- Kasten 28/7.8: eigenes Kontaktfoto wie bei Apple Kontakte — nur ich sehe es. -->
+        ${imMessenger && u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
+        ${imMessenger ? '' : `<div class="kp__nummer">${esc(u.handle)}</div>`}
+        ${
+          imMessenger
+            ? `<!-- Kasten 28/7.8: eigenes Kontaktfoto wie bei Apple Kontakte — nur ich sehe es. -->
         <button class="kp__foto" id="kpFoto" type="button" data-testid="kontaktbild-bearbeiten">${esc(
           window.Kontaktbild.FOTO_BEARBEITEN
         )}</button>
         <input type="file" accept="image/*" id="kpFotoDatei" hidden />
-        <input type="file" accept="image/*" capture="environment" id="kpFotoKamera" hidden />
+        <input type="file" accept="image/*" capture="environment" id="kpFotoKamera" hidden />`
+            : ''
+        }
       </div>
 
       ${profil.bio ? `<div class="kp__bio">${esc(profil.bio)}</div>` : ''}
@@ -4596,6 +4626,8 @@ async function openContactProfile(userId) {
         <button data-kp="videoprofil">${esc(u.handle)} · Videos</button>
         <button data-kp="communityprofil">${esc(u.handle)} · Communitys</button>
       </div>
+
+      ${anfrageZeilen ? `<div class="kp__liste" data-kp-anfrage>${anfrageZeilen}</div>` : ''}
 
       <div class="kp__aktionen">
         <!-- Henrik 7.9.: „Kontaktinfo: Button zum direkten Chat-Sprung fehlt."
@@ -4629,12 +4661,13 @@ async function openContactProfile(userId) {
       </div>
 
       <div class="kp__liste">
-        ${zeile('Kontaktdetails', u.handle)}
+        ${imMessenger ? zeile('Kontaktdetails', u.handle) : ''}
       </div>
 
-      <div class="kp__gruppenkopf">${gemeinsameGruppen.length} gemeinsame ${gemeinsameGruppen.length === 1 ? 'Gruppe' : 'Gruppen'}</div>
       ${
-        gemeinsameGruppen.length
+        imMessenger
+          ? `<div class="kp__gruppenkopf">${gemeinsameGruppen.length} gemeinsame ${gemeinsameGruppen.length === 1 ? 'Gruppe' : 'Gruppen'}</div>` +
+            (gemeinsameGruppen.length
           ? `<ul class="rows">${gemeinsameGruppen
               .map(
                 (g) => `<li><button class="row" data-kp-gruppe="${g.id}">
@@ -4647,12 +4680,13 @@ async function openContactProfile(userId) {
                 </button></li>`
               )
               .join('')}</ul>`
-          : `<div class="sheet__hint">Ihr seid in keiner gemeinsamen Gruppe.</div>`
+          : `<div class="sheet__hint">Ihr seid in keiner gemeinsamen Gruppe.</div>`)
+          : ''
       }
 
       <div class="kp__liste">
-        ${zeile('Kontakt teilen', '', 'is-gruen')}
-        ${zeile(kontakt?.favorit ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen', '', 'is-gruen')}
+        ${imMessenger ? zeile('Kontakt teilen', '', 'is-gruen') : ''}
+        ${imMessenger ? zeile(kontakt?.favorit ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen', '', 'is-gruen') : ''}
         ${zeile('Chat exportieren', '', 'is-gruen')}
         ${zeile('Chat leeren', '', 'is-danger')}
       </div>
@@ -4670,7 +4704,10 @@ async function openContactProfile(userId) {
 
   // Kasten 28/7.9: aus der Gruppeninfo geöffnet → Zurück führt dorthin.
   const kpZurueck = profilZurueckNehmen(userId);
-  $('#kpBack').addEventListener('click', () => (kpZurueck ? kpZurueck() : schliessen()));
+  // Die Chat-Info unter Communitys kommt immer aus dem Chat — zurück dorthin.
+  $('#kpBack').addEventListener('click', () =>
+    kpZurueck ? kpZurueck() : !imMessenger && chat ? openChat(chat.id) : schliessen()
+  );
 
   /*
    * Kasten 28/7.8: „Foto bearbeiten" — Mediathek, Kamera, Eigenes Foto
@@ -4703,9 +4740,10 @@ async function openContactProfile(userId) {
     if (!hoch.ok) return toast(hoch.error || 'Das Bild ließ sich nicht hochladen');
     await fotoSetzen(hoch.url, hoch.anzeige || bild);
   };
-  $('#kpFotoDatei').addEventListener('change', fotoGewaehlt);
-  $('#kpFotoKamera').addEventListener('change', fotoGewaehlt);
-  $('#kpFoto').addEventListener('click', () =>
+  // In der Community-Fassung gibt es kein eigenes Kontaktbild (Kasten 28/12).
+  $('#kpFotoDatei')?.addEventListener('change', fotoGewaehlt);
+  $('#kpFotoKamera')?.addEventListener('change', fotoGewaehlt);
+  $('#kpFoto')?.addEventListener('click', () =>
     openSheet(
       K.FOTO_BEARBEITEN,
       `<div class="sheet__body">
@@ -4732,7 +4770,7 @@ async function openContactProfile(userId) {
     )
   );
 
-  $('#kpEdit').addEventListener('click', () =>
+  $('#kpEdit')?.addEventListener('click', () =>
     openFormular(
       'Kontakt bearbeiten',
       [
@@ -4836,7 +4874,21 @@ async function openContactProfile(userId) {
   );
 
   overlay.querySelectorAll('[data-kp-item]').forEach((b) =>
-    b.addEventListener('click', () => kontaktZeile(b.dataset.kpItem, userId, chat, daten))
+    b.addEventListener('click', () => kontaktZeile(b.dataset.kpItem, userId, chat, daten, optionen))
+  );
+
+  // Kasten 28/12.4: Messenger-Anfrage aus der Chat-Info (messengerAnfragen & Co.).
+  overlay.querySelectorAll('[data-kp-messenger]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const was = b.dataset.kpMessenger;
+      if (!chat) return toast('Noch kein Chat mit dieser Person');
+      if (was === 'oeffnen') return zumMessenger(userId);
+      // Antworten führt wie im Chat in den Chat (messengerAntworten).
+      if (was !== 'fragen') return messengerAntworten(chat, was === 'ja');
+      await messengerAnfragen(chat);
+      // Danach steht die Info mit dem neuen Zustand wieder da, nicht der Chat.
+      openContactProfile(userId, optionen);
+    })
   );
 }
 
@@ -5039,7 +5091,7 @@ async function openGruppenInfo(chatId) {
 }
 
 /** Was hinter den Zeilen der Kontaktinfo steckt. */
-async function kontaktZeile(label, userId, chat, daten) {
+async function kontaktZeile(label, userId, chat, daten, optionen = {}) {
   const u = user(userId);
 
   if (label === 'Medien, Links, Doks') return openChatMedien(chat, daten.medien, 'Medien, Links, Doks');
@@ -5071,14 +5123,14 @@ async function kontaktZeile(label, userId, chat, daten) {
     if (!antwort.ok) return toast(antwort.error || 'Das hat gerade nicht geklappt');
     chat.muted = Boolean(antwort.muted);
     toast(chat.muted ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
-    return openContactProfile(userId);
+    return openContactProfile(userId, optionen);
   }
 
   if (label === 'Chatdesign') {
-    return openEinstellung({ label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' }, () => openContactProfile(userId));
+    return openEinstellung({ label: 'Chat-Hintergrund', wahl: ['Hell', 'Dunkel', 'Farbverlauf'], standard: 'Hell' }, () => openContactProfile(userId, optionen));
   }
   if (label === 'In Fotos speichern') {
-    return openEinstellung({ label: 'In Fotos speichern', wahl: ['An', 'Aus'], standard: 'Aus' }, () => openContactProfile(userId));
+    return openEinstellung({ label: 'In Fotos speichern', wahl: ['An', 'Aus'], standard: 'Aus' }, () => openContactProfile(userId, optionen));
   }
   if (label === 'Selbstlöschende Nachrichten') {
     return openEinstellung(
@@ -5087,11 +5139,11 @@ async function kontaktZeile(label, userId, chat, daten) {
         wahl: ['Aus', 'Nach 24 Stunden', 'Nach 7 Tagen'],
         standard: 'Aus',
       },
-      () => openContactProfile(userId)
+      () => openContactProfile(userId, optionen)
     );
   }
   if (label === 'Erweiterter Chat-Datenschutz') {
-    return openEinstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' }, () => openContactProfile(userId));
+    return openEinstellung({ label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' }, () => openContactProfile(userId, optionen));
   }
   if (label === 'Verschlüsselung') {
     const krypto = await kryptoZustand(userId, chat);
@@ -5144,7 +5196,7 @@ async function kontaktZeile(label, userId, chat, daten) {
     if (!antwort.ok) return toast(antwort.error);
     state.contacts = antwort.contacts;
     toast(antwort.favorit ? `${u.name} ist jetzt ein Favorit` : 'Aus den Favoriten entfernt');
-    return openContactProfile(userId);
+    return openContactProfile(userId, optionen);
   }
 
   if (label === 'Chat exportieren') {
@@ -5166,7 +5218,7 @@ async function kontaktZeile(label, userId, chat, daten) {
     const frisch = await (await fetch('/api/bootstrap')).json();
     state.chats = frisch.chats;
     toast('Chat geleert');
-    return openContactProfile(userId);
+    return openContactProfile(userId, optionen);
   }
 
   if (label.includes('blockieren')) {
@@ -5181,7 +5233,7 @@ async function kontaktZeile(label, userId, chat, daten) {
     state.chats = antwort.chats;
     toast(antwort.blocked ? `${u.name} blockiert` : 'Blockierung aufgehoben');
     render();
-    return openContactProfile(userId);
+    return openContactProfile(userId, optionen);
   }
 
   // Melden — Kasten RS 3: das Melden-Blatt (art 'user', Schema 102).
@@ -20912,13 +20964,16 @@ async function openChat(chatId) {
   const gruppeMitInfo =
     chat.isGroup &&
     [...(state.chats || []), ...(state.archiviert || []), ...(state.communityChats || [])].some((c) => c.id === chat.id);
+  // Kasten 28/12.1: im Einzelchat unter Communitys öffnet der Name die
+  // Chat-Info, nicht das Profil (wie onOpenChatInfo in der App).
+  const communityEinzel = !chat.isGroup && !!chat.userId && (state.communityChats || []).some((c) => c.id === chat.id);
 
   overlay.hidden = false;
   overlay.innerHTML = `
     <header class="chathead">
       <button class="chathead__back" id="chatBack" aria-label="Zurück">${ICONS.back}</button>
       ${chat.isGroup ? avatarOf(chat, 36) : mitStoryRing(chat.userId, avatarOf(chat, 36), 'messenger')}
-      <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} ${gruppeMitInfo ? 'data-gruppeninfo' : ''} style="${chat.userId || gruppeMitInfo ? 'cursor:pointer' : ''}">
+      <div class="chathead__body" ${communityEinzel ? 'data-chatinfo' : chat.userId ? `data-profile="${chat.userId}"` : ''} ${gruppeMitInfo ? 'data-gruppeninfo' : ''} style="${chat.userId || gruppeMitInfo ? 'cursor:pointer' : ''}">
         <div class="chathead__name">${esc(chat.name)}</div>
         <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}" id="chatStatus">${
           chat.isGroup ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder` : ''
@@ -20959,6 +21014,7 @@ async function openChat(chatId) {
 
   $('#chatBack').addEventListener('click', closeChat);
   overlay.querySelector('[data-gruppeninfo]')?.addEventListener('click', () => openGruppenInfo(chat.id));
+  overlay.querySelector('[data-chatinfo]')?.addEventListener('click', () => openContactProfile(chat.userId, { bereich: 'community' }));
   const profileBtn = overlay.querySelector('[data-profile]');
   if (profileBtn) {
     profileBtn.addEventListener('click', () => {

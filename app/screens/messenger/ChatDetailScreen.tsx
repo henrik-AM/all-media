@@ -93,6 +93,12 @@ interface Props {
   onOpenGroupSettings?: (chatId: string) => void;
   /** Kasten 28/11.2: Unterthema-Kopf öffnet seine Community. */
   onOpenCommunity?: (communityId: string) => void;
+  /*
+   * Kasten 28/12.1: im Einzelchat unter Communitys öffnet der Name die
+   * Chat-Einstellungen (ContactProfileScreen, bereich 'community'), nicht
+   * das Profil.
+   */
+  onOpenChatInfo?: () => void;
   /** Offene Kontaktanfrage annehmen. */
   /** Über eine eingegangene Anfrage entscheiden — annehmen oder ablehnen. */
   onAnfrageEntscheiden?: (chatId: string, annehmen: boolean) => void;
@@ -129,6 +135,7 @@ export const ChatDetailScreen = ({
   onOpenProfile,
   onOpenGroupSettings,
   onOpenCommunity,
+  onOpenChatInfo,
   onAnfrageEntscheiden,
   messengerAnfrageMoeglich = false,
   onMessengerAnfragen,
@@ -1308,7 +1315,8 @@ export const ChatDetailScreen = ({
             if (kanalCommunity) {
               onOpenCommunity?.(kanalCommunity.id);
             } else if (!chat.isGroup && chat.userId) {
-              onOpenProfile(chat.userId);
+              if (onOpenChatInfo && communityChats.some((c) => c.id === chat.id)) onOpenChatInfo();
+              else onOpenProfile(chat.userId);
             } else if (chat.isGroup && !istKanal) {
               // Kasten 28/7.9: Antippen öffnet die Gruppeninfo (wie die Kontaktinfo).
               // Ein Unterthema ist keine Gruppe — sein Kopf bleibt, wie er ist (11.1).
