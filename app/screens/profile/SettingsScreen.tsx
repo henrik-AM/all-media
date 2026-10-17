@@ -56,7 +56,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 interface EingabeFeld {
   key: string;
   label: string;
-  typ?: 'text' | 'mehrzeilig' | 'zahl' | 'auswahl';
+  typ?: 'text' | 'mehrzeilig' | 'zahl' | 'auswahl' | 'geheim';
   /** Bei typ 'auswahl' — FormularSheet zeigt die Werte als Reihe zum Antippen. */
   auswahl?: string[];
   platzhalter?: string;
@@ -205,16 +205,18 @@ const SECTIONS: Section[] = [
             typ: 'auswahl',
             auswahl: Bildschirmzeit.TEXTE.codeArten,
           },
-          { key: 'code', label: 'Eigener Code (4 bis 8 Ziffern)', typ: 'zahl' },
-          { key: 'wdh', label: 'Eigenen Code wiederholen', typ: 'zahl' },
-          { key: 'bisher', label: 'Bisheriger eigener Code (falls schon einer gesetzt ist)', typ: 'zahl' },
+          // Henrik, 17.10.2026: mindestens 4 Zeichen, sonst frei (Ziffern,
+          // Buchstaben, Sonderzeichen). Regel in gemeinsam/bildschirmzeit.js.
+          { key: 'code', label: `Eigener Code (${Bildschirmzeit.ENTSPERRCODE_REGEL})`, typ: 'geheim' },
+          { key: 'wdh', label: 'Eigenen Code wiederholen', typ: 'geheim' },
+          { key: 'bisher', label: 'Bisheriger eigener Code (falls schon einer gesetzt ist)', typ: 'geheim' },
         ],
         aktion: 'entsperrcode',
         pruefen: (w) =>
           w.art !== Bildschirmzeit.TEXTE.codeArten[1]
             ? null
-            : !/^\d{4,8}$/.test(w.code)
-            ? 'Der Code muss aus 4 bis 8 Ziffern bestehen'
+            : Bildschirmzeit.entsperrcodePruefen(w.code)
+            ? Bildschirmzeit.entsperrcodePruefen(w.code)
             : w.code !== w.wdh
             ? 'Die beiden Eingaben stimmen nicht überein'
             : null,

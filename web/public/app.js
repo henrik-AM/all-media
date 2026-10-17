@@ -8237,7 +8237,7 @@ function bzSperreHtml(bereich, st, vollbild) {
     <button class="prof__btn" data-bz-code-auf>Mit ${esc(text.feld)} freigeben</button>
     <div class="bzsperre__code" data-bz-code hidden>
       <p class="bzsperre__hinweis">${esc(text.code)}</p>
-      <input type="password" ${spenden ? 'maxlength="20"' : 'inputmode="numeric" maxlength="8"'} autocomplete="off" placeholder="${esc(text.feld)}" id="bzCode" aria-label="${esc(text.feld)}" data-bz-spenden="${spenden ? '1' : ''}">
+      <input type="password" ${spenden ? 'maxlength="20"' : `maxlength="${BZ.ENTSPERRCODE_MAX}"`} autocomplete="off" placeholder="${esc(text.feld)}" id="bzCode" aria-label="${esc(text.feld)}" data-bz-spenden="${spenden ? '1' : ''}">
       <div class="bzsperre__wahl">
         <button class="bzchip is-an" data-bz-min="15">15 Min.</button>
         <button class="bzchip" data-bz-min="60">1 Std.</button>
@@ -8289,9 +8289,10 @@ function bzSperreBinden(wurzel, bereich, st, nachher) {
   wurzel.querySelector('[data-bz-freigeben]')?.addEventListener('click', async () => {
     const feld = wurzel.querySelector('#bzCode');
     const spenden = feld.dataset.bzSpenden === '1';
-    const code = (feld.value || '').replace(spenden ? /[\s-]/g : /\D/g, '');
-    if (spenden ? !/^[A-Za-z0-9]{6,16}$/.test(code) : !/^\d{4,8}$/.test(code)) {
-      return melden(spenden ? 'Die Spenden-PIN hat 6 bis 16 Zeichen' : 'Der Code hat 4 bis 8 Ziffern');
+    // Eigener Code: frei wählbar (17.10.2026) — nur außen Leerzeichen weg.
+    const code = spenden ? (feld.value || '').replace(/[\s-]/g, '') : (feld.value || '').trim();
+    if (spenden ? !/^[A-Za-z0-9]{6,16}$/.test(code) : BZ.entsperrcodePruefen(code)) {
+      return melden(spenden ? 'Die Spenden-PIN hat 6 bis 16 Zeichen' : BZ.entsperrcodePruefen(code));
     }
     await bzSchicken();
     const a = await api('/api/bildschirmzeit/entsperren', { ziel, code, minuten });
@@ -8801,16 +8802,17 @@ const SETTINGS = [
               return BZ.TEXTE.codeArten[bz.stand?.eigene_art === 'eigen' ? 1 : 0];
             },
           },
-          { key: 'code', label: 'Eigener Code (4 bis 8 Ziffern)', typ: 'zahl' },
-          { key: 'wdh', label: 'Eigenen Code wiederholen', typ: 'zahl' },
-          { key: 'bisher', label: 'Bisheriger eigener Code (falls schon einer gesetzt ist)', typ: 'zahl' },
+          // Henrik, 17.10.2026: mindestens 4 Zeichen, sonst frei. Gleiche Regel wie SettingsScreen.tsx.
+          { key: 'code', label: `Eigener Code (${BZ.ENTSPERRCODE_REGEL})`, typ: 'geheim' },
+          { key: 'wdh', label: 'Eigenen Code wiederholen', typ: 'geheim' },
+          { key: 'bisher', label: 'Bisheriger eigener Code (falls schon einer gesetzt ist)', typ: 'geheim' },
         ],
         aktion: 'entsperrcode',
         pruefen: (w) =>
           w.art !== BZ.TEXTE.codeArten[1]
             ? null
-            : !/^\d{4,8}$/.test(w.code)
-            ? 'Der Code muss aus 4 bis 8 Ziffern bestehen'
+            : BZ.entsperrcodePruefen(w.code)
+            ? BZ.entsperrcodePruefen(w.code)
             : w.code !== w.wdh
             ? 'Die beiden Eingaben stimmen nicht überein'
             : null,
@@ -18003,7 +18005,7 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
               .map((w) => `<option value="${esc(w)}" ${w === f.wert ? 'selected' : ''}>${esc(w)}</option>`)
               .join('')}</select>`
           : // 'betrag': Text mit Kommatastatur - "2,50" nimmt ein number-Feld nicht an.
-            `<input ${gemeinsam} type="${f.typ === 'zahl' ? 'number' : 'text'}"${
+            `<input ${gemeinsam} type="${f.typ === 'zahl' ? 'number' : f.typ === 'geheim' ? 'password' : 'text'}"${f.typ === 'geheim' ? ' autocomplete="off"' : ''}${
               f.typ === 'betrag' ? ' inputmode="decimal"' : ''
             } value="${esc(f.wert || '')}">`;
     return `<div class="sheet__field">

@@ -15,7 +15,8 @@ import { colors, radius, spacing, themenStyles, typography } from '../constants/
 export interface FormularFeld {
   key: string;
   label: string;
-  typ?: 'text' | 'mehrzeilig' | 'zahl' | 'auswahl';
+  /** 'geheim': verdeckte Eingabe ohne Autokorrektur (Entsperrcode, 17.10.2026). */
+  typ?: 'text' | 'mehrzeilig' | 'zahl' | 'auswahl' | 'geheim';
   platzhalter?: string;
   pflicht?: boolean;
   /**
@@ -159,6 +160,9 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
                 placeholder={f.platzhalter}
                 placeholderTextColor={colors.text3}
                 multiline={f.typ === 'mehrzeilig'}
+                secureTextEntry={f.typ === 'geheim'}
+                autoCapitalize={f.typ === 'geheim' ? 'none' : undefined}
+                autoCorrect={f.typ === 'geheim' ? false : undefined}
                 autoFocus={i === 0}
               />
               ) : (
@@ -174,6 +178,9 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
                 /* Mit Komma: „2,50" liess sich auf dem Ziffernblock nicht tippen. */
                 keyboardType={f.typ === 'zahl' ? 'decimal-pad' : 'default'}
                 multiline={f.typ === 'mehrzeilig'}
+                secureTextEntry={f.typ === 'geheim'}
+                autoCapitalize={f.typ === 'geheim' ? 'none' : undefined}
+                autoCorrect={f.typ === 'geheim' ? false : undefined}
                 autoFocus={i === 0}
                 returnKeyType={i === felder.length - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === felder.length - 1 ? absenden : undefined}

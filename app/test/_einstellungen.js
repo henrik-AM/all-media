@@ -145,9 +145,9 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.fill('#f_wdh', '12');
     await page.click('#formOk');
     // Seit 28.09.2026 steht der Fehler im Blatt (#formFehler), nicht im Toast.
-    await page.waitForFunction(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })().includes('4 bis 8'), null, { timeout: 5000 }).catch(() => {});
+    await page.waitForFunction(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })().includes('mindestens 4 Zeichen'), null, { timeout: 5000 }).catch(() => {});
     const hinweis = await page.evaluate(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })());
-    if (!hinweis.includes('4 bis 8')) throw new Error(hinweis);
+    if (!hinweis.includes('mindestens 4 Zeichen')) throw new Error(hinweis);
   });
 
   await pruefe('Zwei verschiedene Eingaben werden abgelehnt', async () => {
@@ -161,8 +161,9 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Ein richtiger Code wird angenommen', async () => {
-    await page.fill('#f_code', '1234');
-    await page.fill('#f_wdh', '1234');
+    // Seit 17.10.2026 frei wählbar: Buchstaben und Sonderzeichen gehören dazu.
+    await page.fill('#f_code', 'ab!9');
+    await page.fill('#f_wdh', 'ab!9');
     await page.click('#formOk');
     // Seit Kasten 22 geht der Code als Hash nach Supabase (entsperrcode_setzen) —
     // die Antwort braucht einen Rundlauf, also auf den Toast warten statt 600 ms.
@@ -185,7 +186,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     const vorher = await page.$eval('#f_art', (el) => el.value);
     if (vorher !== 'Eigener Code') throw new Error('vorbelegt: ' + vorher);
     await page.selectOption('#f_art', 'Spenden-PIN verwenden');
-    await page.fill('#f_bisher', '1234');
+    await page.fill('#f_bisher', 'ab!9');
     await page.click('#formOk');
     await page
       .waitForFunction(() => { const t = document.querySelector('#toast'); return t && !t.hidden && /Spenden-PIN entsperrt/.test(t.textContent); }, null, { timeout: 8000 })

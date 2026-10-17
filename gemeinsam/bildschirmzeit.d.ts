@@ -146,6 +146,10 @@ export function sperrText(
   codeArt?: 'eigen' | 'spenden' | null
 ): { titel: string; satz: string; code: string; feld: string };
 export function hinweisText(status: BzStatus, bereich: BzBereich): string;
+export const ENTSPERRCODE_MIN: number;
+export const ENTSPERRCODE_MAX: number;
+export const ENTSPERRCODE_REGEL: string;
+export function entsperrcodePruefen(code: string): string | null;
 export function wertText(punkt: 'uebersicht' | 'gesamt' | 'bereiche' | 'auszeit' | 'pause', regeln: unknown, nutzung?: Partial<Record<string, number>>): string;
 export function bereichWertText(regeln: unknown, bereich: BzBereich): string;
 export function woche(zeilen: { tag: string; bereich: string; sekunden: number }[], heute: string): BzTag[];

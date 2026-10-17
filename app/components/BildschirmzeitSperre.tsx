@@ -63,8 +63,8 @@ export const BildschirmzeitSperre = ({ bereich, onSchliessen, vollbild, onNotice
   };
 
   const freigeben = async () => {
-    if (spenden ? !/^[A-Za-z0-9]{6,16}$/.test(code) : !/^\d{4,8}$/.test(code)) {
-      return setMeldung(spenden ? 'Die Spenden-PIN hat 6 bis 16 Zeichen' : 'Der Code hat 4 bis 8 Ziffern');
+    if (spenden ? !/^[A-Za-z0-9]{6,16}$/.test(code) : Bildschirmzeit.entsperrcodePruefen(code)) {
+      return setMeldung(spenden ? 'Die Spenden-PIN hat 6 bis 16 Zeichen' : (Bildschirmzeit.entsperrcodePruefen(code) as string));
     }
     setLaeuft(true);
     const a = await entsperren(ziel, code, minuten);
@@ -106,13 +106,14 @@ export const BildschirmzeitSperre = ({ bereich, onSchliessen, vollbild, onNotice
           <TextInput
             value={code}
             onChangeText={(t) => {
-              setCode(spenden ? t.replace(/[^A-Za-z0-9]/g, '').slice(0, 16) : t.replace(/\D/g, '').slice(0, 8));
+              // Eigener Code: frei wählbar (17.10.2026), nur die Länge ist begrenzt.
+              setCode(spenden ? t.replace(/[^A-Za-z0-9]/g, '').slice(0, 16) : t.slice(0, Bildschirmzeit.ENTSPERRCODE_MAX));
               setMeldung(null);
             }}
             placeholder={text.feld}
             placeholderTextColor={colors.text3}
-            keyboardType={spenden ? 'default' : 'number-pad'}
-            autoCapitalize="characters"
+            keyboardType="default"
+            autoCapitalize={spenden ? 'characters' : 'none'}
             autoCorrect={false}
             secureTextEntry
             style={styles.eingabe}

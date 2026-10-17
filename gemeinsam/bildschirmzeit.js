@@ -650,6 +650,28 @@
     return { titel, satz, code, feld };
   }
 
+  /*
+   * Der eigene Entsperrcode (Henrik, 17.10.2026): mindestens vier Zeichen,
+   * sonst frei — Länge, Ziffern, Buchstaben, Sonderzeichen wählt jeder
+   * selbst. Bis dahin waren es 4 bis 8 Ziffern. Dieselbe Regel prüft
+   * entsperrcode_setzen() in der Datenbank (Schema 96); die Obergrenze kommt
+   * von bcrypt, das nach 72 Byte still abschneidet — 64 Zeichen bleiben
+   * auch mit Umlauten darunter.
+   */
+  const ENTSPERRCODE_MIN = 4;
+  const ENTSPERRCODE_MAX = 64;
+  const ENTSPERRCODE_REGEL = 'Mindestens 4 Zeichen — Ziffern, Buchstaben und Sonderzeichen frei wählbar';
+
+  /** null, wenn der Code passt, sonst der Grund auf Deutsch. */
+  function entsperrcodePruefen(code) {
+    const c = typeof code === 'string' ? code.trim() : '';
+    if (c.length < ENTSPERRCODE_MIN) return 'Der Code braucht mindestens ' + ENTSPERRCODE_MIN + ' Zeichen';
+    if (c.length > ENTSPERRCODE_MAX) return 'Der Code darf höchstens ' + ENTSPERRCODE_MAX + ' Zeichen haben';
+    // Steuerzeichen (Zeilenumbruch, Tab …) tippt niemand absichtlich.
+    if (/[\u0000-\u001f\u007f]/.test(c)) return 'Der Code enthält ein unzulässiges Zeichen';
+    return null;
+  }
+
   /** Der Satz für den Hinweis kurz vor Ablauf. */
   function hinweisText(st, bereich) {
     const zeit = dauerText(st.rest);
@@ -853,6 +875,10 @@
     status,
     sperrText,
     hinweisText,
+    ENTSPERRCODE_MIN,
+    ENTSPERRCODE_MAX,
+    ENTSPERRCODE_REGEL,
+    entsperrcodePruefen,
     wertText,
     bereichWertText,
     woche,
