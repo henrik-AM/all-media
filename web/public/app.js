@@ -6125,7 +6125,8 @@ async function renderCommunityChannels(communityId) {
 
   $('#backBtn').addEventListener('click', () => {
     state.openCommunityId = null;
-    renderCommunities();
+    // Zurück dorthin, woher man kam: Home oder — aus der Suche — die Suche.
+    render();
   });
   /*
    * Kasten 28/9 (Henrik 28.09.2026): „wenn man auf der Homeseite der
@@ -6202,7 +6203,7 @@ async function renderCommunityMitglieder(daten, fehler = '') {
         <button class="iconbtn" id="mitgliederBack" aria-label="Zurück zur Community">${ICONS.back}</button>
         <div>
           <h2 class="pagehead__title">${esc(Beitritt.TITEL)}</h2>
-          <div class="pagehead__sub">${esc(daten.name)} · ${esc(Beitritt.anzahlText(daten.members))}</div>
+          <div class="pagehead__sub" style="margin-top:2px">${esc(daten.name)} · ${esc(Beitritt.anzahlText(daten.members))}</div>
         </div>
       </div>
     </div>
@@ -17983,11 +17984,20 @@ function trefferFuer(q, art) {
   return t.personen.filter((p) => !state.users[p.id]);
 }
 
-/** Eine Community aus der Suche öffnen — ein Datenbanktreffer kommt vorher in die Liste. */
+/*
+ * Eine Community aus der Suche öffnen — ihre Homeseite, wie in der App
+ * (Suchen → CommunityDetailScreen). Bis 20.10.2026 stand hier openChat(id):
+ * das zeigte den Gruppenchat-Rahmen, bei einer fremden privaten Community
+ * also eine leere Seite ohne Weg zur Anfrage (Kasten 28/15.1). Ein
+ * Datenbanktreffer (15.5) kommt vorher in die Liste. Zurück führt über
+ * render() wieder in die Suche.
+ */
 function oeffneCommunityTreffer(id) {
   const treffer = (state.commTreffer?.communities || []).find((c) => c.id === id);
   if (treffer && !state.communities.some((c) => c.id === id)) communityMerken(treffer);
-  openChat(id);
+  state.openCommunityId = id;
+  state.openChannelId = null;
+  renderCommunityChannels(id);
 }
 
 let commSucheTakt = null;
@@ -18002,6 +18012,11 @@ function commDatenbankSuche(roh, neuZeichnen) {
       .catch(() => null);
     if (!r || r.error) return;
     state.commTreffer = { wort: q, communities: r.communities || [], personen: r.personen || [] };
+    // Damit Bild und Name überall stehen (avatarForUser liest state.users) —
+    // sonst zeigte ein Treffer nur „?".
+    for (const p of state.commTreffer.personen) {
+      if (!state.users[p.id]) state.users[p.id] = { ...p, initials: initialenVon(p.name) };
+    }
     neuZeichnen();
   }, 300);
 }

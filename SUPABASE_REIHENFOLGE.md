@@ -80,7 +80,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "stories_im_highlight" auf public.stories | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql | **SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql** |
 | Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** (Ziel entscheidet: Videos für alle Sichtbaren, Messenger nur Kontakte, Markierte) |
 | Regel "Beitraege lesen" auf public.posts | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
-| Regel "Communitys lesen" auf public.communities | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
+| Regel "Communitys lesen" auf public.communities | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_97_mitglieder_beitritt.sql | **SUPABASE_SCHEMA_97_mitglieder_beitritt.sql** |
 | Regel "Eigene Chats aendern" auf public.chats | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Regel "Eigene Chats lesen" auf public.chats | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Eigene Nachricht aendern" auf public.messages | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
@@ -316,3 +316,22 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
 **Folge:** Jedes Konto ohne Zustimmung (am 02.11. 15 Konten, alle von vor dem 24.10.) sieht beim nächsten Öffnen „Unsere Bedingungen“ und muss zustimmen. Prüf- und Testkonto (`all.media.prueflauf@web.de`, `test@all-media.app`) haben zugestimmt; neue Prüfkonten aus SQL ohne `pruefsumme_<dok>` in den Metadaten landen ebenfalls dort.
 
 **Nicht auf main** (bleibt auf `kasten/rs-recht` bzw. im Sammelzweig): alle Kasten-28-Teile mit den Schemas 88–100. Wer 92 einspielt, muss danach den F11-Block aus 102 erneut ausführen.
+
+## Nachtrag 20.10.2026: Schema 97 (Feedback 28.09., Kästen 9 und 15.1–15.3)
+
+**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 90 (Mitteilungsarten) und nach 95
+(Regeln auf `community_members`).
+
+- `SUPABASE_SCHEMA_97_mitglieder_beitritt.sql` — `communities.mitglieder_anzahl` + Auslöser
+  `mitglieder_zaehlen`, `community_vorgaben` (Zahl/Grundwert/Demo beim Anlegen nur durch die Datenbank);
+  Regel „Communitys lesen“ → `using (true)` (private Communitys auffindbar, Inhalt weiter über
+  `community_sichtbar`); `mitglieder_sichtbar(uuid)` + Regel „Mitglieder lesen“ auf `community_members`
+  (**ersetzt „Mitglieder sichtbarer Communitys lesen“ aus 95**); Tabelle `community_beitrittsanfragen`
+  (RLS, `nur_freigegebene`), `beitrittsanfrage_annehmen(uuid, uuid)`, Auslöser
+  `beitrittsanfrage_aufraeumen`, `mitteilung_beitrittsanfrage`, `mitteilung_weg_beitrittsanfrage`.
+  **Ersetzt `notifications_art_check` (zuletzt 90) — gilt danach: 97.** Wer 90 oder 95 neu einspielt,
+  muss 97 nachziehen.
+
+Code vor dem Schema: App (`daten.ts`) und Server (`supabase-api.js`) lesen `mitglieder_anzahl` und die
+Anfragen nachsichtig (`Beitritt.fehltSchema`); Anfragen/Annehmen melden ohne 97 „… erst, wenn das
+Datenbank-Update eingespielt ist“.

@@ -3285,7 +3285,9 @@ button.exp__head:hover { color: var(--brand); }
   hellen Motiv nicht verschwindet.
 */
 .kanal__zurueck {
-  position: absolute; left: 10px; top: 10px;
+  /* z-index: das Motiv darunter (großes SVG) fing sonst den Klick ab — der
+     Pfeil war sichtbar, aber nicht bedienbar (gefunden 20.10.2026). */
+  position: absolute; left: 10px; top: 10px; z-index: 2;
   width: 36px; height: 36px; border-radius: 50%;
   display: grid; place-items: center;
   color: #fff;

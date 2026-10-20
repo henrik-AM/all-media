@@ -147,16 +147,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   console.log('\nCommunitys — Name, Einstellungen, eigene Community');
 
-  await pruefe('Der Gruppenname fuehrt zu den Einstellungen', async () => {
+  // Kasten 28/9 (Henrik 28.09.2026): der Name fuehrt zu den Mitgliedern,
+  // die Einstellungen liegen hinter dem „...".
+  await pruefe('Der Gruppenname fuehrt zu den Mitgliedern', async () => {
     await oeffne('React Native DE');
     await page.click('#communityKopf');
-    await page.waitForTimeout(500);
-    if (!(await page.$('.sheet'))) throw new Error('es geht nichts auf');
-    await page.click('[data-sheet-close]').catch(() => {});
+    await page.waitForSelector('#mitgliederBack', { timeout: 5000 }).catch(() => {});
+    if (!(await page.$('#mitgliederBack'))) throw new Error('die Mitgliederseite geht nicht auf');
+    await page.click('#mitgliederBack');
     await page.waitForTimeout(300);
   });
 
-  await pruefe('Das „..." fuehrt zu denselben Einstellungen', async () => {
+  await pruefe('Das „..." fuehrt zu den Einstellungen', async () => {
     await oeffne('React Native DE');
     await page.click('#communityMehr');
     await page.waitForTimeout(500);
