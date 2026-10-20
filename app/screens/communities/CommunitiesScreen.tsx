@@ -11,6 +11,9 @@ import { colors, radius, spacing, themenStyles, typography } from '../../constan
 import { useProfil } from '../../contexts/ProfilContext';
 import { Community } from '../../types';
 
+// Kasten 28/15: dieselbe Meldung wie auf der Community-Seite und der Website.
+const Beitritt = require('../../../gemeinsam/beitritt') as typeof import('../../../gemeinsam/beitritt');
+
 /*
  * Henrik: "Home zeigt nur Communitys, denen der Nutzer bereits beigetreten
  * ist. Noch nicht beigetretene Communitys unter 'Entdecken' o. Ae. anzeigen."
@@ -47,9 +50,10 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel, 
     return communities.filter((c) => c.joined && passt(c));
   }, [communities, query]);
 
-  const toggleJoin = (community: Community) => {
-    kanalBeitreten(community.id);
-    onNotice(community.joined ? `„${community.name}" verlassen` : `„${community.name}" beigetreten`);
+  const toggleJoin = async (community: Community) => {
+    const vorher = Beitritt.zustand(community);
+    const grund = await kanalBeitreten(community.id);
+    onNotice(grund ?? Beitritt.meldung(vorher, community.name));
   };
 
   const open = (community: Community) => {

@@ -26,6 +26,8 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien, medienAnfrage } from './medien';
+// Kästen 28/9 und 15: Beitrittsanfragen, Mitgliederliste, Suche (Schema 97).
+const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gemeinsam/beitritt');
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -137,6 +139,139 @@ export function communityBeitritt(client: SupabaseClient, ichId: string, communi
     community_id: communityId,
     user_id: ichId,
   });
+}
+
+/*
+ * Kasten 28/15.1–15.3 (Schema 97): private Communitys nur mit Freigabe.
+ *
+ * Henrik am 28.09.2026: „Bei privaten Communitys kann ich einfach auf
+ * Beitreten drücken […] Achte darauf, dass dort der Administrator erst mal
+ * meine Anfrage genehmigen muss." Seit Schema 95 lässt die Datenbank den
+ * Direktbeitritt nicht mehr zu; die Anfrage ist der Weg hinein. Welche
+ * Anfrage gestellt werden darf, entscheidet die Regel „Beitrittsanfrage
+ * stellen" — nicht dieser Code. Gleiche Wege in web/server/sync-handlers.js.
+ */
+
+/** Beitritt zu einer privaten Community anfragen. */
+export async function beitrittAnfragen(client: SupabaseClient, ichId: string, communityId: string) {
+  const { error } = await client
+    .from('community_beitrittsanfragen')
+    .insert({ community_id: communityId, user_id: ichId });
+  if (error && error.code === '23505') return; // schon angefragt
+  if (error && Beitritt.fehltSchema(error)) throw new Error(Beitritt.FEHLT_SCHEMA);
+  if (error && error.code === '42501') throw new Error('Diese Community nimmt gerade keine Anfrage von dir an');
+  if (error) throw error;
+}
+
+/** Die eigene Anfrage zurückziehen. Mit Zählung — ein verbotenes DELETE meldet sonst Erfolg. */
+export async function beitrittsanfrageZurueckziehen(client: SupabaseClient, ichId: string, communityId: string) {
+  const { error, count } = await client
+    .from('community_beitrittsanfragen')
+    .delete({ count: 'exact' })
+    .eq('community_id', communityId)
+    .eq('user_id', ichId);
+  if (error && Beitritt.fehltSchema(error)) throw new Error(Beitritt.FEHLT_SCHEMA);
+  if (error) throw error;
+  if ((count ?? 0) === 0) throw new Error('Diese Anfrage gibt es nicht mehr');
+}
+
+/**
+ * Als Ersteller über eine Anfrage entscheiden. Annehmen geht nur über
+ * beitrittsanfrage_annehmen() — die Funktion prüft, dass ich die Community
+ * angelegt habe, und trägt die Mitgliedschaft selbst ein. Ablehnen ist ein
+ * DELETE, das die Regel nur dem Ersteller (und dem Fragenden) erlaubt.
+ */
+export async function beitrittsanfrageEntscheiden(
+  client: SupabaseClient,
+  communityId: string,
+  userId: string,
+  annehmen: boolean
+) {
+  if (annehmen) {
+    const { error } = await client.rpc('beitrittsanfrage_annehmen', { p_community: communityId, p_user: userId });
+    if (error && Beitritt.fehltSchema(error)) throw new Error(Beitritt.FEHLT_SCHEMA);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const { error, count } = await client
+    .from('community_beitrittsanfragen')
+    .delete({ count: 'exact' })
+    .eq('community_id', communityId)
+    .eq('user_id', userId);
+  if (error && Beitritt.fehltSchema(error)) throw new Error(Beitritt.FEHLT_SCHEMA);
+  if (error) throw error;
+  if ((count ?? 0) === 0) throw new Error('Diese Anfrage gibt es nicht mehr');
+}
+
+export interface MitgliedZeile {
+  id: string;
+  name: string;
+  handle: string;
+}
+
+/**
+ * Kasten 28/9: Mitglieder und – für den Ersteller – offene Anfragen.
+ *
+ * Was hier ankommt, entscheidet die Regel „Mitglieder lesen" (Schema 97):
+ * öffentlich alle, privat nur der Ersteller; sonst nur die eigene Zeile.
+ * Die Oberfläche fragt bei privaten Communitys gar nicht erst
+ * (Beitritt.listeSichtbar), damit dort nicht „1 Mitglied: Du" steht.
+ */
+export async function mitgliederLaden(
+  client: SupabaseClient,
+  ichId: string,
+  communityId: string
+): Promise<{ mitglieder: MitgliedZeile[]; anfragen: MitgliedZeile[] }> {
+  const [{ data: zeilen, error }, { data: offene, error: fehlerAnfragen }] = await Promise.all([
+    client.from('community_members').select('user_id, joined_at').eq('community_id', communityId).limit(500),
+    client
+      .from('community_beitrittsanfragen')
+      .select('user_id, created_at')
+      .eq('community_id', communityId)
+      .order('created_at', { ascending: true }),
+  ]);
+  if (error) throw error;
+  if (fehlerAnfragen && !Beitritt.fehltSchema(fehlerAnfragen)) throw fehlerAnfragen;
+
+  const mitgliedIds = ((zeilen ?? []) as any[]).map((z) => z.user_id as string);
+  const anfrageIds = ((offene ?? []) as any[]).map((z) => z.user_id as string).filter((id) => id !== ichId);
+  const alle = [...new Set([...mitgliedIds, ...anfrageIds])];
+  const profile = new Map<string, any>();
+  if (alle.length) {
+    const { data, error: fehlerProfile } = await client.from('profiles').select('id, name, handle').in('id', alle);
+    if (fehlerProfile) throw fehlerProfile;
+    for (const p of (data ?? []) as any[]) profile.set(p.id, p);
+  }
+  const zeile = (id: string): MitgliedZeile => ({
+    id: id === ichId ? 'me' : id,
+    name: profile.get(id)?.name ?? 'Unbekannt',
+    handle: profile.get(id)?.handle ?? '',
+  });
+  return { mitglieder: mitgliedIds.map(zeile), anfragen: anfrageIds.map(zeile) };
+}
+
+/**
+ * Kasten 28/15.5: Personen in der ganzen Datenbank suchen, nicht nur unter
+ * den 500 geladenen. Wen ich sehen darf, entscheidet die Regel auf
+ * `profiles` (nur_freigegebene, Schema 52/74: Minderjährige ohne Freigabe
+ * bleiben unsichtbar). Gleiche Abfrage in web/server/supabase-api.js.
+ */
+export async function personenSuchen(
+  client: SupabaseClient,
+  ichId: string,
+  eingabe: string
+): Promise<MitgliedZeile[]> {
+  const filter = Beitritt.suchFilter(['name', 'handle'], eingabe);
+  if (!filter) return [];
+  const { data, error } = await client
+    .from('profiles')
+    .select('id, name, handle')
+    .or(filter)
+    .neq('id', ichId)
+    .order('name', { ascending: true })
+    .limit(30);
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((p) => ({ id: p.id, name: p.name ?? '', handle: p.handle ?? '' }));
 }
 
 /**

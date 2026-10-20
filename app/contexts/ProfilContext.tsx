@@ -55,6 +55,9 @@ export const zeitText = (minuten: number) => {
   return `vor ${Math.floor(tage / 30)} M`;
 };
 
+// Kasten 28/15: Beitreten oder Anfrage — dieselbe Regel wie auf der Website.
+const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gemeinsam/beitritt');
+
 /**
  * Woran ein Herz hängen kann. Seit Schema 49 gibt es auch Herzen an
  * Kommentaren — ohne diese Liste hieße es dort "gefällt dein Beitrag".
@@ -115,6 +118,11 @@ const mitteilungText = (
       return `${name} hat einen neuen Kanal in „${kanal}“ erstellt.`;
     case 'beitritt':
       return `${name} ist „${kanal}“ beigetreten.`;
+    // Kasten 28/15.2 (Schema 97). Gleicher Satz in web/server/app.js (mitteilungText).
+    case 'beitritt_anfrage':
+      return `${name} möchte „${kanal}“ beitreten.`;
+    case 'beitritt_ok':
+      return `${name} hat deine Anfrage für „${kanal}“ angenommen.`;
     case 'nachricht':
       return `Neue Nachrichten in „${kanal}“.`;
     case 'einladung':
@@ -207,7 +215,8 @@ interface ProfilWert {
   kanalEntfernenNachName: (name: string) => void;
   /** Unterthema in einer Community anlegen. Gibt einen Fehlertext zurueck. */
   unterthemaAnlegen: (communityId: string, name: string) => string | null;
-  kanalBeitreten: (id: string) => void;
+  /** Kasten 28/15: gibt den Grund zurück, wenn es nicht geklappt hat. */
+  kanalBeitreten: (id: string, bekannt?: Community) => Promise<string | null>;
   /**
    * Den Stumm-Zustand einer Community im Bildschirmstand nachziehen.
    *
@@ -218,6 +227,8 @@ interface ProfilWert {
   kanalStummSetzen: (id: string, stumm: boolean) => void;
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
+  /** Kasten 28/15.5: eine Community aus der Datenbanksuche in die Liste aufnehmen. */
+  communityMerken: (community: Community) => void;
 
   /* --- Folgen --- */
   /*
@@ -791,20 +802,50 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   }, [communities, supabase, daten.ichId]);
 
   const kanalBeitreten = useCallback(
-    (id: string) => {
-      const drehen = () =>
-        setCommunities((prev) =>
-          prev.map((c) =>
-            c.id === id ? { ...c, joined: !c.joined, members: c.members + (c.joined ? -1 : 1) } : c
-          )
-        );
+    (id: string, bekannt?: Community): Promise<string | null> => {
+      /*
+       * Kasten 28/15.1: bei einer privaten Community wird aus Beitreten eine
+       * Anfrage (und aus „Angefragt" das Zurückziehen). Mitglied wird man
+       * erst, wenn der Ersteller annimmt — das trägt die Datenbank ein
+       * (beitrittsanfrage_annehmen, Schema 97), nie dieser Knopf.
+       *
+       * Zurück kommt der Grund, wenn es nicht geklappt hat. Vorher stellte
+       * sich der Knopf nur still zurück; bei einer Anfrage, die die
+       * Datenbank ablehnt, sähe man sonst nie, warum.
+       */
+      // `bekannt`: ein Treffer aus der Datenbanksuche, der gerade erst gemerkt wurde.
+      const zustand = Beitritt.zustand(communities.find((c) => c.id === id) ?? bekannt);
+      if (zustand === 'eigen') return Promise.resolve(null);
+      if (!supabase || !daten.ichId) return Promise.resolve('Dafür musst du angemeldet sein');
+
+      const anfrage = zustand === 'anfragen' || zustand === 'angefragt';
+      const drehen = anfrage
+        ? () => setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, angefragt: !c.angefragt } : c)))
+        : () =>
+            setCommunities((prev) =>
+              prev.map((c) =>
+                c.id === id ? { ...c, joined: !c.joined, members: c.members + (c.joined ? -1 : 1) } : c
+              )
+            );
+      const tun =
+        zustand === 'anfragen'
+          ? Aktion.beitrittAnfragen(supabase, daten.ichId, id)
+          : zustand === 'angefragt'
+            ? Aktion.beitrittsanfrageZurueckziehen(supabase, daten.ichId, id)
+            : // Und in die Datenbank — sonst ist man nach dem naechsten Start
+              // wieder draussen, und die Website sieht den Beitritt nie.
+              Aktion.communityBeitritt(supabase, daten.ichId, id);
 
       drehen();
-      // Und in die Datenbank — sonst ist man nach dem naechsten Start wieder
-      // draussen, und die Website sieht den Beitritt nie.
-      schreiben('Der Beitritt', (c, ich) => Aktion.communityBeitritt(c, ich, id), drehen);
+      return tun
+        .then(() => null)
+        .catch((e: any) => {
+          console.error('Der Beitritt fehlgeschlagen:', e?.message ?? e);
+          drehen();
+          return e?.message || 'Das hat nicht geklappt';
+        });
     },
-    [schreiben]
+    [supabase, daten.ichId, communities]
   );
 
   const kanalStummSetzen = useCallback((id: string, stumm: boolean) => {
@@ -947,6 +988,15 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)));
   }, []);
 
+  /*
+   * Kasten 28/15.5: Die Suche findet auch Communitys, die nicht unter den
+   * ersten 100 geladenen stehen. Wer eine davon öffnet, braucht sie hier —
+   * Community-Seite und Beitreten suchen in dieser Liste.
+   */
+  const communityMerken = useCallback((community: Community) => {
+    setCommunities((prev) => (prev.some((c) => c.id === community.id) ? prev : [...prev, community]));
+  }, []);
+
   const wert = useMemo<ProfilWert>(
     () => ({
       mitteilungen,
@@ -991,6 +1041,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       kanalBeitreten,
       kanalStummSetzen,
       kanalGelesen,
+      communityMerken,
       gefolgt,
       folgtPerson,
       folgenUmschalten,
@@ -1003,7 +1054,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen, communityMerken,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]
   );

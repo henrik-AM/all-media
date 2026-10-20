@@ -151,6 +151,9 @@ const UMD_BAUSTEINE = [
   // 31.10.2026: `einwilligung.js` — Zustimmung mit Fassung und Eltern-Widerruf
   // (Kasten RS 7/5, Schema 106). Liest global.Rechtstexte — muss danach stehen.
   ['einwilligung', 'Einwilligung'],
+  // 20.10.2026: `beitritt.js` — Mitgliederliste und Beitrittsanfragen
+  // (Feedback 28.09., Kästen 9 und 15, Schema 97). daten.ts und aktionen.ts holen ihn.
+  ['beitritt', 'Beitritt'],
 ];
 
 function umdTeile() {

@@ -14,6 +14,11 @@ import { useProfil } from '../../contexts/ProfilContext';
 import { MeldenSheet } from '../../components/MeldenSheet';
 import { ladePtt } from '../../lib/daten';
 import { useSupabase } from '../../contexts/SupabaseContext';
+import { CommunityMitgliederScreen } from './CommunityMitgliederScreen';
+import type { MitgliedZeile } from '../../lib/aktionen';
+
+// Kästen 28/9 und 15: Mitgliederliste, Beitritt oder Anfrage — wie die Website.
+const Beitritt = require('../../../gemeinsam/beitritt') as typeof import('../../../gemeinsam/beitritt');
 
 interface Props {
   community: Community;
@@ -41,6 +46,14 @@ interface Props {
    * keinem Bild vor.
    */
   optionenOffenStart?: boolean;
+  /** Kasten 28/9: die Mitgliederseite gleich offen (Prüfschalter, Mitteilung „möchte beitreten"). */
+  mitgliederOffenStart?: boolean;
+  onOpenProfile: (userId: string) => void;
+  mitgliederLaden: (
+    communityId: string
+  ) => Promise<{ mitglieder: MitgliedZeile[]; anfragen: MitgliedZeile[]; fehler?: string }>;
+  anfrageEntscheiden: (communityId: string, userId: string, annehmen: boolean) => Promise<string | null>;
+  onMitgliederGeaendert: () => void;
 }
 
 /**
@@ -73,6 +86,11 @@ export const CommunityDetailScreen = ({
   onNeuesUnterthema,
   onNotice,
   optionenOffenStart,
+  mitgliederOffenStart,
+  onOpenProfile,
+  mitgliederLaden,
+  anfrageEntscheiden,
+  onMitgliederGeaendert,
 }: Props) => {
   const insets = useSafeAreaInsets();
   const unterthemen = community.unterthemen ?? [];
@@ -80,6 +98,9 @@ export const CommunityDetailScreen = ({
   const [optionenOffen, setOptionenOffen] = useState(Boolean(optionenOffenStart));
   // Kasten RS 3: eine fremde Community melden (art 'community', Schema 102).
   const [melden, setMelden] = useState(false);
+  const [mitgliederOffen, setMitgliederOffen] = useState(Boolean(mitgliederOffenStart));
+  const zustand = Beitritt.zustand(community);
+  const inhaltSichtbar = Beitritt.inhaltSichtbar(community);
 
   const einstellungenOeffnen = () => {
     setOptionenOffen(true);
@@ -121,6 +142,25 @@ export const CommunityDetailScreen = ({
     pttHolen();
   }, [pttHolen]);
 
+  /*
+   * Kasten 28/9 (Henrik 28.09.2026): „wenn man auf der Homeseite der
+   * Community auf den Namen drückt", sieht man die Mitglieder — bei privaten
+   * nur die Anzahl. Vorher führte der Name in die Einstellungen; die
+   * erreicht man weiter über „…".
+   */
+  if (mitgliederOffen) {
+    return (
+      <CommunityMitgliederScreen
+        community={community}
+        onBack={() => setMitgliederOffen(false)}
+        onOpenProfile={onOpenProfile}
+        laden={mitgliederLaden}
+        entscheiden={anfrageEntscheiden}
+        onGeaendert={onMitgliederGeaendert}
+      />
+    );
+  }
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
@@ -145,24 +185,34 @@ export const CommunityDetailScreen = ({
             Echte Namen wie "Design Systeme" wurden nebeneinander
             abgeschnitten, und das ist schlimmer als eine zweite Zeile.
           */}
-          <Druck style={styles.titel} onPress={einstellungenOeffnen}>
-            <Text style={styles.name} numberOfLines={1}>
-              {community.name}
-            </Text>
-            <Text style={styles.mitglieder}>
-              {community.members.toLocaleString('de-DE')} Mitglieder
-            </Text>
+          <Druck
+            style={styles.titel}
+            onPress={() => setMitgliederOffen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Mitglieder anzeigen"
+          >
+            <View style={styles.nameZeile}>
+              <Text style={styles.name} numberOfLines={1}>
+                {community.name}
+              </Text>
+              {community.visibility === 'private' && (
+                <Ionicons name="lock-closed" size={14} color={colors.text3} />
+              )}
+            </View>
+            <Text style={styles.mitglieder}>{Beitritt.anzahlText(community.members)}</Text>
           </Druck>
 
-          {community.eigen ? (
+          {zustand === 'eigen' ? (
             // Eine eigene Community laesst sich nicht verlassen - vorher
             // konnte Henrik sich aus seiner eigenen Community entfernen.
             <View style={styles.eigen}>
-              <Text style={styles.eigenText}>Deine Community</Text>
+              <Text style={styles.eigenText}>{Beitritt.knopfText(community)}</Text>
             </View>
-          ) : community.joined ? (
+          ) : zustand === 'verlassen' || zustand === 'angefragt' ? (
+            // Kasten 28/15.1: „Angefragt" ist leise wie „Verlassen" — Antippen
+            // zieht die Anfrage zurück.
             <Druck style={styles.knopfLeise} onPress={onBeitreten}>
-              <Text style={styles.knopfLeiseText}>Verlassen</Text>
+              <Text style={styles.knopfLeiseText}>{Beitritt.knopfText(community)}</Text>
             </Druck>
           ) : (
             <Druck onPress={onBeitreten}>
@@ -172,9 +222,7 @@ export const CommunityDetailScreen = ({
                 end={{ x: 1, y: 1 }}
                 style={styles.knopf}
               >
-                <Text style={styles.knopfText}>
-                  {community.visibility === 'private' ? 'Anfrage' : 'Beitreten'}
-                </Text>
+                <Text style={styles.knopfText}>{Beitritt.knopfText(community)}</Text>
               </LinearGradient>
             </Druck>
           )}
@@ -214,17 +262,33 @@ export const CommunityDetailScreen = ({
           </View>
         )}
 
-        <Druck style={styles.neu} onPress={onNeuesUnterthema}>
-          <LinearGradient
-            colors={markenVerlauf()}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.neuKreis}
-          >
-            <Ionicons name="add" size={18} color="#FFFFFF" />
-          </LinearGradient>
-          <Text style={styles.neuText}>neues Unterthema erstellen</Text>
-        </Druck>
+        {/* Kasten 28/15.2: wer die Community angelegt hat, sieht wartende Anfragen gleich hier. */}
+        {community.eigen && (community.offeneAnfragen ?? 0) > 0 && (
+          <Druck style={styles.anfragen} onPress={() => setMitgliederOffen(true)} accessibilityRole="button">
+            <Ionicons name="person-add-outline" size={18} color={colors.brand} />
+            <Text style={styles.anfragenText}>
+              {Beitritt.ANFRAGEN} ({community.offeneAnfragen})
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.text3} />
+          </Druck>
+        )}
+
+        {!inhaltSichtbar && <Text style={styles.privatInhalt}>{Beitritt.PRIVAT_INHALT}</Text>}
+
+        {/* Neue Unterthemen nur in beigetretenen Communitys (Handbuch; Regel „Kanal anlegen"). */}
+        {(community.joined || community.eigen) && (
+          <Druck style={styles.neu} onPress={onNeuesUnterthema}>
+            <LinearGradient
+              colors={markenVerlauf()}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.neuKreis}
+            >
+              <Ionicons name="add" size={18} color="#FFFFFF" />
+            </LinearGradient>
+            <Text style={styles.neuText}>neues Unterthema erstellen</Text>
+          </Druck>
+        )}
 
         <View>
           {unterthemen.map((ut) => (
@@ -312,7 +376,8 @@ const styles = themenStyles((colors) => ({
     paddingTop: spacing.lg,
   },
   titel: { flex: 1, minWidth: 0, gap: 2 },
-  name: { ...typography.h2, color: colors.text },
+  nameZeile: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  name: { ...typography.h2, color: colors.text, flexShrink: 1 },
   mitglieder: { ...typography.small, color: colors.text3 },
 
   knopf: { paddingHorizontal: 16, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
@@ -355,6 +420,26 @@ const styles = themenStyles((colors) => ({
     lineHeight: 20,
   },
   link: { paddingHorizontal: '7.2%', paddingTop: 6, color: colors.brand, fontSize: 14 },
+
+  anfragen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: '7.2%',
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandSoft,
+  },
+  anfragenText: { flex: 1, color: colors.text, fontSize: 14.5, fontWeight: '600' },
+  privatInhalt: {
+    paddingHorizontal: '7.2%',
+    paddingTop: spacing.xl,
+    color: colors.text3,
+    fontSize: 14,
+    lineHeight: 20,
+  },
 
   neu: {
     flexDirection: 'row',

@@ -3299,6 +3299,9 @@ function mitteilungText(m, namen, communityNamen) {
     story: `${name} hat auf deine Story geantwortet.`,
     kanal: `${name} hat einen neuen Kanal in „${community}" erstellt.`,
     beitritt: `${name} ist „${community}" beigetreten.`,
+    // Kasten 28/15.2 (Schema 97) — derselbe Satz wie in der App (ProfilContext).
+    beitritt_anfrage: `${name} möchte „${community}" beitreten.`,
+    beitritt_ok: `${name} hat deine Anfrage für „${community}" angenommen.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
     share: `${name} hat etwas mit dir geteilt.`,

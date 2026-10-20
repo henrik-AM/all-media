@@ -70,6 +70,8 @@ import { neulingsliste, ordnenJeArt, punktekarte } from '../../gemeinsam/rang';
 // nicht. Und kein Import aus './lenkung' — das Zusammenlegen dort kennt nur
 // './medien' und './krypto'; deshalb steht ladeLenkung hier in der Datei.
 const Lenkung = require('../../gemeinsam/lenkung') as typeof import('../../gemeinsam/lenkung');
+// Kästen 28/9 und 15: Mitgliederzahl, Beitrittsanfragen (Schema 97).
+const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gemeinsam/beitritt');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -1258,16 +1260,45 @@ export async function ladeKommentare(
 // Communitys
 // ============================================================================
 
-export async function ladeCommunities(client: SupabaseClient, ichId: string): Promise<Community[]> {
-  const { data, error } = await client
-    .from('communities')
-    .select(
-      'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
-        ' community_members(count), community_channels(id, slug, name, topics, position, created_at)'
-    )
-    .order('created_at', { ascending: true })
-    .limit(100);
+/*
+ * Kasten 28/9 (Schema 97): Die Zahl steht in `communities.mitglieder_anzahl`.
+ * `community_members(count)` zählt nur, was man lesen darf — in einer
+ * privaten Community seit Schema 97 nur die eigene Zeile. Ohne Schema 97
+ * fehlt die Spalte; dann einmal mit der alten Zählung.
+ */
+const COMMUNITY_SPALTEN =
+  'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
+  ' community_channels(id, slug, name, topics, position, created_at)';
+
+/**
+ * Communitys laden. Mit `suche` (Kasten 28/15.5) nur die passenden, aus der
+ * ganzen Tabelle statt aus den ersten 100 — die Suche soll auch finden, was
+ * nicht geladen und nicht vorgeschlagen ist. Gleiche Regel in
+ * web/server/supabase-api.js (ladeCommunities).
+ */
+export async function ladeCommunities(client: SupabaseClient, ichId: string, suche = ''): Promise<Community[]> {
+  const abfrage = (zaehlung: string) => {
+    let q = client.from('communities').select(COMMUNITY_SPALTEN + zaehlung);
+    const filter = Beitritt.suchFilter(['name', 'topic'], suche);
+    if (filter) q = q.or(filter);
+    return q.order('created_at', { ascending: true }).limit(filter ? 30 : 100);
+  };
+  let { data, error } = await abfrage(', mitglieder_anzahl');
+  if (error && Beitritt.fehltSchema(error)) ({ data, error } = await abfrage(', community_members(count)'));
   if (error) throw error;
+
+  /*
+   * Kasten 28/15: offene Beitrittsanfragen. Die Regel aus Schema 97 gibt
+   * genau zwei Sorten heraus: meine eigenen und die an meine Communitys.
+   * Ohne Schema 97 keine.
+   */
+  const { data: anfragen } = await client.from('community_beitrittsanfragen').select('community_id, user_id');
+  const angefragt = new Set<string>();
+  const offeneAnfragen = new Map<string, number>();
+  for (const a of (anfragen ?? []) as any[]) {
+    if (a.user_id === ichId) angefragt.add(a.community_id);
+    else offeneAnfragen.set(a.community_id, (offeneAnfragen.get(a.community_id) ?? 0) + 1);
+  }
 
   const { data: meine } = await client
     .from('community_members')
@@ -1285,8 +1316,11 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     bio: c.bio ?? '',
     link: c.link ?? '',
     visibility: c.visibility,
-    members: Number(c.mitglieder_basis ?? 0) + (c.community_members?.[0]?.count ?? 0),
+    members: Number(c.mitglieder_basis ?? 0) + Number(c.mitglieder_anzahl ?? c.community_members?.[0]?.count ?? 0),
     joined: beigetreten.has(c.id),
+    angefragt: angefragt.has(c.id),
+    offeneAnfragen: c.created_by === ichId ? offeneAnfragen.get(c.id) ?? 0 : 0,
+    erstellerId: c.created_by === ichId ? ICH : c.created_by ?? undefined,
     stumm: stumme.has(c.id),
     unreadCount: 0,
     // Eine selbst angelegte Community lässt sich nicht verlassen — sie stünde

@@ -334,6 +334,15 @@ export interface Community {
    * `visibility === 'private'` und zeigte damit etwas voellig anderes an.
    */
   stumm?: boolean;
+  /**
+   * Kasten 28/15 (Schema 97): Meine Beitrittsanfrage an diese private
+   * Community läuft — community_beitrittsanfragen.
+   */
+  angefragt?: boolean;
+  /** Nur bei eigenen Communitys: so viele Anfragen warten auf mich (Kasten 28/15.2). */
+  offeneAnfragen?: number;
+  /** Kasten 28/9: wer sie angelegt hat ('me' für mich) — steht in der Mitgliederliste oben. */
+  erstellerId?: string;
   unterthemen?: Unterthema[];
 }
 
@@ -519,7 +528,10 @@ export type MitteilungArt =
    * Eingangsbestätigung, Entscheidung, Begründung, Widerspruch. Der Satz
    * steht fertig in `notifications.text`.
    */
-  | 'system';
+  | 'system'
+  /** Kasten 28/15.2: Beitrittsanfrage an meine Community bzw. angenommen — Schema 97. */
+  | 'beitritt_anfrage'
+  | 'beitritt_ok';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
