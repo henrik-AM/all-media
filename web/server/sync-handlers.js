@@ -16,6 +16,8 @@
  */
 
 const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
+// Kästen 28/9 und 15: Beitrittsanfragen, Mitgliederliste, Suche (Schema 97).
+const Beitritt = require('../../gemeinsam/beitritt');
 const Telefon = require('../../gemeinsam/telefon');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
@@ -1441,6 +1443,112 @@ const handleJoinCommunity = handler('Community beitreten', async (client, nutzer
   return { ok: true, mitglied: gesetzt };
 });
 
+/*
+ * Kasten 28/15.1–15.3 (Schema 97): private Communitys nur mit Freigabe.
+ * Welche Anfrage gestellt werden darf, entscheidet die Regel „Beitrittsanfrage
+ * stellen" — nicht dieser Code. Gegenstücke in app/lib/aktionen.ts
+ * (beitrittAnfragen, beitrittsanfrageZurueckziehen, beitrittsanfrageEntscheiden).
+ */
+const handleBeitrittAnfrage = handler('Beitrittsanfrage', async (client, nutzerId, communityId, stellen) => {
+  if (stellen) {
+    const { error } = await client
+      .from('community_beitrittsanfragen')
+      .insert({ community_id: communityId, user_id: nutzerId });
+    if (error && error.code === '23505') return { ok: true, angefragt: true };
+    if (error && Beitritt.fehltSchema(error)) return { ok: false, fehler: Beitritt.FEHLT_SCHEMA };
+    if (error && error.code === '42501') {
+      return { ok: false, fehler: 'Diese Community nimmt gerade keine Anfrage von dir an' };
+    }
+    if (error) throw error;
+    return { ok: true, angefragt: true };
+  }
+  // Zurückziehen. Mit Zählung — ein verbotenes DELETE meldet sonst Erfolg.
+  const { error, count } = await client
+    .from('community_beitrittsanfragen')
+    .delete({ count: 'exact' })
+    .eq('community_id', communityId)
+    .eq('user_id', nutzerId);
+  if (error && Beitritt.fehltSchema(error)) return { ok: false, fehler: Beitritt.FEHLT_SCHEMA };
+  if (error) throw error;
+  if (!count) return { ok: false, fehler: 'Diese Anfrage gibt es nicht mehr' };
+  return { ok: true, angefragt: false };
+});
+
+/** Als Ersteller annehmen (über beitrittsanfrage_annehmen) oder ablehnen (DELETE). */
+const handleBeitrittsanfrageEntscheiden = handler(
+  'Beitrittsanfrage entscheiden',
+  async (client, nutzerId, communityId, userId, annehmen) => {
+    if (annehmen) {
+      const { error } = await client.rpc('beitrittsanfrage_annehmen', { p_community: communityId, p_user: userId });
+      if (error && Beitritt.fehltSchema(error)) return { ok: false, fehler: Beitritt.FEHLT_SCHEMA };
+      if (error) throw error;
+      return { ok: true };
+    }
+    const { error, count } = await client
+      .from('community_beitrittsanfragen')
+      .delete({ count: 'exact' })
+      .eq('community_id', communityId)
+      .eq('user_id', userId);
+    if (error && Beitritt.fehltSchema(error)) return { ok: false, fehler: Beitritt.FEHLT_SCHEMA };
+    if (error) throw error;
+    if (!count) return { ok: false, fehler: 'Diese Anfrage gibt es nicht mehr' };
+    return { ok: true };
+  }
+);
+
+/**
+ * Kasten 28/9: Mitglieder und — für den Ersteller — offene Anfragen.
+ * Was ankommt, entscheidet die Regel „Mitglieder lesen" (Schema 97).
+ * Gegenstück: mitgliederLaden in app/lib/aktionen.ts.
+ */
+const handleMitglieder = handler('Mitglieder laden', async (client, nutzerId, communityId) => {
+  const [{ data: zeilen, error }, { data: offene, error: fehlerAnfragen }] = await Promise.all([
+    client.from('community_members').select('user_id, joined_at').eq('community_id', communityId).limit(500),
+    client
+      .from('community_beitrittsanfragen')
+      .select('user_id, created_at')
+      .eq('community_id', communityId)
+      .order('created_at', { ascending: true }),
+  ]);
+  if (error) throw error;
+  if (fehlerAnfragen && !Beitritt.fehltSchema(fehlerAnfragen)) throw fehlerAnfragen;
+
+  const mitgliedIds = (zeilen || []).map((z) => z.user_id);
+  const anfrageIds = (offene || []).map((z) => z.user_id).filter((id) => id !== nutzerId);
+  const alle = [...new Set([...mitgliedIds, ...anfrageIds])];
+  const profile = new Map();
+  if (alle.length) {
+    const { data, error: fehlerProfile } = await client.from('profiles').select('id, name, handle').in('id', alle);
+    if (fehlerProfile) throw fehlerProfile;
+    for (const p of data || []) profile.set(p.id, p);
+  }
+  const zeile = (id) => ({
+    id: id === nutzerId ? 'me' : id,
+    name: profile.get(id)?.name || 'Unbekannt',
+    handle: profile.get(id)?.handle || '',
+  });
+  return { ok: true, mitglieder: mitgliedIds.map(zeile), anfragen: anfrageIds.map(zeile) };
+});
+
+/**
+ * Kasten 28/15.5: Personen in der ganzen Datenbank suchen, nicht nur unter
+ * den 500 geladenen. Wen man sehen darf, entscheidet die Regel auf
+ * `profiles` (nur_freigegebene). Gegenstück: personenSuchen in aktionen.ts.
+ */
+const handlePersonenSuchen = handler('Personen suchen', async (client, nutzerId, eingabe) => {
+  const filter = Beitritt.suchFilter(['name', 'handle'], eingabe);
+  if (!filter) return { ok: true, personen: [] };
+  const { data, error } = await client
+    .from('profiles')
+    .select('id, name, handle')
+    .or(filter)
+    .neq('id', nutzerId)
+    .order('name', { ascending: true })
+    .limit(30);
+  if (error) throw error;
+  return { ok: true, personen: (data || []).map((p) => ({ id: p.id, name: p.name || '', handle: p.handle || '' })) };
+});
+
 /**
  * Eine Community stummschalten oder wieder hoerbar machen.
  *
@@ -2503,6 +2611,10 @@ module.exports = {
   handleFindPerson,
   handlePersonPerNutzername,
   handleAddContact,
+  handleBeitrittAnfrage,
+  handleBeitrittsanfrageEntscheiden,
+  handleMitglieder,
+  handlePersonenSuchen,
   handleAcceptRequest,
   handleMessengerAnfragen,
   handleMessengerAnfrageBeantworten,

@@ -33,6 +33,8 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
+// Kästen 28/9 und 15: Beitreten oder Anfrage, Suchmuster (Schema 97).
+const Beitritt = require('../../gemeinsam/beitritt');
 const syncHandlers = require('./sync-handlers');
 const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
@@ -3114,11 +3116,47 @@ app.get('/api/communities', route(async (req) => {
 }));
 
 app.get('/api/communities/:id', route(async (req, res) => {
-  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
-  const community = alle.find((c) => c.id === req.params.id);
+  // Genau diese eine — auch jenseits der ersten 100 (Kasten 28/15.5).
+  const [community] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: req.params.id })) || [];
   if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
   res.json(community);
 }));
+
+/*
+ * Kasten 28/15.5 (Henrik 28.09.2026): „…so dass ich wirklich alle suchen
+ * kann." Communitys und Personen aus der ganzen Datenbank, nicht nur aus
+ * den geladenen 100 bzw. 500. Kein /api/communities/suche — das finge die
+ * Route /api/communities/:id ab.
+ */
+app.get('/api/community-suche', route(async (req) => {
+  const eingabe = String(req.query.q || '');
+  const [communities, personen] = await Promise.all([
+    supabaseApi.ladeCommunities(req.db, req.nutzerId, { suche: eingabe }),
+    syncHandlers.handlePersonenSuchen(req.db, req.nutzerId, eingabe),
+  ]);
+  return {
+    communities: Beitritt.suchmuster(eingabe) ? communities || [] : [],
+    personen: personen && personen.ok ? personen.personen : [],
+  };
+}));
+
+/*
+ * Kasten 28/9: Mitglieder einer Community, für den Ersteller mit den offenen
+ * Beitrittsanfragen. Wer was sieht, entscheidet die Regel „Mitglieder lesen"
+ * (Schema 97) — bei privaten sieht nur der Ersteller die Liste.
+ */
+app.get('/api/communities/:id/mitglieder', route(async (req) =>
+  antwort(await syncHandlers.handleMitglieder(req.db, req.nutzerId, req.params.id))
+));
+
+/** Kasten 28/15.2: der Ersteller nimmt eine Anfrage an oder lehnt sie ab. */
+app.post('/api/communities/:id/anfragen/:userId', route(async (req) =>
+  antwort(
+    await syncHandlers.handleBeitrittsanfrageEntscheiden(
+      req.db, req.nutzerId, req.params.id, req.params.userId, req.body?.annehmen === true
+    )
+  )
+));
 
 app.post('/api/communities', route(async (req) => {
   const name = String(req.body?.name || '').trim();
@@ -3144,8 +3182,7 @@ app.post('/api/communities', route(async (req) => {
 }));
 
 app.post('/api/communities/:id/join', route(async (req, res) => {
-  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
-  const community = alle.find((c) => c.id === req.params.id);
+  const [community] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: req.params.id })) || [];
   if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
 
   /*
@@ -3157,9 +3194,21 @@ app.post('/api/communities/:id/join', route(async (req, res) => {
     return res.status(409).json({ error: 'Die eigene Community lässt sich nicht verlassen' });
   }
 
-  await syncHandlers.handleJoinCommunity(req.db, req.nutzerId, req.params.id);
-  const frisch = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
-  res.json(frisch.find((c) => c.id === req.params.id));
+  /*
+   * Kasten 28/15.1: bei einer privaten Community wird aus Beitreten eine
+   * Anfrage (bzw. aus „Angefragt" das Zurückziehen). Mitglied macht erst der
+   * Ersteller (beitrittsanfrage_annehmen). `meldung` sagt, was wirklich
+   * passiert ist; `fehler`, warum nicht. Gleiche Regel in der App
+   * (ProfilContext.kanalBeitreten).
+   */
+  const vorher = Beitritt.zustand(community);
+  const e =
+    vorher === 'anfragen' || vorher === 'angefragt'
+      ? await syncHandlers.handleBeitrittAnfrage(req.db, req.nutzerId, req.params.id, vorher === 'anfragen')
+      : await syncHandlers.handleJoinCommunity(req.db, req.nutzerId, req.params.id);
+  const [frisch] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: req.params.id })) || [];
+  const fehler = !e ? 'Nicht angemeldet' : e.ok === false ? e.fehler : null;
+  res.json({ ...(frisch || community), fehler, meldung: fehler || Beitritt.meldung(vorher, community.name) });
 }));
 
 /*

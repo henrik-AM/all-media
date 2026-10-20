@@ -6019,6 +6019,8 @@ async function renderCommunityChannels(communityId) {
    * Biografie, kein Link, kein Weg, ein Unterthema anzulegen.
    */
   const eigen = !!daten.eigen;
+  // Kästen 28/9 und 15: Knopf, Sichtbarkeit — dieselbe Regel wie die App.
+  const zustand = Beitritt.zustand(daten);
 
   main.innerHTML = `
     <div class="kanal">
@@ -6028,9 +6030,9 @@ async function renderCommunityChannels(communityId) {
       </div>
 
       <div class="kanal__kopfzeile">
-        <button class="kanal__titel" id="communityKopf">
-          <span class="kanal__name">${esc(daten.name)}</span>
-          <span class="kanal__mitglieder">${daten.members.toLocaleString('de-DE')} Mitglieder</span>
+        <button class="kanal__titel" id="communityKopf" aria-label="Mitglieder anzeigen">
+          <span class="kanal__name">${esc(daten.name)}${daten.visibility === 'private' ? ` <span class="kanal__schloss">${ICONS.lock}</span>` : ''}</span>
+          <span class="kanal__mitglieder">${Beitritt.anzahlText(daten.members)}</span>
         </button>
         ${
           /*
@@ -6039,12 +6041,11 @@ async function renderCommunityChannels(communityId) {
            * Community als Mitglied entfernen und stand dann davor.
            */
           eigen
-            ? '<span class="kanal__eigen">Deine Community</span>'
-            : // Beitreten traegt den Verlauf, Verlassen bleibt die leise
-              // Kante - der Weg hinein soll der auffaellige sein.
-              `<button class="btn ${daten.joined ? '' : 'btn--primary'}" data-join="${esc(daten.id)}">${
-                daten.joined ? 'Verlassen' : daten.visibility === 'private' ? 'Anfrage' : 'Beitreten'
-              }</button>`
+            ? `<span class="kanal__eigen">${Beitritt.knopfText(daten)}</span>`
+            : // Beitreten/Anfrage traegt den Verlauf, Verlassen und
+              // „Angefragt" bleiben die leise Kante - der Weg hinein soll der
+              // auffaellige sein. Kasten 28/15.1: privat heisst Anfrage.
+              `<button class="btn ${zustand === 'beitreten' || zustand === 'anfragen' ? 'btn--primary' : ''}" data-join="${esc(daten.id)}">${Beitritt.knopfText(daten)}</button>`
         }
         ${/*
             Das "..." aus dem Frame. Dort steht es unter der Mitgliederzahl;
@@ -6083,10 +6084,23 @@ async function renderCommunityChannels(communityId) {
           : ''
       }
 
-      <button class="kanal__neu" id="neuesUnterthema">
-        <span class="kanal__neu-kreis">${ICONS.plus}</span>
-        <span>neues Unterthema erstellen</span>
-      </button>
+      ${
+        // Kasten 28/15.2: wer die Community angelegt hat, sieht wartende Anfragen gleich hier.
+        eigen && daten.offeneAnfragen > 0
+          ? `<button class="kanal__anfragen" id="communityAnfragen">${esc(Beitritt.ANFRAGEN)} (${daten.offeneAnfragen})</button>`
+          : ''
+      }
+      ${Beitritt.inhaltSichtbar(daten) ? '' : `<div class="kanal__privat">${esc(Beitritt.PRIVAT_INHALT)}</div>`}
+
+      ${
+        // Neue Unterthemen nur in beigetretenen Communitys (Handbuch; Regel „Kanal anlegen").
+        daten.joined || eigen
+          ? `<button class="kanal__neu" id="neuesUnterthema">
+              <span class="kanal__neu-kreis">${ICONS.plus}</span>
+              <span>neues Unterthema erstellen</span>
+            </button>`
+          : ''
+      }
 
       <div class="kanal__themen">
         ${daten.channels
@@ -6113,24 +6127,27 @@ async function renderCommunityChannels(communityId) {
     state.openCommunityId = null;
     renderCommunities();
   });
-  // Henrik: "Gruppennamen muessen anklickbar sein und zu den vorgesehenen
-  // Einstellungen fuehren." Das gilt fuer den Namen und fuer das "...".
-  const einstellungen = () => openCommunityEinstellungen(daten);
-  $('#communityKopf').addEventListener('click', einstellungen);
-  $('#communityMehr').addEventListener('click', einstellungen);
+  /*
+   * Kasten 28/9 (Henrik 28.09.2026): „wenn man auf der Homeseite der
+   * Community auf den Namen drückt", sieht man die Mitglieder — bei privaten
+   * nur die Anzahl. Bis dahin führte der Name in die Einstellungen; dorthin
+   * führt weiter das „...". Gleich in der App (CommunityDetailScreen).
+   */
+  $('#communityKopf').addEventListener('click', () => renderCommunityMitglieder(daten));
+  $('#communityAnfragen')?.addEventListener('click', () => renderCommunityMitglieder(daten));
+  $('#communityMehr').addEventListener('click', () => openCommunityEinstellungen(daten));
 
-  $('#neuesUnterthema').addEventListener('click', () => neuesUnterthema(daten));
+  $('#neuesUnterthema')?.addEventListener('click', () => neuesUnterthema(daten));
 
   if ($('#pttKnopf')) pttEinhaengen(daten.id);
 
   main.querySelectorAll('[data-join]').forEach((b) =>
     b.addEventListener('click', async () => {
-      await fetch(`/api/communities/${b.dataset.join}/join`, { method: 'POST' });
-      const frisch = state.communities.find((c) => c.id === b.dataset.join);
-      if (frisch) {
-        frisch.joined = !frisch.joined;
-        frisch.members += frisch.joined ? 1 : -1;
-      }
+      const frisch = await fetch(`/api/communities/${b.dataset.join}/join`, { method: 'POST' }).then((r) => r.json());
+      if (frisch.error) return toast(frisch.error);
+      communityMerken(frisch);
+      // Kasten 28/15.1: sagt, was wirklich passiert ist (Anfrage statt Beitritt).
+      toast(frisch.meldung || Beitritt.knopfText(frisch));
       renderCommunityChannels(communityId);
     })
   );
@@ -6139,6 +6156,115 @@ async function renderCommunityChannels(communityId) {
     b.addEventListener('click', () => {
       const kanal = daten.channels.find((ch) => ch.id === b.dataset.channel);
       renderKanalThemen(daten, kanal);
+    })
+  );
+}
+
+/** Eine Community in state.communities ersetzen oder — als Suchtreffer — dazunehmen. */
+function communityMerken(community) {
+  if (!community || !community.id) return;
+  const idx = state.communities.findIndex((c) => c.id === community.id);
+  if (idx === -1) state.communities.push(community);
+  else state.communities[idx] = community;
+}
+
+/*
+ * Kasten 28/9: die Mitglieder einer Community (Prototyp-Frame „CC + Kanal":
+ * „Name · Mitglieder"). Öffentlich: Liste für alle. Privat: nur die Anzahl,
+ * außer für den Ersteller — dieselbe Bedingung wie die Regel „Mitglieder
+ * lesen" in Schema 97 (Beitritt.listeSichtbar). Der Ersteller sieht hier
+ * auch die offenen Beitrittsanfragen und entscheidet (Kasten 15.2).
+ * Gleiche Seite in der App: CommunityMitgliederScreen.
+ */
+async function renderCommunityMitglieder(daten, fehler = '') {
+  const lauf = ++renderLauf;
+  const sichtbar = Beitritt.listeSichtbar(daten);
+  let liste = { mitglieder: [], anfragen: [] };
+  if (sichtbar) {
+    const r = await fetch(`/api/communities/${daten.id}/mitglieder`).then((x) => x.json());
+    if (lauf !== renderLauf) return;
+    if (r.ok) liste = r;
+    else fehler = fehler || r.error || 'Die Mitglieder ließen sich nicht laden';
+  }
+  const mitglieder = Beitritt.ordnen(liste.mitglieder, daten.erstellerId, 'me');
+  const person = (p, rechts) => `<li><div class="row">
+      <span ${p.id === 'me' ? '' : `data-profile="${esc(p.id)}"`}>${avatarForUser(p.id, 44)}</span>
+      <div class="row__body" ${p.id === 'me' ? '' : `data-profile="${esc(p.id)}"`}>
+        <div class="row__name">${esc(p.id === 'me' ? Beitritt.DU : p.name)}</div>
+        ${p.handle ? `<div class="row__bottom"><span class="row__preview">${esc(p.handle)}</span></div>` : ''}
+      </div>
+      ${rechts || ''}
+    </div></li>`;
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="pagehead__row">
+        <button class="iconbtn" id="mitgliederBack" aria-label="Zurück zur Community">${ICONS.back}</button>
+        <div>
+          <h2 class="pagehead__title">${esc(Beitritt.TITEL)}</h2>
+          <div class="pagehead__sub">${esc(daten.name)} · ${esc(Beitritt.anzahlText(daten.members))}</div>
+        </div>
+      </div>
+    </div>
+    <div class="scroll" data-mitglieder="${esc(daten.id)}">
+      ${fehler ? `<div class="hinweis hinweis--fehler" id="mitgliederFehler">${esc(fehler)}</div>` : ''}
+      ${
+        !sichtbar
+          ? `<div class="empty" id="mitgliederPrivat">${ICONS.lock}
+              <div class="empty__title">${esc(Beitritt.anzahlText(daten.members))}</div>
+              <div class="empty__text">${esc(Beitritt.PRIVAT_HINWEIS)}</div>
+            </div>`
+          : `${
+              daten.eigen && liste.anfragen.length
+                ? `<div class="exp__head" id="anfragenKopf">${esc(Beitritt.ANFRAGEN)} (${liste.anfragen.length})</div>
+                   <ul class="rows" id="anfragenListe">${liste.anfragen
+                     .map((p) =>
+                       person(
+                         p,
+                         `<span class="anfrage__knoepfe">
+                            <button class="joinbtn is-joined" data-anfrage="${esc(p.id)}" data-annehmen="0">${esc(Beitritt.ABLEHNEN)}</button>
+                            <button class="joinbtn" data-anfrage="${esc(p.id)}" data-annehmen="1">${esc(Beitritt.ANNEHMEN)}</button>
+                          </span>`
+                       )
+                     )
+                     .join('')}</ul>`
+                : ''
+            }
+            ${daten.visibility === 'private' ? `<div class="hinweis">${esc(Beitritt.PRIVAT_HINWEIS)}</div>` : ''}
+            <div class="exp__head">${esc(Beitritt.anzahlText(daten.members))}</div>
+            ${
+              mitglieder.length
+                ? `<ul class="rows" id="mitgliederListe">${mitglieder
+                    .map((p) =>
+                      person(p, p.id === daten.erstellerId ? `<span class="kanal__eigen">${esc(Beitritt.ERSTELLER)}</span>` : '')
+                    )
+                    .join('')}</ul>`
+                : `<div class="empty"><div class="empty__text">${esc(Beitritt.LEER)}</div></div>`
+            }`
+      }
+    </div>`;
+
+  $('#mitgliederBack').addEventListener('click', () => renderCommunityChannels(daten.id));
+  main.querySelectorAll('[data-profile]').forEach((el) =>
+    el.addEventListener('click', () => openProfile(el.dataset.profile))
+  );
+  main.querySelectorAll('[data-anfrage]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      const annehmen = b.dataset.annehmen === '1';
+      const r = await fetch(`/api/communities/${daten.id}/anfragen/${b.dataset.anfrage}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ annehmen }),
+      }).then((x) => x.json());
+      // Fehler stehen auf der Seite, nicht im Toast dahinter.
+      if (!r.ok) return renderCommunityMitglieder(daten, r.error || 'Das hat nicht geklappt');
+      const frisch = await fetch(`/api/communities/${daten.id}`).then((x) => x.json());
+      if (!frisch.error) {
+        communityMerken(frisch);
+        daten = frisch;
+      }
+      renderCommunityMitglieder(daten);
     })
   );
 }
@@ -6631,9 +6757,11 @@ function bindJoinButtons(rerender) {
       e.stopPropagation();
       const res = await fetch(`/api/communities/${btn.dataset.join}/join`, { method: 'POST' });
       const updated = await res.json();
-      const idx = state.communities.findIndex((c) => c.id === updated.id);
-      state.communities[idx] = updated;
-      toast(updated.joined ? `„${updated.name}" beigetreten` : `„${updated.name}" verlassen`);
+      if (updated.error) return toast(updated.error);
+      // Ein Suchtreffer (Kasten 28/15.5) steht noch nicht in der Liste.
+      communityMerken(updated);
+      // Kasten 28/15.1: die Meldung sagt, was wirklich passiert ist.
+      toast(updated.meldung || Beitritt.knopfText(updated));
       rerender();
     })
   );
@@ -6673,7 +6801,8 @@ function communityRow(c) {
           ${
             c.eigen
               ? ''
-              : `<span class="joinbtn ${c.joined ? 'is-joined' : ''}" data-join="${c.id}">${c.joined ? 'Mitglied' : 'Beitreten'}</span>`
+              : // Kasten 28/15.1: privat heisst „Anfrage senden" — der Ersteller entscheidet.
+                `<span class="joinbtn ${Beitritt.zustand(c) === 'beitreten' || Beitritt.zustand(c) === 'anfragen' ? '' : 'is-joined'}" data-join="${c.id}">${esc(Beitritt.suchText(c))}</span>`
           }
         </span>
       </button>
@@ -17832,14 +17961,67 @@ function renderCommunityChats() {
 /* --------------------------------------------------- Communitys: Suchen */
 // Prototyp-Frame "Community - Suchen": Filter Alle/Communitys/Kontakte, dann
 // die Abschnitte Kanäle und Profile mit Befreunden-Schaltfläche.
+
+/*
+ * Kasten 28/15.5 (Henrik 28.09.2026): „Stelle sicher, dass ich in dem
+ * Suchfeld auch Personen/Kontakte oder auch Communitys finde, die mir nicht
+ * vorgeschlagen werden, so dass ich wirklich alle suchen kann."
+ *
+ * Geladen sind höchstens 500 Personen und 100 Communitys. Ab zwei Zeichen
+ * fragt die Suche zusätzlich die Datenbank (/api/community-suche) und legt
+ * die Treffer dahinter — nur die, die nicht ohnehin geladen sind. Wen man
+ * sehen darf, entscheiden die Regeln dort. Gleich in der App
+ * (CommunitySearchScreen, communitySuche).
+ */
+function trefferFuer(q, art) {
+  const t = state.commTreffer;
+  if (!t || !q || t.wort !== q) return [];
+  if (art === 'communities') {
+    const da = new Set(state.communities.map((c) => c.id));
+    return t.communities.filter((c) => !da.has(c.id));
+  }
+  return t.personen.filter((p) => !state.users[p.id]);
+}
+
+/** Eine Community aus der Suche öffnen — ein Datenbanktreffer kommt vorher in die Liste. */
+function oeffneCommunityTreffer(id) {
+  const treffer = (state.commTreffer?.communities || []).find((c) => c.id === id);
+  if (treffer && !state.communities.some((c) => c.id === id)) communityMerken(treffer);
+  openChat(id);
+}
+
+let commSucheTakt = null;
+/** Nach kurzer Tipp-Pause die Datenbank fragen; danach `neuZeichnen()`. */
+function commDatenbankSuche(roh, neuZeichnen) {
+  const q = roh.trim().toLowerCase();
+  clearTimeout(commSucheTakt);
+  if (!Beitritt.suchmuster(q) || (state.commTreffer && state.commTreffer.wort === q)) return;
+  commSucheTakt = setTimeout(async () => {
+    const r = await fetch(`/api/community-suche?q=${encodeURIComponent(q)}`)
+      .then((x) => x.json())
+      .catch(() => null);
+    if (!r || r.error) return;
+    state.commTreffer = { wort: q, communities: r.communities || [], personen: r.personen || [] };
+    neuZeichnen();
+  }, 300);
+}
+
 function renderCommunitySearch() {
   const q = state.communityQuery.trim().toLowerCase();
   const f = state.commSearchFilter;
-  const chans = f === 'people' ? [] : state.communities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
+  // Kasten 28/15.5: geladene zuerst, Datenbanktreffer (trefferFuer) dahinter.
+  const chans =
+    f === 'people'
+      ? []
+      : [...state.communities, ...trefferFuer(q, 'communities')].filter(
+          (c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q)
+        );
   const people =
     f === 'channels'
       ? []
-      : Object.values(state.users).filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)));
+      : [...Object.values(state.users), ...trefferFuer(q, 'personen')].filter(
+          (u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q))
+        );
 
   const statusOf = (id) => {
     const c = state.contacts.find((x) => x.id === id);
@@ -17938,13 +18120,17 @@ function renderCommunitySearch() {
     })
   );
   main.querySelectorAll('[data-community]').forEach((r) =>
-    r.addEventListener('click', () => openChat(r.dataset.community))
+    r.addEventListener('click', () => oeffneCommunityTreffer(r.dataset.community))
   );
   bindJoinButtons(renderCommunitySearch);
   main.querySelectorAll('[data-befriend]').forEach((b) =>
     b.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const u = state.users[b.dataset.befriend];
+      // Kasten 28/15.5: ein Datenbanktreffer steht nicht in state.users.
+      const u =
+        state.users[b.dataset.befriend] ||
+        (state.commTreffer?.personen || []).find((p) => p.id === b.dataset.befriend);
+      if (!u) return;
       const res = await fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -17960,6 +18146,17 @@ function renderCommunitySearch() {
       renderCommunitySearch();
     })
   );
+  // Kasten 28/15.5: nach kurzer Tipp-Pause zusätzlich die Datenbank fragen.
+  commDatenbankSuche(state.communityQuery, () => {
+    if (!$('#commSearch')) return; // inzwischen woanders
+    const pos = $('#commSearch').selectionStart;
+    const fokus = document.activeElement === $('#commSearch');
+    renderCommunitySearch();
+    if (fokus) {
+      $('#commSearch').focus();
+      $('#commSearch').setSelectionRange(pos, pos);
+    }
+  });
 }
 
 /* --------------------------------------------------- Communitys: Profil */

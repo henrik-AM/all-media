@@ -275,7 +275,8 @@ begin
   delete from public.community_beitrittsanfragen
    where community_id = p_community and user_id = p_user;
   if not found then
-    raise exception 'Diese Anfrage gibt es nicht mehr' using errcode = 'P0002';
+    -- P0001 (Vorgabe): der Satz darf bis zum Browser durch (fuerMenschen).
+    raise exception 'Diese Anfrage gibt es nicht mehr';
   end if;
 
   insert into public.community_members (community_id, user_id)

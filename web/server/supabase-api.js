@@ -44,6 +44,8 @@ const Lenkung = require('../../gemeinsam/lenkung');
 const StoryRegeln = require('../../gemeinsam/story');
 // Kasten 27: Stand und Reihenfolge offener Chats — gemeinsam mit der App.
 const ChatAbgleich = require('../../gemeinsam/chatabgleich');
+// Kästen 28/9 und 15: Mitgliederzahl, Beitrittsanfragen, Suche (Schema 97).
+const Beitritt = require('../../gemeinsam/beitritt');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -1126,17 +1128,48 @@ async function ladeKommentare(client, nutzerId, beitragId) {
 // Communitys
 // ============================================================================
 
-async function ladeCommunities(client, nutzerId) {
+/*
+ * Kasten 28/9 (Schema 97): Die Zahl steht in `communities.mitglieder_anzahl`.
+ * `community_members(count)` zählt nur, was man lesen darf — in einer
+ * privaten Community seit Schema 97 nur die eigene Zeile. Ohne Schema 97
+ * fehlt die Spalte; dann einmal mit der alten Zählung. Wie in app/lib/daten.ts.
+ */
+const COMMUNITY_SPALTEN =
+  'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
+  ' community_channels(id, slug, name, topics, position, created_at)';
+
+/**
+ * Communitys laden.
+ *
+ * `wahl.suche` (Kasten 28/15.5): nur passende, aus der ganzen Tabelle statt
+ * aus den ersten 100. `wahl.id`: genau diese eine — auch wenn sie nicht unter
+ * den ersten 100 steht (ein Suchtreffer, den man öffnet oder dem man beitritt).
+ */
+async function ladeCommunities(client, nutzerId, wahl = {}) {
   if (!client) return null;
-  const { data, error } = await client
-    .from('communities')
-    .select(
-      'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
-        ' community_members(count), community_channels(id, slug, name, topics, position, created_at)'
-    )
-    .order('created_at', { ascending: true })
-    .limit(100);
+  const abfrage = (zaehlung) => {
+    let q = client.from('communities').select(COMMUNITY_SPALTEN + zaehlung);
+    const filter = Beitritt.suchFilter(['name', 'topic'], wahl.suche);
+    if (wahl.id) q = q.eq('id', wahl.id);
+    else if (filter) q = q.or(filter);
+    return q.order('created_at', { ascending: true }).limit(wahl.id ? 1 : filter ? 30 : 100);
+  };
+  let { data, error } = await abfrage(', mitglieder_anzahl');
+  if (error && Beitritt.fehltSchema(error)) ({ data, error } = await abfrage(', community_members(count)'));
   if (error) throw error;
+
+  /*
+   * Kasten 28/15: offene Beitrittsanfragen. Die Regel aus Schema 97 gibt
+   * genau zwei Sorten heraus: meine eigenen und die an meine Communitys.
+   * Ohne Schema 97 keine.
+   */
+  const { data: anfragen } = await client.from('community_beitrittsanfragen').select('community_id, user_id');
+  const angefragt = new Set();
+  const offeneAnfragen = new Map();
+  for (const a of anfragen || []) {
+    if (a.user_id === nutzerId) angefragt.add(a.community_id);
+    else offeneAnfragen.set(a.community_id, (offeneAnfragen.get(a.community_id) || 0) + 1);
+  }
 
   const { data: meine } = await client
     .from('community_members')
@@ -1153,11 +1186,14 @@ async function ladeCommunities(client, nutzerId) {
     bio: c.bio || '',
     link: c.link || '',
     visibility: c.visibility,
-    members: Number(c.mitglieder_basis || 0) + (c.community_members?.[0]?.count ?? 0),
+    members: Number(c.mitglieder_basis || 0) + Number(c.mitglieder_anzahl ?? c.community_members?.[0]?.count ?? 0),
     // Eine selbst angelegte Community kann man nicht verlassen — sie stünde
     // sonst ohne Besitzer da.
     eigen: c.created_by === nutzerId,
     joined: beigetreten.has(c.id),
+    angefragt: angefragt.has(c.id),
+    offeneAnfragen: c.created_by === nutzerId ? offeneAnfragen.get(c.id) || 0 : 0,
+    erstellerId: c.created_by === nutzerId ? 'me' : c.created_by || null,
     stumm: stumme.has(c.id),
     unread: 0,
     // Bei gleicher Position das ältere zuerst — dieselbe Reihenfolge, nach
