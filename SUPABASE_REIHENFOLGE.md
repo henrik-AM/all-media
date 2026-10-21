@@ -316,3 +316,33 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
 **Folge:** Jedes Konto ohne Zustimmung (am 02.11. 15 Konten, alle von vor dem 24.10.) sieht beim nächsten Öffnen „Unsere Bedingungen“ und muss zustimmen. Prüf- und Testkonto (`all.media.prueflauf@web.de`, `test@all-media.app`) haben zugestimmt; neue Prüfkonten aus SQL ohne `pruefsumme_<dok>` in den Metadaten landen ebenfalls dort.
 
 **Nicht auf main** (bleibt auf `kasten/rs-recht` bzw. im Sammelzweig): alle Kasten-28-Teile mit den Schemas 88–100. Wer 92 einspielt, muss danach den F11-Block aus 102 erneut ausführen.
+
+## Nachtrag 21.10.2026: Schema 99 (Feedback 28.09., Kästen 10.2 und 16)
+
+**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 90 (`ptt_messages.channel_id`,
+`ptt_mitteilen`) und nach 98.
+
+- `SUPABASE_SCHEMA_99_erstellen_einladung.sql` — `communities.bild_url` (nur Ordner avatars);
+  `community_channels.bio/link/privat/erstellt_von` + Auslöser `unterthema_vorgaben`; Tabelle
+  `unterthema_mitglieder` (RLS, `nur_freigegebene`, kein INSERT für Nutzer);
+  `unterthema_zugang(uuid, uuid)` (nur intern), `unterthema_offen(uuid)`; Tabelle `einladungen`
+  (RLS, `nur_freigegebene`), `einladung_annehmen(text)`; restriktive Regel
+  „PTT nur mit Unterthema-Zugang" auf `ptt_messages`.
+  **Ersetzt `kanal_sichtbar`, `kanal_mitglied` (zuletzt EINSPIELEN/59), Regel „Kanaele lesen",
+  `ptt_mitteilen` (zuletzt 90) und `markierung_sichtbar` (zuletzt 86).** Wer 86 oder 90 neu
+  einspielt, muss 99 nachziehen.
+
+Code vor dem Schema: App (`daten.ts`, `aktionen.ts`) und Server (`supabase-api.js`,
+`sync-handlers.js`) lesen Bild und Unterthema-Felder nachsichtig (`Erstellen.zusatzLaden`) und
+legen ohne 99 wie bisher an; ein privates Unterthema wird ohne 99 gar nicht angelegt
+(„… erst, wenn das Datenbank-Update eingespielt ist"). Probe: `app/test/_probe99.js`.
+
+| Objekt | Dateien (die letzte gewinnt) |
+|---|---|
+| Funktion public.kanal_sichtbar() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_99_erstellen_einladung.sql |
+| Regel "Kanaele lesen" auf public.community_channels | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_99_erstellen_einladung.sql |
+| Funktion public.kanal_mitglied() | SUPABASE_SCHEMA_59_teilen_in_community.sql → SUPABASE_SCHEMA_99_erstellen_einladung.sql |
+| Funktion public.markierung_sichtbar() | SUPABASE_SCHEMA_86_markierungen.sql → SUPABASE_SCHEMA_99_erstellen_einladung.sql |
+| Funktion public.ptt_mitteilen() | SUPABASE_SCHEMA_90_push_to_talk.sql → SUPABASE_SCHEMA_99_erstellen_einladung.sql |
+
+**Gesamtreihenfolge der offenen Entwürfe:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 97 → 98 → 99.

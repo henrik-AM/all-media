@@ -126,7 +126,8 @@
     "test:bildschirmzeit-einheit": "node test/_bildschirmzeit_einheit.js",
     "test:vorschlaege": "node test/_vorschlaege.js",
     "test:angriffe": "node test/_angriffe.js",
-    "test:recht": "node test/_rechtstexte_einheit.js"
+    "test:recht": "node test/_rechtstexte_einheit.js",
+    "test:k28-erstellen": "node test/k28-erstellen.js"
   },
   "private": true
 }
