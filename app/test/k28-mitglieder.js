@@ -10,6 +10,9 @@
  * 15.1 Private Community: „Anfrage senden" statt Beitreten.
  * 15.2 Der Ersteller sieht die Anfrage und nimmt an oder lehnt ab.
  * 15.3 Die Regel steht in der Datenbank (Tabelle + Regeln + Annahmefunktion).
+ * 15.4 Befreunden/Angefragt/Befreundet zeigt den echten Stand (Schema 98,
+ *      21.10.2026 — Henrik: „ja" zu eigener Freundschaft unter Communitys,
+ *      öffentlich sofort, privat als Anfrage).
  * 15.5 Die Suche fragt die Datenbank, nicht nur die geladenen Listen.
  *
  * WAS DIESER LAUF ZEIGT
@@ -132,6 +135,76 @@ function teilA() {
   pruefe('15.2 Website-Server: Annehmen/Ablehnen-Route', /app\.post\('\/api\/communities\/:id\/anfragen\/:userId'/.test(server));
   pruefe('15.5 Website-Server: Suchroute', /app\.get\('\/api\/community-suche'/.test(server));
   pruefe('15.2 Website: Satz für die neuen Mitteilungen', /beitritt_anfrage: `\$\{name\} möchte/.test(server) && /beitritt_ok: /.test(server));
+
+  // 15.4 — Schema 98
+  const sql98 = lies('SUPABASE_SCHEMA_98_freundschaften.sql');
+  pruefe('15.4 Tabelle freundschaften mit RLS', /create table if not exists public\.freundschaften/.test(sql98) && /alter table public\.freundschaften enable row level security/.test(sql98));
+  pruefe('15.4 je Paar höchstens eine Zeile', /create unique index if not exists freundschaften_paar\s+on public\.freundschaften \(least\(von, an\), greatest\(von, an\)\)/.test(sql98));
+  pruefe('15.4 öffentlich sofort, privat Anfrage — entscheidet der Auslöser',
+    /new\.angenommen := not coalesce\(\(select p\.privat from public\.profiles p where p\.id = new\.an\), false\)/.test(sql98) &&
+      /before insert on public\.freundschaften/.test(sql98));
+  pruefe('15.4 anfragen nur selbst, nur sichtbare Profile, nicht blockiert',
+    /"Freundschaft anfragen"[\s\S]{0,200}von = \(select auth\.uid\(\)\)[\s\S]{0,120}exists \(select 1 from public\.profiles p where p\.id = an\)[\s\S]{0,80}not public\.blockiert_zwischen/.test(sql98));
+  pruefe('15.4 kein UPDATE für Nutzer — annehmen nur über die Funktion',
+    /revoke update on public\.freundschaften from authenticated/.test(sql98) && !/for update to authenticated/.test(sql98) &&
+      /update public\.freundschaften\s+set angenommen = true\s+where von = p_von and an = auth\.uid\(\)/.test(sql98));
+  pruefe('15.4 nur_freigegebene einschränkend', /create policy nur_freigegebene on public\.freundschaften\s+as restrictive/.test(sql98));
+  pruefe('15.4 Annahmefunktion für anon gesperrt', /revoke execute on function public\.freundschaft_annehmen\(uuid\) from public, anon/.test(sql98));
+  pruefe('15.4 Blockieren beendet die Freundschaft', /after insert on public\.blocks/.test(sql98));
+  const liste98 = (sql98.match(/notifications_art_check\s+check \(art in \(([\s\S]*?)\)\);/) || [])[1] || '';
+  pruefe('15.4 Mitteilungsarten: Liste aus 97 vollständig + 2 neue',
+    arten(liste97).length > 0 && arten(liste97).every((a) => arten(liste98).includes(a)) &&
+      arten(liste98).includes("'freund_anfrage'") && arten(liste98).includes("'freund_ok'"),
+    `${arten(liste97).length} → ${arten(liste98).length}`);
+
+  let F = null;
+  try {
+    F = require(path.join(WURZEL, 'gemeinsam', 'freundschaft.js'));
+  } catch {}
+  pruefe('Baustein gemeinsam/freundschaft.js lädt', !!F);
+  if (F) {
+    const stand = F.ausZeilen([
+      { von: 'ich', an: 'a', angenommen: true },
+      { von: 'b', an: 'ich', angenommen: true },
+      { von: 'ich', an: 'c', angenommen: false },
+      { von: 'd', an: 'ich', angenommen: false },
+    ], 'ich');
+    pruefe('15.4 Zustände aus den Zeilen, egal wer gefragt hat',
+      stand.a === 'befreundet' && stand.b === 'befreundet' && stand.c === 'angefragt' && stand.d === 'eingegangen' && F.zustand(stand, 'x') === 'keine',
+      JSON.stringify(stand));
+    pruefe('15.4 öffentlich „+ Befreunden“, privat „Freundschaftsanfrage senden“ (29.08.)',
+      F.knopfText('keine', false) === '+ Befreunden' && F.knopfText('keine', true) === 'Freundschaftsanfrage senden');
+    pruefe('15.4 „Angefragt“, „Annehmen“, „Befreundet“',
+      F.knopfText('angefragt') === 'Angefragt' && F.knopfText('eingegangen') === 'Annehmen' && F.knopfText('befreundet') === 'Befreundet');
+    pruefe('15.4 Schritte: anfragen, zurückziehen, annehmen; befreundet nicht tippbar',
+      F.schritt('keine') === 'anfragen' && F.schritt('angefragt') === 'zurueckziehen' && F.schritt('eingegangen') === 'annehmen' && !F.tippbar('befreundet'));
+    pruefe('15.4 Meldung aus dem Zustand der Datenbank',
+      /seid jetzt befreundet/.test(F.meldung('keine', 'befreundet', 'A')) && /Freundschaftsanfrage an A gesendet/.test(F.meldung('keine', 'angefragt', 'A')) &&
+        /zurückgezogen/.test(F.meldung('angefragt', 'keine', 'A')));
+    pruefe('15.4 Schema fehlt → nachsichtig, Rechtefehler nicht',
+      F.fehltSchema({ code: '42P01', message: 'relation "public.freundschaften" does not exist' }) && !F.fehltSchema({ code: '42501', message: 'new row violates row-level security policy for table "freundschaften"' }));
+  }
+  pruefe('UMD: freundschaft in UMD_BAUSTEINE', /\['freundschaft', 'Freundschaft'\]/.test(lies('app/test/_modulquelle.js')));
+  pruefe('UMD: Website lädt /gemeinsam/freundschaft.js', /<script src="\/gemeinsam\/freundschaft\.js"><\/script>/.test(lies('web/public/index.html')));
+
+  const aktionen = lies('app/lib/aktionen.ts');
+  const mittSheet = lies('app/components/MitteilungenSheet.tsx');
+  const handler = lies('web/server/sync-handlers.js');
+  pruefe('15.4 App: „+ Befreunden“ schreibt in die Datenbank, nicht nur in die Anzeige',
+    /\.from\('freundschaften'\)\s*\.insert\(\{ von: ichId, an: userId \}\)/.test(aktionen) && !/const befriend = /.test(shell));
+  pruefe('15.4 App: Stand aus freundschaften, nicht aus den Messenger-Kontakten',
+    /freundschaftenLaden\(\)\.then/.test(such) && !/contacts\.find/.test(such));
+  pruefe('15.4 App: Zustand danach aus der Datenbank (angenommen)', /return \(data as any\)\?\.angenommen \? 'befreundet' : 'angefragt'/.test(aktionen));
+  pruefe('15.4 App: Annehmen/Ablehnen in der Mitteilung', /m\.art === 'freund_anfrage'/.test(mittSheet) && /freundschaftAblehnen/.test(mittSheet));
+  pruefe('15.4 App: Sätze für die neuen Mitteilungen', /case 'freund_anfrage':/.test(profil) && /case 'freund_ok':/.test(profil));
+  pruefe('15.4 Website: nicht mehr über /api/contacts mit Benutzernamen',
+    !/body: JSON\.stringify\(\{ handle: u\.handle \}\)/.test(web) && /fetch\(`\/api\/freunde\/\$\{id\}`/.test(web));
+  pruefe('15.4 Website-Server: Routen und Handler', /app\.get\('\/api\/freunde'/.test(server) && /app\.post\('\/api\/freunde\/:id'/.test(server) &&
+    /app\.post\('\/api\/freunde\/:id\/ablehnen'/.test(server) && /const handleFreundschaftSchritt = handler/.test(handler));
+  pruefe('15.4 Website: Sätze für die neuen Mitteilungen', /freund_anfrage: `\$\{name\} möchte mit dir befreundet sein\.`/.test(server) && /freund_ok: /.test(server));
+  pruefe('15.4 gleicher Satz in App und Website',
+    /`\$\{name\} möchte mit dir befreundet sein\.`/.test(profil) && /`Du und \$\{name\} seid jetzt befreundet\.`/.test(profil) &&
+      /`Du und \$\{name\} seid jetzt befreundet\.`/.test(server));
 }
 
 /* --------------------------------------------------- B Website mit Attrappe */
@@ -145,7 +218,12 @@ async function teilB() {
       [ICH]: { id: ICH, name: 'Test Konto', handle: '@test', initials: 'TK' },
       'u-anna': { id: 'u-anna', name: 'Anna Schmidt', handle: '@anna', initials: 'AS' },
       'u-ben': { id: 'u-ben', name: 'Ben Berg', handle: '@benno', initials: 'BB' },
+      'u-cara': { id: 'u-cara', name: 'Cara Öffentlich', handle: '@cara', initials: 'CÖ' },
+      'u-dora': { id: 'u-dora', name: 'Dora Privat', handle: '@dora', initials: 'DP' },
     },
+    privateProfile: ['u-dora'],
+    // 15.4: ein Messenger-Kontakt ist nicht automatisch befreundet — der Stand kommt aus /api/freunde.
+    contacts: [{ id: 'u-cara', name: 'Cara Öffentlich', status: 'friend' }],
     communities: [
       community('c-oeff', 'Fotografie', { visibility: 'public', members: 3, erstellerId: 'u-anna' }),
       community('c-priv', 'Geheimclub', { visibility: 'private', members: 7, erstellerId: 'u-anna' }),
@@ -181,7 +259,22 @@ async function teilB() {
           : { ok: false, error: 'Diese Anfrage gibt es nicht mehr' },
       '/api/community-suche': {
         communities: [community('c-neu', 'Gehweg-Fotos', { visibility: 'private', members: 9, joined: false, channels: [] })],
-        personen: [{ id: 'u-zoe', name: 'Zoe Gehrke', handle: '@zoe' }],
+        personen: [{ id: 'u-zoe', name: 'Zoe Gehrke', handle: '@zoe', privat: true }],
+      },
+      // 15.4: der Stand aus der Datenbank (Schema 98).
+      '/api/freunde': { freunde: { 'u-anna': 'befreundet', 'u-ben': 'eingegangen' } },
+      '/api/freunde/u-zoe': { ok: true, zustand: 'angefragt' },
+      '/api/freunde/u-ben': { ok: true, zustand: 'befreundet' },
+      // Öffentlich: die Datenbank macht daraus sofort eine Freundschaft.
+      '/api/freunde/u-cara': { ok: true, zustand: 'befreundet' },
+      '/api/freunde/u-eva/ablehnen': { ok: true },
+      '/api/freunde/u-fritz': { ok: true, zustand: 'befreundet' },
+      '/api/mitteilungen/communities': {
+        eintraege: [
+          { id: 'm-eva', userId: 'u-eva', art: 'freund_anfrage', bereich: 'communities', ziel: { art: 'profile', id: 'u-eva' }, text: 'Eva Ernst möchte mit dir befreundet sein.', zeit: 'jetzt', gelesen: false },
+          { id: 'm-fritz', userId: 'u-fritz', art: 'freund_anfrage', bereich: 'communities', ziel: { art: 'profile', id: 'u-fritz' }, text: 'Fritz Feld möchte mit dir befreundet sein.', zeit: 'jetzt', gelesen: false },
+          { id: 'm-alt', userId: 'u-anna', art: 'beitritt', bereich: 'communities', ziel: { art: 'community', id: 'c-oeff' }, text: 'Anna Schmidt ist „Fotografie“ beigetreten.', zeit: '1 Std.', gelesen: true },
+        ],
       },
       // Wie der echte Server: die Community frisch, mit dem Stand nach der Anfrage.
       '/api/communities/c-zu': () =>
@@ -271,6 +364,59 @@ async function teilB() {
     pruefe('15.1 Antippen schickt POST …/join (Server macht daraus die Anfrage)', anfrageGestellt);
     pruefe('15.1 danach „Angefragt“', (await knopf('c-zu')) === 'Angefragt', await knopf('c-zu'));
     pruefe('15.1 Meldung sagt „Anfrage … gesendet“', /Anfrage an „Gehobene Küche“ gesendet/.test(await seite.textContent('body')));
+
+    // 15.4: Befreunden — Stand aus /api/freunde, Antippen schickt den Zustand mit
+    const freund = async (id) => ((await seite.textContent(`[data-befriend="${id}"]`).catch(() => '')) || '').trim();
+    pruefe('15.4 Stand wird aus der Datenbank geholt (GET /api/freunde)', aufrufe.some((a) => a.pfad === '/api/freunde' && a.methode === 'GET'));
+    pruefe('15.4 privater Datenbanktreffer: „Freundschaftsanfrage senden“', (await freund('u-zoe')) === 'Freundschaftsanfrage senden', await freund('u-zoe'));
+    await seite.click('[data-befriend="u-zoe"]');
+    await seite.waitForTimeout(600);
+    const zoe = aufrufe.find((a) => a.pfad === '/api/freunde/u-zoe' && a.methode === 'POST');
+    pruefe('15.4 Antippen: POST /api/freunde/u-zoe mit vorher „keine“', !!zoe && JSON.parse(zoe.body || '{}').vorher === 'keine');
+    pruefe('15.4 danach „Angefragt“ (aus der Antwort)', (await freund('u-zoe')) === 'Angefragt', await freund('u-zoe'));
+    pruefe('15.4 Meldung „Freundschaftsanfrage an Zoe Gehrke gesendet“', /Freundschaftsanfrage an Zoe Gehrke gesendet/.test(await seite.textContent('body')));
+    pruefe('15.4 nicht mehr über /api/contacts', !aufrufe.some((a) => a.pfad === '/api/contacts' && a.methode === 'POST'));
+
+    await seite.fill('#commSearch', '');
+    await seite.waitForTimeout(400);
+    pruefe('15.4 befreundet: „Befreundet“, nicht tippbar', (await freund('u-anna')) === 'Befreundet' &&
+      (await seite.$eval('[data-befriend="u-anna"]', (b) => b.disabled)), await freund('u-anna'));
+    pruefe('15.4 Messenger-Kontakt ohne Freundschaft: „+ Befreunden“ (öffentlich)', (await freund('u-cara')) === '+ Befreunden', await freund('u-cara'));
+    pruefe('15.4 privates Profil: „Freundschaftsanfrage senden“', (await freund('u-dora')) === 'Freundschaftsanfrage senden', await freund('u-dora'));
+    pruefe('15.4 eingegangene Anfrage: „Annehmen“', (await freund('u-ben')) === 'Annehmen', await freund('u-ben'));
+    if (process.env.BILDER) await seite.waitForTimeout(500), await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-15-befreunden.png') });
+    await seite.click('[data-befriend="u-ben"]');
+    await seite.waitForTimeout(600);
+    const ben = aufrufe.find((a) => a.pfad === '/api/freunde/u-ben' && a.methode === 'POST');
+    pruefe('15.4 Annehmen: POST mit vorher „eingegangen“', !!ben && JSON.parse(ben.body || '{}').vorher === 'eingegangen');
+    pruefe('15.4 danach „Befreundet“', (await freund('u-ben')) === 'Befreundet', await freund('u-ben'));
+    await seite.click('[data-befriend="u-cara"]');
+    await seite.waitForTimeout(600);
+    pruefe('15.4 öffentlich: sofort „Befreundet“, Meldung „seid jetzt befreundet“',
+      (await freund('u-cara')) === 'Befreundet' && /Du und Cara Öffentlich seid jetzt befreundet/.test(await seite.textContent('body')), await freund('u-cara'));
+
+    // 15.4: Freundschaftsanfrage in den Mitteilungen annehmen/ablehnen
+    await seite.evaluate(() => openMitteilungen('communities'));
+    await seite.waitForSelector('.mitt__knoepfe', { timeout: 5000 }).catch(() => {});
+    pruefe('15.4 Mitteilung mit „Annehmen“/„Ablehnen“', (await seite.$$('[data-freund-ja]')).length === 2 && (await seite.$$('[data-freund-nein]')).length === 2);
+    pruefe('15.4 andere Mitteilungen ohne Knöpfe', (await seite.$$('.mitt__knoepfe')).length === 2);
+    if (process.env.BILDER) await seite.waitForTimeout(500), await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-15-mitteilung-freund.png') });
+    await seite.click('[data-freund-nein="u-eva"]');
+    await seite.waitForTimeout(600);
+    pruefe('15.4 Ablehnen: POST /api/freunde/u-eva/ablehnen', aufrufe.some((a) => a.pfad === '/api/freunde/u-eva/ablehnen' && a.methode === 'POST'));
+    pruefe('15.4 abgelehnte Zeile verschwindet', !(await seite.$('[data-freund-nein="u-eva"]')) && !(await seite.$('[data-mitt="m-eva"]')));
+    await seite.click('[data-freund-ja="u-fritz"]');
+    await seite.waitForTimeout(600);
+    const fritz = aufrufe.find((a) => a.pfad === '/api/freunde/u-fritz' && a.methode === 'POST');
+    pruefe('15.4 Annehmen: POST /api/freunde/u-fritz mit vorher „eingegangen“', !!fritz && JSON.parse(fritz.body || '{}').vorher === 'eingegangen');
+    pruefe('15.4 Meldung „Ihr seid jetzt befreundet“', /Ihr seid jetzt befreundet/.test(await seite.textContent('body')));
+    pruefe('15.4 Antippen der Knöpfe öffnet die Mitteilung nicht', !aufrufe.some((a) => /^\/api\/mitteilungen\/m-(eva|fritz)\/gelesen$/.test(a.pfad)));
+    await seite.keyboard.press('Escape').catch(() => {});
+    await seite.evaluate(() => document.querySelector('.sheet__close, [data-sheet-close]')?.click()).catch(() => {});
+    await seite.waitForTimeout(300);
+    await seite.click('[data-area="communities"]');
+    await seite.click('[data-sub="search"]');
+    await seite.waitForSelector('#commSearch', { timeout: 5000 });
 
     // 15.1: Homeseite einer fremden privaten Community — kein Inhalt, kein neues Unterthema
     await seite.click('[data-community="c-zu"]');
