@@ -3158,6 +3158,27 @@ app.post('/api/communities/:id/anfragen/:userId', route(async (req) =>
   )
 ));
 
+/*
+ * Kasten 28/15.4 (Schema 98): Befreunden unter Communitys. `vorher` ist der
+ * Zustand, den der Knopf zeigte — daraus folgt anfragen, zurückziehen oder
+ * annehmen (Freundschaft.schritt). Zurück kommt der Zustand danach.
+ */
+app.get('/api/freunde', route(async (req) => ({
+  freunde: await syncHandlers.freundschaftenLaden(req.db, req.nutzerId),
+})));
+
+app.post('/api/freunde/:id', route(async (req) =>
+  antwort(
+    await syncHandlers.handleFreundschaftSchritt(
+      req.db, req.nutzerId, req.params.id, String(req.body?.vorher || 'keine')
+    )
+  )
+));
+
+app.post('/api/freunde/:id/ablehnen', route(async (req) =>
+  antwort(await syncHandlers.handleFreundschaftAblehnen(req.db, req.nutzerId, req.params.id))
+));
+
 app.post('/api/communities', route(async (req) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
@@ -3351,6 +3372,9 @@ function mitteilungText(m, namen, communityNamen) {
     // Kasten 28/15.2 (Schema 97) — derselbe Satz wie in der App (ProfilContext).
     beitritt_anfrage: `${name} möchte „${community}" beitreten.`,
     beitritt_ok: `${name} hat deine Anfrage für „${community}" angenommen.`,
+    // Kasten 28/15.4 (Schema 98) — derselbe Satz wie in der App (ProfilContext).
+    freund_anfrage: `${name} möchte mit dir befreundet sein.`,
+    freund_ok: `Du und ${name} seid jetzt befreundet.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
     share: `${name} hat etwas mit dir geteilt.`,

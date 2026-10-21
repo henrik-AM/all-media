@@ -18,6 +18,8 @@
 const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
 // Kästen 28/9 und 15: Beitrittsanfragen, Mitgliederliste, Suche (Schema 97).
 const Beitritt = require('../../gemeinsam/beitritt');
+// Kasten 28/15.4: Befreunden unter Communitys (Schema 98).
+const Freundschaft = require('../../gemeinsam/freundschaft');
 const Telefon = require('../../gemeinsam/telefon');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
@@ -1540,13 +1542,88 @@ const handlePersonenSuchen = handler('Personen suchen', async (client, nutzerId,
   if (!filter) return { ok: true, personen: [] };
   const { data, error } = await client
     .from('profiles')
-    .select('id, name, handle')
+    .select('id, name, handle, privat')
     .or(filter)
     .neq('id', nutzerId)
     .order('name', { ascending: true })
     .limit(30);
   if (error) throw error;
-  return { ok: true, personen: (data || []).map((p) => ({ id: p.id, name: p.name || '', handle: p.handle || '' })) };
+  return { ok: true, personen: (data || []).map((p) => ({
+      id: p.id,
+      name: p.name || '',
+      handle: p.handle || '',
+      privat: Boolean(p.privat),
+    })),
+  };
+});
+
+/*
+ * Kasten 28/15.4 (Schema 98): Befreunden unter Communitys. Ob eine neue
+ * Freundschaft sofort gilt (öffentliches Profil) oder eine Anfrage ist
+ * (privat), entscheidet der Auslöser freundschaft_vorgaben — zurück kommt
+ * der Zustand, den die Datenbank daraus gemacht hat. Gegenstücke in
+ * app/lib/aktionen.ts (freundschaftenLaden, freundschaftSchritt,
+ * freundschaftAblehnen).
+ */
+async function freundschaftenLaden(client, nutzerId) {
+  const { data, error } = await client.from('freundschaften').select('von, an, angenommen');
+  if (error && Freundschaft.fehltSchema(error)) return {};
+  if (error) throw error;
+  return Freundschaft.ausZeilen(data || [], nutzerId);
+}
+
+const handleFreundschaftSchritt = handler('Befreunden', async (client, nutzerId, userId, vorher) => {
+  const schritt = Freundschaft.schritt(vorher);
+  if (schritt === 'anfragen') {
+    const { data, error } = await client
+      .from('freundschaften')
+      .insert({ von: nutzerId, an: userId })
+      .select('angenommen')
+      .single();
+    if (error && Freundschaft.fehltSchema(error)) return { ok: false, fehler: Freundschaft.FEHLT_SCHEMA };
+    // Das Paar gibt es schon (die andere Person hat gerade gefragt): neu lesen.
+    if (error && error.code === '23505') {
+      return { ok: true, zustand: Freundschaft.zustand(await freundschaftenLaden(client, nutzerId), userId) };
+    }
+    if (error && error.code === '42501') {
+      return { ok: false, fehler: 'Diese Person nimmt gerade keine Anfrage von dir an' };
+    }
+    if (error) throw error;
+    return { ok: true, zustand: data && data.angenommen ? 'befreundet' : 'angefragt' };
+  }
+  if (schritt === 'zurueckziehen') {
+    // Mit Zählung — ein verbotenes DELETE meldet sonst Erfolg.
+    const { error, count } = await client
+      .from('freundschaften')
+      .delete({ count: 'exact' })
+      .eq('von', nutzerId)
+      .eq('an', userId);
+    if (error && Freundschaft.fehltSchema(error)) return { ok: false, fehler: Freundschaft.FEHLT_SCHEMA };
+    if (error) throw error;
+    if (!count) return { ok: true, zustand: Freundschaft.zustand(await freundschaftenLaden(client, nutzerId), userId) };
+    return { ok: true, zustand: 'keine' };
+  }
+  if (schritt === 'annehmen') {
+    const { error } = await client.rpc('freundschaft_annehmen', { p_von: userId });
+    if (error && Freundschaft.fehltSchema(error)) return { ok: false, fehler: Freundschaft.FEHLT_SCHEMA };
+    if (error) throw error;
+    return { ok: true, zustand: 'befreundet' };
+  }
+  return { ok: true, zustand: vorher };
+});
+
+/** Eine eingegangene Anfrage ablehnen (aus der Mitteilung). */
+const handleFreundschaftAblehnen = handler('Freundschaft ablehnen', async (client, nutzerId, vonId) => {
+  const { error, count } = await client
+    .from('freundschaften')
+    .delete({ count: 'exact' })
+    .eq('von', vonId)
+    .eq('an', nutzerId)
+    .eq('angenommen', false);
+  if (error && Freundschaft.fehltSchema(error)) return { ok: false, fehler: Freundschaft.FEHLT_SCHEMA };
+  if (error) throw error;
+  if (!count) return { ok: false, fehler: 'Diese Anfrage gibt es nicht mehr' };
+  return { ok: true };
 });
 
 /**
@@ -2615,6 +2692,9 @@ module.exports = {
   handleBeitrittsanfrageEntscheiden,
   handleMitglieder,
   handlePersonenSuchen,
+  freundschaftenLaden,
+  handleFreundschaftSchritt,
+  handleFreundschaftAblehnen,
   handleAcceptRequest,
   handleMessengerAnfragen,
   handleMessengerAnfrageBeantworten,

@@ -12087,6 +12087,14 @@ async function openMitteilungen(bereich) {
         <span class="mitt__text">${esc(m.text)}</span>
         <span class="mitt__zeit">${esc(m.zeit)}</span>
       </button>
+      ${
+        m.art === 'freund_anfrage'
+          ? `<div class="mitt__knoepfe">
+               <button class="joinbtn" data-freund-ja="${m.userId}" data-freund-mitt="${m.id}" aria-label="Freundschaftsanfrage annehmen">Annehmen</button>
+               <button class="joinbtn is-joined" data-freund-nein="${m.userId}" data-freund-mitt="${m.id}" aria-label="Freundschaftsanfrage ablehnen">Ablehnen</button>
+             </div>`
+          : ''
+      }
     </li>`;
 
   openSheet(
@@ -12109,6 +12117,36 @@ async function openMitteilungen(bereich) {
           close();
           await mitteilungenZaehlen();
           mitteilungOeffnen({ art: b.dataset.zielArt, id: b.dataset.zielId }, b.querySelector('.mitt__text')?.textContent || '');
+        })
+      );
+
+      /*
+       * Kasten 28/15.4 (Schema 98): eine Freundschaftsanfrage wird dort
+       * entschieden, wo sie ankommt — wie bei Instagram. Der Auslöser löscht
+       * die Mitteilung danach; hier verschwindet die Zeile sofort. Gleich in
+       * der App (MitteilungenSheet, entscheiden).
+       */
+      sheet.querySelectorAll('[data-freund-ja], [data-freund-nein]').forEach((b) =>
+        b.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const annehmen = 'freundJa' in b.dataset;
+          const id = annehmen ? b.dataset.freundJa : b.dataset.freundNein;
+          b.closest('li').querySelectorAll('.mitt__knoepfe button').forEach((k) => (k.disabled = true));
+          const r = await fetch(annehmen ? `/api/freunde/${id}` : `/api/freunde/${id}/ablehnen`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vorher: 'eingegangen' }),
+          })
+            .then((x) => x.json())
+            .catch(() => ({ ok: false, error: 'Das hat nicht geklappt' }));
+          if (!r.ok) {
+            b.closest('li').querySelectorAll('.mitt__knoepfe button').forEach((k) => (k.disabled = false));
+            return toast(r.error);
+          }
+          if (state.freunde) state.freunde[id] = annehmen ? 'befreundet' : 'keine';
+          b.closest('li').remove();
+          await mitteilungenZaehlen();
+          toast(annehmen ? 'Ihr seid jetzt befreundet' : 'Freundschaftsanfrage abgelehnt');
         })
       );
 
@@ -18021,6 +18059,77 @@ function commDatenbankSuche(roh, neuZeichnen) {
   }, 300);
 }
 
+/*
+ * Kasten 28/15.4 (Henrik 28.09.2026): „Ich denke mal, dass der Button
+ * befreunden und angefragt und so nicht synchronisiert ist, denn ich hab
+ * gerade eine Person eine Freundschaftsanfrage gesendet, mit der ich schon
+ * geschrieben habe."
+ *
+ * Bis 21.10.2026 kam der Stand aus den Messenger-Kontakten, und der Knopf
+ * schickte den Benutzernamen an /api/contacts — das nimmt seit 07.09. nur
+ * Telefonnummern an, also scheiterte er immer. Jetzt: eigene Freundschaft
+ * unter Communitys (Schema 98), Stand aus /api/freunde bei jedem Öffnen der
+ * Suche, nach dem Antippen der Zustand, den die Datenbank zurückgab.
+ * Gleich in der App (CommunitySearchScreen, befreunden).
+ */
+let freundeGeladen = 0;
+function freundeLaden(neuZeichnen) {
+  if (Date.now() - freundeGeladen < 30000) return;
+  freundeGeladen = Date.now();
+  fetch('/api/freunde')
+    .then((x) => x.json())
+    .then((r) => {
+      if (!r || r.error) return;
+      state.freunde = r.freunde || {};
+      neuZeichnen();
+    })
+    .catch(() => {});
+}
+
+/** Eine Profilzeile der Community-Suche, mit Befreunden-Knopf. */
+function commProfilZeile(u) {
+  const z = Freundschaft.zustand(state.freunde, u.id);
+  // Punkt 57 / 29.08.: öffentlich „+ Befreunden", privat „Freundschaftsanfrage senden".
+  const privat = Boolean(u.privat) || (state.privateProfile || []).includes(u.id);
+  const label = Freundschaft.knopfText(z, privat);
+  return `<li><div class="row">
+     ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
+     <div class="row__body" data-profile="${u.id}">
+       <div class="row__name">${esc(u.name)}</div>
+       <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
+     </div>
+     <button class="joinbtn ${Freundschaft.leise(z) ? 'is-joined' : ''}" data-befriend="${u.id}" data-freund="${z}" aria-label="${esc(label)}: ${esc(u.name)}" ${Freundschaft.tippbar(z) ? '' : 'disabled'}>${label}</button>
+   </div></li>`;
+}
+
+/** Befreunden-Knoepfe der Community-Suche verdrahten; danach `neuZeichnen`. */
+function bindBefreunden(neuZeichnen) {
+  main.querySelectorAll('[data-befriend]').forEach((b) =>
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = b.dataset.befriend;
+      const u = state.users[id];
+      const vorher = b.dataset.freund;
+      b.disabled = true;
+      const r = await fetch(`/api/freunde/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vorher }),
+      })
+        .then((x) => x.json())
+        .catch(() => ({ ok: false, error: 'Das hat nicht geklappt' }));
+      if (!r.ok) {
+        toast(r.error);
+        return neuZeichnen();
+      }
+      state.freunde = { ...(state.freunde || {}), [id]: r.zustand };
+      // Die Meldung sagt, was die Datenbank daraus gemacht hat.
+      toast(Freundschaft.meldung(vorher, r.zustand, u ? u.name : ''));
+      neuZeichnen();
+    })
+  );
+}
+
 function renderCommunitySearch() {
   const q = state.communityQuery.trim().toLowerCase();
   const f = state.commSearchFilter;
@@ -18037,12 +18146,6 @@ function renderCommunitySearch() {
       : [...Object.values(state.users), ...trefferFuer(q, 'personen')].filter(
           (u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q))
         );
-
-  const statusOf = (id) => {
-    const c = state.contacts.find((x) => x.id === id);
-    if (!c) return 'none';
-    return c.status === 'pending' ? 'pending' : 'friend';
-  };
 
   main.innerHTML = `
     <div class="pagehead">
@@ -18072,31 +18175,8 @@ function renderCommunitySearch() {
              ${
                people.length
                  ? `<button class="exp__head" data-csmehr="people">Profile →</button><ul class="rows">${people
-                     .map((u) => {
-                       const st = statusOf(u.id);
-                       /*
-                        * Punkt 57: bei einem privaten Profil geht erst eine
-                        * Anfrage raus. "+ Befreunden" waere dort ein
-                        * Versprechen, das der Knopf nicht halten kann.
-                        */
-                       const privat = (state.privateProfile || []).includes(u.id);
-                       const label =
-                         st === 'friend'
-                           ? 'Befreundet'
-                           : st === 'pending'
-                             ? 'Angefragt'
-                             : privat
-                               ? 'Anfrage senden'
-                               : '+ Befreunden';
-                       return `<li><div class="row">
-                          ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
-                          <div class="row__body" data-profile="${u.id}">
-                            <div class="row__name">${esc(u.name)}</div>
-                            <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
-                          </div>
-                          <button class="joinbtn ${st === 'none' ? '' : 'is-joined'}" data-befriend="${u.id}" ${st === 'none' ? '' : 'disabled'}>${label}</button>
-                        </div></li>`;
-                     })
+                     // Kasten 28/15.4: Stand aus freundschaften (Schema 98), nicht aus den Messenger-Kontakten.
+                     .map(commProfilZeile)
                      .join('')}</ul>`
                  : ''
              }`
@@ -18138,31 +18218,9 @@ function renderCommunitySearch() {
     r.addEventListener('click', () => oeffneCommunityTreffer(r.dataset.community))
   );
   bindJoinButtons(renderCommunitySearch);
-  main.querySelectorAll('[data-befriend]').forEach((b) =>
-    b.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      // Kasten 28/15.5: ein Datenbanktreffer steht nicht in state.users.
-      const u =
-        state.users[b.dataset.befriend] ||
-        (state.commTreffer?.personen || []).find((p) => p.id === b.dataset.befriend);
-      if (!u) return;
-      const res = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle: u.handle }),
-      });
-      const result = await res.json();
-      if (!result.ok) return toast(result.error);
-      state.contacts.push(result.contact);
-      if (result.chat) state.chats.unshift(result.chat);
-      // Punkt 57: die Meldung sagt, was wirklich passiert ist - bei einem
-      // privaten Profil laeuft eine Anfrage, sonst steht der Kontakt schon.
-      toast(result.privat ? `Anfrage an ${u.name} gesendet` : `${u.name} ist jetzt dein Kontakt`);
-      renderCommunitySearch();
-    })
-  );
-  // Kasten 28/15.5: nach kurzer Tipp-Pause zusätzlich die Datenbank fragen.
-  commDatenbankSuche(state.communityQuery, () => {
+  bindBefreunden(renderCommunitySearch);
+  // Nachgeladenes (Datenbanktreffer, Freundschaften) neu zeichnen, ohne den Cursor zu verlieren.
+  const nachladen = () => {
     if (!$('#commSearch')) return; // inzwischen woanders
     const pos = $('#commSearch').selectionStart;
     const fokus = document.activeElement === $('#commSearch');
@@ -18171,7 +18229,9 @@ function renderCommunitySearch() {
       $('#commSearch').focus();
       $('#commSearch').setSelectionRange(pos, pos);
     }
-  });
+  };
+  freundeLaden(nachladen);
+  commDatenbankSuche(state.communityQuery, nachladen);
 }
 
 /* --------------------------------------------------- Communitys: Profil */
