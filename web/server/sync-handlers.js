@@ -16,6 +16,8 @@
  */
 
 const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
+// Kästen 28/10.2 und 16: Community und Unterthema erstellen, Einladung (Schema 99).
+const Erstellen = require('../../gemeinsam/erstellen');
 const Telefon = require('../../gemeinsam/telefon');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
@@ -814,7 +816,7 @@ const handleStoryReply = handler('Story beantworten', async (client, nutzerId, s
 /** Neues Unterthema in einer Community. */
 const handleCreateChannel = handler(
   'Unterthema anlegen',
-  async (client, nutzerId, communityId, name) => {
+  async (client, nutzerId, communityId, name, zusatz = {}) => {
     const slug =
       'ch-' + name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-').replace(/^-|-$/g, '');
 
@@ -836,15 +838,50 @@ const handleCreateChannel = handler(
       .limit(1)
       .maybeSingle();
 
-    const { data, error } = await client
+    const zeile = { community_id: communityId, slug, name, position: letztes ? (letztes.position || 0) + 1 : 0 };
+    // Kasten 28/10.2 (Schema 99): Biografie, Link, privat. Ein privates
+    // Unterthema ohne 99 nicht öffentlich anlegen — lieber gar nicht.
+    // Gleiche Weiche in app/lib/aktionen.ts (kanalAnlegen).
+    const brauchtZusatz = !!(zusatz.bio || zusatz.link || zusatz.privat);
+    let { data, error } = await client
       .from('community_channels')
-      .insert({ community_id: communityId, slug, name, position: letztes ? (letztes.position || 0) + 1 : 0 })
+      .insert({ ...zeile, bio: zusatz.bio || '', link: zusatz.link || '', privat: !!zusatz.privat })
       .select()
       .single();
+    if (error && Erstellen.fehltSchema(error)) {
+      if (brauchtZusatz) return { ok: false, fehler: Erstellen.FEHLT_SCHEMA };
+      ({ data, error } = await client.from('community_channels').insert(zeile).select().single());
+    }
     if (error) throw error;
     return { ok: true, kanal: data };
   }
 );
+
+/**
+ * Kästen 28/10.2 und 16 (Schema 99): den Einladungscode einer Community oder
+ * eines Unterthemas speichern. Der Code stand schon auf der Erstellen-Seite;
+ * gültig wird er hier. Gegenstück: einladungSpeichern() in app/lib/aktionen.ts.
+ */
+const handleEinladungSpeichern = handler(
+  'Einladung speichern',
+  async (client, nutzerId, code, communityId, kanalId = null) => {
+    if (!Erstellen.istCode(code)) return { ok: false, fehler: 'Der Einladungscode ist ungültig' };
+    const { error } = await client
+      .from('einladungen')
+      .insert({ code, community_id: communityId, channel_id: kanalId, erstellt_von: nutzerId });
+    if (error && Erstellen.fehltSchema(error)) return { ok: false, fehler: Erstellen.FEHLT_SCHEMA };
+    if (error) throw error;
+    return { ok: true };
+  }
+);
+
+/** Eine Einladung annehmen — die Datenbank entscheidet (einladung_annehmen). */
+const handleEinladungAnnehmen = handler('Einladung annehmen', async (client, _nutzerId, code) => {
+  const { data, error } = await client.rpc('einladung_annehmen', { p_code: code });
+  if (error && Erstellen.fehltSchema(error)) return { ok: false, fehler: Erstellen.FEHLT_SCHEMA };
+  if (error) throw error;
+  return { ok: true, communityId: data && data.community_id, kanalId: (data && data.channel_id) || null };
+});
 
 /**
  * Im Unterthema schreiben — mit oder ohne Anhang.
@@ -1403,17 +1440,27 @@ const handleViewStory = handler('Story gesehen', async (client, nutzerId, storyI
 
 const handleCreateCommunity = handler(
   'Community anlegen',
-  async (client, nutzerId, name, thema = '', privat = false) => {
-    const { data, error } = await client
+  async (client, nutzerId, name, thema = '', privat = false, zusatz = {}) => {
+    const zeile = {
+      name,
+      topic: thema,
+      visibility: privat ? 'private' : 'public',
+      created_by: nutzerId,
+    };
+    if (zusatz.bio) zeile.bio = zusatz.bio;
+    if (zusatz.link) zeile.link = zusatz.link;
+    // Kasten 28/16 (Schema 99): das Bild. Fehlt die Spalte, ohne Bild anlegen;
+    // `ohneBild` sagt das der Oberfläche. Gleiche Weiche in app/lib/aktionen.ts.
+    let { data, error } = await client
       .from('communities')
-      .insert({
-        name,
-        topic: thema,
-        visibility: privat ? 'private' : 'public',
-        created_by: nutzerId,
-      })
+      .insert(zusatz.bildUrl ? { ...zeile, bild_url: zusatz.bildUrl } : zeile)
       .select()
       .single();
+    let ohneBild = false;
+    if (error && zusatz.bildUrl && Erstellen.fehltSchema(error)) {
+      ({ data, error } = await client.from('communities').insert(zeile).select().single());
+      ohneBild = true;
+    }
     if (error) throw error;
 
     /*
@@ -1429,7 +1476,7 @@ const handleCreateCommunity = handler(
       throw fehlerMitglied;
     }
 
-    return { ok: true, community: data };
+    return { ok: true, community: data, ohneBild };
   }
 );
 
@@ -2491,6 +2538,8 @@ const handleImpressionen = handler('Sichtungen', async (client, nutzerId, eintra
 });
 
 module.exports = {
+  handleEinladungSpeichern,
+  handleEinladungAnnehmen,
   handleUpdateProfile,
   handleFollowUser,
   handleAcceptContactRequest,

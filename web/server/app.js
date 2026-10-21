@@ -33,6 +33,8 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
+// Kästen 28/10.2 und 16: Community und Unterthema erstellen, Einladung (Schema 99).
+const Erstellen = require('../../gemeinsam/erstellen');
 const syncHandlers = require('./sync-handlers');
 const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
@@ -3121,26 +3123,64 @@ app.get('/api/communities/:id', route(async (req, res) => {
 }));
 
 app.post('/api/communities', route(async (req) => {
-  const name = String(req.body?.name || '').trim();
-  if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
+  /*
+   * Kasten 28/16 (Feedback 28.09.): Community nach Figma „CP + Kanal
+   * erstellen" — Name*, Bild*, Biografie, Link, Unterthemen, privat,
+   * Einladungscode. Prüfregel aus gemeinsam/erstellen.js, dieselbe wie in
+   * der App (ErstellenScreen). Das Bild ist Pflicht auf der Seite (Stern im
+   * Prototyp), nicht hier: Prüfläufe legen ihre Prüfcommunity ohne Bild an
+   * (_teilen.js, k28-anhaenge.js), und ein fehlendes Bild betrifft niemanden.
+   */
+  const k = req.body || {};
+  const bildUrl = k.bild ? String(k.bild) : null;
+  if (bildUrl && !/\/storage\/v1\/object\/public\/media\/avatars\/[A-Za-z0-9._-]+$/.test(bildUrl)) {
+    return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
+  }
+  const geprueft = Erstellen.pruefeCommunity({
+    name: k.name,
+    bild: true,
+    bio: k.bio,
+    link: k.link,
+    unterthemen: Array.isArray(k.unterthemen) ? k.unterthemen.map(String) : [],
+    privat: k.sichtbarkeit === 'private' || k.privat === true,
+  });
+  if (geprueft.fehler) return { ok: false, error: geprueft.fehler };
+  const w = geprueft.werte;
 
   const { count } = await req.db
     .from('communities')
     .select('*', { count: 'exact', head: true })
-    .ilike('name', name);
-  if (count > 0) return { ok: false, error: 'Diesen Kanal gibt es schon' };
+    .ilike('name', w.name);
+  if (count > 0) return { ok: false, error: 'Diese Community gibt es schon' };
 
-  const privat = req.body?.sichtbarkeit !== 'public';
-  const e = await syncHandlers.handleCreateCommunity(
-    req.db, req.nutzerId, name, String(req.body?.thema || '').trim(), privat
-  );
+  const e = await syncHandlers.handleCreateCommunity(req.db, req.nutzerId, w.name, w.bio, w.privat, {
+    bio: w.bio,
+    link: w.link,
+    bildUrl,
+  });
   if (!e || e.ok === false) return antwort(e);
 
   // Eine Community ohne Kanal hat keine Seite, auf der etwas stehen könnte.
-  await syncHandlers.handleCreateChannel(req.db, req.nutzerId, e.community.id, 'Allgemein');
+  // Danach die Unterthemen aus der Erstellen-Seite, dann die Einladung.
+  // Was davon scheitert, lässt die Community stehen und steht im Hinweis.
+  const fehlt = [];
+  for (const name of ['Allgemein', ...w.unterthemen]) {
+    const kanal = await syncHandlers.handleCreateChannel(req.db, req.nutzerId, e.community.id, name);
+    if (!kanal || kanal.ok === false) fehlt.push(name);
+  }
+  let ohneEinladung = false;
+  if (k.code) {
+    const ein = await syncHandlers.handleEinladungSpeichern(req.db, req.nutzerId, String(k.code), e.community.id);
+    ohneEinladung = !ein || ein.ok === false;
+  }
+  const hinweis = [
+    e.ohneBild ? Erstellen.FEHLT_SCHEMA : '',
+    fehlt.length ? `Nicht angelegt: ${fehlt.join(', ')}` : '',
+    ohneEinladung ? 'Der Einladungslink gilt noch nicht' : '',
+  ].filter(Boolean).join(' · ');
 
-  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
-  return { ok: true, community: alle.find((c) => c.id === e.community.id) };
+  const [community] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: e.community.id })) || [];
+  return { ok: true, community, hinweis: hinweis || null };
 }));
 
 app.post('/api/communities/:id/join', route(async (req, res) => {
@@ -3171,11 +3211,51 @@ app.post('/api/communities/:id/stumm', route(async (req) =>
 ));
 
 app.post('/api/communities/:id/channels', route(async (req) => {
-  const name = String(req.body?.name || '').trim();
-  if (!name) return { ok: false, error: 'Bitte einen Namen eingeben' };
-  const e = await syncHandlers.handleCreateChannel(req.db, req.nutzerId, req.params.id, name);
+  // Kasten 28/10.2: Unterthema nach Figma „CC + Unterthema erstellen" —
+  // Name*, Biografie, Link, privat, Einladungscode.
+  const k = req.body || {};
+  const geprueft = Erstellen.pruefeUnterthema({ name: k.name, bio: k.bio, link: k.link, privat: k.privat === true });
+  if (geprueft.fehler) return { ok: false, error: geprueft.fehler };
+  const w = geprueft.werte;
+  const e = await syncHandlers.handleCreateChannel(req.db, req.nutzerId, req.params.id, w.name, w);
   if (!e || e.ok === false) return antwort(e);
-  return { ok: true, id: e.kanal.id, name: e.kanal.name };
+  let hinweis = null;
+  if (k.code) {
+    const ein = await syncHandlers.handleEinladungSpeichern(req.db, req.nutzerId, String(k.code), req.params.id, e.kanal.id);
+    if (!ein || ein.ok === false) hinweis = 'Der Einladungslink gilt noch nicht';
+  }
+  return { ok: true, id: e.kanal.id, name: e.kanal.name, hinweis };
+}));
+
+/*
+ * Kästen 28/10.2 und 16: eine Einladung (Link ?einladung=… oder QR-Code)
+ * annehmen. Mitglied macht die Datenbank (einladung_annehmen, Schema 99).
+ */
+app.post('/api/einladung/:code', route(async (req) => {
+  const code = Erstellen.codeAus(String(req.params.code || ''));
+  if (!code) return { ok: false, error: 'Diese Einladung gibt es nicht mehr' };
+  return antwort(await syncHandlers.handleEinladungAnnehmen(req.db, req.nutzerId, code));
+}));
+
+/*
+ * Der QR-Code auf der Erstellen-Seite. Der Code entsteht im Browser
+ * (gemeinsam/erstellen.js, neuerCode); hier wird nur gezeichnet — mit
+ * demselben Paket wie /api/qr.svg und die App (QrCode.tsx).
+ */
+app.get('/api/einladung-qr.svg', route(async (req, res) => {
+  const code = String(req.query.code || '');
+  if (!Erstellen.istCode(code)) return { ok: false, error: 'Der Einladungscode ist ungültig' };
+  const basis = `${req.protocol}://${req.get('host')}`;
+  const svg = await QRCode.toString(Erstellen.link(code, basis), {
+    type: 'svg',
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 220,
+    color: { dark: '#000000', light: '#ffffff' },
+  });
+  res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(svg);
 }));
 
 app.get('/api/communities/:id/channels/:chId', route(async (req, res) => {

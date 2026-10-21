@@ -54,7 +54,7 @@ export const CommunityProfileScreen = ({ onSwitchArea, onOpenCommunity, onAction
         {/* Abgerundetes Quadrat, nicht Kreis: so unterscheidet die App eine
             Community von einer Person, und so steht es im Prototyp-Frame
             "Community - Profil". Hier war es als Einziges ein Kreis. */}
-        <Avatar id={c.id} name={c.name} size={44} ecke={radius.lg} />
+        <Avatar id={c.id} name={c.name} size={44} ecke={radius.lg} bild={c.bild} />
         <View style={styles.body}>
           <Text style={styles.name}>{c.name}</Text>
           <Text style={styles.sub} numberOfLines={1}>

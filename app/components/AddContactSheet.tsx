@@ -24,6 +24,7 @@ import { FarbfilterSchicht } from './Farbfilter';
 // Dieselbe Regel und dieselbe Schreibweise wie auf der Website.
 const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
 const QrKontakt = require('../../gemeinsam/qr') as typeof import('../../gemeinsam/qr');
+const Erstellen = require('../../gemeinsam/erstellen') as typeof import('../../gemeinsam/erstellen');
 
 /*
  * Kontakt hinzufuegen — Telefonnummer oder QR-Code.
@@ -52,9 +53,11 @@ interface Props {
   onClose: () => void;
   onAdd: (contact: Contact, nachricht: string) => void;
   onNotice: (message: string) => void;
+  /** Kästen 28/10.2 und 16: ein gescannter Einladungscode einer Community. */
+  onEinladung?: (code: string) => void;
 }
 
-export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }: Props) => {
+export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice, onEinladung }: Props) => {
   const { users } = useDaten();
   /*
    * Meldungen erscheinen im Blatt selbst. `onNotice` zeichnet den Hinweis
@@ -219,6 +222,10 @@ export const AddContactSheet = ({ visible, contacts, onClose, onAdd, onNotice }:
         onClose={() => setScannen(false)}
         onCode={(text) => {
           setScannen(false);
+          // Kästen 28/10.2 und 16: Einladung in eine Community oder ein
+          // Unterthema — gleich annehmen. Gleiche Weiche auf der Website.
+          const einladung = Erstellen.codeAus(text);
+          if (einladung && onEinladung) return onEinladung(einladung);
           const nummer = QrKontakt.nummerAus(text);
           // Ein fremder Code — Fahrkarte, Werbeplakat — ist kein Fehler des
           // Nutzers, nur der falsche Code. Deshalb ein Satz und kein Alarm.

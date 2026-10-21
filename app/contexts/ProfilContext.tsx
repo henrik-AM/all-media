@@ -203,6 +203,8 @@ interface ProfilWert {
     bildUrl: string | null,
     code: string
   ) => Promise<{ fehler?: string; id?: string; hinweis?: string }>;
+  /** Kästen 28/10.2 und 16: Einladung annehmen (QR-Code). */
+  einladungAnnehmen: (code: string) => Promise<{ fehler?: string; communityId?: string; kanalId?: string | null }>;
   /** Kasten 28/10.2: Unterthema mit Biografie, Link, privat, Einladung. */
   unterthemaErstellen: (
     communityId: string,
@@ -754,6 +756,21 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [supabase, daten, communities]
   );
 
+  /** Kästen 28/10.2 und 16: Einladung (QR-Code) annehmen — die Datenbank entscheidet. */
+  const einladungAnnehmen = useCallback(
+    async (code: string): Promise<{ fehler?: string; communityId?: string; kanalId?: string | null }> => {
+      if (!supabase) return { fehler: 'Dafür musst du angemeldet sein' };
+      try {
+        const e = await Aktion.einladungAnnehmen(supabase, code);
+        await daten.neuLaden();
+        return e;
+      } catch (e: any) {
+        return { fehler: e?.message ?? 'Diese Einladung gibt es nicht mehr' };
+      }
+    },
+    [supabase, daten]
+  );
+
   const kanalBeitreten = useCallback(
     (id: string) => {
       const drehen = () =>
@@ -951,6 +968,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       communities,
       communityErstellen,
       unterthemaErstellen,
+      einladungAnnehmen,
       kanalBeitreten,
       kanalStummSetzen,
       kanalGelesen,
@@ -966,7 +984,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, communityErstellen, unterthemaErstellen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, communityErstellen, unterthemaErstellen, einladungAnnehmen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]
   );

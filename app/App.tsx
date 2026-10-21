@@ -2501,6 +2501,16 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onClose={() => setSheet(null)}
         onAdd={addContact}
         onNotice={setNotice}
+        onEinladung={(code) => {
+          setSheet(null);
+          void (async () => {
+            const e = await profil.einladungAnnehmen(code);
+            if (e.fehler || !e.communityId) return setNotice(e.fehler ?? 'Diese Einladung gibt es nicht mehr');
+            setNotice('Einladung angenommen');
+            setArea('communities');
+            setOverlay({ kind: 'community', communityId: e.communityId });
+          })();
+        }}
       />
 
       <KontoWechsel

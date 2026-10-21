@@ -72,7 +72,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel, 
         Community-Uebersicht im Profil, wo laengst Verlaeufe stehen, sah das
         aus wie zwei verschiedene Apps.
       */}
-      <Avatar id={item.id} name={item.name} size={52} ecke={radius.lg} />
+      <Avatar id={item.id} name={item.name} size={52} ecke={radius.lg} bild={item.bild} />
 
       <View style={styles.body}>
         <View style={styles.titleRow}>
