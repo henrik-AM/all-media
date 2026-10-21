@@ -17,6 +17,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import * as A from './aktionen';
 import { ladeCommunities } from './daten';
 import type { Community } from '../types';
+import type { FreundZustand } from '../../gemeinsam/freundschaft';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
 import { SpendenwegContext } from '../contexts/SpendenwegContext';
@@ -85,6 +86,18 @@ export interface Aktionen {
    * nicht nur unter den geladenen. Leer, wenn die Eingabe zu kurz ist.
    */
   communitySuche: (eingabe: string) => Promise<{ communities: Community[]; personen: A.MitgliedZeile[] }>;
+  /** Kasten 28/15.4: meine Freundschaften unter Communitys, je Gegenüber ein Zustand. */
+  freundschaftenLaden: () => Promise<Record<string, FreundZustand>>;
+  /**
+   * Kasten 28/15.4: anfragen, zurückziehen oder annehmen — je nach Zustand.
+   * Zurück kommt der Zustand danach oder der Grund, warum es nicht ging.
+   */
+  freundschaftSchritt: (
+    userId: string,
+    vorher: FreundZustand
+  ) => Promise<{ zustand: FreundZustand; fehler?: string }>;
+  /** Kasten 28/15.4: eine eingegangene Anfrage ablehnen. Null heißt geklappt, sonst der Grund. */
+  freundschaftAblehnen: (userId: string) => Promise<string | null>;
   /** Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt. */
   personPerNutzername: (
     eingabe: string
@@ -848,6 +861,34 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           // Ohne Treffer aus der Datenbank bleibt die geladene Liste stehen.
           console.error('Community-Suche fehlgeschlagen:', e?.message ?? e);
           return { communities: [], personen: [] };
+        }
+      },
+      freundschaftenLaden: async () => {
+        if (!supabase || !ichId) return {};
+        try {
+          return await A.freundschaftenLaden(supabase, ichId);
+        } catch (e: any) {
+          console.error('Freundschaften laden fehlgeschlagen:', e?.message ?? e);
+          return {};
+        }
+      },
+      freundschaftSchritt: async (userId, vorher) => {
+        if (!supabase || !ichId) return { zustand: vorher, fehler: 'Dafür musst du angemeldet sein' };
+        try {
+          return { zustand: await A.freundschaftSchritt(supabase, ichId, userId, vorher) };
+        } catch (e: any) {
+          console.error('Befreunden fehlgeschlagen:', e?.message ?? e);
+          return { zustand: vorher, fehler: e?.message || 'Das hat nicht geklappt' };
+        }
+      },
+      freundschaftAblehnen: async (userId) => {
+        if (!supabase || !ichId) return 'Dafür musst du angemeldet sein';
+        try {
+          await A.freundschaftAblehnen(supabase, ichId, userId);
+          return null;
+        } catch (e: any) {
+          console.error('Freundschaft ablehnen fehlgeschlagen:', e?.message ?? e);
+          return e?.message || 'Das hat nicht geklappt';
         }
       },
       personPerNutzername: async (eingabe) => {

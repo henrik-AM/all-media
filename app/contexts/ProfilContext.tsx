@@ -123,6 +123,11 @@ const mitteilungText = (
       return `${name} möchte „${kanal}“ beitreten.`;
     case 'beitritt_ok':
       return `${name} hat deine Anfrage für „${kanal}“ angenommen.`;
+    // Kasten 28/15.4 (Schema 98). Gleicher Satz in web/server/app.js (mitteilungText).
+    case 'freund_anfrage':
+      return `${name} möchte mit dir befreundet sein.`;
+    case 'freund_ok':
+      return `Du und ${name} seid jetzt befreundet.`;
     case 'nachricht':
       return `Neue Nachrichten in „${kanal}“.`;
     case 'einladung':
@@ -146,6 +151,8 @@ interface ProfilWert {
   mitteilungen: (bereich: MitteilungsBereich) => MitteilungAnzeige[];
   ungelesen: (bereich: MitteilungsBereich) => number;
   alsGelesen: (id: string) => void;
+  /** Eine Mitteilung aus der Liste nehmen (Freundschaftsanfrage erledigt). */
+  mitteilungWeg: (id: string) => void;
   alleGelesen: (bereich: MitteilungsBereich) => void;
 
   /* --- Plus: eigene Inhalte --- */
@@ -480,6 +487,14 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     },
     [schreiben]
   );
+
+  /**
+   * Kasten 28/15.4: nach Annehmen/Ablehnen einer Freundschaftsanfrage löscht
+   * der Auslöser in Schema 98 die Mitteilung; hier verschwindet sie sofort.
+   */
+  const mitteilungWeg = useCallback((id: string) => {
+    setAlle((prev) => prev.filter((m) => m.id !== id));
+  }, []);
 
   const alleGelesen = useCallback(
     (bereich: MitteilungsBereich) => {
@@ -1002,6 +1017,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       mitteilungen,
       ungelesen,
       alsGelesen,
+      mitteilungWeg,
       alleGelesen,
       eigeneBeitraege,
       eigeneVideos,
@@ -1049,7 +1065,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       profilSpeichern,
     }),
     [
-      mitteilungen, ungelesen, alsGelesen, alleGelesen,
+      mitteilungen, ungelesen, alsGelesen, mitteilungWeg, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,

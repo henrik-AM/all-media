@@ -181,6 +181,7 @@ export async function ladeNutzer(
       // Bestaendige Form; unterschrieben wird mit allem anderen unten in
       // ladeAlles (signiereMedien).
       avatar: bilder.get(zeile.id),
+      privat: Boolean(zeile.privat),
     };
 
     profile[schluessel] = {

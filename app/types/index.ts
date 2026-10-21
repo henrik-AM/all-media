@@ -32,6 +32,8 @@ export interface User {
    * zeichnet Avatar die Initialen. Kommt aus `profiles.avatar_url`.
    */
   avatar?: string;
+  /** Privates Profil (`profiles.privat`) — Kasten 15.4: „Freundschaftsanfrage senden". */
+  privat?: boolean;
 }
 
 export interface Message {
@@ -531,7 +533,10 @@ export type MitteilungArt =
   | 'system'
   /** Kasten 28/15.2: Beitrittsanfrage an meine Community bzw. angenommen — Schema 97. */
   | 'beitritt_anfrage'
-  | 'beitritt_ok';
+  | 'beitritt_ok'
+  // Kasten 28/15.4 (Schema 98): Befreunden unter Communitys.
+  | 'freund_anfrage'
+  | 'freund_ok';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
@@ -564,6 +569,10 @@ export interface MitteilungAnzeige {
   zeit: string;
   gelesen: boolean;
   ziel: MitteilungsZiel;
+  /** Kasten 28/15.4: bei 'freund_anfrage' stehen Annehmen/Ablehnen in der Zeile. */
+  art: MitteilungArt;
+  /** Wer sie ausgelöst hat. */
+  userId: string;
 }
 
 /** Spendenaktion aus dem Erstellen-Blatt. */

@@ -28,6 +28,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien, medienAnfrage } from './medien';
 // Kästen 28/9 und 15: Beitrittsanfragen, Mitgliederliste, Suche (Schema 97).
 const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gemeinsam/beitritt');
+// Kasten 28/15.4: Befreunden — Zustände und Sätze gleich mit der Website.
+const Freundschaft = require('../../gemeinsam/freundschaft') as typeof import('../../gemeinsam/freundschaft');
+import type { FreundZustand } from '../../gemeinsam/freundschaft';
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -207,6 +210,8 @@ export interface MitgliedZeile {
   id: string;
   name: string;
   handle: string;
+  /** Privates Profil — „Freundschaftsanfrage senden" statt „+ Befreunden" (Kasten 15.4). */
+  privat?: boolean;
 }
 
 /**
@@ -265,13 +270,98 @@ export async function personenSuchen(
   if (!filter) return [];
   const { data, error } = await client
     .from('profiles')
-    .select('id, name, handle')
+    .select('id, name, handle, privat')
     .or(filter)
     .neq('id', ichId)
     .order('name', { ascending: true })
     .limit(30);
   if (error) throw error;
-  return ((data ?? []) as any[]).map((p) => ({ id: p.id, name: p.name ?? '', handle: p.handle ?? '' }));
+  return ((data ?? []) as any[]).map((p) => ({
+    id: p.id,
+    name: p.name ?? '',
+    handle: p.handle ?? '',
+    privat: Boolean(p.privat),
+  }));
+}
+
+/*
+ * Kasten 28/15.4 (Schema 98): Befreunden unter Communitys.
+ *
+ * Henrik am 28.09.2026: „Ich denke mal, dass der Button befreunden und
+ * angefragt und so nicht synchronisiert ist […]". Bis hierher schrieb
+ * „+ Befreunden" in der App nur in die Anzeige. Jetzt steht der Stand in
+ * `freundschaften`; ob eine neue Freundschaft sofort gilt (öffentliches
+ * Profil) oder eine Anfrage ist (privat), entscheidet der Auslöser dort.
+ * Gleiche Wege in web/server/sync-handlers.js.
+ */
+
+/** Meine Freundschaften und Anfragen, je Gegenüber ein Zustand. Ohne Schema 98: keine. */
+export async function freundschaftenLaden(
+  client: SupabaseClient,
+  ichId: string
+): Promise<Record<string, FreundZustand>> {
+  const { data, error } = await client.from('freundschaften').select('von, an, angenommen');
+  if (error && Freundschaft.fehltSchema(error)) return {};
+  if (error) throw error;
+  return Freundschaft.ausZeilen((data ?? []) as any[], ichId);
+}
+
+/**
+ * Den Schritt ausführen, den der Knopf gerade anbietet (Freundschaft.schritt),
+ * und den Zustand danach zurückgeben — aus der Datenbank, nicht geraten.
+ */
+export async function freundschaftSchritt(
+  client: SupabaseClient,
+  ichId: string,
+  userId: string,
+  vorher: FreundZustand
+): Promise<FreundZustand> {
+  const schritt = Freundschaft.schritt(vorher);
+  if (schritt === 'anfragen') {
+    const { data, error } = await client
+      .from('freundschaften')
+      .insert({ von: ichId, an: userId })
+      .select('angenommen')
+      .single();
+    if (error && Freundschaft.fehltSchema(error)) throw new Error(Freundschaft.FEHLT_SCHEMA);
+    // Das Paar gibt es schon (z. B. hat die andere Person gerade gefragt): neu lesen.
+    if (error && error.code === '23505') return Freundschaft.zustand(await freundschaftenLaden(client, ichId), userId);
+    if (error && error.code === '42501') throw new Error('Diese Person nimmt gerade keine Anfrage von dir an');
+    if (error) throw error;
+    return (data as any)?.angenommen ? 'befreundet' : 'angefragt';
+  }
+  if (schritt === 'zurueckziehen') {
+    // Mit Zählung — ein verbotenes DELETE meldet sonst Erfolg.
+    const { error, count } = await client
+      .from('freundschaften')
+      .delete({ count: 'exact' })
+      .eq('von', ichId)
+      .eq('an', userId);
+    if (error && Freundschaft.fehltSchema(error)) throw new Error(Freundschaft.FEHLT_SCHEMA);
+    if (error) throw error;
+    if ((count ?? 0) === 0) return Freundschaft.zustand(await freundschaftenLaden(client, ichId), userId);
+    return 'keine';
+  }
+  if (schritt === 'annehmen') {
+    const { error } = await client.rpc('freundschaft_annehmen', { p_von: userId });
+    if (error && Freundschaft.fehltSchema(error)) throw new Error(Freundschaft.FEHLT_SCHEMA);
+    if (error) throw new Error(error.message);
+    return 'befreundet';
+  }
+  return vorher;
+}
+
+/** Eine eingegangene Anfrage ablehnen (aus der Mitteilung). Mit Zählung, siehe oben. */
+export async function freundschaftAblehnen(client: SupabaseClient, ichId: string, vonId: string) {
+  const { error, count } = await client
+    .from('freundschaften')
+    .delete({ count: 'exact' })
+    .eq('von', vonId)
+    .eq('an', ichId)
+    .eq('angenommen', false);
+  if (error && Freundschaft.fehltSchema(error)) throw new Error(Freundschaft.FEHLT_SCHEMA);
+  if (error) throw error;
+  if ((count ?? 0) === 0) throw new Error('Diese Anfrage gibt es nicht mehr');
 }
 
 /**

@@ -1065,13 +1065,6 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     setSubs((prev) => ({ ...prev, messenger: 'chats' }));
   };
 
-  const befriend = (userId: string) => {
-    const person = daten.users[userId];
-    if (contacts.some((c) => c.id === userId)) return setNotice(`${person.name} ist bereits in deinen Kontakten`);
-    setContacts((prev) => [...prev, { id: userId, name: person.name, status: 'pending', about: 'Anfrage gesendet' }]);
-    setNotice(`Anfrage an ${person.name} gesendet`);
-  };
-
   // Aus dem Messenger heraus gehoert das Kontaktprofil dazu - Henrik wurde
   // vorher aus einem Chat heraus im Bereich Videos abgesetzt.
   const openProfile = (userId: string) =>
@@ -2338,14 +2331,15 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       if (sub === 'search') {
         return (
           <CommunitySearchScreen
-            contacts={contacts}
             onOpenCommunity={(community) => {
               // Kasten 28/15.5: ein Datenbanktreffer steht noch in keiner Liste.
               profil.communityMerken(community);
               openCommunity(community);
             }}
             onOpenProfile={openProfile}
-            onBefriend={befriend}
+            freundschaftenLaden={aktion.freundschaftenLaden}
+            freundschaftSchritt={aktion.freundschaftSchritt}
+            onNotice={setNotice}
             onBeitreten={async (community) => {
               profil.communityMerken(community);
               const vorher = Beitritt.zustand(community);
