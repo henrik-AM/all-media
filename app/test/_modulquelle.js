@@ -151,6 +151,10 @@ const UMD_BAUSTEINE = [
   // 31.10.2026: `einwilligung.js` — Zustimmung mit Fassung und Eltern-Widerruf
   // (Kasten RS 7/5, Schema 106). Liest global.Rechtstexte — muss danach stehen.
   ['einwilligung', 'Einwilligung'],
+
+  // 21.10.2026: `erstellen.js` — Community und Unterthema erstellen nach Figma
+  // (Kästen 28/10.2 und 16, Schema 99). Erstellen-Seiten in App und Website.
+  ['erstellen', 'Erstellen'],
 ];
 
 function umdTeile() {

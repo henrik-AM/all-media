@@ -197,16 +197,18 @@ interface ProfilWert {
 
   /* --- Communitys --- */
   communities: Community[];
-  kanalAnlegen: (name: string, thema: string) => string | null;
-  /**
-   * Eine gerade angelegte Community wieder entfernen.
-   *
-   * Gebraucht, wenn die Namenspruefung gegen die Datenbank erst nachtraeglich
-   * zurueckkommt und ergibt, dass es sie schon gibt.
-   */
-  kanalEntfernenNachName: (name: string) => void;
-  /** Unterthema in einer Community anlegen. Gibt einen Fehlertext zurueck. */
-  unterthemaAnlegen: (communityId: string, name: string) => string | null;
+  /** Kasten 28/16: Community mit Bild, Biografie, Link, Unterthemen, Einladung. */
+  communityErstellen: (
+    werte: { name: string; bio: string; link: string; unterthemen: string[]; privat: boolean },
+    bildUrl: string | null,
+    code: string
+  ) => Promise<{ fehler?: string; id?: string; hinweis?: string }>;
+  /** Kasten 28/10.2: Unterthema mit Biografie, Link, privat, Einladung. */
+  unterthemaErstellen: (
+    communityId: string,
+    werte: { name: string; bio: string; link: string; privat: boolean },
+    code: string
+  ) => Promise<{ fehler?: string; id?: string; hinweis?: string }>;
   kanalBeitreten: (id: string) => void;
   /**
    * Den Stumm-Zustand einer Community im Bildschirmstand nachziehen.
@@ -658,137 +660,99 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [spende, schreiben]
   );
 
-  /** Die angelegte Community in die Datenbank bringen und die Kennung nachziehen. */
-  const inDatenbankCommunity = useCallback(
-    (vorlaeufig: string, name: string, thema: string) => {
-      if (!supabase || !daten.ichId) return;
-      Aktion.communityAnlegen(supabase, daten.ichId, name, thema || '', true)
-        .then((echt) =>
-          setCommunities((prev) =>
-            prev.map((c) =>
-              c.id === vorlaeufig
-                ? {
-                    ...c,
-                    id: echt,
-                    unterthemen: (c.unterthemen ?? []).map((u) => ({
-                      ...u,
-                      id: `${echt}-allgemein`,
-                    })),
-                  }
-                : c
-            )
-          )
-        )
-        .catch((e: any) => {
-          console.error('Community anlegen fehlgeschlagen:', e?.message ?? e);
-          setCommunities((prev) => prev.filter((c) => c.id !== vorlaeufig));
-        });
-    },
-    [supabase, daten.ichId]
-  );
-
-  const kanalAnlegen = useCallback(
-    (name: string, thema: string) => {
-      if (communities.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-        return 'Diesen Kanal gibt es schon';
-      }
-      const vorlaeufig = `k${Date.now()}`;
-      setCommunities((prev) => [
-        {
-          id: vorlaeufig,
-          name,
-          topic: thema || 'Ohne Beschreibung',
-          members: 1,
-          visibility: 'private',
-          joined: true,
-          unreadCount: 0,
-          // Selbst angelegt: sie laesst sich nicht verlassen, und sie faengt
-          // mit dem einen Unterthema an, das jede Community hat.
-          eigen: true,
-          bio: thema || '',
-          link: '',
-          unterthemen: [{ id: `${vorlaeufig}-allgemein`, name: 'Allgemein', themen: [] }],
-        },
-        ...prev,
-      ]);
-
-      /*
-       * Und wirklich anlegen. Vorher lebte eine selbst angelegte Community
-       * nur in diesem Zustand: nach dem naechsten Start war sie weg, und
-       * niemand sonst konnte ihr beitreten.
-       */
-      inDatenbankCommunity(vorlaeufig, name, thema);
-      return null;
-    },
-    [communities, inDatenbankCommunity]
-  );
-
   /*
-   * Ein Unterthema in einer Community anlegen.
-   * Prototyp-Frame "CH + Unterthema erstellen" - auf der Community-Seite gab
-   * es dafuer bis zum 26.08.2026 keinen Weg.
+   * Community und Unterthema erstellen (Kästen 28/10.2 und 16, Schema 99).
+   *
+   * Bis zum 21.10.2026 trug die App beides zuerst nur in ihren Zustand ein
+   * und schrieb im Hintergrund — das Unterthema „Allgemein" einer neuen
+   * Community kam dabei nie in die Datenbank, und ein Fehler ließ die Zeile
+   * still verschwinden. Jetzt wird gewartet: Die Seite schließt erst, wenn
+   * alles gespeichert ist, und ein Fehler steht auf der Seite.
+   *
+   * Gleiche Reihenfolge wie POST /api/communities auf der Website:
+   * Community → Mitgliedschaft → „Allgemein" → weitere Unterthemen →
+   * Einladung. Zurück kommt { fehler } oder { id, hinweis }.
    */
-
-  const kanalEntfernenNachName = useCallback((name: string) => {
-    setCommunities((prev) => prev.filter((c) => c.name.toLowerCase() !== name.toLowerCase()));
-  }, []);
-  const unterthemaAnlegen = useCallback((communityId: string, name: string) => {
-    const sauber = name.trim();
-    if (!sauber) return 'Bitte einen Namen eingeben';
-
-    const community = communities.find((c) => c.id === communityId);
-    if (!community) return 'Diese Community gibt es nicht mehr';
-    if ((community.unterthemen ?? []).some((u) => u.name.toLowerCase() === sauber.toLowerCase())) {
-      return 'Dieses Unterthema gibt es schon';
-    }
-
-    const vorlaeufig = `${communityId}-${Date.now()}`;
-    setCommunities((prev) =>
-      prev.map((c) =>
-        c.id === communityId
-          ? {
-              ...c,
-              unterthemen: [...(c.unterthemen ?? []), { id: vorlaeufig, name: sauber, themen: [] }],
-            }
-          : c
-      )
-    );
-
-    /*
-     * Und wirklich anlegen. Vorher stand das Unterthema nur hier: es tauchte
-     * auf der Website nie auf, und in der App war es nach dem naechsten Start
-     * wieder verschwunden. Die Kennung aus der Datenbank wird nachgezogen —
-     * unter der vorlaeufigen liesse sich spaeter nichts hineinschreiben.
-     */
-    if (supabase && daten.ichId) {
-      Aktion.kanalAnlegen(supabase, daten.ichId, communityId, sauber)
-        .then((echt) =>
-          setCommunities((prev) =>
-            prev.map((c) =>
-              c.id === communityId
-                ? {
-                    ...c,
-                    unterthemen: (c.unterthemen ?? []).map((u) =>
-                      u.id === vorlaeufig ? { ...u, id: echt } : u
-                    ),
-                  }
-                : c
-            )
-          )
-        )
-        .catch((e: any) => {
-          console.error('Das Unterthema anlegen fehlgeschlagen:', e?.message ?? e);
-          setCommunities((prev) =>
-            prev.map((c) =>
-              c.id === communityId
-                ? { ...c, unterthemen: (c.unterthemen ?? []).filter((u) => u.id !== vorlaeufig) }
-                : c
-            )
-          );
+  const communityErstellen = useCallback(
+    async (
+      werte: { name: string; bio: string; link: string; unterthemen: string[]; privat: boolean },
+      bildUrl: string | null,
+      code: string
+    ): Promise<{ fehler?: string; id?: string; hinweis?: string }> => {
+      if (!supabase || !daten.ichId) return { fehler: 'Dafür musst du angemeldet sein' };
+      if (communities.some((c) => c.name.toLowerCase() === werte.name.toLowerCase())) {
+        return { fehler: 'Diese Community gibt es schon' };
+      }
+      if (!(await Aktion.communityNameFrei(supabase, werte.name))) {
+        return { fehler: `„${werte.name}“ gibt es schon — such sie in der Community-Suche` };
+      }
+      let id: string;
+      try {
+        id = await Aktion.communityAnlegen(supabase, daten.ichId, werte.name, werte.bio, werte.privat, {
+          bio: werte.bio,
+          link: werte.link,
+          bildUrl,
         });
-    }
-    return null;
-  }, [communities, supabase, daten.ichId]);
+      } catch (e: any) {
+        return { fehler: e?.message ?? 'Die Community ließ sich nicht anlegen' };
+      }
+
+      // Was danach scheitert, lässt die Community stehen — sie ist da, nur
+      // unvollständig. Das sagt der Hinweis, statt still zu schweigen.
+      const fehlt: string[] = [];
+      for (const name of ['Allgemein', ...werte.unterthemen]) {
+        try {
+          await Aktion.kanalAnlegen(supabase, daten.ichId, id, name);
+        } catch {
+          fehlt.push(name);
+        }
+      }
+      let ohneEinladung = false;
+      try {
+        await Aktion.einladungSpeichern(supabase, daten.ichId, code, id);
+      } catch {
+        ohneEinladung = true;
+      }
+      await daten.neuLaden();
+
+      const hinweise = [
+        fehlt.length ? `Nicht angelegt: ${fehlt.join(', ')}` : '',
+        ohneEinladung ? 'Der Einladungslink gilt noch nicht' : '',
+      ].filter(Boolean);
+      return { id, hinweis: hinweise.length ? hinweise.join(' · ') : undefined };
+    },
+    [supabase, daten, communities]
+  );
+
+  const unterthemaErstellen = useCallback(
+    async (
+      communityId: string,
+      werte: { name: string; bio: string; link: string; privat: boolean },
+      code: string
+    ): Promise<{ fehler?: string; id?: string; hinweis?: string }> => {
+      if (!supabase || !daten.ichId) return { fehler: 'Dafür musst du angemeldet sein' };
+      const community = communities.find((c) => c.id === communityId);
+      if (!community) return { fehler: 'Diese Community gibt es nicht mehr' };
+      if ((community.unterthemen ?? []).some((u) => u.name.toLowerCase() === werte.name.toLowerCase())) {
+        return { fehler: 'Dieses Unterthema gibt es schon' };
+      }
+      let id: string;
+      try {
+        id = await Aktion.kanalAnlegen(supabase, daten.ichId, communityId, werte.name, werte);
+      } catch (e: any) {
+        return { fehler: e?.message ?? 'Das Unterthema ließ sich nicht anlegen' };
+      }
+      let hinweis: string | undefined;
+      try {
+        await Aktion.einladungSpeichern(supabase, daten.ichId, code, communityId, id);
+      } catch {
+        hinweis = 'Der Einladungslink gilt noch nicht';
+      }
+      await daten.neuLaden();
+      return { id, hinweis };
+    },
+    [supabase, daten, communities]
+  );
 
   const kanalBeitreten = useCallback(
     (id: string) => {
@@ -985,9 +949,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       geteiltZaehler,
       geteilt,
       communities,
-      kanalAnlegen,
-      kanalEntfernenNachName,
-      unterthemaAnlegen,
+      communityErstellen,
+      unterthemaErstellen,
       kanalBeitreten,
       kanalStummSetzen,
       kanalGelesen,
@@ -1003,7 +966,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, communityErstellen, unterthemaErstellen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]
   );

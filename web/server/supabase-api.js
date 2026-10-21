@@ -44,6 +44,8 @@ const Lenkung = require('../../gemeinsam/lenkung');
 const StoryRegeln = require('../../gemeinsam/story');
 // Kasten 27: Stand und Reihenfolge offener Chats — gemeinsam mit der App.
 const ChatAbgleich = require('../../gemeinsam/chatabgleich');
+// Kästen 28/10.2 und 16: Community und Unterthema erstellen (Schema 99).
+const Erstellen = require('../../gemeinsam/erstellen');
 
 /*
  * "spende" und "live" stehen als JSON in einer Textspalte — so schreibt es
@@ -1146,12 +1148,17 @@ async function ladeCommunities(client, nutzerId) {
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine || []).filter((m) => m.is_muted).map((m) => m.community_id));
 
+  // Kasten 28/10.2 und 16 (Schema 99): Bild, Biografie/Link/privat der
+  // Unterthemen. Fehlt 99, bleibt es leer (gemeinsam/erstellen.js).
+  const zusatz = await Erstellen.zusatzLaden(client, (data || []).map((c) => c.id));
+
   return (data || []).map((c) => ({
     id: c.id,
     name: c.name,
     topic: c.topic || '',
     bio: c.bio || '',
     link: c.link || '',
+    bild: zusatz.bild[c.id] || null,
     visibility: c.visibility,
     members: Number(c.mitglieder_basis || 0) + (c.community_members?.[0]?.count ?? 0),
     // Eine selbst angelegte Community kann man nicht verlassen — sie stünde
@@ -1164,7 +1171,7 @@ async function ladeCommunities(client, nutzerId) {
     // der handleShareToCommunities „das erste“ Unterthema sucht (29.09.2026).
     channels: (c.community_channels || [])
       .sort((a, b) => (a.position || 0) - (b.position || 0) || String(a.created_at).localeCompare(String(b.created_at)))
-      .map((k) => ({ id: k.id, slug: k.slug, name: k.name, topics: k.topics || [] })),
+      .map((k) => ({ id: k.id, slug: k.slug, name: k.name, topics: k.topics || [], ...Erstellen.kanalFelder(zusatz, k.id, nutzerId) })),
   }));
 }
 

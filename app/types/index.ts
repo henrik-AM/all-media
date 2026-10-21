@@ -307,6 +307,13 @@ export interface Unterthema {
   name: string;
   /** Worueber dort gesprochen wird - steht als zweite Zeile in der Liste. */
   themen: string[];
+  /** Kasten 28/10.2 (Schema 99): Biografie und Link aus „Unterthema erstellen“. */
+  bio?: string;
+  link?: string;
+  /** Privates Unterthema — Beitritt nur mit Einladung. */
+  privat?: boolean;
+  /** Selbst angelegt: ich darf dazu einladen. */
+  eigen?: boolean;
 }
 
 export interface Community {
@@ -324,6 +331,8 @@ export interface Community {
    */
   bio?: string;
   link?: string;
+  /** Kasten 28/16 (Schema 99): das Community-Bild, unterschrieben. */
+  bild?: string | null;
   /** Selbst angelegt. Eine eigene Community laesst sich nicht verlassen. */
   eigen?: boolean;
   /**

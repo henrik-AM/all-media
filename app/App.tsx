@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useContext, useRef, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import { Modal, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { ThemeContext, ThemeProvider } from './contexts/ThemeContext';
@@ -51,6 +51,7 @@ import { CallScreen } from './screens/messenger/CallScreen';
 import { CommunitiesScreen } from './screens/communities/CommunitiesScreen';
 import { CommunityChatsScreen } from './screens/communities/CommunityChatsScreen';
 import { CommunityDetailScreen } from './screens/communities/CommunityDetailScreen';
+import { ErstellenScreen } from './screens/communities/ErstellenScreen';
 import { CommunityProfileScreen } from './screens/communities/CommunityProfileScreen';
 import { CommunitySearchScreen } from './screens/communities/CommunitySearchScreen';
 import { VideoFeedScreen } from './screens/video/VideoFeedScreen';
@@ -273,6 +274,10 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   // eigenes Erstellen-Menue, so wie im Prototyp.
   const [profilBereich, setProfilBereich] = useState<MitteilungsBereich>('videos');
   const [formular, setFormular] = useState<Formular | null>(null);
+  // Kästen 28/10.2 und 16: Community bzw. Unterthema erstellen (eigene Seite).
+  const [erstellen, setErstellen] = useState<
+    { art: 'community' } | { art: 'unterthema'; communityId: string } | null
+  >(null);
   /** Abschnitt, bei dem die Einstellungen aufgehen sollen. */
   const [settingsSprung, setSettingsSprung] = useState<string | null>(null);
   /** Bereich, von dem man zu den Settings kam (messenger/videos/communities). */
@@ -1575,38 +1580,10 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     }
 
     if (punkt === 'kanal') {
-      return setFormular({
-        title: 'Neuen Kanal erstellen',
-        knopf: 'Erstellen',
-        felder: [
-          { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
-          { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
-        ],
-        absenden: ({ name, thema }) => {
-          /*
-           * Der Duplikatfilter aus dem Handbuch prueft jetzt gegen alle
-           * Communitys, nicht nur gegen die eigenen. Vorher konnte man eine
-           * Community, der man nicht beigetreten war, ein zweites Mal
-           * anlegen — danach standen beide nebeneinander in der Suche.
-           *
-           * Die Pruefung laeuft nach dem Schliessen des Formulars, weil sie
-           * die Datenbank fragt. Ergibt sie einen Treffer, wird das eben
-           * Angelegte wieder entfernt und der Grund genannt.
-           */
-          const fehler = profil.kanalAnlegen(name, thema);
-          if (fehler) return fehler;
-
-          void (async () => {
-            const frei = await aktion.communityNameFrei(name);
-            if (!frei) {
-              profil.kanalEntfernenNachName(name);
-              return setNotice(`„${name}“ gibt es schon — such sie in der Community-Suche`);
-            }
-            setNotice(`„${name}“ erstellt`);
-          })();
-          return null;
-        },
-      });
+      // Kasten 28/16: eigene Seite nach Figma „CP + Kanal erstellen“ statt
+      // des Blatts mit Name und Thema. Namensprüfung gegen alle Communitys
+      // macht profil.communityErstellen, bevor etwas angelegt wird.
+      return setErstellen({ art: 'community' });
     }
 
     /*
@@ -2077,26 +2054,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             profil.kanalBeitreten(community.id);
             setNotice(community.joined ? `„${community.name}“ verlassen` : `„${community.name}“ beigetreten`);
           }}
-          onNeuesUnterthema={() =>
-            setFormular({
-              title: 'Neues Unterthema',
-              knopf: 'Anlegen',
-              felder: [
-                {
-                  key: 'name',
-                  label: 'Name des Unterthemas',
-                  platzhalter: 'z. B. Ankündigungen',
-                  pflicht: true,
-                },
-              ],
-              absenden: ({ name }) => {
-                const fehler = profil.unterthemaAnlegen(community.id, name);
-                if (fehler) return fehler;
-                setNotice(`„${name}“ angelegt`);
-                return null;
-              },
-            })
-          }
+          // Kasten 28/10.2: Seite nach Figma „CC + Unterthema erstellen“.
+          onNeuesUnterthema={() => setErstellen({ art: 'unterthema', communityId: community.id })}
           onNotice={setNotice}
         />
       );
@@ -2609,7 +2568,47 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Kasten 11.1: die Storylisten gehen als Kontext an jedes Profilbild
    * (StoryAvatar) — ein Ring, eine Quelle, statt jeder Bildschirm für sich.
    */
-  return <StoryContext.Provider value={storyWert}>{inhalt}</StoryContext.Provider>;
+  return (
+    <StoryContext.Provider value={storyWert}>
+      {inhalt}
+      {/*
+       * Kästen 28/10.2 und 16: die Erstellen-Seite liegt in einem eigenen
+       * Modal — vor jeder Vollbildansicht, wie das Formularblatt oben.
+       */}
+      <Modal
+        visible={!!erstellen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setErstellen(null)}
+      >
+        {erstellen && (
+          <ErstellenScreen
+            art={erstellen.art}
+            communityName={
+              erstellen.art === 'unterthema'
+                ? profil.communities.find((c) => c.id === erstellen.communityId)?.name
+                : undefined
+            }
+            onClose={() => setErstellen(null)}
+            onFertig={(meldung) => {
+              const ziel = erstellen;
+              setErstellen(null);
+              setNotice(meldung);
+              if (ziel.art === 'community') {
+                setArea('communities');
+                setSubs((prev) => ({ ...prev, communities: 'profile' }));
+              }
+            }}
+            absenden={(werte, bildUrl, code) =>
+              erstellen.art === 'community'
+                ? profil.communityErstellen(werte, bildUrl, code)
+                : profil.unterthemaErstellen(erstellen.communityId, werte, code)
+            }
+          />
+        )}
+      </Modal>
+    </StoryContext.Provider>
+  );
 };
 
 const Root = () => {

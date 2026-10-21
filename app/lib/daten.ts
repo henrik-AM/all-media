@@ -70,6 +70,8 @@ import { neulingsliste, ordnenJeArt, punktekarte } from '../../gemeinsam/rang';
 // nicht. Und kein Import aus './lenkung' — das Zusammenlegen dort kennt nur
 // './medien' und './krypto'; deshalb steht ladeLenkung hier in der Datei.
 const Lenkung = require('../../gemeinsam/lenkung') as typeof import('../../gemeinsam/lenkung');
+// Kästen 28/10.2 und 16: Community und Unterthema erstellen (Schema 99).
+const Erstellen = require('../../gemeinsam/erstellen') as typeof import('../../gemeinsam/erstellen');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -1277,6 +1279,10 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine ?? []).filter((m: any) => m.is_muted).map((m: any) => m.community_id));
 
+  // Kasten 28/10.2 und 16 (Schema 99): Bild, Biografie/Link/privat der
+  // Unterthemen. Fehlt 99, bleibt es leer (gemeinsam/erstellen.js).
+  const zusatz = await Erstellen.zusatzLaden(client, (data ?? []).map((c: any) => c.id));
+
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
   return signiereMedien(client, (data ?? []).map((c: any) => ({
     id: c.id,
@@ -1284,6 +1290,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     topic: c.topic ?? '',
     bio: c.bio ?? '',
     link: c.link ?? '',
+    bild: zusatz.bild[c.id] ?? null,
     visibility: c.visibility,
     members: Number(c.mitglieder_basis ?? 0) + (c.community_members?.[0]?.count ?? 0),
     joined: beigetreten.has(c.id),
@@ -1296,7 +1303,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     // der teilenInCommunitys „das erste“ Unterthema sucht (29.09.2026).
     unterthemen: (c.community_channels ?? [])
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0) || String(a.created_at).localeCompare(String(b.created_at)))
-      .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [] })),
+      .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [], ...Erstellen.kanalFelder(zusatz, k.id, ichId) })),
   })));
 }
 
