@@ -337,3 +337,22 @@ Schema 90 nicht mehr: die Mitteilungsarten-Liste ist die live gültige (zuletzt 
 Code vor dem Schema: App (`daten.ts`) und Server (`supabase-api.js`) lesen `mitglieder_anzahl` und die
 Anfragen nachsichtig (`Beitritt.fehltSchema`); Anfragen/Annehmen melden ohne 97 „… erst, wenn das
 Datenbank-Update eingespielt ist“.
+
+
+## Nachtrag 21.10.2026: Schema 98 (Feedback 28.09., Kasten 15.4)
+
+**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 97 (Mitteilungsarten) und nach 95
+(`blockiert_zwischen`).
+
+- `SUPABASE_SCHEMA_98_freundschaften.sql` — Tabelle `freundschaften (von, an, angenommen)` (RLS,
+  `nur_freigegebene`, je Paar eine Zeile über `freundschaften_paar`, kein UPDATE für `authenticated`);
+  Auslöser `freundschaft_vorgaben` (öffentliches Profil → sofort befreundet, privat → Anfrage),
+  `freundschaft_annehmen(uuid)`, Auslöser `freundschaft_bei_blockierung` auf `blocks`,
+  `mitteilung_freundschaft`, `mitteilung_freundschaft_angenommen`, `mitteilung_weg_freundschaft`.
+  **Ersetzt `notifications_art_check` (zuletzt 97) — gilt danach: 98.** Wer 90 oder 97 neu einspielt,
+  muss 98 nachziehen.
+
+Code vor dem Schema: App (`aktionen.ts`) und Server (`sync-handlers.js`) lesen `freundschaften`
+nachsichtig (`Freundschaft.fehltSchema` → niemand befreundet); Befreunden meldet ohne 98 „… erst, wenn
+das Datenbank-Update eingespielt ist“. Probe: `app/test/_probe98.js` (verworfene Transaktion).
+

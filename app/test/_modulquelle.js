@@ -154,6 +154,9 @@ const UMD_BAUSTEINE = [
   // 20.10.2026: `beitritt.js` — Mitgliederliste und Beitrittsanfragen
   // (Feedback 28.09., Kästen 9 und 15, Schema 97). daten.ts und aktionen.ts holen ihn.
   ['beitritt', 'Beitritt'],
+  // 21.10.2026: `freundschaft.js` — Befreunden unter Communitys (Kasten 28/15.4,
+  // Schema 98). aktionen.ts und CommunitySearchScreen holen ihn.
+  ['freundschaft', 'Freundschaft'],
 ];
 
 function umdTeile() {
