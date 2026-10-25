@@ -79,8 +79,8 @@ const app = express();
  *
  * `scriptSrc` erlaubt bewusst 'unsafe-inline' NICHT. Geprueft vor dem
  * Einschalten: index.html hat keinen einzigen Inline-Block und weder app.js
- * noch index.html ein onclick=/onload=-Attribut. Fremd geladen wird nur
- * Leaflet von cdnjs, und das steht namentlich in der Liste.
+ * noch index.html ein onclick=/onload=-Attribut. Fremd geladen wird
+ * nichts mehr (Leaflet liegt seit 22.10.2026 unter public/lib/).
  *
  * `styleSrc` erlaubt 'unsafe-inline', weil die Oberflaeche Farben und
  * Hintergruende ueber style-Attribute setzt (Avatare, Verlaeufe). Das ist
@@ -97,18 +97,19 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         /*
-         * Eine einzige fremde Quelle, namentlich statt pauschal:
-         *   cdnjs — Leaflet fuer die Karte (index.html)
+         * Keine fremde Quelle mehr fuer Code, Stil und Schrift.
          *
-         * jsdelivr stand hier bis zum 04.09.2026 fuer supabase-js. Die
-         * Bibliothek liegt jetzt unter public/lib/ und wird von uns selbst
-         * ausgeliefert (anmeldung.js), damit fuer die Anmeldung — und damit
-         * fuer die Sitzung jedes angemeldeten Nutzers — kein Dritter mehr
-         * Code beisteuern kann.
+         * jsdelivr stand hier bis zum 04.09.2026 fuer supabase-js, cdnjs
+         * (Leaflet) und Google Fonts (Inter) bis zum 22.10.2026. Alles liegt
+         * jetzt unter public/lib/ und wird von uns selbst ausgeliefert: kein
+         * Dritter steuert Code bei, und kein Seitenaufruf schickt die
+         * IP-Adresse ohne Einwilligung an Google oder Cloudflare (TDDDG § 25).
+         * Die Richtlinie verbietet es, hier wieder fremde Quellen einzutragen
+         * (test:recht prueft das).
          */
-        scriptSrc: ["'self'", 'https://cdnjs.cloudflare.com'],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        fontSrc: ["'self'", 'data:'],
         // Kartenkacheln: OpenStreetMap und die Satellitenansicht (public/app.js).
         // Die drei Kartenansichten der Friend-Map: Standard (OpenStreetMap),
         // Satellit (ArcGIS) und Gelaende (OpenTopoMap). OpenTopoMap fehlte

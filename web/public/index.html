@@ -19,10 +19,14 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/icon-180.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <!--
+    Schrift (Inter) und Karte (Leaflet) liefern wir seit 22.10.2026 selbst aus
+    (public/lib/). Vorher kamen sie von Google Fonts und cdnjs (Cloudflare):
+    Jeder Aufruf der Seite schickte die IP-Adresse an beide, ohne Einwilligung
+    (TDDDG § 25, DSGVO Art. 6). Auftrag Recht/Sicherheit, Kasten RS 1.
+  -->
+  <link rel="stylesheet" href="/lib/inter/inter.css" />
+  <link rel="stylesheet" href="/lib/leaflet-1.9.4/leaflet.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body class="is-startet">
@@ -96,7 +100,7 @@
     <div class="offline-text">Offline — Inhalte werden synchronisiert</div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/lib/leaflet-1.9.4/leaflet.js"></script>
   <!--
     Die Kryptoschicht kommt aus /gemeinsam/ — derselbe Ordner, den auch die
     App und die Pruefläufe benutzen. Eine Kopie hier daneben waere die eine
