@@ -31,8 +31,8 @@ pr "$(pb KI_SITZUNG=11 KI_SITZUNG_ID=A1 KI_ABGLEICH=/gibt/es/nicht.sh)" 2 "Skrip
 M="$tmp/marke"; : > "$M"
 ein() { "${basis[@]}" NODE_OPTIONS="--require $T/_ki_belegung_attrappe.js" KI_PROBE_MARKE="$M" "$@" >/dev/null 2>&1; echo $?; }
 pr "$(ein KI_SITZUNG=12 KI_SITZUNG_ID=A2 node -e "require('$T/_testpasswoerter')")" 2 "_testpasswoerter.js: fremde Sitzung → 2"
-# Eigene Sitzung kommt am Schutz vorbei bis zur Passwortprüfung (im Wegwerfordner fehlt .env.local absichtlich).
-pr "$("${basis[@]}" NODE_OPTIONS="--require $T/_ki_belegung_attrappe.js" KI_PROBE_MARKE="$M" KI_SITZUNG=11 KI_SITZUNG_ID=A1 node -e "require('$T/_testpasswoerter')" 2>&1 | grep -c 'testbestand\|TESTKONTO_PASS fehlt' )" 1 "_testpasswoerter.js: eigene Sitzung passiert den Schutz"
+# Eigene Sitzung kommt am Schutz vorbei (danach lädt die Datei, oder ohne .env.local meldet sie das fehlende Passwort).
+pr "$("${basis[@]}" NODE_OPTIONS="--require $T/_ki_belegung_attrappe.js" KI_PROBE_MARKE="$M" KI_SITZUNG=11 KI_SITZUNG_ID=A1 node -e "require('$T/_testpasswoerter')" 2>&1 | grep -c 'ABBRUCH  testbestand' )" 0 "_testpasswoerter.js: eigene Sitzung passiert den Schutz"
 pr "$(ein KI_SITZUNG=12 KI_SITZUNG_ID=A2 node -e "require('$T/_konto')")" 2 "_konto.js: fremde Sitzung → 2 (vor Anmeldung)"
 pr "$(ein KI_SITZUNG=12 KI_SITZUNG_ID=A2 node "$T/alles.js")" 2 "alles.js: fremde Sitzung → 2 vor der Sperre"
 # Reihenfolge im Quelltext: Schutz vor Laufsperre und vor dem ersten Aufruf eines Laufs/Resets.
