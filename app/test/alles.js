@@ -128,6 +128,7 @@ function stempel() {
   return hash.digest('hex');
 }
 
+require('./_ki_belegung').pruefeBelegung('testbestand');
 sperreSetzen();
 const stempelVorher = stempel();
 

@@ -38,6 +38,9 @@ const fs = require('fs');
 const path = require('path');
 const { nurTestkonto } = require('./_nur_testkonten');
 
+// Löscht Mitteilungen des Prüfkontos — gemeinsame Daten, nur mit eigener Belegung.
+require('./_ki_belegung').pruefeBelegung('testbestand');
+
 /** Zaehlt, wie viele Mitteilungen des Pruefkontos gerade herumliegen. */
 async function zaehlen() {
   return frage('select count(*) as anzahl from notifications where actor_id in (select id from auth.users where email = $KONTO) or user_id in (select id from auth.users where email = $KONTO)');

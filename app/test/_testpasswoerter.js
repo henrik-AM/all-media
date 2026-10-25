@@ -17,6 +17,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// Wer Passwörter braucht, läuft gegen Supabase — nur mit eigener Belegung des
+// Testbestands (_ki_belegung.js), sonst Abbruch vor der Anmeldung.
+require('./_ki_belegung').pruefeBelegung('testbestand');
+
 const DATEI = path.join(__dirname, '..', '.env.local');
 const UMGEBUNG = fs.existsSync(DATEI) ? fs.readFileSync(DATEI, 'utf8') : '';
 const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) || [])[1] || '';
