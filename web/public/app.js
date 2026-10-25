@@ -8519,7 +8519,7 @@ function einstellungsListe(art) {
    */
   if (art === 'insights') {
     const st = state.statistik;
-    if (!st) return { leer: 'Wird geladen …', zeilen: [] };
+    if (!st) return { leer: nachladenLeer('statistik'), zeilen: [] };
     const z = (n) => Number(n || 0).toLocaleString('de-DE');
     return {
       leer: '',
@@ -8580,7 +8580,7 @@ function einstellungsListe(art) {
    * vier. Gleiche Quelle und gleiche Ersatztexte wie gelikteVon() in der App.
    */
   if (art === 'gelikt') {
-    if (!state.gelikt) return { leer: 'Wird geladen …', zeilen: [] };
+    if (!state.gelikt) return { leer: nachladenLeer('gelikt'), zeilen: [] };
     return {
       leer: 'Dir hat noch nichts gefallen.',
       zeilen: state.gelikt.map((b) => ({
@@ -8596,7 +8596,7 @@ function einstellungsListe(art) {
    * der Browser seine eigene Fassung der Regel.
    */
   if (art === 'kommentiert') {
-    if (!state.kommentiert) return { leer: 'Wird geladen …', zeilen: [] };
+    if (!state.kommentiert) return { leer: nachladenLeer('kommentiert'), zeilen: [] };
     return {
       leer: 'Du hast noch nichts kommentiert.',
       zeilen: state.kommentiert.map((k) => ({
@@ -8940,6 +8940,42 @@ function openEinstellung(punkt, nachher) {
   toast(`${punkt.label} ist noch in Entwicklung`);
 }
 
+/*
+ * Nachladen für die Einstellungen (Statistik, Gelikt, Kommentiert): je Liste
+ * höchstens eine Anfrage gleichzeitig. Scheitert sie, sagt die Liste das,
+ * und frühestens nach 30 Sekunden wird wieder gefragt.
+ *
+ * Bis zum 25.10.2026 setzte ein Fehler den Wert auf null, renderSettings()
+ * sah null und fragte sofort wieder — im Prüflauf über 20 000 Aufrufe in
+ * Sekunden, live bei jedem Serverfehler (Rechtsprüfung 21.10., S6).
+ */
+const NACHLADEN_PAUSE = 30000;
+const einstellungNachgeladen = {}; // Name → 'laeuft' oder Zeitpunkt des Fehlers
+function einstellungNachladen(name, pfad, auswerten) {
+  const stand = einstellungNachgeladen[name];
+  if (state[name] || stand === 'laeuft' || (stand && Date.now() - stand < NACHLADEN_PAUSE)) return;
+  einstellungNachgeladen[name] = 'laeuft';
+  fetch(pfad)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      state[name] = auswerten(d);
+      einstellungNachgeladen[name] = state[name] ? undefined : Date.now();
+    })
+    .catch((fehler) => {
+      console.error(`${name} laden fehlgeschlagen:`, fehler);
+      einstellungNachgeladen[name] = Date.now();
+    })
+    .finally(() => {
+      if (state.area === 'settings') renderSettings();
+    });
+}
+/** Leertext einer nachgeladenen Liste: noch unterwegs oder gescheitert. */
+function nachladenLeer(name) {
+  return einstellungNachgeladen[name] && einstellungNachgeladen[name] !== 'laeuft'
+    ? 'Konnte gerade nicht geladen werden — versuch es gleich noch einmal.'
+    : 'Wird geladen …';
+}
+
 function renderSettings() {
   /*
    * Ein einzelner Abschnitt als eigene Seite - das Ziel der Ueberschrift mit
@@ -8988,36 +9024,11 @@ function renderSettings() {
    * Nachladen und danach neu zeichnen. Ohne das zweite `renderSettings()`
    * bliebe in der Liste „Wird geladen …" stehen, bis irgendetwas anderes
    * einen Neuaufbau ausloest — die Zahlen waeren da und trotzdem unsichtbar.
+   * Wie oft gefragt wird, regelt einstellungNachladen() (Rechtsprüfung S6).
    */
-  if (!state.statistik) {
-    fetch('/api/statistik')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        state.statistik = d?.statistik || null;
-        if (state.area === 'settings') renderSettings();
-      })
-      .catch((fehler) => console.error('Statistik laden fehlgeschlagen:', fehler));
-  }
-
-  if (!state.gelikt) {
-    fetch('/api/gelikt')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        state.gelikt = Array.isArray(d) ? d : null;
-        if (state.area === 'settings') renderSettings();
-      })
-      .catch((fehler) => console.error('Gelikte Beitraege laden fehlgeschlagen:', fehler));
-  }
-
-  if (!state.kommentiert) {
-    fetch('/api/kommentiert')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        state.kommentiert = Array.isArray(d) ? d : null;
-        if (state.area === 'settings') renderSettings();
-      })
-      .catch((fehler) => console.error('Eigene Kommentare laden fehlgeschlagen:', fehler));
-  }
+  einstellungNachladen('statistik', '/api/statistik', (d) => d?.statistik || null);
+  einstellungNachladen('gelikt', '/api/gelikt', (d) => (Array.isArray(d) ? d : null));
+  einstellungNachladen('kommentiert', '/api/kommentiert', (d) => (Array.isArray(d) ? d : null));
 
   const itemHtml = (it, sektionId) => {
     if (it.toggle) {
