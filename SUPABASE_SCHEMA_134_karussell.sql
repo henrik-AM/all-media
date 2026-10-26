@@ -267,6 +267,8 @@ grant execute on function public.medium_video_geprueft(text,uuid) to authenticat
 -- JSON-Liste im selben INSERT wie der Beitrag: kein halbfertiges Karussell.
 -- Keine feste Anzahl; HTTP-/Speichergrenzen gelten je Aufnahme weiterhin.
 alter table public.posts add column if not exists medien jsonb not null default '[]'::jsonb;
+-- Containment in medium_sichtbar mit dem Altindex auf media_url kombinierbar.
+create index if not exists posts_medien_gin on public.posts using gin (medien jsonb_path_ops);
 create or replace function public.karussell_pruefen() returns trigger
 language plpgsql security invoker set search_path=public as $$
 declare m jsonb;p text;belegt boolean;dauer double precision;
