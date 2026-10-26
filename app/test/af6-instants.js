@@ -42,10 +42,17 @@ const t = async (name, fn) => { await fn(); console.log(`OK ${++n} ${name}`); };
         const ex = {};
         vm.runInNewContext(code, { exports: ex, require, module: { exports: ex }, console, Map, WeakMap, Date, Set });
         const zeiten = [];
-        const c = { storage: { from: () => ({ createSignedUrl: async (p, s) => { zeiten.push(s); return { data: { signedUrl: 'url-' + zeiten.length } }; } }) } };
+        const c = { auth:{getSession:async()=>({data:{session:{access_token:'a',user:{id:'a'}}}})},storage: { from: () => ({ createSignedUrl: async (p, s) => { zeiten.push(s); return { data: { signedUrl: 'url-' + zeiten.length } }; } }) } };
         assert.equal(await ex.signiereEine(c, pfad), 'url-1');
         assert.equal(await ex.signiereEine(c, pfad), 'url-2');
         assert.deepEqual(zeiten, [60, 60]);
+    });
+    await t('Kontowechsel während Instant-Signatur verwirft das alte Bild', async () => {
+        const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../lib/medien.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+        const ex={};vm.runInNewContext(code,{exports:ex,require,module:{exports:ex},console,Map,WeakMap,Date,Set});
+        let token='a';
+        const c={auth:{getSession:async()=>({data:{session:{access_token:token,user:{id:token}}}})},storage:{from:()=>({createSignedUrl:async()=>{token='b';return {data:{signedUrl:'privates-altes-bild'}};}})}};
+        assert.equal(await ex.signiereEine(c,pfad),null);
     });
     await t('Dateifehler löscht keine Metadaten', async () => {
         let bestaetigt = false;

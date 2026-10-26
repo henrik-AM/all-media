@@ -239,12 +239,14 @@ export async function signiereEine(
 ): Promise<string | null> {
   if (!client) return null;
 
-  if (pfad.startsWith('instants/')) {
-    const {data,error}=await client.storage.from('media').createSignedUrl(pfad,60);
-    if(error)throw error;return data?.signedUrl || null;
-  }
   const speicher = await speicherFuer(client);
   if (!speicher) return null;
+  if (pfad.startsWith('instants/')) {
+    const { data, error } = await client.storage.from('media').createSignedUrl(pfad, 60);
+    if (error) throw error;
+    if (await speicherFuer(client) !== speicher) return null;
+    return data?.signedUrl || null;
+  }
   const eintrag = speicher.eintraege.get(pfad);
   if (eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;
 

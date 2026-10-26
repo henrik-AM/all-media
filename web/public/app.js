@@ -892,6 +892,8 @@ async function sendeKoerper(chatId, text, weiteres = {}) {
 
 async function bootstrap() {
   let data;
+  state.kontoAnalyse = null;
+  state.kontoAnalyseFehler = null;
 
   // Erst klaeren, ob jemand angemeldet ist. Sonst holt der Aufruf unten die
   // Beispieldaten, obwohl eine Sitzung vorliegt und echte Daten da waeren.
@@ -10594,11 +10596,17 @@ function openEinstellung(punkt, nachher) {
   if (punkt.liste === 'kontoanalysen' && !punkt._frisch) {
     return (async () => {
       state.kontoAnalyseFehler = null;
+      const konto=window.Anmeldung?.nutzer?.()?.id || null;
       try {
         const r=await fetch('/api/kontoanalysen');const d=await r.json();
         if (!r.ok || !d?.zeitraeume) throw new Error('Analysen konnten nicht geladen werden.');
+        if((window.Anmeldung?.nutzer?.()?.id || null)!==konto)return;
         Analyse.zeilen(d);state.kontoAnalyse=d;
-      } catch(e) { state.kontoAnalyseFehler=e.message; }
+      } catch(e) {
+        if((window.Anmeldung?.nutzer?.()?.id || null)!==konto)return;
+        state.kontoAnalyseFehler=e.message;
+      }
+      if((window.Anmeldung?.nutzer?.()?.id || null)!==konto)return;
       openEinstellung({...punkt,_frisch:true});
     })();
   }
@@ -23424,8 +23432,10 @@ window.fetch = function(...args) {
 
 /* AF6 — private Kamera-Instants. Keine Fotos aus der Galerie. */
 async function instantApi(pfad, body) {
+    const konto = window.Anmeldung?.nutzer?.()?.id || null;
     const r = await fetch(pfad, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json();
+    if ((window.Anmeldung?.nutzer?.()?.id || null) !== konto) throw new Error('Konto wurde gewechselt. Bitte erneut öffnen.');
     if (!r.ok || d?.ok === false)
         throw new Error(d.error || 'Das hat nicht geklappt.');
     return d;

@@ -7,4 +7,6 @@ test('20:00.001 abgelehnt',()=>assert.match(R.pruefen(1200.001),/20 Minuten/));
 test('Zeitformat',()=>assert.equal(R.zeit(1200),'20:00'));
 test('Hälfte 10:00',()=>assert.equal(R.ziel(.5,1200),600));
 test('Sprung an Grenzen',()=>assert.deepEqual([R.ziel(-1,1200),R.ziel(2,1200)],[0,1200]));
+test('unbekannte Abspieldauer als 0:00',()=>assert.equal(R.zeit(Infinity),'0:00'));
+test('unbekannte Abspieldauer erlaubt keinen unendlichen Sprung',()=>assert.equal(R.ziel(.5,Infinity),0));
 console.log(`${n}/${n} Prüfungen bestanden`);

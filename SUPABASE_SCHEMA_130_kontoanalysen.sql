@@ -71,6 +71,48 @@ drop trigger if exists spalten_fest on public.konto_sichtungen;
 create trigger spalten_fest before update on public.konto_sichtungen for each row
 execute function public.spalten_fest('impression_id','post_id','zuschauer','tag','folgt','land','sichtungen','dauer_ms');
 
+-- Netto-Interaktionen ausschließlich ab Messbeginn, mit Serverzeit.
+-- Alte created_at-Werte (teils vom Client setzbar) werden nicht als Verlauf ausgegeben.
+create table if not exists public.konto_interaktionen (
+ art text not null, schluessel text not null,
+ post_id uuid not null references public.posts(id) on delete cascade,
+ akteur uuid not null references public.profiles(id) on delete cascade,
+ zeitpunkt timestamptz not null default now(), primary key(art,schluessel)
+);
+create index if not exists konto_interaktionen_post_zeit on public.konto_interaktionen(post_id,zeitpunkt);
+alter table public.konto_interaktionen enable row level security;
+revoke all on public.konto_interaktionen from public,anon,authenticated;
+drop policy if exists nur_freigegebene on public.konto_interaktionen;
+create policy nur_freigegebene on public.konto_interaktionen as restrictive for all to authenticated
+using((select public.konto_freigegeben())) with check((select public.konto_freigegeben()));
+drop trigger if exists spalten_fest on public.konto_interaktionen;
+create trigger spalten_fest before update on public.konto_interaktionen for each row
+execute function public.spalten_fest('art','schluessel','post_id','akteur','zeitpunkt');
+create or replace function public.konto_interaktion_messen() returns trigger
+language plpgsql security definer set search_path=public as $$
+declare alt jsonb;neu jsonb;k text;
+begin
+ if tg_op<>'INSERT' then
+  alt:=to_jsonb(old);k:=coalesce(alt->>'id',(alt->>'post_id')||':'||(alt->>'user_id'));
+  delete from public.konto_interaktionen where art=tg_table_name and schluessel=k;
+ end if;
+ if tg_op<>'DELETE' then
+  neu:=to_jsonb(new);k:=coalesce(neu->>'id',(neu->>'post_id')||':'||(neu->>'user_id'));
+  insert into public.konto_interaktionen(art,schluessel,post_id,akteur)
+  select tg_table_name,k,(neu->>'post_id')::uuid,(neu->>'user_id')::uuid
+  where exists(select 1 from public.posts p where p.id=(neu->>'post_id')::uuid and p.user_id<>(neu->>'user_id')::uuid)
+  on conflict(art,schluessel) do nothing;
+ end if;
+ return null;
+end $$;
+revoke execute on function public.konto_interaktion_messen() from public,anon,authenticated;
+do $$ declare t text;begin
+ foreach t in array array['post_likes','comments','saves','reposts'] loop
+ execute format('drop trigger if exists konto_interaktion_messen on public.%I',t);
+ execute format('create trigger konto_interaktion_messen after insert or delete or update of post_id,user_id on public.%I for each row execute function public.konto_interaktion_messen()',t);
+ end loop;
+end $$;
+
 create or replace function public.meine_kontoanalysen() returns jsonb
 language plpgsql stable security definer set search_path=public as $$
 declare ich uuid:=auth.uid(); tage int; ab date; fenster jsonb:='[]'; z jsonb;
@@ -85,10 +127,9 @@ begin
     coalesce(sum(b.sichtungen),0) as aufrufe,count(distinct b.zuschauer) as reichweite
     from eigen e left join basis b on b.post_id=e.id group by e.id,e.title,e.description),
   interaktionen as (
-    select l.user_id from public.post_likes l join eigen e on e.id=l.post_id where l.created_at>=ab::timestamptz and l.user_id<>ich
-    union all select c.user_id from public.comments c join eigen e on e.id=c.post_id where c.created_at>=ab::timestamptz and c.user_id<>ich
-    union all select s.user_id from public.saves s join eigen e on e.id=s.post_id where s.created_at>=ab::timestamptz and s.user_id<>ich
-    union all select r.user_id from public.reposts r join eigen e on e.id=r.post_id where r.created_at>=ab::timestamptz and r.user_id<>ich
+    select k.akteur from public.konto_interaktionen k join eigen e on e.id=k.post_id
+    where k.zeitpunkt >= (ab::timestamp at time zone 'UTC')
+
   )
   select jsonb_build_object('tage',tage,
     'reichweite',(select count(distinct zuschauer) from basis),

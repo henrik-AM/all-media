@@ -60,7 +60,7 @@ export const ChatListScreen = ({
    * hinter dem eingespeicherten Namen. Bis zum 01.09.2026 gab es sie
    * nirgends.
    */
-  const { insightStreaks, insights, neuLaden } = useDaten();
+  const { ichId, insightStreaks, insights, neuLaden } = useDaten();
   /*
    * „Vorschau anzeigen" aus den Einstellungen. Der Schalter stand seit Anfang
    * an in der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen
@@ -222,7 +222,7 @@ export const ChatListScreen = ({
     <View style={styles.container}>
       {/* Reihenfolge wie im Prototyp: Story-Leiste, Suche, Filter, Liste. */}
       <StoryRail stories={stories} onPress={onOpenStory} />
-      <InstantsBereich/>
+      <InstantsBereich key={ichId}/>
 
       <View style={styles.header}>
         <SearchBar

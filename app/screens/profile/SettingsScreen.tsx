@@ -630,8 +630,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      */
     if (art === 'kontoanalysen') {
       if(analyseFehler)return {leer:analyseFehler,zeilen:[]};
-      if(!analyse)return {leer:'Wird geladen …',zeilen:[]};
-      return {leer:'',zeilen:Analyse.zeilen(analyse)};
+      if(!analyse || analyse.konto!==ichId)return {leer:'Wird geladen …',zeilen:[]};
+      return {leer:'',zeilen:Analyse.zeilen(analyse.daten)};
     }
     if (art === 'insights') {
       if (!statistik) return { leer: 'Wird geladen …', zeilen: [] };
@@ -854,18 +854,18 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    * Die Statistik hinter "Insights". Sie stand bis zum 02.09.2026 in App und
    * Website als dieselben vier erfundenen Zahlen im Code.
    */
-  const [analyse,setAnalyse]=useState<unknown>(null);
+  const [analyse,setAnalyse]=useState<{konto:string;daten:unknown}|null>(null);
   const [analyseFehler,setAnalyseFehler]=useState('');
   useEffect(()=>{
     if(offen?.liste!=='kontoanalysen'||!supabase)return;
     let aktiv=true;setAnalyse(null);setAnalyseFehler('');
     supabase.rpc('meine_kontoanalysen').then(({data,error})=>{
       if(!aktiv)return;
-      try{if(error)throw error;Analyse.zeilen(data);setAnalyse(data);}
+      try{if(error)throw error;Analyse.zeilen(data);setAnalyse({konto:ichId,daten:data});}
       catch{setAnalyseFehler('Analysen konnten nicht geladen werden.');}
     },()=>{if(aktiv)setAnalyseFehler('Analysen konnten nicht geladen werden.');});
     return ()=>{aktiv=false;};
-  },[offen,supabase]);
+  },[offen,supabase,ichId]);
   const [statistik, setStatistik] = useState<Statistik | null>(null);
 
   /*
@@ -1001,7 +1001,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
   return (
     <View style={styles.screen}>
-      <EngeFreundeSheet visible={offen?.aktion === "engefreunde"} onClose={()=>setOffen(null)}/>
+      <EngeFreundeSheet key={ichId} visible={offen?.aktion === "engefreunde"} onClose={()=>setOffen(null)}/>
       {/*
         Einstellungen ist der einzige Bereich ohne obere Leiste (so steht es im
         Prototyp). Damit fehlt aber auch derjenige, der sonst den Platz für
