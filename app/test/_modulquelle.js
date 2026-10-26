@@ -187,6 +187,7 @@ const UMD_BAUSTEINE = [
   // (Kästen 28/10.2 und 16, Schema 99). Erstellen-Seiten in App und Website.
   ['erstellen', 'Erstellen'],
   ['reel', 'Reel'],
+  ['analyse', 'Analyse'],
 ];
 
 function umdTeile() {

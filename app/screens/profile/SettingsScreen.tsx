@@ -1,3 +1,4 @@
+import * as Analyse from '../../../gemeinsam/analyse';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -393,6 +394,7 @@ const SECTIONS: Section[] = [
       { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'videoPrivate' },
       SPENDENCODE,
       { label: 'Insights', icon: 'compass-outline', liste: 'insights' },
+      { label: 'Konto-Analysen', icon: 'analytics-outline', liste: 'kontoanalysen' },
       { label: 'Wem ich folge', icon: 'person-outline', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
       /*
@@ -623,6 +625,11 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * Aufgeteilt in drei Blöcke, weil eine Liste aus neun gleich aussehenden
      * Zeilen niemand liest.
      */
+    if (art === 'kontoanalysen') {
+      if(analyseFehler)return {leer:analyseFehler,zeilen:[]};
+      if(!analyse)return {leer:'Wird geladen …',zeilen:[]};
+      return {leer:'',zeilen:Analyse.zeilen(analyse)};
+    }
     if (art === 'insights') {
       if (!statistik) return { leer: 'Wird geladen …', zeilen: [] };
       const z = (n: number) => n.toLocaleString('de-DE');
@@ -844,6 +851,18 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    * Die Statistik hinter "Insights". Sie stand bis zum 02.09.2026 in App und
    * Website als dieselben vier erfundenen Zahlen im Code.
    */
+  const [analyse,setAnalyse]=useState<unknown>(null);
+  const [analyseFehler,setAnalyseFehler]=useState('');
+  useEffect(()=>{
+    if(offen?.liste!=='kontoanalysen'||!supabase)return;
+    let aktiv=true;setAnalyse(null);setAnalyseFehler('');
+    supabase.rpc('meine_kontoanalysen').then(({data,error})=>{
+      if(!aktiv)return;
+      try{if(error)throw error;Analyse.zeilen(data);setAnalyse(data);}
+      catch{setAnalyseFehler('Analysen konnten nicht geladen werden.');}
+    },()=>{if(aktiv)setAnalyseFehler('Analysen konnten nicht geladen werden.');});
+    return ()=>{aktiv=false;};
+  },[offen,supabase]);
   const [statistik, setStatistik] = useState<Statistik | null>(null);
 
   /*

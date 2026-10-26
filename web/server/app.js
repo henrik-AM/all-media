@@ -1548,6 +1548,12 @@ app.post('/api/vorschlaege/:userId/entfernen', route(async (req) => {
  * /api/insights — dort liegt das Snapchat-Aequivalent, ein voellig anderes
  * Ding mit demselben Namen im Handbuch.
  */
+app.get('/api/kontoanalysen', route(async (req) => {
+  const { data, error } = await req.db.rpc('meine_kontoanalysen');
+  if (error) throw error;
+  return data;
+}));
+
 app.get('/api/statistik', route(async (req) => ({
   ok: true,
   statistik: await supabaseApi.ladeStatistik(req.db, req.nutzerId),

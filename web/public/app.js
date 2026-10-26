@@ -9344,6 +9344,7 @@ const SETTINGS = [
       { label: 'Privates Profil', icon: 'lock', toggle: 'videoPrivate' },
       { label: 'Spenden-PIN', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Insights', icon: 'compass', liste: 'insights' },
+      { label: 'Konto-Analysen', icon: 'compass', liste: 'kontoanalysen' },
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
       /*
@@ -10368,6 +10369,11 @@ async function einstellungSetzen(punkt, wert) {
 
 /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
 function einstellungsListe(art) {
+  if (art === 'kontoanalysen') {
+    if (state.kontoAnalyseFehler) return {leer:state.kontoAnalyseFehler,zeilen:[]};
+    try { return {leer:'',zeilen:Analyse.zeilen(state.kontoAnalyse)}; }
+    catch { return {leer:'Analysen noch nicht verfügbar.',zeilen:[]}; }
+  }
   // Kasten RS 1 (L11): kein erfundenes Gerät, kein Knopf ohne Wirkung. Wie in der App.
   if (art === 'geraete') {
     return {
@@ -10579,6 +10585,17 @@ function openEinstellung(punkt, nachher) {
    * gerade im Feed etwas gespeichert hat, soll es hier sehen, ohne die Seite
    * neu zu laden. Ein offenes Blatt baut sich nicht von selbst neu auf.
    */
+  if (punkt.liste === 'kontoanalysen' && !punkt._frisch) {
+    return (async () => {
+      state.kontoAnalyseFehler = null;
+      try {
+        const r=await fetch('/api/kontoanalysen');const d=await r.json();
+        if (!r.ok || !d?.zeitraeume) throw new Error('Analysen konnten nicht geladen werden.');
+        Analyse.zeilen(d);state.kontoAnalyse=d;
+      } catch(e) { state.kontoAnalyseFehler=e.message; }
+      openEinstellung({...punkt,_frisch:true});
+    })();
+  }
   if (punkt.liste === 'verlauf' && !punkt._frisch) {
     return fetch('/api/verlauf')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))

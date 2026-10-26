@@ -685,3 +685,6 @@ mit `telefonbuch_schluessel()` (42501). Alte 95 nicht erneut einspielen: öffnet
 
 ## Schema 129 — AF3 Negativreaktionen (Paket 9)
 Nach 128: `SUPABASE_SCHEMA_129_video_negativ.sql` (Entwurf 108 aus dem Sammelzweig, auf main-Stand gebracht). Ersetzt `feed_rang`. Private Negativreaktionen, atomarer Ausschluss von Likes, Faktoren 0,02 / 0,3 / 0,5.
+
+## Schema 130 — AF7 Kontoanalysen (Paket 9)
+Nach 129: `SUPABASE_SCHEMA_130_kontoanalysen.sql` (Entwurf 110). Neue private Messung ab Einspielung; Follower/Vorwahl-Snapshot je Tageszeile, nur eigene Aggregate. Neue Tabellen nur Trigger/RPC, keine direkten Clientrechte.
