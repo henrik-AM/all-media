@@ -5571,41 +5571,67 @@ function renderVideoFeed() {
  * Video ohne Zutun des Nutzers nur stumm starten, mit Ton wuerde die
  * Wiedergabe abgelehnt und die Flaeche bliebe stehen.
  */
+let reelsStoppen = () => {};
 function reelsBeobachten() {
+  reelsStoppen();
   const spieler = [...main.querySelectorAll('.slide__stage video')];
   if (!spieler.length) return;
-
+  const feed = document.getElementById('feed');
+  const vonSelbst = !schalterAn('datensparen');
   spieler.forEach((v) => { v.muted = tonAus; });
 
-  /*
-   * „Datensparen" aus den Einstellungen. Der Schalter stand seit Anfang an in
-   * der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen hat
-   * (Audit vom 17.09.2026, Befund 1). Ist er an, startet kein Video von
-   * selbst — angetippt laeuft es weiterhin, die Wahl bleibt beim Nutzer.
-   * Gleiche Regel in app/components/Videoflaeche.tsx.
-   */
-  const vonSelbst = !schalterAn('datensparen');
-
-  const beobachter = new IntersectionObserver(
-    (eintraege) => {
-      eintraege.forEach((e) => {
-        const v = e.target;
-        if (e.isIntersecting && e.intersectionRatio > 0.6) {
-          if (vonSelbst) v.play().catch(() => {});
-        } else {
-          v.pause();
-          v.currentTime = 0;
+  // Ohne src kann ein unsichtbarer Spieler auch nicht weiter puffern.
+  // preload="none" allein ist nur ein Hinweis an den Browser.
+  const laden = (v) => {
+    if (!v.hasAttribute('src')) v.src = v.dataset.quelle;
+  };
+  const entladen = (v) => {
+    v.pause();
+    if (v.hasAttribute('src')) {
+      v.removeAttribute('src');
+      v.load();
+    }
+  };
+  const beobachter = new IntersectionObserver((eintraege) => {
+    // Zuerst alte Quellen entfernen, dann die neue starten.
+    eintraege.filter((e) => !e.isIntersecting || e.intersectionRatio <= 0.6)
+      .forEach((e) => entladen(e.target));
+    eintraege.filter((e) => e.isIntersecting && e.intersectionRatio > 0.6)
+      .forEach((e) => {
+        if (vonSelbst && !document.hidden) {
+          laden(e.target);
+          e.target.play().catch(() => {});
         }
       });
-    },
-    { threshold: [0, 0.6, 1] }
-  );
-  spieler.forEach((v) => beobachter.observe(v));
-
-  /* Antippen haelt an und laesst weiterlaufen. */
-  spieler.forEach((v) =>
-    v.addEventListener('click', () => (v.paused ? v.play().catch(() => {}) : v.pause()))
-  );
+  }, { root: feed, threshold: [0, 0.6, 1] });
+  spieler.forEach((v) => {
+    beobachter.observe(v);
+    v.addEventListener('click', () => {
+      if (v.paused) {
+        laden(v);
+        v.play().catch(() => {});
+      } else v.pause();
+    });
+  });
+  const sichtbarkeit = () => {
+    if (document.hidden) spieler.forEach(entladen);
+    else {
+      // Nach Rückkehr Sichtbarkeit neu messen; Datensparen bleibt wirksam.
+      spieler.forEach((v) => { beobachter.unobserve(v); beobachter.observe(v); });
+    }
+  };
+  document.addEventListener('visibilitychange', sichtbarkeit);
+  const wechsel = new MutationObserver(() => {
+    if (!feed?.isConnected) reelsStoppen();
+  });
+  wechsel.observe(main, { childList: true });
+  reelsStoppen = () => {
+    beobachter.disconnect();
+    wechsel.disconnect();
+    document.removeEventListener('visibilitychange', sichtbarkeit);
+    spieler.forEach(entladen);
+    reelsStoppen = () => {};
+  };
 }
 
 /*
@@ -5638,7 +5664,7 @@ function videoSlide(v) {
     <section class="slide" id="slide-${v.id}" data-impression="${v.id}" data-impressionsquelle="reels">
       <div class="slide__stage" data-reelflaeche="${v.id}">${
         istVideoAdresse(v.mediaUrl)
-          ? videoElement(`reel-${v.id}`, v.mediaUrl, v.thumbnail, 'loop muted')
+          ? videoElement(`reel-${v.id}`, v.mediaUrl, v.thumbnail, 'loop muted', true)
           : medienFlaeche(v.id, ICONS.play, v.mediaUrl, v.thumbnail)
       }
         <span class="slide__herz" aria-hidden="true">${ICONS.heart}</span>
@@ -15105,10 +15131,10 @@ function istVideoAdresse(adresse) {
  * iPhone Pflicht — ohne das reisst Safari jedes Video ins Vollbild, sobald
  * man auf Wiedergabe drueckt.
  */
-function videoElement(kennung, adresse, standbild, zusatz = '') {
-  return `<video id="${kennung}" class="medienvideo" src="${esc(adresse)}"` +
+function videoElement(kennung, adresse, standbild, zusatz = '', spaeter = false) {
+  return `<video id="${kennung}" class="medienvideo" ${spaeter ? 'data-quelle' : 'src'}="${esc(adresse)}"` +
     (standbild ? ` poster="${esc(standbild)}"` : '') +
-    ` playsinline preload="metadata" ${zusatz}></video>`;
+    ` playsinline preload="${spaeter ? 'none' : 'metadata'}" ${zusatz}></video>`;
 }
 
 /* ------------------------------------------------------ Formular-Blatt */

@@ -67,6 +67,7 @@ const NAME = process.env.AM_TEST_NAME || 'prueflauf';
  * Lauf diese Datei vor oder nach playwright einbindet.
  */
 const { chromium } = require('playwright-core');
+const { medienEgressSchuetzen } = require('./_medien_egressschutz');
 
 /** Warten, bis die Oberflaeche steht und Daten da sind. Nie werfen. */
 async function inhaltAbwarten(page) {
@@ -110,12 +111,15 @@ if (!chromium.__geruestet) {
   chromium.launch = async (...args) => {
     const browser = await echtStarten(...args);
 
+    // Cloud-Medien in Prüfbrowsern vor dem Download sperren.
+    // Lokale Testmedien bleiben erreichbar; kein automatisches Nachfüllen.
     const echtSeite = browser.newPage.bind(browser);
-    browser.newPage = async (...a) => geruestet(await echtSeite(...a));
+    browser.newPage = async (...a) =>
+      geruestet(await medienEgressSchuetzen(await echtSeite({ ...a[0], serviceWorkers: 'block' })));
 
     const echtKontext = browser.newContext.bind(browser);
     browser.newContext = async (...a) => {
-      const kontext = await echtKontext(...a);
+      const kontext = await medienEgressSchuetzen(await echtKontext({ ...a[0], serviceWorkers: 'block' }));
       const echtKontextSeite = kontext.newPage.bind(kontext);
       kontext.newPage = async (...b) => geruestet(await echtKontextSeite(...b));
       return kontext;

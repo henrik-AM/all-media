@@ -934,7 +934,7 @@ function spalteFehlt(fehler) {
  * der die Zahl aus den Beispielinhalten trägt. Ein neu angelegter Beitrag hat
  * Sockel 0, dort ist jede Zahl vollständig echt.
  */
-async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {}) {
+async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurIds = null } = {}) {
   if (!client) return null;
 
   let abfrage = client
@@ -945,6 +945,10 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200 } = {
     .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
     .order('created_at', { ascending: false })
     .limit(limit);
+  if (nurIds) {
+    if (!nurIds.length) return [];
+    abfrage = abfrage.in('id', nurIds);
+  }
   if (arten && arten.length > 0) abfrage = abfrage.in('kind', arten);
 
   const { data, error } = await abfrage;

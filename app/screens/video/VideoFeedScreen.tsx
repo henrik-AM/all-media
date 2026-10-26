@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
   Dimensions,
   FlatList,
   GestureResponderEvent,
@@ -115,8 +116,9 @@ export const VideoFeedScreen = ({
    * man hoert sie uebereinander.
    */
   const [sichtbar, setSichtbar] = useState<string | null>(null);
-  /* Angehalten durch Antippen. Beim Weiterwischen faengt das naechste an. */
-  const [pause, setPause] = useState(false);
+  const { an } = useEinstellungen();
+  const datensparen = an('datensparen');
+  const [pause, setPause] = useState(datensparen);
   /*
    * „Datensparen" aus den Einstellungen. Der Schalter stand seit Anfang an in
    * der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen hat
@@ -124,8 +126,6 @@ export const VideoFeedScreen = ({
    * selbst: das naechste steht angehalten da, ein Tippen laesst es laufen.
    * Gleiche Regel in web/public/app.js (videoAutomatik).
    */
-  const { an } = useEinstellungen();
-  const datensparen = an('datensparen');
 
   /*
    * Die beiden Gesten aus dem Handbuch, plus die von Henrik gewuenschte
@@ -186,8 +186,8 @@ export const VideoFeedScreen = ({
   // Beim ersten Aufbau ist noch nichts gescrollt, also meldet die Liste auch
   // nichts — ohne diese Zeile bliebe das oberste Reel stehen.
   useEffect(() => {
-    if (!sichtbar && sichtbareVideos.length) setSichtbar(sichtbareVideos[0].id);
-  }, [sichtbar, sichtbareVideos]);
+    if (!sichtbar && sichtbareVideos.length) setSichtbar(startBei ?? sichtbareVideos[0].id);
+  }, [sichtbar, sichtbareVideos, startBei]);
 
   const measure = (event: LayoutChangeEvent) => setSlideHeight(event.nativeEvent.layout.height);
 
@@ -313,7 +313,21 @@ export const VideoFeedScreen = ({
     }
   };
 
-  const renderVideo = ({ item }: { item: Video }) => {
+  // Auch im Hintergrund darf der native Player nicht weiter puffern.
+  const [aktiv, setAktiv] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const horcher = AppState.addEventListener('change', (zustand) => setAktiv(zustand === 'active'));
+    return () => horcher.remove();
+  }, []);
+
+  // Nur das sichtbare Reel laden. Auch pausierte Nachbarn puffern sonst.
+  // Beim Sprung aus dem Profil gilt zuerst das gewünschte Ziel.
+  const sichtbarStelle = Math.max(
+    0,
+    sichtbareVideos.findIndex((v) => v.id === (startBei ?? sichtbar))
+  );
+
+  const renderVideo = ({ item, index }: { item: Video; index: number }) => {
     const author = alleNutzer[item.userId];
 
     return (
@@ -331,7 +345,8 @@ export const VideoFeedScreen = ({
             id={item.id}
             quelle={item.mediaUri}
             standbild={item.standbild}
-            laeuft={sichtbar === item.id && !pause}
+            laeuft={aktiv && index === sichtbarStelle && !pause}
+            laden={aktiv && index === sichtbarStelle && (!datensparen || !pause)}
             stumm={false}
             /* Reels laufen in Schleife — wie im Prototyp und ueberall sonst. */
             schleife

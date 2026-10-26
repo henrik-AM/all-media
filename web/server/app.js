@@ -330,10 +330,11 @@ function antwort(ergebnis, zusatz = {}) {
   return { ok: true, ...ergebnis, ...zusatz };
 }
 
-/** Einen einzelnen Beitrag frisch aus der Datenbank holen. */
+/** Einen Beitrag laden, nicht zweimal 500 je Like (Egress-Sperre 10.10.). */
 async function beitrag(req, id) {
-  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
-  return alle.find((b) => b.id === id) || null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''))) return null;
+  const treffer = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 1, nurIds: [id] });
+  return (treffer || []).find((b) => b.id === id) || null;
 }
 
 // ============================================================================

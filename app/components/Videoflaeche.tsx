@@ -78,6 +78,13 @@ interface Props {
    * Der Story-Balken einer 5-s-Story sprang sonst in fünf Stufen.
    */
   genau?: boolean;
+  /**
+   * Darf das Video überhaupt geladen werden? Ohne Quelle zeigt die Fläche nur
+   * das Standbild. Der Video-Feed hält so nur das sichtbare Reel geladen: Ein angehaltener Spieler puffert trotzdem, und die
+   * Liste hielt bis zu 21 davon gleichzeitig. Das ist Datenverkehr, den
+   * Supabase als Egress zählt (Sperre vom 10.10.2026).
+   */
+  laden?: boolean;
 }
 
 export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflaeche(
@@ -97,18 +104,20 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
     onEnde,
     onFehler,
     genau = false,
+    laden = true,
   },
   ref
 ) {
   // Ganze Sekunden für Zeitanzeigen, Viertelsekunden für den Story-Balken.
   const runden = (wert: number) => (genau ? Math.round(wert * 4) / 4 : Math.floor(wert));
-  const spielbar = istVideo(quelle);
+  const spielbar = istVideo(quelle) && laden;
   /*
    * Ein Video, das sich nicht laden lässt, darf nicht als schwarze Fläche
    * stehen bleiben. Dann tritt das Standbild an seine Stelle — sichtbar ist
    * dasselbe wie vorher, nur ohne Wiedergabe.
    */
   const [fehler, setFehler] = useState(false);
+  useEffect(() => { setFehler(false); }, [quelle, laden]);
 
   /*
    * useVideoPlayer ist ein Hook und muss deshalb bei jedem Aufbau laufen,
@@ -191,7 +200,8 @@ export const Videoflaeche = forwardRef<VideoSteuerung, Props>(function Videoflae
     return (
       <Motiv
         id={id}
-        bild={standbild ?? quelle}
+        // Ein zurückgehaltenes Video gehört nicht in ein Bild.
+        bild={laden ? standbild ?? quelle : standbild}
         icon={icon}
         iconSize={iconSize}
         dunkel={dunkel}
