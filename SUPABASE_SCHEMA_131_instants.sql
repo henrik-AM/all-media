@@ -1,5 +1,18 @@
 -- AF6 / Schema 111 — ENTWURF. Nach 110 und 107 (Medienbesitzerprüfung).
 -- Kamera-Instants für festgeschriebene Enge Freunde; kein Jahresarchiv.
+-- B2: Vorgabe bis Henriks Entscheidung. Zentral rückbaubar; nie nur Clientfilter.
+-- Schema 52/58 entscheiden die Freigabe beider Konten; Schema 57 den Kontakt.
+create or replace function public.instant_beziehung_erlaubt(p_freund uuid) returns boolean
+language sql stable security definer set search_path=public as $$
+ select auth.uid() is not null and p_freund<>auth.uid()
+ and public.konto_freigegeben() and public.profil_freigegeben(p_freund)
+ and not public.blockiert_zwischen(auth.uid(),p_freund)
+ and (public.messenger_erlaubt(auth.uid(),p_freund) or (
+ exists(select 1 from public.follows where follower_id=auth.uid() and followee_id=p_freund)
+ and exists(select 1 from public.follows where follower_id=p_freund and followee_id=auth.uid())));
+$$;
+revoke execute on function public.instant_beziehung_erlaubt(uuid) from public,anon;
+grant execute on function public.instant_beziehung_erlaubt(uuid) to authenticated;
 create table if not exists public.enge_freunde (
  user_id uuid not null references public.profiles(id) on delete cascade,
  freund_id uuid not null references public.profiles(id) on delete cascade,
@@ -10,8 +23,7 @@ revoke all on public.enge_freunde from public,anon,authenticated;
 grant select,insert,delete on public.enge_freunde to authenticated;
 drop policy if exists eigene on public.enge_freunde;
 create policy eigene on public.enge_freunde for all to authenticated using(user_id=auth.uid())
-with check(user_id=auth.uid() and not public.blockiert_zwischen(user_id,freund_id)
- and public.profil_freigegeben(freund_id) and exists(select 1 from public.profiles where id=freund_id));
+with check(user_id=auth.uid() and public.instant_beziehung_erlaubt(freund_id));
 
 create table if not exists public.instants (
  id uuid primary key default gen_random_uuid(),
@@ -37,7 +49,7 @@ language sql stable security definer set search_path=public as $$
  and public.profil_freigegeben(i.absender)
  and (i.absender=auth.uid() or exists(select 1 from public.instant_empfaenger e
  where e.instant_id=i.id and e.empfaenger=auth.uid() and e.geoeffnet_at is null
- and not public.blockiert_zwischen(i.absender,e.empfaenger))));
+ and public.instant_beziehung_erlaubt(i.absender))));
 $$;
 revoke execute on function public.instant_zugang(uuid) from public,anon;
 grant execute on function public.instant_zugang(uuid) to authenticated;
@@ -80,8 +92,7 @@ end $$;
 create or replace function public.instant_empfaenger_liste() returns setof uuid
 language sql stable security definer set search_path=public as $$
  select f.freund_id from public.enge_freunde f where f.user_id=auth.uid()
- and public.konto_freigegeben() and public.profil_freigegeben(f.freund_id)
- and not public.blockiert_zwischen(auth.uid(),f.freund_id)
+ and public.instant_beziehung_erlaubt(f.freund_id)
  and not exists(select 1 from public.user_settings s where s.user_id=f.freund_id
  and s.schluessel='instantsEmpfangen' and s.wert='aus');
 $$;
@@ -112,7 +123,7 @@ begin
   perform public.mitteilung_anlegen(an,ich,'instant','videos','instant',neu);
   menge:=menge+1;
  end loop;
- if menge=0 then raise exception 'Lege zuerst Enge Freunde an (mit Empfangsfreigabe).';end if;
+ if menge=0 then raise exception 'Keine berechtigten Empfänger. Prüfe deine Enge-Freunde-Liste.';end if;
  return neu;
 end $$;
 revoke execute on function public.instant_senden(text,text) from public,anon;
@@ -221,8 +232,7 @@ create or replace function public.enge_freunde_suche(p_suche text) returns table
 language sql stable security invoker set search_path=public as $$
  select p.id,p.name,p.handle from public.profiles p where length(trim(p_suche))>=2
  and p.name ilike '%'||replace(replace(left(trim(p_suche),80),'%','\%'),'_','\_')||'%'
- and p.id<>auth.uid() and public.profil_freigegeben(p.id)
- and not public.blockiert_zwischen(auth.uid(),p.id) order by p.name,p.id limit 20;
+ and public.instant_beziehung_erlaubt(p.id) order by p.name,p.id limit 20;
 $$;
 revoke execute on function public.enge_freunde_suche(text) from public,anon;
 grant execute on function public.enge_freunde_suche(text) to authenticated;

@@ -213,7 +213,7 @@ begin
   perform public.mitteilung_anlegen(an,ich,'instant','videos','instant',neu);
   menge:=menge+1;
  end loop;
- if menge=0 then raise exception 'Lege zuerst Enge Freunde an (mit Empfangsfreigabe).';end if;
+ if menge=0 then raise exception 'Keine berechtigten Empfänger. Prüfe deine Enge-Freunde-Liste.';end if;
  return neu;
 end $$;
 revoke execute on function public.instant_senden(text,text) from public,anon;

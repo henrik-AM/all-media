@@ -1,0 +1,25 @@
+const S=require('./_af_fix_sql'),{id,schema,check,deny,als,admin,konto}=S;
+const A=id(1),B=id(2),C=id(3),W=id(4),K=id(5),pfad=`instants/${A}/probe.jpg`;
+let sql=S.anfang();for(const n of [89,90,94,97,98,99,107,109,110,111,113])sql+=schema(n,true);
+for(const n of [1,2,3])sql+=konto(n);sql+=konto(4,'wartet','2020-01-01')+konto(5,'frei','2013-01-01');
+sql+=`insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values('media','${pfad}','${A}','${A}','{"size":1000,"mimetype":"image/jpeg"}');`;
+sql+=als(A,`insert into public.enge_freunde(user_id,freund_id) values(auth.uid(),'${B}');v:=public.instant_senden('${pfad}','Vorher');perform set_config('probe.alt_instant',v::text,true);`+check('B2_vorher_Fremdzustellung_belegt',`v is not null`));
+sql+=schema(111)+schema(113);
+sql+=als(A,deny('B2_nachher_Fremden_eintragen_zu',`insert into public.enge_freunde(user_id,freund_id) values(auth.uid(),'${C}')`)+check('B2_nachher_Suche_ohne_Beziehung_leer',`not exists(select 1 from public.enge_freunde_suche('AF Fix'))`));
+sql+=als(B,check('B2_nachher_Altinstant_nicht_lesbar',`not public.instant_zugang(current_setting('probe.alt_instant')::uuid)`));
+sql+=`delete from public.instants where id=current_setting('probe.alt_instant')::uuid;`;
+sql+=als(A,deny('B2_nachher_Altlisten_Senden_zu',`perform public.instant_senden('${pfad}','Nachher')`));
+sql+=`insert into public.follows(follower_id,followee_id) values('${A}','${B}');`;
+sql+=als(A,check('B2_einseitiges_Folgen_reicht_nicht',`not public.instant_beziehung_erlaubt('${B}')`));
+sql+=`insert into public.follows(follower_id,followee_id) values('${B}','${A}'),('${A}','${W}'),('${W}','${A}'),('${A}','${K}'),('${K}','${A}');`;
+sql+=als(A,check('B2_gegenseitig_erlaubt',`public.instant_beziehung_erlaubt('${B}')`)+check('B2_Suche_nur_berechtigte',`exists(select 1 from public.enge_freunde_suche('AF Fix') where id='${B}') and not exists(select 1 from public.enge_freunde_suche('AF Fix') where id='${C}')`)+check('B2_wartendes_Kind_gesperrt',`not public.instant_beziehung_erlaubt('${W}')`)+check('B2_freigegebenes_Kind_erlaubt',`public.instant_beziehung_erlaubt('${K}')`)+deny('B2_wartendes_Kind_Liste_zu',`insert into public.enge_freunde(user_id,freund_id) values(auth.uid(),'${W}')`)+`v:=public.instant_senden('${pfad}','Zweite');`);
+sql+=als(W,check('B2_wartender_Absender_gesperrt',`not public.instant_beziehung_erlaubt('${A}')`));
+// Kontakt nach Schema 57: Nummernanfrage ist angenommen, kein bloßer fremder Listeneintrag.
+sql+=`insert into public.contacts(user_id,contact_id,status) values('${A}','${C}','friend');`;
+sql+=als(A,check('B2_Kontakt_nach_57_erlaubt',`public.instant_beziehung_erlaubt('${C}')`)+`insert into public.enge_freunde(user_id,freund_id) values(auth.uid(),'${C}');`+check('B2_Kontakt_in_Liste',`exists(select 1 from public.enge_freunde where freund_id='${C}')`));
+sql+=`delete from public.follows where follower_id='${B}' and followee_id='${A}';`;
+sql+=als(A,check('B2_Entfolgen_widerruft_Altlistenrecht',`not public.instant_beziehung_erlaubt('${B}')`));
+sql+=`insert into public.blocks(user_id,blocked_user_id) values('${C}','${A}');`;
+sql+=als(A,check('B2_Blockierung_hat_Vorrang',`not public.instant_beziehung_erlaubt('${C}')`));
+sql+=admin(check('B2_anon_Helfer_gesperrt',`not has_function_privilege('anon','public.instant_beziehung_erlaubt(uuid)','EXECUTE')`));
+S.ausfuehren(sql).catch(e=>{console.error(e.message);process.exitCode=1;});

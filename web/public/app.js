@@ -23487,7 +23487,7 @@ setInterval(() => { if (!document.hidden && state.area === 'messenger' && sub() 
 function openEngeFreunde(nachher) {
     let lauf = 0, uhr;
     const stateF = { freunde: [], vorschlaege: [] };
-    return openSheet('Enge Freunde', `<div class="sheet__body" style="padding:16px"><p>Deine Liste ist privat · <span id="efZahl">0</span> Personen</p><input class="instant-feld" id="efSuche" type="search" placeholder="Nach Namen suchen (mindestens 2 Zeichen)" aria-label="Enge Freunde suchen"><p role="alert" id="efFehler"></p><div id="efListe">Wird geladen …</div></div>`, (sheet) => {
+    return openSheet('Enge Freunde', `<div class="sheet__body" style="padding:16px"><p>Deine Liste ist privat · <span id="efZahl">0</span> Personen</p><p>${esc(Instants.FREUNDE_HINWEIS)}</p><input class="instant-feld" id="efSuche" type="search" placeholder="Nach Namen suchen (mindestens 2 Zeichen)" aria-label="Enge Freunde suchen"><p role="alert" id="efFehler"></p><div id="efListe">Wird geladen …</div></div>`, (sheet) => {
         const suche = sheet.querySelector('#efSuche');
         const laden = async () => {
             const nr = ++lauf;

@@ -11,3 +11,5 @@ export function sichtbar(i: {
     blockiert?: boolean;
     expires_at: string;
 }, jetzt?: number): boolean;
+
+export const FREUNDE_HINWEIS: string;

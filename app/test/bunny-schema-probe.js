@@ -32,6 +32,7 @@ insert into storage.objects(id,bucket_id,name,owner_id,metadata) values
 ('${id(30)}','media','posts/${A}-alt.jpg','${A}','{"size":200,"mimetype":"image/jpeg"}'),
 ('${id(31)}','media','${getarnt}','${A}','{"size":1000,"mimetype":"video/mp4"}'),
 ('${id(32)}','media','${bild}','${B}','{"size":200,"mimetype":"image/jpeg"}');\n`;
+sql+=`insert into public.follows(follower_id,followee_id) values('${A}','${B}'),('${B}','${A}');`;
 sql+=als(A,
  check('eigener_bunny_besitz',`public.medium_besitzer_stimmt('${bild}',auth.uid())`)+
  check('bunny_leseliste_eigen',`(select anbieter='bunny' from public.medien_leseliste(array['${bild}']))`)+

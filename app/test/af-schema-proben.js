@@ -68,6 +68,7 @@ if(nr===110){
  sql+=als(W,deny('wartend_Analyse_zu',`perform public.meine_kontoanalysen()`)+deny('wartend_messen_zu',`perform public.impression_vermerken('${P}',1000,'feed')`));
 }
 if(nr===111){
+ sql+=`insert into public.follows(follower_id,followee_id) values('${A}','${B}'),('${B}','${A}'),('${A}','${C}'),('${C}','${A}');`;
  const pfad=`instants/${A}/probe.jpg`;
  sql+=owner(check('anon_Instant_zu',`not has_function_privilege('anon','public.instant_senden(text,text)','EXECUTE')`)+check('aufräumer_nur_dienst',`not has_function_privilege('authenticated','public.instant_loeschkandidaten()','EXECUTE')`));
  sql+=`insert into storage.objects(bucket_id,name,owner_id,metadata) values('media','${pfad}','${A}','{"size":1234,"mimetype":"image/jpeg"}');`;

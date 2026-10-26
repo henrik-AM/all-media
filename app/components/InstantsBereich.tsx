@@ -51,6 +51,7 @@ export function EngeFreundeSheet({ visible, onClose }: {
     return <SheetRahmen visible={visible} title="Enge Freunde" onClose={onClose} hoch>
   <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
    <Text style={{ color: colors.text }}>Deine Liste ist privat · {daten.freunde.length} Personen</Text>
+   <Text style={{ color: colors.text }}>{I.FREUNDE_HINWEIS}</Text>
    <TextInput style={feld} value={suche} onChangeText={setSuche} placeholder="Nach Namen suchen (mindestens 2 Zeichen)" accessibilityLabel="Enge Freunde suchen"/>
    {!!fehler && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{fehler}</Text>}
    {laden && <Text style={{ color: colors.text }}>Wird geladen …</Text>}
