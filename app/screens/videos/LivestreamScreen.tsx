@@ -12,6 +12,9 @@ import { ladeSpendenSumme, ladeStreamKommentare } from '../../lib/daten';
 import * as Aktion from '../../lib/aktionen';
 import { LiveAntwortLeiste, LiveKommentarZeile } from '../../components/LiveAntwort';
 
+// Spendentexte („vorgemerkt, nicht bezahlt“) — einmal für App und Website.
+const Spende = require('../../../gemeinsam/spende') as typeof import('../../../gemeinsam/spende');
+
 interface Props {
   /** Nach dem Ende — ob die Aufzeichnung veroeffentlicht oder geloescht wurde. */
   onEnd: (veroeffentlicht: boolean) => void;
@@ -281,11 +284,10 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
           </Text>
           {/* Spenden waehrend des Streams — das Handbuch nennt sie
               ausdruecklich ("Geld senden/spenden -> bei Spendenlinks und
-              Livestreams"). Der Betrag steht in Euro, gerechnet wird in Cent. */}
+              Livestreams"). Der Betrag steht in Euro, gerechnet wird in Cent.
+              Ohne Zahlungsdienst nur vorgemerkt, nie als echtes Geld. */}
           {spenden > 0 && (
-            <Text style={styles.spenden}>
-              {(spenden / 100).toFixed(2).replace('.', ',')} € gespendet
-            </Text>
+            <Text style={styles.spenden}>{Spende.liveText(spenden)}</Text>
           )}
         </View>
         {vorbei ? (

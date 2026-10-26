@@ -16437,6 +16437,7 @@ function spendenweg(anfrage, bereich) {
  * (/api/spendenstand → spendenstand(), SUPABASE_SCHEMA_71_spendenziel.sql).
  * Rechnung und Texte: gemeinsam/spende.js, wie in app/components/SpendeKarte.tsx.
  * Zahlungsmethode und Spenden-Code: Kasten 13.
+ * Ohne Zahlungsdienst heißt alles „vorgemerkt, nicht bezahlt" (Offene Punkte 0c).
  */
 function spendeKarte(spende, userId, name) {
   const stand = Spende.stand(spende, null);
@@ -16479,7 +16480,7 @@ async function openSpendenziel(spende, userId, name) {
        <div class="spendeziel__titel">${esc(stand.titel)}</div>
        ${stand.text ? `<div class="spendeziel__text">${esc(stand.text)}</div>` : ''}
        <div class="spendeziel__zeilen">
-         ${zeile('Erreicht', Spende.euro(stand.erreicht))}
+         ${zeile('Vorgemerkt', Spende.euro(stand.erreicht))}
          ${zeile('Ziel', stand.ziel > 0 ? Spende.euro(stand.ziel) : 'ohne festes Ziel')}
          ${stand.prozent !== null ? zeile('Fortschritt', `${stand.prozent} %`) : ''}
          ${zeile('Spender', stand.spender === null ? (eigen ? '–' : 'nur für dich sichtbar') : String(stand.spender))}
@@ -16487,6 +16488,7 @@ async function openSpendenziel(spende, userId, name) {
        </div>
        ${stand.prozent !== null ? `<div class="spende__balken"><div class="spende__fuellung" style="width:${stand.prozent}%"></div></div>` : ''}
        <div class="spende__zahlen">${esc(stand.spender === null ? stand.zahlenText : `${stand.zahlenText} · ${stand.spenderText}`)}</div>
+       <div class="spendeziel__hinweis" data-nicht-bezahlt>${esc(Spende.HINWEIS)}</div>
      </div>
      <div class="sheet__footer">
        <button class="btn btn--primary" id="spendeKnopf" ${gesperrt ? 'disabled' : ''}>Spenden</button>
@@ -16521,7 +16523,7 @@ function openSpende(empfaengerId, postId) {
   // Kasten 13: jede Spende läuft durch den Spendenweg (Methode, Code).
   const buchen = async (cent) => {
     const ok = await spendenweg({ empfaengerId, name, cent, postId });
-    if (ok) toast(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${name} gespendet`);
+    if (ok) toast(Spende.bestaetigung(cent, name));
   };
   openSheet(
     `An ${name} spenden`,

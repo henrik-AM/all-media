@@ -25,6 +25,8 @@ export interface SpendeBuchung {
   spender: number;
 }
 
+/** „Vorgemerkt, nicht bezahlt …“ — solange kein Zahlungsdienst angeschlossen ist. */
+export const HINWEIS: string;
 export function euroAus(text: unknown): number;
 export function fristAus(text: unknown): string | null;
 export function ausFormular(
@@ -34,4 +36,6 @@ export function ausFormular(
 export function lesen(roh: unknown): SpendeGespeichert | null;
 export function euro(betrag: number): string;
 export function stand(spende: unknown, buchung: SpendeBuchung | null, jetzt?: number): SpendeStand | null;
+export function bestaetigung(cent: number, name: string): string;
+export function liveText(cent: number): string;
 export function centAus(text: unknown): number | null;

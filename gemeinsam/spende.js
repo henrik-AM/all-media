@@ -29,6 +29,16 @@
  * Schema 71, weil `donations` nur für die beiden
  * Beteiligten lesbar ist — ein Besucher des Profils sähe sonst nichts.
  *
+ * VORGEMERKT, NICHT BEZAHLT (26.10.2026)
+ *
+ * Es ist noch kein Zahlungsdienst angeschlossen: `spende_senden()` legt nur
+ * eine Zeile in `donations` an, belastet wird nichts. Mit einem Zweitkonto
+ * ließe sich der Stand beliebig hochtreiben (Offene Punkte 0c, „Spendenstand
+ * fälschbar"). Bis ein Zahlungsdienst `zahlungsstatus = 'bezahlt'` setzt,
+ * darf der Stand nicht wie echtes Geld aussehen. Darum stehen alle Texte
+ * dazu hier, und überall heißt es „vorgemerkt", nie „gesammelt" oder
+ * „gespendet" — App und Website lesen dieselben Wörter.
+ *
  * UMD-Hülle wie in rang.js; Eintrag in UMD_BAUSTEINE
  * (app/test/_modulquelle.js).
  */
@@ -143,6 +153,10 @@
     };
   }
 
+  /** Unter Karte und Detailblatt — solange kein Zahlungsdienst angeschlossen ist. */
+  const HINWEIS =
+    'Vorgemerkt, nicht bezahlt: Es ist noch kein Zahlungsdienst angeschlossen, es ist kein Geld geflossen.';
+
   /** 1234.5 → „1.234,50 €", 500 → „500 €". */
   function euro(betrag) {
     const n = Number(betrag) || 0;
@@ -191,13 +205,25 @@
       spender: buchung ? Number(buchung.spender || 0) : null,
       fristText,
       abgelaufen,
-      zahlenText: s.ziel > 0 ? `${euro(erreicht)} von ${euro(s.ziel)} gesammelt` : `${euro(erreicht)} gesammelt`,
+      zahlenText:
+        (s.ziel > 0 ? `${euro(erreicht)} von ${euro(s.ziel)} vorgemerkt` : `${euro(erreicht)} vorgemerkt`) +
+        ' · nicht bezahlt',
       spenderText: buchung
         ? Number(buchung.spender || 0) === 1
-          ? '1 Person hat gespendet'
-          : `${Number(buchung.spender || 0)} Personen haben gespendet`
+          ? '1 Person hat vorgemerkt'
+          : `${Number(buchung.spender || 0)} Personen haben vorgemerkt`
         : 'Spender werden gezählt …',
     };
+  }
+
+  /** Meldung nach einer Spende: „2,50 € an Anna vorgemerkt — nicht bezahlt". */
+  function bestaetigung(cent, name) {
+    return `${euro((Number(cent) || 0) / 100)} an ${name || 'diese Person'} vorgemerkt — nicht bezahlt`;
+  }
+
+  /** Summe der Spenden während eines Livestreams. */
+  function liveText(cent) {
+    return `${euro((Number(cent) || 0) / 100)} vorgemerkt · nicht bezahlt`;
   }
 
   /**
@@ -212,5 +238,5 @@
     return Math.round(zahl * 100);
   }
 
-  return { euroAus, fristAus, ausFormular, lesen, euro, stand, centAus };
+  return { HINWEIS, euroAus, fristAus, ausFormular, lesen, euro, stand, bestaetigung, liveText, centAus };
 });

@@ -466,7 +466,7 @@ const LANG = 'Design Tokens sauber aufsetzen';
     await page.screenshot({ path: bild('spende-code-falsch') });
     await page.fill('#swCode', spendenCode);
     await page.click('#swSpenden');
-    await page.waitForFunction(() => /2,50 € an .* gespendet/.test(document.body.textContent), null, {
+    await page.waitForFunction(() => /2,50 € an .* vorgemerkt — nicht bezahlt/.test(document.body.textContent), null, {
       timeout: 10000,
     });
     await page.screenshot({ path: bild('spende-ok') });

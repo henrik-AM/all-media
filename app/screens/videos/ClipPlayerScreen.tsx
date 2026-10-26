@@ -32,6 +32,9 @@ import {
 import { gefaelltRest } from '../../lib/kommentare';
 import { MarkierterText } from '../../components/MarkierterText';
 
+// Spendentexte („vorgemerkt, nicht bezahlt“) — einmal für App und Website.
+const Spende = require('../../../gemeinsam/spende') as typeof import('../../../gemeinsam/spende');
+
 interface Props {
   clipId: string;
   /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
@@ -718,9 +721,7 @@ export const ClipPlayerScreen = ({ clipId, kommentar, onBack, onOpenProfile, onO
             if (cent === 'eigen') return setEigenerBetrag(true);
             const ok = await aktionen.spenden(clip.userId, Number(cent), clip.id, '', autor.name);
             if (ok) {
-              onNotice(
-                `${(Number(cent) / 100).toFixed(2).replace('.', ',')} € an ${autor.name} gespendet`
-              );
+              onNotice(Spende.bestaetigung(Number(cent), autor.name));
             }
           }}
           onClose={() => setSpendeOffen(false)}
@@ -737,7 +738,7 @@ export const ClipPlayerScreen = ({ clipId, kommentar, onBack, onOpenProfile, onO
             if (cent === null) return 'Bitte einen Betrag zwischen 0,50 € und 1.000 € eingeben';
             setEigenerBetrag(false);
             aktionen.spenden(clip.userId, cent, clip.id, '', autor.name).then((ok) => {
-              if (ok) onNotice(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${autor.name} gespendet`);
+              if (ok) onNotice(Spende.bestaetigung(cent, autor.name));
             });
             return null;
           }}
