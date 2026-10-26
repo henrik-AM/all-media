@@ -952,7 +952,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           : was === 'save'
             ? Aktion.speichern
             : Aktion.repost;
-      schreiben(was === 'like' ? 'Das Like' : was === 'save' ? 'Das Speichern' : 'Der Repost',
+      schreiben(was === 'dislike' ? 'Die Negativreaktion' : was === 'like' ? 'Das Like' : was === 'save' ? 'Das Speichern' : 'Der Repost',
         (c, ich) => tun(c, ich, id), () => { if (vorher) setClips((prev) => prev.map((c) => c.id === id ? vorher : c)); });
     },
     [schreiben, clips]

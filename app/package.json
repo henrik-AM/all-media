@@ -185,7 +185,8 @@
     "test:bunny-schema": "node test/bunny-schema-probe.js",
     "test:af4-profilsprung": "node test/af4-profilsprung.js",
     "test:af-fix-b1": "node test/af-fix-b1.js",
-    "test:af-fix-b3": "node test/af-fix-b3.js"
+    "test:af-fix-b3": "node test/af-fix-b3.js",
+    "test:af-fix-b4": "node test/af-fix-b4.js"
   },
   "private": true
 }
