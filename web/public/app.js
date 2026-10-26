@@ -23549,6 +23549,7 @@ function openEngeFreunde(nachher) {
             catch (e) {
                 if (nr === lauf && sheet.isConnected) {
                     sheet.querySelector('#efZahl').textContent = 'derzeit nicht verfügbar';
+                    sheet.querySelector('#efListe').innerHTML = '<p>Enge Freunde derzeit nicht verfügbar.</p>';
                     sheet.querySelector('#efFehler').textContent = e.message;
                 }
             }

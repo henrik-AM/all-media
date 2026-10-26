@@ -189,7 +189,12 @@
     "test:af-fix-b4": "node test/af-fix-b4.js",
     "test:af-fix-b5": "node test/af-fix-b5.js",
     "test:af-fix-b5-app": "node test/af-fix-b5-app.js",
-    "test:af-fix-b7": "node test/af-fix-b7.js"
+    "test:af-fix-b7": "node test/af-fix-b7.js",
+    "test:af-fix-vorher": "node test/af-fix-vorher.js",
+    "test:af-fix-bilder": "node test/af-fix-bilder.js",
+    "test:af-fix-b1-schema": "node test/af-fix-b1-schema.js",
+    "test:af-fix-b2-schema": "node test/af-fix-b2-schema.js",
+    "test:af-fix-b6-schema": "node test/af-fix-b6-schema.js"
   },
   "private": true
 }

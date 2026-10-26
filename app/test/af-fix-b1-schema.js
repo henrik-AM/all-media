@@ -9,6 +9,13 @@ sql+=`delete from storage.objects where name='${pfad}';`+objekt()+beleg()+schema
 sql+=als(A,`delete from storage.objects where id='${O}';get diagnostics n=row_count;`+check('B1_nachher_109_DELETE_null','n=0')+deny('B1_nachher_109_Pfad_bleibt_belegt',`insert into storage.objects(bucket_id,name) values('media','${pfad}')`)+check('B1_nachher_109_Serverloeschung_zu',`public.medium_loeschrecht('${pfad}') is null`));
 for(const n of [110,111,113])sql+=schema(n);
 sql+=als(A,`delete from storage.objects where id='${O}';get diagnostics n=row_count;`+check('B1_nachher_113_DELETE_null','n=0')+check('B1_nachher_113_Serverloeschung_zu',`public.medium_loeschrecht('${pfad}') is null`)+`delete from public.posts where id='${P}';`+check('B1_nachher_unreferenziert_loeschbar',`public.medium_loeschrecht('${pfad}')='supabase'`));
+const bild=`posts/${A}-bild.jpg`,Q=id(11);
+sql+=`insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values('media','${bild}','${A}','${A}','{"size":1000,"mimetype":"image/jpeg"}');`;
+sql+=als(A,`insert into public.posts(id,user_id,kind,medien) values('${Q}',auth.uid(),'post',jsonb_build_array(jsonb_build_object('url',public.medien_adresse('${bild}'),'typ','image'),jsonb_build_object('url',public.medien_adresse('${pfad}'),'typ','video')));`+
+ check('B1_113_Video_an_zweiter_Stelle_geschuetzt',`public.medium_loeschrecht('${pfad}') is null`)+
+ check('B1_113_Titelbild_geschuetzt',`public.medium_loeschrecht('${bild}') is null`)+
+ `delete from storage.objects where name='${bild}';get diagnostics n=row_count;`+check('B1_113_Bild_DELETE_null','n=0')+
+ `delete from public.posts where id='${Q}';`+check('B1_113_nach_Karussellloeschung_frei',`public.medium_loeschrecht('${pfad}')='supabase'`));
 sql+=als(B,check('B1_fremde_Serverloeschung_zu',`public.medium_loeschrecht('${pfad}') is null`));
 sql+=admin(check('B1_Beleg_unveraendert',`exists(select 1 from public.video_upload_belege where objekt_id='${O}' and bytes=1000)`));
 S.ausfuehren(sql).catch(e=>{console.error(e.message);process.exitCode=1;});

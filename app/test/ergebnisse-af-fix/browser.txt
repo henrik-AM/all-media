@@ -1,0 +1,11 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+OK 1 B7 Browser: unbekannte Zahl zeigt Laden statt Null
+OK 2 B7 Browser: Fehler zeigt nicht verfügbar, keine feste Null
+OK 3 B7 Browser: erfolgreiche leere Liste zeigt bestätigte Null
+OK 4 B5 Browser: Pflichttext blockiert vor Upload
+OK 5 B5 Browser: DB-Fehler zeigt Formular, Wiederholen lädt nicht erneut hoch
+OK 6 B1 Browser/Server: veröffentlichte Bunny-Datei bleibt vor Löschung geschützt
+OK 7 B5 Browser: endgültiger Abbruch räumt Bunny-Restdatei auf
+OK 8 B5 Browser: endgültiger Abbruch räumt Supabase-Restdatei auf
+OK 9 Browser bleibt ohne JavaScript-Absturz
+9/9 Browser-/Serverprüfungen bestanden; vier Bilder gesondert ansehen.

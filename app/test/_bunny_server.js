@@ -24,7 +24,7 @@ async function starten(){
    if(name==='instant_loeschbestaetigen'){lage.instantBestaetigt=args.p_ids;return {error:null};}
    if(name==='medium_upload_erlaubt')return {data:lage.freigegeben};
    if(name==='medien_leseliste')return {data:lage.freigegeben?args.p_pfade.filter(p=>!p.startsWith('instants/')&&(owner(p)||lage.oeffentlich.has(p))).map(p=>({pfad:p,anbieter:provider(p)})):[]};
-   if(name==='medium_loeschrecht')return {data:lage.freigegeben&&owner(args.p_pfad)?provider(args.p_pfad):null};
+   if(name==='medium_loeschrecht'){const url='https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/'+args.p_pfad;const referenziert=lage.posts.some(p=>p.media_url===url||(p.medien||[]).some(m=>m.url===url));return {data:lage.freigegeben&&owner(args.p_pfad)&&!referenziert?provider(args.p_pfad):null};}
    if(name==='medium_anbieter')return {data:provider(args.p_pfad)};
    throw Error('Unerwartetes RPC '+name);
   },from:t=>{if(t==='posts')return {insert:b=>({select:()=>({single:async()=>{const z={...b,id:'ab260026-0000-4000-8001-'+String(lage.posts.length+1).padStart(12,'0')};lage.posts.push(z);for(const m of b.medien||[])lage.oeffentlich.add(m.url.split('/storage/v1/object/public/media/')[1]);return {data:z};}})})};if(t==='instants')return {select:()=>({eq:(_k,p)=>({single:async()=>({data:register.get(p)?.owner_id===wer?{bild_pfad:p}:null})})})};return dienstTabelle(t);},
@@ -36,7 +36,7 @@ async function starten(){
    createSignedUrls:async pfade=>({data:pfade.filter(p=>alt.get(p)?.owner===wer||lage.oeffentlich.has(p)).map(path=>({path,signedUrl:`http://localhost:3300/alt/${path}`}))}),
   })}};}
  const S=require('../../web/server/supabase');const altFuer=S.clientFuer;S.clientFuer=t=>t==='lokal-a'?client(A):t==='lokal-b'?client(B):null;
- const V=require('../../web/server/videopruefung'),altDienst=V.dienstclient;V.dienstclient=()=>({from:dienstTabelle});
+ const V=require('../../web/server/videopruefung'),altDienst=V.dienstclient;V.dienstclient=()=>({from:dienstTabelle,storage:{from:()=>({remove:async pfade=>{for(const p of pfade)alt.delete(p);return {error:null};}})}});
  const api=require('../../web/server/supabase-api');
  api.ladeBeitraege=async(_c,_u,optionen={})=>lage.posts.filter(p=>!optionen.nurIds||optionen.nurIds.includes(p.id)).map(p=>({...p,userId:'me',mediaUrl:p.media_url,description:p.description,medien:p.medien||[],kind:p.kind}));
  const app=require('../../web/server/app');

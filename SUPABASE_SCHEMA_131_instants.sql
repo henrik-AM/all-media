@@ -2,14 +2,23 @@
 -- Kamera-Instants für festgeschriebene Enge Freunde; kein Jahresarchiv.
 -- B2: Vorgabe bis Henriks Entscheidung. Zentral rückbaubar; nie nur Clientfilter.
 -- Schema 52/58 entscheiden die Freigabe beider Konten; Schema 57 den Kontakt.
-create or replace function public.instant_beziehung_erlaubt(p_freund uuid) returns boolean
+-- Die Richtung entspricht Schema 57 auch beim lesenden Empfänger.
+create or replace function public.instant_beziehung_zwischen(p_absender uuid,p_empfaenger uuid) returns boolean
 language sql stable security definer set search_path=public as $$
- select auth.uid() is not null and p_freund<>auth.uid()
- and public.konto_freigegeben() and public.profil_freigegeben(p_freund)
- and not public.blockiert_zwischen(auth.uid(),p_freund)
- and (public.messenger_erlaubt(auth.uid(),p_freund) or (
- exists(select 1 from public.follows where follower_id=auth.uid() and followee_id=p_freund)
- and exists(select 1 from public.follows where follower_id=p_freund and followee_id=auth.uid())));
+ select auth.uid() in (p_absender,p_empfaenger) and p_absender<>p_empfaenger
+ and public.profil_freigegeben(p_absender) and public.profil_freigegeben(p_empfaenger)
+ and not public.blockiert_zwischen(p_absender,p_empfaenger)
+ and (exists(select 1 from public.contacts
+   where (user_id=p_absender and contact_id=p_empfaenger and status<>'blocked')
+   or (user_id=p_empfaenger and contact_id=p_absender and status='friend')) or (
+ exists(select 1 from public.follows where follower_id=p_absender and followee_id=p_empfaenger)
+ and exists(select 1 from public.follows where follower_id=p_empfaenger and followee_id=p_absender)));
+$$;
+revoke execute on function public.instant_beziehung_zwischen(uuid,uuid) from public,anon;
+grant execute on function public.instant_beziehung_zwischen(uuid,uuid) to authenticated;
+create or replace function public.instant_beziehung_erlaubt(p_freund uuid) returns boolean
+language sql stable security invoker set search_path=public as $$
+ select public.instant_beziehung_zwischen(auth.uid(),p_freund);
 $$;
 revoke execute on function public.instant_beziehung_erlaubt(uuid) from public,anon;
 grant execute on function public.instant_beziehung_erlaubt(uuid) to authenticated;
@@ -49,7 +58,7 @@ language sql stable security definer set search_path=public as $$
  and public.profil_freigegeben(i.absender)
  and (i.absender=auth.uid() or exists(select 1 from public.instant_empfaenger e
  where e.instant_id=i.id and e.empfaenger=auth.uid() and e.geoeffnet_at is null
- and public.instant_beziehung_erlaubt(i.absender))));
+ and public.instant_beziehung_zwischen(i.absender,e.empfaenger))));
 $$;
 revoke execute on function public.instant_zugang(uuid) from public,anon;
 grant execute on function public.instant_zugang(uuid) to authenticated;

@@ -19,7 +19,12 @@ sql+=`insert into public.contacts(user_id,contact_id,status) values('${A}','${C}
 sql+=als(A,check('B2_Kontakt_nach_57_erlaubt',`public.instant_beziehung_erlaubt('${C}')`)+`insert into public.enge_freunde(user_id,freund_id) values(auth.uid(),'${C}');`+check('B2_Kontakt_in_Liste',`exists(select 1 from public.enge_freunde where freund_id='${C}')`));
 sql+=`delete from public.follows where follower_id='${B}' and followee_id='${A}';`;
 sql+=als(A,check('B2_Entfolgen_widerruft_Altlistenrecht',`not public.instant_beziehung_erlaubt('${B}')`));
+// Schema 57 erlaubt die eigene, über Nummer/Anfrage belegte Kontaktzeile auch
+// ohne spiegelbildliches friend beim Empfänger. Zugang muss die Senderichtung prüfen.
+sql+=`update public.contacts set status='pending' where user_id='${A}' and contact_id='${C}';insert into storage.objects(bucket_id,name,owner_id,metadata) values('media','instants/${A}/kontakt.jpg','${A}','{"size":1000,"mimetype":"image/jpeg"}');`;
+sql+=als(A,`v:=public.instant_senden('instants/${A}/kontakt.jpg','Kontakt');perform set_config('probe.kontakt',v::text,true);`);
+sql+=als(C,check('B2_Kontakt_Richtung_beim_Empfaenger_korrekt',`public.instant_zugang(current_setting('probe.kontakt')::uuid)`));
 sql+=`insert into public.blocks(user_id,blocked_user_id) values('${C}','${A}');`;
 sql+=als(A,check('B2_Blockierung_hat_Vorrang',`not public.instant_beziehung_erlaubt('${C}')`));
-sql+=admin(check('B2_anon_Helfer_gesperrt',`not has_function_privilege('anon','public.instant_beziehung_erlaubt(uuid)','EXECUTE')`));
+sql+=admin(check('B2_anon_Paarhelfer_gesperrt',`not has_function_privilege('anon','public.instant_beziehung_zwischen(uuid,uuid)','EXECUTE')`)+check('B2_anon_Helfer_gesperrt',`not has_function_privilege('anon','public.instant_beziehung_erlaubt(uuid)','EXECUTE')`));
 S.ausfuehren(sql).catch(e=>{console.error(e.message);process.exitCode=1;});
