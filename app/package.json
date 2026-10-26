@@ -45,6 +45,7 @@
     "web-app": "node web-app.js",
     "lint": "tsc --noEmit",
     "test": "node test/smoke.js",
+    "test:egress": "node --test test/_egress_offline.js",
     "test:feedback": "node test/_feedback.js",
     "app": "expo start",
     "compare": "node test/figma-compare.js",

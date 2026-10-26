@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 const ts = require('typescript');
 const { cloudMedium, medienEgressSchuetzen } = require('./_medien_egressschutz');
-const wurzel = path.join(__dirname, '../..');
+const wurzel = process.env.AM_EGRESS_QUELLE || path.join(__dirname, '../..');
 
 function web({ sparen = false } = {}) {
   const quelle = fs.readFileSync(path.join(wurzel, 'web/public/app.js'), 'utf8');
@@ -148,6 +148,7 @@ for (const [name, optionen, props, erwartet] of [
   ['Wischen', { zustaende: { 5: '4' } }, {}, 4],
   ['Profilziel', { zustaende: { 5: '0' } }, { startBei: '6' }, 6],
   ['Datensparen', { sparen: true }, {}, -1],
+  ['Hintergrund', { zustaende: { 8: false } }, {}, -1],
 ]) test(`App-Feed: ${name}, höchstens eine Quelle bei acht Reels`, () => {
   const a = appLaden('app/screens/video/VideoFeedScreen.tsx', optionen);
   const baum = a.exports.VideoFeedScreen(props);
@@ -174,6 +175,38 @@ test('Prüfbrowser: Schutz wird nur einmal registriert', async () => {
   await medienEgressSchuetzen(ziel);
   assert.equal(anzahl, 1);
 });
+test('Prüfbrowser: _konto schützt neue Seiten und Kontexte, Service Worker bleiben aus', async () => {
+  const registriert = [];
+  const seite = () => ({ evaluate() {}, goto() {}, reload() {},
+    route: async (muster) => registriert.push(muster) });
+  const optionen = [];
+  const browser = {
+    newPage: async (opts) => { optionen.push(opts); return seite(); },
+    newContext: async (opts) => {
+      optionen.push(opts);
+      return { route: async (muster) => registriert.push(muster), newPage: async () => seite() };
+    },
+  };
+  const chromium = { launch: async () => browser };
+  const module = { exports: {} };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '_konto.js'), 'utf8'), {
+    module, process: { env: {} }, setTimeout,
+    require: (name) => {
+      if (name === './_nur_testkonten') return { nurTestkonto: (v) => v };
+      if (name === './_testpasswoerter') return { PRUEFKONTO_PASS: 'lokale-attrappe' };
+      if (name === 'playwright-core') return { chromium };
+      if (name === './_medien_egressschutz') return { medienEgressSchuetzen };
+      throw new Error(`Unerwarteter Import: ${name}`);
+    },
+  });
+  const b = await chromium.launch();
+  await b.newPage({ serviceWorkers: 'allow' });
+  const kontext = await b.newContext({ serviceWorkers: 'allow' });
+  await kontext.newPage();
+  assert.equal(registriert.length, 2);
+  assert.ok(optionen.every((o) => o.serviceWorkers === 'block'));
+  assert.ok(registriert.every((fn) => fn(new URL('https://test.invalid/storage/v1/object/sign/media/x'))));
+});
 test('Prüfbrowser: gesperrtes Medium erzwingt Fehlercode trotz process.exit(0)', () => {
   const datei = path.join(__dirname, '_medien_egressschutz.js');
   const kind = spawnSync(process.execPath, ['-e', `
@@ -184,4 +217,73 @@ test('Prüfbrowser: gesperrtes Medium erzwingt Fehlercode trotz process.exit(0)'
   `], { encoding: 'utf8' });
   assert.equal(kind.status, 2);
   assert.match(kind.stderr, /Cloud-Medium/);
+});
+
+const api = require(path.join(wurzel, 'web/server/supabase-api'));
+const zielId = '12345678-1234-1234-1234-123456789abc';
+function datenbank({ unsichtbar = false, fehler = null } = {}) {
+  const abfragen = [], rpcs = [];
+  return { abfragen, rpcs,
+    from(tabelle) {
+      const q = { tabelle, schritte: [] };
+      abfragen.push(q);
+      const kette = new Proxy({}, { get: (_, key) => {
+        if (key === 'then') return (fertig) => {
+          const ids = q.schritte.find(([art, feld]) => art === 'in' && feld === 'id')?.[2];
+          const limit = q.schritte.find(([art]) => art === 'limit')?.[1] ?? 200;
+          const bestand = Array.from({ length: 600 }, (_, i) => ({
+            id: i === 599 ? zielId : String(i), user_id: 'autor', kind: 'reel',
+            created_at: new Date(0).toISOString(),
+          }));
+          const data = tabelle === 'posts' && !unsichtbar
+            ? bestand.filter((b) => !ids || ids.includes(b.id)).slice(0, limit) : [];
+          fertig({ data, error: tabelle === 'posts' ? fehler : null });
+        };
+        return (...args) => { q.schritte.push([key, ...args]); return kette; };
+      } });
+      return kette;
+    },
+    rpc(name, args) { rpcs.push([name, args]); return Promise.resolve({ data: [] }); },
+  };
+}
+function serverBeitrag(db) {
+  const quelle = fs.readFileSync(path.join(wurzel, 'web/server/app.js'), 'utf8');
+  const ast = ts.createSourceFile('server.js', quelle, ts.ScriptTarget.Latest, true);
+  const fn = ast.statements.find((s) => ts.isFunctionDeclaration(s) && s.name?.text === 'beitrag');
+  return vm.runInNewContext(`(${fn.getText(ast)})`, { supabaseApi: api });
+}
+test('Server: Like-Vorher/Nachher lädt zweimal einen Beitrag statt zweimal 500', async () => {
+  const db = datenbank();
+  const beitrag = serverBeitrag(db);
+  const req = { db, nutzerId: 'ich' };
+  assert.equal((await beitrag(req, zielId)).id, zielId);
+  assert.equal((await beitrag(req, zielId)).id, zielId);
+  const posts = db.abfragen.filter((q) => q.tabelle === 'posts');
+  assert.equal(posts.length, 2);
+  for (const q of posts) {
+    assert.equal(q.schritte.find(([art]) => art === 'limit')[1], 1);
+    assert.deepEqual(Array.from(q.schritte.find(([art, feld]) => art === 'in' && feld === 'id')[2]), [zielId]);
+  }
+  for (const [name, args] of db.rpcs.filter(([name]) => ['liker_namen', 'like_zahlen', 'feed_rang'].includes(name))) {
+    assert.deepEqual(Array.from(args.beitraege), [zielId], name);
+  }
+});
+test('Server: ungültige ID und leere ID-Liste lösen keine Datenbankabfrage aus', async () => {
+  const db = datenbank();
+  assert.equal(await serverBeitrag(db)({ db, nutzerId: 'ich' }, 'kaputt'), null);
+  assert.equal(db.abfragen.length, 0);
+  assert.deepEqual(await api.ladeBeitraege(db, 'ich', { nurIds: [] }), []);
+  assert.equal(db.rpcs.length, 0);
+});
+test('Server: unsichtbare Beiträge bleiben unsichtbar, Abfragefehler werden weitergereicht', async () => {
+  const db = datenbank({ unsichtbar: true });
+  assert.equal(await serverBeitrag(db)({ db, nutzerId: 'ich' }, zielId), null);
+  const fehler = new Error('Probe');
+  await assert.rejects(() => api.ladeBeitraege(datenbank({ fehler }), 'ich', { nurIds: [zielId] }), fehler);
+});
+test('Server: normaler Feed behält sein Limit und erhält keinen ID-Filter', async () => {
+  const db = datenbank();
+  const ergebnis = await api.ladeBeitraege(db, 'ich', { limit: 20 });
+  assert.equal(ergebnis.length, 20);
+  assert.equal(db.abfragen[0].schritte.some(([art, feld]) => art === 'in' && feld === 'id'), false);
 });
