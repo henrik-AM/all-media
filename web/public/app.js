@@ -1726,6 +1726,7 @@ function renderChats() {
   const list = filteredChats();
   main.innerHTML = `
     ${storyRail(state.stories, 'messenger')}
+    <button class="item" id="instantPostfach">Instants</button>
     <div class="pagehead">
       <div class="searchrow">
         <label class="searchbox">
@@ -1781,6 +1782,8 @@ function renderChats() {
             </div>`
       }
     </div>`;
+  document.getElementById('instantPostfach')?.addEventListener('click',openInstants);
+  void instantBadgeLaden();
 
   const input = $('#chatSearch');
   input.addEventListener('input', (e) => {
@@ -9344,6 +9347,8 @@ const SETTINGS = [
       { label: 'Privates Profil', icon: 'lock', toggle: 'videoPrivate' },
       { label: 'Spenden-PIN', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Insights', icon: 'compass', liste: 'insights' },
+      { label: 'Enge Freunde', icon: 'people', aktion: 'engefreunde' },
+      { label: 'Instants empfangen', icon: 'camera', toggle: 'instantsEmpfangen' },
       { label: 'Konto-Analysen', icon: 'compass', liste: 'kontoanalysen' },
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
@@ -9426,6 +9431,7 @@ const SCHALTER_STANDARD = {
   datensparen: false,
   // Livestream: Aufzeichnung ohne Rueckfrage veroeffentlichen (28.09.2026).
   liveAutoVeroeffentlichen: false,
+  instantsEmpfangen: true,
   // Adressbuch abgleichen (Schema 87). Leer heißt: noch nicht gefragt.
   kontakteAbgleich: false,
 };
@@ -10811,6 +10817,7 @@ function openEinstellung(punkt, nachher) {
   if (punkt.aktion === 'kontostatus') return openKontostatus('kontostatus');
   if (punkt.aktion === 'kontoLoeschen') return openKontoLoeschen();
   if (punkt.aktion === 'moderation') return state.istModerator ? openModeration() : toast(window.Meldung.grundText('nicht_erlaubt'));
+  if (punkt.aktion === 'engefreunde') return openEngeFreunde();
 
   if (punkt.aktion === 'datenauskunft') return datenauskunftLaden();
 
@@ -13634,6 +13641,7 @@ function renderVideoSearch() {
 
 /** Eine Mitteilung anklickbar machen: dorthin springen, wo sie herkommt. */
 function mitteilungOeffnen(ziel, text = '') {
+  if (ziel.art === 'instant') return openInstants();
   /*
    * Kasten RS 3: Rechtsmitteilung (Schema 102). Wer betroffen ist, bekommt
    * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen" —
@@ -23413,3 +23421,180 @@ window.fetch = function(...args) {
     return Promise.reject(error);
   });
 };
+
+/* AF6 — private Kamera-Instants. Keine Fotos aus der Galerie. */
+async function instantApi(pfad, body) {
+    const r = await fetch(pfad, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok || d?.ok === false)
+        throw new Error(d.error || 'Das hat nicht geklappt.');
+    return d;
+}
+async function instantBadgeLaden() {
+    const knopf = document.getElementById('instantPostfach');
+    if (!knopf)
+        return;
+    try {
+        const d = await instantApi('/api/instants');
+        if (!Array.isArray(d.postfach))
+            throw new Error();
+        knopf.textContent = `Instants · ${d.postfach.length} ungeöffnet`;
+    }
+    catch {
+        knopf.textContent = 'Instants · derzeit nicht verfügbar';
+    }
+}
+setInterval(() => { if (!document.hidden && state.area === 'messenger' && sub() === 'chats')
+    void instantBadgeLaden(); }, 30000);
+function openEngeFreunde(nachher) {
+    let lauf = 0, uhr;
+    const stateF = { freunde: [], vorschlaege: [] };
+    return openSheet('Enge Freunde', `<div class="sheet__body" style="padding:16px"><p>Deine Liste ist privat · <span id="efZahl">0</span> Personen</p><input class="instant-feld" id="efSuche" type="search" placeholder="Nach Namen suchen (mindestens 2 Zeichen)" aria-label="Enge Freunde suchen"><p role="alert" id="efFehler"></p><div id="efListe">Wird geladen …</div></div>`, (sheet) => {
+        const suche = sheet.querySelector('#efSuche');
+        const laden = async () => {
+            const nr = ++lauf;
+            try {
+                const d = await instantApi('/api/enge-freunde?suche=' + encodeURIComponent(suche.value));
+                if (nr !== lauf || !sheet.isConnected)
+                    return;
+                if (!Array.isArray(d.freunde) || !Array.isArray(d.vorschlaege))
+                    throw new Error('Enge Freunde konnten nicht geladen werden.');
+                Object.assign(stateF, d);
+                sheet.querySelector('#efZahl').textContent = d.freunde.length;
+                const ids = new Set(d.freunde.map(p => p.id));
+                sheet.querySelector('#efListe').innerHTML = [...d.freunde.map(p => ({ ...p, an: true })), ...d.vorschlaege.filter(p => !ids.has(p.id)).map(p => ({ ...p, an: false }))].map(p => `<button class="item" data-ef="${esc(p.id)}" data-an="${!p.an}"><span class="item__label">${esc(p.name)}</span><span>${p.an ? 'Entfernen' : 'Hinzufügen'}</span></button>`).join('') || '<p>Noch keine Einträge. Suche nach einem Namen.</p>';
+                sheet.querySelectorAll('[data-ef]').forEach(b => b.addEventListener('click', async () => { b.disabled = true; try {
+                    await instantApi('/api/enge-freunde', { id: b.dataset.ef, an: b.dataset.an === 'true' });
+                    await laden();
+                }
+                catch (e) {
+                    sheet.querySelector('#efFehler').textContent = e.message;
+                    b.disabled = false;
+                } }));
+            }
+            catch (e) {
+                if (sheet.isConnected)
+                    sheet.querySelector('#efFehler').textContent = e.message;
+            }
+        };
+        suche.addEventListener('input', () => { clearTimeout(uhr); uhr = setTimeout(laden, 250); });
+        void laden();
+    }, { schliessen: true, hoch: true, beimSchliessen: () => { lauf++; clearTimeout(uhr); nachher?.(); } });
+}
+function openInstants() {
+    let stream = null, foto = null, freundeZahl = 0, aktiv = true;
+    const stop = () => { stream?.getTracks().forEach(t => t.stop()); stream = null; };
+    openSheet('Instants', `<div class="sheet__body" style="padding:16px"><p>${esc(Instants.HINWEIS)}</p><p role="alert" id="instantFehler"></p><div id="instantInhalt">Wird geladen …</div></div>`, (sheet, close) => {
+        const feld = sheet.querySelector('#instantInhalt'), fehler = sheet.querySelector('#instantFehler');
+        const laden = async () => {
+            try {
+                const [d, f] = await Promise.all([instantApi('/api/instants'), instantApi('/api/enge-freunde')]);
+                if (!aktiv)
+                    return;
+                if (!Array.isArray(d.postfach) || !Array.isArray(f.freunde))
+                    throw new Error('Instants konnten nicht geladen werden.');
+                freundeZahl = Number(f.empfaengerzahl);
+                if (!Number.isInteger(freundeZahl) || freundeZahl < 0)
+                    throw new Error("Empfängerzahl nicht verfügbar.");
+                feld.innerHTML = `<button class="item" id="instantFreunde">Enge Freunde bearbeiten · ${freundeZahl}</button><p>An deine Liste · ${freundeZahl} ${freundeZahl === 1 ? 'Person' : 'Personen'}</p><button class="prof__btn is-primary" id="instantKamera" ${freundeZahl ? '' : 'disabled'}>Instant aufnehmen</button><div id="instantAufnahme"></div><div id="instantStapel">${d.postfach.map(i => `<button class="item" data-instant="${esc(i.id)}">${esc(i.name)} · Einmal ansehen</button>`).join('') || '<p>Keine ungeöffneten Instants.</p>'}</div><div>${(d.eigene || []).map(i => `<button class="item" data-instantzurueck="${esc(i.id)}">Gesendet: ${esc(i.text || 'Foto')} · Zurückziehen</button>`).join('')}</div>`;
+                feld.querySelector('#instantFreunde').addEventListener('click', () => openEngeFreunde(laden));
+                feld.querySelector('#instantKamera').addEventListener('click', kamera);
+                feld.querySelectorAll('[data-instant]').forEach(b => b.addEventListener('click', () => ansehen(b.dataset.instant)));
+                feld.querySelectorAll('[data-instantzurueck]').forEach(b => b.addEventListener('click', async () => { try {
+                    await instantApi(`/api/instants/${b.dataset.instantzurueck}/zurueckziehen`, {});
+                    await laden();
+                }
+                catch (e) {
+                    fehler.textContent = e.message;
+                } }));
+            }
+            catch (e) {
+                fehler.textContent = e.message;
+            }
+        };
+        const kamera = async () => {
+            try {
+                stop();
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1080 } }, audio: false });
+                if (!aktiv) {
+                    stop();
+                    return;
+                }
+                const bereich = feld.querySelector('#instantAufnahme');
+                bereich.innerHTML = '<video id="instantLive" playsinline muted autoplay style="width:100%;max-height:360px"></video><button class="prof__btn" id="instantAusloeser">Foto aufnehmen</button>';
+                const v = bereich.querySelector('video');
+                v.srcObject = stream;
+                await v.play();
+                bereich.querySelector('#instantAusloeser').addEventListener('click', () => {
+                    if (!v.videoWidth)
+                        return;
+                    const m = Instants.masse(v.videoWidth, v.videoHeight), c = document.createElement('canvas');
+                    c.width = m.breite;
+                    c.height = m.hoehe;
+                    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+                    for (const q of [.8, .65, .5, .35]) {
+                        foto = c.toDataURL('image/jpeg', q);
+                        if (atob(foto.split(',')[1]).length <= Instants.BILD_MAX)
+                            break;
+                    }
+                    stop();
+                    const grund = Instants.pruefen('', freundeZahl, atob(foto.split(',')[1]).length);
+                    if (grund) {
+                        fehler.textContent = grund;
+                        return;
+                    }
+                    bereich.innerHTML = `<img alt="Vorschau des Instants" src="${foto}" style="width:100%;max-height:240px;object-fit:contain"><input id="instantText" class="instant-feld" maxlength="100" placeholder="Bildunterschrift (freiwillig)"><button class="prof__btn is-primary" id="instantSenden">Instant senden</button><button class="prof__btn" id="instantNeu">Neu aufnehmen</button>`;
+                    bereich.querySelector('#instantNeu').addEventListener('click', kamera);
+                    bereich.querySelector('#instantSenden').addEventListener('click', async (e) => {
+                        e.currentTarget.disabled = true;
+                        try {
+                            const hoch = await instantApi('/api/hochladen', { ordner: 'instants', aufnahme: foto });
+                            if (!hoch.pfad)
+                                throw new Error('Das Foto konnte nicht gespeichert werden.');
+                            await instantApi('/api/instants', { pfad: hoch.pfad, text: bereich.querySelector('#instantText').value });
+                            foto = null;
+                            await laden();
+                            void instantBadgeLaden();
+                        }
+                        catch (err) {
+                            fehler.textContent = err.message;
+                            bereich.querySelector('#instantSenden').disabled = false;
+                        }
+                    });
+                });
+            }
+            catch (e) {
+                fehler.textContent = 'Kamera nicht verfügbar. Erlaube den Kamerazugriff im Browser.';
+                stop();
+            }
+        };
+        const ansehen = async (id) => {
+            try {
+                const d = await instantApi(`/api/instants/${id}/bild`);
+                if (!aktiv)
+                    return;
+                feld.innerHTML = `<img id="instantBild" alt="Instant" src="${esc(d.bild)}" style="width:100%;max-height:60vh;object-fit:contain"><p>${esc(d.text || '')}</p><button class="prof__btn" id="instantZu">Bild schließen</button>`;
+                const bild = feld.querySelector('#instantBild');
+                let bestaetigt = false;
+                const gesehen = async () => { if (bestaetigt)
+                    return; bestaetigt = true; try {
+                    await instantApi(`/api/instants/${id}/gesehen`, {});
+                    void instantBadgeLaden();
+                }
+                catch (e) {
+                    bild.remove();
+                    fehler.textContent = 'Öffnen konnte nicht bestätigt werden.';
+                } };
+                bild.addEventListener('load', gesehen);
+                bild.addEventListener('error', () => { fehler.textContent = 'Das Foto konnte nicht geladen werden.'; });
+                if (bild.complete && bild.naturalWidth)
+                    void gesehen();
+                feld.querySelector('#instantZu').addEventListener('click', laden);
+            }
+            catch (e) {
+                fehler.textContent = 'Instant nicht mehr verfügbar.';
+            }
+        };
+        void laden();
+    }, { schliessen: true, hoch: true, beimSchliessen: () => { aktiv = false; foto = null; stop(); void instantBadgeLaden(); } });
+}

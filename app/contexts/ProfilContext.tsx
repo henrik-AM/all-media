@@ -135,6 +135,7 @@ const mitteilungText = (
     // Kasten 28/15.4 (Schema 98). Gleicher Satz in web/server/app.js (mitteilungText).
     case 'freund_anfrage':
       return `${name} möchte mit dir befreundet sein.`;
+    case 'instant': return `${name} hat dir ein Instant gesendet.`;
     case 'freund_ok':
       return `Du und ${name} seid jetzt befreundet.`;
     case 'nachricht':

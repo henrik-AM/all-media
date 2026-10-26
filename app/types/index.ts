@@ -596,7 +596,8 @@ export type MitteilungArt =
   | 'beitritt_ok'
   // Kasten 28/15.4 (Schema 98): Befreunden unter Communitys.
   | 'freund_anfrage'
-  | 'freund_ok';
+  | 'freund_ok'
+  | 'instant';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
@@ -605,7 +606,7 @@ export interface MitteilungsZiel {
   /** 'comment': Herz an einem Kommentar (Schema 49), @ im Kommentar (Kasten 25). */
   /** 'meldung': eine Rechtsmitteilung zu einer Meldung (Kasten RS 3, Schema 102). */
   /** 'channel': ein Unterthema (Kasten 8.3, Schema 90). */
-  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung' | 'channel';
+  art: 'instant' | 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung' | 'channel';
   id: string;
 }
 

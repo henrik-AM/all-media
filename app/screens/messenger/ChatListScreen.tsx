@@ -1,3 +1,4 @@
+import {InstantsBereich} from '../../components/InstantsBereich';
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { Druck } from '../../components/Druck';
@@ -221,6 +222,7 @@ export const ChatListScreen = ({
     <View style={styles.container}>
       {/* Reihenfolge wie im Prototyp: Story-Leiste, Suche, Filter, Liste. */}
       <StoryRail stories={stories} onPress={onOpenStory} />
+      <InstantsBereich/>
 
       <View style={styles.header}>
         <SearchBar

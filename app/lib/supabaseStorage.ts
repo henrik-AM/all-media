@@ -31,7 +31,7 @@ import { signiereEine, medienServerBasis, medienAnfrage } from './medien';
  * Getrennte Ordner, damit sich Aufraeumen und Ablauffristen spaeter je
  * Gattung regeln lassen.
  */
-export type Ordner = 'messages' | 'stories' | 'avatars' | 'posts' | 'insights' | 'ptt';
+export type Ordner = 'messages' | 'stories' | 'avatars' | 'posts' | 'insights' | 'ptt' | 'instants';
 
 export interface UploadErgebnis {
   success: boolean;

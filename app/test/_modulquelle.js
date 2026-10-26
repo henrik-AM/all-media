@@ -188,6 +188,8 @@ const UMD_BAUSTEINE = [
   ['erstellen', 'Erstellen'],
   ['reel', 'Reel'],
   ['analyse', 'Analyse'],
+  ['instants', 'Instants'],
+  ['instantsdaten', 'InstantsDaten'],
 ];
 
 function umdTeile() {

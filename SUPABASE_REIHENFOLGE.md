@@ -688,3 +688,13 @@ Nach 128: `SUPABASE_SCHEMA_129_video_negativ.sql` (Entwurf 108 aus dem Sammelzwe
 
 ## Schema 130 — AF7 Kontoanalysen (Paket 9)
 Nach 129: `SUPABASE_SCHEMA_130_kontoanalysen.sql` (Entwurf 110). Neue private Messung ab Einspielung; Follower/Vorwahl-Snapshot je Tageszeile, nur eigene Aggregate. Neue Tabellen nur Trigger/RPC, keine direkten Clientrechte.
+
+## Schema 131 — AF6 Instants (Paket 9)
+Nach 130 und 128: `SUPABASE_SCHEMA_131_instants.sql` (Entwurf 111). Private Enge-Freunde-Liste,
+Kamera-Instants, fester Empfängerkreis, Einmal-Öffnen und 24-Stunden-Sichtbarkeit.
+Erweitert die CHECK-Listen von notifications dynamisch um `instant`, ohne Arten
+aus 98 oder späteren Schemas zu entfernen. Zusätzliche restriktive Speicherregel
+verhindert Wiederfreigabe über fremde Inhaltstabellen. Kurze URLs nur über die
+zentralen Medienmodule (60 s, ohne Vierstunden-Cache). Der Server-Aufräumer braucht
+`INSTANTS_BEREINIGUNG=an` und einen serverseitigen `SUPABASE_SERVICE_ROLE_KEY`;
+noch nicht eingerichtet, keine sofortige physische Löschung behaupten.

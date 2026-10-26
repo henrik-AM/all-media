@@ -1,3 +1,4 @@
+import {EngeFreundeSheet} from '../../components/InstantsBereich';
 import * as Analyse from '../../../gemeinsam/analyse';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View, type ScrollViewInstance } from 'react-native';
@@ -102,7 +103,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'profilseite' | 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode' | 'problem' | 'meinemeldungen' | 'kontostatus' | 'kontoLoeschen';
+  aktion?: 'profilseite' | 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode' | 'problem' | 'meinemeldungen' | 'kontostatus' | 'kontoLoeschen' | 'engefreunde';
   /** Kasten RS 1: öffnet einen Rechtstext (gemeinsam/rechtstexte.js). */
   rechtstext?: string;
   /** Kasten 22: öffnet das Bildschirmzeit-Blatt auf dieser Unterseite. */
@@ -394,6 +395,8 @@ const SECTIONS: Section[] = [
       { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'videoPrivate' },
       SPENDENCODE,
       { label: 'Insights', icon: 'compass-outline', liste: 'insights' },
+      { label: 'Enge Freunde', icon: 'people-outline', aktion: 'engefreunde' },
+      { label: 'Instants empfangen', icon: 'camera-outline', toggle: 'instantsEmpfangen' },
       { label: 'Konto-Analysen', icon: 'analytics-outline', liste: 'kontoanalysen' },
       { label: 'Wem ich folge', icon: 'person-outline', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
@@ -998,6 +1001,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
   return (
     <View style={styles.screen}>
+      <EngeFreundeSheet visible={offen?.aktion === "engefreunde"} onClose={()=>setOffen(null)}/>
       {/*
         Einstellungen ist der einzige Bereich ohne obere Leiste (so steht es im
         Prototyp). Damit fehlt aber auch derjenige, der sonst den Platz für
@@ -1354,7 +1358,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         />
       )}
 
-      {offen && !offen.eingabe && (
+      {offen && offen.aktion !== "engefreunde" && !offen.eingabe && (
         <EinstellungSheet
           titel={offen.label}
           wahl={offen.wahl}

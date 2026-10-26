@@ -1543,6 +1543,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
   const mitteilungOeffnen = (ziel: MitteilungsZiel, text = '') => {
+    if (ziel.art === 'instant') { setArea('messenger'); setSubs((p) => ({ ...p, messenger: 'chats' })); setNotice('Instants im Postfach öffnen'); return; }
     /*
      * Kasten RS 3: Rechtsmitteilung (Schema 102). Wer betroffen ist, bekommt
      * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen“ —

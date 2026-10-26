@@ -5521,3 +5521,5 @@ body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom,
 
 /* Die Sprungleiste erhält Platz unter Beschreibung und Verfasser. */
 .slide:has(.reel-position) .slide__meta{bottom:64px}
+
+.instant-feld{width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);margin:8px 0}

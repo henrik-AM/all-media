@@ -256,6 +256,7 @@ const LAEUFE = [
   ['af3-negativ', 'af3-negativ.js'],
   ['af5-reels', 'af5-reels.js'],
   ['af7-analysen', 'af7-analysen.js'],
+  ['af6-instants', 'af6-instants.js'],
   ['lenken', '_lenken.js'],
   ['markierung-einheit', '_markierung_einheit.js'],
   ['markieren', '_markieren.js'],

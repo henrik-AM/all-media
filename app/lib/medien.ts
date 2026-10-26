@@ -239,6 +239,10 @@ export async function signiereEine(
 ): Promise<string | null> {
   if (!client) return null;
 
+  if (pfad.startsWith('instants/')) {
+    const {data,error}=await client.storage.from('media').createSignedUrl(pfad,60);
+    if(error)throw error;return data?.signedUrl || null;
+  }
   const speicher = await speicherFuer(client);
   if (!speicher) return null;
   const eintrag = speicher.eintraege.get(pfad);

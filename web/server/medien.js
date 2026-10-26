@@ -235,7 +235,7 @@ function ersetze(wert, karte) {
  * Wer die unterschriebene in die Datenbank schreibt, hat dort nach vier
  * Stunden eine tote Adresse stehen.
  */
-const ORDNER = ['messages', 'stories', 'avatars', 'posts', 'insights', 'ptt'];
+const ORDNER = ['messages', 'stories', 'avatars', 'posts', 'insights', 'ptt', 'instants'];
 
 async function hochladen(client, nutzerId, ordner, datenadresse) {
   if (!client) return { ok: false, error: 'Nicht angemeldet' };
@@ -246,6 +246,7 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
 
   const typ = treffer[1];
   const inhalt = Buffer.from(treffer[2], 'base64');
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   return ablegen(client, nutzerId, ordner, typ, inhalt);
 }
 
@@ -272,6 +273,7 @@ async function hochladenVideo(client, nutzerId, ordner, mime, inhalt) {
   if (!Buffer.isBuffer(inhalt)) return { ok: false, error: 'Das ist keine lesbare Aufnahme' };
   const zuGross = StoryRegeln.videoPruefen({ bytes: inhalt.length });
   if (zuGross) return { ok: false, error: zuGross };
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   return ablegen(client, nutzerId, ordner, typ, inhalt);
 }
 
@@ -294,10 +296,10 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
    * nur noch die Millisekunde raten muss.
    */
   const zufall = Math.random().toString(36).slice(2, 10);
-  const pfad = `${ordner}/${nutzerId}-${Date.now()}-${zufall}.${endung}`;
+  const pfad = ordner === 'instants' ? `instants/${nutzerId}/${Date.now()}-${zufall}.jpg` : `${ordner}/${nutzerId}-${Date.now()}-${zufall}.${endung}`;
 
   const { error } = await client.storage.from('media').upload(pfad, inhalt, {
-    cacheControl: '3600',
+    cacheControl: ordner === 'instants' ? '0' : '3600',
     contentType: typ,
     upsert: false,
   });
@@ -310,6 +312,7 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
 
   const { data } = client.storage.from('media').getPublicUrl(pfad);
   let anzeige = null;
+  if (ordner === 'instants') return {ok:true,url:data.publicUrl,anzeige:null,pfad};
   try {
     const { data: unterschrift } = await client.storage
       .from('media')
@@ -423,4 +426,17 @@ async function loeschen(client,nutzerId,pfad) {
   const {error}=await client.storage.from('media').remove([pfad]);
   return error?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
 }
-module.exports = { mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, istMedienAdresse, istFremdeMedienAdresse, ohneFremdeMedien, pfadAus, hochladen, hochladenVideo };
+async function instantUnterschrift(client,pfad) {
+  if(!/^instants\/[0-9a-f-]{36}\/[A-Za-z0-9_-]+\.jpg$/.test(pfad))throw new Error('Ungültiger Instant-Pfad');
+  const {data,error}=await client.storage.from('media').createSignedUrl(pfad,60);
+  if(error)throw error;return data.signedUrl;
+}
+async function instantsAufraeumen(client) {
+  const {data,error}=await client.rpc('instant_loeschkandidaten');if(error)throw error;
+  const zeilen=data||[];if(!zeilen.length)return 0;
+  const {error:loeschFehler}=await client.storage.from('media').remove(zeilen.map(z=>z.bild_pfad));
+  if(loeschFehler)throw loeschFehler;
+  const {error:bestaetigung}=await client.rpc('instant_loeschbestaetigen',{p_ids:zeilen.map(z=>z.id).filter(Boolean)});
+  if(bestaetigung)throw bestaetigung;return zeilen.length;
+}
+module.exports = { instantUnterschrift, instantsAufraeumen, mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, istMedienAdresse, istFremdeMedienAdresse, ohneFremdeMedien, pfadAus, hochladen, hochladenVideo };

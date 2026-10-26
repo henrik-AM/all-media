@@ -3688,6 +3688,7 @@ function mitteilungText(m, namen, communityNamen, kanalCommunity = new Map()) {
     beitritt_ok: `${name} hat deine Anfrage für „${community}" angenommen.`,
     // Kasten 28/15.4 (Schema 98) — derselbe Satz wie in der App (ProfilContext).
     freund_anfrage: `${name} möchte mit dir befreundet sein.`,
+    instant: `${name} hat dir ein Instant gesendet.`,
     freund_ok: `Du und ${name} seid jetzt befreundet.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
@@ -4127,6 +4128,8 @@ app.post('/api/impressionen', route(async (req) =>
  * mit 413; `res.json()` im Browser scheiterte daran, und die Meldung lautete
  * nur „Keine Verbindung". Jetzt steht dort der Grund.
  */
+require("./instants").einhaengen(app,route);
+
 // eslint-disable-next-line no-unused-vars
 app.use((fehler, req, res, next) => {
   if (fehler && (fehler.type === 'entity.too.large' || fehler.status === 413)) {
