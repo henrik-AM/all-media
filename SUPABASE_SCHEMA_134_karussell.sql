@@ -108,9 +108,11 @@ $$;
 revoke execute on function public.medien_leseliste(text[]) from public,anon;
 grant execute on function public.medien_leseliste(text[]) to authenticated;
 create or replace function public.medium_loeschrecht(p_pfad text) returns text
-language sql stable security invoker set search_path=public as $$
+language sql stable security definer set search_path=public as $$
  select public.medium_anbieter(p_pfad) where auth.uid() is not null and public.konto_freigegeben()
- and public.medium_besitzer_stimmt(p_pfad,auth.uid());
+ and public.medium_besitzer_stimmt(p_pfad,auth.uid())
+ and not exists(select 1 from public.posts p where p.media_url=public.medien_adresse(p_pfad)
+ or coalesce(to_jsonb(p)->'medien','[]'::jsonb) @> jsonb_build_array(jsonb_build_object('url',public.medien_adresse(p_pfad))));
 $$;
 revoke execute on function public.medium_loeschrecht(text) from public,anon;
 grant execute on function public.medium_loeschrecht(text) to authenticated;

@@ -18,7 +18,7 @@ let n=0;async function test(name,f){await f();console.log(`OK ${++n} ${name}`);}
   await test('Echte 20:01-Datei lokal abgewiesen',async()=>assert.rejects(V.pruefen(lang),/20 Minuten/));
   await test('Beschädigte Bytes abgewiesen',async()=>assert.rejects(V.pruefen(Buffer.from('kein Video'))));
   const alt=V.dienstclient;let uploads=0,belege=[],entfernt=0,belegFehler=false;
-  V.dienstclient=()=>({from:t=>({insert:async b=>{assert.equal(t,'video_upload_belege');belege.push(b);return {error:belegFehler?Error('DB nicht bereit'):null};}})});
+  V.dienstclient=()=>({storage:{from:()=>({remove:async()=>{entfernt++;return {error:null};}})},from:t=>({insert:async b=>{assert.equal(t,'video_upload_belege');belege.push(b);return {error:belegFehler?Error('DB nicht bereit'):null};}})});
   const client={storage:{from:t=>({upload:async(p,b)=>{uploads++;assert.equal(t,'media');assert.deepEqual(b,kurz);return {data:{id:'objekt'}};},getPublicUrl:p=>({data:{publicUrl:'https://lokal/'+p}}),createSignedUrl:async()=>({data:{signedUrl:'lokal'}}),remove:async()=>{entfernt++;return {error:null};}})}};
   try{
    await test('Zulässige Bytes → Upload → gebundener SHA256-Beleg',async()=>{const r=await M.hochladenVideo(client,'konto','posts','video/mp4',kurz);assert.equal(r.sekunden,1200);assert.equal(uploads,1);assert.equal(belege.length,1);assert.equal(belege[0].objekt_id,'objekt');assert.match(belege[0].sha256,/^[a-f0-9]{64}$/);assert.equal(belege[0].bytes,kurz.length);});

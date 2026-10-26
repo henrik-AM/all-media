@@ -18,12 +18,8 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-<<<<<<< HEAD
-import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand, ladePersonen } from '../lib/daten';
+import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand, ladePersonen, ladeBeitraege } from '../lib/daten';
 import type { Profile, User } from '../types';
-=======
-import { AlleDaten, ladeAlles, ladeBeitraege, ladeChatlisten, ladeChatlistenStand } from '../lib/daten';
->>>>>>> 2690f16 (Zwischenstand: Karussells aus beiden Profilen gezielt öffnen und nachladen)
 import { meinSchluessel } from '../lib/krypto';
 import { AuthContext } from './AuthContext';
 import { useSupabase } from './SupabaseContext';
@@ -312,7 +308,6 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     []
   );
 
-<<<<<<< HEAD
   const personMerken = useCallback((eintrag: { user: User; profile: Profile }) => {
     const id = eintrag.user.id;
     versucht.current.add(id);
@@ -347,22 +342,6 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     [supabase, ichId]
   );
 
-  const wert = useMemo<DatenWert>(
-    () => ({
-      ...daten,
-      users,
-      profile,
-      laedt,
-      fehler,
-      neuLaden: laden,
-      chatsNeuLaden,
-      chatsGelesenSeit,
-      keinInteresseMerken,
-      personMerken,
-      personenNachladen,
-    }),
-    [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, chatsGelesenSeit, keinInteresseMerken, personMerken, personenNachladen]
-=======
   const beitragNachladen=useCallback(async(id:string)=>{
     if([...daten.posts,...daten.videos,...daten.clips].some(p=>p.id===id))return true;
     if(!supabase||!ichId||!/^[0-9a-f-]{36}$/i.test(id))return false;
@@ -378,10 +357,23 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     return gefunden;
   },[supabase,ichId,daten.posts,daten.videos,daten.clips]);
 
+
   const wert = useMemo<DatenWert>(
-    () => ({ ...daten, laedt, fehler, neuLaden: laden, chatsNeuLaden, keinInteresseMerken, beitragNachladen }),
-    [daten, laedt, fehler, laden, chatsNeuLaden, keinInteresseMerken, beitragNachladen]
->>>>>>> 2690f16 (Zwischenstand: Karussells aus beiden Profilen gezielt öffnen und nachladen)
+    () => ({
+      ...daten,
+      users,
+      profile,
+      laedt,
+      fehler,
+      neuLaden: laden,
+      chatsNeuLaden,
+      chatsGelesenSeit,
+      keinInteresseMerken,
+      personMerken,
+      personenNachladen,
+      beitragNachladen,
+    }),
+    [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, chatsGelesenSeit, keinInteresseMerken, personMerken, personenNachladen, beitragNachladen]
   );
 
   return <DatenContext.Provider value={wert}>{children}</DatenContext.Provider>;

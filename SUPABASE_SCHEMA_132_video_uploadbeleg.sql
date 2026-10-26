@@ -22,8 +22,24 @@ execute function public.spalten_fest('objekt_id','user_id','pfad','sekunden','sh
 -- Bereits beim INSERT unveränderlich; verhindert Austausch zwischen Upload und Beleg.
 drop policy if exists video_upload_unveraenderlich on storage.objects;
 create policy video_upload_unveraenderlich on storage.objects as restrictive for update to authenticated
-using(not(bucket_id='media' and name ~* '^posts/.*\.(mp4|mov|m4v|webm)$'))
-with check(not(bucket_id='media' and name ~* '^posts/.*\.(mp4|mov|m4v|webm)$'));
+using(not(bucket_id='media' and name like 'posts/%'))
+with check(not(bucket_id='media' and name like 'posts/%'));
+-- B1: Auch Bildpfade einfrieren: sonst wäre Bild → ungeprüftes Video möglich.
+-- Client-DELETE mit anschließendem INSERT darf keinen belegten Pfad ersetzen.
+drop policy if exists post_upload_loeschsperre on storage.objects;
+create policy post_upload_loeschsperre on storage.objects as restrictive for delete to authenticated
+using(not(bucket_id='media' and name like 'posts/%'));
+-- Server darf nur eigene, nicht mehr referenzierte Dateien beseitigen.
+-- to_jsonb berücksichtigt Karussells nach 113, läuft aber schon ohne diese Spalte.
+create or replace function public.medium_loeschrecht(p_pfad text) returns text
+language sql stable security definer set search_path=public as $$
+ select 'supabase'::text where auth.uid() is not null and public.konto_freigegeben()
+ and public.medium_besitzer_stimmt(p_pfad,auth.uid())
+ and not exists(select 1 from public.posts p where p.media_url=public.medien_adresse(p_pfad)
+ or coalesce(to_jsonb(p)->'medien','[]'::jsonb) @> jsonb_build_array(jsonb_build_object('url',public.medien_adresse(p_pfad))));
+$$;
+revoke execute on function public.medium_loeschrecht(text) from public,anon;
+grant execute on function public.medium_loeschrecht(text) to authenticated;
 -- Auch privilegiertes Ersetzen entwertet einen früheren Beleg.
 create or replace function public.video_beleg_entwerten() returns trigger
 language plpgsql security definer set search_path=public as $$

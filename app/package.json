@@ -183,7 +183,8 @@
     "test:bunny-anschluss": "node test/bunny-anschluss.js",
     "test:bunny-bilder": "node test/bunny-bilder.js",
     "test:bunny-schema": "node test/bunny-schema-probe.js",
-    "test:af4-profilsprung": "node test/af4-profilsprung.js"
+    "test:af4-profilsprung": "node test/af4-profilsprung.js",
+    "test:af-fix-b1": "node test/af-fix-b1.js"
   },
   "private": true
 }
