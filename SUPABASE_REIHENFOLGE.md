@@ -683,8 +683,13 @@ Nach 95/115/117. Probe: `app/test/_probe128.js` (verworfen). **Kein Index auf
 `profiles.avatar_url`** — macht Profil-Updates nicht-HOT und scheitert am Ausdrucksindex
 mit `telefonbuch_schluessel()` (42501). Alte 95 nicht erneut einspielen: öffnet `avatars/` wieder.
 
+<<<<<<< HEAD
 ## Schema 129 — AF3 Negativreaktionen (Paket 9)
 Nach 128: `SUPABASE_SCHEMA_129_video_negativ.sql` (Entwurf 108 aus dem Sammelzweig, auf main-Stand gebracht). Ersetzt `feed_rang`. Private Negativreaktionen, atomarer Ausschluss von Likes, Faktoren 0,02 / 0,3 / 0,5.
+=======
+## Schema 110 — AF7 (Entwurf)
+Nach 108: `SUPABASE_SCHEMA_110_kontoanalysen.sql`. Neue private Messung ab Einspielung; Follower/Vorwahl-Snapshot je Tageszeile, nur eigene Aggregate. Neue Tabellen nur Trigger/RPC, keine direkten Clientrechte. `impression_vermerken(uuid,integer,text)` aus 28 wird ersetzt: nur freigegebene Konten, sichtbare Beiträge und Meldungen ab 1000 ms. Interaktionen werden ab Einspielung mit Serverzeit als Netto-Bestand gemessen. 109 bleibt frei.
+>>>>>>> cdbccf0 (AF-Abschluss: Prüflauf und Schema-Abhängigkeiten vollständig eintragen)
 
 ## Schema 130 — AF7 Kontoanalysen (Paket 9)
 Nach 129: `SUPABASE_SCHEMA_130_kontoanalysen.sql` (Entwurf 110). Neue private Messung ab Einspielung; Follower/Vorwahl-Snapshot je Tageszeile, nur eigene Aggregate. Neue Tabellen nur Trigger/RPC, keine direkten Clientrechte.
@@ -694,7 +699,12 @@ Nach 130 und 128: `SUPABASE_SCHEMA_131_instants.sql` (Entwurf 111). Private Enge
 Kamera-Instants, fester Empfängerkreis, Einmal-Öffnen und 24-Stunden-Sichtbarkeit.
 Erweitert die CHECK-Listen von notifications dynamisch um `instant`, ohne Arten
 aus 98 oder späteren Schemas zu entfernen. Zusätzliche restriktive Speicherregel
-verhindert Wiederfreigabe über fremde Inhaltstabellen. Kurze URLs nur über die
-zentralen Medienmodule (60 s, ohne Vierstunden-Cache). Der Server-Aufräumer braucht
+verhindert Wiederfreigabe über fremde Inhaltstabellen. Direkte Storage-Downloads und -Signaturen für angemeldete Clients sind für Instant-Pfade gesperrt.
+Kurze URLs ausschließlich über den Server nach Nutzer-RLS-Prüfung (60 s, ohne Cache);
+auch dafür ist der serverseitige `SUPABASE_SERVICE_ROLE_KEY` nötig, sonst kein Bildabruf.
+Die App nutzt `EXPO_PUBLIC_WEB_URL` (Standard: bestehende Render-Website), HTTPS;
+lokal nur explizit localhost/127.0.0.1. Code, Schema und Server zusammen ausliefern.
+Badge über `instant_stand()`, Listen in 50er-Seiten (`instant_postfach(integer)` ersetzt
+die frühere argumentlose Entwurfsfassung). Der Server-Aufräumer braucht
 `INSTANTS_BEREINIGUNG=an` und einen serverseitigen `SUPABASE_SERVICE_ROLE_KEY`;
 noch nicht eingerichtet, keine sofortige physische Löschung behaupten.
