@@ -6291,7 +6291,8 @@ function renderHomeFeed() {
   );
 
   main.querySelectorAll('[data-doppelklick]').forEach((flaeche) =>
-    flaeche.addEventListener('dblclick', () => {
+    flaeche.addEventListener('dblclick', (e) => {
+      if(e.target.closest('button,video,input'))return;
       const pid = flaeche.dataset.doppelklick;
       const beitrag = state.posts.find((x) => x.id === pid);
 
@@ -6980,7 +6981,10 @@ function pttEinhaengen(communityId, kanalId = null, nachSenden = null) {
     }
     try {
       stuecke = [];
-      aufnahme = new MediaRecorder(spur);
+      const konfig=await fetch('/api/medien/konfiguration').then(r=>r.json()).catch(()=>({}));
+      const mp4=['audio/mp4;codecs=mp4a.40.2','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+      if(konfig.anbieter==='bunny'&&!mp4){spur.getTracks().forEach(t=>t.stop());return toast('Dieser Browser nimmt kein M4A auf. Bitte Push-to-Talk in der App verwenden.');}
+      aufnahme = new MediaRecorder(spur,konfig.anbieter==='bunny'?{mimeType:mp4}:undefined);
       aufnahme.addEventListener('dataavailable', (e) => stuecke.push(e.data));
 
       aufnahme.addEventListener('stop', async () => {
@@ -6991,7 +6995,7 @@ function pttEinhaengen(communityId, kanalId = null, nachSenden = null) {
         const dauerMs = Date.now() - beginn;
         if (dauerMs < PTT_MINDESTDAUER) return toast('Zu kurz — halte den Knopf gedrückt');
 
-        const blob = new Blob(stuecke, { type: 'audio/webm' });
+        const blob = new Blob(stuecke, { type: (aufnahme.mimeType||'audio/webm').split(';')[0] });
         const adresse = await new Promise((fertig) => {
           const leser = new FileReader();
           leser.onload = () => fertig(leser.result);
@@ -12131,7 +12135,7 @@ function kameraLaufwerk(wurzel, fertig) {
     if (typeof MediaRecorder === 'undefined') {
       return toast('Dieser Browser kann keine Videos aufnehmen');
     }
-    const medienKonfig=await api('/api/medien/konfiguration');
+    const medienKonfig=await fetch('/api/medien/konfiguration').then(r=>r.json()).catch(()=>({}));
     if(medienKonfig?.anbieter==='bunny' && !['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4'].some(t=>MediaRecorder.isTypeSupported(t)))return toast('Dieser Browser nimmt kein MP4 auf. Bitte eine MP4-Datei aus der Galerie wählen.');
     stuecke = [];
     try {
@@ -18694,7 +18698,8 @@ async function erstelle(was) {
         if(video)hoch=await videoHochladen({art:'video',datei:d,typ:d.type},'posts');
         else {
           const klein=await bildVerkleinern(d);
-          const blob=await (await fetch(klein)).blob();
+          const typ=/^data:([^;]+)/.exec(klein)?.[1]||'image/jpeg';
+          const blob=new Blob([Uint8Array.from(atob(klein.split(',')[1]),c=>c.charCodeAt(0))],{type:typ});
           hoch=await medienDateiHochladen(blob,'posts',blob.type);
         }
         if(!hoch.ok){await aufraeumen();return hoch.error;}
@@ -18706,7 +18711,7 @@ async function erstelle(was) {
         body: JSON.stringify({ ...werte, sekunden, mediaUrl,...(istBild?{medien}:{}), geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
       });
       const daten = await res.json();
-      if (!daten.ok){await aufraeumen();return daten.error;}
+      if (!daten.ok)return daten.error;
 
       /*
        * Geplante Beiträge kommen nicht in den Feed. Sie dort schon zu zeigen

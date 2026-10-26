@@ -69,10 +69,26 @@ revoke execute on function public.medium_besitzer_stimmt(text, uuid) from public
 grant execute on function public.medium_besitzer_stimmt(text, uuid) to authenticated;
 
 
+-- Bestehende Inhalts-RLS kann öffentliche Beiträge trotz Blockierung liefern.
+-- Für neue Dateifreigaben zusätzlich den tatsächlichen Upload-Eigentümer prüfen.
+create or replace function public.medium_ursprung_frei(p_pfad text) returns boolean
+language plpgsql stable security definer set search_path=public as $$
+declare e uuid;alt text;
+begin
+ if auth.uid() is null then return false;end if;
+ select owner_id into e from public.medien_objekte where pfad=p_pfad;
+ if not found then
+   select owner_id into alt from storage.objects where bucket_id='media' and name=p_pfad;
+   if alt ~ '^[0-9a-f-]{36}$' then e:=alt::uuid;end if;
+ end if;
+ return e is null or e=auth.uid() or (public.profil_freigegeben(e) and not public.blockiert_zwischen(e,auth.uid()));
+end $$;
+revoke execute on function public.medium_ursprung_frei(text) from public,anon;
+grant execute on function public.medium_ursprung_frei(text) to authenticated;
 -- Keine Instant-Freigabe über andere Tabellen oder Eigentumsabkürzungen.
 create or replace function public.medium_darf_lesen(p_pfad text) returns boolean
 language sql stable security invoker set search_path=public as $$
- select auth.uid() is not null and public.konto_freigegeben() and p_pfad not like 'instants/%'
+ select auth.uid() is not null and public.konto_freigegeben() and p_pfad not like 'instants/%' and public.medium_ursprung_frei(p_pfad)
  and (public.medium_besitzer_stimmt(p_pfad,auth.uid()) or public.medium_sichtbar(p_pfad));
 $$;
 revoke execute on function public.medium_darf_lesen(text) from public,anon;
@@ -312,4 +328,9 @@ revoke execute on function public.medium_sichtbar(text) from public, anon;
 grant execute on function public.medium_sichtbar(text) to authenticated;
 
 
+-- UPDATE nur der Liste ändert media_url im BEFORE-Trigger. UPDATE-OF-Trigger
+-- richten sich nach der ursprünglichen SET-Liste, deshalb medien ausdrücklich aufnehmen.
+drop trigger if exists video_beleg_pruefen on public.posts;
+create trigger video_beleg_pruefen before insert or update of media_url,kind,duration,medien on public.posts
+for each row execute function public.video_beleg_pruefen();
 commit;

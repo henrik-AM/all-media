@@ -5549,3 +5549,5 @@ body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom,
 .karussellvoll {background:#111;color:white;border:0;padding:12px;width:95vw;max-width:1200px;height:95dvh;max-height:95dvh;}
 .karussellvoll::backdrop {background:#000c}.karussellvoll>button {color:white;padding:14px;}
 .karussell--voll {aspect-ratio:auto;height:calc(100% - 56px);}
+
+.karussell:has(video[src]) .karussell__leiste {bottom:52px;}

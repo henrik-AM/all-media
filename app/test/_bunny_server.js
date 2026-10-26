@@ -25,7 +25,7 @@ async function starten(){
    if(name==='medium_loeschrecht')return {data:lage.freigegeben&&owner(args.p_pfad)?provider(args.p_pfad):null};
    if(name==='medium_anbieter')return {data:provider(args.p_pfad)};
    throw Error('Unerwartetes RPC '+name);
-  },from:t=>{if(t==='posts')return {insert:b=>({select:()=>({single:async()=>{const z={...b,id:'lokaler-post-'+(lage.posts.length+1)};lage.posts.push(z);for(const m of b.medien||[])lage.oeffentlich.add(m.url.split('/storage/v1/object/public/media/')[1]);return {data:z};}})})};if(t==='instants')return {select:()=>({eq:(_k,p)=>({single:async()=>({data:register.get(p)?.owner_id===wer?{bild_pfad:p}:null})})})};return dienstTabelle(t);},
+  },from:t=>{if(t==='posts')return {insert:b=>({select:()=>({single:async()=>{const z={...b,id:'ab260026-0000-4000-8001-'+String(lage.posts.length+1).padStart(12,'0')};lage.posts.push(z);for(const m of b.medien||[])lage.oeffentlich.add(m.url.split('/storage/v1/object/public/media/')[1]);return {data:z};}})})};if(t==='instants')return {select:()=>({eq:(_k,p)=>({single:async()=>({data:register.get(p)?.owner_id===wer?{bild_pfad:p}:null})})})};return dienstTabelle(t);},
   storage:{from:()=>({
    upload:async(p,b)=>{alt.set(p,{inhalt:b,owner:wer});return {data:{id:'altes-objekt'}};},
    remove:async pfade=>{for(const p of pfade)if(alt.get(p)?.owner===wer)alt.delete(p);return {error:null};},

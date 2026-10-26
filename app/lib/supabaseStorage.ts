@@ -21,7 +21,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { signiereEine, medienServerBasis, medienAnfrage, uploadStandSetzen } from './medien';
+import { signiereEine, medienServerBasis, medienAnfrage, uploadStandSetzen, uploadIstAktiv } from './medien';
 import * as MedienUpload from '../../gemeinsam/upload';
 
 
@@ -106,6 +106,7 @@ export async function ladeHoch(
     const { data: sitzung } = await client.auth.getSession();
     const token = sitzung.session?.access_token;
     if (!token) throw new Error('Bitte erneut anmelden.');
+    if (uploadIstAktiv()) throw new Error('Bitte das laufende Hochladen abwarten oder abbrechen.');
     const steuerung = new AbortController();
     const melden = (stand: MedienUpload.Stand) => uploadStandSetzen({ ...stand, abbrechen: () => steuerung.abort() });
     let wert: any;

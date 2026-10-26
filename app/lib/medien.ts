@@ -62,6 +62,7 @@ export type UploadStand = import('../../gemeinsam/upload').Stand & {abbrechen:()
 let uploadStand:UploadStand|null=null;
 const uploadZuhoerer=new Set<(s:UploadStand|null)=>void>();
 export function uploadBeobachten(fn:(s:UploadStand|null)=>void){uploadZuhoerer.add(fn);fn(uploadStand);return ()=>{uploadZuhoerer.delete(fn);};}
+export function uploadIstAktiv(){return uploadStand!==null;}
 export function uploadStandSetzen(s:UploadStand|null){uploadStand=s;for(const fn of uploadZuhoerer)fn(s);}
 const GUELTIG = 4 * 60 * 60;
 
