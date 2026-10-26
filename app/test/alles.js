@@ -258,6 +258,8 @@ const LAEUFE = [
   ['bunny', '_bunny_einheit.js'],
   ['af-fix-b3', 'af-fix-b3.js'],
   ['af-fix-b4', 'af-fix-b4.js'],
+  ['af-fix-b5', 'af-fix-b5.js'],
+  ['af-fix-b5-app', 'af-fix-b5-app.js'],
   ['af-fix-b1', 'af-fix-b1.js'],
   ['bunny-upload', 'bunny-upload.js'],
   ['af4-karussell', 'af4-karussell.js'],

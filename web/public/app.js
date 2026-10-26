@@ -18418,7 +18418,7 @@ function bestaetigen(titel, text, knopf = 'Weiter') {
   });
 }
 
-function openFormular(titel, felder, senden, knopf = 'Fertig') {
+function openFormular(titel, felder, senden, knopf = 'Fertig', optionen = {}) {
   const feldHtml = (f) => {
     const gemeinsam = `id="f_${f.key}" placeholder="${esc(f.platzhalter || '')}"`;
     const eingabe =
@@ -18500,7 +18500,7 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
         el.addEventListener('input', () => (sheet.querySelector('#formFehler').hidden = true))
       );
     },
-    { schliessen: true }
+    { ...optionen, schliessen: true }
   );
 }
 
@@ -18655,6 +18655,20 @@ async function erstelle(was) {
   catch{return toast('Aufnahme konnte nicht gelesen werden');}
 
   const quer = was === 'landscape';
+  // Ein Formular besitzt seine Uploads bis Erfolg oder endgültigem Schließen.
+  const hochgeladen = new Map();
+  let aktiv = true, veroeffentlicht = false, lauf = Promise.resolve();
+  const aufraeumen = async () => {
+    let fehlgeschlagen = false;
+    for (const [datei, hoch] of hochgeladen) {
+      try {
+        const weg = await api('/api/medien/loeschen', { pfad: hoch.pfad });
+        if (!weg?.ok) { fehlgeschlagen = true; continue; }
+        hochgeladen.delete(datei);
+      } catch { fehlgeschlagen = true; }
+    }
+    if (fehlgeschlagen) toast('Nicht alle unveröffentlichten Aufnahmen konnten entfernt werden.');
+  };
   openFormular(
     { post: 'Neuer Beitrag', reels: 'Neues Reel', landscape: 'Neues Querformat-Video' }[was],
     [
@@ -18696,30 +18710,43 @@ async function erstelle(was) {
         wert: 'Sofort',
       },
     ],
-    async (werte) => {
+    (werte) => {
+      const ausfuehren = async () => {
+      if (veroeffentlicht) return;
+      if (!aktiv) return 'Das Formular wurde geschlossen.';
+      if (!String(werte.beschreibung || '').trim()) return 'Bitte eine Beschreibung eingeben';
+      if (!['Sofort', 'In einer Stunde', 'Heute Abend', 'Morgen früh'].includes(werte.zeitpunkt || 'Sofort')) return 'Bitte einen gültigen Veröffentlichungszeitpunkt wählen.';
       const spaeter = geplantAb(werte.zeitpunkt);
+      if (spaeter && (!Number.isFinite(Date.parse(spaeter)) || Date.parse(spaeter) <= Date.now())) return 'Der Veröffentlichungszeitpunkt muss in der Zukunft liegen.';
       const ziel = istBild ? '/api/eigene/beitrag' : '/api/eigene/video';
-      let mediaUrl;const medien=[],hochgeladen=[];
-      const aufraeumen=async()=>{for(const p of hochgeladen)await api('/api/medien/loeschen',{pfad:p});};
-      for(const d of dateien){
-        const video=d.type.startsWith('video/');let hoch;
-        if(video)hoch=await videoHochladen({art:'video',datei:d,typ:d.type},'posts');
-        else {
-          const klein=await bildVerkleinern(d);
-          const typ=/^data:([^;]+)/.exec(klein)?.[1]||'image/jpeg';
-          const blob=new Blob([Uint8Array.from(atob(klein.split(',')[1]),c=>c.charCodeAt(0))],{type:typ});
-          hoch=await medienDateiHochladen(blob,'posts',blob.type);
+      const medien = [];
+      for (const d of dateien) {
+        const video = d.type.startsWith('video/');
+        let hoch = hochgeladen.get(d);
+        if (!hoch) {
+          if (video) hoch = await videoHochladen({ art: 'video', datei: d, typ: d.type }, 'posts');
+          else {
+            const klein = await bildVerkleinern(d);
+            const typ = /^data:([^;]+)/.exec(klein)?.[1] || 'image/jpeg';
+            const blob = new Blob([Uint8Array.from(atob(klein.split(',')[1]), c => c.charCodeAt(0))], { type: typ });
+            hoch = await medienDateiHochladen(blob, 'posts', blob.type);
+          }
+          if (!hoch.ok) return hoch.error;
+          if (!hoch.pfad || !hoch.url) return 'Die Aufnahme konnte nicht bestätigt werden.';
+          hochgeladen.set(d, hoch);
         }
-        if(!hoch.ok){await aufraeumen();return hoch.error;}
-        hochgeladen.push(hoch.pfad);medien.push({url:hoch.url,typ:video?'video':'image'});
+        if (!aktiv) return 'Das Formular wurde geschlossen.';
+        medien.push({ url: hoch.url, typ: video ? 'video' : 'image' });
       }
-      mediaUrl=medien[0]?.url;
+      const mediaUrl = medien[0]?.url;
       const res = await fetch(ziel, {
-        method: 'POST',headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...werte, sekunden, mediaUrl,...(istBild?{medien}:{}), geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...werte, sekunden, mediaUrl, ...(istBild ? { medien } : {}), geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
       });
       const daten = await res.json();
-      if (!daten.ok)return daten.error;
+      if (!daten.ok) return daten.error || 'Veröffentlichen fehlgeschlagen.';
+      // Vor Nachladen/Anzeige bestätigen: deren Ausfall darf nicht erneut posten.
+      veroeffentlicht = true;
 
       /*
        * Geplante Beiträge kommen nicht in den Feed. Sie dort schon zu zeigen
@@ -18736,8 +18763,15 @@ async function erstelle(was) {
       state.sub.videos = istBild ? 'home' : quer ? 'landscape' : 'portrait';
       await bootstrap();
       toast(istBild ? 'Beitrag veröffentlicht' : 'Video veröffentlicht');
+      };
+      lauf = ausfuehren();
+      return lauf;
     },
-    'Veröffentlichen'
+    'Veröffentlichen',
+    { beimSchliessen: () => {
+      aktiv = false;
+      void lauf.catch(() => {}).then(() => veroeffentlicht ? undefined : aufraeumen());
+    } }
   );
 }
 
