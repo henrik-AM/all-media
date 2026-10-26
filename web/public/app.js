@@ -23674,11 +23674,15 @@ function karussellVerbinden(wurzel){
   const observer=new IntersectionObserver(entries=>{nah=entries[0].isIntersecting;laden();},{rootMargin:'200px'});observer.observe(el);
   el.querySelector('[data-k-voll]')?.addEventListener('click',()=>{
    const p=[...(state.posts||[])].find(p=>p.id===el.dataset.kid);if(!p)return;
+   const warNah=nah;nah=false;laden();
    const dialog=document.createElement('dialog');dialog.className='karussellvoll';dialog.innerHTML='<button data-schliessen>Vollbild schließen</button>'+karussellFlaeche(p,true,bei);document.body.appendChild(dialog);dialog.showModal();
-   const freigeben=()=>{dialog.remove();for(const [k,stop] of karussellBeobachter)if(!k.isConnected){stop();karussellBeobachter.delete(k);}};
+   const freigeben=()=>{dialog.remove();nah=warNah;laden();for(const [k,stop] of karussellBeobachter)if(!k.isConnected){stop();karussellBeobachter.delete(k);}};
    dialog.querySelector('[data-schliessen]').onclick=()=>dialog.close();dialog.addEventListener('close',freigeben,{once:true});karussellVerbinden(dialog);
   });
   karussellBeobachter.set(el,()=>{observer.disconnect();nah=false;laden();});
   if(bei)streifen.scrollLeft=bei*streifen.clientWidth;stand();
  });
 }
+
+// Navigation entfernt DOM-Knoten; auch deren Spieler/Beobachter sofort freigeben.
+new MutationObserver(()=>{for(const [el,stop] of karussellBeobachter)if(!el.isConnected){karussellBeobachter.delete(el);stop();}}).observe(document.body,{childList:true,subtree:true});

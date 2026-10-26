@@ -58,10 +58,11 @@ stable
 security definer
 set search_path = public
 as $$
-  select auth.uid() is not null and exists (
-    select 1 from storage.objects o
-    where o.bucket_id = 'media' and o.name = pfad and o.owner_id = wer::text
-  ) or (auth.uid() is not null and exists(select 1 from public.medien_objekte b where b.pfad=$1 and b.owner_id=wer));
+  select auth.uid() is not null and case
+    when exists(select 1 from public.medien_objekte b where b.pfad=$1)
+    then exists(select 1 from public.medien_objekte b where b.pfad=$1 and b.owner_id=wer)
+    else exists(select 1 from storage.objects o where o.bucket_id='media' and o.name=$1 and o.owner_id=wer::text)
+  end;
 $$;
 
 revoke execute on function public.medium_besitzer_stimmt(text, uuid) from public, anon;
@@ -217,6 +218,26 @@ $$;
 revoke execute on function public.instant_loeschkandidaten() from public,anon,authenticated;
 grant execute on function public.instant_loeschkandidaten() to service_role;
 
+-- INVOKER-Trigger dürfen die privaten Belegtabellen nicht selbst lesen.
+-- Helfer geben ausschließlich Typ bzw. booleschen Eigenbeleg zurück, keine Metadatenzeilen.
+create or replace function public.medium_typ(p_pfad text) returns text
+language sql stable security definer set search_path=public as $$
+ select coalesce((select typ from public.medien_objekte where pfad=p_pfad),
+ (select metadata->>'mimetype' from storage.objects where bucket_id='media' and name=p_pfad))
+ where auth.uid() is not null;
+$$;
+revoke execute on function public.medium_typ(text) from public,anon;
+grant execute on function public.medium_typ(text) to authenticated;
+create or replace function public.medium_video_geprueft(p_pfad text,p_owner uuid) returns boolean
+language sql stable security definer set search_path=public as $$
+ select auth.uid()=p_owner and case when exists(select 1 from public.medien_objekte where pfad=p_pfad)
+ then exists(select 1 from public.medien_objekte b where b.pfad=p_pfad and b.owner_id=p_owner
+   and b.typ='video/mp4' and b.sekunden is not null)
+ else exists(select 1 from public.video_upload_belege b join storage.objects o on o.id=b.objekt_id
+ where b.pfad=p_pfad and b.user_id=p_owner and o.owner_id=p_owner::text and b.bytes=(o.metadata->>'size')::bigint) end;
+$$;
+revoke execute on function public.medium_video_geprueft(text,uuid) from public,anon;
+grant execute on function public.medium_video_geprueft(text,uuid) to authenticated;
 -- JSON-Liste im selben INSERT wie der Beitrag: kein halbfertiges Karussell.
 -- Keine feste Anzahl; HTTP-/Speichergrenzen gelten je Aufnahme weiterhin.
 alter table public.posts add column if not exists medien jsonb not null default '[]'::jsonb;
@@ -239,15 +260,12 @@ begin
    if p like 'instants/%' or (current_user='authenticated' and not public.medium_darf_lesen(p)) then
      raise exception 'Dieses Medium darfst du nicht verwenden' using errcode='42501';end if;
    -- Ein Video darf weder als Bild getarnt noch nur an zweiter Stelle versteckt sein.
-   if m->>'typ'='video' or p ~* '\.(mp4|mov|m4v|webm)$' then
+   if m->>'typ'='video' or public.medium_typ(p) like 'video/%' or p ~* '\.(mp4|mov|m4v|webm)$' then
      if m->>'typ'<>'video' then raise exception 'Falscher Medientyp';end if;
-     select exists(select 1 from public.medien_objekte b where b.pfad=p and b.owner_id=new.user_id
-       and b.typ='video/mp4' and b.sekunden is not null) or
-       exists(select 1 from public.video_upload_belege b join storage.objects o on o.id=b.objekt_id
-       where b.pfad=p and b.user_id=new.user_id and o.owner_id=new.user_id::text and b.bytes=(o.metadata->>'size')::bigint)
-       into belegt;
-     if not belegt then raise exception 'Bitte das Video über die geprüfte Uploadstelle hochladen.' using errcode='42501';end if;
-   elsif p !~* '\.(jpg|jpeg|png|webp)$' then raise exception 'Falscher Medientyp';end if;
+     if not public.medium_video_geprueft(p,new.user_id) then
+       raise exception 'Bitte das Video über die geprüfte Uploadstelle hochladen.' using errcode='42501';end if;
+   elsif p !~* '\.(jpg|jpeg|png|webp)$' or public.medium_typ(p) not in ('image/jpeg','image/png','image/webp') then
+     raise exception 'Falscher Medientyp';end if;
  end loop;
  new.media_url:=new.medien->0->>'url';return new;
 end $$;
