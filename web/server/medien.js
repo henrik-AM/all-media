@@ -246,6 +246,7 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
 
   const typ = treffer[1];
   const inhalt = Buffer.from(treffer[2], 'base64');
+  if (typ.startsWith('video/')) return hochladenVideo(client, nutzerId, ordner, typ, inhalt);
   if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   return ablegen(client, nutzerId, ordner, typ, inhalt);
 }
@@ -295,10 +296,17 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
    * app/lib/supabaseStorage.ts: `<kennung>-<zeitstempel>` heisst, dass man
    * nur noch die Millisekunde raten muss.
    */
-  const zufall = Math.random().toString(36).slice(2, 10);
+  const zufall = require('node:crypto').randomBytes(16).toString('hex');
   const pfad = ordner === 'instants' ? `instants/${nutzerId}/${Date.now()}-${zufall}.jpg` : `${ordner}/${nutzerId}-${Date.now()}-${zufall}.${endung}`;
 
-  const { error } = await client.storage.from('media').upload(pfad, inhalt, {
+  let sekunden, dienst;
+  // Vor dem Ablegen aus den empfangenen Bytes bestimmen; Clientwerte ignorieren.
+  if (ordner === 'posts' && typ.startsWith('video/')) {
+    const pruefung = require('./videopruefung');
+    dienst = pruefung.dienstclient();
+    sekunden = await pruefung.pruefen(inhalt);
+  }
+  const { data: upload, error } = await client.storage.from('media').upload(pfad, inhalt, {
     cacheControl: ordner === 'instants' ? '0' : '3600',
     contentType: typ,
     upsert: false,
@@ -310,6 +318,19 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
     return { ok: false, error: 'Die Aufnahme ließ sich nicht speichern' };
   }
 
+  if (dienst) {
+    try {
+      if (!upload?.id) throw new Error('Der Uploadbeleg fehlt.');
+      const { error: belegFehler } = await dienst.from('video_upload_belege').insert({
+        objekt_id: upload.id, user_id: nutzerId, pfad, sekunden,
+        bytes: inhalt.length, sha256: require('node:crypto').createHash('sha256').update(inhalt).digest('hex'),
+      });
+      if (belegFehler) throw belegFehler;
+    } catch (e) {
+      await client.storage.from('media').remove([pfad]);
+      throw new Error('Das Video konnte nicht bestätigt werden. Bitte erneut versuchen.');
+    }
+  }
   const { data } = client.storage.from('media').getPublicUrl(pfad);
   let anzeige = null;
   if (ordner === 'instants') return {ok:true,url:data.publicUrl,anzeige:null,pfad};
@@ -322,7 +343,7 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
     console.error('Unterschreiben nach dem Hochladen fehlgeschlagen:', fehler.message);
   }
 
-  return { ok: true, url: data.publicUrl, anzeige, pfad };
+  return { ok: true, url: data.publicUrl, anzeige, pfad, sekunden };
 }
 
 async function hochladenDatei(client, nutzerId, ordner, mime, inhalt, optionen) {

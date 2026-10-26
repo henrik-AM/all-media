@@ -35,6 +35,7 @@ export type Ordner = 'messages' | 'stories' | 'avatars' | 'posts' | 'insights' |
 
 export interface UploadErgebnis {
   success: boolean;
+  sekunden?: number;
   error: string | null;
   /**
    * Die Adresse, die in die DATENBANK gehoert — in der bestaendigen Form
@@ -110,7 +111,7 @@ export async function ladeHoch(
     const wert=await r.json();
     if((await client.auth.getSession()).data.session?.access_token!==token)throw new Error('Das Konto wurde gewechselt.');
     if(!r.ok||!wert.ok)throw new Error(wert.error||'Upload fehlgeschlagen');
-    return {success:true,error:null,url:wert.url,anzeige:wert.anzeige};
+    return {success:true,error:null,url:wert.url,anzeige:wert.anzeige,sekunden:wert.sekunden};
   } catch (fehler: any) {
     // Sichtbar machen, nicht verschlucken: genau das Verschweigen hat
     // verborgen, dass nie etwas ankam.
