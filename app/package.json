@@ -188,7 +188,8 @@
     "test:af-fix-b3": "node test/af-fix-b3.js",
     "test:af-fix-b4": "node test/af-fix-b4.js",
     "test:af-fix-b5": "node test/af-fix-b5.js",
-    "test:af-fix-b5-app": "node test/af-fix-b5-app.js"
+    "test:af-fix-b5-app": "node test/af-fix-b5-app.js",
+    "test:af-fix-b7": "node test/af-fix-b7.js"
   },
   "private": true
 }

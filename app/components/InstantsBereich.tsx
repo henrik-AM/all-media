@@ -23,7 +23,8 @@ export function EngeFreundeSheet({ visible, onClose }: {
         vorschlaege: Person[];
     }>({ freunde: [], vorschlaege: [] });
     const [fehler, setFehler] = useState('');
-    const [laden, setLaden] = useState(false);
+    const [laden, setLaden] = useState(true);
+    const [geladen, setGeladen] = useState(false);
     const [version, setVersion] = useState(0);
     useEffect(() => {
         if (!visible || !supabase || !ichId)
@@ -32,9 +33,11 @@ export function EngeFreundeSheet({ visible, onClose }: {
         setLaden(true);
         const t = setTimeout(() => { D.freunde(supabase, ichId, suche).then(d => { if (aktiv) {
             setDaten(d);
+            setGeladen(true);
             setFehler('');
-        } }, () => { if (aktiv)
-            setFehler('Enge Freunde konnten nicht geladen werden.'); }).finally(() => { if (aktiv)
+        } }, () => { if (aktiv) {
+            setGeladen(false);
+            setFehler('Enge Freunde konnten nicht geladen werden.'); } }).finally(() => { if (aktiv)
             setLaden(false); }); }, 200);
         return () => { aktiv = false; clearTimeout(t); };
     }, [visible, supabase, ichId, suche, version]);
@@ -50,7 +53,7 @@ export function EngeFreundeSheet({ visible, onClose }: {
     const ids = new Set(daten.freunde.map(p => p.id));
     return <SheetRahmen visible={visible} title="Enge Freunde" onClose={onClose} hoch>
   <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-   <Text style={{ color: colors.text }}>Deine Liste ist privat · {daten.freunde.length} Personen</Text>
+   <Text style={{ color: colors.text }}>Deine Liste ist privat · {laden ? 'Wird geladen …' : geladen ? `${daten.freunde.length} Personen` : 'derzeit nicht verfügbar'}</Text>
    <Text style={{ color: colors.text }}>{I.FREUNDE_HINWEIS}</Text>
    <TextInput style={feld} value={suche} onChangeText={setSuche} placeholder="Nach Namen suchen (mindestens 2 Zeichen)" accessibilityLabel="Enge Freunde suchen"/>
    {!!fehler && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{fehler}</Text>}
@@ -67,7 +70,8 @@ export function InstantsBereich({ sprung = 0, onSprungFertig }: { sprung?: numbe
     const [postfachGeladen, setPostfachGeladen] = useState(false);
     const [ungeoeffnet, setUngeoeffnet] = useState<number | null>(null);
     const [mehrPostfach, setMehrPostfach] = useState(false), [mehrEigene, setMehrEigene] = useState(false);
-    const [postfach, setPostfach] = useState<Instant[]>([]), [eigene, setEigene] = useState<Instant[]>([]), [anzahl, setAnzahl] = useState(0);
+    const [postfach, setPostfach] = useState<Instant[]>([]), [eigene, setEigene] = useState<Instant[]>([]), [anzahl, setAnzahl] = useState<number | null>(null);
+    const [anzahlLaden, setAnzahlLaden] = useState(true);
     const [foto, setFoto] = useState<string | null>(null), [text, setText] = useState(''), [fehler, setFehler] = useState(''), [busy, setBusy] = useState(false);
     const [bild, setBild] = useState<{
         id: string;
@@ -78,8 +82,9 @@ export function InstantsBereich({ sprung = 0, onSprungFertig }: { sprung?: numbe
     const cam = useRef<CameraView>(null);
     const [groesse, setGroesse] = useState<string | null>(null);
     const laden = async () => { if (!supabase || !ichId)
-        return; try {
+        return; setAnzahl(null); setAnzahlLaden(true); try {
         const [p, e, z] = await Promise.all([D.postfach(supabase), D.eigene(supabase, ichId), D.empfaengerzahl(supabase)]);
+        if (!Number.isInteger(z) || z < 0) throw new Error('Listengröße nicht verfügbar.');
         setPostfach(p || []);
         setPostfachGeladen(true);
         setMehrPostfach(p.length === 50);
@@ -90,8 +95,9 @@ export function InstantsBereich({ sprung = 0, onSprungFertig }: { sprung?: numbe
         setFehler('');
     }
     catch {
+        setAnzahl(null);
         setFehler('Instants konnten nicht geladen werden.');
-    } };
+    } finally { setAnzahlLaden(false); } };
     const standLaden = async () => {
         if (!supabase) return;
         try { const z = await D.stand(supabase); if (!Number.isInteger(z) || z < 0) throw new Error(); setUngeoeffnet(z); }
@@ -145,7 +151,7 @@ export function InstantsBereich({ sprung = 0, onSprungFertig }: { sprung?: numbe
     finally {
         setBusy(false);
     } };
-    const senden = async () => { if (!supabase || !foto)
+    const senden = async () => { if (!supabase || !foto || anzahl === null)
         return; setBusy(true); try {
         await instantSenden(supabase, ichId, foto, text, anzahl);
         setFoto(null);
@@ -187,10 +193,10 @@ export function InstantsBereich({ sprung = 0, onSprungFertig }: { sprung?: numbe
     <Text style={{ color: colors.text }}>{I.HINWEIS}</Text>
     {!!fehler && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{fehler}</Text>}
     {bild ? <><Image source={{ uri: bild.uri }} style={{ height: 420, width: '100%' }} resizeMode="contain" onLoad={() => void gesehen()} onError={() => { setBild(null); setFehler('Das Foto konnte nicht geladen werden.'); }}/><Text style={{ color: colors.text }}>{bild.text}</Text><Druck style={knopf} onPress={() => setBild(null)}><Text style={{ color: colors.text }}>Bild schließen</Text></Druck></> : <>
-     <Druck style={knopf} onPress={() => setFreunde(true)}><Text style={{ color: colors.text }}>Enge Freunde bearbeiten · {anzahl}</Text></Druck>
-     <Text style={{ color: colors.text }}>An deine Liste · {anzahl} {anzahl === 1 ? 'Person' : 'Personen'}</Text>
+     <Druck style={knopf} onPress={() => setFreunde(true)}><Text style={{ color: colors.text }}>Enge Freunde bearbeiten · {anzahl === null ? (anzahlLaden ? 'Wird geladen …' : 'derzeit nicht verfügbar') : anzahl}</Text></Druck>
+     <Text style={{ color: colors.text }}>An deine Liste · {anzahl === null ? (anzahlLaden ? 'Wird geladen …' : 'derzeit nicht verfügbar') : `${anzahl} ${anzahl === 1 ? 'Person' : 'Personen'}`}</Text>
      {kamera ? <><CameraView ref={cam} style={{ height: 320 }} pictureSize={groesse || undefined} onCameraReady={async () => { const g = I.kameragroesse(await cam.current?.getAvailablePictureSizesAsync() || []); setGroesse(g); if (!g)
-            setFehler('Keine Kameraauflösung bis 1080 Pixel verfügbar.'); }}/><Druck disabled={busy || !groesse} style={knopf} onPress={() => void knipsen()}><Text style={{ color: colors.text }}>Foto aufnehmen</Text></Druck></> : foto ? <><Image source={{ uri: foto }} style={{ height: 240, width: '100%' }} resizeMode="contain"/><TextInput style={feld} value={text} onChangeText={setText} maxLength={I.TEXT_MAX} placeholder="Bildunterschrift (freiwillig)"/><Druck disabled={busy} style={knopf} onPress={() => void senden()}><Text style={{ color: colors.text }}>Instant senden</Text></Druck><Druck style={knopf} onPress={() => void aufnehmen()}><Text style={{ color: colors.text }}>Neu aufnehmen</Text></Druck></> : <Druck disabled={anzahl < 1 || busy} style={knopf} onPress={() => void aufnehmen()}><Text style={{ color: colors.text }}>Instant aufnehmen</Text></Druck>}
+            setFehler('Keine Kameraauflösung bis 1080 Pixel verfügbar.'); }}/><Druck disabled={busy || !groesse} style={knopf} onPress={() => void knipsen()}><Text style={{ color: colors.text }}>Foto aufnehmen</Text></Druck></> : foto ? <><Image source={{ uri: foto }} style={{ height: 240, width: '100%' }} resizeMode="contain"/><TextInput style={feld} value={text} onChangeText={setText} maxLength={I.TEXT_MAX} placeholder="Bildunterschrift (freiwillig)"/><Druck disabled={busy} style={knopf} onPress={() => void senden()}><Text style={{ color: colors.text }}>Instant senden</Text></Druck><Druck style={knopf} onPress={() => void aufnehmen()}><Text style={{ color: colors.text }}>Neu aufnehmen</Text></Druck></> : <Druck disabled={anzahl === null || anzahl < 1 || busy} style={knopf} onPress={() => void aufnehmen()}><Text style={{ color: colors.text }}>Instant aufnehmen</Text></Druck>}
      {postfach.map(i => <Druck key={i.id} disabled={busy} style={knopf} onPress={() => void ansehen(i)}><Text style={{ color: colors.text }}>{i.name} · Einmal ansehen</Text></Druck>)}
      {mehrPostfach && <Druck disabled={busy} style={knopf} onPress={() => void nachladen('postfach')}><Text style={{ color: colors.text }}>Weitere empfangene Instants</Text></Druck>}
      {postfachGeladen && !postfach.length && <Text style={{ color: colors.text }}>Keine ungeöffneten Instants.</Text>}

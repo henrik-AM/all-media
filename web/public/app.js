@@ -23521,10 +23521,12 @@ setInterval(() => { if (!document.hidden && state.area === 'messenger' && sub() 
 function openEngeFreunde(nachher) {
     let lauf = 0, uhr;
     const stateF = { freunde: [], vorschlaege: [] };
-    return openSheet('Enge Freunde', `<div class="sheet__body" style="padding:16px"><p>Deine Liste ist privat · <span id="efZahl">0</span> Personen</p><p>${esc(Instants.FREUNDE_HINWEIS)}</p><input class="instant-feld" id="efSuche" type="search" placeholder="Nach Namen suchen (mindestens 2 Zeichen)" aria-label="Enge Freunde suchen"><p role="alert" id="efFehler"></p><div id="efListe">Wird geladen …</div></div>`, (sheet) => {
+    return openSheet('Enge Freunde', `<div class="sheet__body" style="padding:16px"><p>Deine Liste ist privat · <span id="efZahl">Wird geladen …</span></p><p>${esc(Instants.FREUNDE_HINWEIS)}</p><input class="instant-feld" id="efSuche" type="search" placeholder="Nach Namen suchen (mindestens 2 Zeichen)" aria-label="Enge Freunde suchen"><p role="alert" id="efFehler"></p><div id="efListe">Wird geladen …</div></div>`, (sheet) => {
         const suche = sheet.querySelector('#efSuche');
         const laden = async () => {
             const nr = ++lauf;
+            sheet.querySelector('#efZahl').textContent = 'Wird geladen …';
+            sheet.querySelector('#efFehler').textContent = '';
             try {
                 const d = await instantApi('/api/enge-freunde?suche=' + encodeURIComponent(suche.value));
                 if (nr !== lauf || !sheet.isConnected)
@@ -23532,7 +23534,7 @@ function openEngeFreunde(nachher) {
                 if (!Array.isArray(d.freunde) || !Array.isArray(d.vorschlaege))
                     throw new Error('Enge Freunde konnten nicht geladen werden.');
                 Object.assign(stateF, d);
-                sheet.querySelector('#efZahl').textContent = d.freunde.length;
+                sheet.querySelector('#efZahl').textContent = `${d.freunde.length} Personen`;
                 const ids = new Set(d.freunde.map(p => p.id));
                 sheet.querySelector('#efListe').innerHTML = [...d.freunde.map(p => ({ ...p, an: true })), ...d.vorschlaege.filter(p => !ids.has(p.id)).map(p => ({ ...p, an: false }))].map(p => `<button class="item" data-ef="${esc(p.id)}" data-an="${!p.an}"><span class="item__label">${esc(p.name)}</span><span>${p.an ? 'Entfernen' : 'Hinzufügen'}</span></button>`).join('') || '<p>Noch keine Einträge. Suche nach einem Namen.</p>';
                 sheet.querySelectorAll('[data-ef]').forEach(b => b.addEventListener('click', async () => { b.disabled = true; try {
@@ -23545,8 +23547,10 @@ function openEngeFreunde(nachher) {
                 } }));
             }
             catch (e) {
-                if (sheet.isConnected)
+                if (nr === lauf && sheet.isConnected) {
+                    sheet.querySelector('#efZahl').textContent = 'derzeit nicht verfügbar';
                     sheet.querySelector('#efFehler').textContent = e.message;
+                }
             }
         };
         suche.addEventListener('input', () => { clearTimeout(uhr); uhr = setTimeout(laden, 250); });
