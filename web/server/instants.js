@@ -4,7 +4,10 @@ function einhaengen(app, route) {
     app.use('/api/instants', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
     app.get('/api/enge-freunde', route(async (req) => ({ ...await D.freunde(req.db, req.nutzerId, String(req.query.suche || '')), empfaengerzahl: await D.empfaengerzahl(req.db) })));
     app.post('/api/enge-freunde', route(async (req) => { await D.freund(req.db, req.nutzerId, String(req.body.id), req.body.an === true); return { ok: true }; }));
-    app.get('/api/instants', route(async (req) => ({ postfach: await D.postfach(req.db), eigene: await D.eigene(req.db, req.nutzerId) })));
+    const seite = v => Math.max(0, Math.min(100000, Math.floor(Number(v) || 0)));
+    app.get('/api/instants/stand', route(async (req) => ({ ungeoeffnet: await D.stand(req.db) })));
+    app.get('/api/instants', route(async (req) => ({ postfach: await D.postfach(req.db, seite(req.query.postfachAb)), eigene: await D.eigene(req.db, req.nutzerId, seite(req.query.eigeneAb)) })));
+    app.post('/api/instants/signatur', route(async (req) => ({ bild: await M.instantUnterschrift(req.db, String(req.body.pfad || '')) })));
     app.post('/api/instants', route(async (req) => ({ ok: true, id: await D.senden(req.db, String(req.body.pfad || ''), String(req.body.text || '')) })));
     app.get('/api/instants/:id/bild', route(async (req) => {
         const zeile = await D.datei(req.db, req.params.id);

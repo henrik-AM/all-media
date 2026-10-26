@@ -15,5 +15,6 @@ t('Länder als Band statt Einzelzahl',()=>assert.equal(rows.find(r=>r.text==='De
 t('pro Beitrag Aufrufe und Reichweite',()=>assert.equal(rows.find(r=>r.text==='Beitrag').neben,'40 / 20'));
 t('keine erfundenen Nullwerte bei Fehler',()=>assert.throws(()=>A.zeilen({zeitraeume:[{tage:7}]})));
 t('fehlender Zeitraum abgelehnt',()=>assert.throws(()=>A.zeilen({zeitraeume:[fenster(7)]})));
+t('begrenzte Vorwahlabdeckung offen ausgewiesen',()=>assert.ok(rows.some(r=>r.text.includes('16 eindeutige Vorwahlen'))));
 console.log(`${n}/${n} Prüfungen bestanden`);
 module.exports={daten};

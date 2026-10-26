@@ -6,7 +6,8 @@
  function zeilen(daten){
   if(!daten||!Array.isArray(daten.zeitraeume))throw new Error('Analysen konnten nicht geladen werden.');
   const zeilen=[{text:'Gemessen seit',neben:daten.seit?new Date(daten.seit).toLocaleDateString('de-DE'):'Noch keine Messung'},
-    {text:'Sichtungen ab einer Sekunde; eigene Aufrufe zählen nicht.',kopf:true}];
+    {text:'Sichtungen ab einer Sekunde; eigene Aufrufe zählen nicht.',kopf:true},
+    {text:'Vorwahlregionen: 16 eindeutige Vorwahlen unterstützt. Andere und unklare Nummern fehlen in der Länderanzeige.'}];
   for(const tage of [7,30]){
    const f=daten.zeitraeume.find(f=>f.tage===tage);if(!f)throw new Error('Analysezeitraum fehlt.');
    for(const k of ['reichweite','aufrufe','followerAufrufe','nichtFollowerAufrufe','sichtzeitMs','interaktionen'])if(typeof f[k]!=='number'||!Number.isFinite(f[k])||f[k]<0)throw new Error('Messwert fehlt.');
@@ -16,7 +17,7 @@
     {text:'Davon Follower',neben:z(f.followerAufrufe)},
     {text:'Davon Nicht-Follower',neben:z(f.nichtFollowerAufrufe)},
     {text:'Gemessene Verweildauer (Min.)',neben:(n(f.sichtzeitMs)/60000).toLocaleString('de-DE',{maximumFractionDigits:1})},
-    {text:'Vorhandene Likes, Kommentare, Saves, Reposts',neben:z(f.interaktionen)},
+    {text:'Vorhandene Likes, Kommentare, Saves, Reposts seit Messbeginn',neben:z(f.interaktionen)},
     {text:'Vorwahlregion · kein Standort',kopf:true});
    const laender=(f.laender||[]).filter(l=>n(l.ab)>=MINDESTZAHL);
    if(!laender.length)zeilen.push({text:'Länder erst ab 10 verschiedenen Konten je Land.'});

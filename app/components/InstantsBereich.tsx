@@ -59,10 +59,13 @@ export function EngeFreundeSheet({ visible, onClose }: {
   </ScrollView>
  </SheetRahmen>;
 }
-export function InstantsBereich() {
+export function InstantsBereich({ sprung = 0 }: { sprung?: number }) {
     const { supabase } = useSupabase();
     const { ichId } = useDaten();
     const [offen, setOffen] = useState(false), [freunde, setFreunde] = useState(false), [kamera, setKamera] = useState(false);
+    const [postfachGeladen, setPostfachGeladen] = useState(false);
+    const [ungeoeffnet, setUngeoeffnet] = useState<number | null>(null);
+    const [mehrPostfach, setMehrPostfach] = useState(false), [mehrEigene, setMehrEigene] = useState(false);
     const [postfach, setPostfach] = useState<Instant[]>([]), [eigene, setEigene] = useState<Instant[]>([]), [anzahl, setAnzahl] = useState(0);
     const [foto, setFoto] = useState<string | null>(null), [text, setText] = useState(''), [fehler, setFehler] = useState(''), [busy, setBusy] = useState(false);
     const [bild, setBild] = useState<{
@@ -77,6 +80,10 @@ export function InstantsBereich() {
         return; try {
         const [p, e, z] = await Promise.all([D.postfach(supabase), D.eigene(supabase, ichId), D.empfaengerzahl(supabase)]);
         setPostfach(p || []);
+        setPostfachGeladen(true);
+        setMehrPostfach(p.length === 50);
+        setMehrEigene(e.length === 50);
+        void standLaden();
         setEigene(e || []);
         setAnzahl(z);
         setFehler('');
@@ -84,10 +91,30 @@ export function InstantsBereich() {
     catch {
         setFehler('Instants konnten nicht geladen werden.');
     } };
-    useEffect(() => { void laden(); const t = setInterval(() => { if (AppState.currentState === 'active')
-        void laden(); }, 30000); const a = AppState.addEventListener('change', s => { if (s === 'active')
-        void laden(); }); return () => { clearInterval(t); a.remove(); }; }, [supabase, ichId]);
-    const schliessen = () => { setKamera(false); setFoto(null); setBild(null); setOffen(false); void laden(); };
+    const standLaden = async () => {
+        if (!supabase) return;
+        try { const z = await D.stand(supabase); if (!Number.isInteger(z) || z < 0) throw new Error(); setUngeoeffnet(z); }
+        catch { setUngeoeffnet(null); }
+    };
+    useEffect(() => { void standLaden(); const t = setInterval(() => { if (AppState.currentState === 'active')
+        void standLaden(); }, 30000); const a = AppState.addEventListener('change', s => { if (s === 'active')
+        void standLaden(); }); return () => { clearInterval(t); a.remove(); }; }, [supabase, ichId]);
+    useEffect(() => { if (sprung) { setOffen(true); void laden(); } }, [sprung]);
+    const nachladen = async (art: 'postfach' | 'eigene') => {
+        if (!supabase || busy) return;
+        setBusy(true);
+        try {
+            if (art === 'postfach') {
+                const p = await D.postfach(supabase, postfach.length);
+                setPostfach(v => [...v, ...p.filter(i => !v.some(a => a.id === i.id))]); setMehrPostfach(p.length === 50);
+            } else {
+                const p = await D.eigene(supabase, ichId, eigene.length);
+                setEigene(v => [...v, ...p.filter(i => !v.some(a => a.id === i.id))]); setMehrEigene(p.length === 50);
+            }
+        } catch { setFehler('Weitere Instants konnten nicht geladen werden.'); }
+        finally { setBusy(false); }
+    };
+    const schliessen = () => { setKamera(false); setFoto(null); setBild(null); setOffen(false); void standLaden(); };
     const aufnehmen = async () => { if (!permission?.granted) {
         const p = await anfragen();
         if (!p.granted) {
@@ -145,7 +172,7 @@ export function InstantsBereich() {
         setFehler('Instant konnte nicht als geöffnet bestätigt werden.');
     } };
     return <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
-  <Druck style={knopf} onPress={() => { setOffen(true); void laden(); }} accessibilityLabel="Instants öffnen"><Text style={{ color: colors.text }}>Instants · {postfach.length} ungeöffnet</Text></Druck>
+  <Druck style={knopf} onPress={() => { setOffen(true); void laden(); }} accessibilityLabel="Instants öffnen"><Text style={{ color: colors.text }}>Instants · {ungeoeffnet === null ? 'derzeit nicht verfügbar' : `${ungeoeffnet} ungeöffnet`}</Text></Druck>
   <SheetRahmen visible={offen} title="Instants" onClose={schliessen} hoch>
    <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
     <Text style={{ color: colors.text }}>{I.HINWEIS}</Text>
@@ -156,7 +183,8 @@ export function InstantsBereich() {
      {kamera ? <><CameraView ref={cam} style={{ height: 320 }} pictureSize={groesse || undefined} onCameraReady={async () => { const g = I.kameragroesse(await cam.current?.getAvailablePictureSizesAsync() || []); setGroesse(g); if (!g)
             setFehler('Keine Kameraauflösung bis 1080 Pixel verfügbar.'); }}/><Druck disabled={busy || !groesse} style={knopf} onPress={() => void knipsen()}><Text style={{ color: colors.text }}>Foto aufnehmen</Text></Druck></> : foto ? <><Image source={{ uri: foto }} style={{ height: 240, width: '100%' }} resizeMode="contain"/><TextInput style={feld} value={text} onChangeText={setText} maxLength={I.TEXT_MAX} placeholder="Bildunterschrift (freiwillig)"/><Druck disabled={busy} style={knopf} onPress={() => void senden()}><Text style={{ color: colors.text }}>Instant senden</Text></Druck><Druck style={knopf} onPress={() => void aufnehmen()}><Text style={{ color: colors.text }}>Neu aufnehmen</Text></Druck></> : <Druck disabled={anzahl < 1 || busy} style={knopf} onPress={() => void aufnehmen()}><Text style={{ color: colors.text }}>Instant aufnehmen</Text></Druck>}
      {postfach.map(i => <Druck key={i.id} disabled={busy} style={knopf} onPress={() => void ansehen(i)}><Text style={{ color: colors.text }}>{i.name} · Einmal ansehen</Text></Druck>)}
-     {!postfach.length && <Text style={{ color: colors.text }}>Keine ungeöffneten Instants.</Text>}
+     {mehrPostfach && <Druck disabled={busy} style={knopf} onPress={() => void nachladen('postfach')}><Text style={{ color: colors.text }}>Weitere empfangene Instants</Text></Druck>}
+     {postfachGeladen && !postfach.length && <Text style={{ color: colors.text }}>Keine ungeöffneten Instants.</Text>}
      {eigene.map(i => <Druck key={i.id} disabled={busy} style={knopf} onPress={async () => { if (supabase) {
             try {
                 await D.zurueckziehen(supabase, i.id);
@@ -166,6 +194,7 @@ export function InstantsBereich() {
                 setFehler('Zurückziehen fehlgeschlagen.');
             }
         } }}><Text style={{ color: colors.text }}>Gesendet: {i.text || 'Foto'} · Zurückziehen</Text></Druck>)}
+     {mehrEigene && <Druck disabled={busy} style={knopf} onPress={() => void nachladen('eigene')}><Text style={{ color: colors.text }}>Weitere gesendete Instants</Text></Druck>}
     </>}
    </ScrollView>
   </SheetRahmen>

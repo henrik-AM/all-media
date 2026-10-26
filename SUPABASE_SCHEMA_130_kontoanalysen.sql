@@ -1,6 +1,31 @@
 -- AF7 / Schema 110 — ENTWURF, nicht eingespielt. Nach 108.
 -- Keine Rückrechnung historischer Follower-/Vorwahlmerkmale. Neue Messung ab Einspielung.
 -- post_impressions bleibt privat; der Verfasser erhält ausschließlich Aggregate.
+-- Ersetzt impression_vermerken(uuid,integer,text) aus 28: nur sichtbare Beiträge,
+-- freigegebene Konten und mindestens 1000 ms; Messdauer bleibt Client-Telemetrie.
+create or replace function public.impression_vermerken(
+ beitrag uuid, dauer integer default 0, herkunft text default 'feed'
+) returns void language plpgsql security definer set search_path=public as $$
+declare ich uuid:=auth.uid(); gedeckelt integer;
+begin
+ if ich is null or not public.konto_freigegeben() then raise exception 'Konto nicht freigegeben';end if;
+ if herkunft is null or herkunft not in ('feed','reels','explorer','profil','community') then raise exception 'Unbekannte Herkunft';end if;
+ if not exists(select 1 from public.posts p where p.id=beitrag
+  and public.beitrag_sichtbar(p.user_id,p.demo)
+  and not public.blockiert_zwischen(ich,p.user_id)
+  and (p.publish_at is null or p.publish_at<=now() or p.user_id=ich)) then
+  raise exception 'Beitrag nicht sichtbar';
+ end if;
+ if coalesce(dauer,0)<1000 then return;end if;
+ gedeckelt:=least(dauer,300000);
+ insert into public.post_impressions(post_id,user_id,tag,dauer_ms,quelle)
+ values(beitrag,ich,(now() at time zone 'utc')::date,gedeckelt,herkunft)
+ on conflict(user_id,post_id,tag,quelle) do update set
+ dauer_ms=public.post_impressions.dauer_ms+excluded.dauer_ms,
+ sichtungen=public.post_impressions.sichtungen+1,zuletzt=now();
+end $$;
+revoke execute on function public.impression_vermerken(uuid,integer,text) from public,anon;
+grant execute on function public.impression_vermerken(uuid,integer,text) to authenticated;
 create table if not exists public.konto_analysen_start (
   id boolean primary key default true check(id), seit timestamptz not null default now()
 );
@@ -54,6 +79,8 @@ begin
  if autor=new.user_id or not public.konto_freigegeben() then return new; end if;
  delta_s := greatest(0,new.sichtungen-case when tg_op='UPDATE' then old.sichtungen else 0 end);
  delta_d := greatest(0,new.dauer_ms-case when tg_op='UPDATE' then old.dauer_ms else 0 end);
+ -- Auch privilegierte Direktimporte mit Null-/Kurzsichtungen nicht auswerten.
+ if delta_s<1 or delta_d<1000 then return new;end if;
  insert into public.konto_sichtungen(impression_id,post_id,zuschauer,tag,folgt,land,sichtungen,dauer_ms)
  values(new.id,new.post_id,new.user_id,(now() at time zone 'utc')::date,
    exists(select 1 from public.follows where follower_id=new.user_id and followee_id=autor),
@@ -129,7 +156,6 @@ begin
   interaktionen as (
     select k.akteur from public.konto_interaktionen k join eigen e on e.id=k.post_id
     where k.zeitpunkt >= (ab::timestamp at time zone 'UTC')
-
   )
   select jsonb_build_object('tage',tage,
     'reichweite',(select count(distinct zuschauer) from basis),

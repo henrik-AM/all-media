@@ -43,7 +43,7 @@ begin
   if not exists(select 1 from public.posts p where p.id=p_post
       and public.beitrag_sichtbar(p.user_id,p.demo)
       and not public.blockiert_zwischen(auth.uid(),p.user_id)
-      and (p.publish_at is null or p.publish_at<=now())) then raise exception 'Beitrag nicht sichtbar'; end if;
+      and (p.publish_at is null or p.publish_at<=now() or p.user_id=auth.uid())) then raise exception 'Beitrag nicht sichtbar'; end if;
   if p_art not in ('like','dislike') or p_art is null then raise exception 'Unbekannte Reaktion'; end if;
   if p_art='dislike' and not exists(select 1 from public.posts where id=p_post and kind in ('reel','clip')) then raise exception 'Nur Videos'; end if;
   perform pg_advisory_xact_lock(hashtextextended(auth.uid()::text || p_post::text,108));
@@ -88,8 +88,8 @@ declare
    */
   lern_ab timestamptz;
 begin
-  if ich is null then
-    raise exception 'nicht angemeldet';
+  if ich is null or not public.konto_freigegeben() then
+    raise exception 'Konto nicht freigegeben';
   end if;
 
   select greatest(now() - interval '60 days',
@@ -118,6 +118,10 @@ begin
            coalesce(p.shares_basis, 0)   as teil_sockel
       from public.posts p
      where p.id = any(beitraege)
+       -- SECURITY DEFINER umgeht RLS: dieselben Sichtgrenzen hier anwenden.
+       and public.beitrag_sichtbar(p.user_id,p.demo)
+       and not public.blockiert_zwischen(ich,p.user_id)
+       and (p.publish_at is null or p.publish_at<=now() or p.user_id=ich)
   ),
 
   negativ as (

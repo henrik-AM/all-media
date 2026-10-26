@@ -426,9 +426,18 @@ async function loeschen(client,nutzerId,pfad) {
   const {error}=await client.storage.from('media').remove([pfad]);
   return error?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
 }
-async function instantUnterschrift(client,pfad) {
+async function instantUnterschrift(client,pfad,dienst) {
   if(!/^instants\/[0-9a-f-]{36}\/[A-Za-z0-9_-]+\.jpg$/.test(pfad))throw new Error('Ungültiger Instant-Pfad');
-  const {data,error}=await client.storage.from('media').createSignedUrl(pfad,60);
+  // Zuerst RLS im Namen des Nutzers, erst danach privilegiert signieren.
+  const {data:zeile,error:leseFehler}=await client.from('instants').select('bild_pfad').eq('bild_pfad',pfad).single();
+  if(leseFehler || zeile?.bild_pfad!==pfad)throw new Error('Instant nicht mehr verfügbar');
+  if(!dienst){
+    if(!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error('Instants sind derzeit nicht verfügbar.');
+    const {createClient}=require('@supabase/supabase-js');
+    const {supabaseUrl}=require('./supabase');
+    dienst=createClient(supabaseUrl,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+  }
+  const {data,error}=await dienst.storage.from('media').createSignedUrl(pfad,60);
   if(error)throw error;return data.signedUrl;
 }
 async function instantsAufraeumen(client) {

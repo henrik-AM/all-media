@@ -242,10 +242,16 @@ export async function signiereEine(
   const speicher = await speicherFuer(client);
   if (!speicher) return null;
   if (pfad.startsWith('instants/')) {
-    const { data, error } = await client.storage.from('media').createSignedUrl(pfad, 60);
-    if (error) throw error;
+    const server = (process.env.EXPO_PUBLIC_WEB_URL || 'https://all-media-website.onrender.com').replace(/\/$/, '');
+    if (!/^https:\/\//.test(server) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(server)) throw new Error('Ungültiger Instants-Server');
+    const r = await fetch(`${server}/api/instants/signatur`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${speicher.token}` },
+      body: JSON.stringify({ pfad }), redirect: 'error',
+    });
+    const data = await r.json();
+    if (!r.ok || !data?.bild) throw new Error('Instant nicht mehr verfügbar');
     if (await speicherFuer(client) !== speicher) return null;
-    return data?.signedUrl || null;
+    return data.bild;
   }
   const eintrag = speicher.eintraege.get(pfad);
   if (eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;

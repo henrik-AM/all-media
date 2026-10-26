@@ -8,12 +8,12 @@ const path=require('node:path');
  const browser=await chromium.launch({args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']});
  try {
   const page=await browser.newPage({viewport:{width:430,height:932}});
-  await page.route('**/*',route=>new URL(route.request().url()).hostname==='localhost'?route.continue():route.abort());
+  await page.route('**/*',route=>new URL(route.request().url()).origin==='http://localhost:3300'?route.continue():route.abort());
   await page.context().grantPermissions(['camera'],{origin:'http://localhost:3300'});
   const R=require('../../gemeinsam/rang');
   let v={id:'af-video',userId:'u-anna',description:'Lokales Prüfvideo',music:'',likes:8,comments:0,shares:0,liked:false,saved:false,reposted:false,notify:false,tags:[],mediaUrl:'http://localhost:3300/af-pruefvideo.mp4'};
   const daten=bestand({videos:[v]});
-  let analyseAufrufe=0,freundListe=[],gesehen=0,sendungen=0,aufnahmeBytes=0,zurueck=0;
+  let analyseAufrufe=0,freundListe=[],gesehen=0,sendungen=0,aufnahmeBytes=0,zurueck=0,listenAufrufe=0,viele=false;
   const anna={id:'u-anna',name:'Anna Schmidt',handle:'anna'};
   const pixel='data:image/png;base64,'+fs.readFileSync(path.join(__dirname,'_testbild.png')).toString('base64');
   const instant={id:'i-empfang',absender:'u-anna',name:'Anna Schmidt',text:'Lokales Kamera-Instant',expires_at:'2099-01-01T00:00:00Z'};
@@ -23,7 +23,8 @@ const path=require('node:path');
     if(req.method()==='POST'){const body=JSON.parse(req.postData());freundListe=body.an?[anna]:[];return {ok:true};}
     return {empfaengerzahl:freundListe.length,freunde:freundListe,vorschlaege:new URL(req.url()).searchParams.get('suche')?.includes('Anna')?[anna]:[]};
    },
-   '/api/instants':req=>{if(req.method()==='POST'){sendungen++;return {ok:true,id:'i-eigen'};}return {postfach:gesehen?[]:[instant],eigene:sendungen&&!zurueck?[{id:'i-eigen',text:'Prüffoto'}]:[]};},
+   '/api/instants/stand':()=>({ungeoeffnet:gesehen?0:1}),
+   '/api/instants':req=>{if(req.method()==='POST'){sendungen++;return {ok:true,id:'i-eigen'};}listenAufrufe++;if(viele){const ab=Number(new URL(req.url()).searchParams.get('postfachAb')||0);return {postfach:Array.from({length:55},(_,i)=>({...instant,id:'i-'+i})).slice(ab,ab+50),eigene:[]};}return {postfach:gesehen?[]:[instant],eigene:sendungen&&!zurueck?[{id:'i-eigen',text:'Prüffoto'}]:[]};},
    '/api/instants/i-empfang/bild':{bild:pixel,text:'Lokales Kamera-Instant'},
    '/api/instants/i-empfang/gesehen':()=>{gesehen++;return{ok:true}},
    '/api/instants/i-eigen/zurueckziehen':()=>{zurueck++;return{ok:true}},
@@ -77,6 +78,9 @@ const path=require('node:path');
   await page.getByRole('button',{name:'Anna Schmidt Entfernen'}).waitFor();
   await page.keyboard.press('Escape');
   await page.locator('[data-area="messenger"]').click();
+  const vorher=listenAufrufe;
+  await page.evaluate(()=>instantBadgeLaden());
+  assert.equal(listenAufrufe,vorher);
   await page.locator('#instantPostfach').click();
   await page.getByRole('button',{name:'Instant aufnehmen',exact:true}).click();
   await page.waitForFunction(()=>document.getElementById('instantLive')?.videoWidth>0);
@@ -97,6 +101,14 @@ const path=require('node:path');
   await page.waitForFunction(()=>!document.querySelector('[data-instantzurueck]'));
   assert.equal(zurueck,1);
   console.log(`AF6 Browser 8/8: Freund hinzufügen/erneut laden, virtuelle Kamera/Vorschau, ${aufnahmeBytes} Bytes, Senden, Öffnen einmal, leerer Stapel, Zurückziehen`);
+  await page.keyboard.press('Escape');
+  viele=true;await page.evaluate(()=>openInstants());
+  await page.waitForFunction(()=>document.querySelectorAll('[data-instant]').length===50);
+  await page.getByRole('button',{name:'Weitere Instants laden',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('[data-instant]').length===55);
+  assert.equal(await page.locator('[data-instant="i-54"]').count(),1);
+  assert.equal(await page.locator('#instantMehr').count(),0);
+  console.log('AF-Nachprüfung Browser 4/4: Badge ohne Listenabruf, Seite 50, Nachladen 55 ohne Duplikate, Ende ohne Mehrknopf');
   assert.deepEqual(fehler,[]);
   console.log('AF3 Browser 4/4: Knopf, gesetzt, Like schließt aus, keine Seitenfehler');
  }finally{await browser.close();}

@@ -29,6 +29,7 @@ const mediaIcon = (media?: string) =>
   media === 'image' ? 'image-outline' : media === 'audio' ? 'mic-outline' : null;
 
 interface Props {
+  instantSprung?: number;
   allChats: Chat[];
   stories: Story[];
   onOpenChat: (chat: Chat) => void;
@@ -46,6 +47,7 @@ interface Props {
 }
 
 export const ChatListScreen = ({
+  instantSprung,
   allChats,
   stories,
   onOpenChat,
@@ -222,7 +224,7 @@ export const ChatListScreen = ({
     <View style={styles.container}>
       {/* Reihenfolge wie im Prototyp: Story-Leiste, Suche, Filter, Liste. */}
       <StoryRail stories={stories} onPress={onOpenStory} />
-      <InstantsBereich key={ichId}/>
+      <InstantsBereich key={ichId} sprung={instantSprung}/>
 
       <View style={styles.header}>
         <SearchBar

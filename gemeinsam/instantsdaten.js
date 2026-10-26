@@ -22,11 +22,12 @@ else
             throw new Error('Eintrag konnte nicht entfernt werden.');
     }
     const empfaengerzahl = c => wert(c.rpc('instant_empfaengerzahl'));
-    const postfach = c => wert(c.rpc('instant_postfach'));
+    const stand = c => wert(c.rpc('instant_stand'));
+    const postfach = (c, ab = 0) => wert(c.rpc('instant_postfach', { p_ab: ab }));
     const senden = (c, pfad, text) => wert(c.rpc('instant_senden', { p_pfad: pfad, p_text: text || '' }));
     const datei = (c, id) => wert(c.from('instants').select('bild_pfad,text').eq('id', id).single());
     const oeffnen = (c, id) => wert(c.rpc('instant_oeffnen', { p_id: id }));
     const zurueckziehen = (c, id) => wert(c.rpc('instant_zurueckziehen', { p_id: id }));
-    const eigene = (c, ich) => wert(c.from('instants').select('id,text,expires_at').eq('absender', ich).order('created_at', { ascending: false }));
-    return { freunde, freund, empfaengerzahl, postfach, senden, datei, oeffnen, zurueckziehen, eigene };
+    const eigene = (c, ich, ab = 0) => wert(c.from('instants').select('id,text,expires_at').eq('absender', ich).order('created_at', { ascending: false }).order('id').range(ab, ab + 49));
+    return { freunde, freund, empfaengerzahl, stand, postfach, senden, datei, oeffnen, zurueckziehen, eigene };
 });

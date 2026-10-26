@@ -23445,10 +23445,10 @@ async function instantBadgeLaden() {
     if (!knopf)
         return;
     try {
-        const d = await instantApi('/api/instants');
-        if (!Array.isArray(d.postfach))
+        const d = await instantApi('/api/instants/stand');
+        if (!Number.isInteger(d.ungeoeffnet) || d.ungeoeffnet < 0)
             throw new Error();
-        knopf.textContent = `Instants · ${d.postfach.length} ungeöffnet`;
+        knopf.textContent = `Instants · ${d.ungeoeffnet} ungeöffnet`;
     }
     catch {
         knopf.textContent = 'Instants · derzeit nicht verfügbar';
@@ -23492,23 +23492,26 @@ function openEngeFreunde(nachher) {
     }, { schliessen: true, hoch: true, beimSchliessen: () => { lauf++; clearTimeout(uhr); nachher?.(); } });
 }
 function openInstants() {
-    let stream = null, foto = null, freundeZahl = 0, aktiv = true;
+    let stream = null, foto = null, freundeZahl = 0, aktiv = true, postfach = [], eigene = [];
     const stop = () => { stream?.getTracks().forEach(t => t.stop()); stream = null; };
     openSheet('Instants', `<div class="sheet__body" style="padding:16px"><p>${esc(Instants.HINWEIS)}</p><p role="alert" id="instantFehler"></p><div id="instantInhalt">Wird geladen …</div></div>`, (sheet, close) => {
         const feld = sheet.querySelector('#instantInhalt'), fehler = sheet.querySelector('#instantFehler');
-        const laden = async () => {
+        const laden = async (weiter = false) => {
             try {
-                const [d, f] = await Promise.all([instantApi('/api/instants'), instantApi('/api/enge-freunde')]);
+                const [d, f] = await Promise.all([instantApi('/api/instants' + (weiter ? `?postfachAb=${postfach.length}&eigeneAb=${eigene.length}` : '')), instantApi('/api/enge-freunde')]);
                 if (!aktiv)
                     return;
-                if (!Array.isArray(d.postfach) || !Array.isArray(f.freunde))
+                if (!Array.isArray(d.postfach) || !Array.isArray(d.eigene) || !Array.isArray(f.freunde))
                     throw new Error('Instants konnten nicht geladen werden.');
+                postfach = weiter ? [...postfach, ...d.postfach.filter(i => !postfach.some(a => a.id === i.id))] : d.postfach;
+                eigene = weiter ? [...eigene, ...d.eigene.filter(i => !eigene.some(a => a.id === i.id))] : d.eigene;
                 freundeZahl = Number(f.empfaengerzahl);
                 if (!Number.isInteger(freundeZahl) || freundeZahl < 0)
                     throw new Error("Empfängerzahl nicht verfügbar.");
-                feld.innerHTML = `<button class="item" id="instantFreunde">Enge Freunde bearbeiten · ${freundeZahl}</button><p>An deine Liste · ${freundeZahl} ${freundeZahl === 1 ? 'Person' : 'Personen'}</p><button class="prof__btn is-primary" id="instantKamera" ${freundeZahl ? '' : 'disabled'}>Instant aufnehmen</button><div id="instantAufnahme"></div><div id="instantStapel">${d.postfach.map(i => `<button class="item" data-instant="${esc(i.id)}">${esc(i.name)} · Einmal ansehen</button>`).join('') || '<p>Keine ungeöffneten Instants.</p>'}</div><div>${(d.eigene || []).map(i => `<button class="item" data-instantzurueck="${esc(i.id)}">Gesendet: ${esc(i.text || 'Foto')} · Zurückziehen</button>`).join('')}</div>`;
+                feld.innerHTML = `<button class="item" id="instantFreunde">Enge Freunde bearbeiten · ${freundeZahl}</button><p>An deine Liste · ${freundeZahl} ${freundeZahl === 1 ? 'Person' : 'Personen'}</p><button class="prof__btn is-primary" id="instantKamera" ${freundeZahl ? '' : 'disabled'}>Instant aufnehmen</button><div id="instantAufnahme"></div><div id="instantStapel">${postfach.map(i => `<button class="item" data-instant="${esc(i.id)}">${esc(i.name)} · Einmal ansehen</button>`).join('') || '<p>Keine ungeöffneten Instants.</p>'}</div><div>${eigene.map(i => `<button class="item" data-instantzurueck="${esc(i.id)}">Gesendet: ${esc(i.text || 'Foto')} · Zurückziehen</button>`).join('')}</div>${d.postfach.length === 50 || d.eigene.length === 50 ? '<button class="item" id="instantMehr">Weitere Instants laden</button>' : ''}`;
                 feld.querySelector('#instantFreunde').addEventListener('click', () => openEngeFreunde(laden));
                 feld.querySelector('#instantKamera').addEventListener('click', kamera);
+                feld.querySelector('#instantMehr')?.addEventListener('click', async e => { e.currentTarget.disabled = true; await laden(true); });
                 feld.querySelectorAll('[data-instant]').forEach(b => b.addEventListener('click', () => ansehen(b.dataset.instant)));
                 feld.querySelectorAll('[data-instantzurueck]').forEach(b => b.addEventListener('click', async () => { try {
                     await instantApi(`/api/instants/${b.dataset.instantzurueck}/zurueckziehen`, {});
@@ -23599,7 +23602,7 @@ function openInstants() {
                 bild.addEventListener('error', () => { fehler.textContent = 'Das Foto konnte nicht geladen werden.'; });
                 if (bild.complete && bild.naturalWidth)
                     void gesehen();
-                feld.querySelector('#instantZu').addEventListener('click', laden);
+                feld.querySelector('#instantZu').addEventListener('click', () => laden());
             }
             catch (e) {
                 fehler.textContent = 'Instant nicht mehr verfügbar.';

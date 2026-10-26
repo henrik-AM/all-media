@@ -202,6 +202,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
   // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt — genau wie im
   // Prototyp, wo die obere Leiste zum Bereich gehoert.
+  const [instantSprung, setInstantSprung] = useState(0);
   const [area, setArea] = useState<AreaKey>(rueckkehr?.area ?? 'messenger');
   const [subs, setSubs] = useState<Record<AreaKey, SubKey>>(() =>
     rueckkehr ? { ...defaultSub, [rueckkehr.area]: rueckkehr.sub } : defaultSub
@@ -1543,7 +1544,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
   const mitteilungOeffnen = (ziel: MitteilungsZiel, text = '') => {
-    if (ziel.art === 'instant') { setArea('messenger'); setSubs((p) => ({ ...p, messenger: 'chats' })); setNotice('Instants im Postfach öffnen'); return; }
+    if (ziel.art === 'instant') { setArea('messenger'); setSubs((p) => ({ ...p, messenger: 'chats' })); setInstantSprung((v) => v + 1); return; }
     /*
      * Kasten RS 3: Rechtsmitteilung (Schema 102). Wer betroffen ist, bekommt
      * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen“ —
@@ -2486,6 +2487,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       }
       return (
         <ChatListScreen
+          instantSprung={instantSprung}
           allChats={chats}
           stories={stories}
           onOpenChat={(chat) => oeffneChat(chat)}

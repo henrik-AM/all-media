@@ -11,7 +11,7 @@ grant select,insert,delete on public.enge_freunde to authenticated;
 drop policy if exists eigene on public.enge_freunde;
 create policy eigene on public.enge_freunde for all to authenticated using(user_id=auth.uid())
 with check(user_id=auth.uid() and not public.blockiert_zwischen(user_id,freund_id)
- and public.konto_stand(freund_id)='frei' and exists(select 1 from public.profiles where id=freund_id));
+ and public.profil_freigegeben(freund_id) and exists(select 1 from public.profiles where id=freund_id));
 
 create table if not exists public.instants (
  id uuid primary key default gen_random_uuid(),
@@ -34,6 +34,7 @@ create or replace function public.instant_zugang(p_id uuid) returns boolean
 language sql stable security definer set search_path=public as $$
  select auth.uid() is not null and public.konto_freigegeben() and exists(
  select 1 from public.instants i where i.id=p_id and i.expires_at>now()
+ and public.profil_freigegeben(i.absender)
  and (i.absender=auth.uid() or exists(select 1 from public.instant_empfaenger e
  where e.instant_id=i.id and e.empfaenger=auth.uid() and e.geoeffnet_at is null
  and not public.blockiert_zwischen(i.absender,e.empfaenger))));
@@ -79,7 +80,7 @@ end $$;
 create or replace function public.instant_empfaenger_liste() returns setof uuid
 language sql stable security definer set search_path=public as $$
  select f.freund_id from public.enge_freunde f where f.user_id=auth.uid()
- and public.konto_freigegeben() and public.konto_stand(f.freund_id)='frei'
+ and public.konto_freigegeben() and public.profil_freigegeben(f.freund_id)
  and not public.blockiert_zwischen(auth.uid(),f.freund_id)
  and not exists(select 1 from public.user_settings s where s.user_id=f.freund_id
  and s.schluessel='instantsEmpfangen' and s.wert='aus');
@@ -117,14 +118,24 @@ end $$;
 revoke execute on function public.instant_senden(text,text) from public,anon;
 grant execute on function public.instant_senden(text,text) to authenticated;
 
-create or replace function public.instant_postfach() returns table(id uuid,absender uuid,name text,text text,expires_at timestamptz)
+drop function if exists public.instant_postfach();
+create or replace function public.instant_postfach(p_ab integer default 0) returns table(id uuid,absender uuid,name text,text text,expires_at timestamptz)
 language sql stable security invoker set search_path=public as $$
  select i.id,i.absender,p.name,i.text,i.expires_at from public.instants i
  join public.instant_empfaenger e on e.instant_id=i.id and e.empfaenger=auth.uid()
- join public.profiles p on p.id=i.absender where e.geoeffnet_at is null and i.expires_at>now() order by i.created_at;
+ join public.profiles p on p.id=i.absender where e.geoeffnet_at is null and i.expires_at>now() order by i.created_at,i.id limit 50 offset greatest(0,least(coalesce(p_ab,0),100000));
 $$;
-revoke execute on function public.instant_postfach() from public,anon;
-grant execute on function public.instant_postfach() to authenticated;
+revoke execute on function public.instant_postfach(integer) from public,anon;
+grant execute on function public.instant_postfach(integer) to authenticated;
+
+-- Ein kleiner Standwert für das Badge, keine Namen oder Listen im Hintergrund.
+create or replace function public.instant_stand() returns bigint
+language sql stable security invoker set search_path=public as $$
+ select count(*) from public.instants i join public.instant_empfaenger e on e.instant_id=i.id
+ where e.empfaenger=auth.uid() and e.geoeffnet_at is null and i.expires_at>now();
+$$;
+revoke execute on function public.instant_stand() from public,anon;
+grant execute on function public.instant_stand() to authenticated;
 
 create or replace function public.instant_oeffnen(p_id uuid) returns boolean
 language plpgsql security definer set search_path=public as $$
@@ -177,9 +188,10 @@ create policy "Instant lesen" on storage.objects for select to authenticated usi
 -- Zusätzliche RESTRICTIVE-Regel wirkt auch auf owner_id und medium_sichtbar aus 95/107.
 drop policy if exists instant_nur_einmal on storage.objects;
 create policy instant_nur_einmal on storage.objects as restrictive for select to authenticated using(
- bucket_id<>'media' or split_part(name,'/',1)<>'instants'
-
- or exists(select 1 from public.instants i where i.bild_pfad=name and public.instant_zugang(i.id)));
+ bucket_id<>'media' or split_part(name,'/',1)<>'instants');
+-- Direkte Downloads/Signaturen vollständig sperren: expiresIn ist clientseitig
+-- frei wählbar. Nur der Server prüft die lesbare Instant-Zeile und signiert
+-- anschließend als service_role mit festem TTL 60. Kein Schlüssel im Client.
 
 -- Bereinigung: bytes zuerst über Storage-API löschen, erst dann Metadaten bestätigen.
 -- Nur service_role (Server-Arbeiter); ohne konfigurierten Schlüssel keine automatische Löschzusage.
@@ -209,7 +221,7 @@ create or replace function public.enge_freunde_suche(p_suche text) returns table
 language sql stable security invoker set search_path=public as $$
  select p.id,p.name,p.handle from public.profiles p where length(trim(p_suche))>=2
  and p.name ilike '%'||replace(replace(left(trim(p_suche),80),'%','\%'),'_','\_')||'%'
- and p.id<>auth.uid() and public.konto_stand(p.id)='frei'
+ and p.id<>auth.uid() and public.profil_freigegeben(p.id)
  and not public.blockiert_zwischen(auth.uid(),p.id) order by p.name,p.id limit 20;
 $$;
 revoke execute on function public.enge_freunde_suche(text) from public,anon;
