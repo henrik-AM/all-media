@@ -1,0 +1,6 @@
+FEHL B7_Klient_mit_Videobeleg_erlaubt
+FEHL B7_Dienstrolle_darf_Medienliste_pflegen
+FEHL B7_Klient_ohne_Videobeleg_weiter_gesperrt
+0/3 Rollenprüfungen, verworfen
+Rollback-Kontrolle 1/1
+{"message":"Failed to run sql query: ERROR:  42501: Bitte das Video über die geprüfte Uploadstelle hochladen.\nCONTEXT:  PL/pgSQL function karussell_pruefen() line 22 at RAISE\nSQL statement \"update public.posts set medien=jsonb_build_array(jsonb_build_object('url',public.medien_adresse('posts/cf260026-0000-4000-8000-000000000001-film.mp4'),'typ','video'))||jsonb_build_array(jsonb_build_object('url',public.medien_adresse('posts/cf260026-0000-4000-8000-000000000001-film.mp4'),'typ','video')) where id='cf260026-0000-4000-8000-000000000010'\"\nPL/pgSQL function inline_code_block line 1 at SQL statement\n"}

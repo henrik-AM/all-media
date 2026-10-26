@@ -1,0 +1,5 @@
+OK B7_Klient_mit_Videobeleg_erlaubt
+OK B7_Dienstrolle_darf_Medienliste_pflegen
+OK B7_Klient_ohne_Videobeleg_weiter_gesperrt
+3/3 Rollenprüfungen, verworfen
+Rollback-Kontrolle 1/1

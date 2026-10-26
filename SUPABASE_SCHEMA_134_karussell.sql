@@ -283,7 +283,7 @@ begin
    -- Ein Video darf weder als Bild getarnt noch nur an zweiter Stelle versteckt sein.
    if m->>'typ'='video' or public.medium_typ(p) like 'video/%' or p ~* '\.(mp4|mov|m4v|webm)$' then
      if m->>'typ'<>'video' then raise exception 'Falscher Medientyp';end if;
-     if not public.medium_video_geprueft(p,new.user_id) then
+     if current_user='authenticated' and not public.medium_video_geprueft(p,new.user_id) then
        raise exception 'Bitte das Video über die geprüfte Uploadstelle hochladen.' using errcode='42501';end if;
    elsif p !~* '\.(jpg|jpeg|png|webp)$' or public.medium_typ(p) not in ('image/jpeg','image/png','image/webp') then
      raise exception 'Falscher Medientyp';end if;
