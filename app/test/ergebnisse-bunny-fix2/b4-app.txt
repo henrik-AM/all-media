@@ -1,0 +1,3 @@
+OK 1 ProfilProvider übernimmt gezielt nachgeladenen Clip ohne neues Bootstrap
+OK 2 Normale Querformatübersicht filtert den Einzelclip aus
+2/2 Prüfungen bestanden

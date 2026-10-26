@@ -1,0 +1,10 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+OK 1 B1 HTTP: wiederholte Altdateisignatur bleibt identisch, ein Storage-Aufruf
+OK 2 B11 HTTP: unbekannter Pfad lässt gültiges Nachbarmedium bestehen
+OK 3 B2 Browser: alter Beitrag ohne Medienliste zeigt sein Einzelbild
+OK 4 B4 Browser: fremder Profilbeitrag sichtbar, Feedreihenfolge bleibt erhalten
+OK 5 B4 Reaktionsantwort erhält Einzelmarkierung
+OK 6 B4 Home-Rückkehr entfernt fremden Einzelbeitrag aus dem Feed
+OK 7 B4 erneutes gezieltes Öffnen bleibt möglich
+OK 8 Kein JavaScript-Absturz
+8/8 Browser-/HTTP-Prüfungen bestanden; zwei Bilder gesondert ansehen.

@@ -17217,7 +17217,7 @@ function openClip(clipId) {
         const res = await fetch(`/api/clips/${clip.id}/${was}`, { method: 'POST' });
         const antwort = await res.json();
         if (!res.ok) return toast(antwort.error || 'Reaktion konnte nicht gespeichert werden');
-        clip = antwort;
+        clip = {...antwort,nurEinzeln:clip.nurEinzeln};
         const stelle = state.clips.findIndex((c) => c.id === clip.id);
         if (stelle !== -1) state.clips[stelle] = clip;
         paint();

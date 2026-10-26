@@ -7,7 +7,7 @@ async function starten(){
   const u=new URL(url);if(!['localhost','127.0.0.1'].includes(u.hostname))throw Error('Externer Abruf im Offline-Test gesperrt');return originalFetch(url,opts);
  };
  const register=new Map(),alt=new Map(),belege=[];
- const lage={freigegeben:true,schreibfehler:false,rechtefehler:false,oeffentlich:new Set(),anfragen:0,posts:[],instantKandidaten:[],instantBestaetigt:[]};
+ const lage={freigegeben:true,schreibfehler:false,rechtefehler:false,oeffentlich:new Set(),anfragen:0,altSignierungen:0,posts:[],instantKandidaten:[],instantBestaetigt:[]};
  function dienstTabelle(t){
   if(t==='video_upload_belege')return {insert:async b=>{belege.push(b);return {error:null};}};
   if(t!=='medien_objekte')throw Error('Unerwartete Diensttabelle '+t);
@@ -32,13 +32,13 @@ async function starten(){
    upload:async(p,b)=>{alt.set(p,{inhalt:b,owner:wer});return {data:{id:'altes-objekt'}};},
    remove:async pfade=>{for(const p of pfade)if(alt.get(p)?.owner===wer)alt.delete(p);return {error:null};},
    getPublicUrl:p=>({data:{publicUrl:`https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/${p}`}}),
-   createSignedUrl:async p=>({data:{signedUrl:`http://localhost:3300/alt/${p}`}}),
-   createSignedUrls:async pfade=>({data:pfade.filter(p=>alt.get(p)?.owner===wer||lage.oeffentlich.has(p)).map(path=>({path,signedUrl:`http://localhost:3300/alt/${path}`}))}),
+   createSignedUrl:async p=>({data:{signedUrl:`http://127.0.0.1:3300/alt/${p}`}}),
+   createSignedUrls:async pfade=>{lage.altSignierungen++;return {data:pfade.filter(p=>alt.get(p)?.owner===wer||lage.oeffentlich.has(p)).map(path=>({path,signedUrl:`http://127.0.0.1:3300/alt/${path}`}))};},
   })}};}
  const S=require('../../web/server/supabase');const altFuer=S.clientFuer;S.clientFuer=t=>t==='lokal-a'?client(A):t==='lokal-b'?client(B):null;
  const V=require('../../web/server/videopruefung'),altDienst=V.dienstclient;V.dienstclient=()=>({from:dienstTabelle,storage:{from:()=>({remove:async pfade=>{for(const p of pfade)alt.delete(p);return {error:null};}})}});
  const api=require('../../web/server/supabase-api');
- api.ladeBeitraege=async(_c,_u,optionen={})=>lage.posts.filter(p=>!optionen.nurIds||optionen.nurIds.includes(p.id)).map(p=>({...p,userId:'me',mediaUrl:p.media_url,description:p.description,medien:p.medien||[],kind:p.kind}));
+ api.ladeBeitraege=async(_c,_u,optionen={})=>lage.posts.filter(p=>!optionen.nurIds||optionen.nurIds.includes(p.id)).map(p=>({...p,userId:p.user_id&&p.user_id!==_u?p.user_id:'me',mediaUrl:p.media_url,description:p.description,medien:p.medien||[],kind:p.kind}));
  const app=require('../../web/server/app');
  app.get('/alt/:ordner/:datei',(req,res)=>{const e=alt.get(`${req.params.ordner}/${req.params.datei}`);e?res.type('image/jpeg').send(e.inhalt):res.sendStatus(404);});
  const server=await new Promise((resolve,reject)=>{const s=app.listen(3300,'127.0.0.1',()=>resolve(s));s.on('error',reject);});

@@ -928,6 +928,15 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, pttBenachrichtigung: an } : c)));
   }, []);
 
+  // Gezielt nachgeladene Clips ändern keinen Bootstrap-Zeitstempel.
+  // Im Spieler verfügbar halten, in der normalen Querformatliste ausfiltern.
+  useEffect(() => {
+    setClips(prev => {
+      const neue=daten.clips.filter(c=>c.nurEinzeln&&!prev.some(p=>p.id===c.id));
+      return neue.length?[...prev,...neue]:prev;
+    });
+  },[daten.clips]);
+
   const clipUmschalten = useCallback(
     (id: string, was: 'like' | 'dislike' | 'save' | 'repost') => {
       const vorher = clips.find((c) => c.id === id);
