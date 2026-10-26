@@ -794,6 +794,7 @@ export async function beitragAnlegen(
   ichId: string,
   felder: NeuerBeitrag = {}
 ): Promise<string> {
+  if(felder.medien!==undefined){const fehler=require('../../gemeinsam/karussell').pruefen(felder.medien);if(fehler)throw new Error(fehler);}
   if (felder.art === 'reel' || (felder.art === 'clip' && felder.sekunden !== undefined)) {
     const fehler = require('../../gemeinsam/reel').pruefen(felder.sekunden);
     if (fehler) throw new Error(fehler);

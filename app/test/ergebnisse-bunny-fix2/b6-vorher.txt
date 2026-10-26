@@ -1,0 +1,13 @@
+Beitrag anlegen fehlgeschlagen: Kein Insert bei ungültiger Eingabe
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+2 !== 0
+
+    at /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b6.js:2:527 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
