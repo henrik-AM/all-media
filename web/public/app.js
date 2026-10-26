@@ -2759,20 +2759,30 @@ async function storyPosten(bild, wahl) {
 }
 
 /** Eine Video-Aufnahme roh hochladen (Kasten 15). Antwort wie /api/hochladen. */
-async function videoHochladen(aufnahme, ordner) {
+async function medienDateiHochladen(datei, ordner, typ) {
+  const konto=window.Anmeldung?.nutzer?.()?.id;
+  const client=window.Anmeldung?.client?.();
+  const token=client?(await client.auth.getSession()).data.session?.access_token:null;
+  const steuerung=new AbortController();
+  const rahmen=document.createElement('div');rahmen.className='medienupload';
+  rahmen.setAttribute('role','dialog');rahmen.setAttribute('aria-modal','true');rahmen.setAttribute('aria-label','Aufnahme hochladen');
+  rahmen.innerHTML='<div class="medienupload__karte"><h2>Aufnahme hochladen</h2><p aria-live="polite">Hochladen …</p><progress aria-label="Hochladefortschritt" max="100"></progress><button class="primary-btn" type="button">Hochladen abbrechen</button></div>';
+  const vorher=document.activeElement;document.body.appendChild(rahmen);
+  const knopf=rahmen.querySelector('button');knopf.onclick=()=>steuerung.abort();knopf.focus();
+  const taste=e=>{if(e.key==='Escape'){e.preventDefault();steuerung.abort();}if(e.key==='Tab'){e.preventDefault();knopf.focus();}};
+  rahmen.addEventListener('keydown',taste);
   try {
-    const res = await fetch(`/api/hochladen/video?ordner=${encodeURIComponent(ordner)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': aufnahme.typ || 'video/mp4' },
-      body: aufnahme.datei,
-    });
-    const daten = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: daten.error || `Server antwortet mit ${res.status}` };
+    const daten=await window.MedienUpload.senden({url:`/api/hochladen/datei?ordner=${encodeURIComponent(ordner)}`,
+      body:datei,headers:{'Content-Type':typ || datei.type || 'video/mp4',...(token?{Authorization:`Bearer ${token}`}:{})},signal:steuerung.signal,
+      fortschritt:s=>{rahmen.querySelector('p').textContent=window.MedienUpload.text(s);const p=rahmen.querySelector('progress');if(s.gesamt>0)p.value=100*s.geladen/s.gesamt;else p.removeAttribute('value');}});
+    if(steuerung.signal.aborted)throw new Error('Hochladen abgebrochen.');
+    if(window.Anmeldung?.nutzer?.()?.id!==konto || (client&&(await client.auth.getSession()).data.session?.access_token!==token))throw new Error('Das Konto wurde gewechselt. Bitte erneut versuchen.');
     return daten;
-  } catch (fehler) {
-    console.error('Video hochladen fehlgeschlagen:', fehler);
-    return { ok: false, error: 'Keine Verbindung' };
-  }
+  } catch(e){return {ok:false,error:e.message || 'Hochladen fehlgeschlagen.'};}
+  finally{rahmen.remove();if(vorher?.isConnected)vorher.focus();}
+}
+async function videoHochladen(aufnahme, ordner) {
+  return medienDateiHochladen(aufnahme.datei,ordner,aufnahme.typ || 'video/mp4');
 }
 
 /*
@@ -12120,6 +12130,8 @@ function kameraLaufwerk(wurzel, fertig) {
     if (typeof MediaRecorder === 'undefined') {
       return toast('Dieser Browser kann keine Videos aufnehmen');
     }
+    const medienKonfig=await api('/api/medien/konfiguration');
+    if(medienKonfig?.anbieter==='bunny' && !['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4'].some(t=>MediaRecorder.isTypeSupported(t)))return toast('Dieser Browser nimmt kein MP4 auf. Bitte eine MP4-Datei aus der Galerie wählen.');
     stuecke = [];
     try {
       aufnehmer = new MediaRecorder(kameraStrom, aufnahmeOptionen());

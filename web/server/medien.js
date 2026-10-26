@@ -266,7 +266,7 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
  * Erlaubt sind nur die Videotypen des Eimers (StoryRegeln.videoTyp); die
  * Größe prüft express.raw, die Länge der Browser vor dem Hochladen.
  */
-async function hochladenVideo(client, nutzerId, ordner, mime, inhalt) {
+async function hochladenVideo(client, nutzerId, ordner, mime, inhalt, optionen) {
   if (!client) return { ok: false, error: 'Nicht angemeldet' };
   if (!ORDNER.includes(ordner)) return { ok: false, error: 'Unbekannte Ablage' };
   const typ = StoryRegeln.videoTyp(mime);
@@ -275,12 +275,14 @@ async function hochladenVideo(client, nutzerId, ordner, mime, inhalt) {
   const zuGross = StoryRegeln.videoPruefen({ bytes: inhalt.length });
   if (zuGross) return { ok: false, error: zuGross };
   if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
-  return ablegen(client, nutzerId, ordner, typ, inhalt);
+  return ablegen(client, nutzerId, ordner, typ, inhalt, optionen);
 }
 
 /** Der gemeinsame Teil: Datei in den Eimer, zwei Adressen zurück. */
-async function ablegen(client, nutzerId, ordner, typ, inhalt) {
-  if (mitBunny()) return bunnyAblegen(client, nutzerId, ordner, typ, inhalt);
+async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
+  if(signal?.aborted)return {ok:false,error:'Hochladen abgebrochen.'};
+  // Instants bleiben im privaten Supabase-Eimer (60-s-Signaturen, Schema 131).
+  if (mitBunny() && ordner !== 'instants') return bunnyAblegen(client, nutzerId, ordner, typ, inhalt, {signal});
   if (!inhalt.length) return { ok: false, error: 'Die Aufnahme ist leer' };
 
   /*
@@ -316,6 +318,7 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
     contentType: typ,
     upsert: false,
   });
+  if (signal?.aborted && !error) {await client.storage.from('media').remove([pfad]);return {ok:false,error:'Hochladen abgebrochen.'};}
   if (error) {
     // Sichtbar machen, nicht verschlucken: das Verschweigen war der Grund,
     // warum der Fehler in der App ein Vierteljahr unbemerkt blieb.
@@ -336,6 +339,7 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
       return { ok: false, error: 'Das Video konnte nicht bestätigt werden. Bitte erneut versuchen.' };
     }
   }
+  if(signal?.aborted){await client.storage.from('media').remove([pfad]);return {ok:false,error:'Hochladen abgebrochen.'};}
   const { data } = client.storage.from('media').getPublicUrl(pfad);
   let anzeige = null;
   if (ordner === 'instants') return {ok:true,url:data.publicUrl,anzeige:null,pfad};

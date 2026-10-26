@@ -255,6 +255,8 @@ const LAEUFE = [
   ['lenkung-einheit', '_lenkung_einheit.js'],
   ['af3-negativ', 'af3-negativ.js'],
   ['af5-reels', 'af5-reels.js'],
+  ['bunny', '_bunny_einheit.js'],
+  ['bunny-upload', 'bunny-upload.js'],
   ['af7-analysen', 'af7-analysen.js'],
   ['af6-instants', 'af6-instants.js'],
   ['af-nachpruefung', 'af-nachpruefung.js'],

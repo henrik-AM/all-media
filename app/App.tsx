@@ -26,6 +26,7 @@ import { KontoFreigabe } from './components/KontoFreigabe';
 import { NeueBedingungen } from './components/NeueBedingungen';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
+import { UploadAnzeige } from './components/UploadAnzeige';
 import { Toast } from './components/Toast';
 import { BildschirmzeitSperre } from './components/BildschirmzeitSperre';
 import { BildschirmzeitProvider, useBildschirmzeit } from './contexts/BildschirmzeitContext';
@@ -3059,6 +3060,7 @@ const App = () => (
       Themenwechsel neu auf, und das soll wirklich alles betreffen.
     */}
     <ThemeProvider>
+      <UploadAnzeige />
       <SupabaseProvider>
         <AuthProvider>
           {/*

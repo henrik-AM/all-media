@@ -5523,3 +5523,9 @@ body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom,
 .slide:has(.reel-position) .slide__meta{bottom:64px}
 
 .instant-feld{width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);margin:8px 0}
+
+/* Upload liegt auch über Formularblättern; 100 % Bytes ist noch kein Speichererfolg. */
+.medienupload { position:fixed;inset:0;z-index:10050;background:#0009;display:flex;align-items:center;justify-content:center;padding:24px; }
+.medienupload__karte { width:min(100%,420px);background:var(--bg,#fff);color:var(--text,#111);padding:24px;border-radius:20px;display:grid;gap:18px; }
+.medienupload__karte h2,.medienupload__karte p {margin:0;}
+.medienupload__karte progress {width:100%;height:12px;accent-color:var(--accent,#1261d7);}

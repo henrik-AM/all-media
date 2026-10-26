@@ -58,6 +58,11 @@ function eigeneBasis(): string | undefined {
 export function eigeneMedienadresse(url: unknown, ordner?: string | string[]): boolean {
   return MedienAdresse.gespeichert(url, ordner ?? null, eigeneBasis());
 }
+export type UploadStand = import('../../gemeinsam/upload').Stand & {abbrechen:()=>void};
+let uploadStand:UploadStand|null=null;
+const uploadZuhoerer=new Set<(s:UploadStand|null)=>void>();
+export function uploadBeobachten(fn:(s:UploadStand|null)=>void){uploadZuhoerer.add(fn);fn(uploadStand);return ()=>{uploadZuhoerer.delete(fn);};}
+export function uploadStandSetzen(s:UploadStand|null){uploadStand=s;for(const fn of uploadZuhoerer)fn(s);}
 const GUELTIG = 4 * 60 * 60;
 
 /*
@@ -200,7 +205,7 @@ export async function signiereMedien<T>(client: SupabaseClient | null, daten: T)
   const fehlend: string[] = [];
   for (const pfad of pfade) {
     const eintrag = speicher.eintraege.get(pfad);
-    if (eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
+    if (!medienServerAktiv() && eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
       karte.set(pfad, eintrag.url);
     } else {
       fehlend.push(pfad);
@@ -254,7 +259,7 @@ export async function signiereEine(
     return data.bild;
   }
   const eintrag = speicher.eintraege.get(pfad);
-  if (eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;
+  if (!medienServerAktiv() && eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;
 
   try {
     const { data, error } = medienServerAktiv()

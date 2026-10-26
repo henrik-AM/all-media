@@ -21,7 +21,8 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { signiereEine, medienServerBasis, medienAnfrage } from './medien';
+import { signiereEine, medienServerBasis, medienAnfrage, uploadStandSetzen } from './medien';
+import * as MedienUpload from '../../gemeinsam/upload';
 
 
 /*
@@ -101,17 +102,24 @@ export async function ladeHoch(
     const inhalt = await antwort.arrayBuffer();
     if (grenze && inhalt.byteLength > grenze.bytes) throw new Error(grenze.zuGross(inhalt.byteLength));
 
-    const {data}=await client.auth.getSession();
-    const token=data.session?.access_token;
-    if(!token)throw new Error('Bitte erneut anmelden.');
-    const r=await fetch(medienServerBasis()+`/api/hochladen/datei?ordner=${ordner}`,{
-      method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':typVon(dateiname, inhalt)},
-      body:inhalt,redirect:'error',signal:AbortSignal.timeout(120000),
-    });
-    const wert=await r.json();
-    if((await client.auth.getSession()).data.session?.access_token!==token)throw new Error('Das Konto wurde gewechselt.');
-    if(!r.ok||!wert.ok)throw new Error(wert.error||'Upload fehlgeschlagen');
-    return {success:true,error:null,url:wert.url,anzeige:wert.anzeige,sekunden:wert.sekunden};
+    // AF5.3: echter Bytefortschritt und Abbrechen (gemeinsam/upload.js, wie die Website).
+    const { data: sitzung } = await client.auth.getSession();
+    const token = sitzung.session?.access_token;
+    if (!token) throw new Error('Bitte erneut anmelden.');
+    const steuerung = new AbortController();
+    const melden = (stand: MedienUpload.Stand) => uploadStandSetzen({ ...stand, abbrechen: () => steuerung.abort() });
+    let wert: any;
+    try {
+      wert = await MedienUpload.senden({
+        url: medienServerBasis() + `/api/hochladen/datei?ordner=${ordner}`,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': typVon(dateiname, inhalt) },
+        body: inhalt, signal: steuerung.signal, fortschritt: melden,
+      });
+      if (steuerung.signal.aborted) throw new Error('Hochladen abgebrochen.');
+    } finally { uploadStandSetzen(null); }
+    if (!wert?.url) throw new Error('Die Aufnahme konnte nicht bestätigt werden.');
+    if ((await client.auth.getSession()).data.session?.access_token !== token) throw new Error('Das Konto wurde gewechselt.');
+    return { success: true, error: null, url: wert.url, anzeige: wert.anzeige, sekunden: wert.sekunden };
   } catch (fehler: any) {
     // Sichtbar machen, nicht verschlucken: genau das Verschweigen hat
     // verborgen, dass nie etwas ankam.

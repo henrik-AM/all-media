@@ -186,6 +186,7 @@ const UMD_BAUSTEINE = [
   // 21.10.2026: `erstellen.js` — Community und Unterthema erstellen nach Figma
   // (Kästen 28/10.2 und 16, Schema 99). Erstellen-Seiten in App und Website.
   ['erstellen', 'Erstellen'],
+  ['upload', 'MedienUpload'],
   ['reel', 'Reel'],
   ['analyse', 'Analyse'],
   ['instants', 'Instants'],
