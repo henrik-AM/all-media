@@ -253,6 +253,8 @@ const LAEUFE = [
   ['bildschirmzeit', '_bildschirmzeit.js'],
   ['vorschlaege', '_vorschlaege.js'],
   ['lenkung-einheit', '_lenkung_einheit.js'],
+  ['af3-negativ', 'af3-negativ.js'],
+  ['af5-reels', 'af5-reels.js'],
   ['lenken', '_lenken.js'],
   ['markierung-einheit', '_markierung_einheit.js'],
   ['markieren', '_markieren.js'],

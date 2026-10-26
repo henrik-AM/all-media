@@ -1,3 +1,4 @@
+import * as Reel from '../../../gemeinsam/reel';
 import { reaktion } from '../../../gemeinsam/rang';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -154,6 +155,7 @@ export const VideoFeedScreen = ({
    * gelegt wuerde die oberste alle Beruehrungen schlucken, und die beiden
    * darunter waeren tot.
    */
+  const [fortschritt, setFortschritt] = useState<Record<string, { bei: number; gesamt: number }>>({});
   const spieler = useRef<Record<string, VideoSteuerung | null>>({});
   const letzterTipp = useRef(0);
   const tippZeitgeber = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -351,6 +353,17 @@ export const VideoFeedScreen = ({
 
     return (
       <View style={[styles.slide, slideHeight > 0 && { height: slideHeight }]}>
+        <View style={{ position:'absolute', bottom:4, left:16, right:16, zIndex:20, backgroundColor:'rgba(0,0,0,.6)', padding:8, borderRadius:8 }}>
+          <Text style={{color:'white',fontSize:12}}>{Reel.zeit(fortschritt[item.id]?.bei || 0)} / {Reel.zeit(fortschritt[item.id]?.gesamt || 0)}</Text>
+          <Pressable accessibilityRole="adjustable" accessibilityLabel="Videoposition"
+            accessibilityValue={{min:0,max:fortschritt[item.id]?.gesamt || 0,now:fortschritt[item.id]?.bei || 0}}
+            accessibilityActions={[{name:'increment'},{name:'decrement'}]}
+            onAccessibilityAction={(e) => spieler.current[item.id]?.springen(Math.max(0,Math.min(fortschritt[item.id]?.gesamt || 0,(fortschritt[item.id]?.bei || 0)+(e.nativeEvent.actionName==='increment'?10:-10))))}
+            onPress={(e) => { const f=fortschritt[item.id]; e.currentTarget.measure((_x,_y,w) => spieler.current[item.id]?.springen(Reel.ziel(e.nativeEvent.locationX/w,f?.gesamt || 0))); }}
+            style={{height:24,justifyContent:'center'}}>
+            <View style={{height:4,backgroundColor:'#888'}}><View style={{height:4,backgroundColor:'#fff',width:`${100*Reel.ziel((fortschritt[item.id]?.bei || 0)/(fortschritt[item.id]?.gesamt || 1),1)}%`}} /></View>
+          </Pressable>
+        </View>
         <Pressable
           style={styles.stage}
           onPress={() => flaecheGetippt(item)}
@@ -373,6 +386,7 @@ export const VideoFeedScreen = ({
             icon="play-outline"
             iconSize={72}
             dunkel
+            onFortschritt={(bei, gesamt) => { if (sichtbar === item.id) setFortschritt((p) => ({ ...p, [item.id]: { bei, gesamt } })); }}
             style={styles.stageBild}
           />
           {pause && sichtbar === item.id && (
@@ -623,7 +637,7 @@ const styles = themenStyles((colors) => ({
   railBtn: { width: '100%', alignItems: 'center', gap: 4 },
   railLabel: { color: colors.white, fontSize: 11, fontWeight: '600' },
 
-  meta: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, paddingRight: 78 },
+  meta: { paddingHorizontal: spacing.lg, paddingBottom: 76, paddingRight: 78 },
   author: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: spacing.sm },
   authorTap: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   authorName: { color: colors.white, fontSize: 14.5, fontWeight: '700' },

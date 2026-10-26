@@ -2242,6 +2242,8 @@ app.post('/api/eigene/video', route(async (req) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
   if (!beschreibung) return { ok: false, error: 'Bitte eine Beschreibung eingeben' };
   const quer = req.body?.format === 'quer';
+  const dauerFehler = require('../../gemeinsam/reel').pruefen(req.body?.sekunden);
+  if (dauerFehler) return { ok: false, error: dauerFehler };
 
   const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
     // Querformat ist 'clip', Hochformat 'reel'. Eine eigene Tabelle für
@@ -2252,7 +2254,9 @@ app.post('/api/eigene/video', route(async (req) => {
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),
     soundAb: soundAbAus(req.body),
-    dauer: quer ? String(req.body?.dauer || '00:15') : null,
+    dauer: require('../../gemeinsam/reel').zeit(req.body.sekunden),
+    sekunden: req.body.sekunden,
+    mediaUrl: req.body.mediaUrl,
     // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag zurück.
     geplantAb: req.body?.geplantAb || null,
     mediaUrl: req.body?.mediaUrl || null,

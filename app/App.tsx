@@ -1774,7 +1774,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Steht getrennt von `erstelle`, weil es zwei Wege hierher gibt: das
    * Erstellen-Menü und die Kamera, die ihre Aufnahme hierher weiterreicht.
    */
-  const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string) => {
+  const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string, sekunden?: number) => {
     const istBild = punkt === 'post';
     const quer = punkt === 'landscape';
     setFormular({
@@ -1835,6 +1835,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             musik: music,
             soundAb,
             mediaUrl: uri,
+            sekunden,
             art: istBild ? 'post' : quer ? 'clip' : 'reel',
             geplantAb: spaeter,
           });
@@ -1844,7 +1845,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         }
 
         if (istBild) await profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music, soundAb });
-        else await profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb });
+        else await profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb, sekunden });
 
         // Gleich dorthin, wo das Neue jetzt steht.
         setArea('videos');
@@ -2195,13 +2196,14 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           zielChat
             ? (uri) => aufnahmeInChat(zielChat, uri)
             : zielBeitrag
-              ? (uri) => {
+              ? (uri, sekunden) => {
                   setOverlay(null);
-                  beitragBeschreiben(zielBeitrag, uri);
+                  beitragBeschreiben(zielBeitrag, uri, sekunden);
                 }
               : undefined
         }
         // Ein Reel und ein Querformat-Video sind Videos, ein Beitrag ist ein Bild.
+        zielVideo={!!zielBeitrag && zielBeitrag !== 'post'}
         startModus={zielBeitrag && zielBeitrag !== 'post' ? 'video' : undefined}
         zielStory={overlay.zielStory}
         onClose={() => setOverlay(null)}

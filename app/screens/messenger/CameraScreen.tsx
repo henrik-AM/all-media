@@ -1,3 +1,4 @@
+import * as Reel from '../../../gemeinsam/reel';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
@@ -43,7 +44,8 @@ interface Props {
    * Steht das Ziel schon fest — die Kamera kam aus einem Chat —, geht die
    * Aufnahme ohne Rückfrage dorthin.
    */
-  direktZu?: (uri: string) => void;
+  direktZu?: (uri: string, sekunden?: number) => void;
+  zielVideo?: boolean;
   /**
    * Die Kamera kam über das Plus an der eigenen Story.
    *
@@ -105,6 +107,7 @@ export const CameraScreen = ({
   onCaptured,
   onAnChat,
   direktZu,
+  zielVideo = false,
   zielStory = false,
   startModus,
   onNotice,
@@ -197,7 +200,13 @@ export const CameraScreen = ({
   /** Was mit einer fertigen Aufnahme geschieht — einerlei woher sie kommt. */
   const uebernehmen = (uri: string, art?: AufnahmeArt) => {
     aufnahmeArt.current = art ?? { typ: mode === 'video' ? 'video' : 'image' };
-    if (direktZu) return direktZu(uri);
+    if (direktZu) {
+      if (zielVideo) {
+        const fehler = aufnahmeArt.current.typ !== 'video' ? 'Bitte ein Video aufnehmen oder wählen.' : Reel.pruefen(aufnahmeArt.current.sekunden);
+        if (fehler) return onNotice(fehler);
+      }
+      return direktZu(uri, aufnahmeArt.current.sekunden ?? undefined);
+    }
     // Das Plus an der eigenen Story: die Aufnahme geht dorthin, ohne Frage.
     if (zielStory) {
       setAufnahme(null);
@@ -227,7 +236,7 @@ export const CameraScreen = ({
         allowsEditing: !originalVideo,
         ...(originalVideo ? { videoExportPreset: ImagePicker.VideoExportPreset.Passthrough } : {}),
         quality: 0.8,
-        ...(zielStory ? { videoMaxDuration: StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS } : {}),
+        ...((zielStory || zielVideo) ? { videoMaxDuration: zielVideo ? Reel.MAX_SEKUNDEN : StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS } : {}),
       });
       if (ergebnis.canceled || !ergebnis.assets.length) return;
       const wahl = ergebnis.assets[0];
@@ -277,11 +286,12 @@ export const CameraScreen = ({
          * Grenze des Speichers; ohne sie scheiterte eine lange Aufnahme in
          * hoher Auflösung erst beim Hochladen.
          */
+        const beginn = Date.now();
         const video = await kamera.current.recordAsync({
-          maxDuration: StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS,
+          maxDuration: zielVideo ? Reel.MAX_SEKUNDEN : StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS,
           maxFileSize: StoryRegeln.VIDEO_BYTES_HOECHSTENS,
         });
-        if (video?.uri) uebernehmen(video.uri, { typ: 'video' });
+        if (video?.uri) uebernehmen(video.uri, { typ: 'video', sekunden: Math.min(zielVideo ? Reel.MAX_SEKUNDEN : StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS, (Date.now()-beginn)/1000) });
       } catch {
         onNotice('Die Aufnahme ist fehlgeschlagen');
       } finally {

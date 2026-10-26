@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict');
+const R=require('../../gemeinsam/reel');
+let n=0;const test=(name,fn)=>{fn();console.log(`OK ${++n} ${name}`)};
+for(const sec of [0,-1,NaN,Infinity,undefined,'1200'])test(`ungültige Länge ${sec}`,()=>assert.ok(R.pruefen(sec)));
+for(const sec of [.1,60,1199.99,1200])test(`zulässig ${sec}`,()=>assert.equal(R.pruefen(sec),null));
+test('20:00.001 abgelehnt',()=>assert.match(R.pruefen(1200.001),/20 Minuten/));
+test('Zeitformat',()=>assert.equal(R.zeit(1200),'20:00'));
+test('Hälfte 10:00',()=>assert.equal(R.ziel(.5,1200),600));
+test('Sprung an Grenzen',()=>assert.deepEqual([R.ziel(-1,1200),R.ziel(2,1200)],[0,1200]));
+console.log(`${n}/${n} Prüfungen bestanden`);

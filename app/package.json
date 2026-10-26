@@ -168,7 +168,8 @@
     "test:paket7-offline": "node --test test/_paket7_regression.cjs",
     "test:paket7-kanal": "node test/_paket7_kanal_offline.cjs",
     "test:af3-negativ": "node test/af3-negativ.js",
-    "test:af-kaesten-bilder": "node test/af-kaesten-bilder.js"
+    "test:af-kaesten-bilder": "node test/af-kaesten-bilder.js",
+    "test:af5-reels": "node test/af5-reels.js"
   },
   "private": true
 }

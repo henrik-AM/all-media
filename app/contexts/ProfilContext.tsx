@@ -1,3 +1,4 @@
+import * as Reel from '../../gemeinsam/reel';
 import { reaktion } from '../../gemeinsam/rang';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -150,6 +151,7 @@ const mitteilungText = (
 };
 
 interface NeuesVideo {
+  sekunden?: number;
   beschreibung: string;
   ort: string;
   quer: boolean;
@@ -625,14 +627,14 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
   }, [inDatenbank]);
 
-  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(async ({ beschreibung, ort, quer, mediaUri, music, soundAb }) => {
-    const gespeichert = await inDatenbank({ art: quer ? 'clip' : 'reel', titel: quer ? beschreibung : '', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri });
+  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(async ({ beschreibung, ort, quer, mediaUri, music, soundAb, sekunden }) => {
+    const gespeichert = await inDatenbank({ art: quer ? 'clip' : 'reel', titel: quer ? beschreibung : '', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri, sekunden, dauer: Reel.zeit(sekunden || 0) });
     const id = gespeichert.id;
     mediaUri = gespeichert.mediaUri;
 
     if (quer) {
       setClips((prev) => [
-        { id, userId: 'me', title: beschreibung, duration: '', views: 0, age: 'gerade eben', art: 'standard' },
+        { id, userId: 'me', title: beschreibung, duration: Reel.zeit(sekunden || 0), views: 0, age: 'gerade eben', art: 'standard', mediaUri },
         ...prev,
       ]);
     } else {

@@ -6699,7 +6699,17 @@ function reelsBeobachten() {
   if (!spieler.length) return;
   const feed = document.getElementById('feed');
   const vonSelbst = !schalterAn('datensparen');
-  spieler.forEach((v) => { v.muted = tonAus; });
+  spieler.forEach((v) => {
+    v.muted = tonAus;
+    // AF5: Sprungleiste für lange Reels.
+    const id = v.closest('.slide')?.dataset.impression;
+    const feld = id && main.querySelector(`[data-reelposition="${id}"]`);
+    const zeit = id && main.querySelector(`[data-reelzeit="${id}"]`);
+    if (!feld) return;
+    const zeigen = () => { feld.value = String(1000 * (v.currentTime || 0) / (v.duration || 1)); zeit.textContent = Reel.zeit(v.currentTime) + ' / ' + Reel.zeit(v.duration); };
+    v.addEventListener('timeupdate', zeigen); v.addEventListener('loadedmetadata', zeigen);
+    feld.addEventListener('input', () => { if (Number.isFinite(v.duration)) v.currentTime = Reel.ziel(Number(feld.value) / 1000, v.duration); zeigen(); });
+  });
 
   // Ohne src kann ein unsichtbarer Spieler auch nicht weiter puffern.
   // preload="none" allein ist nur ein Hinweis an den Browser.
@@ -6792,6 +6802,8 @@ function videoSlide(v) {
         <span class="slide__tempo" hidden>2×</span>
       </div>
 
+      <div class="reel-position"><label>Videoposition <output data-reelzeit="${v.id}">0:00 / 0:00</output>
+        <input type="range" min="0" max="1000" value="0" data-reelposition="${v.id}" aria-label="Videoposition" /></label></div>
       <div class="slide__rail">
         <button class="railbtn ${v.disliked ? 'is-on' : ''}" data-vaction="dislike" data-vid="${v.id}" aria-label="Gefällt mir nicht" aria-pressed="${!!v.disliked}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M16 3H6a2 2 0 0 0-2 2l-1 7a2 2 0 0 0 2 2h5l-1 5c0 2 2 3 3 1l4-7V3ZM16 3h5v10h-5"/></svg></button>
         <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
@@ -18573,6 +18585,13 @@ async function erstelle(was) {
   const datei = await dateiWaehlen(istBild ? 'photo' : 'video');
   if (!datei) return;
 
+  let sekunden;
+  if (!istBild) {
+    const lokal = URL.createObjectURL(datei);
+    try { sekunden = await videoLaenge(lokal); } finally { URL.revokeObjectURL(lokal); }
+    const fehler = Reel.pruefen(sekunden) || StoryRegeln.videoPruefen({bytes: datei.size, mime: datei.type});
+    if (fehler) return toast(fehler);
+  }
   let bild = null;
   try {
     bild = istBild ? await bildVerkleinern(datei) : await videoStandbild(datei);
@@ -18632,7 +18651,7 @@ async function erstelle(was) {
       const res = await fetch(ziel, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...werte, mediaUrl: hoch.url, geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
+        body: JSON.stringify({ ...werte, sekunden, mediaUrl: hoch.url, geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
       });
       const daten = await res.json();
       if (!daten.ok) {

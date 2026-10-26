@@ -767,6 +767,7 @@ export interface NeuerBeitrag {
   mediaUrl?: string;
   thumbnail?: string;
   dauer?: string;
+  sekunden?: number;
   /**
    * "Spaeter posten": Zeitpunkt, ab dem der Beitrag sichtbar ist.
    * Leer heisst sofort. Steht in posts.publish_at.
@@ -791,6 +792,10 @@ export async function beitragAnlegen(
   ichId: string,
   felder: NeuerBeitrag = {}
 ): Promise<string> {
+  if (felder.art === 'reel' || (felder.art === 'clip' && felder.sekunden !== undefined)) {
+    const fehler = require('../../gemeinsam/reel').pruefen(felder.sekunden);
+    if (fehler) throw new Error(fehler);
+  }
   const { data, error } = await client
     .from('posts')
     .insert({
@@ -804,7 +809,7 @@ export async function beitragAnlegen(
       sound_ab: felder.soundAb || 0,
       media_url: felder.mediaUrl || null,
       thumbnail_url: felder.thumbnail || null,
-      duration: felder.dauer || null,
+      duration: felder.sekunden ? require('../../gemeinsam/reel').zeit(felder.sekunden) : felder.dauer || null,
       publish_at: felder.geplantAb || null,
       format: felder.format || 'standard',
     })

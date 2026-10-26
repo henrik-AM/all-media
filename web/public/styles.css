@@ -5517,3 +5517,7 @@ textarea.profilseite__gross { min-height: 160px; }
 
 /* Kopierbestätigung darf den Fertig-Knopf der Erstellen-Seite nicht verdecken. */
 body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.reel-position{position:absolute;bottom:4px;left:16px;right:16px;z-index:5;background:rgba(0,0,0,.6);color:white;padding:6px 10px;border-radius:8px;font-size:11px}.reel-position label{display:block}.reel-position output{float:right}.reel-position input{display:block;width:100%;accent-color:white;height:20px}
+
+/* Die Sprungleiste erhält Platz unter Beschreibung und Verfasser. */
+.slide:has(.reel-position) .slide__meta{bottom:64px}

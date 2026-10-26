@@ -1427,6 +1427,10 @@ const handleMarkChatAsRead = handler('Chat gelesen', async (client, nutzerId, ch
 // --------------------------------------------------------------- Beiträge --
 
 const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, felder = {}) => {
+  if (felder.art === 'reel' || (felder.art === 'clip' && felder.sekunden !== undefined)) {
+    const fehler = require('../../gemeinsam/reel').pruefen(felder.sekunden);
+    if (fehler) throw new Error(fehler);
+  }
   const { data, error } = await client
     .from('posts')
     .insert({
