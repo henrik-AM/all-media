@@ -1144,6 +1144,7 @@ export async function ladeStorys(client: SupabaseClient, ichId: string): Promise
 // ============================================================================
 
 interface RohBeitrag {
+  medien?: import("../../gemeinsam/karussell").Medium[];
   id: string;
   userId: string;
   kind: 'post' | 'reel' | 'clip';
@@ -1286,6 +1287,7 @@ export async function ladeBeitraege(
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),
     notify: benachrichtigt.has(b.id),
+    medien: b.medien || [],
     mediaUri: b.media_url ?? undefined,
     standbild: b.thumbnail_url ?? undefined,
   }));
@@ -1357,6 +1359,7 @@ export async function ladeBeitraege(
         notify: b.notify,
         reposts: b.shares,
         reposted: b.reposted,
+        medien: b.medien,
         mediaUri: b.mediaUri,
         standbild: b.standbild,
         tags: b.tags,

@@ -765,6 +765,7 @@ export interface NeuerBeitrag {
   /** Kasten 7.5: ab welcher Sekunde der Sound läuft (posts.sound_ab). */
   soundAb?: number;
   mediaUrl?: string;
+  medien?: import('../../gemeinsam/karussell').Medium[];
   thumbnail?: string;
   dauer?: string;
   sekunden?: number;
@@ -808,6 +809,7 @@ export async function beitragAnlegen(
       // Schema 67: welche Stelle des Sounds (sound_id setzt die Datenbank aus music).
       sound_ab: felder.soundAb || 0,
       media_url: felder.mediaUrl || null,
+      ...(felder.medien?.length?{medien:felder.medien.map(({url,typ})=>({url,typ}))}:{}),
       thumbnail_url: felder.thumbnail || null,
       duration: felder.sekunden ? require('../../gemeinsam/reel').zeit(felder.sekunden) : felder.dauer || null,
       publish_at: felder.geplantAb || null,

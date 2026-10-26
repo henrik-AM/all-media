@@ -189,7 +189,7 @@ interface ProfilWert {
   spende: Spende | null;
   raster: RasterEintrag[];
 
-  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; music?: string; soundAb?: number }) => Promise<void>;
+  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; medien?: import('../../gemeinsam/karussell').Medium[]; music?: string; soundAb?: number }) => Promise<void>;
   videoAnlegen: (werte: NeuesVideo) => Promise<void>;
   highlightAnlegen: (name: string) => string | null;
   playlistAnlegen: (name: string) => string | null;
@@ -600,8 +600,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     return beitragSpeichern(supabase, daten.ichId, felder);
   }, [supabase, daten.ichId]);
 
-  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(async ({ beschreibung, ort, mediaUri, music, soundAb }) => {
-    const gespeichert = await inDatenbank({ art: 'post', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri });
+  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(async ({ beschreibung, ort, mediaUri, medien, music, soundAb }) => {
+    const gespeichert = await inDatenbank({ art: 'post', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri, medien });
     const id = gespeichert.id;
     mediaUri = gespeichert.mediaUri;
     setEigeneBeitraege((prev) => [
@@ -620,7 +620,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         notify: false,
         reposts: 0,
         reposted: false,
-        mediaUri,
+        mediaUri, medien,
       },
       ...prev,
     ]);

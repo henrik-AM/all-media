@@ -286,6 +286,7 @@ export interface Comment {
 }
 
 export interface Post {
+  medien?: import('../../gemeinsam/karussell').Medium[];
   id: string;
   userId: string;
   location: string;

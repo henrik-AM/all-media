@@ -2226,6 +2226,8 @@ app.post('/api/eigene/beitrag', route(async (req) => {
 
   const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
     art: 'post',
+    mediaUrl: req.body?.mediaUrl,
+    medien: req.body?.medien,
     beschreibung,
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),

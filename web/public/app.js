@@ -6226,6 +6226,7 @@ function renderHomeFeed() {
       <div class="postlist">${karten.join('')}</div>
     </div>`;
 
+  karussellVerbinden(main);
   vorschlaegeEinhaengen('videos');
   bindStoryRail();
   /*
@@ -6456,7 +6457,7 @@ function postCard(p) {
         state.umfragen?.[p.id]
           ? umfrageKarte(state.umfragen[p.id])
           : `<div class="post__media" data-doppelklick="${p.id}">
-               ${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}
+               ${p.medien?.length?karussellFlaeche(p):medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}
                <span class="post__herz" aria-hidden="true">${ICONS.heart}</span>
              </div>`
       }
@@ -18625,24 +18626,21 @@ async function erstelle(was) {
     );
   }
 
-  // Beitrag, Reels und Querformat: erst aufnehmen, dann beschreiben.
+  // Gemischte Auswahl ohne Stückgrenze; erst ordnen, dann hochladen.
   const istBild = was === 'post';
-  const datei = await dateiWaehlen(istBild ? 'photo' : 'video');
-  if (!datei) return;
-
+  const dateien = istBild ? await karussellWaehlen() : [await dateiWaehlen('video')].filter(Boolean);
+  if (!dateien?.length) return;
+  const datei=dateien[0];
   let sekunden;
-  if (!istBild) {
-    const lokal = URL.createObjectURL(datei);
-    try { sekunden = await videoLaenge(lokal); } finally { URL.revokeObjectURL(lokal); }
-    const fehler = Reel.pruefen(sekunden) || StoryRegeln.videoPruefen({bytes: datei.size, mime: datei.type});
-    if (fehler) return toast(fehler);
+  for(const d of dateien){if(!d.type.startsWith('video/'))continue;
+    const lokal=URL.createObjectURL(d);let laenge;
+    try{laenge=await videoLaenge(lokal);}finally{URL.revokeObjectURL(lokal);}
+    const fehler=Reel.pruefen(laenge)||StoryRegeln.videoPruefen({bytes:d.size,mime:d.type});
+    if(fehler)return toast(fehler);if(d===datei)sekunden=laenge;
   }
-  let bild = null;
-  try {
-    bild = istBild ? await bildVerkleinern(datei) : await videoStandbild(datei);
-  } catch {
-    return toast('Aufnahme konnte nicht gelesen werden');
-  }
+  let bild=null;
+  try{bild=datei.type.startsWith('video/')?await videoStandbild(datei):await bildVerkleinern(datei);}
+  catch{return toast('Aufnahme konnte nicht gelesen werden');}
 
   const quer = was === 'landscape';
   openFormular(
@@ -18689,21 +18687,26 @@ async function erstelle(was) {
     async (werte) => {
       const spaeter = geplantAb(werte.zeitpunkt);
       const ziel = istBild ? '/api/eigene/beitrag' : '/api/eigene/video';
-      const hoch = istBild
-        ? await api('/api/hochladen', { ordner: 'posts', aufnahme: bild })
-        : await videoHochladen({ datei, typ: datei.type || 'video/mp4' }, 'posts');
-      if (!hoch.ok) return hoch.error || 'Die Aufnahme ließ sich nicht speichern';
+      let mediaUrl;const medien=[],hochgeladen=[];
+      const aufraeumen=async()=>{for(const p of hochgeladen)await api('/api/medien/loeschen',{pfad:p});};
+      for(const d of dateien){
+        const video=d.type.startsWith('video/');let hoch;
+        if(video)hoch=await videoHochladen({art:'video',datei:d,typ:d.type},'posts');
+        else {
+          const klein=await bildVerkleinern(d);
+          const blob=await (await fetch(klein)).blob();
+          hoch=await medienDateiHochladen(blob,'posts',blob.type);
+        }
+        if(!hoch.ok){await aufraeumen();return hoch.error;}
+        hochgeladen.push(hoch.pfad);medien.push({url:hoch.url,typ:video?'video':'image'});
+      }
+      mediaUrl=medien[0]?.url;
       const res = await fetch(ziel, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...werte, sekunden, mediaUrl: hoch.url, geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
+        method: 'POST',headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...werte, sekunden, mediaUrl,...(istBild?{medien}:{}), geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
       });
       const daten = await res.json();
-      if (!daten.ok) {
-        const pfad = hoch.url?.split('/storage/v1/object/public/media/')[1];
-        if (pfad) await api('/api/medien/loeschen', { pfad });
-        return daten.error;
-      }
+      if (!daten.ok){await aufraeumen();return daten.error;}
 
       /*
        * Geplante Beiträge kommen nicht in den Feed. Sie dort schon zu zeigen
@@ -23622,4 +23625,60 @@ function openInstants() {
         };
         void laden();
     }, { schliessen: true, hoch: true, beimSchliessen: () => { aktiv = false; foto = null; stop(); void instantBadgeLaden(); } });
+}
+
+/** Auswahl bleibt lokal; Abbrechen lädt keine Datei hoch. */
+function karussellWaehlen(){return new Promise(fertig=>{
+ const rahmen=document.createElement('div');rahmen.className='karusselleditor';
+ rahmen.setAttribute('role','dialog');rahmen.setAttribute('aria-modal','true');rahmen.setAttribute('aria-label','Medien auswählen');
+ rahmen.innerHTML='<section><h2>Medien auswählen</h2><p>Bilder und Videos gemischt auswählen, ordnen und entfernen.</p><ol></ol><p role="alert"></p><button data-add>Bilder und Videos hinzufügen</button><button data-fertig disabled>Weiter zur Beschreibung</button><button data-abbrechen>Abbrechen</button></section>';
+ const vorher=document.activeElement;document.body.appendChild(rahmen);let dateien=[],urls=[];let beendet=false;
+ const ende=wert=>{if(beendet)return;beendet=true;urls.forEach(URL.revokeObjectURL);rahmen.remove();vorher?.isConnected&&vorher.focus();fertig(wert);};
+ const zeichnen=()=>{
+  urls.forEach(URL.revokeObjectURL);urls=[];
+  rahmen.querySelector('ol').innerHTML=dateien.map((d,i)=>{const bild=d.type.startsWith('image/');const url=bild?URL.createObjectURL(d):null;if(url)urls.push(url);
+   return `<li>${bild?`<img src="${esc(url)}" alt="">`:'<span>Video</span>'}<span>${i+1}. ${esc(d.name)}</span><button data-vor="${i}" ${i===0?'disabled':''} aria-label="Medium ${i+1} nach vorn">↑</button><button data-nach="${i}" ${i===dateien.length-1?'disabled':''} aria-label="Medium ${i+1} nach hinten">↓</button><button data-weg="${i}" aria-label="Medium ${i+1} entfernen">×</button></li>`;}).join('');
+  rahmen.querySelector('[data-fertig]').disabled=!dateien.length;
+ };
+ rahmen.querySelector('[data-add]').onclick=()=>{const input=document.createElement('input');input.type='file';input.multiple=true;input.accept='image/*,video/*';input.onchange=()=>{dateien.push(...input.files);zeichnen();};input.click();};
+ rahmen.querySelector('[data-fertig]').onclick=()=>ende(dateien);
+ rahmen.querySelector('[data-abbrechen]').onclick=()=>ende(null);
+ rahmen.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.vor!==undefined)dateien=window.Karussell.verschieben(dateien,Number(b.dataset.vor),Number(b.dataset.vor)-1);
+  else if(b.dataset.nach!==undefined)dateien=window.Karussell.verschieben(dateien,Number(b.dataset.nach),Number(b.dataset.nach)+1);
+  else if(b.dataset.weg!==undefined)dateien=window.Karussell.entfernen(dateien,Number(b.dataset.weg));else return;zeichnen();});
+ rahmen.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();ende(null);}if(e.key==='Tab'){const knoepfe=[...rahmen.querySelectorAll('button:not(:disabled)')];if(e.shiftKey&&document.activeElement===knoepfe[0]){e.preventDefault();knoepfe.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===knoepfe.at(-1)){e.preventDefault();knoepfe[0].focus();}}});
+ rahmen.querySelector('[data-add]').focus();
+});}
+function karussellFlaeche(p,voll=false,start=0){
+ const medien=window.Karussell.liste(p);return `<div class="karussell ${voll?'karussell--voll':''}" data-karussell data-start="${start}" data-kid="${esc(p.id)}">
+ <div class="karussell__streifen" tabindex="0" aria-label="Beitragsmedien">${medien.map((m,i)=>`<div class="karussell__seite" role="group" aria-label="Medium ${i+1} von ${medien.length}">${m.typ==='video'?`<video data-k-src="${esc(m.url)}" preload="none" playsinline controls></video>`:`<img data-k-src="${esc(m.url)}" alt="Medium ${i+1}" loading="lazy">`}</div>`).join('')}</div>
+ <div class="karussell__leiste"><button data-k-vor aria-label="Vorheriges Medium">‹</button><span data-k-zaehler aria-live="polite">${start+1}/${medien.length}</span><button data-k-nach aria-label="Nächstes Medium">›</button></div>
+ ${voll?'':`<button class="karussell__voll" data-k-voll aria-label="Medien im Vollbild öffnen">Vollbild</button>`}</div>`;
+}
+const karussellBeobachter=new Map();
+function karussellVerbinden(wurzel){
+ for(const [el,stop] of karussellBeobachter)if(!el.isConnected){stop();karussellBeobachter.delete(el);}
+ wurzel.querySelectorAll('[data-karussell]').forEach(el=>{
+  if(karussellBeobachter.has(el))return;
+  const streifen=el.querySelector('.karussell__streifen'),seiten=[...el.querySelectorAll('.karussell__seite')];let nah=false,bei=Number(el.dataset.start)||0;
+  const laden=()=>seiten.forEach((seite,i)=>seite.querySelectorAll('[data-k-src]').forEach(m=>{
+   const erlaubt=nah&&(m.tagName==='VIDEO'?i===bei:Math.abs(i-bei)<=1);
+   if(erlaubt&&!m.getAttribute('src'))m.src=m.dataset.kSrc;
+   if(!erlaubt&&m.getAttribute('src')){if(m.tagName==='VIDEO')m.pause();m.removeAttribute('src');if(m.tagName==='VIDEO')m.load();}
+  }));
+  const stand=()=>{bei=Math.max(0,Math.min(seiten.length-1,Math.round(streifen.scrollLeft/Math.max(1,streifen.clientWidth))));el.querySelector('[data-k-zaehler]').textContent=`${bei+1}/${seiten.length}`;el.querySelector('[data-k-vor]').disabled=bei===0;el.querySelector('[data-k-nach]').disabled=bei===seiten.length-1;laden();};
+  const springen=i=>streifen.scrollTo({left:Math.max(0,Math.min(seiten.length-1,i))*streifen.clientWidth,behavior:'instant'});
+  streifen.addEventListener('scroll',stand,{passive:true});streifen.addEventListener('keydown',e=>{if(e.target!==streifen)return;if(e.key==='ArrowRight'){e.preventDefault();springen(bei+1);}if(e.key==='ArrowLeft'){e.preventDefault();springen(bei-1);}});
+  el.querySelector('[data-k-vor]').onclick=()=>springen(bei-1);el.querySelector('[data-k-nach]').onclick=()=>springen(bei+1);
+  const observer=new IntersectionObserver(entries=>{nah=entries[0].isIntersecting;laden();},{rootMargin:'200px'});observer.observe(el);
+  el.querySelector('[data-k-voll]')?.addEventListener('click',()=>{
+   const p=[...(state.posts||[])].find(p=>p.id===el.dataset.kid);if(!p)return;
+   const dialog=document.createElement('dialog');dialog.className='karussellvoll';dialog.innerHTML='<button data-schliessen>Vollbild schließen</button>'+karussellFlaeche(p,true,bei);document.body.appendChild(dialog);dialog.showModal();
+   const freigeben=()=>{dialog.remove();for(const [k,stop] of karussellBeobachter)if(!k.isConnected){stop();karussellBeobachter.delete(k);}};
+   dialog.querySelector('[data-schliessen]').onclick=()=>dialog.close();dialog.addEventListener('close',freigeben,{once:true});karussellVerbinden(dialog);
+  });
+  karussellBeobachter.set(el,()=>{observer.disconnect();nah=false;laden();});
+  if(bei)streifen.scrollLeft=bei*streifen.clientWidth;stand();
+ });
 }

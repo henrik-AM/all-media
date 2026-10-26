@@ -257,6 +257,7 @@ const LAEUFE = [
   ['af5-reels', 'af5-reels.js'],
   ['bunny', '_bunny_einheit.js'],
   ['bunny-upload', 'bunny-upload.js'],
+  ['af4-karussell', 'af4-karussell.js'],
   ['af7-analysen', 'af7-analysen.js'],
   ['af6-instants', 'af6-instants.js'],
   ['af-nachpruefung', 'af-nachpruefung.js'],

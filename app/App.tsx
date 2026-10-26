@@ -26,6 +26,8 @@ import { KontoFreigabe } from './components/KontoFreigabe';
 import { NeueBedingungen } from './components/NeueBedingungen';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
+import { KarussellEditor } from './components/KarussellEditor';
+import type { Medium } from '../gemeinsam/karussell';
 import { UploadAnzeige } from './components/UploadAnzeige';
 import { Toast } from './components/Toast';
 import { BildschirmzeitSperre } from './components/BildschirmzeitSperre';
@@ -306,6 +308,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   // Bereich - Videos oder Communitys. Beide haben eigene Mitteilungen und ein
   // eigenes Erstellen-Menue, so wie im Prototyp.
   const [profilBereich, setProfilBereich] = useState<MitteilungsBereich>('videos');
+  const [karussellStart,setKarussellStart]=useState<Medium[]|null>(null);
   const [formular, setFormular] = useState<Formular | null>(null);
   // Kästen 28/10.2 und 16: Community bzw. Unterthema erstellen (eigene Seite).
   const [erstellen, setErstellen] = useState<
@@ -1777,7 +1780,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Steht getrennt von `erstelle`, weil es zwei Wege hierher gibt: das
    * Erstellen-Menü und die Kamera, die ihre Aufnahme hierher weiterreicht.
    */
-  const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string, sekunden?: number) => {
+  const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string, sekunden?: number, medien?:Medium[]) => {
+    if(punkt==='post'&&!medien){setKarussellStart([{url:uri,typ:'image'}]);return;}
     const istBild = punkt === 'post';
     const quer = punkt === 'landscape';
     setFormular({
@@ -1838,6 +1842,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             musik: music,
             soundAb,
             mediaUrl: uri,
+            medien,
             sekunden,
             art: istBild ? 'post' : quer ? 'clip' : 'reel',
             geplantAb: spaeter,
@@ -1847,7 +1852,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           return null;
         }
 
-        if (istBild) await profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music, soundAb });
+        if (istBild) await profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, medien, music, soundAb });
         else await profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb, sekunden });
 
         // Gleich dorthin, wo das Neue jetzt steht.
@@ -2920,6 +2925,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
        * war (Community-Seite → „neues Unterthema erstellen“): Es öffnete
        * sich unsichtbar und tauchte erst nach dem Verlassen auf.
        */}
+      {karussellStart && <KarussellEditor start={karussellStart} onClose={() => setKarussellStart(null)} onFertig={(m) => { setKarussellStart(null); beitragBeschreiben('post', m[0].url, undefined, m); }} />}
       {formular && (
         <FormularSheet
           visible

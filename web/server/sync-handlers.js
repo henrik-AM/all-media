@@ -1443,6 +1443,7 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       // Schema 67: welche Stelle des Sounds (sound_id setzt die Datenbank aus music).
       sound_ab: felder.soundAb || 0,
       media_url: felder.mediaUrl || null,
+      ...(felder.medien?.length?{medien:felder.medien.map(({url,typ})=>({url,typ}))}:{}),
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,
       // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag

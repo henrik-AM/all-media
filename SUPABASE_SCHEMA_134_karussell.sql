@@ -147,7 +147,9 @@ begin
   -- Andere Altbeitragsänderungen bleiben möglich; keine rückwirkende Zertifizierung.
   if new.duration is distinct from old.duration then
    select * into b from public.video_upload_belege where public.medien_adresse(pfad)=new.media_url;
-   if found then new.duration:=floor(b.sekunden/60)::int::text||':'||lpad((floor(b.sekunden)::int%60)::text,2,'0');end if;
+   if found then new.duration:=floor(b.sekunden/60)::int::text||':'||lpad((floor(b.sekunden)::int%60)::text,2,'0');
+   else select * into bm from public.medien_objekte where public.medien_adresse(pfad)=new.media_url;
+   if bm.sekunden is not null then new.duration:=floor(bm.sekunden/60)::int::text||':'||lpad((floor(bm.sekunden)::int%60)::text,2,'0');end if;end if;
   end if;
   return new;
  end if;
@@ -214,5 +216,82 @@ language sql stable security definer set search_path=public as $$
 $$;
 revoke execute on function public.instant_loeschkandidaten() from public,anon,authenticated;
 grant execute on function public.instant_loeschkandidaten() to service_role;
+
+-- JSON-Liste im selben INSERT wie der Beitrag: kein halbfertiges Karussell.
+-- Keine feste Anzahl; HTTP-/Speichergrenzen gelten je Aufnahme weiterhin.
+alter table public.posts add column if not exists medien jsonb not null default '[]'::jsonb;
+create or replace function public.karussell_pruefen() returns trigger
+language plpgsql security invoker set search_path=public as $$
+declare m jsonb;p text;belegt boolean;dauer double precision;
+begin
+ if jsonb_typeof(new.medien)<>'array' then raise exception 'Ungültige Medienliste';end if;
+ if jsonb_array_length(new.medien)=0 then return new;end if;
+ if new.kind<>'post' then raise exception 'Eine Medienliste gehört zu einem Beitrag';end if;
+ if tg_op='UPDATE' and new.medien=old.medien and new.user_id=old.user_id then
+   new.media_url:=new.medien->0->>'url';return new;
+ end if;
+ for m in select value from jsonb_array_elements(new.medien) loop
+   if jsonb_typeof(m)<>'object' or m->>'typ' not in ('image','video') or m->>'typ' is null
+   or m->>'url' is null or not public.medien_adresse_gueltig(m->>'url')
+   or exists(select 1 from jsonb_object_keys(m) k where k not in ('url','typ')) then
+     raise exception 'Ungültiges Medium';end if;
+   p:=substr(m->>'url',length(public.medien_adresse(''))+1);
+   if p like 'instants/%' or (current_user='authenticated' and not public.medium_darf_lesen(p)) then
+     raise exception 'Dieses Medium darfst du nicht verwenden' using errcode='42501';end if;
+   -- Ein Video darf weder als Bild getarnt noch nur an zweiter Stelle versteckt sein.
+   if m->>'typ'='video' or p ~* '\.(mp4|mov|m4v|webm)$' then
+     if m->>'typ'<>'video' then raise exception 'Falscher Medientyp';end if;
+     select exists(select 1 from public.medien_objekte b where b.pfad=p and b.owner_id=new.user_id
+       and b.typ='video/mp4' and b.sekunden is not null) or
+       exists(select 1 from public.video_upload_belege b join storage.objects o on o.id=b.objekt_id
+       where b.pfad=p and b.user_id=new.user_id and o.owner_id=new.user_id::text and b.bytes=(o.metadata->>'size')::bigint)
+       into belegt;
+     if not belegt then raise exception 'Bitte das Video über die geprüfte Uploadstelle hochladen.' using errcode='42501';end if;
+   elsif p !~* '\.(jpg|jpeg|png|webp)$' then raise exception 'Falscher Medientyp';end if;
+ end loop;
+ new.media_url:=new.medien->0->>'url';return new;
+end $$;
+revoke execute on function public.karussell_pruefen() from public,anon,authenticated;
+drop trigger if exists karussell_pruefen on public.posts;
+create trigger karussell_pruefen before insert or update of medien,media_url,kind,user_id on public.posts
+for each row execute function public.karussell_pruefen();
+create or replace function public.medium_sichtbar(pfad text)
+returns boolean
+language plpgsql
+stable
+security invoker
+set search_path = public
+as $$
+declare
+  ordner text := split_part(pfad, '/', 1);
+  adresse text := public.medien_adresse(pfad);
+begin
+  if ordner = 'beispiel' then
+    return true;
+  end if;
+  if ordner = 'avatars' then
+    return
+      exists (select 1 from public.profiles p
+              where p.avatar_url = adresse
+                and public.medium_besitzer_stimmt(pfad, p.id))
+      or exists (select 1 from public.communities c
+                 where c.bild_url = adresse
+                   and public.medium_besitzer_stimmt(pfad, c.created_by));
+  end if;
+  return
+       exists (select 1 from public.stories where media_url = adresse)
+    or exists (select 1 from public.posts where media_url = adresse or thumbnail_url = adresse
+       or medien @> jsonb_build_array(jsonb_build_object('url',adresse)))
+    or exists (select 1 from public.messages where media_url = adresse)
+    or exists (select 1 from public.insights where media_url = adresse)
+    or exists (select 1 from public.ptt_messages where audio_url = adresse)
+    or exists (select 1 from public.community_channel_messages where media_url = adresse)
+    or exists (select 1 from public.sammlungen where titelbild_url = adresse);
+end;
+$$;
+
+revoke execute on function public.medium_sichtbar(text) from public, anon;
+grant execute on function public.medium_sichtbar(text) to authenticated;
+
 
 commit;

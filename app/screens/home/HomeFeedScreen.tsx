@@ -7,6 +7,7 @@ import { Avatar } from '../../components/Avatar';
 import { StoryAvatar } from '../../components/StoryAvatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { BeitragOptionenSheet, OptionenBeitrag } from '../../components/BeitragOptionenSheet';
+import { Karussell } from '../../components/Karussell';
 import { Motiv } from '../../components/Motiv';
 import { StoryRail } from '../../components/StoryRail';
 import { PersonenVorschlaege } from '../../components/PersonenVorschlaege';
@@ -72,6 +73,11 @@ export const HomeFeedScreen = ({
   const aktion = useAktionen(onNotice);
   // Und was gesehen wird, ebenfalls — siehe lib/useImpressionen.ts.
   const { sichtbarWechsel, sichtbarkeit } = useImpressionen('feed');
+  const [sichtbareMedien,setSichtbareMedien]=useState<Set<string>>(new Set());
+  const wechselRef=useRef(sichtbarWechsel);wechselRef.current=sichtbarWechsel;
+  const medienSichtbarWechsel=useRef((info:Parameters<typeof sichtbarWechsel>[0])=>{
+    wechselRef.current(info);setSichtbareMedien(new Set(info.viewableItems.filter(v=>v.isViewable).map(v=>v.item.id)));
+  }).current;
   // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
   // damit sie auch im Profilraster auftauchen.
   const { eigeneBeitraege, folgtPerson, folgenUmschalten } = useProfil();
@@ -346,7 +352,7 @@ export const HomeFeedScreen = ({
           />
         ) : (
         <Pressable style={styles.media} onPress={() => bildGetippt(item)}>
-          {item.mediaUri ? (
+          {item.medien?.length ? <Karussell beitrag={item} sichtbar={sichtbareMedien.has(item.id)}/> : item.mediaUri ? (
             <Image source={{ uri: item.mediaUri }} style={styles.mediaBild} />
           ) : (
             <Motiv id={item.id} bild={item.standbild ?? item.mediaUri} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
@@ -467,7 +473,7 @@ export const HomeFeedScreen = ({
          * spaeteren Feed-Rankings. Sichtbar heisst hier 60 Prozent der
          * Flaeche und mindestens eine Sekunde; siehe lib/impressionen.ts.
          */
-        onViewableItemsChanged={sichtbarWechsel}
+        onViewableItemsChanged={medienSichtbarWechsel}
         viewabilityConfig={sichtbarkeit}
       />
 

@@ -1167,6 +1167,7 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
     description: b.description || '',
     location: b.location || '',
     music: b.music || '',
+    medien: b.medien || [],
     mediaUrl: b.media_url,
     thumbnail: b.thumbnail_url,
     duration: b.duration || '',

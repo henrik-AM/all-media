@@ -158,3 +158,21 @@ export async function adresseVon(
   if (!client) return '';
   return (await signiereEine(client, `${ordner}/${dateiname}`)) ?? '';
 }
+
+/** Sequenziell statt alle Dateien zugleich im RAM; Fehler/Abbruch stoppt die gesamte Liste. */
+export async function ladeMedienlisteHoch(client:SupabaseClient,ich:string,medien:import('../../gemeinsam/karussell').Medium[]) {
+ const fertig:import('../../gemeinsam/karussell').Medium[]=[],neu:string[]=[];
+ try {
+  for(const m of medien){
+   if(/^https?:/.test(m.url)){fertig.push({url:m.url,typ:m.typ});continue;}
+   const ext=m.mime==='image/png'?'png':m.mime==='image/webp'?'webp':m.mime==='video/quicktime'?'mov':m.mime==='video/webm'?'webm':m.typ==='video'?'mp4':'jpg';
+   const hoch=await ladeHoch(client,m.url,'posts',`${ich}-${Date.now()}.${ext}`);
+   if(!hoch.success||!hoch.url)throw new Error(hoch.error||'Die Aufnahme ließ sich nicht speichern.');
+   neu.push(hoch.url);fertig.push({url:hoch.url,typ:m.typ});
+  }
+  return fertig;
+ } catch(e){
+  for(const url of neu)await loesche(client,url.split('/storage/v1/object/public/media/')[1]);
+  throw e;
+ }
+}
