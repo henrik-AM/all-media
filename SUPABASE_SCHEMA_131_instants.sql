@@ -101,7 +101,8 @@ create or replace function public.instant_empfaengerzahl() returns integer
 language plpgsql stable security definer set search_path=public as $$
 begin
  if auth.uid() is null or not public.konto_freigegeben() then raise exception 'Konto nicht freigegeben';end if;
- return (select count(*)::integer from public.instant_empfaenger_liste());
+ -- B6: Sichtbare Listengröße, keine Auskunft über private Empfangseinstellungen.
+ return (select count(*)::integer from public.enge_freunde where user_id=auth.uid());
 end $$;
 revoke execute on function public.instant_empfaengerzahl() from public,anon;
 grant execute on function public.instant_empfaengerzahl() to authenticated;
@@ -117,13 +118,15 @@ begin
      and (o.metadata->>'size')::bigint between 1 and 256000 and o.metadata->>'mimetype'='image/jpeg') then
  raise exception 'Nur ein eigenes Kamera-Foto bis 250 KB';end if;
  if length(coalesce(p_text,''))>100 then raise exception 'Höchstens 100 Zeichen';end if;
+ if not exists(select 1 from public.enge_freunde f where f.user_id=ich and public.instant_beziehung_erlaubt(f.freund_id)) then
+ raise exception 'Keine berechtigten Empfänger. Prüfe deine Enge-Freunde-Liste.';end if;
  insert into public.instants(absender,bild_pfad,text) values(ich,p_pfad,coalesce(p_text,'')) returning id into neu;
  for an in select public.instant_empfaenger_liste() loop
   insert into public.instant_empfaenger(instant_id,empfaenger) values(neu,an);
   perform public.mitteilung_anlegen(an,ich,'instant','videos','instant',neu);
   menge:=menge+1;
  end loop;
- if menge=0 then raise exception 'Keine berechtigten Empfänger. Prüfe deine Enge-Freunde-Liste.';end if;
+ -- Keine Zustellquittung: Empfangsabwahl darf der Absender nicht erfahren.
  return neu;
 end $$;
 revoke execute on function public.instant_senden(text,text) from public,anon;
@@ -210,7 +213,8 @@ create or replace function public.instant_loeschkandidaten() returns table(id uu
 language sql stable security definer set search_path=public as $$
  select * from (
  select i.id,i.bild_pfad from public.instants i where i.expires_at<=now()
- or not exists(select 1 from public.instant_empfaenger e where e.instant_id=i.id and e.geoeffnet_at is null)
+ or (exists(select 1 from public.instant_empfaenger e where e.instant_id=i.id)
+ and not exists(select 1 from public.instant_empfaenger e where e.instant_id=i.id and e.geoeffnet_at is null))
  union all
  select null::uuid,o.name from storage.objects o where o.bucket_id='media'
  and o.name like 'instants/%' and o.created_at<now()-interval '24 hours'
@@ -222,8 +226,9 @@ grant execute on function public.instant_loeschkandidaten() to service_role;
 create or replace function public.instant_loeschbestaetigen(p_ids uuid[]) returns void
 language sql security definer set search_path=public as $$
  delete from public.notifications where target_type='instant' and target_id=any(p_ids);
- delete from public.instants where id=any(p_ids) and (expires_at<=now() or not exists(
- select 1 from public.instant_empfaenger e where e.instant_id=instants.id and e.geoeffnet_at is null));
+ delete from public.instants where id=any(p_ids) and (expires_at<=now() or (exists(
+ select 1 from public.instant_empfaenger e where e.instant_id=instants.id) and not exists(
+ select 1 from public.instant_empfaenger e where e.instant_id=instants.id and e.geoeffnet_at is null)));
 $$;
 revoke execute on function public.instant_loeschbestaetigen(uuid[]) from public,anon,authenticated;
 grant execute on function public.instant_loeschbestaetigen(uuid[]) to service_role;

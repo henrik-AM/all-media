@@ -207,13 +207,15 @@ begin
  and not exists(select 1 from public.medien_objekte b where b.pfad=p_pfad and b.owner_id=ich and b.typ='image/jpeg' and b.bytes<=256000)) then
  raise exception 'Nur ein eigenes Kamera-Foto bis 250 KB';end if;
  if length(coalesce(p_text,''))>100 then raise exception 'Höchstens 100 Zeichen';end if;
+ if not exists(select 1 from public.enge_freunde f where f.user_id=ich and public.instant_beziehung_erlaubt(f.freund_id)) then
+ raise exception 'Keine berechtigten Empfänger. Prüfe deine Enge-Freunde-Liste.';end if;
  insert into public.instants(absender,bild_pfad,text) values(ich,p_pfad,coalesce(p_text,'')) returning id into neu;
  for an in select public.instant_empfaenger_liste() loop
   insert into public.instant_empfaenger(instant_id,empfaenger) values(neu,an);
   perform public.mitteilung_anlegen(an,ich,'instant','videos','instant',neu);
   menge:=menge+1;
  end loop;
- if menge=0 then raise exception 'Keine berechtigten Empfänger. Prüfe deine Enge-Freunde-Liste.';end if;
+ -- Keine Zustellquittung: Empfangsabwahl darf der Absender nicht erfahren.
  return neu;
 end $$;
 revoke execute on function public.instant_senden(text,text) from public,anon;
@@ -223,7 +225,8 @@ create or replace function public.instant_loeschkandidaten() returns table(id uu
 language sql stable security definer set search_path=public as $$
  select * from (
  select i.id,i.bild_pfad from public.instants i where i.expires_at<=now()
- or not exists(select 1 from public.instant_empfaenger e where e.instant_id=i.id and e.geoeffnet_at is null)
+ or (exists(select 1 from public.instant_empfaenger e where e.instant_id=i.id)
+ and not exists(select 1 from public.instant_empfaenger e where e.instant_id=i.id and e.geoeffnet_at is null))
  union all
  select null::uuid,o.name from storage.objects o where o.bucket_id='media'
  and o.name like 'instants/%' and o.created_at<now()-interval '24 hours'
