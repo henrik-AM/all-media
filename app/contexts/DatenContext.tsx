@@ -351,9 +351,9 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     if(kontoRef.current!==ichId||!token||nach.session?.access_token!==token)return false;
     const gefunden=[...teil.posts,...teil.videos,...teil.clips].some(p=>p.id===id);
     if(gefunden)setDaten(d=>d.ichId!==ichId?d:{...d,
-      posts:[...teil.posts,...d.posts.filter(p=>p.id!==id)],
-      videos:[...teil.videos,...d.videos.filter(p=>p.id!==id)],
-      clips:[...teil.clips,...d.clips.filter(p=>p.id!==id)]});
+      posts:[...d.posts.filter(p=>p.id!==id),...teil.posts.map(p=>({...p,nurEinzeln:true}))],
+      videos:[...d.videos.filter(p=>p.id!==id),...teil.videos.map(p=>({...p,nurEinzeln:true}))],
+      clips:[...d.clips.filter(p=>p.id!==id),...teil.clips.map(p=>({...p,nurEinzeln:true}))]});
     return gefunden;
   },[supabase,ichId,daten.posts,daten.videos,daten.clips]);
 

@@ -79,6 +79,7 @@ function gemeinsameSpalten() {
  */
 const UMD_BAUSTEINE = [
   ['beitragschema', 'Beitragschema'],
+  ['einzelbeitrag', 'Einzelbeitrag'],
   ['telefon', 'Telefon'],
   ['passwort', 'Passwort'],
   // 21.09.2026: `kommentar.js` kam fuer „Meine Kommentare" dazu — und genau

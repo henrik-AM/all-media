@@ -1,3 +1,4 @@
+const Einzelbeitrag = require('../../../gemeinsam/einzelbeitrag') as typeof import('../../../gemeinsam/einzelbeitrag');
 import * as Reel from '../../../gemeinsam/reel';
 import { reaktion } from '../../../gemeinsam/rang';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -47,6 +48,7 @@ interface Props {
    * Profilraster hierher. Gleiche Regel wie in HomeFeedScreen.
    */
   startBei?: string | null;
+  einzelZiel?: string | null;
   /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
   startKommentar?: { beitrag: string; kommentar: string } | null;
   onStartErreicht?: () => void;
@@ -59,6 +61,7 @@ export const VideoFeedScreen = ({
   onOpenProfile,
   onShare,
   startBei,
+  einzelZiel,
   startKommentar,
   onStartErreicht,
   onNotice,
@@ -91,8 +94,8 @@ export const VideoFeedScreen = ({
    * Feed - ausser man kommt ueber genau diesen Beitrag aus dem Profil.
    */
   const sichtbareVideos = useMemo(
-    () => videos.filter((v) => v.id === startBei || !keinInteresse.includes(v.id)),
-    [videos, keinInteresse, startBei]
+    () => videos.filter((v) => Einzelbeitrag.imFeed(v,einzelZiel||startBei,keinInteresse)),
+    [videos, keinInteresse, startBei, einzelZiel]
   );
 
   useEffect(() => {

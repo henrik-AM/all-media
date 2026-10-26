@@ -286,6 +286,8 @@ export interface Comment {
 }
 
 export interface Post {
+  /** Nur bei gezielter Profilöffnung anzeigen, nicht im normalen Feed. */
+  nurEinzeln?: boolean;
   medien?: import('../../gemeinsam/karussell').Medium[];
   id: string;
   userId: string;
@@ -316,6 +318,8 @@ export interface Post {
 }
 
 export interface Video {
+  /** Nur bei gezielter Profilöffnung anzeigen, nicht im normalen Feed. */
+  nurEinzeln?: boolean;
   id: string;
   userId: string;
   description: string;
@@ -448,6 +452,8 @@ export type StoryText = import('../../gemeinsam/story').StoryText;
 export type ClipArt = 'standard' | '360' | 'live';
 
 export interface Clip {
+  /** Nur bei gezielter Profilöffnung anzeigen, nicht im normalen Feed. */
+  nurEinzeln?: boolean;
   id: string;
   userId: string;
   title: string;

@@ -979,6 +979,7 @@ async function bootstrap() {
   if (window.KryptoWeb) await window.KryptoWeb.anmelden();
 
   Object.assign(state, data);
+  state.einzelBeitragZiel=null;
 
   // Kasten 27: Chatlisten ab jetzt im Takt nachsehen (listeNachsehen).
   listeNachsehenStarten();
@@ -1490,6 +1491,7 @@ function renderBottomNav() {
        * unterer Leiste.
        */
       profilReiterPruefen(ziel, STARTPUNKT[ziel]);
+      state.einzelBeitragZiel=null;
       state.area = ziel;
       state.sub[ziel] = STARTPUNKT[ziel];
       verlasseExplorer();
@@ -1528,6 +1530,7 @@ function renderTopBar() {
   bar.querySelectorAll('[data-sub]').forEach((b) =>
     b.addEventListener('click', () => {
       profilReiterPruefen(state.area, b.dataset.sub);
+      state.einzelBeitragZiel=null;
       state.sub[state.area] = b.dataset.sub;
       verlasseExplorer();
       render();
@@ -6343,7 +6346,7 @@ function renderHomeFeed() {
       const updated = await res.json();
       if (!res.ok) return toast(updated.error || 'Reaktion konnte nicht gespeichert werden');
       const idx = state.posts.findIndex((p) => p.id === updated.id);
-      state.posts[idx] = updated;
+      state.posts[idx] = {...updated,nurEinzeln:state.posts[idx]?.nurEinzeln};
 
       // Punkt 42: Folgen gilt der Person, nicht dem einzelnen Beitrag - alle
       // ihre Beitraege im Feed ziehen mit, sonst widersprechen sie sich.
@@ -6662,7 +6665,7 @@ function renderVideoFeed() {
       const updated = await res.json();
       if (!res.ok) return toast(updated.error || 'Reaktion konnte nicht gespeichert werden');
       const idx = state.videos.findIndex((v) => v.id === updated.id);
-      state.videos[idx] = updated;
+      state.videos[idx] = {...updated,nurEinzeln:state.videos[idx]?.nurEinzeln};
 
       if (vaction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
@@ -13087,7 +13090,7 @@ function renderLandscapeVideos() {
   const q = state.clipQuery.trim().toLowerCase();
   const filter = CLIP_FILTER[state.clipFilter] ? state.clipFilter : 'alle';
   const passt = CLIP_FILTER[filter].passt;
-  const list = state.clips.filter(
+  const list = state.clips.filter(c=>!c.nurEinzeln).filter(
     (c) =>
       passt(c) &&
       (!q || c.title.toLowerCase().includes(q) || user(c.userId).name.toLowerCase().includes(q))
@@ -13738,12 +13741,13 @@ function mitteilungOeffnen(ziel, text = '') {
  */
 async function beitragOeffnen(kind, id) {
   if (!id) return;
+  state.einzelBeitragZiel=id;
   if(![...(state.posts||[]),...(state.videos||[]),...(state.clips||[])].some(p=>p.id===id)){
     const konto=window.Anmeldung?.nutzer?.()?.id;
     const r=await fetch(`/api/beitraege/${encodeURIComponent(id)}`).then(r=>r.json()).catch(()=>null);
     if(window.Anmeldung?.nutzer?.()?.id!==konto)return;
     if(!r?.beitrag)return toast('Dieser Beitrag ist nicht verfügbar.');
-    const b=r.beitrag;const liste=b.kind==='clip'?'clips':b.kind==='reel'?'videos':'posts';state[liste]=[b,...(state[liste]||[])];
+    const b=r.beitrag;const liste=b.kind==='clip'?'clips':b.kind==='reel'?'videos':'posts';state[liste]=[...(state[liste]||[]),{...b,nurEinzeln:true}];
   }
   if (kind === 'clip') return openClip(id);
   if (kind === 'reel' || kind === 'video') return mitteilungOeffnen({ art: 'video', id });
@@ -14869,7 +14873,7 @@ function kanalNachrichtMenue(id) {
  * auf dem Profil und in der Suche steht er weiter. Gleiche Regel in
  * VideoFeedScreen.tsx und HomeFeedScreen.tsx (sichtbareVideos/-Posts).
  */
-const imFeed = (b) => !(state.keinInteresse || []).includes(b.id);
+const imFeed = (b) => Einzelbeitrag.imFeed(b,state.einzelBeitragZiel,state.keinInteresse || []);
 
 /* Die Adresse eines Beitrags. bootstrap() oeffnet sie wieder (?beitrag=). */
 const beitragLink = (id) => `${location.origin}/?beitrag=${encodeURIComponent(id)}`;
@@ -23440,6 +23444,7 @@ const ptr = new PullToRefresh({
       if (!res.ok) throw new Error('Network error');
       const data = await res.json();
       Object.assign(state, data);
+  state.einzelBeitragZiel=null;
       render();
       toast('Inhalte aktualisiert');
     } catch (error) {

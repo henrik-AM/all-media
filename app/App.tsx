@@ -326,6 +326,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * sobald er dort ist; sonst spraenge er bei jedem Neubau zurueck.
    */
   const [startBeitrag, setStartBeitrag] = useState<string | null>(null);
+  const [einzelZiel,setEinzelZiel]=useState<string|null>(null);
   // Nachtrag 4.3: Kommentar aus einer Mitteilung — das Blatt öffnet sich dort.
   const [startKommentar, setStartKommentar] = useState<{ beitrag: string; kommentar: string } | null>(null);
   const { supabase: sbClient } = useSupabase();
@@ -394,7 +395,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     };
   }, [pttGlockeSichtbar, sbClient, eigenId, pttMitteilungenErgaenzen, communityMerken]);
 
-  const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
+  const setSub = (next: SubKey) => {setEinzelZiel(null);setStartBeitrag(null);setSubs((prev) => ({ ...prev, [area]: next }));};
 
   /*
    * Bereichswechsel unten: jeder Bereich faengt auf seiner Hauptseite an.
@@ -406,6 +407,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * mit unterer Leiste.
    */
   const wechsleBereich = (next: AreaKey) => {
+    setEinzelZiel(null);setStartBeitrag(null);
     // Untere Leiste verlässt das Video-Profil (oder den Beitrag daraus): Reiter zurück.
     if (area === 'videos' && (subs.videos === 'profile' || profilBeitragOffen.current)) profilVerlassen();
     setArea(next);
@@ -1521,6 +1523,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * bei einer Mitteilung. Vorher gaben alle drei nur einen Hinweistext aus.
    */
   const eintragOeffnen = (art: 'reel' | 'clip' | 'beitrag', id: string) => {
+    setEinzelZiel(id);
     if (art === 'clip') return setOverlay({ kind: 'clip', clipId: id });
     setOverlay(null);
     setArea('videos');
@@ -2517,6 +2520,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             onOpenProfile={openPublicProfile}
             onShare={teileVideo}
             startBei={startBeitrag}
+            einzelZiel={einzelZiel}
             onStartErreicht={() => setStartBeitrag(null)}
             startKommentar={startKommentar}
             onNotice={setNotice}
@@ -2569,6 +2573,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           onOpenProfile={openPublicProfile}
           onShare={teileBeitrag}
           startBei={startBeitrag}
+            einzelZiel={einzelZiel}
           onStartErreicht={() => setStartBeitrag(null)}
           startKommentar={startKommentar}
           onNotice={setNotice}

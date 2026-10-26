@@ -1,3 +1,4 @@
+const Einzelbeitrag = require('../../../gemeinsam/einzelbeitrag') as typeof import('../../../gemeinsam/einzelbeitrag');
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
@@ -46,6 +47,7 @@ interface Props {
    * Stelle anfangen.
    */
   startBei?: string | null;
+  einzelZiel?: string | null;
   /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
   startKommentar?: { beitrag: string; kommentar: string } | null;
   /** Wird gerufen, sobald dorthin gesprungen wurde — einmal, nicht bei jedem Neubau. */
@@ -61,6 +63,7 @@ export const HomeFeedScreen = ({
   onOpenProfile,
   onShare,
   startBei,
+  einzelZiel,
   startKommentar,
   onStartErreicht,
   onNotice,
@@ -122,8 +125,8 @@ export const HomeFeedScreen = ({
    * Feed - ausser man kommt ueber genau diesen Beitrag aus dem Profil.
    */
   const sichtbarePosts = useMemo(
-    () => posts.filter((p) => p.id === startBei || !keinInteresse.includes(p.id)),
-    [posts, keinInteresse, startBei]
+    () => posts.filter((p) => Einzelbeitrag.imFeed(p,einzelZiel||startBei,keinInteresse)),
+    [posts, keinInteresse, startBei, einzelZiel]
   );
 
   useEffect(() => {
