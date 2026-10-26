@@ -269,6 +269,9 @@ const LAEUFE = [
   ['af7-analysen', 'af7-analysen.js'],
   ['af6-instants', 'af6-instants.js'],
   ['af-nachpruefung', 'af-nachpruefung.js'],
+  // 26.10.2026: Spendenstand „vorgemerkt, nicht bezahlt“ (Offene Punkte 0c).
+  // Braucht keinen Server — liest nur die Bausteine und den Quelltext.
+  ['spende-vorgemerkt', 'spende-vorgemerkt.js'],
   ['lenken', '_lenken.js'],
   ['markierung-einheit', '_markierung_einheit.js'],
   ['markieren', '_markieren.js'],

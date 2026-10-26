@@ -194,7 +194,11 @@
     "test:af-fix-bilder": "node test/af-fix-bilder.js",
     "test:af-fix-b1-schema": "node test/af-fix-b1-schema.js",
     "test:af-fix-b2-schema": "node test/af-fix-b2-schema.js",
-    "test:af-fix-b6-schema": "node test/af-fix-b6-schema.js"
+    "test:af-fix-b6-schema": "node test/af-fix-b6-schema.js",
+    "test:storyvideo-web": "node test/_storyvideo_web.js",
+    "test:highlight-fremd-web": "node test/_highlight_fremd_web.js",
+    "test:spende-vorgemerkt": "node test/spende-vorgemerkt.js",
+    "test:spende-vorgemerkt-bilder": "node test/spende-vorgemerkt-bilder.js"
   },
   "private": true
 }
