@@ -206,7 +206,7 @@ export async function signiereMedien<T>(client: SupabaseClient | null, daten: T)
   const fehlend: string[] = [];
   for (const pfad of pfade) {
     const eintrag = speicher.eintraege.get(pfad);
-    if (!medienServerAktiv() && eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
+    if (eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
       karte.set(pfad, eintrag.url);
     } else {
       fehlend.push(pfad);
@@ -260,7 +260,7 @@ export async function signiereEine(
     return data.bild;
   }
   const eintrag = speicher.eintraege.get(pfad);
-  if (!medienServerAktiv() && eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;
+  if (eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;
 
   try {
     const { data, error } = medienServerAktiv()
