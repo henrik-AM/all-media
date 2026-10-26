@@ -25,11 +25,11 @@
   OK   JPEG hochgeladen
   OK   url ist die beständige Supabase-Form  — https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/posts/test-bild.jpg
   OK   pfad zurück
-  OK   anzeige ist unterschriebene Pull-Adresse  — http://127.0.0.1:54346/posts/test-bild.jpg?token=HS256-4y4iWwlIrGKeS9JWmXF_DP7kLkvA8WdpNcEN28xtGeM&expires=1793034000
+  OK   anzeige ist unterschriebene Pull-Adresse  — http://127.0.0.1:54548/posts/test-bild.jpg?token=HS256-4y4iWwlIrGKeS9JWmXF_DP7kLkvA8WdpNcEN28xtGeM&expires=1793034000
   OK   Inhalt kam unverändert an
   OK   MP4 (Typ mit Zusatz) hochgeladen
   OK   Push-to-Talk M4A geht in ptt
-  OK   ablegen baut Pfad mit 32 Zufallszeichen  — avatars/nutzer-1-1793017200000-ef8a14661e3b69a4ad32bd2b09af62ce.png
+  OK   ablegen baut Pfad mit 32 Zufallszeichen  — avatars/nutzer-1-1793017200000-52964363dc4b82bd17b94b112fe2c9d5.png
   OK   ablegen zweimal → zwei Pfade (kein Überschreiben)
 
 4. Falscher Schlüssel
