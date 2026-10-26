@@ -5551,3 +5551,5 @@ body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom,
 .karussell--voll {aspect-ratio:auto;height:calc(100% - 56px);}
 
 .karussell:has(video[src]) .karussell__leiste {bottom:52px;}
+
+.griditem__zaehler {position:absolute;right:6px;top:6px;background:#0009;color:white;padding:5px 7px;border-radius:8px;font-size:12px;}

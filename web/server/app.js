@@ -1432,6 +1432,7 @@ app.get('/api/profile/:userId', route(async (req, res) => {
       // Ohne die Adresse zeigt jede Kachel die Ersatzflaeche, auch wenn ein
       // Bild da ist. Bei einem Video steht in mediaUrl eine .mp4 — dann
       // braucht die Kachel das Standbild dazu.
+      medien: b.medien,
       mediaUrl: b.mediaUrl,
       thumbnail: b.thumbnail,
     })),
@@ -2219,6 +2220,8 @@ app.post('/api/eigene/spende', route(async (req) => {
 const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
 // Kasten 7.5: ab welcher Sekunde der Beitrag den Sound nutzt (posts.sound_ab, Schema 67).
 const soundAbAus = (body) => SoundStellen.abAus(body?.soundAb, musikAus(body));
+
+app.get('/api/beitraege/:id',route(async req=>{const b=await beitrag(req,req.params.id);return b?{ok:true,beitrag:b}:{ok:false,error:'Dieser Beitrag ist nicht verfügbar.'};}));
 
 app.post('/api/eigene/beitrag', route(async (req) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();

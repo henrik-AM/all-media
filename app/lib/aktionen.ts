@@ -3992,6 +3992,7 @@ export async function profileZuHandles(
  * Eine Kachel im Profilraster — für alle drei Reiter dieselbe Form.
  */
 export interface Rasterkachel {
+  medienAnzahl?:number;
   id: string;
   kind: string;
   mediaUrl: string | null;
@@ -4003,6 +4004,7 @@ function kachel(b: any): Rasterkachel {
   return {
     id: b.id,
     kind: b.kind,
+    medienAnzahl: b.medien?.length,
     mediaUrl: b.media_url ?? null,
     thumbnail: b.thumbnail_url ?? null,
   };
@@ -4025,7 +4027,7 @@ export async function beitraegeVon(
 ): Promise<Rasterkachel[]> {
   const { data, error } = await client
     .from('posts')
-    .select('id, kind, media_url, thumbnail_url, created_at')
+    .select('id, kind, media_url, thumbnail_url, medien, created_at')
     .eq('user_id', profilId)
     .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
     .order('created_at', { ascending: false })

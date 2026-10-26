@@ -493,7 +493,7 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
                 key={eintrag.id}
                 style={[styles.gridItem, { height: kachelHoehe }]}
                 onPress={() => onOpenKachel?.(eintrag)}
-                accessibilityLabel={`Beitrag ${i + 1} öffnen`}
+                accessibilityLabel={`Beitrag ${i + 1} öffnen${eintrag.medienAnzahl?`, ${eintrag.medienAnzahl} Medien`:''}`}
               >
                 {/*
                   * Bei einem Video steht in mediaUri seit Schema 8 eine .mp4;
@@ -507,6 +507,7 @@ export const VideoProfileScreen = ({ onSwitchArea, tab: tabVonAussen, onTab, onS
                   iconSize={20}
                   style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
                 />
+                {!!eintrag.medienAnzahl&&eintrag.medienAnzahl>1&&<Text style={{position:'absolute',top:6,right:6,color:'white',backgroundColor:'#0009',borderRadius:8,padding:5}}>1/{eintrag.medienAnzahl}</Text>}
               </Druck>
             ))}
           </View>

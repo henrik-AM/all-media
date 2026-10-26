@@ -18,8 +18,12 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+<<<<<<< HEAD
 import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand, ladePersonen } from '../lib/daten';
 import type { Profile, User } from '../types';
+=======
+import { AlleDaten, ladeAlles, ladeBeitraege, ladeChatlisten, ladeChatlistenStand } from '../lib/daten';
+>>>>>>> 2690f16 (Zwischenstand: Karussells aus beiden Profilen gezielt öffnen und nachladen)
 import { meinSchluessel } from '../lib/krypto';
 import { AuthContext } from './AuthContext';
 import { useSupabase } from './SupabaseContext';
@@ -74,6 +78,7 @@ interface DatenWert extends AlleDaten {
    */
   fehler: string | null;
   neuLaden: () => Promise<void>;
+  beitragNachladen:(id:string)=>Promise<boolean>;
   /**
    * Nur die Chatlisten neu holen (Kasten 27) — nach dem Zurueckkehren aus
    * einem Chat und im Takt, wenn sich ihr Stand in der Datenbank geaendert
@@ -117,6 +122,7 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
   const { supabase } = useSupabase();
   const { user } = useContext(AuthContext);
   const ichId = user?.id ?? '';
+  const kontoRef=useRef(ichId);kontoRef.current=ichId;
 
   const [daten, setDaten] = useState<AlleDaten>(LEER);
   const [laedt, setLaedt] = useState(false);
@@ -306,6 +312,7 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     []
   );
 
+<<<<<<< HEAD
   const personMerken = useCallback((eintrag: { user: User; profile: Profile }) => {
     const id = eintrag.user.id;
     versucht.current.add(id);
@@ -355,6 +362,26 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
       personenNachladen,
     }),
     [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, chatsGelesenSeit, keinInteresseMerken, personMerken, personenNachladen]
+=======
+  const beitragNachladen=useCallback(async(id:string)=>{
+    if([...daten.posts,...daten.videos,...daten.clips].some(p=>p.id===id))return true;
+    if(!supabase||!ichId||!/^[0-9a-f-]{36}$/i.test(id))return false;
+    const {data:vor}=await supabase.auth.getSession();const token=vor.session?.access_token;
+    const teil=await ladeBeitraege(supabase,ichId,id);
+    const {data:nach}=await supabase.auth.getSession();
+    if(kontoRef.current!==ichId||!token||nach.session?.access_token!==token)return false;
+    const gefunden=[...teil.posts,...teil.videos,...teil.clips].some(p=>p.id===id);
+    if(gefunden)setDaten(d=>d.ichId!==ichId?d:{...d,
+      posts:[...teil.posts,...d.posts.filter(p=>p.id!==id)],
+      videos:[...teil.videos,...d.videos.filter(p=>p.id!==id)],
+      clips:[...teil.clips,...d.clips.filter(p=>p.id!==id)]});
+    return gefunden;
+  },[supabase,ichId,daten.posts,daten.videos,daten.clips]);
+
+  const wert = useMemo<DatenWert>(
+    () => ({ ...daten, laedt, fehler, neuLaden: laden, chatsNeuLaden, keinInteresseMerken, beitragNachladen }),
+    [daten, laedt, fehler, laden, chatsNeuLaden, keinInteresseMerken, beitragNachladen]
+>>>>>>> 2690f16 (Zwischenstand: Karussells aus beiden Profilen gezielt öffnen und nachladen)
   );
 
   return <DatenContext.Provider value={wert}>{children}</DatenContext.Provider>;

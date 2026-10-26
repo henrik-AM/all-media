@@ -179,7 +179,11 @@
     "test:af-folgerunde-bilder": "node test/af-folgerunde-bilder.js",
     "test:bunny": "node test/_bunny_einheit.js",
     "test:bunny-upload": "node test/bunny-upload.js",
-    "test:af4-karussell": "node test/af4-karussell.js"
+    "test:af4-karussell": "node test/af4-karussell.js",
+    "test:bunny-anschluss": "node test/bunny-anschluss.js",
+    "test:bunny-bilder": "node test/bunny-bilder.js",
+    "test:bunny-schema": "node test/bunny-schema-probe.js",
+    "test:af4-profilsprung": "node test/af4-profilsprung.js"
   },
   "private": true
 }

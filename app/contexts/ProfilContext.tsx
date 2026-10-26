@@ -453,8 +453,10 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         .filter((e) => e.userId === 'me')
         .map((e) => ({
           id: e.id,
+          art: daten.posts.some(p=>p.id===e.id)?'post':daten.clips.some(p=>p.id===e.id)?'clip':'reel',
           kind: daten.posts.some((p) => p.id === e.id) ? 'image' : 'video',
           eigen: true,
+          medienAnzahl: (e as {medien?:unknown[]}).medien?.length,
           mediaUri: (e as { mediaUri?: string }).mediaUri,
           standbild: (e as { standbild?: string }).standbild,
         }))
@@ -624,7 +626,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       },
       ...prev,
     ]);
-    setRaster((prev) => [{ id, kind: 'image', eigen: true, mediaUri }, ...prev]);
+    setRaster((prev) => [{ id, kind: 'image',art:'post', eigen: true, mediaUri,medienAnzahl:medien?.length }, ...prev]);
 
   }, [inDatenbank]);
 
@@ -658,7 +660,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         ...prev,
       ]);
     }
-    setRaster((prev) => [{ id, kind: 'video', eigen: true, mediaUri }, ...prev]);
+    setRaster((prev) => [{ id, kind: 'video', art:quer?'clip':'reel',eigen: true, mediaUri }, ...prev]);
 
   }, [inDatenbank]);
 

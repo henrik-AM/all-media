@@ -1185,9 +1185,10 @@ interface RohBeitrag {
  */
 export async function ladeBeitraege(
   client: SupabaseClient,
-  ichId: string
+  ichId: string,
+  nurId?:string
 ): Promise<{ posts: Post[]; videos: Video[]; clips: Clip[] }> {
-  const { data, error } = await client
+  let abfrage = client
     .from('posts')
     .select(BEITRAG_SPALTEN)
     /*
@@ -1197,7 +1198,9 @@ export async function ladeBeitraege(
      */
     .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
     .order('created_at', { ascending: false })
-    .limit(300);
+    .limit(nurId?1:300);
+  if(nurId)abfrage=abfrage.eq('id',nurId);
+  const {data,error}=await abfrage;
   if (error) throw error;
 
   const zeilen = (data ?? []) as any[];

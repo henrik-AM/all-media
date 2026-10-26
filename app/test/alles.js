@@ -258,6 +258,7 @@ const LAEUFE = [
   ['bunny', '_bunny_einheit.js'],
   ['bunny-upload', 'bunny-upload.js'],
   ['af4-karussell', 'af4-karussell.js'],
+  ['af4-profilsprung', 'af4-profilsprung.js'],
   ['af7-analysen', 'af7-analysen.js'],
   ['af6-instants', 'af6-instants.js'],
   ['af-nachpruefung', 'af-nachpruefung.js'],

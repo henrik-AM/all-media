@@ -653,6 +653,8 @@ export interface Spende {
 
 /** Ein Eintrag im eigenen Beitragsraster. */
 export interface RasterEintrag {
+  art?:'post'|'reel'|'clip';
+  medienAnzahl?:number;
   id: string;
   kind: 'image' | 'video';
   /** Selbst aufgenommen - dann steht in mediaUri das Bild. */

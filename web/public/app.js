@@ -5604,6 +5604,7 @@ async function openProfile(userId, variante) {
         ${profilRaster(profile, tab, reiterListen)}
       </div>`;
 
+    overlay.querySelectorAll('[data-profilmedium]').forEach(b=>b.addEventListener('click',()=>{closeOverlay();void beitragOeffnen(b.dataset.profilart,b.dataset.profilmedium);}));
     // Kasten 28/7.9: aus der Gruppeninfo geöffnet → Zurück führt dorthin.
     $('#profBack').addEventListener('click', () => (profilZurueckVon ? profilZurueckVon() : closeOverlay()));
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
@@ -5680,10 +5681,10 @@ function profilRaster(profile, tab, listen) {
     }
     return `<div class="prof__grid">${profile.grid
       .map(
-        (g) => `<div class="griditem">
-          ${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}
+        (g) => `<button class="griditem" data-profilmedium="${esc(g.id)}" data-profilart="${esc(g.art || (g.kind==='video'?'reel':'post'))}">
+          ${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}${medienZaehlerBadge(g)}
           ${g.kind === 'video' ? `<span class="griditem__badge">${ICONS.play}</span>` : ''}
-        </div>`
+        </button>`
       )
       .join('')}</div>`;
   }
@@ -13735,8 +13736,15 @@ function mitteilungOeffnen(ziel, text = '') {
  * `kind` ist posts.kind (post, reel, clip). Die Profil-Routen liefern
  * stattdessen `art` (post, clip, video) — `video` heisst dort Reel.
  */
-function beitragOeffnen(kind, id) {
+async function beitragOeffnen(kind, id) {
   if (!id) return;
+  if(![...(state.posts||[]),...(state.videos||[]),...(state.clips||[])].some(p=>p.id===id)){
+    const konto=window.Anmeldung?.nutzer?.()?.id;
+    const r=await fetch(`/api/beitraege/${encodeURIComponent(id)}`).then(r=>r.json()).catch(()=>null);
+    if(window.Anmeldung?.nutzer?.()?.id!==konto)return;
+    if(!r?.beitrag)return toast('Dieser Beitrag ist nicht verfügbar.');
+    const b=r.beitrag;const liste=b.kind==='clip'?'clips':b.kind==='reel'?'videos':'posts';state[liste]=[b,...(state[liste]||[])];
+  }
   if (kind === 'clip') return openClip(id);
   if (kind === 'reel' || kind === 'video') return mitteilungOeffnen({ art: 'video', id });
   return mitteilungOeffnen({ art: 'post', id });
@@ -18352,7 +18360,7 @@ function medienFlaeche(id, symbol, adresse, standbild) {
    * (thumbnail_url). Fehlt auch das, bleibt die Farbflaeche.
    */
   const bild = eigeneMedien()[id] || (istVideoAdresse(adresse) ? standbild : adresse) || standbild;
-  if (bild && !istVideoAdresse(bild)) return `<img class="eigenbild" src="${esc(bild)}" alt="">`;
+  if (bild && !istVideoAdresse(bild)) return `<img class="eigenbild" src="${esc(bild)}" alt="" loading="lazy">`;
   return `<span class="motiv motiv--${motivVon(id)}">${symbol}</span>`;
 }
 
@@ -19991,7 +19999,7 @@ async function renderVideoProfile() {
               .map(
                 (g) => `<button class="griditem" data-eigen="${esc(g.id)}" data-eigenkind="${esc(g.art || '')}" data-eigenart="${
                   g.kind === 'video' ? 'video' : 'post'
-                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}</button>`
+                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}${medienZaehlerBadge(g)}</button>`
               )
               .join('')}</div>`
           : tab === 'repost' && meineReposts.length
@@ -23691,3 +23699,5 @@ function karussellVerbinden(wurzel){
 
 // Navigation entfernt DOM-Knoten; auch deren Spieler/Beobachter sofort freigeben.
 new MutationObserver(()=>{for(const [el,stop] of karussellBeobachter)if(!el.isConnected){karussellBeobachter.delete(el);stop();}}).observe(document.body,{childList:true,subtree:true});
+
+function medienZaehlerBadge(e){return e.medien?.length>1?`<span class="griditem__zaehler">1/${e.medien.length}</span>`:'';}

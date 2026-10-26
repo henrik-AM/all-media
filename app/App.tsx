@@ -1540,9 +1540,12 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Wohin es geht, entscheidet `kind` aus der Datenbank, nicht der Reiter:
    * unter „Reposts" steht ebenso gut ein Querformat-Video wie ein Bild.
    */
-  const kachelOeffnen = (kachel: { id: string; kind?: string }) => {
+  const kachelOeffnen = async (kachel: { id: string; kind?: string;art?:string }) => {
+    try{if(!(await daten.beitragNachladen(kachel.id))){setNotice('Dieser Beitrag ist nicht verfügbar.');return;}}
+    catch{setNotice('Dieser Beitrag konnte nicht geladen werden.');return;}
     // `posts.kind` kennt genau drei Werte (Schema: post, reel, clip).
-    const art = kachel.kind === 'clip' ? 'clip' : kachel.kind === 'reel' ? 'reel' : 'beitrag';
+    const kind=kachel.art||kachel.kind;
+    const art = kind === 'clip' ? 'clip' : kind === 'reel' ? 'reel' : 'beitrag';
     eintragOeffnen(art, kachel.id);
   };
 
