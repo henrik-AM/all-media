@@ -1,0 +1,9 @@
+OK 1 App Explorer-Übersicht reels ohne Einzelöffnung
+OK 2 App Explorer-Übersicht querformat ohne Einzelöffnung
+OK 3 App Explorer-Übersicht beitraege ohne Einzelöffnung
+OK 4 App Explorer Hashtag ohne Einzelöffnung
+OK 5 App Videosuche ohne Einzelöffnung
+OK 6 Website Videosuche/Explorer-Übersichten ohne Einzelöffnung
+OK 7 Website renderHashtagExplorer ohne Einzelöffnung
+OK 8 Website renderPlaceExplorer ohne Einzelöffnung
+8/8 Prüfungen bestanden

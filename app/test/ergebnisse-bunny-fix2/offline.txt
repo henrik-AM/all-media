@@ -25,11 +25,11 @@
   OK   JPEG hochgeladen
   OK   url ist die beständige Supabase-Form  — https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/posts/test-bild.jpg
   OK   pfad zurück
-  OK   anzeige ist unterschriebene Pull-Adresse  — http://127.0.0.1:54548/posts/test-bild.jpg?token=HS256-4y4iWwlIrGKeS9JWmXF_DP7kLkvA8WdpNcEN28xtGeM&expires=1793034000
+  OK   anzeige ist unterschriebene Pull-Adresse  — http://127.0.0.1:55043/posts/test-bild.jpg?token=HS256-4y4iWwlIrGKeS9JWmXF_DP7kLkvA8WdpNcEN28xtGeM&expires=1793034000
   OK   Inhalt kam unverändert an
   OK   MP4 (Typ mit Zusatz) hochgeladen
   OK   Push-to-Talk M4A geht in ptt
-  OK   ablegen baut Pfad mit 32 Zufallszeichen  — avatars/nutzer-1-1793017200000-52964363dc4b82bd17b94b112fe2c9d5.png
+  OK   ablegen baut Pfad mit 32 Zufallszeichen  — avatars/nutzer-1-1793017200000-a29f0350f686c75feb78cb3ab01c11ad.png
   OK   ablegen zweimal → zwei Pfade (kein Überschreiben)
 
 4. Falscher Schlüssel
@@ -373,6 +373,17 @@ OK 1 ProfilProvider übernimmt gezielt nachgeladenen Clip ohne neues Bootstrap
 OK 2 Normale Querformatübersicht filtert den Einzelclip aus
 2/2 Prüfungen bestanden
 
+=== bunny-fix-b4-suche ===
+OK 1 App Explorer-Übersicht reels ohne Einzelöffnung
+OK 2 App Explorer-Übersicht querformat ohne Einzelöffnung
+OK 3 App Explorer-Übersicht beitraege ohne Einzelöffnung
+OK 4 App Explorer Hashtag ohne Einzelöffnung
+OK 5 App Videosuche ohne Einzelöffnung
+OK 6 Website Videosuche/Explorer-Übersichten ohne Einzelöffnung
+OK 7 Website renderHashtagExplorer ohne Einzelöffnung
+OK 8 Website renderPlaceExplorer ohne Einzelöffnung
+8/8 Prüfungen bestanden
+
 === bunny-fix-b5 ===
 OK 1 Eigene vorläufige post-Kachel öffnet lokalen Inhalt
 OK 2 Unbekannte lokale Kennung wird nicht als eigener Inhalt geöffnet
@@ -424,4 +435,4 @@ Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
 Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
 Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
 
-27/27 Läufe; 302/302 Offlineprüfungen bestanden. Dokumentabnahme/SQL/Browser getrennt.
+28/28 Läufe; 310/310 Offlineprüfungen bestanden. Dokumentabnahme/SQL/Browser getrennt.

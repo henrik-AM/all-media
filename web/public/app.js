@@ -13265,9 +13265,10 @@ function renderPostsExplorer() {
 }
 
 function renderHashtagExplorer(tag) {
-  const items = state.videos.filter(v => v.tags?.includes(tag))
-    .concat(state.clips.filter(c => c.tags?.includes(tag)))
-    .concat(state.posts.filter(p => p.tags?.includes(tag)));
+  // Gezielt geöffnete Fremdbeiträge (nurEinzeln) gehören nicht in den Explorer.
+  const items = state.videos.filter(v => !v.nurEinzeln && v.tags?.includes(tag))
+    .concat(state.clips.filter(c => !c.nurEinzeln && c.tags?.includes(tag)))
+    .concat(state.posts.filter(p => !p.nurEinzeln && p.tags?.includes(tag)));
   main.innerHTML = `
     ${explorerKopf(esc(tag))}
     <div class="scroll">
@@ -13366,9 +13367,9 @@ function renderSoundsExplorer() {
 
 function renderPlaceExplorer(placeId) {
   const place = state.places.find(p => p.id === placeId);
-  const items = state.videos.filter(v => v.location === place?.name)
-    .concat(state.clips.filter(c => c.location === place?.name))
-    .concat(state.posts.filter(p => p.location === place?.name));
+  const items = state.videos.filter(v => !v.nurEinzeln && v.location === place?.name)
+    .concat(state.clips.filter(c => !c.nurEinzeln && c.location === place?.name))
+    .concat(state.posts.filter(p => !p.nurEinzeln && p.location === place?.name));
   main.innerHTML = `
     ${explorerKopf(esc(place?.name || 'Standort'))}
     <div class="scroll">
@@ -13445,12 +13446,13 @@ const vonGefolgten = (e) => !!(state.gefolgt && state.gefolgt[e.userId]);
  * versprochen hat.
  */
 function suchTreffer() {
+  // Gezielt geöffnete Fremdbeiträge (nurEinzeln) gehören nicht in die Suche.
   const q = (state.videoSearchQuery || '').trim().toLowerCase();
   const hit = (t) => !q || String(t).toLowerCase().includes(q);
   return {
-    reels: nachInteresse(state.videos.filter((v) => hit(v.description) || hit(v.music || '') || hit(user(v.userId).name)), (v) => v.likes, vonGefolgten),
-    clips: nachInteresse(state.clips.filter((c) => hit(c.title) || hit(user(c.userId).name)), (c) => c.views, vonGefolgten),
-    posts: nachInteresse(state.posts.filter((p) => hit(p.description) || hit(p.music || '') || hit(user(p.userId).name)), (p) => p.likes, vonGefolgten),
+    reels: nachInteresse(state.videos.filter((v) => !v.nurEinzeln && (hit(v.description) || hit(v.music || '') || hit(user(v.userId).name))), (v) => v.likes, vonGefolgten),
+    clips: nachInteresse(state.clips.filter((c) => !c.nurEinzeln && (hit(c.title) || hit(user(c.userId).name))), (c) => c.views, vonGefolgten),
+    posts: nachInteresse(state.posts.filter((p) => !p.nurEinzeln && (hit(p.description) || hit(p.music || '') || hit(user(p.userId).name))), (p) => p.likes, vonGefolgten),
     people: nachInteresse(
       Object.values(state.users).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
       () => 0,

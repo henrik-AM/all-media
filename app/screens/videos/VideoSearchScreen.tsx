@@ -109,22 +109,23 @@ export const VideoSearchScreen = ({ onOpenProfile, onOpenExplorer, onOpenEintrag
    * Untertiteltexte in der Datenbank.
    */
     const gefolgt = (e: { userId: string }) => folgtPerson(e.userId);
+    // Gezielt geöffnete Fremdbeiträge (nurEinzeln) gehören nicht in die Suche.
     return {
       reels: nachInteresse(
         [...eigeneVideos, ...alleVideos].filter(
-          (v) => hit(v.description) || hit(v.music ?? '') || hit(alleNutzer[v.userId]?.name ?? '')
+          (v) => !v.nurEinzeln && (hit(v.description) || hit(v.music ?? '') || hit(alleNutzer[v.userId]?.name ?? ''))
         ),
         (v) => v.likes,
         gefolgt
       ),
       clips: nachInteresse(
-        clips.filter((c) => hit(c.title) || hit(alleNutzer[c.userId]?.name ?? '')),
+        clips.filter((c) => !c.nurEinzeln && (hit(c.title) || hit(alleNutzer[c.userId]?.name ?? ''))),
         (c) => c.views,
         gefolgt
       ),
       posts: nachInteresse(
         [...eigeneBeitraege, ...alleBeitraege].filter(
-          (p) => hit(p.description) || hit(p.music ?? '') || hit(alleNutzer[p.userId]?.name ?? '')
+          (p) => !p.nurEinzeln && (hit(p.description) || hit(p.music ?? '') || hit(alleNutzer[p.userId]?.name ?? ''))
         ),
         (p) => p.likes,
         gefolgt

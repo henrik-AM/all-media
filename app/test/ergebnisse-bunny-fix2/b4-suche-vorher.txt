@@ -1,0 +1,9 @@
+ROT 1 App Explorer-Übersicht reels ohne Einzelöffnung: Expected values to be strictly deep-equal:
+ROT 2 App Explorer-Übersicht querformat ohne Einzelöffnung: Expected values to be strictly deep-equal:
+ROT 3 App Explorer-Übersicht beitraege ohne Einzelöffnung: Expected values to be strictly deep-equal:
+ROT 4 App Explorer Hashtag ohne Einzelöffnung: Expected values to be strictly deep-equal:
+ROT 5 App Videosuche ohne Einzelöffnung: Expected values to be strictly deep-equal:
+ROT 6 Website Videosuche/Explorer-Übersichten ohne Einzelöffnung: Expected values to be strictly deep-equal:
+ROT 7 Website renderHashtagExplorer ohne Einzelöffnung: Expected values to be strictly deep-equal:
+ROT 8 Website renderPlaceExplorer ohne Einzelöffnung: Expected values to be strictly deep-equal:
+0/8 Prüfungen bestanden

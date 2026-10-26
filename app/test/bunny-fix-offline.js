@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../..');
 const alt=['_bunny_einheit','bunny-upload','af4-karussell','af4-profilsprung','af3-negativ','af5-reels','af6-instants','af7-analysen','af-nachpruefung','af-folgerunde','af-video-beleg','af-fix-b1','af-fix-b3','af-fix-b4','af-fix-b5','af-fix-b5-app','af-fix-b7'];
-const neu=['bunny-fix-b1','bunny-fix-b2','bunny-fix-b3','bunny-fix-b4','bunny-fix-b4-app','bunny-fix-b5','bunny-fix-b6','bunny-fix-b8','bunny-fix-b11','_owasp_medien_einheit'];
+const neu=['bunny-fix-b1','bunny-fix-b2','bunny-fix-b3','bunny-fix-b4','bunny-fix-b4-app','bunny-fix-b4-suche','bunny-fix-b5','bunny-fix-b6','bunny-fix-b8','bunny-fix-b11','_owasp_medien_einheit'];
 let log='',summe=0,laeufe=0;
 for(const name of [...alt,...neu]){const r=spawnSync(process.execPath,[`app/test/${name}.js`],{cwd:root,encoding:'utf8',timeout:120000});const ausgabe=r.stdout+r.stderr;log+=`\n=== ${name} ===\n${ausgabe}`;fs.writeFileSync(path.join(__dirname,'ergebnisse-bunny-fix2/offline.txt'),log);assert.equal(r.status,0,`${name} gescheitert:\n${ausgabe}`);const m=[...ausgabe.matchAll(/(\d+)\s*(?:\/|von)\s*(\d+)\s+(?:Pr[uü]efungen|Prüfungen|Regressionen)/gi)].at(-1)||[...ausgabe.matchAll(/(\d+)\/(\d+)/g)].at(-1);assert.ok(m,`${name}: keine Prüfzahl`);assert.equal(m[1],m[2]);summe+=Number(m[1]);laeufe++;console.log(`OK ${name} ${m[1]}/${m[2]}`);}
 const ende=`${laeufe}/${alt.length+neu.length} Läufe; ${summe}/${summe} Offlineprüfungen bestanden. Dokumentabnahme/SQL/Browser getrennt.`;console.log(ende);fs.appendFileSync(path.join(__dirname,'ergebnisse-bunny-fix2/offline.txt'),'\n'+ende+'\n');
