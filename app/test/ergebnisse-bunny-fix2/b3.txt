@@ -1,0 +1,8 @@
+Der Beitrag fehlgeschlagen: DB abgelehnt
+OK 1 Karussell-DB-Fehler entfernt ausschließlich neu hochgeladene Medien
+Der Beitrag fehlgeschlagen: DB abgelehnt
+OK 2 Einzelvideo-DB-Fehler räumt den neuen Upload auf
+OK 3 Bestätigter Beitrag behält alle Dateien
+Der Beitrag fehlgeschlagen: DB abgelehnt Unveröffentlichte Aufnahmen konnten nicht vollständig entfernt werden.
+OK 4 Fehlgeschlagenes Aufräumen wird sichtbar gemeldet
+4/4 Prüfungen bestanden
