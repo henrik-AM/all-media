@@ -1,0 +1,5 @@
+FEHL B9_Kontoloeschung_mit_Bytebeleg_gesperrt
+FEHL B9_nach_expliziter_Dateibereinigung_Konto_loeschbar
+0/2 Rollenprüfungen, verworfen
+Rollback-Kontrolle 1/1
+{"message":"Failed to run sql query: ERROR:  P0001: PRUEFFEHLER:B9_Kontoloeschung_mit_Bytebeleg_gesperrt\nCONTEXT:  PL/pgSQL function pg_temp_41.pruefe(text,boolean) line 1 at RAISE\nSQL statement \"SELECT pg_temp.pruefe('B9_Kontoloeschung_mit_Bytebeleg_gesperrt',(exists(select 1 from public.profiles where id='cf260026-0000-4000-8000-000000000001') and exists(select 1 from public.medien_objekte where pfad='posts/cf260026-0000-4000-8000-000000000001-b9.jpg')))\"\nPL/pgSQL function inline_code_block line 1 at PERFORM\n"}

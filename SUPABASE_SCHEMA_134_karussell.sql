@@ -4,7 +4,7 @@
 -- Ersetzt Helfer aus 107, Video-Trigger aus 109 und Instant-Helfer aus 111.
 begin;
 create table if not exists public.medien_objekte (
- pfad text primary key, owner_id uuid not null references public.profiles(id) on delete cascade,
+ pfad text primary key, owner_id uuid not null references public.profiles(id) on delete restrict,
  typ text not null, bytes bigint not null check(bytes>0 and bytes<=52428800),
  sha256 text not null check(sha256 ~ '^[0-9a-f]{64}$'),
  sekunden double precision check(sekunden>0 and sekunden<=1200),
@@ -14,6 +14,11 @@ create table if not exists public.medien_objekte (
  check(typ in ('image/jpeg','image/png','image/webp','video/mp4','audio/mp4')),
  check(pfad not like 'instants/%' or (typ='image/jpeg' and bytes<=256000))
 );
+-- Kein Profil löschen, bevor dessen echte Dateien und danach die Belege entfernt sind.
+-- Auch beim erneuten Ausführen eines früheren Entwurfs die Kaskade schließen.
+alter table public.medien_objekte drop constraint if exists medien_objekte_owner_id_fkey;
+alter table public.medien_objekte add constraint medien_objekte_owner_id_fkey
+ foreign key(owner_id) references public.profiles(id) on delete restrict;
 alter table public.medien_objekte enable row level security;
 revoke all on public.medien_objekte from public,anon,authenticated;
 grant select,insert,delete on public.medien_objekte to service_role;

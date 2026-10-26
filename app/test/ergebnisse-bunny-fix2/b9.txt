@@ -1,0 +1,4 @@
+OK B9_Kontoloeschung_mit_Bytebeleg_gesperrt
+OK B9_nach_expliziter_Dateibereinigung_Konto_loeschbar
+2/2 Rollenprüfungen, verworfen
+Rollback-Kontrolle 1/1
