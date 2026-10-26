@@ -35,6 +35,10 @@ create or replace function public.video_beleg_pruefen() returns trigger
 language plpgsql security definer set search_path=public as $$
 declare p text;b public.video_upload_belege; o storage.objects; video boolean;
 begin
+ -- Geschützte Demo-Vorlagen der eigenen Testkonten sind kein Nutzerupload.
+ -- Schema 95 anlegen_vorgaben läuft alphabetisch vorher und erzwingt bei
+ -- direktem authenticated-INSERT demo=false. Kein Client kann sich ausnehmen.
+ if tg_op='INSERT' and new.demo and public.ist_testkonto(new.user_id) then return new;end if;
  if tg_op='UPDATE' and new.media_url is not distinct from old.media_url and new.kind=old.kind then
   -- Andere Altbeitragsänderungen bleiben möglich; keine rückwirkende Zertifizierung.
   if new.duration is distinct from old.duration then

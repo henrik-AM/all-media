@@ -37,13 +37,16 @@ if(nr!==109)sql+=post(P,A)+post(Q,A)+post(F,A,"now()+interval '1 day'")+`insert 
 if(nr===109){
  const pfad=`posts/${A}-probe.mp4`,obj=id(30);
  sql+=`insert into storage.objects(id,bucket_id,name,owner_id,metadata) values('${obj}','media','${pfad}','${A}','{"size":1234,"mimetype":"video/mp4"}');`;
- sql+=als(A,deny('ohne_beleg_zu',`insert into public.posts(user_id,kind,media_url,duration) values(auth.uid(),'reel',public.medien_adresse('${pfad}'),'0:01')`)+deny('beleg_faelschen_zu',`insert into public.video_upload_belege(objekt_id,user_id,pfad,sekunden,sha256,bytes) values('${obj}',auth.uid(),'${pfad}',1,repeat('a',64),1234)`)+`update storage.objects set metadata='{"size":1234}' where id='${obj}';get diagnostics n=row_count;`+check('austausch_null_zeilen','n=0'));
+ sql+=als(A,deny('demo_tarnung_zu',`insert into public.posts(user_id,kind,media_url,duration,demo) values(auth.uid(),'reel',public.medien_adresse('${pfad}'),'0:01',true)`)+deny('ohne_beleg_zu',`insert into public.posts(user_id,kind,media_url,duration) values(auth.uid(),'reel',public.medien_adresse('${pfad}'),'0:01')`)+deny('beleg_faelschen_zu',`insert into public.video_upload_belege(objekt_id,user_id,pfad,sekunden,sha256,bytes) values('${obj}',auth.uid(),'${pfad}',1,repeat('a',64),1234)`)+`update storage.objects set metadata='{"size":1234}' where id='${obj}';get diagnostics n=row_count;`+check('austausch_null_zeilen','n=0'));
  sql+=`set local role service_role;insert into public.video_upload_belege(objekt_id,user_id,pfad,sekunden,sha256,bytes) values('${obj}','${A}','${pfad}',1200,repeat('a',64),1234);reset role;`;
  sql+=als(A,`insert into public.posts(id,user_id,kind,media_url,duration) values('${P}',auth.uid(),'reel',public.medien_adresse('${pfad}'),'0:01');`+check('dauer_aus_beleg',`(select duration='20:00' from public.posts where id='${P}')`)+`update public.posts set duration='0:01' where id='${P}';`+check('dauer_update_korrigiert',`(select duration='20:00' from public.posts where id='${P}')`));
  sql+=als(B,deny('fremder_beleg_zu',`insert into public.posts(user_id,kind,media_url) values(auth.uid(),'reel',public.medien_adresse('${pfad}'))`));
  sql+=`update storage.objects set metadata=metadata||'{"size":1235}'::jsonb where id='${obj}';`;
  sql+=owner(check('privilegierter_austausch_entwertet',`not exists(select 1 from public.video_upload_belege where objekt_id='${obj}')`));
  sql+=als(A,deny('nach_austausch_zu',`insert into public.posts(user_id,kind,media_url) values(auth.uid(),'reel',public.medien_adresse('${pfad}'))`)+deny('als_foto_tarnen_zu',`insert into public.posts(user_id,kind,media_url) values(auth.uid(),'post',public.medien_adresse('${pfad}'))`));
+ sql+=`insert into public.posts(id,user_id,kind,demo,description) select '${id(41)}',id,'reel',true,'Rollback: bekannte Demo-Vorlage' from public.profiles where id='3baafacd-bbdb-40fb-8ef4-a4e365ae00c4' and public.ist_testkonto(id);`;
+ sql+=als('3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',deny('demo_update_keine_ausnahme',`update public.posts set media_url=public.medien_adresse('${pfad}') where id='${id(41)}'`));
+ sql+=owner(check('interne_testvorlage_weiter_möglich',`exists(select 1 from public.posts where description='Rollback: bekannte Demo-Vorlage' and demo)`));
  sql+=owner(check('anon_belege_zu',`not has_table_privilege('anon','public.video_upload_belege','SELECT')`)+check('beleg_update_zu',`not has_table_privilege('authenticated','public.video_upload_belege','UPDATE')`));
 }
 if(nr===108){
