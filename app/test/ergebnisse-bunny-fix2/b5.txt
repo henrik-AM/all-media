@@ -1,0 +1,7 @@
+OK 1 Eigene vorläufige post-Kachel öffnet lokalen Inhalt
+OK 2 Unbekannte lokale Kennung wird nicht als eigener Inhalt geöffnet
+OK 3 Eigene vorläufige reel-Kachel öffnet lokalen Inhalt
+OK 4 Unbekannte lokale Kennung wird nicht als eigener Inhalt geöffnet
+OK 5 Eigene vorläufige clip-Kachel öffnet lokalen Inhalt
+OK 6 Unbekannte lokale Kennung wird nicht als eigener Inhalt geöffnet
+6/6 Prüfungen bestanden
