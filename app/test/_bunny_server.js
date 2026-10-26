@@ -7,7 +7,7 @@ async function starten(){
   const u=new URL(url);if(!['localhost','127.0.0.1'].includes(u.hostname))throw Error('Externer Abruf im Offline-Test gesperrt');return originalFetch(url,opts);
  };
  const register=new Map(),alt=new Map(),belege=[];
- const lage={freigegeben:true,schreibfehler:false,rechtefehler:false,oeffentlich:new Set(),anfragen:0,posts:[]};
+ const lage={freigegeben:true,schreibfehler:false,rechtefehler:false,oeffentlich:new Set(),anfragen:0,posts:[],instantKandidaten:[],instantBestaetigt:[]};
  function dienstTabelle(t){
   if(t==='video_upload_belege')return {insert:async b=>{belege.push(b);return {error:null};}};
   if(t!=='medien_objekte')throw Error('Unerwartete Diensttabelle '+t);
@@ -20,6 +20,8 @@ async function starten(){
   rpc:async(name,args)=>{lage.anfragen++;if(lage.rechtefehler)return {error:Error('Probe')};
    const owner=p=>register.get(p)?.owner_id===wer||alt.get(p)?.owner===wer;
    const provider=p=>register.has(p)?'bunny':'supabase';
+   if(name==='instant_loeschkandidaten')return {data:lage.instantKandidaten};
+   if(name==='instant_loeschbestaetigen'){lage.instantBestaetigt=args.p_ids;return {error:null};}
    if(name==='medium_upload_erlaubt')return {data:lage.freigegeben};
    if(name==='medien_leseliste')return {data:lage.freigegeben?args.p_pfade.filter(p=>!p.startsWith('instants/')&&(owner(p)||lage.oeffentlich.has(p))).map(p=>({pfad:p,anbieter:provider(p)})):[]};
    if(name==='medium_loeschrecht')return {data:lage.freigegeben&&owner(args.p_pfad)?provider(args.p_pfad):null};
