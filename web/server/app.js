@@ -2374,6 +2374,11 @@ async function inhaltsAktion(req) {
   if (!vorher) return { fehlt: true };
 
   const handler = {
+    dislike: async () => {
+      const { error } = await req.db.rpc('beitrag_reaktion', { p_post: id, p_art: 'dislike' });
+      if (error) throw error;
+      return { ok: true };
+    },
     like: () => syncHandlers.handleLikeContent(req.db, req.nutzerId, id),
     save: () => syncHandlers.handleSaveContent(req.db, req.nutzerId, id),
     repost: () => syncHandlers.handleRepostContent(req.db, req.nutzerId, id),

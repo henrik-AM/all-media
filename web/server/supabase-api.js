@@ -1060,6 +1060,9 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
   const beitraege = data || [];
   const ids = beitraege.map((b) => b.id);
 
+  const { data: negativ } = ids.length ? await client.from('post_dislikes').select('post_id').eq('user_id', nutzerId).in('post_id', ids) : { data: [] };
+  const abgelehnt = new Set((negativ || []).map((z) => z.post_id));
+
   // Eigener Zustand je Beitrag: gefällt mir, gespeichert, geteilt, Glocke.
   const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: glocke }, lenkung] =
     ids.length === 0
@@ -1180,6 +1183,7 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
     // hier nur der Sockel — jedes Teilen verpuffte, die Zahl blieb stehen.
     shares: Number(b.shares_basis || 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
+    disliked: abgelehnt.has(b.id),
     likedBy: likerNamen.get(b.id) || '',
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),

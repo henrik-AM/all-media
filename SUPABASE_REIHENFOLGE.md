@@ -682,3 +682,6 @@ Ersetzt den nie eingespielten Entwurf 107 (Sammelzweig); dessen Referenz-Auslös
 Nach 95/115/117. Probe: `app/test/_probe128.js` (verworfen). **Kein Index auf
 `profiles.avatar_url`** — macht Profil-Updates nicht-HOT und scheitert am Ausdrucksindex
 mit `telefonbuch_schluessel()` (42501). Alte 95 nicht erneut einspielen: öffnet `avatars/` wieder.
+
+## Schema 129 — AF3 Negativreaktionen (Paket 9)
+Nach 128: `SUPABASE_SCHEMA_129_video_negativ.sql` (Entwurf 108 aus dem Sammelzweig, auf main-Stand gebracht). Ersetzt `feed_rang`. Private Negativreaktionen, atomarer Ausschluss von Likes, Faktoren 0,02 / 0,3 / 0,5.

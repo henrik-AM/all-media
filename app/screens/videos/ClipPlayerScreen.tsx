@@ -540,6 +540,9 @@ export const ClipPlayerScreen = ({ clipId, kommentar, onBack, onOpenProfile, onO
           Jetzt hat jeder Knopf ein Fuenftel der Breite und eine Beschriftung.
         */}
         <View style={styles.aktionen}>
+          <Druck style={styles.aktion} onPress={() => clipUmschalten(clip.id, 'dislike')} accessibilityLabel="Gefällt mir nicht" accessibilityState={{ selected: !!clip.disliked }}>
+            <Ionicons name={clip.disliked ? 'thumbs-down' : 'thumbs-down-outline'} size={22} color={colors.text} />
+          </Druck>
           <Druck style={styles.aktion} onPress={() => clipUmschalten(clip.id, 'like')} accessibilityLabel="Gefällt mir">
             <Ionicons
               name={clip.liked ? 'heart' : 'heart-outline'}

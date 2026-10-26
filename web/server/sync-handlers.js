@@ -1490,10 +1490,8 @@ const handleDeleteContent = handler('Inhalt löschen', async (client, nutzerId, 
 });
 
 const handleLikeContent = handler('Like', async (client, nutzerId, beitragId) => {
-  const gesetzt = await umschalten(client, 'post_likes', {
-    post_id: beitragId,
-    user_id: nutzerId,
-  });
+  const { data: gesetzt, error } = await client.rpc('beitrag_reaktion', { p_post: beitragId, p_art: 'like' });
+  if (error) throw error;
   return { ok: true, geliked: gesetzt };
 });
 

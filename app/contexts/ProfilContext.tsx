@@ -1,3 +1,4 @@
+import { reaktion } from '../../gemeinsam/rang';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Clip,
@@ -192,7 +193,7 @@ interface ProfilWert {
   spendeSetzen: (spende: Spende) => void;
 
   /** Like, Merken oder Repost bei einem Querformat-Video umschalten. */
-  clipUmschalten: (id: string, was: 'like' | 'save' | 'repost') => void;
+  clipUmschalten: (id: string, was: 'like' | 'dislike' | 'save' | 'repost') => void;
 
   /* --- Kontaktinfo (Prototyp "MC + Kontakteinstellungen") --- */
   /** Mit einem Stern markierte Nachrichten. */
@@ -923,15 +924,13 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const clipUmschalten = useCallback(
-    (id: string, was: 'like' | 'save' | 'repost') => {
+    (id: string, was: 'like' | 'dislike' | 'save' | 'repost') => {
+      const vorher = clips.find((c) => c.id === id);
       const drehen = () =>
         setClips((prev) =>
           prev.map((c) => {
             if (c.id !== id) return c;
-            if (was === 'like') {
-              const jetzt = !c.liked;
-              return { ...c, liked: jetzt, likes: Math.max(0, (c.likes ?? 0) + (jetzt ? 1 : -1)) };
-            }
+            if (was === 'like' || was === 'dislike') return reaktion(c, was);
             if (was === 'save') return { ...c, saved: !c.saved };
             return { ...c, reposted: !c.reposted };
           })
@@ -941,15 +940,17 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
       // Dasselbe noch einmal umschalten stellt den alten Stand wieder her.
       const tun =
-        was === 'like'
+        was === 'dislike'
+          ? Aktion.dislike
+          : was === 'like'
           ? Aktion.like
           : was === 'save'
             ? Aktion.speichern
             : Aktion.repost;
       schreiben(was === 'like' ? 'Das Like' : was === 'save' ? 'Das Speichern' : 'Der Repost',
-        (c, ich) => tun(c, ich, id), drehen);
+        (c, ich) => tun(c, ich, id), () => { if (vorher) setClips((prev) => prev.map((c) => c.id === id ? vorher : c)); });
     },
-    [schreiben]
+    [schreiben, clips]
   );
 
   /** Umschalten. Gibt zurueck, was danach gilt. */

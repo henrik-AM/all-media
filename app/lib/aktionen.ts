@@ -112,7 +112,7 @@ async function umschalten(
 
 /** Herz an oder aus. Gibt zurück, ob der Beitrag danach geliked ist. */
 export function like(client: SupabaseClient, ichId: string, beitragId: string) {
-  return umschalten(client, 'post_likes', { post_id: beitragId, user_id: ichId });
+  return beitragReaktion(client, beitragId, 'like');
 }
 
 /** Lesezeichen an oder aus. */
@@ -4671,4 +4671,13 @@ export async function ausSammlung(
   const { data, error } = await frage.select('id');
   if (error) throw error;
   if (!data?.length) throw new Error('Das liess sich nicht herausnehmen');
+}
+
+async function beitragReaktion(client: SupabaseClient, beitragId: string, art: string): Promise<boolean> {
+  const { data, error } = await client.rpc('beitrag_reaktion', { p_post: beitragId, p_art: art });
+  if (error) throw error;
+  return !!data;
+}
+export function dislike(client: SupabaseClient, ichId: string, beitragId: string) {
+  return beitragReaktion(client, beitragId, 'dislike');
 }

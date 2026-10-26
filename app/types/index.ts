@@ -275,6 +275,7 @@ export interface Comment {
   time: string;
   likes: number;
   liked: boolean;
+  disliked?: boolean;
   /**
    * Nachtrag 4.3b (11.10.2026): die Wurzel, an der diese Antwort hängt
    * (`comments.reply_to`, Schema 92). Leer = Kommentar oben.
@@ -294,6 +295,7 @@ export interface Post {
   likes: number;
   comments: number;
   liked: boolean;
+  disliked?: boolean;
   saved: boolean;
   following: boolean;
   notify: boolean;
@@ -327,6 +329,7 @@ export interface Video {
   comments: number;
   shares: number;
   liked: boolean;
+  disliked?: boolean;
   saved: boolean;
   reposted: boolean;
   notify: boolean;
@@ -408,6 +411,7 @@ export interface Story {
   viewed: boolean;
   own?: boolean;
   liked?: boolean;
+  disliked?: boolean;
   caption?: string;
   /**
    * Bei der eigenen Story: die aufgenommene Datei. Solange leer, fuehrt ein
@@ -482,6 +486,7 @@ export interface Clip {
   likedBy?: string;
   comments?: number;
   liked?: boolean;
+  disliked?: boolean;
   saved?: boolean;
   reposted?: boolean;
 }

@@ -1,3 +1,4 @@
+import { reaktion } from '../../../gemeinsam/rang';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -225,9 +226,14 @@ export const VideoFeedScreen = ({
   const toggleLike = async (video: Video) => {
     haptic.impact('medium');
     const zurueck = () =>
-      update(video.id, (v) => ({ ...v, liked: video.liked, likes: video.likes }));
-    update(video.id, (v) => ({ ...v, liked: !v.liked, likes: v.likes + (v.liked ? -1 : 1) }));
+      update(video.id, (v) => ({ ...v, liked: video.liked, disliked: video.disliked, likes: video.likes }));
+    update(video.id, (v) => reaktion(v, 'like'));
     aktion.like(video.id, zurueck);
+  };
+
+  const toggleDislike = (video: Video) => {
+    update(video.id, (v) => reaktion(v, 'dislike'));
+    aktion.dislike(video.id, () => update(video.id, () => video));
   };
 
   const toggleSave = async (video: Video) => {
@@ -399,6 +405,9 @@ export const VideoFeedScreen = ({
         </Pressable>
 
         <View style={styles.rail}>
+          <Druck style={styles.railBtn} onPress={() => toggleDislike(item)} accessibilityLabel="Gefällt mir nicht" accessibilityState={{ selected: !!item.disliked }}>
+            <Ionicons name={item.disliked ? 'thumbs-down' : 'thumbs-down-outline'} size={24} color={colors.white} />
+          </Druck>
           <Druck style={styles.railBtn} onPress={() => toggleLike(item)} accessibilityLabel="Gefällt mir">
             <Ionicons
               name={item.liked ? 'heart' : 'heart-outline'}

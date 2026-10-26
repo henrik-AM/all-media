@@ -6323,6 +6323,7 @@ function renderHomeFeed() {
 
       const res = await fetch(`/api/posts/${pid}/${paction}`, { method: 'POST' });
       const updated = await res.json();
+      if (!res.ok) return toast(updated.error || 'Reaktion konnte nicht gespeichert werden');
       const idx = state.posts.findIndex((p) => p.id === updated.id);
       state.posts[idx] = updated;
 
@@ -6641,6 +6642,7 @@ function renderVideoFeed() {
 
       const res = await fetch(`/api/videos/${vid}/${vaction}`, { method: 'POST' });
       const updated = await res.json();
+      if (!res.ok) return toast(updated.error || 'Reaktion konnte nicht gespeichert werden');
       const idx = state.videos.findIndex((v) => v.id === updated.id);
       state.videos[idx] = updated;
 
@@ -6791,6 +6793,7 @@ function videoSlide(v) {
       </div>
 
       <div class="slide__rail">
+        <button class="railbtn ${v.disliked ? 'is-on' : ''}" data-vaction="dislike" data-vid="${v.id}" aria-label="Gefällt mir nicht" aria-pressed="${!!v.disliked}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M16 3H6a2 2 0 0 0-2 2l-1 7a2 2 0 0 0 2 2h5l-1 5c0 2 2 3 3 1l4-7V3ZM16 3h5v10h-5"/></svg></button>
         <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
           ${ICONS.heart}
           <span>${compactNumber(v.likes)}</span>
@@ -16645,6 +16648,7 @@ function openClip(clipId) {
               gar nicht mehr.
             */ ''}
           <div class="post__actions post__actions--fuenf ${istLive() ? 'post__actions--vier' : ''}">
+            <button class="postbtn ${clip.disliked ? 'is-liked' : ''}" data-clipact="dislike" aria-label="Gefällt mir nicht" aria-pressed="${!!clip.disliked}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M16 3H6a2 2 0 0 0-2 2l-1 7a2 2 0 0 0 2 2h5l-1 5c0 2 2 3 3 1l4-7V3ZM16 3h5v10h-5"/></svg></button>
             <button class="postbtn ${clip.liked ? 'is-liked' : ''}" data-clipact="like" aria-label="Gefällt mir">
               ${ICONS.heart}<span class="postbtn__zahl">${clip.likes ? compactNumber(clip.likes) : 'Like'}</span>
             </button>
@@ -17137,7 +17141,9 @@ function openClip(clipId) {
         if (was === 'share') return openTeilen('clip', clip.id);
 
         const res = await fetch(`/api/clips/${clip.id}/${was}`, { method: 'POST' });
-        clip = await res.json();
+        const antwort = await res.json();
+        if (!res.ok) return toast(antwort.error || 'Reaktion konnte nicht gespeichert werden');
+        clip = antwort;
         const stelle = state.clips.findIndex((c) => c.id === clip.id);
         if (stelle !== -1) state.clips[stelle] = clip;
         paint();

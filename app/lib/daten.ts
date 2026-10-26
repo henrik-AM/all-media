@@ -1166,6 +1166,7 @@ interface RohBeitrag {
   shares: number;
   liked: boolean;
   likedBy: string;
+  disliked?: boolean;
   saved: boolean;
   reposted: boolean;
   notify: boolean;
@@ -1200,6 +1201,9 @@ export async function ladeBeitraege(
 
   const zeilen = (data ?? []) as any[];
   const ids = zeilen.map((b) => b.id);
+
+  const { data: negativ } = ids.length ? await client.from('post_dislikes').select('post_id').eq('user_id', ichId).in('post_id', ids) : { data: [] };
+  const abgelehnt = new Set((negativ || []).map((z: any) => z.post_id));
 
   const leer = { data: [] as any[] };
   const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: hinweise }, lenkung] =
@@ -1277,6 +1281,7 @@ export async function ladeBeitraege(
     // auf der Website hochging (web/server/supabase-api.js zaehlt beides).
     shares: Number(b.shares_basis ?? 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
+    disliked: abgelehnt.has(b.id),
     likedBy: likerNamen.get(b.id) ?? '',
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),
@@ -1346,6 +1351,7 @@ export async function ladeBeitraege(
         likes: b.likes,
         comments: b.comments,
         liked: b.liked,
+        disliked: b.disliked,
         saved: b.saved,
         following: false, // kommt aus `gefolgt`, nicht vom Beitrag
         notify: b.notify,
@@ -1368,6 +1374,7 @@ export async function ladeBeitraege(
         comments: b.comments,
         shares: b.shares,
         liked: b.liked,
+        disliked: b.disliked,
         saved: b.saved,
         reposted: b.reposted,
         notify: b.notify,
@@ -1397,6 +1404,7 @@ export async function ladeBeitraege(
         likedBy: b.likedBy,
         comments: b.comments,
         liked: b.liked,
+        disliked: b.disliked,
         saved: b.saved,
         reposted: b.reposted,
         mediaUri: b.mediaUri,
