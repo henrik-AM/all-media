@@ -1,0 +1,4 @@
+OK 1 Ungültige Pfade beeinträchtigen keine gültige Signatur, Instants bleiben zu
+OK 2 Form- und Paketgrenzen bleiben wirksam
+OK 3 App sammelt ausschließlich erlaubte allgemeine Medienpfade
+3/3 Prüfungen bestanden
