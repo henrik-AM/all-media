@@ -33,6 +33,7 @@ const {
 } = require('../../gemeinsam/spalten');
 // Kasten 1.3 (Nachtrag 10.10.2026): Pronomen und Links — gemeinsam mit der App.
 const Profilfelder = require('../../gemeinsam/profilfelder');
+const Beitragschema = require('../../gemeinsam/beitragschema');
 
 /*
  * Die Reihenfolge des Feeds — ebenfalls einmal fuer Website und App. Die
@@ -1040,9 +1041,10 @@ function spalteFehlt(fehler) {
 async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurIds = null } = {}) {
   if (!client) return null;
 
-  let abfrage = client
+  const {data,error}=await Beitragschema.lesen((mitMedien)=>{
+    let abfrage = client
     .from('posts')
-    .select(BEITRAG_SPALTEN)
+    .select(Beitragschema.spalten(BEITRAG_SPALTEN,mitMedien))
     // Geplante Beiträge ("später posten") bleiben draußen, bis ihr Zeitpunkt
     // erreicht ist. Gleiche Regel wie in app/lib/daten.ts.
     .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
@@ -1054,7 +1056,8 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
   }
   if (arten && arten.length > 0) abfrage = abfrage.in('kind', arten);
 
-  const { data, error } = await abfrage;
+    return abfrage;
+  });
   if (error) throw error;
 
   const beitraege = data || [];

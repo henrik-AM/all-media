@@ -31,6 +31,7 @@ const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('.
 const Kontaktbild = require('../../gemeinsam/kontaktbild') as typeof import('../../gemeinsam/kontaktbild');
 // Kästen 28/9 und 15: Beitrittsanfragen, Mitgliederliste, Suche (Schema 97).
 const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gemeinsam/beitritt');
+const Beitragschema = require('../../gemeinsam/beitragschema') as typeof import('../../gemeinsam/beitragschema');
 // Kasten 28/15.4: Befreunden — Zustände und Sätze gleich mit der Website.
 const Freundschaft = require('../../gemeinsam/freundschaft') as typeof import('../../gemeinsam/freundschaft');
 import type { FreundZustand } from '../../gemeinsam/freundschaft';
@@ -797,9 +798,7 @@ export async function beitragAnlegen(
     const fehler = require('../../gemeinsam/reel').pruefen(felder.sekunden);
     if (fehler) throw new Error(fehler);
   }
-  const { data, error } = await client
-    .from('posts')
-    .insert({
+  const { data, error } = await Beitragschema.schreiben(client,{
       user_id: ichId,
       kind: felder.art || 'post',
       title: felder.titel || '',
@@ -808,15 +807,13 @@ export async function beitragAnlegen(
       music: felder.musik || '',
       // Schema 67: welche Stelle des Sounds (sound_id setzt die Datenbank aus music).
       sound_ab: felder.soundAb || 0,
-      media_url: felder.mediaUrl || null,
+      media_url: felder.mediaUrl || felder.medien?.[0]?.url || null,
       ...(felder.medien?.length?{medien:felder.medien.map(({url,typ})=>({url,typ}))}:{}),
       thumbnail_url: felder.thumbnail || null,
       duration: felder.sekunden ? require('../../gemeinsam/reel').zeit(felder.sekunden) : felder.dauer || null,
       publish_at: felder.geplantAb || null,
       format: felder.format || 'standard',
-    })
-    .select('id')
-    .single();
+    },'id');
   if (error) throw error;
   return data.id as string;
 }
@@ -4025,13 +4022,15 @@ export async function beitraegeVon(
   client: SupabaseClient,
   profilId: string
 ): Promise<Rasterkachel[]> {
-  const { data, error } = await client
+  const { data, error } = await Beitragschema.lesen((mitMedien:boolean)=>{
+    return client
     .from('posts')
-    .select('id, kind, media_url, thumbnail_url, medien, created_at')
+    .select(Beitragschema.spalten('id, kind, media_url, thumbnail_url, created_at',mitMedien))
     .eq('user_id', profilId)
     .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
     .order('created_at', { ascending: false })
     .limit(200);
+  });
   if (error) throw error;
   // Fund 4: Kachelbilder brauchen unterschriebene Adressen (lib/medien.ts).
   return signiereMedien(client, ((data ?? []) as any[]).map(kachel));

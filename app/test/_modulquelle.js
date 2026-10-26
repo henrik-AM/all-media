@@ -78,6 +78,7 @@ function gemeinsameSpalten() {
  * neuen gemeinsamen Baustein einfuehrt, muss ihn in diese Liste eintragen.
  */
 const UMD_BAUSTEINE = [
+  ['beitragschema', 'Beitragschema'],
   ['telefon', 'Telefon'],
   ['passwort', 'Passwort'],
   // 21.09.2026: `kommentar.js` kam fuer „Meine Kommentare" dazu — und genau

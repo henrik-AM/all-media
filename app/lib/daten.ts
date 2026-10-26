@@ -17,6 +17,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien } from './medien';
+const Beitragschema = require('../../gemeinsam/beitragschema') as typeof import('../../gemeinsam/beitragschema');
 import { SUPABASE_CONFIG } from '../constants/supabase';
 import {
   Chat,
@@ -1188,9 +1189,10 @@ export async function ladeBeitraege(
   ichId: string,
   nurId?:string
 ): Promise<{ posts: Post[]; videos: Video[]; clips: Clip[] }> {
-  let abfrage = client
+  const {data,error}=await Beitragschema.lesen((mitMedien:boolean)=>{
+    let abfrage = client
     .from('posts')
-    .select(BEITRAG_SPALTEN)
+    .select(Beitragschema.spalten(BEITRAG_SPALTEN,mitMedien))
     /*
      * "Spaeter posten": ein Beitrag mit einem Zeitpunkt in der Zukunft ist
      * angelegt, aber noch nicht sichtbar. Ohne diesen Filter erschiene er
@@ -1200,7 +1202,8 @@ export async function ladeBeitraege(
     .order('created_at', { ascending: false })
     .limit(nurId?1:300);
   if(nurId)abfrage=abfrage.eq('id',nurId);
-  const {data,error}=await abfrage;
+    return abfrage;
+  });
   if (error) throw error;
 
   const zeilen = (data ?? []) as any[];

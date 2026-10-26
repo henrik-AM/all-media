@@ -19,6 +19,7 @@ const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
 const Profilfelder = require('../../gemeinsam/profilfelder');
 // Kästen 28/9 und 15: Beitrittsanfragen, Mitgliederliste, Suche (Schema 97).
 const Beitritt = require('../../gemeinsam/beitritt');
+const Beitragschema = require('../../gemeinsam/beitragschema');
 // Kasten 28/15.4: Befreunden unter Communitys (Schema 98).
 const Freundschaft = require('../../gemeinsam/freundschaft');
 // Kästen 28/10.2 und 16: Community und Unterthema erstellen, Einladung (Schema 99).
@@ -1431,9 +1432,7 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
     const fehler = require('../../gemeinsam/reel').pruefen(felder.sekunden);
     if (fehler) throw new Error(fehler);
   }
-  const { data, error } = await client
-    .from('posts')
-    .insert({
+  const { data, error } = await Beitragschema.schreiben(client,{
       user_id: nutzerId,
       kind: felder.art || 'post',
       title: felder.titel || '',
@@ -1442,7 +1441,7 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       music: felder.musik || '',
       // Schema 67: welche Stelle des Sounds (sound_id setzt die Datenbank aus music).
       sound_ab: felder.soundAb || 0,
-      media_url: felder.mediaUrl || null,
+      media_url: felder.mediaUrl || felder.medien?.[0]?.url || null,
       ...(felder.medien?.length?{medien:felder.medien.map(({url,typ})=>({url,typ}))}:{}),
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,
@@ -1451,9 +1450,7 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       publish_at: felder.geplantAb || null,
       // 'live' nur fuer den laufenden Stream, siehe /api/stream/start.
       format: felder.format || 'standard',
-    })
-    .select()
-    .single();
+    });
   if (error) throw error;
 
   /*
