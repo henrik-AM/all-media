@@ -60,7 +60,7 @@ export function EngeFreundeSheet({ visible, onClose }: {
   </ScrollView>
  </SheetRahmen>;
 }
-export function InstantsBereich({ sprung = 0 }: { sprung?: number }) {
+export function InstantsBereich({ sprung = 0, onSprungFertig }: { sprung?: number; onSprungFertig?: (sprung: number) => void }) {
     const { supabase } = useSupabase();
     const { ichId } = useDaten();
     const [offen, setOffen] = useState(false), [freunde, setFreunde] = useState(false), [kamera, setKamera] = useState(false);
@@ -100,7 +100,15 @@ export function InstantsBereich({ sprung = 0 }: { sprung?: number }) {
     useEffect(() => { void standLaden(); const t = setInterval(() => { if (AppState.currentState === 'active')
         void standLaden(); }, 30000); const a = AppState.addEventListener('change', s => { if (s === 'active')
         void standLaden(); }); return () => { clearInterval(t); a.remove(); }; }, [supabase, ichId]);
-    useEffect(() => { if (sprung) { setOffen(true); void laden(); } }, [sprung]);
+    const sprungVerarbeitet = useRef(0);
+    useEffect(() => {
+        if (!sprung) { sprungVerarbeitet.current = 0; return; }
+        if (sprungVerarbeitet.current === sprung) return;
+        sprungVerarbeitet.current = sprung;
+        setOffen(true);
+        onSprungFertig?.(sprung);
+        void laden();
+    }, [sprung, onSprungFertig]);
     const nachladen = async (art: 'postfach' | 'eigene') => {
         if (!supabase || busy) return;
         setBusy(true);

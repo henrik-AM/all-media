@@ -256,6 +256,7 @@ const LAEUFE = [
   ['af3-negativ', 'af3-negativ.js'],
   ['af5-reels', 'af5-reels.js'],
   ['bunny', '_bunny_einheit.js'],
+  ['af-fix-b3', 'af-fix-b3.js'],
   ['af-fix-b1', 'af-fix-b1.js'],
   ['bunny-upload', 'bunny-upload.js'],
   ['af4-karussell', 'af4-karussell.js'],

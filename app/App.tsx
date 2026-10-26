@@ -206,6 +206,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt — genau wie im
   // Prototyp, wo die obere Leiste zum Bereich gehoert.
   const [instantSprung, setInstantSprung] = useState(0);
+  useEffect(() => setInstantSprung(0), [user?.id]);
   const [area, setArea] = useState<AreaKey>(rueckkehr?.area ?? 'messenger');
   const [subs, setSubs] = useState<Record<AreaKey, SubKey>>(() =>
     rueckkehr ? { ...defaultSub, [rueckkehr.area]: rueckkehr.sub } : defaultSub
@@ -2497,6 +2498,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       return (
         <ChatListScreen
           instantSprung={instantSprung}
+          onInstantSprungFertig={sprung => setInstantSprung(v => v === sprung ? 0 : v)}
           allChats={chats}
           stories={stories}
           onOpenChat={(chat) => oeffneChat(chat)}
