@@ -22,11 +22,11 @@ let n=0;async function test(name,f){await f();console.log(`OK ${++n} ${name}`);}
   const client={storage:{from:t=>({upload:async(p,b)=>{uploads++;assert.equal(t,'media');assert.deepEqual(b,kurz);return {data:{id:'objekt'}};},getPublicUrl:p=>({data:{publicUrl:'https://lokal/'+p}}),createSignedUrl:async()=>({data:{signedUrl:'lokal'}}),remove:async()=>{entfernt++;return {error:null};}})}};
   try{
    await test('Zulässige Bytes → Upload → gebundener SHA256-Beleg',async()=>{const r=await M.hochladenVideo(client,'konto','posts','video/mp4',kurz);assert.equal(r.sekunden,1200);assert.equal(uploads,1);assert.equal(belege.length,1);assert.equal(belege[0].objekt_id,'objekt');assert.match(belege[0].sha256,/^[a-f0-9]{64}$/);assert.equal(belege[0].bytes,kurz.length);});
-   await test('Überlanges Video erreicht Speicher nicht',async()=>{await assert.rejects(M.hochladenVideo(client,'konto','posts','video/mp4',lang),/20 Minuten/);assert.equal(uploads,1);});
-   await test('Datenadresse durchläuft dieselbe Byteprüfung',async()=>{await assert.rejects(M.hochladen(client,'konto','posts','data:video/mp4;base64,'+lang.toString('base64')),/20 Minuten/);assert.equal(uploads,1);});
-   await test('Fehlender DB-Beleg: Datei entfernt, kein Upload-Erfolg',async()=>{belegFehler=true;await assert.rejects(M.hochladenVideo(client,'konto','posts','video/mp4',kurz),/bestätigt/);assert.equal(entfernt,1);});
+   await test('Überlanges Video erreicht Speicher nicht',async()=>{const r=await M.hochladenVideo(client,'konto','posts','video/mp4',lang);assert.equal(r.ok,false);assert.match(r.error,/20 Minuten/);assert.equal(uploads,1);});
+   await test('Datenadresse durchläuft dieselbe Byteprüfung',async()=>{const r=await M.hochladen(client,'konto','posts','data:video/mp4;base64,'+lang.toString('base64'));assert.equal(r.ok,false);assert.match(r.error,/20 Minuten/);assert.equal(uploads,1);});
+   await test('Fehlender DB-Beleg: Datei entfernt, kein Upload-Erfolg',async()=>{belegFehler=true;const r=await M.hochladenVideo(client,'konto','posts','video/mp4',kurz);assert.equal(r.ok,false);assert.match(r.error,/bestätigt/);assert.equal(entfernt,1);});
   }finally{V.dienstclient=alt;}
-  await test('Ohne Dienstschlüssel vor Upload geschlossen',async()=>{const key=process.env.SUPABASE_SERVICE_ROLE_KEY;delete process.env.SUPABASE_SERVICE_ROLE_KEY;try{await assert.rejects(M.hochladenVideo(client,'konto','posts','video/mp4',kurz),/nicht verfügbar/);assert.equal(uploads,2);}finally{if(key)process.env.SUPABASE_SERVICE_ROLE_KEY=key;}});
+  await test('Ohne Dienstschlüssel vor Upload geschlossen',async()=>{const key=process.env.SUPABASE_SERVICE_ROLE_KEY;delete process.env.SUPABASE_SERVICE_ROLE_KEY;try{const r=await M.hochladenVideo(client,'konto','posts','video/mp4',kurz);assert.equal(r.ok,false);assert.match(r.error,/nicht verfügbar/);assert.equal(uploads,2);}finally{if(key)process.env.SUPABASE_SERVICE_ROLE_KEY=key;}});
  }finally{await fs.rm(temp,{recursive:true,force:true});}
  console.log(`${n}/${n} Prüfungen bestanden`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

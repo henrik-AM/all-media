@@ -303,8 +303,13 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
   // Vor dem Ablegen aus den empfangenen Bytes bestimmen; Clientwerte ignorieren.
   if (ordner === 'posts' && typ.startsWith('video/')) {
     const pruefung = require('./videopruefung');
-    dienst = pruefung.dienstclient();
-    sekunden = await pruefung.pruefen(inhalt);
+    try {
+      dienst = pruefung.dienstclient();
+      sekunden = await pruefung.pruefen(inhalt);
+    } catch (e) {
+      if (e instanceof pruefung.VideoFehler) return { ok: false, error: e.message };
+      throw e;
+    }
   }
   const { data: upload, error } = await client.storage.from('media').upload(pfad, inhalt, {
     cacheControl: ordner === 'instants' ? '0' : '3600',
@@ -328,7 +333,7 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
       if (belegFehler) throw belegFehler;
     } catch (e) {
       await client.storage.from('media').remove([pfad]);
-      throw new Error('Das Video konnte nicht bestätigt werden. Bitte erneut versuchen.');
+      return { ok: false, error: 'Das Video konnte nicht bestätigt werden. Bitte erneut versuchen.' };
     }
   }
   const { data } = client.storage.from('media').getPublicUrl(pfad);
