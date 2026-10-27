@@ -19115,6 +19115,13 @@ function openLivestream() {
           if (!res.ok) return;
           fehlschlaege = 0;
           const daten = await res.json();
+          // Spendensumme wie in der App (LivestreamScreen): erst ab 1 Cent,
+          // Text aus gemeinsam/spende.js. null = nicht lesbar → letzter Stand bleibt.
+          const spendenFeld = overlay.querySelector('#liveSpenden');
+          if (spendenFeld && typeof daten.spendenCent === 'number') {
+            spendenFeld.hidden = !(daten.spendenCent > 0);
+            spendenFeld.textContent = daten.spendenCent > 0 ? Spende.liveText(daten.spendenCent) : '';
+          }
           const zeilen = daten.kommentare || [];
           spaltenListe = zeilen;
           // Nicht mitten in einem Ziehen neu zeichnen.

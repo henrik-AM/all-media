@@ -4057,10 +4057,20 @@ app.post('/api/stream/:postId/ende', route(async (req) =>
   )
 ));
 
-app.get('/api/stream/:postId/kommentare', route(async (req) => ({
-  ok: true,
-  kommentare: await supabaseApi.ladeStreamKommentare(req.db, req.params.postId),
-})));
+/*
+ * Mit den Kommentaren kommt die Spendensumme des Streams in Cent — wie
+ * ladeSpendenSumme im LivestreamScreen der App. `donations` sieht nur, wer
+ * Sender oder Empfänger ist (Schema 11): der Host also alle Spenden seines
+ * Streams. Ist sie nicht lesbar, kommen die Kommentare trotzdem (Summe null).
+ */
+app.get('/api/stream/:postId/kommentare', route(async (req) => {
+  const [kommentare, spendenCent] = await Promise.all([
+    supabaseApi.ladeStreamKommentare(req.db, req.params.postId),
+    req.db.from('donations').select('betrag_cent').eq('post_id', req.params.postId)
+      .then(({ data, error }) => (error ? null : (data || []).reduce((s, z) => s + Number(z.betrag_cent || 0), 0)), () => null),
+  ]);
+  return { ok: true, kommentare, spendenCent };
+}));
 
 app.post('/api/stream/:postId/kommentare', route(async (req) =>
   antwort(
