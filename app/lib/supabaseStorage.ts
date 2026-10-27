@@ -21,9 +21,8 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { signiereEine } from './medien';
+import { signiereEine, medienServerBasis, medienAnfrage } from './medien';
 
-const EIMER = 'media';
 
 /*
  * Die Ablagen im Eimer `media`. `insights` und `ptt` kamen am 01.09.2026
@@ -56,7 +55,9 @@ export interface UploadErgebnis {
 function typVon(dateiname: string): string {
   const endung = dateiname.split('.').pop()?.toLowerCase() ?? '';
   if (endung === 'png') return 'image/png';
-  if (endung === 'mp4' || endung === 'mov') return 'video/mp4';
+  if (endung === 'mp4') return 'video/mp4';
+  if (endung === 'mov') return 'video/quicktime';
+  if (endung === 'm4a') return 'audio/mp4';
   if (endung === 'webm') return 'video/webm';
   if (endung === 'webp') return 'image/webp';
   return 'image/jpeg';
@@ -91,43 +92,17 @@ export async function ladeHoch(
     const inhalt = await antwort.arrayBuffer();
     if (grenze && inhalt.byteLength > grenze.bytes) throw new Error(grenze.zuGross(inhalt.byteLength));
 
-    /*
-     * Fund 4, Nachtrag: die Dateinamen der Aufrufer sind
-     * `<kennung>-<zeitstempel>.jpg` — wer die Kennung kennt, muss nur noch
-     * die Millisekunde raten. Solange der Eimer oeffentlich war, war das der
-     * Unterschied zwischen "schwer" und "unmoeglich"; jetzt braucht es dafuer
-     * zusaetzlich eine gueltige Anmeldung. Ein Zufallsteil macht den Pfad
-     * trotzdem unratbar, und er kostet nichts.
-     */
-    const zufall = Math.random().toString(36).slice(2, 10);
-    const punkt = dateiname.lastIndexOf('.');
-    const gestreut =
-      punkt === -1
-        ? `${dateiname}-${zufall}`
-        : `${dateiname.slice(0, punkt)}-${zufall}${dateiname.slice(punkt)}`;
-
-    const pfad = `${ordner}/${gestreut}`;
-    const { error } = await client.storage.from(EIMER).upload(pfad, inhalt, {
-      cacheControl: '3600',
-      contentType: typVon(dateiname),
-      upsert: false,
+    const {data}=await client.auth.getSession();
+    const token=data.session?.access_token;
+    if(!token)throw new Error('Bitte erneut anmelden.');
+    const r=await fetch(medienServerBasis()+`/api/hochladen/datei?ordner=${ordner}`,{
+      method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':typVon(dateiname)},
+      body:inhalt,redirect:'error',signal:AbortSignal.timeout(120000),
     });
-    if (error) throw error;
-
-    /*
-     * Zwei Adressen, und die Unterscheidung ist der Kern von Fund 4:
-     *
-     *   url      die bestaendige Form. Sie wandert in die Datenbank. Abrufbar
-     *            ist sie nicht mehr — der Eimer ist geschlossen —, aber sie
-     *            ueberlebt jeden Ablauf und laesst sich jederzeit neu
-     *            unterschreiben.
-     *   anzeige  die unterschriebene. Vier Stunden gueltig, gut fuer das Bild,
-     *            das sofort erscheinen soll. In die Datenbank gehoert sie
-     *            nicht.
-     */
-    const { data } = client.storage.from(EIMER).getPublicUrl(pfad);
-    const anzeige = await signiereEine(client, pfad);
-    return { success: true, error: null, url: data.publicUrl, anzeige };
+    const wert=await r.json();
+    if((await client.auth.getSession()).data.session?.access_token!==token)throw new Error('Das Konto wurde gewechselt.');
+    if(!r.ok||!wert.ok)throw new Error(wert.error||'Upload fehlgeschlagen');
+    return {success:true,error:null,url:wert.url,anzeige:wert.anzeige};
   } catch (fehler: any) {
     // Sichtbar machen, nicht verschlucken: genau das Verschweigen hat
     // verborgen, dass nie etwas ankam.
@@ -140,8 +115,7 @@ export async function ladeHoch(
 export async function loesche(client: SupabaseClient | null, pfad: string) {
   if (!client) return { success: false, error: 'Nicht angemeldet' };
   try {
-    const { error } = await client.storage.from(EIMER).remove([pfad]);
-    if (error) throw error;
+    await medienAnfrage(client, '/api/medien/loeschen', {pfad});
     return { success: true, error: null };
   } catch (fehler: any) {
     console.error('Löschen fehlgeschlagen:', fehler?.message ?? fehler);

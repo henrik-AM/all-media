@@ -61,6 +61,8 @@ const QrKontakt = require('../../gemeinsam/qr');
 const QRCode = require('qrcode');
 
 const app = express();
+const bunnyKonfig = require('./bunny').konfigurationAus();
+const bunnyQuellen = require('./medien').mitBunny() && bunnyKonfig.ok ? [bunnyKonfig.auslieferung] : [];
 
 /*
  * Sicherheitspruefung 04.09.2026 (Fund 10).
@@ -115,10 +117,10 @@ app.use(
         // Satellit (ArcGIS) und Gelaende (OpenTopoMap). OpenTopoMap fehlte
         // hier bis zum 09.09.2026 — die Ansicht liess sich waehlen, blieb
         // aber leer, weil jede Kachel an der Richtlinie scheiterte.
-        imgSrc: ["'self'", 'data:', 'blob:', supabaseUrl,
+        imgSrc: ["'self'", 'data:', 'blob:', supabaseUrl, ...bunnyQuellen,
           'https://*.tile.openstreetmap.org', 'https://server.arcgisonline.com',
           'https://*.tile.opentopomap.org'],
-        mediaSrc: ["'self'", 'data:', 'blob:', supabaseUrl],
+        mediaSrc: ["'self'", 'data:', 'blob:', supabaseUrl, ...bunnyQuellen],
         /*
          * `api.pwnedpasswords.com` kam am 13.09.2026 dazu: dort fragt
          * `gemeinsam/passwort.js` nach, ob ein gewähltes Passwort in einem
@@ -238,6 +240,7 @@ app.use('/api', async (req, _res, next) => {
     const { data, error } = await client.auth.getUser();
     if (!error && data?.user) {
       req.db = client;
+      client.nutzerId = data.user.id;
       req.nutzerId = data.user.id;
       // Der Geraetschluessel dieses Browsers (public/anmeldung.js), fuer die
       // Kuverts in supabase-api.js. Nur eine UUID wird durchgelassen.
@@ -479,6 +482,20 @@ app.post(
     hochladenVideo(req.db, req.nutzerId, String(req.query?.ordner || ''), req.headers['content-type'], req.body)
   )
 );
+
+// App und Website verwenden dieselbe authentifizierte Medienstelle.
+app.get('/api/medien/konfiguration', route(async () => ({ok:true,anbieter:require('./medien').mitBunny()?'bunny':'supabase'})));
+app.post('/api/hochladen/datei',
+  (req,res,next)=>req.db && req.nutzerId ? next() : res.status(401).json({ok:false,error:'Bitte anmelden'}),
+  express.raw({type:['image/*','video/*','audio/mp4'],limit:StoryRegeln.VIDEO_BYTES_HOECHSTENS}),
+  route(async (req,res)=>{
+    const steuerung=new AbortController();
+    const stop=()=>{if(!res.writableEnded)steuerung.abort();};res.on('close',stop);
+    try{return await require('./medien').hochladenDatei(req.db,req.nutzerId,String(req.query.ordner||''),req.headers['content-type'],req.body,{signal:steuerung.signal});}
+    finally{res.off('close',stop);}
+  }));
+app.post('/api/medien/unterschreiben',route(async req=>require('./medien').unterschreiben(req.db,req.body?.pfade)));
+app.post('/api/medien/loeschen',route(async req=>require('./medien').loeschen(req.db,req.nutzerId,req.body?.pfad)));
 
 app.post('/api/reset', route(async (req) => {
   const { data, error } = await req.db.rpc('zuruecksetzen', { ziel: req.nutzerId });
@@ -3566,7 +3583,7 @@ app.post('/api/impressionen', route(async (req) =>
 // eslint-disable-next-line no-unused-vars
 app.use((fehler, req, res, next) => {
   if (fehler && (fehler.type === 'entity.too.large' || fehler.status === 413)) {
-    const video = req.path === '/api/hochladen/video';
+    const video = ['/api/hochladen/video','/api/hochladen/datei'].includes(req.path);
     return res.status(413).json({
       ok: false,
       error: video

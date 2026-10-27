@@ -34,6 +34,10 @@
  */
 
 // Videotypen und -grenzen (Kasten 15) — dieselbe Datei wie in App und Browser.
+const Bunny = require('./bunny');
+// Bereits eine teilweise gesetzte Konfiguration darf nicht still auf Supabase ausweichen.
+const mitBunny = () => ['BUNNY_STORAGE_ZONE','BUNNY_STORAGE_KEY','BUNNY_STORAGE_HOST','BUNNY_PULL_HOST','BUNNY_TOKEN_KEY'].some(k => Boolean(process.env[k]));
+
 const StoryRegeln = require('../../gemeinsam/story');
 
 const OEFFENTLICH = '/storage/v1/object/public/media/';
@@ -83,6 +87,7 @@ function pfadAus(adresse) {
  */
 async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
   if (!client || daten == null) return daten;
+  if (mitBunny()) return signiereMitBunny(client, daten, sekunden);
 
   const pfade = new Set();
   sammle(daten, pfade);
@@ -221,6 +226,7 @@ async function hochladenVideo(client, nutzerId, ordner, mime, inhalt) {
 
 /** Der gemeinsame Teil: Datei in den Eimer, zwei Adressen zurück. */
 async function ablegen(client, nutzerId, ordner, typ, inhalt) {
+  if (mitBunny()) return bunnyAblegen(client, nutzerId, ordner, typ, inhalt);
   if (!inhalt.length) return { ok: false, error: 'Die Aufnahme ist leer' };
 
   /*
@@ -264,4 +270,96 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
   return { ok: true, url: data.publicUrl, anzeige, pfad };
 }
 
-module.exports = { signiereMedien, istMedienAdresse, pfadAus, hochladen, hochladenVideo };
+async function hochladenDatei(client, nutzerId, ordner, mime, inhalt, optionen) {
+  if (!client || !nutzerId) return {ok:false,error:'Nicht angemeldet'};
+  if (!ORDNER.includes(ordner) || !Buffer.isBuffer(inhalt)) return {ok:false,error:'Unbekannte Aufnahme'};
+  const typ=String(mime || '').split(';')[0].toLowerCase();
+  if (typ.startsWith('video/')) return hochladenVideo(client,nutzerId,ordner,typ,inhalt,optionen);
+  if (!['image/jpeg','image/png','image/webp','audio/mp4'].includes(typ)) return {ok:false,error:'Dieses Dateiformat wird nicht unterstützt.'};
+  if (inhalt.length>10*1024*1024 && typ.startsWith('image/')) return {ok:false,error:'Das Bild darf höchstens 10 MB groß sein.'};
+  return ablegen(client,nutzerId,ordner,typ,inhalt,optionen);
+}
+async function signiereMitBunny(client,daten,sekunden) {
+  const pfade=new Set();sammle(daten,pfade);const karte=new Map();
+  const liste=[...pfade].filter(p=>!p.startsWith('instants/'));
+  for(let i=0;i<liste.length;i+=500) {
+    const {data,error}=await client.rpc('medien_leseliste',{p_pfade:liste.slice(i,i+500)});
+    if(error) {
+      if (error.code === 'PGRST202') {
+        const {data:alt,error:e}=await client.storage.from('media').createSignedUrls(liste.slice(i,i+500),sekunden);
+        if(!e)for(const z of alt || [])if(z.signedUrl&&!z.error)karte.set(z.path,z.signedUrl);
+      }
+      continue;
+    }
+    const alt=[];
+    for(const z of data || []) {
+      if(!pfade.has(z.pfad))continue;
+      if(z.anbieter==='bunny') {const url=Bunny.signierteAdresse(z.pfad,sekunden);if(url)karte.set(z.pfad,url);}
+      else if(z.anbieter==='supabase') {
+        // Rechte wurden gerade erneut geprüft; nur die Signatur wiederverwenden.
+        alt.push(z.pfad);
+      }
+    }
+    if(alt.length) {
+      const {data:signiert,error:e}=await client.storage.from('media').createSignedUrls(alt,sekunden);
+      if(!e)for(const z of signiert || [])if(z.signedUrl&&!z.error) {
+        karte.set(z.path,z.signedUrl);
+        zwischenspeicher.set(z.path,{url:z.signedUrl,ablauf:Date.now()+sekunden*1000});
+      }
+    }
+  }
+  return ersetze(daten,karte);
+}
+async function unterschreiben(client,pfade) {
+  if(!Array.isArray(pfade)||pfade.length>500)return {ok:false,error:'Ungültige Medienliste'};
+  const gueltig=p=>!!Bunny.pfadPruefen(p,Bunny.ORDNER_LESEN)&&!p.startsWith('instants/');
+  const basis=require('./supabase').supabaseUrl + OEFFENTLICH;
+  const liste=pfade.filter(gueltig);
+  const daten=await signiereMedien(client,liste.map(p=>basis+p));
+  const signiert=new Map(liste.map((p,i)=>[p,daten[i]!==basis+p?daten[i]:null]));
+  return {ok:true,dateien:pfade.map(p=>{
+    const pfad=typeof p==='string'?p:null;
+    const url=gueltig(p)?signiert.get(p):null;
+    const eintrag=zwischenspeicher.get(pfad);
+    const tokenAblauf=url?Number(new URL(url).searchParams.get('expires'))*1000:0;
+    return {pfad,url,ablauf:url?(eintrag?.url===url?eintrag.ablauf:tokenAblauf||Date.now()+4*60*60*1000):null};
+  })};
+}
+
+/** Bunny braucht einen dauerhaften Eigentumsbeleg. Ohne Schema 113 geschlossen bleiben. */
+async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt) {
+  const {data:frei,error}=await client.rpc('medium_upload_erlaubt');
+  if(error?.code==='PGRST202')return {ok:false,error:'Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).'};
+  if(error || frei!==true)return {ok:false,error:'Dieses Konto darf derzeit keine Medien hochladen.'};
+  if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return {ok:false,error:'Der Medienspeicher ist derzeit nicht vollständig eingerichtet.'};
+  const {createClient}=require('@supabase/supabase-js');
+  const {supabaseUrl}=require('./supabase');
+  const dienst=createClient(supabaseUrl,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+  // Auch den Metadatenvertrag vor dem ersten Datei-Byte prüfen.
+  const {error:bereit}=await dienst.from('medien_objekte').select('pfad').limit(0);
+  if(bereit)return {ok:false,error:'Die Medienablage ist noch nicht vorbereitet (Schema 113).'};
+  const hoch=await Bunny.ablegen(nutzerId,ordner,typ,inhalt);
+  if(!hoch.ok)return hoch;
+  const {error:beleg}=await dienst.from('medien_objekte').insert({pfad:hoch.pfad,owner_id:nutzerId,typ,bytes:inhalt.length,sha256:require('crypto').createHash('sha256').update(inhalt).digest('hex')});
+  if(beleg){await Bunny.loeschen(hoch.pfad);return {ok:false,error:'Die Aufnahme konnte nicht bestätigt werden.'};}
+  return hoch;
+}
+async function loeschen(client,nutzerId,pfad) {
+  if(!Bunny.pfadPruefen(pfad,Bunny.ORDNER_LESEN))return {ok:false,error:'Ungültige Datei'};
+  if(mitBunny()) {
+    const {data:anbieter,error}=await client.rpc('medium_loeschrecht',{p_pfad:pfad});
+    if(error || !anbieter)return {ok:false,error:'Diese Datei darfst du nicht löschen oder die Datenbankfreigabe fehlt.'};
+    if(anbieter==='bunny') {
+      if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return {ok:false,error:'Der Medienspeicher ist derzeit nicht vollständig eingerichtet.'};
+      const {createClient}=require('@supabase/supabase-js');
+      const dienst=createClient(require('./supabase').supabaseUrl,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+      const weg=await Bunny.loeschen(pfad);if(!weg.ok&&!weg.fehlt)return weg;
+      const {error:e}=await dienst.from('medien_objekte').delete().eq('pfad',pfad).eq('owner_id',nutzerId);
+      return e?{ok:false,error:'Löschung muss erneut bestätigt werden.'}:{ok:true};
+    }
+    if(anbieter!=='supabase')return {ok:false,error:'Unbekannte Ablage'};
+  }
+  const {error}=await client.storage.from('media').remove([pfad]);
+  return error?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
+}
+module.exports = { mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, istMedienAdresse, pfadAus, hochladen, hochladenVideo };

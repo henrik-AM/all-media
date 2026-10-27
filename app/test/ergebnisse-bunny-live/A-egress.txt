@@ -1,0 +1,28 @@
+✔ Website: Reel-HTML hat keine aktive Quelle, Einzelplayer weiterhin schon (54.572958ms)
+✔ Website: acht Reels beim Aufbau ohne Quelle; nur sichtbares Reel lädt (37.8205ms)
+✔ Website: Wegwischen entfernt Quelle und stoppt Pufferung (33.027167ms)
+✔ Website: Datensparen lädt erst beim Tippen (22.614292ms)
+✔ Website: Hintergrund und Seitenwechsel entladen Player und räumen Beobachter auf (26.2025ms)
+✔ App: zurückgehaltenes Video erreicht weder Player noch Ersatzbild (22.210583ms)
+✔ App-Feed: Start, höchstens eine Quelle bei acht Reels (15.416958ms)
+✔ App-Feed: Wischen, höchstens eine Quelle bei acht Reels (12.250541ms)
+✔ App-Feed: Profilziel, höchstens eine Quelle bei acht Reels (14.8705ms)
+✔ App-Feed: Datensparen, höchstens eine Quelle bei acht Reels (8.214583ms)
+✔ App-Feed: Hintergrund, höchstens eine Quelle bei acht Reels (7.186ms)
+✔ Prüfbrowser: Storage-Downloads und Bildtransformationen in allen Buckets gesperrt (2.744625ms)
+✔ Prüfbrowser: Schutz wird nur einmal registriert (0.070458ms)
+✔ Prüfbrowser: _konto schützt neue Seiten und Kontexte, Service Worker bleiben aus (0.736667ms)
+✔ Prüfbrowser: gesperrtes Medium erzwingt Fehlercode trotz process.exit(0) (21.929708ms)
+✔ Server: Like-Vorher/Nachher lädt zweimal einen Beitrag statt zweimal 500 (11.348542ms)
+✔ Server: ungültige ID und leere ID-Liste lösen keine Datenbankabfrage aus (5.897167ms)
+✔ Server: unsichtbare Beiträge bleiben unsichtbar, Abfragefehler werden weitergereicht (6.216875ms)
+✔ Server: normaler Feed behält sein Limit und erhält keinen ID-Filter (1.683083ms)
+✔ Server: Listen laden nur ihre IDs, in Blöcken, ohne 500er-Abfrage (14.867042ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 424.972583
