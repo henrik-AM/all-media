@@ -315,7 +315,16 @@ async function unterschreiben(client,pfade) {
   const gueltig=p=>!!Bunny.pfadPruefen(p,Bunny.ORDNER_LESEN)&&!p.startsWith('instants/');
   const basis=require('./supabase').supabaseUrl + OEFFENTLICH;
   const liste=pfade.filter(gueltig);
-  const daten=await signiereMedien(client,liste.map(p=>basis+p));
+  // Frei angefragte Pfade nie aus dem bestehenden globalen Antwortcache bedienen.
+  // Supabase muss für diesen Nutzer jedes Mal selbst unter RLS entscheiden.
+  let daten;
+  if (mitBunny()) daten=await signiereMitBunny(client,liste.map(p=>basis+p),4*60*60);
+  else {
+    const {data,error}=await client.storage.from('media').createSignedUrls(liste,4*60*60);
+    if(error)return {ok:false,error:'Medien konnten nicht unterschrieben werden.'};
+    const karte=new Map((data||[]).filter(z=>z.signedUrl&&!z.error).map(z=>[z.path,z.signedUrl]));
+    daten=liste.map(p=>karte.get(p)||basis+p);
+  }
   const signiert=new Map(liste.map((p,i)=>[p,daten[i]!==basis+p?daten[i]:null]));
   return {ok:true,dateien:pfade.map(p=>{
     const pfad=typeof p==='string'?p:null;

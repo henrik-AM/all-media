@@ -1,0 +1,24 @@
+
+> app@1.0.0 test:alles
+> node test/alles.js
+
+
+======================================================================
+  smoke
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.reload: Target page, context or browser has been closed
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/bunny-live/app/test/_konto.js:100:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/bunny-live/app/test/smoke.js:73:11 {
+  log: []
+}
+
+Node.js v24.19.0
+
+======================================================================
+  feedback
+======================================================================

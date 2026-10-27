@@ -1,0 +1,40 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+Upload fehlgeschlagen: Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).
+Upload fehlgeschlagen: Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).
+{
+  "konto": "test@all-media.app",
+  "website": [
+    {
+      "typ": "image/jpeg",
+      "status": 200,
+      "ok": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+      "anbieter": null,
+      "bereinigt": null
+    },
+    {
+      "typ": "video/mp4",
+      "status": 200,
+      "ok": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+      "anbieter": null,
+      "bereinigt": null
+    }
+  ],
+  "app": [
+    {
+      "name": "probe.jpg",
+      "success": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+      "anbieter": null,
+      "bereinigt": null
+    },
+    {
+      "name": "probe.mp4",
+      "success": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+      "anbieter": null,
+      "bereinigt": null
+    }
+  ]
+}

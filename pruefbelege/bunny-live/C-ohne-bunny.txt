@@ -1,0 +1,48 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+{
+  "konto": "test@all-media.app",
+  "website": [
+    {
+      "typ": "image/jpeg",
+      "status": 200,
+      "ok": true,
+      "anbieter": "supabase",
+      "bereinigt": {
+        "ok": true,
+        "verschwunden": true
+      }
+    },
+    {
+      "typ": "video/mp4",
+      "status": 200,
+      "ok": true,
+      "anbieter": "supabase",
+      "bereinigt": {
+        "ok": true,
+        "verschwunden": true
+      }
+    }
+  ],
+  "app": [
+    {
+      "name": "probe.jpg",
+      "success": true,
+      "error": null,
+      "anbieter": "supabase",
+      "bereinigt": {
+        "ok": true,
+        "verschwunden": true
+      }
+    },
+    {
+      "name": "probe.mp4",
+      "success": true,
+      "error": null,
+      "anbieter": "supabase",
+      "bereinigt": {
+        "ok": true,
+        "verschwunden": true
+      }
+    }
+  ]
+}

@@ -298,7 +298,9 @@ function route(fn) {
     res.json = (koerper) => {
       if (schonGeantwortet) return res;
       schonGeantwortet = true;
-      signiereMedien(req.db, koerper)
+      // Der neue App-Weg liefert einen dauerhaften DB-Schlüssel getrennt von der Anzeige.
+      ((req.path === '/api/hochladen/datei' || (require('./medien').mitBunny() && req.path.startsWith('/api/hochladen')))
+        ? Promise.resolve(koerper) : signiereMedien(req.db, koerper))
         .then(jsonOriginal)
         .catch((fehler) => {
           console.error('Antwort konnte nicht unterschrieben werden:', fehler.message);

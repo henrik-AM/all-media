@@ -1,0 +1,18 @@
+✔ Ohne Bunny unveränderter Supabase-Upload und zwei Adressen (0.454916ms)
+✔ Signier-Endpunkt prüft Supabase-Rechte pro Konto auch nach Cachefüllung (19.836208ms)
+✔ Teilkonfiguration schaltet ein und fällt nicht still zurück (0.151583ms)
+✔ Fehlende Leseliste lässt nur Supabase selbst unter RLS signieren (0.338625ms)
+✔ Andere Rechtefehler erzeugen weder Bunny- noch Supabase-Signaturen (0.077875ms)
+✔ Verweigertes Uploadrecht erreicht Bunny nicht (0.093ms)
+✔ Bunny-Leserecht wird für jeden Aufruf neu geprüft (0.097917ms)
+✔ Löschrecht verweigert: kein Bunny-Aufruf (0.082084ms)
+✔ Nicht angemeldet und ungültige Medienliste werden abgewiesen (0.059291ms)
+✔ Präfix _probe bleibt ausschließlich im Adapter, kein Nutzer-Uploadordner (0.043833ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23.818458

@@ -1,0 +1,77 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+Upload fehlgeschlagen: Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).
+Upload fehlgeschlagen: Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).
+{
+  "vorBrowser": {
+    "konto": "test@all-media.app",
+    "website": [
+      {
+        "typ": "image/jpeg",
+        "status": 200,
+        "ok": false,
+        "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113)."
+      },
+      {
+        "typ": "video/mp4",
+        "status": 200,
+        "ok": false,
+        "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113)."
+      }
+    ],
+    "app": [
+      {
+        "name": "probe.jpg",
+        "success": false,
+        "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+        "url": null,
+        "anzeige": null
+      },
+      {
+        "name": "probe.mp4",
+        "success": false,
+        "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+        "url": null,
+        "anzeige": null
+      }
+    ]
+  }
+}
+{
+  "konto": "test@all-media.app",
+  "website": [
+    {
+      "typ": "image/jpeg",
+      "status": 200,
+      "ok": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113)."
+    },
+    {
+      "typ": "video/mp4",
+      "status": 200,
+      "ok": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113)."
+    }
+  ],
+  "app": [
+    {
+      "name": "probe.jpg",
+      "success": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+      "url": null,
+      "anzeige": null
+    },
+    {
+      "name": "probe.mp4",
+      "success": false,
+      "error": "Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).",
+      "url": null,
+      "anzeige": null
+    }
+  ],
+  "altmedien": {
+    "bilder": 5,
+    "hintergruende": 5,
+    "beitraege": 5
+  },
+  "bild": "pruefbelege/bunny-live/C-altmedien.png"
+}

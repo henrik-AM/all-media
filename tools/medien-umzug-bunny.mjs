@@ -470,7 +470,8 @@ function argumente(liste) {
   const a = { ausfuehren: false, pruefen: false };
   for (let i = 0; i < liste.length; i++) {
     const w = liste[i];
-    if (w === '--ausfuehren') a.ausfuehren = true;
+    if (w === '--trockenlauf') a.ausfuehren = false;
+    else if (w === '--ausfuehren') a.ausfuehren = true;
     else if (w === '--pruefen') a.pruefen = true;
     else if (w === '--umschalten') a.umschalten = true;
     else if (w === '--budget-mb') a.budgetMb = Number(liste[++i]);

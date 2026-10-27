@@ -48,3 +48,6 @@ Thumbs.db
 # Wissensgraph von Graphify (installiert 20.09.2026). Jederzeit mit
 # "graphify update ." neu zu bauen, darum kein Projektstand.
 /graphify-out/
+
+# Lokaler, auf Geheimnisse geprüfter Bunny-App-Export
+.bunny-live-bundle/
