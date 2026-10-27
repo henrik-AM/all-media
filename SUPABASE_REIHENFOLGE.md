@@ -216,3 +216,14 @@ Reihenfolge: nach Schema 54 (Spalten der Sounds).
   `sammlung_inhalt_pruefen()` (**Gewinner 80**, ersetzt 46): in eine Sammlung
   kommt nur, was dem Besitzer gehört. `starter_sammlungen()` legt nur Eigenes
   ab und bleibt davon unberührt.
+
+## Schema 115 — isolierter Bunny-Medienvertrag (27.10.2026)
+
+`SUPABASE_SCHEMA_115_bunny_medienvertrag.sql` führt ausschließlich neue Objekte ein:
+`medien_objekte`, `medium_upload_erlaubt`, `medien_leseliste`, `medium_loeschrecht`
+und die `bunny_*`-Rechte-/Referenzhelfer und Trigger. Keine Überschreibung einer
+älteren Funktion, keine Doppelungskette. Benötigt die live vorhandenen Helfer
+`medien_adresse`, `medien_adresse_gueltig`, `medium_sichtbar` sowie Kontofreigabe
+und Blockierprüfung. Die nicht auf diesem main-Stand enthaltenen Schemas 107–114
+werden nicht vorausgesetzt oder eingespielt. Schema 115 ist kein Ersatz für 113
+auf dem Sammelzweig; dessen spätere Integration muss die beiden Verträge abstimmen.
