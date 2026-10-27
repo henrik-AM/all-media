@@ -20,7 +20,7 @@ async function main(){
  await test('Teilkonfiguration schaltet ein und fällt nicht still zurück',async()=>{
   process.env.BUNNY_STORAGE_ZONE='probe';assert.equal(M.mitBunny(),true);let storage=false;
   const r=await M.hochladenDatei({rpc:async()=>({error:{code:'PGRST202'}}),storage:{from:()=>{storage=true;throw Error('verboten');}}},'nutzer','posts','image/jpeg',Buffer.from([255,216,255,1]));
-  assert.equal(r.ok,false);assert.match(r.error,/Schema 113/);assert.equal(storage,false);
+  assert.equal(r.ok,false);assert.match(r.error,/nicht freigeschaltet/);assert.equal(storage,false);
  });
  await test('Fehlende Leseliste lässt nur Supabase selbst unter RLS signieren',async()=>{
   let pfade;const r=await M.signiereMedien({rpc:async()=>({error:{code:'PGRST202'}}),storage:{from:()=>({createSignedUrls:async p=>{pfade=p;return {data:[{path:p[0],signedUrl:'https://alt/erlaubt'}]};}})}},[basis+'posts/alt.jpg']);assert.deepEqual(pfade,['posts/alt.jpg']);assert.deepEqual(r,['https://alt/erlaubt']);

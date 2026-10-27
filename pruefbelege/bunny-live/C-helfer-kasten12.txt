@@ -1,0 +1,85 @@
+
+Gemeinsame Bausteine
+  OK   sammlungen.js und spende.js stehen in UMD_BAUSTEINE
+  OK   index.html bindet beide ein
+  OK   beide Dateien haben eine UMD-Hülle
+
+12.9  Ringfarben
+  OK   Playlist rot wie im Prototyp (#FF0A0A)
+  OK   Highlight orange wie im Prototyp (#FF990A)
+  OK   Die beiden Gattungen unterscheiden sich
+  OK   Strich 4/45 des Durchmessers (64 → 6 px)
+  OK   App: eigenes Profil nimmt die Farbe aus dem Baustein
+  OK   App: fremdes Profil nimmt die Farbe aus dem Baustein
+  OK   Website: ringStil() nimmt Farbe und Stärke aus dem Baustein
+  OK   Website: kein fest verdrahteter Farbverlauf mehr am Ring
+  OK   Website: Ring ist rund
+
+12.7 / 12.8  Titelbild
+  OK   Ohne Wahl: ein Beitrag der Sammlung ist das Titelbild
+  OK   Gewählter Beitrag gewinnt
+  OK   Gewählte Story gewinnt
+  OK   Eigenes Foto gewinnt vor allem
+  OK   Leere Sammlung ohne Foto: kein Bild
+  OK   Schema-Entwurf: Spalten, Prüfung auf Inhalt, idempotent
+  OK   App: Knopf „Titelbild wählen" im eigenen Profil
+  OK   App: speichert über aktionen.titelbildSetzen
+  OK   Website: openTitelbildWahl mit Beitrag, Foto und Kamera
+  OK   Server: POST /api/eigene/sammlung/:id/titelbild
+
+12.3  Spendenziel
+  OK   Formular: Titel, Ziel, Frist, Text werden übernommen
+  OK   Formular: Ziel bleibt freiwillig
+  OK   Formular: Unsinn wird abgelehnt
+  OK   Frist ungültig: fristAus wirft
+  OK   Stand: erreicht, Fortschritt, Spender aus den Buchungen
+  OK   Abgelaufene Frist wird erkannt
+  OK   Eigener Betrag: 2,50 → 250 Cent, 0,10 abgelehnt
+  OK   Schema-Entwurf: spendenstand() nur für angemeldete Nutzer
+  OK   App: Karte, Detailblatt und Spenden-Knopf
+  OK   App: Karte im eigenen und im fremden Profil
+  OK   Website: Karte ist ein Knopf und öffnet openSpendenziel
+  OK   Website: Karte auch im fremden Profil
+  OK   Server: GET /api/spendenstand/:userId
+  OK   Server: Spende-Formular über Spende.ausFormular
+
+12.5  Profilbild
+  OK   Schema-Entwurf: avatar_url nur aus dem Eimer media
+  OK   App: Kopf mit Mediathek, Kamera, Entfernen
+  OK   App: „Profil bearbeiten" zeigt den Kopf
+  OK   App: Ordner avatars, gespeichert über profilbildSetzen
+  OK   Website: kein Profilbild mehr nur im Browser (localStorage)
+  OK   Website: Upload nach avatars und /api/eigene/profilbild
+  OK   Website: Avatare zeigen das Bild (personenAvatar)
+  OK   Server: POST /api/eigene/profilbild prüft Pfad und Zeilenzahl
+  OK   Server: jeder Nutzer bringt sein Bild mit
+  OK   Website: nur noch EIN bildVerkleinern (das zweite brach Storys)
+
+12.1  Tab bleibt
+  OK   App: Reiter liegt in der Shell, nicht im Bildschirm
+  OK   App: Beitrag öffnen merkt sich den Reiter
+  OK   App: Verlassen setzt zurück
+  OK   Website: profilReiterPruefen bei Ober- und Unterleiste
+  OK   Website: Kacheln im Raster öffnen den Beitrag
+
+12.2  Name mittig
+  OK   App: Handle mit eigener Mitte (testID profil-handle)
+  OK   Website: .oprof__handle links und rechts gleich weit
+
+12.4  Profil wechseln
+  OK   App: Video-Profil ruft den Wechsel selbst auf
+  OK   App: nach dem Wechsel landet ein anderes Konto im Video-Profil
+  OK   App: zweimal abholen geht (StrictMode ruft den Initialisierer doppelt)
+  OK   App: dasselbe Konto (Wechsel abgebrochen) springt nicht
+  OK   App: nach drei Minuten gilt die Stelle nicht mehr
+  OK   App: vergessen() räumt ab
+  OK   App: Messenger und Einstellungen vergessen die Stelle vor dem Wechsel
+  OK   App: neue Shell startet im Video-Profil
+  OK   Website: #switchProfile öffnet den Wechsel im Video-Profil
+
+12.6  Online-Punkt
+  OK   App: grüner Punkt antippbar
+  OK   App: öffnet die Sichtbarkeit onlinestatus
+  OK   Website: #onlinePunkt öffnet openSichtbarkeit onlinestatus
+
+65 von 65 Pruefungen bestanden.

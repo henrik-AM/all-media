@@ -293,7 +293,9 @@ function zusammengelegt(bauOrdner, name) {
   if (!medien) return `${spaltenteil}\n${bausteine}\n${kryptoQuelle}\n${quelltext}`; // Ohne medien.js.
 
   // Aus `export function x` wird `function x` — im Blob gibt es nur ein Modul.
-  const hilfsteil = umdAufloesen(fs.readFileSync(medien, 'utf8')).replace(/^export\s+/gm, '');
+  const hilfsteil = umdAufloesen(fs.readFileSync(medien, 'utf8')).replace(/^export\s+/gm, '')
+    // Browser-Blob-Prüfungen nutzen denselben lokalen Server wie die Website.
+    .replace(/(['"])https:\/\/all-media-website\.onrender\.com\1/g, 'location.origin');
 
   // Die Importzeile fliegt raus, egal ob mit oder ohne Strichpunkt.
   quelltext = quelltext.replace(

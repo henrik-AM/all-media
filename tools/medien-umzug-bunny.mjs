@@ -2,9 +2,9 @@
 /**
  * Medien von Supabase Storage zu Bunny Storage umziehen.
  *
- * STAND 26.10.2026: vorbereitet, nie gegen echte Dienste gelaufen. Es gibt
- * noch kein Bunny-Konto. Geprüft nur gegen lokale Nachbauten
- * (app/test/_bunny_einheit.js).
+ * STAND 27.10.2026: Kopiermodus nur gegen lokale Nachbauten geprüft.
+ * Das echte Konto ist vorhanden; dieser Auftrag führt keinen Medienumzug aus.
+ * Der echte Listen-Trockenlauf braucht einen nur serverseitigen Dienstschlüssel.
  *
  * WARUM SO VORSICHTIG
  *

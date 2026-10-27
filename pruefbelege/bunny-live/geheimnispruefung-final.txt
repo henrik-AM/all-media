@@ -1,0 +1,1 @@
+{"gepruefteDateien":47,"echteBunnySchluesseltreffer":0,"encodings":["utf8","utf16le"]}

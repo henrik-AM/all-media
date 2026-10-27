@@ -1,0 +1,19 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+✔ Ohne Bunny unveränderter Supabase-Upload und zwei Adressen (0.411167ms)
+✔ Signier-Endpunkt prüft Supabase-Rechte pro Konto auch nach Cachefüllung (28.531959ms)
+✔ Teilkonfiguration schaltet ein und fällt nicht still zurück (0.138667ms)
+✔ Fehlende Leseliste lässt nur Supabase selbst unter RLS signieren (0.518541ms)
+✔ Andere Rechtefehler erzeugen weder Bunny- noch Supabase-Signaturen (0.091375ms)
+✔ Verweigertes Uploadrecht erreicht Bunny nicht (0.100125ms)
+✔ Bunny-Leserecht wird für jeden Aufruf neu geprüft (0.107375ms)
+✔ Löschrecht verweigert: kein Bunny-Aufruf (0.092333ms)
+✔ Nicht angemeldet und ungültige Medienliste werden abgewiesen (0.055041ms)
+✔ Präfix _probe bleibt ausschließlich im Adapter, kein Nutzer-Uploadordner (0.044ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32.594583

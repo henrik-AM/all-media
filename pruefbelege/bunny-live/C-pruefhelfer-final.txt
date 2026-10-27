@@ -1,0 +1,7 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+OK Produktionsfallback im Prüfhilfsteil ersetzt
+OK Browser-Blob benutzt lokale Basis
+OK App-Signierfunktion tatsächlich aufgerufen
+OK Signieranfrage ausschließlich auf 3300
+OK Nicht vorhandene Datei bleibt ohne Signatur
+5/5 Prüfungen bestanden; keine Uploads, Nachrichten oder SQL-Abfragen.

@@ -1,0 +1,56 @@
+
+16  Gemeinsame Sätze (gemeinsam/story.js)
+  OK   Empfänger: „Anna hat dich in einer Story markiert“
+  OK   Absender: „Du hast Anna in einer Story markiert“
+  OK   Chatliste Empfänger: „Hat dich in einer Story markiert“
+  OK   Abgelaufen: „Story nicht mehr verfügbar“
+  OK   istMarkierungsHinweis erkennt nur story_markierung
+
+16  Laden
+  OK   NACHRICHT_SPALTEN holt hinweis
+  OK   App: ladeNachrichten setzt hinweis
+  OK   Website-Server: setzt hinweis
+  OK   App: Chatliste nennt die Markierung statt leerer Zeile
+  OK   Website-Server: Chatliste nennt die Markierung
+  OK   Story-Einbettung trägt mediaType (Standbild/Video)
+
+16.4  Karte statt Blase
+  OK   App: eigene Karte für story_markierung
+  OK   App: Karte ohne Story ist nicht antippbar
+  OK   App: Karte öffnet die Story über onOpenStory
+  OK   App: Schließen der Story führt zurück in den Chat
+  OK   App: Menü ohne Antworten/Zitieren/Weiterleiten bei Hinweisen
+  OK   Website: eigene Karte für story_markierung
+  OK   Website: Karte öffnet die Story mit Ersatz aus der Einbettung
+  OK   Website: Menü ohne Antworten/Zitieren/Weiterleiten bei Hinweisen
+  OK   Website: CSS für die Karte
+
+16  Chat-Anfrage mit Markierung
+  OK   App: Anfrage-Leiste kennt die Markierung
+  OK   Website: Anfrage-Leiste kennt die Markierung
+
+19  Stufen (gemeinsam/sichtbarkeit.js)
+  OK   Likes: fünf Stufen, „Nur Follower“ zwischen den vorhandenen
+  OK   standort: kein „Nur Follower“
+  OK   story: kein „Nur Follower“
+  OK   repost: kein „Nur Follower“
+  OK   onlinestatus: kein „Nur Follower“
+  OK   ptt: kein „Nur Follower“
+  OK   download: kein „Nur Follower“
+  OK   dm: kein „Nur Follower“
+  OK   Name „Nur Follower“
+  OK   „Nur Follower“ zeigt keine Ausnahmezahl
+  OK   „Alle bis auf …“ zeigt die Zahl
+  OK   Server-Regel: nur_follower bei likes erlaubt, bei story nicht
+  OK   Ersteller-Hinweis (19.1)
+
+19  Eingebaut
+  OK   sichtbarkeit.js in UMD_BAUSTEINE
+  OK   index.html bindet sichtbarkeit.js ein
+  OK   Server prüft über stufeErlaubt
+  OK   App-Blatt: Stufen je Bereich und Ersteller-Hinweis
+  OK   App-Einstellungen reichen den Bereich ans Blatt
+  OK   Website-Blatt: Stufen je Bereich und Ersteller-Hinweis
+  OK   Website-Zusammenfassung über stufeText
+
+42 von 42 Pruefungen bestanden.

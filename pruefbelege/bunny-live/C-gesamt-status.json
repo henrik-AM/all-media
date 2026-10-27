@@ -1,0 +1,371 @@
+{
+  "laeufe": 71,
+  "exit0": 27,
+  "fehlgeschlagen": 44,
+  "pruefungen_bestanden": 2080,
+  "pruefungen_gesamt": 2103,
+  "ohne_zahl": [
+    "querformat",
+    "minderjaehrig",
+    "elternnummer",
+    "auth",
+    "bildschirmzeit"
+  ],
+  "ergebnisse": [
+    {
+      "lauf": "smoke",
+      "status": "FEHL",
+      "pruefungen": "75/75"
+    },
+    {
+      "lauf": "feedback",
+      "status": "FEHL",
+      "pruefungen": "51/52"
+    },
+    {
+      "lauf": "erstellen",
+      "status": "FEHL",
+      "pruefungen": "19/19"
+    },
+    {
+      "lauf": "teilen",
+      "status": "FEHL",
+      "pruefungen": "25/25"
+    },
+    {
+      "lauf": "sync",
+      "status": "FEHL",
+      "pruefungen": "5/6"
+    },
+    {
+      "lauf": "uebernacht",
+      "status": "FEHL",
+      "pruefungen": "11/11"
+    },
+    {
+      "lauf": "schema",
+      "status": "FEHL",
+      "pruefungen": "6/7"
+    },
+    {
+      "lauf": "sammlungen",
+      "status": "OK",
+      "pruefungen": "16/16"
+    },
+    {
+      "lauf": "sammlungenweb",
+      "status": "FEHL",
+      "pruefungen": "23/23"
+    },
+    {
+      "lauf": "explorer",
+      "status": "FEHL",
+      "pruefungen": "21/21"
+    },
+    {
+      "lauf": "anhang",
+      "status": "FEHL",
+      "pruefungen": "12/12"
+    },
+    {
+      "lauf": "einstellungen",
+      "status": "FEHL",
+      "pruefungen": "18/19"
+    },
+    {
+      "lauf": "kontaktinfo",
+      "status": "FEHL",
+      "pruefungen": "10/10"
+    },
+    {
+      "lauf": "henrik",
+      "status": "FEHL",
+      "pruefungen": "23/23"
+    },
+    {
+      "lauf": "henrik2",
+      "status": "FEHL",
+      "pruefungen": "19/19"
+    },
+    {
+      "lauf": "insel",
+      "status": "FEHL",
+      "pruefungen": "17/17"
+    },
+    {
+      "lauf": "suche",
+      "status": "FEHL",
+      "pruefungen": "13/13"
+    },
+    {
+      "lauf": "optionen",
+      "status": "FEHL",
+      "pruefungen": "15/16"
+    },
+    {
+      "lauf": "kasten8",
+      "status": "FEHL",
+      "pruefungen": "6/6"
+    },
+    {
+      "lauf": "kasten12",
+      "status": "OK",
+      "pruefungen": "65/65"
+    },
+    {
+      "lauf": "kasten17",
+      "status": "OK",
+      "pruefungen": "53/53"
+    },
+    {
+      "lauf": "glocke",
+      "status": "FEHL",
+      "pruefungen": "19/21"
+    },
+    {
+      "lauf": "pfeile",
+      "status": "FEHL",
+      "pruefungen": "67/68"
+    },
+    {
+      "lauf": "profil",
+      "status": "FEHL",
+      "pruefungen": "22/22"
+    },
+    {
+      "lauf": "community",
+      "status": "FEHL",
+      "pruefungen": "24/24"
+    },
+    {
+      "lauf": "chatoptionen",
+      "status": "FEHL",
+      "pruefungen": "17/17"
+    },
+    {
+      "lauf": "player",
+      "status": "FEHL",
+      "pruefungen": "15/15"
+    },
+    {
+      "lauf": "gesten",
+      "status": "FEHL",
+      "pruefungen": "9/9"
+    },
+    {
+      "lauf": "kommentare",
+      "status": "FEHL",
+      "pruefungen": "9/9"
+    },
+    {
+      "lauf": "querformat",
+      "status": "FEHL",
+      "pruefungen": "—"
+    },
+    {
+      "lauf": "feinschliff",
+      "status": "FEHL",
+      "pruefungen": "23/23"
+    },
+    {
+      "lauf": "kamera",
+      "status": "FEHL",
+      "pruefungen": "10/10"
+    },
+    {
+      "lauf": "eigenes",
+      "status": "FEHL",
+      "pruefungen": "19/19"
+    },
+    {
+      "lauf": "datenbank",
+      "status": "FEHL",
+      "pruefungen": "26/27"
+    },
+    {
+      "lauf": "aktionen",
+      "status": "FEHL",
+      "pruefungen": "43/43"
+    },
+    {
+      "lauf": "gleichstand",
+      "status": "OK",
+      "pruefungen": "50/50"
+    },
+    {
+      "lauf": "handbuch",
+      "status": "FEHL",
+      "pruefungen": "25/27"
+    },
+    {
+      "lauf": "sichtbarkeit",
+      "status": "FEHL",
+      "pruefungen": "28/33"
+    },
+    {
+      "lauf": "likes",
+      "status": "FEHL",
+      "pruefungen": "73/73"
+    },
+    {
+      "lauf": "fremdprofil",
+      "status": "OK",
+      "pruefungen": "14/14"
+    },
+    {
+      "lauf": "chatanfrage",
+      "status": "OK",
+      "pruefungen": "17/17"
+    },
+    {
+      "lauf": "messengeranfrage",
+      "status": "OK",
+      "pruefungen": "37/37"
+    },
+    {
+      "lauf": "mitteilungen",
+      "status": "OK",
+      "pruefungen": "24/24"
+    },
+    {
+      "lauf": "dmsperre",
+      "status": "FEHL",
+      "pruefungen": "14/16"
+    },
+    {
+      "lauf": "lesebestaetigung",
+      "status": "OK",
+      "pruefungen": "13/13"
+    },
+    {
+      "lauf": "kanal",
+      "status": "FEHL",
+      "pruefungen": "12/12"
+    },
+    {
+      "lauf": "impressionen",
+      "status": "OK",
+      "pruefungen": "17/17"
+    },
+    {
+      "lauf": "rang",
+      "status": "OK",
+      "pruefungen": "34/34"
+    },
+    {
+      "lauf": "verlauf",
+      "status": "OK",
+      "pruefungen": "45/45"
+    },
+    {
+      "lauf": "storyvideos",
+      "status": "OK",
+      "pruefungen": "13/13"
+    },
+    {
+      "lauf": "storys",
+      "status": "OK",
+      "pruefungen": "24/24"
+    },
+    {
+      "lauf": "krypto",
+      "status": "OK",
+      "pruefungen": "23/23"
+    },
+    {
+      "lauf": "rechte",
+      "status": "OK",
+      "pruefungen": "187/187"
+    },
+    {
+      "lauf": "minderjaehrig",
+      "status": "FEHL",
+      "pruefungen": "—"
+    },
+    {
+      "lauf": "elternnummer",
+      "status": "FEHL",
+      "pruefungen": "—"
+    },
+    {
+      "lauf": "bremse",
+      "status": "OK",
+      "pruefungen": "9/9"
+    },
+    {
+      "lauf": "auth",
+      "status": "OK",
+      "pruefungen": "—"
+    },
+    {
+      "lauf": "zahlung",
+      "status": "OK",
+      "pruefungen": "93/93"
+    },
+    {
+      "lauf": "stumm",
+      "status": "OK",
+      "pruefungen": "21/21"
+    },
+    {
+      "lauf": "storyvideoregeln",
+      "status": "OK",
+      "pruefungen": "27/27"
+    },
+    {
+      "lauf": "kasten16-19",
+      "status": "OK",
+      "pruefungen": "42/42"
+    },
+    {
+      "lauf": "farbfilterrechnung",
+      "status": "OK",
+      "pruefungen": "58/58"
+    },
+    {
+      "lauf": "farbfilter",
+      "status": "FEHL",
+      "pruefungen": "15/16"
+    },
+    {
+      "lauf": "bildschirmzeit-einheit",
+      "status": "OK",
+      "pruefungen": "78/78"
+    },
+    {
+      "lauf": "bildschirmzeit",
+      "status": "FEHL",
+      "pruefungen": "—"
+    },
+    {
+      "lauf": "vorschlaege",
+      "status": "FEHL",
+      "pruefungen": "54/54"
+    },
+    {
+      "lauf": "lenkung-einheit",
+      "status": "OK",
+      "pruefungen": "57/57"
+    },
+    {
+      "lauf": "lenken",
+      "status": "OK",
+      "pruefungen": "42/42"
+    },
+    {
+      "lauf": "markierung-einheit",
+      "status": "OK",
+      "pruefungen": "50/50"
+    },
+    {
+      "lauf": "markieren",
+      "status": "FEHL",
+      "pruefungen": "40/43"
+    },
+    {
+      "lauf": "chatsync",
+      "status": "FEHL",
+      "pruefungen": "38/39"
+    }
+  ]
+}

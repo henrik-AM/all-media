@@ -7,7 +7,8 @@
  * Datenbank war winzig, teuer war allein das Ausliefern der Dateien.
  *
  * medien.js aktiviert diesen Adapter bei gesetzten BUNNY_*-Variablen. Kein Konto, keine Schlüssel in der App.
- * Rückweg für Uploads: Supabase; BUNNY_BESTAND_LESEN=an hält bestehende Bunny-Dateien lesbar.
+ * Ohne Bunny-Konfiguration bleibt der Supabase-Weg. Ein bestehender Bunny-Bestand
+ * benötigt weiterhin die Schlüssel; dieser isolierte Schalter hat keinen getrennten Lesemodus.
  *
  * GLEICHE FORM WIE medien.js
  *

@@ -309,8 +309,8 @@ async function main() {
   const dauer = (p) => `https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/${p}`;
   const daten = { posts: [{ media_url: dauer('stories/clip.mp4'), text: 'hallo' }, { media_url: dauer('ptt/ton.m4a') }], fremd: 'https://anderswo.de/x.jpg' };
   const Medien=require('../../web/server/medien');
-  const altSignatur=Bunny.signierteAdresse,altAnbieter=process.env.MEDIEN_ANBIETER;
-  Bunny.signierteAdresse=(...args)=>bunny.signierteAdresse(...args);process.env.MEDIEN_ANBIETER='bunny';
+  const altSignatur=Bunny.signierteAdresse,altZone=process.env.BUNNY_STORAGE_ZONE;
+  Bunny.signierteAdresse=(...args)=>bunny.signierteAdresse(...args);process.env.BUNNY_STORAGE_ZONE=ZONE;
   try {
     let gefragt=[];
     const client={nutzerId:'nutzer-1',rpc:async(name,{p_pfade})=>{gefragt.push(...p_pfade);return {data:name==='medien_leseliste'?[{pfad:'stories/clip.mp4',anbieter:'bunny'}]:[]};}};
@@ -325,7 +325,7 @@ async function main() {
     pruefe('Prüfung fällt aus → nichts unterschrieben',JSON.stringify(s4)===JSON.stringify(daten));
     const s5=await Medien.signiereMedien({nutzerId:'nutzer-4',rpc:async name=>({data:name==='medien_leseliste'?[{pfad:'ptt/ton.m4a',anbieter:'bunny'}]:[]})},daten,3600);
     pruefe('Zentraler Batchweg berücksichtigt freigegebenen Pfad',s5.posts[1].media_url.startsWith(`${pull}/ptt/ton.m4a?token=`)&&s5.posts[0].media_url===dauer('stories/clip.mp4'));
-  } finally {Bunny.signierteAdresse=altSignatur;if(altAnbieter===undefined)delete process.env.MEDIEN_ANBIETER;else process.env.MEDIEN_ANBIETER=altAnbieter;}
+  } finally {Bunny.signierteAdresse=altSignatur;if(altZone===undefined)delete process.env.BUNNY_STORAGE_ZONE;else process.env.BUNNY_STORAGE_ZONE=altZone;}
 
   console.log('\n11. Umzugsskript');
   const { umziehen } = await import('../../tools/medien-umzug-bunny.mjs');

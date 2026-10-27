@@ -338,7 +338,7 @@ async function unterschreiben(client,pfade) {
 /** Bunny braucht einen dauerhaften Eigentumsbeleg. Ohne Schema 113 geschlossen bleiben. */
 async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt) {
   const {data:frei,error}=await client.rpc('medium_upload_erlaubt');
-  if(error?.code==='PGRST202')return {ok:false,error:'Bunny-Upload benötigt die noch fehlende Datenbankfreigabe (Schema 113).'};
+  if(error?.code==='PGRST202')return {ok:false,error:'Der Medienspeicher ist noch nicht freigeschaltet. Bitte später erneut versuchen.'};
   if(error || frei!==true)return {ok:false,error:'Dieses Konto darf derzeit keine Medien hochladen.'};
   if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return {ok:false,error:'Der Medienspeicher ist derzeit nicht vollständig eingerichtet.'};
   const {createClient}=require('@supabase/supabase-js');
@@ -346,7 +346,7 @@ async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt) {
   const dienst=createClient(supabaseUrl,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
   // Auch den Metadatenvertrag vor dem ersten Datei-Byte prüfen.
   const {error:bereit}=await dienst.from('medien_objekte').select('pfad').limit(0);
-  if(bereit)return {ok:false,error:'Die Medienablage ist noch nicht vorbereitet (Schema 113).'};
+  if(bereit)return {ok:false,error:'Der Medienspeicher ist noch nicht freigeschaltet. Bitte später erneut versuchen.'};
   const hoch=await Bunny.ablegen(nutzerId,ordner,typ,inhalt);
   if(!hoch.ok)return hoch;
   const {error:beleg}=await dienst.from('medien_objekte').insert({pfad:hoch.pfad,owner_id:nutzerId,typ,bytes:inhalt.length,sha256:require('crypto').createHash('sha256').update(inhalt).digest('hex')});

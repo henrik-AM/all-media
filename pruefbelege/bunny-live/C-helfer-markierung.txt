@@ -1,0 +1,72 @@
+
+Erkennen
+  OK   Einfacher Name
+  OK   Groß geschrieben meint denselben Namen
+  OK   Am Textanfang
+  OK   Punkt am Satzende gehört nicht dazu
+  OK   Punkt im Namen gehört dazu
+  OK   Komma und Klammern trennen
+  OK   E-Mail-Adresse ist keine Markierung
+  OK   Zwei Zeichen sind zu kurz
+  OK   Drei Zeichen reichen
+  OK   25 Zeichen sind zu lang (nichts abgeschnitten)
+  OK   24 Zeichen gehen
+  OK   Zwei Punkte hintereinander nicht
+  OK   Unterstrich am Ende nicht (kein Teilname)
+  OK   @@anna ist keine Markierung
+  OK   Doppelte nur einmal
+  OK   Höchstens HOECHSTENS verschiedene
+  OK   Umlaut beendet den Namen nicht mittendrin falsch
+  OK   Zeilenumbruch davor
+
+Jeder erkannte Name ist ein gültiger Benutzername
+  OK   benutzername.pruefe() nimmt alle an  — [["anna.meier"],["x_y_z"],["a1b2c3"],["ben"],["henrik_d"]]
+
+Positionen
+  OK   Zwei Treffer
+  OK   Erster Treffer an Stelle 3 bis 8
+  OK   Zweiter Treffer ohne Punkt
+
+Zerlegen
+  OK   Ohne Liste wird jeder Name eine Markierung
+  OK   Unbekannter Name bleibt Text  — [{"art":"text","text":"Hi "},{"art":"markierung","text":"@Anna","handle":"anna"},{"art":"text","text":", und @niemand!"}]
+  OK   Funktion als Liste
+  OK   Objekt als Liste
+  OK   Text ohne @ bleibt ein Stück
+  OK   Leerer Text gibt nichts
+  OK   Zusammengesetzt ergibt den Ausgangstext
+
+Wort am Cursor
+  OK   Direkt nach @ beginnt die Suche (leer)
+  OK   Teilwort
+  OK   Cursor mitten im Wort, Ende dahinter
+  OK   Nach Leerzeichen kein Wort mehr
+  OK   E-Mail ist kein Wort
+  OK   Ohne @ kein Wort
+  OK   Ohne Cursor gilt das Ende
+
+Einsetzen
+  OK   Ersetzt das Wort und hängt ein Leerzeichen an  — {"text":"Hallo @anna.meier ","cursor":18}
+  OK   Mitten im Text, vorhandenes Leerzeichen bleibt einfach  — {"text":"Hallo @anna und du","cursor":12}
+  OK   Ohne @-Wort wird eingefügt  — {"text":"Hallo @ben ","cursor":11}
+
+Vorschläge ordnen
+  OK   Mitglieder vor Nahen vor Suche
+  OK   Suche filtert nach Name oder Handle
+  OK   Wer mit der Suche beginnt, steht innerhalb der Stufe vorn
+
+Verschlüsselter Zweierchat (25.6)
+  OK   Partner wird erkannt
+  OK   Nicht-Mitglied wird nicht gemeldet
+  OK   Ich selbst nicht
+
+Gleiches Muster in der Datenbank
+  OK   Schema-Datei vorhanden  — SUPABASE_SCHEMA_86_markierungen.sql
+  OK   markierung_handles() benutzt dasselbe Muster wie gemeinsam/markierung.js
+  OK   Datenbank und Baustein haben dieselbe Obergrenze
+
+Eingebunden
+  OK   UMD_BAUSTEINE kennt markierung
+  OK   index.html bindet markierung.js ein
+
+50/50 Prüfungen bestanden
