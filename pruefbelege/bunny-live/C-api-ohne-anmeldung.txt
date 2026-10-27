@@ -1,0 +1,3 @@
+/api/hochladen/datei?ordner=posts 401
+/api/medien/unterschreiben 401
+/api/medien/loeschen 401
