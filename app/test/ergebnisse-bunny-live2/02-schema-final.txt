@@ -1,0 +1,13 @@
+
+> app@1.0.0 test:schema
+> node test/_schema.js
+
+PASS  Schema eingelesen  — 92 Tabellen
+PASS  Alle angesprochenen Tabellen gibt es im Schema
+PASS  Alle angesprochenen Spalten gibt es im Schema
+PASS  Tabelle "videos" wird nicht mehr verwendet
+PASS  Tabelle "likes" wird nicht mehr verwendet
+PASS  Tabelle "favorites" wird nicht mehr verwendet
+PASS  Jede doppelt definierte Funktion, Regel und Vorlage steht in SUPABASE_REIHENFOLGE.md
+
+Schema und Code passen zusammen.

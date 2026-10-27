@@ -1924,6 +1924,7 @@ app.post('/api/eigene/beitrag', route(async (req) => {
     musik: musikAus(req.body),
     soundAb: soundAbAus(req.body),
     geplantAb: req.body?.geplantAb || null,
+    mediaUrl: req.body?.mediaUrl || null,
   });
   if (!e || e.ok === false) return antwort(e);
 
@@ -1953,6 +1954,7 @@ app.post('/api/eigene/video', route(async (req) => {
     dauer: quer ? String(req.body?.dauer || '00:15') : null,
     // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag zurück.
     geplantAb: req.body?.geplantAb || null,
+    mediaUrl: req.body?.mediaUrl || null,
   });
   if (!e || e.ok === false) return antwort(e);
 

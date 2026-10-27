@@ -1,0 +1,207 @@
+
+> app@1.0.0 test:rechte
+> node test/_rechte.js
+
+Prüft ohne Anmeldung gegen https://ijztosbjfybdgotpdixw.supabase.co
+
+189 Funktionen aus den Schemadateien gelesen
+
+PASS  alter_bei_anmeldung ist ohne Anmeldung zu  — HTTP 404
+PASS  alter_in_jahren ist ohne Anmeldung zu  — HTTP 401
+PASS  alter_jahre ist ohne Anmeldung zu  — HTTP 401
+PASS  altersgrenze_fuer ist ohne Anmeldung zu  — HTTP 401
+PASS  anfrage_erlaubt ist ohne Anmeldung zu  — HTTP 401
+PASS  anfrage_ip ist ohne Anmeldung zu  — HTTP 401
+PASS  beitrag_sichtbar ist ohne Anmeldung zu  — HTTP 401
+PASS  benachrichtige ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_basis ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_bereiche ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_bin_eltern_von ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_eltern_von ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_elternkontrolle_beenden ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_entsperren ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_heute ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_kontrolle ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_lockerer ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_mehr ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_name ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_pruefen ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_setzen ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_stand ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_wochenende ist ohne Anmeldung zu  — HTTP 401
+PASS  bildschirmzeit_zaehlen ist ohne Anmeldung zu  — HTTP 401
+PASS  bunny_eigenes_medium ist ohne Anmeldung zu  — HTTP 401
+PASS  bunny_medium_anbieter ist ohne Anmeldung zu  — HTTP 401
+PASS  bunny_medium_lesbar ist ohne Anmeldung zu  — HTTP 401
+PASS  bunny_medium_referenziert ist ohne Anmeldung zu  — HTTP 401
+PASS  bunny_objekt_vorgaben ist ohne Anmeldung zu  — HTTP 404
+PASS  bunny_referenz_pruefen ist ohne Anmeldung zu  — HTTP 404
+PASS  bunny_ursprung_frei ist ohne Anmeldung zu  — HTTP 401
+PASS  bz_auszeit_an ist ohne Anmeldung zu  — HTTP 401
+PASS  bz_im_fenster ist ohne Anmeldung zu  — HTTP 401
+PASS  bz_int ist ohne Anmeldung zu  — HTTP 401
+PASS  bz_limit ist ohne Anmeldung zu  — HTTP 401
+PASS  bz_minute ist ohne Anmeldung zu  — HTTP 401
+PASS  bz_modus ist ohne Anmeldung zu  — HTTP 401
+PASS  bz_rang ist ohne Anmeldung zu  — HTTP 401
+PASS  chat_anfrage_pruefen ist ohne Anmeldung zu  — HTTP 404
+PASS  chat_anfrage_setzen ist ohne Anmeldung zu  — HTTP 404
+PASS  chat_antwort_nimmt_an ist ohne Anmeldung zu  — HTTP 404
+PASS  chat_gelesen ist ohne Anmeldung zu  — HTTP 401
+PASS  community_sichtbar ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_angeschrieben_werden ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_herunterladen ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_kommentieren ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_markieren ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_markieren_person ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_markierung_loesen ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_mitglied_werden ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_schreiben ist ohne Anmeldung zu  — HTTP 401
+PASS  darf_story_markieren ist ohne Anmeldung zu  — HTTP 401
+PASS  einwilligung_entscheiden ist ohne Anmeldung zu  — HTTP 401
+PASS  einwilligungen_offen ist ohne Anmeldung zu  — HTTP 401
+PASS  eltern_anfragen ist ohne Anmeldung zu  — HTTP 401
+PASS  eltern_geeignet ist ohne Anmeldung zu  — HTTP 401
+PASS  email_zu_handle ist ohne Anmeldung zu  — HTTP 401
+PASS  entsperrcode_art ist ohne Anmeldung zu  — HTTP 401
+PASS  entsperrcode_entfernen ist ohne Anmeldung zu  — HTTP 401
+PASS  entsperrcode_setzen ist ohne Anmeldung zu  — HTTP 401
+PASS  feed_lenkung_grenze ist ohne Anmeldung zu  — HTTP 404
+PASS  feed_rang ist ohne Anmeldung zu  — HTTP 401
+PASS  feed_zuruecksetzen ist ohne Anmeldung zu  — HTTP 401
+PASS  finde_per_nummer ist ohne Anmeldung zu  — HTTP 401
+PASS  freier_handle ist ohne Anmeldung zu  — HTTP 401
+PASS  freigegeben ist ohne Anmeldung zu  — HTTP 401
+PASS  frisch_angemeldet ist ohne Anmeldung zu  — HTTP 401
+PASS  fuehrt_als_kontakt ist ohne Anmeldung zu  — HTTP 401
+PASS  geburtsdatum_nachtragen ist ohne Anmeldung zu  — HTTP 401
+PASS  gesperrt ist ohne Anmeldung zu  — HTTP 401
+PASS  handle_aendern ist ohne Anmeldung zu  — HTTP 401
+PASS  handle_frei bleibt für die Registrierung erreichbar  — HTTP 200
+PASS  handle_gueltig ist ohne Anmeldung zu  — HTTP 401
+PASS  handle_new_user ist ohne Anmeldung zu  — HTTP 404
+PASS  handle_normal ist ohne Anmeldung zu  — HTTP 401
+PASS  hier_bin_ich ist ohne Anmeldung zu  — HTTP 401
+PASS  impression_vermerken ist ohne Anmeldung zu  — HTTP 401
+PASS  impressionen_vermerken ist ohne Anmeldung zu  — HTTP 401
+PASS  insight_streak_fortschreiben ist ohne Anmeldung zu  — HTTP 401
+PASS  interessenbild ist ohne Anmeldung zu  — HTTP 401
+PASS  is_chat_member ist ohne Anmeldung zu  — HTTP 401
+PASS  is_community_member ist ohne Anmeldung zu  — HTTP 401
+PASS  ist_chat_ersteller ist ohne Anmeldung zu  — HTTP 401
+PASS  ist_insight_absender ist ohne Anmeldung zu  — HTTP 401
+PASS  ist_insight_empfaenger ist ohne Anmeldung zu  — HTTP 401
+PASS  ist_messenger_kontakt ist ohne Anmeldung zu  — HTTP 401
+PASS  ist_minderjaehrig ist ohne Anmeldung zu  — HTTP 401
+PASS  ist_story_markiert ist ohne Anmeldung zu  — HTTP 401
+PASS  ist_testkonto ist ohne Anmeldung zu  — HTTP 401
+PASS  kanal_mitglied ist ohne Anmeldung zu  — HTTP 401
+PASS  kanal_sichtbar ist ohne Anmeldung zu  — HTTP 401
+PASS  kommentar_like_sichtbar ist ohne Anmeldung zu  — HTTP 401
+PASS  kommentar_like_zahlen ist ohne Anmeldung zu  — HTTP 401
+PASS  kontakt_pruefen ist ohne Anmeldung zu  — HTTP 404
+PASS  kontakte_abgleichen ist ohne Anmeldung zu  — HTTP 401
+PASS  kontakte_entfernen ist ohne Anmeldung zu  — HTTP 401
+PASS  konto_freigegeben ist ohne Anmeldung zu  — HTTP 401
+PASS  konto_stand ist ohne Anmeldung zu  — HTTP 401
+PASS  letzte_nachrichten ist ohne Anmeldung zu  — HTTP 401
+PASS  like_sichtbar ist ohne Anmeldung zu  — HTTP 401
+PASS  like_zahlen ist ohne Anmeldung zu  — HTTP 401
+PASS  liker_namen ist ohne Anmeldung zu  — HTTP 401
+PASS  markierung_bei_text ist ohne Anmeldung zu  — HTTP 404
+PASS  markierung_handles ist ohne Anmeldung zu  — HTTP 401
+PASS  markierung_mitteilung ist ohne Anmeldung zu  — HTTP 401
+PASS  markierung_mitteilung_weg ist ohne Anmeldung zu  — HTTP 401
+PASS  markierung_sichtbar ist ohne Anmeldung zu  — HTTP 401
+PASS  markierung_vorschlaege ist ohne Anmeldung zu  — HTTP 401
+PASS  markierung_weg_bei_loeschen ist ohne Anmeldung zu  — HTTP 404
+PASS  markierung_ziel ist ohne Anmeldung zu  — HTTP 401
+PASS  markierungen_abgleichen ist ohne Anmeldung zu  — HTTP 401
+PASS  markierungen_aus_text ist ohne Anmeldung zu  — HTTP 401
+PASS  markierungen_melden ist ohne Anmeldung zu  — HTTP 401
+PASS  medien_leseliste ist ohne Anmeldung zu  — HTTP 401
+PASS  medium_loeschrecht ist ohne Anmeldung zu  — HTTP 401
+PASS  medium_upload_erlaubt ist ohne Anmeldung zu  — HTTP 401
+PASS  mein_kontostand ist ohne Anmeldung zu  — HTTP 401
+PASS  mein_profil ist ohne Anmeldung zu  — HTTP 401
+PASS  meine_chat_erwaehnungen ist ohne Anmeldung zu  — HTTP 401
+PASS  meine_daten ist ohne Anmeldung zu  — HTTP 401
+PASS  meine_kontaktnummern ist ohne Anmeldung zu  — HTTP 401
+PASS  messenger_anfrage_beantworten ist ohne Anmeldung zu  — HTTP 401
+PASS  messenger_anfrage_schuetzen ist ohne Anmeldung zu  — HTTP 404
+PASS  messenger_anfragen ist ohne Anmeldung zu  — HTTP 401
+PASS  messenger_erlaubt ist ohne Anmeldung zu  — HTTP 401
+PASS  mitteilung_anlegen ist ohne Anmeldung zu  — HTTP 401
+PASS  mitteilung_bei_beitritt ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_chatanfrage ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_folgen ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_kommentar ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_kommentarlike ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_like ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_markierung ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_repost ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_story_markierung ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_bei_storylike ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_stumm ist ohne Anmeldung zu  — HTTP 401
+PASS  mitteilung_weg_bei_folgen ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_weg_bei_kommentar ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_weg_bei_kommentarlike ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_weg_bei_like ist ohne Anmeldung zu  — HTTP 404
+PASS  mitteilung_weg_bei_story_markierung ist ohne Anmeldung zu  — HTTP 404
+PASS  nachricht_macht_ungelesen ist ohne Anmeldung zu  — HTTP 404
+PASS  nummer_bekannt ist ohne Anmeldung zu  — HTTP 401
+PASS  nummer_frei bleibt für die Registrierung erreichbar  — HTTP 200
+PASS  nummer_vergleichsform ist ohne Anmeldung zu  — HTTP 401
+PASS  nur_eigene_aktion ist ohne Anmeldung zu  — HTTP 404
+PASS  on_comment ist ohne Anmeldung zu  — HTTP 404
+PASS  on_contact ist ohne Anmeldung zu  — HTTP 404
+PASS  on_post_like ist ohne Anmeldung zu  — HTTP 404
+PASS  personen_vorschlaege ist ohne Anmeldung zu  — HTTP 401
+PASS  posts_sound_zuordnen ist ohne Anmeldung zu  — HTTP 404
+PASS  profil_freigegeben ist ohne Anmeldung zu  — HTTP 401
+PASS  profil_vervollstaendigen ist ohne Anmeldung zu  — HTTP 404
+PASS  profil_zu_handle ist ohne Anmeldung zu  — HTTP 401
+PASS  profil_zu_nummer ist ohne Anmeldung zu  — HTTP 401
+PASS  sammlung_inhalt_pruefen ist ohne Anmeldung zu  — HTTP 404
+PASS  sammlung_titel_freigeben ist ohne Anmeldung zu  — HTTP 404
+PASS  sammlung_titel_pruefen ist ohne Anmeldung zu  — HTTP 404
+PASS  sichtbar_fuer ist ohne Anmeldung zu  — HTTP 401
+PASS  sound_stellen ist ohne Anmeldung zu  — HTTP 401
+PASS  spende_senden ist ohne Anmeldung zu  — HTTP 401
+PASS  spendencode_entfernen ist ohne Anmeldung zu  — HTTP 401
+PASS  spendencode_fingerabdruck ist ohne Anmeldung zu  — HTTP 404
+PASS  spendencode_gesperrt ist ohne Anmeldung zu  — HTTP 401
+PASS  spendencode_gueltig ist ohne Anmeldung zu  — HTTP 401
+PASS  spendencode_normal ist ohne Anmeldung zu  — HTTP 401
+PASS  spendencode_setzen ist ohne Anmeldung zu  — HTTP 401
+PASS  spendencode_status ist ohne Anmeldung zu  — HTTP 401
+PASS  spendencode_stimmt ist ohne Anmeldung zu  — HTTP 401
+PASS  spendenstand ist ohne Anmeldung zu  — HTTP 401
+PASS  starter_inhalte ist ohne Anmeldung zu  — HTTP 401
+PASS  starter_nach_registrierung ist ohne Anmeldung zu  — HTTP 404
+PASS  starter_sammlungen ist ohne Anmeldung zu  — HTTP 401
+PASS  story_eigner ist ohne Anmeldung zu  — HTTP 401
+PASS  story_in_videos_zuruecknehmen ist ohne Anmeldung zu  — HTTP 404
+PASS  story_like_sichtbar ist ohne Anmeldung zu  — HTTP 401
+PASS  story_markierbar ist ohne Anmeldung zu  — HTTP 401
+PASS  storys_aus_videos_nehmen ist ohne Anmeldung zu  — HTTP 404
+PASS  takt_pruefen ist ohne Anmeldung zu  — HTTP 401
+PASS  teilt_chat ist ohne Anmeldung zu  — HTTP 401
+PASS  telefonbuch_schluessel ist ohne Anmeldung zu  — HTTP 401
+PASS  testbestand_insight ist ohne Anmeldung zu  — HTTP 401
+PASS  testbestand_profilaufrufe ist ohne Anmeldung zu  — HTTP 401
+PASS  zahlungsmethode_nachher ist ohne Anmeldung zu  — HTTP 404
+PASS  zahlungsmethode_vorher ist ohne Anmeldung zu  — HTTP 404
+PASS  zuruecksetzen ist ohne Anmeldung zu  — HTTP 401
+PASS  zuruecksetzen_einstellungen ist ohne Anmeldung zu  — HTTP 401
+PASS  zweierchat ist ohne Anmeldung zu  — HTTP 401
+PASS  profiles gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+PASS  posts gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+PASS  messages gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+PASS  chats gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+PASS  stories gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+PASS  contacts gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+PASS  sammlungen gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+PASS  sammlung_inhalte gibt Fremden nichts heraus  — HTTP 401 {"code":"42501","details":null,"hint":"Grant the required privileges to the curr
+
+197 von 197 Pruefungen bestanden

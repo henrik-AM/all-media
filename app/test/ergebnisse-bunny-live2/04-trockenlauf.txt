@@ -1,0 +1,3 @@
+Trockenlauf: 119 Dateien (96.6 MB), schon fertig 0, offen 119 (96.6 MB).
+Ein echter Lauf holt bis zu 96.6 MB aus Supabase (Egress), Liste bisher 0.1 MB.
+{"gelistet":119,"gelistetBytes":101308181,"schonFertig":0,"offen":119,"offenBytes":101308181,"geholt":0,"geholtBytes":0,"listeBytes":65530,"hochgeladen":0,"fehler":0,"nichtMp4":0,"pruefAbweichungen":0,"ausgelassen":0,"umgeschaltet":0,"umschaltAusgelassen":0,"status":"trockenlauf"}

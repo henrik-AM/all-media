@@ -25,7 +25,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { signiereMedien } from './medien';
+import { signiereMedien, medienAnfrage } from './medien';
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -428,8 +428,7 @@ export async function beitragAnlegen(
 
 /** Einen eigenen Beitrag wieder loeschen. Fremde ruehrt die Datenbank nicht an. */
 export async function beitragLoeschen(client: SupabaseClient, ichId: string, id: string) {
-  const { error } = await client.from('posts').delete().eq('id', id).eq('user_id', ichId);
-  if (error) throw error;
+  await medienAnfrage(client, `/api/eigene/${encodeURIComponent(id)}/loeschen`, {});
   return true;
 }
 

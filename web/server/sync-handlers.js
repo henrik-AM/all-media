@@ -1163,8 +1163,26 @@ const handleCreateVideo = (client, nutzerId, felder = {}) =>
 
 const handleDeleteContent = handler('Inhalt löschen', async (client, nutzerId, id, art = 'post') => {
   const tabelle = art === 'comment' ? 'comments' : art === 'story' ? 'stories' : 'posts';
-  const { error } = await client.from(tabelle).delete().eq('id', id).eq('user_id', nutzerId);
+  const Medien = require('./medien');
+  let medien = null;
+  if (art === 'post' && Medien.mitBunny()) {
+    const {data, error} = await client.from('posts').select('media_url, thumbnail_url').eq('id', id).eq('user_id', nutzerId).maybeSingle();
+    if (error) throw error;
+    medien = data;
+  }
+  const { data: weg, error } = await client.from(tabelle).delete().eq('id', id).eq('user_id', nutzerId).select('id');
   if (error) throw error;
+  if (!weg?.length) return {ok:false, error:'Dieser Inhalt ließ sich nicht löschen'};
+  for (const adresse of new Set(Object.values(medien || {}))) {
+    if (!Medien.istMedienAdresse(adresse)) continue;
+    const pfad = Medien.pfadAus(adresse);
+    // Geteilte Dateien bleiben erhalten; Altmedien werden hier nicht entfernt.
+    const {data: anbieter, error: recht} = await client.rpc('medium_loeschrecht', {p_pfad:pfad});
+    if (recht) throw recht;
+    if (anbieter !== 'bunny') continue;
+    const geloescht = await Medien.loeschen(client, nutzerId, pfad);
+    if (!geloescht.ok) throw new Error(geloescht.error);
+  }
   return { ok: true };
 });
 

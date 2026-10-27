@@ -145,7 +145,7 @@ function verwendungen(quelltext) {
 
     // .insert({ spalte: ..., }) und .update({ ... }) und .upsert({ ... })
     for (const m of abschnitt.matchAll(/\.(?:insert|update|upsert)\(\{([\s\S]*?)\}/g)) {
-      for (const f of m[1].matchAll(/(\w+)\s*:/g)) spalten.add(f[1]);
+      for (const f of m[1].matchAll(/([a-z_]\w*)\s*:/gi)) spalten.add(f[1]);
     }
 
     // .select('a, b, c') — verschachtelte Beziehungen wie "chats(...)" und

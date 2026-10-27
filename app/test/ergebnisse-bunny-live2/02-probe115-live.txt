@@ -1,0 +1,16 @@
+PASS upload_eigen
+PASS eigen_lesen
+PASS eigen_loeschrecht
+PASS beleg_direkt_gesperrt
+PASS metadaten_lesen_gesperrt
+PASS upload_zweites_konto
+PASS fremd_privat_lesen_gesperrt
+PASS fremd_loeschen_gesperrt
+PASS fremde_referenz_gesperrt
+PASS eigener_beitrag_lesbar
+PASS referenziert_nicht_loeschen
+PASS nach_beitrag_loeschbar
+PASS anon_rpc_gesperrt
+PASS anon_tabelle_gesperrt
+PASS keine_public_funktionsrechte
+PASS beleg_geloescht

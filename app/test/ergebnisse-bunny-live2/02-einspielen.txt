@@ -1,0 +1,2 @@
+SUPABASE_SCHEMA_115_bunny_medienvertrag.sql — 175 Zeilen an Projekt ijztosbjfybdgotpdixw
+Erfolgreich eingespielt.

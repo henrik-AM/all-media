@@ -1,0 +1,61 @@
+
+> app@1.0.0 test:minderjaehrig
+> node test/_minderjaehrig.js
+
+
+Die Tabelle der Altersgrenzen
+  OK   gemeinsam/alter.js und public.altersgrenzen sind gleich (40 Länder)
+  OK   +423 1234567 → LI in der Datenbank und in alter.js  — DB LI, JS LI
+  OK   0151 2345678 → DE in der Datenbank und in alter.js  — DB DE, JS DE
+  OK   +81 90 12345678 → XX in der Datenbank und in alter.js  — DB XX, JS XX
+  OK   +1 555 1234567 → US in der Datenbank und in alter.js  — DB US, JS US
+
+Die Sperre steht auf jeder Tabelle
+  OK   jede Tabelle trägt die einschränkende Regel nur_freigegebene
+
+Ein Kind aus Deutschland, zwölf Jahre, mit der Nummer seines Elternteils @test
+  OK   das Konto entsteht
+  OK   mein_kontostand sagt „wartet"  — {"land":"Deutschland","stand":"wartet","eltern":"@test","angefragt_am":"2026-10-27T22:47:19.646956+00:00","mindestalter":16}
+  OK   … mit dem richtigen Elternteil  — @test
+  OK   … und Deutschland ab 16
+  OK   das eigene Profil bleibt lesbar
+  OK   das wartende Kind sieht keine Beiträge
+  OK   … und keine fremden Profile
+  OK   das wartende Kind kann nichts veröffentlichen  — abgewiesen: 42501
+  OK   fremde Konten finden das wartende Kind nicht
+  OK   das Kind kann sich nicht selbst freigeben  — {"ok":false,"meldung":"Du kannst für dieses Konto nicht entscheiden."}
+  OK   … auch nicht an den Funktionen vorbei  — 42501
+  OK   ein fremdes Konto kann nicht zustimmen  — {"ok":false,"meldung":"Diese Anfrage ist nicht mehr offen."}
+  OK   der Elternteil sieht die Anfrage  — [{"kind":"6da46d75-61e0-468e-aac2-8d0a3cd35ca0","land":"Deutschland","name":"Prüfkind","alter":12,"handle":"@pruefkindmvr9ztnc","telefon":"+49 1412393801","angefragt_am":"2026-10-27T22:47:19.646956+00:00","mindestalter":16}]
+  OK   … mit Benutzername und Alter
+  OK   … und der Nummer des Kindes  — +49 1412393801
+  OK   der Elternteil stimmt zu  — {"ok":true,"stand":"frei"}
+  OK   danach ist das Kind frei
+  OK   … und sieht fremde Profile — die leere Liste vorher war also die Sperre
+  OK   die Anfrage ist beim Elternteil erledigt
+
+Abgelehnt, dann ein anderer Elternteil
+  OK   abgelehnt bleibt gesperrt  — {"land":"Österreich","stand":"abgelehnt","eltern":"@test","angefragt_am":"2026-10-27T22:47:21.696848+00:00","mindestalter":14}
+  OK   sich selbst als Elternteil eintragen geht nicht  — Das ist deine eigene Nummer.
+  OK   ein zwölfjähriges Konto kann nicht zustimmen, auch wenn es freigegeben ist  — {"ok":false,"meldung":"Dieses Konto kann nicht für dich zustimmen."}
+  OK   über den @-Namen lässt sich kein Elternteil anfragen  — {"ok":false,"meldung":"Bitte die Telefonnummer deines Elternteils eingeben, nicht den Benutzernamen."}
+  OK   eine Nummer ohne Konto wird genannt  — Zu dieser Nummer gibt es bei All Media kein Konto.
+  OK   ein anderer Elternteil lässt sich anfragen  — {"land":"Österreich","stand":"wartet","eltern":"@prueflauf","angefragt_am":"2026-10-27T22:47:22.856182+00:00","mindestalter":14}
+  OK   der frühere Elternteil entscheidet nicht mehr mit
+
+Unter der Untergrenze, ohne Datum, volljährig
+  OK   Australien unter 16: das Konto entsteht gar nicht  — {"message":"Failed to run sql query: ERROR:  P0001: In Australien ist All Media erst ab 16
+  OK   ohne Geburtsdatum ist das Konto gesperrt
+  OK   nachgetragen mit 30 Jahren ist es frei  — {"ok":true,"stand":"frei"}
+  OK   ein zweites Nachtragen geht nicht
+  OK   zwanzig Jahre: sofort frei
+  OK   Konten von vor Schema 52 bleiben frei
+
+Der Benutzername
+  OK   ein vergebener Name meldet „vergeben"  — {"frei":false,"grund":"vergeben","meldung":"Dieser Benutzername ist schon vergeben."}
+  OK   ein freier Name meldet frei  — {"frei":true,"handle":"@freimvr9ztnc"}
+  OK   das Konto heißt, wie es gewählt wurde  — @pruefkindmvr9ztnc
+
+  (4 Prüfkonten wieder gelöscht)
+
+Alle Prüfungen bestanden

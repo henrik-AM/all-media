@@ -1,0 +1,12 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+PASS Testbeiträge vorher 0
+PASS Website Formular post
+PASS Website-post dauerhafte Referenz
+PASS Website-post Bunny signiert
+PASS Website-post Ablauf maximal eine Stunde
+PASS Website-post Anzeige HTTP 200
+PASS Website Formular reels
+PASS Website-reels dauerhafte Referenz
+PASS Website-reels Bunny signiert
+PASS Website-reels Ablauf maximal eine Stunde
+PASS Website-reels Anzeige HTTP 206

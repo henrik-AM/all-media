@@ -120,7 +120,8 @@
     "test:farbfilterrechnung": "node test/_farbfilter_rechnung.js",
     "test:bildschirmzeit": "node test/_bildschirmzeit.js",
     "test:bildschirmzeit-einheit": "node test/_bildschirmzeit_einheit.js",
-    "test:vorschlaege": "node test/_vorschlaege.js"
+    "test:vorschlaege": "node test/_vorschlaege.js",
+    "test:angriffe": "node test/_angriffe.js"
   },
   "private": true
 }

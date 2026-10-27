@@ -281,17 +281,17 @@ async function main() {
   pruefe('Zweites Löschen: gibt es nicht', !l2.ok && l2.error === 'Die Datei gibt es nicht');
 
   console.log('\n9. Ablauf und Fenster');
-  pruefe('ablaufFuer rundet auf volle Stunde', Bunny.ablaufFuer(3600, Date.parse('2026-10-26T12:20:00Z')) === Date.parse('2026-10-26T14:00:00Z') / 1000);
+  pruefe('ablaufFuer rundet auf Viertelstunde', Bunny.ablaufFuer(3600, Date.parse('2026-10-26T12:20:00Z')) === Date.parse('2026-10-26T13:30:00Z') / 1000);
   pruefe('ablaufFuer: genau auf der Stunde bleibt', Bunny.ablaufFuer(3600, Date.parse('2026-10-26T12:00:00Z')) === Date.parse('2026-10-26T13:00:00Z') / 1000);
   const a1 = bunny.signierteAdresse('stories/clip.mp4', 3600);
-  jetztMs += 25 * 60 * 1000; // 12:45, gleiches Fenster
+  jetztMs += 5 * 60 * 1000; // 12:25, gleiches Fenster
   const a2 = bunny.signierteAdresse('stories/clip.mp4', 3600);
   pruefe('Im selben Fenster dieselbe Adresse (Browser-Cache!)', a1 === a2);
   jetztMs += 30 * 60 * 1000; // 13:15
   pruefe('Im nächsten Fenster neue Adresse', bunny.signierteAdresse('stories/clip.mp4', 3600) !== a1);
   const ablauf = Number(new URL(a1).searchParams.get('expires'));
   const ausgestellt = Date.parse('2026-10-26T12:20:00Z') / 1000;
-  pruefe('Gültig mindestens sekunden, höchstens + 1 Stunde', ablauf - ausgestellt >= 3600 && ablauf - ausgestellt <= 7200, `${ablauf - ausgestellt} s`);
+  pruefe('Gültig 45 bis höchstens 60 Minuten inklusive Rundung', ablauf - ausgestellt >= 2700 && ablauf - ausgestellt <= 3600, `${ablauf - ausgestellt} s`);
   const holen = async (adresse) => (await fetch(adresse)).status;
   pullJetztS = ausgestellt;
   pruefe('Pull Zone liefert mit gültigem Token', (await holen(a1)) === 200);
@@ -301,8 +301,8 @@ async function main() {
   pruefe('Pull Zone lehnt fremden Pfad mit diesem Token ab', (await holen(a1.replace('stories/clip.mp4', 'ptt/ton.m4a'))) === 403);
   pruefe('Pull Zone lehnt verlängertes expires ab', (await holen(a1.replace(/expires=\d+/, `expires=${ablauf + 86400}`))) === 403);
   pruefe('Pull Zone lehnt fehlenden Token ab', (await holen(`${pull}/stories/clip.mp4`)) === 403);
-  pruefe('Höchstens 7 Tage', Number(new URL(bunny.signierteAdresse('stories/clip.mp4', 999999999)).searchParams.get('expires')) * 1000 - jetztMs <= 7 * 86400 * 1000 + 3600 * 1000);
-  pruefe('Unsinnige Dauer → Standard 4 Stunden', bunny.signierteAdresse('stories/clip.mp4', -5) === bunny.signierteAdresse('stories/clip.mp4', 4 * 3600));
+  pruefe('Auch bei riesiger Wunschdauer höchstens eine Stunde', Number(new URL(bunny.signierteAdresse('stories/clip.mp4', 999999999)).searchParams.get('expires')) * 1000 - jetztMs <= 3600 * 1000);
+  pruefe('Unsinnige Dauer → Standard 45 Minuten', bunny.signierteAdresse('stories/clip.mp4', -5) === bunny.signierteAdresse('stories/clip.mp4', 45 * 60));
 
   console.log('\n10. Zentraler Signierweg (Leserechte vor jeder Unterschrift)');
   pruefe('Adapter exportiert keinen zweiten Listen-Signierweg', !bunny.signiereMedien && !Bunny.signiereMedien);

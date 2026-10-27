@@ -87,17 +87,12 @@ const ZEIT_HOCHLADEN_MS = 120 * 1000;
 const ZEIT_SONST_MS = 15 * 1000;
 
 /*
- * Ablauf in festen Fenstern.
- *
- * Der Ablauf wird auf die nächste volle Stunde AUFGERUNDET. Ohne das bekäme
- * jede Anfrage einen neuen `expires`-Wert, also eine neue Adresse — für den
- * Browser jedes Mal eine „neue" Datei. Genau das war im September das
- * Signier-Leck (44 MB Speicher, 7,2 GB Egress, siehe medien.js). Mit Fenster
- * ist die Adresse für denselben Pfad eine Stunde lang dieselbe; gültig ist
- * sie mindestens `sekunden`, höchstens `sekunden` + eine Stunde.
+ * Feste Viertelstundenfenster halten identische Adressen im Browsercache.
+ * Ohne Purge-Schlüssel höchstens eine Stunde gültig, einschließlich Rundung.
+ * 45 Minuten Basis + maximal 15 Minuten Rundung. Kürzere Probetoken bleiben kurz.
  */
-const FENSTER_S = 60 * 60;
-const STANDARD_SEKUNDEN = 4 * 60 * 60;
+const FENSTER_S = 15 * 60;
+const STANDARD_SEKUNDEN = 45 * 60;
 
 const OEFFENTLICH = '/storage/v1/object/public/media/';
 const STANDARD_SUPABASE = 'https://ijztosbjfybdgotpdixw.supabase.co';
@@ -341,12 +336,12 @@ function erstelleBunny(konfig, { abruf = fetch, jetzt = () => Date.now() } = {})
     return `${konfig.dauerBasis}${OEFFENTLICH}${pfad}`;
   }
 
-  /** Unterschriebene Adresse für einen Pfad, gültig mindestens `sekunden`. */
+  /** Unterschriebene Adresse für einen Pfad, höchstens eine Stunde gültig. */
   function signierteAdresse(pfad, sekunden = STANDARD_SEKUNDEN) {
     if (!bereit) return null;
     const geprueft = pfadPruefen(pfad, ORDNER_LESEN);
     if (!geprueft) return null;
-    const dauer = Number.isFinite(sekunden) && sekunden > 0 ? Math.min(Math.floor(sekunden), 7 * 24 * 60 * 60) : STANDARD_SEKUNDEN;
+    const dauer = Number.isFinite(sekunden) && sekunden > 0 ? Math.min(Math.floor(sekunden), STANDARD_SEKUNDEN) : STANDARD_SEKUNDEN;
     return adresseBauen({
       basis: konfig.auslieferung,
       schluessel: konfig.tokenSchluessel,

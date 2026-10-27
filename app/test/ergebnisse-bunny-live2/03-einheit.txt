@@ -1,0 +1,126 @@
+
+1. Token-Rechnung gegen die offiziellen Prüfwerte
+  OK   Prüfwert plain  — HS256-o10JRWlsAItyAsdKS6jJKjabHN4FrFsplDHPV1idcX4
+  OK   Prüfwert countries_only  — HS256-i5s3Uv7mnrFfN5nznwU2BxhILpnipYeE18TapV0WNFM
+  OK   Prüfwert blocked_only  — HS256-JS8dSuBSjSH-W2-xhdkCPC36-2rlxfDCQJjlNMPqKZQ
+  OK   Prüfwert path_only  — HS256-uVZvT3SbEoVKYJyDJgbcsDmSFf73cv-uNUVaJiKWpbQ
+  OK   Prüfwert ignore_params  — HS256-1lwWBD_c1IAGSj1UKPoxreu8ePDQ-Z9FoWLcRn_RRH0
+  OK   Prüfwert limit_only  — HS256-DAVapqNNED3Z7JkjRTYX0UOIHNtbHEuuhRNEc4A7mMQ
+  OK   Ganze Adresse wie im Prüfwert countries_only
+  OK   Verzeichnis-Token steht im Pfad
+
+2. Konfiguration
+  OK   Ohne Variablen: nicht bereit, nennt die Namen  — BUNNY_STORAGE_ZONE,BUNNY_STORAGE_KEY,BUNNY_PULL_HOST,BUNNY_TOKEN_KEY
+  OK   Fremder Speicher-Host wird abgelehnt
+  OK   http nur lokal
+  OK   Echter Regions-Host geht
+  OK   Teilweise falsch: nennt nur Namen, keinen Schlüssel
+  OK   Nicht eingerichtet: hochladen sagt es, ohne Anfrage
+  OK   Nicht eingerichtet: keine Adresse
+  OK   Lokale Konfiguration bereit
+
+3. Hochladen
+  OK   JPEG hochgeladen
+  OK   url ist die beständige Supabase-Form  — https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/posts/test-bild.jpg
+  OK   pfad zurück
+  OK   anzeige ist unterschriebene Pull-Adresse  — http://127.0.0.1:63145/posts/test-bild.jpg?token=HS256-9AgECd_vWtvswEsd2jNy8ryLorLuxTbKFxKTiQRnng4&expires=1793020500
+  OK   Inhalt kam unverändert an
+  OK   MP4 (Typ mit Zusatz) hochgeladen
+  OK   Push-to-Talk M4A geht in ptt
+  OK   ablegen baut Pfad mit 32 Zufallszeichen  — avatars/nutzer-1-1793017200000-a68f4000af04ed9e7790086e52cabb51.png
+  OK   ablegen zweimal → zwei Pfade (kein Überschreiben)
+
+4. Falscher Schlüssel
+  OK   Hochladen abgelehnt
+  OK   Löschen abgelehnt, Datei bleibt
+  OK   Auflisten abgelehnt
+  OK   Kein Schlüssel und keine Speicheradresse in Rückgabe/Protokoll  — Bunny: Hochladen fehlgeschlagen: Status 401 | Bunny: Löschen fehlgeschlagen: Status 401 | Bunny: Auflisten fehlgeschlagen: Status 401
+
+5. Zu große Dateien
+  OK   Bild über 10 MB abgelehnt  — Die Datei ist zu groß (11 MB, höchstens 10 MB).
+  OK   Video über 50 MB abgelehnt  — Die Datei ist zu groß (51 MB, höchstens 50 MB).
+  OK   Video mit genau 50 MB geht
+  OK   Leere Datei abgelehnt
+  OK   Abgelehnte gingen nie zum Speicher  — 1 Anfragen
+
+6. Falsche Typen
+  OK   WebM abgelehnt
+  OK   MOV abgelehnt
+  OK   HTML als image/jpeg abgelehnt (Inhalt passt nicht)
+  OK   Video als Profilbild abgelehnt
+  OK   M4A außerhalb ptt abgelehnt
+  OK   SVG abgelehnt
+  OK   Kein Buffer abgelehnt
+
+7. Pfadmanipulation
+  OK   Hochladen: 17 böse Pfade abgelehnt
+  OK   Löschen: alle bösen Pfade abgelehnt (vor allem „posts/" = ganzes Verzeichnis)
+  OK   Keine davon kam beim Speicher an  — 0 Anfragen
+  OK   Verzeichnis posts/ ist noch da
+  OK   signierteAdresse lehnt ../ ab
+  OK   pfadAus lehnt kodiertes ../ ab
+  OK   pfadAus nimmt gültige Adresse
+  OK   auflisten lehnt fremden Ordner ab
+  OK   Umzug darf beispiel/ ablegen (pruefen:false)
+
+8. Löschen und Auflisten
+  OK   Auflisten nennt Name und Größe
+  OK   Löschen
+  OK   Zweites Löschen: gibt es nicht
+
+9. Ablauf und Fenster
+  OK   ablaufFuer rundet auf Viertelstunde
+  OK   ablaufFuer: genau auf der Stunde bleibt
+  OK   Im selben Fenster dieselbe Adresse (Browser-Cache!)
+  OK   Im nächsten Fenster neue Adresse
+  OK   Gültig 45 bis höchstens 60 Minuten inklusive Rundung  — 3300 s
+  OK   Pull Zone liefert mit gültigem Token
+  OK   Pull Zone lehnt abgelaufenen Token ab
+  OK   Pull Zone lehnt fremden Pfad mit diesem Token ab
+  OK   Pull Zone lehnt verlängertes expires ab
+  OK   Pull Zone lehnt fehlenden Token ab
+  OK   Auch bei riesiger Wunschdauer höchstens eine Stunde
+  OK   Unsinnige Dauer → Standard 45 Minuten
+
+10. Zentraler Signierweg (Leserechte vor jeder Unterschrift)
+  OK   Adapter exportiert keinen zweiten Listen-Signierweg
+  OK   Erlaubter Pfad wird unterschrieben
+  OK   Verbotener Pfad bleibt unverändert
+  OK   Fremde Adresse und Text unverändert
+  OK   Eingabe nicht verändert
+  OK   Jeder Abruf prüft beide Pfade erneut
+  OK   Prüfung fällt aus → nichts unterschrieben
+  OK   Zentraler Batchweg berücksichtigt freigegebenen Pfad
+
+11. Umzugsskript
+  OK   Trockenlauf ist Vorgabe: zählt 3, lädt nichts  — {"gelistet":3,"gelistetBytes":432,"schonFertig":0,"offen":3,"offenBytes":432,"geholt":0,"geholtBytes":0,"listeBytes":0,"hochgeladen":0,"fehler":0,"nichtMp4":1,"pruefAbweichungen":0,"ausgelassen":1,"umgeschaltet":0,"umschaltAusgelassen":0,"status":"trockenlauf"}
+  OK   Trockenlauf zählt WebM als nicht MP4
+  OK   Trockenlauf schreibt keine Zustandsdatei
+  OK   Echt ohne --zustand verweigert
+  OK   Echter Lauf aus Ordner: 3/3 abgelegt, 0 Abweichungen  — {"gelistet":3,"gelistetBytes":432,"schonFertig":0,"offen":3,"offenBytes":432,"geholt":3,"geholtBytes":0,"listeBytes":0,"hochgeladen":3,"fehler":0,"nichtMp4":1,"pruefAbweichungen":0,"ausgelassen":1,"umgeschaltet":0,"umschaltAusgelassen":0,"status":"fertig"}
+  OK   Pfade gleich wie in der Quelle
+  OK   Zustandsdatei: 3 Zeilen mit SHA256
+  OK   Fortsetzen: 3 schon fertig, nur die neue geladen  — {"gelistet":4,"gelistetBytes":636,"schonFertig":3,"offen":1,"offenBytes":204,"geholt":1,"geholtBytes":0,"listeBytes":0,"hochgeladen":1,"fehler":0,"nichtMp4":1,"pruefAbweichungen":0,"ausgelassen":1,"umgeschaltet":0,"umschaltAusgelassen":0,"status":"fertig"}
+  OK   Supabase echt ohne Budget verweigert
+  OK   Supabase-Trockenlauf holt keine Datei
+  OK   Budget: hält vor der Datei an, die es sprengen würde  — {"gelistet":3,"gelistetBytes":4408,"schonFertig":0,"offen":3,"offenBytes":4408,"geholt":1,"geholtBytes":204,"listeBytes":397,"hochgeladen":1,"fehler":0,"nichtMp4":0,"pruefAbweichungen":0,"ausgelassen":0,"umgeschaltet":0,"umschaltAusgelassen":0,"status":"budget"}
+  OK   Budget nie überschritten
+  OK   Fortsetzen nach Budget: s1 übersprungen  — {"gelistet":3,"gelistetBytes":4408,"schonFertig":1,"offen":2,"offenBytes":4204,"geholt":2,"geholtBytes":4204,"listeBytes":397,"hochgeladen":1,"fehler":1,"nichtMp4":0,"pruefAbweichungen":0,"ausgelassen":0,"umgeschaltet":0,"umschaltAusgelassen":0,"status":"fehler"}
+  OK   MD5 passt nicht → Fehler, nicht als fertig vermerkt
+  OK   Schlüssel nicht im Zähler
+
+12. Anschluss: Instants und kurze Signaturen
+  OK   Instant-Pfad mit Nutzerordner hochladbar
+  OK   Instant-Pfad sicher lesbar
+  OK   Instant ohne Nutzerordner unzulässig
+  OK   Instant-Foto höchstens 250 KB
+  OK   Instant-Video abgelehnt
+  OK   QuickTime als MP4 umbenannt abgelehnt
+  OK   Instant-Signatur exakt 60 Sekunden, keine Stundenrundung
+  OK   Instant-Verzeichnis niemals löschbar
+  OK   Instant-Datei einzeln löschbar
+
+12. Protokoll
+  OK   Kein Schlüssel, kein Token im Protokoll  — 3 Zeilen
+
+98 von 98 Pruefungen bestanden

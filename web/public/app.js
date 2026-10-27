@@ -15435,13 +15435,21 @@ async function erstelle(was) {
     async (werte) => {
       const spaeter = geplantAb(werte.zeitpunkt);
       const ziel = istBild ? '/api/eigene/beitrag' : '/api/eigene/video';
+      const hoch = istBild
+        ? await api('/api/hochladen', { ordner: 'posts', aufnahme: bild })
+        : await videoHochladen({ datei, typ: datei.type || 'video/mp4' }, 'posts');
+      if (!hoch.ok) return hoch.error || 'Die Aufnahme ließ sich nicht speichern';
       const res = await fetch(ziel, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...werte, geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
+        body: JSON.stringify({ ...werte, mediaUrl: hoch.url, geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
       });
       const daten = await res.json();
-      if (!daten.ok) return daten.error;
+      if (!daten.ok) {
+        const pfad = hoch.url?.split('/storage/v1/object/public/media/')[1];
+        if (pfad) await api('/api/medien/loeschen', { pfad });
+        return daten.error;
+      }
 
       /*
        * Geplante Beiträge kommen nicht in den Feed. Sie dort schon zu zeigen
@@ -15452,9 +15460,6 @@ async function erstelle(was) {
         toast(`Geplant für ${(werte.zeitpunkt || 'später').toLowerCase()}`);
         return;
       }
-
-      const eintrag = daten.beitrag || daten.video || daten.clip;
-      eigenesMediumSichern(eintrag.id, bild);
 
       // Erst das Ziel setzen, dann laden: bootstrap baut das Bild selbst auf.
       state.area = 'videos';
