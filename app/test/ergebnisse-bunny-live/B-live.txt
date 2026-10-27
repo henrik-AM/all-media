@@ -1,0 +1,29 @@
+{
+  "bild": {
+    "status": 200,
+    "bytes": 259,
+    "identisch": true
+  },
+  "ohneToken": 403,
+  "abgelaufen": 403,
+  "fremderPfad": 403,
+  "video": {
+    "bytes": 1862,
+    "status": 206,
+    "contentRange": "bytes 0-31/1862",
+    "identisch": true
+  },
+  "loeschen": [
+    {
+      "ok": true,
+      "verschwunden": true,
+      "status": 200
+    },
+    {
+      "ok": true,
+      "verschwunden": true,
+      "status": 200
+    }
+  ],
+  "probeRest": 0
+}
