@@ -119,6 +119,9 @@ export const VideoFeedScreen = ({
   const { an } = useEinstellungen();
   const datensparen = an('datensparen');
   const [pause, setPause] = useState(datensparen);
+  // Die Einstellungen kommen erst nach dem ersten Aufbau aus Supabase. Ohne
+  // das hier lief das erste Reel trotz Datensparen schon los.
+  useEffect(() => { if (datensparen) setPause(true); }, [datensparen]);
   /*
    * „Datensparen" aus den Einstellungen. Der Schalter stand seit Anfang an in
    * der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen hat

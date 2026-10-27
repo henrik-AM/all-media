@@ -287,3 +287,19 @@ test('Server: normaler Feed behält sein Limit und erhält keinen ID-Filter', as
   assert.equal(ergebnis.length, 20);
   assert.equal(db.abfragen[0].schritte.some(([art, feld]) => art === 'in' && feld === 'id'), false);
 });
+test('Server: Listen laden nur ihre IDs, in Blöcken, ohne 500er-Abfrage', async () => {
+  const quelle = fs.readFileSync(path.join(wurzel, 'web/server/app.js'), 'utf8');
+  assert.equal((quelle.match(/limit: 500/g) || []).length, 1, 'nur der Explorer darf noch 500 laden');
+  const ast = ts.createSourceFile('server.js', quelle, ts.ScriptTarget.Latest, true);
+  const fn = ast.statements.find((s) => ts.isFunctionDeclaration(s) && s.name?.text === 'beitraegeMit');
+  const beitraegeMit = vm.runInNewContext(`(${fn.getText(ast)})`, { supabaseApi: api });
+  const db = datenbank();
+  const ids = Array.from({ length: 250 }, (_, i) => `12345678-1234-1234-1234-${String(i).padStart(12, '0')}`);
+  await beitraegeMit({ db, nutzerId: 'ich' }, [...ids, ids[0], 'kaputt']);
+  const posts = db.abfragen.filter((q) => q.tabelle === 'posts');
+  assert.deepEqual(posts.map((q) => q.schritte.find(([art]) => art === 'limit')[1]), [100, 100, 50]);
+  assert.deepEqual(posts.flatMap((q) => Array.from(q.schritte.find(([art, feld]) => art === 'in' && feld === 'id')[2])), ids);
+  const leer = datenbank();
+  assert.deepEqual(Array.from(await beitraegeMit({ db: leer, nutzerId: 'ich' }, [])), []);
+  assert.equal(leer.abfragen.length, 0);
+});

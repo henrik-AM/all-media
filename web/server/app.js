@@ -337,6 +337,22 @@ async function beitrag(req, id) {
   return (treffer || []).find((b) => b.id === id) || null;
 }
 
+/*
+ * Genau diese Beiträge laden. Gespeichert, Reposts, Markiert und Sammlungen
+ * holten je Aufruf die neuesten 500 samt Folgeabfragen und siebten danach —
+ * Egress für nichts, und Älteres als die 500 fehlte still. In Hunderterblöcken,
+ * damit die Adresse mit .in() nicht zu lang wird.
+ */
+async function beitraegeMit(req, ids) {
+  const liste = [...new Set(ids)].filter((id) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || '')));
+  const bloecke = [];
+  for (let i = 0; i < liste.length; i += 100) bloecke.push(liste.slice(i, i + 100));
+  const teile = await Promise.all(bloecke.map((block) =>
+    supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: block.length, nurIds: block })));
+  return teile.flatMap((t) => t || []);
+}
+
 // ============================================================================
 // Zustand und Zugangsdaten
 // ============================================================================
@@ -2315,8 +2331,7 @@ app.get('/api/sammlung/:id', route(async (req) => {
 
   const beitraege = new Map();
   if (postIds.length) {
-    const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
-    for (const b of alle) if (postIds.includes(b.id)) beitraege.set(b.id, b);
+    for (const b of await beitraegeMit(req, postIds)) beitraege.set(b.id, b);
   }
 
   const storys = new Map();
@@ -2544,7 +2559,7 @@ app.get('/api/gespeichert', route(async (req) => {
   const ids = new Set((data || []).map((z) => z.post_id));
   if (ids.size === 0) return [];
 
-  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+  const alle = await beitraegeMit(req, [...ids]);
   return alle
     .filter((b) => ids.has(b.id))
     .map((b) => ({ art: b.kind === 'post' ? 'post' : b.kind === 'clip' ? 'clip' : 'video', eintrag: b }));
@@ -2640,7 +2655,8 @@ app.get('/api/reposts', route(async (req) => {
   if (error) throw error;
 
   const ids = new Set((data || []).map((r) => r.post_id));
-  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+  if (ids.size === 0) return [];
+  const alle = await beitraegeMit(req, [...ids]);
   return alle
     .filter((b) => ids.has(b.id))
     .map((b) => ({ art: b.kind === 'post' ? 'post' : b.kind === 'clip' ? 'clip' : 'video', eintrag: b }));
@@ -2666,7 +2682,7 @@ app.get('/api/markierungen', route(async (req) => {
   const ids = new Set((data || []).map((z) => z.post_id));
   if (ids.size === 0) return [];
 
-  const alle = await supabaseApi.ladeBeitraege(req.db, req.nutzerId, { limit: 500 });
+  const alle = await beitraegeMit(req, [...ids]);
   return alle
     .filter((b) => ids.has(b.id))
     .map((b) => ({ art: b.kind === 'post' ? 'post' : b.kind === 'clip' ? 'clip' : 'video', eintrag: b }));
