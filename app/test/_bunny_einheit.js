@@ -280,6 +280,42 @@ async function main() {
   const l2 = await bunny.loeschen('posts/test-bild.jpg');
   pruefe('Zweites Löschen: gibt es nicht', !l2.ok && l2.error === 'Die Datei gibt es nicht');
 
+  console.log('\n8b. CDN-Purge nach Storage-Löschung');
+  const kontoSchluessel = 'konto-geheim-9012';
+  const purgeKonfig = Bunny.konfigurationAus({ ...umgebung, BUNNY_API_KEY: kontoSchluessel });
+  pruefe('Purge-Schlüssel optional', konfig.ok && konfig.purgeSchluessel === '');
+  pruefe('Purge-Schlüssel aus Umgebung', purgeKonfig.purgeSchluessel === kontoSchluessel);
+  const warnungen = [];
+  const echtesWarn = console.warn;
+  console.warn = (...teile) => warnungen.push(teile.join(' '));
+  try {
+    for (const fall of ['ohne', 'ok', 'http', 'netz', 'zeit', 'storage404', 'storage500']) {
+      const aufrufe = [];
+      const adapter = Bunny.erstelleBunny(fall === 'ohne' ? konfig : purgeKonfig, { abruf: async (url, optionen) => {
+        aufrufe.push({ url: new URL(url), ...optionen });
+        if (optionen.method === 'DELETE') return { status: fall === 'storage404' ? 404 : fall === 'storage500' ? 500 : 200 };
+        pruefe(fall + ': Storage-DELETE vor Purge', aufrufe[0].method === 'DELETE');
+        pruefe(fall + ': Konto-Schlüssel nur an feste API', new URL(url).origin === 'https://api.bunny.net' && optionen.headers.AccessKey === kontoSchluessel && aufrufe[0].headers.AccessKey === SPEICHER_SCHLUESSEL);
+        pruefe(fall + ': POST mit Zeitgrenze, keine Weiterleitung', optionen.method === 'POST' && optionen.signal instanceof AbortSignal && optionen.redirect === 'error');
+        const u = new URL(url);
+        pruefe(fall + ': Wildcard für sämtliche Queryvarianten, synchron', u.pathname === '/purge' && u.searchParams.get('url') === pull + '/posts/purge.jpg*' && u.searchParams.get('async') === 'false');
+        if (fall === 'netz' || fall === 'zeit') {
+          const f = new Error(kontoSchluessel + TOKEN_SCHLUESSEL);
+          f.name = fall === 'zeit' ? 'TimeoutError' : 'TypeError';
+          throw f;
+        }
+        return { status: fall === 'http' ? 401 : 200 };
+      }});
+      const vorher = warnungen.length;
+      const r = await adapter.loeschen('posts/purge.jpg');
+      const storageFehler = fall.startsWith('storage');
+      pruefe(fall + ': Löschstatus bleibt erhalten', r.ok === !storageFehler);
+      pruefe(fall + ': Purge nur mit Schlüssel und erfolgreichem DELETE', aufrufe.length === (fall === 'ohne' || storageFehler ? 1 : 2));
+      pruefe(fall + ': Warnung nur bei Purge-Fehler', warnungen.length - vorher === (['http','netz','zeit'].includes(fall) ? 1 : 0));
+    }
+    pruefe('Purge-Warnungen ohne Schlüssel, Token oder URL', !warnungen.join().includes(kontoSchluessel) && !warnungen.join().includes(TOKEN_SCHLUESSEL) && !warnungen.join().includes('http'));
+  } finally { console.warn = echtesWarn; }
+
   console.log('\n9. Ablauf und Fenster');
   pruefe('ablaufFuer rundet auf Viertelstunde', Bunny.ablaufFuer(3600, Date.parse('2026-10-26T12:20:00Z')) === Date.parse('2026-10-26T13:30:00Z') / 1000);
   pruefe('ablaufFuer: genau auf der Stunde bleibt', Bunny.ablaufFuer(3600, Date.parse('2026-10-26T12:00:00Z')) === Date.parse('2026-10-26T13:00:00Z') / 1000);

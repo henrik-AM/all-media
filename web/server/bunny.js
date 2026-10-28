@@ -85,6 +85,7 @@ const GRENZE_JE_TYP = (typ) => (typ.startsWith('image/') ? BILD_BYTES_HOECHSTENS
  */
 const ZEIT_HOCHLADEN_MS = 120 * 1000;
 const ZEIT_SONST_MS = 15 * 1000;
+const ZEIT_PURGE_MS = 10 * 1000;
 
 /*
  * Feste Viertelstundenfenster halten identische Adressen im Browsercache.
@@ -152,7 +153,8 @@ function konfigurationAus(umgebung = process.env) {
   const dauerBasis = basisAus(String(umgebung.SUPABASE_URL || STANDARD_SUPABASE).trim(), null);
   if (!dauerBasis) fehlt.push('SUPABASE_URL');
   if (fehlt.length) return { ok: false, fehlt };
-  return { ok: true, zone, speicherSchluessel, speicher, auslieferung, tokenSchluessel, dauerBasis };
+  const purgeSchluessel = String(umgebung.BUNNY_API_KEY || '').trim();
+  return { ok: true, zone, speicherSchluessel, speicher, auslieferung, tokenSchluessel, dauerBasis, purgeSchluessel };
 }
 
 /*
@@ -402,13 +404,44 @@ function erstelleBunny(konfig, { abruf = fetch, jetzt = () => Date.now() } = {})
     return ergebnis;
   }
 
+  /**
+   * URL-Purge mit abschließendem Wildcard: erfasst den Dateipfad samt allen
+   * Query-/Signaturvarianten, unabhängig von IgnoreQueryStrings. Kein Token
+   * und kein Schlüssel in der URL. Nur der feste Bunny-API-Host erhält den
+   * Kontoschlüssel; Weiterleitungen sind verboten.
+   * Quellen: https://docs.bunny.net/reference/purgepublic_index
+   * https://bunny.net/blog/wildcard-cdn-cache-purging-is-here/
+   */
+  async function purgen(pfad) {
+    if (!konfig.purgeSchluessel) return;
+    try {
+      const adresse = new URL('https://api.bunny.net/purge');
+      adresse.searchParams.set('url', `${konfig.auslieferung}/${pfad}*`);
+      adresse.searchParams.set('async', 'false');
+      const antwort = await abruf(adresse.href, {
+        method: 'POST',
+        headers: { AccessKey: konfig.purgeSchluessel },
+        signal: AbortSignal.timeout(ZEIT_PURGE_MS),
+        redirect: 'error',
+      });
+      if (antwort.status === 200) return;
+      console.warn('Bunny: CDN-Purge fehlgeschlagen: Status', antwort.status);
+    } catch {
+      // Niemals fremde Fehlermeldungen/Antworten oder Requestdaten loggen.
+      console.warn('Bunny: CDN-Purge fehlgeschlagen: nicht erreichbar oder Zeitüberschreitung');
+    }
+  }
+
   /** Eine Datei löschen. Nie ein Verzeichnis (siehe pfadPruefen). */
   async function loeschen(pfad) {
     if (!bereit) return NICHT_BEREIT;
     const geprueft = pfadPruefen(pfad, ORDNER_LESEN);
     if (!geprueft) return { ok: false, error: 'Unbekannte Ablage' };
     const { status, grund } = await anfrage('DELETE', geprueft);
-    if (status === 200) return { ok: true };
+    if (status === 200) {
+      await purgen(geprueft);
+      return { ok: true };
+    }
     if (status === 404) return { ok: false, fehlt:true, error: 'Die Datei gibt es nicht' };
     console.error('Bunny: Löschen fehlgeschlagen:', grund || `Status ${status}`);
     return { ok: false, error: 'Die Datei ließ sich nicht löschen' };
