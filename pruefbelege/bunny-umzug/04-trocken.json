@@ -1,0 +1,21 @@
+{
+  "modus": "trocken",
+  "gelistet": 123,
+  "gelistetBytes": 101348121,
+  "schonFertig": 0,
+  "offen": 123,
+  "offenBytes": 101348121,
+  "geholt": 0,
+  "geholtBytes": 0,
+  "listeBytes": 67802,
+  "hochgeladen": 0,
+  "fehler": 0,
+  "nichtMp4": 0,
+  "pruefAbweichungen": 0,
+  "ausgelassen": 0,
+  "umgeschaltet": 0,
+  "umschaltAusgelassen": 0,
+  "status": "trockenlauf",
+  "gesamtEgressBytes": 67802,
+  "budgetBytes": 157286400
+}
