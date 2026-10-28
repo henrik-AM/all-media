@@ -38,6 +38,8 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 
 | Objekt | definiert in (Reihenfolge) | gilt |
 |---|---|---|
+| Funktion public.bunny_objekt_vorgaben() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_116_bunny_altmedien.sql | **SUPABASE_SCHEMA_116_bunny_altmedien.sql** |
+| Funktion public.bunny_ursprung_frei() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_116_bunny_altmedien.sql | **SUPABASE_SCHEMA_116_bunny_altmedien.sql** |
 | Funktion public.darf_markieren() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_86_markierungen.sql | **SUPABASE_SCHEMA_86_markierungen.sql** |
 | Funktion public.darf_story_markieren() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_86_markierungen.sql | **SUPABASE_SCHEMA_86_markierungen.sql** |
 | Funktion public.story_markierbar() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_86_markierungen.sql → SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql | **SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql** |
@@ -227,3 +229,11 @@ und die `bunny_*`-Rechte-/Referenzhelfer und Trigger. Keine Überschreibung eine
 und Blockierprüfung. Die nicht auf diesem main-Stand enthaltenen Schemas 107–114
 werden nicht vorausgesetzt oder eingespielt. Schema 115 ist kein Ersatz für 113
 auf dem Sammelzweig; dessen spätere Integration muss die beiden Verträge abstimmen.
+
+## Schema 116 — Altmedien registrieren (28.10.2026)
+
+Auf 115: dienstseitige Registrierung ausschließlich aus storage.objects, historische
+Pfade, gemeinsame Beispielmedien ohne Eigentümer, ursprüngliche Zeitstempel.
+Bunny-Löschmarken erhalten die Supabase-Originale und verhindern Rückfälle.
+Keine Funktionen aus 107–114 vorausgesetzt. Ersetzt nur die beiden oben genannten
+115-Helfer; Uploadlimit und Eigentümerpräfix für neue Uploads bleiben wirksam.

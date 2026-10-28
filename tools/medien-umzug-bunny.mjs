@@ -2,8 +2,7 @@
 /**
  * Medien von Supabase Storage zu Bunny Storage umziehen.
  *
- * STAND 27.10.2026: Kopiermodus nur gegen lokale Nachbauten geprüft.
- * Das echte Konto ist vorhanden; dieser Auftrag führt keinen Medienumzug aus.
+ * STAND 28.10.2026: Altmedienumzug freigegeben, Supabase-Originale bleiben erhalten.
  * Der echte Listen-Trockenlauf braucht einen nur serverseitigen Dienstschlüssel.
  *
  * WARUM SO VORSICHTIG
@@ -39,10 +38,10 @@
  *
  * Ohne `--umschalten` ist der Lauf nur eine KOPIE: Anzeige und Löschen
  * laufen weiter über Supabase, denn der Server schaltet einen Pfad erst
- * mit einem Eintrag in `medien_objekte` auf Bunny (`medium_anbieter`,
- * Schema 113). `--umschalten` (nur zusammen mit `--pruefen`) trägt jede in
+ * mit einem Eintrag in `medien_objekte` auf Bunny (`bunny_medium_anbieter`,
+ * Schema 115/116). `--umschalten` (nur zusammen mit `--pruefen`) trägt jede in
  * diesem Lauf bei Bunny bestätigte Datei über die Dienst-RPC
- * `medien_umzug_registrieren` ein (SUPABASE_SCHEMA_XX_medien_umzug.sql).
+ * `medien_umzug_registrieren` ein (SUPABASE_SCHEMA_116_bunny_altmedien.sql).
  * Die RPC übernimmt den Eigentümer aus Supabase und lässt aus, was keinen
  * eindeutigen Eigentümer hat. Ausgelassen werden auch Beispielmedien und
  * Dateien, die die heutige Uploadprüfung nicht bestehen (WebM/MOV, zu groß).
@@ -305,6 +304,7 @@ export async function umziehen(optionen) {
     bunny,
     ordner = Bunny.ORDNER_LESEN,
     ausfuehren = false,
+    maxDateien = Infinity,
     budgetBytes = 0,
     zustand = null,
     pruefen = false,
@@ -356,7 +356,7 @@ export async function umziehen(optionen) {
 
   zaehler.status = 'fertig';
   const bestaetigtJetzt = new Map(); // pfad → Journaleintrag, unabhängig vom erneuten Lesen
-  for (const e of offen) {
+  for (const e of offen.slice(0, maxDateien)) {
     let inhalt;
     if (ausSupabase) {
       // Budget VOR dem Laden, gegen die gelistete Größe.
@@ -397,7 +397,9 @@ export async function umziehen(optionen) {
     zaehler.hochgeladen++;
     // Darf die Datei nach heutigen Regeln auf Bunny ausgeliefert werden?
     const ablage = e.pfad.split('/')[0];
-    const umschaltbar = ablage === 'beispiel' ? 'Beispielmedien bleiben bei Supabase' : Bunny.inhaltPruefen(ablage, e.typ, inhalt);
+    // Historische Ablagen dürfen gültige Altbilder enthalten (auch ptt).
+    // Neue Uploadregeln bleiben im Server unverändert.
+    const umschaltbar = Bunny.inhaltPruefen(ablage === 'beispiel' || (ablage === 'ptt' && e.typ.startsWith('image/')) ? 'posts' : ablage, e.typ, inhalt);
     const eintrag = { pfad: e.pfad, bytes: e.bytes, sha256, typ: e.typ, umschaltbar: umschaltbar || true };
     fs.appendFileSync(zustand, JSON.stringify(eintrag) + '\n');
     bestaetigtJetzt.set(e.pfad, eintrag);
@@ -474,6 +476,7 @@ function argumente(liste) {
     else if (w === '--ausfuehren') a.ausfuehren = true;
     else if (w === '--pruefen') a.pruefen = true;
     else if (w === '--umschalten') a.umschalten = true;
+    else if (w === '--max-dateien') a.maxDateien = Number(liste[++i]);
     else if (w === '--budget-mb') a.budgetMb = Number(liste[++i]);
     else if (w === '--zustand') a.zustand = liste[++i];
     else if (w === '--quelle-ordner') a.quelleOrdner = liste[++i];
@@ -511,7 +514,7 @@ async function main() {
       console.error('--umschalten braucht SUPABASE_SERVICE_ROLE_KEY.');
       process.exit(2);
     }
-    // Dienst-RPC aus SUPABASE_SCHEMA_XX_medien_umzug.sql; Antwort 'bunny' oder 'ausgelassen: <grund>'.
+    // Dienst-RPC aus SUPABASE_SCHEMA_116_bunny_altmedien.sql; Antwort 'bunny' oder 'ausgelassen: <grund>'.
     umschalten = async (e) => {
       const antwort = await fetch(`${supabaseBasis}/rest/v1/rpc/medien_umzug_registrieren`, {
         method: 'POST',
@@ -548,6 +551,7 @@ async function main() {
       bunny: konfig.ok ? Bunny.erstelleBunny(konfig) : null,
       ordner: a.ordner,
       ausfuehren: a.ausfuehren,
+      maxDateien: a.maxDateien,
       budgetBytes: Number.isFinite(a.budgetMb) ? Math.floor(a.budgetMb * 1048576) : 0,
       zustand: a.zustand || null,
       pruefen: a.pruefen,
