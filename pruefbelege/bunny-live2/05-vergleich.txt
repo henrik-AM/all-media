@@ -1,3 +1,4 @@
 bunny-live Start 2026-10-28T01:51:16.968Z
 bunny-live beendet {"code":1,"signal":null}
 main Start 2026-10-28T04:04:45.221Z
+main beendet {"code":1,"signal":null}
