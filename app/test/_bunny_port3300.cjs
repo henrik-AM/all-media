@@ -1,7 +1,7 @@
 /** Alte Prüfläufe enthalten feste URLs. Nur im Prüflauf auf Codex-Port 3300 lenken. */
 const Module=require('module');
 const path=require('path');
-const root=__dirname+path.sep;
+const root=path.resolve(process.env.BUNNY_PRUEF_ROOT || __dirname)+path.sep;
 const laden=Module._extensions['.js'];
 Module._extensions['.js']=function(mod,datei){
  if(!datei.startsWith(root))return laden(mod,datei);

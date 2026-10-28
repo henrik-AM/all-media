@@ -1,0 +1,60 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+PASS Testbeiträge vorher 0
+PASS Website Formular post
+PASS Website-post dauerhafte Referenz
+PASS Website-post Bunny signiert
+PASS Website-post Ablauf maximal eine Stunde
+PASS Website-post Anzeige HTTP 200
+PASS Website Formular reels
+PASS Website-reels dauerhafte Referenz
+PASS Website-reels Bunny signiert
+PASS Website-reels Ablauf maximal eine Stunde
+PASS Website-reels Anzeige HTTP 206
+PASS Website Videoplayer decodiert echte MP4
+PASS App Upload bild.jpg
+PASS App-bild.jpg dauerhafte Referenz
+PASS App-bild.jpg Bunny signiert
+PASS App-bild.jpg Ablauf maximal eine Stunde
+PASS App-bild.jpg Anzeige HTTP 200
+PASS App Upload video.mp4
+PASS App-video.mp4 dauerhafte Referenz
+PASS App-video.mp4 Bunny signiert
+PASS App-video.mp4 Ablauf maximal eine Stunde
+PASS App-video.mp4 Anzeige HTTP 206
+Mischbetrieb {"bilder":5,"hintergruende":5}
+PASS Alte Supabase-Medien eingebunden
+[
+  {
+    "weg": "Website-post",
+    "id": "81072866-1997-4183-a6e2-aad850eaae43",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152113111-61722d82051139147248eeb71208e3ee.jpg",
+    "status": 200,
+    "signaturSekunden": 3386
+  },
+  {
+    "weg": "Website-reels",
+    "id": "b53496b6-4c98-4f0f-88f7-25b3e2eca056",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152119732-7986b7d6c3f6871cbd5080ddadc56118.mp4",
+    "status": 206,
+    "signaturSekunden": 3379
+  },
+  {
+    "weg": "App-bild.jpg",
+    "id": "2a081ada-8863-4cf3-a9b3-cfead423a8d6",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152124995-9107c54f02a54d5be56825762de89881.jpg",
+    "status": 200,
+    "signaturSekunden": 3373
+  },
+  {
+    "weg": "App-video.mp4",
+    "id": "c9a06f42-748a-4bdf-8fe5-dc55a8648163",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152130871-784d821b1520187e5ccf907e50e5c9ed.mp4",
+    "status": 206,
+    "signaturSekunden": 3368
+  }
+]
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152113111-61722d82051139147248eeb71208e3ee.jpg
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152119732-7986b7d6c3f6871cbd5080ddadc56118.mp4
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152124995-9107c54f02a54d5be56825762de89881.jpg
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152130871-784d821b1520187e5ccf907e50e5c9ed.mp4
+PASS Testbeiträge nachher 0

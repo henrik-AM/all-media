@@ -15,7 +15,19 @@ execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','col
 const mp4=fs.readFileSync(path.join(tmp,'probe.mp4'));
 let token,client,uid,browser;
 const angelegt=new Set(),pfade=new Set(),ergebnis=[];
-const check=(name,wert)=>{assert.ok(wert,name);console.log('PASS '+name);};
+let pruefungen=0;
+const appIds=new Set();let appAktionen;
+// Nur die unveränderten Produktfunktionen übersetzen, ohne native Kryptospeicher zu laden.
+function aktionenLaden(medien){
+ const quelle=fs.readFileSync('app/lib/aktionen.ts','utf8');
+ const ast=ts.createSourceFile('aktionen.ts',quelle,ts.ScriptTarget.Latest,true);
+ const namen=['beitragAnlegen','beitragLoeschen'];
+ const funktionen=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&namen.includes(n.name?.text));
+ assert.equal(funktionen.length,2);
+ const js=ts.transpileModule(funktionen.map(n=>n.getText(ast)).join('\n'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const m={exports:{}};vm.runInThisContext('(function(module,exports,medienAnfrage){'+js+'\n})')(m,m.exports,medien.medienAnfrage);return m.exports;
+}
+const check=(name,wert)=>{assert.ok(wert,name);pruefungen++;console.log('PASS '+name);};
 const pfad=url=>url.split('/storage/v1/object/public/media/')[1];
 async function api(route,body){const r=await fetch('http://127.0.0.1:3300'+route,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
 async function bestaetige(id,weg){
@@ -32,11 +44,11 @@ async function bestaetige(id,weg){
 }
 async function cleanup(){
  for(const id of angelegt){
-  const w=await api(`/api/eigene/${id}/loeschen`,{});
-  if(!w.ok){console.log('HINWEIS Löschroute: '+(w.error||'fehlgeschlagen'));await client.from('posts').delete().eq('id',id).eq('user_id',uid);}
+  if(appIds.has(id))check('App beitragLoeschen erfolgreich',await appAktionen.beitragLoeschen(client,uid,id));
+  else {const w=await api(`/api/eigene/${id}/loeschen`,{});check('Website Löschroute erfolgreich',w.ok);}
  }
  for(const p of pfade){
-  const {data}=await client.rpc('medium_loeschrecht',{p_pfad:p});if(data==='bunny')await api('/api/medien/loeschen',{pfad:p});
+  const {data,error}=await client.rpc('medium_loeschrecht',{p_pfad:p});assert.ifError(error);check('Medienbeleg nach Löschung weg',data===null);
   const liste=await Bunny.erstelleBunny(Bunny.konfigurationAus()).auflisten('posts');check('Datei weg '+p.split('/').pop(),liste.ok&&!liste.dateien.some(z=>z.name===p.split('/')[1]));
  }
  const {data,error}=await client.from('posts').select('id').eq('user_id',uid).like('description',prefix+'%');assert.ifError(error);check('Testbeiträge nachher 0',data.length===0);
@@ -75,9 +87,10 @@ async function cleanup(){
   const cache=new Map();
   function lade(datei){datei=path.resolve(datei);if(cache.has(datei))return cache.get(datei).exports;const m={exports:{}};cache.set(datei,m);const req=createRequire(datei);const js=ts.transpileModule(fs.readFileSync(datei,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInThisContext('(function(require,module,exports){'+js+'\n})',{filename:datei})(p=>p.startsWith('./')?lade(path.resolve(path.dirname(datei),p+'.ts')):req(p),m,m.exports);return m.exports;}
   process.env.EXPO_PUBLIC_WEB_URL='http://127.0.0.1:3300';const upload=lade('app/lib/supabaseStorage.ts');
+  appAktionen=aktionenLaden(lade('app/lib/medien.ts'));
   for(const [name,bytes,typ] of [['bild.jpg',jpg,'image/jpeg'],['video.mp4',mp4,'video/mp4']]){
    const hoch=await upload.ladeHoch(client,`data:${typ};base64,${bytes.toString('base64')}`,'posts',name);check('App Upload '+name,hoch.success);pfade.add(pfad(hoch.url));
-   const {data,error}=await client.from('posts').insert({user_id:uid,kind:typ.startsWith('video/')?'reel':'post',media_url:hoch.url,description:prefix+'-App-'+name}).select('id').single();assert.ifError(error);
+   const data={id:await appAktionen.beitragAnlegen(client,uid,{art:typ.startsWith('video/')?'reel':'post',mediaUrl:hoch.url,beschreibung:prefix+'-App-'+name})};appIds.add(data.id);check('App beitragAnlegen '+name,!!data.id);
    await bestaetige(data.id,'App-'+name);
    await page.reload({waitUntil:'load'});await page.waitForSelector('[data-area]',{timeout:45000});
    await page.evaluate(video=>{state.area='videos';state.sub.videos=video?'portrait':'home';render();},typ.startsWith('video/'));
@@ -92,5 +105,5 @@ async function cleanup(){
   console.log('Mischbetrieb '+JSON.stringify(alt));check('Alte Supabase-Medien eingebunden',alt.bilder+alt.hintergruende>0);
   await page.screenshot({path:path.join(aus,'Mischbetrieb.png'),fullPage:false});
   console.log(JSON.stringify(ergebnis,null,2));
- }finally{await cleanup();}
+ }finally{await cleanup();console.log(`${pruefungen}/${pruefungen} Prüfungen bestanden`);}
 })().catch(e=>{console.error('FEHL '+e.message);process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();fs.rmSync(tmp,{recursive:true,force:true});});

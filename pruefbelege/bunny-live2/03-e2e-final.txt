@@ -1,0 +1,71 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+PASS Testbeiträge vorher 0
+PASS Website Formular post
+PASS Website-post dauerhafte Referenz
+PASS Website-post Bunny signiert
+PASS Website-post Ablauf maximal eine Stunde
+PASS Website-post Anzeige HTTP 200
+PASS Website Formular reels
+PASS Website-reels dauerhafte Referenz
+PASS Website-reels Bunny signiert
+PASS Website-reels Ablauf maximal eine Stunde
+PASS Website-reels Anzeige HTTP 206
+PASS Website Videoplayer decodiert echte MP4
+PASS App Upload bild.jpg
+PASS App beitragAnlegen bild.jpg
+PASS App-bild.jpg dauerhafte Referenz
+PASS App-bild.jpg Bunny signiert
+PASS App-bild.jpg Ablauf maximal eine Stunde
+PASS App-bild.jpg Anzeige HTTP 200
+PASS App Upload video.mp4
+PASS App beitragAnlegen video.mp4
+PASS App-video.mp4 dauerhafte Referenz
+PASS App-video.mp4 Bunny signiert
+PASS App-video.mp4 Ablauf maximal eine Stunde
+PASS App-video.mp4 Anzeige HTTP 206
+Mischbetrieb {"bilder":5,"hintergruende":5}
+PASS Alte Supabase-Medien eingebunden
+[
+  {
+    "weg": "Website-post",
+    "id": "49f8b696-a127-411d-ae02-db077f7d222c",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152200520-691e1e315e56a22a42446c33ec79f436.jpg",
+    "status": 200,
+    "signaturSekunden": 3298
+  },
+  {
+    "weg": "Website-reels",
+    "id": "04e408b3-19d8-4b90-92c5-f76d8a248f46",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152206125-5359febe8a3c3d2721649df44566bd1a.mp4",
+    "status": 206,
+    "signaturSekunden": 3293
+  },
+  {
+    "weg": "App-bild.jpg",
+    "id": "95746f88-66d4-4f85-b19c-a5c8dd055457",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152211608-b06df90c853b5695a41edd534846e730.jpg",
+    "status": 200,
+    "signaturSekunden": 3288
+  },
+  {
+    "weg": "App-video.mp4",
+    "id": "de2f9155-e799-4f13-855b-5ffe326272af",
+    "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152216970-8ace9df439e91e44f9f66700f4411568.mp4",
+    "status": 206,
+    "signaturSekunden": 3283
+  }
+]
+PASS Website Löschroute erfolgreich
+PASS Website Löschroute erfolgreich
+PASS App beitragLoeschen erfolgreich
+PASS App beitragLoeschen erfolgreich
+PASS Medienbeleg nach Löschung weg
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152200520-691e1e315e56a22a42446c33ec79f436.jpg
+PASS Medienbeleg nach Löschung weg
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152206125-5359febe8a3c3d2721649df44566bd1a.mp4
+PASS Medienbeleg nach Löschung weg
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152211608-b06df90c853b5695a41edd534846e730.jpg
+PASS Medienbeleg nach Löschung weg
+PASS Datei weg 3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793152216970-8ace9df439e91e44f9f66700f4411568.mp4
+PASS Testbeiträge nachher 0
+38/38 Prüfungen bestanden
