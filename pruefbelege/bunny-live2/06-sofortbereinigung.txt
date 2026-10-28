@@ -1,0 +1,4 @@
+Runde 4, 28.10.2026: getrennte Aufrufe des bestehenden _aufraeumen.js
+all.media.prueflauf@web.de: 300 vorher, 300 entfernt, 0 nachher, Exit 0
+test@all-media.app: 39 vorher, 39 entfernt, 0 nachher, Exit 0
+Gesamt 339 entfernt. Nur Mitteilungen der beiden Prüfakteure/Empfänger.
