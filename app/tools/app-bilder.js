@@ -327,6 +327,26 @@ function metroLaeuft() {
 }
 
 (async () => {
+  // Bedienfolgen festhalten, ohne Anmeldung, Navigation oder App-Neustart.
+  // npm run mac:bilder -- --aktuell ../../pruefbelege/bunny-app/01-feed.png
+  const aktuell = process.argv.indexOf('--aktuell');
+  if (aktuell !== -1) {
+    const ziel = process.argv[aktuell + 1];
+    if (!ziel || !ziel.endsWith('.png')) throw new Error('--aktuell braucht einen PNG-Zielpfad.');
+    GERAET = pruefgeraet();
+    const fenster = [
+      '/Applications/Xcode.app/Contents/Applications/DeviceHub.app',
+      '/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app',
+    ].find((p) => fs.existsSync(p));
+    if (!fenster) throw new Error('Simulator-Fenster fehlt; kein verlässlicher Bildbeleg.');
+    execFileSync('open', ['-a', fenster, '--args', '-CurrentDeviceUDID', GERAET], { timeout: GRENZE });
+    schlaf(1500);
+    const bild = path.resolve(ziel);
+    fs.mkdirSync(path.dirname(bild), { recursive: true });
+    execFileSync('xcrun', ['simctl', 'io', GERAET, 'screenshot', bild], { timeout: GRENZE, stdio: 'ignore' });
+    log(`  Aktueller Bildschirm: ${bild}. Inhalt ansehen.`);
+    return;
+  }
   if (!metroLaeuft()) {
     log('  Metro laeuft nicht. Erst "npm run wlan" (oder "npm run up") starten.');
     process.exit(1);
