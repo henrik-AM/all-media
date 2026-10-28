@@ -1,1 +1,3 @@
 main Start 2026-10-28T08:21:27.660Z
+main Manifest unverändert true
+main beendet {"code":1,"signal":null}

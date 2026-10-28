@@ -1,0 +1,1279 @@
+{
+  "main": {
+    "name": "main",
+    "laeufe": [
+      {
+        "name": "smoke",
+        "status": "FEHL",
+        "gut": 75,
+        "gesamt": 75
+      },
+      {
+        "name": "feedback",
+        "status": "FEHL",
+        "gut": 51,
+        "gesamt": 52
+      },
+      {
+        "name": "erstellen",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      {
+        "name": "teilen",
+        "status": "FEHL",
+        "gut": 25,
+        "gesamt": 25
+      },
+      {
+        "name": "sync",
+        "status": "FEHL",
+        "gut": 5,
+        "gesamt": 6
+      },
+      {
+        "name": "uebernacht",
+        "status": "FEHL",
+        "gut": 11,
+        "gesamt": 11
+      },
+      {
+        "name": "schema",
+        "status": "FEHL",
+        "gut": 6,
+        "gesamt": 7
+      },
+      {
+        "name": "sammlungen",
+        "status": "OK",
+        "gut": 16,
+        "gesamt": 16
+      },
+      {
+        "name": "sammlungenweb",
+        "status": "FEHL",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "explorer",
+        "status": "FEHL",
+        "gut": 21,
+        "gesamt": 21
+      },
+      {
+        "name": "anhang",
+        "status": "FEHL",
+        "gut": 12,
+        "gesamt": 12
+      },
+      {
+        "name": "einstellungen",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      {
+        "name": "kontaktinfo",
+        "status": "FEHL",
+        "gut": 10,
+        "gesamt": 10
+      },
+      {
+        "name": "henrik",
+        "status": "FEHL",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "henrik2",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      {
+        "name": "insel",
+        "status": "FEHL",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "suche",
+        "status": "ZEIT",
+        "gut": null,
+        "gesamt": null
+      },
+      {
+        "name": "optionen",
+        "status": "ZEIT",
+        "gut": null,
+        "gesamt": null
+      },
+      {
+        "name": "kasten8",
+        "status": "FEHL",
+        "gut": 6,
+        "gesamt": 6
+      },
+      {
+        "name": "kasten12",
+        "status": "OK",
+        "gut": 65,
+        "gesamt": 65
+      },
+      {
+        "name": "kasten17",
+        "status": "OK",
+        "gut": 53,
+        "gesamt": 53
+      },
+      {
+        "name": "glocke",
+        "status": "FEHL",
+        "gut": 20,
+        "gesamt": 21
+      },
+      {
+        "name": "pfeile",
+        "status": "FEHL",
+        "gut": 67,
+        "gesamt": 68
+      },
+      {
+        "name": "profil",
+        "status": "FEHL",
+        "gut": 22,
+        "gesamt": 22
+      },
+      {
+        "name": "community",
+        "status": "FEHL",
+        "gut": 24,
+        "gesamt": 24
+      },
+      {
+        "name": "chatoptionen",
+        "status": "FEHL",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "player",
+        "status": "FEHL",
+        "gut": 15,
+        "gesamt": 15
+      },
+      {
+        "name": "gesten",
+        "status": "FEHL",
+        "gut": 9,
+        "gesamt": 9
+      },
+      {
+        "name": "kommentare",
+        "status": "FEHL",
+        "gut": 9,
+        "gesamt": 9
+      },
+      {
+        "name": "querformat",
+        "status": "FEHL",
+        "gut": null,
+        "gesamt": null
+      },
+      {
+        "name": "feinschliff",
+        "status": "FEHL",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "kamera",
+        "status": "FEHL",
+        "gut": 10,
+        "gesamt": 10
+      },
+      {
+        "name": "eigenes",
+        "status": "FEHL",
+        "gut": 18,
+        "gesamt": 19
+      },
+      {
+        "name": "datenbank",
+        "status": "FEHL",
+        "gut": 26,
+        "gesamt": 27
+      },
+      {
+        "name": "aktionen",
+        "status": "FEHL",
+        "gut": 43,
+        "gesamt": 43
+      },
+      {
+        "name": "gleichstand",
+        "status": "FEHL",
+        "gut": 50,
+        "gesamt": 50
+      },
+      {
+        "name": "handbuch",
+        "status": "FEHL",
+        "gut": 25,
+        "gesamt": 27
+      },
+      {
+        "name": "sichtbarkeit",
+        "status": "FEHL",
+        "gut": 28,
+        "gesamt": 33
+      },
+      {
+        "name": "likes",
+        "status": "FEHL",
+        "gut": 73,
+        "gesamt": 73
+      },
+      {
+        "name": "fremdprofil",
+        "status": "OK",
+        "gut": 14,
+        "gesamt": 14
+      },
+      {
+        "name": "chatanfrage",
+        "status": "OK",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "messengeranfrage",
+        "status": "OK",
+        "gut": 37,
+        "gesamt": 37
+      },
+      {
+        "name": "mitteilungen",
+        "status": "OK",
+        "gut": 24,
+        "gesamt": 24
+      },
+      {
+        "name": "dmsperre",
+        "status": "FEHL",
+        "gut": 14,
+        "gesamt": 16
+      },
+      {
+        "name": "lesebestaetigung",
+        "status": "OK",
+        "gut": 13,
+        "gesamt": 13
+      },
+      {
+        "name": "kanal",
+        "status": "FEHL",
+        "gut": 12,
+        "gesamt": 12
+      },
+      {
+        "name": "impressionen",
+        "status": "OK",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "rang",
+        "status": "OK",
+        "gut": 34,
+        "gesamt": 34
+      },
+      {
+        "name": "verlauf",
+        "status": "OK",
+        "gut": 45,
+        "gesamt": 45
+      },
+      {
+        "name": "storyvideos",
+        "status": "OK",
+        "gut": 13,
+        "gesamt": 13
+      },
+      {
+        "name": "storys",
+        "status": "OK",
+        "gut": 24,
+        "gesamt": 24
+      },
+      {
+        "name": "krypto",
+        "status": "OK",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "rechte",
+        "status": "OK",
+        "gut": 187,
+        "gesamt": 187
+      },
+      {
+        "name": "minderjaehrig",
+        "status": "OK",
+        "gut": 41,
+        "gesamt": 41
+      },
+      {
+        "name": "elternnummer",
+        "status": "FEHL",
+        "gut": 13,
+        "gesamt": 13
+      },
+      {
+        "name": "bremse",
+        "status": "OK",
+        "gut": 10,
+        "gesamt": 10
+      },
+      {
+        "name": "auth",
+        "status": "OK",
+        "gut": 9,
+        "gesamt": 9
+      },
+      {
+        "name": "zahlung",
+        "status": "OK",
+        "gut": 94,
+        "gesamt": 94
+      },
+      {
+        "name": "stumm",
+        "status": "OK",
+        "gut": 21,
+        "gesamt": 21
+      },
+      {
+        "name": "storyvideoregeln",
+        "status": "OK",
+        "gut": 27,
+        "gesamt": 27
+      },
+      {
+        "name": "kasten16-19",
+        "status": "OK",
+        "gut": 42,
+        "gesamt": 42
+      },
+      {
+        "name": "farbfilterrechnung",
+        "status": "OK",
+        "gut": 58,
+        "gesamt": 58
+      },
+      {
+        "name": "farbfilter",
+        "status": "FEHL",
+        "gut": 15,
+        "gesamt": 16
+      },
+      {
+        "name": "bildschirmzeit-einheit",
+        "status": "OK",
+        "gut": 78,
+        "gesamt": 78
+      },
+      {
+        "name": "bildschirmzeit",
+        "status": "FEHL",
+        "gut": 59,
+        "gesamt": 59
+      },
+      {
+        "name": "vorschlaege",
+        "status": "FEHL",
+        "gut": 69,
+        "gesamt": 69
+      },
+      {
+        "name": "lenkung-einheit",
+        "status": "OK",
+        "gut": 57,
+        "gesamt": 57
+      },
+      {
+        "name": "lenken",
+        "status": "FEHL",
+        "gut": 42,
+        "gesamt": 42
+      },
+      {
+        "name": "markierung-einheit",
+        "status": "OK",
+        "gut": 50,
+        "gesamt": 50
+      },
+      {
+        "name": "markieren",
+        "status": "FEHL",
+        "gut": 46,
+        "gesamt": 49
+      },
+      {
+        "name": "chatsync",
+        "status": "FEHL",
+        "gut": 39,
+        "gesamt": 39
+      }
+    ],
+    "gut": 2199,
+    "gesamt": 2219,
+    "fehler": {
+      "smoke": [],
+      "feedback": [
+        "FEHL Aufnahme wird übernommen  — new row for relation \"stories\" violates check constraint \"stories_media_url_eigener_eimer\""
+      ],
+      "erstellen": [],
+      "teilen": [],
+      "sync": [
+        "FEHL Jede Person im Raster traegt ihr Bereichs-Abzeichen — 9 Abzeichen bei 14 Kacheln"
+      ],
+      "uebernacht": [],
+      "schema": [
+        "FAIL  Alle angesprochenen Spalten gibt es im Schema  — web/server/sync-handlers.js:838  community_channels.1"
+      ],
+      "sammlungen": [],
+      "sammlungenweb": [],
+      "explorer": [],
+      "anhang": [],
+      "einstellungen": [],
+      "kontaktinfo": [],
+      "henrik": [],
+      "henrik2": [],
+      "insel": [],
+      "suche": [],
+      "optionen": [],
+      "kasten8": [],
+      "kasten12": [],
+      "kasten17": [],
+      "glocke": [
+        "FEHL Keine Fehler in der Konsole — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"
+      ],
+      "pfeile": [
+        "FEHL Keine Fehler in der Konsole — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"
+      ],
+      "profil": [],
+      "community": [],
+      "chatoptionen": [],
+      "player": [],
+      "gesten": [],
+      "kommentare": [],
+      "querformat": [],
+      "feinschliff": [],
+      "kamera": [],
+      "eigenes": [
+        "FEHL Videos-Profil zeigt die Info aus dem Konto — die geaenderte Info steht nicht auf der Seite"
+      ],
+      "datenbank": [
+        "FAIL  Ablage \"media\": Hochladen geht  — 400 {\"statusCode\":\"403\",\"error\":\"Unauthorized\",\"message\":\"new row violates row-level security policy\",\"code\":\"AccessDenied\"}"
+      ],
+      "aktionen": [],
+      "gleichstand": [],
+      "handbuch": [
+        "FEHL Ein Insight aus der App landet in der Datenbank  — new row for relation \"insights\" violates check constraint \"insights_media_url_eigener_eimer\"",
+        "FEHL Eine Sprachnachricht in die Community  — new row for relation \"ptt_messages\" violates check constraint \"ptt_messages_audio_url_eigener_eimer\""
+      ],
+      "sichtbarkeit": [
+        "FEHL Bei „Alle\" sieht das andere Konto die Storys  — 0 Stück",
+        "FEHL „Niemand bis auf …\" laesst die eingetragene Person durch  — 0 sichtbar",
+        "FEHL Eine PTT-Nachricht laesst sich senden  — new row for relation \"ptt_messages\" violates check constraint \"ptt_messages_audio_url_eigener_eimer\"",
+        "FEHL Bei „Alle\" hoert das andere Konto sie  — 0 sichtbar",
+        "FEHL Die eigene Nachricht bleibt einem selbst sichtbar  — 0 sichtbar"
+      ],
+      "likes": [],
+      "fremdprofil": [],
+      "chatanfrage": [],
+      "messengeranfrage": [],
+      "mitteilungen": [],
+      "dmsperre": [
+        "FEHL In eine Gruppe darf sie trotz „Niemand\"",
+        "FEHL Nachgezählt: sie steht drin"
+      ],
+      "lesebestaetigung": [],
+      "kanal": [],
+      "impressionen": [],
+      "rang": [],
+      "verlauf": [],
+      "storyvideos": [],
+      "storys": [],
+      "krypto": [],
+      "rechte": [],
+      "minderjaehrig": [],
+      "elternnummer": [],
+      "bremse": [],
+      "auth": [],
+      "zahlung": [],
+      "stumm": [],
+      "storyvideoregeln": [],
+      "kasten16-19": [],
+      "farbfilterrechnung": [],
+      "farbfilter": [
+        "FEHL Keine Fehler im Browser — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"
+      ],
+      "bildschirmzeit-einheit": [],
+      "bildschirmzeit": [],
+      "vorschlaege": [],
+      "lenkung-einheit": [],
+      "lenken": [],
+      "markierung-einheit": [],
+      "markieren": [
+        "FEHL B ist Mitglied  — new row violates row-level security policy for table \"chat_members\"",
+        "FEHL markierungen: Nachricht-Zeile für B",
+        "FEHL Messenger: „@\" in der Chatliste von B"
+      ],
+      "chatsync": []
+    },
+    "quellstandGeaendert": false,
+    "aufgeraeumt": 445
+  },
+  "bunny": {
+    "name": "bunny-live",
+    "laeufe": [
+      {
+        "name": "smoke",
+        "status": "FEHL",
+        "gut": 75,
+        "gesamt": 75
+      },
+      {
+        "name": "feedback",
+        "status": "FEHL",
+        "gut": 52,
+        "gesamt": 52
+      },
+      {
+        "name": "erstellen",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      {
+        "name": "teilen",
+        "status": "FEHL",
+        "gut": 25,
+        "gesamt": 25
+      },
+      {
+        "name": "sync",
+        "status": "FEHL",
+        "gut": 5,
+        "gesamt": 6
+      },
+      {
+        "name": "uebernacht",
+        "status": "FEHL",
+        "gut": 11,
+        "gesamt": 11
+      },
+      {
+        "name": "schema",
+        "status": "OK",
+        "gut": 7,
+        "gesamt": 7
+      },
+      {
+        "name": "sammlungen",
+        "status": "OK",
+        "gut": 16,
+        "gesamt": 16
+      },
+      {
+        "name": "sammlungenweb",
+        "status": "FEHL",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "explorer",
+        "status": "FEHL",
+        "gut": 20,
+        "gesamt": 21
+      },
+      {
+        "name": "anhang",
+        "status": "FEHL",
+        "gut": 12,
+        "gesamt": 12
+      },
+      {
+        "name": "einstellungen",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      {
+        "name": "kontaktinfo",
+        "status": "FEHL",
+        "gut": 10,
+        "gesamt": 10
+      },
+      {
+        "name": "henrik",
+        "status": "FEHL",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "henrik2",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      {
+        "name": "insel",
+        "status": "FEHL",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "suche",
+        "status": "FEHL",
+        "gut": 13,
+        "gesamt": 13
+      },
+      {
+        "name": "optionen",
+        "status": "FEHL",
+        "gut": 16,
+        "gesamt": 16
+      },
+      {
+        "name": "kasten8",
+        "status": "FEHL",
+        "gut": 6,
+        "gesamt": 6
+      },
+      {
+        "name": "kasten12",
+        "status": "OK",
+        "gut": 65,
+        "gesamt": 65
+      },
+      {
+        "name": "kasten17",
+        "status": "OK",
+        "gut": 53,
+        "gesamt": 53
+      },
+      {
+        "name": "glocke",
+        "status": "FEHL",
+        "gut": 20,
+        "gesamt": 21
+      },
+      {
+        "name": "pfeile",
+        "status": "FEHL",
+        "gut": 67,
+        "gesamt": 68
+      },
+      {
+        "name": "profil",
+        "status": "ZEIT",
+        "gut": 22,
+        "gesamt": 22
+      },
+      {
+        "name": "community",
+        "status": "FEHL",
+        "gut": 24,
+        "gesamt": 24
+      },
+      {
+        "name": "chatoptionen",
+        "status": "FEHL",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "player",
+        "status": "FEHL",
+        "gut": 15,
+        "gesamt": 15
+      },
+      {
+        "name": "gesten",
+        "status": "FEHL",
+        "gut": 9,
+        "gesamt": 9
+      },
+      {
+        "name": "kommentare",
+        "status": "FEHL",
+        "gut": 9,
+        "gesamt": 9
+      },
+      {
+        "name": "querformat",
+        "status": "FEHL",
+        "gut": null,
+        "gesamt": null
+      },
+      {
+        "name": "feinschliff",
+        "status": "FEHL",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "kamera",
+        "status": "FEHL",
+        "gut": 10,
+        "gesamt": 10
+      },
+      {
+        "name": "eigenes",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      {
+        "name": "datenbank",
+        "status": "FEHL",
+        "gut": 26,
+        "gesamt": 27
+      },
+      {
+        "name": "aktionen",
+        "status": "FEHL",
+        "gut": 43,
+        "gesamt": 43
+      },
+      {
+        "name": "gleichstand",
+        "status": "OK",
+        "gut": 50,
+        "gesamt": 50
+      },
+      {
+        "name": "handbuch",
+        "status": "FEHL",
+        "gut": 25,
+        "gesamt": 27
+      },
+      {
+        "name": "sichtbarkeit",
+        "status": "FEHL",
+        "gut": 28,
+        "gesamt": 33
+      },
+      {
+        "name": "likes",
+        "status": "FEHL",
+        "gut": 73,
+        "gesamt": 73
+      },
+      {
+        "name": "fremdprofil",
+        "status": "OK",
+        "gut": 14,
+        "gesamt": 14
+      },
+      {
+        "name": "chatanfrage",
+        "status": "OK",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "messengeranfrage",
+        "status": "OK",
+        "gut": 37,
+        "gesamt": 37
+      },
+      {
+        "name": "mitteilungen",
+        "status": "OK",
+        "gut": 24,
+        "gesamt": 24
+      },
+      {
+        "name": "dmsperre",
+        "status": "FEHL",
+        "gut": 14,
+        "gesamt": 16
+      },
+      {
+        "name": "lesebestaetigung",
+        "status": "OK",
+        "gut": 13,
+        "gesamt": 13
+      },
+      {
+        "name": "kanal",
+        "status": "FEHL",
+        "gut": 12,
+        "gesamt": 12
+      },
+      {
+        "name": "impressionen",
+        "status": "OK",
+        "gut": 17,
+        "gesamt": 17
+      },
+      {
+        "name": "rang",
+        "status": "OK",
+        "gut": 34,
+        "gesamt": 34
+      },
+      {
+        "name": "verlauf",
+        "status": "OK",
+        "gut": 45,
+        "gesamt": 45
+      },
+      {
+        "name": "storyvideos",
+        "status": "OK",
+        "gut": 13,
+        "gesamt": 13
+      },
+      {
+        "name": "storys",
+        "status": "OK",
+        "gut": 24,
+        "gesamt": 24
+      },
+      {
+        "name": "krypto",
+        "status": "OK",
+        "gut": 23,
+        "gesamt": 23
+      },
+      {
+        "name": "rechte",
+        "status": "OK",
+        "gut": 197,
+        "gesamt": 197
+      },
+      {
+        "name": "minderjaehrig",
+        "status": "OK",
+        "gut": 41,
+        "gesamt": 41
+      },
+      {
+        "name": "elternnummer",
+        "status": "FEHL",
+        "gut": 13,
+        "gesamt": 13
+      },
+      {
+        "name": "bremse",
+        "status": "OK",
+        "gut": 10,
+        "gesamt": 10
+      },
+      {
+        "name": "auth",
+        "status": "OK",
+        "gut": 9,
+        "gesamt": 9
+      },
+      {
+        "name": "zahlung",
+        "status": "OK",
+        "gut": 94,
+        "gesamt": 94
+      },
+      {
+        "name": "stumm",
+        "status": "OK",
+        "gut": 21,
+        "gesamt": 21
+      },
+      {
+        "name": "storyvideoregeln",
+        "status": "OK",
+        "gut": 27,
+        "gesamt": 27
+      },
+      {
+        "name": "kasten16-19",
+        "status": "OK",
+        "gut": 42,
+        "gesamt": 42
+      },
+      {
+        "name": "farbfilterrechnung",
+        "status": "OK",
+        "gut": 58,
+        "gesamt": 58
+      },
+      {
+        "name": "farbfilter",
+        "status": "FEHL",
+        "gut": 15,
+        "gesamt": 16
+      },
+      {
+        "name": "bildschirmzeit-einheit",
+        "status": "OK",
+        "gut": 78,
+        "gesamt": 78
+      },
+      {
+        "name": "bildschirmzeit",
+        "status": "FEHL",
+        "gut": 59,
+        "gesamt": 59
+      },
+      {
+        "name": "vorschlaege",
+        "status": "FEHL",
+        "gut": 69,
+        "gesamt": 69
+      },
+      {
+        "name": "lenkung-einheit",
+        "status": "OK",
+        "gut": 57,
+        "gesamt": 57
+      },
+      {
+        "name": "lenken",
+        "status": "OK",
+        "gut": 42,
+        "gesamt": 42
+      },
+      {
+        "name": "markierung-einheit",
+        "status": "OK",
+        "gut": 50,
+        "gesamt": 50
+      },
+      {
+        "name": "markieren",
+        "status": "FEHL",
+        "gut": 46,
+        "gesamt": 49
+      },
+      {
+        "name": "chatsync",
+        "status": "FEHL",
+        "gut": 38,
+        "gesamt": 39
+      }
+    ],
+    "gut": 2239,
+    "gesamt": 2258,
+    "fehler": {
+      "smoke": [],
+      "feedback": [],
+      "erstellen": [],
+      "teilen": [],
+      "sync": [
+        "FEHL Jede Person im Raster traegt ihr Bereichs-Abzeichen — 9 Abzeichen bei 14 Kacheln"
+      ],
+      "uebernacht": [],
+      "schema": [],
+      "sammlungen": [],
+      "sammlungenweb": [],
+      "explorer": [
+        "FEHL Der Abspielknopf laesst die Zeit laufen — Zeit steht bei 0:00 / 0:30"
+      ],
+      "anhang": [],
+      "einstellungen": [],
+      "kontaktinfo": [],
+      "henrik": [],
+      "henrik2": [],
+      "insel": [],
+      "suche": [],
+      "optionen": [],
+      "kasten8": [],
+      "kasten12": [],
+      "kasten17": [],
+      "glocke": [
+        "FEHL Keine Fehler in der Konsole — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"
+      ],
+      "pfeile": [
+        "FEHL Keine Fehler in der Konsole — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"
+      ],
+      "profil": [],
+      "community": [],
+      "chatoptionen": [],
+      "player": [],
+      "gesten": [],
+      "kommentare": [],
+      "querformat": [],
+      "feinschliff": [],
+      "kamera": [],
+      "eigenes": [],
+      "datenbank": [
+        "FAIL  Ablage \"media\": Hochladen geht  — 400 {\"statusCode\":\"403\",\"error\":\"Unauthorized\",\"message\":\"new row violates row-level security policy\",\"code\":\"AccessDenied\"}"
+      ],
+      "aktionen": [],
+      "gleichstand": [],
+      "handbuch": [
+        "FEHL Ein Insight aus der App landet in der Datenbank  — new row for relation \"insights\" violates check constraint \"insights_media_url_eigener_eimer\"",
+        "FEHL Eine Sprachnachricht in die Community  — new row for relation \"ptt_messages\" violates check constraint \"ptt_messages_audio_url_eigener_eimer\""
+      ],
+      "sichtbarkeit": [
+        "FEHL Bei „Alle\" sieht das andere Konto die Storys  — 0 Stück",
+        "FEHL „Niemand bis auf …\" laesst die eingetragene Person durch  — 0 sichtbar",
+        "FEHL Eine PTT-Nachricht laesst sich senden  — new row for relation \"ptt_messages\" violates check constraint \"ptt_messages_audio_url_eigener_eimer\"",
+        "FEHL Bei „Alle\" hoert das andere Konto sie  — 0 sichtbar",
+        "FEHL Die eigene Nachricht bleibt einem selbst sichtbar  — 0 sichtbar"
+      ],
+      "likes": [],
+      "fremdprofil": [],
+      "chatanfrage": [],
+      "messengeranfrage": [],
+      "mitteilungen": [],
+      "dmsperre": [
+        "FEHL In eine Gruppe darf sie trotz „Niemand\"",
+        "FEHL Nachgezählt: sie steht drin"
+      ],
+      "lesebestaetigung": [],
+      "kanal": [],
+      "impressionen": [],
+      "rang": [],
+      "verlauf": [],
+      "storyvideos": [],
+      "storys": [],
+      "krypto": [],
+      "rechte": [],
+      "minderjaehrig": [],
+      "elternnummer": [],
+      "bremse": [],
+      "auth": [],
+      "zahlung": [],
+      "stumm": [],
+      "storyvideoregeln": [],
+      "kasten16-19": [],
+      "farbfilterrechnung": [],
+      "farbfilter": [
+        "FEHL Keine Fehler im Browser — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"
+      ],
+      "bildschirmzeit-einheit": [],
+      "bildschirmzeit": [],
+      "vorschlaege": [],
+      "lenkung-einheit": [],
+      "lenken": [],
+      "markierung-einheit": [],
+      "markieren": [
+        "FEHL B ist Mitglied  — new row violates row-level security policy for table \"chat_members\"",
+        "FEHL markierungen: Nachricht-Zeile für B",
+        "FEHL Messenger: „@\" in der Chatliste von B"
+      ],
+      "chatsync": [
+        "FEHL … und bei B steht genau dieser Text, ohne Neuladen (≤ 15 s)"
+      ]
+    },
+    "quellstandGeaendert": false,
+    "aufgeraeumt": 465
+  },
+  "abweichungen": [
+    {
+      "name": "feedback",
+      "main": {
+        "name": "feedback",
+        "status": "FEHL",
+        "gut": 51,
+        "gesamt": 52
+      },
+      "bunny": {
+        "name": "feedback",
+        "status": "FEHL",
+        "gut": 52,
+        "gesamt": 52
+      },
+      "mainFehler": [
+        "FEHL Aufnahme wird übernommen  — new row for relation \"stories\" violates check constraint \"stories_media_url_eigener_eimer\""
+      ],
+      "bunnyFehler": []
+    },
+    {
+      "name": "schema",
+      "main": {
+        "name": "schema",
+        "status": "FEHL",
+        "gut": 6,
+        "gesamt": 7
+      },
+      "bunny": {
+        "name": "schema",
+        "status": "OK",
+        "gut": 7,
+        "gesamt": 7
+      },
+      "mainFehler": [
+        "FAIL  Alle angesprochenen Spalten gibt es im Schema  — web/server/sync-handlers.js:838  community_channels.1"
+      ],
+      "bunnyFehler": []
+    },
+    {
+      "name": "explorer",
+      "main": {
+        "name": "explorer",
+        "status": "FEHL",
+        "gut": 21,
+        "gesamt": 21
+      },
+      "bunny": {
+        "name": "explorer",
+        "status": "FEHL",
+        "gut": 20,
+        "gesamt": 21
+      },
+      "mainFehler": [],
+      "bunnyFehler": [
+        "FEHL Der Abspielknopf laesst die Zeit laufen — Zeit steht bei 0:00 / 0:30"
+      ]
+    },
+    {
+      "name": "suche",
+      "main": {
+        "name": "suche",
+        "status": "ZEIT",
+        "gut": null,
+        "gesamt": null
+      },
+      "bunny": {
+        "name": "suche",
+        "status": "FEHL",
+        "gut": 13,
+        "gesamt": 13
+      },
+      "mainFehler": [],
+      "bunnyFehler": []
+    },
+    {
+      "name": "optionen",
+      "main": {
+        "name": "optionen",
+        "status": "ZEIT",
+        "gut": null,
+        "gesamt": null
+      },
+      "bunny": {
+        "name": "optionen",
+        "status": "FEHL",
+        "gut": 16,
+        "gesamt": 16
+      },
+      "mainFehler": [],
+      "bunnyFehler": []
+    },
+    {
+      "name": "profil",
+      "main": {
+        "name": "profil",
+        "status": "FEHL",
+        "gut": 22,
+        "gesamt": 22
+      },
+      "bunny": {
+        "name": "profil",
+        "status": "ZEIT",
+        "gut": 22,
+        "gesamt": 22
+      },
+      "mainFehler": [],
+      "bunnyFehler": []
+    },
+    {
+      "name": "eigenes",
+      "main": {
+        "name": "eigenes",
+        "status": "FEHL",
+        "gut": 18,
+        "gesamt": 19
+      },
+      "bunny": {
+        "name": "eigenes",
+        "status": "FEHL",
+        "gut": 19,
+        "gesamt": 19
+      },
+      "mainFehler": [
+        "FEHL Videos-Profil zeigt die Info aus dem Konto — die geaenderte Info steht nicht auf der Seite"
+      ],
+      "bunnyFehler": []
+    },
+    {
+      "name": "gleichstand",
+      "main": {
+        "name": "gleichstand",
+        "status": "FEHL",
+        "gut": 50,
+        "gesamt": 50
+      },
+      "bunny": {
+        "name": "gleichstand",
+        "status": "OK",
+        "gut": 50,
+        "gesamt": 50
+      },
+      "mainFehler": [],
+      "bunnyFehler": []
+    },
+    {
+      "name": "rechte",
+      "main": {
+        "name": "rechte",
+        "status": "OK",
+        "gut": 187,
+        "gesamt": 187
+      },
+      "bunny": {
+        "name": "rechte",
+        "status": "OK",
+        "gut": 197,
+        "gesamt": 197
+      },
+      "mainFehler": [],
+      "bunnyFehler": []
+    },
+    {
+      "name": "lenken",
+      "main": {
+        "name": "lenken",
+        "status": "FEHL",
+        "gut": 42,
+        "gesamt": 42
+      },
+      "bunny": {
+        "name": "lenken",
+        "status": "OK",
+        "gut": 42,
+        "gesamt": 42
+      },
+      "mainFehler": [],
+      "bunnyFehler": []
+    },
+    {
+      "name": "chatsync",
+      "main": {
+        "name": "chatsync",
+        "status": "FEHL",
+        "gut": 39,
+        "gesamt": 39
+      },
+      "bunny": {
+        "name": "chatsync",
+        "status": "FEHL",
+        "gut": 38,
+        "gesamt": 39
+      },
+      "mainFehler": [],
+      "bunnyFehler": [
+        "FEHL … und bei B steht genau dieser Text, ohne Neuladen (≤ 15 s)"
+      ]
+    }
+  ]
+}

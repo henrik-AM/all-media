@@ -1,0 +1,1 @@
+{"main":{"gut":2199,"gesamt":2219,"gruen":26},"bunny":{"gut":2239,"gesamt":2258,"gruen":29},"abweichend":["feedback","schema","explorer","suche","optionen","profil","eigenes","gleichstand","rechte","lenken","chatsync"]}

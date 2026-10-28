@@ -1,7 +1,5 @@
 # Gesamtläufe main und Bunny
 
-**VORLÄUFIG / NICHT ABGENOMMEN:** Main-Werte aus dem wegen Fixtureänderung verworfenen Erstlauf. Die laufende unveränderte Wiederholung und serielle Nachprüfungen ersetzen diese Tabelle nach Abschluss.
-
 Gleiche Live-Datenbank einschließlich Schema 115; main ohne Bunny. OK bedeutet Exit 0, FEHL einen nicht erfolgreichen Prozess, ZEIT einen unvollständigen Lauf nach 15 Minuten. Die Prüfzahlen enthalten nur tatsächlich gezählte Zeilen.
 
 | Lauf | main | bunny-live |
@@ -15,15 +13,15 @@ Gleiche Live-Datenbank einschließlich Schema 115; main ohne Bunny. OK bedeutet 
 | schema | FEHL 6/7 | OK 7/7 |
 | sammlungen | OK 16/16 | OK 16/16 |
 | sammlungenweb | FEHL 23/23 | FEHL 23/23 |
-| explorer | FEHL 20/21 | FEHL 20/21 |
+| explorer | FEHL 21/21 | FEHL 20/21 |
 | anhang | FEHL 12/12 | FEHL 12/12 |
-| einstellungen | ZEIT 16/19 | FEHL 19/19 |
+| einstellungen | FEHL 19/19 | FEHL 19/19 |
 | kontaktinfo | FEHL 10/10 | FEHL 10/10 |
 | henrik | FEHL 23/23 | FEHL 23/23 |
 | henrik2 | FEHL 19/19 | FEHL 19/19 |
 | insel | FEHL 17/17 | FEHL 17/17 |
-| suche | FEHL 13/13 | FEHL 13/13 |
-| optionen | FEHL 16/16 | FEHL 16/16 |
+| suche | ZEIT ohne Zählung | FEHL 13/13 |
+| optionen | ZEIT ohne Zählung | FEHL 16/16 |
 | kasten8 | FEHL 6/6 | FEHL 6/6 |
 | kasten12 | OK 65/65 | OK 65/65 |
 | kasten17 | OK 53/53 | OK 53/53 |
@@ -38,7 +36,7 @@ Gleiche Live-Datenbank einschließlich Schema 115; main ohne Bunny. OK bedeutet 
 | querformat | FEHL ohne Zählung | FEHL ohne Zählung |
 | feinschliff | FEHL 23/23 | FEHL 23/23 |
 | kamera | FEHL 10/10 | FEHL 10/10 |
-| eigenes | FEHL 19/19 | FEHL 19/19 |
+| eigenes | FEHL 18/19 | FEHL 19/19 |
 | datenbank | FEHL 26/27 | FEHL 26/27 |
 | aktionen | FEHL 43/43 | FEHL 43/43 |
 | gleichstand | FEHL 50/50 | OK 50/50 |
@@ -75,9 +73,9 @@ Gleiche Live-Datenbank einschließlich Schema 115; main ohne Bunny. OK bedeutet 
 | lenkung-einheit | OK 57/57 | OK 57/57 |
 | lenken | FEHL 42/42 | OK 42/42 |
 | markierung-einheit | OK 50/50 | OK 50/50 |
-| markieren | ZEIT 46/49 | FEHL 46/49 |
+| markieren | FEHL 46/49 | FEHL 46/49 |
 | chatsync | FEHL 39/39 | FEHL 38/39 |
-| **Gezählte Prüfungen** | **2225/2248** | **2239/2258** |
+| **Gezählte Prüfungen** | **2199/2219** | **2239/2258** |
 | **Exit 0** | **26/71** | **29/71** |
 | **Nicht erfolgreich einschließlich Zeitgrenze** | **45/71** | **42/71** |
 | **Davon Zeitgrenze** | **2/71** | **1/71** |
@@ -88,23 +86,18 @@ Gleiche Live-Datenbank einschließlich Schema 115; main ohne Bunny. OK bedeutet 
   - main: FEHL Aufnahme wird übernommen  — new row for relation "stories" violates check constraint "stories_media_url_eigener_eimer"
 - schema: main FEHL 6/7, Bunny OK 7/7.
   - main: FAIL  Alle angesprochenen Spalten gibt es im Schema  — web/server/sync-handlers.js:838  community_channels.1
-- einstellungen: main ZEIT 16/19, Bunny FEHL 19/19.
-  - main: FEHL Ein Erklärtext geht auf — page.click: Timeout 8000ms exceeded.
-  - main: FEHL Konto löschen fragt erst nach — page.click: Timeout 8000ms exceeded.
-  - main: FEHL Kein Punkt gibt mehr "folgt mit dem Backend" aus — page.click: Timeout 8000ms exceeded.
+- explorer: main FEHL 21/21, Bunny FEHL 20/21.
+  - Bunny: FEHL Der Abspielknopf laesst die Zeit laufen — Zeit steht bei 0:00 / 0:30
+- suche: main ZEIT ohne Zählung, Bunny FEHL 13/13.
+- optionen: main ZEIT ohne Zählung, Bunny FEHL 16/16.
 - profil: main FEHL 22/22, Bunny ZEIT 22/22.
+- eigenes: main FEHL 18/19, Bunny FEHL 19/19.
+  - main: FEHL Videos-Profil zeigt die Info aus dem Konto — die geaenderte Info steht nicht auf der Seite
 - gleichstand: main FEHL 50/50, Bunny OK 50/50.
 - rechte: main OK 187/187, Bunny OK 197/197.
 - lenken: main FEHL 42/42, Bunny OK 42/42.
-- markieren: main ZEIT 46/49, Bunny FEHL 46/49.
-  - main: FEHL B ist Mitglied  — new row violates row-level security policy for table "chat_members"
-  - main: FEHL markierungen: Nachricht-Zeile für B
-  - main: FEHL Messenger: „@" in der Chatliste von B
-  - Bunny: FEHL B ist Mitglied  — new row violates row-level security policy for table "chat_members"
-  - Bunny: FEHL markierungen: Nachricht-Zeile für B
-  - Bunny: FEHL Messenger: „@" in der Chatliste von B
 - chatsync: main FEHL 39/39, Bunny FEHL 38/39.
   - Bunny: FEHL … und bei B steht genau dieser Text, ohne Neuladen (≤ 15 s)
 
-Quellstandänderung gemeldet: main true, Bunny false.
-Automatisch entfernte Mitteilungen: main 465, Bunny 465. Separate Nachzählung siehe 06-bereinigung.txt.
+Quellstandänderung gemeldet: main false, Bunny false.
+Automatisch entfernte Mitteilungen: main 445, Bunny 465. Separate Nachzählung siehe 06-bereinigung.txt.

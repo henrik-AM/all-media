@@ -5,3 +5,5 @@ Teilen in Community 44444444-a11e-4d1a-8000-000000000004 fehlgeschlagen: new row
 bildschirmzeit_stand fehlgeschlagen: TypeError: fetch failed
 POST /api/reset fehlgeschlagen: TypeError: fetch failed
 POST /api/reset fehlgeschlagen: TypeError: fetch failed
+POST /api/krypto/schluessel fehlgeschlagen: new row violates row-level security policy "nur_freigegebene" for table "krypto_schluessel"
+POST /api/krypto/schluessel fehlgeschlagen: new row violates row-level security policy "nur_freigegebene" for table "krypto_schluessel"
