@@ -1,0 +1,926 @@
+[
+  {
+    "pfad": "app/lib/aktionen.ts",
+    "sha256": "a2c6f92926a8d30a465120765617ff3ee82712ad8dbb1b18a72c0123279be0da"
+  },
+  {
+    "pfad": "app/lib/animations.ts",
+    "sha256": "afa7b68b0ea24e9933fd5d11a367d693f296fe517712ae1ce3e21da6c6992757"
+  },
+  {
+    "pfad": "app/lib/aufnehmen.ts",
+    "sha256": "944857699050574b5ccc2915637a808efbc785589006db4d9b7dc3c5f98e0662"
+  },
+  {
+    "pfad": "app/lib/bildschirmzeit.ts",
+    "sha256": "2b2319687620b8b5164325b7905236b25d6d70420e891c1058499df146f7d952"
+  },
+  {
+    "pfad": "app/lib/daten.ts",
+    "sha256": "6edde87595fc045e101028231b600e4284788276f3c3dff3775bbe472ef830ed"
+  },
+  {
+    "pfad": "app/lib/haptics.ts",
+    "sha256": "1ee988640e310f4a2f63c0dd35e04ad6776ba7bca930bcb076daa3127686b3d4"
+  },
+  {
+    "pfad": "app/lib/impressionen.ts",
+    "sha256": "12e6cd73629ee44306a7153180499fcca3144c550c1e857a845bd183112859db"
+  },
+  {
+    "pfad": "app/lib/interesse.ts",
+    "sha256": "b1cda7b62c1ced9ceb2ebe46bb05322050e19b760f86f6447ba0464eb36ddb4c"
+  },
+  {
+    "pfad": "app/lib/kameraErlaubnis.ts",
+    "sha256": "672019668a7feb12b56ec078edcf01dd9bd16bea9580684bfaad7b03006189c0"
+  },
+  {
+    "pfad": "app/lib/kommentare.ts",
+    "sha256": "dd7fdf61df1a90ca67f4eac01b5a0cc5e0dd167391020a1f0d98e966583ed18f"
+  },
+  {
+    "pfad": "app/lib/kontakte.ts",
+    "sha256": "ab7b9a98d208e1d7ad238b144676dbd81fc9f8e53d108e272995630856118a98"
+  },
+  {
+    "pfad": "app/lib/kontenspeicher.ts",
+    "sha256": "cc11e45294c8633fee4c9c6a800727e4d8e0a2d26f4011b749ec66bd2c7b0beb"
+  },
+  {
+    "pfad": "app/lib/krypto.ts",
+    "sha256": "9019249662a3641c0dfc706668373f3957ff1f5d18df5d9f01e1953c8884222e"
+  },
+  {
+    "pfad": "app/lib/lenkung.ts",
+    "sha256": "d9fc9cc04efc5555a8bdff8963a386cf1441ec39091497c489238c06a1b2e1e0"
+  },
+  {
+    "pfad": "app/lib/links.ts",
+    "sha256": "189f2e9317f40d1bd398ec02086fa63bdd7add8fcde24ab330f364c408a6ec1f"
+  },
+  {
+    "pfad": "app/lib/markierung.ts",
+    "sha256": "69a5e3785603b187c34602915a5d9a5bfde57f4088556eea9632b950fdca3749"
+  },
+  {
+    "pfad": "app/lib/medien.ts",
+    "sha256": "c403e3b2dbb9395963cee7a0b99af9b5fd8ce3c6087001c7a0ba747018ae5a77"
+  },
+  {
+    "pfad": "app/lib/profilbild.ts",
+    "sha256": "bc26bbad854dc2ae2e64512318fa22556c145fbf1683783073f6b6f1c4613910"
+  },
+  {
+    "pfad": "app/lib/raster.ts",
+    "sha256": "f1ca3013d881357bf9fd871975fc4c6c17ddde2b9a1b7a7d29a3880fddf3054d"
+  },
+  {
+    "pfad": "app/lib/registrierung.ts",
+    "sha256": "5e799a67671edc49a759ff3c196eb1768bf2dd39a6ced645898937674d8bff75"
+  },
+  {
+    "pfad": "app/lib/rueckkehr.ts",
+    "sha256": "ab007aa5779ca631355bd344c1aa6a860dbd4843edc5b7a635539e3b1dfa6df0"
+  },
+  {
+    "pfad": "app/lib/sitzungsspeicher.ts",
+    "sha256": "0a315ebfb01b954086f7e9d0a381e27bb6197b2387214584e5b20bf2aef53d5a"
+  },
+  {
+    "pfad": "app/lib/supabaseAuth.ts",
+    "sha256": "98a94374209a2e27ecd3bd7ee7a76f385b4868985446f4bcb05d3995644ca71e"
+  },
+  {
+    "pfad": "app/lib/supabaseStorage.ts",
+    "sha256": "a5eea38a97e0fa84e50cdb82b1ad5a5496b9d3b4379fb84e5ed92862ab48b03a"
+  },
+  {
+    "pfad": "app/lib/supabaseTypes.ts",
+    "sha256": "7d88c4cb1e5a889d3ce63182ea1244fb180e9d6b0413335068f73f64994bdc4b"
+  },
+  {
+    "pfad": "app/lib/toene.ts",
+    "sha256": "90b50c228e385f99bdec5db1b1613fca8a9645c16aa3cc463fe5ad403a540580"
+  },
+  {
+    "pfad": "app/lib/tonModus.ts",
+    "sha256": "0522793c4c8d5ceff5d6fdd93ed213f1ce83f28eeb3ddc36ab81bab6c83f7379"
+  },
+  {
+    "pfad": "app/lib/useAktionen.ts",
+    "sha256": "1fe96afc79cd12a92d086f23778d5ff88fbd02a7a8989439b84920254ae586bf"
+  },
+  {
+    "pfad": "app/lib/useImpressionen.ts",
+    "sha256": "2fb1800577798e14f4bbf38aa096563ef1ea97f423ecc8e425c778cc456ca14e"
+  },
+  {
+    "pfad": "app/lib/videoEinstellungen.ts",
+    "sha256": "f57d64ec1905111b6543be564a6565bd159e3a5aa79799af27d434928fe6190f"
+  },
+  {
+    "pfad": "app/lib/vorschlaege.ts",
+    "sha256": "2ec7ca948b51bf0ffe0b83114081663b0baadba913328d17f539188e91122d81"
+  },
+  {
+    "pfad": "app/lib/zahlen.ts",
+    "sha256": "352eb0a71b657e4e972eae5dcbf690bc761f18c599df556be15e55275dd2d209"
+  },
+  {
+    "pfad": "app/lib/ziehen.ts",
+    "sha256": "f9ba05d4b0b78e5ee279fbdf0161a321306c40fb33f7c0eaf5c666e1dd74d11a"
+  },
+  {
+    "pfad": "app/lib/ziele.ts",
+    "sha256": "5bb742c5920f7b81b854dca06292d5b5379546c59567b3ba6c0f474f5d820163"
+  },
+  {
+    "pfad": "app/test/_aktionen.js",
+    "sha256": "2ea028a278709f18e7fe64ba221ee2389143d13fa5b383f4f824de401b14beee"
+  },
+  {
+    "pfad": "app/test/_anhang.js",
+    "sha256": "eebaa5ebbbe963fa223c014300ce21c8e80303d08d932e50eaaa778cbd0e5eca"
+  },
+  {
+    "pfad": "app/test/_ansehen.js",
+    "sha256": "a7d7464afa7b0b1a313448e2780e25d04277e9c035ac146a50e72e618c78fd97"
+  },
+  {
+    "pfad": "app/test/_aufraeumen.js",
+    "sha256": "0ad1589917f6d010d7cad22fb09a6986468a407423ddb0354834ae51ed7e5d57"
+  },
+  {
+    "pfad": "app/test/_auth.js",
+    "sha256": "3699abf47a7e781a9b4a3288ae5cf334a233c1b6f646021fd383e3a2c4c3dd75"
+  },
+  {
+    "pfad": "app/test/_bestand.js",
+    "sha256": "cb987b50058f34e3a74b252f7582b760913e61e87d29c75b1ccf09970a1a4f24"
+  },
+  {
+    "pfad": "app/test/_bildschirmzeit_einheit.js",
+    "sha256": "009fcde0cd561bbc296bd76d178a7fc1db795ae08be6f3503b39fb85f47fa253"
+  },
+  {
+    "pfad": "app/test/_bildschirmzeit.js",
+    "sha256": "80422f4ceec81e56a60bca42b11e66fa2d1705d037d50d182f6e44d632ded49c"
+  },
+  {
+    "pfad": "app/test/_bremse.js",
+    "sha256": "a95c2e19223783a0b0f091427b16ad4b9fb040c5023c86ac894e9e17ee603ed4"
+  },
+  {
+    "pfad": "app/test/_chatanfrage.js",
+    "sha256": "716e79dd9124a8addf420cf2e5f3a635fac5f5e5d75f664a2ef863b33f3fb74a"
+  },
+  {
+    "pfad": "app/test/_chatoptionen.js",
+    "sha256": "57e63843fc7bf5d96cdf81785ab746ccecac247b9eb4bf313f9537fe709a0197"
+  },
+  {
+    "pfad": "app/test/_chatsync.js",
+    "sha256": "633a0e985bd314c68e2d1aec13b929c72cacb40196198fc02c8c3e80bd26a05a"
+  },
+  {
+    "pfad": "app/test/_community.js",
+    "sha256": "2397cf054a313439d4e58aebbb0194a204d86df110fae042e7d52974f94459d8"
+  },
+  {
+    "pfad": "app/test/_datenbank.js",
+    "sha256": "c73657bc69fbf59214ef781196bcbdbfa6e713f33ca65d77e06a3c8801c9bb3a"
+  },
+  {
+    "pfad": "app/test/_dmsperre.js",
+    "sha256": "69fd320e40384f476fb89e5d6d4801e344db0af0f9b7c817ce08f409a4bbc733"
+  },
+  {
+    "pfad": "app/test/_egress_offline.js",
+    "sha256": "8634023d35b837481d2e02a8ad3fdef3b56fecdebb5118cb1641fd7e7bb5f3cc"
+  },
+  {
+    "pfad": "app/test/_eigenes.js",
+    "sha256": "0bd0410c504e0369de737cf178803a47356af9434e315f8d63abe0ea0753a39f"
+  },
+  {
+    "pfad": "app/test/_einstellungen.js",
+    "sha256": "1732908469b4b98aeebdb881e51aca1fb09c5c6165ed2c797f30e4ce0c086484"
+  },
+  {
+    "pfad": "app/test/_eltern_nummer.js",
+    "sha256": "ea23684722c80015163d63335866a21c3dbbac4f69e94a76f5cd31fd1da497d3"
+  },
+  {
+    "pfad": "app/test/_erstellen.js",
+    "sha256": "a872d37615003fe7e911b8f712ed13f7af724bf148fe37eeceb96100c7412c1e"
+  },
+  {
+    "pfad": "app/test/_explorer.js",
+    "sha256": "bf55e84d64ab2706c594c366a8c83dcecf735c72e25e15f12d06cc624fda0555"
+  },
+  {
+    "pfad": "app/test/_f_web.js",
+    "sha256": "a15aaa2badcf5363d5ded8a2bcb04f360d79c32d5cabb2c94fc123cd7ceade1f"
+  },
+  {
+    "pfad": "app/test/_farbfilter_rechnung.js",
+    "sha256": "6762f3626a1432500f3d8281683a58cdeb75f80fb2e083554c930a34f502522f"
+  },
+  {
+    "pfad": "app/test/_farbfilter.js",
+    "sha256": "ba3262d454bb7350108c6702de99ea09131405ef721e0cdf125cfcb4cb2dd4b9"
+  },
+  {
+    "pfad": "app/test/_feedback.js",
+    "sha256": "0eeda17df08982ec50344ae8f9b60b373dee877b0fd45c30de9338ed73046bbb"
+  },
+  {
+    "pfad": "app/test/_feedback.png",
+    "sha256": "d0cadb7ab9cafe9f0f7d62de95a27f382116fd8434e46fbc051ba54fdeb7a80a"
+  },
+  {
+    "pfad": "app/test/_feinschliff.js",
+    "sha256": "5ed786414dde582b28c6c4ad28832a132719db8c4344c93ca5de0b6b7d8e23c3"
+  },
+  {
+    "pfad": "app/test/_fremdprofil.js",
+    "sha256": "b48d1f238fd35cb63487a7042605e04ea468dafecdfa525b53a8da7628aae70a"
+  },
+  {
+    "pfad": "app/test/_gesten.js",
+    "sha256": "ba9c40868863e4c3a6cc5c2ddb413998fa9b872a931c788c2fc3a69afb9160ef"
+  },
+  {
+    "pfad": "app/test/_gleichstand.js",
+    "sha256": "169ac294e58e97a7829a3772c67e50deebeafe642fda840046ce357c167a8af3"
+  },
+  {
+    "pfad": "app/test/_glocke.js",
+    "sha256": "e92882456a848fefa4ba56917c56bd5780074e7e12b0b2ca16b915a1843b2ab8"
+  },
+  {
+    "pfad": "app/test/_handbuch.js",
+    "sha256": "7223402f1fb57e1d60e2178ea2a6a87e7a274a51f209d94ccbac33da047368a4"
+  },
+  {
+    "pfad": "app/test/_henrik.js",
+    "sha256": "9cf400175342e1fb7ddd974f2a0f08a0108b5364a22f61d5600a12d2ac4b679d"
+  },
+  {
+    "pfad": "app/test/_henrik2.js",
+    "sha256": "37d2565069e8232852c95783b7654a50adb9ce66b74e498c61fcbf8c5b1fb77b"
+  },
+  {
+    "pfad": "app/test/_impressionen.js",
+    "sha256": "3a1affe445ceb6979d3b2c3b611b2a6069849fd6d35e22916ffb55549b93c71d"
+  },
+  {
+    "pfad": "app/test/_insel.js",
+    "sha256": "34d05b7c4c251978903fdb641d87565e5eb9f0d69e6e5201175b864a3cccf1f2"
+  },
+  {
+    "pfad": "app/test/_kamera.js",
+    "sha256": "2e48ff225b185faf799493880672323c13c79e47e51f8537a988ba13029781c9"
+  },
+  {
+    "pfad": "app/test/_kanal.js",
+    "sha256": "8e304c85c47ecee247bd3b5c18cc915912f1add6f80d25368bc6205318c79a11"
+  },
+  {
+    "pfad": "app/test/_kasten12.js",
+    "sha256": "d9032706780d58a5e5a80d15c991e78274292429cc4c99221220d988e86765e7"
+  },
+  {
+    "pfad": "app/test/_kasten16_19.js",
+    "sha256": "76d1e56e43306fbe8670707c2bc8d6c90681cc7eb8b592c9c03d22ecb1b7d4f4"
+  },
+  {
+    "pfad": "app/test/_kasten17.js",
+    "sha256": "f87dc347b5eb4e7faabab02673a466793b3ce9cf6da7d8296cdd90156f1cdf52"
+  },
+  {
+    "pfad": "app/test/_kasten3_bilder.js",
+    "sha256": "511fd809afbc78fed150736c9184cba3131d5df95007688ce8637b3873a7c29e"
+  },
+  {
+    "pfad": "app/test/_kasten3_gegenseite.js",
+    "sha256": "fa301f6ddd514fdf73c6d97d63cee92d1870b67622a1bcbf13933ca78e8f3e1b"
+  },
+  {
+    "pfad": "app/test/_kasten8.js",
+    "sha256": "5a41c8628904cfdc2a4ae701e87558fd99a1b444932c1519b67a0d402c3c3351"
+  },
+  {
+    "pfad": "app/test/_kennungen.js",
+    "sha256": "bd1736cc1ae9cf23eb712084f65e2e7d8471fdbd5a546118c1443122d129a4f1"
+  },
+  {
+    "pfad": "app/test/_ki_belegung_attrappe.js",
+    "sha256": "b3582639229acf66cdaaf01f74ed4dd05c8d2cb9f174f57422e7f3a924f73c35"
+  },
+  {
+    "pfad": "app/test/_ki_belegung_probe.sh",
+    "sha256": "7f337da2d836b0b9a836e12145def1dd3dd485f957fca0af8625a9581fe85ff5"
+  },
+  {
+    "pfad": "app/test/_ki_belegung.js",
+    "sha256": "bbba1d73fff4b1e47f6b6eb308bfb4b363a1a0d335af08a2d25b01b4ace584d1"
+  },
+  {
+    "pfad": "app/test/_kommentare.js",
+    "sha256": "27628ad25e5b8eb9fc38623b518219e63ee9decebe1c492d6ff93183936febc4"
+  },
+  {
+    "pfad": "app/test/_kontaktinfo.js",
+    "sha256": "f8f9d75c12243bfdcd7bd7c3f62ca6bf0b5cace34e4a4b44b9fbcb2c70b04b04"
+  },
+  {
+    "pfad": "app/test/_konto.js",
+    "sha256": "582de268500e92e4ced2abf53cc07587c2818094e26d7bacd2b66dc72f8e78c0"
+  },
+  {
+    "pfad": "app/test/_krypto.js",
+    "sha256": "0b7efa94cf239be4c9da0b8ebc28cde690637de606d08bd6b702f54913c4d331"
+  },
+  {
+    "pfad": "app/test/_lenken.js",
+    "sha256": "e4f0e1de07cbfcdf1b5ac0fc4110dd8e825505cc995ef876caf942534f1d8937"
+  },
+  {
+    "pfad": "app/test/_lenkung_einheit.js",
+    "sha256": "16d2550190681b1c62deb3118a4152c855b1bb3ef0616471e6566eadd0cf521d"
+  },
+  {
+    "pfad": "app/test/_lesebestaetigung.js",
+    "sha256": "8c74f0e75e5debebda3b05375ec6cd385d61963db4937719fe1242197c28fd9a"
+  },
+  {
+    "pfad": "app/test/_likes_sichtbarkeit.js",
+    "sha256": "03eac7cb9075c2fc751309645d3d31dcc31289efd9de6856e8546cbd0ea88cf7"
+  },
+  {
+    "pfad": "app/test/_markieren.js",
+    "sha256": "7698a0a2cd1893dfa74dac730b877d84fe33ede310697c9f35df06dbc002f133"
+  },
+  {
+    "pfad": "app/test/_markierung_einheit.js",
+    "sha256": "b959590e61c47bd8188c5808965f92eb9900297aa76742b39b4725259bb4f0f6"
+  },
+  {
+    "pfad": "app/test/_medien_egressschutz.js",
+    "sha256": "c11db38a02d037d9a9ac1263379536be463edd97895c67d124cc3ec49e9be532"
+  },
+  {
+    "pfad": "app/test/_messengeranfrage.js",
+    "sha256": "c72ee21b69ea587bf2e9612da6d52163563fbc11881213a714c858d5d24c8ac5"
+  },
+  {
+    "pfad": "app/test/_minderjaehrig.js",
+    "sha256": "0f8c3c58c236908120c63443c47e47c43e40785dda82464837253629b9bf6136"
+  },
+  {
+    "pfad": "app/test/_mitteilungen.js",
+    "sha256": "74f48044c22d6ea87d492e93468a74fafcbce58a944a4f9203d95e924d612b0f"
+  },
+  {
+    "pfad": "app/test/_modulquelle.js",
+    "sha256": "c91cff5f64fcaca6e40fe72202b85f3b57327cd3cc57c382b25efd30d8129cf2"
+  },
+  {
+    "pfad": "app/test/_nur_testkonten.js",
+    "sha256": "9d1d33beba64edba7874856416198bf67b487e84dea808d430f154f42567422c"
+  },
+  {
+    "pfad": "app/test/_optionen.js",
+    "sha256": "6d3039305e95dc2c2ec66a10714f00220b84f9ddc2fcde347b4c708e99ef18a0"
+  },
+  {
+    "pfad": "app/test/_pfeile.js",
+    "sha256": "386dfad6dae362d1b2a50be0fd3158a7a0175f13393b4e7f9d9da71e4e212eef"
+  },
+  {
+    "pfad": "app/test/_player.js",
+    "sha256": "aae0fc2c517ab6905c4ff3c089890cb305f34ad36b874699cf3cd112c5b44abe"
+  },
+  {
+    "pfad": "app/test/_profil.js",
+    "sha256": "8c0f8c7fa4c46680e8bdaa4e398c53d4809650afb7568ff6c70b077a49dc8533"
+  },
+  {
+    "pfad": "app/test/_querformat.js",
+    "sha256": "c40a537fd9454addfe3a17974cdc3d6ab6a726d0682a23ae6857c39d93b560dd"
+  },
+  {
+    "pfad": "app/test/_rang.js",
+    "sha256": "8220d8874d3b40d63e0b16bc9f285f458883857a2c95771a5d16d7b95b1f584a"
+  },
+  {
+    "pfad": "app/test/_rechte.js",
+    "sha256": "b104f285581996d2908c70f46adde6e5681738d4e5341f0ed87d2a3e38b8dae1"
+  },
+  {
+    "pfad": "app/test/_sammlungen.js",
+    "sha256": "357af932ed9d17ec4f22d5d7af51f73edf9ae93a0d8a51f2be5ef09ff1bb9ab0"
+  },
+  {
+    "pfad": "app/test/_sammlungenweb.js",
+    "sha256": "3cea602bc0bf886858e66d884c65d407587971e4cfd7fc7f68924166b7d5e2ef"
+  },
+  {
+    "pfad": "app/test/_schema.js",
+    "sha256": "7ad2cdd6597e39fd4b3808b6a4553e06c595796d854d897f964f121a0d3adf35"
+  },
+  {
+    "pfad": "app/test/_sichtbarkeit.js",
+    "sha256": "02af3b7e87bc3e4140048dd2633a8f8415ea7eff2b4cc2d84b3bc86954320403"
+  },
+  {
+    "pfad": "app/test/_spendencode.js",
+    "sha256": "909ccf940df2388bdb117834d242237bdab43d25f2d42235af2a3e1c4b26aae6"
+  },
+  {
+    "pfad": "app/test/_storys.js",
+    "sha256": "034bb461aaa4a2c04cc5f5b3f440a2bbbdfb9f461cf5cefacae6af58cc88a3fd"
+  },
+  {
+    "pfad": "app/test/_storyvideo_regeln.js",
+    "sha256": "20f744b47bc0587e31f55fda980409b2e957ba39b6093b4b6e3a695ae03a31ba"
+  },
+  {
+    "pfad": "app/test/_storyvideos.js",
+    "sha256": "ea864a9f9f34768185dcf92989ce73e8f4682ebb5510159c16d807713f0caa5e"
+  },
+  {
+    "pfad": "app/test/_stumm.js",
+    "sha256": "c0062ab180fa7daae642b3f5d4de220f6d01342186559ad66e7bcdbb64b45778"
+  },
+  {
+    "pfad": "app/test/_suche.js",
+    "sha256": "31963b1b6e64e31b0af523288a1544edc76ef2d5fd20a0dff090d72de38e1cf2"
+  },
+  {
+    "pfad": "app/test/_sync.js",
+    "sha256": "cb36d14636f70e773a0e8baf649b4af68233bd9e26ce2d15d58fa98917462125"
+  },
+  {
+    "pfad": "app/test/_teilen.js",
+    "sha256": "336f9ea52da3c3ae12b1473624e3506bbe4938edf782d5df306ba7f8f6aaacbc"
+  },
+  {
+    "pfad": "app/test/_testbild.png",
+    "sha256": "8dddea00cf89401aad1ddac7c790ab1a057388c4bc5d3be2b122f6255393b3bb"
+  },
+  {
+    "pfad": "app/test/_testpasswoerter.js",
+    "sha256": "3cfc09ef7aa20fde94f0adf22f1a82c52721f4a89c344284cab1f79f981687b3"
+  },
+  {
+    "pfad": "app/test/_teststory.png",
+    "sha256": "8dddea00cf89401aad1ddac7c790ab1a057388c4bc5d3be2b122f6255393b3bb"
+  },
+  {
+    "pfad": "app/test/_uebernacht.js",
+    "sha256": "4b1cda3c0a23bf77dd8886c505a1c6f30f467979147d02e9cf721dc1c8889fd2"
+  },
+  {
+    "pfad": "app/test/_verlauf.js",
+    "sha256": "d1763cda1adb40fb638bf69449ddfe0c6e0d71fa8db813a98b9f6188f238c226"
+  },
+  {
+    "pfad": "app/test/_vorschlaege.js",
+    "sha256": "211ef9c65c4e4d894a6a5bd5576332153c0b9079feb1018796b7ebfdd2c09577"
+  },
+  {
+    "pfad": "app/test/_warten.js",
+    "sha256": "f7911a9da11754064c06b0ad02d662c6b592cfd366d835e0475255d1c30c1db4"
+  },
+  {
+    "pfad": "app/test/_zahlung.js",
+    "sha256": "9f0456400dcfdde7bada93e698c2e8dc24d7c29dfcc6eaf0eccdfa53a7d1ad7f"
+  },
+  {
+    "pfad": "app/test/alles.js",
+    "sha256": "25d2a4a2d73e8002f614c07c06630cb6828044aacbabaece6bf9a73d3bf96db2"
+  },
+  {
+    "pfad": "app/test/figma-compare.js",
+    "sha256": "628428b803ec5ca8f39aa3c172786c6f5ed718b7c2aa475eed8a5e12628d47fb"
+  },
+  {
+    "pfad": "app/test/smoke.js",
+    "sha256": "ded36c5cfda83915d51f59da8945e033dc9d01b33df6561755ba3b738999eec8"
+  },
+  {
+    "pfad": "app/tools/pruefgeraet.js",
+    "sha256": "94f2e565b631956f746edcb1d5515cce1befbe83ee92a9ec4505f21858d4df03"
+  },
+  {
+    "pfad": "gemeinsam/alter.d.ts",
+    "sha256": "2e613b7bcd412e74fca1f19b284ff4ceb51166b9b1b8d819c4ba7ab39654351e"
+  },
+  {
+    "pfad": "gemeinsam/alter.js",
+    "sha256": "51760d683b8cb846bddcc13d4e829a5bb0f45f29a84742dcf0c565fc0089860c"
+  },
+  {
+    "pfad": "gemeinsam/benutzername.d.ts",
+    "sha256": "5a5fca439c766ba90dd613bd876565c2c109d32c48a7b84097cde5b39a7e39af"
+  },
+  {
+    "pfad": "gemeinsam/benutzername.js",
+    "sha256": "b3ae965837213b9125a267b3a3687a9fe4be78360513da162b48f3112c87e150"
+  },
+  {
+    "pfad": "gemeinsam/bildschirmzeit.d.ts",
+    "sha256": "71c08cfa1f9e1c44bd66d97ae3f1fff6245182519c78db30a685fa1cfe5ca613"
+  },
+  {
+    "pfad": "gemeinsam/bildschirmzeit.js",
+    "sha256": "7cab4cb548aa561cefd009f7eea66e01012d54d4e28d33094eb91bf571bfe17b"
+  },
+  {
+    "pfad": "gemeinsam/chatabgleich.d.ts",
+    "sha256": "51497d88d1bc2650ff0a8dfbdd31bea4371fea83474e0efbf085b887792df16d"
+  },
+  {
+    "pfad": "gemeinsam/chatabgleich.js",
+    "sha256": "fec1f552868603984239d559b7f29da0197e18c481ced1f841c2c70ba8e9d53c"
+  },
+  {
+    "pfad": "gemeinsam/farbfilter.d.ts",
+    "sha256": "f94120fd2efde42d48364bdc16edcdcfcc9d67df5500d279bd71023ae02408db"
+  },
+  {
+    "pfad": "gemeinsam/farbfilter.js",
+    "sha256": "6ad0fcdc5ac16e719748154e0223c0777d14d8e1b29315d18e008025fbd59586"
+  },
+  {
+    "pfad": "gemeinsam/kein-node-crypto.js",
+    "sha256": "2864c6f2adc53ef7871050847ad03ead74e27591cfeb4d76b9a5cc7007f8f711"
+  },
+  {
+    "pfad": "gemeinsam/kommentar.d.ts",
+    "sha256": "ecfe2d3f437adc4a9ec390135e8867dcf28ed92bf74dd3051a123aba46095e64"
+  },
+  {
+    "pfad": "gemeinsam/kommentar.js",
+    "sha256": "faec3c50f186b63696182925423427424e8c5aabed0521c28d77a2e117c7afda"
+  },
+  {
+    "pfad": "gemeinsam/krypto.js",
+    "sha256": "b17792ebf144cebad2b231a2801f8bf82250074f17c87602e9be821207411e03"
+  },
+  {
+    "pfad": "gemeinsam/lenkung.d.ts",
+    "sha256": "72de1aa553f0cc27ae6f370aeb5c09105753d11ba27e19d1bfaccad19b567a77"
+  },
+  {
+    "pfad": "gemeinsam/lenkung.js",
+    "sha256": "96534fff21b2de8024d59217931e247315325f22b6f76ad49785a339b3c8abd7"
+  },
+  {
+    "pfad": "gemeinsam/liedtext.d.ts",
+    "sha256": "eae694921272a8120b19ea0023ce44abacffbc0aafe26ad44ef2d28872bca463"
+  },
+  {
+    "pfad": "gemeinsam/liedtext.js",
+    "sha256": "949d5fed904c2ad5652fec9deed84b010e1b31e979adc2b396c231bdaa8cc5a1"
+  },
+  {
+    "pfad": "gemeinsam/markierung.d.ts",
+    "sha256": "c01e7ae1cbafd18098d19c29fb6953e58ad5fc5ac4a6a8893a74fd59a188ca7a"
+  },
+  {
+    "pfad": "gemeinsam/markierung.js",
+    "sha256": "c3f378ebaaaac319ecc1b10c82f6f83e86f50e65507029698b1201c98c06dd36"
+  },
+  {
+    "pfad": "gemeinsam/naehe.d.ts",
+    "sha256": "e844ffa613e3766c6dd9ffb907c0b900304073f410784c8e323c8665b29fd16b"
+  },
+  {
+    "pfad": "gemeinsam/naehe.js",
+    "sha256": "d8517ae0875e9428ae0fe03b2990636b6ea70d815b06cb9f9fcce299e82966e1"
+  },
+  {
+    "pfad": "gemeinsam/passwort.d.ts",
+    "sha256": "513b95afd15fc16979b7930577e6b6b19fbbeddf30d9d6329c401bc8d64b0210"
+  },
+  {
+    "pfad": "gemeinsam/passwort.js",
+    "sha256": "815527c5332dd67c7b69d4b4d6ffb41fe2975bf83c4c929cd36cf6fae3b4d1dc"
+  },
+  {
+    "pfad": "gemeinsam/qr.d.ts",
+    "sha256": "b2d6d45541faea238e9c7c2ca4490536ba08d292e2b6e5b01c7de4da99993a55"
+  },
+  {
+    "pfad": "gemeinsam/qr.js",
+    "sha256": "bcbba6122d3c6d506925662a1e8c366ff8fc3bee38ccf1f081a8b2b85c458c03"
+  },
+  {
+    "pfad": "gemeinsam/rang.d.ts",
+    "sha256": "5f19eb7932870d9d2f8c1380c457770d7202064e698ece3cc0f918ab194ac1e5"
+  },
+  {
+    "pfad": "gemeinsam/rang.js",
+    "sha256": "55f7074111f104b0a69d0107c82eefcf9463d08e1c66daefae563e8614f8df4a"
+  },
+  {
+    "pfad": "gemeinsam/sammlungen.d.ts",
+    "sha256": "fc6532dace0de72d5d120f7f67ff7f561fb08f11d43ebcb140f271b925c0674e"
+  },
+  {
+    "pfad": "gemeinsam/sammlungen.js",
+    "sha256": "99eab291a8a21631afc7597ae1c3c5aa126d78724e9a1d61ace9e563b70604b6"
+  },
+  {
+    "pfad": "gemeinsam/sichtbarkeit.d.ts",
+    "sha256": "025407a45511dd642116fc4b279c7b16c22a32395144f452012ddb356a3e07ed"
+  },
+  {
+    "pfad": "gemeinsam/sichtbarkeit.js",
+    "sha256": "f6aa0d54dd4524dd33f12cb13e29d4d9966ed05810f70ce88b2774995c23249d"
+  },
+  {
+    "pfad": "gemeinsam/soundstellen.d.ts",
+    "sha256": "0a7498982867be28ac77f4d69f089e395243cc07e2d65297194641a1c95a55c2"
+  },
+  {
+    "pfad": "gemeinsam/soundstellen.js",
+    "sha256": "84b3babf22d957358ae67ea53057da81f9c5979529d63142b3cd2b9dfd925a59"
+  },
+  {
+    "pfad": "gemeinsam/spalten.d.ts",
+    "sha256": "90f304aa615dae7ebc3d6b4a1308165e8df9fb844897c586ba4ef8827489b11e"
+  },
+  {
+    "pfad": "gemeinsam/spalten.js",
+    "sha256": "e7a51f8a94182c02dd2f720771c39378d5c29c892e5fdb0148f9679237ca06c5"
+  },
+  {
+    "pfad": "gemeinsam/spende.d.ts",
+    "sha256": "c917bb07faef08cc8134b11786ea2ad4080ab27484a83e35010107deba7509de"
+  },
+  {
+    "pfad": "gemeinsam/spende.js",
+    "sha256": "e25a0ef9206282a14160720bdd55ea94ef266af4508e09f027cb2a027384ed2e"
+  },
+  {
+    "pfad": "gemeinsam/story.d.ts",
+    "sha256": "218785e7f34e3f67d67db24cebe23e502dd9caa89245289590960d13f4d08bb7"
+  },
+  {
+    "pfad": "gemeinsam/story.js",
+    "sha256": "dfad065422fa9a6b0b0687585a41b26118a38c3c9cb307f85c51df1db8cea471"
+  },
+  {
+    "pfad": "gemeinsam/teilen.d.ts",
+    "sha256": "0da7c366947521cef60c91a29891fb5e5fe75fde112bff2fde58dac219ddac42"
+  },
+  {
+    "pfad": "gemeinsam/teilen.js",
+    "sha256": "4ce900fe5e9e1cf4a4d2e6fccc731865d9eb8c0c29bd3011e44c09eb726c38f8"
+  },
+  {
+    "pfad": "gemeinsam/telefon.d.ts",
+    "sha256": "64d64dfbda7eea36de49360fe2650ab2fc81fa97fc55b0ba9715fe7b6f019a75"
+  },
+  {
+    "pfad": "gemeinsam/telefon.js",
+    "sha256": "9ad617c538ec52e6cff8f724fe0ddc0eedfe213a2b278b5ffa1e5a71da00dfef"
+  },
+  {
+    "pfad": "gemeinsam/tweetnacl.js",
+    "sha256": "6d9512c245886bb2ee89ab59b87d3a7c59acc8b7930271811ada96dd797948b7"
+  },
+  {
+    "pfad": "gemeinsam/tweetnacl.LICENSE",
+    "sha256": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd"
+  },
+  {
+    "pfad": "gemeinsam/verlauf.d.ts",
+    "sha256": "9db5bb001f1ee448b8fe36aad51559cfde9e69e7bb506f1135cb5d021c467146"
+  },
+  {
+    "pfad": "gemeinsam/verlauf.js",
+    "sha256": "6382249c5fb47db8a39b6d9e3d8683e1a7882da6aac8a8de11405a900d982585"
+  },
+  {
+    "pfad": "gemeinsam/zahlung.d.ts",
+    "sha256": "411b2b6ea5089a53eaacd4a60fcae0370ad29696370a2e366c65e3890829e0f8"
+  },
+  {
+    "pfad": "gemeinsam/zahlung.js",
+    "sha256": "4cf496125cae91f6536be3f7a103b6b227bffda282c0566382e0cf6009c2678d"
+  },
+  {
+    "pfad": "web/public/anmeldung.js",
+    "sha256": "9f303803a7378318fb33fbc55378315d1e144b3cda0a670da1da7198ec651af2"
+  },
+  {
+    "pfad": "web/public/app.js",
+    "sha256": "59a1aeb3996cc358250dcdad5847773f0ef3382f77f778ed94f5fe90c18032c7"
+  },
+  {
+    "pfad": "web/public/farbfilter-start.js",
+    "sha256": "537b10b079b44c1d08b1d4ac842c0f8ce35b4eb5714eabf2843dea7fce349a36"
+  },
+  {
+    "pfad": "web/public/icon-180.png",
+    "sha256": "4863933c4378207b1ff4c42ca0dc08a9f752417142e2fbee6cca3d36f3efce5c"
+  },
+  {
+    "pfad": "web/public/icon-192.png",
+    "sha256": "d74c2c390213785dcaeb8221634e4cee240a72179ad799aeba855b7a79fc22eb"
+  },
+  {
+    "pfad": "web/public/icon-512.png",
+    "sha256": "b374cfb7d0296edb96516ed700e6698ba216cfad5c021c52dc75705d9cb79872"
+  },
+  {
+    "pfad": "web/public/icons.js",
+    "sha256": "a5b5e617c4deedf945ede34c11006f80672fa9756ee9102dc29ac75707cf872e"
+  },
+  {
+    "pfad": "web/public/impressionen.js",
+    "sha256": "d2e82c90b3859b451dcb794589f55b7a5be5fac1be47d03c76e85ebef9a3778d"
+  },
+  {
+    "pfad": "web/public/index.html",
+    "sha256": "ab8c278f856fb38685f3679effbe3ab290f86188160cc6e12f97c3e1a1429898"
+  },
+  {
+    "pfad": "web/public/jsQR.js",
+    "sha256": "bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859"
+  },
+  {
+    "pfad": "web/public/jsQR.LICENSE",
+    "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+  },
+  {
+    "pfad": "web/public/krypto.js",
+    "sha256": "fce5a0ce466cab937d029869dd190ec1fedf964231c55b5aa0835670e4fe3c25"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-400-normal.woff2",
+    "sha256": "8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-500-normal.woff2",
+    "sha256": "f3779f1efccc4bdcdf9c0a02ab95bf6bd092ed09c48c08cedc725889edd1d19f"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-600-normal.woff2",
+    "sha256": "f9a06e79cd3a2a20951c0f0e28f66dd0e6d3fda73911d640a2125c8fcb78f21a"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-700-normal.woff2",
+    "sha256": "6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-ext-400-normal.woff2",
+    "sha256": "6744a7f509ebc6ab220a6cd4ea77e898adf014f03d88dcda5d45d8a9feefb4e9"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-ext-500-normal.woff2",
+    "sha256": "2c6fbc42d315528beb06c1096df45487bf4186c4b78b8111d12c9c951f8acca2"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-ext-600-normal.woff2",
+    "sha256": "e4bdf67b0cd15ca9e184509275be95db942195d3cc2b17f6a0452f2adf75d0bf"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter-latin-ext-700-normal.woff2",
+    "sha256": "143f9504f1377012aa3e39c90c4354ef429cb0494b9ac0e1437f1a81e5412236"
+  },
+  {
+    "pfad": "web/public/lib/inter/inter.css",
+    "sha256": "cf460fd04ad5b4ae1cc8cf8855761784d6f5b6a65c3c60ffef262a035fc4a62a"
+  },
+  {
+    "pfad": "web/public/lib/inter/LICENSE",
+    "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/images/layers-2x.png",
+    "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/images/layers.png",
+    "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/images/marker-icon-2x.png",
+    "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/images/marker-icon.png",
+    "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/images/marker-shadow.png",
+    "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/leaflet.css",
+    "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/leaflet.js",
+    "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a"
+  },
+  {
+    "pfad": "web/public/lib/leaflet-1.9.4/LICENSE",
+    "sha256": "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb"
+  },
+  {
+    "pfad": "web/public/lib/supabase-2.47.10.js",
+    "sha256": "a31b1483623c9d2a07b60237eeb8c43212b2e9c73e50f278540d4297223d0262"
+  },
+  {
+    "pfad": "web/public/manifest.webmanifest",
+    "sha256": "90fd1157646eec6e2dd0f108835b0f4c5b75a4e2d975c1e44357876694d7a9ac"
+  },
+  {
+    "pfad": "web/public/nachricht.wav",
+    "sha256": "325cdac701ee661b80cf1f5815fd67b4055b979d3d93667d56b87212320dda83"
+  },
+  {
+    "pfad": "web/public/pull-to-refresh.js",
+    "sha256": "383bbfb7958d14a03b09a79b7fc8b748962a544a133a7377c738c357fd7ddc7f"
+  },
+  {
+    "pfad": "web/public/sounds/ambient-sunrise.jpg",
+    "sha256": "3fc434f35a8cb41c2261bbbcac23746dbbe14e50bdba190aaa59448198f994cc"
+  },
+  {
+    "pfad": "web/public/sounds/ambient-sunrise.m4a",
+    "sha256": "508f690663bbd9a116542995d6f34b6a8f62ef60b5ecfc84bbd8cc13ec2b6ab9"
+  },
+  {
+    "pfad": "web/public/sounds/golden-hour.jpg",
+    "sha256": "581a3cc58f2fb30f44f23cf989e042b07543ecb9a006b3063aa163137f925096"
+  },
+  {
+    "pfad": "web/public/sounds/golden-hour.m4a",
+    "sha256": "4bbdf32fd21164fde8dc138cc8867ac403133ba0873e301b4134900989f5d3f6"
+  },
+  {
+    "pfad": "web/public/sounds/kitchen-groove.jpg",
+    "sha256": "88460c8da4cd6994b62ebc4966ee565115ae3621a9f1dd0e32f4c708cd4d7359"
+  },
+  {
+    "pfad": "web/public/sounds/kitchen-groove.m4a",
+    "sha256": "5cf61866deef8ced54ce10eb0c3dd3cf7aa2a5a5a1809aaba80ede47e4500331"
+  },
+  {
+    "pfad": "web/public/sounds/lo-fi-focus.jpg",
+    "sha256": "e929cf5911eeb761fd17c4689aa804773e92f1555393dcc4b1c6375b834b203c"
+  },
+  {
+    "pfad": "web/public/sounds/lo-fi-focus.m4a",
+    "sha256": "e5d770b19521e913d4c6e93179b9cd7841748f027a3e55206d0449681712df1f"
+  },
+  {
+    "pfad": "web/public/sounds/runner-high.jpg",
+    "sha256": "e0629b13afdcd74f154ed43a1bc540d241f4f0e2fb195e843a6d2b5b7b644772"
+  },
+  {
+    "pfad": "web/public/sounds/runner-high.m4a",
+    "sha256": "b8f4e21be07352a21c1867a96fb9f43b262501bafc24ecc40d422d77808ceabe"
+  },
+  {
+    "pfad": "web/public/styles.css",
+    "sha256": "34717107c32cd3f777e86ff34ba3ac06bce96a81dae4265da6203bcf3cb489bf"
+  },
+  {
+    "pfad": "web/server/app.js",
+    "sha256": "ae8ddd98f8bf3fa5f00559a0192b16adb0698b1a9c9d5e671d6d430048b14231"
+  },
+  {
+    "pfad": "web/server/lokal.js",
+    "sha256": "1cc1ef97fa01ee044ad87a1e9d8abb6a99af4faed3d438b423323d265b5067e9"
+  },
+  {
+    "pfad": "web/server/medien.js",
+    "sha256": "037c7e54769a7cd5ab763ca900f403379a92809c1033c81f483f425f6b00b9d1"
+  },
+  {
+    "pfad": "web/server/supabase-api.js",
+    "sha256": "551e680019bd5bd42815bb8e65a2923b35383eedbbb2e16e53b73ee58d2bd7a4"
+  },
+  {
+    "pfad": "web/server/supabase.js",
+    "sha256": "8ce0e936bd1593488ef976707bc0a3e79e881b56ad5ec6c59258c4a4c11069c8"
+  },
+  {
+    "pfad": "web/server/sync-handlers.js",
+    "sha256": "060d019191603e5e62615277e7d0df9f02ca54d9b4fceb6962a0d4eeef7df9ea"
+  },
+  {
+    "pfad": "web/server/version.js",
+    "sha256": "e87d45aa17d7a920decf1f236b1b5e85c27ad215900aa7f7f39d00b7b590b3d3"
+  }
+]
