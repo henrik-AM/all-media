@@ -1,0 +1,19 @@
+/** Offline: Dreierpilot, Fortsetzung, Altbeispiele und historische PTT-Bilder. */
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('fs'),os=require('os'),path=require('path');
+test('Pilot begrenzt auf drei, Rest registriert nur fehlende Medien und behält SHA256',async()=>{
+ const {umziehen}=await import('../../tools/medien-umzug-bunny.mjs');
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'umzug-116-'));
+ try{
+  for(const o of ['posts','beispiel','ptt'])fs.mkdirSync(path.join(tmp,o));
+  const bild=Buffer.from([255,216,255,1]);
+  for(const p of ['posts/a.jpg','posts/b.jpg','posts/c.jpg','beispiel/d.jpg','ptt/e.jpg'])fs.writeFileSync(path.join(tmp,p),bild);
+  const kopien=new Map(),registriert=[];
+  const bunny={bereit:true,hochladen:async(p,b)=>{kopien.set(p,Buffer.from(b));return {ok:true};},auflisten:async v=>({ok:true,dateien:[...kopien].filter(([p])=>p.startsWith(v+'/')).map(([p,b])=>({name:p.split('/')[1],bytes:b.length}))})};
+  const option={quelle:{art:'ordner',wurzel:tmp},bunny,ordner:['posts','beispiel','ptt'],ausfuehren:true,zustand:path.join(tmp,'journal'),pruefen:true,umschalten:async e=>{registriert.push(e);return {ok:true};},melde:()=>{}};
+  const pilot=await umziehen({...option,maxDateien:3});assert.equal(pilot.hochgeladen,3);assert.equal(pilot.umgeschaltet,3);
+  const rest=await umziehen(option);assert.equal(rest.schonFertig,3);assert.equal(rest.hochgeladen,2);assert.equal(rest.umgeschaltet,2);assert.equal(rest.umschaltAusgelassen,0);assert.equal(registriert.length,5);assert.ok(registriert.every(e=>/^[a-f0-9]{64}$/.test(e.sha256)));
+  const erneut=await umziehen(option);assert.equal(erneut.hochgeladen,0);assert.equal(erneut.umgeschaltet,0);
+  await assert.rejects(umziehen({...option,maxDateien:0}),/positive ganze Zahl/);
+ }finally{fs.rmSync(tmp,{recursive:true,force:true});}
+});

@@ -42,9 +42,9 @@
  * Schema 115/116). `--umschalten` (nur zusammen mit `--pruefen`) trägt jede in
  * diesem Lauf bei Bunny bestätigte Datei über die Dienst-RPC
  * `medien_umzug_registrieren` ein (SUPABASE_SCHEMA_116_bunny_altmedien.sql).
- * Die RPC übernimmt den Eigentümer aus Supabase und lässt aus, was keinen
- * eindeutigen Eigentümer hat. Ausgelassen werden auch Beispielmedien und
- * Dateien, die die heutige Uploadprüfung nicht bestehen (WebM/MOV, zu groß).
+ * Die RPC übernimmt den Eigentümer aus Supabase; eigentümerlose gemeinsame
+ * Beispielmedien bleiben ohne Eigentümer. Andere Dateien ohne Eigentümer und
+ * ungültige Inhalte werden ausgelassen (WebM/MOV, zu groß).
  *
  * UNTERORDNER (F4)
  *
@@ -59,6 +59,8 @@
  * - Zu Bunny geht die SHA256 als Kopfzeile `Checksum` mit (bunny.js);
  *   Bunny weist eine veränderte Datei ab.
  * - `--pruefen` vergleicht danach die Größen in der Bunny-Liste.
+ *   Der kontrollierte Live-Lauf in bunny-umzug-lauf.cjs prüft zusätzlich
+ *   alle Bunny-Bytes per SHA256 und führt ein persistentes Gesamtbudget.
  *
  * DIE PFADE BLEIBEN GLEICH (`posts/<name>.mp4` hier wie dort). Darum muss in
  * der Datenbank keine Zeile umgeschrieben werden (siehe web/server/bunny.js).
@@ -314,6 +316,8 @@ export async function umziehen(optionen) {
   } = optionen;
   const zaehler = leererZaehler();
   const ausSupabase = quelle?.art === 'supabase';
+
+  if (maxDateien !== Infinity && (!Number.isInteger(maxDateien) || maxDateien < 1)) throw new Error('--max-dateien muss eine positive ganze Zahl sein');
 
   if (ausfuehren) {
     if (!bunny || !bunny.bereit) throw new Error('Bunny ist nicht eingerichtet');

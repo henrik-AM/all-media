@@ -10,7 +10,7 @@ const aus=path.resolve('pruefbelege/bunny-umzug');fs.mkdirSync(aus,{recursive:tr
 const budgetDatei=path.join(root,'budget.json'),zustand=path.join(root,'zustand.jsonl'),hashDatei=path.join(root,'hash-belege.jsonl');
 const budget=fs.existsSync(budgetDatei)?JSON.parse(fs.readFileSync(budgetDatei)): {grenze:150*1048576,verbraucht:0};
 assert.equal(budget.grenze,150*1048576);
-function speichern(){fs.writeFileSync(budgetDatei,JSON.stringify(budget)+'\n',{mode:0o600});}
+function speichern(){fs.writeFileSync(budgetDatei+'.neu',JSON.stringify(budget)+'\n',{mode:0o600});fs.renameSync(budgetDatei+'.neu',budgetDatei);}
 async function gezaehlt(url,opt){
  const r=await fetch(url,opt);const reader=r.body?.getReader();
  const stream=new ReadableStream({async pull(controller){try{const d=await reader.read();if(d.done){controller.close();return;}budget.verbraucht+=d.value.length;speichern();if(budget.verbraucht>budget.grenze){await reader.cancel();controller.error(Error('Gesamtbudget überschritten'));return;}controller.enqueue(d.value);}catch(e){controller.error(e);}},cancel(){return reader?.cancel();}});

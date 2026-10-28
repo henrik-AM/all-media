@@ -1,0 +1,3 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+PASS Produktion Bunny 200 SHA256 stories/1788788105993-uo4b24uh.jpg
+1/1 Produktionsmedien: Bunny, 200, SHA256 identisch

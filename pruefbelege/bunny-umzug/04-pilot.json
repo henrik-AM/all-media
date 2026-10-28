@@ -1,0 +1,21 @@
+{
+  "modus": "pilot",
+  "gelistet": 123,
+  "gelistetBytes": 101348121,
+  "schonFertig": 0,
+  "offen": 123,
+  "offenBytes": 101348121,
+  "geholt": 3,
+  "geholtBytes": 1426166,
+  "listeBytes": 67802,
+  "hochgeladen": 3,
+  "fehler": 0,
+  "nichtMp4": 0,
+  "pruefAbweichungen": 0,
+  "ausgelassen": 0,
+  "umgeschaltet": 3,
+  "umschaltAusgelassen": 0,
+  "status": "fertig",
+  "gesamtEgressBytes": 1561770,
+  "budgetBytes": 157286400
+}
