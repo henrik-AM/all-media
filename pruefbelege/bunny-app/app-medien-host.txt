@@ -1,0 +1,4 @@
+Verbunden
+{"className":"Object","description":"Object","type":"object","value":{"medien":[{"endung":"jpg","host":"allmedia-cdn.b-cdn.net"},{"endung":"mp4","host":"allmedia-cdn.b-cdn.net"}],"spieler":[{"dauer":4,"sekunden":4,"spielt":false},{},{}]}}
+Verbunden
+{"className":"Object","description":"Object","type":"object","value":{"ansicht":"Profilraster","medien":[{"endung":"jpg","host":"allmedia-cdn.b-cdn.net"}]}}
