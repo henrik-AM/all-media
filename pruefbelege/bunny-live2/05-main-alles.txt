@@ -366,8 +366,19 @@ console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-
-  ABBRUCH — smoke lief laenger als 15 Minuten und wurde beendet. Die Zahlen unten sind unvollstaendig.
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+console: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 
 ======================================================================
   feedback
@@ -749,7 +760,7 @@ Standort-Seite
 
 Sound-Seite
   OK   Ein Sound zeigt Songbild, Interpret, Songwriter und eine Liedzeile
-  FEHL Der Abspielknopf laesst die Zeit laufen — Zeit steht bei 0:00 / 0:30
+  OK   Der Abspielknopf laesst die Zeit laufen
   OK   Die Hoerprobe spielt wirklich
   OK   Die Einsaetze der Liedzeilen kommen aus der Datenbank (Schema 63)
   OK   Bei 11,2 s steht genau die gesungene Zeile da
@@ -757,7 +768,7 @@ Sound-Seite
   OK   "Lyrics ansehen" zeigt den ganzen Text mit der gesungenen Zeile hervorgehoben
   OK   Noch einmal tippen haelt an
 
-20 von 21 Pruefungen bestanden
+21 von 21 Pruefungen bestanden
 Konsolenfehler:
 Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 
@@ -810,83 +821,9 @@ Einstellungen
   OK   Zwei Schreibweisen finden dieselbe Person
   OK   Eine zu kurze Nummer wird abgelehnt
   OK   Dieselbe Nummer anders geschrieben faellt als Dopplung auf
-  FEHL Kein Punkt gibt mehr "folgt mit dem Backend" aus — page.click: Timeout 8000ms exceeded.
-Call log:
-[2m  - waiting for locator('[data-setting="Gelikte Beiträge"]')[22m
-[2m    - locator resolved to <button class="item " data-abschnitt="videos" data-setting="Gelikte Beiträge">…</button>[22m
-[2m  - attempting click action[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <span class="item__label">Gespeichert · Expo SDK 57 live erklärt – Fragen w…</span> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <span class="item__label">Gespeichert · Sonntagsküche live – wir kochen zus…</span> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <span class="item__label">Gefällt dir · Sonntagsküche live – wir kochen zus…</span> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m  2 × retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="sheet__kopf">…</div> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m  3 × retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <span class="item__label">Gespeichert · Sonntagsküche live – wir kochen zus…</span> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <span class="item__label">Gefällt dir · Sonntagsküche live – wir kochen zus…</span> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="sheet__kopf">…</div> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="sheet__kopf">…</div> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <span class="item__label">Gespeichert · Sonntagsküche live – wir kochen zus…</span> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <span class="item__label">Gefällt dir · Sonntagsküche live – wir kochen zus…</span> from <div class="sheet-backdrop">…</div> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
+  OK   Kein Punkt gibt mehr "folgt mit dem Backend" aus
 
-
-18 von 19 Pruefungen bestanden
+19 von 19 Pruefungen bestanden
 Konsolenfehler:
 Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 
@@ -1168,26 +1105,1148 @@ Navigation
 ======================================================================
   suche
 ======================================================================
+/Users/henrik.dikta/allmedia-wt-codex/bunny-live2-main/app/test/_konto.js:181
+          () => ablehnen(new Error(`page.evaluate kam nach ${ms} ms nicht zurueck`)),
+                         ^
+
+Error: page.evaluate kam nach 60000 ms nicht zurueck
+    at Timeout._onTimeout (/Users/henrik.dikta/allmedia-wt-codex/bunny-live2-main/app/test/_konto.js:181:26)
+    at listOnTimeout (node:internal/timers:635:17)
+    at process.processTimers (node:internal/timers:571:7)
+
+Node.js v24.19.0
+
+  ABBRUCH — suche lief laenger als 15 Minuten und wurde beendet. Die Zahlen unten sind unvollstaendig.
+
+======================================================================
+  optionen
+======================================================================
+/Users/henrik.dikta/allmedia-wt-codex/bunny-live2-main/app/test/_konto.js:181
+          () => ablehnen(new Error(`page.evaluate kam nach ${ms} ms nicht zurueck`)),
+                         ^
+
+Error: page.evaluate kam nach 60000 ms nicht zurueck
+    at Timeout._onTimeout (/Users/henrik.dikta/allmedia-wt-codex/bunny-live2-main/app/test/_konto.js:181:26)
+    at listOnTimeout (node:internal/timers:635:17)
+    at process.processTimers (node:internal/timers:571:7)
+
+Node.js v24.19.0
+
+  ABBRUCH — optionen lief laenger als 15 Minuten und wurde beendet. Die Zahlen unten sind unvollstaendig.
+
+======================================================================
+  kasten8
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+  OK   Querformat-Video mit Ort oder Sound im Bestand
+  OK   8.1 Kein Ton-/Lautstaerkeknopf im Querformat-Player
+  OK   8.2 Ort und Sound stehen unter dem Namen im Querformat
+  OK   8.2 Ort antippen oeffnet die Standortseite (nicht das Profil)
+  OK   8.2 Sound antippen oeffnet die Soundseite oder sagt, warum nicht
+  OK   8.1 Chat-Vollformat: Video ohne Browserleiste und mit Ton
+
+6 von 6 Pruefungen bestanden
+Konsolenfehler:
+Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+======================================================================
+  kasten12
+======================================================================
+
+Gemeinsame Bausteine
+  OK   sammlungen.js und spende.js stehen in UMD_BAUSTEINE
+  OK   index.html bindet beide ein
+  OK   beide Dateien haben eine UMD-Hülle
+
+12.9  Ringfarben
+  OK   Playlist rot wie im Prototyp (#FF0A0A)
+  OK   Highlight orange wie im Prototyp (#FF990A)
+  OK   Die beiden Gattungen unterscheiden sich
+  OK   Strich 4/45 des Durchmessers (64 → 6 px)
+  OK   App: eigenes Profil nimmt die Farbe aus dem Baustein
+  OK   App: fremdes Profil nimmt die Farbe aus dem Baustein
+  OK   Website: ringStil() nimmt Farbe und Stärke aus dem Baustein
+  OK   Website: kein fest verdrahteter Farbverlauf mehr am Ring
+  OK   Website: Ring ist rund
+
+12.7 / 12.8  Titelbild
+  OK   Ohne Wahl: ein Beitrag der Sammlung ist das Titelbild
+  OK   Gewählter Beitrag gewinnt
+  OK   Gewählte Story gewinnt
+  OK   Eigenes Foto gewinnt vor allem
+  OK   Leere Sammlung ohne Foto: kein Bild
+  OK   Schema-Entwurf: Spalten, Prüfung auf Inhalt, idempotent
+  OK   App: Knopf „Titelbild wählen" im eigenen Profil
+  OK   App: speichert über aktionen.titelbildSetzen
+  OK   Website: openTitelbildWahl mit Beitrag, Foto und Kamera
+  OK   Server: POST /api/eigene/sammlung/:id/titelbild
+
+12.3  Spendenziel
+  OK   Formular: Titel, Ziel, Frist, Text werden übernommen
+  OK   Formular: Ziel bleibt freiwillig
+  OK   Formular: Unsinn wird abgelehnt
+  OK   Frist ungültig: fristAus wirft
+  OK   Stand: erreicht, Fortschritt, Spender aus den Buchungen
+  OK   Abgelaufene Frist wird erkannt
+  OK   Eigener Betrag: 2,50 → 250 Cent, 0,10 abgelehnt
+  OK   Schema-Entwurf: spendenstand() nur für angemeldete Nutzer
+  OK   App: Karte, Detailblatt und Spenden-Knopf
+  OK   App: Karte im eigenen und im fremden Profil
+  OK   Website: Karte ist ein Knopf und öffnet openSpendenziel
+  OK   Website: Karte auch im fremden Profil
+  OK   Server: GET /api/spendenstand/:userId
+  OK   Server: Spende-Formular über Spende.ausFormular
+
+12.5  Profilbild
+  OK   Schema-Entwurf: avatar_url nur aus dem Eimer media
+  OK   App: Kopf mit Mediathek, Kamera, Entfernen
+  OK   App: „Profil bearbeiten" zeigt den Kopf
+  OK   App: Ordner avatars, gespeichert über profilbildSetzen
+  OK   Website: kein Profilbild mehr nur im Browser (localStorage)
+  OK   Website: Upload nach avatars und /api/eigene/profilbild
+  OK   Website: Avatare zeigen das Bild (personenAvatar)
+  OK   Server: POST /api/eigene/profilbild prüft Pfad und Zeilenzahl
+  OK   Server: jeder Nutzer bringt sein Bild mit
+  OK   Website: nur noch EIN bildVerkleinern (das zweite brach Storys)
+
+12.1  Tab bleibt
+  OK   App: Reiter liegt in der Shell, nicht im Bildschirm
+  OK   App: Beitrag öffnen merkt sich den Reiter
+  OK   App: Verlassen setzt zurück
+  OK   Website: profilReiterPruefen bei Ober- und Unterleiste
+  OK   Website: Kacheln im Raster öffnen den Beitrag
+
+12.2  Name mittig
+  OK   App: Handle mit eigener Mitte (testID profil-handle)
+  OK   Website: .oprof__handle links und rechts gleich weit
+
+12.4  Profil wechseln
+  OK   App: Video-Profil ruft den Wechsel selbst auf
+  OK   App: nach dem Wechsel landet ein anderes Konto im Video-Profil
+  OK   App: zweimal abholen geht (StrictMode ruft den Initialisierer doppelt)
+  OK   App: dasselbe Konto (Wechsel abgebrochen) springt nicht
+  OK   App: nach drei Minuten gilt die Stelle nicht mehr
+  OK   App: vergessen() räumt ab
+  OK   App: Messenger und Einstellungen vergessen die Stelle vor dem Wechsel
+  OK   App: neue Shell startet im Video-Profil
+  OK   Website: #switchProfile öffnet den Wechsel im Video-Profil
+
+12.6  Online-Punkt
+  OK   App: grüner Punkt antippbar
+  OK   App: öffnet die Sichtbarkeit onlinestatus
+  OK   Website: #onlinePunkt öffnet openSichtbarkeit onlinestatus
+
+65 von 65 Pruefungen bestanden.
+
+======================================================================
+  kasten17
+======================================================================
+
+Gemeinsame Regeln (gemeinsam/sammlungen.js)
+  OK   Untertitel Playlist, Mehrzahl
+  OK   Untertitel Playlist, Einzahl
+  OK   Untertitel Highlight nennt Storys
+  OK   Untertitel Highlight, Einzahl
+  OK   Untertitel leer
+  OK   Alter: gerade eben
+  OK   Alter: Minuten
+  OK   Alter: Stunden
+  OK   Alter: ein Tag
+  OK   Alter: Tage
+  OK   Alter: Wochen
+  OK   Alter: Datum ab vier Wochen
+  OK   Alter: kein Datum → leer
+  OK   Story: fremd, Kennung bleibt
+  OK   Story: Vorname wie in der Leiste
+  OK   Story: Video bleibt Video
+  OK   Story: gemocht
+  OK   Story: Zeitpunkt für den Kopf
+  OK   Story: eigene heißt „me" wie in der Leiste
+
+17.1  Highlight im Story-Betrachter
+  OK   App: kein neuer Betrachter — HighlightBetrachter nutzt StoryViewerScreen
+  OK   App: Betrachter kennt den Highlight-Modus
+  OK   App: Name des Highlights im Kopf
+  OK   App: eigenes Highlight — Bearbeiten, Herausnehmen, Löschen
+  OK   App: eigenes Profil spielt Highlights ab
+  OK   App: fremdes Profil spielt Highlights ab
+  OK   App: fremdes Profil zeigt keinen Hinweis mehr statt der Sammlung
+  OK   App: Storys des Highlights über sammlung_inhalte
+  OK   Website: Highlight-Kreis spielt ab
+  OK   Website: openStory nimmt eine eigene Liste
+  OK   Website: fremdes Profil kommt nach dem Schließen zurück
+  OK   Website: Highlight-Optionen im Betrachter
+  OK   Server: GET /api/sammlung/:id/storys
+  OK   Server und App bauen die Story mit derselben Regel
+
+17.2  Playlist als Ordner
+  OK   App: Ordner mit Untertitel aus der gemeinsamen Regel
+  OK   App: eigenes Profil nutzt den Ordner
+  OK   App: fremdes Profil nutzt den Ordner — ohne kopfRechts
+  OK   App: Kachel im fremden Ordner öffnet den Beitrag
+  OK   App: Story-Kachel im Ordner hatte mediaUri statt mediaUrl (behoben)
+  OK   Website: Untertitel aus der gemeinsamen Regel
+  OK   Website: Löschen und Titelbild nur im eigenen Ordner
+
+17.3  Selbst einordnen und herausnehmen
+  OK   App: „Zu Playlist hinzufügen" nur am eigenen Beitrag
+  OK   App: Playlist-Wahl im selben Blatt
+  OK   App: „Zu Highlight hinzufügen" an der eigenen Story
+  OK   App: Häkchen schaltet hinein und heraus
+  OK   App: „Neue Playlist" legt an und legt hinein
+  OK   App: langes Drücken im eigenen Ordner nimmt heraus
+  OK   Website: „Zu Playlist hinzufügen" im Drei-Punkte-Menü
+  OK   Website: „Zu Highlight hinzufügen" an der eigenen Story
+  OK   Website: langes Drücken im eigenen Raster bietet keine Highlights mehr an
+  OK   Server: Zuordnung lesen, hinein, heraus, neu
+  OK   Server: nur Eigenes lässt sich einordnen
+  OK   Server: Löschen prüft die Zahl der gelöschten Zeilen (RLS)
+  OK   Server: kein Pfad, den DELETE /api/eigene/sammlung/:art/:name verschluckt
+
+53 von 53 Pruefungen bestanden.
+
+======================================================================
+  glocke
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Home
+  OK   Home: eine abgeschaltete Glocke ist zu sehen
+  OK   Home: genau ein Strich, kein zweiter per CSS — Striche 1, ::before false
+  OK   Home: Strich mittig (±0,5 px) — dx 0.00, dy 0.00
+  OK   Home: Strich 45°, nicht schief — Breite-Höhe 0.00
+  OK   Home: Strich ragt nicht aus dem Symbol
+  OK   Home: Strich rot, andere Farbe als die Glocke — Strich rgb(229, 72, 77), Glocke rgb(102, 110, 125)
+  OK   Home: angeschaltet ohne Strich, in Markenfarbe (unverändert) — rgb(91, 69, 224)
+  OK   Home: „an" übersteht das Neuladen (Datenbank)
+  OK   Home: wieder abschaltbar
+
+Kurzformat
+  OK   Kurzformat: Glocke vorhanden (wie in der App)
+  OK   Kurzformat: genau ein Strich, kein zweiter per CSS — Striche 1, ::before false
+  OK   Kurzformat: Strich mittig (±0,5 px) — dx 0.00, dy 0.00
+  OK   Kurzformat: Strich 45°, nicht schief — Breite-Höhe 0.00
+  OK   Kurzformat: Strich ragt nicht aus dem Symbol
+  OK   Kurzformat: Strich rot, andere Farbe als die Glocke — Strich rgb(229, 72, 77), Glocke rgb(255, 255, 255)
+  OK   Kurzformat: Antippen schaltet an
+  OK   Kurzformat: wieder abschaltbar
+  OK   Kurzformat: am eigenen Reel weder „Folgen" noch Glocke — 1 eigene
+  OK   Kurzformat: an jedem fremden Reel „Folgen" und Glocke — 5 fremde
+  OK   Kurzformat: „Gefolgt" stimmt mit der Datenbank überein — Gefolgt/true Gefolgt/true Gefolgt/true Gefolgt/true Gefolgt/true
+  FEHL Keine Fehler in der Konsole — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+20/21 Prüfungen bestanden
+
+======================================================================
+  pfeile
+======================================================================
 ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
 
 Videos — Suche
-  OK   Jede der sieben Kategorien hat einen Pfeil zum Mehr anzeigen
-  OK   Die Vorschau zeigt je Kategorie hoechstens fuenf Eintraege
-  OK   Hinter der Ueberschrift steht die volle Liste
-  OK   „reels" oeffnet eine eigene Seite mit Zurueck-Pfeil
-  OK   „clips" oeffnet eine eigene Seite mit Zurueck-Pfeil
-  OK   „posts" oeffnet eine eigene Seite mit Zurueck-Pfeil
-  OK   „profile" oeffnet eine eigene Seite mit Zurueck-Pfeil
-  OK   „hashtags" oeffnet eine eigene Seite mit Zurueck-Pfeil
-  OK   „standorte" oeffnet eine eigene Seite mit Zurueck-Pfeil
-  OK   „sounds" oeffnet eine eigene Seite mit Zurueck-Pfeil
+  OK   „Reels →" ist ein Knopf
+  OK   „Reels →" führt auf eine andere Seite
+  OK   „Reels →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Querformat →" ist ein Knopf
+  OK   „Querformat →" führt auf eine andere Seite
+  OK   „Querformat →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Beiträge →" ist ein Knopf
+  OK   „Beiträge →" führt auf eine andere Seite
+  OK   „Beiträge →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Profile →" ist ein Knopf
+  OK   „Profile →" führt auf eine andere Seite
+  OK   „Profile →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „# Hashtags →" ist ein Knopf
+  OK   „# Hashtags →" führt auf eine andere Seite
+  OK   „# Hashtags →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Standorte →" ist ein Knopf
+  OK   „Standorte →" führt auf eine andere Seite
+  OK   „Standorte →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Sounds →" ist ein Knopf
+  OK   „Sounds →" führt auf eine andere Seite
+  OK   „Sounds →": dahinter kein Leertext, die Vorschau hatte Einträge
 
-Videos — Suche, der gemeldete Bug
-  OK   Ein Unterpunkt fuehrt aus der Uebersichtsseite heraus
-  OK   Ein Bereich fuehrt aus der Uebersichtsseite heraus
-  OK   Danach ist die App wieder normal bedienbar
+Communitys — Profil
+  OK   „Erstellt →" ist ein Knopf
+  OK   „Erstellt →" führt auf eine andere Seite
+  OK   „Erstellt →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Beigetreten →" ist ein Knopf
+  OK   „Beigetreten →" führt auf eine andere Seite
+  OK   „Beigetreten →": dahinter kein Leertext, die Vorschau hatte Einträge
 
-  13 von 13 Punkten erfuellt
+Communitys — Suche
+  OK   „Communitys →" ist ein Knopf
+  OK   „Communitys →" führt auf eine andere Seite
+  OK   „Communitys →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Profile →" ist ein Knopf
+  OK   „Profile →" führt auf eine andere Seite
+  OK   „Profile →": dahinter kein Leertext, die Vorschau hatte Einträge
+
+Einstellungen
+  OK   „Allgemein →" ist ein Knopf
+  OK   „Allgemein →" führt auf eine andere Seite
+  OK   „Allgemein →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Farbfilter →" ist ein Knopf
+  OK   „Farbfilter →" führt auf eine andere Seite
+  OK   „Farbfilter →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Konto →" ist ein Knopf
+  OK   „Konto →" führt auf eine andere Seite
+  OK   „Konto →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Datenschutz →" ist ein Knopf
+  OK   „Datenschutz →" führt auf eine andere Seite
+  OK   „Datenschutz →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Mitteilungen →" ist ein Knopf
+  OK   „Mitteilungen →" führt auf eine andere Seite
+  OK   „Mitteilungen →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Bildschirmzeit →" ist ein Knopf
+  OK   „Bildschirmzeit →" führt auf eine andere Seite
+  OK   „Bildschirmzeit →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Messenger →" ist ein Knopf
+  OK   „Messenger →" führt auf eine andere Seite
+  OK   „Messenger →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Speicher →" ist ein Knopf
+  OK   „Speicher →" führt auf eine andere Seite
+  OK   „Speicher →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Hilfe →" ist ein Knopf
+  OK   „Hilfe →" führt auf eine andere Seite
+  OK   „Hilfe →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Videos →" ist ein Knopf
+  OK   „Videos →" führt auf eine andere Seite
+  OK   „Videos →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   „Communitys →" ist ein Knopf
+  OK   „Communitys →" führt auf eine andere Seite
+  OK   „Communitys →": dahinter kein Leertext, die Vorschau hatte Einträge
+  OK   Mindestens zehn Überschriften mit Pfeil gefunden — 22
+  FEHL Keine Fehler in der Konsole — Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector | Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+67/68 Prüfungen bestanden
+
+======================================================================
+  profil
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Einstellungen aus dem Profil
+  OK   Ein Unterpunkt oeffnet seine eigene Seite, nicht die lange Liste
+  OK   Der Pfeil oben links fuehrt zurueck ins Profil
+  OK   Die dicke Schrift fuehrt weiterhin in die Haupt-Einstellungen
+  OK   Ueber die untere Leiste geoeffnet gibt es keinen Zurueck-Pfeil
+
+Eigene Profile
+  OK   Der Username im Videos-Profil steht mittig
+  OK   Der Username im Communitys-Profil steht mittig
+
+Communitys — Profil
+  OK   Es gibt einen Knopf „Profil bearbeiten"
+  OK   Der Knopf oeffnet wirklich das Formular
+  OK   Der Link in der Beschreibung ist ein echter Link
+  OK   „Erstellte Communitys" oeffnet eine eigene Seite
+  OK   „Beigetretene Communitys" oeffnet eine eigene Seite
+  OK   Auch das Messenger-Profil hat „Profil bearbeiten"
+
+Story-Ring am eigenen Profil
+  OK   Ohne eigene Story ist kein Ring da
+  OK   Mit eigener Story steht der Ring am Profilbild
+  OK   Der Ring steht auch im Communitys-Profil
+  OK   Ein Klick auf den Ring oeffnet die Story
+
+Playlists und Highlights
+  OK   Playlist und Highlight sehen unterschiedlich aus
+  OK   Eine gefuellte Playlist traegt ihr Titelbild, eine leere nicht
+  OK   Eine Playlist laesst sich oeffnen und wieder schliessen
+  OK   Auf einem fremden Profil sind Highlights klickbar
+  OK   Der Link auf einem fremden Profil ist ein echter Link
+  OK   Ein Bereichswechsel laesst die Seite nicht haengen
+
+  22 von 22 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+======================================================================
+  community
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Communitys — die Seite nach dem Prototyp
+  OK   Es gibt das grosse Kopfbild
+  OK   Es gibt der Zurueck-Pfeil auf dem Bild
+  OK   Es gibt der Name
+  OK   Es gibt die Mitgliederzahl
+  OK   Es gibt das „..."
+  OK   Es gibt die Biografie
+  OK   Es gibt der Link
+  OK   Es gibt „neues Unterthema erstellen"
+  OK   Es gibt die Unterthemen
+  OK   Das Kopfbild ist gross, nicht ein Symbol in einer Zeile
+  OK   Der Name ist nicht abgeschnitten
+  OK   Der Link ist ein echter Link
+  OK   Die Unterthemen tragen die Raute vor dem Namen
+  OK   Ein Unterthema laesst sich oeffnen
+
+Communitys — Name, Einstellungen, eigene Community
+  OK   Der Gruppenname fuehrt zu den Einstellungen
+  OK   Das „..." fuehrt zu denselben Einstellungen
+  OK   Eine fremde Community laesst sich verlassen
+  OK   Die eigene Community laesst sich NICHT verlassen
+  OK   Ein neues Unterthema laesst sich anlegen
+  OK   Ein zweites Unterthema mit demselben Namen wird abgelehnt
+
+Communitys — Chats
+  OK   Ein einzelner Chat laesst sich oeffnen
+  OK   Auch ein Gruppenchat laesst sich oeffnen
+  OK   Das Plus bleibt auf der Chats-Seite
+  OK   „Neue Gruppe" aus dem Menue oeffnet direkt
+
+  24 von 24 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+======================================================================
+  chatoptionen
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Chat-Einstellungen
+  OK   Das Blatt zeigt, um wen es geht
+  OK   Es steht mehr darin als die frueheren sechs Punkte
+  OK   Die Punkte sind in Abschnitte sortiert
+  OK   „Chat sperren" gibt es überhaupt
+  OK   „Chat sperren" merkt sich seinen Stand
+  OK   Ein gesperrter Chat zeigt in der Liste keine Vorschau
+  OK   Ein gesperrter Chat fragt vor dem Öffnen nach
+  OK   Nach „Öffnen" geht der Chat auf
+  OK   Die Sperre laesst sich wieder aufheben
+  OK   „Stumm" merkt sich seinen Stand
+  OK   Ein langes Blatt scrollt, statt oben aus dem Bild zu laufen
+  OK   „Mitteilungen" merkt sich seinen Stand
+  OK   „Melden" fragt nach einem Grund statt nur zu bestätigen
+  OK   „Blockieren" wirkt und laesst sich wieder aufheben
+
+Von der Community in den Messenger
+  OK   Der Punkt steht im Community-Zweierchat
+  OK   Er legt keinen Messenger-Chat an, sondern fragt
+  OK   Eine gesendete Anfrage bietet sich nicht noch einmal an
+
+  17 von 17 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+======================================================================
+  player
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Videos — Hochformat
+  OK   Die Aktionsspalte bleibt beim Liken an ihrem Platz
+  OK   Auch ein Repost verschiebt nichts
+
+Videos — Querformat-Player
+  OK   Alle fünf Aktionen stehen nebeneinander
+  OK   Sie sind gleichmäßig verteilt, keiner klebt am Rand
+  OK   Die Reihe bleibt beim Liken an ihrem Platz
+
+Videos — Kapitel
+  OK   Ein Video mit Kapiteln zeigt sie an
+  OK   Ein Klick springt an die Stelle
+  OK   Ein Video ohne Kapitel zeigt keine leere Überschrift
+
+Videos — Vollbild und Einstellungen
+  OK   Es gibt einen Vollbild-Knopf
+  OK   Er legt den Player über den ganzen Bildschirm
+  OK   Und wieder zurück
+  OK   Es gibt Video-Einstellungen mit drei Punkten
+  OK   Die Geschwindigkeit lässt sich ändern und bleibt stehen
+  OK   Untertitel merken sich ihren Stand über einen Neustart
+  OK   Ein Video ohne Untertitel bietet den Punkt nicht an
+
+  15 von 15 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+======================================================================
+  gesten
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Kommentare
+  OK   Die angezeigte Kommentarzahl stimmt mit der echten überein
+  OK   Unter jedem Kommentar steht die Zahl seiner Likes
+  OK   Ein Like erhöht die Zahl sofort
+  OK   Ein neuer Kommentar zieht die Zahl am Beitrag mit
+
+Ziehen zum Schließen
+  OK   Ein kurzer Zug schließt das Kommentar-Blatt NICHT
+  OK   Ein langer Zug nach unten schließt es
+
+Story-Betrachter
+  OK   Ein kurzer Zug beendet die Story NICHT
+  OK   Ein Wischen nach unten beendet sie
+  OK   Danach steht wieder die Chatliste da
+
+  9 von 9 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+======================================================================
+  kommentare
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+5.1 Eingabe, Senden, Profilbild vollständig
+  OK   Home: alle drei Teile sind zu sehen
+  OK   Kurzformat: alle drei Teile sind zu sehen
+
+5.2 Kommentar-Knopf im Querformat
+  OK   Querformat: der Knopf öffnet das Blatt, und es liegt über dem Player
+  OK   Ein gesperrtes Wort meldet sich IM Blatt, der Entwurf bleibt stehen
+  OK   Weitertippen nimmt den Hinweis wieder weg
+  OK   Ein erlaubter Kommentar erscheint sofort und zieht die Zahl mit
+
+5.2 / 5.3 Live
+  OK   Live: zugeklappt steht ein kleines Fenster mit höchstens drei Zeilen
+  OK   Live: der Kommentar-Knopf klappt auf und setzt den Cursor ins Feld
+  OK   Live: ein Kommentar erscheint im Fenster, der Knopf zählt die Live-Kommentare
+
+  9 von 9 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+
+======================================================================
+  querformat
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+6.3 Rote Zeitleiste
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.waitForFunction: Timeout 15000ms exceeded.
+    at clipAuf (/Users/henrik.dikta/allmedia-wt-codex/bunny-live2-main/app/test/_querformat.js:92:16)
+    at async /Users/henrik.dikta/allmedia-wt-codex/bunny-live2-main/app/test/_querformat.js:122:3 {
+  log: [],
+  name: 'TimeoutError'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  feinschliff
+======================================================================
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Messenger
+  OK   Die Chats-Filter werden nicht von der Liste überschnitten
+  OK   Auch die Insel überschneidet den Inhalt nicht
+  OK   „Ausstehende Anfragen" steht über den Kontakten
+
+Messenger — Friend-Map
+  OK   Die Standort-Sichtbarkeit fuehrt zu denselben vier Stufen
+
+Videos — Home
+  OK   Die abgeschaltete Glocke trägt einen Strich
+  OK   Ein Profilbild ohne Story führt zum Profil statt zu einem Hinweis
+
+Fremdes Profil
+  OK   Der Story-Ring eines fremden Profils lässt sich öffnen
+
+Communitys — Suchen
+  OK   Die Liste heißt „Communitys", nicht „Kanäle"
+
+Videos — Profil, Spendenaktion
+  OK   Eine Spendenaktion geht auch ohne Ziel
+
+Videos — Sound-Seite
+  OK   Ein Sound zeigt seinen Liedtext
+  OK   Nur die gesungene Zeile steht da, keine nächste
+  OK   Ein Instrumental sagt, dass es keinen Text gibt
+
+Videos — Alle Fotos an einem Ort
+  OK   „Alle Fotos ansehen" öffnet eine eigene Seite
+  OK   Der Zurück-Pfeil und das Plus sind sichtbar
+  OK   Es stehen dort nur Fotos, keine Videos
+  OK   Jedes Foto trägt eine Autorzeile
+  OK   Der Pfeil führt zurück zum Ort
+
+Videos — eigene Beiträge verwalten
+  OK   Langes Drücken öffnet die Optionen zu einem eigenen Beitrag
+  OK   Die eigenen Playlists stehen zur Wahl, keine Highlights
+  OK   Ein Beitrag lässt sich in eine Playlist legen
+  OK   Ein zweiter Klick nimmt ihn wieder heraus
+  OK   Löschen fragt nach und nimmt die Kachel dann weg
+  OK   Ein Livestream lässt sich beenden, ohne eine Aufzeichnung zu hinterlassen
+
+  23 von 23 Punkten erfuellt
 
   Konsolenfehler:
    Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
@@ -1496,316 +2555,309 @@ Videos — Suche, der gemeldete Bug
    Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
    Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
    Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 
 ======================================================================
-  optionen
+  kamera
 ======================================================================
 ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
-  OK   Kein Tonknopf mehr im Hochformat
-  OK   Der Ton geht nach dem ersten Tippen an
-  OK   Fremdes Reel vorhanden
-  OK   "Mehr" am Reel zeigt die fuenf Punkte nach TikTok
-  OK   Reihenfolge wie Henriks Aufzaehlung
-  OK   Aussehen wie TikTok: runde Kreise nebeneinander, kein Pfeil, Abbrechen
-  OK   Abbrechen schliesst das Menue
-  OK   Link kopieren legt die Website-Adresse ab
-  OK   Der Link oeffnet das Reel
-  OK   Zu Story hinzufuegen legt eine Story an
-  OK   Melden fragt nach dem Grund und kommt an
-  OK   Kein Interesse nimmt das Reel sofort heraus
-  OK   ... und bleibt nach dem Neuladen weg (Datenbank)
-  OK   Zuruecksetzen bringt es zurueck
-  OK   Am eigenen Beitrag fehlen "Kein Interesse" und "Melden"
-  OK   Querformat-Player hat "Mehr"
 
-16 von 16 Pruefungen bestanden
-Konsolenfehler:
-Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
-Konsole: Unhandled promise rejection: NotSupportedError: The element has no supported sources.
-JS-Fehler: The element has no supported sources.
+Kamera — Punkt 17 und 18
+  OK   Das Bildsymbol öffnet die Galerie, nicht die Kamera
+  OK   Nach der Galerie steht die Frage nach dem Ziel
+  OK   Die Aufnahme lässt sich in einen Chat schicken
+  OK   Im Chat steht das Kamerasymbol
+
+Langes Drücken auf einen Chat — Punkt 15
+  OK   Das Blatt zeigt zuerst, um wen es geht
+
+Erstellen — Punkt 38 und 45
+  OK   Livestream steht direkt unter Story
+  OK   Zum Beitrag lässt sich Musik wählen
+
+Folgen — Punkt 42
+  OK   Folgen zählt die eigene Gefolgt-Zahl mit
+
+Community-Suche — Punkt 56 und 57
+  OK   Die Überschriften sind anklickbar
+  OK   Ein privates Profil bekommt eine Anfrage, kein Befreunden
+
+  10 von 10 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 
 ======================================================================
-  kasten8
+  eigenes
 ======================================================================
 ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
-  OK   Querformat-Video mit Ort oder Sound im Bestand
-  OK   8.1 Kein Ton-/Lautstaerkeknopf im Querformat-Player
-  OK   8.2 Ort und Sound stehen unter dem Namen im Querformat
-  OK   8.2 Ort antippen oeffnet die Standortseite (nicht das Profil)
-  OK   8.2 Sound antippen oeffnet die Soundseite oder sagt, warum nicht
-  OK   8.1 Chat-Vollformat: Video ohne Browserleiste und mit Ton
 
-6 von 6 Pruefungen bestanden
-Konsolenfehler:
-Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+Der eigene Beitrag im Feed
+  OK   Ein Beitrag ohne Likes zeigt keine Like-Zeile
+  OK   Am eigenen Beitrag steht kein "Folgen"
+  OK   Am eigenen Beitrag steht keine Glocke
+  OK   Ein Beitrag ohne Ort schreibt nicht "Ohne Ort"
+  OK   Ein Beitrag ohne Ort beginnt nicht mit einem Mittelpunkt
+  OK   Bei einem fremden Beitrag steht "Folgen" weiterhin
+  OK   Die Like-Zeile eines fremden Beitrags nennt einen Namen
 
-======================================================================
-  kasten12
-======================================================================
+Der eigene Name
+  OK   Das Konto traegt seinen Namen, nicht "Du"
+  OK   Name und Info lassen sich aendern
+  OK   Videos-Profil zeigt den Namen aus dem Konto
+  FEHL Videos-Profil zeigt die Info aus dem Konto — die geaenderte Info steht nicht auf der Seite
+  OK   Messenger-Profil zeigt den Namen aus dem Konto
+  OK   Messenger-Profil zeigt die Info aus dem Konto
+  OK   Community-Profil zeigt den Namen aus dem Konto
+  OK   Community-Profil zeigt die Info aus dem Konto
 
-Gemeinsame Bausteine
-  OK   sammlungen.js und spende.js stehen in UMD_BAUSTEINE
-  OK   index.html bindet beide ein
-  OK   beide Dateien haben eine UMD-Hülle
+Die eigene Community — Punkt 62
+  OK   An der eigenen Community steht kein Beitritts-Knopf
+  OK   Der Server verweigert das Verlassen der eigenen Community
+  OK   Einer fremden Community kann man weiter beitreten
+  OK   Das Bearbeiten-Formular ist nicht leer
 
-12.9  Ringfarben
-  OK   Playlist rot wie im Prototyp (#FF0A0A)
-  OK   Highlight orange wie im Prototyp (#FF990A)
-  OK   Die beiden Gattungen unterscheiden sich
-  OK   Strich 4/45 des Durchmessers (64 → 6 px)
-  OK   App: eigenes Profil nimmt die Farbe aus dem Baustein
-  OK   App: fremdes Profil nimmt die Farbe aus dem Baustein
-  OK   Website: ringStil() nimmt Farbe und Stärke aus dem Baustein
-  OK   Website: kein fest verdrahteter Farbverlauf mehr am Ring
-  OK   Website: Ring ist rund
+  18 von 19 Punkten erfuellt
 
-12.7 / 12.8  Titelbild
-  OK   Ohne Wahl: ein Beitrag der Sammlung ist das Titelbild
-  OK   Gewählter Beitrag gewinnt
-  OK   Gewählte Story gewinnt
-  OK   Eigenes Foto gewinnt vor allem
-  OK   Leere Sammlung ohne Foto: kein Bild
-  OK   Schema-Entwurf: Spalten, Prüfung auf Inhalt, idempotent
-  OK   App: Knopf „Titelbild wählen" im eigenen Profil
-  OK   App: speichert über aktionen.titelbildSetzen
-  OK   Website: openTitelbildWahl mit Beitrag, Foto und Kamera
-  OK   Server: POST /api/eigene/sammlung/:id/titelbild
-
-12.3  Spendenziel
-  OK   Formular: Titel, Ziel, Frist, Text werden übernommen
-  OK   Formular: Ziel bleibt freiwillig
-  OK   Formular: Unsinn wird abgelehnt
-  OK   Frist ungültig: fristAus wirft
-  OK   Stand: erreicht, Fortschritt, Spender aus den Buchungen
-  OK   Abgelaufene Frist wird erkannt
-  OK   Eigener Betrag: 2,50 → 250 Cent, 0,10 abgelehnt
-  OK   Schema-Entwurf: spendenstand() nur für angemeldete Nutzer
-  OK   App: Karte, Detailblatt und Spenden-Knopf
-  OK   App: Karte im eigenen und im fremden Profil
-  OK   Website: Karte ist ein Knopf und öffnet openSpendenziel
-  OK   Website: Karte auch im fremden Profil
-  OK   Server: GET /api/spendenstand/:userId
-  OK   Server: Spende-Formular über Spende.ausFormular
-
-12.5  Profilbild
-  OK   Schema-Entwurf: avatar_url nur aus dem Eimer media
-  OK   App: Kopf mit Mediathek, Kamera, Entfernen
-  OK   App: „Profil bearbeiten" zeigt den Kopf
-  OK   App: Ordner avatars, gespeichert über profilbildSetzen
-  OK   Website: kein Profilbild mehr nur im Browser (localStorage)
-  OK   Website: Upload nach avatars und /api/eigene/profilbild
-  OK   Website: Avatare zeigen das Bild (personenAvatar)
-  OK   Server: POST /api/eigene/profilbild prüft Pfad und Zeilenzahl
-  OK   Server: jeder Nutzer bringt sein Bild mit
-  OK   Website: nur noch EIN bildVerkleinern (das zweite brach Storys)
-
-12.1  Tab bleibt
-  OK   App: Reiter liegt in der Shell, nicht im Bildschirm
-  OK   App: Beitrag öffnen merkt sich den Reiter
-  OK   App: Verlassen setzt zurück
-  OK   Website: profilReiterPruefen bei Ober- und Unterleiste
-  OK   Website: Kacheln im Raster öffnen den Beitrag
-
-12.2  Name mittig
-  OK   App: Handle mit eigener Mitte (testID profil-handle)
-  OK   Website: .oprof__handle links und rechts gleich weit
-
-12.4  Profil wechseln
-  OK   App: Video-Profil ruft den Wechsel selbst auf
-  OK   App: nach dem Wechsel landet ein anderes Konto im Video-Profil
-  OK   App: zweimal abholen geht (StrictMode ruft den Initialisierer doppelt)
-  OK   App: dasselbe Konto (Wechsel abgebrochen) springt nicht
-  OK   App: nach drei Minuten gilt die Stelle nicht mehr
-  OK   App: vergessen() räumt ab
-  OK   App: Messenger und Einstellungen vergessen die Stelle vor dem Wechsel
-  OK   App: neue Shell startet im Video-Profil
-  OK   Website: #switchProfile öffnet den Wechsel im Video-Profil
-
-12.6  Online-Punkt
-  OK   App: grüner Punkt antippbar
-  OK   App: öffnet die Sichtbarkeit onlinestatus
-  OK   Website: #onlinePunkt öffnet openSichtbarkeit onlinestatus
-
-65 von 65 Pruefungen bestanden.
-
-======================================================================
-  kasten17
-======================================================================
-
-Gemeinsame Regeln (gemeinsam/sammlungen.js)
-  OK   Untertitel Playlist, Mehrzahl
-  OK   Untertitel Playlist, Einzahl
-  OK   Untertitel Highlight nennt Storys
-  OK   Untertitel Highlight, Einzahl
-  OK   Untertitel leer
-  OK   Alter: gerade eben
-  OK   Alter: Minuten
-  OK   Alter: Stunden
-  OK   Alter: ein Tag
-  OK   Alter: Tage
-  OK   Alter: Wochen
-  OK   Alter: Datum ab vier Wochen
-  OK   Alter: kein Datum → leer
-  OK   Story: fremd, Kennung bleibt
-  OK   Story: Vorname wie in der Leiste
-  OK   Story: Video bleibt Video
-  OK   Story: gemocht
-  OK   Story: Zeitpunkt für den Kopf
-  OK   Story: eigene heißt „me" wie in der Leiste
-
-17.1  Highlight im Story-Betrachter
-  OK   App: kein neuer Betrachter — HighlightBetrachter nutzt StoryViewerScreen
-  OK   App: Betrachter kennt den Highlight-Modus
-  OK   App: Name des Highlights im Kopf
-  OK   App: eigenes Highlight — Bearbeiten, Herausnehmen, Löschen
-  OK   App: eigenes Profil spielt Highlights ab
-  OK   App: fremdes Profil spielt Highlights ab
-  OK   App: fremdes Profil zeigt keinen Hinweis mehr statt der Sammlung
-  OK   App: Storys des Highlights über sammlung_inhalte
-  OK   Website: Highlight-Kreis spielt ab
-  OK   Website: openStory nimmt eine eigene Liste
-  OK   Website: fremdes Profil kommt nach dem Schließen zurück
-  OK   Website: Highlight-Optionen im Betrachter
-  OK   Server: GET /api/sammlung/:id/storys
-  OK   Server und App bauen die Story mit derselben Regel
-
-17.2  Playlist als Ordner
-  OK   App: Ordner mit Untertitel aus der gemeinsamen Regel
-  OK   App: eigenes Profil nutzt den Ordner
-  OK   App: fremdes Profil nutzt den Ordner — ohne kopfRechts
-  OK   App: Kachel im fremden Ordner öffnet den Beitrag
-  OK   App: Story-Kachel im Ordner hatte mediaUri statt mediaUrl (behoben)
-  OK   Website: Untertitel aus der gemeinsamen Regel
-  OK   Website: Löschen und Titelbild nur im eigenen Ordner
-
-17.3  Selbst einordnen und herausnehmen
-  OK   App: „Zu Playlist hinzufügen" nur am eigenen Beitrag
-  OK   App: Playlist-Wahl im selben Blatt
-  OK   App: „Zu Highlight hinzufügen" an der eigenen Story
-  OK   App: Häkchen schaltet hinein und heraus
-  OK   App: „Neue Playlist" legt an und legt hinein
-  OK   App: langes Drücken im eigenen Ordner nimmt heraus
-  OK   Website: „Zu Playlist hinzufügen" im Drei-Punkte-Menü
-  OK   Website: „Zu Highlight hinzufügen" an der eigenen Story
-  OK   Website: langes Drücken im eigenen Raster bietet keine Highlights mehr an
-  OK   Server: Zuordnung lesen, hinein, heraus, neu
-  OK   Server: nur Eigenes lässt sich einordnen
-  OK   Server: Löschen prüft die Zahl der gelöschten Zeilen (RLS)
-  OK   Server: kein Pfad, den DELETE /api/eigene/sammlung/:art/:name verschluckt
-
-53 von 53 Pruefungen bestanden.
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
 
 ======================================================================
-  glocke
+  datenbank
+======================================================================
+PASS  Testkonto test@all-media.app kann sich anmelden
+PASS  Alle Tabellen aus dem Code gibt es in der Datenbank
+PASS  Beispielprofile vorhanden (Anna, Bob, ...)
+PASS  Beispielbeitraege vorhanden
+PASS  Sounds vorhanden
+PASS  Standorte vorhanden
+PASS  Hashtags vorhanden
+PASS  Oeffentliche Communitys vorhanden
+PASS  Eigener Foto-Beitrag
+PASS  Eigenes Video im Hochformat
+PASS  Eigenes Video im Querformat
+PASS  Eigenes 360-Video
+PASS  Eigener Livebeitrag
+PASS  Eigene Story
+PASS  Merkliste nicht leer
+PASS  Repost vorhanden
+PASS  Kontakte vorhanden
+PASS  Chats vorhanden
+PASS  Mitteilungen vorhanden
+PASS  Punkt auf der Freundeskarte
+PASS  Kein Videobeitrag zeigt auf eine Bilddatei  — 24 geprueft
+PASS  Kein Beitrag haengt noch an einem Platzhalter
+PASS  Eigener Kommentar vorhanden  — 1 Zeilen
+PASS  Jeder eigene Kommentar haengt an einem lesbaren Beitrag  — 1 geprueft
+PASS  Profil des Testkontos ausgefuellt  — Test Nutzer @test
+FAIL  Ablage "media": Hochladen geht  — 400 {"statusCode":"403","error":"Unauthorized","message":"new row violates row-level security policy","code":"AccessDenied"}
+PASS  Ablage "media": HTML wird abgewiesen
+
+1 Pruefung(en) fehlgeschlagen — SUPABASE_EINSPIELEN.sql im SQL-Editor ausfuehren.
+
+======================================================================
+  aktionen
 ======================================================================
