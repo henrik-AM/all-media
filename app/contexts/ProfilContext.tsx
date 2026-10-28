@@ -515,7 +515,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (quer) {
       setClips((prev) => [
-        { id, userId: 'me', title: beschreibung, duration: '00:15', views: 0, age: 'gerade eben', art: 'standard' },
+        { id, userId: 'me', title: beschreibung, duration: '', views: 0, age: 'gerade eben', art: 'standard' },
         ...prev,
       ]);
     } else {

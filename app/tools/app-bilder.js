@@ -328,7 +328,7 @@ function metroLaeuft() {
 
 (async () => {
   // Bedienfolgen festhalten, ohne Anmeldung, Navigation oder App-Neustart.
-  // npm run mac:bilder -- --aktuell ../../pruefbelege/bunny-app/01-feed.png
+  // npm run mac:bilder -- --aktuell ../pruefbelege/bunny-app/01-feed.png
   const aktuell = process.argv.indexOf('--aktuell');
   if (aktuell !== -1) {
     const ziel = process.argv[aktuell + 1];

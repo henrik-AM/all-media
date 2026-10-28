@@ -51,7 +51,7 @@ export interface UploadErgebnis {
   anzeige: string | null;
 }
 
-/** Aus dem Dateinamen den Inhaltstyp ableiten. */
+/** Inhaltssignatur bevorzugen, unbekannte Formate nach Dateiendung einordnen. */
 function typVon(dateiname: string, inhalt: ArrayBuffer): string {
   // iOS behält PNG trotz quality bei; Aufrufer nennen Aufnahmen oft .jpg.
   // Der tatsächliche Inhalt zählt, wie bei der Prüfung auf dem Server.
