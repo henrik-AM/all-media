@@ -6,7 +6,7 @@ const vm=require('node:vm');
 const ts=require('typescript');
 function modul(datei, abhaengig, extras={}) {
   const exports={};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../',datei),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports,require:n=>abhaengig[n],console:{error(){}},AbortSignal,Uint8Array,...extras});
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../',datei),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.React}}).outputText,{exports,require:n=>abhaengig[n],console:{error(){}},AbortSignal,Uint8Array,...extras});
   return exports;
 }
 const client={auth:{getSession:async()=>({data:{session:{access_token:'attrappe'}}})}};
@@ -55,4 +55,17 @@ test('Websiteformular: Fehler sichtbar, kein Schließen, Doppelklick gesperrt',a
  kontext.openFormular('Beitrag',[],async()=>{aufrufe++;await new Promise(r=>ablehnen=r);throw Error('Upload abgelehnt')},'Veröffentlichen');
  const erster=knopf.klick();await knopf.klick();assert.equal(aufrufe,1);assert.equal(knopf.disabled,true);
  ablehnen();await erster;assert.equal(geschlossen,0);assert.equal(fehler.hidden,false);assert.equal(fehler.textContent,'Upload abgelehnt');assert.equal(knopf.disabled,false);
+});
+
+test('Appformular: warten, Mehrfachtippen sperren, Fehler im Blatt, Wiederholung möglich',async()=>{
+ const zustand=[];const react={createElement:(typ,props,...children)=>({typ,props,children}),useEffect(){},useRef:v=>({current:v}),useState:v=>{const i=zustand.length;zustand.push(v);return [v,x=>zustand[i]=x]}};
+ let zu=0,aufrufe=0,weiter;
+ const {FormularSheet}=modul('components/FormularSheet.tsx',{
+  react:{...react,default:react},'react-native':{},'./Druck':{Druck:'Druck'},'./SheetRahmen':{SheetRahmen:'Sheet'},'./MarkierungsEingabe':{},'../constants/design':{themenStyles:()=>({}),colors:{},radius:{},spacing:{},typography:{}}
+ });
+ const blatt=FormularSheet({visible:true,title:'Beitrag',felder:[],onClose:()=>zu++,onSubmit:async()=>{aufrufe++;if(aufrufe===1){await new Promise(r=>weiter=r);throw Error('Upload abgelehnt')}return null}});
+ const erster=blatt.props.fuss.props.onPress();await blatt.props.fuss.props.onPress();blatt.props.onClose();
+ assert.equal(aufrufe,1);assert.equal(zu,0);assert.equal(zustand[1],true);
+ weiter();await erster;assert.equal(zu,0);assert.equal(zustand[2],'Upload abgelehnt');assert.equal(zustand[1],false);
+ await blatt.props.fuss.props.onPress();assert.equal(aufrufe,2);assert.equal(zu,1);
 });

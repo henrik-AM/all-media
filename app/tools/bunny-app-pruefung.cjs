@@ -23,8 +23,8 @@ async function bestand() {
   return data;
 }
 async function befehl(s) {
-  if(s==='leer-loeschen') {
-    const leere = (await bestand()).filter(p=>p.description.startsWith('Bunny-App 28.10.2026')&&!p.media_url);
+  if(s==='leer-loeschen'||s==='wiederholung-aufraeumen') {
+    const leere = (await bestand()).filter(p=>p.description.startsWith('Bunny-App 28.10.2026')&&(s==='wiederholung-aufraeumen'||!p.media_url));
     for(const p of leere) {
       const r=await fetch(basis+`/api/eigene/${p.id}/loeschen`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:'{}'});
       if(!r.ok) throw new Error('Leeren Prüfbeitrag löschen fehlgeschlagen: '+r.status);
