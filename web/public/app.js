@@ -15235,7 +15235,9 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
           if (fehler) return melden(fehler);
           close();
         } catch (e) {
-          melden(e?.message || 'Die Aufnahme ließ sich nicht speichern');
+          const text = e?.message || 'Die Aufnahme ließ sich nicht speichern';
+          melden(/fetch failed|failed to fetch|network (request|connection)|load failed/i.test(text)
+            ? 'Die Aufnahme ließ sich nicht speichern. Bitte erneut versuchen.' : text);
         } finally {
           speichert = false;
           knopfElement.disabled = false;

@@ -60,6 +60,7 @@ function typVon(dateiname: string, inhalt: ArrayBuffer): string {
   if ([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => b[i] === v)) return 'image/png';
   const text = (ab: number, bis: number) => String.fromCharCode(...b.slice(ab, bis));
   if (text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP') return 'image/webp';
+  if (text(4, 8) === 'ftyp' && text(8, 12) === 'qt  ') return 'video/quicktime';
   const endung = dateiname.split('.').pop()?.toLowerCase() ?? '';
   if (endung === 'png') return 'image/png';
   if (endung === 'mp4') return 'video/mp4';
@@ -114,7 +115,10 @@ export async function ladeHoch(
     // Sichtbar machen, nicht verschlucken: genau das Verschweigen hat
     // verborgen, dass nie etwas ankam.
     console.error('Upload fehlgeschlagen:', fehler?.message ?? fehler);
-    return { success: false, error: fehler?.message ?? 'Upload fehlgeschlagen', url: null, anzeige: null };
+    const text = fehler?.message ?? 'Die Aufnahme ließ sich nicht speichern';
+    const error = /fetch failed|failed to fetch|network (request|connection)|load failed/i.test(text)
+      ? 'Die Aufnahme ließ sich nicht speichern. Bitte erneut versuchen.' : text;
+    return { success: false, error, url: null, anzeige: null };
   }
 }
 

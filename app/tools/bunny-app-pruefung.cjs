@@ -65,6 +65,17 @@ async function befehl(s) {
   if(error) throw error;
   ich=data.user.id;token=data.session.access_token;anfang=(await bestand()).length;
   protokoll({bereit:true,anfang,konto:'test@all-media.app'});
+  if(process.argv.includes('--loeschen')) {
+    const pruefbeitraege=(await bestand()).filter(p=>p.description.startsWith('Bunny-App 28.10.2026'));
+    if(pruefbeitraege.length!==2 || pruefbeitraege.some(p=>!p.media_url)) throw new Error('Genau zwei vollständige eigene Prüfbeiträge erforderlich');
+    for(const p of pruefbeitraege) {
+      const r=await fetch(basis+`/api/eigene/${p.id}/loeschen`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:'{}'});
+      const antwort=await r.json();
+      protokoll({geloescht:p.id,status:r.status,erfolg:antwort.ok===true});
+      if(!r.ok||!antwort.ok) throw new Error('Prüfbeitrag löschen fehlgeschlagen');
+    }
+    return;
+  }
   for await(const s of readline.createInterface({input:process.stdin})) {
     if(s==='ende') break;
     try {await befehl(s.trim());} catch(e) {protokoll({fehler:e.message});}

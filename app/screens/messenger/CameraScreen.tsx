@@ -210,6 +210,13 @@ export const CameraScreen = ({
   const ausGalerie = async () => {
     setBusy(true);
     try {
+      // Ohne Bearbeitung liefert iOS die ursprüngliche MP4 statt eines
+      // neu verpackten QuickTime-Videos. Die Website lädt ebenfalls das Original.
+      const originalVideo = !zielStory && mode === 'video';
+      if (originalVideo) {
+        const zugriff = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!zugriff.granted) { onNotice('Zugriff auf die Galerie nicht möglich'); return; }
+      }
       const ergebnis = await ImagePicker.launchImageLibraryAsync({
         /*
          * Kasten 15: für die Story Foto ODER Video, wie bei Instagram. Die
@@ -217,7 +224,8 @@ export const CameraScreen = ({
          * (allowsEditing + videoMaxDuration); geprüft wird trotzdem unten.
          */
         mediaTypes: zielStory ? ['images', 'videos'] : mode === 'photo' ? ['images'] : ['videos'],
-        allowsEditing: true,
+        allowsEditing: !originalVideo,
+        ...(originalVideo ? { videoExportPreset: ImagePicker.VideoExportPreset.Passthrough } : {}),
         quality: 0.8,
         ...(zielStory ? { videoMaxDuration: StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS } : {}),
       });

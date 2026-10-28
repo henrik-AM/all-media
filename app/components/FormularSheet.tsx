@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
@@ -89,6 +90,7 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
     const fehlt = felder.find((f) => f.pflicht && !gefuellt[f.key]);
     if (fehlt) return setFehler(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
 
+    Keyboard.dismiss();
     sperre.current = true;
     setSpeichert(true);
     setFehler(null);

@@ -15,6 +15,7 @@ for(const [typ,bytes,name] of [
   ['image/jpeg',[255,216,255,0],'aufnahme.png'],
   ['image/webp',Array.from(Buffer.from('RIFFxxxxWEBP')),'aufnahme.jpg'],
   ['video/mp4',Array.from(Buffer.from('0000ftypisom')),'aufnahme.mp4'],
+  ['video/quicktime',Array.from(Buffer.from('0000ftypqt  ')),'aufnahme.mp4'],
 ]) test('Upload sendet '+typ+' anhand Aufnahmeinhalt/Videoendung',async()=>{
   let gesendet;
   const storage=modul('lib/supabaseStorage.ts',{'./medien':{medienServerBasis:()=> 'https://attrappe.invalid'}},{fetch:async(url,opts)=>{
@@ -61,11 +62,17 @@ test('Appformular: warten, Mehrfachtippen sperren, Fehler im Blatt, Wiederholung
  const zustand=[];const react={createElement:(typ,props,...children)=>({typ,props,children}),useEffect(){},useRef:v=>({current:v}),useState:v=>{const i=zustand.length;zustand.push(v);return [v,x=>zustand[i]=x]}};
  let zu=0,aufrufe=0,weiter;
  const {FormularSheet}=modul('components/FormularSheet.tsx',{
-  react:{...react,default:react},'react-native':{},'./Druck':{Druck:'Druck'},'./SheetRahmen':{SheetRahmen:'Sheet'},'./MarkierungsEingabe':{},'../constants/design':{themenStyles:()=>({}),colors:{},radius:{},spacing:{},typography:{}}
+  react:{...react,default:react},'react-native':{Keyboard:{dismiss(){}}},'./Druck':{Druck:'Druck'},'./SheetRahmen':{SheetRahmen:'Sheet'},'./MarkierungsEingabe':{},'../constants/design':{themenStyles:()=>({}),colors:{},radius:{},spacing:{},typography:{}}
  });
  const blatt=FormularSheet({visible:true,title:'Beitrag',felder:[],onClose:()=>zu++,onSubmit:async()=>{aufrufe++;if(aufrufe===1){await new Promise(r=>weiter=r);throw Error('Upload abgelehnt')}return null}});
  const erster=blatt.props.fuss.props.onPress();await blatt.props.fuss.props.onPress();blatt.props.onClose();
  assert.equal(aufrufe,1);assert.equal(zu,0);assert.equal(zustand[1],true);
  weiter();await erster;assert.equal(zu,0);assert.equal(zustand[2],'Upload abgelehnt');assert.equal(zustand[1],false);
  await blatt.props.fuss.props.onPress();assert.equal(aufrufe,2);assert.equal(zu,1);
+});
+
+test('Netzabbruch zeigt eine verständliche Meldung ohne SDK-Interna',async()=>{
+ const storage=modul('lib/supabaseStorage.ts',{'./medien':{}},{fetch:async()=>{throw Error('fetch failed: UnexpectedException: The network connection was lost. (at ExpoModulesCore/Promise.swift:56)')}});
+ const r=await storage.ladeHoch(client,'file://aufnahme','posts','bild.jpg');
+ assert.equal(r.success,false);assert.equal(r.error,'Die Aufnahme ließ sich nicht speichern. Bitte erneut versuchen.');
 });
