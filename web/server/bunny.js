@@ -21,13 +21,14 @@
  *            Anbieter. Keine Datenwanderung.
  *   anzeige  die von Bunny unterschriebene Adresse zum sofortigen Anzeigen.
  *
- * DIE ZWEI SCHLÜSSEL
+ * DIE SCHLÜSSEL
  *
  * BUNNY_STORAGE_KEY ist das Passwort der Speicherzone (Kopfzeile
  * `AccessKey`), BUNNY_TOKEN_KEY der Token-Schlüssel der Pull Zone. Beide
  * bleiben auf dem Server. Sie stehen nie in einer Meldung, nie im
  * Protokoll und nie in einer Rückgabe — auch eine unterschriebene Adresse
  * wird nicht protokolliert, denn sie ist bis zum Ablauf ein Schlüssel.
+ * BUNNY_API_KEY ist optional und dient ausschließlich dem CDN-Purge.
  *
  * Quellen (abgerufen 26.10.2026):
  *   https://bunny.net/docs/storage/http.md

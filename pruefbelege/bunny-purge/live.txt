@@ -1,0 +1,25 @@
+PASS Alle sechs BUNNY-Variablen gesetzt
+PASS _probe vorher leer
+PASS _probe Upload
+PASS Zwei unterschiedliche Signaturvarianten
+PASS _probe Variante 0 GET 1: 200, Bytes identisch (Cache MISS)
+PASS _probe Variante 0 GET 2: 200, Bytes identisch (Cache HIT)
+PASS _probe Variante 1 GET 1: 200, Bytes identisch (Cache HIT)
+PASS _probe Variante 1 GET 2: 200, Bytes identisch (Cache HIT)
+PASS _probe loeschen
+PASS _probe CDN: gleiche Signaturen nach DELETE 404/404 in 559 ms
+PASS _probe nachher leer
+PASS Management-API Dienstschlüsselabruf
+PASS Eigener Server 3300 bereit
+PASS Testkonto-Anmeldung
+PASS Sitzung hat Rolle authenticated
+PASS /api/hochladen/datei?ordner=posts: HTTP 200
+PASS Upload registriert, signierte Bunny-Adresse
+PASS API-Upload GET 1: 200, Bytes identisch (Cache MISS)
+PASS API-Upload GET 2: 200, Bytes identisch (Cache HIT)
+PASS /api/medien/loeschen: HTTP 200
+PASS Medienlöschroute erfolgreich
+PASS API CDN: gleiche Signaturen nach DELETE 404 in 4209 ms
+PASS Registerbeleg entfernt
+PASS Eigene API-Datei aus Storage entfernt
+24 bestandene Prüfungen; Exit 0
