@@ -14,7 +14,7 @@ import {
 import { useDaten } from '../contexts/DatenContext';
 import { useSupabase } from '../contexts/SupabaseContext';
 import * as Aktion from '../lib/aktionen';
-import { ladeHoch } from '../lib/supabaseStorage';
+import { beitragSpeichern } from '../lib/beitragSpeichern';
 
 /*
  * Was hinter den drei Knoepfen oben rechts im eigenen Profil steckt:
@@ -148,8 +148,8 @@ interface ProfilWert {
   spende: Spende | null;
   raster: RasterEintrag[];
 
-  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; music?: string; soundAb?: number }) => void;
-  videoAnlegen: (werte: NeuesVideo) => void;
+  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; music?: string; soundAb?: number }) => Promise<void>;
+  videoAnlegen: (werte: NeuesVideo) => Promise<void>;
   highlightAnlegen: (name: string) => string | null;
   playlistAnlegen: (name: string) => string | null;
   spendeSetzen: (spende: Spende) => void;
@@ -474,85 +474,16 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     [schreiben]
   );
 
-  const nummer = () => `e${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  /** Upload und Datenbank müssen fertig sein, bevor eine Kachel erscheint. */
+  const inDatenbank = useCallback(async (felder: Aktion.NeuerBeitrag) => {
+    if (!supabase || !daten.ichId) throw new Error('Bitte erneut anmelden.');
+    return beitragSpeichern(supabase, daten.ichId, felder);
+  }, [supabase, daten.ichId]);
 
-  /*
-   * Einen angelegten Beitrag nachtraeglich auf seine echte Kennung umstellen.
-   *
-   * Die App vergibt beim Anlegen eine vorlaeufige Kennung („p_1756…"), damit
-   * die Kachel sofort dasteht. Die Datenbank vergibt ihre eigene. Solange
-   * beide auseinander liefen, zeigte auf einen frisch angelegten Beitrag
-   * weder Liken noch Kommentieren noch Loeschen — es gab ihn unter dieser
-   * Kennung nirgends.
-   */
-  const kennungTauschen = useCallback((vorlaeufig: string, echt: string) => {
-    setEigeneBeitraege((prev) => prev.map((b) => (b.id === vorlaeufig ? { ...b, id: echt } : b)));
-    setEigeneVideos((prev) => prev.map((v) => (v.id === vorlaeufig ? { ...v, id: echt } : v)));
-    setClips((prev) => prev.map((c) => (c.id === vorlaeufig ? { ...c, id: echt } : c)));
-    setRaster((prev) => prev.map((r) => (r.id === vorlaeufig ? { ...r, id: echt } : r)));
-  }, []);
-
-  /** Einen gerade angelegten Eintrag wieder wegnehmen, wenn er nicht ankam. */
-  const eintragZuruecknehmen = useCallback((id: string) => {
-    setEigeneBeitraege((prev) => prev.filter((b) => b.id !== id));
-    setEigeneVideos((prev) => prev.filter((v) => v.id !== id));
-    setClips((prev) => prev.filter((c) => c.id !== id));
-    setRaster((prev) => prev.filter((r) => r.id !== id));
-  }, []);
-
-  /**
-   * Den Beitrag in die Datenbank legen und die Kennung nachziehen.
-   *
-   * Die Anzeige steht schon; hier geht es nur noch darum, dass er auch
-   * wirklich existiert. Klappt das nicht, verschwindet die Kachel wieder —
-   * eine Kachel, die es nur auf diesem Bildschirm gibt, ist irrefuehrender
-   * als gar keine.
-   */
-  const inDatenbank = useCallback(
-    (vorlaeufig: string, felder: Aktion.NeuerBeitrag) => {
-      if (!supabase || !daten.ichId) return;
-
-      (async () => {
-        /*
-         * Erst die Aufnahme hochladen, dann den Beitrag anlegen.
-         *
-         * Was die Kamera liefert, ist ein Pfad auf diesem Geraet
-         * („file:///var/…"). Er gilt nur hier. Stuende er in der Datenbank,
-         * saehe die Website an dieser Stelle ein kaputtes Bild, und auf einem
-         * zweiten Geraet auch. Gespeichert wird deshalb die oeffentliche
-         * Adresse aus dem Speicher von Supabase.
-         *
-         * Klappt der Upload nicht, wird der Beitrag trotzdem angelegt — nur
-         * ohne Bild. Ein Beitrag ohne Bild ist immer noch besser als eine
-         * Kachel, die es nur auf diesem Bildschirm gibt.
-         */
-        let adresse = felder.mediaUrl;
-        if (adresse && !/^https?:/i.test(adresse)) {
-          const endung = felder.art === 'post' ? 'jpg' : 'mp4';
-          const upload = await ladeHoch(
-            supabase,
-            adresse,
-            'posts',
-            `${daten.ichId}-${Date.now()}.${endung}`
-          );
-          adresse = upload.success ? upload.url ?? undefined : undefined;
-        }
-
-        const echt = await Aktion.beitragAnlegen(supabase, daten.ichId, {
-          ...felder,
-          mediaUrl: adresse,
-        });
-        kennungTauschen(vorlaeufig, echt);
-      })().catch((e: any) => {
-        console.error('Beitrag anlegen fehlgeschlagen:', e?.message ?? e);
-        eintragZuruecknehmen(vorlaeufig);
-      });
-    },
-    [supabase, daten.ichId, kennungTauschen, eintragZuruecknehmen]
-  );
-
-  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(({ beschreibung, ort, mediaUri, music, soundAb }) => {
-    const id = `p_${nummer()}`;
+  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(async ({ beschreibung, ort, mediaUri, music, soundAb }) => {
+    const gespeichert = await inDatenbank({ art: 'post', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri });
+    const id = gespeichert.id;
+    mediaUri = gespeichert.mediaUri;
     setEigeneBeitraege((prev) => [
       {
         id,
@@ -575,18 +506,12 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     ]);
     setRaster((prev) => [{ id, kind: 'image', eigen: true, mediaUri }, ...prev]);
 
-    inDatenbank(id, {
-      art: 'post',
-      beschreibung,
-      ort: ort || '',
-      musik: music || 'Originalton',
-      soundAb,
-      mediaUrl: mediaUri,
-    });
   }, [inDatenbank]);
 
-  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(({ beschreibung, ort, quer, mediaUri, music, soundAb }) => {
-    const id = quer ? `q_${nummer()}` : `v_${nummer()}`;
+  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(async ({ beschreibung, ort, quer, mediaUri, music, soundAb }) => {
+    const gespeichert = await inDatenbank({ art: quer ? 'clip' : 'reel', titel: quer ? beschreibung : '', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri });
+    const id = gespeichert.id;
+    mediaUri = gespeichert.mediaUri;
 
     if (quer) {
       setClips((prev) => [
@@ -615,18 +540,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setRaster((prev) => [{ id, kind: 'video', eigen: true, mediaUri }, ...prev]);
 
-    // Querformat ist ein „clip", Hochformat ein „reel" — dieselbe Einteilung
-    // wie in der Datenbank und auf der Website.
-    inDatenbank(id, {
-      art: quer ? 'clip' : 'reel',
-      titel: quer ? beschreibung : '',
-      beschreibung,
-      ort: ort || '',
-      musik: music || 'Originalton',
-      soundAb,
-      mediaUrl: mediaUri,
-      dauer: quer ? '00:15' : undefined,
-    });
   }, [inDatenbank]);
 
   useEffect(() => {

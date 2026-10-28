@@ -147,7 +147,7 @@ interface Formular {
   knopf: string;
   /** Was schon in den Feldern steht, wenn das Blatt aufgeht. */
   vorbelegung?: Record<string, string>;
-  absenden: (werte: Record<string, string>) => string | null;
+  absenden: (werte: Record<string, string>) => string | null | Promise<string | null>;
   /** Was über den Feldern steht (Profilbild in „Profil bearbeiten"). */
   kopf?: React.ReactNode;
 }
@@ -1663,7 +1663,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           auswahl: ['Sofort', 'In einer Stunde', 'Heute Abend', 'Morgen früh'],
         },
       ],
-      absenden: ({ beschreibung, ort, music, soundAb: abText, zeitpunkt }) => {
+      absenden: async ({ beschreibung, ort, music, soundAb: abText, zeitpunkt }) => {
         const spaeter = geplantAb(zeitpunkt);
         const soundAb = SoundStellen.abAus(abText, music);
 
@@ -1673,23 +1673,22 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
            * zeigen waere die naheliegende Abkuerzung und genau falsch: man
            * saehe einen Beitrag, den ausser einem selbst niemand hat.
            */
-          void (async () => {
-            const id = await aktion.beitragMitId({
-              beschreibung,
-              ort,
-              musik: music,
-              soundAb,
-              mediaUrl: uri,
-              art: istBild ? 'post' : quer ? 'clip' : 'reel',
-              geplantAb: spaeter,
-            });
-            if (id) setNotice(`Geplant für ${zeitpunktText(zeitpunkt)}`);
-          })();
+          const id = await aktion.beitragMitId({
+            beschreibung,
+            ort,
+            musik: music,
+            soundAb,
+            mediaUrl: uri,
+            art: istBild ? 'post' : quer ? 'clip' : 'reel',
+            geplantAb: spaeter,
+          });
+          if (!id) return 'Die Aufnahme ließ sich nicht speichern';
+          setNotice(`Geplant für ${zeitpunktText(zeitpunkt)}`);
           return null;
         }
 
-        if (istBild) profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music, soundAb });
-        else profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb });
+        if (istBild) await profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music, soundAb });
+        else await profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb });
 
         // Gleich dorthin, wo das Neue jetzt steht.
         setArea('videos');

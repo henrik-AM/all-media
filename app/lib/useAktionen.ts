@@ -19,6 +19,7 @@ import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
 import { SpendenwegContext } from '../contexts/SpendenwegContext';
 import { ladeHoch } from './supabaseStorage';
+import { beitragSpeichern } from './beitragSpeichern';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -540,13 +541,7 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
 
       beitragMitId: (felder) =>
         holen('Der Beitrag', async (c, i) => {
-          let adresse = felder.mediaUrl;
-          if (adresse && !/^https?:/i.test(adresse)) {
-            const endung = felder.art === 'post' ? 'jpg' : 'mp4';
-            const upload = await ladeHoch(c, adresse, 'posts', `${i}-${Date.now()}.${endung}`);
-            adresse = upload.success ? upload.url ?? undefined : undefined;
-          }
-          const id = await A.beitragAnlegen(c, i, { ...felder, mediaUrl: adresse });
+          const { id } = await beitragSpeichern(c, i, felder);
 
           /*
            * @-Namen aus der Beschreibung markiert seit Kasten 25 die

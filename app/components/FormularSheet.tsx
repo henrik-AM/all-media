@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -40,7 +40,7 @@ interface Props {
   vorbelegung?: Record<string, string>;
   onClose: () => void;
   /** Gibt einen Fehlertext zurueck, dann bleibt das Blatt offen. */
-  onSubmit: (werte: Record<string, string>) => string | null;
+  onSubmit: (werte: Record<string, string>) => string | null | Promise<string | null>;
   /** Frueher fuer Fehler gebraucht, die stehen jetzt im Blatt selbst. */
   onNotice?: (message: string) => void;
   /**
@@ -62,6 +62,8 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
    * Blatt und waren nicht zu sehen (Kasten 6.5, 28.09.2026) — wie beim
    * Kommentarblatt in Kasten 5.
    */
+  const sperre = useRef(false);
+  const [speichert, setSpeichert] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
   // Beim Oeffnen zuruecksetzen, sonst steht die vorige Eingabe noch drin -
@@ -74,7 +76,8 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, title]);
 
-  const absenden = () => {
+  const absenden = async () => {
+    if (sperre.current) return;
     const gefuellt: Record<string, string> = {};
     for (const f of felder) {
       // Eine Auswahl steht schon auf dem ersten Wert, auch ohne Antippen —
@@ -86,19 +89,29 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
     const fehlt = felder.find((f) => f.pflicht && !gefuellt[f.key]);
     if (fehlt) return setFehler(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
 
-    const abgelehnt = onSubmit(gefuellt);
-    if (abgelehnt) return setFehler(abgelehnt);
-    onClose();
+    sperre.current = true;
+    setSpeichert(true);
+    setFehler(null);
+    try {
+      const abgelehnt = await onSubmit(gefuellt);
+      if (abgelehnt) return setFehler(abgelehnt);
+      onClose();
+    } catch (e: any) {
+      setFehler(e?.message || 'Die Aufnahme ließ sich nicht speichern');
+    } finally {
+      sperre.current = false;
+      setSpeichert(false);
+    }
   };
 
   return (
     <SheetRahmen
       visible={visible}
       title={title}
-      onClose={onClose}
+      onClose={() => { if (!sperre.current) onClose(); }}
       fuss={
-        <Druck style={styles.knopf} onPress={absenden}>
-          <Text style={styles.knopfText}>{knopf}</Text>
+        <Druck style={styles.knopf} disabled={speichert} onPress={absenden}>
+          <Text style={styles.knopfText}>{speichert ? 'Wird gespeichert …' : knopf}</Text>
         </Druck>
       }
     >

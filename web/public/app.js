@@ -15208,7 +15208,10 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
       // Kasten 25.1: Felder mit `markierbar` (Beschreibung) schlagen bei @ Personen vor.
       for (const f of felder) if (f.markierbar) markierungsEingabe(sheet.querySelector('#f_' + f.key), { unten: true });
 
+      let speichert = false;
+      const knopfElement = sheet.querySelector('#formOk');
       const absenden = async () => {
+        if (speichert) return;
         const werte = {};
         for (const f of felder) werte[f.key] = sheet.querySelector('#f_' + f.key).value.trim();
 
@@ -15224,9 +15227,20 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
         const fehlt = felder.find((f) => f.pflicht && !werte[f.key]);
         if (fehlt) return melden(`Bitte ${fehlt.label.toLowerCase()} ausfüllen`);
 
-        const fehler = await senden(werte);
-        if (fehler) return melden(fehler);
-        close();
+        speichert = true;
+        knopfElement.disabled = true;
+        knopfElement.textContent = 'Wird gespeichert …';
+        try {
+          const fehler = await senden(werte);
+          if (fehler) return melden(fehler);
+          close();
+        } catch (e) {
+          melden(e?.message || 'Die Aufnahme ließ sich nicht speichern');
+        } finally {
+          speichert = false;
+          knopfElement.disabled = false;
+          knopfElement.textContent = knopf;
+        }
       };
 
       sheet.querySelector('#formOk').addEventListener('click', absenden);

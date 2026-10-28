@@ -52,7 +52,14 @@ export interface UploadErgebnis {
 }
 
 /** Aus dem Dateinamen den Inhaltstyp ableiten. */
-function typVon(dateiname: string): string {
+function typVon(dateiname: string, inhalt: ArrayBuffer): string {
+  // iOS behält PNG trotz quality bei; Aufrufer nennen Aufnahmen oft .jpg.
+  // Der tatsächliche Inhalt zählt, wie bei der Prüfung auf dem Server.
+  const b = new Uint8Array(inhalt);
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if ([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => b[i] === v)) return 'image/png';
+  const text = (ab: number, bis: number) => String.fromCharCode(...b.slice(ab, bis));
+  if (text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP') return 'image/webp';
   const endung = dateiname.split('.').pop()?.toLowerCase() ?? '';
   if (endung === 'png') return 'image/png';
   if (endung === 'mp4') return 'video/mp4';
@@ -96,7 +103,7 @@ export async function ladeHoch(
     const token=data.session?.access_token;
     if(!token)throw new Error('Bitte erneut anmelden.');
     const r=await fetch(medienServerBasis()+`/api/hochladen/datei?ordner=${ordner}`,{
-      method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':typVon(dateiname)},
+      method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':typVon(dateiname, inhalt)},
       body:inhalt,redirect:'error',signal:AbortSignal.timeout(120000),
     });
     const wert=await r.json();
