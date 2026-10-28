@@ -1,0 +1,32 @@
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Hashtag-Seite
+  OK   Ein Hashtag oeffnet seine eigene Seite
+  OK   Dort stehen die passenden Beitraege, nicht alle
+  OK   Eine Abschnittsueberschrift klappt die volle Liste auf
+  OK   Der Zurueck-Pfeil schliesst die Seite wieder
+
+Standort-Seite
+  OK   Ein Standort zeigt Adresse, Koordinaten und Karte
+  OK   Der Vollbild-Knopf oeffnet die grosse Karte mit allen Orten
+  OK   Ein Klick auf die Karte selbst oeffnet die Kartenansicht
+  OK   Die Kartenansicht listet die Orte in der Naehe, der Ort selbst zuerst
+  OK   Die Kartenansicht hat die Ansichtswahl wie die Friend-Map
+  OK   Vollbild blendet die Liste aus und wieder ein
+  OK   Der Pfeil an einer Zeile oeffnet den anderen Ort
+  OK   Das Karussell blaettert zwischen den Standortbildern
+  OK   "Alle Fotos ansehen" fuehrt auf die Fotoseite
+
+Sound-Seite
+  OK   Ein Sound zeigt Songbild, Interpret, Songwriter und eine Liedzeile
+  OK   Der Abspielknopf laesst die Zeit laufen
+  OK   Die Hoerprobe spielt wirklich
+  OK   Die Einsaetze der Liedzeilen kommen aus der Datenbank (Schema 63)
+  OK   Bei 11,2 s steht genau die gesungene Zeile da
+  OK   Ein Klick auf die Wellenform springt an die Stelle
+  OK   "Lyrics ansehen" zeigt den ganzen Text mit der gesungenen Zeile hervorgehoben
+  OK   Noch einmal tippen haelt an
+
+21 von 21 Pruefungen bestanden
+Konsolenfehler:
+Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector

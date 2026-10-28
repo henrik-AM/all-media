@@ -1,0 +1,224 @@
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+
+Einstellungen aus dem Profil
+  OK   Ein Unterpunkt oeffnet seine eigene Seite, nicht die lange Liste
+  OK   Der Pfeil oben links fuehrt zurueck ins Profil
+  OK   Die dicke Schrift fuehrt weiterhin in die Haupt-Einstellungen
+  OK   Ueber die untere Leiste geoeffnet gibt es keinen Zurueck-Pfeil
+
+Eigene Profile
+  OK   Der Username im Videos-Profil steht mittig
+  OK   Der Username im Communitys-Profil steht mittig
+
+Communitys — Profil
+  OK   Es gibt einen Knopf „Profil bearbeiten"
+  OK   Der Knopf oeffnet wirklich das Formular
+  OK   Der Link in der Beschreibung ist ein echter Link
+  OK   „Erstellte Communitys" oeffnet eine eigene Seite
+  OK   „Beigetretene Communitys" oeffnet eine eigene Seite
+  OK   Auch das Messenger-Profil hat „Profil bearbeiten"
+
+Story-Ring am eigenen Profil
+  OK   Ohne eigene Story ist kein Ring da
+  OK   Mit eigener Story steht der Ring am Profilbild
+  OK   Der Ring steht auch im Communitys-Profil
+  OK   Ein Klick auf den Ring oeffnet die Story
+
+Playlists und Highlights
+  OK   Playlist und Highlight sehen unterschiedlich aus
+  OK   Eine gefuellte Playlist traegt ihr Titelbild, eine leere nicht
+  OK   Eine Playlist laesst sich oeffnen und wieder schliessen
+  OK   Auf einem fremden Profil sind Highlights klickbar
+  OK   Der Link auf einem fremden Profil ist ein echter Link
+  OK   Ein Bereichswechsel laesst die Seite nicht haengen
+
+  22 von 22 Punkten erfuellt
+
+  Konsolenfehler:
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector
+   Konsole: Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector

@@ -1,0 +1,10 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+  All Media Website: http://localhost:3300
+GET /api/sammlungen fehlgeschlagen: <html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>cloudflare</center>
+</body>
+</html>
+

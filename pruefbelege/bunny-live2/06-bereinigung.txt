@@ -1,0 +1,32 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+Bereinigung test@all-media.app
+Eigene Runde-2-Beiträge vorher 0
+Prüfkonto auf Startzustand zurückgesetzt
+Eigene unreferenzierte Bunny-Belege bereinigt 0
+Eigene Runde-2-Beiträge nachher 0
+Bunny-Belege Testkonto nachher 0
+Bunny posts eigene Testdateien nachher 0
+Bunny stories eigene Testdateien nachher 0
+Bunny avatars eigene Testdateien nachher 0
+Bunny messages eigene Testdateien nachher 0
+Bunny insights eigene Testdateien nachher 0
+Bunny ptt eigene Testdateien nachher 0
+Bereinigung all.media.prueflauf@web.de
+Eigene Runde-2-Beiträge vorher 0
+Prüfkonto auf Startzustand zurückgesetzt
+Eigene unreferenzierte Bunny-Belege bereinigt 4
+Eigene Runde-2-Beiträge nachher 0
+Bunny-Belege Testkonto nachher 0
+Bunny posts eigene Testdateien nachher 0
+Bunny stories eigene Testdateien nachher 0
+Bunny avatars eigene Testdateien nachher 0
+Bunny messages eigene Testdateien nachher 0
+Bunny insights eigene Testdateien nachher 0
+Bunny ptt eigene Testdateien nachher 0
+Bunny _probe nachher 0
+
+  Aufgeraeumt: 67 Mitteilungen dieses Laufs entfernt.
+all.media.prueflauf@web.de Mitteilungen 67 → 0
+
+  Aufgeraeumt: 38 Mitteilungen dieses Laufs entfernt.
+test@all-media.app Mitteilungen 38 → 0

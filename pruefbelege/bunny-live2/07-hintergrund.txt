@@ -16,3 +16,11 @@ Main wird abgewartet: 2026-10-28T10:49:10.477Z
 Main wird abgewartet: 2026-10-28T10:54:10.384Z
 Main wird abgewartet: 2026-10-28T10:59:10.379Z
 Main wird abgewartet: 2026-10-28T11:04:10.376Z
+Main wird abgewartet: 2026-10-28T11:09:10.432Z
+Main wird abgewartet: 2026-10-28T11:14:10.432Z
+Main wird abgewartet: 2026-10-28T11:19:10.433Z
+main/profil Start 2026-10-28T11:24:11.955Z
+main/chatsync Start 2026-10-28T11:26:42.129Z
+bunny-live/profil Start 2026-10-28T11:27:52.520Z
+bunny-live/chatsync Start 2026-10-28T11:30:18.202Z
+Abschlussläufe fehlgeschlagen: Abschlussbereinigung nicht erfolgreich

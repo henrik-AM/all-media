@@ -1,0 +1,4 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+Bereinigung test@all-media.app
+Eigene Runde-2-Beiträge vorher 0
+FEHL ifError got unwanted exception: Could not find the function public.zuruecksetzen without parameters in the schema cache

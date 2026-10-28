@@ -101,3 +101,23 @@ Gleiche Live-Datenbank einschließlich Schema 115; main ohne Bunny. OK bedeutet 
 
 Quellstandänderung gemeldet: main false, Bunny false.
 Automatisch entfernte Mitteilungen: main 445, Bunny 465. Separate Nachzählung siehe 06-bereinigung.txt.
+
+## Gezielte Wiederholungen und Bewertung
+
+Diese Ergebnisse ersetzen keine Zahlen des ursprünglichen Gesamtlaufs.
+
+| Auffälligkeit | main | bunny-live | Bewertung |
+|---|---|---|---|
+| Profil | 21/22, Exit 2, ohne Zeitabbruch | 22/22, Exit 2, ohne Zeitabbruch | Ursprünglicher Bunny-Zeitabbruch nicht wiederholt; auf Main Highlight-Anzeige schwankend. |
+| Chatsync | 38/39, Exit 2 | 38/39, Exit 2 | Exakt derselbe offene Empfängerchat zeigt den neuen Text nicht innerhalb 15 s; bestehendes Main-Problem. Datenbanktext und spätere Listenvorschau korrekt. |
+| Explorer | Gesamtlauf 21/21; Erstlauf 20/21 mit identischer stehender Zeit | Wiederholung 21/21, Prozess beendet | Abspielzeitprüfung schwankt auch auf Main; Bunny-Ausfall nicht wiederholt. Prüfung wartet fest 2200 ms, genaue Ursache des Einzelausfalls nicht bewiesen. |
+
+Alle vier Profil-/Chatsync-Prozesse endeten mit Exit 2 und ohne Zeitabbruch; die vorhandene Cloud-Mediensperre verhindert einen grünen Gesamtstatus. Explorer hat ebenfalls 21/21 funktionale Prüfungen und meldet weiterhin den Cloud-Medienwächter. Keine dieser drei Differenzen bestätigt einen ausschließlich auf Bunny vorhandenen Funktionsfehler. Deshalb keine sachfremde Chat-/Player-Produktänderung. Protokolle: `07-*-profil.txt`, `07-*-chatsync.txt`, `07-status.json`, `08-bunny-live-explorer.txt`.
+
+Weitere Differenzen: Feedback ist durch den realen Uploadweg auf Bunny funktional 52/52 statt 51/52. Schema 7/7 statt 6/7 folgt aus der Korrektur des Prüfregex, das zuvor die numerische JavaScript-Eigenschaft `1` als Spalte interpretierte. Rechte 197/197 statt 187/187 enthält zehn zusätzliche Prüfungen des Bunny-Vertrags. Suche/Optionen sind nur auf Main an der Zeitgrenze ohne Prüfzahl beendet; daraus entsteht kein Bunny-Rückschritt. Eigenes schwankt auf Main bei der Konto-Info (18/19 statt Bunny 19/19). Gleichstand/Lenken erreichen auf Bunny Exit 0, auf Main trotz gleicher Funktionszahlen keinen erfolgreichen Prozessabschluss.
+
+## Abschlussbereinigung
+
+Der erste Versuch scheiterte am parameterlosen Reset-RPC. Helfer auf den vorhandenen authentifizierten Reset-Endpunkt korrigiert und echt erfolgreich wiederholt (Exit 0). Beide zugelassenen Prüfkonten zurückgesetzt; vier eigene unreferenzierte Bunny-Belege entfernt. Je Konto eigene Runde-2-Beiträge, Bunny-Belege und eigene Testdateien in sechs Ordnern danach 0; `_probe` danach 0. Mitteilungen unabhängig vor/nach gezählt: primäres Prüfkonto **67 → 0**, zweites Prüfkonto **38 → 0**, insgesamt **105** entfernt. Nachweis `06-bereinigung.txt`; Fehlerbeleg separat `06-bereinigung-fehlversuch.txt`.
+
+Keine vollständige grüne Produktfreigabe: Gesamtläufe bleiben 45/71 beziehungsweise 42/71 nicht erfolgreich. Bestehende signierte CDN-Links können nach Storage-Löschung bis zum Ablauf weiter abrufbar bleiben, höchstens eine Stunde; kein Purge-Schlüssel verfügbar. Kein Umzug, Main-Merge, Push, Render oder Simulator.

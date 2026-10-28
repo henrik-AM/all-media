@@ -1,0 +1,58 @@
+
+Verschlüsselung kann keinen anderen Text liefern
+  OK   Rundreise "cxv" (3 Zeichen)
+  OK   Rundreise "cwkdew" (6 Zeichen)
+  OK   Rundreise "ä" (1 Zeichen)
+  OK   Rundreise "Grüße 🌧️👍\ud83c" (13 Zeichen)
+  OK   Rundreise "xxxxxxxxxxxx" (2000 Zeichen)
+  OK   Rundreise " führend und" (21 Zeichen)
+  OK   Kuvert der anderen Nachricht öffnet nichts (null, kein anderer Text)
+  OK   Fremder Schlüssel öffnet nichts
+  OK   Vertauschte Nonce öffnet nichts
+  OK   Base64-Umrechnung ist umkehrbar (alle Bytewerte)
+
+Bearbeiten einer verschlüsselten Nachricht
+  OK   Absender kann neu verschließen
+  OK   Gegenüber liest mit dem ALTEN Kuvert den neuen Text
+  OK   Ohne passendes Kuvert kein Neuverschließen
+
+Chatliste der App: altes Verhalten gegen neues
+  OK   BELEG: das alte Verhalten zeigt bei B weiter „cwkdew"  — Vorschau nach Neuladen: cwkdew
+  OK   Neu: Vorschau „cxv", Uhrzeit und Ungelesen aus der Datenbank
+  OK   Eigener, eben umgelegter Schalter springt nicht zurück
+  OK   Unverändert: dasselbe Feld zurück (kein Neuzeichnen)
+  OK   Reihenfolge folgt der Datenbank (jüngste oben)
+
+Offener Chat: zusammenlegen
+  OK   Eben gesendete (lokal) bleibt stehen, bis die DB sie liefert
+  OK   Neue fremde Nachricht kommt dazu, lokale wird durch die DB-Fassung ersetzt
+  OK   neueFremde erkennt genau die neue fremde
+  OK   Unverändert: dasselbe Feld zurück
+  OK   Bearbeiteter Text wird erkannt
+
+Jüngste 500 statt älteste 500
+  OK   BELEG: altes `ascending … limit(500)` verliert die 501. Nachricht
+  OK   Neu: absteigend holen + umdrehen endet mit der jüngsten
+
+Stand
+  OK   Neue Nachricht ändert den Stand
+  OK   Bearbeiten ändert den Stand
+  OK   Lesebestätigung ändert den Stand
+
+Datenbank: Stand, Ungelesen, Bearbeiten
+  OK   B sieht am Stand, dass etwas Neues da ist
+  OK   In der Datenbank steht für B genau A's Text  — cxv-1793187019885
+  OK   Schema 81: neue Nachricht macht den Chat bei B ungelesen  — is_read = false
+  OK   … beim Absender selbst nicht
+  OK   Bearbeiten trifft die Zeile
+  OK   B liest nach dem Bearbeiten „cxv" mit seinem alten Kuvert  — cxv
+
+Website: Nachricht erscheint ohne Neuladen
+ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.
+  OK   B hat den Prüfchat offen
+  OK   A schreibt
+  FEHL … und bei B steht genau dieser Text, ohne Neuladen (≤ 15 s)
+  OK   Die Chatliste zeigt danach A's Text als Vorschau
+  OK   Keine Seitenfehler
+
+38 von 39 Prüfungen bestanden

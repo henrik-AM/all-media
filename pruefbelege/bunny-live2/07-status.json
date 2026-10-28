@@ -1,0 +1,30 @@
+[
+  {
+    "name": "main",
+    "lauf": "profil",
+    "code": 2,
+    "signal": null,
+    "abgelaufen": false
+  },
+  {
+    "name": "main",
+    "lauf": "chatsync",
+    "code": 2,
+    "signal": null,
+    "abgelaufen": false
+  },
+  {
+    "name": "bunny-live",
+    "lauf": "profil",
+    "code": 2,
+    "signal": null,
+    "abgelaufen": false
+  },
+  {
+    "name": "bunny-live",
+    "lauf": "chatsync",
+    "code": 2,
+    "signal": null,
+    "abgelaufen": false
+  }
+]

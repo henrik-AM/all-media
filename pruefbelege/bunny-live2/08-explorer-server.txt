@@ -1,0 +1,2 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+  All Media Website: http://localhost:3300

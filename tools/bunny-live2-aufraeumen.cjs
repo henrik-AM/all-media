@@ -15,7 +15,7 @@ const speicher=Bunny.erstelleBunny(Bunny.konfigurationAus(),{abruf:async(url,opt
  const {data:posts,error:e}=await supabase.from('posts').select('id').eq('user_id',uid).like('description','Bunny-Runde2-%');assert.ifError(e);
  console.log('Eigene Runde-2-Beiträge vorher '+posts.length);
  for(const p of posts)await api(`/api/eigene/${p.id}/loeschen`,{});
- if(process.argv.includes('--nach-gesamtlauf')){const {error:resetFehler}=await supabase.rpc('zuruecksetzen').abortSignal(AbortSignal.timeout(30000));assert.ifError(resetFehler);console.log('Prüfkonto auf Startzustand zurückgesetzt');}
+ if(process.argv.includes('--nach-gesamtlauf')){await api('/api/reset',{});console.log('Prüfkonto auf Startzustand zurückgesetzt');}
  const objekte=await frage(`select pfad from public.medien_objekte where owner_id='${uid}' and public.ist_testkonto(owner_id)`);assert.ok(Array.isArray(objekte));
  let entfernt=0;
  for(const z of objekte){const {data:recht,error:e}=await supabase.rpc('medium_loeschrecht',{p_pfad:z.pfad});assert.ifError(e);if(recht==='bunny'){await api('/api/medien/loeschen',{pfad:z.pfad});entfernt++;}}
