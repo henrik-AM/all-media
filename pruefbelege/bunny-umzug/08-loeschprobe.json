@@ -1,0 +1,20 @@
+{
+  "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-umzug-loeschprobe-1793222857148.jpg",
+  "bytes": 229,
+  "sha256": "fe8366a41987d5f50cf8373e6cc065053902535ea722aba91feae06e1f40fa14",
+  "quelleBleibtAbsichtlich": true,
+  "pruefungen": [
+    "Eigene Supabase-Testquelle angelegt",
+    "Testquelle zu Bunny kopiert",
+    "Testquelle als Altmedium registriert",
+    "Produktion signiert Bunny",
+    "Bunny vor DELETE 200, gleiche Bytes",
+    "Produktions-DELETE erfolgreich",
+    "Gleiche gecachte Bunny-Signatur nach DELETE 404",
+    "Datei nicht mehr in Bunny-Liste",
+    "Neue Signatur verweigert; kein Supabase-Rückfall",
+    "Supabase-Original bleibt bytegleich",
+    "Dauerhafte Löschmarke bleibt"
+  ],
+  "nachDeleteMs": 2492
+}

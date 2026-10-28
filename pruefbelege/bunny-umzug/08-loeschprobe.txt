@@ -1,0 +1,13 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+PASS Eigene Supabase-Testquelle angelegt
+PASS Testquelle zu Bunny kopiert
+PASS Testquelle als Altmedium registriert
+PASS Produktion signiert Bunny
+PASS Bunny vor DELETE 200, gleiche Bytes
+PASS Produktions-DELETE erfolgreich
+PASS Gleiche gecachte Bunny-Signatur nach DELETE 404
+PASS Datei nicht mehr in Bunny-Liste
+PASS Neue Signatur verweigert; kein Supabase-Rückfall
+PASS Supabase-Original bleibt bytegleich
+PASS Dauerhafte Löschmarke bleibt
+11/11 Prüfungen; Quelle und Löschmarke bleiben absichtlich erhalten.

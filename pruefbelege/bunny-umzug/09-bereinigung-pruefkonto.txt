@@ -1,0 +1,5 @@
+  Vorher liegen 0 Mitteilungen des Pruefkontos da.
+
+  Aufgeraeumt: 0 Mitteilungen dieses Laufs entfernt.
+  Nachher: 0
+  OK   Nichts mehr uebrig.

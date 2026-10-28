@@ -1,0 +1,82 @@
+[
+  {
+    "pfad": "beispiel/clip-01.jpg",
+    "typ": "image/jpeg",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 17845,
+    "sha256": "062bac488387d8c9e33bb32375571b7e19935af99ce36b2d576b1ab7b74b85ce"
+  },
+  {
+    "pfad": "beispiel/clip-02.jpg",
+    "typ": "image/jpeg",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 85999,
+    "sha256": "df00b4e2aa216f77d5cde054534901d0998f9f685255242e4510d7fd9ec8fdd7"
+  },
+  {
+    "pfad": "beispiel/clip-03.jpg",
+    "typ": "image/jpeg",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 30993,
+    "sha256": "a1b57e09b9ac121ab879509fee27cad5453af03eeb1735edabe13ec5ff606afd"
+  },
+  {
+    "pfad": "beispiel/clip-04.jpg",
+    "typ": "image/jpeg",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 39522,
+    "sha256": "4c99cc90b751613efc6bf8f7d0322620a862b11e7976bce743f71d46ce45064b"
+  },
+  {
+    "pfad": "beispiel/clip-05.jpg",
+    "typ": "image/jpeg",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 37319,
+    "sha256": "117e093e5b8b8a88ba93e983d44f423da5341c7da341470677861146e4085d2c"
+  },
+  {
+    "pfad": "beispiel/clip-01.mp4",
+    "typ": "video/mp4",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 3884430,
+    "sha256": "ab640b2122d524ca36b77af2f0981733ad7a46edb6a128598c793e357220f7d8"
+  },
+  {
+    "pfad": "beispiel/clip-02.mp4",
+    "typ": "video/mp4",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 4877361,
+    "sha256": "e8dd4f5d05af4478eebc533454c314e2632e4b7479cca3f5a97d8305b8507f88"
+  },
+  {
+    "pfad": "beispiel/clip-03.mp4",
+    "typ": "video/mp4",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 5617602,
+    "sha256": "367e3f64cc2999db8e35328e74bfcd56c8f3d190ba1d8e62f5055ef5ee2eeeed"
+  },
+  {
+    "pfad": "beispiel/clip-04.mp4",
+    "typ": "video/mp4",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 5969869,
+    "sha256": "ab0bbd8f2185e5f8c25ff16ae9594027ae189cf36f5ffaad109510392eafec6c"
+  },
+  {
+    "pfad": "beispiel/clip-05.mp4",
+    "typ": "video/mp4",
+    "host": "allmedia-cdn.b-cdn.net",
+    "status": 200,
+    "bytes": 7881159,
+    "sha256": "18783ca0d5c4f43605c8ef95443c9ca8dbf16bc0301b3a5a090e271c3c5392ee"
+  }
+]

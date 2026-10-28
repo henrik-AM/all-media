@@ -308,6 +308,7 @@ export async function umziehen(optionen) {
     ordner = Bunny.ORDNER_LESEN,
     ausfuehren = false,
     maxDateien = Infinity,
+    nurPfade = null, // optionaler Set: fester Altbestand, keine späteren Uploads
     budgetBytes = 0,
     zustand = null,
     pruefen = false,
@@ -339,6 +340,7 @@ export async function umziehen(optionen) {
     melde(`Budget erreicht beim Listen (${f.message}): ${mb(zaehler.listeBytes)} von ${mb(budgetBytes)} verbraucht. Nichts kopiert.`);
     return zaehler;
   }
+  if (nurPfade) liste = liste.filter(e => nurPfade.has(e.pfad));
   const { fertig, umgeschaltet: schonUmgeschaltet } = zustandLesen(zustand);
 
   const offen = [];

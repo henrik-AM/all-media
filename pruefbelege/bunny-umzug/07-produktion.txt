@@ -1,0 +1,13 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+PASS Produktion Bunny 200 SHA256 beispiel/clip-01.jpg
+PASS Produktion Bunny 200 SHA256 beispiel/clip-02.jpg
+PASS Produktion Bunny 200 SHA256 beispiel/clip-03.jpg
+PASS Produktion Bunny 200 SHA256 beispiel/clip-04.jpg
+PASS Produktion Bunny 200 SHA256 beispiel/clip-05.jpg
+PASS Produktion Bunny 200 SHA256 beispiel/clip-01.mp4
+PASS Produktion Bunny 200 SHA256 beispiel/clip-02.mp4
+PASS Produktion Bunny 200 SHA256 beispiel/clip-03.mp4
+PASS Produktion Bunny 200 SHA256 beispiel/clip-04.mp4
+PASS Produktion Bunny 200 SHA256 beispiel/clip-05.mp4
+10/10 Produktionsmedien: Bunny, 200, SHA256 identisch
+PASS Produktionswebsite {"beitraege":5,"bunnyBilder":5,"bunnyHintergruende":5}

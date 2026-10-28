@@ -1,0 +1,21 @@
+{
+  "modus": "rest",
+  "gelistet": 123,
+  "gelistetBytes": 101348121,
+  "schonFertig": 123,
+  "offen": 0,
+  "offenBytes": 0,
+  "geholt": 0,
+  "geholtBytes": 0,
+  "listeBytes": 68376,
+  "hochgeladen": 0,
+  "fehler": 0,
+  "nichtMp4": 0,
+  "pruefAbweichungen": 0,
+  "ausgelassen": 0,
+  "umgeschaltet": 0,
+  "umschaltAusgelassen": 0,
+  "status": "fertig",
+  "gesamtEgressBytes": 101687705,
+  "budgetBytes": 157286400
+}

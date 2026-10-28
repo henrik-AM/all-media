@@ -36,12 +36,15 @@ async function gezaehlt(url,opt){
    assert.equal(ergebnisse.length,4);fs.writeFileSync(path.join(aus,'06-m4a-typen.json'),JSON.stringify(ergebnisse,null,2)+'\n');console.log('4/4 historische M4A: CDN-Purge, Audiotyp, ffprobe, 200 und SHA256 identisch');return;
  }
  if(modus==='kontrolle'){
-   const vorher=JSON.parse(fs.readFileSync(path.join(root,'quelle-vorher.json')));assert.deepEqual(katalog,vorher,'Supabase-Quellkatalog verändert');
+   const vorher=JSON.parse(fs.readFileSync(path.join(root,'quelle-vorher.json')));const baseline=new Set(vorher.map(e=>e.pfad));const extra=katalog.filter(e=>!baseline.has(e.pfad));
+   assert.deepEqual(katalog.filter(e=>baseline.has(e.pfad)),vorher,'Supabase-Quellkatalog verändert');
+   const loeschDatei=path.join(aus,'08-loeschprobe.json');const loesch=fs.existsSync(loeschDatei)?JSON.parse(fs.readFileSync(loeschDatei)):null;
+   assert.ok(extra.every(e=>e.pfad===loesch?.pfad&&Number(e.bytes)===loesch.bytes),'Unerwartete neue Quelldateien');
    const fertig=new Map(fs.readFileSync(zustand,'utf8').trim().split('\n').map(l=>JSON.parse(l)).filter(e=>e.sha256).map(e=>[e.pfad,e]));
    const hashes=new Map(fs.readFileSync(hashDatei,'utf8').trim().split('\n').map(l=>JSON.parse(l)).map(e=>[e.pfad,e]));
    const db=await frage('select pfad,bytes,sha256,geloescht_am from public.medien_objekte where migriert_am is not null order by pfad');
-   for(const e of katalog){assert.ok(fertig.has(e.pfad),'Kopie fehlt');assert.equal(hashes.get(e.pfad)?.sha256,fertig.get(e.pfad).sha256);const d=db.find(d=>d.pfad===e.pfad);assert.equal(d?.sha256,fertig.get(e.pfad).sha256);assert.equal(Number(d.bytes),Number(e.bytes));assert.equal(d.geloescht_am,null);}
-   const report={gelistet:katalog.length,kopiert:fertig.size,sha256Identisch:hashes.size,registriert:db.length,quellkatalogIdentisch:true,quellBytes:katalog.reduce((s,e)=>s+Number(e.bytes),0),supabaseEgressBytes:budget.verbraucht,budgetBytes:budget.grenze,zustandsordner:root};
+   for(const e of vorher){assert.ok(fertig.has(e.pfad),'Kopie fehlt');assert.equal(hashes.get(e.pfad)?.sha256,fertig.get(e.pfad).sha256);const d=db.find(d=>d.pfad===e.pfad);assert.equal(d?.sha256,fertig.get(e.pfad).sha256);assert.equal(Number(d.bytes),Number(e.bytes));assert.equal(d.geloescht_am,null);}
+   const report={gelistet:vorher.length,kopiert:fertig.size,sha256Identisch:hashes.size,registriert:db.filter(e=>baseline.has(e.pfad)).length,quellkatalogIdentisch:true,quellBytes:vorher.reduce((s,e)=>s+Number(e.bytes),0),absichtlichErhalteneTestquellen:extra.map(e=>({pfad:e.pfad,bytes:Number(e.bytes)})),supabaseEgressBytes:budget.verbraucht,budgetBytes:budget.grenze,zustandsordner:root};
    fs.writeFileSync(path.join(aus,'06-vollstaendigkeit.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));return;
  }
  const original=adapter.hochladen;
@@ -68,7 +71,8 @@ async function gezaehlt(url,opt){
    const r=await fetch(basis+'/rest/v1/rpc/medien_umzug_registrieren',{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({p_pfad:e.pfad,p_typ:e.typ,p_bytes:e.bytes,p_sha256:e.sha256}),signal:AbortSignal.timeout(30000)});
    assert.ok(r.ok,'Registrierung Status '+r.status);const wert=await r.json();return {ok:wert==='bunny',grund:wert};
  };
- const z=await umziehen({quelle:{art:'supabase',basis,schluessel:key},bunny:adapter,ausfuehren:modus!=='trocken',maxDateien:modus==='pilot'?3:Infinity,budgetBytes:budget.grenze-budget.verbraucht,zustand,pruefen:modus!=='trocken',umschalten:modus==='trocken'?null:umschalten,abruf:gezaehlt});
+ const nurPfade=new Set(JSON.parse(fs.readFileSync(path.join(root,'quelle-vorher.json'))).map(e=>e.pfad));
+ const z=await umziehen({nurPfade,quelle:{art:'supabase',basis,schluessel:key},bunny:adapter,ausfuehren:modus!=='trocken',maxDateien:modus==='pilot'?3:Infinity,budgetBytes:budget.grenze-budget.verbraucht,zustand,pruefen:modus!=='trocken',umschalten:modus==='trocken'?null:umschalten,abruf:gezaehlt});
  const report={modus,...z,gesamtEgressBytes:budget.verbraucht,budgetBytes:budget.grenze};fs.writeFileSync(path.join(aus,'04-'+modus+'.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
  assert.equal(z.fehler,0);assert.equal(z.pruefAbweichungen,0);assert.equal(z.umschaltAusgelassen,0);if(modus==='pilot'){assert.equal(z.hochgeladen,3);assert.equal(z.umgeschaltet,3);}if(modus==='rest')assert.equal(z.status,'fertig');
 })().catch(e=>{console.error('FEHL '+e.message);process.exitCode=1;});

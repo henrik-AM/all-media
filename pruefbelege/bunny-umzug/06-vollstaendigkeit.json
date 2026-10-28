@@ -5,7 +5,13 @@
   "registriert": 123,
   "quellkatalogIdentisch": true,
   "quellBytes": 101348121,
-  "supabaseEgressBytes": 101619329,
+  "absichtlichErhalteneTestquellen": [
+    {
+      "pfad": "posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-umzug-loeschprobe-1793222857148.jpg",
+      "bytes": 229
+    }
+  ],
+  "supabaseEgressBytes": 101687705,
   "budgetBytes": 157286400,
   "zustandsordner": "/Users/henrik.dikta/allmedia-wt-codex/bunny-umzug-zustand"
 }
