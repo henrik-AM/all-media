@@ -1,0 +1,49 @@
+
+Chats
+  OK   Gruppe mit einem eigenen Kontakt anlegen geht  — ok
+  OK   Fremde Person in eine Gruppe ziehen geht nicht
+  OK   Gruppe nachträglich zum Einzelchat machen geht nicht
+  OK   Zurück in einen verlassenen Chat geht nicht
+  OK   Einzelchat mit Kontakt anlegen geht  — ok
+  OK   Neuer Einzelchat startet als Anfrage  — wartet
+  OK   Anfrage durch Leeren von anfrage_von aufheben geht nicht
+  OK   Drittes Mitglied im Einzelchat geht nicht
+  OK   Erste Nachricht senden geht  — ok
+  OK   Chat als Favorit markieren geht  — ok
+  OK   Mit 👍 reagieren geht  — ok
+  OK   HTML als Reaktion geht nicht
+  OK   Nachricht in fremden Chat verschieben geht nicht
+  OK   Mitgliedschaft auf fremden Chat umbiegen geht nicht
+  OK   Zeit und Systemhinweis einer Nachricht setzt die Datenbank  — true/leer
+
+Communitys
+  OK   Mitgliedschaften fremder privater Communitys sind unsichtbar  — 0
+  OK   Öffentlicher Community beitreten geht  — ok
+  OK   Stummschalten und Austreten geht  — ok
+  OK   Privater Community selbst beitreten geht nicht  — true
+
+Medien und Storys
+  OK   Fremde Storys, Insights, Anhänge im Speicher unsichtbar  — 0
+  OK   Story mit eigener Medienadresse anlegen geht  — ok
+  OK   Story mit fremder/HTML-Adresse geht nicht
+  OK   Eine Story lebt höchstens einen Tag
+  OK   In den eigenen Story-Ordner hochladen geht  — ok
+  OK   In den Beispielordner hochladen geht nicht
+
+Profil und Beiträge
+  OK   Eigenes Profil ändern geht  — ok
+  OK   Follower-Zahl fälschen geht nicht
+  OK   Benutzername an handle_aendern vorbei geht nicht
+  OK   Neuer Beitrag startet ohne geschenkte Likes  — 0
+  OK   Eigenen Beitrag bearbeiten geht  — ok
+  OK   Beitrag in die Zukunft datieren geht nicht
+  OK   Fremde Kontaktlisten nicht abfragbar  — false
+
+Rechte (Drift)
+  OK   Anonym nur handle_frei und nummer_frei  — handle_frei,nummer_frei
+  OK   starter_sammlungen nicht aufrufbar
+  OK   Anonym keine Tabelle außer altersgrenzen  — 0
+  OK   Realtime-Veröffentlichung leer  — 0
+
+36 von 36 bestanden
+Alle Prüfungen bestanden

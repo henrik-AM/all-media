@@ -17,10 +17,24 @@ async function gezaehlt(url,opt){
  return new Response(stream,{status:r.status,statusText:r.statusText,headers:r.headers});
 }
 (async()=>{
- const modus=process.argv[2];assert.ok(['trocken','pilot','rest','kontrolle'].includes(modus),'Modus trocken|pilot|rest|kontrolle');
+ const modus=process.argv[2];assert.ok(['trocken','pilot','rest','kontrolle','typen'].includes(modus),'Modus trocken|pilot|rest|kontrolle|typen');
  const key=await dienst();const adapter=Bunny.erstelleBunny(Bunny.konfigurationAus());assert.ok(adapter.bereit);
  const katalog=await frage("select name as pfad,owner_id,metadata->>'size' as bytes,metadata->>'mimetype' as typ,metadata->>'eTag' as md5,created_at from storage.objects where bucket_id='media' order by name");
  if(!fs.existsSync(path.join(root,'quelle-vorher.json')))fs.writeFileSync(path.join(root,'quelle-vorher.json'),JSON.stringify(katalog,null,2));
+ if(modus==='typen'){
+   const journal=new Map(fs.readFileSync(zustand,'utf8').trim().split('\n').map(JSON.parse).filter(e=>e.sha256).map(e=>[e.pfad,e]));
+   const ergebnisse=[];
+   for(const e of journal.values())if(e.pfad.startsWith('ptt/')&&e.typ==='audio/mp4'){
+     // Gleiche Pfade wurden zuvor mit falschem MIME gecacht: nur diesen Pfad purgen.
+     const purge=new URL('https://api.bunny.net/purge');purge.searchParams.set('url',Bunny.konfigurationAus().auslieferung+'/'+e.pfad+'*');purge.searchParams.set('async','false');
+     const p=await fetch(purge,{method:'POST',headers:{AccessKey:process.env.BUNNY_API_KEY},redirect:'error',signal:AbortSignal.timeout(10000)});assert.equal(p.status,200);
+     const r=await fetch(adapter.signierteAdresse(e.pfad),{signal:AbortSignal.timeout(30000)});assert.equal(r.status,200);const typ=r.headers.get('content-type').split(';')[0];assert.ok(['audio/mp4','audio/x-m4a'].includes(typ),'CDN liefert einen M4A-Audiotyp');
+     const bytes=Buffer.from(await r.arrayBuffer());assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),e.sha256);
+     const probe=require('child_process').spawnSync('ffprobe',['-v','error','-show_entries','stream=codec_name,codec_type','-of','json','pipe:0'],{input:bytes,encoding:'utf8'});assert.equal(probe.status,0);const streams=JSON.parse(probe.stdout).streams;assert.ok(streams.some(s=>s.codec_type==='audio'));
+     ergebnisse.push({pfad:e.pfad,typ,registerTyp:e.typ,streams,bytes:bytes.length,sha256:e.sha256,status:r.status});
+   }
+   assert.equal(ergebnisse.length,4);fs.writeFileSync(path.join(aus,'06-m4a-typen.json'),JSON.stringify(ergebnisse,null,2)+'\n');console.log('4/4 historische M4A: CDN-Purge, Audiotyp, ffprobe, 200 und SHA256 identisch');return;
+ }
  if(modus==='kontrolle'){
    const vorher=JSON.parse(fs.readFileSync(path.join(root,'quelle-vorher.json')));assert.deepEqual(katalog,vorher,'Supabase-Quellkatalog verändert');
    const fertig=new Map(fs.readFileSync(zustand,'utf8').trim().split('\n').map(l=>JSON.parse(l)).filter(e=>e.sha256).map(e=>[e.pfad,e]));
@@ -38,6 +52,17 @@ async function gezaehlt(url,opt){
    const soll=crypto.createHash('sha256').update(bytes).digest('hex');assert.equal(ist,soll,'Bunny SHA256 '+p);
    fs.appendFileSync(hashDatei,JSON.stringify({pfad:p,bytes:bytes.length,sha256:ist})+'\n');return r;
  };
+ // Fortsetzung des ursprünglichen Laufes: bereits kopierte, wegen falschem
+ // Quell-MIME ausgelassene M4A-Dateien aus Bunny korrigieren, ohne Supabase-Egress.
+ if(modus!=='trocken'&&fs.existsSync(zustand)){
+   const eintraege=new Map(fs.readFileSync(zustand,'utf8').trim().split('\n').map(JSON.parse).filter(e=>e.sha256).map(e=>[e.pfad,e]));
+   for(const e of eintraege.values())if(e.pfad.startsWith('ptt/')&&e.pfad.endsWith('.m4a')&&e.typ==='image/jpeg'&&e.umschaltbar!==true){
+     const r=await fetch(adapter.signierteAdresse(e.pfad),{signal:AbortSignal.timeout(30000)});assert.equal(r.status,200);const bytes=Buffer.from(await r.arrayBuffer());
+     assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),e.sha256);assert.equal(Bunny.inhaltPruefen('ptt','audio/mp4',bytes),null);
+     assert.ok((await adapter.hochladen(e.pfad,bytes,'audio/mp4',{pruefen:false})).ok);
+     fs.appendFileSync(zustand,JSON.stringify({...e,typ:'audio/mp4',umschaltbar:true})+'\n');console.log('M4A-Typ aus geprüften Bunny-Bytes korrigiert: '+e.pfad);
+   }
+ }
  const {umziehen}=await import('./medien-umzug-bunny.mjs');
  const umschalten=async e=>{
    const r=await fetch(basis+'/rest/v1/rpc/medien_umzug_registrieren',{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({p_pfad:e.pfad,p_typ:e.typ,p_bytes:e.bytes,p_sha256:e.sha256}),signal:AbortSignal.timeout(30000)});

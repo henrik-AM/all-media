@@ -22,8 +22,9 @@
  *   - Mit `--quelle-ordner` kommen die Dateien aus einem lokalen Ordner
  *     (z. B. `.medien-cache/fertig/`) statt aus Supabase: null Egress für
  *     die Testmedien.
- *   - In Supabase wird nichts gelöscht und nichts geschrieben. Den Eimer zu
- *     leeren ist eine eigene Entscheidung Henriks, nach der Stichprobe.
+ *   - In Supabase Storage wird nichts gelöscht oder überschrieben.
+ *     --umschalten schreibt nur den Anbieterbeleg in die Datenbank;
+ *     die Quelldateien bleiben als Rückweg erhalten.
  *
  * FORTSETZEN
  *
@@ -392,7 +393,11 @@ export async function umziehen(optionen) {
       continue;
     }
     const sha256 = crypto.createHash('sha256').update(inhalt).digest('hex');
-    const ergebnis = await bunny.hochladen(e.pfad, inhalt, e.typ, { pruefen: false });
+    // Vier historische M4A-Uploads besitzen in Supabase irrtümlich image/jpeg.
+    // Nur bei tatsächlich gültigen MP4-Audiobytes korrigieren, Quelle unverändert.
+    const typ = e.pfad.startsWith('ptt/') && e.pfad.endsWith('.m4a') && e.typ === 'image/jpeg' &&
+      !Bunny.inhaltPruefen('ptt', 'audio/mp4', inhalt) ? 'audio/mp4' : e.typ;
+    const ergebnis = await bunny.hochladen(e.pfad, inhalt, typ, { pruefen: false });
     if (!ergebnis.ok) {
       zaehler.fehler++;
       melde(`FEHLER ablegen ${e.pfad}: ${ergebnis.error}`);
@@ -403,8 +408,8 @@ export async function umziehen(optionen) {
     const ablage = e.pfad.split('/')[0];
     // Historische Ablagen dürfen gültige Altbilder enthalten (auch ptt).
     // Neue Uploadregeln bleiben im Server unverändert.
-    const umschaltbar = Bunny.inhaltPruefen(ablage === 'beispiel' || (ablage === 'ptt' && e.typ.startsWith('image/')) ? 'posts' : ablage, e.typ, inhalt);
-    const eintrag = { pfad: e.pfad, bytes: e.bytes, sha256, typ: e.typ, umschaltbar: umschaltbar || true };
+    const umschaltbar = Bunny.inhaltPruefen(ablage === 'beispiel' || (ablage === 'ptt' && typ.startsWith('image/')) ? 'posts' : ablage, typ, inhalt);
+    const eintrag = { pfad: e.pfad, bytes: e.bytes, sha256, typ, umschaltbar: umschaltbar || true };
     fs.appendFileSync(zustand, JSON.stringify(eintrag) + '\n');
     bestaetigtJetzt.set(e.pfad, eintrag);
   }

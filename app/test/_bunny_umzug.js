@@ -17,3 +17,13 @@ test('Pilot begrenzt auf drei, Rest registriert nur fehlende Medien und behält 
   await assert.rejects(umziehen({...option,maxDateien:0}),/positive ganze Zahl/);
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
 });
+test('Historische M4A mit JPEG-Quellmetadaten wird bytegeprüft als Audio registriert',async()=>{
+ const {umziehen}=await import('../../tools/medien-umzug-bunny.mjs');const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'umzug-m4a-'));
+ try{
+  const bytes=Buffer.alloc(24);bytes.write('ftypM4A ',4,'latin1');let hochTyp,beleg;
+  const bunny={bereit:true,hochladen:async(p,b,typ)=>{hochTyp=typ;assert.deepEqual(b,bytes);return {ok:true};},auflisten:async()=>({ok:true,dateien:[{name:'alt.m4a',bytes:24}]})};
+  const abruf=async url=>url.endsWith('/list/media')?new Response(JSON.stringify([{id:'alt',name:'alt.m4a',metadata:{size:24,mimetype:'image/jpeg'}}])):new Response(bytes);
+  const z=await umziehen({quelle:{art:'supabase',basis:'https://nur-lokal.invalid',schluessel:'attrappe'},bunny,ordner:['ptt'],ausfuehren:true,budgetBytes:1024,zustand:path.join(tmp,'journal'),pruefen:true,umschalten:async e=>{beleg=e;return {ok:true};},abruf,melde:()=>{}});
+  assert.equal(hochTyp,'audio/mp4');assert.equal(beleg.typ,'audio/mp4');assert.equal(z.umgeschaltet,1);assert.equal(z.umschaltAusgelassen,0);
+ }finally{fs.rmSync(tmp,{recursive:true,force:true});}
+});

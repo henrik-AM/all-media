@@ -1,0 +1,2 @@
+SUPABASE_SCHEMA_116_bunny_altmedien.sql — 119 Zeilen an Projekt ijztosbjfybdgotpdixw
+Erfolgreich eingespielt.

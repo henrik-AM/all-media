@@ -1,9 +1,10 @@
-✔ Pilot begrenzt auf drei, Rest registriert nur fehlende Medien und behält SHA256 (6.778167ms)
-ℹ tests 1
+✔ Pilot begrenzt auf drei, Rest registriert nur fehlende Medien und behält SHA256 (7.242125ms)
+✔ Historische M4A mit JPEG-Quellmetadaten wird bytegeprüft als Audio registriert (7.206208ms)
+ℹ tests 2
 ℹ suites 0
-ℹ pass 1
+ℹ pass 2
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 37.772042
+ℹ duration_ms 42.243375

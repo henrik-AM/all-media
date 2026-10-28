@@ -1,4 +1,5 @@
 -- 28.10.2026 — Nur Altmedienregistrierung auf dem live vorhandenen Schema 115.
+-- Historische M4A-Dateien mit falschem JPEG-MIME dürfen bytegeprüft als audio/mp4 registriert werden.
 -- Keine Voraussetzungen aus 107–114. Supabase-Dateien werden niemals gelöscht.
 -- Ersetzt bunny_objekt_vorgaben und bunny_ursprung_frei aus 115.
 -- Beispielmedien ohne Eigentümer bleiben gemeinsame, nicht löschbare Lesemedien.
@@ -25,7 +26,8 @@ begin
        (new.owner_id is null and new.pfad not like 'beispiel/%') or
        (new.owner_id is not null and not public.profil_freigegeben(new.owner_id)) or
        (o.metadata->>'size')::bigint is distinct from new.bytes or
-       o.metadata->>'mimetype' is distinct from new.typ then
+       (o.metadata->>'mimetype' is distinct from new.typ and not
+         (new.pfad like 'ptt/%.m4a' and o.metadata->>'mimetype'='image/jpeg' and new.typ='audio/mp4')) then
       raise exception 'Kein passender Altbestand' using errcode='42501';
     end if;
     new.created_at := o.created_at;
@@ -68,7 +70,8 @@ begin
   select * into o from storage.objects where bucket_id='media' and name=p_pfad for share;
   if not found then return 'ausgelassen: Quelle fehlt';end if;
   if (o.metadata->>'size')::bigint is distinct from p_bytes or
-     o.metadata->>'mimetype' is distinct from p_typ then
+     (o.metadata->>'mimetype' is distinct from p_typ and not
+       (p_pfad like 'ptt/%.m4a' and o.metadata->>'mimetype'='image/jpeg' and p_typ='audio/mp4')) then
     return 'ausgelassen: Quelle weicht ab';end if;
   if o.owner_id is not null then
     select id into e from public.profiles where id::text=o.owner_id;

@@ -1,0 +1,10 @@
+BLEIBT BEI SUPABASE ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588842322-993vq9bg.m4a: Die Datei passt nicht zu ihrem Format
+BLEIBT BEI SUPABASE ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588848857-wcvnyim1.m4a: Die Datei passt nicht zu ihrem Format
+BLEIBT BEI SUPABASE ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588856055-9qxooae4.m4a: Die Datei passt nicht zu ihrem Format
+BLEIBT BEI SUPABASE ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790592128512-ee751me2.m4a: Die Datei passt nicht zu ihrem Format
+Umzug: 120/120 abgelegt, 0 Fehler, 3 schon fertig, aus Supabase 95.4 MB, Prüfung: 0 Abweichungen, umgeschaltet 116, bleiben bei Supabase 4 — fertig.
+{"modus":"rest","gelistet":123,"gelistetBytes":101348121,"schonFertig":3,"offen":120,"offenBytes":99921955,"geholt":120,"geholtBytes":99921955,"listeBytes":67802,"hochgeladen":120,"fehler":0,"nichtMp4":0,"pruefAbweichungen":0,"ausgelassen":0,"umgeschaltet":116,"umschaltAusgelassen":4,"status":"fertig","gesamtEgressBytes":101551527,"budgetBytes":157286400}
+FEHL Expected values to be strictly equal:
+
+4 !== 0
+

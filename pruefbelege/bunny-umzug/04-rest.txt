@@ -1,0 +1,6 @@
+M4A-Typ aus geprüften Bunny-Bytes korrigiert: ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588842322-993vq9bg.m4a
+M4A-Typ aus geprüften Bunny-Bytes korrigiert: ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588848857-wcvnyim1.m4a
+M4A-Typ aus geprüften Bunny-Bytes korrigiert: ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588856055-9qxooae4.m4a
+M4A-Typ aus geprüften Bunny-Bytes korrigiert: ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790592128512-ee751me2.m4a
+Umzug: 0/0 abgelegt, 0 Fehler, 123 schon fertig, aus Supabase 0.1 MB, Prüfung: 0 Abweichungen, umgeschaltet 4, bleiben bei Supabase 0 — fertig.
+{"modus":"rest","gelistet":123,"gelistetBytes":101348121,"schonFertig":123,"offen":0,"offenBytes":0,"geholt":0,"geholtBytes":0,"listeBytes":67802,"hochgeladen":0,"fehler":0,"nichtMp4":0,"pruefAbweichungen":0,"ausgelassen":0,"umgeschaltet":4,"umschaltAusgelassen":0,"status":"fertig","gesamtEgressBytes":101619329,"budgetBytes":157286400}

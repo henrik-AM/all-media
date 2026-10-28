@@ -1,0 +1,58 @@
+[
+  {
+    "pfad": "ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588842322-993vq9bg.m4a",
+    "typ": "audio/x-m4a",
+    "registerTyp": "audio/mp4",
+    "streams": [
+      {
+        "codec_name": "aac",
+        "codec_type": "audio"
+      }
+    ],
+    "bytes": 82734,
+    "sha256": "b18bb74e81318fa715eda1334b45dbbb41bf64fde75b52a437a59e774398d6a4",
+    "status": 200
+  },
+  {
+    "pfad": "ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588848857-wcvnyim1.m4a",
+    "typ": "audio/x-m4a",
+    "registerTyp": "audio/mp4",
+    "streams": [
+      {
+        "codec_name": "aac",
+        "codec_type": "audio"
+      }
+    ],
+    "bytes": 82924,
+    "sha256": "67394c7b1759ab818d1f372fe8f91e9f39398ec42a1a16520ab155779811128a",
+    "status": 200
+  },
+  {
+    "pfad": "ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790588856055-9qxooae4.m4a",
+    "typ": "audio/x-m4a",
+    "registerTyp": "audio/mp4",
+    "streams": [
+      {
+        "codec_name": "aac",
+        "codec_type": "audio"
+      }
+    ],
+    "bytes": 125158,
+    "sha256": "141e76bf4f6817949baa268a8d53e753cde88502949d5d3d5510318db79fa6f5",
+    "status": 200
+  },
+  {
+    "pfad": "ptt/cc5c200b-1abd-445c-beaa-e64d20477cea-1790592128512-ee751me2.m4a",
+    "typ": "audio/x-m4a",
+    "registerTyp": "audio/mp4",
+    "streams": [
+      {
+        "codec_name": "aac",
+        "codec_type": "audio"
+      }
+    ],
+    "bytes": 66446,
+    "sha256": "3496d019aac6040cb733837a34319b8c5ad3682befb9cae35d2ace314b538ce5",
+    "status": 200
+  }
+]
