@@ -1,0 +1,16 @@
+{"zeit":"2026-10-28T21:56:05.407Z","bereit":true,"anfang":5,"konto":"test@all-media.app"}
+{"zeit":"2026-10-28T21:56:55.799Z","befehl":"vorher","eigeneBeitraege":6,"pruefbeitraege":[{"id":"7e5a7b1d-300c-4add-82db-7c1abcbcd554","art":"post","text":"Bunny-App 28.10.2026 Bild"}],"anfang":5}
+{"zeit":"2026-10-28T21:56:55.802Z","fehler":"Cannot read properties of null (reading 'split')"}
+{"zeit":"2026-10-28T21:57:05.851Z","befehl":"vorher","eigeneBeitraege":6,"pruefbeitraege":[{"id":"7e5a7b1d-300c-4add-82db-7c1abcbcd554","art":"post","text":"Bunny-App 28.10.2026 Bild"}],"anfang":5}
+{"zeit":"2026-10-28T21:57:05.851Z","fehler":"Cannot read properties of null (reading 'split')"}
+{"zeit":"2026-10-28T22:08:36.574Z","bereit":true,"anfang":6,"konto":"test@all-media.app"}
+{"zeit":"2026-10-28T22:08:57.220Z","bereinigteLeere":1,"anfang":5}
+{"zeit":"2026-10-28T22:08:57.296Z","befehl":"leer-loeschen","eigeneBeitraege":5,"pruefbeitraege":[],"anfang":5}
+{"zeit":"2026-10-28T22:12:03.853Z","befehl":"stand","eigeneBeitraege":6,"pruefbeitraege":[{"id":"17ccc4c9-36e4-43bb-a238-ca5373373a55","art":"post","text":"Bunny-App 28.10.2026 Bild"}],"anfang":5}
+{"zeit":"2026-10-28T22:12:46.386Z","bereit":true,"anfang":6,"konto":"test@all-media.app"}
+{"zeit":"2026-10-28T22:12:52.005Z","bereinigteLeere":1,"anfang":5}
+{"zeit":"2026-10-28T22:12:52.094Z","befehl":"wiederholung-aufraeumen","eigeneBeitraege":5,"pruefbeitraege":[],"anfang":5}
+{"zeit":"2026-10-28T22:15:31.190Z","befehl":"stand","eigeneBeitraege":5,"pruefbeitraege":[],"anfang":5}
+{"zeit":"2026-10-28T22:16:20.947Z","befehl":"stand","eigeneBeitraege":5,"pruefbeitraege":[],"anfang":5}
+{"zeit":"2026-10-28T22:17:15.454Z","befehl":"vorher","eigeneBeitraege":6,"pruefbeitraege":[{"id":"22973b31-00bd-4ad9-b378-b21493f338cc","art":"post","text":"Bunny-App 28.10.2026 Bild"}],"anfang":5}
+{"zeit":"2026-10-28T22:17:15.934Z","id":"22973b31-00bd-4ad9-b378-b21493f338cc","host":"allmedia-cdn.b-cdn.net","pfad":"posts/3baafacd-bbdb-40fb-8ef4-a4e365ae00c4-1793225812351-76e2d2704bf42f87cb5fb0a550221db3.png","status":206,"typ":"image/png","range":"bytes 0-1023/7336"}
