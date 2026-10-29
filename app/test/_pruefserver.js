@@ -65,8 +65,11 @@ function juengsteDatei(pfade) {
 function serverAuf3000() {
   const pid = befehl(['lsof', '-nP', '-tiTCP:3000', '-sTCP:LISTEN']).split('\n')[0];
   if (!pid) return null;
-  const ordner = (befehl(['lsof', '-a', '-p', pid, '-d', 'cwd', '-Fn']).split('\n')
+  // lsof schreibt Nicht-ASCII-Bytes als \xHH („ö“ im OneDrive-Pfad als \xcc\x88).
+  const roh = (befehl(['lsof', '-a', '-p', pid, '-d', 'cwd', '-Fn']).split('\n')
     .find(z => z.startsWith('n')) || '').slice(1);
+  const ordner = Buffer.from(roh.replace(/\\x([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16))), 'latin1')
+    .toString('utf8');
   const start = Date.parse(befehl(['ps', '-o', 'lstart=', '-p', pid]));
   return { pid, ordner, start };
 }
