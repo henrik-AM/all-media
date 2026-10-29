@@ -1846,7 +1846,12 @@ export async function ladeUmfragen(
   art: 'post' | 'story' | 'channel',
   traegerIds: string[]
 ): Promise<Record<string, Umfrage>> {
-  if (!traegerIds.length) return {};
+  // Lokale Entwürfe haben noch keine Datenbankkennung. Eine solche ID
+  // würde die UUID-Abfrage auch für alle bereits gespeicherten Beiträge abbrechen.
+  const datenbankIds = [...new Set((traegerIds || []).filter((id) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  ))];
+  if (!datenbankIds.length) return {};
 
   const { data, error } = await client
     .from('polls')
@@ -1861,7 +1866,7 @@ export async function ladeUmfragen(
      */
     .select('id, traeger_id, frage, mehrfach, ende_at, poll_options!poll_id(id, text, position)')
     .eq('traeger_art', art)
-    .in('traeger_id', traegerIds);
+    .in('traeger_id', datenbankIds);
   if (error) throw error;
 
   const umfragen = (data ?? []) as any[];
