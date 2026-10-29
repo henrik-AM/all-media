@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { EmptyState } from '../../components/EmptyState';
-import { FilterPillen } from '../../components/FilterPillen';
+import { FilterPille, FilterPillen } from '../../components/FilterPillen';
 import { SearchBar } from '../../components/SearchBar';
 import { Avatar } from '../../components/Avatar';
 import { PersonenVorschlaege } from '../../components/PersonenVorschlaege';
@@ -16,17 +16,17 @@ const Beitritt = require('../../../gemeinsam/beitritt') as typeof import('../../
 
 /*
  * Henrik: "Home zeigt nur Communitys, denen der Nutzer bereits beigetreten
- * ist. Noch nicht beigetretene Communitys unter 'Entdecken' o. Ae. anzeigen."
+ * ist." Nicht beigetretene stehen unter Suchen (Kasten 28/3.2).
  *
- * Vorher standen alle in einer Liste, getrennt nur nach oeffentlich/privat -
- * beigetreten und nicht beigetreten waren nicht auseinanderzuhalten. Genauso
- * geloest wie in der Website (renderCommunities).
+ * Kasten 28/13 (Prototyp „Communitys - Home“): darüber Alle | Öffentlich |
+ * Privat. Gleiche Regel auf der Website (renderCommunities).
  */
-type Filter = 'meine' | 'entdecken';
+type Filter = 'alle' | 'oeffentlich' | 'privat';
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'meine', label: 'Meine' },
-  { key: 'entdecken', label: 'Entdecken' },
+const FILTERS: FilterPille<Filter>[] = [
+  { key: 'alle', label: 'Alle' },
+  { key: 'oeffentlich', label: 'Öffentlich' },
+  { key: 'privat', label: 'Privat' },
 ];
 
 interface Props {
@@ -41,14 +41,20 @@ interface Props {
 export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel, onOpenProfile }: Props) => {
   const { communities, kanalBeitreten, kanalGelesen } = useProfil();
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<Filter>('alle');
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     const passt = (c: Community) =>
       !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
 
-    return communities.filter((c) => c.joined && passt(c));
-  }, [communities, query]);
+    return communities.filter(
+      (c) =>
+        c.joined &&
+        passt(c) &&
+        (filter === 'alle' || (filter === 'privat') === (c.visibility === 'private'))
+    );
+  }, [communities, query, filter]);
 
   const toggleJoin = async (community: Community) => {
     const vorher = Beitritt.zustand(community);
@@ -130,7 +136,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel, 
           </>
         )}
       </View>
-
+      <FilterPillen pillen={FILTERS} aktiv={filter} onChange={setFilter} />
 
       <FlatList
         data={visible}
@@ -151,12 +157,18 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel, 
           <EmptyState
             icon="people-outline"
             title={
-              query ? 'Keine Community gefunden' : 'Noch keiner Community beigetreten'
+              query
+                ? 'Keine Community gefunden'
+                : filter === 'alle'
+                  ? 'Noch keiner Community beigetreten'
+                  : filter === 'privat'
+                    ? 'Keine private Community'
+                    : 'Keine öffentliche Community'
             }
             text={
               query
                 ? `Für „${query}" wurde nichts gefunden.`
-                : 'Du kannst hier später Communitys verwalten.'
+                : 'Unter „Suchen" findest du Communitys zum Beitreten.'
             }
           />
         }

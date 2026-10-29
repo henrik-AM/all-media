@@ -173,7 +173,7 @@ const state = {
   communityQuery: '',
   // Home startet bei den eigenen Communitys, nicht bei allen - siehe
   // renderCommunities.
-  communityFilter: 'meine',
+  communityFilter: 'alle',
   commSearchQuery: '',
   commSearchFilter: 'all',
   // Die Seite hinter "Communitys →" bzw. "Profile →" unter Suchen
@@ -7913,16 +7913,26 @@ function renderCommunities() {
   const q = state.communityQuery.trim().toLowerCase();
   const passt = (c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q);
 
-  const meine = state.communities.filter((c) => c.joined && passt(c));
-  const entdecken = state.communities.filter((c) => !c.joined && passt(c));
-  const list = state.communityFilter === 'entdecken' ? entdecken : meine;
+  /*
+   * Kasten 28/13 (Prototyp „Communitys - Home“): Alle | Öffentlich | Privat
+   * über den beigetretenen Communitys. Vorher stand hier Meine | Entdecken —
+   * die App hatte das nie, und Nicht-Beigetretene stehen unter Suchen
+   * (Kasten 28/3.2). Gleiche Regel in der App (CommunitiesScreen).
+   */
+  const list = state.communities.filter(
+    (c) =>
+      c.joined &&
+      passt(c) &&
+      (state.communityFilter === 'alle' ||
+        (state.communityFilter === 'privat') === (c.visibility === 'private'))
+  );
 
   main.innerHTML = `
     <div class="pagehead">
       <div class="searchrow">
         <label class="searchbox">
           ${ICONS.search}
-          <input id="commSearch" type="search" placeholder="Suche nach Communitys" value="${esc(state.communityQuery)}" autocomplete="off" />
+          <input id="commSearch" type="search" placeholder="Suche hier nach deinen Communitys..." value="${esc(state.communityQuery)}" autocomplete="off" />
           ${state.communityQuery ? `<button class="searchbox__clear" id="commSearchClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
         </label>
       </div>
@@ -7935,8 +7945,9 @@ function renderCommunities() {
       */ ''}
     <div class="pills">
       ${[
-        ['meine', 'Meine'],
-        ['entdecken', 'Entdecken'],
+        ['alle', 'Alle'],
+        ['oeffentlich', 'Öffentlich'],
+        ['privat', 'Privat'],
       ]
         .map(
           ([f, label]) =>
@@ -7958,16 +7969,16 @@ function renderCommunities() {
               <div class="empty__title">${
                 state.communityQuery
                   ? 'Keine Community gefunden'
-                  : state.communityFilter === 'entdecken'
-                    ? 'Du bist überall dabei'
-                    : 'Noch keiner Community beigetreten'
+                  : state.communityFilter === 'alle'
+                    ? 'Noch keiner Community beigetreten'
+                    : state.communityFilter === 'privat'
+                      ? 'Keine private Community'
+                      : 'Keine öffentliche Community'
               }</div>
               <div class="empty__text">${
                 state.communityQuery
                   ? `Für „${esc(state.communityQuery)}" wurde nichts gefunden.`
-                  : state.communityFilter === 'entdecken'
-                    ? 'Es gibt gerade nichts Neues zu entdecken.'
-                    : 'Unter „Entdecken" findest du Communitys zum Beitreten.'
+                  : 'Unter „Suchen" findest du Communitys zum Beitreten.'
               }</div>
             </div>`
       }
