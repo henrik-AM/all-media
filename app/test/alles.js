@@ -129,6 +129,7 @@ function stempel() {
 }
 
 require('./_ki_belegung').pruefeBelegung('testbestand');
+require('./_pruefserver').pruefeServer();
 sperreSetzen();
 const stempelVorher = stempel();
 

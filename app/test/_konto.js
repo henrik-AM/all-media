@@ -97,6 +97,7 @@ function geruestet(page) {
   for (const name of ['goto', 'reload']) {
     const echt = page[name].bind(page);
     page[name] = async (...args) => {
+      if (name === 'goto') require('./_pruefserver').pruefeServer(String(args[0]));
       const antwort = await echt(...args);
       await inhaltAbwarten(page);
       return antwort;
