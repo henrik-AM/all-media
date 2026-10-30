@@ -1844,6 +1844,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onOpenProfile={openProfile}
         // Kasten 28/7.9: echte Gruppeninfo statt des Hinweises „Gruppeneinstellungen: X“.
         onOpenGroupSettings={() => setOverlay({ kind: 'gruppe', chat: overlay.chat, zurueck: overlay })}
+        // Kasten 28/11.2: Unterthema-Kopf öffnet dessen Community-Homeseite.
+        onOpenCommunity={(communityId) => setOverlay({ kind: 'community', communityId })}
         onAnfrageEntscheiden={anfrageEntscheiden}
         messengerAnfrageMoeglich={
           !overlay.chat.isGroup &&

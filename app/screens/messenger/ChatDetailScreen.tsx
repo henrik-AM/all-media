@@ -91,6 +91,8 @@ interface Props {
   onOpenStandort?: (name: string) => void;
   onOpenProfile: (userId: string) => void;
   onOpenGroupSettings?: (chatId: string) => void;
+  /** Kasten 28/11.2: Unterthema-Kopf öffnet seine Community. */
+  onOpenCommunity?: (communityId: string) => void;
   /** Offene Kontaktanfrage annehmen. */
   /** Über eine eingegangene Anfrage entscheiden — annehmen oder ablehnen. */
   onAnfrageEntscheiden?: (chatId: string, annehmen: boolean) => void;
@@ -126,6 +128,7 @@ export const ChatDetailScreen = ({
   onCamera,
   onOpenProfile,
   onOpenGroupSettings,
+  onOpenCommunity,
   onAnfrageEntscheiden,
   messengerAnfrageMoeglich = false,
   onMessengerAnfragen,
@@ -207,15 +210,15 @@ export const ChatDetailScreen = ({
    * verschiedenen Tabellen — welche es ist, steht hier fest, damit es der
    * Aufrufer nicht wissen muss.
    */
-  const istKanal = communities.some((c) =>
+  const kanalCommunity = communities.find((c) =>
     (c.unterthemen ?? []).some((u) => u.id === chat.id)
   );
+  /** Kasten 8.2: kanalCommunity ist die Community dieses Unterthemas — auch fuer Push-to-Talk. */
+  const istKanal = !!kanalCommunity;
   /** Kasten 8.6: die angetippte Sitzung „Push to Talk", deren Verlauf offen ist. */
   const [pttVerlauf, setPttVerlauf] = useState<{ id: string; zeitpunkt?: string } | null>(null);
-  /** Kasten 8.2: die Community dieses Unterthemas — fuer Push-to-Talk. */
-  const kanalCommunity = istKanal
-    ? communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === chat.id))
-    : undefined;
+  // Nur die Anzeige kürzen; chat.name bleibt Zielname für Anruf und Teilen.
+  const kanalName = kanalCommunity?.unterthemen?.find((u) => u.id === chat.id)?.name;
 
   /*
    * "Zuletzt online". Hier stand bis zum 03.09.2026 fest das Wort "Online" —
@@ -1302,7 +1305,9 @@ export const ChatDetailScreen = ({
         <Druck
           style={styles.headerBody}
           onPress={() => {
-            if (!chat.isGroup && chat.userId) {
+            if (kanalCommunity) {
+              onOpenCommunity?.(kanalCommunity.id);
+            } else if (!chat.isGroup && chat.userId) {
               onOpenProfile(chat.userId);
             } else if (chat.isGroup && !istKanal) {
               // Kasten 28/7.9: Antippen öffnet die Gruppeninfo (wie die Kontaktinfo).
@@ -1317,15 +1322,19 @@ export const ChatDetailScreen = ({
           }}
           delayLongPress={500}
           disabled={!chat.userId && !chat.isGroup}
+          accessibilityLabel={kanalCommunity ? `# ${kanalName}, zur Community ${kanalCommunity.name}` : undefined}
         >
           <Text style={styles.headerName} numberOfLines={1}>
-            {chat.name}
+            {istKanal ? `# ${kanalName ?? ''}` : chat.name}
           </Text>
-          <Text style={[styles.headerStatus, chat.isGroup && styles.headerStatusMuted]}>
-            {chat.isGroup
-              ? `${((chat.memberIds?.length ?? 0) + 1).toLocaleString('de-DE')} Mitglieder`
-              : praesenz}
-          </Text>
+          {/* Unterthemen zeigen keine Community-/Mitglieder-/Präsenzzeile. */}
+          {!istKanal && (
+            <Text style={[styles.headerStatus, chat.isGroup && styles.headerStatusMuted]}>
+              {chat.isGroup
+                ? `${((chat.memberIds?.length ?? 0) + 1).toLocaleString('de-DE')} Mitglieder`
+                : praesenz}
+            </Text>
+          )}
         </Druck>
         <Druck style={styles.headerAction} onPress={() => onCall('video')} hitSlop={4}>
           <Ionicons name="videocam-outline" size={22} color={colors.text2} />

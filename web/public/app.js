@@ -7196,9 +7196,8 @@ async function renderCommunityChat(community, kanal, thema) {
   main.innerHTML = `
     <div class="pagehead pagehead__row">
       <button class="back-btn" id="backBtn" aria-label="Zurück">${ICONS.back}</button>
-      <button class="kanalkopf" id="kanalKopf">
-        <span class="kanalkopf__name">${esc(thema)}</span>
-        <span class="kanalkopf__sub">#${esc(kanal.name)} · ${esc(community.name)}</span>
+      <button class="kanalkopf" id="kanalKopf" aria-label="# ${esc(kanal.name)}, zur Community ${esc(community.name)}">
+        <span class="kanalkopf__name"># ${esc(kanal.name)}</span>
       </button>
       ${/* Kasten 5.2: auch eine Community laesst sich anrufen — wie in der
            App (ChatDetailScreen, Kopf). Der Anruf steht danach hier im Verlauf. */ ''}
@@ -7241,7 +7240,8 @@ async function renderCommunityChat(community, kanal, thema) {
     </form>`;
 
   $('#backBtn').addEventListener('click', () => renderKanalThemen(community, kanal));
-  $('#kanalKopf').addEventListener('click', () => openCommunityEinstellungen(community));
+  // Kasten 28/11.2: Kopf führt auf die Homeseite der Community.
+  $('#kanalKopf').addEventListener('click', () => renderCommunityChannels(community.id));
   if ($('#pttKnopf')) pttEinhaengen(community.id, kanal.id, () => renderCommunityChat(community, kanal, thema));
   main.querySelectorAll('[data-kanalcall]').forEach((b) =>
     b.addEventListener('click', () =>
@@ -7252,6 +7252,7 @@ async function renderCommunityChat(community, kanal, thema) {
       )
     )
   );
+  $('#kanalKopf').addEventListener('click', () => renderCommunityChannels(community.id));
 
   /*
    * Kasten 27: das Unterthema im Takt nachsehen, wie den offenen Chat
@@ -7271,6 +7272,8 @@ async function renderCommunityChat(community, kanal, thema) {
         const r = await fetch(`/api/communities/${community.id}/channels/${kanal.id}/stand`);
         if (!r.ok) return;
         const { stand } = await r.json();
+        // Eine inzwischen verlassene Chatansicht darf nicht zurückgezeichnet werden.
+        if (renderLauf !== zeichenLauf || !$('#commMsgs')) return;
         if (stand === null || stand === undefined) return;
         const vorher = kanalStand;
         kanalStand = stand;
