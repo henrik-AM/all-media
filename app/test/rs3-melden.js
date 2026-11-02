@@ -265,6 +265,9 @@ async function teilL() {
   const ben = Krypto.schluesselpaarErzeugen();
   fach.set('allmedia.krypto.geheim.ben', ben.geheim);
   fach.set('allmedia.krypto.geraet.ben', 'geraet-ben');
+  // main (vor der Sicherheitsprüfung 16.10.) hat ein Fach je Gerät, nicht je Konto.
+  fach.set('allmedia.krypto.geheim', ben.geheim);
+  fach.set('allmedia.krypto.geraet', 'geraet-ben');
   const text = 'Wenn du das jemandem sagst, passiert was.';
   const v = Krypto.verschluesseln(text, anna.geheim, [{ id: 'k-ben', oeffentlich: ben.oeffentlich }, { id: 'k-anna', oeffentlich: anna.oeffentlich }]);
   const kuvert = v.kuverts.find((k) => k.schluesselId === 'k-ben');

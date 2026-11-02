@@ -226,26 +226,24 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (an) throw new Error('nach dem erneuten Öffnen wieder an');
   });
 
+  /*
+   * Seit Kasten RS 3 (DSA Art. 16) öffnet „Melden" das Melden-Blatt: Grund
+   * wählen, Begründung, Bestätigung — die Eingangsbestätigung steht im Blatt,
+   * nicht mehr im Toast. Danach „Fertig", sonst verdeckt das Blatt die
+   * nächsten Schritte.
+   */
   await pruefe('„Melden" fragt nach einem Grund statt nur zu bestätigen', async () => {
     await page.click('[data-chatopt-aktion="melden"]');
-    await page.waitForSelector('#f_grund', { timeout: 10000 }).catch(() => {});
-    if (!(await page.$('#f_grund'))) throw new Error('kein Feld für den Grund');
-    await page.fill('#f_grund', 'Unerwünschte Werbung');
-    await page.click('#formOk');
-    // Die Meldung geht erst in die Datenbank, dann kommt der Hinweis. Nach
-    // 600 ms war er in der Kette noch nicht da - und weil er sich nach 2,2
-    // Sekunden selbst wieder ausblendet, half laenger warten auch nicht.
-    await page
-      .waitForFunction(
-        () => {
-          const t = document.querySelector('#toast');
-          return t && !t.hidden && t.textContent.includes('angekommen');
-        },
-        null, { timeout: 10000 }
-      )
-      .catch(() => {});
-    const toast = await page.$eval('#toast', (n) => (n.hidden ? '' : n.textContent));
-    if (!toast.includes('angekommen')) throw new Error('Toast sagt „' + toast + '"');
+    await page.waitForSelector('[data-mkat]', { timeout: 10000 }).catch(() => {});
+    if (!(await page.$('[data-mkat]'))) throw new Error('kein Melden-Blatt mit Gründen');
+    await page.click('[data-mkat="betrug_spam"]');
+    await page.fill('#meldenText', 'Unerwünschte Werbung im Chat');
+    if (await page.$('#meldenHaken')) await page.check('#meldenHaken');
+    await page.click('#meldenSenden');
+    await page.waitForSelector('[data-melden-bestaetigung]', { timeout: 10000 }).catch(() => {});
+    const text = (await page.textContent('[data-melden-bestaetigung]').catch(() => '')) || '';
+    if (!text.includes('angekommen')) throw new Error('Bestätigung fehlt: „' + text.trim().slice(0, 80) + '"');
+    await page.click('#meldenFertig').catch(() => {});
   });
 
   await pruefe('„Blockieren" wirkt und laesst sich wieder aufheben', async () => {
