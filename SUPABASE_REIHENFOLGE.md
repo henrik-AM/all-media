@@ -308,3 +308,11 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
 `SUPABASE_SCHEMA_102_melden_moderation.sql` und `SUPABASE_SCHEMA_103_konto_loeschen_auskunft.sql` sind seit 02.11.2026 live (Henriks Ja). Danach zwei Korrekturen, in beiden Dateien nachgetragen und live eingespielt: F11-Helfer `beitrag_ausgeblendet`/`kommentar_ausgeblendet` und die Regeln `nicht_ausgeblendet` nur noch für `authenticated` (anon liest posts/comments nicht; test:rechte/test:angriffe schlugen an), `nummer_pfeffer` trägt `nur_freigegebene` (test:minderjaehrig). Danach test:rechte 281/281, test:angriffe 37/37, test:minderjaehrig grün, test:schema grün, Proben 102 83/83, 103 27/27, Funde 76/76.
 
 **106 bewusst noch nicht live:** es löscht `einwilligung_entscheiden(uuid, boolean)`, das `main` (App `app/lib/registrierung.ts`, Website `web/public/anmeldung.js`) live aufruft — Elternfreigabe wäre bis zum Merge kaputt. 106 erst zusammen mit dem Merge von `kasten/rs-recht` nach `main` einspielen.
+
+## Nachtrag 02.11.2026 (abends): Schema 106 live, Recht-Teile auf main
+
+`SUPABASE_SCHEMA_106_einwilligung_fassung.sql` ist seit 02.11.2026 live — nach dem Push der Recht-Teile (`main` cce53c3, Render live), weil 106 die alte `einwilligung_entscheiden(uuid, boolean)` löscht. Prüfsumme `datenschutz` ist `73aa228acb1edf9d` (Bunny.net in der Datenschutzerklärung). `meine_daten()` (103) nimmt `einwilligungen` schon dynamisch auf — kein Nachtrag nötig. Probe 106 55/55, danach test:rechte 243/243, test:angriffe 37/37, test:minderjaehrig grün, test:schema grün, Funde 76/76, `_eltern_nummer` gegen die Live-Website 13/13.
+
+**Folge:** Jedes Konto ohne Zustimmung (am 02.11. 15 Konten, alle von vor dem 24.10.) sieht beim nächsten Öffnen „Unsere Bedingungen“ und muss zustimmen. Prüf- und Testkonto (`all.media.prueflauf@web.de`, `test@all-media.app`) haben zugestimmt; neue Prüfkonten aus SQL ohne `pruefsumme_<dok>` in den Metadaten landen ebenfalls dort.
+
+**Nicht auf main** (bleibt auf `kasten/rs-recht` bzw. im Sammelzweig): alle Kasten-28-Teile mit den Schemas 88–100. Wer 92 einspielt, muss danach den F11-Block aus 102 erneut ausführen.
