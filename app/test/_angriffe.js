@@ -162,8 +162,12 @@ const weg = (name, anweisung) => `
     select count(*) into n from storage.objects
      where bucket_id = 'media' and owner_id is distinct from auth.uid()::text and split_part(name, '/', 1) in ('stories', 'insights', 'messages', 'ptt');
     erg := erg || 'fremde_private_dateien=' || n || ' ';
-    ${weg('story_eigener_eimer', `insert into stories (user_id, media_url, media_type) values (auth.uid(),
+    -- Erst hochladen, dann verweisen (Schema 117: nur eigene Dateien).
+    ${weg('story_eigener_eimer', `insert into storage.objects (bucket_id, name, owner_id) values ('media', 'stories/${PRUEFKONTO}-1-abc.jpg', auth.uid()::text);
+      insert into stories (user_id, media_url, media_type) values (auth.uid(),
       'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/stories/${PRUEFKONTO}-1-abc.jpg', 'image')`)}
+    ${versuch('story_ohne_datei', `insert into stories (user_id, media_url, media_type) values (auth.uid(),
+      'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/stories/${PRUEFKONTO}-nie-hochgeladen.jpg', 'image')`)}
     ${versuch('story_fremde_adresse', `insert into stories (user_id, media_url, media_type) values (auth.uid(), 'x);"><meta http-equiv=refresh>', 'image')`)}
     insert into stories (user_id, media_url, media_type, expires_at) values (auth.uid(), null, 'image', '2036-01-01')
       returning (expires_at <= now() + interval '24 hours')::text into t;
@@ -173,6 +177,7 @@ const weg = (name, anweisung) => `
   `);
   pruefe('Fremde Storys, Insights, Anhänge im Speicher unsichtbar', medien.fremde_private_dateien === '0', medien.fremde_private_dateien);
   pruefe('Story mit eigener Medienadresse anlegen geht', medien.story_eigener_eimer === 'ok', medien.story_eigener_eimer);
+  pruefe('Story mit Adresse einer nie hochgeladenen/fremden Datei geht nicht (Schema 117)', medien.story_ohne_datei === 'zu', medien.story_ohne_datei);
   pruefe('Story mit fremder/HTML-Adresse geht nicht', medien.story_fremde_adresse === 'zu');
   pruefe('Eine Story lebt höchstens einen Tag', medien.story_hoechstens_ein_tag === 'true');
   // Gegenprobe zuerst: geht gar kein Hochladen, wäre das „zu" darunter wertlos.

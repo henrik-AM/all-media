@@ -237,3 +237,11 @@ Pfade, gemeinsame Beispielmedien ohne Eigentümer, ursprüngliche Zeitstempel.
 Bunny-Löschmarken erhalten die Supabase-Originale und verhindern Rückfälle.
 Keine Funktionen aus 107–114 vorausgesetzt. Ersetzt nur die beiden oben genannten
 115-Helfer; Uploadlimit und Eigentümerpräfix für neue Uploads bleiben wirksam.
+
+## Nachtrag 31.10.2026: Schema 117 (Codex-Fund F4) — LIVE eingespielt
+
+**Eingespielt am 31.10.2026 nach Henriks Ja** (vorgezogen, Sicherheitslücke). Nach 95 und 115/116. Entstanden auf `kasten/rs-recht`.
+
+- `SUPABASE_SCHEMA_117_medienreferenz_eigen.sql` — Auslöser `medienreferenz_pruefen` auf allen Medienspalten (Liste wie `bunny_referenz_pruefen` aus 115, dazu `kontakt_bilder`): eine Medienadresse setzen darf nur, wer die Datei selbst hochgeladen hat (`medium_selbst_hochgeladen`), außer `beispiel/…` und Weiterleiten (`forwarded_from` = Absender einer lesbaren Nachricht mit derselben Adresse). Neue Objekte, keine Doppelung.
+- Live fehlen `communities.bild_url` (99) und `kontakt_bilder` (94): Die Schleife überspringt fehlende Spalten. **Nach dem Einspielen von 94 bzw. 99 Schema 117 erneut einspielen** (idempotent).
+- Probe `app/test/_probe_f4_medien.js`: live vorher 9/18, danach 18/18. `test:angriffe` lädt für „Story mit eigener Medienadresse" jetzt erst hoch.

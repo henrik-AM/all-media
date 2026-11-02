@@ -3107,7 +3107,7 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
 .btn--primary { border-color: transparent; }
 .btn--breit { width: 100%; }
 .btn--primary { background: var(--brand-grad); color: #fff; box-shadow: var(--shadow-brand); }
-.btn--primary:hover { filter: brightness(1.07); }
+.btn--primary:hover { background: var(--brand-grad); filter: brightness(1.07); }
 .btn--primary:disabled { opacity: .45; cursor: default; filter: none; }
 
 /* Formularfeld im Bottom-Sheet. */
