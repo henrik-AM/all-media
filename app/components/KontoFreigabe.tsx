@@ -5,11 +5,11 @@ import { Druck } from './Druck';
 import { AuthContext } from '../contexts/AuthContext';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
+import { RechtstextSheet } from './RechtstextSheet';
 import {
   Einwilligung,
   Kontostand,
   datumTippen,
-  einwilligungEntscheiden,
   einwilligungenLaden,
   elternAnfragen,
   geburtsdatumNachtragen,
@@ -18,6 +18,9 @@ import {
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
 import { FarbfilterSchicht } from './Farbfilter';
+
+// Elternblatt zeigt die Texte und schickt deren Fassung mit (Codex-Fund F12).
+const Zustimmung = require('../../gemeinsam/einwilligung') as typeof import('../../gemeinsam/einwilligung');
 /** Wie oft nachgesehen wird, ob sich etwas getan hat. */
 const WARTEN_MS = 15_000;
 const ELTERN_MS = 60_000;
@@ -189,6 +192,9 @@ const Elternfrage = () => {
   const [offen, setOffen] = useState<Einwilligung[]>([]);
   const [arbeitet, setArbeitet] = useState(false);
   const [meldung, setMeldung] = useState<string | null>(null);
+  const [lesen, setLesen] = useState<string | null>(null);
+  // Doppeltippen: der Zustand ist erst nach dem nächsten Zeichnen gesetzt.
+  const laeuft = useRef(false);
 
   const laden = useCallback(async () => {
     if (!supabase) return;
@@ -210,12 +216,14 @@ const Elternfrage = () => {
   if (!kind) return null;
 
   const entscheiden = async (zustimmen: boolean) => {
-    if (!supabase) return;
+    if (!supabase || laeuft.current) return;
+    laeuft.current = true;
     setArbeitet(true);
     setMeldung(null);
-    const antwort = await einwilligungEntscheiden(supabase, kind.kind, zustimmen);
+    const antwort = await Zustimmung.elternEntscheiden(supabase, kind.kind, zustimmen);
+    laeuft.current = false;
     setArbeitet(false);
-    if (!antwort.ok) return setMeldung(antwort.meldung || 'Das hat nicht geklappt.');
+    if (!antwort.ok) return setMeldung(antwort.text || 'Das hat nicht geklappt.');
     setOffen((v) => v.slice(1));
   };
 
@@ -232,10 +240,33 @@ const Elternfrage = () => {
             ein Konto unter {kind.mindestalter} Jahren die Zustimmung eines Elternteils.
           </Text>
           {kind.telefon ? <Text style={styles.klein}>Telefonnummer des Kontos: {kind.telefon}</Text> : null}
-          <Text style={styles.klein}>
-            Stimmst du zu, kann {kind.handle} All Media nutzen. Lehnst du ab, bleibt das Konto gesperrt.
-          </Text>
-          {meldung ? <Text style={styles.fehler}>{meldung}</Text> : null}
+          <Text style={styles.klein}>{Zustimmung.elternHinweis(kind)}</Text>
+          <View style={styles.liste} testID="elternblatt-texte">
+            {Zustimmung.elternZeilen().map((z) => (
+              <Druck
+                key={z.dokument}
+                style={styles.zeile}
+                onPress={() => setLesen(z.dokument)}
+                accessibilityRole="link"
+                testID={`elternblatt-${z.dokument}`}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.zeileTitel}>{z.titel}</Text>
+                  <Text style={styles.zeileKlein}>
+                    Fassung {z.version}
+                    {z.kenntnis ? ` · ${Zustimmung.KENNTNIS_ZUSATZ}` : ''}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.text3} />
+              </Druck>
+            ))}
+          </View>
+          <Text style={styles.klein}>Lehnst du ab, bleibt das Konto gesperrt.</Text>
+          {meldung ? (
+            <Text style={styles.fehler} accessibilityRole="alert" testID="elternblatt-fehler">
+              {meldung}
+            </Text>
+          ) : null}
           <Druck
             style={[styles.knopf, arbeitet && { opacity: 0.6 }]}
             onPress={() => entscheiden(true)}
@@ -250,6 +281,8 @@ const Elternfrage = () => {
           <FarbfilterSchicht rundum={radius.xl} />
         </View>
       </View>
+      {/* Im Modal gerendert: iOS präsentiert das Blatt vom offenen Elternblatt aus. */}
+      {lesen && <RechtstextSheet id={lesen} onClose={() => setLesen(null)} />}
     </Modal>
   );
 };
@@ -293,6 +326,17 @@ const styles = themenStyles((colors) => ({
   knopfText: { color: colors.white, ...typography.h3 },
   leise: { alignItems: 'center', paddingVertical: spacing.sm },
   leiseText: { color: colors.brand, ...typography.body },
+  liste: { borderRadius: radius.soft, backgroundColor: colors.surface2, overflow: 'hidden' },
+  zeile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  zeileTitel: { color: colors.text, ...typography.body, fontWeight: '600' },
+  zeileKlein: { color: colors.text3, ...typography.small },
 
   schleier: {
     flex: 1,

@@ -28,6 +28,8 @@ import { AnhangSheet } from '../../components/AnhangSheet';
 import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
 import { WeiterleitenSheet } from '../../components/WeiterleitenSheet';
+import { MeldenSheet, MeldeZiel } from '../../components/MeldenSheet';
+import { meldebelegHolen } from '../../lib/krypto';
 import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useEinstellungen } from '../../contexts/EinstellungenContext';
@@ -119,7 +121,15 @@ export const ChatDetailScreen = ({
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
   const [kameraAuf, setKameraAuf] = useState(false);
-  const { users: alleNutzer, ichId, communities, chats: alleChats } = useDaten();
+  /*
+   * Kasten RS 3: eine fremde Nachricht melden — im Messenger, im Community-
+   * Chat (art 'message') und im Unterthema (art 'kanal_nachricht'). Nur hier,
+   * also nur in Chats, in denen man selbst ist. Bei Ende-zu-Ende geht der
+   * Klartext dieser einen Nachricht mit ihrem Sitzungsschlüssel mit
+   * (lib/krypto.ts, meldebelegHolen) — nie der Gerätschlüssel.
+   */
+  const [meldeZiel, setMeldeZiel] = useState<MeldeZiel | null>(null);
+  const { users: alleNutzer, ichId, communities, chats: alleChats, communityChats } = useDaten();
   // „Mit Enter senden" — siehe SCHALTER_STANDARD im EinstellungenContext.
   const { an } = useEinstellungen();
   const enterSendet = an('entersenden');
@@ -509,10 +519,22 @@ export const ChatDetailScreen = ({
    * Blase, die "bearbeitet" zeigt, obwohl in der Datenbank der alte Text
    * steht, waere schlimmer als gar keine Aenderung.
    */
+  // 'melden' bietet NachrichtSheet nur bei fremden Nachrichten an, die kein Hinweis sind.
   const nachrichtAktion = async (was: NachrichtAktion) => {
     const m = gewaehlt;
     setGewaehlt(null);
     if (!m) return;
+
+    if (was === 'melden') {
+      if (m.senderId === CURRENT_USER_ID || m.senderId === ichId) return;
+      if (istKanal) return setMeldeZiel({ art: 'kanal_nachricht', id: m.id });
+      return setMeldeZiel({
+        art: 'message',
+        id: m.id,
+        beleg: () =>
+          supabase && ichId ? meldebelegHolen(supabase, ichId, m.id, m.text ?? '') : Promise.resolve(null),
+      });
+    }
 
     if (was === 'antworten') return setBezug({ art: 'antwort', nachricht: m });
     if (was === 'zitieren') return setBezug({ art: 'zitat', nachricht: m });
@@ -1331,6 +1353,8 @@ export const ChatDetailScreen = ({
         onReaktion={reaktionSetzen}
         onClose={() => setGewaehlt(null)}
       />
+
+      <MeldenSheet ziel={meldeZiel} onClose={() => setMeldeZiel(null)} />
 
       <WeiterleitenSheet
         visible={!!weiterleiten}

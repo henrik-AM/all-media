@@ -130,6 +130,8 @@ async function kontoKlick(page) {
     await neu.fill('#kontoTelefon', eigeneNummer);
     await neu.fill('#kontoGeburt', geborenVor(12));
     await neu.locator('#kontoGeburt').dispatchEvent('change');
+    // Kasten RS 1: ohne Häkchen lehnt registrieren() ab — hier geht es um die Elternprüfung davor.
+    await neu.check('#kontoZustimmung');
 
     const feld = neu.locator('#kontoElternFeld');
     pruefe('unter 16 erscheint das Feld für den Elternteil', await feld.isVisible());

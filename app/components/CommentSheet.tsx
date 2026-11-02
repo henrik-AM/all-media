@@ -27,6 +27,7 @@ import { useAktionen } from '../lib/useAktionen';
 import { FarbfilterSchicht } from './Farbfilter';
 import { MarkierterText } from './MarkierterText';
 import { MarkierungsEingabe } from './MarkierungsEingabe';
+import { MeldenSheet } from './MeldenSheet';
 interface Props {
   targetId: string | null;
   onClose: () => void;
@@ -46,6 +47,12 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
   const [hinweis, setHinweis] = useState('');
   const aktionen = useAktionen(setHinweis);
   const [comments, setComments] = useState<Comment[]>([]);
+  /*
+   * Kasten RS 3: fremde Kommentare lassen sich melden (art 'comment',
+   * Schema 102). Bis zum 22.10.2026 gab es dafür keinen Weg. Gleich auf der
+   * Website (commentRow, data-kmelden).
+   */
+  const [meldeKommentar, setMeldeKommentar] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const insets = useSafeAreaInsets();
   /*
@@ -171,7 +178,20 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
             davor={<><Text style={styles.bold}>{author?.name}</Text>{' '}</>}
             text={item.text}
           />
-          <Text style={styles.commentMeta}>{item.time}</Text>
+          <View style={styles.metaZeile}>
+            <Text style={styles.commentMeta}>{item.time}</Text>
+            {item.userId !== CURRENT_USER_ID && item.userId !== ichId && (
+              <Druck
+                onPress={() => setMeldeKommentar(item.id)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Kommentar von ${author?.name ?? 'jemandem'} melden`}
+                testID={`kommentar-melden-${item.id}`}
+              >
+                <Text style={styles.meldenKnopf}>Melden</Text>
+              </Druck>
+            )}
+          </View>
         </View>
         {/*
           Herz und Zahl untereinander. Henrik am 26.08.2026, Punkt 24: "Keine
@@ -267,6 +287,10 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
         {/* Kasten 21: Farbfilter auch in diesem Fenster (eigenes Fenster = eigene Fläche). */}
         <FarbfilterSchicht radius={20} />
       </KeyboardAvoidingView>
+      <MeldenSheet
+        ziel={meldeKommentar ? { art: 'comment', id: meldeKommentar } : null}
+        onClose={() => setMeldeKommentar(null)}
+      />
     </Modal>
   );
 };
@@ -307,6 +331,8 @@ const styles = themenStyles((colors) => ({
   likeZahl: { fontSize: 11, fontWeight: '600', lineHeight: 13, color: colors.text3 },
   likeZahlAn: { color: '#FF3040' },
   commentMeta: { marginTop: 3, color: colors.text3, ...typography.small },
+  metaZeile: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  meldenKnopf: { marginTop: 3, color: colors.text3, ...typography.small, fontWeight: '700' },
   bold: { fontWeight: '700' },
 
   composer: {

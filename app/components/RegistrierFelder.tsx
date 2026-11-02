@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSupabase } from '../contexts/SupabaseContext';
+import { Druck } from './Druck';
+import { RechtstextSheet } from './RechtstextSheet';
 import { Alter, NeuesKonto, Telefon, datumTippen, namensZeile, useNamensStand } from '../lib/registrierung';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
@@ -22,6 +24,7 @@ interface Props {
 export const RegistrierFelder = ({ konto, aendern, variante, gesperrt, ohneTelefon }: Props) => {
   const { supabase } = useSupabase();
   const name = namensZeile(useNamensStand(supabase, konto.handle));
+  const [lesen, setLesen] = useState<string | null>(null);
 
   const datumFehlt = Alter.pruefe(konto.geburtsdatum);
   const einordnung = datumFehlt ? null : Alter.einordnen(konto.geburtsdatum, konto.telefon);
@@ -127,6 +130,39 @@ export const RegistrierFelder = ({ konto, aendern, variante, gesperrt, ohneTelef
           />,
           { text: 'Bis dein Elternteil zustimmt, bleibt dein Konto gesperrt.', gut: true }
         )}
+
+      {/*
+        Kasten RS 1 (24.10.2026): Zustimmung zu Nutzungsbedingungen und
+        Community-Richtlinien — nie vorbelegt. Ohne Häkchen lehnt
+        neuesKontoPruefen ab; mit geht Dokument und Fassung in die
+        signUp-Metadaten (Rechtstexte.zustimmungsDaten). Gleich auf der
+        Website (registrieren in web/public/anmeldung.js).
+      */}
+      <View style={[styles.zustimmung, variante === 'blatt' && styles.zustimmungBlatt]}>
+        <Druck
+          onPress={() => !gesperrt && aendern({ zustimmung: !konto.zustimmung })}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: !!konto.zustimmung, disabled: gesperrt }}
+          accessibilityLabel="Nutzungsbedingungen und Community-Richtlinien zustimmen"
+          hitSlop={8}
+          testID="zustimmung"
+        >
+          <Ionicons
+            name={konto.zustimmung ? 'checkbox' : 'square-outline'}
+            size={22}
+            color={konto.zustimmung ? colors.brand : colors.text3}
+          />
+        </Druck>
+        <Text style={styles.zustimmungText}>
+          Ich stimme den{' '}
+          <Text style={styles.link} onPress={() => setLesen('nutzungsbedingungen')} accessibilityRole="link">Nutzungsbedingungen</Text>
+          {' '}und{' '}
+          <Text style={styles.link} onPress={() => setLesen('community_richtlinien')} accessibilityRole="link">Community-Richtlinien</Text>
+          {' '}zu. Wie wir deine Daten verarbeiten, steht in der{' '}
+          <Text style={styles.link} onPress={() => setLesen('datenschutz')} accessibilityRole="link">Datenschutzerklärung</Text>.
+        </Text>
+      </View>
+      {lesen && <RechtstextSheet id={lesen} onClose={() => setLesen(null)} />}
     </>
   );
 };
@@ -157,4 +193,9 @@ const styles = themenStyles((colors) => ({
   },
 
   zeile: { marginTop: 6, ...typography.small },
+
+  zustimmung: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingTop: spacing.sm },
+  zustimmungBlatt: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  zustimmungText: { flex: 1, color: colors.text2, ...typography.small, lineHeight: 20 },
+  link: { color: colors.brand, fontWeight: '600' },
 }));

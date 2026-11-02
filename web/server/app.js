@@ -127,9 +127,17 @@ app.use(
          * bekannten Datenleck steht. Verschickt werden nur die ersten fünf
          * Zeichen des SHA-1-Werts, nie das Passwort — die Begründung steht in
          * der Datei.
+         *
+         * `nominatim.openstreetmap.org` kam am 25.10.2026 dazu: Die Ortssuche
+         * beim Standort senden (gemeinsam/ortsuche.js, Kasten 28/6.5) fragt
+         * dort direkt aus dem Browser. Ohne den Eintrag blockte die CSP jede
+         * Suche („Die Ortssuche antwortet gerade nicht"); der Prüflauf fing
+         * die Anfrage mit page.route ab und lief ohne Supabase nie. Die
+         * Datenschutzerklärung nennt die Ortssuche (gemeinsam/rechtstexte.js);
+         * test:recht gleicht jede Quelle hier mit ihr ab.
          */
         connectSrc: ["'self'", supabaseUrl, supabaseUrl.replace('https://', 'wss://'),
-          'https://api.pwnedpasswords.com'],
+          'https://api.pwnedpasswords.com', 'https://nominatim.openstreetmap.org'],
         frameAncestors: ["'none'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
@@ -162,6 +170,45 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
  * Website koennte keine Nachricht mehr oeffnen.
  */
 app.use('/gemeinsam', express.static(path.join(__dirname, '..', '..', 'gemeinsam')));
+
+/*
+ * Kasten RS 1 (24.10.2026): die Rechtstexte ohne Anmeldung. Das Impressum
+ * muss „leicht erkennbar, unmittelbar erreichbar" sein (§ 5 DDG), und die
+ * App-Stores verlangen eine Adresse für die Datenschutzerklärung. Text aus
+ * gemeinsam/rechtstexte.js — derselbe wie im Blatt der Website und der App.
+ */
+const Rechtstexte = require('../../gemeinsam/rechtstexte');
+const htmlEsc = (t) => String(t).replace(/[&<>"']/g, (z) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[z]);
+const rechtSeite = (titel, inhalt) => `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${htmlEsc(titel)} · All Media</title>
+<style>
+  body { font: 15px/1.55 -apple-system, system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; color: #1b1d22; }
+  h1 { font-size: 26px; } h2 { font-size: 17px; margin-top: 28px; } p { margin: 0 0 10px; color: #3a3d45; }
+  nav a, a { color: #6b4eff; } nav { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; margin-bottom: 24px; }
+  .stand { font-size: 13px; color: #777; margin-top: 32px; }
+  @media (prefers-color-scheme: dark) { body { background: #111317; color: #eceef2; } p { color: #c4c7cf; } }
+</style></head><body>
+<nav>${Rechtstexte.liste().map((d) => `<a href="/recht/${d.id}">${htmlEsc(d.titel)}</a>`).join('')}<a href="/">Zu All Media</a></nav>
+${inhalt}
+</body></html>`;
+
+app.get('/recht', (_req, res) => {
+  // Dazu die Seiten für die Stores (Kinderschutz, Konto löschen ohne App, Kasten RS 1b).
+  const seiten = Rechtstexte.SEITEN.map((id) => ({ id, titel: Rechtstexte.dokument(id).titel }));
+  res.type('html').send(rechtSeite('Rechtliches', `<h1>Rechtliches</h1>${Rechtstexte.liste().concat(seiten)
+    .map((d) => `<p><a href="/recht/${d.id}">${htmlEsc(d.titel)}</a></p>`).join('')}`));
+});
+app.get(['/impressum', '/datenschutz', '/kinderschutz'], (req, res) => res.redirect(301, '/recht' + req.path));
+// Diese Adresse steht in der Play Console (Kontolöschung ohne App).
+app.get('/konto-loeschen', (_req, res) => res.redirect(301, '/recht/konto_loeschen'));
+app.get('/recht/:id', (req, res) => {
+  const dok = Rechtstexte.dokument(req.params.id);
+  if (!dok) return res.status(404).type('html').send(rechtSeite('Nicht gefunden', '<h1>Nicht gefunden</h1>'));
+  res.type('html').send(rechtSeite(dok.titel, `<h1>${htmlEsc(dok.titel)}</h1>${dok.abschnitte
+    .map((a) => `<h2>${htmlEsc(a.titel)}</h2>${a.text.map((t) => `<p>${htmlEsc(t)}</p>`).join('')}`).join('')}
+    <p class="stand">Stand ${htmlEsc(Rechtstexte.STAND)} · Fassung ${dok.version}</p>`));
+});
 
 /*
  * Fund 10, zweiter Teil: ohne Bremse liefen Anmeldeversuche und teure
@@ -628,20 +675,30 @@ app.post('/api/chats/:chatId/:was', (req, res, next) => {
   })(req, res);
 });
 
+/*
+ * „Chat melden" (Chat-Einstellungen). Seit Kasten RS 3 über das neue
+ * Verfahren (inhalt_melden, Schema 102): mit `nachricht` die eine Nachricht
+ * (art 'message', Beleg wie vom Browser gebildet), sonst die andere Person im
+ * Zweierchat (art 'user'). In einer Gruppe gibt es nicht „die" andere Person —
+ * dort meldet man die einzelne Nachricht; vorher traf es still das erste
+ * andere Mitglied.
+ */
 app.post('/api/chats/:chatId/melden', route(async (req) => {
-  const grund = String(req.body?.grund || '').trim();
-  if (!grund) return { ok: false, error: 'Bitte einen Grund angeben' };
-
+  const b = req.body || {};
+  if (b.nachricht) {
+    return syncHandlers.handleInhaltMelden(req.db, req.nutzerId, { ...b, art: 'message', ziel: b.nachricht });
+  }
   const { data: andere } = await req.db
     .from('chat_members')
     .select('user_id')
     .eq('chat_id', req.params.chatId)
     .neq('user_id', req.nutzerId);
-  const ziel = (andere || [])[0]?.user_id;
-  if (!ziel) return { ok: false, error: 'Diesen Chat gibt es nicht' };
-
-  await syncHandlers.handleReportContent(req.db, req.nutzerId, ziel, grund, 'user');
-  return { ok: true, grund, meldung: 'Danke, die Meldung ist bei uns angekommen' };
+  const liste = andere || [];
+  if (!liste.length) return { ok: true, gemeldet: false, grund: 'ziel' };
+  if (liste.length > 1) {
+    return { ok: true, gemeldet: false, grund: 'gruppe', error: 'In einer Gruppe meldest du die einzelne Nachricht: lange darauf drücken → Melden.' };
+  }
+  return syncHandlers.handleInhaltMelden(req.db, req.nutzerId, { ...b, art: 'user', ziel: liste[0].user_id });
 }));
 
 app.post('/api/chats/:chatId/leeren', route(async (req) => {
@@ -1296,10 +1353,8 @@ app.post('/api/profile/:userId/:was', (req, res, next) => {
       return antwort(e, { muted: e?.stumm });
     }
     if (was === 'melden') {
-      const grund = String(req.body?.grund || '').trim();
-      if (!grund) return { ok: false, error: 'Bitte einen Grund auswählen' };
-      const e = await syncHandlers.handleReportContent(req.db, req.nutzerId, userId, grund, 'user');
-      return antwort(e, { gemeldet: grund });
+      // Kasten RS 3: Kategorie, Begründung, Häkchen — inhalt_melden (Schema 102).
+      return syncHandlers.handleInhaltMelden(req.db, req.nutzerId, { ...(req.body || {}), art: 'user', ziel: userId });
     }
 
     const e = await syncHandlers.handleBlockUser(req.db, req.nutzerId, userId);
@@ -1662,8 +1717,87 @@ app.post('/api/feed-zuruecksetzen', route(async (req) => {
 }));
 
 app.post('/api/beitraege/:id/melden', route(async (req) =>
-  antwort(await syncHandlers.handleReportContent(req.db, req.nutzerId, req.params.id, String(req.body?.grund || ''), 'post'))
+  // Kasten RS 3: über das neue Verfahren (inhalt_melden, Schema 102).
+  syncHandlers.handleInhaltMelden(req.db, req.nutzerId, { ...(req.body || {}), art: 'post', ziel: req.params.id })
 ));
+
+// ============================================================================
+// Melden und Moderation (Kasten RS 3, DSA Art. 16/17/20, Schema 102)
+// ============================================================================
+
+/*
+ * Ein Weg für alles: Beitrag, Kommentar, Story, Profil, Nachricht, Community,
+ * Nachricht im Unterthema, Problem. Antwort `{ ok, gemeldet, id?, grund?,
+ * alterWeg? }` — den Satz zu `grund` bildet die Oberfläche (gemeinsam/meldung.js).
+ * Gegenstück in der App: lib/aktionen.ts, inhaltMelden.
+ */
+app.post('/api/melden', route(async (req) => syncHandlers.handleInhaltMelden(req.db, req.nutzerId, req.body || {})));
+
+app.get('/api/meldungen/meine', route(async (req) => syncHandlers.handleMeineMeldungen(req.db)));
+app.get('/api/meldungen/kontostatus', route(async (req) => syncHandlers.handleKontostatus(req.db)));
+app.post('/api/meldungen/:id/widersprechen', route(async (req) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return { ok: true, erledigt: false, grund: 'meldung' };
+  return syncHandlers.handleWidersprechen(req.db, req.nutzerId, req.params.id, req.body?.text);
+}));
+
+/*
+ * Moderation. Ob jemand Moderator ist, prüft die Datenbank in jeder Funktion
+ * (ist_moderator → sonst 42501). Kein Lesezugriff auf Chats: Moderatoren
+ * sehen nur den Beleg, den der Meldende freigegeben hat.
+ */
+const MELDE_ID = /^[0-9a-f-]{36}$/i;
+app.get('/api/moderation/meldungen', route(async (req) =>
+  syncHandlers.handleModerationMeldungen(req.db, req.nutzerId, String(req.query.status || 'eingegangen'))
+));
+app.post('/api/moderation/meldungen/:id', route(async (req) => {
+  if (!MELDE_ID.test(req.params.id)) return { ok: true, erledigt: false, grund: 'meldung' };
+  return syncHandlers.handleMeldungEntscheiden(req.db, req.nutzerId, req.params.id, req.body || {});
+}));
+/*
+ * Gate 2, Fund 7: das gemeldete Foto/Video hinter einem Klick. Die Adresse
+ * wird mit der Sitzung des Moderators unterschrieben und gilt nur fünf
+ * Minuten; Supabase gibt sie nur heraus, wenn gemeldetes_medium() ja sagt
+ * (offene Meldung, nie Kindesmissbrauch). Klappt das Unterschreiben nicht,
+ * geht keine Adresse hinaus.
+ */
+const MEDIUM_SEKUNDEN = 300;
+app.get('/api/moderation/meldungen/:id/medium', route(async (req) => {
+  if (!MELDE_ID.test(req.params.id)) return { ok: true, grund: 'medium' };
+  const r = await syncHandlers.handleModerationMedium(req.db, req.nutzerId, req.params.id);
+  if (!r || r.ok === false || !r.adresse) return r ? { ok: r.ok, grund: r.grund, fehler: r.fehler } : r;
+  // Erst ins Protokoll, dann die Adresse — ohne Eintrag keine Ansicht.
+  const vermerk = await syncHandlers.handleMediumVermerken(req.db, req.nutzerId, req.params.id);
+  if (!vermerk || vermerk.ok === false || !vermerk.erledigt) return { ok: true, grund: (vermerk && vermerk.grund) || 'medium' };
+  const signiert = await signiereMedien(req.db, { url: r.adresse }, MEDIUM_SEKUNDEN);
+  if (!signiert || !signiert.url || signiert.url === r.adresse) return { ok: true, grund: 'medium' };
+  return { ok: true, url: signiert.url, typ: r.typ, sekunden: MEDIUM_SEKUNDEN };
+}));
+app.post('/api/moderation/meldungen/:id/nachsenden', route(async (req) => {
+  if (!MELDE_ID.test(req.params.id)) return { ok: true, erledigt: false, grund: 'meldung' };
+  return syncHandlers.handleBegruendungNachsenden(req.db, req.nutzerId, req.params.id);
+}));
+app.post('/api/moderation/meldungen/:id/sperre', route(async (req) => {
+  if (!MELDE_ID.test(req.params.id)) return { ok: true, erledigt: false, grund: 'meldung' };
+  return syncHandlers.handleSperreNachtragen(req.db, req.nutzerId, req.params.id, req.body || {});
+}));
+/* Art. 18 DSA: BKA informiert (Fund 6) → art18_vermerken (Schema 102). */
+app.post('/api/moderation/art18', route(async (req) => {
+  const id = String(req.body?.meldung || '');
+  if (!MELDE_ID.test(id)) return { ok: true, erledigt: false, grund: 'meldung' };
+  return syncHandlers.handleArt18Vermerken(req.db, req.nutzerId, id, req.body?.vermerk);
+}));
+app.get('/api/moderation/beschwerden', route(async (req) =>
+  syncHandlers.handleModerationBeschwerden(req.db, req.nutzerId, String(req.query.status || 'offen'))
+));
+app.post('/api/moderation/beschwerden/:id', route(async (req) => {
+  if (!MELDE_ID.test(req.params.id)) return { ok: true, erledigt: false, grund: 'beschwerde' };
+  return syncHandlers.handleBeschwerdeEntscheiden(req.db, req.nutzerId, req.params.id, req.body || {});
+}));
+app.get('/api/moderation/zahlen', route(async (req) => {
+  const bis = new Date(String(req.query.bis || '')).getTime() || Date.now();
+  const von = new Date(String(req.query.von || '')).getTime() || bis - 30 * 864e5;
+  return syncHandlers.handleModerationZahlen(req.db, req.nutzerId, new Date(von).toISOString(), new Date(bis).toISOString());
+}));
 
 /**
  * Darf ich dieser Person schreiben? — "Nachrichten senden deaktivieren".
@@ -3183,7 +3317,12 @@ app.get('/api/mitteilungen/:bereich', route(async (req) => {
   const namen = new Map(Object.values(nutzer).map((u) => [u.id, u.name]));
   const communityNamen = new Map(communities.map((c) => [c.id, c.name]));
 
-  const fertig = eintraege.map((m) => ({ ...m, text: m.text || mitteilungText(m, namen, communityNamen) }));
+  const fertig = eintraege.map((m) => ({
+    ...m,
+    // Kasten RS 3: Rechtsmitteilung (Schema 102) — Ziel ist die Meldung.
+    ziel: m.art === 'system' ? { art: 'meldung', id: m.ziel?.id || null } : m.ziel,
+    text: m.text || mitteilungText(m, namen, communityNamen),
+  }));
   return { eintraege: fertig, ungelesen: fertig.filter((m) => !m.gelesen).length };
 }));
 

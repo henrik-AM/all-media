@@ -202,6 +202,13 @@
       return 'Die Anmeldung ist abgelaufen. Bitte melde dich neu an.';
     if (m.indexOf('failed to fetch') >= 0 || m.indexOf('network') >= 0)
       return 'Keine Verbindung. Bitte prüfe dein Netz.';
+    // Seit Schema 103 weist die Datenbank ein neues Konto mit einer
+    // gesperrten Telefonnummer ab. Supabase reicht die Meldung des Auslösers
+    // nicht durch, nur diesen Satz — andere Ursachen sind selten, deshalb
+    // nennt der Text beides.
+    if (m.indexOf('database error saving new user') >= 0 || m.indexOf('gesperrt') >= 0)
+      return 'Das Konto konnte nicht angelegt werden. Ist diese Telefonnummer wegen eines ' +
+        'Verstoßes gesperrt, geht das erst nach Ende der Sperre.';
 
     return meldung;
   }

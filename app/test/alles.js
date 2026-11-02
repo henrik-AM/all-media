@@ -222,6 +222,7 @@ const LAEUFE = [
   ['farbfilterrechnung', '_farbfilter_rechnung.js'],
   ['farbfilter', '_farbfilter.js'],
   ['bildschirmzeit-einheit', '_bildschirmzeit_einheit.js'],
+  ['recht', '_rechtstexte_einheit.js'],
   ['bildschirmzeit', '_bildschirmzeit.js'],
   ['vorschlaege', '_vorschlaege.js'],
   ['lenkung-einheit', '_lenkung_einheit.js'],
@@ -229,6 +230,12 @@ const LAEUFE = [
   ['markierung-einheit', '_markierung_einheit.js'],
   ['markieren', '_markieren.js'],
   ['chatsync', '_chatsync.js'],
+  // Kasten RS 3 (25.10.2026): Melden offline. Der Bildlauf test/rs3-melden.js
+  // braucht einen eigenen Server mit Attrappe (Port 3201) und läuft für sich.
+  ['melden-einheit', '_melden_einheit.js'],
+  // Kasten RS 7/5 (31.10.2026): Zustimmung mit Fassung und Eltern-Widerruf offline.
+  // Der Bildlauf test/rs7-einwilligung.js braucht einen Server (wie rs3-melden).
+  ['einwilligung-einheit', '_einwilligung_einheit.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */

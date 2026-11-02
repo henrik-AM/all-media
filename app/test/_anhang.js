@@ -282,32 +282,25 @@ if (!fs.existsSync(BILD)) {
     if (!aus) throw new Error('Knopf ist noch aktiv');
   });
 
-  await pruefe('Melden fragt nach einem Grund', async () => {
+  /*
+   * Kasten RS 3: Melden ist ein eigenes Blatt (DSA Art. 16) — Kategorie,
+   * Begründung, Häkchen „nach bestem Wissen“, Eingangsbestätigung im Blatt
+   * statt im Hinweis unten. Ausführlich prüft das test/rs3-melden.js.
+   */
+  await pruefe('Melden fragt nach Kategorie und Begründung', async () => {
     await page.click('#profMore');
     await page.waitForSelector('[data-popt]');
     await page.click('[data-popt="melden"]');
-    await page.waitForSelector('[data-grund]', { timeout: 3000 });
-    const gruende = await page.$$eval('[data-grund]', (els) => els.length);
-    if (gruende < 3) throw new Error('nur ' + gruende + ' Gruende');
-    /*
-     * Der Hinweis unten blendet sich nach 2,2 Sekunden aus.
-     *
-     * Vorher wurde erst 600 ms gewartet und dann nachgesehen. Seit die
-     * Meldung über die Datenbank läuft, war das mal zu früh und mal zu spät —
-     * der Prüflauf fand ein leeres Feld und meldete "kein Treffer". Deshalb:
-     * das Feld leeren, dann auf den Text warten.
-     */
-    await page.evaluate(() => {
-      const t = document.querySelector('#toast');
-      if (t) { t.textContent = ''; t.hidden = true; }
-    });
-    await page.click('[data-grund]');
-    await page.waitForFunction(
-      () => { const t = document.querySelector('#toast'); return t && !t.hidden && t.textContent.trim().length > 0; },
-      null, { timeout: 10000 }
-    ).catch(() => {});
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
-    if (!hinweis.includes('Danke')) throw new Error(hinweis || 'kein Hinweis erschienen');
+    await page.waitForSelector('[data-mkat]', { timeout: 3000 });
+    const kategorien = await page.$$eval('[data-mkat]', (els) => els.length);
+    if (kategorien < 3) throw new Error('nur ' + kategorien + ' Kategorien');
+    await page.click('[data-mkat="betrug_spam"]');
+    await page.fill('#meldenText', 'Prüflauf: wirbt in jeder Nachricht');
+    await page.check('#meldenHaken');
+    await page.click('#meldenSenden');
+    await page.waitForSelector('[data-melden-bestaetigung]', { timeout: 10000 }).catch(() => {});
+    const hinweis = await page.$eval('[data-melden-bestaetigung]', (e) => e.textContent).catch(() => '');
+    if (!hinweis.includes('Danke')) throw new Error(hinweis || 'keine Eingangsbestätigung');
   });
 
   await zuruecksetzen(page);

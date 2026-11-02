@@ -311,6 +311,75 @@
     }
   }
 
+  // ------------------------------------------------------ Meldebeleg --
+
+  /*
+   * Eine verschlüsselte Nachricht melden (Kasten RS 3, Schema 102).
+   *
+   * Der Betreiber darf Chats nicht lesen (Fernmeldegeheimnis, TDDDG § 3) —
+   * und kann es bei Ende-zu-Ende-Verschlüsselung auch nicht. Wer eine
+   * Nachricht meldet, gibt deshalb selbst frei: den Klartext GENAU DIESER
+   * einen Nachricht und ihren Sitzungsschlüssel. Mit beiden kann ein
+   * Moderator prüfen, dass der gemeldete Text wirklich so verschickt wurde
+   * (die Chiffre liegt auf dem Server) — ohne dass irgendeine andere
+   * Nachricht des Chats lesbar wird: jede Nachricht hat ihren eigenen
+   * Sitzungsschlüssel (siehe `verschluesseln`).
+   *
+   * NIE der Gerätschlüssel: mit dem ließe sich jedes Kuvert dieses Geräts
+   * öffnen, also der ganze Chatverlauf.
+   */
+
+  /**
+   * Den Beleg einer Nachricht bilden, die dieses Gerät öffnen kann.
+   *
+   * `nachricht` = { version, chiffre, nonce, absender }, `kuvert` = mein
+   * Kuvert dieser Nachricht, `meinGeheim` = mein Gerätschlüssel (bleibt hier).
+   * Gibt `{ text, sitzung }` zurück (sitzung = Base64 des 32-Byte-
+   * Sitzungsschlüssels) oder null, wenn die Nachricht nicht aufgeht.
+   */
+  function meldebeleg(nachricht, kuvert, meinGeheim) {
+    try {
+      if (!nachricht || !kuvert || !meinGeheim) return null;
+      if (Number(nachricht.version) !== VERSION) return null;
+      var sitzung = nacl.box.open(
+        ausBase64(kuvert.chiffre),
+        ausBase64(kuvert.nonce),
+        ausBase64(nachricht.absender),
+        ausBase64(meinGeheim)
+      );
+      if (!sitzung) return null;
+      var klar = nacl.secretbox.open(ausBase64(nachricht.chiffre), ausBase64(nachricht.nonce), sitzung);
+      if (!klar) return null;
+      return { text: ausBytes(klar), sitzung: zuBase64(sitzung) };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Stimmt ein Beleg? `verschlossen` = { chiffre, nonce } wie auf dem Server
+   * gespeichert (messages.chiffre, messages.krypto_nonce), `sitzung` aus dem
+   * Beleg, `text` der gemeldete Klartext.
+   *
+   * true nur, wenn die Chiffre mit genau diesem Schlüssel aufgeht UND genau
+   * diesen Text ergibt. Alles andere — falscher Schlüssel, veränderter Text,
+   * kaputte Eingabe — ist false, nie ein Wurf.
+   */
+  function belegPruefen(verschlossen, sitzung, text) {
+    try {
+      if (!verschlossen || !verschlossen.chiffre || !verschlossen.nonce || !sitzung) return false;
+      var schluessel = ausBase64(sitzung);
+      if (schluessel.length !== nacl.secretbox.keyLength) return false;
+      var nonce = ausBase64(verschlossen.nonce);
+      if (nonce.length !== nacl.secretbox.nonceLength) return false;
+      var klar = nacl.secretbox.open(ausBase64(verschlossen.chiffre), nonce, schluessel);
+      if (!klar) return false;
+      return ausBytes(klar) === String(text == null ? '' : text);
+    } catch (e) {
+      return false;
+    }
+  }
+
   return {
     VERSION: VERSION,
     zufallsquelleSetzen: zufallsquelleSetzen,
@@ -320,6 +389,8 @@
     verschluesseln: verschluesseln,
     entschluesseln: entschluesseln,
     umschliessen: umschliessen,
+    meldebeleg: meldebeleg,
+    belegPruefen: belegPruefen,
     zuBase64: zuBase64,
     ausBase64: ausBase64,
   };

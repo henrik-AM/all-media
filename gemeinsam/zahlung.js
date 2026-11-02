@@ -284,6 +284,8 @@
     betrag: 'Bitte einen Betrag zwischen 0,50 € und 1.000 € eingeben',
     selbst: 'An dich selbst geht keine Spende',
     empfaenger: 'Dieses Profil gibt es nicht mehr',
+    // Schema 101: Konten, die noch auf die Zustimmung der Eltern warten, spenden nicht.
+    nicht_freigegeben: 'Dein Konto wartet noch auf die Zustimmung deiner Eltern',
   };
 
   function grundText(grund, verbleibend) {

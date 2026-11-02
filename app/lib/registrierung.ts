@@ -21,8 +21,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 const Telefon = require('../../gemeinsam/telefon') as typeof import('../../gemeinsam/telefon');
 const Benutzername = require('../../gemeinsam/benutzername') as typeof import('../../gemeinsam/benutzername');
 const Alter = require('../../gemeinsam/alter') as typeof import('../../gemeinsam/alter');
+const Rechtstexte = require('../../gemeinsam/rechtstexte') as typeof import('../../gemeinsam/rechtstexte');
 
-export { Alter, Benutzername, Telefon };
+export { Alter, Benutzername, Rechtstexte, Telefon };
 
 export interface NeuesKonto {
   name?: string;
@@ -30,6 +31,8 @@ export interface NeuesKonto {
   telefon: string;
   geburtsdatum: string;
   eltern?: string;
+  /** Häkchen „Nutzungsbedingungen und Community-Richtlinien gelesen" — nie vorbelegt (Kasten RS 1). */
+  zustimmung?: boolean;
 }
 
 export type NamensStand =
@@ -134,6 +137,8 @@ export async function neuesKontoPruefen(
     if (Telefon.vergleichsform(eltern) === Telefon.vergleichsform(konto.telefon)) return 'Das ist deine eigene Nummer';
   }
 
+  if (!konto.zustimmung) return Rechtstexte.ZUSTIMMUNG_FEHLT;
+
   if (!supabase) return null;
 
   // Kurz vor dem Anlegen noch einmal: zwischen Tippen und Absenden kann sich
@@ -154,7 +159,10 @@ export async function neuesKontoPruefen(
   return null;
 }
 
-/** Was mit signUp als Registrierungsdaten mitgeht (Schema 34 und 52). */
+/**
+ * Was mit signUp als Registrierungsdaten mitgeht (Schema 34 und 52), dazu
+ * Dokument und Version der Zustimmung (Rechtstexte.zustimmungsDaten).
+ */
 export function metadatenFuer(konto: NeuesKonto): Record<string, string> {
   const einordnung = Alter.einordnen(konto.geburtsdatum, konto.telefon);
   const daten: Record<string, string> = {
@@ -162,6 +170,7 @@ export function metadatenFuer(konto: NeuesKonto): Record<string, string> {
     name: konto.name?.trim() || Benutzername.normal(konto.handle),
     phone: Telefon.speicherform(konto.telefon),
     geburtsdatum: einordnung.iso,
+    ...(konto.zustimmung ? Rechtstexte.zustimmungsDaten() : {}),
   };
   if (einordnung.stufe === 'eltern' && konto.eltern) daten.eltern = Telefon.speicherform(konto.eltern);
   return daten;
@@ -216,8 +225,6 @@ export async function einwilligungenLaden(supabase: SupabaseClient): Promise<Ein
   return (data || []) as Einwilligung[];
 }
 
-export async function einwilligungEntscheiden(supabase: SupabaseClient, kind: string, zustimmen: boolean) {
-  const { data, error } = await supabase.rpc('einwilligung_entscheiden', { p_kind: kind, p_zustimmen: zustimmen });
-  if (error) return { ok: false, meldung: 'Die Entscheidung ist gerade nicht möglich.' };
-  return data as { ok: boolean; meldung?: string };
-}
+// Zustimmen/Ablehnen als Elternteil: gemeinsam/einwilligung.js
+// (elternEntscheiden) — mit Version und Prüfsumme der gezeigten Texte
+// (Codex-Fund F12, Schema 106).

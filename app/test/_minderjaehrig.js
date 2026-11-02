@@ -43,6 +43,20 @@ const Telefon = require('../../gemeinsam/telefon');
 const { nurTestkonto } = require('./_nur_testkonten');
 const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
+// Eltern-Einwilligung wie App und Website (gemeinsam/einwilligung.js): mit
+// Fassung der gezeigten Texte (Schema 106, Codex-Fund F12), ohne 106 die
+// Fassung aus Schema 52. Liefert { data } wie client.rpc.
+const EinwilligungGemeinsam = require('../../gemeinsam/einwilligung');
+async function entscheiden(client, kind, ja) {
+  let r = await client.rpc('einwilligung_entscheiden', {
+    p_kind: kind, p_zustimmen: ja, p_fassungen: ja ? EinwilligungGemeinsam.elternFassungen() : null,
+  });
+  if (r.error && EinwilligungGemeinsam.fehltFunktion(r.error, 'einwilligung_entscheiden')) {
+    r = await client.rpc('einwilligung_entscheiden', { p_kind: kind, p_zustimmen: ja });
+  }
+  return r;
+}
+
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
   : '';
@@ -146,7 +160,7 @@ function geborenVor(jahre) {
       select c.relname
         from pg_class c join pg_namespace n on n.oid = c.relnamespace
        where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
-         and c.relname not in ('konto_alter', 'altersgrenzen', 'anon_takt', 'nummer_suche_takt')
+         and c.relname not in ('konto_alter', 'altersgrenzen', 'anon_takt', 'nummer_suche_takt', 'rechtstext_fassungen', 'einwilligungen')
          and not exists (select 1 from pg_policies p
                           where p.schemaname = 'public' and p.tablename = c.relname
                             and p.policyname = 'nur_freigegebene' and p.permissive = 'RESTRICTIVE')`);
@@ -204,14 +218,14 @@ function geborenVor(jahre) {
     const { data: sichtbarFuerFremde } = await fremder.client.from('profiles').select('id').eq('id', k.id);
     pruefe('fremde Konten finden das wartende Kind nicht', (sichtbarFuerFremde || []).length === 0);
 
-    const { data: frechesSetzen } = await k.client.rpc('einwilligung_entscheiden', { p_kind: k.id, p_zustimmen: true });
+    const { data: frechesSetzen } = await entscheiden(k.client, k.id, true);
     pruefe('das Kind kann sich nicht selbst freigeben', frechesSetzen?.ok === false, JSON.stringify(frechesSetzen));
 
     const { error: direktSchreiben } = await k.client.from('konto_alter').update({ status: 'frei' }).eq('user_id', k.id);
     const { data: nachDirekt } = await k.client.rpc('mein_kontostand');
     pruefe('… auch nicht an den Funktionen vorbei', nachDirekt?.stand === 'wartet', direktSchreiben?.code || '');
 
-    const { data: fremdEntscheidet } = await fremder.client.rpc('einwilligung_entscheiden', { p_kind: k.id, p_zustimmen: true });
+    const { data: fremdEntscheidet } = await entscheiden(fremder.client, k.id, true);
     pruefe('ein fremdes Konto kann nicht zustimmen', fremdEntscheidet?.ok === false, JSON.stringify(fremdEntscheidet));
 
     const { data: offen } = await eltern.client.rpc('einwilligungen_offen');
@@ -220,7 +234,7 @@ function geborenVor(jahre) {
     pruefe('… mit Benutzername und Alter', anfrage?.handle === '@' + kindHandle && anfrage?.alter === 12);
     pruefe('… und der Nummer des Kindes', anfrage?.telefon === kindNummer, anfrage?.telefon);
 
-    const { data: ja } = await eltern.client.rpc('einwilligung_entscheiden', { p_kind: k.id, p_zustimmen: true });
+    const { data: ja } = await entscheiden(eltern.client, k.id, true);
     pruefe('der Elternteil stimmt zu', ja?.ok === true && ja?.stand === 'frei', JSON.stringify(ja));
 
     const { data: danach } = await k.client.rpc('mein_kontostand');
@@ -243,7 +257,7 @@ function geborenVor(jahre) {
       eltern: elternNummer,
     });
     const k2 = await anmelden({ email: MAIL('at'), passwort: PASSWORT });
-    const { data: nein } = await eltern.client.rpc('einwilligung_entscheiden', { p_kind: kind2.id, p_zustimmen: false });
+    const { data: nein } = await entscheiden(eltern.client, kind2.id, false);
     const { data: stand2 } = await k2.client.rpc('mein_kontostand');
     pruefe('abgelehnt bleibt gesperrt', nein?.ok === true && stand2?.stand === 'abgelehnt', JSON.stringify(stand2));
 
@@ -272,7 +286,7 @@ function geborenVor(jahre) {
     const { data: stand2b } = await k2.client.rpc('mein_kontostand');
     pruefe('ein anderer Elternteil lässt sich anfragen', neuAngefragt?.ok === true && stand2b?.stand === 'wartet' && stand2b?.eltern === fremderHandle, JSON.stringify(stand2b));
 
-    const { data: alterElternteil } = await eltern.client.rpc('einwilligung_entscheiden', { p_kind: kind2.id, p_zustimmen: true });
+    const { data: alterElternteil } = await entscheiden(eltern.client, kind2.id, true);
     pruefe('der frühere Elternteil entscheidet nicht mehr mit', alterElternteil?.ok === false);
 
     console.log('\nUnter der Untergrenze, ohne Datum, volljährig');

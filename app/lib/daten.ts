@@ -1484,6 +1484,8 @@ export async function ladeMitteilungen(
     bereich: b.bereich,
     art: b.art,
     userId: b.actor_id,
+    // Fertiger Satz nur bei Rechtsmitteilungen (Schema 102); sonst steht dort ''.
+    text: b.text || undefined,
     ziel: { art: b.target_type, id: b.target_id },
     minuten: Math.max(0, Math.floor((Date.now() - new Date(b.created_at).getTime()) / 60000)),
     gelesen: Boolean(b.read_at),

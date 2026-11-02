@@ -10,11 +10,15 @@ import { ThemeContext } from '../../contexts/ThemeContext';
 import { useProfil } from '../../contexts/ProfilContext';
 import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet';
 import { FormularSheet } from '../../components/FormularSheet';
+import { MeldenSheet } from '../../components/MeldenSheet';
+import { KontostatusSheet, KontostatusAnsicht } from '../../components/KontostatusSheet';
+import { KontoLoeschenSheet } from '../../components/KontoLoeschenSheet';
 import { useDaten } from '../../contexts/DatenContext';
 import { colors, radius, sizes, spacing, themenStyles, typography, verlaufAus } from '../../constants/design';
 import { SichtbarkeitSheet } from '../../components/SichtbarkeitSheet';
 import { FeedLenkenSheet } from '../../components/FeedLenkenSheet';
 import { FarbfilterSheet } from '../../components/FarbfilterSheet';
+import { RechtstextSheet } from '../../components/RechtstextSheet';
 import { useFarbfilter } from '../../components/Farbfilter';
 import { useAktionen } from '../../lib/useAktionen';
 import { useSpendenweg } from '../../contexts/SpendenwegContext';
@@ -67,8 +71,7 @@ interface EingabeFeld {
  *   eingabe      Formular mit Feldern
  *   liste        was gerade eingetragen ist (Geräte, blockierte Profile, ...)
  *   info         Erklärtext
- *   bestaetigen  Nachfrage vor etwas Endgültigem
- *   aktion       tut etwas Einmaliges
+ *   aktion       tut etwas Einmaliges (oder öffnet ein eigenes Blatt)
  */
 interface Item {
   label: string;
@@ -98,7 +101,9 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode';
+  aktion?: 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode' | 'problem' | 'meinemeldungen' | 'kontostatus' | 'kontoLoeschen';
+  /** Kasten RS 1: öffnet einen Rechtstext (gemeinsam/rechtstexte.js). */
+  rechtstext?: string;
   /** Kasten 22: öffnet das Bildschirmzeit-Blatt auf dieser Unterseite. */
   bz?: BzAnsicht;
   /** Nur zeigen, wenn ein Kinderkonto mit mir verknüpft ist. */
@@ -272,9 +277,14 @@ const SECTIONS: Section[] = [
           passwortPruefen(w.neu) ??
           (w.neu !== w.wdh ? 'Die beiden Eingaben stimmen nicht überein' : null),
         aktion: 'passwort',
-        fertig: 'Passwort geändert',
+        fertig: 'Passwort geändert — auf deinen anderen Geräten bist du jetzt abgemeldet',
       },
-      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield-checkmark-outline', wahlKey: 'zweiFaktor', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
+      /*
+       * Kasten RS 1 (L11, § 5 UWG): die Wahl „Per SMS / Über eine App“ wurde
+       * gespeichert und wirkte nie. Bis es eine echte zweite Stufe gibt, sagt
+       * der Punkt das — er bleibt, weil der Prototyp ihn hier vorsieht.
+       */
+      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield-checkmark-outline', info: 'Noch nicht verfügbar. Bis dahin schützt dein Passwort das Konto — wir prüfen es beim Festlegen gegen bekannte Datenlecks.' },
       /*
        * Artikel 15 und 20 DSGVO: jeder darf seine Daten sehen und
        * mitnehmen. Fuer eine App, die live gehen soll, ist das keine
@@ -282,7 +292,8 @@ const SECTIONS: Section[] = [
        * daneben stand.
        */
       { label: 'Meine Daten herunterladen', icon: 'download-outline', aktion: 'datenauskunft' },
-      { label: 'Konto löschen', icon: 'trash-outline', gefahr: true, bestaetigen: 'Konto endgültig löschen?' },
+      // Kasten RS 2: echt löschen (KontoLoeschenSheet) statt „Löschauftrag vorgemerkt“.
+      { label: 'Konto löschen', icon: 'trash-outline', gefahr: true, aktion: 'kontoLoeschen' },
     ],
   },
   {
@@ -436,25 +447,27 @@ const SECTIONS: Section[] = [
         icon: 'help-circle-outline',
         info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
       },
-      {
-        label: 'Problem melden',
-        icon: 'bug-outline',
-        eingabe: [
-          { key: 'was', label: 'Was ist passiert?', typ: 'mehrzeilig', pflicht: true },
-          { key: 'kontakt', label: 'Antwort an (freiwillig)', platzhalter: 'E-Mail oder Telefonnummer' },
-        ],
-        fertig: 'Danke, die Meldung ist bei uns angekommen',
-      },
-      {
-        label: 'Nutzungsbedingungen',
-        icon: 'document-text-outline',
-        info: 'All Media ist für Menschen ab 13 Jahren. Inhalte, die andere herabwürdigen oder gegen geltendes Recht verstoßen, werden entfernt. Wer sein Konto löscht, verliert seine Beiträge unwiderruflich.',
-      },
-      {
-        label: 'Datenschutzerklärung',
-        icon: 'lock-closed-outline',
-        info: 'Beiträge, Nachrichten und Profildaten liegen auf unseren Servern. Standortdaten nur, solange die Friend-Map eingeschaltet ist. Aufnahmen aus Kamera und Galerie bleiben auf deinem Gerät, bis du sie veröffentlichst.',
-      },
+      /*
+       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
+       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
+       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
+       * der Stand eigener Meldungen und der Kontostatus (DSA Art. 16, 17, 20).
+       * Gleiche Einträge auf der Website (SETTINGS, Hilfe).
+       */
+      { label: 'Problem melden', icon: 'bug-outline', aktion: 'problem' },
+      { label: 'Meine Meldungen', icon: 'flag-outline', aktion: 'meinemeldungen' },
+      { label: 'Kontostatus', icon: 'shield-checkmark-outline', aktion: 'kontostatus' },
+      /*
+       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
+       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
+       * gemeinsam/rechtstexte.js — dieselben wie auf der Website.
+       */
+      { label: 'Die Regeln kurz erklärt', icon: 'bulb-outline', rechtstext: 'kurz_erklaert' },
+      { label: 'Nutzungsbedingungen', icon: 'document-text-outline', rechtstext: 'nutzungsbedingungen' },
+      { label: 'Community-Richtlinien', icon: 'people-outline', rechtstext: 'community_richtlinien' },
+      { label: 'Datenschutzerklärung', icon: 'lock-closed-outline', rechtstext: 'datenschutz' },
+      { label: 'Für Eltern', icon: 'heart-outline', rechtstext: 'eltern_info' },
+      { label: 'Impressum', icon: 'information-circle-outline', rechtstext: 'impressum' },
       { label: 'Freunde einladen', icon: 'share-social-outline', aktion: 'einladen' },
     ],
   },
@@ -514,17 +527,26 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const [offen, setOffen] = useState<Item | null>(null);
   // Kasten 24: das Blatt „Feed steuern".
   const [lenkenOffen, setLenkenOffen] = useState(false);
+  // Kasten RS 3: Problem melden, Meine Meldungen, Kontostatus.
+  const [problemOffen, setProblemOffen] = useState(false);
+  const [kontostatus, setKontostatus] = useState<KontostatusAnsicht | null>(null);
+  // Kasten RS 2: Konto löschen.
+  const [kontoLoeschenOffen, setKontoLoeschenOffen] = useState(false);
 
   /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
-  const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string; knopf?: string } => {
+  const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string } => {
+    /*
+     * Kasten RS 1 (L11): hier standen „All Media Web — zuletzt heute“ und ein
+     * Knopf „Gerät verknüpfen“, beide fest im Quelltext. Verknüpfen gibt es
+     * noch nicht; die Liste sagt das, statt ein Gerät zu erfinden.
+     */
     if (art === 'geraete') {
       return {
         leer: '',
         zeilen: [
           { text: 'Dieses Gerät', neben: 'gerade aktiv' },
-          { text: 'All Media Web', neben: 'zuletzt heute' },
+          { text: 'Weitere Geräte verknüpfen', neben: 'noch nicht verfügbar' },
         ],
-        knopf: 'Gerät verknüpfen',
       };
     }
     if (art === 'blockiert') {
@@ -710,29 +732,21 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const spendenweg = useSpendenweg();
   const oeffne = (item: Item) => {
     if (item.aktion === 'lenkung') return setLenkenOffen(true);
+    if (item.aktion === 'problem') return setProblemOffen(true);
+    if (item.aktion === 'meinemeldungen') return setKontostatus('meine');
+    if (item.aktion === 'kontostatus') return setKontostatus('kontostatus');
+    if (item.aktion === 'kontoLoeschen') return setKontoLoeschenOffen(true);
     if (item.aktion === 'spendencode') return spendenweg.verwalten('code');
     if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden');
     if (item.aktion === 'farbfilter') return setFarbfilterOffen(true);
+    if (item.rechtstext) return setRechtstext(item.rechtstext);
     if (item.aktion === 'sicherung') {
       return onNotice(`Sicherung erstellt — ${alleChats.length} Unterhaltungen gespeichert`);
     }
     if (item.aktion === 'einladen') {
       return onNotice('Einladung kopiert: all-media.app');
     }
-    /*
-     * Die Datenauskunft. Auf dem Telefon gibt es keinen "Download"-Ordner
-     * wie im Browser — deshalb legt die App die Datei ab und teilt sie ueber
-     * das Systemblatt. Wer sie in die Cloud, in eine Mail oder in seine
-     * Dateien legen will, entscheidet dort.
-     */
-    if (item.aktion === 'datenauskunft') {
-      void (async () => {
-        onNotice('Deine Daten werden zusammengestellt …');
-        const datei = await aktionen.datenauskunft();
-        if (datei) onNotice('Auskunft fertig — bitte einen Ort zum Sichern wählen');
-      })();
-      return;
-    }
+    if (item.aktion === 'datenauskunft') return datenauskunft();
     setOffen(item);
   };
   const offsets = useRef<Record<string, number>>({});
@@ -747,6 +761,19 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const { sichtbarkeit, ichId, neuLaden } = useDaten();
   const { supabase } = useSupabase();
   const aktionen = useAktionen(onNotice);
+  /*
+   * Die Datenauskunft. Auf dem Telefon gibt es keinen "Download"-Ordner
+   * wie im Browser — deshalb legt die App die Datei ab und teilt sie ueber
+   * das Systemblatt. Wer sie in die Cloud, in eine Mail oder in seine
+   * Dateien legen will, entscheidet dort. Auch vom Lösch-Blatt aus (RS 2).
+   */
+  const datenauskunft = () => {
+    void (async () => {
+      onNotice('Deine Daten werden zusammengestellt …');
+      const datei = await aktionen.datenauskunft();
+      if (datei) onNotice('Auskunft fertig — bitte einen Ort zum Sichern wählen');
+    })();
+  };
 
   /*
    * Die getroffenen Auswahlen und Schalter.
@@ -785,6 +812,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
 
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
   const [farbfilterOffen, setFarbfilterOffen] = useState(false);
+  const [rechtstext, setRechtstext] = useState<string | null>(null);
   const { konfig: farbfilter } = useFarbfilter();
   // Kasten 22: offenes Bildschirmzeit-Blatt und was rechts daneben steht.
   const [bzOffen, setBzOffen] = useState<BzAnsicht | null>(null);
@@ -902,6 +930,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   // kurze Aufschub - vorher waere offsets.current noch leer.
   useEffect(() => {
     if (!sprung) return;
+    // Kasten RS 3: aus einer Rechtsmitteilung — das Blatt öffnen, nicht nur hinscrollen.
+    if (sprung === 'kontostatus' || sprung === 'meinemeldungen') {
+      setKontostatus(sprung === 'kontostatus' ? 'kontostatus' : 'meine');
+      onSprungFertig?.();
+      return;
+    }
     const zeit = setTimeout(() => {
       scroll.current?.scrollTo({ y: offsets.current[sprung] ?? 0, animated: false });
       onSprungFertig?.();
@@ -1181,6 +1215,15 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       )}
 
       <FeedLenkenSheet visible={lenkenOffen} onClose={() => setLenkenOffen(false)} />
+      {rechtstext && <RechtstextSheet id={rechtstext} onClose={() => setRechtstext(null)} />}
+      <MeldenSheet ziel={problemOffen ? { art: 'problem' } : null} onClose={() => setProblemOffen(false)} />
+      <KontoLoeschenSheet
+        visible={kontoLoeschenOffen}
+        onClose={() => setKontoLoeschenOffen(false)}
+        onDatenauskunft={datenauskunft}
+        onGeloescht={() => onNotice('Dein Konto ist gelöscht.')}
+      />
+      {kontostatus && <KontostatusSheet ansicht={kontostatus} onClose={() => setKontostatus(null)} />}
       {farbfilterOffen && (
         <FarbfilterSheet onClose={() => setFarbfilterOffen(false)} onNotice={onNotice} />
       )}
@@ -1289,7 +1332,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
               if (!supabase || !mail) return 'Dafür musst du angemeldet sein';
               void (async () => {
                 const ergebnis = await passwortAendern(supabase, mail, werte.alt, werte.neu);
-                onNotice(ergebnis.success ? 'Passwort geändert' : ergebnis.error ?? 'Das hat nicht geklappt');
+                onNotice(ergebnis.success ? (offen.fertig ?? 'Passwort geändert') : ergebnis.error ?? 'Das hat nicht geklappt');
               })();
               setOffen(null);
               return null;
@@ -1317,19 +1360,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           }}
           zeilen={offen.liste ? listeVon(offen.liste).zeilen : undefined}
           leer={offen.liste ? listeVon(offen.liste).leer : undefined}
-          knopf={offen.liste ? listeVon(offen.liste).knopf : undefined}
-          onKnopf={() => {
-            setOffen(null);
-            onNotice('Zum Verknüpfen den QR-Code auf dem anderen Gerät scannen');
-          }}
           info={offen.info}
-          bestaetigen={offen.bestaetigen}
-          onBestaetigt={() => {
-            setOffen(null);
-            // Ohne Backend wird nichts wirklich geloescht - das gehoert
-            // gesagt, statt es vorzutaeuschen.
-            onNotice('Löschauftrag vorgemerkt — er greift, sobald das Backend steht');
-          }}
           onClose={() => setOffen(null)}
         />
       )}

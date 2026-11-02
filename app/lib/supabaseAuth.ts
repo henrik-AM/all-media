@@ -250,6 +250,13 @@ export async function passwortAendern(
       console.error('Passwort aendern fehlgeschlagen:', error.message);
       return { success: false, error: Passwort.uebersetze(error.message) };
     }
+    /*
+     * Richtlinie 8.4 (Auftrag Recht/Sicherheit, 25.10.2026): wer sein Passwort
+     * wechselt, glaubt oft, jemand kennt es. Dann muss auch die Sitzung des
+     * anderen enden — alle anderen Geräte dieses Kontos, dieses bleibt
+     * angemeldet. Scheitert das, ist das Passwort trotzdem geändert.
+     */
+    await client.auth.signOut({ scope: 'others' }).catch(() => undefined);
     return { success: true, error: null };
   } catch (err: any) {
     console.error('Passwort aendern fehlgeschlagen:', err?.message ?? err);

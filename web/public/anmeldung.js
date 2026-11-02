@@ -407,7 +407,7 @@
    * Registrieren. Der Benutzername kommt vom Nutzer und wird unverändert
    * übernommen — der Trigger in der Datenbank erzeugt ihn nicht mehr selbst.
    */
-  async function registrieren({ benutzername, passwort, email, name, telefon, geburtsdatum, eltern }) {
+  async function registrieren({ benutzername, passwort, email, name, telefon, geburtsdatum, eltern, zustimmung }) {
     const c = await aufbauen();
     if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
 
@@ -466,6 +466,10 @@
       if (e.frei === true) return { ok: false, fehler: 'Zu dieser Nummer gibt es bei All Media kein Konto', feld: 'eltern' };
     }
 
+    // Kasten RS 1: Zustimmung zu Nutzungsbedingungen und Community-Richtlinien,
+    // nie vorbelegt. Gleiche Stelle in app/lib/registrierung.ts.
+    if (!zustimmung) return { ok: false, fehler: window.Rechtstexte.ZUSTIMMUNG_FEHLT, feld: 'zustimmung' };
+
     /*
      * Erst hier, nicht weiter oben: die Leck-Pruefung fragt einen fremden
      * Dienst und kostet eine knappe Sekunde. Wer ohnehin an Benutzername oder
@@ -486,6 +490,8 @@
           // alter_bei_anmeldung liest beides (Schema 52).
           geburtsdatum: einordnung.iso,
           ...(einordnung.stufe === 'eltern' ? { eltern: elternNummer } : {}),
+          // Dokument und Fassung der Zustimmung (Rechtstexte.zustimmungsDaten).
+          ...window.Rechtstexte.zustimmungsDaten(),
         },
       },
     });
@@ -544,9 +550,8 @@
     rpc('geburtsdatum_nachtragen', { p_datum: window.Alter.lesen(datum), p_eltern: null },
       { ok: false, meldung: 'Das Speichern ist gerade nicht möglich.' });
   const einwilligungenOffen = () => rpc('einwilligungen_offen', {}, []);
-  const einwilligungEntscheiden = (kind, zustimmen) =>
-    rpc('einwilligung_entscheiden', { p_kind: kind, p_zustimmen: zustimmen },
-      { ok: false, meldung: 'Die Entscheidung ist gerade nicht möglich.' });
+  // Zustimmen/Ablehnen als Elternteil: window.Einwilligung.elternEntscheiden
+  // (gemeinsam/einwilligung.js) — mit Fassung der gezeigten Texte (F12).
 
   /**
    * Das laufende Konto abmelden — das nächste Konto mit Sitzung übernimmt
@@ -612,6 +617,8 @@
 
     const { error } = await c.auth.updateUser({ password: neu });
     if (error) return { ok: false, fehler: uebersetze(error.message) };
+    // Richtlinie 8.4: alle anderen Sitzungen dieses Kontos beenden, diese bleibt. Wie in der App.
+    await c.auth.signOut({ scope: 'others' }).catch(() => null);
     return { ok: true, fehler: null };
   }
 
@@ -632,7 +639,6 @@
     elternAnfragen,
     geburtsdatumNachtragen,
     einwilligungenOffen,
-    einwilligungEntscheiden,
     nutzer,
     angemeldet: () => Boolean(sitzung?.access_token),
     beiAenderung: (fn) => {

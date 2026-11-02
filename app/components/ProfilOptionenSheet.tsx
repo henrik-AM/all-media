@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
+import { MeldenSheet } from './MeldenSheet';
 import { useProfil } from '../contexts/ProfilContext';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
@@ -18,31 +19,26 @@ interface Props {
   onBlockiert?: (userId: string, blockiert: boolean) => void;
 }
 
-const GRUENDE = [
-  'Spam oder Werbung',
-  'Beleidigung oder Hass',
-  'Gefälschtes Profil',
-  'Nicht jugendfreie Inhalte',
-  'Etwas anderes',
-];
-
 /**
  * Die drei Punkte im Profil einer anderen Person. Jede Option hat eine
  * Folge: Blockieren nimmt sie aus den Kontakten und sperrt den Chat,
- * Stummschalten und Melden merkt sich die App.
+ * Stummschalten merkt sich die App. Melden geht seit Kasten RS 3 über das
+ * Melden-Blatt (art 'user', Schema 102 inhalt_melden).
  */
 export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBlockiert }: Props) => {
   const { users: alleNutzer } = useDaten();
-  const { istStumm, istBlockiert, stummSchalten, blockieren, melden } = useProfil();
-  const [meldeSchritt, setMeldeSchritt] = useState(false);
+  const { istStumm, istBlockiert, stummSchalten, blockieren } = useProfil();
+  const [melden, setMelden] = useState(false);
 
   const person = alleNutzer[userId];
   if (!person) return null;
 
   const schliessen = () => {
-    setMeldeSchritt(false);
+    setMelden(false);
     onClose();
   };
+
+  if (melden && visible) return <MeldenSheet ziel={{ art: 'user', id: userId }} onClose={schliessen} />;
 
   const punkte: { key: string; label: string; icon: IconName; gefahr?: boolean }[] = [
     { key: 'link', label: 'Link kopieren', icon: 'link-outline' },
@@ -77,33 +73,16 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
       onNotice(jetzt ? `${person.name} blockiert` : 'Blockierung aufgehoben');
       return schliessen();
     }
-    setMeldeSchritt(true);
+    setMelden(true);
   };
 
   return (
     <SheetRahmen
       visible={visible}
-      title={meldeSchritt ? 'Profil melden' : person.name}
+      title={person.name}
       onClose={schliessen}
     >
-      {meldeSchritt ? (
-        <ScrollView>
-          {GRUENDE.map((grund) => (
-            <Druck
-              key={grund}
-              style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
-              onPress={() => {
-                melden(userId, grund);
-                onNotice('Danke, wir sehen uns das an');
-                schliessen();
-              }}
-            >
-              <Text style={styles.label}>{grund}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Druck>
-          ))}
-        </ScrollView>
-      ) : (
+      {(
         <View>
           {punkte.map((p) => (
             <Druck

@@ -76,6 +76,14 @@ const mitteilungText = (
   const kanal = communities.find((c) => c.id === m.ziel.id)?.name ?? 'einer Community';
 
   switch (m.art) {
+    /*
+     * Kasten RS 3 (Schema 102): Rechtsmitteilung — Eingangsbestätigung,
+     * Entscheidung mit Begründung, Widerspruch. Der Satz kommt fertig aus der
+     * Datenbank (rechtsmitteilung()); gleich auf der Website (mitteilungText,
+     * `system`).
+     */
+    case 'system':
+      return m.text || 'Neuigkeit zu einer Meldung. Details unter Einstellungen → Meine Meldungen.';
     case 'like':
       return `${name} gefällt dein ${GEGENSTAND[m.ziel.art] ?? 'Beitrag'}.`;
     case 'follow':
@@ -173,11 +181,14 @@ interface ProfilWert {
   /* --- Weitere Optionen im Profil einer Person --- */
   istStumm: (userId: string) => boolean;
   istBlockiert: (userId: string) => boolean;
-  meldeGrund: (userId: string) => string | undefined;
   /** Umschalten. Gibt zurueck, was danach gilt. */
   stummSchalten: (userId: string) => boolean;
   blockieren: (userId: string) => boolean;
-  melden: (userId: string, grund: string) => void;
+  /*
+   * `melden` stand hier bis zum 22.10.2026 und meldete immer eine PERSON —
+   * auch bei „Story melden". Seit Kasten RS 3 meldet jede Stelle über
+   * components/MeldenSheet.tsx (Aktion.inhaltMelden, Schema 102).
+   */
 
   /* --- Teilen --- */
   /** Wie oft dieser Beitrag oder dieses Video von hier aus gesendet wurde. */
@@ -325,7 +336,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const [geteiltZaehler, setGeteiltZaehler] = useState<Record<string, number>>({});
   const [stumm, setStumm] = useState<string[]>([]);
   const [blockiert, setBlockiert] = useState<string[]>([]);
-  const [gemeldet, setGemeldet] = useState<Record<string, string>>({});
   const [markierte, setMarkierte] = useState<string[]>([]);
   const [favoriten, setFavoriten] = useState<string[]>([]);
   const [chatStumm, setChatStumm] = useState<string[]>([]);
@@ -428,20 +438,24 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const mitteilungen = useCallback(
     (bereich: MitteilungsBereich): MitteilungAnzeige[] =>
       alle
-        .filter((m) => m.bereich === bereich)
+        // Rechtsmitteilungen (bereich 'system') stehen in beiden Glocken.
+        .filter((m) => m.bereich === bereich || m.bereich === 'system')
         .sort((a, b) => a.minuten - b.minuten)
         .map((m) => ({
           id: m.id,
           text: mitteilungText(m, communities, daten.users),
           zeit: zeitText(m.minuten),
           gelesen: m.gelesen,
-          ziel: m.ziel,
+          ziel: m.art === 'system' ? { art: 'meldung' as const, id: m.ziel.id } : m.ziel,
+          art: m.art,
+          userId: m.userId,
         })),
     [alle, communities, daten.users]
   );
 
   const ungelesen = useCallback(
-    (bereich: MitteilungsBereich) => alle.filter((m) => m.bereich === bereich && !m.gelesen).length,
+    (bereich: MitteilungsBereich) =>
+      alle.filter((m) => (m.bereich === bereich || m.bereich === 'system') && !m.gelesen).length,
     [alle]
   );
 
@@ -461,8 +475,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       // Welche vorher ungelesen waren — nur die duerfen zurueckgedreht werden.
       let vorher: string[] = [];
       setAlle((prev) => {
-        vorher = prev.filter((m) => m.bereich === bereich && !m.gelesen).map((m) => m.id);
-        return prev.map((m) => (m.bereich === bereich ? { ...m, gelesen: true } : m));
+        const hier = (m: Mitteilung) => m.bereich === bereich || m.bereich === 'system';
+        vorher = prev.filter((m) => hier(m) && !m.gelesen).map((m) => m.id);
+        return prev.map((m) => (hier(m) ? { ...m, gelesen: true } : m));
       });
 
       schreiben(
@@ -893,7 +908,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
   const istStumm = useCallback((id: string) => stumm.includes(id), [stumm]);
   const istBlockiert = useCallback((id: string) => blockiert.includes(id), [blockiert]);
-  const meldeGrund = useCallback((id: string) => gemeldet[id], [gemeldet]);
 
   const stummSchalten = useCallback(
     (id: string) => {
@@ -923,29 +937,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       return danach;
     },
     [blockiert, schreiben]
-  );
-
-  const melden = useCallback(
-    (id: string, grund: string) => {
-      setGemeldet((prev) => ({ ...prev, [id]: grund }));
-      // Eine Meldung nimmt man nicht zurueck — es gibt hier keinen Rueckweg,
-      // ausser dem Vermerk, dass gemeldet wurde.
-      /*
-       * Gemeldet wird hier immer eine Person: alle drei Aufrufer
-       * (ContactProfileScreen, ProfilOptionenSheet, StoryOptionenSheet)
-       * uebergeben eine Nutzerkennung. Stuende hier 'post', wiese die
-       * Datenbank die Zeile ab — target_id waere dann gar keine Beitrags-
-       * kennung.
-       */
-      schreiben('Das Melden', (c, ich) => Aktion.melden(c, ich, id, grund, 'user'), () =>
-        setGemeldet((prev) => {
-          const ohne = { ...prev };
-          delete ohne[id];
-          return ohne;
-        })
-      );
-    },
-    [schreiben]
   );
 
   const geteilt = useCallback((id: string) => {
@@ -989,10 +980,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       chatLeeren,
       istStumm,
       istBlockiert,
-      meldeGrund,
       stummSchalten,
       blockieren,
-      melden,
       geteiltZaehler,
       geteilt,
       communities,
@@ -1014,7 +1003,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, meldeGrund, stummSchalten, blockieren, melden, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
     ]
   );

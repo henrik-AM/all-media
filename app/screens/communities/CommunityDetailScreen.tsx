@@ -11,6 +11,7 @@ import { Community, Unterthema } from '../../types';
 import { PushToTalk } from '../../components/PushToTalk';
 import { CommunityOptionenSheet } from '../../components/CommunityOptionenSheet';
 import { useProfil } from '../../contexts/ProfilContext';
+import { MeldenSheet } from '../../components/MeldenSheet';
 import { ladePtt } from '../../lib/daten';
 import { useSupabase } from '../../contexts/SupabaseContext';
 
@@ -77,6 +78,8 @@ export const CommunityDetailScreen = ({
   const unterthemen = community.unterthemen ?? [];
   const { kanalStummSetzen } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(Boolean(optionenOffenStart));
+  // Kasten RS 3: eine fremde Community melden (art 'community', Schema 102).
+  const [melden, setMelden] = useState(false);
 
   const einstellungenOeffnen = () => {
     setOptionenOffen(true);
@@ -237,7 +240,26 @@ export const CommunityDetailScreen = ({
             </Druck>
           ))}
         </View>
+
+        {/*
+          Kasten RS 3: „Community melden" — nicht bei der eigenen. Unten auf
+          der Homeseite statt im „…"-Blatt: CommunityOptionenSheet gehört
+          nicht zu diesem Kasten (Eintrag dort steht im Bericht). Gleiche
+          Stelle auf der Website (renderCommunityChannels, #commMelden).
+        */}
+        {!community.eigen && (
+          <Druck
+            style={styles.melden}
+            onPress={() => setMelden(true)}
+            accessibilityRole="button"
+            testID="community-melden"
+          >
+            <Ionicons name="flag-outline" size={15} color={colors.danger} />
+            <Text style={styles.meldenText}>Community melden</Text>
+          </Druck>
+        )}
       </ScrollView>
+      <MeldenSheet ziel={melden ? { art: 'community', id: community.id } : null} onClose={() => setMelden(false)} />
 
       {optionenOffen && (
         <CommunityOptionenSheet
@@ -306,6 +328,16 @@ const styles = themenStyles((colors) => ({
     backgroundColor: colors.surface,
   },
   knopfLeiseText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  melden: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginTop: spacing.xl,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  meldenText: { ...typography.small, fontWeight: '700', color: colors.danger },
   eigen: {
     paddingHorizontal: 10,
     paddingVertical: 6,

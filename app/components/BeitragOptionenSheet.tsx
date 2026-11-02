@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import type { ActionSheetItem } from './ActionSheet';
 import { OptionenKacheln } from './OptionenKacheln';
 import { SammlungZuordnen } from './SammlungZuordnen';
+import { MeldenSheet } from './MeldenSheet';
 import { SUPABASE_CONFIG } from '../constants/supabase';
 import { useDaten } from '../contexts/DatenContext';
 import { useSupabase } from '../contexts/SupabaseContext';
@@ -30,15 +31,6 @@ interface Props {
   onNotice: (message: string) => void;
 }
 
-const GRUENDE = [
-  'Spam oder Werbung',
-  'Beleidigung oder Hass',
-  'Gewalt oder Gefahr',
-  'Nicht jugendfreie Inhalte',
-  'Falschinformation',
-  'Etwas anderes',
-];
-
 /**
  * Die Adresse eines Beitrags. Sie fuehrt auf die Website, die ihn dort
  * oeffnet (`?beitrag=` in web/public/app.js, bootstrap) — vorher kopierte die
@@ -59,7 +51,13 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
   const { ichId, keinInteresseMerken } = useDaten();
   const { supabase } = useSupabase();
   const aktion = useAktionen(onNotice);
-  const [meldeSchritt, setMeldeSchritt] = useState(false);
+  /*
+   * Kasten RS 3: Melden öffnet das Melden-Blatt (Kategorie, Begründung,
+   * Häkchen, Eingangsbestätigung) statt einer Grundliste ohne Begründung.
+   * Das Optionen-Blatt bleibt so lange stehen — erst danach geht es zu,
+   * sonst nähme der Aufrufer `beitrag` weg und das Melden-Blatt mit.
+   */
+  const [melden, setMelden] = useState(false);
   // Kasten 17.3: zweiter Schritt „Zu Playlist hinzufügen".
   const [playlistSchritt, setPlaylistSchritt] = useState(false);
   const [darfSichern, setDarfSichern] = useState(false);
@@ -72,7 +70,7 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
    * nicht" sagt, ist schlechter als keiner. Gleiche Regel wie bei Storys.
    */
   useEffect(() => {
-    setMeldeSchritt(false);
+    setMelden(false);
     setPlaylistSchritt(false);
     if (!beitrag) return;
     if (eigener) return setDarfSichern(true);
@@ -89,9 +87,7 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
 
   if (!beitrag) return null;
 
-  const punkte: ActionSheetItem[] = meldeSchritt
-    ? GRUENDE.map((g) => ({ key: `grund:${g}`, label: g, icon: 'flag-outline' }))
-    : [
+  const punkte: ActionSheetItem[] = [
         { key: 'link', label: 'Link kopieren', icon: 'link-outline' },
         ...(darfSichern && beitrag.mediaUri && !beitrag.live
           ? [{ key: 'sichern', label: 'Herunterladen', icon: 'download-outline' } as ActionSheetItem]
@@ -119,15 +115,10 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
       ];
 
   const waehlen = async (key: string) => {
-    if (key === 'melden') return setMeldeSchritt(true);
+    if (key === 'melden') return setMelden(true);
     if (key === 'playlist') return setPlaylistSchritt(true);
     onClose();
 
-    if (key.startsWith('grund:')) {
-      const ok = await aktion.beitragMelden(beitrag.id, key.slice(6));
-      if (ok) onNotice('Danke, wir sehen uns das an');
-      return;
-    }
     if (key === 'link') {
       await Clipboard.setStringAsync(beitragLink(beitrag.id));
       return onNotice('Link kopiert');
@@ -154,17 +145,24 @@ export const BeitragOptionenSheet = ({ beitrag, onClose, onNotice }: Props) => {
     }
   };
 
-  // Kasten 8.3: TikTok-Kacheln statt Liste; die Meldegruende als Liste im
-  // selben Blatt (components/OptionenKacheln.tsx).
+  if (melden) {
+    return (
+      <MeldenSheet
+        ziel={{ art: 'post', id: beitrag.id }}
+        onClose={() => {
+          setMelden(false);
+          onClose();
+        }}
+      />
+    );
+  }
+
+  // Kasten 8.3: TikTok-Kacheln statt Liste (components/OptionenKacheln.tsx).
   return (
     <OptionenKacheln
       visible
       liste={
-        playlistSchritt
-          ? { titel: 'Zu Playlist hinzufügen' }
-          : meldeSchritt
-            ? { titel: 'Warum meldest du das?' }
-            : null
+        playlistSchritt ? { titel: 'Zu Playlist hinzufügen' } : null
       }
       inhalt={
         playlistSchritt ? (

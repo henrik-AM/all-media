@@ -13,7 +13,8 @@ interface Props {
   bereich: MitteilungsBereich;
   onClose: () => void;
   /** Dorthin springen, wo die Mitteilung herkommt. */
-  onOpen: (ziel: MitteilungsZiel) => void;
+  /** `text` braucht nur die Rechtsmitteilung: er sagt, ob Kontostatus oder Meine Meldungen. */
+  onOpen: (ziel: MitteilungsZiel, text: string) => void;
   onNotice: (message: string) => void;
 }
 
@@ -59,7 +60,7 @@ export const MitteilungenSheet = ({ visible, bereich, onClose, onOpen, onNotice 
               onPress={() => {
                 alsGelesen(m.id);
                 onClose();
-                onOpen(m.ziel);
+                onOpen(m.ziel, m.text);
               }}
             >
               <View style={styles.symbol}>

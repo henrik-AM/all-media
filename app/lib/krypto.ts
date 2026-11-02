@@ -336,6 +336,55 @@ export async function fuerBearbeitenUmschliessen(
   return neu ? { chiffre: neu.chiffre, krypto_nonce: neu.nonce } : null;
 }
 
+/**
+ * Der Beleg einer gemeldeten Nachricht (Kasten RS 3, Schema 102).
+ *
+ * Unverschlüsselt: `{ text }` — der Server hat den Text ohnehin.
+ * Verschlüsselt: `{ text, sitzung }` — der Klartext und der
+ * Sitzungsschlüssel NUR dieser Nachricht (gemeinsam/krypto.js,
+ * `meldebeleg`). Der Gerätschlüssel verlässt das Gerät nicht; mit dem
+ * Sitzungsschlüssel lässt sich keine andere Nachricht öffnen.
+ *
+ * null, wenn dieses Gerät die Nachricht nicht öffnen kann — dann gibt es
+ * auch nichts Belegbares, und die Meldung geht ohne Klartext (der Moderator
+ * sieht „ohne Schlüssel gemeldet"). Gleicher Weg auf der Website
+ * (KryptoWeb.meldebeleg).
+ */
+export async function meldebelegHolen(
+  client: SupabaseClient,
+  ichId: string,
+  nachrichtId: string,
+  angezeigt: string
+): Promise<{ text: string; sitzung?: string } | null> {
+  const { data: n } = await client
+    .from('messages')
+    .select('krypto, chiffre, krypto_nonce, absender_schluessel')
+    .eq('id', nachrichtId)
+    .maybeSingle();
+  if (!n) return null;
+  if (!Number((n as any).krypto)) return { text: angezeigt ?? '' };
+  const meiner = await meinSchluessel(client, ichId);
+  if (!meiner) return null;
+  const { data: kuvert } = await client
+    .from('message_keys')
+    .select('nonce, chiffre')
+    .eq('message_id', nachrichtId)
+    .eq('schluessel_id', meiner.id)
+    .maybeSingle();
+  if (!kuvert) return null;
+  const beleg = Krypto.meldebeleg(
+    {
+      version: (n as any).krypto,
+      chiffre: (n as any).chiffre,
+      nonce: (n as any).krypto_nonce,
+      absender: (n as any).absender_schluessel,
+    },
+    kuvert,
+    meiner.geheim
+  );
+  return beleg ? { text: beleg.text, sitzung: beleg.sitzung } : null;
+}
+
 /** Der Platzhalter für eine Nachricht, deren Kuvert dieses Gerät nicht hat. */
 export const NICHT_LESBAR = 'Auf diesem Gerät nicht lesbar';
 

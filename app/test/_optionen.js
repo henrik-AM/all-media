@@ -161,14 +161,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (!t.includes('Zu deiner Story hinzugefügt')) throw new Error(t || 'keine Meldung');
   });
 
-  await pruefe('Melden fragt nach dem Grund und kommt an', async () => {
+  // Kasten RS 3: eigenes Melde-Blatt mit Eingangsbestätigung (DSA Art. 16).
+  await pruefe('Melden fragt nach Kategorie und Begründung und kommt an', async () => {
     await page.click(`[data-vaction="mehr"][data-vid="${reel}"]`);
     await page.waitForSelector('[data-beitragopt="melden"]');
     await page.click('[data-beitragopt="melden"]');
-    await page.waitForSelector('[data-grund="Spam oder Werbung"]');
-    await page.click('[data-grund="Spam oder Werbung"]');
-    const t = await toastText();
-    if (!t.includes('Danke')) throw new Error(t || 'keine Meldung');
+    await page.waitForSelector('[data-mkat="betrug_spam"]');
+    await page.click('[data-mkat="betrug_spam"]');
+    await page.fill('#meldenText', 'Prüflauf: Werbung für ein Gewinnspiel');
+    await page.check('#meldenHaken');
+    await page.click('#meldenSenden');
+    await page.waitForSelector('[data-melden-bestaetigung]', { timeout: 10000 }).catch(() => {});
+    const t = await page.$eval('[data-melden-bestaetigung]', (e) => e.textContent).catch(() => '');
+    if (!t.includes('Danke')) throw new Error(t || 'keine Eingangsbestätigung');
   });
 
   await pruefe('Kein Interesse nimmt das Reel sofort heraus', async () => {

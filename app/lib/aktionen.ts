@@ -214,6 +214,132 @@ export async function melden(
   return true;
 }
 
+/* -------------------------------------------------------------------------
+ * Melden und Moderation nach DSA (Kasten RS 3, Schema 102)
+ *
+ * `melden()` oben ist der alte Weg (direkter Eintrag, nur fünf Arten). Neue
+ * Aufrufer nehmen `inhaltMelden()`: es ruft inhalt_melden() und fällt NUR
+ * dann auf den alten Weg zurück, wenn die Funktion in der Datenbank fehlt
+ * (Schema 102 nicht eingespielt — Meldung.fehltFunktion). Arten, die die
+ * alte Tabelle nicht kennt (community, kanal_nachricht, problem), sagen dann
+ * ehrlich `grund: 'update'` statt eine Meldung vorzutäuschen.
+ *
+ * Gleicher Ablauf auf der Website: web/server/sync-handlers.js
+ * (handleInhaltMelden).
+ * ---------------------------------------------------------------------- */
+
+const Meldung = require('../../gemeinsam/meldung') as typeof import('../../gemeinsam/meldung');
+export type MeldeEingabe = import('../../gemeinsam/meldung').MeldeEingabe;
+
+export interface MeldeErgebnis {
+  ok: boolean;
+  id?: string | null;
+  /** Ein `grund` aus Schema 102 oder 'update' / 'netz'. */
+  grund?: string;
+  /** Ohne Schema 102 über den alten Eintrag gespeichert. */
+  alterWeg?: boolean;
+}
+
+export async function inhaltMelden(
+  client: SupabaseClient,
+  ichId: string,
+  eingabe: MeldeEingabe
+): Promise<MeldeErgebnis> {
+  // Dieselbe Prüfung wie in der Datenbank — der Fehler steht im Blatt,
+  // bevor etwas losgeht.
+  const grund = Meldung.pruefen(eingabe);
+  if (grund) return { ok: false, grund };
+
+  const { data, error } = await client.rpc('inhalt_melden', {
+    p_art: eingabe.art,
+    p_ziel: eingabe.art === 'problem' ? null : eingabe.ziel,
+    p_kategorie: eingabe.art === 'problem' ? 'problem' : eingabe.kategorie,
+    p_begruendung: eingabe.begruendung ?? '',
+    p_gutglaeubig: eingabe.gutglaeubig === true,
+    p_beleg: eingabe.beleg ?? null,
+  });
+  if (!error) {
+    const d = (data ?? {}) as { ok?: boolean; id?: string; grund?: string };
+    return d.ok ? { ok: true, id: d.id ?? null } : { ok: false, grund: d.grund || 'ziel' };
+  }
+  if (!Meldung.fehltFunktion(error, 'inhalt_melden')) throw error;
+
+  // Schema 102 fehlt: alter Weg, wo es ihn gibt.
+  if (!Meldung.alterWegMoeglich(eingabe.art)) return { ok: false, grund: 'update' };
+  await melden(
+    client,
+    ichId,
+    eingabe.ziel as string,
+    Meldung.alterGrund(eingabe),
+    eingabe.art as 'post' | 'comment' | 'story' | 'user' | 'message'
+  );
+  return { ok: true, id: null, alterWeg: true };
+}
+
+/** Eine eigene Meldung mit Stand (meine_meldungen). */
+export interface MeineMeldung {
+  id: string;
+  art: string;
+  kategorie: string;
+  status: string;
+  massnahme: string | null;
+  begruendung: string | null;
+  erstellt: string;
+  entschieden: string | null;
+  /** Nur bei entschiedenen Meldungen gesetzt. */
+  widerspruch_bis: string | null;
+  beschwerde_status: string | null;
+}
+
+/** Eine Entscheidung, die mich betrifft (mich_betreffende_entscheidungen). */
+export interface MichBetreffend {
+  id: string;
+  art: string;
+  kategorie: string;
+  massnahme: string;
+  begruendung: string | null;
+  grundlage: string | null;
+  sperre_bis: string | null;
+  entschieden: string;
+  widerspruch_bis: string;
+  beschwerde_status: string | null;
+}
+
+/** `fehlt: true` = Schema 102 ist nicht eingespielt; dann KEINE leere Liste zeigen. */
+export type Liste<T> = { fehlt: true } | { fehlt: false; zeilen: T[] };
+
+async function listeHolen<T>(client: SupabaseClient, funktion: string): Promise<Liste<T>> {
+  const { data, error } = await client.rpc(funktion);
+  if (error) {
+    if (Meldung.fehltFunktion(error, funktion)) return { fehlt: true };
+    throw error;
+  }
+  return { fehlt: false, zeilen: (data ?? []) as T[] };
+}
+
+export const meineMeldungen = (client: SupabaseClient) => listeHolen<MeineMeldung>(client, 'meine_meldungen');
+
+export const michBetreffendeEntscheidungen = (client: SupabaseClient) =>
+  listeHolen<MichBetreffend>(client, 'mich_betreffende_entscheidungen');
+
+/** Widerspruch (Art. 20 DSA). Gibt `{ ok }` oder `{ ok: false, grund }`. */
+export async function entscheidungWidersprechen(
+  client: SupabaseClient,
+  meldungId: string,
+  text: string
+): Promise<MeldeErgebnis> {
+  const { data, error } = await client.rpc('entscheidung_widersprechen', {
+    p_meldung: meldungId,
+    p_text: text ?? '',
+  });
+  if (error) {
+    if (Meldung.fehltFunktion(error, 'entscheidung_widersprechen')) return { ok: false, grund: 'update' };
+    throw error;
+  }
+  const d = (data ?? {}) as { ok?: boolean; id?: string; grund?: string };
+  return d.ok ? { ok: true, id: d.id ?? null } : { ok: false, grund: d.grund || 'meldung' };
+}
+
 /** Eine Mitteilung als gelesen vermerken. */
 export async function mitteilungGelesen(client: SupabaseClient, ichId: string, id: string) {
   const { error } = await client
@@ -241,7 +367,8 @@ export async function alleMitteilungenGelesen(
     .update({ read_at: new Date().toISOString() })
     .eq('user_id', ichId)
     .is('read_at', null);
-  if (bereich) abfrage = abfrage.eq('bereich', bereich);
+  // Kasten RS 3: Rechtsmitteilungen (bereich 'system') stehen in beiden Glocken.
+  if (bereich) abfrage = abfrage.in('bereich', [bereich, 'system']);
 
   const { error } = await abfrage;
   if (error) throw error;
@@ -2164,6 +2291,15 @@ export async function nachrichtZuruecknehmen(
       chiffre: null,
       krypto_nonce: null,
       absender_schluessel: null,
+      // Anhang mit weg (Codex-Fund F9, 31.10.2026): Sonst blieb die Datei über
+      // die Zeile für alle im Chat abrufbar, und ein gesperrtes Konto konnte
+      // eine Foto-/Dateinachricht gar nicht zurücknehmen (nicht_gesperrt_aendern
+      // in Schema 102 verlangt den leeren Zustand). Gleich in
+      // web/server/sync-handlers.js (handleNachrichtZuruecknehmen).
+      media_url: null,
+      media_type: null,
+      file_name: null,
+      file_size: null,
     })
     .eq('id', nachrichtId)
     .eq('sender_id', ichId);

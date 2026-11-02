@@ -209,6 +209,31 @@
     return neu ? { krypto: Number(nachricht.krypto), chiffre: neu.chiffre, kryptoNonce: neu.nonce } : null;
   }
 
+  /**
+   * Der Beleg einer gemeldeten Nachricht (Kasten RS 3, Schema 102).
+   *
+   * Unverschlüsselt: `{ text }`. Verschlüsselt: `{ text, sitzung }` — der
+   * Klartext und der Sitzungsschlüssel NUR dieser Nachricht
+   * (gemeinsam/krypto.js, meldebeleg). Der Gerätschlüssel dieses Browsers
+   * verlässt ihn nicht. null, wenn die Nachricht hier nicht aufgeht.
+   * Gleicher Weg in app/lib/krypto.ts (meldebelegHolen).
+   */
+  function meldebeleg(nachricht) {
+    if (!nachricht) return null;
+    if (!Number(nachricht.krypto)) return { text: String(nachricht.text || '') };
+    if (!meiner || !nachricht.kuvert || typeof Krypto.meldebeleg !== 'function') return null;
+    return Krypto.meldebeleg(
+      {
+        version: nachricht.krypto,
+        chiffre: nachricht.chiffre,
+        nonce: nachricht.kryptoNonce,
+        absender: nachricht.absenderSchluessel,
+      },
+      nachricht.kuvert,
+      meiner.geheim
+    );
+  }
+
   /** Der Fingerabdruck zum Vergleichen von Hand — im Kontaktprofil sichtbar. */
   function fingerabdruck(oeffentlich) {
     return Krypto.fingerabdruck(oeffentlich);
@@ -227,6 +252,7 @@
     oeffnen,
     stapelOeffnen,
     umschliessen,
+    meldebeleg,
     fingerabdruck,
     bereit,
     meinSchluessel: () => meiner,

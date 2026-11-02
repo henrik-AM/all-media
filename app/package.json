@@ -112,6 +112,10 @@
     "test:kasten16-19": "node test/_kasten16_19.js",
     "test:kasten17": "node test/_kasten17.js",
     "test:chatsync": "node test/_chatsync.js",
+    "test:melden-einheit": "node test/_melden_einheit.js",
+    "test:rs3-melden": "node test/rs3-melden.js",
+    "test:einwilligung-einheit": "node test/_einwilligung_einheit.js",
+    "test:rs7-einwilligung": "node test/rs7-einwilligung.js",
     "test:lenken": "node test/_lenken.js",
     "test:lenkung-einheit": "node test/_lenkung_einheit.js",
     "test:markieren": "node test/_markieren.js",
@@ -121,7 +125,8 @@
     "test:bildschirmzeit": "node test/_bildschirmzeit.js",
     "test:bildschirmzeit-einheit": "node test/_bildschirmzeit_einheit.js",
     "test:vorschlaege": "node test/_vorschlaege.js",
-    "test:angriffe": "node test/_angriffe.js"
+    "test:angriffe": "node test/_angriffe.js",
+    "test:recht": "node test/_rechtstexte_einheit.js"
   },
   "private": true
 }

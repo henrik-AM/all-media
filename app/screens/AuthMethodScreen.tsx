@@ -87,7 +87,7 @@ export const AuthMethodScreen = ({ onSelectMethod }: Props) => {
 
         <View style={styles.trustBox}>
           <Ionicons name="shield-checkmark" size={20} color={colors.success} />
-          <Text style={styles.trustText}>Deine Daten sind sicher verschlüsselt und werden nicht mit Dritten geteilt.</Text>
+          <Text style={styles.trustText}>Zweierchats sind Ende-zu-Ende verschlüsselt. Wir verkaufen keine Daten und zeigen keine Werbung.</Text>
         </View>
 
         <Text style={styles.hint}>

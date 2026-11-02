@@ -3717,6 +3717,16 @@ body.is-startet .bottomnav { visibility: hidden; }
 .startfehler__grund { margin-top: 6px; font-size: 11.5px; color: var(--text-3); }
 .startfehler__grund.is-fehler { color: var(--danger, #E5484D); }
 .startfehler .linkbtn { margin-top: 2px; }
+/* Kasten RS 7: Tür „Unsere Bedingungen“ — Liste der offenen Fassungen. */
+.bedingungen__liste {
+  width: 100%; max-width: 340px; text-align: left;
+  border-radius: 14px; overflow: hidden; background: var(--surface-2);
+}
+.bedingungen__liste .item:last-child { border-bottom: 0; }
+/* Im Elternblatt (Codex-Fund F12): mit Rand wie die Texte darüber, volle Breite. */
+.sheet .bedingungen__liste { width: auto; max-width: none; margin: 4px 16px 10px; }
+.bedingungen__fassung { display: block; margin-top: 2px; font-size: 12px; color: var(--text-3); }
+.startfehler .linkbtn.is-gefahr { color: var(--danger); }
 .freigabe__feld {
   width: 100%;
   max-width: 300px;
@@ -4884,3 +4894,113 @@ body.ist-abgemeldet .ptr-indicator {
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
   background: var(--brand); color: #fff; font-size: 11.5px; font-weight: 700;
 }
+
+/* Kasten RS 1 (24.10.2026): Rechtstexte und Zustimmung bei der Registrierung. */
+.sheet__zustimmung { display: flex; gap: 10px; align-items: flex-start; padding: 8px 16px 4px; font-size: 13px; line-height: 1.45; color: var(--text2); }
+.sheet__zustimmung input { width: 18px; height: 18px; margin-top: 1px; flex: none; accent-color: var(--brand); }
+.sheet__zustimmung a { color: var(--brand); font-weight: 600; }
+.rechtstext { padding: 4px 16px 24px; }
+.rechtstext__kopf { font-size: 15px; font-weight: 600; margin: 18px 0 6px; color: var(--text); }
+.rechtstext__text { font-size: 13px; line-height: 1.5; margin: 0 0 8px; color: var(--text2); }
+.rechtstext__stand { font-size: 12px; color: var(--text3); margin-top: 20px; }
+.startfehler__recht { margin-top: 18px; font-size: 13px; color: var(--text3); }
+.startfehler__recht a { color: var(--text2); }
+
+/* ------------------------------------------------ Melden und Moderation */
+/* Kasten RS 3 (Schema 102): Melden-Blatt, Meine Meldungen/Kontostatus,
+   Moderationsbereich. Gegenstück in der App: MeldenSheet, KontostatusSheet. */
+.melden__kat .item__label { display: flex; flex-direction: column; gap: 2px; white-space: normal; }
+.melden__kat .item__label small { font-size: 12.5px; color: var(--text-2); font-weight: 400; }
+.melden__gewaehlt {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  padding: 12px 16px; background: none; border: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+.melden__grund { font-size: 15px; }
+.melden__aendern { font-size: 12.5px; font-weight: 700; color: var(--brand); }
+.melden__hinweis {
+  margin: 0 16px 12px; padding: 12px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.melden__hinweistitel { display: block; color: var(--danger); margin-bottom: 6px; }
+.melden__hinweis ul { margin: 0; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.45; color: var(--text); }
+.melden__hinweis li + li { margin-top: 4px; }
+.melden__hinweisknoepfe { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.melden__hinweisknopf {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px;
+  background: var(--surface); color: var(--danger); font-size: 12.5px; font-weight: 700; text-decoration: none;
+}
+.melden__leise { padding-top: 0; }
+.melden__label { display: block; padding: 4px 16px 6px; font-size: 12.5px; color: var(--text-2); font-weight: 500; }
+.melden__text { display: block; width: calc(100% - 32px); margin: 0 16px; min-height: 96px; box-sizing: border-box; }
+.melden__zaehler { padding: 4px 16px 0; font-size: 12.5px; color: var(--text-3); }
+.melden__haken { display: flex; align-items: center; gap: 10px; padding: 14px 16px; font-size: 15px; color: var(--text); cursor: pointer; }
+.melden__haken input { width: 20px; height: 20px; accent-color: var(--brand); flex: none; }
+.melden__fehler { margin: 4px 16px 0; font-size: 12.5px; font-weight: 600; color: var(--danger); }
+.melden__fertig { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 24px; text-align: center; }
+.melden__fertig p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text); }
+.melden__fertigicon { display: inline-flex; width: 52px; height: 52px; border-radius: 50%; align-items: center; justify-content: center; background: var(--success); color: #fff; }
+.melden__fertigicon svg { width: 28px; height: 28px; }
+
+.kstatus { padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.kstatus__karte {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.kstatus__karte p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text); }
+.kstatus__kopf { display: flex; justify-content: space-between; gap: 8px; }
+.kstatus__kopf span { font-size: 12.5px; color: var(--text-3); white-space: nowrap; }
+.kstatus__stand { font-size: 12.5px; font-weight: 700; color: var(--brand); }
+.kstatus__leise { color: var(--text-2) !important; font-size: 12.5px !important; }
+.kstatus__meldung { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.kstatus__karte .joinbtn { align-self: flex-start; margin-top: 6px; }
+.kstatus__widerspruch { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.kstatus__widerspruch .melden__fehler { margin: 0; }
+
+.kanal__melden {
+  display: flex; align-items: center; gap: 6px; margin: 24px auto 8px; padding: 8px 14px;
+  background: none; border: 0; color: var(--danger); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.kanal__melden svg { width: 15px; height: 15px; }
+
+.modr__tabs { display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.modr { padding-bottom: 16px; }
+.modr__filter { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; }
+.modr__zeile .item__label { display: flex; flex-direction: column; gap: 2px; white-space: normal; }
+.modr__zeile .item__label small { font-size: 12.5px; color: var(--text-2); font-weight: 400; }
+.modr__zeile.is-dringend { box-shadow: inset 3px 0 0 var(--danger); }
+.modr__dringend { white-space: nowrap; font-size: 11px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 999px; padding: 2px 8px; }
+.modr__detail { display: flex; flex-direction: column; gap: 10px; padding: 8px 16px; }
+.modr__detail h3 { margin: 0; font-size: 17px; }
+.modr__detail .melden__hinweis, .modr__detail .melden__label, .modr__detail .melden__fehler { margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
+.modr__detail .melden__hinweis { padding: 12px 14px; }
+.modr__feld span { display: block; font-size: 12px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.modr__feld p { margin: 2px 0 0; font-size: 14.5px; line-height: 1.45; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.modr__beleg { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.modr__urteil { margin: 0; font-size: 13px; font-weight: 700; }
+.modr__urteil--echt, .modr__urteil--ohne { color: var(--success); }
+/* Gate 2, Fund 30: „passt nicht" ist kein Fälschungsbeweis — Hinweis, kein Alarm. */
+.modr__urteil--falsch { color: var(--text); font-weight: 600; }
+/* Gate 2, Fund 6: Art.-18-Pflichtschritt. */
+.modr__art18 { margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.modr__art18.is-vermerkt { font-size: 13px; font-weight: 700; color: var(--success); }
+/* Gate 2, Fund 7: gemeldetes Medium hinter Klick. */
+.modr__medium { display: block; max-width: 100%; max-height: 360px; margin-top: 8px; border-radius: 8px; background: #000; }
+/* Gate 2, Fund 5: „Community-Richtlinien" bei Kindesmissbrauch gesperrt. */
+.modr__wahl.is-aus { color: var(--text-3); }
+.modr__urteil--keinSchluessel { color: var(--text-2); }
+.modr__form { display: flex; flex-direction: column; gap: 10px; }
+.modr__gruppe { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.modr__gruppe > span { width: 100%; font-size: 12.5px; color: var(--text-2); font-weight: 600; }
+.modr__wahl { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.modr__knoepfe { display: flex; gap: 8px; margin-top: 4px; }
+.linkbtn[data-modzurueck] { margin: 8px 16px 0; }
+/* .prof__btn hat flex: 1 — in einer Spalte schrumpfte er auf eine Linie. */
+.modr__form .prof__btn, .kstatus__widerspruch .prof__btn { flex: none; }
+
+/* Kasten RS 3: „Melden" in der Kommentarzeile (data-kmelden), wie in der App. */
+.comment__antworten {
+  margin-left: 12px;
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-weight: 700; color: var(--text-2);
+}
+.comment__antworten:hover { color: var(--text); }

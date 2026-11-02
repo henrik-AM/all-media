@@ -17,6 +17,7 @@ import * as Aktion from '../../lib/aktionen';
 import { useAktionen } from '../../lib/useAktionen';
 import * as Krypto from '../../lib/krypto';
 import { Chat, Message } from '../../types';
+import { MeldenSheet } from '../../components/MeldenSheet';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 
@@ -53,13 +54,6 @@ type Offen =
   | { art: 'bearbeiten' }
   | null;
 
-const GRUENDE = [
-  'Spam oder Werbung',
-  'Beleidigung oder Hass',
-  'Gefälschtes Profil',
-  'Nicht jugendfreie Inhalte',
-  'Etwas anderes',
-];
 
 /**
  * Kontaktinfo nach dem Prototyp-Frame "MC + Kontakteinstellungen":
@@ -103,7 +97,6 @@ export const ContactProfileScreen = ({
     geleerteChats,
     istBlockiert,
     blockieren,
-    melden,
   } = useProfil();
 
   /*
@@ -535,18 +528,8 @@ export const ContactProfileScreen = ({
         <EinstellungSheet titel={offen.titel} info={offen.text} onClose={() => setOffen(null)} />
       )}
 
-      {offen?.art === 'melden' && (
-        <EinstellungSheet
-          titel="Kontakt melden"
-          wahl={GRUENDE}
-          onWahl={(grund) => {
-            melden(userId, grund);
-            setOffen(null);
-            onNotice('Danke, wir sehen uns das an');
-          }}
-          onClose={() => setOffen(null)}
-        />
-      )}
+      {/* Kasten RS 3: das Melden-Blatt (art 'user', Schema 102) statt einer Grundliste. */}
+      <MeldenSheet ziel={offen?.art === 'melden' ? { art: 'user', id: userId } : null} onClose={() => setOffen(null)} />
 
       {offen?.art === 'bearbeiten' && (
         /*

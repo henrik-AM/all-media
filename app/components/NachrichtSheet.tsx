@@ -44,7 +44,8 @@ export type NachrichtAktion =
   | 'weiterleiten'
   | 'bearbeiten'
   | 'markieren'
-  | 'zuruecknehmen';
+  | 'zuruecknehmen'
+  | 'melden';
 
 interface Props {
   visible: boolean;
@@ -103,6 +104,9 @@ export const NachrichtSheet = ({
       gefahr: true,
     });
   }
+  // Kasten RS 3: fremde Nachrichten melden (DSA Art. 16). Hinweise der
+  // Datenbank sind keine Nachricht eines Menschen, dort gibt es nichts zu melden.
+  if (!eigene && !hinweis) punkte.push({ key: 'melden', label: 'Melden', icon: 'flag-outline', gefahr: true });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

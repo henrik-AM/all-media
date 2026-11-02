@@ -18,6 +18,7 @@ import { useSupabase } from '../contexts/SupabaseContext';
 import { PASSWORT_REGEL, passwortPruefen } from '../lib/supabaseAuth';
 import { NeuesKonto, Telefon, neuesKontoPruefen } from '../lib/registrierung';
 import { RegistrierFelder } from '../components/RegistrierFelder';
+import { RechtstextSheet } from '../components/RechtstextSheet';
 import { brandGradient, colors, radius, shadow, spacing, themenStyles, typography } from '../constants/design';
 
 interface Props {
@@ -41,6 +42,8 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
   const [verificationCode, setVerificationCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Kasten RS 1: Rechtstexte vor der Anmeldung lesbar (Impressum nach § 5 DDG).
+  const [rechtlich, setRechtlich] = useState<string | null | false>(false);
   const { login, kontoHinzufuegen, sendPasswordResetCode } = useContext(AuthContext);
   const { supabase } = useSupabase();
 
@@ -586,7 +589,16 @@ export const LoginScreen = ({ authMethod: initialMethod = 'email', onBack }: Pro
           <Text style={styles.hint}>
             Testzugang: beliebige E-Mail mit @ und ein Passwort mit 6 Zeichen
           </Text>
+
+          <Text style={styles.hint}>
+            <Text style={styles.rechtLink} onPress={() => setRechtlich('impressum')} accessibilityRole="link">Impressum</Text>
+            {'  ·  '}
+            <Text style={styles.rechtLink} onPress={() => setRechtlich('datenschutz')} accessibilityRole="link">Datenschutz</Text>
+            {'  ·  '}
+            <Text style={styles.rechtLink} onPress={() => setRechtlich(null)} accessibilityRole="link">Alle Rechtstexte</Text>
+          </Text>
         </ScrollView>
+        {rechtlich !== false && <RechtstextSheet id={rechtlich} onClose={() => setRechtlich(false)} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -705,4 +717,5 @@ const styles = themenStyles((colors) => ({
   switchText: { color: colors.brand, ...typography.body },
 
   hint: { textAlign: 'center', color: colors.text3, ...typography.small },
+  rechtLink: { color: colors.text2, textDecorationLine: 'underline' },
 }));

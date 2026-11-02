@@ -828,6 +828,18 @@ async function bootstrap() {
     return;
   }
   clearInterval(freigabeUhr);
+
+  /*
+   * Kasten RS 7 (Schema 106): der geltenden Fassung der Bedingungen
+   * zugestimmt? Sonst die Tür „Unsere Bedingungen“ — nur zustimmen, Konto
+   * löschen oder abmelden. Fehlt Schema 106 oder das Netz, sperrt sie
+   * niemanden aus. Gleiche Tür in app/components/NeueBedingungen.tsx.
+   */
+  const bedingungen = await bedingungenPruefen();
+  if (bedingungen.length) {
+    zeigeBedingungen(bedingungen);
+    return;
+  }
   document.body.classList.remove('ist-abgemeldet');
 
   /*
@@ -970,6 +982,80 @@ function zeigeFreigabe(stand, anderer = false) {
   }, 15000);
 }
 
+async function bedingungenPruefen() {
+  if (!window.Einwilligung) return [];
+  const db = await window.Anmeldung?.aufbauen?.().catch(() => null);
+  if (!db) return [];
+  const r = await window.Einwilligung.offen(db).catch(() => null);
+  return r?.ok ? r.liste : [];
+}
+
+function zeigeBedingungen(liste) {
+  document.body.classList.remove('is-startet');
+  document.body.classList.add('ist-abgemeldet');
+  const ziel = $('#main');
+  if (!ziel) return;
+  const E = window.Einwilligung;
+  ziel.innerHTML = `
+    <div class="startfehler" id="bedingungen">
+      <div class="startfehler__symbol">${ICONS.person}</div>
+      <div class="startfehler__titel">Unsere Bedingungen</div>
+      <div class="startfehler__text">${esc(E.blattText(liste))}</div>
+      <div class="bedingungen__liste">
+        ${E.zeilen(liste)
+          .map(
+            (z) => `<button class="item" data-bedingung="${esc(z.dokument)}">
+              <span class="item__label">${esc(z.titel)}<small class="bedingungen__fassung">Fassung ${z.version}${z.neu ? ' · neu' : ''}${z.kenntnis ? ' · ' + esc(E.KENNTNIS_ZUSATZ) : ''}</small></span>
+              <span class="row__chevron">${ICONS.chevron}</span>
+            </button>`
+          )
+          .join('')}
+      </div>
+      <div class="startfehler__grund is-fehler" id="bedingungenMeldung" aria-live="polite"></div>
+      <button class="btn btn--primary" id="bedingungenOk">${esc(E.KNOPF)}</button>
+      <button class="linkbtn is-gefahr" id="bedingungenLoeschen">Konto löschen</button>
+      <button class="linkbtn" id="bedingungenAbmelden">Abmelden</button>
+    </div>`;
+
+  ziel.querySelectorAll('[data-bedingung]').forEach((b) => b.addEventListener('click', () => openRechtstext(b.dataset.bedingung)));
+  $('#bedingungenLoeschen').addEventListener('click', () => openKontoLoeschen());
+  $('#bedingungenAbmelden').addEventListener('click', async () => {
+    await window.Anmeldung.abmelden();
+    window.KryptoWeb?.vergessen();
+    bootstrap();
+  });
+  // Ein Objekt als Sperre: zwei schnelle Klicks schicken nicht zweimal (Gate 2, Fund 23).
+  const z = { sendet: false };
+  $('#bedingungenOk').addEventListener('click', async () => {
+    if (z.sendet) return;
+    z.sendet = true;
+    const knopf = $('#bedingungenOk');
+    knopf.disabled = true;
+    $('#bedingungenMeldung').textContent = '';
+    const db = await window.Anmeldung.aufbauen().catch(() => null);
+    const r = await E.zustimmen(db, liste);
+    z.sendet = false;
+    knopf.disabled = false;
+    if (!r.ok) {
+      $('#bedingungenMeldung').textContent = r.text;
+      // Codex-Fund F6: Diese Seite zeigt eine ältere Fassung als die geltende.
+      // Einmal neu laden holt den neuen Text (rechtstexte.js); bleibt er alt
+      // (Zwischenspeicher), steht nur die Meldung da — keine Schleife.
+      if (r.grund === 'veraltet') {
+        try {
+          if (!sessionStorage.getItem('bedingungen_neu_geladen')) {
+            sessionStorage.setItem('bedingungen_neu_geladen', '1');
+            location.reload();
+          }
+        } catch (e) { /* ohne sessionStorage: nur die Meldung */ }
+      }
+      return;
+    }
+    try { sessionStorage.removeItem('bedingungen_neu_geladen'); } catch (e) { /* egal */ }
+    bootstrap();
+  });
+}
+
 /*
  * Wartet ein Kind auf meine Zustimmung? Einmal beim Start und danach jede
  * Minute — die Anfrage soll auftauchen, ohne dass jemand irgendwo sucht.
@@ -998,9 +1084,18 @@ function elternfrageZeigen(kind) {
         ${esc(String(kind.mindestalter))} Jahren die Zustimmung eines Elternteils.
       </div>
       ${kind.telefon ? `<div class="sheet__hint">Telefonnummer des Kontos: ${esc(kind.telefon)}</div>` : ''}
-      <div class="sheet__hint">
-        Stimmst du zu, kann ${esc(kind.handle)} All Media nutzen. Lehnst du ab, bleibt das Konto gesperrt.
+      <div class="sheet__hint">${esc(window.Einwilligung ? window.Einwilligung.elternHinweis(kind) : '')}</div>
+      <div class="bedingungen__liste" id="elternTexte">
+        ${(window.Einwilligung ? window.Einwilligung.elternZeilen() : [])
+          .map(
+            (z) => `<button class="item" data-elterntext="${esc(z.dokument)}">
+              <span class="item__label">${esc(z.titel)}<small class="bedingungen__fassung">Fassung ${esc(String(z.version))}${z.kenntnis ? ' · ' + esc(window.Einwilligung.KENNTNIS_ZUSATZ) : ''}</small></span>
+              <span class="row__chevron">${ICONS.chevron}</span>
+            </button>`
+          )
+          .join('')}
       </div>
+      <div class="sheet__hint">Lehnst du ab, bleibt das Konto gesperrt.</div>
       <div class="sheet__hinweis is-fehler" id="elternMeldung" hidden></div>
       <div class="sheet__footer">
         <button class="btn" id="elternNein">Ablehnen</button>
@@ -1011,13 +1106,24 @@ function elternfrageZeigen(kind) {
     'Zustimmung als Elternteil',
     body,
     (sheet, close) => {
+      // Codex-Fund F12: Die Texte stehen im Blatt; zugestimmt wird genau
+      // ihrer Fassung (Einwilligung.elternEntscheiden schickt Version und
+      // Prüfsumme mit). Gleiche Liste in app/components/KontoFreigabe.tsx.
+      sheet.querySelectorAll('[data-elterntext]').forEach((b) =>
+        b.addEventListener('click', () => openRechtstext(b.dataset.elterntext))
+      );
+      const z = { sendet: false };
       const entscheiden = async (zustimmen) => {
+        if (z.sendet) return;
+        z.sendet = true;
         sheet.querySelectorAll('.sheet__footer .btn').forEach((b) => (b.disabled = true));
-        const antwort = await window.Anmeldung.einwilligungEntscheiden(kind.kind, zustimmen);
+        const db = await window.Anmeldung.aufbauen().catch(() => null);
+        const antwort = await window.Einwilligung.elternEntscheiden(db, kind.kind, zustimmen);
+        z.sendet = false;
         if (!antwort.ok) {
           const m = sheet.querySelector('#elternMeldung');
           m.hidden = false;
-          m.textContent = antwort.meldung || 'Das hat nicht geklappt.';
+          m.textContent = antwort.text || 'Das hat nicht geklappt.';
           sheet.querySelectorAll('.sheet__footer .btn').forEach((b) => (b.disabled = false));
           return;
         }
@@ -1124,6 +1230,10 @@ function zeigeAnmeldung() {
         wählst du selbst.
       </div>
       <button class="btn btn--primary" id="startAnmelden">Anmelden oder Konto anlegen</button>
+      <!-- Kasten RS 1: ohne Anmeldung erreichbar (§ 5 DDG), Seiten aus web/server/app.js. -->
+      <div class="startfehler__recht">
+        <a href="/recht/impressum">Impressum</a> · <a href="/recht/datenschutz">Datenschutz</a> · <a href="/recht">Alle Rechtstexte</a>
+      </div>
     </div>`;
 
   $('#startAnmelden').addEventListener('click', () => openKontoWechsel());
@@ -3015,6 +3125,26 @@ function ziehenZumSchliessen(blatt, zumachen) {
   blatt.addEventListener('touchcancel', loslassen);
 }
 
+/*
+ * Kasten RS 1 (24.10.2026): ein Rechtstext aus gemeinsam/rechtstexte.js als
+ * Blatt. Gleicher Aufbau wie app/components/RechtstextSheet.tsx; ohne
+ * Anmeldung liefert der Server dieselben Texte unter /recht/<id>.
+ */
+function openRechtstext(id) {
+  const dok = window.Rechtstexte.dokument(id);
+  if (!dok) return;
+  openSheet(
+    dok.titel,
+    `<div class="sheet__body rechtstext" data-testid="rechtstext-${esc(id)}">${dok.abschnitte
+      .map((a) => `<h3 class="rechtstext__kopf">${esc(a.titel)}</h3>${a.text.map((t) => `<p class="rechtstext__text">${esc(t)}</p>`).join('')}`)
+      .join('')}
+      <p class="rechtstext__stand">Stand ${esc(window.Rechtstexte.STAND)} · Fassung ${dok.version}</p>
+    </div>`,
+    null,
+    { hoch: true }
+  );
+}
+
 function openSheet(title, bodyHtml, onMount, opts = {}) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet-backdrop';
@@ -4305,30 +4435,8 @@ async function kontaktZeile(label, userId, chat, daten) {
     return openContactProfile(userId);
   }
 
-  // Melden
-  openSheet(
-    'Kontakt melden',
-    `<div class="sheet__body">${MELDE_GRUENDE.map(
-      (g) => `<button class="item" data-grund="${esc(g)}">
-        <span class="item__label">${esc(g)}</span>
-        <span class="row__chevron">${ICONS.chevron}</span>
-      </button>`
-    ).join('')}</div>`,
-    (blatt, zu) => {
-      blatt.querySelectorAll('[data-grund]').forEach((g) =>
-        g.addEventListener('click', async () => {
-          zu();
-          await fetch(`/api/profile/${userId}/melden`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ grund: g.dataset.grund }),
-          });
-          toast('Danke, wir sehen uns das an');
-        })
-      );
-    },
-    { schliessen: true }
-  );
+  // Melden — Kasten RS 3: das Melden-Blatt (art 'user', Schema 102).
+  openMeldenBlatt({ art: 'user', id: userId });
 }
 
 /** Medien oder markierte Nachrichten eines Chats. */
@@ -4788,6 +4896,12 @@ async function openComments(targetId, onCountChange) {
       hinweis.textContent = text;
       hinweis.hidden = !text;
     };
+    sheet.querySelectorAll('[data-kmelden]').forEach((b) =>
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMeldenBlatt({ art: 'comment', id: b.dataset.kmelden });
+      })
+    );
 
     input.addEventListener('input', () => {
       melden('');
@@ -4868,7 +4982,10 @@ function commentRow(c) {
       ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
       <div class="comment__body">
         <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${markierterText(c.text)}</div>
-        <div class="comment__meta">${esc(c.time)}</div>
+        <div class="comment__meta">${esc(c.time)}${
+          // Kasten RS 3: fremde Kommentare melden (art 'comment'). Gleich in der App (CommentSheet).
+          istEigen(c.userId) ? '' : `<button type="button" class="comment__antworten" data-kmelden="${esc(c.id)}" aria-label="Kommentar von ${esc(u.name)} melden">Melden</button>`
+        }</div>
       </div>
       <button class="comment__like ${c.liked ? 'is-on' : ''}" data-clike="${c.id}" aria-label="${
         c.likes ? `Gefällt mir, ${c.likes} mal` : 'Gefällt mir'
@@ -5983,7 +6100,14 @@ async function renderCommunityChannels(communityId) {
           )
           .join('')}
       </div>
+      ${
+        /* Kasten RS 3: eine fremde Community melden (art 'community', Schema
+           102) — unten auf der Homeseite, wie in der App (CommunityDetailScreen). */
+        eigen ? '' : `<button class="kanal__melden" id="commMelden">${ICONS.flag}<span>Community melden</span></button>`
+      }
     </div>`;
+
+  $('#commMelden')?.addEventListener('click', () => openMeldenBlatt({ art: 'community', id: daten.id }));
 
   $('#backBtn').addEventListener('click', () => {
     state.openCommunityId = null;
@@ -6172,6 +6296,28 @@ async function renderCommunityChat(community, kanal, thema) {
   liste.querySelectorAll('[data-voll]').forEach((b) =>
     b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
   );
+  /*
+   * Kasten RS 3: eine fremde Nachricht im Unterthema melden (art
+   * 'kanal_nachricht', Schema 102) — lange drücken wie im Chat, am Rechner
+   * auch per Rechtsklick. Eigene Nachrichten nicht.
+   */
+  liste.querySelectorAll('.msg--in[data-msgid]').forEach((el) => {
+    let halten;
+    const ende = () => clearTimeout(halten);
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button, a, [data-voll]')) return;
+      halten = setTimeout(() => kanalNachrichtMenue(el.dataset.msgid), 500);
+    });
+    el.addEventListener('pointerup', ende);
+    el.addEventListener('pointerleave', ende);
+    el.addEventListener('pointercancel', ende);
+    el.addEventListener('ziehstart', ende);
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      ende();
+      kanalNachrichtMenue(el.dataset.msgid);
+    });
+  });
 
   const feld = $('#commMsgInput');
   const sendKnopf = $('#commSend');
@@ -6919,6 +7065,14 @@ function openBildschirmzeit(ansicht) {
   let meldung = '';
   let sheet = null;
   let schliessen = null;
+  // Kasten RS 5 (Schema 106): Zustimmung zurücknehmen — wie im Kind-Menü der App.
+  let einw = null;
+  let widerrufFrage = false;
+  const einwLaden = async () => {
+    const db = window.Einwilligung && (await window.Anmeldung?.aufbauen?.().catch(() => null));
+    const r = db ? await window.Einwilligung.kinder(db) : null;
+    einw = r?.ok ? r.liste : null;
+  };
 
   const aktuell = () => (kind ? kindStand : bz.stand);
   const nutzung = () => (kind ? kindStand?.nutzung || {} : bzNutzungJetzt());
@@ -6960,6 +7114,19 @@ function openBildschirmzeit(ansicht) {
   const kopf = (t) => `<div class="sheet__gruppe">${esc(t)}</div>`;
   const hinweis = (t) => `<p class="sheet__text bz__hinweis">${esc(t)}</p>`;
 
+  // Nur wenn Schema 106 da ist und es etwas zu sehen gibt — kein Knopf ohne Wirkung.
+  const zustimmungBlock = () => {
+    const E = window.Einwilligung;
+    const e = (einw || []).find((x) => x.id === kind?.id);
+    if (!E || !e) return '';
+    return kopf('Zustimmung') +
+      zeile(E.standText(e), e.entschieden_am ? E.datum(e.entschieden_am) : '') +
+      (e.widerrufbar && widerrufFrage ? hinweis(E.widerrufHinweis(e)) : '') +
+      (e.widerrufbar
+        ? `<div class="sheet__footer"><button class="prof__btn is-danger" data-bz-widerruf>${esc(widerrufFrage ? 'Ja, zurücknehmen' : E.WIDERRUF_KNOPF)}</button></div>`
+        : '');
+  };
+
   const inhalt = () => {
     const st = aktuell();
     if (!st) return hinweis('Wird geladen …');
@@ -6970,7 +7137,8 @@ function openBildschirmzeit(ansicht) {
     if (seite === 'menue') {
       return ['uebersicht', 'gesamt', 'bereiche', 'auszeit', 'pause']
         .map((p) => zeile(BZ_TITEL[p], BZ.wertText(p, r, n), `data-bz-zu="${p}"`))
-        .join('') + `<div class="sheet__footer"><button class="prof__btn is-danger" data-bz-beenden>Elternkontrolle beenden</button></div>`;
+        .join('') + `<div class="sheet__footer"><button class="prof__btn is-danger" data-bz-beenden>Elternkontrolle beenden</button></div>` +
+        zustimmungBlock();
     }
     if (seite === 'kinder') {
       const kinder = bz.stand?.kinder || [];
@@ -7080,11 +7248,27 @@ function openBildschirmzeit(ansicht) {
       b.addEventListener('click', async () => {
         kind = (bz.stand?.kinder || []).find((k) => k.id === b.dataset.bzKind) || null;
         kindStand = null;
+        widerrufFrage = false;
         zu('menue');
-        await kindLaden();
+        await Promise.all([kindLaden(), einwLaden()]);
         zeichnen();
       })
     );
+    const w = { laeuft: false };
+    blatt.querySelector('[data-bz-widerruf]')?.addEventListener('click', async () => {
+      if (!widerrufFrage) {
+        widerrufFrage = true;
+        return zeichnen();
+      }
+      if (w.laeuft || !kind) return;
+      w.laeuft = true;
+      const db = await window.Anmeldung.aufbauen().catch(() => null);
+      const r = await window.Einwilligung.widerrufen(db, kind.id);
+      widerrufFrage = false;
+      meldung = r.text;
+      await einwLaden();
+      zeichnen();
+    });
     blatt.querySelector('[data-bz-beenden]')?.addEventListener('click', async () => {
       const a = await api('/api/bildschirmzeit/elternkontrolle-beenden', { kind: kind?.id });
       meldung = a?.ok ? `${kind.name} kann die Bildschirmzeit jetzt selbst ändern.` : bzMeldungText(a);
@@ -7301,9 +7485,10 @@ const SETTINGS = [
           passwortPruefen(w.neu) ||
           (w.neu !== w.wdh ? 'Die beiden Eingaben stimmen nicht überein' : null),
         aktion: 'passwort',
-        fertig: 'Passwort geändert',
+        fertig: 'Passwort geändert — auf deinen anderen Geräten bist du jetzt abgemeldet',
       },
-      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield', wahlKey: 'zweiFaktor', wahl: ['Aus', 'Per SMS', 'Über eine App'], standard: 'Aus' },
+      // Kasten RS 1 (L11, § 5 UWG): die Wahl wirkte nie. Wie in der App (SettingsScreen).
+      { label: 'Zwei-Faktor-Anmeldung', icon: 'shield', info: 'Noch nicht verfügbar. Bis dahin schützt dein Passwort das Konto — wir prüfen es beim Festlegen gegen bekannte Datenlecks.' },
       /*
        * Artikel 15 und 20 DSGVO: jeder darf seine Daten sehen und
        * mitnehmen. Fuer eine App, die live gehen soll, ist das keine
@@ -7311,7 +7496,8 @@ const SETTINGS = [
        * daneben stand.
        */
       { label: 'Meine Daten herunterladen', icon: 'image', aktion: 'datenauskunft' },
-      { label: 'Konto löschen', icon: 'block', gefahr: true, bestaetigen: 'Konto endgültig löschen?' },
+      // Kasten RS 2: echt löschen (openKontoLoeschen) statt „Löschauftrag vorgemerkt“. Wie in der App.
+      { label: 'Konto löschen', icon: 'block', gefahr: true, aktion: 'kontoLoeschen' },
     ],
   },
   {
@@ -7408,25 +7594,30 @@ const SETTINGS = [
         icon: 'info',
         info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
       },
-      {
-        label: 'Problem melden',
-        icon: 'shield',
-        eingabe: [
-          { key: 'was', label: 'Was ist passiert?', typ: 'mehrzeilig', pflicht: true },
-          { key: 'kontakt', label: 'Antwort an (freiwillig)', platzhalter: 'E-Mail oder Telefonnummer' },
-        ],
-        fertig: 'Danke, die Meldung ist bei uns angekommen',
-      },
-      {
-        label: 'Nutzungsbedingungen',
-        icon: 'bookmark',
-        info: 'All Media ist für Menschen ab 13 Jahren. Inhalte, die andere herabwürdigen oder gegen geltendes Recht verstoßen, werden entfernt. Wer sein Konto löscht, verliert seine Beiträge unwiderruflich.',
-      },
-      {
-        label: 'Datenschutzerklärung',
-        icon: 'lock',
-        info: 'Beiträge, Nachrichten und Profildaten liegen auf unseren Servern. Standortdaten nur, solange die Friend-Map eingeschaltet ist. Aufnahmen aus Kamera und Galerie bleiben auf deinem Gerät, bis du sie veröffentlichst.',
-      },
+      /*
+       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
+       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
+       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
+       * der Stand eigener Meldungen, der Kontostatus (DSA Art. 16, 17, 20)
+       * und — nur für Moderatoren — die Moderation. Gleiche Einträge in der
+       * App (SettingsScreen, Hilfe); die Moderation gibt es nur hier.
+       */
+      { label: 'Problem melden', icon: 'shield', aktion: 'problem' },
+      { label: 'Meine Meldungen', icon: 'flag', aktion: 'meinemeldungen' },
+      { label: 'Kontostatus', icon: 'info', aktion: 'kontostatus' },
+      { label: 'Moderation', icon: 'shield', aktion: 'moderation', nurModerator: true },
+      /*
+       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
+       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
+       * gemeinsam/rechtstexte.js — dieselben wie in der App
+       * (app/components/RechtstextSheet.tsx).
+       */
+      { label: 'Die Regeln kurz erklärt', icon: 'info', rechtstext: 'kurz_erklaert' },
+      { label: 'Nutzungsbedingungen', icon: 'document', rechtstext: 'nutzungsbedingungen' },
+      { label: 'Community-Richtlinien', icon: 'people', rechtstext: 'community_richtlinien' },
+      { label: 'Datenschutzerklärung', icon: 'lock', rechtstext: 'datenschutz' },
+      { label: 'Für Eltern', icon: 'heart', rechtstext: 'eltern_info' },
+      { label: 'Impressum', icon: 'info', rechtstext: 'impressum' },
       { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
     ],
   },
@@ -8460,15 +8651,14 @@ async function einstellungSetzen(punkt, wert) {
 
 /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
 function einstellungsListe(art) {
+  // Kasten RS 1 (L11): kein erfundenes Gerät, kein Knopf ohne Wirkung. Wie in der App.
   if (art === 'geraete') {
     return {
-      leer: 'Es ist kein weiteres Gerät verknüpft.',
+      leer: '',
       zeilen: [
         { text: 'Dieses Gerät', neben: 'gerade aktiv' },
-        { text: 'All Media Web', neben: 'zuletzt heute' },
+        { text: 'Weitere Geräte verknüpfen', neben: 'noch nicht verfügbar' },
       ],
-      knopf: 'Gerät verknüpfen',
-      knopfText: 'Zum Verknüpfen den QR-Code auf dem anderen Gerät scannen',
     };
   }
   if (art === 'blockiert') {
@@ -8794,7 +8984,7 @@ function openEinstellung(punkt, nachher) {
           if (!window.Anmeldung?.passwortAendern) return 'Die Anmeldung ist gerade nicht erreichbar.';
           (async () => {
             const antwort = await window.Anmeldung.passwortAendern(werte.alt, werte.neu);
-            toast(antwort.ok ? 'Passwort geändert' : antwort.fehler || 'Das hat nicht geklappt');
+            toast(antwort.ok ? punkt.fertig : antwort.fehler || 'Das hat nicht geklappt');
           })();
           return null;
         }
@@ -8869,22 +9059,6 @@ function openEinstellung(punkt, nachher) {
     );
   }
 
-  if (punkt.bestaetigen) {
-    return openSheet(
-      punkt.label,
-      `<div class="sheet__body"><p class="sheet__text">${esc(punkt.bestaetigen)} Alle Beiträge, Nachrichten und Communitys gehen dabei unwiderruflich verloren.</p></div>
-       <div class="sheet__footer"><button class="prof__btn is-danger" id="loeschJa">Ja, Konto löschen</button></div>`,
-      (sheet, close) => {
-        sheet.querySelector('#loeschJa').addEventListener('click', () => {
-          close();
-          // Ohne Backend wird nichts wirklich geloescht - das gehoert gesagt,
-          // statt es vorzutaeuschen.
-          toast('Löschauftrag vorgemerkt — er greift, sobald das Backend steht');
-        });
-      },
-      { schliessen: true }
-    );
-  }
 
   /*
    * Die Datenauskunft. Ueber fetch und nicht als schlichter Link: die
@@ -8896,35 +9070,21 @@ function openEinstellung(punkt, nachher) {
   if (punkt.aktion === 'spendencode') return spendenweg(null, 'code');
   if (punkt.aktion === 'zahlungsmethoden') return spendenweg(null, 'methoden');
   if (punkt.aktion === 'lenkung') return openLenkung();
+  // Kasten RS 3: Melden und Moderation.
+  if (punkt.aktion === 'problem') return openMeldenBlatt({ art: 'problem' });
+  if (punkt.aktion === 'meinemeldungen') return openKontostatus('meine');
+  if (punkt.aktion === 'kontostatus') return openKontostatus('kontostatus');
+  if (punkt.aktion === 'kontoLoeschen') return openKontoLoeschen();
+  if (punkt.aktion === 'moderation') return state.istModerator ? openModeration() : toast(window.Meldung.grundText('nicht_erlaubt'));
 
-  if (punkt.aktion === 'datenauskunft') {
-    toast('Deine Daten werden zusammengestellt …');
-    return (async () => {
-      try {
-        const r = await fetch('/api/meine-daten');
-        if (!r.ok) return toast('Die Auskunft hat nicht geklappt');
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `all-media-daten-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        // Erst freigeben, wenn der Browser den Download begonnen hat.
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-        toast('Auskunft heruntergeladen');
-      } catch (fehler) {
-        console.error('Datenauskunft fehlgeschlagen:', fehler);
-        toast('Die Auskunft hat nicht geklappt');
-      }
-    })();
-  }
+  if (punkt.aktion === 'datenauskunft') return datenauskunftLaden();
 
   if (punkt.aktion === 'sicherung') {
     const anzahl = state.chats.length;
     return toast(`Sicherung erstellt — ${anzahl} Unterhaltungen gespeichert`);
   }
+
+  if (punkt.rechtstext) return openRechtstext(punkt.rechtstext);
 
   if (punkt.aktion === 'einladen') {
     const auswahl = state.contacts.filter((c) => state.users[c.id]);
@@ -9147,6 +9307,8 @@ function renderSettings() {
         }
           <div class="group">${sec.items
             .filter((it) => !it.nurEltern || bzKinderZahl() > 0)
+            // Kasten RS 3: die Moderation nur, wenn ist_moderator() ja sagt (Bootstrap).
+            .filter((it) => !it.nurModerator || state.istModerator === true)
             .map((it) => itemHtml(it, sec.id))
             .join('')}</div>`
       ).join('')}
@@ -10471,6 +10633,8 @@ function openKontoWechsel() {
     // Pflicht seit 22.09.2026 (Schema 52) — siehe formularNeuMail().
     geburtsdatum: '',
     eltern: '',
+    // Kasten RS 1: nie vorbelegt.
+    zustimmung: false,
     // Was handle_frei zuletzt über den Wunschnamen gesagt hat.
     namensStand: { text: '', gut: true },
     kennung: '',
@@ -10621,6 +10785,16 @@ function openKontoWechsel() {
       <input id="kontoEltern" type="tel" placeholder="0151 2345678" value="${esc(zustand.eltern)}" autocomplete="off" />
       <div class="sheet__fussnote">Bis dein Elternteil zustimmt, bleibt dein Konto gesperrt.</div>
     </div>
+    <!-- Kasten RS 1 (24.10.2026): Zustimmung, nie vorbelegt. Gleiches Häkchen
+         in app/components/RegistrierFelder.tsx. Die Texte öffnen ohne Anmeldung
+         unter /recht/<id> (web/server/app.js). -->
+    <label class="sheet__zustimmung">
+      <input type="checkbox" id="kontoZustimmung" data-testid="zustimmung" ${zustand.zustimmung ? 'checked' : ''} />
+      <span>Ich stimme den <a href="/recht/nutzungsbedingungen" target="_blank" rel="noopener">Nutzungsbedingungen</a>
+        und <a href="/recht/community_richtlinien" target="_blank" rel="noopener">Community-Richtlinien</a> zu.
+        Wie wir deine Daten verarbeiten, steht in der
+        <a href="/recht/datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a>.</span>
+    </label>
     ${hinweis()}
     <div class="sheet__footer">
       <button class="prof__btn is-primary" id="kontoOk">neues Konto erstellen</button>
@@ -10686,6 +10860,8 @@ function openKontoWechsel() {
       const t = sheet.querySelector('#kontoTelefon');
       const g = sheet.querySelector('#kontoGeburt');
       const e = sheet.querySelector('#kontoEltern');
+      const z = sheet.querySelector('#kontoZustimmung');
+      if (z) zustand.zustimmung = z.checked;
       if (g) zustand.geburtsdatum = g.value;
       if (e) zustand.eltern = e.value;
       if (k) zustand.kennung = k.value;
@@ -10758,6 +10934,7 @@ function openKontoWechsel() {
         telefon: zustand.telefon,
         geburtsdatum: zustand.geburtsdatum,
         eltern: zustand.eltern,
+        zustimmung: zustand.zustimmung,
       });
       fertig();
 
@@ -11704,7 +11881,13 @@ function renderVideoSearch() {
  */
 
 /** Eine Mitteilung anklickbar machen: dorthin springen, wo sie herkommt. */
-function mitteilungOeffnen(ziel) {
+function mitteilungOeffnen(ziel, text = '') {
+  /*
+   * Kasten RS 3: Rechtsmitteilung (Schema 102). Wer betroffen ist, bekommt
+   * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen" —
+   * so steht es im Satz der Datenbank (meldung_entscheiden).
+   */
+  if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine');
   if (ziel.art === 'profile') return openProfile(ziel.id);
   if (ziel.art === 'community') return openChat(ziel.id);
   // Chat-Anfrage und Messenger-Anfrage führen in den Chat, um den es geht.
@@ -11795,7 +11978,7 @@ async function openMitteilungen(bereich) {
           await fetch(`/api/mitteilungen/${b.dataset.mitt}/gelesen`, { method: 'POST' });
           close();
           await mitteilungenZaehlen();
-          mitteilungOeffnen({ art: b.dataset.zielArt, id: b.dataset.zielId });
+          mitteilungOeffnen({ art: b.dataset.zielArt, id: b.dataset.zielId }, b.querySelector('.mitt__text')?.textContent || '');
         })
       );
 
@@ -11888,6 +12071,938 @@ function openErstellen(bereich) {
   );
 }
 
+/* ------------------------------------------------ Melden und Moderation */
+/*
+ * Kasten RS 3 (rechtliche Prüfung 21.10.2026, DSA Art. 16, 17, 20;
+ * Schema 102). Ein Melden-Blatt für alles, was sich melden lässt:
+ *
+ *   1. Kategorie (gemeinsam/meldung.js, Schlüssel wie Schema 102)
+ *   2. Begründung (ab 10 Zeichen, außer bei Kindesmissbrauch) und das
+ *      Häkchen „nach bestem Wissen und Gewissen" — nie vorausgefüllt
+ *   3. Senden → Eingangsbestätigung im Blatt
+ *
+ * Fehler stehen IM Blatt (#meldenFehler), nicht als Toast dahinter.
+ * Gegenstück in der App: components/MeldenSheet.tsx.
+ *
+ * ziel: { art, id, pfad?, beleg?: () => ({ text, sitzung? }) | null }
+ *   pfad  eine ältere Route, die dasselbe Verfahren nimmt (Chat-Einstellungen)
+ *   beleg nur bei Nachrichten — Klartext dieser einen Nachricht und bei
+ *         Ende-zu-Ende ihr Sitzungsschlüssel (KryptoWeb.meldebeleg)
+ */
+function meldeGrundText(antwort, art) {
+  const M = window.Meldung;
+  if (antwort?.grund === 'update') return M.updateText(art);
+  if (antwort?.error && (antwort.grund === 'gruppe' || !antwort.grund)) return antwort.error;
+  return M.grundText(antwort?.grund);
+}
+
+function openMeldenBlatt(ziel, danach) {
+  const M = window.Meldung;
+  const art = ziel.art;
+  const z = {
+    schritt: art === 'problem' ? 'details' : 'kategorie',
+    kat: null,
+    text: '',
+    haken: false,
+    sendet: false,
+    alterWeg: false,
+  };
+  const istNachricht = art === 'message' || art === 'kanal_nachricht';
+
+  openSheet(
+    M.titel(art),
+    `<div class="sheet__body melden" data-melden="${esc(art)}"></div><div class="sheet__footer" data-melden-fuss></div>`,
+    (sheet, close) => {
+      const body = sheet.querySelector('[data-melden]');
+      const fuss = sheet.querySelector('[data-melden-fuss]');
+
+      const fehler = (text) => {
+        const el = sheet.querySelector('#meldenFehler');
+        if (!el) return;
+        el.textContent = text || '';
+        el.hidden = !text;
+      };
+
+      const hinweisHtml = (h) =>
+        h
+          ? `<div class="melden__hinweis" data-mhinweis="${esc(z.kat)}">
+               <b class="melden__hinweistitel">${esc(h.titel)}</b>
+               <ul>${h.punkte.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+               <div class="melden__hinweisknoepfe">
+                 ${h.link ? `<a class="melden__hinweisknopf" href="${esc(h.link)}" target="_blank" rel="noopener noreferrer">Internet-Beschwerdestelle</a>` : ''}
+                 ${h.notruf ? `<a class="melden__hinweisknopf" href="tel:${esc(h.notruf)}">110 anrufen</a>` : ''}
+                 ${h.telefonseelsorge ? `<a class="melden__hinweisknopf" href="tel:${esc(h.telefonseelsorge.replace(/\s/g, ''))}">Telefonseelsorge</a>` : ''}
+                 ${h.kummer ? `<a class="melden__hinweisknopf" href="tel:${esc(h.kummer.replace(/\s/g, ''))}">116 111</a>` : ''}
+               </div>
+             </div>`
+          : '';
+
+      const zeichne = () => {
+        if (z.schritt === 'kategorie') {
+          body.innerHTML = `
+            <p class="sheet__text">Worum geht es? Wähle, was am besten passt.</p>
+            ${M.KATEGORIEN.map(
+              (k) => `<button class="item melden__kat" data-mkat="${esc(k.key)}">
+                <span class="item__label"><b>${esc(k.name)}</b><small>${esc(k.erklaerung)}</small></span>
+                <span class="row__chevron">${ICONS.chevron}</span>
+              </button>`
+            ).join('')}`;
+          fuss.hidden = true;
+          body.querySelectorAll('[data-mkat]').forEach((b) =>
+            b.addEventListener('click', () => {
+              z.kat = b.dataset.mkat;
+              z.schritt = 'details';
+              zeichne();
+            })
+          );
+          return;
+        }
+
+        if (z.schritt === 'fertig') {
+          body.innerHTML = `<div class="melden__fertig" data-melden-bestaetigung>
+              <span class="melden__fertigicon">${ICONS.check}</span>
+              <p>${esc(M.eingangText(art, z.alterWeg))}</p>
+            </div>`;
+          fuss.hidden = false;
+          fuss.innerHTML = `<button class="prof__btn is-primary" id="meldenFertig">Fertig</button>`;
+          fuss.querySelector('#meldenFertig').addEventListener('click', close);
+          return;
+        }
+
+        const katFuerText = art === 'problem' ? 'problem' : z.kat;
+        body.innerHTML = `
+          ${
+            art === 'problem'
+              ? ''
+              : `<button class="melden__gewaehlt" data-mkat-aendern><span class="melden__grund">Grund: <b>${esc(M.kategorieName(z.kat))}</b></span><span class="melden__aendern">ändern</span></button>`
+          }
+          ${hinweisHtml(M.hinweisFuer(z.kat))}
+          ${istNachricht ? `<p class="sheet__hint melden__leise">${esc(M.NACHRICHT_HINWEIS)}</p>` : ''}
+          <label class="melden__label" for="meldenText">${art === 'problem' ? 'Was ist passiert?' : 'Was ist daran nicht in Ordnung?'}</label>
+          <textarea class="feld__eingabe feld__eingabe--mehrzeilig melden__text" id="meldenText" rows="4" maxlength="${M.MAX_BEGRUENDUNG}" placeholder="${esc(M.platzhalter(art, z.kat))}">${esc(z.text)}</textarea>
+          <div class="melden__zaehler" id="meldenZaehler">${esc(M.zaehlerText(z.text, katFuerText))}</div>
+          ${
+            art === 'problem'
+              ? ''
+              : `<label class="melden__haken"><input type="checkbox" id="meldenHaken"${z.haken ? ' checked' : ''} /><span>${esc(M.GUTGLAEUBIG)}</span></label>`
+          }
+          <p class="melden__fehler" id="meldenFehler" role="alert" hidden></p>`;
+        fuss.hidden = false;
+        fuss.innerHTML = `<button class="prof__btn is-primary" id="meldenSenden">Senden</button>`;
+
+        body.querySelector('[data-mkat-aendern]')?.addEventListener('click', () => {
+          z.schritt = 'kategorie';
+          zeichne();
+        });
+        const feld = body.querySelector('#meldenText');
+        feld.addEventListener('input', () => {
+          z.text = feld.value;
+          body.querySelector('#meldenZaehler').textContent = M.zaehlerText(z.text, katFuerText);
+          fehler('');
+        });
+        body.querySelector('#meldenHaken')?.addEventListener('change', (e) => {
+          z.haken = e.target.checked;
+          fehler('');
+        });
+        fuss.querySelector('#meldenSenden').addEventListener('click', senden);
+      };
+
+      const senden = async () => {
+        if (z.sendet) return;
+        const eingabe = {
+          art,
+          ziel: ziel.id || null,
+          kategorie: art === 'problem' ? 'problem' : z.kat,
+          begruendung: z.text,
+          gutglaeubig: z.haken === true,
+        };
+        const grund = M.pruefen(eingabe);
+        if (grund) return fehler(M.grundText(grund));
+        z.sendet = true;
+        const knopf = fuss.querySelector('#meldenSenden');
+        knopf.disabled = true;
+        knopf.textContent = 'Wird gesendet …';
+        let beleg = null;
+        try {
+          beleg = ziel.beleg ? await ziel.beleg() : null;
+        } catch (e) {
+          console.warn('Meldebeleg nicht gebildet:', e?.message || e);
+        }
+        const antwort = await api(ziel.pfad || '/api/melden', { ...eingabe, beleg });
+        z.sendet = false;
+        if (antwort?.ok && antwort.gemeldet) {
+          z.alterWeg = Boolean(antwort.alterWeg);
+          z.schritt = 'fertig';
+          return zeichne();
+        }
+        knopf.disabled = false;
+        knopf.textContent = 'Senden';
+        fehler(antwort?.ok === false ? antwort.error || M.grundText('netz') : meldeGrundText(antwort, art));
+      };
+
+      zeichne();
+    },
+    { schliessen: true, hoch: true, beimSchliessen: danach }
+  );
+}
+
+/** Datenauskunft (Art. 15, 20 DSGVO) — aus den Einstellungen und vor dem Löschen (RS 2). */
+function datenauskunftLaden() {
+  toast('Deine Daten werden zusammengestellt …');
+  void (async () => {
+    try {
+      const r = await fetch('/api/meine-daten');
+      if (!r.ok) return toast('Die Auskunft hat nicht geklappt');
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `all-media-daten-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Erst freigeben, wenn der Browser den Download begonnen hat.
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      toast('Auskunft heruntergeladen');
+    } catch (fehler) {
+      console.error('Datenauskunft fehlgeschlagen:', fehler);
+      toast('Die Auskunft hat nicht geklappt');
+    }
+  })();
+}
+
+/*
+ * Kasten RS 2: Konto löschen — echt. Bis zum 25.10.2026 stand hier ein
+ * Bestätigungsblatt, das nur „Löschauftrag vorgemerkt“ meldete (DSGVO
+ * Art. 17; Apple 5.1.1 v, Google Play). Ablauf, Texte und Gründe stehen in
+ * gemeinsam/konto-loeschen.js — derselbe Weg wie in der App
+ * (KontoLoeschenSheet): Das Passwort geht nur an Supabase, nicht an diesen
+ * Server. Fehlt Schema 103, bricht der Ablauf ab, bevor etwas gelöscht ist.
+ */
+function openKontoLoeschen() {
+  const K = window.KontoLoeschen;
+  openSheet(
+    'Konto löschen',
+    `<div class="sheet__body" data-konto-loeschen>
+       <p class="sheet__text">${esc(K.HINWEIS)}</p>
+       <div class="sheet__zeile"><button class="linkbtn" id="loeschDaten">Meine Daten herunterladen</button></div>
+       <div class="sheet__field">
+         <label class="sheet__label" for="loeschPasswort">Zur Sicherheit: dein Passwort</label>
+         <input id="loeschPasswort" type="password" placeholder="Passwort" autocomplete="current-password" />
+       </div>
+       <p class="sheet__fehler" id="loeschFehler" role="alert" hidden></p>
+     </div>
+     <div class="sheet__footer"><button class="prof__btn is-danger" id="loeschJa">Konto endgültig löschen</button></div>`,
+    (sheet, close) => {
+      const knopf = sheet.querySelector('#loeschJa');
+      const feld = sheet.querySelector('#loeschPasswort');
+      const fehler = sheet.querySelector('#loeschFehler');
+      const zeigeFehler = (text) => {
+        fehler.textContent = text;
+        fehler.hidden = !text;
+      };
+      feld.addEventListener('input', () => zeigeFehler(''));
+      sheet.querySelector('#loeschDaten').addEventListener('click', datenauskunftLaden);
+      knopf.addEventListener('click', async () => {
+        if (knopf.disabled) return;
+        zeigeFehler('');
+        const ich = window.Anmeldung?.nutzer?.();
+        const db = ich ? await window.Anmeldung.aufbauen() : null;
+        if (!ich || !db) return zeigeFehler(K.grundText('nicht_angemeldet'));
+        knopf.disabled = feld.disabled = true;
+        knopf.textContent = 'Wird gelöscht …';
+        const r = await K.ablauf(
+          feld.value,
+          K.schritteFuer(db, ich.email, async () => {
+            await window.Anmeldung.abmelden();
+            window.KryptoWeb?.vergessen();
+            // Ein gelöschtes Konto gehört nicht unter „Frühere Konten“.
+            fruehereVergessen(ich.id);
+          })
+        );
+        if (!r.ok) {
+          knopf.disabled = feld.disabled = false;
+          knopf.textContent = 'Konto endgültig löschen';
+          return zeigeFehler(r.text);
+        }
+        close();
+        toast('Dein Konto ist gelöscht.');
+        await bootstrap();
+      });
+    },
+    { schliessen: true }
+  );
+}
+
+/*
+ * „Meine Meldungen" und „Kontostatus" (Einstellungen → Hilfe). Nur echte
+ * Daten; leer → Leertext; ohne Schema 102 → ehrlicher Hinweis statt einer
+ * leeren Liste. Gegenstück in der App: components/KontostatusSheet.tsx.
+ */
+async function openKontostatus(ansicht) {
+  const M = window.Meldung;
+  const titel = ansicht === 'meine' ? 'Meine Meldungen' : 'Kontostatus';
+  const pfad = ansicht === 'meine' ? '/api/meldungen/meine' : '/api/meldungen/kontostatus';
+
+  openSheet(
+    titel,
+    `<div class="sheet__body kstatus" data-kontostatus="${esc(ansicht)}"><div class="sheet__hint">Wird geladen …</div></div>`,
+    (sheet) => {
+      const body = sheet.querySelector('[data-kontostatus]');
+      let meldung = '';
+
+      const laden = async () => {
+        let d;
+        try {
+          const r = await fetch(pfad);
+          d = await r.json();
+          if (!r.ok || d.ok === false) throw new Error(d.error || `Server antwortet mit ${r.status}`);
+        } catch (fehler) {
+          body.innerHTML = `<p class="melden__fehler" role="alert">Laden hat nicht geklappt: ${esc(fehler.message)}</p>`;
+          return;
+        }
+        if (d.fehlt) {
+          body.innerHTML = `<p class="sheet__text" data-kstatus-ohne-schema>${esc(ansicht === 'meine' ? M.OHNE_SCHEMA.meine : M.OHNE_SCHEMA.kontostatus)}</p>`;
+          return;
+        }
+        const zeilen = (d.zeilen || []).map((m) =>
+          ansicht === 'meine'
+            ? {
+                id: m.id,
+                kopf: `${M.ART_NAME[m.art] || 'Inhalt'} · ${M.kategorieName(m.kategorie)}`,
+                stand: M.statusText(m.status),
+                datum: M.datum(m.erstellt),
+                massnahme: m.massnahme ? M.massnahmeText(m.massnahme) : '',
+                begruendung: m.begruendung,
+                bis: m.widerspruch_bis,
+                beschwerde: m.beschwerde_status,
+              }
+            : {
+                id: m.id,
+                kopf: `${M.ART_NAME[m.art] || 'Inhalt'} · ${M.kategorieName(m.kategorie)}`,
+                stand: M.massnahmeText(m.massnahme, m.sperre_bis),
+                datum: M.datum(m.entschieden),
+                grundlage: M.grundlageText(m.grundlage),
+                begruendung: m.begruendung,
+                bis: m.widerspruch_bis,
+                beschwerde: m.beschwerde_status,
+              }
+        );
+        body.innerHTML = `
+          ${meldung ? `<p class="kstatus__meldung" role="status">${esc(meldung)}</p>` : ''}
+          ${
+            zeilen.length
+              ? zeilen
+                  .map((z) => {
+                    const offen = M.widerspruchOffen(z.bis) && !z.beschwerde;
+                    return `<div class="kstatus__karte" data-kstatus="${esc(z.id)}">
+                      <div class="kstatus__kopf"><b>${esc(z.kopf)}</b><span>${esc(z.datum)}</span></div>
+                      <div class="kstatus__stand">${esc(z.stand)}</div>
+                      ${z.massnahme ? `<p>${esc(z.massnahme)}.</p>` : ''}
+                      ${z.grundlage ? `<p>Grund: ${esc(z.grundlage)}.</p>` : ''}
+                      ${z.begruendung ? `<p>Begründung: ${esc(z.begruendung)}</p>` : ''}
+                      ${z.beschwerde ? `<p>${esc(M.beschwerdeText(z.beschwerde))}</p>` : ''}
+                      ${z.bis && !z.beschwerde ? `<p class="kstatus__leise">${esc(offen ? M.WIDERSPRUCH.fristText(z.bis) : M.WIDERSPRUCH.abgelaufen)}</p>` : ''}
+                      ${offen ? `<button class="joinbtn" data-widersprechen="${esc(z.id)}">${esc(M.WIDERSPRUCH.knopf)}</button>` : ''}
+                    </div>`;
+                  })
+                  .join('')
+              : `<p class="sheet__text" data-kstatus-leer>${esc(ansicht === 'meine' ? M.LEER.meine : M.LEER.kontostatus)}</p>`
+          }
+          <p class="sheet__hint" data-kstatus-weitere>${esc(M.WIDERSPRUCH.weitere)}</p>`;
+
+        body.querySelectorAll('[data-widersprechen]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const id = b.dataset.widersprechen;
+            const karte = b.closest('.kstatus__karte');
+            b.remove();
+            const form = document.createElement('div');
+            form.className = 'kstatus__widerspruch';
+            form.innerHTML = `
+              <textarea class="feld__eingabe feld__eingabe--mehrzeilig" id="widerspruchText" rows="3" maxlength="${M.MAX_BEGRUENDUNG}" placeholder="${esc(M.WIDERSPRUCH.platzhalter)}"></textarea>
+              <p class="melden__fehler" id="widerspruchFehler" role="alert" hidden></p>
+              <button class="prof__btn is-primary" id="widerspruchSenden">Widerspruch senden</button>`;
+            karte.appendChild(form);
+            form.querySelector('#widerspruchSenden').addEventListener('click', async (e) => {
+              e.target.disabled = true;
+              const a = await api(`/api/meldungen/${encodeURIComponent(id)}/widersprechen`, {
+                text: form.querySelector('#widerspruchText').value,
+              });
+              if (a?.ok && a.erledigt) {
+                meldung = M.WIDERSPRUCH.gesendet;
+                return laden();
+              }
+              e.target.disabled = false;
+              const f = form.querySelector('#widerspruchFehler');
+              f.textContent = a?.ok === false ? a.error || M.grundText('netz') : M.grundText(a?.grund);
+              f.hidden = false;
+            });
+          })
+        );
+      };
+      laden();
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/*
+ * Moderation — NUR Website, nur sichtbar, wenn die Datenbank ja sagt
+ * (state.istModerator aus ist_moderator(), Schema 102). Jede Funktion prüft
+ * es dort noch einmal. Kein Lesezugriff auf Chats: Moderatoren sehen nur den
+ * Beleg, den der Meldende freigegeben hat; bei Kindesmissbrauch nicht einmal
+ * den (beleg_verborgen), nur den Ablauf.
+ */
+const moderation = { tab: 'meldungen', status: 'eingegangen', meldungen: [], beschwerden: [] };
+
+/** Prüft den Beleg einer gemeldeten Nachricht: echt, stimmt nicht, ohne, ohne Schlüssel. */
+function belegUrteil(beleg) {
+  if (!beleg || beleg.krypto === undefined) return null;
+  if (!Number(beleg.krypto)) return 'ohne';
+  if (!beleg.sitzung) return 'keinSchluessel';
+  const echt = window.Krypto?.belegPruefen?.({ chiffre: beleg.chiffre, nonce: beleg.nonce }, beleg.sitzung, beleg.klartext_gemeldet);
+  return echt ? 'echt' : 'falsch';
+}
+
+/** Was im Beleg steht — als Text, nie als eingebettetes Medium. */
+function belegHtml(m) {
+  const M = window.Meldung;
+  if (m.beleg_verborgen) {
+    return `<div class="melden__hinweis modr__verborgen" data-beleg-verborgen>
+      <b class="melden__hinweistitel">Beleg verborgen</b>
+      <ul>${M.ABLAUF_VERBORGEN.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+    </div>`;
+  }
+  const b = m.beleg || {};
+  const felder = [
+    ['Titel', b.titel],
+    ['Beschreibung', b.beschreibung],
+    ['Text', b.text],
+    ['Name', b.name],
+    ['Benutzername', b.handle],
+    ['Info', b.info || b.bio],
+    ['Thema', b.thema],
+    ['Link', b.link],
+    ['Datei', b.datei],
+    ['Gemeldeter Text', b.klartext_gemeldet],
+    ['Text (unverschlüsselt)', b.klartext_server],
+  ].filter(([, w]) => w);
+  const urteil = m.art === 'message' ? belegUrteil(b) : null;
+  return `<div class="modr__beleg" data-beleg>
+    ${felder.map(([k, w]) => `<div class="modr__feld"><span>${esc(k)}</span><p>${esc(String(w))}</p></div>`).join('')}
+    ${
+      b.medium
+        ? `<div class="modr__feld" data-modmedium-feld><span>Medien</span>
+            <p>Datei im Speicher${b.medium_datei ? ` (${esc(String(b.medium_datei))})` : ''}</p>
+            ${
+              M.mediumZeigbar(m)
+                ? `<button class="joinbtn" data-modmedium>${esc(M.MEDIUM.knopf)}</button><p class="kstatus__leise">${esc(M.MEDIUM.hinweis)}</p><div data-modmedium-ziel></div>`
+                : ''
+            }
+          </div>`
+        : ''
+    }
+    ${!felder.length && !b.medium ? '<p class="sheet__hint">Kein Inhalt gesichert.</p>' : ''}
+    ${urteil ? `<p class="modr__urteil modr__urteil--${urteil}" data-beleg-urteil="${urteil}">${esc(M.BELEG[urteil])}</p>` : ''}
+  </div>`;
+}
+
+async function openModeration() {
+  const M = window.Meldung;
+  openSheet(
+    'Moderation',
+    `<div class="modr__tabs" role="tablist">
+       <button class="pill" data-modtab="meldungen">Meldungen</button>
+       <button class="pill" data-modtab="beschwerden">Widersprüche</button>
+       <button class="pill" data-modtab="zahlen">Zahlen</button>
+     </div>
+     <div class="sheet__body modr" data-moderation></div>`,
+    (sheet) => {
+      const body = sheet.querySelector('[data-moderation]');
+      const fehlerHtml = (t) => `<p class="melden__fehler" role="alert" data-modfehler>${esc(t)}</p>`;
+      const holen = async (pfad) => {
+        try {
+          const r = await fetch(pfad);
+          const d = await r.json();
+          if (!r.ok || d.ok === false) return { fehler: d.error || `Server antwortet mit ${r.status}` };
+          if (d.fehlt) return { fehler: M.OHNE_SCHEMA.moderation };
+          if (d.erlaubt === false) return { fehler: M.grundText('nicht_erlaubt') };
+          return d;
+        } catch (e) {
+          return { fehler: M.grundText('netz') };
+        }
+      };
+
+      const tabs = () =>
+        sheet.querySelectorAll('[data-modtab]').forEach((b) => b.classList.toggle('is-active', b.dataset.modtab === moderation.tab));
+
+      const liste = async () => {
+        tabs();
+        body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
+        const d = await holen(`/api/moderation/meldungen?status=${encodeURIComponent(moderation.status)}`);
+        if (d.fehler) return (body.innerHTML = fehlerHtml(d.fehler));
+        // Dringende oben — die Datenbank sortiert schon so; hier noch einmal,
+        // damit es nicht an einer Abfrage hängt.
+        moderation.meldungen = [...(d.zeilen || [])].sort(
+          (a, b) => M.dringlichkeit(a.kategorie) - M.dringlichkeit(b.kategorie) || String(a.erstellt).localeCompare(String(b.erstellt))
+        );
+        body.innerHTML = `
+          <div class="modr__filter">
+            ${[
+              ['eingegangen', 'Offen'],
+              ['entschieden', 'Entschieden'],
+              ['erledigt', 'Erledigt'],
+              ['alle', 'Alle'],
+            ]
+              .map(([k, n]) => `<button class="pill${moderation.status === k ? ' is-active' : ''}" data-modstatus="${k}">${n}</button>`)
+              .join('')}
+          </div>
+          ${
+            moderation.meldungen.length
+              ? moderation.meldungen
+                  .map(
+                    (m) => `<button class="item modr__zeile${M.dringlichkeit(m.kategorie) < 2 ? ' is-dringend' : ''}" data-modmeldung="${esc(m.id)}">
+                      <span class="item__label"><b>${esc(M.kategorieName(m.kategorie))}</b><small>${esc(M.ART_NAME[m.art] || m.art)} · ${esc(m.ziel_name || m.ziel_handle || 'ohne Konto')} · ${esc(M.datum(m.erstellt))}${Number(m.gleiches_ziel) > 1 ? ` · ${Number(m.gleiches_ziel)}× gemeldet` : ''}</small></span>
+                      ${M.art18Pflicht(m.kategorie) && !m.art18 ? `<span class="modr__dringend" data-art18-offen>${esc(M.ART18.offen)}</span>` : ''}
+                      ${m.zurueckgestellt ? `<span class="modr__dringend" data-zurueckgestellt>zurückgestellt</span>` : ''}
+                      ${M.dringlichkeit(m.kategorie) < 2 ? '<span class="modr__dringend">dringend</span>' : ''}
+                      <span class="row__chevron">${ICONS.chevron}</span>
+                    </button>`
+                  )
+                  .join('')
+              : `<p class="sheet__text" data-modleer>${esc(M.LEER.moderation)}</p>`
+          }`;
+        body.querySelectorAll('[data-modstatus]').forEach((b) =>
+          b.addEventListener('click', () => {
+            moderation.status = b.dataset.modstatus;
+            liste();
+          })
+        );
+        body.querySelectorAll('[data-modmeldung]').forEach((b) =>
+          b.addEventListener('click', () => detail(moderation.meldungen.find((m) => m.id === b.dataset.modmeldung)))
+        );
+      };
+
+      /*
+       * Gate 2 (Funde 5, 6, 8, 11, 17, 19): Vorschrift Pflicht bei Gesetz,
+       * Klausel der Community-Richtlinien bei Regeln, Kindesmissbrauch nur
+       * Gesetz und Sperre erst nach Bestätigung, Art.-18-Vermerk bei
+       * Kindesmissbrauch und Drohung, „Ohne Enddatum" nur in schweren Fällen.
+       * Alle Regeln stehen in gemeinsam/meldung.js (entscheidungPruefen).
+       */
+      const art18Html = (m) => {
+        if (!M.art18Pflicht(m.kategorie)) return '';
+        if (m.art18) return `<p class="modr__art18 is-vermerkt" data-art18-vermerkt>${esc(M.ART18.vermerkt)}</p>`;
+        return `<div class="melden__hinweis modr__art18" data-art18>
+            <b class="melden__hinweistitel">${esc(M.ART18.titel)}</b>
+            <ul>${M.ART18.punkte.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+            <div class="melden__hinweisknoepfe">
+              <a class="melden__hinweisknopf" href="${esc(M.ART18.link)}" target="_blank" rel="noopener noreferrer">u-entrance öffnen</a>
+              <a class="melden__hinweisknopf" href="tel:110">110 anrufen</a>
+            </div>
+            <label class="melden__label" for="modArt18">${esc(M.ART18.label)}</label>
+            <input class="feld__eingabe" id="modArt18" maxlength="500" placeholder="${esc(M.ART18.platzhalter)}" />
+            <p class="melden__fehler" id="modArt18Fehler" role="alert" hidden></p>
+            <button class="joinbtn" id="modArt18Senden">${esc(M.ART18.knopf)}</button>
+          </div>`;
+      };
+
+      const art18Verdrahten = (m) => {
+        const knopf = body.querySelector('#modArt18Senden');
+        if (!knopf) return;
+        knopf.addEventListener('click', async () => {
+          const f = body.querySelector('#modArt18Fehler');
+          const vermerk = body.querySelector('#modArt18').value;
+          if (M.zeichen(M.btrim(vermerk)) < M.MIN_VERMERK) {
+            f.textContent = M.grundText('vermerk');
+            f.hidden = false;
+            return;
+          }
+          knopf.disabled = true;
+          const a = await api('/api/moderation/art18', { meldung: m.id, vermerk });
+          if (a?.ok && a.erledigt) {
+            m.art18 = true;
+            const block = body.querySelector('[data-art18]');
+            block.outerHTML = `<p class="modr__art18 is-vermerkt" data-art18-vermerkt>${esc(M.ART18.gespeichert)}</p>`;
+            return;
+          }
+          knopf.disabled = false;
+          f.textContent = a?.ok === false ? a.error || a.fehler || M.grundText('netz') : M.grundText(a?.grund);
+          f.hidden = false;
+        });
+      };
+
+      const mediumVerdrahten = (m) => {
+        const knopf = body.querySelector('[data-modmedium]');
+        if (!knopf) return;
+        knopf.addEventListener('click', async () => {
+          const ziel = body.querySelector('[data-modmedium-ziel]');
+          knopf.disabled = true;
+          ziel.innerHTML = '<p class="sheet__hint">Wird geladen …</p>';
+          let d;
+          try {
+            const r = await fetch(`/api/moderation/meldungen/${encodeURIComponent(m.id)}/medium`);
+            d = await r.json();
+          } catch {
+            d = { ok: true, grund: 'netz' };
+          }
+          if (!d || !d.url) {
+            knopf.disabled = false;
+            ziel.innerHTML = `<p class="melden__fehler" role="alert" data-modmedium-fehler>${esc(d && d.ok === false ? d.error || d.fehler || M.grundText('netz') : M.grundText(d?.grund || 'medium'))}</p>`;
+            return;
+          }
+          knopf.hidden = true;
+          ziel.innerHTML =
+            d.typ === 'video'
+              ? `<video class="modr__medium" data-modmedium-zeigt src="${esc(d.url)}" controls playsinline preload="metadata" controlslist="nodownload"></video>`
+              : `<img class="modr__medium" data-modmedium-zeigt src="${esc(d.url)}" alt="Gemeldetes Bild" referrerpolicy="no-referrer" />`;
+        });
+      };
+
+      // Nach der Entscheidung: zurückgestellte Begründung nachsenden, bei
+      // Kindesmissbrauch die Sperre nach Bestätigung nachtragen (Fund 5, 17).
+      const nachtraegeVerdrahten = (m) => {
+        const senden = body.querySelector('#modNachsenden');
+        senden?.addEventListener('click', async () => {
+          senden.disabled = true;
+          const a = await api(`/api/moderation/meldungen/${encodeURIComponent(m.id)}/nachsenden`, {});
+          if (a?.ok && a.erledigt) {
+            toast(M.ZURUECK.gesendet);
+            return liste();
+          }
+          senden.disabled = false;
+          const f = body.querySelector('#modZFehler');
+          f.textContent = a?.ok === false ? a.error || a.fehler || M.grundText('netz') : M.grundText(a?.grund);
+          f.hidden = false;
+        });
+        const sperren = body.querySelector('#modNachtrag');
+        // Ein alter Fehler bleibt nicht stehen, während korrigiert wird.
+        body.querySelectorAll('#modNBestaetigt, #modNBegruendung').forEach((el) =>
+          el.addEventListener('input', () => {
+            body.querySelector('#modNFehler').hidden = true;
+          })
+        );
+        sperren?.addEventListener('click', async () => {
+          const f = body.querySelector('#modNFehler');
+          const zeige = (t) => {
+            f.textContent = t;
+            f.hidden = !t;
+          };
+          const bestaetigt = body.querySelector('#modNBestaetigt').value;
+          const begruendung = body.querySelector('#modNBegruendung').value;
+          if (M.zeichen(M.btrim(bestaetigt)) < M.MIN_BESTAETIGUNG) return zeige(M.grundText('bestaetigung'));
+          if (!/(§|Art\.)/.test(begruendung)) return zeige(M.grundText('norm'));
+          if (M.zeichen(M.btrim(begruendung)) < 20) return zeige(M.grundText('begruendung_entscheidung'));
+          sperren.disabled = true;
+          const a = await api(`/api/moderation/meldungen/${encodeURIComponent(m.id)}/sperre`, {
+            bestaetigt,
+            begruendung,
+            sperreTage: body.querySelector('#modNSperre').value || null,
+          });
+          if (a?.ok && a.erledigt) {
+            toast(M.NACHTRAG.gesperrt);
+            return liste();
+          }
+          sperren.disabled = false;
+          const g = a?.grund === 'begruendung' ? 'begruendung_entscheidung' : a?.grund;
+          zeige(a?.ok === false ? a.error || a.fehler || M.grundText('netz') : M.grundText(g));
+        });
+      };
+
+      const detail = (m) => {
+        if (!m) return;
+        const kat = M.kategorie(m.kategorie);
+        const offen = m.status === 'eingegangen';
+        const problem = m.art === 'problem';
+        const km = m.kategorie === 'kindesmissbrauch';
+        const massnahmen = M.massnahmenFuer(m.art);
+        const klauselVor = M.klauselFuer(m.kategorie);
+        const grundlageVor = km ? 'gesetz' : kat?.grundlage === 'gesetz' ? 'gesetz' : 'regeln';
+        body.innerHTML = `
+          <button class="linkbtn" data-modzurueck>← Zur Liste</button>
+          <div class="modr__detail" data-moddetail="${esc(m.id)}">
+            <h3>${esc(M.kategorieName(m.kategorie))} · ${esc(M.ART_NAME[m.art] || m.art)}</h3>
+            <p class="sheet__hint">Gemeldet am ${esc(M.datum(m.erstellt))}${m.ziel_name ? ` · betrifft ${esc(m.ziel_name)}${m.ziel_handle ? ` (@${esc(String(m.ziel_handle).replace(/^@/, ''))})` : ''}` : ''}</p>
+            ${m.begruendung_meldung ? `<div class="modr__feld"><span>Begründung der Meldung</span><p>${esc(m.begruendung_meldung)}</p></div>` : ''}
+            ${belegHtml(m)}
+            ${problem ? '' : art18Html(m)}
+            ${
+              offen
+                ? `<div class="modr__form">
+                    ${
+                      problem
+                        ? ''
+                        : `<div class="modr__gruppe"><span>Maßnahme</span>${massnahmen
+                            .map(
+                              (x) => `<label class="modr__wahl"><input type="radio" name="modMassnahme" value="${x.key}"${x.key === (km ? 'entfernen' : 'keine') ? ' checked' : ''} /> ${esc(x.name)}</label>`
+                            )
+                            .join('')}</div>
+                          <div class="modr__gruppe" id="modGrundlageGruppe"><span>Grundlage</span>
+                            <label class="modr__wahl"><input type="radio" name="modGrundlage" value="gesetz"${grundlageVor === 'gesetz' ? ' checked' : ''} /> Gesetz</label>
+                            <label class="modr__wahl${km ? ' is-aus' : ''}"><input type="radio" name="modGrundlage" value="regeln"${grundlageVor === 'regeln' ? ' checked' : ''}${km ? ' disabled' : ''} /> Community-Richtlinien${km ? ' (nicht bei Missbrauch von Kindern)' : ''}</label>
+                          </div>
+                          <div class="modr__gruppe" id="modNormGruppe"${grundlageVor === 'gesetz' ? '' : ' hidden'}>
+                            <label class="melden__label" for="modNorm">${esc(M.NORM.label)}</label>
+                            <input class="feld__eingabe" id="modNorm" maxlength="120" placeholder="${esc(M.NORM.platzhalter(m.kategorie))}" value="${km ? esc(M.NORM_VORSCHLAG.kindesmissbrauch) : ''}" />
+                          </div>
+                          <div class="modr__gruppe" id="modKlauselGruppe"${grundlageVor === 'regeln' ? '' : ' hidden'}>
+                            <label class="melden__label" for="modKlausel">Abschnitt der Community-Richtlinien</label>
+                            <select class="feld__eingabe" id="modKlausel">
+                              <option value=""${klauselVor ? '' : ' selected'}>— bitte wählen —</option>
+                              ${M.KLAUSELN.map((k) => `<option value="${k.nr}"${klauselVor && klauselVor.nr === k.nr ? ' selected' : ''}>${k.nr}. ${esc(k.titel)}</option>`).join('')}
+                            </select>
+                          </div>
+                          <div class="modr__gruppe" id="modSperreGruppe" hidden><span>Sperrdauer</span>
+                            <select class="feld__eingabe" id="modSperre">${M.sperrdauernFuer(m.kategorie).map((s) => `<option value="${s.tage ?? ''}">${esc(s.name)}</option>`).join('')}</select>
+                          </div>
+                          ${
+                            km
+                              ? `<div class="modr__gruppe" id="modBestaetigtGruppe" hidden>
+                                  <label class="melden__label" for="modBestaetigt">${esc(M.BESTAETIGUNG.label)}</label>
+                                  <input class="feld__eingabe" id="modBestaetigt" maxlength="500" placeholder="${esc(M.BESTAETIGUNG.platzhalter)}" />
+                                </div>`
+                              : ''
+                          }
+                          ${
+                            M.art18Pflicht(m.kategorie)
+                              ? `<div class="modr__gruppe" id="modZurueckGruppe" hidden>
+                                  <label class="modr__wahl"><input type="checkbox" id="modZurueck" /> ${esc(M.ZURUECK.label)}</label>
+                                  <p class="sheet__hint">${esc(M.ZURUECK.hinweis)}</p>
+                                </div>`
+                              : ''
+                          }`
+                    }
+                    <label class="melden__label" for="modBegruendung">${problem ? 'Antwort an die meldende Person (freiwillig)' : 'Begründung (geht an beide Seiten, mindestens 20 Zeichen)'}</label>
+                    <textarea class="feld__eingabe feld__eingabe--mehrzeilig" id="modBegruendung" rows="4" maxlength="${M.MAX_BEGRUENDUNG}">${esc(problem ? M.vorlage('problem') : M.vorlageFuer(m.kategorie, km ? 'entfernen' : 'keine'))}</textarea>
+                    <p class="melden__fehler" id="modFehler" role="alert" hidden></p>
+                    <button class="prof__btn is-primary" id="modEntscheiden">${problem ? 'Als erledigt markieren' : 'Entscheiden'}</button>
+                  </div>`
+                : `<div class="modr__feld"><span>Entschieden ${esc(m.entschieden ? M.datum(m.entschieden) : '')}</span><p>${esc(M.massnahmeName(m.massnahme))}${m.begruendung ? ` — ${esc(m.begruendung)}` : ''}</p></div>
+                   ${
+                     km && m.massnahme === 'entfernen' && m.ziel_profil
+                       ? `<div class="modr__form" data-modnachtrag>
+                           <b class="melden__hinweistitel">${esc(M.NACHTRAG.titel)}</b>
+                           <label class="melden__label" for="modNBestaetigt">${esc(M.BESTAETIGUNG.label)}</label>
+                           <input class="feld__eingabe" id="modNBestaetigt" maxlength="500" placeholder="${esc(M.BESTAETIGUNG.platzhalter)}" />
+                           <div class="modr__gruppe"><span>Sperrdauer</span>
+                             <select class="feld__eingabe" id="modNSperre">${M.sperrdauernFuer(m.kategorie).map((s) => `<option value="${s.tage ?? ''}">${esc(s.name)}</option>`).join('')}</select>
+                           </div>
+                           <label class="melden__label" for="modNBegruendung">${esc(M.NACHTRAG.begruendung)}</label>
+                           <textarea class="feld__eingabe feld__eingabe--mehrzeilig" id="modNBegruendung" rows="3" maxlength="${M.MAX_BEGRUENDUNG}">${esc(M.NORM_VORSCHLAG.kindesmissbrauch)}: </textarea>
+                           <p class="melden__fehler" id="modNFehler" role="alert" hidden></p>
+                           <button class="prof__btn is-danger" id="modNachtrag">${esc(M.NACHTRAG.knopf)}</button>
+                         </div>`
+                       : ''
+                   }
+                   ${
+                     m.zurueckgestellt
+                       ? `<div class="modr__form" data-modzurueckgestellt>
+                           <p class="sheet__hint">${esc(M.ZURUECK.liste)}</p>
+                           <p class="melden__fehler" id="modZFehler" role="alert" hidden></p>
+                           <button class="prof__btn is-primary" id="modNachsenden">${esc(M.ZURUECK.knopf)}</button>
+                         </div>`
+                       : ''
+                   }`
+            }
+          </div>`;
+        body.querySelector('[data-modzurueck]').addEventListener('click', liste);
+        art18Verdrahten(m);
+        mediumVerdrahten(m);
+        if (!offen) return nachtraegeVerdrahten(m);
+        const fehlerFeld = body.querySelector('#modFehler');
+        const zeige = (t) => {
+          fehlerFeld.textContent = t || '';
+          fehlerFeld.hidden = !t;
+        };
+        // Ein alter Fehler bleibt nicht stehen, während korrigiert wird.
+        body.querySelectorAll('#modBegruendung, #modNorm, #modBestaetigt, #modKlausel').forEach((el) => el.addEventListener('input', () => zeige('')));
+        const textfeld = body.querySelector('#modBegruendung');
+        const gewaehlt = () => body.querySelector('[name="modMassnahme"]:checked')?.value || 'keine';
+        const grundlage = () => body.querySelector('[name="modGrundlage"]:checked')?.value || null;
+        let letzteVorlage = textfeld.value;
+        const sichtbarkeit = () => {
+          const ms = gewaehlt();
+          const g = grundlage();
+          const set = (id, an) => {
+            const el = body.querySelector(id);
+            if (el) el.hidden = !an;
+          };
+          set('#modSperreGruppe', M.sperrt(ms));
+          set('#modBestaetigtGruppe', km && M.sperrt(ms));
+          set('#modNormGruppe', ms !== 'keine' && g === 'gesetz');
+          set('#modKlauselGruppe', ms !== 'keine' && g === 'regeln');
+          set('#modGrundlageGruppe', ms !== 'keine');
+          set('#modZurueckGruppe', ms !== 'keine');
+          // Vorlage folgt der Maßnahme, solange nichts eigenes dasteht (Fund 17).
+          if (!problem && (M.btrim(textfeld.value) === '' || textfeld.value === letzteVorlage)) {
+            letzteVorlage = M.vorlageFuer(m.kategorie, ms);
+            textfeld.value = letzteVorlage;
+          }
+        };
+        body.querySelectorAll('[name="modMassnahme"], [name="modGrundlage"]').forEach((r) => r.addEventListener('change', sichtbarkeit));
+        if (!problem) sichtbarkeit();
+
+        body.querySelector('#modEntscheiden').addEventListener('click', async (e) => {
+          const ms = problem ? 'keine' : gewaehlt();
+          const roh = {
+            art: m.art,
+            kategorie: m.kategorie,
+            massnahme: ms,
+            grundlage: problem ? null : grundlage(),
+            begruendung: textfeld.value,
+            norm: body.querySelector('#modNorm')?.value ?? '',
+            klausel: body.querySelector('#modKlausel')?.value || null,
+            bestaetigt: body.querySelector('#modBestaetigt')?.value ?? '',
+            sperreTage: M.sperrt(ms) ? body.querySelector('#modSperre').value || null : null,
+            zielProfil: m.ziel_profil,
+            art18: Boolean(m.art18),
+          };
+          // Die Vorlage allein reicht nicht: sie nennt die Regel, nicht die Tatsachen.
+          if (!problem && !km && M.btrim(roh.begruendung) === M.btrim(M.vorlage(m.kategorie))) {
+            return zeige('Bitte ergänze die Vorlage um die Tatsachen: was genau steht im Inhalt?');
+          }
+          const grund = M.entscheidungPruefen(roh);
+          if (grund) return zeige(M.grundText(grund));
+          const eingabe = {
+            massnahme: ms,
+            grundlage: problem ? null : roh.grundlage,
+            begruendung: problem ? roh.begruendung : M.begruendungMitGrundlage(roh),
+            sperreTage: roh.sperreTage,
+            ...(km && M.sperrt(ms) ? { bestaetigt: roh.bestaetigt } : {}),
+            ...(ms !== 'keine' && body.querySelector('#modZurueck')?.checked ? { zurueckstellen: true } : {}),
+          };
+          e.target.disabled = true;
+          const a = await api(`/api/moderation/meldungen/${encodeURIComponent(m.id)}`, eingabe);
+          if (a?.ok && a.erledigt) {
+            toast(eingabe.zurueckstellen ? 'Entschieden — die Begründung an die betroffene Person ist zurückgestellt' : 'Entschieden — beide Seiten bekommen die Begründung');
+            return liste();
+          }
+          e.target.disabled = false;
+          // „begruendung" heißt hier die 20 Zeichen der Entscheidung, nicht die 10 der Meldung.
+          const g = a?.grund === 'begruendung' ? 'begruendung_entscheidung' : a?.grund;
+          zeige(a?.ok === false ? a.error || a.fehler || M.grundText('netz') : M.grundText(g));
+        });
+      };
+
+      const beschwerden = async () => {
+        tabs();
+        body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
+        const d = await holen('/api/moderation/beschwerden?status=offen');
+        if (d.fehler) return (body.innerHTML = fehlerHtml(d.fehler));
+        moderation.beschwerden = d.zeilen || [];
+        body.innerHTML = moderation.beschwerden.length
+          ? moderation.beschwerden
+              .map(
+                (b) => `<div class="kstatus__karte" data-modbeschwerde="${esc(b.id)}">
+                  <div class="kstatus__kopf"><b>${esc(M.kategorieName(b.kategorie))} · ${esc(M.ART_NAME[b.art] || b.art)}</b><span>${esc(M.datum(b.erstellt))}</span></div>
+                  <div class="kstatus__stand">${b.rolle === 'betroffen' ? 'Widerspruch der betroffenen Person' : 'Widerspruch der meldenden Person'}</div>
+                  <p>Entscheidung: ${esc(M.massnahmeName(b.massnahme))}${b.begruendung_entscheidung ? ` — ${esc(b.begruendung_entscheidung)}` : ''}</p>
+                  ${b.text ? `<p>Widerspruch: ${esc(b.text)}</p>` : '<p class="kstatus__leise">Ohne Begründung eingelegt.</p>'}
+                  ${b.entschieden_von_mir ? '<p class="kstatus__leise">Du hast die Entscheidung selbst getroffen — besser prüft das jemand anderes.</p>' : ''}
+                  ${belegHtml(b)}
+                  <textarea class="feld__eingabe feld__eingabe--mehrzeilig" data-bbegruendung rows="3" maxlength="${M.MAX_BEGRUENDUNG}" placeholder="Begründung (mindestens 20 Zeichen)"></textarea>
+                  <p class="melden__fehler" data-bfehler role="alert" hidden></p>
+                  <div class="modr__knoepfe">
+                    <button class="joinbtn" data-bergebnis="aufgehoben">Aufheben</button>
+                    <button class="joinbtn is-joined" data-bergebnis="bestaetigt">Bestätigen</button>
+                  </div>
+                </div>`
+              )
+              .join('')
+          : `<p class="sheet__text" data-modleer>${esc(M.LEER.beschwerden)}</p>`;
+        body.querySelectorAll('[data-bbegruendung]').forEach((feld) =>
+          feld.addEventListener('input', () => {
+            const f = feld.closest('[data-modbeschwerde]').querySelector('[data-bfehler]');
+            f.textContent = '';
+            f.hidden = true;
+          })
+        );
+        body.querySelectorAll('[data-bergebnis]').forEach((k) =>
+          k.addEventListener('click', async () => {
+            const karte = k.closest('[data-modbeschwerde]');
+            const f = karte.querySelector('[data-bfehler]');
+            const begruendung = karte.querySelector('[data-bbegruendung]').value;
+            if (M.zeichen(M.btrim(begruendung)) < M.MIN_ENTSCHEIDUNG) {
+              f.textContent = M.grundText('begruendung_entscheidung');
+              f.hidden = false;
+              return;
+            }
+            k.disabled = true;
+            const a = await api(`/api/moderation/beschwerden/${encodeURIComponent(karte.dataset.modbeschwerde)}`, {
+              ergebnis: k.dataset.bergebnis,
+              begruendung,
+            });
+            if (a?.ok && a.erledigt) {
+              toast(k.dataset.bergebnis === 'aufgehoben' ? 'Entscheidung aufgehoben' : 'Entscheidung bestätigt');
+              return beschwerden();
+            }
+            k.disabled = false;
+            const g = a?.grund === 'begruendung' ? 'begruendung_entscheidung' : a?.grund;
+            f.textContent = a?.ok === false ? a.error || a.fehler || M.grundText('netz') : M.grundText(g);
+            f.hidden = false;
+          })
+        );
+      };
+
+      const zahlen = async () => {
+        tabs();
+        body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
+        const bis = new Date();
+        const von = new Date(bis.getTime() - 30 * 864e5);
+        const d = await holen(`/api/moderation/zahlen?von=${encodeURIComponent(von.toISOString())}&bis=${encodeURIComponent(bis.toISOString())}`);
+        if (d.fehler) return (body.innerHTML = fehlerHtml(d.fehler));
+        const z = d.zahlen || {};
+        const reihe = (k, w) => `<div class="item"><span class="item__label">${esc(k)}</span><span class="item__value">${esc(String(w))}</span></div>`;
+        const gruppe = (obj, name) =>
+          Object.entries(obj || {})
+            .map(([k, n]) => reihe(name(k), n))
+            .join('') || '<div class="sheet__hint">—</div>';
+        body.innerHTML = `
+          <div class="sheet__gruppe">Letzte 30 Tage</div>
+          <div data-modzahlen>
+            ${reihe('Meldungen', z.meldungen ?? 0)}
+            ${reihe('Mittlere Bearbeitungszeit', z.median_stunden != null ? `${z.median_stunden} Std.` : '—')}
+            ${reihe('Widersprüche', z.beschwerden ?? 0)}
+            ${reihe('davon aufgehoben', z.aufgehoben ?? 0)}
+            ${reihe('Automatisiert entschieden', z.automatisiert ?? 0)}
+          </div>
+          <div class="sheet__gruppe">Je Kategorie</div>${gruppe(z.je_kategorie, M.kategorieName)}
+          <div class="sheet__gruppe">Je Maßnahme</div>${gruppe(z.je_massnahme, M.massnahmeName)}`;
+      };
+
+      const zeige = () => (moderation.tab === 'beschwerden' ? beschwerden() : moderation.tab === 'zahlen' ? zahlen() : liste());
+      sheet.querySelectorAll('[data-modtab]').forEach((b) =>
+        b.addEventListener('click', () => {
+          moderation.tab = b.dataset.modtab;
+          zeige();
+        })
+      );
+      zeige();
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/** Lange drücken (oder Rechtsklick) auf eine fremde Nachricht im Unterthema → melden. */
+function kanalNachrichtMenue(id) {
+  openSheet(
+    'Nachricht',
+    `<div class="sheet__body">
+       <button class="item item--danger" data-kanalmelden="${esc(id)}">
+         <span class="item__icon">${ICONS.flag}</span>
+         <span class="item__label">Nachricht melden</span>
+       </button>
+     </div>`,
+    (sheet, close) => {
+      sheet.querySelector('[data-kanalmelden]').addEventListener('click', () => {
+        close();
+        openMeldenBlatt({ art: 'kanal_nachricht', id });
+      });
+    },
+    { schliessen: true }
+  );
+}
+
 /* ------------------------------ Weitere Optionen im Profil einer Person */
 /*
  * Der Knopf gab bisher "folgen in Phase 3" aus. Jetzt hat jede Option
@@ -11907,15 +13022,6 @@ const beitragLink = (id) => `${location.origin}/?beitrag=${encodeURIComponent(id
 
 /* Henriks Aufzaehlung vom 21.09.2026 (Kasten 8.3). Gleiche Liste in der App. */
 const BEITRAG_OPTIONEN_REIHENFOLGE = ['link', 'sichern', 'story', 'melden', 'kein'];
-
-const BEITRAG_MELDE_GRUENDE = [
-  'Spam oder Werbung',
-  'Beleidigung oder Hass',
-  'Gewalt oder Gefahr',
-  'Nicht jugendfreie Inhalte',
-  'Falschinformation',
-  'Etwas anderes',
-];
 
 /*
  * Drei-Punkte-Menue am Beitrag — Henrik am 21.09.2026: "Link kopieren,
@@ -12048,30 +13154,8 @@ async function openBeitragOptionen(beitrag) {
             return toast('Du siehst diesen Beitrag nicht mehr im Feed');
           }
 
-          // Melden: erst der Grund, dann an die Datenbank.
-          openSheet(
-            'Warum meldest du das?',
-            `<div class="sheet__body">${BEITRAG_MELDE_GRUENDE.map(
-              (g) => `<button class="item" data-grund="${esc(g)}">
-                <span class="item__label">${esc(g)}</span>
-                <span class="row__chevron">${ICONS.chevron}</span>
-              </button>`
-            ).join('')}</div>`,
-            (blatt, zu) => {
-              blatt.querySelectorAll('[data-grund]').forEach((g) =>
-                g.addEventListener('click', async () => {
-                  zu();
-                  try {
-                    await senden('melden', { grund: g.dataset.grund });
-                    toast('Danke, wir sehen uns das an');
-                  } catch (fehler) {
-                    toast(`Das Melden fehlgeschlagen: ${fehler.message}`);
-                  }
-                })
-              );
-            },
-            { schliessen: true }
-          );
+          // Kasten RS 3: das Melden-Blatt (Kategorie, Begründung, Häkchen).
+          if (was === 'melden') return openMeldenBlatt({ art: 'post', id: beitrag.id });
         })
       );
     },
@@ -12099,14 +13183,6 @@ function geteiltenBeitragOeffnen() {
   }
   toast('Diesen Beitrag gibt es nicht mehr');
 }
-
-const MELDE_GRUENDE = [
-  'Spam oder Werbung',
-  'Beleidigung oder Hass',
-  'Gefälschtes Profil',
-  'Nicht jugendfreie Inhalte',
-  'Etwas anderes',
-];
 
 function openProfilOptionen(profile, aktualisiert) {
   const senden = async (was, koerper) => {
@@ -12172,25 +13248,8 @@ function openProfilOptionen(profile, aktualisiert) {
 
           if (was === 'melden') {
             close();
-            return openSheet(
-              'Profil melden',
-              `<div class="sheet__body">${MELDE_GRUENDE.map(
-                (g) => `<button class="item" data-grund="${esc(g)}">
-                  <span class="item__label">${esc(g)}</span>
-                  <span class="row__chevron">${ICONS.chevron}</span>
-                </button>`
-              ).join('')}</div>`,
-              (blatt, zu) => {
-                blatt.querySelectorAll('[data-grund]').forEach((g) =>
-                  g.addEventListener('click', async () => {
-                    zu();
-                    const daten = await senden('melden', { grund: g.dataset.grund });
-                    if (daten) toast('Danke, wir sehen uns das an');
-                  })
-                );
-              },
-              { schliessen: true }
-            );
+            // Kasten RS 3: das Melden-Blatt (art 'user', Schema 102).
+            return openMeldenBlatt({ art: 'user', id: profile.id });
           }
 
           close();
@@ -12664,31 +13723,12 @@ async function openStoryOptionen(story, danach) {
             return danach?.();
           }
 
-          // Melden: derselbe Weg wie im Profil.
-          openSheet(
-            'Story melden',
-            `<div class="sheet__body">${MELDE_GRUENDE.map(
-              (g) => `<button class="item" data-grund="${esc(g)}">
-                <span class="item__label">${esc(g)}</span>
-                <span class="row__chevron">${ICONS.chevron}</span>
-              </button>`
-            ).join('')}</div>`,
-            (blatt, zu) => {
-              blatt.querySelectorAll('[data-grund]').forEach((g) =>
-                g.addEventListener('click', async () => {
-                  zu();
-                  await fetch(`/api/profile/${story.userId}/melden`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ grund: g.dataset.grund }),
-                  });
-                  toast('Danke, wir sehen uns das an');
-                  danach?.();
-                })
-              );
-            },
-            { schliessen: true }
-          );
+          /*
+           * Kasten RS 3: bis zum 22.10.2026 meldete „Story melden" das PROFIL
+           * (/api/profile/:userId/melden). Jetzt die Story selbst — echte
+           * Story-ID, art 'story' — über das Melden-Blatt.
+           */
+          if (was === 'melden') return openMeldenBlatt({ art: 'story', id: story.id }, danach);
         })
       );
     },
@@ -17231,22 +18271,15 @@ async function openChatSettings(chatId) {
           return toast('Chat exportiert');
         }
 
+        /*
+         * Kasten RS 3: „Chat melden" meldet im Zweierchat die andere Person
+         * über das neue Verfahren (Route /api/chats/:id/melden → inhalt_melden).
+         * In einer Gruppe gibt es nicht „die" andere Person — dort die einzelne
+         * Nachricht (lange drücken → Melden).
+         */
         if (was === 'melden') {
-          return openFormular(
-            'Chat melden',
-            [{ key: 'grund', label: 'Was ist passiert?', typ: 'mehrzeilig', pflicht: true }],
-            async ({ grund }) => {
-              const res = await fetch(`/api/chats/${chatId}/melden`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ grund }),
-              }).then((r) => r.json());
-              if (!res.ok) return res.error || 'Das hat nicht geklappt';
-              toast(res.meldung);
-              return null;
-            },
-            'Melden'
-          );
+          if (chat?.isGroup) return toast('In einer Gruppe meldest du die einzelne Nachricht: lange darauf drücken → Melden.');
+          return openMeldenBlatt({ art: 'user', id: chat?.userId || chatId, pfad: `/api/chats/${encodeURIComponent(chatId)}/melden` });
         }
 
         if (was === 'leeren') {
@@ -18221,6 +19254,8 @@ function openNachrichtMenue(m, chat) {
     ...(eigene && !hinweis ? [{ key: 'bearbeiten', label: 'Bearbeiten', icon: 'bearbeiten' }] : []),
     { key: 'markieren', label: m.stern ? 'Markierung entfernen' : 'Mit Stern markieren', icon: 'star' },
     ...(eigene ? [{ key: 'zuruecknehmen', label: 'Zurücknehmen', icon: 'trash', gefahr: true }] : []),
+    // Kasten RS 3: eine fremde Nachricht melden — nur hier, also nur in eigenen Chats.
+    ...(!eigene && !hinweis ? [{ key: 'melden', label: 'Melden', icon: 'flag', gefahr: true }] : []),
   ];
 
   openSheet(
@@ -18281,6 +19316,39 @@ function openNachrichtMenue(m, chat) {
           }
 
           if (was === 'weiterleiten') return openWeiterleiten(m, chat);
+
+          /*
+           * Kasten RS 3: der Beleg — Klartext dieser einen Nachricht und bei
+           * Ende-zu-Ende ihr Sitzungsschlüssel (KryptoWeb.meldebeleg), nie der
+           * Schlüssel dieses Browsers. Gleicher Weg in der App
+           * (ChatDetailScreen → meldebelegHolen).
+           */
+          if (was === 'melden') {
+            return openMeldenBlatt({
+              art: 'message',
+              id: m.id,
+              /*
+               * Gate 2, Fund 30: die Nachricht vor dem Beleg FRISCH laden (wie
+               * die App, meldebelegHolen). inhalt_melden speichert die aktuelle
+               * Chiffre; ein Beleg aus der geladenen, inzwischen bearbeiteten
+               * Fassung hieße beim Moderator „passt nicht". Geht das Laden
+               * schief, bleibt die geladene Fassung.
+               */
+              beleg: async () => {
+                let frisch = null;
+                try {
+                  const r = await fetch(`/api/messages/${encodeURIComponent(chat.id)}`);
+                  const d = await r.json();
+                  const liste = Array.isArray(d) ? d : Array.isArray(d?.messages) ? d.messages : [];
+                  frisch = liste.find((x) => x && x.id === m.id) || null;
+                } catch (e) {
+                  console.warn('Nachricht für den Beleg nicht frisch geladen:', e?.message || e);
+                }
+                const n = frisch || m;
+                return window.KryptoWeb?.meldebeleg ? window.KryptoWeb.meldebeleg(n) : { text: n.text || '' };
+              },
+            });
+          }
 
           if (was === 'markieren') {
             const res = await fetch(`/api/messages/${chat.id}/${m.id}/stern`, { method: 'POST' });

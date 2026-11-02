@@ -26,6 +26,8 @@ import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { useBildschirmzeit } from '../contexts/BildschirmzeitContext';
 import { useSupabase } from '../contexts/SupabaseContext';
+
+const Einwilligung = require('../../gemeinsam/einwilligung') as typeof import('../../gemeinsam/einwilligung');
 import {
   Bildschirmzeit,
   BzBereich,
@@ -61,6 +63,10 @@ export const BildschirmzeitSheet = ({ ansicht, onClose }: Props) => {
   const [kind, setKind] = useState<BzPerson | null>(null);
   const [kindStand, setKindStand] = useState<BzStand | null>(null);
   const [meldung, setMeldung] = useState<string | null>(null);
+  // Kasten RS 5 (Schema 106): Zustimmung zurücknehmen — Stand je Kind und Rückfrage.
+  const [einw, setEinw] = useState<import('../../gemeinsam/einwilligung').Kind[] | null>(null);
+  const [widerrufFrage, setWiderrufFrage] = useState(false);
+  const widerrufLaeuft = useRef(false);
 
   const seite = stapel[stapel.length - 1];
   const stand = kind ? kindStand : bz.stand;
@@ -74,6 +80,23 @@ export const BildschirmzeitSheet = ({ ansicht, onClose }: Props) => {
   useEffect(() => {
     void kindLaden();
   }, [kindLaden]);
+
+  useEffect(() => {
+    setWiderrufFrage(false);
+    if (!supabase || !kind) return;
+    void Einwilligung.kinder(supabase).then((r) => setEinw(r.ok ? r.liste : null));
+  }, [supabase, kind]);
+
+  const widerrufen = async () => {
+    if (!supabase || !kind || widerrufLaeuft.current) return;
+    widerrufLaeuft.current = true;
+    const r = await Einwilligung.widerrufen(supabase, kind.id);
+    widerrufLaeuft.current = false;
+    setWiderrufFrage(false);
+    setMeldung(r.text);
+    const neu = await Einwilligung.kinder(supabase);
+    setEinw(neu.ok ? neu.liste : null);
+  };
 
   const zu = (s: Seite) => {
     setMeldung(null);
@@ -139,6 +162,27 @@ export const BildschirmzeitSheet = ({ ansicht, onClose }: Props) => {
           >
             <Text style={styles.gefahrText}>Elternkontrolle beenden</Text>
           </Druck>
+          {(() => {
+            // Nur wenn Schema 106 da ist und es etwas zu widerrufen gibt — sonst kein Knopf ohne Wirkung.
+            const e = einw?.find((e) => e.id === kind?.id);
+            if (!e) return null;
+            return (
+              <>
+                {kopf('Zustimmung')}
+                {zeile(Einwilligung.standText(e), e.entschieden_am ? Einwilligung.datum(e.entschieden_am) : '')}
+                {e.widerrufbar && widerrufFrage && <Text style={styles.hinweis}>{Einwilligung.widerrufHinweis(e)}</Text>}
+                {e.widerrufbar && (
+                  <Druck
+                    style={styles.gefahr}
+                    onPress={() => (widerrufFrage ? widerrufen() : setWiderrufFrage(true))}
+                    testID="bz-widerruf"
+                  >
+                    <Text style={styles.gefahrText}>{widerrufFrage ? 'Ja, zurücknehmen' : Einwilligung.WIDERRUF_KNOPF}</Text>
+                  </Druck>
+                )}
+              </>
+            );
+          })()}
         </>
       );
     }

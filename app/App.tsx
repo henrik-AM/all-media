@@ -23,6 +23,7 @@ import { useAktionen } from './lib/useAktionen';
 import { ladeEinstellungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
 import { KontoFreigabe } from './components/KontoFreigabe';
+import { NeueBedingungen } from './components/NeueBedingungen';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
@@ -1403,7 +1404,17 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   };
 
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
-  const mitteilungOeffnen = (ziel: MitteilungsZiel) => {
+  const mitteilungOeffnen = (ziel: MitteilungsZiel, text = '') => {
+    /*
+     * Kasten RS 3: Rechtsmitteilung (Schema 102). Wer betroffen ist, bekommt
+     * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen“ —
+     * so steht es im Satz der Datenbank. Wie die Website (mitteilungOeffnen).
+     */
+    if (ziel.art === 'meldung') {
+      setSettingsSprung(/Kontostatus/.test(text) ? 'kontostatus' : 'meinemeldungen');
+      setSettingsVonBereich(area);
+      return setArea('settings');
+    }
     if (ziel.art === 'profile') return openPublicProfile(ziel.id);
     // Chat-Anfrage und Messenger-Anfrage führen in den Chat, um den es geht.
     if (ziel.art === 'chat') {
@@ -2635,13 +2646,16 @@ const Root = () => {
   // Zustimmung eines Elternteils (Schema 52, components/KontoFreigabe.tsx).
   return isLoggedIn ? (
     <KontoFreigabe>
-      <View style={{ flex: 1 }}>
-        {/* Kasten 22: Messung und Sperre der eigenen Bildschirmzeit. */}
-        <BildschirmzeitProvider onNotice={setNotice}>
-          <Shell setNotice={setNotice} />
-        </BildschirmzeitProvider>
-        <Toast message={notice} onHide={hideNotice} />
-      </View>
+      {/* Kasten RS 7: geltender Fassung der Bedingungen zugestimmt (Schema 106). */}
+      <NeueBedingungen>
+        <View style={{ flex: 1 }}>
+          {/* Kasten 22: Messung und Sperre der eigenen Bildschirmzeit. */}
+          <BildschirmzeitProvider onNotice={setNotice}>
+            <Shell setNotice={setNotice} />
+          </BildschirmzeitProvider>
+          <Toast message={notice} onHide={hideNotice} />
+        </View>
+      </NeueBedingungen>
     </KontoFreigabe>
   ) : (
     <LoginScreen />

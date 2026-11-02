@@ -21,6 +21,8 @@ const Telefon = require('../../gemeinsam/telefon');
 const Teilen = require('../../gemeinsam/teilen');
 // Spendencode und Gründe (Kasten 13) — dieselbe Regel wie App und Datenbank.
 const Zahlung = require('../../gemeinsam/zahlung');
+// Kasten RS 3: Melden und Moderation (Schema 102) — dieselben Regeln wie die App.
+const Meldung = require('../../gemeinsam/meldung');
 
 // Ein Umschalter (Like, Gespeichert, Repost …): Zeile da → weg, sonst → hin.
 async function umschalten(client, tabelle, schluessel) {
@@ -1554,6 +1556,209 @@ const handleReportContent = handler(
   }
 );
 
+// ------------------------------------------------ Melden und Moderation --
+/*
+ * Kasten RS 3 (DSA Art. 16, 17, 20; Schema 102). Gleicher Ablauf wie in der
+ * App (app/lib/aktionen.ts, inhaltMelden):
+ *
+ *   1. Eingabe prüfen wie inhalt_melden() (gemeinsam/meldung.js)
+ *   2. inhalt_melden() rufen
+ *   3. NUR wenn die Funktion fehlt (Schema 102 nicht eingespielt): alter
+ *      direkter Eintrag in `reports` für die fünf alten Arten; alles andere
+ *      `grund: 'update'` — nie eine vorgetäuschte Bestätigung.
+ *
+ * Rückgabe immer `{ ok, id?, grund?, alterWeg? }` — `grund` ist ein Schlüssel
+ * aus Meldung.GRUND, den Satz bildet die Oberfläche.
+ */
+const handleInhaltMelden = handler('Melden', async (client, nutzerId, eingabe) => {
+  const e = {
+    art: String(eingabe?.art || ''),
+    ziel: eingabe?.ziel ? String(eingabe.ziel) : null,
+    kategorie: eingabe?.art === 'problem' ? 'problem' : eingabe?.kategorie ? String(eingabe.kategorie) : null,
+    begruendung: String(eingabe?.begruendung || '').slice(0, Meldung.MAX_BEGRUENDUNG),
+    gutglaeubig: eingabe?.gutglaeubig === true,
+    beleg:
+      eingabe?.beleg && typeof eingabe.beleg === 'object'
+        ? {
+            text: String(eingabe.beleg.text || '').slice(0, 5000),
+            ...(eingabe.beleg.sitzung ? { sitzung: String(eingabe.beleg.sitzung).slice(0, 64) } : {}),
+          }
+        : null,
+  };
+  if (e.ziel && !/^[0-9a-f-]{36}$/i.test(e.ziel)) return { ok: true, gemeldet: false, grund: 'ziel' };
+  const grund = Meldung.pruefen(e);
+  if (grund) return { ok: true, gemeldet: false, grund };
+
+  const { data, error } = await client.rpc('inhalt_melden', {
+    p_art: e.art,
+    p_ziel: e.art === 'problem' ? null : e.ziel,
+    p_kategorie: e.kategorie,
+    p_begruendung: e.begruendung,
+    p_gutglaeubig: e.gutglaeubig,
+    p_beleg: e.beleg,
+  });
+  if (!error) {
+    return data && data.ok
+      ? { ok: true, gemeldet: true, id: data.id || null }
+      : { ok: true, gemeldet: false, grund: (data && data.grund) || 'ziel' };
+  }
+  if (!Meldung.fehltFunktion(error, 'inhalt_melden')) throw error;
+  if (!Meldung.alterWegMoeglich(e.art)) return { ok: true, gemeldet: false, grund: 'update' };
+  const { error: alt } = await client
+    .from('reports')
+    .insert({ reported_by: nutzerId, target_type: e.art, target_id: e.ziel, reason: Meldung.alterGrund(e) });
+  if (alt) throw alt;
+  return { ok: true, gemeldet: true, id: null, alterWeg: true };
+});
+
+/*
+ * Eine Liste aus einer Funktion von Schema 102. `fehlt: true`, wenn es die
+ * Funktion noch nicht gibt — die Oberfläche zeigt dann einen ehrlichen
+ * Hinweis statt einer leeren Liste. 42501 (kein Moderator) → `erlaubt: false`.
+ */
+async function meldeListe(client, funktion, argumente) {
+  const { data, error } = argumente ? await client.rpc(funktion, argumente) : await client.rpc(funktion);
+  if (error) {
+    if (Meldung.fehltFunktion(error, funktion)) return { ok: true, fehlt: true, zeilen: [] };
+    if (error.code === '42501') return { ok: true, erlaubt: false, zeilen: [] };
+    throw error;
+  }
+  return { ok: true, fehlt: false, zeilen: data || [] };
+}
+
+const handleMeineMeldungen = handler('Meine Meldungen', (client) => meldeListe(client, 'meine_meldungen'));
+const handleKontostatus = handler('Kontostatus', (client) => meldeListe(client, 'mich_betreffende_entscheidungen'));
+
+/** Ein JSON-Ergebnis `{ ok, grund }` einer Funktion von Schema 102 — gleich verpackt. */
+async function meldeAufruf(client, funktion, argumente) {
+  const { data, error } = await client.rpc(funktion, argumente);
+  if (error) {
+    if (Meldung.fehltFunktion(error, funktion)) return { ok: true, erledigt: false, grund: 'update' };
+    if (error.code === '42501') return { ok: true, erledigt: false, grund: 'nicht_erlaubt' };
+    throw error;
+  }
+  return data && data.ok ? { ok: true, erledigt: true, id: data.id || null } : { ok: true, erledigt: false, grund: (data && data.grund) || 'meldung' };
+}
+
+const handleWidersprechen = handler('Widerspruch', (client, nutzerId, meldungId, text) =>
+  meldeAufruf(client, 'entscheidung_widersprechen', {
+    p_meldung: meldungId,
+    p_text: String(text || '').slice(0, Meldung.MAX_BEGRUENDUNG),
+  })
+);
+
+/* Moderation — die Datenbank prüft selbst, ob ein Moderator fragt (ist_moderator). */
+const MELDE_STATUS = ['eingegangen', 'entschieden', 'erledigt', 'alle'];
+const BESCHWERDE_STATUS = ['offen', 'bestaetigt', 'aufgehoben', 'alle'];
+
+/*
+ * Gate 2, Fund 7: Die Medienadresse im Beleg geht NICHT mit der Liste hinaus.
+ * Sonst unterschriebe route() in app.js jedes gemeldete Bild und Video für
+ * vier Stunden, ohne dass jemand es angeklickt hat. Die Liste sagt nur, DASS
+ * es ein Medium gibt (`medium: true`, Dateiname); angesehen wird es über
+ * /api/moderation/meldungen/:id/medium — einzeln, fünf Minuten lang.
+ */
+function belegOhneMedien(zeilen) {
+  return (zeilen || []).map((z) => {
+    if (!z || !z.beleg || typeof z.beleg !== 'object' || !z.beleg.medien) return z;
+    const { medien, ...rest } = z.beleg;
+    const datei = String(medien).split(/[?#]/)[0].split('/').pop() || '';
+    return { ...z, beleg: { ...rest, medium: true, medium_datei: datei } };
+  });
+}
+
+const handleModerationMeldungen = handler('Moderation: Meldungen', async (client, nutzerId, status) => {
+  const r = await meldeListe(client, 'meldungen_liste', { p_status: MELDE_STATUS.includes(status) ? status : 'eingegangen' });
+  return { ...r, zeilen: belegOhneMedien(r.zeilen) };
+});
+
+/*
+ * Die Adresse des gemeldeten Mediums einer OFFENEN Meldung — nie bei
+ * Kindesmissbrauch. Unterschrieben wird in app.js (kurzlebig); die
+ * Speicherregel „Gemeldete Medien prüfen" (gemeldetes_medium, Schema 102)
+ * entscheidet dort noch einmal, ob die Moderator-Sitzung die Datei lesen darf.
+ */
+const handleModerationMedium = handler('Moderation: Medium', async (client, nutzerId, id) => {
+  const r = await meldeListe(client, 'meldungen_liste', { p_status: 'eingegangen' });
+  if (r.fehlt) return { ok: true, grund: 'update' };
+  if (r.erlaubt === false) return { ok: true, grund: 'nicht_erlaubt' };
+  const m = (r.zeilen || []).find((z) => z && z.id === id);
+  if (!m) return { ok: true, grund: 'medium' };
+  if (m.beleg_verborgen || m.kategorie === 'kindesmissbrauch') return { ok: true, grund: 'verborgen' };
+  const adresse = m.beleg && typeof m.beleg.medien === 'string' ? m.beleg.medien : '';
+  if (!adresse) return { ok: true, grund: 'medium' };
+  const typ = /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(adresse) ? 'video' : 'bild';
+  return { ok: true, adresse, typ };
+});
+
+const handleMeldungEntscheiden = handler('Moderation: Entscheiden', (client, nutzerId, id, e) => {
+  const tage = e && e.sperreTage != null && e.sperreTage !== '' ? Math.max(1, Math.min(3650, parseInt(e.sperreTage, 10) || 0)) : null;
+  const bestaetigt = String((e && e.bestaetigt) || '').trim().slice(0, 500);
+  return meldeAufruf(client, 'meldung_entscheiden', {
+    p_id: id,
+    p_massnahme: String((e && e.massnahme) || ''),
+    p_begruendung: String((e && e.begruendung) || '').slice(0, Meldung.MAX_BEGRUENDUNG),
+    p_grundlage: e && (e.grundlage === 'gesetz' || e.grundlage === 'regeln') ? e.grundlage : null,
+    p_sperre_tage: tage,
+    // Kindesmissbrauch: wer den Verdacht bestätigt hat (Fund 5) — sonst null.
+    p_bestaetigt: bestaetigt || null,
+    // Begründung an den Betroffenen zurückstellen (Ermittlungen, Fund 17).
+    p_zurueckstellen: Boolean(e && e.zurueckstellen === true),
+  });
+});
+
+/* Zurückgestellte Begründung nachsenden (Fund 17). */
+const handleBegruendungNachsenden = handler('Moderation: Begründung nachsenden', (client, nutzerId, id) =>
+  meldeAufruf(client, 'begruendung_nachsenden', { p_id: id })
+);
+
+/* Kindesmissbrauch, zweite Stufe: Sperre nach Bestätigung (Fund 5). */
+const handleSperreNachtragen = handler('Moderation: Sperre nachtragen', (client, nutzerId, id, e) => {
+  const tage = e && e.sperreTage != null && e.sperreTage !== '' ? Math.max(1, Math.min(3650, parseInt(e.sperreTage, 10) || 0)) : null;
+  return meldeAufruf(client, 'sperre_nachtragen', {
+    p_id: id,
+    p_sperre_tage: tage,
+    p_bestaetigt: String((e && e.bestaetigt) || '').trim().slice(0, 500),
+    p_begruendung: String((e && e.begruendung) || '').slice(0, Meldung.MAX_BEGRUENDUNG),
+  });
+});
+
+/* Fund 7: wer ein gemeldetes Medium ansieht, steht im Protokoll — vor dem Unterschreiben. */
+const handleMediumVermerken = handler('Moderation: Medium vermerken', (client, nutzerId, id) =>
+  meldeAufruf(client, 'medium_abruf_vermerken', { p_meldung: id })
+);
+
+/* Art. 18 DSA: BKA informiert — Aktenzeichen/Datum ins Protokoll (Fund 6). */
+const handleArt18Vermerken = handler('Moderation: Art. 18', (client, nutzerId, meldungId, vermerk) =>
+  meldeAufruf(client, 'art18_vermerken', {
+    p_meldung: meldungId,
+    p_vermerk: String(vermerk || '').slice(0, 500),
+  })
+);
+
+const handleModerationBeschwerden = handler('Moderation: Widersprüche', async (client, nutzerId, status) => {
+  const r = await meldeListe(client, 'beschwerden_liste', { p_status: BESCHWERDE_STATUS.includes(status) ? status : 'offen' });
+  return { ...r, zeilen: belegOhneMedien(r.zeilen) };
+});
+
+const handleBeschwerdeEntscheiden = handler('Moderation: Widerspruch entscheiden', (client, nutzerId, id, e) =>
+  meldeAufruf(client, 'beschwerde_entscheiden', {
+    p_id: id,
+    p_ergebnis: e && (e.ergebnis === 'aufgehoben' || e.ergebnis === 'bestaetigt') ? e.ergebnis : '',
+    p_begruendung: String((e && e.begruendung) || '').slice(0, Meldung.MAX_BEGRUENDUNG),
+  })
+);
+
+const handleModerationZahlen = handler('Moderation: Zahlen', async (client, nutzerId, von, bis) => {
+  const { data, error } = await client.rpc('moderation_zahlen', { p_von: von, p_bis: bis });
+  if (error) {
+    if (Meldung.fehltFunktion(error, 'moderation_zahlen')) return { ok: true, fehlt: true };
+    if (error.code === '42501') return { ok: true, erlaubt: false };
+    throw error;
+  }
+  return { ok: true, zahlen: data || {} };
+});
+
 const handleBlockUser = handler('Blockieren', async (client, nutzerId, zielId) => {
   const gesetzt = await umschalten(client, 'blocks', {
     user_id: nutzerId,
@@ -1590,7 +1795,8 @@ const handleMarkAllNotificationsRead = handler(
       .update({ read_at: new Date().toISOString() })
       .eq('user_id', nutzerId)
       .is('read_at', null);
-    if (bereich) abfrage = abfrage.eq('bereich', bereich);
+    // Kasten RS 3: Rechtsmitteilungen (bereich 'system') stehen in beiden Glocken.
+    if (bereich) abfrage = abfrage.in('bereich', [bereich, 'system']);
 
     const { error } = await abfrage;
     if (error) throw error;
@@ -1790,7 +1996,22 @@ const handleNachrichtZuruecknehmen = handler(
   async (client, nutzerId, nachrichtId) => {
     const { error } = await client
       .from('messages')
-      .update({ deleted_at: new Date().toISOString(), text: '' })
+      .update({
+        deleted_at: new Date().toISOString(),
+        text: '',
+        // Wie nachrichtZuruecknehmen() in app/lib/aktionen.ts: Chiffre und
+        // Anhang mit weg (Codex-Fund F9, 31.10.2026). Bis dahin blieb bei
+        // einer verschlüsselten Nachricht die Chiffre stehen, und eine
+        // Foto-/Dateinachricht konnte ein gesperrtes Konto nicht zurücknehmen.
+        krypto: 0,
+        chiffre: null,
+        krypto_nonce: null,
+        absender_schluessel: null,
+        media_url: null,
+        media_type: null,
+        file_name: null,
+        file_size: null,
+      })
       .eq('id', nachrichtId)
       .eq('sender_id', nutzerId);
     if (error) throw error;
@@ -2322,6 +2543,21 @@ module.exports = {
   handleEinstellung,
   handleProfilAufruf,
   handleReportContent,
+  handleInhaltMelden,
+  handleMeineMeldungen,
+  handleKontostatus,
+  handleWidersprechen,
+  handleModerationMeldungen,
+  handleMeldungEntscheiden,
+  handleModerationBeschwerden,
+  handleBeschwerdeEntscheiden,
+  handleModerationZahlen,
+  handleModerationMedium,
+  handleArt18Vermerken,
+  handleBegruendungNachsenden,
+  handleSperreNachtragen,
+  handleMediumVermerken,
+  belegOhneMedien,
   handleBlockUser,
   handleMuteUser,
   handleMarkNotificationRead,

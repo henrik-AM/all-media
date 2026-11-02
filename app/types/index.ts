@@ -513,22 +513,32 @@ export type MitteilungArt =
   | 'anfrage_ok'
   /** Messenger-Anfrage aus einem Community-Chat — Schema 57. */
   | 'messenger_anfrage'
-  | 'messenger_ok';
+  | 'messenger_ok'
+  /*
+   * Kasten RS 3 (Schema 102): Rechtsmitteilung ohne Absender —
+   * Eingangsbestätigung, Entscheidung, Begründung, Widerspruch. Der Satz
+   * steht fertig in `notifications.text`.
+   */
+  | 'system';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
 export interface MitteilungsZiel {
   /** 'story' seit Kasten 11.6: Markierung in einer Story. */
   /** 'comment': Herz an einem Kommentar (Schema 49), @ im Kommentar (Kasten 25). */
-  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment';
+  /** 'meldung': eine Rechtsmitteilung zu einer Meldung (Kasten RS 3, Schema 102). */
+  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung';
   id: string;
 }
 
 export interface Mitteilung {
   id: string;
-  bereich: MitteilungsBereich;
+  /** 'system' = Rechtsmitteilung (Schema 102); sie steht in beiden Glocken. */
+  bereich: MitteilungsBereich | 'system';
   art: MitteilungArt;
   userId: string;
+  /** Fertiger Satz — bei Rechtsmitteilungen (art 'system') gesetzt. */
+  text?: string;
   ziel: MitteilungsZiel;
   /** Wie lange her, in Minuten. Daraus wird "vor 10 min", "vor 3 W" ... */
   minuten: number;

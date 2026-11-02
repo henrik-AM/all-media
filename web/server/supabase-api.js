@@ -1333,7 +1333,10 @@ async function ladeBenachrichtigungen(client, nutzerId, bereich = null) {
     .eq('user_id', nutzerId)
     .order('created_at', { ascending: false })
     .limit(100);
-  if (bereich) abfrage = abfrage.eq('bereich', bereich);
+  // Kasten RS 3: Rechtsmitteilungen (bereich 'system', Schema 102) stehen in
+  // beiden Glocken — Eingangsbestätigung, Entscheidung, Begründung. Gleich in
+  // der App (ProfilContext, mitteilungen).
+  if (bereich) abfrage = abfrage.in('bereich', [bereich, 'system']);
 
   const { data, error } = await abfrage;
   if (error) throw error;
@@ -1479,6 +1482,17 @@ async function bootstrapData(client, nutzerId, schluesselId = null) {
     ladeKeinInteresse(client, nutzerId),
   ]);
 
+  /*
+   * Kasten RS 3: Moderator? Entscheidet die Datenbank (ist_moderator, Schema
+   * 102) — hier nur, ob die Website den Bereich „Moderation" zeigt. Fehlt die
+   * Funktion noch, ist niemand Moderator. Ein Aufruf, kein Lesezugriff auf
+   * die Tabelle `moderatoren`.
+   */
+  const istModerator = await client
+    .rpc('ist_moderator')
+    .then(({ data, error }) => !error && data === true)
+    .catch(() => false);
+
   // Der selbst vergebene Kontaktname gilt überall, wo diese Person auftaucht —
   // Chatkopf, Listen, Profil. Gleiche Regel in app/lib/daten.ts (alleDaten).
   for (const k of kontakte || []) {
@@ -1527,9 +1541,10 @@ async function bootstrapData(client, nutzerId, schluesselId = null) {
     sichtbarkeit,
     privateProfile: Object.values(nutzer).filter((u) => u.privat).map((u) => u.id),
     ungelesen: {
-      videos: benachrichtigungen.filter((b) => b.bereich === 'videos' && !b.gelesen).length,
-      communities: benachrichtigungen.filter((b) => b.bereich === 'communities' && !b.gelesen).length,
+      videos: benachrichtigungen.filter((b) => (b.bereich === 'videos' || b.bereich === 'system') && !b.gelesen).length,
+      communities: benachrichtigungen.filter((b) => (b.bereich === 'communities' || b.bereich === 'system') && !b.gelesen).length,
     },
+    istModerator,
     eigenesProfil: {
       bio: eigenes.bio || '',
       link: eigenes.link || '',

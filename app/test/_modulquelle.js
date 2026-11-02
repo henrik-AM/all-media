@@ -137,6 +137,20 @@ const UMD_BAUSTEINE = [
   // 08.10.2026: `markierung.js` fuer @-Markierungen (Kasten 25) — aktionen.ts,
   // MarkierungsEingabe und MarkierterText holen ihn. Gleich mit eingetragen.
   ['markierung', 'Markierung'],
+  // 22.10.2026: `konto-loeschen.js` — echtes Konto löschen (Auftrag Recht/
+  // Sicherheit, Kasten RS 2, Schema 103). Einstellungen in App und Website.
+  ['konto-loeschen', 'KontoLoeschen'],
+  // 22.10.2026: `rechtstexte.js` — Nutzungsbedingungen, Datenschutz, Impressum
+  // (Kasten RS 1). Liest global.Alter — muss nach `alter` stehen.
+  ['rechtstexte', 'Rechtstexte'],
+
+  // 25.10.2026: `meldung.js` — Melden nach DSA Art. 16 (Kasten RS 3, Schema 102).
+  // aktionen.ts, MeldenSheet und die Website holen ihn.
+  ['meldung', 'Meldung'],
+
+  // 31.10.2026: `einwilligung.js` — Zustimmung mit Fassung und Eltern-Widerruf
+  // (Kasten RS 7/5, Schema 106). Liest global.Rechtstexte — muss danach stehen.
+  ['einwilligung', 'Einwilligung'],
 ];
 
 function umdTeile() {

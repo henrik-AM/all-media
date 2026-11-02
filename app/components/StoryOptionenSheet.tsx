@@ -6,6 +6,7 @@ import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { SichtbarkeitSheet } from './SichtbarkeitSheet';
 import { SammlungZuordnen } from './SammlungZuordnen';
+import { MeldenSheet } from './MeldenSheet';
 import { useProfil } from '../contexts/ProfilContext';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
@@ -16,14 +17,6 @@ import * as Aktion from '../lib/aktionen';
 import { Story } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const GRUENDE = [
-  'Spam oder Werbung',
-  'Beleidigung oder Hass',
-  'Gefälschtes Profil',
-  'Nicht jugendfreie Inhalte',
-  'Etwas anderes',
-];
 
 /* --------------------------------------------------- Wer sie gesehen hat */
 
@@ -119,13 +112,18 @@ interface OptionenProps {
 
 export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice }: OptionenProps) => {
   const { users: alleNutzer, sichtbarkeit, neuLaden } = useDaten();
-  const { stummSchalten, melden } = useProfil();
+  const { stummSchalten } = useProfil();
   const { supabase } = useSupabase();
   const { user } = useContext(AuthContext);
   const nutzerId = user?.id ?? '';
   const aktionen = useAktionen(onNotice);
   const { medienSichern } = aktionen;
-  const [meldeSchritt, setMeldeSchritt] = useState(false);
+  /*
+   * Kasten RS 3: „Story melden" meldete bis zum 22.10.2026 in Wahrheit das
+   * PROFIL (Aufruf mit der Nutzerkennung, art 'user'). Jetzt die Story selbst —
+   * echte Story-ID, art 'story' — über das Melden-Blatt.
+   */
+  const [melden, setMelden] = useState(false);
   /*
    * Henrik, 07.09.2026: "Eigene-Story-Menü (3 Punkte) ohne Funktion."
    *
@@ -215,7 +213,7 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
       onNotice(jetzt ? `${person?.name} stummgeschaltet` : 'Stummschaltung aufgehoben');
       return onClose();
     }
-    setMeldeSchritt(true);
+    setMelden(true);
   };
 
   /*
@@ -250,15 +248,15 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
     );
   }
 
+  if (melden) return <MeldenSheet ziel={{ art: 'story', id: story.id }} onClose={onClose} />;
+
   return (
     <SheetRahmen
       visible
       title={
         highlightSchritt
           ? 'Zu Highlight hinzufügen'
-          : meldeSchritt
-            ? 'Story melden'
-            : eigene
+          : eigene
               ? 'Deine Story'
               : person?.name ?? 'Story'
       }
@@ -266,23 +264,6 @@ export const StoryOptionenSheet = ({ story, eigene, onClose, onDelete, onNotice 
     >
       {highlightSchritt ? (
         <SammlungZuordnen art="highlight" stueck={{ storyId: story.id }} onNotice={onNotice} />
-      ) : meldeSchritt ? (
-        <ScrollView>
-          {GRUENDE.map((grund) => (
-            <Druck
-              key={grund}
-              style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
-              onPress={() => {
-                melden(story.userId, grund);
-                onNotice('Danke, wir sehen uns das an');
-                onClose();
-              }}
-            >
-              <Text style={styles.label}>{grund}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Druck>
-          ))}
-        </ScrollView>
       ) : (
         <View>
           {punkte.map((p) => (

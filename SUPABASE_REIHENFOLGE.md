@@ -245,3 +245,66 @@ Keine Funktionen aus 107–114 vorausgesetzt. Ersetzt nur die beiden oben genann
 - `SUPABASE_SCHEMA_117_medienreferenz_eigen.sql` — Auslöser `medienreferenz_pruefen` auf allen Medienspalten (Liste wie `bunny_referenz_pruefen` aus 115, dazu `kontakt_bilder`): eine Medienadresse setzen darf nur, wer die Datei selbst hochgeladen hat (`medium_selbst_hochgeladen`), außer `beispiel/…` und Weiterleiten (`forwarded_from` = Absender einer lesbaren Nachricht mit derselben Adresse). Neue Objekte, keine Doppelung.
 - Live fehlen `communities.bild_url` (99) und `kontakt_bilder` (94): Die Schleife überspringt fehlende Spalten. **Nach dem Einspielen von 94 bzw. 99 Schema 117 erneut einspielen** (idempotent).
 - Probe `app/test/_probe_f4_medien.js`: live vorher 9/18, danach 18/18. `test:angriffe` lädt für „Story mit eigener Medienadresse" jetzt erst hoch.
+
+## Nachtrag 22.10.2026: Schema 101 (Auftrag Recht/Sicherheit, eingespielt)
+
+**Eingespielt am 22.10.2026** (Sicherheits-Schema ohne neuen Code, Regel 4 der Sperr-Notiz;
+Probe `app/test/_probe101.js` 12/12 verworfen, Gegenprobe ohne 101 7/12, danach `test:angriffe` 36/36).
+
+- `SUPABASE_SCHEMA_101_freigabe_nummer_spende.sql` — `finde_per_nummer()` findet kein wartendes/
+  abgelehntes Kinderkonto mehr (und ein wartendes Konto sucht niemanden), `spende_senden()` nur
+  zwischen freigegebenen Konten (Empfänger → „empfaenger", Absender → „nicht_freigegeben").
+  **Ersetzt `finde_per_nummer` (zuletzt 57) und `spende_senden` (zuletzt 72).** Wer 57 oder 72 neu
+  einspielt, muss 101 nachziehen.
+
+| Objekt | Dateien (die letzte gewinnt) |
+|---|---|
+| Funktion public.finde_per_nummer() | SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_telefon.sql → SUPABASE_SCHEMA_38_nummer_bremse.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql → SUPABASE_SCHEMA_101_freigabe_nummer_spende.sql |
+| Funktion public.spende_senden() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_101_freigabe_nummer_spende.sql |
+
+Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.).
+
+## Nachtrag 22.10.2026: Schemas 102 und 103 (Auftrag Recht/Sicherheit, Entwürfe)
+
+**Nicht eingespielt** (Feature-Schemas mit neuem Code, erst beim Abschluss der Supabase-Sperre). Reihenfolge: **102 vor 103** — 103 ruft `rechtsmitteilung()` aus 102.
+
+- `SUPABASE_SCHEMA_102_melden_moderation.sql` — Melden und Moderation nach DSA Art. 16/17/20 (Kategorien, Begründung, Beschwerde, Moderatoren ohne Lesezugriff auf `messages`). `reports.reported_by` wird `on delete set null` (Meldungen überleben das Löschen des Meldenden). Probe `app/test/_probe102.js` 45/45 verworfen. **Nach Gate 2 (25.–31.10.2026):** direkter Insert gehärtet, Sperre wirkt (`nicht_gesperrt`), `nur_eigene_aktion` (66) neu mit Wiederherstellungs-Schalter, dazu `art18_vermerken`, `gemeldetes_medium`, `begruendung_nachsenden`, `sperre_nachtragen`, `medium_abruf_vermerken`; `meldung_entscheiden` hat jetzt 7 Parameter (`p_zurueckstellen`), `meldungen_liste` liefert `art18` und `zurueckgestellt` (drop + create). Probe **83/83** verworfen, Probe 103 danach 27/27.
+- `SUPABASE_SCHEMA_103_konto_loeschen_auskunft.sql` — echtes Konto löschen (`konto_loeschen`, `meine_medien`), Sperr-Hash der Telefonnummer bis Sperrende (Auslöser auf `auth.users` und `profiles`), vollständige Auskunft. **Ersetzt `meine_daten` (zuletzt 18).** Wer 18 neu einspielt, muss 103 nachziehen. Probe `app/test/_probe103.js` 27/27 verworfen.
+
+| Objekt | Dateien (die letzte gewinnt) |
+|---|---|
+| Funktion public.meine_daten() | SUPABASE_SCHEMA_18_sichtbarkeit_daten.sql → SUPABASE_SCHEMA_103_konto_loeschen_auskunft.sql |
+| Funktion public.nur_eigene_aktion() | SUPABASE_SCHEMA_66_verlauf_nur_eigenes.sql → SUPABASE_SCHEMA_102_melden_moderation.sql |
+
+**Gesamtreihenfolge der offenen Entwürfe:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 97 → 98 → 99 → 100 → 102 → 103.
+
+## Nachtrag 31.10.2026: Schema 106 (Auftrag Recht/Sicherheit, Kasten RS 7, Entwurf)
+
+**Nicht eingespielt**, erst nach Henriks Ja. Nach 52, 58 und 103. Nummern 104 und 105 bleiben für RS reserviert.
+
+- `SUPABASE_SCHEMA_106_einwilligung_fassung.sql` — `rechtstext_fassungen` (geltende Fassung je Rechtstext, Prüfsumme wie `test:recht`) und `einwilligungen` (nur anhängen). Auslöser `einwilligung_aus_registrierung` **after insert on auth.users** (neben `on_auth_user_created` aus 3/34 und `gesperrte_nummer_pruefen` aus 103; fängt eigene Fehler ab, blockiert kein Konto). ~~Auslöser `eltern_einwilligung_vermerken`~~ (seit Codex-Fund F12, 02.11.2026 gelöscht, siehe unten). `zustimmung_offen()`, `zustimmen(text,int,text)` (seit Codex-Fund F6 mit Prüfsumme des gezeigten Texts; alte Signatur wird gelöscht; Registrierung nur mit `pruefsumme_<dok>` in den Metadaten). Neue Objekte, keine Doppelung.
+- Beide Tabellen sind bewusst ohne `nur_freigegebene` (das wartende Kind muss zustimmen und lesen können); `_minderjaehrig.js` nimmt sie aus.
+- Beim Einspielen `meine_daten()` (103) um `einwilligungen` ergänzen (Nachtrag am Dateiende).
+- Neue Fassung eines Rechtstextes = neue Zeile in `rechtstext_fassungen` per eigenem Schema, Prüfsumme aus `test:recht`.
+- Dazu Familienbereich: `meine_kinder()`, `elterneinwilligung_widerrufen(uuid)` (Art. 7 Abs. 3, Richtlinie 1.6 — Konto ruht bis neue Zustimmung oder Landesgrenze).
+- Probe `app/test/_probe106.js` **55/55** verworfen, keine Spuren (02.11.2026, nach F12; vorher 44/44 nach F6, 39/39).
+- **Codex-Fund F12 (02.11.2026):** `einwilligung_entscheiden(uuid, boolean, jsonb)` ersetzt die Fassung aus 52 (alte Signatur `(uuid, boolean)` wird gelöscht). Zustimmen nur mit Version und Prüfsumme jedes geltenden Texts, den das Elternblatt zeigt; Beleg in derselben Transaktion. Der Auslöser `eltern_einwilligung_vermerken` ist gelöscht — Freigabe von Hand erzeugt keinen Beleg mehr. Clients (`gemeinsam/einwilligung.js` → `elternEntscheiden`) fallen ohne 106 auf die Fassung aus 52 zurück.
+
+| Funktion public.einwilligung_entscheiden() | SUPABASE_SCHEMA_52_geburtsdatum.sql → SUPABASE_SCHEMA_106_einwilligung_fassung.sql |
+
+**Gesamtreihenfolge der offenen Entwürfe:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 97 → 98 → 99 → 100 → 102 → 103 → 106.
+
+## Nachtrag 01.11.2026: Codex-Funde F5, F7–F9 in Schema 102 (Entwurf)
+
+- F5: `communities.moderiert_am`; moderatives Entfernen einer Community blendet aus statt zu löschen. Restriktive Regel `nicht_ausgeblendet` auf `communities`, `community_members`, `community_channels`, `community_beitrittsanfragen`, `community_channel_messages`, `ptt_messages`; Helfer `community_ausgeblendet(uuid)`, `kanal_ausgeblendet(uuid)`; `community_entfernte_loeschen()` (nur Moderatoren, nach 6 Monaten, kein Cron).
+- F7: Entfernen einer Nachricht setzt `krypto = 0` (sonst `messages_krypto_stimmig`), Widerspruch stellt `krypto`, `absender_schluessel`, Anhang wieder her.
+- F8: `meldung_vorbelegen` weist Selbstmeldungen ab; `meine_meldungen()` verbirgt zurückgestellte Begründungen bei Selbstbetroffenheit.
+- F10 (02.11.): `community_entfernte_loeschen()` löscht erst 6 Monate nach der Mitteilung und nie bei zurückgestellter Begründung; `entscheidung_widersprechen` sperrt die Meldung (for update).
+- F11 (02.11.): `posts.moderiert_am`, `comments.moderiert_am`; moderatives Entfernen von Beitrag/Kommentar blendet aus statt zu löschen (Kommentare, Antworten, Likes bleiben). Restriktive Regel `nicht_ausgeblendet` auf `posts`, `comments` (auch Kommentare am ausgeblendeten Beitrag und Antworten am ausgeblendeten Kommentar) und für INSERT auf `post_likes`, `comment_likes`, `saves`, `reposts`, `shares`, `sammlung_inhalte`, `sammlung_beitraege`, `post_tags`; Helfer `beitrag_ausgeblendet(uuid)`, `kommentar_ausgeblendet(uuid)`; `beitraege_entfernte_loeschen()` (Fristregeln wie F10). **Schema 92 ist live nicht eingespielt:** `kommentar_ausgeblendet` und die Regel auf `comments` entstehen ohne `reply_to`-Teil. **Nach dem Einspielen von 92 den F11-Block aus 102 erneut ausführen.**
+- Probe `app/test/_probe_rs_funde.js` **76/76** (02.11., mit F11 und F12), `_probe102.js` 83/83, `_probe103.js` 27/27.
+
+## Nachtrag 02.11.2026: 102 und 103 live eingespielt
+
+`SUPABASE_SCHEMA_102_melden_moderation.sql` und `SUPABASE_SCHEMA_103_konto_loeschen_auskunft.sql` sind seit 02.11.2026 live (Henriks Ja). Danach zwei Korrekturen, in beiden Dateien nachgetragen und live eingespielt: F11-Helfer `beitrag_ausgeblendet`/`kommentar_ausgeblendet` und die Regeln `nicht_ausgeblendet` nur noch für `authenticated` (anon liest posts/comments nicht; test:rechte/test:angriffe schlugen an), `nummer_pfeffer` trägt `nur_freigegebene` (test:minderjaehrig). Danach test:rechte 281/281, test:angriffe 37/37, test:minderjaehrig grün, test:schema grün, Proben 102 83/83, 103 27/27, Funde 76/76.
+
+**106 bewusst noch nicht live:** es löscht `einwilligung_entscheiden(uuid, boolean)`, das `main` (App `app/lib/registrierung.ts`, Website `web/public/anmeldung.js`) live aufruft — Elternfreigabe wäre bis zum Merge kaputt. 106 erst zusammen mit dem Merge von `kasten/rs-recht` nach `main` einspielen.

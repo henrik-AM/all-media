@@ -205,6 +205,8 @@ async function anmelden(page) {
         benutzername: name,
         passwort: pass,
         email: mail,
+        // Kasten RS 1: Pflicht seit 24.10.2026.
+        zustimmung: true,
       });
 
       /*
