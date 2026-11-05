@@ -3179,8 +3179,10 @@ app.post('/api/communities', route(async (req) => {
     ohneEinladung ? 'Der Einladungslink gilt noch nicht' : '',
   ].filter(Boolean).join(' · ');
 
-  const [community] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: e.community.id })) || [];
-  return { ok: true, community, hinweis: hinweis || null };
+  // Paket 3: ladeCommunities kennt auf main keine Auswahl nach id (kam erst
+  // mit Kasten 28/14) — darum wie bisher alle laden und die neue heraussuchen.
+  const alle = (await supabaseApi.ladeCommunities(req.db, req.nutzerId)) || [];
+  return { ok: true, community: alle.find((c) => c.id === e.community.id), hinweis: hinweis || null };
 }));
 
 app.post('/api/communities/:id/join', route(async (req, res) => {

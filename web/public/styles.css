@@ -3366,6 +3366,10 @@ button.exp__head:hover { color: var(--brand); }
 .kanal__thema:last-child { border-bottom: 1px solid var(--hairline); }
 .kanal__thema:hover { background: var(--surface-2); }
 .kanal__thema-name { font-size: 15.5px; font-weight: 600; color: var(--text); }
+/* Paket 3 (Kasten 28/10.2): Schloss hinter einem privaten Unterthema — der Stil kam
+   im Sammelzweig mit Kasten 10.1/14 und fehlte auf main. */
+.kanal__schloss { display: inline-flex; vertical-align: middle; color: var(--text-3); }
+.kanal__schloss svg { width: 14px; height: 14px; }
 .kanal__thema-sub {
   font-size: 12.5px; color: var(--text-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

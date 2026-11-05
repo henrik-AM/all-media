@@ -393,5 +393,8 @@ const styles = themenStyles((colors) => ({
   },
   themaPressed: { backgroundColor: colors.surface2 },
   themaName: { ...typography.name, color: colors.text },
+  // Paket 3: Name und Schloss eines privaten Unterthemas nebeneinander (auf
+  // main fehlte der Stil, den der Sammelzweig für den Kopf mitbrachte).
+  nameZeile: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
   themaSub: { ...typography.small, color: colors.text3 },
 }));
