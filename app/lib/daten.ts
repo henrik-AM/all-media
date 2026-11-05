@@ -76,6 +76,8 @@ const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('.
 const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
 // Kästen 28/9 und 15: Mitgliederzahl, Beitrittsanfragen (Schema 97).
 const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gemeinsam/beitritt');
+// Kästen 28/10.2 und 16: Community und Unterthema erstellen (Schema 99).
+const Erstellen = require('../../gemeinsam/erstellen') as typeof import('../../gemeinsam/erstellen');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -158,7 +160,8 @@ function personAusZeile(
   z: any,
   ichId: string,
   phone: string | undefined,
-  avatar: string | undefined
+  avatar: string | undefined,
+  zusatz?: { pronomen: string; links: unknown }
 ): { user: User; profile: Profile } {
   const schluessel = zeile.id === ichId ? ICH : zeile.id;
   return {
@@ -179,6 +182,8 @@ function personAusZeile(
       userId: schluessel,
       bio: zeile.bio ?? '',
       link: zeile.link ?? '',
+      pronomen: zusatz?.pronomen ?? '',
+      links: Profilfelder.linksAus({ links: zusatz?.links, link: zeile.link }),
       spende: jsonOderNull(zeile.spende),
       posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
       followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
@@ -214,10 +219,9 @@ export async function ladeNutzer(
   const profile: Record<string, Profile> = {};
 
   for (const zeile of (data ?? []) as any[]) {
-    const eintrag = personAusZeile(zeile, zahlenNach.get(zeile.id), ichId, nummerVon(zeile.id), bilder.get(zeile.id));
+    const eintrag = personAusZeile(zeile, zahlenNach.get(zeile.id), ichId, nummerVon(zeile.id), bilder.get(zeile.id), zusatz.get(zeile.id));
     users[eintrag.user.id] = eintrag.user;
     profile[eintrag.user.id] = eintrag.profile;
-    Object.assign(profile[eintrag.user.id], { pronomen: zusatz.get(zeile.id)?.pronomen ?? '', links: Profilfelder.linksAus({ links: zusatz.get(zeile.id)?.links, link: zeile.link }) });
   }
 
   return { users, profile };
@@ -249,12 +253,14 @@ export async function ladePerson(
   ]);
   if (error) throw error;
   if (!data) return null;
+  const zusatz = await ladeProfilZusatz(client, [ziel]);
   const eintrag = personAusZeile(
     data,
     z,
     ichId,
     ((nummern as any)?.[ziel] as string | undefined) || undefined,
-    ((bild as any)?.avatar_url as string | undefined) || undefined
+    ((bild as any)?.avatar_url as string | undefined) || undefined,
+    zusatz.get(ziel)
   );
   eintrag.profile.isFollowing = Boolean(folge);
   return signiereMedien(client, eintrag);
@@ -290,6 +296,7 @@ export async function ladePersonen(
       client.from('follows').select('followee_id').eq('follower_id', ichId).in('followee_id', teil),
     ]);
     if (error) throw error;
+    const zusatz = await ladeProfilZusatz(client, teil);
     const zahlenNach = new Map(((zahlen ?? []) as any[]).map((z) => [z.id, z]));
     const bildNach = new Map(((bilder ?? []) as any[]).map((b) => [b.id, b.avatar_url]));
     const gefolgt = new Set(((folgen ?? []) as any[]).map((f) => f.followee_id));
@@ -299,7 +306,8 @@ export async function ladePersonen(
         zahlenNach.get(zeile.id),
         ichId,
         ((nummern as any)?.[zeile.id] as string | undefined) || undefined,
-        (bildNach.get(zeile.id) as string | undefined) || undefined
+        (bildNach.get(zeile.id) as string | undefined) || undefined,
+        zusatz.get(zeile.id)
       );
       eintrag.profile.isFollowing = gefolgt.has(zeile.id);
       users[eintrag.user.id] = eintrag.user;
@@ -336,11 +344,14 @@ export async function ladeProfilbilder(client: SupabaseClient): Promise<Map<stri
  * profilZusatz() in web/server/supabase-api.js.
  */
 export async function ladeProfilZusatz(
-  client: SupabaseClient
+  client: SupabaseClient,
+  ids?: string[]
 ): Promise<Map<string, { pronomen: string; links: unknown }>> {
   const karte = new Map<string, { pronomen: string; links: unknown }>();
   try {
-    const { data, error } = await client.from('profiles').select('id, pronomen, links').limit(500);
+    let q = client.from('profiles').select('id, pronomen, links');
+    q = ids ? q.in('id', ids) : q.limit(500);
+    const { data, error } = await q;
     if (error) return karte;
     for (const z of (data ?? []) as any[]) karte.set(z.id, { pronomen: z.pronomen ?? '', links: z.links });
   } catch {
@@ -1496,6 +1507,10 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string, suc
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine ?? []).filter((m: any) => m.is_muted).map((m: any) => m.community_id));
 
+  // Kasten 28/10.2 und 16 (Schema 99): Bild, Biografie/Link/privat der
+  // Unterthemen. Fehlt 99, bleibt es leer (gemeinsam/erstellen.js).
+  const zusatz = await Erstellen.zusatzLaden(client, (data ?? []).map((c: any) => c.id));
+
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
   return signiereMedien(client, (data ?? []).map((c: any) => ({
     id: c.id,
@@ -1503,6 +1518,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string, suc
     topic: c.topic ?? '',
     bio: c.bio ?? '',
     link: c.link ?? '',
+    bild: zusatz.bild[c.id] ?? null,
     visibility: c.visibility,
     members: Number(c.mitglieder_basis ?? 0) + Number(c.mitglieder_anzahl ?? c.community_members?.[0]?.count ?? 0),
     joined: beigetreten.has(c.id),
@@ -1519,7 +1535,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string, suc
     // der teilenInCommunitys „das erste“ Unterthema sucht (29.09.2026).
     unterthemen: (c.community_channels ?? [])
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0) || String(a.created_at).localeCompare(String(b.created_at)))
-      .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [] })),
+      .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [], ...Erstellen.kanalFelder(zusatz, k.id, ichId) })),
   })));
 }
 

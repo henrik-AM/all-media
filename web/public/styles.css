@@ -3400,6 +3400,7 @@ button.exp__head:hover { color: var(--brand); }
   background: var(--surface-3);
 }
 .kanal__bild > .motiv { position: absolute; inset: 0; }
+.kanal__foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /*
   Der Pfeil liegt auf dem Bild, nicht darueber - im Frame steht er frei in
   der oberen linken Ecke. Er bekommt einen dunklen Grund, damit er auf einem
@@ -3503,6 +3504,10 @@ button.exp__head:hover { color: var(--brand); }
 .kanal__thema:last-child { border-bottom: 1px solid var(--hairline); }
 .kanal__thema:hover { background: var(--surface-2); }
 .kanal__thema-name { font-size: 15.5px; font-weight: 600; color: var(--text); }
+/* Paket 3 (Kasten 28/10.2): Schloss hinter einem privaten Unterthema — der Stil kam
+   im Sammelzweig mit Kasten 10.1/14 und fehlte auf main. */
+.kanal__schloss { display: inline-flex; vertical-align: middle; color: var(--text-3); }
+.kanal__schloss svg { width: 14px; height: 14px; }
 .kanal__thema-sub {
   font-size: 12.5px; color: var(--text-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -5431,3 +5436,70 @@ textarea.profilseite__gross { min-height: 160px; }
 /* Nachtrag 4.3 (12.10.2026): der Kommentar aus einer Mitteilung leuchtet kurz auf. */
 .comment { transition: background-color .6s ease; }
 .comment--markiert { background: var(--surface-3); border-radius: 12px; }
+
+/* ------------------------------------------------------------------------
+ * Kästen 28/10.2 und 16: Community / Unterthema erstellen nach Figma
+ * („CC + Unterthema erstellen“, „CP + Kanal erstellen“). Gleicher Aufbau
+ * wie app/screens/communities/ErstellenScreen.tsx.
+ * ------------------------------------------------------------------------ */
+.erstellseite { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--surface); color: var(--text); }
+.erstellseite__kopf { padding: 14px 16px 6px; }
+.erstellseite__zu { background: none; border: 0; padding: 4px; color: var(--text); cursor: pointer; }
+.erstellseite__zu svg { width: 28px; height: 28px; stroke-width: 2.6; }
+.erstellseite__inhalt { flex: 1 1 auto; overflow-y: auto; padding: 0 16px 32px; display: flex; flex-direction: column; }
+/* In der scrollenden Spalte nichts zusammendrücken — sonst schrumpft das Bildfeld zum Strich. */
+.erstellseite__inhalt > * { flex-shrink: 0; }
+.erstellseite__feld[rows] { min-height: 50px; }
+.erstellseite__pflicht { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; margin: 0 0 16px; }
+.erstellseite__stern { color: var(--danger, #E5484D); font-size: 16px; line-height: 1; }
+.erstellseite__stern--ecke { position: absolute; top: 8px; right: 12px; }
+.erstellseite__name { position: relative; display: block; border: 1.5px solid var(--text); border-radius: 16px; padding: 0 36px 0 16px; }
+.erstellseite__name input { width: 100%; border: 0; background: none; outline: none; color: var(--text); font: inherit; font-size: 20px; font-weight: 700; padding: 22px 0; }
+.erstellseite__bild {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  margin: 24px 8px 0; aspect-ratio: 1.35; border: 1.5px solid var(--text); border-radius: 20px;
+  overflow: hidden; cursor: pointer;
+}
+.erstellseite__bildLeer { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-2); font-size: 20px; font-weight: 700; }
+.erstellseite__bildLeer svg { width: 86px; height: 86px; color: var(--text); stroke-width: 1.6; }
+.erstellseite__bild img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.erstellseite__bildMarke {
+  position: absolute; bottom: 12px; background: rgba(0,0,0,.55); color: #fff;
+  border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 500;
+}
+.erstellseite__feld {
+  width: 100%; box-sizing: border-box; border: 1.5px solid var(--text); border-radius: 16px; background: none;
+  color: var(--text); font: inherit; font-size: 17px; padding: 12px 16px; margin-top: 8px; resize: none; outline: none;
+}
+.erstellseite__feld--abstand { margin-top: 24px; }
+.erstellseite__strich { border-top: 1px dashed var(--text-2); margin: 16px 0; }
+.erstellseite__ut { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 12px; padding: 0 12px; margin-bottom: 8px; }
+.erstellseite__ut input { flex: 1; border: 0; background: none; outline: none; color: var(--text); font: inherit; font-size: 16px; padding: 12px 0; }
+.erstellseite__ut button { background: none; border: 0; color: var(--text-3, #9AA1AF); cursor: pointer; padding: 4px; }
+.erstellseite__ut button svg { width: 16px; height: 16px; }
+.erstellseite__raute { font-weight: 600; color: var(--text-2); }
+.erstellseite__unterthemen {
+  display: flex; align-items: center; gap: 12px; border: 1.5px solid var(--text); border-radius: 16px;
+  background: none; color: var(--text); font: inherit; font-size: 15px; padding: 12px 16px; cursor: pointer; text-align: left;
+}
+.erstellseite__unterthemen[hidden] { display: none; }
+.erstellseite__plus { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #1D7FF2; color: #fff; }
+.erstellseite__plus svg { width: 20px; height: 20px; stroke-width: 2.6; }
+.erstellseite__schalter {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 24px -16px 0; padding: 16px; border-top: 1px solid var(--text); border-bottom: 1px solid var(--text); cursor: pointer;
+}
+.erstellseite__schalter > span:first-child { display: flex; flex-direction: column; }
+.erstellseite__schalterTitel { font-size: 19px; }
+.erstellseite__schalterSub { font-size: 12.5px; }
+.erstellseite__einladen {
+  margin-top: 24px; border: 1.5px solid var(--text); border-radius: 16px; background: none;
+  color: var(--text); font: inherit; font-size: 17px; padding: 8px 24px; text-align: left; cursor: pointer;
+}
+.erstellseite__qrText { margin: 12px 0 0 24px; font-size: 15px; }
+.erstellseite__qr { align-self: center; margin-top: 16px; width: 200px; height: 200px; background: #fff; }
+.erstellseite__qrHinweis { text-align: center; color: var(--text-3, #9AA1AF); font-size: 12.5px; margin: 8px 0 0; }
+.erstellseite__fuss { border-top: 1px solid var(--border); padding: 12px 16px 16px; display: flex; flex-direction: column; align-items: center; background: var(--surface); }
+.erstellseite__meldung { color: var(--danger, #E5484D); font-size: 14px; margin: 0 0 8px; text-align: center; }
+.erstellseite__fertig { background: #0A7CEB; color: #fff; border: 0; border-radius: 12px; min-width: 140px; padding: 12px 24px; font: inherit; font-size: 17px; cursor: pointer; }
+.erstellseite__fertig:disabled { opacity: .6; }

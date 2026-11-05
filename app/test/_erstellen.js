@@ -450,12 +450,16 @@ if (!fs.existsSync(BILD)) {
     await page.click('[data-sheet-close]');
   });
 
+  // Seit 21.10. eigene Seite nach Figma (Kasten 28/16): Name, Bild (Pflicht),
+  // Biografie … statt Name/Thema im Blatt. Das Bild geht über /api/hochladen.
   await pruefe('Neue Community erstellen legt sie unter Erstellt an', async () => {
     await erstellen('kanal');
-    await page.waitForSelector('#f_name', { timeout: 3000 });
-    await page.fill('#f_name', 'Nachtschicht');
-    await page.fill('#f_thema', 'Alles nach 22 Uhr');
-    await page.click('#formOk');
+    await page.waitForSelector('#esName', { timeout: 3000 });
+    await page.fill('#esName', 'Nachtschicht');
+    await page.setInputFiles('#esBildDatei', BILD);
+    await page.waitForSelector('#esBildVorschau:not([hidden])', { timeout: 10000 });
+    await page.fill('#esBio', 'Alles nach 22 Uhr');
+    await page.click('#esFertig');
     await page.waitForFunction(
       () => (document.querySelector('#main')?.textContent || '').includes('Nachtschicht'),
       null, { timeout: 10000 }
@@ -464,12 +468,15 @@ if (!fs.existsSync(BILD)) {
 
   await pruefe('Dieselbe Community gibt es kein zweites Mal', async () => {
     await erstellen('kanal');
-    await page.waitForSelector('#f_name');
-    await page.fill('#f_name', 'Nachtschicht');
-    await page.fill('#f_thema', 'Doppelt');
-    const hinweis = await hinweisNach(() => page.click('#formOk'));
-    if (!/schon/.test(hinweis)) throw new Error('Hinweis war: ' + hinweis);
-    await page.click('[data-sheet-close]');
+    await page.waitForSelector('#esName');
+    await page.fill('#esName', 'Nachtschicht');
+    await page.setInputFiles('#esBildDatei', BILD);
+    await page.waitForSelector('#esBildVorschau:not([hidden])', { timeout: 10000 });
+    await page.click('#esFertig');
+    // Der Grund steht auf der Seite (#esMeldung), nicht in einem Toast.
+    await page.waitForFunction(() => /schon/.test(document.querySelector('#esMeldung')?.textContent || ''), null, { timeout: 8000 })
+      .catch(async () => { throw new Error('Hinweis war: ' + (await page.textContent('#esMeldung'))); });
+    await page.click('#esZu');
   });
 
   /* ---------------------------------------------------------- Abschluss */

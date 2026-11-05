@@ -975,6 +975,7 @@ async function bootstrap() {
   praesenzMelden();
   render();
   geteiltenBeitragOeffnen();
+  einladungAusLink();
   elternfrageStarten();
 }
 
@@ -4218,6 +4219,14 @@ function openAddContact() {
       sheet.querySelector('#contactQrScannen').addEventListener('click', async () => {
         const text = await qrScannerOeffnen();
         if (!text) return;
+        // Kästen 28/10.2 und 16: ein Einladungscode einer Community oder
+        // eines Unterthemas — gleich annehmen. Gleiche Weiche in der App
+        // (AddContactSheet).
+        const einladung = Erstellen.codeAus(text);
+        if (einladung) {
+          sheet.querySelector('[data-sheet-close]')?.click();
+          return einladungAnnehmen(einladung);
+        }
         const nummer = window.QrKontakt.nummerAus(text);
         // Ein fremder Code — Fahrkarte, Werbeplakat — ist kein Fehler des
         // Nutzers, nur der falsche Code.
@@ -6717,7 +6726,12 @@ function communityAvatar(c, size = 52) {
     .map((w) => w[0])
     .join('')
     .toUpperCase();
-  return `<div class="avatar avatar--${size}" style="background:${palette[hash % palette.length]};border-radius:16px">${esc(initials)}</div>`;
+  // Kasten 28/16: das Bild aus „Community erstellen“ liegt über den Initialen
+  // (wie beim Profilbild). Ein Inline-onerror verbietet die CSP (script-src-attr).
+  const foto = c.bild
+    ? `<img src="${esc(c.bild)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:16px">`
+    : '';
+  return `<div class="avatar avatar--${size}" style="position:relative;background:${palette[hash % palette.length]};border-radius:16px">${esc(initials)}${foto}</div>`;
 }
 
 /*
@@ -6885,7 +6899,10 @@ async function renderCommunityChannels(communityId) {
   main.innerHTML = `
     <div class="kanal">
       <div class="kanal__bild">
-        ${medienFlaeche('community-' + daten.id, ICONS.people)}
+        ${/* Kasten 28/16: das Bild aus „Community erstellen“ (Schema 99); ohne Bild das Motiv. */ ''}
+        ${daten.bild
+          ? `<img class="kanal__foto" id="communityBild" src="${esc(daten.bild)}" alt="Bild von ${esc(daten.name)}">`
+          : medienFlaeche('community-' + daten.id, ICONS.people)}
         <button class="kanal__zurueck" id="backBtn" aria-label="Zurück">${ICONS.back}</button>
       </div>
 
@@ -6949,9 +6966,13 @@ async function renderCommunityChannels(communityId) {
         ${daten.channels
           .map(
             (ch) => `<button class="kanal__thema" data-channel="${esc(ch.id)}">
-              <span class="kanal__thema-name"># ${esc(ch.name)}</span>
+              <span class="kanal__thema-name"># ${esc(ch.name)}${
+                // Kasten 28/10.2: privates Unterthema (nur mit Einladung).
+                ch.privat ? ` <span class="kanal__schloss" aria-label="Privat">${ICONS.lock}</span>` : ''
+              }</span>
               <span class="kanal__thema-sub">${
-                ch.topics.length ? ch.topics.map(esc).join(' · ') : 'Noch keine Themen'
+                [ch.bio, ch.link].filter(Boolean).map(esc).join(' · ') ||
+                (ch.topics.length ? ch.topics.map(esc).join(' · ') : 'Noch keine Themen')
               }</span>
             </button>`
           )
@@ -7113,26 +7134,11 @@ async function renderCommunityMitglieder(daten, fehler = '') {
 }
 
 /*
- * "neues Unterthema erstellen" aus dem Prototyp-Frame "CH + Unterthema
- * erstellen". Vorher gab es den Punkt auf dieser Seite gar nicht.
+ * "neues Unterthema erstellen" — Kasten 28/10.2: eigene Seite nach dem
+ * Prototyp-Frame "CC + Unterthema erstellen" (openErstellenSeite).
  */
 function neuesUnterthema(daten) {
-  openFormular(
-    'Neues Unterthema',
-    [{ key: 'name', label: 'Name des Unterthemas', platzhalter: 'z. B. Ankündigungen', pflicht: true }],
-    async ({ name }) => {
-      const res = await fetch(`/api/communities/${daten.id}/channels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      }).then((r) => r.json());
-      if (!res.ok) return res.error || 'Das hat nicht geklappt';
-      toast(`„${name}" angelegt`);
-      renderCommunityChannels(daten.id);
-      return null;
-    },
-    'Anlegen'
-  );
+  openErstellenSeite('unterthema', daten);
 }
 
 /** Zweite Ebene: die Themen eines Kanals. */
@@ -14617,6 +14623,37 @@ async function openBeitragOptionen(beitrag) {
  * hingehoert: Bild im Home-Feed, Reel im Hochformat, Video im Querformat.
  * Danach verschwindet der Parameter, sonst oeffnete jedes Neuladen ihn wieder.
  */
+/*
+ * Kästen 28/10.2 und 16: ein Einladungslink (?einladung=<code>) aus
+ * „Einladungslink senden“ oder dem QR-Code der Erstellen-Seite. Der
+ * Parameter verschwindet danach, sonst nähme jedes Neuladen ihn wieder an.
+ * Ohne Anmeldung kommt bootstrap() nicht bis hierher — der Parameter bleibt
+ * stehen und wird nach der Anmeldung angenommen.
+ */
+function einladungAusLink() {
+  const code = Erstellen.codeAus(location.search);
+  if (!code) return;
+  const rest = new URLSearchParams(location.search);
+  rest.delete('einladung');
+  const suche = rest.toString();
+  history.replaceState(null, '', location.pathname + (suche ? '?' + suche : '') + location.hash);
+  einladungAnnehmen(code);
+}
+
+/** Einladung annehmen und die Community (bzw. das Unterthema) öffnen. */
+async function einladungAnnehmen(code) {
+  const res = await api(`/api/einladung/${encodeURIComponent(code)}`);
+  if (!res.ok) return toast(res.error || 'Diese Einladung gibt es nicht mehr');
+  state.area = 'communities';
+  await bootstrap();
+  const community = (state.communities || []).find((c) => c.id === res.communityId);
+  toast(community ? `Willkommen in „${community.name}“` : 'Einladung angenommen');
+  if (!res.communityId) return;
+  await renderCommunityChannels(res.communityId);
+  const kanal = community && res.kanalId ? (community.channels || []).find((k) => k.id === res.kanalId) : null;
+  if (kanal) renderCommunityChat(community, kanal);
+}
+
 function geteiltenBeitragOeffnen() {
   const id = new URLSearchParams(location.search).get('beitrag');
   if (!id) return;
@@ -18267,33 +18304,213 @@ async function erstelle(was) {
 }
 
 /**
- * Neue Community anlegen (Prototyp "CP + erstellen"). Der Kommentar sagte
- * "Kanal in einer Community", angelegt wird aber eine Community selbst
- * (POST /api/communities) - Kasten 2.2 (28.09.2026) hat die Texte angepasst.
+ * Neue Community anlegen (Prototyp "CP + erstellen" → "CP + Kanal
+ * erstellen"). Kasten 28/16: eigene Seite statt des Blatts mit Name und
+ * Thema (openErstellenSeite).
  */
 function openKanalErstellen() {
-  openFormular(
-    'Neue Community erstellen',
-    [
-      { key: 'name', label: 'Name der Community', platzhalter: 'z. B. Fotografie', pflicht: true },
-      { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
-    ],
-    async ({ name, thema }) => {
-      const res = await fetch('/api/communities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, thema, sichtbarkeit: 'private' }),
-      });
-      const daten = await res.json();
-      if (!daten.ok) return daten.error;
+  openErstellenSeite('community');
+}
 
+/**
+ * „Community erstellen“ und „Unterthema erstellen“ nach dem Figma-Prototyp
+ * (Kästen 28/10.2 und 16, Feedback 28.09.2026).
+ *
+ * Henrik: „…halte dich, wenn ich auf Neues Unterthema erstellen drücke,
+ * explizit an meinen Figma Prototypen." Aufbau wie die Frames
+ * „CC + Unterthema erstellen“ (928:13446) und „CP + Kanal erstellen“
+ * (942:15097): X, „✳ Pflichtfeld“, großes Namensfeld, (Bild), Biografie,
+ * Link, (Unterthemen) bzw. „Privates Unterthema“, „Einladungslink senden“,
+ * QR-Code, unten „fertig“.
+ *
+ * Liegt im Overlay, also vor jeder Seite (Kasten 10.1). Felder, Grenzen,
+ * Texte und Einladungslink aus gemeinsam/erstellen.js — dieselben wie in der
+ * App (app/screens/communities/ErstellenScreen.tsx). Der Einladungscode
+ * entsteht hier, damit Link und QR-Code schon dastehen; gültig wird er mit
+ * „fertig“ (Schema 99).
+ */
+function openErstellenSeite(art, community) {
+  const T = Erstellen.TEXTE;
+  const istCommunity = art === 'community';
+  const code = Erstellen.neuerCode(crypto.getRandomValues(new Uint8Array(Erstellen.CODE_LAENGE)));
+  const einladung = Erstellen.link(code, location.origin);
+  const stand = { bild: null, unterthemen: [], laeuft: false };
+
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="erstellseite" data-erstellseite="${art}">
+      <div class="erstellseite__kopf">
+        <button class="erstellseite__zu" id="esZu" aria-label="${esc(T.schliessen)}">${ICONS.close}</button>
+      </div>
+      <div class="erstellseite__inhalt scroll">
+        <p class="erstellseite__pflicht"><span class="erstellseite__stern">✳</span> ${esc(T.pflichtfeld)}</p>
+        <label class="erstellseite__name">
+          <input id="esName" maxlength="${Erstellen.NAME_MAX}" placeholder="${esc(istCommunity ? T.communityName : T.unterthemaName)}"
+                 aria-label="${esc(istCommunity ? T.communityName : T.unterthemaName)}" autocomplete="off">
+          <span class="erstellseite__stern erstellseite__stern--ecke">✳</span>
+        </label>
+        ${istCommunity ? `
+        <label class="erstellseite__bild" id="esBild" aria-label="${esc(T.bild)}">
+          <input type="file" accept="image/*" id="esBildDatei" hidden>
+          <span class="erstellseite__bildLeer" id="esBildLeer">${ICONS.image}<span>${esc(T.bild)}</span></span>
+          <img id="esBildVorschau" alt="" hidden>
+          <span class="erstellseite__bildMarke" id="esBildMarke" hidden>${esc(T.bildAendern)}</span>
+          <span class="erstellseite__stern erstellseite__stern--ecke">✳</span>
+        </label>` : ''}
+        <textarea id="esBio" class="erstellseite__feld erstellseite__feld--abstand" rows="1" maxlength="${Erstellen.BIO_MAX}"
+                  placeholder="${esc(T.bio)}" aria-label="${esc(T.bio)}"></textarea>
+        <input id="esLink" class="erstellseite__feld" maxlength="${Erstellen.LINK_MAX}" inputmode="url" autocapitalize="off"
+               placeholder="${esc(T.link)}" aria-label="${esc(T.link)}">
+        ${istCommunity ? `
+        <div class="erstellseite__strich"></div>
+        <div id="esUnterthemen"></div>
+        <button class="erstellseite__unterthemen" id="esUnterthemaNeu">
+          <span class="erstellseite__plus">${ICONS.plus}</span>${esc(T.unterthemen)}
+        </button>
+        <div class="erstellseite__strich"></div>` : ''}
+        <label class="erstellseite__schalter">
+          <span>
+            <span class="erstellseite__schalterTitel">${esc(istCommunity ? T.privatCommunity : T.privatUnterthema)}</span>
+            <span class="erstellseite__schalterSub">${esc(istCommunity ? T.privatCommunitySub : T.privatUnterthemaSub)}</span>
+          </span>
+          <span class="schalter"><input type="checkbox" id="esPrivat"><span></span></span>
+        </label>
+        <button class="erstellseite__einladen" id="esEinladen">${esc(T.einladen)}</button>
+        <p class="erstellseite__qrText">${esc(T.qr)}</p>
+        <img class="erstellseite__qr" id="esQr" alt="QR-Code: ${esc(einladung)}" src="/api/einladung-qr.svg?code=${code}" width="200" height="200">
+        <p class="erstellseite__qrHinweis">${esc(T.qrHinweis)}</p>
+      </div>
+      <div class="erstellseite__fuss">
+        <p class="erstellseite__meldung" id="esMeldung" hidden></p>
+        <button class="erstellseite__fertig" id="esFertig">${esc(T.fertig)}</button>
+      </div>
+    </div>`;
+
+  // Fehler stehen auf der Seite, nicht in einem Toast hinter ihr.
+  const meldung = (text) => {
+    const el = $('#esMeldung');
+    el.textContent = text || '';
+    el.hidden = !text;
+  };
+  const schliessen = () => {
+    overlay.hidden = true;
+    overlay.innerHTML = '';
+  };
+  $('#esZu').addEventListener('click', schliessen);
+
+  if (istCommunity) {
+    $('#esBildDatei').addEventListener('change', async (e) => {
+      const datei = e.target.files?.[0];
+      e.target.value = '';
+      if (!datei) return;
+      let daten;
+      try {
+        daten = await bildVerkleinern(datei, 800);
+      } catch {
+        return meldung('Dieses Bild lässt sich nicht lesen');
+      }
+      meldung('Wird hochgeladen …');
+      // Dieselbe Medienstelle wie das Profilbild (/api/hochladen, Ordner avatars).
+      const hoch = await api('/api/hochladen', { ordner: 'avatars', aufnahme: daten });
+      if (!hoch.ok) return meldung(hoch.error || 'Das Bild ließ sich nicht hochladen');
+      stand.bild = hoch.url;
+      const vorschau = $('#esBildVorschau');
+      vorschau.src = hoch.anzeige || daten;
+      vorschau.hidden = false;
+      $('#esBildLeer').hidden = true;
+      $('#esBildMarke').hidden = false;
+      meldung('');
+    });
+
+    const zeichneUnterthemen = () => {
+      $('#esUnterthemen').innerHTML = stand.unterthemen
+        .map(
+          (u, i) => `
+        <div class="erstellseite__ut">
+          <span class="erstellseite__raute">#</span>
+          <input data-esut="${i}" value="${esc(u)}" maxlength="${Erstellen.NAME_MAX}"
+                 placeholder="${esc(T.unterthemaPlatzhalter)}" aria-label="${esc(T.unterthemaPlatzhalter)} ${i + 1}">
+          <button data-esutweg="${i}" aria-label="Unterthema ${i + 1} entfernen">${ICONS.close}</button>
+        </div>`
+        )
+        .join('');
+      $('#esUnterthemaNeu').hidden = stand.unterthemen.length >= Erstellen.UNTERTHEMEN_MAX;
+      overlay.querySelectorAll('[data-esut]').forEach((el) =>
+        el.addEventListener('input', () => (stand.unterthemen[Number(el.dataset.esut)] = el.value))
+      );
+      overlay.querySelectorAll('[data-esutweg]').forEach((b) =>
+        b.addEventListener('click', () => {
+          stand.unterthemen.splice(Number(b.dataset.esutweg), 1);
+          zeichneUnterthemen();
+        })
+      );
+    };
+    $('#esUnterthemaNeu').addEventListener('click', () => {
+      stand.unterthemen.push('');
+      zeichneUnterthemen();
+      overlay.querySelector(`[data-esut="${stand.unterthemen.length - 1}"]`)?.focus();
+    });
+  }
+
+  $('#esEinladen').addEventListener('click', async () => {
+    const name = $('#esName').value.trim() || (istCommunity ? 'meine Community' : 'mein Unterthema');
+    const wie = istCommunity || !community ? name : `${name} (${community.name})`;
+    const textTeilen = Erstellen.teilenText(art, wie, code, location.origin);
+    try {
+      if (navigator.share) return await navigator.share({ text: textTeilen });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+    try {
+      await navigator.clipboard.writeText(einladung);
+      meldung('');
+      toast('Einladungslink kopiert');
+    } catch {
+      meldung(einladung);
+    }
+  });
+
+  $('#esFertig').addEventListener('click', async () => {
+    if (stand.laeuft) return;
+    const eingabe = {
+      name: $('#esName').value,
+      bio: $('#esBio').value,
+      link: $('#esLink').value,
+      privat: $('#esPrivat').checked,
+    };
+    const geprueft = istCommunity
+      ? Erstellen.pruefeCommunity({ ...eingabe, bild: !!stand.bild, unterthemen: stand.unterthemen })
+      : Erstellen.pruefeUnterthema(eingabe);
+    if (geprueft.fehler) return meldung(geprueft.fehler);
+    const w = geprueft.werte;
+    stand.laeuft = true;
+    $('#esFertig').disabled = true;
+    meldung('');
+    const res = istCommunity
+      ? await api('/api/communities', {
+          name: w.name, bio: w.bio, link: w.link, bild: stand.bild, unterthemen: w.unterthemen,
+          sichtbarkeit: w.privat ? 'private' : 'public', code,
+        })
+      : await api(`/api/communities/${community.id}/channels`, {
+          name: w.name, bio: w.bio, link: w.link, privat: w.privat, code,
+        });
+    stand.laeuft = false;
+    $('#esFertig').disabled = false;
+    if (!res.ok) return meldung(res.error || 'Das hat nicht geklappt');
+
+    schliessen();
+    const fertigText = `„${w.name}“ erstellt`;
+    toast(res.hinweis ? `${fertigText} · ${res.hinweis}` : fertigText);
+    if (istCommunity) {
       state.area = 'communities';
       state.sub.communities = 'profile';
       await bootstrap();
-      toast(`„${name}" erstellt`);
-    },
-    'Erstellen'
-  );
+    } else {
+      renderCommunityChannels(community.id);
+    }
+  });
+
+  $('#esName').focus();
 }
 
 /** Livestream: laufende Sendung mit Dauer, danach bleibt die Aufzeichnung. */

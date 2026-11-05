@@ -34,6 +34,9 @@ const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gem
 // Kasten 28/15.4: Befreunden — Zustände und Sätze gleich mit der Website.
 const Freundschaft = require('../../gemeinsam/freundschaft') as typeof import('../../gemeinsam/freundschaft');
 import type { FreundZustand } from '../../gemeinsam/freundschaft';
+// Kästen 28/10.2 und 16: Community und Unterthema erstellen (Schema 99).
+const Erstellen = require('../../gemeinsam/erstellen') as typeof import('../../gemeinsam/erstellen');
+import { SUPABASE_CONFIG } from '../constants/supabase';
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -988,19 +991,34 @@ export async function communityAnlegen(
   ichId: string,
   name: string,
   thema = '',
-  privat = false
+  privat = false,
+  zusatz: { bio?: string; link?: string; bildUrl?: string | null } = {}
 ): Promise<string> {
-  const { data, error } = await client
+  const zeile: Record<string, unknown> = {
+    name,
+    topic: thema,
+    visibility: privat ? 'private' : 'public',
+    created_by: ichId,
+  };
+  if (zusatz.bio) zeile.bio = zusatz.bio;
+  if (zusatz.link) zeile.link = zusatz.link;
+  // Vollständiger Bildvertrag (eigener Host + avatars/), derselbe wie die
+  // Website (/api/communities) und communities_bild_url_check (Schema 99).
+  if (zusatz.bildUrl && !Erstellen.bildAdresseGueltig(zusatz.bildUrl, SUPABASE_CONFIG.url)) {
+    throw new Error(Erstellen.FEHLER.bildFremd);
+  }
+  // Kasten 28/16 (Schema 99): das Bild. Fehlt die Spalte, ohne Bild anlegen
+  // und es sagen (communityErstellen meldet FEHLT_SCHEMA).
+  let { data, error } = await client
     .from('communities')
-    .insert({
-      name,
-      topic: thema,
-      visibility: privat ? 'private' : 'public',
-      created_by: ichId,
-    })
+    .insert(zusatz.bildUrl ? { ...zeile, bild_url: zusatz.bildUrl } : zeile)
     .select('id')
     .single();
+  if (error && zusatz.bildUrl && Erstellen.fehltSchema(error)) {
+    ({ data, error } = await client.from('communities').insert(zeile).select('id').single());
+  }
   if (error) throw error;
+  if (!data) throw new Error('Die Community ließ sich nicht anlegen');
 
   const { error: fehlerMitglied } = await client
     .from('community_members')
@@ -2088,7 +2106,8 @@ export async function kanalAnlegen(
   client: SupabaseClient,
   _ichId: string,
   communityId: string,
-  name: string
+  name: string,
+  zusatz: { bio?: string; link?: string; privat?: boolean } = {}
 ): Promise<string> {
   const slug = 'ch-' + name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-').replace(/^-|-$/g, '');
 
@@ -2109,13 +2128,64 @@ export async function kanalAnlegen(
     .limit(1)
     .maybeSingle();
 
-  const { data, error } = await client
-    .from('community_channels')
-    .insert({ community_id: communityId, slug, name, position: letztes ? ((letztes as any).position ?? 0) + 1 : 0 })
-    .select('id')
-    .single();
+  const zeile: Record<string, unknown> = {
+    community_id: communityId,
+    slug,
+    name,
+    position: letztes ? ((letztes as any).position ?? 0) + 1 : 0,
+  };
+  // Kasten 28/10.2 (Schema 99): Biografie, Link, privat. Ohne 99 nicht
+  // stillschweigend weglassen, wenn es privat sein soll — ein privates
+  // Unterthema, das öffentlich angelegt wird, wäre schlimmer als keins.
+  const mitZusatz = { ...zeile, bio: zusatz.bio ?? '', link: zusatz.link ?? '', privat: !!zusatz.privat };
+  const brauchtZusatz = !!(zusatz.bio || zusatz.link || zusatz.privat);
+  let { data, error } = await client.from('community_channels').insert(mitZusatz).select('id').single();
+  if (error && Erstellen.fehltSchema(error)) {
+    if (brauchtZusatz) throw new Error(Erstellen.FEHLT_SCHEMA);
+    ({ data, error } = await client.from('community_channels').insert(zeile).select('id').single());
+  }
   if (error) throw error;
-  return data.id as string;
+  return (data as any).id as string;
+}
+
+/**
+ * Den Einladungscode einer Community oder eines Unterthemas speichern
+ * (Kästen 28/10.2 und 16, Schema 99). Der Code stand schon auf der
+ * Erstellen-Seite; gültig wird er hier. Gegenstück: sync-handlers.js
+ * (handleEinladungSpeichern).
+ */
+export async function einladungSpeichern(
+  client: SupabaseClient,
+  ichId: string,
+  code: string,
+  communityId: string,
+  kanalId: string | null = null
+): Promise<void> {
+  if (!Erstellen.istCode(code)) throw new Error('Der Einladungscode ist ungültig');
+  const { error } = await client
+    .from('einladungen')
+    .insert({ code, community_id: communityId, channel_id: kanalId, erstellt_von: ichId });
+  if (error) {
+    if (Erstellen.fehltSchema(error)) throw new Error(Erstellen.FEHLT_SCHEMA);
+    throw error;
+  }
+}
+
+/**
+ * Eine Einladung annehmen (Link oder QR-Code). Gibt Community und ggf.
+ * Unterthema zurück. Die Datenbank entscheidet (einladung_annehmen).
+ */
+export async function einladungAnnehmen(
+  client: SupabaseClient,
+  code: string
+): Promise<{ communityId: string; kanalId: string | null }> {
+  const { data, error } = await client.rpc('einladung_annehmen', { p_code: code });
+  if (error) {
+    if (Erstellen.fehltSchema(error)) throw new Error(Erstellen.FEHLT_SCHEMA);
+    throw error;
+  }
+  const z = (data ?? {}) as any;
+  return { communityId: z.community_id, kanalId: z.channel_id ?? null };
 }
 
 /**

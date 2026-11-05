@@ -171,7 +171,7 @@ export const CommunitySearchScreen = ({
 
   const communityZeile = (c: Community) => (
             <Druck key={c.id} style={styles.row} onPress={() => onOpenCommunity(c)}>
-              <Avatar id={c.id} name={c.name} size={44} />
+              <Avatar id={c.id} name={c.name} size={44} bild={c.bild} />
               <View style={styles.body}>
                 <View style={styles.nameRow}>
                   <Text style={styles.name}>{c.name}</Text>

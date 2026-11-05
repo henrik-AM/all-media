@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Image, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -145,12 +145,22 @@ export const CommunityDetailScreen = ({
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
         <View style={styles.bild}>
-          <Motiv
-            id={`community-${community.id}`}
-            icon="people-outline"
-            iconSize={44}
-            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-          />
+          {/* Kasten 28/16: das Bild aus „Community erstellen“ (Schema 99); ohne Bild das Motiv. */}
+          {community.bild ? (
+            <Image
+              source={{ uri: community.bild }}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+              accessibilityLabel={`Bild von ${community.name}`}
+              testID="community-bild"
+            />
+          ) : (
+            <Motiv
+              id={`community-${community.id}`}
+              icon="people-outline"
+              iconSize={44}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+            />
+          )}
           {/* Der Pfeil liegt auf dem Bild, nicht darueber - so steht er im
               Frame. Der dunkle Kreis haelt ihn auf hellen Motiven lesbar. */}
           <Druck style={styles.zurueck} onPress={onBack} accessibilityLabel="Zurück" hitSlop={8}>
@@ -255,9 +265,13 @@ export const CommunityDetailScreen = ({
               style={({ pressed }) => [styles.thema, pressed && styles.themaPressed]}
               onPress={() => onOpenUnterthema(ut)}
             >
-              <Text style={styles.themaName}># {ut.name}</Text>
+              <View style={styles.nameZeile}>
+                <Text style={styles.themaName}># {ut.name}</Text>
+                {/* Kasten 28/10.2: privates Unterthema (nur mit Einladung). */}
+                {ut.privat && <Ionicons name="lock-closed" size={13} color={colors.text3} accessibilityLabel="Privat" />}
+              </View>
               <Text style={styles.themaSub} numberOfLines={1}>
-                {ut.themen.length ? ut.themen.join(' · ') : 'Noch keine Themen'}
+                {[ut.bio, ut.link].filter(Boolean).join(' · ') || (ut.themen.length ? ut.themen.join(' · ') : 'Noch keine Themen')}
               </Text>
             </Druck>
           ))}
