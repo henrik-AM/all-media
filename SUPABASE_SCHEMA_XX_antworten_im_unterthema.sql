@@ -1,3 +1,13 @@
+-- ===========================================================================
+-- ABGLEICH MIT MAIN (Paket 1, 05.11.2026, Stand origin/main ad7f221)
+--   Auf dem Sammelzweig als SUPABASE_SCHEMA_91_antworten_im_unterthema.sql
+--   vergeben (Merge 963f1b9); die Umbenennung XX → 91 macht der Hauptagent.
+--   * community_channel_messages.reply_to (+ Index): neu, live nicht vorhanden.
+--   * Regel „Antwort nur im selben Unterthema“: neu, restriktiv, nur INSERT.
+--     Schema 102 legt auf derselben Tabelle die restriktive Regel
+--     nicht_ausgeblendet an — restriktive Regeln werden verundet, keine
+--     Rückdrehung. Keine spätere main-Datei definiert diese Objekte.
+-- ===========================================================================
 -- ============================================================================
 --  SUPABASE_SCHEMA_XX_antworten_im_unterthema.sql
 --  (Nummer vergibt der Hauptagent. Entwurf — eingespielt wird erst nach der
