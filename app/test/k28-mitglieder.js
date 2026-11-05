@@ -76,10 +76,15 @@ function teilA() {
   pruefe('15.3 Annehmen prüft den Ersteller', /beitrittsanfrage_annehmen[\s\S]{0,400}v_ersteller is distinct from auth\.uid\(\)/.test(sql));
   pruefe('15.3 Annahmefunktion für anon gesperrt', /revoke execute on function public\.beitrittsanfrage_annehmen\(uuid, uuid\) from public, anon/.test(sql));
   pruefe('15.3 Direktbeitritt bleibt zu (Regel aus 95 nicht angefasst)', !/create policy "Community beitreten"/.test(sql));
-  const liste90 = (lies('SUPABASE_SCHEMA_90_push_to_talk.sql').match(/notifications_art_check\s+check \(art in \(([\s\S]*?)\)\);/) || [])[1] || '';
+  // Paket 2 (05.11.2026): Schema 90 liegt nicht auf main und ist live nicht
+  // eingespielt. Maßstab ist die live gültige Liste (zuletzt 57, gemessen
+  // 05.11.2026) — 97 muss sie vollständig enthalten.
+  const liste90 =
+    "'like', 'comment', 'follow', 'mention', 'share', 'message', 'system', 'repost', 'story', 'kanal', " +
+    "'beitritt', 'nachricht', 'einladung', 'anfrage', 'anfrage_ok', 'messenger_anfrage', 'messenger_ok'";
   const liste97 = (sql.match(/notifications_art_check\s+check \(art in \(([\s\S]*?)\)\);/) || [])[1] || '';
   const arten = (t) => (t.match(/'[a-z_]+'/g) || []).sort();
-  pruefe('15.2 Mitteilungsarten: Liste aus 90 vollständig + 2 neue',
+  pruefe('15.2 Mitteilungsarten: live gültige Liste vollständig + 2 neue',
     arten(liste90).length > 0 && arten(liste90).every((a) => arten(liste97).includes(a)) &&
       arten(liste97).includes("'beitritt_anfrage'") && arten(liste97).includes("'beitritt_ok'"),
     `${arten(liste90).length} → ${arten(liste97).length}`);

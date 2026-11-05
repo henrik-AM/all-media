@@ -341,8 +341,9 @@ Datenbank-Update eingespielt ist“.
 
 ## Nachtrag 21.10.2026: Schema 98 (Feedback 28.09., Kasten 15.4)
 
-**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 97 (Mitteilungsarten) und nach 95
-(`blockiert_zwischen`).
+**Entwurf, noch nicht eingespielt.** Nach 97 (Mitteilungsarten) und nach 95 (`blockiert_zwischen`, live).
+Abgleich 05.11.2026 (Paket 2): keine Datei 101–117 berührt die Objekte; 103 (live) nimmt `freundschaften`
+in `meine_daten()` auf, sobald es die Tabelle gibt.
 
 - `SUPABASE_SCHEMA_98_freundschaften.sql` — Tabelle `freundschaften (von, an, angenommen)` (RLS,
   `nur_freigegebene`, je Paar eine Zeile über `freundschaften_paar`, kein UPDATE für `authenticated`);
