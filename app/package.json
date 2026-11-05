@@ -124,6 +124,7 @@
     "test:farbfilterrechnung": "node test/_farbfilter_rechnung.js",
     "test:bildschirmzeit": "node test/_bildschirmzeit.js",
     "test:bildschirmzeit-einheit": "node test/_bildschirmzeit_einheit.js",
+    "test:medienadresse-einheit": "node test/_medienadresse_einheit.js",
     "test:vorschlaege": "node test/_vorschlaege.js",
     "test:angriffe": "node test/_angriffe.js",
     "test:recht": "node test/_rechtstexte_einheit.js"

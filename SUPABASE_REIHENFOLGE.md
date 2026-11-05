@@ -316,3 +316,16 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
 **Folge:** Jedes Konto ohne Zustimmung (am 02.11. 15 Konten, alle von vor dem 24.10.) sieht beim nächsten Öffnen „Unsere Bedingungen“ und muss zustimmen. Prüf- und Testkonto (`all.media.prueflauf@web.de`, `test@all-media.app`) haben zugestimmt; neue Prüfkonten aus SQL ohne `pruefsumme_<dok>` in den Metadaten landen ebenfalls dort.
 
 **Nicht auf main** (bleibt auf `kasten/rs-recht` bzw. im Sammelzweig): alle Kasten-28-Teile mit den Schemas 88–100. Wer 92 einspielt, muss danach den F11-Block aus 102 erneut ausführen.
+
+## Nachtrag 05.11.2026: Schema 118 — Medienadresse mit eigenem Host (Entwurf)
+
+**Nicht eingespielt**, erst nach Henriks Ja. Kasten `live-medienadresse`, Codex-Review 05.11.2026.
+
+- `SUPABASE_SCHEMA_118_medienadresse_host.sql` — verschärft nur die CHECKs `profiles_avatar_url_eimer` (Schema 69) und `sammlungen_titelbild_eimer` (Schema 70) um `public.medien_adresse_gueltig(...)` (eigener Projekt-Host, kein `?`/`#`). Vorher ging `https://boese.example/storage/v1/object/public/media/avatars/x.png` durch, und `medienreferenz_pruefen` (117) / `bunny_referenz_pruefen` (115) übersprangen sie.
+- **Ersetzt keine Funktion.** Gewinner der beiden CHECKs ist ab jetzt 118: **wer 69 oder 70 neu einspielt, muss 118 danach erneut einspielen** (sonst ist die Hostprüfung wieder weg).
+- CHECK erst `not valid`, dann validiert; verletzt Altbestand, bleibt er `not valid` mit Hinweis (Bereinigung nur auskommentiert, mit Henriks Ja). Live am 05.11.: 0 Profilbilder und 0 Titelbilder gesetzt, 0 Verletzungen.
+- Clients gleichauf: `gemeinsam/medienadresse.js` (UMD, `MedienAdresse`) prüft in `POST /api/eigene/profilbild`, `POST /api/eigene/sammlung/:id/titelbild`, `profilbildSetzen`/`titelbildSetzen` (App); `signiereMedien` (Server und App) liefert Medienadressen auf fremdem Host nie aus (null).
+- Probe `app/test/_probe118.js` (verworfen), Gegenprobe mit `SCHEMAS=` (ohne 118: fremder Host offen). Danach `test:rechte`, `test:angriffe`, `test:schema`.
+
+| CHECK profiles_avatar_url_eimer | SUPABASE_SCHEMA_69_profilbild.sql → SUPABASE_SCHEMA_118_medienadresse_host.sql |
+| CHECK sammlungen_titelbild_eimer | SUPABASE_SCHEMA_70_titelbild.sql → SUPABASE_SCHEMA_118_medienadresse_host.sql |
