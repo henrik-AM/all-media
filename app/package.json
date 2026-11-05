@@ -127,7 +127,8 @@
     "test:vorschlaege": "node test/_vorschlaege.js",
     "test:angriffe": "node test/_angriffe.js",
     "test:recht": "node test/_rechtstexte_einheit.js",
-    "test:k28-mitglieder": "node test/k28-mitglieder.js"
+    "test:k28-mitglieder": "node test/k28-mitglieder.js",
+    "test:profil-ruecknavigation": "node test/profil-ruecknavigation.cjs"
   },
   "private": true
 }
