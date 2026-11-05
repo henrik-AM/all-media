@@ -241,6 +241,7 @@ as $$
 declare
   v_community uuid;
   v_sitzung   uuid;
+  v_jetzt     timestamptz;
 begin
   -- Was der Client mitschickt, zaehlt nicht.
   new.sitzung_id := null;
@@ -259,15 +260,29 @@ begin
   -- anlegen: je Unterthema nacheinander.
   perform pg_advisory_xact_lock(hashtext('ptt:' || new.channel_id::text));
 
-  -- `created_at <= now()`: eine Zeile mit Zukunftszeitstempel (Altbestand
-  -- von vor `zeitstempel_vom_server`, Codex-Fund 05.11.) haelt sonst die
-  -- Sitzung fuer immer offen — keine neue Sitzungszeile, keine Einladung.
+  -- Uhrzeit NACH der Sperre, einmal erfasst (Codex-Fund Runde 2, 05.11.):
+  -- now() ist der Transaktionsbeginn. Beginnt A vor B, bekommt die Sperre
+  -- aber erst nach Bs Commit, laege Bs Wortmeldung fuer A „in der Zukunft"
+  -- und A legte eine zweite Sitzung an (doppelte Einladung). Ab der Sperre
+  -- ist jede schon committete Wortmeldung dieses Unterthemas aelter als
+  -- clock_timestamp() — beide Grenzen kommen deshalb aus v_jetzt.
+  v_jetzt := clock_timestamp();
+
+  -- Zukunftsgrenze `v_jetzt + 5 Sekunden`: eine Zeile mit echter Zukunftszeit
+  -- (Altbestand/Angriff von vor `zeitstempel_vom_server`, Codex-Fund 05.11.)
+  -- haelt sonst die Sitzung fuer immer offen — keine neue Sitzungszeile,
+  -- keine Einladung. 5 s statt 0: Client-Zeilen tragen seit dem Fix ihre
+  -- clock_timestamp() unter derselben Sperre, liegen also nie nach v_jetzt;
+  -- die Toleranz faengt nur Uhrkorrekturen (NTP-Schritt rueckwaerts) und
+  -- Eigentuemer-Zeilen mit Sekundenbruchteilen Vorlauf ab.
+  -- Schaden der Toleranz: eine Zeile hoechstens 5 s in der Zukunft haelt die
+  -- Sitzung hoechstens 5 s laenger offen — unerheblich bei 10 Minuten.
   select p.sitzung_id into v_sitzung
     from public.ptt_messages p
    where p.channel_id = new.channel_id
      and p.sitzung_id is not null
-     and p.created_at > now() - interval '10 minutes'
-     and p.created_at <= now()
+     and p.created_at > v_jetzt - interval '10 minutes'
+     and p.created_at <= v_jetzt + interval '5 seconds'
    order by p.created_at desc
    limit 1;
 
@@ -304,7 +319,7 @@ create trigger ptt_sitzung_zuordnen
 --  jeder Unterthema-Nachricht (community_channel_messages).
 --
 --  Jetzt: beim Einfuegen durch den Client (Rolle authenticated/anon) setzt
---  der Server created_at := now(); beim Aendern bleibt der alte Wert (heute
+--  der Server created_at := clock_timestamp(); beim Aendern bleibt der alte Wert (heute
 --  gibt es auf beiden Tabellen keine UPDATE-Regel, das ist Vorsorge).
 --  Absichtlich SECURITY INVOKER: so ist current_user die Rolle der
 --  Anweisung. Eigene Wege des Servers (starter_inhalte, Testbestand aus
@@ -314,6 +329,21 @@ create trigger ptt_sitzung_zuordnen
 --  Liest/aendert nur created_at — beruehrt geteilt_weg_schuetzen (93),
 --  medienreferenz_pruefen (117), bunny_referenz_pruefen (115) und die
 --  Regeln aus 102 nicht.
+--
+--  clock_timestamp() statt now() (Codex-Fund Runde 2, 05.11.): now() ist der
+--  Transaktionsbeginn. Mit now() bekaeme eine Wortmeldung, deren Transaktion
+--  frueher begann, aber spaeter committet, einen AELTEREN Zeitstempel als
+--  eine schon committete fremde — Reihenfolge im Verlauf ungleich
+--  Commit-Reihenfolge, und ein langer Transaktionsbeginn koennte die Zeile
+--  ausserhalb des 10-Minuten-Fensters der Sitzungssuche ablegen.
+--  Auf ptt_messages laufen BEFORE-Auslöser nach Namen sortiert:
+--  ptt_sitzung_zuordnen (p) vor zeitstempel_vom_server (z). Der Zeitstempel
+--  entsteht also erst NACH der Kanalsperre, die bis zum Commit gehalten
+--  wird — je Unterthema ist created_at damit streng in Commit-Reihenfolge
+--  und nie spaeter als das v_jetzt einer nachfolgenden Sitzungssuche.
+--  Wer einen Auslöser umbenennt, muss diese Reihenfolge erhalten.
+--  Auf community_channel_messages (ohne Sperre) ist clock_timestamp() immer
+--  noch naeher am Commit als now() — nicht schlechter, meist besser.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.zeitstempel_vom_server()
@@ -326,7 +356,7 @@ begin
     return new;
   end if;
   if tg_op = 'INSERT' then
-    new.created_at := now();
+    new.created_at := clock_timestamp();
   else
     new.created_at := old.created_at;
   end if;

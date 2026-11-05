@@ -392,6 +392,9 @@ Datei im Kopf. Wichtig beim Einspielen:
   Neu (Codex-Fund 05.11.): Auslöser `zeitstempel_vom_server` setzt `created_at` auf `ptt_messages`
   und `community_channel_messages` beim Client-Einfügen auf `now()`, die Sitzungssuche übergeht
   Zukunftszeilen; Funktion nur in 90 definiert.
+  Nachtrag (Codex Runde 2): Zeitstempel und beide Grenzen der Sitzungssuche nutzen
+  `clock_timestamp()` nach der Kanalsperre (Zukunftsgrenze + 5 s), weil `now()` bei überkreuzten
+  Transaktionen eine schon committete Wortmeldung als Zukunft verwarf und eine zweite Sitzung anlegte.
 - **92:** führt am Ende den F11-Block aus 102 (`kommentar_ausgeblendet`, Regel `nicht_ausgeblendet`
   auf `comments`) wortgleich erneut aus, jetzt mit `reply_to`; der Nachweis bricht ab, wenn der
   Antwort-Teil fehlt. Der Nachtrag „nach 92 den F11-Block aus 102 erneut ausführen“ ist damit erledigt.

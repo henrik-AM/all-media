@@ -25,6 +25,7 @@ const COMM = '88888888-0000-4000-8000-000000000001';
 const K1 = '88888888-0000-4000-8000-000000000002';
 const K2 = '88888888-0000-4000-8000-000000000003';
 const N1 = '88888888-0000-4000-8000-000000000004';
+const K3 = '88888888-0000-4000-8000-000000000005'; // überkreuzte Transaktionen (Codex Runde 2)
 // Eigene, registrierte Datei des Prüfkontos (unten in medien_objekte) — 115/117 lassen sie durch.
 const PTT_AUDIO = `https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/avatars/${PRUEFKONTO}-probe88-eigen.png`;
 
@@ -101,7 +102,8 @@ insert into public.communities (id, name, topic, visibility, created_by)
 insert into public.community_members (community_id, user_id)
   values ('${COMM}', '${TESTKONTO}'), ('${COMM}', '${PRUEFKONTO}') on conflict do nothing;
 insert into public.community_channels (id, community_id, slug, name)
-  values ('${K1}', '${COMM}', 'eins', 'Eins'), ('${K2}', '${COMM}', 'zwei', 'Zwei');
+  values ('${K1}', '${COMM}', 'eins', 'Eins'), ('${K2}', '${COMM}', 'zwei', 'Zwei'),
+         ('${K3}', '${COMM}', 'drei', 'Drei');
 insert into public.community_channel_messages (id, channel_id, sender_id, text)
   values ('${N1}', '${K1}', '${TESTKONTO}', 'Original in Eins');
 insert into public.contacts (user_id, contact_id)
@@ -165,12 +167,14 @@ ${als(PRUEFKONTO, `
 `)}
 
 ${eigner(`
-  -- Was der Client geschickt hat, zählt nicht: gespeichert ist now().
-  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at > now();
+  -- Was der Client geschickt hat, zählt nicht: gespeichert ist die Serverzeit
+  -- (clock_timestamp() beim Einfügen, also zwischen now() und jetzt).
+  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at > now() + interval '1 hour';
   ${merke('ptt_zukunft_gespeichert', 'n')}
-  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at = now();
+  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and sender_id = '${PRUEFKONTO}'
+     and created_at between now() and clock_timestamp();
   ${merke('ptt_zeit_jetzt', 'n')}
-  select count(*) into n from public.community_channel_messages where channel_id = '${K2}' and created_at > now();
+  select count(*) into n from public.community_channel_messages where channel_id = '${K2}' and created_at > now() + interval '1 hour';
   ${merke('kanal_zukunft_gespeichert', 'n')}
   select count(*) into n from pg_proc where proname = 'zeitstempel_vom_server' and has_function_privilege('authenticated', oid, 'execute');
   ${merke('zeit_execute_auth', 'n')}
@@ -188,11 +192,11 @@ ${eigner(`
   -- Sitzungszeile wieder entfernen.
   update public.ptt_messages z set sitzung_id = (select a.sitzung_id from public.ptt_messages a
           where a.channel_id = '${K2}' and a.created_at < now() order by a.created_at limit 1)
-   where z.channel_id = '${K2}' and z.created_at > now();
+   where z.channel_id = '${K2}' and z.created_at > now() + interval '1 hour';
   delete from public.community_channel_messages c
    where c.channel_id = '${K2}' and c.ptt_sitzung
      and not exists (select 1 from public.ptt_messages p where p.sitzung_id = c.id);
-  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at > now() and sitzung_id is not null;
+  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at > now() + interval '1 hour' and sitzung_id is not null;
   ${merke('altbestand_zukunft', 'n')}
   select count(*) into n from public.community_channel_messages where channel_id = '${K2}' and ptt_sitzung;
   ${merke('sitzungen_vorher', 'n')}
@@ -222,12 +226,37 @@ ${eigner(`
   select count(*) into n from public.community_channel_messages where channel_id = '${K2}' and ptt_sitzung;
   ${merke('sitzungen_nachher', 'n')}
   select count(*) into n from public.ptt_messages p
-   where p.channel_id = '${K2}' and p.created_at = now() and p.dauer = 2
+   where p.channel_id = '${K2}' and p.dauer = 2
      and p.sitzung_id is not null
-     and p.sitzung_id is distinct from (select q.sitzung_id from public.ptt_messages q where q.channel_id = '${K2}' and q.created_at > now() limit 1);
+     and p.sitzung_id is distinct from (select q.sitzung_id from public.ptt_messages q where q.channel_id = '${K2}' and q.created_at > now() + interval '1 hour' limit 1);
   ${merke('ptt_neue_sitzung', 'n')}
   select count(*) into n from public.notifications where user_id = '${TESTKONTO}' and art = 'ptt' and target_id = '${K2}';
   ${merke('einladungen_nachher', 'n')}
+
+  -- Codex-Fund Runde 2: überkreuzte Transaktionen nachstellen. Zwei echte
+  -- Verbindungen gehen über die Management-API nicht (eine Anfrage = eine
+  -- Transaktion). Darum: B „hat schon committet" — Wortmeldung als Eigentümer
+  -- mit created_at = clock_timestamp(), also NACH dem now() dieser Transaktion
+  -- (A hat zuerst begonnen). Danach schreibt A normal. Vor dem Fix galt Bs
+  -- Zeile für A als Zukunft (created_at <= now()) → zweite Sitzung.
+  insert into public.ptt_messages (community_id, channel_id, sender_id, audio_url, dauer, created_at)
+    values ('${COMM}', '${K3}', '${TESTKONTO}', '${PTT_AUDIO}', 4, clock_timestamp());
+  select count(*) into n from public.ptt_messages
+   where channel_id = '${K3}' and created_at > now() and sitzung_id is not null;
+  ${merke('kreuz_b_nach_now', 'n')}
+`)}
+
+${als(PRUEFKONTO, `
+  ${weg('kreuz_a', `insert into public.ptt_messages (community_id, channel_id, sender_id, audio_url, dauer) values ('${COMM}', '${K3}', auth.uid(), '${PTT_AUDIO}', 5)`)}
+`)}
+
+${eigner(`
+  select count(*) into n from public.ptt_messages where channel_id = '${K3}';
+  ${merke('kreuz_zeilen', 'n')}
+  select count(distinct sitzung_id) into n from public.ptt_messages where channel_id = '${K3}' and sitzung_id is not null;
+  ${merke('kreuz_sitzungen_ids', 'n')}
+  select count(*) into n from public.community_channel_messages where channel_id = '${K3}' and ptt_sitzung;
+  ${merke('kreuz_sitzungszeilen', 'n')}
 `)}
 
 ${als(PRUEFKONTO, `
@@ -293,7 +322,7 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('90 PTT-Schalter speichern: ok', w.ptt_schalter === 'ok', w.ptt_schalter);
   pruefe('90 PTT mit created_at 2100 einfügen: angenommen', w.ptt_zukunft === 'ok', w.ptt_zukunft);
   pruefe('90 … gespeichert ist kein Zukunftszeitstempel', w.ptt_zukunft_gespeichert === '0', w.ptt_zukunft_gespeichert);
-  pruefe('90 … sondern now()', w.ptt_zeit_jetzt === '1', w.ptt_zeit_jetzt);
+  pruefe('90 … sondern die Serverzeit', w.ptt_zeit_jetzt === '1', w.ptt_zeit_jetzt);
   pruefe('90 Unterthema-Nachricht mit created_at 2100: angenommen', w.kanal_zukunft === 'ok', w.kanal_zukunft);
   pruefe('90 … gespeichert ohne Zukunftszeitstempel', w.kanal_zukunft_gespeichert === '0', w.kanal_zukunft_gespeichert);
   pruefe('90 created_at nachträglich ändern: zu', w.ptt_zeit_aendern === 'zu', w.ptt_zeit_aendern);
@@ -305,6 +334,11 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('90 … Einladung „Push to Talk beitreten?“ wie erwartet',
     Number(w.einladungen_nachher) - Number(w.einladungen_vorher) === Number(w.einladung_erwartet),
     `erwartet ${w.einladung_erwartet}, ${w.einladungen_vorher} → ${w.einladungen_nachher}`);
+  pruefe('90 überkreuzt: Bs Wortmeldung liegt nach As now()', w.kreuz_b_nach_now === '1', w.kreuz_b_nach_now);
+  pruefe('90 überkreuzt: As Wortmeldung danach: ok', w.kreuz_a === 'ok', w.kreuz_a);
+  pruefe('90 … beide Wortmeldungen gespeichert', w.kreuz_zeilen === '2', w.kreuz_zeilen);
+  pruefe('90 … beide mit derselben sitzung_id', w.kreuz_sitzungen_ids === '1', w.kreuz_sitzungen_ids);
+  pruefe('90 … nur eine Sitzungszeile', w.kreuz_sitzungszeilen === '1', w.kreuz_sitzungszeilen);
   pruefe('91 Antwort im selben Unterthema: ok', w.antwort_selbes_unterthema === 'ok', w.antwort_selbes_unterthema);
   pruefe('91 Antwort in anderes Unterthema: zu', w.antwort_anderes_unterthema === 'zu', w.antwort_anderes_unterthema);
   pruefe('93 Weg-Merker vom Client nicht setzbar', w.weg_merker_selbst === 'zu' || w.weg_merker_gesetzt === '0', `${w.weg_merker_selbst} ${w.weg_merker_gesetzt}`);
