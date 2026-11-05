@@ -1,4 +1,16 @@
 -- ===========================================================================
+-- ABGLEICH MIT MAIN (Paket 1, 05.11.2026, Stand origin/main ad7f221)
+--   * profiles.pronomen/links, profiles_pronomen_laenge, profiles_links_gueltig,
+--     profil_links_gueltig(), profil_links_abgleichen() + Auslöser:
+--     neue Objekte, keine spätere main-Datei (101–117) definiert sie → unverändert.
+--   * Spaltenrechte select/update (pronomen, links): keine spätere main-Datei
+--     ändert Spaltenrechte auf profiles → unverändert.
+--   * zuruecksetzen(): wird nur am Anker umgeschrieben (keine Vollfassung).
+--     Live geprüft (nur lesend, 05.11.2026): Anker „geburtsdatum = null /
+--     where id = ziel;“ ist in der Live-Fassung vorhanden → greift.
+--   * Live fehlen pronomen/links noch (88 nicht eingespielt).
+-- ===========================================================================
+-- ===========================================================================
 -- Schema 88 (ENTWURF, noch nicht eingespielt — Supabase-Sperre seit 10.10.2026)
 -- Seite „Profil bearbeiten“: Pronomen und bis zu fünf Links
 -- (Kasten 1.3, Nachtrag 10.10.2026)
