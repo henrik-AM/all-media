@@ -14,6 +14,9 @@
 --     ptt_messages.sitzung_id, Regel „Sitzungszeile nur vom Ausloeser“
 --     (restriktiv, verundet mit nicht_ausgeblendet aus 102),
 --     ptt_mitteilen(), ptt_sitzung_zuordnen() + Auslöser: neu.
+--   * zeitstempel_vom_server() + Auslöser auf ptt_messages und
+--     community_channel_messages: neu (Codex-Fund 05.11., Zukunftszeitstempel).
+--     Live geprüft: keine Zukunftszeilen, keine UPDATE-Regel auf beiden Tabellen.
 --   * Schema 117 prüft ptt_messages.audio_url und community_channel_messages.
 --     media_url; die Sitzungszeile hat keine Medienadresse → unberührt.
 -- ===========================================================================
@@ -256,11 +259,15 @@ begin
   -- anlegen: je Unterthema nacheinander.
   perform pg_advisory_xact_lock(hashtext('ptt:' || new.channel_id::text));
 
+  -- `created_at <= now()`: eine Zeile mit Zukunftszeitstempel (Altbestand
+  -- von vor `zeitstempel_vom_server`, Codex-Fund 05.11.) haelt sonst die
+  -- Sitzung fuer immer offen — keine neue Sitzungszeile, keine Einladung.
   select p.sitzung_id into v_sitzung
     from public.ptt_messages p
    where p.channel_id = new.channel_id
      and p.sitzung_id is not null
      and p.created_at > now() - interval '10 minutes'
+     and p.created_at <= now()
    order by p.created_at desc
    limit 1;
 
@@ -286,6 +293,61 @@ create trigger ptt_sitzung_zuordnen
 
 
 -- ---------------------------------------------------------------------------
+--  Zeitstempel vom Server (Codex-Fund [high], 05.11.2026)
+--
+--  Vorher durfte der Client `created_at` mitschicken (Spaltenrecht INSERT und
+--  UPDATE fuer authenticated, live geprueft). Eine PTT-Wortmeldung mit
+--  created_at = '2100-01-01' war fuer die Sitzungssuche oben dauerhaft „die
+--  juengste" → nie wieder eine neue Sitzungszeile, nie wieder eine Einladung;
+--  im Verlauf (aufsteigend, limit 200) und im Unterthema (neueste zuerst)
+--  klebte die Zeile ausserdem fuer immer am Ende bzw. oben. Dasselbe ging mit
+--  jeder Unterthema-Nachricht (community_channel_messages).
+--
+--  Jetzt: beim Einfuegen durch den Client (Rolle authenticated/anon) setzt
+--  der Server created_at := now(); beim Aendern bleibt der alte Wert (heute
+--  gibt es auf beiden Tabellen keine UPDATE-Regel, das ist Vorsorge).
+--  Absichtlich SECURITY INVOKER: so ist current_user die Rolle der
+--  Anweisung. Eigene Wege des Servers (starter_inhalte, Testbestand aus
+--  Schema 6/7/23, die Sitzungszeile aus ptt_sitzung_zuordnen — alle als
+--  Eigentuemer) behalten ihren Zeitstempel. Gleiches Muster wie
+--  medienreferenz_pruefen (117) und bunny_referenz_pruefen (115).
+--  Liest/aendert nur created_at — beruehrt geteilt_weg_schuetzen (93),
+--  medienreferenz_pruefen (117), bunny_referenz_pruefen (115) und die
+--  Regeln aus 102 nicht.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.zeitstempel_vom_server()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if current_user not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    new.created_at := now();
+  else
+    new.created_at := old.created_at;
+  end if;
+  return new;
+end $$;
+
+revoke execute on function public.zeitstempel_vom_server()
+  from public, anon, authenticated;
+
+drop trigger if exists zeitstempel_vom_server on public.ptt_messages;
+create trigger zeitstempel_vom_server
+  before insert or update of created_at on public.ptt_messages
+  for each row execute function public.zeitstempel_vom_server();
+
+drop trigger if exists zeitstempel_vom_server on public.community_channel_messages;
+create trigger zeitstempel_vom_server
+  before insert or update of created_at on public.community_channel_messages
+  for each row execute function public.zeitstempel_vom_server();
+
+
+-- ---------------------------------------------------------------------------
 --  Nachweis (liest nur)
 -- ---------------------------------------------------------------------------
 do $$
@@ -293,7 +355,7 @@ begin
   if exists (
     select 1 from information_schema.routine_privileges
      where routine_schema = 'public'
-       and routine_name in ('ptt_mitteilen', 'ptt_sitzung_zuordnen')
+       and routine_name in ('ptt_mitteilen', 'ptt_sitzung_zuordnen', 'zeitstempel_vom_server')
        and grantee in ('PUBLIC', 'anon', 'authenticated')
        and privilege_type = 'EXECUTE'
   ) then

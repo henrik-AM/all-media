@@ -25,6 +25,8 @@ const COMM = '88888888-0000-4000-8000-000000000001';
 const K1 = '88888888-0000-4000-8000-000000000002';
 const K2 = '88888888-0000-4000-8000-000000000003';
 const N1 = '88888888-0000-4000-8000-000000000004';
+// Eigene, registrierte Datei des Prüfkontos (unten in medien_objekte) — 115/117 lassen sie durch.
+const PTT_AUDIO = `https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/avatars/${PRUEFKONTO}-probe88-eigen.png`;
 
 const DATEIEN = [
   'SUPABASE_SCHEMA_88_profilseite.sql',
@@ -156,6 +158,80 @@ ${als(PRUEFKONTO, `
   ${versuch('ptt_sitzung_selbst', `insert into public.community_channel_messages (channel_id, sender_id, text, ptt_sitzung) values ('${K1}', auth.uid(), 'x', true)`)}
   ${weg('ptt_schalter', `update public.community_members set ptt_benachrichtigung = false where community_id = '${COMM}' and user_id = auth.uid()`)}
 
+  -- 90 Codex-Fund: Zukunftszeitstempel darf die Sitzung nicht offen halten
+  ${weg('ptt_zukunft', `insert into public.ptt_messages (community_id, channel_id, sender_id, audio_url, dauer, created_at) values ('${COMM}', '${K2}', auth.uid(), '${PTT_AUDIO}', 3, '2100-01-01')`)}
+  ${weg('kanal_zukunft', `insert into public.community_channel_messages (channel_id, sender_id, text, created_at) values ('${K2}', auth.uid(), 'Zukunft', '2100-01-01')`)}
+  ${versuch('ptt_zeit_aendern', `update public.ptt_messages set created_at = '2100-01-01' where channel_id = '${K2}' and sender_id = auth.uid(); get diagnostics n = row_count; if n = 0 then raise exception 'keine Zeile'; end if`)}
+`)}
+
+${eigner(`
+  -- Was der Client geschickt hat, zählt nicht: gespeichert ist now().
+  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at > now();
+  ${merke('ptt_zukunft_gespeichert', 'n')}
+  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at = now();
+  ${merke('ptt_zeit_jetzt', 'n')}
+  select count(*) into n from public.community_channel_messages where channel_id = '${K2}' and created_at > now();
+  ${merke('kanal_zukunft_gespeichert', 'n')}
+  select count(*) into n from pg_proc where proname = 'zeitstempel_vom_server' and has_function_privilege('authenticated', oid, 'execute');
+  ${merke('zeit_execute_auth', 'n')}
+
+  -- Altbestand nachstellen: eine Wortmeldung, die VOR dem Fix mit Zukunftszeit
+  -- gespeichert wurde (als Eigentümer — der Auslöser lässt das durch), und die
+  -- erste Wortmeldung 11 Minuten zurückdatieren (Zeit vorspulen geht in einer
+  -- Transaktion nicht; so ist die Sitzung abgelaufen).
+  update public.ptt_messages set created_at = now() - interval '11 minutes'
+   where channel_id = '${K2}' and sender_id = '${PRUEFKONTO}';
+  insert into public.ptt_messages (community_id, channel_id, sender_id, audio_url, dauer, created_at)
+    values ('${COMM}', '${K2}', '${PRUEFKONTO}', '${PTT_AUDIO}', 1, '2100-01-01');
+  -- sitzung_id setzt der Auslöser neu (eigene Sitzung) — hinterher auf die
+  -- erste Sitzung legen, wie es der Altbestand hätte, und die überzählige
+  -- Sitzungszeile wieder entfernen.
+  update public.ptt_messages z set sitzung_id = (select a.sitzung_id from public.ptt_messages a
+          where a.channel_id = '${K2}' and a.created_at < now() order by a.created_at limit 1)
+   where z.channel_id = '${K2}' and z.created_at > now();
+  delete from public.community_channel_messages c
+   where c.channel_id = '${K2}' and c.ptt_sitzung
+     and not exists (select 1 from public.ptt_messages p where p.sitzung_id = c.id);
+  select count(*) into n from public.ptt_messages where channel_id = '${K2}' and created_at > now() and sitzung_id is not null;
+  ${merke('altbestand_zukunft', 'n')}
+  select count(*) into n from public.community_channel_messages where channel_id = '${K2}' and ptt_sitzung;
+  ${merke('sitzungen_vorher', 'n')}
+  -- Einladung an das Testkonto möglich machen; erwartet nur, wenn es die
+  -- Bedingungen aus ptt_mitteilen() erfüllt (Einstellung, Stummschaltung …).
+  update public.community_members set ptt_benachrichtigung = true
+   where community_id = '${COMM}' and user_id = '${TESTKONTO}';
+  select count(*) into n from public.community_members m
+   where m.community_id = '${COMM}' and m.user_id = '${TESTKONTO}'
+     and not coalesce(m.is_muted, false)
+     and public.konto_stand(m.user_id) = 'frei'
+     and public.sichtbar_fuer(m.user_id, 'ptt', '${PRUEFKONTO}')
+     and not public.mitteilung_stumm(m.user_id, '${PRUEFKONTO}', 'channel', '${K2}')
+     and not exists (select 1 from public.blocks b
+          where (b.user_id = m.user_id and b.blocked_user_id = '${PRUEFKONTO}')
+             or (b.user_id = '${PRUEFKONTO}' and b.blocked_user_id = m.user_id));
+  ${merke('einladung_erwartet', 'n')}
+  select count(*) into n from public.notifications where user_id = '${TESTKONTO}' and art = 'ptt' and target_id = '${K2}';
+  ${merke('einladungen_vorher', 'n')}
+`)}
+
+${als(PRUEFKONTO, `
+  ${weg('ptt_normal', `insert into public.ptt_messages (community_id, channel_id, sender_id, audio_url, dauer) values ('${COMM}', '${K2}', auth.uid(), '${PTT_AUDIO}', 2)`)}
+`)}
+
+${eigner(`
+  select count(*) into n from public.community_channel_messages where channel_id = '${K2}' and ptt_sitzung;
+  ${merke('sitzungen_nachher', 'n')}
+  select count(*) into n from public.ptt_messages p
+   where p.channel_id = '${K2}' and p.created_at = now() and p.dauer = 2
+     and p.sitzung_id is not null
+     and p.sitzung_id is distinct from (select q.sitzung_id from public.ptt_messages q where q.channel_id = '${K2}' and q.created_at > now() limit 1);
+  ${merke('ptt_neue_sitzung', 'n')}
+  select count(*) into n from public.notifications where user_id = '${TESTKONTO}' and art = 'ptt' and target_id = '${K2}';
+  ${merke('einladungen_nachher', 'n')}
+`)}
+
+${als(PRUEFKONTO, `
+
   -- 91 Antwort im Unterthema
   ${weg('antwort_selbes_unterthema', `insert into public.community_channel_messages (channel_id, sender_id, text, reply_to) values ('${K1}', auth.uid(), 'Antwort', '${N1}')`)}
   ${versuch('antwort_anderes_unterthema', `insert into public.community_channel_messages (channel_id, sender_id, text, reply_to) values ('${K2}', auth.uid(), 'Antwort', '${N1}')`)}
@@ -215,6 +291,20 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('89 „gestartet“ mit Dauer: zu', w.anruf_gestartet_mit_dauer === 'zu', w.anruf_gestartet_mit_dauer);
   pruefe('90 PTT-Sitzungszeile vom Client: zu', w.ptt_sitzung_selbst === 'zu', w.ptt_sitzung_selbst);
   pruefe('90 PTT-Schalter speichern: ok', w.ptt_schalter === 'ok', w.ptt_schalter);
+  pruefe('90 PTT mit created_at 2100 einfügen: angenommen', w.ptt_zukunft === 'ok', w.ptt_zukunft);
+  pruefe('90 … gespeichert ist kein Zukunftszeitstempel', w.ptt_zukunft_gespeichert === '0', w.ptt_zukunft_gespeichert);
+  pruefe('90 … sondern now()', w.ptt_zeit_jetzt === '1', w.ptt_zeit_jetzt);
+  pruefe('90 Unterthema-Nachricht mit created_at 2100: angenommen', w.kanal_zukunft === 'ok', w.kanal_zukunft);
+  pruefe('90 … gespeichert ohne Zukunftszeitstempel', w.kanal_zukunft_gespeichert === '0', w.kanal_zukunft_gespeichert);
+  pruefe('90 created_at nachträglich ändern: zu', w.ptt_zeit_aendern === 'zu', w.ptt_zeit_aendern);
+  pruefe('90 zeitstempel_vom_server: kein EXECUTE für authenticated', w.zeit_execute_auth === '0', w.zeit_execute_auth);
+  pruefe('90 Altbestand mit Zukunftszeile nachgestellt', w.altbestand_zukunft === '1', w.altbestand_zukunft);
+  pruefe('90 normale Wortmeldung danach: ok', w.ptt_normal === 'ok', w.ptt_normal);
+  pruefe('90 … neue Sitzungszeile trotz Zukunftszeile', Number(w.sitzungen_nachher) === Number(w.sitzungen_vorher) + 1, `${w.sitzungen_vorher} → ${w.sitzungen_nachher}`);
+  pruefe('90 … Wortmeldung hängt an der neuen Sitzung', w.ptt_neue_sitzung === '1', w.ptt_neue_sitzung);
+  pruefe('90 … Einladung „Push to Talk beitreten?“ wie erwartet',
+    Number(w.einladungen_nachher) - Number(w.einladungen_vorher) === Number(w.einladung_erwartet),
+    `erwartet ${w.einladung_erwartet}, ${w.einladungen_vorher} → ${w.einladungen_nachher}`);
   pruefe('91 Antwort im selben Unterthema: ok', w.antwort_selbes_unterthema === 'ok', w.antwort_selbes_unterthema);
   pruefe('91 Antwort in anderes Unterthema: zu', w.antwort_anderes_unterthema === 'zu', w.antwort_anderes_unterthema);
   pruefe('93 Weg-Merker vom Client nicht setzbar', w.weg_merker_selbst === 'zu' || w.weg_merker_gesetzt === '0', `${w.weg_merker_selbst} ${w.weg_merker_gesetzt}`);

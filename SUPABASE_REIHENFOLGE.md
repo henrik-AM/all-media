@@ -389,6 +389,9 @@ Datei im Kopf. Wichtig beim Einspielen:
   zuerst als `XX` übertragen, am 05.11. zurückbenannt).
 - **90:** `notifications_art_check`/`notifications_target_type_check` = Live-Liste + `ptt`/`channel`,
   keine Rückdrehung. Spätere Entwürfe (97/98, Paket 2) müssen `ptt`/`channel` mitnehmen.
+  Neu (Codex-Fund 05.11.): Auslöser `zeitstempel_vom_server` setzt `created_at` auf `ptt_messages`
+  und `community_channel_messages` beim Client-Einfügen auf `now()`, die Sitzungssuche übergeht
+  Zukunftszeilen; Funktion nur in 90 definiert.
 - **92:** führt am Ende den F11-Block aus 102 (`kommentar_ausgeblendet`, Regel `nicht_ausgeblendet`
   auf `comments`) wortgleich erneut aus, jetzt mit `reply_to`; der Nachweis bricht ab, wenn der
   Antwort-Teil fehlt. Der Nachtrag „nach 92 den F11-Block aus 102 erneut ausführen“ ist damit erledigt.
