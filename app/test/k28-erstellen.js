@@ -67,8 +67,22 @@ function teilA() {
       /create policy "Einladung anlegen"[\s\S]{0,700}c\.created_by = \(select auth\.uid\(\)\)/.test(sql) &&
       /create policy nur_freigegebene on public\.einladungen\s+as restrictive/.test(sql));
   pruefe('10.2/16 einladung_annehmen: angemeldet, freigegeben, nicht blockiert; anon gesperrt',
-    /function public\.einladung_annehmen[\s\S]{0,1200}konto_freigegeben\(\)[\s\S]{0,600}blockiert_zwischen\(v_ich, v_e\.erstellt_von\)/.test(sql) &&
+    /function public\.einladung_annehmen[\s\S]{0,1200}konto_freigegeben\(\)[\s\S]{0,2500}blockiert_zwischen\(v_ich, v_e\.erstellt_von\)/.test(sql) &&
       /revoke execute on function public\.einladung_annehmen\(text\) from public, anon/.test(sql));
+  // Codex-Fund Paket 3 (05.11.2026): Unterthema-Einladung umging Schema 97.
+  const annehmen = (sql.match(/create or replace function public\.einladung_annehmen[\s\S]*?end \$\$;/) || [''])[0];
+  pruefe('Fund P3: einladung_annehmen prüft Blockierung auch gegenüber dem Community-Ersteller',
+    /blockiert_zwischen\(v_ich, v_e\.erstellt_von\)\s+or \(v_c\.created_by is not null and public\.blockiert_zwischen\(v_ich, v_c\.created_by\)\)/.test(annehmen));
+  pruefe('Fund P3: Unterthema-Einladung macht bei privater Community nicht zum Mitglied (vor dem INSERT)',
+    /v_e\.channel_id is not null\s+and v_c\.visibility <> 'public'[\s\S]{0,300}raise exception 'Diese Einladung gilt nur für Mitglieder der Community – tritt ihr zuerst bei'[\s\S]{0,40}insert into public\.community_members/.test(annehmen));
+  pruefe('Fund P3: ausgeblendete Community und ausgetretener Unterthema-Ersteller: Einladung ungültig',
+    /v_c\.moderiert_am is not null/.test(annehmen) && /m\.user_id = v_e\.erstellt_von/.test(annehmen));
+  pruefe('Fund P3: Blockier-/Mitglieder-Prüfung steht vor jedem Eintragen',
+    annehmen.indexOf('blockiert_zwischen') > 0 && annehmen.indexOf('blockiert_zwischen') < annehmen.indexOf('insert into public.community_members'));
+  pruefe('Fund P3: Regel „Einladung anlegen“: Unterthema-Ersteller nur, solange Mitglied',
+    /create policy "Einladung anlegen"[\s\S]{0,900}k\.erstellt_von = \(select auth\.uid\(\)\)\s+and public\.is_community_member\(c\.id\)/.test(sql));
+  pruefe('Fund P3: Bild-Check zusätzlich medien_adresse_gueltig (eigener Host)',
+    /communities_bild_url_check\s+check \(bild_url is null[\s\S]{0,160}and public\.medien_adresse_gueltig\(bild_url\)/.test(sql));
   pruefe('99 Selbstprüfung am Ende', /raise exception 'unterthema_mitglieder ist direkt beschreibbar'/.test(sql));
   const reihenfolge = lies('SUPABASE_REIHENFOLGE.md');
   pruefe('99 in SUPABASE_REIHENFOLGE.md (nach 98)', /Schema 99/.test(reihenfolge) && /97 → 98 → 99/.test(reihenfolge));
@@ -96,6 +110,19 @@ function teilA() {
     pruefe('Code nie aus zu wenig Zufall', wirft);
     pruefe('Link ↔ Code (Website, QR)', E.codeAus(E.link(code, 'https://x.de/')) === code && E.link(code, 'https://x.de/') === `https://x.de/?einladung=${code}`);
     pruefe('fremder QR-Code / Telefonnummer ist keine Einladung', E.codeAus('allmedia:+49 151 2345678') === null && E.codeAus('https://werbung.de/?a=1') === null);
+    const eigen = 'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/avatars/a-1.jpg';
+    pruefe('Fund P3: Bildvertrag — eigene avatars-Adresse ok, fremder Host mit Eimer-Pfad nein',
+      typeof E.bildAdresseGueltig === 'function' && E.bildAdresseGueltig(eigen) && E.bildAdresseGueltig(eigen, 'https://ijztosbjfybdgotpdixw.supabase.co/') &&
+        !E.bildAdresseGueltig('https://boese.example/storage/v1/object/public/media/avatars/a-1.jpg') &&
+        !E.bildAdresseGueltig('https://ijztosbjfybdgotpdixw.supabase.co.boese.example/storage/v1/object/public/media/avatars/a-1.jpg') &&
+        !E.bildAdresseGueltig(eigen + '?t=1') &&
+        !E.bildAdresseGueltig(eigen.replace('/avatars/', '/posts/')) &&
+        !E.bildAdresseGueltig(eigen.replace('a-1.jpg', 'x/a-1.jpg')) &&
+        !E.bildAdresseGueltig(null));
+    pruefe('Fund P3: Fehlersätze im Baustein = Sätze im Schema',
+      !!E.FEHLER && [E.FEHLER.einladungWeg, E.FEHLER.einladungBlockiert, E.FEHLER.einladungNurMitglieder].every((t) => sql.includes(`'${t}'`)));
+    pruefe('Fund P3: Standard-Host im Baustein = Host in medien_adresse_gueltig (live, Schema 23/95)',
+      E.SUPABASE_STANDARD === 'https://ijztosbjfybdgotpdixw.supabase.co');
     pruefe('fehltSchema erkennt fehlende Spalte/Tabelle', E.fehltSchema({ code: '42703' }) && E.fehltSchema({ code: 'PGRST205' }) && !E.fehltSchema({ code: '42501' }));
   }
   pruefe('UMD: erstellen in UMD_BAUSTEINE', /\['erstellen', 'Erstellen'\]/.test(lies('app/test/_modulquelle.js')));
@@ -134,6 +161,13 @@ function teilA() {
   pruefe('Website: Code aus crypto.getRandomValues, QR vom Server', /crypto\.getRandomValues\(new Uint8Array\(Erstellen\.CODE_LAENGE\)\)/.test(web) && /\/api\/einladung-qr\.svg\?code=/.test(web));
   pruefe('Website: ?einladung= wird nach dem Start angenommen', /einladungAusLink\(\);/.test(web) && /api\(`\/api\/einladung\/\$\{encodeURIComponent\(code\)\}`\)/.test(web));
   pruefe('Website: Bild auf Homeseite und in Listen', /id="communityBild"/.test(web) && /const foto = c\.bild/.test(web));
+  pruefe('Fund P3: Server prüft Community-Bild mit dem Baustein (Host + Pfad), nicht nur das Pfadende',
+    /app\.post\('\/api\/communities'[\s\S]{0,1200}Erstellen\.bildAdresseGueltig\(bildUrl, supabaseUrl\)/.test(server));
+  pruefe('Fund P3: App prüft Community-Bild mit demselben Baustein',
+    /function communityAnlegen[\s\S]{0,1200}Erstellen\.bildAdresseGueltig\(zusatz\.bildUrl, SUPABASE_CONFIG\.url\)/.test(aktionen));
+  pruefe('Fund P3: Fehlersatz der Datenbank kommt unverändert an (App e.message, Website res.error)',
+    /return \{ fehler: e\?\.message \?\? 'Diese Einladung gibt es nicht mehr' \}/.test(profil) &&
+      /if \(!res\.ok\) return toast\(res\.error \|\| 'Diese Einladung gibt es nicht mehr'\)/.test(web));
   pruefe('Server: Prüfregel aus dem Baustein, Routen für Einladung',
     /Erstellen\.pruefeCommunity\(/.test(server) && /Erstellen\.pruefeUnterthema\(/.test(server) &&
       /app\.post\('\/api\/einladung\/:code'/.test(server) && /app\.get\('\/api\/einladung-qr\.svg'/.test(server));

@@ -15,6 +15,16 @@
  *                     hinein → sieht und schreibt
  *     private Community: Direktbeitritt zu, per Einladung offen
  *     Blockiert: Einladung zu
+ *   Codex-Fund Paket 3 (05.11.2026):
+ *     Wegwerf-Konto D (nur in der Transaktion, auth.users) ist Mitglied der
+ *     privaten Community, legt dort ein Unterthema an und lädt ein.
+ *     (a) vom ERSTELLER blockiertes Prüfkonto nimmt D's Unterthema-Einladung
+ *         an → zu, keine Community-, keine Unterthema-Mitgliedschaft;
+ *         ohne Blockierung, aber kein Mitglied → zu („nur für Mitglieder");
+ *         als Mitglied → ok; Prüfkonto blockiert den Ersteller (umgekehrte
+ *         Richtung) → zu.
+ *     (b) Bild mit fremdem Host und Eimer-Pfad (avatars/…) → abgelehnt,
+ *         obwohl der Pfad als eigener Upload registriert ist.
  *   Ergebnis per raise → alles zurückgerollt, nichts bleibt.
  *
  * Nur die eigenen Konten (Prüfkonto, Testkonto). Läuft auch bei gesperrtem
@@ -33,6 +43,11 @@ const BILD = 'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/
 const CODE_C = 'probeccccccccccc';
 const CODE_K = 'probekkkkkkkkkkk';
 const CODE_P = 'probepppppppppp2';
+const CODE_D = 'probedddddddddd2';
+const DRITT = 'a1000000-0000-4000-8000-000000000099'; // nur in der Transaktion
+const FREMDHOST = 'https://boese.example/storage/v1/object/public/media/avatars/' + TESTKONTO + '-probe99.jpg';
+const NUR_MITGLIEDER = 'Diese Einladung gilt nur für Mitglieder der Community – tritt ihr zuerst bei';
+const BLOCKIERT_TEXT = 'Diese Einladung kannst du nicht annehmen';
 
 let fehler = 0;
 let anzahl = 0;
@@ -51,6 +66,13 @@ const versuch = (name, anweisung) => `
 const weg = (name, anweisung) => `
   begin ${anweisung}; ${merke(name, "'ok'")}
   exception when others then ${merke(name, "replace(sqlstate, ' ', '_')")}
+  end;`;
+// Wie versuch, merkt aber zusätzlich, ob genau dieser Fehlersatz kam.
+const versuchText = (name, anweisung, satz) => `
+  begin ${anweisung}; ${merke(name, "'offen'")}
+  exception when others then
+    ${merke(name, "'zu'")}
+    ${merke(name + '_text', `(sqlerrm = '${satz}')`)}
   end;`;
 const als = (konto, rumpf) => `
   reset role;
@@ -104,6 +126,8 @@ ${eigner(`
 ${als(TESTKONTO, `
   ${versuch('fremdes_bild', `insert into public.communities (name, topic, visibility, created_by, bild_url)
      values ('Probe99 Fremd', '', 'public', auth.uid(), 'https://boese.example/pixel.png')`)}
+  ${versuch('fremder_host_eimerpfad', `insert into public.communities (name, topic, visibility, created_by, bild_url)
+     values ('Probe99 Fremdhost', '', 'public', auth.uid(), '${FREMDHOST}')`)}
   ${weg('community_anlegen', `insert into public.communities (name, topic, bio, link, visibility, created_by, bild_url)
      values ('Probe99 Offen', 'Nach 22 Uhr', 'Nach 22 Uhr', 'https://beispiel.de', 'public', auth.uid(), '${BILD}')`)}
   insert into public.community_members (community_id, user_id)
@@ -172,6 +196,58 @@ ${als(PRUEFKONTO, `
      values (current_setting('probe.privat')::uuid, auth.uid())`)}
 `)}
 
+${eigner(`
+  insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, created_at, updated_at)
+  values ('${DRITT}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          'probe99@prueflauf.invalid',
+          '{"name":"Probe Mitglied","phone":"+4915199990099","handle":"@prueflauf.probe99"}', now(), now());
+  insert into public.konto_alter (user_id, geburtsdatum, land, mindestalter, status)
+  values ('${DRITT}', '1990-01-01', 'DE', 16, 'frei')
+  on conflict (user_id) do update set status = 'frei', geburtsdatum = '1990-01-01';
+  -- D ist schon Mitglied (wie nach angenommener Beitrittsanfrage).
+  insert into public.community_members (community_id, user_id)
+  values (current_setting('probe.privat')::uuid, '${DRITT}');
+`)}
+
+${als(DRITT, `
+  ${weg('d_kanal', `insert into public.community_channels (community_id, slug, name, position)
+     values (current_setting('probe.privat')::uuid, 'ch-dritt', 'Von D', 5)`)}
+  ${weg('d_einladung', `insert into public.einladungen (code, community_id, channel_id, erstellt_von)
+     select '${CODE_D}', k.community_id, k.id, auth.uid() from public.community_channels k
+      where k.community_id = current_setting('probe.privat')::uuid and k.slug = 'ch-dritt'`)}
+`)}
+
+${eigner(`
+  perform set_config('probe.kanal_d', (select k.id::text from public.community_channels k
+     where k.community_id = current_setting('probe.privat')::uuid and k.slug = 'ch-dritt'), true);
+`)}
+
+${als(TESTKONTO, `
+  insert into public.blocks (user_id, blocked_user_id) values (auth.uid(), '${PRUEFKONTO}') on conflict do nothing;
+`)}
+${als(PRUEFKONTO, `
+  ${versuchText('a_ersteller_blockiert', `perform public.einladung_annehmen('${CODE_D}')`, BLOCKIERT_TEXT)}
+`)}
+${eigner(`
+  select count(*) into n from public.community_members
+   where community_id = current_setting('probe.privat')::uuid and user_id = '${PRUEFKONTO}';
+  ${merke('a_mitglied_nach_block', 'n')}
+  select count(*) into n from public.unterthema_mitglieder
+   where channel_id = current_setting('probe.kanal_d')::uuid and user_id = '${PRUEFKONTO}';
+  ${merke('a_unterthema_nach_block', 'n')}
+`)}
+${als(TESTKONTO, `
+  delete from public.blocks where user_id = auth.uid() and blocked_user_id = '${PRUEFKONTO}';
+`)}
+${als(PRUEFKONTO, `
+  ${versuchText('a_nicht_mitglied', `perform public.einladung_annehmen('${CODE_D}')`, NUR_MITGLIEDER)}
+`)}
+${eigner(`
+  select count(*) into n from public.community_members
+   where community_id = current_setting('probe.privat')::uuid and user_id = '${PRUEFKONTO}';
+  ${merke('a_mitglied_ohne_beitritt', 'n')}
+`)}
+
 ${als(TESTKONTO, `
   insert into public.blocks (user_id, blocked_user_id) values (auth.uid(), '${PRUEFKONTO}') on conflict do nothing;
 `)}
@@ -186,6 +262,14 @@ ${als(PRUEFKONTO, `
   select count(*) into n from public.community_members m
    where m.community_id = current_setting('probe.privat')::uuid and m.user_id = auth.uid();
   ${merke('privat_mitglied', 'n')}
+  -- umgekehrte Richtung: das Prüfkonto blockiert den Ersteller
+  insert into public.blocks (user_id, blocked_user_id) values (auth.uid(), '${TESTKONTO}') on conflict do nothing;
+  ${versuchText('a_umgekehrt_blockiert', `perform public.einladung_annehmen('${CODE_D}')`, BLOCKIERT_TEXT)}
+  delete from public.blocks where user_id = auth.uid() and blocked_user_id = '${TESTKONTO}';
+  ${weg('a_als_mitglied', `perform public.einladung_annehmen('${CODE_D}')`)}
+  select count(*) into n from public.unterthema_mitglieder
+   where channel_id = current_setting('probe.kanal_d')::uuid and user_id = auth.uid();
+  ${merke('a_unterthema_als_mitglied', 'n')}
 `)}
 
 ${eigner(`
@@ -213,6 +297,8 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('Ausgangslage: keine Blockierung zwischen den Konten', w.blockiert_vorher === '0', w.blockiert_vorher);
   console.log('\nAnlegen (Testkonto)');
   pruefe('16 fremde Bildadresse abgelehnt', w.fremdes_bild === 'zu', w.fremdes_bild);
+  pruefe('(b) fremder Host mit Eimer-Pfad avatars/… abgelehnt (medien_adresse_gueltig)',
+    w.fremder_host_eimerpfad === 'zu', w.fremder_host_eimerpfad);
   pruefe('16 Community mit Bild, Biografie, Link', w.community_anlegen === 'ok', w.community_anlegen);
   pruefe('10.2 Unterthemen anlegen (öffentlich, privat)', w.kanal_offen === 'ok' && w.kanal_privat === 'ok', `${w.kanal_offen} ${w.kanal_privat}`);
   pruefe('10.2 Ersteller setzt die Datenbank (mitgeschickter fremder Wert zählt nicht)', w.ersteller_von_datenbank === 'true', w.ersteller_von_datenbank);
@@ -240,6 +326,23 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('16 private Community: Direktbeitritt zu', w.privat_direkt === 'zu', w.privat_direkt);
   pruefe('16 blockiert: Einladung zu', w.annehmen_blockiert === 'zu', w.annehmen_blockiert);
   pruefe('16 private Community per Einladung: Mitglied', w.annehmen_privat === 'ok' && w.privat_mitglied === '1', `${w.annehmen_privat} ${w.privat_mitglied}`);
+  console.log('\nCodex-Fund Paket 3: Unterthema-Einladung eines Mitglieds (private Community)');
+  pruefe('Mitglied D legt Unterthema und Einladung an', w.d_kanal === 'ok' && w.d_einladung === 'ok', `${w.d_kanal} ${w.d_einladung}`);
+  pruefe('(a) vom Ersteller blockiert: Einladung von D zu, Blockier-Satz',
+    w.a_ersteller_blockiert === 'zu' && w.a_ersteller_blockiert_text === 'true',
+    `${w.a_ersteller_blockiert} ${w.a_ersteller_blockiert_text}`);
+  pruefe('(a) danach weder Community- noch Unterthema-Mitglied',
+    w.a_mitglied_nach_block === '0' && w.a_unterthema_nach_block === '0',
+    `${w.a_mitglied_nach_block} ${w.a_unterthema_nach_block}`);
+  pruefe('ohne Blockierung, kein Mitglied: zu („nur für Mitglieder“), kein Beitritt',
+    w.a_nicht_mitglied === 'zu' && w.a_nicht_mitglied_text === 'true' && w.a_mitglied_ohne_beitritt === '0',
+    `${w.a_nicht_mitglied} ${w.a_nicht_mitglied_text} ${w.a_mitglied_ohne_beitritt}`);
+  pruefe('umgekehrte Richtung (Prüfkonto blockiert Ersteller): zu',
+    w.a_umgekehrt_blockiert === 'zu' && w.a_umgekehrt_blockiert_text === 'true',
+    `${w.a_umgekehrt_blockiert} ${w.a_umgekehrt_blockiert_text}`);
+  pruefe('als Mitglied: Einladung von D ok, im Unterthema',
+    w.a_als_mitglied === 'ok' && w.a_unterthema_als_mitglied === '1',
+    `${w.a_als_mitglied} ${w.a_unterthema_als_mitglied}`);
   pruefe('einladung_annehmen für anon gesperrt', w.anon_annehmen === 'false', w.anon_annehmen);
 
   console.log(`\n${anzahl - fehler}/${anzahl} Prüfungen bestanden (alles verworfen)`);
