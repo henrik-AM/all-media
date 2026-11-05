@@ -363,3 +363,36 @@ Gruppe (42703), wird nur sie weggelassen.
 
 Code vor dem Schema: App (`daten.ts`, `aktionen.ts`) und Server (`supabase-api.js`, `sync-handlers.js`)
 lesen/schreiben `reply_to`/`antwort_an` nachsichtig (`Kommentar.fehltSpalte`).
+
+## Nachtrag 12.10.2026: Schemas 93–94 (Feedback 28.09., Kasten 7.5–7.8)
+
+Beide **Entwürfe, noch nicht eingespielt.** Reihenfolge beliebig; 94 nach 87 (Anker).
+
+- `SUPABASE_SCHEMA_93_geteilt_weg.sql` — `shared_post_weg`/`shared_post_konto` auf `messages` und
+  `community_channel_messages`; Auslöser `geteilt_weg_merken` (BEFORE DELETE auf `posts`, security
+  definer, EXECUTE entzogen) und `geteilt_weg_schuetzen` (Client kann den Merker nicht setzen).
+  Ersetzt nichts. Block 5 (Nachtrag alter Nachrichten) auskommentiert, nur mit Henriks Freigabe.
+- `SUPABASE_SCHEMA_94_kontaktbild.sql` — Tabelle `kontakt_bilder` (RLS nur Eigentümer, eine Regel je
+  Befehl, `nur_freigegebene`, Check auf eigenen Eimer), `ist_messenger_kontakt(uuid)` (EXECUTE nur
+  authenticated). `zuruecksetzen()` am Anker aus Schema 87 umgeschrieben (Testkonto: `kontakt_bilder`
+  leeren). **Wer Schema 87 oder ältere zuruecksetzen-Fassungen neu einspielt, muss 94 nachziehen.**
+
+Code vor dem Schema: App und Server laden Merker und Kontaktbilder getrennt und nachsichtig — ohne 93
+keine Weg-Spur bei gelöschten Beiträgen, ohne 94 nur Profilbilder.
+
+## Nachtrag 05.11.2026: Paket 1 (Kästen 28.09. 1–8) auf main-Stand ad7f221 übertragen
+
+Abgleich der Schemas 88–94 gegen main (101–117) und den Live-Stand (nur lesend), Ergebnis je
+Datei im Kopf. Wichtig beim Einspielen:
+
+- **91:** liegt im Paket als `SUPABASE_SCHEMA_XX_antworten_im_unterthema.sql` — vor dem Einspielen
+  in `SUPABASE_SCHEMA_91_antworten_im_unterthema.sql` umbenennen (Nummer seit 10.10. vergeben).
+- **90:** `notifications_art_check`/`notifications_target_type_check` = Live-Liste + `ptt`/`channel`,
+  keine Rückdrehung. Spätere Entwürfe (97/98, Paket 2) müssen `ptt`/`channel` mitnehmen.
+- **92:** führt am Ende den F11-Block aus 102 (`kommentar_ausgeblendet`, Regel `nicht_ausgeblendet`
+  auf `comments`) wortgleich erneut aus, jetzt mit `reply_to`; der Nachweis bricht ab, wenn der
+  Antwort-Teil fehlt. Der Nachtrag „nach 92 den F11-Block aus 102 erneut ausführen“ ist damit erledigt.
+- **94:** danach **Schema 117 erneut einspielen** (Medienreferenz-Prüfung auf `kontakt_bilder`).
+  `ist_messenger_kontakt(uuid)` ist eine neue Überladung neben `ist_messenger_kontakt(uuid, uuid)` (68/102).
+
+**Gesamtreihenfolge Paket 1:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 117 (erneut).
