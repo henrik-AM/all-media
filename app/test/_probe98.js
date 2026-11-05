@@ -67,12 +67,22 @@ const mitteilungen = (an, von, art) =>
     console.log('ÜBERSPRUNGEN  SUPABASE_TOKEN fehlt.');
     process.exit(2);
   }
+  // Auftrag Pakete 1–3 (05.11.2026): Vorgänger, die live fehlen, in DERSELBEN
+  // verworfenen Transaktion vorweg einspielen (VORGAENGER=pfad1,pfad2,…), danach
+  // NACHFOLGER (z. B. Schema 117 erneut). Pfade absolut oder relativ zum Aufruf.
+  const dateiListe = (v) => (process.env[v] || '').split(',').filter(Boolean)
+    .map((f) => `-- ===== ${path.basename(f)}\n` + fs.readFileSync(path.resolve(f), 'utf8')).join('\n\n');
+  const vorgaenger = dateiListe('VORGAENGER');
+  const nachfolger = dateiListe('NACHFOLGER');
+  if (!vorgaenger) console.log('HINWEIS  VORGAENGER leer — die Probe läuft nur gegen den Live-Stand.');
   const schema = fs.readFileSync(path.join(__dirname, '..', '..', 'SUPABASE_SCHEMA_98_freundschaften.sql'), 'utf8');
 
   const sql = `
 begin;
 select set_config('probe.erg', '', true);
+${vorgaenger}
 ${schema}
+${nachfolger}
 
 -- Bestand für die Probe (als Eigentümer, verworfen am Ende)
 update public.profiles set privat = true where id = '${PRUEFKONTO}';
