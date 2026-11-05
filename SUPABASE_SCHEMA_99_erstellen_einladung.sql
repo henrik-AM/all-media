@@ -48,8 +48,13 @@
 --       ptt_mitteilen) und @-Markierungen (markierung_sichtbar).
 --    4. Einladungen: Tabelle `einladungen` (Code je Community bzw.
 --       Unterthema, nur der Ersteller sieht ihn) und
---       einladung_annehmen(code). Eine Einladung des Erstellers IST die
---       Freigabe — auch bei einer privaten Community ohne Beitrittsanfrage.
+--       einladung_annehmen(code). Eine COMMUNITY-Einladung (nur der
+--       Ersteller legt sie an) IST die Freigabe — auch bei einer privaten
+--       Community ohne Beitrittsanfrage. Eine UNTERTHEMA-Einladung macht bei
+--       einer privaten Community nicht zum Mitglied, sie setzt die
+--       Mitgliedschaft voraus (Codex-Fund Paket 3, Begründung bei
+--       einladung_annehmen). Blockierung gegenüber Einladendem und
+--       Community-Ersteller, beide Richtungen: nein.
 --       Der Code entsteht im Gerät (zufällig, 16 Zeichen), damit er schon
 --       auf der Erstellen-Seite als Link und QR-Code steht; gültig wird er
 --       mit dem Speichern.
@@ -118,10 +123,20 @@ alter table public.communities
 
 -- Nur die eigene Medienstelle, Ordner avatars — dieselbe Form wie
 -- /api/eigene/profilbild. Fremde Adressen wären Tracking-Pixel.
+--
+-- Codex-Fund Paket 3 (05.11.2026): Das Pfadende allein reicht nicht —
+-- https://boese.example/storage/v1/object/public/media/avatars/x.jpg ging
+-- durch, und die Auslöser aus 115/117 überspringen Adressen, die
+-- medien_adresse_gueltig() nicht kennt. Scheitert dann die Signierung, lädt
+-- jeder Betrachter das Bild vom fremden Host (IP, Zeitpunkt). Darum
+-- zusätzlich medien_adresse_gueltig() (eigener Projekt-Host, Schema 23/95) —
+-- dasselbe Muster wie kontakt_bilder_eimer in Schema 94. Denselben Vertrag
+-- prüfen App und Server mit Erstellen.bildAdresseGueltig (gemeinsam/erstellen.js).
 alter table public.communities drop constraint if exists communities_bild_url_check;
 alter table public.communities add constraint communities_bild_url_check
   check (bild_url is null
-         or bild_url ~ '/storage/v1/object/public/media/avatars/[A-Za-z0-9._-]+$')
+         or (bild_url ~ '/storage/v1/object/public/media/avatars/[A-Za-z0-9._-]+$'
+             and public.medien_adresse_gueltig(bild_url)))
   not valid;
 
 alter table public.communities drop constraint if exists communities_texte_check;
@@ -409,7 +424,10 @@ create policy "Einladung lesen" on public.einladungen
 
 /*
  * Anlegen darf nur, wer das Ziel angelegt hat: die Community selbst, oder
- * das Unterthema (bzw. die Community, zu der es gehört).
+ * das Unterthema (bzw. die Community, zu der es gehört). Wer ein Unterthema
+ * angelegt hat, die Community aber verlassen hat, lädt nicht mehr ein
+ * (Codex-Fund Paket 3) — einladung_annehmen() prüft dasselbe noch einmal
+ * beim Annehmen, für Einladungen, die schon vor dem Austritt bestanden.
  */
 drop policy if exists "Einladung anlegen" on public.einladungen;
 create policy "Einladung anlegen" on public.einladungen
@@ -425,7 +443,9 @@ create policy "Einladung anlegen" on public.einladungen
          select 1 from public.community_channels k
            join public.communities c on c.id = k.community_id
           where k.id = channel_id and k.community_id = einladungen.community_id
-            and (k.erstellt_von = (select auth.uid()) or c.created_by = (select auth.uid()))))
+            and (c.created_by = (select auth.uid())
+                 or (k.erstellt_von = (select auth.uid())
+                     and public.is_community_member(c.id)))))
     )
   );
 
@@ -445,10 +465,53 @@ revoke update on public.einladungen from authenticated;
 grant select, insert, delete on public.einladungen to authenticated;
 
 /*
- * Eine Einladung annehmen. Wer den Code hat, wird Mitglied der Community —
- * auch einer privaten, ohne Anfrage: die Einladung kommt vom Ersteller und
- * ist die Freigabe. Bei einem Unterthema zusätzlich Mitglied des
- * Unterthemas. Blockierung in eine der beiden Richtungen: nein.
+ * Eine Einladung annehmen.
+ *
+ * Community-Einladung (channel_id null): nur der Community-Ersteller kann
+ * sie anlegen (Regel „Einladung anlegen"). Sie IST seine Freigabe — wer den
+ * Code hat, wird Mitglied, auch einer privaten Community ohne Anfrage.
+ *
+ * Unterthema-Einladung: anlegen kann sie auch ein gewöhnliches Mitglied,
+ * das das Unterthema angelegt hat. Codex-Fund Paket 3 (05.11.2026): Bis
+ * hierher trug diese Funktion den Annehmenden an RLS vorbei auch in die
+ * COMMUNITY ein und prüfte nur die Blockierung gegenüber dem Einladenden.
+ * Eine vom Ersteller blockierte Person kam so über ein anderes Mitglied in
+ * eine private Community — an der Beitrittsfreigabe aus Schema 97 vorbei.
+ *
+ * GEWÄHLTE REGEL (die engere der beiden möglichen):
+ *
+ *   Eine Unterthema-Einladung öffnet NIE die Tür zu einer privaten
+ *   Community — auch nicht, wenn sie vom Ersteller selbst stammt. Wer noch
+ *   nicht Mitglied ist, tritt zuerst bei (Community-Einladung des
+ *   Erstellers oder angenommene Beitrittsanfrage), dann gilt der
+ *   Unterthema-Code.
+ *
+ *   Begründung: In eine private Community führen damit genau zwei Türen,
+ *   und beide hält der Ersteller (Schema 97: Anfrage annehmen; hier:
+ *   Community-Einladung). Ein Unterthema-Code wird herumgereicht wie ein
+ *   Link in einem Gruppenchat; ob er vom Ersteller oder einem Mitglied
+ *   stammt, sieht der Empfänger nicht, und „Ersteller-Code öffnet, anderer
+ *   nicht" wäre eine Regel, die niemand nachvollziehen kann. Der Ersteller
+ *   verliert nichts: er hat die Community-Einladung.
+ *
+ *   Bei einer ÖFFENTLICHEN Community macht die Unterthema-Einladung weiter
+ *   gleich zum Mitglied — beitreten darf dort ohnehin jeder.
+ *
+ * Für beide Arten zusätzlich:
+ *   - Blockierung in beide Richtungen gegenüber dem Einladenden UND dem
+ *     Community-Ersteller → nein.
+ *   - Community ausgeblendet (Moderation, Schema 102) → „gibt es nicht
+ *     mehr". Diese Funktion schreibt an der Regel nicht_ausgeblendet vorbei,
+ *     darum hier ausdrücklich.
+ *   - Unterthema-Einladung eines Mitglieds, das die Community inzwischen
+ *     verlassen hat (oder nicht mehr Ersteller des Unterthemas ist): gilt
+ *     nicht mehr.
+ *
+ * Fehlersätze (P0001, gehen bis zur Oberfläche durch; App und Website
+ * zeigen error.message bzw. res.error unverändert):
+ *   'Diese Einladung gibt es nicht mehr'
+ *   'Diese Einladung kannst du nicht annehmen'
+ *   'Diese Einladung gilt nur für Mitglieder der Community – tritt ihr zuerst bei'
  */
 create or replace function public.einladung_annehmen(p_code text)
 returns json
@@ -456,8 +519,10 @@ language plpgsql
 security definer set search_path = public
 as $$
 declare
-  v_ich uuid := auth.uid();
-  v_e   public.einladungen%rowtype;
+  v_ich       uuid := auth.uid();
+  v_e         public.einladungen%rowtype;
+  v_c         public.communities%rowtype;
+  v_kanal_von uuid;
 begin
   if v_ich is null then
     raise exception 'Dafür musst du angemeldet sein' using errcode = '42501';
@@ -471,8 +536,47 @@ begin
     -- P0001 (Vorgabe): der Satz darf bis zum Browser durch (fuerMenschen).
     raise exception 'Diese Einladung gibt es nicht mehr';
   end if;
-  if public.blockiert_zwischen(v_ich, v_e.erstellt_von) then
+
+  select * into v_c from public.communities where id = v_e.community_id;
+  if not found or v_c.moderiert_am is not null then
+    raise exception 'Diese Einladung gibt es nicht mehr';
+  end if;
+
+  -- Gilt die Einladung noch? Community-Einladung: nur vom Ersteller.
+  -- Unterthema-Einladung: vom Community-Ersteller, oder vom Ersteller des
+  -- Unterthemas, solange er noch Mitglied ist.
+  if v_e.channel_id is null then
+    if v_e.erstellt_von is distinct from v_c.created_by then
+      raise exception 'Diese Einladung gibt es nicht mehr';
+    end if;
+  else
+    select k.erstellt_von into v_kanal_von
+      from public.community_channels k
+     where k.id = v_e.channel_id and k.community_id = v_e.community_id;
+    if not found then
+      raise exception 'Diese Einladung gibt es nicht mehr';
+    end if;
+    if v_e.erstellt_von is distinct from v_c.created_by
+       and not (v_e.erstellt_von = v_kanal_von
+                and exists (select 1 from public.community_members m
+                             where m.community_id = v_c.id and m.user_id = v_e.erstellt_von)) then
+      raise exception 'Diese Einladung gibt es nicht mehr';
+    end if;
+  end if;
+
+  -- Blockierung: beide Richtungen, gegenüber Einladendem und Ersteller.
+  if public.blockiert_zwischen(v_ich, v_e.erstellt_von)
+     or (v_c.created_by is not null and public.blockiert_zwischen(v_ich, v_c.created_by)) then
     raise exception 'Diese Einladung kannst du nicht annehmen';
+  end if;
+
+  -- Private Community: ein Unterthema-Code macht nicht zum Mitglied.
+  if v_e.channel_id is not null
+     and v_c.visibility <> 'public'
+     and v_c.created_by is distinct from v_ich
+     and not exists (select 1 from public.community_members m
+                      where m.community_id = v_c.id and m.user_id = v_ich) then
+    raise exception 'Diese Einladung gilt nur für Mitglieder der Community – tritt ihr zuerst bei';
   end if;
 
   insert into public.community_members (community_id, user_id)
