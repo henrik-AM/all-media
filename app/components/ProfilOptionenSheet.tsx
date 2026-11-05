@@ -30,8 +30,16 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
   const { istStumm, istBlockiert, stummSchalten, blockieren } = useProfil();
   const [melden, setMelden] = useState(false);
 
+  /*
+   * Codex-Fund Runde 2 (05.11.2026): stand hier `if (!person) return null`,
+   * waren Blockieren und Melden bei jeder Person außerhalb der ersten 500
+   * unerreichbar. Nachgeladene stehen jetzt im gemeinsamen Bestand
+   * (personMerken); fehlt sie trotzdem, bleiben Stummschalten, Blockieren
+   * und Melden bedienbar — die brauchen nur die ID. Nur der Link braucht
+   * den Benutzernamen.
+   */
   const person = alleNutzer[userId];
-  if (!person) return null;
+  const name = person?.name ?? 'Person';
 
   const schliessen = () => {
     setMelden(false);
@@ -41,7 +49,7 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
   if (melden && visible) return <MeldenSheet ziel={{ art: 'user', id: userId }} onClose={schliessen} />;
 
   const punkte: { key: string; label: string; icon: IconName; gefahr?: boolean }[] = [
-    { key: 'link', label: 'Link kopieren', icon: 'link-outline' },
+    ...(person ? [{ key: 'link', label: 'Link kopieren', icon: 'link-outline' as IconName }] : []),
     {
       key: 'stumm',
       label: istStumm(userId) ? 'Stummschaltung aufheben' : 'Stummschalten',
@@ -57,20 +65,20 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
   ];
 
   const waehlen = (key: string) => {
-    if (key === 'link') {
+    if (key === 'link' && person) {
       // Ohne Zwischenablage-Baustein wenigstens die Adresse zeigen.
       onNotice(`all-media.app/${person.handle.replace('@', '')}`);
       return schliessen();
     }
     if (key === 'stumm') {
       const jetzt = stummSchalten(userId);
-      onNotice(jetzt ? `${person.name} stummgeschaltet` : 'Stummschaltung aufgehoben');
+      onNotice(jetzt ? `${name} stummgeschaltet` : 'Stummschaltung aufgehoben');
       return schliessen();
     }
     if (key === 'block') {
       const jetzt = blockieren(userId);
       onBlockiert?.(userId, jetzt);
-      onNotice(jetzt ? `${person.name} blockiert` : 'Blockierung aufgehoben');
+      onNotice(jetzt ? `${name} blockiert` : 'Blockierung aufgehoben');
       return schliessen();
     }
     setMelden(true);
@@ -79,7 +87,7 @@ export const ProfilOptionenSheet = ({ visible, userId, onClose, onNotice, onBloc
   return (
     <SheetRahmen
       visible={visible}
-      title={person.name}
+      title={name}
       onClose={schliessen}
     >
       {(

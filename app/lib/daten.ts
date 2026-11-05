@@ -254,6 +254,55 @@ export async function ladePerson(
   return signiereMedien(client, eintrag);
 }
 
+/**
+ * Mehrere Personen auf einmal nachladen — für Listen (Follower, Gefolgt),
+ * in denen Menschen außerhalb der ersten 500 aus ladeNutzer stehen
+ * (Codex-Fund Runde 2, 05.11.2026: sie fielen bisher still aus der Liste).
+ *
+ * Dieselben Spalten und dieselbe Zeilenregel wie ladePerson. In Blöcken
+ * zu höchstens 100 IDs, damit `.in()` die Adresse nicht sprengt. Wer nicht
+ * zurückkommt (RLS, gelöscht), fehlt im Ergebnis. Wirft bei einem echten
+ * Fehler der Profilabfrage; Bild und Zahlen sind nachsichtig.
+ */
+export async function ladePersonen(
+  client: SupabaseClient,
+  ichId: string,
+  ids: string[]
+): Promise<{ users: Record<string, User>; profile: Record<string, Profile> }> {
+  const users: Record<string, User> = {};
+  const profile: Record<string, Profile> = {};
+  const ziele = [...new Set(ids.map((id) => (id === ICH ? ichId : id)).filter(Boolean))];
+  if (!ziele.length) return { users, profile };
+
+  const { data: nummern } = await client.rpc('meine_kontaktnummern');
+  for (let i = 0; i < ziele.length; i += 100) {
+    const teil = ziele.slice(i, i + 100);
+    const [{ data, error }, { data: zahlen }, { data: bilder }, { data: folgen }] = await Promise.all([
+      client.from('profiles').select(PROFIL_SPALTEN).in('id', teil),
+      client.from('profile_zahlen').select('id, followers, following, beitraege').in('id', teil),
+      client.from('profiles').select('id, avatar_url').in('id', teil),
+      client.from('follows').select('followee_id').eq('follower_id', ichId).in('followee_id', teil),
+    ]);
+    if (error) throw error;
+    const zahlenNach = new Map(((zahlen ?? []) as any[]).map((z) => [z.id, z]));
+    const bildNach = new Map(((bilder ?? []) as any[]).map((b) => [b.id, b.avatar_url]));
+    const gefolgt = new Set(((folgen ?? []) as any[]).map((f) => f.followee_id));
+    for (const zeile of (data ?? []) as any[]) {
+      const eintrag = personAusZeile(
+        zeile,
+        zahlenNach.get(zeile.id),
+        ichId,
+        ((nummern as any)?.[zeile.id] as string | undefined) || undefined,
+        (bildNach.get(zeile.id) as string | undefined) || undefined
+      );
+      eintrag.profile.isFollowing = gefolgt.has(zeile.id);
+      users[eintrag.user.id] = eintrag.user;
+      profile[eintrag.user.id] = eintrag.profile;
+    }
+  }
+  return signiereMedien(client, { users, profile });
+}
+
 /*
  * Die Profilbilder (Kasten 12.5) — getrennt und nachsichtig geladen.
  *

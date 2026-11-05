@@ -50,7 +50,7 @@ interface Props {
 }
 
 export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onOpenFollowers, onOpenFollowing, onOpenKachel, onNotice }: Props) => {
-  const { profile: alleProfile, users: alleNutzer, ichId } = useDaten();
+  const { profile: alleProfile, users: alleNutzer, ichId, personMerken } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
@@ -79,7 +79,11 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
     setNachgeladen({ id: userId, stand: 'laedt' });
     ladePerson(supabase, ichId, userId)
       .then((eintrag) => {
-        if (!abgebrochen) setNachgeladen({ id: userId, stand: eintrag ? 'da' : 'fehlt', eintrag });
+        if (abgebrochen) return;
+        setNachgeladen({ id: userId, stand: eintrag ? 'da' : 'fehlt', eintrag });
+        // Codex-Fund Runde 2: in den gemeinsamen Bestand, damit Optionen
+        // (Blockieren/Melden), Follower und Gefolgt die Person auch finden.
+        if (eintrag) personMerken(eintrag);
       })
       .catch((e) => {
         console.error('Profil nachladen fehlgeschlagen:', e?.message ?? e);
@@ -201,8 +205,11 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
     return () => {
       abgebrochen = true;
     };
+    // Codex-Fund Runde 2: an der Person hängend. Beim Nachladen fehlt sie im
+    // ersten Durchlauf; nur mit [supabase, userId] liefe der Effekt danach
+    // nie wieder, Playlists fehlten und Highlights blieben ohne ID.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, userId]);
+  }, [supabase, userId, person?.id]);
 
   /*
    * Kasten 17.1/17.2: eine Sammlung im FREMDEN Profil öffnen.
@@ -258,8 +265,15 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
   if (!person || !profile) {
     // Ohne Verbindung lädt nichts — dann gleich der Leertext, kein ewiger Kreisel.
     const laedt = !imBestand && !!supabase && !!ichId && (!eigenGeladen || eigenGeladen.stand === 'laedt');
+    // Mit Zurück-Knopf — ohne ihn war „Profil nicht verfügbar" eine Sackgasse.
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Druck style={styles.back} onPress={onBack} hitSlop={6} accessibilityLabel="Zurück">
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </Druck>
+          <View style={{ width: 22 }} />
+        </View>
         {laedt ? (
           <View style={styles.laden}>
             <ActivityIndicator color={colors.text3} />

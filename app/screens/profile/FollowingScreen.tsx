@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -17,10 +17,29 @@ interface Props {
 }
 
 export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Props) => {
-  const { users: alleNutzer, ichId } = useDaten();
+  const { users: alleNutzer, ichId, personenNachladen } = useDaten();
   const { supabase } = useSupabase();
   const insets = useSafeAreaInsets();
   const person = alleNutzer[userId];
+
+  /*
+   * Codex-Fund Runde 2 (05.11.2026): `users` kennt nur die ersten 500 aus
+   * ladeNutzer (plus Nachgeladene). Fehlt die Person, wird sie einmal per
+   * ID nachgeladen; erst danach heißt es „gibt es nicht". Laden und
+   * Ergebnis sind getrennte Zustände — kein erneuter Versuch je Zeichnen.
+   */
+  const [personStand, setPersonStand] = useState<'laedt' | 'fertig' | 'fehler'>(person ? 'fertig' : 'laedt');
+  useEffect(() => {
+    if (alleNutzer[userId]) return setPersonStand('fertig');
+    let gilt = true;
+    setPersonStand('laedt');
+    personenNachladen([userId]).then((stand) => gilt && setPersonStand(stand));
+    return () => {
+      gilt = false;
+    };
+    // Absichtlich nur an der ID: personenNachladen versucht jede ID ohnehin nur einmal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, personenNachladen]);
 
   /*
    * Gegenstueck zu FollowersScreen: hier stand u2 bis u6 fest im Code. Die
@@ -33,7 +52,12 @@ export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Pro
     if (!supabase || !ichId) return;
     let gilt = true;
     ladeFolgeListe(supabase, ichId, userId, 'gefolgt')
-      .then((liste) => gilt && setIds(liste))
+      .then(async (liste) => {
+        // Wer in der Liste steht, aber nicht im Bestand, fiel bisher still
+        // heraus. Erst nachladen, dann zeigen — sonst blitzt „niemand" auf.
+        await personenNachladen(liste);
+        if (gilt) setIds(liste);
+      })
       .catch((e: any) => {
         console.error('Gefolgte laden fehlgeschlagen:', e?.message ?? e);
         if (gilt) setIds([]);
@@ -42,17 +66,9 @@ export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Pro
     return () => {
       gilt = false;
     };
-  }, [supabase, ichId, userId]);
+  }, [supabase, ichId, userId, personenNachladen]);
 
   const following = (ids ?? []).map((id) => alleNutzer[id]).filter(Boolean);
-
-  if (!person) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.leer}>Diese Person gibt es nicht.</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -63,6 +79,18 @@ export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Pro
         <Text style={styles.headerTitel}>Gefolgt</Text>
         <View style={{ width: 22 }} />
       </View>
+
+      {!person ? (
+        // Bis zum 05.11.2026 stand dieser Text ohne Kopfzeile da — ohne
+        // Zurück-Knopf eine Sackgasse.
+        personStand === 'laedt' ? (
+          <ActivityIndicator style={{ marginTop: 20 }} color={colors.text3} />
+        ) : (
+          <Text style={styles.leer}>
+            {personStand === 'fehler' ? 'Das Profil ließ sich gerade nicht laden.' : 'Diese Person gibt es nicht.'}
+          </Text>
+        )
+      ) : (
 
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl + insets.bottom }}>
         {ids !== null && following.length === 0 && (
@@ -85,6 +113,7 @@ export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Pro
           </Druck>
         ))}
       </ScrollView>
+      )}
     </View>
   );
 };
