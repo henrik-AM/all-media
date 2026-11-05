@@ -25,7 +25,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { signiereMedien, medienAnfrage } from './medien';
+import { signiereMedien, medienAnfrage, eigeneMedienadresse } from './medien';
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -1930,6 +1930,11 @@ export async function profilbildSetzen(
   ichId: string,
   url: string | null
 ): Promise<void> {
+  // Eigener Host + Ordner avatars, kein ?/# — gleiche Regel wie
+  // POST /api/eigene/profilbild und der CHECK aus Schema 118.
+  if (url && !eigeneMedienadresse(url, 'avatars')) {
+    throw new Error('Dieses Bild kommt nicht aus dem eigenen Upload');
+  }
   const { data, error } = await client
     .from('profiles')
     .update({ avatar_url: url })
@@ -3847,6 +3852,14 @@ export async function titelbildSetzen(
     titel_story_id: wahl.storyId ?? null,
     titelbild_url: wahl.bildUrl ?? null,
   };
+  if ([zeile.titel_post_id, zeile.titel_story_id, zeile.titelbild_url].filter(Boolean).length > 1) {
+    throw new Error('Bitte nur ein Titelbild wählen');
+  }
+  // Eigener Host + Ordner stories/posts, kein ?/# — wie der Website-Server
+  // und der CHECK aus Schema 118.
+  if (zeile.titelbild_url && !eigeneMedienadresse(zeile.titelbild_url, ['stories', 'posts'])) {
+    throw new Error('Dieses Bild kommt nicht aus dem eigenen Upload');
+  }
   const { data, error } = await client
     .from('sammlungen')
     .update(zeile)

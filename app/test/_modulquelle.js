@@ -151,6 +151,11 @@ const UMD_BAUSTEINE = [
   // 31.10.2026: `einwilligung.js` — Zustimmung mit Fassung und Eltern-Widerruf
   // (Kasten RS 7/5, Schema 106). Liest global.Rechtstexte — muss danach stehen.
   ['einwilligung', 'Einwilligung'],
+
+  // 05.11.2026: `medienadresse.js` — Medienadressen nur vom eigenen Host
+  // (Codex-Review, Schema 118). medien.ts und damit jeder Lauf mit
+  // signiereMedien holt ihn. Gleich mit dem Baustein eingetragen.
+  ['medienadresse', 'MedienAdresse'],
 ];
 
 function umdTeile() {

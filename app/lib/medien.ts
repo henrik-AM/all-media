@@ -38,7 +38,26 @@ async function medienSignaturliste(client:SupabaseClient,pfade:string[]) {
  for(let i=0;i<pfade.length;i+=500){const r=await medienAnfrage(client,'/api/medien/unterschreiben',{pfade:pfade.slice(i,i+500)});dateien.push(...r.dateien);}
  return dateien;
 }
-const OEFFENTLICH = '/storage/v1/object/public/media/';
+/*
+ * Eigene Adresse = eigener Host + Medienpfad (gemeinsam/medienadresse.js,
+ * Schema 118, Codex-Review 05.11.2026). Bis dahin genuegte der Pfadteil:
+ * `https://boese.example/storage/v1/object/public/media/…` galt als unsere,
+ * und scheiterte das Unterschreiben, zeigte die App die Rohadresse an —
+ * ein Bild von einem fremden Server bei jedem Betrachter.
+ */
+const MedienAdresse = require('../../gemeinsam/medienadresse') as typeof import('../../gemeinsam/medienadresse');
+/** Projektadresse wie constants/supabase (EXPO_PUBLIC_SUPABASE_URL), sonst die Standardadresse des Bausteins. */
+function eigeneBasis(): string | undefined {
+  return typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_SUPABASE_URL : undefined;
+}
+/**
+ * Darf `url` in eine Medienspalte (`ordner` z. B. 'avatars' oder
+ * ['stories','posts'])? Gleiche Regel wie der Website-Server und
+ * medien_adresse_gueltig() in der Datenbank.
+ */
+export function eigeneMedienadresse(url: unknown, ordner?: string | string[]): boolean {
+  return MedienAdresse.gespeichert(url, ordner ?? null, eigeneBasis());
+}
 const GUELTIG = 4 * 60 * 60;
 
 /*
@@ -99,25 +118,24 @@ function merken(speicher: Medienspeicher, pfad: string, url: string, ablauf: num
 
 function istMedienAdresse(wert: unknown): wert is string {
   // Der ganze Wert muss eine Adresse sein, nicht ein Satz, der eine erwähnt —
-  // gleiche Regel wie web/server/medien.js (Sicherheitsprüfung 17.10.2026).
-  return typeof wert === 'string' && /^https?:\/\/\S+$/.test(wert) && wert.includes(OEFFENTLICH);
+  // gleiche Regel wie web/server/medien.js (Sicherheitsprüfung 17.10.2026) —
+  // und seit Schema 118 vom eigenen Host.
+  return MedienAdresse.art(wert, eigeneBasis()) === 'eigen';
+}
+
+/** Medienpfad auf fremdem Host: wird nie angezeigt (Schema 118). */
+function istFremdeMedienAdresse(wert: unknown): boolean {
+  return MedienAdresse.art(wert, eigeneBasis()) === 'fremd';
 }
 
 function pfadAus(adresse: string): string | null {
-  const stelle = adresse.indexOf(OEFFENTLICH);
-  if (stelle === -1) return null;
-  const rest = adresse.slice(stelle + OEFFENTLICH.length);
   /*
-   * decodeURIComponent wirft bei kaputter Kodierung (`%zz`). Ohne den Fang
-   * reichte ein einziger Beitrag mit so einer Beschreibung, und der Feed
-   * jedes Nutzers, der ihn laden sollte, blieb leer.
+   * decodeURIComponent wirft bei kaputter Kodierung (`%zz`). Der Baustein
+   * faengt das ab und gibt null — ohne den Fang reichte ein einziger Beitrag
+   * mit so einer Beschreibung, und der Feed jedes Nutzers blieb leer.
    */
-  let pfad: string;
-  try {
-    pfad = decodeURIComponent(rest.split(/[?#]/)[0]);
-  } catch {
-    return null;
-  }
+  const pfad = MedienAdresse.pfad(adresse, eigeneBasis());
+  if (!pfad) return null;
   // Allgemeine Signaturen erlauben dieselben Ordner wie Bunny. Instants bleiben separat.
   return /^(messages|stories|avatars|posts|insights|ptt|beispiel)\/[A-Za-z0-9_-][A-Za-z0-9._-]*$/.test(pfad) && !pfad.includes('..') ? pfad : null;
 }
@@ -138,6 +156,7 @@ function sammle(wert: any, pfade: Set<string>) {
 }
 
 function ersetze(wert: any, karte: Map<string, string>): any {
+  if (istFremdeMedienAdresse(wert)) return null;
   if (istMedienAdresse(wert)) {
     const p = pfadAus(wert);
     return (p && karte.get(p)) || wert;
@@ -160,16 +179,21 @@ function ersetze(wert: any, karte: Map<string, string>): any {
  * Schlaegt das Unterschreiben fehl, bleibt die alte Adresse stehen. Sie
  * fuehrt dann ins Leere, aber ein fehlendes Bild ist besser als ein Bildschirm,
  * der gar nicht laedt.
+ *
+ * Medienadressen auf FREMDEM Host werden immer zu null (Schema 118), auch
+ * in jedem Rueckfall — eigene bleiben im Rueckfall wie bisher stehen.
  */
 export async function signiereMedien<T>(client: SupabaseClient | null, daten: T): Promise<T> {
-  if (!client || daten == null) return daten;
+  if (daten == null) return daten;
+  const ohneFremde = (): T => ersetze(daten, new Map());
+  if (!client) return ohneFremde();
 
   const pfade = new Set<string>();
   sammle(daten, pfade);
-  if (pfade.size === 0) return daten;
+  if (pfade.size === 0) return ohneFremde();
 
   const speicher = await speicherFuer(client);
-  if (!speicher) return daten;
+  if (!speicher) return ohneFremde();
 
   const karte = new Map<string, string>();
   const jetzt = Date.now();
@@ -199,12 +223,12 @@ export async function signiereMedien<T>(client: SupabaseClient | null, daten: T)
       }
     } catch (fehler: any) {
       console.error('Medienadressen unterschreiben fehlgeschlagen:', fehler?.message ?? fehler);
-      if (karte.size === 0) return daten;
+      if (karte.size === 0) return ohneFremde();
     }
   }
 
   // Ein Kontowechsel waehrend der Unterschrift darf kein altes Kuvert liefern.
-  if (await speicherFuer(client) !== speicher) return daten;
+  if (await speicherFuer(client) !== speicher) return ohneFremde();
   return ersetze(daten, karte);
 }
 
