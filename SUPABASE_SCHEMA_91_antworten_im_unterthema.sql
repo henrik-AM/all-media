@@ -36,8 +36,9 @@
 --     Dasselbe für UPDATE ist nicht nötig: es gibt keine UPDATE-Regel für
 --     Kanalnachrichten, eine Änderung von reply_to ist also ohnehin verboten.
 --
---  Ersetzt KEINE bestehende Funktion. Keine neue Funktion (kein EXECUTE an
---  PUBLIC), keine neue Tabelle (nur_freigegebene aus Schema 52/74 gilt für
+--  Ersetzt KEINE bestehende Funktion. Neu (05.11.2026): Hilfe
+--  kanal_antwort_erlaubt() (EXECUTE nur authenticated) gegen RLS-Rekursion.
+--  Keine neue Tabelle (nur_freigegebene aus Schema 52/74 gilt für
 --  community_channel_messages unverändert weiter — die Zeile bleibt dieselbe).
 --
 --  Zitattext liegt NIE in der Datenbank: gespeichert wird nur die Kennung des
@@ -63,19 +64,36 @@ comment on column public.community_channel_messages.reply_to is
   'Antwort auf diese Nachricht desselben Unterthemas (Feedback 28.09., Kasten 4.2). '
   'Nur die Kennung, nie der Text.';
 
+-- Prüfung über eine Definer-Hilfe statt einer Unterabfrage in der Regel:
+-- Eine Regel auf community_channel_messages, die selbst community_channel_messages
+-- liest, löst „42P17 infinite recursion detected in policy“ aus — dann scheitert
+-- JEDE neue Nachricht im Unterthema, auch ohne Antwort (Probe Paket 1, 05.11.2026,
+-- _probe_paket1_rekursion.js). Muster wie kommentar_antwort_erlaubt() aus Schema 92.
+-- Die Hilfe verrät nur, ob eine Kennung im selben Unterthema liegt.
+create or replace function public.kanal_antwort_erlaubt(p_reply_to uuid, p_channel uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_reply_to is null
+      or exists (
+        select 1
+          from public.community_channel_messages o
+         where o.id = p_reply_to
+           and o.channel_id = p_channel
+      );
+$$;
+
+revoke execute on function public.kanal_antwort_erlaubt(uuid, uuid) from public, anon;
+grant execute on function public.kanal_antwort_erlaubt(uuid, uuid) to authenticated;
+
 drop policy if exists "Antwort nur im selben Unterthema" on public.community_channel_messages;
 create policy "Antwort nur im selben Unterthema" on public.community_channel_messages
   as restrictive
   for insert to authenticated
-  with check (
-    reply_to is null
-    or exists (
-      select 1
-        from public.community_channel_messages o
-       where o.id = reply_to
-         and o.channel_id = community_channel_messages.channel_id
-    )
-  );
+  with check (public.kanal_antwort_erlaubt(reply_to, channel_id));
 
 -- PostgREST soll die neue Spalte sofort kennen.
 notify pgrst, 'reload schema';

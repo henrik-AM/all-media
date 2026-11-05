@@ -83,6 +83,18 @@ create table if not exists public.kontakt_bilder (
   )
 );
 
+-- Eimer-Prüfung mit eigener Projektadresse (05.11.2026, Probe Paket 1): Der Check
+-- oben prüft nur das Pfadende — eine Adresse wie https://boese.de/storage/v1/object/
+-- public/media/avatars/x.png ging durch, und medienreferenz_pruefen (Schema 117)
+-- überspringt Adressen, die medien_adresse_gueltig() nicht kennt. Darum zusätzlich
+-- medien_adresse_gueltig() (Schema 23/95). Neu angelegt, damit es auch auf einer
+-- schon vorhandenen Tabelle gilt.
+alter table public.kontakt_bilder drop constraint if exists kontakt_bilder_eimer;
+alter table public.kontakt_bilder add constraint kontakt_bilder_eimer check (
+  media_url ~ '/storage/v1/object/public/media/avatars/[A-Za-z0-9._-]+$'
+  and public.medien_adresse_gueltig(media_url)
+);
+
 comment on table public.kontakt_bilder is
   'Eigenes Kontaktbild (Kasten 7.8, Schema 94): nur der Eigentümer sieht es, nur im Messenger.';
 
