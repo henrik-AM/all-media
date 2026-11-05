@@ -101,7 +101,7 @@ function teilA() {
     /window\.Anruf\.text\(m\.anruf, opts\)/.test(WEB) && /if \(m\.anruf\) return anrufZeile\(m, \{ eigen: m\.from === 'me', gruppe: true \}\)/.test(WEB));
   pruefe('Server: handleAnrufStarten + Route', /const handleAnrufStarten = handler/.test(SRV) && /app\.post\('\/api\/anruf'/.test(SAPP));
   pruefe('Kanal-Laden mit Anrufspalten und Rückfall 42703 (App + Server)',
-    /anruf_art, anruf_status, anruf_dauer, ptt_sitzung/.test(lies('app/lib/daten.ts')) && /42703/.test(SAPI));
+    (() => { const d = lies('app/lib/daten.ts'); return /'anruf_art, anruf_status, anruf_dauer'/.test(d) && /'ptt_sitzung'/.test(d); })() && /42703/.test(SAPI));
 
   const Anruf = require(path.join(WURZEL, 'gemeinsam/anruf.js'));
   const g = { art: 'video', status: 'gestartet', dauer: 0 };

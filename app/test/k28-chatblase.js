@@ -122,7 +122,7 @@ function teilA() {
     /accessibilityActions=.*antworten/.test(lies('app/components/ZiehZumAntworten.tsx')));
   pruefe('4.x App: Zitat antippen springt zum Original', /onPress=\{\(\) => zuNachricht\(item\.antwortAuf!\.id\)\}/.test(chat));
   pruefe('4.2 App: Kanalnachricht schickt reply_to mit', /kanalNachricht\(supabase, ichId, chat\.id, text, \{\}, bezug \?/.test(chat) && /zeile\.reply_to = antwortAuf/.test(akt));
-  pruefe('4.2 App: Kanal lädt reply_to und baut den Bezug', /\$\{spalten\}, reply_to/.test(daten) && /Chatblase\.kanalBezug\(m, alleZeilen/.test(daten));
+  pruefe('4.2 App: Kanal lädt reply_to und baut den Bezug', /zusatz = \['reply_to'/.test(daten) && /Chatblase\.kanalBezug\(m, alleZeilen/.test(daten));
   pruefe('4.2 Server: dasselbe beim Laden und Schreiben',
     /Chatblase\.kanalBezug\(m, alleZeilen/.test(api) && /zeile\.reply_to = antwortAuf/.test(sync) && /req\.body\?\.antwortAuf/.test(srv));
   pruefe('4.4 Website: Chat und Unterthema binden Ziehen/Knopf/Sprung',
