@@ -1,4 +1,15 @@
 -- ===========================================================================
+-- ABGLEICH MIT MAIN (Paket 1, 05.11.2026, Stand origin/main ad7f221)
+--   Live nur lesend geprüft (pg_get_constraintdef), keine main-Datei 101–117
+--   definiert eines dieser Objekte neu:
+--   * messages_anruf_status_check: live ('beendet','verpasst','abgelehnt') →
+--     hier + 'gestartet'. Nur Erweiterung, keine Rückdrehung.
+--   * messages_anruf_gestartet_ohne_dauer, kanalnachricht_anruf_*: neu.
+--   * kanalnachricht_nicht_leer: live wortgleich mit Schema 59 → hier + anruf_art.
+--     Schema 90 erweitert dieselbe Bedingung danach noch um ptt_sitzung.
+--   * community_channel_messages.anruf_*: neu, live nicht vorhanden.
+-- ===========================================================================
+-- ===========================================================================
 --  SUPABASE_SCHEMA_89_anrufe_ueberall.sql        (Feedback 28.09.2026, Kasten 5)
 --  Ein Anruf steht beim Start im Chat — Person, Gruppe, Community, Unterthema
 --  ENTWURF, 10.10.2026 — NICHT EINGESPIELT (Supabase gesperrt, 402)

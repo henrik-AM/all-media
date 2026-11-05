@@ -1,4 +1,24 @@
 -- ===========================================================================
+-- ABGLEICH MIT MAIN (Paket 1, 05.11.2026, Stand origin/main ad7f221)
+--   Live nur lesend geprüft (pg_get_constraintdef), keine main-Datei 101–117
+--   (auch nicht 102/103/106) definiert eines dieser Objekte neu:
+--   * notifications_art_check: Liste hier = Live-Liste (17 Arten, inkl.
+--     'system' für Schema 102) + 'ptt'. Keine live erlaubte Art fehlt.
+--   * notifications_target_type_check: Liste hier = Live-Liste (9 Ziele)
+--     + 'channel'. Kein live erlaubtes Ziel fehlt.
+--     ACHTUNG beim Einspielen: Schema 92 ersetzt notifications_art_check
+--     erneut (+ 'antwort') und muss 'ptt' aus dieser Datei enthalten
+--     (geprüft, siehe Kopf von 92). Die Entwürfe 97–100 (Pakete 2/3) nicht
+--     geprüft — wer dort die Liste ersetzt, muss 'ptt'/'channel' mitnehmen.
+--   * kanalnachricht_nicht_leer: Fassung aus 89 + ptt_sitzung.
+--   * community_members.ptt_benachrichtigung, community_channel_messages.ptt_sitzung,
+--     ptt_messages.sitzung_id, Regel „Sitzungszeile nur vom Ausloeser“
+--     (restriktiv, verundet mit nicht_ausgeblendet aus 102),
+--     ptt_mitteilen(), ptt_sitzung_zuordnen() + Auslöser: neu.
+--   * Schema 117 prüft ptt_messages.audio_url und community_channel_messages.
+--     media_url; die Sitzungszeile hat keine Medienadresse → unberührt.
+-- ===========================================================================
+-- ===========================================================================
 --  SUPABASE_SCHEMA_90_push_to_talk.sql            (Feedback 28.09.2026, Kasten 8)
 --  Push to Talk: Sitzung im Unterthema, Schalter je Community, Mitteilung
 --  ENTWURF, 10.10.2026 — NICHT EINGESPIELT (Supabase gesperrt, 402)
