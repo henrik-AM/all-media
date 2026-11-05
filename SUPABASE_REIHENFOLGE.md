@@ -400,6 +400,9 @@ Datei im Kopf. Wichtig beim Einspielen:
 |---|---|
 | Funktion public.kommentar_ausgeblendet() | SUPABASE_SCHEMA_92_kommentar_antworten.sql → SUPABASE_SCHEMA_102_melden_moderation.sql |
 | Funktion public.mitteilung_bei_kommentar() | SUPABASE_SCHEMA_44_mitteilungen.sql → SUPABASE_SCHEMA_92_kommentar_antworten.sql |
+| Funktion public.ist_messenger_kontakt() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_94_kontaktbild.sql |
+
+`ist_messenger_kontakt`: 94 legt eine **zweite Fassung mit anderer Signatur** `(uuid)` an; die live gültige `(uuid, uuid)` (68, gehärtet in 95) bleibt unberührt.
 
 - **94:** danach **Schema 117 erneut einspielen** (Medienreferenz-Prüfung auf `kontakt_bilder`).
   `ist_messenger_kontakt(uuid)` ist eine neue Überladung neben `ist_messenger_kontakt(uuid, uuid)` (68/102).
