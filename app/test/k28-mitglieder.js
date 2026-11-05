@@ -75,6 +75,21 @@ function teilA() {
   pruefe('15.3 nur_freigegebene einschränkend auf der neuen Tabelle', /create policy nur_freigegebene on public\.community_beitrittsanfragen\s+as restrictive/.test(sql));
   pruefe('15.3 Annehmen prüft den Ersteller', /beitrittsanfrage_annehmen[\s\S]{0,400}v_ersteller is distinct from auth\.uid\(\)/.test(sql));
   pruefe('15.3 Annahmefunktion für anon gesperrt', /revoke execute on function public\.beitrittsanfrage_annehmen\(uuid, uuid\) from public, anon/.test(sql));
+  // Codex-Fund 05.11.2026: Anfrage → Blockierung → Annahme. Die Funktion läuft
+  // an RLS vorbei, also prüft sie die Blockierung selbst — vor dem Eintragen.
+  const annahme97 = (sql.match(/function public\.beitrittsanfrage_annehmen[\s\S]*?end \$\$;/) || [''])[0];
+  pruefe('15.3 Annehmen prüft die Blockierung (beide Richtungen) vor dem Eintragen',
+    /if public\.blockiert_zwischen\(v_ersteller, p_user\) then\s+raise exception 'Diese Anfrage gibt es nicht mehr';/.test(annahme97) &&
+      annahme97.indexOf('blockiert_zwischen') < annahme97.indexOf('insert into public.community_members'));
+  pruefe('15.3 Blockieren räumt offene Beitrittsanfragen ab',
+    /create trigger beitrittsanfrage_bei_blockierung\s+after insert on public\.blocks/.test(sql) &&
+      /revoke execute on function public\.beitrittsanfrage_bei_blockierung\(\) from public, anon/.test(sql));
+  pruefe('15.3 Selbstprüfung bricht ab, wenn die Blockierungsprüfung fehlt',
+    /'beitrittsanfrage_annehmen prüft die Blockierung nicht'/.test(sql));
+  const probe97 = lies('app/test/_probe97.js');
+  pruefe('15.3 Probe 97: Anfrage → Blockierung → Annahme scheitert, keine Mitgliedschaft',
+    /annehmen_trotz_block_1 === 'P0001'/.test(probe97) && /annehmen_trotz_block_2 === 'P0001'/.test(probe97) &&
+      /mitglied_trotz_block === '0'/.test(probe97));
   pruefe('15.3 Direktbeitritt bleibt zu (Regel aus 95 nicht angefasst)', !/create policy "Community beitreten"/.test(sql));
   // Paket 2 (05.11.2026): Schema 90 liegt nicht auf main und ist live nicht
   // eingespielt. Maßstab ist die live gültige Liste (zuletzt 57, gemessen
@@ -156,6 +171,13 @@ function teilA() {
   pruefe('15.4 nur_freigegebene einschränkend', /create policy nur_freigegebene on public\.freundschaften\s+as restrictive/.test(sql98));
   pruefe('15.4 Annahmefunktion für anon gesperrt', /revoke execute on function public\.freundschaft_annehmen\(uuid\) from public, anon/.test(sql98));
   pruefe('15.4 Blockieren beendet die Freundschaft', /after insert on public\.blocks/.test(sql98));
+  const annahme98 = (sql98.match(/function public\.freundschaft_annehmen[\s\S]*?end \$\$;/) || [''])[0];
+  pruefe('15.4 Annehmen prüft die Blockierung vor dem Update',
+    /if public\.blockiert_zwischen\(auth\.uid\(\), p_von\) then/.test(annahme98) &&
+      annahme98.indexOf('blockiert_zwischen') < annahme98.indexOf('update public.freundschaften'));
+  const probe98 = lies('app/test/_probe98.js');
+  pruefe('15.4 Probe 98: Anfrage → Blockierung → Annahme scheitert',
+    /annehmen_trotz_block === 'P0001'/.test(probe98) && /befreundet_trotz_block === '0'/.test(probe98));
   const liste98 = (sql98.match(/notifications_art_check\s+check \(art in \(([\s\S]*?)\)\);/) || [])[1] || '';
   pruefe('15.4 Mitteilungsarten: Liste aus 97 vollständig + 2 neue',
     arten(liste97).length > 0 && arten(liste97).every((a) => arten(liste98).includes(a)) &&

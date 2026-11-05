@@ -20,7 +20,9 @@
 --      auf community_beitrittsanfragen nur an, wenn die Tabelle schon steht
 --      — live fehlt sie noch. Darum legt 97 die Regel selbst an (Teil 4b);
 --      beitrittsanfrage_annehmen() läuft als definer an RLS vorbei und
---      prüft deshalb selbst, dass die Community nicht ausgeblendet ist.
+--      prüft deshalb selbst, dass die Community nicht ausgeblendet ist —
+--      und (Codex-Fund 05.11.) dass zwischen Ersteller und Fragendem keine
+--      Blockierung besteht, die nach der Anfrage entstanden ist.
 --    - Die übrigen ersetzten Objekte („Communitys lesen“, Leseregel auf
 --      community_members) definiert keine Datei 101–117 neu. Die
 --      restriktiven Regeln nur_freigegebene und nicht_ausgeblendet auf
@@ -313,6 +315,16 @@ begin
   if not public.konto_freigegeben() then
     raise exception 'Dein Konto ist noch nicht freigegeben' using errcode = '42501';
   end if;
+  -- Paket 2 (05.11.2026, Codex-Fund): Die INSERT-Regel prüft die Blockierung
+  -- nur beim Anfragen. Blockiert danach einer den anderen (egal wer wen),
+  -- darf die Annahme niemanden mehr an RLS vorbei eintragen — sonst sähe der
+  -- Blockierte über community_sichtbar private Unterthemen und Nachrichten.
+  -- auth.uid() ist hier der Ersteller, blockiert_zwischen (95) sieht also
+  -- beide Richtungen. Gleicher Satz wie freundschaft_annehmen (98): verrät
+  -- die Blockierung nicht und kommt als P0001 bis zum Bildschirm durch.
+  if public.blockiert_zwischen(v_ersteller, p_user) then
+    raise exception 'Diese Anfrage gibt es nicht mehr';
+  end if;
 
   delete from public.community_beitrittsanfragen
    where community_id = p_community and user_id = p_user;
@@ -350,6 +362,29 @@ drop trigger if exists beitrittsanfrage_aufraeumen on public.community_members;
 create trigger beitrittsanfrage_aufraeumen
   after insert on public.community_members
   for each row execute function public.beitrittsanfrage_aufraeumen();
+
+-- Wer blockiert, hat keine offene Anfrage mehr beim anderen (beide
+-- Richtungen; wie freundschaft_bei_blockierung in 98). Die Prüfung in
+-- beitrittsanfrage_annehmen() bleibt trotzdem: sie schützt auch dann, wenn
+-- dieser Auslöser fehlt oder die Anfrage auf anderem Weg zurückkommt.
+create or replace function public.beitrittsanfrage_bei_blockierung()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  delete from public.community_beitrittsanfragen a
+   using public.communities c
+   where c.id = a.community_id
+     and ((a.user_id = new.user_id and c.created_by = new.blocked_user_id)
+       or (a.user_id = new.blocked_user_id and c.created_by = new.user_id));
+  return new;
+end $$;
+
+drop trigger if exists beitrittsanfrage_bei_blockierung on public.blocks;
+create trigger beitrittsanfrage_bei_blockierung
+  after insert on public.blocks
+  for each row execute function public.beitrittsanfrage_bei_blockierung();
 
 
 -- ---------------------------------------------------------------------------
@@ -409,11 +444,13 @@ revoke execute on function public.beitrittsanfrage_aufraeumen() from public, ano
 revoke execute on function public.mitteilung_bei_beitrittsanfrage() from public, anon;
 revoke execute on function public.mitteilung_weg_bei_beitrittsanfrage() from public, anon;
 revoke execute on function public.community_vorgaben() from public, anon;
+revoke execute on function public.beitrittsanfrage_bei_blockierung() from public, anon;
 grant execute on function public.mitglieder_zaehlen() to authenticated;
 grant execute on function public.beitrittsanfrage_aufraeumen() to authenticated;
 grant execute on function public.mitteilung_bei_beitrittsanfrage() to authenticated;
 grant execute on function public.mitteilung_weg_bei_beitrittsanfrage() to authenticated;
 grant execute on function public.community_vorgaben() to authenticated;
+grant execute on function public.beitrittsanfrage_bei_blockierung() to authenticated;
 
 
 -- ---------------------------------------------------------------------------
@@ -439,6 +476,10 @@ begin
   end if;
   if has_function_privilege('anon', 'public.beitrittsanfrage_annehmen(uuid, uuid)', 'execute') then
     raise exception 'beitrittsanfrage_annehmen ist für anon ausführbar';
+  end if;
+  if position('blockiert_zwischen' in pg_get_functiondef(
+       'public.beitrittsanfrage_annehmen(uuid, uuid)'::regprocedure)) = 0 then
+    raise exception 'beitrittsanfrage_annehmen prüft die Blockierung nicht';
   end if;
   if has_function_privilege('anon', 'public.mitglieder_sichtbar(uuid)', 'execute') then
     raise exception 'mitglieder_sichtbar ist für anon ausführbar';

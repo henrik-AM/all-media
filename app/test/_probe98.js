@@ -150,6 +150,30 @@ ${als(PRUEFKONTO, `
   ${versuch('anfrage_blockiert', `insert into public.freundschaften (von, an) values (auth.uid(), '${TESTKONTO}')`)}
 `)}
 
+-- Codex-Fund 05.11.2026 (Gegenstück zu 97): offene Anfrage → Blockierung →
+-- Annahme muss scheitern. Erst die Blockierung von oben aufheben.
+delete from public.blocks where user_id = '${TESTKONTO}' and blocked_user_id = '${PRUEFKONTO}';
+${als(TESTKONTO, `
+  ${weg('anfrage_vor_block', `insert into public.freundschaften (von, an) values (auth.uid(), '${PRUEFKONTO}')`)}
+`)}
+-- Der Empfänger blockiert den Fragenden.
+insert into public.blocks (user_id, blocked_user_id) values ('${PRUEFKONTO}', '${TESTKONTO}') on conflict do nothing;
+${eigner(`
+  select count(*) into n from public.freundschaften where von = '${TESTKONTO}' and an = '${PRUEFKONTO}';
+  ${merke('anfrage_nach_block', 'n')}
+`)}
+-- Anfrage als Eigentümer zurücklegen (Profil privat → offen): prüft die
+-- Funktion selbst, nicht nur den Aufräum-Auslöser.
+insert into public.freundschaften (von, an) values ('${TESTKONTO}', '${PRUEFKONTO}');
+${als(PRUEFKONTO, `
+  ${weg('annehmen_trotz_block', `perform public.freundschaft_annehmen('${TESTKONTO}')`)}
+`)}
+${eigner(`
+  select count(*) into n from public.freundschaften
+   where von = '${TESTKONTO}' and an = '${PRUEFKONTO}' and angenommen;
+  ${merke('befreundet_trotz_block', 'n')}
+`)}
+
 do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p$;
 `;
 
@@ -193,6 +217,11 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   console.log('\nBlockieren');
   pruefe('15.4 Blockieren beendet die Freundschaft', w.nach_blockieren === '0', w.nach_blockieren);
   pruefe('15.4 danach keine neue Anfrage', w.anfrage_blockiert === 'zu', w.anfrage_blockiert);
+  console.log('\nAnfrage → Blockierung → Annahme (Codex-Fund 05.11.)');
+  pruefe('Anfrage vor der Blockierung: ok', w.anfrage_vor_block === 'ok', w.anfrage_vor_block);
+  pruefe('Blockierung räumt die offene Anfrage ab', w.anfrage_nach_block === '0', w.anfrage_nach_block);
+  pruefe('Annahme trotz Blockierung scheitert (P0001)', w.annehmen_trotz_block === 'P0001', w.annehmen_trotz_block);
+  pruefe('nicht befreundet trotz Blockierung', w.befreundet_trotz_block === '0', w.befreundet_trotz_block);
 
   console.log(`\n${anzahl - fehler}/${anzahl} Prüfungen bestanden (alles verworfen)`);
   process.exit(fehler ? 1 : 0);

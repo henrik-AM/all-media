@@ -144,6 +144,37 @@ ${als(TESTKONTO, `
   get diagnostics n = row_count; ${merke('ablehnen_zeilen', 'n')}
 `)}
 
+-- Codex-Fund 05.11.2026: Anfrage → Blockierung → Annahme muss scheitern.
+-- Richtung 1: der Fragende blockiert den Ersteller.
+${als(PRUEFKONTO, `
+  ${weg('anfrage_vor_block', `insert into public.community_beitrittsanfragen (community_id, user_id) values ('${PRIV}', auth.uid())`)}
+`)}
+insert into public.blocks (user_id, blocked_user_id) values ('${PRUEFKONTO}', '${TESTKONTO}') on conflict do nothing;
+do $p$ declare n int; begin
+  select count(*) into n from public.community_beitrittsanfragen
+   where community_id = '${PRIV}' and user_id = '${PRUEFKONTO}';
+  ${merke('anfrage_nach_block', 'n')}
+end $p$;
+-- Anfrage als Eigentümer zurücklegen: prüft die Funktion selbst, nicht nur
+-- den Aufräum-Auslöser.
+insert into public.community_beitrittsanfragen (community_id, user_id) values ('${PRIV}', '${PRUEFKONTO}');
+${als(TESTKONTO, `
+  ${weg('annehmen_trotz_block_1', `perform public.beitrittsanfrage_annehmen('${PRIV}', '${PRUEFKONTO}')`)}
+`)}
+-- Richtung 2: der Ersteller blockiert den Fragenden.
+delete from public.blocks where user_id = '${PRUEFKONTO}' and blocked_user_id = '${TESTKONTO}';
+insert into public.blocks (user_id, blocked_user_id) values ('${TESTKONTO}', '${PRUEFKONTO}') on conflict do nothing;
+insert into public.community_beitrittsanfragen (community_id, user_id) values ('${PRIV}', '${PRUEFKONTO}')
+  on conflict do nothing;
+${als(TESTKONTO, `
+  ${weg('annehmen_trotz_block_2', `perform public.beitrittsanfrage_annehmen('${PRIV}', '${PRUEFKONTO}')`)}
+`)}
+do $p$ declare n int; begin
+  select count(*) into n from public.community_members
+   where community_id = '${PRIV}' and user_id = '${PRUEFKONTO}';
+  ${merke('mitglied_trotz_block', 'n')}
+end $p$;
+
 do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p$;
 `;
 
@@ -187,6 +218,13 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('15.1 erneut anfragen: ok', w.neu_anfragen === 'ok', w.neu_anfragen);
   console.log('\nAblehnen');
   pruefe('15.2 Ersteller lehnt ab (1 Zeile gelöscht)', w.ablehnen_zeilen === '1', w.ablehnen_zeilen);
+  console.log('\nAnfrage → Blockierung → Annahme (Codex-Fund 05.11.)');
+  pruefe('Anfrage vor der Blockierung: ok', w.anfrage_vor_block === 'ok', w.anfrage_vor_block);
+  pruefe('Blockierung räumt die offene Anfrage ab', w.anfrage_nach_block === '0', w.anfrage_nach_block);
+  // P0001 = „Diese Anfrage gibt es nicht mehr“ — der Satz, den App und Website zeigen.
+  pruefe('Fragender blockiert Ersteller → Annahme scheitert (P0001)', w.annehmen_trotz_block_1 === 'P0001', w.annehmen_trotz_block_1);
+  pruefe('Ersteller blockiert Fragenden → Annahme scheitert (P0001)', w.annehmen_trotz_block_2 === 'P0001', w.annehmen_trotz_block_2);
+  pruefe('keine Mitgliedschaft trotz Blockierung', w.mitglied_trotz_block === '0', w.mitglied_trotz_block);
 
   console.log(`\n${anzahl - fehler}/${anzahl} Prüfungen bestanden (alles verworfen)`);
   process.exit(fehler ? 1 : 0);
