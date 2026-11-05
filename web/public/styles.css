@@ -531,6 +531,9 @@ ul { margin: 0; padding: 0; list-style: none; }
   text-shadow: 0 1px 2px rgba(0,0,0,.16);
   overflow: hidden;
 }
+/* Kasten 28/7.11: Profilbild bzw. Kontaktbild im Ring, über den Initialen. */
+.story__inner { position: relative; }
+.story__profilbild { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .story__name {
   width: 72px;
   margin: 7px -4px 0;
@@ -575,6 +578,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 .avatar--44 { width: 44px; height: 44px; font-size: 15px; }
 .avatar--40 { width: 40px; height: 40px; font-size: 14px; }
 .avatar--36 { width: 36px; height: 36px; font-size: 13px; }
+/* Kasten 28/7.7: Konto über der Karte eines geteilten Beitrags. */
+.avatar--22 { width: 22px; height: 22px; font-size: 9px; }
 .avatar--88 { width: 88px; height: 88px; font-size: 30px; }
 
 /* ---------- List rows ---------- */
@@ -1611,6 +1616,45 @@ ul { margin: 0; padding: 0; list-style: none; }
 .comment__like.is-on { color: #FF3040; }
 .comment__like.is-on svg { fill: #FF3040; }
 
+/*
+ * Nachtrag 4.3b (11.10.2026): Antworten auf Kommentare. „Antworten" unter
+ * dem Kommentar, Antworten eingerückt (Avatarbreite + Abstand), Klappknopf
+ * „N Antworten ansehen" mit dem Strich davor wie bei Instagram. Ziehen nach
+ * rechts wie die Chatblase (--zug aus antwortenBinden, Pfeil links).
+ */
+.avatar--28 { width: 28px; height: 28px; font-size: 11px; }
+.comment[data-ziehbar] { position: relative; touch-action: pan-y; }
+.sheet__body:has(> .comment) { overflow-x: hidden; }
+.comment[data-ziehbar]::before {
+  content: ''; position: absolute; left: -30px; top: 50%;
+  width: 26px; height: 26px; margin-top: -13px; border-radius: 50%;
+  background: var(--surface-3) center / 15px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666E7D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14 4 9l5-5'/%3E%3Cpath d='M4 9h10a6 6 0 0 1 6 6v5'/%3E%3C/svg%3E");
+  opacity: var(--zug, 0); pointer-events: none;
+}
+.comment--antwort { padding-left: 63px; padding-top: 6px; padding-bottom: 6px; }
+.comment__meta { display: flex; align-items: center; gap: 14px; }
+.comment__antworten {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-weight: 700; color: var(--text-2);
+}
+.comment__antworten:hover { color: var(--text); }
+.comment__klapp {
+  display: flex; align-items: center; gap: 8px;
+  border: 0; background: none; cursor: pointer;
+  padding: 4px 16px 6px 63px;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--text-2);
+}
+.comment__klappStrich { width: 24px; height: 1px; background: var(--text-3); }
+.comment__antwortLeiste {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; background: var(--surface-3);
+  font-size: 12px; color: var(--text-2);
+}
+.comment__antwortLeiste span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment__antwortLeiste button { border: 0; background: none; padding: 0; cursor: pointer; color: var(--text-2); display: flex; }
+.comment__antwortLeiste svg { width: 18px; height: 18px; }
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed;
@@ -2013,6 +2057,8 @@ body:has(.camera) .toast { bottom: 132px; }
 .kp__name { margin-top: 12px; font-size: 21px; font-weight: 700; }
 .kp__handle { font-size: 15px; color: var(--text-3); }
 .kp__nummer { margin-top: 2px; font-size: 15px; color: var(--text-2); }
+/* Kasten 28/7.8: „Foto bearbeiten" unter dem Kontaktbild. */
+.kp__foto { margin-top: 6px; padding: 2px 6px; border: 0; background: none; color: var(--brand); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .kp__aktionen {
   display: grid; grid-template-columns: repeat(4, 1fr);
   padding: 14px 0; margin-bottom: 8px;
@@ -2108,11 +2154,16 @@ body:has(.camera) .toast { bottom: 132px; }
 }
 /* Ein weicher Lichtkranz statt einer harten Kante - der Avatar ist das
    einzige grosse Element auf der Flaeche und darf Gewicht haben. */
+/* Kasten 28/7.11: Profil- bzw. Kontaktbild über den Initialen. */
+.anruf__avatar { position: relative; overflow: hidden; }
+.anruf__bild { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .anruf__avatar { box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 0 6px rgba(255,255,255,.05); }
 .anruf__avatar.is-klingelt { animation: anrufPuls 1.8s ease-in-out infinite; }
 @keyframes anrufPuls { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }
 .anruf__name { margin-top: 12px; font-size: 26px; font-weight: 700; }
 .anruf__status { color: rgba(255,255,255,.65); font-size: 15px; }
+/* Kasten 5.1: sagt offen, dass es (noch) eine Vorschau ist. */
+.anruf__vorschau { margin-top: 8px; max-width: 280px; text-align: center; color: rgba(255,255,255,.45); font-size: 12px; line-height: 1.45; }
 .anruf__eigen {
   position: absolute; right: 16px; top: 110px;
   width: 92px; height: 128px; border-radius: 12px;
@@ -2349,18 +2400,60 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
  * ist ein <button>, weil sie sich oeffnen laesst — vorher war sie ein
  * stummes <div>.
  */
+/*
+ * Kasten 7 (Feedback 28.09.): die Karte eines geteilten Beitrags —
+ * Instagram/WhatsApp-Vorbild. Konto klein oben, Vorschaubild über die volle
+ * Blasenbreite, darunter Titel und Beschreibung. Gleiche Maße in der App
+ * (styles.geteiltKarte in ChatDetailScreen.tsx).
+ */
+.msg--karte { padding: 4px 4px 6px; }
 .msg__geteilt {
-  display: flex; flex-direction: column; gap: 6px;
-  margin: 2px 0 4px; padding: 8px;
-  border: 0; text-align: left; cursor: pointer; font: inherit; color: inherit;
-  border-radius: 12px; background: rgba(0,0,0,.05);
-  /* Ein langer Titel steht einzeilig mit „…" — ohne diese Grenze schob er
-     die Karte über die Blase hinaus und den Verlauf zur Seite (26.09.2026). */
-  max-width: 100%; min-width: 0; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  width: 248px; max-width: 100%; box-sizing: border-box;
+  margin: 0 0 4px; padding: 0;
+  border: 0; text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  border-radius: 14px; overflow: hidden; background: var(--surface);
 }
-[data-theme="dark"] .msg__geteilt { background: rgba(255,255,255,.07); }
-.msg__geteiltZeile { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.msg__geteiltZeile > svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--text-3); }
+.msg__geteiltKopf { display: flex; align-items: center; gap: 8px; padding: 8px 10px; min-width: 0; }
+.msg__geteiltAvatar {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--brand); color: #fff; font-size: 10px; font-weight: 700;
+}
+.msg__geteiltAutor {
+  flex: 1; min-width: 0; font-size: 13px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.msg__geteiltRahmen { position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; background: var(--surface-3); }
+.msg__geteiltGross { display: block; width: 100%; height: 100%; object-fit: cover; }
+.msg__geteiltLeer {
+  display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: var(--text-3);
+}
+.msg__geteiltLeer svg { width: 28px; height: 28px; }
+.msg__geteiltVideo {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.5); color: #fff;
+}
+.msg__geteiltVideo svg { width: 16px; height: 16px; }
+.msg__geteiltWeg {
+  /* Nachtrag 11.10. (7.6): Weg-Karte in Kartenform, nicht als Fehlerzeile. */
+  display: flex; flex-direction: column;
+  width: 248px; max-width: 100%; box-sizing: border-box; margin: 0 0 4px;
+  border-radius: 14px; overflow: hidden; background: var(--surface); color: var(--text);
+}
+.msg__geteiltWegFlaeche {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 26px 16px; background: var(--surface-3); text-align: center; font-size: 13px;
+}
+.msg__geteiltWegFlaeche strong { font-weight: 600; color: var(--text-2); }
+.msg__geteiltWegFlaeche span:not(.msg__geteiltWegSymbol) { color: var(--text-3); }
+.msg__geteiltWegSymbol {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); color: var(--text-3);
+}
+.msg__geteiltWegSymbol svg { width: 22px; height: 22px; }
 
 /*
  * Anhang und Vollformat (Henrik 7.9.). Der Anhang steht in der Blase in
@@ -2441,10 +2534,14 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
   background: rgba(0,0,0,.55); color: #fff;
   font-size: 11px; font-weight: 600;
 }
-.msg__geteiltText { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+.msg__geteiltText { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 8px 10px 10px; font-size: 13px; }
+.msg__geteiltText strong {
+  font-weight: 700;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .msg__geteiltText span {
   color: var(--text-2);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 
 /* ------------------------------------------------ Kontakt per QR-Code */
@@ -2930,6 +3027,10 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
 .kp__gruppenkopf { padding: 16px 16px 6px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
 .kp__zeile.is-gruen .kp__zeileText { color: var(--success); }
 .kp__zeile.is-danger .kp__zeileText { color: var(--danger); }
+/* Kasten 28/7.9: Mitgliederliste in der Gruppeninfo. */
+.gi__mitglied { padding: 10px 16px; cursor: pointer; }
+.gi__mitglied .avatar { flex: none; }
+.gi__mitglied:disabled { cursor: default; opacity: 1; }
 
 /* Markierte Nachricht */
 .msg__stern { display: inline-flex; margin-left: 4px; color: #F5A524; }
@@ -3151,6 +3252,19 @@ button.spende { display: block; width: calc(100% - 32px); text-align: left; colo
   padding: 18px 16px 6px;
 }
 .bearbeiten__bildaktionen { display: flex; gap: 8px; }
+/* Kasten 1.3–1.5: kleine Schrift unter den Feldern, führt in die Einstellungen (Konto). */
+.bearbeiten__weiter {
+  display: block;
+  margin: 6px auto 4px;
+  padding: 6px 8px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+  cursor: pointer;
+}
 
 .farbwahl { display: flex; gap: 9px; flex-wrap: wrap; }
 .farbwahl__punkt {
@@ -4152,7 +4266,53 @@ body.ist-abgemeldet .ptr-indicator {
 
 /* Antwort und Zitat sehen verschieden aus, weil sie verschiedenes sind: die
    Antwort zeigt nur den Bezug, das Zitat nimmt den Text mit. */
-.msg__bezug { display: flex; gap: 8px; margin-bottom: 5px; }
+.msg__bezug {
+  display: flex; gap: 8px; margin-bottom: 5px;
+  /* Kasten 4: antippbar (springt zum Original), abgesetzt wie bei WhatsApp. */
+  width: 100%; box-sizing: border-box; padding: 5px 8px 5px 0;
+  border: 0; border-radius: 8px; overflow: hidden;
+  background: rgba(0,0,0,.05); font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+[data-theme="dark"] .msg__bezug { background: rgba(255,255,255,.07); }
+
+/*
+ * Kasten 4 (Feedback 28.09.): Antworten per Ziehen und per Knopf beim
+ * Überfahren. `touch-action: pan-y` lässt dem Verlauf das senkrechte Rollen
+ * und gibt das waagrechte Ziehen an die Seite. Der Pfeil links neben der
+ * Blase blendet mit dem Weg auf (--zug, 0 bis 1).
+ */
+.msg[data-ziehbar] { touch-action: pan-y; }
+/* Eine gezogene Blase schiebt den Verlauf nicht zur Seite. */
+.messages { overflow-x: hidden; }
+.msg[data-ziehbar]::before {
+  content: ''; position: absolute; left: -38px; top: 50%;
+  width: 28px; height: 28px; margin-top: -14px; border-radius: 50%;
+  background: var(--surface-3) center / 16px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666E7D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14 4 9l5-5'/%3E%3Cpath d='M4 9h10a6 6 0 0 1 6 6v5'/%3E%3C/svg%3E");
+  opacity: var(--zug, 0); pointer-events: none;
+}
+.msg__antworten {
+  position: absolute; top: 50%; margin-top: -15px;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; cursor: pointer; padding: 0;
+  background: var(--surface); color: var(--text-2);
+  box-shadow: 0 1px 3px rgba(12,14,20,.15);
+  opacity: 0; transition: opacity .12s ease;
+}
+.msg--in > .msg__antworten { right: -38px; }
+.msg--out > .msg__antworten { left: -38px; }
+.msg__antworten svg { width: 16px; height: 16px; }
+.msg:hover > .msg__antworten,
+.msg:focus-within > .msg__antworten,
+.msg__antworten:focus-visible { opacity: 1; }
+/* Ohne Maus gibt es kein Überfahren — dort zieht man. */
+@media (hover: none) { .msg__antworten { display: none; } }
+.msg.is-hervor { animation: msgHervor 1.4s ease; }
+@keyframes msgHervor {
+  0%, 60% { box-shadow: 0 0 0 2px var(--brand); }
+  100% { box-shadow: none; }
+}
 .msg__bezugBalken { width: 3px; border-radius: 2px; background: var(--brand); }
 .msg__bezugText { display: flex; flex-direction: column; min-width: 0; }
 .msg__bezugText b { font-size: 10.5px; color: var(--brand); }
@@ -4416,6 +4576,8 @@ body.ist-abgemeldet .ptr-indicator {
 .ptt__knopf.is-rec { background: var(--danger); }
 .ptt__knopf svg { width: 19px; height: 19px; }
 .ptt__hinweis { font-size: 10.5px; color: var(--text-3); }
+/* Kasten 8.2: im Unterthema direkt ueber der Eingabezeile. */
+.ptt--kanal { padding: 8px 16px; border-top: 1px solid var(--border); }
 .ptt__liste { width: 100%; display: flex; flex-direction: column; gap: 4px; }
 .ptt__zeile {
   display: flex;
@@ -4438,6 +4600,21 @@ body.ist-abgemeldet .ptr-indicator {
 .live__leer { margin: 8px 0; font-size: 12.5px; color: #6B7280; }
 .live__kommentar { margin: 3px 0; font-size: 12.5px; color: #D6D9E0; }
 .live__kommentar b { color: var(--brand-2); }
+/* Nachtrag 4.3c: Antworten in der Live-Spalte — Zitat, Ziehen, Knopf beim Überfahren. */
+.live__zitat {
+  display: block; font-size: 11px; line-height: 1.3; color: #9CA3AF;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.live__kommentar[data-ziehbar] { position: relative; touch-action: pan-y; }
+.live__antworten {
+  margin-left: 8px; border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 700; color: #9CA3AF;
+  opacity: 0; transition: opacity .12s ease;
+}
+.live__kommentar:hover .live__antworten,
+.live__antworten:focus-visible { opacity: 1; }
+@media (hover: none) { .live__antworten { display: none; } }
+.live__bezug { margin: 6px 0 0; border-radius: 10px; }
 
 .live__eingabe { display: flex; align-items: center; gap: 8px; padding: 8px 16px 0; }
 .live__eingabe input {
@@ -5004,3 +5181,229 @@ body.ist-abgemeldet .ptr-indicator {
   font: inherit; font-weight: 700; color: var(--text-2);
 }
 .comment__antworten:hover { color: var(--text); }
+/* ---------------------------------------------------------------------------
+   Kasten 1.3 (Nachtrag 10.10.2026): Seite „Profil bearbeiten“, Pronomen und
+   Links im Profilkopf. Gegenstück: ProfilBearbeitenScreen.tsx, ProfilAngaben.tsx.
+   --------------------------------------------------------------------------- */
+.prof__pronomen { margin-left: 8px; font-size: 12.5px; font-weight: 400; color: var(--text-2); }
+.prof__links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 4px; }
+.prof__links .prof__link { margin-top: 0; font-weight: 600; }
+.prof__weitere { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; color: var(--text-2); cursor: pointer; }
+.prof__weitere:hover { text-decoration: underline; }
+.mprof__profillinks { padding: 0 16px 12px; }
+
+.avatar--96 { width: 96px; height: 96px; font-size: 32px; }
+.profilseite { background: var(--surface); }
+.profilseite__kopf {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr minmax(80px, auto);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.profilseite__kopf > :last-child { justify-self: end; }
+.profilseite__titel { margin: 0; text-align: center; font-size: 16px; font-weight: 600; }
+.profilseite__textknopf { background: none; border: 0; padding: 6px 4px; font: inherit; font-size: 15px; color: var(--text); cursor: pointer; }
+.profilseite__textknopf.is-fertig { color: var(--brand); font-weight: 700; }
+.profilseite__textknopf:disabled { opacity: .5; cursor: default; }
+.profilseite__bild { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 16px; }
+.profilseite__bildknopf { background: none; border: 0; padding: 4px 8px; font: inherit; font-size: 15px; font-weight: 600; color: var(--brand); cursor: pointer; }
+.profilseite__meldung { font-size: 12.5px; color: var(--text-2); text-align: center; }
+.profilseite__liste { border-top: 1px solid var(--border); }
+.profilseite__zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.profilseite__label { flex: 0 0 120px; font-size: 15px; }
+.profilseite__wert { flex: 1; min-width: 0; text-align: right; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profilseite__wert.is-leer { color: var(--text-3); }
+.profilseite__feld { display: flex; flex-direction: column; gap: 8px; padding: 16px; max-width: 640px; }
+.profilseite__eingabezeile { display: flex; align-items: center; gap: 4px; }
+.profilseite__at { font-size: 18px; color: var(--text-2); }
+.profilseite__gross { font-size: 18px; padding: 12px 14px; }
+textarea.profilseite__gross { min-height: 160px; }
+.profilseite__namensstand { font-size: 12.5px; color: var(--text-2); }
+.profilseite__namensstand.is-gut { color: var(--success); }
+.profilseite__namensstand.is-fehler { color: var(--danger); }
+.profilseite__fehler { font-size: 13px; font-weight: 600; color: var(--danger); }
+.profilseite__erklaerung { font-size: 12.5px; color: var(--text-2); }
+.profilseite__linkkarte { display: flex; flex-direction: column; gap: 6px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 12px; }
+.profilseite__linkkopf { display: flex; align-items: center; justify-content: space-between; }
+.profilseite__linkkopf .feld__label { margin: 0; }
+.profilseite__linkkopf .iconbtn { color: var(--danger); }
+.profilseite__linkneu { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: none; border: 0; padding: 8px 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--brand); cursor: pointer; }
+.profilseite__linkneu svg { width: 20px; height: 20px; }
+/* ---------------------------------------------------------------------------
+ * Kasten 28/6.3: GIF | Sticker hinter dem Knopf rechts im Eingabefeld.
+ * Gleiches Blatt in der App: app/components/GifStickerSheet.tsx.
+ * ------------------------------------------------------------------------- */
+.gifsticker__reiter {
+  display: flex;
+  margin: 0 16px 12px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.gifsticker__reiter button {
+  flex: 1;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gifsticker__reiter button.is-an { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.gifsticker__gif {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 24px 32px;
+  text-align: center;
+}
+.gifsticker__gif p { margin: 0; color: var(--text-2); }
+.gifsticker__symbol {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #8E44AD;
+  color: #fff;
+}
+.gifsticker__symbol svg { width: 30px; height: 30px; }
+
+/* ---------------------------------------------------------------------------
+ * Kasten 28/6.2: Anhang-Blatt als Raster runder Symbole (WhatsApp-Vorbild).
+ * Gleiche Farben in app/components/AnhangSheet.tsx.
+ * ------------------------------------------------------------------------- */
+.anhangraster {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px 12px 16px;
+}
+.anhangraster__kachel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.anhangraster__kachel:hover,
+.anhangraster__kachel:focus-visible { background: var(--surface-2); }
+.anhangraster__kreis {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+}
+.anhangraster__kreis svg { width: 26px; height: 26px; }
+.anhangraster__text { font-size: 13px; font-weight: 500; text-align: center; line-height: 1.25; }
+
+/* ---------------------------------------------------------------------------
+ * Kasten 28/6.5: Standort senden — Suche + Karte mit fester Nadel.
+ * Gleiches Blatt in der App: app/components/StandortWahl.tsx.
+ * ------------------------------------------------------------------------- */
+.ortwahl { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 16px; }
+.ortwahl__suche { display: flex; gap: 8px; }
+.ortwahl__suche input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface-3, var(--surface-2));
+  color: var(--text);
+  font: inherit;
+}
+.ortwahl__treffer { max-height: 220px; overflow-y: auto; border-radius: 12px; background: var(--surface-2); }
+.ortwahl__zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ortwahl__zeile:hover { background: var(--surface-3, rgba(0,0,0,.04)); }
+.ortwahl__punkt { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: #1FA855; color: #fff; }
+.ortwahl__punkt svg { width: 18px; height: 18px; }
+.ortwahl__text { display: flex; flex-direction: column; min-width: 0; }
+.ortwahl__text span { color: var(--text-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ortwahl__leer { padding: 12px; color: var(--text-2); }
+.ortwahl__karte { position: relative; height: 300px; border-radius: 16px; overflow: hidden; }
+.ortwahl__karte > div { width: 100%; height: 100%; }
+.ortwahl__nadel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 500;
+  transform: translate(-50%, -100%);
+  color: #E5484D;
+  pointer-events: none;
+}
+.ortwahl__nadel svg { width: 40px; height: 40px; fill: #E5484D; stroke: #fff; }
+.ortwahl__quelle { font-size: 11px; color: var(--text-3); text-align: center; }
+.ortwahl__adresse { color: var(--text); }
+.ortwahl__senden {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: #1FA855;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ortwahl__senden svg { width: 16px; height: 16px; }
+.ortwahl__senden:disabled { opacity: .6; cursor: default; }
+/* Kasten 8.5/8.6: Zeile „Push to Talk" im Unterthema und der Verlauf dahinter. */
+.msg__ptt {
+  align-self: center; display: inline-flex; align-items: center; gap: 6px; margin: 6px auto;
+  padding: 7px 14px; border-radius: 999px; background: var(--surface-3); color: var(--text);
+  font-size: 13px; font-weight: 600; border: 0; cursor: pointer;
+}
+.msg__ptt svg { width: 15px; height: 15px; }
+.msg__ptt svg:first-child { color: var(--brand); }
+.msg__ptt svg:last-child { color: var(--text-3); width: 13px; height: 13px; }
+.pttverlauf__kopf { text-align: center; font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
+.pttverlauf__zeile { flex-wrap: wrap; }
+.pttverlauf__zeile audio { width: 100%; max-width: 260px; height: 34px; }
+
+/* Nachtrag 4.3 (12.10.2026): der Kommentar aus einer Mitteilung leuchtet kurz auf. */
+.comment { transition: background-color .6s ease; }
+.comment--markiert { background: var(--surface-3); border-radius: 12px; }

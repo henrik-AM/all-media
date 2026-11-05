@@ -20,7 +20,7 @@ import { profilOeffnerSetzen } from './lib/markierung';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenBereich, TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
-import { ladeEinstellungen } from './lib/daten';
+import { kommentarOrt, ladeEinstellungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
 import { KontoFreigabe } from './components/KontoFreigabe';
 import { NeueBedingungen } from './components/NeueBedingungen';
@@ -38,6 +38,7 @@ import { ChatListScreen } from './screens/messenger/ChatListScreen';
 import { ChatDetailScreen } from './screens/messenger/ChatDetailScreen';
 import { ContactsScreen } from './screens/messenger/ContactsScreen';
 import { ContactProfileScreen } from './screens/messenger/ContactProfileScreen';
+import { GroupSettingsScreen } from './screens/messenger/GroupSettingsScreen';
 import { FriendMapScreen } from './screens/messenger/FriendMapScreen';
 import { EditSelectedContactsScreen } from './screens/messenger/EditSelectedContactsScreen';
 import { AvatarViewerScreen } from './screens/AvatarViewerScreen';
@@ -60,14 +61,16 @@ import { ExplorerScreen, ExplorerZiel } from './screens/videos/ExplorerScreen';
 import { LivestreamScreen } from './screens/videos/LivestreamScreen';
 import { ProfilTab, VideoProfileScreen } from './screens/videos/VideoProfileScreen';
 import * as Rueckkehr from './lib/rueckkehr';
-import { ProfilbildKopf, ProfilbildSheet } from './components/ProfilbildWahl';
+import { ProfilbildKopf, ProfilbildSheet, WeitereEinstellungenHinweis } from './components/ProfilbildWahl';
 import { VideoSearchScreen } from './screens/videos/VideoSearchScreen';
 import { HomeFeedScreen } from './screens/home/HomeFeedScreen';
 import { SettingsScreen } from './screens/profile/SettingsScreen';
+import { ProfilBearbeitenScreen } from './screens/profile/ProfilBearbeitenScreen';
 import { UserProfileScreen } from './screens/profile/UserProfileScreen';
 import { FollowersScreen } from './screens/profile/FollowersScreen';
 import { FollowingScreen } from './screens/profile/FollowingScreen';
 import { colors, themenStyles } from './constants/design';
+import { KontaktBildBereich } from './contexts/KontaktBildContext';
 import { useDaten } from './contexts/DatenContext';
 import { Chat, Community, Contact, Message, MitteilungsBereich, MitteilungsZiel, Post, Story, Unterthema, Video } from './types';
 // UMD wie in ExplorerScreen: die Prüfläufe laden App-Code als blob:-Modul.
@@ -98,7 +101,16 @@ type Overlay =
    * Kontaktprofil (Nummer, Medien, Blockieren), sonst das oeffentliche
    * Profil mit Beitraegen.
    */
-  | { kind: 'profile'; userId: string; variant: 'kontakt' | 'oeffentlich'; versatz?: number }
+  | {
+      kind: 'profile';
+      userId: string;
+      variant: 'kontakt' | 'oeffentlich';
+      versatz?: number;
+      /** Kasten 28/7.9: aus der Gruppeninfo geöffnet — Zurück führt dorthin. */
+      zurueck?: Overlay;
+    }
+  /** Kasten 28/7.9: Gruppeninfo mit Mitgliederliste; Zurück führt in den Chat. */
+  | { kind: 'gruppe'; chat: Chat; zurueck?: Overlay }
   | { kind: 'contacts' }
   /**
    * `zielChat` gesetzt heißt: die Kamera kam aus einem Chat. Dann steht das
@@ -115,12 +127,21 @@ type Overlay =
       zielStory?: boolean;
       zielBeitrag?: 'post' | 'reels' | 'landscape';
     }
-  | { kind: 'call'; userId?: string; gruppenName?: string; teilnehmer?: string[]; art: 'audio' | 'video' }
+  | {
+      kind: 'call';
+      userId?: string;
+      gruppenName?: string;
+      teilnehmer?: string[];
+      art: 'audio' | 'video';
+      /** Kasten 5.2: der Chat bzw. das Unterthema, in dem der Anruf vermerkt wird. */
+      chatId?: string;
+      kanalId?: string;
+    }
   | { kind: 'livestream' }
   /* Die offenen Insights einer Person ansehen — Handbuch-Abgleich 01.09.2026. */
   | { kind: 'insights'; userId: string }
   | { kind: 'explorer'; ziel: ExplorerZiel }
-  | { kind: 'clip'; clipId: string }
+  | { kind: 'clip'; clipId: string; kommentar?: string }
   /**
    * Die Seite einer Community — Prototyp-Frame "CH + Kanal". Vorher fuehrte
    * eine Community direkt in einen Gruppenchat; die Seite dazwischen gab es
@@ -137,6 +158,8 @@ type Overlay =
   | { kind: 'avatarViewer'; userId: string; name: string }
   | { kind: 'followers'; userId: string }
   | { kind: 'following'; userId: string }
+  /** Kasten 1.3 (Nachtrag 10.10.2026): die Seite „Profil bearbeiten“. */
+  | { kind: 'profilBearbeiten' }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -151,6 +174,8 @@ interface Formular {
   absenden: (werte: Record<string, string>) => string | null | Promise<string | null>;
   /** Was über den Feldern steht (Profilbild in „Profil bearbeiten"). */
   kopf?: React.ReactNode;
+  /** Was unter den Feldern steht (Hinweis auf die Einstellungen, Kasten 1.3). */
+  unten?: React.ReactNode;
 }
 
 const now = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -284,6 +309,9 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * sobald er dort ist; sonst spraenge er bei jedem Neubau zurueck.
    */
   const [startBeitrag, setStartBeitrag] = useState<string | null>(null);
+  // Nachtrag 4.3: Kommentar aus einer Mitteilung — das Blatt öffnet sich dort.
+  const [startKommentar, setStartKommentar] = useState<{ beitrag: string; kommentar: string } | null>(null);
+  const { supabase: sbClient } = useSupabase();
   /** Aufnahme aus der Kamera, die auf die Wahl eines Chats wartet. */
   const [aufnahmeFuerChat, setAufnahmeFuerChat] = useState<string | null>(null);
   /*
@@ -1341,10 +1369,31 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Website macht es seit laengerem so (`openProfilBearbeiten`).
    */
   const profilBearbeiten = () => {
+    /*
+     * Kasten 1.3–1.5 (Feedback 28.09.2026): „Erstelle noch so ne kleine
+     * Schrift wie ‚weitere Bearbeitungen unter Einstellungen'. Wenn man da
+     * drauf drückt, kommt man in die Einstellungen … Füge diese Aktion auch
+     * unter Videos und Messenger hinzu." Das Blatt ist für alle drei Profile
+     * dasselbe, also steht der Hinweis in allen dreien. Ziel ist der
+     * vorhandene Abschnitt „Konto" (dort „Profil bearbeiten", Telefonnummer,
+     * Passwort …); der Zurück-Pfeil führt wieder ins Profil, aus dem man kam.
+     * Gleicher Text und gleiches Ziel auf der Website (openProfilBearbeiten).
+     */
+    /*
+     * Nachtrag 10.10.2026: der Hinweis führt nicht mehr in den Abschnitt
+     * Konto, sondern direkt auf die große Seite „Profil bearbeiten“ (dort
+     * führt auch Einstellungen → Konto → „Profil bearbeiten“ hin). Der
+     * Zurück-Pfeil der Seite führt wieder ins Profil, aus dem man kam.
+     */
+    const zuDenEinstellungen = () => {
+      setFormular(null);
+      setOverlay({ kind: 'profilBearbeiten' });
+    };
     setFormular({
       title: 'Profil bearbeiten',
       // Kasten 12.5: das Profilbild gehört mit hierher.
       kopf: <ProfilbildKopf name={profil.eigenesProfil.name} onNotice={setNotice} />,
+      unten: <WeitereEinstellungenHinweis onPress={zuDenEinstellungen} />,
       felder: [
         { key: 'name', label: 'Name', pflicht: true },
         { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
@@ -1431,9 +1480,32 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       if (!story) return setNotice('Diese Story ist nicht mehr online');
       return setOverlay({ kind: 'story', story, liste: [story] });
     }
+    /*
+     * Kasten 8.3: „Push to Talk beitreten?" führt ins Unterthema, in dem
+     * gesprochen wird — dort sitzt der Knopf (8.2).
+     */
+    if (ziel.art === 'channel') {
+      const com = daten.communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === ziel.id));
+      const ut = com?.unterthemen?.find((u) => u.id === ziel.id);
+      return com && ut ? oeffneUnterthema(com, ut) : setNotice('Dieses Unterthema gibt es nicht mehr');
+    }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);
-      return community ? openCommunity(community) : setNotice('Diesen Kanal gibt es nicht mehr');
+      return community ? openCommunity(community) : setNotice('Diese Community gibt es nicht mehr');
+    }
+    /*
+     * Kommentar (Antwort, Herz daran, @ darin): die Mitteilung kennt nur den
+     * Kommentar. Bis zum 12.10.2026 ging es deshalb nur in den Feed. Jetzt:
+     * Beitrag nachsehen, dort hin, Kommentarblatt beim Kommentar. Gleich auf
+     * der Website (mitteilungOeffnen, 'comment').
+     */
+    if (ziel.art === 'comment' && sbClient) {
+      return void kommentarOrt(sbClient, ziel.id).then((ort) => {
+        if (!ort) return setNotice('Diesen Kommentar gibt es nicht mehr');
+        if (ort.kind === 'clip') return setOverlay({ kind: 'clip', clipId: ort.beitragId, kommentar: ziel.id });
+        eintragOeffnen(ort.kind === 'reel' ? 'reel' : 'beitrag', ort.beitragId);
+        setStartKommentar({ beitrag: ort.beitragId, kommentar: ziel.id });
+      });
     }
     setArea('videos');
     setSubs((prev) => ({ ...prev, videos: ziel.art === 'post' || ziel.art === 'comment' ? 'home' : 'portrait' }));
@@ -1576,10 +1648,11 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
     if (punkt === 'kanal') {
       return setFormular({
-        title: 'Neuen Kanal erstellen',
+        // Kasten 2.2: angelegt wird eine Community, kein Kanal darin.
+        title: 'Neue Community erstellen',
         knopf: 'Erstellen',
         felder: [
-          { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
+          { key: 'name', label: 'Name der Community', platzhalter: 'z. B. Fotografie', pflicht: true },
           { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
         ],
         absenden: ({ name, thema }) => {
@@ -1774,21 +1847,32 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           // vom App-Start.
           void daten.chatsNeuLaden();
         }}
-        onCall={(art) =>
+        onCall={(art) => {
+          /*
+           * Kasten 5.2: der Anruf steht in GENAU diesem Chat — auch im
+           * Community-Zweierchat (vorher landete er im Messenger-Chat mit
+           * derselben Person) und im Unterthema (vorher gar nicht).
+           */
+          const kanal = daten.communities.some((c) =>
+            (c.unterthemen ?? []).some((u) => u.id === overlay.chat.id)
+          );
+          const ort = kanal ? { kanalId: overlay.chat.id } : { chatId: overlay.chat.id };
           setOverlay(
-            overlay.chat.userId
-              ? { kind: 'call', userId: overlay.chat.userId, art }
+            overlay.chat.userId && !overlay.chat.isGroup
+              ? { kind: 'call', userId: overlay.chat.userId, art, ...ort }
               : {
                   kind: 'call',
                   gruppenName: overlay.chat.name,
                   teilnehmer: overlay.chat.memberIds ?? [],
                   art,
+                  ...ort,
                 }
-          )
-        }
+          );
+        }}
         onCamera={() => setOverlay({ kind: 'camera', zielChat: overlay.chat })}
         onOpenProfile={openProfile}
-        onOpenGroupSettings={(chatId) => setNotice(`Gruppeneinstellungen: ${overlay.chat.name}`)}
+        // Kasten 28/7.9: echte Gruppeninfo statt des Hinweises „Gruppeneinstellungen: X“.
+        onOpenGroupSettings={() => setOverlay({ kind: 'gruppe', chat: overlay.chat, zurueck: overlay })}
         onAnfrageEntscheiden={anfrageEntscheiden}
         messengerAnfrageMoeglich={
           !overlay.chat.isGroup &&
@@ -1828,10 +1912,40 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         }}
         contacts={contacts}
         onNotice={setNotice}
+        // Kasten 7.3: geteilte Karte → der Beitrag selbst.
+        onOpenBeitrag={(b) => kachelOeffnen(b)}
         onOpenStandort={(name) => {
           const platz = daten.places.find((p) => p.name === name);
           if (platz) setOverlay({ kind: 'explorer', ziel: { art: 'standort', wert: platz.id } });
         }}
+      />
+    );
+  }
+
+  if (overlay?.kind === 'gruppe') {
+    const g = overlay.chat;
+    return (
+      <GroupSettingsScreen
+        chat={g}
+        onBack={() => setOverlay(overlay.zurueck ?? { kind: 'chat', chat: g })}
+        onCall={(art) => {
+          const kanal = daten.communities.some((c) => (c.unterthemen ?? []).some((u) => u.id === g.id));
+          setOverlay({
+            kind: 'call',
+            gruppenName: g.name,
+            teilnehmer: g.memberIds ?? [],
+            art,
+            ...(kanal ? { kanalId: g.id } : { chatId: g.id }),
+          });
+        }}
+        onOpenMitglied={(userId, ziel) =>
+          setOverlay({ kind: 'profile', userId, variant: ziel, zurueck: overlay })
+        }
+        onVerlassen={() => {
+          setChats((prev) => prev.filter((c) => c.id !== g.id));
+          setOverlay(null);
+        }}
+        onNotice={setNotice}
       />
     );
   }
@@ -1841,7 +1955,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       return (
         <ContactProfileScreen
           userId={overlay.userId}
-          onBack={() => setOverlay(null)}
+          onBack={() => setOverlay(overlay.zurueck ?? null)}
           onMessage={openChatWith}
           onCall={(id, art) => setOverlay({ kind: 'call', userId: id, art })}
           chat={chats.find((c) => !c.isGroup && c.userId === overlay.userId)}
@@ -1857,7 +1971,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     return (
       <UserProfileScreen
         userId={overlay.userId}
-        onBack={() => setOverlay(null)}
+        onBack={() => setOverlay(overlay.zurueck ?? null)}
         onMessage={openChatWith}
         onAvatarPress={() => {
           const person = daten.users[overlay.userId];
@@ -1966,6 +2080,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         userId={overlay.userId}
         gruppenName={overlay.gruppenName}
         teilnehmer={overlay.teilnehmer}
+        chatId={overlay.chatId}
+        kanalId={overlay.kanalId}
         art={overlay.art}
         onClose={() => setOverlay(null)}
         onNotice={setNotice}
@@ -2031,6 +2147,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <>
       <ClipPlayerScreen
         clipId={overlay.clipId}
+        kommentar={overlay.kommentar ?? null}
         onBack={() => setOverlay(null)}
         onOpenProfile={openPublicProfile}
         onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
@@ -2161,6 +2278,10 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     );
   }
 
+  if (overlay?.kind === 'profilBearbeiten') {
+    return <ProfilBearbeitenScreen onBack={() => setOverlay(null)} onNotice={setNotice} />;
+  }
+
   if (overlay?.kind === 'avatarViewer') {
     return (
       <AvatarViewerScreen
@@ -2258,6 +2379,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             onShare={teileVideo}
             startBei={startBeitrag}
             onStartErreicht={() => setStartBeitrag(null)}
+            startKommentar={startKommentar}
             onNotice={setNotice}
             onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
           />
@@ -2309,6 +2431,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           onShare={teileBeitrag}
           startBei={startBeitrag}
           onStartErreicht={() => setStartBeitrag(null)}
+          startKommentar={startKommentar}
           onNotice={setNotice}
           onOpenExplorer={(ziel) => setOverlay({ kind: 'explorer', ziel })}
         />
@@ -2338,6 +2461,16 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         return (
           <CommunityProfileScreen
             onSwitchArea={switchArea}
+            /*
+             * Kasten 1.1 (28.09.2026): „Profil wechseln" bleibt unter
+             * Communitys — dieselbe Lösung wie Kasten 12.4 im Video-Profil.
+             * Vorher führte die Leiste über onSwitchArea in den Messenger.
+             */
+            onSwitchAccount={() => {
+              Rueckkehr.merken(user?.id, 'communities', 'profile');
+              setSheet('konto');
+            }}
+            onProfilbild={() => setProfilbildWahl(true)}
             onOpenCommunity={openCommunity}
             onAction={profilAktion}
             onBearbeiten={profilBearbeiten}
@@ -2359,6 +2492,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             }}
         sprung={settingsSprung}
         onSprungFertig={() => setSettingsSprung(null)}
+        // Kasten 1.3 (Nachtrag): Konto → „Profil bearbeiten“ ist die große Seite.
+        onProfilBearbeiten={() => setOverlay({ kind: 'profilBearbeiten' })}
         pruefSicht={pruefSicht}
         pruefListe={pruefListe}
         // „Mein Verlauf" (Kasten 10.1): Antippen fuehrt zum Beitrag, wie
@@ -2520,7 +2655,9 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             // Die Kontaktinfo ist die Chat-Einstellung — dort stehen
             // Benachrichtigungen, Sperre und Chat leeren.
             if (chat.userId) return openProfile(chat.userId);
-            return setNotice('Für Gruppen gibt es die Einstellungen noch nicht');
+            // Kasten 28/7.9: Gruppen haben jetzt ihre Gruppeninfo.
+            if (chat.isGroup) return setOverlay({ kind: 'gruppe', chat });
+            return setNotice('Für diesen Chat gibt es keine Einstellungen');
           }
           if (key === 'loeschen') return chatLoeschen(chat);
           if (key === 'messenger') return void messengerAnfragen(chat);
@@ -2597,6 +2734,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           onSubmit={formular.absenden}
           onNotice={setNotice}
           kopf={formular.kopf}
+          unten={formular.unten}
         />
       )}
       <ProfilbildSheet visible={profilbildWahl} onClose={() => setProfilbildWahl(false)} onNotice={setNotice} />
@@ -2609,7 +2747,35 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Kasten 11.1: die Storylisten gehen als Kontext an jedes Profilbild
    * (StoryAvatar) — ein Ring, eine Quelle, statt jeder Bildschirm für sich.
    */
-  return <StoryContext.Provider value={storyWert}>{inhalt}</StoryContext.Provider>;
+  /*
+   * Kasten 28/7.8: gehört die offene Ansicht zum Messenger? Nur dort zeigt
+   * jeder Avatar mein eigenes Kontaktbild (KontaktBildBereich). Ein Chat
+   * zählt, wenn er weder unter Communitys → Chats steht noch eine Community
+   * oder ein Unterthema ist; das Kontaktprofil (variant 'kontakt') zählt,
+   * das öffentliche Profil (Videos) nicht. Übrige Vollbilder nur, wenn sie
+   * aus dem Messenger kommen (Kontakte, Anruf, Story, Insights).
+   */
+  const imMessenger = (() => {
+    // Kasten 28/7.9: die Gruppeninfo gehört dorthin, wo ihr Chat hingehört.
+    if (overlay?.kind === 'chat' || overlay?.kind === 'gruppe') {
+      const id = overlay.chat.id;
+      return !(
+        daten.communityChats.some((c) => c.id === id) ||
+        daten.communities.some((c) => c.id === id || (c.unterthemen ?? []).some((u) => u.id === id))
+      );
+    }
+    if (overlay?.kind === 'profile') return overlay.variant === 'kontakt';
+    if (overlay) {
+      return area === 'messenger' && ['contacts', 'call', 'story', 'insights', 'editSelectedContacts'].includes(overlay.kind);
+    }
+    return area === 'messenger';
+  })();
+
+  return (
+    <StoryContext.Provider value={storyWert}>
+      <KontaktBildBereich.Provider value={imMessenger}>{inhalt}</KontaktBildBereich.Provider>
+    </StoryContext.Provider>
+  );
 };
 
 const Root = () => {

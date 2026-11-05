@@ -51,7 +51,12 @@ export interface Message {
   media?: MediaType;
   read?: boolean;
   /** Weitergeleiteter Beitrag oder weitergeleitetes Video. */
-  geteilt?: { art: 'post' | 'video'; id: string; titel: string; autor: string; bild?: string };
+  /*
+   * Ein geteilter Beitrag (Kasten 7, 28.09.): Bild, Name (`titel` =
+   * posts.title, kann leer sein), Beschreibung, Konto. `weg` heisst: die
+   * Leseregel gibt ihn nicht (mehr) heraus — die Karte sagt das.
+   */
+  geteilt?: import('../../gemeinsam/chatblase').GeteilteKarte;
   /** Anhang aus dem Plus in der Nachrichtenzeile. */
   bildUri?: string;
   /**
@@ -63,7 +68,8 @@ export interface Message {
    * Geraet liegt — beim naechsten Laden kommt derselbe Anhang hierueber.
    */
   mediaUrl?: string;
-  standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number };
+  /** lat/lng nur bei frei gewählten Orten (Kasten 28/6.5, gemeinsam/ortsuche.js). */
+  standort?: { name: string; adresse?: string; koordinaten?: string; x?: number; y?: number; lat?: number; lng?: number };
   kontakt?: { id: string; name: string; handle: string };
   /** Story-Anhang (fixiert - nur horizontal swipeable). */
   story?: { id: string; userId: string; mediaUri?: string; mediaType?: 'image' | 'video' };
@@ -99,7 +105,20 @@ export interface Message {
    * Zeile ist keine Nachricht, sondern die Notiz „Videoanruf · 02:14". Der
    * Text bleibt leer; was dasteht, entscheidet die Anzeige.
    */
-  anruf?: { art: 'audio' | 'video'; status: 'beendet' | 'verpasst' | 'abgelehnt'; dauer: number };
+  /*
+   * Kasten 5 (Schema 89): `gestartet` — beim Start vermerkt, Dauer 0. Seit
+   * es den Zustand gibt, steht der Eintrag auch in Gruppen, Community-Chats
+   * und Unterthemen.
+   */
+  anruf?: { art: 'audio' | 'video'; status: 'gestartet' | 'beendet' | 'verpasst' | 'abgelehnt'; dauer: number };
+  /**
+   * Kasten 8.5 (Schema 90): diese Zeile im Unterthema ist der Beginn einer
+   * Push-to-Talk-Sitzung — „Push to Talk" mit Datum und Uhrzeit. Ihre id ist
+   * die Sitzung; antippen zeigt den Verlauf (ptt_messages.sitzung_id).
+   */
+  pttSitzung?: boolean;
+  /** Zeitpunkt der Zeile (ISO) — fuer „Datum und Uhrzeit" der Sitzung. */
+  zeitpunkt?: string;
 }
 
 /**
@@ -223,6 +242,10 @@ export interface Profile {
   userId: string;
   bio: string;
   link: string;
+  /** Kasten 1.3 (Schema 88): klein neben dem Namen. Leer, solange Schema 88 fehlt. */
+  pronomen?: string;
+  /** Kasten 1.3 (Schema 88): bis zu fünf Links; ohne Schema 88 nur der alte Einzellink. */
+  links?: { url: string; titel: string }[];
   posts: number;
   followers: number;
   following: number;
@@ -241,6 +264,13 @@ export interface Comment {
   time: string;
   likes: number;
   liked: boolean;
+  /**
+   * Nachtrag 4.3b (11.10.2026): die Wurzel, an der diese Antwort hängt
+   * (`comments.reply_to`, Schema 92). Leer = Kommentar oben.
+   */
+  antwortAuf?: string | null;
+  /** Der Kommentar, an den sich die Antwort richtet (`antwort_an`). */
+  antwortAn?: string | null;
 }
 
 export interface Post {
@@ -334,6 +364,11 @@ export interface Community {
    * `visibility === 'private'` und zeigte damit etwas voellig anderes an.
    */
   stumm?: boolean;
+  /**
+   * Kasten 8.4 (Schema 90): „Push to Talk beitreten?" fuer diese Community
+   * bekommen — community_members.ptt_benachrichtigung, Vorgabe aus.
+   */
+  pttBenachrichtigung?: boolean;
   unterthemen?: Unterthema[];
 }
 
@@ -519,7 +554,9 @@ export type MitteilungArt =
    * Eingangsbestätigung, Entscheidung, Begründung, Widerspruch. Der Satz
    * steht fertig in `notifications.text`.
    */
-  | 'system';
+  | 'system'
+  /** Kasten 8.3: „Push to Talk beitreten?" — Schema 90. */
+  | 'ptt';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
@@ -527,7 +564,8 @@ export interface MitteilungsZiel {
   /** 'story' seit Kasten 11.6: Markierung in einer Story. */
   /** 'comment': Herz an einem Kommentar (Schema 49), @ im Kommentar (Kasten 25). */
   /** 'meldung': eine Rechtsmitteilung zu einer Meldung (Kasten RS 3, Schema 102). */
-  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung';
+  /** 'channel': ein Unterthema (Kasten 8.3, Schema 90). */
+  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung' | 'channel';
   id: string;
 }
 

@@ -4,10 +4,13 @@ import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
+import { NameMitPronomen, ProfilLinks } from '../../components/ProfilAngaben';
 import { StoryAvatar } from '../../components/StoryAvatar';
 import { EinstellungSheet, ListenZeile } from '../../components/EinstellungSheet';
 import { FormularSheet } from '../../components/FormularSheet';
 import { SheetRahmen } from '../../components/SheetRahmen';
+import { ActionSheet } from '../../components/ActionSheet';
+import { fotoHochladen } from '../../lib/profilbild';
 import { useProfil } from '../../contexts/ProfilContext';
 import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
@@ -20,6 +23,7 @@ import { Chat, Message } from '../../types';
 import { MeldenSheet } from '../../components/MeldenSheet';
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
+const Kontaktbild = require('../../../gemeinsam/kontaktbild') as typeof import('../../../gemeinsam/kontaktbild');
 
 interface Props {
   userId: string;
@@ -82,6 +86,7 @@ export const ContactProfileScreen = ({
     contacts: alleKontakte,
     ichId,
     neuLaden,
+    kontaktBilder,
   } = useDaten();
   const aktionen = useAktionen(onNotice);
   const kontakt = alleKontakte.find((k) => k.id === userId);
@@ -110,6 +115,31 @@ export const ContactProfileScreen = ({
   const [geladen, setGeladen] = useState<Message[]>([]);
 
   const [offen, setOffen] = useState<Offen>(null);
+  /* Kasten 28/7.8: „Foto bearbeiten" — eigenes Kontaktbild, nur für mich. */
+  const [fotoWahl, setFotoWahl] = useState(false);
+  const [fotoLaedt, setFotoLaedt] = useState(false);
+  const eigenesFoto = Boolean(kontaktBilder[userId]);
+  const fotoAendern = async (quelle: 'galerie' | 'kamera' | 'entfernen') => {
+    if (!supabase || !ichId) return onNotice('Dafür musst du angemeldet sein');
+    setFotoLaedt(true);
+    try {
+      if (quelle === 'entfernen') {
+        await Aktion.kontaktBildSetzen(supabase, ichId, userId, null);
+        onNotice(Kontaktbild.ENTFERNT);
+      } else {
+        // Hochladen nur über die vorhandene Medienstelle (Ordner avatars).
+        const foto = await fotoHochladen(supabase, quelle, 'avatars', `${ichId}-kontakt.jpg`, onNotice);
+        if (!foto) return;
+        await Aktion.kontaktBildSetzen(supabase, ichId, userId, foto.url);
+        onNotice(Kontaktbild.GESPEICHERT);
+      }
+      await neuLaden();
+    } catch (e: any) {
+      onNotice(e?.message ?? Kontaktbild.NICHT_GESPEICHERT);
+    } finally {
+      setFotoLaedt(false);
+    }
+  };
   /*
    * Die Sperre kommt aus der Datenbank (chat_members.is_locked) und geht auch
    * dorthin zurueck. Vorher war sie ein Schalter, der beim naechsten Start
@@ -211,6 +241,9 @@ export const ContactProfileScreen = ({
 
   const name = person.name;
   const bio = alleProfile[userId]?.bio;
+  // Kasten 1.3h: Pronomen und Links auch im Kontaktprofil.
+  const pronomen = alleProfile[userId]?.pronomen;
+  const links = alleProfile[userId]?.links ?? [];
   const geleert = !!chat && geleerteChats.includes(chat.id);
   // Der geladene Verlauf plus das, was in dieser Sitzung dazukam.
   const zusammen = [...geladen, ...nachrichten.filter((m) => !geladen.some((g) => g.id === m.id))];
@@ -233,7 +266,7 @@ export const ContactProfileScreen = ({
   const beschreibung = (m: Message) =>
     m.hinweis === 'story_markierung'
       ? StoryRegeln.markierungVorschau(m.senderId === 'me')
-      : m.geteilt ? `${m.geteilt.autor}: ${m.geteilt.titel}` : m.standort ? m.standort.name : m.kontakt ? m.kontakt.name : m.text || 'Foto';
+      : m.geteilt ? (m.geteilt.weg ? 'Beitrag nicht mehr verfügbar' : `${m.geteilt.autor}: ${m.geteilt.titel || m.geteilt.beschreibung || ''}`) : m.standort ? m.standort.name : m.kontakt ? m.kontakt.name : m.text || 'Foto';
 
   const zeile = (label: string, neben: string, onPress: () => void, art?: 'gruen' | 'gefahr') => (
     <Druck key={label} style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]} onPress={onPress}>
@@ -266,11 +299,27 @@ export const ContactProfileScreen = ({
         <View style={styles.kopf}>
           {/* Kasten 11.1: Ring im Kontaktprofil (Messenger-Storys). */}
           <StoryAvatar id={person.id} name={name} size={112} bereich="messenger" />
-          <Text style={styles.name}>{name}</Text>
+          <NameMitPronomen name={name} pronomen={pronomen} style={styles.name} zentriert />
           {!!person.phone && <Text style={styles.nummer}>{person.phone}</Text>}
+          {/* Kasten 28/7.8: wie Apple Kontakte — eigenes Foto, nur ich sehe es. */}
+          <Druck
+            onPress={() => setFotoWahl(true)}
+            disabled={fotoLaedt}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={Kontaktbild.FOTO_BEARBEITEN}
+            testID="kontaktbild-bearbeiten"
+          >
+            <Text style={styles.fotoBearbeiten}>{fotoLaedt ? 'Wird gespeichert …' : Kontaktbild.FOTO_BEARBEITEN}</Text>
+          </Druck>
         </View>
 
         {!!bio && <Text style={styles.bio}>{bio}</Text>}
+        {links.length > 0 && (
+          <View style={styles.links}>
+            <ProfilLinks links={links} onNotice={onNotice} />
+          </View>
+        )}
 
         <View style={styles.profile}>
           <Druck style={styles.profilKnopf} onPress={() => onOpenPublicProfile?.(userId)}>
@@ -531,6 +580,23 @@ export const ContactProfileScreen = ({
       {/* Kasten RS 3: das Melden-Blatt (art 'user', Schema 102) statt einer Grundliste. */}
       <MeldenSheet ziel={offen?.art === 'melden' ? { art: 'user', id: userId } : null} onClose={() => setOffen(null)} />
 
+      <ActionSheet
+        visible={fotoWahl}
+        title={Kontaktbild.FOTO_BEARBEITEN}
+        items={[
+          { key: 'galerie', label: Kontaktbild.AUS_MEDIATHEK, icon: 'images-outline' },
+          { key: 'kamera', label: Kontaktbild.AUFNEHMEN, icon: 'camera-outline' },
+          ...(eigenesFoto
+            ? [{ key: 'entfernen', label: Kontaktbild.ENTFERNEN, icon: 'trash-outline' as const, gefahr: true }]
+            : []),
+        ]}
+        onSelect={(key) => {
+          setFotoWahl(false);
+          void fotoAendern(key as 'galerie' | 'kamera' | 'entfernen');
+        }}
+        onClose={() => setFotoWahl(false)}
+      />
+
       {offen?.art === 'bearbeiten' && (
         /*
          * Henrik, 07.09.2026: "Kontaktinfo-Änderungen (z.B. Name) speichern/
@@ -625,7 +691,9 @@ const styles = themenStyles((colors) => ({
   kopf: { alignItems: 'center', paddingVertical: spacing.xl, backgroundColor: colors.surface, gap: 4 },
   name: { marginTop: spacing.md, color: colors.text, ...typography.h2 },
   nummer: { marginTop: 2, color: colors.text2, ...typography.body },
+  fotoBearbeiten: { marginTop: spacing.xs, ...typography.small, color: colors.brand, fontWeight: '600' },
   bio: { backgroundColor: colors.surface, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, color: colors.text, ...typography.message, lineHeight: 20 },
+  links: { backgroundColor: colors.surface, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
 
   profile: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.surface },
   profilKnopf: { flex: 1, paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface2, alignItems: 'center' },

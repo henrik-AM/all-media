@@ -25,6 +25,8 @@ import * as Sharing from 'expo-sharing';
 
 // Kasten 15: Grenzen für Video-Storys — dieselbe Datei wie auf der Website.
 const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
+// Nachtrag 4.3c: Meldung, wenn eine Live-Antwort ohne Bezug rausging.
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
 
 /** JJJJ-MM-TT fuer den Dateinamen. */
 const heute = () => new Date().toISOString().slice(0, 10);
@@ -117,6 +119,15 @@ export interface Aktionen {
     sekunden: number,
     status?: 'beendet' | 'verpasst' | 'abgelehnt'
   ) => Promise<void>;
+  /**
+   * Kasten 5.2: einen Anruf beim Start im Chat vermerken (Schema 89) —
+   * Person, Gruppe, Community-Chat oder Unterthema. Still wie anrufNotieren:
+   * eine Meldung über dem Anrufbildschirm hilft niemandem.
+   */
+  anrufStarten: (
+    ziel: { chatId?: string | null; kanalId?: string | null; zielId?: string | null },
+    art: 'audio' | 'video'
+  ) => Promise<string | null>;
   /** Über eine Chat-Anfrage entscheiden. Nur die angeschriebene Person darf das. */
   anfrageEntscheiden: (chatId: string, annehmen: boolean, zurueck: Rueckweg) => Promise<void>;
   chatEinstellung: (
@@ -253,6 +264,8 @@ export interface Aktionen {
   communityNameFrei: (name: string) => Promise<boolean>;
   /** Community stumm/laut. Gibt den Zustand danach zurueck, oder null. */
   communityStumm: (communityId: string) => Promise<boolean | null>;
+  /** Kasten 8.4: Push-to-Talk-Benachrichtigung je Community (Schema 90). */
+  pttBenachrichtigung: (communityId: string, an: boolean) => Promise<boolean | null>;
 
   /**
    * Eine Einstellung setzen. Gibt den Wert zurueck, oder null bei Fehler —
@@ -295,7 +308,8 @@ export interface Aktionen {
     kanalId?: string | null
   ) => Promise<string | null>;
 
-  streamKommentar: (postId: string, text: string) => Promise<string | null>;
+  /** Nachtrag 4.3c: `antwortAuf` = der Live-Kommentar, auf den geantwortet wird. */
+  streamKommentar: (postId: string, text: string, antwortAuf?: string | null) => Promise<string | null>;
   /**
    * Spenden. Läuft immer durch das Spendenblatt (SpendenwegContext): fehlt
    * eine Zahlungsmethode oder der Spendencode, fragt das Blatt danach und
@@ -416,6 +430,15 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
           await A.anrufNotieren(supabase, ichId, zielId, art, sekunden, status);
         } catch (e: any) {
           console.error('Anruf konnte nicht im Chat vermerkt werden:', e?.message ?? e);
+        }
+      },
+      anrufStarten: async (ziel, art) => {
+        if (!supabase || !ichId) return null;
+        try {
+          return await A.anrufStarten(supabase, ichId, ziel, art);
+        } catch (e: any) {
+          console.error('Anruf konnte nicht im Chat vermerkt werden:', e?.message ?? e);
+          return null;
         }
       },
       anfrageEntscheiden: (chatId, annehmen, zurueck) =>
@@ -617,6 +640,8 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
        */
       communityStumm: (communityId) =>
         holen('Das Stummschalten', (c, i) => A.communityStumm(c, i, communityId)),
+      pttBenachrichtigung: (communityId, an) =>
+        holen('Die Einstellung', (c, i) => A.pttBenachrichtigungSetzen(c, i, communityId, an)),
 
       beitragInStory: (id) => holen('Zur Story hinzufügen', (c, i) => A.beitragInStory(c, i, id)),
       keinInteresse: (id) => holen('Kein Interesse', (c, i) => A.keinInteresse(c, i, id)),
@@ -724,10 +749,12 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         }),
 
       // ------------------------------------------------------- Livestream --
-      streamKommentar: async (postId, text) => {
+      streamKommentar: async (postId, text, antwortAuf = null) => {
         const zeile = await holen('Der Kommentar', (c, i) =>
-          A.streamKommentar(c, i, postId, text)
+          A.streamKommentar(c, i, postId, text, antwortAuf)
         );
+        // Ohne Schema 92 ging er ohne Bezug raus — das sagen, nicht verschweigen.
+        if (zeile && (zeile as { ohneBezug?: boolean }).ohneBezug) melden?.(Kommentar.LIVE_OHNE_BEZUG);
         return zeile?.id ?? null;
       },
       spenden: async (empfaengerId, betragCent, postId, nachricht, empfaengerName) => {

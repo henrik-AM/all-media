@@ -75,7 +75,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.story_in_videos_zuruecknehmen() | SUPABASE_SCHEMA_30_story_in_videos.sql → SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.storys_aus_videos_nehmen() | SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.testbestand_profilaufrufe() | SUPABASE_SCHEMA_17_testbestand_statistik.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
-| Funktion public.zuruecksetzen() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_13_zuruecksetzen_handbuch.sql → SUPABASE_SCHEMA_14_chatstau.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_47_sammlungen_testbestand.sql | **SUPABASE_SCHEMA_47_sammlungen_testbestand.sql** (Schema 62 schreibt sie am Anker um: nur Testkonten; SUPABASE_SCHEMA_85_personen_vorschlaege.sql hängt am Anker `delete from public.follows` das Leeren von vorschlag_entfernt an; SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql hängt dahinter das Leeren von telefonbuch an) |
+| Funktion public.zuruecksetzen() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_13_zuruecksetzen_handbuch.sql → SUPABASE_SCHEMA_14_chatstau.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_47_sammlungen_testbestand.sql | **SUPABASE_SCHEMA_47_sammlungen_testbestand.sql** (Schema 62 schreibt sie am Anker um: nur Testkonten; SUPABASE_SCHEMA_85_personen_vorschlaege.sql hängt am Anker `delete from public.follows` das Leeren von vorschlag_entfernt an; SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql hängt dahinter das Leeren von telefonbuch an; SUPABASE_SCHEMA_88_profilseite.sql — **Entwurf, noch nicht eingespielt (Supabase-Sperre)** — hängt am Anker `geburtsdatum = null` das Zurücksetzen von pronomen und links an) |
 | Funktion public.zuruecksetzen_einstellungen() | SUPABASE_SCHEMA_16_einstellungen.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_83_bildschirmzeit.sql | **SUPABASE_SCHEMA_83_bildschirmzeit.sql** |
 | Regel "stories_im_highlight" auf public.stories | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql | **SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql** |
 | Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** (Ziel entscheidet: Videos für alle Sichtbaren, Messenger nur Kontakte, Markierte) |
@@ -329,3 +329,101 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
 
 | CHECK profiles_avatar_url_eimer | SUPABASE_SCHEMA_69_profilbild.sql → SUPABASE_SCHEMA_118_medienadresse_host.sql |
 | CHECK sammlungen_titelbild_eimer | SUPABASE_SCHEMA_70_titelbild.sql → SUPABASE_SCHEMA_118_medienadresse_host.sql |
+## Nachtrag 10.10.2026: Schema 88 (Kasten 1.3, Seite „Profil bearbeiten“)
+
+- `SUPABASE_SCHEMA_88_profilseite.sql` — **Entwurf, noch nicht eingespielt (Supabase-Sperre).**
+  Neu `profiles.pronomen` (≤ 30 Zeichen, eine Zeile) und `profiles.links` (jsonb, ≤ 5 Einträge
+  `{url, titel}`, url nur http/https), `profil_links_gueltig()` (Check), Trigger
+  `profil_links_abgleichen` (hält `link` = erster Link; alte Schreiber von `link` ersetzen nur
+  den ersten Eintrag), Spaltenrechte `select/update (pronomen, links)` an `authenticated`.
+  `zuruecksetzen()` am Anker umgeschrieben (Testkonto: Pronomen und Links leer). Keine Funktion
+  als Ganzes ersetzt. **Schema 23_audit erneut einspielen nimmt die Leserechte wieder weg —
+  danach 88 nachziehen** (wie 30 und 69). App und Website laden die beiden Spalten getrennt und
+  nachsichtig; ohne Schema 88 fehlen nur Pronomen und Zusatzlinks.
+
+## Nachtrag 11.10.2026: Schemas 89–91 (Feedback 28.09., Kästen 4, 5, 8)
+
+Alle drei sind **Entwürfe, noch nicht eingespielt (Supabase-Sperre).** Reihenfolge 89 → 90 → 91
+(90 bricht ab, wenn 89 fehlt).
+
+- `SUPABASE_SCHEMA_89_anrufe_ueberall.sql` — Anrufzustand `gestartet` (Dauer 0 erzwungen) auf
+  `messages`; Anrufspalten auch auf `community_channel_messages`. Ersetzt die Bedingungen
+  `messages_anruf_status_check` (aus 35) und `kanalnachricht_nicht_leer` (zuletzt 59).
+- `SUPABASE_SCHEMA_90_push_to_talk.sql` — `community_members.ptt_benachrichtigung`,
+  `community_channel_messages.ptt_sitzung`, `ptt_messages.sitzung_id`; Auslöser
+  `ptt_sitzung_zuordnen` und `ptt_mitteilen` (EXECUTE entzogen); restriktive Regel
+  „Sitzungszeile nur vom Ausloeser“. Ersetzt `notifications_art_check` (zuletzt 57),
+  `notifications_target_type_check` (zuletzt 49) und `kanalnachricht_nicht_leer` (aus 89) —
+  **gilt danach: 90.** Wer später eine Mitteilungsart ergänzt, übernimmt die Liste aus 90.
+- `SUPABASE_SCHEMA_91_antworten_im_unterthema.sql` — `community_channel_messages.reply_to`
+  (on delete set null) und restriktive Regel „Antwort nur im selben Unterthema“. Ersetzt nichts.
+
+Code vor dem Schema: App (`daten.ts`) und Server (`supabase-api.js`) laden die Unterthema-
+Zusatzspalten (`reply_to` | Anrufspalten | `ptt_sitzung`) gruppenweise nachsichtig — fehlt eine
+Gruppe (42703), wird nur sie weggelassen.
+
+## Nachtrag 12.10.2026: Schema 92 (Feedback 28.09., Nachtrag 4.3)
+
+**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 89 → 90 → 91; setzt 62, 78, 86 voraus.
+
+- `SUPABASE_SCHEMA_92_kommentar_antworten.sql` — `comments.reply_to` (Wurzel, on delete cascade),
+  `comments.antwort_an` (angesprochener Kommentar, on delete set null), `stream_comments.reply_to`
+  (on delete set null); restriktive Regeln „Antwort nur im selben Beitrag“ und „Live-Antwort nur im
+  selben Stream“ (inkl. Blockieren); Auslöser `kommentar_bezug_fest`, `mitteilung_kommentar_antwort`,
+  `mitteilung_weg_kommentar_antwort`. **Ersetzt `mitteilung_bei_kommentar()` (zuletzt 44) — gilt danach: 92.**
+  Fasst `notifications_art_check`/`notifications_target_type_check` NICHT an (art 'comment' +
+  target_type 'comment' stehen schon in der Liste aus 90) — Gewinner bleibt 90.
+
+Code vor dem Schema: App (`daten.ts`, `aktionen.ts`) und Server (`supabase-api.js`, `sync-handlers.js`)
+lesen/schreiben `reply_to`/`antwort_an` nachsichtig (`Kommentar.fehltSpalte`).
+
+## Nachtrag 12.10.2026: Schemas 93–94 (Feedback 28.09., Kasten 7.5–7.8)
+
+Beide **Entwürfe, noch nicht eingespielt.** Reihenfolge beliebig; 94 nach 87 (Anker).
+
+- `SUPABASE_SCHEMA_93_geteilt_weg.sql` — `shared_post_weg`/`shared_post_konto` auf `messages` und
+  `community_channel_messages`; Auslöser `geteilt_weg_merken` (BEFORE DELETE auf `posts`, security
+  definer, EXECUTE entzogen) und `geteilt_weg_schuetzen` (Client kann den Merker nicht setzen).
+  Ersetzt nichts. Block 5 (Nachtrag alter Nachrichten) auskommentiert, nur mit Henriks Freigabe.
+- `SUPABASE_SCHEMA_94_kontaktbild.sql` — Tabelle `kontakt_bilder` (RLS nur Eigentümer, eine Regel je
+  Befehl, `nur_freigegebene`, Check auf eigenen Eimer), `ist_messenger_kontakt(uuid)` (EXECUTE nur
+  authenticated). `zuruecksetzen()` am Anker aus Schema 87 umgeschrieben (Testkonto: `kontakt_bilder`
+  leeren). **Wer Schema 87 oder ältere zuruecksetzen-Fassungen neu einspielt, muss 94 nachziehen.**
+
+Code vor dem Schema: App und Server laden Merker und Kontaktbilder getrennt und nachsichtig — ohne 93
+keine Weg-Spur bei gelöschten Beiträgen, ohne 94 nur Profilbilder.
+
+## Nachtrag 05.11.2026: Paket 1 (Kästen 28.09. 1–8) auf main-Stand ad7f221 übertragen
+
+Abgleich der Schemas 88–94 gegen main (101–117) und den Live-Stand (nur lesend), Ergebnis je
+Datei im Kopf. Wichtig beim Einspielen:
+
+- **91:** `SUPABASE_SCHEMA_91_antworten_im_unterthema.sql` (Nummer seit 10.10. vergeben; im Paket
+  zuerst als `XX` übertragen, am 05.11. zurückbenannt).
+- **90:** `notifications_art_check`/`notifications_target_type_check` = Live-Liste + `ptt`/`channel`,
+  keine Rückdrehung. Spätere Entwürfe (97/98, Paket 2) müssen `ptt`/`channel` mitnehmen.
+  Neu (Codex-Fund 05.11.): Auslöser `zeitstempel_vom_server` setzt `created_at` auf `ptt_messages`
+  und `community_channel_messages` beim Client-Einfügen auf `now()`, die Sitzungssuche übergeht
+  Zukunftszeilen; Funktion nur in 90 definiert.
+  Nachtrag (Codex Runde 2): Zeitstempel und beide Grenzen der Sitzungssuche nutzen
+  `clock_timestamp()` nach der Kanalsperre (Zukunftsgrenze + 5 s), weil `now()` bei überkreuzten
+  Transaktionen eine schon committete Wortmeldung als Zukunft verwarf und eine zweite Sitzung anlegte.
+- **92:** führt am Ende den F11-Block aus 102 (`kommentar_ausgeblendet`, Regel `nicht_ausgeblendet`
+  auf `comments`) wortgleich erneut aus, jetzt mit `reply_to`; der Nachweis bricht ab, wenn der
+  Antwort-Teil fehlt. Der Nachtrag „nach 92 den F11-Block aus 102 erneut ausführen“ ist damit erledigt.
+  Achtung, Ausnahme von „die letzte Nummer gewinnt“: 102 ist seit 02.11. live, 92 wird **danach**
+  eingespielt und gewinnt deshalb. Wer 102 später neu einspielt, muss 92 (bzw. dessen F11-Block)
+  nachziehen.
+
+| Objekt | Dateien (die letzte gewinnt) |
+|---|---|
+| Funktion public.kommentar_ausgeblendet() | SUPABASE_SCHEMA_92_kommentar_antworten.sql → SUPABASE_SCHEMA_102_melden_moderation.sql |
+| Funktion public.mitteilung_bei_kommentar() | SUPABASE_SCHEMA_44_mitteilungen.sql → SUPABASE_SCHEMA_92_kommentar_antworten.sql |
+| Funktion public.ist_messenger_kontakt() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_94_kontaktbild.sql |
+
+`ist_messenger_kontakt`: 94 legt eine **zweite Fassung mit anderer Signatur** `(uuid)` an; die live gültige `(uuid, uuid)` (68, gehärtet in 95) bleibt unberührt.
+
+- **94:** danach **Schema 117 erneut einspielen** (Medienreferenz-Prüfung auf `kontakt_bilder`).
+  `ist_messenger_kontakt(uuid)` ist eine neue Überladung neben `ist_messenger_kontakt(uuid, uuid)` (68/102).
+
+**Gesamtreihenfolge Paket 1:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 117 (erneut).

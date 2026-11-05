@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Keyboard,
@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View, Animated } from 'react-native';
+import { ZiehZumAntworten } from './ZiehZumAntworten';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,15 +29,25 @@ import { FarbfilterSchicht } from './Farbfilter';
 import { MarkierterText } from './MarkierterText';
 import { MarkierungsEingabe } from './MarkierungsEingabe';
 import { MeldenSheet } from './MeldenSheet';
+
+// Nachtrag 4.3b: Fäden, „@name", Klappknopf — dieselben Regeln wie die Website.
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
+
 interface Props {
   targetId: string | null;
   onClose: () => void;
   onCountChange?: (targetId: string, count: number) => void;
   /** Wird nicht mehr genutzt: Meldungen stehen seit 28.09.2026 im Blatt. */
   onNotice?: (text: string) => void;
+  /**
+   * Nachtrag 4.3 (12.10.2026): Kommentar aus einer Mitteilung — Faden
+   * aufklappen, hinrollen, kurz hervorheben. Gleich auf der Website
+   * (openComments, springeZu).
+   */
+  springeZu?: string | null;
 }
 
-export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
+export const CommentSheet = ({ targetId, onClose, onCountChange, springeZu }: Props) => {
   const { users: alleNutzer, ichId } = useDaten();
   const { supabase } = useSupabase();
   /*
@@ -54,6 +65,19 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
    */
   const [meldeKommentar, setMeldeKommentar] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  /*
+   * Nachtrag 4.3b (Henrik, 11.10.2026): auf einen Kommentar antworten — per
+   * „Antworten" unter dem Kommentar oder nach rechts ziehen. `antwort` ist
+   * der angesprochene Kommentar; die Wurzel rechnet Kommentar.antwortZiel.
+   */
+  const [antwort, setAntwort] = useState<Comment | null>(null);
+  /** Aufgeklappte Fäden („N Antworten ansehen"). */
+  const [offen, setOffen] = useState<Set<string>>(new Set());
+  // Nachtrag 4.3: der Kommentar aus einer Mitteilung leuchtet kurz auf.
+  const [markiert, setMarkiert] = useState<string | null>(null);
+  const liste = useRef<FlatList<{ kommentar: Comment; antworten: Comment[] }>>(null);
+  const feldRef = useRef<TextInput>(null);
+  const faeden = useMemo(() => Kommentar.faeden(comments), [comments]);
   const insets = useSafeAreaInsets();
   /*
    * Mit offener Tastatur liegt die Home-Leiste unter der Tastatur. Ihr
@@ -83,15 +107,27 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
     let abgebrochen = false;
     setDraft('');
     setHinweis('');
+    setAntwort(null);
+    setOffen(new Set());
     ladeKommentare(supabase, ichId, targetId)
       .then((geladen) => {
-        if (!abgebrochen) setComments(geladen);
+        if (abgebrochen) return;
+        setComments(geladen);
+        if (!springeZu) return;
+        const ziel = geladen.find((c) => c.id === springeZu);
+        if (!ziel) return setHinweis('Dieser Kommentar ist nicht mehr da');
+        const wurzel = ziel.antwortAuf ?? ziel.id;
+        setOffen(new Set([wurzel]));
+        setMarkiert(ziel.id);
+        setTimeout(() => setMarkiert(null), 2500);
+        const platz = Kommentar.faeden(geladen).findIndex((f) => f.kommentar.id === wurzel);
+        if (platz >= 0) setTimeout(() => liste.current?.scrollToIndex({ index: platz, viewPosition: 0.3, animated: true }), 350);
       })
       .catch((e) => console.error('Kommentare laden fehlgeschlagen:', e?.message ?? e));
     return () => {
       abgebrochen = true;
     };
-  }, [targetId, supabase, ichId]);
+  }, [targetId, supabase, ichId, springeZu]);
 
   const toggleLike = async (comment: Comment) => {
     // Erst anzeigen, dann speichern: ein Herz, das eine halbe Sekunde
@@ -140,9 +176,10 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
     setHinweis('');
     setDraft('');
 
+    const ziel = antwort ? Kommentar.antwortZiel(antwort) : null;
     let data;
     try {
-      data = await Aktion.kommentarAnlegen(supabase, ichId, targetId, text);
+      data = await Aktion.kommentarAnlegen(supabase, ichId, targetId, text, ziel);
     } catch (e: any) {
       console.error('Kommentar senden fehlgeschlagen:', e?.message ?? e);
       setDraft(text);
@@ -150,6 +187,8 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
       return;
     }
 
+    const imFaden = !!ziel && !data.ohneFaden;
+    if (data.ohneFaden) setHinweis(Kommentar.OHNE_FADEN);
     const comment: Comment = {
       id: data.id,
       userId: CURRENT_USER_ID,
@@ -157,20 +196,54 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
       time: new Date(data.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
       likes: 0,
       liked: false,
+      antwortAuf: imFaden ? ziel!.antwortAuf : null,
+      antwortAn: imFaden ? ziel!.antwortAn : null,
     };
     const next = [...comments, comment];
     setComments(next);
+    // Die eigene Antwort soll man sehen: ihren Faden aufklappen.
+    if (imFaden && ziel!.antwortAuf) setOffen((o) => new Set(o).add(ziel!.antwortAuf!));
+    setAntwort(null);
     onCountChange?.(targetId, next.length);
   };
 
+  /** „Antworten" unter dem Kommentar oder nach rechts gezogen. */
+  const antworten = (k: Comment) => {
+    const eigen = k.userId === CURRENT_USER_ID;
+    const vor = Kommentar.vorbelegung(alleNutzer[k.userId]?.handle, eigen);
+    setAntwort(k);
+    setHinweis('');
+    // Einen schon getippten Text nicht überschreiben — nur das @ davor.
+    setDraft((d) => (vor && !d.startsWith(vor) ? vor + d.replace(/^@\S+\s/, '') : d));
+    setTimeout(() => feldRef.current?.focus(), 50);
+  };
+
+  const umklappen = (wurzel: string) =>
+    setOffen((o) => {
+      const n = new Set(o);
+      if (n.has(wurzel)) n.delete(wurzel);
+      else n.add(wurzel);
+      return n;
+    });
+
   const { griff, ziehStil } = useZiehenZumSchliessen(onClose);
 
-  const renderComment = ({ item }: { item: Comment }) => {
+  const kommentarZeile = (item: Comment, alsAntwort: boolean) => {
     const author = alleNutzer[item.userId];
     return (
-      <View style={styles.comment}>
+      /*
+       * Nachtrag 4.3b: nach rechts ziehen → antworten. Dieselbe Geste wie in
+       * der Chatblase (ZiehZumAntworten, Schwelle aus gemeinsam/chatblase.js).
+       */
+      <ZiehZumAntworten aktiv onAntworten={() => antworten(item)} testID={`kommentar-${item.id}`}>
+      <View style={[styles.comment, alsAntwort && styles.commentAntwort, markiert === item.id && styles.commentMarkiert]}>
         {/* Kasten 11.1: Ring an der Person, die kommentiert hat. */}
-        <StoryAvatar id={item.userId} name={author?.name ?? ''} size={sizes.avatarSm + 4} bereich="videos" />
+        <StoryAvatar
+          id={item.userId}
+          name={author?.name ?? ''}
+          size={alsAntwort ? sizes.avatarSm - 6 : sizes.avatarSm + 4}
+          bereich="videos"
+        />
         <View style={styles.commentBody}>
           {/* Kasten 25.3: @-Namen im Kommentar führen zum Profil. */}
           <MarkierterText
@@ -180,6 +253,16 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
           />
           <View style={styles.metaZeile}>
             <Text style={styles.commentMeta}>{item.time}</Text>
+            {/* Wie Instagram/TikTok: „Antworten" direkt unter dem Kommentar. */}
+            <Druck
+              onPress={() => antworten(item)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`Antworten an ${author?.name ?? 'Kommentar'}`}
+              testID={`kommentar-antworten-${item.id}`}
+            >
+              <Text style={styles.antwortenKnopf}>Antworten</Text>
+            </Druck>
             {item.userId !== CURRENT_USER_ID && item.userId !== ichId && (
               <Druck
                 onPress={() => setMeldeKommentar(item.id)}
@@ -211,6 +294,32 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
           </Text>
         </Druck>
       </View>
+      </ZiehZumAntworten>
+    );
+  };
+
+  /** Ein Kommentar oben, darunter eingerückt seine Antworten (aufklappbar). */
+  const renderFaden = ({ item }: { item: { kommentar: Comment; antworten: Comment[] } }) => {
+    const auf = offen.has(item.kommentar.id);
+    const klapp = Kommentar.klappText(item.antworten.length, auf);
+    return (
+      <View>
+        {kommentarZeile(item.kommentar, false)}
+        {klapp ? (
+          <Druck
+            style={styles.klapp}
+            onPress={() => umklappen(item.kommentar.id)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={klapp}
+            testID={`kommentar-klapp-${item.kommentar.id}`}
+          >
+            <View style={styles.klappStrich} />
+            <Text style={styles.klappText}>{klapp}</Text>
+          </Druck>
+        ) : null}
+        {auf ? item.antworten.map((a) => <React.Fragment key={a.id}>{kommentarZeile(a, true)}</React.Fragment>) : null}
+      </View>
     );
   };
 
@@ -234,9 +343,12 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
         </Text>
 
         <FlatList
-          data={comments}
-          renderItem={renderComment}
-          keyExtractor={(item) => item.id}
+          data={faeden}
+          renderItem={renderFaden}
+          keyExtractor={(item) => item.kommentar.id}
+          ref={liste}
+          extraData={[offen, markiert]}
+          onScrollToIndexFailed={() => {}}
           style={styles.list}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
@@ -259,18 +371,43 @@ export const CommentSheet = ({ targetId, onClose, onCountChange }: Props) => {
           bis an den Bildschirmrand, und dort liegt beim iPhone die
           Home-Leiste — ohne diesen Abstand verschwand die Zeile darunter.
         */}
+        {/* Nachtrag 4.3b: wem man gerade antwortet — × bricht ab. */}
+        {antwort ? (
+          <View style={styles.antwortLeiste}>
+            <Text style={styles.antwortLeisteText} numberOfLines={1}>
+              {Kommentar.leistenText(
+                antwort.userId === CURRENT_USER_ID ? 'dich selbst' : alleNutzer[antwort.userId]?.name
+              )}
+            </Text>
+            <Druck
+              hitSlop={8}
+              onPress={() => {
+                const vor = Kommentar.vorbelegung(
+                  alleNutzer[antwort.userId]?.handle,
+                  antwort.userId === CURRENT_USER_ID
+                );
+                setAntwort(null);
+                if (vor) setDraft((d) => (d.startsWith(vor) ? d.slice(vor.length) : d));
+              }}
+              accessibilityLabel="Antworten abbrechen"
+            >
+              <Ionicons name="close" size={18} color={colors.text2} />
+            </Druck>
+          </View>
+        ) : null}
         <View style={[styles.composer, { paddingBottom: 9 + (tastatur ? 0 : insets.bottom) }]}>
           <Avatar id={CURRENT_USER_ID} name={alleNutzer[CURRENT_USER_ID]?.name ?? ""} size={sizes.avatarSm} />
           <View style={styles.field}>
             {/* Kasten 25.1: @ schlägt Personen vor. */}
             <MarkierungsEingabe
+              ref={feldRef}
               style={styles.input}
               value={draft}
               onChangeText={(t) => {
                 setDraft(t);
                 if (hinweis) setHinweis('');
               }}
-              placeholder="Kommentar hinzufügen"
+              placeholder={antwort ? Kommentar.PLATZHALTER_ANTWORT : 'Kommentar hinzufügen'}
               placeholderTextColor={colors.text3}
               multiline
             />
@@ -330,9 +467,31 @@ const styles = themenStyles((colors) => ({
   likeSpalte: { alignItems: 'center', gap: 2, minWidth: 26 },
   likeZahl: { fontSize: 11, fontWeight: '600', lineHeight: 13, color: colors.text3 },
   likeZahlAn: { color: '#FF3040' },
-  commentMeta: { marginTop: 3, color: colors.text3, ...typography.small },
-  metaZeile: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  meldenKnopf: { marginTop: 3, color: colors.text3, ...typography.small, fontWeight: '700' },
+  commentMeta: { color: colors.text3, ...typography.small },
+  /* Nachtrag 4.3b: Antworten eingerückt unter dem Kommentar (Avatar-Breite). */
+  commentAntwort: { paddingLeft: spacing.lg + sizes.avatarSm + 4 + 11, paddingVertical: 6 },
+  commentMarkiert: { backgroundColor: colors.surface3, borderRadius: 12 },
+  metaZeile: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
+  antwortenKnopf: { color: colors.text2, ...typography.small, fontWeight: '700' },
+  klapp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: spacing.lg + sizes.avatarSm + 4 + 11,
+    paddingVertical: 4,
+  },
+  klappStrich: { width: 24, height: StyleSheet.hairlineWidth * 2, backgroundColor: colors.text3 },
+  klappText: { color: colors.text2, ...typography.small, fontWeight: '600' },
+  antwortLeiste: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 8,
+    backgroundColor: colors.surface3,
+  },
+  antwortLeisteText: { flex: 1, color: colors.text2, ...typography.small },
+  meldenKnopf: { color: colors.text3, ...typography.small, fontWeight: '700' },
   bold: { fontWeight: '700' },
 
   composer: {

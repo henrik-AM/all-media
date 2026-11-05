@@ -10,6 +10,7 @@ import { useEinstellungen } from '../../contexts/EinstellungenContext';
 import { useAktionen } from '../../lib/useAktionen';
 import { ladeSpendenSumme, ladeStreamKommentare } from '../../lib/daten';
 import * as Aktion from '../../lib/aktionen';
+import { LiveAntwortLeiste, LiveKommentarZeile } from '../../components/LiveAntwort';
 
 interface Props {
   /** Nach dem Ende — ob die Aufzeichnung veroeffentlicht oder geloescht wurde. */
@@ -24,6 +25,8 @@ interface Kommentar {
   name: string;
   text: string;
   zeit: string;
+  /** Nachtrag 4.3c: Zitat des Kommentars, auf den geantwortet wurde. */
+  antwortAuf?: { id: string; name: string; text: string; fehlt?: boolean };
 }
 
 const zweistellig = (n: number) => String(n).padStart(2, '0');
@@ -63,6 +66,9 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
   const [kommentare, setKommentare] = useState<Kommentar[]>([]);
   const [spenden, setSpenden] = useState(0);
   const [entwurf, setEntwurf] = useState('');
+  /** Nachtrag 4.3c: der Live-Kommentar, auf den gerade geantwortet wird. */
+  const [antwortAn, setAntwortAn] = useState<Kommentar | null>(null);
+  const feldRef = useRef<TextInput>(null);
 
   // Einmal beim Aufmachen: ab jetzt steht im eigenen Profil, dass gesendet
   // wird. Vorher wusste das nur dieser Bildschirm.
@@ -134,7 +140,9 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
     const text = entwurf.trim();
     if (!text || !postId) return;
     setEntwurf('');
-    const id = await aktionen.streamKommentar(postId, text);
+    const bezug = antwortAn?.id ?? null;
+    setAntwortAn(null);
+    const id = await aktionen.streamKommentar(postId, text, bezug);
     if (id) holen();
   };
 
@@ -218,10 +226,18 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
           inverted
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <View style={styles.kommentar}>
-              <Text style={styles.kommentarName}>{item.name}</Text>
-              <Text style={styles.kommentarText}>{item.text}</Text>
-            </View>
+            // Nachtrag 4.3c: nach rechts ziehen → antworten, mit Zitat.
+            <LiveKommentarZeile
+              k={item}
+              aktiv={!vorbei}
+              onAntworten={(k) => {
+                setAntwortAn(k as Kommentar);
+                setTimeout(() => feldRef.current?.focus(), 50);
+              }}
+              nameStil={styles.kommentarName}
+              textStil={styles.kommentarText}
+              zitatFarbe="#9CA3AF"
+            />
           )}
           ListEmptyComponent={
             <Text style={styles.spalteLeer}>
@@ -231,9 +247,18 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
         />
       </View>
 
+      {!vorbei && antwortAn ? (
+        <LiveAntwortLeiste
+          an={antwortAn}
+          onAbbrechen={() => setAntwortAn(null)}
+          farbe="#D6D9E0"
+          hintergrund="rgba(255,255,255,0.08)"
+        />
+      ) : null}
       {!vorbei && (
       <View style={styles.eingabe}>
         <TextInput
+          ref={feldRef}
           style={styles.feld}
           value={entwurf}
           onChangeText={setEntwurf}

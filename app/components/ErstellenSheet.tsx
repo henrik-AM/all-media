@@ -57,9 +57,11 @@ const VIDEOS: { key: ErstellenPunkt; label: string; symbol: Symbol }[] = [
   { key: 'spende', label: 'Spendenaktion', symbol: 'heart-outline' },
 ];
 
-// "CP + erstellen" zeigt genau einen Punkt.
+// "CP + erstellen" zeigt genau einen Punkt. Er legt eine Community an
+// (communities), keinen Kanal darin - darum heisst er seit Kasten 2.2
+// (28.09.2026) auch so. Der Schluessel 'kanal' bleibt.
 const COMMUNITYS: { key: ErstellenPunkt; label: string; symbol: Symbol }[] = [
-  { key: 'kanal', label: 'Neuen Kanal erstellen', symbol: 'add-outline' },
+  { key: 'kanal', label: 'Neue Community erstellen', symbol: 'add-outline' },
 ];
 
 export const ErstellenSheet = ({ visible, bereich, onClose, onSelect }: Props) => {

@@ -49,7 +49,7 @@ const LEER: AlleDaten = {
   stummgeschaltet: [],
   markierte: [],
   favoriten: [],
-  eigenesProfil: { name: '', bio: '', link: '' },
+  eigenesProfil: { name: '', bio: '', link: '', pronomen: '', links: [] },
   highlights: [],
   playlists: [],
   spende: null,
@@ -58,6 +58,7 @@ const LEER: AlleDaten = {
   insightZiele: [],
   sichtbarkeit: {},
   keinInteresse: [],
+  kontaktBilder: {},
   ichId: '',
   geladen: '',
 };

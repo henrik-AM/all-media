@@ -55,12 +55,16 @@ export const zeitText = (minuten: number) => {
   return `vor ${Math.floor(tage / 30)} M`;
 };
 
+// Nachtrag 4.3d: Satz „… hat auf deinen Kommentar geantwortet.“
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
+
 /**
  * Woran ein Herz hängen kann. Seit Schema 49 gibt es auch Herzen an
  * Kommentaren — ohne diese Liste hieße es dort "gefällt dein Beitrag".
  * Dieselbe Liste steht in web/server/app.js: App und Website sagen denselben
  * Satz.
  */
+
 const GEGENSTAND: Record<string, string> = {
   video: 'Video',
   comment: 'Kommentar',
@@ -89,6 +93,10 @@ const mitteilungText = (
     case 'follow':
       return `${name} folgt dir jetzt.`;
     case 'comment':
+      // Nachtrag 4.3d (Schema 92): Antwort auf einen Kommentar — Ziel ist
+      // die Antwort selbst (target_type 'comment'). Satz aus
+      // gemeinsam/kommentar.js, gleich in web/server/app.js.
+      if (m.ziel.art === 'comment') return Kommentar.mitteilungAntwort(name);
       return `${name} hat deinen Beitrag kommentiert.`;
     case 'repost':
       return `${name} hat dein Video repostet.`;
@@ -119,6 +127,12 @@ const mitteilungText = (
       return `Neue Nachrichten in „${kanal}“.`;
     case 'einladung':
       return `${name} hat dich zu „${kanal}“ eingeladen.`;
+    // Kasten 8.3 (Schema 90): ziel = das Unterthema, in dem gesprochen wird.
+    case 'ptt': {
+      const pttCommunity =
+        communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === m.ziel.id))?.name ?? 'einer Community';
+      return `${name} spricht in „${pttCommunity}“ – Push to Talk beitreten?`;
+    }
   }
 };
 
@@ -216,6 +230,8 @@ interface ProfilWert {
    * Schalter dasselbe zeigen, ohne dass alles neu geladen werden muss.
    */
   kanalStummSetzen: (id: string, stumm: boolean) => void;
+  /** Kasten 8.4: den gespeicherten PTT-Schalter in die Liste übernehmen. */
+  kanalPttSetzen: (id: string, an: boolean) => void;
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
 
@@ -246,12 +262,22 @@ interface ProfilWert {
    */
   eigenesProfil: EigenesProfil;
   profilSpeichern: (werte: Partial<EigenesProfil>) => void;
+  /**
+   * Wie profilSpeichern, aber mit Ergebnis: null bei Erfolg, sonst der Grund.
+   * Für die Seite „Profil bearbeiten“ (Kasten 1.3) — dort steht ein Fehler
+   * auf der Seite, nicht in einer Meldung hinter ihr.
+   */
+  profilSpeichernWarten: (werte: Partial<EigenesProfil>) => Promise<string | null>;
 }
 
 export interface EigenesProfil {
   name: string;
   bio: string;
   link: string;
+  /** Kasten 1.3 (Schema 88). */
+  pronomen: string;
+  /** Kasten 1.3 (Schema 88): bis zu fünf; `link` ist immer der erste. */
+  links: { url: string; titel: string }[];
   /** Selbst gewaehltes Bild. Liegt nur auf diesem Geraet. */
   bildUri?: string;
 }
@@ -355,6 +381,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     name: '',
     bio: '',
     link: '',
+    pronomen: '',
+    links: [],
   });
 
   /*
@@ -398,7 +426,17 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const profilSpeichern = useCallback(
     (werte: Partial<EigenesProfil>) => {
       const vorherStand = eigenesProfil;
-      setEigenesProfil((vorher) => ({ ...vorher, ...werte }));
+      setEigenesProfil((vorher) => {
+        const neu = { ...vorher, ...werte };
+        // Das kleine Blatt kennt nur `link`: es ersetzt den ersten der Links
+        // (dieselbe Regel wie der Trigger in Schema 88), die übrigen bleiben.
+        if (werte.link !== undefined && werte.links === undefined) {
+          const einzel = werte.link.trim();
+          const rest = (vorher.links ?? []).slice(1);
+          neu.links = einzel ? [{ url: einzel, titel: '' }, ...rest] : [];
+        }
+        return neu;
+      });
 
       /*
        * Und in die Datenbank. Henrik wollte ausdruecklich „Name, Info/Bio,
@@ -417,6 +455,25 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       );
     },
     [eigenesProfil, schreiben]
+  );
+
+  const profilSpeichernWarten = useCallback(
+    async (werte: Partial<EigenesProfil>): Promise<string | null> => {
+      const { bildUri, ...felder } = werte;
+      if (Object.keys(felder).length === 0) return null;
+      if (!supabase || !daten.ichId) return 'Dafür musst du angemeldet sein';
+      // `link` wandert mit den Links: alte Leser sehen den ersten (Schema 88
+      // hält es in der Datenbank ohnehin gleich).
+      if (felder.links) felder.link = felder.links[0]?.url ?? '';
+      try {
+        await Aktion.profilAendern(supabase, daten.ichId, felder);
+      } catch (e: any) {
+        return e?.message ?? 'Das Profil ließ sich nicht speichern';
+      }
+      setEigenesProfil((vorher) => ({ ...vorher, ...felder }));
+      return null;
+    },
+    [supabase, daten.ichId]
   );
 
   const folgenUmschalten = useCallback(
@@ -690,7 +747,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const kanalAnlegen = useCallback(
     (name: string, thema: string) => {
       if (communities.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-        return 'Diesen Kanal gibt es schon';
+        return 'Diese Community gibt es schon';
       }
       const vorlaeufig = `k${Date.now()}`;
       setCommunities((prev) => [
@@ -809,6 +866,9 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
   const kanalStummSetzen = useCallback((id: string, stumm: boolean) => {
     setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, stumm } : c)));
+  }, []);
+  const kanalPttSetzen = useCallback((id: string, an: boolean) => {
+    setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, pttBenachrichtigung: an } : c)));
   }, []);
 
   const clipUmschalten = useCallback(
@@ -990,12 +1050,14 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       unterthemaAnlegen,
       kanalBeitreten,
       kanalStummSetzen,
+      kanalPttSetzen,
       kanalGelesen,
       gefolgt,
       folgtPerson,
       folgenUmschalten,
       eigenesProfil,
       profilSpeichern,
+      profilSpeichernWarten,
     }),
     [
       mitteilungen, ungelesen, alsGelesen, alleGelesen,
@@ -1003,8 +1065,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalGelesen,
-      gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern,
+      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, kanalAnlegen, unterthemaAnlegen, kanalBeitreten, kanalStummSetzen, kanalPttSetzen, kanalGelesen,
+      gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern, profilSpeichernWarten,
     ]
   );
 

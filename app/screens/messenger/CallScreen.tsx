@@ -1,25 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
-import { colors, radius, spacing, themenStyles, typography } from '../../constants/design';
+import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
 import { useAktionen } from '../../lib/useAktionen';
+
+const Anruf = require('../../../gemeinsam/anruf') as typeof import('../../../gemeinsam/anruf');
 
 /*
  * Die Oberflaeche eines Anrufs.
  *
- * Die Uebertragung selbst fehlt bewusst: dafuer braucht es WebRTC, einen
+ * Die Uebertragung selbst fehlt: dafuer braucht es WebRTC, einen
  * Signalweg (Supabase Realtime) und einen TURN-Server - und WebRTC laeuft
- * nicht in Expo Go, sondern erst in einem eigenen Build. Die Oberflaeche
- * steht damit schon vollstaendig, der Verlauf ist simuliert:
- * klingelt -> verbunden (Dauer laeuft) -> beendet.
+ * nicht in Expo Go, sondern erst in einem eigenen Build.
+ *
+ * Kasten 5.1 (Henrik 28.09.2026: „Ist das nur eine Vorschau, oder könnte
+ * die andere Person wirklich in Echtzeit drangehen?"): Es ist eine Vorschau.
+ * Bis zum 10.10.2026 tat der Bildschirm trotzdem so, als nehme die
+ * Gegenseite nach 2,6 Sekunden ab, und zaehlte eine Gespraechsdauer hoch,
+ * die dann als „Anruf · 02:14" im Chat stand. Das war eine erfundene
+ * Anzeige. Jetzt:
+ *
+ *   gestartet -> beendet
+ *
+ * Beim Start steht der Anruf im Chat (Kasten 5.2, Schema 89), bei beiden
+ * gleich (5.4). Es gibt kein „verbunden" und keine Dauer, solange niemand
+ * verbunden sein kann. Gleiche Regel auf der Website (openCall).
  */
 
-type Zustand = 'klingelt' | 'verbunden' | 'beendet';
+type Zustand = 'gestartet' | 'beendet';
 
 interface Props {
   /** Bei einem Gruppenanruf leer - dann zaehlen name und teilnehmer. */
@@ -28,22 +41,22 @@ interface Props {
   gruppenName?: string;
   /** Kennungen der Mitglieder. */
   teilnehmer?: string[];
+  /**
+   * Der Chat, aus dem angerufen wird (Person, Gruppe, Community-Chat).
+   * Fehlt er, geht der Eintrag in den Messenger-Zweierchat mit userId.
+   */
+  chatId?: string;
+  /** Das Unterthema einer Community, wenn von dort angerufen wird. */
+  kanalId?: string;
   art: 'audio' | 'video';
   onClose: () => void;
   onNotice: (message: string) => void;
 }
 
-const zweistellig = (n: number) => String(n).padStart(2, '0');
+/** Sekunden als mm:ss, ab einer Stunde als h:mm:ss — Rechnung in gemeinsam/anruf.js. */
+export const dauerText = (sekunden: number) => Anruf.dauerText(sekunden);
 
-/** Sekunden als mm:ss, ab einer Stunde als h:mm:ss. */
-export const dauerText = (sekunden: number) => {
-  const st = Math.floor(sekunden / 3600);
-  const min = Math.floor((sekunden % 3600) / 60);
-  const sek = sekunden % 60;
-  return st > 0 ? `${st}:${zweistellig(min)}:${zweistellig(sek)}` : `${zweistellig(min)}:${zweistellig(sek)}`;
-};
-
-export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose, onNotice }: Props) => {
+export const CallScreen = ({ userId, gruppenName, teilnehmer = [], chatId, kanalId, art, onClose, onNotice }: Props) => {
   const { users: alleNutzer, neuLaden } = useDaten();
   const aktionen = useAktionen(onNotice);
   const insets = useSafeAreaInsets();
@@ -51,68 +64,40 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
   const person = userId ? alleNutzer[userId] : undefined;
   const dabei = teilnehmer.filter((id) => alleNutzer[id]);
 
-  const [zustand, setZustand] = useState<Zustand>('klingelt');
-  const [dauer, setDauer] = useState(0);
+  const [zustand, setZustand] = useState<Zustand>('gestartet');
   const [stumm, setStumm] = useState(false);
   const [lautsprecher, setLautsprecher] = useState(art === 'video');
   const [kameraAn, setKameraAn] = useState(art === 'video');
 
-  const puls = useRef(new Animated.Value(1)).current;
-
-  // Klingeln: der Ring pulsiert, bis abgenommen wird.
+  /*
+   * Kasten 5.2: der Eintrag entsteht beim Start, einmal. Der Bildschirm
+   * kann in der Entwicklung doppelt aufgebaut werden (StrictMode) — der
+   * Riegel verhindert zwei Eintraege fuer einen Anruf.
+   */
+  const vermerkt = useRef(false);
   useEffect(() => {
-    if (zustand !== 'klingelt') return;
-    const schleife = Animated.loop(
-      Animated.sequence([
-        Animated.timing(puls, { toValue: 1.08, duration: 900, useNativeDriver: true }),
-        Animated.timing(puls, { toValue: 1, duration: 900, useNativeDriver: true }),
-      ])
-    );
-    schleife.start();
-    return () => schleife.stop();
-  }, [zustand, puls]);
-
-  // Nach kurzer Zeit wird abgenommen - in der Demo automatisch.
-  useEffect(() => {
-    if (zustand !== 'klingelt') return;
-    const t = setTimeout(() => setZustand('verbunden'), 2600);
-    return () => clearTimeout(t);
-  }, [zustand]);
-
-  // Gespraechsdauer
-  useEffect(() => {
-    if (zustand !== 'verbunden') return;
-    const t = setInterval(() => setDauer((d) => d + 1), 1000);
-    return () => clearInterval(t);
-  }, [zustand]);
+    if (vermerkt.current) return;
+    vermerkt.current = true;
+    if (!chatId && !kanalId && !userId) return;
+    void aktionen
+      .anrufStarten({ chatId: chatId ?? null, kanalId: kanalId ?? null, zielId: userId ?? null }, art)
+      // Danach neu laden, sonst steht der Eintrag zwar in der Datenbank,
+      // aber nicht im Chat, in den man gleich zurueckkehrt.
+      .then((id) => {
+        if (id) neuLaden();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const auflegen = () => {
     setZustand('beendet');
-    /*
-     * Henrik 07.09.2026: „Anrufe sollen als Chatnachricht protokolliert werden
-     * (wie WhatsApp)." Der Eintrag geht in den Chat mit dieser Person — bei
-     * einem Gruppenanruf gibt es keinen, deshalb nur beim Zweiergespraech.
-     * Wird nicht abgewartet: der Bildschirm soll sofort zugehen.
-     */
-    if (userId) {
-      void aktionen
-        .anrufNotieren(userId, art, dauer, dauer > 0 ? 'beendet' : 'verpasst')
-        // Erst danach neu laden, sonst steht der Eintrag zwar in der
-        // Datenbank, aber nicht im Chat, in den man gerade zurueckkehrt.
-        .then(() => neuLaden());
-    }
-    onNotice(dauer > 0 ? `Anruf beendet · ${dauerText(dauer)}` : 'Anruf beendet');
+    // Der Eintrag steht seit dem Start im Chat; beim Auflegen kommt nichts
+    // dazu — es gab kein Gespraech, also auch keine Dauer.
+    onNotice('Anruf beendet');
     setTimeout(onClose, 700);
   };
 
-  const statusText =
-    zustand === 'klingelt'
-      ? art === 'video'
-        ? 'Videoanruf …'
-        : 'Klingelt …'
-      : zustand === 'verbunden'
-      ? dauerText(dauer)
-      : 'Beendet';
+  const statusText = zustand === 'gestartet' ? `${Anruf.artName(art)} gestartet` : 'Beendet';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.lg }]}>
@@ -121,14 +106,6 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
         style={styles.schleier}
         pointerEvents="none"
       />
-
-      {/* Bei einem Videoanruf steht hier spaeter das Bild der Gegenseite. */}
-      {art === 'video' && zustand === 'verbunden' && (
-        <View style={styles.videoFlaeche}>
-          <Ionicons name="videocam-outline" size={44} color="rgba(255,255,255,0.35)" />
-          <Text style={styles.videoHinweis}>Bildübertragung folgt mit dem Backend</Text>
-        </View>
-      )}
 
       <View style={styles.kopf}>
         {gruppe && dabei.length > 0 ? (
@@ -143,13 +120,20 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
         ) : gruppe ? (
           <Avatar id={gruppenName ?? 'gruppe'} name={gruppenName ?? 'Gruppe'} size={124} />
         ) : (
-          <Animated.View style={{ transform: [{ scale: zustand === 'klingelt' ? puls : 1 }] }}>
-            <Avatar id={userId ?? 'me'} name={person?.name ?? 'Unbekannt'} size={124} />
-          </Animated.View>
+          <Avatar id={userId ?? 'me'} name={person?.name ?? 'Unbekannt'} size={124} />
         )}
         <Text style={styles.name}>{gruppe ? gruppenName : person?.name ?? 'Unbekannt'}</Text>
         {gruppe && <Text style={styles.dabei}>{dabei.map((id) => alleNutzer[id].name.split(' ')[0]).join(', ')}</Text>}
-        <Text style={styles.status}>{statusText}</Text>
+        <Text style={styles.status} accessibilityLabel="Anrufstatus">{statusText}</Text>
+        {/*
+          Kasten 5.1: offen sagen, was dieser Bildschirm ist. Ohne den Satz
+          wartet man auf ein Abheben, das nicht kommen kann.
+        */}
+        <Text style={styles.vorschau}>
+          Vorschau: Sprache und Bild werden noch nicht übertragen.{'\n'}
+          {gruppe ? 'Die anderen sehen' : `${person?.name?.split(' ')[0] ?? 'Die andere Person'} sieht`} den
+          Anruf im Chat, annehmen geht noch nicht.
+        </Text>
         {/*
           Hier stand bis zum 07.09.2026 „Ende-zu-Ende-verschlüsselt".
 
@@ -164,12 +148,6 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
           und verschlüsselt ist. Lieber keine Angabe als eine falsche.
         */}
       </View>
-
-      {art === 'video' && kameraAn && zustand === 'verbunden' && (
-        <View style={styles.eigenesBild}>
-          <Ionicons name="person" size={26} color="rgba(255,255,255,0.5)" />
-        </View>
-      )}
 
       <View style={styles.leiste}>
         <Druck
@@ -215,14 +193,9 @@ export const CallScreen = ({ userId, gruppenName, teilnehmer = [], art, onClose,
       </View>
 
       <View style={styles.unten}>
-        {zustand === 'klingelt' && (
-          // In der Demo nimmt die Gegenseite von selbst ab - der Knopf
-          // ueberspringt das Warten.
-          <Druck style={[styles.rund, styles.annehmen]} onPress={() => setZustand('verbunden')}>
-            <Ionicons name="call" size={28} color={colors.white} />
-          </Druck>
-        )}
-        <Druck style={[styles.rund, styles.auflegen]} onPress={auflegen}>
+        {/* Kein „Annehmen" mehr: wer anruft, nimmt nicht selbst ab, und eine
+            Gegenseite, die abnehmen koennte, gibt es noch nicht (5.1). */}
+        <Druck style={[styles.rund, styles.auflegen]} onPress={auflegen} accessibilityLabel="Auflegen">
           <Ionicons name="call" size={28} color={colors.white} style={styles.aufgelegt} />
         </Druck>
       </View>
@@ -244,18 +217,7 @@ const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: '#0A0C10', justifyContent: 'flex-start' },
   schleier: { position: 'absolute', top: 0, left: 0, right: 0, height: '55%' },
 
-  videoFlaeche: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: '#171C22',
-  },
-  videoHinweis: { color: 'rgba(255,255,255,0.4)', ...typography.small },
+
 
   runde: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', maxWidth: 260, marginBottom: 6 },
   dabei: { marginTop: 4, ...typography.preview, color: 'rgba(255,255,255,0.65)', textAlign: 'center' },
@@ -269,18 +231,15 @@ const styles = themenStyles((colors) => ({
   kopf: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   name: { marginTop: spacing.lg, color: colors.white, ...typography.title },
   status: { color: 'rgba(255,255,255,0.65)', ...typography.body },
-
-  eigenesBild: {
-    position: 'absolute',
-    right: spacing.lg,
-    top: 110,
-    width: 92,
-    height: 128,
-    borderRadius: radius.md,
-    backgroundColor: '#252B33',
-    alignItems: 'center',
-    justifyContent: 'center',
+  vorschau: {
+    marginTop: spacing.sm,
+    maxWidth: 280,
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.45)',
+    ...typography.small,
   },
+
+
 
   leiste: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginBottom: 28 },
   knopf: {
@@ -301,14 +260,7 @@ const styles = themenStyles((colors) => ({
 
   unten: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xxl },
   rund: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
-  annehmen: {
-    backgroundColor: '#17A458',
-    shadowColor: '#12A150',
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
+
   auflegen: {
     backgroundColor: '#DC474C',
     shadowColor: '#E5484D',

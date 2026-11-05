@@ -25,6 +25,10 @@ import { useDaten } from '../../contexts/DatenContext';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import { ICH as CURRENT_USER_ID, chatZeit, ladeChatStand, ladeChatZustand, ladeKanalNachrichten, ladeNachrichten } from '../../lib/daten';
 import { AnhangSheet } from '../../components/AnhangSheet';
+import { GifStickerSheet } from '../../components/GifStickerSheet';
+import { StandortAnsicht } from '../../components/StandortAnsicht';
+
+const OrtSuche = require('../../../gemeinsam/ortsuche') as typeof import('../../../gemeinsam/ortsuche');
 import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
 import { WeiterleitenSheet } from '../../components/WeiterleitenSheet';
@@ -38,15 +42,23 @@ import { haptic } from '../../lib/haptics';
 import { nachrichtTon } from '../../lib/toene';
 // Dieselbe mm:ss-Schreibweise wie im Anrufbildschirm — sonst stuende im Chat
 // eine andere Dauer als waehrend des Gespraechs.
-import { dauerText } from './CallScreen';
+// Kasten 5: der Satz zum Anrufeintrag, gleich mit der Website.
+const Anruf = require('../../../gemeinsam/anruf') as typeof import('../../../gemeinsam/anruf');
 import * as Aktion from '../../lib/aktionen';
 import { FarbfilterSchicht } from '../../components/Farbfilter';
 import { MarkierterText } from '../../components/MarkierterText';
 import { MarkierungsEingabe } from '../../components/MarkierungsEingabe';
+import { ZiehZumAntworten } from '../../components/ZiehZumAntworten';
+import { PushToTalk } from '../../components/PushToTalk';
+import { PttVerlaufSheet } from '../../components/PttVerlaufSheet';
+// Kasten 8.5: die Zeile „Push to Talk · Datum · Uhrzeit", gleich mit der Website.
+const Ptt = require('../../../gemeinsam/ptt') as typeof import('../../../gemeinsam/ptt');
 
 const StoryRegeln = require('../../../gemeinsam/story') as typeof import('../../../gemeinsam/story');
 // Kasten 27: offenen Chat im Takt nachsehen — gemeinsam mit der Website.
 const ChatAbgleich = require('../../../gemeinsam/chatabgleich') as typeof import('../../../gemeinsam/chatabgleich');
+// Kasten 4/7 (28.09.): Ziehen zum Antworten, Karte geteilter Beitraege — gemeinsam mit der Website.
+const Chatblase = require('../../../gemeinsam/chatblase') as typeof import('../../../gemeinsam/chatblase');
 
 const nowTime = () =>
   new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -98,6 +110,12 @@ interface Props {
    * Nichtkontakts), öffnet sie den Betrachter mit genau dieser einen Story.
    */
   onOpenStory?: (story: NonNullable<Message['story']>) => void;
+  /*
+   * Kasten 7.3 (28.09.): die Karte eines geteilten Beitrags oeffnet den
+   * Beitrag selbst — Querformat im Player, Reel im Hochformat-Feed, Bild im
+   * Beitrags-Feed (kachelOeffnen in App.tsx).
+   */
+  onOpenBeitrag?: (beitrag: { id: string; kind: 'post' | 'reel' | 'clip' }) => void;
 }
 
 export const ChatDetailScreen = ({
@@ -118,8 +136,13 @@ export const ChatDetailScreen = ({
   onNotice,
   onOpenStandort,
   onOpenStory,
+  onOpenBeitrag,
 }: Props) => {
   const [anhangOffen, setAnhangOffen] = useState(false);
+  // Kasten 28/6.3: GIFs und Sticker hinter dem Knopf rechts im Eingabefeld.
+  const [gifStickerOffen, setGifStickerOffen] = useState(false);
+  // Kasten 28/6.5: Karte eines frei gewaehlten Ortes.
+  const [ortAnsicht, setOrtAnsicht] = useState<{ name: string; adresse?: string; lat: number; lng: number } | null>(null);
   const [kameraAuf, setKameraAuf] = useState(false);
   /*
    * Kasten RS 3: eine fremde Nachricht melden — im Messenger, im Community-
@@ -187,6 +210,12 @@ export const ChatDetailScreen = ({
   const istKanal = communities.some((c) =>
     (c.unterthemen ?? []).some((u) => u.id === chat.id)
   );
+  /** Kasten 8.6: die angetippte Sitzung „Push to Talk", deren Verlauf offen ist. */
+  const [pttVerlauf, setPttVerlauf] = useState<{ id: string; zeitpunkt?: string } | null>(null);
+  /** Kasten 8.2: die Community dieses Unterthemas — fuer Push-to-Talk. */
+  const kanalCommunity = istKanal
+    ? communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === chat.id))
+    : undefined;
 
   /*
    * "Zuletzt online". Hier stand bis zum 03.09.2026 fest das Wort "Online" —
@@ -277,6 +306,25 @@ export const ChatDetailScreen = ({
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, []);
+
+  /*
+   * Kasten 4: Zitat antippen → zur Originalnachricht. Steht sie nicht unter
+   * den geladenen (aelter als die juengsten 500), sagt das eine Meldung,
+   * statt still nichts zu tun. Die Nachricht leuchtet kurz auf.
+   */
+  const [hervor, setHervor] = useState<string | null>(null);
+  const hervorUhr = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (hervorUhr.current) clearTimeout(hervorUhr.current);
+  }, []);
+  const zuNachricht = (id: string) => {
+    const index = messagesRef.current.findIndex((m) => m.id === id);
+    if (index < 0) return onNotice?.('Die Nachricht ist nicht mehr im geladenen Verlauf');
+    listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+    setHervor(id);
+    if (hervorUhr.current) clearTimeout(hervorUhr.current);
+    hervorUhr.current = setTimeout(() => setHervor(null), 1400);
+  };
 
   /*
    * Den offenen Chat im Takt nachsehen (Kasten 27, 06.10.2026).
@@ -468,8 +516,13 @@ export const ChatDetailScreen = ({
       // Nachrichten stehen in einer eigenen Tabelle. Gelesen wurde von dort
       // schon immer (ladeKanalNachrichten oben), geschrieben bis hierher
       // nicht — das Geschriebene war beim naechsten Oeffnen weg.
+      /*
+       * Kasten 4.2: im Unterthema geht die Antwort mit (reply_to, Schema XX).
+       * Kennt die Datenbank die Spalte noch nicht, geht die Nachricht ohne
+       * Bezug raus und die Meldung sagt das — kein stiller Verlust.
+       */
       data = istKanal
-        ? await Aktion.kanalNachricht(supabase, ichId, chat.id, text)
+        ? await Aktion.kanalNachricht(supabase, ichId, chat.id, text, {}, bezug ? bezug.nachricht.id : null)
         : await Aktion.nachrichtSenden(supabase, ichId, chat.id, text, {
             antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
             zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
@@ -481,7 +534,8 @@ export const ChatDetailScreen = ({
       return;
     }
 
-    const bezugText = bezug
+    if (istKanal && (data as { ohneBezug?: boolean }).ohneBezug) onNotice?.(Chatblase.OHNE_BEZUG);
+    const bezugText = bezug && !(data as { ohneBezug?: boolean }).ohneBezug
       ? {
           id: bezug.nachricht.id,
           text: bezug.nachricht.text,
@@ -503,8 +557,10 @@ export const ChatDetailScreen = ({
         read: false,
         // Bis das Nachsehen sie aus der Datenbank liefert (Kasten 27).
         lokal: true,
-        antwortAuf: bezug?.art === 'antwort' ? bezugText : undefined,
-        zitat: bezug?.art === 'zitat' ? bezugText : undefined,
+        // Im Unterthema gibt es nur den Bezug, kein eigenes Zitat (Schema XX):
+        // dort wird ein Zitat als Antwort gezeigt — so wie es gespeichert ist.
+        antwortAuf: bezug?.art === 'antwort' || (istKanal && bezug) ? bezugText : undefined,
+        zitat: bezug?.art === 'zitat' && !istKanal ? bezugText : undefined,
       },
     ]);
     setBezug(null);
@@ -584,6 +640,9 @@ export const ChatDetailScreen = ({
 
   const renderMessage = ({ item }: { item: Message }) => {
     const out = item.senderId === CURRENT_USER_ID;
+    // Kasten 28/6.5: ein frei gewaehlter Ort steht im (ggf. entschluesselten)
+    // Text — gemeinsam/ortsuche.js macht daraus dieselbe Karte.
+    const ortDerBlase = item.standort ?? (item.media ? null : OrtSuche.ausText(item.text));
     const sender = alleNutzer[item.senderId];
     // Der Anhang, den es wirklich zu sehen gibt (Henrik 7.9.): frisch vom
     // Geraet oder vom Server. Ohne Adresse bleibt es beim grauen Kaestchen —
@@ -602,26 +661,49 @@ export const ChatDetailScreen = ({
      * WhatsApp. Eine Sprechblase wuerde behaupten, jemand haette etwas
      * geschrieben. Gleiche Darstellung auf der Website (paintMessages).
      */
-    if (item.anruf) {
-      const verpasst = item.anruf.status !== 'beendet';
+    /*
+     * Kasten 8.5 (Henrik 28.09.2026): statt aller Wortmeldungen steht im
+     * Unterthema EINE Zeile „Push to Talk" mit Datum und Uhrzeit je Sitzung
+     * (angelegt von der Datenbank, Schema 90). Antippen zeigt den Verlauf
+     * (8.6, PttVerlaufSheet). Gleiche Zeile auf der Website (pttSitzungZeile).
+     */
+    if (item.pttSitzung) {
+      const satz = Ptt.zeile(item.zeitpunkt);
       return (
-        <View style={styles.anruf}>
+        <Druck
+          style={styles.pttZeile}
+          onPress={() => setPttVerlauf({ id: item.id, zeitpunkt: item.zeitpunkt })}
+          accessibilityLabel={satz}
+        >
+          <Ionicons name="mic" size={15} color={colors.brand} />
+          <Text style={styles.pttZeileText}>{satz}</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.text3} />
+        </Druck>
+      );
+    }
+
+    if (item.anruf) {
+      /*
+       * Kasten 5.2–5.4 (28.09.2026): derselbe Satz wie auf der Website, aus
+       * gemeinsam/anruf.js — zu zweit „Ausgehender/Eingehender …", in
+       * Gruppe und Unterthema „Max hat einen Videoanruf gestartet". Ein
+       * nur gestarteter Anruf heisst nie „angenommen" (5.1).
+       */
+      const anrufOpts = {
+        eigen: out,
+        gruppe: Boolean(chat.isGroup || istKanal),
+        name: sender?.name?.split(' ')[0],
+      };
+      const verpasst = Anruf.verpasst(item.anruf, anrufOpts);
+      const anrufSatz = `${Anruf.text(item.anruf, anrufOpts)} · ${item.time}`;
+      return (
+        <View style={styles.anruf} accessibilityLabel={anrufSatz}>
           <Ionicons
             name={item.anruf.art === 'video' ? 'videocam-outline' : 'call-outline'}
             size={14}
             color={verpasst ? colors.danger : colors.text2}
           />
-          <Text style={[styles.anrufText, verpasst && styles.anrufVerpasst]}>
-            {out ? 'Ausgehender ' : ''}
-            {item.anruf.art === 'video' ? 'Videoanruf' : 'Anruf'}
-            {verpasst
-              ? item.anruf.status === 'abgelehnt'
-                ? ' · abgelehnt'
-                : ' · verpasst'
-              : ` · ${dauerText(item.anruf.dauer)}`}
-            {' · '}
-            {item.time}
-          </Text>
+          <Text style={[styles.anrufText, verpasst && styles.anrufVerpasst]}>{anrufSatz}</Text>
         </View>
       );
     }
@@ -693,14 +775,31 @@ export const ChatDetailScreen = ({
       );
     }
 
+    /*
+     * Kasten 4 (Feedback 28.09.): nach rechts ziehen → Antworten. Gilt in
+     * jedem Chat, der hier gezeichnet wird: Messenger, Communitys → Chats,
+     * Unterthema (Kanal) und Chats, die aus Videos heraus geoeffnet werden.
+     * Nicht bei zurueckgenommenen Nachrichten — dort gibt es nichts, worauf
+     * man sich beziehen koennte — und nicht, solange der Chat gesperrt ist.
+     */
+    const ziehbar = !gesperrt && !item.zurueckgenommen;
     return (
-      // Lange druecken markiert eine Nachricht mit einem Stern - so fuellt
-      // sich "Mit Stern markiert" in der Kontaktinfo wirklich.
+      <ZiehZumAntworten
+        aktiv={ziehbar}
+        onAntworten={() => {
+          setBearbeitet(null);
+          setBezug({ art: 'antwort', nachricht: item });
+        }}
+        testID={`nachricht-${item.id}`}
+      >
+      {/* Lange druecken oeffnet das Menue (Antworten, Zitieren, Stern …). */}
       <Druck
         style={[
           styles.bubble,
+          hervor === item.id && styles.bubbleHervor,
           out ? styles.bubbleOut : styles.bubbleIn,
           item.media === 'sticker' && styles.bubbleSticker,
+          item.geteilt && !item.zurueckgenommen && styles.bubbleKarte,
         ]}
         onLongPress={() => {
           haptic.medium();
@@ -728,15 +827,28 @@ export const ChatDetailScreen = ({
           * das Original zurueckgenommen wird.
           */}
         {item.antwortAuf ? (
-          <View style={styles.bezug}>
+          /*
+           * Kasten 4: das Zitat antippen springt zur Originalnachricht,
+           * wenn sie geladen ist, und hebt sie kurz hervor.
+           */
+          <Druck
+            style={[styles.bezug, styles.bezugInBlase, out && styles.bezugInBlaseOut]}
+            onPress={() => zuNachricht(item.antwortAuf!.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Antwort auf ${item.antwortAuf.autor || 'Nachricht'}: ${item.antwortAuf.text || ''}`}
+            testID="antwort-bezug"
+          >
             <View style={styles.bezugBalken} />
             <View style={styles.bezugText}>
-              <Text style={styles.bezugAutor}>{item.antwortAuf.autor}</Text>
-              <Text style={styles.bezugZeile} numberOfLines={1}>
-                {item.antwortAuf.text || 'Zurückgenommen'}
+              {item.antwortAuf.autor ? (
+                <Text style={styles.bezugAutor}>{item.antwortAuf.autor}</Text>
+              ) : null}
+              <Text style={styles.bezugZeile} numberOfLines={2}>
+                {item.antwortAuf.text ||
+                  ((item.antwortAuf as { fehlt?: boolean }).fehlt ? Chatblase.BEZUG_WEG : 'Zurückgenommen')}
               </Text>
             </View>
-          </View>
+          </Druck>
         ) : null}
 
         {item.zitat ? (
@@ -800,16 +912,20 @@ export const ChatDetailScreen = ({
               />
             ) : null}
           </View>
-        ) : item.standort ? (
-          <Druck style={styles.ortKarte} onPress={() => onOpenStandort?.(item.standort!.name)}>
+        ) : ortDerBlase ? (
+          <Druck
+            style={styles.ortKarte}
+            onPress={() => ortOeffnen(ortDerBlase)}
+            accessibilityLabel={`Standort ${ortDerBlase.name}`}
+          >
             <View style={styles.ortBild}>
-              <View style={[styles.ortNadel, { left: `${item.standort.x ?? 50}%`, top: `${item.standort.y ?? 50}%` }]}>
+              <View style={[styles.ortNadel, { left: `${ortDerBlase.x ?? 50}%`, top: `${ortDerBlase.y ?? 50}%` }]}>
                 <Ionicons name="location" size={22} color={colors.danger} />
               </View>
             </View>
-            <Text style={styles.ortName}>{item.standort.name}</Text>
+            <Text style={styles.ortName}>{ortDerBlase.name}</Text>
             <Text style={styles.ortSub} numberOfLines={1}>
-              {item.standort.adresse ?? item.standort.koordinaten}
+              {ortDerBlase.adresse || ortDerBlase.koordinaten}
             </Text>
           </Druck>
         ) : item.kontakt ? (
@@ -822,46 +938,123 @@ export const ChatDetailScreen = ({
           </Druck>
         ) : item.geteilt ? (
           /*
-           * Ein geteilter Beitrag (Henrik 7.9.). Bis dahin war das eine
-           * Zeile mit einem grauen Kaestchen daneben und liess sich nicht
-           * oeffnen — ein weitergeleitetes Video war damit im Chat nichts
-           * weiter als sein Titel. Jetzt steht der Beitrag selbst da und
-           * geht beim Antippen ins Vollformat.
+           * Ein geteilter Beitrag (Henrik 7.9., neu gestaltet nach Feedback
+           * 28.09., Kasten 7): „Thumbnail im Grossformat, darunter der Name
+           * des Beitrags und die Beschreibung" — nach dem Vorbild von
+           * Instagram/WhatsApp. Oben klein das Konto, dann das Vorschaubild
+           * ueber die volle Blasenbreite (bei Videos mit Video-Zeichen),
+           * darunter Titel (posts.title) und Beschreibung (posts.description).
+           * Antippen oeffnet den Beitrag selbst, nicht nur sein Bild.
+           * Abbildung in gemeinsam/chatblase.js (geteiltAus), gleiche Karte
+           * auf der Website (geteiltKarte in web/public/app.js).
            */
-          <Druck
-            style={styles.geteiltKarte}
-            onPress={() =>
-              item.geteilt?.bild
-                ? setVollbild({ id: item.geteilt.id, uri: item.geteilt.bild })
-                : onNotice?.('Zu diesem Beitrag gibt es keine Datei')
-            }
-          >
-            <Videoflaeche
-              id={item.geteilt.id}
-              quelle={item.geteilt.bild}
-              laeuft={false}
-              stumm
-              icon={item.geteilt.art === 'video' ? 'play' : 'image-outline'}
-              iconSize={20}
-              fuellen="cover"
-              style={styles.anhangBild}
-            />
-            <View style={styles.geteiltZeile}>
-              <Ionicons
-                name={item.geteilt.art === 'video' ? 'play-circle-outline' : 'image-outline'}
-                size={16}
-                color={colors.text3}
-              />
-              <View style={styles.geteiltText}>
+          item.geteilt.weg ? (
+            /*
+             * Nachtrag 11.10. (7.5/7.6): die Weg-Karte. Graue Fläche in
+             * Kartenform statt einer Fehlerzeile; gelöscht (Merker aus
+             * Schema 93) und nicht sichtbar (Kennung steht, Leseregel sagt
+             * nein) getrennt — mehr weiß die Datenbank nicht, mehr steht
+             * nicht da. Bei „gelöscht" das Konto mit Profilbild, falls es
+             * noch lesbar ist. Gleiche Karte auf der Website (geteiltKarte).
+             */
+            <View
+              style={styles.geteiltWeg}
+              accessibilityLabel={Chatblase.geteiltBeschriftung(item.geteilt)}
+              testID={item.geteilt.grund === 'geloescht' ? 'geteilt-geloescht' : 'geteilt-weg'}
+            >
+              {item.geteilt.autorId && (item.geteilt.autor || alleNutzer[item.geteilt.autorId]?.name) ? (
+                <View style={styles.geteiltWegKonto}>
+                  <Avatar
+                    id={item.geteilt.autorId}
+                    name={item.geteilt.autor || alleNutzer[item.geteilt.autorId]?.name || '?'}
+                    size={22}
+                    bild={item.geteilt.autorBild}
+                  />
+                  <Text style={styles.geteiltAutor} numberOfLines={1}>
+                    {item.geteilt.autor || alleNutzer[item.geteilt.autorId]?.name}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={styles.geteiltWegFlaeche}>
+                <View style={styles.geteiltWegSymbol}>
+                  <Ionicons
+                    name={item.geteilt.grund === 'geloescht' ? 'trash-outline' : 'eye-off-outline'}
+                    size={22}
+                    color={colors.text3}
+                  />
+                </View>
+                <Text style={styles.geteiltWegText}>{Chatblase.GETEILT_WEG}</Text>
+                {Chatblase.geteiltWegGrund(item.geteilt) ? (
+                  <Text style={styles.geteiltWegGrund}>{Chatblase.geteiltWegGrund(item.geteilt)}</Text>
+                ) : null}
+              </View>
+            </View>
+          ) : (
+            <Druck
+              style={styles.geteiltKarte}
+              onPress={() => {
+                const g = item.geteilt!;
+                if (onOpenBeitrag) return onOpenBeitrag({ id: g.id, kind: g.kind ?? 'post' });
+                if (g.bild) setVollbild({ id: g.id, uri: g.bild });
+              }}
+              onLongPress={() => {
+                haptic.medium();
+                setGewaehlt(item);
+              }}
+              delayLongPress={450}
+              accessibilityRole="button"
+              accessibilityLabel={Chatblase.geteiltBeschriftung(item.geteilt)}
+              testID="geteilt-karte"
+            >
+              <View style={styles.geteiltKopf}>
+                {/* 7.7: echtes Profilbild des Kontos (im Messenger ggf. mein eigenes Kontaktbild, 7.8). */}
+                <Avatar
+                  id={item.geteilt.autorId ?? item.geteilt.id}
+                  name={item.geteilt.autor || '?'}
+                  size={22}
+                  bild={item.geteilt.autorBild}
+                />
                 <Text style={styles.geteiltAutor} numberOfLines={1}>
                   {item.geteilt.autor}
                 </Text>
-                <Text style={styles.geteiltTitel} numberOfLines={1}>
-                  {item.geteilt.titel}
-                </Text>
               </View>
-            </View>
-          </Druck>
+              <View style={styles.geteiltBildRahmen}>
+                <Videoflaeche
+                  id={item.geteilt.id}
+                  quelle={item.geteilt.bild}
+                  laeuft={false}
+                  stumm
+                  icon={item.geteilt.art === 'video' ? 'play' : 'image-outline'}
+                  iconSize={28}
+                  fuellen="cover"
+                  style={styles.geteiltBild}
+                />
+                {item.geteilt.art === 'video' ? (
+                  <View style={styles.geteiltVideoZeichen}>
+                    <Ionicons
+                      name={item.geteilt.kind === 'clip' ? 'tv-outline' : 'film-outline'}
+                      size={16}
+                      color={colors.white}
+                    />
+                  </View>
+                ) : null}
+              </View>
+              {item.geteilt.titel || item.geteilt.beschreibung ? (
+                <View style={styles.geteiltText}>
+                  {item.geteilt.titel ? (
+                    <Text style={styles.geteiltTitel} numberOfLines={2}>
+                      {item.geteilt.titel}
+                    </Text>
+                  ) : null}
+                  {item.geteilt.beschreibung ? (
+                    <Text style={styles.geteiltBeschreibung} numberOfLines={3}>
+                      {item.geteilt.beschreibung}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </Druck>
+          )
         ) : item.media === 'sticker' ? (
           /*
            * Ein Sticker steht ohne Blase und ohne Rahmen da — sonst waere er
@@ -964,6 +1157,7 @@ export const ChatDetailScreen = ({
           </View>
         ) : null}
       </Druck>
+      </ZiehZumAntworten>
     );
   };
 
@@ -991,6 +1185,9 @@ export const ChatDetailScreen = ({
      * die Karte baut die Oberfläche daraus.
      */
     let id = `m${Date.now()}`;
+    // Kasten 4.3a: der Bezug aus dem Ziehen gilt auch für den Anhang.
+    const anhangBezug = bezug && !bearbeitet ? bezug : null;
+    let anhangOhneBezug = false;
     if (supabase && ichId) {
       try {
         /*
@@ -1003,17 +1200,35 @@ export const ChatDetailScreen = ({
          * Text nahm die richtige Abzweigung (kanalNachricht), der
          * Anhang nicht.
          */
+        /*
+         * Kasten 4.3a (Nachtrag 11.10.): wer gezogen hat und dann ein Foto,
+         * einen Sticker oder einen Ort schickt, antwortet damit. Bis hierher
+         * ging der Anhang ohne Bezug raus und die Leiste blieb stehen — die
+         * Antwort verlor still ihren Anlass. Gleiche Weiche auf der Website
+         * (anhangSenden → antwortAuf).
+         */
         const anhang = {
           typ: teil.media ?? null,
           standortId: ortId ?? null,
           kontaktId: personId ?? null,
           dateiName: dateiName ?? null,
           dateiGroesse: dateiGroesse ?? null,
+          antwortAuf: anhangBezug?.art === 'antwort' ? anhangBezug.nachricht.id : null,
+          zitatVon: anhangBezug?.art === 'zitat' ? anhangBezug.nachricht.id : null,
         };
         const data = istKanal
-          ? await Aktion.kanalNachricht(supabase, ichId, chat.id, teil.text ?? '', anhang)
+          ? await Aktion.kanalNachricht(
+              supabase, ichId, chat.id, teil.text ?? '',
+              { ...anhang, antwortAuf: null, zitatVon: null },
+              anhangBezug ? anhangBezug.nachricht.id : null
+            )
           : await Aktion.nachrichtSenden(supabase, ichId, chat.id, teil.text ?? '', anhang);
         id = data.id;
+        if (anhangBezug) {
+          anhangOhneBezug = istKanal && !!(data as { ohneBezug?: boolean }).ohneBezug;
+          if (anhangOhneBezug) onNotice?.(Chatblase.OHNE_BEZUG);
+          setBezug(null);
+        }
       } catch (e: any) {
         console.error('Anhang senden fehlgeschlagen:', e?.message ?? e);
         onNotice?.('Der Anhang ging nicht raus');
@@ -1021,11 +1236,58 @@ export const ChatDetailScreen = ({
       }
     }
 
+    const anhangKopf =
+      anhangBezug && !anhangOhneBezug
+        ? {
+            id: anhangBezug.nachricht.id,
+            text: anhangBezug.nachricht.text,
+            autor:
+              anhangBezug.nachricht.senderId === CURRENT_USER_ID
+                ? 'Du'
+                : alleNutzer[anhangBezug.nachricht.senderId]?.name ?? '',
+          }
+        : undefined;
     setMessages((prev) => [
       ...prev,
-      { id, chatId: chat.id, senderId: CURRENT_USER_ID, time: nowTime(), ...teil, lokal: true },
+      {
+        id,
+        chatId: chat.id,
+        senderId: CURRENT_USER_ID,
+        time: nowTime(),
+        ...teil,
+        lokal: true,
+        // Wie beim Text: im Unterthema wird ein Zitat als Antwort gezeigt.
+        antwortAuf: anhangBezug && (anhangBezug.art === 'antwort' || istKanal) ? anhangKopf : undefined,
+        zitat: anhangBezug?.art === 'zitat' && !istKanal ? anhangKopf : undefined,
+      },
     ]);
     scrollToEnd();
+  };
+
+  /*
+   * Kasten 28/6: Plus, Kamera und GIF/Sticker-Knopf antworten bei einem
+   * gesperrten Chat mit demselben Satz — vorher stand er nur am Plus.
+   */
+  /*
+   * Kasten 28/6.5: Ort aus `places` → Standortseite im Explorer (wie bisher);
+   * frei gewaehlter Ort mit Koordinaten → Karte im Blatt.
+   */
+  const ortOeffnen = (ort: NonNullable<Message['standort']>) => {
+    if (typeof ort.lat === 'number' && typeof ort.lng === 'number') {
+      return setOrtAnsicht({ name: ort.name, adresse: ort.adresse, lat: ort.lat, lng: ort.lng });
+    }
+    onOpenStandort?.(ort.name);
+  };
+
+  const wennFrei = (weiter: () => void) => {
+    if (!gesperrt) return weiter();
+    onNotice?.(
+      blockiert
+        ? 'Diese Person ist blockiert'
+        : dmGesperrt
+          ? `${chat.name} empfängt keine Nachrichten`
+          : 'Warte, bis die Anfrage angenommen wurde'
+    );
   };
 
   return (
@@ -1042,10 +1304,14 @@ export const ChatDetailScreen = ({
           onPress={() => {
             if (!chat.isGroup && chat.userId) {
               onOpenProfile(chat.userId);
+            } else if (chat.isGroup && !istKanal) {
+              // Kasten 28/7.9: Antippen öffnet die Gruppeninfo (wie die Kontaktinfo).
+              // Ein Unterthema ist keine Gruppe — sein Kopf bleibt, wie er ist (11.1).
+              onOpenGroupSettings?.(chat.id);
             }
           }}
           onLongPress={() => {
-            if (chat.isGroup) {
+            if (chat.isGroup && !istKanal) {
               onOpenGroupSettings?.(chat.id);
             }
           }}
@@ -1084,7 +1350,16 @@ export const ChatDetailScreen = ({
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
-          onContentSizeChange={scrollToEnd}
+          onContentSizeChange={hervor ? undefined : scrollToEnd}
+          // Ohne feste Hoehen kennt die Liste fernere Zeilen noch nicht:
+          // erst grob hinrollen, dann genau (Kasten 4, Zitat → Original).
+          onScrollToIndexFailed={(info) => {
+            listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(
+              () => listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.4 }),
+              80
+            );
+          }}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <View style={styles.dayDivider}>
@@ -1275,21 +1550,43 @@ export const ChatDetailScreen = ({
           </View>
         )}
 
+        {/*
+          Kasten 8.2 (Henrik 28.09.2026): Push-to-Talk liegt nicht mehr auf
+          der Home-Seite der Community, sondern im Unterthema (#). Nur fuer
+          Mitglieder — die Regel „PTT senden" laesst nur sie zu. Die
+          Wortmeldung geht an dieses Unterthema (channel_id); die Datenbank
+          legt daraus die eine Zeile „Push to Talk" an (Schema 90).
+        */}
+        {pttVerlauf && (
+          <PttVerlaufSheet
+            sitzungId={pttVerlauf.id}
+            zeitpunkt={pttVerlauf.zeitpunkt}
+            onClose={() => setPttVerlauf(null)}
+          />
+        )}
+
+        {kanalCommunity && (kanalCommunity.joined || kanalCommunity.eigen) && (
+          <View style={styles.pttLeiste}>
+            <PushToTalk
+              communityId={kanalCommunity.id}
+              kanalId={chat.id}
+              onNotice={(t) => onNotice?.(t)}
+              onGesendet={() => {
+                if (!supabase || !ichId) return;
+                ladeKanalNachrichten(supabase, ichId, chat.id)
+                  .then((frisch) => setMessages((prev) => ChatAbgleich.nachrichtenAbgleichen(prev, frisch)))
+                  .catch(() => {});
+              }}
+            />
+          </View>
+        )}
+
         <View style={[styles.composer, { paddingBottom: 8 + insets.bottom }]}>
           <Druck
             style={styles.composerIcon}
-            onPress={() =>
-              gesperrt
-                ? onNotice?.(
-                    blockiert
-                      ? 'Diese Person ist blockiert'
-                      : dmGesperrt
-                        ? `${chat.name} empfängt keine Nachrichten`
-                        : 'Warte, bis die Anfrage angenommen wurde'
-                  )
-                : setAnhangOffen(true)
-            }
+            onPress={() => wennFrei(() => setAnhangOffen(true))}
             hitSlop={4}
+            accessibilityLabel="Anhang"
           >
             <Ionicons name="add" size={24} color={colors.text2} />
           </Druck>
@@ -1326,7 +1623,29 @@ export const ChatDetailScreen = ({
               returnKeyType={enterSendet ? 'send' : 'default'}
               onSubmitEditing={enterSendet ? () => send() : undefined}
             />
-            <Druck style={styles.composerIcon} onPress={onCamera} hitSlop={4} accessibilityLabel="Kamera">
+            {/*
+              Kasten 28/6.1: die Kamera sitzt nur noch hier, nicht mehr im
+              Anhang-Blatt (WhatsApp-Vorbild). Sie oeffnet die eigene Kamera
+              mit festem Ziel (`direktZu` → anhangSenden), die wirklich in die
+              Datenbank schreibt — auch im Unterthema. Der alte Weg ueber
+              `onCamera` (App.tsx, aufnahmeInChat) legte das Foto nur lokal
+              an und meldete trotzdem „Foto gesendet".
+            */}
+            {/* Kasten 28/6.3: GIF | Sticker wie bei WhatsApp — Symbol innen rechts. */}
+            <Druck
+              style={styles.composerIcon}
+              onPress={() => wennFrei(() => setGifStickerOffen(true))}
+              hitSlop={4}
+              accessibilityLabel="GIFs und Sticker"
+            >
+              <Ionicons name="happy-outline" size={21} color={colors.text2} />
+            </Druck>
+            <Druck
+              style={styles.composerIcon}
+              onPress={() => wennFrei(() => setKameraAuf(true))}
+              hitSlop={4}
+              accessibilityLabel="Kamera"
+            >
               <Ionicons name="camera-outline" size={21} color={colors.text2} />
             </Druck>
           </View>
@@ -1376,9 +1695,12 @@ export const ChatDetailScreen = ({
         visible={anhangOffen}
         contacts={contacts}
         ausserId={chat.userId}
-        ohne={istKanal ? ['standortAnfragen'] : []}
+        // Kasten 28/6.6: „Standort anfragen" richtet sich an eine Person —
+        // in Unterthema UND Gruppe gibt es kein Gegenueber (vorher stand er in
+        // Gruppen und antwortete nur „In einer Gruppe geht das nicht").
+        // Gleiche Regel in web/public/app.js (zielChat).
+        ohne={istKanal || !chat.userId ? ['standortAnfragen'] : []}
         onClose={() => setAnhangOffen(false)}
-        onKamera={() => setKameraAuf(true)}
         onStandortAnfragen={async () => {
           if (!chat.userId) return onNotice?.('In einer Gruppe geht das nicht');
           const id = await aktionen.standortAnfragen(chat.id, chat.userId);
@@ -1388,8 +1710,18 @@ export const ChatDetailScreen = ({
         onNotice={(text) => onNotice?.(text)}
       />
 
+      <StandortAnsicht ort={ortAnsicht} onClose={() => setOrtAnsicht(null)} />
+
+      <GifStickerSheet
+        visible={gifStickerOffen}
+        onClose={() => setGifStickerOffen(false)}
+        onAnhang={anhangSenden}
+        onNotice={(text) => onNotice?.(text)}
+      />
+
       {/*
-        Die eigene Kamera aus dem Anhang-Blatt heraus.
+        Die eigene Kamera aus dem Eingabefeld heraus (bis Kasten 28/6.1 aus
+        dem Anhang-Blatt).
 
         `direktZu` heisst: das Ziel steht fest. Wer im Chat auf "Foto
         aufnehmen" tippt, hat gerade gesagt, wohin die Aufnahme soll — die
@@ -1474,6 +1806,16 @@ const styles = themenStyles((colors) => ({
   weiter: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
   weiterText: { ...typography.tiny, color: colors.text3, fontStyle: 'italic' },
   bezug: { flexDirection: 'row', gap: spacing.sm, marginBottom: 5 },
+  /* Kasten 4: der Bezug in der Blase als abgesetzte, antippbare Flaeche. */
+  bezugInBlase: {
+    paddingVertical: 5,
+    paddingRight: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  bezugInBlaseOut: { backgroundColor: 'rgba(0,0,0,0.07)' },
+  bubbleHervor: { borderWidth: 2, borderColor: colors.brand },
   bezugBalken: { width: 3, borderRadius: 2, backgroundColor: colors.brand },
   bezugText: { flex: 1 },
   bezugAutor: { ...typography.tiny, color: colors.brand },
@@ -1577,6 +1919,26 @@ const styles = themenStyles((colors) => ({
     backgroundColor: colors.surface3,
   },
   anrufText: { color: colors.text2, ...typography.small },
+  /* Kasten 8.5: die Zeile „Push to Talk" — mittig wie der Anrufeintrag, aber antippbar. */
+  pttZeile: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface3,
+  },
+  pttZeileText: { color: colors.text, ...typography.small, fontWeight: '600' },
+  /* Kasten 8.2: Push-to-Talk ueber der Eingabezeile im Unterthema. */
+  pttLeiste: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   anrufVerpasst: { color: colors.danger },
 
   /* Kasten 16: die Karte einer Story-Markierung — mittig, keine Blase. */
@@ -1694,11 +2056,60 @@ const styles = themenStyles((colors) => ({
    * derselben Groesse wie jeder andere Anhang, darunter eine Zeile mit Autor
    * und Titel. Vorher war es umgekehrt — Text mit einem 42px-Kaestchen davor.
    */
-  geteiltKarte: { marginBottom: 4 },
-  geteiltZeile: { flexDirection: 'row', alignItems: 'center', gap: 8, width: 210 },
-  geteiltText: { flex: 1, minWidth: 0 },
-  geteiltAutor: { ...typography.small, fontWeight: '600', color: colors.text },
-  geteiltTitel: { ...typography.small, color: colors.text2, marginTop: 2 },
+  /* Kasten 7 (28.09.): die Karte eines geteilten Beitrags — volle Blasenbreite. */
+  bubbleKarte: { paddingHorizontal: 4, paddingTop: 4 },
+  geteiltKarte: {
+    width: 248,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    marginBottom: 4,
+  },
+  geteiltKopf: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  geteiltAutor: { flex: 1, ...typography.small, fontWeight: '600', color: colors.text },
+  geteiltBildRahmen: { width: 248, height: 310, backgroundColor: colors.surface3 },
+  geteiltBild: { width: 248, height: 310 },
+  geteiltVideoZeichen: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  geteiltText: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10, gap: 3 },
+  geteiltTitel: { ...typography.small, fontWeight: '700', color: colors.text },
+  geteiltBeschreibung: { ...typography.small, color: colors.text2 },
+  /* Nachtrag 11.10. (7.6): Weg-Karte in Kartenform, nicht als Fehlerzeile. */
+  geteiltWeg: {
+    width: 248,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    marginBottom: 4,
+  },
+  geteiltWegKonto: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  geteiltWegFlaeche: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 26,
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface3,
+  },
+  geteiltWegSymbol: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface2,
+  },
+  geteiltWegText: { ...typography.small, fontWeight: '600', color: colors.text2, textAlign: 'center' },
+  geteiltWegGrund: { ...typography.small, color: colors.text3, textAlign: 'center' },
   bubbleFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
   time: { color: colors.text3, ...typography.tiny },
   timeOut: { color: colors.bubbleOutMeta },

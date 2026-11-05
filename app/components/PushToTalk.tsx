@@ -1,6 +1,9 @@
 /**
  * Push-to-Talk in einer Community.
  *
+ * Seit Kasten 8.2 (10.10.2026) sitzt der Knopf im Chat eines Unterthemas
+ * (ChatDetailScreen, mit kanalId), nicht mehr auf der Community-Startseite.
+ *
  * WARUM ES DAS GIBT
  *
  * Im Handbuch ist Push-to-Talk eine Funktion: „Push-to-Talk Nachricht an
@@ -121,6 +124,8 @@ export const PushToTalk = ({ communityId, kanalId, onNotice, onGesendet }: Props
         style={[styles.knopf, laeuft && styles.knopfAn]}
         onPressIn={start}
         onPressOut={stop}
+        accessibilityLabel="Push to Talk"
+        accessibilityHint="Gedrückt halten zum Sprechen"
         // Der Knopf reagiert auf Drücken und Loslassen, nicht auf einen
         // abgeschlossenen Tipp — deshalb hier kein onPress.
         delayLongPress={100}

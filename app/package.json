@@ -76,6 +76,7 @@
     "test:gesten": "node test/_gesten.js",
     "test:feinschliff": "node test/_feinschliff.js",
     "test:kamera": "node test/_kamera.js",
+    "test:k28-suchen": "node test/k28-suchen.js",
     "test:storyvideo": "node test/_storyvideo_regeln.js",
     "test:eigenes": "node test/_eigenes.js",
     "test:gleichstand": "node test/_gleichstand.js",
@@ -127,7 +128,16 @@
     "test:medienadresse-einheit": "node test/_medienadresse_einheit.js",
     "test:vorschlaege": "node test/_vorschlaege.js",
     "test:angriffe": "node test/_angriffe.js",
-    "test:recht": "node test/_rechtstexte_einheit.js"
+    "test:recht": "node test/_rechtstexte_einheit.js",
+    "test:k28-profil": "node test/k28-profil.js",
+    "test:k28-profilseite": "node test/k28-profilseite.js",
+    "test:k28-chatblase": "node test/k28-chatblase.js",
+    "test:k28-karte": "node test/k28-karte.js",
+    "test:k28-gruppe": "node test/k28-gruppe.js",
+    "test:k28-anhaenge": "node test/k28-anhaenge.js",
+    "test:ortsuche-einheit": "node test/_ortsuche_einheit.js",
+    "test:k28-anruf-ptt": "node test/k28-anruf-ptt.js",
+    "test:k28-kommentare": "node test/k28-kommentare.js"
   },
   "private": true
 }

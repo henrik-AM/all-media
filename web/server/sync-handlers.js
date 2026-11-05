@@ -16,7 +16,11 @@
  */
 
 const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
+const Profilfelder = require('../../gemeinsam/profilfelder');
 const Telefon = require('../../gemeinsam/telefon');
+// Kasten 4 (28.09.): Antworten im Unterthema, solange Schema XX fehlt.
+const Chatblase = require('../../gemeinsam/chatblase');
+const Kommentar = require('../../gemeinsam/kommentar');
 // Wer im Teilen-Blatt steht und warum an jemanden nichts geht — mit der App.
 const Teilen = require('../../gemeinsam/teilen');
 // Spendencode und Gründe (Kasten 13) — dieselbe Regel wie App und Datenbank.
@@ -71,7 +75,8 @@ function handler(name, fn) {
 // ---------------------------------------------------------------- Profil --
 
 const handleUpdateProfile = handler('Profil ändern', async (client, nutzerId, aenderungen) => {
-  const erlaubt = ['name', 'handle', 'bio', 'link', 'status', 'initials', 'color', 'phone', 'privat'];
+  // Kasten 1.3 (Schema 88): pronomen und links dazu.
+  const erlaubt = ['name', 'handle', 'bio', 'link', 'status', 'initials', 'color', 'phone', 'privat', 'pronomen', 'links'];
   const daten = {};
   for (const feld of erlaubt) {
     if (aenderungen[feld] !== undefined) daten[feld] = aenderungen[feld];
@@ -87,7 +92,13 @@ const handleUpdateProfile = handler('Profil ändern', async (client, nutzerId, a
     .eq('id', nutzerId)
     .select(PROFIL_RUECKGABE_SPALTEN)
     .single();
-  if (error) throw error;
+  if (error) {
+    // Spalte fehlt bzw. ist nicht freigegeben: Schema 88 noch nicht eingespielt.
+    if (('pronomen' in daten || 'links' in daten) && ['42703', 'PGRST204', '42501'].includes(error.code)) {
+      return { ok: false, fehler: Profilfelder.TEXTE.nochNichtDa };
+    }
+    throw error;
+  }
   return { ok: true, profil: data };
 });
 
@@ -600,6 +611,47 @@ const handleAnrufNotieren = handler('Anrufeintrag', async (client, nutzerId, zie
 });
 
 /*
+ * Einen Anruf beim START im Chat vermerken — Kasten 5.2–5.4 (28.09.2026).
+ *
+ * Henrik: „Wenn ich eine Person oder eine Gruppe oder eine Community, egal
+ * was, anrufe, soll das im Chat wie eine Nachricht angezeigt werden, dass ich
+ * einen Anruf gestartet habe. Andersherum bei eingehenden Anrufen genauso."
+ *
+ * Zustand `gestartet`, Dauer 0 (Schema 89) — eine Übertragung gibt es nicht
+ * (Kasten 5.1), also auch keine Dauer. Ort: der Chat, aus dem angerufen wurde
+ * (`messages`), oder das Unterthema (`community_channel_messages`). Ohne
+ * beides der Messenger-Zweierchat mit der Person.
+ *
+ * Gleiche Regel in app/lib/aktionen.ts (anrufStarten).
+ */
+const handleAnrufStarten = handler('Anrufeintrag', async (client, nutzerId, werte) => {
+  const art = werte.art === 'video' ? 'video' : 'audio';
+  const zeile = { sender_id: nutzerId, text: '', anruf_art: art, anruf_status: 'gestartet', anruf_dauer: 0 };
+
+  if (werte.kanalId) {
+    const { data, error } = await client
+      .from('community_channel_messages')
+      .insert({ ...zeile, channel_id: werte.kanalId })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return { ok: true, id: data.id, kanalId: werte.kanalId };
+  }
+
+  const chatId = werte.chatId || (werte.zielId ? await chatMit(client, nutzerId, werte.zielId) : null);
+  if (!chatId) return { ok: false, error: 'Kein Chat für diesen Anruf' };
+
+  const { data, error } = await client
+    .from('messages')
+    .insert({ ...zeile, chat_id: chatId })
+    .select('id')
+    .single();
+  if (error) throw error;
+  await client.from('chats').update({ updated_at: new Date().toISOString() }).eq('id', chatId);
+  return { ok: true, id: data.id, chatId };
+});
+
+/*
  * Kontaktinfo ändern — selbst vergebener Name und Notiz.
  *
  * Henrik 7.9.: „Kontaktinfo-Änderungen (z.B. Name) speichern/synchronisieren
@@ -855,24 +907,34 @@ const handleCreateChannel = handler(
  */
 const handleSendChannelMessage = handler(
   'Im Kanal schreiben',
-  async (client, nutzerId, kanalId, text, medien = {}) => {
-    const { data, error } = await client
-      .from('community_channel_messages')
-      .insert({
-        channel_id: kanalId,
-        sender_id: nutzerId,
-        text,
-        media_url: medien.url || null,
-        media_type: medien.typ || null,
-        place_id: medien.standortId || null,
-        contact_user_id: medien.kontaktId || null,
-        file_name: medien.dateiName || null,
-        file_size: medien.dateiGroesse || null,
-      })
-      .select()
-      .single();
+  async (client, nutzerId, kanalId, text, medien = {}, antwortAuf = null) => {
+    const zeile = {
+      channel_id: kanalId,
+      sender_id: nutzerId,
+      text,
+      media_url: medien.url || null,
+      media_type: medien.typ || null,
+      place_id: medien.standortId || null,
+      contact_user_id: medien.kontaktId || null,
+      file_name: medien.dateiName || null,
+      file_size: medien.dateiGroesse || null,
+    };
+    /*
+     * Kasten 4.2 (Feedback 28.09.): die Antwort im Unterthema (`reply_to`,
+     * Schema XX). Fehlt die Spalte noch, geht die Nachricht ohne Bezug raus,
+     * und `ohneBezug` sagt das der Oberflaeche. Gleiche Weiche in
+     * app/lib/aktionen.ts (kanalNachricht).
+     */
+    if (antwortAuf) zeile.reply_to = antwortAuf;
+    let { data, error } = await client.from('community_channel_messages').insert(zeile).select().single();
+    let ohneBezug = false;
+    if (error && antwortAuf && Chatblase.fehltSpalte(error, 'reply_to')) {
+      delete zeile.reply_to;
+      ohneBezug = true;
+      ({ data, error } = await client.from('community_channel_messages').insert(zeile).select().single());
+    }
     if (error) throw error;
-    return { ok: true, nachricht: data };
+    return { ok: true, nachricht: data, ohneBezug };
   }
 );
 
@@ -1226,14 +1288,30 @@ const handleShareContent = handler(
 
 const handleCreateComment = handler(
   'Kommentar anlegen',
-  async (client, nutzerId, beitragId, text) => {
-    const { data, error } = await client
-      .from('comments')
-      .insert({ post_id: beitragId, user_id: nutzerId, text })
-      .select()
-      .single();
+  /*
+   * Nachtrag 4.3b (11.10.2026): `bezug` = { antwortAuf (Wurzel, reply_to),
+   * antwortAn (angesprochener Kommentar, antwort_an) }. Kennt die Datenbank
+   * die Spalten noch nicht (Schema 92), geht der Kommentar ohne Faden raus
+   * und `ohneFaden` sagt das. Gleiche Weiche in app/lib/aktionen.ts
+   * (kommentarAnlegen).
+   */
+  async (client, nutzerId, beitragId, text, bezug = null) => {
+    const zeile = { post_id: beitragId, user_id: nutzerId, text };
+    if (bezug && bezug.antwortAuf) {
+      zeile.reply_to = bezug.antwortAuf;
+      zeile.antwort_an = bezug.antwortAn || bezug.antwortAuf;
+    }
+    const anlegen = () => client.from('comments').insert(zeile).select().single();
+    let { data, error } = await anlegen();
+    let ohneFaden = false;
+    if (error && zeile.reply_to && Kommentar.fehltSpalte(error)) {
+      delete zeile.reply_to;
+      delete zeile.antwort_an;
+      ohneFaden = true;
+      ({ data, error } = await anlegen());
+    }
     if (error) throw error;
-    return { ok: true, kommentar: data };
+    return { ok: true, kommentar: data, ohneFaden };
   }
 );
 
@@ -1467,6 +1545,27 @@ const handleCommunityStumm = handler(
       .eq('user_id', nutzerId);
     if (error) throw error;
     return { ok: true, stumm: neu };
+  }
+);
+
+/**
+ * Kasten 8.4: „Push-to-Talk-Benachrichtigung" je Community setzen
+ * (community_members.ptt_benachrichtigung, Schema 90). Mit `.select()`, weil
+ * ein ins Leere gehendes UPDATE sonst Erfolg meldet. Gegenstueck zu
+ * pttBenachrichtigungSetzen() in app/lib/aktionen.ts.
+ */
+const handlePttBenachrichtigung = handler(
+  'Push-to-Talk-Benachrichtigung',
+  async (client, nutzerId, communityId, an) => {
+    const { data, error } = await client
+      .from('community_members')
+      .update({ ptt_benachrichtigung: Boolean(an) })
+      .eq('community_id', communityId)
+      .eq('user_id', nutzerId)
+      .select('ptt_benachrichtigung');
+    if (error) throw error;
+    if (!data || data.length === 0) return { ok: false, error: 'Du bist in dieser Community nicht Mitglied.' };
+    return { ok: true, an: Boolean(data[0].ptt_benachrichtigung) };
   }
 );
 
@@ -2372,15 +2471,25 @@ const handlePtt = handler(
 
 const handleStreamKommentar = handler(
   'Streamkommentar',
-  async (client, nutzerId, postId, text) => {
+  /*
+   * Nachtrag 4.3c (11.10.2026): `antwortAuf` = Live-Kommentar, auf den
+   * geantwortet wird (stream_comments.reply_to, Schema 92). Fehlt die Spalte
+   * noch, ohne Bezug und `ohneBezug`. Gleich in app/lib/aktionen.ts.
+   */
+  async (client, nutzerId, postId, text, antwortAuf = null) => {
     if (!text || !String(text).trim()) return { ok: false, fehler: 'Leerer Kommentar' };
-    const { data, error } = await client
-      .from('stream_comments')
-      .insert({ post_id: postId, user_id: nutzerId, text: String(text).trim() })
-      .select('id, created_at')
-      .single();
+    const zeile = { post_id: postId, user_id: nutzerId, text: String(text).trim() };
+    if (antwortAuf) zeile.reply_to = antwortAuf;
+    const anlegen = () => client.from('stream_comments').insert(zeile).select('id, created_at').single();
+    let { data, error } = await anlegen();
+    let ohneBezug = false;
+    if (error && antwortAuf && Kommentar.fehltSpalte(error)) {
+      delete zeile.reply_to;
+      ohneBezug = true;
+      ({ data, error } = await anlegen());
+    }
     if (error) throw error;
-    return { ok: true, id: data.id, zeit: data.created_at };
+    return { ok: true, id: data.id, zeit: data.created_at, ohneBezug };
   }
 );
 
@@ -2509,6 +2618,7 @@ module.exports = {
   handleContactFavorite,
   handleContactEdit,
   handleAnrufNotieren,
+  handleAnrufStarten,
   handleNotifyPost,
   handleShareToChats,
   handleShareToCommunities,
@@ -2540,6 +2650,7 @@ module.exports = {
   handleCreateCommunity,
   handleJoinCommunity,
   handleCommunityStumm,
+  handlePttBenachrichtigung,
   handleEinstellung,
   handleProfilAufruf,
   handleReportContent,

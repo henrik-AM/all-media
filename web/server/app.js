@@ -33,6 +33,10 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const supabaseApi = require('./supabase-api');
+// Kasten 1.3: Grenzen und Link-Regel der Seite „Profil bearbeiten“ — gemeinsam mit der App.
+const Profilfelder = require('../../gemeinsam/profilfelder');
+// Kasten 28/7.8: eigenes Kontaktbild — Prüfung und Texte gemeinsam mit der App.
+const Kontaktbild = require('../../gemeinsam/kontaktbild');
 const syncHandlers = require('./sync-handlers');
 const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
@@ -1041,6 +1045,9 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
   const gedeutet = await anhangDeuten(req, req.body?.art);
   if (gedeutet.error) return { ok: false, error: gedeutet.error };
   const { text, medien } = gedeutet;
+  // Kasten 4.3a: ein Anhang kann eine Antwort oder ein Zitat sein — wie Text.
+  medien.antwortAuf = req.body?.antwortAuf || null;
+  medien.zitatVon = req.body?.zitatVon || null;
 
   const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, medien);
   if (!e || e.ok === false) return antwort(e);
@@ -1247,6 +1254,15 @@ app.post('/api/kontakte/:userId/anruf', route(async (req) => {
   const e = await syncHandlers.handleAnrufNotieren(req.db, req.nutzerId, req.params.userId, req.body || {});
   return antwort(e);
 }));
+
+/*
+ * Kasten 5.2: der Anruf beim Start, im Chat oder Unterthema, aus dem
+ * angerufen wird — { art, chatId? | kanalId? | zielId? }. Gegenstück in der
+ * App: CallScreen.tsx → anrufStarten.
+ */
+app.post('/api/anruf', route(async (req) =>
+  antwort(await syncHandlers.handleAnrufStarten(req.db, req.nutzerId, req.body || {}))
+));
 
 /*
  * Den Chat mit einer Person holen — und ihn anlegen, wenn es noch keinen gibt.
@@ -1881,14 +1897,60 @@ app.post('/api/eigene/profilbild', route(async (req) => {
   return { ok: true, url };
 }));
 
+/*
+ * Kasten 28/7.8 (Schema 94): mein eigenes Bild für einen Messenger-Kontakt
+ * setzen ({ kontaktId, url }) oder entfernen ({ kontaktId, url: null }).
+ * Hochgeladen hat der Browser vorher über /api/hochladen (Ordner avatars) —
+ * keine eigene Medienstelle. Nur ich sehe es (RLS nur Eigentümer).
+ * Gegenstück: kontaktBildSetzen() in app/lib/aktionen.ts.
+ */
+app.post('/api/kontaktbild', route(async (req) => {
+  const kontaktId = String(req.body?.kontaktId || '');
+  const url = req.body?.url ? String(req.body.url) : null;
+  if (!/^[0-9a-f-]{36}$/i.test(kontaktId)) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
+  if (url && !Kontaktbild.adresseGueltig(url)) {
+    return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
+  }
+  const fehltSchema = (e) =>
+    ['42P01', 'PGRST205', '42703', 'PGRST204'].includes(String(e?.code || ''));
+  if (!url) {
+    const { error } = await req.db
+      .from('kontakt_bilder')
+      .delete()
+      .eq('owner_id', req.nutzerId)
+      .eq('kontakt_id', kontaktId);
+    if (error) return { ok: false, error: fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : error.message };
+    // RLS: ein abgelehntes DELETE meldet Erfolg mit null Zeilen — nachsehen.
+    const { data: rest } = await req.db
+      .from('kontakt_bilder')
+      .select('kontakt_id')
+      .eq('owner_id', req.nutzerId)
+      .eq('kontakt_id', kontaktId);
+    if (rest?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
+    return { ok: true, url: null };
+  }
+  const { data, error } = await req.db
+    .from('kontakt_bilder')
+    .upsert({ owner_id: req.nutzerId, kontakt_id: kontaktId, media_url: url }, { onConflict: 'owner_id,kontakt_id' })
+    .select('kontakt_id');
+  if (error) {
+    if (fehltSchema(error)) return { ok: false, error: Kontaktbild.FEHLT_SCHEMA };
+    if (error.code === '42501') return { ok: false, error: 'Ein eigenes Foto geht nur für Messenger-Kontakte' };
+    return { ok: false, error: error.message };
+  }
+  if (!data?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
+  return { ok: true, url };
+}));
+
 app.post('/api/eigene/profil', route(async (req) => {
-  const { name, bio, link, color } = req.body || {};
+  const { name, bio, link, color, pronomen, links } = req.body || {};
   const aenderungen = {};
 
   if (name !== undefined) {
     const sauber = String(name).trim();
-    if (!sauber) return { ok: false, error: 'Der Name darf nicht leer sein' };
-    if (sauber.length > 40) return { ok: false, error: 'Der Name ist zu lang (höchstens 40 Zeichen)' };
+    // Kasten 1.3: Grenzen aus gemeinsam/profilfelder.js, wie in der App.
+    const grund = Profilfelder.namePruefen(sauber);
+    if (grund) return { ok: false, error: grund };
     aenderungen.name = sauber;
     // Kürzel aus den Anfangsbuchstaben, höchstens zwei.
     aenderungen.initials = sauber.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -1896,11 +1958,31 @@ app.post('/api/eigene/profil', route(async (req) => {
 
   if (bio !== undefined) {
     const sauber = String(bio).trim();
-    if (sauber.length > 150) return { ok: false, error: 'Die Info ist zu lang (höchstens 150 Zeichen)' };
+    const grund = Profilfelder.bioPruefen(sauber);
+    if (grund) return { ok: false, error: grund };
     aenderungen.bio = sauber;
   }
 
   if (link !== undefined) aenderungen.link = String(link).trim();
+
+  /*
+   * Kasten 1.3 (Nachtrag 10.10.2026, Schema 88): Pronomen und bis zu fünf
+   * Links. Dieselbe Prüfung wie in der App (gemeinsam/profilfelder.js); die
+   * Datenbank prüft sie mit profil_links_gueltig() ein drittes Mal. `link`
+   * wandert als erster Link mit — alte Leser sehen ihn weiter.
+   */
+  if (pronomen !== undefined) {
+    const sauber = String(pronomen ?? '').trim();
+    const grund = Profilfelder.pronomenPruefen(sauber);
+    if (grund) return { ok: false, error: grund };
+    aenderungen.pronomen = sauber;
+  }
+  if (links !== undefined) {
+    const geprueft = Profilfelder.linksPruefen(Array.isArray(links) ? links : []);
+    if (geprueft.fehler) return { ok: false, error: geprueft.fehler };
+    aenderungen.links = geprueft.links;
+    aenderungen.link = geprueft.links[0]?.url || '';
+  }
 
   /*
    * Erlaubt ist eine einzelne Farbe oder ein Zwei-Ton-Verlauf. Der Wert landet
@@ -2858,11 +2940,21 @@ app.get('/api/comments/:targetId', route(async (req) =>
   supabaseApi.ladeKommentare(req.db, req.nutzerId, req.params.targetId)
 ));
 
+// Nachtrag 4.3: Mitteilung zu einem Kommentar → unter welchem Beitrag er steht.
+app.get('/api/kommentar/:id/ort', route(async (req) => {
+  const ort = await supabaseApi.kommentarOrt(req.db, req.params.id);
+  return ort ? { ok: true, ...ort } : { ok: false, error: 'Diesen Kommentar gibt es nicht mehr' };
+}));
+
 app.post('/api/comments/:targetId', route(async (req) => {
   const text = String(req.body?.text || '').trim();
   if (!text) return { ok: false, error: 'Text erforderlich' };
 
-  const e = await syncHandlers.handleCreateComment(req.db, req.nutzerId, req.params.targetId, text);
+  // Nachtrag 4.3b: Antwort auf einen Kommentar (Wurzel + angesprochener Kommentar).
+  const bezug = req.body?.antwortAuf
+    ? { antwortAuf: String(req.body.antwortAuf), antwortAn: req.body?.antwortAn ? String(req.body.antwortAn) : null }
+    : null;
+  const e = await syncHandlers.handleCreateComment(req.db, req.nutzerId, req.params.targetId, text, bezug);
   if (!e || e.ok === false) return antwort(e);
 
   return {
@@ -2872,6 +2964,9 @@ app.post('/api/comments/:targetId', route(async (req) => {
     time: supabaseApi.chatZeit(e.kommentar.created_at),
     likes: 0,
     liked: false,
+    antwortAuf: e.kommentar.reply_to || null,
+    antwortAn: e.kommentar.antwort_an || null,
+    ohneFaden: Boolean(e.ohneFaden),
   };
 }));
 
@@ -3135,7 +3230,7 @@ app.post('/api/communities', route(async (req) => {
     .from('communities')
     .select('*', { count: 'exact', head: true })
     .ilike('name', name);
-  if (count > 0) return { ok: false, error: 'Diesen Kanal gibt es schon' };
+  if (count > 0) return { ok: false, error: 'Diese Community gibt es schon' };
 
   const privat = req.body?.sichtbarkeit !== 'public';
   const e = await syncHandlers.handleCreateCommunity(
@@ -3173,6 +3268,10 @@ app.post('/api/communities/:id/join', route(async (req, res) => {
  * Eine Community stummschalten. Der Schalter „Benachrichtigungen" im
  * Community-Blatt legte bis zum 02.09.2026 nur eine CSS-Klasse um.
  */
+app.post('/api/communities/:id/ptt-benachrichtigung', route(async (req) =>
+  antwort(await syncHandlers.handlePttBenachrichtigung(req.db, req.nutzerId, req.params.id, req.body?.an))
+));
+
 app.post('/api/communities/:id/stumm', route(async (req) =>
   antwort(await syncHandlers.handleCommunityStumm(req.db, req.nutzerId, req.params.id))
 ));
@@ -3212,10 +3311,15 @@ app.get('/api/communities/:id/channels/:chId/stand', route(async (req) => {
 app.post('/api/communities/:id/channels/:chId/nachricht', route(async (req) => {
   const text = String(req.body?.text || '').trim();
   if (!text) return { ok: false, error: 'Text erforderlich' };
-  const e = await syncHandlers.handleSendChannelMessage(req.db, req.nutzerId, req.params.chId, text);
+  // Kasten 4.2: die Nachricht, auf die geantwortet wird (Schema XX).
+  const antwortAuf = /^[0-9a-f-]{36}$/i.test(String(req.body?.antwortAuf || '')) ? req.body.antwortAuf : null;
+  const e = await syncHandlers.handleSendChannelMessage(
+    req.db, req.nutzerId, req.params.chId, text, {}, antwortAuf
+  );
   if (!e || e.ok === false) return antwort(e);
   return {
     ok: true,
+    ohneBezug: Boolean(e.ohneBezug),
     message: {
       id: e.nachricht.id,
       from: 'me',
@@ -3241,8 +3345,9 @@ app.post('/api/communities/:id/channels/:chId/anhang', route(async (req) => {
   if (gedeutet.error) return { ok: false, error: gedeutet.error };
   const { text, medien } = gedeutet;
 
+  // Kasten 4.3a: die Antwort im Unterthema gilt auch für den Anhang (Schema 91).
   const e = await syncHandlers.handleSendChannelMessage(
-    req.db, req.nutzerId, req.params.chId, text, medien
+    req.db, req.nutzerId, req.params.chId, text, medien, req.body?.antwortAuf || null
   );
   if (!e || e.ok === false) return antwort(e);
 
@@ -3256,6 +3361,7 @@ app.post('/api/communities/:id/channels/:chId/anhang', route(async (req) => {
 
   return {
     ok: true,
+    ohneBezug: Boolean(e.ohneBezug),
     message: angelegt || {
       id: e.nachricht.id,
       from: 'me',
@@ -3280,13 +3386,14 @@ const GEGENSTAND = { video: 'Video', comment: 'Kommentar', post: 'Beitrag' };
  * Der Satz entsteht erst hier, gespeichert ist nur, was passiert ist. Sonst
  * müsste bei jeder Textänderung der ganze Bestand mitwandern.
  */
-function mitteilungText(m, namen, communityNamen) {
+function mitteilungText(m, namen, communityNamen, kanalCommunity = new Map()) {
   const name = namen.get(m.userId) || 'Jemand';
   const community = communityNamen.get(m.ziel?.id) || 'einer Community';
   return {
     like: `${name} gefällt dein ${GEGENSTAND[m.ziel?.art] || 'Beitrag'}.`,
     follow: `${name} folgt dir jetzt.`,
-    comment: `${name} hat deinen Beitrag kommentiert.`,
+    // Nachtrag 4.3d (Schema 92): Ziel 'comment' = Antwort auf einen Kommentar.
+    comment: m.ziel?.art === 'comment' ? Kommentar.mitteilungAntwort(name) : `${name} hat deinen Beitrag kommentiert.`,
     repost: `${name} hat dein Video repostet.`,
     // Kasten 11.6: Markierung in einer Story — derselbe Satz wie in der App.
     mention: m.ziel?.art === 'story'
@@ -3308,6 +3415,8 @@ function mitteilungText(m, namen, communityNamen) {
     beitritt: `${name} ist „${community}" beigetreten.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
+    // Kasten 8.3 (Schema 90): Ziel ist das Unterthema — Satz wie in der App.
+    ptt: `${name} spricht in „${kanalCommunity.get(m.ziel?.id) || 'einer Community'}" – Push to Talk beitreten?`,
     share: `${name} hat etwas mit dir geteilt.`,
     message: `${name} hat dir geschrieben.`,
     system: m.text || 'Es gibt Neuigkeiten.',
@@ -3323,12 +3432,14 @@ app.get('/api/mitteilungen/:bereich', route(async (req) => {
 
   const namen = new Map(Object.values(nutzer).map((u) => [u.id, u.name]));
   const communityNamen = new Map(communities.map((c) => [c.id, c.name]));
+  // Kasten 8.3: Unterthema → Name seiner Community („… spricht in X").
+  const kanalCommunity = new Map(communities.flatMap((c) => (c.channels || []).map((k) => [k.id, c.name])));
 
   const fertig = eintraege.map((m) => ({
     ...m,
     // Kasten RS 3: Rechtsmitteilung (Schema 102) — Ziel ist die Meldung.
     ziel: m.art === 'system' ? { art: 'meldung', id: m.ziel?.id || null } : m.ziel,
-    text: m.text || mitteilungText(m, namen, communityNamen),
+    text: m.text || mitteilungText(m, namen, communityNamen, kanalCommunity),
   }));
   return { eintraege: fertig, ungelesen: fertig.filter((m) => !m.gelesen).length };
 }));
@@ -3609,6 +3720,12 @@ app.get('/api/banne', route(async (req) => ({
 
 // ------------------------------------------------------- Push-to-Talk --
 
+// Kasten 8.6: der Verlauf hinter einer Zeile „Push to Talk" (Schema 90).
+app.get('/api/ptt/sitzung/:id', route(async (req) => ({
+  ok: true,
+  eintraege: await supabaseApi.ladePttSitzung(req.db, req.params.id),
+})));
+
 app.get('/api/communities/:id/ptt', route(async (req) => ({
   ok: true,
   ptt: await supabaseApi.ladePtt(req.db, req.params.id),
@@ -3663,7 +3780,8 @@ app.get('/api/stream/:postId/kommentare', route(async (req) => ({
 app.post('/api/stream/:postId/kommentare', route(async (req) =>
   antwort(
     await syncHandlers.handleStreamKommentar(
-      req.db, req.nutzerId, req.params.postId, req.body?.text || ''
+      // Nachtrag 4.3c: Antwort auf einen Live-Kommentar (reply_to, Schema 92).
+      req.db, req.nutzerId, req.params.postId, req.body?.text || '', req.body?.antwortAuf || null
     )
   )
 ));

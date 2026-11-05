@@ -70,6 +70,10 @@ import { neulingsliste, ordnenJeArt, punktekarte } from '../../gemeinsam/rang';
 // nicht. Und kein Import aus './lenkung' — das Zusammenlegen dort kennt nur
 // './medien' und './krypto'; deshalb steht ladeLenkung hier in der Datei.
 const Lenkung = require('../../gemeinsam/lenkung') as typeof import('../../gemeinsam/lenkung');
+// Kasten 1.3 (Nachtrag 10.10.2026): Pronomen und Links — gemeinsam mit der Website.
+const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('../../gemeinsam/profilfelder');
+// Nachtrag 4.3b: Antworten auf Kommentare (Fäden, fehlende Spalten vor Schema 92).
+const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -156,6 +160,7 @@ export async function ladeNutzer(
     ladeProfilbilder(client),
   ]);
   if (error) throw error;
+  const zusatz = await ladeProfilZusatz(client);
 
   const nummerVon = (id: string): string | undefined =>
     (id === ichId ? (ich as any)?.phone : (nummern as any)?.[id]) || undefined;
@@ -185,6 +190,9 @@ export async function ladeNutzer(
       userId: schluessel,
       bio: zeile.bio ?? '',
       link: zeile.link ?? '',
+      // Kasten 1.3: ohne Schema 88 leer bzw. nur der alte Einzellink.
+      pronomen: zusatz.get(zeile.id)?.pronomen ?? '',
+      links: Profilfelder.linksAus({ links: zusatz.get(zeile.id)?.links, link: zeile.link }),
       spende: jsonOderNull(zeile.spende),
       posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
       followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
@@ -212,6 +220,29 @@ export async function ladeProfilbilder(client: SupabaseClient): Promise<Map<stri
   const { data, error } = await client.from('profiles').select('id, avatar_url').not('avatar_url', 'is', null).limit(500);
   if (error) return karte;
   for (const z of (data ?? []) as any[]) if (z.avatar_url) karte.set(z.id, z.avatar_url);
+  return karte;
+}
+
+/*
+ * Pronomen und Links (Kasten 1.3, Nachtrag 10.10.2026) — getrennt und
+ * nachsichtig geladen, aus demselben Grund wie die Profilbilder darüber:
+ * beide Spalten kommen erst mit SUPABASE_SCHEMA_88_profilseite.sql. Stuenden
+ * sie in PROFIL_SPALTEN, fiele bis zum Einspielen das ganze Laden des Profils
+ * um (Schema 23_audit: eine ungewaehrte Spalte laesst das select scheitern).
+ * So fehlen hoechstens Pronomen und Zusatzlinks. Gegenstueck:
+ * profilZusatz() in web/server/supabase-api.js.
+ */
+export async function ladeProfilZusatz(
+  client: SupabaseClient
+): Promise<Map<string, { pronomen: string; links: unknown }>> {
+  const karte = new Map<string, { pronomen: string; links: unknown }>();
+  try {
+    const { data, error } = await client.from('profiles').select('id, pronomen, links').limit(500);
+    if (error) return karte;
+    for (const z of (data ?? []) as any[]) karte.set(z.id, { pronomen: z.pronomen ?? '', links: z.links });
+  } catch {
+    /* Netz weg — dann eben ohne */
+  }
   return karte;
 }
 
@@ -460,6 +491,17 @@ export async function ladeChats(
     const meiner = await meinSchluessel(client, ichId);
     await aufschliessen(client, vorschauen, meiner);
   }
+  /*
+   * Nachtrag 11.10. (7.5): eine geteilte Karte als letzte Nachricht, deren
+   * Beitrag gelöscht (Merker, Schema 93) oder für mich nicht sichtbar ist,
+   * heißt auch in der Liste „Beitrag nicht mehr verfügbar". Gleiche Rechnung
+   * in web/server/supabase-api.js (ladeChats).
+   */
+  const geteiltSichtbar = await Chatblase.geteiltSichtbar(
+    client,
+    [...new Set(vorschauen.map((n) => n?.shared_post_id).filter(Boolean) as string[])]
+  );
+
   const mitgliederNach = new Map<string, string[]>();
   for (const m of (mitglieder ?? []) as any[]) {
     if (!mitgliederNach.has(m.chat_id)) mitgliederNach.set(m.chat_id, []);
@@ -514,7 +556,7 @@ export async function ladeChats(
         preview: vorschau?.anruf_art
           ? vorschau.anruf_art === 'video'
             ? 'Videoanruf'
-            : 'Anruf'
+            : 'Sprachanruf'
           : /*
              * Kasten 16: die Story-Markierung hat absichtlich keinen Text
              * (Schema 75). Ohne diesen Zweig stuende in der Chatliste — und
@@ -524,7 +566,7 @@ export async function ladeChats(
              */
             StoryRegeln.istMarkierungsHinweis(vorschau)
             ? StoryRegeln.markierungVorschau(vorschau.sender_id === ichId)
-            : vorschau?.text ?? '',
+            : Chatblase.geteiltVorschau(vorschau, geteiltSichtbar) ?? vorschau?.text ?? '',
         previewMedia: vorschau?.media_type ?? undefined,
         time: chatZeit(vorschau?.created_at ?? z.chats.updated_at),
         unreadCount: z.is_read ? 0 : 1,
@@ -714,6 +756,16 @@ export async function ladeNachrichten(
     await aufschliessen(client, [...zeilen, ...bezugZeilen], meiner);
   }
 
+  /*
+   * Nachtrag 11.10. (7.5–7.7): Merker „gelöscht" (Schema 93, nachsichtig)
+   * und Name/Profilbild der Konten über den Karten. Gleiche Rechnung in
+   * web/server/supabase-api.js (ladeNachrichten).
+   */
+  const geteiltWeg = zeilen.length
+    ? await Chatblase.geteiltWegLaden(client, 'messages', 'chat_id', chatId)
+    : {};
+  const geteiltKonten = await Chatblase.geteiltKonten(client, Chatblase.geteiltKontoIds(zeilen, geteiltWeg));
+
   const reaktionen = new Map<string, { userId: string; emoji: string }[]>();
   if (zeilen.length) {
     const { data: reakZeilen } = await client
@@ -765,15 +817,10 @@ export async function ladeNachrichten(
     mediaUrl: n.media_url ?? undefined,
     // Die Karte im Chat für einen geteilten Beitrag. Gleiche Regel wie in
     // web/server/supabase-api.js.
-    geteilt: n.posts
-      ? {
-          id: n.posts.id,
-          art: n.posts.kind === 'post' ? ('post' as const) : ('video' as const),
-          autor: n.posts.profiles?.name ?? '',
-          titel: n.posts.title || n.posts.description || '',
-          bild: n.posts.thumbnail_url || n.posts.media_url || undefined,
-        }
-      : undefined,
+    // Kasten 7 (28.09.): Name UND Beschreibung, `kind` zum Oeffnen, und
+    // ehrlich „nicht mehr verfügbar", wenn die Leseregel ihn nicht herausgibt
+    // (gemeinsam/chatblase.js, geteiltAus).
+    geteilt: Chatblase.geteiltAus(n.shared_post_id, n.posts, geteiltWeg[n.id], geteiltKonten),
     // Angehängter Standort und Kontakt — gleiche Regel wie in
     // web/server/supabase-api.js.
     standort: n.places
@@ -830,7 +877,7 @@ export async function ladeNachrichten(
     anruf: n.anruf_art
       ? {
           art: n.anruf_art as 'audio' | 'video',
-          status: (n.anruf_status ?? 'beendet') as 'beendet' | 'verpasst' | 'abgelehnt',
+          status: (n.anruf_status ?? 'beendet') as 'gestartet' | 'beendet' | 'verpasst' | 'abgelehnt',
           dauer: Number(n.anruf_dauer ?? 0),
         }
       : undefined,
@@ -886,6 +933,9 @@ export interface StoryListen {
 const StoryRegeln = require('../../gemeinsam/story') as typeof import('../../gemeinsam/story');
 // Kasten 27: Takt, Stand und Reihenfolge offener Chats — gemeinsam mit der Website.
 const ChatAbgleich = require('../../gemeinsam/chatabgleich') as typeof import('../../gemeinsam/chatabgleich');
+// Kasten 4/7 (28.09.): Bezug im Unterthema und die Karte geteilter Beitraege.
+const Chatblase = require('../../gemeinsam/chatblase') as typeof import('../../gemeinsam/chatblase');
+const Kontaktbild = require('../../gemeinsam/kontaktbild') as typeof import('../../gemeinsam/kontaktbild');
 
 /** Spalten mit und ohne die Felder aus dem Story-Schema (Kasten 11). */
 const STORY_SPALTEN_NEU =
@@ -1215,20 +1265,52 @@ export async function ladeBeitraege(
   });
 }
 
+/**
+ * Nachtrag 4.3 (Henrik, 12.10.2026): unter welchem Beitrag ein Kommentar
+ * steht — für den Tipp auf eine Mitteilung zu einem Kommentar (Antwort, Herz,
+ * @). Gleiche Abfrage in web/server/supabase-api.js (kommentarOrt).
+ * Unsichtbar oder gelöscht → null.
+ */
+export async function kommentarOrt(
+  client: SupabaseClient,
+  kommentarId: string
+): Promise<{ beitragId: string; kind: string } | null> {
+  const { data, error } = await client
+    .from('comments')
+    .select('id, post_id, posts!post_id(kind)')
+    .eq('id', kommentarId)
+    .maybeSingle();
+  if (error || !data || !(data as any).post_id) return null;
+  return { beitragId: (data as any).post_id, kind: (data as any).posts?.kind ?? 'post' };
+}
+
 export async function ladeKommentare(
   client: SupabaseClient,
   ichId: string,
   beitragId: string
 ): Promise<Comment[]> {
-  const { data, error } = await client
-    .from('comments')
-    .select('id, post_id, user_id, text, created_at, comment_likes(count)')
-    .eq('post_id', beitragId)
-    .order('created_at', { ascending: true })
-    .limit(200);
+  /*
+   * Nachtrag 4.3b (11.10.2026): Antworten auf Kommentare (Schema 92,
+   * `reply_to` + `antwort_an`). Kennt die Datenbank die Spalten noch nicht
+   * (42703), einmal ohne — dann stehen alle Kommentare oben, statt dass die
+   * Liste leer bleibt. Gleiche Weiche in web/server/supabase-api.js.
+   */
+  const abfrage = (spalten: string) =>
+    client
+      .from('comments')
+      .select(spalten)
+      .eq('post_id', beitragId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+  let { data, error } = await abfrage(
+    'id, post_id, user_id, text, created_at, reply_to, antwort_an, comment_likes(count)'
+  );
+  if (error && Kommentar.fehltSpalte(error)) {
+    ({ data, error } = await abfrage('id, post_id, user_id, text, created_at, comment_likes(count)'));
+  }
   if (error) throw error;
 
-  const ids = (data ?? []).map((k: any) => k.id);
+  const ids = ((data ?? []) as any[]).map((k: any) => k.id);
   const { data: eigene } =
     ids.length === 0
       ? { data: [] as any[] }
@@ -1244,13 +1326,15 @@ export async function ladeKommentare(
     if (!zFehler) for (const r of (z ?? []) as any[]) zahlen.set(r.comment_id, Number(r.anzahl ?? 0));
   }
 
-  return (data ?? []).map((k: any) => ({
+  return ((data ?? []) as any[]).map((k: any) => ({
     id: k.id,
     userId: k.user_id === ichId ? ICH : k.user_id,
     text: k.text,
     time: chatZeit(k.created_at),
     likes: zahlen.get(k.id) ?? k.comment_likes?.[0]?.count ?? 0,
     liked: gemocht.has(k.id),
+    antwortAuf: k.reply_to ?? null,
+    antwortAn: k.antwort_an ?? null,
   }));
 }
 
@@ -1269,10 +1353,13 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     .limit(100);
   if (error) throw error;
 
-  const { data: meine } = await client
-    .from('community_members')
-    .select('community_id, is_muted')
-    .eq('user_id', ichId);
+  // Kasten 8.4: der PTT-Schalter (Schema 90). Fehlt die Spalte noch (42703),
+  // einmal ohne — sonst stuende man in keiner Community mehr als Mitglied.
+  const mitgliedschaft = (spalten: string) =>
+    client.from('community_members').select(spalten).eq('user_id', ichId);
+  let { data: meine, error: fehlerMeine } = await mitgliedschaft('community_id, is_muted, ptt_benachrichtigung');
+  if (fehlerMeine && (fehlerMeine as any).code === '42703') ({ data: meine } = await mitgliedschaft('community_id, is_muted'));
+  const pttAn = new Set(((meine ?? []) as any[]).filter((m) => m.ptt_benachrichtigung).map((m) => m.community_id));
   const beigetreten = new Set((meine ?? []).map((m: any) => m.community_id));
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine ?? []).filter((m: any) => m.is_muted).map((m: any) => m.community_id));
@@ -1288,6 +1375,7 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     members: Number(c.mitglieder_basis ?? 0) + (c.community_members?.[0]?.count ?? 0),
     joined: beigetreten.has(c.id),
     stumm: stumme.has(c.id),
+    pttBenachrichtigung: pttAn.has(c.id),
     unreadCount: 0,
     // Eine selbst angelegte Community lässt sich nicht verlassen — sie stünde
     // sonst ohne Besitzer da.
@@ -1311,22 +1399,64 @@ export async function ladeKanalNachrichten(
    * nicht ueber den Namen des Fremdschluessels: ein umbenannter Constraint
    * waere sonst ein stiller Ausfall der ganzen Kanalansicht.
    */
-  const { data, error } = await client
-    .from('community_channel_messages')
-    .select(
-      'id, channel_id, sender_id, text, created_at,' +
-        ' media_url, media_type, file_name, file_size,' +
-        ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
-        ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
-        // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
-        ' shared_post_id, posts!shared_post_id(id, kind, title, description, media_url, thumbnail_url,' +
-        ' profiles!posts_user_id_fkey(name))'
-    )
-    .eq('channel_id', kanalId)
-    // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
-    .order('created_at', { ascending: false })
-    .limit(500);
+  const spalten =
+    'id, channel_id, sender_id, text, created_at,' +
+    ' media_url, media_type, file_name, file_size,' +
+    ' place_id, places!place_id(id, name, adresse, koordinaten, x, y),' +
+    ' contact_user_id, profiles!contact_user_id(id, name, handle),' +
+    // Der geteilte Beitrag (Schema 59) — dieselbe Einbettung wie NACHRICHT_SPALTEN.
+    ' shared_post_id, posts!shared_post_id(id, user_id, kind, title, description, media_url, thumbnail_url,' +
+    ' profiles!posts_user_id_fkey(name, handle))';
+  /*
+   * Spalten aus spaeteren Schemas: Bezug (91), Anrufeintrag (89),
+   * Push-to-Talk-Sitzung (90). Fehlt eine noch — Code vor dem Schema
+   * ausgeliefert —, faellt die Abfrage mit 42703 um und das ganze
+   * Unterthema saehe leer aus. Dann ohne genau diese Gruppe nochmal.
+   */
+  let zusatz = ['reply_to', 'anruf_art, anruf_status, anruf_dauer', 'ptt_sitzung'];
+  const holen = () =>
+    client
+      .from('community_channel_messages')
+      .select([spalten, ...zusatz].join(', '))
+      .eq('channel_id', kanalId)
+      // Die juengsten 500 (Kasten 27) — siehe ladeNachrichten.
+      .order('created_at', { ascending: false })
+      .limit(500);
+  let { data, error }: { data: any[] | null; error: any } = await holen();
+  while (error && Chatblase.fehltSpalte(error) && zusatz.length) {
+    const fehlt = zusatz.filter((g) => !g.split(', ').some((sp) => Chatblase.fehltSpalte(error, sp)));
+    // Nennt die Meldung keine bekannte Spalte, alle Zusaetze weglassen.
+    zusatz = fehlt.length < zusatz.length ? fehlt : [];
+    ({ data, error } = await holen());
+  }
   if (error) throw error;
+
+  /*
+   * Kasten 4.2: der Bezug einer Antwort im Unterthema. Das Original steht
+   * fast immer unter denselben 500; die Namen der Originalabsender in einer
+   * Abfrage (gemeinsam/chatblase.js, kanalBezug). Gleiche Rechnung in
+   * web/server/supabase-api.js.
+   */
+  const alleZeilen = (data ?? []) as any[];
+  const bezugAbsender = [
+    ...new Set(
+      alleZeilen
+        .filter((z) => z.reply_to)
+        .map((z) => alleZeilen.find((o) => o.id === z.reply_to)?.sender_id)
+        .filter((id) => id && id !== ichId) as string[]
+    ),
+  ];
+  const namen: Record<string, string> = {};
+  if (bezugAbsender.length) {
+    const { data: profile } = await client.from('profiles').select('id, name').in('id', bezugAbsender);
+    for (const p of (profile ?? []) as any[]) namen[p.id] = p.name;
+  }
+
+  // Nachtrag 11.10. (7.5–7.7): wie in ladeNachrichten — Merker und Konten.
+  const geteiltWeg = alleZeilen.length
+    ? await Chatblase.geteiltWegLaden(client, 'community_channel_messages', 'channel_id', kanalId)
+    : {};
+  const geteiltKonten = await Chatblase.geteiltKonten(client, Chatblase.geteiltKontoIds(alleZeilen, geteiltWeg));
 
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
   return signiereMedien(client, ChatAbgleich.chronologisch((data ?? []) as any[]).map((m: any) => ({
@@ -1356,16 +1486,21 @@ export async function ladeKanalNachrichten(
       : undefined,
     // Die Karte eines in die Community geteilten Beitrags (Schema 59) —
     // gleiche Abbildung wie in ladeNachrichten.
-    geteilt: m.posts
+    geteilt: Chatblase.geteiltAus(m.shared_post_id, m.posts, geteiltWeg[m.id], geteiltKonten),
+    datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size ?? 0) } : undefined,
+    antwortAuf: Chatblase.kanalBezug(m, alleZeilen, ichId, namen),
+    // Kasten 5: der Anrufeintrag im Unterthema (Schema 89) — dieselbe
+    // Abbildung wie in ladeNachrichten.
+    anruf: m.anruf_art
       ? {
-          id: m.posts.id,
-          art: m.posts.kind === 'post' ? ('post' as const) : ('video' as const),
-          autor: m.posts.profiles?.name ?? '',
-          titel: m.posts.title || m.posts.description || '',
-          bild: m.posts.thumbnail_url || m.posts.media_url || undefined,
+          art: m.anruf_art as 'audio' | 'video',
+          status: (m.anruf_status ?? 'gestartet') as 'gestartet' | 'beendet' | 'verpasst' | 'abgelehnt',
+          dauer: Number(m.anruf_dauer ?? 0),
         }
       : undefined,
-    datei: m.file_name ? { name: m.file_name, groesse: Number(m.file_size ?? 0) } : undefined,
+    // Kasten 8.5: die eine Zeile „Push to Talk" je Sitzung (Schema 90).
+    pttSitzung: Boolean(m.ptt_sitzung) || undefined,
+    zeitpunkt: m.ptt_sitzung ? m.created_at : undefined,
   })));
 }
 
@@ -1527,7 +1662,7 @@ export interface AlleDaten {
   markierte: string[];
   favoriten: string[];
   /** Eigenes Profil, fertig für die Bearbeitungsmaske. */
-  eigenesProfil: { name: string; bio: string; link: string };
+  eigenesProfil: { name: string; bio: string; link: string; pronomen: string; links: { url: string; titel: string }[] };
   highlights: string[];
   playlists: string[];
   /** Die eigene Spendenaktion — null, solange keine läuft. */
@@ -1546,6 +1681,12 @@ export interface AlleDaten {
   sichtbarkeit: Record<string, Sichtbarkeit>;
   /** Beitraege mit "Kein Interesse" — fallen aus beiden Feeds (Schema 55). */
   keinInteresse: string[];
+  /**
+   * Kasten 28/7.8 (Schema 94): meine eigenen Kontaktbilder, Kennung →
+   * Adresse. Nur ich sehe sie, nur im Messenger (Avatar + KontaktBildBereich,
+   * Regel in gemeinsam/kontaktbild.js).
+   */
+  kontaktBilder: Record<string, string>;
 
   ichId: string;
   geladen: string;
@@ -1613,6 +1754,26 @@ export async function ladeChatlisten(
  * fünfzehn nacheinander. Auf einem Handy im Mobilfunknetz ist das der
  * Unterschied zwischen einer und acht Sekunden.
  */
+/**
+ * Kasten 28/7.8: meine eigenen Kontaktbilder (Schema 94) — nachsichtig.
+ * Fehlt die Tabelle (Code vor dem Schema) oder scheitert die Abfrage, gibt es
+ * keine eigenen Bilder, und überall bleibt das Profilbild. Unterschrieben wird
+ * mit allem anderen in ladeAlles (signiereMedien). Gegenstück:
+ * ladeKontaktBilder in web/server/supabase-api.js.
+ */
+export async function ladeKontaktBilder(client: SupabaseClient, ichId: string): Promise<Record<string, string>> {
+  try {
+    const { data, error } = await client
+      .from('kontakt_bilder')
+      .select('kontakt_id, media_url')
+      .eq('owner_id', ichId);
+    if (error) return {};
+    return Kontaktbild.ausZeilen((data ?? []) as any[]);
+  } catch {
+    return {};
+  }
+}
+
 export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<AlleDaten> {
   const [
     { users, profile },
@@ -1634,6 +1795,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     insightZiele,
     sichtbarkeit,
     keinInteresse,
+    kontaktBilder,
   ] = await Promise.all([
     ladeNutzer(client, ichId),
     ladeKontakte(client, ichId),
@@ -1654,6 +1816,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     ladeInsightZiele(client, ichId),
     ladeSichtbarkeit(client, ichId),
     ladeKeinInteresse(client, ichId),
+    ladeKontaktBilder(client, ichId),
   ]);
 
   // „Folge ich?" gehört an die Person, nicht an den einzelnen Beitrag. Vorher
@@ -1709,6 +1872,8 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
       name: users[ICH]?.name ?? '',
       bio: profile[ICH]?.bio ?? '',
       link: profile[ICH]?.link ?? '',
+      pronomen: profile[ICH]?.pronomen ?? '',
+      links: profile[ICH]?.links ?? [],
     },
     highlights: profile[ICH]?.highlights ?? [],
     playlists: profile[ICH]?.playlists ?? [],
@@ -1718,6 +1883,7 @@ export async function ladeAlles(client: SupabaseClient, ichId: string): Promise<
     insightZiele,
     sichtbarkeit,
     keinInteresse,
+    kontaktBilder,
     ichId,
     geladen: new Date().toISOString(),
   };
@@ -2053,21 +2219,58 @@ export async function ladeBanne(client: SupabaseClient, ichId: string) {
 
 /** Die Live-Kommentarspalte zu einem Stream. */
 export async function ladeStreamKommentare(client: SupabaseClient, postId: string) {
-  const { data, error } = await client
-    .from('stream_comments')
-    .select('id, user_id, text, created_at, profiles(id, name)')
-    .eq('post_id', postId)
-    .order('created_at', { ascending: true })
-    .limit(200);
+  /*
+   * Nachtrag 4.3c (11.10.2026): `reply_to` (Schema 92) — Antwort mit Zitat
+   * wie im Chat. Fehlt die Spalte noch, einmal ohne. Die Einbettung heißt
+   * `profiles!user_id`, damit sie eindeutig bleibt, falls später eine
+   * zweite Verbindung zu profiles dazukommt. Gleich in
+   * web/server/supabase-api.js.
+   */
+  const abfrage = (spalten: string) =>
+    client
+      .from('stream_comments')
+      .select(spalten)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+  let { data, error } = await abfrage('id, user_id, text, created_at, reply_to, profiles!user_id(id, name)');
+  if (error && Kommentar.fehltSpalte(error)) {
+    ({ data, error } = await abfrage('id, user_id, text, created_at, profiles!user_id(id, name)'));
+  }
   if (error) throw error;
 
   // Fund 4: Medienadressen unterschreiben (siehe lib/medien.ts).
-  return signiereMedien(client, ((data ?? []) as any[]).map((k) => ({
-    id: k.id,
-    userId: k.user_id,
-    name: k.profiles?.name ?? '',
-    text: k.text,
+  return signiereMedien(client, Kommentar.liveBezuege(((data ?? []) as any[]).map((k) => ({
+    id: k.id as string,
+    userId: k.user_id as string,
+    name: (k.profiles?.name ?? '') as string,
+    text: k.text as string,
     zeit: chatZeit(k.created_at),
+    antwortAufId: (k.reply_to ?? null) as string | null,
+  }))));
+}
+
+/**
+ * Kasten 8.6: die Wortmeldungen EINER Sitzung (Schema 90, sitzung_id), in
+ * der Reihenfolge, in der gesprochen wurde — wer, wann, was. Gelesen wird
+ * unter der Regel „PTT in eigenen Communitys lesen" (Mitglied +
+ * sichtbar_fuer). Gleiche Abfrage in web/server/supabase-api.js.
+ */
+export async function ladePttSitzung(client: SupabaseClient, sitzungId: string) {
+  const { data, error } = await client
+    .from('ptt_messages')
+    .select('id, sender_id, audio_url, dauer, created_at, profiles(id, name)')
+    .eq('sitzung_id', sitzungId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  return signiereMedien(client, ((data ?? []) as any[]).map((p) => ({
+    id: p.id as string,
+    userId: p.sender_id as string,
+    name: (p.profiles?.name ?? '') as string,
+    audioUrl: p.audio_url as string,
+    dauer: Number(p.dauer ?? 0),
+    zeitpunkt: p.created_at as string,
   })));
 }
 

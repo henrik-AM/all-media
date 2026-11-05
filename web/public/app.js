@@ -176,6 +176,10 @@ const state = {
   communityFilter: 'meine',
   commSearchQuery: '',
   commSearchFilter: 'all',
+  // Die Seite hinter "Communitys →" bzw. "Profile →" unter Suchen
+  // (Kasten 3.1/3.2) und ihr eigenes Suchfeld.
+  commSuchSeite: null,
+  commSuchSeiteQuery: '',
   // Filter der persoenlichen Chats im Community-Bereich.
   commChatFilter: 'all',
   videoSearchQuery: '',
@@ -266,13 +270,12 @@ function farbeFuerNadel(farbe) {
   return treffer ? treffer[0] : '#0a66ff';
 }
 
-function avatarOf(chat, size = 54) {
+function avatarOf(chat, size = 54, messenger = istMessengerChat(chat)) {
   if (chat.isGroup) {
     return `<div class="avatar avatar--${size}" style="background:linear-gradient(135deg,#7E93C4,#4A6699)">${ICONS.people}</div>`
       .replace('<svg', '<svg style="width:45%;height:45%"');
   }
-  const u = user(chat.userId);
-  return personenAvatar(u, size);
+  return avatarForUser(chat.userId, size, messenger);
 }
 
 /*
@@ -289,9 +292,28 @@ function personenAvatar(u, size, extra = '') {
   }</div>`;
 }
 
-function avatarForUser(id, size = 44) {
+/*
+ * Kasten 28/7.8 (Nachtrag 11.10.): mein eigenes Kontaktbild — nur im
+ * Messenger (`messenger` = true), nur für mich (state.kontaktBilder kommt aus
+ * kontakt_bilder, Schema 94, RLS nur Eigentümer). Die Regel steht einmal in
+ * gemeinsam/kontaktbild.js (anzeigeFuer), dieselbe wie in der App.
+ * `bild` setzt ein Profilbild, das nicht in state.users steht (Karte, 7.7).
+ */
+function avatarForUser(id, size = 44, messenger = false, bild = undefined) {
   if (id === 'me') return eigenerAvatar(state.users.me, size);
-  return personenAvatar(user(id), size);
+  const u = user(id);
+  const anzeige = window.Kontaktbild.anzeigeFuer(id, {
+    profil: { name: u.name, avatar: bild || u.avatar },
+    kontaktBilder: state.kontaktBilder,
+    messenger,
+  });
+  return personenAvatar({ ...u, avatar: anzeige.bild || null }, size);
+}
+
+/** Ist das ein Chat des Messengers (nicht Communitys → Chats, kein Unterthema)? */
+function istMessengerChat(chat) {
+  if (!chat || !chat.id) return false;
+  return [...(state.chats || []), ...(state.archiviert || [])].some((c) => c.id === chat.id);
 }
 
 /* ------------------------------------------------- @-Markierungen (Kasten 25) */
@@ -438,7 +460,16 @@ function markierungsEingabe(feld, ort = {}) {
     box.innerHTML = liste
       .map(
         (p, i) => `<button type="button" class="markierliste__zeile${i === aktiv ? ' is-active' : ''}" role="option" data-mwahl="${i}">
-          ${personenAvatar({ avatar: p.avatar_url, color: p.color, initials: initialenVon(p.name) }, 36)}
+          ${/* Kasten 28/7.11: im Messenger-Chat mein Kontaktbild (wie MarkierungsEingabe → Avatar). */ ''}
+          ${personenAvatar({
+            avatar: window.Kontaktbild.anzeigeFuer(p.id, {
+              profil: { avatar: p.avatar_url },
+              kontaktBilder: state.kontaktBilder,
+              messenger: Boolean(ort.chat) && istMessengerChat({ id: ort.chat }),
+            }).bild || null,
+            color: p.color,
+            initials: initialenVon(p.name),
+          }, 36)}
           <span class="markierliste__namen"><strong>${esc(p.name)}</strong><span>${esc(p.handle)}</span></span>
         </button>`
       )
@@ -641,6 +672,60 @@ function bioLink(adresse) {
   const ziel = /^https?:\/\//i.test(adresse) ? adresse : `https://${adresse}`;
   return `<a class="prof__link" href="${esc(ziel)}" target="_blank" rel="noopener noreferrer">${esc(adresse)}</a>`;
 }
+
+/*
+ * Kasten 1.3 (Nachtrag 10.10.2026): Pronomen klein neben dem Namen und die
+ * Links eines Profils — erster sichtbar, bei mehreren „und N weitere“ → Liste.
+ * In allen Profilköpfen gleich (Videos, Communitys, Messenger, fremdes
+ * Profil). Gegenstück in der App: components/ProfilAngaben.tsx. Regeln und
+ * Texte aus gemeinsam/profilfelder.js.
+ */
+function nameMitPronomen(name, pronomen) {
+  const p = String(pronomen || '').trim();
+  return `${esc(name)}${p ? `<span class="prof__pronomen" data-testid="profil-pronomen">${esc(p)}</span>` : ''}`;
+}
+
+function profilLinksHtml(links) {
+  const alle = (links || []).filter((l) => l && l.url);
+  if (!alle.length) return '';
+  const erster = alle[0];
+  const weitere = window.Profilfelder.weitereText(alle.length);
+  return `<div class="prof__links">
+    <a class="prof__link" data-testid="profil-link" href="${esc(window.Profilfelder.linkZiel(erster))}" target="_blank" rel="noopener noreferrer">${esc(window.Profilfelder.linkText(erster))}</a>
+    ${
+      weitere
+        ? `<button class="prof__weitere" type="button" data-profillinks="${esc(JSON.stringify(alle))}" data-testid="profil-links-weitere" aria-label="Alle Links: ${esc(weitere)}">${esc(weitere)}</button>`
+        : ''
+    }
+  </div>`;
+}
+
+/* Ein Klick auf „und N weitere“ — egal in welchem Profil — zeigt alle Links. */
+document.addEventListener('click', (e) => {
+  const knopf = e.target.closest?.('[data-profillinks]');
+  if (!knopf) return;
+  e.preventDefault();
+  let alle = [];
+  try {
+    alle = JSON.parse(knopf.dataset.profillinks || '[]');
+  } catch {
+    alle = [];
+  }
+  openSheet(
+    window.Profilfelder.TEXTE.linksTitel,
+    `<div class="sheet__body" data-testid="profil-links-liste">${alle
+      .map(
+        (l) => `<a class="item" href="${esc(window.Profilfelder.linkZiel(l))}" target="_blank" rel="noopener noreferrer">
+          <span class="item__icon">${ICONS.link}</span>
+          <span class="item__label">${esc(window.Profilfelder.linkText(l))}</span>
+          <span class="row__chevron">${ICONS.chevron}</span>
+        </a>`
+      )
+      .join('')}</div>`,
+    null,
+    { schliessen: true }
+  );
+});
 
 /* ------------------------------------------------------------------ theme */
 function applyTheme() {
@@ -1452,6 +1537,10 @@ function profilReiterPruefen(zielBereich, zielUnterpunkt) {
 function verlasseExplorer() {
   state.explorerView = null;
   state.explorerParam = null;
+  // Auch die Unterseite der Community-Suche (Kasten 3.1/3.2).
+  state.commSuchSeite = null;
+  // Kasten 1.3: die Seite „Profil bearbeiten“.
+  state.profilSeite = null;
   /*
    * Auch der Weg zurueck ins Profil gilt nur fuer den Besuch, aus dem er kam.
    * Wer die Einstellungen ueber die untere Leiste oeffnet, soll dort keinen
@@ -1498,6 +1587,14 @@ function render() {
   kameraStromStoppen();
   renderBottomNav();
   renderTopBar();
+
+  /*
+   * Kasten 1.3 (Nachtrag): die Seite „Profil bearbeiten“. Vor der
+   * Bildschirmzeit-Sperre, weil sie wie die Einstellungen zu keinem Bereich
+   * gehört (App: bereichFuer → null). Geleert von ihrem Zurück-Pfeil und von
+   * jedem Navigationsklick (verlasseExplorer).
+   */
+  if (state.profilSeite) return renderProfilSeite();
 
   /*
    * Kasten 22: ist der Bereich der Hauptseite in der Bildschirmzeit zu,
@@ -1551,7 +1648,9 @@ function render() {
   if (state.area === 'communities') {
     if (v === 'home') return renderCommunities();
     if (v === 'chats') return renderCommunityChats();
-    if (v === 'search') return renderCommunitySearch();
+    // Kasten 3.1/3.2: die Unterseite hinter dem Pfeil. Wie commProfilView
+    // hier abgefragt, damit ein erneutes render() sie nicht wegwischt.
+    if (v === 'search') return state.commSuchSeite ? renderCommunitySuchSeite() : renderCommunitySearch();
     // Die Seite hinter "Erstellt"/"Beigetreten". Sie wird hier mit
     // abgefragt, damit ein erneutes render() sie nicht wegwischt - und in
     // verlasseExplorer() geleert, damit sie nicht haengen bleibt.
@@ -1845,7 +1944,8 @@ function chatOptionen(chatId) {
           const was = b.dataset.copt;
           close();
 
-          if (was === 'einstellungen') return openChatSettings(chatId);
+          // Kasten 28/7.9: bei Gruppen die Gruppeninfo, wie in der App.
+          if (was === 'einstellungen') return chat.isGroup ? openGruppenInfo(chatId) : openChatSettings(chatId);
 
           if (was === 'messenger') return messengerAnfragen(chat);
 
@@ -2822,10 +2922,10 @@ function storyRail(liste, bereich) {
   }
   // Die Map behält die Reihenfolge des Eintragens: die eigene Kachel bleibt
   // links, die fremden dahinter so, wie der Server sie geliefert hat.
-  return `<div class="storyrail" data-storybereich="${wo}">${[...nachPerson.values()].map(storyItem).join('')}</div>`;
+  return `<div class="storyrail" data-storybereich="${wo}">${[...nachPerson.values()].map((g) => storyItem(g, wo)).join('')}</div>`;
 }
 
-function storyItem(storys) {
+function storyItem(storys, wo = 'messenger') {
   const ungesehen = storys.find((x) => !x.viewed);
   const s = ungesehen || storys[storys.length - 1];
   const u = user(s.userId);
@@ -2836,9 +2936,24 @@ function storyItem(storys) {
   // Kasten 15: auch an der Adresse erkennen — das Bild der Kachel kann von
   // einer anderen Story derselben Person stammen als `s`.
   const standbild = bild && s.mediaType !== 'video' && !istVideoAdresse(bild) ? bild : null;
+  /*
+   * Kasten 28/7.11: ohne Standbild (keine Story, Video-Story) steht das
+   * Profilbild im Ring — in der Messenger-Leiste mein eigenes Kontaktbild
+   * (gemeinsam/kontaktbild.js), wie in der App (StoryRail → Avatar). Vorher
+   * standen hier immer nur die Initialen.
+   */
+  const profilbild = s.own
+    ? state.users?.me?.avatar
+    : window.Kontaktbild.anzeigeFuer(s.userId, {
+        profil: { avatar: u.avatar },
+        kontaktBilder: state.kontaktBilder,
+        messenger: wo === 'messenger',
+      }).bild;
   const kern = standbild
     ? `<div class="story__inner" style="background-image:url(${standbild});background-size:cover;background-position:center"></div>`
-    : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`;
+    : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}${
+        profilbild ? `<img class="story__profilbild" src="${esc(profilbild)}" alt="" onerror="this.remove()" />` : ''
+      }</div>`;
 
   // Der dritte Zustand: keine Story, kein Ring. Es gibt ihn nur bei der
   // eigenen Kachel — fremde ohne Story stehen gar nicht erst in der Leiste.
@@ -2913,7 +3028,7 @@ function renderContacts() {
 
   const item = (c) => `
     <li><button class="row" data-contact="${c.id}">
-      ${avatarForUser(c.id, 44)}
+      ${avatarForUser(c.id, 44, true)}
       <div class="row__body">
         <div class="row__name">${esc(c.name)}</div>
         <div class="row__bottom"><span class="row__preview">${esc(c.about)}</span></div>
@@ -3281,6 +3396,13 @@ function openProfilBearbeiten(fertig) {
           ).join('')}
         </div>
       </div>
+      ${/*
+          Kasten 1.3–1.5 (Feedback 28.09.2026): kleine Schrift, die in den
+          Abschnitt „Konto" der Einstellungen führt. Das Blatt ist für alle
+          drei Profile dasselbe, also steht der Hinweis in allen dreien.
+          Gleicher Text und gleiches Ziel in der App (WeitereEinstellungenHinweis).
+        */ ''}
+      <button class="bearbeiten__weiter" id="pbEinstellungen" type="button">Weitere Bearbeitungen unter Einstellungen</button>
     </div>
     <div class="sheet__footer">
       <button class="btn btn--primary" id="pbSichern">Merken</button>
@@ -3348,6 +3470,14 @@ function openProfilBearbeiten(fertig) {
 
       sheet.querySelector('#pbEntfernen').addEventListener('click', () => bildSetzen(null, null));
 
+      // Nachtrag 10.10.2026: der Hinweis führt direkt auf die große Seite
+      // „Profil bearbeiten“ (wie Einstellungen → Konto). Ihr Zurück-Pfeil
+      // führt wieder ins Profil, aus dem man kam.
+      sheet.querySelector('#pbEinstellungen').addEventListener('click', () => {
+        close();
+        openProfilSeite();
+      });
+
       sheet.querySelector('#pbSichern').addEventListener('click', async () => {
         const antwort = await fetch('/api/eigene/profil', {
           method: 'POST',
@@ -3367,7 +3497,14 @@ function openProfilBearbeiten(fertig) {
           initials: antwort.profil.initials,
           color: antwort.profil.color,
         });
-        state.eigenesProfil = { ...state.eigenesProfil, bio: antwort.profil.bio, link: antwort.profil.link };
+        state.eigenesProfil = {
+          ...state.eigenesProfil,
+          bio: antwort.profil.bio,
+          link: antwort.profil.link,
+          // Kasten 1.3: der Server liefert die Links mit (Schema 88 hält link = erster).
+          pronomen: antwort.profil.pronomen || '',
+          links: antwort.profil.links || [],
+        };
 
         close();
         toast('Profil gespeichert');
@@ -3376,6 +3513,357 @@ function openProfilBearbeiten(fertig) {
     },
     { schliessen: true, hoch: true }
   );
+}
+
+/*
+ * Die Seite „Profil bearbeiten“ (Kasten 1.3, Nachtrag 10.10.2026).
+ *
+ * Henrik: „deutlich mehr Freiraum“ als das kleine Blatt, „orientiere dich an
+ * Instagram und entscheide selbst“. Oben das große Bild mit „Bild
+ * bearbeiten“, darunter Zeilen (Beschriftung links, Wert rechts); jede Zeile
+ * öffnet eine eigene Unterseite mit großem Eingabefeld und Abbrechen/Fertig.
+ * Fehler stehen auf der Seite (#psFehler), nicht im Toast dahinter.
+ *
+ * Erreichbar über den Hinweis „Weitere Bearbeitungen unter Einstellungen“
+ * (Blatt Profil bearbeiten, alle drei Profile) und Einstellungen → Konto →
+ * „Profil bearbeiten“. Gegenstück in der App:
+ * app/screens/profile/ProfilBearbeitenScreen.tsx — dieselben Texte aus
+ * gemeinsam/profilfelder.js. Bewusst nicht: Geschlecht.
+ */
+function openProfilSeite() {
+  state.profilSeite = { feld: null, aus: state.area };
+  render();
+}
+
+function profilSeiteLinks() {
+  const profil = state.eigenesProfil || {};
+  return profil.links && profil.links.length
+    ? profil.links
+    : window.Profilfelder.linksAus({ link: profil.link });
+}
+
+/** Nach dem Speichern: was der Server zurückgibt, steht überall sofort. */
+function profilSeiteUebernehmen(p) {
+  if (!p) return;
+  Object.assign(state.users.me, {
+    name: p.name,
+    initials: p.initials,
+    color: p.color,
+    pronomen: p.pronomen || '',
+    links: p.links || [],
+  });
+  state.eigenesProfil = {
+    ...state.eigenesProfil,
+    bio: p.bio,
+    link: p.link,
+    pronomen: p.pronomen || '',
+    links: p.links || [],
+  };
+}
+
+function renderProfilSeite() {
+  const PF = window.Profilfelder;
+  const T = PF.TEXTE;
+  const seite = state.profilSeite;
+  if (seite.feld) return renderProfilSeiteFeld();
+
+  const me = state.users.me;
+  const profil = state.eigenesProfil || {};
+  const links = profilSeiteLinks();
+  const zeilen = [
+    { feld: 'name', label: T.name, wert: me.name, leer: T.leer.name },
+    { feld: 'benutzername', label: T.benutzername, wert: me.handle, leer: T.leer.benutzername },
+    { feld: 'pronomen', label: T.pronomen, wert: profil.pronomen, leer: T.leer.pronomen },
+    { feld: 'bio', label: T.bio, wert: profil.bio, leer: T.leer.bio },
+    { feld: 'links', label: T.links, wert: PF.linksZeile(links), leer: T.leer.links },
+  ];
+
+  main.innerHTML = `
+    <div class="scroll profilseite" data-testid="profilseite">
+      <div class="profilseite__kopf">
+        <button class="iconbtn" id="psZurueck" aria-label="${esc(T.zurueck)}">${ICONS.back}</button>
+        <h2 class="profilseite__titel">${esc(T.seite)}</h2>
+        <span class="profilseite__platz"></span>
+      </div>
+
+      <div class="profilseite__bild">
+        <div class="avatar avatar--96" id="psVorschau" style="background:${farbe(me.color)}">
+          ${me.avatar ? `<img src="${esc(me.avatar)}" alt="" />` : esc(me.initials)}
+        </div>
+        <button class="profilseite__bildknopf" id="psBild" type="button">${esc(T.bildBearbeiten)}</button>
+        <div class="profilseite__meldung" id="psBildMeldung" role="status" hidden></div>
+        <input type="file" accept="image/*" id="psDatei" hidden />
+        <input type="file" accept="image/*" capture="user" id="psKameraDatei" hidden />
+      </div>
+
+      <div class="profilseite__liste">
+        ${zeilen
+          .map(
+            (z) => `<button class="profilseite__zeile" type="button" data-psfeld="${z.feld}" aria-label="${esc(z.label)} bearbeiten">
+              <span class="profilseite__label">${esc(z.label)}</span>
+              <span class="profilseite__wert ${z.wert ? '' : 'is-leer'}">${esc(z.wert || z.leer)}</span>
+              <span class="row__chevron">${ICONS.chevron}</span>
+            </button>`
+          )
+          .join('')}
+      </div>
+    </div>`;
+
+  $('#psZurueck').addEventListener('click', () => {
+    state.profilSeite = null;
+    render();
+  });
+  main.querySelectorAll('[data-psfeld]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.profilSeite.feld = b.dataset.psfeld;
+      render();
+    })
+  );
+
+  // Das Bild: dieselben Wege wie im kleinen Blatt (/api/hochladen →
+  // /api/eigene/profilbild), keine eigene Medienstelle.
+  const meldung = (text) => {
+    const el = $('#psBildMeldung');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
+  };
+  const bildSetzen = async (url, anzeige) => {
+    const antwort = await api('/api/eigene/profilbild', { url });
+    if (!antwort.ok) return meldung(antwort.error || 'Das Profilbild ließ sich nicht speichern');
+    state.users.me.avatar = anzeige;
+    if (state.profilSeite && !state.profilSeite.feld) renderProfilSeite();
+    meldung(anzeige ? 'Profilbild gespeichert' : 'Profilbild entfernt');
+  };
+  const dateiGewaehlt = async (e) => {
+    const datei = e.target.files?.[0];
+    e.target.value = '';
+    if (!datei) return;
+    let daten;
+    try {
+      daten = await bildVerkleinern(datei, 600);
+    } catch {
+      return meldung('Dieses Bild lässt sich nicht lesen');
+    }
+    meldung('Wird hochgeladen …');
+    const hoch = await api('/api/hochladen', { ordner: 'avatars', aufnahme: daten });
+    if (!hoch.ok) return meldung(hoch.error || 'Das Bild ließ sich nicht hochladen');
+    await bildSetzen(hoch.url, hoch.anzeige || daten);
+  };
+  $('#psDatei').addEventListener('change', dateiGewaehlt);
+  $('#psKameraDatei').addEventListener('change', dateiGewaehlt);
+  $('#psBild').addEventListener('click', () => {
+    meldung('');
+    openSheet(
+      T.bildBearbeiten,
+      `<div class="sheet__body">
+        <button class="item" data-psbild="waehlen"><span class="item__icon">${ICONS.image}</span><span class="item__label">${esc(T.bildWaehlen)}</span></button>
+        <button class="item" data-psbild="kamera"><span class="item__icon">${ICONS.camera}</span><span class="item__label">${esc(T.bildAufnehmen)}</span></button>
+        ${
+          state.users.me.avatar
+            ? `<button class="item item--danger" data-psbild="entfernen"><span class="item__icon">${ICONS.trash}</span><span class="item__label">${esc(T.bildEntfernen)}</span></button>`
+            : ''
+        }
+      </div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-psbild]').forEach((b) =>
+          b.addEventListener('click', () => {
+            close();
+            if (b.dataset.psbild === 'waehlen') $('#psDatei')?.click();
+            else if (b.dataset.psbild === 'kamera') $('#psKameraDatei')?.click();
+            else bildSetzen(null, null);
+          })
+        );
+      },
+      { schliessen: true }
+    );
+  });
+}
+
+function renderProfilSeiteFeld() {
+  const PF = window.Profilfelder;
+  const T = PF.TEXTE;
+  const G = PF.GRENZEN;
+  const feld = state.profilSeite.feld;
+  const me = state.users.me;
+  const profil = state.eigenesProfil || {};
+  const titel = { name: T.name, benutzername: T.benutzername, pronomen: T.pronomen, bio: T.bio, links: T.links }[feld];
+  const grenze = { name: G.name, pronomen: G.pronomen, bio: G.bio }[feld];
+  const eigenerHandle = window.Benutzername.normal(me.handle || '');
+  const anfang =
+    feld === 'name' ? me.name : feld === 'benutzername' ? eigenerHandle : feld === 'pronomen' ? profil.pronomen : profil.bio;
+  // Die Links werden auf der Unterseite bearbeitet und erst mit „Fertig“ gespeichert.
+  const links = profilSeiteLinks().map((l) => ({ ...l }));
+
+  const linkKarte = (l, i) => `<div class="profilseite__linkkarte" data-pslink="${i}" data-testid="profilseite-link-${i + 1}">
+      <div class="profilseite__linkkopf">
+        <span class="feld__label">Link ${i + 1}</span>
+        <button class="iconbtn" type="button" data-psloeschen="${i}" aria-label="${esc(T.linkLoeschen)} ${i + 1}">${ICONS.trash}</button>
+      </div>
+      <input class="feld__eingabe" data-psurl="${i}" type="url" inputmode="url" autocomplete="off" value="${esc(l.url)}" maxlength="${G.adresse}" placeholder="${esc(T.adresseBeispiel)}" aria-label="${esc(T.adresse)} ${i + 1}" />
+      <input class="feld__eingabe" data-pstitel="${i}" value="${esc(l.titel)}" maxlength="${G.titel}" placeholder="${esc(T.titel)}" aria-label="${esc(T.titel)} ${i + 1}" />
+    </div>`;
+
+  main.innerHTML = `
+    <div class="scroll profilseite" data-testid="profilseite-feld-${feld}">
+      <div class="profilseite__kopf">
+        <button class="profilseite__textknopf" id="psAbbrechen" type="button">${esc(T.abbrechen)}</button>
+        <h2 class="profilseite__titel">${esc(titel)}</h2>
+        <button class="profilseite__textknopf is-fertig" id="psFertig" type="button">${esc(T.fertig)}</button>
+      </div>
+      <div class="profilseite__feld">
+        ${
+          feld === 'links'
+            ? `<div id="psLinks"></div>
+               <button class="profilseite__linkneu" id="psLinkNeu" type="button">${ICONS.plus} ${esc(T.linkHinzufuegen)}</button>
+               <div class="profilseite__erklaerung" id="psLinksVoll" hidden>${esc(T.linksVoll)}</div>`
+            : `<label class="feld__label" for="psEingabe">${esc(titel)}</label>
+               <div class="profilseite__eingabezeile">
+                 ${feld === 'benutzername' ? '<span class="profilseite__at">@</span>' : ''}
+                 ${
+                   feld === 'bio'
+                     ? `<textarea class="feld__eingabe feld__eingabe--mehrzeilig profilseite__gross" id="psEingabe" rows="6" maxlength="${grenze}" placeholder="${esc(T.leer.bio)}">${esc(anfang || '')}</textarea>`
+                     : `<input class="feld__eingabe profilseite__gross" id="psEingabe" value="${esc(anfang || '')}" ${grenze ? `maxlength="${grenze}"` : ''} placeholder="${esc(T.leer[feld])}" ${feld === 'benutzername' ? 'autocapitalize="none" autocorrect="off" spellcheck="false"' : ''} autocomplete="off" />`
+                 }
+               </div>
+               ${grenze ? `<span class="feld__zaehler" id="psZaehler" data-testid="profilseite-zaehler"></span>` : ''}
+               ${feld === 'benutzername' ? '<div class="profilseite__namensstand" id="psNamensstand" data-testid="profilseite-namensstand"></div>' : ''}`
+        }
+        <div class="profilseite__fehler" id="psFehler" role="alert" data-testid="profilseite-fehler" hidden></div>
+        <div class="profilseite__erklaerung">${esc(T.erklaerung[feld])}</div>
+      </div>
+    </div>`;
+
+  const fehler = (text) => {
+    const el = $('#psFehler');
+    el.textContent = text || '';
+    el.hidden = !text;
+  };
+  const zurueck = (toastText) => {
+    state.profilSeite.feld = null;
+    render();
+    if (toastText) toast(toastText);
+  };
+  $('#psAbbrechen').addEventListener('click', () => zurueck());
+
+  // --- Links: Karten zeichnen, hinzufügen, löschen ---
+  const linksZeichnen = () => {
+    const box = $('#psLinks');
+    if (!box) return;
+    box.innerHTML = links.length ? links.map(linkKarte).join('') : `<div class="profilseite__erklaerung">${esc(T.keineLinks)}</div>`;
+    $('#psLinkNeu').hidden = links.length >= G.links;
+    $('#psLinksVoll').hidden = links.length < G.links;
+    box.querySelectorAll('[data-psurl]').forEach((e) =>
+      e.addEventListener('input', () => {
+        links[Number(e.dataset.psurl)].url = e.value;
+        fehler('');
+      })
+    );
+    box.querySelectorAll('[data-pstitel]').forEach((e) =>
+      e.addEventListener('input', () => {
+        links[Number(e.dataset.pstitel)].titel = e.value;
+      })
+    );
+    box.querySelectorAll('[data-psloeschen]').forEach((b) =>
+      b.addEventListener('click', () => {
+        links.splice(Number(b.dataset.psloeschen), 1);
+        fehler('');
+        linksZeichnen();
+      })
+    );
+  };
+  if (feld === 'links') {
+    linksZeichnen();
+    $('#psLinkNeu').addEventListener('click', () => {
+      if (links.length >= G.links) return;
+      links.push({ url: '', titel: '' });
+      linksZeichnen();
+      $(`[data-psurl="${links.length - 1}"]`)?.focus();
+    });
+  }
+
+  // --- Ein Feld: Zähler und, beim Benutzernamen, „frei“/„vergeben“ live ---
+  const eingabe = $('#psEingabe');
+  let namensUhr = null;
+  let namensStand = { gut: true, vergeben: false };
+  const namenPruefen = () => {
+    const zeile = $('#psNamensstand');
+    const setzen = (text, gut, vergeben = false) => {
+      namensStand = { gut, vergeben };
+      zeile.textContent = text;
+      zeile.classList.toggle('is-fehler', Boolean(text) && !gut);
+      zeile.classList.toggle('is-gut', Boolean(text) && gut);
+    };
+    clearTimeout(namensUhr);
+    const name = window.Benutzername.normal(eingabe.value);
+    if (!name) return setzen('', true);
+    if (name === eigenerHandle) return setzen(T.eigenerName, true);
+    const form = window.Benutzername.pruefe(name);
+    if (form) return setzen(form, false);
+    setzen('Wird geprüft …', true);
+    // Gleiche Regel wie bei der Registrierung: halbe Sekunde Ruhe, dann handle_frei.
+    namensUhr = setTimeout(async () => {
+      const antwort = await window.Anmeldung?.benutzernameFrei(name);
+      if (!eingabe.isConnected || window.Benutzername.normal(eingabe.value) !== name) return;
+      if (antwort?.frei) setzen(`${antwort.handle} ist frei`, true);
+      else setzen(antwort?.meldung || 'Dieser Benutzername ist schon vergeben.', false, antwort?.grund === 'vergeben');
+    }, 500);
+  };
+  if (eingabe) {
+    const zaehler = $('#psZaehler');
+    const zaehlen = () => {
+      if (zaehler) zaehler.textContent = PF.zaehler(eingabe.value, grenze);
+    };
+    eingabe.addEventListener('input', () => {
+      fehler('');
+      zaehlen();
+      if (feld === 'benutzername') namenPruefen();
+    });
+    zaehlen();
+    if (feld === 'benutzername') namenPruefen();
+    eingabe.focus();
+    if (feld !== 'bio') eingabe.addEventListener('keydown', (e) => e.key === 'Enter' && $('#psFertig').click());
+  }
+
+  // --- Fertig ---
+  $('#psFertig').addEventListener('click', async () => {
+    fehler('');
+    const knopf = $('#psFertig');
+
+    if (feld === 'benutzername') {
+      const name = window.Benutzername.normal(eingabe.value);
+      if (name === eigenerHandle) return zurueck();
+      const form = window.Benutzername.pruefe(name);
+      if (form) return fehler(form);
+      if (namensStand.vergeben) return fehler('Dieser Benutzername ist schon vergeben.');
+      knopf.disabled = true;
+      const antwort = await window.Anmeldung?.benutzernameAendern(name);
+      knopf.disabled = false;
+      if (!antwort?.ok) return fehler(antwort?.meldung || 'Die Änderung ist gerade nicht möglich.');
+      state.users.me.handle = antwort.handle;
+      return zurueck(T.gespeichert);
+    }
+
+    let koerper;
+    if (feld === 'links') {
+      const geprueft = PF.linksPruefen(links);
+      if (geprueft.fehler) return fehler(geprueft.fehler);
+      koerper = { links: geprueft.links };
+    } else {
+      const wert = eingabe.value.trim();
+      const pruefer = { name: PF.namePruefen, pronomen: PF.pronomenPruefen, bio: PF.bioPruefen }[feld];
+      const grund = pruefer(wert);
+      if (grund) return fehler(grund);
+      koerper = { [feld]: wert };
+    }
+
+    knopf.disabled = true;
+    const antwort = await api('/api/eigene/profil', koerper);
+    knopf.disabled = false;
+    if (!antwort.ok) return fehler(antwort.error || 'Das Profil ließ sich nicht speichern');
+    profilSeiteUebernehmen(antwort.profil);
+    zurueck(T.gespeichert);
+  });
 }
 
 function openNewMenu() {
@@ -3427,7 +3915,7 @@ function openNewGroup() {
       ${zustand.extern
         .map(
           (e) => `<div class="row">
-            ${avatarForUser(e.id, 44)}
+            ${avatarForUser(e.id, 44, true)}
             <div class="row__body">
               <div class="row__name">${esc(e.name)}</div>
               <div class="row__sub">${e.extern ? 'Wird eingeladen' : esc(e.phone || '')}</div>
@@ -3440,7 +3928,7 @@ function openNewGroup() {
         .filter((c) => c.status === 'friend')
         .map(
           (c) => `<button class="row" data-member="${c.id}">
-            ${avatarForUser(c.id, 44)}
+            ${avatarForUser(c.id, 44, true)}
             <div class="row__body"><div class="row__name">${esc(c.name)}</div></div>
             <span class="checkbox ${zustand.gewaehlt.has(c.id) ? 'is-on' : ''}">${
               zustand.gewaehlt.has(c.id) ? ICONS.check : ''
@@ -3847,33 +4335,31 @@ function qrScannerOeffnen() {
 /*
  * Die Oberflaeche eines Anrufs.
  *
- * Die Uebertragung selbst fehlt bewusst: dafuer braucht es WebRTC, einen
- * Signalweg und einen TURN-Server. Die Oberflaeche steht damit schon
- * vollstaendig, der Verlauf ist simuliert:
- * klingelt -> verbunden (Dauer laeuft) -> beendet.
+ * Die Uebertragung fehlt: dafuer braucht es WebRTC, einen Signalweg und einen
+ * TURN-Server. Kasten 5.1 (Henrik 28.09.2026: „nur eine Vorschau, oder kann
+ * die andere Person wirklich drangehen?"): Es ist eine Vorschau. Bis zum
+ * 10.10.2026 nahm die Gegenseite hier nach 2,6 Sekunden „von selbst ab", und
+ * die hochgezaehlte Dauer stand danach als „Anruf · 02:14" im Chat — eine
+ * erfundene Anzeige. Jetzt: gestartet -> beendet, ohne Dauer. Der Eintrag
+ * geht beim Start in den Chat (Kasten 5.2, Schema 89). Gleiche Regel in der
+ * App (CallScreen.tsx).
  */
 let anrufTimer;
 
-function zweistellig(n) {
-  return String(n).padStart(2, '0');
-}
-
-/** Sekunden als mm:ss, ab einer Stunde als h:mm:ss. */
+/** Sekunden als mm:ss, ab einer Stunde als h:mm:ss — gemeinsam/anruf.js. */
 function dauerText(sekunden) {
-  const st = Math.floor(sekunden / 3600);
-  const min = Math.floor((sekunden % 3600) / 60);
-  const sek = sekunden % 60;
-  return st > 0
-    ? `${st}:${zweistellig(min)}:${zweistellig(sek)}`
-    : `${zweistellig(min)}:${zweistellig(sek)}`;
+  return window.Anruf.dauerText(sekunden);
 }
 
 /*
  * Anruf - fuer eine Person oder fuer eine Gruppe. Bei einer Gruppe stehen
  * alle Mitglieder oben, sonst die eine Person. Prototyp-Frames
  * "MC + Sprachanruf" und "CC+ Sprachanruf".
+ *
+ * `ort` (Kasten 5.2): { chatId } oder { kanalId } — wo der Anruf im Chat
+ * steht. Ohne `ort` der Messenger-Zweierchat mit der Person.
  */
-function openCall(ziel, art) {
+function openCall(ziel, art, ort = {}) {
   // Bei einer Gruppe wird der Chat uebergeben, sonst die Kennung der Person.
   const gruppe = typeof ziel === 'object' ? ziel : null;
   const userId = gruppe ? null : ziel;
@@ -3882,37 +4368,57 @@ function openCall(ziel, art) {
   const u = gruppe
     ? { name: gruppe.name, initials: '', color: '#5C6BC0' }
     : user(userId);
+  // Kasten 28/7.11: das große Bild der Person — im Messenger mein eigenes
+  // Kontaktbild (gemeinsam/kontaktbild.js), sonst ihr Profilbild.
+  const anrufBild = gruppe
+    ? null
+    : window.Kontaktbild.anzeigeFuer(userId, {
+        profil: { avatar: u.avatar },
+        kontaktBilder: state.kontaktBilder,
+        messenger: state.area === 'messenger',
+      }).bild;
   if (!u) return toast('Diese Person gibt es nicht');
 
-  let zustand = 'klingelt';
-  let dauer = 0;
+  let zustand = 'gestartet';
   const an = { stumm: false, laut: art === 'video', kamera: art === 'video' };
+  clearInterval(anrufTimer);
 
   overlay.hidden = false;
 
+  /*
+   * Kasten 5.2: der Eintrag entsteht beim Start — in Person, Gruppe,
+   * Community-Chat oder Unterthema. Die Gegenseite liest dieselbe Zeile
+   * (5.3/5.4). Erst danach neu laden, sonst fehlt er im Chat.
+   */
+  if (ort.chatId || ort.kanalId || userId) fetch('/api/anruf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ art, chatId: ort.chatId || null, kanalId: ort.kanalId || null, zielId: userId }),
+  })
+    .then((r) => r.json().catch(() => ({})))
+    .then((e) => {
+      if (e && e.ok === false) return console.error('Anruf konnte nicht im Chat vermerkt werden:', e.error);
+      if (ort.kanalId) return; // Das Unterthema laedt sich beim Zurueckkehren selbst.
+      return bootstrap();
+    })
+    .catch((f) => console.error('Anruf konnte nicht im Chat vermerkt werden:', f));
+
   const zeichnen = () => {
-    const status =
-      zustand === 'klingelt'
-        ? art === 'video' ? 'Videoanruf …' : 'Klingelt …'
-        : zustand === 'verbunden' ? dauerText(dauer) : 'Beendet';
+    const status = zustand === 'gestartet' ? `${window.Anruf.artName(art)} gestartet` : 'Beendet';
+    const wer = gruppe ? 'Die anderen sehen' : `${esc((u.name || '').split(' ')[0] || 'Die andere Person')} sieht`;
 
     overlay.innerHTML = `
       <div class="anruf">
-        ${
-          art === 'video' && zustand === 'verbunden'
-            ? `<div class="anruf__video">${ICONS.video}
-                <span>Videoübertragung kommt bald</span>
-              </div>`
-            : ''
-        }
         <div class="anruf__kopf">
           ${
             gruppe && teilnehmer.length
               ? `<div class="anruf__runde">${teilnehmer
-                  .map((id) => `<span class="avatar avatar--52" style="background:${farbe(user(id).color)}">${esc(user(id).initials)}</span>`)
+                  // Kasten 28/7.11: Profilbild, im Messenger mein Kontaktbild (wie CallScreen → Avatar).
+                  .map((id) => avatarForUser(id, 52, state.area === 'messenger'))
                   .join('')}</div>`
-              : `<div class="anruf__avatar ${zustand === 'klingelt' ? 'is-klingelt' : ''}"
-                   style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}</div>`
+              : `<div class="anruf__avatar" style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}${
+                  anrufBild ? `<img class="anruf__bild" src="${esc(anrufBild)}" alt="" onerror="this.remove()" />` : ''
+                }</div>`
           }
           <div class="anruf__name">${esc(u.name)}</div>
           ${
@@ -3921,21 +4427,14 @@ function openCall(ziel, art) {
               : ''
           }
           <div class="anruf__status" id="anrufStatus">${esc(status)}</div>
+          <div class="anruf__vorschau" id="anrufVorschau">Vorschau: Sprache und Bild werden noch nicht übertragen.<br>${wer} den Anruf im Chat, annehmen geht noch nicht.</div>
           <!--
             Hier stand bis zum 07.09.2026 "Ende-zu-Ende-verschlüsselt". Das war
-            unzutreffend, und zwar doppelt: verschlüsselt wurde damals nichts,
-            und ein Anruf wird es auch jetzt nicht — Schema 31 nimmt Anrufe
-            ausdrücklich aus. Es gibt an dieser Stelle nicht einmal eine
+            unzutreffend: es gibt an dieser Stelle nicht einmal eine
             Übertragung. Ein Schloss, das nichts verschließt, ist schlimmer als
-            gar keins, weil sich jemand darauf verlässt.
+            gar keins.
           -->
         </div>
-
-        ${
-          art === 'video' && an.kamera && zustand === 'verbunden'
-            ? `<div class="anruf__eigen">${ICONS.person}</div>`
-            : ''
-        }
 
         <div class="anruf__leiste">
           <button class="anruf__knopf ${an.stumm ? 'is-an' : ''}" data-anruf="stumm">
@@ -3950,11 +4449,7 @@ function openCall(ziel, art) {
         </div>
 
         <div class="anruf__unten">
-          ${
-            zustand === 'klingelt'
-              ? `<button class="anruf__rund is-annehmen" data-anruf="annehmen" aria-label="Annehmen">${ICONS.phone}</button>`
-              : ''
-          }
+          ${/* Kein „Annehmen": wer anruft, nimmt nicht selbst ab (5.1). */ ''}
           <button class="anruf__rund is-auflegen" data-anruf="auflegen" aria-label="Auflegen">${ICONS.phone}</button>
         </div>
       </div>`;
@@ -3963,45 +4458,14 @@ function openCall(ziel, art) {
   };
 
   const beenden = () => {
-    clearInterval(anrufTimer);
     zustand = 'beendet';
-    toast(dauer > 0 ? `Anruf beendet · ${dauerText(dauer)}` : 'Anruf beendet');
+    // Es gab kein Gespraech, also auch keine Dauer.
+    toast('Anruf beendet');
     zeichnen();
-
-    /*
-     * Henrik 7.9.: „Anrufe sollen als Chatnachricht protokolliert werden (wie
-     * WhatsApp)." Bei einem Gruppenanruf gibt es keinen Chat zu zweit, deshalb
-     * nur beim Zweiergespräch. Gleiche Stelle in der App: CallScreen.tsx,
-     * `auflegen`.
-     */
-    if (userId) {
-      fetch(`/api/kontakte/${userId}/anruf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ art, dauer, status: dauer > 0 ? 'beendet' : 'verpasst' }),
-      })
-        // Erst danach neu laden, sonst steht der Eintrag zwar in der
-        // Datenbank, aber nicht im Chat, in den man zurückkehrt.
-        .then(() => bootstrap())
-        .catch((f) => console.error('Anruf konnte nicht im Chat vermerkt werden:', f));
-    }
-
     setTimeout(() => {
       overlay.hidden = true;
       overlay.innerHTML = '';
     }, 700);
-  };
-
-  const verbinden = () => {
-    if (zustand !== 'klingelt') return;
-    zustand = 'verbunden';
-    zeichnen();
-    clearInterval(anrufTimer);
-    anrufTimer = setInterval(() => {
-      dauer += 1;
-      const feld = $('#anrufStatus');
-      if (feld) feld.textContent = dauerText(dauer);
-    }, 1000);
   };
 
   const binden = () => {
@@ -4009,7 +4473,6 @@ function openCall(ziel, art) {
       b.addEventListener('click', () => {
         const was = b.dataset.anruf;
         if (was === 'auflegen') return beenden();
-        if (was === 'annehmen') return verbinden();
 
         an[was] = !an[was];
         const texte = {
@@ -4024,8 +4487,6 @@ function openCall(ziel, art) {
   };
 
   zeichnen();
-  // In der Demo nimmt die Gegenseite von selbst ab.
-  setTimeout(verbinden, 2600);
 }
 
 /* ------------------------------------------------------ contact profile */
@@ -4096,9 +4557,15 @@ async function openContactProfile(userId) {
 
     <div class="scroll">
       <div class="kp__kopf">
-        ${mitStoryRing(userId, avatarForUser(userId, 104), 'messenger')}
+        ${mitStoryRing(userId, avatarForUser(userId, 104, true), 'messenger')}
         <div class="kp__name">${esc(u.name)}</div>
         ${u.phone ? `<div class="kp__nummer">${esc(u.phone)}</div>` : ''}
+        <!-- Kasten 28/7.8: eigenes Kontaktfoto wie bei Apple Kontakte — nur ich sehe es. -->
+        <button class="kp__foto" id="kpFoto" type="button" data-testid="kontaktbild-bearbeiten">${esc(
+          window.Kontaktbild.FOTO_BEARBEITEN
+        )}</button>
+        <input type="file" accept="image/*" id="kpFotoDatei" hidden />
+        <input type="file" accept="image/*" capture="environment" id="kpFotoKamera" hidden />
       </div>
 
       ${profil.bio ? `<div class="kp__bio">${esc(profil.bio)}</div>` : ''}
@@ -4179,7 +4646,69 @@ async function openContactProfile(userId) {
     overlay.innerHTML = '';
   };
 
-  $('#kpBack').addEventListener('click', schliessen);
+  // Kasten 28/7.9: aus der Gruppeninfo geöffnet → Zurück führt dorthin.
+  const kpZurueck = profilZurueckNehmen(userId);
+  $('#kpBack').addEventListener('click', () => (kpZurueck ? kpZurueck() : schliessen()));
+
+  /*
+   * Kasten 28/7.8: „Foto bearbeiten" — Mediathek, Kamera, Eigenes Foto
+   * entfernen. Hochladen über /api/hochladen (Ordner avatars, vorhandene
+   * Medienstelle), speichern über /api/kontaktbild (kontakt_bilder, Schema 94).
+   * Gleicher Ablauf in der App (ContactProfileScreen, fotoAendern).
+   */
+  const K = window.Kontaktbild;
+  const fotoSetzen = async (url, anzeige) => {
+    const antwort = await api('/api/kontaktbild', { kontaktId: userId, url });
+    if (!antwort.ok) return toast(antwort.error || K.NICHT_GESPEICHERT);
+    state.kontaktBilder = { ...(state.kontaktBilder || {}) };
+    if (url) state.kontaktBilder[userId] = anzeige;
+    else delete state.kontaktBilder[userId];
+    toast(url ? K.GESPEICHERT : K.ENTFERNT);
+    openContactProfile(userId);
+  };
+  const fotoGewaehlt = async (e) => {
+    const datei = e.target.files?.[0];
+    e.target.value = '';
+    if (!datei) return;
+    let bild;
+    try {
+      bild = await bildVerkleinern(datei, 600);
+    } catch {
+      return toast('Dieses Bild lässt sich nicht lesen');
+    }
+    toast('Wird hochgeladen …');
+    const hoch = await api('/api/hochladen', { ordner: 'avatars', aufnahme: bild });
+    if (!hoch.ok) return toast(hoch.error || 'Das Bild ließ sich nicht hochladen');
+    await fotoSetzen(hoch.url, hoch.anzeige || bild);
+  };
+  $('#kpFotoDatei').addEventListener('change', fotoGewaehlt);
+  $('#kpFotoKamera').addEventListener('change', fotoGewaehlt);
+  $('#kpFoto').addEventListener('click', () =>
+    openSheet(
+      K.FOTO_BEARBEITEN,
+      `<div class="sheet__body">
+        <div class="sheet__hint">${esc(K.HINWEIS)}</div>
+        <button class="item" data-kpfoto="waehlen"><span class="item__icon">${ICONS.image}</span><span class="item__label">${esc(K.AUS_MEDIATHEK)}</span></button>
+        <button class="item" data-kpfoto="kamera"><span class="item__icon">${ICONS.camera}</span><span class="item__label">${esc(K.AUFNEHMEN)}</span></button>
+        ${
+          state.kontaktBilder?.[userId]
+            ? `<button class="item item--danger" data-kpfoto="entfernen"><span class="item__icon">${ICONS.trash}</span><span class="item__label">${esc(K.ENTFERNEN)}</span></button>`
+            : ''
+        }
+      </div>`,
+      (sheet, close) => {
+        sheet.querySelectorAll('[data-kpfoto]').forEach((b) =>
+          b.addEventListener('click', () => {
+            close();
+            if (b.dataset.kpfoto === 'waehlen') $('#kpFotoDatei')?.click();
+            else if (b.dataset.kpfoto === 'kamera') $('#kpFotoKamera')?.click();
+            else fotoSetzen(null, null);
+          })
+        );
+      },
+      { schliessen: true }
+    )
+  );
 
   $('#kpEdit').addEventListener('click', () =>
     openFormular(
@@ -4286,6 +4815,204 @@ async function openContactProfile(userId) {
 
   overlay.querySelectorAll('[data-kp-item]').forEach((b) =>
     b.addEventListener('click', () => kontaktZeile(b.dataset.kpItem, userId, chat, daten))
+  );
+}
+
+/*
+ * Kasten 28/7.9 (Nachtrag 12.10.2026 (3)): Zurück aus einem Profil, das aus
+ * der Gruppeninfo geöffnet wurde, führt in die Gruppeninfo — nicht ins Leere.
+ * { userId, fn }; gilt nur für genau diese Person und nur einmal.
+ */
+let profilZurueck = null;
+function profilZurueckNehmen(userId) {
+  const z = profilZurueck;
+  profilZurueck = null;
+  return z && z.userId === userId ? z.fn : null;
+}
+
+/**
+ * Gruppeninfo (Kasten 28/7.9 und 7.10) — Aufbau nach dem Prototyp-Frame
+ * „MC + Kontakteinstellungen" (560-1471), angepasst an Gruppen: Bild, Name,
+ * „N Mitglieder", Kacheln Audio/Video/Suchen, gruppierte Zeilen, die
+ * Mitgliederliste und unten rot „Gruppe verlassen". Nur, was es wirklich
+ * gibt: kein Gruppenbild-Upload, keine Admins, kein Umbenennen.
+ *
+ * Name und Bild jedes Mitglieds kommen aus gemeinsam/gruppe.js →
+ * Kontaktbild.anzeigeFuer: in einer Messenger-Gruppe mein Spitzname und mein
+ * eigenes Kontaktbild, in einer Community-Gruppe das Profil.
+ *
+ * Gleicher Aufbau in der App: app/screens/messenger/GroupSettingsScreen.tsx.
+ */
+async function openGruppenInfo(chatId) {
+  const chat =
+    state.chats.find((c) => c.id === chatId) ||
+    (state.archiviert || []).find((c) => c.id === chatId) ||
+    (state.communityChats || []).find((c) => c.id === chatId);
+  if (!chat || !chat.isGroup) return;
+  const G = window.Gruppe;
+  const messenger = istMessengerChat(chat);
+
+  let daten = { medien: [], markiert: [], gesamt: 0 };
+  try {
+    daten = await (await fetch(`/api/chats/${chat.id}/medien`)).json();
+  } catch {
+    /* Ohne Verlauf stehen die Zahlen auf 0 — ehrlich, nichts erfunden. */
+  }
+
+  // Kasten 7.10: mein Name für Kontakte (contacts.spitzname, Schema 33).
+  const spitznamen = {};
+  (state.contacts || []).forEach((k) => {
+    if (k.id && k.name) spitznamen[k.id] = k.name;
+  });
+  const liste = G.mitglieder({
+    andere: chat.members || [],
+    ich: { name: state.users.me?.name, bild: state.users.me?.avatar },
+    // Unbekannte ohne „?“-Namen: die Liste schreibt dann „Unbekanntes Mitglied“.
+    profil: (id) => state.users[id],
+    kontaktBilder: state.kontaktBilder,
+    spitznamen,
+    messenger,
+    kontaktbild: window.Kontaktbild,
+  });
+
+  const zeile = (key, label, wert, art = '') =>
+    `<button class="kp__zeile ${art}" data-gi="${key}">
+       <span class="kp__zeileText">${esc(label)}</span>
+       ${wert ? `<span class="kp__zeileWert">${esc(wert)}</span>` : ''}
+       ${art.includes('is-danger') ? '' : `<span class="row__chevron">${ICONS.chevron}</span>`}
+     </button>`;
+
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <header class="chathead">
+      <button class="chathead__back" id="giBack" aria-label="Zurück">${ICONS.back}</button>
+      <div class="chathead__body"><div class="chathead__name">${esc(G.TITEL)}</div></div>
+    </header>
+
+    <div class="scroll">
+      <div class="kp__kopf">
+        ${avatarOf(chat, 104)}
+        <div class="kp__name">${esc(chat.name)}</div>
+        <div class="kp__nummer" data-testid="gruppe-anzahl">${esc(G.anzahlText(chat.members))}</div>
+      </div>
+
+      <div class="kp__aktionen" style="grid-template-columns:repeat(3,1fr)">
+        <button data-gi="audio">${ICONS.phone}<span>Audioanruf</span></button>
+        <button data-gi="video">${ICONS.video}<span>Videoanruf</span></button>
+        <button data-gi="suche">${ICONS.search}<span>Suchen</span></button>
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('medien', 'Medien, Links, Doks', String(daten.medien.length))}
+        ${zeile('markiert', 'Mit Stern markiert', String(daten.markiert.length))}
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('stumm', 'Benachrichtigungen', chat.muted ? 'Aus' : 'An')}
+        <div class="kp__zeile">
+          <span class="kp__zeileText">Chat sperren</span>
+          <button class="switch ${chat.gesperrt ? 'is-on' : ''}" id="giSperre" aria-label="Chat sperren"><span class="switch__knob"></span></button>
+        </div>
+      </div>
+
+      <div class="kp__gruppenkopf" data-testid="gruppe-mitglieder-kopf">${esc(G.anzahlText(chat.members))}</div>
+      <div class="kp__liste">
+        ${liste
+          .map(
+            (m) => `<button class="kp__zeile gi__mitglied" data-gi-mitglied="${esc(m.id)}" data-testid="gruppe-mitglied-${esc(m.id)}" ${m.ich ? 'disabled' : ''}>
+              ${avatarForUser(m.id, 40, messenger)}
+              <span class="kp__zeileText">${esc(m.name)}</span>
+              ${m.ich ? `<span class="kp__zeileWert">${esc(G.DU)}</span>` : `<span class="row__chevron">${ICONS.chevron}</span>`}
+            </button>`
+          )
+          .join('')}
+      </div>
+
+      <div class="kp__liste">
+        ${zeile('leeren', 'Chat leeren', '', 'is-danger')}
+        ${zeile('verlassen', G.VERLASSEN, '', 'is-danger')}
+      </div>
+    </div>`;
+
+  const zurueckZurGruppe = () => openGruppenInfo(chat.id);
+
+  $('#giBack').addEventListener('click', () => openChat(chat.id));
+
+  $('#giSperre').addEventListener('click', async (e) => {
+    const knopf = e.currentTarget;
+    const res = await fetch(`/api/chats/${chat.id}/sperren`, { method: 'POST' })
+      .then((r) => r.json())
+      .catch(() => ({ ok: false }));
+    if (!res.ok) return toast(res.error || 'Die Chatsperre hat nicht geklappt');
+    chat.gesperrt = Boolean(res.gesperrt);
+    knopf.classList.toggle('is-on', chat.gesperrt);
+    toast(res.meldung || (chat.gesperrt ? 'Chat gesperrt' : 'Chatsperre aufgehoben'));
+  });
+
+  overlay.querySelectorAll('[data-gi-mitglied]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const id = b.dataset.giMitglied;
+      const istKontakt = (state.contacts || []).some((k) => k.id === id && (k.status || 'friend') === 'friend');
+      const ziel = G.ziel(id, { messenger, istKontakt });
+      if (ziel === 'selbst') return;
+      profilZurueck = { userId: id, fn: zurueckZurGruppe };
+      if (ziel === 'kontakt') return openContactProfile(id);
+      return openProfile(id, 'oeffentlich');
+    })
+  );
+
+  overlay.querySelectorAll('[data-gi]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const was = b.dataset.gi;
+      if (was === 'audio' || was === 'video') {
+        // Wie der Hörer im Chatkopf: der Eintrag gehört in genau diese Gruppe.
+        return openCall(chat, was, { chatId: chat.id });
+      }
+      if (was === 'suche') return openChatSuche(chat);
+      if (was === 'medien') return openChatMedien(chat, daten.medien, 'Medien, Links, Doks');
+      if (was === 'markiert') return openChatMedien(chat, daten.markiert, 'Mit Stern markiert');
+      if (was === 'stumm') {
+        const res = await fetch(`/api/chats/${chat.id}/stumm`, { method: 'POST' })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false }));
+        if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
+        chat.muted = Boolean(res.muted);
+        toast(chat.muted ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+        return zurueckZurGruppe();
+      }
+      if (was === 'leeren') {
+        const res = await (await fetch(`/api/chats/${chat.id}/leeren`, { method: 'POST' })).json();
+        if (!res.ok) return toast('Das hat gerade nicht geklappt');
+        chat.preview = 'Keine Nachrichten';
+        toast('Chat geleert');
+        return zurueckZurGruppe();
+      }
+      if (was === 'verlassen') {
+        return openSheet(
+          G.VERLASSEN,
+          `<div class="sheet__body">
+            <div class="sheet__hint">${esc(G.VERLASSEN_FRAGE)}</div>
+            <button class="item item--danger" data-gi-ja><span class="item__icon">${ICONS.trash || ICONS.close}</span><span class="item__label">${esc(G.VERLASSEN)}</span></button>
+          </div>`,
+          (sheet, close) => {
+            sheet.querySelector('[data-gi-ja]').addEventListener('click', async () => {
+              close();
+              // Dieselbe Route wie „Chat löschen": die eigene Mitgliedschaft
+              // geht (Regel „Eigene Mitgliedschaft beenden", Schema 9).
+              const res = await fetch(`/api/chats/${chat.id}/loeschen`, { method: 'POST' })
+                .then((r) => r.json())
+                .catch(() => ({ ok: false }));
+              if (!res.ok) return toast(res.error || G.VERLASSEN_FEHLER);
+              toast(G.VERLASSEN_OK);
+              state.openChatId = null;
+              closeOverlay();
+              await bootstrap();
+            });
+          },
+          { schliessen: true }
+        );
+      }
+    })
   );
 }
 
@@ -4449,7 +5176,9 @@ function openChatMedien(chat, liste, titel) {
     window.StoryRegeln.istMarkierungsHinweis(m)
       ? window.StoryRegeln.markierungVorschau(m.from === 'me')
       : m.geteilt
-      ? `${m.geteilt.autor}: ${m.geteilt.titel}`
+      ? m.geteilt.weg
+        ? window.Chatblase.GETEILT_WEG
+        : `${m.geteilt.autor}: ${m.geteilt.titel || m.geteilt.beschreibung || ''}`
       : m.standort
       ? m.standort.name
       : m.kontakt
@@ -4549,6 +5278,8 @@ async function openProfile(userId, variante) {
   if (!res.ok) return toast('Profil nicht verfügbar');
   let profile = await res.json();
   let tab = 'grid';
+  // Kasten 28/7.9: einmal beim Öffnen genommen, gilt für jedes Neuzeichnen.
+  let profilZurueckVon = profilZurueckNehmen(userId);
 
   /*
    * Die beiden anderen Reiter, aus der Datenbank.
@@ -4640,13 +5371,14 @@ async function openProfile(userId, variante) {
         </div>
 
         <div class="prof__about">
-          <div class="prof__name">${esc(profile.name)}</div>
+          <div class="prof__name">${nameMitPronomen(profile.name, profile.pronomen)}</div>
           <div class="prof__bio">${esc(profile.bio)}</div>
           ${/* Ein echter Link, der im Browser aufgeht - vorher stand hier
                 href="#" und ein Klick gab nur die Adresse als Hinweis aus.
                 Das war Henriks Punkt 9. bioLink macht daraus dasselbe
                 target="_blank"-Element wie im eigenen Profil. */ ''}
-          ${bioLink(profile.link)}
+          ${/* Kasten 1.3h: alle Links, der erste sichtbar. */ ''}
+          ${profilLinksHtml(profile.links || (profile.link ? [{ url: profile.link, titel: '' }] : []))}
         </div>
 
         ${
@@ -4694,7 +5426,8 @@ async function openProfile(userId, variante) {
         ${profilRaster(profile, tab, reiterListen)}
       </div>`;
 
-    $('#profBack').addEventListener('click', closeOverlay);
+    // Kasten 28/7.9: aus der Gruppeninfo geöffnet → Zurück führt dorthin.
+    $('#profBack').addEventListener('click', () => (profilZurueckVon ? profilZurueckVon() : closeOverlay()));
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
     bindSammlungen(overlay);
     bindSpendeKarte(overlay, profile.spende);
@@ -4810,15 +5543,53 @@ function profilRaster(profile, tab, listen) {
 }
 
 /* ---------------------------------------------------------- comments */
-async function openComments(targetId, onCountChange) {
+/*
+ * `springeZu` (Nachtrag 4.3, 12.10.2026): eine Kommentar-Kennung aus einer
+ * Mitteilung. Das Blatt klappt ihren Faden auf, rollt hin und hebt sie kurz
+ * hervor. Gleich in der App (CommentSheet, springeZu).
+ */
+async function openComments(targetId, onCountChange, springeZu) {
   const res = await fetch(`/api/comments/${targetId}`);
   let list = await res.json();
+  if (!Array.isArray(list)) list = [];
+  const K = window.Kommentar;
+
+  /*
+   * Nachtrag 4.3b (Henrik, 11.10.2026): auf einen Kommentar antworten —
+   * „Antworten" unter dem Kommentar, nach rechts ziehen (antwortenBinden,
+   * dieselbe Geste wie in der Chatblase), „@name" vorbelegt, Antworten
+   * eingerückt darunter, „N Antworten ansehen" klappt auf. Gleiche Regeln
+   * in der App (CommentSheet.tsx), beide aus gemeinsam/kommentar.js.
+   *
+   * paint() baut das Blatt bei jedem Herz neu — Entwurf, Antwort und
+   * aufgeklappte Fäden leben deshalb hier außen.
+   */
+  let antwortAn = null; // der angesprochene Kommentar
+  const offen = new Set();
+  let entwurf = '';
+  let meldung = '';
 
   const sheet = document.createElement('div');
   sheet.className = 'sheet-backdrop';
   document.querySelector('.app').appendChild(sheet);
 
+  const fadenHtml = (f) => {
+    const auf = offen.has(f.kommentar.id);
+    const klapp = K.klappText(f.antworten.length, auf);
+    return `${commentRow(f.kommentar)}${
+      klapp
+        ? `<button type="button" class="comment__klapp" data-cklapp="${esc(f.kommentar.id)}" aria-expanded="${auf}"><span class="comment__klappStrich"></span>${esc(klapp)}</button>`
+        : ''
+    }${auf ? f.antworten.map((a) => commentRow(a, true)).join('') : ''}`;
+  };
+
   const paint = () => {
+    const faeden = K.faeden(list);
+    const leiste = antwortAn
+      ? `<div class="comment__antwortLeiste"><span>${esc(
+          K.leistenText(antwortAn.userId === 'me' ? 'dich selbst' : user(antwortAn.userId).name)
+        )}</span><button type="button" id="commentAntwortZu" aria-label="Antworten abbrechen">${ICONS.close}</button></div>`
+      : '';
     sheet.innerHTML = `
       <div class="sheet sheet--tall" role="dialog" aria-label="Kommentare">
         <div class="sheet__handle"></div>
@@ -4826,7 +5597,7 @@ async function openComments(targetId, onCountChange) {
         <div class="sheet__body">
           ${
             list.length
-              ? list.map(commentRow).join('')
+              ? faeden.map(fadenHtml).join('')
               : `<div class="empty">${ICONS.chat}
                   <div class="empty__title">Noch keine Kommentare</div>
                   <div class="empty__text">Schreib den ersten.</div>
@@ -4834,10 +5605,13 @@ async function openComments(targetId, onCountChange) {
           }
         </div>
         <div class="sheet__fehler" id="commentHinweis" role="status" hidden></div>
+        ${leiste}
         <form class="composer" id="commentForm">
           <div class="avatar avatar--36" style="background:${farbe(user('me').color)}">DU</div>
           <div class="composer__field">
-            <textarea id="commentInput" rows="1" placeholder="Kommentar hinzufügen"></textarea>
+            <textarea id="commentInput" rows="1" placeholder="${
+              antwortAn ? K.PLATZHALTER_ANTWORT : 'Kommentar hinzufügen'
+            }"></textarea>
           </div>
           <button type="submit" class="composer__send" id="commentSend" aria-label="Senden" disabled>${ICONS.send}</button>
         </form>
@@ -4886,6 +5660,9 @@ async function openComments(targetId, onCountChange) {
     // Kasten 25.1: @ schlägt Personen vor.
     markierungsEingabe(input);
     const send = sheet.querySelector('#commentSend');
+    // Nachtrag 4.3b: der Entwurf überlebt das Neuzeichnen (Herz, Aufklappen).
+    input.value = entwurf;
+    send.disabled = !entwurf.trim();
 
     /*
      * Meldungen gehoeren ins Blatt. Als Toast lagen sie hinter dem Blatt und
@@ -4893,9 +5670,44 @@ async function openComments(targetId, onCountChange) {
      */
     const hinweis = sheet.querySelector('#commentHinweis');
     const melden = (text) => {
+      meldung = text;
       hinweis.textContent = text;
       hinweis.hidden = !text;
     };
+    if (meldung) melden(meldung);
+
+    // Nachtrag 4.3b: Antworten-Knopf, Ziehen nach rechts — wie im Chat.
+    const antworten = (k) => {
+      const vor = K.vorbelegung(user(k.userId).handle, k.userId === 'me');
+      antwortAn = k;
+      meldung = '';
+      if (vor && !input.value.startsWith(vor)) entwurf = vor + input.value.replace(/^@\S+\s/, '');
+      else entwurf = input.value;
+      paint();
+      const feld = sheet.querySelector('#commentInput');
+      feld.focus();
+      feld.setSelectionRange(feld.value.length, feld.value.length);
+    };
+    antwortenBinden(
+      sheet.querySelector('.sheet__body'),
+      (id) => list.find((c) => c.id === id),
+      antworten
+    );
+    sheet.querySelectorAll('[data-cklapp]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const id = b.dataset.cklapp;
+        if (offen.has(id)) offen.delete(id);
+        else offen.add(id);
+        entwurf = input.value;
+        paint();
+      })
+    );
+    sheet.querySelector('#commentAntwortZu')?.addEventListener('click', () => {
+      const vor = antwortAn ? K.vorbelegung(user(antwortAn.userId).handle, antwortAn.userId === 'me') : '';
+      entwurf = vor && input.value.startsWith(vor) ? input.value.slice(vor.length) : input.value;
+      antwortAn = null;
+      paint();
+    });
     sheet.querySelectorAll('[data-kmelden]').forEach((b) =>
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -4904,6 +5716,7 @@ async function openComments(targetId, onCountChange) {
     );
 
     input.addEventListener('input', () => {
+      entwurf = input.value;
       melden('');
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 108) + 'px';
@@ -4944,21 +5757,43 @@ async function openComments(targetId, onCountChange) {
         return melden(`„${pruefung.treffer.wort}" geht hier nicht. Formuliere es bitte anders.`);
       }
 
+      // Nachtrag 4.3b: als Antwort — Wurzel und angesprochener Kommentar.
+      const ziel = antwortAn ? K.antwortZiel(antwortAn) : null;
       const r = await fetch(`/api/comments/${targetId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(ziel ? { text, ...ziel } : { text }),
       });
       // Ohne diese Pruefung landete die Fehlerantwort als leerer Kommentar in der Liste.
       if (!r.ok) return melden('Der Kommentar ging nicht durch. Versuch es noch einmal.');
-      list = [...list, await r.json()];
+      const neu = await r.json();
+      if (!neu || neu.ok === false || !neu.id) return melden('Der Kommentar ging nicht durch. Versuch es noch einmal.');
+      list = [...list, neu];
+      antwortAn = null;
+      entwurf = '';
+      meldung = neu.ohneFaden ? K.OHNE_FADEN : '';
+      // Die eigene Antwort soll man sehen: ihren Faden aufklappen.
+      if (neu.antwortAuf) offen.add(neu.antwortAuf);
       onCountChange?.(list.length);
       paint();
-      sheet.querySelector('.sheet__body').scrollTop = sheet.querySelector('.sheet__body').scrollHeight;
+      if (!neu.antwortAuf) {
+        sheet.querySelector('.sheet__body').scrollTop = sheet.querySelector('.sheet__body').scrollHeight;
+      } else {
+        sheet.querySelector(`[data-msgid="${CSS.escape(neu.id)}"]`)?.scrollIntoView({ block: 'nearest' });
+      }
     });
   };
 
+  const ziel = springeZu ? list.find((c) => String(c.id) === String(springeZu)) : null;
+  if (ziel) offen.add(ziel.antwortAuf || ziel.id);
   paint();
+  if (springeZu && !ziel) toast('Dieser Kommentar ist nicht mehr da');
+  if (ziel) {
+    const zeile = sheet.querySelector(`[data-msgid="${CSS.escape(String(ziel.id))}"]`);
+    zeile?.scrollIntoView({ block: 'center' });
+    zeile?.classList.add('comment--markiert');
+    setTimeout(() => zeile?.classList.remove('comment--markiert'), 2500);
+  }
 
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet) sheet.remove();
@@ -4975,14 +5810,18 @@ async function openComments(targetId, onCountChange) {
  * Herz rechts - genau dort, wo man sie von Instagram und TikTok her erwartet,
  * und direkt neben dem Knopf, der sie veraendert.
  */
-function commentRow(c) {
+function commentRow(c, alsAntwort = false) {
   const u = user(c.userId);
+  /*
+   * Nachtrag 4.3b: `data-msgid` + `data-ziehbar` — dieselbe Zieh-Bindung wie
+   * die Chatblase (antwortenBinden); „Antworten" ist der Knopf dazu.
+   */
   return `
-    <div class="comment">
-      ${mitStoryRing(c.userId, `<div class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
+    <div class="comment${alsAntwort ? ' comment--antwort' : ''}" data-msgid="${esc(c.id)}" data-ziehbar>
+      ${mitStoryRing(c.userId, `<div class="avatar ${alsAntwort ? 'avatar--28' : 'avatar--36'}" style="background:${farbe(u.color)}">${esc(u.initials)}</div>`)}
       <div class="comment__body">
         <div class="comment__text"><strong data-profile="${c.userId}">${esc(u.name)}</strong> ${markierterText(c.text)}</div>
-        <div class="comment__meta">${esc(c.time)}${
+        <div class="comment__meta">${esc(c.time)}<button type="button" class="comment__antworten" data-antworten aria-label="Antworten an ${esc(u.name)}">Antworten</button>${
           // Kasten RS 3: fremde Kommentare melden (art 'comment'). Gleich in der App (CommentSheet).
           istEigen(c.userId) ? '' : `<button type="button" class="comment__antworten" data-kmelden="${esc(c.id)}" aria-label="Kommentar von ${esc(u.name)} melden">Melden</button>`
         }</div>
@@ -5914,7 +6753,13 @@ async function pttListeLaden(communityId) {
   }
 }
 
-function pttEinhaengen(communityId) {
+/*
+ * Kasten 8.2: der Knopf sitzt im Chat eines Unterthemas (renderCommunityChat).
+ * `kanalId` geht mit, damit die Datenbank die Sitzung diesem Unterthema
+ * zuordnet (Schema 90); `nachSenden` laedt den Chat neu, damit die Zeile
+ * „Push to Talk" erscheint.
+ */
+function pttEinhaengen(communityId, kanalId = null, nachSenden = null) {
   const knopf = $('#pttKnopf');
   if (!knopf) return;
 
@@ -5957,10 +6802,12 @@ function pttEinhaengen(communityId) {
         const antwort = await api(`/api/communities/${communityId}/ptt`, {
           audioUrl: adresse,
           dauer: Math.round(dauerMs / 1000),
+          kanalId,
         });
         if (!antwort?.ok) return toast(antwort?.error || 'Die Aufnahme ging nicht raus');
         toast('Push-to-Talk gesendet');
         pttListeLaden(communityId);
+        if (nachSenden) nachSenden();
       });
 
       aufnahme.start();
@@ -6060,28 +6907,11 @@ async function renderCommunityChannels(communityId) {
       ${daten.link ? `<div class="kanal__link">${bioLink(daten.link)}</div>` : ''}
 
       ${/*
-          Push-to-Talk. Das Handbuch beschreibt es als Nachricht an alle
-          Mitglieder einer Community — gedacht für Gruppenanrufe und für
-          Momente außergewöhnlich hoher Aktivität. Bis zum 01.09.2026 gab es
-          dafür nur einen Schalter in den Einstellungen.
-
-          Der Knopf steht nur bei Mitgliedern: wer nicht beigetreten ist,
-          darf nichts hineinsprechen, und ein Knopf, der immer scheitert, ist
-          schlimmer als keiner.
-
-          Gedrückt halten, nicht klicken — das ist nicht nur der Name: eine
-          Aufnahme, die nach dem ersten Klick weiterläuft, läuft irgendwann
-          in der Hosentasche weiter.
+          Kasten 8.1 (Henrik 28.09.2026): kein Push-to-Talk-Knopf mehr auf der
+          Home-Seite der Community — er sitzt jetzt im Chat jedes Unterthemas
+          (renderCommunityChat). Gleiche Aenderung in der App
+          (CommunityDetailScreen).
         */ ''}
-      ${
-        daten.joined || eigen
-          ? `<div class="ptt">
-               <button class="ptt__knopf" id="pttKnopf">${ICONS.mic}<span>Push-to-Talk</span></button>
-               <span class="ptt__hinweis">gedrückt halten</span>
-               <div class="ptt__liste" id="pttListe"></div>
-             </div>`
-          : ''
-      }
 
       <button class="kanal__neu" id="neuesUnterthema">
         <span class="kanal__neu-kreis">${ICONS.plus}</span>
@@ -6121,7 +6951,6 @@ async function renderCommunityChannels(communityId) {
 
   $('#neuesUnterthema').addEventListener('click', () => neuesUnterthema(daten));
 
-  if ($('#pttKnopf')) pttEinhaengen(daten.id);
 
   main.querySelectorAll('[data-join]').forEach((b) =>
     b.addEventListener('click', async () => {
@@ -6202,6 +7031,12 @@ function renderKanalThemen(community, kanal) {
 /** Dritte Ebene: der Chat zu einem Thema. */
 // Kasten 27: Takt des offenen Unterthemas (renderCommunityChat).
 let kanalUhr = null;
+/*
+ * Kasten 4.2: worauf die nächste Nachricht im Unterthema antwortet — je
+ * Kanal. Liegt außerhalb von renderCommunityChat, weil das Nachsehen im Takt
+ * die Seite neu zeichnet; der Bezug soll das überstehen.
+ */
+let kanalAntwort = null; // { kanalId, nachricht }
 
 async function renderCommunityChat(community, kanal, thema) {
   const lauf = ++renderLauf;
@@ -6219,6 +7054,12 @@ async function renderCommunityChat(community, kanal, thema) {
         <span class="kanalkopf__name">${esc(thema)}</span>
         <span class="kanalkopf__sub">#${esc(kanal.name)} · ${esc(community.name)}</span>
       </button>
+      ${/* Kasten 5.2: auch eine Community laesst sich anrufen — wie in der
+           App (ChatDetailScreen, Kopf). Der Anruf steht danach hier im Verlauf. */ ''}
+      <div class="chathead__actions">
+        <button data-kanalcall="video" aria-label="Videoanruf">${ICONS.video}</button>
+        <button data-kanalcall="audio" aria-label="Anruf">${ICONS.phone}</button>
+      </div>
     </div>
     <div class="messages" id="commMsgs">
       ${
@@ -6230,18 +7071,41 @@ async function renderCommunityChat(community, kanal, thema) {
             </div>`
       }
     </div>
+    ${/* Kasten 8.2: Push-to-Talk im Unterthema, nur fuer Mitglieder — wie in
+         der App (ChatDetailScreen, pttLeiste). */ ''}
+    ${
+      community.joined || community.eigen
+        ? `<div class="ptt ptt--kanal">
+             <button class="ptt__knopf" id="pttKnopf" aria-label="Push to Talk">${ICONS.mic}<span>Push-to-Talk</span></button>
+             <span class="ptt__hinweis">gedrückt halten</span>
+           </div>`
+        : ''
+    }
     <form class="composer" id="commForm">
       ${/* Das Plus gab es im Unterthema nicht — Handbuch-Abgleich 01.09.2026,
            "Sticker innerhalb von Community-Kanaelen". Nachgetragen 04.09. */ ''}
       <button type="button" class="composer__icon" id="commAttach" aria-label="Anhang">${ICONS.plus}</button>
       <div class="composer__field">
         <textarea id="commMsgInput" rows="1" placeholder="Nachricht schreiben ..."></textarea>
+        ${/* Kasten 28/6.1 + 6.3: Kamera und GIF/Sticker wie im Chat. */ ''}
+        <button type="button" class="composer__icon" id="commGifSticker" aria-label="GIFs und Sticker">${ICONS.sticker}</button>
+        <button type="button" class="composer__icon" id="commKamera" aria-label="Kamera">${ICONS.camera}</button>
       </div>
       <button type="submit" class="composer__send" id="commSend" aria-label="Senden" disabled>${ICONS.send}</button>
     </form>`;
 
   $('#backBtn').addEventListener('click', () => renderKanalThemen(community, kanal));
   $('#kanalKopf').addEventListener('click', () => openCommunityEinstellungen(community));
+  if ($('#pttKnopf')) pttEinhaengen(community.id, kanal.id, () => renderCommunityChat(community, kanal, thema));
+  main.querySelectorAll('[data-kanalcall]').forEach((b) =>
+    b.addEventListener('click', () =>
+      openCall(
+        { name: community.name, members: [] },
+        b.dataset.kanalcall === 'video' ? 'video' : 'audio',
+        { kanalId: kanal.id }
+      )
+    )
+  );
 
   /*
    * Kasten 27: das Unterthema im Takt nachsehen, wie den offenen Chat
@@ -6287,12 +7151,13 @@ async function renderCommunityChat(community, kanal, thema) {
     b.addEventListener('click', () => openContactProfile(b.dataset.msgkontakt))
   );
   liste.querySelectorAll('[data-msgort]').forEach((b) =>
-    b.addEventListener('click', () => {
-      const platz = state.places.find((p) => p.name === b.dataset.msgort);
-      if (platz) openExplorer('standort', platz.id);
-    })
+    b.addEventListener('click', () => standortKarteOeffnen(b))
   );
-  // Die Karte eines geteilten Beitrags → Vollformat, wie im Chat.
+  // Kasten 8.6: Zeile „Push to Talk" → Verlauf der Sitzung.
+  liste.querySelectorAll('[data-pttsitzung]').forEach((b) =>
+    b.addEventListener('click', () => openPttVerlauf(b.dataset.pttsitzung, b.dataset.pttzeit))
+  );
+  // Anhang → Vollformat, wie im Chat.
   liste.querySelectorAll('[data-voll]').forEach((b) =>
     b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
   );
@@ -6318,6 +7183,44 @@ async function renderCommunityChat(community, kanal, thema) {
       kanalNachrichtMenue(el.dataset.msgid);
     });
   });
+  // Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag.
+  geteiltBinden(liste);
+
+  /*
+   * Kasten 4.2/4.4: im Unterthema antworten — ziehen, Knopf beim Überfahren,
+   * Bezug → Original. Die Leiste über der Eingabe sagt, worauf geantwortet
+   * wird; das × nimmt den Bezug zurück. Gleiche Leiste wie im Chat (.msgbezug).
+   */
+  const kanalLeiste = () => {
+    document.querySelector('#commForm')?.parentNode.querySelector('.msgbezug')?.remove();
+    if (!kanalAntwort || kanalAntwort.kanalId !== kanal.id) return;
+    const q = kanalAntwort.nachricht;
+    const leiste = document.createElement('div');
+    leiste.className = 'msgbezug';
+    leiste.innerHTML = `
+      <span class="msgbezug__balken"></span>
+      <span class="msgbezug__text"><b>Antworten${q.from === 'me' ? '' : ` · ${esc(user(q.from).name)}`}</b><span>${esc(
+        q.text || 'Anhang'
+      )}</span></span>
+      <button type="button" class="msgbezug__zu" aria-label="Abbrechen">${ICONS.close}</button>`;
+    const form = $('#commForm');
+    form.parentNode.insertBefore(leiste, form);
+    leiste.querySelector('.msgbezug__zu').addEventListener('click', () => {
+      kanalAntwort = null;
+      leiste.remove();
+    });
+  };
+  if (kanalAntwort && kanalAntwort.kanalId !== kanal.id) kanalAntwort = null;
+  kanalLeiste();
+  antwortenBinden(
+    liste,
+    (id) => nachrichten.find((x) => x.id === id),
+    (m) => {
+      kanalAntwort = { kanalId: kanal.id, nachricht: m };
+      kanalLeiste();
+      $('#commMsgInput')?.focus();
+    }
+  );
 
   const feld = $('#commMsgInput');
   const sendKnopf = $('#commSend');
@@ -6347,14 +7250,35 @@ async function renderCommunityChat(community, kanal, thema) {
    * bestimmte Person, und ein Kanal hat kein Gegenueber. Im Handbuch steht
    * sie ausdruecklich unter "im Privatchat".
    */
-  $('#commAttach').addEventListener('click', () =>
-    openAnhang({
-      pfad: `/api/communities/${community.id}/channels/${kanal.id}/anhang`,
-      ausserId: null,
-      ohne: ['standortAnfragen'],
-      fertig: () => renderCommunityChat(community, kanal, thema),
-    })
-  );
+  const kanalZiel = {
+    pfad: `/api/communities/${community.id}/channels/${kanal.id}/anhang`,
+    ausserId: null,
+    // Kasten 4.3a: die Antwort im Unterthema gilt auch für den Anhang.
+    bezug: () =>
+      kanalAntwort && kanalAntwort.kanalId === kanal.id ? { antwortAuf: kanalAntwort.nachricht.id } : null,
+    bezugFertig: (daten) => {
+      kanalAntwort = null;
+      if (daten?.ohneBezug) toast(window.Chatblase.OHNE_BEZUG);
+    },
+    ohne: ['standortAnfragen'],
+    fertig: () => renderCommunityChat(community, kanal, thema),
+    // Kasten 28/6.5: ein frei gewählter Ort geht als Text in den Kanal —
+    // mit dem Bezug aus dem Ziehen (4.3a), wie jeder andere Anhang.
+    textSenden: (text, bezug) =>
+      fetch(`/api/communities/${community.id}/channels/${kanal.id}/nachricht`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, antwortAuf: bezug?.antwortAuf || null }),
+      }).then((r) => r.json().catch(() => ({}))),
+  };
+  $('#commAttach').addEventListener('click', () => openAnhang(kanalZiel));
+  /*
+   * Die Kamera im Kanal: Aufnahme über die Kamera des Geräts (capture) und
+   * derselbe Anhang-Weg wie „Aus der Galerie". Die Chat-Kamera (openCamera)
+   * schreibt fest an /api/messages/ — für einen Kanal die falsche Ablage.
+   */
+  $('#commKamera').addEventListener('click', () => anhangSenden(kanalZiel, 'kamera'));
+  $('#commGifSticker').addEventListener('click', () => openGifSticker(kanalZiel));
 
   $('#commForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -6371,14 +7295,175 @@ async function renderCommunityChat(community, kanal, thema) {
      * etwas, und weil die Seite danach neu lud, sah es nach einem
      * Anzeigefehler aus. Die richtige Route gab es die ganze Zeit.
      */
+    // Kasten 4.2: die Antwort geht mit (reply_to, Schema XX).
+    const antwortAuf = kanalAntwort && kanalAntwort.kanalId === kanal.id ? kanalAntwort.nachricht.id : null;
     const res = await fetch(`/api/communities/${community.id}/channels/${kanal.id}/nachricht`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, antwortAuf }),
     });
     const daten = await res.json().catch(() => ({}));
-    if (daten && daten.ok === false) toast(daten.error || 'Die Nachricht ging nicht raus');
+    if (daten && daten.ok === false) {
+      toast(daten.error || 'Die Nachricht ging nicht raus');
+      // Text und Bezug bleiben, damit nichts verloren geht.
+      feld.value = text;
+      sendKnopf.disabled = false;
+      return;
+    }
+    kanalAntwort = null;
+    if (daten && daten.ohneBezug) toast(window.Chatblase.OHNE_BEZUG);
     renderCommunityChat(community, kanal, thema);
+  });
+}
+
+/* ==========================================================================
+ * Kasten 4 (Feedback 28.09.): Antworten per Ziehen — und auf der Website
+ * zusätzlich per Knopf beim Überfahren (Kasten 4.4). Gilt im Chat
+ * (paintMessages) und im Unterthema (renderCommunityChat). Schwelle und Weg
+ * aus gemeinsam/chatblase.js — dieselben Zahlen wie in der App
+ * (app/components/ZiehZumAntworten.tsx).
+ * ======================================================================== */
+
+/** Der Bezugskopf über einer Antwort — antippbar, springt zum Original. */
+function bezugHtml(a) {
+  if (!a) return '';
+  const text = a.text || (a.fehlt ? window.Chatblase.BEZUG_WEG : 'Zurückgenommen');
+  return `<button type="button" class="msg__bezug" data-bezugid="${esc(a.id)}" data-testid="antwort-bezug">
+       <span class="msg__bezugBalken"></span>
+       <span class="msg__bezugText">
+         ${a.autor ? `<b>${esc(a.autor)}</b>` : ''}
+         <span>${esc(text)}</span>
+       </span>
+     </button>`;
+}
+
+/*
+ * Nachtrag 4.3c (11.10.2026): Antworten in der Live-Kommentarspalte — wie im
+ * Chat nach rechts ziehen (oder „Antworten" beim Überfahren), über der
+ * Antwort steht klein das Zitat. Keine Fäden: die Spalte läuft durch. Gleich
+ * in der App (components/LiveAntwort.tsx), Zitat aus gemeinsam/kommentar.js.
+ */
+function liveZeileHtml(k, ziehbar) {
+  const zitat = k.antwortAuf
+    ? `<span class="live__zitat">↪ ${esc(window.Kommentar.liveZitat(k.antwortAuf))}</span>`
+    : '';
+  const knopf = ziehbar
+    ? `<button type="button" class="live__antworten" data-antworten aria-label="Antworten an ${esc(k.name)}">Antworten</button>`
+    : '';
+  return `<p class="live__kommentar"${ziehbar ? ` data-msgid="${esc(k.id)}" data-ziehbar` : ''}>${zitat}<b>${esc(
+    k.name
+  )}</b> ${esc(k.text)}${knopf}</p>`;
+}
+
+/**
+ * Die Leiste „Antwort an …" über der Eingabezeile `zeile`. `an` = der
+ * Kommentar oder null (entfernt die Leiste), `abbrechen` beim ×.
+ */
+function liveAntwortLeiste(zeile, an, abbrechen) {
+  if (!zeile) return;
+  zeile.parentNode.querySelector('.live__bezug')?.remove();
+  if (!an) return;
+  const leiste = document.createElement('div');
+  leiste.className = 'msgbezug live__bezug';
+  leiste.innerHTML = `
+    <span class="msgbezug__balken"></span>
+    <span class="msgbezug__text"><b>${esc(window.Kommentar.leistenText(an.name))}</b><span>${esc(an.text || '')}</span></span>
+    <button type="button" class="msgbezug__zu" aria-label="Antworten abbrechen">${ICONS.close}</button>`;
+  zeile.parentNode.insertBefore(leiste, zeile);
+  leiste.querySelector('.msgbezug__zu').addEventListener('click', abbrechen);
+}
+
+/** Der Antworten-Knopf neben der Blase — sichtbar beim Überfahren. */
+function antwortKnopfHtml() {
+  return `<button type="button" class="msg__antworten" data-antworten aria-label="Antworten" title="Antworten">${ICONS.antwort}</button>`;
+}
+
+/**
+ * Ziehen, Antworten-Knopf und Sprung zum Original an eine gezeichnete Liste
+ * binden. `finde(id)` liefert die Nachricht, `antworten(m)` setzt den Bezug.
+ */
+function antwortenBinden(liste, finde, antworten) {
+  const C = window.Chatblase;
+  liste.querySelectorAll('[data-antworten]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const m = finde(b.closest('[data-msgid]')?.dataset.msgid);
+      if (m) antworten(m);
+    })
+  );
+
+  liste.querySelectorAll('[data-bezugid]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const ziel = liste.querySelector(`[data-msgid="${CSS.escape(b.dataset.bezugid)}"]`);
+      if (!ziel) return toast('Die Nachricht ist nicht mehr im geladenen Verlauf');
+      ziel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      ziel.classList.remove('is-hervor');
+      void ziel.offsetWidth;
+      ziel.classList.add('is-hervor');
+      setTimeout(() => ziel.classList.remove('is-hervor'), 1400);
+    })
+  );
+
+  // Ziehen nach rechts — mit der Maus wie mit dem Finger (Pointer Events).
+  liste.querySelectorAll('[data-msgid][data-ziehbar]').forEach((el) => {
+    let start = null;
+    let zieht = false;
+    const zurueck = () => {
+      el.style.transition = 'transform .18s ease';
+      el.style.transform = '';
+      el.style.setProperty('--zug', '0');
+      setTimeout(() => {
+        el.style.transition = '';
+        delete el.dataset.gezogen;
+      }, 200);
+    };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      zieht = false;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!start || e.pointerId !== start.id) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (!zieht) {
+        if (!C.istZug(dx, dy)) return;
+        zieht = true;
+        el.dataset.gezogen = '1';
+        // Das lange Drücken (Menü) bricht ab, sobald gezogen wird.
+        el.dispatchEvent(new Event('ziehstart'));
+        try { el.setPointerCapture(e.pointerId); } catch { /* egal */ }
+      }
+      el.style.transform = `translateX(${C.zugWeg(dx)}px)`;
+      el.style.setProperty('--zug', String(C.pfeilSichtbar(dx)));
+    });
+    const ende = (e) => {
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const warZug = zieht;
+      start = null;
+      zieht = false;
+      if (!warZug) return;
+      zurueck();
+      if (e.type === 'pointerup' && C.ausgeloest(dx)) {
+        const m = finde(el.dataset.msgid);
+        if (m) antworten(m);
+      }
+    };
+    el.addEventListener('pointerup', ende);
+    el.addEventListener('pointercancel', ende);
+    // Ein Ziehen endet nicht als Klick auf Karte, Bild oder Bezug.
+    el.addEventListener(
+      'click',
+      (e) => {
+        if (el.dataset.gezogen) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true
+    );
   });
 }
 
@@ -6396,49 +7481,171 @@ async function renderCommunityChat(community, kanal, thema) {
  * beim Klick ins Vollformat. Seit dem 26.09.2026 auch im Unterthema einer
  * Community (Schema 59). Gleiche Regel in der App.
  */
-function geteiltKarte(g) {
-  return `<button class="msg__geteilt" ${
-    g.bild ? `data-voll="${esc(g.bild)}"` : ''
-  }>
-     ${
-       g.bild && !istVideoAdresse(g.bild)
-         ? `<img class="msg__bild" src="${esc(g.bild)}" alt="">`
-         : g.bild
-         ? `<span class="msg__anhang"><video class="msg__bild" src="${esc(
-             g.bild
-           )}" muted playsinline preload="metadata"></video><span class="msg__anhangPlay">${
-             ICONS.play
-           }</span></span>`
-         : `<span class="msg__geteiltBild">${
-             g.art === 'video' ? ICONS.play : ICONS.image
-           }</span>`
-     }
-     <span class="msg__geteiltZeile">
-       ${g.art === 'video' ? ICONS.play : ICONS.image}
-       <span class="msg__geteiltText">
-         <strong>${esc(g.autor)}</strong>
-         <span>${esc(g.titel)}</span>
+function geteiltKarte(g, messenger = false) {
+  /*
+   * Kasten 7 (Feedback 28.09.): „Thumbnail im Großformat, darunter der Name
+   * des Beitrags und die Beschreibung" — nach Instagram/WhatsApp-Vorbild:
+   * oben klein das Konto, das Vorschaubild über die volle Breite (Video mit
+   * Zeichen oben rechts), darunter Titel (posts.title) und Beschreibung
+   * (posts.description). Klick öffnet den Beitrag selbst (beitragOeffnen),
+   * nicht mehr nur sein Bild. Abbildung in gemeinsam/chatblase.js, gleiche
+   * Karte in der App (ChatDetailScreen.tsx).
+   */
+  const C = window.Chatblase;
+  /*
+   * Nachtrag 11.10. (7.6/7.7): oben das echte Profilbild des Kontos statt
+   * Initialen auf fester Farbe; im Messenger mein eigenes Kontaktbild (7.8).
+   * `autorBild` hat der Server beim Antworten unterschrieben.
+   */
+  const kontoName = g.autor || (g.autorId ? user(g.autorId).name : '') || '';
+  const kontoBild =
+    g.autorId && state.users[g.autorId]
+      ? avatarForUser(g.autorId, 22, messenger, g.autorBild)
+      : personenAvatar({ initials: initialenVon(kontoName || '?'), avatar: g.autorBild || null }, 22);
+  if (g.weg) {
+    /*
+     * Nachtrag 11.10. (7.5/7.6): die Weg-Karte in Kartenform statt einer
+     * Fehlerzeile. „Gelöscht" (Merker aus Schema 93) und „nicht sichtbar"
+     * (Kennung steht, Leseregel sagt nein) getrennt; mehr weiß die
+     * Datenbank nicht. Gleiche Karte in der App (ChatDetailScreen).
+     */
+    const grund = C.geteiltWegGrund(g);
+    return `<div class="msg__geteiltWeg" role="note" aria-label="${esc(C.geteiltBeschriftung(g))}" data-testid="${
+      g.grund === 'geloescht' ? 'geteilt-geloescht' : 'geteilt-weg'
+    }">
+       ${
+         g.autorId && kontoName
+           ? `<span class="msg__geteiltKopf">${kontoBild}<span class="msg__geteiltAutor">${esc(kontoName)}</span></span>`
+           : ''
+       }
+       <span class="msg__geteiltWegFlaeche">
+         <span class="msg__geteiltWegSymbol">${g.grund === 'geloescht' ? ICONS.trash : ICONS.eyeOff}</span>
+         <strong>${esc(C.GETEILT_WEG)}</strong>
+         ${grund ? `<span>${esc(grund)}</span>` : ''}
        </span>
+     </div>`;
+  }
+  const istVid = g.art === 'video';
+  const bild = !g.bild
+    ? `<span class="msg__geteiltLeer">${istVid ? ICONS.play : ICONS.image}</span>`
+    : istVideoAdresse(g.bild)
+    ? `<video class="msg__geteiltGross" src="${esc(g.bild)}" muted playsinline preload="metadata"></video>`
+    : `<img class="msg__geteiltGross" src="${esc(g.bild)}" alt="" loading="lazy">`;
+  return `<button class="msg__geteilt" data-beitrag="${esc(g.id)}" data-beitragkind="${esc(
+    g.kind || 'post'
+  )}" aria-label="${esc(C.geteiltBeschriftung(g))}" data-testid="geteilt-karte">
+     <span class="msg__geteiltKopf">
+       ${kontoBild}
+       <span class="msg__geteiltAutor">${esc(g.autor || '')}</span>
      </span>
+     <span class="msg__geteiltRahmen">
+       ${bild}
+       ${istVid ? `<span class="msg__geteiltVideo">${ICONS.video}</span>` : ''}
+     </span>
+     ${
+       g.titel || g.beschreibung
+         ? `<span class="msg__geteiltText">
+              ${g.titel ? `<strong>${esc(g.titel)}</strong>` : ''}
+              ${g.beschreibung ? `<span>${esc(g.beschreibung)}</span>` : ''}
+            </span>`
+         : ''
+     }
    </button>`;
 }
 
+/**
+ * Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag — im
+ * Chat wie im Unterthema. Wird nach jedem Zeichnen an die Liste gebunden.
+ */
+function geteiltBinden(liste) {
+  liste.querySelectorAll('[data-beitrag]').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      // Ein Ziehen zum Antworten endet nicht als Klick auf die Karte.
+      if (b.closest('[data-gezogen]')) return e.preventDefault();
+      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag);
+    })
+  );
+}
+
+/*
+ * Kasten 8.5 (Henrik 28.09.2026): statt aller Wortmeldungen steht im
+ * Unterthema EINE Zeile „Push to Talk" mit Datum und Uhrzeit je Sitzung
+ * (angelegt von der Datenbank, Schema 90). Klick zeigt den Verlauf (8.6).
+ * Gleiche Zeile in der App (ChatDetailScreen, pttZeile).
+ */
+function pttSitzungZeile(m) {
+  const satz = window.Ptt.zeile(m.zeitpunkt);
+  return `<button class="msg__ptt" data-pttsitzung="${esc(m.id)}" data-pttzeit="${esc(m.zeitpunkt || '')}" aria-label="${esc(satz)}">
+            ${ICONS.mic}<span>${esc(satz)}</span>${ICONS.chevron}
+          </button>`;
+}
+
+/*
+ * Kasten 8.6: der Verlauf einer Sitzung — wer, wann, was (zum Abspielen).
+ * Gleiche Ansicht in der App (PttVerlaufSheet). Leer heisst ehrlich „Keine
+ * Wortmeldungen sichtbar" (Leseregel: Mitglied + sichtbar_fuer).
+ */
+async function openPttVerlauf(sitzungId, zeitpunkt) {
+  let eintraege = null;
+  try {
+    const r = await fetch(`/api/ptt/sitzung/${encodeURIComponent(sitzungId)}`);
+    const d = await r.json();
+    if (d && d.ok) eintraege = d.eintraege || [];
+  } catch (f) {
+    console.error('Push-to-Talk-Verlauf laden fehlgeschlagen:', f);
+  }
+  openSheet(
+    window.Ptt.TITEL,
+    `<div class="sheet__body">
+      <div class="pttverlauf__kopf">${esc(window.Ptt.datumZeit(zeitpunkt))}</div>
+      ${
+        eintraege === null
+          ? '<div class="empty__text">Der Verlauf ließ sich nicht laden</div>'
+          : !eintraege.length
+          ? `<div class="empty__text">${esc(window.Ptt.LEER)}</div>`
+          : eintraege
+              .map(
+                (e) => `<div class="item pttverlauf__zeile">
+                  <span class="avatar avatar--36" style="background:${farbe(user(e.userId)?.color)}">${esc(user(e.userId)?.initials || '')}</span>
+                  <div class="item__body">
+                    <span class="item__label">${esc(e.name || 'Unbekannt')}</span>
+                    <span class="item__sub">${esc(window.Ptt.uhrzeit(e.zeitpunkt))} · ${esc(window.Ptt.dauer(e.dauer))}</span>
+                  </div>
+                  ${e.audioUrl ? `<audio controls preload="none" src="${esc(e.audioUrl)}" aria-label="Wortmeldung von ${esc(e.name || '')}"></audio>` : ''}
+                </div>`
+              )
+              .join('')
+      }
+    </div>`,
+    () => {},
+    { schliessen: true }
+  );
+}
+
 function kanalNachricht(m) {
+  // Kasten 5: Anruf im Unterthema — eine Zeile in der Mitte, keine Blase.
+  if (m.anruf) return anrufZeile(m, { eigen: m.from === 'me', gruppe: true });
+  // Kasten 8.5: eine Zeile „Push to Talk" je Sitzung, kein ganzer Verlauf.
+  if (m.pttSitzung) return pttSitzungZeile(m);
   // Anhaenge seit 04.09.2026 — derselbe Inhalt wie im Chat, aus derselben
   // Funktion. Ein Sticker steht auch hier ohne Blase (msg--sticker).
   const inhalt = m.geteilt ? geteiltKarte(m.geteilt) : anhangInhalt(m);
   const stickerKlasse = m.media === 'sticker' ? ' msg--sticker' : '';
+  const karteKlasse = m.geteilt ? ' msg--karte' : '';
 
   // Eigene Nachrichten behalten den bestehenden Aufbau: .msg IST die Blase.
+  // Kasten 4.2: Antworten im Unterthema — Bezug oben, ziehen oder Knopf.
+  const bezug = bezugHtml(m.antwortAuf);
   if (m.from === 'me') {
-    return `<div class="msg msg--out${stickerKlasse}" data-msgid="${esc(m.id)}">${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
+    return `<div class="msg msg--out${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>${antwortKnopfHtml()}${bezug}${inhalt}<div class="msg__foot">${esc(m.time)}</div></div>`;
   }
   const u = user(m.from);
   return `<div class="msgzeile">
     <button class="msgzeile__avatar" data-profile="${esc(m.from)}" style="background:${farbe(u.color)}" aria-label="Profil von ${esc(u.name)}">${esc(u.initials)}</button>
-    <div class="msg msg--in${stickerKlasse}" data-msgid="${esc(m.id)}">
+    <div class="msg msg--in${stickerKlasse}${karteKlasse}" data-msgid="${esc(m.id)}" data-ziehbar>
+      ${antwortKnopfHtml()}
       <button class="msg__sender" data-profile="${esc(m.from)}">${esc(u.name)}</button>
-      ${inhalt}
+      ${bezug}${inhalt}
       <div class="msg__foot">${esc(m.time)}</div>
     </div>
   </div>`;
@@ -6475,6 +7682,24 @@ function openCommunityEinstellungen(community) {
         <span class="item__label">Benachrichtigungen</span>
         <button class="switch ${community.stumm ? '' : 'is-on'}" data-commtoggle="mitteilungen" aria-label="Benachrichtigungen"><span class="switch__knob"></span></button>
       </div>
+      ${/*
+          Kasten 8.4: „Push-to-Talk-Benachrichtigung" je Community, nur fuer
+          Mitglieder. Gespeichert in community_members.ptt_benachrichtigung
+          (Schema 90), wirksam im Ausloeser der Datenbank. Gleiche Zeile in der
+          App (CommunityOptionenSheet).
+        */ ''}
+      ${
+        community.joined || community.eigen
+          ? `<div class="item">
+              <span class="item__icon">${ICONS.mic}</span>
+              <div class="item__body">
+                <span class="item__label">Push-to-Talk-Benachrichtigung</span>
+                <span class="item__sub">„Push to Talk beitreten?“, wenn hier jemand zu sprechen beginnt</span>
+              </div>
+              <button class="switch ${community.pttBenachrichtigung ? 'is-on' : ''}" data-commptt aria-label="Push-to-Talk-Benachrichtigung"><span class="switch__knob"></span></button>
+            </div>`
+          : ''
+      }
       <button class="item item--danger" data-commaction="verlassen">
         <span class="item__icon">${ICONS.close}</span>
         <span class="item__label">Community verlassen</span>
@@ -6498,6 +7723,21 @@ function openCommunityEinstellungen(community) {
         if (inListe) inListe.stumm = r.stumm;
         knopf.classList.toggle('is-on', !r.stumm);
         toast(r.stumm ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
+      });
+      sheet.querySelector('[data-commptt]')?.addEventListener('click', async (e) => {
+        const knopf = e.currentTarget;
+        const warAn = knopf.classList.contains('is-on');
+        knopf.classList.toggle('is-on', !warAn);
+        const r = await api(`/api/communities/${community.id}/ptt-benachrichtigung`, { an: !warAn });
+        if (!r?.ok) {
+          knopf.classList.toggle('is-on', warAn);
+          return toast(r?.error || 'Nicht gespeichert');
+        }
+        community.pttBenachrichtigung = r.an;
+        const inListe = state.communities.find((c) => c.id === community.id);
+        if (inListe) inListe.pttBenachrichtigung = r.an;
+        knopf.classList.toggle('is-on', r.an);
+        toast(r.an ? 'Push-to-Talk-Benachrichtigung an' : 'Push-to-Talk-Benachrichtigung aus');
       });
       sheet.querySelector('[data-commaction="verlassen"]')?.addEventListener('click', async () => {
         close();
@@ -7448,16 +8688,12 @@ const SETTINGS = [
     id: 'konto',
     title: 'Konto',
     items: [
-      {
-        label: 'Profil bearbeiten',
-        icon: 'person',
-        eingabe: [
-          { key: 'name', label: 'Name', pflicht: true },
-          { key: 'bio', label: 'Biografie', typ: 'mehrzeilig' },
-          { key: 'link', label: 'Link' },
-        ],
-        fertig: 'Profil gespeichert',
-      },
+      /*
+       * Kasten 1.3 (Nachtrag 10.10.2026): statt des Formulars mit Name,
+       * Biografie, Link die eigene Seite „Profil bearbeiten“ nach
+       * Instagram-Vorbild (renderProfilSeite). Gleicher Eintrag in der App.
+       */
+      { label: 'Profil bearbeiten', icon: 'person', aktion: 'profilseite' },
       {
         label: 'Telefonnummer ändern',
         icon: 'phone',
@@ -8317,7 +9553,8 @@ function openSichtbarkeit(punkt) {
                           (p) => `<button class="insight__person${
                             jetzt.ausnahmen.includes(p.id) ? ' is-active' : ''
                           }" data-ausnahme="${p.id}">
-                            ${avatarForUser(p.id, 36)}
+                            ${/* Kasten 28/7.11: im Messenger mein Kontaktbild, wie SichtbarkeitSheet → Avatar. */ ''}
+                            ${avatarForUser(p.id, 36, state.area === 'messenger')}
                             <span class="insight__personText"><span class="insight__personName">${esc(p.name)}</span></span>
                             <span class="insight__haken">${ICONS.check}</span>
                           </button>`
@@ -9066,6 +10303,7 @@ function openEinstellung(punkt, nachher) {
    * anhaengt (web/public/anmeldung.js). Ein <a href> ginge ohne Token los
    * und bekaeme 401.
    */
+  if (punkt.aktion === 'profilseite') return openProfilSeite();
   if (punkt.aktion === 'farbfilter') return openFarbfilter();
   if (punkt.aktion === 'spendencode') return spendenweg(null, 'code');
   if (punkt.aktion === 'zahlungsmethoden') return spendenweg(null, 'methoden');
@@ -9604,8 +10842,9 @@ function renderFriendMap() {
         ${nadeln
           .map((f) => {
             const u = user(f.id);
+            // Kasten 28/7.11: die Freundeskarte gehört zum Messenger — mein Kontaktbild (wie FriendMapScreen).
             return `<li><div class="row ${state.karte.aktiv === f.id ? 'is-aktiv' : ''}" data-zoom="${f.id}">
-              ${avatarForUser(f.id, 44)}
+              ${avatarForUser(f.id, 44, true)}
               <div class="row__body">
                 <div class="row__name">${esc(u.name)}</div>
                 <div class="row__bottom"><span class="row__preview">${esc(f.place)} · ${esc(f.when)}</span></div>
@@ -9823,7 +11062,7 @@ function renderAusgewaehlteKontakte() {
             const ist = state.standortAusgewaehlt.includes(f.id);
             return `<li><label class="row" style="cursor: pointer;">
               <input type="checkbox" class="checkAusgewaehlt" data-id="${f.id}" ${ist ? 'checked' : ''} style="width: 18px; height: 18px;" />
-              ${avatarForUser(f.id, 44)}
+              ${avatarForUser(f.id, 44, true)}
               <div class="row__body">
                 <div class="row__name">${esc(u.name)}</div>
               </div>
@@ -9948,7 +11187,8 @@ function openInsightSenden(bild) {
            ? personen
                .map(
                  (p) => `<button class="insight__person${gewaehlt.has(p.id) ? ' is-active' : ''}" data-person="${p.id}">
-                   ${avatarForUser(p.id, 38)}
+                   ${/* Kasten 28/7.11: im Messenger mein Kontaktbild, wie InsightSheet → Avatar. */ ''}
+                   ${avatarForUser(p.id, 38, state.area === 'messenger')}
                    <span class="insight__personText">
                      <span class="insight__personName">${esc(p.name)}</span>
                      ${p.tage ? `<span class="streak">📷 ${p.tage}</span>` : ''}
@@ -11153,11 +12393,16 @@ function renderMessengerProfile() {
           ${/* Wie im Videos- und Community-Profil aus dem Konto, nicht fest
                 im Markup - sonst zeigt "Profil bearbeiten" hier keine
                 Wirkung. */ ''}
-          <div class="mprof__name">${esc(me.name)}</div>
+          <div class="mprof__name">${nameMitPronomen(me.name, profil.pronomen)}</div>
           ${me.handle ? `<div class="mprof__handle">${esc(me.handle)}</div>` : ''}
         </div>
       </div>
       ${profil.bio ? `<div class="mprof__bio">${esc(profil.bio)}</div>` : ''}
+      ${/* Kasten 1.3h: Links wie in den anderen beiden Profilen. */ ''}
+      ${(() => {
+        const l = profilLinksHtml(profil.links || (profil.link ? [{ url: profil.link, titel: '' }] : []));
+        return l ? `<div class="mprof__profillinks">${l}</div>` : '';
+      })()}
       <div class="mprof__links">
         <button data-switch="videos">@videoprofil</button>
         <button data-switch="communities">@communityprofil</button>
@@ -11890,6 +13135,15 @@ function mitteilungOeffnen(ziel, text = '') {
   if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine');
   if (ziel.art === 'profile') return openProfile(ziel.id);
   if (ziel.art === 'community') return openChat(ziel.id);
+  // Kasten 8.3: „Push to Talk beitreten?" führt ins Unterthema — dort sitzt
+  // der Knopf (8.2). Wie in der App (mitteilungOeffnen, 'channel').
+  if (ziel.art === 'channel') {
+    const com = state.communities.find((c) => (c.channels || []).some((k) => k.id === ziel.id));
+    const kanal = com && com.channels.find((k) => k.id === ziel.id);
+    if (!com || !kanal) return toast('Dieses Unterthema gibt es nicht mehr');
+    state.openCommunityId = com.id;
+    return renderCommunityChat(com, kanal, kanal.topics?.[0] || kanal.name);
+  }
   // Chat-Anfrage und Messenger-Anfrage führen in den Chat, um den es geht.
   if (ziel.art === 'chat') return openChat(ziel.id);
 
@@ -11902,9 +13156,23 @@ function mitteilungOeffnen(ziel, text = '') {
     return openStory(story.id, { bereich: story.inMessenger === false ? 'videos' : 'messenger' });
   }
 
-  // Kommentar (Herz daran, Kasten 25: @ darin): die Mitteilung kennt nur den
-  // Kommentar, nicht den Beitrag — also in den Beitrags-Feed, wie die App.
-  if (ziel.art === 'post' || ziel.art === 'comment') {
+  /*
+   * Kommentar (Antwort, Herz daran, @ darin): die Mitteilung kennt nur den
+   * Kommentar. Bis zum 12.10.2026 ging es deshalb nur in den Beitrags-Feed.
+   * Jetzt fragt der Server, unter welchem Beitrag er steht; der Beitrag geht
+   * auf und darüber das Kommentarblatt beim Kommentar. Gleich in der App.
+   */
+  if (ziel.art === 'comment') {
+    return (async () => {
+      const ort = await fetch(`/api/kommentar/${encodeURIComponent(ziel.id)}/ort`)
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!ort || !ort.ok) return toast(ort?.error || 'Diesen Kommentar gibt es nicht mehr');
+      beitragOeffnen(ort.kind, ort.beitragId);
+      setTimeout(() => openComments(ort.beitragId, null, ziel.id), 120);
+    })();
+  }
+  if (ziel.art === 'post') {
     state.area = 'videos';
     state.sub.videos = 'home';
     render();
@@ -12043,7 +13311,7 @@ const ERSTELLEN_VIDEOS = [
 ];
 
 function openErstellen(bereich) {
-  const punkte = bereich === 'communities' ? [{ key: 'kanal', label: 'Neuen Kanal erstellen', icon: 'plus' }] : ERSTELLEN_VIDEOS;
+  const punkte = bereich === 'communities' ? [{ key: 'kanal', label: 'Neue Community erstellen', icon: 'plus' }] : ERSTELLEN_VIDEOS;
 
   openSheet(
     'Erstellen',
@@ -13328,10 +14596,42 @@ function zielChat(chat) {
   return {
     pfad: `/api/messages/${chat.id}/anhang`,
     ausserId: chat.userId,
-    ohne: [],
+    // Kasten 4.3a: der Bezug aus dem Ziehen geht mit dem Anhang mit.
+    bezug: () =>
+      msgBezug && !msgBearbeitet
+        ? {
+            antwortAuf: msgBezug.art === 'antwort' ? msgBezug.nachricht.id : null,
+            zitatVon: msgBezug.art === 'zitat' ? msgBezug.nachricht.id : null,
+          }
+        : null,
+    bezugFertig: () => {
+      msgBezug = null;
+      document.querySelector('.msgbezug')?.remove();
+    },
+    // Kasten 28/6.6: „Standort anfragen" nur im Chat zu zweit — gleiche
+    // Regel in ChatDetailScreen.tsx (ohne=…).
+    ohne: chat.userId ? [] : ['standortAnfragen'],
     fertig: (nachricht) => {
       state.messages.push(nachricht);
       paintMessages(chat);
+    },
+    /*
+     * Kasten 28/6.5: ein frei gewählter Ort geht als Text — im Zweierchat
+     * also verschlüsselt (sendeKoerper), wie jede andere Nachricht.
+     * Gibt die Nachricht zurück, so wie sie der Chat zeichnet.
+     */
+    textSenden: async (text, bezug) => {
+      const koerper = await sendeKoerper(chat.id, text, bezug || {});
+      const res = await fetch(`/api/messages/${chat.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(koerper),
+      });
+      const msg = await res.json().catch(() => ({}));
+      if (!msg || msg.ok === false || !msg.id) return { ok: false, error: msg?.error };
+      msg.lokal = true;
+      if (Number(msg.krypto) > 0) msg.text = text;
+      return { ok: true, message: msg };
     },
   };
 }
@@ -13348,7 +14648,6 @@ function openAnhang(ziel, chat) {
   }
 
   const punkte = [
-    { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera' },
     { key: 'galerie', label: 'Aus der Galerie', icon: 'image' },
     /*
      * Datei, Gif, Sticker und Standortanfrage kamen am 01.09.2026 dazu. Alle
@@ -13356,25 +14655,50 @@ function openAnhang(ziel, chat) {
      * "Standortanfrage"); im Anhang-Menü gab es sie nicht.
      */
     { key: 'datei', label: 'Datei senden', icon: 'document' },
-    { key: 'gif', label: 'Gif senden', icon: 'film' },
-    { key: 'sticker', label: 'Sticker', icon: 'sticker' },
+    /*
+     * Kasten 28/6.1 (Henrik 28.09.2026): „Foto aufnehmen", „GIF senden" und
+     * „Sticker" stehen nicht mehr hier. Kamera im Eingabefeld, GIF und
+     * Sticker hinter dem eigenen Knopf (openGifSticker). Die Zweige in
+     * anhangSenden() bleiben — die neuen Knöpfe benutzen sie.
+     */
     { key: 'standort', label: 'Standort senden', icon: 'mapPin' },
     { key: 'standortAnfragen', label: 'Standort anfragen', icon: 'standortAnfrage' },
     { key: 'kontakt', label: 'Kontakt senden', icon: 'person' },
   ];
 
+  /*
+   * Kasten 28/6.2: Raster runder, farbiger Symbole wie bei WhatsApp statt
+   * einer Liste mit Pfeilen. Farben und Kurztexte wie in
+   * app/components/AnhangSheet.tsx (FARBEN, KURZ).
+   */
+  const ANHANG_FARBEN = {
+    galerie: '#007BFC',
+    datei: '#7F66FF',
+    standort: '#1FA855',
+    liveStandort: '#00A5A8',
+    standortAnfragen: '#FF8A00',
+    kontakt: '#009DE2',
+  };
+  const ANHANG_KURZ = {
+    galerie: 'Galerie',
+    datei: 'Dokument',
+    standort: 'Standort',
+    liveStandort: 'Live-Standort',
+    standortAnfragen: 'Standort anfragen',
+    kontakt: 'Kontakt',
+  };
+
   openSheet(
     'Anhang',
-    punkte
+    `<div class="anhangraster">${punkte
       .filter((p) => !(ziel.ohne || []).includes(p.key))
       .map(
-        (p) => `<button class="item" data-anhang="${p.key}">
-          <span class="item__icon">${ICONS[p.icon]}</span>
-          <span class="item__label">${esc(p.label)}</span>
-          <span class="row__chevron">${ICONS.chevron}</span>
+        (p) => `<button type="button" class="anhangraster__kachel" data-anhang="${p.key}" aria-label="${esc(p.label)}">
+          <span class="anhangraster__kreis" style="background:${ANHANG_FARBEN[p.key] || 'var(--brand)'}">${ICONS[p.icon]}</span>
+          <span class="anhangraster__text">${esc(ANHANG_KURZ[p.key] || p.label)}</span>
         </button>`
       )
-      .join(''),
+      .join('')}</div>`,
     (sheet, close) => {
       sheet.querySelectorAll('[data-anhang]').forEach((b) =>
         b.addEventListener('click', () => {
@@ -13386,19 +14710,233 @@ function openAnhang(ziel, chat) {
   );
 }
 
+/*
+ * „Standort senden" — Ort suchen oder auf der Karte wählen (Kasten 28/6.5).
+ *
+ * Henrik, 28.09.2026: „kein Standort aussuchen auf der Karte oder kein
+ * Suchfenster … nur ein paar vorgeschlagene Standorte." Die Karte hat eine
+ * feste Nadel in der Mitte, man schiebt die Karte darunter. Gesucht wird
+ * über Nominatim (gemeinsam/ortsuche.js) erst auf „Suchen"/Enter — so
+ * verlangen es dessen Nutzungsregeln; der Browser schickt den Referer.
+ *
+ * Der Ort geht als Text (OrtSuche.alsText): im Zweierchat verschlüsselt,
+ * kein neues Schema. Die Blase macht daraus die Karte (anhangInhalt).
+ */
+function openStandortWahl(ziel) {
+  const O = window.OrtSuche;
+  if (!O || !window.L || !ziel.textSenden) return toast('Die Karte ist gerade nicht verfügbar');
+
+  openSheet(
+    'Standort senden',
+    `<div class="ortwahl">
+       <form class="ortwahl__suche" id="ortSuche">
+         <input type="search" id="ortSucheFeld" placeholder="Ort oder Adresse suchen" aria-label="Ort oder Adresse suchen" autocomplete="off">
+         <button type="submit" class="btn btn--primary" id="ortSucheKnopf">Suchen</button>
+       </form>
+       <div class="ortwahl__treffer" id="ortTreffer" hidden></div>
+       <div class="ortwahl__karte">
+         <div id="ortWahlKarte"></div>
+         <span class="ortwahl__nadel" aria-hidden="true">${ICONS.mapPin}</span>
+       </div>
+       <div class="ortwahl__quelle">${esc(O.QUELLE)}</div>
+       <button type="button" class="ortwahl__senden" id="ortSenden">${ICONS.send} Diesen Ort senden</button>
+     </div>`,
+    (sheet, close) => {
+      const karte = L.map(sheet.querySelector('#ortWahlKarte'), { zoomSnap: 0 }).setView([51.1657, 10.4515], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(karte);
+      // Das Blatt fährt animiert hoch; erst danach kennt Leaflet seine Größe.
+      setTimeout(() => karte.invalidateSize(), 300);
+
+      let gewaehlt = null;
+      const trefferBox = sheet.querySelector('#ortTreffer');
+      const knopf = sheet.querySelector('#ortSucheKnopf');
+
+      sheet.querySelector('#ortSuche').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = sheet.querySelector('#ortSucheFeld').value.trim();
+        if (text.length < 2) return;
+        knopf.disabled = true;
+        let liste;
+        try {
+          liste = await O.suchen(text, window.fetch.bind(window));
+        } catch {
+          knopf.disabled = false;
+          return toast('Die Ortssuche antwortet gerade nicht');
+        }
+        knopf.disabled = false;
+        trefferBox.hidden = false;
+        trefferBox.innerHTML = liste.length
+          ? liste
+              .map(
+                (t, i) => `<button type="button" class="ortwahl__zeile" data-treffer="${i}">
+                  <span class="ortwahl__punkt">${ICONS.mapPin}</span>
+                  <span class="ortwahl__text"><strong>${esc(t.name)}</strong>${t.adresse ? `<span>${esc(t.adresse)}</span>` : ''}</span>
+                </button>`
+              )
+              .join('')
+          : `<div class="ortwahl__leer">Nichts gefunden. Versuch es mit Straße und Ort.</div>`;
+        trefferBox.querySelectorAll('[data-treffer]').forEach((b) =>
+          b.addEventListener('click', () => {
+            gewaehlt = liste[Number(b.dataset.treffer)];
+            trefferBox.hidden = true;
+            karte.setView([gewaehlt.lat, gewaehlt.lng], 16);
+          })
+        );
+      });
+
+      sheet.querySelector('#ortSenden').addEventListener('click', async (e) => {
+        const b = e.currentTarget;
+        const c = karte.getCenter();
+        // Nadel noch auf dem Treffer → dessen Name; sonst die Stelle benennen.
+        const nahe = gewaehlt && Math.abs(gewaehlt.lat - c.lat) < 0.0003 && Math.abs(gewaehlt.lng - c.lng) < 0.0003;
+        b.disabled = true;
+        const ort = nahe ? gewaehlt : await O.benennen(c.lat, c.lng, window.fetch.bind(window));
+        const text = O.alsText(ort);
+        if (!text) {
+          b.disabled = false;
+          return toast('Dieser Ort lässt sich nicht senden');
+        }
+        // Kasten 4.3a: wer gezogen hat, antwortet auch mit einem Ort.
+        const bezug = ziel.bezug?.() || null;
+        const antwort = await ziel.textSenden(text, bezug);
+        if (!antwort || antwort.ok === false) {
+          b.disabled = false;
+          return toast(antwort?.error || 'Der Standort ging nicht raus');
+        }
+        if (bezug) ziel.bezugFertig?.(antwort);
+        close();
+        if (antwort.message) ziel.fertig(antwort.message);
+        else ziel.fertig();
+        toast('Standort gesendet');
+      });
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/** Karte eines frei gewählten Ortes (Kasten 28/6.5). Gegenstück: StandortAnsicht.tsx. */
+function openStandortAnsicht(ort) {
+  const O = window.OrtSuche;
+  openSheet(
+    ort.name,
+    `<div class="ortwahl">
+       <div class="ortwahl__karte"><div id="ortAnsichtKarte"></div></div>
+       ${ort.adresse ? `<div class="ortwahl__adresse">${esc(ort.adresse)}</div>` : ''}
+       <div class="ortwahl__quelle">${esc(O.koordinatenText(ort.lat, ort.lng))}</div>
+       <a class="ortwahl__senden" href="${esc(O.kartenLink(ort.lat, ort.lng))}" target="_blank" rel="noopener noreferrer">In OpenStreetMap öffnen</a>
+     </div>`,
+    (sheet) => {
+      if (!window.L) return;
+      const karte = L.map(sheet.querySelector('#ortAnsichtKarte'), { zoomSnap: 0 }).setView([ort.lat, ort.lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(karte);
+      L.circleMarker([ort.lat, ort.lng], { radius: 10, fillColor: '#E5484D', color: '#fff', weight: 3, fillOpacity: 1 }).addTo(karte);
+      setTimeout(() => karte.invalidateSize(), 300);
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
+/** Kasten 28/6.5: Klick auf eine Standortkarte — Explorer-Seite oder freie Karte. */
+function standortKarteOeffnen(knopf) {
+  const lat = Number(knopf.dataset.msglat);
+  const lng = Number(knopf.dataset.msglng);
+  if (knopf.dataset.msglat && Number.isFinite(lat) && Number.isFinite(lng)) {
+    return openStandortAnsicht({ name: knopf.dataset.msgort, adresse: knopf.dataset.msgadresse || '', lat, lng });
+  }
+  const platz = state.places.find((p) => p.name === knopf.dataset.msgort);
+  if (platz) openExplorer('standort', platz.id);
+}
+
+/*
+ * GIFs und Sticker — der Knopf rechts im Eingabefeld (Kasten 28/6.3).
+ * Blatt mit Reitern GIF | Sticker wie bei WhatsApp. Gleiches Blatt in der
+ * App: app/components/GifStickerSheet.tsx.
+ *
+ * GIF: eine GIF-Suche (Giphy, Tenor) bräuchte einen Schlüssel bei einem
+ * fremden Konto und schickte jede Suche dorthin. Darum kommt das GIF aus den
+ * eigenen Dateien; der Reiter sagt das offen.
+ */
+function openGifSticker(ziel) {
+  let reiter = 'sticker';
+  openSheet(
+    'GIFs und Sticker',
+    `<div class="gifsticker">
+       <div class="gifsticker__reiter" role="tablist">
+         <button type="button" role="tab" data-reiter="gif">GIF</button>
+         <button type="button" role="tab" data-reiter="sticker">Sticker</button>
+       </div>
+       <div class="gifsticker__seite" data-seite="sticker">
+         <div class="sticker-raster">
+           ${STICKER.map((z) => `<button class="sticker-raster__z" data-sticker="${z}" aria-label="Sticker ${z}">${z}</button>`).join('')}
+         </div>
+       </div>
+       <div class="gifsticker__seite gifsticker__gif" data-seite="gif">
+         <span class="gifsticker__symbol">${ICONS.film}</span>
+         <strong>GIF aus deinen Dateien</strong>
+         <p>Eine GIF-Suche gibt es nicht: sie würde jede Suche an einen fremden Dienst schicken.</p>
+         <button type="button" class="btn btn--primary" data-gifwahl>GIF aus der Galerie wählen</button>
+       </div>
+     </div>`,
+    (sheet, close) => {
+      const zeigen = () => {
+        sheet.querySelectorAll('[data-reiter]').forEach((b) => {
+          const an = b.dataset.reiter === reiter;
+          b.classList.toggle('is-an', an);
+          b.setAttribute('aria-selected', an ? 'true' : 'false');
+        });
+        sheet.querySelectorAll('[data-seite]').forEach((s) => {
+          s.hidden = s.dataset.seite !== reiter;
+        });
+      };
+      sheet.querySelectorAll('[data-reiter]').forEach((b) =>
+        b.addEventListener('click', () => {
+          reiter = b.dataset.reiter;
+          zeigen();
+        })
+      );
+      sheet.querySelectorAll('[data-sticker]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          close();
+          await anhangSenden(ziel, 'stickerZeichen', null, b.dataset.sticker);
+        })
+      );
+      sheet.querySelector('[data-gifwahl]').addEventListener('click', () => {
+        close();
+        anhangSenden(ziel, 'gif');
+      });
+      zeigen();
+    },
+    { schliessen: true, hoch: true }
+  );
+}
+
 /** Anhang wirklich verschicken und anzeigen. */
-async function anhangSenden(ziel, art, chat) {
+async function anhangSenden(ziel, art, chat, zeichen) {
   const senden = async (koerper) => {
+    /*
+     * Kasten 4.3a (Nachtrag 11.10.): wer gezogen hat und dann einen Anhang
+     * schickt, antwortet damit — bis hierher ging der Anhang ohne Bezug
+     * raus und die Leiste blieb stehen. Gleiche Weiche in der App
+     * (ChatDetailScreen, anhangSenden).
+     */
+    const bezug = ziel.bezug?.() || null;
     const res = await fetch(ziel.pfad, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(koerper),
+      body: JSON.stringify(bezug ? { ...koerper, ...bezug } : koerper),
     });
     const daten = await res.json();
     if (!daten.ok) {
       toast(daten.error);
       return null;
     }
+    if (bezug) ziel.bezugFertig?.(daten);
     return daten.message;
   };
 
@@ -13463,6 +15001,13 @@ async function anhangSenden(ziel, art, chat) {
     return toast('Gif gesendet');
   }
 
+  // Kasten 28/6.3: der Sticker ist im GIF/Sticker-Blatt schon gewählt.
+  if (art === 'stickerZeichen') {
+    const nachricht = await senden({ art: 'sticker', zeichen });
+    if (!nachricht) return;
+    return ziel.fertig(nachricht);
+  }
+
   if (art === 'sticker') {
     return openSheet(
       'Sticker',
@@ -13495,32 +15040,11 @@ async function anhangSenden(ziel, art, chat) {
     return toast(`Standort bei ${chat.name} angefragt`);
   }
 
-  if (art === 'standort') {
-    return openSheet(
-      'Standort senden',
-      `<div class="sheet__body">${state.places
-        .map(
-          (p) => `<button class="item" data-ort="${p.id}">
-            <span class="item__icon">${ICONS.mapPin}</span>
-            <span class="item__label">${esc(p.name)}</span>
-            <span class="row__chevron">${ICONS.chevron}</span>
-          </button>`
-        )
-        .join('')}</div>`,
-      (sheet, close) => {
-        sheet.querySelectorAll('[data-ort]').forEach((b) =>
-          b.addEventListener('click', async () => {
-            close();
-            const nachricht = await senden({ art: 'standort', id: b.dataset.ort });
-            if (!nachricht) return;
-            ziel.fertig(nachricht);
-            toast('Standort gesendet');
-          })
-        );
-      },
-      { schliessen: true, hoch: true }
-    );
-  }
+  /*
+   * Kasten 28/6.5: Ort suchen oder auf der Karte wählen statt der festen
+   * Liste aus `places`. Gleiches Blatt in der App: StandortWahl.tsx.
+   */
+  if (art === 'standort') return openStandortWahl(ziel);
 
   // Kontakt: nur Personen, die man auch wirklich kennt.
   const auswahl = state.contacts.filter((c) => state.users[c.id] && c.id !== ziel.ausserId);
@@ -13588,7 +15112,10 @@ async function openStoryAnsichten(story, danach) {
                  // sonst das, was der Server mitgeschickt hat.
                  const u = state.users[v.id] || v;
                  return `<button class="item" data-seher="${esc(v.id)}">
-                   <span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials || '')}</span>
+                   ${/* Kasten 28/7.11: Profilbild, in Messenger-Storys mein Kontaktbild (wie StoryOptionenSheet → Avatar). */ ''}
+                   ${state.users[v.id]
+                     ? avatarForUser(v.id, 36, state.area === 'messenger')
+                     : `<span class="avatar avatar--36" style="background:${farbe(u.color)}">${esc(u.initials || '')}</span>`}
                    <span class="item__label">${esc(u.name || 'Unbekannt')}</span>
                    <span class="item__value">${esc(u.handle || '')}</span>
                  </button>`;
@@ -14419,6 +15946,9 @@ function openClip(clipId) {
   let liveEinstieg = null;
   let liveOffen = false;
   let liveUhr = null;
+  // Nachtrag 4.3c: der Live-Kommentar, auf den gerade geantwortet wird.
+  let liveAntwortAn = null;
+  let liveListe = [];
   const istLive = () => clip.art === 'live';
 
   const zeit = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -14945,14 +16475,29 @@ function openClip(clipId) {
           if (!res.ok) return;
           fehlschlaege = 0;
           const liste = (await res.json()).kommentare || [];
+          liveListe = liste;
           const zahl = overlay.querySelector('#clipKommentarZahl');
           if (zahl) zahl.textContent = liste.length ? compactNumber(liste.length) : 'Kommentar';
+          // Nicht mitten in einem Ziehen neu zeichnen.
+          if (zeilen.querySelector('[data-gezogen]')) return;
           zeilen.innerHTML = liste.length
             ? liste
                 .slice(liveOffen ? -30 : -3)
-                .map((k) => `<p class="live__kommentar"><b>${esc(k.name)}</b> ${esc(k.text)}</p>`)
+                .map((k) => liveZeileHtml(k, liveOffen))
                 .join('')
             : '<p class="live__leer">Noch hat niemand etwas geschrieben.</p>';
+          // Nachtrag 4.3c: aufgeklappt ziehen oder „Antworten" → Zitat.
+          if (liveOffen) {
+            antwortenBinden(
+              zeilen,
+              (id) => liveListe.find((k) => k.id === id),
+              (k) => {
+                liveAntwortAn = k;
+                zeigeLiveLeiste();
+                overlay.querySelector('#liveFeld')?.focus();
+              }
+            );
+          }
           if (liveOffen) zeilen.scrollTop = zeilen.scrollHeight;
         } catch (fehler) {
           // Erst drei Aussetzer hintereinander melden, wie in der App.
@@ -14960,6 +16505,12 @@ function openClip(clipId) {
           if (fehlschlaege === 3) console.warn('Live-Kommentare laden fehlgeschlagen:', fehler);
         }
       };
+      const zeigeLiveLeiste = () =>
+        liveAntwortLeiste(overlay.querySelector('.livebox__eingabe'), liveOffen ? liveAntwortAn : null, () => {
+          liveAntwortAn = null;
+          zeigeLiveLeiste();
+        });
+      zeigeLiveLeiste();
       clearInterval(liveUhr);
       holen();
       liveUhr = setInterval(holen, 4000);
@@ -14988,8 +16539,12 @@ function openClip(clipId) {
         if (!text) return;
         feld.value = '';
         sendenKnopf.disabled = true;
-        const antwort = await api(`/api/stream/${clip.id}/kommentare`, { text });
+        const antwortAuf = liveAntwortAn?.id || null;
+        const antwort = await api(`/api/stream/${clip.id}/kommentare`, { text, antwortAuf });
         if (!antwort?.ok) return toast(antwort?.error || 'Der Kommentar ging nicht durch');
+        liveAntwortAn = null;
+        zeigeLiveLeiste();
+        if (antwort.ohneBezug) toast(window.Kommentar.LIVE_OHNE_BEZUG);
         holen();
       };
       feld?.addEventListener('keydown', (e) => e.key === 'Enter' && liveSenden());
@@ -15866,7 +17421,10 @@ function openTeilen(art, id) {
       <button class="${klasse}" data-teilen="${uid}" data-bereich="${bereich}" ${sperre || gesendet.has(uid) ? 'disabled' : ''}
               aria-pressed="${gewaehlt.has(uid)}">
         <span class="teilen__bild">
-          <span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials || (u.name || '?').slice(0, 1))}</span>
+          ${/* Kasten 28/7.11: Profilbild statt nur Initialen; im Messenger mein Kontaktbild (wie TeilenSheet → Avatar). */ ''}
+          ${state.users[uid]
+            ? avatarForUser(uid, 52, state.area === 'messenger')
+            : `<span class="avatar avatar--52" style="background:${farbe(u.color)}">${esc(u.initials || (u.name || '?').slice(0, 1))}</span>`}
           <span class="teilen__marke teilen__marke--${bereich}">${
             bereich === 'community' ? ICONS.people : ICONS.chat
           }</span>
@@ -16527,12 +18085,16 @@ async function erstelle(was) {
   );
 }
 
-/** Neuen Kanal in einer Community anlegen (Prototyp "CP + erstellen"). */
+/**
+ * Neue Community anlegen (Prototyp "CP + erstellen"). Der Kommentar sagte
+ * "Kanal in einer Community", angelegt wird aber eine Community selbst
+ * (POST /api/communities) - Kasten 2.2 (28.09.2026) hat die Texte angepasst.
+ */
 function openKanalErstellen() {
   openFormular(
-    'Neuen Kanal erstellen',
+    'Neue Community erstellen',
     [
-      { key: 'name', label: 'Name des Kanals', platzhalter: 'z. B. Ankündigungen', pflicht: true },
+      { key: 'name', label: 'Name der Community', platzhalter: 'z. B. Fotografie', pflicht: true },
       { key: 'thema', label: 'Worum geht es?', platzhalter: 'Kurz beschrieben', pflicht: true },
     ],
     async ({ name, thema }) => {
@@ -16622,6 +18184,9 @@ function openLivestream() {
    */
   let streamId = null;
   let spaltenUhr = null;
+  // Nachtrag 4.3c: der Live-Kommentar, auf den der Host gerade antwortet.
+  let antwortAn = null;
+  let spaltenListe = [];
 
   api('/api/stream/start', {})
     .then((antwort) => {
@@ -16652,14 +18217,25 @@ function openLivestream() {
           fehlschlaege = 0;
           const daten = await res.json();
           const zeilen = daten.kommentare || [];
+          spaltenListe = zeilen;
+          // Nicht mitten in einem Ziehen neu zeichnen.
+          if (spalte.querySelector('[data-gezogen]')) return;
           spalte.innerHTML = zeilen.length
             ? zeilen
                 .slice(-30)
-                .map(
-                  (k) => `<p class="live__kommentar"><b>${esc(k.name)}</b> ${esc(k.text)}</p>`
-                )
+                .map((k) => liveZeileHtml(k, true))
                 .join('')
             : '<p class="live__leer">Noch keine Kommentare.</p>';
+          // Nachtrag 4.3c: ziehen oder „Antworten" → Zitat über der Antwort.
+          antwortenBinden(
+            spalte,
+            (id) => spaltenListe.find((k) => k.id === id),
+            (k) => {
+              antwortAn = k;
+              zeigeLeiste();
+              feld?.focus();
+            }
+          );
           spalte.scrollTop = spalte.scrollHeight;
         } catch (fehler) {
           /* Ein Aussetzer im Vier-Sekunden-Takt holt die naechste Runde nach;
@@ -16670,6 +18246,12 @@ function openLivestream() {
         }
       };
 
+      const zeigeLeiste = () =>
+        liveAntwortLeiste(overlay.querySelector('.live__eingabe'), antwortAn, () => {
+          antwortAn = null;
+          zeigeLeiste();
+        });
+
       holen();
       spaltenUhr = setInterval(holen, 4000);
 
@@ -16677,8 +18259,12 @@ function openLivestream() {
         const text = feld.value.trim();
         if (!text) return;
         feld.value = '';
-        const antwortK = await api(`/api/stream/${streamId}/kommentare`, { text });
+        const antwortAuf = antwortAn?.id || null;
+        const antwortK = await api(`/api/stream/${streamId}/kommentare`, { text, antwortAuf });
         if (!antwortK?.ok) return toast(antwortK?.error || 'Der Kommentar ging nicht durch');
+        antwortAn = null;
+        zeigeLeiste();
+        if (antwortK.ohneBezug) toast(window.Kommentar.LIVE_OHNE_BEZUG);
         holen();
       };
 
@@ -17527,9 +19113,9 @@ async function renderVideoProfile() {
         </div>
       </div>
       <div class="prof__about">
-        <div class="prof__name">${esc(me.name)}</div>
+        <div class="prof__name">${nameMitPronomen(me.name, me.pronomen)}</div>
         ${me.bio ? `<div class="prof__bio">${esc(me.bio)}</div>` : ''}
-        ${me.link ? bioLink(me.link) : ''}
+        ${profilLinksHtml(me.links)}
       </div>
       <div class="prof__aktionen">
         <button class="btn btn--breit" id="profilBearbeiten">Profil bearbeiten</button>
@@ -17831,21 +19417,78 @@ function renderCommunityChats() {
 
 /* --------------------------------------------------- Communitys: Suchen */
 // Prototyp-Frame "Community - Suchen": Filter Alle/Communitys/Kontakte, dann
-// die Abschnitte Kanäle und Profile mit Befreunden-Schaltfläche.
+// die Abschnitte Communitys und Profile mit Befreunden-Schaltfläche.
+
+/*
+ * Die Suchregel der Community-Suche. Die Hauptsuche und die Unterseiten
+ * hinter "Communitys →" / "Profile →" (Kasten 3.1/3.2) suchen damit in
+ * derselben Quelle - den geladenen Communitys bzw. Nutzern - und nach
+ * derselben Regel. Gleich in der App (passendeCommunitys/passendeProfile in
+ * CommunitySearchScreen.tsx).
+ */
+function passendeCommunitys(q) {
+  return state.communities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
+}
+function passendeProfile(q) {
+  return Object.values(state.users).filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)));
+}
+
+/** Eine Profilzeile der Community-Suche, mit Befreunden-Knopf. */
+function commProfilZeile(u) {
+  const c = state.contacts.find((x) => x.id === u.id);
+  const st = !c ? 'none' : c.status === 'pending' ? 'pending' : 'friend';
+  /*
+   * Punkt 57: bei einem privaten Profil geht erst eine
+   * Anfrage raus. "+ Befreunden" waere dort ein
+   * Versprechen, das der Knopf nicht halten kann.
+   */
+  const privat = (state.privateProfile || []).includes(u.id);
+  const label =
+    st === 'friend'
+      ? 'Befreundet'
+      : st === 'pending'
+        ? 'Angefragt'
+        : privat
+          ? 'Anfrage senden'
+          : '+ Befreunden';
+  return `<li><div class="row">
+     ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
+     <div class="row__body" data-profile="${u.id}">
+       <div class="row__name">${esc(u.name)}</div>
+       <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
+     </div>
+     <button class="joinbtn ${st === 'none' ? '' : 'is-joined'}" data-befriend="${u.id}" ${st === 'none' ? '' : 'disabled'}>${label}</button>
+   </div></li>`;
+}
+
+/** Befreunden-Knoepfe der Community-Suche verdrahten; danach `neuZeichnen`. */
+function bindBefreunden(neuZeichnen) {
+  main.querySelectorAll('[data-befriend]').forEach((b) =>
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const u = state.users[b.dataset.befriend];
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: u.handle }),
+      });
+      const result = await res.json();
+      if (!result.ok) return toast(result.error);
+      state.contacts.push(result.contact);
+      if (result.chat) state.chats.unshift(result.chat);
+      // Punkt 57: die Meldung sagt, was wirklich passiert ist - bei einem
+      // privaten Profil laeuft eine Anfrage, sonst steht der Kontakt schon.
+      toast(result.privat ? `Anfrage an ${u.name} gesendet` : `${u.name} ist jetzt dein Kontakt`);
+      neuZeichnen();
+    })
+  );
+}
+
 function renderCommunitySearch() {
   const q = state.communityQuery.trim().toLowerCase();
   const f = state.commSearchFilter;
-  const chans = f === 'people' ? [] : state.communities.filter((c) => !q || c.name.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q));
-  const people =
-    f === 'channels'
-      ? []
-      : Object.values(state.users).filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)));
-
-  const statusOf = (id) => {
-    const c = state.contacts.find((x) => x.id === id);
-    if (!c) return 'none';
-    return c.status === 'pending' ? 'pending' : 'friend';
-  };
+  const chans = f === 'people' ? [] : passendeCommunitys(q);
+  const people = f === 'channels' ? [] : passendeProfile(q);
 
   main.innerHTML = `
     <div class="pagehead">
@@ -17869,40 +19512,12 @@ function renderCommunitySearch() {
             // ist der Name der Unterthemen INNERHALB einer Community - hier
             // stehen aber die Communitys selbst.
             // Punkt 56: die beiden Ueberschriften waren tote <div>s mit einem
-            // Pfeil daran. Jetzt fuehren sie auf die Liste mit nur dieser
-            // Kategorie - derselbe Weg wie bei den Kategorien der Video-Suche.
-            `${chans.length ? `<button class="exp__head" data-csmehr="channels">Communitys →</button><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
-             ${
-               people.length
-                 ? `<button class="exp__head" data-csmehr="people">Profile →</button><ul class="rows">${people
-                     .map((u) => {
-                       const st = statusOf(u.id);
-                       /*
-                        * Punkt 57: bei einem privaten Profil geht erst eine
-                        * Anfrage raus. "+ Befreunden" waere dort ein
-                        * Versprechen, das der Knopf nicht halten kann.
-                        */
-                       const privat = (state.privateProfile || []).includes(u.id);
-                       const label =
-                         st === 'friend'
-                           ? 'Befreundet'
-                           : st === 'pending'
-                             ? 'Angefragt'
-                             : privat
-                               ? 'Anfrage senden'
-                               : '+ Befreunden';
-                       return `<li><div class="row">
-                          ${mitStoryRing(u.id, `<span data-profile="${u.id}">${avatarForUser(u.id, 44)}</span>`)}
-                          <div class="row__body" data-profile="${u.id}">
-                            <div class="row__name">${esc(u.name)}</div>
-                            <div class="row__bottom"><span class="row__preview">${esc(u.handle)}</span></div>
-                          </div>
-                          <button class="joinbtn ${st === 'none' ? '' : 'is-joined'}" data-befriend="${u.id}" ${st === 'none' ? '' : 'disabled'}>${label}</button>
-                        </div></li>`;
-                     })
-                     .join('')}</ul>`
-                 : ''
-             }`
+            // Pfeil daran. Kasten 3.1/3.2 (28.09.2026): sie oeffnen jetzt eine
+            // eigene Seite mit Zurueck-Pfeil, eigener Suchleiste und nur
+            // dieser Liste (renderCommunitySuchSeite) - vorher schalteten sie
+            // nur den Filter oben um.
+            `${chans.length ? `<button class="exp__head" data-csmehr="channels" aria-label="Alle Communitys anzeigen">Communitys →</button><ul class="rows">${chans.map(communityRow).join('')}</ul>` : ''}
+             ${people.length ? `<button class="exp__head" data-csmehr="people" aria-label="Alle Profile anzeigen">Profile →</button><ul class="rows">${people.map(commProfilZeile).join('')}</ul>` : ''}`
           : `<div class="empty">${ICONS.search}
               <div class="empty__title">Nichts gefunden</div>
               <div class="empty__text">Für „${esc(state.communityQuery)}" gibt es keinen Treffer.</div>
@@ -17930,36 +19545,94 @@ function renderCommunitySearch() {
       renderCommunitySearch();
     })
   );
-  // Punkt 56: die Ueberschrift schaltet auf genau diese Kategorie um.
+  // Kasten 3.1/3.2: die Ueberschrift oeffnet die eigene Seite dieser
+  // Kategorie. Was oben schon getippt war, gilt dort weiter.
   main.querySelectorAll('[data-csmehr]').forEach((b) =>
     b.addEventListener('click', () => {
-      state.commSearchFilter = b.dataset.csmehr;
-      renderCommunitySearch();
+      state.commSuchSeite = b.dataset.csmehr;
+      state.commSuchSeiteQuery = state.communityQuery;
+      renderCommunitySuchSeite();
     })
   );
   main.querySelectorAll('[data-community]').forEach((r) =>
     r.addEventListener('click', () => openChat(r.dataset.community))
   );
   bindJoinButtons(renderCommunitySearch);
-  main.querySelectorAll('[data-befriend]').forEach((b) =>
-    b.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const u = state.users[b.dataset.befriend];
-      const res = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle: u.handle }),
-      });
-      const result = await res.json();
-      if (!result.ok) return toast(result.error);
-      state.contacts.push(result.contact);
-      if (result.chat) state.chats.unshift(result.chat);
-      // Punkt 57: die Meldung sagt, was wirklich passiert ist - bei einem
-      // privaten Profil laeuft eine Anfrage, sonst steht der Kontakt schon.
-      toast(result.privat ? `Anfrage an ${u.name} gesendet` : `${u.name} ist jetzt dein Kontakt`);
-      renderCommunitySearch();
-    })
+  bindBefreunden(renderCommunitySearch);
+}
+
+/*
+ * Die Seite hinter "Communitys →" bzw. "Profile →" unter Suchen.
+ *
+ * Henrik am 28.09.2026 (Kasten 3.1/3.2, Register F-07): "Wenn ich auf die
+ * dicke schwarze Schrift mit dem Pfeil nach rechts druecke, moechte ich auf
+ * eine separate Seite weitergeleitet werden mit dann entweder nur
+ * vorgeschlagenen Profilen, auf der ich ja auch Profile suchen kann oder halt
+ * nur vorgeschlagenen Communitys, auf der ich dann auch Communitys suchen
+ * kann." Aufgebaut wie renderCommunityListe: Zurueck-Pfeil, Titel, dazu ein
+ * eigenes Suchfeld. Gesucht wird wie in der Hauptsuche (passendeCommunitys /
+ * passendeProfile).
+ */
+function renderCommunitySuchSeite() {
+  const istCommunitys = state.commSuchSeite === 'channels';
+  const roh = state.commSuchSeiteQuery;
+  const q = roh.trim().toLowerCase();
+  const liste = istCommunitys ? passendeCommunitys(q) : passendeProfile(q);
+
+  main.innerHTML = `
+    <div class="pagehead">
+      <div class="pagehead__row">
+        <button class="iconbtn" id="commSuchSeiteBack" aria-label="Zurück zur Suche">${ICONS.back}</button>
+        <h2 class="pagehead__title">${istCommunitys ? 'Communitys' : 'Profile'}</h2>
+      </div>
+      <div class="searchrow">
+        <label class="searchbox">
+          ${ICONS.search}
+          <input id="commSuchSeiteInput" type="search" placeholder="${istCommunitys ? 'Suche nach Communitys...' : 'Suche nach Profilen...'}" value="${esc(roh)}" autocomplete="off" />
+          ${roh ? `<button class="searchbox__clear" id="commSuchSeiteClear" aria-label="Suche löschen">${ICONS.close}</button>` : ''}
+        </label>
+      </div>
+    </div>
+    <div class="scroll" data-commsuchseite="${istCommunitys ? 'channels' : 'people'}">
+      ${
+        liste.length
+          ? `<ul class="rows">${(istCommunitys ? liste.map(communityRow) : liste.map(commProfilZeile)).join('')}</ul>`
+          : `<div class="empty">${ICONS.search}
+              <div class="empty__title">Nichts gefunden</div>
+              <div class="empty__text">${
+                q
+                  ? `Für „${esc(roh)}" gibt es keinen Treffer.`
+                  : istCommunitys
+                    ? 'Es gibt gerade keine Communitys.'
+                    : 'Es gibt gerade keine Profile.'
+              }</div>
+            </div>`
+      }
+    </div>`;
+
+  $('#commSuchSeiteBack').addEventListener('click', () => {
+    state.commSuchSeite = null;
+    renderCommunitySearch();
+  });
+  const input = $('#commSuchSeiteInput');
+  input.addEventListener('input', (e) => {
+    state.commSuchSeiteQuery = e.target.value;
+    const pos = e.target.selectionStart;
+    renderCommunitySuchSeite();
+    const next = $('#commSuchSeiteInput');
+    next.focus();
+    next.setSelectionRange(pos, pos);
+  });
+  $('#commSuchSeiteClear')?.addEventListener('click', () => {
+    state.commSuchSeiteQuery = '';
+    renderCommunitySuchSeite();
+    $('#commSuchSeiteInput').focus();
+  });
+  main.querySelectorAll('[data-community]').forEach((r) =>
+    r.addEventListener('click', () => openChat(r.dataset.community))
   );
+  bindJoinButtons(renderCommunitySuchSeite);
+  bindBefreunden(renderCommunitySuchSeite);
 }
 
 /* --------------------------------------------------- Communitys: Profil */
@@ -17980,10 +19653,16 @@ function renderCommunityProfile() {
     <div class="scroll">
       ${ownProfileTop(me.handle, 'communities')}
       <div class="oprof__top">
-        ${eigenerAvatarMitStory(me)}
+        ${/*
+            Communitys haben keine Storys — der Ring der Videos-Storys stand
+            hier trotzdem (eigenerAvatarMitStory mit Bereich 'videos'). Die
+            App zeigt im Communitys-Profil das schlichte Bild (OwnProfileHead
+            ohne storyBereich); jetzt beide gleich.
+          */ ''}
+        ${eigenerAvatar(me, 88, 'has-status')}
         <div class="prof__stats">
-          <button class="prof__stat" data-stat="created"><span>Erstellte Communitys</span><strong>${created.length}</strong></button>
-          <button class="prof__stat" data-stat="joined"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></button>
+          <button class="prof__stat" data-stat="created" data-commview="erstellt" aria-label="Erstellte Communitys: ${created.length}"><span>Erstellte Communitys</span><strong>${created.length}</strong></button>
+          <button class="prof__stat" data-stat="joined" data-commview="beigetreten" aria-label="Beigetretene Communitys: ${joined.length}"><span>Beigetretene Communitys</span><strong>${joined.length}</strong></button>
         </div>
       </div>
       ${/*
@@ -17993,9 +19672,9 @@ function renderCommunityProfile() {
           nur an einer der beiden Stellen. Jetzt dieselbe Quelle wie dort.
         */ ''}
       <div class="prof__about">
-        <div class="prof__name">${esc(me.name)}</div>
+        <div class="prof__name">${nameMitPronomen(me.name, profil.pronomen)}</div>
         ${profil.bio ? `<div class="prof__bio">${esc(profil.bio)}</div>` : ''}
-        ${profil.link ? bioLink(profil.link) : ''}
+        ${profilLinksHtml(profil.links || (profil.link ? [{ url: profil.link, titel: '' }] : []))}
       </div>
       ${/*
           "Profil bearbeiten" gab es nur im Videos-Profil. Hier fuehrt derselbe
@@ -18024,6 +19703,13 @@ function renderCommunityProfile() {
 
   $('#switchProfile').addEventListener('click', openKontoWechsel);
   $('#profilBearbeiten')?.addEventListener('click', () => openProfilBearbeiten(renderCommunityProfile));
+  /*
+   * Kasten 3.4/3.5 (Feedback 28.09.2026): auch die Kacheln „Erstellte" und
+   * „Beigetretene Communitys" führen über data-commview auf die eigene Seite
+   * (renderCommunityListe) — bis zum 10.10.2026 taten sie nichts. Die Seite
+   * steht auch bei null Einträgen, dann mit Leertext. Gleich in der App
+   * (CommunityProfileScreen, onStat).
+   */
   main.querySelectorAll('[data-commview]').forEach((b) =>
     b.addEventListener('click', () => {
       state.commProfilView = b.dataset.commview;
@@ -18606,12 +20292,18 @@ async function openChat(chatId) {
     }
   }
 
+  // Kasten 28/7.9: Gruppenkopf antippen öffnet die Gruppeninfo — nur bei echten
+  // Gruppen-Chats (Zeile in chats), nicht bei einer als Chat geöffneten Community.
+  const gruppeMitInfo =
+    chat.isGroup &&
+    [...(state.chats || []), ...(state.archiviert || []), ...(state.communityChats || [])].some((c) => c.id === chat.id);
+
   overlay.hidden = false;
   overlay.innerHTML = `
     <header class="chathead">
       <button class="chathead__back" id="chatBack" aria-label="Zurück">${ICONS.back}</button>
       ${chat.isGroup ? avatarOf(chat, 36) : mitStoryRing(chat.userId, avatarOf(chat, 36), 'messenger')}
-      <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} style="${chat.userId ? 'cursor:pointer' : ''}">
+      <div class="chathead__body" ${chat.userId ? `data-profile="${chat.userId}"` : ''} ${gruppeMitInfo ? 'data-gruppeninfo' : ''} style="${chat.userId || gruppeMitInfo ? 'cursor:pointer' : ''}">
         <div class="chathead__name">${esc(chat.name)}</div>
         <div class="chathead__status ${chat.isGroup ? 'is-off' : ''}" id="chatStatus">${
           chat.isGroup ? `${((chat.members || []).length + 1).toLocaleString('de-DE')} Mitglieder` : ''
@@ -18637,6 +20329,7 @@ async function openChat(chatId) {
                 ? 'Anfrage abgelehnt'
                 : 'Nachricht'
         }" autocomplete="off" ${chatGesperrt(chat) ? 'disabled' : ''}></textarea>
+        <button type="button" class="composer__icon" id="gifStickerBtn" aria-label="GIFs und Sticker">${ICONS.sticker}</button>
         <button type="button" class="composer__icon" id="camBtn" aria-label="Kamera">${ICONS.camera}</button>
       </div>
       <button type="submit" class="composer__send" id="sendBtn" aria-label="Senden" disabled>${ICONS.send}</button>
@@ -18650,6 +20343,7 @@ async function openChat(chatId) {
   if (!chat.isGroup) praesenzEintragen(chat.userId, $('#chatStatus'));
 
   $('#chatBack').addEventListener('click', closeChat);
+  overlay.querySelector('[data-gruppeninfo]')?.addEventListener('click', () => openGruppenInfo(chat.id));
   const profileBtn = overlay.querySelector('[data-profile]');
   if (profileBtn) {
     profileBtn.addEventListener('click', () => {
@@ -18696,12 +20390,27 @@ async function openChat(chatId) {
   );
   overlay.querySelectorAll('[data-call]').forEach((b) =>
     b.addEventListener('click', () =>
-      openCall(chat.userId || chat, b.dataset.call === 'video' ? 'video' : 'audio')
+      // Kasten 5.2: der Eintrag gehoert in GENAU diesen Chat (auch Community-Chat).
+      openCall(chat.isGroup ? chat : chat.userId || chat, b.dataset.call === 'video' ? 'video' : 'audio', {
+        // Nur ein echter Chat (Zeile in `chats`) traegt den Eintrag; die
+        // Community selbst, als Chat geoeffnet, hat keinen.
+        chatId: state.chats.some((c) => c.id === chat.id) || (state.communityChats || []).some((c) => c.id === chat.id)
+          ? chat.id
+          : null,
+      })
     )
   );
   $('#attach').addEventListener('click', () => openAnhang(zielChat(chat), chat));
   // Aus dem Chat heraus steht das Ziel fest: die Aufnahme geht hierher.
-  $('#camBtn').addEventListener('click', () => openCamera(chat));
+  $('#camBtn').addEventListener('click', () => {
+    if (chatGesperrt(chat)) return openAnhang(zielChat(chat), chat); // dieselbe Absage wie am Plus
+    openCamera(chat);
+  });
+  // Kasten 28/6.3: GIF | Sticker rechts im Eingabefeld, wie bei WhatsApp.
+  $('#gifStickerBtn').addEventListener('click', () => {
+    if (chatGesperrt(chat)) return openAnhang(zielChat(chat), chat);
+    openGifSticker(zielChat(chat));
+  });
 
   const input = $('#msgInput');
   const sendBtn = $('#sendBtn');
@@ -18772,6 +20481,8 @@ function paintMessages(chat) {
     el.addEventListener('pointerup', ende);
     el.addEventListener('pointerleave', ende);
     el.addEventListener('pointercancel', ende);
+    // Kasten 4: wer zieht, will antworten, nicht das Menü.
+    el.addEventListener('ziehstart', ende);
     // Ohne das oeffnet sich auf dem Handy beim Halten das Systemmenue.
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   });
@@ -18780,15 +20491,26 @@ function paintMessages(chat) {
     b.addEventListener('click', () => openContactProfile(b.dataset.msgkontakt))
   );
   box.querySelectorAll('[data-msgort]').forEach((b) =>
-    b.addEventListener('click', () => {
-      const platz = state.places.find((p) => p.name === b.dataset.msgort);
-      if (platz) openExplorer('standort', platz.id);
-    })
+    b.addEventListener('click', () => standortKarteOeffnen(b))
   );
 
   // Anhang antippen → Vollformat (Henrik 7.9.).
   box.querySelectorAll('[data-voll]').forEach((b) =>
     b.addEventListener('click', () => oeffneVollformat(b.dataset.voll))
+  );
+  // Kasten 7.3: die Karte eines geteilten Beitrags öffnet den Beitrag.
+  geteiltBinden(box);
+
+  // Kasten 4: ziehen, Knopf beim Überfahren, Bezug → Original.
+  antwortenBinden(
+    box,
+    (id) => state.messages.find((x) => x.id === id),
+    (m) => {
+      msgBezug = { art: 'antwort', nachricht: m };
+      msgBearbeitet = null;
+      zeigeBezugLeiste(chat);
+      $('#msgInput')?.focus();
+    }
   );
 
   // Kasten 16: die Markierungs-Karte öffnet ihre Story. Fehlt sie in den
@@ -18888,13 +20610,18 @@ function anhangInhalt(m) {
     ? `<div class="msg__media">${ICONS.mic} Sprachnachricht · 0:14</div>`
     : '';
 
-  const standort = m.standort
-    ? `<button class="msg__standort" data-msgort="${esc(m.standort.name)}">
+  // Kasten 28/6.5: ein frei gewählter Ort steht im (entschlüsselten) Text.
+  const ort = m.standort || (!m.media && window.OrtSuche ? window.OrtSuche.ausText(m.text) : null);
+  const frei = ort && typeof ort.lat === 'number' && typeof ort.lng === 'number';
+  const standort = ort
+    ? `<button class="msg__standort" data-msgort="${esc(ort.name)}"${
+        frei ? ` data-msglat="${ort.lat}" data-msglng="${ort.lng}" data-msgadresse="${esc(ort.adresse || '')}"` : ''
+      }>
          <span class="msg__standortKarte">
-           <i class="msg__standortNadel" style="left:${m.standort.x}%;top:${m.standort.y}%">${ICONS.mapPin}</i>
+           <i class="msg__standortNadel" style="left:${Number(ort.x ?? 50)}%;top:${Number(ort.y ?? 50)}%">${ICONS.mapPin}</i>
          </span>
-         <span class="msg__standortName">${esc(m.standort.name)}</span>
-         <span class="msg__standortSub">${esc(m.standort.adresse || m.standort.koordinaten || '')}</span>
+         <span class="msg__standortName">${esc(ort.name)}</span>
+         <span class="msg__standortSub">${esc(ort.adresse || ort.koordinaten || '')}</span>
        </button>`
     : '';
 
@@ -18927,6 +20654,22 @@ function anhangInhalt(m) {
   return sticker || datei || gif || standort || kontakt || media || markierterText(m.text);
 }
 
+/*
+ * Kasten 5.2–5.4: der Anrufeintrag — derselbe Satz wie in der App
+ * (gemeinsam/anruf.js). Zu zweit „Ausgehender/Eingehender …", in Gruppe und
+ * Unterthema „Max hat einen Videoanruf gestartet". Ein nur gestarteter
+ * Anruf heisst nie „angenommen" (5.1).
+ */
+function anrufZeile(m, { eigen, gruppe }) {
+  const opts = { eigen, gruppe, name: eigen ? '' : (user(m.from)?.name || '').split(' ')[0] };
+  const verpasst = window.Anruf.verpasst(m.anruf, opts);
+  const satz = `${window.Anruf.text(m.anruf, opts)} · ${m.time || ''}`;
+  return `<div class="msg__anruf${verpasst ? ' msg__anruf--verpasst' : ''}" data-msgid="${esc(m.id)}" aria-label="${esc(satz)}">
+            ${m.anruf.art === 'video' ? ICONS.video : ICONS.phone}
+            <span>${esc(satz)}</span>
+          </div>`;
+}
+
 function messageBubble(m, chat) {
   const out = m.from === 'me';
 
@@ -18939,21 +20682,7 @@ function messageBubble(m, chat) {
    * hat aber keinen Text. Gleiche Darstellung in der App (renderMessage in
    * app/screens/messenger/ChatDetailScreen.tsx).
    */
-  if (m.anruf) {
-    const verpasst = m.anruf.status !== 'beendet';
-    const ausgang =
-      verpasst
-        ? m.anruf.status === 'abgelehnt'
-          ? ' · abgelehnt'
-          : ' · verpasst'
-        : ` · ${dauerText(m.anruf.dauer)}`;
-    return `<div class="msg__anruf${verpasst ? ' msg__anruf--verpasst' : ''}">
-              ${m.anruf.art === 'video' ? ICONS.video : ICONS.phone}
-              <span>${out ? 'Ausgehender ' : ''}${
-      m.anruf.art === 'video' ? 'Videoanruf' : 'Anruf'
-    }${ausgang} · ${esc(m.time || '')}</span>
-            </div>`;
-  }
+  if (m.anruf) return anrufZeile(m, { eigen: out, gruppe: Boolean(chat && chat.isGroup) });
 
   /*
    * Kasten 16 (Henrik, 01.10.2026): „Wenn ich im Messenger bei den Stories
@@ -19005,15 +20734,8 @@ function messageBubble(m, chat) {
    * nimmt den Text mit und bleibt lesbar, auch wenn das Original
    * zurückgenommen wird.
    */
-  const antwortAuf = m.antwortAuf
-    ? `<div class="msg__bezug">
-         <span class="msg__bezugBalken"></span>
-         <span class="msg__bezugText">
-           <b>${esc(m.antwortAuf.autor)}</b>
-           <span>${esc(m.antwortAuf.text || 'Zurückgenommen')}</span>
-         </span>
-       </div>`
-    : '';
+  // Kasten 4: der Bezug ist antippbar und springt zum Original (bezugHtml).
+  const antwortAuf = bezugHtml(m.antwortAuf);
 
   const zitat = m.zitat
     ? `<div class="msg__zitat">
@@ -19070,11 +20792,18 @@ function messageBubble(m, chat) {
   const inhalt = m.zurueckgenommen
     ? '<span class="msg__zurueck">Diese Nachricht wurde zurückgenommen</span>'
     : m.geteilt
-    ? geteiltKarte(m.geteilt)
+    ? geteiltKarte(m.geteilt, istMessengerChat({ id: state.openChatId }))
     : anhangInhalt(m);
 
+  // Kasten 4: ziehen/Knopf zum Antworten — nicht bei Zurückgenommenem und
+  // nicht, solange der Chat gesperrt ist (Anfrage offen, blockiert).
+  const ziehbar = !m.zurueckgenommen && !chatGesperrt(chat);
+
   return `
-    <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}" data-msgid="${esc(m.id)}">
+    <div class="msg msg--${out ? 'out' : 'in'}${m.media === 'sticker' ? ' msg--sticker' : ''}${
+      m.geteilt && !m.zurueckgenommen ? ' msg--karte' : ''
+    }" data-msgid="${esc(m.id)}"${ziehbar ? ' data-ziehbar' : ''}>
+      ${ziehbar ? antwortKnopfHtml() : ''}
       ${!out && chat.isGroup ? `<div class="msg__sender">${esc(user(m.from).name)}</div>` : ''}
       ${weiter}${antwortAuf}${zitat}
       ${storyBezug}${inhalt}
@@ -19780,7 +21509,8 @@ function openStory(storyId, { bereich, ersatz, liste: eigeneListe, highlight = n
       <div class="viewer__bars" data-testid="story-balken">${balken}</div>
       <div class="viewer__head">
         <button class="viewer__close" id="storyClose" aria-label="Zurück">${ICONS.back}</button>
-        ${s.own ? eigenerAvatar(state.users.me, 36) : `<div class="avatar avatar--36" style="background:${farbe(u.color)}" data-profile="${u.id}">${esc(u.initials)}</div>`}
+        ${/* Kasten 28/7.11: Profilbild statt nur Initialen; in Messenger-Storys mein Kontaktbild (wie StoryViewerScreen → Avatar). */ ''}
+        ${s.own ? eigenerAvatar(state.users.me, 36) : avatarForUser(u.id, 36, wo === 'messenger').replace('<div class="avatar', `<div data-profile="${esc(u.id)}" class="avatar`)}
         <div class="viewer__who" ${s.own ? '' : `data-profile="${u.id}"`}>
           <div class="viewer__name">${s.own ? (highlight ? 'Dein Highlight' : 'Deine Story') : esc(u.name)}</div>
           <div class="viewer__time"${highlight ? ' data-testid="highlight-kopf"' : ''}>${esc(

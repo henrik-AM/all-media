@@ -5,14 +5,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
-import { aufnehmen, ausGalerie } from '../lib/aufnehmen';
+import { ausGalerie } from '../lib/aufnehmen';
 import * as DocumentPicker from 'expo-document-picker';
-import { STICKER } from '../constants/sticker';
 import { useDaten } from '../contexts/DatenContext';
+import { StandortWahl } from './StandortWahl';
+
+const OrtSuche = require('../../gemeinsam/ortsuche') as typeof import('../../gemeinsam/ortsuche');
 import { Contact, Message } from '../types';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-type Schritt = 'menue' | 'standort' | 'kontakt' | 'liveStandort' | 'sticker';
+type Schritt = 'menue' | 'standort' | 'kontakt' | 'liveStandort';
 
 interface Props {
   visible: boolean;
@@ -44,19 +46,6 @@ interface Props {
    */
   onStandortAnfragen?: () => void;
   /**
-   * Die eigene Kamera oeffnen statt der des Systems.
-   *
-   * Bis zum 20.09.2026 rief "Foto aufnehmen" hier `launchCameraAsync` — die
-   * Kamera-App des Systems. Die hat im Simulator kein Gegenstueck, kennt
-   * keinen Filter und keinen Weg in die Galerie. Die eigene Kamera liegt
-   * eine Ebene hoeher, weil ein Vollbild nicht in ein Blatt gehoert; dieses
-   * Blatt sagt nur Bescheid.
-   *
-   * Fehlt der Anschluss, bleibt es beim alten Weg — dann ist das Blatt in
-   * einem Zusammenhang eingebaut, der keine eigene Kamera hat.
-   */
-  onKamera?: () => void;
-  /**
    * Anhang-Arten, die es hier nicht gibt.
    *
    * Im Unterthema einer Community faellt "Standort anfragen" weg: die Anfrage
@@ -68,8 +57,33 @@ interface Props {
   onNotice: (message: string) => void;
 }
 
+/*
+ * Kasten 28/6.2 (Henrik 28.09.2026): „gefällt mir das Design nicht … hoch
+ * professionell … orientiere dich an WhatsApp." Statt einer Liste mit
+ * Pfeilen ein Raster runder, farbiger Symbole mit Beschriftung darunter —
+ * jede Art mit eigener Farbe, damit man sie ohne Lesen wiederfindet.
+ * Dieselben Farben in web/public/app.js (ANHANG_FARBEN) und styles.css.
+ */
+const FARBEN: Record<string, string> = {
+  galerie: '#007BFC',
+  datei: '#7F66FF',
+  standort: '#1FA855',
+  liveStandort: '#00A5A8',
+  standortAnfragen: '#FF8A00',
+  kontakt: '#009DE2',
+};
+
+/** Kurze Beschriftungen unter den Kreisen; die langen bleiben für VoiceOver. */
+const KURZ: Record<string, string> = {
+  galerie: 'Galerie',
+  datei: 'Dokument',
+  standort: 'Standort',
+  liveStandort: 'Live-Standort',
+  standortAnfragen: 'Standort anfragen',
+  kontakt: 'Kontakt',
+};
+
 const PUNKTE: { key: string; label: string; icon: IconName }[] = [
-  { key: 'kamera', label: 'Foto aufnehmen', icon: 'camera-outline' },
   { key: 'galerie', label: 'Aus der Galerie', icon: 'image-outline' },
   /*
    * Datei, Gif, Sticker und Standortanfrage kamen am 01.09.2026 dazu. Alle
@@ -77,10 +91,19 @@ const PUNKTE: { key: string; label: string; icon: IconName }[] = [
    * "Standortanfrage"); im Anhang-Menue gab es sie nicht.
    */
   { key: 'datei', label: 'Datei senden', icon: 'document-outline' },
-  { key: 'gif', label: 'Gif senden', icon: 'film-outline' },
-  { key: 'sticker', label: 'Sticker', icon: 'happy-outline' },
+  /*
+   * Kasten 28/6.1 (Henrik 28.09.2026): „Foto aufnehmen", „GIF senden" und
+   * „Sticker" fliegen aus der Liste. Die Kamera sitzt im Eingabefeld, GIFs
+   * und Sticker hinter dem eigenen Knopf rechts davon (GifStickerSheet).
+   */
   { key: 'standort', label: 'Standort senden', icon: 'location-outline' },
-  { key: 'liveStandort', label: 'Live-Standort teilen', icon: 'navigate-circle-outline' },
+  /*
+   * „Live-Standort teilen" ist ausgeblendet (Henrik, 11.10.2026): er schlug
+   * immer fehl (navigator.geolocation gibt es in RN nicht). Kommt zurück,
+   * sobald der eigene Server steht — dann in vollem Umfang wie die
+   * Snapchat-Karte (Vault: All-Media-Offene-Punkte, 0a). Die Website hatte
+   * den Punkt nie, beide Menüs sind damit gleich.
+   */
   { key: 'standortAnfragen', label: 'Standort anfragen', icon: 'help-circle-outline' },
   { key: 'kontakt', label: 'Kontakt senden', icon: 'person-outline' },
 ];
@@ -93,11 +116,10 @@ export const AnhangSheet = ({
   onClose,
   onAnhang,
   onStandortAnfragen,
-  onKamera,
   ohne = [],
   onNotice,
 }: Props) => {
-  const { places: alleOrte, users: alleNutzer } = useDaten();
+  const { users: alleNutzer } = useDaten();
   const [schritt, setSchritt] = useState<Schritt>('menue');
 
   const schliessen = () => {
@@ -105,12 +127,8 @@ export const AnhangSheet = ({
     onClose();
   };
 
-  const foto = async (ausDerGalerie: boolean) => {
-    if (!ausDerGalerie && onKamera) {
-      schliessen();
-      return onKamera();
-    }
-    const uri = ausDerGalerie ? await ausGalerie('photo', onNotice) : await aufnehmen('photo', onNotice);
+  const foto = async () => {
+    const uri = await ausGalerie('photo', onNotice);
     if (!uri) return schliessen();
     onAnhang({ text: 'Foto', media: 'image', bildUri: uri });
     onNotice('Foto gesendet');
@@ -140,19 +158,6 @@ export const AnhangSheet = ({
     } catch {
       onNotice('Auf die Datei ließ sich nicht zugreifen');
     }
-    schliessen();
-  };
-
-  /*
-   * Ein Gif kommt aus der Galerie. Eine Suche bei einem Gif-Dienst braeuchte
-   * einen fremden Zugang und wuerde jede Suchanfrage dorthin schicken — fuer
-   * eine App, die mit Ende-zu-Ende wirbt, waere das der falsche Weg.
-   */
-  const gif = async () => {
-    const uri = await ausGalerie('photo', onNotice);
-    if (!uri) return schliessen();
-    onAnhang({ text: 'Gif', media: 'gif', bildUri: uri });
-    onNotice('Gif gesendet');
     schliessen();
   };
 
@@ -194,22 +199,21 @@ export const AnhangSheet = ({
     standort: 'Standort senden',
     kontakt: 'Kontakt senden',
     liveStandort: 'Live-Standort',
-    sticker: 'Sticker',
   }[schritt];
 
   return (
     <SheetRahmen visible={visible} title={titel} onClose={schliessen} hoch={schritt !== 'menue'}>
       {schritt === 'menue' && (
-        <View>
+        <View style={styles.raster}>
           {PUNKTE.filter((p) => !ohne.includes(p.key)).map((p) => (
             <Druck
               key={p.key}
-              style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
+              style={({ pressed }) => [styles.kachel, pressed && styles.kachelGedrueckt]}
+              accessibilityRole="button"
+              accessibilityLabel={p.label}
               onPress={() => {
-                if (p.key === 'kamera') return foto(false);
-                if (p.key === 'galerie') return foto(true);
+                if (p.key === 'galerie') return foto();
                 if (p.key === 'datei') return datei();
-                if (p.key === 'gif') return gif();
                 if (p.key === 'liveStandort') return liveStandortTeilen();
                 if (p.key === 'standortAnfragen') {
                   onStandortAnfragen?.();
@@ -218,63 +222,35 @@ export const AnhangSheet = ({
                 setSchritt(p.key as Schritt);
               }}
             >
-              <View style={styles.symbol}>
-                <Ionicons name={p.icon} size={22} color={colors.white} />
+              <View style={[styles.kreis, { backgroundColor: FARBEN[p.key] ?? colors.brand }]}>
+                <Ionicons name={p.icon} size={26} color="#FFFFFF" />
               </View>
-              <Text style={styles.label}>{p.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.text3} />
+              <Text style={styles.kachelText} numberOfLines={2}>
+                {KURZ[p.key] ?? p.label}
+              </Text>
             </Druck>
           ))}
         </View>
       )}
 
-      {schritt === 'sticker' && (
-        <ScrollView contentContainerStyle={styles.stickerRaster}>
-          {STICKER.map((st) => (
-            <Druck
-              key={st}
-              style={styles.sticker}
-              onPress={() => {
-                onAnhang({ text: st, media: 'sticker' });
-                schliessen();
-              }}
-            >
-              <Text style={styles.stickerZeichen}>{st}</Text>
-            </Druck>
-          ))}
-        </ScrollView>
-      )}
-
+      {/*
+        Kasten 28/6.5: Ort suchen oder auf der Karte waehlen statt der festen
+        Liste aus `places`. Der Ort geht als Text (gemeinsam/ortsuche.js,
+        alsText) — damit laeuft er im Zweierchat mit durch die
+        Verschluesselung, und es braucht kein neues Schema. Die Blase macht
+        daraus wieder die Karte (OrtSuche.ausText).
+      */}
       {schritt === 'standort' && (
-        <ScrollView>
-          {alleOrte.map((platz) => (
-            <Druck
-              key={platz.id}
-              style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
-              onPress={() => {
-                onAnhang({
-                  text: `Standort: ${platz.name}`,
-                  ortId: platz.id,
-                  standort: {
-                    name: platz.name,
-                    adresse: platz.adresse,
-                    koordinaten: platz.koordinaten,
-                    x: platz.x,
-                    y: platz.y,
-                  },
-                });
-                onNotice('Standort gesendet');
-                schliessen();
-              }}
-            >
-              <View style={styles.symbol}>
-                <Ionicons name="location-outline" size={22} color={colors.white} />
-              </View>
-              <Text style={styles.label}>{platz.name}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-            </Druck>
-          ))}
-        </ScrollView>
+        <StandortWahl
+          onNotice={onNotice}
+          onWahl={(ort) => {
+            const text = OrtSuche.alsText(ort);
+            if (!text) return onNotice('Dieser Ort lässt sich nicht senden');
+            onAnhang({ text, standort: OrtSuche.ausText(text) ?? undefined });
+            onNotice('Standort gesendet');
+            schliessen();
+          }}
+        />
       )}
 
       {schritt === 'kontakt' &&
@@ -311,15 +287,34 @@ export const AnhangSheet = ({
 };
 
 const styles = themenStyles((colors) => ({
-  stickerRaster: {
+  // Kasten 28/6.2: drei Kacheln je Reihe, wie das Anhang-Blatt bei WhatsApp.
+  raster: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
-  sticker: { width: '20%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  stickerZeichen: { fontSize: 40 },
-
+  kachel: {
+    width: '33.333%',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    gap: 8,
+  },
+  kachelGedrueckt: { backgroundColor: colors.surface2 },
+  kreis: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  kachelText: { ...typography.small, fontWeight: '500', color: colors.text, textAlign: 'center' },
   zeile: {
     flexDirection: 'row',
     alignItems: 'center',
