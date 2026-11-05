@@ -57,6 +57,7 @@ async function frage(sql) {
     body: JSON.stringify({ query: sql.replaceAll('$KONTO', `'${konto.replace(/'/g, "''")}'`) }),
     signal: AbortSignal.timeout(30000),
   });
+  if (!antwort.ok) throw new Error(`Management-API: HTTP ${antwort.status}`);
   return antwort.json();
 }
 
@@ -106,7 +107,7 @@ async function aufraeumen() {
   }
 }
 
-module.exports = { aufraeumen, zaehlen, frage };
+module.exports = { aufraeumen, zaehlen, frage, umgebung };
 
 // Direkt aufgerufen: einmal aufraeumen und nachzaehlen, ob wirklich nichts
 // mehr dasteht. Eine Erfolgsmeldung allein ist kein Nachweis.

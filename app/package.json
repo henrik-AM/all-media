@@ -59,6 +59,7 @@
     "test:insel": "node test/_insel.js",
     "test:suche": "node test/_suche.js",
     "test:alles": "node test/alles.js",
+    "test:testhygiene": "node --test test/_testhygiene_offline.js",
     "test:einstellungen": "node test/_einstellungen.js",
     "test:kontaktinfo": "node test/_kontaktinfo.js",
     "wlan": "node tools/lokal.js",
