@@ -39,6 +39,11 @@
   'use strict';
 
   var WEBSITE = 'https://all-media-website.onrender.com';
+  // Eigene Supabase-Adresse — dieselbe, die medien_adresse_gueltig() in der
+  // Datenbank fest eingetragen hat (Schema 23/95). App und Server reichen ihre
+  // konfigurierte Adresse herein; ohne Angabe gilt diese.
+  var SUPABASE_STANDARD = 'https://ijztosbjfybdgotpdixw.supabase.co';
+  var AVATARS = '/storage/v1/object/public/media/avatars/';
 
   // Grenzen — die Datenbank prüft Biografie und Link noch einmal (Schema 99).
   var NAME_MAX = 40;
@@ -70,6 +75,20 @@
     qrHinweis: 'Gilt, sobald du auf „fertig“ tippst.',
     fertig: 'fertig',
     schliessen: 'Schließen',
+  };
+
+  /*
+   * Fehlersätze — wörtlich dieselben wie in einladung_annehmen() (Schema 99)
+   * und communities_bild_url_check. Die Datenbank schickt sie als P0001
+   * durch; App (error.message) und Website (res.error) zeigen sie
+   * unverändert. Hier stehen sie, damit die Prüfläufe sie gegen das Schema
+   * halten können und beide Seiten dasselbe sagen.
+   */
+  var FEHLER = {
+    einladungWeg: 'Diese Einladung gibt es nicht mehr',
+    einladungBlockiert: 'Diese Einladung kannst du nicht annehmen',
+    einladungNurMitglieder: 'Diese Einladung gilt nur für Mitglieder der Community – tritt ihr zuerst bei',
+    bildFremd: 'Dieses Bild kommt nicht aus dem eigenen Upload',
   };
 
   var FEHLT_SCHEMA =
@@ -200,6 +219,24 @@
     return 'Ich lade dich in ' + wo + ' auf All Media ein: ' + link(code, basis);
   }
 
+  /**
+   * Ist das eine Community-Bildadresse aus dem eigenen Upload? Vollständiger
+   * Vertrag wie in der Datenbank (communities_bild_url_check =
+   * Pfadende avatars/… UND medien_adresse_gueltig): eigener Host, Ordner
+   * avatars, ein Dateiname ohne Unterordner, kein ?/#. Codex-Fund Paket 3:
+   * nur das Pfadende zu prüfen ließ https://boese.example/storage/v1/…/avatars/x.jpg
+   * durch — ein Tracking-Pixel für jeden Betrachter.
+   * `projektUrl`: die konfigurierte Supabase-Adresse (App SUPABASE_CONFIG.url,
+   * Server supabase.js supabaseUrl).
+   */
+  function bildAdresseGueltig(adresse, projektUrl) {
+    if (typeof adresse !== 'string') return false;
+    var basis = (text(projektUrl) || SUPABASE_STANDARD).replace(/\/+$/, '');
+    var vorne = basis + AVATARS;
+    if (adresse.indexOf(vorne) !== 0) return false;
+    return /^[A-Za-z0-9._-]+$/.test(adresse.slice(vorne.length));
+  }
+
   /** Fehlt Schema 99 (Spalte oder Tabelle)? Dann wie bisher anlegen. */
   function fehltSchema(fehler) {
     if (!fehler) return false;
@@ -260,6 +297,9 @@
     CODE_LAENGE: CODE_LAENGE,
     TEXTE: TEXTE,
     FEHLT_SCHEMA: FEHLT_SCHEMA,
+    FEHLER: FEHLER,
+    SUPABASE_STANDARD: SUPABASE_STANDARD,
+    bildAdresseGueltig: bildAdresseGueltig,
     linkSauber: linkSauber,
     unterthemenSauber: unterthemenSauber,
     pruefeCommunity: pruefeCommunity,

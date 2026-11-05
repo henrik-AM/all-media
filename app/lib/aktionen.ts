@@ -28,6 +28,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien, medienAnfrage } from './medien';
 // Kästen 28/10.2 und 16: Community und Unterthema erstellen (Schema 99).
 const Erstellen = require('../../gemeinsam/erstellen') as typeof import('../../gemeinsam/erstellen');
+import { SUPABASE_CONFIG } from '../constants/supabase';
 import type { Impression } from './impressionen';
 import type { Story } from '../types';
 import {
@@ -716,6 +717,11 @@ export async function communityAnlegen(
   };
   if (zusatz.bio) zeile.bio = zusatz.bio;
   if (zusatz.link) zeile.link = zusatz.link;
+  // Vollständiger Bildvertrag (eigener Host + avatars/), derselbe wie die
+  // Website (/api/communities) und communities_bild_url_check (Schema 99).
+  if (zusatz.bildUrl && !Erstellen.bildAdresseGueltig(zusatz.bildUrl, SUPABASE_CONFIG.url)) {
+    throw new Error(Erstellen.FEHLER.bildFremd);
+  }
   // Kasten 28/16 (Schema 99): das Bild. Fehlt die Spalte, ohne Bild anlegen
   // und es sagen (communityErstellen meldet FEHLT_SCHEMA).
   let { data, error } = await client

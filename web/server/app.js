@@ -3133,8 +3133,10 @@ app.post('/api/communities', route(async (req) => {
    */
   const k = req.body || {};
   const bildUrl = k.bild ? String(k.bild) : null;
-  if (bildUrl && !/\/storage\/v1\/object\/public\/media\/avatars\/[A-Za-z0-9._-]+$/.test(bildUrl)) {
-    return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
+  // Vollständiger Vertrag (eigener Host + avatars/), derselbe wie die App und
+  // communities_bild_url_check in Schema 99 — nicht nur das Pfadende.
+  if (bildUrl && !Erstellen.bildAdresseGueltig(bildUrl, supabaseUrl)) {
+    return { ok: false, error: Erstellen.FEHLER.bildFremd };
   }
   const geprueft = Erstellen.pruefeCommunity({
     name: k.name,

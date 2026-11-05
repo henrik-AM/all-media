@@ -7,6 +7,15 @@ export const LINK_MAX: number;
 export const UNTERTHEMEN_MAX: number;
 export const CODE_LAENGE: number;
 export const FEHLT_SCHEMA: string;
+export const SUPABASE_STANDARD: string;
+export const FEHLER: {
+  einladungWeg: string;
+  einladungBlockiert: string;
+  einladungNurMitglieder: string;
+  bildFremd: string;
+};
+/** Vollständiger Bildvertrag: eigener Host + Ordner avatars + Dateiname (wie communities_bild_url_check). */
+export function bildAdresseGueltig(adresse: unknown, projektUrl?: string | null): boolean;
 export const TEXTE: {
   pflichtfeld: string;
   communityName: string;
