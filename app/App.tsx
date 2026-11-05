@@ -137,8 +137,8 @@ type Overlay =
   | { kind: 'community'; communityId: string; optionen?: boolean; mitglieder?: boolean }
   | { kind: 'editSelectedContacts' }
   | { kind: 'avatarViewer'; userId: string; name: string }
-  | { kind: 'followers'; userId: string }
-  | { kind: 'following'; userId: string }
+  | { kind: 'followers'; userId: string; zurueck?: Overlay }
+  | { kind: 'following'; userId: string; zurueck?: Overlay }
   | null;
 
 type Sheet = 'new' | 'group' | 'contact' | 'konto' | 'mitteilungen' | 'erstellen' | null;
@@ -1859,8 +1859,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           const person = daten.users[overlay.userId];
           setOverlay({ kind: 'avatarViewer', userId: overlay.userId, name: person?.name ?? 'Profil' });
         }}
-        onOpenFollowers={(userId) => setOverlay({ kind: 'followers', userId })}
-        onOpenFollowing={(userId) => setOverlay({ kind: 'following', userId })}
+        onOpenFollowers={(userId) => setOverlay({ kind: 'followers', userId, zurueck: overlay })}
+        onOpenFollowing={(userId) => setOverlay({ kind: 'following', userId, zurueck: overlay })}
         onOpenKachel={kachelOeffnen}
         onBlockiert={(userId, blockiert) => {
           // Blockieren hat Folgen: die Person faellt aus den Kontakten, beim
@@ -2179,7 +2179,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     return (
       <FollowersScreen
         userId={overlay.userId}
-        onBack={() => setOverlay(null)}
+        onBack={() => setOverlay(overlay.zurueck ?? null)}
         onOpenProfile={openPublicProfile}
         onNotice={setNotice}
       />
@@ -2190,7 +2190,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     return (
       <FollowingScreen
         userId={overlay.userId}
-        onBack={() => setOverlay(null)}
+        onBack={() => setOverlay(overlay.zurueck ?? null)}
         onOpenProfile={openPublicProfile}
         onNotice={setNotice}
       />

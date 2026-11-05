@@ -73,7 +73,7 @@ export const FollowingScreen = ({ userId, onBack, onOpenProfile, onNotice }: Pro
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Druck onPress={onBack} hitSlop={8}>
+        <Druck onPress={onBack} hitSlop={8} accessibilityLabel="Zurück zum Profil">
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Druck>
         <Text style={styles.headerTitel}>Gefolgt</Text>

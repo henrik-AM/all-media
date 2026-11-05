@@ -17,7 +17,10 @@ const os = require('os');
 const path = require('path');
 const { execSync, execFileSync } = require('child_process');
 
-const NAME = 'All-Media Test';
+const NAME = process.env.SIM_GERAET || 'All-Media Test';
+if (!['All-Media Test', 'All-Media Codex'].includes(NAME)) {
+  throw new Error('Nur die Prüfgeräte All-Media Test und All-Media Codex sind erlaubt.');
+}
 const EXPO_GO_ID = 'host.exp.Exponent';
 const ROOT = path.join(__dirname, '..');
 

@@ -305,7 +305,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Druck>
         <Text style={styles.handle}>{person.handle}</Text>
-        <Druck onPress={() => setOptionenOffen(true)} hitSlop={6}>
+        <Druck onPress={() => setOptionenOffen(true)} hitSlop={6} accessibilityLabel="Profiloptionen">
           <Ionicons name="information-circle-outline" size={22} color={colors.text2} />
         </Druck>
       </View>
