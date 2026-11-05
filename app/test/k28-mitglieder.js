@@ -145,6 +145,23 @@ function teilA() {
   pruefe('15.5 App: Suche fragt die Datenbank', /suchen\(suchwort\)/.test(such) && /suchen=\{aktion\.communitySuche\}/.test(shell));
   pruefe('15.5 App: Suchtreffer wird vor dem Öffnen gemerkt', /profil\.communityMerken\(community\);\s*openCommunity\(community\)/.test(shell));
   pruefe('15.2 App: Satz für die neuen Mitteilungen', /case 'beitritt_anfrage':/.test(profil) && /case 'beitritt_ok':/.test(profil));
+  // Codex-Fund 05.11.2026: Suchtreffer/Mitglieder außerhalb der ersten 500
+  // öffneten „Profil nicht verfügbar". Jetzt lädt das Profil per ID nach.
+  const nutzerProfil = lies('app/screens/profile/UserProfileScreen.tsx');
+  const ladePersonQuelle = (daten.match(/export async function ladePerson[\s\S]*?\n\}\n/) || [''])[0];
+  pruefe('15.5 App: ladePerson lädt eine Person per ID mit PROFIL_SPALTEN (kein *)',
+    /\.from\('profiles'\)\.select\(PROFIL_SPALTEN\)\.eq\('id', ziel\)\.maybeSingle\(\)/.test(ladePersonQuelle) &&
+      !/select\('\*'\)/.test(ladePersonQuelle) && /signiereMedien\(client, eintrag\)/.test(ladePersonQuelle));
+  pruefe('15.5 App: ladeNutzer und ladePerson bauen dieselbe Zeile (personAusZeile)',
+    (daten.match(/personAusZeile\(/g) || []).length >= 3);
+  pruefe('15.5 App: Profil lädt nach, wenn die Person im Bestand fehlt',
+    /ladePerson\(supabase, ichId, userId\)/.test(nutzerProfil) && /if \(imBestand \|\| !supabase \|\| !ichId\) return;/.test(nutzerProfil));
+  pruefe('15.5 App: Lade- und Fehlerstand getrennt, kein erneutes Laden nach Fehler',
+    /stand: 'laedt' \| 'da' \| 'fehlt' \| 'fehler'/.test(nutzerProfil) &&
+      /if \(nachgeladen\?\.id === userId\) return;/.test(nutzerProfil) &&
+      /setNachgeladen\(\{ id: userId, stand: 'fehler' \}\)/.test(nutzerProfil));
+  pruefe('15.5 App: Kreisel beim Laden, „Profil nicht verfügbar“ erst danach',
+    /<ActivityIndicator/.test(nutzerProfil) && /title="Profil nicht verfügbar"/.test(nutzerProfil));
 
   // Website
   const web = lies('web/public/app.js');
@@ -154,6 +171,13 @@ function teilA() {
   pruefe('15.1 Website-Server: privat → Anfrage statt Beitritt', /vorher === 'anfragen' \|\| vorher === 'angefragt'[\s\S]{0,80}handleBeitrittAnfrage/.test(server));
   pruefe('15.2 Website-Server: Annehmen/Ablehnen-Route', /app\.post\('\/api\/communities\/:id\/anfragen\/:userId'/.test(server));
   pruefe('15.5 Website-Server: Suchroute', /app\.get\('\/api\/community-suche'/.test(server));
+  // Gegenstück zum App-Fund: die Website lädt das Profil beim Öffnen per ID
+  // vom Server (nicht aus state.users) — Suchtreffer/Mitglieder gehen also.
+  const supaApi = lies('web/server/supabase-api.js');
+  pruefe('15.5 Website: Profil öffnen lädt per ID (/api/profile/:userId → ladeProfil)',
+    /async function openProfile\(userId, variante\)[\s\S]{0,600}fetch\(`\/api\/profile\/\$\{userId\}`\)/.test(web) &&
+      /app\.get\('\/api\/profile\/:userId'[\s\S]{0,200}supabaseApi\.ladeProfil\(req\.db, id\)/.test(server) &&
+      /async function ladeProfil\(client, profilId\)[\s\S]{0,200}\.select\(PROFIL_SPALTEN\)\s*\.eq\('id', profilId\)/.test(supaApi));
   pruefe('15.2 Website: Satz für die neuen Mitteilungen', /beitritt_anfrage: `\$\{name\} möchte/.test(server) && /beitritt_ok: /.test(server));
 
   // 15.4 — Schema 98

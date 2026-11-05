@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -16,6 +16,7 @@ import { useKachelHoehe } from '../../lib/raster';
 import { compactNumber } from '../../lib/zahlen';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import * as Aktion from '../../lib/aktionen';
+import { ladePerson } from '../../lib/daten';
 import { SpendeKarte } from '../../components/SpendeKarte';
 import { SammlungOrdner } from '../../components/SammlungOrdner';
 import { HighlightBetrachter } from '../../components/HighlightBetrachter';
@@ -53,15 +54,54 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
-  const person = alleNutzer[userId];
-  const [profile, setProfile] = useState(alleProfile[userId]);
+  const { supabase } = useSupabase();
+
+  /*
+   * Codex-Fund 05.11.2026: useDaten kennt nur die ersten 500 Profile
+   * (ladeNutzer). Ein Datenbanktreffer der Suche oder ein Mitglied außerhalb
+   * davon zeigte deshalb „Profil nicht verfügbar". Fehlt die Person im
+   * Bestand, wird sie hier einmal per ID nachgeladen (ladePerson, dieselben
+   * Spalten und RLS wie der Bestand). Laden und Fehler sind getrennte
+   * Zustände: nach einem Fehler oder „gibt es nicht" wird NICHT erneut
+   * geladen — sonst liefe bei jedem Zeichnen eine neue Abfrage.
+   */
+  const [nachgeladen, setNachgeladen] = useState<{
+    id: string;
+    stand: 'laedt' | 'da' | 'fehlt' | 'fehler';
+    eintrag?: Awaited<ReturnType<typeof ladePerson>>;
+  } | null>(null);
+  const imBestand = Boolean(alleNutzer[userId] && alleProfile[userId]);
+
+  useEffect(() => {
+    if (imBestand || !supabase || !ichId) return;
+    if (nachgeladen?.id === userId) return; // schon geladen, lädt oder gescheitert
+    let abgebrochen = false;
+    setNachgeladen({ id: userId, stand: 'laedt' });
+    ladePerson(supabase, ichId, userId)
+      .then((eintrag) => {
+        if (!abgebrochen) setNachgeladen({ id: userId, stand: eintrag ? 'da' : 'fehlt', eintrag });
+      })
+      .catch((e) => {
+        console.error('Profil nachladen fehlgeschlagen:', e?.message ?? e);
+        if (!abgebrochen) setNachgeladen({ id: userId, stand: 'fehler' });
+      });
+    return () => {
+      abgebrochen = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imBestand, supabase, ichId, userId]);
+
+  const eigenGeladen = nachgeladen?.id === userId ? nachgeladen : null;
+  const person = alleNutzer[userId] ?? eigenGeladen?.eintrag?.user;
+  const bestandProfil = alleProfile[userId] ?? eigenGeladen?.eintrag?.profile;
+  const [profile, setProfile] = useState(bestandProfil);
   const [tab, setTab] = useState<Tab>('grid');
 
   // Nachziehen, sobald das Profil aus der Datenbank da ist — und beim
   // Wechsel auf eine andere Person. Siehe HomeFeedScreen.
   useEffect(() => {
-    setProfile(alleProfile[userId]);
-  }, [alleProfile, userId]);
+    setProfile(bestandProfil);
+  }, [bestandProfil, userId]);
 
   /*
    * Den Aufruf vermerken — einmal je geoeffnetem Profil.
@@ -83,7 +123,6 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
    * Geladen wird erst beim Oeffnen des jeweiligen Reiters: das Raster sieht
    * jeder sofort, Reposts und Markierungen sieht kaum jemand an.
    */
-  const { supabase } = useSupabase();
   const [kacheln, setKacheln] = useState<Record<Tab, Aktion.Rasterkachel[] | null>>({
     grid: null,
     repost: null,
@@ -217,9 +256,21 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
   }, [userId]);
 
   if (!person || !profile) {
+    // Ohne Verbindung lädt nichts — dann gleich der Leertext, kein ewiger Kreisel.
+    const laedt = !imBestand && !!supabase && !!ichId && (!eigenGeladen || eigenGeladen.stand === 'laedt');
     return (
       <SafeAreaView style={styles.container}>
-        <EmptyState icon="person-outline" title="Profil nicht verfügbar" />
+        {laedt ? (
+          <View style={styles.laden}>
+            <ActivityIndicator color={colors.text3} />
+          </View>
+        ) : (
+          <EmptyState
+            icon="person-outline"
+            title="Profil nicht verfügbar"
+            text={eigenGeladen?.stand === 'fehler' ? 'Das Profil ließ sich gerade nicht laden.' : undefined}
+          />
+        )}
       </SafeAreaView>
     );
   }
@@ -481,6 +532,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
 
 const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
+  laden: { paddingVertical: 56, alignItems: 'center' },
 
   header: {
     flexDirection: 'row',

@@ -144,6 +144,48 @@ export interface PersonZahlen {
   beitraege: number;
 }
 
+/*
+ * Eine Zeile aus `profiles` (PROFIL_SPALTEN) wird zu Person und Profil —
+ * gemeinsam für ladeNutzer (die ersten 500) und ladePerson (eine einzelne,
+ * nachgeladen beim Öffnen).
+ */
+function personAusZeile(
+  zeile: any,
+  z: any,
+  ichId: string,
+  phone: string | undefined,
+  avatar: string | undefined
+): { user: User; profile: Profile } {
+  const schluessel = zeile.id === ichId ? ICH : zeile.id;
+  return {
+    user: {
+      id: schluessel,
+      name: zeile.name,
+      handle: zeile.handle,
+      status: zeile.status ?? 'offline',
+      about: zeile.about ?? '',
+      phone,
+      color: zeile.color ?? undefined,
+      // Bestaendige Form; unterschrieben wird mit allem anderen in
+      // ladeAlles bzw. ladePerson (signiereMedien).
+      avatar,
+      privat: Boolean(zeile.privat),
+    },
+    profile: {
+      userId: schluessel,
+      bio: zeile.bio ?? '',
+      link: zeile.link ?? '',
+      spende: jsonOderNull(zeile.spende),
+      posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
+      followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
+      following: Number(z?.following ?? zeile.following_basis ?? 0),
+      isFollowing: false, // wird aus `follows` gefüllt
+      highlights: zeile.highlights ?? [],
+      playlists: zeile.playlists ?? [],
+    },
+  };
+}
+
 export async function ladeNutzer(
   client: SupabaseClient,
   ichId: string
@@ -167,38 +209,49 @@ export async function ladeNutzer(
   const profile: Record<string, Profile> = {};
 
   for (const zeile of (data ?? []) as any[]) {
-    const schluessel = zeile.id === ichId ? ICH : zeile.id;
-    const z = zahlenNach.get(zeile.id);
-
-    users[schluessel] = {
-      id: schluessel,
-      name: zeile.name,
-      handle: zeile.handle,
-      status: zeile.status ?? 'offline',
-      about: zeile.about ?? '',
-      phone: nummerVon(zeile.id),
-      color: zeile.color ?? undefined,
-      // Bestaendige Form; unterschrieben wird mit allem anderen unten in
-      // ladeAlles (signiereMedien).
-      avatar: bilder.get(zeile.id),
-      privat: Boolean(zeile.privat),
-    };
-
-    profile[schluessel] = {
-      userId: schluessel,
-      bio: zeile.bio ?? '',
-      link: zeile.link ?? '',
-      spende: jsonOderNull(zeile.spende),
-      posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
-      followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
-      following: Number(z?.following ?? zeile.following_basis ?? 0),
-      isFollowing: false, // wird unten aus `follows` gefüllt
-      highlights: zeile.highlights ?? [],
-      playlists: zeile.playlists ?? [],
-    };
+    const eintrag = personAusZeile(zeile, zahlenNach.get(zeile.id), ichId, nummerVon(zeile.id), bilder.get(zeile.id));
+    users[eintrag.user.id] = eintrag.user;
+    profile[eintrag.user.id] = eintrag.profile;
   }
 
   return { users, profile };
+}
+
+/**
+ * Eine einzelne Person nachladen — für Profile außerhalb der ersten 500
+ * aus ladeNutzer (Codex-Fund 05.11.2026: Suchtreffer und Mitglieder
+ * öffneten sonst „Profil nicht verfügbar").
+ *
+ * Dieselben Spalten wie ladeNutzer (Schema 23: kein `*`), dieselbe
+ * Zeilenregel — was RLS nicht zeigt, kommt als `null` zurück. Das Bild
+ * nachsichtig wie ladeProfilbilder, die Nummer wie dort nur für Kontakte.
+ * Wirft bei einem echten Fehler, damit der Bildschirm Laden und Fehler
+ * auseinanderhalten kann.
+ */
+export async function ladePerson(
+  client: SupabaseClient,
+  ichId: string,
+  userId: string
+): Promise<{ user: User; profile: Profile } | null> {
+  const ziel = userId === ICH ? ichId : userId;
+  const [{ data, error }, { data: z }, { data: bild }, { data: folge }, { data: nummern }] = await Promise.all([
+    client.from('profiles').select(PROFIL_SPALTEN).eq('id', ziel).maybeSingle(),
+    client.from('profile_zahlen').select('id, followers, following, beitraege').eq('id', ziel).maybeSingle(),
+    client.from('profiles').select('id, avatar_url').eq('id', ziel).maybeSingle(),
+    client.from('follows').select('followee_id').eq('follower_id', ichId).eq('followee_id', ziel).maybeSingle(),
+    client.rpc('meine_kontaktnummern'),
+  ]);
+  if (error) throw error;
+  if (!data) return null;
+  const eintrag = personAusZeile(
+    data,
+    z,
+    ichId,
+    ((nummern as any)?.[ziel] as string | undefined) || undefined,
+    ((bild as any)?.avatar_url as string | undefined) || undefined
+  );
+  eintrag.profile.isFollowing = Boolean(folge);
+  return signiereMedien(client, eintrag);
 }
 
 /*
