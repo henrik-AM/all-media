@@ -75,6 +75,37 @@
 --
 --  Danach: npm run test:rechte, test:schema, test:minderjaehrig,
 --  test:angriffe, test:k28-erstellen. Mehrfach einspielbar.
+--
+--  ABGLEICH MIT MAIN 101–117 UND LIVE (Paket 3, 05.11.2026, nur lesend)
+--
+--    kanal_sichtbar(uuid)        main 101–117: nicht neu definiert (102 ruft
+--                                sie nur auf). Live = Fassung 5/59 — 99 ändert
+--                                nur „+ unterthema_zugang“. Übernommen.
+--    kanal_mitglied(uuid)        main: nicht neu definiert. Live = Fassung 59.
+--    Regel „Kanaele lesen“       main: nicht neu definiert. Live
+--                                community_sichtbar(community_id). Die
+--                                restriktiven Regeln aus 102 (nicht_ausgeblendet
+--                                auf community_channels/ptt_messages, Helfer
+--                                kanal_ausgeblendet/community_ausgeblendet)
+--                                heißen anders und bleiben unberührt; 99 dreht
+--                                F5 nicht zurück.
+--    ptt_mitteilen(...)          main: nicht definiert, live NICHT vorhanden
+--                                (90 nicht eingespielt; live fehlt auch
+--                                community_members.ptt_benachrichtigung). Ohne 90
+--                                ist der Abschnitt nur eine unbenutzte Funktion
+--                                — 99 erst nach 90 einspielen (Paket 1/Sammelzweig).
+--    markierung_sichtbar(...)    main: nicht neu definiert. Live = Fassung 86.
+--    communities.bild_url        115 (bunny_referenz_pruefen) und 117
+--                                (medienreferenz_pruefen) kennen die Spalte
+--                                schon, legen ihren Auslöser aber nur an, wenn
+--                                sie existiert. NACH 99 die Auslöser-Blöcke von
+--                                115 und 117 erneut ausführen, sonst prüft
+--                                niemand, dass das Bild selbst hochgeladen ist.
+--    einladungen                 103 (Auskunft) führt die Tabelle schon auf und
+--                                überspringt sie, solange sie fehlt.
+--                                unterthema_mitglieder fehlt in der Auskunft (103)
+--                                — offen, gehört in 103.
+--    zuruecksetzen(), notifications_*_check: von 99 nicht berührt.
 -- ===========================================================================
 
 
