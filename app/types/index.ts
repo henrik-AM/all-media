@@ -32,6 +32,8 @@ export interface User {
    * zeichnet Avatar die Initialen. Kommt aus `profiles.avatar_url`.
    */
   avatar?: string;
+  /** Privates Profil (`profiles.privat`) — Kasten 15.4: „Freundschaftsanfrage senden". */
+  privat?: boolean;
 }
 
 export interface Message {
@@ -369,6 +371,15 @@ export interface Community {
    * bekommen — community_members.ptt_benachrichtigung, Vorgabe aus.
    */
   pttBenachrichtigung?: boolean;
+  /**
+   * Kasten 28/15 (Schema 97): Meine Beitrittsanfrage an diese private
+   * Community läuft — community_beitrittsanfragen.
+   */
+  angefragt?: boolean;
+  /** Nur bei eigenen Communitys: so viele Anfragen warten auf mich (Kasten 28/15.2). */
+  offeneAnfragen?: number;
+  /** Kasten 28/9: wer sie angelegt hat ('me' für mich) — steht in der Mitgliederliste oben. */
+  erstellerId?: string;
   unterthemen?: Unterthema[];
 }
 
@@ -556,7 +567,13 @@ export type MitteilungArt =
    */
   | 'system'
   /** Kasten 8.3: „Push to Talk beitreten?" — Schema 90. */
-  | 'ptt';
+  | 'ptt'
+  /** Kasten 28/15.2: Beitrittsanfrage an meine Community bzw. angenommen — Schema 97. */
+  | 'beitritt_anfrage'
+  | 'beitritt_ok'
+  // Kasten 28/15.4 (Schema 98): Befreunden unter Communitys.
+  | 'freund_anfrage'
+  | 'freund_ok';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
@@ -590,6 +607,10 @@ export interface MitteilungAnzeige {
   zeit: string;
   gelesen: boolean;
   ziel: MitteilungsZiel;
+  /** Kasten 28/15.4: bei 'freund_anfrage' stehen Annehmen/Ablehnen in der Zeile. */
+  art: MitteilungArt;
+  /** Wer sie ausgelöst hat. */
+  userId: string;
 }
 
 /** Spendenaktion aus dem Erstellen-Blatt. */

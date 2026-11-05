@@ -37,6 +37,8 @@ const supabaseApi = require('./supabase-api');
 const Profilfelder = require('../../gemeinsam/profilfelder');
 // Kasten 28/7.8: eigenes Kontaktbild — Prüfung und Texte gemeinsam mit der App.
 const Kontaktbild = require('../../gemeinsam/kontaktbild');
+// Kästen 28/9 und 15: Beitreten oder Anfrage, Suchmuster (Schema 97).
+const Beitritt = require('../../gemeinsam/beitritt');
 const syncHandlers = require('./sync-handlers');
 const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
@@ -1846,15 +1848,17 @@ app.get('/api/praesenz/:userId', route(async (req) => {
   return { ok: true, zuletzt: data?.last_seen || null };
 }));
 
-app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
-  ok: true,
-  ids: await supabaseApi.ladeFolgeListe(
+app.get('/api/profile/:userId/folge/:art', route(async (req) => {
+  const ids = await supabaseApi.ladeFolgeListe(
     req.db,
     req.nutzerId,
     req.params.userId,
     req.params.art === 'follower' ? 'follower' : 'gefolgt'
-  ),
-})));
+  );
+  // Codex-Fund Runde 2: die Personen gleich mit — die Oberfläche kennt nur
+  // die ersten 500. Fehlt eine (RLS), bleibt sie aus der Liste.
+  return { ok: true, ids, personen: await supabaseApi.ladePersonenKurz(req.db, req.nutzerId, ids) };
+}));
 
 // ============================================================================
 // Eigenes Profil und eigene Inhalte
@@ -3216,11 +3220,68 @@ app.get('/api/communities', route(async (req) => {
 }));
 
 app.get('/api/communities/:id', route(async (req, res) => {
-  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
-  const community = alle.find((c) => c.id === req.params.id);
+  // Genau diese eine — auch jenseits der ersten 100 (Kasten 28/15.5).
+  const [community] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: req.params.id })) || [];
   if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
   res.json(community);
 }));
+
+/*
+ * Kasten 28/15.5 (Henrik 28.09.2026): „…so dass ich wirklich alle suchen
+ * kann." Communitys und Personen aus der ganzen Datenbank, nicht nur aus
+ * den geladenen 100 bzw. 500. Kein /api/communities/suche — das finge die
+ * Route /api/communities/:id ab.
+ */
+app.get('/api/community-suche', route(async (req) => {
+  const eingabe = String(req.query.q || '');
+  const [communities, personen] = await Promise.all([
+    supabaseApi.ladeCommunities(req.db, req.nutzerId, { suche: eingabe }),
+    syncHandlers.handlePersonenSuchen(req.db, req.nutzerId, eingabe),
+  ]);
+  return {
+    communities: Beitritt.suchmuster(eingabe) ? communities || [] : [],
+    personen: personen && personen.ok ? personen.personen : [],
+  };
+}));
+
+/*
+ * Kasten 28/9: Mitglieder einer Community, für den Ersteller mit den offenen
+ * Beitrittsanfragen. Wer was sieht, entscheidet die Regel „Mitglieder lesen"
+ * (Schema 97) — bei privaten sieht nur der Ersteller die Liste.
+ */
+app.get('/api/communities/:id/mitglieder', route(async (req) =>
+  antwort(await syncHandlers.handleMitglieder(req.db, req.nutzerId, req.params.id))
+));
+
+/** Kasten 28/15.2: der Ersteller nimmt eine Anfrage an oder lehnt sie ab. */
+app.post('/api/communities/:id/anfragen/:userId', route(async (req) =>
+  antwort(
+    await syncHandlers.handleBeitrittsanfrageEntscheiden(
+      req.db, req.nutzerId, req.params.id, req.params.userId, req.body?.annehmen === true
+    )
+  )
+));
+
+/*
+ * Kasten 28/15.4 (Schema 98): Befreunden unter Communitys. `vorher` ist der
+ * Zustand, den der Knopf zeigte — daraus folgt anfragen, zurückziehen oder
+ * annehmen (Freundschaft.schritt). Zurück kommt der Zustand danach.
+ */
+app.get('/api/freunde', route(async (req) => ({
+  freunde: await syncHandlers.freundschaftenLaden(req.db, req.nutzerId),
+})));
+
+app.post('/api/freunde/:id', route(async (req) =>
+  antwort(
+    await syncHandlers.handleFreundschaftSchritt(
+      req.db, req.nutzerId, req.params.id, String(req.body?.vorher || 'keine')
+    )
+  )
+));
+
+app.post('/api/freunde/:id/ablehnen', route(async (req) =>
+  antwort(await syncHandlers.handleFreundschaftAblehnen(req.db, req.nutzerId, req.params.id))
+));
 
 app.post('/api/communities', route(async (req) => {
   const name = String(req.body?.name || '').trim();
@@ -3246,8 +3307,7 @@ app.post('/api/communities', route(async (req) => {
 }));
 
 app.post('/api/communities/:id/join', route(async (req, res) => {
-  const alle = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
-  const community = alle.find((c) => c.id === req.params.id);
+  const [community] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: req.params.id })) || [];
   if (!community) return res.status(404).json({ error: 'Nicht gefunden' });
 
   /*
@@ -3259,9 +3319,21 @@ app.post('/api/communities/:id/join', route(async (req, res) => {
     return res.status(409).json({ error: 'Die eigene Community lässt sich nicht verlassen' });
   }
 
-  await syncHandlers.handleJoinCommunity(req.db, req.nutzerId, req.params.id);
-  const frisch = await supabaseApi.ladeCommunities(req.db, req.nutzerId);
-  res.json(frisch.find((c) => c.id === req.params.id));
+  /*
+   * Kasten 28/15.1: bei einer privaten Community wird aus Beitreten eine
+   * Anfrage (bzw. aus „Angefragt" das Zurückziehen). Mitglied macht erst der
+   * Ersteller (beitrittsanfrage_annehmen). `meldung` sagt, was wirklich
+   * passiert ist; `fehler`, warum nicht. Gleiche Regel in der App
+   * (ProfilContext.kanalBeitreten).
+   */
+  const vorher = Beitritt.zustand(community);
+  const e =
+    vorher === 'anfragen' || vorher === 'angefragt'
+      ? await syncHandlers.handleBeitrittAnfrage(req.db, req.nutzerId, req.params.id, vorher === 'anfragen')
+      : await syncHandlers.handleJoinCommunity(req.db, req.nutzerId, req.params.id);
+  const [frisch] = (await supabaseApi.ladeCommunities(req.db, req.nutzerId, { id: req.params.id })) || [];
+  const fehler = !e ? 'Nicht angemeldet' : e.ok === false ? e.fehler : null;
+  res.json({ ...(frisch || community), fehler, meldung: fehler || Beitritt.meldung(vorher, community.name) });
 }));
 
 /*
@@ -3413,6 +3485,12 @@ function mitteilungText(m, namen, communityNamen, kanalCommunity = new Map()) {
     story: `${name} hat auf deine Story geantwortet.`,
     kanal: `${name} hat einen neuen Kanal in „${community}" erstellt.`,
     beitritt: `${name} ist „${community}" beigetreten.`,
+    // Kasten 28/15.2 (Schema 97) — derselbe Satz wie in der App (ProfilContext).
+    beitritt_anfrage: `${name} möchte „${community}" beitreten.`,
+    beitritt_ok: `${name} hat deine Anfrage für „${community}" angenommen.`,
+    // Kasten 28/15.4 (Schema 98) — derselbe Satz wie in der App (ProfilContext).
+    freund_anfrage: `${name} möchte mit dir befreundet sein.`,
+    freund_ok: `Du und ${name} seid jetzt befreundet.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
     // Kasten 8.3 (Schema 90): Ziel ist das Unterthema — Satz wie in der App.

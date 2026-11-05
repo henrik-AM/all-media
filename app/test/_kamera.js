@@ -300,18 +300,20 @@ const BILD = path.join(__dirname, '_testbild.png');
     });
     if (!privateIds.length) throw new Error('der Server nennt kein privates Profil');
 
-    // Nur wer noch kein Kontakt ist, zeigt ueberhaupt einen Knopf zum
-    // Anfragen - bei den uebrigen steht "Befreundet" oder "Angefragt".
+    // Nur wer noch nicht befreundet ist und nichts angefragt hat, zeigt einen
+    // Knopf zum Anfragen. Seit Kasten 28/15.4 (21.10.2026) steht der Zustand
+    // in data-freund (Schema 98) — „Angefragt" ist tippbar (zurückziehen).
     const offeneKnoepfe = (
       await page.$$eval('[data-befriend]', (n) =>
-        n.map((e) => ({ id: e.dataset.befriend, text: e.textContent.trim(), zu: e.disabled }))
+        n.map((e) => ({ id: e.dataset.befriend, text: e.textContent.trim(), zustand: e.dataset.freund }))
       )
-    ).filter((b) => !b.zu);
+    ).filter((b) => b.zustand === 'keine');
 
     const privat = offeneKnoepfe.find((b) => privateIds.includes(b.id));
     const offen = offeneKnoepfe.find((b) => !privateIds.includes(b.id));
 
-    if (!privat || privat.text !== 'Anfrage senden') {
+    // 29.08.2026: „Privat = ‚Freundschaftsanfrage senden'".
+    if (!privat || privat.text !== 'Freundschaftsanfrage senden') {
       throw new Error('privates Profil zeigt: ' + (privat ? privat.text : 'keinen offenen Knopf'));
     }
     if (!offen || offen.text !== '+ Befreunden') {

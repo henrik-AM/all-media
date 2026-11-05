@@ -99,4 +99,3 @@ const styles = themenStyles((colors) => ({
   link: { ...typography.message, color: colors.brand, fontWeight: '600' },
   weitere: { ...typography.message, color: colors.text2 },
 }));
-

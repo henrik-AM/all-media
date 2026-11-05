@@ -18,7 +18,8 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand } from '../lib/daten';
+import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand, ladePersonen } from '../lib/daten';
+import type { Profile, User } from '../types';
 import { meinSchluessel } from '../lib/krypto';
 import { AuthContext } from './AuthContext';
 import { useSupabase } from './SupabaseContext';
@@ -84,6 +85,22 @@ interface DatenWert extends AlleDaten {
    * Schreiben in die Datenbank macht das Drei-Punkte-Menue (BeitragOptionen).
    */
   keinInteresseMerken: (beitragId: string) => void;
+  /**
+   * Eine einzeln nachgeladene Person (ladePerson) in den gemeinsamen Bestand
+   * übernehmen — Codex-Fund Runde 2, 05.11.2026. Bis hierher hielt das
+   * fremde Profil sie nur für sich; Optionen (Blockieren/Melden), Follower
+   * und Gefolgt lasen `users` und fanden sie nicht. Überschreibt nichts,
+   * was ladeAlles schon geliefert hat.
+   */
+  personMerken: (eintrag: { user: User; profile: Profile }) => void;
+  /**
+   * Fehlende Personen per ID nachladen und übernehmen (ladePersonen). Jede
+   * ID wird je Anmeldung höchstens EINMAL versucht — auch nach einem
+   * Fehler oder „gibt es nicht" nicht erneut, sonst liefe bei jedem
+   * Zeichnen eine neue Abfrage (Lehre „Fehlerwert gleich Ladewert").
+   * Antwort: 'fertig' (geladen oder nichts zu tun) oder 'fehler'.
+   */
+  personenNachladen: (ids: string[]) => Promise<'fertig' | 'fehler'>;
 }
 
 const DatenContext = createContext<DatenWert | null>(null);
@@ -102,6 +119,22 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
   const [daten, setDaten] = useState<AlleDaten>(LEER);
   const [laedt, setLaedt] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+
+  /*
+   * Nachgeladene Personen (außerhalb der ersten 500 aus ladeNutzer). Eigener
+   * Zustand statt in `daten`: neuLaden ersetzt `daten` ganz und hätte sie
+   * sonst wieder vergessen — das offene Profil stünde plötzlich ohne Person
+   * da. Beim Abmelden bzw. Kontowechsel geleert.
+   */
+  const [extra, setExtra] = useState<{ users: Record<string, User>; profile: Record<string, Profile> }>({
+    users: {},
+    profile: {},
+  });
+  const versucht = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    setExtra({ users: {}, profile: {} });
+    versucht.current = new Set();
+  }, [ichId]);
 
   const laden = useCallback(async () => {
     if (!supabase || !ichId) {
@@ -218,9 +251,54 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     []
   );
 
+  const personMerken = useCallback((eintrag: { user: User; profile: Profile }) => {
+    const id = eintrag.user.id;
+    versucht.current.add(id);
+    setExtra((x) =>
+      x.users[id] && x.profile[id]
+        ? x
+        : { users: { ...x.users, [id]: eintrag.user }, profile: { ...x.profile, [id]: eintrag.profile } }
+    );
+  }, []);
+
+  // Der gemeinsame Bestand: Geladenes geht vor, Nachgeladenes ergänzt nur.
+  const users = useMemo(() => ({ ...extra.users, ...daten.users }), [extra.users, daten.users]);
+  const profile = useMemo(() => ({ ...extra.profile, ...daten.profile }), [extra.profile, daten.profile]);
+  const bekannt = useRef(users);
+  bekannt.current = users;
+
+  const personenNachladen = useCallback(
+    async (ids: string[]): Promise<'fertig' | 'fehler'> => {
+      if (!supabase || !ichId) return 'fertig';
+      const fehlend = [...new Set(ids)].filter((id) => id && !bekannt.current[id] && !versucht.current.has(id));
+      if (!fehlend.length) return 'fertig';
+      fehlend.forEach((id) => versucht.current.add(id));
+      try {
+        const neu = await ladePersonen(supabase, ichId, fehlend);
+        setExtra((x) => ({ users: { ...neu.users, ...x.users }, profile: { ...neu.profile, ...x.profile } }));
+        return 'fertig';
+      } catch (e: any) {
+        console.error('Personen nachladen fehlgeschlagen:', e?.message ?? e);
+        return 'fehler';
+      }
+    },
+    [supabase, ichId]
+  );
+
   const wert = useMemo<DatenWert>(
-    () => ({ ...daten, laedt, fehler, neuLaden: laden, chatsNeuLaden, keinInteresseMerken }),
-    [daten, laedt, fehler, laden, chatsNeuLaden, keinInteresseMerken]
+    () => ({
+      ...daten,
+      users,
+      profile,
+      laedt,
+      fehler,
+      neuLaden: laden,
+      chatsNeuLaden,
+      keinInteresseMerken,
+      personMerken,
+      personenNachladen,
+    }),
+    [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, keinInteresseMerken, personMerken, personenNachladen]
   );
 
   return <DatenContext.Provider value={wert}>{children}</DatenContext.Provider>;

@@ -80,7 +80,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "stories_im_highlight" auf public.stories | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql | **SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql** |
 | Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** (Ziel entscheidet: Videos für alle Sichtbaren, Messenger nur Kontakte, Markierte) |
 | Regel "Beitraege lesen" auf public.posts | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
-| Regel "Communitys lesen" auf public.communities | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
+| Regel "Communitys lesen" auf public.communities | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_97_mitglieder_beitritt.sql | **SUPABASE_SCHEMA_97_mitglieder_beitritt.sql** |
 | Regel "Eigene Chats aendern" auf public.chats | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Regel "Eigene Chats lesen" auf public.chats | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Eigene Nachricht aendern" auf public.messages | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
@@ -427,3 +427,42 @@ Datei im Kopf. Wichtig beim Einspielen:
   `ist_messenger_kontakt(uuid)` ist eine neue Überladung neben `ist_messenger_kontakt(uuid, uuid)` (68/102).
 
 **Gesamtreihenfolge Paket 1:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 117 (erneut).
+## Nachtrag 20.10.2026: Schema 97 (Feedback 28.09., Kästen 9 und 15.1–15.3)
+
+**Entwurf, noch nicht eingespielt.** Nach 95 (live) und 102 (live). Seit Paket 2 (05.11.2026) braucht 97
+Schema 90 nicht mehr: die Mitteilungsarten-Liste ist die live gültige (zuletzt 57) plus `ptt`,
+`beitritt_anfrage`, `beitritt_ok`. 97 legt die F5-Regel `nicht_ausgeblendet` (102) auf
+`community_beitrittsanfragen` selbst an — 102 übersprang die damals fehlende Tabelle.
+
+- `SUPABASE_SCHEMA_97_mitglieder_beitritt.sql` — `communities.mitglieder_anzahl` + Auslöser
+  `mitglieder_zaehlen`, `community_vorgaben` (Zahl/Grundwert/Demo beim Anlegen nur durch die Datenbank);
+  Regel „Communitys lesen“ → `using (true)` (private Communitys auffindbar, Inhalt weiter über
+  `community_sichtbar`); `mitglieder_sichtbar(uuid)` + Regel „Mitglieder lesen“ auf `community_members`
+  (**ersetzt „Mitglieder sichtbarer Communitys lesen“ aus 95**); Tabelle `community_beitrittsanfragen`
+  (RLS, `nur_freigegebene`), `beitrittsanfrage_annehmen(uuid, uuid)`, Auslöser
+  `beitrittsanfrage_aufraeumen`, `mitteilung_beitrittsanfrage`, `mitteilung_weg_beitrittsanfrage`.
+  **Ersetzt `notifications_art_check` (live zuletzt 57, Entwurf 90) — gilt danach: 97.** Wer 90 oder 95
+  (danach) einspielt, muss 97 nachziehen. Wer den F5-Block aus 102 neu ausführt, ändert nichts an 97.
+
+Code vor dem Schema: App (`daten.ts`) und Server (`supabase-api.js`) lesen `mitglieder_anzahl` und die
+Anfragen nachsichtig (`Beitritt.fehltSchema`); Anfragen/Annehmen melden ohne 97 „… erst, wenn das
+Datenbank-Update eingespielt ist“.
+
+
+## Nachtrag 21.10.2026: Schema 98 (Feedback 28.09., Kasten 15.4)
+
+**Entwurf, noch nicht eingespielt.** Nach 97 (Mitteilungsarten) und nach 95 (`blockiert_zwischen`, live).
+Abgleich 05.11.2026 (Paket 2): keine Datei 101–117 berührt die Objekte; 103 (live) nimmt `freundschaften`
+in `meine_daten()` auf, sobald es die Tabelle gibt.
+
+- `SUPABASE_SCHEMA_98_freundschaften.sql` — Tabelle `freundschaften (von, an, angenommen)` (RLS,
+  `nur_freigegebene`, je Paar eine Zeile über `freundschaften_paar`, kein UPDATE für `authenticated`);
+  Auslöser `freundschaft_vorgaben` (öffentliches Profil → sofort befreundet, privat → Anfrage),
+  `freundschaft_annehmen(uuid)`, Auslöser `freundschaft_bei_blockierung` auf `blocks`,
+  `mitteilung_freundschaft`, `mitteilung_freundschaft_angenommen`, `mitteilung_weg_freundschaft`.
+  **Ersetzt `notifications_art_check` (zuletzt 97) — gilt danach: 98.** Wer 90 oder 97 neu einspielt,
+  muss 98 nachziehen.
+
+Code vor dem Schema: App (`aktionen.ts`) und Server (`sync-handlers.js`) lesen `freundschaften`
+nachsichtig (`Freundschaft.fehltSchema` → niemand befreundet); Befreunden meldet ohne 98 „… erst, wenn
+das Datenbank-Update eingespielt ist“. Probe: `app/test/_probe98.js` (verworfene Transaktion).

@@ -79,6 +79,8 @@ const StoryRegeln = require('../gemeinsam/story') as typeof import('../gemeinsam
 const Spende = require('../gemeinsam/spende') as typeof import('../gemeinsam/spende');
 // Kasten 27: Chatliste mit dem frischen Stand zusammenlegen — gemeinsam mit der Website.
 const ChatAbgleich = require('../gemeinsam/chatabgleich') as typeof import('../gemeinsam/chatabgleich');
+// Kästen 28/9 und 15: Beitreten oder Anfrage, Meldung danach (Schema 97).
+const Beitritt = require('../gemeinsam/beitritt') as typeof import('../gemeinsam/beitritt');
 
 type Overlay =
   | { kind: 'chat'; chat: Chat; extra?: Message[] }
@@ -153,12 +155,11 @@ type Overlay =
    * liegt, in keinem Bild vorbei. Genau so ist die feste Follower-Liste
    * jahrelang unbemerkt geblieben.
    */
-  | { kind: 'community'; communityId: string; optionen?: boolean }
+  | { kind: 'community'; communityId: string; optionen?: boolean; mitglieder?: boolean }
   | { kind: 'editSelectedContacts' }
   | { kind: 'avatarViewer'; userId: string; name: string }
-  | { kind: 'followers'; userId: string }
-  | { kind: 'following'; userId: string }
-  /** Kasten 1.3 (Nachtrag 10.10.2026): die Seite „Profil bearbeiten“. */
+  | { kind: 'followers'; userId: string; zurueck?: Overlay }
+  | { kind: 'following'; userId: string; zurueck?: Overlay }
   | { kind: 'profilBearbeiten' }
   | null;
 
@@ -508,7 +509,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         break;
       case 'community': {
         const com = daten.communities.find((c) => c.id === a || c.name === a);
-        if (com) setOverlay({ kind: 'community', communityId: com.id, optionen: b === 'optionen' });
+        if (com)
+          setOverlay({ kind: 'community', communityId: com.id, optionen: b === 'optionen', mitglieder: b === 'mitglieder' });
         break;
       }
       /*
@@ -1088,13 +1090,6 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     setOverlay(null);
     setArea('messenger');
     setSubs((prev) => ({ ...prev, messenger: 'chats' }));
-  };
-
-  const befriend = (userId: string) => {
-    const person = daten.users[userId];
-    if (contacts.some((c) => c.id === userId)) return setNotice(`${person.name} ist bereits in deinen Kontakten`);
-    setContacts((prev) => [...prev, { id: userId, name: person.name, status: 'pending', about: 'Anfrage gesendet' }]);
-    setNotice(`Anfrage an ${person.name} gesendet`);
   };
 
   // Aus dem Messenger heraus gehoert das Kontaktprofil dazu - Henrik wurde
@@ -1977,8 +1972,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           const person = daten.users[overlay.userId];
           setOverlay({ kind: 'avatarViewer', userId: overlay.userId, name: person?.name ?? 'Profil' });
         }}
-        onOpenFollowers={(userId) => setOverlay({ kind: 'followers', userId })}
-        onOpenFollowing={(userId) => setOverlay({ kind: 'following', userId })}
+        onOpenFollowers={(userId) => setOverlay({ kind: 'followers', userId, zurueck: overlay })}
+        onOpenFollowing={(userId) => setOverlay({ kind: 'following', userId, zurueck: overlay })}
         onOpenKachel={kachelOeffnen}
         onBlockiert={(userId, blockiert) => {
           // Blockieren hat Folgen: die Person faellt aus den Kontakten, beim
@@ -2190,10 +2185,18 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           // Anschluss nach aussen.
           onEinstellungen={() => {}}
           optionenOffenStart={overlay.optionen}
-          onBeitreten={() => {
-            profil.kanalBeitreten(community.id);
-            setNotice(community.joined ? `„${community.name}“ verlassen` : `„${community.name}“ beigetreten`);
+          mitgliederOffenStart={overlay.mitglieder}
+          onBeitreten={async () => {
+            // Kasten 28/15.1: die Meldung sagt, was wirklich passiert ist —
+            // bei einer privaten Community läuft eine Anfrage.
+            const vorher = Beitritt.zustand(community);
+            const grund = await profil.kanalBeitreten(community.id);
+            setNotice(grund ?? Beitritt.meldung(vorher, community.name));
           }}
+          onOpenProfile={openPublicProfile}
+          mitgliederLaden={aktion.mitgliederLaden}
+          anfrageEntscheiden={aktion.beitrittsanfrageEntscheiden}
+          onMitgliederGeaendert={() => void daten.neuLaden()}
           onNeuesUnterthema={() =>
             setFormular({
               title: 'Neues Unterthema',
@@ -2296,7 +2299,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     return (
       <FollowersScreen
         userId={overlay.userId}
-        onBack={() => setOverlay(null)}
+        onBack={() => setOverlay(overlay.zurueck ?? null)}
         onOpenProfile={openPublicProfile}
         onNotice={setNotice}
       />
@@ -2307,7 +2310,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     return (
       <FollowingScreen
         userId={overlay.userId}
-        onBack={() => setOverlay(null)}
+        onBack={() => setOverlay(overlay.zurueck ?? null)}
         onOpenProfile={openPublicProfile}
         onNotice={setNotice}
       />
@@ -2450,10 +2453,22 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       if (sub === 'search') {
         return (
           <CommunitySearchScreen
-            contacts={contacts}
-            onOpenCommunity={openCommunity}
+            onOpenCommunity={(community) => {
+              // Kasten 28/15.5: ein Datenbanktreffer steht noch in keiner Liste.
+              profil.communityMerken(community);
+              openCommunity(community);
+            }}
             onOpenProfile={openProfile}
-            onBefriend={befriend}
+            freundschaftenLaden={aktion.freundschaftenLaden}
+            freundschaftSchritt={aktion.freundschaftSchritt}
+            onNotice={setNotice}
+            onBeitreten={async (community) => {
+              profil.communityMerken(community);
+              const vorher = Beitritt.zustand(community);
+              const grund = await profil.kanalBeitreten(community.id, community);
+              setNotice(grund ?? Beitritt.meldung(vorher, community.name));
+            }}
+            suchen={aktion.communitySuche}
           />
         );
       }

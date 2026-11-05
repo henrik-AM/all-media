@@ -74,6 +74,8 @@ const Lenkung = require('../../gemeinsam/lenkung') as typeof import('../../gemei
 const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('../../gemeinsam/profilfelder');
 // Nachtrag 4.3b: Antworten auf Kommentare (Fäden, fehlende Spalten vor Schema 92).
 const Kommentar = require('../../gemeinsam/kommentar') as typeof import('../../gemeinsam/kommentar');
+// Kästen 28/9 und 15: Mitgliederzahl, Beitrittsanfragen (Schema 97).
+const Beitritt = require('../../gemeinsam/beitritt') as typeof import('../../gemeinsam/beitritt');
 import { aufschliessen, meinSchluessel } from './krypto';
 
 /** Die Oberfläche erkennt einen selbst an der Kennung „me". */
@@ -146,6 +148,48 @@ export interface PersonZahlen {
   beitraege: number;
 }
 
+/*
+ * Eine Zeile aus `profiles` (PROFIL_SPALTEN) wird zu Person und Profil —
+ * gemeinsam für ladeNutzer (die ersten 500) und ladePerson (eine einzelne,
+ * nachgeladen beim Öffnen).
+ */
+function personAusZeile(
+  zeile: any,
+  z: any,
+  ichId: string,
+  phone: string | undefined,
+  avatar: string | undefined
+): { user: User; profile: Profile } {
+  const schluessel = zeile.id === ichId ? ICH : zeile.id;
+  return {
+    user: {
+      id: schluessel,
+      name: zeile.name,
+      handle: zeile.handle,
+      status: zeile.status ?? 'offline',
+      about: zeile.about ?? '',
+      phone,
+      color: zeile.color ?? undefined,
+      // Bestaendige Form; unterschrieben wird mit allem anderen in
+      // ladeAlles bzw. ladePerson (signiereMedien).
+      avatar,
+      privat: Boolean(zeile.privat),
+    },
+    profile: {
+      userId: schluessel,
+      bio: zeile.bio ?? '',
+      link: zeile.link ?? '',
+      spende: jsonOderNull(zeile.spende),
+      posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
+      followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
+      following: Number(z?.following ?? zeile.following_basis ?? 0),
+      isFollowing: false, // wird aus `follows` gefüllt
+      highlights: zeile.highlights ?? [],
+      playlists: zeile.playlists ?? [],
+    },
+  };
+}
+
 export async function ladeNutzer(
   client: SupabaseClient,
   ichId: string
@@ -170,40 +214,99 @@ export async function ladeNutzer(
   const profile: Record<string, Profile> = {};
 
   for (const zeile of (data ?? []) as any[]) {
-    const schluessel = zeile.id === ichId ? ICH : zeile.id;
-    const z = zahlenNach.get(zeile.id);
-
-    users[schluessel] = {
-      id: schluessel,
-      name: zeile.name,
-      handle: zeile.handle,
-      status: zeile.status ?? 'offline',
-      about: zeile.about ?? '',
-      phone: nummerVon(zeile.id),
-      color: zeile.color ?? undefined,
-      // Bestaendige Form; unterschrieben wird mit allem anderen unten in
-      // ladeAlles (signiereMedien).
-      avatar: bilder.get(zeile.id),
-    };
-
-    profile[schluessel] = {
-      userId: schluessel,
-      bio: zeile.bio ?? '',
-      link: zeile.link ?? '',
-      // Kasten 1.3: ohne Schema 88 leer bzw. nur der alte Einzellink.
-      pronomen: zusatz.get(zeile.id)?.pronomen ?? '',
-      links: Profilfelder.linksAus({ links: zusatz.get(zeile.id)?.links, link: zeile.link }),
-      spende: jsonOderNull(zeile.spende),
-      posts: Number(z?.beitraege ?? zeile.beitraege_basis ?? 0),
-      followers: Number(z?.followers ?? zeile.followers_basis ?? 0),
-      following: Number(z?.following ?? zeile.following_basis ?? 0),
-      isFollowing: false, // wird unten aus `follows` gefüllt
-      highlights: zeile.highlights ?? [],
-      playlists: zeile.playlists ?? [],
-    };
+    const eintrag = personAusZeile(zeile, zahlenNach.get(zeile.id), ichId, nummerVon(zeile.id), bilder.get(zeile.id));
+    users[eintrag.user.id] = eintrag.user;
+    profile[eintrag.user.id] = eintrag.profile;
+    Object.assign(profile[eintrag.user.id], { pronomen: zusatz.get(zeile.id)?.pronomen ?? '', links: Profilfelder.linksAus({ links: zusatz.get(zeile.id)?.links, link: zeile.link }) });
   }
 
   return { users, profile };
+}
+
+/**
+ * Eine einzelne Person nachladen — für Profile außerhalb der ersten 500
+ * aus ladeNutzer (Codex-Fund 05.11.2026: Suchtreffer und Mitglieder
+ * öffneten sonst „Profil nicht verfügbar").
+ *
+ * Dieselben Spalten wie ladeNutzer (Schema 23: kein `*`), dieselbe
+ * Zeilenregel — was RLS nicht zeigt, kommt als `null` zurück. Das Bild
+ * nachsichtig wie ladeProfilbilder, die Nummer wie dort nur für Kontakte.
+ * Wirft bei einem echten Fehler, damit der Bildschirm Laden und Fehler
+ * auseinanderhalten kann.
+ */
+export async function ladePerson(
+  client: SupabaseClient,
+  ichId: string,
+  userId: string
+): Promise<{ user: User; profile: Profile } | null> {
+  const ziel = userId === ICH ? ichId : userId;
+  const [{ data, error }, { data: z }, { data: bild }, { data: folge }, { data: nummern }] = await Promise.all([
+    client.from('profiles').select(PROFIL_SPALTEN).eq('id', ziel).maybeSingle(),
+    client.from('profile_zahlen').select('id, followers, following, beitraege').eq('id', ziel).maybeSingle(),
+    client.from('profiles').select('id, avatar_url').eq('id', ziel).maybeSingle(),
+    client.from('follows').select('followee_id').eq('follower_id', ichId).eq('followee_id', ziel).maybeSingle(),
+    client.rpc('meine_kontaktnummern'),
+  ]);
+  if (error) throw error;
+  if (!data) return null;
+  const eintrag = personAusZeile(
+    data,
+    z,
+    ichId,
+    ((nummern as any)?.[ziel] as string | undefined) || undefined,
+    ((bild as any)?.avatar_url as string | undefined) || undefined
+  );
+  eintrag.profile.isFollowing = Boolean(folge);
+  return signiereMedien(client, eintrag);
+}
+
+/**
+ * Mehrere Personen auf einmal nachladen — für Listen (Follower, Gefolgt),
+ * in denen Menschen außerhalb der ersten 500 aus ladeNutzer stehen
+ * (Codex-Fund Runde 2, 05.11.2026: sie fielen bisher still aus der Liste).
+ *
+ * Dieselben Spalten und dieselbe Zeilenregel wie ladePerson. In Blöcken
+ * zu höchstens 100 IDs, damit `.in()` die Adresse nicht sprengt. Wer nicht
+ * zurückkommt (RLS, gelöscht), fehlt im Ergebnis. Wirft bei einem echten
+ * Fehler der Profilabfrage; Bild und Zahlen sind nachsichtig.
+ */
+export async function ladePersonen(
+  client: SupabaseClient,
+  ichId: string,
+  ids: string[]
+): Promise<{ users: Record<string, User>; profile: Record<string, Profile> }> {
+  const users: Record<string, User> = {};
+  const profile: Record<string, Profile> = {};
+  const ziele = [...new Set(ids.map((id) => (id === ICH ? ichId : id)).filter(Boolean))];
+  if (!ziele.length) return { users, profile };
+
+  const { data: nummern } = await client.rpc('meine_kontaktnummern');
+  for (let i = 0; i < ziele.length; i += 100) {
+    const teil = ziele.slice(i, i + 100);
+    const [{ data, error }, { data: zahlen }, { data: bilder }, { data: folgen }] = await Promise.all([
+      client.from('profiles').select(PROFIL_SPALTEN).in('id', teil),
+      client.from('profile_zahlen').select('id, followers, following, beitraege').in('id', teil),
+      client.from('profiles').select('id, avatar_url').in('id', teil),
+      client.from('follows').select('followee_id').eq('follower_id', ichId).in('followee_id', teil),
+    ]);
+    if (error) throw error;
+    const zahlenNach = new Map(((zahlen ?? []) as any[]).map((z) => [z.id, z]));
+    const bildNach = new Map(((bilder ?? []) as any[]).map((b) => [b.id, b.avatar_url]));
+    const gefolgt = new Set(((folgen ?? []) as any[]).map((f) => f.followee_id));
+    for (const zeile of (data ?? []) as any[]) {
+      const eintrag = personAusZeile(
+        zeile,
+        zahlenNach.get(zeile.id),
+        ichId,
+        ((nummern as any)?.[zeile.id] as string | undefined) || undefined,
+        (bildNach.get(zeile.id) as string | undefined) || undefined
+      );
+      eintrag.profile.isFollowing = gefolgt.has(zeile.id);
+      users[eintrag.user.id] = eintrag.user;
+      profile[eintrag.user.id] = eintrag.profile;
+    }
+  }
+  return signiereMedien(client, { users, profile });
 }
 
 /*
@@ -1342,15 +1445,31 @@ export async function ladeKommentare(
 // Communitys
 // ============================================================================
 
-export async function ladeCommunities(client: SupabaseClient, ichId: string): Promise<Community[]> {
-  const { data, error } = await client
-    .from('communities')
-    .select(
-      'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
-        ' community_members(count), community_channels(id, slug, name, topics, position, created_at)'
-    )
-    .order('created_at', { ascending: true })
-    .limit(100);
+/*
+ * Kasten 28/9 (Schema 97): Die Zahl steht in `communities.mitglieder_anzahl`.
+ * `community_members(count)` zählt nur, was man lesen darf — in einer
+ * privaten Community seit Schema 97 nur die eigene Zeile. Ohne Schema 97
+ * fehlt die Spalte; dann einmal mit der alten Zählung.
+ */
+const COMMUNITY_SPALTEN =
+  'id, name, topic, bio, link, visibility, created_by, mitglieder_basis, created_at,' +
+  ' community_channels(id, slug, name, topics, position, created_at)';
+
+/**
+ * Communitys laden. Mit `suche` (Kasten 28/15.5) nur die passenden, aus der
+ * ganzen Tabelle statt aus den ersten 100 — die Suche soll auch finden, was
+ * nicht geladen und nicht vorgeschlagen ist. Gleiche Regel in
+ * web/server/supabase-api.js (ladeCommunities).
+ */
+export async function ladeCommunities(client: SupabaseClient, ichId: string, suche = ''): Promise<Community[]> {
+  const abfrage = (zaehlung: string) => {
+    let q = client.from('communities').select(COMMUNITY_SPALTEN + zaehlung);
+    const filter = Beitritt.suchFilter(['name', 'topic'], suche);
+    if (filter) q = q.or(filter);
+    return q.order('created_at', { ascending: true }).limit(filter ? 30 : 100);
+  };
+  let { data, error } = await abfrage(', mitglieder_anzahl');
+  if (error && Beitritt.fehltSchema(error)) ({ data, error } = await abfrage(', community_members(count)'));
   if (error) throw error;
 
   // Kasten 8.4: der PTT-Schalter (Schema 90). Fehlt die Spalte noch (42703),
@@ -1360,6 +1479,19 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
   let { data: meine, error: fehlerMeine } = await mitgliedschaft('community_id, is_muted, ptt_benachrichtigung');
   if (fehlerMeine && (fehlerMeine as any).code === '42703') ({ data: meine } = await mitgliedschaft('community_id, is_muted'));
   const pttAn = new Set(((meine ?? []) as any[]).filter((m) => m.ptt_benachrichtigung).map((m) => m.community_id));
+  /*
+   * Kasten 28/15: offene Beitrittsanfragen. Die Regel aus Schema 97 gibt
+   * genau zwei Sorten heraus: meine eigenen und die an meine Communitys.
+   * Ohne Schema 97 keine.
+   */
+  const { data: anfragen } = await client.from('community_beitrittsanfragen').select('community_id, user_id');
+  const angefragt = new Set<string>();
+  const offeneAnfragen = new Map<string, number>();
+  for (const a of (anfragen ?? []) as any[]) {
+    if (a.user_id === ichId) angefragt.add(a.community_id);
+    else offeneAnfragen.set(a.community_id, (offeneAnfragen.get(a.community_id) ?? 0) + 1);
+  }
+
   const beigetreten = new Set((meine ?? []).map((m: any) => m.community_id));
   // Stumm ist eine Eigenschaft der Mitgliedschaft, nicht der Community.
   const stumme = new Set((meine ?? []).filter((m: any) => m.is_muted).map((m: any) => m.community_id));
@@ -1372,8 +1504,11 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string): Pr
     bio: c.bio ?? '',
     link: c.link ?? '',
     visibility: c.visibility,
-    members: Number(c.mitglieder_basis ?? 0) + (c.community_members?.[0]?.count ?? 0),
+    members: Number(c.mitglieder_basis ?? 0) + Number(c.mitglieder_anzahl ?? c.community_members?.[0]?.count ?? 0),
     joined: beigetreten.has(c.id),
+    angefragt: angefragt.has(c.id),
+    offeneAnfragen: c.created_by === ichId ? offeneAnfragen.get(c.id) ?? 0 : 0,
+    erstellerId: c.created_by === ichId ? ICH : c.created_by ?? undefined,
     stumm: stumme.has(c.id),
     pttBenachrichtigung: pttAn.has(c.id),
     unreadCount: 0,

@@ -137,7 +137,9 @@
     "test:k28-anhaenge": "node test/k28-anhaenge.js",
     "test:ortsuche-einheit": "node test/_ortsuche_einheit.js",
     "test:k28-anruf-ptt": "node test/k28-anruf-ptt.js",
-    "test:k28-kommentare": "node test/k28-kommentare.js"
+    "test:k28-kommentare": "node test/k28-kommentare.js",
+    "test:k28-mitglieder": "node test/k28-mitglieder.js",
+    "test:profil-ruecknavigation": "node test/profil-ruecknavigation.cjs"
   },
   "private": true
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -16,6 +16,7 @@ import { useKachelHoehe } from '../../lib/raster';
 import { compactNumber } from '../../lib/zahlen';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import * as Aktion from '../../lib/aktionen';
+import { ladePerson } from '../../lib/daten';
 import { SpendeKarte } from '../../components/SpendeKarte';
 import { SammlungOrdner } from '../../components/SammlungOrdner';
 import { HighlightBetrachter } from '../../components/HighlightBetrachter';
@@ -49,19 +50,62 @@ interface Props {
 }
 
 export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, onBlockiert, onOpenFollowers, onOpenFollowing, onOpenKachel, onNotice }: Props) => {
-  const { profile: alleProfile, users: alleNutzer, ichId } = useDaten();
+  const { profile: alleProfile, users: alleNutzer, ichId, personMerken } = useDaten();
   const kachelHoehe = useKachelHoehe();
   const { istStumm, istBlockiert } = useProfil();
   const [optionenOffen, setOptionenOffen] = useState(false);
-  const person = alleNutzer[userId];
-  const [profile, setProfile] = useState(alleProfile[userId]);
+  const { supabase } = useSupabase();
+
+  /*
+   * Codex-Fund 05.11.2026: useDaten kennt nur die ersten 500 Profile
+   * (ladeNutzer). Ein Datenbanktreffer der Suche oder ein Mitglied außerhalb
+   * davon zeigte deshalb „Profil nicht verfügbar". Fehlt die Person im
+   * Bestand, wird sie hier einmal per ID nachgeladen (ladePerson, dieselben
+   * Spalten und RLS wie der Bestand). Laden und Fehler sind getrennte
+   * Zustände: nach einem Fehler oder „gibt es nicht" wird NICHT erneut
+   * geladen — sonst liefe bei jedem Zeichnen eine neue Abfrage.
+   */
+  const [nachgeladen, setNachgeladen] = useState<{
+    id: string;
+    stand: 'laedt' | 'da' | 'fehlt' | 'fehler';
+    eintrag?: Awaited<ReturnType<typeof ladePerson>>;
+  } | null>(null);
+  const imBestand = Boolean(alleNutzer[userId] && alleProfile[userId]);
+
+  useEffect(() => {
+    if (imBestand || !supabase || !ichId) return;
+    if (nachgeladen?.id === userId) return; // schon geladen, lädt oder gescheitert
+    let abgebrochen = false;
+    setNachgeladen({ id: userId, stand: 'laedt' });
+    ladePerson(supabase, ichId, userId)
+      .then((eintrag) => {
+        if (abgebrochen) return;
+        setNachgeladen({ id: userId, stand: eintrag ? 'da' : 'fehlt', eintrag });
+        // Codex-Fund Runde 2: in den gemeinsamen Bestand, damit Optionen
+        // (Blockieren/Melden), Follower und Gefolgt die Person auch finden.
+        if (eintrag) personMerken(eintrag);
+      })
+      .catch((e) => {
+        console.error('Profil nachladen fehlgeschlagen:', e?.message ?? e);
+        if (!abgebrochen) setNachgeladen({ id: userId, stand: 'fehler' });
+      });
+    return () => {
+      abgebrochen = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imBestand, supabase, ichId, userId]);
+
+  const eigenGeladen = nachgeladen?.id === userId ? nachgeladen : null;
+  const person = alleNutzer[userId] ?? eigenGeladen?.eintrag?.user;
+  const bestandProfil = alleProfile[userId] ?? eigenGeladen?.eintrag?.profile;
+  const [profile, setProfile] = useState(bestandProfil);
   const [tab, setTab] = useState<Tab>('grid');
 
   // Nachziehen, sobald das Profil aus der Datenbank da ist — und beim
   // Wechsel auf eine andere Person. Siehe HomeFeedScreen.
   useEffect(() => {
-    setProfile(alleProfile[userId]);
-  }, [alleProfile, userId]);
+    setProfile(bestandProfil);
+  }, [bestandProfil, userId]);
 
   /*
    * Den Aufruf vermerken — einmal je geoeffnetem Profil.
@@ -83,7 +127,6 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
    * Geladen wird erst beim Oeffnen des jeweiligen Reiters: das Raster sieht
    * jeder sofort, Reposts und Markierungen sieht kaum jemand an.
    */
-  const { supabase } = useSupabase();
   const [kacheln, setKacheln] = useState<Record<Tab, Aktion.Rasterkachel[] | null>>({
     grid: null,
     repost: null,
@@ -162,8 +205,11 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
     return () => {
       abgebrochen = true;
     };
+    // Codex-Fund Runde 2: an der Person hängend. Beim Nachladen fehlt sie im
+    // ersten Durchlauf; nur mit [supabase, userId] liefe der Effekt danach
+    // nie wieder, Playlists fehlten und Highlights blieben ohne ID.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, userId]);
+  }, [supabase, userId, person?.id]);
 
   /*
    * Kasten 17.1/17.2: eine Sammlung im FREMDEN Profil öffnen.
@@ -217,9 +263,28 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
   }, [userId]);
 
   if (!person || !profile) {
+    // Ohne Verbindung lädt nichts — dann gleich der Leertext, kein ewiger Kreisel.
+    const laedt = !imBestand && !!supabase && !!ichId && (!eigenGeladen || eigenGeladen.stand === 'laedt');
+    // Mit Zurück-Knopf — ohne ihn war „Profil nicht verfügbar" eine Sackgasse.
     return (
       <SafeAreaView style={styles.container}>
-        <EmptyState icon="person-outline" title="Profil nicht verfügbar" />
+        <View style={styles.header}>
+          <Druck style={styles.back} onPress={onBack} hitSlop={6} accessibilityLabel="Zurück">
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </Druck>
+          <View style={{ width: 22 }} />
+        </View>
+        {laedt ? (
+          <View style={styles.laden}>
+            <ActivityIndicator color={colors.text3} />
+          </View>
+        ) : (
+          <EmptyState
+            icon="person-outline"
+            title="Profil nicht verfügbar"
+            text={eigenGeladen?.stand === 'fehler' ? 'Das Profil ließ sich gerade nicht laden.' : undefined}
+          />
+        )}
       </SafeAreaView>
     );
   }
@@ -240,7 +305,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Druck>
         <Text style={styles.handle}>{person.handle}</Text>
-        <Druck onPress={() => setOptionenOffen(true)} hitSlop={6}>
+        <Druck onPress={() => setOptionenOffen(true)} hitSlop={6} accessibilityLabel="Profiloptionen">
           <Ionicons name="information-circle-outline" size={22} color={colors.text2} />
         </Druck>
       </View>
@@ -478,6 +543,7 @@ export const UserProfileScreen = ({ userId, onBack, onMessage, onAvatarPress, on
 
 const styles = themenStyles((colors) => ({
   container: { flex: 1, backgroundColor: colors.surface },
+  laden: { paddingVertical: 56, alignItems: 'center' },
 
   header: {
     flexDirection: 'row',

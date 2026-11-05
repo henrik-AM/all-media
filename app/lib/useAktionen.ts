@@ -15,6 +15,9 @@
 import { useCallback, useContext, useMemo } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import * as A from './aktionen';
+import { ladeCommunities } from './daten';
+import type { Community } from '../types';
+import type { FreundZustand } from '../../gemeinsam/freundschaft';
 import { useSupabase } from '../contexts/SupabaseContext';
 import { useDaten } from '../contexts/DatenContext';
 import { SpendenwegContext } from '../contexts/SpendenwegContext';
@@ -70,6 +73,33 @@ export interface Aktionen {
     vorschau: string,
     kanaele?: Record<string, string>
   ) => Promise<{ gesendet: string[]; fehlgeschlagen: { id: string; grund: string }[]; grund?: string }>;
+  /**
+   * Kasten 28/9: Mitglieder einer Community und — für den Ersteller — die
+   * offenen Beitrittsanfragen. Fehler kommen als `fehler` zurück, damit die
+   * Seite sie selbst zeigt (nicht im Toast hinter ihr).
+   */
+  mitgliederLaden: (
+    communityId: string
+  ) => Promise<{ mitglieder: A.MitgliedZeile[]; anfragen: A.MitgliedZeile[]; fehler?: string }>;
+  /** Kasten 28/15.2: Anfrage annehmen oder ablehnen. Null heißt geklappt, sonst der Grund. */
+  beitrittsanfrageEntscheiden: (communityId: string, userId: string, annehmen: boolean) => Promise<string | null>;
+  /**
+   * Kasten 28/15.5: Communitys und Personen in der ganzen Datenbank suchen,
+   * nicht nur unter den geladenen. Leer, wenn die Eingabe zu kurz ist.
+   */
+  communitySuche: (eingabe: string) => Promise<{ communities: Community[]; personen: A.MitgliedZeile[] }>;
+  /** Kasten 28/15.4: meine Freundschaften unter Communitys, je Gegenüber ein Zustand. */
+  freundschaftenLaden: () => Promise<Record<string, FreundZustand>>;
+  /**
+   * Kasten 28/15.4: anfragen, zurückziehen oder annehmen — je nach Zustand.
+   * Zurück kommt der Zustand danach oder der Grund, warum es nicht ging.
+   */
+  freundschaftSchritt: (
+    userId: string,
+    vorher: FreundZustand
+  ) => Promise<{ zustand: FreundZustand; fehler?: string }>;
+  /** Kasten 28/15.4: eine eingegangene Anfrage ablehnen. Null heißt geklappt, sonst der Grund. */
+  freundschaftAblehnen: (userId: string) => Promise<string | null>;
   /** Ein Profil über den genauen Nutzernamen — Fremde im Teilen-Blatt. */
   personPerNutzername: (
     eingabe: string
@@ -825,6 +855,67 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
         } catch (e: any) {
           console.error('Teilen in Community fehlgeschlagen:', e?.message ?? e);
           return { gesendet: [], fehlgeschlagen: [], grund: 'Das Senden hat nicht geklappt' };
+        }
+      },
+      mitgliederLaden: async (communityId) => {
+        if (!supabase || !ichId) return { mitglieder: [], anfragen: [], fehler: 'Dafür musst du angemeldet sein' };
+        try {
+          return await A.mitgliederLaden(supabase, ichId, communityId);
+        } catch (e: any) {
+          console.error('Mitglieder laden fehlgeschlagen:', e?.message ?? e);
+          return { mitglieder: [], anfragen: [], fehler: 'Die Mitglieder ließen sich nicht laden' };
+        }
+      },
+      beitrittsanfrageEntscheiden: async (communityId, userId, annehmen) => {
+        if (!supabase || !ichId) return 'Dafür musst du angemeldet sein';
+        try {
+          await A.beitrittsanfrageEntscheiden(supabase, communityId, userId, annehmen);
+          return null;
+        } catch (e: any) {
+          console.error('Beitrittsanfrage entscheiden fehlgeschlagen:', e?.message ?? e);
+          return e?.message || 'Das hat nicht geklappt';
+        }
+      },
+      communitySuche: async (eingabe) => {
+        if (!supabase || !ichId) return { communities: [], personen: [] };
+        try {
+          const [communities, personen] = await Promise.all([
+            ladeCommunities(supabase, ichId, eingabe),
+            A.personenSuchen(supabase, ichId, eingabe),
+          ]);
+          return { communities, personen };
+        } catch (e: any) {
+          // Ohne Treffer aus der Datenbank bleibt die geladene Liste stehen.
+          console.error('Community-Suche fehlgeschlagen:', e?.message ?? e);
+          return { communities: [], personen: [] };
+        }
+      },
+      freundschaftenLaden: async () => {
+        if (!supabase || !ichId) return {};
+        try {
+          return await A.freundschaftenLaden(supabase, ichId);
+        } catch (e: any) {
+          console.error('Freundschaften laden fehlgeschlagen:', e?.message ?? e);
+          return {};
+        }
+      },
+      freundschaftSchritt: async (userId, vorher) => {
+        if (!supabase || !ichId) return { zustand: vorher, fehler: 'Dafür musst du angemeldet sein' };
+        try {
+          return { zustand: await A.freundschaftSchritt(supabase, ichId, userId, vorher) };
+        } catch (e: any) {
+          console.error('Befreunden fehlgeschlagen:', e?.message ?? e);
+          return { zustand: vorher, fehler: e?.message || 'Das hat nicht geklappt' };
+        }
+      },
+      freundschaftAblehnen: async (userId) => {
+        if (!supabase || !ichId) return 'Dafür musst du angemeldet sein';
+        try {
+          await A.freundschaftAblehnen(supabase, ichId, userId);
+          return null;
+        } catch (e: any) {
+          console.error('Freundschaft ablehnen fehlgeschlagen:', e?.message ?? e);
+          return e?.message || 'Das hat nicht geklappt';
         }
       },
       personPerNutzername: async (eingabe) => {
