@@ -1,3 +1,26 @@
+-- ===========================================================================
+-- ABGLEICH MIT MAIN (Paket 1, 05.11.2026, Stand origin/main ad7f221)
+--   Nur lesend geprüft:
+--   * kontakt_bilder: neu, live nicht vorhanden. Schema 117 (live) kennt die
+--     Tabelle schon in seiner Liste, überspringt sie aber, solange sie fehlt.
+--     NACH DEM EINSPIELEN VON 94 SCHEMA 117 ERNEUT EINSPIELEN (idempotent),
+--     sonst ist kontakt_bilder.media_url ohne medienreferenz_pruefen — dann
+--     ließe sich eine fremde Medienadresse als Kontaktbild eintragen.
+--     Schema 115 (bunny_referenz_pruefen) listet kontakt_bilder nicht; die
+--     Lesbarkeitsprüfung kommt allein über 117.
+--   * Check kontakt_bilder_eimer passt zu medien_adresse() live
+--     (…/storage/v1/object/public/media/avatars/…); Upload läuft in App
+--     (fotoHochladen → ladeHoch → /api/hochladen/datei) und Website
+--     (/api/hochladen) über die vorhandenen Medienstellen, der Eigentümer
+--     lädt selbst hoch → passt zu medium_selbst_hochgeladen (117).
+--   * ist_messenger_kontakt(k uuid): live gibt es (aus 68/102) die Überladung
+--     ist_messenger_kontakt(eigner uuid, betrachter uuid) — andere Signatur,
+--     wird NICHT ersetzt; Aufrufe mit einem Argument treffen die neue.
+--   * zuruecksetzen(): nur am Anker umgeschrieben; Anker
+--     „delete from public.telefonbuch where user_id = ziel;  -- Schema 87“
+--     ist live vorhanden.
+--   * nur_freigegebene auf kontakt_bilder: vorhanden (Schema 74-Muster).
+-- ===========================================================================
 -- ============================================================================
 -- SUPABASE_SCHEMA_94_kontaktbild.sql
 -- (Nummer 94 reserviert vom Hauptagenten für Kasten 7.8.

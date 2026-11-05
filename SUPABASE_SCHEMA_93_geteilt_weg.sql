@@ -1,3 +1,17 @@
+-- ===========================================================================
+-- ABGLEICH MIT MAIN (Paket 1, 05.11.2026, Stand origin/main ad7f221)
+--   Keine main-Datei 101–117 definiert eines dieser Objekte; live nicht
+--   vorhanden (nur lesend geprüft): Spalten shared_post_weg/-konto,
+--   geteilt_weg_merken() (before delete on posts), geteilt_weg_schuetzen().
+--   Zusammenspiel mit main:
+--   * Schema 102 (F11) blendet moderierte Beiträge aus statt sie zu löschen —
+--     dann feuert geteilt_weg_merken nicht; die Karte zeigt „für dich nicht
+--     sichtbar“ (Beitrag nicht lesbar), erst das endgültige Löschen nach der
+--     Frist (beitraege_entfernte_loeschen) setzt den Merker.
+--   * Schema 103 (konto_loeschen) löscht Beiträge → Merker wird gesetzt.
+--   * messages_krypto_stimmig, nicht_gesperrt_aendern (102) und
+--     medienreferenz_pruefen (117) betreffen die beiden Spalten nicht.
+-- ===========================================================================
 -- ============================================================================
 -- SUPABASE_SCHEMA_93_geteilt_weg.sql
 -- (Nummer 93 reserviert vom Hauptagenten für Kasten 7.5/7.6.
