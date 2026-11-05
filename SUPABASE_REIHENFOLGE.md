@@ -319,8 +319,10 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
 
 ## Nachtrag 20.10.2026: Schema 97 (Feedback 28.09., Kästen 9 und 15.1–15.3)
 
-**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 90 (Mitteilungsarten) und nach 95
-(Regeln auf `community_members`).
+**Entwurf, noch nicht eingespielt.** Nach 95 (live) und 102 (live). Seit Paket 2 (05.11.2026) braucht 97
+Schema 90 nicht mehr: die Mitteilungsarten-Liste ist die live gültige (zuletzt 57) plus `ptt`,
+`beitritt_anfrage`, `beitritt_ok`. 97 legt die F5-Regel `nicht_ausgeblendet` (102) auf
+`community_beitrittsanfragen` selbst an — 102 übersprang die damals fehlende Tabelle.
 
 - `SUPABASE_SCHEMA_97_mitglieder_beitritt.sql` — `communities.mitglieder_anzahl` + Auslöser
   `mitglieder_zaehlen`, `community_vorgaben` (Zahl/Grundwert/Demo beim Anlegen nur durch die Datenbank);
@@ -329,8 +331,8 @@ Die offenen Entwürfe 88–100 berühren beide Funktionen nicht (geprüft 22.10.
   (**ersetzt „Mitglieder sichtbarer Communitys lesen“ aus 95**); Tabelle `community_beitrittsanfragen`
   (RLS, `nur_freigegebene`), `beitrittsanfrage_annehmen(uuid, uuid)`, Auslöser
   `beitrittsanfrage_aufraeumen`, `mitteilung_beitrittsanfrage`, `mitteilung_weg_beitrittsanfrage`.
-  **Ersetzt `notifications_art_check` (zuletzt 90) — gilt danach: 97.** Wer 90 oder 95 neu einspielt,
-  muss 97 nachziehen.
+  **Ersetzt `notifications_art_check` (live zuletzt 57, Entwurf 90) — gilt danach: 97.** Wer 90 oder 95
+  (danach) einspielt, muss 97 nachziehen. Wer den F5-Block aus 102 neu ausführt, ändert nichts an 97.
 
 Code vor dem Schema: App (`daten.ts`) und Server (`supabase-api.js`) lesen `mitglieder_anzahl` und die
 Anfragen nachsichtig (`Beitritt.fehltSchema`); Anfragen/Annehmen melden ohne 97 „… erst, wenn das

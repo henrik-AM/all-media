@@ -4,6 +4,28 @@
 --  20.10.2026
 -- ===========================================================================
 --
+--  ABGLEICH MIT MAIN UND LIVE (Paket 2, 05.11.2026, nur lesend gemessen)
+--
+--    - Schema 95 ist live: „Mitglieder sichtbarer Communitys lesen“ (user_id =
+--      ich ODER community_sichtbar), „Community beitreten“ (öffentlich oder
+--      Ersteller), blockiert_zwischen(a, b), spalten_fest auf
+--      community_members. Die Datei 95 liegt nur auf dem Sammelzweig.
+--    - Schema 90 ist live NICHT eingespielt. notifications_art_check live:
+--      like, comment, follow, mention, share, message, system, repost, story,
+--      kanal, beitritt, nachricht, einladung, anfrage, anfrage_ok,
+--      messenger_anfrage, messenger_ok. Unten: genau diese, dazu 'ptt'
+--      (aus 90, schadet ohne 90 nicht) und die beiden neuen Arten.
+--      Keine Datei auf main (101–117) ändert die Liste; 102 nutzt 'system'.
+--    - Schema 102 (live) legt die restriktive Regel nicht_ausgeblendet (F5)
+--      auf community_beitrittsanfragen nur an, wenn die Tabelle schon steht
+--      — live fehlt sie noch. Darum legt 97 die Regel selbst an (Teil 4b);
+--      beitrittsanfrage_annehmen() läuft als definer an RLS vorbei und
+--      prüft deshalb selbst, dass die Community nicht ausgeblendet ist.
+--    - Die übrigen ersetzten Objekte („Communitys lesen“, Leseregel auf
+--      community_members) definiert keine Datei 101–117 neu. Die
+--      restriktiven Regeln nur_freigegebene und nicht_ausgeblendet auf
+--      communities/community_members bleiben unberührt.
+--
 --  WORUM ES GEHT
 --
 --  Henrik am 28.09.2026:
@@ -56,16 +78,16 @@
 --    - Regel „Communitys lesen" auf public.communities (zuletzt 7/EINSPIELEN)
 --    - Regel „Mitglieder sichtbarer Communitys lesen" auf
 --      public.community_members (zuletzt 95) → heißt jetzt „Mitglieder lesen"
---    - Bedingung notifications_art_check (zuletzt 90) — die Liste aus 90
---      plus 'beitritt_anfrage', 'beitritt_ok'. 97 also NACH 90 einspielen.
---      Wer 90 neu einspielt, muss 97 nachziehen.
+--    - Bedingung notifications_art_check (live zuletzt 57; Entwurf 90) — die
+--      Liste aus 90 plus 'beitritt_anfrage', 'beitritt_ok'. 97 braucht 90
+--      nicht. Wer 90 (danach) einspielt, muss 97 nachziehen.
 --
 --  Code vor dem Schema: App (daten.ts) und Server (supabase-api.js) lesen
 --  `mitglieder_anzahl` nachsichtig (fehlt sie → alte Zählung) und die
 --  Anfragen nachsichtig (fehlt die Tabelle → keine). Anfragen und Annehmen
 --  melden ohne Schema „… erst, wenn das Datenbank-Update eingespielt ist".
 --
---  EINSPIELEN (nach 88 → … → 96, siehe SUPABASE_REIHENFOLGE.md)
+--  EINSPIELEN (nach 95 und 102, beide live; siehe SUPABASE_REIHENFOLGE.md)
 --
 --    SUPABASE_TOKEN=sbp_... node tools/sql-einspielen.mjs \
 --      ../SUPABASE_SCHEMA_97_mitglieder_beitritt.sql
@@ -247,6 +269,21 @@ create policy nur_freigegebene on public.community_beitrittsanfragen
   using ((select public.konto_freigegeben()))
   with check ((select public.konto_freigegeben()));
 
+-- 4b. Paket 2 (05.11.2026): Codex-Fund F5 aus Schema 102. 102 legt die Regel
+-- nur an, wenn die Tabelle schon steht — beim Einspielen von 102 fehlte sie.
+-- Gleicher Wortlaut wie in 102.
+do $$
+begin
+  if to_regprocedure('public.community_ausgeblendet(uuid)') is null then
+    raise exception 'Schema 102 fehlt (community_ausgeblendet) — erst 102 einspielen';
+  end if;
+end $$;
+drop policy if exists nicht_ausgeblendet on public.community_beitrittsanfragen;
+create policy nicht_ausgeblendet on public.community_beitrittsanfragen
+  as restrictive for all to authenticated
+  using (not public.community_ausgeblendet(community_id))
+  with check (not public.community_ausgeblendet(community_id));
+
 revoke all on public.community_beitrittsanfragen from anon;
 grant select, insert, delete on public.community_beitrittsanfragen to authenticated;
 
@@ -267,6 +304,11 @@ begin
   if v_ersteller is null or v_ersteller is distinct from auth.uid() then
     raise exception 'Nur wer die Community angelegt hat, kann Anfragen annehmen'
       using errcode = '42501';
+  end if;
+  -- Paket 2 (05.11.2026): moderativ ausgeblendete Community (Schema 102, F5)
+  -- nimmt niemanden auf. Die Funktion läuft an RLS vorbei, also hier prüfen.
+  if exists (select 1 from public.communities where id = p_community and moderiert_am is not null) then
+    raise exception 'Diese Community ist ausgeblendet' using errcode = '42501';
   end if;
   if not public.konto_freigegeben() then
     raise exception 'Dein Konto ist noch nicht freigegeben' using errcode = '42501';
@@ -384,6 +426,11 @@ begin
                   where schemaname = 'public' and tablename = 'community_beitrittsanfragen'
                     and policyname = 'nur_freigegebene' and permissive = 'RESTRICTIVE') then
     raise exception 'nur_freigegebene fehlt auf community_beitrittsanfragen';
+  end if;
+  if not exists (select 1 from pg_policies
+                  where schemaname = 'public' and tablename = 'community_beitrittsanfragen'
+                    and policyname = 'nicht_ausgeblendet' and permissive = 'RESTRICTIVE') then
+    raise exception 'nicht_ausgeblendet fehlt auf community_beitrittsanfragen';
   end if;
   if exists (select 1 from pg_policies
               where schemaname = 'public' and tablename = 'community_members'
