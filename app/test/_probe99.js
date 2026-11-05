@@ -29,7 +29,7 @@ const { frage } = require('./_aufraeumen');
 
 const PRUEFKONTO = '62616c1d-82e2-4ee4-aab9-950e40e438a4'; // all.media.prueflauf@web.de
 const TESTKONTO = '3baafacd-bbdb-40fb-8ef4-a4e365ae00c4'; // test@all-media.app
-const BILD = 'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/avatars/probe99.jpg';
+const BILD = 'https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/avatars/' + TESTKONTO + '-probe99.jpg';
 const CODE_C = 'probeccccccccccc';
 const CODE_K = 'probekkkkkkkkkkk';
 const CODE_P = 'probepppppppppp2';
@@ -72,16 +72,27 @@ const eigner = (rumpf) => `
     process.exit(2);
   }
   const datei = (n) => fs.readFileSync(path.join(__dirname, '..', '..', n), 'utf8');
-  const s89 = datei('SUPABASE_SCHEMA_89_anrufe_ueberall.sql');
-  const s90 = datei('SUPABASE_SCHEMA_90_push_to_talk.sql');
+  // Auftrag Pakete 1–3 (05.11.2026): Vorgänger, die live fehlen, in DERSELBEN
+  // verworfenen Transaktion vorweg einspielen (VORGAENGER=pfad1,pfad2,…), danach
+  // NACHFOLGER (z. B. Schema 117 erneut). Pfade absolut oder relativ zum Aufruf.
+  const dateiListe = (v) => (process.env[v] || '').split(',').filter(Boolean)
+    .map((f) => `-- ===== ${path.basename(f)}\n` + fs.readFileSync(path.resolve(f), 'utf8')).join('\n\n');
+  const vorgaenger = dateiListe('VORGAENGER');
+  const nachfolger = dateiListe('NACHFOLGER');
+  if (!vorgaenger) console.log('HINWEIS  VORGAENGER leer — die Probe läuft nur gegen den Live-Stand.');
   const s99 = datei('SUPABASE_SCHEMA_99_erstellen_einladung.sql');
 
   const sql = `
 begin;
 select set_config('probe.erg', '', true);
-${s89}
-${s90}
+${vorgaenger}
 ${s99}
+${nachfolger}
+
+-- Das Probebild gilt als eigener Upload des Testkontos (Schema 115/117: eine
+-- Medienadresse darf nur setzen, wer die Datei selbst hochgeladen hat).
+insert into public.medien_objekte (pfad, owner_id, typ, bytes, sha256)
+  values ('avatars/${TESTKONTO}-probe99.jpg', '${TESTKONTO}', 'image/jpeg', 1, repeat('c', 64));
 
 ${eigner(`
   select count(*) into n from public.blocks
