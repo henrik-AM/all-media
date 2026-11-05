@@ -60,18 +60,29 @@ const OEFFENTLICH = '/storage/v1/object/public/media/';
 const zwischenspeicher = new Map();
 const PUFFER_MS = 10 * 60 * 1000;
 
-/** Steckt in diesem Wert eine Adresse aus unserem Eimer? */
+/*
+ * Eigene Adresse = eigener Host + Medienpfad, und der GANZE Wert ist eine
+ * Adresse (gemeinsam/medienadresse.js, Schema 118, Codex-Review 05.11.2026).
+ * Bis dahin genuegte `includes(OEFFENTLICH)`: auch
+ * `https://boese.example/storage/v1/object/public/media/…` galt als unsere,
+ * und scheiterte das Unterschreiben, ging sie roh an jeden Betrachter.
+ */
+const MedienAdresse = require('../../gemeinsam/medienadresse');
+const eigeneBasis = () => require('./supabase').supabaseUrl;
+
+/** Ist dieser Wert eine Adresse aus unserem Eimer (eigener Host)? */
 function istMedienAdresse(wert) {
-  return typeof wert === 'string' && wert.includes(OEFFENTLICH);
+  return MedienAdresse.art(wert, eigeneBasis()) === 'eigen';
 }
 
-/** Aus der vollen Adresse den Pfad im Eimer holen. */
+/** Medienpfad auf fremdem Host — wird nie ausgeliefert. */
+function istFremdeMedienAdresse(wert) {
+  return MedienAdresse.art(wert, eigeneBasis()) === 'fremd';
+}
+
+/** Aus der vollen eigenen Adresse den Pfad im Eimer holen (ohne ?t=…/#…), sonst null. */
 function pfadAus(adresse) {
-  const stelle = adresse.indexOf(OEFFENTLICH);
-  if (stelle === -1) return null;
-  const rest = adresse.slice(stelle + OEFFENTLICH.length);
-  // Ein angehaengtes ?t=... oder #... gehoert nicht zum Pfad.
-  return decodeURIComponent(rest.split(/[?#]/)[0]);
+  return MedienAdresse.pfad(adresse, eigeneBasis());
 }
 
 /**
@@ -84,14 +95,20 @@ function pfadAus(adresse) {
  * Faellt das Unterschreiben aus, bleibt die urspruengliche Adresse stehen.
  * Sie fuehrt dann ins Leere (der Eimer ist nicht mehr oeffentlich) — aber ein
  * fehlendes Bild ist besser als eine Seite, die gar nicht laedt.
+ *
+ * Medienadressen auf FREMDEM Host werden immer zu null (Schema 118) — auch
+ * wenn gar nichts zu unterschreiben ist. Sonst laedt jeder Betrachter ein
+ * Bild von einem fremden Server.
  */
 async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
-  if (!client || daten == null) return daten;
+  if (daten == null) return daten;
+  // Ohne Client wird nichts unterschrieben — fremde Hosts fallen trotzdem weg.
+  if (!client) return ohneFremdeMedien(daten);
   if (mitBunny()) return signiereMitBunny(client, daten, sekunden);
 
   const pfade = new Set();
   sammle(daten, pfade);
-  if (pfade.size === 0) return daten;
+  if (pfade.size === 0) return ersetze(daten, new Map());
 
   const karte = new Map();
   const jetzt = Date.now();
@@ -119,11 +136,16 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
     } catch (fehler) {
       // Sichtbar machen, nicht verschlucken.
       console.error('Medienadressen unterschreiben fehlgeschlagen:', fehler.message);
-      if (karte.size === 0) return daten;
+      if (karte.size === 0) return ersetze(daten, new Map());
     }
   }
 
   return ersetze(daten, karte);
+}
+
+/** Nur fremde Medienadressen entfernen, eigene unveraendert lassen (Rueckfall bei Fehlern). */
+function ohneFremdeMedien(daten) {
+  return ersetze(daten, new Map());
 }
 
 function sammle(wert, pfade) {
@@ -142,6 +164,7 @@ function sammle(wert, pfade) {
 }
 
 function ersetze(wert, karte) {
+  if (istFremdeMedienAdresse(wert)) return null;
   if (istMedienAdresse(wert)) {
     const p = pfadAus(wert);
     return (p && karte.get(p)) || wert;
@@ -371,4 +394,4 @@ async function loeschen(client,nutzerId,pfad) {
   const {error}=await client.storage.from('media').remove([pfad]);
   return error?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
 }
-module.exports = { mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, istMedienAdresse, pfadAus, hochladen, hochladenVideo };
+module.exports = { mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, istMedienAdresse, istFremdeMedienAdresse, ohneFremdeMedien, pfadAus, hochladen, hochladenVideo };

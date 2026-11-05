@@ -36,6 +36,8 @@ const supabaseApi = require('./supabase-api');
 const syncHandlers = require('./sync-handlers');
 const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
+// Medienadressen nur vom eigenen Projekt (Schema 118, Codex-Review 05.11.2026).
+const MedienAdresse = require('../../gemeinsam/medienadresse');
 const { clientFuer, tokenAus, isConfigured, supabaseUrl, supabaseKey } = require('./supabase');
 // Dieselbe Regel wie in der App — siehe gemeinsam/telefon.js.
 const Telefon = require('../../gemeinsam/telefon');
@@ -351,7 +353,10 @@ function route(fn) {
         .then(jsonOriginal)
         .catch((fehler) => {
           console.error('Antwort konnte nicht unterschrieben werden:', fehler.message);
-          jsonOriginal(koerper);
+          // Auch im Rueckfall keine Medienadresse auf fremdem Host (Schema 118).
+          let sicher = koerper;
+          try { sicher = require('./medien').ohneFremdeMedien(koerper); } catch {}
+          jsonOriginal(sicher);
         });
       return res;
     };
@@ -1856,7 +1861,8 @@ app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
  */
 app.post('/api/eigene/profilbild', route(async (req) => {
   const url = req.body?.url ? String(req.body.url) : null;
-  if (url && !/\/storage\/v1\/object\/public\/media\/avatars\/[A-Za-z0-9._-]+$/.test(url)) {
+  // Eigener Host + Ordner avatars, kein ?/# (Schema 118, gemeinsam/medienadresse.js).
+  if (url && !MedienAdresse.gespeichert(url, 'avatars', supabaseUrl)) {
     return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
   }
   const { data, error } = await req.db
@@ -2438,7 +2444,8 @@ app.post('/api/eigene/sammlung/:id/titelbild', route(async (req) => {
   if ([zeile.titel_post_id, zeile.titel_story_id, zeile.titelbild_url].filter(Boolean).length > 1) {
     return { ok: false, error: 'Bitte nur ein Titelbild wählen' };
   }
-  if (zeile.titelbild_url && !/\/storage\/v1\/object\/public\/media\/(stories|posts)\/[A-Za-z0-9._-]+$/.test(zeile.titelbild_url)) {
+  // Eigener Host + Ordner stories/posts, kein ?/# (Schema 118).
+  if (zeile.titelbild_url && !MedienAdresse.gespeichert(zeile.titelbild_url, ['stories', 'posts'], supabaseUrl)) {
     return { ok: false, error: 'Dieses Bild kommt nicht aus dem eigenen Upload' };
   }
 
