@@ -3002,14 +3002,27 @@ async function openFollowerList(profile, art) {
   let ids = [];
   try {
     const res = await fetch(`/api/profile/${wessen}/folge/${schluessel}`);
-    if (res.ok) ids = (await res.json()).ids || [];
-    else toast('Die Liste konnte nicht geladen werden.');
+    if (res.ok) {
+      const antwort = await res.json();
+      ids = antwort.ids || [];
+      /*
+       * Codex-Fund Runde 2 (05.11.2026): `state.users` kennt nur die ersten
+       * 500. Wer außerhalb stand, erschien als „?" ohne Kennung. Der Server
+       * schickt die Personen jetzt mit; sie ergänzen den Bestand, ohne
+       * Vorhandenes zu überschreiben (Gegenstück: personenNachladen in
+       * app/contexts/DatenContext.tsx).
+       */
+      for (const [id, p] of Object.entries(antwort.personen || {})) {
+        if (!state.users[id]) state.users[id] = p;
+      }
+    } else toast('Die Liste konnte nicht geladen werden.');
   } catch (fehler) {
     console.error('Folgeliste fehlgeschlagen:', fehler);
     toast('Keine Verbindung');
   }
 
-  const liste = ids.map((id) => user(id)).filter(Boolean);
+  // Nicht user(id): das liefert für Unbekannte einen „?"-Platzhalter.
+  const liste = ids.map((id) => state.users[id]).filter(Boolean);
   const titel = art === 'follower' ? 'Follower' : 'Gefolgt';
   openSheet(
     titel,

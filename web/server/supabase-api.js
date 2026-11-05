@@ -248,6 +248,37 @@ async function ladeFolgeListe(client, nutzerId, userId, art) {
 }
 
 /**
+ * Die Personen einer Folgeliste — Name, Kennung, Farbe, Bild.
+ *
+ * Codex-Fund Runde 2 (05.11.2026): die Oberfläche schlug die IDs nur in
+ * `state.users` nach, und das sind die ersten 500 aus ladeNutzer. Wer
+ * außerhalb stand, erschien als „?" ohne Kennung. Gegenstück zu
+ * ladePersonen() in app/lib/daten.ts: dieselben Spalten (Schema 23),
+ * dieselbe Zeilenregel, Blöcke zu 100 IDs.
+ */
+async function ladePersonenKurz(client, nutzerId, ids) {
+  const personen = {};
+  if (!client) return personen;
+  const ziele = [...new Set((ids || []).map((id) => (id === 'me' ? nutzerId : id)).filter(Boolean))];
+  for (let i = 0; i < ziele.length; i += 100) {
+    const teil = ziele.slice(i, i + 100);
+    const [{ data, error }, bilder] = await Promise.all([
+      client.from('profiles').select(PROFIL_SPALTEN).in('id', teil),
+      profilbilder(client, teil),
+    ]);
+    if (error) throw error;
+    for (const zeile of data || []) {
+      const u = profilZuNutzer(zeile);
+      u.avatar = bilder.get(zeile.id) || null;
+      u.phone = ''; // Nummern nur über meine_kontaktnummern (Fund 1) — hier nicht nötig.
+      const schluessel = zeile.id === nutzerId ? 'me' : zeile.id;
+      personen[schluessel] = { ...u, id: schluessel };
+    }
+  }
+  return personen;
+}
+
+/**
  * Die „Insights" aus den Einstellungen — Statistik zum eigenen Content.
  *
  * Gegenstueck zu ladeStatistik() in app/lib/daten.ts. Bis zum 02.09.2026
@@ -1874,6 +1905,7 @@ module.exports = {
   ladeKontakte,
   ladeFolgen,
   ladeFolgeListe,
+  ladePersonenKurz,
   ladeStatistik,
   ladeEinstellungen,
   ladeBlockiert,

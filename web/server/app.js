@@ -1827,15 +1827,17 @@ app.get('/api/praesenz/:userId', route(async (req) => {
   return { ok: true, zuletzt: data?.last_seen || null };
 }));
 
-app.get('/api/profile/:userId/folge/:art', route(async (req) => ({
-  ok: true,
-  ids: await supabaseApi.ladeFolgeListe(
+app.get('/api/profile/:userId/folge/:art', route(async (req) => {
+  const ids = await supabaseApi.ladeFolgeListe(
     req.db,
     req.nutzerId,
     req.params.userId,
     req.params.art === 'follower' ? 'follower' : 'gefolgt'
-  ),
-})));
+  );
+  // Codex-Fund Runde 2: die Personen gleich mit — die Oberfläche kennt nur
+  // die ersten 500. Fehlt eine (RLS), bleibt sie aus der Liste.
+  return { ok: true, ids, personen: await supabaseApi.ladePersonenKurz(req.db, req.nutzerId, ids) };
+}));
 
 // ============================================================================
 // Eigenes Profil und eigene Inhalte
