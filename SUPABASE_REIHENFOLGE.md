@@ -385,13 +385,22 @@ keine Weg-Spur bei gelöschten Beiträgen, ohne 94 nur Profilbilder.
 Abgleich der Schemas 88–94 gegen main (101–117) und den Live-Stand (nur lesend), Ergebnis je
 Datei im Kopf. Wichtig beim Einspielen:
 
-- **91:** liegt im Paket als `SUPABASE_SCHEMA_XX_antworten_im_unterthema.sql` — vor dem Einspielen
-  in `SUPABASE_SCHEMA_91_antworten_im_unterthema.sql` umbenennen (Nummer seit 10.10. vergeben).
+- **91:** `SUPABASE_SCHEMA_91_antworten_im_unterthema.sql` (Nummer seit 10.10. vergeben; im Paket
+  zuerst als `XX` übertragen, am 05.11. zurückbenannt).
 - **90:** `notifications_art_check`/`notifications_target_type_check` = Live-Liste + `ptt`/`channel`,
   keine Rückdrehung. Spätere Entwürfe (97/98, Paket 2) müssen `ptt`/`channel` mitnehmen.
 - **92:** führt am Ende den F11-Block aus 102 (`kommentar_ausgeblendet`, Regel `nicht_ausgeblendet`
   auf `comments`) wortgleich erneut aus, jetzt mit `reply_to`; der Nachweis bricht ab, wenn der
   Antwort-Teil fehlt. Der Nachtrag „nach 92 den F11-Block aus 102 erneut ausführen“ ist damit erledigt.
+  Achtung, Ausnahme von „die letzte Nummer gewinnt“: 102 ist seit 02.11. live, 92 wird **danach**
+  eingespielt und gewinnt deshalb. Wer 102 später neu einspielt, muss 92 (bzw. dessen F11-Block)
+  nachziehen.
+
+| Objekt | Dateien (die letzte gewinnt) |
+|---|---|
+| Funktion public.kommentar_ausgeblendet() | SUPABASE_SCHEMA_92_kommentar_antworten.sql → SUPABASE_SCHEMA_102_melden_moderation.sql |
+| Funktion public.mitteilung_bei_kommentar() | SUPABASE_SCHEMA_44_mitteilungen.sql → SUPABASE_SCHEMA_92_kommentar_antworten.sql |
+
 - **94:** danach **Schema 117 erneut einspielen** (Medienreferenz-Prüfung auf `kontakt_bilder`).
   `ist_messenger_kontakt(uuid)` ist eine neue Überladung neben `ist_messenger_kontakt(uuid, uuid)` (68/102).
 
