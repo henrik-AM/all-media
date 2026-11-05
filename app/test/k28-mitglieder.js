@@ -163,6 +163,46 @@ function teilA() {
   pruefe('15.5 App: Kreisel beim Laden, „Profil nicht verfügbar“ erst danach',
     /<ActivityIndicator/.test(nutzerProfil) && /title="Profil nicht verfügbar"/.test(nutzerProfil));
 
+  // Codex-Fund Runde 2 (05.11.2026): Nachgeladene fehlten Optionen,
+  // Follower/Gefolgt und dem Sammlungseffekt.
+  const datenCtx = lies('app/contexts/DatenContext.tsx');
+  const optionen = lies('app/components/ProfilOptionenSheet.tsx');
+  const followerS = lies('app/screens/profile/FollowersScreen.tsx');
+  const followingS = lies('app/screens/profile/FollowingScreen.tsx');
+  const ladePersonenQuelle = (daten.match(/export async function ladePersonen[\s\S]*?\n\}\n/) || [''])[0];
+  pruefe('R2 App: ladePersonen mit PROFIL_SPALTEN, .in() in Blöcken zu 100, signiert',
+    /\.from\('profiles'\)\.select\(PROFIL_SPALTEN\)\.in\('id', teil\)/.test(ladePersonenQuelle) &&
+      /i \+= 100/.test(ladePersonenQuelle) && /personAusZeile\(/.test(ladePersonenQuelle) &&
+      /signiereMedien\(client, \{ users, profile \}\)/.test(ladePersonenQuelle) && !/select\('\*'\)/.test(ladePersonenQuelle));
+  pruefe('R2 App: DatenContext führt Nachgeladene getrennt (überlebt neuLaden), Geladenes geht vor',
+    /const \[extra, setExtra\] = useState/.test(datenCtx) &&
+      /\(\{ \.\.\.extra\.users, \.\.\.daten\.users \}\)/.test(datenCtx) &&
+      /\(\{ \.\.\.extra\.profile, \.\.\.daten\.profile \}\)/.test(datenCtx) &&
+      /\.\.\.daten,\s*users,\s*profile,/.test(datenCtx));
+  pruefe('R2 App: personMerken überschreibt nichts, personenNachladen versucht jede ID nur einmal',
+    /const personMerken = useCallback/.test(datenCtx) && /x\.users\[id\] && x\.profile\[id\]\s*\? x/.test(datenCtx) &&
+      /!bekannt\.current\[id\] && !versucht\.current\.has\(id\)/.test(datenCtx) &&
+      /fehlend\.forEach\(\(id\) => versucht\.current\.add\(id\)\)/.test(datenCtx));
+  pruefe('R2 App: Nachgeladenes wird beim Kontowechsel geleert',
+    /setExtra\(\{ users: \{\}, profile: \{\} \}\);\s*versucht\.current = new Set\(\);\s*\}, \[ichId\]\)/.test(datenCtx));
+  pruefe('R2 App: Profil übernimmt die nachgeladene Person in den Bestand',
+    /if \(eintrag\) personMerken\(eintrag\);/.test(nutzerProfil));
+  pruefe('R2 App: Sammlungseffekt hängt an person?.id',
+    /Aktion\.sammlungenVon\(supabase, userId, 'highlight'\)[\s\S]{0,600}\}, \[supabase, userId, person\?\.id\]\);/.test(nutzerProfil));
+  pruefe('R2 App: „Profil nicht verfügbar" mit Zurück-Knopf',
+    /if \(!person \|\| !profile\) \{[\s\S]{0,900}onPress=\{onBack\}[\s\S]{0,800}title="Profil nicht verfügbar"/.test(nutzerProfil));
+  pruefe('R2 App: Optionen ohne „return null" — Blockieren/Melden brauchen nur die ID',
+    !/if \(!person\) return null;/.test(optionen) && /const name = person\?\.name \?\? 'Person';/.test(optionen) &&
+      /title=\{name\}/.test(optionen) && /key: 'block'/.test(optionen) && /key: 'melden'/.test(optionen));
+  for (const [titel, q] of [['Follower', followerS], ['Gefolgt', followingS]]) {
+    pruefe(`R2 App ${titel}: Person fehlt → einmal nachladen, Kreisel, dann Text`,
+      /personenNachladen\(\[userId\]\)/.test(q) && /personStand === 'laedt' \?/.test(q) && /'Diese Person gibt es nicht\.'/.test(q));
+    pruefe(`R2 App ${titel}: „gibt es nicht" steht unter der Kopfzeile mit Zurück`,
+      !/if \(!person\) \{\s*return/.test(q) && /onPress=\{onBack\}[\s\S]{0,300}\{!person \? \(/.test(q));
+    pruefe(`R2 App ${titel}: Listeneinträge außerhalb des Bestands werden nachgeladen`,
+      /await personenNachladen\(liste\);\s*if \(gilt\) setIds\(liste\);/.test(q));
+  }
+
   // Website
   const web = lies('web/public/app.js');
   const server = lies('web/server/app.js');
@@ -171,6 +211,17 @@ function teilA() {
   pruefe('15.1 Website-Server: privat → Anfrage statt Beitritt', /vorher === 'anfragen' \|\| vorher === 'angefragt'[\s\S]{0,80}handleBeitrittAnfrage/.test(server));
   pruefe('15.2 Website-Server: Annehmen/Ablehnen-Route', /app\.post\('\/api\/communities\/:id\/anfragen\/:userId'/.test(server));
   pruefe('15.5 Website-Server: Suchroute', /app\.get\('\/api\/community-suche'/.test(server));
+  const api = lies('web/server/supabase-api.js');
+  pruefe('R2 Website-Server: Folgeliste liefert die Personen mit (PROFIL_SPALTEN, Blöcke zu 100)',
+    /personen: await supabaseApi\.ladePersonenKurz\(req\.db, req\.nutzerId, ids\)/.test(server) &&
+      /async function ladePersonenKurz[\s\S]{0,600}i \+= 100[\s\S]{0,300}select\(PROFIL_SPALTEN\)\.in\('id', teil\)/.test(api) &&
+      /ladePersonenKurz,/.test(api));
+  pruefe('R2 Website: Folgeliste ergänzt state.users ohne Überschreiben, kein „?"-Platzhalter',
+    /if \(!state\.users\[id\]\) state\.users\[id\] = p;/.test(web) &&
+      /const liste = ids\.map\(\(id\) => state\.users\[id\]\)\.filter\(Boolean\);/.test(web));
+  pruefe('R2 Website: Profiloptionen arbeiten mit dem per ID geladenen Profil (nicht state.users)',
+    /function openProfilOptionen\(profile, aktualisiert\)[\s\S]{0,200}\/api\/profile\/\$\{profile\.id\}/.test(web) &&
+      /openMeldenBlatt\(\{ art: 'user', id: profile\.id \}\)/.test(web));
   // Gegenstück zum App-Fund: die Website lädt das Profil beim Öffnen per ID
   // vom Server (nicht aus state.users) — Suchtreffer/Mitglieder gehen also.
   const supaApi = lies('web/server/supabase-api.js');
