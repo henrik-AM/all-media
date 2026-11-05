@@ -1,3 +1,23 @@
+-- ===========================================================================
+-- ABGLEICH MIT MAIN (Paket 1, 05.11.2026, Stand origin/main ad7f221)
+--   Live nur lesend geprüft (pg_get_functiondef, pg_policies):
+--   * mitteilung_bei_kommentar(): letzte Fassung auf main = Schema 44, live
+--     wortgleich mit 44 → die Fassung hier (44 + Ausnahme für Antworten an
+--     den Beitragsinhaber) dreht nichts zurück. 101–117 definieren sie nicht.
+--   * comments.moderiert_am, kommentar_ausgeblendet(), Regel nicht_ausgeblendet
+--     (Schema 102, F11): diese Datei fasst moderiert_am nicht an. Live sind
+--     Funktion und Regel OHNE reply_to-Teil angelegt; Abschnitt 6 unten führt
+--     den F11-Block aus 102 wortgleich erneut aus (jetzt mit reply_to) —
+--     der Nachtrag „nach 92 den F11-Block aus 102 erneut ausführen“
+--     (SUPABASE_REIHENFOLGE.md, 02.11.) ist damit Teil dieser Datei.
+--   * notifications_art_check/target_type_check: NICHT angefasst (Gewinner 90).
+--   * comments.reply_to/antwort_an, stream_comments.reply_to, Regeln „Antwort
+--     nur im selben Beitrag“/„Live-Antwort nur im selben Stream“ (restriktiv,
+--     verundet mit nicht_ausgeblendet/nicht_gesperrt/nur_freigegebene),
+--     kommentar_antwort_erlaubt, kommentar_bezug_fest, live_antwort_erlaubt,
+--     kommentar_angesprochen, mitteilung_bei_kommentar_antwort,
+--     mitteilung_weg_bei_kommentar_antwort + Auslöser: neu, live nicht vorhanden.
+-- ===========================================================================
 -- ============================================================================
 --  SUPABASE_SCHEMA_92_kommentar_antworten.sql
 --  (Nummer 92 vom Hauptagenten reserviert. ENTWURF — eingespielt wird erst
@@ -421,6 +441,57 @@ create trigger mitteilung_weg_kommentar_antwort
 
 
 -- ---------------------------------------------------------------------------
+--  6. Codex-Fund F11 (Schema 102) mit reply_to nachziehen — Paket 1, 05.11.2026
+--
+--  Schema 102 (live seit 02.11.2026) legt kommentar_ausgeblendet() und die
+--  restriktive Regel nicht_ausgeblendet auf comments je nach Spalte reply_to
+--  an; live ohne Antwort-Teil, weil 92 fehlte. Damit das nicht vergessen
+--  wird, hier der F11-Block aus SUPABASE_SCHEMA_102_melden_moderation.sql
+--  WORTGLEICH (nur den comments-Teil, Regel nur für authenticated wie die
+--  live korrigierte Fassung). Jetzt mit reply_to: Antworten an einem
+--  ausgeblendeten Kommentar sind ebenfalls ausgeblendet. Ändert 102 diesen
+--  Block später, hier mitziehen (Quelle bleibt 102).
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  mit_antwort boolean := exists (select 1 from information_schema.columns
+                                  where table_schema = 'public' and table_name = 'comments'
+                                    and column_name = 'reply_to');
+begin
+  execute format($f$
+    create or replace function public.kommentar_ausgeblendet(p_kommentar uuid)
+    returns boolean
+    language sql
+    stable
+    security definer
+    set search_path = public
+    as $b$
+      select exists (
+        select 1 from public.comments c
+          %s
+          join public.posts p on p.id = c.post_id
+         where c.id = p_kommentar
+           and (c.moderiert_am is not null or p.moderiert_am is not null %s));
+    $b$;$f$,
+    case when mit_antwort then 'left join public.comments w on w.id = c.reply_to' else '' end,
+    case when mit_antwort then 'or w.moderiert_am is not null' else '' end);
+
+  -- Die eigene Zeile prüft die Regel direkt (sonst sähe die Hilfsfunktion
+  -- beim Einfügen die neue Zeile noch nicht), Beitrag und Wurzel über die
+  -- Hilfsfunktionen.
+  execute 'drop policy if exists nicht_ausgeblendet on public.comments';
+  execute format(
+    'create policy nicht_ausgeblendet on public.comments as restrictive for all to authenticated '
+    'using (%1$s) with check (%1$s)',
+    'moderiert_am is null and not public.beitrag_ausgeblendet(post_id)'
+    || case when mit_antwort then ' and (reply_to is null or not public.kommentar_ausgeblendet(reply_to))' else '' end);
+end $$;
+revoke execute on function public.kommentar_ausgeblendet(uuid) from public, anon;
+grant execute on function public.kommentar_ausgeblendet(uuid) to authenticated;
+
+
+-- ---------------------------------------------------------------------------
 --  Gegenprobe im selben Lauf (die Verwaltungs-API meldet sonst auch dann
 --  Erfolg, wenn nichts gegriffen hat).
 -- ---------------------------------------------------------------------------
@@ -456,6 +527,13 @@ begin
      or has_function_privilege('authenticated', 'public.mitteilung_bei_kommentar_antwort()', 'execute')
      or has_function_privilege('authenticated', 'public.kommentar_angesprochen(uuid)', 'execute') then
     fehlt := fehlt || ' Rechte(EXECUTE zu offen)';
+  end if;
+  if position('reply_to' in pg_get_functiondef('public.kommentar_ausgeblendet(uuid)'::regprocedure)) = 0
+     or not exists (select 1 from pg_policies
+                     where schemaname = 'public' and tablename = 'comments'
+                       and policyname = 'nicht_ausgeblendet' and permissive = 'RESTRICTIVE'
+                       and qual like '%reply_to%') then
+    fehlt := fehlt || ' F11(kommentar_ausgeblendet/nicht_ausgeblendet ohne reply_to)';
   end if;
   if fehlt <> '' then
     raise exception 'Schema 92 unvollstaendig:%', fehlt;

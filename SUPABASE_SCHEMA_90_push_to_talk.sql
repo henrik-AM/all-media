@@ -6,10 +6,9 @@
 --     'system' für Schema 102) + 'ptt'. Keine live erlaubte Art fehlt.
 --   * notifications_target_type_check: Liste hier = Live-Liste (9 Ziele)
 --     + 'channel'. Kein live erlaubtes Ziel fehlt.
---     ACHTUNG beim Einspielen: Schema 92 ersetzt notifications_art_check
---     erneut (+ 'antwort') und muss 'ptt' aus dieser Datei enthalten
---     (geprüft, siehe Kopf von 92). Die Entwürfe 97–100 (Pakete 2/3) nicht
---     geprüft — wer dort die Liste ersetzt, muss 'ptt'/'channel' mitnehmen.
+--     Schema 92 fasst beide Bedingungen nicht an (Gewinner bleibt 90).
+--     Die Entwürfe 97/98 (Paket 2, Sammelzweig) ersetzen notifications_art_check
+--     erneut — dort nicht geprüft; sie müssen 'ptt'/'channel' mitnehmen.
 --   * kanalnachricht_nicht_leer: Fassung aus 89 + ptt_sitzung.
 --   * community_members.ptt_benachrichtigung, community_channel_messages.ptt_sitzung,
 --     ptt_messages.sitzung_id, Regel „Sitzungszeile nur vom Ausloeser“
