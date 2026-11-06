@@ -219,6 +219,39 @@ test('Prüfbrowser: gesperrtes Medium erzwingt Fehlercode trotz process.exit(0)'
   assert.match(kind.stderr, /Cloud-Medium/);
 });
 
+test('Prüfbrowser: nur unsignierte feste Beispielbilder bekommen ein lokales Ersatzbild', async () => {
+  const { festesBeispiel } = require('./_medien_egressschutz');
+  const basis = 'https://projekt.supabase.co/storage/v1/object';
+  for (const ok of ['/public/media/beispiel/story-berge.jpg', '/public/media/beispiel/x_1.PNG',
+    '/public/media/beispiel/a.webp']) assert.equal(festesBeispiel(basis + ok), true, ok);
+  for (const nein of ['/sign/media/beispiel/story-berge.jpg?token=x', '/public/media/beispiel/story.jpg?x=1',
+    '/public/media/posts/a.jpg', '/public/media/beispiel/../posts/a.jpg', '/public/media/beispiel/a.mp4',
+    '/public/media/beispiel/unter/a.jpg', '/public/anderer/beispiel/a.jpg', '/public/media/beispiel/%2e%2e.jpg'])
+    assert.equal(festesBeispiel(basis + nein), false, nein);
+  // Ersatz statt Sperre: kein Fehlercode, Antwort ist ein Bild.
+  const datei = path.join(__dirname, '_medien_egressschutz.js');
+  const kind = spawnSync(process.execPath, ['-e', `
+    const {medienEgressSchuetzen} = require(${JSON.stringify(datei)});
+    medienEgressSchuetzen({route: async (_, fn) => {
+      await fn({request: () => ({url: () => ${JSON.stringify(basis + '/public/media/beispiel/story-test.jpg')}}),
+        abort: async () => { throw Error('gesperrt'); },
+        fulfill: async (a) => { if (a.status !== 200 || a.contentType !== 'image/png' || !a.body.length) throw Error('falsch'); }});
+    }}).then(() => process.exit(0));
+  `], { encoding: 'utf8' });
+  assert.equal(kind.status, 0, kind.stderr);
+  // Andere Cloud-Medien bleiben gesperrt und werden mit Pfad genannt.
+  const gesperrt = spawnSync(process.execPath, ['-e', `
+    const {medienEgressSchuetzen} = require(${JSON.stringify(datei)});
+    medienEgressSchuetzen({route: async (_, fn) => {
+      await fn({request: () => ({url: () => ${JSON.stringify(basis + '/sign/media/posts/a.jpg?token=geheim')}}),
+        abort: async () => {}, fulfill: async () => { throw Error('ersetzt'); }});
+    }}).then(() => process.exit(0));
+  `], { encoding: 'utf8' });
+  assert.equal(gesperrt.status, 2);
+  assert.match(gesperrt.stderr, /gesperrt: \/storage\/v1\/object\/sign\/media\/posts\/a\.jpg/);
+  assert.doesNotMatch(gesperrt.stderr, /geheim/);
+});
+
 const api = require(path.join(wurzel, 'web/server/supabase-api'));
 const zielId = '12345678-1234-1234-1234-123456789abc';
 function datenbank({ unsichtbar = false, fehler = null } = {}) {
