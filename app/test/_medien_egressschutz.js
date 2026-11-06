@@ -13,7 +13,8 @@
  * BUNNY_* kann sie nicht unterschreiben und reicht die rohe, tote Adresse
  * durch. Jeder Lauf mit Startseite endete so mit Exit 2 (_aktionen, _kanal),
  * obwohl alle Prüfungen grün waren. Diese Adressen bekommen ein lokales
- * Ersatzbild — nur unsigniert, nur Ordner `beispiel`, nur Bilddateien.
+ * Ersatz — nur unsigniert, nur Ordner `beispiel`, nur Bild- und MP4-Dateien.
+ * Videos bekommen das lokale 4-s-Testvideo aus pruefbelege/bunny-app.
  * `beispiel` darf ohnehin jeder sehen; eine Rechteprüfung wird nicht umgangen.
  */
 const net = require('node:net');
@@ -33,11 +34,23 @@ const ERSATZBILD = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGO4BwAAzgDNGzVPuAAAAABJRU5ErkJggg==',
   'base64');
 
-/** Unsignierte Adresse eines festen Beispielbilds (Schema 43/45)? */
+// Lokales Testvideo (H.264, 320×240, 4 s); erst bei Bedarf gelesen.
+const ERSATZVIDEO = require('node:path').join(__dirname, '..', '..', 'pruefbelege', 'bunny-app', 'testvideo.mp4');
+let ersatzvideo = null;
+
+/** Unsignierte Adresse eines festen Beispielmediums (Schema 43/45)? 'bild', 'video' oder null. */
 function festesBeispiel(adresse) {
   const url = new URL(adresse);
-  return !url.search && !url.hash &&
-    /^\/storage\/v1\/object\/public\/media\/beispiel\/[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)$/i.test(url.pathname);
+  if (url.search || url.hash) return null;
+  const treffer = /^\/storage\/v1\/object\/public\/media\/beispiel\/[A-Za-z0-9_-]+\.(jpe?g|png|webp|mp4)$/i.exec(url.pathname);
+  if (!treffer) return null;
+  return treffer[1].toLowerCase() === 'mp4' ? 'video' : 'bild';
+}
+
+function ersatzFuer(art) {
+  if (art === 'bild') return { status: 200, contentType: 'image/png', body: ERSATZBILD };
+  if (!ersatzvideo) ersatzvideo = require('node:fs').readFileSync(ERSATZVIDEO);
+  return { status: 200, contentType: 'video/mp4', body: ersatzvideo };
 }
 
 async function medienEgressSchuetzen(ziel) {
@@ -45,9 +58,8 @@ async function medienEgressSchuetzen(ziel) {
   ziel.__medienEgressSchutz = true;
   await ziel.route((url) => cloudMedium(url.href), async (route) => {
     const adresse = route.request?.().url();
-    if (adresse && festesBeispiel(adresse)) {
-      return route.fulfill({ status: 200, contentType: 'image/png', body: ERSATZBILD });
-    }
+    const art = adresse && festesBeispiel(adresse);
+    if (art) return route.fulfill(ersatzFuer(art));
     // Auch ein funktionaler Test darf mit fehlenden Medien nicht grün enden.
     process.exitCode = 2;
     if (!gesperrt) console.error('ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.');

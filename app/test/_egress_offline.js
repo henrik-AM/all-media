@@ -223,11 +223,13 @@ test('Prüfbrowser: nur unsignierte feste Beispielbilder bekommen ein lokales Er
   const { festesBeispiel } = require('./_medien_egressschutz');
   const basis = 'https://projekt.supabase.co/storage/v1/object';
   for (const ok of ['/public/media/beispiel/story-berge.jpg', '/public/media/beispiel/x_1.PNG',
-    '/public/media/beispiel/a.webp']) assert.equal(festesBeispiel(basis + ok), true, ok);
+    '/public/media/beispiel/a.webp']) assert.equal(festesBeispiel(basis + ok), 'bild', ok);
+  assert.equal(festesBeispiel(basis + '/public/media/beispiel/reel-01.mp4'), 'video');
   for (const nein of ['/sign/media/beispiel/story-berge.jpg?token=x', '/public/media/beispiel/story.jpg?x=1',
-    '/public/media/posts/a.jpg', '/public/media/beispiel/../posts/a.jpg', '/public/media/beispiel/a.mp4',
-    '/public/media/beispiel/unter/a.jpg', '/public/anderer/beispiel/a.jpg', '/public/media/beispiel/%2e%2e.jpg'])
-    assert.equal(festesBeispiel(basis + nein), false, nein);
+    '/public/media/posts/a.jpg', '/public/media/beispiel/../posts/a.jpg', '/public/media/beispiel/a.mov',
+    '/public/media/beispiel/unter/a.jpg', '/public/anderer/beispiel/a.jpg', '/public/media/beispiel/%2e%2e.jpg',
+    '/public/media/posts/a.mp4', '/sign/media/beispiel/reel-01.mp4?token=x'])
+    assert.equal(festesBeispiel(basis + nein), null, nein);
   // Ersatz statt Sperre: kein Fehlercode, Antwort ist ein Bild.
   const datei = path.join(__dirname, '_medien_egressschutz.js');
   const kind = spawnSync(process.execPath, ['-e', `
@@ -239,6 +241,15 @@ test('Prüfbrowser: nur unsignierte feste Beispielbilder bekommen ein lokales Er
     }}).then(() => process.exit(0));
   `], { encoding: 'utf8' });
   assert.equal(kind.status, 0, kind.stderr);
+  const video = spawnSync(process.execPath, ['-e', `
+    const {medienEgressSchuetzen} = require(${JSON.stringify(datei)});
+    medienEgressSchuetzen({route: async (_, fn) => {
+      await fn({request: () => ({url: () => ${JSON.stringify(basis + '/public/media/beispiel/reel-01.mp4')}}),
+        abort: async () => { throw Error('gesperrt'); },
+        fulfill: async (a) => { if (a.contentType !== 'video/mp4' || a.body.subarray(4, 8).toString() !== 'ftyp') throw Error('kein mp4'); }});
+    }}).then(() => process.exit(0));
+  `], { encoding: 'utf8' });
+  assert.equal(video.status, 0, video.stderr);
   // Andere Cloud-Medien bleiben gesperrt und werden mit Pfad genannt.
   const gesperrt = spawnSync(process.execPath, ['-e', `
     const {medienEgressSchuetzen} = require(${JSON.stringify(datei)});
