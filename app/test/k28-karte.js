@@ -260,6 +260,16 @@ async function teilB() {
   const prId = a1.data.user.id;
   const teId = a2.data.user.id;
 
+  // Kontakt + Zweierchat des Testpaars sichern (fehlten am 06.11.2026 im
+  // Testbestand; Management-API, nur die zwei Testkonten).
+  const Testpaar = require('./_testpaar');
+  try {
+    await Testpaar.testpaarSichern();
+  } catch (e) {
+    pruefe('Testpaar @test ↔ @prueflauf (Kontakt + Zweierchat) sichern', false, e.message);
+    return;
+  }
+
   /* ---- 7.5: teilen, löschen, Merker lesen ---- */
   let chatId = null;
   let beitragId = null;
@@ -315,7 +325,9 @@ async function teilB() {
   }
 
   /* ---- 7.8: eigenes Kontaktbild ---- */
-  const url = URL.replace(/\/$/, '') + '/storage/v1/object/public/media/avatars/prueflauf-k28-' + Date.now() + '.jpg';
+  // Seit Schema 117: nur ein eigener Upload (medien_objekte) darf hinein.
+  const medium = await Testpaar.eigenesMedium(URL, prId, 'avatars', 'k28-karte-' + Date.now() + '.jpg');
+  const url = medium.url;
   const { data: teVorher } = await pr.from('profiles').select('avatar_url').eq('id', teId).maybeSingle();
   await pruefeAsync('7.8 gespeichert: @prueflauf setzt ein eigenes Bild für @test', async () => {
     const { data, error } = await pr.from('kontakt_bilder')
@@ -360,6 +372,7 @@ async function teilB() {
     const { data } = await pr.from('kontakt_bilder').select('kontakt_id').eq('owner_id', prId).eq('kontakt_id', teId);
     if ((data || []).length) throw new Error('Zeile steht noch da');
   });
+  await Testpaar.eigenesMediumWeg(medium.pfad).catch(() => {});
 }
 
 (async () => {
