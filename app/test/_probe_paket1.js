@@ -86,6 +86,9 @@ const literale = `(select string_agg(m[1], ',' order by m[1]) from regexp_matche
   if (auswahl.length !== DATEIEN.length) console.log('GEGENPROBE nur mit: ' + (auswahl.join(', ') || 'keinem Schema'));
   const schemas = auswahl.map((d) => `-- ===== ${d}\n` + fs.readFileSync(path.join(WURZEL, d), 'utf8')).join('\n\n');
 
+  const nachfolger = (process.env.NACHFOLGER || '').split(',').filter(Boolean)
+    .map((f) => fs.readFileSync(path.resolve(f), 'utf8')).join('\n\n');
+
   const sql = `
 begin;
 select set_config('probe.erg', '', true);
@@ -95,6 +98,7 @@ select set_config('probe.art_vorher', coalesce((select ${literale} from pg_const
        set_config('probe.ziel_vorher', coalesce((select ${literale} from pg_constraint c where c.conname = 'notifications_target_type_check'), ''), true);
 
 ${schemas}
+${nachfolger}
 
 -- Bestand für die Probe (als Eigentümer, verworfen am Ende)
 insert into public.communities (id, name, topic, visibility, created_by)

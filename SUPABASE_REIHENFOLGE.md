@@ -495,3 +495,12 @@ legen ohne 99 wie bisher an; ein privates Unterthema wird ohne 99 gar nicht ange
 | Funktion public.ptt_mitteilen() | SUPABASE_SCHEMA_90_push_to_talk.sql → SUPABASE_SCHEMA_99_erstellen_einladung.sql |
 
 **Gesamtreihenfolge der offenen Entwürfe:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 97 → 98 → 99.
+
+
+## Gemeinsame Abnahme 05.11.2026: Datenauskunft für Schema 99
+
+99 ergänzt den Tabellen-Eintrag `unterthema_mitgliedschaften` für
+`unterthema_mitglieder` (nur `user_id = auth.uid()`) in der vorhandenen
+`meine_daten()`-Fassung. Andere spätere Auskunftserweiterungen bleiben erhalten.
+Nach erneutem Einspielen von 103 muss 99 danach nachgezogen werden. Die Probe 99
+prüft den eigenen Eintrag und den Ausschluss fremder Mitgliedschaften.

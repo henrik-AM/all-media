@@ -185,6 +185,9 @@ ${als(PRUEFKONTO, `
   ${versuch('falscher_code', `perform public.einladung_annehmen('probezzzzzzzzzzz')`)}
   ${versuch('zugang_abfragen', `perform public.unterthema_zugang(gen_random_uuid(), auth.uid())`)}
   ${weg('annehmen_kanal', `perform public.einladung_annehmen('${CODE_K}')`)}
+  ${merke('auskunft_eigen', "exists (select 1 from jsonb_array_elements(public.meine_daten()->'unterthema_mitgliedschaften') x where x->>'user_id' = auth.uid()::text)")}
+  ${merke('auskunft_keine_fremden', "not exists (select 1 from jsonb_array_elements(public.meine_daten()->'unterthema_mitgliedschaften') x where x->>'user_id' <> auth.uid()::text)")}
+
   select count(*) into n from public.community_channels k join public.communities c on c.id = k.community_id where c.name = 'Probe99 Offen';
   ${merke('mitglied_sieht_nachher', 'n')}
   select count(*) into n from public.community_channel_messages m where m.text = 'geheim';
@@ -319,6 +322,9 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('unterthema_zugang direkt aufrufen: zu', w.zugang_abfragen === 'zu', w.zugang_abfragen);
   console.log('\nMit Einladung (Prüfkonto)');
   pruefe('10.2 Einladung ins private Unterthema annehmen: ok', w.annehmen_kanal === 'ok', w.annehmen_kanal);
+  pruefe('Datenauskunft enthält eigene Unterthema-Mitgliedschaft', w.auskunft_eigen === 'true', w.auskunft_eigen);
+  pruefe('Datenauskunft enthält keine fremden Unterthema-Mitgliedschaften', w.auskunft_keine_fremden === 'true', w.auskunft_keine_fremden);
+
   pruefe('10.2 danach sichtbar (2 von 2), Nachrichten lesbar, schreiben ok',
     w.mitglied_sieht_nachher === '2' && w.nachrichten_nachher === '1' && w.schreiben_nachher === 'ok',
     `${w.mitglied_sieht_nachher} ${w.nachrichten_nachher} ${w.schreiben_nachher}`);

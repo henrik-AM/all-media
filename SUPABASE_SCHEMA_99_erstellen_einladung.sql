@@ -109,7 +109,8 @@
 --    einladungen                 103 (Auskunft) führt die Tabelle schon auf und
 --                                überspringt sie, solange sie fehlt.
 --                                unterthema_mitglieder fehlt in der Auskunft (103)
---                                — offen, gehört in 103.
+--                                — unten ergänzt 99 nur den Tabellen-Eintrag; nach
+--                                erneutem 103 muss 99 danach nachgezogen werden.
 --    zuruecksetzen(), notifications_*_check: von 99 nicht berührt.
 -- ===========================================================================
 
@@ -603,6 +604,28 @@ grant execute on function public.kanal_sichtbar(uuid) to authenticated;
 revoke execute on function public.kanal_mitglied(uuid) from public, anon;
 grant execute on function public.kanal_mitglied(uuid) to authenticated;
 
+
+-- ---------------------------------------------------------------------------
+-- 4b. Neue Mitgliedschaft in der bestehenden Datenauskunft ergänzen.
+-- Nur die Tabellenliste der aktuellen Funktion erweitern: keine ältere
+-- vollständige Fassung aus 103 über spätere Änderungen (z. B. 106) schreiben.
+-- CREATE OR REPLACE erhält die bestehenden Ausführungsrechte.
+-- ---------------------------------------------------------------------------
+
+do $auskunft$
+declare
+  definition text;
+  anker constant text := '(''einladungen'',';
+begin
+  definition := pg_get_functiondef('public.meine_daten()'::regprocedure);
+  if position('unterthema_mitgliedschaften' in definition) = 0 then
+    if position(anker in definition) = 0 then
+      raise exception 'Datenauskunft unbekannt: Unterthema-Mitgliedschaften nicht sicher ergänzbar';
+    end if;
+    execute replace(definition, anker,
+      '(''unterthema_mitgliedschaften'', ''unterthema_mitglieder'', ''user_id'', ''{}''),' || E'\n      ' || anker);
+  end if;
+end $auskunft$;
 
 -- ---------------------------------------------------------------------------
 -- 5. Selbstprüfung

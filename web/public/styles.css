@@ -5503,3 +5503,6 @@ textarea.profilseite__gross { min-height: 160px; }
 .erstellseite__meldung { color: var(--danger, #E5484D); font-size: 14px; margin: 0 0 8px; text-align: center; }
 .erstellseite__fertig { background: #0A7CEB; color: #fff; border: 0; border-radius: 12px; min-width: 140px; padding: 12px 24px; font: inherit; font-size: 17px; cursor: pointer; }
 .erstellseite__fertig:disabled { opacity: .6; }
+
+/* Kopierbestätigung darf den Fertig-Knopf der Erstellen-Seite nicht verdecken. */
+body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
