@@ -400,7 +400,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
           .catch(() => { throw new Error(`„${label}“ nach Rückkehr nicht da (davor: ${uebrig.zuletzt || '—'})`); });
       }
       uebrig.zuletzt = label;
-      await page.click(`[data-setting="${label}"]`);
+      /*
+       * Blätter, die erst nachladen (Gelikte Beiträge, Gespeichert …), gehen
+       * manchmal erst nach dem Wegräumen auf und legen ihre .sheet-backdrop
+       * über den nächsten Knopf (Gesamtlauf 07.11.: Klick 8 s abgefangen).
+       * Dann das späte Blatt wegräumen und noch einmal klicken.
+       */
+      const wegRaeumen = () => page.evaluate(() => document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove()));
+      await wegRaeumen();
+      await page.click(`[data-setting="${label}"]`, { timeout: 3000 }).catch(async () => {
+        await page.waitForTimeout(1500);
+        await wegRaeumen();
+        await page.click(`[data-setting="${label}"]`);
+      });
       await page.waitForTimeout(350);
       const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
       if (/\bfolgt\b|\bfolgen\b|Phase 3/i.test(hinweis)) uebrig.push(`${label}: ${hinweis}`);
