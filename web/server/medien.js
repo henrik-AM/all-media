@@ -258,7 +258,8 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
    * auch ein WebM aus dem Browser; der Inhaltstyp stimmte, der Name nicht.
    */
   const endung =
-    typ === 'image/png' ? 'png' : typ === 'image/webp' ? 'webp' : typ.startsWith('video/') ? StoryRegeln.videoEndung(typ) : 'jpg';
+    typ === 'image/png' ? 'png' : typ === 'image/webp' ? 'webp' : typ === 'audio/mp4' ? 'm4a'
+      : typ.startsWith('video/') ? StoryRegeln.videoEndung(typ) : 'jpg';
   /*
    * Zufallsteil im Namen — dieselbe Ueberlegung wie in
    * app/lib/supabaseStorage.ts: `<kennung>-<zeitstempel>` heisst, dass man

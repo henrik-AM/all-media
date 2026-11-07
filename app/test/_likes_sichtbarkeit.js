@@ -36,6 +36,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const { testmedium } = require('./_testmedium');
 const { nurTestkonto } = require('./_nur_testkonten');
 const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
@@ -346,8 +347,12 @@ const mitFrist = (versprechen, was, ms = 20000) =>
 
       // Storys: eine Story des Erstellers, Like des Likenden, und umgekehrt.
       const verfall = new Date(Date.now() + 3600e3).toISOString();
+      // Seit Schema 95/117 nur eine selbst hochgeladene Datei (siehe _testmedium.js).
+      const m1 = await testmedium(ersteller.client, ersteller.id, 'stories', URL);
+      const m2 = await testmedium(liker.client, liker.id, 'stories', URL);
+      try {
       const { data: st1, error: sErr } = await ersteller.client.from('stories')
-        .insert({ user_id: ersteller.id, media_url: 'x/likespruefung.jpg', media_type: 'image', expires_at: verfall })
+        .insert({ user_id: ersteller.id, media_url: m1.url, media_type: 'image', expires_at: verfall })
         .select('id').single();
       if (sErr) throw sErr;
       try {
@@ -361,7 +366,7 @@ const mitFrist = (versprechen, was, ms = 20000) =>
         await ersteller.client.from('stories').delete().eq('id', st1.id);
       }
       const { data: st2, error: sErr2 } = await liker.client.from('stories')
-        .insert({ user_id: liker.id, media_url: 'x/likespruefung2.jpg', media_type: 'image', expires_at: verfall })
+        .insert({ user_id: liker.id, media_url: m2.url, media_type: 'image', expires_at: verfall })
         .select('id').single();
       if (sErr2) throw sErr2;
       try {
@@ -373,6 +378,10 @@ const mitFrist = (versprechen, was, ms = 20000) =>
         }
       } finally {
         await liker.client.from('stories').delete().eq('id', st2.id);
+      }
+      } finally {
+        await m1.weg();
+        await m2.weg();
       }
     }
   } finally {

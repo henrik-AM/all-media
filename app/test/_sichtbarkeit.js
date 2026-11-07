@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { nurTestkonto } = require('./_nur_testkonten');
+const { testmedium } = require('./_testmedium');
 const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
@@ -132,7 +133,13 @@ async function anmelden(zugang) {
   const bestandAnlegen = async () => {
     const { data: story, error: f1 } = await eigner.client
       .from('stories')
-      .insert({ user_id: eigner.id, caption: 'Prüflauf Sichtbarkeit' })
+      /*
+       * in_videos: Seit Schema 68 sieht ein Fremder eine reine Messenger-Story
+       * nur als Messenger-Kontakt (contacts.status = 'friend'). Dieser Lauf
+       * prüft die Stufe „story“, nicht den Kanal; er hing still an einem
+       * Freundes-Kontakt im Bestand, den es seit 06.11.2026 nicht mehr gibt.
+       */
+      .insert({ user_id: eigner.id, caption: 'Prüflauf Sichtbarkeit', in_videos: true })
       .select('id')
       .maybeSingle();
     if (f1) throw f1;
@@ -216,6 +223,9 @@ async function anmelden(zugang) {
         .eq('id', eigenes.communityId);
       pruefe('Die Pruefcommunity ist danach wirklich weg', (rest || []).length === 0,
         `${(rest || []).length} Zeile(n) geblieben`);
+    }
+    if (eigenes.ton) {
+      pruefe('Die Prüfdatei der PTT-Nachricht ist danach weg', await eigenes.ton.weg());
     }
   };
 
@@ -586,10 +596,13 @@ async function anmelden(zugang) {
         .from('community_members')
         .insert({ community_id: gemeinschaft.id, user_id: fremder.id });
 
+      // Seit Schema 95/117 nur eine selbst hochgeladene Datei (siehe _testmedium.js);
+      // die erfundene Adresse scheiterte am CHECK, und „Niemand" war grün aus falschem Grund.
+      eigenes.ton = await testmedium(eigner.client, eigner.id, 'ptt', URL, { ton: true });
       const { error: sErr } = await eigner.client.from('ptt_messages').insert({
         community_id: gemeinschaft.id,
         sender_id: eigner.id,
-        audio_url: 'https://example.invalid/pruef.m4a',
+        audio_url: eigenes.ton.url,
         dauer: 2,
       });
       pruefe('Eine PTT-Nachricht laesst sich senden', !sErr, sErr ? sErr.message : '');

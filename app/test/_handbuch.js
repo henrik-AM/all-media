@@ -154,8 +154,27 @@ const pruefe = (name, wahr, zusatz = '') => {
   // ======================================================== Insight Time ==
   console.log('\nInsight Time');
 
+  /*
+   * Seit Schema 95/117 (live 06.11.2026) nimmt eine Medienspalte nur eine
+   * selbst hochgeladene Datei in Datenbankform. Die erfundene Adresse
+   * (example.invalid) scheiterte am CHECK, bevor geprüft wurde, was hier
+   * geprüft werden soll. Darum über denselben Hochladeweg wie die Website.
+   */
+  const hochgeladen = [];
+  const hochladen = async (ordner, base64, typ) => {
+    const r = await seite.evaluate(async ({ ordner, aufnahme }) =>
+      (await fetch('/api/hochladen', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordner, aufnahme }),
+      })).json(), { ordner, aufnahme: `data:${typ};base64,${base64}` });
+    if (!r?.ok || !r.url) throw new Error(`Hochladen nach ${ordner}/: ${r?.error || 'keine Adresse'}`);
+    hochgeladen.push(r.pfad);
+    return r.url;
+  };
+  const { PNG, M4A } = require('./_testmedium');
+
   const insight = await app('insightSenden', [K_BOB], {
-    mediaUrl: 'https://example.invalid/pruef.jpg',
+    mediaUrl: await hochladen('insights', PNG.toString('base64'), 'image/png'),
     mediaTyp: 'image',
     einmal: true,
   });
@@ -422,7 +441,7 @@ const pruefe = (name, wahr, zusatz = '') => {
   });
 
   if (community) {
-    const ptt = await app('pttSenden', community.id, 'https://example.invalid/ton.m4a', 3);
+    const ptt = await app('pttSenden', community.id, await hochladen('ptt', M4A.toString('base64'), 'audio/mp4'), 3);
     pruefe('Eine Sprachnachricht in die Community', ptt.ok, ptt.ok ? '' : ptt.fehler);
   } else {
     pruefe('Eine Sprachnachricht in die Community', false, 'keine eigene Community');
@@ -456,6 +475,12 @@ const pruefe = (name, wahr, zusatz = '') => {
   }
 
   await zuruecksetzen(seite);
+  // Die Dateien dieses Laufs wieder abräumen (nach den Zeilen, die auf sie zeigten).
+  for (const pfad of hochgeladen) {
+    await seite.evaluate(async (pfad) => fetch('/api/medien/loeschen', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pfad }),
+    }), pfad).catch(() => {});
+  }
 
   console.log(
     browserFehler.length ? '\nKonsolenfehler:\n' + browserFehler.join('\n') : '\nKonsolenfehler: keine'

@@ -231,7 +231,13 @@ async function main() {
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
     'base64'
   );
-  const pfad = `test/pruefung-${Date.now()}.png`;
+  /*
+   * Ordner `posts/` mit eigener Kennung vorn, wie die App ablegt: Die Regel
+   * „Eigene Medien hochladen" nimmt nur noch messages|stories|avatars|posts|
+   * insights|ptt. Der alte Ordner `test/` wurde deshalb abgewiesen — und die
+   * HTML-Prüfung darunter war grün aus falschem Grund (Ordner statt Typ).
+   */
+  const pfad = `posts/${ichId}-pruefung-${Date.now()}.png`;
   const hoch = await fetch(`${URL}/storage/v1/object/media/${pfad}`, {
     method: 'POST',
     headers: { ...kopf, 'Content-Type': 'image/png' },
@@ -241,7 +247,7 @@ async function main() {
   pruefe('Ablage "media": Hochladen geht', hoch.ok, hoch.ok ? '' : `${hoch.status} ${hochText}`);
 
   // Fund 6: was kein Medium ist, darf gar nicht erst hinein.
-  const verboten = await fetch(`${URL}/storage/v1/object/media/test/boese-${Date.now()}.html`, {
+  const verboten = await fetch(`${URL}/storage/v1/object/media/posts/${ichId}-boese-${Date.now()}.html`, {
     method: 'POST',
     headers: { ...kopf, 'Content-Type': 'text/html' },
     body: '<script>alert(1)</script>',
