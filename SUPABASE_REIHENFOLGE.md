@@ -513,3 +513,14 @@ versteckte sie, es galt immer „Meine Kontakte" (auch bei „Niemand"). Neu:
 Definer-Hilfe `darf_in_gruppe_holen(uuid)` (nur Ja/Nein für den Aufrufer,
 anon/PUBLIC entzogen). Fund aus test:dmsperre, Probe `app/test/_probe120.js` 9/9.
 
+
+## Nachtrag 07.11.2026: Schema 121 — Beitragsbezug fest (Codex-Fund zu 119)
+
+119 prüft die Sichtbarkeit des Beitrags nur beim INSERT. Bei post_likes, reposts,
+saves, post_notify und sammlung_beitraege (Regel FOR ALL `auth.uid() = user_id`)
+ließ sich `post_id` danach per UPDATE auf einen unsichtbaren Beitrag umbiegen
+(Probe live 07.11.: 18/36). 121 legt den Auslöser `beitrag_bezug_fest`
+(`spalten_fest('post_id')` bzw. `('shared_post_id')`) auf alle 11 Tabellen aus 119 —
+neu, keine Doppelung; ändert weder spalten_fest noch eine Regel. messages/comments
+waren über ihre vorhandenen spalten_fest-Listen schon geschützt (doppelt hält
+besser). Probe `app/test/_probe121.js` 36/36.
