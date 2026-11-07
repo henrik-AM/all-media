@@ -124,7 +124,13 @@ function uebersetzen(name) {
    */
   const kanalDaten = await seite.evaluate(async () => {
     const boot = await (await fetch('/api/bootstrap')).json();
-    for (const c of boot.communities || []) {
+    /*
+     * Nur beigetretene: die Communitys-Startseite zeigt unter „Meine“ nur
+     * diese (renderCommunities), und der Oberflächenteil unten klickt dort.
+     * Im Gesamtlauf vom 06.11. stand vorn eine nicht beigetretene Community
+     * mit Unterthema — der Klick wartete 30 s auf eine Zeile, die es nicht gab.
+     */
+    for (const c of (boot.communities || []).filter((x) => x.joined)) {
       const k = (c.channels || [])[0];
       if (k) return { communityId: c.id, communityName: c.name, kanalId: k.id, kanalName: k.name };
     }
@@ -369,4 +375,9 @@ function uebersetzen(name) {
   console.log('Konsolenfehler: ' + (browserFehler.length ? browserFehler.join(' | ') : 'keine'));
 
   await beenden(browser, fehler || browserFehler.length ? 1 : 0);
-})();
+})().catch((e) => {
+  // Wie _dmsperre.js: ein Absturz ist ein roter Lauf mit Grund, kein
+  // stilles Warten bis zur 15-Minuten-Grenze des Gesamtlaufs.
+  console.error('FEHLER  ' + (e?.message ?? e));
+  process.exit(1);
+});
