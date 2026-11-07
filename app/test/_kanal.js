@@ -278,7 +278,12 @@ function uebersetzen(name) {
       const punkte = await seite.$$eval('[data-anhang]', (n) => n.map((x) => x.dataset.anhang));
       await seite.click('[data-sheet-close]').catch(() => {});
       await seite.waitForTimeout(300);
-      return punkte.includes('sticker') && !punkte.includes('standortAnfragen');
+      /*
+       * Seit Kasten 28/6.1 (28.09.2026) stehen GIF/Sticker hinter einem eigenen
+       * Knopf, nicht mehr im Anhang-Blatt; geprüft wurde bis 07.11. noch
+       * 'sticker'. Das Blatt hat jetzt Galerie/Dokument/Standort/Kontakt.
+       */
+      return punkte.includes('standort') && punkte.includes('datei') && !punkte.includes('standortAnfragen');
     })(),
     'im Kanal gibt es kein Gegenüber, das man fragen könnte'
   );

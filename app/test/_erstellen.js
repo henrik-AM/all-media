@@ -32,7 +32,8 @@ if (!fs.existsSync(BILD)) {
 
   const browserFehler = [];
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
-  page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
+  // Mit Herkunft: „401 (Unauthorized)“ allein sagt nicht, welche Anfrage es war.
+  page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text() + (m.location?.().url ? ' @ ' + m.location().url : '')));
 
   await page.goto(ZIEL, { waitUntil: 'load' });
 
