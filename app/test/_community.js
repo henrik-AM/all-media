@@ -197,9 +197,10 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await oeffne('Laufgruppe Köln');
     const vorher = await page.$$eval('.kanal__thema', (n) => n.length);
     await page.click('#neuesUnterthema');
-    await page.waitForSelector('#f_name');
-    await page.fill('#f_name', 'Ankündigungen');
-    await page.click('#formOk');
+    // Seit 21.10.2026 (Kasten 28/10.2, 4c07dc1) eigene Erstellseite statt Blatt.
+    await page.waitForSelector('#esName');
+    await page.fill('#esName', 'Ankündigungen');
+    await page.click('#esFertig');
 
     /*
      * Auf das neue Unterthema warten, nicht auf die Uhr. Es wird in der
@@ -222,22 +223,23 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Ein zweites Unterthema mit demselben Namen wird abgelehnt', async () => {
     await page.click('#neuesUnterthema');
-    await page.waitForSelector('#f_name');
-    await page.fill('#f_name', 'Ankündigungen');
-    await page.click('#formOk');
+    await page.waitForSelector('#esName');
+    await page.fill('#esName', 'Ankündigungen');
+    await page.click('#esFertig');
     /*
      * Auf den Hinweis warten, nicht auf die Uhr. Die 600 ms, die hier
      * standen, waren geraten: im Gesamtlauf vom 20.09.2026 war der Toast
      * nach 600 ms noch nicht da, gemeldet wurde „Toast sagt " — als gaebe
      * es gar keinen Hinweis. Einzeln lief dieselbe Pruefung gruen.
      */
-    // Seit 28.09.2026 steht der Fehler im Blatt (#formFehler), nicht im Toast.
+    // Seit 21.10.2026 steht der Fehler auf der Erstellseite (#esMeldung).
     await page
-      .waitForFunction(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })().trim() !== '', undefined, { timeout: 15000 })
+      .waitForFunction(() => { const m = document.querySelector('#esMeldung'); return m && !m.hidden && m.textContent.trim() !== ''; }, undefined, { timeout: 15000 })
       .catch(() => {});
-    const toast = await page.evaluate(() => (() => { const f = document.querySelector('#formFehler'); if (f && !f.hidden && f.textContent.trim()) return f.textContent; const t = document.querySelector('#toast'); return t && !t.hidden ? t.textContent : ''; })());
-    if (!toast.includes('gibt es schon')) throw new Error('kein Hinweis, Blatt sagt „' + toast + '"');
-    await page.click('[data-sheet-close]').catch(() => {});
+    const toast = await page.evaluate(() => { const m = document.querySelector('#esMeldung'); return m && !m.hidden ? m.textContent.trim() : ''; });
+    if (!toast.includes('gibt es schon')) throw new Error('kein Hinweis, Seite sagt „' + toast + '"');
+    // Die Seite bleibt bei Fehler offen; schließen, sonst fängt das Overlay die Folgeklicks.
+    await page.click('#esZu').catch(() => {});
   });
 
   /* ------------------------------------------- Community-Chats */
