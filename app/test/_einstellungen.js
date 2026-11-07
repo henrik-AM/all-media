@@ -60,8 +60,10 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForTimeout(600);
   };
 
+  // Blätter ohne X (z. B. Rechtstexte, sheet--tall) gehen per Tippen daneben zu.
   const blattZu = async () => {
-    await page.click('[data-sheet-close]').catch(() => {});
+    if (await page.$('[data-sheet-close]')) await page.click('[data-sheet-close]').catch(() => {});
+    else if (await page.$('.sheet-backdrop')) await page.mouse.click(195, 40);
     await page.waitForTimeout(300);
   };
 
@@ -251,21 +253,43 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await blattZu();
   });
 
+  /*
+   * Kasten RS 1 (24.10.2026): Datenschutzerklärung ist ein Rechtstext aus
+   * gemeinsam/rechtstexte.js (Blatt `rechtstext-datenschutz`, Absätze
+   * `.rechtstext__text`), nicht mehr ein kurzer `.sheet__text`.
+   */
   await pruefe('Ein Erklärtext geht auf', async () => {
-    await page.click('[data-setting="Datenschutzerklärung"]');
-    await page.waitForSelector('.sheet__text');
-    const text = await page.$eval('.sheet__text', (e) => e.textContent);
-    if (text.length < 60) throw new Error('Text zu kurz: ' + text);
-    await blattZu();
+    try {
+      await page.click('[data-setting="Datenschutzerklärung"]');
+      await page.waitForSelector('[data-testid="rechtstext-datenschutz"] .rechtstext__text');
+      const text = await page.$$eval('[data-testid="rechtstext-datenschutz"] .rechtstext__text',
+        (els) => els.map((e) => e.textContent).join(' '));
+      if (text.length < 60) throw new Error('Text zu kurz: ' + text);
+    } finally {
+      await blattZu();
+    }
   });
 
+  /*
+   * Schema 103 (Kasten RS, live 02.11.2026): Löschen ist echt und endgültig,
+   * nicht mehr „vorgemerkt“. Es fragt das Passwort ab. Ohne Passwort darf
+   * nichts passieren — das wird hier geprüft; gelöscht wird das Testkonto
+   * natürlich nicht. Den ganzen Ablauf prüft test/_konto_loeschen_einheit.js.
+   */
   await pruefe('Konto löschen fragt erst nach', async () => {
-    await page.click('[data-setting="Konto löschen"]');
-    await page.waitForSelector('#loeschJa');
-    await page.click('#loeschJa');
-    await page.waitForTimeout(500);
-    const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));
-    if (!hinweis.includes('vorgemerkt')) throw new Error(hinweis);
+    try {
+      await page.click('[data-setting="Konto löschen"]');
+      await page.waitForSelector('[data-konto-loeschen] #loeschPasswort');
+      await page.click('#loeschJa');
+      await page.waitForSelector('#loeschFehler:not([hidden])', { timeout: 5000 });
+      const fehlerText = await page.$eval('#loeschFehler', (e) => e.textContent.trim());
+      if (!fehlerText) throw new Error('ohne Passwort keine Rückfrage');
+      if (!(await page.$('[data-konto-loeschen]'))) throw new Error('Blatt ging ohne Passwort zu');
+      const angemeldet = await page.evaluate(() => Boolean(window.Anmeldung?.nutzer?.()));
+      if (!angemeldet) throw new Error('ohne Passwort abgemeldet');
+    } finally {
+      await blattZu();
+    }
   });
 
   /*
