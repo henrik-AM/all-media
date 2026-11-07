@@ -181,6 +181,14 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
     if (!antwort.ok) throw new Error('der Server sagt: ' + (antwort.error || 'nichts'));
   });
 
+  /** Wartet bis 15 s, bis #main den Text zeigt; gibt den Seitentext zurück. */
+  const sichtbarerText = async (soll) => {
+    await page
+      .waitForFunction((t) => (document.querySelector('#main')?.innerText || '').includes(t), soll, { timeout: 15000 })
+      .catch(() => {});
+    return page.$eval('#main', (e) => e.innerText);
+  };
+
   await page.reload({ waitUntil: 'load' });
 
   for (const [bereich, unter, wo] of [
@@ -190,15 +198,17 @@ const ZIEL = process.env.AM_URL || process.env.ZIEL || 'http://localhost:3000/';
   ]) {
     await pruefe(`${wo} zeigt den Namen aus dem Konto`, async () => {
       await gehe(bereich, unter);
-      await page.waitForTimeout(500);
-      const text = await page.$eval('#main', (e) => e.innerText);
+      // Das Videos-Profil holt erst /api/profile/me, dann zeichnet es; im
+      // Gesamtlauf dauert das länger als feste 500 ms (07.11.: Info fehlte,
+      // weil noch die vorige Seite stand). Auf den Text warten, nicht raten.
+      const text = await sichtbarerText(NEUER_NAME);
       if (!text.includes(NEUER_NAME)) {
         throw new Error('der geaenderte Name steht nicht auf der Seite');
       }
     });
 
     await pruefe(`${wo} zeigt die Info aus dem Konto`, async () => {
-      const text = await page.$eval('#main', (e) => e.innerText);
+      const text = await sichtbarerText(NEUE_INFO);
       if (!text.includes(NEUE_INFO)) {
         throw new Error('die geaenderte Info steht nicht auf der Seite');
       }
