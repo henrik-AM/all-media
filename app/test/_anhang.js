@@ -1,5 +1,5 @@
 // Prueft zwei Knoepfe, die vorher nur einen Hinweis ausgegeben haben:
-//   - das Plus in der Nachrichtenzeile (Foto, Standort, Kontakt)
+//   - das Plus in der Nachrichtenzeile (Galerie, Standort, Kontakt)
 //   - die drei Punkte im Profil einer anderen Person
 //
 // Start:  node test/_anhang.js   (Server muss laufen)
@@ -32,6 +32,16 @@ if (!fs.existsSync(BILD)) {
   const browserFehler = [];
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
+
+  // Ortssuche (Nominatim) abfangen: kein Netzverkehr zum echten Dienst.
+  const ORT = { lat: '47.421066', lon: '10.985365', name: 'Zugspitze',
+    address: { road: 'Zugspitze', postcode: '82475', city: 'Grainau' } };
+  let ortsAnfragen = 0;
+  await page.route('https://nominatim.openstreetmap.org/**', (route) => {
+    ortsAnfragen++;
+    const body = route.request().url().includes('/reverse') ? ORT : [ORT];
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
 
   await page.goto(ZIEL, { waitUntil: 'load' });
 
@@ -84,28 +94,30 @@ if (!fs.existsSync(BILD)) {
     await page.click(`[data-anhang="${art}"]`);
   };
 
+  // Offene Blätter schließen, auch nach einem Fehlschlag (sonst fängt das
+  // Blatt jeden folgenden Klick ab — 06.11.2026: 0/12 statt 1 Fehler).
+  const blaetterZu = () => page.evaluate(() => {
+    document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+  }).then(() => page.waitForTimeout(300));
+
   console.log('\nAnhang im Chat');
   await imChat();
 
-  // Seit dem Handbuch-Abgleich am 01.09.2026 haengen vier weitere Arten
-  // darin: Datei, Gif, Sticker und "Standort anfragen". Die Liste wird hier
-  // vollstaendig geprueft, weil ein verschwundener Punkt sonst niemandem
-  // auffaellt.
+  /*
+   * Kasten 28/6 (Henrik 28.09.2026, Website seit 11.10.2026): Das Plus ist ein
+   * Raster runder Symbole mit Kurztexten. „Foto aufnehmen" sitzt als Kamera
+   * im Eingabefeld, GIF und Sticker hinter ihrem eigenen Knopf, Live-Standort
+   * ist bis zum eigenen Server ausgeblendet (6.4). Die alte Liste mit acht
+   * Punkten prüfte also einen Stand, den es nicht mehr gibt. Die Liste wird
+   * weiter vollständig geprüft, weil ein verschwundener Punkt sonst niemandem
+   * auffällt. Ausführlich: test/k28-anhaenge.js.
+   */
   await pruefe('Das Plus zeigt alle Anhang-Arten', async () => {
     try {
       await page.click('#attach');
       await page.waitForSelector('[data-anhang]', { timeout: 3000 });
       const punkte = await page.$$eval('[data-anhang]', (els) => els.map((e) => e.textContent.trim()));
-      const soll = [
-        'Foto aufnehmen',
-        'Aus der Galerie',
-        'Datei senden',
-        'Gif senden',
-        'Sticker',
-        'Standort senden',
-        'Standort anfragen',
-        'Kontakt senden',
-      ];
+      const soll = ['Galerie', 'Dokument', 'Standort', 'Standort anfragen', 'Kontakt'];
       if (JSON.stringify(punkte) !== JSON.stringify(soll)) throw new Error(punkte.join(' | '));
     } finally {
       // Das Anhang-Menue schliesst wie das Neu-Menue: Tippen daneben. Das
@@ -117,31 +129,45 @@ if (!fs.existsSync(BILD)) {
     }
   });
 
+  /*
+   * Kasten 28/6.5: Standort über die Ortssuche (Nominatim) statt einer festen
+   * Liste aus der Datenbank. Die Suche wird im Browser abgefangen — der Lauf
+   * schickt keine Anfrage an den echten Dienst. Die Karte in der Blase führt
+   * seither zur Kartenansicht des Ortes, nicht mehr zur Explorer-Ortsseite.
+   */
   await pruefe('Standort landet als Karte im Chat', async () => {
-    await anhangAuf('standort');
-    await page.waitForSelector('[data-ort]', { timeout: 3000 });
-    // "pl2" war die feste Kennung aus den Beispieldaten — Standorte stehen
-    // jetzt in der Datenbank. Siehe test/_kennungen.js.
-    await page.click(`[data-ort="${await K.kennungNachText(page, 'data-ort', 'Zugspitze')}"]`);
-    await page.waitForFunction(
-      () => [...document.querySelectorAll('.msg__standortName')]
-        .some((n) => n.textContent.includes('Zugspitze')),
-      null, { timeout: 10000 }
-    ).catch(() => {});
-    const namen = await page.$$eval('.msg__standortName', (els) => els.map((e) => e.textContent));
-    if (!namen.includes('Zugspitze')) throw new Error(namen.join(' | '));
-    const adresse = await page.$eval('.msg__standortSub', (e) => e.textContent);
-    if (!adresse.trim()) throw new Error('keine Adresse auf der Karte');
+    try {
+      await anhangAuf('standort');
+      await page.waitForSelector('#ortSucheFeld', { timeout: 5000 });
+      await page.fill('#ortSucheFeld', 'Zugspitze');
+      await page.click('#ortSucheKnopf');
+      await page.waitForSelector('[data-treffer="0"]', { timeout: 5000 });
+      await page.click('[data-treffer="0"]');
+      await page.click('#ortSenden');
+      await page.waitForFunction(
+        () => [...document.querySelectorAll('.msg__standortName')]
+          .some((n) => n.textContent.includes('Zugspitze')),
+        null, { timeout: 10000 }
+      ).catch(() => {});
+      const namen = await page.$$eval('.msg__standortName', (els) => els.map((e) => e.textContent));
+      if (!namen.includes('Zugspitze')) throw new Error(namen.join(' | ') || 'keine Karte');
+      const adresse = await page.$eval('.msg__standortSub', (e) => e.textContent);
+      if (!adresse.trim()) throw new Error('keine Adresse auf der Karte');
+    } finally {
+      await blaetterZu();
+    }
+  });
+  await pruefe('Ortssuche abgefangen, nicht am echten Dienst', async () => {
+    if (ortsAnfragen < 1) throw new Error('keine Suche abgefangen');
   });
 
-  await pruefe('Die Standort-Karte fuehrt zur Standort-Seite', async () => {
-    await page.click('[data-msgort]');
-    await page.waitForSelector('.exp__adresse', { timeout: 3000 });
-    const titel = await page.$eval('#overlay .exp__titel', (e) => e.textContent);
-    if (titel !== 'Zugspitze') throw new Error(titel);
-    await page.click('#expBack');
-    await page.waitForTimeout(400);
-    await imChat();
+  await pruefe('Die Standort-Karte fuehrt zur Kartenansicht des Ortes', async () => {
+    try {
+      await page.click('.msg__standort[data-msglat]');
+      await page.waitForSelector('#ortAnsichtKarte', { timeout: 5000 });
+    } finally {
+      await blaetterZu();
+    }
   });
 
   await pruefe('Kontakt landet als Karte im Chat', async () => {
@@ -171,7 +197,7 @@ if (!fs.existsSync(BILD)) {
     // Der Fehlschlag darf nicht als unbehandelte Zusage enden - sonst
     // bricht Node ab, statt die Pruefung rot zu melden.
     const wartet = page.waitForEvent('filechooser').catch(() => null);
-    await anhangAuf('kamera');
+    await anhangAuf('galerie');
     const auswahl = await wartet;
     if (!auswahl) throw new Error('die Dateiauswahl ging nicht auf');
     await auswahl.setFiles(BILD);
