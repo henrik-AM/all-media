@@ -75,6 +75,21 @@ select ch.id from public.chats ch
   return r[0]?.id || null;
 }
 
+/**
+ * Nimmt die Messenger-Kontakte zwischen den beiden Konten wieder heraus
+ * (Grundstand des Testbestands: KEIN Kontakt). Sonst prüft test:angriffe
+ * „Fremde Person in eine Gruppe ziehen" gegen ein Konto, das gar nicht mehr
+ * fremd ist. Der Zweierchat bleibt (er schadet keinem Lauf).
+ */
+async function testpaarLoesen() {
+  await abfrage(`
+delete from public.contacts
+ where ((user_id = '${TESTKONTO}' and contact_id = '${PRUEFKONTO}')
+     or (user_id = '${PRUEFKONTO}' and contact_id = '${TESTKONTO}'))
+   and public.ist_testkonto(user_id) and public.ist_testkonto(contact_id);
+select 1 as ok;`);
+}
+
 /** Basis aller eigenen Medienadressen (wie public.medien_adresse('')). */
 function medienBasis(supabaseUrl) {
   return supabaseUrl.replace(/\/$/, '') + '/storage/v1/object/public/media/';
@@ -105,4 +120,4 @@ async function eigenesMediumWeg(pfad) {
   await abfrage(`delete from public.medien_objekte where pfad = '${pfad}'; select 1 as ok;`);
 }
 
-module.exports = { TESTKONTO, PRUEFKONTO, testpaarSichern, eigenesMedium, eigenesMediumWeg, medienBasis };
+module.exports = { TESTKONTO, PRUEFKONTO, testpaarSichern, testpaarLoesen, eigenesMedium, eigenesMediumWeg, medienBasis };

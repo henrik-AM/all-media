@@ -373,6 +373,7 @@ async function teilB() {
     if ((data || []).length) throw new Error('Zeile steht noch da');
   });
   await Testpaar.eigenesMediumWeg(medium.pfad).catch(() => {});
+  await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
 }
 
 (async () => {

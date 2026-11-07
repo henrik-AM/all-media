@@ -295,6 +295,7 @@ async function teilB() {
   } finally {
     await B.c.from('communities').delete().eq('id', com.id);
     for (const p of pttPfade) await Testpaar.eigenesMediumWeg(p).catch(() => {});
+    await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
     const { data: rest } = await B.c.from('communities').select('id').eq('id', com.id);
     pruefe('Prüfcommunity ist wieder weg', (rest || []).length === 0);
   }

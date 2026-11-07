@@ -310,6 +310,7 @@ async function teilB() {
       await pr.from('chats').delete().eq('id', gruppeId);
     }
     if (kontaktbildPfad) await Testpaar.eigenesMediumWeg(kontaktbildPfad).catch(() => {});
+    await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
   }
 }
 
