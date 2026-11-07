@@ -79,7 +79,9 @@ select ch.id from public.chats ch
  * Nimmt die Messenger-Kontakte zwischen den beiden Konten wieder heraus
  * (Grundstand des Testbestands: KEIN Kontakt). Sonst prüft test:angriffe
  * „Fremde Person in eine Gruppe ziehen" gegen ein Konto, das gar nicht mehr
- * fremd ist. Der Zweierchat bleibt (er schadet keinem Lauf).
+ * fremd ist. Auch der eigene Zweierchat „Testpaar“ geht weg: test:messengeranfrage
+ * verlangt zwei unverbundene Konten (kein Kontakt, kein Messenger-Chat) und lief
+ * im Gesamtlauf nach sichtbarkeit sonst ohne Prüfzahl ab (07.11.).
  */
 async function testpaarLoesen() {
   await abfrage(`
@@ -87,6 +89,13 @@ delete from public.contacts
  where ((user_id = '${TESTKONTO}' and contact_id = '${PRUEFKONTO}')
      or (user_id = '${PRUEFKONTO}' and contact_id = '${TESTKONTO}'))
    and public.ist_testkonto(user_id) and public.ist_testkonto(contact_id);
+delete from public.chats ch
+ where ch.name = 'Testpaar' and not ch.is_group
+   and coalesce(ch.bereich, 'messenger') = 'messenger'
+   and ch.created_by = '${TESTKONTO}'
+   and public.ist_testkonto('${TESTKONTO}') and public.ist_testkonto('${PRUEFKONTO}')
+   and not exists (select 1 from public.chat_members m
+                    where m.chat_id = ch.id and m.user_id not in ('${TESTKONTO}', '${PRUEFKONTO}'));
 select 1 as ok;`);
 }
 
