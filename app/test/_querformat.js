@@ -349,8 +349,11 @@ const LANG = 'Design Tokens sauber aufsetzen';
     const soll = Math.floor((Date.now() - new Date(zeile[0].created_at).getTime()) / 1000) % Math.round(laenge);
     const k = await kante();
     const { bei } = await video();
-    if (Math.abs(k - soll) > 3) throw new Error(`Kante ${k} s statt etwa ${soll} s`);
-    if (Math.abs(bei - k) > 2) throw new Error(`Video steht bei ${bei.toFixed(1)} s, gesendet ist ${k} s`);
+    // Im Kreis messen: an der Nahtstelle (Datei läuft gerade von vorn) sind
+    // 59 s und 0 s nur eine Sekunde auseinander (Gesamtlauf 07.11.: „59 statt 0“).
+    const kreis = (a, b) => Math.min(Math.abs(a - b), laenge - Math.abs(a - b));
+    if (kreis(k, soll) > 3) throw new Error(`Kante ${k} s statt etwa ${soll} s`);
+    if (kreis(bei, k) > 2) throw new Error(`Video steht bei ${bei.toFixed(1)} s, gesendet ist ${k} s`);
   });
 
   await pruefe('Vorspulen über die gesendete Stelle hinaus geht nicht', async () => {
