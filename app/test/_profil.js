@@ -181,13 +181,19 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   const mittigPruefen = async (bereich) => {
     await zumProfil(bereich);
-    const { mitte, breite } = await page.evaluate(() => {
+    // Messen, sobald der Name steht: renderVideoProfile zeichnet nach
+    // /api/profile/me neu; ein einmaliges evaluate griff am 07.11.2026 in
+    // die Lücke dazwischen (null.getBoundingClientRect).
+    const { mitte, breite } = await (await page.waitForFunction(() => {
       const n = document.querySelector('.oprof__handle');
       const app = document.querySelector('.app');
+      if (!n || !app) return null;
       const k = n.getBoundingClientRect();
       const a = app.getBoundingClientRect();
       return { mitte: k.left + k.width / 2 - a.left, breite: a.width };
-    });
+    }, null, { timeout: 10000 }).catch(() => {
+      throw new Error('kein Benutzername im Profil');
+    })).jsonValue();
     const abweichung = Math.abs(mitte - breite / 2);
     if (abweichung > 4) throw new Error(Math.round(abweichung) + 'px neben der Mitte');
   };
@@ -328,8 +334,14 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
       throw new Error('der Betrachter geht nicht auf');
     }
     // Wieder zumachen - sonst liegt er ueber allem, was danach geprueft wird.
-    await page.evaluate(() => document.querySelector('#overlay')?.setAttribute('hidden', ''));
-    await page.waitForTimeout(300);
+    // Über den eigenen Schließen-Knopf, nicht per `hidden`: bis 07.11.2026
+    // wurde nur das Overlay versteckt, die Story-Uhr lief weiter. Solange die
+    // Beispielmedien ohne Bunny nicht luden, blieb sie stehen; seit der
+    // Prüfserver Bunny hat, spielt sie weiter, öffnet die nächste Story und
+    // legt den Betrachter wieder über die Playlist (#storyPrev fing Klicks ab).
+    await page.click('#storyClose');
+    await page.waitForFunction(() => document.querySelector('#overlay')?.hidden === true, null, { timeout: 5000 })
+      .catch(() => { throw new Error('der Betrachter geht nicht wieder zu'); });
   });
 
   /* ------------------------------------- Playlists und Highlights */
@@ -417,6 +429,16 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
    */
   await pruefe('Auf einem fremden Profil sind Highlights klickbar', async () => {
     await zumFremdprofil(K.person('u1'));
+    /*
+     * Erst steht die Rückfall-Reihe aus den alten Namen (ohne id, Klick sagt
+     * „lässt sich gerade nicht öffnen"), dann tauscht ladeSammlungen die
+     * echten Kreise ein. Bis 07.11.2026 klickte der Lauf sofort und gewann
+     * den Wettlauf nur, solange die Abfrage schneller war. Auf die echte
+     * Reihe warten; kommt sie nicht, prüft der Klick die Rückfalltür.
+     */
+    await page
+      .waitForSelector('.highlight[data-sammlung="highlight"]:not([data-sammlung-id=""])', { timeout: 10000 })
+      .catch(() => {});
     const knopf = await page.$('.highlight[data-sammlung="highlight"]');
     if (!knopf) throw new Error('die Highlights sind keine Knoepfe');
     await knopf.click();
@@ -431,7 +453,14 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
       .catch(() => {});
     const betrachter = await page.$('.viewer [data-testid="highlight-kopf"]');
     const hinweis = await page.$eval('#toast', (n) => n.textContent || '').catch(() => '');
-    if (!betrachter && !/nichts zu sehen/.test(hinweis)) throw new Error('weder Betrachter noch Hinweis');
+    if (!betrachter && !/nichts zu sehen/.test(hinweis)) {
+      const lage = await page.evaluate(() => ({
+        overlay: document.querySelector('#overlay')?.hidden === false,
+        viewer: Boolean(document.querySelector('.viewer')),
+        kopf: document.querySelector('.viewer .viewer__head, .viewer header')?.textContent?.trim().slice(0, 80) || '',
+      }));
+      throw new Error('weder Betrachter noch Hinweis — Toast „' + hinweis.trim().slice(0, 80) + '", ' + JSON.stringify(lage));
+    }
     if (await page.$('.pagehead__sub')) throw new Error('es geht noch das alte Raster auf');
     if (betrachter) await page.click('#storyClose');
   });
