@@ -204,6 +204,58 @@ const weg = (name, anweisung) => `
   pruefe('Beitrag in die Zukunft datieren geht nicht', profil.beitrag_in_zukunft === 'zu');
   pruefe('Fremde Kontaktlisten nicht abfragbar', profil.fremdes_kontakt_orakel === 'false', profil.fremdes_kontakt_orakel);
 
+  // Schema 119 prüft „nur sichtbare Beiträge" beim INSERT; Schema 121 macht
+  // den Bezug danach unveränderlich (Codex-Fund 07.11.2026: Zeile auf einen
+  // sichtbaren Beitrag anlegen, dann per UPDATE auf einen unsichtbaren
+  // umbiegen). Ein abgelehntes UPDATE kann unter RLS still 0 Zeilen treffen —
+  // deshalb wird die Zeile danach gegengelesen.
+  console.log('\nBeitragsbezug (Schema 119/121)');
+  const ziele = await frage(`begin;
+    select set_config('request.jwt.claims', '{"sub":"${PRUEFKONTO}","role":"authenticated"}', true);
+    select
+      (select p.id from posts p where not public.beitrag_lesbar(p.id) and p.user_id <> '${PRUEFKONTO}'
+        order by p.created_at limit 1) as unsichtbar,
+      (select p.id from posts p where public.beitrag_lesbar(p.id) and p.user_id <> '${PRUEFKONTO}'
+        and p.publish_at is null order by p.created_at limit 1) as sichtbar;
+    rollback;`);
+  const U = ziele?.[0]?.unsichtbar, S = ziele?.[0]?.sichtbar;
+  pruefe('Ein sichtbarer und ein unsichtbarer fremder Beitrag für die Probe da', !!U && !!S, `${S}/${U}`);
+  if (U && S) {
+    const bezug = await alsPruefkonto(`
+      delete from saves where user_id = auth.uid() and post_id in ('${S}', '${U}');
+      ${weg('merken_sichtbar', `insert into saves (user_id, post_id) values (auth.uid(), '${S}')`)}
+      ${versuch('merken_umbiegen', `update saves set post_id = '${U}' where user_id = auth.uid() and post_id = '${S}'`)}
+      select string_agg(post_id::text, ',') into t from saves where user_id = auth.uid() and post_id in ('${S}', '${U}');
+      erg := erg || 'merken_bezug=' || coalesce(t, 'leer') || ' ';
+      ${weg('sammlung_sichtbar', `insert into sammlung_beitraege (user_id, sammlung, post_id) values (auth.uid(), 'Angriff121', '${S}')`)}
+      ${versuch('sammlung_umbiegen', `update sammlung_beitraege set post_id = '${U}' where user_id = auth.uid() and sammlung = 'Angriff121'`)}
+      ${weg('sammlung_umbenennen', `update sammlung_beitraege set sammlung = 'Angriff121b' where user_id = auth.uid() and sammlung = 'Angriff121'`)}
+      select string_agg(post_id::text, ',') into t from sammlung_beitraege where user_id = auth.uid() and sammlung = 'Angriff121b';
+      erg := erg || 'sammlung_bezug=' || coalesce(t, 'leer') || ' ';
+      insert into chats (name, is_group, bereich, created_by) values ('x', true, 'messenger', auth.uid()) returning id into v;
+      insert into chat_members (chat_id, user_id) values (v, auth.uid());
+      insert into messages (chat_id, sender_id, text) values (v, auth.uid(), 'ohne Beitrag') returning id into v2;
+      ${versuch('teilen_umbiegen', `update messages set shared_post_id = '${U}' where id = v2`)}
+      ${versuch('teilen_nachtragen_sichtbar', `update messages set shared_post_id = '${S}' where id = v2`)}
+      ${weg('nachricht_bearbeiten', `update messages set text = 'neu', edited_at = now() where id = v2`)}
+      select coalesce(shared_post_id::text, 'leer') into t from messages where id = v2;
+      erg := erg || 'teilen_bezug=' || t || ' ';
+    `);
+    pruefe('Sichtbaren Beitrag merken geht', bezug.merken_sichtbar === 'ok', bezug.merken_sichtbar);
+    pruefe('Gemerkten Beitrag auf unsichtbaren umbiegen geht nicht',
+      bezug.merken_umbiegen === 'zu' && bezug.merken_bezug === S, `${bezug.merken_umbiegen}/${bezug.merken_bezug}`);
+    pruefe('Sichtbaren Beitrag in Sammlung legen und Sammlung umbenennen geht',
+      bezug.sammlung_sichtbar === 'ok' && bezug.sammlung_umbenennen === 'ok',
+      `${bezug.sammlung_sichtbar}/${bezug.sammlung_umbenennen}`);
+    pruefe('Sammlungseintrag auf unsichtbaren Beitrag umbiegen geht nicht',
+      bezug.sammlung_umbiegen === 'zu' && bezug.sammlung_bezug === S, `${bezug.sammlung_umbiegen}/${bezug.sammlung_bezug}`);
+    pruefe('Nachricht nachträglich auf unsichtbaren Beitrag teilen geht nicht', bezug.teilen_umbiegen === 'zu');
+    pruefe('Geteilten Beitrag nachträglich setzen geht auch bei sichtbarem nicht (Bezug fest)',
+      bezug.teilen_nachtragen_sichtbar === 'zu' && bezug.teilen_bezug === 'leer',
+      `${bezug.teilen_nachtragen_sichtbar}/${bezug.teilen_bezug}`);
+    pruefe('Nachricht bearbeiten geht weiter', bezug.nachricht_bearbeiten === 'ok', bezug.nachricht_bearbeiten);
+  }
+
   console.log('\nRechte (Drift)');
   const rechte = await frage(`
     select
