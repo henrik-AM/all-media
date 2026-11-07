@@ -240,6 +240,8 @@ const weg = (name, anweisung) => `
       ${weg('nachricht_bearbeiten', `update messages set text = 'neu', edited_at = now() where id = v2`)}
       select coalesce(shared_post_id::text, 'leer') into t from messages where id = v2;
       erg := erg || 'teilen_bezug=' || t || ' ';
+      select coalesce(text, 'leer') into t from messages where id = v2;
+      erg := erg || 'nachricht_text=' || t || ' ';
     `);
     pruefe('Sichtbaren Beitrag merken geht', bezug.merken_sichtbar === 'ok', bezug.merken_sichtbar);
     pruefe('Gemerkten Beitrag auf unsichtbaren umbiegen geht nicht',
@@ -253,7 +255,10 @@ const weg = (name, anweisung) => `
     pruefe('Geteilten Beitrag nachträglich setzen geht auch bei sichtbarem nicht (Bezug fest)',
       bezug.teilen_nachtragen_sichtbar === 'zu' && bezug.teilen_bezug === 'leer',
       `${bezug.teilen_nachtragen_sichtbar}/${bezug.teilen_bezug}`);
-    pruefe('Nachricht bearbeiten geht weiter', bezug.nachricht_bearbeiten === 'ok', bezug.nachricht_bearbeiten);
+    // Gegenlesen: ein verbotenes UPDATE träfe still 0 Zeilen und hieße sonst 'ok' (Codex-Gegencheck).
+    pruefe('Nachricht bearbeiten geht weiter (Text gegengelesen)',
+      bezug.nachricht_bearbeiten === 'ok' && bezug.nachricht_text === 'neu',
+      `${bezug.nachricht_bearbeiten}/${bezug.nachricht_text}`);
   }
 
   console.log('\nRechte (Drift)');

@@ -18,12 +18,15 @@
  *   rollback → nichts bleibt.
  *
  * Läuft nur in einer Transaktion, die verworfen wird — fasst den Testbestand
- * nicht an, braucht daher nur die Belegung `schema`, nicht `testbestand`.
+ * nicht an, braucht daher die Belegung `schema` (geprüft, sonst Abbruch 2),
+ * nicht `testbestand`.
  * PROBE_LIVE=1: Schema 121 nicht mitspielen (prüft den Live-Stand).
  * Start: SUPABASE_TOKEN=… node test/_probe121.js
  */
 const fs = require('fs');
 const path = require('path');
+// Codex-Gegencheck 07.11.: eigener Management-API-Zugriff ohne Belegung → jetzt geprüft.
+require('./_ki_belegung').pruefeBelegung('schema');
 
 const P = '62616c1d-82e2-4ee4-aab9-950e40e438a4'; // @prueflauf
 const T = '3baafacd-bbdb-40fb-8ef4-a4e365ae00c4'; // @test
