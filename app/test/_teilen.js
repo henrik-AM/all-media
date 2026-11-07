@@ -228,8 +228,11 @@ async function abraeumen(a, b) {
     await page.click(await K.waehlerChat(page, 'Anna Schmidt'));
     await chatOffen(page);
     await page.waitForSelector('.msg__geteilt', { timeout: 10000 }).catch(() => {});
+    // Seit Kasten 28/7 (10.10.2026) steht das Konto oben in der Karte
+    // (.msg__geteiltAutor); <strong> im Textteil ist der Titel des Beitrags,
+    // und den hat nicht jeder Beitrag.
     const karten = await page.$$eval('.msg__geteilt', (els) =>
-      els.map((e) => e.querySelector('.msg__geteiltText strong')?.textContent?.trim() ?? '')
+      els.map((e) => e.querySelector('.msg__geteiltAutor')?.textContent?.trim() ?? '')
     );
     if (!karten.length) throw new Error('keine Karte im Chat');
     if (!karten[karten.length - 1]) throw new Error('Karte ohne Autor');
