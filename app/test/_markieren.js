@@ -298,10 +298,29 @@ async function teilDatenbank(a, b) {
         await a.client.from('chats').delete().eq('id', chat.id);
       });
       await a.client.from('chat_members').insert({ chat_id: chat.id, user_id: a.id });
-      // Im Messenger darf A einen Fremden nicht eintragen (Schema 57); B tritt
-      // selbst bei, wie nach einer angenommenen Anfrage.
-      const { error: eMb } = await (bereich === 'messenger' ? b : a).client
-        .from('chat_members').insert({ chat_id: chat.id, user_id: b.id });
+      /*
+       * Im Messenger darf A einen Fremden nicht eintragen (Schema 57), und
+       * seit darf_mitglied_werden vom 17.10. (live 06.11.2026) auch B sich
+       * nicht selbst in einen fremden Chat — beides gewollt. Echt kommt B
+       * über eine angenommene Messenger-Anfrage (Definer-Funktion) hinein.
+       * Geprüft wird hier die Markierung, nicht der Beitritt: B wird darum
+       * wie der Testbestand eingetragen (Management-API, nicht als Client).
+       */
+      let eMb = null;
+      if (bereich === 'messenger') {
+        if (!process.env.SUPABASE_TOKEN) eMb = { message: 'Messenger-Teil braucht SUPABASE_TOKEN' };
+        else {
+          const r = await fetch(`https://api.supabase.com/v1/projects/${PROJEKT}/database/query`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${process.env.SUPABASE_TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: `insert into public.chat_members (chat_id, user_id)
+              values ('${chat.id}', '${b.id}') on conflict do nothing` }),
+          });
+          if (!r.ok) eMb = { message: `Management-API ${r.status}: ${(await r.text()).slice(0, 200)}` };
+        }
+      } else {
+        ({ error: eMb } = await a.client.from('chat_members').insert({ chat_id: chat.id, user_id: b.id }));
+      }
       pruefe('B ist Mitglied', !eMb, eMb?.message);
       const vorhanden = new Set((await neueBei(b, new Date(Date.now() - 3600000).toISOString(), {})).map((x) => x.id));
       seit = jetzt();
