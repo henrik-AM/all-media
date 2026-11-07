@@ -356,7 +356,11 @@ function route(fn) {
       if (schonGeantwortet) return res;
       schonGeantwortet = true;
       // Der neue App-Weg liefert einen dauerhaften DB-Schlüssel getrennt von der Anzeige.
-      ((req.path === '/api/hochladen/datei' || (require('./medien').mitBunny() && req.path.startsWith('/api/hochladen')))
+      // Jede Upload-Antwort bringt `url` (Datenbank) und `anzeige` (unterschrieben)
+      // schon getrennt mit. Bis 07.11. wurde ohne Bunny auch `url` unterschrieben:
+      // die Website schrieb dann eine sign/-Adresse in die Datenbank, und der
+      // CHECK `<spalte>_eigener_eimer` (Schema 95) lehnte Story/Avatar ab.
+      (req.path.startsWith('/api/hochladen')
         ? Promise.resolve(koerper) : signiereMedien(req.db, koerper))
         .then(jsonOriginal)
         .catch((fehler) => {
