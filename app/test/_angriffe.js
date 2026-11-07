@@ -261,6 +261,55 @@ const weg = (name, anweisung) => `
       `${bezug.nachricht_bearbeiten}/${bezug.nachricht_text}`);
   }
 
+  // Schema 122: security-definer-Funktionen umgehen RLS und damit 119
+  // (Codex-Fund 07.11.2026). Impression auf unsichtbaren Beitrag: kein Fehler,
+  // aber keine Zeile (gegengelesen). Spende mit unsichtbarem Beitrag: „beitrag".
+  // feed_rang: keine Zeile für den unsichtbaren Beitrag.
+  console.log('\nDefiner-RPCs nur auf sichtbare Beiträge (Schema 122)');
+  const ziele2 = await frage(`begin;
+    select set_config('request.jwt.claims', '{"sub":"${PRUEFKONTO}","role":"authenticated"}', true);
+    select u.id as unsichtbar, u.user_id as u_eigner, s.id as sichtbar, s.user_id as s_eigner from
+      (select p.id, p.user_id from posts p where not public.beitrag_lesbar(p.id) and p.user_id <> '${PRUEFKONTO}'
+         and public.konto_stand(p.user_id) = 'frei' order by p.created_at limit 1) u,
+      (select p.id, p.user_id from posts p where public.beitrag_lesbar(p.id) and p.user_id <> '${PRUEFKONTO}'
+         and p.publish_at is null and public.konto_stand(p.user_id) = 'frei' order by p.created_at limit 1) s;
+    rollback;`);
+  const z2 = (Array.isArray(ziele2) && ziele2[0]) || {};
+  pruefe('Sichtbarer und unsichtbarer fremder Beitrag (Verfasser freigegeben) da', !!z2.unsichtbar && !!z2.sichtbar,
+    `${z2.sichtbar}/${z2.unsichtbar}`);
+  if (z2.unsichtbar && z2.sichtbar) {
+    const U2 = z2.unsichtbar, S2 = z2.sichtbar;
+    const rpc = await alsPruefkonto(`
+      delete from post_impressions where user_id = auth.uid() and post_id in ('${S2}', '${U2}');
+      ${weg('impr_sichtbar', `perform public.impression_vermerken('${S2}', 1000, 'feed')`)}
+      ${weg('impr_unsichtbar', `perform public.impression_vermerken('${U2}', 1000, 'feed')`)}
+      select public.impressionen_vermerken(jsonb_build_array(jsonb_build_object('beitrag', '${U2}'))) into n;
+      erg := erg || 'impr_sammel=' || n || ' ';
+      select count(*) into n from post_impressions where user_id = auth.uid() and post_id = '${S2}';
+      erg := erg || 'impr_s_zeilen=' || n || ' ';
+      select count(*) into n from post_impressions where user_id = auth.uid() and post_id = '${U2}';
+      erg := erg || 'impr_u_zeilen=' || n || ' ';
+      select coalesce(string_agg(post_id::text, ','), 'leer') into t from public.feed_rang(array['${S2}', '${U2}']::uuid[], 'feed');
+      erg := erg || 'rang=' || t || ' ';
+      select public.spende_senden('${z2.u_eigner}', 500, 'Falsch999', null, '${U2}', '') ->> 'grund' into t;
+      erg := erg || 'spende_unsichtbar=' || coalesce(t, 'leer') || ' ';
+      select public.spende_senden('${z2.s_eigner}', 500, 'Falsch999', null, '${S2}', '') ->> 'grund' into t;
+      erg := erg || 'spende_sichtbar=' || coalesce(t, 'leer') || ' ';
+      select count(*) into n from donations where sender_id = auth.uid() and post_id = '${U2}';
+      erg := erg || 'spende_u_zeilen=' || n || ' ';
+    `);
+    pruefe('Impression auf sichtbaren Beitrag wird vermerkt (gegengelesen)',
+      rpc.impr_sichtbar === 'ok' && rpc.impr_s_zeilen === '1', `${rpc.impr_sichtbar}/${rpc.impr_s_zeilen}`);
+    pruefe('Impression auf unsichtbaren Beitrag: kein Fehler, keine Zeile (gegengelesen)',
+      rpc.impr_unsichtbar === 'ok' && rpc.impr_u_zeilen === '0', `${rpc.impr_unsichtbar}/${rpc.impr_u_zeilen}`);
+    pruefe('impressionen_vermerken bricht bei unsichtbarem Beitrag nicht', rpc.impr_sammel === '1', rpc.impr_sammel);
+    pruefe('feed_rang liefert nur den sichtbaren Beitrag', rpc.rang === S2, rpc.rang);
+    pruefe('Spende mit unsichtbarem Beitrag abgelehnt („beitrag"), keine Zeile',
+      rpc.spende_unsichtbar === 'beitrag' && rpc.spende_u_zeilen === '0', `${rpc.spende_unsichtbar}/${rpc.spende_u_zeilen}`);
+    pruefe('Spende mit sichtbarem Beitrag kommt an der Beitragsprüfung vorbei',
+      !!rpc.spende_sichtbar && rpc.spende_sichtbar !== 'beitrag' && rpc.spende_sichtbar !== 'leer', rpc.spende_sichtbar);
+  }
+
   console.log('\nRechte (Drift)');
   const rechte = await frage(`
     select
