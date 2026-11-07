@@ -655,18 +655,35 @@
    * sonst frei — Länge, Ziffern, Buchstaben, Sonderzeichen wählt jeder
    * selbst. Bis dahin waren es 4 bis 8 Ziffern. Dieselbe Regel prüft
    * entsperrcode_setzen() in der Datenbank (Schema 96); die Obergrenze kommt
-   * von bcrypt, das nach 72 Byte still abschneidet — 64 Zeichen bleiben
-   * auch mit Umlauten darunter.
+   * von bcrypt, das nach 72 Byte still abschneidet. Die Datenbank prüft
+   * deshalb 64 Zeichen UND 72 Byte (UTF-8) — Umlaute zählen zwei, Emojis
+   * vier Byte. Paket 4 (08.11.2026): bis dahin prüfte dieser Baustein nur die
+   * Zeichen; 40 Umlaute gingen hier durch und scheiterten erst in Supabase
+   * mit der falschen Meldung „höchstens 64 Zeichen“.
    */
   const ENTSPERRCODE_MIN = 4;
   const ENTSPERRCODE_MAX = 64;
+  const ENTSPERRCODE_MAX_BYTE = 72;
   const ENTSPERRCODE_REGEL = 'Mindestens 4 Zeichen — Ziffern, Buchstaben und Sonderzeichen frei wählbar';
+
+  /** Länge in UTF-8-Byte, wie octet_length() in Postgres. */
+  function utf8Byte(text) {
+    let n = 0;
+    for (const z of text) {
+      const cp = z.codePointAt(0);
+      n += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+    }
+    return n;
+  }
 
   /** null, wenn der Code passt, sonst der Grund auf Deutsch. */
   function entsperrcodePruefen(code) {
     const c = typeof code === 'string' ? code.trim() : '';
-    if (c.length < ENTSPERRCODE_MIN) return 'Der Code braucht mindestens ' + ENTSPERRCODE_MIN + ' Zeichen';
-    if (c.length > ENTSPERRCODE_MAX) return 'Der Code darf höchstens ' + ENTSPERRCODE_MAX + ' Zeichen haben';
+    // Zeichen wie char_length() in Postgres zählen: ein Emoji ist eins, nicht zwei.
+    const zeichen = Array.from(c).length;
+    if (zeichen < ENTSPERRCODE_MIN) return 'Der Code braucht mindestens ' + ENTSPERRCODE_MIN + ' Zeichen';
+    if (zeichen > ENTSPERRCODE_MAX) return 'Der Code darf höchstens ' + ENTSPERRCODE_MAX + ' Zeichen haben';
+    if (utf8Byte(c) > ENTSPERRCODE_MAX_BYTE) return 'Der Code ist zu lang — Umlaute und Emojis zählen mehrfach';
     // Steuerzeichen (Zeilenumbruch, Tab …) tippt niemand absichtlich.
     if (/[\u0000-\u001f\u007f]/.test(c)) return 'Der Code enthält ein unzulässiges Zeichen';
     return null;
@@ -877,6 +894,7 @@
     hinweisText,
     ENTSPERRCODE_MIN,
     ENTSPERRCODE_MAX,
+    ENTSPERRCODE_MAX_BYTE,
     ENTSPERRCODE_REGEL,
     entsperrcodePruefen,
     wertText,

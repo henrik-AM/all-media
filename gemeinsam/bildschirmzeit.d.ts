@@ -148,6 +148,7 @@ export function sperrText(
 export function hinweisText(status: BzStatus, bereich: BzBereich): string;
 export const ENTSPERRCODE_MIN: number;
 export const ENTSPERRCODE_MAX: number;
+export const ENTSPERRCODE_MAX_BYTE: number;
 export const ENTSPERRCODE_REGEL: string;
 export function entsperrcodePruefen(code: string): string | null;
 export function wertText(punkt: 'uebersicht' | 'gesamt' | 'bereiche' | 'auszeit' | 'pause', regeln: unknown, nutzung?: Partial<Record<string, number>>): string;
