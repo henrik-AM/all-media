@@ -552,4 +552,4 @@ sammlung_inhalte, sammlung_beitraege, post_tags) und „Markierung entfernen“ 
 
 **Wer 20, 92 oder den F11-Block aus 102 neu einspielt, legt die public-Helfer und die alten
 Regeln wieder an — danach 123 erneut einspielen.** Probe `app/test/_probe123.js`
-(live vorher 18/29, mit 123 29/29).
+(live vorher 18/29, mit 123 29/29). **Live eingespielt 07.11.2026 ~23:5x**: Probe live 29/29, RPC 404, rechte 278/278, angriffe 55/55, minderjaehrig grün, schema grün, markieren 49/49, likes 94/94.

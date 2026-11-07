@@ -313,6 +313,23 @@ const weg = (name, anweisung) => `
         .includes(rpc.spende_sichtbar), rpc.spende_sichtbar);
   }
 
+  // Schema 123 (Codex-Funde zu 122): Regel-Helfer verrieten per RPC Existenz,
+  // Moderation und Verfasser unsichtbarer Beiträge. Sie liegen jetzt in
+  // `intern` (von PostgREST nicht ausgeliefert). Wer 20/92/102 neu einspielt,
+  // legt die public-Fassungen wieder an — das soll hier auffallen.
+  console.log('\nRegel-Helfer nicht per RPC (Schema 123)');
+  const helfer = await frage(`
+    select
+      (select count(*) from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+        where s.nspname = 'public' and p.proname in ('beitrag_ausgeblendet', 'kommentar_ausgeblendet', 'darf_markierung_loesen')) as public_helfer,
+      (select count(*) from pg_policies where coalesce(qual, '') || coalesce(with_check, '') ~ 'intern\\.') as regeln_intern,
+      has_schema_privilege('anon', 'intern', 'usage') as anon_intern
+  `);
+  const h = (Array.isArray(helfer) && helfer[0]) || {};
+  pruefe('Keine public-Fassung von beitrag_/kommentar_ausgeblendet, darf_markierung_loesen', Number(h.public_helfer) === 0, String(h.public_helfer));
+  pruefe('Die 10 Regeln rufen intern.* auf', Number(h.regeln_intern) === 10, String(h.regeln_intern));
+  pruefe('anon hat keinen Zugang zu intern', h.anon_intern === false, String(h.anon_intern));
+
   console.log('\nRechte (Drift)');
   const rechte = await frage(`
     select
