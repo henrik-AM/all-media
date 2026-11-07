@@ -29,12 +29,16 @@ interface Props {
  *
  * Alles, was hineingeht, sind Zahlen; kein Text aus Daten landet als
  * Quelltext im Skript (siehe alsDaten in KarteWeb.tsx).
+ *
+ * Leaflet kommt vom eigenen Website-Server wie in KarteWeb.tsx — bis zum
+ * 07.11.2026 von cdnjs.cloudflare.com, einem Dienst, der in der
+ * Datenschutzerklärung nicht steht (Richtlinie 7.1, test:recht).
  */
 const KARTE_HTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://all-media-website.onrender.com/lib/leaflet-1.9.4/leaflet.css" />
+<script src="https://all-media-website.onrender.com/lib/leaflet-1.9.4/leaflet.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { touch-action: none; height: 100%; }

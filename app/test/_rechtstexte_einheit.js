@@ -137,7 +137,8 @@ const DIENSTE = {
 const OHNE_DATEN = ['www.openstreetmap.org', 'deine-seite.de', 'fremd.example', 'cdn.jsdelivr.net',
   'github.com', 'tweetnacl.cr.yp.to', 'unlicense.org', 'www.w3.org', 'en.wikipedia.org' /* Kommentar in jsQR.js */,
   'www.internet-beschwerdestelle.de' /* Link für Moderatoren in meldung.js (RS 3) */,
-  'u-entrance.bka.de' /* Art.-18-Link für Moderatoren in meldung.js (RS 3) */];
+  'u-entrance.bka.de' /* Art.-18-Link für Moderatoren in meldung.js (RS 3) */,
+  'boese.example' /* Beispiel einer fremden Adresse in Kommentaren (Schema 118); .example ist reserviert */];
 const bekannt = (host) => {
   const h = host.replace(/^(\{s\}|\*)\./, '');
   return Object.keys(DIENSTE).some((d) => h === d || h.endsWith('.' + d)) || OHNE_DATEN.includes(h);
