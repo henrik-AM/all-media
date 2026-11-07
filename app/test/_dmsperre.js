@@ -235,6 +235,27 @@ async function anmelden(zugang) {
      * ein einzelnes Mitglied verhindern, dass überhaupt jemand dazukommt —
      * dasselbe Argument wie in `darf_schreiben()`.
      */
+    /*
+     * Seit darf_mitglied_werden (17.10., live 06.11.2026) gilt für Gruppen
+     * die eigene Einstellung „Gruppen: wer darf hinzufügen“ (Vorgabe „Meine
+     * Kontakte“). Geprüft wird hier nur, dass die DM-Sperre Gruppen nicht
+     * erfasst — darum für diesen Schritt „Alle“, danach der alte Stand.
+     */
+    const { data: gruppenWahl } = await empfaenger.client
+      .from('user_settings').select('wert')
+      .eq('user_id', empfaenger.id).eq('schluessel', 'gruppenHinzufuegen').maybeSingle();
+    wegRaeumen.push(async () => {
+      const q = empfaenger.client.from('user_settings');
+      const { error } = gruppenWahl
+        ? await q.upsert({ user_id: empfaenger.id, schluessel: 'gruppenHinzufuegen', wert: gruppenWahl.wert },
+            { onConflict: 'user_id,schluessel' })
+        : await q.delete().eq('user_id', empfaenger.id).eq('schluessel', 'gruppenHinzufuegen');
+      if (error) throw error;
+    });
+    const { error: wahlFehler } = await empfaenger.client.from('user_settings').upsert(
+      { user_id: empfaenger.id, schluessel: 'gruppenHinzufuegen', wert: 'Alle' },
+      { onConflict: 'user_id,schluessel' });
+    pruefe('„Gruppen: wer darf hinzufügen“ steht für den Schritt auf „Alle“', !wahlFehler, wahlFehler?.message);
     const gruppe = await chatAnlegen(true);
     pruefe('In eine Gruppe darf sie trotz „Niemand"', !(await dazuHolen(gruppe)));
     pruefe('Nachgezählt: sie steht drin', (await mitgliederZaehlen(gruppe)) === 1);
