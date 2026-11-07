@@ -177,6 +177,15 @@ async function teilB() {
   const A = await konto('test@all-media.app', TESTKONTO_PASS);
   const B = await konto('all.media.prueflauf@web.de', PRUEFKONTO_PASS);
   const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Zweierchat + Kontakt des Testpaars sichern (fehlten am 06.11.2026 im
+  // Testbestand) — sonst fällt der Messenger-Teil von 5.x stumm aus.
+  const Testpaar = require('./_testpaar');
+  const pttPfade = [];
+  try {
+    await Testpaar.testpaarSichern();
+  } catch (e) {
+    pruefe('Testpaar @test ↔ @prueflauf (Kontakt + Zweierchat) sichern', false, e.message);
+  }
 
   // Prüfcommunity von B, öffentlich, zwei Unterthemen; A tritt bei.
   const name = 'Prüfcommunity PTT ' + Date.now();
@@ -234,8 +243,12 @@ async function teilB() {
     const mitteilungenA = async (kanal) =>
       ((await A.c.from('notifications').select('id, art, actor_id, target_type, target_id')
         .eq('user_id', A.id).eq('art', 'ptt').eq('target_id', kanal)).data || []);
+    // Seit Schema 117/118: nur ein eigener Upload unter der eigenen Adresse
+    // (Platzhalter wie example.invalid lehnt die Datenbank ab).
+    const pttMedium = await Testpaar.eigenesMedium(URL, B.id, 'ptt', 'k28-ptt-' + Date.now() + '.m4a', 'audio/mp4');
+    pttPfade.push(pttMedium.pfad);
     const ptt = (kanal) => B.c.from('ptt_messages')
-      .insert({ community_id: com.id, channel_id: kanal, sender_id: B.id, audio_url: 'https://example.invalid/ptt.m4a', dauer: 2 })
+      .insert({ community_id: com.id, channel_id: kanal, sender_id: B.id, audio_url: pttMedium.url, dauer: 2 })
       .select('id, sitzung_id').single();
 
     // ---- 8.4 gespeichert
@@ -281,6 +294,8 @@ async function teilB() {
     await A.c.from('notifications').delete().eq('user_id', A.id).eq('art', 'ptt').eq('target_id', k2.id);
   } finally {
     await B.c.from('communities').delete().eq('id', com.id);
+    for (const p of pttPfade) await Testpaar.eigenesMediumWeg(p).catch(() => {});
+    await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
     const { data: rest } = await B.c.from('communities').select('id').eq('id', com.id);
     pruefe('Prüfcommunity ist wieder weg', (rest || []).length === 0);
   }

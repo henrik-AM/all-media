@@ -36,9 +36,10 @@
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-const { testmedium } = require('./_testmedium');
 const { nurTestkonto } = require('./_nur_testkonten');
 const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
+const Testpaar = require('./_testpaar');
+const storyMedien = [];
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -276,9 +277,15 @@ const mitFrist = (versprechen, was, ms = 20000) =>
      * (Schema 84) — Besitzer sieht, Dritte nicht, eigene immer, Zahl bleibt.
      */
     console.log('\nErsteller-Ausnahme und Kommentar-/Story-Likes (Kasten 26)');
+    // Ein eigener Beitrag, den der Likende SEHEN kann. Der Testbestand hat für
+    // beide Konten nur demo-Beiträge, die das andere Konto nicht sieht; seit
+    // Schema 119 lässt sich ein unsichtbarer Beitrag nicht mehr liken. Darum
+    // legt der Lauf einen sichtbaren an und löscht ihn danach wieder.
     const eigenerBeitrag = async (k) => {
-      const { data } = await k.client.from('posts').select('id').eq('user_id', k.id).limit(1);
-      return data?.[0]?.id ?? null;
+      const { data, error } = await k.client.from('posts')
+        .insert({ user_id: k.id, description: 'Prüflauf Likes Ersteller (Kasten 26.4)' }).select('id').single();
+      if (error) throw error;
+      return data.id;
     };
     for (const [liker, ersteller] of [[a, b], [b, a]]) {
       await ausnahmenLeeren(liker);
@@ -299,6 +306,9 @@ const mitFrist = (versprechen, was, ms = 20000) =>
         pruefe(`Ersteller ${ersteller.rufname} sieht das Like von ${liker.rufname} trotz „Niemand“ (26.4)`,
           (sieht || []).length === 1);
         if (!hatte) await liker.client.from('post_likes').delete().eq('post_id', pid).eq('user_id', liker.id);
+        await ersteller.client.from('posts').delete().eq('id', pid);
+        const { data: rest } = await ersteller.client.from('posts').select('id').eq('id', pid);
+        pruefe('Aufräumen: Prüfbeitrag des Erstellers gelöscht (gegengeprüft)', (rest || []).length === 0);
       }
 
       // Kommentar des Erstellers, Like des Likenden.
@@ -347,10 +357,10 @@ const mitFrist = (versprechen, was, ms = 20000) =>
 
       // Storys: eine Story des Erstellers, Like des Likenden, und umgekehrt.
       const verfall = new Date(Date.now() + 3600e3).toISOString();
-      // Seit Schema 95/117 nur eine selbst hochgeladene Datei (siehe _testmedium.js).
-      const m1 = await testmedium(ersteller.client, ersteller.id, 'stories', URL);
-      const m2 = await testmedium(liker.client, liker.id, 'stories', URL);
-      try {
+      // Seit Schema 117/118 nur eigene, registrierte Medienadressen.
+      const m1 = await Testpaar.eigenesMedium(URL, ersteller.id, 'stories', 'likespruefung-' + Date.now() + '.jpg');
+      const m2 = await Testpaar.eigenesMedium(URL, liker.id, 'stories', 'likespruefung2-' + Date.now() + '.jpg');
+      storyMedien.push(m1.pfad, m2.pfad);
       const { data: st1, error: sErr } = await ersteller.client.from('stories')
         .insert({ user_id: ersteller.id, media_url: m1.url, media_type: 'image', expires_at: verfall })
         .select('id').single();
@@ -379,13 +389,10 @@ const mitFrist = (versprechen, was, ms = 20000) =>
       } finally {
         await liker.client.from('stories').delete().eq('id', st2.id);
       }
-      } finally {
-        await m1.weg();
-        await m2.weg();
-      }
     }
   } finally {
     console.log('\nAufraeumen');
+    for (const p of storyMedien) await Testpaar.eigenesMediumWeg(p).catch(() => {});
     for (const k of [a, b]) {
       const v = vorher[k.id];
       await ausnahmenLeeren(k);

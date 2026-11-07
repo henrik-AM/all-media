@@ -24,8 +24,10 @@ const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { nurTestkonto } = require('./_nur_testkonten');
-const { testmedium } = require('./_testmedium');
 const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
+const Testpaar = require('./_testpaar');
+const pruefBeitraege = [];
+let pttMedium = null;
 
 const UMGEBUNG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
   ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
@@ -133,13 +135,7 @@ async function anmelden(zugang) {
   const bestandAnlegen = async () => {
     const { data: story, error: f1 } = await eigner.client
       .from('stories')
-      /*
-       * in_videos: Seit Schema 68 sieht ein Fremder eine reine Messenger-Story
-       * nur als Messenger-Kontakt (contacts.status = 'friend'). Dieser Lauf
-       * prüft die Stufe „story“, nicht den Kanal; er hing still an einem
-       * Freundes-Kontakt im Bestand, den es seit 06.11.2026 nicht mehr gibt.
-       */
-      .insert({ user_id: eigner.id, caption: 'Prüflauf Sichtbarkeit', in_videos: true })
+      .insert({ user_id: eigner.id, caption: 'Prüflauf Sichtbarkeit' })
       .select('id')
       .maybeSingle();
     if (f1) throw f1;
@@ -224,11 +220,12 @@ async function anmelden(zugang) {
       pruefe('Die Pruefcommunity ist danach wirklich weg', (rest || []).length === 0,
         `${(rest || []).length} Zeile(n) geblieben`);
     }
-    if (eigenes.ton) {
-      pruefe('Die Prüfdatei der PTT-Nachricht ist danach weg', await eigenes.ton.weg());
-    }
   };
 
+  // Messenger-Storys sieht nur ein Messenger-Kontakt (Regel „Aktuelle Storys
+  // lesen"). Der Grundstand hat KEINEN Kontakt (test:angriffe braucht das),
+  // darum knüpft der Lauf ihn selbst und löst ihn am Ende wieder.
+  await Testpaar.testpaarSichern();
   try {
     await bestandAnlegen();
 
@@ -308,12 +305,19 @@ async function anmelden(zugang) {
 
     console.log('\nWer darf kommentieren');
 
+    // Eigener, für den Fremden SICHTBARER Beitrag. Der Testbestand hat nur
+    // demo-Beiträge, die das andere Konto nicht sieht; seit Schema 119 wird
+    // ein Kommentar darauf immer abgelehnt — „Niemand" wäre sonst grün aus
+    // falschem Grund. Darum ein eigener Beitrag, am Ende wieder gelöscht.
     const { data: beitrag } = await eigner.client
       .from('posts')
+      .insert({ user_id: eigner.id, description: 'Prüflauf Sichtbarkeit Kommentare' })
       .select('id')
-      .eq('user_id', eigner.id)
-      .limit(1)
       .maybeSingle();
+    const { data: siehtFremder } = beitrag
+      ? await fremder.client.from('posts').select('id').eq('id', beitrag.id)
+      : { data: [] };
+    pruefe('Der Fremde sieht den Prüfbeitrag (sonst sagt „Niemand" nichts)', (siehtFremder || []).length === 1);
 
     if (!beitrag) {
       pruefe('Ein eigener Beitrag zum Pruefen', false, 'das Testkonto hat keinen');
@@ -346,6 +350,9 @@ async function anmelden(zugang) {
       pruefe('Unter dem eigenen Beitrag darf man selbst kommentieren', !f3 && Boolean(k3),
         f3 ? f3.message : '');
       if (k3) await eigner.client.from('comments').delete().eq('id', k3.id);
+      await eigner.client.from('posts').delete().eq('id', beitrag.id);
+      const { data: rest } = await eigner.client.from('posts').select('id').eq('id', beitrag.id);
+      pruefe('Aufräumen: Prüfbeitrag gelöscht (gegengeprüft)', (rest || []).length === 0);
     }
 
     console.log('\nWer darf mir schreiben');
@@ -387,12 +394,14 @@ async function anmelden(zugang) {
      * ===================================================================== */
 
     // Ein eigener Beitrag traegt die Faelle Repost, Likes und Markierung.
+    // Für den Fremden SICHTBAR: der Testbestand hat nur demo-Beiträge, die das
+    // andere Konto nicht sieht — seit Schema 119 kann er sie nicht mehr liken.
     const { data: eigenerBeitrag } = await eigner.client
       .from('posts')
+      .insert({ user_id: eigner.id, description: 'Prüflauf Sichtbarkeit Repost/Likes/Markierung' })
       .select('id')
-      .eq('user_id', eigner.id)
-      .limit(1)
       .maybeSingle();
+    if (eigenerBeitrag) pruefBeitraege.push([eigner, eigenerBeitrag.id]);
 
     console.log('\nRepost-Sichtbarkeit');
 
@@ -581,7 +590,9 @@ async function anmelden(zugang) {
     // einzelnen Adressaten.
     const { data: gemeinschaft, error: cErr } = await eigner.client
       .from('communities')
-      .insert({ name: 'Prüflauf PTT', created_by: eigner.id, visibility: 'private' })
+      // Öffentlich: einer privaten Community kann der Fremde seit Schema 97 nicht
+      // mehr selbst beitreten (nur per Anfrage) — dann hört er nie etwas.
+      .insert({ name: 'Prüflauf PTT', created_by: eigner.id, visibility: 'public' })
       .select('id')
       .maybeSingle();
 
@@ -592,17 +603,16 @@ async function anmelden(zugang) {
       await eigner.client
         .from('community_members')
         .insert({ community_id: gemeinschaft.id, user_id: eigner.id });
-      await fremder.client
+      const { error: bErr } = await fremder.client
         .from('community_members')
         .insert({ community_id: gemeinschaft.id, user_id: fremder.id });
+      pruefe('Das andere Konto tritt der Prüfcommunity bei', !bErr, bErr ? bErr.message : '');
 
-      // Seit Schema 95/117 nur eine selbst hochgeladene Datei (siehe _testmedium.js);
-      // die erfundene Adresse scheiterte am CHECK, und „Niemand" war grün aus falschem Grund.
-      eigenes.ton = await testmedium(eigner.client, eigner.id, 'ptt', URL, { ton: true });
       const { error: sErr } = await eigner.client.from('ptt_messages').insert({
         community_id: gemeinschaft.id,
         sender_id: eigner.id,
-        audio_url: eigenes.ton.url,
+        // Seit Schema 117/118 nur eine eigene, registrierte Medienadresse.
+        audio_url: (pttMedium = await Testpaar.eigenesMedium(URL, eigner.id, 'ptt', 'sichtbarkeit-' + Date.now() + '.m4a', 'audio/mp4')).url,
         dauer: 2,
       });
       pruefe('Eine PTT-Nachricht laesst sich senden', !sErr, sErr ? sErr.message : '');
@@ -633,6 +643,13 @@ async function anmelden(zugang) {
   } finally {
     await aufraeumen();
     await bestandAbraeumen();
+    for (const [k, id] of pruefBeitraege) {
+      await k.client.from('posts').delete().eq('id', id);
+      const { data: rest } = await k.client.from('posts').select('id').eq('id', id);
+      if ((rest || []).length) console.log('  FEHL Aufräumen: Prüfbeitrag ' + id + ' blieb');
+    }
+    if (pttMedium) await Testpaar.eigenesMediumWeg(pttMedium.pfad);
+    await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
   }
 
   console.log(

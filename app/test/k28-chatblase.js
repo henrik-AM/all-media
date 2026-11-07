@@ -199,7 +199,8 @@ async function teilBC() {
       const m = await pr.from('community_members').insert({ community_id: communityId, user_id: prId });
       if (m.error) throw m.error;
       const k = await pr.from('community_channels')
-        .insert([{ community_id: communityId, name: 'Eins', position: 0 }, { community_id: communityId, name: 'Zwei', position: 1 }])
+        // slug ist Pflicht (wie aktionen.ts/Server beim Anlegen).
+        .insert([{ community_id: communityId, slug: 'eins', name: 'Eins', position: 0 }, { community_id: communityId, slug: 'zwei', name: 'Zwei', position: 1 }])
         .select('id, name');
       if (k.error) throw k.error;
       kanal1 = k.data.find((x) => x.name === 'Eins').id;

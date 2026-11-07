@@ -247,12 +247,20 @@ async function teilB() {
   const { data: prProfil } = await pr.from('profiles').select('handle').eq('id', prId).maybeSingle();
   const { data: teProfil } = await te.from('profiles').select('handle').eq('id', teId).maybeSingle();
 
-  // Zwei eigene Beiträge von @prueflauf (für „über Beiträge hinweg").
-  const { data: posts } = await pr.from('posts').select('id').eq('user_id', prId)
-    .order('created_at', { ascending: false }).limit(2);
-  pruefe('@prueflauf hat zwei eigene Beiträge', (posts || []).length === 2, 'Testbestand ohne zwei Beiträge von @prueflauf');
+  // Zwei eigene, für @test SICHTBARE Beiträge von @prueflauf (für „über
+  // Beiträge hinweg"). Der Testbestand hat für @prueflauf nur demo-Beiträge;
+  // die sieht kein anderes Konto, und der Auslöser aus Schema 92 schickt für
+  // einen unsichtbaren Beitrag zu Recht keine Mitteilung (4.3d blieb leer).
+  // Deshalb legt der Lauf zwei eigene an und löscht sie am Ende wieder.
+  const { data: posts, error: postFehler } = await pr.from('posts')
+    .insert([{ user_id: prId, description: 'Prüflauf k28 Kommentare A' }, { user_id: prId, description: 'Prüflauf k28 Kommentare B' }])
+    .select('id, demo');
+  pruefe('@prueflauf legt zwei eigene, sichtbare Beiträge an', (posts || []).length === 2 && posts.every((p) => p.demo === false),
+    postFehler?.message || JSON.stringify(posts));
   if ((posts || []).length < 2) return;
   const [beitrag, anderer] = posts.map((p) => p.id);
+  const { data: siehtTe } = await te.from('posts').select('id').in('id', [beitrag, anderer]);
+  pruefe('@test sieht beide Beiträge', (siehtTe || []).length === 2, JSON.stringify(siehtTe));
 
   let wurzel = null;
   let antwortPr = null;
@@ -354,6 +362,9 @@ async function teilB() {
       }
     }
     for (const [c, id] of live) if (id) await c.from('stream_comments').delete().eq('id', id);
+    await pr.from('posts').delete().in('id', [beitrag, anderer]);
+    const { data: rest } = await pr.from('posts').select('id').in('id', [beitrag, anderer]);
+    pruefe('Aufräumen: beide Prüfbeiträge gelöscht (gegengeprüft)', (rest || []).length === 0, JSON.stringify(rest));
   }
 }
 

@@ -217,6 +217,16 @@ async function teilB() {
   const teId = a2.data.user.id;
 
   let gruppeId = null;
+  // Seit Chat-Anfrage/Schema 95: Gruppe nur unter Messenger-Kontakten — das
+  // Testpaar sichert Kontakt + Zweierchat (Management-API, nur Testkonten).
+  const Testpaar = require('./_testpaar');
+  try {
+    await Testpaar.testpaarSichern();
+  } catch (e) {
+    pruefe('Testpaar @test ↔ @prueflauf (Kontakt + Zweierchat) sichern', false, e.message);
+    return;
+  }
+  let kontaktbildPfad = null;
   try {
     await pruefeAsync('@prueflauf legt eine Gruppe mit @test an', async () => {
       const { data, error } = await pr.from('chats')
@@ -248,7 +258,10 @@ async function teilB() {
     });
 
     // 7.10 mit Schema 94: mein Kontaktbild steht nur in MEINER Liste.
-    const bildUrl = URL.replace(/\/$/, '') + '/storage/v1/object/public/media/avatars/prueflauf-k28-gruppe-' + Date.now() + '.jpg';
+    // Seit Schema 117: nur ein eigener Upload (medien_objekte) darf hinein.
+    const medium = await Testpaar.eigenesMedium(URL, prId, 'avatars', 'k28-gruppe-' + Date.now() + '.jpg');
+    kontaktbildPfad = medium.pfad;
+    const bildUrl = medium.url;
     const { error: fBild } = await pr.from('kontakt_bilder')
       .upsert({ owner_id: prId, kontakt_id: teId, media_url: bildUrl }, { onConflict: 'owner_id,kontakt_id' });
     if (fBild) {
@@ -296,6 +309,8 @@ async function teilB() {
       await pr.from('chat_members').delete().eq('chat_id', gruppeId).eq('user_id', prId);
       await pr.from('chats').delete().eq('id', gruppeId);
     }
+    if (kontaktbildPfad) await Testpaar.eigenesMediumWeg(kontaktbildPfad).catch(() => {});
+    await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
   }
 }
 
