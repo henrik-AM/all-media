@@ -307,7 +307,10 @@ const weg = (name, anweisung) => `
     pruefe('Spende mit unsichtbarem Beitrag abgelehnt („beitrag"), keine Zeile',
       rpc.spende_unsichtbar === 'beitrag' && rpc.spende_u_zeilen === '0', `${rpc.spende_unsichtbar}/${rpc.spende_u_zeilen}`);
     pruefe('Spende mit sichtbarem Beitrag kommt an der Beitragsprüfung vorbei',
-      !!rpc.spende_sichtbar && rpc.spende_sichtbar !== 'beitrag' && rpc.spende_sichtbar !== 'leer', rpc.spende_sichtbar);
+      // Nur Gründe, die erst NACH der Beitragsprüfung kommen, beweisen, dass sie
+      // durchlaufen wurde (nicht_freigegeben/empfaenger kämen schon vorher).
+      ['keine_zahlungsmethode', 'methode_unbekannt', 'methode_abgelaufen', 'kein_code', 'gesperrt', 'falscher_code']
+        .includes(rpc.spende_sichtbar), rpc.spende_sichtbar);
   }
 
   console.log('\nRechte (Drift)');

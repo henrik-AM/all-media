@@ -227,10 +227,12 @@ async function zeile(konto, beitragId, herkunft = 'feed') {
       Number(gezaehlt) === 2, `${gezaehlt} von 2 angenommen`);
     const nachBuendel = await zeile(ich, beitrag);
     pruefe('Der brauchbare Eintrag steht in der Tabelle', nachBuendel?.dauer_ms === 1200);
-    const { data: unbrauchbar } = await ich.client.from('post_impressions').select('id')
+    const { data: unbrauchbar, error: lesefehler } = await ich.client.from('post_impressions').select('id')
       .eq('user_id', ich.id).eq('post_id', '00000000-0000-0000-0000-000000000000');
-    pruefe('Der unbrauchbare Eintrag hat nichts geschrieben', (unbrauchbar ?? []).length === 0,
-      `${(unbrauchbar ?? []).length} Zeile(n)`);
+    // Lesefehler oder data:null wären sonst ein falsch-grünes „nichts geschrieben“.
+    pruefe('Der unbrauchbare Eintrag hat nichts geschrieben',
+      !lesefehler && Array.isArray(unbrauchbar) && unbrauchbar.length === 0,
+      lesefehler ? lesefehler.message : `${unbrauchbar?.length ?? 'null'} Zeile(n)`);
 
     console.log('\nOhne Anmeldung');
 
