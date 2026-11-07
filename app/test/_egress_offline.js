@@ -347,3 +347,29 @@ test('Server: Listen laden nur ihre IDs, in Blöcken, ohne 500er-Abfrage', async
   assert.deepEqual(Array.from(await beitraegeMit({ db: leer, nutzerId: 'ich' }, [])), []);
   assert.equal(leer.abfragen.length, 0);
 });
+test('Prüfbrowser: Beispielvideos bekommen Ersatz gleicher Länge/Form und lassen sich spulen (206)', () => {
+  const { ersatzFuer, ersatzvideoName, festesBeispiel } = require('./_medien_egressschutz');
+  const b = 'https://projekt.supabase.co/storage/v1/object/public/media/beispiel/';
+  // Längen und Formen wie app/tools/testmedien.js.
+  assert.equal(ersatzvideoName('reel-03.mp4'), 'hoch-60.mp4');
+  assert.equal(ersatzvideoName('clip-01.mp4'), 'quer-52.mp4');
+  assert.equal(ersatzvideoName('clip-09.mp4'), 'quer-60.mp4');
+  const ganz = ersatzFuer(festesBeispiel(b + 'clip-06.mp4'), b + 'clip-06.mp4');
+  assert.equal(ganz.status, 200);
+  assert.equal(ganz.headers['Accept-Ranges'], 'bytes');
+  const teil = ersatzFuer('video', b + 'clip-06.mp4', 'bytes=10-19');
+  assert.equal(teil.status, 206);
+  assert.equal(teil.body.length, 10);
+  assert.equal(teil.headers['Content-Range'], `bytes 10-19/${ganz.body.length}`);
+  assert.equal(ersatzFuer('video', b + 'clip-06.mp4', `bytes=${ganz.body.length}-`).status, 416);
+  // Die Dateien selbst: echte Länge, nicht die frühere 4-s-Attrappe.
+  for (const [name, sek, quer] of [['quer-60.mp4', 60, true], ['quer-52.mp4', 52, true], ['hoch-60.mp4', 60, false]]) {
+    const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=width,height', '-of', 'json',
+      path.join(__dirname, 'ersatzmedien', name)], { encoding: 'utf8' });
+    if (r.error) continue; // ohne ffprobe nur die Zuordnung
+    const info = JSON.parse(r.stdout);
+    assert.equal(Math.round(Number(info.format.duration)), sek, name);
+    const { width, height } = info.streams[0];
+    assert.equal(width > height, quer, name);
+  }
+});
