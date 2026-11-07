@@ -383,6 +383,23 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
         const t = document.querySelector('#toast');
         if (t) { t.textContent = ''; t.hidden = true; }
       });
+      /*
+       * Manche Punkte öffnen seit Oktober eine eigene Seite (Rechtstexte,
+       * Erstellseite, Unterseiten) statt eines Blatts — danach stand der
+       * nächste Knopf nicht mehr da und der Lauf wartete 8 s (06./07.11.).
+       * Vor jedem Klick zurück auf die Einstellungen.
+       */
+      if (!(await page.$(`[data-setting="${label}"]`))) {
+        await page.evaluate(() => {
+          const o = document.querySelector('#overlay');
+          if (o && !o.hidden) { o.hidden = true; o.innerHTML = ''; }
+          document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+        });
+        await page.click('[data-area="settings"]');
+        await page.waitForSelector(`[data-setting="${label}"]`, { timeout: 8000 })
+          .catch(() => { throw new Error(`„${label}“ nach Rückkehr nicht da (davor: ${uebrig.zuletzt || '—'})`); });
+      }
+      uebrig.zuletzt = label;
       await page.click(`[data-setting="${label}"]`);
       await page.waitForTimeout(350);
       const hinweis = await page.$eval('#toast', (e) => (e.hidden ? '' : e.textContent));

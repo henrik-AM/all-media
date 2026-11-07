@@ -322,7 +322,13 @@ const pruefe = (name, wahr, zusatz = '') => {
   await pruefe('Community-Beitritt aus der App steht auf der Website', await (async () => {
     const gemeinschaft = await seite.evaluate(async () => {
       const boot = await (await fetch('/api/bootstrap')).json();
-      return (boot.communities || [])[0] || null;
+      /*
+       * Eine öffentliche, die man nicht selbst erstellt hat: privaten tritt
+       * man seit Schema 97 nur über eine Anfrage bei (direkt → 42501), und
+       * aus der eigenen kann man nicht austreten. Bis 07.11. nahm der Lauf
+       * die erste Community — die war im Bestand zuletzt eine private.
+       */
+      return (boot.communities || []).find((c) => c.visibility === 'public' && !c.eigen) || null;
     });
     if (!gemeinschaft) return false;
 
