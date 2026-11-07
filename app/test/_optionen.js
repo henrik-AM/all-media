@@ -61,9 +61,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   const punkte = () =>
     page.$$eval('[data-beitragopt] .optkachel__text', (l) => l.map((e) => e.textContent.trim()));
 
+  /*
+   * Auf den Hinweis warten, nicht auf die Uhr: „Zu Story hinzufügen“ legt
+   * erst die Story an und lädt dann beide Story-Leisten neu — unter Last
+   * länger als die früheren festen 700 ms („keine Meldung“, 06.11.2026).
+   */
   const toastText = async () => {
-    await page.waitForTimeout(700);
-    return page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.textContent).join(' | '));
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.toast')].some((t) => !t.hidden && t.textContent.trim()),
+      null, { timeout: 10000 }
+    ).catch(() => {});
+    return page.evaluate(() => [...document.querySelectorAll('.toast')].filter((t) => !t.hidden)
+      .map((t) => t.textContent).join(' | '));
   };
 
   // Das erste fremde Reel - an eigenen fehlen "Kein Interesse" und "Melden".
@@ -174,6 +183,10 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.waitForSelector('[data-melden-bestaetigung]', { timeout: 10000 }).catch(() => {});
     const t = await page.$eval('[data-melden-bestaetigung]', (e) => e.textContent).catch(() => '');
     if (!t.includes('Danke')) throw new Error(t || 'keine Eingangsbestätigung');
+    // Seit RS 3 bleibt die Bestätigung im Blatt stehen, bis „Fertig“ getippt
+    // wird; das offene Blatt fing am 06.11. den nächsten Klick ab (30 s).
+    await page.click('#meldenFertig');
+    await page.waitForSelector('[data-melden="post"]', { state: 'detached', timeout: 3000 });
   });
 
   await pruefe('Kein Interesse nimmt das Reel sofort heraus', async () => {
