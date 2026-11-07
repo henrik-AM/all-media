@@ -330,6 +330,21 @@ const weg = (name, anweisung) => `
   pruefe('Die 10 Regeln rufen intern.* auf', Number(h.regeln_intern) === 10, String(h.regeln_intern));
   pruefe('anon hat keinen Zugang zu intern', h.anon_intern === false, String(h.anon_intern));
 
+  // Schema 124: Likes/Aufrufe/Story-Antworten nur auf Sichtbares — sonst verrät
+  // 23503 (Fremdschlüssel) gegen Erfolg/42501, ob es einen Kommentar/eine Story gibt.
+  // Verhalten prüft app/test/_probe124.js; hier nur, dass Regeln und Sperren da sind.
+  console.log('\nNur Sichtbares liken (Schema 124)');
+  const sicht = await frage(`
+    select
+      (select count(*) from pg_policies where schemaname = 'public' and policyname in ('nur_sichtbare_kommentare', 'nur_sichtbare_storys')
+         and permissive = 'RESTRICTIVE' and tablename in ('comment_likes', 'story_likes', 'story_views', 'messages')) as regeln,
+      (select count(*) from pg_trigger where tgname = 'bezug_fest'
+         and tgrelid in ('public.comment_likes'::regclass, 'public.story_likes'::regclass, 'public.story_views'::regclass)) as sperren
+  `);
+  const s124 = (Array.isArray(sicht) && sicht[0]) || {};
+  pruefe('4 Regeln „nur Sichtbares“ (comment_likes, story_likes, story_views, messages)', Number(s124.regeln) === 4, String(s124.regeln));
+  pruefe('Bezugsspalten per bezug_fest gesperrt (3 Tabellen)', Number(s124.sperren) === 3, String(s124.sperren));
+
   console.log('\nRechte (Drift)');
   const rechte = await frage(`
     select

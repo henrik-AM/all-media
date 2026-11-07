@@ -582,3 +582,17 @@ dokumentieren den Live-Stand.
   **Wer 83 oder 87 neu einspielt, muss 96 nachziehen.**
 - Umgekehrt drehen Neueinspielungen von 7, 11, 12, 19, 21, 23, 24, 68 oder 94 die 95-Fassung
   der jeweiligen Regel/Funktion zurück (Tabelle oben).
+
+## Nachtrag 08.11.2026: Schema 124 — Likes/Aufrufe nur auf Sichtbares (Rest aus 123)
+
+Rest aus 123: Wer eine fremde UUID kannte, las an der Fehlerart (23503 Fremdschlüssel gegen
+Erfolg/42501) ab, ob es einen Inhalt gibt. Beitragsbezüge waren schon dicht (`beitrag_lesbar`
+aus 119, Sammlungs-Auslöser „nur Eigenes“). Offen waren `comment_likes`, `story_likes`,
+`story_views` und `messages.reply_to_story` — dort ging sogar das Schreiben auf unsichtbare
+Kommentare/Storys durch. 124 legt je eine RESTRICTIVE-INSERT-Regel `nur_sichtbare_kommentare` /
+`nur_sichtbare_storys` an (`exists` auf die Zieltabelle unter den RLS-Regeln des Kontos, **keine
+neue Hilfsfunktion**, also kein RPC-Orakel) und sperrt die Bezugsspalten per Auslöser
+`bezug_fest` (`spalten_fest`, 121). Keine Doppelung mit älteren Dateien.
+
+Probe `app/test/_probe124.js` (live vorher: unbekannt 23503, unsichtbar ok; mit 124 28/28).
+**Live eingespielt 08.11.2026**; `test:angriffe` prüft Regeln und Sperren.
