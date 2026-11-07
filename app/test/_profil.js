@@ -308,9 +308,16 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     });
   });
 
-  await pruefe('Der Ring steht auch im Communitys-Profil', async () => {
+  /*
+   * Kasten 28/3.5 (10.10.2026, 2dd280a): Communitys haben keine Storys — am
+   * Communitys-Profil steht kein Ring, wie in der App. Bis 07.11. forderte
+   * diese Prüfung ihn noch ein. Jetzt bewacht sie die Regel: die Prüf-Story
+   * läuft (in_videos), trotzdem bleibt das Community-Profilbild schlicht.
+   */
+  await pruefe('Das Communitys-Profil zeigt keinen Story-Ring', async () => {
     await zumProfil('communities');
-    if (!(await page.$('[data-eigene-story]'))) throw new Error('kein Ring');
+    if (!(await page.$('.oprof__handle'))) throw new Error('Communitys-Profil nicht geladen');
+    if (await page.$('[data-eigene-story]')) throw new Error('Ring steht da');
   });
 
   await pruefe('Ein Klick auf den Ring oeffnet die Story', async () => {
