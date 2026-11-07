@@ -62,7 +62,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.interessenbild() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: nur eigenes Bild, Signale erst ab Neustart) |
 | Funktion public.community_sichtbar() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Funktion public.darf_angeschrieben_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql | **SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql** |
-| Funktion public.darf_mitglied_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
+| Funktion public.darf_mitglied_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql → SUPABASE_SCHEMA_120_gruppen_einstellung_lesbar.sql | **SUPABASE_SCHEMA_120_gruppen_einstellung_lesbar.sql** |
 | Funktion public.darf_herunterladen() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql | **SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql** |
 | Funktion public.finde_per_nummer() | SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_telefon.sql → SUPABASE_SCHEMA_38_nummer_bremse.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
 | Funktion public.handle_frei() | SUPABASE_SCHEMA_4.sql → SUPABASE_SCHEMA_39_anonyme_bremse.sql | **SUPABASE_SCHEMA_39_anonyme_bremse.sql** |
@@ -504,3 +504,12 @@ legen ohne 99 wie bisher an; ein privates Unterthema wird ohne 99 gar nicht ange
 `meine_daten()`-Fassung. Andere spätere Auskunftserweiterungen bleiben erhalten.
 Nach erneutem Einspielen von 103 muss 99 danach nachgezogen werden. Die Probe 99
 prüft den eigenen Eintrag und den Ausschluss fremder Mitgliedschaften.
+
+## Nachtrag 07.11.2026: Schema 120 — „Gruppen: wer darf hinzufügen" wirkt
+
+`darf_mitglied_werden` (Stand Schema 95 — Datei nur auf dem Sammelzweig, live seit 17.10.) las die fremde
+Einstellung `gruppenHinzufuegen` als Aufrufer — RLS „Eigene Einstellungen"
+versteckte sie, es galt immer „Meine Kontakte" (auch bei „Niemand"). Neu:
+Definer-Hilfe `darf_in_gruppe_holen(uuid)` (nur Ja/Nein für den Aufrufer,
+anon/PUBLIC entzogen). Fund aus test:dmsperre, Probe `app/test/_probe120.js` 9/9.
+

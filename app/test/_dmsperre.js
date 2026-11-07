@@ -257,7 +257,8 @@ async function anmelden(zugang) {
       { onConflict: 'user_id,schluessel' });
     pruefe('„Gruppen: wer darf hinzufügen“ steht für den Schritt auf „Alle“', !wahlFehler, wahlFehler?.message);
     const gruppe = await chatAnlegen(true);
-    pruefe('In eine Gruppe darf sie trotz „Niemand"', !(await dazuHolen(gruppe)));
+    const gruppenFehler = await dazuHolen(gruppe);
+    pruefe('In eine Gruppe darf sie trotz „Niemand"', !gruppenFehler, gruppenFehler?.message);
     pruefe('Nachgezählt: sie steht drin', (await mitgliederZaehlen(gruppe)) === 1);
 
     console.log('\n„Niemand bis auf" lässt genau diesen einen durch');
