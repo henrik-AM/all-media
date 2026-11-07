@@ -58,7 +58,9 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.mitteilung_bei_story_markierung() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_75_story_markierung_im_chat.sql | **SUPABASE_SCHEMA_75_story_markierung_im_chat.sql** |
 | Funktion public.spendencode_setzen() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_77_spendenpin_doppelt.sql | **SUPABASE_SCHEMA_77_spendenpin_doppelt.sql** |
 | Funktion public.sammlung_inhalt_pruefen() | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql | **SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql** |
-| Funktion public.feed_rang() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: Nähe-Likes erst ab „Feed zurücksetzen“) |
+| Funktion public.feed_rang() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 82 + nur lesbare Beiträge; 82 neu eingespielt → 122 nachziehen) |
+| Funktion public.impression_vermerken() | SUPABASE_SCHEMA_28_impressionen.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 28 + still nichts bei unlesbarem Beitrag) |
+| Funktion public.spende_senden() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_101_freigabe_nummer_spende.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 101 + p_post muss lesbar sein) |
 | Funktion public.interessenbild() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: nur eigenes Bild, Signale erst ab Neustart) |
 | Funktion public.community_sichtbar() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Funktion public.darf_angeschrieben_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql | **SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql** |
@@ -524,3 +526,15 @@ ließ sich `post_id` danach per UPDATE auf einen unsichtbaren Beitrag umbiegen
 neu, keine Doppelung; ändert weder spalten_fest noch eine Regel. messages/comments
 waren über ihre vorhandenen spalten_fest-Listen schon geschützt (doppelt hält
 besser). Probe `app/test/_probe121.js` 36/36.
+
+## Nachtrag 07.11.2026: Schema 122 — Definer-RPCs nur auf sichtbare Beiträge (Codex-Fund zu 121)
+
+Security-definer-Funktionen umgehen RLS und damit 119. 122 definiert drei Funktionen
+neu — jeweils die live gegengelesene Fassung (prosrc gleich der Datei) plus
+`beitrag_lesbar()` aus 119:
+- **ersetzt `impression_vermerken` (zuletzt 28)** — unlesbarer/unbekannter Beitrag → still nichts.
+- **ersetzt `spende_senden` (zuletzt 101)** — `p_post` unlesbar → `{ok:false, grund:'beitrag'}`.
+- **ersetzt `feed_rang` (zuletzt 82)** — unlesbare Kandidaten bekommen keine Zeile.
+
+Wer 28, 82 oder 101 neu einspielt, muss 122 nachziehen. Rechte unverändert
+(EXECUTE nur authenticated, Nachweis in der Datei). Probe `app/test/_probe122.js`.
