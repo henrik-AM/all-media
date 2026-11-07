@@ -47,7 +47,8 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.markierung_vorschlaege() | SUPABASE_SCHEMA_86_markierungen.sql → SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql | **SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql** |
 | Funktion public.personen_vorschlaege() | SUPABASE_SCHEMA_85_personen_vorschlaege.sql → SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql | **SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql** |
 | Funktion public.bildschirmzeit_stand() | SUPABASE_SCHEMA_83_bildschirmzeit.sql → SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql | **SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql** |
-| Funktion public.bildschirmzeit_entsperren() | SUPABASE_SCHEMA_83_bildschirmzeit.sql → SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql | **SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql** |
+| Funktion public.bildschirmzeit_entsperren() | SUPABASE_SCHEMA_83_bildschirmzeit.sql → SUPABASE_SCHEMA_87_entsperrcode_kontakte_minderjaehrige.sql → SUPABASE_SCHEMA_96_entsperrcode_frei.sql | **SUPABASE_SCHEMA_96_entsperrcode_frei.sql** (live seit 17.10.; Code frei ab 4 Zeichen, Tagesbremse 20 Fehlversuche) |
+| Funktion public.entsperrcode_setzen() | SUPABASE_SCHEMA_83_bildschirmzeit.sql → SUPABASE_SCHEMA_96_entsperrcode_frei.sql | **SUPABASE_SCHEMA_96_entsperrcode_frei.sql** (live seit 17.10.; 87 hat sie nicht neu angelegt) |
 | Funktion public.alter_bei_anmeldung() | SUPABASE_SCHEMA_52_geburtsdatum.sql → SUPABASE_SCHEMA_58_eltern_per_nummer.sql | **SUPABASE_SCHEMA_58_eltern_per_nummer.sql** |
 | Funktion public.eltern_anfragen() | SUPABASE_SCHEMA_52_geburtsdatum.sql → SUPABASE_SCHEMA_58_eltern_per_nummer.sql | **SUPABASE_SCHEMA_58_eltern_per_nummer.sql** |
 | Funktion public.geburtsdatum_nachtragen() | SUPABASE_SCHEMA_52_geburtsdatum.sql → SUPABASE_SCHEMA_58_eltern_per_nummer.sql | **SUPABASE_SCHEMA_58_eltern_per_nummer.sql** |
@@ -64,7 +65,9 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.interessenbild() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: nur eigenes Bild, Signale erst ab Neustart) |
 | Funktion public.community_sichtbar() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Funktion public.darf_angeschrieben_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql | **SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql** |
-| Funktion public.darf_mitglied_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql → SUPABASE_SCHEMA_120_gruppen_einstellung_lesbar.sql | **SUPABASE_SCHEMA_120_gruppen_einstellung_lesbar.sql** |
+| Funktion public.darf_mitglied_werden() | SUPABASE_SCHEMA_22_dm_sperre.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql → SUPABASE_SCHEMA_95_sicherheit.sql → SUPABASE_SCHEMA_120_gruppen_einstellung_lesbar.sql | **SUPABASE_SCHEMA_120_gruppen_einstellung_lesbar.sql** (Fassung 95, Einstellung über Definer-Hilfe `darf_in_gruppe_holen`; 95 neu eingespielt → 120 nachziehen) |
+| Funktion public.darf_schreiben() | SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_95_sicherheit.sql | **SUPABASE_SCHEMA_95_sicherheit.sql** (live seit 17.10.) |
+| Funktion public.fuehrt_als_kontakt() | SUPABASE_SCHEMA_21_chatanfrage.sql → SUPABASE_SCHEMA_95_sicherheit.sql | **SUPABASE_SCHEMA_95_sicherheit.sql** (live seit 17.10.) |
 | Funktion public.darf_herunterladen() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql | **SUPABASE_SCHEMA_27_sichtbarkeitspruefer.sql** |
 | Funktion public.finde_per_nummer() | SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_telefon.sql → SUPABASE_SCHEMA_38_nummer_bremse.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
 | Funktion public.handle_frei() | SUPABASE_SCHEMA_4.sql → SUPABASE_SCHEMA_39_anonyme_bremse.sql | **SUPABASE_SCHEMA_39_anonyme_bremse.sql** |
@@ -91,14 +94,16 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Regel "Eigene und empfangene Insights lesen" auf public.insights | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_12_insight_rekursion.sql | **SUPABASE_SCHEMA_12_insight_rekursion.sql** |
 | Regel "Eigenen Insight aendern" auf public.insights | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Regel "Eigenes Profil aendern" auf public.profiles | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
-| Regel "Empfaenger eintragen" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_12_insight_rekursion.sql | **SUPABASE_SCHEMA_12_insight_rekursion.sql** |
+| Regel "Empfaenger eintragen" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_12_insight_rekursion.sql → SUPABASE_SCHEMA_95_sicherheit.sql | **SUPABASE_SCHEMA_95_sicherheit.sql** (live seit 17.10.: Insights nur an Kontakte) |
+| Regel "Eigene Reaktion setzen" auf public.message_reactions | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_95_sicherheit.sql | **SUPABASE_SCHEMA_95_sicherheit.sql** (live seit 17.10.) |
 | Regel "Empfaengerzeilen lesen" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_12_insight_rekursion.sql | **SUPABASE_SCHEMA_12_insight_rekursion.sql** |
 | Regel "Insight als gesehen vermerken" auf public.insight_recipients | SUPABASE_SCHEMA_11_handbuch.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
 | Regel "Likes lesen" auf public.post_likes | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql | **SUPABASE_SCHEMA_65_likes_sichtbarkeit.sql** (vorher für alle offen; jetzt like_sichtbar()) |
 | Regel "Kommentar-Likes lesen" auf public.comment_likes | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_84_likes_wirkt.sql | **SUPABASE_SCHEMA_84_likes_wirkt.sql** (vorher für alle offen; jetzt kommentar_like_sichtbar()) |
 | Regel "Story-Likes lesen" auf public.story_likes | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_84_likes_wirkt.sql | **SUPABASE_SCHEMA_84_likes_wirkt.sql** (vorher für alle offen; jetzt story_like_sichtbar()) |
 | Regel "Kanal anlegen" auf public.community_channels | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
-| Regel "Medien lesen" auf storage.objects | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_medien_auflisten.sql | **SUPABASE_SCHEMA_24_medien_auflisten.sql** |
+| Regel "Medien lesen" auf storage.objects | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_24_medien_auflisten.sql → SUPABASE_SCHEMA_95_sicherheit.sql | **SUPABASE_SCHEMA_95_sicherheit.sql** (live seit 17.10.; Supabase-Eimer, Bunny-Medien über 115–117) |
+| Regel "Eigene Medien hochladen" auf storage.objects | SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_95_sicherheit.sql | **SUPABASE_SCHEMA_95_sicherheit.sql** (live seit 17.10.) |
 | Regel "Mitglieder hinzufuegen" auf public.chat_members | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_22_dm_sperre.sql | **SUPABASE_SCHEMA_22_dm_sperre.sql** |
 | Regel "Mitglieder lesen" auf public.chat_members | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_53_chat_schleife.sql | **SUPABASE_SCHEMA_53_chat_schleife.sql** |
 | Regel "Nachricht senden" auf public.messages | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_21_chatanfrage.sql | **SUPABASE_SCHEMA_21_chatanfrage.sql** |
@@ -422,7 +427,7 @@ Datei im Kopf. Wichtig beim Einspielen:
 |---|---|
 | Funktion public.kommentar_ausgeblendet() | SUPABASE_SCHEMA_92_kommentar_antworten.sql → SUPABASE_SCHEMA_102_melden_moderation.sql |
 | Funktion public.mitteilung_bei_kommentar() | SUPABASE_SCHEMA_44_mitteilungen.sql → SUPABASE_SCHEMA_92_kommentar_antworten.sql |
-| Funktion public.ist_messenger_kontakt() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_94_kontaktbild.sql |
+| Funktion public.ist_messenger_kontakt() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_94_kontaktbild.sql → SUPABASE_SCHEMA_95_sicherheit.sql |
 
 `ist_messenger_kontakt`: 94 legt eine **zweite Fassung mit anderer Signatur** `(uuid)` an; die live gültige `(uuid, uuid)` (68, gehärtet in 95) bleibt unberührt.
 
@@ -553,3 +558,27 @@ sammlung_inhalte, sammlung_beitraege, post_tags) und „Markierung entfernen“ 
 **Wer 20, 92 oder den F11-Block aus 102 neu einspielt, legt die public-Helfer und die alten
 Regeln wieder an — danach 123 erneut einspielen.** Probe `app/test/_probe123.js`
 (live vorher 18/29, mit 123 29/29). **Live eingespielt 07.11.2026 ~23:5x**: Probe live 29/29, RPC 404, rechte 278/278, angriffe 55/55, minderjaehrig grün, schema grün, markieren 49/49, likes 94/94.
+
+## Nachtrag 08.11.2026: Schemas 95 und 96 als Dateien nachgezogen (Paket 4)
+
+Beide sind **seit 17.10.2026 live** (Sicherheitsprüfung 16./17.10., Zweig `sicherheit-16-10`),
+ihre Dateien lagen aber nur im Sammelzweig `feedback-ohne-supabase`. Paket 4 holt sie
+**bytegleich** nach main (95 = Stand `53a1bab`, 96 = `622f00b`; Codex' Rekonstruktion auf
+`codex/nachholen-2026-10-29` ist mit beiden bytegleich). **Nicht erneut einspielen** — sie
+dokumentieren den Live-Stand.
+
+- **95** (`SUPABASE_SCHEMA_95_sicherheit.sql`): 14 Funktionen (u. a. `spalten_fest`,
+  `anlegen_vorgaben`, `medien_adresse_gueltig`, `darf_schreiben`, `fuehrt_als_kontakt`,
+  `ist_messenger_kontakt(uuid, uuid)`), 11 Regeln, `anon` ohne Tabellenrechte (außer
+  `altersgrenzen`), sechs Tabellen aus `supabase_realtime`. Später live und **gewinnen**:
+  120 (`darf_mitglied_werden`, baut auf 95 auf), 115–117 (Bunny-Medien, Medienreferenz).
+  121 nutzt `spalten_fest()` aus 95 für eigene Auslöser `beitrag_bezug_fest`. **Wer 95 neu einspielt, muss 117, 120, 121, 122,
+  123 nachziehen** und die anon-/Realtime-Rechte neuer Tabellen (ab 97) gegenprüfen.
+- **96** (`SUPABASE_SCHEMA_96_entsperrcode_frei.sql`): ersetzt `entsperrcode_setzen` und
+  `bildschirmzeit_entsperren` (Code nach `btrim` 4–64 Zeichen, ≤ 72 Byte, keine Steuerzeichen;
+  Bremse 10/h beim Setzen, 5/15 min und 20/24 h beim Entsperren). Rechte aus 83/87 bleiben,
+  weil `create or replace` sie nicht anfasst. Code dazu: `gemeinsam/bildschirmzeit.js`
+  (`entsperrcodePruefen`), App `BildschirmzeitSperre`/`SettingsScreen`, Website `app.js`.
+  **Wer 83 oder 87 neu einspielt, muss 96 nachziehen.**
+- Umgekehrt drehen Neueinspielungen von 7, 11, 12, 19, 21, 23, 24, 68 oder 94 die 95-Fassung
+  der jeweiligen Regel/Funktion zurück (Tabelle oben).
