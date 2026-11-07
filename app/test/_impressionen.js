@@ -220,10 +220,17 @@ async function zeile(konto, beitragId, herkunft = 'feed') {
       ] }
     );
     pruefe('Ein Buendel wird angenommen', !buendelFehler, buendelFehler?.message ?? '');
-    pruefe('Ein unbrauchbarer Eintrag reisst den Rest nicht mit',
-      Number(gezaehlt) === 1, `${gezaehlt} von 2 vermerkt`);
+    // Seit Schema 122 wird ein unbekannter/unsichtbarer Beitrag still
+    // übergangen und mitgezählt — die Zahl verrät nicht, ob es ihn gibt.
+    // Dass er nichts geschrieben hat, wird gegengelesen.
+    pruefe('Ein unbrauchbarer Eintrag reisst den Rest nicht mit (still mitgezaehlt, Schema 122)',
+      Number(gezaehlt) === 2, `${gezaehlt} von 2 angenommen`);
     const nachBuendel = await zeile(ich, beitrag);
     pruefe('Der brauchbare Eintrag steht in der Tabelle', nachBuendel?.dauer_ms === 1200);
+    const { data: unbrauchbar } = await ich.client.from('post_impressions').select('id')
+      .eq('user_id', ich.id).eq('post_id', '00000000-0000-0000-0000-000000000000');
+    pruefe('Der unbrauchbare Eintrag hat nichts geschrieben', (unbrauchbar ?? []).length === 0,
+      `${(unbrauchbar ?? []).length} Zeile(n)`);
 
     console.log('\nOhne Anmeldung');
 
