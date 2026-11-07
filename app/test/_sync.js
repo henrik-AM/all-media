@@ -119,8 +119,11 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-paction="share"]');
     await page.waitForSelector('.teilen', { timeout: 8000 });
 
-    const kacheln = await page.$$eval('.teilen__kachel', (els) => els.length);
-    const marken = await page.$$eval('.teilen__marke', (els) => els.length);
+    // Seit Schema 59 (27.09.2026) stehen auch ganze Communitys als Kachel im
+    // Blatt ([data-teilen-community]); sie haben keinen Bereich und kein
+    // Abzeichen. Gezählt werden darum nur die Personen ([data-teilen]).
+    const kacheln = await page.$$eval('.teilen__kachel[data-teilen]', (els) => els.length);
+    const marken = await page.$$eval('.teilen__kachel[data-teilen] .teilen__marke', (els) => els.length);
     if (kacheln === 0) throw new Error('kein Raster');
     if (marken !== kacheln) throw new Error(`${marken} Abzeichen bei ${kacheln} Kacheln`);
   });
