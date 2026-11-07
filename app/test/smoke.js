@@ -421,7 +421,20 @@ const STRUCTURE = {
   assert(`Filter Kontakte zeigt nur Profile (${personen})`, personen >= 9);
   await p.click('[data-csfilter="channels"]');
   await p.waitForTimeout(350);
-  assert('Filter Communitys zeigt nur Kanaele', (await p.$$eval('[data-community]', e => e.length)) === 6);
+  /*
+   * Wie bei den Profilen oben keine feste Zahl mehr: die Suche zeigt alle
+   * Communitys der Datenbank (passendeCommunitys), und jede echte oder von
+   * einem Prüflauf angelegte kommt dazu — im Gesamtlauf 06.11. waren es
+   * mehr als die sechs aus dem Bestand. Geprüft wird, was der Filter
+   * verspricht: genau die Communitys der Seite, keine einzige Profilzeile.
+   */
+  const csFilter = await p.evaluate(() => ({
+    zeilen: document.querySelectorAll('[data-community]').length,
+    profile: document.querySelectorAll('[data-befriend]').length,
+    soll: passendeCommunitys('').length,
+  }));
+  assert(`Filter Communitys zeigt nur Kanaele (${csFilter.zeilen}/${csFilter.soll}, Profile ${csFilter.profile})`,
+    csFilter.zeilen >= 6 && csFilter.zeilen === csFilter.soll && csFilter.profile === 0);
   await p.click('[data-sub="profile"]');
   await p.waitForTimeout(400);
   assert('Community-Profil zeigt beide Abschnitte', (await p.$$eval('.exp__head', e => e.length)) === 2);
