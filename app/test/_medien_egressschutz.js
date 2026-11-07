@@ -24,6 +24,18 @@
  * GLEICHER Länge und Form wie das Original (app/tools/testmedien.js:
  * reel-* 60 s hochkant, clip-01 52 s quer, übrige clip-* 60 s quer), ein
  * einfarbiges H.264 von ~7 KB aus app/test/ersatzmedien/, mit Range-Antworten.
+ *
+ * Eigene Uploads DIESES Laufs (07.11.2026): Story, Beitrag und Community-Bild
+ * lädt der Lauf selbst hoch und bekommt sie unterschrieben zurück; die
+ * Oberfläche zeigt sie danach an. Das war bei feedback/erstellen/kamera der
+ * einzige verbliebene Grund für Exit 2 (alle Prüfungen grün). Ersatz gibt es
+ * nur für Dateien im Namensschema der Uploadwege
+ * (`<ordner>/<uuid>-<millisekunden>-<zufall>.<endung>`, web/server/medien.js
+ * und app/lib/supabaseStorage.ts) mit Zeitstempel ab Start dieses Prozesses
+ * — also nichts aus dem Bestand und nichts von früheren Läufen. Es wird
+ * nichts aus der Cloud geladen; die Unterschrift hat der Server schon
+ * ausgestellt, eine Rechteprüfung wird nicht übersprungen. Jeder Ersatz steht
+ * im Log (`ersetzt (eigener Upload): …`).
  */
 const net = require('node:net');
 let gesperrt = false;
@@ -58,6 +70,16 @@ function festesBeispiel(adresse) {
   const treffer = /^\/storage\/v1\/object\/public\/media\/beispiel\/[A-Za-z0-9_-]+\.(jpe?g|png|webp|mp4)$/i.exec(url.pathname);
   if (!treffer) return null;
   return treffer[1].toLowerCase() === 'mp4' ? 'video' : 'bild';
+}
+
+const LAUFSTART = Date.now() - 60 * 1000; // eine Minute Spiel für Uhrabweichung zum Server
+
+/** Vom laufenden Prüflauf selbst hochgeladene Datei? 'bild', 'video' oder null. */
+function eigenerUploadDiesesLaufs(adresse, ab = LAUFSTART) {
+  const url = new URL(adresse);
+  const treffer = /^\/storage\/v1\/object\/(?:sign|public)\/media\/(?:messages|stories|avatars|posts|insights)\/[0-9a-f-]{36}-(\d{13})-[a-z0-9]{4,12}\.(jpe?g|png|webp|mp4|mov|webm)$/i.exec(url.pathname);
+  if (!treffer || Number(treffer[1]) < ab) return null;
+  return /^(mp4|mov|webm)$/i.test(treffer[2]) ? 'video' : 'bild';
 }
 
 /**
@@ -96,6 +118,11 @@ async function medienEgressSchuetzen(ziel) {
     const adresse = anfrage?.url();
     const art = adresse && festesBeispiel(adresse);
     if (art) return route.fulfill(ersatzFuer(art, adresse, anfrage.headers?.()?.range));
+    const eigen = adresse && eigenerUploadDiesesLaufs(adresse);
+    if (eigen) {
+      console.log('  ersetzt (eigener Upload): ' + new URL(adresse).pathname);
+      return route.fulfill(ersatzFuer(eigen, adresse, anfrage.headers?.()?.range));
+    }
     // Auch ein funktionaler Test darf mit fehlenden Medien nicht grün enden.
     process.exitCode = 2;
     if (!gesperrt) console.error('ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.');
@@ -107,4 +134,4 @@ async function medienEgressSchuetzen(ziel) {
   return ziel;
 }
 
-module.exports = { cloudMedium, festesBeispiel, ersatzFuer, ersatzvideoName, medienEgressSchuetzen };
+module.exports = { cloudMedium, festesBeispiel, eigenerUploadDiesesLaufs, ersatzFuer, ersatzvideoName, medienEgressSchuetzen };

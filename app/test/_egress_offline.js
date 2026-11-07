@@ -373,3 +373,18 @@ test('Prüfbrowser: Beispielvideos bekommen Ersatz gleicher Länge/Form und lass
     assert.equal(width > height, quer, name);
   }
 });
+test('Prüfbrowser: nur Uploads dieses Laufs bekommen Ersatz, Bestand und Fremdes bleiben gesperrt', () => {
+  const { eigenerUploadDiesesLaufs } = require('./_medien_egressschutz');
+  const s = 'https://projekt.supabase.co/storage/v1/object/sign/media/';
+  const uid = '62616c1d-82e2-4ee4-aab9-950e40e438a4';
+  const ab = 1794020000000;
+  assert.equal(eigenerUploadDiesesLaufs(`${s}stories/${uid}-1794020631497-y9fdspbk.jpg?token=x`, ab), 'bild');
+  assert.equal(eigenerUploadDiesesLaufs(`${s}posts/${uid}-1794020631497-y9fdspbk.mp4?token=x`, ab), 'video');
+  // Älter als der Laufstart: Bestand oder früherer Lauf — bleibt gesperrt.
+  assert.equal(eigenerUploadDiesesLaufs(`${s}stories/${uid}-1794010000000-y9fdspbk.jpg?token=x`, ab), null);
+  // Anderes Namensschema, anderer Ordner, Audio: kein Ersatz.
+  assert.equal(eigenerUploadDiesesLaufs(`${s}stories/irgendwas.jpg?token=x`, ab), null);
+  assert.equal(eigenerUploadDiesesLaufs(`${s}beispiel/${uid}-1794020631497-y9fdspbk.jpg`, ab), null);
+  assert.equal(eigenerUploadDiesesLaufs(`${s}ptt/${uid}-1794020631497-y9fdspbk.m4a?token=x`, ab), null);
+});
+
