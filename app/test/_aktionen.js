@@ -322,7 +322,11 @@ const pruefe = (name, wahr, zusatz = '') => {
   await pruefe('Community-Beitritt aus der App steht auf der Website', await (async () => {
     const gemeinschaft = await seite.evaluate(async () => {
       const boot = await (await fetch('/api/bootstrap')).json();
-      return (boot.communities || [])[0] || null;
+      // Nur eine, der man direkt beitreten oder die man verlassen kann: in eine
+      // private Community führt seit Schema 95/97 nur die Anfrage (Kasten 28/15),
+      // und die eigene lässt sich nicht verlassen. Der Testbestand legt die
+      // Communitys der Testkonten privat an.
+      return (boot.communities || []).find((c) => !c.eigen && (c.joined || c.visibility !== 'private')) || null;
     });
     if (!gemeinschaft) return false;
 
