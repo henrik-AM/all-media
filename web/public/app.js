@@ -18377,7 +18377,7 @@ function openErstellenSeite(art, community) {
         </label>
         <button class="erstellseite__einladen" id="esEinladen">${esc(T.einladen)}</button>
         <p class="erstellseite__qrText">${esc(T.qr)}</p>
-        <img class="erstellseite__qr" id="esQr" alt="QR-Code: ${esc(einladung)}" src="/api/einladung-qr.svg?code=${code}" width="200" height="200">
+        <img class="erstellseite__qr" id="esQr" alt="QR-Code: ${esc(einladung)}" width="200" height="200">
         <p class="erstellseite__qrHinweis">${esc(T.qrHinweis)}</p>
       </div>
       <div class="erstellseite__fuss">
@@ -18397,6 +18397,27 @@ function openErstellenSeite(art, community) {
     overlay.innerHTML = '';
   };
   $('#esZu').addEventListener('click', schliessen);
+
+  /*
+   * Den QR-Code per fetch holen, nicht über <img src>: der Server verlangt die
+   * Anmeldung (Authorization-Kopf), und den schickt nur fetch mit. Bis
+   * 07.11.2026 stand hier src="/api/einladung-qr.svg?…" — der Server
+   * antwortete 401, auf der Seite stand ein leeres Feld. Wie /api/qr.svg im
+   * Kontaktblatt. Die App zeichnet ihren Code selbst (QrCode.tsx).
+   */
+  (async () => {
+    try {
+      const res = await fetch(`/api/einladung-qr.svg?code=${code}`);
+      if (!res.ok || !(res.headers.get('content-type') || '').includes('svg')) throw new Error();
+      const adresse = URL.createObjectURL(await res.blob());
+      const bild = $('#esQr');
+      if (!bild) return URL.revokeObjectURL(adresse);
+      bild.addEventListener('load', () => URL.revokeObjectURL(adresse), { once: true });
+      bild.src = adresse;
+    } catch {
+      $('#esQr')?.setAttribute('hidden', '');
+    }
+  })();
 
   if (istCommunity) {
     $('#esBildDatei').addEventListener('change', async (e) => {
