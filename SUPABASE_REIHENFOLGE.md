@@ -81,6 +81,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.zuruecksetzen_einstellungen() | SUPABASE_SCHEMA_16_einstellungen.sql → SUPABASE_SCHEMA_23_sicherheit.sql → SUPABASE_SCHEMA_83_bildschirmzeit.sql | **SUPABASE_SCHEMA_83_bildschirmzeit.sql** |
 | Regel "stories_im_highlight" auf public.stories | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql | **SUPABASE_SCHEMA_48_highlight_sichtbarkeit.sql** |
 | Regel "Aktuelle Storys lesen" auf public.stories | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_19_sichtbarkeit_wirkt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** (Ziel entscheidet: Videos für alle Sichtbaren, Messenger nur Kontakte, Markierte) |
+| Regel "Markierung entfernen" auf public.post_tags | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_123_regelhelfer_intern.sql | **SUPABASE_SCHEMA_123_regelhelfer_intern.sql** (ruft intern.darf_markierung_loesen; 20 neu eingespielt → 123 nachziehen) |
 | Regel "Beitraege lesen" auf public.posts | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql | **SUPABASE_SCHEMA_7_testkonto.sql** |
 | Regel "Communitys lesen" auf public.communities | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_97_mitglieder_beitritt.sql | **SUPABASE_SCHEMA_97_mitglieder_beitritt.sql** |
 | Regel "Eigene Chats aendern" auf public.chats | SUPABASE_SCHEMA.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
@@ -538,3 +539,17 @@ neu — jeweils die live gegengelesene Fassung (prosrc gleich der Datei) plus
 
 Wer 28, 82 oder 101 neu einspielt, muss 122 nachziehen. Rechte unverändert
 (EXECUTE nur authenticated, Nachweis in der Datei). Probe `app/test/_probe122.js`.
+
+## Nachtrag 07.11.2026: Schema 123 — Regel-Helfer nach `intern` (Codex-Funde zu 122)
+
+`beitrag_ausgeblendet`, `kommentar_ausgeblendet` (92/102) und `darf_markierung_loesen` (20)
+waren per RPC aufrufbar und verrieten Existenz, Moderation und Verfasser unsichtbarer Inhalte.
+123 legt sie im Schema `intern` neu an (PostgREST liefert nur public, graphql_public aus),
+`darf_markierung_loesen` ohne `wer`-Parameter (liest auth.uid()), stellt die zehn Regeln
+`nicht_ausgeblendet` (comments, comment_likes, post_likes, saves, reposts, shares,
+sammlung_inhalte, sammlung_beitraege, post_tags) und „Markierung entfernen“ (post_tags) auf
+`intern.*` um und **löscht die drei public-Funktionen**.
+
+**Wer 20, 92 oder den F11-Block aus 102 neu einspielt, legt die public-Helfer und die alten
+Regeln wieder an — danach 123 erneut einspielen.** Probe `app/test/_probe123.js`
+(live vorher 18/29, mit 123 29/29).
