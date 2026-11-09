@@ -222,9 +222,11 @@ function ok(name, bedingung, zusatz = '') {
   await geheZu('communities', 'home');
   const commText = await seite.locator('.main').textContent();
 
-  // "Home zeigt nur Communitys, denen der Nutzer bereits beigetreten ist.
-  //  Noch nicht beigetretene unter 'Entdecken'."
-  ok('Entdecken-Bereich vorhanden', /[Ee]ntdecken/.test(commText));
+  // "Home zeigt nur Communitys, denen der Nutzer bereits beigetreten ist."
+  // Kasten 28/13: darüber Alle | Öffentlich | Privat (Prototyp „Communitys -
+  // Home“); Nicht-Beigetretene stehen seitdem unter Suchen, nicht mehr unter
+  // „Entdecken“.
+  ok('Filter Alle/Öffentlich/Privat vorhanden', /Alle\s*Öffentlich\s*Privat/.test(commText));
 
   /* ---------------------------------------------------- Einstellungen */
   console.log('\nEinstellungen');
