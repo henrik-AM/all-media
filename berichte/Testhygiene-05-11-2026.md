@@ -14,7 +14,6 @@ Basis: main ad7f221. Testablauf-Korrektur: b512c56, nur eigener Zweig.
 - Testhygiene: 22/22 (`node --test app/test/_testhygiene_offline.js`).
 - Belegungsschutz: 18/18 (`bash app/test/_ki_belegung_probe.sh`).
 - Schema/Code: 7/7 (`node app/test/_schema.js`).
-- Sitzungsbudget: 13/13 (`python3 -B -m unittest discover -s Claude/Tools -p test_sitzungsbudget.py -v`, aus Henrik/).
 - Bunny-Adapter: 138/138; Umzug: 2/2, ausschließlich lokal/Attrappen. Kein vollständiger Review.
 - Keine echte SQL-Ausführung, kein Cloudlauf, keine Installation von Abhängigkeiten, kein main/Push/Deploy.
 
