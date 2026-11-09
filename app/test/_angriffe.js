@@ -345,6 +345,27 @@ const weg = (name, anweisung) => `
   pruefe('4 Regeln „nur Sichtbares“ (comment_likes, story_likes, story_views, messages)', Number(s124.regeln) === 4, String(s124.regeln));
   pruefe('Bezugsspalten per bezug_fest gesperrt (3 Tabellen)', Number(s124.sperren) === 3, String(s124.sperren));
 
+  // Schema 125: weitere Regel-Helfer nicht per RPC — verschoben (42883) oder
+  // public-Fassung ohne EXECUTE für authenticated. 30/90/102/119 neu eingespielt
+  // legt public-Fassungen wieder an — das soll hier auffallen.
+  console.log('\nRegel-Helfer nicht per RPC (Schema 125)');
+  const h125 = await frage(`
+    select
+      (select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in
+        ('story_eigner','darf_story_markieren','darf_markieren','darf_kommentieren','darf_schreiben','darf_mitglied_werden',
+         'darf_in_gruppe_holen','community_ausgeblendet','kanal_ausgeblendet','kanal_antwort_erlaubt',
+         'kommentar_antwort_erlaubt','live_antwort_erlaubt')) as verschoben_public,
+      (select count(*) from unnest(array['public.sichtbar_fuer(uuid,text,uuid)','public.blockiert_zwischen(uuid,uuid)',
+         'public.ist_story_markiert(uuid,uuid)','public.ist_messenger_kontakt(uuid,uuid)','public.gesperrt(uuid,text)',
+         'public.profil_freigegeben(uuid)']::regprocedure[]) f where has_function_privilege('authenticated', f, 'execute')) as offen,
+      (select count(*) from pg_policies where coalesce(qual,'') || ' ' || coalesce(with_check,'') ~
+         '(^|[^.[:alnum:]_])(sichtbar_fuer|blockiert_zwischen|ist_story_markiert|gesperrt|profil_freigegeben)\\(') as regeln_public
+  `);
+  const g = (Array.isArray(h125) && h125[0]) || {};
+  pruefe('12 Helfer nicht mehr in public', Number(g.verschoben_public) === 0, String(g.verschoben_public));
+  pruefe('6 public-Helfer ohne EXECUTE für authenticated', Number(g.offen) === 0, String(g.offen));
+  pruefe('Keine Regel ruft eine gesperrte public-Fassung', Number(g.regeln_public) === 0, String(g.regeln_public));
+
   console.log('\nRechte (Drift)');
   const rechte = await frage(`
     select

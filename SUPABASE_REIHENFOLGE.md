@@ -596,3 +596,23 @@ neue Hilfsfunktion**, also kein RPC-Orakel) und sperrt die Bezugsspalten per Aus
 
 Probe `app/test/_probe124.js` (live vorher: unbekannt 23503, unsichtbar ok; mit 124 28/28).
 **Live eingespielt 08.11.2026**; `test:angriffe` prüft Regeln und Sperren.
+
+## Nachtrag 09.11.2026: Schema 125 — restliche Regel-Helfer aus der RPC-API
+
+Fortsetzung von 123. Zwölf nur von Regeln genutzte Helfer ziehen per `alter function … set
+schema intern` um (Regeln folgen der OID): `story_eigner`, `darf_story_markieren`,
+`darf_markieren`, `darf_kommentieren`, `darf_schreiben`, `darf_mitglied_werden` (ruft danach
+`intern.blockiert_zwischen`/`intern.darf_in_gruppe_holen`), `darf_in_gruppe_holen`,
+`community_ausgeblendet`, `kanal_ausgeblendet`, `kanal_antwort_erlaubt`,
+`kommentar_antwort_erlaubt`, `live_antwort_erlaubt`. Sechs, die auch Definer-Funktionen rufen
+(`sichtbar_fuer`, `blockiert_zwischen`, `ist_story_markiert`, `ist_messenger_kontakt(uuid,uuid)`,
+`gesperrt`, `profil_freigegeben`), bekommen Hüllen `intern.<f>`; alle Regeln zeigen darauf, die
+public-Fassung hat kein EXECUTE mehr für authenticated. `anfrage_erlaubt` und
+`darf_angeschrieben_werden` (App-RPC) antworten nur noch fürs eigene Konto.
+
+**Wer eine ältere Datei mit `create or replace function public.<einer der zwölf>` neu einspielt
+(u. a. 19, 20, 21, 30, 60, 80, 90, 92, 102, 120), legt wieder eine public-Fassung an — die Regeln
+zeigen aber weiter auf intern; die public-Fassung ist dann ein offenes Orakel. Danach die
+public-Fassung löschen bzw. 125 nachziehen.** Gleiches gilt für Dateien, die die sechs
+public-Helfer neu anlegen (Rechte kehren zurück). `test:angriffe` fällt in beiden Fällen auf.
+Probe `app/test/_probe125.js` (72/72). **Live eingespielt 09.11.2026.**
