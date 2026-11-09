@@ -81,9 +81,10 @@ async function appChecks() {
     headerTree = module.exports({ ...base, chat: { id: 'chat-einzeln', name: 'Anna', userId: 'u-anna', isGroup: false } });
     assert.equal(flatten(headerTree), 'AnnaOnline'); headerTree.props.onPress(); assert.deepEqual(calls.pop(), ['profile', 'u-anna']);
   });
-  await check('App: Gruppenkopf-Klick bleibt ohne neue Gruppeninfo', () => {
+  // Paket 5: seit Kasten 28/7.9 (main) öffnet schon das Antippen die Gruppeninfo — gewollt.
+  await check('App: Gruppenkopf-Klick öffnet die Gruppeninfo (Kasten 7.9), nicht die Community', () => {
     headerTree = module.exports({ ...base, chat: { id: 'gruppe', name: 'Gruppe', isGroup: true, memberIds: ['a', 'b'] } });
-    assert.equal(flatten(headerTree), 'Gruppe3 Mitglieder'); const before = calls.length; headerTree.props.onPress(); assert.equal(calls.length, before);
+    assert.equal(flatten(headerTree), 'Gruppe3 Mitglieder'); headerTree.props.onPress(); assert.deepEqual(calls.pop(), ['group', 'gruppe']);
   });
   await check('App: Gruppe öffnet bestehende Gruppeninfo weiterhin per LongPress', () => { headerTree.props.onLongPress(); assert.deepEqual(calls.pop(), ['group', 'gruppe']); });
   // Tatsächliche App.tsx-Prop aus TS-AST ausführen, ohne ganze Shell zu booten.
@@ -125,6 +126,11 @@ async function webChecks() {
     const medienFlaeche=()=>''; const bioLink=(s)=>esc(s); const pttEinhaengen=()=>{};
     const neuesUnterthema=()=>{}; const kanalNachricht=()=>''; const markierungsEingabe=()=>{};
     const openAnhang=()=>{}; const schalterAn=()=>false; const toast=()=>{};
+    // Paket 5: main nutzt seit Kasten 7/9/15 geteiltBinden und den Baustein Beitritt (echter Code).
+    const geteiltBinden=()=>{}; let kanalAntwort=null;
+    // Homeseite-Zurück ruft in main render() (Liste neu zeichnen) statt renderCommunities direkt.
+    const render=()=>renderCommunities();
+    ${read('gemeinsam/beitritt.js')}
     const openCommunityEinstellungen=()=>{window.k11Settings=(window.k11Settings||0)+1;};
     const renderCommunities=()=>{main.innerHTML='<div id="communityListe">Communityliste</div>';};
     ${functions}

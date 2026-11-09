@@ -57,6 +57,8 @@ async function appChecks() {
     '@expo/vector-icons/Ionicons': { __esModule: true, default: 'Ionicons' },
     '../../constants/design': { colors: {}, radius: {}, spacing: {}, typography: {}, themenStyles: () => ({}) },
     '../../contexts/ProfilContext': { useProfil: () => ({ communities, kanalBeitreten() {}, kanalGelesen() {} }) },
+    // Paket 5: main bindet seit Kasten 9/15 den gemeinsamen Baustein ein (echter Code, kein Ersatz).
+    '../../../gemeinsam/beitritt': require(require('path').join(__dirname, '../../gemeinsam/beitritt')),
   };
   for (const name of ['Druck', 'EmptyState', 'FilterPillen', 'SearchBar', 'Avatar', 'PersonenVorschlaege']) {
     dependencies[`../../components/${name}`] = { [name]: name };
