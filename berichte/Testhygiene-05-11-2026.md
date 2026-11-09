@@ -32,3 +32,10 @@ zusätzlich Testhygiene ergibt 75 Läufe. `test:bz-neuladen` bleibt erhalten,
 ist bereits auf main nicht in `LAEUFE` eingetragen; keine fremde Laufliste erweitert.
 Kein TypeScript berührt; `tsc --noEmit` gemäß Auftrag nicht erforderlich.
 Laufjournal und Rohbelege werden über `app/test/.gitignore` lokal ausgeschlossen.
+
+Gesamtlaufversuch am 09.11.: `npm run test:alles` mit vorhandenem
+`SUPABASE_TOKEN`, eigener Belegung `testbestand`, Exit 2 vor Anmeldung/SQL.
+Grund: Auf Port 3000 läuft kein Prüfserver. Laut Auftrag darf Port 3000
+nicht angefasst werden; Wächter nicht umgangen. 0/75 Läufe ausgeführt,
+Prüfzahl nicht ermittelt (Nenner unbekannt). Vollständige Liveabnahme offen.
+Belegung anschließend freigegeben. Kein Schema, keine Live-Daten geändert.
