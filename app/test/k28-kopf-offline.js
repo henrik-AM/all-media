@@ -52,7 +52,7 @@ async function appChecks() {
   visit(tree);
   const statements = [...declarations.values()].join('\n');
   const code = ts.transpileModule(`module.exports = function(props) {
-    const {chat,communities,onOpenCommunity,onOpenProfile,onOpenGroupSettings,praesenz='Online'}=props;
+    const {chat,communities,onOpenCommunity,onOpenProfile,onOpenGroupSettings,onOpenChatInfo,communityChats=[],praesenz='Online'}=props;
     ${statements}
     return (${header});
   };`, { compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS } }).outputText;
@@ -127,7 +127,7 @@ async function webChecks() {
     const neuesUnterthema=()=>{}; const kanalNachricht=()=>''; const markierungsEingabe=()=>{};
     const openAnhang=()=>{}; const schalterAn=()=>false; const toast=()=>{};
     // Paket 5: main nutzt seit Kasten 7/9/15 geteiltBinden und den Baustein Beitritt (echter Code).
-    const geteiltBinden=()=>{}; let kanalAntwort=null;
+    const geteiltBinden=()=>{}; const blasenBildBinden=()=>{}; let kanalAntwort=null;
     // Homeseite-Zurück ruft in main render() (Liste neu zeichnen) statt renderCommunities direkt.
     const render=()=>renderCommunities();
     ${read('gemeinsam/beitritt.js')}

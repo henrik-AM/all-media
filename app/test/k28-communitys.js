@@ -71,8 +71,9 @@ function teilA() {
   const home = lies('app/screens/communities/CommunitiesScreen.tsx');
 
   pruefe('10.1 Formularblatt hängt außerhalb der Vollbildansichten', /\{inhalt\}\s*\{\/\*[\s\S]*?\*\/\}\s*\{formular && \(/.test(shell));
-  pruefe('11.1 Kopf nimmt im Unterthema den Namen des Unterthemas', /kanalName \? `# \$\{kanalName\}` : chat\.name/.test(chat));
-  pruefe('11.1 Mitgliederzahl nur außerhalb eines Unterthemas', /\{!kanalName && \(/.test(chat));
+  // Paket 5: 11.1 in Codex' Fassung (98fa4af) — istKanal statt kanalName als Weiche.
+  pruefe('11.1 Kopf nimmt im Unterthema den Namen des Unterthemas', /istKanal \? `# \$\{kanalName \?\? ''\}` : chat\.name/.test(chat));
+  pruefe('11.1 Mitgliederzahl nur außerhalb eines Unterthemas', /\{!istKanal && \(/.test(chat));
   pruefe('11.2 Kopf im Unterthema ruft onOpenCommunity', /if \(kanalCommunity\) \{[\s\S]{0,120}onOpenCommunity\?\.\(kanalCommunity\.id\)/.test(chat));
   pruefe('11.2 App.tsx öffnet die Community-Homeseite', /onOpenCommunity=\{\(communityId\) => setOverlay\(\{ kind: 'community', communityId \}\)\}/.test(shell));
   pruefe('13.1 Home hat FilterPillen', /<FilterPillen pillen=\{FILTERS\}/.test(home));
@@ -168,17 +169,18 @@ async function teilB() {
     );
 
     // 10.1: das Formular „Neues Unterthema“ liegt sichtbar vor der Homeseite.
+    // Paket 5: seit Kasten 10.2 (main, Paket 3) ist es die Erstellen-Seite, kein Blatt mehr.
     await seite.click('#neuesUnterthema');
-    await seite.waitForSelector('.sheet', { state: 'visible', timeout: 5000 }).catch(() => {});
-    const blatt = await seite.$('.sheet');
+    await seite.waitForSelector('[data-erstellseite="unterthema"]', { state: 'visible', timeout: 5000 }).catch(() => {});
+    const blatt = await seite.$('[data-erstellseite="unterthema"]');
     const oben = blatt && (await seite.evaluate((el) => {
       const r = el.getBoundingClientRect();
       const mitte = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(40, r.height / 2));
       return el.contains(mitte);
     }, blatt));
     pruefe('10.1 Formular „Neues Unterthema“ liegt sichtbar oben', !!oben && /Unterthema/.test(await blatt.textContent()));
-    await seite.click('[data-sheet-close]').catch(() => {});
-    await seite.waitForTimeout(300);
+    await seite.click('#esZu').catch(() => {});
+    await seite.waitForSelector('[data-erstellseite]', { state: 'detached', timeout: 5000 }).catch(() => {});
 
     // 14.1/14.2: Plus unter Communitys → Chats
     await seite.click('[data-sub="chats"]');

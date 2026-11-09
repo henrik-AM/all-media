@@ -246,8 +246,9 @@ async function teilB() {
       ['Pflichtfeld', 'Bild einfügen', 'Unterthemen erstellen', 'Einladungslink senden', 'oder per QR-Code:', 'fertig'].every((t) => text.includes(t)) &&
         ['Community benennen', 'Biografie hinzufügen', 'Link hinzufügen'].every((p) => platzhalter.includes(p)), platzhalter.join(' | '));
     pruefe('16.2 ergänzt: Private Community (Beitritt nur mit Anfrage oder Einladung)', /Private Community/.test(text) && /Beitritt nur mit Anfrage oder Einladung/.test(text));
-    const qrSrc = await seite.getAttribute('#esQr', 'src');
-    const code = (qrSrc.match(/code=([a-z2-9]+)/) || [])[1] || '';
+    // Seit 112ec5f lädt die Website das QR-Bild per fetch (blob:) — der Code steht im alt-Text (Einladungslink).
+    const qrSrc = await seite.getAttribute('#esQr', 'alt');
+    const code = (qrSrc.match(/einladung=([a-z2-9]+)/) || [])[1] || '';
     await seite.waitForFunction(() => document.querySelector('#esQr')?.naturalWidth > 0, null, { timeout: 5000 }).catch(() => {});
     pruefe('16 QR-Code mit Einladungscode gezeichnet', E.istCode(code) && (await seite.$eval('#esQr', (i) => i.naturalWidth > 0)), qrSrc);
 
@@ -317,7 +318,7 @@ async function teilB() {
       ['Pflichtfeld', 'Privates Unterthema', 'Beitritt nur mit Einladung', 'Einladungslink senden', 'oder per QR-Code:', 'fertig'].every((t) => ut.includes(t)) &&
         ['Unterthema benennen', 'Biografie hinzufügen', 'Link hinzufügen'].every((p) => utPlatz.includes(p)), utPlatz.join(' | '));
     pruefe('10.2 kein Bild, keine Unterthemen beim Unterthema', !(await seite.$('#esBild')) && !(await seite.$('#esUnterthemaNeu')));
-    const utCode = ((await seite.getAttribute('#esQr', 'src')).match(/code=([a-z2-9]+)/) || [])[1] || '';
+    const utCode = ((await seite.getAttribute('#esQr', 'alt')).match(/einladung=([a-z2-9]+)/) || [])[1] || '';
     pruefe('10.2 eigener Einladungscode fürs Unterthema', E.istCode(utCode) && utCode !== code);
     await seite.fill('#esName', 'Geheim');
     await seite.fill('#esBio', 'Nur für Eingeladene');
