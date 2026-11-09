@@ -184,6 +184,22 @@ async function teilBC() {
   const prId = a1.data.user.id;
   const teId = a2.data.user.id;
 
+  /*
+   * Paket 5 (09.11.2026): Die Prüf-Anmeldung der Website ruft /api/reset, und
+   * zuruecksetzen() löscht die Communitys des Prüfkontos — also auch die
+   * Prüfcommunity aus Teil B, wenn sie vorher angelegt wurde (Teil C fand sie
+   * nie). Deshalb zuerst im Browser anmelden, danach aufbauen.
+   */
+  let browser = null;
+  let page = null;
+  let angemeldet = null;
+  if (!process.env.OHNE_BROWSER) {
+    const { chromium } = require('playwright-core');
+    browser = await chromium.launch();
+    page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+    angemeldet = await require('./_konto').vorbereiten(page, BASIS).catch((e) => (console.error(e.message), false));
+  }
+
   let communityId = null;
   let kanalId = null;
   const ids = [];
@@ -197,7 +213,7 @@ async function teilBC() {
       communityId = data.id;
       const m = await pr.from('community_members').insert({ community_id: communityId, user_id: prId });
       if (m.error) throw m.error;
-      const k = await pr.from('community_channels').insert({ community_id: communityId, name: 'Bilder', position: 0 }).select('id').single();
+      const k = await pr.from('community_channels').insert({ community_id: communityId, slug: 'bilder', name: 'Bilder', position: 0 }).select('id').single();
       if (k.error) throw k.error;
       kanalId = k.data.id;
     });
@@ -228,12 +244,9 @@ async function teilBC() {
     /* ------------------------------------------------------- C Website */
     if (process.env.OHNE_BROWSER) return;
     console.log('\nC  Website (Port 3000, @prueflauf)');
-    const { chromium } = require('playwright-core');
-    const { vorbereiten, schliesse } = require('./_konto');
-    const browser = await chromium.launch();
+    const { schliesse } = require('./_konto');
     try {
-      const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
-      const ok = await vorbereiten(page, BASIS);
+      const ok = angemeldet;
       if (ok === false) {
         pruefe('Website-Anmeldung', false);
         return;
@@ -292,8 +305,12 @@ async function teilBC() {
         await page.waitForTimeout(1500);
         if (!anfragen.some((u) => u.includes('/api/profile/' + teId))) throw new Error('kein /api/profile/' + teId);
       });
+      // Paket 5: das öffentliche Profil liegt heute als Overlay über #main — erst schließen.
+      await page.evaluate(() => typeof closeOverlay === 'function' && closeOverlay());
       await zeichnen();
       await page.waitForSelector('#commMsgs', { timeout: 15000 });
+      // Nach dem Overlay blendet die Seite ein; vorher hängt der Klick bis zur Zeitgrenze.
+      await page.waitForTimeout(800);
       await pruefeAsync('11.4 Klick aufs eigene Bild → Communitys → Profil', async () => {
         await page.locator('.msgzeile__bild[data-commprofil="me"]').first().click();
         await page.waitForTimeout(800);
@@ -319,6 +336,7 @@ async function teilBC() {
       try { await browser.close(); } catch { /* egal */ }
     }
   } finally {
+    if (browser) { try { await browser.close(); } catch { /* schon zu */ } }
     if (communityId) {
       await pr.from('communities').delete().eq('id', communityId);
       const { data } = await pr.from('communities').select('id').eq('id', communityId).maybeSingle();
