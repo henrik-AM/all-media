@@ -46,9 +46,11 @@ daten['all-media.pruefbild'] = ZIEL;
 fs.writeFileSync(datei, JSON.stringify(daten));
 
 // Die Adresse des Metro-Bundlers im eigenen WLAN — dieselbe wie npm run wlan.
-const ip = still("ipconfig getifaddr en0").trim() || '127.0.0.1';
+// Eigener Metro (z. B. aus einem Worktree): METRO_PORT=8082 — dann lokal, wie tools/app-bilder.js.
+const METRO_PORT = process.env.METRO_PORT;
+const ip = METRO_PORT ? '127.0.0.1' : still("ipconfig getifaddr en0").trim() || '127.0.0.1';
 still(`xcrun simctl terminate ${geraet} ${EXPO_GO_ID}`);
-execFileSync('xcrun', ['simctl', 'openurl', geraet, `exp://${ip}:8081`]);
+execFileSync('xcrun', ['simctl', 'openurl', geraet, `exp://${ip}:${METRO_PORT || 8081}`]);
 execSync(`sleep ${WARTEN / 1000}`);
 execFileSync('xcrun', ['simctl', 'io', geraet, 'screenshot', DATEI], { stdio: 'ignore' });
 console.log(`  ${ZIEL} -> ${DATEI}`);

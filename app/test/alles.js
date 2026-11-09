@@ -236,6 +236,17 @@ const LAEUFE = [
   // Kasten RS 7/5 (31.10.2026): Zustimmung mit Fassung und Eltern-Widerruf offline.
   // Der Bildlauf test/rs7-einwilligung.js braucht einen Server (wie rs3-melden).
   ['einwilligung-einheit', '_einwilligung_einheit.js'],
+  // Kasten 28 (Feedback 28.09.), eingehängt mit Paket 5 am 09.11.2026.
+  // Ohne Supabase: Attrappe bzw. isolierte Renderer.
+  ['k28-communitys', 'k28-communitys.js'],
+  ['k28-kopf-offline', 'k28-kopf-offline.js'],
+  ['k28-filter-offline', 'k28-filter-offline.js'],
+  ['k28-erstellen', 'k28-erstellen.js'],
+  ['k28-mitglieder', 'k28-mitglieder.js'],
+  // Mit Supabase (zwei Testkonten, eigene Prüfcommunity, räumt selbst auf).
+  ['k28-commbild', 'k28-commbild.js'],
+  ['k28-gruppe', 'k28-gruppe.js'],
+  ['k28-karte', 'k28-karte.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */
