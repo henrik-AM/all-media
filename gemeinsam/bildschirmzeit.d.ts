@@ -105,6 +105,8 @@ export const AUSZEIT_MEHR_STUNDEN: number;
 export const HINWEIS_SEKUNDEN: number;
 export const PAUSE_RUHE_SEKUNDEN: number;
 export const TAKT_SEKUNDEN: number;
+export const STAND_NEU_SEKUNDEN: number;
+export const STAND_WECHSEL_SEKUNDEN: number;
 export const HOECHSTENS_JE_AUFRUF: number;
 export const TEXTE: {
   abschnitt: string;
@@ -155,4 +157,6 @@ export function wertText(punkt: 'uebersicht' | 'gesamt' | 'bereiche' | 'auszeit'
 export function bereichWertText(regeln: unknown, bereich: BzBereich): string;
 export function woche(zeilen: { tag: string; bereich: string; sekunden: number }[], heute: string): BzTag[];
 export function uhr(): BzUhr;
+/** Stand neu laden? `geladenMs` = Beginn des letzten Ladens (null = nie). */
+export function standFaellig(geladenMs: number | null, jetztMs: number, anlass: 'takt' | 'wechsel'): boolean;
 export function zusammen(nutzung: Partial<Record<string, number>>, offen: Partial<Record<string, number>>): Partial<Record<string, number>>;

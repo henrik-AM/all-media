@@ -101,6 +101,17 @@
   /** Mehr nimmt bildschirmzeit_zaehlen je Aufruf nicht an. */
   const HOECHSTENS_JE_AUFRUF = 120;
 
+  /**
+   * So alt darf der geladene Stand (Regeln, Freigaben, Code-Art, Eltern)
+   * höchstens werden, solange App/Website sichtbar sind — dann holen sie ihn
+   * im 30-s-Takt frisch. Sonst greift ein Limit, das woanders gesetzt wurde
+   * (Eltern am anderen Gerät, Website, zweites Gerät), erst nach Neustart.
+   * Kein Realtime, kein Sekundentakt: Supabase-Datenverkehr ist knapp.
+   */
+  const STAND_NEU_SEKUNDEN = 90;
+  /** Beim Wechsel des Bereichs frisch laden — aber nicht öfter als so. */
+  const STAND_WECHSEL_SEKUNDEN = 60;
+
   /** „15 Min. mehr" in der Auszeit: höchstens einmal in so vielen Stunden. */
   const AUSZEIT_MEHR_STUNDEN = 12;
 
@@ -845,6 +856,21 @@
     };
   }
 
+  /**
+   * Soll der Stand jetzt neu geladen werden? `geladenMs` = Beginn des letzten
+   * Ladens (null = nie). `anlass`: 'takt' (alle 30 s, nur wenn sichtbar) oder
+   * 'wechsel' (anderer Bereich offen). Im Takt mit halbem Takt Spielraum, damit
+   * Laufzeit und Taktversatz nicht einen ganzen Takt kosten: geladen wird bei
+   * jedem dritten Takt, also alle 90 s.
+   */
+  function standFaellig(geladenMs, jetztMs, anlass) {
+    if (geladenMs == null) return true;
+    const alter = (jetztMs - geladenMs) / 1000;
+    if (!(alter >= 0)) return true; // Uhr zurückgestellt oder Unsinn: lieber frisch
+    if (anlass === 'wechsel') return alter >= STAND_WECHSEL_SEKUNDEN;
+    return alter >= STAND_NEU_SEKUNDEN - TAKT_SEKUNDEN / 2;
+  }
+
   /** Gezählte plus noch nicht geschickte Sekunden. */
   function zusammen(nutzung, offen) {
     const z = Object.assign({}, nutzung || {});
@@ -868,6 +894,8 @@
     PAUSE_RUHE_SEKUNDEN,
     TAKT_SEKUNDEN,
     HOECHSTENS_JE_AUFRUF,
+    STAND_NEU_SEKUNDEN,
+    STAND_WECHSEL_SEKUNDEN,
     TEXTE,
     uhrzeit,
     minuteAus,
@@ -901,6 +929,7 @@
     bereichWertText,
     woche,
     uhr,
+    standFaellig,
     zusammen,
   };
 });

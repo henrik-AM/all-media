@@ -11,6 +11,15 @@
  * nach Supabase (bildschirmzeit_zaehlen, mit Obergrenze). Die Website zählt
  * in dieselben Zeilen.
  *
+ * STAND FRISCH HALTEN (09.11.2026)
+ *
+ * Regeln, Freigaben und Code-Art können sich woanders ändern (Eltern am
+ * anderen Gerät, Website, zweites Gerät). Deshalb holt die App den Stand
+ * (bildschirmzeit_stand) nicht nur beim Start und bei Rückkehr in den
+ * Vordergrund, sondern im Vordergrund auch im 30-s-Takt, sobald er älter als
+ * 90 s ist, und beim Wechsel des Bereichs, wenn er älter als 60 s ist
+ * (Bildschirmzeit.standFaellig). Kein Realtime — Datenverkehr ist knapp.
+ *
  * SPERRE
  *
  * `status` ist die Antwort von `Bildschirmzeit.status()` für den offenen
@@ -94,14 +103,23 @@ export const BildschirmzeitProvider = ({
   const uhr = useRef(Bildschirmzeit.uhr()).current;
   const gezeigt = useRef<string | null>(null);
   const schickt = useRef(false);
+  // Wann zuletzt ein Laden begann (ms) und welches — eine ältere Antwort, die
+  // nach einer neueren ankommt, darf den frischeren Stand nicht überschreiben.
+  const geladenUm = useRef<number | null>(null);
+  const ladeNr = useRef(0);
+  const imVordergrund = useRef(vordergrund);
+  imVordergrund.current = vordergrund;
 
   const neuLaden = useCallback(async () => {
     if (!supabase || !user?.id) {
       setStand(null);
+      geladenUm.current = null;
       return;
     }
+    const nr = ++ladeNr.current;
+    geladenUm.current = Date.now();
     const s = await bzStandLaden(supabase);
-    if (s) setStand(s);
+    if (s && nr === ladeNr.current) setStand(s);
   }, [supabase, user?.id]);
 
   useEffect(() => {
@@ -144,7 +162,9 @@ export const BildschirmzeitProvider = ({
   }, [schicken, neuLaden]);
 
 
-  // Takt: 5 s rechnen, 30 s schicken.
+  // Takt: 5 s rechnen, 30 s schicken — und danach den Stand frisch holen,
+  // wenn er älter als 90 s ist (erst nach dem Schicken, damit die neue
+  // Nutzung schon drin ist und nichts doppelt oder gar nicht zählt).
   useEffect(() => {
     let n = 0;
     const t = setInterval(() => {
@@ -152,11 +172,23 @@ export const BildschirmzeitProvider = ({
       n += 5;
       if (n >= Bildschirmzeit.TAKT_SEKUNDEN) {
         n = 0;
-        void schicken();
+        void (async () => {
+          await schicken();
+          if (imVordergrund.current && Bildschirmzeit.standFaellig(geladenUm.current, Date.now(), 'takt')) {
+            await neuLaden();
+          }
+        })();
       }
     }, 5000);
     return () => clearInterval(t);
-  }, [schicken]);
+  }, [schicken, neuLaden]);
+
+  // Anderer Bereich offen: Stand frisch holen, wenn er älter als 60 s ist —
+  // so greift ein neues Limit schon beim Hineingehen, nicht erst im Takt.
+  useEffect(() => {
+    if (!bereich || !imVordergrund.current || schickt.current) return;
+    if (Bildschirmzeit.standFaellig(geladenUm.current, Date.now(), 'wechsel')) void neuLaden();
+  }, [bereich, neuLaden]);
 
   // Mitternacht in der Zeitzone des Kontos: neuer Tag, neue Zahlen.
   useEffect(() => {

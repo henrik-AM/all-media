@@ -8086,6 +8086,12 @@ function communityRow(c) {
  * Sperrseite statt seiner — Leisten oben und unten bleiben. Ist eine
  * Vollbildansicht (Chat, Story, Player …) zu, legt sich #bzSperre darüber.
  *
+ * STAND FRISCH HALTEN (09.11.2026): Regeln, Freigaben und Code-Art können
+ * sich woanders ändern (Eltern am anderen Gerät, App, zweiter Tab). Darum
+ * holt bzTick() den Stand bei sichtbarem Tab im 30-s-Takt neu, sobald er
+ * älter als 90 s ist, und beim Wechsel des Bereichs, wenn er älter als 60 s
+ * ist (BZ.standFaellig — dieselbe Regel wie die App). Kein Realtime.
+ *
  * Die Rechnung steht in gemeinsam/bildschirmzeit.js. Gegenstück in der App:
  * contexts/BildschirmzeitContext.tsx, components/BildschirmzeitSperre.tsx.
  */
@@ -8100,6 +8106,9 @@ const bz = {
   pauseOffen: false,
   hauptGesperrt: false,
   schickt: false,
+  geladenUm: null, // ms, wann das letzte Laden begann (BZ.standFaellig)
+  ladeNr: 0, // ältere Antworten überschreiben keinen frischeren Stand
+  zuletztBereich: null, // für das Nachladen beim Bereichswechsel
 };
 
 /*
@@ -8132,10 +8141,12 @@ async function bzLaden() {
     bz.stand = null;
     return;
   }
+  const nr = ++bz.ladeNr;
+  bz.geladenUm = Date.now();
   try {
     const r = await fetch('/api/bildschirmzeit');
     const d = r.ok ? await r.json() : null;
-    if (d?.ok) {
+    if (d?.ok && nr === bz.ladeNr) {
       bz.stand = d;
       bz.konto = window.Anmeldung?.nutzer?.()?.id || null;
     }
@@ -8386,6 +8397,13 @@ async function bzTick() {
 
   const sichtbar = document.visibilityState === 'visible';
   const bereich = bzAnsicht();
+  // Anderer Bereich: Stand frisch holen, wenn er älter als 60 s ist — ein
+  // woanders gesetztes Limit greift dann schon beim Hineingehen.
+  if (bereich !== bz.zuletztBereich) {
+    bz.zuletztBereich = bereich;
+    if (bereich && sichtbar && !bz.schickt && BZ.standFaellig(bz.geladenUm, Date.now(), 'wechsel')) await bzLaden();
+    if (!bz.stand) return;
+  }
   const art = bzOverlayArt();
   const st = bzStatus(bereich);
   // Vor der Sperrseite wird nicht gezählt — dort nutzt niemand den Bereich.
@@ -8417,7 +8435,13 @@ async function bzTick() {
   bz.takt += 2;
   if (bz.takt >= BZ.TAKT_SEKUNDEN) {
     bz.takt = 0;
-    void bzSchicken();
+    // Erst schicken, dann (wenn älter als 90 s) frisch laden — so ist die
+    // eben geschickte Nutzung schon im neuen Stand.
+    void bzSchicken().then(() => {
+      if (document.visibilityState === 'visible' && bzAngemeldet() && BZ.standFaellig(bz.geladenUm, Date.now(), 'takt')) {
+        return bzLaden();
+      }
+    });
   }
 }
 
