@@ -362,12 +362,14 @@ const mitFrist = (versprechen, was, ms = 20000) =>
       const m2 = await Testpaar.eigenesMedium(URL, liker.id, 'stories', 'likespruefung2-' + Date.now() + '.jpg');
       storyMedien.push(m1.pfad, m2.pfad);
       const { data: st1, error: sErr } = await ersteller.client.from('stories')
-        .insert({ user_id: ersteller.id, media_url: m1.url, media_type: 'image', expires_at: verfall })
+        // in_videos: für alle sichtbar — seit Schema 124 lässt sich nur liken, was man sieht.
+        .insert({ user_id: ersteller.id, media_url: m1.url, media_type: 'image', expires_at: verfall, in_videos: true })
         .select('id').single();
       if (sErr) throw sErr;
       try {
         await stufe(liker, 'niemand');
-        await liker.client.from('story_likes').insert({ story_id: st1.id, user_id: liker.id });
+        const { error: lErr } = await liker.client.from('story_likes').insert({ story_id: st1.id, user_id: liker.id });
+        if (lErr) console.log('  Story-Like setzen: ' + lErr.message);
         const sl = async (wer) => (await wer.client.from('story_likes').select('user_id')
           .eq('story_id', st1.id).eq('user_id', liker.id)).data?.length > 0;
         pruefe(`Story-Like: Ersteller ${ersteller.rufname} sieht es trotz „Niemand“ (26.4)`, await sl(ersteller));
