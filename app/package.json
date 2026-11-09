@@ -102,6 +102,7 @@
     "test:sammlungen": "node test/_sammlungen.js",
     "test:sammlungenweb": "node test/_sammlungenweb.js",
     "test:schema": "node test/_schema.js",
+    "test:bz-neuladen": "node test/bz-neuladen.js",
     "test:rang": "node test/_rang.js",
     "test:verlauf": "node test/_verlauf.js",
     "test:minderjaehrig": "node test/_minderjaehrig.js",
