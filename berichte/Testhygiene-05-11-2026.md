@@ -38,3 +38,28 @@ Grund: Auf Port 3000 läuft kein Prüfserver. Laut Auftrag darf Port 3000
 nicht angefasst werden; Wächter nicht umgangen. 0/75 Läufe ausgeführt,
 Prüfzahl nicht ermittelt (Nenner unbekannt). Vollständige Liveabnahme offen.
 Belegung anschließend freigegeben. Kein Schema, keine Live-Daten geändert.
+
+## Gesamtlauf 09.11. — neuer Auftrag, Vorbereitung
+
+Freigabe laut `AUFTRAG-paket-t-gesamtlauf-codex-09-11.md`: Supabase-Gesamtlauf,
+eigener Prüfserver auf 3300; fremde Ports 3000/8081 bleiben tabu.
+Testbestand beim Start durch Claude belegt; Belegungsversuche alle drei Minuten,
+maximal vier Stunden, ohne Erzwingen oder Übernehmen.
+Server per `PORT=3300 npm start` aus diesem Worktree gestartet, HTTP 200 geprüft.
+Adressvariablen: `BASE`, `BASIS`, `ZIEL`, `AM_URL`, `AM_BASIS` jeweils
+`http://localhost:3300`. `SUPABASE_TOKEN` vorhanden, nicht ausgegeben.
+Lokale, ignorierte Env-Dateien vorbereitet; keine Schlüssel im Commit.
+
+Vorbefund: `smoke.js:59` verwendet die feste Adresse `http://localhost:3000`;
+`_uebernacht.js` verwendet ebenfalls feste Standardadressen ohne Env-Auswertung.
+Beides unverändert auch auf main fbf0e79. Der Auftrag verlangt bei einem Lauf
+gegen 3000 den Abbruch; der bestehende Prüfserverwächter bleibt eingeschaltet.
+
+`npm ci --ignore-scripts` gemäß Lockdateien: web 109, app 571 Pakete installiert.
+Audit meldet web 4 Lücken (2 mittel, 1 hoch, 1 kritisch), app 14
+(1 niedrig, 7 mittel, 5 hoch, 1 kritisch). Keine Abhängigkeiten geändert.
+Web: body-parser hoch, proxy-addr kritisch, ip-address und qs mittel.
+
+Budget-/Hook-Freigaben laut Auftrag erledigt: alle fünf Hooks konfiguriert,
+Vertrauenseintrag vorhanden, vorheriger Budgettest 13/13. Hier keine
+Hook-Konfiguration gelesen, geändert oder erneut geprüft.
