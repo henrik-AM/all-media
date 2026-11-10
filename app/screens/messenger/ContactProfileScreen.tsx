@@ -249,7 +249,7 @@ export const ContactProfileScreen = ({
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <Druck onPress={onBack} hitSlop={8}>
+          <Druck onPress={onBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Zurück">
             <Ionicons name="arrow-back" size={22} color={colors.text} />
           </Druck>
         </View>
@@ -302,7 +302,7 @@ export const ContactProfileScreen = ({
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Druck onPress={onBack} hitSlop={8}>
+        <Druck onPress={onBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Zurück">
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Druck>
         <Text style={styles.headerTitel}>{imMessenger ? 'Kontaktinfo' : 'Chat-Info'}</Text>

@@ -119,9 +119,14 @@ function main() {
   const ganz = (g) => g.width >= app.width && g.height >= app.height;
   const f = ziel.f;
   const innen = (g) => g.x >= f.x && g.y >= f.y && g.x + g.width <= f.x + f.width && g.y + g.height <= f.y + f.height;
+  // Ein unbeschrifteter Behaelter, der das Ziel ganz umschliesst, ist sein
+  // Rahmen, keine Ueberdeckung (10.11.2026: Gruppe um „Messenger-Anfrage
+  // annehmen/ablehnen“ in der Chat-Info). Beschriftete bleiben verdaechtig.
+  const rahmen = (e) =>
+    !e.text && e.f.x <= f.x && e.f.y <= f.y && e.f.x + e.f.width >= f.x + f.width && e.f.y + e.f.height >= f.y + f.height;
   const drueber = alle
     .slice(alle.indexOf(ziel) + 1)
-    .find((e) => e.typ !== 'Slider' && !ganz(e.f) && !innen(e.f) && x >= e.f.x && x <= e.f.x + e.f.width && y >= e.f.y && y <= e.f.y + e.f.height);
+    .find((e) => e.typ !== 'Slider' && !ganz(e.f) && !innen(e.f) && !rahmen(e) && x >= e.f.x && x <= e.f.x + e.f.width && y >= e.f.y && y <= e.f.y + e.f.height);
   if (drueber) {
     console.error(`"${ziel.text}" ist verdeckt von "${drueber.text}" [${drueber.typ} ${JSON.stringify(drueber.f)}]. Erst wischen (--runter / --hoch). Nicht getippt.`);
     process.exit(1);
