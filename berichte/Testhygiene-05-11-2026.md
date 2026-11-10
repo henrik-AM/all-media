@@ -63,3 +63,59 @@ Web: body-parser hoch, proxy-addr kritisch, ip-address und qs mittel.
 Budget-/Hook-Freigaben laut Auftrag erledigt: alle fünf Hooks konfiguriert,
 Vertrauenseintrag vorhanden, vorheriger Budgettest 13/13. Hier keine
 Hook-Konfiguration gelesen, geändert oder erneut geprüft.
+
+
+## Gesamtlauf 09.11. — Abschluss am 10.11.: wartet weiter
+
+Status: **wartet weiter**. Der Testbestand blieb bei sämtlichen Belegungsversuchen
+exklusiv durch Claude belegt (`Paket 5: Live-Läufe community/henrik/k28-commbild`,
+seit 09.11. 21:51). Keine fremde Belegung übernommen, erzwungen oder gelöst.
+Der Gesamtlauf wurde deshalb nicht gestartet: **0/75 Läufe**, Prüfungen nicht
+gemessen, Nenner unbekannt. Keine vollständige Liveabnahme.
+
+Beginn des protokollierten Wartens: 09.11. 21:58:53; Sollfrist: 10.11. 01:58:53.
+Die Wiederholung lief mit 180 Sekunden Abstand und einer Vierstundengrenze auf
+monotoner Prozesszeit. Abweichung: Die beobachtete Kalenderzeit sprang zwischen
+kurzen Werkzeugaufrufen von 01:51 über 04:29 auf 06:24; die Warteschleife lief
+dabei noch. Die Kalenderfrist wurde damit überschritten. Nach Feststellung
+Warteschleife sofort beendet; keine weiteren Belegungsversuche. Eine Ursache
+für die abweichenden Uhren wurde nicht nachgewiesen.
+
+Vorbereitung vollständig: eigener Server `PORT=3300 npm start`, HTTP 200;
+`web/.env.local` gemäß Auftrag aus dem Hauptordner kopiert, App-Testkonfiguration
+aus dem erlaubten Worktree `~/allmedia-wt/p5-main/app/.env.local` kopiert.
+Beide Dateien lokal ignoriert, Schlüssel weder ausgegeben noch committet.
+`BASE`, `BASIS`, `ZIEL`, `AM_URL`, `AM_BASIS` für 3300 identifiziert;
+`SUPABASE_TOKEN` vorhanden. Prüfbrowser startet und schließt erfolgreich.
+
+Zusätzlicher statischer Befund, noch nicht live geprüft: `app/test/smoke.js:59`
+verwendet fest `http://localhost:3000`; `_uebernacht.js:82,137,249` verwendet
+ebenfalls Standardadressen auf 3000 ohne Env-Auswertung. Beide Befunde stimmen
+mit main fbf0e79 überein (`git show main:…`), gehören nicht zu Paket T.
+Die verlangte einzelne Live-Gegenprobe gegen main konnte mangels eigener
+Testbestandsbelegung ebenfalls nicht stattfinden. Keine Quellkorrektur vorgenommen.
+Bei Fortsetzung vor jeder Anmeldung auf 3000 abbrechen, wie beauftragt.
+
+Nachzählung/Testhygiene: **nicht live gemessen**, da ohne eigene Belegung verboten.
+Kein Gesamtlauf und keine Anmeldung/Reset/SQL durch diese Sitzung gestartet;
+kein Bereinigungsjournal und keine Gesamtlaufsperre vorhanden. Daher keine
+verifizierte Restzahl 0 behauptet. Claudes Bestand blieb unangetastet.
+
+Eigenen Server 3300 beendet; anschließend kein Listener auf 3300.
+Eigene Warteschleife beendet. Keine eigene Testbestandsbelegung zu lösen;
+fremde Belegung bleibt bestehen. Isolierte main-Gegenprobe nicht ausgeführt.
+Kein main/Push/Deploy/Schema, keine echten Konten, keine Änderungen an Paket 5.
+
+Abhängigkeiten mit unveränderten Lockdateien installiert: web 109, app 571 Pakete.
+Audit web: 4 Lücken (2 mittel, 1 hoch, 1 kritisch); app: 14
+(1 niedrig, 7 mittel, 5 hoch, 1 kritisch). Keine Updates ausgeführt.
+Web-Befunde: body-parser hoch, proxy-addr kritisch, ip-address und qs mittel.
+
+Budget-/Hook-Freigaben laut neuem Auftrag erledigt: alle fünf Hooks,
+Vertrauenseintrag, vorheriger Budgettest 13/13. Keine Hook-Konfiguration geändert.
+Die älteren Aussagen über offene Budgetfreigaben sind damit überholt.
+Sechs-Stunden-Hinweis im Sitzungskontext erhalten; keine riskanten Schritte begonnen.
+
+Offen: Nach regulärer Freigabe des Testbestands Gesamtlauf unter eigener Belegung
+starten; feste 3000-Adressen beachten, bei einem solchen Lauf abbrechen und melden.
+Erst danach Lauf-/Prüfnenner, Einzelursachen, main-Gegenprobe und Restzahl 0 prüfen.
