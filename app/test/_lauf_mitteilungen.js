@@ -26,7 +26,8 @@ function zahl(antwort, feld) {
 }
 
 function pruefeJournal(journal, projekt) {
-  if (journal?.version !== 1 || journal.projekt !== projekt || !UUID.test(journal.id)
+  if (![1, 2].includes(journal?.version) || (journal.version === 2 && journal.leerstand !== true)
+    || journal.projekt !== projekt || !UUID.test(journal.id)
     || !ZEIT.test(journal.seit) || JSON.stringify(journal.konten) !== JSON.stringify(TESTKONTEN)) {
     throw new Error('Bereinigungsjournal passt nicht zu Projekt/Testkonten; nicht automatisch löschen.');
   }
@@ -43,7 +44,11 @@ function laufMitteilungen({ datei, projekt, frage, melden = console.log }) {
         throw new Error('Alter Prüfprozess möglicherweise noch aktiv; vor Bereinigung prüfen.');
       }
     }
-    const filter = `${BETEILIGT} and created_at >= '${journal.seit}'::timestamptz`;
+    // Reset-Vorlagen datieren created_at zurück. Version 2 belegt vor dem
+    // exklusiven Lauf den Leerstand: auch zurückdatierte Zeilen sind neu.
+    // Alte Journale haben diesen Nachweis nicht und bleiben zeitlich begrenzt.
+    const filter = journal.version === 2 ? BETEILIGT
+      : `${BETEILIGT} and created_at >= '${journal.seit}'::timestamptz`;
     const geloescht = zahl(await frage(`with weg as (
       delete from notifications where ${filter} returning 1
     ) select count(*) as geloescht from weg`), 'geloescht');
@@ -69,7 +74,7 @@ function laufMitteilungen({ datei, projekt, frage, melden = console.log }) {
       }
       const antwort = await frage(`select to_char(clock_timestamp() at time zone 'UTC',
         'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as seit`);
-      aktuell = { version: 1, id: crypto.randomUUID(), projekt,
+      aktuell = { version: 2, leerstand: true, id: crypto.randomUUID(), projekt,
         konten: [...TESTKONTEN], seit: antwort?.[0]?.seit, kind: null };
       pruefeJournal(aktuell, projekt);
       fs.writeFileSync(datei, JSON.stringify(aktuell, null, 2) + '\n', { flag: 'wx', mode: 0o600 });

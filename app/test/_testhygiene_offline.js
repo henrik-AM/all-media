@@ -57,7 +57,7 @@ test('Abweichende Fixture wird abgelehnt und nicht überschrieben', t => {
   assert.equal(fs.readFileSync(path.join(p, '_teststory.png'), 'utf8'), 'fremder Inhalt');
 });
 
-test('Laufjournal enthält Kennung, Projekt und DB-Zeit; Löschen erfasst nur beide Testkonten seit Laufstart', async t => {
+test('Laufjournal belegt Leerstand; Löschen erfasst beide Testkonten auch bei zurückdatierten Vorlagen', async t => {
   const datei = path.join(temp(t), 'journal.json');
   const db = datenbank();
   const l = lebenszyklus(datei, db);
@@ -66,15 +66,35 @@ test('Laufjournal enthält Kennung, Projekt und DB-Zeit; Löschen erfasst nur be
   assert.equal(journal.id, id);
   assert.equal(journal.seit, '2026-11-05T14:00:00.123456Z');
   assert.equal(journal.projekt, 'projekt1');
+  assert.equal(journal.version, 2);
+  assert.equal(journal.leerstand, true);
   await l.beenden();
   assert.equal(fs.existsSync(datei), false);
   const sql = db.sql.find(q => /delete/.test(q));
   assert.match(sql, /where \(actor_id in/);
-  assert.match(sql, /or user_id in[\s\S]+\)\) and created_at >= '2026-11-05T14:00:00.123456Z'::timestamptz/);
+  assert.match(sql, /or user_id in[\s\S]+\)\)/);
+  assert.doesNotMatch(sql, /created_at >=/);
   assert.match(sql, /test@all-media\.app/);
   assert.match(sql, /all\.media\.prueflauf@web\.de/);
   assert.equal(db.sql.filter(q => /select count/.test(q)).length, 3); // Vorprüfung, DELETE-CTE, Nachzählung
   assert.doesNotMatch(JSON.stringify(journal), /token|password/i);
+});
+
+test('Alte Journale bleiben zeitlich begrenzt; Version 2 ohne Leerstandsnachweis wird abgelehnt', async t => {
+  const datei = path.join(temp(t), 'journal.json');
+  const l = lebenszyklus(datei, datenbank());
+  await l.beginnen();
+  const journal = JSON.parse(fs.readFileSync(datei));
+  fs.writeFileSync(datei, JSON.stringify({ ...journal, leerstand: false }));
+  const abgelehnt = datenbank();
+  await assert.rejects(lebenszyklus(datei, abgelehnt).beginnen(), /passt nicht/);
+  assert.equal(abgelehnt.sql.length, 0);
+  fs.writeFileSync(datei, JSON.stringify({ ...journal, version: 1 }));
+  const alt = datenbank();
+  const neu = lebenszyklus(datei, alt);
+  await neu.beginnen();
+  assert.match(alt.sql[0], /and created_at >= '2026-11-05T14:00:00.123456Z'::timestamptz/);
+  await neu.beenden();
 });
 
 test('Fehlgeschlagene Bereinigung bleibt wiederaufnehmbar; nächster Start räumt zuerst auf', async t => {

@@ -148,3 +148,26 @@ Weiterer Zwischenstand: 41/75 Läufe, 1099/1104 Prüfungen grün. Zusätzlich
 Chatoptionen 16/17: „Mitteilungen“ nach erneutem Öffnen wieder eingeschaltet.
 Prüfdatei unverändert gegenüber main. Querformat dagegen 37/37 grün.
 Die übrigen bisher abgeschlossenen Läufe bestanden; noch keine Endzählung.
+
+### Vollständiger Lauf: 75/75, 2639/2645
+
+Laufkennung `2a8249ab-2403-4eeb-a9ce-293539effb94`: 75/75 ausgeführt,
+2639/2645 gezählte Prüfungen bestanden; alle Läufe lieferten Zahlen.
+Quellen während des gesamten Laufs unverändert (`quellenUnveraendert: true`).
+Vier rote Läufe: Explorer 18/21, Kontaktinfo 9/10, Chatoptionen 16/17
+(wie oben), Minderjährig 32/33: Management-API HTTP 400 beim Anlegen des
+absichtlich zu jungen Australien-Kontos; weitere Prüfungen danach nicht erreicht.
+Der Nenner 2645 beschreibt nur tatsächlich erreichte Prüfungen.
+
+Abschlussbereinigung zunächst fehlgeschlagen: 21 zurückdatierte Demo→Test-
+Mitteilungen blieben trotz Zeitfilter. Reset erzeugt sie aus vorlage_mitteilungen
+mit `now() - make_interval(...)`; created_at ist kein Erzeugungsnachweis.
+Paket-T-Fehler korrigiert: Journal Version 2 dokumentiert den vor dem exklusiven
+Lauf bestätigten Leerstand. Danach erfasst Bereinigung alle Mitteilungen beider
+Testkonten einschließlich zurückdatierter Reset-Vorlagen; fremder Altbestand
+blockiert weiterhin vor Start. Version-1-Journale behalten den engen Zeitfilter.
+Altes Journal nicht umgeschrieben: exakt 21 nach Herkunft geprüfte Rest-UUIDs
+gezielt entfernt, dann reguläre Wiederaufnahme mit Nachzählung **Rest 0**.
+Offline-Regression nach Korrektur **23/23** grün. Einzelwiederholungen folgen.
+Supabase-Doku vor Code via Context7 gelesen; Projektversionen App ^2.112.4,
+Web ^2.43.0. Keine Schemaänderung.
