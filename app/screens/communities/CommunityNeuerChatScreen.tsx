@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,11 +8,18 @@ import { EmptyState } from '../../components/EmptyState';
 import { SearchBar } from '../../components/SearchBar';
 import { colors, spacing, themenStyles, typography } from '../../constants/design';
 import { useDaten } from '../../contexts/DatenContext';
+import { useProfil } from '../../contexts/ProfilContext';
+import { Community } from '../../types';
+import type { MitgliedZeile } from '../../lib/aktionen';
+
+const Beitritt = require('../../../gemeinsam/beitritt') as typeof import('../../../gemeinsam/beitritt');
 
 interface Props {
   onBack: () => void;
   /** Person gewählt: den Community-Chat mit ihr öffnen (openChatWith in App.tsx). */
-  onChat: (userId: string) => void;
+  onChat: (userId: string, name?: string) => void;
+  /** Datenbanksuche wie in CommunitySearchScreen (aktion.communitySuche). */
+  suchen: (eingabe: string) => Promise<{ communities: Community[]; personen: MitgliedZeile[] }>;
 }
 
 /*
@@ -27,19 +34,45 @@ interface Props {
  *
  * Gleiche Seite auf der Website: openCommunityNeuerChat in web/public/app.js.
  */
-export const CommunityNeuerChatScreen = ({ onBack, onChat }: Props) => {
+export const CommunityNeuerChatScreen = ({ onBack, onChat, suchen }: Props) => {
   const insets = useSafeAreaInsets();
   const { users, communityChats } = useDaten();
+  const { istBlockiert } = useProfil();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
 
-  const treffer = useMemo(
-    () =>
-      Object.values(users)
-        .filter((u) => u.id !== 'me' && (!q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)))
-        .sort((a, b) => a.name.localeCompare(b.name, 'de')),
-    [users, q]
-  );
+  /*
+   * Geladen sind höchstens 500 Profile. Ab zwei Zeichen fragt die Seite
+   * deshalb zusätzlich die Datenbank (personenSuchen), wie die Suche unter
+   * Communitys (Kasten 28/15.5) — sonst stand bei einem exakten
+   * Benutzernamen „Nichts gefunden“ (Codex-Prüfung 10.11.2026). Eine
+   * verspätete Antwort auf ein älteres Suchwort wird verworfen.
+   */
+  const [db, setDb] = useState<{ wort: string; personen: MitgliedZeile[] }>({ wort: '', personen: [] });
+  useEffect(() => {
+    if (!Beitritt.suchmuster(query)) return;
+    let aktuell = true;
+    const warten = setTimeout(() => {
+      suchen(query).then((r) => {
+        if (aktuell) setDb({ wort: query, personen: r.personen });
+      });
+    }, 300);
+    return () => {
+      aktuell = false;
+      clearTimeout(warten);
+    };
+  }, [query, suchen]);
+  const dbGilt = Boolean(Beitritt.suchmuster(query)) && db.wort === query;
+
+  const treffer = useMemo(() => {
+    const liste: Record<string, { id: string; name: string; handle: string }> = {};
+    for (const u of Object.values(users)) if (u.id !== 'me') liste[u.id] = u;
+    if (dbGilt) for (const p of db.personen) if (!liste[p.id]) liste[p.id] = p;
+    return Object.values(liste)
+      .filter((u) => !istBlockiert(u.id))
+      .filter((u) => !q || u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }, [users, q, db, dbGilt, istBlockiert]);
 
   const hatChat = (userId: string) => communityChats.some((c) => !c.isGroup && c.userId === userId);
 
@@ -63,7 +96,7 @@ export const CommunityNeuerChatScreen = ({ onBack, onChat }: Props) => {
         renderItem={({ item: u }) => (
           <Druck
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            onPress={() => onChat(u.id)}
+            onPress={() => onChat(u.id, u.name)}
             accessibilityLabel={`Chat mit ${u.name}`}
           >
             <Avatar id={u.id} name={u.name} size={44} />

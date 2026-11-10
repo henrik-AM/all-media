@@ -675,7 +675,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    *
    * `bereich` entscheidet, in welcher der beiden Listen er landet.
    */
-  const openChatWith = async (userId: string, bereich?: 'messenger' | 'community') => {
+  const openChatWith = async (userId: string, bereich?: 'messenger' | 'community', nameAusSuche?: string) => {
     const person = daten.users[userId];
     const wo = bereich ?? bereichFuer(userId);
     const vorhanden = (wo === 'community' ? daten.communityChats : chats).find(
@@ -691,7 +691,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
     const chat: Chat = {
       id: chatId,
-      name: person?.name ?? 'Chat',
+      // Treffer aus der Datenbanksuche (Kasten 28/14) sind nicht in daten.users.
+      name: person?.name ?? nameAusSuche ?? 'Chat',
       userId,
       isGroup: false,
       preview: '',
@@ -1070,12 +1071,20 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Kontakte und Messenger-Chat an. Die Bedingungen prüft Schema 57, deren
    * Meldungen reicht `holen` durch. Gleicher Ablauf in web/public/app.js.
    */
-  const messengerZustandSetzen = (chatId: string, zustand: Chat['messengerAnfrage']) =>
-    setOverlay((prev) =>
-      prev?.kind === 'chat' && prev.chat.id === chatId
-        ? { ...prev, chat: { ...prev.chat, messengerAnfrage: zustand } }
-        : prev
-    );
+  /*
+   * Gilt für den offenen Chat und für die Chat-Info (Kasten 28/12) samt dem
+   * Chat, zu dem ihr Zurückpfeil führt — sonst zeigte die Info nach dem
+   * Annehmen weiter „Annehmen/Ablehnen“ (Codex-Prüfung 10.11.2026).
+   */
+  const messengerZustandSetzen = (chatId: string, zustand: Chat['messengerAnfrage']) => {
+    const nachziehen = (o: Overlay): Overlay => {
+      if (o?.kind === 'chat' && o.chat.id === chatId) return { ...o, chat: { ...o.chat, messengerAnfrage: zustand } };
+      if (o?.kind === 'communityChatInfo' && o.chat.id === chatId)
+        return { ...o, chat: { ...o.chat, messengerAnfrage: zustand }, zurueck: nachziehen(o.zurueck) };
+      return o;
+    };
+    setOverlay((prev) => nachziehen(prev));
+  };
 
   const messengerAnfragen = async (chat: Chat) => {
     const ergebnis = await aktion.messengerAnfragen(chat.id);
@@ -2189,10 +2198,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
         onMessengerAnfragen={async () => {
           // Die Datenbank kann ablehnen (Schema 57: erst nach Austausch) —
           // dann steht ihr Grund in der Meldung, und die Zeile bleibt.
-          if (!(await messengerAnfragen(chat))) return;
-          setOverlay((prev) =>
-            prev?.kind === 'communityChatInfo' ? { ...prev, chat: { ...prev.chat, messengerAnfrage: 'gesendet' } } : prev
-          );
+          // messengerZustandSetzen zieht Info und Rücksprung-Chat mit.
+          await messengerAnfragen(chat);
         }}
         onMessengerAntworten={(annehmen) => void messengerAntworten(chat, annehmen)}
         onZumMessenger={() => zumMessenger(userId)}
@@ -2206,7 +2213,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <CommunityNeuerChatScreen
         onBack={() => setOverlay(null)}
         // Kasten 28/14.2: immer ein Community-Chat, nie der Messenger.
-        onChat={(userId) => void openChatWith(userId, 'community')}
+        onChat={(userId, name) => void openChatWith(userId, 'community', name)}
+        suchen={aktion.communitySuche}
       />
     );
   }

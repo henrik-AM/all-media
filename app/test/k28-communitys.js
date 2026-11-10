@@ -85,7 +85,15 @@ function teilA() {
   pruefe('14.1 Plus öffnet die Seite „Neuer Chat“', /onNewChat=\{\(\) => setOverlay\(\{ kind: 'neuerCommunityChat' \}\)\}/.test(shell));
   pruefe('14.1 Seite mit Suchleiste „Community-Profil suchen…“', /placeholder="Community-Profil suchen\.\.\."/.test(neu));
   pruefe('14.1 gesucht nach Name und Benutzername, nicht nach Nummer', /u\.name\.toLowerCase\(\)\.includes\(q\) \|\| u\.handle\.toLowerCase\(\)\.includes\(q\)/.test(neu) && !/phone/.test(neu));
-  pruefe('14.2 Antippen öffnet den Community-Chat', /onChat=\{\(userId\) => void openChatWith\(userId, 'community'\)\}/.test(shell));
+  pruefe('14.2 Antippen öffnet den Community-Chat', /onChat=\{\(userId, name\) => void openChatWith\(userId, 'community', name\)\}/.test(shell));
+  // Codex-Prüfung 10.11.2026, Fund 1: nicht nur die 500 vorgeladenen Profile.
+  pruefe('14.1 App.tsx gibt der Seite die Datenbanksuche', /<CommunityNeuerChatScreen[\s\S]{0,300}suchen=\{aktion\.communitySuche\}/.test(shell));
+  pruefe('14.1 Seite fragt ab zwei Zeichen die Datenbank, mit Pause', /Beitritt\.suchmuster\(query\)/.test(neu) && /setTimeout\(\(\) => \{\s*suchen\(query\)/.test(neu));
+  pruefe('14.1 verspätete Antwort wird verworfen', /if \(aktuell\) setDb/.test(neu) && /aktuell = false/.test(neu) && /db\.wort === query/.test(neu));
+  pruefe('14.1 Datenbanktreffer kommen dazu, Blockierte nicht', /for \(const p of db\.personen\)/.test(neu) && /!istBlockiert\(u\.id\)/.test(neu));
+  pruefe('14.2 Name eines Datenbanktreffers geht mit', /onChat\(u\.id, u\.name\)/.test(neu) && /person\?\.name \?\? nameAusSuche \?\? 'Chat'/.test(shell));
+  // Fund 2: Annehmen/Ablehnen zieht die offene Chat-Info und ihren Rücksprung mit.
+  zustandSetzenProbe(shell);
   const kp = lies('app/screens/messenger/ContactProfileScreen.tsx');
   pruefe('12.1 Community-Einzelchat ruft onOpenChatInfo', /if \(onOpenChatInfo && communityChats\.some\(\(c\) => c\.id === chat\.id\)\) onOpenChatInfo\(\);/.test(chat));
   pruefe('12.1 App.tsx öffnet ContactProfileScreen bereich="community"', /kind: 'communityChatInfo'[\s\S]*<ContactProfileScreen\s+bereich="community"/.test(shell));
@@ -95,6 +103,44 @@ function teilA() {
     '13.2 Filterregel über beigetretenen Communitys',
     /c\.joined &&[\s\S]{0,60}\(filter === 'alle' \|\| \(filter === 'privat'\) === \(c\.visibility === 'private'\)\)/.test(home)
   );
+}
+
+/*
+ * Die echte messengerZustandSetzen aus App.tsx (per TypeScript-AST
+ * herausgelöst) mit einem nachgebauten setOverlay ausführen.
+ */
+function zustandSetzenProbe(shell) {
+  let ts;
+  try {
+    ts = require('typescript');
+  } catch {
+    return pruefe('12.4 messengerZustandSetzen ausführbar', false, 'typescript fehlt');
+  }
+  const baum = ts.createSourceFile('App.tsx', shell, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let quelle = null;
+  (function such(k) {
+    if (ts.isVariableDeclaration(k) && ts.isIdentifier(k.name) && k.name.text === 'messengerZustandSetzen') quelle = k.getText(baum);
+    else ts.forEachChild(k, such);
+  })(baum);
+  if (!quelle) return pruefe('12.4 messengerZustandSetzen gefunden', false);
+  const js = ts.transpileModule(`type Overlay = any; type Chat = any;\nmodule.exports = (setOverlay) => { const ${quelle}; return messengerZustandSetzen; };`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const m = { exports: {} };
+  new Function('module', 'exports', js)(m, m.exports);
+  let overlay;
+  const setzen = m.exports((f) => (overlay = typeof f === 'function' ? f(overlay) : f));
+  const chatOverlay = { kind: 'chat', chat: { id: 'cc-1', messengerAnfrage: 'eingegangen' } };
+  overlay = { kind: 'communityChatInfo', chat: { id: 'cc-1', messengerAnfrage: 'eingegangen' }, zurueck: chatOverlay };
+  setzen('cc-1', 'angenommen');
+  pruefe('12.4 Annehmen: offene Chat-Info zeigt „angenommen“', overlay.kind === 'communityChatInfo' && overlay.chat.messengerAnfrage === 'angenommen', JSON.stringify(overlay));
+  pruefe('12.4 Annehmen: Chat hinter dem Zurückpfeil ebenso', overlay.zurueck.chat.messengerAnfrage === 'angenommen', JSON.stringify(overlay.zurueck));
+  overlay = { kind: 'communityChatInfo', chat: { id: 'cc-2', messengerAnfrage: 'eingegangen' }, zurueck: chatOverlay };
+  setzen('cc-1', 'keine');
+  pruefe('12.4 fremde Chat-Info bleibt unberührt', overlay.chat.messengerAnfrage === 'eingegangen' && overlay.zurueck.chat.messengerAnfrage === 'eingegangen');
+  overlay = { kind: 'chat', chat: { id: 'cc-1', messengerAnfrage: 'eingegangen' } };
+  setzen('cc-1', 'keine');
+  pruefe('12.4 offener Chat wie bisher', overlay.chat.messengerAnfrage === 'keine');
 }
 
 /* --------------------------------------------------- B Website mit Attrappe */
@@ -108,8 +154,14 @@ async function teilB() {
       [ICH]: { id: ICH, name: 'Test Konto', handle: 'test', initials: 'TK' },
       'u-anna': { id: 'u-anna', name: 'Anna Schmidt', handle: 'anna', initials: 'AS' },
       'u-ben': { id: 'u-ben', name: 'Ben Berg', handle: 'benno', initials: 'BB', phone: '+49 151 0000000' },
+      'u-cara': { id: 'u-cara', name: 'Cara Klein', handle: 'cara', initials: 'CK' },
+      'u-block': { id: 'u-block', name: 'Bernd Blockiert', handle: 'bernd', initials: 'BB' },
     },
-    communityChats: [{ id: 'cc-ben', name: 'Ben Berg', userId: 'u-ben', isGroup: false, preview: 'Hallo', time: '12:00', unread: 0 }],
+    blockiert: ['u-block'],
+    communityChats: [
+      { id: 'cc-ben', name: 'Ben Berg', userId: 'u-ben', isGroup: false, preview: 'Hallo', time: '12:00', unread: 0 },
+      { id: 'cc-cara', name: 'Cara Klein', userId: 'u-cara', isGroup: false, preview: 'Hi', time: '11:00', unread: 0, messengerAnfrage: 'eingegangen' },
+    ],
     communities: [
       community('c-oeff', 'Fotografie', { visibility: 'public', members: 40 }),
       community('c-priv', 'Geheimclub', { visibility: 'private', members: 7 }),
@@ -126,6 +178,18 @@ async function teilB() {
       '/api/communities/c-oeff/channels/c-oeff-k1': { messages: [] },
       '/api/kontakte/u-anna/chat': { ok: true, chatId: 'cc-anna', bereich: 'community' },
       '/api/chats/cc-ben/messenger-anfrage': { ok: false, error: 'Schreibt euch erst ein paar Nachrichten' },
+      // Fund 1: ein Profil, das nicht unter den vorgeladenen steht.
+      '/api/community-suche': (a) => {
+        const q = new URL(a.url()).searchParams.get('q') || '';
+        return { communities: [], personen: 'fernweit'.startsWith(q) ? [{ id: 'u-fern', name: 'Fritz Fern', handle: 'fernweit' }] : [] };
+      },
+      '/api/kontakte/u-fern/chat': { ok: true, chatId: 'cc-fern', bereich: 'community' },
+      // Fund 2: Annehmen ändert, was der nächste Bootstrap liefert.
+      '/api/chats/cc-cara/messenger-antwort': () => {
+        daten.communityChats.find((c) => c.id === 'cc-cara').messengerAnfrage = 'angenommen';
+        daten.chats = [{ id: 'mc-cara', name: 'Cara Klein', userId: 'u-cara', isGroup: false, preview: '', time: '11:05', unread: 0 }];
+        return { ok: true };
+      },
     });
     await seite.goto(BASE, { waitUntil: 'domcontentloaded' });
     await seite.waitForSelector('[data-area="communities"]', { timeout: 15000 });
@@ -191,7 +255,15 @@ async function teilB() {
     pruefe('14.1 kein Blatt mit „Kontakt hinzufügen“', !(await seite.$('[data-cneu]')));
     pruefe('14.1 Bereich bleibt Chats', (await seite.$eval('#topbar .is-active', (n) => n.dataset.sub)) === 'chats');
     const personen = () => seite.$$eval('[data-neuerchat]', (e) => e.map((b) => b.dataset.neuerchat).sort().join(','));
-    pruefe('14.1 ohne Eingabe alle Profile außer mir', (await personen()) === 'u-anna,u-ben', await personen()); // ohne 'me'
+    pruefe('14.1 ohne Eingabe alle Profile außer mir und Blockierten', (await personen()) === 'u-anna,u-ben,u-cara', await personen()); // ohne 'me', 'u-block'
+    await seite.fill('#commNeuerChatInput', 'bernd');
+    await seite.waitForTimeout(150);
+    pruefe('14.1 Blockierte auch gesucht nicht', (await personen()) === '', await personen());
+    await seite.fill('#commNeuerChatInput', 'fernweit');
+    await seite.waitForSelector('[data-neuerchat="u-fern"]', { timeout: 5000 }).catch(() => {});
+    pruefe('14.1 nicht vorgeladenes Profil kommt aus der Datenbank', (await personen()) === 'u-fern', await personen());
+    pruefe('14.1 Suchfeld behält die Eingabe', (await seite.inputValue('#commNeuerChatInput')) === 'fernweit');
+    pruefe('14.1 Datenbank wurde mit dem Suchwort gefragt', aufrufe.some((a) => a.pfad === '/api/community-suche'));
     await seite.fill('#commNeuerChatInput', 'ann');
     await seite.waitForTimeout(150);
     pruefe('14.1 Suche „ann“ findet nur Anna', (await personen()) === 'u-anna', await personen());
@@ -237,6 +309,33 @@ async function teilB() {
     await seite.waitForTimeout(800);
     const anlage = aufrufe.find((a) => a.pfad === '/api/kontakte/u-anna/chat' && a.methode === 'POST');
     pruefe('14.2 neuer Chat mit bereich „community“', !!anlage && JSON.parse(anlage.body || '{}').bereich === 'community', JSON.stringify(anlage));
+
+    // Fund 1: Datenbanktreffer anschreiben
+    await seite.click('[data-sub="chats"]').catch(() => {});
+    await seite.click('#commNewChat');
+    await seite.fill('#commNeuerChatInput', 'fernweit');
+    await seite.waitForSelector('[data-neuerchat="u-fern"]', { timeout: 5000 });
+    await seite.click('[data-neuerchat="u-fern"]');
+    await seite.waitForTimeout(800);
+    const fern = aufrufe.find((a) => a.pfad === '/api/kontakte/u-fern/chat' && a.methode === 'POST');
+    pruefe('14.2 Datenbanktreffer bekommt einen Community-Chat', !!fern && JSON.parse(fern.body || '{}').bereich === 'community', JSON.stringify(fern));
+
+    // Fund 2: Annehmen in der Chat-Info → Info zeigt danach „Zum Messenger-Chat“
+    await seite.click('[data-sub="chats"]').catch(() => {});
+    await seite.click('#commNewChat');
+    await seite.waitForSelector('[data-neuerchat="u-cara"]', { timeout: 5000 });
+    await seite.click('[data-neuerchat="u-cara"]');
+    await seite.waitForSelector('.chathead__body[data-chatinfo]', { timeout: 5000 });
+    await seite.click('.chathead__body[data-chatinfo]');
+    await seite.waitForSelector('[data-kp-messenger="ja"]', { timeout: 5000 });
+    pruefe('12.4 eingegangene Anfrage: Annehmen und Ablehnen', !!(await seite.$('[data-kp-messenger="nein"]')));
+    await seite.click('[data-kp-messenger="ja"]');
+    await seite.waitForSelector('[data-kp-messenger="oeffnen"]', { timeout: 5000 }).catch(() => {});
+    pruefe('12.4 nach Annehmen bleibt die Chat-Info offen', !!(await seite.$('#kpBack')));
+    pruefe('12.4 … mit „Zum Messenger-Chat“ statt Annehmen/Ablehnen', !!(await seite.$('[data-kp-messenger="oeffnen"]')) && !(await seite.$('[data-kp-messenger="ja"]')));
+    await seite.click('[data-kp-messenger="oeffnen"]');
+    await seite.waitForSelector('#chatBack', { timeout: 5000 }).catch(() => {});
+    pruefe('12.4 „Zum Messenger-Chat“ öffnet den Messenger-Chat', !!(await seite.$('#chatBack')) && (await seite.evaluate(() => document.body.textContent.includes('Cara Klein'))));
     pruefe('keine Fehler in der Seite', seitenfehler.length === 0, seitenfehler.join(' | '));
   } finally {
     await browser.close();

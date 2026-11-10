@@ -4883,8 +4883,12 @@ async function openContactProfile(userId, optionen = {}) {
       const was = b.dataset.kpMessenger;
       if (!chat) return toast('Noch kein Chat mit dieser Person');
       if (was === 'oeffnen') return zumMessenger(userId);
-      // Antworten führt wie im Chat in den Chat (messengerAntworten).
-      if (was !== 'fragen') return messengerAntworten(chat, was === 'ja');
+      // Nach dem Antworten steht die Info mit dem neuen Zustand wieder da
+      // (Annehmen → „Zum Messenger-Chat“), wie in der App (Codex-Prüfung 10.11.2026).
+      if (was !== 'fragen') {
+        await messengerAntworten(chat, was === 'ja', { inDerInfo: true });
+        return openContactProfile(userId, optionen);
+      }
       await messengerAnfragen(chat);
       // Danach steht die Info mit dem neuen Zustand wieder da, nicht der Chat.
       openContactProfile(userId, optionen);
@@ -20307,7 +20311,12 @@ function renderCommunitySuchSeite() {
  */
 function renderCommunityNeuerChat(roh) {
   const q = roh.trim().toLowerCase();
-  const liste = passendeProfile(q).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  // Datenbanktreffer stehen nach commDatenbankSuche auch in state.users —
+  // doppelte IDs nur einmal; Blockierte gar nicht (wie die App).
+  const gesehen = new Set();
+  const liste = passendeProfile(q)
+    .filter((u) => !(state.blockiert || []).includes(u.id) && !gesehen.has(u.id) && gesehen.add(u.id))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   const chatMit = (id) => (state.communityChats || []).find((c) => !c.isGroup && c.userId === id);
 
   main.innerHTML = `
@@ -20353,6 +20362,24 @@ function renderCommunityNeuerChat(roh) {
     const next = $('#commNeuerChatInput');
     next.focus();
     next.setSelectionRange(pos, pos);
+  });
+  /*
+   * Geladen sind höchstens 500 Profile; ab zwei Zeichen fragt die Seite die
+   * Datenbank wie die Suche unter Communitys (Kasten 28/15.5). Gezeichnet
+   * wird mit dem Wort, das jetzt im Feld steht — eine Antwort auf ein älteres
+   * Wort zeigt trefferFuer nicht an (Codex-Prüfung 10.11.2026).
+   */
+  commDatenbankSuche(roh, () => {
+    const feld = $('#commNeuerChatInput');
+    if (!feld) return;
+    const fokus = document.activeElement === feld;
+    const pos = feld.selectionStart;
+    renderCommunityNeuerChat(feld.value);
+    if (fokus) {
+      const next = $('#commNeuerChatInput');
+      next.focus();
+      next.setSelectionRange(pos, pos);
+    }
   });
   main.querySelectorAll('[data-neuerchat]').forEach((b) =>
     b.addEventListener('click', async () => {
@@ -20890,7 +20917,7 @@ async function messengerAnfragen(chat) {
   if ($('#messages')) openChat(chat.id);
 }
 
-async function messengerAntworten(chat, annehmen) {
+async function messengerAntworten(chat, annehmen, { inDerInfo = false } = {}) {
   const res = await fetch(`/api/chats/${chat.id}/messenger-antwort`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -20901,7 +20928,7 @@ async function messengerAntworten(chat, annehmen) {
   if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
   await bootstrap();
   toast(annehmen ? `${chat.name} ist jetzt in deinem Messenger` : 'Ihr schreibt weiter unter Communitys');
-  openChat(chat.id);
+  if (!inDerInfo) openChat(chat.id);
 }
 
 /** Aus dem Community-Chat zum Messenger-Chat derselben Person. */
