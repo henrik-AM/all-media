@@ -47,7 +47,7 @@ async function zaehlen() {
 }
 
 /** Eine SQL-Abfrage ueber die Management-API stellen. */
-async function frage(sql) {
+async function frage(sql, { erwarteterFehler } = {}) {
   const { token, projekt, konto } = umgebung();
   if (!token || !projekt) return null;
 
@@ -57,7 +57,15 @@ async function frage(sql) {
     body: JSON.stringify({ query: sql.replaceAll('$KONTO', `'${konto.replace(/'/g, "''")}'`) }),
     signal: AbortSignal.timeout(30000),
   });
-  if (!antwort.ok) throw new Error(`Management-API: HTTP ${antwort.status}`);
+  if (!antwort.ok) {
+    // Einzelne Negativproben erwarten eine konkrete SQL-Ausnahme. Bereinigung
+    // und alle anderen Aufrufer behandeln HTTP-Fehler weiterhin als Abbruch.
+    if (antwort.status === 400 && erwarteterFehler) {
+      const fehler = await antwort.json();
+      if (typeof fehler?.message === 'string' && erwarteterFehler.test(fehler.message)) return fehler;
+    }
+    throw new Error(`Management-API: HTTP ${antwort.status}`);
+  }
   return antwort.json();
 }
 

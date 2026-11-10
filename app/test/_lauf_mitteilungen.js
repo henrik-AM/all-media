@@ -1,6 +1,6 @@
 /**
  * Mitteilungen eines exklusiven Gesamtlaufs, einschließlich Wiederaufnahme nach SIGKILL.
- * Die Laufkennung und die DB-Zeitgrenze bleiben bis zur erfolgreichen Nachzählung liegen.
+ * Laufkennung, DB-Startzeit und Leerstandsnachweis bleiben bis zur erfolgreichen Nachzählung liegen.
  * Alte Mitteilungen und Daten ohne Beteiligung eigener Testkonten bleiben erhalten.
  * Keine Zugangsdaten im Journal. Aufruf ausschließlich nach Prüfung der KI-Belegung.
  */

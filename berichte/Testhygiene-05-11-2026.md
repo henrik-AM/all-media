@@ -191,3 +191,28 @@ in Git wiederhergestellt; keine Bilder in Paket T übernommen. Graph aktualisier
 
 Sechs-Stunden-Hinweis erhalten. Zwischenstand gesichert und Pause vor der noch
 offenen main-Gegenprobe; kein weiterer Gesamtlauf auf korrigiertem Stand bisher.
+
+### main-Gegenproben und zweiter Paket-T-Fehler
+
+Isolierte Kopie von main fbf0e79 unter
+`~/allmedia-wt-codex/paket-t-main-gegenprobe-10-11`, eigene Env-Dateien,
+Server auf belegtem Port 3000; keine main-Referenz oder Hauptarbeitskopie verändert.
+Vier Gegenproben einzeln und sequenziell: Explorer **21/21**, Kontaktinfo **10/10**,
+Chatoptionen **16/17**, Minderjährig **41/41**. Automatische Bereinigung danach
+42, 47, 38, 0 Mitteilungen entfernt, jeweils **Rest 0**. Beide eigenen Server
+inzwischen gestoppt; Port-Nachprüfung und Freigabe folgen nach letztem API-Lauf.
+
+Explorer/Kontaktinfo: ursprüngliche 3000-ms-Fehler auf main diesmal nicht
+reproduziert; unveränderte Prüfdateien/Website, zeitabhängige Fehlschläge,
+keine belegte Änderung durch Paket T. Die zusätzlichen Zeit-/Ladefehler der
+Paket-T-Einzelversuche bleiben als unvollständige Messungen ausdrücklich offen.
+Chatoptionen: derselbe Mitteilungsschalter-Fehler auf main bestätigt, unverändert.
+
+Minderjährig ist **ein zweiter Paket-T-Fehler**, kein main-Fehler: Die neu
+eingeführte strenge HTTP-Prüfung in _aufraeumen.frage warf vor der bewusst
+erwarteten Negativprobe (HTTP 400 / SQLSTATE P0001 / Australien unter 16).
+Korrektur: nur dieser erwartete SQL-Fehler wird beim Australien-INSERT explizit
+ausgenommen; sonstige HTTP-/SQL-Fehler bleiben harte Abbrüche. Regression
+prüft Standard-HTTP-400, gezielte Ausnahme, falschen SQLSTATE und HTTP 401.
+Offline jetzt **24/24**; tatsächlicher Minderjährig-Lauf nach Korrektur gestartet.
+Keine Aufsummierung von Einzelläufen zu einem erfundenen neuen Gesamtlauf.

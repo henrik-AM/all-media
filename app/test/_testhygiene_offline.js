@@ -191,6 +191,26 @@ test('Fehlende oder falsch geformte Zählantwort ist kein leerer Bestand', async
   }
 });
 
+test('Management-API: nur die ausdrücklich erwartete SQL-Ausnahme passiert eine Negativprobe', async () => {
+  const mod = { exports: {} };
+  let status = 400;
+  let message = 'Failed to run sql query: ERROR: P0001: In Australien ist All Media erst ab 16';
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '_aufraeumen.js'), 'utf8'), {
+    module: mod, __dirname, AbortSignal,
+    process: { env: { SUPABASE_TOKEN: 'attrappe', SUPABASE_URL: 'https://projekt1.supabase.co' } },
+    require: name => name === './_ki_belegung' ? { pruefeBelegung() {} }
+      : name === 'fs' ? { existsSync: () => false } : require(name),
+    fetch: async () => ({ ok: false, status, json: async () => ({ message }) }),
+  });
+  const erlaubt = { erwarteterFehler: /ERROR:\s+P0001:\s+In Australien ist All Media erst ab 16/ };
+  await assert.rejects(mod.exports.frage('insert'), /HTTP 400/);
+  assert.equal((await mod.exports.frage('insert', erlaubt)).message, message);
+  message = 'ERROR: 23505: duplicate key';
+  await assert.rejects(mod.exports.frage('insert', erlaubt), /HTTP 400/);
+  status = 401;
+  await assert.rejects(mod.exports.frage('insert', erlaubt), /HTTP 401/);
+});
+
 function runner(t, { token = 'attrappe', db = datenbank(), abbrechen = false, laufdauer = false } = {}) {
   const p = temp(t);
   const prozess = new EventEmitter();

@@ -106,7 +106,8 @@ async function kontoAnlegen(was, metadaten) {
        ${sql(MAIL(was))}, crypt(${sql(PASSWORT)}, gen_salt('bf')), now(),
        '{"provider":"email","providers":["email"]}'::jsonb, ${sql(JSON.stringify(metadaten))}::jsonb,
        now(), now(), '', '', '', '')
-    returning id`);
+    returning id`, { erwarteterFehler: was === 'au'
+      ? /ERROR:\s+P0001:\s+In Australien ist All Media erst ab 16/ : undefined });
   if (!Array.isArray(antwort)) return { fehler: JSON.stringify(antwort) };
   return { id: antwort[0].id };
 }
