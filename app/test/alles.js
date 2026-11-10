@@ -25,7 +25,7 @@
  * Start:  npm run test:alles   (Server muss laufen)
  */
 
-const { spawnSync } = require('child_process');
+const { laufProzess } = require('./_lauf_prozess');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -70,7 +70,10 @@ function sperreSetzen() {
     } catch {
       alt = null;
     }
-    if (alt && lebt(alt.pid)) {
+    if (!alt || !Number.isSafeInteger(alt.pid) || alt.pid < 1) {
+      throw new Error('Gesamtlaufsperre ist unlesbar; nicht automatisch übernehmen.');
+    }
+    if (lebt(alt.pid)) {
       console.error(
         `\n  ABBRUCH — es läuft bereits ein Gesamtlauf (PID ${alt.pid}, seit ${alt.seit}).\n` +
           '  Beide würden denselben Testbestand zurücksetzen; die Zahlen beider Läufe\n' +
@@ -79,16 +82,16 @@ function sperreSetzen() {
       process.exit(2);
     }
     console.log('  Hinweis: eine verwaiste Sperre lag noch da — sie wird ersetzt.');
+    fs.unlinkSync(SPERRE);
   }
-  fs.writeFileSync(SPERRE, JSON.stringify({ pid: process.pid, seit: new Date().toISOString() }));
-  const weg = () => fs.rmSync(SPERRE, { force: true });
+  fs.writeFileSync(SPERRE, JSON.stringify({ pid: process.pid, seit: new Date().toISOString() }), { flag: 'wx' });
+  const weg = () => {
+    try {
+      const jetzt = JSON.parse(fs.readFileSync(SPERRE, 'utf8'));
+      if (jetzt.pid === process.pid) fs.unlinkSync(SPERRE);
+    } catch (e) { if (e.code !== 'ENOENT') console.error('Sperre nicht entfernt:', e.message); }
+  };
   process.on('exit', weg);
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.on(signal, () => {
-      weg();
-      process.exit(1);
-    });
-  }
 }
 
 /*
@@ -105,7 +108,7 @@ const BEOBACHTET = [
   path.join(__dirname, '..', '..', 'web', 'public'),
 ];
 
-function stempel() {
+function stempel(pfade = BEOBACHTET) {
   const hash = crypto.createHash('sha256');
   const dateien = [];
 
@@ -119,7 +122,7 @@ function stempel() {
     }
   };
 
-  for (const ort of BEOBACHTET) sammle(ort);
+  for (const ort of pfade) sammle(ort);
 
   for (const datei of dateien.sort()) {
     hash.update(datei);
@@ -128,12 +131,9 @@ function stempel() {
   return hash.digest('hex');
 }
 
-require('./_ki_belegung').pruefeBelegung('testbestand');
-require('./_pruefserver').pruefeServer();
-sperreSetzen();
-const stempelVorher = stempel();
 
 const LAEUFE = [
+  ['testhygiene', '_testhygiene_offline.js'],
   ['smoke', 'smoke.js'],
   ['feedback', '_feedback.js'],
   ['erstellen', '_erstellen.js'],
@@ -251,8 +251,12 @@ const LAEUFE = [
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */
 function zaehlen(ausgabe) {
-  const summe = ausgabe.match(/(\d+)\s+von\s+(\d+)\s+Pruefungen bestanden/);
+  const summe = ausgabe.match(/(\d+)\s+von\s+(\d+)\s+Pr(?:ue|ü)fungen bestanden/);
   if (summe) return { gut: Number(summe[1]), gesamt: Number(summe[2]) };
+
+  const nodeAlle = ausgabe.match(/^(?:ℹ|#) tests (\d+)\s*$/m);
+  const nodeGut = ausgabe.match(/^(?:ℹ|#) pass (\d+)\s*$/m);
+  if (nodeAlle && nodeGut) return { gut: Number(nodeGut[1]), gesamt: Number(nodeAlle[1]) };
 
   // Läufe, die Zeile für Zeile melden statt am Schluss zu summieren.
   const gut = (ausgabe.match(/^\s*(OK|PASS)\b/gm) || []).length;
@@ -267,96 +271,121 @@ function zaehlen(ausgabe) {
  */
 const ZEITGRENZE = 15 * 60 * 1000;
 
-const ergebnisse = [];
-
-for (const [name, datei] of LAEUFE) {
-  console.log(`\n${'='.repeat(70)}\n  ${name}\n${'='.repeat(70)}`);
-
-  /*
-   * Die Ausgabe geht in eine Datei, nicht in eine Pipe.
-   *
-   * Der Grund ist unangenehm: `spawnSync` wartet nicht auf das Ende des
-   * Prozesses, sondern auf das Ende seiner Pipes. Steigt ein Pruefskript
-   * frueh mit `process.exit(1)` aus, ohne den Browser zu schliessen, laeuft
-   * das `chrome-headless-shell` weiter und haelt die geerbte Pipe offen —
-   * und `alles.js` wartet ewig auf ein Ende, das nie kommt. Genau so hat der
-   * Lauf am 09.09.2026 eine Stunde lang stillgestanden. Mit einer Datei als
-   * Ziel zaehlt nur noch, wann der Prozess selbst endet.
-   */
-  const protokoll = path.join(__dirname, `.lauf-${name}.log`);
-  const ziel = fs.openSync(protokoll, 'w');
-  let lauf;
+async function haupt() {
+  require('./_ki_belegung').pruefeBelegung('testbestand');
+  require('./_pruefserver').pruefeServer();
+  sperreSetzen();
+  const { frage, umgebung } = require('./_aufraeumen');
+  const { token, projekt } = umgebung();
+  if (!token || !projekt) throw new Error('ABBRUCH: SUPABASE_TOKEN/Projekt fehlen; Bereinigung wäre unmöglich.');
+  const mitteilungen = require('./_lauf_mitteilungen').laufMitteilungen({
+    datei: path.join(__dirname, '.gesamtlauf-bereinigung.json'), projekt, frage,
+  });
+  const abbruch = new AbortController();
+  let signal;
+  const stoppen = name => { signal = name; abbruch.abort(); };
+  const beiInt = () => stoppen('SIGINT');
+  const beiTerm = () => stoppen('SIGTERM');
+  process.on('SIGINT', beiInt);
+  process.on('SIGTERM', beiTerm);
+  let code = 1;
+  let statusDatei;
+  let stand;
   try {
-    lauf = spawnSync(process.execPath, [path.join(__dirname, datei)], {
-      env: process.env,
-      stdio: ['ignore', ziel, ziel],
-      timeout: ZEITGRENZE,
-      killSignal: 'SIGKILL',
-    });
+    require('./_fixtures').bereiteFixturesVor();
+    const laufId = await mitteilungen.beginnen();
+    if (signal) throw new Error(`Abbruch durch ${signal} vor dem ersten Prüflauf.`);
+    const stempelVorher = stempel();
+    const belege = path.join(__dirname, '.gesamtlauf-belege', laufId);
+    fs.mkdirSync(belege, { recursive: true });
+    statusDatei = path.join(belege, 'status.json');
+    stand = { laufId, erwartet: LAEUFE.length, phase: 'laeuft', bereinigung: 'offen',
+      stempelVorher, ergebnisse: [] };
+    fs.writeFileSync(statusDatei, JSON.stringify(stand, null, 2) + '\n');
+    const gestartet = Date.now();
+    let budgetGemeldet = false;
+    const ergebnisse = [];
+
+    for (const [name, datei] of LAEUFE) {
+      if (signal) break;
+      if (!budgetGemeldet && Date.now() - gestartet >= 6 * 60 * 60 * 1000) {
+        budgetGemeldet = true;
+        console.error('WARNUNG: Gesamtlauf seit sechs Stunden aktiv; Ergebnisse sichern und Pause einplanen.');
+      }
+      console.log(`\n${'='.repeat(70)}\n  ${name}\n${'='.repeat(70)}`);
+      const protokoll = path.join(belege, `${name}.log`);
+      const ziel = fs.openSync(protokoll, 'w');
+      let lauf;
+      try {
+        mitteilungen.kindVorbereiten();
+        lauf = await laufProzess(path.join(__dirname, datei), {
+          ausgabe: ziel, zeitgrenze: ZEITGRENZE, signal: abbruch.signal,
+          gestartet: pid => mitteilungen.kindGestartet(pid),
+        });
+        if (lauf.sicherBeendet) mitteilungen.kindBeendet();
+      } finally {
+        fs.closeSync(ziel);
+      }
+      const ausgabe = fs.readFileSync(protokoll, 'utf8');
+      // Rohbelege bleiben auch bei Abbruch erhalten. Punktdateien verändern den Stempel nicht.
+      process.stdout.write(ausgabe);
+      if (lauf.zeit) console.error(`ABBRUCH: ${name} nach 15 Minuten; Zahlen unvollständig.`);
+      if (lauf.error) console.error(`ABBRUCH: ${name}: ${lauf.error.message}`);
+      ergebnisse.push({ name,
+        code: lauf.zeit ? 'zeit' : lauf.abgebrochen ? 'abbruch' : lauf.error ? 'fehler' : lauf.status,
+        zahlen: zaehlen(ausgabe) });
+      Object.assign(stand, { ergebnisse, signal: signal || null });
+      fs.writeFileSync(statusDatei, JSON.stringify(stand, null, 2) + '\n');
+      if (lauf.error) throw lauf.error;
+    }
+
+    console.log(`\n${'='.repeat(70)}\n  Übersicht\n${'='.repeat(70)}`);
+    let gesamtGut = 0;
+    let gesamtAlle = 0;
+    for (const e of ergebnisse) {
+      const zahl = e.zahlen ? `${e.zahlen.gut}/${e.zahlen.gesamt}` : '—';
+      if (e.zahlen) { gesamtGut += e.zahlen.gut; gesamtAlle += e.zahlen.gesamt; }
+      const zeichen = e.code === 0 ? 'OK  ' : e.code === 'zeit' ? 'ZEIT' : 'FEHL';
+      console.log(`  ${zeichen}  ${e.name.padEnd(16)} ${zahl.padStart(9)}`);
+    }
+    const gescheitert = ergebnisse.filter(e => e.code !== 0 || (e.zahlen && e.zahlen.gut !== e.zahlen.gesamt));
+    const ohneZahlen = ergebnisse.filter(e => !e.zahlen || e.zahlen.gesamt === 0);
+    console.log(`\n  ${gesamtGut} von ${gesamtAlle} Prüfungen bestanden, ${ergebnisse.length}/${LAEUFE.length} Läufe.`);
+    if (ohneZahlen.length) console.log(`  Ohne zählbare Prüfungen: ${ohneZahlen.map(e => e.name).join(', ')}`);
+    if (gescheitert.length) console.log(`  Nicht durchgekommen: ${gescheitert.map(e => e.name).join(', ')}`);
+    const verwackelt = stempel() !== stempelVorher;
+    stand.quellenUnveraendert = !verwackelt;
+    if (verwackelt) console.error('ACHTUNG: Code oder Prüfdatei während des Laufs geändert; Messung ungültig.');
+    code = gescheitert.length || ohneZahlen.length || verwackelt || ergebnisse.length !== LAEUFE.length ? 1 : 0;
+  } catch (fehler) {
+    if (stand) stand.fehler = fehler.message;
+    throw fehler;
   } finally {
-    fs.closeSync(ziel);
+    try {
+      await mitteilungen.beenden();
+      if (stand) stand.bereinigung = 'erfolgreich';
+    } catch (fehler) {
+      if (stand) { stand.bereinigung = 'fehlgeschlagen'; stand.fehler = fehler.message; }
+      throw fehler;
+    } finally {
+      process.removeListener('SIGINT', beiInt);
+      process.removeListener('SIGTERM', beiTerm);
+      if (stand) {
+        stand.phase = 'beendet';
+        stand.signal = signal || null;
+        stand.code = stand.fehler ? 1 : signal ? signal === 'SIGINT' ? 130 : 143 : code;
+        fs.writeFileSync(statusDatei, JSON.stringify(stand, null, 2) + '\n');
+      }
+    }
   }
+  return signal ? signal === 'SIGINT' ? 130 : 143 : code;
+}
 
-  const ausgabe = fs.readFileSync(protokoll, 'utf8');
-  fs.unlinkSync(protokoll);
-  process.stdout.write(ausgabe);
-
-  /*
-   * Am 09.09.2026 hing ein einzelner Lauf ueber eine Stunde in einem
-   * `waitUntil: 'load'`. Ohne Zeitgrenze blockiert so einer den
-   * gesamten Durchlauf, und am Ende steht ueberhaupt keine Zahl da. Lieber
-   * einen Lauf als abgebrochen melden als gar kein Ergebnis.
-   */
-  const abgebrochen = lauf.error && lauf.error.code === 'ETIMEDOUT';
-  if (abgebrochen) {
-    console.log(
-      `\n  ABBRUCH — ${name} lief laenger als ${Math.round(ZEITGRENZE / 60000)} Minuten ` +
-        'und wurde beendet. Die Zahlen unten sind unvollstaendig.'
-    );
-  }
-
-  ergebnisse.push({
-    name,
-    code: abgebrochen ? 'zeit' : lauf.status,
-    zahlen: zaehlen(ausgabe),
+if (require.main === module) {
+  haupt().then(code => { process.exitCode = code; }).catch(fehler => {
+    console.error(`ABBRUCH: ${fehler.message}`);
+    process.exitCode = 1;
   });
 }
 
-console.log(`\n${'='.repeat(70)}\n  Übersicht\n${'='.repeat(70)}`);
-
-let gesamtGut = 0;
-let gesamtAlle = 0;
-
-for (const e of ergebnisse) {
-  const zahl = e.zahlen ? `${e.zahlen.gut}/${e.zahlen.gesamt}` : '—';
-  if (e.zahlen) {
-    gesamtGut += e.zahlen.gut;
-    gesamtAlle += e.zahlen.gesamt;
-  }
-  const zeichen = e.code === 0 ? 'OK  ' : e.code === 'zeit' ? 'ZEIT' : 'FEHL';
-  console.log(`  ${zeichen}  ${e.name.padEnd(16)} ${zahl.padStart(9)}`);
-}
-
-const gescheitert = ergebnisse.filter((e) => e.code !== 0);
-const ohneZahlen = ergebnisse.filter((e) => !e.zahlen);
-
-console.log(`\n  ${gesamtGut} von ${gesamtAlle} Prüfungen bestanden, ${ergebnisse.length} Läufe.`);
-if (ohneZahlen.length) {
-  console.log(`  Ohne zählbare Prüfungen: ${ohneZahlen.map((e) => e.name).join(', ')}`);
-}
-if (gescheitert.length) {
-  console.log(`  Nicht durchgekommen: ${gescheitert.map((e) => e.name).join(', ')}`);
-}
-
-const verwackelt = stempel() !== stempelVorher;
-if (verwackelt) {
-  console.log(
-    '\n  ACHTUNG — während des Laufs hat sich Code oder eine Prüfdatei geändert.\n' +
-      '  Die Zahlen oben stammen damit aus zwei verschiedenen Ständen und sagen nichts.\n' +
-      '  Lauf wiederholen, sobald niemand sonst in diesem Ordner arbeitet.'
-  );
-}
-
-require('./_aufraeumen').aufraeumen().finally(() => {
-  process.exit(gescheitert.length || verwackelt ? 1 : 0);
-});
+module.exports = { haupt, stempel, LAEUFE };
