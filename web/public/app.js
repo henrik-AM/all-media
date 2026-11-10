@@ -20364,6 +20364,15 @@ async function openChatSettings(chatId) {
     if ('gesperrt' in antwort) chat.gesperrt = antwort.gesperrt;
     if ('aus' in antwort) chat.mitteilungenAus = antwort.aus;
     if ('blocked' in antwort) chat.blocked = antwort.blocked;
+    // Eine Liste, die schon unterwegs war, kennt diesen Klick nicht
+    // (listeNachsehen verwirft sie und holt neu).
+    chatListeAenderungen++;
+    const aktuell =
+      state.chats.find((c) => c.id === chatId) ||
+      (state.communityChats || []).find((c) => c.id === chatId);
+    if (aktuell && aktuell !== chat) {
+      for (const k of ['muted', 'gesperrt', 'mitteilungenAus', 'blocked']) aktuell[k] = chat[k];
+    }
 
     toast(antwort.meldung);
     zeichne(sheet);
@@ -21475,6 +21484,12 @@ function chatNachsehenStarten(chat) {
  */
 let listenUhr = null;
 let listenStand = null;
+/*
+ * Zählt eigene Umschaltungen im Chat-Optionsblatt. Kommt eine Liste an, die
+ * vor dem Klick angefragt wurde, würde sie den Schalter zurückdrehen
+ * (Chatoptionen „Mitteilungen“ kippte so, 10.11.2026).
+ */
+let chatListeAenderungen = 0;
 
 async function listeNachsehen(sofort = false) {
   if (document.hidden || !window.Anmeldung?.angemeldet?.()) return;
@@ -21487,8 +21502,13 @@ async function listeNachsehen(sofort = false) {
     listenStand = stand;
     if (!sofort && (vorher === null || vorher === stand)) return;
 
+    const aenderungenVorher = chatListeAenderungen;
     const d = await (await fetch('/api/chats')).json();
     if (!d?.ok) return;
+    if (aenderungenVorher !== chatListeAenderungen) {
+      listenStand = '';
+      return;
+    }
     state.chats = d.chats || [];
     state.communityChats = d.communityChats || [];
     vorschauenOeffnen(state.chats);
