@@ -119,3 +119,19 @@ Sechs-Stunden-Hinweis im Sitzungskontext erhalten; keine riskanten Schritte bego
 Offen: Nach regulärer Freigabe des Testbestands Gesamtlauf unter eigener Belegung
 starten; feste 3000-Adressen beachten, bei einem solchen Lauf abbrechen und melden.
 Erst danach Lauf-/Prüfnenner, Einzelursachen, main-Gegenprobe und Restzahl 0 prüfen.
+
+
+## Gesamtlauf 09.11. — Wiederaufnahme 10.11.
+
+Nachtrag angewandt: `testbestand` und `port-3000` erfolgreich für diese Sitzung
+belegt; eigener Prüfserver aus diesem Worktree auf Port 3000 gestartet.
+Alle fünf Adressvariablen BASE, BASIS, ZIEL, AM_URL, AM_BASIS zeigen auf 3000;
+SUPABASE_TOKEN vorhanden. Lokale Env-Dateien bereits vorhanden und ignoriert.
+
+Erster Start sicher vor den Prüfungen blockiert: 164 alte Testmitteilungen ohne
+Laufjournal. Herkunft gezielt geprüft: 138 Test→Demo, 26 Demo→Test; keine anderen
+Beteiligten. Nur diese 164 zuvor erfassten UUIDs mit erneutem Test/Demo-Filter
+entfernt, Löschzahl 164. Lokaler Herkunftsbeleg unter
+`app/test/.gesamtlauf-belege/altbestand-10-11.json`, keine Inhalte oder Schlüssel.
+Zweiter Start erfolgreich; Laufkennung und 75er-Laufliste werden protokolliert.
+Ergebnisse und Abschlussbereinigung folgen nach Laufende.
