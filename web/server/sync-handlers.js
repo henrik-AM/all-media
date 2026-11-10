@@ -342,7 +342,7 @@ async function messengerErlaubt(client, nutzerId, zielId) {
  * Paar, getrennte Verläufe. Laufende Ermittlungen je Paar und Bereich werden
  * zusammengeführt: der zweite Aufruf bekommt dieselbe Antwort wie der erste.
  * Gleicher Schutz in app/lib/aktionen.ts (chatMit). Gleichzeitiges Anlegen
- * von zwei Geräten oder Servern fängt erst die Datenbank ab — offen.
+ * von zwei Geräten oder Servern fängt die Datenbank ab (Schema 126).
  */
 const chatMitLaeuft = new Map();
 
@@ -395,28 +395,20 @@ async function chatMitErmitteln(client, nutzerId, zielId, bereich) {
   }
 
   const { data: person } = await client.from('profiles').select('name').eq('id', zielId).maybeSingle();
-  const { data: neu, error: fehlerNeu } = await client
-    .from('chats')
-    .insert({ name: person?.name || 'Chat', is_group: false, bereich, created_by: nutzerId })
-    .select()
-    .single();
-  if (fehlerNeu) throw fehlerNeu;
-
   /*
-   * Die Mitglieder gehoeren zum Chat. Schlaegt das fehl, entsteht ein Chat,
-   * in dem niemand drin ist: er taucht in keiner Liste auf, nimmt aber jede
-   * Nachricht an, die dann nie jemand sieht. Deshalb wird der Fehler nicht
-   * verschluckt, und der halbe Chat wieder weggeraeumt.
+   * Schema 126: Suchen und Anlegen in EINER Transaktion mit Schloss je Paar
+   * und Bereich. Tippen zwei Geräte gleichzeitig, wartet der zweite Aufruf
+   * und bekommt den Chat des ersten. Scheitert das Eintragen der Mitglieder,
+   * verschwindet auch die Chatzeile — kein halber Chat mehr zum Wegräumen.
+   * Gleicher Aufruf in app/lib/aktionen.ts (chatMit).
    */
-  const { error: fehlerMitglieder } = await client.from('chat_members').insert([
-    { chat_id: neu.id, user_id: nutzerId },
-    { chat_id: neu.id, user_id: zielId },
-  ]);
-  if (fehlerMitglieder) {
-    await client.from('chats').delete().eq('id', neu.id);
-    throw fehlerMitglieder;
-  }
-  return neu.id;
+  const { data: chatId, error: fehlerNeu } = await client.rpc('zweierchat_anlegen', {
+    p_ziel: zielId,
+    p_bereich: bereich,
+    p_name: person?.name || 'Chat',
+  });
+  if (fehlerNeu) throw fehlerNeu;
+  return chatId;
 }
 
 const handleChatMit = handler('Chat finden', async (client, nutzerId, zielId, bereich) => {
