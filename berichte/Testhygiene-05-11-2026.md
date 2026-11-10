@@ -135,3 +135,11 @@ entfernt, Löschzahl 164. Lokaler Herkunftsbeleg unter
 `app/test/.gesamtlauf-belege/altbestand-10-11.json`, keine Inhalte oder Schlüssel.
 Zweiter Start erfolgreich; Laufkennung und 75er-Laufliste werden protokolliert.
 Ergebnisse und Abschlussbereinigung folgen nach Laufende.
+
+Zwischenstand während Lauf `2a8249ab-2403-4eeb-a9ce-293539effb94`: 22/75
+Läufe abgeschlossen, 528/532 Prüfungen bestanden. Explorer 18/21: Hashtag-Seite
+öffnet nicht innerhalb 3000 ms, passende Beiträge und Abschnittsüberschrift fehlen
+als Folge. Kontaktinfo 9/10: Chatdesign-Rückweg wartet 3000 ms vergeblich auf
+`.kp__zeileText`. Beide Prüfdateien und die Website sind unverändert gegenüber
+main fbf0e79. Isolierter main-Stand für spätere Einzelgegenproben vorbereitet;
+keine parallelen Liveprüfungen. Noch keine Aussage zur Abschlussbereinigung.
