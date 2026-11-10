@@ -143,3 +143,8 @@ als Folge. Kontaktinfo 9/10: Chatdesign-Rückweg wartet 3000 ms vergeblich auf
 `.kp__zeileText`. Beide Prüfdateien und die Website sind unverändert gegenüber
 main fbf0e79. Isolierter main-Stand für spätere Einzelgegenproben vorbereitet;
 keine parallelen Liveprüfungen. Noch keine Aussage zur Abschlussbereinigung.
+
+Weiterer Zwischenstand: 41/75 Läufe, 1099/1104 Prüfungen grün. Zusätzlich
+Chatoptionen 16/17: „Mitteilungen“ nach erneutem Öffnen wieder eingeschaltet.
+Prüfdatei unverändert gegenüber main. Querformat dagegen 37/37 grün.
+Die übrigen bisher abgeschlossenen Läufe bestanden; noch keine Endzählung.
