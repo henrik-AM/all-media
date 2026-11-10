@@ -675,6 +675,12 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    *
    * `bereich` entscheidet, in welcher der beiden Listen er landet.
    */
+  /*
+   * Codex-Prüfung 10.11.2026: zweimal schnell angetippt liefen zwei Öffnungen
+   * (und zwei Anlagen) für dieselbe Person. Solange eine läuft, zählt ein
+   * weiterer Tipp nicht; chatMit führt laufende Anlagen zusätzlich zusammen.
+   */
+  const chatOeffnetGerade = useRef(new Set<string>());
   const openChatWith = async (userId: string, bereich?: 'messenger' | 'community', nameAusSuche?: string) => {
     const person = daten.users[userId];
     const wo = bereich ?? bereichFuer(userId);
@@ -683,6 +689,20 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     );
     if (vorhanden) return oeffneChat(vorhanden);
 
+    const schluessel = `${userId}|${wo}`;
+    if (chatOeffnetGerade.current.has(schluessel)) return;
+    chatOeffnetGerade.current.add(schluessel);
+    try {
+      await chatAnlegenUndOeffnen(userId, wo, person?.name ?? nameAusSuche);
+    } finally {
+      chatOeffnetGerade.current.delete(schluessel);
+    }
+  };
+
+  const chatAnlegenUndOeffnen = async (userId: string, wo: 'messenger' | 'community', name?: string) => {
+    // Treffer aus der Datenbanksuche (Kasten 28/14) fehlen in daten.users —
+    // die Chat-Info braucht sie dort (Codex-Prüfung 10.11.2026).
+    if (!daten.users[userId]) void daten.personenNachladen([userId]);
     const chatId = await aktion.chatMit(userId, wo);
     // `chatMit` hat den Grund schon gemeldet — etwa, dass diese Person keine
     // Nachrichten empfängt. Dann bleibt der Bildschirm, wo er ist; einen
@@ -692,7 +712,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     const chat: Chat = {
       id: chatId,
       // Treffer aus der Datenbanksuche (Kasten 28/14) sind nicht in daten.users.
-      name: person?.name ?? nameAusSuche ?? 'Chat',
+      name: name ?? 'Chat',
       userId,
       isGroup: false,
       preview: '',

@@ -20386,18 +20386,39 @@ function renderCommunityNeuerChat(roh) {
       const id = b.dataset.neuerchat;
       const vorhanden = chatMit(id);
       if (vorhanden) return openChat(vorhanden.id);
-      // Kasten 28/14.2: immer ein Community-Chat, nie der Messenger.
-      const res = await fetch(`/api/kontakte/${id}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bereich: 'community' }),
-      });
-      const antwort = await res.json().catch(() => ({}));
-      if (!antwort.ok) return toast(antwort.error || 'Das hat nicht geklappt');
-      await bootstrap();
-      return openChat(antwort.chatId);
+      /*
+       * Codex-Prüfung 10.11.2026: während der Anlage blieb die Zeile aktiv,
+       * ein zweiter Klick startete eine zweite Anlage. Laufende Anlagen je
+       * Person sperren weitere Klicks (der Server führt sie zusätzlich zusammen).
+       */
+      if (commNeuerChatLaeuft.has(id)) return;
+      commNeuerChatLaeuft.add(id);
+      b.disabled = true;
+      b.setAttribute('aria-busy', 'true');
+      try {
+        return await commNeuerChatAnlegen(id);
+      } finally {
+        commNeuerChatLaeuft.delete(id);
+        b.disabled = false;
+        b.removeAttribute('aria-busy');
+      }
     })
   );
+}
+
+const commNeuerChatLaeuft = new Set();
+
+async function commNeuerChatAnlegen(id) {
+  // Kasten 28/14.2: immer ein Community-Chat, nie der Messenger.
+  const res = await fetch(`/api/kontakte/${id}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bereich: 'community' }),
+  });
+  const antwort = await res.json().catch(() => ({}));
+  if (!antwort.ok) return toast(antwort.error || 'Das hat nicht geklappt');
+  await bootstrap();
+  return openChat(antwort.chatId);
 }
 
 /* --------------------------------------------------- Communitys: Profil */

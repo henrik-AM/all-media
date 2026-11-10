@@ -91,7 +91,7 @@ function teilA() {
   pruefe('14.1 Seite fragt ab zwei Zeichen die Datenbank, mit Pause', /Beitritt\.suchmuster\(query\)/.test(neu) && /setTimeout\(\(\) => \{\s*suchen\(query\)/.test(neu));
   pruefe('14.1 verspätete Antwort wird verworfen', /if \(aktuell\) setDb/.test(neu) && /aktuell = false/.test(neu) && /db\.wort === query/.test(neu));
   pruefe('14.1 Datenbanktreffer kommen dazu, Blockierte nicht', /for \(const p of db\.personen\)/.test(neu) && /!istBlockiert\(u\.id\)/.test(neu));
-  pruefe('14.2 Name eines Datenbanktreffers geht mit', /onChat\(u\.id, u\.name\)/.test(neu) && /person\?\.name \?\? nameAusSuche \?\? 'Chat'/.test(shell));
+  pruefe('14.2 Name eines Datenbanktreffers geht mit', /onChat\(u\.id, u\.name\)/.test(neu) && /chatAnlegenUndOeffnen\(userId, wo, person\?\.name \?\? nameAusSuche\)/.test(shell) && /name: name \?\? 'Chat'/.test(shell));
   // Fund 2: Annehmen/Ablehnen zieht die offene Chat-Info und ihren Rücksprung mit.
   zustandSetzenProbe(shell);
   const kp = lies('app/screens/messenger/ContactProfileScreen.tsx');

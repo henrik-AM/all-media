@@ -241,6 +241,7 @@ const LAEUFE = [
   ['k28-communitys', 'k28-communitys.js'],
   ['k28-kopf-offline', 'k28-kopf-offline.js'],
   ['k28-filter-offline', 'k28-filter-offline.js'],
+  ['k28-doppeltippen', 'k28-doppeltippen.js'],
   ['k28-erstellen', 'k28-erstellen.js'],
   ['k28-mitglieder', 'k28-mitglieder.js'],
   // Mit Supabase (zwei Testkonten, eigene Prüfcommunity, räumt selbst auf).

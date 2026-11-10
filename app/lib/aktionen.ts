@@ -1207,11 +1207,33 @@ export async function messengerErlaubt(client: SupabaseClient, ichId: string, zi
  * Ohne die Suche nach dem vorhandenen entstünde bei jedem Teilen ein neuer
  * Chat, und der Verlauf zerfiele in lauter Einzelstücke.
  */
-export async function chatMit(
+const chatMitLaeuft = new Map<string, Promise<string>>();
+
+export function chatMit(
   client: SupabaseClient,
   ichId: string,
   zielId: string,
   bereich = 'messenger'
+): Promise<string> {
+  /*
+   * Codex-Prüfung 10.11.2026: zweimal schnell angetippt liefen zwei
+   * Ermittlungen, beide fanden noch keinen Chat und legten je einen an —
+   * zwei Chats für dasselbe Paar. Laufende Aufrufe je Paar und Bereich
+   * werden zusammengeführt. Gleicher Schutz in web/server/sync-handlers.js.
+   */
+  const schluessel = `${ichId}|${zielId}|${bereich}`;
+  const laufend = chatMitLaeuft.get(schluessel);
+  if (laufend) return laufend;
+  const lauf = chatMitErmitteln(client, ichId, zielId, bereich).finally(() => chatMitLaeuft.delete(schluessel));
+  chatMitLaeuft.set(schluessel, lauf);
+  return lauf;
+}
+
+async function chatMitErmitteln(
+  client: SupabaseClient,
+  ichId: string,
+  zielId: string,
+  bereich: string
 ): Promise<string> {
   /*
    * Fremde lernt man unter Communitys kennen (Feedback 21.09., Kasten 3).

@@ -147,7 +147,8 @@
     "test:k28-commbild": "node test/k28-commbild.js",
     "test:k28-communitys": "node test/k28-communitys.js",
     "test:k28-kopf-offline": "node test/k28-kopf-offline.js",
-    "test:k28-filter-offline": "node test/k28-filter-offline.js"
+    "test:k28-filter-offline": "node test/k28-filter-offline.js",
+    "test:k28-doppeltippen": "node test/k28-doppeltippen.js"
   },
   "private": true
 }

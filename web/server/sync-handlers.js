@@ -336,7 +336,26 @@ async function messengerErlaubt(client, nutzerId, zielId) {
   return data === true;
 }
 
-async function chatMit(client, nutzerId, zielId, bereich = 'messenger') {
+/*
+ * Codex-Prüfung 10.11.2026: zweimal schnell „Chat mit …“ angetippt startete
+ * zwei Anlagen, beide fanden noch keinen Chat — zwei Chats für dasselbe
+ * Paar, getrennte Verläufe. Laufende Ermittlungen je Paar und Bereich werden
+ * zusammengeführt: der zweite Aufruf bekommt dieselbe Antwort wie der erste.
+ * Gleicher Schutz in app/lib/aktionen.ts (chatMit). Gleichzeitiges Anlegen
+ * von zwei Geräten oder Servern fängt erst die Datenbank ab — offen.
+ */
+const chatMitLaeuft = new Map();
+
+function chatMit(client, nutzerId, zielId, bereich = 'messenger') {
+  const schluessel = `${nutzerId}|${zielId}|${bereich}`;
+  const laufend = chatMitLaeuft.get(schluessel);
+  if (laufend) return laufend;
+  const lauf = chatMitErmitteln(client, nutzerId, zielId, bereich).finally(() => chatMitLaeuft.delete(schluessel));
+  chatMitLaeuft.set(schluessel, lauf);
+  return lauf;
+}
+
+async function chatMitErmitteln(client, nutzerId, zielId, bereich) {
   /*
    * Fremde lernt man unter Communitys kennen (Feedback 21.09., Kasten 3).
    * Ein Teilen aus Videos an jemanden, der kein Kontakt ist, legte bis zum

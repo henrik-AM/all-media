@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -106,6 +106,7 @@ export const ContactProfileScreen = ({
     ichId,
     neuLaden,
     kontaktBilder,
+    personenNachladen,
   } = useDaten();
   const aktionen = useAktionen(onNotice);
   const kontakt = alleKontakte.find((k) => k.id === userId);
@@ -245,6 +246,26 @@ export const ContactProfileScreen = ({
 
   const person = alleNutzer[userId];
 
+  /*
+   * Codex-Prüfung 10.11.2026: „Neuer Chat“ findet Personen auch in der
+   * Datenbank, also außerhalb der 500 geladenen Profile. Deren Chat-Info
+   * stand dann als „Diese Person gibt es nicht.“ da — ohne Messenger-Anfrage,
+   * Blockieren oder Melden. Fehlt die Person, wird sie einmal per ID
+   * nachgeladen (wie FollowersScreen); erst danach gilt sie als nicht da.
+   */
+  const [personStand, setPersonStand] = useState<'laedt' | 'fertig' | 'fehler'>(person ? 'fertig' : 'laedt');
+  useEffect(() => {
+    if (!userId || alleNutzer[userId]) return setPersonStand('fertig');
+    let gilt = true;
+    setPersonStand('laedt');
+    personenNachladen([userId]).then((stand) => gilt && setPersonStand(stand));
+    return () => {
+      gilt = false;
+    };
+    // Absichtlich nur an der ID: personenNachladen versucht jede ID ohnehin nur einmal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, personenNachladen]);
+
   if (!person) {
     return (
       <View style={styles.container}>
@@ -253,7 +274,13 @@ export const ContactProfileScreen = ({
             <Ionicons name="arrow-back" size={22} color={colors.text} />
           </Druck>
         </View>
-        <Text style={styles.leer}>Diese Person gibt es nicht.</Text>
+        {personStand === 'laedt' ? (
+          <ActivityIndicator style={{ marginTop: 20 }} color={colors.text3} accessibilityLabel="Profil wird geladen" />
+        ) : (
+          <Text style={styles.leer}>
+            {personStand === 'fehler' ? 'Das Profil ließ sich gerade nicht laden.' : 'Diese Person gibt es nicht.'}
+          </Text>
+        )}
       </View>
     );
   }
