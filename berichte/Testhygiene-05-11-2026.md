@@ -1,0 +1,245 @@
+# Testhygiene, 05.11.2026
+
+Aktueller Paket-T-Stand: main fbf0e79 als Basis; Abschluss 10.11. unten.
+Historische Ausgangsbasis: main ad7f221, Testablauf-Korrektur b512c56.
+
+- Fixtures werden vor dem Quellenfingerabdruck vorbereitet; der Quellwächter bleibt aktiv.
+- Vor dem Gesamtlauf: eigene KI-Belegung, passender Server, Bereinigungstoken/Projekt und leerer Altbestand erforderlich.
+- Lauf-UUID, DB-Startzeit und bestätigter Leerstand im lokalen Journal; Version 2 entfernt auch zurückdatierte neue Testmitteilungen. Alte Journale behalten den Zeitfilter. Nachzählung über beide Konten muss null ergeben. Unklarer Altbestand wird nicht pauschal gelöscht.
+- Laufende Kinder/Browser beenden, dann bereinigen. SIGINT/SIGTERM und Zeitlimit sind behandelt. Bei SIGKILL bleibt das Journal; ein noch lebender oder unklarer alter Prüfprozess blockiert die Wiederaufnahme.
+- Rohprotokolle und Abschlussstatus bleiben je Laufkennung erhalten. Bereinigungsfehler, fehlende/0 Prüfzahlen und fehlende Läufe verhindern Exit 0.
+- Sechs-Stunden-Warnung im Gesamtlauf; kein eigenständiger Sitzungswächter in diesem Paket.
+
+## Prüfungen
+
+- Testhygiene: 22/22 (`node --test app/test/_testhygiene_offline.js`).
+- Belegungsschutz: 18/18 (`bash app/test/_ki_belegung_probe.sh`).
+- Schema/Code: 7/7 (`node app/test/_schema.js`).
+- Bunny-Adapter: 138/138; Umzug: 2/2, ausschließlich lokal/Attrappen. Kein vollständiger Review.
+- Keine echte SQL-Ausführung, kein Cloudlauf, keine Installation von Abhängigkeiten, kein main/Push/Deploy.
+
+## Paket T, 09.11.2026
+
+Neu aufgebaut auf main fbf0e79, Zweig `codex/paket-t-testhygiene`.
+Nur App-Testhygiene aus b512c56 und Bericht aus 3db230c übernommen.
+590d579 betrifft ausschließlich Sitzungsbudget und ist vollständig ausgeschlossen.
+Sitzungsbudget-Dateien, Hooks und deren Freigaben bleiben außerhalb von Paket T.
+Die alten Prüfzahlen oben sind historische Nachweise vom 05.11., keine neuen Läufe.
+
+Aktuell offline: Testhygiene 22/22, Belegungsschutz 18/18, Schema/Code 7/7.
+Main-Abgleich: 105/105 Skripte unverändert erhalten, 74/74 Gesamtläufe erhalten;
+zusätzlich Testhygiene ergibt 75 Läufe. `test:bz-neuladen` bleibt erhalten,
+ist bereits auf main nicht in `LAEUFE` eingetragen; keine fremde Laufliste erweitert.
+Kein TypeScript berührt; `tsc --noEmit` gemäß Auftrag nicht erforderlich.
+Laufjournal und Rohbelege werden über `app/test/.gitignore` lokal ausgeschlossen.
+
+Gesamtlaufversuch am 09.11.: `npm run test:alles` mit vorhandenem
+`SUPABASE_TOKEN`, eigener Belegung `testbestand`, Exit 2 vor Anmeldung/SQL.
+Grund: Auf Port 3000 läuft kein Prüfserver. Laut Auftrag darf Port 3000
+nicht angefasst werden; Wächter nicht umgangen. 0/75 Läufe ausgeführt,
+Prüfzahl nicht ermittelt (Nenner unbekannt). Vollständige Liveabnahme offen.
+Belegung anschließend freigegeben. Kein Schema, keine Live-Daten geändert.
+
+## Gesamtlauf 09.11. — neuer Auftrag, Vorbereitung
+
+Freigabe laut `AUFTRAG-paket-t-gesamtlauf-codex-09-11.md`: Supabase-Gesamtlauf,
+eigener Prüfserver auf 3300; fremde Ports 3000/8081 bleiben tabu.
+Testbestand beim Start durch Claude belegt; Belegungsversuche alle drei Minuten,
+maximal vier Stunden, ohne Erzwingen oder Übernehmen.
+Server per `PORT=3300 npm start` aus diesem Worktree gestartet, HTTP 200 geprüft.
+Adressvariablen: `BASE`, `BASIS`, `ZIEL`, `AM_URL`, `AM_BASIS` jeweils
+`http://localhost:3300`. `SUPABASE_TOKEN` vorhanden, nicht ausgegeben.
+Lokale, ignorierte Env-Dateien vorbereitet; keine Schlüssel im Commit.
+
+Vorbefund: `smoke.js:59` verwendet die feste Adresse `http://localhost:3000`;
+`_uebernacht.js` verwendet ebenfalls feste Standardadressen ohne Env-Auswertung.
+Beides unverändert auch auf main fbf0e79. Der Auftrag verlangt bei einem Lauf
+gegen 3000 den Abbruch; der bestehende Prüfserverwächter bleibt eingeschaltet.
+
+`npm ci --ignore-scripts` gemäß Lockdateien: web 109, app 571 Pakete installiert.
+Audit meldet web 4 Lücken (2 mittel, 1 hoch, 1 kritisch), app 14
+(1 niedrig, 7 mittel, 5 hoch, 1 kritisch). Keine Abhängigkeiten geändert.
+Web: body-parser hoch, proxy-addr kritisch, ip-address und qs mittel.
+
+Budget-/Hook-Freigaben laut Auftrag erledigt: alle fünf Hooks konfiguriert,
+Vertrauenseintrag vorhanden, vorheriger Budgettest 13/13. Hier keine
+Hook-Konfiguration gelesen, geändert oder erneut geprüft.
+
+
+## Gesamtlauf 09.11. — Abschluss am 10.11.: wartet weiter
+
+Status: **wartet weiter**. Der Testbestand blieb bei sämtlichen Belegungsversuchen
+exklusiv durch Claude belegt (`Paket 5: Live-Läufe community/henrik/k28-commbild`,
+seit 09.11. 21:51). Keine fremde Belegung übernommen, erzwungen oder gelöst.
+Der Gesamtlauf wurde deshalb nicht gestartet: **0/75 Läufe**, Prüfungen nicht
+gemessen, Nenner unbekannt. Keine vollständige Liveabnahme.
+
+Beginn des protokollierten Wartens: 09.11. 21:58:53; Sollfrist: 10.11. 01:58:53.
+Die Wiederholung lief mit 180 Sekunden Abstand und einer Vierstundengrenze auf
+monotoner Prozesszeit. Abweichung: Die beobachtete Kalenderzeit sprang zwischen
+kurzen Werkzeugaufrufen von 01:51 über 04:29 auf 06:24; die Warteschleife lief
+dabei noch. Die Kalenderfrist wurde damit überschritten. Nach Feststellung
+Warteschleife sofort beendet; keine weiteren Belegungsversuche. Eine Ursache
+für die abweichenden Uhren wurde nicht nachgewiesen.
+
+Vorbereitung vollständig: eigener Server `PORT=3300 npm start`, HTTP 200;
+`web/.env.local` gemäß Auftrag aus dem Hauptordner kopiert, App-Testkonfiguration
+aus dem erlaubten Worktree `~/allmedia-wt/p5-main/app/.env.local` kopiert.
+Beide Dateien lokal ignoriert, Schlüssel weder ausgegeben noch committet.
+`BASE`, `BASIS`, `ZIEL`, `AM_URL`, `AM_BASIS` für 3300 identifiziert;
+`SUPABASE_TOKEN` vorhanden. Prüfbrowser startet und schließt erfolgreich.
+
+Zusätzlicher statischer Befund, noch nicht live geprüft: `app/test/smoke.js:59`
+verwendet fest `http://localhost:3000`; `_uebernacht.js:82,137,249` verwendet
+ebenfalls Standardadressen auf 3000 ohne Env-Auswertung. Beide Befunde stimmen
+mit main fbf0e79 überein (`git show main:…`), gehören nicht zu Paket T.
+Die verlangte einzelne Live-Gegenprobe gegen main konnte mangels eigener
+Testbestandsbelegung ebenfalls nicht stattfinden. Keine Quellkorrektur vorgenommen.
+Bei Fortsetzung vor jeder Anmeldung auf 3000 abbrechen, wie beauftragt.
+
+Nachzählung/Testhygiene: **nicht live gemessen**, da ohne eigene Belegung verboten.
+Kein Gesamtlauf und keine Anmeldung/Reset/SQL durch diese Sitzung gestartet;
+kein Bereinigungsjournal und keine Gesamtlaufsperre vorhanden. Daher keine
+verifizierte Restzahl 0 behauptet. Claudes Bestand blieb unangetastet.
+
+Eigenen Server 3300 beendet; anschließend kein Listener auf 3300.
+Eigene Warteschleife beendet. Keine eigene Testbestandsbelegung zu lösen;
+fremde Belegung bleibt bestehen. Isolierte main-Gegenprobe nicht ausgeführt.
+Kein main/Push/Deploy/Schema, keine echten Konten, keine Änderungen an Paket 5.
+
+Abhängigkeiten mit unveränderten Lockdateien installiert: web 109, app 571 Pakete.
+Audit web: 4 Lücken (2 mittel, 1 hoch, 1 kritisch); app: 14
+(1 niedrig, 7 mittel, 5 hoch, 1 kritisch). Keine Updates ausgeführt.
+Web-Befunde: body-parser hoch, proxy-addr kritisch, ip-address und qs mittel.
+
+Budget-/Hook-Freigaben laut neuem Auftrag erledigt: alle fünf Hooks,
+Vertrauenseintrag, vorheriger Budgettest 13/13. Keine Hook-Konfiguration geändert.
+Die älteren Aussagen über offene Budgetfreigaben sind damit überholt.
+Sechs-Stunden-Hinweis im Sitzungskontext erhalten; keine riskanten Schritte begonnen.
+
+Offen: Nach regulärer Freigabe des Testbestands Gesamtlauf unter eigener Belegung
+starten; feste 3000-Adressen beachten, bei einem solchen Lauf abbrechen und melden.
+Erst danach Lauf-/Prüfnenner, Einzelursachen, main-Gegenprobe und Restzahl 0 prüfen.
+
+
+## Gesamtlauf 09.11. — Wiederaufnahme 10.11.
+
+Nachtrag angewandt: `testbestand` und `port-3000` erfolgreich für diese Sitzung
+belegt; eigener Prüfserver aus diesem Worktree auf Port 3000 gestartet.
+Alle fünf Adressvariablen BASE, BASIS, ZIEL, AM_URL, AM_BASIS zeigen auf 3000;
+SUPABASE_TOKEN vorhanden. Lokale Env-Dateien bereits vorhanden und ignoriert.
+
+Erster Start sicher vor den Prüfungen blockiert: 164 alte Testmitteilungen ohne
+Laufjournal. Herkunft gezielt geprüft: 138 Test→Demo, 26 Demo→Test; keine anderen
+Beteiligten. Nur diese 164 zuvor erfassten UUIDs mit erneutem Test/Demo-Filter
+entfernt, Löschzahl 164. Lokaler Herkunftsbeleg unter
+`app/test/.gesamtlauf-belege/altbestand-10-11.json`, keine Inhalte oder Schlüssel.
+Zweiter Start erfolgreich; Laufkennung und 75er-Laufliste werden protokolliert.
+Ergebnisse und Abschlussbereinigung folgen nach Laufende.
+
+Zwischenstand während Lauf `2a8249ab-2403-4eeb-a9ce-293539effb94`: 22/75
+Läufe abgeschlossen, 528/532 Prüfungen bestanden. Explorer 18/21: Hashtag-Seite
+öffnet nicht innerhalb 3000 ms, passende Beiträge und Abschnittsüberschrift fehlen
+als Folge. Kontaktinfo 9/10: Chatdesign-Rückweg wartet 3000 ms vergeblich auf
+`.kp__zeileText`. Beide Prüfdateien und die Website sind unverändert gegenüber
+main fbf0e79. Isolierter main-Stand für spätere Einzelgegenproben vorbereitet;
+keine parallelen Liveprüfungen. Noch keine Aussage zur Abschlussbereinigung.
+
+Weiterer Zwischenstand: 41/75 Läufe, 1099/1104 Prüfungen grün. Zusätzlich
+Chatoptionen 16/17: „Mitteilungen“ nach erneutem Öffnen wieder eingeschaltet.
+Prüfdatei unverändert gegenüber main. Querformat dagegen 37/37 grün.
+Die übrigen bisher abgeschlossenen Läufe bestanden; noch keine Endzählung.
+
+### Vollständiger Lauf: 75/75, 2639/2645
+
+Laufkennung `2a8249ab-2403-4eeb-a9ce-293539effb94`: 75/75 ausgeführt,
+2639/2645 gezählte Prüfungen bestanden; alle Läufe lieferten Zahlen.
+Quellen während des gesamten Laufs unverändert (`quellenUnveraendert: true`).
+Vier rote Läufe: Explorer 18/21, Kontaktinfo 9/10, Chatoptionen 16/17
+(wie oben), Minderjährig 32/33: Management-API HTTP 400 beim Anlegen des
+absichtlich zu jungen Australien-Kontos; weitere Prüfungen danach nicht erreicht.
+Der Nenner 2645 beschreibt nur tatsächlich erreichte Prüfungen.
+
+Abschlussbereinigung zunächst fehlgeschlagen: 21 zurückdatierte Demo→Test-
+Mitteilungen blieben trotz Zeitfilter. Reset erzeugt sie aus vorlage_mitteilungen
+mit `now() - make_interval(...)`; created_at ist kein Erzeugungsnachweis.
+Paket-T-Fehler korrigiert: Journal Version 2 dokumentiert den vor dem exklusiven
+Lauf bestätigten Leerstand. Danach erfasst Bereinigung alle Mitteilungen beider
+Testkonten einschließlich zurückdatierter Reset-Vorlagen; fremder Altbestand
+blockiert weiterhin vor Start. Version-1-Journale behalten den engen Zeitfilter.
+Altes Journal nicht umgeschrieben: exakt 21 nach Herkunft geprüfte Rest-UUIDs
+gezielt entfernt, dann reguläre Wiederaufnahme mit Nachzählung **Rest 0**.
+Offline-Regression nach Korrektur **23/23** grün. Einzelwiederholungen folgen.
+Supabase-Doku vor Code via Context7 gelesen; Projektversionen App ^2.112.4,
+Web ^2.43.0. Keine Schemaänderung.
+
+### Wiederholungen Paket T nach Bereinigungskorrektur
+
+23/23 Offline, 18/18 Belegungsprobe, 7/7 Schema; diff --check grün.
+Vier betroffene Einzeldateien sequenziell ausgeführt, kein paralleler Livezugriff:
+Explorer nach Teilprüfungen am 15-Minuten-Limit beendet (Standort-Timeouts,
+kein vollständiger Nenner); Kontaktinfo schon beim Laden nach 8000 ms ohne
+Prüfzahl abgebrochen; Chatoptionen am 15-Minuten-Limit ohne Prüfzahl beendet;
+Minderjährig erneut 32/33, SQLSTATE P0001, Grund Australien-Altersgrenze.
+Keine Aussagen „einzeln grün“. Browser-/Prozessgruppen jeweils sicher beendet.
+**Neue automatische Bereinigung**: Explorer 37 entfernt/Rest 0; Kontaktinfo
+0/Rest 0; Chatoptionen 37/Rest 0; Minderjährig 0/Rest 0. Damit zurückdatierte
+Reset-Vorlagen live erfasst; keine Einzeljournaldatei zurückgeblieben.
+Die historischen Rohdaten des ersten Gesamtlaufs bleiben unverändert rot.
+27 vom Gesamtlauf neu erzeugte, zuvor saubere Testbilder lokal unter
+`.gesamtlauf-belege/screenshots-gesamtlauf/` gesichert und eigene Bildänderungen
+in Git wiederhergestellt; keine Bilder in Paket T übernommen. Graph aktualisiert.
+
+Sechs-Stunden-Hinweis erhalten. Zwischenstand gesichert und Pause vor der noch
+offenen main-Gegenprobe; kein weiterer Gesamtlauf auf korrigiertem Stand bisher.
+
+### main-Gegenproben und zweiter Paket-T-Fehler
+
+Isolierte Kopie von main fbf0e79 unter
+`~/allmedia-wt-codex/paket-t-main-gegenprobe-10-11`, eigene Env-Dateien,
+Server auf belegtem Port 3000; keine main-Referenz oder Hauptarbeitskopie verändert.
+Vier Gegenproben einzeln und sequenziell: Explorer **21/21**, Kontaktinfo **10/10**,
+Chatoptionen **16/17**, Minderjährig **41/41**. Automatische Bereinigung danach
+42, 47, 38, 0 Mitteilungen entfernt, jeweils **Rest 0**. Beide eigenen Server
+inzwischen gestoppt; Port-Nachprüfung und Freigabe folgen nach letztem API-Lauf.
+
+Explorer/Kontaktinfo: ursprüngliche 3000-ms-Fehler auf main diesmal nicht
+reproduziert; unveränderte Prüfdateien/Website, zeitabhängige Fehlschläge,
+keine belegte Änderung durch Paket T. Die zusätzlichen Zeit-/Ladefehler der
+Paket-T-Einzelversuche bleiben als unvollständige Messungen ausdrücklich offen.
+Chatoptionen: derselbe Mitteilungsschalter-Fehler auf main bestätigt, unverändert.
+
+Minderjährig ist **ein zweiter Paket-T-Fehler**, kein main-Fehler: Die neu
+eingeführte strenge HTTP-Prüfung in _aufraeumen.frage warf vor der bewusst
+erwarteten Negativprobe (HTTP 400 / SQLSTATE P0001 / Australien unter 16).
+Korrektur: nur dieser erwartete SQL-Fehler wird beim Australien-INSERT explizit
+ausgenommen; sonstige HTTP-/SQL-Fehler bleiben harte Abbrüche. Regression
+prüft Standard-HTTP-400, gezielte Ausnahme, falschen SQLSTATE und HTTP 401.
+Offline jetzt **24/24**; tatsächlicher Minderjährig-Lauf nach Korrektur gestartet.
+Keine Aufsummierung von Einzelläufen zu einem erfundenen neuen Gesamtlauf.
+
+### Abschluss 10.11.
+
+Auftrag ausgeführt, Ergebnis **nicht vollständig grün**: historischer Gesamtlauf
+**75/75 Läufe, 2639/2645 gezählte Prüfungen**. Alle sechs roten Prüfungen und
+die ausgefallene Abschlussbereinigung oben einzeln erfasst. Zwei Paket-T-Fehler
+behoben und gezielt live wiederholt: zurückdatierte Reset-Vorlagen werden
+automatisch entfernt (u. a. 37, 42, 47, 38 entfernte Zeilen mit Rest 0);
+Minderjährig nach gezielter HTTP-Ausnahme **41/41**, Exit 0.
+Offline-Endstand **24/24**, Belegungsprobe **18/18**, Schema **7/7**;
+Graph aktualisiert, diff --check grün.
+
+Offene Fremd-/Zeitbefunde: Chatoptionen-Schalter unverändert rot, auch auf main
+**16/17**. Explorer/Kontaktinfo im Gesamtlauf zeitbedingt rot, auf main einzeln
+**21/21** und **10/10** grün; Paket-T-Einzelwiederholungen mit zusätzlichen
+Timeouts unvollständig. Keine gesicherte weitere Ursache, keine pauschale
+Codekorrektur. Kein zweiter vollständiger Gesamtlauf nach beiden Korrekturen;
+die grünen Einzel-/Offlinezahlen ersetzen ihn nicht.
+
+Finale unabhängige DB-Nachzählung über beide erlaubten Testkonten: **Rest 0**.
+Alle vier verwendeten Bereinigungsjournale weg; keine laufenden Prüfkinder.
+Eigene Worktree- und main-Kopie-Server gestoppt; kein Listener auf 3000/3300.
+`testbestand` und `port-3000` regulär freigegeben. Arbeitskopie vor diesem
+Abschlussbericht sauber, eigene neue Commits mit Codex-Coautor. Keine Env-Datei
+oder Schlüssel committet. main, Push, Deploy, Schema, Hooks und Paket 5 unverändert.
+Budget-/Hook-Freigaben laut Auftrag erledigt, daran nichts geändert.

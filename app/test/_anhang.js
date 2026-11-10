@@ -7,21 +7,12 @@
 const { chromium } = require('playwright-core');
 const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const K = require('./_kennungen');
-const fs = require('fs');
 const path = require('path');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
 const BILD = path.join(__dirname, '_testbild.png');
-if (!fs.existsSync(BILD)) {
-  fs.writeFileSync(
-    BILD,
-    Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAG0lEQVQIW2P8z8Dwn4EIwDiqkL4hRQAAAP//AwDPUAX3rN6iSwAAAABJRU5ErkJggg==',
-      'base64'
-    )
-  );
-}
+require('./_fixtures').bereiteFixturesVor();
 
 (async () => {
   const browser = await chromium.launch();
