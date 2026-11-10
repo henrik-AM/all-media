@@ -171,3 +171,23 @@ gezielt entfernt, dann reguläre Wiederaufnahme mit Nachzählung **Rest 0**.
 Offline-Regression nach Korrektur **23/23** grün. Einzelwiederholungen folgen.
 Supabase-Doku vor Code via Context7 gelesen; Projektversionen App ^2.112.4,
 Web ^2.43.0. Keine Schemaänderung.
+
+### Wiederholungen Paket T nach Bereinigungskorrektur
+
+23/23 Offline, 18/18 Belegungsprobe, 7/7 Schema; diff --check grün.
+Vier betroffene Einzeldateien sequenziell ausgeführt, kein paralleler Livezugriff:
+Explorer nach Teilprüfungen am 15-Minuten-Limit beendet (Standort-Timeouts,
+kein vollständiger Nenner); Kontaktinfo schon beim Laden nach 8000 ms ohne
+Prüfzahl abgebrochen; Chatoptionen am 15-Minuten-Limit ohne Prüfzahl beendet;
+Minderjährig erneut 32/33, SQLSTATE P0001, Grund Australien-Altersgrenze.
+Keine Aussagen „einzeln grün“. Browser-/Prozessgruppen jeweils sicher beendet.
+**Neue automatische Bereinigung**: Explorer 37 entfernt/Rest 0; Kontaktinfo
+0/Rest 0; Chatoptionen 37/Rest 0; Minderjährig 0/Rest 0. Damit zurückdatierte
+Reset-Vorlagen live erfasst; keine Einzeljournaldatei zurückgeblieben.
+Die historischen Rohdaten des ersten Gesamtlaufs bleiben unverändert rot.
+27 vom Gesamtlauf neu erzeugte, zuvor saubere Testbilder lokal unter
+`.gesamtlauf-belege/screenshots-gesamtlauf/` gesichert und eigene Bildänderungen
+in Git wiederhergestellt; keine Bilder in Paket T übernommen. Graph aktualisiert.
+
+Sechs-Stunden-Hinweis erhalten. Zwischenstand gesichert und Pause vor der noch
+offenen main-Gegenprobe; kein weiterer Gesamtlauf auf korrigiertem Stand bisher.
