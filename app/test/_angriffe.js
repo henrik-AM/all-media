@@ -59,7 +59,7 @@ async function alsPruefkonto(rumpf) {
       ${rumpf}
       raise exception 'ERG:%', erg;
     end $x$;
-  `);
+  `, { erwarteterFehler: /ERG:/ }); // Seit Paket T bricht frage() bei HTTP 400 sonst ab
   const text = JSON.stringify(antwort || '');
   const treffer = text.match(/ERG:(.*?)(\\n|")/);
   if (!treffer) throw new Error('Keine Antwort aus der Probe: ' + text.slice(0, 300));
