@@ -1,10 +1,11 @@
 # Testhygiene, 05.11.2026
 
-Basis: main ad7f221. Testablauf-Korrektur: b512c56, nur eigener Zweig.
+Aktueller Paket-T-Stand: main fbf0e79 als Basis; Abschluss 10.11. unten.
+Historische Ausgangsbasis: main ad7f221, Testablauf-Korrektur b512c56.
 
 - Fixtures werden vor dem Quellenfingerabdruck vorbereitet; der Quellwächter bleibt aktiv.
 - Vor dem Gesamtlauf: eigene KI-Belegung, passender Server, Bereinigungstoken/Projekt und leerer Altbestand erforderlich.
-- Lauf-UUID und DB-Zeitgrenze im lokalen Journal; Benachrichtigungen beider erlaubten Testkonten werden nur seit Beginn entfernt. Nachzählung über beide Konten muss null ergeben. Unklarer Altbestand wird nicht pauschal gelöscht.
+- Lauf-UUID, DB-Startzeit und bestätigter Leerstand im lokalen Journal; Version 2 entfernt auch zurückdatierte neue Testmitteilungen. Alte Journale behalten den Zeitfilter. Nachzählung über beide Konten muss null ergeben. Unklarer Altbestand wird nicht pauschal gelöscht.
 - Laufende Kinder/Browser beenden, dann bereinigen. SIGINT/SIGTERM und Zeitlimit sind behandelt. Bei SIGKILL bleibt das Journal; ein noch lebender oder unklarer alter Prüfprozess blockiert die Wiederaufnahme.
 - Rohprotokolle und Abschlussstatus bleiben je Laufkennung erhalten. Bereinigungsfehler, fehlende/0 Prüfzahlen und fehlende Läufe verhindern Exit 0.
 - Sechs-Stunden-Warnung im Gesamtlauf; kein eigenständiger Sitzungswächter in diesem Paket.
@@ -216,3 +217,29 @@ ausgenommen; sonstige HTTP-/SQL-Fehler bleiben harte Abbrüche. Regression
 prüft Standard-HTTP-400, gezielte Ausnahme, falschen SQLSTATE und HTTP 401.
 Offline jetzt **24/24**; tatsächlicher Minderjährig-Lauf nach Korrektur gestartet.
 Keine Aufsummierung von Einzelläufen zu einem erfundenen neuen Gesamtlauf.
+
+### Abschluss 10.11.
+
+Auftrag ausgeführt, Ergebnis **nicht vollständig grün**: historischer Gesamtlauf
+**75/75 Läufe, 2639/2645 gezählte Prüfungen**. Alle sechs roten Prüfungen und
+die ausgefallene Abschlussbereinigung oben einzeln erfasst. Zwei Paket-T-Fehler
+behoben und gezielt live wiederholt: zurückdatierte Reset-Vorlagen werden
+automatisch entfernt (u. a. 37, 42, 47, 38 entfernte Zeilen mit Rest 0);
+Minderjährig nach gezielter HTTP-Ausnahme **41/41**, Exit 0.
+Offline-Endstand **24/24**, Belegungsprobe **18/18**, Schema **7/7**;
+Graph aktualisiert, diff --check grün.
+
+Offene Fremd-/Zeitbefunde: Chatoptionen-Schalter unverändert rot, auch auf main
+**16/17**. Explorer/Kontaktinfo im Gesamtlauf zeitbedingt rot, auf main einzeln
+**21/21** und **10/10** grün; Paket-T-Einzelwiederholungen mit zusätzlichen
+Timeouts unvollständig. Keine gesicherte weitere Ursache, keine pauschale
+Codekorrektur. Kein zweiter vollständiger Gesamtlauf nach beiden Korrekturen;
+die grünen Einzel-/Offlinezahlen ersetzen ihn nicht.
+
+Finale unabhängige DB-Nachzählung über beide erlaubten Testkonten: **Rest 0**.
+Alle vier verwendeten Bereinigungsjournale weg; keine laufenden Prüfkinder.
+Eigene Worktree- und main-Kopie-Server gestoppt; kein Listener auf 3000/3300.
+`testbestand` und `port-3000` regulär freigegeben. Arbeitskopie vor diesem
+Abschlussbericht sauber, eigene neue Commits mit Codex-Coautor. Keine Env-Datei
+oder Schlüssel committet. main, Push, Deploy, Schema, Hooks und Paket 5 unverändert.
+Budget-/Hook-Freigaben laut Auftrag erledigt, daran nichts geändert.
