@@ -12,6 +12,11 @@
  *     node test/k28-messenger-zwei.js pruefen  Datenbank nach dem Annehmen
  *     node test/k28-messenger-zwei.js abbau    alles weg, Gegenprobe
  *
+ *   14.2 (App legt über „Neuer Chat“ einen Community-Chat an):
+ *     node test/k28-messenger-zwei.js leer     vorher: keine Verbindung
+ *     … App: Communitys → Chats → Neu → „pruef“ → „Chat mit Henrik Prüfname“
+ *     node test/k28-messenger-zwei.js neu142   genau ein Community-Chat, kein Messenger
+ *
  * Abbau IMMER laufen lassen: ein stehender Testpaar-Chat kippt sonst
  * test:messengeranfrage im Gesamtlauf (Erinnerung „Prüf-Aufbau ganz lösen“).
  * Braucht die Belegung „testbestand“ und einen Prüfserver (BASE, Vorgabe 3250).
@@ -131,6 +136,23 @@ async function pruefen(app, web) {
   pruefe('Genau ein Messenger-Chat', v.messenger.length === 1, JSON.stringify(v.messenger));
 }
 
+async function leer(app, web) {
+  const v = await verbindung(app, web);
+  pruefe('Vorher: keine Verbindung @test ↔ @prueflauf', !v.kontaktApp && !v.kontaktWeb && !v.messenger.length && !v.community.length, JSON.stringify(v));
+}
+
+async function neu142(app, web) {
+  const v = await verbindung(app, web);
+  pruefe('14.2 genau ein Community-Zweierchat', v.community.length === 1, JSON.stringify(v.community));
+  pruefe('14.2 kein Messenger-Chat, kein Kontakt', !v.messenger.length && !v.kontaktApp && !v.kontaktWeb, JSON.stringify(v));
+  if (v.community.length) {
+    const { data } = await web.client.from('chat_members').select('chat_id').eq('chat_id', v.community[0]).eq('user_id', web.id);
+    pruefe('14.2 @prueflauf ist Mitglied (sieht den Chat)', (data || []).length === 1);
+    const { data: c } = await app.client.from('chats').select('bereich, is_group, created_by').eq('id', v.community[0]).single();
+    pruefe('14.2 angelegt von @test, bereich community', c?.created_by === app.id && c?.bereich === 'community' && !c?.is_group, JSON.stringify(c));
+  }
+}
+
 async function abbau(app, web) {
   const v = await verbindung(app, web);
   const chats = [...v.community, ...v.messenger];
@@ -155,13 +177,15 @@ async function abbau(app, web) {
 }
 
 (async () => {
-  if (!['aufbau', 'pruefen', 'abbau'].includes(PHASE)) throw new Error('Phase: aufbau | pruefen | abbau');
+  if (!['aufbau', 'pruefen', 'abbau', 'leer', 'neu142'].includes(PHASE)) throw new Error('Phase: aufbau | pruefen | abbau | leer | neu142');
   if (require('./_ki_belegung').pruefeBelegung) require('./_ki_belegung').pruefeBelegung('testbestand');
   const app = await anmelden(APPKONTO);
   const web = await anmelden(WEBKONTO);
   if (PHASE === 'aufbau') await aufbau(app, web);
   if (PHASE === 'pruefen') await pruefen(app, web);
   if (PHASE === 'abbau') await abbau(app, web);
+  if (PHASE === 'leer') await leer(app, web);
+  if (PHASE === 'neu142') await neu142(app, web);
   console.log(`\n${geprueft - fehler}/${geprueft} Prüfungen bestanden`);
   process.exit(fehler ? 1 : 0);
 })().catch((e) => {
