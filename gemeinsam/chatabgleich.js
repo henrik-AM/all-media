@@ -127,6 +127,9 @@
       Boolean(m.read),
       Boolean(m.bearbeitet),
       Boolean(m.zurueckgenommen),
+      // AR-04: wird die Kennzeichnung „Absender nicht prüfbar" erst beim
+      // nächsten Nachsehen klar, muss die Blase neu gezeichnet werden.
+      Boolean(m.nichtPruefbar),
       m.reaktionen || [],
       m.media || null,
       m.datei ? m.datei.name : null,

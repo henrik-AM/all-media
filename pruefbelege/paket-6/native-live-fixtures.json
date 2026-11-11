@@ -1,0 +1,42 @@
+{
+  "lauf": "104f3820-6d55-43d9-8ede-755c687b550e",
+  "pid": 93683,
+  "chatId": "f7700c81-90cc-4384-8aca-6db2fdb30429",
+  "schluessel": [
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "5c316b90-e85f-4481-87ec-b00ee23121bc"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "2714f074-ce06-490c-b1cd-d1fc6e02d790"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "278ae9f9-47eb-4a58-b80d-39ab31a0897c"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "db3fd3c6-7b95-4a6e-a740-99d7b489e0f6"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "70c70041-e7f5-4d98-bfc8-3bd1511948f6"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "936ff432-f088-40ed-915e-41ec6e1709fd"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "86f5221c-b548-4022-bb5f-0e3d7a96033b"
+    }
+  ],
+  "start": "2026-11-10T18:55:43.595Z",
+  "pruefungen": {
+    "ok": 8,
+    "fehl": 0
+  },
+  "ende": "2026-11-10T18:59:57.111Z",
+  "rest": 0
+}

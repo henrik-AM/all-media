@@ -561,7 +561,15 @@ export const ChatDetailScreen = ({
           });
     } catch (e: any) {
       console.error('Nachricht senden fehlgeschlagen:', e?.message ?? e);
-      onNotice?.('Die Nachricht ging nicht raus');
+      /*
+       * AR-05 (16.10.2026): Scheitert es an der Verschlüsselung, steht ihr
+       * eigener Satz da — er sagt, dass NICHTS offen hinausging. Geprüft
+       * wird am Namen, nicht mit instanceof: eine von Error abgeleitete
+       * Klasse verliert unter Babel/Hermes gern ihren Prototyp.
+       */
+      onNotice?.(
+        e?.name === 'VerschluesselnFehler' ? e.message : 'Die Nachricht ging nicht raus'
+      );
       setDraft(text);
       return;
     }
@@ -1204,6 +1212,17 @@ export const ChatDetailScreen = ({
           {item.bearbeitet && !item.zurueckgenommen ? (
             <Text style={[styles.time, out && styles.timeOut]}>bearbeitet ·</Text>
           ) : null}
+          {/* AR-04: der Absenderschlüssel gehört nicht zum Absender. Nicht
+              verstecken, nicht blockieren — sagen. Gleicher Satz auf der
+              Website (nachrichtHtml). */}
+          {item.nichtPruefbar && !item.zurueckgenommen ? (
+            <Text
+              style={[styles.time, out && styles.timeOut, styles.nichtPruefbar]}
+              accessibilityLabel="Absender nicht prüfbar"
+            >
+              ⚠ Absender nicht prüfbar ·
+            </Text>
+          ) : null}
           <Text style={[styles.time, out && styles.timeOut]}>{item.time}</Text>
           {/* Ein Haken heisst zugestellt, zwei heissen gelesen. Vorher stand
               hier immer der doppelte — also „gelesen" fuer etwas, das nie
@@ -1311,7 +1330,10 @@ export const ChatDetailScreen = ({
         }
       } catch (e: any) {
         console.error('Anhang senden fehlgeschlagen:', e?.message ?? e);
-        onNotice?.('Der Anhang ging nicht raus');
+        // Wie beim Text: an der Verschlüsselung gescheitert heißt ihr Satz.
+        onNotice?.(
+          e?.name === 'VerschluesselnFehler' ? e.message : 'Der Anhang ging nicht raus'
+        );
         return;
       }
     }
@@ -2206,6 +2228,8 @@ const styles = themenStyles((colors) => ({
   bubbleFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
   time: { color: colors.text3, ...typography.tiny },
   timeOut: { color: colors.bubbleOutMeta },
+  // AR-04: auffällig, aber in der Fußzeile — die Nachricht bleibt lesbar.
+  nichtPruefbar: { color: colors.danger, fontWeight: '700' as const },
 
   typing: { paddingVertical: 10 },
   typingText: { color: colors.text3, ...typography.preview, fontStyle: 'italic' },

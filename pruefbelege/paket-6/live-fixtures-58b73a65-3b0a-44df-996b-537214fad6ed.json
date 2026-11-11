@@ -1,0 +1,39 @@
+{
+  "lauf": "58b73a65-3b0a-44df-996b-537214fad6ed",
+  "pid": 88174,
+  "chatId": "fc51424a-191e-44f3-ad3c-d849a26ba7fb",
+  "schluessel": [
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "1e07326a-f028-427f-b406-d774ee51f88a"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "6c6430f5-c8ed-47b1-954c-85d63a5530fa"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "d5fbb013-04ec-4783-97df-7f923971b361"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "0ee3e54b-bbf5-4410-b92e-acbfee899986"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "45c0e256-f33b-470e-84a1-be5b8265aa12"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "d1797c89-f120-4578-b10a-028e0971d20a"
+    }
+  ],
+  "start": "2026-11-10T18:46:26.866Z",
+  "pruefungen": {
+    "ok": 20,
+    "fehl": 1
+  },
+  "ende": "2026-11-10T18:46:50.517Z",
+  "rest": 0,
+  "nachbereinigung": "2026-11-10T18:51:46.571Z"
+}

@@ -1,0 +1,83 @@
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/paket6-native
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+
+TypeScript: A tsconfig.json has been auto-generated
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+| (node:72673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:72673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:72673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:72673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:72673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:72673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:72673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 2456ms einstieg.tsx (944 modules)
+iOS Bundled 59ms einstieg.tsx (1 module)
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/paket6-native
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+| (node:74389) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 588ms einstieg.tsx (719 modules)
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/paket6-native
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+| (node:76778) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 642ms einstieg.tsx (878 modules)
+ WARN  Verschlüsselung nicht prüfbar: Simulierter Schlüssel-/Netzfehler
+ ERROR  Nachricht senden fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+ WARN  Gerätschlüssel nicht verfügbar: Simulierter Schlüssel-/Netzfehler
+iOS Bundled 27ms einstieg.tsx (1 module)
+ WARN  Verschlüsselung nicht prüfbar: Simulierter Schlüssel-/Netzfehler
+ ERROR  Nachricht senden fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+ WARN  Gerätschlüssel nicht verfügbar: Simulierter Schlüssel-/Netzfehler
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/paket6-native
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+| (node:81270) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 614ms einstieg.tsx (932 modules)
+ WARN  Verschlüsselung nicht prüfbar: Simulierter Schlüssel-/Netzfehler
+ ERROR  Nachricht senden fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+ WARN  Gerätschlüssel nicht verfügbar: Simulierter Schlüssel-/Netzfehler
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/paket6-native
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+| (node:83275) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 669ms einstieg.tsx (919 modules)
+ WARN  Verschlüsselung nicht prüfbar: Simulierter Schlüssel-/Netzfehler
+ ERROR  Nachricht senden fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+ WARN  Gerätschlüssel nicht verfügbar: Simulierter Schlüssel-/Netzfehler
+iOS Bundled 23ms einstieg.tsx (1 module)
+ WARN  Verschlüsselung nicht prüfbar: Simulierter Schlüssel-/Netzfehler
+ ERROR  Nachricht senden fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+ WARN  Gerätschlüssel nicht verfügbar: Simulierter Schlüssel-/Netzfehler

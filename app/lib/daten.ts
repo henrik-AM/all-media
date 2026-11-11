@@ -867,7 +867,9 @@ export async function ladeNachrichten(
   if (zeilen.some((z) => Number(z?.krypto) > 0) ||
       bezugZeilen.some((z) => Number(z?.krypto) > 0)) {
     const meiner = await meinSchluessel(client, ichId);
-    await aufschliessen(client, [...zeilen, ...bezugZeilen], meiner);
+    // Absender prüfen (AR-04). Die Bezüge laufen mit, gekennzeichnet wird
+    // aber nur die Blase selbst (nichtPruefbar unten).
+    await aufschliessen(client, [...zeilen, ...bezugZeilen], meiner, { absenderPruefen: true });
   }
 
   /*
@@ -984,6 +986,9 @@ export async function ladeNachrichten(
     weitergeleitetVon: n.forwarded_from ? namen.get(n.forwarded_from) : undefined,
     bearbeitet: Boolean(n.edited_at),
     zurueckgenommen: Boolean(n.deleted_at),
+    // AR-04: Absenderschlüssel gehört nicht zum Absender — die Blase sagt es.
+    // Gleiche Regel in web/public/krypto.js (absenderPruefen).
+    nichtPruefbar: n.nichtPruefbar ? true : undefined,
     reaktionen: reaktionen.get(n.id),
     datei: n.file_name ? { name: n.file_name, groesse: Number(n.file_size ?? 0) } : undefined,
     // Der Anrufeintrag (Henrik 7.9., Schema 35). Gleiche Regel in

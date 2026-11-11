@@ -1,0 +1,45 @@
+{
+  "auszug": "Anwendung und relevante Kryptohinweise; Bild/Absturzlog separat",
+  "elemente": [
+    {
+      "type": "Application",
+      "AXLabel": "Expo Go",
+      "frame": {
+        "width": 874,
+        "x": 0,
+        "height": 402,
+        "y": 0
+      }
+    },
+    {
+      "type": "StaticText",
+      "AXLabel": "OFFLINE quer · extern 0",
+      "frame": {
+        "width": 154.3333282470703,
+        "x": 62,
+        "height": 17,
+        "y": 5.333333492279053
+      }
+    },
+    {
+      "type": "StaticText",
+      "AXLabel": "OFFLINE quer · extern 0",
+      "frame": {
+        "width": 154.3333282470703,
+        "x": 62,
+        "height": 17,
+        "y": 5.333333492279053
+      }
+    },
+    {
+      "type": "GenericElement",
+      "AXLabel": "Simulierter fremder Absenderschlüssel, Absender nicht prüfbar, 20:20",
+      "frame": {
+        "width": 286.3333435058594,
+        "x": 76,
+        "height": 49.66667175292969,
+        "y": 130.33333206176758
+      }
+    }
+  ]
+}

@@ -1,0 +1,392 @@
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+✖ Alle 1201 Geräte: App und Server lesen auch den ältesten Schlüssel (39.670375ms)
+✔ Verkürzte Seite, Fehler in Seite 2, wechselnde Anzahl: kein Teilergebnis (5.802292ms)
+✖ Unvollständige Fakten und fehlende Mitgliedschaft werden abgelehnt (0.368958ms)
+✖ Absender: 251 verschiedene Paare werden vollständig geprüft (1.802125ms)
+✖ Absender: entfernter Schlüssel wird nach Ablauf erneut geprüft (0.421708ms)
+✖ App: Altbestand ohne Gerätekennung bleibt lesbar; neue Konten sind getrennt (11.571334ms)
+✖ App: unterbrochene Fachschreibung verliert vorhandenen Schlüssel nicht (8.832ms)
+✔ App: frische Konten bekommen auch bei parallelem Start getrennte Schlüssel (11.222083ms)
+✖ App: unzulässige Fachkennung wird abgewiesen statt mit anderer zu kollidieren (7.44375ms)
+✖ App: Chat-/Verlauf-/Mitgliederfehler verhindern Senden einschließlich Anhang (7.454583ms)
+✖ Browser: zwei parallele Kontoanmeldungen verwechseln ihre Ergebnisse nicht (18.034209ms)
+✖ Browser: vergessen widerruft auch eine noch laufende Anmeldung (13.53175ms)
+✖ Browser: fehlende/alte Fakten und Kontowechsel beim Senden sperren Klartext (13.406167ms)
+✖ Browser: nicht ladbarer Absender wird sichtbar gewarnt; späterer Erfolg löscht Warnung (13.939625ms)
+✖ Server: Kontakttext und Beitrag-Teilen können nicht mehr offen am Wächter vorbei (0.854083ms)
+✖ Server: verschlüsselte Kontakt-/Beitragsnachricht erreicht alle Kuverts (2.205541ms)
+✖ App: Kontakt und Beitrag-Teilen benutzen die echte Verschlüsselung (46.449625ms)
+✖ Server: fehlende Chiffre/Kuverts und unlesbarer Chat führen zu null Schreibvorgängen (1.381ms)
+✖ Absender: abgelaufene positive Prüfung bei Netzfehler ohne Vertrauen (0.1305ms)
+✖ Sicherheitsnummer: kaputter Schlüssel darf keine gültige Nummer vortäuschen (0.335834ms)
+✖ App: drittes Mitglied ohne eigenes Gerät bekommt kein Verschlüsselungsschloss (8.057208ms)
+✖ Kontakt-/Teilen-Kryptopaket kann keine fremden Medien-/Storybezüge einschleusen (1.81975ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 2
+ℹ fail 20
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 319.582667
+
+✖ failing tests:
+
+test at app/test/_paket6_offline.js:6:1
+✖ Alle 1201 Geräte: App und Server lesen auch den ältesten Schlüssel (39.670375ms)
+  TypeError: K.kontoSchluessel is not a function
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:9:26)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+
+test at app/test/_paket6_offline.js:21:1
+✖ Unvollständige Fakten und fehlende Mitgliedschaft werden abgelehnt (0.368958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'offen'
+  - 'ablehnen'
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:22:149)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'offen',
+    expected: 'ablehnen',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:24:1
+✖ Absender: 251 verschiedene Paare werden vollständig geprüft (1.802125ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok((await p.pruefen(paare)).every(Boolean))
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:27:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:29:1
+✖ Absender: entfernter Schlüssel wird nach Ablauf erneut geprüft (0.421708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   true
+  -   false
+    ]
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:32:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true ],
+    expected: [ false ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:34:1
+✖ App: Altbestand ohne Gerätekennung bleibt lesbar; neue Konten sind getrennt (11.571334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'C6TAZs5QC6zxerOD7SLFYfHDu29a4QYKQvGKl7KyyEA='
+  - '8rEtpBDxR6F/e/O2Zquy0ZfwYeaqjoCGE4YEVy1Z3iA='
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:38:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'C6TAZs5QC6zxerOD7SLFYfHDu29a4QYKQvGKl7KyyEA=',
+    expected: '8rEtpBDxR6F/e/O2Zquy0ZfwYeaqjoCGE4YEVy1Z3iA=',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:41:1
+✖ App: unterbrochene Fachschreibung verliert vorhandenen Schlüssel nicht (8.832ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hmZZOFv6py+FRhHWLpw/MtyP/gqF2xgtemygBAtZdHI='
+  - 'Xhc5W37rN1iT8PcKtNfOniPlV9aTMpGDsNR+zlNA2U8='
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:43:84)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hmZZOFv6py+FRhHWLpw/MtyP/gqF2xgtemygBAtZdHI=',
+    expected: 'Xhc5W37rN1iT8PcKtNfOniPlV9aTMpGDsNR+zlNA2U8=',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:50:1
+✖ App: unzulässige Fachkennung wird abgewiesen statt mit anderer zu kollidieren (7.44375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   geheim: 'BXH+HXn5+m7Pm7YKKOXrXnnqY+BSELnee+00D78q9Ow=',
+  +   geraet: '67226f63-f286-49a2-84a0-87c9952c4896',
+  +   id: 'ffc29bc4-3885-4497-a25f-8e4d617f6b8c',
+  +   oeffentlich: 'uVAoJqsde4oLVPSC1hPj0L6upRn3macKs29McrCIT0E='
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:51:44)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { id: 'ffc29bc4-3885-4497-a25f-8e4d617f6b8c', geraet: '67226f63-f286-49a2-84a0-87c9952c4896', oeffentlich: 'uVAoJqsde4oLVPSC1hPj0L6upRn3macKs29McrCIT0E=', geheim: 'BXH+HXn5+m7Pm7YKKOXrXnnqY+BSELnee+00D78q9Ow=' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:53:1
+✖ App: Chat-/Verlauf-/Mitgliederfehler verhindern Senden einschließlich Anhang (7.454583ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:56:37)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /nicht verschlüsseln/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:59:1
+✖ Browser: zwei parallele Kontoanmeldungen verwechseln ihre Ergebnisse nicht (18.034209ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 2
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:64:87)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:67:1
+✖ Browser: vergessen widerruft auch eine noch laufende Anmeldung (13.53175ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   geheim: 'w3pw0jfoEHxEFoi6k4vndS2wt46UcC1O0EXvHGkDwFE=',
+  +   geraet: '2d0ab6ff-2bc0-44f8-a562-eeae9f1a00e4',
+  +   id: 'alt',
+  +   kontoId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  +   oeffentlich: 'Yf+ou20lShv/ABThM3rz7Mo6MhE67IPbiPUVAkTpamc='
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:69:78)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { id: 'alt', geraet: '2d0ab6ff-2bc0-44f8-a562-eeae9f1a00e4', oeffentlich: 'Yf+ou20lShv/ABThM3rz7Mo6MhE67IPbiPUVAkTpamc=', geheim: 'w3pw0jfoEHxEFoi6k4vndS2wt46UcC1O0EXvHGkDwFE=', kontoId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:71:1
+✖ Browser: fehlende/alte Fakten und Kontowechsel beim Senden sperren Klartext (13.406167ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:74:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /nicht verschlüsseln/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:77:1
+✖ Browser: nicht ladbarer Absender wird sichtbar gewarnt; späterer Erfolg löscht Warnung (13.939625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:80:51)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:82:1
+✖ Server: Kontakttext und Beitrag-Teilen können nicht mehr offen am Wächter vorbei (0.854083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:84:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:87:1
+✖ Server: verschlüsselte Kontakt-/Beitragsnachricht erreicht alle Kuverts (2.205541ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:92:36)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:96:1
+✖ App: Kontakt und Beitrag-Teilen benutzen die echte Verschlüsselung (46.449625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  undefined !== 1
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:101:47)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:104:1
+✖ Server: fehlende Chiffre/Kuverts und unlesbarer Chat führen zu null Schreibvorgängen (1.381ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:106:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:110:1
+✖ Absender: abgelaufene positive Prüfung bei Netzfehler ohne Vertrauen (0.1305ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   true
+  -   null
+    ]
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:113:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true ],
+    expected: [ null ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:115:1
+✖ Sicherheitsnummer: kaputter Schlüssel darf keine gültige Nummer vortäuschen (0.335834ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:116:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Ungültiger/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:119:1
+✖ App: drittes Mitglied ohne eigenes Gerät bekommt kein Verschlüsselungsschloss (8.057208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:121:26)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_offline.js:123:1
+✖ Kontakt-/Teilen-Kryptopaket kann keine fremden Medien-/Storybezüge einschleusen (1.81975ms)
+  TypeError: Cannot read properties of undefined (reading 'media_url')
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_offline.js:129:57)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+Exit: 1 (erwartete Negativkontrolle)

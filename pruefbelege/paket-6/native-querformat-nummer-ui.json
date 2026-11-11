@@ -1,0 +1,15 @@
+{
+  "auszug": "Anwendung und relevante Kryptohinweise; Bild/Absturzlog separat",
+  "elemente": [
+    {
+      "type": "Application",
+      "AXLabel": " ",
+      "frame": {
+        "width": 402,
+        "x": 0,
+        "y": 0,
+        "height": 874
+      }
+    }
+  ]
+}

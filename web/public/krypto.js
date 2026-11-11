@@ -32,8 +32,53 @@
 (function () {
   'use strict';
 
-  const SCHLUESSEL_FACH = 'allmedia.krypto.geheim';
-  const GERAET_FACH = 'allmedia.krypto.geraet';
+  /*
+   * Die Fächer im localStorage — je KONTO (AR-08, 16.10.2026), wie in der
+   * App (app/lib/krypto.ts). Bis dahin teilten sich alle Konten dieses
+   * Browsers ein Paar: gleiche Sicherheitsnummer für Haupt- und Zweitkonto,
+   * und wer nach dem Abmelden ein anderes Konto anmeldete, erbte es. Das alte
+   * Fach ohne Kennung wird beim ersten Zugriff übernommen und gelöscht
+   * (altbestandUebernehmen).
+   */
+  const ALT_SCHLUESSEL_FACH = 'allmedia.krypto.geheim';
+  const ALT_GERAET_FACH = 'allmedia.krypto.geraet';
+
+  function faecher(kontoId) {
+    const id = String(kontoId);
+    if (!/^[A-Za-z0-9._-]+$/.test(id)) throw new Error('Ungültige Kontokennung');
+    return { geheim: `${ALT_SCHLUESSEL_FACH}.${id}`, geraet: `${ALT_GERAET_FACH}.${id}` };
+  }
+
+  /**
+   * Das alte, kontolose Paar übernehmen, damit bestehende Chats lesbar
+   * bleiben: in das Fach des aktiven Kontos und — weil bisher JEDES Konto
+   * dieses Browsers damit geschrieben hat — in die der übrigen hier
+   * angemeldeten (Anmeldung.konten()), sofern sie noch keins haben. Erst
+   * schreiben, dann löschen. Gleicher Weg in der App.
+   */
+  function altbestandUebernehmen(kontoId) {
+    const altGeheim = localStorage.getItem(ALT_SCHLUESSEL_FACH);
+    const altGeraet = localStorage.getItem(ALT_GERAET_FACH);
+    // Die Kennung legte die alte Fassung erst beim Anmelden an; fehlt sie,
+    // entsteht unten eine neue — der Schlüssel ist das, was zählt.
+    if (!altGeheim) return;
+
+    let konten = [kontoId];
+    try {
+      konten = [...new Set([kontoId, ...(window.Anmeldung?.konten?.() || []).map((k) => k.id)])];
+    } catch {
+      throw new Error('Gespeicherte Konten nicht ladbar; Altbestand bleibt erhalten');
+    }
+    for (const id of konten) {
+      if (!id) continue;
+      const f = faecher(id);
+      if (localStorage.getItem(f.geheim)) continue;
+      localStorage.setItem(f.geheim, altGeheim);
+      if (altGeraet) localStorage.setItem(f.geraet, altGeraet);
+    }
+    localStorage.removeItem(ALT_SCHLUESSEL_FACH);
+    localStorage.removeItem(ALT_GERAET_FACH);
+  }
 
   /** Der Platzhalter, wenn das Kuvert für dieses Gerät fehlt. Wie in der App. */
   const NICHT_LESBAR = 'Auf diesem Gerät nicht lesbar';
@@ -46,15 +91,17 @@
    * steht dabei nur im Speicher dieser Seite; er wandert nicht mit.
    */
   let meiner = null;
-  let anmeldungLaeuft = null;
+  const anmeldungen = new Map();
+  let stand = 0;
+  const kontoJetzt = () => window.Anmeldung?.nutzer?.()?.id || null;
 
-  function geraeteKennung() {
-    let kennung = localStorage.getItem(GERAET_FACH);
+  function geraeteKennung(f) {
+    let kennung = localStorage.getItem(f.geraet);
     if (!kennung) {
       // `crypto.randomUUID` ist in jedem Browser da, der auch WebCrypto hat —
       // und ohne WebCrypto gäbe es hier ohnehin keinen brauchbaren Zufall.
       kennung = crypto.randomUUID();
-      localStorage.setItem(GERAET_FACH, kennung);
+      localStorage.setItem(f.geraet, kennung);
     }
     return kennung;
   }
@@ -67,22 +114,35 @@
   /**
    * Den Schlüssel dieses Browsers anlegen (falls nötig) und beim Server anmelden.
    *
-   * Gibt `null` zurück, wenn irgendetwas davon nicht geht. Dann wird im
-   * Klartext geschrieben wie vor Schema 31 — und die Oberfläche zeigt kein
-   * Schloss, behauptet also auch nichts.
+   * Gibt bei Fehlern null zurück; verschliessen lehnt dann ab, wo der
+   * Chat Verschlüsselung verlangt.
    */
   async function anmelden() {
-    if (meiner) return meiner;
-    if (anmeldungLaeuft) return anmeldungLaeuft;
+    /*
+     * Der behaltene Schlüssel gilt nur für das Konto, für das er geholt
+     * wurde. Schaltet die Seite um, ohne `vergessen` zu rufen, wäre sonst
+     * der des vorigen Kontos weiter im Spiel (AR-08).
+     */
+    const kontoId = kontoJetzt();
+    const version = stand;
+    if (meiner && meiner.kontoId === kontoId) return meiner;
+    if (meiner) meiner = null;
+    if (anmeldungen.has(kontoId)) return anmeldungen.get(kontoId);
 
-    anmeldungLaeuft = (async () => {
+    const lauf = (async () => {
       try {
-        let geheim = localStorage.getItem(SCHLUESSEL_FACH);
+        if (!kontoId) throw new Error('Kein Konto angemeldet');
+        const f = faecher(kontoId);
+        if (!localStorage.getItem(f.geheim)) altbestandUebernehmen(kontoId);
+        let geheim = localStorage.getItem(f.geheim);
         if (!geheim) {
           geheim = Krypto.schluesselpaarErzeugen().geheim;
-          localStorage.setItem(SCHLUESSEL_FACH, geheim);
+          localStorage.setItem(f.geheim, geheim);
+          // Neues Paar, neues Gerät: eine liegengebliebene Kennung gehörte
+          // zu einem anderen Schlüssel.
+          localStorage.removeItem(f.geraet);
         }
-        const geraet = geraeteKennung();
+        const geraet = geraeteKennung(f);
         const oeffentlich = oeffentlichAus(geheim);
 
         const antwort = await fetch('/api/krypto/schluessel', {
@@ -92,57 +152,110 @@
         });
         if (!antwort.ok) throw new Error('Schlüssel nicht angemeldet');
         const { id } = await antwort.json();
+        if (!id) throw new Error('Keine Schlüsselkennung');
+        if (version !== stand || kontoJetzt() !== kontoId) return null;
 
-        meiner = { id, geraet, oeffentlich, geheim };
+        meiner = { id, geraet, oeffentlich, geheim, kontoId };
         return meiner;
       } catch (fehler) {
         console.warn('Gerätschlüssel nicht verfügbar:', fehler.message);
         return null;
-      } finally {
-        anmeldungLaeuft = null;
       }
     })();
 
-    return anmeldungLaeuft;
+    anmeldungen.set(kontoId, lauf);
+    lauf.finally(() => { if (anmeldungen.get(kontoId) === lauf) anmeldungen.delete(kontoId); });
+    return lauf;
   }
 
   /** Den eigenen Schlüssel wegwerfen — beim Abmelden. */
   function vergessen() {
+    stand++;
     meiner = null;
+    anmeldungen.clear();
+    verschluesselteChats.clear();
+    pruefer = neuerPruefer();
   }
+
+  /** Diesen Chat als verschlüsselt merken — für die Vorschau der Chatliste. */
+  function merken(chatId) {
+    if (chatId) verschluesselteChats.add(kontoJetzt() + '|' + chatId);
+  }
+
+  /*
+   * Die Meldung, wenn verschlüsselt werden müsste und es nicht geht. Steht in
+   * gemeinsam/krypto.js; der Rückgriff hier gilt nur für den Fall, dass der
+   * Browser von dort noch eine alte Fassung im Zwischenspeicher hat — auch
+   * dann soll der Satz stimmen und nichts offen hinausgehen.
+   */
+  const MELDUNG_NICHT_VERSCHLUESSELT =
+    (typeof Krypto !== 'undefined' && Krypto.MELDUNG_NICHT_VERSCHLUESSELT) ||
+    'Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. ' +
+      'Bitte versuch es noch einmal.';
+
+  /*
+   * Chats, die dieser Browser in dieser Sitzung schon verschlüsselt erlebt
+   * hat — beim Öffnen oder beim eigenen Senden. Zweite Sicherung neben der
+   * Abfrage nach `krypto > 0`: liefert der Server später eine leere Antwort,
+   * weiß die Seite trotzdem, dass hier verschlüsselt geschrieben wird.
+   * Gleiche Liste in app/lib/krypto.ts (verschluesselteChats).
+   */
+  const verschluesselteChats = new Set();
 
   /**
    * Einen Text für einen Chat verschließen.
    *
-   * Gibt `null` zurück, wenn nicht verschlüsselt werden kann — kein
-   * Schlüssel, Gruppe, Gegenüber ohne Gerät. Der Aufrufer schickt dann den
-   * Klartext wie bisher. Das ist bewusst kein Fehler: eine Nachricht, die
-   * nicht ankommt, wäre schlechter als eine, die unverschlüsselt ankommt und
-   * dabei auch nichts anderes behauptet.
+   * Drei Ausgänge, entschieden von `Krypto.sendeweg` — derselben Regel wie in
+   * der App (AR-05, 16.10.2026):
+   *
+   *   - `null`: Klartext ist hier richtig (Gruppe, Gegenüber ohne Gerät und
+   *     noch nie verschlüsselt geschrieben). Der Aufrufer schickt `text`.
+   *   - ein Paket: verschlossen, der Server bekommt nur die Chiffre.
+   *   - ein Wurf mit dem Satz für den Nutzer: verschlüsselt werden MÜSSTE,
+   *     geht aber nicht. Dann geht gar nichts hinaus.
+   *
+   * Bis zum 16.10.2026 hieß jeder Fehler hier `null` — und damit Klartext,
+   * still, in einem Chat, den das Kontaktprofil „Ende-zu-Ende" nannte.
    */
   async function verschliessen(chatId, text) {
-    if (!text) return null;
+    const kontoId = kontoJetzt();
+    let fakten;
     try {
+      if (typeof Krypto.sendeweg !== 'function') throw new Error('Alte krypto.js im Zwischenspeicher');
       const ich = await anmelden();
-      if (!ich) return null;
-
       const antwort = await fetch(`/api/krypto/empfaenger/${chatId}`);
-      if (!antwort.ok) return null;
-      const { verschluesselbar, schluessel } = await antwort.json();
-      if (!verschluesselbar || !schluessel?.length) return null;
-
-      const paket = Krypto.verschluesseln(text, ich.geheim, schluessel);
-      return {
-        krypto: paket.version,
-        chiffre: paket.chiffre,
-        kryptoNonce: paket.nonce,
-        absenderSchluessel: paket.absender,
-        kuverts: paket.kuverts,
-      };
+      if (!antwort.ok) throw new Error('Server antwortet mit ' + antwort.status);
+      fakten = await antwort.json();
+      if (kontoJetzt() !== kontoId || !kontoId || fakten?.ichId !== kontoId) throw new Error('Konto gewechselt');
+      if (!fakten || fakten.ok === false) throw new Error(fakten?.error || 'Keine Fakten');
+      fakten.meiner = ich;
+      fakten.gemerkt = verschluesselteChats.has(kontoJetzt() + '|' + chatId);
     } catch (fehler) {
-      console.warn('Verschlüsseln übersprungen:', fehler.message);
-      return null;
+      console.warn('Verschlüsselung nicht prüfbar:', fehler.message);
+      throw new Error(MELDUNG_NICHT_VERSCHLUESSELT);
     }
+
+    if (Krypto.zuVieleMitglieder(fakten)) throw new Error(Krypto.MELDUNG_NUR_ZU_ZWEIT);
+    if (!text) return null;
+    const weg = Krypto.sendeweg(fakten);
+    if (weg.art === 'offen') return null;
+    if (weg.art === 'ablehnen') throw new Error(weg.meldung);
+
+    let paket;
+    try {
+      paket = Krypto.verschluesseln(text, fakten.meiner.geheim, weg.empfaenger);
+    } catch (fehler) {
+      console.warn('Verschlüsseln fehlgeschlagen:', fehler.message);
+      throw new Error(MELDUNG_NICHT_VERSCHLUESSELT);
+    }
+    verschluesselteChats.add(kontoJetzt() + '|' + chatId);
+    return {
+      krypto: paket.version,
+      chiffre: paket.chiffre,
+      kryptoNonce: paket.nonce,
+      absenderSchluessel: paket.absender,
+      kuverts: paket.kuverts,
+    };
   }
 
   /**
@@ -155,7 +268,10 @@
    */
   function oeffnen(nachricht) {
     if (!nachricht || !Number(nachricht.krypto)) return nachricht;
-    if (!meiner || !nachricht.kuvert) {
+    // Ab jetzt weiß diese Seite: in diesem Chat wird verschlüsselt geschrieben.
+    if (nachricht.chatId) verschluesselteChats.add(kontoJetzt() + '|' + nachricht.chatId);
+    nachricht._geoeffnet = false;
+    if (!bereit() || !nachricht.kuvert) {
       nachricht.text = NICHT_LESBAR;
       return nachricht;
     }
@@ -170,7 +286,55 @@
       meiner.geheim
     );
     nachricht.text = klar === null ? NICHT_LESBAR : klar;
+    if (klar !== null) nachricht._geoeffnet = true;
     return nachricht;
+  }
+
+  /*
+   * Der Absender-Prüfer (AR-04) — eine Liste je Seite, gemerkt über das
+   * Nachsehen im Takt hinweg. Die Rechnung steht in gemeinsam/krypto.js,
+   * gleich wie in der App.
+   */
+  function neuerPruefer() { return typeof Krypto.absenderPruefer === 'function'
+      ? Krypto.absenderPruefer(async (paare) => {
+          const antwort = await fetch('/api/krypto/absender', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paare }),
+          });
+          if (!antwort.ok) throw new Error('Server antwortet mit ' + antwort.status);
+          return (await antwort.json()).gefunden || [];
+        })
+      : null; }
+  let pruefer = neuerPruefer();
+
+  /**
+   * Gehört der Absenderschlüssel jeder geöffneten Nachricht zu ihrem
+   * Absender? (AR-04, 16.10.2026)
+   *
+   * Setzt `nichtPruefbar` an Nachrichten, deren Schlüssel der Absender nie
+   * angemeldet hat — die Blase sagt dann „Absender nicht prüfbar". Sind die
+   * Schlüssel gerade nicht ladbar, warnt die Blase ebenfalls; der Text bleibt lesbar.
+   * Nur der Verlauf, nicht die Vorschau der Chatliste. Gleiche Regel in
+   * app/lib/krypto.ts (aufschliessen, absenderPruefen).
+   */
+  async function absenderPruefen(nachrichten) {
+    if (!pruefer) return nachrichten;
+    const geoeffnet = (nachrichten || []).filter(
+      (n) => n && n._geoeffnet && n.senderId && n.absenderSchluessel
+    );
+    if (!geoeffnet.length) return nachrichten;
+    try {
+      const urteile = await pruefer.pruefen(
+        geoeffnet.map((n) => ({ userId: n.senderId, schluessel: n.absenderSchluessel }))
+      );
+      geoeffnet.forEach((n, i) => {
+        n.nichtPruefbar = urteile[i] !== true;
+      });
+    } catch (fehler) {
+      console.warn('Absender nicht geprüft:', fehler.message);
+    }
+    return nachrichten;
   }
 
   /**
@@ -239,22 +403,34 @@
     return Krypto.fingerabdruck(oeffentlich);
   }
 
+  /**
+   * Die Sicherheitsnummer einer Person über ALLE ihre Geräte — im
+   * Kontaktprofil sichtbar (AR-04, 16.10.2026). Dieselbe Rechnung wie in der
+   * App (gemeinsam/krypto.js). `{ nummer, geraete }` oder null.
+   */
+  function sicherheitsnummer(oeffentliche) {
+    return Krypto.sicherheitsnummer(oeffentliche);
+  }
+
   /** Steht für diesen Browser überhaupt ein Schlüssel bereit? */
   function bereit() {
-    return Boolean(meiner);
+    return Boolean(meiner && meiner.kontoId === kontoJetzt());
   }
 
   window.KryptoWeb = {
     NICHT_LESBAR,
     anmelden,
     vergessen,
+    merken,
     verschliessen,
     oeffnen,
     stapelOeffnen,
+    absenderPruefen,
     umschliessen,
     meldebeleg,
     fingerabdruck,
+    sicherheitsnummer,
     bereit,
-    meinSchluessel: () => meiner,
+    meinSchluessel: () => bereit() ? meiner : null,
   };
 })();

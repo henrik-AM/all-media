@@ -1,0 +1,16 @@
+✔ Scroll-Inhalt oberhalb des Fensters darf keinen sichtbaren Knopf verdecken (0.423708ms)
+✔ Sichtbarer Anteil einer teilweise abgeschnittenen Zeile bestimmt sichere Tippmitte (0.304042ms)
+✔ Echte überlagernde Fläche bleibt erhalten und kann weiter blockieren (0.074334ms)
+✔ Verschachtelte Scroll-Fenster begrenzen gemeinsam (0.060375ms)
+✔ Ganz außerhalb liegendes Scroll-Fenster gibt keine Nachfahren frei (0.050958ms)
+✔ Element ohne Scroll-Vorfahren bleibt innerhalb der App unverändert (0.042417ms)
+✔ AXScrollArea-Rolle begrenzt auch bei anderem Typnamen (0.045708ms)
+✔ Berührende Ränder sind keine sichtbare Fläche (0.073708ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3.857375

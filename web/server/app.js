@@ -835,72 +835,57 @@ app.post('/api/krypto/schluessel', route(async (req) => {
 }));
 
 /*
- * Die Geraete, fuer die in diesem Chat verschlossen werden darf.
+ * Die Fakten fuer den Browser — er entscheidet mit `Krypto.sendeweg` selbst,
+ * wie seine Nachricht hinausgeht (web/public/krypto.js), und verschliesst sie,
+ * bevor sie diesen Server erreicht.
  *
- * Die eigenen sind dabei und muessen es sein: ohne sie koennte man seine
- * eigene Nachricht am zweiten Geraet nicht mehr lesen.
- *
- * `verschluesselbar` sagt, ob es ueberhaupt geht — nur ein Chat zu zweit, und
- * nur wenn beide Seiten je ein Geraet angemeldet haben. Ist das Gegenueber
- * nie mit einem Geraet dagewesen, gibt es niemanden, fuer den man
- * verschliessen koennte; dann bleibt es Klartext und die Oberflaeche zeigt
- * kein Schloss.
+ * Die eigenen Geraete sind in `schluessel` dabei und muessen es sein: ohne
+ * sie koennte man seine eigene Nachricht am zweiten Geraet nicht mehr lesen.
  */
-app.get('/api/krypto/empfaenger/:chatId', route(async (req) => {
-  const chatId = req.params.chatId;
-
-  const { data: chat } = await req.db
-    .from('chats')
-    .select('is_group')
-    .eq('id', chatId)
-    .maybeSingle();
-  if (!chat || chat.is_group) return { verschluesselbar: false, schluessel: [] };
-
-  const { data: mitglieder } = await req.db
-    .from('chat_members')
-    .select('user_id')
-    .eq('chat_id', chatId);
-  const ids = (mitglieder || []).map((m) => m.user_id);
-  if (!ids.length) return { verschluesselbar: false, schluessel: [] };
-
-  /*
-   * Neueste zuerst. PostgREST gibt höchstens 1000 Zeilen heraus — ohne
-   * Reihenfolge waren das die ältesten, und ein Konto mit mehr Geräten
-   * (die Prüfkonten sammeln bei jedem Lauf eines) bekam für sein aktuelles
-   * Gerät nichts mehr: „Auf diesem Gerät nicht lesbar" (24.09.2026).
-   */
-  const { data, error } = await req.db
-    .from('krypto_schluessel')
-    .select('id, user_id, oeffentlich')
-    .in('user_id', ids)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-
-  const konten = new Set((data || []).map((k) => k.user_id));
-  return {
-    verschluesselbar: konten.size >= 2,
-    schluessel: (data || []).map((k) => ({ id: k.id, oeffentlich: k.oeffentlich })),
-  };
-}));
+app.get('/api/krypto/empfaenger/:chatId', route(async (req) =>
+  syncHandlers.kryptoFakten(req.db, req.params.chatId, req.nutzerId)
+));
 
 /*
- * Der oeffentliche Schluessel eines Gegenuebers — fuer das Kontaktprofil.
+ * Die oeffentlichen Schluessel eines Gegenuebers — fuer das Kontaktprofil.
  *
  * Die Zeile "Verschluesselung" dort soll nachsehen statt behaupten, genau wie
- * in der App. Dazu reicht die neueste angemeldete Kennung der anderen Person:
- * gibt es keine, kann niemand fuer sie verschliessen. Die Sicherheitsregel in
+ * in der App. Bis zum 16.10.2026 ging hier nur der NEUESTE Schluessel hinaus,
+ * und die Sicherheitsnummer zeigte nur ihn — ein untergeschobenes zweites
+ * Geraet blieb unsichtbar (AR-04). Jetzt kommen alle; der Browser rechnet
+ * daraus mit `Krypto.sicherheitsnummer` dieselbe Nummer wie die App.
+ *
+ * Neueste zuerst wie in der App: PostgREST gibt hoechstens 1000 Zeilen
+ * heraus, und beide Seiten muessen dieselben hashen. Die Sicherheitsregel in
  * Schema 31 gibt fremde Schluessel ohnehin nur heraus, wenn man einen Chat
  * teilt — hier steht deshalb kein zweiter Filter im Code.
  */
 app.get('/api/krypto/kontakt/:userId', route(async (req) => {
-  const { data, error } = await req.db
-    .from('krypto_schluessel')
-    .select('oeffentlich')
-    .eq('user_id', req.params.userId)
-    .order('created_at', { ascending: false })
-    .limit(1);
-  if (error) throw error;
-  return { oeffentlich: (data || [])[0]?.oeffentlich || null };
+  const data = await require('../../gemeinsam/kryptodaten').schluesselHolen(req.db, [req.params.userId]);
+  return { schluessel: data.map((k) => k.oeffentlich) };
+}));
+
+/*
+ * Welche dieser Paare aus Konto und Absenderschluessel gibt es wirklich?
+ * (AR-04, 16.10.2026)
+ *
+ * Der Browser prueft damit, ob eine verschluesselte Nachricht mit einem
+ * Schluessel verschlossen wurde, den ihr Absender angemeldet hat
+ * (KryptoWeb.absenderPruefen, gemeinsam/krypto.js `absenderPruefer`).
+ * Gefragt wird gezielt nach den Paaren — klein, und ohne die
+ * 1000-Zeilen-Grenze. Die Leseregel aus Schema 31 gibt fremde Schluessel nur
+ * bei gemeinsamem Chat heraus; ein Paar, das man nicht sehen darf, gilt als
+ * unbekannt. POST, weil die Liste in keine Adresse passt.
+ */
+app.post('/api/krypto/absender', route(async (req) => {
+  const paare = (Array.isArray(req.body?.paare) ? req.body.paare : []).slice(0, 200);
+  const konten = [...new Set(paare.map((p) => String(p?.userId || '')).filter((id) => /^[0-9a-f-]{36}$/i.test(id)))];
+  const schluessel = [
+    ...new Set(paare.map((p) => String(p?.schluessel || '')).filter((k) => /^[A-Za-z0-9+/=]{20,100}$/.test(k))),
+  ];
+  if (!konten.length || !schluessel.length) return { gefunden: [] };
+  const data = await require('../../gemeinsam/kryptodaten').schluesselHolen(req.db, konten, schluessel);
+  return { gefunden: data };
 }));
 
 app.post('/api/messages/:chatId', route(async (req) => {
@@ -920,6 +905,8 @@ app.post('/api/messages/:chatId', route(async (req) => {
   if (sperre) return { ok: false, error: sperre };
 
   const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, {
+    // Waechter gegen den stillen Klartext (AR-05) — siehe handleSendMessage.
+    klartextPruefen: true,
     antwortAuf: req.body?.antwortAuf || null,
     zitatVon: req.body?.zitatVon || null,
     krypto,
@@ -1046,6 +1033,13 @@ async function anhangDeuten(req, art) {
   return { text, medien };
 }
 
+app.post('/api/messages/:chatId/anhang/vorbereiten', route(async (req) => {
+  const sperre = await chatGesperrt(req, req.params.chatId);
+  if (sperre) return { ok: false, error: sperre };
+  const gedeutet = await anhangDeuten(req, req.body?.art);
+  return gedeutet.error ? { ok: false, error: gedeutet.error } : { ok: true, text: gedeutet.text };
+}));
+
 app.post('/api/messages/:chatId/anhang', route(async (req) => {
   const sperre = await chatGesperrt(req, req.params.chatId);
   if (sperre) return { ok: false, error: sperre };
@@ -1053,11 +1047,13 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
   const gedeutet = await anhangDeuten(req, req.body?.art);
   if (gedeutet.error) return { ok: false, error: gedeutet.error };
   const { text, medien } = gedeutet;
+  const paket = req.body?.paket || {};
+  for (const k of ['krypto', 'chiffre', 'kryptoNonce', 'absenderSchluessel', 'kuverts']) medien[k] = paket[k];
   // Kasten 4.3a: ein Anhang kann eine Antwort oder ein Zitat sein — wie Text.
   medien.antwortAuf = req.body?.antwortAuf || null;
   medien.zitatVon = req.body?.zitatVon || null;
 
-  const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, text, medien);
+  const e = await syncHandlers.handleSendMessage(req.db, req.nutzerId, req.params.chatId, Number(paket.krypto) > 0 ? '' : text, medien);
   if (!e || e.ok === false) return antwort(e);
 
   /*
@@ -1176,6 +1172,16 @@ app.get('/api/qr.svg', route(async (req, res) => {
  * Suche, keine Fehler der Anfrage. Deshalb 200 mit ok-Feld statt 404/409 —
  * sonst protokolliert der Browser bei jeder Fehleingabe einen Ladefehler.
  */
+// Nur den Zielchat ermitteln; Nachricht wird anschließend im Browser verschlossen.
+app.post('/api/contacts/vorbereiten', route(async (req) => {
+  const eingabe = String(req.body?.handle || '').trim();
+  const grund = Telefon.pruefe(eingabe);
+  if (grund) return { ok: false, error: grund };
+  const gefunden = await syncHandlers.handleFindPerson(req.db, req.nutzerId, eingabe);
+  if (!gefunden?.person) return { ok: false, error: 'Zu dieser Nummer gibt es noch kein Konto' };
+  return antwort(await syncHandlers.handleChatMit(req.db, req.nutzerId, gefunden.person.id, 'messenger'));
+}));
+
 app.post('/api/contacts', route(async (req) => {
   const eingabe = String(req.body?.handle || '').trim();
   if (!eingabe) return { ok: false, error: 'Bitte eine Telefonnummer eingeben' };
@@ -1202,7 +1208,7 @@ app.post('/api/contacts', route(async (req) => {
 
   const privat = Boolean(person.privat);
   const e = await syncHandlers.handleAddContact(
-    req.db, req.nutzerId, person.id, privat, String(req.body?.nachricht || '')
+    req.db, req.nutzerId, person.id, privat, String(req.body?.nachricht || ''), req.body?.paket || {}
   );
   if (e?.fehler === 'schon-vorhanden') {
     return { ok: false, error: `${person.name} ist bereits in deinen Kontakten` };
@@ -2377,7 +2383,7 @@ app.post('/api/teilen', route(async (req) => {
   }
   const [personen, inCommunitys] = await Promise.all([
     empfaenger.length
-      ? syncHandlers.handleShareToChats(req.db, req.nutzerId, eintrag.id, empfaenger, vorschau, bereiche)
+      ? syncHandlers.handleShareToChats(req.db, req.nutzerId, eintrag.id, empfaenger, vorschau, bereiche, Array.isArray(req.body?.ziele) ? req.body.ziele : [])
       : { ok: true, gesendet: [], fehlgeschlagen: [] },
     communitys.length
       ? syncHandlers.handleShareToCommunities(req.db, req.nutzerId, eintrag.id, communitys, vorschau, kanaele)
@@ -3189,18 +3195,43 @@ app.post('/api/stories/:id/like', route(async (req) => {
    */
   const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
   const alle = [...listen.messenger, ...listen.videos];
-  return alle.find((s) => s.id === req.params.id) || { ok: true };
+  const story = alle.find((s) => s.id === req.params.id) || { ok: true };
+  // Das Herz muss verschluesselt nachgeschickt werden (AR-05) — der Browser
+  // erledigt das, siehe handleLikeStory.
+  return e.herzChatId ? { ...story, herzChatId: e.herzChatId } : story;
 }));
+
+/*
+ * In welchen Chat eine Antwort auf diese Story geht — damit der Browser sie
+ * vorher fuer dessen Geraete verschliessen kann (AR-05, handleStoryChat).
+ */
+app.post('/api/stories/:id/chat', route(async (req) =>
+  antwort(await syncHandlers.handleStoryChat(req.db, req.nutzerId, req.params.id))
+));
 
 app.post('/api/stories/:id/seen', route(async (req) =>
   antwort(await syncHandlers.handleViewStory(req.db, req.nutzerId, req.params.id))
 ));
 
 app.post('/api/stories/:id/reply', route(async (req) => {
+  /*
+   * Zwei Formen wie bei POST /api/messages: verschlossen (krypto, chiffre,
+   * kuverts, dazu der Chat, fuer den verschlossen wurde) oder offen (text).
+   * Verschlossen kommt hier kein Text an — dieser Server soll ihn nicht sehen.
+   */
+  const krypto = Number(req.body?.krypto || 0);
   const text = String(req.body?.text || '').trim();
-  if (!text) return { ok: false, error: 'Bitte etwas schreiben' };
+  if (!krypto && !text) return { ok: false, error: 'Bitte etwas schreiben' };
+  if (krypto && !req.body?.chiffre) return { ok: false, error: 'Chiffre erforderlich' };
 
-  const e = await syncHandlers.handleStoryReply(req.db, req.nutzerId, req.params.id, text);
+  const e = await syncHandlers.handleStoryReply(req.db, req.nutzerId, req.params.id, text, {
+    chatId: req.body?.chatId || null,
+    krypto,
+    chiffre: req.body?.chiffre || null,
+    kryptoNonce: req.body?.kryptoNonce || null,
+    absenderSchluessel: req.body?.absenderSchluessel || null,
+    kuverts: req.body?.kuverts || [],
+  });
   if (!e || e.ok === false) return antwort(e);
 
   return {
@@ -3782,7 +3813,9 @@ app.post('/api/messages/:chatId/:messageId/zuruecknehmen', route(async (req) =>
 app.post('/api/messages/:chatId/:messageId/weiterleiten', route(async (req) =>
   antwort(
     await syncHandlers.handleNachrichtWeiterleiten(
-      req.db, req.nutzerId, req.params.messageId, req.body?.chatIds || []
+      req.db, req.nutzerId, req.params.messageId, req.body?.chatIds || [],
+      // Je Ziel, was der Browser verschlossen hat (AR-05) — siehe Handler.
+      Array.isArray(req.body?.ziele) ? req.body.ziele : []
     )
   )
 ));

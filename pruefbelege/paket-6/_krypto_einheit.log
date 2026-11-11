@@ -1,0 +1,48 @@
+
+Sendeweg (AR-05)
+  OK    Beide mit Schlüssel: verschließen  (verschliessen)
+  OK    … für beide Geräte, je einmal  (k-ich,k-du)
+  OK    Gruppe: offen, auch ohne eigenen Schlüssel  (offen)
+  OK    Gegenüber ohne Gerät, nie verschlüsselt: offen  (offen)
+  OK    Niemand mit Gerät, kein eigener Schlüssel: offen  (offen)
+  OK    Eigener Schlüssel fehlt, Gegenüber hat einen: ABLEHNEN  (ablehnen)
+  OK    … mit dem Satz für den Nutzer  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK    Leere Schlüsselliste in verschlüsseltem Chat (Downgrade): ABLEHNEN  (ablehnen)
+  OK    Gemerkt verschlüsselt, Server liefert nichts vom Gegenüber: ABLEHNEN  (ablehnen)
+  OK    Eigenes Gerät fehlt in der Liste: kommt trotzdem dazu  (k-du,k-ich)
+  OK    Schlüssel eines Nicht-Mitglieds bekommt kein Kuvert  (k-ich,k-du)
+  OK    Server-Wächter: Klartext in verschlüsselbarem Chat abgelehnt  (ablehnen)
+
+Nur zu zweit (Schlüssel-Unterschiebung über die Mitgliedschaft)
+  OK    Zweierchat mit drittem Mitglied: ABLEHNEN statt für ihn verschließen  (ablehnen)
+  OK    … mit eigenem Satz  (Dieser Chat ist keine Gruppe, hat aber mehr als zwei Mitglieder. Damit niemand unbemerkt mitliest, wurde die Nachricht nicht gesendet.)
+  OK    … auch ohne Schlüssel kein Klartext an den Dritten  (ablehnen)
+  OK    zuVieleMitglieder: drei in Nicht-Gruppe
+  OK    zuVieleMitglieder: Gruppe ist frei
+  OK    zuVieleMitglieder: zwei sind richtig
+
+Sicherheitsnummer über alle Geräte (AR-04)
+  OK    Format wie der Fingerabdruck  (76EA 4F82 5C95 E7AF 6235 DB0B 56B9 58D0)
+  OK    Zählt die Geräte  (2)
+  OK    Reihenfolge egal (App und Website gleich)
+  OK    Doppelte zählen einmal
+  OK    Untergeschobenes drittes Gerät ändert die Nummer
+  OK    … auch wenn es das älteste ist (Reihenfolge der Abfrage)
+  OK    Ein Gerät: dieselbe Nummer wie bisher (fingerabdruck)
+  OK    Kein Schlüssel: null
+  OK    Gegenüber öffnet, was nach sendeweg verschlossen wurde
+
+Absender prüfen (AR-04)
+  OK    Die Fälschung geht beim Empfänger auf — ohne Prüfung fiele sie nicht auf
+  OK    Echter Absenderschlüssel: bekannt  (true)
+  OK    Fälschung: nicht prüfbar  (false)
+  OK    Schlüssel eines anderen Kontos zählt nicht  (false)
+  OK    Eine Abfrage für alle drei  (1)
+  OK    Nachsehen im Takt: gemerkt, keine neue Abfrage  (1)
+  OK    Unbekanntes wird nach der Frist neu gefragt  (true)
+  OK    Nicht ladbar: kein Urteil (null), nichts blockiert  (null)
+  OK    … abgelaufene Bestätigung wird ohne Netz nicht weiter vertraut  (null)
+
+36 von 36 Pruefungen bestanden.
+
+Exit: 0

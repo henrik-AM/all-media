@@ -1,0 +1,20 @@
+OK Eigener nativer Offline-Prüfstand mit App-Chat sichtbar
+OK Native Blase zeigt Absenderwarnung
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (169,244 132x31)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native Sendeaktion erzeugt genau eine Chiffre und kein externes Netz
+Getippt: 1. [Button] "Netzfehler umschalten"  (4,244 160x31)
+Getippt: 2. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (169,244 132x31)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native Fehlermeldung, unveränderter Bestand und erhaltener Entwurf
+Getippt: 1. [Button] "Netzfehler umschalten"  (4,244 160x31)
+Getippt: 1. [Button] "Prüfstand Kontakt"  (120,208 130x31)
+Getippt: 1. [GenericElement] "Verschlüsselung, Ende-zu-Ende, "  (0,726 402x46)
+OK Native Kontaktinfo zeigt Sicherheitsnummer für ein Gerät
+Getippt: 1. [GenericElement] "Zurück"  (12,402 22x23)
+Getippt: 1. [Button] "Zweites Gerät"  (8,142 104x31)
+Getippt: 1. [GenericElement] "Verschlüsselung, Ende-zu-Ende, "  (0,726 402x46)
+OK Zweites simuliertes Gerät ändert native Nummer und Gerätezahl
+6/6 native Offline-Komponentenprüfungen. Keine Live-/Konten-Abnahme.

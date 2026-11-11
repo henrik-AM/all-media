@@ -1,0 +1,23 @@
+2026-11-10T18:52:02.919Z LIVE: exklusiver Bestand bestätigt; keine Registrierung, kein Reset, kein Schema
+2026-11-10T18:52:07.095Z OK Zwei App- und zwei echte Browsergeräte registriert
+2026-11-10T18:52:09.293Z OK App → Website test@all-media.app
+2026-11-10T18:52:11.210Z OK Website-Sendeantwort test@all-media.app
+2026-11-10T18:52:11.695Z OK Website → App-Logik test@all-media.app
+2026-11-10T18:52:14.279Z OK App → Website all.media.prueflauf@web.de
+2026-11-10T18:52:15.969Z OK Website-Sendeantwort all.media.prueflauf@web.de
+2026-11-10T18:52:16.370Z OK Website → App-Logik all.media.prueflauf@web.de
+2026-11-10T18:52:16.441Z OK Alle vier Rundreise-Nachrichten nur als Chiffre gespeichert
+2026-11-10T18:52:16.626Z OK Jedes eigene Gerät erhält vier Kuverts test@all-media.app
+2026-11-10T18:52:16.772Z OK Jedes eigene Gerät erhält vier Kuverts all.media.prueflauf@web.de
+2026-11-10T18:52:17.507Z OK Alter Website-Aufrufer mit Klartext ausdrücklich abgewiesen
+2026-11-10T18:52:17.588Z OK Klartext-Abweisung schreibt keine zusätzliche Zeile
+2026-11-10T18:52:17.597Z OK Simulierter Faktenausfall im echten Websiteweg fällt nicht auf Klartext
+2026-11-10T18:52:18.214Z OK Sicherheitsnummer App/Website umfasst dieselben Geräte
+2026-11-10T18:52:18.732Z OK Zusätzliches reales Gerät ändert die Sicherheitsnummer
+2026-11-10T18:52:19.257Z OK Entferntes Gerät stellt die ursprüngliche Nummer wieder her
+2026-11-10T18:52:19.646Z OK Kontowechsel hat eigenes Gerätepaar
+2026-11-10T18:52:19.985Z OK Zurückwechseln verwendet wieder genau das erste Gerät
+2026-11-10T18:52:20.933Z OK App-Logik warnt vor unregistriertem Absenderschlüssel
+2026-11-10T18:52:21.873Z OK Website warnt vor unregistriertem Absenderschlüssel
+2026-11-10T18:52:23.441Z OK Geprüfte Bereinigung: keine eigenen Chat-/Nachrichten-/Geräte-/Kontaktreste
+2026-11-10T18:52:23.442Z 21/21 Live-Prüfungen; Rest 0. App-Logik mit simuliertem Schlüsselbund; Browser mit echter Anmeldung und Supabase.

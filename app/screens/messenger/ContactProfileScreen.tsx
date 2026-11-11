@@ -211,28 +211,33 @@ export const ContactProfileScreen = ({
    * angemeldet, und ist es ein Chat zu zweit. Nur dann kann überhaupt
    * verschlüsselt werden.
    */
+  /*
+   * Seit dem 16.10.2026 (AR-04) steht hier die Sicherheitsnummer über ALLE
+   * Geräte des Gegenübers und deren Zahl — nicht mehr der Fingerabdruck des
+   * jüngsten. Ein untergeschobenes Gerät ändert jetzt die Nummer und die
+   * Zahl. Gleiche Abfrage und Rechnung auf der Website
+   * (/api/krypto/kontakt, KryptoWeb.sicherheitsnummer).
+   */
   const [kryptoZustand, setKryptoZustand] = useState<{
     an: boolean;
     fingerabdruck: string | null;
-  }>({ an: false, fingerabdruck: null });
+    geraete: number;
+  }>({ an: false, fingerabdruck: null, geraete: 0 });
 
   useEffect(() => {
+    setKryptoZustand({ an: false, fingerabdruck: null, geraete: 0 });
     if (!supabase || !ichId || !chat || chat.isGroup) return;
     let gilt = true;
     (async () => {
       try {
-        const { data } = await supabase
-          .from('krypto_schluessel')
-          .select('oeffentlich')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        const meiner = await Krypto.meinSchluessel(supabase, ichId);
-        const seiner = (data ?? [])[0]?.oeffentlich ?? null;
+        const data = await Krypto.kontoSchluessel(supabase, userId);
+        const verschluesselbar = await Krypto.chatVerschluesselbar(supabase, chat.id, ichId);
+        const nr = Krypto.sicherheitsnummer(((data ?? []) as any[]).map((z) => z.oeffentlich));
         if (!gilt) return;
         setKryptoZustand({
-          an: Boolean(meiner && seiner),
-          fingerabdruck: seiner ? Krypto.fingerabdruck(seiner) : null,
+          an: Boolean(verschluesselbar && nr),
+          fingerabdruck: nr?.nummer ?? null,
+          geraete: nr?.geraete ?? 0,
         });
       } catch (e) {
         // Kein Zustand heisst: kein Schloss. Nichts behaupten ist richtig.
@@ -544,10 +549,16 @@ export const ContactProfileScreen = ({
                     'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
                     'Verbindung.\n\n' +
                     (kryptoZustand.fingerabdruck
-                      ? 'Sicherheitsnummer des Gegenübers:\n' +
+                      ? 'Sicherheitsnummer des Gegenübers (' +
+                        (kryptoZustand.geraete === 1
+                          ? '1 Gerät'
+                          : `${kryptoZustand.geraete} Geräte`) +
+                        '):\n' +
                         kryptoZustand.fingerabdruck +
                         '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
-                        'dass niemand dazwischen sitzt.'
+                        'dass niemand dazwischen sitzt. Sie ändert sich, sobald ' +
+                        'ein Gerät dazukommt oder wegfällt — stimmt die Zahl der ' +
+                        'Geräte nicht, fragt nach.'
                       : '')
                   : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
                     'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +

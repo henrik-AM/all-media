@@ -1098,10 +1098,7 @@ export async function teilen(
         continue;
       }
 
-      const { error } = await client
-        .from('messages')
-        .insert({ chat_id: chatId, sender_id: ichId, text: vorschau, shared_post_id: beitragId });
-      if (error) throw error;
+      await nachrichtSenden(client, ichId, chatId, vorschau, { geteilterBeitragId: beitragId });
       gesendet.push(zielId);
     } catch (e: any) {
       console.error('Teilen an', zielId, 'fehlgeschlagen:', e?.message ?? e);
@@ -1512,6 +1509,7 @@ export interface Anhang {
    * dort wird `storyId` schlicht nicht gelesen.
    */
   storyId?: string | null;
+  geteilterBeitragId?: string | null;
 }
 
 /**
@@ -1524,8 +1522,15 @@ export interface Anhang {
  * Seit Schema 31 geht der Text durch `fuerChatVerschliessen`. In einem Chat
  * zu zweit, in dem beide Seiten ein Gerät angemeldet haben, steht danach in
  * `text` nichts mehr und in `chiffre` alles. In jedem anderen Fall — Gruppe,
- * Gegenüber ohne Gerät, kein Zufall verfügbar — bleibt es beim Klartext von
- * vorher. Der Aufrufer merkt davon nichts; das ist der Zweck.
+ * Gegenüber ohne Gerät — bleibt es beim Klartext von vorher.
+ *
+ * Seit dem 16.10.2026 (AR-05) fällt es nicht mehr still auf Klartext, wenn
+ * verschlüsselt werden MÜSSTE und es nicht geht (eigener Schlüssel nicht
+ * lesbar, Schlüsselabfrage gescheitert, Gegenüber plötzlich ohne Gerät in
+ * einem schon verschlüsselten Chat). Dann wirft `fuerChatVerschliessen`
+ * einen `VerschluesselnFehler`, es wird nichts geschrieben, und der
+ * Bildschirm zeigt dessen Satz. Gleiche Regel auf der Website
+ * (web/public/krypto.js, gemeinsam/krypto.js `sendeweg`).
  */
 export async function nachrichtSenden(
   client: SupabaseClient,
@@ -1551,6 +1556,7 @@ export async function nachrichtSenden(
       file_name: anhang.dateiName || null,
       file_size: anhang.dateiGroesse || null,
       reply_to_story: anhang.storyId || null,
+      shared_post_id: anhang.geteilterBeitragId || null,
     })
     .select('id, created_at')
     .single();
@@ -1755,10 +1761,7 @@ export async function kontaktHinzufuegen(
 
   const chatId = await chatMit(client, ichId, zielId);
   if (nachricht.trim()) {
-    const { error: fehlerNachricht } = await client
-      .from('messages')
-      .insert({ chat_id: chatId, sender_id: ichId, text: nachricht.trim() });
-    if (fehlerNachricht) throw fehlerNachricht;
+    await nachrichtSenden(client, ichId, chatId, nachricht.trim());
   }
 
   return { status, chatId };
@@ -2885,6 +2888,10 @@ export async function nachrichtWeiterleiten(
    * Ein Ziel nach dem anderen statt eines gemeinsamen Inserts: jeder Chat
    * hat seine eigenen Geräte und bekommt damit eine eigene Chiffre. Ein
    * Insert über alle Ziele könnte nur eine einzige tragen.
+   *
+   * Lässt sich ein Ziel nicht verschlüsseln, obwohl es müsste, wirft
+   * `fuerChatVerschliessen` (AR-05) und die übrigen Ziele bleiben aus — die
+   * Meldung nennt den Grund, statt dass eines davon still offen ankommt.
    */
   for (const chat_id of chatIds) {
     const paket = await fuerChatVerschliessen(client, chat_id, ichId, text);

@@ -1,0 +1,22 @@
+  OK   POST /api/messages: Klartext in verschlüsselbaren Chat abgelehnt  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   … und nichts geschrieben
+  OK   Gruppe: Klartext geht
+  OK   Gegenüber ohne Gerät: Klartext geht
+  OK   Drittes Mitglied: abgelehnt  (Dieser Chat ist keine Gruppe, hat aber mehr als zwei Mitglieder. Damit niemand unbemerkt mitliest, wurde die Nachricht nicht gesendet.)
+  OK   … auch ein Anhang
+  OK   Anhang-Beschriftung ohne Chiffre abgelehnt
+  OK   Anhang ohne Text bleibt möglich
+  OK   Verschlüsselt: geschrieben, mit Kuverts
+  OK   Weiterleiten verschlüsselt → Gruppe ohne Browsertext: abgelehnt statt leerer Blase  (Diese Nachricht lässt sich hier nicht weiterleiten)
+  OK   Ein Ziel bräuchte Verschlüsselung: alles abgelehnt, nichts geschrieben  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   Je Ziel richtig: Gruppe offen, Zweierchat verschlüsselt  ({"ok":true,"anzahl":2})
+  OK   Weiterleiten in Chat mit drittem Mitglied: abgelehnt
+  OK   Story-Chat gefunden  ({"ok":true,"chatId":"zwei"})
+  OK   Story-Antwort im Klartext in verschlüsselten Chat: abgelehnt  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   Story-Antwort verschlüsselt: geschrieben mit reply_to_story  ({"ok":true,"chatId":"zwei","nachricht":{"id":"id11","created_at":"2026-11-10T19:35:28.271Z","chat_id":"zwei","sender_id")
+  OK   Für falschen Chat verschlossen: abgelehnt
+  OK   Story-Herz: Server schreibt kein Klartext-Herz, gibt Chat zurück  ({"ok":true,"geliked":true,"herzChatId":"zwei"})
+
+18 von 18 Pruefungen bestanden.
+
+Exit: 0

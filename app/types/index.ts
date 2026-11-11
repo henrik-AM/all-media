@@ -96,6 +96,13 @@ export interface Message {
   weitergeleitetVon?: string;
   /** Gesetzt, sobald der Text geaendert wurde — die Blase sagt "bearbeitet". */
   bearbeitet?: boolean;
+  /**
+   * Verschluesselt, aber mit einem Schluessel, den der Absender nie
+   * angemeldet hat (AR-04, 16.10.2026). Die Blase sagt „Absender nicht
+   * prüfbar" — wer in die Datenbank schreiben kann, koennte sie gefaelscht
+   * haben.
+   */
+  nichtPruefbar?: boolean;
   /** Zurueckgenommen. Die Zeile bleibt, damit Antworten ihren Bezug behalten. */
   zurueckgenommen?: boolean;
   /** Emoji je Person, die reagiert hat. */

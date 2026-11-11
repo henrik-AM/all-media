@@ -43,8 +43,9 @@
  *   Ratchet; das ist ein eigenes Vorhaben.
  * - Die öffentlichen Schlüssel kommen vom Server. Wer den Server beherrscht,
  *   kann einen eigenen Schlüssel unterschieben. Dagegen hilft nur ein
- *   Vergleich der Fingerabdrücke von Hand — `fingerabdruck()` liefert ihn,
- *   die Oberfläche zeigt ihn im Kontaktprofil.
+ *   Vergleich der Sicherheitsnummer von Hand — `sicherheitsnummer()` bildet
+ *   sie über ALLE Geräte einer Person (seit 16.10.2026, AR-04), die
+ *   Oberfläche zeigt sie samt Gerätezahl im Kontaktprofil.
  */
 
 (function (global, factory) {
@@ -185,6 +186,66 @@
     var ziffern = '';
     for (var i = 0; i < 16; i++) ziffern += ('0' + summe[i].toString(16)).slice(-2);
     return (ziffern.toUpperCase().match(/.{4}/g) || []).join(' ');
+  }
+
+  /**
+   * Die Sicherheitsnummer einer PERSON — über alle ihre Geräte zugleich
+   * (Sicherheitsprüfung 16.10.2026, AR-04).
+   *
+   * WARUM NICHT MEHR DER EINE SCHLÜSSEL
+   *
+   * Bis dahin zeigte das Kontaktprofil den Fingerabdruck des JÜNGSTEN
+   * Schlüssels. Verschlossen wird aber für ALLE Geräte des Gegenübers. Wer
+   * einen eigenen Schlüssel für das Konto unterbringt — mit einem
+   * `created_at` in der Vergangenheit —, bekam ein Kuvert für jede Nachricht,
+   * und die Nummer blieb dieselbe. Ein Vergleich von Hand fiel positiv aus
+   * und bewies nichts.
+   *
+   * Jetzt gehen alle Schlüssel in eine Nummer ein: sortiert (die Reihenfolge
+   * aus der Datenbank darf keine Rolle spielen, App und Website müssen
+   * dieselbe Nummer zeigen), doppelte nur einmal, dann gemeinsam gehasht.
+   * Kommt ein Gerät dazu oder fällt eins weg, ändert sich die Nummer — genau
+   * das soll ein Vergleich sehen.
+   *
+   * Mit genau einem Schlüssel ist die Nummer dieselbe wie `fingerabdruck`
+   * dieses Schlüssels: wer früher verglichen hat und nur ein Gerät benutzt,
+   * sieht keine neue Nummer.
+   *
+   * Gibt `{ nummer, geraete }` zurück oder `null`, wenn es keinen Schlüssel gibt.
+   */
+  function sicherheitsnummer(oeffentliche) {
+    var schon = {};
+    var liste = [];
+    (oeffentliche || []).forEach(function (k) {
+      var text = String(k || '');
+      if (!text || schon[text]) return;
+      if (ausBase64(text).length !== 32 || zuBase64(ausBase64(text)) !== text) {
+        throw new Error('Ungültiger Geräteschlüssel');
+      }
+      schon[text] = true;
+      liste.push(text);
+    });
+    if (!liste.length) return null;
+    liste.sort();
+
+    var teile = liste.map(ausBase64);
+    var laenge = teile.reduce(function (summe, t) {
+      return summe + t.length;
+    }, 0);
+    var alles = new Uint8Array(laenge);
+    var p = 0;
+    teile.forEach(function (t) {
+      alles.set(t, p);
+      p += t.length;
+    });
+
+    var summe = nacl.hash(alles);
+    var ziffern = '';
+    for (var i = 0; i < 16; i++) ziffern += ('0' + summe[i].toString(16)).slice(-2);
+    return {
+      nummer: (ziffern.toUpperCase().match(/.{4}/g) || []).join(' '),
+      geraete: liste.length,
+    };
   }
 
   // -------------------------------------------------------- Verschließen --
@@ -380,12 +441,258 @@
     }
   }
 
+  // ------------------------------------------------------ Absender prüfen --
+
+  /**
+   * Prüft, ob der Absenderschlüssel einer Nachricht zu ihrem Absender gehört
+   * (Sicherheitsprüfung 16.10.2026, AR-04).
+   *
+   * WARUM
+   *
+   * `entschluesseln` öffnet das Kuvert mit `absender_schluessel` — und der
+   * steht an der Nachricht selbst. Wer in die Datenbank schreiben kann, legt
+   * sich ein eigenes Paar an, verschließt damit eine Nachricht „von A" und
+   * setzt seinen eigenen öffentlichen Schlüssel als Absender: sie geht auf,
+   * und B sieht sie ohne jeden Hinweis als echt. Prüfbar ist das nur gegen
+   * die Schlüssel, die A tatsächlich angemeldet hat (`krypto_schluessel`).
+   *
+   * WIE
+   *
+   * `holen(paare)` bekommt `[{ userId, schluessel }]` und liefert die Paare,
+   * die es in `krypto_schluessel` gibt, als `[{ user_id, oeffentlich }]` —
+   * jede Seite auf ihrem Weg (App direkt, Website über ihren Server). Gefragt
+   * wird gezielt nach diesen Paaren statt nach allen Schlüsseln der Konten:
+   * die Prüfkonten haben über tausend, und PostgREST gibt nicht mehr heraus.
+   *
+   * Das Ergebnis wird gemerkt, denn der Chat sieht alle vier Sekunden nach
+   * (Kasten 27). Auch bekannte Paare werden frühestens
+   * nach `nachladenMs` noch einmal gefragt — ein gerade erst angemeldetes
+   * Gerät soll nicht dauerhaft als „nicht prüfbar" stehen bleiben, und eine
+   * gefälschte Nachricht soll nicht bei jedem Nachsehen eine Abfrage kosten.
+   *
+   * `pruefen(paare)` gibt je Paar `true` (bekannt), `false` (nicht bekannt —
+   * die Blase zeigt „nicht prüfbar") oder `null` (Schlüssel gerade nicht
+   * ladbar — die Blase warnt, der Text bleibt lesbar).
+   */
+  function absenderPruefer(holen, optionen) {
+    var nachladenMs = (optionen && optionen.nachladenMs) || 60000;
+    var gemerkt = {};
+
+    function kennung(p) {
+      return String(p.userId) + '|' + String(p.schluessel);
+    }
+
+    function pruefen(paare) {
+      var liste = paare || [];
+      var jetzt = Date.now();
+      var fragen = [];
+      var schon = {};
+      liste.forEach(function (p) {
+        if (!p || !p.userId || !p.schluessel) return;
+        var k = kennung(p);
+        var e = gemerkt[k];
+        var faellig = !e || jetzt - e.zeit > nachladenMs;
+        if (faellig && !schon[k]) {
+          schon[k] = true;
+          fragen.push({ userId: p.userId, schluessel: p.schluessel });
+        }
+      });
+
+      var weg = fragen.length
+        ? Promise.resolve()
+            .then(function () {
+              // Die API nimmt höchstens 200 Paare an; auch lange Verläufe
+              // vollständig prüfen, ohne lange URL-Filter zu erzeugen.
+              var ergebnis = [];
+              return fragen.reduce(function (weg, _, i) {
+                if (i % 100) return weg;
+                return weg.then(function () { return holen(fragen.slice(i, i + 100)); })
+                  .then(function (teil) {
+                    if (!Array.isArray(teil)) throw new Error('Absenderliste nicht ladbar');
+                    ergebnis = ergebnis.concat(teil);
+                  });
+              }, Promise.resolve()).then(function () { return ergebnis; });
+            })
+            .then(function (gefunden) {
+              var da = {};
+              (gefunden || []).forEach(function (g) {
+                da[String(g.user_id) + '|' + String(g.oeffentlich)] = true;
+              });
+              fragen.forEach(function (p) {
+                var k = kennung(p);
+                gemerkt[k] = { bekannt: Boolean(da[k]), zeit: jetzt };
+              });
+            })
+            .catch(function () {
+              // Eine fällige, nicht ladbare Bestätigung liefert kein Vertrauen.
+              fragen.forEach(function (p) { delete gemerkt[kennung(p)]; });
+            })
+        : Promise.resolve();
+
+      return weg.then(function () {
+        return liste.map(function (p) {
+          if (!p || !p.userId || !p.schluessel) return null;
+          var e = gemerkt[kennung(p)];
+          return e ? e.bekannt : null;
+        });
+      });
+    }
+
+    return { pruefen: pruefen };
+  }
+
+  // ------------------------------------------------------------ Sendeweg --
+
+  /**
+   * Die Meldung, wenn eine Nachricht verschlüsselt hinausgehen müsste und es
+   * gerade nicht kann. Wortgleich in App und Website, deshalb hier.
+   */
+  var MELDUNG_NICHT_VERSCHLUESSELT =
+    'Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. ' +
+    'Bitte versuch es noch einmal.';
+
+  /**
+   * Die Meldung, wenn ein Chat, der keine Gruppe ist, mehr als zwei
+   * Mitglieder hat. Wortgleich in App und Website, deshalb hier.
+   */
+  var MELDUNG_NUR_ZU_ZWEIT =
+    'Dieser Chat ist keine Gruppe, hat aber mehr als zwei Mitglieder. ' +
+    'Damit niemand unbemerkt mitliest, wurde die Nachricht nicht gesendet.';
+
+  /**
+   * Hat ein Chat, der keine Gruppe ist, mehr als zwei Mitglieder?
+   *
+   * WARUM DAS EINE SPERRE IST (Sicherheitsprüfung 16.10.2026,
+   * „Schlüssel-Unterschiebung" im Datenbankbericht)
+   *
+   * Verschlossen wird für alle Geräte aller Mitglieder. Wer sich in einen
+   * fremden Zweierchat einträgt — Selbsteintrag in `chat_members`, oder ein
+   * UPDATE auf `chat_id` —, bekäme so jede künftige Nachricht mit eigenem
+   * Kuvert geliefert, ohne dass einer der beiden es merkt. Ein Zweierchat
+   * mit drei Mitgliedern ist also kein Altbestand, mit dem man leben kann,
+   * sondern genau das Bild eines Mitlesers. Nicht für ihn verschlüsseln,
+   * sondern gar nicht senden — auch keinen Klartext, denn den läse er
+   * ebenso.
+   */
+  function zuVieleMitglieder(fakten) {
+    var f = fakten || {};
+    return !f.istGruppe && (f.mitglieder || []).length > 2;
+  }
+
+  /**
+   * Wie eine Nachricht in diesem Chat hinausgeht — verschlossen, offen oder
+   * gar nicht (Sicherheitsprüfung 16.10.2026, AR-05).
+   *
+   * WARUM ES DAS GIBT
+   *
+   * Bis dahin fiel jede Nachricht still auf Klartext zurück, sobald
+   * irgendetwas auf dem Weg zur Chiffre fehlte: der eigene Schlüssel ließ sich
+   * nicht lesen, die Schlüsselabfrage scheiterte an einer kurzen Netzstörung,
+   * oder ein Server antwortete einfach mit einer leeren Liste. Das
+   * Kontaktprofil sagte weiter „Ende-zu-Ende", und keiner der beiden sah einen
+   * Unterschied. Wer den Server beherrscht, brauchte für ein Downgrade nur
+   * die Schlüsselliste leer zu lassen.
+   *
+   * DIE REGEL
+   *
+   * Ein Chat, der keine Gruppe ist und mehr als zwei Mitglieder hat, nimmt
+   * gar nichts an (`zuVieleMitglieder`).
+   *
+   * Klartext nur dort, wo Verschlüsselung gar nicht vorgesehen ist: in einer
+   * Gruppe, und in einem Chat zu zweit, dessen Gegenüber nie ein Gerät
+   * angemeldet hat UND in dem noch nie verschlüsselt geschrieben wurde. Ist
+   * eins von beidem anders, MUSS verschlossen werden — und geht das nicht,
+   * wird abgelehnt statt still offen gesendet. Lieber eine Nachricht, die
+   * nicht ankommt und das sagt, als eine, die ankommt und dabei etwas
+   * Falsches behauptet.
+   *
+   * WARUM HIER UND NICHT JE SEITE
+   *
+   * Die App fragt Supabase selbst, die Website fragt ihren Server — die
+   * Fakten kommen also auf zwei Wegen. Die Entscheidung darüber darf es aber
+   * nur einmal geben, sonst verschlüsselt die eine Seite, wo die andere schon
+   * Klartext schickt.
+   *
+   * `fakten`:
+   *   istGruppe           — chats.is_group
+   *   mitglieder          — alle user_id aus chat_members
+   *   ichId               — das eigene Konto
+   *   schluessel          — [{ id, user_id, oeffentlich }] der Mitglieder
+   *   schonVerschluesselt — gibt es im Chat eine Nachricht mit krypto > 0?
+   *   gemerkt             — hat dieses Gerät den Chat schon verschlüsselt erlebt?
+   *   meiner              — { id, oeffentlich } des eigenen Geräts oder null
+   *
+   * Rückgabe:
+   *   { art: 'offen' }
+   *   { art: 'verschliessen', empfaenger: [{ id, oeffentlich }] }
+   *   { art: 'ablehnen', meldung }
+   */
+  function sendeweg(fakten) {
+    var f = fakten || {};
+    if (f.istGruppe === true) return { art: 'offen' };
+    if (f.istGruppe !== false || !Array.isArray(f.mitglieder) ||
+        !Array.isArray(f.schluessel) || typeof f.schonVerschluesselt !== 'boolean' ||
+        !f.ichId || f.mitglieder.indexOf(f.ichId) === -1 || f.mitglieder.length < 2) {
+      return { art: 'ablehnen', meldung: MELDUNG_NICHT_VERSCHLUESSELT };
+    }
+    if (zuVieleMitglieder(f)) return { art: 'ablehnen', meldung: MELDUNG_NUR_ZU_ZWEIT };
+
+    var mitglieder = f.mitglieder || [];
+    var ich = f.ichId;
+
+    // Nur Schlüssel von Mitgliedern. Liefert eine Abfrage mehr — falscher
+    // Filter, fremder Server —, bekommt dieser Fremde trotzdem kein Kuvert.
+    var schluessel = (f.schluessel || []).filter(function (s) {
+      return s && s.id && s.oeffentlich && mitglieder.indexOf(s.user_id) !== -1;
+    });
+    var fremde = schluessel.filter(function (s) {
+      return s.user_id !== ich;
+    });
+
+    var vorgesehen = fremde.length > 0 || Boolean(f.schonVerschluesselt) || Boolean(f.gemerkt);
+    if (!vorgesehen) return { art: 'offen' };
+
+    /*
+     * Vorgesehen, aber nicht machbar: kein eigener Schlüssel (Schlüsselkette
+     * nicht lesbar, Anmeldung beim Server gescheitert) oder kein Gerät des
+     * Gegenübers in der Antwort, obwohl der Chat schon verschlüsselt war.
+     * Genau hier fiel es bis zum 16.10.2026 still auf Klartext.
+     */
+    if (!f.meiner || !f.meiner.id || !f.meiner.oeffentlich || !fremde.length) {
+      return { art: 'ablehnen', meldung: MELDUNG_NICHT_VERSCHLUESSELT };
+    }
+
+    var empfaenger = [];
+    var schon = {};
+    function dazu(s) {
+      if (schon[s.id]) return;
+      schon[s.id] = true;
+      empfaenger.push({ id: s.id, oeffentlich: s.oeffentlich });
+    }
+    schluessel.forEach(dazu);
+    /*
+     * Das eigene Gerät gehört immer dazu. Die Abfrage gibt höchstens 1000
+     * Schlüssel heraus (PostgREST); bei einem Konto mit sehr vielen Geräten
+     * fiel das eigene sonst hinten herunter, und man konnte die eigene
+     * Nachricht nicht mehr lesen.
+     */
+    dazu({ id: f.meiner.id, oeffentlich: f.meiner.oeffentlich });
+
+    return { art: 'verschliessen', empfaenger: empfaenger };
+  }
+
   return {
     VERSION: VERSION,
+    MELDUNG_NICHT_VERSCHLUESSELT: MELDUNG_NICHT_VERSCHLUESSELT,
+    MELDUNG_NUR_ZU_ZWEIT: MELDUNG_NUR_ZU_ZWEIT,
+    zuVieleMitglieder: zuVieleMitglieder,
+    sendeweg: sendeweg,
+    absenderPruefer: absenderPruefer,
     zufallsquelleSetzen: zufallsquelleSetzen,
     zufallBereit: zufallBereit,
     schluesselpaarErzeugen: schluesselpaarErzeugen,
     fingerabdruck: fingerabdruck,
+    sicherheitsnummer: sicherheitsnummer,
     verschluesseln: verschluesseln,
     entschluesseln: entschluesseln,
     umschliessen: umschliessen,

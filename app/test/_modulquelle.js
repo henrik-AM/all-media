@@ -274,10 +274,15 @@ function kryptoteil(bauOrdner) {
   const nacl = fs.readFileSync(path.join(gemeinsam, 'tweetnacl.js'), 'utf8');
   const rechnung = fs.readFileSync(path.join(gemeinsam, 'krypto.js'), 'utf8');
 
-  const attrappen = `
+  const kryptodaten = fs.readFileSync(path.join(gemeinsam, 'kryptodaten.js'), 'utf8').replace(/module\.exports\s*=.*;/, '');
+  const attrappen = `${kryptodaten}
+
 const SecureStore = {
   getItemAsync: async (k) => localStorage.getItem('prueflauf.' + k),
   setItemAsync: async (k, v) => localStorage.setItem('prueflauf.' + k, v),
+  // Seit dem 16.10.2026 (AR-08) übernimmt lib/krypto.ts das alte Fach ohne
+  // Kontokennung und löscht es danach.
+  deleteItemAsync: async (k) => localStorage.removeItem('prueflauf.' + k),
 };
 const ExpoCrypto = {
   getRandomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
@@ -290,6 +295,7 @@ const ExpoCrypto = {
     .replace(/^\s*import\s+\*\s+as\s+\w+\s+from\s+['"]expo-[\w-]+['"];?\s*$/gm, '')
     .replace(/require\(['"][^'"]*gemeinsam\/tweetnacl['"]\)/g, 'globalThis.nacl')
     .replace(/require\(['"][^'"]*gemeinsam\/krypto['"]\)/g, 'globalThis.Krypto')
+    .replace(/const \{ schluesselHolen \} = require\([^;]+;/, '')
     // Im Blob gibt es nur ein Modul — aus `export const x` wird `const x`.
     .replace(/^export\s+/gm, '');
 

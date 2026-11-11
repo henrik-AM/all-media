@@ -1,0 +1,13 @@
+OK Browser sendet verschlüsselt, Speichertabelle enthält keinen Klartext
+OK Kuverts auch für das Browsergerät und Gegenüber vorhanden
+OK Gegenüber kann das echte Browserpaket lesen
+AssertionError [ERR_ASSERTION]: Bearbeiten: fehlendes Umschlüsselpaket erhält Entwurf/Bezug und ermöglicht Wiederholung
+    at pruefe (/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_browser_offline.cjs:58:33)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_browser_offline.cjs:91:36 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

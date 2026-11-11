@@ -1,0 +1,183 @@
+  Laufkennung: 0845e0a2-d9c6-491e-8bb0-32e14651e743
+
+======================================================================
+  testhygiene
+======================================================================
+✔ Frischer Worktree: beide Fixtures vor dem Stempel; wiederholte Vorbereitung bytegleich (2.082625ms)
+✔ Abweichende Fixture wird abgelehnt und nicht überschrieben (0.434416ms)
+✔ Laufjournal belegt Leerstand; Löschen erfasst beide Testkonten auch bei zurückdatierten Vorlagen (0.71975ms)
+✔ Alte Journale bleiben zeitlich begrenzt; Version 2 ohne Leerstandsnachweis wird abgelehnt (0.660208ms)
+✔ Fehlgeschlagene Bereinigung bleibt wiederaufnehmbar; nächster Start räumt zuerst auf (0.521667ms)
+✔ Nichtnull-Rest zählt als Fehler und erhält das Journal (0.326625ms)
+✔ Altbestand ohne Journal blockiert vor dem ersten Löschaufruf (0.164959ms)
+✔ Fremdes Projekt und manipulierte DB-Zeit werden ohne SQL abgelehnt (0.444125ms)
+✔ SIGKILL im Startfenster: unklarer Kindprozess verhindert automatische Löschung (0.324625ms)
+✔ Verwaister laufender Prüfprozess blockiert Bereinigung; nach seinem Ende ist Wiederaufnahme möglich (2.004416ms)
+✔ Management-API: HTTP-Fehler wird vor dem Auswerten einer scheinbaren Zählantwort verworfen (0.667125ms)
+✔ Fehlende oder falsch geformte Zählantwort ist kein leerer Bestand (0.20325ms)
+✔ Management-API: nur die ausdrücklich erwartete SQL-Ausnahme passiert eine Negativprobe (0.425542ms)
+✔ Gesamtlauf: Fehlgeschlagene Suite stoppt weitere Suiten nicht; Bereinigung und Rohbelege vorhanden (40.632334ms)
+✔ Gesamtlauf: alle Suiten mit Zahlen, stabile Quellen und Rest null ergeben Exit 0 (21.845792ms)
+✔ Gesamtlauf: fehlendes Token blockiert vor SQL und vor Start eines Prüfers (0.756417ms)
+✔ Gesamtlauf: Exit 0 ohne Prüfzahlen bleibt unvollständig (20.3035ms)
+✔ Gesamtlauf: deutscher Summensatz und node:test werden gezählt, null Prüfungen nicht (82.917708ms)
+✔ Gesamtlauf: Bereinigungsfehler verhindert Erfolg und bewahrt Journal (21.770541ms)
+✔ Gesamtlauf: SIGTERM beendet Kind, überspringt Rest und räumt vor Rückgabe 143 auf (105.070792ms)
+✔ Gesamtlauf: geänderter Prüfcode macht einen sonst grünen Lauf ungültig (25.121208ms)
+✔ Gesamtlauf: sechs Stunden lösen genau eine Warnung aus (38.869125ms)
+✔ Kind mit geerbten Browser-Pipes: Prozessgruppe endet trotz frühem exit (42.049375ms)
+✔ Zeitlimit beendet den Prüfprozess (104.373125ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 515.161708
+
+======================================================================
+  smoke
+======================================================================
+PASS  Unten genau vier Bereiche
+PASS  Bereiche in Prototyp-Reihenfolge
+PASS  Oben 4 Unterpunkte in messenger
+PASS  Oben 5 Unterpunkte in videos
+PASS  Oben 4 Unterpunkte in communities
+PASS  Oben 0 Unterpunkte in settings
+PASS  messenger/friendmap oeffnet
+PASS  messenger/chats oeffnet
+PASS  messenger/camera oeffnet
+PASS  messenger/profile oeffnet
+PASS  videos/home oeffnet
+PASS  videos/portrait oeffnet
+PASS  videos/landscape oeffnet
+PASS  videos/search oeffnet
+PASS  videos/profile oeffnet
+PASS  communities/home oeffnet
+PASS  communities/chats oeffnet
+PASS  communities/search oeffnet
+PASS  communities/profile oeffnet
+PASS  Chat-Suche filtert (projekt -> 1)
+PASS  Leerzustand bei 0 Treffern
+PASS  Gruppen-Filter (2 Gruppen)
+PASS  Kontakt-Filter (6 Einzelchats)
+PASS  Chat-Bereich nicht abgeschnitten
+PASS  Nachricht senden
+PASS  Nachricht steht im Verlauf
+PASS  Zurueck aus Chat
+PASS  Story-Viewer oeffnet
+PASS  Herz wird rot
+PASS  Rechts blaettert weiter
+PASS  Links blaettert zurueck
+PASS  Like bleibt bestehen
+PASS  Zeit steht waehrend des Tippens
+PASS  Enter schickt die Story-Antwort nicht ab
+PASS  Senden-Pfeil ist nutzbar, sobald etwas dasteht
+PASS  Antwort oeffnet den Chat
+PASS  Antwort steht im Chat
+PASS  Eigene Story oeffnet den Betrachter
+PASS  Eigene Story heisst "Deine Story"
+PASS  Kamera oeffnet
+PASS  Neu-Menue mit drei Eintraegen
+PASS  Auswahl wird gezaehlt
+PASS  Schritt 2 fragt den Namen
+PASS  Gruppe oeffnet sich als Chat
+PASS  Mitgliederzahl stimmt
+PASS  Gruppe steht in der Chatliste
+PASS  Kontaktliste oeffnet (6 Kontakte)
+PASS  Kontakt-Suche filtert (elif -> 1)
+PASS  Unbekannte Nummer wird abgelehnt
+PASS  Doppelter Kontakt wird abgelehnt
+PASS  Eine Kennung wird nicht mehr angenommen
+PASS  Querformat zeigt 12 Videos
+PASS  Querformat-Suche ohne Treffer
+PASS  Querformat-Suche filtert (design -> 1)
+PASS  Explorer zeigt sieben Abschnitte
+PASS  Explorer filtert
+PASS  Kommentare oeffnen (3)
+PASS  Kommentar senden
+PASS  Kommentar liken
+PASS  Profil aus Beitrag oeffnet
+PASS  Folgen schaltet um
+PASS  Community-Chats zeigen persoenliche Chats
+PASS  Community-Chats zeigen keine Communitys
+PASS  Filter Alle/Chats/Gruppen vorhanden
+PASS  Plus-Knopf zum Hinzufuegen
+PASS  Filter Gruppen zeigt nur die Gruppe
+PASS  Filter Kontakte zeigt nur Profile (16)
+PASS  Filter Communitys zeigt nur Kanaele (29/29, Profile 0)
+PASS  Community-Profil zeigt beide Abschnitte
+PASS  Profil wechseln steht über dem Profil
+PASS  Einstellungen ohne obere Leiste
+PASS  Einstellungen ohne Seitentitel
+PASS  Prototyp-Abschnitte vorhanden
+PASS  Zusaetzliche Abschnitte ergaenzt
+PASS  Dark-Mode-Schalter
+
+Keine Konsolenfehler
+
+======================================================================
+  feedback
+======================================================================
+
+Chats
+  OK   Chatliste hat Eintraege  — 8 Zeilen
+  OK   Chat laesst sich oeffnen  — Anna Schmidt
+  FEHL Eigene Nachricht landet im Verlauf
+
+Filter
+  OK   Pills sind vollstaendig hoch  — Alle:33px Kontakte:33px Gruppen:33px
+  OK   Text sitzt mittig in der Pille  — flex/center/center
+  OK   Pills werden unten nicht abgeschnitten  — Pills bis 272, Rahmen 275
+
+Vollbild / PWA
+  OK   Als App startbar (Homescreen)
+  OK   Manifest verlinkt
+  OK   Statusleiste durchsichtig  — black-translucent
+  OK   Manifest sagt standalone  — standalone
+
+Friend-Map
+  OK   Karte ist da
+  OK   Kein Plus/Minus mehr
+  OK   Vollbild-Pfeil ist da
+  OK   Ansicht-Umschalter ist da
+  OK   Standort-Freigabe ist da
+  OK   Vollbild schaltet um
+  OK   Vollbild laesst sich verlassen
+  OK   Auswahlfenster fuer die Kartenansicht geht auf
+  OK   Kartenansicht wechselt
+  OK   Kontakt-Tippen bleibt auf der Karte
+  OK   Kontakt ist hervorgehoben
+
+Kontakt hinzufuegen
+  OK   Feld nimmt auch Telefonnummern  — Telefonnummer
+  OK   Nachricht vor Annahme moeglich
+  OK   Anfrage per Nummer angelegt
+  OK   Weitere Nachrichten gesperrt bis zur Annahme
+  OK   Der Absender kann seine Anfrage nicht selbst annehmen
+
+Gruppe erstellen
+  OK   Schritt 1 zeigt Personen, nicht den Namen
+  OK   Nicht-Kontakte per Nummer moeglich
+  OK   Schritt 2 fragt Name und Info
+  OK   Gruppenbild anlegbar
+  OK   Blatt schliesst per Klick daneben
+
+Konto wechseln
+  OK   Profil wechseln fuehrt zur Kontoliste
+  OK   Zweites Konto anlegbar
+
+Repost
+  OK   Ein noch nicht repposteter Beitrag im Feed
+
+======================================================================
+  Übersicht
+======================================================================
+  OK    testhygiene          24/24
+  OK    smoke                75/75
+  FEHL  feedback             33/34
+
+  132 von 133 Prüfungen bestanden, 3/80 Läufe.
+  Nicht durchgekommen: feedback
+ABBRUCH: Lauf 0845e0a2-d9c6-491e-8bb0-32e14651e743: 1 Testmitteilungen übrig.

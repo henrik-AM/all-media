@@ -33,6 +33,9 @@ const Teilen = require('../../gemeinsam/teilen');
 const Zahlung = require('../../gemeinsam/zahlung');
 // Kasten RS 3: Melden und Moderation (Schema 102) — dieselben Regeln wie die App.
 const Meldung = require('../../gemeinsam/meldung');
+// Die Senderegel der Verschluesselung (AR-05) — dieselbe wie in App und Browser.
+const Krypto = require('../../gemeinsam/krypto');
+const { schluesselHolen } = require('../../gemeinsam/kryptodaten');
 
 // Ein Umschalter (Like, Gespeichert, Repost …): Zeile da → weg, sonst → hin.
 async function umschalten(client, tabelle, schluessel) {
@@ -478,6 +481,12 @@ const handleFindPerson = handler('Person suchen', async (client, nutzerId, einga
   return { ok: true, person: (data || [])[0] || null, warNummer: false };
 });
 
+/** Nur die Kryptofelder eines Browserpakets, keine mitgeschickten Medienbezüge. */
+function kryptoAngaben(p = {}) {
+  return { krypto: p.krypto, chiffre: p.chiffre, kryptoNonce: p.kryptoNonce,
+    absenderSchluessel: p.absenderSchluessel, kuverts: p.kuverts };
+}
+
 /**
  * Kontakt hinzufügen.
  *
@@ -487,7 +496,7 @@ const handleFindPerson = handler('Person suchen', async (client, nutzerId, einga
  */
 const handleAddContact = handler(
   'Kontakt hinzufügen',
-  async (client, nutzerId, zielId, privat, nachricht = '') => {
+  async (client, nutzerId, zielId, privat, nachricht = '', paket = {}) => {
     const { count } = await client
       .from('contacts')
       .select('*', { count: 'exact', head: true })
@@ -502,11 +511,10 @@ const handleAddContact = handler(
     if (error && error.code !== '23505') throw error;
 
     const chatId = await chatMit(client, nutzerId, zielId);
-    if (nachricht.trim()) {
-      const { error: fehlerNachricht } = await client
-        .from('messages')
-        .insert({ chat_id: chatId, sender_id: nutzerId, text: nachricht.trim() });
-      if (fehlerNachricht) throw fehlerNachricht;
+    if (nachricht.trim() || Number(paket.krypto) > 0) {
+      if (Number(paket.krypto) > 0 && paket.chatId !== chatId) return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
+      const e = await handleSendMessage(client, nutzerId, chatId, Number(paket.krypto) > 0 ? '' : nachricht.trim(), kryptoAngaben(paket));
+      if (!e?.ok) return e;
     }
 
     return { ok: true, status, chatId };
@@ -730,7 +738,7 @@ const handleNotifyPost = handler('Beitragshinweis', async (client, nutzerId, bei
  */
 const handleShareToChats = handler(
   'An Kontakte schicken',
-  async (client, nutzerId, beitragId, empfaenger = [], vorschau = 'Beitrag geteilt', bereich = 'messenger') => {
+  async (client, nutzerId, beitragId, empfaenger = [], vorschau = 'Beitrag geteilt', bereich = 'messenger', ziele = []) => {
     if (empfaenger.length === 0) return { ok: false, fehler: 'Bitte mindestens eine Person auswählen' };
 
     const gesendet = [];
@@ -768,10 +776,10 @@ const handleShareToChats = handler(
         // Welcher Beitrag geteilt wurde, gehoert an die Nachricht. Sonst steht
         // im Chat nur der Satz "Beitrag geteilt" und niemand kommt von dort aus
         // zum Beitrag — im Prototyp ist das eine Karte, die ihn oeffnet.
-        const { error: fehlerNachricht } = await client
-          .from('messages')
-          .insert({ chat_id: chatId, sender_id: nutzerId, text: vorschau, shared_post_id: beitragId });
-        if (fehlerNachricht) throw fehlerNachricht;
+        const paket = ziele.find((z) => z?.chatId === chatId) || {};
+        const e = await handleSendMessage(client, nutzerId, chatId, Number(paket.krypto) > 0 ? '' : vorschau,
+          { ...kryptoAngaben(paket), geteilterBeitragId: beitragId });
+        if (!e?.ok) throw new Error(e?.fehler || Krypto.MELDUNG_NICHT_VERSCHLUESSELT);
         gesendet.push(zielId);
       } catch (fehler) {
         console.error('Teilen an', zielId, 'fehlgeschlagen:', fehler.message);
@@ -864,8 +872,15 @@ const handlePersonPerNutzername = handler('Nutzername suchen', async (client, nu
   return { ok: true, person: data || null };
 });
 
-/** Antwort auf eine Story landet im normalen Chat mit dieser Person. */
-const handleStoryReply = handler('Story beantworten', async (client, nutzerId, storyId, text) => {
+/*
+ * Der Chat zu einer Story — vor dem Antworten (16.10.2026, AR-05).
+ *
+ * Der Browser muss wissen, in welchen Chat die Antwort geht, BEVOR er sie
+ * schreibt: nur dann kann er sie fuer die Geraete dieses Chats verschliessen.
+ * `chatMit` legt ihn an, wenn es ihn noch nicht gibt — dasselbe, was die
+ * Antwort selbst ohnehin taete.
+ */
+const handleStoryChat = handler('Story-Chat', async (client, nutzerId, storyId) => {
   const { data: story, error } = await client
     .from('stories')
     .select('id, user_id')
@@ -873,20 +888,59 @@ const handleStoryReply = handler('Story beantworten', async (client, nutzerId, s
     .maybeSingle();
   if (error) throw error;
   if (!story) return { ok: false, fehler: 'Diese Story gibt es nicht mehr' };
+  if (story.user_id === nutzerId) return { ok: false, fehler: 'Das ist deine eigene Story' };
+  return { ok: true, chatId: await chatMit(client, nutzerId, story.user_id) };
+});
 
-  const chatId = await chatMit(client, nutzerId, story.user_id);
-  const { data: nachricht, error: fehlerN } = await client
-    .from('messages')
+/**
+ * Antwort auf eine Story landet im normalen Chat mit dieser Person.
+ *
+ * Bis zum 16.10.2026 schrieb das hier `text` direkt nach `messages` — immer
+ * im Klartext, auch in einem verschluesselten Chat, und ohne dass jemand es
+ * merkte (AR-05). Die App verschluesselte dieselbe Antwort laengst
+ * (aktionen.ts, storyAntwort → nachrichtSenden). Jetzt bringt der Browser
+ * mit, was er verschlossen hat (`krypto`), und der Weg ist derselbe wie beim
+ * gewoehnlichen Senden: handleSendMessage mit Kuverts, Klartext-Waechter und
+ * der Sperre fuer Zweierchats mit drittem Mitglied.
+ */
+const handleStoryReply = handler(
+  'Story beantworten',
+  async (client, nutzerId, storyId, text, krypto = {}) => {
+    const { data: story, error } = await client
+      .from('stories')
+      .select('id, user_id')
+      .eq('id', storyId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!story) return { ok: false, fehler: 'Diese Story gibt es nicht mehr' };
+
+    const chatId = await chatMit(client, nutzerId, story.user_id);
+    /*
+     * Verschlossen wurde fuer die Geraete eines bestimmten Chats. Ist das
+     * nicht der, in den die Antwort geht, passten die Kuverts auf niemanden
+     * — dann lieber gar nicht senden.
+     */
+    if (Number(krypto.krypto || 0) > 0 && krypto.chatId !== chatId) {
+      return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
+    }
+
     // Mit Bezug auf die Story (Schema 41). Ohne ihn stand im Chat ein Satz
     // wie „schoenes Bild!", und niemand wusste zwei Tage spaeter noch, worauf
     // er sich bezog. Gleiche Regel in app/lib/aktionen.ts (storyAntwort).
-    .insert({ chat_id: chatId, sender_id: nutzerId, text, reply_to_story: storyId })
-    .select()
-    .single();
-  if (fehlerN) throw fehlerN;
+    const e = await handleSendMessage(client, nutzerId, chatId, Number(krypto.krypto || 0) > 0 ? '' : text, {
+      storyId,
+      klartextPruefen: true,
+      krypto: Number(krypto.krypto || 0),
+      chiffre: krypto.chiffre || null,
+      kryptoNonce: krypto.kryptoNonce || null,
+      absenderSchluessel: krypto.absenderSchluessel || null,
+      kuverts: Array.isArray(krypto.kuverts) ? krypto.kuverts : [],
+    });
+    if (!e || e.ok === false) return e;
 
-  return { ok: true, chatId, nachricht };
-});
+    return { ok: true, chatId, nachricht: e.nachricht };
+  }
+);
 
 /** Neues Unterthema in einer Community. */
 const handleCreateChannel = handler(
@@ -1149,9 +1203,96 @@ const handleStreamEnde = handler('Livestream beenden', async (client, nutzerId, 
   return { ok: true, veroeffentlicht: true };
 });
 
+/*
+ * Die Fakten, nach denen `Krypto.sendeweg` (gemeinsam/krypto.js) entscheidet,
+ * ob eine Nachricht verschlossen, offen oder gar nicht hinausgeht — dieselben,
+ * die app/lib/krypto.ts (sendefakten) direkt bei Supabase holt.
+ *
+ * Wirft, wenn eine Abfrage scheitert. Bis zum 16.10.2026 hiess ein Fehler
+ * hier „verschluesselbar: false", und der Browser schickte still Klartext
+ * (AR-05). Ohne Fakten laesst sich aber nicht sagen, ob Klartext erlaubt
+ * waere — dann ist er es nicht.
+ *
+ * `knapp` holt vom Gegenueber nur EINEN Schluessel: der Waechter beim
+ * Klartext-Senden will nur wissen, ob es ueberhaupt einen gibt, und soll
+ * nicht bei jeder Gruppennachricht bis zu 1000 Zeilen ziehen (Egress, 10.10.).
+ */
+async function kryptoFakten(db, chatId, nutzerId, { knapp = false } = {}) {
+  const { data: chat, error: fehlerC } = await db
+    .from('chats')
+    .select('is_group')
+    .eq('id', chatId)
+    .maybeSingle();
+  if (fehlerC) throw fehlerC;
+  if (!chat) throw new Error('Chat nicht ladbar');
+  if (chat?.is_group) {
+    return { istGruppe: true, mitglieder: [], ichId: nutzerId, schluessel: [], schonVerschluesselt: false };
+  }
+
+  const [mitgliedAntwort, verlaufAntwort] = await Promise.all([
+    db.from('chat_members').select('user_id').eq('chat_id', chatId),
+    // Wurde hier schon einmal verschluesselt geschrieben? Eine Zeile reicht.
+    db.from('messages').select('id').eq('chat_id', chatId).gt('krypto', 0).limit(1),
+  ]);
+  if (mitgliedAntwort.error) throw mitgliedAntwort.error;
+  if (verlaufAntwort.error) throw verlaufAntwort.error;
+  const ids = (mitgliedAntwort.data || []).map((m) => m.user_id);
+
+  let schluessel = [];
+  if (ids.length) {
+    if (knapp) {
+      const { data, error } = await db.from('krypto_schluessel').select('id, user_id, oeffentlich')
+        .in('user_id', ids.filter((id) => id !== nutzerId)).limit(1);
+      if (error) throw error;
+      schluessel = data || [];
+    } else {
+      schluessel = await schluesselHolen(db, ids);
+    }
+  }
+
+  return {
+    istGruppe: false,
+    mitglieder: ids,
+    ichId: nutzerId,
+    schluessel,
+    schonVerschluesselt: (verlaufAntwort.data || []).length > 0,
+  };
+}
+
 const handleSendMessage = handler(
   'Nachricht senden',
   async (client, nutzerId, chatId, text, medien = {}) => {
+    /*
+     * Zwei Waechter vor dem Schreiben (Sicherheitsprüfung 16.10.2026).
+     *
+     * 1. Ein Chat, der keine Gruppe ist, aber mehr als zwei Mitglieder hat,
+     *    nimmt nichts an — weder verschlossen (der Dritte bekaeme ein
+     *    Kuvert) noch offen (er laese mit). Gilt fuer jeden Weg hierher,
+     *    auch fuer Anhaenge. Gleiche Regel in der App (fuerChatVerschliessen).
+     *
+     * 2. Alle Textwege (auch Kontakt, Teilen und Anhang-Beschriftungen): der Browser entscheidet
+     *    selbst und schickt nur dort Klartext, wo `Krypto.sendeweg` es
+     *    erlaubt. Kommt trotzdem Klartext an — eine alte app.js aus dem
+     *    Zwischenspeicher, krypto.js nicht geladen —, prueft dieser Server
+     *    dieselbe Regel und lehnt ab, statt den Text offen in einen
+     *    verschluesselten Chat zu schreiben (AR-05). `meiner: null`, weil der
+     *    Server keinen Schluessel hat: ist Verschluesselung vorgesehen, heisst
+     *    das hier immer „ablehnen". Die Dateien selbst
+     *    bleiben unverschlüsselt; ihr Nachrichtentext folgt derselben Regel.
+     */
+    const fakten = await kryptoFakten(client, chatId, nutzerId, { knapp: true });
+    if (Krypto.zuVieleMitglieder(fakten)) return { ok: false, fehler: Krypto.MELDUNG_NUR_ZU_ZWEIT };
+    if (!Number(medien.krypto || 0) && text) {
+      const weg = Krypto.sendeweg({ ...fakten, meiner: null });
+      if (weg.art !== 'offen') return { ok: false, fehler: weg.meldung };
+    }
+
+    if (Number(medien.krypto || 0) > 0 &&
+        (Number(medien.krypto) !== Krypto.VERSION || text || !medien.chiffre || !medien.kryptoNonce ||
+         !medien.absenderSchluessel || !Array.isArray(medien.kuverts) || !medien.kuverts.length)) {
+      return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
+    }
+
     const { data, error } = await client
       .from('messages')
       .insert({
@@ -1172,6 +1313,10 @@ const handleSendMessage = handler(
         quote_of: medien.zitatVon || null,
         file_name: medien.dateiName || null,
         file_size: medien.dateiGroesse || null,
+        // Antwort oder Herz zu einer Story (Schema 41) — seit dem 16.10.2026
+        // auch ueber diesen Weg, damit sie verschluesselt hinausgehen kann.
+        reply_to_story: medien.storyId || null,
+        shared_post_id: medien.geteilterBeitragId || null,
         /*
          * Verschluesselung (Schema 31). Verschlossen hat der Browser, nicht
          * dieser Server — er bekommt Chiffre und Nonce fertig und legt sie
@@ -1497,6 +1642,21 @@ const handleLikeStory = handler('Story-Like', async (client, nutzerId, storyId) 
    */
   try {
     const chatId = await chatMit(client, nutzerId, story.user_id);
+    /*
+     * Das Herz ist eine Nachricht wie jede andere (AR-05, 16.10.2026). In
+     * einem Chat, in dem verschluesselt werden muss, schreibt dieser Server
+     * es nicht offen hinein — er hat keinen Schluessel. Er gibt den Chat
+     * zurueck, und der Browser schickt das Herz verschlossen ueber den
+     * Antwortweg nach (public/app.js, storyHerzNachsenden). Die App
+     * verschluesselt es ohnehin (aktionen.ts, storyLike → nachrichtSenden).
+     */
+    const fakten = await kryptoFakten(client, chatId, nutzerId, { knapp: true });
+    const weg = Krypto.sendeweg({ ...fakten, meiner: null });
+    if (weg.art !== 'offen') {
+      // Zweierchat mit drittem Mitglied: gar kein Herz (siehe handleSendMessage).
+      if (Krypto.zuVieleMitglieder(fakten)) return { ok: true, geliked: gesetzt };
+      return { ok: true, geliked: gesetzt, herzChatId: chatId };
+    }
     const { error } = await client
       .from('messages')
       .insert({ chat_id: chatId, sender_id: nutzerId, text: '\u2764\ufe0f', reply_to_story: storyId });
@@ -2369,33 +2529,108 @@ const handleNachrichtZuruecknehmen = handler(
   }
 );
 
+/*
+ * Eine Nachricht in andere Chats weiterleiten.
+ *
+ * Bis zum 16.10.2026 kopierte das `text` in einem Insert ueber alle Ziele.
+ * Zwei Fehler steckten darin (AR-05): eine verschluesselte Quelle hat
+ * leeren `text` und kam als leere Blase an, und in einen verschluesselten
+ * Chat ging der Text still im Klartext. Die App macht es seit Schema 31
+ * richtig (aktionen.ts, nachrichtWeiterleiten): oeffnen, je Ziel neu
+ * verschliessen.
+ *
+ * Hier geht das nur mit dem Browser, denn dieser Server hat keinen
+ * Schluessel. `ziele` traegt deshalb je Ziel, was der Browser mit
+ * `Krypto.sendeweg` entschieden hat: verschlossen (krypto, chiffre,
+ * kryptoNonce, absenderSchluessel, kuverts) oder offen (text). Fuer jedes
+ * offene Ziel prueft dieser Server dieselbe Regel noch einmal — ALLE vor dem
+ * ersten Schreiben, damit nicht die Haelfte hinausgeht und der Rest scheitert.
+ */
 const handleNachrichtWeiterleiten = handler(
   'Weiterleiten',
-  async (client, nutzerId, nachrichtId, chatIds) => {
+  async (client, nutzerId, nachrichtId, chatIds, ziele = []) => {
     if (!Array.isArray(chatIds) || !chatIds.length) {
       return { ok: false, fehler: 'Kein Ziel gewählt' };
     }
 
     const { data, error } = await client
       .from('messages')
-      .select('text, media_url, media_type, file_name, file_size, sender_id')
+      .select('text, media_url, media_type, file_name, file_size, sender_id, krypto')
       .eq('id', nachrichtId)
       .single();
     if (error) throw error;
+    const quelleVerschluesselt = Number(data.krypto || 0) > 0;
 
-    const { error: fehler } = await client.from('messages').insert(
-      chatIds.map((chat_id) => ({
-        chat_id,
-        sender_id: nutzerId,
-        text: data.text,
-        media_url: data.media_url,
-        media_type: data.media_type,
-        file_name: data.file_name,
-        file_size: data.file_size,
-        forwarded_from: data.sender_id,
-      }))
-    );
-    if (fehler) throw fehler;
+    const plan = [];
+    for (const chatId of chatIds) {
+      const fakten = await kryptoFakten(client, chatId, nutzerId, { knapp: true });
+      // Kein Zweierchat mit drei Mitgliedern — siehe handleSendMessage.
+      if (Krypto.zuVieleMitglieder(fakten)) return { ok: false, fehler: Krypto.MELDUNG_NUR_ZU_ZWEIT };
+      const ziel = ziele.find((z) => z && z.chatId === chatId) || {};
+      const krypto = Number(ziel.krypto || 0);
+      if (krypto > 0) {
+        if (!ziel.chiffre || !ziel.kryptoNonce || !Array.isArray(ziel.kuverts) || !ziel.kuverts.length) {
+          return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
+        }
+        plan.push({ chatId, krypto, ziel });
+        continue;
+      }
+      /*
+       * Offen. Den Text einer offenen Quelle nimmt der Server aus der
+       * Datenbank, nicht aus dem Browser — dann kann niemand unter
+       * „weitergeleitet von X" etwas einstellen, das X nie geschrieben hat.
+       * Eine verschluesselte Quelle kann nur der Browser oeffnen; ohne
+       * seinen Text gaebe es die leere Blase von frueher.
+       */
+      const text = quelleVerschluesselt ? String(ziel.text || '') : data.text || '';
+      if (quelleVerschluesselt && !text) {
+        return { ok: false, fehler: 'Diese Nachricht lässt sich hier nicht weiterleiten' };
+      }
+      if (text) {
+        const weg = Krypto.sendeweg({ ...fakten, meiner: null });
+        if (weg.art !== 'offen') return { ok: false, fehler: weg.meldung };
+      }
+      plan.push({ chatId, krypto: 0, text });
+    }
+
+    for (const schritt of plan) {
+      const { data: neu, error: fehler } = await client
+        .from('messages')
+        .insert({
+          chat_id: schritt.chatId,
+          sender_id: nutzerId,
+          text: schritt.krypto ? '' : schritt.text,
+          krypto: schritt.krypto,
+          chiffre: schritt.krypto ? schritt.ziel.chiffre : null,
+          krypto_nonce: schritt.krypto ? schritt.ziel.kryptoNonce : null,
+          absender_schluessel: schritt.krypto ? schritt.ziel.absenderSchluessel || null : null,
+          media_url: data.media_url,
+          media_type: data.media_type,
+          file_name: data.file_name,
+          file_size: data.file_size,
+          forwarded_from: data.sender_id,
+        })
+        .select('id')
+        .single();
+      if (fehler) throw fehler;
+
+      // Die Kuverts — gleiche Regel wie in handleSendMessage: ohne sie ist
+      // die Nachricht fuer niemanden lesbar, also wieder weg damit.
+      if (schritt.krypto) {
+        const { error: fehlerK } = await client.from('message_keys').insert(
+          schritt.ziel.kuverts.map((k) => ({
+            message_id: neu.id,
+            schluessel_id: k.schluesselId,
+            nonce: k.nonce,
+            chiffre: k.chiffre,
+          }))
+        );
+        if (fehlerK) {
+          await client.from('messages').delete().eq('id', neu.id);
+          throw fehlerK;
+        }
+      }
+    }
 
     await client
       .from('chats')
@@ -2883,6 +3118,7 @@ module.exports = {
   handleShareToChats,
   handleShareToCommunities,
   handleStoryReply,
+  handleStoryChat,
   handleCreateChannel,
   handleSendChannelMessage,
   handleProfilListe,
@@ -2892,6 +3128,7 @@ module.exports = {
   handleStreamEnde,
   istNummer,
   handleSendMessage,
+  kryptoFakten,
   handleMarkChatAsRead,
   handleCreatePost,
   handleCreateVideo,

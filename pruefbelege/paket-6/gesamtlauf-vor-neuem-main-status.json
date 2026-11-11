@@ -1,0 +1,100 @@
+{
+  "laufId": "801f2907-97d7-4fa4-a4b5-cc987ea422a3",
+  "erwartet": 80,
+  "phase": "beendet",
+  "bereinigung": "erfolgreich",
+  "stempelVorher": "9b69fa3dd8472316ca11082c11ac34b5b6e1245d610a30c5e02ca4bfb34f568e",
+  "ergebnisse": [
+    {
+      "name": "testhygiene",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "smoke",
+      "code": 0,
+      "zahlen": {
+        "gut": 75,
+        "gesamt": 75
+      }
+    },
+    {
+      "name": "feedback",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "teilen",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "sync",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "uebernacht",
+      "code": 0,
+      "zahlen": {
+        "gut": 11,
+        "gesamt": 11
+      }
+    },
+    {
+      "name": "schema",
+      "code": 0,
+      "zahlen": {
+        "gut": 7,
+        "gesamt": 7
+      }
+    },
+    {
+      "name": "sammlungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "sammlungenweb",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "explorer",
+      "code": "abbruch",
+      "zahlen": {
+        "gut": 2,
+        "gesamt": 13
+      }
+    }
+  ],
+  "signal": "SIGTERM",
+  "quellenUnveraendert": true,
+  "code": 143
+}

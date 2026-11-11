@@ -830,6 +830,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .msg--out .msg__foot { color: var(--bubble-out-meta, #4A7A5C); }
 .msg__foot svg { width: 14px; height: 14px; }
+/* AR-04: Absenderschlüssel gehört nicht zum Absender — wie in der App rot und fett. */
+.msg__nichtPruefbar { color: var(--danger); font-weight: 700; margin-right: 2px; }
 
 .typing { align-self: flex-start; display: flex; gap: 4px; padding: 12px 14px; background: var(--bubble-in); box-shadow: 0 1px 1px rgba(12,14,20,.05), 0 1px 3px rgba(12,14,20,.06); border-radius: 18px; border-bottom-left-radius: 6px; }
 .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); animation: bounce 1.2s infinite; }

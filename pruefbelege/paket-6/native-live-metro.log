@@ -1,0 +1,18 @@
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/paket6-live-native
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+
+TypeScript: A tsconfig.json has been auto-generated
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+| (node:93739) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:93739) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 658ms einstieg.tsx (908 modules)
+ WARN  Gerätschlüssel nicht verfügbar: Error: Simulierter Schlüsselausfall im Live-Prüfstand
+ WARN  Verschlüsselung nicht prüfbar: Error: Simulierter Schlüsselausfall im Live-Prüfstand
+ ERROR  Nachricht senden fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.

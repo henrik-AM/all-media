@@ -28,18 +28,7 @@ const HEIKEL = /senden|teilen|l(ö|oe)schen|folgen|anruf|melden|blockieren|bezah
 
 function baum(udid) {
   const roh = execFileSync('axe', ['describe-ui', '--udid', udid], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  const flach = [];
-  const laufen = (knoten) => {
-    for (const k of knoten) {
-      const text = [k.AXLabel, k.title, k.AXValue].filter(Boolean).join(' | ');
-      // Auch Knoten ohne Beschriftung: sie sind kein Ziel, koennen aber eines
-      // verdecken (die untere Leiste hat unter ihren Knoepfen einen leeren Rand).
-      if (k.frame && k.frame.width > 0 && k.frame.height > 0) flach.push({ text, typ: k.type, f: k.frame });
-      if (k.children) laufen(k.children);
-    }
-  };
-  laufen(JSON.parse(roh));
-  return flach;
+  return require('./ui-sichtbar').baumAbflachen(JSON.parse(roh));
 }
 
 function zeile(e, i) {

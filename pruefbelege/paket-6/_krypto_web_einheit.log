@@ -1,0 +1,22 @@
+  OK   Altbestand: Konto A übernimmt das alte Paar
+  OK   Altbestand: altes Fach gelöscht
+  OK   Altbestand: auch das zweite angemeldete Konto B behält es
+  OK   Neues Konto C erbt nichts, eigenes Paar
+  OK   … mit eigener Gerätekennung
+  OK   Kontowechsel ohne vergessen(): wieder As Schlüssel
+  OK   Beide mit Schlüssel: verschlossen
+  OK   Gegenüber ohne Gerät, neuer Chat: Klartext (null)
+  OK   Gemerkter Chat, Server liefert Gegenüber leer: abgelehnt  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   Server-Fehler bei den Fakten: abgelehnt statt Klartext  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   Kein Netz: abgelehnt statt Klartext  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   Drittes Mitglied: abgelehnt  (Dieser Chat ist keine Gruppe, hat aber mehr als zwei Mitglieder. Damit niemand unbemerkt mitliest, wurde die Nachricht nicht gesendet.)
+  OK   Gruppe: Klartext
+  OK   Echte Nachricht geöffnet, nicht gekennzeichnet
+  OK   Fälschung geöffnet UND als nicht prüfbar gekennzeichnet
+  OK   Sicherheitsnummer im Browser = in Node
+
+16 von 16 Pruefungen bestanden.
+Verschlüsselung nicht prüfbar: Server antwortet mit 500
+Verschlüsselung nicht prüfbar: offline
+
+Exit: 0

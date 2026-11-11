@@ -203,6 +203,13 @@ const LAEUFE = [
   ['storyvideos', '_storyvideos.js'],
   ['storys', '_storys.js'],
   ['krypto', '_krypto.js'],
+  // Sicherheitsprüfung 16.10.2026 (AR-04/05/08): Senderegel, Sicherheitsnummer,
+  // Absenderprüfung, Schlüssel je Konto — App, Browser und Server, ohne Netz.
+  ['krypto-einheit', '_krypto_einheit.js'],
+  ['krypto-app', '_krypto_app_einheit.js'],
+  ['krypto-web', '_krypto_web_einheit.js'],
+  ['krypto-server', '_krypto_server_einheit.js'],
+  ['paket6-offline', '_paket6_offline.js'],
   ['rechte', '_rechte.js'],
   // Geburtsdatum und Zustimmung der Eltern (Schema 52); braucht SUPABASE_TOKEN wie rechte.
   ['minderjaehrig', '_minderjaehrig.js'],

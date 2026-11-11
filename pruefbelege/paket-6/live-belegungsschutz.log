@@ -1,0 +1,8 @@
+
+ABBRUCH  testbestand gehört einer anderen Sitzung.
+          Dieser Lauf setzt gemeinsame Testdaten zurück und läuft nur mit eigener Belegung:
+          ki-abgleich.sh belegen <ki> testbestand "<zweck>"   (danach: freigeben <ki> testbestand)
+          Gehört sie einer anderen Sitzung: warten oder Henrik fragen, nicht erzwingen.
+
+
+Exit: 2

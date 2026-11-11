@@ -1,0 +1,42 @@
+OK Native Live-Komponenten mit echtem SecureStore gestartet
+OK Website-Chiffre auf nativem Gerät A tatsächlich gelesen
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (4,208 130x29)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+Getippt: 1. [Button] "Konto B"  (71,175 63x29)
+OK Zweites Konto liest Website-Chiffre mit eigenem SecureStore-Schlüssel
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (4,208 130x29)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+Getippt: 1. [Button] "Live prüfen"  (146,241 84x29)
+OK Native Nachrichten beider Konten in echter Website gelesen
+Getippt: 1. [Button] "Störung"  (138,208 63x29)
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (4,208 130x29)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native Live-Sendefehler erhält den Entwurf
+Getippt: 1. [Button] "Störung"  (138,208 63x29)
+Getippt: 1. [Button] "Prüfstand Kontakt"  (251,175 128x29)
+Getippt: 1. [GenericElement] "Verschlüsselung, Ende-zu-Ende, "  (0,693 402x46)
+Traceback (most recent call last):
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_native_live.py", line 61, in <module>
+    pruefe('Native Live-Kontaktinfo zeigt alle drei realen Geräte','3 Geräte' in info1);bild('native-live-nummer-drei.png')
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6/app/test/_paket6_native_live.py", line 42, in pruefe
+    assert wahr,text;ok+=1;print('OK '+text,flush=True)
+           ^^^^
+AssertionError: Native Live-Kontaktinfo zeigt alle drei realen Geräte
+OK Native Live-Kontaktinfo zeigt alle bestehenden realen Geräte
+Getippt: 1. [GenericElement] "Zurück"  (12,402 22x23)
+Getippt: 1. [Button] "Zweites Gerät"  (206,208 102x29)
+Getippt: 1. [GenericElement] "Verschlüsselung, Ende-zu-Ende, "  (0,693 402x46)
+OK Reales Zusatzgerät ändert die native Sicherheitsnummer
+Getippt: 1. [GenericElement] "Zurück"  (12,402 22x23)
+Getippt: 1. [Button] "Absenderfälschung"  (4,241 138x29)
+OK Native Originalblase warnt bei real unregistriertem Absenderschlüssel
+Getippt: 1. [Button] "Konto A"  (4,175 63x29)
+OK Native Rückkehr A liest bestehende Chiffre weiter
+Getippt: 1. [Button] "Live prüfen"  (146,241 84x29)
+OK Schlüsselfehler hinterließ keine fünfte Nachrichtenzeile
+Getippt: 1. [Button] "Fertig"  (234,241 50x29)
+10/10 native Live-Komponentenprüfungen. Echte Konten/Supabase/SecureStore, gesonderte Rahmenkontexte.

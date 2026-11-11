@@ -1,0 +1,19 @@
+OK Browser sendet verschlüsselt, Speichertabelle enthält keinen Klartext
+OK Kuverts auch für das Browsergerät und Gegenüber vorhanden
+OK Gegenüber kann das echte Browserpaket lesen
+GET /api/krypto/empfaenger/zwei fehlgeschlagen: simuliert offline
+Browserkonsole: Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+OK Fehler sichtbar und Entwurf erhalten
+OK Netz-/Schlüsselstörung schreibt nichts
+OK Kontakt-Sicherheitsnummer entspricht Rechenschicht
+OK Altes zusätzliches Gerät ändert sichtbare Nummer
+OK Drittes Mitglied ohne Schlüssel erhält keine aktive Schlossanzeige
+OK Echte Blase zeigt Absenderwarnung
+OK Echte Teilen-Route schreibt verschlüsselt samt Beitragsbezug
+OK Echte Anhangroute verschließt die Beschriftung
+OK Echte Storyroute verschließt Antwort mit Storybezug
+OK Alter Anhang-Aufrufer wird ausdrücklich abgewiesen
+OK Fehlendes Kryptoskript sendet keinen Klartext
+OK Keine externen Browseranfragen
+OK Keine Browser-Skriptfehler
+16/16 Offline-Browserprüfungen; Port 3300, keine Supabase-Verbindung.

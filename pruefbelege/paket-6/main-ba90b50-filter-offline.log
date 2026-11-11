@@ -1,0 +1,28 @@
+OK App: genau Alle / Öffentlich / Privat
+OK App: Alle enthält nur beigetretene Communitys
+OK App: Öffentlich und aktive Auswahl
+OK App: Privat und aktive Auswahl
+OK App: Themen-Suche kombiniert sich mit Privat
+OK App: Namenssuche bleibt beim Filterwechsel erhalten
+OK App: Nulltreffer zeigt passenden Leertext
+OK App: Privat ohne Treffer zeigt privaten Leertext
+OK App: Öffentlich ohne Treffer zeigt öffentlichen Leertext
+OK App: Alle ohne Mitgliedschaft zeigt passenden Leertext
+OK Netzsperre: externer HTTP-Aufruf vor Verbindung abgewiesen
+OK Netzsperre: externer WebSocket ohne connectToServer geschlossen
+OK Web: genau Alle / Öffentlich / Privat
+OK Web: Alle startet aktiv und schließt Nichtmitglieder aus
+OK Web: Öffentlich filtert und markiert
+OK Web: Privat filtert und markiert
+OK Web: Themen-Suche mit Leerzeichen und Großschreibung
+OK Web: Namenssuche kombiniert sich mit Filter
+OK Web: Filterwechsel erhält Suchbegriff
+OK Web: Suche löschen zeigt gefilterte Liste
+OK Web: Nulltreffer nennt den Suchbegriff
+OK Web: Alle ohne Mitgliedschaft zeigt passenden Leertext
+OK Web: leerer privater Filter nennt Privat
+OK Web: leerer öffentlicher Filter nennt Öffentlich
+OK Web: nach Gegenprobe keinerlei unerwartete Netz-/WS-Versuche
+OK Web: keine JavaScript-Fehler
+
+26/26 Prüfungen bestanden. App: Hook-Hülle; Web: isolierter Renderer; keine Live-/Simulatorabnahme.

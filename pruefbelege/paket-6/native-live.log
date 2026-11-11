@@ -1,0 +1,11 @@
+2026-11-10T18:55:43.595Z LIVE: exklusiver Bestand bestätigt; keine Registrierung, kein Reset, kein Schema
+2026-11-10T18:55:48.018Z Native Live-Fixtures bereit; Bridge 3302, nur eigenes Gerät starten
+2026-11-10T18:55:59.037Z OK Zwei native SecureStore-Geräte registriert
+2026-11-10T18:55:59.037Z OK Native Geräte je Konto verschieden
+2026-11-10T18:58:18.139Z OK Native Sicherheitsnummer gegen alle Live-Geräte
+2026-11-10T18:59:18.056Z OK Native Sicherheitsnummer gegen alle Live-Geräte
+2026-11-10T18:59:55.100Z OK Beide nativen Nachrichten in echter Website lesbar
+2026-11-10T18:59:55.101Z OK Alle Live-Zeilen ohne Klartext
+2026-11-10T18:59:55.101Z OK Zusätzliches echtes Gerät ändert native Sicherheitsnummer
+2026-11-10T18:59:57.111Z OK Geprüfte Bereinigung: keine eigenen Chat-/Nachrichten-/Geräte-/Kontaktreste
+2026-11-10T18:59:57.112Z 8/8 Live-Prüfungen; Rest 0. Native Komponenten mit echtem SecureStore, echter Supabase und echter Website; Rahmenkontexte ersetzt.

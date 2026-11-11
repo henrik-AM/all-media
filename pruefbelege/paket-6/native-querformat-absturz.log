@@ -1,0 +1,12 @@
+Timestamp               Ty Process[PID:TID]
+2026-11-10 20:23:53.073 Df Expo Go[4093:616157] (CoreFoundation) *** Terminating app due to uncaught exception 'UIApplicationInvalidInterfaceOrientation', reason: 'Supported orientations has no common orientation with the application, and [RCTFabricModalHostViewController shouldAutorotate] is returning YES'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x00000001804c3dec __exceptionPreprocess + 172
+	1   libobjc.A.dylib                     0x0000000180063438 objc_exception_throw + 72
+	2   CoreFoundation                      0x00000001804c3cfc -[NSException initWithCoder:] + 0
+	3   UIKitCore                           0x0000000185c60a6c -[UIViewController __supportedInterfaceOrientations] + 872
+	4   UIKitCore                           0x0000000185b57118 -[_UIFullscreenPresentationController _prepareForMixedOrientationTransitionIfNecessaryInWindow:fromViewController:toViewController:] + 456
+	5   UIKitCore                           0x0000000185b56e68 -[_UIFullscreenPresentationController _adjustOrientationIfNecessaryInWindow:forViewController:p<…>
+2026-11-10 20:24:21.309 Df log[4709:0] [com.apple.log:] log run noninteractively, parent: 96722 (launchd_sim), args: 'log' 'show' '--style' 'compact' '--last' '2m' '--predicate' 'eventMessage CONTAINS "Supported orientations"'
+2026-11-10 20:24:48.471 Df log[4836:0] [com.apple.log:] log run noninteractively, parent: 96722 (launchd_sim), args: 'log' 'show' '--style' 'compact' '--last' '5m' '--predicate' 'eventMessage CONTAINS "Supported orientations"'

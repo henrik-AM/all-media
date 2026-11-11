@@ -1,0 +1,37 @@
+{
+  "laufId": "0845e0a2-d9c6-491e-8bb0-32e14651e743",
+  "erwartet": 80,
+  "phase": "beendet",
+  "bereinigung": "fehlgeschlagen",
+  "stempelVorher": "7b1b23458281bdf1cc737d0ef469db43580be18563183da5ef46a953ccbe6426",
+  "ergebnisse": [
+    {
+      "name": "testhygiene",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "smoke",
+      "code": 0,
+      "zahlen": {
+        "gut": 75,
+        "gesamt": 75
+      }
+    },
+    {
+      "name": "feedback",
+      "code": "abbruch",
+      "zahlen": {
+        "gut": 33,
+        "gesamt": 34
+      }
+    }
+  ],
+  "signal": "SIGTERM",
+  "quellenUnveraendert": true,
+  "fehler": "Lauf 0845e0a2-d9c6-491e-8bb0-32e14651e743: 1 Testmitteilungen übrig.",
+  "code": 1
+}

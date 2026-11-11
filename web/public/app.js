@@ -814,6 +814,9 @@ function vorschauenOeffnen(chats) {
   if (!window.KryptoWeb) return chats;
   for (const c of chats || []) {
     if (!c.previewKrypto || !Number(c.previewKrypto.krypto)) continue;
+    // Dieser Chat ist verschlüsselt — auch wenn der Schlüssel noch fehlt
+    // (AR-05, siehe KryptoWeb.verschliessen).
+    window.KryptoWeb.merken?.(c.id);
     // Schon geoeffnet: `filteredChats` laeuft bei jedem Zeichnen, und
     // zweimal dasselbe zu entschluesseln waere Arbeit ohne Ergebnis.
     if (c._vorschauOffen) continue;
@@ -841,20 +844,29 @@ async function nachrichtenHolen(chatId) {
   // Schalters des Lesers; dieselbe Zeile steht im ChatDetailScreen der App.
   // Ohne await: eine ausgebliebene Bestaetigung darf den Verlauf nicht aufhalten.
   fetch(`/api/messages/${chatId}/gelesen`, { method: 'POST' }).catch(() => {});
-  return window.KryptoWeb ? window.KryptoWeb.stapelOeffnen(verlauf) : verlauf;
+  if (!window.KryptoWeb) return verlauf;
+  window.KryptoWeb.stapelOeffnen(verlauf);
+  // AR-04: gehört der Absenderschlüssel zum Absender? Gleiche Regel in der App.
+  await window.KryptoWeb.absenderPruefen?.(verlauf);
+  return verlauf;
 }
 
 /*
  * Einen Text fuer einen Chat verschliessen und den Koerper der Sendeanfrage
  * bauen.
  *
- * Geht es nicht — Gruppe, Gegenueber ohne Geraet, kein Schluessel —, steht
- * der Klartext im Koerper wie vor Schema 31. Das ist kein Fehlerfall: die
- * Nachricht kommt an, und die Oberflaeche behauptet dann auch nichts ueber
- * Verschluesselung.
+ * Ist Verschluesselung hier nicht vorgesehen — Gruppe, Gegenueber ohne
+ * Geraet und noch nie verschluesselt geschrieben —, steht der Klartext im
+ * Koerper wie vor Schema 31.
+ *
+ * WIRFT, wenn verschluesselt werden muesste und es nicht geht (AR-05,
+ * 16.10.2026); die Meldung ist der Satz fuer den Nutzer. Bis dahin hiess
+ * jeder Fehler still Klartext. Fehlt KryptoWeb ganz, geht der Klartext
+ * hinaus und der Server prueft dieselbe Regel (POST /api/messages).
  */
 async function sendeKoerper(chatId, text, weiteres = {}) {
-  const paket = window.KryptoWeb ? await window.KryptoWeb.verschliessen(chatId, text) : null;
+  if (!window.KryptoWeb) throw new Error('Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte lade die Seite neu.');
+  const paket = await window.KryptoWeb.verschliessen(chatId, text);
   if (!paket) return { text, ...weiteres };
   return { text: '', ...paket, ...weiteres };
 }
@@ -4174,10 +4186,17 @@ function openAddContact() {
         if (grund) return melden(grund);
 
         const nachricht = msg.value.trim();
+        let paket = null;
+        if (nachricht) {
+          const vorab = await api('/api/contacts/vorbereiten', { handle });
+          if (!vorab?.ok) return melden(vorab?.error || 'Die Anfrage ging nicht raus');
+          try { paket = { chatId: vorab.chatId, ...(await sendeKoerper(vorab.chatId, nachricht)) }; }
+          catch (fehler) { return melden(fehler.message); }
+        }
         const res = await fetch('/api/contacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ handle, nachricht }),
+          body: JSON.stringify({ handle, nachricht: paket?.krypto ? '' : nachricht, paket }),
         });
         const result = await res.json();
 
@@ -4534,18 +4553,31 @@ function openCall(ziel, art, ort = {}) {
  * verschlossen werden. Geht die Abfrage schief, bleibt es bei "Nicht aktiv" —
  * nichts zu behaupten ist hier die richtige Antwort auf einen Fehler.
  */
+/*
+ * Seit dem 16.10.2026 (AR-04) ist die Sicherheitsnummer ueber ALLE Geraete
+ * des Gegenuebers gebildet, mit deren Zahl — nicht mehr der Fingerabdruck des
+ * juengsten. Gleiche Rechnung in der App (ContactProfileScreen).
+ */
 async function kryptoZustand(userId, chat) {
-  if (!chat || chat.isGroup || !window.KryptoWeb) return { an: false, fingerabdruck: null };
+  const nichts = { an: false, fingerabdruck: null, geraete: 0 };
+  if (!chat || chat.isGroup || !window.KryptoWeb) return nichts;
   try {
-    const { oeffentlich } = await (await fetch(`/api/krypto/kontakt/${userId}`)).json();
+    const antwort = await fetch(`/api/krypto/empfaenger/${chat.id}`);
+    if (!antwort.ok) throw new Error('Server antwortet mit ' + antwort.status);
+    const fakten = await antwort.json();
     const meiner = await window.KryptoWeb.anmelden();
+    if (fakten.ichId !== window.Anmeldung?.nutzer?.()?.id) throw new Error('Konto gewechselt');
+    const nr = window.KryptoWeb.sicherheitsnummer((fakten.schluessel || [])
+      .filter((k) => k.user_id === userId).map((k) => k.oeffentlich));
+    const verschluesselbar = Krypto.sendeweg({ ...fakten, meiner }).art === 'verschliessen';
     return {
-      an: Boolean(meiner && oeffentlich),
-      fingerabdruck: oeffentlich ? window.KryptoWeb.fingerabdruck(oeffentlich) : null,
+      an: Boolean(verschluesselbar && nr),
+      fingerabdruck: nr ? nr.nummer : null,
+      geraete: nr ? nr.geraete : 0,
     };
   } catch (fehler) {
     console.warn('Verschlüsselungszustand unbekannt:', fehler.message);
-    return { an: false, fingerabdruck: null };
+    return nichts;
   }
 }
 
@@ -5168,10 +5200,14 @@ async function kontaktZeile(label, userId, chat, daten, optionen = {}) {
           'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
           'Verbindung.\n\n' +
           (krypto.fingerabdruck
-            ? 'Sicherheitsnummer des Gegenübers:\n' +
+            ? 'Sicherheitsnummer des Gegenübers (' +
+              (krypto.geraete === 1 ? '1 Gerät' : `${krypto.geraete} Geräte`) +
+              '):\n' +
               krypto.fingerabdruck +
               '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
-              'dass niemand dazwischen sitzt.'
+              'dass niemand dazwischen sitzt. Sie ändert sich, sobald ' +
+              'ein Gerät dazukommt oder wegfällt — stimmt die Zahl der ' +
+              'Geräte nicht, fragt nach.'
             : '')
         : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
           'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +
@@ -10661,13 +10697,23 @@ function openEinstellung(punkt, nachher) {
             close();
             const chat = state.chats.find((c) => !c.isGroup && c.userId === b.dataset.einladen);
             if (!chat) return toast('Noch kein Chat mit dieser Person');
-            await fetch(`/api/messages/${chat.id}`, {
+            // AR-05: scheitert die Verschluesselung, steht ihr Satz da —
+            // nicht „gesendet", und nichts ging offen hinaus.
+            let koerper;
+            try {
+              koerper = await sendeKoerper(chat.id, 'Komm zu All Media: all-media.app');
+            } catch (fehler) {
+              return toast(fehler.message);
+            }
+            const res = await fetch(`/api/messages/${chat.id}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(
-                await sendeKoerper(chat.id, 'Komm zu All Media: all-media.app')
-              ),
+              body: JSON.stringify(koerper),
             });
+            const msg = await res.json().catch(() => null);
+            if (!msg || msg.ok === false || !msg.id) {
+              return toast(msg?.error || 'Die Einladung ging nicht raus');
+            }
             toast(`Einladung an ${user(b.dataset.einladen).name} gesendet`);
           })
         );
@@ -14980,6 +15026,7 @@ function openProfilSenden(profile) {
 function zielChat(chat) {
   return {
     pfad: `/api/messages/${chat.id}/anhang`,
+    chatId: chat.id,
     ausserId: chat.userId,
     // Kasten 4.3a: der Bezug aus dem Ziehen geht mit dem Anhang mit.
     bezug: () =>
@@ -15311,6 +15358,13 @@ async function anhangSenden(ziel, art, chat, zeichen) {
      * (ChatDetailScreen, anhangSenden).
      */
     const bezug = ziel.bezug?.() || null;
+    if (ziel.chatId) {
+      const vorab = await api(`${ziel.pfad}/vorbereiten`, koerper);
+      if (!vorab?.ok) { toast(vorab?.error || 'Anhang nicht vorbereitet'); return null; }
+      try { koerper = { ...koerper, paket: await sendeKoerper(ziel.chatId, vorab.text) }; }
+      catch (fehler) { toast(fehler.message); return null; }
+    }
+
     const res = await fetch(ziel.pfad, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -15322,6 +15376,7 @@ async function anhangSenden(ziel, art, chat, zeichen) {
       return null;
     }
     if (bezug) ziel.bezugFertig?.(daten);
+    if (daten.message) window.KryptoWeb?.oeffnen(daten.message);
     return daten.message;
   };
 
@@ -17982,10 +18037,20 @@ function openTeilen(art, id) {
         knopf.disabled = true;
         knopf.textContent = 'Wird gesendet …';
 
+        const ziele = [];
+        try {
+          for (const uid of empfaenger) {
+            const vorab = await api(`/api/kontakte/${uid}/chat`, { bereich: bereiche[uid] });
+            if (!vorab?.ok) throw new Error(vorab?.error || 'Zielchat nicht erreichbar');
+            ziele.push({ chatId: vorab.chatId, ...(await sendeKoerper(vorab.chatId, art === 'post' ? 'Beitrag geteilt' : 'Video geteilt')) });
+          }
+        } catch (fehler) {
+          meldung.textContent = fehler.message; meldung.hidden = false; zeichnen(); return;
+        }
         const res = await fetch('/api/teilen', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ art, id, empfaenger, bereiche, communitys, kanaele: kanalWahl }),
+          body: JSON.stringify({ art, id, empfaenger, bereiche, communitys, kanaele: kanalWahl, ziele }),
         }).catch(() => null);
         const daten = res ? await res.json().catch(() => null) : null;
 
@@ -21603,6 +21668,12 @@ function messageBubble(m, chat, i, absender) {
       ${storyBezug}${inhalt}
       <div class="msg__foot">${m.stern ? `<span class="msg__stern">${ICONS.star}</span>` : ''}${
         m.bearbeitet && !m.zurueckgenommen ? 'bearbeitet · ' : ''
+      }${
+        // AR-04: Absenderschlüssel gehört nicht zum Absender — sagen, nicht
+        // verstecken. Gleicher Satz in der App (ChatDetailScreen).
+        m.nichtPruefbar && !m.zurueckgenommen
+          ? '<span class="msg__nichtPruefbar">⚠ Absender nicht prüfbar · </span>'
+          : ''
       }${esc(m.time)}${out ? (m.read ? ICONS.checkDouble : ICONS.check) : ''}</div>
       ${reaktionen}
     </div>`;
@@ -21997,8 +22068,30 @@ function openWeiterleiten(m, chat) {
       );
 
       knopf.addEventListener('click', async () => {
+        /*
+         * Je Ziel verschliessen, was verschlossen werden muss (AR-05,
+         * 16.10.2026). Bis dahin kopierte der Server den Text — bei einer
+         * verschluesselten Quelle war der leer, und in einen verschluesselten
+         * Chat ging er still offen. `m.text` ist hier schon geoeffnet
+         * (stapelOeffnen). Scheitert ein Ziel, geht an keines etwas.
+         * Gleicher Weg in der App (aktionen.ts, nachrichtWeiterleiten).
+         */
+        if (Number(m.krypto) > 0 && (!m.text || m.text === window.KryptoWeb?.NICHT_LESBAR)) {
+          close();
+          return toast('Diese Nachricht lässt sich hier nicht weiterleiten');
+        }
+        const ziele = [];
+        try {
+          for (const zielId of gewaehlt) {
+            ziele.push({ chatId: zielId, ...(await sendeKoerper(zielId, m.text || '')) });
+          }
+        } catch (fehler) {
+          close();
+          return toast(fehler.message);
+        }
         const antwort = await api(`/api/messages/${chat.id}/${m.id}/weiterleiten`, {
           chatIds: [...gewaehlt],
+          ziele,
         });
         close();
         if (!antwort?.ok) return toast(antwort?.error || 'Das Weiterleiten hat nicht geklappt');
@@ -22009,111 +22102,168 @@ function openWeiterleiten(m, chat) {
   );
 }
 
+/*
+ * Eine Antwort auf eine Story senden — verschlossen, wo der Chat es verlangt
+ * (AR-05, 16.10.2026).
+ *
+ * Bis dahin ging der Text an /api/stories/:id/reply und von dort offen in
+ * den Chat mit der Person, auch wenn der verschluesselt war. Die App
+ * verschluesselte dieselbe Antwort laengst (aktionen.ts, storyAntwort). Jetzt
+ * erst den Chat erfragen, dann wie jede Nachricht durch sendeKoerper — und
+ * scheitert die Verschluesselung, geht nichts hinaus.
+ *
+ * Gibt `{ ok, error, chatId, message }` zurueck wie die Route.
+ */
+async function storyAntwortSenden(storyId, text) {
+  const vorab = await api(`/api/stories/${storyId}/chat`, {});
+  if (!vorab?.ok || !vorab.chatId) return { ok: false, error: vorab?.error || 'Die Antwort ging nicht raus' };
+  let koerper;
+  try {
+    koerper = await sendeKoerper(vorab.chatId, text);
+  } catch (fehler) {
+    return { ok: false, error: fehler.message };
+  }
+  return api(`/api/stories/${storyId}/reply`, { chatId: vorab.chatId, ...koerper });
+}
+
+/*
+ * Das Herz an einer Story verschlossen nachschicken — der Server hat es
+ * nicht offen geschrieben, weil der Chat Verschluesselung verlangt
+ * (handleLikeStory). Wie in der App (storyLike) bleibt das Like stehen, auch
+ * wenn das Herz nicht in den Chat kommt; ein Klartext-Herz gibt es nicht.
+ */
+async function storyHerzNachsenden(storyId) {
+  try {
+    const r = await storyAntwortSenden(storyId, '\u2764\ufe0f');
+    if (!r?.ok) console.warn('Herz an der Story kam nicht in den Chat:', r?.error);
+  } catch (fehler) {
+    console.warn('Herz an der Story kam nicht in den Chat:', fehler.message);
+  }
+}
+
 async function sendMessage(chat) {
   const input = $('#msgInput');
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || input.dataset.sendet === 'ja') return;
+  input.dataset.sendet = 'ja';
 
   nachrichtTon();
 
-  input.value = '';
-  input.style.height = 'auto';
+  const bearbeitet = msgBearbeitet;
+  const bezug = msgBezug;
   $('#sendBtn').disabled = true;
 
-  /*
-   * Bearbeiten läuft über denselben Knopf wie Senden.
-   *
-   * Ein eigener „Speichern"-Knopf wäre ein zweiter Zustand der Eingabezeile,
-   * den man erst begreifen muss. Solange oben „Nachricht bearbeiten" steht,
-   * überschreibt der Sendeknopf — das ist die naheliegende Erwartung.
-   */
-  if (msgBearbeitet) {
-    const alt = msgBearbeitet;
-    msgBearbeitet = null;
+  // Erst die bestätigte Nachricht aus dem Entwurf entfernen. Kryptofehler,
+  // Serverabsagen und Netzfehler erhalten Text und Bearbeiten-/Antwortbezug.
+  // Ein während der Anfrage neu geschriebener Entwurf bleibt ebenfalls stehen.
+  const abgeschlossen = () => {
+    if (input.value.trim() === text) {
+      input.value = '';
+      input.style.height = 'auto';
+    }
+    if (msgBearbeitet === bearbeitet) msgBearbeitet = null;
+    if (msgBezug === bezug) msgBezug = null;
     document.querySelector('.msgbezug')?.remove();
+    if (msgBearbeitet || msgBezug) zeigeBezugLeiste(chat);
+  };
+
+  try {
 
     /*
-     * Kasten 27: eine verschluesselte Nachricht geht als neue Chiffre raus
-     * (KryptoWeb.umschliessen), nicht als Klartext — den wies die Datenbank
-     * bisher ab, und Bearbeiten ging dort nie. Gleicher Weg in der App.
+     * Bearbeiten läuft über denselben Knopf wie Senden.
+     *
+     * Ein eigener „Speichern"-Knopf wäre ein zweiter Zustand der Eingabezeile,
+     * den man erst begreifen muss. Solange oben „Nachricht bearbeiten" steht,
+     * überschreibt der Sendeknopf — das ist die naheliegende Erwartung.
      */
-    let koerper = { text };
-    if (Number(alt.krypto) > 0) {
-      const paket = window.KryptoWeb?.umschliessen(alt, text);
-      if (!paket) return toast('Diese Nachricht lässt sich hier nicht bearbeiten');
-      koerper = { text: '', ...paket };
-    }
-    const antwort = await api(`/api/messages/${chat.id}/${alt.id}/bearbeiten`, koerper);
-    if (!antwort?.ok) return toast(antwort?.error || 'Das Bearbeiten hat nicht geklappt');
+    if (bearbeitet) {
+      const alt = bearbeitet;
 
-    const m = state.messages.find((x) => x.id === alt.id);
-    if (m && koerper.chiffre) {
-      m.chiffre = koerper.chiffre;
-      m.kryptoNonce = koerper.kryptoNonce;
+      /*
+       * Kasten 27: eine verschluesselte Nachricht geht als neue Chiffre raus
+       * (KryptoWeb.umschliessen), nicht als Klartext — den wies die Datenbank
+       * bisher ab, und Bearbeiten ging dort nie. Gleicher Weg in der App.
+       */
+      let koerper = { text };
+      if (Number(alt.krypto) > 0) {
+        const paket = window.KryptoWeb?.umschliessen(alt, text);
+        if (!paket) throw new Error('Diese Nachricht lässt sich hier nicht bearbeiten');
+        koerper = { text: '', ...paket };
+      }
+      const antwort = await api(`/api/messages/${chat.id}/${alt.id}/bearbeiten`, koerper);
+      if (!antwort?.ok) throw new Error(antwort?.error || 'Das Bearbeiten hat nicht geklappt');
+
+      const m = state.messages.find((x) => x.id === alt.id);
+      if (m && koerper.chiffre) {
+        m.chiffre = koerper.chiffre;
+        m.kryptoNonce = koerper.kryptoNonce;
+      }
+      if (m) {
+        m.text = text;
+        m.bearbeitet = true;
+      }
+      // Kasten 25.6: verschlüsselt löst die Datenbank die @-Namen nicht selbst auf.
+      if (koerper.chiffre) verschluesseltMarkieren(chat, alt.id, text);
+      abgeschlossen();
+      paintMessages(chat);
+      return;
     }
-    if (m) {
-      m.text = text;
-      m.bearbeitet = true;
+
+    const koerper = await sendeKoerper(chat.id, text, {
+      antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
+      zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
+    });
+    const res = await fetch(`/api/messages/${chat.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(koerper),
+    });
+    const msg = await res.json();
+    if (!msg || msg.ok === false || !msg.id) {
+      throw new Error(msg?.error || 'Die Nachricht ging nicht raus');
     }
-    // Kasten 25.6: verschlüsselt löst die Datenbank die @-Namen nicht selbst auf.
-    if (koerper.chiffre) verschluesseltMarkieren(chat, alt.id, text);
+    // Kasten 27: steht nur hier, bis das Nachsehen sie aus der Datenbank
+    // liefert — und traegt ihre Chiffre mit, damit Bearbeiten sofort geht.
+    msg.lokal = true;
+    if (koerper.chiffre) {
+      const meiner = window.KryptoWeb?.meinSchluessel();
+      msg.chiffre = koerper.chiffre;
+      msg.kryptoNonce = koerper.kryptoNonce;
+      msg.absenderSchluessel = koerper.absenderSchluessel;
+      msg.kuvert = (koerper.kuverts || []).find((k) => meiner && k.schluesselId === meiner.id) || null;
+    }
+
+    /*
+     * Der Server schickt bei einer verschluesselten Nachricht keinen Text
+     * zurueck — er hat ihn nie gehabt. Ohne diese Zeile erschiene die eigene
+     * Nachricht als leere Blase und waere erst nach dem naechsten Laden da.
+     */
+    if (Number(msg.krypto) > 0) msg.text = text;
+    // Kasten 25.6: den Text sieht die Datenbank nicht — Markierte melden.
+    if (koerper.chiffre) verschluesseltMarkieren(chat, msg.id, text);
+
+    // Bezug gleich mitzeichnen, statt auf das nächste Laden zu warten — sonst
+    // erschiene die eigene Antwort einen Moment lang ohne ihren Anlass.
+    if (bezug) {
+      const kopf = {
+        id: bezug.nachricht.id,
+        text: bezug.nachricht.text,
+        autor: bezug.nachricht.from === 'me' ? 'Du' : user(bezug.nachricht.from).name,
+      };
+      if (bezug.art === 'antwort') msg.antwortAuf = kopf;
+      else msg.zitat = kopf;
+    }
+
+    abgeschlossen();
+    state.messages.push(msg);
     paintMessages(chat);
-    return;
+  } catch (fehler) {
+    toast(fehler?.message || 'Die Nachricht ging nicht raus');
+  } finally {
+    delete input.dataset.sendet;
+    const knopf = $('#sendBtn');
+    if (knopf) knopf.disabled = !$('#msgInput')?.value.trim();
   }
-
-  const bezug = msgBezug;
-  msgBezug = null;
-  document.querySelector('.msgbezug')?.remove();
-
-  const koerper = await sendeKoerper(chat.id, text, {
-    antwortAuf: bezug?.art === 'antwort' ? bezug.nachricht.id : null,
-    zitatVon: bezug?.art === 'zitat' ? bezug.nachricht.id : null,
-  });
-  const res = await fetch(`/api/messages/${chat.id}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(koerper),
-  });
-  const msg = await res.json();
-  if (!msg || msg.ok === false || !msg.id) {
-    input.value = text;
-    return toast(msg?.error || 'Die Nachricht ging nicht raus');
-  }
-  // Kasten 27: steht nur hier, bis das Nachsehen sie aus der Datenbank
-  // liefert — und traegt ihre Chiffre mit, damit Bearbeiten sofort geht.
-  msg.lokal = true;
-  if (koerper.chiffre) {
-    const meiner = window.KryptoWeb?.meinSchluessel();
-    msg.chiffre = koerper.chiffre;
-    msg.kryptoNonce = koerper.kryptoNonce;
-    msg.absenderSchluessel = koerper.absenderSchluessel;
-    msg.kuvert = (koerper.kuverts || []).find((k) => meiner && k.schluesselId === meiner.id) || null;
-  }
-
-  /*
-   * Der Server schickt bei einer verschluesselten Nachricht keinen Text
-   * zurueck — er hat ihn nie gehabt. Ohne diese Zeile erschiene die eigene
-   * Nachricht als leere Blase und waere erst nach dem naechsten Laden da.
-   */
-  if (Number(msg.krypto) > 0) msg.text = text;
-  // Kasten 25.6: den Text sieht die Datenbank nicht — Markierte melden.
-  if (koerper.chiffre) verschluesseltMarkieren(chat, msg.id, text);
-
-  // Bezug gleich mitzeichnen, statt auf das nächste Laden zu warten — sonst
-  // erschiene die eigene Antwort einen Moment lang ohne ihren Anlass.
-  if (bezug) {
-    const kopf = {
-      id: bezug.nachricht.id,
-      text: bezug.nachricht.text,
-      autor: bezug.nachricht.from === 'me' ? 'Du' : user(bezug.nachricht.from).name,
-    };
-    if (bezug.art === 'antwort') msg.antwortAuf = kopf;
-    else msg.zitat = kopf;
-  }
-
-  state.messages.push(msg);
-  paintMessages(chat);
-
 }
 
 /*
@@ -22639,6 +22789,9 @@ function openStory(storyId, { bereich, ersatz, liste: eigeneListe, highlight = n
     const updated = await res.json();
     s.liked = updated.liked;
     btn.classList.toggle('is-liked', s.liked);
+    // AR-05: in einem verschluesselten Chat schickt der Server das Herz nicht
+    // offen — es geht verschlossen ueber den Antwortweg hinterher.
+    if (updated.herzChatId) storyHerzNachsenden(s.id);
     toast(s.liked ? `Dir gefällt die Story von ${u.name}` : 'Gefällt-mir entfernt');
   });
 
@@ -22672,12 +22825,7 @@ function openStory(storyId, { bereich, ersatz, liste: eigeneListe, highlight = n
     const text = reply.value.trim();
     if (!text) return toast('Bitte etwas schreiben');
 
-    const res = await fetch(`/api/stories/${s.id}/reply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    });
-    const result = await res.json();
+    const result = await storyAntwortSenden(s.id, text);
     if (!result.ok) return toast(result.error);
 
     reply.value = '';

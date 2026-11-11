@@ -1,0 +1,3 @@
+OFFLINE: Original-Chatblase im isolierten Querformat874x402 sichtbar; simulierte Warnung vollständig sichtbar; extern0; Bild angesehen.
+Zusatzprobe Kontaktmodal NICHT bestanden: nur Querformat erlaubender Prüfstand kollidiert mit RCT-Modal (standardmäßig Hochformat); UIApplicationInvalidInterfaceOrientation. Tatsächliche App ist laut app/app.json auf portrait begrenzt. Kein Produkt-Absturz im zugelassenen Hochformat daraus abgeleitet; dieses wurde zuvor10/10 live geprüft. Keine Änderung der App-Ausrichtung.
+Eigener Metro beendet. Keine Supabase-Verbindung.
