@@ -65,7 +65,7 @@
 
     let konten = [kontoId];
     try {
-      konten = [...new Set([kontoId, ...(window.Anmeldung?.konten?.() || []).map((k) => k.id)])];
+      konten = [...new Set([kontoId, ...(window.Anmeldung?.konten?.({ streng: true }) || []).map((k) => k.id)])];
     } catch {
       throw new Error('Gespeicherte Konten nicht ladbar; Altbestand bleibt erhalten');
     }

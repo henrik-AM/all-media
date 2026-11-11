@@ -135,11 +135,18 @@
    */
   const KONTEN_FACH = 'all-media.web.konten.v1';
 
-  function kontenLesen() {
+  function kontenLesen(streng = false) {
     try {
       const roh = JSON.parse(localStorage.getItem(KONTEN_FACH) || '{}');
+      if (streng && (!roh || typeof roh !== 'object' || Array.isArray(roh) ||
+          Object.entries(roh).some(([id, k]) => !k || k.id !== id ||
+            !/^[A-Za-z0-9._-]+$/.test(id) || typeof k.refresh_token !== 'string' || !k.refresh_token))) {
+        throw new Error('Gespeicherte Kontenliste ist ungültig');
+      }
       return roh && typeof roh === 'object' && !Array.isArray(roh) ? roh : {};
-    } catch {
+    } catch (fehler) {
+      // Für die Schlüsselmigration darf ein Lesefehler keine leere Liste sein.
+      if (streng) throw fehler;
       return {};
     }
   }
@@ -176,9 +183,9 @@
   }
 
   /** Die Konten mit Sitzung in diesem Browser — ohne Token, jedes einmal. */
-  function konten() {
+  function konten(optionen = {}) {
     const aktiv = sitzung?.user?.id || null;
-    return Object.values(kontenLesen())
+    return Object.values(kontenLesen(optionen.streng === true))
       .filter((k) => k && k.id && k.refresh_token)
       .sort((a, b) => (b.zuletzt || 0) - (a.zuletzt || 0))
       .map((k) => ({ id: k.id, email: k.email, name: k.name, handle: k.handle, aktiv: k.id === aktiv }));

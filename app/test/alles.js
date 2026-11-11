@@ -218,6 +218,7 @@ const LAEUFE = [
   // Reine Offline-Regressionsproben; eigener Browser-/Native-Server bleibt separat.
   ['paket6-migration', '_paket6_migration_regression.cjs'],
   ['paket6-kontenliste', '_paket6_kontenliste_regression.cjs'],
+  ['paket6-webkonten', '_paket6_webkonten_regression.cjs'],
   ['paket6-weiterleiten', '_paket6_weiterleiten_regression.cjs'],
   ['paket6-pruefharness', '_paket6_pruefharness_regression.cjs'],
   ['rechte', '_rechte.js'],

@@ -29,3 +29,5 @@ Restgrenzen: Chat-Anlage kann bei verlorener Antwort vor Journal ein nicht erfas
 - Angriffe 60/60, Prozess Exit0. Anschließend 167 Testmitteilungen entfernt, gegengeprüfter Rest0 für beide erlaubten Testkonten. Log live-_angriffe.log.
 - Zweiter App-Migrationsfehler gefunden: kontenspeicher schluckte Lesefehler/kaputtes JSON und löschte Altpaare ohne weitere Konten zu migrieren. Migration liest jetzt streng; normale UI bleibt fehlertolerant. Vier echte Modulgegenproben bestanden, alte Chiffren beider Konten nach Wiederholung lesbar. Offlinegruppen erneut 9/9. Browseranalogie wird separat geprüft.
 - Gesamtlaufinventar um Regressionen und Quellwächter für native UI ergänzt; noch nicht vollständig ausgeführt.
+
+Browseranalog ebenfalls korrigiert: Anmeldung.konten({streng:true}) verweigert Speicher-/JSON-/Strukturfehler, bevor globale Altpaare gelöscht werden. Vier Gegenproben mit echtem anmeldung.js/krypto.js und tatsächlich gelesenen alten Chiffren bestanden. Migration/Weiterleitung/Harness/Kontenlisten zusammen 23/23 neue Gegenproben. Gesamtlaufinventar jetzt 94 Läufe.
