@@ -1281,25 +1281,20 @@ async function chatMitErmitteln(
     .eq('id', zielId)
     .maybeSingle();
 
-  const { data: neu, error: fehlerNeu } = await client
-    .from('chats')
-    .insert({ name: person?.name || 'Chat', is_group: false, bereich, created_by: ichId })
-    .select()
-    .single();
+  /*
+   * Schema 126: Suchen und Anlegen in EINER Transaktion mit Schloss je Paar
+   * und Bereich. Tippen zwei Geräte gleichzeitig, wartet der zweite Aufruf
+   * und bekommt den Chat des ersten. Scheitert das Eintragen der Mitglieder,
+   * verschwindet auch die Chatzeile. Gleicher Aufruf in
+   * web/server/sync-handlers.js (chatMit).
+   */
+  const { data: chatId, error: fehlerNeu } = await client.rpc('zweierchat_anlegen', {
+    p_ziel: zielId,
+    p_bereich: bereich,
+    p_name: person?.name || 'Chat',
+  });
   if (fehlerNeu) throw fehlerNeu;
-
-  // Ein Chat ohne Mitglieder taucht in keiner Liste auf, nimmt aber jede
-  // Nachricht an — die dann nie jemand sieht. Lieber wieder wegräumen.
-  const { error: fehlerMitglieder } = await client.from('chat_members').insert([
-    { chat_id: neu.id, user_id: ichId },
-    { chat_id: neu.id, user_id: zielId },
-  ]);
-  if (fehlerMitglieder) {
-    await client.from('chats').delete().eq('id', neu.id);
-    throw fehlerMitglieder;
-  }
-
-  return neu.id;
+  return chatId as string;
 }
 
 /* ======================================================================== *

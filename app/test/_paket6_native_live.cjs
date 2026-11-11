@@ -60,7 +60,7 @@ async function webSenden(seite,text){
  assert.equal(angenommen.anfrage_zustand,'angenommen','Anfrage ist nicht angenommen');
  browser=await chromium.launch();await browserAnmelden(a);await browserAnmelden(b);
 
- const http=require('node:http');let gestartet=false,ende;const fertig=new Promise(r=>ende=r),nummern=[];
+ const http=require('node:http');let gestartet=false,ende,webBereit=false,neustarts=0;const fertig=new Promise(r=>ende=r),nummern=[];
  const natives=new Map();
  // Keine Passwörter im Bundle: flüchtige Test-Sitzungen nur über Loopback.
  // Der Server ist ausschließlich während exklusiver Abnahme erreichbar.
@@ -69,16 +69,17 @@ async function webSenden(seite,text){
   try{
    let roh='';for await(const x of req){roh+=x;if(roh.length>20000)throw Error('Zu groß');}const d=roh?JSON.parse(roh):{};
    const send=x=>res.end(JSON.stringify(x));
+   if(req.url==='/neustart'){assert.equal(natives.size,2);gestartet=false;neustarts++;return send({ok:true});}
    if(req.url==='/start'){
     if(gestartet)throw Error('Prüfstart bereits benutzt');gestartet=true;
     return send({lauf,url:URL,anon:KEY,chat:{id:chatId,isGroup:false,requestState:'accepted',bereich:'community',initials:'P6',color:'#767',preview:'',time:''},
      konten:await Promise.all(konten.map(async(s,i)=>({id:s.id,name:i?'B':'A',sitzung:{access_token:(await s.client.auth.getSession()).data.session.access_token,refresh_token:(await s.client.auth.getSession()).data.session.refresh_token}})))});
    }
    if(req.url==='/key'){
-    const s=konten.find(s=>s.id===d.konto);assert.ok(s);const k=await ergebnis(s.client.from('krypto_schluessel').select('id,oeffentlich').eq('id',d.id).single(),'Natives Gerät gegenlesen');assert.equal(k.oeffentlich,d.oeffentlich);merken(s,k.id);natives.set(s.id,k);return send({ok:true});
+    const s=konten.find(s=>s.id===d.konto);assert.ok(s);const k=await ergebnis(s.client.from('krypto_schluessel').select('id,oeffentlich').eq('id',d.id).single(),'Natives Gerät gegenlesen');assert.equal(k.oeffentlich,d.oeffentlich);merken(s,k.id);if(neustarts){const alt=natives.get(s.id);pruefe('Native Schlüsselidentität nach Prozessneustart '+s.email,alt?.id===k.id&&alt?.oeffentlich===k.oeffentlich);}natives.set(s.id,k);return send({ok:true});
    }
    if(req.url==='/bereit'){
-    assert.equal(natives.size,2);pruefe('Zwei native SecureStore-Geräte registriert',true);
+    assert.equal(natives.size,2);if(webBereit)return send({ok:true});webBereit=true;pruefe('Zwei native SecureStore-Geräte registriert',true);
     pruefe('Native Geräte je Konto verschieden',natives.get(a.id).oeffentlich!==natives.get(b.id).oeffentlich);
     for(let i=0;i<2;i++){const r=await webSenden(konten[1-i],'Website an Native '+(i?'B':'A'));assert.ok(r.id);}
     return send({ok:true});
@@ -99,6 +100,7 @@ async function webSenden(seite,text){
     const z=await zeilen();let gelesen=0;
     for(let i=0;i<2;i++){const ns=await konten[1-i].page.evaluate(id=>nachrichtenHolen(id),chatId);const trifft=ns.some(n=>n.text==='Native an Website '+(i?'B':'A'));if(trifft)gelesen++;}
     if(req.url==='/pruefen')return send({text:`Live: ${gelesen}/2 native Nachrichten im Browser lesbar; ${z.length} Zeilen, ${z.filter(n=>n.krypto===1&&n.text==='').length} Chiffren`});
+    pruefe('Nativer Prozessneustart tatsächlich durchlaufen',neustarts===1);
     pruefe('Beide nativen Nachrichten in echter Website lesbar',gelesen===2);
     pruefe('Alle Live-Zeilen ohne Klartext',z.length>=4&&z.every(n=>n.krypto===1&&n.text===''));
     pruefe('Zusätzliches echtes Gerät ändert native Sicherheitsnummer',nummern.length>=2&&nummern[0].nummer!==nummern[1].nummer&&nummern[1].geraete===nummern[0].geraete+1);

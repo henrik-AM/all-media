@@ -77,7 +77,15 @@ function attrappe() {
   return {
     zaehler,
     from: kette,
-    rpc: (name) => warte({ data: true, error: null }),
+    rpc: (name) => {
+      // Seit Schema 126 legt zweierchat_anlegen Chat und Mitglieder an.
+      if (name === 'zweierchat_anlegen') {
+        zaehler.chats++;
+        zaehler.mitglieder += 2;
+        return warte({ data: 'chat-' + zaehler.chats, error: null });
+      }
+      return warte({ data: true, error: null });
+    },
   };
 }
 
@@ -134,6 +142,16 @@ function attrappe() {
   await pruefe('openChatWith sperrt einen zweiten Tipp, solange einer läuft', async () => {
     const s = quelle('app/App.tsx');
     if (!/chatOeffnetGerade\.current\.has\(/.test(s)) throw new Error('keine Sperre in openChatWith');
+  });
+
+  console.log('\nZwei Geräte gleichzeitig: Anlage in der Datenbank (Schema 126)');
+  await pruefe('Server und App legen nur noch über zweierchat_anlegen an', async () => {
+    for (const datei of ['web/server/sync-handlers.js', 'app/lib/aktionen.ts']) {
+      const s = quelle(datei);
+      if (!/rpc\('zweierchat_anlegen'/.test(s)) throw new Error(datei + ': kein zweierchat_anlegen');
+      const rumpf = s.slice(s.indexOf('function chatMitErmitteln'), s.indexOf('function chatMitErmitteln') + 4000);
+      if (/from\('chats'\)\s*\.insert/.test(rumpf)) throw new Error(datei + ': legt Chat noch selbst an');
+    }
   });
 
   console.log('\nApp: Chat-Info mit Person aus der Datenbanksuche');

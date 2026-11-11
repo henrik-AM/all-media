@@ -92,6 +92,15 @@ async function webSenden(seite,text){
  const bkey=await a.page.evaluate(async()=>{const k=await KryptoWeb.anmelden();return {id:k.id,oeffentlich:k.oeffentlich,kontoId:k.kontoId};});merken(b,bkey.id);pruefe('Kontowechsel hat eigenes Gerätepaar',bkey.kontoId===b.id&&bkey.oeffentlich!==altKey.oeffentlich);
  const zurueck=await a.page.evaluate(async id=>Anmeldung.wechseln(id),a.id);if(zurueck?.ok===false)throw new Error('Zurückwechseln gescheitert');
  const akey=await a.page.evaluate(async()=>{const k=await KryptoWeb.anmelden();return {id:k.id,oeffentlich:k.oeffentlich,kontoId:k.kontoId};});pruefe('Zurückwechseln verwendet wieder genau das erste Gerät',akey.id===altKey.id&&akey.oeffentlich===altKey.oeffentlich);
+
+ for(const s of konten){
+  const vorher=await s.page.evaluate(()=>({id:KryptoWeb.meinSchluessel().id,oeffentlich:KryptoWeb.meinSchluessel().oeffentlich}));
+  await s.page.reload({waitUntil:'domcontentloaded'});await s.page.waitForFunction(()=>Boolean(window.Anmeldung));
+  const nachher=await s.page.evaluate(async()=>{await Anmeldung.bereit;const k=await KryptoWeb.anmelden();return {id:k?.id,oeffentlich:k?.oeffentlich};});if(nachher.id)merken(s,nachher.id);
+  pruefe('Browser-Neustart behält das eigene Konto-Gerätepaar '+s.email,nachher.id===vorher.id&&nachher.oeffentlich===vorher.oeffentlich);
+  const gelesen=await s.page.evaluate(id=>nachrichtenHolen(id),chatId);
+  pruefe('Browser-Neustart liest frühere Rundreise-Chiffren '+s.email,gelesen.filter(n=>n.text?.startsWith('Paket6 ')).length===4);
+ }
  const fake=Krypto.schluesselpaarErzeugen();const emp=await a.runtime.K.empfaengerSchluessel(a.client,chatId);const pk=Krypto.verschluesseln('Paket6 unregistrierter Absender '+lauf,fake.geheim,emp);
  const f=await a.client.from('messages').insert({chat_id:chatId,sender_id:a.id,text:'',krypto:1,chiffre:pk.chiffre,krypto_nonce:pk.nonce,absender_schluessel:pk.absender}).select('id').single();
  if(f.error){pruefe('Unregistrierter Absenderschlüssel serverseitig abgewiesen',true);}
@@ -99,6 +108,17 @@ async function webSenden(seite,text){
   await ergebnis(a.client.from('message_keys').insert(pk.kuverts.map(k=>({message_id:f.data.id,schluessel_id:k.schluesselId,nonce:k.nonce,chiffre:k.chiffre}))),'Fälschungs-Kuverts');
   const appN=await appLesen(b,'Paket6 unregistrierter Absender '+lauf);pruefe('App-Logik warnt vor unregistriertem Absenderschlüssel',appN?.nichtPruefbar===true);
   const webN=await b.page.evaluate(id=>nachrichtenHolen(id),chatId);pruefe('Website warnt vor unregistriertem Absenderschlüssel',webN.find(n=>n.id===f.data.id)?.nichtPruefbar===true);
+  const reg=await ergebnis(a.client.from('krypto_schluessel').insert({user_id:a.id,geraet:'cache-'+lauf,art:'app',oeffentlich:fake.oeffentlich}).select('id').single(),'Absenderschlüssel testweise registrieren');merken(a,reg.id);
+  log('Cache-Probe: reale Neuregistrierung; reguläre 60-Sekunden-Frist abwarten');await new Promise(r=>setTimeout(r,61000));
+  const gutApp=await appLesen(b,'Paket6 unregistrierter Absender '+lauf);const gutWeb=await b.page.evaluate(id=>nachrichtenHolen(id),chatId);
+  pruefe('App-Logik bestätigt nach Cacheablauf neu registrierten Absender',gutApp?.nichtPruefbar===false);
+  pruefe('Website entfernt Warnung nach regulärem Cacheablauf',gutWeb.find(n=>n.id===f.data.id)?.nichtPruefbar===false);
+  await ergebnis(a.client.from('krypto_schluessel').delete().eq('id',reg.id).select('id'),'Registrierung zurücknehmen');
+  log('Cache-Probe: reale Entfernung; reguläre 60-Sekunden-Frist abwarten');await new Promise(r=>setTimeout(r,61000));
+  const wegApp=await appLesen(b,'Paket6 unregistrierter Absender '+lauf);const wegWeb=await b.page.evaluate(id=>nachrichtenHolen(id),chatId);
+  pruefe('App-Logik entzieht entferntem Absender nach Cacheablauf das Vertrauen',wegApp?.nichtPruefbar===true);
+  pruefe('Website warnt nach tatsächlicher Geräteentfernung erneut',wegWeb.find(n=>n.id===f.data.id)?.nichtPruefbar===true);
+
  }
  manifest.pruefungen={ok,fehl};sichern();
 })().catch(e=>{fehl++;log('FEHLER '+e.message);process.exitCode=1;}).finally(async()=>{

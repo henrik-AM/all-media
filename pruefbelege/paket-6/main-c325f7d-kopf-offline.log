@@ -1,0 +1,22 @@
+OK App: nur # Unterthema, ohne Community oder Mitgliederzahl, Kopf aktiv
+OK App: technische Chatbezeichnung bleibt unverändert
+OK App: Kopfklick nimmt richtige ID bei gleichnamigen Unterthemen
+OK App: Zugänglichkeitslabel bezeichnet Ziel-Community
+OK App: Einzelchat behält Name, Präsenz und Profilklick
+OK App: Gruppenkopf-Klick öffnet die Gruppeninfo (Kasten 7.9), nicht die Community
+OK App: Gruppe öffnet bestehende Gruppeninfo weiterhin per LongPress
+OK App: Shell-Kopfrückweg setzt Community-Overlay ohne Optionsblatt
+OK Netzsperre: externer HTTP-Aufruf abgewiesen
+OK Netzsperre: externer WebSocket ohne connectToServer geschlossen
+OK Web: Kopf nur # Kanalname, nicht Thema oder Community
+OK Web: Sonderzeichen sicher in Text und aria-label
+OK Web: Kopfklick öffnet richtige Community-Homeseite ohne Einstellungen
+OK Web: Zurück auf Community-Homeseite führt zur bestehenden Liste
+OK Web: Chat-Zurück führt getrennt zur Themenliste
+OK Web: Themenliste-Zurück führt zur Community-Homeseite
+OK Web: verzögerte Pollantwort holt Chat nach Kopfklick nicht zurück
+OK Web: verzögerte Pollantwort holt Chat nach Chat-Zurück nicht zurück
+OK Web: keine unerwarteten HTTP-/WS-Versuche
+OK Web: keine JavaScript-Fehler
+
+20/20 Prüfungen bestanden; isolierter Kopf/Renderer, native und echte Daten offen.

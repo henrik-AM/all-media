@@ -67,6 +67,13 @@ tap('Zurück');tap('Absenderfälschung');rows=wait(lambda r:label(r,'Absender ni
 pruefe('Native Originalblase warnt bei real unregistriertem Absenderschlüssel',label(rows,'Absender nicht prüfbar'));bild('native-live-absenderwarnung.png')
 tap('Konto A');rows=wait(lambda r:label(r,'Native an Website A'))
 pruefe('Native Rückkehr A liest bestehende Chiffre weiter',label(rows,'Website an Native A'))
+import urllib.request
+req=urllib.request.Request('http://127.0.0.1:3302/neustart',data=b'{}',headers={'Content-Type':'application/json'})
+with urllib.request.urlopen(req,timeout=5) as antwort:assert json.load(antwort)['ok']
+cmd([SIM,'terminate',UDID,'host.exp.Exponent']);cmd([SIM,'launch',UDID,'host.exp.Exponent','exp://127.0.0.1:3301']);cmd([SIM,'openurl',UDID,'exp://127.0.0.1:3301'])
+rows=wait(lambda r:label(r,'Native Schlüssel im echten SecureStore') and label(r,'Native an Website A'))
+pruefe('Echter Prozessneustart liest die bestehenden Chiffren mit SecureStore weiter',label(rows,'Website an Native A'))
+bild('native-live-neustart.png')
 tap('Live prüfen');rows=wait(lambda r:label(r,'2/2 native Nachrichten im Browser lesbar'))
 pruefe('Schlüsselfehler hinterließ keine fünfte Nachrichtenzeile',label(rows,'5 Zeilen, 5 Chiffren'))
 tap('Fertig');wait(lambda r:label(r,'Live abgeschlossen'))
