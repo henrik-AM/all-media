@@ -18,7 +18,7 @@ export interface StandZeile {
 
 export function stand(zeilen: StandZeile[] | null | undefined): string;
 export function listenStand(
-  mitglieder: { chat_id: string; is_read?: boolean | null; is_archived?: boolean | null; is_muted?: boolean | null; geleert_bis?: string | null }[] | null | undefined,
+  mitglieder: { chat_id: string; is_read?: boolean | null; is_archived?: boolean | null; is_muted?: boolean | null; notifications_off?: boolean | null; is_locked?: boolean | null; is_favorite?: boolean | null; geleert_bis?: string | null }[] | null | undefined,
   letzte: { chat_id: string; id: string; edited_at?: string | null; deleted_at?: string | null }[] | null | undefined
 ): string;
 export function fingerabdruck(m: any): string;

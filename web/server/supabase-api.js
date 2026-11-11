@@ -682,7 +682,7 @@ async function ladeChatlistenStand(client, nutzerId) {
   if (!client) return null;
   const { data: mitglieder, error } = await client
     .from('chat_members')
-    .select('chat_id, is_read, is_archived, is_muted, geleert_bis')
+    .select('chat_id, is_read, is_archived, is_muted, notifications_off, is_locked, is_favorite, geleert_bis')
     .eq('user_id', nutzerId);
   if (error) throw error;
   const ids = (mitglieder || []).map((m) => m.chat_id);

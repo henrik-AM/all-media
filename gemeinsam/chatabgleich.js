@@ -100,6 +100,11 @@
           z.is_read ? 1 : 0,
           z.is_archived ? 1 : 0,
           z.is_muted ? 1 : 0,
+          // Ohne diese drei merkte die Liste nie, dass Mitteilungen, Sperre
+          // oder Favorit umgeschaltet wurden (Chatoptionen, 10.11.2026).
+          z.notifications_off ? 1 : 0,
+          z.is_locked ? 1 : 0,
+          z.is_favorite ? 1 : 0,
           wert(z.geleert_bis),
         ].join('|');
       })
