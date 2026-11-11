@@ -34,7 +34,7 @@ async function sauber(){
   const log=path.join(W,'pruefbelege/paket-6/live-'+datei.replace(/\.(c?js)$/,'')+'.log'),fd=fs.openSync(log,'a');
   console.log('START',datei);
   const p=spawn(process.execPath,['test/'+datei],{cwd:path.join(W,'app'),env:process.env,stdio:['ignore',fd,fd]});fs.closeSync(fd);
-  const code=await new Promise((r,j)=>{p.once('error',j);p.once('exit',r);});console.log('ENDE',datei,code);if(code)process.exitCode=1;
+  const status=await new Promise((r,j)=>{p.once('error',j);p.once('exit',(code,signal)=>r({code,signal}));});console.log('ENDE',datei,status.code,status.signal||'');if(status.code!==0||status.signal)process.exitCode=1;
   if(datei!=='alles.js')await sauber();
  }
 })().catch(e=>{console.error(e.message);process.exitCode=1;});

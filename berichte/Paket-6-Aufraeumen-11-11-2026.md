@@ -16,3 +16,9 @@ Drei unabhängige Unteragenten prüften Krypto, Nebenwege und Prüfharness.
 - Erweiterte Live-/native Abnahme, Nebenwege, Angriffe und vollständiger Gesamtlauf bleiben offen; siehe Paket-6-Fortsetzung-11-11-2026.md.
 
 Kein Schema, main-Schreiben, Push oder Deploy. Sicherungszweig unverändert.
+
+## Prüfharness korrigiert
+
+Signalbeendigung zählt als Fehler; Live/native Journalwahl getrennt; Chat-ID darf vor Anlage fehlen. Kontakt-/Gerätebaseline vor erster Mutation persistent, Journaltausch atomar; fehlende Baseline verhindert Kontaktlöschung und Rest0. Nachricht-IDs vor Löschen persistiert; Kuverts explizit nachgezählt. Unbekannte Neugeräte bleiben unangetastet, verhindern aber Rest0. Fremde Konten verweigert. Regression 8/8 offline. Unregistrierte Absenderprobe zählt beliebige Insertfehler nicht mehr als Erfolg.
+
+Restgrenzen: Chat-Anlage kann bei verlorener Antwort vor Journal ein nicht erfasstes Objekt erzeugen. Kein atomarer DB/Dateijournal-Vorgang. Kontakt+Nachricht braucht Vorgangskennung und atomaren RPC; AddContactSheet blockiert vorhandene Kontakte selbst und leert Entwurf bisher früh.

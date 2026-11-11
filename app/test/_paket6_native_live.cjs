@@ -16,11 +16,12 @@ if(!ZIEL||!/^http:\/\/(127\.0\.0\.1|localhost):3300\/?$/.test(ZIEL))throw new Er
 const URL=process.env.SUPABASE_URL||process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.SUPABASE_ANON_KEY||process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if(!URL||!KEY)throw new Error('Supabase-Konfiguration fehlt');
 const konten=[{id:'3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',email:'test@all-media.app',pass:TESTKONTO_PASS},{id:'62616c1d-82e2-4ee4-aab9-950e40e438a4',email:'all.media.prueflauf@web.de',pass:PRUEFKONTO_PASS}];
-const lauf=crypto.randomUUID(),manifest={lauf,pid:process.pid,chatId:null,schluessel:[],start:new Date().toISOString()};
+const lauf=crypto.randomUUID(),manifest={supabaseUrl:URL,kontakteVorher:{},schluesselVorher:{},nachrichten:[],lauf,pid:process.pid,chatId:null,schluessel:[],start:new Date().toISOString()};
 fs.mkdirSync(OUT,{recursive:true});
 const manifestDatei=path.join(OUT,'native-live-fixtures.json');
-if(fs.existsSync(manifestDatei)){const alt=JSON.parse(fs.readFileSync(manifestDatei));if(alt.rest!==0)throw new Error('Vorherige Fixture-Bereinigung nicht bestätigt; zuerst _paket6_reste.cjs ausführen');fs.copyFileSync(manifestDatei,path.join(OUT,'live-fixtures-'+alt.lauf+'.json'));}
-const sichern=()=>fs.writeFileSync(path.join(OUT,'native-live-fixtures.json'),JSON.stringify(manifest,null,2));sichern();
+if(fs.existsSync(manifestDatei)){const alt=JSON.parse(fs.readFileSync(manifestDatei));if(alt.rest!==0)throw new Error('Vorherige Fixture-Bereinigung nicht bestätigt; zuerst _paket6_reste.cjs native ausführen');fs.copyFileSync(manifestDatei,path.join(OUT,'native-live-fixtures-'+alt.lauf+'.json'));}
+const {schreiben}=require('./_paket6_journal.cjs');
+const sichern=()=>schreiben(manifestDatei,manifest,fs);sichern();
 let browser,chatId,ok=0,fehl=0;const seiten=[],kontakteVorher=new Set();
 const log=t=>console.log(new Date().toISOString(),t);
 const pruefe=(name,b)=>{if(b)ok++;else fehl++;log(`${b?'OK':'FEHL'} ${name}`);};
@@ -48,9 +49,10 @@ async function webSenden(seite,text){
  log('LIVE: exklusiver Bestand bestätigt; keine Registrierung, kein Reset, kein Schema');
  for(const s of konten){
   s.client=client();const r=await s.client.auth.signInWithPassword({email:s.email,password:s.pass});if(r.error)throw new Error('Testanmeldung fehlgeschlagen: '+r.error.message);assert.equal(r.data.user.id,s.id);
-  const k=await ergebnis(s.client.from('contacts').select('id').eq('user_id',s.id).in('contact_id',konten.map(x=>x.id)),'Kontakt-Grundstand');k.forEach(x=>kontakteVorher.add(x.id));
-  s.runtime=appRuntime({},konten.map(x=>x.id));s.meiner=await s.runtime.K.meinSchluessel(s.client,s.id);if(!s.meiner)throw new Error('App-Testschlüssel nicht angelegt');merken(s,s.meiner.id);
+  const k=await ergebnis(s.client.from('contacts').select('id').eq('user_id',s.id).in('contact_id',konten.map(x=>x.id)),'Kontakt-Grundstand');k.forEach(x=>kontakteVorher.add(x.id));manifest.kontakteVorher[s.id]=k.map(x=>x.id);manifest.schluesselVorher[s.id]=(await ergebnis(s.client.from('krypto_schluessel').select('id').eq('user_id',s.id),'Geräte-Grundstand')).map(x=>x.id);sichern();
  }
+ // Beide Kontaktgrundstände sichern, bevor das erste Gerät angelegt wird.
+ for(const s of konten){s.runtime=appRuntime({},konten.map(x=>x.id));s.meiner=await s.runtime.K.meinSchluessel(s.client,s.id);if(!s.meiner)throw new Error('App-Testschlüssel nicht angelegt');merken(s,s.meiner.id);}
  const [a,b]=konten;
  const ch=await ergebnis(a.client.from('chats').insert({name:'Paket 6 '+lauf,is_group:false,bereich:'community',created_by:a.id}).select('id').single(),'Isolierten Chat anlegen');chatId=ch.id;manifest.chatId=chatId;sichern();
  for(const s of konten)await ergebnis(a.client.from('chat_members').insert({chat_id:chatId,user_id:s.id}).select('user_id'),'Chatmitglied anlegen');
@@ -120,11 +122,14 @@ async function webSenden(seite,text){
  if(chatId&&konten[0].client){
   try{
    const a=konten[0];
+   const vor=await ergebnis(a.client.from('messages').select('id').eq('chat_id',chatId),'Kuvert-Zielnachrichten sichern');
+   manifest.nachrichten=[...new Set([...manifest.nachrichten,...vor.map(n=>n.id)])];sichern();
    for(const s of konten)await ergebnis(s.client.from('messages').delete().eq('chat_id',chatId).eq('sender_id',s.id).select('id'),'Eigene Nachrichten löschen');
    // RLS erlaubt Chatlöschung erst nach Austritt des Gegenübers.
    await ergebnis(konten[1].client.from('chat_members').delete().eq('chat_id',chatId).eq('user_id',konten[1].id).select('user_id'),'Prüfmitglied austreten');
    await ergebnis(a.client.from('chats').delete().eq('id',chatId).select('id'),'Eigenen Chat löschen');
    for(const s of konten){
+    if(manifest.nachrichten.length)rest+=(await ergebnis(s.client.from('message_keys').select('message_id').in('message_id',manifest.nachrichten),'Restkuverts gegenlesen')).length;
     const n=await ergebnis(s.client.from('messages').select('id').eq('chat_id',chatId),'Restnachrichten gegenlesen');rest+=n.length;
     const c=await ergebnis(s.client.from('chats').select('id').eq('id',chatId),'Restchat gegenlesen');rest+=c.length;
    }
@@ -134,7 +139,10 @@ async function webSenden(seite,text){
   try{
    const ids=manifest.schluessel.filter(k=>k.konto===s.id).map(k=>k.id);
    if(ids.length){await ergebnis(s.client.from('krypto_schluessel').delete().in('id',ids).select('id'),'Eigene Prüfgeräte löschen');rest+=(await ergebnis(s.client.from('krypto_schluessel').select('id').in('id',ids),'Prüfgeräte gegenlesen')).length;}
-   const neu=(await ergebnis(s.client.from('contacts').select('id').eq('user_id',s.id).in('contact_id',konten.map(k=>k.id)),'Kontaktzustand nachlesen')).filter(k=>!kontakteVorher.has(k.id));
+   const grund=manifest.schluesselVorher[s.id];if(!Array.isArray(grund))throw Error('Geräte-Grundstand fehlt; keine Leerstandsbestätigung');
+   rest+=(await ergebnis(s.client.from('krypto_schluessel').select('id').eq('user_id',s.id),'Unprotokollierte Geräte gegenlesen')).filter(k=>!grund.includes(k.id)).length;
+   if(!Array.isArray(manifest.kontakteVorher[s.id]))throw Error('Kontaktgrundstand fehlt; Kontakte bleiben unberührt');
+   const neu=(await ergebnis(s.client.from('contacts').select('id').eq('user_id',s.id).in('contact_id',konten.map(k=>k.id)),'Kontaktzustand nachlesen')).filter(k=>!manifest.kontakteVorher[s.id].includes(k.id));
    if(neu.length){await ergebnis(s.client.from('contacts').delete().in('id',neu.map(k=>k.id)).select('id'),'Neu entstandene Testkontakte entfernen');rest+=(await ergebnis(s.client.from('contacts').select('id').in('id',neu.map(k=>k.id)),'Kontaktbereinigung gegenlesen')).length;}
   }catch(e){fehl++;rest++;log('BEREINIGUNG Geräte/Kontakte: '+e.message);}
  }
