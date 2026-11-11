@@ -2884,12 +2884,18 @@ export async function nachrichtWeiterleiten(
    * hat seine eigenen Geräte und bekommt damit eine eigene Chiffre. Ein
    * Insert über alle Ziele könnte nur eine einzige tragen.
    *
-   * Lässt sich ein Ziel nicht verschlüsseln, obwohl es müsste, wirft
-   * `fuerChatVerschliessen` (AR-05) und die übrigen Ziele bleiben aus — die
-   * Meldung nennt den Grund, statt dass eines davon still offen ankommt.
+   * Alle Ziele vor dem ersten Schreiben prüfen und verschließen. Scheitert
+   * ein Ziel an fehlenden Schlüsseln oder Mitgliedern, bleibt auch bei den
+   * vorherigen Zielen alles aus. Ein späterer Schreibfehler kann weiterhin
+   * einen Teilabschluss erzeugen; mehrere Requests sind keine Transaktion.
    */
+  const plan = [];
   for (const chat_id of chatIds) {
     const paket = await fuerChatVerschliessen(client, chat_id, ichId, text);
+    plan.push({ chat_id, paket });
+  }
+
+  for (const { chat_id, paket } of plan) {
     const { data: neue, error: fehler } = await client
       .from('messages')
       .insert({

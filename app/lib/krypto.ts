@@ -109,9 +109,13 @@ async function altbestandUebernehmen(kontoId: string): Promise<void> {
 
   for (const id of konten) {
     const f = faecher(id);
-    if (await SecureStore.getItemAsync(f.geheim)) continue;
-    await SecureStore.setItemAsync(f.geheim, altGeheim);
-    if (altGeraet) await SecureStore.setItemAsync(f.geraet, altGeraet);
+    const vorhanden = await SecureStore.getItemAsync(f.geheim);
+    if (vorhanden && vorhanden !== altGeheim) continue;
+    if (!vorhanden) await SecureStore.setItemAsync(f.geheim, altGeheim);
+    // Nach einem Abbruch zwischen beiden Schreibvorgängen das Paar ergänzen.
+    if (altGeraet && !(await SecureStore.getItemAsync(f.geraet))) {
+      await SecureStore.setItemAsync(f.geraet, altGeraet);
+    }
   }
   await SecureStore.deleteItemAsync(ALT_SCHLUESSEL_FACH);
   await SecureStore.deleteItemAsync(ALT_GERAET_FACH);

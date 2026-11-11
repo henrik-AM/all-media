@@ -72,9 +72,13 @@
     for (const id of konten) {
       if (!id) continue;
       const f = faecher(id);
-      if (localStorage.getItem(f.geheim)) continue;
-      localStorage.setItem(f.geheim, altGeheim);
-      if (altGeraet) localStorage.setItem(f.geraet, altGeraet);
+      const vorhanden = localStorage.getItem(f.geheim);
+      if (vorhanden && vorhanden !== altGeheim) continue;
+      if (!vorhanden) localStorage.setItem(f.geheim, altGeheim);
+      // Nach einem Abbruch zwischen beiden Schreibvorgängen das Paar ergänzen.
+      if (altGeraet && !localStorage.getItem(f.geraet)) {
+        localStorage.setItem(f.geraet, altGeraet);
+      }
     }
     localStorage.removeItem(ALT_SCHLUESSEL_FACH);
     localStorage.removeItem(ALT_GERAET_FACH);
@@ -133,7 +137,9 @@
       try {
         if (!kontoId) throw new Error('Kein Konto angemeldet');
         const f = faecher(kontoId);
-        if (!localStorage.getItem(f.geheim)) altbestandUebernehmen(kontoId);
+        if (!localStorage.getItem(f.geheim) || !localStorage.getItem(f.geraet)) {
+          altbestandUebernehmen(kontoId);
+        }
         let geheim = localStorage.getItem(f.geheim);
         if (!geheim) {
           geheim = Krypto.schluesselpaarErzeugen().geheim;
