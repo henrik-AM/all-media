@@ -22,3 +22,10 @@ Kein Schema, main-Schreiben, Push oder Deploy. Sicherungszweig unverändert.
 Signalbeendigung zählt als Fehler; Live/native Journalwahl getrennt; Chat-ID darf vor Anlage fehlen. Kontakt-/Gerätebaseline vor erster Mutation persistent, Journaltausch atomar; fehlende Baseline verhindert Kontaktlöschung und Rest0. Nachricht-IDs vor Löschen persistiert; Kuverts explizit nachgezählt. Unbekannte Neugeräte bleiben unangetastet, verhindern aber Rest0. Fremde Konten verweigert. Regression 8/8 offline. Unregistrierte Absenderprobe zählt beliebige Insertfehler nicht mehr als Erfolg.
 
 Restgrenzen: Chat-Anlage kann bei verlorener Antwort vor Journal ein nicht erfasstes Objekt erzeugen. Kein atomarer DB/Dateijournal-Vorgang. Kontakt+Nachricht braucht Vorgangskennung und atomaren RPC; AddContactSheet blockiert vorhandene Kontakte selbst und leert Entwurf bisher früh.
+
+## Frisch live am 11.11.2026, 16:02–16:05 MEZ
+
+- Zwei-Konten-Rundreise 29/29 mit echten Browsern/Supabase und App-Logik mit simuliertem Schlüsselbund. Vier Sende-/Leserichtungen, Chiffren/Kuverts, Klartextabwehr, A/B/A, Browser-Neuladen, Gerätenummern und reale Neuregistrierung/-entfernung nach zwei regulären Cachefristen bestanden. Geprüfter Rest 0 einschließlich Kuverts, Geräte und Kontakte. Journal live-fixtures.json. Keine vollständige native App-Abnahme.
+- Angriffe 60/60, Prozess Exit0. Anschließend 167 Testmitteilungen entfernt, gegengeprüfter Rest0 für beide erlaubten Testkonten. Log live-_angriffe.log.
+- Zweiter App-Migrationsfehler gefunden: kontenspeicher schluckte Lesefehler/kaputtes JSON und löschte Altpaare ohne weitere Konten zu migrieren. Migration liest jetzt streng; normale UI bleibt fehlertolerant. Vier echte Modulgegenproben bestanden, alte Chiffren beider Konten nach Wiederholung lesbar. Offlinegruppen erneut 9/9. Browseranalogie wird separat geprüft.
+- Gesamtlaufinventar um Regressionen und Quellwächter für native UI ergänzt; noch nicht vollständig ausgeführt.

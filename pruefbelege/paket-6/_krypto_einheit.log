@@ -22,7 +22,7 @@ Nur zu zweit (Schlüssel-Unterschiebung über die Mitgliedschaft)
   OK    zuVieleMitglieder: zwei sind richtig
 
 Sicherheitsnummer über alle Geräte (AR-04)
-  OK    Format wie der Fingerabdruck  (FC09 32DE A5A3 A358 568F 1521 9D39 2FFF)
+  OK    Format wie der Fingerabdruck  (A89A CC00 2D31 623A 966F 7BE8 F227 EB59)
   OK    Zählt die Geräte  (2)
   OK    Reihenfolge egal (App und Website gleich)
   OK    Doppelte zählen einmal

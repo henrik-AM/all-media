@@ -13,7 +13,7 @@
   OK   Weiterleiten in Chat mit drittem Mitglied: abgelehnt
   OK   Story-Chat gefunden  ({"ok":true,"chatId":"zwei"})
   OK   Story-Antwort im Klartext in verschlüsselten Chat: abgelehnt  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
-  OK   Story-Antwort verschlüsselt: geschrieben mit reply_to_story  ({"ok":true,"chatId":"zwei","nachricht":{"id":"id11","created_at":"2026-11-11T14:58:34.020Z","chat_id":"zwei","sender_id")
+  OK   Story-Antwort verschlüsselt: geschrieben mit reply_to_story  ({"ok":true,"chatId":"zwei","nachricht":{"id":"id11","created_at":"2026-11-11T15:05:46.828Z","chat_id":"zwei","sender_id")
   OK   Für falschen Chat verschlossen: abgelehnt
   OK   Story-Herz: Server schreibt kein Klartext-Herz, gibt Chat zurück  ({"ok":true,"geliked":true,"herzChatId":"zwei"})
 

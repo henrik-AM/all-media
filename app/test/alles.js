@@ -102,6 +102,11 @@ function sperreSetzen() {
 const BEOBACHTET = [
   path.join(__dirname),
   path.join(__dirname, '..', 'lib'),
+  path.join(__dirname, '..', 'screens'),
+  path.join(__dirname, '..', 'components'),
+  path.join(__dirname, '..', 'contexts'),
+  path.join(__dirname, '..', 'constants'),
+  path.join(__dirname, '..', 'App.tsx'),
   path.join(__dirname, '..', 'tools', 'pruefgeraet.js'),
   path.join(__dirname, '..', '..', 'gemeinsam'),
   path.join(__dirname, '..', '..', 'web', 'server'),
@@ -210,6 +215,11 @@ const LAEUFE = [
   ['krypto-web', '_krypto_web_einheit.js'],
   ['krypto-server', '_krypto_server_einheit.js'],
   ['paket6-offline', '_paket6_offline.js'],
+  // Reine Offline-Regressionsproben; eigener Browser-/Native-Server bleibt separat.
+  ['paket6-migration', '_paket6_migration_regression.cjs'],
+  ['paket6-kontenliste', '_paket6_kontenliste_regression.cjs'],
+  ['paket6-weiterleiten', '_paket6_weiterleiten_regression.cjs'],
+  ['paket6-pruefharness', '_paket6_pruefharness_regression.cjs'],
   ['rechte', '_rechte.js'],
   // Geburtsdatum und Zustimmung der Eltern (Schema 52); braucht SUPABASE_TOKEN wie rechte.
   ['minderjaehrig', '_minderjaehrig.js'],
@@ -353,7 +363,8 @@ async function haupt() {
     for (const e of ergebnisse) {
       const zahl = e.zahlen ? `${e.zahlen.gut}/${e.zahlen.gesamt}` : '—';
       if (e.zahlen) { gesamtGut += e.zahlen.gut; gesamtAlle += e.zahlen.gesamt; }
-      const zeichen = e.code === 0 ? 'OK  ' : e.code === 'zeit' ? 'ZEIT' : 'FEHL';
+      const vollstaendig = e.zahlen && e.zahlen.gesamt > 0 && e.zahlen.gut === e.zahlen.gesamt;
+      const zeichen = e.code === 0 && vollstaendig ? 'OK  ' : e.code === 'zeit' ? 'ZEIT' : 'FEHL';
       console.log(`  ${zeichen}  ${e.name.padEnd(16)} ${zahl.padStart(9)}`);
     }
     const gescheitert = ergebnisse.filter(e => e.code !== 0 || (e.zahlen && e.zahlen.gut !== e.zahlen.gesamt));

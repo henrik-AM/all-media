@@ -44,12 +44,18 @@ interface GespeicherteSitzung {
   refresh_token: string;
 }
 
-async function liste(): Promise<string[]> {
+async function liste(streng = false): Promise<string[]> {
   try {
     const roh = await sitzungsspeicher.getItem(SCHLUESSELLISTE);
     const daten = roh ? JSON.parse(roh) : [];
+    if (streng && (!Array.isArray(daten) || daten.some((x) =>
+      typeof x !== 'string' || !/^[A-Za-z0-9._-]+$/.test(x)))) {
+      throw new Error('Gespeicherte Kontenliste ist ungültig');
+    }
     return Array.isArray(daten) ? daten.filter((x) => typeof x === 'string') : [];
-  } catch {
+  } catch (fehler) {
+    // Migration darf einen Lesefehler nicht mit einer leeren Liste verwechseln.
+    if (streng) throw fehler;
     return [];
   }
 }
@@ -129,8 +135,8 @@ export async function sitzungVergessen(kontoId: string): Promise<void> {
 }
 
 /** Zu welchen Konten liegt auf diesem Gerät eine Sitzung? */
-export async function gespeicherteKonten(): Promise<string[]> {
-  return liste();
+export async function gespeicherteKonten(optionen: { streng?: boolean } = {}): Promise<string[]> {
+  return liste(optionen.streng === true);
 }
 
 /**

@@ -102,7 +102,7 @@ async function altbestandUebernehmen(kontoId: string): Promise<void> {
      * `require` — dann wird eben nur das aktive Konto bedacht.
      */
     const { gespeicherteKonten } = require('./kontenspeicher') as typeof import('./kontenspeicher');
-    konten = [...new Set([kontoId, ...(await gespeicherteKonten())])];
+    konten = [...new Set([kontoId, ...(await gespeicherteKonten({ streng: true }))])];
   } catch {
     throw new Error('Gespeicherte Konten nicht ladbar; Altbestand bleibt erhalten');
   }

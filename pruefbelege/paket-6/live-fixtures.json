@@ -1,38 +1,100 @@
 {
-  "lauf": "d39bc898-1918-4862-a952-457c9552e7ed",
-  "pid": 92551,
-  "chatId": "d6af85d9-c8f4-47da-991c-d65dc69ae64a",
+  "supabaseUrl": "https://ijztosbjfybdgotpdixw.supabase.co",
+  "kontakteVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": []
+  },
+  "schluesselVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [
+      "871e028c-5274-4d0b-b153-38a973cb26d5",
+      "37fa221e-0c25-4109-907b-707cf42111ed",
+      "6b1cd4bf-f183-4971-8af2-a348a855174a",
+      "88343632-13f3-4343-854d-7496cb07fff8",
+      "19e1dfcc-4f45-449c-a65d-71a426ea6d19",
+      "0faf8b51-5e65-4008-a45b-fa10a95a1062",
+      "c6f94e85-2db2-48bf-8a9a-5bfdd0d1aef4",
+      "30ee81f9-5029-49fb-9907-dfe2d4bda6ae",
+      "70c6bbd4-03a3-4028-8322-38e484c96613",
+      "b8656946-7cfa-42e7-af97-d41535086a18",
+      "91141467-0dd8-4799-9e34-161af7591e1e",
+      "096464aa-bc1b-479f-a23a-49aad5595c8b",
+      "c9992d57-faab-4986-8123-dfd36e94862b"
+    ],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": [
+      "e5fb027c-b28d-4f46-bca1-a1716b16a17f",
+      "a871f47e-7adb-43df-919d-1f4761ab9589",
+      "6311e872-67b0-47e8-a7fb-88ecbc4cb17e",
+      "0ca04952-5d6b-43b6-9eb9-9f1c967c9d28",
+      "1da3fd44-fad5-4192-bdb8-60c79f585a5a",
+      "34b9bc49-1d76-4d7d-a5d5-9dc5802ddf2b",
+      "23b97403-2c7f-481c-b6f5-fc2d3894e6c3",
+      "64f4de95-75f0-42f1-8139-2e7e19147322",
+      "ba5affe7-de90-42d8-8ab2-58843e174e8b",
+      "4d4c6ff2-012e-40c6-aa40-43b0a0017b20",
+      "334d3697-7ff9-48b3-b925-b35d0ea5d827",
+      "a5e80d3f-b9f7-4617-9d2a-17372bc28609",
+      "a0a0147a-02a9-413f-8a9d-cc49a8f8eb62",
+      "5cd483de-8fb0-4f7e-b588-b79f58a0093a",
+      "7c5902a6-af4b-42a4-938a-f059fe2471e5",
+      "e18d802c-0a89-474e-b05e-05d0d830a1f2",
+      "01f34011-9020-4a46-8e1a-ff82a932ef1d",
+      "e97f3acb-2de6-4d7e-a670-43993fce8087",
+      "2c4a47f6-40cb-433e-ba82-cdf073be8468",
+      "6d8434ed-dbe6-4fa0-a0e9-0775c26e9fe8",
+      "62509988-cf5a-4c65-9a99-a60bffe7e8e2",
+      "6a649709-c9d6-4645-82c0-8b5e4962799d",
+      "38ccab35-dc12-4e75-9ae8-dedb4e0da9b1",
+      "e44ec85a-bb07-40f7-8704-1340ede3dd66",
+      "749d6913-4f92-4781-a232-2dce73bdb6c7",
+      "23fc2bfc-88d7-43be-88f9-556c9043eda9",
+      "0ecadcda-e54d-49f7-97eb-d7325cacf819"
+    ]
+  },
+  "nachrichten": [
+    "58c15f0c-15de-4dea-b9bd-a1386f0f2467",
+    "990fec2b-9dcc-4b56-8f45-161f60d468eb",
+    "a1d32ce9-ab9b-4085-8927-c890e5a2ac51",
+    "509f3bcc-6b12-4970-844e-1378858e85ee",
+    "4b24b97a-98d4-4d76-87ce-7feab793a88f"
+  ],
+  "lauf": "93beb2b3-f7d4-4ea1-a7e7-90ee6c359fbc",
+  "pid": 91041,
+  "chatId": "a7c3d4db-fdd1-46bb-b4aa-d6564e1206c6",
   "schluessel": [
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "7e6bdcdb-3369-4544-9bba-5ade5a94e189"
+      "id": "f273abac-c329-4ab1-bb63-97a9c04c999d"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "ce6df46d-3b64-4691-b800-ddadc1e3a9c0"
+      "id": "9345ec39-381e-4e97-9fc5-862f8bc7daa3"
     },
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "d619551d-6f28-4bd5-86f7-68c5eee15246"
+      "id": "b819f15a-a815-464a-923b-d86e960b71b7"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "0ba7e059-71d0-4308-a079-648260be88c0"
+      "id": "404089c0-e4f7-489d-bae4-fb3931933a0a"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "29c37a2f-6872-4e17-9ab1-5ea047016873"
+      "id": "c2dba006-52fa-46ee-820a-20cba0e255bc"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "f0f009fa-ec67-4a3f-a2a8-056c203ca9d5"
+      "id": "46b44edd-1636-4326-8001-d1c0c158e417"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "251e65f3-84cf-437e-8429-82f54b62702c"
     }
   ],
-  "start": "2026-11-10T18:52:02.915Z",
+  "start": "2026-11-11T15:02:09.856Z",
   "pruefungen": {
-    "ok": 21,
+    "ok": 29,
     "fehl": 0
   },
-  "ende": "2026-11-10T18:52:23.441Z",
+  "ende": "2026-11-11T15:04:40.305Z",
   "rest": 0
 }
