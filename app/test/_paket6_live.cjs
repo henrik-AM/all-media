@@ -149,7 +149,7 @@ function appDatenModul(seite){
  pruefe('App-Originalmodul/RLS: anderes eigenes Gerät heilt Empfänger nicht',typeof fremdApp==='string'&&fremdApp.endsWith(spaet.id+':0'));
  // Zwei echte Produkt-Polls abwarten; keine manuelle Verlaufabfrage dazwischen.
  for(let i=0;i<2;i++){
-  const r=await b.page.waitForResponse(r=>new URL(r.url()).pathname==='/api/messages/'+chatId+'/stand'&&r.request().method()==='POST',{timeout:15000});
+  const r=await b.page.waitForResponse(r=>new globalThis.URL(r.url()).pathname==='/api/messages/'+chatId+'/stand'&&r.request().method()==='POST',{timeout:15000});
   if(r.status()===503)throw Error('Kuvertpoll: HTTP503 ist Infrastrukturfehler, kein Prüfbeleg');
   assert.equal(r.status(),200,'Produkt-Kuvertpoll muss erfolgreich antworten');
   const x=await r.json();assert.ok(x.ok&&typeof x.stand==='string'&&x.stand.endsWith(spaet.id+':0'),'Produktpoll muss genau das Empfängergerät als fehlend melden');
@@ -164,9 +164,7 @@ function appDatenModul(seite){
  await b.page.waitForFunction(({id,text})=>{const n=state.messages.find(m=>m.id===id);return state.openChatId===n?.chatId&&n?.text===text&&n.kuvertFehlt===false&&document.querySelector('#messages')?.textContent.includes(text);},{id:spaet.id,text:spaetText},{timeout:20000});
  pruefe('Produktbrowser heilt Chiffre automatisch im offenen Chat, ohne Neuöffnung',true);
  await b.page.screenshot({path:path.join(OUT,'live-kuvert-heilung.png')});
- // Kein 503/Netzausfall darf als bewiesene Eingabeabwehr zählen. Der aktuelle
- // Produkt-Wrapper maskiert Validierungsfehler als HTTP500; daher direkte
- // Helfer-Gegenprobe plus erfolgreiche Kontrollen unmittelbar davor/danach.
+ // Eindeutige Eingabeabwehr plus gesunde Kontrollen: Infrastrukturfehler zählen nicht.
  const postStand=ids=>b.page.evaluate(async({chatId,ids})=>{
   const r=await fetch('/api/messages/'+chatId+'/stand',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kuvertIds:ids})});
   return {status:r.status,koerper:await r.json()};
@@ -180,7 +178,7 @@ function appDatenModul(seite){
   await assert.rejects(()=>kuvertStandHolen(b.client,b.meiner.id,ids),/Ungültige Kuvertliste/);
   const r=await postStand(ids);
   if(r.status===503)throw Error(name+': HTTP503 ist Ausfall, keine Validierungsbestätigung');
-  const abgewiesen=[400,422,500].includes(r.status)&&r.koerper.ok===false&&typeof r.koerper.error==='string'&&r.koerper.stand===undefined;
+  const abgewiesen=r.status===400&&r.koerper.ok===false&&r.koerper.error==='Ungültige Kuvertliste (höchstens 500 UUIDs)'&&r.koerper.stand===undefined;
   pruefe('Standroute weist '+name+' explizit ab (HTTP '+r.status+')',abgewiesen);
   const danach=await postStand([spaet.id]);assert.equal(danach.status,200,name+': gesunder Kontrollaufruf danach fehlt');assert.ok(danach.koerper.ok&&danach.koerper.stand.endsWith(spaet.id+':1'));
  }

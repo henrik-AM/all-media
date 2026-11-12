@@ -1,0 +1,74 @@
+{
+  "supabaseUrl": "https://ijztosbjfybdgotpdixw.supabase.co",
+  "kontakteVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": []
+  },
+  "schluesselVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [
+      "871e028c-5274-4d0b-b153-38a973cb26d5",
+      "37fa221e-0c25-4109-907b-707cf42111ed",
+      "6b1cd4bf-f183-4971-8af2-a348a855174a",
+      "88343632-13f3-4343-854d-7496cb07fff8",
+      "19e1dfcc-4f45-449c-a65d-71a426ea6d19",
+      "0faf8b51-5e65-4008-a45b-fa10a95a1062",
+      "c6f94e85-2db2-48bf-8a9a-5bfdd0d1aef4",
+      "30ee81f9-5029-49fb-9907-dfe2d4bda6ae",
+      "70c6bbd4-03a3-4028-8322-38e484c96613",
+      "b8656946-7cfa-42e7-af97-d41535086a18",
+      "91141467-0dd8-4799-9e34-161af7591e1e",
+      "096464aa-bc1b-479f-a23a-49aad5595c8b",
+      "c9992d57-faab-4986-8123-dfd36e94862b"
+    ],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": [
+      "f829f60e-8a96-4ed6-9083-1b21d6ef8f3d",
+      "7c3b256c-6124-47ce-9c2b-4e66cf8f59a8",
+      "aa38eeea-1aec-41fc-b17d-af9ffffcc745",
+      "d51bec9a-d056-41ab-ac50-a2693c7990a1",
+      "148df168-b916-4bb5-8219-ac2d92ad2cfe"
+    ]
+  },
+  "nachrichten": [
+    "17a8fa49-e557-44c2-9ede-835105f29799",
+    "64d1a26c-b3ec-4cda-b653-06b34902c77c",
+    "09a4401e-8ae7-4761-919b-9e95a52e3f31",
+    "b94e62ad-252b-459b-8736-1d1651e23f7c",
+    "0c2c6ab7-a273-4a50-a8a4-a3c51200c971"
+  ],
+  "lauf": "8f4b97f8-0055-4820-a846-f7f12803d58b",
+  "pid": 27432,
+  "chatId": "6ba2db16-0d70-4f93-b94b-cec96ffbae76",
+  "schluessel": [
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "f5836578-2ec5-4469-80c8-4e498aa0b7a9"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "d4ce6eb4-a198-44fd-9d7f-f4f149469c63"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "97906bcd-e6fb-4abe-811f-030f3877f411"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "6e04646e-d59a-431e-9f5e-18f6594552fe"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "16acc30b-1fbd-4a67-9cf5-3afdfeab0190"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "8ee64e7d-cfed-4bd9-865d-a0220ceec859"
+    }
+  ],
+  "start": "2026-11-12T13:05:23.168Z",
+  "ende": "2026-11-12T13:05:43.270Z",
+  "rest": 0,
+  "pruefungen": {
+    "ok": 26,
+    "fehl": 1
+  }
+}

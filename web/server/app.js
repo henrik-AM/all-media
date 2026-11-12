@@ -791,11 +791,14 @@ app.get('/api/messages/:chatId', route(async (req) =>
  * den Verlauf nur, wenn er sich geaendert hat (gemeinsam/chatabgleich.js).
  * Dieselben Abfragen macht die App direkt (app/lib/daten.ts).
  */
-const nachrichtenStandRoute = route(async (req) => ({
-  ok: true,
-  stand: await supabaseApi.ladeChatStand(req.db, req.params.chatId, false,
-    req.schluesselId, req.method === 'POST' ? (req.body?.kuvertIds ?? []) : []),
-}));
+const nachrichtenStandRoute = route(async (req, res) => {
+  const kuvertIds = req.method === 'POST' ? (req.body?.kuvertIds ?? []) : [];
+  if (!require('../../gemeinsam/kryptodaten').kuvertListeGueltig(kuvertIds)) {
+    return res.status(400).json({ ok: false, error: 'Ungültige Kuvertliste (höchstens 500 UUIDs)' });
+  }
+  return { ok: true, stand: await supabaseApi.ladeChatStand(req.db, req.params.chatId, false,
+    req.schluesselId, kuvertIds) };
+});
 // GET bleibt für bestehende Clients; POST trägt begrenzte Pending-IDs im Körper.
 app.get('/api/messages/:chatId/stand', nachrichtenStandRoute);
 app.post('/api/messages/:chatId/stand', nachrichtenStandRoute);

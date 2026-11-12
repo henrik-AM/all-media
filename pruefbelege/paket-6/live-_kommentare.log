@@ -1,0 +1,33 @@
+  START Startseite mit Datenbereitschaft
+  ENDE Startseite mit Datenbereitschaft (30071 ms)
+  START Anmeldung einschließlich erstem Reset
+  ENDE Anmeldung einschließlich erstem Reset (3749 ms)
+  START Neuladen nach Anmeldung
+  ENDE Neuladen nach Anmeldung (16879 ms)
+  START Anmeldung bereit nach Neuladen
+  ENDE Anmeldung bereit nach Neuladen (2 ms)
+  START Zweiter Reset mit Neuladen
+  ENDE Zweiter Reset mit Neuladen (21422 ms)
+  START Neuladen nach zweitem Reset
+  ENDE Neuladen nach zweitem Reset (18366 ms)
+  START Oberfläche bereit
+  ENDE Oberfläche bereit (6 ms)
+
+5.1 Eingabe, Senden, Profilbild vollständig
+  OK   Home: alle drei Teile sind zu sehen
+  OK   Kurzformat: alle drei Teile sind zu sehen
+
+5.2 Kommentar-Knopf im Querformat
+  OK   Querformat: der Knopf öffnet das Blatt, und es liegt über dem Player
+  OK   Ein gesperrtes Wort meldet sich IM Blatt, der Entwurf bleibt stehen
+  OK   Weitertippen nimmt den Hinweis wieder weg
+  OK   Ein erlaubter Kommentar erscheint sofort und zieht die Zahl mit
+
+5.2 / 5.3 Live
+  OK   Live: zugeklappt steht ein kleines Fenster mit höchstens drei Zeilen
+  OK   Live: der Kommentar-Knopf klappt auf und setzt den Cursor ins Feld
+  OK   Live: ein Kommentar erscheint im Fenster, der Knopf zählt die Live-Kommentare
+
+  9 von 9 Punkten erfuellt
+
+  Keine Konsolenfehler

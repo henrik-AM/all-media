@@ -43,11 +43,13 @@ function offeneKuvertIds(nachrichten) {
 }
 
 /** Gerätebezogene Bereitschaft für höchstens 500 gerenderte IDs; ohne Geheimnisse. */
+function kuvertListeGueltig(ids) {
+  return Array.isArray(ids) && ids.length <= 500 &&
+    ids.every(id => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+}
+
 async function kuvertStandHolen(client, schluesselId, ids = []) {
-  if (!Array.isArray(ids) || ids.length > 500 ||
-      ids.some(id => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
-    throw new Error('Ungültige Kuvertliste (höchstens 500 UUIDs)');
-  }
+  if (!kuvertListeGueltig(ids)) throw new Error('Ungültige Kuvertliste (höchstens 500 UUIDs)');
   const gesucht = [...new Set(ids)].sort();
   if (!gesucht.length) return '';
   if (!schluesselId) return '|kuverts:geraet-fehlt';
@@ -66,4 +68,4 @@ async function kuvertStandHolen(client, schluesselId, ids = []) {
   return '|kuverts:' + gesucht.map(id => id + ':' + (gefunden.has(id) ? 1 : 0)).join(',');
 }
 
-module.exports = { schluesselHolen, offeneKuvertIds, kuvertStandHolen };
+module.exports = { schluesselHolen, offeneKuvertIds, kuvertStandHolen, kuvertListeGueltig };

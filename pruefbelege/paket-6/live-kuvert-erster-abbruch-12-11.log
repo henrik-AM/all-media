@@ -1,0 +1,28 @@
+2026-11-12T13:05:26.936Z OK Zwei App- und zwei echte Browsergeräte registriert
+2026-11-12T13:05:28.895Z OK App → Website test@all-media.app
+2026-11-12T13:05:30.320Z OK Website-Sendeantwort test@all-media.app
+2026-11-12T13:05:30.658Z OK Website → App-Logik test@all-media.app
+2026-11-12T13:05:32.194Z OK App → Website all.media.prueflauf@web.de
+2026-11-12T13:05:33.516Z OK Website-Sendeantwort all.media.prueflauf@web.de
+2026-11-12T13:05:33.853Z OK Website → App-Logik all.media.prueflauf@web.de
+2026-11-12T13:05:33.932Z OK Alle vier Rundreise-Nachrichten nur als Chiffre gespeichert
+2026-11-12T13:05:34.053Z OK Jedes eigene Gerät erhält vier Kuverts test@all-media.app
+2026-11-12T13:05:34.215Z OK Jedes eigene Gerät erhält vier Kuverts all.media.prueflauf@web.de
+2026-11-12T13:05:34.790Z OK Alter Website-Aufrufer mit Klartext ausdrücklich abgewiesen
+2026-11-12T13:05:34.872Z OK Klartext-Abweisung schreibt keine zusätzliche Zeile
+2026-11-12T13:05:34.878Z OK Simulierter Faktenausfall im echten Websiteweg fällt nicht auf Klartext
+2026-11-12T13:05:35.358Z OK Sicherheitsnummer App/Website umfasst dieselben Geräte
+2026-11-12T13:05:35.813Z OK Zusätzliches reales Gerät ändert die Sicherheitsnummer
+2026-11-12T13:05:36.227Z OK Entferntes Gerät stellt die ursprüngliche Nummer wieder her
+2026-11-12T13:05:36.491Z OK Kontowechsel hat eigenes Gerätepaar
+2026-11-12T13:05:36.761Z OK Zurückwechseln verwendet wieder genau das erste Gerät
+2026-11-12T13:05:36.991Z OK Browser-Neustart behält das eigene Konto-Gerätepaar test@all-media.app
+2026-11-12T13:05:37.860Z OK Browser-Neustart liest frühere Rundreise-Chiffren test@all-media.app
+2026-11-12T13:05:38.084Z OK Browser-Neustart behält das eigene Konto-Gerätepaar all.media.prueflauf@web.de
+2026-11-12T13:05:39.006Z OK Browser-Neustart liest frühere Rundreise-Chiffren all.media.prueflauf@web.de
+2026-11-12T13:05:39.560Z OK App-Originalmodul/RLS: Nachricht vor eigenem Kuvert signalisiert 0
+2026-11-12T13:05:40.888Z OK Produktbrowser zeigt tatsächlichen fehlenden Kuvertmarker
+2026-11-12T13:05:41.152Z OK App-Originalmodul/RLS: anderes eigenes Gerät heilt Empfänger nicht
+2026-11-12T13:05:41.687Z FEHLER page.waitForResponse: URL is not a constructor
+2026-11-12T13:05:43.270Z OK Geprüfte Bereinigung: keine eigenen Chat-/Nachrichten-/Geräte-/Kontaktreste
+2026-11-12T13:05:43.271Z 26/27 Live-Prüfungen; Rest 0. App-Logik mit simuliertem Schlüsselbund; Browser mit echter Anmeldung und Supabase.

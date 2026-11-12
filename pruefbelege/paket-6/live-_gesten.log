@@ -1,0 +1,19 @@
+
+Kommentare
+  OK   Die angezeigte Kommentarzahl stimmt mit der echten überein
+  OK   Unter jedem Kommentar steht die Zahl seiner Likes
+  OK   Ein Like erhöht die Zahl sofort
+  OK   Ein neuer Kommentar zieht die Zahl am Beitrag mit
+
+Ziehen zum Schließen
+  OK   Ein kurzer Zug schließt das Kommentar-Blatt NICHT
+  OK   Ein langer Zug nach unten schließt es
+
+Story-Betrachter
+  OK   Ein kurzer Zug beendet die Story NICHT
+  OK   Ein Wischen nach unten beendet sie
+  OK   Danach steht wieder die Chatliste da
+
+  9 von 9 Punkten erfuellt
+
+  Keine Konsolenfehler

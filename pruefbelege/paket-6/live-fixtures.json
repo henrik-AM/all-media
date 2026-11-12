@@ -21,80 +21,59 @@
       "c9992d57-faab-4986-8123-dfd36e94862b"
     ],
     "62616c1d-82e2-4ee4-aab9-950e40e438a4": [
-      "e5fb027c-b28d-4f46-bca1-a1716b16a17f",
-      "a871f47e-7adb-43df-919d-1f4761ab9589",
-      "6311e872-67b0-47e8-a7fb-88ecbc4cb17e",
-      "0ca04952-5d6b-43b6-9eb9-9f1c967c9d28",
-      "1da3fd44-fad5-4192-bdb8-60c79f585a5a",
-      "34b9bc49-1d76-4d7d-a5d5-9dc5802ddf2b",
-      "23b97403-2c7f-481c-b6f5-fc2d3894e6c3",
-      "64f4de95-75f0-42f1-8139-2e7e19147322",
-      "ba5affe7-de90-42d8-8ab2-58843e174e8b",
-      "4d4c6ff2-012e-40c6-aa40-43b0a0017b20",
-      "334d3697-7ff9-48b3-b925-b35d0ea5d827",
-      "a5e80d3f-b9f7-4617-9d2a-17372bc28609",
-      "a0a0147a-02a9-413f-8a9d-cc49a8f8eb62",
-      "5cd483de-8fb0-4f7e-b588-b79f58a0093a",
-      "7c5902a6-af4b-42a4-938a-f059fe2471e5",
-      "e18d802c-0a89-474e-b05e-05d0d830a1f2",
-      "01f34011-9020-4a46-8e1a-ff82a932ef1d",
-      "e97f3acb-2de6-4d7e-a670-43993fce8087",
-      "2c4a47f6-40cb-433e-ba82-cdf073be8468",
-      "6d8434ed-dbe6-4fa0-a0e9-0775c26e9fe8",
-      "62509988-cf5a-4c65-9a99-a60bffe7e8e2",
-      "6a649709-c9d6-4645-82c0-8b5e4962799d",
-      "38ccab35-dc12-4e75-9ae8-dedb4e0da9b1",
-      "e44ec85a-bb07-40f7-8704-1340ede3dd66",
-      "749d6913-4f92-4781-a232-2dce73bdb6c7",
-      "23fc2bfc-88d7-43be-88f9-556c9043eda9",
-      "0ecadcda-e54d-49f7-97eb-d7325cacf819"
+      "f829f60e-8a96-4ed6-9083-1b21d6ef8f3d",
+      "7c3b256c-6124-47ce-9c2b-4e66cf8f59a8",
+      "aa38eeea-1aec-41fc-b17d-af9ffffcc745",
+      "d51bec9a-d056-41ab-ac50-a2693c7990a1",
+      "148df168-b916-4bb5-8219-ac2d92ad2cfe"
     ]
   },
   "nachrichten": [
-    "58c15f0c-15de-4dea-b9bd-a1386f0f2467",
-    "990fec2b-9dcc-4b56-8f45-161f60d468eb",
-    "a1d32ce9-ab9b-4085-8927-c890e5a2ac51",
-    "509f3bcc-6b12-4970-844e-1378858e85ee",
-    "4b24b97a-98d4-4d76-87ce-7feab793a88f"
+    "d433da06-fec8-4453-9329-f2b58b18fd4f",
+    "be90adcf-19d6-4814-ac53-e6fe74078608",
+    "5d61d454-5923-495d-b644-4bfcb6e7251a",
+    "a4d49897-8f04-411e-88e1-325001180a58",
+    "8714f299-6720-49a3-8736-fc350553386d",
+    "49bd6203-5ecf-43cd-95c7-65938e642410"
   ],
-  "lauf": "93beb2b3-f7d4-4ea1-a7e7-90ee6c359fbc",
-  "pid": 91041,
-  "chatId": "a7c3d4db-fdd1-46bb-b4aa-d6564e1206c6",
+  "lauf": "fa240a75-b099-47fb-830a-b66b360e7797",
+  "pid": 27556,
+  "chatId": "b5fe6f9f-3f85-42c5-a3d8-7e165f9f42a9",
   "schluessel": [
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "f273abac-c329-4ab1-bb63-97a9c04c999d"
+      "id": "12a9c024-f94c-4b30-8c18-c2053c4d29dc"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "9345ec39-381e-4e97-9fc5-862f8bc7daa3"
+      "id": "cbfda065-ad2b-4360-b2e9-b8abf7123a4e"
     },
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "b819f15a-a815-464a-923b-d86e960b71b7"
+      "id": "8607945b-d9ab-45e4-8ad3-9bad4e2c2e9d"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "404089c0-e4f7-489d-bae4-fb3931933a0a"
+      "id": "5ac1760f-73b1-4c66-8610-9481d3c7d185"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "c2dba006-52fa-46ee-820a-20cba0e255bc"
+      "id": "0d9b2935-1923-4bfc-9d6c-67827d66946f"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "46b44edd-1636-4326-8001-d1c0c158e417"
+      "id": "400202c7-c5f7-473e-86b7-e2a264b49571"
     },
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "251e65f3-84cf-437e-8429-82f54b62702c"
+      "id": "af3e74a5-0dbc-4e19-a173-6ab38cb864d7"
     }
   ],
-  "start": "2026-11-11T15:02:09.856Z",
+  "start": "2026-11-12T13:05:59.602Z",
   "pruefungen": {
-    "ok": 29,
+    "ok": 38,
     "fehl": 0
   },
-  "ende": "2026-11-11T15:04:40.305Z",
+  "ende": "2026-11-12T13:08:43.544Z",
   "rest": 0
 }
