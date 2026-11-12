@@ -15,3 +15,9 @@ Aktuellen main757fc5c nur in den eigenen Codex-Zweig mergen. SDK58-Versionen üb
 main757fc5c ließ sich automatisch ohne Konflikt mergen. Alle drei eigenen Paket6-npm-Skripte bleiben vorhanden. Lockdateien wurden ausdrücklich aus main übernommen und npm install bestätigte dieselben Fassungen. Beide node_modules-Symlinks zum Hauptprojekt wurden nur als Links entfernt; danach isolierte App-/Web-Installationen per npm ci, beide Exit0. Hauptprojekt-Abhängigkeiten unberührt. Die beiden eigenen nativen Prüfprojekte deklarieren ebenfalls Expo58/RN0.88/React19.3.
 
 Frisch: TypeScript Exit0,21/21 Paket6-Gegenproben bestanden. Expo Doctor19/20: inzwischen verfügbare kompatible Patches Expo58.0.25 und expo-contacts58.0.11 werden empfohlen; keine Prüfungen ausgeblendet. Vor vollständiger Abnahme werden diese beiden SDK58-Patches im eigenen Zweig nachgezogen. App-Audit meldet drei mittlere Befunde, Web-Audit0. Kein npm audit fix --force und kein SDK-Downgrade.
+
+## Frisch geprüfter Stand nach kompatiblen Patches
+
+Nur zwei Lockfile-Auflösungen zusätzlich zu main geändert: Expo58.0.24→58.0.25 und expo-contacts58.0.10→58.0.11, innerhalb der übernommenen~58.0-Bereiche. Keine manuellen Lockfile-Merges. App anschließend erneut per npm ci reproduziert. Tatsächlich installiert: Expo58.0.25, ReactNative0.88.1, React19.3.0.
+
+Expo Doctor **20/20**, TypeScript **Exit0**, Paket6-Kuvert-/Generations-/Öffnungsregressionen **21/21**. AST-Graph lokal ohne LLM aktualisiert. App weiterhin drei mittlere Abhängigkeitsbefunde; Website0. SDK58-Produktlauf und Nativeabnahme dadurch noch nicht bestätigt. Vor dem nächsten Gesamtlauf ausreichendes Kontingent für etwa zwei Stunden klären; derzeit kein eigener Server und keine Testbestandsbelegung. Paket8 wurde nicht weiterbearbeitet und muss vor dortiger Fortsetzung ebenfalls mit aktuellem main abgeglichen werden.
