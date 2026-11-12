@@ -1,0 +1,30 @@
+✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (4.560625ms)
+✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (0.806791ms)
+✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (0.897291ms)
+✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (0.656166ms)
+✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (173.134917ms)
+✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (55.637625ms)
+Chat nachsehen fehlgeschlagen: simulierter Lesefehler
+✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (57.914166ms)
+✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (55.747458ms)
+✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.348292ms)
+✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.384667ms)
+✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (20.120709ms)
+✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (17.232625ms)
+✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (23.740875ms)
+✔ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.442167ms)
+✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.088084ms)
+✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (88.726208ms)
+✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (11.100083ms)
+✔ Initiales Promise.all: alte Neuöffnung derselben Chat-ID ersetzt neuen Kontoverlauf nicht (21.917958ms)
+✔ Verspätete DM-Antwort nach neuer Öffnung zeichnet nicht neu (0.918334ms)
+✔ Verspätetes DM-json nach Stop bleibt ohne UI- und Chatmutation (0.739125ms)
+✔ Alte Sperrbestätigung nach einer neueren Öffnung wird verworfen (2.077959ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 629.86025

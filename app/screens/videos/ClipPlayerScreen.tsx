@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StatusBar, StyleSheet, Text, TextInput, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Motiv } from '../../components/Motiv';
@@ -143,7 +143,7 @@ export const ClipPlayerScreen = ({ clipId, kommentar, onBack, onOpenProfile, onO
    */
   const liveKante = useRef(0);
   /* Vor dem fruehen return unten — Hooks muessen in jeder Runde gleich stehen. */
-  const seite = useRef<ScrollView>(null);
+  const seite = useRef<ScrollViewInstance>(null);
   const [balkenBreite, setBalkenBreite] = useState(0);
   const fenster = useWindowDimensions();
   const video = useVideoEinstellungen();

@@ -19,7 +19,7 @@
  * Supabase.
  */
 import React, { useRef, useState } from 'react';
-import { PanResponder, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { PanResponder, Platform, ScrollView, Switch, Text, View, type ViewInstance } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -205,7 +205,7 @@ const Regler = ({
   onZiehen: (v: number) => void;
   onFertig: (v: number) => void;
 }) => {
-  const bahn = useRef<View>(null);
+  const bahn = useRef<ViewInstance>(null);
   const lage = useRef({ x: 0, breite: 1 });
   const letzter = useRef(wert);
   const [breite, setBreite] = useState(0);

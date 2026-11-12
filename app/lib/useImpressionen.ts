@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
-import type { ViewToken } from 'react-native';
+import type { ListViewToken } from 'react-native';
 import { Impressionssammler, type Impressionsquelle } from './impressionen';
 import { impressionenVermerken } from './aktionen';
 import { useSupabase } from '../contexts/SupabaseContext';
@@ -52,7 +52,7 @@ export function useImpressionen(quelle: Impressionsquelle) {
   }
 
   const sichtbarWechsel = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    ({ viewableItems }: { viewableItems: ListViewToken[] }) => {
       const ids = viewableItems
         .map((v) => (v.item as { id?: string })?.id)
         .filter((id): id is string => Boolean(id));

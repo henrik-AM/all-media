@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../constants/design';
 
 export const OfflineIndicator = () => {
   const [isOnline, setIsOnline] = useState(true);
-  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [appState, setAppState] = useState<AppStateStatus>((AppState.currentState ?? 'active') as AppStateStatus);
 
   useEffect(() => {
     // For now, we assume online unless we implement network detection

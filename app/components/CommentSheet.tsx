@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View, Animated } from 'react-native';
+  View, Animated, type TextInputInstance } from 'react-native';
 import { ZiehZumAntworten } from './ZiehZumAntworten';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -76,7 +76,7 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, springeZu }: Pr
   // Nachtrag 4.3: der Kommentar aus einer Mitteilung leuchtet kurz auf.
   const [markiert, setMarkiert] = useState<string | null>(null);
   const liste = useRef<FlatList<{ kommentar: Comment; antworten: Comment[] }>>(null);
-  const feldRef = useRef<TextInput>(null);
+  const feldRef = useRef<TextInputInstance>(null);
   const faeden = useMemo(() => Kommentar.faeden(comments), [comments]);
   const insets = useSafeAreaInsets();
   /*

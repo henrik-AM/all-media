@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { FlatList, StyleSheet, Switch, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,7 +68,7 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
   const [entwurf, setEntwurf] = useState('');
   /** Nachtrag 4.3c: der Live-Kommentar, auf den gerade geantwortet wird. */
   const [antwortAn, setAntwortAn] = useState<Kommentar | null>(null);
-  const feldRef = useRef<TextInput>(null);
+  const feldRef = useRef<TextInputInstance>(null);
 
   // Einmal beim Aufmachen: ab jetzt steht im eigenen Profil, dass gesendet
   // wird. Vorher wusste das nur dieser Bildschirm.

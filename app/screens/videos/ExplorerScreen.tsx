@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, Image, Linking, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Linking, Modal, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 import { KarteWeb, KartenSteuerung, Pin as KartenPin } from '../../components/KarteWeb';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -739,7 +739,7 @@ const OrtKarte = ({
 }) => {
   const insets = useSafeAreaInsets();
   const karte = useRef<KartenSteuerung>(null);
-  const blatt = useRef<ScrollView>(null);
+  const blatt = useRef<ScrollViewInstance>(null);
   const [vollbild, setVollbild] = useState(false);
   const [gewaehlt, setGewaehlt] = useState<string>(platz.id);
 
@@ -1076,7 +1076,7 @@ const LyricsSeite = ({
   onZu: () => void;
 }) => {
   const insets = useSafeAreaInsets();
-  const blatt = useRef<ScrollView>(null);
+  const blatt = useRef<ScrollViewInstance>(null);
   const lagen = useRef<Record<number, number>>({});
   const eintraege = useMemo(() => Liedtext.eintraege(sound.lyrics), [sound.lyrics]);
 

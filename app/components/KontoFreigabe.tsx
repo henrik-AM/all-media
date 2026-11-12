@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { AppState, Modal, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { AppState, Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Druck } from './Druck';
 import { AuthContext } from '../contexts/AuthContext';

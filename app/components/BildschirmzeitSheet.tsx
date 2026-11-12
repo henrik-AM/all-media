@@ -18,7 +18,7 @@
  * gleiche Texte aus gemeinsam/bildschirmzeit.js.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { ScrollView, Switch, Text, View, type ScrollViewInstance } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Druck } from './Druck';
@@ -401,7 +401,7 @@ const ChipReihe = ({
   text: (w: number | null) => string;
   wahl: (w: number | null) => void;
 }) => {
-  const ref = useRef<ScrollView>(null);
+  const ref = useRef<ScrollViewInstance>(null);
   const breite = useRef(0);
   const gerollt = useRef(false);
   return (

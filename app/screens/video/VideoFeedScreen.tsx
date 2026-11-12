@@ -11,7 +11,7 @@ import {
   Text,
   View,
   RefreshControl,
-  ViewToken,
+  type ListViewToken,
 } from 'react-native';
 import { Druck } from '../../components/Druck';
 import { Glocke } from '../../components/Glocke';
@@ -185,7 +185,7 @@ export const VideoFeedScreen = ({
    */
   const { sichtbarWechsel: impressionWechsel } = useImpressionen('reels');
   const sichtbarWechsel = useCallback(
-    (info: { viewableItems: ViewToken[] }) => {
+    (info: { viewableItems: ListViewToken[] }) => {
       const erstes = info.viewableItems[0]?.item as Video | undefined;
       if (erstes) {
         setSichtbar(erstes.id);

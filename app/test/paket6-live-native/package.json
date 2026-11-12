@@ -1,1 +1,11 @@
-{"name": "paket6-native-live", "version": "1.0.0", "private": true, "main": "einstieg.tsx", "dependencies": {"expo": "~57.0.16", "react": "19.2.3", "react-native": "0.86.2"}}
+{
+  "name": "paket6-native-live",
+  "version": "1.0.0",
+  "private": true,
+  "main": "einstieg.tsx",
+  "dependencies": {
+    "expo": "~58.0.24",
+    "react": "19.3.0",
+    "react-native": "0.88.1"
+  }
+}
