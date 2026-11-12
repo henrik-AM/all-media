@@ -37,6 +37,8 @@ export interface User {
 }
 
 export interface Message {
+  /** Gerät hat noch kein Kuvert; getrennt von kaputter Chiffre/Absenderwarnung. */
+  kuvertFehlt?: boolean;
   id: string;
   chatId: string;
   senderId: string;

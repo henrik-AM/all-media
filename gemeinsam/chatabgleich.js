@@ -135,6 +135,11 @@
       // AR-04: wird die Kennzeichnung „Absender nicht prüfbar" erst beim
       // nächsten Nachsehen klar, muss die Blase neu gezeichnet werden.
       Boolean(m.nichtPruefbar),
+      Boolean(m.kuvertFehlt),
+      // Ein nachträglich geöffnetes Kuvert eines Antwort-/Zitatbezugs
+      // muss auch bei unverändertem Haupttext neu gezeichnet werden.
+      m.antwortAuf ? [m.antwortAuf.id, m.antwortAuf.text, m.antwortAuf.autor, Boolean(m.antwortAuf.kuvertFehlt)] : null,
+      m.zitat ? [m.zitat.id, m.zitat.text, m.zitat.autor, Boolean(m.zitat.kuvertFehlt)] : null,
       m.reaktionen || [],
       m.media || null,
       m.datei ? m.datei.name : null,
@@ -271,9 +276,30 @@
     return (zeilenAbsteigend || []).slice().reverse();
   }
 
+function offeneKuvertIds(nachrichten) {
+  const ids = [];
+  for (const n of nachrichten || []) {
+    for (const z of [n, n?.antwortAuf, n?.zitat]) {
+      if (z?.kuvertFehlt && z.id && !ids.includes(z.id)) ids.push(z.id);
+    }
+  }
+  return ids;
+}
+
+
+  /** Pro Anfrage maximal 500 IDs; Bezugszeilen können den Verlauf verdoppeln. */
+  function kuvertBloecke(ids) {
+    var alle = Array.from(new Set(ids || [])).sort();
+    var bloecke = [];
+    for (var i = 0; i < alle.length; i += 500) bloecke.push(alle.slice(i, i + 500));
+    return bloecke.length ? bloecke : [[]];
+  }
+
   return {
     INTERVALL_CHAT_MS: INTERVALL_CHAT_MS,
     INTERVALL_LISTE_MS: INTERVALL_LISTE_MS,
+    offeneKuvertIds: offeneKuvertIds,
+    kuvertBloecke: kuvertBloecke,
     STAND_ZEILEN: STAND_ZEILEN,
     STAND_SPALTEN: STAND_SPALTEN,
     STAND_SPALTEN_KANAL: STAND_SPALTEN_KANAL,

@@ -625,7 +625,7 @@ export async function aufschliessen(
   for (const z of verschlossen) if (z.chat_id) verschluesselteChats.add(z.chat_id);
 
   if (!meiner) {
-    for (const z of verschlossen) z.text = NICHT_LESBAR;
+    for (const z of verschlossen) { z.text = NICHT_LESBAR; z.kuvertFehlt = true; }
     return zeilen;
   }
 
@@ -640,6 +640,7 @@ export async function aufschliessen(
 
   for (const z of verschlossen) {
     const kuvert = nachId.get(z.id);
+    z.kuvertFehlt = !kuvert;
     const klar = kuvert
       ? Krypto.entschluesseln(
           { version: z.krypto, chiffre: z.chiffre, nonce: z.krypto_nonce, absender: z.absender_schluessel },

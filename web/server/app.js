@@ -791,10 +791,14 @@ app.get('/api/messages/:chatId', route(async (req) =>
  * den Verlauf nur, wenn er sich geaendert hat (gemeinsam/chatabgleich.js).
  * Dieselben Abfragen macht die App direkt (app/lib/daten.ts).
  */
-app.get('/api/messages/:chatId/stand', route(async (req) => ({
+const nachrichtenStandRoute = route(async (req) => ({
   ok: true,
-  stand: await supabaseApi.ladeChatStand(req.db, req.params.chatId, false),
-})));
+  stand: await supabaseApi.ladeChatStand(req.db, req.params.chatId, false,
+    req.schluesselId, req.method === 'POST' ? (req.body?.kuvertIds ?? []) : []),
+}));
+// GET bleibt für bestehende Clients; POST trägt begrenzte Pending-IDs im Körper.
+app.get('/api/messages/:chatId/stand', nachrichtenStandRoute);
+app.post('/api/messages/:chatId/stand', nachrichtenStandRoute);
 
 app.get('/api/chatstand', route(async (req) => ({
   ok: true,

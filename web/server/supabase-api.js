@@ -655,7 +655,7 @@ async function ladeChats(client, nutzerId, bereich = 'messenger', schluesselId =
  * ladeChatStand in app/lib/daten.ts. Der Browser fragt ihn im Takt und holt
  * den Verlauf nur, wenn er sich geaendert hat.
  */
-async function ladeChatStand(client, chatId, istKanal = false) {
+async function ladeChatStand(client, chatId, istKanal = false, schluesselId = null, kuvertIds = []) {
   if (!client) return null;
   const { data, error } = istKanal
     ? await client
@@ -671,7 +671,9 @@ async function ladeChatStand(client, chatId, istKanal = false) {
         .order('created_at', { ascending: false })
         .limit(ChatAbgleich.STAND_ZEILEN);
   if (error) throw error;
-  return ChatAbgleich.stand(data || []);
+  const { kuvertStandHolen } = require('../../gemeinsam/kryptodaten');
+  return ChatAbgleich.stand(data || []) +
+    (istKanal ? '' : await kuvertStandHolen(client, schluesselId, kuvertIds));
 }
 
 /**

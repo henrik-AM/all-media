@@ -21,6 +21,8 @@ export function listenStand(
   mitglieder: { chat_id: string; is_read?: boolean | null; is_archived?: boolean | null; is_muted?: boolean | null; notifications_off?: boolean | null; is_locked?: boolean | null; is_favorite?: boolean | null; geleert_bis?: string | null }[] | null | undefined,
   letzte: { chat_id: string; id: string; edited_at?: string | null; deleted_at?: string | null }[] | null | undefined
 ): string;
+export function offeneKuvertIds(nachrichten: any[]): string[];
+export function kuvertBloecke(ids: string[]): string[][];
 export function fingerabdruck(m: any): string;
 /** Gibt `lokal` selbst zurück, wenn sich nichts Sichtbares geändert hat. */
 export function nachrichtenAbgleichen<T extends { id: string; lokal?: boolean }>(lokal: T[], frisch: T[]): T[];

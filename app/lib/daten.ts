@@ -747,7 +747,9 @@ export async function ladeChatZustand(
 export async function ladeChatStand(
   client: SupabaseClient,
   chatId: string,
-  istKanal = false
+  istKanal = false,
+  schluesselId: string | null = null,
+  kuvertIds: string[] = []
 ): Promise<string | null> {
   const { data, error } = istKanal
     ? await client
@@ -763,7 +765,11 @@ export async function ladeChatStand(
         .order('created_at', { ascending: false })
         .limit(ChatAbgleich.STAND_ZEILEN);
   if (error) return null;
-  return ChatAbgleich.stand((data ?? []) as any[]);
+  try {
+    const { kuvertStandHolen } = require('../../gemeinsam/kryptodaten');
+    return ChatAbgleich.stand((data ?? []) as any[]) +
+      (istKanal ? '' : await kuvertStandHolen(client, schluesselId, kuvertIds));
+  } catch { return null; }
 }
 
 /**
@@ -910,10 +916,11 @@ export async function ladeNachrichten(
     for (const p of (profile ?? []) as any[]) namen.set(p.id, p.name);
   }
 
-  const bezug = new Map<string, { text: string; autor: string }>();
+  const bezug = new Map<string, { text: string; autor: string; kuvertFehlt?: boolean }>();
   for (const b of bezugZeilen) {
     bezug.set(b.id, {
       text: b.text ?? '',
+      kuvertFehlt: Boolean(b.kuvertFehlt),
       autor: b.sender_id === ichId ? 'Du' : namen.get(b.sender_id) ?? '',
     });
   }
@@ -924,6 +931,7 @@ export async function ladeNachrichten(
     chatId: n.chat_id,
     senderId: n.sender_id === ichId ? ICH : n.sender_id,
     text: n.text,
+    kuvertFehlt: Boolean(n.kuvertFehlt),
     time: chatZeit(n.created_at),
     media: n.media_type ?? undefined,
     read: Boolean(n.read_at),

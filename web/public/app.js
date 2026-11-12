@@ -21742,32 +21742,46 @@ let msgBearbeitet = null;
  * geaendert hat. Gleiche Regel in der App (ChatDetailScreen).
  */
 let chatUhr = null;
+let chatNachsehenGeneration = 0;
 
 function chatNachsehenStoppen() {
+  chatNachsehenGeneration++;
   clearInterval(chatUhr);
   chatUhr = null;
 }
 
 function chatNachsehenStarten(chat) {
   chatNachsehenStoppen();
+  const generation = chatNachsehenGeneration;
+  const aktuell = () => generation === chatNachsehenGeneration && state.openChatId === chat.id;
   const takt = window.ChatAbgleich?.INTERVALL_CHAT_MS || 4000;
   let letzterStand = null;
   let laeuft = false;
 
   const nachsehen = async () => {
-    if (laeuft || document.hidden || state.openChatId !== chat.id) return;
+    if (laeuft || document.hidden || !aktuell()) return;
     laeuft = true;
     try {
-      const r = await fetch(`/api/messages/${chat.id}/stand`);
-      if (!r.ok) return;
-      const { stand } = await r.json();
-      if (stand === null || stand === undefined || state.openChatId !== chat.id) return;
+      const kuvertIds = window.ChatAbgleich?.offeneKuvertIds(state.messages) || [];
+      const staende = [];
+      const bloecke = window.ChatAbgleich?.kuvertBloecke(kuvertIds) || [kuvertIds];
+      for (const block of bloecke) {
+        const r = await fetch(`/api/messages/${chat.id}/stand`, block.length ? {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kuvertIds: block }),
+        } : undefined);
+        if (!aktuell() || !r.ok) return;
+        const teil = await r.json();
+        if (teil.stand === null || teil.stand === undefined || !aktuell()) return;
+        staende.push(teil.stand);
+      }
+      const stand = JSON.stringify(staende);
       const vorher = letzterStand;
-      letzterStand = stand;
-      if (vorher === null || vorher === stand) return;
+      if (vorher === stand) return;
 
       const frisch = await nachrichtenHolen(chat.id);
-      if (state.openChatId !== chat.id || !Array.isArray(frisch)) return;
+      if (!aktuell() || !Array.isArray(frisch)) return;
+      letzterStand = stand; // Fehler dürfen den neuen Stand nicht verbrauchen.
       const alt = state.messages;
       const neu = window.ChatAbgleich
         ? window.ChatAbgleich.nachrichtenAbgleichen(alt, frisch)
@@ -21796,7 +21810,7 @@ function chatNachsehenStarten(chat) {
   };
 
   nachsehen();
-  chatUhr = setInterval(nachsehen, takt);
+  if (aktuell()) chatUhr = setInterval(nachsehen, takt);
 }
 
 /*

@@ -33,7 +33,7 @@ import { CameraScreen } from './CameraScreen';
 import { NachrichtSheet, NachrichtAktion } from '../../components/NachrichtSheet';
 import { WeiterleitenSheet } from '../../components/WeiterleitenSheet';
 import { MeldenSheet, MeldeZiel } from '../../components/MeldenSheet';
-import { meldebelegHolen } from '../../lib/krypto';
+import { meldebelegHolen, meinSchluessel } from '../../lib/krypto';
 import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useEinstellungen } from '../../contexts/EinstellungenContext';
@@ -379,21 +379,41 @@ export const ChatDetailScreen = ({
     let aus = false;
     let laeuft = false;
     let letzterStand: string | null = null;
+    let erfolgreicheSchluesselId: string | null = null;
+    let schluesselVersuchAb = 0;
+    let schluesselPause = 4000;
 
     const nachsehen = async () => {
       if (aus || laeuft || AppState.currentState !== 'active') return;
       laeuft = true;
       try {
-        const stand = await ladeChatStand(supabase, chat.id, istKanal);
-        if (aus || stand === null) return;
+        const kuvertIds = istKanal ? [] : ChatAbgleich.offeneKuvertIds(messagesRef.current);
+        if (kuvertIds.length && !erfolgreicheSchluesselId && Date.now() >= schluesselVersuchAb) {
+          try {
+            erfolgreicheSchluesselId = (await meinSchluessel(supabase, ichId))?.id ?? null;
+          } finally {
+            if (!erfolgreicheSchluesselId) {
+              schluesselVersuchAb = Date.now() + schluesselPause;
+              schluesselPause = Math.min(60000, schluesselPause * 2);
+            }
+          }
+        }
+        if (aus) return;
+        const staende: string[] = [];
+        for (const block of ChatAbgleich.kuvertBloecke(kuvertIds)) {
+          const teil = await ladeChatStand(supabase, chat.id, istKanal, erfolgreicheSchluesselId, block);
+          if (aus || teil === null) return;
+          staende.push(teil);
+        }
+        const stand = JSON.stringify(staende);
         const vorher = letzterStand;
-        letzterStand = stand;
-        if (vorher === null || vorher === stand) return;
+        if (vorher === stand) return;
 
         const frisch = istKanal
           ? await ladeKanalNachrichten(supabase, ichId, chat.id)
           : await ladeNachrichten(supabase, chat.id, ichId);
         if (aus) return;
+        letzterStand = stand; // Erst nach erfolgreichem Nachladen bestätigen.
 
         // Ob eine fremde Nachricht dazukam, am letzten gezeichneten Stand
         // ablesen — der Rechenweg in setMessages laeuft unter React 18 nicht

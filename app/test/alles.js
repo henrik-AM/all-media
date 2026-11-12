@@ -221,6 +221,8 @@ const LAEUFE = [
   ['paket6-webkonten', '_paket6_webkonten_regression.cjs'],
   ['paket6-weiterleiten', '_paket6_weiterleiten_regression.cjs'],
   ['paket6-pruefharness', '_paket6_pruefharness_regression.cjs'],
+  ['paket6-kuvert', '_paket6_kuvert_regression.cjs'],
+  ['paket6-generation', '_paket6_chatgeneration_regression.cjs'],
   ['rechte', '_rechte.js'],
   // Geburtsdatum und Zustimmung der Eltern (Schema 52); braucht SUPABASE_TOKEN wie rechte.
   ['minderjaehrig', '_minderjaehrig.js'],

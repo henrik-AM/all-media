@@ -277,6 +277,7 @@
     // Ab jetzt weiß diese Seite: in diesem Chat wird verschlüsselt geschrieben.
     if (nachricht.chatId) verschluesselteChats.add(kontoJetzt() + '|' + nachricht.chatId);
     nachricht._geoeffnet = false;
+    nachricht.kuvertFehlt = !bereit() || !nachricht.kuvert;
     if (!bereit() || !nachricht.kuvert) {
       nachricht.text = NICHT_LESBAR;
       return nachricht;
