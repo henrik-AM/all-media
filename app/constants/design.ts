@@ -324,11 +324,14 @@ export const farbsaetze = { hell: hellFarben, dunkel: dunkelFarben };
  * Beide Fassungen entstehen einmal beim Laden — der Stellvertreter kostet zur
  * Laufzeit nur einen Zugriff und keine neue Berechnung.
  */
-export function themenStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
+/** Was StyleSheet.create annimmt; RN 0.88 exportiert NamedStyles nicht mehr. */
+type StilBlatt = Parameters<typeof StyleSheet.create>[0];
+
+export function themenStyles<T extends StilBlatt>(
   // Wortgleiche Schranke wie bei StyleSheet.create - inklusive des any, das
   // dort steht. Ohne sie verliert TypeScript die genauen Werte: aus
   // flexDirection: 'row' wird string, und jede Verwendung schlägt fehl.
-  bauen: (farben: Farbsatz) => T & StyleSheet.NamedStyles<any>
+  bauen: (farben: Farbsatz) => T & StilBlatt
 ): T {
   const hell = StyleSheet.create(bauen(hellFarben));
   const dunkel = StyleSheet.create(bauen(dunkelFarben));

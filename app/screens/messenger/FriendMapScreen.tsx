@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -51,7 +51,7 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
   const { friendPins: alleNadeln, users: alleNutzer, neuLaden } = useDaten();
   const insets = useSafeAreaInsets();
   const karte = useRef<KartenSteuerung>(null);
-  const blatt = useRef<ScrollView>(null);
+  const blatt = useRef<ScrollViewInstance>(null);
   const [aktiv, setAktiv] = useState<string | null>(null);
   const { sichtbarkeit } = useDaten();
   const aktionen = useAktionen(onNotice);

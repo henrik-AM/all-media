@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -524,7 +524,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const { communities, istBlockiert, istStumm, raster, gefolgt } =
     useProfil();
   const insets = useSafeAreaInsets();
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
   const [offen, setOffen] = useState<Item | null>(null);
   // Kasten 24: das Blatt „Feed steuern".
   const [lenkenOffen, setLenkenOffen] = useState(false);

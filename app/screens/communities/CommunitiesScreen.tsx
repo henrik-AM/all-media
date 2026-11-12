@@ -149,7 +149,7 @@ export const CommunitiesScreen = ({ onOpenCommunity, onNotice, onCreateChannel, 
          * Gegenstück: renderCommunities() in web/public/app.js.
          */
         ListHeaderComponent={
-          query.trim() ? null : (
+          query.trim() ? undefined : (
             <PersonenVorschlaege bereich="communitys" onOpenProfile={onOpenProfile} onNotice={onNotice} />
           )
         }

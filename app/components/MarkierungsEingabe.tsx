@@ -25,7 +25,8 @@ import {
   Text,
   TextInput,
   TextInputProps,
-  TextInputSelectionChangeEventData,
+  type TextInputSelectionChangeEvent,
+  type TextInputInstance,
   View,
   ViewStyle,
 } from 'react-native';
@@ -56,7 +57,7 @@ interface Props extends TextInputProps {
   onMarkiert?: (p: Aktion.MarkierungVorschlag) => void;
 }
 
-export const MarkierungsEingabe = forwardRef<TextInput, Props>(
+export const MarkierungsEingabe = forwardRef<TextInputInstance, Props>(
   ({ value, onChangeText, chatId, kanalId, huelle, listeUnten, onMarkiert, onSelectionChange, ...rest }, ref) => {
     const { users, ichId } = useDaten();
     const { supabase } = useSupabase();
@@ -144,7 +145,7 @@ export const MarkierungsEingabe = forwardRef<TextInput, Props>(
             // Änderung; onSelectionChange kommt gleich danach und stellt ihn genau.
             setCursor(Math.min(t.length, cursor + (t.length - value.length)));
           }}
-          onSelectionChange={(e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+          onSelectionChange={(e: TextInputSelectionChangeEvent) => {
             setCursor(e.nativeEvent.selection.end);
             if (erzwungen) setErzwungen(undefined);
             onSelectionChange?.(e);

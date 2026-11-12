@@ -447,7 +447,7 @@ export const HomeFeedScreen = ({
         ListFooterComponent={
           sichtbarePosts.length === 0 ? (
             <PersonenVorschlaege bereich="videos" onOpenProfile={onOpenProfile} onNotice={onNotice} />
-          ) : null
+          ) : undefined
         }
         keyExtractor={(item) => item.id}
         /*
