@@ -23,7 +23,9 @@ const ROOT = path.join(__dirname, '..');
 const FEST = require('./adressen.json');
 const EXPO_GO_ID = 'host.exp.Exponent';
 const GERAET = process.env.SIM_GERAET || 'iPhone 17 Pro';
-const EXPO_URL = `exp://127.0.0.1:${FEST.expoPort}`;
+// EXPO_PORT: eigener Metro neben einem fremden auf 8081 (z. B. in einem Worktree).
+const EXPO_PORT = process.env.EXPO_PORT || FEST.expoPort;
+const EXPO_URL = `exp://127.0.0.1:${EXPO_PORT}`;
 
 // Die UDID des Geraets, auf dem gearbeitet wird. Steht erst nach
 // simulatorStarten() fest - siehe die Begruendung dort.
@@ -36,7 +38,7 @@ function schlaf(ms) { execSync(`sleep ${ms / 1000}`); }
 
 // --- 1. Laeuft der Server ueberhaupt? --------------------------------------
 function serverLaeuft() {
-  const code = still(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${FEST.expoPort}/status`);
+  const code = still(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${EXPO_PORT}/status`);
   return code.trim() === '200';
 }
 
@@ -92,12 +94,27 @@ function sdkVersion() {
   return roh.split('.')[0] + '.0.0';                            // -> "57.0.0"
 }
 
+// Hauptversion des installierten Expo Go (= SDK, fuer das es gebaut ist), oder
+// null, wenn keins da ist. Am 12.11.2026 (SDK 57 -> 58) lag in den Simulatoren
+// noch Expo Go 57; "ist vorhanden" reichte als Pruefung nicht mehr.
+function expoGoHauptversion() {
+  const ordner = still(`xcrun simctl get_app_container ${ZIEL} ${EXPO_GO_ID}`).trim();
+  if (!ordner || !fs.existsSync(ordner)) return null;
+  const v = still(`/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${ordner}/Info.plist"`).trim();
+  return v ? v.split('.')[0] : null;
+}
+
 function expoGoInstallieren() {
-  if (still(`xcrun simctl listapps ${ZIEL}`).includes(EXPO_GO_ID)) {
-    log('  Expo Go ist im Simulator vorhanden.');
+  const sdk = sdkVersion();
+  const vorhanden = expoGoHauptversion();
+  if (vorhanden === sdk.split('.')[0]) {
+    log(`  Expo Go ${vorhanden} ist im Simulator vorhanden.`);
     return;
   }
-  const sdk = sdkVersion();
+  if (vorhanden) {
+    log(`  Expo Go ${vorhanden} passt nicht zu SDK ${sdk} - wird ersetzt.`);
+    still(`xcrun simctl uninstall ${ZIEL} ${EXPO_GO_ID}`);
+  }
   log(`  Expo Go fehlt - wird fuer SDK ${sdk} geladen (ca. 140 MB) ...`);
 
   const antwort = sh('curl -s https://api.expo.dev/v2/versions/latest');
