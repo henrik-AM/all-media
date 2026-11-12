@@ -105,13 +105,45 @@ const pruefe = (was, ok, zusatz = '') => {
    * stehen, antwortet niemand mehr von selbst — und das ist richtig so.
    */
   const vorher = await page.$$eval('.msg', (n) => n.length);
-  await page.fill('#msgInput', 'Wann treffen wir uns?');
-  await page.click('#sendBtn');
-  await page.waitForTimeout(1500);
-  const nachher = await page.$$eval('.msg', (n) => n.length);
-  const eigene = await page.$$eval('.msg--out', (n) => n.map((x) => x.textContent));
-  pruefe('Eigene Nachricht landet im Verlauf',
-         nachher > vorher && (eigene[eigene.length - 1] || '').includes('Wann treffen wir uns?'));
+  // Nur HTTP-Phase/Methode/Status, niemals Header, rohe URLs oder Nachrichtenkörper.
+  const http = [];
+  const antwort = (r) => {
+    const p = new URL(r.url()).pathname;
+    const phase = p.startsWith('/api/messages/') ? 'Nachricht'
+      : p.startsWith('/api/krypto/empfaenger/') ? 'Empfaenger'
+      : p === '/api/krypto/schluessel' ? 'Geraeteschluessel' : null;
+    if (phase) http.push({ phase, methode: r.request().method(), status: r.status() });
+  };
+  page.on('response', antwort);
+  let angekommen;
+  try {
+    await page.fill('#msgInput', 'Wann treffen wir uns?');
+    await page.click('#sendBtn');
+    angekommen = await K.bisWahr(page, `(() => {
+      const eigene = [...document.querySelectorAll('.msg--out')];
+      return document.querySelectorAll('.msg').length > ${vorher} &&
+        (eigene.at(-1)?.textContent || '').includes('Wann treffen wir uns?');
+    })()`, 10000);
+    if (!angekommen) {
+      const diagnose = await page.evaluate(() => {
+        const t = document.querySelector('#toast')?.textContent || '';
+        const f = document.querySelector('#msgInput');
+        return {
+          toastArt: !t ? 'leer' : /verschl|Gerät|Schlüssel/i.test(t) ? 'Krypto'
+            : /gesperrt|block|Anfrage|annehm/i.test(t) ? 'Sperre'
+            : /Netz|fetch|Verbindung/i.test(t) ? 'Netz' : 'andere Meldung',
+          toastLaenge: t.length, entwurfLaenge: f?.value.length ?? null,
+          entwurfErhalten: f?.value === 'Wann treffen wir uns?', sendet: f?.dataset.sendet === 'ja',
+          nachrichten: document.querySelectorAll('.msg').length,
+          eigeneNachrichten: document.querySelectorAll('.msg--out').length,
+        };
+      });
+      console.log('SENDE-DIAGNOSE', JSON.stringify({ http, ...diagnose }));
+    }
+  } finally {
+    page.off('response', antwort);
+  }
+  pruefe('Eigene Nachricht landet im Verlauf', angekommen);
 
   await page.click('#chatBack');
   await page.waitForTimeout(300);

@@ -109,8 +109,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     if (clip.sound) {
       await pruefe('8.2 Sound antippen oeffnet die Soundseite oder sagt, warum nicht', async () => {
         await clipOeffnen();
-        await page.click('.player__ziele [data-postsound]');
-        await page.waitForTimeout(1500);
+        // Request vor dem Klick beobachten; erst Antwort und sichtbare Wirkung prüfen.
+        const soundPfad = '/api/explorer/sound/' + encodeURIComponent(clip.sound);
+        const [antwort] = await Promise.all([
+          page.waitForResponse((r) => new URL(r.url()).pathname === soundPfad, { timeout: 8000 }),
+          page.click('.player__ziele [data-postsound]'),
+        ]);
+        if (!antwort.ok()) throw new Error('Soundexplorer HTTP ' + antwort.status());
+        await page.waitForFunction(() => {
+          const hinweis = document.querySelector('#toast');
+          return Boolean(document.querySelector('.exp__kopf') ||
+            (hinweis && !hinweis.hidden && hinweis.textContent.trim()));
+        }, null, { timeout: 8000 });
         const seite = await page.$('.exp__kopf');
         const hinweis = await page.evaluate(() =>
           [...document.querySelectorAll('.toast')].map((t) => t.textContent).join(' | ')

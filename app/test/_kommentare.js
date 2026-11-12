@@ -35,17 +35,29 @@ const bild = (name) => path.join(__dirname, '..', '..', 'bilder', 'kasten5', `we
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
 
-  await page.goto(ZIEL, { waitUntil: 'load' });
-  const angemeldet = await anmelden(page);
+  const startSchritt = async (name, fn) => {
+    const beginn = Date.now();
+    console.log('  START ' + name);
+    try {
+      const ergebnis = await fn();
+      console.log('  ENDE ' + name + ' (' + (Date.now() - beginn) + ' ms)');
+      return ergebnis;
+    } catch (e) {
+      console.error('  ABBRUCH Startschritt ' + name + ' (' + (Date.now() - beginn) + ' ms)');
+      throw e;
+    }
+  };
+  await startSchritt('Startseite mit Datenbereitschaft', () => page.goto(ZIEL, { waitUntil: 'load' }));
+  const angemeldet = await startSchritt('Anmeldung einschließlich erstem Reset', () => anmelden(page));
   if (!angemeldet.ok) {
     console.error('Prüfkonto konnte sich nicht anmelden: ' + angemeldet.fehler);
     await beenden(browser, 1);
   }
-  await page.reload({ waitUntil: 'load' });
-  await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));
-  await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForSelector('#topbar button');
+  await startSchritt('Neuladen nach Anmeldung', () => page.reload({ waitUntil: 'load' }));
+  await startSchritt('Anmeldung bereit nach Neuladen', () => page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null)));
+  await startSchritt('Zweiter Reset mit Neuladen', () => zuruecksetzen(page));
+  await startSchritt('Neuladen nach zweitem Reset', () => page.reload({ waitUntil: 'load' }));
+  await startSchritt('Oberfläche bereit', () => page.waitForSelector('#topbar button'));
 
   const ergebnisse = [];
   const pruefe = async (name, fn) => {

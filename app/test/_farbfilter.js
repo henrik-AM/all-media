@@ -250,12 +250,52 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nZurücksetzen');
 
   await pruefe('Zurücksetzen nimmt den Filter weg und schreibt den Auslieferungszustand', async () => {
-    await page.click('[data-ff-zurueck]');
-    await page.waitForFunction(() => getComputedStyle(document.documentElement).filter === 'none');
-    await page.waitForTimeout(800);
-    const w = await werteVomServer();
-    const soll = Object.fromEntries(F.ZURUECKSETZEN);
-    for (const [k, v] of Object.entries(soll)) if (w[k] !== v) throw new Error(`${k}=${w[k]} statt ${v}`);
+    // Lokal aus ist keine Speicherbestätigung: vier serielle Antworten und Abschluss prüfen.
+    const protokoll = F.ZURUECKSETZEN.map(([schluessel]) => ({ schluessel, phase: 'ausstehend' }));
+    await page.evaluate(() => { const t = document.querySelector('#toast'); if (t) t.textContent = ''; });
+    const antworten = protokoll.map((e) =>
+      page.waitForResponse((r) => r.request().method() === 'POST' &&
+        new URL(r.url()).pathname === '/api/einstellungen/' + e.schluessel, { timeout: 20000 })
+        .then(async (r) => {
+          e.status = r.status();
+          let uhr;
+          try {
+            const d = await Promise.race([
+              r.json(),
+              new Promise((_, nein) => { uhr = setTimeout(() => nein(new Error('Antwortfrist')), 3000); }),
+            ]);
+            e.ok = d?.ok === true;
+            e.phase = 'beantwortet';
+          } catch { e.ok = false; e.phase = 'Antwort nicht lesbar'; }
+          finally { clearTimeout(uhr); }
+        })
+        .catch(() => { e.ok = false; e.phase = 'keine Antwort innerhalb der Frist'; })
+    );
+    // Parallel beobachten: ein kurzer Erfolgstoast darf während des Wartens nicht verschwinden.
+    const abschluss = page.waitForFunction(() => {
+      const t = document.querySelector('#toast')?.textContent.trim();
+      return t === 'Farbfilter zurückgesetzt' || t === 'Nicht alles ließ sich zurücksetzen';
+    }, null, { timeout: 20000 }).then(async () => page.evaluate(() =>
+      document.querySelector('#toast')?.textContent.trim() === 'Farbfilter zurückgesetzt' ? 'Erfolg' : 'Fehler'
+    )).catch(() => 'kein Abschluss innerhalb der Frist');
+    let toastArt = 'ausstehend';
+    try {
+      await page.click('[data-ff-zurueck]');
+      [, toastArt] = await Promise.all([Promise.all(antworten), abschluss]);
+      if (protokoll.some((e) => !e.ok || e.status < 200 || e.status >= 300)) {
+        throw new Error('Nicht alle vier Speicheranfragen bestätigt');
+      }
+      if (toastArt !== 'Erfolg') throw new Error('Zurücksetzen meldet keinen vollständigen Erfolg');
+      const w = await werteVomServer();
+      for (const [k, v] of F.ZURUECKSETZEN) {
+        if (w[k] !== v) throw new Error(`${k}: gespeicherter Wert weicht vom Auslieferungszustand ab`);
+      }
+      if ((await wurzel()).filter !== 'none') throw new Error('Filter bleibt nach abgeschlossenem Zurücksetzen aktiv');
+    } catch (fehler) {
+      // Ausschließlich feste Schlüsselnamen, Status/Boolesche Werte und Ablaufkategorien.
+      console.log('RESET-DIAGNOSE', JSON.stringify({ anfragen: protokoll, toastArt }));
+      throw fehler;
+    }
   });
   await blattZu();
 

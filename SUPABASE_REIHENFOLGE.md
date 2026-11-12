@@ -617,3 +617,24 @@ zeigen aber weiter auf intern; die public-Fassung ist dann ein offenes Orakel. D
 public-Fassung löschen bzw. 125 nachziehen.** Gleiches gilt für Dateien, die die sechs
 public-Helfer neu anlegen (Rechte kehren zurück). `test:angriffe` fällt in beiden Fällen auf.
 Probe `app/test/_probe125.js` (72/72). **Live eingespielt 09.11.2026.**
+
+
+## Nachtrag 10.11.2026: Schema 126 — Zweierchat atomar anlegen
+
+`SUPABASE_SCHEMA_126_zweierchat_atomar.sql` ergänzt
+`public.zweierchat_anlegen(p_ziel, p_bereich, p_name)`. App und Server nutzen
+sie für die Suche beziehungsweise Anlage eines Zweierchats. Eine
+Transaktionssperre je sortiertem Kontenpaar und Bereich verhindert parallele
+Doppelanlagen; Chat und Mitgliedschaften entstehen in einer Transaktion.
+Die Funktion läuft als SECURITY INVOKER mit den vorhandenen RLS-Regeln und
+Auslösern; EXECUTE erhalten ausschließlich angemeldete Konten.
+
+**Seit 10.11.2026 live, dokumentiert in main-Commit `c325f7d`.** Dort festgehalten:
+vier gleichzeitige Gerätewege mit zwei Konten über Server und RPC ergeben eine
+Chat-ID und einen Chat; anschließend abgebaut, **6/6**. Angriffsprüfung **60/60**.
+Dies ist der dokumentierte damalige Live-Nachweis, keine neue Einspielung oder
+Liveprüfung durch diesen Nachtrag. Die Livefassung nicht allein zum Nachtragen
+der Dokumentation erneut einspielen.
+
+Aktuelle Paket-6-Fortsetzung und verbleibende Abnahme:
+[Aufräumfortsetzung 11.11.2026](berichte/Paket-6-Aufraeumen-11-11-2026.md).

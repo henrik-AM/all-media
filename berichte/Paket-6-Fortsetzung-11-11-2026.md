@@ -1,5 +1,14 @@
 # Paket 6 – Stand der Fortsetzung am 11.11.2026
 
+> **Historischer Zwischenstand vom Sitzungsende am 11.11.2026, 01:14 MEZ.**
+> Aktueller Arbeits- und Prüfstand: [Aufräumfortsetzung 11.11.2026 nachmittags](Paket-6-Aufraeumen-11-11-2026.md).
+> Die folgenden Commitstände, Belegungen, Pausen und offenen Schritte beschreiben
+> den damaligen Stand. Die Nachmittagsfortsetzung enthält inzwischen neue Korrekturen
+> sowie die frische Live-Rundreise und Angriffsprüfung. Native Abnahme, vollständige
+> Liveprüfung der Nebenwege und vollständiger Gesamtlauf bleiben dort offen;
+> ein gestarteter Gesamtlauf gilt erst nach vollständiger Auswertung als Nachweis.
+> Die historischen Ergebnisse und Einschränkungen unten bleiben unverändert.
+
 ## Gesicherter Stand
 
 Worktree: `/Users/henrik.dikta/allmedia-wt-codex/paket-6`.

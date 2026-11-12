@@ -30,6 +30,25 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   const browserFehler = [];
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
   page.on('console', (m) => m.type() === 'error' && browserFehler.push('Konsole: ' + m.text()));
+  // Nur Routenschablone: keine UUIDs, Dateinamen, Suchwerte oder Queryparameter.
+  const routeOhneWerte = (adresse) => {
+    const statisch = new Set(['api', 'comments', 'posts', 'reset', 'bootstrap', 'chatstand',
+      'krypto', 'stand', 'messages', 'chats', 'notifications', 'mitteilungen', 'medien',
+      'stories', 'profiles', 'profile', 'explorer', 'sound', 'standort', 'hashtag', 'avatars',
+      'storage', 'v1', 'object', 'sign', 'render', 'image', 'media', 'beispiel', 'insights',
+      'live', 'likes', 'like', 'views', 'view', 'read', 'anfrage', 'status', 'impression']);
+    try { return new URL(adresse).pathname.split('/').map(s => !s || statisch.has(s) ? s : ':wert').join('/'); }
+    catch { return '/:unbekannt'; }
+  };
+  page.on('response', (r) => {
+    if (r.status() >= 400) {
+      const meldung = 'HTTP ' + r.status() + ' ' + r.request().method() + ' ' + routeOhneWerte(r.url());
+      console.log('  DIAG ' + meldung);
+      // Auch ohne Konsolenmeldung bleibt jede fehlerhafte Antwort ein Fehler.
+      browserFehler.push(meldung);
+    }
+  });
+
 
   await page.goto(ZIEL, { waitUntil: 'load' });
 

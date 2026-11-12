@@ -45,6 +45,18 @@ async function webSenden(seite,text){
   const koerper=await sendeKoerper(chatId,text);const r=await fetch('/api/messages/'+chatId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(koerper)});return r.json();
  },{chatId,text});
 }
+/** Vollständiges originales App-Datenmodul; Standabfragen nutzen den echten Client/RLS.
+ * Medien-/Configimporte werden hier nicht ausgeführt, Schlüsselmodul ist das
+ * bereits registrierte App-Prüfgerät. Keine nachgebauten Tabellen/HTTP-Antworten.
+ */
+function appDatenModul(seite){
+ const Module=require('node:module'),ts=require('typescript'),datei=path.join(W,'app/lib/daten.ts');
+ const m=new Module(datei);m.filename=datei;m.paths=Module._nodeModulePaths(path.dirname(datei));
+ const original=m.require.bind(m);m.require=id=>id==='./medien'?{}:id==='./krypto'?seite.runtime.K:id==='../constants/supabase'?{SUPABASE_CONFIG:{}}:original(id);
+ m._compile(ts.transpileModule(fs.readFileSync(datei,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,datei);
+ return m.exports;
+}
+
 (async()=>{
  log('LIVE: exklusiver Bestand bestätigt; keine Registrierung, kein Reset, kein Schema');
  for(const s of konten){
@@ -103,6 +115,78 @@ async function webSenden(seite,text){
   const gelesen=await s.page.evaluate(id=>nachrichtenHolen(id),chatId);
   pruefe('Browser-Neustart liest frühere Rundreise-Chiffren '+s.email,gelesen.filter(n=>n.text?.startsWith('Paket6 ')).length===4);
  }
+
+ // Zusatznachricht erst NACH allen festen Vier-Zeilen-/Neustarterwartungen.
+ // Raw INSERT ohne Kuverts bildet den echten Abstand der zwei Schreibrequests ab.
+ const datenApp=appDatenModul(b);
+ const browserB=await b.page.evaluate(()=>({id:KryptoWeb.meinSchluessel()?.id}));
+ assert.ok(browserB.id,'Empfangendes Browsergerät fehlt');
+ assert.notEqual(bkey.id,browserB.id,'Gegenprobe braucht ein anderes Gerät desselben Kontos');
+ assert.notEqual(bkey.id,b.meiner.id,'Gegenprobe darf nicht das App-Empfangsgerät sein');
+ const spaetText='Paket6 verspätetes Kuvert '+lauf;
+ const spaetEmp=await a.runtime.K.empfaengerSchluessel(a.client,chatId);
+ const spaetPaket=Krypto.verschluesseln(spaetText,a.meiner.geheim,spaetEmp);
+ const spaet=await ergebnis(a.client.from('messages').insert({chat_id:chatId,sender_id:a.id,text:'',krypto:1,chiffre:spaetPaket.chiffre,krypto_nonce:spaetPaket.nonce,absender_schluessel:spaetPaket.absender}).select('id').single(),'Verzögerte Kuvertnachricht anlegen');
+ manifest.nachrichten.push(spaet.id);sichern();
+ const appStand=()=>datenApp.ladeChatStand(b.client,chatId,false,b.meiner.id,[spaet.id]);
+ const nullApp=await appStand();
+ pruefe('App-Originalmodul/RLS: Nachricht vor eigenem Kuvert signalisiert 0',typeof nullApp==='string'&&nullApp.endsWith(spaet.id+':0'));
+ // Echte Daten aus /api/chats bereitstellen, dann unverändertes Produkt-openChat.
+ const geoeffnet=await b.page.evaluate(async id=>{
+  const r=await fetch('/api/chats');const x=await r.json();if(!r.ok||!x.ok)throw Error('Chatdaten nicht erreichbar: HTTP '+r.status);
+  state.chats=x.chats||[];state.communityChats=x.communityChats||[];
+  if(![...state.chats,...state.communityChats].some(c=>c.id===id))throw Error('Fixturechat fehlt in echten Chatdaten');
+  await openChat(id);return state.openChatId===id;
+ },chatId);
+ assert.ok(geoeffnet,'Produktchat wurde nicht geöffnet');
+ await b.page.waitForFunction(id=>{const n=state.messages.find(m=>m.id===id);return n?.kuvertFehlt===true&&n.text===KryptoWeb.NICHT_LESBAR;},spaet.id,{timeout:20000});
+ pruefe('Produktbrowser zeigt tatsächlichen fehlenden Kuvertmarker',true);
+ const zuZeile=k=>({message_id:spaet.id,schluessel_id:k.schluesselId,nonce:k.nonce,chiffre:k.chiffre});
+ const anderes=spaetPaket.kuverts.find(k=>k.schluesselId===bkey.id);
+ assert.ok(anderes,'Anderes eigenes Empfangsgerät besitzt kein vorberechnetes Kuvert');
+ await ergebnis(a.client.from('message_keys').insert(zuZeile(anderes)),'Kuvert nur für anderes eigenes Gerät nachliefern');
+ const fremdApp=await appStand();
+ pruefe('App-Originalmodul/RLS: anderes eigenes Gerät heilt Empfänger nicht',typeof fremdApp==='string'&&fremdApp.endsWith(spaet.id+':0'));
+ // Zwei echte Produkt-Polls abwarten; keine manuelle Verlaufabfrage dazwischen.
+ for(let i=0;i<2;i++){
+  const r=await b.page.waitForResponse(r=>new URL(r.url()).pathname==='/api/messages/'+chatId+'/stand'&&r.request().method()==='POST',{timeout:15000});
+  if(r.status()===503)throw Error('Kuvertpoll: HTTP503 ist Infrastrukturfehler, kein Prüfbeleg');
+  assert.equal(r.status(),200,'Produkt-Kuvertpoll muss erfolgreich antworten');
+  const x=await r.json();assert.ok(x.ok&&typeof x.stand==='string'&&x.stand.endsWith(spaet.id+':0'),'Produktpoll muss genau das Empfängergerät als fehlend melden');
+ }
+ const nochFehlend=await b.page.evaluate(id=>{const n=state.messages.find(m=>m.id===id);return n?.kuvertFehlt===true&&n.text===KryptoWeb.NICHT_LESBAR;},spaet.id);
+ pruefe('Produktbrowser bleibt nach zwei Polls mit fremdem Gerätekuvert unlesbar',nochFehlend);
+ const echte=spaetPaket.kuverts.filter(k=>[browserB.id,b.meiner.id].includes(k.schluesselId));
+ assert.equal(echte.length,2,'Beide tatsächlichen Empfängergeräte brauchen Kuverts');
+ await ergebnis(a.client.from('message_keys').insert(echte.map(zuZeile)),'Tatsächliche Empfängerkuverts nachliefern');
+ const jaApp=await appStand();
+ pruefe('App-Originalmodul/RLS: tatsächliches App-Kuvert signalisiert 1',typeof jaApp==='string'&&jaApp.endsWith(spaet.id+':1'));
+ await b.page.waitForFunction(({id,text})=>{const n=state.messages.find(m=>m.id===id);return state.openChatId===n?.chatId&&n?.text===text&&n.kuvertFehlt===false&&document.querySelector('#messages')?.textContent.includes(text);},{id:spaet.id,text:spaetText},{timeout:20000});
+ pruefe('Produktbrowser heilt Chiffre automatisch im offenen Chat, ohne Neuöffnung',true);
+ await b.page.screenshot({path:path.join(OUT,'live-kuvert-heilung.png')});
+ // Kein 503/Netzausfall darf als bewiesene Eingabeabwehr zählen. Der aktuelle
+ // Produkt-Wrapper maskiert Validierungsfehler als HTTP500; daher direkte
+ // Helfer-Gegenprobe plus erfolgreiche Kontrollen unmittelbar davor/danach.
+ const postStand=ids=>b.page.evaluate(async({chatId,ids})=>{
+  const r=await fetch('/api/messages/'+chatId+'/stand',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kuvertIds:ids})});
+  return {status:r.status,koerper:await r.json()};
+ },{chatId,ids});
+ const grenzIds=[spaet.id,...Array.from({length:499},()=>crypto.randomUUID())];
+ const grenze=await postStand(grenzIds);
+ assert.equal(grenze.status,200,'500 gültige UUID-Einträge müssen erreichbar bleiben');
+ pruefe('Standroute akzeptiert Grenze 500 mit echter Anmeldung/RLS',grenze.koerper.ok===true&&grenze.koerper.stand.includes(spaet.id+':1')&&grenze.koerper.stand.split('|kuverts:')[1]?.split(',').length===500);
+ const {kuvertStandHolen}=require('../../gemeinsam/kryptodaten');
+ for(const [name,ids]of [['ungültige UUID',['keine-uuid']],['501 Einträge',[...grenzIds,crypto.randomUUID()]]]){
+  await assert.rejects(()=>kuvertStandHolen(b.client,b.meiner.id,ids),/Ungültige Kuvertliste/);
+  const r=await postStand(ids);
+  if(r.status===503)throw Error(name+': HTTP503 ist Ausfall, keine Validierungsbestätigung');
+  const abgewiesen=[400,422,500].includes(r.status)&&r.koerper.ok===false&&typeof r.koerper.error==='string'&&r.koerper.stand===undefined;
+  pruefe('Standroute weist '+name+' explizit ab (HTTP '+r.status+')',abgewiesen);
+  const danach=await postStand([spaet.id]);assert.equal(danach.status,200,name+': gesunder Kontrollaufruf danach fehlt');assert.ok(danach.koerper.ok&&danach.koerper.stand.endsWith(spaet.id+':1'));
+ }
+ // Nur die Pollschleife beenden, bevor nachfolgende Absender-/Cacheproben beginnen.
+ await b.page.evaluate(()=>chatNachsehenStoppen());
+
  const fake=Krypto.schluesselpaarErzeugen();const emp=await a.runtime.K.empfaengerSchluessel(a.client,chatId);const pk=Krypto.verschluesseln('Paket6 unregistrierter Absender '+lauf,fake.geheim,emp);
  const f=await a.client.from('messages').insert({chat_id:chatId,sender_id:a.id,text:'',krypto:1,chiffre:pk.chiffre,krypto_nonce:pk.nonce,absender_schluessel:pk.absender}).select('id').single();
  if(f.error){throw Error('Absenderprobe nicht ausgeführt: '+(f.error.code||'ohne Code')+' '+f.error.message);}
