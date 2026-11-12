@@ -1,0 +1,77 @@
+
+Chats
+  OK   Chatliste hat Eintraege  — 8 Zeilen
+  OK   Chat laesst sich oeffnen  — Anna Schmidt
+  OK   Eigene Nachricht landet im Verlauf
+
+Filter
+  OK   Pills sind vollstaendig hoch  — Alle:33px Kontakte:33px Gruppen:33px
+  OK   Text sitzt mittig in der Pille  — flex/center/center
+  OK   Pills werden unten nicht abgeschnitten  — Pills bis 272, Rahmen 275
+
+Vollbild / PWA
+  OK   Als App startbar (Homescreen)
+  OK   Manifest verlinkt
+  OK   Statusleiste durchsichtig  — black-translucent
+  OK   Manifest sagt standalone  — standalone
+
+Friend-Map
+  OK   Karte ist da
+  OK   Kein Plus/Minus mehr
+  OK   Vollbild-Pfeil ist da
+  OK   Ansicht-Umschalter ist da
+  OK   Standort-Freigabe ist da
+  OK   Vollbild schaltet um
+  OK   Vollbild laesst sich verlassen
+  OK   Auswahlfenster fuer die Kartenansicht geht auf
+  OK   Kartenansicht wechselt
+  OK   Kontakt-Tippen bleibt auf der Karte
+  OK   Kontakt ist hervorgehoben
+
+Kontakt hinzufuegen
+  OK   Feld nimmt auch Telefonnummern  — Telefonnummer
+  OK   Nachricht vor Annahme moeglich
+  OK   Anfrage per Nummer angelegt
+  OK   Weitere Nachrichten gesperrt bis zur Annahme
+  OK   Der Absender kann seine Anfrage nicht selbst annehmen
+
+Gruppe erstellen
+  OK   Schritt 1 zeigt Personen, nicht den Namen
+  OK   Nicht-Kontakte per Nummer moeglich
+  OK   Schritt 2 fragt Name und Info
+  OK   Gruppenbild anlegbar
+  OK   Blatt schliesst per Klick daneben
+
+Konto wechseln
+  OK   Profil wechseln fuehrt zur Kontoliste
+  OK   Zweites Konto anlegbar
+
+Repost
+  OK   Ein noch nicht repposteter Beitrag im Feed
+  OK   Repost schaltet um
+  OK   Repost meldet sich
+  OK   Repost erscheint im Profil  — 5 Kachel(n)
+
+Eigene Story
+  OK   Kamera fragt, was mit der Aufnahme geschehen soll
+  OK   Die Aufnahme steht als Vorschau darüber
+  OK   Chat und Insight stehen als Ziel zur Wahl
+  OK   Aus der Kamera heraus wird nichts oeffentlich
+  OK   Vor dem Posten wird gefragt, wo die Story stehen soll
+  OK   Aufnahme wird übernommen  — Deine Story ist online — im Messenger und unter Videos
+  OK   Eigene Story zeigt keinen Plus-Knopf mehr  — story__ring
+  OK   Eigene Story lässt sich ansehen
+  OK   Ansichten statt Antwortfeld
+
+Anruf
+  OK   Anruf öffnet sich
+  OK   Zeigt „Sprachanruf gestartet"
+  OK   Verbindet NICHT von selbst (keine erfundene Dauer)  — Sprachanruf gestartet
+  OK   Sagt, dass es eine Vorschau ist
+  OK   Stummschalten wirkt
+  OK   Auflegen ohne Dauer
+  OK   Anruf schließt sich
+
+Konsolenfehler: keine
+
+Alles gruen

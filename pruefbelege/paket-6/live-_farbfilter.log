@@ -1,0 +1,30 @@
+
+Farbfilter — Ausgangslage
+  OK   Ohne Einstellung kein Filter auf <html>
+
+Gegenstand
+  OK   „Farbfilter" steht als eigener Abschnitt in der Sprungleiste
+  OK   Der Punkt zeigt „Aus"
+  OK   Das Blatt zeigt alle sechs Filter mit ihrem Wofür-Satz  (graustufen, protanopie, deuteranopie, tritanopie, warmton, farbton)
+  OK   Einleitung, Vorschau und Regler sind da
+
+Bedienbar und wirksam
+  OK   Grün/Rot-Filter antippen schaltet ihn ein und legt die Matrix auf <html>
+  OK   Nur <html> trägt den Filter (body/.app nicht — sonst kippt position: fixed)
+  OK   Intensität auf 60 % ändert die Matrix
+  OK   Gedrückt halten zum Vergleichen nimmt den Filter weg und gibt ihn zurück
+
+Gespeichert
+  OK   Die Werte liegen in user_settings  (farbfilter=an, farbfilterArt=deuteranopie, farbfilterStaerke=60)
+  OK   Der Punkt zeigt den Stand
+  OK   Nach Neuladen OHNE Browser-Rückfall: Filter kommt aus dem Konto
+  OK   Sofortwert: Filter steht, während /api/einstellungen noch hängt
+
+Farbtönung
+  OK   Farbtönung mischt mit feBlend mode="color" und zeigt den Farbton-Regler
+
+Zurücksetzen
+  OK   Zurücksetzen nimmt den Filter weg und schreibt den Auslieferungszustand
+  OK   Keine Fehler im Browser
+
+16/16 bestanden

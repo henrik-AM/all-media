@@ -21081,13 +21081,14 @@ async function openChat(chatId) {
    * Face ID oder Code ist eine Rueckfrage die ehrliche Fassung - eine
    * Abfrage, die nichts prueft, waere Theater.
    */
+  const oeffnungsStand = chatNachsehenGeneration;
   if (chat.gesperrt) {
     const weiter = await bestaetigen(
       'Gesperrter Chat',
       `„${chat.name}" ist gesperrt. Trotzdem öffnen?`,
       'Öffnen'
     );
-    if (!weiter) return;
+    if (!weiter || oeffnungsStand !== chatNachsehenGeneration) return;
   }
 
   state.openChatId = chatId;
@@ -21100,6 +21101,8 @@ async function openChat(chatId) {
   msgBezug = null;
   msgBearbeitet = null;
   chatNachsehenStoppen();
+  const generation = chatNachsehenGeneration;
+  const aktuell = () => generation === chatNachsehenGeneration && state.openChatId === chatId;
 
   /*
    * Der Anfragezustand aus dem letzten Laden kann alt sein: hat das
@@ -21119,7 +21122,7 @@ async function openChat(chatId) {
    * Verlauf nicht mehr auf den Bildschirm. Ohne diese Zeile stand nach zwei
    * schnellen Klicks der Verlauf des ersten Chats im zweiten.
    */
-  if (state.openChatId !== chatId) return;
+  if (!aktuell()) return;
   state.messages = verlauf;
   if (zustand?.ok) {
     chat.requestState = zustand.requestState;
@@ -21146,11 +21149,16 @@ async function openChat(chatId) {
   if (chat.userId && !chat.isGroup) {
     try {
       const r = await fetch(`/api/dm-erlaubt/${encodeURIComponent(chat.userId)}`);
-      chat.dmGesperrt = (await r.json()).erlaubt === false;
+      if (!aktuell()) return;
+      const dm = await r.json();
+      if (!aktuell()) return;
+      chat.dmGesperrt = dm.erlaubt === false;
     } catch {
       /* Im Zweifel offen lassen: die Datenbank weist ohnehin ab. */
     }
   }
+
+  if (!aktuell()) return;
 
   // Kasten 28/7.9: Gruppenkopf antippen öffnet die Gruppeninfo — nur bei echten
   // Gruppen-Chats (Zeile in chats), nicht bei einer als Chat geöffneten Community.

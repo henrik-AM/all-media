@@ -152,15 +152,50 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nBedienbar und wirksam');
 
   await pruefe('Grün/Rot-Filter antippen schaltet ihn ein und legt die Matrix auf <html>', async () => {
-    await page.click('[data-ff-art="deuteranopie"]');
-    await page.waitForFunction(() => getComputedStyle(document.documentElement).filter !== 'none');
-    await page.waitForTimeout(400);
-    const w = await wurzel();
-    if (!/url\(/.test(w.filter)) throw new Error(w.filter);
-    if (w.raum !== 'sRGB') throw new Error('color-interpolation-filters ' + w.raum);
-    if (!gleicheZahlen(w.matrix, erwartet('deuteranopie', 100))) throw new Error(w.matrix);
-    const an = await page.$eval('[data-ff-an]', (e) => e.classList.contains('is-on'));
-    if (!an) throw new Error('Schalter blieb aus');
+    // Die Wahl speichert erst die Art, dann "an"; erst danach wird das Blatt neu gezeichnet.
+    const protokoll = [F.SCHLUESSEL.art, F.SCHLUESSEL.an].map((schluessel) => ({ schluessel, phase: 'ausstehend' }));
+    const antworten = protokoll.map((e) =>
+      page.waitForResponse((r) => r.request().method() === 'POST' &&
+        new URL(r.url()).pathname === '/api/einstellungen/' + e.schluessel, { timeout: 20000 })
+        .then(async (r) => {
+          e.status = r.status();
+          let uhr;
+          try {
+            const d = await Promise.race([
+              r.json(),
+              new Promise((_, nein) => { uhr = setTimeout(() => nein(new Error('Antwortfrist')), 3000); }),
+            ]);
+            e.ok = d?.ok === true;
+            e.phase = 'beantwortet';
+          } catch { e.ok = false; e.phase = 'Antwort nicht lesbar'; }
+          finally { clearTimeout(uhr); }
+        })
+        .catch(() => { e.ok = false; e.phase = 'keine Antwort innerhalb der Frist'; })
+    );
+    try {
+      await page.click('[data-ff-art="deuteranopie"]');
+      await Promise.all(antworten);
+      if (protokoll.some((e) => !e.ok || e.status < 200 || e.status >= 300)) {
+        throw new Error('Filterart und Aktivierung nicht beide bestätigt');
+      }
+      await page.waitForFunction(() =>
+        document.querySelector('[data-ff-an]')?.classList.contains('is-on') &&
+        document.querySelector('[data-ff-art="deuteranopie"]')?.getAttribute('aria-checked') === 'true' &&
+        getComputedStyle(document.documentElement).filter !== 'none', null, { timeout: 10000 });
+      const w = await wurzel();
+      if (!/url\(/.test(w.filter)) throw new Error('Kein aktiver SVG-Filter');
+      if (w.raum !== 'sRGB') throw new Error('Filter-Farbraum weicht von sRGB ab');
+      if (!gleicheZahlen(w.matrix, erwartet('deuteranopie', 100))) throw new Error('Filtermatrix weicht vom erwarteten Filter ab');
+    } catch (fehler) {
+      const ui = await page.evaluate(() => ({
+        schalterAn: document.querySelector('[data-ff-an]')?.classList.contains('is-on') === true,
+        artAusgewaehlt: document.querySelector('[data-ff-art="deuteranopie"]')?.getAttribute('aria-checked') === 'true',
+        filterAktiv: getComputedStyle(document.documentElement).filter !== 'none',
+      }));
+      // Nur feste Schlüssel, HTTP-Status/Boolesche Werte; keine Header/Antworttexte.
+      console.log('FILTERWAHL-DIAGNOSE', JSON.stringify({ anfragen: protokoll, ...ui }));
+      throw fehler;
+    }
   });
 
   await pruefe('Nur <html> trägt den Filter (body/.app nicht — sonst kippt position: fixed)', async () => {
