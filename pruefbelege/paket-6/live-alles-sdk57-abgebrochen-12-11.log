@@ -1,0 +1,819 @@
+  Laufkennung: 600e7edf-6ac7-49b5-b4a4-837fd7d9898b
+
+======================================================================
+  testhygiene
+======================================================================
+✔ Frischer Worktree: beide Fixtures vor dem Stempel; wiederholte Vorbereitung bytegleich (2.164334ms)
+✔ Abweichende Fixture wird abgelehnt und nicht überschrieben (0.44775ms)
+✔ Laufjournal belegt Leerstand; Löschen erfasst beide Testkonten auch bei zurückdatierten Vorlagen (0.79675ms)
+✔ Alte Journale bleiben zeitlich begrenzt; Version 2 ohne Leerstandsnachweis wird abgelehnt (0.604459ms)
+✔ Fehlgeschlagene Bereinigung bleibt wiederaufnehmbar; nächster Start räumt zuerst auf (0.458ms)
+✔ Nichtnull-Rest zählt als Fehler und erhält das Journal (0.27825ms)
+✔ Altbestand ohne Journal blockiert vor dem ersten Löschaufruf (0.166916ms)
+✔ Fremdes Projekt und manipulierte DB-Zeit werden ohne SQL abgelehnt (0.404125ms)
+✔ SIGKILL im Startfenster: unklarer Kindprozess verhindert automatische Löschung (0.301667ms)
+✔ Verwaister laufender Prüfprozess blockiert Bereinigung; nach seinem Ende ist Wiederaufnahme möglich (2.040959ms)
+✔ Management-API: HTTP-Fehler wird vor dem Auswerten einer scheinbaren Zählantwort verworfen (0.697125ms)
+✔ Fehlende oder falsch geformte Zählantwort ist kein leerer Bestand (0.204459ms)
+✔ Management-API: nur die ausdrücklich erwartete SQL-Ausnahme passiert eine Negativprobe (0.450666ms)
+✔ Gesamtlauf: Fehlgeschlagene Suite stoppt weitere Suiten nicht; Bereinigung und Rohbelege vorhanden (42.069834ms)
+✔ Gesamtlauf: alle Suiten mit Zahlen, stabile Quellen und Rest null ergeben Exit 0 (20.575333ms)
+✔ Gesamtlauf: fehlendes Token blockiert vor SQL und vor Start eines Prüfers (0.691833ms)
+✔ Gesamtlauf: Exit 0 ohne Prüfzahlen bleibt unvollständig (21.362083ms)
+✔ Gesamtlauf: deutscher Summensatz und node:test werden gezählt, null Prüfungen nicht (85.4305ms)
+✔ Gesamtlauf: Bereinigungsfehler verhindert Erfolg und bewahrt Journal (21.881375ms)
+✔ Gesamtlauf: SIGTERM beendet Kind, überspringt Rest und räumt vor Rückgabe 143 auf (104.460541ms)
+✔ Gesamtlauf: geänderter Prüfcode macht einen sonst grünen Lauf ungültig (20.562916ms)
+✔ Gesamtlauf: sechs Stunden lösen genau eine Warnung aus (39.630166ms)
+✔ Kind mit geerbten Browser-Pipes: Prozessgruppe endet trotz frühem exit (42.467583ms)
+✔ Zeitlimit beendet den Prüfprozess (102.606458ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.237458
+
+======================================================================
+  smoke
+======================================================================
+PASS  Unten genau vier Bereiche
+PASS  Bereiche in Prototyp-Reihenfolge
+PASS  Oben 4 Unterpunkte in messenger
+PASS  Oben 5 Unterpunkte in videos
+PASS  Oben 4 Unterpunkte in communities
+PASS  Oben 0 Unterpunkte in settings
+PASS  messenger/friendmap oeffnet
+PASS  messenger/chats oeffnet
+PASS  messenger/camera oeffnet
+PASS  messenger/profile oeffnet
+PASS  videos/home oeffnet
+PASS  videos/portrait oeffnet
+PASS  videos/landscape oeffnet
+PASS  videos/search oeffnet
+PASS  videos/profile oeffnet
+PASS  communities/home oeffnet
+PASS  communities/chats oeffnet
+PASS  communities/search oeffnet
+PASS  communities/profile oeffnet
+PASS  Chat-Suche filtert (projekt -> 1)
+PASS  Leerzustand bei 0 Treffern
+PASS  Gruppen-Filter (2 Gruppen)
+PASS  Kontakt-Filter (6 Einzelchats)
+PASS  Chat-Bereich nicht abgeschnitten
+PASS  Nachricht senden
+PASS  Nachricht steht im Verlauf
+PASS  Zurueck aus Chat
+PASS  Story-Viewer oeffnet
+PASS  Herz wird rot
+PASS  Rechts blaettert weiter
+PASS  Links blaettert zurueck
+PASS  Like bleibt bestehen
+PASS  Zeit steht waehrend des Tippens
+PASS  Enter schickt die Story-Antwort nicht ab
+PASS  Senden-Pfeil ist nutzbar, sobald etwas dasteht
+PASS  Antwort oeffnet den Chat
+PASS  Antwort steht im Chat
+PASS  Eigene Story oeffnet den Betrachter
+PASS  Eigene Story heisst "Deine Story"
+PASS  Kamera oeffnet
+PASS  Neu-Menue mit drei Eintraegen
+PASS  Auswahl wird gezaehlt
+PASS  Schritt 2 fragt den Namen
+PASS  Gruppe oeffnet sich als Chat
+PASS  Mitgliederzahl stimmt
+PASS  Gruppe steht in der Chatliste
+PASS  Kontaktliste oeffnet (6 Kontakte)
+PASS  Kontakt-Suche filtert (elif -> 1)
+PASS  Unbekannte Nummer wird abgelehnt
+PASS  Doppelter Kontakt wird abgelehnt
+PASS  Eine Kennung wird nicht mehr angenommen
+PASS  Querformat zeigt 12 Videos
+PASS  Querformat-Suche ohne Treffer
+PASS  Querformat-Suche filtert (design -> 1)
+PASS  Explorer zeigt sieben Abschnitte
+PASS  Explorer filtert
+PASS  Kommentare oeffnen (3)
+PASS  Kommentar senden
+PASS  Kommentar liken
+PASS  Profil aus Beitrag oeffnet
+PASS  Folgen schaltet um
+PASS  Community-Chats zeigen persoenliche Chats
+PASS  Community-Chats zeigen keine Communitys
+PASS  Filter Alle/Chats/Gruppen vorhanden
+PASS  Plus-Knopf zum Hinzufuegen
+PASS  Filter Gruppen zeigt nur die Gruppe
+PASS  Filter Kontakte zeigt nur Profile (16)
+PASS  Filter Communitys zeigt nur Kanaele (29/29, Profile 0)
+PASS  Community-Profil zeigt beide Abschnitte
+PASS  Profil wechseln steht über dem Profil
+PASS  Einstellungen ohne obere Leiste
+PASS  Einstellungen ohne Seitentitel
+PASS  Prototyp-Abschnitte vorhanden
+PASS  Zusaetzliche Abschnitte ergaenzt
+PASS  Dark-Mode-Schalter
+
+Keine Konsolenfehler
+
+======================================================================
+  feedback
+======================================================================
+
+Chats
+  OK   Chatliste hat Eintraege  — 8 Zeilen
+  OK   Chat laesst sich oeffnen  — Anna Schmidt
+  OK   Eigene Nachricht landet im Verlauf
+
+Filter
+  OK   Pills sind vollstaendig hoch  — Alle:33px Kontakte:33px Gruppen:33px
+  OK   Text sitzt mittig in der Pille  — flex/center/center
+  OK   Pills werden unten nicht abgeschnitten  — Pills bis 272, Rahmen 275
+
+Vollbild / PWA
+  OK   Als App startbar (Homescreen)
+  OK   Manifest verlinkt
+  OK   Statusleiste durchsichtig  — black-translucent
+  OK   Manifest sagt standalone  — standalone
+
+Friend-Map
+  OK   Karte ist da
+  OK   Kein Plus/Minus mehr
+  OK   Vollbild-Pfeil ist da
+  OK   Ansicht-Umschalter ist da
+  OK   Standort-Freigabe ist da
+  OK   Vollbild schaltet um
+  OK   Vollbild laesst sich verlassen
+  OK   Auswahlfenster fuer die Kartenansicht geht auf
+  OK   Kartenansicht wechselt
+  OK   Kontakt-Tippen bleibt auf der Karte
+  OK   Kontakt ist hervorgehoben
+
+Kontakt hinzufuegen
+  OK   Feld nimmt auch Telefonnummern  — Telefonnummer
+  OK   Nachricht vor Annahme moeglich
+  OK   Anfrage per Nummer angelegt
+  OK   Weitere Nachrichten gesperrt bis zur Annahme
+  OK   Der Absender kann seine Anfrage nicht selbst annehmen
+
+Gruppe erstellen
+  OK   Schritt 1 zeigt Personen, nicht den Namen
+  OK   Nicht-Kontakte per Nummer moeglich
+  OK   Schritt 2 fragt Name und Info
+  OK   Gruppenbild anlegbar
+  OK   Blatt schliesst per Klick daneben
+
+Konto wechseln
+  OK   Profil wechseln fuehrt zur Kontoliste
+  OK   Zweites Konto anlegbar
+
+Repost
+  OK   Ein noch nicht repposteter Beitrag im Feed
+  OK   Repost schaltet um
+  OK   Repost meldet sich
+  OK   Repost erscheint im Profil  — 5 Kachel(n)
+
+Eigene Story
+  OK   Kamera fragt, was mit der Aufnahme geschehen soll
+  OK   Die Aufnahme steht als Vorschau darüber
+  OK   Chat und Insight stehen als Ziel zur Wahl
+  OK   Aus der Kamera heraus wird nichts oeffentlich
+  OK   Vor dem Posten wird gefragt, wo die Story stehen soll
+  OK   Aufnahme wird übernommen  — Deine Story ist online — im Messenger und unter Videos
+  OK   Eigene Story zeigt keinen Plus-Knopf mehr  — story__ring
+  OK   Eigene Story lässt sich ansehen
+  OK   Ansichten statt Antwortfeld
+
+Anruf
+  OK   Anruf öffnet sich
+  OK   Zeigt „Sprachanruf gestartet"
+  OK   Verbindet NICHT von selbst (keine erfundene Dauer)  — Sprachanruf gestartet
+  OK   Sagt, dass es eine Vorschau ist
+  OK   Stummschalten wirkt
+  OK   Auflegen ohne Dauer
+  OK   Anruf schließt sich
+
+Konsolenfehler: keine
+
+Alles gruen
+
+======================================================================
+  erstellen
+======================================================================
+ABBRUCH: erstellen nach 15 Minuten; Zahlen unvollständig.
+
+======================================================================
+  teilen
+======================================================================
+ABBRUCH: teilen nach 15 Minuten; Zahlen unvollständig.
+
+======================================================================
+  sync
+======================================================================
+ABBRUCH: sync nach 15 Minuten; Zahlen unvollständig.
+
+======================================================================
+  uebernacht
+======================================================================
+
+  Abend: anmelden und etwas tun
+
+  OK   Ein Beitrag zum Liken ist da — #22222222
+ABBRUCH: uebernacht nach 15 Minuten; Zahlen unvollständig.
+
+======================================================================
+  schema
+======================================================================
+PASS  Schema eingelesen  — 104 Tabellen
+PASS  Alle angesprochenen Tabellen gibt es im Schema
+PASS  Alle angesprochenen Spalten gibt es im Schema
+PASS  Tabelle "videos" wird nicht mehr verwendet
+PASS  Tabelle "likes" wird nicht mehr verwendet
+PASS  Tabelle "favorites" wird nicht mehr verwendet
+PASS  Jede doppelt definierte Funktion, Regel und Vorlage steht in SUPABASE_REIHENFOLGE.md
+
+Schema und Code passen zusammen.
+
+======================================================================
+  sammlungen
+======================================================================
+
+Sammlungen
+PASS  Testkonto angemeldet
+PASS  Die alten Namen sind Sammlungen geworden  — 5 gefunden: Zum Prüfen, Später ansehen, Test, Reisen
+PASS  Kein alter Name ist unterwegs verloren gegangen  — 5 geprueft
+PASS  Eine Playlist laesst sich anlegen  — HTTP 201
+PASS  Derselbe Name ein zweites Mal wird abgelehnt  — HTTP 409
+PASS  Derselbe Name als andere Gattung geht  — HTTP 201
+PASS  Es gibt einen eigenen Beitrag zum Einsortieren
+PASS  Ein Beitrag laesst sich in die Playlist legen  — HTTP 201
+PASS  Derselbe Beitrag zweimal wird abgelehnt  — HTTP 409
+PASS  Eine Story in einer Playlist wird abgelehnt  — HTTP 400 {"code":"P0001","details":null,"hint":null,"message":"In ein
+PASS  Eine Story laesst sich in ein Highlight legen  — HTTP 201
+PASS  Ein Eintrag ohne Inhalt wird abgelehnt  — HTTP 400
+PASS  Der Inhalt der Playlist ist abrufbar  — 1 Eintraege
+PASS  Herausgenommen heisst wirklich weg  — 0 uebrig
+PASS  In eine fremde Sammlung laesst sich nichts legen  — HTTP 400
+PASS  Die Pruefsammlungen sind wieder weg  — 0 uebrig
+
+16 von 16 Pruefungen bestanden
+
+======================================================================
+  sammlungenweb
+======================================================================
+
+Sammlungen auf der Website
+  OK   Eine Playlist laesst sich anlegen
+  OK   Sie ist danach eine echte Sammlung, nicht nur ein Name
+  OK   Frisch angelegt ist sie leer — und sagt das auch
+  OK   Eine leere Sammlung hat kein Bild
+  OK   Es gibt einen eigenen Beitrag zum Einsortieren
+  OK   Der Beitrag laesst sich hineinlegen
+  OK   Derselbe Beitrag ein zweites Mal wird abgelehnt
+  OK   Darin liegt genau dieser eine Beitrag
+  OK   Die Kachel bringt eine unterschriebene Adresse mit
+  OK   Jetzt hat die Sammlung ein Bild
+  OK   In ein Highlight kommt kein Beitrag
+
+Auf dem Bildschirm
+  OK   Die Kreise stehen im eigenen Profil
+  OK   Der Kreis traegt die id seiner Sammlung
+  OK   Antippen zeigt den Inhalt, nicht eine Meldung
+  OK   Im Raster liegt genau eine Kachel
+  OK   Der Zaehler im Kopf nennt dieselbe Zahl
+
+Loeschen
+  OK   Der Loeschknopf steht im Kopf der eigenen Sammlung
+  OK   Die Rueckfrage sagt, dass die Beitraege bleiben
+  OK   Nach dem Loeschen ist der Kreis weg, der gleichnamige Highlight-Kreis bleibt
+  OK   Sie ist auch in der Datenbank weg, nicht nur auf dem Schirm
+  OK   Den Beitrag darin gibt es weiterhin
+  OK   Loeschen trifft nur die eigene Sammlung, nicht die gleichnamige fremde
+
+Aufraeumen
+  OK   Die Pruefsammlungen sind wieder weg
+
+23 von 23 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  explorer
+======================================================================
+
+Hashtag-Seite
+  OK   Ein Hashtag oeffnet seine eigene Seite
+  OK   Dort stehen die passenden Beitraege, nicht alle
+  OK   Eine Abschnittsueberschrift klappt die volle Liste auf
+  OK   Der Zurueck-Pfeil schliesst die Seite wieder
+
+Standort-Seite
+  OK   Ein Standort zeigt Adresse, Koordinaten und Karte
+  OK   Der Vollbild-Knopf oeffnet die grosse Karte mit allen Orten
+  OK   Ein Klick auf die Karte selbst oeffnet die Kartenansicht
+  OK   Die Kartenansicht listet die Orte in der Naehe, der Ort selbst zuerst
+  OK   Die Kartenansicht hat die Ansichtswahl wie die Friend-Map
+  OK   Vollbild blendet die Liste aus und wieder ein
+  OK   Der Pfeil an einer Zeile oeffnet den anderen Ort
+  OK   Das Karussell blaettert zwischen den Standortbildern
+  OK   "Alle Fotos ansehen" fuehrt auf die Fotoseite
+
+Sound-Seite
+  OK   Ein Sound zeigt Songbild, Interpret, Songwriter und eine Liedzeile
+  OK   Der Abspielknopf laesst die Zeit laufen
+  OK   Die Hoerprobe spielt wirklich
+  OK   Die Einsaetze der Liedzeilen kommen aus der Datenbank (Schema 63)
+  OK   Bei 11,2 s steht genau die gesungene Zeile da
+  OK   Ein Klick auf die Wellenform springt an die Stelle
+  OK   "Lyrics ansehen" zeigt den ganzen Text mit der gesungenen Zeile hervorgehoben
+  OK   Noch einmal tippen haelt an
+
+21 von 21 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  anhang
+======================================================================
+
+Anhang im Chat
+  OK   Das Plus zeigt alle Anhang-Arten
+  OK   Standort landet als Karte im Chat
+  OK   Ortssuche abgefangen, nicht am echten Dienst
+  OK   Die Standort-Karte fuehrt zur Kartenansicht des Ortes
+  OK   Kontakt landet als Karte im Chat
+  OK   Der Chatpartner steht nicht in der Auswahl
+  OK   Foto wird wirklich angezeigt, nicht nur benannt
+  OK   Die Chatliste zeigt den Anhang als Vorschau
+
+Weitere Optionen im Profil
+  OK   Der Mehr-Knopf zeigt fuenf Optionen
+  OK   Stummschalten wird im Profil angezeigt
+  OK   Blockieren nimmt die Person aus den Kontakten
+  OK   Der Nachricht-Knopf ist dann gesperrt
+  OK   Melden fragt nach Kategorie und Begründung
+
+13 von 13 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  einstellungen
+======================================================================
+
+Einstellungen
+  OK   Die Sprungleiste zeigt alle elf Abschnitte
+  OK   Auswahlpunkte zeigen ihren Stand gleich in der Liste
+  OK   Eine Auswahl lässt sich ändern und bleibt stehen
+  OK   Die Auswahl übersteht einen Neustart der Seite
+  OK   „Zuletzt online" führt auf die vier Sichtbarkeitsstufen
+  OK   Ein Formular prüft seine Eingaben
+  OK   Zwei verschiedene Eingaben werden abgelehnt
+  OK   Ein richtiger Code wird angenommen
+  OK   Zurück zur Spenden-PIN nimmt den eigenen Code weg
+  OK   Ein Listenpunkt zeigt echte Einträge
+  OK   Gelikte Beiträge zeigen echte Zeilen
+  OK   Meine Kommentare zeigen Text und Beitrag
+  OK   Ein Erklärtext geht auf
+  OK   Konto löschen fragt erst nach
+  OK   Die Telefonnummer kommt in der Datenbank an
+  OK   Zwei Schreibweisen finden dieselbe Person
+  OK   Eine zu kurze Nummer wird abgelehnt
+  OK   Dieselbe Nummer anders geschrieben faellt als Dopplung auf
+  OK   Kein Punkt gibt mehr "folgt mit dem Backend" aus
+
+19 von 19 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  kontaktinfo
+======================================================================
+
+Kontaktinfo
+  OK   Aus dem Chat heraus kommt die Kontaktinfo, nicht das Beitragsprofil
+  OK   Alle Zeilen aus dem Prototyp-Frame stehen da
+  OK   Die beiden anderen Profile der Person sind erreichbar
+  OK   Benachrichtigungen lassen sich umschalten
+  OK   Chatdesign merkt sich die Auswahl
+  OK   Lange Drücken markiert eine Nachricht, sie erscheint in der Liste
+  OK   Im Chat suchen findet eine Nachricht
+  OK   Chat leeren nimmt die Nachrichten weg
+
+Gruppenanruf
+  OK   Eine Gruppe lässt sich anrufen, alle Mitglieder stehen da
+  OK   Der Gruppenanruf ist „gestartet" und zählt keine erfundene Dauer
+
+10 von 10 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  henrik
+======================================================================
+
+Videos — Home
+  OK   Kommentarzahl stimmt mit der Liste ueberein  — genannt 0, echt 0
+  OK   Story-Ring ist ein Knopf
+  OK   Glocke vorhanden
+  OK   Glocke schaltet sichtbar um  — post__bell  -> post__bell is-on
+
+Videos — Kurzformat
+  OK   Kein "Merken" mehr im Kurzformat
+  OK   Seitenleiste bleibt beim Liken an ihrer Stelle  — y 334 -> 334
+
+Videos — Querformat
+  OK   Querformat-Filter "Alle"  — Alle | Standard | 360° | Live
+  OK   Querformat-Filter "Standard"  — Alle | Standard | 360° | Live
+  OK   Querformat-Filter "360"  — Alle | Standard | 360° | Live
+  OK   Querformat-Filter "Live"  — Alle | Standard | 360° | Live
+
+Videos — Suche
+  OK   Reels-Kachel mit Bildunterschrift
+  OK   Kachel zeigt ein Profilbild
+  OK   Kachel nennt Ort oder Musik  — EY
+          Elif Yilmaz
+        
+      
+  OK   Abschnitts-Ueberschrift ist anklickbar
+
+Profil
+  OK   Followerzahl ist anklickbar
+  OK   Profil bearbeiten erreichbar
+  OK   Bio-Link ist ein Link
+
+Communitys
+  OK   Filter Alle/Öffentlich/Privat vorhanden
+
+Einstellungen
+  OK   Kontowechsel steht in den Einstellungen
+  OK   Messenger-Abschnitt vorhanden
+  OK   Gefolgte in den Einstellungen
+
+Messenger
+  OK   Chat-Kopf ist anklickbar
+  OK   Fuehrt zu den Chat-Einstellungen  — Kontaktinfo
+      Bearbeiten
+    
+
+    
+     
+
+  23 von 23 Punkten erfuellt
+
+  Keine Konsolenfehler
+
+======================================================================
+  henrik2
+======================================================================
+
+Messenger — Friend-Map
+  OK    Kein Raster mehr auf der Karte
+  OK    Vollbild-Pfeil statt Plus/Minus
+  OK    Umschalter fuer die Kartenansicht
+  OK    Standortfreigabe einstellbar
+
+Videos — Kurzformat
+  OK    Standort im Kurzformat anklickbar
+  OK    Musik im Kurzformat anklickbar
+
+Videos — Home
+  OK    Standort im Beitrag anklickbar
+  OK    Musik im Beitrag anklickbar
+
+Communitys — Chats
+  OK    Filter "Alle" in den Community-Chats
+  OK    Filter "Chats" in den Community-Chats
+  OK    Filter "Gruppen" in den Community-Chats
+  OK    Plus-Knopf neben der Suche
+
+Communitys — Aufbau beim Oeffnen
+  OK    Kanalliste statt direkt Chat  — React Native DE
+          850 Mitglieder
+  OK    Themen statt direkt Chat  — 3 Kanäle
+  OK    Profilbild am Absender im Kanal-Chat
+  OK    Profilbild fuehrt zum Profil
+
+Generell — Chats verwalten
+  OK    Langes Druecken oeffnet Chat-Optionen
+  OK    Archivieren angeboten
+  OK    Loeschen angeboten
+
+  19 von 19 Punkten erfuellt
+
+  Keine Konsolenfehler
+
+======================================================================
+  insel
+======================================================================
+
+Dynamic Island
+  OK   Die Leiste schwebt, statt im Fluss zu sitzen
+  OK   Sie ist schmaler als der Bildschirm und rundum von Luft umgeben
+  OK   Sie ist eine Pille, keine Kante
+  OK   Der Inhalt beginnt unter der Insel, nicht dahinter
+  OK   In den Einstellungen gibt es keine Insel
+
+Benachrichtigungen
+  OK   Ungelesenes steht auf dem Bereich Messenger
+  OK   Dieselbe Zahl steht auf dem Unterpunkt Chats
+  OK   Ein gelesener Chat nimmt beide Zahlen mit
+
+Videos — Querformat
+  OK   „Alle" zeigt jedes Video
+  OK   „Standard" zeigt weniger als „Alle"
+  OK   „360°" zeigt eine eigene Auswahl
+  OK   „Live" zeigt eine eigene Auswahl
+  OK   Die drei Arten ueberschneiden sich nicht und ergeben zusammen „Alle"
+  OK   Live-Videos sind auf der Kachel als solche erkennbar
+
+Navigation
+  OK   Ein Bereich faengt immer auf seiner Hauptseite an
+  OK   Der Messenger faengt bei den Chats an
+  OK   Ein schneller Weg aus den Einstellungen laesst sie nicht stehen
+
+  17 von 17 Punkten erfuellt
+
+  Keine Konsolenfehler
+
+======================================================================
+  suche
+======================================================================
+
+Videos — Suche
+  OK   Jede der sieben Kategorien hat einen Pfeil zum Mehr anzeigen
+  OK   Die Vorschau zeigt je Kategorie hoechstens fuenf Eintraege
+  OK   Hinter der Ueberschrift steht die volle Liste
+  OK   „reels" oeffnet eine eigene Seite mit Zurueck-Pfeil
+  OK   „clips" oeffnet eine eigene Seite mit Zurueck-Pfeil
+  OK   „posts" oeffnet eine eigene Seite mit Zurueck-Pfeil
+  OK   „profile" oeffnet eine eigene Seite mit Zurueck-Pfeil
+  OK   „hashtags" oeffnet eine eigene Seite mit Zurueck-Pfeil
+  OK   „standorte" oeffnet eine eigene Seite mit Zurueck-Pfeil
+  OK   „sounds" oeffnet eine eigene Seite mit Zurueck-Pfeil
+
+Videos — Suche, der gemeldete Bug
+  OK   Ein Unterpunkt fuehrt aus der Uebersichtsseite heraus
+  OK   Ein Bereich fuehrt aus der Uebersichtsseite heraus
+  OK   Danach ist die App wieder normal bedienbar
+
+  13 von 13 Punkten erfuellt
+
+  Keine Konsolenfehler
+
+======================================================================
+  optionen
+======================================================================
+  OK   Kein Tonknopf mehr im Hochformat
+  OK   Der Ton geht nach dem ersten Tippen an
+  OK   Fremdes Reel vorhanden
+  OK   "Mehr" am Reel zeigt die fuenf Punkte nach TikTok
+  OK   Reihenfolge wie Henriks Aufzaehlung
+  OK   Aussehen wie TikTok: runde Kreise nebeneinander, kein Pfeil, Abbrechen
+  OK   Abbrechen schliesst das Menue
+  OK   Link kopieren legt die Website-Adresse ab
+  OK   Der Link oeffnet das Reel
+  OK   Zu Story hinzufuegen legt eine Story an
+  OK   Melden fragt nach Kategorie und Begründung und kommt an
+  OK   Kein Interesse nimmt das Reel sofort heraus
+  OK   ... und bleibt nach dem Neuladen weg (Datenbank)
+  OK   Zuruecksetzen bringt es zurueck
+  OK   Am eigenen Beitrag fehlen "Kein Interesse" und "Melden"
+  OK   Querformat-Player hat "Mehr"
+
+16 von 16 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  kasten8
+======================================================================
+  OK   Querformat-Video mit Ort oder Sound im Bestand
+  OK   8.1 Kein Ton-/Lautstaerkeknopf im Querformat-Player
+  OK   8.2 Ort und Sound stehen unter dem Namen im Querformat
+  OK   8.2 Ort antippen oeffnet die Standortseite (nicht das Profil)
+  OK   8.2 Sound antippen oeffnet die Soundseite oder sagt, warum nicht
+  OK   8.1 Chat-Vollformat: Video ohne Browserleiste und mit Ton
+
+6 von 6 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  kasten12
+======================================================================
+
+Gemeinsame Bausteine
+  OK   sammlungen.js und spende.js stehen in UMD_BAUSTEINE
+  OK   index.html bindet beide ein
+  OK   beide Dateien haben eine UMD-Hülle
+
+12.9  Ringfarben
+  OK   Playlist rot wie im Prototyp (#FF0A0A)
+  OK   Highlight orange wie im Prototyp (#FF990A)
+  OK   Die beiden Gattungen unterscheiden sich
+  OK   Strich 4/45 des Durchmessers (64 → 6 px)
+  OK   App: eigenes Profil nimmt die Farbe aus dem Baustein
+  OK   App: fremdes Profil nimmt die Farbe aus dem Baustein
+  OK   Website: ringStil() nimmt Farbe und Stärke aus dem Baustein
+  OK   Website: kein fest verdrahteter Farbverlauf mehr am Ring
+  OK   Website: Ring ist rund
+
+12.7 / 12.8  Titelbild
+  OK   Ohne Wahl: ein Beitrag der Sammlung ist das Titelbild
+  OK   Gewählter Beitrag gewinnt
+  OK   Gewählte Story gewinnt
+  OK   Eigenes Foto gewinnt vor allem
+  OK   Leere Sammlung ohne Foto: kein Bild
+  OK   Schema-Entwurf: Spalten, Prüfung auf Inhalt, idempotent
+  OK   App: Knopf „Titelbild wählen" im eigenen Profil
+  OK   App: speichert über aktionen.titelbildSetzen
+  OK   Website: openTitelbildWahl mit Beitrag, Foto und Kamera
+  OK   Server: POST /api/eigene/sammlung/:id/titelbild
+
+12.3  Spendenziel
+  OK   Formular: Titel, Ziel, Frist, Text werden übernommen
+  OK   Formular: Ziel bleibt freiwillig
+  OK   Formular: Unsinn wird abgelehnt
+  OK   Frist ungültig: fristAus wirft
+  OK   Stand: erreicht, Fortschritt, Spender aus den Buchungen
+  OK   Abgelaufene Frist wird erkannt
+  OK   Eigener Betrag: 2,50 → 250 Cent, 0,10 abgelehnt
+  OK   Schema-Entwurf: spendenstand() nur für angemeldete Nutzer
+  OK   App: Karte, Detailblatt und Spenden-Knopf
+  OK   App: Karte im eigenen und im fremden Profil
+  OK   Website: Karte ist ein Knopf und öffnet openSpendenziel
+  OK   Website: Karte auch im fremden Profil
+  OK   Server: GET /api/spendenstand/:userId
+  OK   Server: Spende-Formular über Spende.ausFormular
+
+12.5  Profilbild
+  OK   Schema-Entwurf: avatar_url nur aus dem Eimer media
+  OK   App: Kopf mit Mediathek, Kamera, Entfernen
+  OK   App: „Profil bearbeiten" zeigt den Kopf
+  OK   App: Ordner avatars, gespeichert über profilbildSetzen
+  OK   Website: kein Profilbild mehr nur im Browser (localStorage)
+  OK   Website: Upload nach avatars und /api/eigene/profilbild
+  OK   Website: Avatare zeigen das Bild (personenAvatar)
+  OK   Server: POST /api/eigene/profilbild prüft Pfad und Zeilenzahl
+  OK   Server: jeder Nutzer bringt sein Bild mit
+  OK   Website: nur noch EIN bildVerkleinern (das zweite brach Storys)
+
+12.1  Tab bleibt
+  OK   App: Reiter liegt in der Shell, nicht im Bildschirm
+  OK   App: Beitrag öffnen merkt sich den Reiter
+  OK   App: Verlassen setzt zurück
+  OK   Website: profilReiterPruefen bei Ober- und Unterleiste
+  OK   Website: Kacheln im Raster öffnen den Beitrag
+
+12.2  Name mittig
+  OK   App: Handle mit eigener Mitte (testID profil-handle)
+  OK   Website: .oprof__handle links und rechts gleich weit
+
+12.4  Profil wechseln
+  OK   App: Video-Profil ruft den Wechsel selbst auf
+  OK   App: nach dem Wechsel landet ein anderes Konto im Video-Profil
+  OK   App: zweimal abholen geht (StrictMode ruft den Initialisierer doppelt)
+  OK   App: dasselbe Konto (Wechsel abgebrochen) springt nicht
+  OK   App: nach drei Minuten gilt die Stelle nicht mehr
+  OK   App: vergessen() räumt ab
+  OK   App: Messenger und Einstellungen vergessen die Stelle vor dem Wechsel
+  OK   App: neue Shell startet im Video-Profil
+  OK   Website: #switchProfile öffnet den Wechsel im Video-Profil
+
+12.6  Online-Punkt
+  OK   App: grüner Punkt antippbar
+  OK   App: öffnet die Sichtbarkeit onlinestatus
+  OK   Website: #onlinePunkt öffnet openSichtbarkeit onlinestatus
+
+65 von 65 Pruefungen bestanden.
+
+======================================================================
+  kasten17
+======================================================================
+
+Gemeinsame Regeln (gemeinsam/sammlungen.js)
+  OK   Untertitel Playlist, Mehrzahl
+  OK   Untertitel Playlist, Einzahl
+  OK   Untertitel Highlight nennt Storys
+  OK   Untertitel Highlight, Einzahl
+  OK   Untertitel leer
+  OK   Alter: gerade eben
+  OK   Alter: Minuten
+  OK   Alter: Stunden
+  OK   Alter: ein Tag
+  OK   Alter: Tage
+  OK   Alter: Wochen
+  OK   Alter: Datum ab vier Wochen
+  OK   Alter: kein Datum → leer
+  OK   Story: fremd, Kennung bleibt
+  OK   Story: Vorname wie in der Leiste
+  OK   Story: Video bleibt Video
+  OK   Story: gemocht
+  OK   Story: Zeitpunkt für den Kopf
+  OK   Story: eigene heißt „me" wie in der Leiste
+
+17.1  Highlight im Story-Betrachter
+  OK   App: kein neuer Betrachter — HighlightBetrachter nutzt StoryViewerScreen
+  OK   App: Betrachter kennt den Highlight-Modus
+  OK   App: Name des Highlights im Kopf
+  OK   App: eigenes Highlight — Bearbeiten, Herausnehmen, Löschen
+  OK   App: eigenes Profil spielt Highlights ab
+  OK   App: fremdes Profil spielt Highlights ab
+  OK   App: fremdes Profil zeigt keinen Hinweis mehr statt der Sammlung
+  OK   App: Storys des Highlights über sammlung_inhalte
+  OK   Website: Highlight-Kreis spielt ab
+  OK   Website: openStory nimmt eine eigene Liste
+  OK   Website: fremdes Profil kommt nach dem Schließen zurück
+  OK   Website: Highlight-Optionen im Betrachter
+  OK   Server: GET /api/sammlung/:id/storys
+  OK   Server und App bauen die Story mit derselben Regel
+
+17.2  Playlist als Ordner
+  OK   App: Ordner mit Untertitel aus der gemeinsamen Regel
+  OK   App: eigenes Profil nutzt den Ordner
+  OK   App: fremdes Profil nutzt den Ordner — ohne kopfRechts
+  OK   App: Kachel im fremden Ordner öffnet den Beitrag
+  OK   App: Story-Kachel im Ordner hatte mediaUri statt mediaUrl (behoben)
+  OK   Website: Untertitel aus der gemeinsamen Regel
+  OK   Website: Löschen und Titelbild nur im eigenen Ordner
+
+17.3  Selbst einordnen und herausnehmen
+  OK   App: „Zu Playlist hinzufügen" nur am eigenen Beitrag
+  OK   App: Playlist-Wahl im selben Blatt
+  OK   App: „Zu Highlight hinzufügen" an der eigenen Story
+  OK   App: Häkchen schaltet hinein und heraus
+  OK   App: „Neue Playlist" legt an und legt hinein
+  OK   App: langes Drücken im eigenen Ordner nimmt heraus
+  OK   Website: „Zu Playlist hinzufügen" im Drei-Punkte-Menü
+  OK   Website: „Zu Highlight hinzufügen" an der eigenen Story
+  OK   Website: langes Drücken im eigenen Raster bietet keine Highlights mehr an
+  OK   Server: Zuordnung lesen, hinein, heraus, neu
+  OK   Server: nur Eigenes lässt sich einordnen
+  OK   Server: Löschen prüft die Zahl der gelöschten Zeilen (RLS)
+  OK   Server: kein Pfad, den DELETE /api/eigene/sammlung/:art/:name verschluckt
+
+53 von 53 Pruefungen bestanden.
+
+======================================================================
+  glocke
+======================================================================
+
+Home
+  OK   Home: eine abgeschaltete Glocke ist zu sehen
+  OK   Home: genau ein Strich, kein zweiter per CSS — Striche 1, ::before false
+  OK   Home: Strich mittig (±0,5 px) — dx 0.00, dy 0.00
+  OK   Home: Strich 45°, nicht schief — Breite-Höhe 0.00
+  OK   Home: Strich ragt nicht aus dem Symbol
+  OK   Home: Strich rot, andere Farbe als die Glocke — Strich rgb(229, 72, 77), Glocke rgb(102, 110, 125)
+  OK   Home: angeschaltet ohne Strich, in Markenfarbe (unverändert) — rgb(91, 69, 224)
+  OK   Home: „an" übersteht das Neuladen (Datenbank)
+  OK   Home: wieder abschaltbar
+
+Kurzformat
+  OK   Kurzformat: Glocke vorhanden (wie in der App)
+  OK   Kurzformat: genau ein Strich, kein zweiter per CSS — Striche 1, ::before false
+  OK   Kurzformat: Strich mittig (±0,5 px) — dx 0.00, dy 0.00
+  OK   Kurzformat: Strich 45°, nicht schief — Breite-Höhe 0.00
+  OK   Kurzformat: Strich ragt nicht aus dem Symbol
+  OK   Kurzformat: Strich rot, andere Farbe als die Glocke — Strich rgb(229, 72, 77), Glocke rgb(255, 255, 255)
+  OK   Kurzformat: Antippen schaltet an
+  OK   Kurzformat: wieder abschaltbar
+  OK   Kurzformat: am eigenen Reel weder „Folgen" noch Glocke — 1 eigene
+  OK   Kurzformat: an jedem fremden Reel „Folgen" und Glocke — 5 fremde
+  OK   Kurzformat: „Gefolgt" stimmt mit der Datenbank überein — Gefolgt/true Gefolgt/true Gefolgt/true Gefolgt/true Gefolgt/true
+  OK   Keine Fehler in der Konsole
+
+21/21 Prüfungen bestanden
+
+======================================================================
+  pfeile
+======================================================================
+
+======================================================================
+  Übersicht
+======================================================================
+  OK    testhygiene          24/24
+  OK    smoke                75/75
+  OK    feedback             53/53
+  ZEIT  erstellen                —
+  ZEIT  teilen                   —
+  ZEIT  sync                     —
+  ZEIT  uebernacht             1/1
+  OK    schema                 7/7
+  OK    sammlungen           16/16
+  OK    sammlungenweb        23/23
+  OK    explorer             21/21
+  OK    anhang               13/13
+  OK    einstellungen        19/19
+  OK    kontaktinfo          10/10
+  OK    henrik               23/23
+  OK    henrik2              19/19
+  OK    insel                17/17
+  OK    suche                13/13
+  OK    optionen             16/16
+  OK    kasten8                6/6
+  OK    kasten12             65/65
+  OK    kasten17             53/53
+  OK    glocke               21/21
+  FEHL  pfeile                   —
+
+  495 von 495 Prüfungen bestanden, 24/97 Läufe.
+  Ohne zählbare Prüfungen: erstellen, teilen, sync, pfeile
+  Nicht durchgekommen: erstellen, teilen, sync, uebernacht, pfeile
+  Lauf 600e7edf-6ac7-49b5-b4a4-837fd7d9898b: 254 Mitteilungen entfernt, Rest 0.
+[abgebrochen 12.11. durch Claude auf Henriks Anweisung: Codex am Nutzungslimit, Testbestand übernommen]
