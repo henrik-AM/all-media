@@ -1,0 +1,11 @@
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/paket6-live-native
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+iOS Bundled 2155ms einstieg.tsx (952 modules)
+ WARN  Gerätschlüssel nicht verfügbar: Error: Simulierter Schlüsselausfall im Live-Prüfstand
+ WARN  Verschlüsselung nicht prüfbar: Error: Simulierter Schlüsselausfall im Live-Prüfstand
+ ERROR  Nachricht senden fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.

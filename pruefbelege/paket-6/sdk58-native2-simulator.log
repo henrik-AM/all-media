@@ -1,0 +1,14 @@
+
+  Simulator "All-Media Codex" laeuft bereits.
+  Expo Go 58 ist im Simulator vorhanden.
+  App wird geladen ...
+An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=3):
+Simulator device failed to terminate host.exp.Exponent.
+found nothing to terminate
+Underlying error (domain=NSPOSIXErrorDomain, code=3):
+	The request to terminate "host.exp.Exponent" failed. found nothing to terminate
+	found nothing to terminate
+
+  Fertig - die App ist im Simulator offen.
+  Screenshot bei Bedarf:  xcrun simctl io 5210E675-C198-4328-B3E2-30FCE9E0F624 screenshot bild.png
+

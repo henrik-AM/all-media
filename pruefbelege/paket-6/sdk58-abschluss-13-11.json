@@ -1,0 +1,50 @@
+{
+  "produktstand": "bb5963c",
+  "gesamtlauf": {
+    "id": "f117d6fb-083e-4273-9a7e-5a137c028e49",
+    "pruefungen": [
+      3287,
+      3287
+    ],
+    "laeufe": [
+      97,
+      97
+    ],
+    "ohne_zaehlbare": [],
+    "quellenUnveraendert": true,
+    "rest": 0
+  },
+  "nativeKomponenten": {
+    "ui": [
+      11,
+      11
+    ],
+    "backend": [
+      11,
+      11
+    ],
+    "rest": 0
+  },
+  "produktApp": {
+    "uiBeobachtungen": 11,
+    "backend": [
+      3,
+      3
+    ],
+    "rest": 0,
+    "expoGo": "58.0.7",
+    "simulator": "All-Media Codex"
+  },
+  "schlussMitteilungen": {
+    "entfernt": 6,
+    "rest": 0
+  },
+  "belegungen": "freigegeben",
+  "ports": [
+    3300,
+    3301,
+    3302
+  ],
+  "prozesse": "beendet",
+  "mainPushDeploy": false
+}

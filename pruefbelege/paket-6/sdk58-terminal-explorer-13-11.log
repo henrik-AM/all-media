@@ -1,0 +1,20 @@
+Beide erlaubten Testkonten: Mitteilungen entfernt 0 Rest 0
+Eigener Paket-6-Server bestätigt; PID 31823
+START _explorer.js
+ENDE _explorer.js 0 
+Beide erlaubten Testkonten: Mitteilungen entfernt 42 Rest 0
+Beide erlaubten Testkonten: Mitteilungen entfernt 0 Rest 0
+basename: illegal option -- z
+usage: basename string [suffix]
+       basename [-a] [-s suffix] string [...]
+basename: illegal option -- z
+usage: basename string [suffix]
+       basename [-a] [-s suffix] string [...]
+[32mfreigegeben: testbestand[0m
+basename: illegal option -- z
+usage: basename string [suffix]
+       basename [-a] [-s suffix] string [...]
+basename: illegal option -- z
+usage: basename string [suffix]
+       basename [-a] [-s suffix] string [...]
+[32mfreigegeben: port-3300[0m

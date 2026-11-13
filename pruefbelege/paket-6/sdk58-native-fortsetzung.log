@@ -1,0 +1,15 @@
+Fortsetzung nach sechs belegten Prüfungen; modalen Zurück-Button explizit wählen
+Traceback (most recent call last):
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/pruefbelege/paket-6/laufsteuerung/native-fortsetzen.py", line 4, in <module>
+    exec(compile(code,orig,"exec"),{"__file__":orig,"__name__":"__main__"})
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 52, in <module>
+    tap('Konto B');rows=wait(lambda r:label(r,'Konto B') and label(r,'Website an Native B'))
+    ~~~^^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 31, in tap
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 15, in cmd
+    if r.returncode:raise RuntimeError(' '.join(a[:3])+': '+r.stdout+r.stderr)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: node tools/tippen.js Zurück: 64:167: execution error: „System Events“ hat einen Fehler erhalten: „process "Simulator"“ kann nicht als „true“ gesetzt werden. (-10006)
+"Zurück" ist verdeckt von "" [GenericElement {"x":0,"y":0,"width":402,"height":386.6666564941406}]. Erst wischen (--runter / --hoch). Nicht getippt.
+

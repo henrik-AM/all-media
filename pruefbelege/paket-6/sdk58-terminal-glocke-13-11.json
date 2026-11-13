@@ -1,0 +1,19 @@
+{
+  "pid": 14014,
+  "parent": 14002,
+  "phase": "beendet",
+  "tests": [
+    "_glocke.js"
+  ],
+  "start": "2026-11-13T12:44:22.928398+00:00",
+  "server": 14098,
+  "vorbereinigung": 0,
+  "code": 0,
+  "nachbereinigung": 0,
+  "server_beendet": true,
+  "freigaben": {
+    "testbestand": 0,
+    "port-3300": 0
+  },
+  "ende": "2026-11-13T12:46:23.370666+00:00"
+}

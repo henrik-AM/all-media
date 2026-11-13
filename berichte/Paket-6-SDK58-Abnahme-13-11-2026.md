@@ -1,29 +1,43 @@
 # Paket 6 – SDK-58-Abnahme am 13.11.2026
 
-Geprüfter Produktstand: `bb5963c` auf `codex/paket6-kuvert-2026-11-11`. Keine Änderung am Produktcode, kein main, Push oder Deploy. Die drei mittleren Expo-internen Auditbefunde bleiben auf Henriks Anweisung unberührt.
+## Ergebnis
 
-## Vollständiger Lauf und angeordnete Einzelwiederholung
+Produktstand **bb5963c**, eigener Zweig `codex/paket6-kuvert-2026-11-11`: vollständiger Gesamtlauf **3287/3287 Prüfungen bei 97/97 Läufen, Exit 0**. Alle 97 Läufe enthalten zählbare Prüfungen. Quellen unverändert. Bereinigung erfolgreich: 512 Testmitteilungen entfernt, **Rest 0**. Eigener Server beendet; Testbestand und port-3300 danach freigegeben.
 
-Laufkennung `6b234b1c-e69e-483e-a6f0-234fb0dff428`: **3283/3287 Prüfungen, 97/97 Läufe**, Exit 1. Einzig roter Lauf: Explorer **17/21**. Die übrigen 96 Läufe sind grün. Alle 97 Läufe enthalten zählbare Prüfungen; die bedingte Warnzeile „Ohne zählbare Prüfungen“ erscheint folglich nicht. Statusfelder zusätzlich geprüft: keine fehlende/Null-Prüfzahl, Quellen unverändert, Bereinigung erfolgreich. 512 Testmitteilungen entfernt, **Rest 0**. Eigener Server beendet; Testbestand und port-3300 jeweils erfolgreich freigegeben.
+Native Abnahme anschließend im eigenen Simulator **All-Media Codex**, UDID `5210E675-C198-4328-B3E2-30FCE9E0F624`, iOS26.5, **Expo Go58.0.7**. Das vorhandene Simulatorwerkzeug ersetzte57.0.9 automatisch. Native Komponentenprüfung **11/11 UI und 11/11 Backend**, danach normale Produkt-App mit echten Anmeldungen, gespeichertem Kontowechsel, SecureStore-Neustart und verspätetem Kuvert nachgewiesen. Produktcode unverändert; einzige Änderung unter app/web/gemeinsam seit bb5963c: eindeutige Auswahl des modalen Zurück im nativen Python-Prüftreiber.
 
-Belege: `pruefbelege/paket-6/live-alles-sdk58-6b234b1c-vollstaendig.log`, `sdk58-6b234b1c-vollstatus.json` sowie `sdk58-terminal-gesamt-13-11.json`. Dieser vollständige Lauf bleibt rot protokolliert.
+**Keine Abnahmepunkte dieses Auftrags offen.** Die drei mittleren Expo-internen minimatch-Auditbefunde bleiben auf Henriks ausdrückliche Anweisung bestehen. Kein main, Push, Deploy oder Schemaeingriff. Gerätesitzungen wurden ausschließlich im eigenen Simulator geprüft.
 
-Explorer wurde vor jeder Codeverdächtigung unverändert einzeln wiederholt: **21/21**, Exit 0, keine Konsolenfehler. Eigene Belegungen und Vor-/Nachbereinigung erfolgreich, Server beendet, beide Belegungen erneut freigegeben. Belege: `live-_explorer.log`, `sdk58-terminal-explorer-13-11.json`. Kein daraus abgeleiteter Produktpatch.
+## Gesamtläufe und rote Einzelwiederholung
 
-## Vollständige Bestätigung vor nativer Abnahme
+Erster vollständiger Lauf `6b234b1c-e69e-483e-a6f0-234fb0dff428`: **3283/3287, 97/97**, Exit1, einzig Explorer17/21. Alle übrigen96 Läufe grün. Die bedingte Warnzeile „Ohne zählbare Prüfungen“ erscheint nicht; zusätzlich im Status alle97 Prüfzahlen als vorhanden und größer0 geprüft. Quellen unverändert,512 Mitteilungen entfernt,Rest0,Server beendet,beide Freigaben Exit0. Belege: `live-alles-sdk58-6b234b1c-vollstaendig.log`, `sdk58-6b234b1c-vollstatus.json`, `sdk58-terminal-gesamt-13-11.json`.
 
-Ohne Quelländerung weiterer vollständiger Lauf auf `bb5963c`: `f117d6fb-083e-4273-9a7e-5a137c028e49`, gestartet 13.11.2026 um 15:33 Uhr Europe/Berlin. Testbestand und port-3300 erneut selbst belegt, SUPABASE_TOKEN ausschließlich im Kindprozess, Vorbereinigung Exit 0. Abgeschlossen: **3287/3287 Prüfungen, 97/97 Läufe, Exit 0**. Alle 97 Läufe enthalten zählbare Prüfungen; keine Warnzeile „Ohne zählbare Prüfungen“. Quellen unverändert. 512 Testmitteilungen entfernt, **Rest 0**. Eigener Server beendet, Testbestand und port-3300 jeweils erfolgreich freigegeben. Belege: `live-alles-sdk58-f117d6fb-gruen.log`, `sdk58-f117d6fb-vollstatus.json`, `sdk58-terminal-gesamt-bestaetigung-13-11.json`. Native Abnahme anschließend.
+Vor jeder Codeverdächtigung unveränderte Einzelwiederholung Explorer: **21/21**, Exit0, keine Konsolenfehler. Vor-/Nachbereinigung erfolgreich, Server beendet, beide Freigaben Exit0. Kein Produktpatch daraus. Belege: `live-_explorer.log`, `sdk58-terminal-explorer-13-11.json`.
 
-Überwachung: `pruefbelege/paket-6/laufsteuerung/monitor-bestaetigung.py`. Terminal-Controller PID 32709, eigener Server PID 32794. Terminal-Kontext wurde vorher mit Glocke 21/21 einschließlich tatsächlichem Codex-Neustart und sauberem Abschluss geprüft. Frühere abgebrochene SDK-58-Läufe bleiben getrennt und zählen nicht als Abnahme.
+Vollständige Bestätigung `f117d6fb-083e-4273-9a7e-5a137c028e49`: **3287/3287, 97/97**, Exit0. „Ohne zählbare Prüfungen“ ebenfalls keine Einträge; Quellen identisch,512 entfernt,Rest0,beide Freigaben Exit0. Belege: `live-alles-sdk58-f117d6fb-gruen.log`, `sdk58-f117d6fb-vollstatus.json`, `sdk58-terminal-gesamt-bestaetigung-13-11.json`. `live-alles.log` enthält zusammengefügte Rohprotokolle und darf nicht als eine doppelt gezählte Abnahme gelesen werden; die getrennten Laufdateien und Status-IDs sind maßgeblich. Belegcommit894a950.
 
-## Noch offen
+Vorherige abgebrochene SDK-58-Läufe und überlappende Einzelstarts bleiben getrennte historische Diagnosebelege und zählen nicht zur Abnahme. Der unabhängige Terminalkontext wurde zuvor mit Glocke21/21 einschließlich tatsächlichem Codex-Neustart und sauberer Bereinigung geprüft.
 
-Native Abnahme nach abgeschlossenem grünem Gesamtlauf durchführen. Der vorhandene native Komponenten-Prüfstand ersetzt Konten-/Datenkontexte und belegt daher keinen echten App-Login. Echter App-Flow und verspätetes Kuvert sind getrennt nachzuweisen. Ergebnis, Bilder und Bereinigung anschließend dokumentieren und auf eigenem Zweig sichern.
+## Native Komponenten mit echtem Backend
 
-## Native Komponentenabnahme
+Erster nativer Teillauf: Expo-Einführung und mehrdeutiger Zurück stoppten die Bedienautomation; später45-Minuten-Zeitlimit, geprüfte Bereinigung Rest0. Nach angeordneter Pause vollständige Wiederholung im unabhängigen Terminal. Prüfbedienung wählt den tatsächlich sichtbaren GenericElement-Zurück im Modal statt des verdeckten Bildschirm-Zurück. Diese nachweislich verwendete Auswahl anschließend in `app/test/_paket6_native_live.py` übernommen; Belegcommit6f5c517.
 
-Eigener Simulator `All-Media Codex` (`5210E675-C198-4328-B3E2-30FCE9E0F624`), iOS26.5, Expo Go durch vorhandenes Werkzeug von57.0.9 auf58.0.7 ersetzt. Erster nativer Teillauf scheiterte an Expo-Einführung und mehrdeutigem Zurück; später45-Minuten-Zeitlimit, geprüfte Bereinigung Rest0. Keine Produktänderung daraus. Nach angeordneter Pause vollständige Wiederholung im unabhängigen Terminal: **11/11 UI-Prüfungen und 11/11 Backendprüfungen**, beide Exit0, Rest0, Prozesse beendet. Testbedienung wählt den modalen GenericElement-Zurück ausdrücklich statt des verdeckten Bildschirm-Zurück; dieselbe Anpassung anschließend in den Python-Prüftreiber übernommen.
+**11/11 UI und 11/11 Backend**, beide Exit0, Rest0, Prozesse beendet. Belegt: getrennte native SecureStore-Geräte je Konto, Browser↔Native beidseitig, Entwurf bleibt bei Verschlüsselungsfehler ohne zusätzliche Zeile, Sicherheitsnummer über alle realen Geräte einschließlich Zusatzgerät, Warnung bei unregistriertem Absender, A/B/A, tatsächlicher Expo-Go-Prozessneustart mit denselben Geräteschlüsseln. Datenbank enthält ausschließlich Chiffren ohne Klartext. Eigene Chat-/Nachrichten-/Kuvert-/Geräte-/Kontaktfixtures beseitigt.
 
-Belegt: zwei echte SecureStore-Geräte, Browser→Native und Native→Browser für beide Testkonten, Entwurferhalt bei Verschlüsselungsfehler ohne zusätzliche Nachrichtenzeile, Sicherheitsnummer über alle realen Geräte und Änderung durch zusätzliches Gerät, Warnung bei unregistriertem Absenderschlüssel, A/B/A und tatsächlicher Expo-Go-Prozessneustart bei identischen Geräteschlüsseln. Ausschließlich Chiffren in der Datenbank, eigener Fixture-Grundstand wiederhergestellt. Bilder Neustart, Sendesperre, Absenderwarnung und Sicherheitsnummer visuell angesehen. Belege `sdk58-native2-terminal.json`, `sdk58-native2-bedienung.log`, `sdk58-native2-bruecke.log`, `native-live-fixtures.json` und `native-live-*.png`.
+Belege: `sdk58-native2-terminal.json`, `sdk58-native2-bedienung.log`, `sdk58-native2-bruecke.log`, `native-live-fixtures.json`, `native-live-*.png`. Neustart, Sendesperre, Absenderwarnung und Sicherheitsnummer visuell geprüft. Dieser Prüfstand ersetzt Rahmenkontexte; er allein belegt keinen Produkt-Login.
 
-Abgrenzung: Original-Chat-/Kontaktbildschirme mit realem Supabase und SecureStore; Rahmenkontexte ersetzt. Echter Produkt-Login/Kontenspeicher und verspätetes Kuvert im offenen Produktchat sind damit noch nicht belegt.
+## Normale Produkt-App ohne ersetzte Kontexte
+
+Metro anschließend aus normalem `app/` gestartet; Zugangskonfiguration im Prozess ausschließlich aus EXPO_PUBLIC-Werten. Kein Harness-Netzfilter und kein Harness-SecureStore-Präfix. Beide vorhandenen Testkonten über echte Produktoberfläche angemeldet. Tastatur des eigenen Simulators für HID-Eingabe von Deutsch/Automatisch auf ABC umgestellt; keine Änderung an Henriks Mac-Tastatur. Geheimnisse nur zur Eingabe im RAM, nicht in Belegen oder Repository.
+
+**11 dokumentierte UI-Beobachtungen und 3/3 Backendprüfungen**:
+
+- Beide Konten lesen die Website-Chiffren im echten Community-Zweierchat und senden jeweils eine im echten Browser lesbare Antwort.
+- Echte Kontoliste: A→B→A ohne erneute Passwortabfrage; Identität in den Einstellungen jeweils über die Testkonto-Mail bestätigt.
+- Nachricht zunächst ohne Kuvert eingefügt: im weiter geöffneten Chat „Auf diesem Gerät nicht lesbar“. Kuverts derselben Nachrichten-ID anschließend ergänzt: derselbe Chat zeigt „Produkt Kuvert nachgeliefert“, ohne Navigation oder Neuladen dazwischen.
+- Expo Go tatsächlich beendet und neu gestartet. Konto A bleibt angemeldet, bestehende Chiffren einschließlich nachgeliefertem Kuvert lesbar. Gespeichertes Konto B danach ohne Passwort nutzbar und dessen alte Chiffren ebenfalls lesbar. Beide nativen Geräteschlüssel-IDs vor/nach Neustart und Kontowechsel identisch.
+- Backend bestätigt beide nativen Antworten im echten Browser und alle fünf Nachrichtenzeilen als Chiffren ohne Klartext. Eigene App beendet, danach Fixturebereinigung Rest0; Server/Metro beendet, eigener Simulator ausgeschaltet.
+
+Belege: `sdk58-produkt-ui.json`, `sdk58-produkt-vor-neustart.json`, `sdk58-produkt-nach-neustart.json`, `sdk58-produkt-nach-kontowechsel.json`, `sdk58-produkt-spaet.json`, `sdk58-produkt-browser.json`, `sdk58-produkt-abschluss.json`, `produkt-live-fixtures.json`, `sdk58-produkt-fixture.log`, `sdk58-produkt-terminal.json`, `produkt-*.png`. Bilder fehlendes/nachgeliefertes Kuvert, Chiffren nach Neustart und gespeichertes Konto B visuell geprüft.
+
+Abschließend unter erneuter eigener Belegung sechs übrig gebliebene Testmitteilungen entfernt, **Rest0**, Belegung wieder freigegeben. Eigene Ports3300/3301/3302 leer, alle vier Belegungen frei. Beleg `sdk58-abschluss-bereinigung.log`. Kein laufender Prüfprozess verbleibt.

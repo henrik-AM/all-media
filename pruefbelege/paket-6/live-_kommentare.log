@@ -1,17 +1,17 @@
   START Startseite mit Datenbereitschaft
-  ENDE Startseite mit Datenbereitschaft (30071 ms)
+  ENDE Startseite mit Datenbereitschaft (30065 ms)
   START Anmeldung einschließlich erstem Reset
-  ENDE Anmeldung einschließlich erstem Reset (3749 ms)
+  ENDE Anmeldung einschließlich erstem Reset (2994 ms)
   START Neuladen nach Anmeldung
-  ENDE Neuladen nach Anmeldung (16879 ms)
+  ENDE Neuladen nach Anmeldung (16861 ms)
   START Anmeldung bereit nach Neuladen
   ENDE Anmeldung bereit nach Neuladen (2 ms)
   START Zweiter Reset mit Neuladen
-  ENDE Zweiter Reset mit Neuladen (21422 ms)
+  ENDE Zweiter Reset mit Neuladen (18680 ms)
   START Neuladen nach zweitem Reset
-  ENDE Neuladen nach zweitem Reset (18366 ms)
+  ENDE Neuladen nach zweitem Reset (17371 ms)
   START Oberfläche bereit
-  ENDE Oberfläche bereit (6 ms)
+  ENDE Oberfläche bereit (3 ms)
 
 5.1 Eingabe, Senden, Profilbild vollständig
   OK   Home: alle drei Teile sind zu sehen

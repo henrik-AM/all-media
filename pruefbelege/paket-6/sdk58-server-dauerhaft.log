@@ -1,0 +1,2 @@
+Paket-6-Prüfserver auf 127.0.0.1:3300, PID 7389
+Teilen in Community 44444444-a11e-4d1a-8000-000000000004 fehlgeschlagen: new row violates row-level security policy "Beitrag nur als Mitglied teilen" for table "community_channel_messages"

@@ -1,0 +1,13 @@
+{
+  "worker": 7950,
+  "pid": 7952,
+  "start": "2026-11-12T20:22:56.840205+00:00",
+  "commit": "bb5963c",
+  "tests": [
+    "_player.js",
+    "_kommentare.js"
+  ],
+  "phase": "beendet",
+  "code": 0,
+  "ende": "2026-11-12T20:26:51.178103+00:00"
+}

@@ -1,0 +1,9 @@
+Starting project at /Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+
+Waiting on http://localhost:3301
+
+Logs for your project will appear below.
+iOS Bundled 409ms index.ts (802 modules)
+iOS Bundled 37ms index.ts (1 module)

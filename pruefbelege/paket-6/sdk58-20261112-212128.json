@@ -1,0 +1,13 @@
+{
+  "worker": 7444,
+  "pid": 7461,
+  "start": "2026-11-12T20:21:28.639073+00:00",
+  "commit": "bb5963c",
+  "tests": [
+    "_player.js",
+    "_kommentare.js"
+  ],
+  "phase": "abgebrochen",
+  "code": 143,
+  "grund": "Startueberschneidung; kein Pruefnachweis"
+}

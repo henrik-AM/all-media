@@ -1,0 +1,287 @@
+{
+  "laufId": "110b90cb-c3e6-4e62-a34e-8a258d3bd157",
+  "erwartet": 97,
+  "phase": "beendet",
+  "bereinigung": "fehlgeschlagen",
+  "stempelVorher": "3c6a4be69863297356f5d4939fc0fcfa56f1d5bba2ee8f79d516a3c1f6fb7365",
+  "ergebnisse": [
+    {
+      "name": "testhygiene",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "smoke",
+      "code": 0,
+      "zahlen": {
+        "gut": 75,
+        "gesamt": 75
+      }
+    },
+    {
+      "name": "feedback",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "teilen",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "sync",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "uebernacht",
+      "code": 0,
+      "zahlen": {
+        "gut": 11,
+        "gesamt": 11
+      }
+    },
+    {
+      "name": "schema",
+      "code": 0,
+      "zahlen": {
+        "gut": 7,
+        "gesamt": 7
+      }
+    },
+    {
+      "name": "sammlungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "sammlungenweb",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "explorer",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "anhang",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "einstellungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "kontaktinfo",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "henrik",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "henrik2",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "insel",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "suche",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "optionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "kasten8",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "kasten12",
+      "code": 0,
+      "zahlen": {
+        "gut": 65,
+        "gesamt": 65
+      }
+    },
+    {
+      "name": "kasten17",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "glocke",
+      "code": 1,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "pfeile",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "profil",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "community",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "chatoptionen",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "player",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "gesten",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "kommentare",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "querformat",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "feinschliff",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "kamera",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "eigenes",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "datenbank",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "aktionen",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "gleichstand",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "handbuch",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "sichtbarkeit",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "likes",
+      "code": 1,
+      "zahlen": null
+    },
+    {
+      "name": "fremdprofil",
+      "code": "abbruch",
+      "zahlen": null
+    }
+  ],
+  "signal": "SIGTERM",
+  "quellenUnveraendert": true,
+  "fehler": "fetch failed",
+  "code": 1
+}

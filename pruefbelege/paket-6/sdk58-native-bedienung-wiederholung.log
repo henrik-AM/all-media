@@ -1,0 +1,36 @@
+OK Native Live-Komponenten mit echtem SecureStore gestartet
+OK Website-Chiffre auf nativem Gerät A tatsächlich gelesen
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (4,208 130x29)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+Getippt: 1. [Button] "Konto B"  (71,175 63x29)
+OK Zweites Konto liest Website-Chiffre mit eigenem SecureStore-Schlüssel
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (4,208 130x29)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+Getippt: 1. [Button] "Live prüfen"  (146,241 84x29)
+OK Native Nachrichten beider Konten in echter Website gelesen
+Getippt: 1. [Button] "Störung"  (138,208 63x29)
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (4,208 130x29)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native Live-Sendefehler erhält den Entwurf
+Getippt: 1. [Button] "Störung"  (138,208 63x29)
+Getippt: 1. [Button] "Prüfstand Kontakt"  (251,175 128x29)
+Getippt: 1. [GenericElement] "Verschlüsselung, Ende-zu-Ende, "  (0,693 402x46)
+OK Native Live-Kontaktinfo zeigt alle bestehenden realen Geräte
+Traceback (most recent call last):
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 62, in <module>
+    tap('Zurück');tap('Zweites Gerät');time.sleep(1);tap('Verschlüsselung');rows=wait(lambda r:label(r,'Sicherheitsnummer des Gegenübers'))
+    ~~~^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 30, in tap
+    print(cmd(args).strip(),flush=True)
+          ~~~^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 15, in cmd
+    if r.returncode:raise RuntimeError(' '.join(a[:3])+': '+r.stdout+r.stderr)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: node tools/tippen.js Zurück: 64:167: execution error: „System Events“ hat einen Fehler erhalten: „process "Simulator"“ kann nicht als „true“ gesetzt werden. (-10006)
+2 Elemente mit "Zurück" - nicht getippt. Mit --nr waehlen:
+   1. [Button] "Zurück"  (16,365 22x23)
+   2. [GenericElement] "Zurück"  (12,402 22x23)
+

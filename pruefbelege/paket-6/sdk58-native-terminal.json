@@ -1,0 +1,9 @@
+{
+  "phase": "laeuft",
+  "pid": 44855,
+  "prozesse": {
+    "server": 44872,
+    "metro": 44985,
+    "bruecke": 44986
+  }
+}

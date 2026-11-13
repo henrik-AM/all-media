@@ -1,0 +1,18 @@
+OK Native Live-Komponenten mit echtem SecureStore gestartet
+OK Website-Chiffre auf nativem Gerät A tatsächlich gelesen
+Traceback (most recent call last):
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 51, in <module>
+    eingeben('Native an Website A');wait(lambda r:label(r,'Native an Website A'));bild('native-live-A.png')
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 45, in eingeben
+    tap('Nachricht');cmd(['axe','type',text,'--udid',UDID]);wait(lambda r:any(x.get('type')=='TextArea' and x.get('AXValue')==text for x in r))
+    ~~~^^^^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 30, in tap
+    print(cmd(args).strip(),flush=True)
+          ~~~^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-6-kuvert/app/test/_paket6_native_live.py", line 15, in cmd
+    if r.returncode:raise RuntimeError(' '.join(a[:3])+': '+r.stdout+r.stderr)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: node tools/tippen.js Nachricht: 64:167: execution error: „System Events“ hat einen Fehler erhalten: „process "Simulator"“ kann nicht als „true“ gesetzt werden. (-10006)
+"Nachricht" ist verdeckt von "1" [CheckBox {"x":163.87229919433594,"y":802.9469604492188,"width":199.4013214111328,"height":26.88555908203125}]. Erst wischen (--runter / --hoch). Nicht getippt.
+

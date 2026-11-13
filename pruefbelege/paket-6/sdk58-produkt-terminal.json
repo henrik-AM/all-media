@@ -1,0 +1,9 @@
+{
+  "phase": "beendet",
+  "pid": 55522,
+  "prozesse": {
+    "server": 55530,
+    "metro": 55640
+  },
+  "prozesse_beendet": true
+}

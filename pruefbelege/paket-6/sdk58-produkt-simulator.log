@@ -1,0 +1,8 @@
+
+  Simulator "All-Media Codex" laeuft bereits.
+  Expo Go 58 ist im Simulator vorhanden.
+  App wird geladen ...
+
+  Fertig - die App ist im Simulator offen.
+  Screenshot bei Bedarf:  xcrun simctl io 5210E675-C198-4328-B3E2-30FCE9E0F624 screenshot bild.png
+
