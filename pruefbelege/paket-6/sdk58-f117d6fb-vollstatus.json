@@ -1,0 +1,788 @@
+{
+  "laufId": "f117d6fb-083e-4273-9a7e-5a137c028e49",
+  "erwartet": 97,
+  "phase": "beendet",
+  "bereinigung": "erfolgreich",
+  "stempelVorher": "3c6a4be69863297356f5d4939fc0fcfa56f1d5bba2ee8f79d516a3c1f6fb7365",
+  "ergebnisse": [
+    {
+      "name": "testhygiene",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "smoke",
+      "code": 0,
+      "zahlen": {
+        "gut": 75,
+        "gesamt": 75
+      }
+    },
+    {
+      "name": "feedback",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "teilen",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "sync",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "uebernacht",
+      "code": 0,
+      "zahlen": {
+        "gut": 11,
+        "gesamt": 11
+      }
+    },
+    {
+      "name": "schema",
+      "code": 0,
+      "zahlen": {
+        "gut": 7,
+        "gesamt": 7
+      }
+    },
+    {
+      "name": "sammlungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "sammlungenweb",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "explorer",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "anhang",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "einstellungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "kontaktinfo",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "henrik",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "henrik2",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "insel",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "suche",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "optionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "kasten8",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "kasten12",
+      "code": 0,
+      "zahlen": {
+        "gut": 65,
+        "gesamt": 65
+      }
+    },
+    {
+      "name": "kasten17",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "glocke",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "pfeile",
+      "code": 0,
+      "zahlen": {
+        "gut": 68,
+        "gesamt": 68
+      }
+    },
+    {
+      "name": "profil",
+      "code": 0,
+      "zahlen": {
+        "gut": 22,
+        "gesamt": 22
+      }
+    },
+    {
+      "name": "community",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "chatoptionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "player",
+      "code": 0,
+      "zahlen": {
+        "gut": 15,
+        "gesamt": 15
+      }
+    },
+    {
+      "name": "gesten",
+      "code": 0,
+      "zahlen": {
+        "gut": 9,
+        "gesamt": 9
+      }
+    },
+    {
+      "name": "kommentare",
+      "code": 0,
+      "zahlen": {
+        "gut": 9,
+        "gesamt": 9
+      }
+    },
+    {
+      "name": "querformat",
+      "code": 0,
+      "zahlen": {
+        "gut": 37,
+        "gesamt": 37
+      }
+    },
+    {
+      "name": "feinschliff",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "kamera",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "eigenes",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "datenbank",
+      "code": 0,
+      "zahlen": {
+        "gut": 29,
+        "gesamt": 29
+      }
+    },
+    {
+      "name": "aktionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 43,
+        "gesamt": 43
+      }
+    },
+    {
+      "name": "gleichstand",
+      "code": 0,
+      "zahlen": {
+        "gut": 50,
+        "gesamt": 50
+      }
+    },
+    {
+      "name": "handbuch",
+      "code": 0,
+      "zahlen": {
+        "gut": 32,
+        "gesamt": 32
+      }
+    },
+    {
+      "name": "sichtbarkeit",
+      "code": 0,
+      "zahlen": {
+        "gut": 36,
+        "gesamt": 36
+      }
+    },
+    {
+      "name": "likes",
+      "code": 0,
+      "zahlen": {
+        "gut": 94,
+        "gesamt": 94
+      }
+    },
+    {
+      "name": "fremdprofil",
+      "code": 0,
+      "zahlen": {
+        "gut": 14,
+        "gesamt": 14
+      }
+    },
+    {
+      "name": "chatanfrage",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "messengeranfrage",
+      "code": 0,
+      "zahlen": {
+        "gut": 37,
+        "gesamt": 37
+      }
+    },
+    {
+      "name": "mitteilungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "dmsperre",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "lesebestaetigung",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "kanal",
+      "code": 0,
+      "zahlen": {
+        "gut": 12,
+        "gesamt": 12
+      }
+    },
+    {
+      "name": "impressionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 18,
+        "gesamt": 18
+      }
+    },
+    {
+      "name": "rang",
+      "code": 0,
+      "zahlen": {
+        "gut": 34,
+        "gesamt": 34
+      }
+    },
+    {
+      "name": "verlauf",
+      "code": 0,
+      "zahlen": {
+        "gut": 45,
+        "gesamt": 45
+      }
+    },
+    {
+      "name": "storyvideos",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "storys",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "krypto",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "krypto-einheit",
+      "code": 0,
+      "zahlen": {
+        "gut": 36,
+        "gesamt": 36
+      }
+    },
+    {
+      "name": "krypto-app",
+      "code": 0,
+      "zahlen": {
+        "gut": 18,
+        "gesamt": 18
+      }
+    },
+    {
+      "name": "krypto-web",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "krypto-server",
+      "code": 0,
+      "zahlen": {
+        "gut": 18,
+        "gesamt": 18
+      }
+    },
+    {
+      "name": "paket6-offline",
+      "code": 0,
+      "zahlen": {
+        "gut": 22,
+        "gesamt": 22
+      }
+    },
+    {
+      "name": "paket6-migration",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-kontenliste",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-webkonten",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-weiterleiten",
+      "code": 0,
+      "zahlen": {
+        "gut": 3,
+        "gesamt": 3
+      }
+    },
+    {
+      "name": "paket6-pruefharness",
+      "code": 0,
+      "zahlen": {
+        "gut": 8,
+        "gesamt": 8
+      }
+    },
+    {
+      "name": "paket6-kuvert",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "paket6-generation",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-oeffnung",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "rechte",
+      "code": 0,
+      "zahlen": {
+        "gut": 289,
+        "gesamt": 289
+      }
+    },
+    {
+      "name": "minderjaehrig",
+      "code": 0,
+      "zahlen": {
+        "gut": 41,
+        "gesamt": 41
+      }
+    },
+    {
+      "name": "elternnummer",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "bremse",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "auth",
+      "code": 0,
+      "zahlen": {
+        "gut": 9,
+        "gesamt": 9
+      }
+    },
+    {
+      "name": "zahlung",
+      "code": 0,
+      "zahlen": {
+        "gut": 94,
+        "gesamt": 94
+      }
+    },
+    {
+      "name": "stumm",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "storyvideoregeln",
+      "code": 0,
+      "zahlen": {
+        "gut": 27,
+        "gesamt": 27
+      }
+    },
+    {
+      "name": "kasten16-19",
+      "code": 0,
+      "zahlen": {
+        "gut": 42,
+        "gesamt": 42
+      }
+    },
+    {
+      "name": "farbfilterrechnung",
+      "code": 0,
+      "zahlen": {
+        "gut": 58,
+        "gesamt": 58
+      }
+    },
+    {
+      "name": "farbfilter",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "bildschirmzeit-einheit",
+      "code": 0,
+      "zahlen": {
+        "gut": 78,
+        "gesamt": 78
+      }
+    },
+    {
+      "name": "recht",
+      "code": 0,
+      "zahlen": {
+        "gut": 78,
+        "gesamt": 78
+      }
+    },
+    {
+      "name": "bildschirmzeit",
+      "code": 0,
+      "zahlen": {
+        "gut": 59,
+        "gesamt": 59
+      }
+    },
+    {
+      "name": "vorschlaege",
+      "code": 0,
+      "zahlen": {
+        "gut": 69,
+        "gesamt": 69
+      }
+    },
+    {
+      "name": "lenkung-einheit",
+      "code": 0,
+      "zahlen": {
+        "gut": 57,
+        "gesamt": 57
+      }
+    },
+    {
+      "name": "lenken",
+      "code": 0,
+      "zahlen": {
+        "gut": 42,
+        "gesamt": 42
+      }
+    },
+    {
+      "name": "markierung-einheit",
+      "code": 0,
+      "zahlen": {
+        "gut": 50,
+        "gesamt": 50
+      }
+    },
+    {
+      "name": "markieren",
+      "code": 0,
+      "zahlen": {
+        "gut": 49,
+        "gesamt": 49
+      }
+    },
+    {
+      "name": "chatsync",
+      "code": 0,
+      "zahlen": {
+        "gut": 39,
+        "gesamt": 39
+      }
+    },
+    {
+      "name": "melden-einheit",
+      "code": 0,
+      "zahlen": {
+        "gut": 105,
+        "gesamt": 105
+      }
+    },
+    {
+      "name": "einwilligung-einheit",
+      "code": 0,
+      "zahlen": {
+        "gut": 27,
+        "gesamt": 27
+      }
+    },
+    {
+      "name": "k28-communitys",
+      "code": 0,
+      "zahlen": {
+        "gut": 66,
+        "gesamt": 66
+      }
+    },
+    {
+      "name": "k28-kopf-offline",
+      "code": 0,
+      "zahlen": {
+        "gut": 20,
+        "gesamt": 20
+      }
+    },
+    {
+      "name": "k28-filter-offline",
+      "code": 0,
+      "zahlen": {
+        "gut": 26,
+        "gesamt": 26
+      }
+    },
+    {
+      "name": "k28-doppeltippen",
+      "code": 0,
+      "zahlen": {
+        "gut": 8,
+        "gesamt": 8
+      }
+    },
+    {
+      "name": "k28-erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 81,
+        "gesamt": 81
+      }
+    },
+    {
+      "name": "k28-mitglieder",
+      "code": 0,
+      "zahlen": {
+        "gut": 147,
+        "gesamt": 147
+      }
+    },
+    {
+      "name": "k28-commbild",
+      "code": 0,
+      "zahlen": {
+        "gut": 36,
+        "gesamt": 36
+      }
+    },
+    {
+      "name": "k28-gruppe",
+      "code": 0,
+      "zahlen": {
+        "gut": 44,
+        "gesamt": 44
+      }
+    },
+    {
+      "name": "k28-karte",
+      "code": 0,
+      "zahlen": {
+        "gut": 50,
+        "gesamt": 50
+      }
+    }
+  ],
+  "signal": null,
+  "quellenUnveraendert": true,
+  "code": 0
+}
