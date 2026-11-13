@@ -1,42 +1,101 @@
 {
-  "lauf": "104f3820-6d55-43d9-8ede-755c687b550e",
-  "pid": 93683,
-  "chatId": "f7700c81-90cc-4384-8aca-6db2fdb30429",
+  "supabaseUrl": "https://ijztosbjfybdgotpdixw.supabase.co",
+  "kontakteVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": []
+  },
+  "schluesselVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [
+      "871e028c-5274-4d0b-b153-38a973cb26d5",
+      "37fa221e-0c25-4109-907b-707cf42111ed",
+      "6b1cd4bf-f183-4971-8af2-a348a855174a",
+      "88343632-13f3-4343-854d-7496cb07fff8",
+      "19e1dfcc-4f45-449c-a65d-71a426ea6d19",
+      "d2aa4f9a-0dd5-4ae0-a752-8d968e17b502",
+      "0faf8b51-5e65-4008-a45b-fa10a95a1062",
+      "c6f94e85-2db2-48bf-8a9a-5bfdd0d1aef4",
+      "30ee81f9-5029-49fb-9907-dfe2d4bda6ae",
+      "70c6bbd4-03a3-4028-8322-38e484c96613",
+      "b8656946-7cfa-42e7-af97-d41535086a18",
+      "91141467-0dd8-4799-9e34-161af7591e1e",
+      "096464aa-bc1b-479f-a23a-49aad5595c8b",
+      "c9992d57-faab-4986-8123-dfd36e94862b"
+    ],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": [
+      "329b9daf-2202-4e4d-bcac-3f729e689b48",
+      "98236e19-de8f-4acc-b78c-b737f4b9b65a",
+      "67a25129-9ee9-4e97-a812-7787638b5d62",
+      "de76a7cb-25ac-4ce5-b393-c79e04fb1943",
+      "9eaecd8f-63ad-475d-9848-eff6cc8e7368",
+      "c83ac3ce-1c9d-46df-88cf-220922b28c18",
+      "d2cc6216-297e-4440-bff4-d7463c6f718b",
+      "37a765ea-9320-46b3-9f8a-231d1c033086",
+      "0939b1f3-1be8-479c-84c6-c8491346b10d",
+      "bb8f1b54-7b93-453c-996c-588027fc861b",
+      "347ce407-1320-4812-9db1-c190c9f90365",
+      "def2109c-efb0-41f2-af9e-24d80ce1748d",
+      "b295841a-bfea-494b-91f6-553dcd5a36eb",
+      "e1fe074e-3d3e-40f4-a9b3-0897e69dfe6f",
+      "9805b8ee-9d49-46a6-931c-57a754b09a0f",
+      "1edcfb9a-0f8a-49d6-93bb-b62a189a1d13",
+      "9c708dca-c696-4c1b-8c93-b9fd2bb9016d",
+      "48748f2d-e044-448f-87e2-216c42aa3731",
+      "46af309a-ff19-4c32-b824-313fc1d35588",
+      "875411ad-a9ec-42ed-8d54-8b5ccc61d7d2",
+      "c4be197e-6efd-44d6-aa9b-61dd3ecb6f1e",
+      "90cf76bd-d6b8-4353-8c92-e8ac8fbdd7c2",
+      "9d772b5d-c227-44a6-b28a-a35003a1cf0d",
+      "279b7fbc-d16d-4775-b3a0-8e2a22a50703",
+      "7dcb5795-7654-4d62-8430-b4ed77a963d6",
+      "25c5ad42-fc30-4fc3-b86e-ba3f90f77530",
+      "d72ce74e-8607-4040-9b06-694481ad9d53"
+    ]
+  },
+  "nachrichten": [
+    "b1862192-f576-4f3d-bc3d-53aa1001e78d",
+    "39d7cfb4-7117-4d12-bc05-c4dc5d224801",
+    "de049e82-fab7-4c9b-a830-d1bafad58c62",
+    "4d9010e3-391a-4f2f-b5c8-46e40ef57bec",
+    "83e9b7ca-6b78-4127-9e95-2e30ca0ba1ab"
+  ],
+  "lauf": "310e5d84-cda4-499b-8210-3dedf9a8154f",
+  "pid": 53588,
+  "chatId": "bcefb044-cf32-4ba6-acf4-1a3498077a70",
   "schluessel": [
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "5c316b90-e85f-4481-87ec-b00ee23121bc"
+      "id": "d45dca59-314a-4341-8188-7b983ecfb4e9"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "2714f074-ce06-490c-b1cd-d1fc6e02d790"
+      "id": "ef466cbc-b751-450c-b02e-4aaa209797c5"
     },
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "278ae9f9-47eb-4a58-b80d-39ab31a0897c"
+      "id": "7c537b1c-8ceb-49d2-8042-ffa2f30594e4"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "db3fd3c6-7b95-4a6e-a740-99d7b489e0f6"
+      "id": "cff37301-4c63-431d-812c-c86ba9f361c1"
     },
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "70c70041-e7f5-4d98-bfc8-3bd1511948f6"
+      "id": "04fd7626-f94f-4d59-9e10-3eb53433db18"
     },
     {
       "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
-      "id": "936ff432-f088-40ed-915e-41ec6e1709fd"
+      "id": "ba770f94-2ecf-4861-b8d4-673ab2ff113d"
     },
     {
       "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
-      "id": "86f5221c-b548-4022-bb5f-0e3d7a96033b"
+      "id": "78182824-8d8e-4977-859c-5ac4b617af88"
     }
   ],
-  "start": "2026-11-10T18:55:43.595Z",
+  "start": "2026-11-13T21:29:23.577Z",
   "pruefungen": {
-    "ok": 8,
+    "ok": 11,
     "fehl": 0
   },
-  "ende": "2026-11-10T18:59:57.111Z",
+  "ende": "2026-11-13T21:31:05.879Z",
   "rest": 0
 }

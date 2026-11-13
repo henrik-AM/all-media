@@ -27,6 +27,10 @@ def tap(text):
  if text=='Nachricht':
   liste=cmd(['node','tools/tippen.js','--liste',text]);felder=re.findall(r'^\s*(\d+)\. \[TextArea\]',liste,re.M)
   assert len(felder)==1,'Eingabefeld nicht eindeutig: '+liste;args+=['--nr',felder[0]]
+ if text=='Zurück':
+  liste=cmd(['node','tools/tippen.js','--liste',text]);treffer=re.findall(r'^\s*(\d+)\. \[GenericElement\]',liste,re.M)
+  assert len(treffer)==1,'Modaler Zurück nicht eindeutig: '+liste
+  args+=['--nr',treffer[0]]
  print(cmd(args).strip(),flush=True)
 
 def wait(pred):

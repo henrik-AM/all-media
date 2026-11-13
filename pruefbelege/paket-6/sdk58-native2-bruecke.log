@@ -1,0 +1,14 @@
+2026-11-13T21:29:23.578Z LIVE: exklusiver Bestand bestätigt; keine Registrierung, kein Reset, kein Schema
+2026-11-13T21:29:28.816Z Native Live-Fixtures bereit; Bridge 3302, nur eigenes Gerät starten
+2026-11-13T21:29:47.729Z OK Zwei native SecureStore-Geräte registriert
+2026-11-13T21:29:47.729Z OK Native Geräte je Konto verschieden
+2026-11-13T21:30:36.935Z OK Native Sicherheitsnummer gegen alle Live-Geräte
+2026-11-13T21:30:42.542Z OK Native Sicherheitsnummer gegen alle Live-Geräte
+2026-11-13T21:30:55.317Z OK Native Schlüsselidentität nach Prozessneustart test@all-media.app
+2026-11-13T21:30:55.644Z OK Native Schlüsselidentität nach Prozessneustart all.media.prueflauf@web.de
+2026-11-13T21:31:03.837Z OK Nativer Prozessneustart tatsächlich durchlaufen
+2026-11-13T21:31:03.839Z OK Beide nativen Nachrichten in echter Website lesbar
+2026-11-13T21:31:03.839Z OK Alle Live-Zeilen ohne Klartext
+2026-11-13T21:31:03.839Z OK Zusätzliches echtes Gerät ändert native Sicherheitsnummer
+2026-11-13T21:31:05.879Z OK Geprüfte Bereinigung: keine eigenen Chat-/Nachrichten-/Geräte-/Kontaktreste
+2026-11-13T21:31:05.879Z 11/11 Live-Prüfungen; Rest 0. Native Komponenten mit echtem SecureStore, echter Supabase und echter Website; Rahmenkontexte ersetzt.

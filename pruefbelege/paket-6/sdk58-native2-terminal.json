@@ -1,0 +1,12 @@
+{
+  "phase": "beendet",
+  "pid": 53470,
+  "prozesse": {
+    "server": 53478,
+    "metro": 53587,
+    "bruecke": 53588
+  },
+  "bedienung_code": 0,
+  "code": 0,
+  "prozesse_beendet": true
+}
