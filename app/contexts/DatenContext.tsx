@@ -206,11 +206,14 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     let aus = false;
     let laeuft = false;
     let nochmal = false;
+    let kuvertVersion = 0;
+    let kuvertBestaetigt = 0;
     let klingelDa = false;
     let letzteAbfrage = 0;
     listenStand.current = null;
 
-    const nachsehen = async (geklingelt = false) => {
+    const nachsehen = async (geklingelt = false, kuvert = false) => {
+      if (kuvert) kuvertVersion++;
       if (aus || AppState.currentState !== 'active') return;
       if (laeuft) {
         if (geklingelt) nochmal = true;
@@ -218,16 +221,18 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
       }
       if (!geklingelt && !ChatAbgleich.faellig('liste', klingelDa, letzteAbfrage, Date.now())) return;
       laeuft = true;
+      const kuvertVorher = kuvertVersion;
       letzteAbfrage = Date.now();
       try {
         const stand = await ladeChatlistenStand(supabase, ichId);
         if (aus || stand === null) return;
         const vorher = listenStand.current;
-        if (vorher !== stand) {
+        if (kuvertVorher !== kuvertBestaetigt || vorher !== stand) {
           const listen = await ladeChatlisten(supabase, ichId);
           if (aus) return;
           setDaten((d) => (d.ichId === ichId ? { ...d, ...listen } : d));
           listenStand.current = stand; // Erst erfolgreichen Listenabruf bestätigen.
+          kuvertBestaetigt = kuvertVorher;
         }
       } catch (e: any) {
         console.warn('Chatliste nachsehen fehlgeschlagen:', e?.message ?? e);
@@ -248,7 +253,7 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     const klingelAus = ChatAbgleich.klingelHoeren(
       supabase,
       ChatAbgleich.klingelThema('nutzer', ichId),
-      () => nachsehen(true),
+      (art) => nachsehen(true, art === 'kuvert'),
       (verbunden) => {
         klingelDa = verbunden;
       }

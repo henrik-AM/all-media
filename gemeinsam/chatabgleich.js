@@ -164,12 +164,16 @@
     }
     var aus = false;
     var uhr = null;
-    var klingeln = function () {
+    var kuvert = false;
+    var klingeln = function (ereignis) {
+      if (ereignis && ereignis.payload && ereignis.payload.art === 'kuvert') kuvert = true;
       if (aus) return;
       if (uhr !== null) return;
       uhr = setTimeout(function () {
         uhr = null;
-        if (!aus) beiKlingel();
+        var art = kuvert ? 'kuvert' : undefined;
+        kuvert = false;
+        if (!aus) beiKlingel(art);
       }, KLINGEL_BUENDELN_MS);
     };
     var kanal;

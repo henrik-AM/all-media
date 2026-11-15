@@ -125,6 +125,17 @@ ${eigner(`
   delete from public.messages where id = (select id from public.messages where chat_id = '${CHAT}' order by created_at desc limit 1);
   ${klingeln(`chat:${CHAT}`)} ${merke('geloescht_chat', 'n')}
 
+  -- Nachgeliefertes Kuvert: Chat und ausschließlich dessen Empfänger.
+  insert into public.krypto_schluessel(id,user_id,geraet,art,oeffentlich)
+    values ('a1000000-0000-4000-8000-000000000102','${PRUEFKONTO}','probe100-kuvert','app',encode(decode(repeat('ab',32),'hex'),'base64'));
+  ${marke}
+  insert into public.message_keys(message_id,schluessel_id,nonce,chiffre)
+    select id,'a1000000-0000-4000-8000-000000000102','probe-nonce','probe-chiffre'
+    from public.messages where chat_id='${CHAT}' limit 1;
+  ${klingeln(`chat:${CHAT}`)} ${merke('kuvert_chat', 'n')}
+  ${klingeln(`nutzer:${PRUEFKONTO}`)} ${merke('kuvert_eigen', 'n')}
+  ${klingeln(`nutzer:${TESTKONTO}`)} ${merke('kuvert_fremd', 'n')}
+
   -- 4 Mitgliedszeile (gelesen) → eigene Liste
   ${marke}
   update public.chat_members set is_read = true where chat_id = '${CHAT}' and user_id = '${PRUEFKONTO}';
@@ -132,7 +143,7 @@ ${eigner(`
   ${klingeln(`nutzer:${TESTKONTO}`)} ${merke('mitglied_fremd', 'n')}
 
   -- Die Klingel trägt keinen Inhalt: nur die Art, nie Text
-  select count(*) into n from public.probe100_mitschrift where art not in ('insert', 'update', 'delete', 'reaktion', 'liste');
+  select count(*) into n from public.probe100_mitschrift where art not in ('insert', 'update', 'delete', 'reaktion', 'liste', 'kuvert');
   ${merke('ohne_inhalt', 'n')}
 `)}
 
@@ -190,6 +201,9 @@ do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p
   pruefe('Bearbeiten klingelt', e.bearbeitet_chat === '1', e.bearbeitet_chat);
   pruefe('Löschen klingelt', e.geloescht_chat === '1', e.geloescht_chat);
 
+  pruefe('Nachgeliefertes Kuvert klingelt im Chat', e.kuvert_chat === '1', e.kuvert_chat);
+  pruefe('Kuvert klingelt in der Empfängerliste', e.kuvert_eigen === '1', e.kuvert_eigen);
+  pruefe('Kuvert klingelt nicht in fremder Liste', e.kuvert_fremd === '0', e.kuvert_fremd);
   console.log('\n4. Mitgliedszeile');
   pruefe('eigene Zeile klingelt in der eigenen Liste', e.mitglied_liste === '1', e.mitglied_liste);
   pruefe('nicht in der Liste des anderen', e.mitglied_fremd === '0', e.mitglied_fremd);

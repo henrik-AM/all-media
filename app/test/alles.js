@@ -270,6 +270,8 @@ const LAEUFE = [
   ['k28-gruppe', 'k28-gruppe.js'],
   ['k28-karte', 'k28-karte.js'],
   ['chatklingel-einheit', '_chatklingel_einheit.js'],
+  ['paket7-offline', '_paket7_regression.cjs'],
+  ['chatklingel-live', '_chatklingel_live.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */

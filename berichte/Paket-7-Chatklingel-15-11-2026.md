@@ -54,3 +54,22 @@ nachweislich SUBSCRIBED. Offline-Gegenproben inzwischen **8/8**;
 Website-Rundreise, Egress-Ruhemessung und native Komponentenabnahme laufen.
 Die bisherige Website-Gesamtzeit inklusive Krypto-Vorbereitung liegt bei
 2,6–2,9 s für Chiffren, 1,6 s für Gruppen; Empfangszeit getrennt messen.
+
+## Kuvert-Klingel und Drosselung
+
+Schema 100 ergänzt nach neuer Probe **25/25** einen INSERT-Auslöser auf
+message_keys. Live gegengelesen: **13 Auslöser**, Realtime-Veröffentlichung 0,
+authenticated darf chat_klingel_kuvert nicht aufrufen. Kuvert-Signale gehen
+an Chat und betroffene Empfängerlisten, ohne Schlüssel-/Nachrichteninhalt.
+Fehlende Kuverts behalten den bisherigen 4-s-Rückweg; Listen laden beim
+Kuvertsignal trotz identischer Message-ID neu. Hintergrundsignale bleiben
+als unbestätigte Version bis zum erfolgreichen Abruf erhalten.
+
+Zusätzliche Regressionen **9/9**, kombiniert mit Paket-6-Gegenproben zuvor
+25/25 (vor der neunten Zusatzprobe); Unterthema mit Entwurf/Fokus/Auswahl
+**4/4**, Screenshot vorhanden. AST-Graph aktualisiert (keine LLM-Abfrage).
+Echte Website-Phase **10/10**: beide Richtungen, Chiffre/Gruppe, Liste,
+65-s-Ruhemessung je Konto **2 Chatstand + 1 Listenstand** statt etwa16+6.
+Empfang nun per DOM-Mutationszeit ab DB-Speicherung gemessen; Gesamtzeit
+inklusive Vorbereitung ist separat und kein Ersatz für Klingellatenz.
+Native Abschlussrunde mit absichtlich späterem Kuvert steht noch aus.

@@ -640,8 +640,9 @@ Aktuelle Paket-6-Fortsetzung und verbleibende Abnahme:
 [Aufräumfortsetzung 11.11.2026](berichte/Paket-6-Aufraeumen-11-11-2026.md).
 ## Nachtrag 21.10.2026: Schema 100 (Allgemeines Feedback 21.10., Kasten AF 1)
 
-**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 99; hängt nur an Funktionen, die
-es schon gibt (`is_chat_member`, `kanal_sichtbar` — Signatur in 99 unverändert, `konto_freigegeben`).
+**Seit 15.11.2026 live (Paket 7).** Nach 99; hängt an `is_chat_member`,
+`kanal_sichtbar` (Signatur in 99 unverändert), `konto_freigegeben` und `realtime.send`.
+Die historischen offenen Reihenfolgen weiter oben sind keine aktuelle Einspielanweisung.
 
 - `SUPABASE_SCHEMA_100_chat_klingel.sql` — Chat-Klingel über Realtime-Broadcast auf privaten
   Kanälen `chat:<id>`, `kanal:<id>`, `nutzer:<id>`, ohne Inhalt. Funktion `chat_klingeln` (nie
@@ -652,7 +653,11 @@ es schon gibt (`is_chat_member`, `kanal_sichtbar` — Signatur in 99 unveränder
 
 Code vor dem Schema: App und Website hören die Klingel (`gemeinsam/chatabgleich.js`,
 `klingelHoeren`); ohne Schema 100 kommt nie eine an, die Abfrage im 4-s-/10-s-Takt läuft wie bisher.
-Probe: `app/test/_probe100.js` (22/22, verworfen). Erst nach dem Einspielen und mit laufendem
-Realtime-Dienst prüfbar, ob die Klingel ankommt (Zwei-Konten-Probe, siehe Kastendatei).
+Probe: `app/test/_probe100.js` **25/25 verworfen** (15.11.), einschließlich
+nachgelieferter Kuverts. `chat_klingel_kuvert` auf `message_keys` INSERT klingelt
+je Chat/Befehl und je Kuvertempfänger ohne Schlüsselinhalt; Auslöserfunktion
+für PUBLIC/anon/authenticated gesperrt. Insgesamt 13 Auslöser auf fünf Tabellen.
+Live-Broadcasts vor Kuvertnachtrag **39/39**. Fünf Realtime-Tagespartitionen vorhanden;
+Veröffentlichung weiter leer. Paket-7-Abnahme: `berichte/Paket-7-Chatklingel-15-11-2026.md`.
 
 **Gesamtreihenfolge der offenen Entwürfe:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 97 → 98 → 99 → 100.

@@ -29,7 +29,7 @@ export function klingelThema(art: 'chat' | 'kanal' | 'nutzer', kennung: string):
 export function klingelHoeren(
   client: any,
   thema: string,
-  beiKlingel: () => void,
+  beiKlingel: (art?: string) => void,
   beiZustand?: (verbunden: boolean) => void
 ): () => void;
 export function listenStand(

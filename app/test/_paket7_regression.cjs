@@ -19,10 +19,10 @@ for(const app of [false,true])test((app?'App':'Server')+': fehlgeschlagene Reakt
  if(app)assert.equal(await ctx.laden(client,'chat'),null);else await assert.rejects(ctx.laden(client,'chat'),/Ausfall/);
 });
 function liste(fetch){const ctx={console,fetch,Date,document:{hidden:false,activeElement:null},window:{Anmeldung:{angemeldet:()=>true,nutzer:()=>({id:'a'})},ChatAbgleich:C},state:{openChatId:'chat'},vorschauenOeffnen(){},main:{contains:()=>false},render(){}};
- vm.runInNewContext(`let listenKlingelDa=false,listenLetzteAbfrage=0,listenLaeuft=false,listenNochmal=false,listenSofort=false,listenGeneration=0,listenStand=null,chatListeAenderungen=0;`+fn('web/public/app.js','listeNachsehen')+';globalThis.run=listeNachsehen;',ctx);return ctx;}
+ vm.runInNewContext(`let listenKlingelDa=false,listenLetzteAbfrage=0,listenLaeuft=false,listenNochmal=false,listenSofort=false,listenGeneration=0,listenKuvertVersion=0,listenKuvertBestaetigt=0,listenStand=null,chatListeAenderungen=0;`+fn('web/public/app.js','listeNachsehen')+';globalThis.run=listeNachsehen;globalThis.kuvert=()=>{listenKuvertVersion++;return listeNachsehen(false,true);};',ctx);return ctx;}
 test('Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe',async()=>{
  let n=0;const c=liste(async url=>({ok:true,json:async()=>url==='/api/chatstand'?{stand:'s'}:++n===1?{ok:false}:{ok:true,chats:[{id:'c',preview:'neu'}],communityChats:[]}}));
- await c.run(false,true);assert.equal(n,1);await c.run(false,true);assert.equal(n,2);assert.equal(c.state.chats[0].preview,'neu');await c.run(false,true);assert.equal(n,2);
+ await c.run(false,true);assert.equal(n,1);await c.run(false,true);assert.equal(n,2);assert.equal(c.state.chats[0].preview,'neu');await c.run(false,true);assert.equal(n,2);c.document.hidden=true;await c.kuvert();assert.equal(n,2);c.document.hidden=false;await c.run(false,true);assert.equal(n,3,'Kuvert aus Hintergrund lädt trotz identischem Stand nach');
 });
 test('Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach',async()=>{
  let resolve,n=0;const c=liste(async url=>{if(url==='/api/chatstand'){n++;if(n===1)await new Promise(r=>resolve=r);return {ok:true,json:async()=>({stand:'s'+n})};}return {ok:true,json:async()=>({ok:true,chats:[{id:'c',preview:'Stand '+n}],communityChats:[]})};});
@@ -31,11 +31,17 @@ test('Website-Chatliste bündelt Klingel während laufendem Abruf und holt danac
 test('Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich',async()=>{
  const file='app/contexts/DatenContext.tsx',s=fs.readFileSync(path.join(W,file),'utf8'),ast=ts.createSourceFile(file,s,ts.ScriptTarget.Latest,true);let effect;
  function visit(n){if(ts.isCallExpression(n)&&n.expression.getText(ast)==='useEffect'&&n.arguments[0]?.getText(ast).includes('listenStand.current = null'))effect=n.arguments[0].getText(ast);ts.forEachChild(n,visit);}visit(ast);assert.ok(effect);
- let poll,n=0,now=1,data={ichId:'a'};const ctx={console:{warn(){}},supabase:{},ichId:'a',listenStand:{current:null},ChatAbgleich:C,Date:{now:()=>now},AppState:{currentState:'active',addEventListener:()=>({remove(){}})},setInterval:f=>(poll=f,1),clearInterval(){},chatsNeuLaden(){},ladeChatlistenStand:async()=>'s',ladeChatlisten:async()=>{if(++n===1)throw Error('Ausfall');return {chats:[{id:'neu'}]};},setDaten:f=>data=f(data)};
- vm.runInNewContext(ts.transpileModule('const effect='+effect+';globalThis.stop=effect();',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,ctx);await tick();assert.equal(ctx.listenStand.current,null);now+=10000;await poll();assert.equal(ctx.listenStand.current,'s');assert.equal(data.chats[0].id,'neu');ctx.stop();
+ let poll,klingel,aktiv,n=0,now=1,data={ichId:'a'};const ctx={console:{warn(){}},supabase:{},ichId:'a',listenStand:{current:null},ChatAbgleich:{...C,klingelHoeren:(_c,_t,f)=>(klingel=f,()=>{})},Date:{now:()=>now},AppState:{currentState:'active',addEventListener:(_e,f)=>(aktiv=f,{remove(){}})},setInterval:f=>(poll=f,1),clearInterval(){},chatsNeuLaden(){},ladeChatlistenStand:async()=>'s',ladeChatlisten:async()=>{if(++n===1)throw Error('Ausfall');return {chats:[{id:'neu'}]};},setDaten:f=>data=f(data)};
+ vm.runInNewContext(ts.transpileModule('const effect='+effect+';globalThis.stop=effect();',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,ctx);await tick();assert.equal(ctx.listenStand.current,null);now+=10000;await poll();assert.equal(ctx.listenStand.current,'s');assert.equal(data.chats[0].id,'neu');ctx.AppState.currentState='background';klingel('kuvert');await tick();assert.equal(n,2);ctx.AppState.currentState='active';aktiv('active');await tick();assert.equal(n,3,'Kuvert aus Hintergrund lädt trotz identischem Stand nach');ctx.stop();
 });
 test('Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join',async()=>{
  let resolve,sub=0,token,weg=0;const k={on(){return k;},subscribe(){assert.equal(token,'nur-test-token');sub++;}},client={auth:{getSession:()=>new Promise(r=>resolve=r)},realtime:{setAuth:async t=>token=t},channel:()=>k,removeChannel:async()=>weg++};
  const aus=C.klingelHoeren(client,'chat:x',()=>{});await tick();assert.equal(sub,0);resolve({data:{session:{access_token:'nur-test-token'}},error:null});await tick();assert.equal(sub,1);aus();
  const aus2=C.klingelHoeren(client,'chat:y',()=>{});await tick();aus2();resolve({data:{session:{access_token:'anderes-test-token'}},error:null});await tick();assert.equal(sub,1);assert.equal(weg,2);
+});
+
+test('Kuvert-Signal überlebt die Bündelung mit gewöhnlichen Klingeln',async()=>{
+ let callback,art;const k={on(_a,_b,f){callback=f;return k;},subscribe(){}};
+ const aus=C.klingelHoeren({channel:()=>k,removeChannel:async()=>{}},'nutzer:a',a=>art=a);
+ callback({payload:{art:'kuvert'}});callback({payload:{art:'liste'}});await warte(300);assert.equal(art,'kuvert');aus();
 });

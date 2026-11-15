@@ -99,8 +99,12 @@
     sitzung = data?.session || null;
 
     client.auth.onAuthStateChange((ereignis, neue) => {
+      // Private Abos gehören zum Konto, auch beim Wechsel ohne Seitenneuladen.
+      if (sitzung?.user?.id !== neue?.user?.id) {
+        Promise.resolve(client.removeAllChannels()).catch(() => {});
+      }
       sitzung = neue;
-      if (neue?.access_token) client.realtime.setAuth(neue.access_token);
+      if (neue?.access_token) Promise.resolve(client.realtime.setAuth(neue.access_token)).catch(() => {});
       // Jede neue Sitzung sofort ins Kontenfach — das Erneuerungstoken wird
       // bei jedem Auffrischen ausgetauscht, das alte ist dann verbraucht.
       if (neue && (ereignis === 'SIGNED_IN' || ereignis === 'TOKEN_REFRESHED' || ereignis === 'USER_UPDATED' || ereignis === 'INITIAL_SESSION')) {

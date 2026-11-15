@@ -323,3 +323,32 @@ create policy "Chat-Klingel hoeren" on realtime.messages
   );
 
 -- Bewusst KEINE insert-Regel: Nutzer können nicht selbst klingeln.
+
+-- Paket 7, 15.11.2026: Kuverts werden nach der Nachricht geschrieben.
+-- Ohne eigene Klingel kann die erste Nachricht bereits als unlesbar geladen
+-- sein; mit gedrosseltem Takt würde sie dann bis zu 30 s unlesbar bleiben.
+-- Nur ein Signal je Chat/Befehl und je betroffenem Nutzer, niemals Schlüssel.
+create or replace function public.chat_klingel_kuvert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare ziel uuid;
+begin
+  for ziel in select distinct m.chat_id from neu z
+    join public.messages m on m.id = z.message_id
+  loop
+    perform public.chat_klingeln('chat:' || ziel, 'kuvert');
+  end loop;
+  for ziel in select distinct k.user_id from neu z
+    join public.krypto_schluessel k on k.id = z.schluessel_id
+  loop
+    perform public.chat_klingeln('nutzer:' || ziel, 'kuvert');
+  end loop;
+  return null;
+end $$;
+revoke execute on function public.chat_klingel_kuvert() from public, anon, authenticated;
+drop trigger if exists chat_klingel_kuvert on public.message_keys;
+create trigger chat_klingel_kuvert after insert on public.message_keys
+  referencing new table as neu for each statement execute function public.chat_klingel_kuvert();

@@ -7280,11 +7280,17 @@ let kanalNachsehenJetzt = null;
 let kanalAntwort = null; // { kanalId, nachricht }
 
 async function renderCommunityChat(community, kanal, thema, entwurfBehalten = false) {
+  const vorherLauf = renderLauf;
   const lauf = ++renderLauf;
   const daten = await fetch(`/api/communities/${community.id}/channels/${kanal.id}`)
-    .then((r) => r.json())
-    .catch(() => ({ messages: [] }));
-  if (lauf !== renderLauf) return;
+    .then((r) => { if (!r.ok) throw Error('Unterthema nicht erreichbar'); return r.json(); })
+    .catch(() => null);
+  if (lauf !== renderLauf) return false;
+  if (!daten) {
+    // Beim Nachsehen bestehende Seite und deren Abgleich aktiv lassen.
+    if (entwurfBehalten) renderLauf = vorherLauf;
+    return false;
+  }
 
   const nachrichten = daten.messages || [];
   const altesFeld = entwurfBehalten ? $('#commMsgInput') : null;
@@ -7364,11 +7370,13 @@ async function renderCommunityChat(community, kanal, thema, entwurfBehalten = fa
   if (/^[0-9a-f-]{36}$/i.test(String(kanal.id))) {
     let kanalStand = null;
     let laeuft = false;
+    let nochmal = false;
     let letzteAbfrage = 0;
     const zeichenLauf = lauf;
     const weg = () => renderLauf !== zeichenLauf || !$('#commMsgs');
     const kanalNachsehen = async (geklingelt = false) => {
-      if (weg() || document.hidden || laeuft) return;
+      if (weg() || document.hidden) return;
+      if (laeuft) { nochmal ||= geklingelt; return; }
       if (!geklingelt && window.ChatAbgleich &&
           !window.ChatAbgleich.faellig('chat', kanalKlingel.da, letzteAbfrage, Date.now())) return;
       laeuft = true;
@@ -7381,14 +7389,14 @@ async function renderCommunityChat(community, kanal, thema, entwurfBehalten = fa
         if (renderLauf !== zeichenLauf || !$('#commMsgs')) return;
         if (stand === null || stand === undefined) return;
         const vorher = kanalStand;
-        kanalStand = stand;
         if (vorher !== null && vorher !== stand) {
-          await renderCommunityChat(community, kanal, thema, true);
-        }
+          if (await renderCommunityChat(community, kanal, thema, true)) kanalStand = stand;
+        } else kanalStand = stand;
       } catch {
         /* Der naechste Takt fragt wieder. */
       } finally {
         laeuft = false;
+        if (nochmal && !weg()) { nochmal = false; kanalNachsehen(true); }
       }
     };
     kanalNachsehenJetzt = kanalNachsehen;
@@ -7612,6 +7620,7 @@ async function renderCommunityChat(community, kanal, thema, entwurfBehalten = fa
       if (entwurf.fokus) { feld.focus(); feld.setSelectionRange(entwurf.von, entwurf.bis); }
     }
   }
+  return true;
 }
 
 /* ==========================================================================
@@ -21849,7 +21858,7 @@ function chatNachsehenStarten(chat) {
       return;
     }
     if (!geklingelt && window.ChatAbgleich &&
-        !window.ChatAbgleich.faellig('chat', klingelDa, letzteAbfrage, Date.now())) return;
+        !window.ChatAbgleich.faellig('chat', klingelDa && !window.ChatAbgleich.offeneKuvertIds(state.messages).length, letzteAbfrage, Date.now())) return;
     laeuft = true;
     letzteAbfrage = Date.now();
     try {
@@ -21944,6 +21953,8 @@ let listenLaeuft = false;
 let listenNochmal = false;
 let listenSofort = false;
 let listenGeneration = 0;
+let listenKuvertVersion = 0;
+let listenKuvertBestaetigt = 0;
 
 /**
  * sofort:     Listen auf jeden Fall neu holen (nach eigener Handlung).
@@ -21962,6 +21973,7 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
   const konto = window.Anmeldung?.nutzer?.()?.id;
   const aktuell = () => generation === listenGeneration && konto === window.Anmeldung?.nutzer?.()?.id;
   listenLaeuft = true;
+  const kuvertVorher = listenKuvertVersion;
   listenLetzteAbfrage = Date.now();
   try {
     const r = await fetch('/api/chatstand');
@@ -21970,7 +21982,7 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
     if (stand === null || stand === undefined) return;
     const vorher = listenStand;
     if (!aktuell()) return;
-    if (!sofort && vorher === stand) return;
+    if (!sofort && vorher === stand && kuvertVorher === listenKuvertBestaetigt) return;
 
     const aenderungenVorher = chatListeAenderungen;
     const d = await (await fetch('/api/chats')).json();
@@ -21980,6 +21992,7 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
       return;
     }
     listenStand = stand;
+    listenKuvertBestaetigt = kuvertVorher;
     state.chats = d.chats || [];
     state.communityChats = d.communityChats || [];
     vorschauenOeffnen(state.chats);
@@ -22007,6 +22020,7 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
 
 function listeNachsehenStarten() {
   listenGeneration++;
+  listenKuvertVersion = listenKuvertBestaetigt = 0;
   listenLetzteAbfrage = 0;
   clearInterval(listenUhr);
   listenStand = null;
@@ -22019,7 +22033,7 @@ function listeNachsehenStarten() {
     listenKlingelAus = window.ChatAbgleich.klingelHoeren(
       klingelClient(),
       window.ChatAbgleich.klingelThema('nutzer', ich),
-      () => listeNachsehen(false, true),
+      (art) => { if (art === 'kuvert') listenKuvertVersion++; listeNachsehen(false, true); },
       (verbunden) => {
         listenKlingelDa = verbunden;
       }

@@ -160,7 +160,9 @@
     "test:k28-doppeltippen": "node test/k28-doppeltippen.js",
     "test:paket6-offline": "node --test test/_paket6_offline.js",
     "test:paket6-browser-offline": "node test/_paket6_browser_offline.cjs",
-    "test:paket6-vorbereitung": "node test/_paket6_pruefen.cjs"
+    "test:paket6-vorbereitung": "node test/_paket6_pruefen.cjs",
+    "test:paket7-offline": "node --test test/_paket7_regression.cjs",
+    "test:paket7-kanal": "node test/_paket7_kanal_offline.cjs"
   },
   "private": true
 }

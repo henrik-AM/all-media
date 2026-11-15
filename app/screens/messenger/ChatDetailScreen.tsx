@@ -400,7 +400,7 @@ export const ChatDetailScreen = ({
         if (geklingelt) nochmal = true;
         return;
       }
-      if (!geklingelt && !ChatAbgleich.faellig('chat', klingelDa, letzteAbfrage, Date.now())) return;
+      if (!geklingelt && !ChatAbgleich.faellig('chat', klingelDa && !ChatAbgleich.offeneKuvertIds(messagesRef.current).length, letzteAbfrage, Date.now())) return;
       laeuft = true;
       letzteAbfrage = Date.now();
       try {
