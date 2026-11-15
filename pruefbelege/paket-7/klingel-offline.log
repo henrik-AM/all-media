@@ -1,0 +1,35 @@
+1. Neue Nachricht kommt sofort an
+  OK   beim Gegenüber in unter 1 s  — 251 ms
+  OK   privater Kanal chat:<id>
+  OK   Abmelden entfernt den Kanal
+
+2. Reaktion ändert den Stand
+  OK   Reaktion dazu → anderer Stand
+  OK   Reaktion gewechselt → anderer Stand
+  OK   Reihenfolge der Reaktionen egal
+
+3. Bündeln und Wiederverbinden
+  OK   nach dem Verbinden einmal nachgesehen  — 1
+  OK   fünf Klingeln → ein Nachsehen  — 1
+  OK   nach Wiederverbinden nachgeholt  — 2
+  OK   nach Abmelden still
+
+4. Ohne Klingel bleibt der Takt
+  OK   ohne Klingel immer fällig
+  OK   mit Klingel nach 4 s nicht fällig
+  OK   mit Klingel nach 30 s fällig
+  OK   Liste mit Klingel nach 60 s fällig
+  OK   kein Client → Klingel aus, kein Fehler
+
+5. App und Website gleichauf
+  OK   App: offener Chat hört chat:/kanal:
+  OK   App: Chatliste hört nutzer:
+  OK   Website: offener Chat hört chat:
+  OK   Website: Chatliste hört nutzer:
+  OK   Website: Unterthema hört kanal:
+  OK   Website: Zurück in den Tab / online → nachholen
+  OK   Stand mit Reaktionen: App
+  OK   Stand mit Reaktionen: Website-Server
+  OK   keine postgres_changes (Schema 95 bleibt)
+
+24/24 bestanden

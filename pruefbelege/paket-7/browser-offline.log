@@ -1,0 +1,10 @@
+  OK   Chat in der Liste
+  OK   offener Chat hört privaten Kanal chat:<id>  — [{"thema":"chat:b1000000-0000-4000-8000-0000000000af","privat":true,"weg":false}]
+  OK   vor der Klingel: nur „Hallo"
+  OK   neue Nachricht nach der Klingel in unter 1,5 s sichtbar (Takt wäre 4 s)  — 272 ms
+  OK   mit Klingel kein 4-s-Takt mehr  — 0 Abrufe in 9 s
+  OK   Zurück in den Tab → sofort nachgesehen
+  OK   Chat zu → Kanal abgemeldet
+  OK   keine Seitenfehler
+
+8/8 bestanden

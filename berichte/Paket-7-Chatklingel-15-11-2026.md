@@ -17,3 +17,21 @@ Egress-Bestandstest 21/23: zwei App-Feed-Renderer-Proben rot
 (Wischen/Hintergrund); vor Bewertung auf unverändertem main gegenprüfen.
 Noch offen: Review/Live-Schema, Sicherheitsläufe, Zwei-Konten-Browser-/native
 Abnahme, Egress-Messung, Bereinigung und Gesamtregression.
+
+## Live-Schema und Review
+
+Schema 100 am 15.11. eingespielt, nach verworfener Probe 22/22.
+Gegengelesen: 12 Auslöser, 1 Empfangsregel, 0 Veröffentlichungstabellen,
+5 Realtime-Tagespartitionen. Keine Altdatei erneut ausgeführt.
+Rechte 299/299, Angriffe 60/60, Schema-Lauf grün.
+Egress-Renderer-Bestand auf unverändertem main ebenfalls 21/23, identische
+zwei Fehler; kein neu eingeführter Paket-7-Fehler behauptet.
+Browserattrappe 8/8, Nachricht 266 ms nach Klingel; Screenshot angesehen.
+Paket-6-Kuvert-/Generationsregression 17/17 nach Ergänzen der neuen
+Klingelabhängigkeiten in den isolierten Prüfkontexten.
+
+Reviewkorrekturen: Klingel-Bündelung kann bei Dauersignalen nicht mehr
+endlos aufgeschoben werden; fehlerhafte Abo-Anlage räumt auf. Chatlisten
+bestätigen den Stand erst nach erfolgreichem Nachladen, auch beim Erststart;
+Website bündelt parallele Listenabrufe und prüft Konto/Generation.
+Unterthema aktualisiert sich trotz Eingabe und erhält Text/Fokus/Auswahl.

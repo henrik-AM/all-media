@@ -223,9 +223,14 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
         const stand = await ladeChatlistenStand(supabase, ichId);
         if (aus || stand === null) return;
         const vorher = listenStand.current;
-        listenStand.current = stand;
-        // Der erste Stand ist der, den ladeAlles gerade geholt hat.
-        if (vorher !== null && vorher !== stand) await chatsNeuLaden();
+        if (vorher !== stand) {
+          const listen = await ladeChatlisten(supabase, ichId);
+          if (aus) return;
+          setDaten((d) => (d.ichId === ichId ? { ...d, ...listen } : d));
+          listenStand.current = stand; // Erst erfolgreichen Listenabruf bestätigen.
+        }
+      } catch (e: any) {
+        console.warn('Chatliste nachsehen fehlgeschlagen:', e?.message ?? e);
       } finally {
         laeuft = false;
         if (nochmal && !aus) {

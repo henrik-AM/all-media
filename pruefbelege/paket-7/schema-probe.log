@@ -1,0 +1,36 @@
+
+1. Neue Nachricht
+  OK   klingelt im Chat genau einmal  — 1
+  OK   klingelt in der Liste von A (Empfänger: Nachricht + Ungelesen)  — 2
+  OK   klingelt in der Liste von B  — 1
+
+2. Viele Zeilen in einem Befehl
+  OK   drei gelesene Nachrichten → eine Klingel  — 1
+
+3. Reaktion, Bearbeiten, Löschen
+  OK   Reaktion klingelt im Chat  — 1
+  OK   Reaktion klingelt nicht in der Liste  — 0
+  OK   Bearbeiten klingelt  — 1
+  OK   Löschen klingelt  — 1
+
+4. Mitgliedszeile
+  OK   eigene Zeile klingelt in der eigenen Liste  — 1
+  OK   nicht in der Liste des anderen  — 0
+  OK   Klingel trägt nur die Art, keinen Text  — 0
+
+5. Wer hören darf
+  OK   Mitglied hört den Chat  — true
+  OK   hört die eigene Liste  — true
+  OK   hört NICHT die Liste eines anderen  — false
+  OK   hört NICHT einen fremden Chat  — false
+  OK   Unsinnsthema → nein, kein Fehler  — false
+  OK   Regel „Chat-Klingel hoeren" auf realtime.messages  — 1
+  OK   keine Einfüge-Regel auf realtime.messages  — 0
+
+6. Niemand klingelt selbst
+  OK   chat_klingeln nicht aufrufbar  — zu
+  OK   kein direktes Einfügen in realtime.messages  — zu
+  OK   anon darf klingel_hoeren_erlaubt nicht  — false
+  OK   Auslöserfunktion nicht aufrufbar  — false
+
+22/22 bestanden — alles zurückgerollt.

@@ -1,0 +1,28 @@
+  OK   B verbunden mit chat:<id>
+  OK   B verbunden mit nutzer:<B>
+  OK   A verbunden mit chat:<id>
+
+1. A schreibt
+  OK   B hört den Chat in unter 2 s  — 260 ms
+  OK   B hört seine Chatliste  — 0 ms
+
+2. B reagiert
+  OK   Reaktion gespeichert
+  OK   A hört die Reaktion  — 260 ms
+
+3. A bearbeitet und nimmt zurück
+  OK   B hört das Bearbeiten  — 260 ms
+  OK   B hört das Zurücknehmen  — 259 ms
+
+4. B liest
+  OK   chat_gelesen läuft
+  FEHL A hört die Lesebestätigung  — keine Klingel (Lesebestätigung bei B aus?)
+
+5. Fremde Liste
+  OK   B darf nutzer:<A> nicht hören  — [false,false]
+
+6. Nichts doppelt, Reihenfolge
+  OK   Kennungen eindeutig  — 2 Zeilen
+  OK   aufsteigend nach Zeit
+
+13/14 bestanden

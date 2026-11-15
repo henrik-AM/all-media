@@ -160,7 +160,7 @@ ${eigner(`
 do $p$ begin raise exception 'ERG:%', current_setting('probe.erg', true); end $p$;
 `;
 
-  const antwort = await frage(sql, { erwarteterFehler: /^ERG:/ });
+  const antwort = await frage(sql, { erwarteterFehler: /P0001: ERG:/ });
   const text = JSON.stringify(antwort);
   const treffer = text.match(/ERG:([^"\\]*)/);
   if (!treffer) {

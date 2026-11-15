@@ -6,7 +6,7 @@ const fn=name=>ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text=
 function harness({fetch,holen}){
  let timer=0;const active=new Map(),state={openChatId:'chat',messages:[]},ctx={console,state,document:{hidden:false},window:{},$:()=>null,paintMessages(){},fetch,nachrichtenHolen:holen,
  setInterval:f=>{active.set(++timer,f);return timer;},clearInterval:id=>active.delete(id)};
- vm.runInNewContext('let chatUhr=null;let chatNachsehenGeneration=0;'+fn('chatNachsehenStoppen')+fn('chatNachsehenStarten'),ctx);
+ vm.runInNewContext('let chatUhr=null;let chatNachsehenGeneration=0;let chatKlingelAus=()=>{};let chatNachsehenJetzt=null;'+fn('chatNachsehenStoppen')+fn('chatNachsehenStarten'),ctx);
  return {ctx,state,active,start:()=>vm.runInNewContext('chatNachsehenStarten({id:"chat"})',ctx),stop:()=>vm.runInNewContext('chatNachsehenStoppen()',ctx)};
 }
 const tick=()=>new Promise(setImmediate),response=()=>({ok:true,json:async()=>({stand:'s'})});

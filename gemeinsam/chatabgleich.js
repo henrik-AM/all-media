@@ -166,8 +166,9 @@
     var uhr = null;
     var klingeln = function () {
       if (aus) return;
-      clearTimeout(uhr);
+      if (uhr !== null) return;
       uhr = setTimeout(function () {
+        uhr = null;
         if (!aus) beiKlingel();
       }, KLINGEL_BUENDELN_MS);
     };
@@ -182,6 +183,9 @@
         if (verbunden) klingeln();
       });
     } catch (e) {
+      aus = true;
+      clearTimeout(uhr);
+      if (kanal) { try { Promise.resolve(client.removeChannel(kanal)).catch(function () {}); } catch (_) {} }
       zustand(false);
       return function () {};
     }
@@ -190,7 +194,7 @@
       clearTimeout(uhr);
       zustand(false);
       try {
-        client.removeChannel(kanal);
+        Promise.resolve(client.removeChannel(kanal)).catch(function () {});
       } catch (e) {
         /* Schon weg. */
       }

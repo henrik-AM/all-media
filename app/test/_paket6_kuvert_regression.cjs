@@ -6,13 +6,13 @@ const H=require(path.join(Q,'gemeinsam/kryptodaten.js'));
 const m={exports:{}};vm.runInNewContext(fs.readFileSync(path.join(Q,'gemeinsam/chatabgleich.js'),'utf8'),{module:m});const C=m.exports;
 const id=n=>'aaaaaaaa-aaaa-4aaa-8aaa-'+String(n).padStart(12,'0');
 function extract(f,name){const a=ts.createSourceFile(f,fs.readFileSync(path.join(Q,f),'utf8'),ts.ScriptTarget.Latest,true);return a.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name).getText(a).replace(/^export /,'');}
-function dbClient(db){let calls=0;return {get calls(){return calls;},from:t=>{let key,ids;const q={select:()=>q,eq:(k,v)=>{if(k==='schluessel_id')key=v;return q;},in:(_,v)=>(ids=v,q),order:()=>q,limit:()=>q,then:(r,j)=>Promise.resolve().then(()=>{if(t==='message_keys'){calls++;assert.ok(ids.length<=100);return {data:db.keys.filter(z=>z.schluessel_id===key&&ids.includes(z.message_id)),error:null};}return {data:db.rows.slice(0,30),error:null};}).then(r,j)};return q;}};}
+function dbClient(db){let calls=0;return {get calls(){return calls;},from:t=>{let key,ids;const q={select:()=>q,eq:(k,v)=>{if(k==='schluessel_id')key=v;return q;},in:(_,v)=>(ids=v,q),order:()=>q,limit:()=>q,then:(r,j)=>Promise.resolve().then(()=>{if(t==='message_reactions')return {data:[],error:null};if(t==='message_keys'){calls++;assert.ok(ids.length<=100);return {data:db.keys.filter(z=>z.schluessel_id===key&&ids.includes(z.message_id)),error:null};}return {data:db.rows.slice(0,30),error:null};}).then(r,j)};return q;}};}
 async function browser({initial=false,outside=false,fail=false}={}){
  const db={rows:initial?[{id:id(1)}]:[],keys:initial?[{message_id:id(1),schluessel_id:'own'}]:[]},client=dbClient(db);
  const api={ChatAbgleich:C,require:()=>H};vm.runInNewContext(extract('web/server/supabase-api.js','ladeChatStand')+';globalThis.laden=ladeChatStand;',api);
  let poll,loads=0,bad=fail;
  const state={openChatId:'chat',messages:initial?[{id:id(1),text:'Auf diesem Gerät nicht lesbar',kuvertFehlt:true,from:'me'}]:[]};
- const c={console,state,document:{hidden:false},window:{ChatAbgleich:C},chatUhr:null,chatNachsehenGeneration:0,clearInterval(){},setInterval:f=>(poll=f,1),$:()=>null,paintMessages(){},
+ const c={console,state,document:{hidden:false},window:{ChatAbgleich:C},chatUhr:null,chatNachsehenGeneration:0,chatKlingelAus:()=>{},chatNachsehenJetzt:null,clearInterval(){},setInterval:f=>(poll=f,1),$:()=>null,paintMessages(){},
  fetch:async(_u,opt)=>({ok:true,json:async()=>({stand:await api.laden(client,'chat',false,'own',opt?JSON.parse(opt.body).kuvertIds:[])})}),
  nachrichtenHolen:async()=>{loads++;if(bad){bad=false;throw Error('simulierter Lesefehler');}return db.rows.length?[{id:id(1),text:db.keys.some(k=>k.schluessel_id==='own')?'Geheim':'Auf diesem Gerät nicht lesbar',kuvertFehlt:!db.keys.some(k=>k.schluessel_id==='own'),from:'me'}]:[];}};
  vm.runInNewContext(extract('web/public/app.js','chatNachsehenStoppen')+';'+extract('web/public/app.js','chatNachsehenStarten')+';chatNachsehenStarten({id:"chat"});',c);await new Promise(setImmediate);
@@ -73,7 +73,7 @@ test('Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests 
  const db={rows:[{id:id(0)}],keys:[]},client=dbClient(db),api={ChatAbgleich:C,require:()=>H};
  vm.runInNewContext(extract('web/server/supabase-api.js','ladeChatStand')+';globalThis.laden=ladeChatStand;',api);
  let poll;const sizes=[],state={openChatId:'chat',messages:original};
- const ctx={console,state,document:{hidden:false},window:{ChatAbgleich:C},chatUhr:null,chatNachsehenGeneration:0,clearInterval(){},setInterval:f=>(poll=f,1),$:()=>null,paintMessages(){},
+ const ctx={console,state,document:{hidden:false},window:{ChatAbgleich:C},chatUhr:null,chatNachsehenGeneration:0,chatKlingelAus:()=>{},chatNachsehenJetzt:null,clearInterval(){},setInterval:f=>(poll=f,1),$:()=>null,paintMessages(){},
  fetch:async(_u,opt)=>{const ids=JSON.parse(opt.body).kuvertIds;sizes.push(ids.length);return {ok:true,json:async()=>({stand:await api.laden(client,'chat',false,'own',ids)})};},
  nachrichtenHolen:async()=>original.map(n=>({...n,text:db.keys.length?'Haupttext':'unlesbar',kuvertFehlt:!db.keys.length,zitat:{...n.zitat,text:db.keys.length?'Geheimer Bezug':'unlesbar',kuvertFehlt:!db.keys.length}}))};
  vm.runInNewContext(extract('web/public/app.js','chatNachsehenStoppen')+';'+extract('web/public/app.js','chatNachsehenStarten')+';chatNachsehenStarten({id:"chat"});',ctx);await new Promise(setImmediate);

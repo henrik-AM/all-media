@@ -7279,7 +7279,7 @@ let kanalNachsehenJetzt = null;
  */
 let kanalAntwort = null; // { kanalId, nachricht }
 
-async function renderCommunityChat(community, kanal, thema) {
+async function renderCommunityChat(community, kanal, thema, entwurfBehalten = false) {
   const lauf = ++renderLauf;
   const daten = await fetch(`/api/communities/${community.id}/channels/${kanal.id}`)
     .then((r) => r.json())
@@ -7287,6 +7287,9 @@ async function renderCommunityChat(community, kanal, thema) {
   if (lauf !== renderLauf) return;
 
   const nachrichten = daten.messages || [];
+  const altesFeld = entwurfBehalten ? $('#commMsgInput') : null;
+  const entwurf = altesFeld ? { text: altesFeld.value, fokus: document.activeElement === altesFeld,
+    von: altesFeld.selectionStart, bis: altesFeld.selectionEnd } : null;
 
   main.innerHTML = `
     <div class="pagehead pagehead__row">
@@ -7379,9 +7382,8 @@ async function renderCommunityChat(community, kanal, thema) {
         if (stand === null || stand === undefined) return;
         const vorher = kanalStand;
         kanalStand = stand;
-        const feldJetzt = $('#commMsgInput');
-        if (vorher !== null && vorher !== stand && !(feldJetzt && feldJetzt.value.trim())) {
-          renderCommunityChat(community, kanal, thema);
+        if (vorher !== null && vorher !== stand) {
+          await renderCommunityChat(community, kanal, thema, true);
         }
       } catch {
         /* Der naechste Takt fragt wieder. */
@@ -7602,6 +7604,14 @@ async function renderCommunityChat(community, kanal, thema) {
     if (daten && daten.ohneBezug) toast(window.Chatblase.OHNE_BEZUG);
     renderCommunityChat(community, kanal, thema);
   });
+  if (entwurf) {
+    const feld = $('#commMsgInput');
+    if (feld) {
+      feld.value = entwurf.text;
+      feld.dispatchEvent(new Event('input', { bubbles: true }));
+      if (entwurf.fokus) { feld.focus(); feld.setSelectionRange(entwurf.von, entwurf.bis); }
+    }
+  }
 }
 
 /* ==========================================================================
@@ -21887,7 +21897,7 @@ function chatNachsehenStarten(chat) {
       console.warn('Chat nachsehen fehlgeschlagen:', fehler?.message || fehler);
     } finally {
       laeuft = false;
-      if (nochmal && state.openChatId === chat.id) {
+      if (nochmal && aktuell()) {
         nochmal = false;
         nachsehen(true);
       }
@@ -21930,6 +21940,10 @@ let chatListeAenderungen = 0;
 let listenKlingelAus = () => {};
 let listenKlingelDa = false;
 let listenLetzteAbfrage = 0;
+let listenLaeuft = false;
+let listenNochmal = false;
+let listenSofort = false;
+let listenGeneration = 0;
 
 /**
  * sofort:     Listen auf jeden Fall neu holen (nach eigener Handlung).
@@ -21939,6 +21953,15 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
   if (document.hidden || !window.Anmeldung?.angemeldet?.()) return;
   if (!sofort && !geklingelt && window.ChatAbgleich &&
       !window.ChatAbgleich.faellig('liste', listenKlingelDa, listenLetzteAbfrage, Date.now())) return;
+  if (listenLaeuft) {
+    listenNochmal ||= sofort || geklingelt;
+    listenSofort ||= sofort;
+    return;
+  }
+  const generation = listenGeneration;
+  const konto = window.Anmeldung?.nutzer?.()?.id;
+  const aktuell = () => generation === listenGeneration && konto === window.Anmeldung?.nutzer?.()?.id;
+  listenLaeuft = true;
   listenLetzteAbfrage = Date.now();
   try {
     const r = await fetch('/api/chatstand');
@@ -21946,16 +21969,17 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
     const { stand } = await r.json();
     if (stand === null || stand === undefined) return;
     const vorher = listenStand;
-    listenStand = stand;
-    if (!sofort && (vorher === null || vorher === stand)) return;
+    if (!aktuell()) return;
+    if (!sofort && vorher === stand) return;
 
     const aenderungenVorher = chatListeAenderungen;
     const d = await (await fetch('/api/chats')).json();
-    if (!d?.ok) return;
+    if (!d?.ok || !aktuell()) return;
     if (aenderungenVorher !== chatListeAenderungen) {
       listenStand = '';
       return;
     }
+    listenStand = stand;
     state.chats = d.chats || [];
     state.communityChats = d.communityChats || [];
     vorschauenOeffnen(state.chats);
@@ -21970,10 +21994,20 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
     if (listeSichtbar && !tippt) render();
   } catch (fehler) {
     console.warn('Chatliste nachsehen fehlgeschlagen:', fehler?.message || fehler);
+  } finally {
+    listenLaeuft = false;
+    if (listenNochmal) {
+      const erzwingen = listenSofort;
+      listenNochmal = false;
+      listenSofort = false;
+      listeNachsehen(erzwingen, true);
+    }
   }
 }
 
 function listeNachsehenStarten() {
+  listenGeneration++;
+  listenLetzteAbfrage = 0;
   clearInterval(listenUhr);
   listenStand = null;
   listeNachsehen(false, true);

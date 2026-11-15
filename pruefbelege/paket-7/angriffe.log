@@ -1,0 +1,83 @@
+
+Chats
+  OK   Gruppe mit einem eigenen Kontakt anlegen geht  — ok
+  OK   Fremde Person in eine Gruppe ziehen geht nicht
+  OK   Gruppe nachträglich zum Einzelchat machen geht nicht
+  OK   Zurück in einen verlassenen Chat geht nicht
+  OK   Einzelchat mit Kontakt anlegen geht  — ok
+  OK   Neuer Einzelchat startet als Anfrage  — wartet
+  OK   Anfrage durch Leeren von anfrage_von aufheben geht nicht
+  OK   Drittes Mitglied im Einzelchat geht nicht
+  OK   Erste Nachricht senden geht  — ok
+  OK   Chat als Favorit markieren geht  — ok
+  OK   Mit 👍 reagieren geht  — ok
+  OK   HTML als Reaktion geht nicht
+  OK   Nachricht in fremden Chat verschieben geht nicht
+  OK   Mitgliedschaft auf fremden Chat umbiegen geht nicht
+  OK   Zeit und Systemhinweis einer Nachricht setzt die Datenbank  — true/leer
+
+Communitys
+  OK   Mitgliedschaften fremder privater Communitys sind unsichtbar  — 0
+  OK   Öffentlicher Community beitreten geht  — ok
+  OK   Stummschalten und Austreten geht  — ok
+  OK   Privater Community selbst beitreten geht nicht  — true
+
+Medien und Storys
+  OK   Fremde Storys, Insights, Anhänge im Speicher unsichtbar  — 0
+  OK   Story mit eigener Medienadresse anlegen geht  — ok
+  OK   Story mit Adresse einer nie hochgeladenen/fremden Datei geht nicht (Schema 117)  — zu
+  OK   Story mit fremder/HTML-Adresse geht nicht
+  OK   Eine Story lebt höchstens einen Tag
+  OK   In den eigenen Story-Ordner hochladen geht  — ok
+  OK   In den Beispielordner hochladen geht nicht
+
+Profil und Beiträge
+  OK   Eigenes Profil ändern geht  — ok
+  OK   Follower-Zahl fälschen geht nicht
+  OK   Benutzername an handle_aendern vorbei geht nicht
+  OK   Neuer Beitrag startet ohne geschenkte Likes  — 0
+  OK   Eigenen Beitrag bearbeiten geht  — ok
+  OK   Beitrag in die Zukunft datieren geht nicht
+  OK   Fremde Kontaktlisten nicht abfragbar  — false
+
+Beitragsbezug (Schema 119/121)
+  OK   Ein sichtbarer und ein unsichtbarer fremder Beitrag für die Probe da  — 22222222-a11e-4d1a-8000-000000000015/20af7596-c8e7-4930-897d-17f210555a0d
+  OK   Sichtbaren Beitrag merken geht  — ok
+  OK   Gemerkten Beitrag auf unsichtbaren umbiegen geht nicht  — zu/22222222-a11e-4d1a-8000-000000000015
+  OK   Sichtbaren Beitrag in Sammlung legen und Sammlung umbenennen geht  — ok/ok
+  OK   Sammlungseintrag auf unsichtbaren Beitrag umbiegen geht nicht  — zu/22222222-a11e-4d1a-8000-000000000015
+  OK   Nachricht nachträglich auf unsichtbaren Beitrag teilen geht nicht
+  OK   Geteilten Beitrag nachträglich setzen geht auch bei sichtbarem nicht (Bezug fest)  — zu/leer
+  OK   Nachricht bearbeiten geht weiter (Text gegengelesen)  — ok/neu
+
+Definer-RPCs nur auf sichtbare Beiträge (Schema 122)
+  OK   Sichtbarer und unsichtbarer fremder Beitrag (Verfasser freigegeben) da  — 22222222-a11e-4d1a-8000-000000000015/20af7596-c8e7-4930-897d-17f210555a0d
+  OK   Impression auf sichtbaren Beitrag wird vermerkt (gegengelesen)  — ok/1
+  OK   Impression auf unsichtbaren Beitrag: kein Fehler, keine Zeile (gegengelesen)  — ok/0
+  OK   impressionen_vermerken bricht bei unsichtbarem Beitrag nicht  — 1
+  OK   feed_rang liefert nur den sichtbaren Beitrag  — 22222222-a11e-4d1a-8000-000000000015
+  OK   Spende mit unsichtbarem Beitrag abgelehnt („beitrag"), keine Zeile  — beitrag/0
+  OK   Spende mit sichtbarem Beitrag kommt an der Beitragsprüfung vorbei  — falscher_code
+
+Regel-Helfer nicht per RPC (Schema 123)
+  OK   Keine public-Fassung von beitrag_/kommentar_ausgeblendet, darf_markierung_loesen  — 0
+  OK   Die 10 Regeln rufen die intern-Helfer aus 123 auf  — 10
+  OK   anon hat keinen Zugang zu intern  — false
+
+Nur Sichtbares liken (Schema 124)
+  OK   4 Regeln „nur Sichtbares“ (comment_likes, story_likes, story_views, messages)  — 4
+  OK   Bezugsspalten per bezug_fest gesperrt (3 Tabellen)  — 3
+
+Regel-Helfer nicht per RPC (Schema 125)
+  OK   12 Helfer nicht mehr in public  — 0
+  OK   6 public-Helfer ohne EXECUTE für authenticated  — 0
+  OK   Keine Regel ruft eine gesperrte public-Fassung  — 0
+
+Rechte (Drift)
+  OK   Anonym nur handle_frei und nummer_frei  — handle_frei,nummer_frei
+  OK   starter_sammlungen nicht aufrufbar
+  OK   Anonym keine Tabelle außer altersgrenzen  — 0
+  OK   Realtime-Veröffentlichung leer  — 0
+
+60 von 60 bestanden
+Alle Prüfungen bestanden

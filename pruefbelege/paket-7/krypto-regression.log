@@ -1,0 +1,26 @@
+✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (2.477375ms)
+✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (1.14075ms)
+✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (0.679834ms)
+✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (0.580917ms)
+✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (114.233292ms)
+✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (56.355667ms)
+Chat nachsehen fehlgeschlagen: simulierter Lesefehler
+✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (56.101ms)
+✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (52.491292ms)
+✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.353375ms)
+✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.356291ms)
+✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (19.1245ms)
+✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (15.514209ms)
+✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (20.407834ms)
+✔ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.01725ms)
+✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.080292ms)
+✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (84.6695ms)
+✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (12.2415ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 539.726375

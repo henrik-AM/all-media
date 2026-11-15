@@ -1,186 +1,89 @@
-#!/usr/bin/env node
-/**
- * Kasten AF 1 — Chat-Klingel mit ZWEI echten Testkonten gegen Supabase.
- * Erst nach der Entsperrung und nach Schema 100 lauffähig (vorher: 402 bzw.
- * keine Klingel). Vorlage: Teil 2 von _chatsync.js.
- *
- *   A = test@all-media.app, B = Prüfkonto. Beide hören wie App und Website
- *   über gemeinsam/chatabgleich.js (klingelHoeren).
- *
- *   1. A schreibt → B hört chat:<id> und nutzer:<B> in unter 2 s
- *   2. B reagiert → A hört chat:<id>
- *   3. A bearbeitet, A nimmt zurück → B hört chat:<id>
- *   4. B liest (read_at) → A hört chat:<id>
- *   5. Ein fremdes Konto hört nichts: B horcht auf nutzer:<A> → kein SUBSCRIBED
- *   6. Nichts doppelt, Reihenfolge: B lädt danach den Verlauf, Kennungen
- *      eindeutig, nach created_at aufsteigend
- *
- * Verschlüsselt/unverschlüsselt macht für die Klingel keinen Unterschied (sie
- * trägt keinen Inhalt); Entschlüsseln nach dem Nachladen prüft _chatsync.js.
- * Räumt seinen Probechat selbst wieder ab.
- *
- * Start:  node test/_chatklingel_live.js   (npm run test:chatklingel-live)
+/** Paket 7: echte private Broadcasts, zwei erlaubte Konten, kein Reset.
+ * Gegenlesen jeder Änderung, Zeitmessung ab VOR dem Schreiben.
+ * Cleanup ausschließlich eigene Lauf-Chat-IDs; anschließend Restkontrolle.
  */
-const fs = require('fs');
-const path = require('path');
-const ChatAbgleich = require('../../gemeinsam/chatabgleich');
-
-let fehler = 0;
-let anzahl = 0;
-const pruefe = (name, wahr, zusatz = '') => {
-  anzahl++;
-  if (!wahr) fehler++;
-  console.log((wahr ? '  OK   ' : '  FEHL ') + name + (zusatz !== '' ? '  — ' + zusatz : ''));
-};
-const warte = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/** Hört ein Thema und zählt Klingeln; wartet auf SUBSCRIBED (höchstens 8 s). */
-async function hoeren(client, thema) {
-  const h = { n: 0, verbunden: false, zustaende: [] };
-  h.aus = ChatAbgleich.klingelHoeren(
-    client,
-    thema,
-    () => h.n++,
-    (v) => {
-      h.verbunden = v;
-      h.zustaende.push(v);
-    }
-  );
-  for (let i = 0; i < 80 && !h.verbunden; i++) await warte(100);
-  // Das Nachsehen nach dem Verbinden ist keine Klingel der Datenbank.
-  await warte(ChatAbgleich.KLINGEL_BUENDELN_MS + 100);
-  h.n = 0;
-  return h;
+require('./_ki_belegung').pruefeBelegung('testbestand');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const {createClient}=require('@supabase/supabase-js');
+const {TESTKONTO_PASS,PRUEFKONTO_PASS}=require('./_testpasswoerter');
+const {frage}=require('./_aufraeumen');
+const C=require('../../gemeinsam/chatabgleich');
+process.loadEnvFile(path.join(__dirname,'../.env.local'));
+const URL=process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const lauf=crypto.randomUUID(),chatIds=[],hoerer=[],konten=[],OUT=path.resolve(__dirname,'../../pruefbelege/paket-7');
+let gut=0,schlecht=0,leseVorher,leseGesichert=false,kontaktVorher,kontaktFilter;
+const warte=ms=>new Promise(r=>setTimeout(r,ms));
+const check=(name,b,extra='')=>{b?gut++:schlecht++;console.log(new Date().toISOString(),b?'OK':'FEHL',name,extra);};
+async function daten(q){const r=await q;if(r.error)throw Error(r.error.message);return r.data;}
+async function bis(fn,ms=6000){const ab=Date.now();while(Date.now()-ab<ms){if(await fn())return Date.now()-ab;await warte(25);}throw Error('Erwartung nach '+ms+' ms nicht erfüllt');}
+async function hoeren(client,thema,erlaubt=true){
+ const h={n:0,verbunden:false,art:[]};
+ h.aus=C.klingelHoeren(client,thema,()=>h.n++,v=>h.verbunden=v);hoerer.push(h);
+ if(erlaubt){await bis(()=>h.verbunden,10000);await warte(C.KLINGEL_BUENDELN_MS+100);h.n=0;}else await warte(1800);
+ return h;
 }
-
-/** Wartet, bis h.n über `vorher` steigt; gibt die Dauer in ms zurück oder null. */
-async function bisKlingel(h, vorher, grenzeMs = 2000) {
-  const start = Date.now();
-  while (Date.now() - start < grenzeMs) {
-    if (h.n > vorher) return Date.now() - start;
-    await warte(25);
+async function mutation(name,h,fn){const n=h.n,ab=Date.now();await fn();await bis(()=>h.n>n);const ms=Date.now()-ab;check(name,ms<2000,ms+' ms ab Schreibbeginn');}
+(async()=>{
+ assert.ok(process.env.SUPABASE_TOKEN,'Managementtoken für geprüfte Bereinigung erforderlich');
+ for(const [email,password] of [['test@all-media.app',TESTKONTO_PASS],['all.media.prueflauf@web.de',PRUEFKONTO_PASS]]){
+  const client=createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(u,o)=>fetch(u,{...o,signal:AbortSignal.timeout(15000)})}});
+  const r=await client.auth.signInWithPassword({email,password});if(r.error)throw r.error;konten.push({client,id:r.data.user.id});
+ }
+ const [a,b]=konten;
+ assert.equal(a.id,'3baafacd-bbdb-40fb-8ef4-a4e365ae00c4');assert.equal(b.id,'62616c1d-82e2-4ee4-aab9-950e40e438a4');
+ kontaktFilter=`((user_id='${a.id}' and contact_id='${b.id}') or (user_id='${b.id}' and contact_id='${a.id}'))`;
+ kontaktVorher=await frage(`select id,user_id,contact_id,status from contacts where ${kontaktFilter}`);
+ await frage(`begin;insert into contacts(user_id,contact_id,status) values('${a.id}','${b.id}','friend'),('${b.id}','${a.id}','friend') on conflict(user_id,contact_id) do update set status='friend';commit;select 1 ok`);
+ leseVorher=await daten(b.client.from('user_settings').select('wert').eq('user_id',b.id).eq('schluessel','lesebestaetigung'));leseGesichert=true;
+ await daten(b.client.from('user_settings').upsert({user_id:b.id,schluessel:'lesebestaetigung',wert:'an'},{onConflict:'user_id,schluessel'}));
+ for(const gruppe of [false,true]){
+  const id=crypto.randomUUID();chatIds.push(id);fs.mkdirSync(OUT,{recursive:true});fs.writeFileSync(path.join(OUT,'live-fixtures.json'),JSON.stringify({lauf,chatIds}));
+  await daten(a.client.from('chats').insert({id,name:'P7 '+lauf,is_group:gruppe,bereich:'community',created_by:a.id}));
+  await daten(a.client.from('chat_members').insert([{chat_id:id,user_id:a.id},{chat_id:id,user_id:b.id}]));
+  const zustand=await daten(b.client.from('chats').select('anfrage_zustand').eq('id',id).single());
+  if(zustand.anfrage_zustand!=='angenommen')await daten(b.client.from('chats').update({anfrage_zustand:'angenommen'}).eq('id',id).select('id').single());
+  const hb=await hoeren(b.client,'chat:'+id),ha=await hoeren(a.client,'chat:'+id),hl=await hoeren(b.client,'nutzer:'+b.id);
+  check((gruppe?'Gruppe':'Zweierchat')+' beide privaten Kanäle verbunden',hb.verbunden&&ha.verbunden&&hl.verbunden);
+  const mid=crypto.randomUUID(),ln=hl.n;
+  await mutation('Neue Nachricht bei B',hb,()=>daten(a.client.from('messages').insert({id:mid,chat_id:id,sender_id:a.id,text:'Paket7 '+lauf})));
+  await bis(()=>hl.n>ln);check('Liste des Empfängers klingelt',hl.n>ln);
+  const z=await daten(b.client.from('messages').select('id,text').eq('id',mid).single());check('Empfänger liest genau gesendeten Text',z.text==='Paket7 '+lauf);
+  await mutation('Lesebestätigung bei A',ha,async()=>{const n=await daten(b.client.rpc('chat_gelesen',{p_chat:id}));assert.equal(n,1);});
+  check('Gelesen tatsächlich gespeichert',!!(await daten(a.client.from('messages').select('read_at').eq('id',mid).single())).read_at);
+  await mutation('Reaktion hinzufügen',ha,()=>daten(b.client.from('message_reactions').insert({message_id:mid,user_id:b.id,emoji:'👍'})));
+  await mutation('Reaktion ändern',ha,()=>daten(b.client.from('message_reactions').update({emoji:'❤️'}).eq('message_id',mid).eq('user_id',b.id).select('emoji').single()));
+  await mutation('Reaktion entfernen',ha,()=>daten(b.client.from('message_reactions').delete().eq('message_id',mid).eq('user_id',b.id).select('message_id').single()));
+  await mutation('Nachricht bearbeiten',hb,()=>daten(a.client.from('messages').update({text:'P7 geändert',edited_at:new Date().toISOString()}).eq('id',mid).select('id').single()));
+  check('Bearbeitung tatsächlich lesbar',(await daten(b.client.from('messages').select('text').eq('id',mid).single())).text==='P7 geändert');
+  await mutation('Nachricht zurücknehmen',hb,()=>daten(a.client.from('messages').update({deleted_at:new Date().toISOString()}).eq('id',mid).select('id').single()));
+  await mutation('Nachricht löschen',hb,()=>daten(a.client.from('messages').delete().eq('id',mid).select('id').single()));
+  check('Gelöschte Nachricht weg',(await daten(b.client.from('messages').select('id').eq('id',mid))).length===0);
+  await mutation('Eigene Listeneinstellung',hl,()=>daten(b.client.from('chat_members').update({is_favorite:true}).eq('chat_id',id).eq('user_id',b.id).select('user_id').single()));
+  // Wiederverbinden holt Änderungen nach: Kanal neu eröffnen, ohne Polling.
+  hb.aus();await daten(a.client.from('messages').insert({chat_id:id,sender_id:a.id,text:'Funkloch '+lauf}));
+  const wieder=await hoeren(b.client,'chat:'+id);const nach=await daten(b.client.from('messages').select('id,text,created_at').eq('chat_id',id).order('created_at'));
+  check('Nach Wiederverbinden genau eine Nachricht nachladbar',wieder.verbunden&&nach.length===1&&new Set(nach.map(z=>z.id)).size===1&&nach[0].text==='Funkloch '+lauf);
+  for(const h of [ha,hl,wieder])h.aus();
+ }
+ const fremd=await hoeren(b.client,'nutzer:'+a.id,false);check('Fremde Nutzerliste verweigert',!fremd.verbunden);
+ const leer=await hoeren(b.client,'chat:'+crypto.randomUUID(),false);check('Unbekannter Chat verweigert',!leer.verbunden);
+ const anon=createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false}});konten.push({client:anon});const ohne=await hoeren(anon,'nutzer:'+a.id,false);check('Anonym privater Kanal verweigert',!ohne.verbunden);
+ const denied=await b.client.rpc('chat_klingeln',{thema:'nutzer:'+a.id,art:'liste'});check('Nutzer darf Klingelfunktion nicht aufrufen',!!denied.error);
+ const publik=await frage("select count(*) n from pg_publication_tables where pubname='supabase_realtime'");check('Realtime-Veröffentlichung weiterhin leer',Number(publik[0].n)===0);
+})().catch(e=>{schlecht++;console.error('FEHLER',e.message);}).finally(async()=>{
+ try{
+  hoerer.forEach(h=>h.aus());
+  for(const s of konten)await s.client.removeAllChannels();
+  if(kontaktVorher){
+   const ids=kontaktVorher.map(z=>"'"+z.id+"'").join(',');
+   const restores=kontaktVorher.map(z=>`update contacts set status='${z.status}' where id='${z.id}';`).join('');
+   await frage(`begin;delete from contacts where ${kontaktFilter}${ids?` and id not in (${ids})`:''};${restores}commit;select 1 ok`);
+   const jetzt=await frage(`select id,user_id,contact_id,status from contacts where ${kontaktFilter} order by id`);
+   check('Kontakt-Grundstand wiederhergestellt',JSON.stringify(jetzt)===JSON.stringify([...kontaktVorher].sort((a,b)=>a.id.localeCompare(b.id))));
   }
-  return null;
-}
-
-(async () => {
-  const { createClient } = require('@supabase/supabase-js');
-  const { nurTestkonto } = require('./_nur_testkonten');
-  const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
-  const UMG = fs.existsSync(path.join(__dirname, '..', '.env.local'))
-    ? fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8')
-    : '';
-  const wert = (n) => (UMG.match(new RegExp('^' + n + '=(.*)$', 'm')) || [])[1] || '';
-  const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
-  const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
-  if (!URL || !KEY) {
-    console.log('ABBRUCH  Supabase-Zugang fehlt (app/.env.local).');
-    process.exit(2);
-  }
-  const anmelden = async (email, passwort) => {
-    const client = createClient(URL, KEY);
-    const { data, error } = await client.auth.signInWithPassword({ email, password: passwort });
-    if (error) throw new Error(`${email}: ${error.message}`);
-    return { client, id: data.user.id };
-  };
-  const A = await anmelden('test@all-media.app', TESTKONTO_PASS);
-  const B = await anmelden(
-    nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
-    process.env.AM_TEST_PASS || PRUEFKONTO_PASS
-  );
-
-  const { data: chat, error } = await A.client
-    .from('chats')
-    .insert({ name: 'Prüflauf Kasten AF 1', is_group: false, bereich: 'community', created_by: A.id })
-    .select('id')
-    .single();
-  if (error) throw error;
-  const hoerer = [];
-  const aufraeumen = async () => {
-    hoerer.forEach((h) => h.aus());
-    await A.client.from('messages').delete().eq('chat_id', chat.id).eq('sender_id', A.id);
-    await B.client.from('messages').delete().eq('chat_id', chat.id).eq('sender_id', B.id);
-    await B.client.from('chat_members').delete().eq('chat_id', chat.id).eq('user_id', B.id);
-    await A.client.from('chat_members').delete().eq('chat_id', chat.id).eq('user_id', A.id);
-    await A.client.from('chats').delete().eq('id', chat.id);
-  };
-
-  try {
-    await A.client.from('chat_members').insert({ chat_id: chat.id, user_id: A.id });
-    const { error: em } = await A.client.from('chat_members').insert({ chat_id: chat.id, user_id: B.id });
-    if (em) throw em;
-
-    const bChat = await hoeren(B.client, ChatAbgleich.klingelThema('chat', chat.id));
-    const bListe = await hoeren(B.client, ChatAbgleich.klingelThema('nutzer', B.id));
-    const aChat = await hoeren(A.client, ChatAbgleich.klingelThema('chat', chat.id));
-    hoerer.push(bChat, bListe, aChat);
-    pruefe('B verbunden mit chat:<id>', bChat.verbunden);
-    pruefe('B verbunden mit nutzer:<B>', bListe.verbunden);
-    pruefe('A verbunden mit chat:<id>', aChat.verbunden);
-
-    console.log('\n1. A schreibt');
-    let n = bChat.n;
-    let l = bListe.n;
-    const { data: m1, error: e1 } = await A.client
-      .from('messages')
-      .insert({ chat_id: chat.id, sender_id: A.id, text: 'af1-' + Date.now() })
-      .select('id')
-      .single();
-    if (e1) throw e1;
-    const d1 = await bisKlingel(bChat, n);
-    pruefe('B hört den Chat in unter 2 s', d1 !== null, d1 === null ? 'keine Klingel' : d1 + ' ms');
-    const d1l = await bisKlingel(bListe, l);
-    pruefe('B hört seine Chatliste', d1l !== null, d1l === null ? 'keine Klingel' : d1l + ' ms');
-
-    // Der Chat ist eine Anfrage (Schema 21): B antwortet, damit A weiter schreiben darf.
-    await B.client.from('messages').insert({ chat_id: chat.id, sender_id: B.id, text: 'ok' });
-    await warte(600);
-
-    console.log('\n2. B reagiert');
-    n = aChat.n;
-    const { error: er } = await B.client.from('message_reactions').insert({ message_id: m1.id, user_id: B.id, emoji: '👍' });
-    pruefe('Reaktion gespeichert', !er, er?.message);
-    const d2 = await bisKlingel(aChat, n);
-    pruefe('A hört die Reaktion', d2 !== null, d2 === null ? 'keine Klingel' : d2 + ' ms');
-
-    console.log('\n3. A bearbeitet und nimmt zurück');
-    n = bChat.n;
-    await A.client.from('messages').update({ text: 'af1-bearbeitet', edited_at: new Date().toISOString() }).eq('id', m1.id);
-    const d3 = await bisKlingel(bChat, n);
-    pruefe('B hört das Bearbeiten', d3 !== null, d3 === null ? 'keine Klingel' : d3 + ' ms');
-    n = bChat.n;
-    await A.client.from('messages').update({ deleted_at: new Date().toISOString() }).eq('id', m1.id);
-    const d3b = await bisKlingel(bChat, n);
-    pruefe('B hört das Zurücknehmen', d3b !== null, d3b === null ? 'keine Klingel' : d3b + ' ms');
-
-    console.log('\n4. B liest');
-    n = aChat.n;
-    const { error: eg } = await B.client.rpc('chat_gelesen', { p_chat: chat.id });
-    pruefe('chat_gelesen läuft', !eg, eg?.message);
-    const d4 = await bisKlingel(aChat, n);
-    pruefe('A hört die Lesebestätigung', d4 !== null || !!eg, d4 === null ? 'keine Klingel (Lesebestätigung bei B aus?)' : d4 + ' ms');
-
-    console.log('\n5. Fremde Liste');
-    const fremd = await hoeren(B.client, ChatAbgleich.klingelThema('nutzer', A.id));
-    hoerer.push(fremd);
-    pruefe('B darf nutzer:<A> nicht hören', !fremd.verbunden, JSON.stringify(fremd.zustaende));
-
-    console.log('\n6. Nichts doppelt, Reihenfolge');
-    const { data: zeilen } = await B.client
-      .from('messages')
-      .select('id, created_at')
-      .eq('chat_id', chat.id)
-      .order('created_at', { ascending: false })
-      .limit(500);
-    const auf = ChatAbgleich.chronologisch(zeilen || []);
-    pruefe('Kennungen eindeutig', new Set(auf.map((z) => z.id)).size === auf.length, auf.length + ' Zeilen');
-    pruefe('aufsteigend nach Zeit', auf.every((z, i) => i === 0 || auf[i - 1].created_at <= z.created_at));
-  } finally {
-    await aufraeumen();
-  }
-  console.log(`\n${anzahl - fehler}/${anzahl} bestanden`);
-  process.exit(fehler ? 1 : 0);
-})().catch((e) => {
-  console.log('ABBRUCH ', e.message);
-  process.exit(1);
+  if(leseGesichert){const b=konten[1];if(leseVorher.length)await daten(b.client.from('user_settings').upsert({user_id:b.id,schluessel:'lesebestaetigung',wert:leseVorher[0].wert},{onConflict:'user_id,schluessel'}));else await daten(b.client.from('user_settings').delete().eq('user_id',b.id).eq('schluessel','lesebestaetigung'));}
+  if(chatIds.length){const ids=chatIds.map(id=>"'"+id+"'").join(',');const r=await frage(`begin;delete from messages where chat_id in (${ids});delete from chat_members where chat_id in (${ids});delete from chats where id in (${ids}) and name='P7 ${lauf}';commit;select (select count(*) from chats where id in (${ids}))+(select count(*) from messages where chat_id in (${ids}))+(select count(*) from chat_members where chat_id in (${ids})) rest`);check('Eigene Chatfixtures vollständig entfernt',Number(r[0].rest)===0);fs.writeFileSync(path.join(OUT,'live-fixtures.json'),JSON.stringify({lauf,chatIds,rest:r[0].rest}));}
+ }catch(e){schlecht++;console.error('BEREINIGUNG FEHL',e.message);}
+ for(const s of konten)s.client.auth.stopAutoRefresh();
+ console.log(`${gut}/${gut+schlecht} bestanden`);process.exit(schlecht?1:0);
 });
