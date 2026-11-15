@@ -56,7 +56,7 @@ Krypto.zufallsquelleSetzen((x: Uint8Array, n: number) => {
  * zu öffnen war.
  *
  * Jetzt trägt jedes Fach die Kontokennung. Das alte Fach ohne Kennung ist
- * der ALTBESTAND: es wird beim ersten Zugriff übernommen und dann gelöscht —
+ * der ALTBESTAND: es bleibt für bestätigte historische Konten erhalten —
  * siehe `altbestandUebernehmen`.
  */
 const ALT_SCHLUESSEL_FACH = 'allmedia.krypto.geheim';
@@ -69,56 +69,34 @@ function faecher(kontoId: string) {
   return { geheim: `${ALT_SCHLUESSEL_FACH}.${id}`, geraet: `${ALT_GERAET_FACH}.${id}` };
 }
 
-/**
- * Das alte, kontolose Fach übernehmen — damit bestehende Chats lesbar bleiben.
- *
- * Die Kuverts alter Nachrichten sind für genau dieses Paar verschlossen.
- * Würde es einfach verworfen, stünde in jedem Chat „Auf diesem Gerät nicht
- * lesbar". Also wird es in das Fach des Kontos kopiert, das gerade zugreift,
- * und — weil vor dem 16.10.2026 JEDES Konto dieses Geräts mit demselben
- * Paar geschrieben hat — auch in die Fächer der übrigen hier angemeldeten
- * Konten (lib/kontenspeicher.ts), sofern sie noch keins haben. Erst danach
- * wird das alte Fach gelöscht: ein später neu angemeldetes Konto erbt nichts
- * mehr.
- *
- * Erst schreiben, dann löschen: bricht die App dazwischen ab, liegt der
- * Schlüssel doppelt, aber nie gar nicht.
- *
- * Die Konten, die das Paar so behalten, teilen es weiterhin — das löst erst
- * ein neues Paar je Konto, und das hieße wieder „nicht lesbar" für alles
- * Alte. Neue Konten bekommen von jetzt an ein eigenes.
+/** Historische Paare bleiben lokal erhalten. Übernahme nur mit einer bereits
+ * registrierten öffentlichen Kontozuordnung, niemals auf Verdacht registrieren.
+ * Auch abgemeldete Konten können so nach dem Update wieder lesen.
  */
-async function altbestandUebernehmen(kontoId: string): Promise<void> {
-  const altGeheim = await SecureStore.getItemAsync(ALT_SCHLUESSEL_FACH);
-  const altGeraet = await SecureStore.getItemAsync(ALT_GERAET_FACH);
-  if (!altGeheim) return;
-
-  let konten: string[] = [kontoId];
-  try {
-    /*
-     * Erst hier und über `require`: kontenspeicher zieht die
-     * Supabase-Einstellungen nach sich, die hier sonst niemand braucht. In
-     * den Prüfläufen im Browser (test/_modulquelle.js) gibt es kein
-     * `require` — dann wird eben nur das aktive Konto bedacht.
-     */
+async function altbestandUebernehmen(client: SupabaseClient, kontoId: string): Promise<void> {
+  const kandidaten: string[] = [];
+  const alt = await SecureStore.getItemAsync(ALT_SCHLUESSEL_FACH);
+  if (alt) kandidaten.push(alt);
+  // Frühere Fassungen löschten das Altfach. Ein noch gespeichertes Konto kann
+  // die erhaltene Kopie liefern; die Serverzuordnung bleibt zwingend.
+  if (!alt) {
     const { gespeicherteKonten } = require('./kontenspeicher') as typeof import('./kontenspeicher');
-    konten = [...new Set([kontoId, ...(await gespeicherteKonten({ streng: true }))])];
-  } catch {
-    throw new Error('Gespeicherte Konten nicht ladbar; Altbestand bleibt erhalten');
-  }
-
-  for (const id of konten) {
-    const f = faecher(id);
-    const vorhanden = await SecureStore.getItemAsync(f.geheim);
-    if (vorhanden && vorhanden !== altGeheim) continue;
-    if (!vorhanden) await SecureStore.setItemAsync(f.geheim, altGeheim);
-    // Nach einem Abbruch zwischen beiden Schreibvorgängen das Paar ergänzen.
-    if (altGeraet && !(await SecureStore.getItemAsync(f.geraet))) {
-      await SecureStore.setItemAsync(f.geraet, altGeraet);
+    for (const id of await gespeicherteKonten({ streng: true })) {
+      const geheim = await SecureStore.getItemAsync(faecher(id).geheim);
+      if (geheim && !kandidaten.includes(geheim)) kandidaten.push(geheim);
     }
   }
-  await SecureStore.deleteItemAsync(ALT_SCHLUESSEL_FACH);
-  await SecureStore.deleteItemAsync(ALT_GERAET_FACH);
+  for (const geheim of kandidaten) {
+    const { data, error } = await client.from('krypto_schluessel').select('id, geraet')
+      .eq('user_id', kontoId).eq('oeffentlich', oeffentlichAus(geheim))
+      .order('id', { ascending: true }).limit(1).maybeSingle();
+    if (error) throw error; // Ohne Nachweis weder übernehmen noch ein Ersatzpaar erzeugen.
+    if (!data?.id || !data?.geraet) continue;
+    const f = faecher(kontoId);
+    await SecureStore.setItemAsync(f.geheim, geheim);
+    await SecureStore.setItemAsync(f.geraet, data.geraet);
+    return;
+  }
 }
 
 /*
@@ -131,7 +109,7 @@ let uebernahmeLaeuft: Promise<void> = Promise.resolve();
 const lokalLaeuft = new Map<string, Promise<{ geheim: string; geraet: string }>>();
 
 /** Das Paar dieses Kontos aus der Schlüsselkette — übernommen oder neu angelegt. */
-function lokalesPaar(kontoId: string): Promise<{ geheim: string; geraet: string }> {
+function lokalesPaar(client: SupabaseClient, kontoId: string): Promise<{ geheim: string; geraet: string }> {
   const laufend = lokalLaeuft.get(kontoId);
   if (laufend) return laufend;
 
@@ -141,7 +119,7 @@ function lokalesPaar(kontoId: string): Promise<{ geheim: string; geraet: string 
     let geraet = await SecureStore.getItemAsync(f.geraet);
 
     if (!geheim || !geraet) {
-      const uebernahme = uebernahmeLaeuft.then(() => altbestandUebernehmen(kontoId));
+      const uebernahme = uebernahmeLaeuft.then(() => altbestandUebernehmen(client, kontoId));
       uebernahmeLaeuft = uebernahme.catch(() => {});
       await uebernahme;
       geheim = await SecureStore.getItemAsync(f.geheim);
@@ -193,7 +171,7 @@ export async function meinSchluessel(
 ): Promise<MeinSchluessel | null> {
   try {
     if (!ichId) throw new Error('Kein Konto');
-    const { geheim, geraet } = await lokalesPaar(ichId);
+    const { geheim, geraet } = await lokalesPaar(client, ichId);
 
     const oeffentlich = oeffentlichAus(geheim);
 

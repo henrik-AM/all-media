@@ -49,39 +49,30 @@
     return { geheim: `${ALT_SCHLUESSEL_FACH}.${id}`, geraet: `${ALT_GERAET_FACH}.${id}` };
   }
 
-  /**
-   * Das alte, kontolose Paar übernehmen, damit bestehende Chats lesbar
-   * bleiben: in das Fach des aktiven Kontos und — weil bisher JEDES Konto
-   * dieses Browsers damit geschrieben hat — in die der übrigen hier
-   * angemeldeten (Anmeldung.konten()), sofern sie noch keins haben. Erst
-   * schreiben, dann löschen. Gleicher Weg in der App.
+  /** Altpaare lokal behalten; vor Übernahme die historische Kontozuordnung
+   * durch die angemeldete Sitzung bestätigen. Neue Konten erben kein Altpaar.
    */
-  function altbestandUebernehmen(kontoId) {
-    const altGeheim = localStorage.getItem(ALT_SCHLUESSEL_FACH);
-    const altGeraet = localStorage.getItem(ALT_GERAET_FACH);
-    // Die Kennung legte die alte Fassung erst beim Anmelden an; fehlt sie,
-    // entsteht unten eine neue — der Schlüssel ist das, was zählt.
-    if (!altGeheim) return;
-
-    let konten = [kontoId];
-    try {
-      konten = [...new Set([kontoId, ...(window.Anmeldung?.konten?.({ streng: true }) || []).map((k) => k.id)])];
-    } catch {
-      throw new Error('Gespeicherte Konten nicht ladbar; Altbestand bleibt erhalten');
-    }
-    for (const id of konten) {
-      if (!id) continue;
-      const f = faecher(id);
-      const vorhanden = localStorage.getItem(f.geheim);
-      if (vorhanden && vorhanden !== altGeheim) continue;
-      if (!vorhanden) localStorage.setItem(f.geheim, altGeheim);
-      // Nach einem Abbruch zwischen beiden Schreibvorgängen das Paar ergänzen.
-      if (altGeraet && !localStorage.getItem(f.geraet)) {
-        localStorage.setItem(f.geraet, altGeraet);
+  async function altbestandUebernehmen(kontoId) {
+    const kandidaten = [];
+    const alt = localStorage.getItem(ALT_SCHLUESSEL_FACH);
+    if (alt) kandidaten.push(alt);
+    if (!alt) {
+      for (const k of window.Anmeldung?.konten?.({ streng: true }) || []) {
+        const geheim = localStorage.getItem(faecher(k.id).geheim);
+        if (geheim && !kandidaten.includes(geheim)) kandidaten.push(geheim);
       }
     }
-    localStorage.removeItem(ALT_SCHLUESSEL_FACH);
-    localStorage.removeItem(ALT_GERAET_FACH);
+    for (const geheim of kandidaten) {
+      const antwort = await fetch('/api/krypto/altbestand?oeffentlich=' + encodeURIComponent(oeffentlichAus(geheim)));
+      if (!antwort.ok) throw new Error('Historische Kontozuordnung nicht ladbar');
+      const zuordnung = await antwort.json();
+      if (kontoJetzt() !== kontoId || zuordnung.kontoId !== kontoId) throw new Error('Konto gewechselt');
+      if (!zuordnung.id || !zuordnung.geraet) continue;
+      const f = faecher(kontoId);
+      localStorage.setItem(f.geheim, geheim);
+      localStorage.setItem(f.geraet, zuordnung.geraet);
+      return;
+    }
   }
 
   /** Der Platzhalter, wenn das Kuvert für dieses Gerät fehlt. Wie in der App. */
@@ -138,7 +129,8 @@
         if (!kontoId) throw new Error('Kein Konto angemeldet');
         const f = faecher(kontoId);
         if (!localStorage.getItem(f.geheim) || !localStorage.getItem(f.geraet)) {
-          altbestandUebernehmen(kontoId);
+          await altbestandUebernehmen(kontoId);
+          if (version !== stand || kontoJetzt() !== kontoId) return null;
         }
         let geheim = localStorage.getItem(f.geheim);
         if (!geheim) {

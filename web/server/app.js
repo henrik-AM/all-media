@@ -824,6 +824,16 @@ app.get('/api/chats', route(async (req) => {
  * die ganze Verschluesselung wertlos — deshalb steht es auch so in
  * `web/public/krypto.js` und in Schema 31.
  */
+// Nur eigene, bereits vorhandene Zuordnung; niemals ein Altpaar hier registrieren.
+app.get('/api/krypto/altbestand', route(async (req) => {
+  const oeffentlich = String(req.query.oeffentlich || '');
+  const { data, error } = await req.db.from('krypto_schluessel').select('id, geraet')
+    .eq('user_id', req.nutzerId).eq('oeffentlich', oeffentlich)
+    .order('id', { ascending: true }).limit(1).maybeSingle();
+  if (error) throw error;
+  return { kontoId: req.nutzerId, id: data?.id || null, geraet: data?.geraet || null };
+}));
+
 app.post('/api/krypto/schluessel', route(async (req) => {
   const oeffentlich = String(req.body?.oeffentlich || '').trim();
   const geraet = String(req.body?.geraet || '').trim();
