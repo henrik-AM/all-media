@@ -1,0 +1,52 @@
+
+A  Regel und Verdrahtung (ohne Netz)
+
+A1  gemeinsam/chatblase.js
+  OK   Unterthema zeigt Bilder
+  OK   Community-Gruppenchat zeigt Bilder
+  OK   Community-Einzelchat ohne Bilder (Prototyp CC + Chat)
+  OK   Messenger-Gruppe ohne Bilder
+  OK   Bild nur an der letzten Blase einer Folge
+  OK   Anruf-, PTT- und Hinweiszeilen unterbrechen die Folge
+  OK   Bildgröße gemeinsam festgelegt
+  OK   Typen in chatblase.d.ts
+
+A2  App
+  OK   ChatDetailScreen fragt die gemeinsame Regel (Unterthema + Community-Chats)
+  OK   Bild nur an der letzten Blase (profilbildAn mit Absenderliste)
+  OK   Fremd links, eigen rechts (vor bzw. nach der Blase)
+  OK   Bildzeile liegt IN ZiehZumAntworten (Geste bleibt)
+  OK   Nie das Messenger-Kontaktbild (KontaktBildBereich = false am Bild)
+  OK   Antippen → onOpenCommunityProfil, Beschriftung für mac:tippen
+  OK   App.tsx: fremd → öffentliches Profil, eigen → Communitys → Profil
+
+A3  Website
+  OK   kanalNachricht: Bildzeile mit gemeinsamer Regel
+  OK   Unterthema übergibt die Absenderliste
+  OK   messageBubble: nur Community-Gruppe mit Bild
+  OK   Bild aus dem Profil (personenAvatar/eigenerAvatar), nicht avatarForUser
+  OK   Klick → oeffneCommunityProfilVon (fremd öffentlich, eigen Communitys → Profil)
+  OK   Klick ist an Unterthema und Chat gebunden
+  OK   CSS: eigene Zeile rechts, Bild als Knopf
+  OK   Alte Initialen-Blase im Unterthema ist weg
+
+B  Unterthema mit zwei Konten (Supabase)
+  OK   Beide Testkonten melden sich an
+  OK   Prüfcommunity mit Unterthema anlegen (@prueflauf)
+  OK   @test tritt bei
+  OK   Verlauf pr, pr, te, pr schreiben
+  OK   11.3 @test darf avatar_url von @prueflauf lesen (Schema 69)
+
+C  Website (Port 3000, @prueflauf)
+  OK   11.3 Genau drei Bilder: an Blase 2, 3, 4
+  OK   11.3 Eigene Blasen: Bild rechts (msgzeile--out, Bild nach der Blase)
+  OK   11.3 Fremde Blase: Bild links mit data-commprofil = @test
+  OK   11.3 Nie das Messenger-Kontaktbild im Unterthema
+  OK   11.4 Klick aufs fremde Bild → öffentliches Profil von @test
+  FEHL Website-Teil  — page.waitForSelector: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('#commMsgs') to be visible[22m
+
+  OK   Aufräumen: Prüfcommunity gelöscht (gegengeprüft)
+
+34/35 Prüfungen bestanden

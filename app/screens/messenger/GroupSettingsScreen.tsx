@@ -59,7 +59,7 @@ export const GroupSettingsScreen = ({ chat, onBack, onCall, onOpenMitglied, onVe
   const { supabase } = useSupabase();
   const insets = useSafeAreaInsets();
   const imMessenger = useImMessenger();
-  const { markierte, chatStumm, chatStummUmschalten, chatLeeren, geleerteChats } = useProfil();
+  const { markierte, chatStummUmschalten, chatStummAnzeige, chatLeeren, geleerteChats } = useProfil();
 
   const [offen, setOffen] = useState<Offen>(null);
   const [suche, setSuche] = useState('');
@@ -107,7 +107,7 @@ export const GroupSettingsScreen = ({ chat, onBack, onCall, onOpenMitglied, onVe
   const verlauf = geleert ? [] : geladen;
   const medien = verlauf.filter((m) => m.media || m.geteilt || m.standort || m.kontakt);
   const mitStern = verlauf.filter((m) => markierte.includes(m.id));
-  const stumm = chatStumm.includes(chat.id) ? !chat.muted : Boolean(chat.muted);
+  const stumm = chatStummAnzeige(chat.id, Boolean(chat.muted));
   const beschreibung = (m: Message) =>
     m.geteilt
       ? m.geteilt.weg ? 'Beitrag nicht mehr verfügbar' : `${m.geteilt.autor}: ${m.geteilt.titel || m.geteilt.beschreibung || ''}`
@@ -201,7 +201,7 @@ export const GroupSettingsScreen = ({ chat, onBack, onCall, onOpenMitglied, onVe
         <View style={styles.liste}>
           {zeile('Benachrichtigungen', stumm ? 'Aus' : 'An', () => {
             const jetzt = !stumm;
-            chatStummUmschalten(chat.id);
+            chatStummUmschalten(chat.id, Boolean(chat.muted));
             onNotice(jetzt ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
           })}
           <View style={styles.zeile}>

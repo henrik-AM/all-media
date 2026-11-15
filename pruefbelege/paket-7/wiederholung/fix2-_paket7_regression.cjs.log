@@ -1,0 +1,17 @@
+✔ Dauernde Klingeln werden begrenzt gebündelt und nie endlos verschoben (956.6365ms)
+✔ Abofehler räumt schon angelegten Kanal und Timer auf (0.691833ms)
+✔ Server: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (52.76475ms)
+✔ App: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (13.753833ms)
+✔ Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe (51.152416ms)
+✔ Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach (30.806292ms)
+✔ Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich (6.183417ms)
+✔ Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join (0.200541ms)
+✔ Kuvert-Signal überlebt die Bündelung mit gewöhnlichen Klingeln (302.407875ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1419.674375

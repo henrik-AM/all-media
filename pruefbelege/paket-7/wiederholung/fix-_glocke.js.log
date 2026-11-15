@@ -1,0 +1,27 @@
+
+Home
+  OK   Home: eine abgeschaltete Glocke ist zu sehen
+  OK   Home: genau ein Strich, kein zweiter per CSS — Striche 1, ::before false
+  OK   Home: Strich mittig (±0,5 px) — dx 0.00, dy 0.00
+  OK   Home: Strich 45°, nicht schief — Breite-Höhe 0.00
+  OK   Home: Strich ragt nicht aus dem Symbol
+  OK   Home: Strich rot, andere Farbe als die Glocke — Strich rgb(229, 72, 77), Glocke rgb(102, 110, 125)
+  OK   Home: angeschaltet ohne Strich, in Markenfarbe (unverändert) — rgb(91, 69, 224)
+  OK   Home: „an" übersteht das Neuladen (Datenbank)
+  OK   Home: wieder abschaltbar
+
+Kurzformat
+  OK   Kurzformat: Glocke vorhanden (wie in der App)
+  OK   Kurzformat: genau ein Strich, kein zweiter per CSS — Striche 1, ::before false
+  OK   Kurzformat: Strich mittig (±0,5 px) — dx 0.00, dy 0.00
+  OK   Kurzformat: Strich 45°, nicht schief — Breite-Höhe 0.00
+  OK   Kurzformat: Strich ragt nicht aus dem Symbol
+  OK   Kurzformat: Strich rot, andere Farbe als die Glocke — Strich rgb(229, 72, 77), Glocke rgb(255, 255, 255)
+  OK   Kurzformat: Antippen schaltet an
+  OK   Kurzformat: wieder abschaltbar
+  OK   Kurzformat: am eigenen Reel weder „Folgen" noch Glocke — 1 eigene
+  OK   Kurzformat: an jedem fremden Reel „Folgen" und Glocke — 5 fremde
+  OK   Kurzformat: „Gefolgt" stimmt mit der Datenbank überein — Gefolgt/true Gefolgt/true Gefolgt/true Gefolgt/true Gefolgt/true
+  OK   Keine Fehler in der Konsole
+
+21/21 Prüfungen bestanden

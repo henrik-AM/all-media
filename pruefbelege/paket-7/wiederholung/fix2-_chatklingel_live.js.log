@@ -1,0 +1,41 @@
+2026-11-15T22:13:16.247Z OK Zweierchat beide privaten Kanäle verbunden 
+2026-11-15T22:13:16.733Z OK Neue Nachricht bei B 484 ms ab Schreibbeginn
+2026-11-15T22:13:16.733Z OK Liste des Empfängers klingelt 
+2026-11-15T22:13:16.823Z OK Empfänger liest genau gesendeten Text 
+2026-11-15T22:13:17.346Z OK Lesebestätigung bei A 523 ms ab Schreibbeginn
+2026-11-15T22:13:17.484Z OK Gelesen tatsächlich gespeichert 
+2026-11-15T22:13:17.884Z OK Reaktion hinzufügen 400 ms ab Schreibbeginn
+2026-11-15T22:13:18.270Z OK Reaktion ändern 386 ms ab Schreibbeginn
+2026-11-15T22:13:18.659Z OK Reaktion entfernen 389 ms ab Schreibbeginn
+2026-11-15T22:13:19.031Z OK Nachricht bearbeiten 371 ms ab Schreibbeginn
+2026-11-15T22:13:19.131Z OK Bearbeitung tatsächlich lesbar 
+2026-11-15T22:13:19.489Z OK Nachricht zurücknehmen 357 ms ab Schreibbeginn
+2026-11-15T22:13:19.852Z OK Nachricht löschen 362 ms ab Schreibbeginn
+2026-11-15T22:13:19.941Z OK Gelöschte Nachricht weg 
+2026-11-15T22:13:20.307Z OK Eigene Listeneinstellung 366 ms ab Schreibbeginn
+2026-11-15T22:13:20.994Z OK Nach Wiederverbinden genau eine Nachricht nachladbar 
+2026-11-15T22:13:22.696Z OK Gruppe beide privaten Kanäle verbunden 
+2026-11-15T22:13:23.179Z OK Neue Nachricht bei B 482 ms ab Schreibbeginn
+2026-11-15T22:13:23.180Z OK Liste des Empfängers klingelt 
+2026-11-15T22:13:23.265Z OK Empfänger liest genau gesendeten Text 
+2026-11-15T22:13:23.613Z OK Lesebestätigung bei A 348 ms ab Schreibbeginn
+2026-11-15T22:13:23.695Z OK Gelesen tatsächlich gespeichert 
+2026-11-15T22:13:24.061Z OK Reaktion hinzufügen 366 ms ab Schreibbeginn
+2026-11-15T22:13:24.436Z OK Reaktion ändern 374 ms ab Schreibbeginn
+2026-11-15T22:13:24.799Z OK Reaktion entfernen 363 ms ab Schreibbeginn
+2026-11-15T22:13:25.190Z OK Nachricht bearbeiten 391 ms ab Schreibbeginn
+2026-11-15T22:13:25.283Z OK Bearbeitung tatsächlich lesbar 
+2026-11-15T22:13:25.632Z OK Nachricht zurücknehmen 348 ms ab Schreibbeginn
+2026-11-15T22:13:25.990Z OK Nachricht löschen 357 ms ab Schreibbeginn
+2026-11-15T22:13:26.073Z OK Gelöschte Nachricht weg 
+2026-11-15T22:13:26.426Z OK Eigene Listeneinstellung 352 ms ab Schreibbeginn
+2026-11-15T22:13:27.039Z OK Nach Wiederverbinden genau eine Nachricht nachladbar 
+2026-11-15T22:13:28.840Z OK Fremde Nutzerliste verweigert 
+2026-11-15T22:13:30.643Z OK Unbekannter Chat verweigert 
+2026-11-15T22:13:32.447Z OK Anonym privater Kanal verweigert 
+2026-11-15T22:13:32.844Z OK Nutzer darf Klingelfunktion nicht aufrufen 
+2026-11-15T22:13:33.174Z OK Realtime-Veröffentlichung weiterhin leer 
+2026-11-15T22:13:36.135Z OK Kontakt-Grundstand wiederhergestellt 
+2026-11-15T22:13:37.130Z OK Eigene Chatfixtures vollständig entfernt 
+39/39 bestanden
+39 von 39 Prüfungen bestanden

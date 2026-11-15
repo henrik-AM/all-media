@@ -1,0 +1,17 @@
+
+Kontaktinfo
+  OK   Aus dem Chat heraus kommt die Kontaktinfo, nicht das Beitragsprofil
+  OK   Alle Zeilen aus dem Prototyp-Frame stehen da
+  OK   Die beiden anderen Profile der Person sind erreichbar
+  FEHL Benachrichtigungen lassen sich umschalten — bleibt bei An
+  OK   Chatdesign merkt sich die Auswahl
+  OK   Lange Drücken markiert eine Nachricht, sie erscheint in der Liste
+  OK   Im Chat suchen findet eine Nachricht
+  OK   Chat leeren nimmt die Nachrichten weg
+
+Gruppenanruf
+  OK   Eine Gruppe lässt sich anrufen, alle Mitglieder stehen da
+  OK   Der Gruppenanruf ist „gestartet" und zählt keine erfundene Dauer
+
+9 von 10 Pruefungen bestanden
+Konsolenfehler: keine

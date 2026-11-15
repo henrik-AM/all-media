@@ -1592,9 +1592,17 @@ function verlasseExplorer() {
  * nur noch, wenn er der zuletzt gestartete ist.
  */
 let renderLauf = 0;
+/*
+ * Paket 7: Nummer des letzten render(). Unterseiten (Unterthema, Kanäle,
+ * Mitglieder, Videoprofil) zählen renderLauf selbst hoch, ohne den Bereich
+ * umzustellen. Weicht renderLauf hiervon ab, liegt eine solche Seite oben
+ * (oder lädt gerade) — listeNachsehen darf dann nicht darüberzeichnen.
+ */
+let renderLaufListe = 0;
 
 function render() {
   renderLauf++;
+  renderLaufListe = renderLauf;
   // Die Kamera laeuft weiter, solange niemand sie abschaltet — auch dann,
   // wenn ihre Seite laengst weggezeichnet ist. Am Handy bliebe das Licht an.
   kameraStromStoppen();
@@ -4868,6 +4876,7 @@ async function openContactProfile(userId, optionen = {}) {
         return toast(antwort.error || 'Das hat nicht geklappt');
       }
       chat.gesperrt = Boolean(antwort.gesperrt);
+      chatStandMitziehen(chat, ['gesperrt']);
       knopf.classList.toggle('is-on', chat.gesperrt);
       toast(antwort.meldung || (chat.gesperrt ? 'Chat gesperrt' : 'Chatsperre aufgehoben'));
     })();
@@ -5055,6 +5064,7 @@ async function openGruppenInfo(chatId) {
       .catch(() => ({ ok: false }));
     if (!res.ok) return toast(res.error || 'Die Chatsperre hat nicht geklappt');
     chat.gesperrt = Boolean(res.gesperrt);
+    chatStandMitziehen(chat, ['gesperrt']);
     knopf.classList.toggle('is-on', chat.gesperrt);
     toast(res.meldung || (chat.gesperrt ? 'Chat gesperrt' : 'Chatsperre aufgehoben'));
   });
@@ -5087,6 +5097,7 @@ async function openGruppenInfo(chatId) {
           .catch(() => ({ ok: false }));
         if (!res.ok) return toast(res.error || 'Das hat gerade nicht geklappt');
         chat.muted = Boolean(res.muted);
+        chatStandMitziehen(chat, ['muted']);
         toast(chat.muted ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
         return zurueckZurGruppe();
       }
@@ -5158,6 +5169,13 @@ async function kontaktZeile(label, userId, chat, daten, optionen = {}) {
       .catch(() => ({ ok: false }));
     if (!antwort.ok) return toast(antwort.error || 'Das hat gerade nicht geklappt');
     chat.muted = Boolean(antwort.muted);
+    /*
+     * Paket 7: Die Klingel tauscht state.chats aus, während die Kontaktinfo
+     * offen ist — `chat` ist dann eine alte Kopie, und openContactProfile
+     * fände den neuen Eintrag noch mit dem alten Wert. Wie in den
+     * Chatoptionen: laufende Liste verwerfen, aktuellen Eintrag mitziehen.
+     */
+    chatStandMitziehen(chat, ['muted']);
     toast(chat.muted ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
     return openContactProfile(userId, optionen);
   }
@@ -21945,6 +21963,21 @@ let listenStand = null;
  * (Chatoptionen „Mitteilungen“ kippte so, 10.11.2026).
  */
 let chatListeAenderungen = 0;
+
+/**
+ * Paket 7: Seit der Klingel tauscht listeNachsehen state.chats auch dann aus,
+ * wenn gerade ein Blatt (Kontaktinfo, Gruppeninfo) mit einer älteren Kopie
+ * des Chats offen ist. Nach einem Schalter am Server deshalb die laufende
+ * Liste verwerfen und den aktuellen Listeneintrag mitziehen — sonst zeichnet
+ * das Blatt beim Neuaufbau den alten Wert (kontaktinfo „bleibt bei An“).
+ */
+function chatStandMitziehen(chat, felder) {
+  chatListeAenderungen++;
+  const aktuell =
+    state.chats.find((c) => c.id === chat.id) ||
+    (state.communityChats || []).find((c) => c.id === chat.id);
+  if (aktuell && aktuell !== chat) for (const k of felder) aktuell[k] = chat[k];
+}
 // Kasten AF 1: Klingel `nutzer:<ich>` für die Chatlisten (Schema 100).
 let listenKlingelAus = () => {};
 let listenKlingelDa = false;
@@ -22000,8 +22033,17 @@ async function listeNachsehen(sofort = false, geklingelt = false) {
 
     const tippt = document.activeElement && main.contains(document.activeElement) &&
       /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+    /*
+     * Paket 7: Ein offenes Unterthema setzt weder openChatId noch den
+     * Bereich um (z. B. aus der Glocke geöffnet). Seit die Klingel die Liste
+     * sofort nachlädt, zeichnete render() die Chatliste darüber und
+     * verwarf das Unterthema — auch schon, während es noch lud
+     * (k28-commbild „#commMsgs“ fehlte).
+     */
     const listeSichtbar =
       !state.openChatId &&
+      renderLauf === renderLaufListe &&
+      !$('#commMsgs') &&
       ((state.area === 'messenger' && sub() === 'chats') ||
         (state.area === 'communities' && sub() === 'chats'));
     if (listeSichtbar && !tippt) render();

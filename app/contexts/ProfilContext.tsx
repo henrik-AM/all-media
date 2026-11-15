@@ -201,7 +201,13 @@ interface ProfilWert {
   favoriten: string[];
   favoritUmschalten: (userId: string) => boolean;
   chatStumm: string[];
-  chatStummUmschalten: (chatId: string) => boolean;
+  /**
+   * Paket 7: `serverWert` ist chat.muted aus der Chatliste. Ohne ihn bleibt
+   * das alte Umkehr-Verhalten (nur für Altaufrufer).
+   */
+  chatStummUmschalten: (chatId: string, serverWert?: boolean) => boolean;
+  /** Was die Zeile „Benachrichtigungen“ zeigen soll (Wunsch bis der Server ihn kennt). */
+  chatStummAnzeige: (chatId: string, serverWert: boolean) => boolean;
   /** Geleerte Chats - ihre Nachrichten werden nicht mehr angezeigt. */
   geleerteChats: string[];
   chatLeeren: (chatId: string) => void;
@@ -985,11 +991,49 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * Chat klingelte nach dem Neustart wieder, der geleerte war wieder voll.
    * Die Website macht es in handleChatAction und handleClearChat.
    */
-  const chatStummUmschalten = useCallback(
+  /*
+   * Paket 7: chatStumm war eine Umkehr-Liste („Server-Wert umdrehen“). Seit
+   * die Klingel die Chatliste sofort neu lädt, kennt chat.muted den neuen
+   * Wert schon nach ~1 s — die Liste drehte ihn dann ein zweites Mal um, die
+   * Zeile sprang zurück auf „An“. Jetzt merkt sich das Gerät den Wunsch samt
+   * dem Server-Wert, gegen den er galt: Hat der Server sich bewegt (eigene
+   * Bestätigung oder ein anderes Gerät), gilt wieder der Server.
+   */
+  const [chatStummWunsch, setChatStummWunsch] = useState<Record<string, { wert: boolean; basis: boolean }>>({});
+  const chatStummAnzeige = useCallback(
+    (id: string, serverWert: boolean) => {
+      const w = chatStummWunsch[id];
+      if (w && Boolean(serverWert) === w.basis) return w.wert;
+      return chatStumm.includes(id) ? !serverWert : Boolean(serverWert);
+    },
+    [chatStummWunsch, chatStumm]
+  );
+  const chatStummUmschaltenAlt = useCallback(
     mitRueckweg(chatStumm, setChatStumm, 'Das Stummschalten', (c, ich, id) =>
       Aktion.chatEinstellung(c, ich, id, 'stumm')
     ),
     [chatStumm, schreiben]
+  );
+  const chatStummUmschalten = useCallback(
+    (id: string, serverWert?: boolean) => {
+      if (serverWert === undefined) return chatStummUmschaltenAlt(id);
+      const basis = Boolean(serverWert);
+      const jetzt = !chatStummAnzeige(id, basis);
+      const vorher = chatStummWunsch[id];
+      setChatStummWunsch((prev) => ({ ...prev, [id]: { wert: jetzt, basis } }));
+      // Festen Wert schreiben, nicht umschalten: zwei schnelle Tipper oder ein
+      // anderes Gerät dazwischen drehen sonst am Server doppelt.
+      schreiben('Das Stummschalten', (c, ich) => Aktion.chatEinstellung(c, ich, id, 'stumm', jetzt), () =>
+        setChatStummWunsch((prev) => {
+          const neu = { ...prev };
+          if (vorher) neu[id] = vorher;
+          else delete neu[id];
+          return neu;
+        })
+      );
+      return jetzt;
+    },
+    [chatStummUmschaltenAlt, chatStummAnzeige, chatStummWunsch, schreiben]
   );
 
   const chatLeeren = useCallback(
@@ -1082,6 +1126,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       favoritUmschalten,
       chatStumm,
       chatStummUmschalten,
+      chatStummAnzeige,
       geleerteChats,
       chatLeeren,
       istStumm,
@@ -1112,7 +1157,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,
       clipUmschalten, markierte, markieren, favoriten, favoritUmschalten,
-      chatStumm, chatStummUmschalten, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, communityErstellen, unterthemaErstellen, einladungAnnehmen, kanalBeitreten, kanalStummSetzen, kanalPttSetzen, kanalGelesen, communityMerken,
+      chatStumm, chatStummUmschalten, chatStummAnzeige, geleerteChats, chatLeeren, istStumm, istBlockiert, stummSchalten, blockieren, geteiltZaehler, geteilt, communities, communityErstellen, unterthemaErstellen, einladungAnnehmen, kanalBeitreten, kanalStummSetzen, kanalPttSetzen, kanalGelesen, communityMerken,
       gefolgt, folgtPerson, folgenUmschalten, eigenesProfil, profilSpeichern, profilSpeichernWarten,
     ]
   );

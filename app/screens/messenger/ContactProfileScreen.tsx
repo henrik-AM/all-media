@@ -116,8 +116,8 @@ export const ContactProfileScreen = ({
     markierte,
     favoriten,
     favoritUmschalten,
-    chatStumm,
     chatStummUmschalten,
+    chatStummAnzeige,
     chatLeeren,
     geleerteChats,
     istBlockiert,
@@ -303,10 +303,11 @@ export const ContactProfileScreen = ({
   const mitStern = verlauf.filter((m) => markierte.includes(m.id));
   /*
    * Stumm kommt aus der Datenbank (chat_members.is_muted) und wird auch
-   * dorthin zurueckgeschrieben. chatStumm ist nur die Kopie im Geraet, damit
+   * dorthin zurueckgeschrieben. chatStummAnzeige haelt den Wunsch im Geraet, damit
    * die Zeile sofort umspringt - ohne den Umweg ueber ein Neuladen.
    */
-  const stumm = !!chat && (chatStumm.includes(chat.id) ? !chat.muted : Boolean(chat.muted));
+  // Paket 7: Wunsch gilt nur, bis die (per Klingel neu geladene) Liste ihn kennt.
+  const stumm = !!chat && chatStummAnzeige(chat.id, Boolean(chat.muted));
   const favorit = favoriten.includes(userId);
 
   const wert = (label: string, standard: string) => wahlen[label] ?? standard;
@@ -482,7 +483,7 @@ export const ContactProfileScreen = ({
             const jetzt = !stumm;
             // Das Schreiben nach chat_members.is_muted macht der Kontext —
             // hier stand es frueher ein zweites Mal, mit eigener Spaltenliste.
-            chatStummUmschalten(chat.id);
+            chatStummUmschalten(chat.id, Boolean(chat.muted));
             onNotice(jetzt ? 'Benachrichtigungen aus' : 'Benachrichtigungen an');
           })}
           {zeile('Chatdesign', wert('Chat-Hintergrund', 'Hell'), () =>

@@ -1,0 +1,12 @@
+✔ Initiales Promise.all: alte Neuöffnung derselben Chat-ID ersetzt neuen Kontoverlauf nicht (8.288625ms)
+✔ Verspätete DM-Antwort nach neuer Öffnung zeichnet nicht neu (0.503792ms)
+✔ Verspätetes DM-json nach Stop bleibt ohne UI- und Chatmutation (0.400583ms)
+✔ Alte Sperrbestätigung nach einer neueren Öffnung wird verworfen (0.3875ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11.324875

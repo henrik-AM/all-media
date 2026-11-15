@@ -1,0 +1,76 @@
+
+A  Regel und Verdrahtung (ohne Netz)
+
+A1  gemeinsam/chatblase.js
+  OK   Unterthema zeigt Bilder
+  OK   Community-Gruppenchat zeigt Bilder
+  OK   Community-Einzelchat ohne Bilder (Prototyp CC + Chat)
+  OK   Messenger-Gruppe ohne Bilder
+  OK   Bild nur an der letzten Blase einer Folge
+  OK   Anruf-, PTT- und Hinweiszeilen unterbrechen die Folge
+  OK   Bildgröße gemeinsam festgelegt
+  OK   Typen in chatblase.d.ts
+
+A2  App
+  OK   ChatDetailScreen fragt die gemeinsame Regel (Unterthema + Community-Chats)
+  OK   Bild nur an der letzten Blase (profilbildAn mit Absenderliste)
+  OK   Fremd links, eigen rechts (vor bzw. nach der Blase)
+  OK   Bildzeile liegt IN ZiehZumAntworten (Geste bleibt)
+  OK   Nie das Messenger-Kontaktbild (KontaktBildBereich = false am Bild)
+  OK   Antippen → onOpenCommunityProfil, Beschriftung für mac:tippen
+  OK   App.tsx: fremd → öffentliches Profil, eigen → Communitys → Profil
+
+A3  Website
+  OK   kanalNachricht: Bildzeile mit gemeinsamer Regel
+  OK   Unterthema übergibt die Absenderliste
+  OK   messageBubble: nur Community-Gruppe mit Bild
+  OK   Bild aus dem Profil (personenAvatar/eigenerAvatar), nicht avatarForUser
+  OK   Klick → oeffneCommunityProfilVon (fremd öffentlich, eigen Communitys → Profil)
+  OK   Klick ist an Unterthema und Chat gebunden
+  OK   CSS: eigene Zeile rechts, Bild als Knopf
+  OK   Alte Initialen-Blase im Unterthema ist weg
+
+B  Unterthema mit zwei Konten (Supabase)
+  OK   Beide Testkonten melden sich an
+  OK   Prüfcommunity mit Unterthema anlegen (@prueflauf)
+  OK   @test tritt bei
+  OK   Verlauf pr, pr, te, pr schreiben
+  OK   11.3 @test darf avatar_url von @prueflauf lesen (Schema 69)
+
+C  Website (Port 3000, @prueflauf)
+  OK   11.3 Genau drei Bilder: an Blase 2, 3, 4
+  OK   11.3 Eigene Blasen: Bild rechts (msgzeile--out, Bild nach der Blase)
+  OK   11.3 Fremde Blase: Bild links mit data-commprofil = @test
+  OK   11.3 Nie das Messenger-Kontaktbild im Unterthema
+  OK   11.4 Klick aufs fremde Bild → öffentliches Profil von @test
+  FEHL 11.4 Klick aufs eigene Bild → Communitys → Profil  — locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('.msgzeile__bild[data-commprofil="me"]').first()[22m
+[2m    - locator resolved to <button type="button" data-commprofil="me" class="msgzeile__bild" data-testid="blasen-profilbild" aria-label="Community-Profil von Du">…</button>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="prof__bio">Testkonto für All Media. Hier lässt sich jede Fun…</div> from <section id="overlay" class="overlay">…</section> subtree intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div class="prof__bio">Testkonto für All Media. Hier lässt sich jede Fun…</div> from <section id="overlay" class="overlay">…</section> subtree intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m      - waiting 100ms[22m
+[2m    58 × waiting for element to be visible, enabled and stable[22m
+[2m       - element is visible, enabled and stable[22m
+[2m       - scrolling into view if needed[22m
+[2m       - done scrolling[22m
+[2m       - <div class="prof__bio">Testkonto für All Media. Hier lässt sich jede Fun…</div> from <section id="overlay" class="overlay">…</section> subtree intercepts pointer events[22m
+[2m     - retrying click action[22m
+[2m       - waiting 500ms[22m
+
+  OK   11.3 messageBubble: Community-Gruppe mit Bild, Einzelchat und Messenger ohne
+  OK   Aufräumen: Prüfcommunity gelöscht (gegengeprüft)
+
+35/36 Prüfungen bestanden

@@ -1,0 +1,62 @@
+  Laufkennung: 08df8666-c660-4827-a016-828e4b5eaa7b
+
+======================================================================
+  testhygiene
+======================================================================
+✔ Frischer Worktree: beide Fixtures vor dem Stempel; wiederholte Vorbereitung bytegleich (2.424875ms)
+✔ Abweichende Fixture wird abgelehnt und nicht überschrieben (0.483084ms)
+✔ Laufjournal belegt Leerstand; Löschen erfasst beide Testkonten auch bei zurückdatierten Vorlagen (0.878333ms)
+✔ Alte Journale bleiben zeitlich begrenzt; Version 2 ohne Leerstandsnachweis wird abgelehnt (0.67425ms)
+✔ Fehlgeschlagene Bereinigung bleibt wiederaufnehmbar; nächster Start räumt zuerst auf (0.53ms)
+✔ Nichtnull-Rest zählt als Fehler und erhält das Journal (0.34375ms)
+✔ Altbestand ohne Journal blockiert vor dem ersten Löschaufruf (0.20425ms)
+✔ Fremdes Projekt und manipulierte DB-Zeit werden ohne SQL abgelehnt (0.479167ms)
+✔ SIGKILL im Startfenster: unklarer Kindprozess verhindert automatische Löschung (0.380167ms)
+✔ Verwaister laufender Prüfprozess blockiert Bereinigung; nach seinem Ende ist Wiederaufnahme möglich (2.236542ms)
+✔ Management-API: HTTP-Fehler wird vor dem Auswerten einer scheinbaren Zählantwort verworfen (0.718041ms)
+✔ Fehlende oder falsch geformte Zählantwort ist kein leerer Bestand (0.258667ms)
+✔ Management-API: nur die ausdrücklich erwartete SQL-Ausnahme passiert eine Negativprobe (0.479583ms)
+✔ Gesamtlauf: Fehlgeschlagene Suite stoppt weitere Suiten nicht; Bereinigung und Rohbelege vorhanden (40.534541ms)
+✔ Gesamtlauf: alle Suiten mit Zahlen, stabile Quellen und Rest null ergeben Exit 0 (19.549208ms)
+✔ Gesamtlauf: fehlendes Token blockiert vor SQL und vor Start eines Prüfers (0.676792ms)
+✔ Gesamtlauf: Exit 0 ohne Prüfzahlen bleibt unvollständig (19.451292ms)
+✔ Gesamtlauf: deutscher Summensatz und node:test werden gezählt, null Prüfungen nicht (80.709334ms)
+✔ Gesamtlauf: Bereinigungsfehler verhindert Erfolg und bewahrt Journal (19.810333ms)
+✔ Gesamtlauf: SIGTERM beendet Kind, überspringt Rest und räumt vor Rückgabe 143 auf (105.031667ms)
+✔ Gesamtlauf: geänderter Prüfcode macht einen sonst grünen Lauf ungültig (25.361958ms)
+✔ Gesamtlauf: sechs Stunden lösen genau eine Warnung aus (40.33125ms)
+✔ Kind mit geerbten Browser-Pipes: Prozessgruppe endet trotz frühem exit (42.105208ms)
+✔ Zeitlimit beendet den Prüfprozess (103.4385ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 509.914041
+
+======================================================================
+  smoke
+======================================================================
+
+ABBRUCH  Auf Port 3000 läuft kein Server.
+          Starten: cd web && node server/lokal.js   (oder: cd app && node web-app.js)
+          Bewusst übergehen: PRUEFSERVER_EGAL=1
+
+
+======================================================================
+  feedback
+======================================================================
+
+======================================================================
+  Übersicht
+======================================================================
+  OK    testhygiene          24/24
+  FEHL  smoke                    —
+  FEHL  feedback                 —
+
+  24 von 24 Prüfungen bestanden, 3/100 Läufe.
+  Ohne zählbare Prüfungen: smoke, feedback
+  Nicht durchgekommen: smoke, feedback
+  Lauf 08df8666-c660-4827-a016-828e4b5eaa7b: 32 Mitteilungen entfernt, Rest 0.
