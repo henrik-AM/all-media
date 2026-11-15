@@ -113,7 +113,7 @@ async function webChecks() {
   const functions = [
     between(source, 'async function renderCommunityChannels(communityId) {', '\n/*\n * "neues Unterthema erstellen"'),
     between(source, 'function renderKanalThemen(community, kanal) {', '\n/** Dritte Ebene: der Chat zu einem Thema. */'),
-    between(source, 'async function renderCommunityChat(community, kanal, thema) {', '\n/*\n * Eine Nachricht im Kanal.'),
+    between(source, 'async function renderCommunityChat(community, kanal, thema, entwurfBehalten = false) {', '\n/*\n * Eine Nachricht im Kanal.'),
   ].join('\n');
   const escSource = between(source, 'const esc = (s) =>', '\n\nfunction user(id)');
   const svg = '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" stroke="currentColor" fill="none" stroke-width="2"/></svg>';

@@ -9,7 +9,7 @@ function setup({group=true,holen,fetch,confirm=async()=>true}={}){
  const c={console,state,draws,clearInterval(){},msgBezug:null,msgBearbeitet:null,nachrichtenHolen:holen,fetch:fetch|| (async()=>({ok:true,json:async()=>({ok:true,erlaubt:true})})),bestaetigen:confirm,
  ICONS:{},avatarOf:()=>'',mitStoryRing:()=>'',esc:x=>String(x),anfrageLeiste:()=>'',messengerLeiste:()=>'',chatGesperrt:()=>false};
  c.overlay={hidden:true,set innerHTML(v){draws.push({text:state.messages[0]?.text,name:state.chats[0].name,html:v});throw Error('PRUEFENDE_VOR_DOM_BINDUNGEN');}};
- vm.runInNewContext('let chatUhr=null;let chatNachsehenGeneration=0;'+fn('chatNachsehenStoppen')+fn('openChat'),c);
+ vm.runInNewContext('let chatUhr=null;let chatNachsehenGeneration=0;let chatKlingelAus=()=>{};let chatNachsehenJetzt=null;'+fn('chatNachsehenStoppen')+fn('openChat'),c);
  return {c,state,chat,draws,start:()=>vm.runInNewContext('openChat("chat")',c).catch(e=>{if(e.message!=='PRUEFENDE_VOR_DOM_BINDUNGEN')throw e;})};
 }
 test('Initiales Promise.all: alte Neuöffnung derselben Chat-ID ersetzt neuen Kontoverlauf nicht',async()=>{

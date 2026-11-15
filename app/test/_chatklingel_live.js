@@ -85,5 +85,5 @@ async function mutation(name,h,fn){const n=h.n,ab=Date.now();await fn();await bi
   if(chatIds.length){const ids=chatIds.map(id=>"'"+id+"'").join(',');const r=await frage(`begin;delete from messages where chat_id in (${ids});delete from chat_members where chat_id in (${ids});delete from chats where id in (${ids}) and name='P7 ${lauf}';commit;select (select count(*) from chats where id in (${ids}))+(select count(*) from messages where chat_id in (${ids}))+(select count(*) from chat_members where chat_id in (${ids})) rest`);check('Eigene Chatfixtures vollständig entfernt',Number(r[0].rest)===0);fs.writeFileSync(path.join(OUT,'live-fixtures.json'),JSON.stringify({lauf,chatIds,rest:r[0].rest}));}
  }catch(e){schlecht++;console.error('BEREINIGUNG FEHL',e.message);}
  for(const s of konten)s.client.auth.stopAutoRefresh();
- console.log(`${gut}/${gut+schlecht} bestanden`);process.exit(schlecht?1:0);
+ console.log(`${gut}/${gut+schlecht} bestanden\n${gut} von ${gut+schlecht} Prüfungen bestanden`);process.exit(schlecht?1:0);
 });
