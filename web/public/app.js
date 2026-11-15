@@ -4567,8 +4567,9 @@ async function kryptoZustand(userId, chat) {
     const fakten = await antwort.json();
     const meiner = await window.KryptoWeb.anmelden();
     if (fakten.ichId !== window.Anmeldung?.nutzer?.()?.id) throw new Error('Konto gewechselt');
-    const nr = window.KryptoWeb.sicherheitsnummer((fakten.schluessel || [])
-      .filter((k) => k.user_id === userId).map((k) => k.oeffentlich));
+    const nr = window.KryptoWeb.paarSicherheitsnummer(fakten.ichId,
+      (fakten.schluessel || []).filter(k => k.user_id === fakten.ichId).map(k => k.oeffentlich), userId,
+      (fakten.schluessel || []).filter(k => k.user_id === userId).map(k => k.oeffentlich));
     const verschluesselbar = Krypto.sendeweg({ ...fakten, meiner }).art === 'verschliessen';
     return {
       an: Boolean(verschluesselbar && nr),
@@ -5200,14 +5201,14 @@ async function kontaktZeile(label, userId, chat, daten, optionen = {}) {
           'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
           'Verbindung.\n\n' +
           (krypto.fingerabdruck
-            ? 'Sicherheitsnummer des Gegenübers (' +
-              (krypto.geraete === 1 ? '1 Gerät' : `${krypto.geraete} Geräte`) +
+            ? 'Gemeinsame Sicherheitsnummer (' +
+              (krypto.geraete === 1 ? '1 Geräteschlüssel' : `${krypto.geraete} Geräteschlüssel`) +
               '):\n' +
               krypto.fingerabdruck +
-              '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
-              'dass niemand dazwischen sitzt. Sie ändert sich, sobald ' +
-              'ein Gerät dazukommt oder wegfällt — stimmt die Zahl der ' +
-              'Geräte nicht, fragt nach.'
+              '\n\nÖffnet beide diese Kontaktinfo und vergleicht die Nummer persönlich. ' +
+              'Sie muss auf beiden Geräten gleich sein. Vergleicht sie erneut, ' +
+              'wenn ein Gerät dazukommt oder wegfällt. Ein Vergleich schützt ' +
+              'nur, solange ihr den beteiligten Geräten vertraut.'
             : '')
         : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
           'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +

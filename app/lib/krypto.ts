@@ -249,6 +249,10 @@ export function sicherheitsnummer(
   return Krypto.sicherheitsnummer(oeffentliche);
 }
 
+export function paarSicherheitsnummer(kontoA: string, a: string[], kontoB: string, b: string[]): { nummer: string; geraete: number } | null {
+  return Krypto.paarSicherheitsnummer(kontoA, a, kontoB, b);
+}
+
 /**
  * Alle Geräte, die eine Nachricht in diesem Chat mitlesen dürfen.
  *

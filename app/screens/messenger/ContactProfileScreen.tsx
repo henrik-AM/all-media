@@ -230,9 +230,11 @@ export const ContactProfileScreen = ({
     let gilt = true;
     (async () => {
       try {
-        const data = await Krypto.kontoSchluessel(supabase, userId);
+        const [data, eigene] = await Promise.all([
+          Krypto.kontoSchluessel(supabase, userId), Krypto.kontoSchluessel(supabase, ichId),
+        ]);
         const verschluesselbar = await Krypto.chatVerschluesselbar(supabase, chat.id, ichId);
-        const nr = Krypto.sicherheitsnummer(((data ?? []) as any[]).map((z) => z.oeffentlich));
+        const nr = Krypto.paarSicherheitsnummer(ichId, eigene.map((z) => z.oeffentlich), userId, data.map((z) => z.oeffentlich));
         if (!gilt) return;
         setKryptoZustand({
           an: Boolean(verschluesselbar && nr),
@@ -549,16 +551,16 @@ export const ContactProfileScreen = ({
                     'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
                     'Verbindung.\n\n' +
                     (kryptoZustand.fingerabdruck
-                      ? 'Sicherheitsnummer des Gegenübers (' +
+                      ? 'Gemeinsame Sicherheitsnummer (' +
                         (kryptoZustand.geraete === 1
-                          ? '1 Gerät'
-                          : `${kryptoZustand.geraete} Geräte`) +
+                          ? '1 Geräteschlüssel'
+                          : `${kryptoZustand.geraete} Geräteschlüssel`) +
                         '):\n' +
                         kryptoZustand.fingerabdruck +
-                        '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
-                        'dass niemand dazwischen sitzt. Sie ändert sich, sobald ' +
-                        'ein Gerät dazukommt oder wegfällt — stimmt die Zahl der ' +
-                        'Geräte nicht, fragt nach.'
+                        '\n\nÖffnet beide diese Kontaktinfo und vergleicht die Nummer persönlich. ' +
+                        'Sie muss auf beiden Geräten gleich sein. Vergleicht sie erneut, ' +
+                        'wenn ein Gerät dazukommt oder wegfällt. Ein Vergleich schützt ' +
+                        'nur, solange ihr den beteiligten Geräten vertraut.'
                       : '')
                   : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
                     'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +

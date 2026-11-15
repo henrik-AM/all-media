@@ -2741,7 +2741,10 @@ export async function nachrichtBearbeiten(
     if (!neu) throw new Error('Diese Nachricht lässt sich auf diesem Gerät nicht bearbeiten');
     felder = { ...neu, edited_at: new Date().toISOString() };
   } else {
-    felder = { ...offen(text).spalten, edited_at: new Date().toISOString() };
+    if (!alt) throw new Error('Nachricht nicht ladbar');
+    const pruefung = await fuerChatVerschliessen(client, (alt as any).chat_id, ichId, text);
+    if (pruefung.spalten.krypto) throw new Error('Diese alte Klartextnachricht kann hier nicht mehr bearbeitet werden. Bitte sende den Text als neue verschlüsselte Nachricht.');
+    felder = { ...pruefung.spalten, edited_at: new Date().toISOString() };
   }
 
   const { data: getroffen, error } = await client

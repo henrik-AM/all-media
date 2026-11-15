@@ -248,6 +248,26 @@
     };
   }
 
+  /** Gemeinsame Referenz: beide Konten sehen dieselbe Nummer samt Gerätezahl.
+   * Kontozuordnung gehört in den Hash: vertauschte Schlüssel sind nicht gleich.
+   */
+  function paarSicherheitsnummer(kontoA, schluesselA, kontoB, schluesselB) {
+    if (!kontoA || !kontoB || kontoA === kontoB) return null;
+    var seiten = [[String(kontoA), schluesselA], [String(kontoB), schluesselB]];
+    var geraete = 0;
+    for (var i = 0; i < seiten.length; i++) {
+      var liste = Array.from(new Set(seiten[i][1] || [])).sort();
+      if (!sicherheitsnummer(liste)) return null;
+      geraete += liste.length;
+      seiten[i][1] = liste;
+    }
+    seiten.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+    var summe = nacl.hash(zuBytes(JSON.stringify(['AllMedia-Paar-1', seiten])));
+    var ziffern = '';
+    for (var j = 0; j < 16; j++) ziffern += ('0' + summe[j].toString(16)).slice(-2);
+    return { nummer: ziffern.toUpperCase().match(/.{4}/g).join(' '), geraete: geraete };
+  }
+
   // -------------------------------------------------------- Verschließen --
 
   /**
@@ -693,6 +713,7 @@
     schluesselpaarErzeugen: schluesselpaarErzeugen,
     fingerabdruck: fingerabdruck,
     sicherheitsnummer: sicherheitsnummer,
+    paarSicherheitsnummer: paarSicherheitsnummer,
     verschluesseln: verschluesseln,
     entschluesseln: entschluesseln,
     umschliessen: umschliessen,

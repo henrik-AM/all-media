@@ -437,6 +437,7 @@
     meldebeleg,
     fingerabdruck,
     sicherheitsnummer,
+    paarSicherheitsnummer: Krypto.paarSicherheitsnummer,
     bereit,
     meinSchluessel: () => bereit() ? meiner : null,
   };

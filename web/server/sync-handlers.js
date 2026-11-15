@@ -2474,6 +2474,16 @@ const handleNachrichtBearbeiten = handler(
     if (!verschluesselt && !String(text || '').trim()) {
       return { ok: false, fehler: 'Text erforderlich' };
     }
+    const { data: alt, error: fehlerAlt } = await client.from('messages')
+      .select('chat_id, krypto').eq('id', nachrichtId).eq('sender_id', nutzerId).maybeSingle();
+    if (fehlerAlt) throw fehlerAlt;
+    if (!alt || (Number(alt.krypto) > 0) !== verschluesselt) return { ok: false, fehler: 'Nachrichtenformat stimmt nicht' };
+    if (!verschluesselt) {
+      const fakten = await kryptoFakten(client, alt.chat_id, nutzerId, { knapp: true });
+      if (Krypto.sendeweg({ ...fakten, meiner: null }).art !== 'offen') {
+        return { ok: false, fehler: 'Diese alte Klartextnachricht kann hier nicht mehr bearbeitet werden. Bitte sende den Text als neue verschlüsselte Nachricht.' };
+      }
+    }
     const felder = verschluesselt
       ? { chiffre: krypto.chiffre, krypto_nonce: krypto.kryptoNonce }
       : { text };

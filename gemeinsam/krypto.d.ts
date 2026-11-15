@@ -37,6 +37,7 @@ export function zufallBereit(): boolean;
 export function schluesselpaarErzeugen(): { oeffentlich: string; geheim: string };
 export function fingerabdruck(oeffentlich: string): string;
 export function sicherheitsnummer(oeffentliche: string[]): { nummer: string; geraete: number } | null;
+export function paarSicherheitsnummer(kontoA: string, a: string[], kontoB: string, b: string[]): { nummer: string; geraete: number } | null;
 export function verschluesseln(
   text: string,
   meinGeheim: string,
