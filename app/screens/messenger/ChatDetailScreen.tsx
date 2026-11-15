@@ -373,19 +373,36 @@ export const ChatDetailScreen = ({
    * dazu, gilt sie als gelesen, denn der Chat ist offen. Im Hintergrund
    * wird nicht gefragt; beim Zurueckkommen sofort. Gleiche Regel auf der
    * Website (chatNachsehen in web/public/app.js).
+   *
+   * Kasten AF 1 (21.10.2026): Dazu die Klingel (Schema 100). Aendert sich
+   * etwas — Nachricht, Bearbeiten, Loeschen, Gelesen, Reaktion —, klingelt
+   * die Datenbank auf `chat:<id>` bzw. `kanal:<id>`, und der Chat sieht
+   * sofort nach. Solange sie verbunden ist, fragt der Takt nur noch alle
+   * INTERVALL_CHAT_MIT_KLINGEL_MS (ChatAbgleich.faellig).
    */
   useEffect(() => {
     if (!supabase || !ichId) return;
     let aus = false;
     let laeuft = false;
+    let nochmal = false;
     let letzterStand: string | null = null;
     let erfolgreicheSchluesselId: string | null = null;
     let schluesselVersuchAb = 0;
     let schluesselPause = 4000;
+    let klingelDa = false;
+    let letzteAbfrage = 0;
 
-    const nachsehen = async () => {
-      if (aus || laeuft || AppState.currentState !== 'active') return;
+    const nachsehen = async (geklingelt = false) => {
+      if (aus || AppState.currentState !== 'active') return;
+      // Klingelt es waehrend einer Abfrage, danach gleich noch einmal —
+      // sonst ginge die Aenderung bis zum naechsten Takt verloren.
+      if (laeuft) {
+        if (geklingelt) nochmal = true;
+        return;
+      }
+      if (!geklingelt && !ChatAbgleich.faellig('chat', klingelDa, letzteAbfrage, Date.now())) return;
       laeuft = true;
+      letzteAbfrage = Date.now();
       try {
         const kuvertIds = istKanal ? [] : ChatAbgleich.offeneKuvertIds(messagesRef.current);
         if (kuvertIds.length && !erfolgreicheSchluesselId && Date.now() >= schluesselVersuchAb) {
@@ -438,18 +455,31 @@ export const ChatDetailScreen = ({
         console.warn('Chat nachsehen fehlgeschlagen:', e?.message ?? e);
       } finally {
         laeuft = false;
+        if (nochmal && !aus) {
+          nochmal = false;
+          nachsehen(true);
+        }
       }
     };
 
-    nachsehen();
-    const uhr = setInterval(nachsehen, ChatAbgleich.INTERVALL_CHAT_MS);
+    nachsehen(true);
+    const uhr = setInterval(() => nachsehen(), ChatAbgleich.INTERVALL_CHAT_MS);
     const horcher = AppState.addEventListener('change', (z) => {
-      if (z === 'active') nachsehen();
+      if (z === 'active') nachsehen(true);
     });
+    const klingelAus = ChatAbgleich.klingelHoeren(
+      supabase,
+      ChatAbgleich.klingelThema(istKanal ? 'kanal' : 'chat', chat.id),
+      () => nachsehen(true),
+      (verbunden) => {
+        klingelDa = verbunden;
+      }
+    );
     return () => {
       aus = true;
       clearInterval(uhr);
       horcher.remove();
+      klingelAus();
     };
   }, [supabase, ichId, chat.id, istKanal, scrollToEnd]);
 

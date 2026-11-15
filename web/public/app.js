@@ -7269,6 +7269,9 @@ function renderKanalThemen(community, kanal) {
 /** Dritte Ebene: der Chat zu einem Thema. */
 // Kasten 27: Takt des offenen Unterthemas (renderCommunityChat).
 let kanalUhr = null;
+// Kasten AF 1: Klingel `kanal:<id>` für das offene Unterthema (Schema 100).
+let kanalKlingel = { thema: null, aus: () => {}, da: false };
+let kanalNachsehenJetzt = null;
 /*
  * Kasten 4.2: worauf die nächste Nachricht im Unterthema antwortet — je
  * Kanal. Liegt außerhalb von renderCommunityChat, weil das Nachsehen im Takt
@@ -7354,12 +7357,19 @@ async function renderCommunityChat(community, kanal, thema) {
    * ganze Seite samt Eingabefeld neu.
    */
   clearInterval(kanalUhr);
+  kanalNachsehenJetzt = null;
   if (/^[0-9a-f-]{36}$/i.test(String(kanal.id))) {
     let kanalStand = null;
+    let laeuft = false;
+    let letzteAbfrage = 0;
     const zeichenLauf = lauf;
-    kanalUhr = setInterval(async () => {
-      if (renderLauf !== zeichenLauf || !$('#commMsgs')) return clearInterval(kanalUhr);
-      if (document.hidden) return;
+    const weg = () => renderLauf !== zeichenLauf || !$('#commMsgs');
+    const kanalNachsehen = async (geklingelt = false) => {
+      if (weg() || document.hidden || laeuft) return;
+      if (!geklingelt && window.ChatAbgleich &&
+          !window.ChatAbgleich.faellig('chat', kanalKlingel.da, letzteAbfrage, Date.now())) return;
+      laeuft = true;
+      letzteAbfrage = Date.now();
       try {
         const r = await fetch(`/api/communities/${community.id}/channels/${kanal.id}/stand`);
         if (!r.ok) return;
@@ -7375,8 +7385,43 @@ async function renderCommunityChat(community, kanal, thema) {
         }
       } catch {
         /* Der naechste Takt fragt wieder. */
+      } finally {
+        laeuft = false;
       }
+    };
+    kanalNachsehenJetzt = kanalNachsehen;
+    kanalUhr = setInterval(() => {
+      if (weg()) {
+        clearInterval(kanalUhr);
+        kanalNachsehenJetzt = null;
+        // Unterthema verlassen: Klingel aus. Bleibt es dasselbe (neu gezeichnet),
+        // hat der neue Lauf die Klingel schon übernommen, siehe unten.
+        if (!$('#commMsgs')) {
+          kanalKlingel.aus();
+          kanalKlingel = { thema: null, aus: () => {}, da: false };
+        }
+        return;
+      }
+      kanalNachsehen();
     }, window.ChatAbgleich?.INTERVALL_CHAT_MS || 4000);
+    kanalNachsehen(true);
+
+    // renderCommunityChat zeichnet bei jeder Änderung die ganze Seite neu —
+    // die Klingel bleibt dann verbunden, nur ein neues Unterthema hört neu.
+    const thema_ = window.ChatAbgleich?.klingelThema('kanal', kanal.id);
+    if (thema_ && kanalKlingel.thema !== thema_) {
+      kanalKlingel.aus();
+      kanalKlingel = { thema: thema_, aus: () => {}, da: false };
+      const eigene = kanalKlingel;
+      eigene.aus = window.ChatAbgleich.klingelHoeren(
+        klingelClient(),
+        thema_,
+        () => kanalNachsehenJetzt?.(true),
+        (verbunden) => {
+          eigene.da = verbunden;
+        }
+      );
+    }
   }
 
   // Der Verlauf steht unten - wie in jedem Chat.
@@ -21752,10 +21797,27 @@ let msgBearbeitet = null;
 let chatUhr = null;
 let chatNachsehenGeneration = 0;
 
+/*
+ * Kasten AF 1 (21.10.2026): die Klingel (Schema 100, gemeinsam/chatabgleich.js).
+ * Ändert sich etwas im offenen Chat, klingelt die Datenbank auf `chat:<id>`,
+ * und der Browser sieht sofort nach statt erst im nächsten Takt. Solange sie
+ * verbunden ist, fragt der Takt nur noch alle INTERVALL_CHAT_MIT_KLINGEL_MS.
+ * Gleiche Regel in der App (ChatDetailScreen).
+ */
+let chatKlingelAus = () => {};
+let chatNachsehenJetzt = null;
+
+function klingelClient() {
+  return window.Anmeldung?.client?.() || null;
+}
+
 function chatNachsehenStoppen() {
   chatNachsehenGeneration++;
   clearInterval(chatUhr);
   chatUhr = null;
+  chatKlingelAus();
+  chatKlingelAus = () => {};
+  chatNachsehenJetzt = null;
 }
 
 function chatNachsehenStarten(chat) {
@@ -21765,10 +21827,21 @@ function chatNachsehenStarten(chat) {
   const takt = window.ChatAbgleich?.INTERVALL_CHAT_MS || 4000;
   let letzterStand = null;
   let laeuft = false;
+  let nochmal = false;
+  let klingelDa = false;
+  let letzteAbfrage = 0;
 
-  const nachsehen = async () => {
-    if (laeuft || document.hidden || !aktuell()) return;
+  const nachsehen = async (geklingelt = false) => {
+    if (document.hidden || !aktuell()) return;
+    // Klingelt es während einer Abfrage, danach gleich noch einmal.
+    if (laeuft) {
+      if (geklingelt) nochmal = true;
+      return;
+    }
+    if (!geklingelt && window.ChatAbgleich &&
+        !window.ChatAbgleich.faellig('chat', klingelDa, letzteAbfrage, Date.now())) return;
     laeuft = true;
+    letzteAbfrage = Date.now();
     try {
       const kuvertIds = window.ChatAbgleich?.offeneKuvertIds(state.messages) || [];
       const staende = [];
@@ -21814,11 +21887,26 @@ function chatNachsehenStarten(chat) {
       console.warn('Chat nachsehen fehlgeschlagen:', fehler?.message || fehler);
     } finally {
       laeuft = false;
+      if (nochmal && state.openChatId === chat.id) {
+        nochmal = false;
+        nachsehen(true);
+      }
     }
   };
 
-  nachsehen();
-  if (aktuell()) chatUhr = setInterval(nachsehen, takt);
+  nachsehen(true);
+  if (aktuell()) chatUhr = setInterval(() => nachsehen(), takt);
+  chatNachsehenJetzt = nachsehen;
+  if (window.ChatAbgleich && /^[0-9a-f-]{36}$/i.test(String(chat.id))) {
+    chatKlingelAus = window.ChatAbgleich.klingelHoeren(
+      klingelClient(),
+      window.ChatAbgleich.klingelThema('chat', chat.id),
+      () => nachsehen(true),
+      (verbunden) => {
+        klingelDa = verbunden;
+      }
+    );
+  }
 }
 
 /*
@@ -21838,9 +21926,20 @@ let listenStand = null;
  * (Chatoptionen „Mitteilungen“ kippte so, 10.11.2026).
  */
 let chatListeAenderungen = 0;
+// Kasten AF 1: Klingel `nutzer:<ich>` für die Chatlisten (Schema 100).
+let listenKlingelAus = () => {};
+let listenKlingelDa = false;
+let listenLetzteAbfrage = 0;
 
-async function listeNachsehen(sofort = false) {
+/**
+ * sofort:     Listen auf jeden Fall neu holen (nach eigener Handlung).
+ * geklingelt: jetzt nachsehen, auch wenn der Takt mit Klingel noch nicht dran ist.
+ */
+async function listeNachsehen(sofort = false, geklingelt = false) {
   if (document.hidden || !window.Anmeldung?.angemeldet?.()) return;
+  if (!sofort && !geklingelt && window.ChatAbgleich &&
+      !window.ChatAbgleich.faellig('liste', listenKlingelDa, listenLetzteAbfrage, Date.now())) return;
+  listenLetzteAbfrage = Date.now();
   try {
     const r = await fetch('/api/chatstand');
     if (!r.ok) return;
@@ -21877,9 +21976,36 @@ async function listeNachsehen(sofort = false) {
 function listeNachsehenStarten() {
   clearInterval(listenUhr);
   listenStand = null;
-  listeNachsehen();
-  listenUhr = setInterval(listeNachsehen, window.ChatAbgleich?.INTERVALL_LISTE_MS || 10000);
+  listeNachsehen(false, true);
+  listenUhr = setInterval(() => listeNachsehen(), window.ChatAbgleich?.INTERVALL_LISTE_MS || 10000);
+  listenKlingelAus();
+  listenKlingelAus = () => {};
+  const ich = window.Anmeldung?.nutzer?.()?.id;
+  if (window.ChatAbgleich && ich) {
+    listenKlingelAus = window.ChatAbgleich.klingelHoeren(
+      klingelClient(),
+      window.ChatAbgleich.klingelThema('nutzer', ich),
+      () => listeNachsehen(false, true),
+      (verbunden) => {
+        listenKlingelDa = verbunden;
+      }
+    );
+  }
 }
+
+/*
+ * Kasten AF 1: Zurück in den Tab oder wieder online → sofort nachsehen, nicht
+ * erst im nächsten Takt. Im Hintergrund fragt nichts (document.hidden); was
+ * dort ankam, holt dieser eine Aufruf nach. Gleiche Regel in der App (AppState).
+ */
+function chatsNachholen() {
+  if (document.hidden) return;
+  chatNachsehenJetzt?.(true);
+  kanalNachsehenJetzt?.(true);
+  listeNachsehen(false, true);
+}
+document.addEventListener('visibilitychange', chatsNachholen);
+window.addEventListener('online', chatsNachholen);
 
 function openNachrichtMenue(m, chat) {
   const eigene = m.from === 'me';

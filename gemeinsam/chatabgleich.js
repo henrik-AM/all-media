@@ -31,13 +31,27 @@
  *
  * WARUM KEIN REALTIME-ABO ALLEIN
  *
- * `messages` steht in der Publikation `supabase_realtime`, ein Abo wäre also
- * möglich. Es fällt aber still aus — Funkloch, App im Hintergrund, Expo Go
- * nach dem Neuladen — und dann ist B wieder genau da, wo Henrik ihn gefunden
- * hat. Die Abfrage im Takt kann nicht still ausfallen. Sie fragt erst einen
- * kleinen „Stand" (Kennungen und Zeitstempel, ein paar hundert Byte) und lädt
- * den Verlauf nur, wenn der sich geändert hat — das hält den Verbrauch klein
+ * Ein Abo fällt still aus — Funkloch, App im Hintergrund, Expo Go nach dem
+ * Neuladen — und dann ist B wieder genau da, wo Henrik ihn gefunden hat. Die
+ * Abfrage im Takt kann nicht still ausfallen. Sie fragt erst einen kleinen
+ * „Stand" (Kennungen und Zeitstempel, ein paar hundert Byte) und lädt den
+ * Verlauf nur, wenn der sich geändert hat — das hält den Verbrauch klein
  * (Supabase-Egress, siehe Projektnotiz vom 13.09.2026).
+ *
+ * KLINGEL (Allgemeines Feedback 21.10.2026, Kasten AF 1, Schema 100)
+ *
+ * Henrik: „Chats werden zwischen echten Nutzern nicht richtig synchronisiert."
+ * Vier Sekunden Takt fühlen sich zu zweit nicht wie „sofort" an, und eine
+ * Reaktion änderte den Stand gar nicht — sie kam erst mit der nächsten
+ * Nachricht an. Bis hierher stand an dieser Stelle auch, `messages` sei in
+ * der Realtime-Veröffentlichung; seit Schema 95 (17.10.) ist die leer.
+ *
+ * Jetzt klingelt die Datenbank (Schema 100) auf privaten Realtime-Kanälen:
+ * `chat:<id>`, `kanal:<id>`, `nutzer:<id>`. Die Klingel trägt keinen Inhalt;
+ * wer sie hört, sieht sofort auf dem gewohnten Weg nach. Die Abfrage im Takt
+ * bleibt darunter, solange die Klingel verbunden ist nur seltener
+ * (`faellig`). Nach jedem (Wieder-)Verbinden wird einmal nachgesehen — was in
+ * der Lücke geschah, kam ohne Klingel.
  *
  * UMD-HÜLLE
  *
@@ -68,6 +82,21 @@
    */
   var STAND_ZEILEN = 30;
 
+  /**
+   * Wie oft nachgesehen wird, solange die Klingel verbunden ist. Die Klingel
+   * meldet jede Änderung sofort; der Takt fängt nur, was sie verpasst.
+   */
+  var INTERVALL_CHAT_MIT_KLINGEL_MS = 30000;
+  var INTERVALL_LISTE_MIT_KLINGEL_MS = 60000;
+
+  /**
+   * Klingeln, die so kurz nacheinander kommen, werden zu einem Nachsehen
+   * zusammengefasst — eine neue Nachricht klingelt beim Empfänger zweimal in
+   * der Liste (Nachricht und Ungelesen, Schema 81), „gelesen" oft zugleich
+   * mit einer Antwort.
+   */
+  var KLINGEL_BUENDELN_MS = 250;
+
   /** Die Spalten der Standabfrage auf `messages` (Kanäle: nur id, created_at). */
   var STAND_SPALTEN = 'id, created_at, edited_at, deleted_at, read_at';
   var STAND_SPALTEN_KANAL = 'id, created_at';
@@ -78,14 +107,94 @@
 
   /**
    * Der Stand eines Verlaufs — ein Text, der sich genau dann ändert, wenn
-   * eine Nachricht dazukommt, bearbeitet, zurückgenommen oder gelesen wird.
+   * eine Nachricht dazukommt, bearbeitet, zurückgenommen oder gelesen wird
+   * oder (Kasten AF 1) eine Reaktion dazukommt, wechselt oder wegfällt.
+   * `reaktionen`: Zeilen aus `message_reactions` zu den Standzeilen
+   * (message_id, user_id, emoji); fehlt das Feld, zählen sie nicht mit.
    */
-  function stand(zeilen) {
-    return (zeilen || [])
+  function stand(zeilen, reaktionen) {
+    var n = (zeilen || [])
       .map(function (z) {
         return [wert(z.id), wert(z.edited_at), wert(z.deleted_at), wert(z.read_at)].join('|');
       })
       .join(';');
+    if (!reaktionen) return n;
+    var r = reaktionen
+      .map(function (z) {
+        return [wert(z.message_id), wert(z.user_id), wert(z.emoji)].join('|');
+      })
+      .sort()
+      .join(';');
+    return n + '#' + r;
+  }
+
+  /**
+   * Ist eine Abfrage im Takt fällig? Ohne Klingel immer (der Takt selbst ist
+   * INTERVALL_CHAT_MS bzw. INTERVALL_LISTE_MS); mit verbundener Klingel erst,
+   * wenn die letzte Abfrage INTERVALL_…_MIT_KLINGEL_MS her ist.
+   * `art`: 'chat' oder 'liste'.
+   */
+  function faellig(art, klingelVerbunden, letzteAbfrage, jetzt) {
+    if (!klingelVerbunden || !letzteAbfrage) return true;
+    var takt = art === 'liste' ? INTERVALL_LISTE_MIT_KLINGEL_MS : INTERVALL_CHAT_MIT_KLINGEL_MS;
+    return jetzt - letzteAbfrage >= takt;
+  }
+
+  /** Thema des privaten Klingelkanals: 'chat', 'kanal' oder 'nutzer' + Kennung. */
+  function klingelThema(art, kennung) {
+    return art + ':' + kennung;
+  }
+
+  /**
+   * Die Klingel eines Themas hören (Schema 100), für App und Website gleich —
+   * beide haben einen supabase-js-Client mit Sitzung.
+   *
+   *   beiKlingel()           — etwas hat sich geändert: jetzt nachsehen.
+   *                            Auch nach jedem (Wieder-)Verbinden.
+   *   beiZustand(verbunden)  — für `faellig`: ist die Klingel gerade da?
+   *
+   * Gibt eine Abmeldefunktion zurück. Ohne Client oder ohne Realtime (alte
+   * Bibliothek, Attrappe) bleibt es still bei der Abfrage im Takt.
+   */
+  function klingelHoeren(client, thema, beiKlingel, beiZustand) {
+    var zustand = typeof beiZustand === 'function' ? beiZustand : function () {};
+    if (!client || typeof client.channel !== 'function') {
+      zustand(false);
+      return function () {};
+    }
+    var aus = false;
+    var uhr = null;
+    var klingeln = function () {
+      if (aus) return;
+      clearTimeout(uhr);
+      uhr = setTimeout(function () {
+        if (!aus) beiKlingel();
+      }, KLINGEL_BUENDELN_MS);
+    };
+    var kanal;
+    try {
+      kanal = client.channel(thema, { config: { private: true } });
+      kanal.on('broadcast', { event: 'klingel' }, klingeln);
+      kanal.subscribe(function (status) {
+        if (aus) return;
+        var verbunden = status === 'SUBSCRIBED';
+        zustand(verbunden);
+        if (verbunden) klingeln();
+      });
+    } catch (e) {
+      zustand(false);
+      return function () {};
+    }
+    return function () {
+      aus = true;
+      clearTimeout(uhr);
+      zustand(false);
+      try {
+        client.removeChannel(kanal);
+      } catch (e) {
+        /* Schon weg. */
+      }
+    };
   }
 
   /**
@@ -300,10 +409,16 @@ function offeneKuvertIds(nachrichten) {
     INTERVALL_LISTE_MS: INTERVALL_LISTE_MS,
     offeneKuvertIds: offeneKuvertIds,
     kuvertBloecke: kuvertBloecke,
+    INTERVALL_CHAT_MIT_KLINGEL_MS: INTERVALL_CHAT_MIT_KLINGEL_MS,
+    INTERVALL_LISTE_MIT_KLINGEL_MS: INTERVALL_LISTE_MIT_KLINGEL_MS,
+    KLINGEL_BUENDELN_MS: KLINGEL_BUENDELN_MS,
     STAND_ZEILEN: STAND_ZEILEN,
     STAND_SPALTEN: STAND_SPALTEN,
     STAND_SPALTEN_KANAL: STAND_SPALTEN_KANAL,
     stand: stand,
+    faellig: faellig,
+    klingelThema: klingelThema,
+    klingelHoeren: klingelHoeren,
     listenStand: listenStand,
     fingerabdruck: fingerabdruck,
     nachrichtenAbgleichen: nachrichtenAbgleichen,

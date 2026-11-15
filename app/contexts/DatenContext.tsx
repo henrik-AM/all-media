@@ -183,6 +183,11 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
    * Gefragt wird zuerst nur der Stand (ladeChatlistenStand, zwei kleine
    * Abfragen). Nur wenn der sich geaendert hat, werden die Listen neu
    * geholt. Im Hintergrund wird nicht gefragt; beim Zurueckkommen sofort.
+   *
+   * Kasten AF 1 (21.10.2026): dazu die Klingel `nutzer:<ich>` (Schema 100) —
+   * neue oder geaenderte Nachricht in einem eigenen Chat, eigene
+   * Mitgliedszeile geaendert. Mit verbundener Klingel fragt der Takt nur noch
+   * alle INTERVALL_LISTE_MIT_KLINGEL_MS.
    */
   const listenStand = useRef<string | null>(null);
 
@@ -200,11 +205,20 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     if (!supabase || !ichId) return;
     let aus = false;
     let laeuft = false;
+    let nochmal = false;
+    let klingelDa = false;
+    let letzteAbfrage = 0;
     listenStand.current = null;
 
-    const nachsehen = async () => {
-      if (aus || laeuft || AppState.currentState !== 'active') return;
+    const nachsehen = async (geklingelt = false) => {
+      if (aus || AppState.currentState !== 'active') return;
+      if (laeuft) {
+        if (geklingelt) nochmal = true;
+        return;
+      }
+      if (!geklingelt && !ChatAbgleich.faellig('liste', klingelDa, letzteAbfrage, Date.now())) return;
       laeuft = true;
+      letzteAbfrage = Date.now();
       try {
         const stand = await ladeChatlistenStand(supabase, ichId);
         if (aus || stand === null) return;
@@ -214,18 +228,31 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
         if (vorher !== null && vorher !== stand) await chatsNeuLaden();
       } finally {
         laeuft = false;
+        if (nochmal && !aus) {
+          nochmal = false;
+          nachsehen(true);
+        }
       }
     };
 
-    nachsehen();
-    const uhr = setInterval(nachsehen, ChatAbgleich.INTERVALL_LISTE_MS);
+    nachsehen(true);
+    const uhr = setInterval(() => nachsehen(), ChatAbgleich.INTERVALL_LISTE_MS);
     const horcher = AppState.addEventListener('change', (z) => {
-      if (z === 'active') nachsehen();
+      if (z === 'active') nachsehen(true);
     });
+    const klingelAus = ChatAbgleich.klingelHoeren(
+      supabase,
+      ChatAbgleich.klingelThema('nutzer', ichId),
+      () => nachsehen(true),
+      (verbunden) => {
+        klingelDa = verbunden;
+      }
+    );
     return () => {
       aus = true;
       clearInterval(uhr);
       horcher.remove();
+      klingelAus();
     };
   }, [supabase, ichId, chatsNeuLaden]);
 

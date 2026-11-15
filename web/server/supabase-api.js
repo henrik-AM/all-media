@@ -671,8 +671,16 @@ async function ladeChatStand(client, chatId, istKanal = false, schluesselId = nu
         .order('created_at', { ascending: false })
         .limit(ChatAbgleich.STAND_ZEILEN);
   if (error) throw error;
+  const zeilen = data || [];
+
+  // Kasten AF 1: Reaktionen gehören zum Stand — gleiche Abfrage wie in der App.
+  const { data: reaktionen, error: reaktionsFehler } = istKanal || !zeilen.length ? { data: [], error: null } : await client
+    .from('message_reactions')
+    .select('message_id, user_id, emoji')
+    .in('message_id', zeilen.map((z) => z.id));
+  if (reaktionsFehler) throw reaktionsFehler;
   const { kuvertStandHolen } = require('../../gemeinsam/kryptodaten');
-  return ChatAbgleich.stand(data || []) +
+  return ChatAbgleich.stand(zeilen, reaktionen || []) +
     (istKanal ? '' : await kuvertStandHolen(client, schluesselId, kuvertIds));
 }
 

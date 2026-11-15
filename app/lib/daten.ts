@@ -732,7 +732,7 @@ export async function ladeChatZustand(
 
 /**
  * Der „Stand" eines offenen Chats — ein paar hundert Byte statt des ganzen
- * Verlaufs (Kasten 27).
+ * Verlaufs (Kasten 27), mit Reaktionen (Kasten AF 1).
  *
  * Ein offener Chat fragt das alle INTERVALL_CHAT_MS ab und laedt den
  * Verlauf nur, wenn sich der Stand geaendert hat. Bis zum 06.10.2026 lud er
@@ -765,9 +765,22 @@ export async function ladeChatStand(
         .order('created_at', { ascending: false })
         .limit(ChatAbgleich.STAND_ZEILEN);
   if (error) return null;
+  const zeilen = (data ?? []) as any[];
+
+  /*
+   * Kasten AF 1: Reaktionen gehoeren zum Stand. Vorher aenderte eine
+   * Reaktion ihn nicht — sie kam erst mit der naechsten Nachricht an.
+   * Scheitert die Abfrage, zaehlen sie diesmal nicht mit (dann laedt der
+   * naechste Takt einmal zu viel, nie zu wenig).
+   */
+  const { data: reaktionen, error: reaktionsFehler } = istKanal || !zeilen.length ? { data: [], error: null } : await client
+    .from('message_reactions')
+    .select('message_id, user_id, emoji')
+    .in('message_id', zeilen.map((z) => z.id));
+  if (reaktionsFehler) return null;
   try {
     const { kuvertStandHolen } = require('../../gemeinsam/kryptodaten');
-    return ChatAbgleich.stand((data ?? []) as any[]) +
+    return ChatAbgleich.stand(zeilen, (reaktionen ?? []) as any[]) +
       (istKanal ? '' : await kuvertStandHolen(client, schluesselId, kuvertIds));
   } catch { return null; }
 }

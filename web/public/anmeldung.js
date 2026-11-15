@@ -647,6 +647,9 @@
     geburtsdatumNachtragen,
     einwilligungenOffen,
     nutzer,
+    // Kasten AF 1: der Client mit Sitzung, für die Chat-Klingel (Realtime,
+    // Schema 100). null, solange er nicht aufgebaut ist.
+    client: () => client,
     angemeldet: () => Boolean(sitzung?.access_token),
     beiAenderung: (fn) => {
       zuhoerer.add(fn);

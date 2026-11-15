@@ -638,3 +638,21 @@ der Dokumentation erneut einspielen.
 
 Aktuelle Paket-6-Fortsetzung und verbleibende Abnahme:
 [Aufräumfortsetzung 11.11.2026](berichte/Paket-6-Aufraeumen-11-11-2026.md).
+## Nachtrag 21.10.2026: Schema 100 (Allgemeines Feedback 21.10., Kasten AF 1)
+
+**Entwurf, noch nicht eingespielt (Supabase-Sperre).** Nach 99; hängt nur an Funktionen, die
+es schon gibt (`is_chat_member`, `kanal_sichtbar` — Signatur in 99 unverändert, `konto_freigegeben`).
+
+- `SUPABASE_SCHEMA_100_chat_klingel.sql` — Chat-Klingel über Realtime-Broadcast auf privaten
+  Kanälen `chat:<id>`, `kanal:<id>`, `nutzer:<id>`, ohne Inhalt. Funktion `chat_klingeln` (nie
+  werfend, nicht aufrufbar), Auslöser je Befehl `chat_klingel_neu/_geaendert/_weg` auf `messages`,
+  `message_reactions`, `chat_members`, `community_channel_messages`;
+  `klingel_hoeren_erlaubt(text)` + Regel „Chat-Klingel hoeren" auf `realtime.messages` (nur SELECT).
+  **Die Realtime-Veröffentlichung bleibt leer (Schema 95, Abschnitt 10).** Ersetzt nichts.
+
+Code vor dem Schema: App und Website hören die Klingel (`gemeinsam/chatabgleich.js`,
+`klingelHoeren`); ohne Schema 100 kommt nie eine an, die Abfrage im 4-s-/10-s-Takt läuft wie bisher.
+Probe: `app/test/_probe100.js` (22/22, verworfen). Erst nach dem Einspielen und mit laufendem
+Realtime-Dienst prüfbar, ob die Klingel ankommt (Zwei-Konten-Probe, siehe Kastendatei).
+
+**Gesamtreihenfolge der offenen Entwürfe:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 97 → 98 → 99 → 100.

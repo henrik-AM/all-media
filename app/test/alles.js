@@ -269,6 +269,7 @@ const LAEUFE = [
   ['k28-commbild', 'k28-commbild.js'],
   ['k28-gruppe', 'k28-gruppe.js'],
   ['k28-karte', 'k28-karte.js'],
+  ['chatklingel-einheit', '_chatklingel_einheit.js'],
 ];
 
 /** Aus der Ausgabe herauslesen, wie viele Prüfungen liefen. */
