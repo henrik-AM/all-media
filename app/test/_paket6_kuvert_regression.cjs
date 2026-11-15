@@ -56,7 +56,7 @@ test('Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwa
  assert.equal(kaputt._geoeffnet,false);
 });
 test('App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht',async()=>{
- const a={Krypto:{entschluesseln:()=>null},verschluesselteChats:new Set(),NICHT_LESBAR:'Auf diesem Gerät nicht lesbar'};
+ const a={Krypto:{kontextAusZeile: z=>z,entschluesseln:()=>null},verschluesselteChats:new Set(),NICHT_LESBAR:'Auf diesem Gerät nicht lesbar'};
  vm.runInNewContext(ts.transpileModule(extract('app/lib/krypto.ts','aufschliessen')+';globalThis.oeffnen=aufschliessen;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,a);
  const db={rows:[],keys:[]};const c=dbClient(db);const z={id:id(1),krypto:1};await a.oeffnen(c,[z],{id:'own',geheim:'mock'});assert.equal(z.kuvertFehlt,true);
  db.keys.push({message_id:id(1),schluessel_id:'own'});await a.oeffnen(c,[z],{id:'own',geheim:'mock'});assert.equal(z.kuvertFehlt,false);assert.equal(z._geoeffnet,false);

@@ -215,7 +215,7 @@
    * Bis zum 16.10.2026 hieß jeder Fehler hier `null` — und damit Klartext,
    * still, in einem Chat, den das Kontaktprofil „Ende-zu-Ende" nannte.
    */
-  async function verschliessen(chatId, text) {
+  async function verschliessen(chatId, text, bezug = {}) {
     const kontoId = kontoJetzt();
     let fakten;
     try {
@@ -240,14 +240,19 @@
     if (weg.art === 'ablehnen') throw new Error(weg.meldung);
 
     let paket;
+    const nachrichtId = crypto.randomUUID();
+    const gesendetAm = new Date().toISOString();
     try {
-      paket = Krypto.verschluesseln(text, fakten.meiner.geheim, weg.empfaenger);
+      paket = Krypto.verschluesseln(text, fakten.meiner.geheim, weg.empfaenger, {
+        id: nachrichtId, zeit: gesendetAm, chatId, senderId: kontoId, antwortAuf: bezug.antwortAuf || null, zitatVon: bezug.zitatVon || null,
+      });
     } catch (fehler) {
       console.warn('Verschlüsseln fehlgeschlagen:', fehler.message);
       throw new Error(MELDUNG_NICHT_VERSCHLUESSELT);
     }
     verschluesselteChats.add(kontoJetzt() + '|' + chatId);
     return {
+      nachrichtId, gesendetAm,
       krypto: paket.version,
       chiffre: paket.chiffre,
       kryptoNonce: paket.nonce,
@@ -276,6 +281,7 @@
     }
     const klar = Krypto.entschluesseln(
       {
+        kontext: Krypto.kontextAusZeile(nachricht),
         version: nachricht.krypto,
         chiffre: nachricht.chiffre,
         nonce: nachricht.kryptoNonce,
@@ -328,7 +334,7 @@
         geoeffnet.map((n) => ({ userId: n.senderId, schluessel: n.absenderSchluessel }))
       );
       geoeffnet.forEach((n, i) => {
-        n.nichtPruefbar = urteile[i] !== true;
+        n.nichtPruefbar = urteile[i] !== true || Number(n.krypto) < 2;
       });
     } catch (fehler) {
       console.warn('Absender nicht geprüft:', fehler.message);
@@ -365,7 +371,7 @@
     if (!meiner || !nachricht || !Number(nachricht.krypto) || !nachricht.kuvert) return null;
     const neu = Krypto.umschliessen(
       text,
-      { version: nachricht.krypto, absender: nachricht.absenderSchluessel },
+      { version: nachricht.krypto, chiffre: nachricht.chiffre, nonce: nachricht.kryptoNonce, absender: nachricht.absenderSchluessel, kontext: Krypto.kontextAusZeile(nachricht) },
       nachricht.kuvert,
       meiner.geheim
     );
@@ -387,6 +393,7 @@
     if (!meiner || !nachricht.kuvert || typeof Krypto.meldebeleg !== 'function') return null;
     return Krypto.meldebeleg(
       {
+        kontext: Krypto.kontextAusZeile(nachricht),
         version: nachricht.krypto,
         chiffre: nachricht.chiffre,
         nonce: nachricht.kryptoNonce,

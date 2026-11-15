@@ -638,3 +638,11 @@ der Dokumentation erneut einspielen.
 
 Aktuelle Paket-6-Fortsetzung und verbleibende Abnahme:
 [Aufräumfortsetzung 11.11.2026](berichte/Paket-6-Aufraeumen-11-11-2026.md).
+
+## Paket 6 – Format 2 (Schema 127, Entwurf)
+
+`messages_krypto_stimmig`: Schema 31 → **Schema 127**. Zusätzlich
+`messages.krypto_gesendet_am` für die vom Absender mitverschlossene Sendezeit.
+Erst Schema 127 prüfen und anwenden, danach neue Clients veröffentlichen.
+Format 1 bleibt lesbar; frühere Clients verstehen Format 2 nicht.
+Schema 127 ist noch nicht live eingespielt.

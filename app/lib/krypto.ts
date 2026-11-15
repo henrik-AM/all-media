@@ -290,6 +290,8 @@ export async function chatVerschluesselbar(
  */
 export interface Verschlossen {
   spalten: {
+    id?: string;
+    krypto_gesendet_am?: string;
     krypto: number;
     text: string;
     chiffre: string | null;
@@ -351,12 +353,14 @@ const verschluesselteChats = new Set<string>();
 export function verschliessen(
   text: string,
   meiner: MeinSchluessel,
-  empfaenger: { id: string; oeffentlich: string }[]
+  empfaenger: { id: string; oeffentlich: string }[],
+  kontext?: Record<string, unknown>
 ): Verschlossen {
   try {
-    const paket = Krypto.verschluesseln(text, meiner.geheim, empfaenger);
+    const paket = Krypto.verschluesseln(text, meiner.geheim, empfaenger, kontext);
     return {
       spalten: {
+        ...(kontext ? { id: kontext.id as string, krypto_gesendet_am: kontext.zeit as string } : {}),
         krypto: paket.version,
         text: '',
         chiffre: paket.chiffre,
@@ -435,7 +439,8 @@ export async function fuerChatVerschliessen(
   client: SupabaseClient,
   chatId: string,
   ichId: string,
-  text: string
+  text: string,
+  bezug: { antwortAuf?: string | null; zitatVon?: string | null } = {}
 ): Promise<Verschlossen> {
   let fakten: any;
   try {
@@ -461,7 +466,9 @@ export async function fuerChatVerschliessen(
   if (weg.art === 'offen') return offen(text);
   if (weg.art === 'ablehnen') throw new VerschluesselnFehler(weg.meldung);
 
-  const paket = verschliessen(text, fakten.meiner as MeinSchluessel, weg.empfaenger);
+  const paket = verschliessen(text, fakten.meiner as MeinSchluessel, weg.empfaenger, {
+    id: ExpoCrypto.randomUUID(), zeit: new Date().toISOString(), chatId, senderId: ichId, antwortAuf: bezug.antwortAuf || null, zitatVon: bezug.zitatVon || null,
+  });
   verschluesselteChats.add(chatId);
   return paket;
 }
@@ -487,7 +494,7 @@ export async function fuerBearbeitenUmschliessen(
   const [{ data: n }, { data: kuvert }] = await Promise.all([
     client
       .from('messages')
-      .select('krypto, absender_schluessel')
+      .select('id, chat_id, sender_id, reply_to, quote_of, krypto_gesendet_am, krypto, chiffre, krypto_nonce, absender_schluessel')
       .eq('id', nachrichtId)
       .maybeSingle(),
     client
@@ -500,7 +507,7 @@ export async function fuerBearbeitenUmschliessen(
   if (!n || !kuvert) return null;
   const neu = Krypto.umschliessen(
     text,
-    { version: (n as any).krypto, absender: (n as any).absender_schluessel },
+    { version: (n as any).krypto, chiffre: (n as any).chiffre, nonce: (n as any).krypto_nonce, absender: (n as any).absender_schluessel, kontext: Krypto.kontextAusZeile(n) },
     kuvert,
     meiner.geheim
   );
@@ -529,7 +536,7 @@ export async function meldebelegHolen(
 ): Promise<{ text: string; sitzung?: string } | null> {
   const { data: n } = await client
     .from('messages')
-    .select('krypto, chiffre, krypto_nonce, absender_schluessel')
+    .select('id, chat_id, sender_id, reply_to, quote_of, krypto_gesendet_am, krypto, chiffre, krypto_nonce, absender_schluessel')
     .eq('id', nachrichtId)
     .maybeSingle();
   if (!n) return null;
@@ -545,6 +552,7 @@ export async function meldebelegHolen(
   if (!kuvert) return null;
   const beleg = Krypto.meldebeleg(
     {
+      kontext: Krypto.kontextAusZeile(n),
       version: (n as any).krypto,
       chiffre: (n as any).chiffre,
       nonce: (n as any).krypto_nonce,
@@ -625,7 +633,7 @@ export async function aufschliessen(
     z.kuvertFehlt = !kuvert;
     const klar = kuvert
       ? Krypto.entschluesseln(
-          { version: z.krypto, chiffre: z.chiffre, nonce: z.krypto_nonce, absender: z.absender_schluessel },
+          { version: z.krypto, chiffre: z.chiffre, nonce: z.krypto_nonce, absender: z.absender_schluessel, kontext: Krypto.kontextAusZeile(z) },
           kuvert,
           meiner.geheim
         )
@@ -633,6 +641,7 @@ export async function aufschliessen(
     z.text = klar === null ? NICHT_LESBAR : klar;
     z.warVerschluesselt = true;
     z._geoeffnet = klar !== null;
+    if (klar !== null && Number(z.krypto) === 2) z.created_at = z.krypto_gesendet_am;
   }
 
   /*
@@ -652,7 +661,7 @@ export async function aufschliessen(
         geoeffnet.map((z) => ({ userId: z.sender_id, schluessel: z.absender_schluessel }))
       );
       geoeffnet.forEach((z, i) => {
-        z.nichtPruefbar = urteile[i] !== true;
+        z.nichtPruefbar = urteile[i] !== true || Number(z.krypto) < 2;
       });
     }
   }

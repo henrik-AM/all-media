@@ -7,7 +7,7 @@ const http = require('node:http');
 const { chromium } = require('playwright-core');
 const ts = require('typescript');
 const {client,basis,A,B,Krypto} = require('./_paket6_hilfe.cjs');
-const W = path.resolve(__dirname,'../..'), PORT = 3300, ORIGIN = `http://127.0.0.1:${PORT}`;
+const W = path.resolve(__dirname,'../..'), PORT = Number(process.env.AM_OFFLINE_PORT || 3300), ORIGIN = `http://127.0.0.1:${PORT}`;
 const out = path.join(W,'pruefbelege/paket-6');
 const db = basis(), postId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 db.posts=[{id:postId,user_id:B,text:'Beitrag'}];
@@ -75,10 +75,10 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   await page.goto(ORIGIN+'/paket6');await page.evaluate(()=>KryptoWeb.anmelden());
   await page.locator('#msgInput').fill('Offline geheim 🔒');await page.locator('#sendBtn').click();
   await page.waitForFunction(()=>document.querySelector('#messages').textContent.includes('Offline geheim'),null,{timeout:5000}).catch(async e=>{console.error(await page.locator('body').innerText());console.error('Tabellen:',db.messages.length,db.krypto_schluessel.length);throw e;});
-  pruefe('Browser sendet verschlüsselt, Speichertabelle enthält keinen Klartext',db.messages.length===1&&db.messages[0].krypto===1&&db.messages[0].text==='');
+  pruefe('Browser sendet verschlüsselt, Speichertabelle enthält keinen Klartext',db.messages.length===1&&db.messages[0].krypto===2&&db.messages[0].text==='');
   pruefe('Kuverts auch für das Browsergerät und Gegenüber vorhanden',db.message_keys.length===3);
   const peer=db.krypto_schluessel.find(s=>s.id==='b'),nachricht=db.messages[0],kuvert=db.message_keys.find(k=>k.message_id===nachricht.id&&k.schluessel_id===peer.id);
-  pruefe('Gegenüber kann das echte Browserpaket lesen',Krypto.entschluesseln({version:1,chiffre:nachricht.chiffre,nonce:nachricht.krypto_nonce,absender:nachricht.absender_schluessel},kuvert,db.pb.geheim)==='Offline geheim 🔒');
+  pruefe('Gegenüber kann das echte Browserpaket lesen',Krypto.entschluesseln({version:nachricht.krypto,kontext:Krypto.kontextAusZeile(nachricht),chiffre:nachricht.chiffre,nonce:nachricht.krypto_nonce,absender:nachricht.absender_schluessel},kuvert,db.pb.geheim)==='Offline geheim 🔒');
 
   // Fehler im echten Composer: nicht nur die Kryptofunktion isoliert prüfen.
   const entwurfStatus=()=>page.evaluate(()=>({text:$('#msgInput').value,edit:!!msgBearbeitet,bezug:!!msgBezug,leiste:!!document.querySelector('.msgbezug'),frei:!$('#sendBtn').disabled}));
@@ -96,7 +96,7 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   await page.unroute('**/api/messages/zwei/*/bearbeiten');
   await page.evaluate(()=>sendMessage(ziel));
   st=await entwurfStatus();pruefe('Bearbeiten: Wiederholung gelingt verschlüsselt und schließt Entwurf erst bei Erfolg',st.text===''&&!st.edit&&!st.leiste&&stateNichtOffen());
-  function stateNichtOffen(){return db.messages.length===1&&db.messages[0].text===''&&db.messages[0].krypto===1;}
+  function stateNichtOffen(){return db.messages.length===1&&db.messages[0].text===''&&db.messages[0].krypto===2;}
   for(const art of ['absage','netz','json']){
     await page.route('**/api/messages/zwei',r=>art==='netz'?r.abort():r.fulfill({contentType:'application/json',body:art==='json'?'keine JSON-Antwort':JSON.stringify({ok:false,error:'Simulierte Sendeabsage'})}));
     await page.evaluate(async()=>{msgBearbeitet=null;msgBezug={art:'antwort',nachricht:state.messages[0]};zeigeBezugLeiste(ziel);$('#msgInput').value='Antwortentwurf bleibt';await sendMessage(ziel);});
@@ -122,9 +122,9 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   pruefe('Fehler sichtbar und Entwurf erhalten',await page.locator('#msgInput').inputValue()==='Nicht offen senden');
   pruefe('Netz-/Schlüsselstörung schreibt nichts',db.messages.length===vorher);
   await page.screenshot({path:path.join(out,'browser-sendesperre.png')});stoerung=null;
-  let nr=await page.evaluate(async B=>kryptoZustand(B,ziel),B);pruefe('Kontakt-Sicherheitsnummer entspricht Rechenschicht',nr.fingerabdruck===Krypto.sicherheitsnummer([db.pb.oeffentlich]).nummer&&nr.geraete===1);
+  let nr=await page.evaluate(async B=>kryptoZustand(B,ziel),B);pruefe('Kontakt-Sicherheitsnummer entspricht Rechenschicht',nr.fingerabdruck===Krypto.paarSicherheitsnummer(A,db.krypto_schluessel.filter(k=>k.user_id===A).map(k=>k.oeffentlich),B,db.krypto_schluessel.filter(k=>k.user_id===B).map(k=>k.oeffentlich)).nummer&&nr.geraete>=2);
   const zweit=Krypto.schluesselpaarErzeugen();db.krypto_schluessel.push({id:'altes-geraet',user_id:B,oeffentlich:zweit.oeffentlich,created_at:'2000-01-01'});
-  const nr2=await page.evaluate(async B=>kryptoZustand(B,ziel),B);pruefe('Altes zusätzliches Gerät ändert sichtbare Nummer',nr2.geraete===2&&nr2.fingerabdruck!==nr.fingerabdruck);
+  const nr2=await page.evaluate(async B=>kryptoZustand(B,ziel),B);pruefe('Altes zusätzliches Gerät ändert sichtbare Nummer',nr2.geraete===nr.geraete+1&&nr2.fingerabdruck!==nr.fingerabdruck);
   db.chat_members.push({chat_id:'zwei',user_id:'dritter-ohne-schluessel'});
   const unsicher=await page.evaluate(async B=>kryptoZustand(B,ziel),B);
   pruefe('Drittes Mitglied ohne Schlüssel erhält keine aktive Schlossanzeige',unsicher.an===false);
@@ -138,7 +138,7 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   const post=await page.evaluate(async id=>{const paket=await sendeKoerper('zwei','Beitrag geteilt');return api('/api/teilen',{id,art:'post',empfaenger:[ziel.userId],ziele:[{chatId:'zwei',...paket}]});},postId);
   pruefe('Echte Teilen-Route schreibt verschlüsselt samt Beitragsbezug',post.ok&&db.messages.at(-1).shared_post_id===postId&&db.messages.at(-1).text==='');
   const a=await page.evaluate(async()=>{const vorab=await api('/api/messages/zwei/anhang/vorbereiten',{art:'gif'});return api('/api/messages/zwei/anhang',{art:'gif',paket:await sendeKoerper('zwei',vorab.text)});});
-  pruefe('Echte Anhangroute verschließt die Beschriftung',a.ok&&db.messages.at(-1).krypto===1&&db.messages.at(-1).text==='');
+  pruefe('Echte Anhangroute verschließt die Beschriftung',a.ok&&db.messages.at(-1).krypto===2&&db.messages.at(-1).text==='');
   const story=await page.evaluate(()=>storyAntwortSenden('story','Schöne Story'));
   pruefe('Echte Storyroute verschließt Antwort mit Storybezug',story.ok&&db.messages.at(-1).reply_to_story==='story'&&db.messages.at(-1).text==='');
   const raw=await page.evaluate(()=>api('/api/messages/zwei/anhang',{art:'gif'}));

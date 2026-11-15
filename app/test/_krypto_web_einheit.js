@@ -53,12 +53,14 @@ function umgebung(speicher, konto, konten, routen) {
   const angemeldet = [];
   const konto = { id: A };
   const ctx = umgebung(speicher, konto, [A, B], (url, opt) => {
+    if (url.startsWith('/api/krypto/altbestand')) return {body:{kontoId:konto.id,id:konto.id===C?null:'alt',geraet:'alt-geraet'}};
     if (url === '/api/krypto/schluessel') { const b = JSON.parse(opt.body); angemeldet.push(b); return { body: { id: 'k-' + b.geraet } }; }
     return { status: 404, body: {} };
   });
   const m1 = await ctx.KryptoWeb.anmelden();
   pruefe('Altbestand: Konto A übernimmt das alte Paar', m1 && m1.geheim === altPaar.geheim && m1.geraet === 'alt-geraet');
-  pruefe('Altbestand: altes Fach gelöscht', !('allmedia.krypto.geheim' in speicher) && !('allmedia.krypto.geraet' in speicher));
+  pruefe('Altbestand bleibt für spätere historische Konten erhalten', speicher['allmedia.krypto.geheim'] === altPaar.geheim);
+  konto.id=B;await ctx.KryptoWeb.anmelden();
   pruefe('Altbestand: auch das zweite angemeldete Konto B behält es', speicher['allmedia.krypto.geheim.' + B] === altPaar.geheim);
   konto.id = C;
   const m3 = await ctx.KryptoWeb.anmelden();
@@ -87,7 +89,7 @@ function umgebung(speicher, konto, konten, routen) {
 
   fakten = { ...basis, schluessel: [sA, sB] };
   const paket = await ctx2.KryptoWeb.verschliessen('chat1', 'Hallo');
-  pruefe('Beide mit Schlüssel: verschlossen', paket && paket.krypto === 1 && paket.kuverts.length === 2);
+  pruefe('Beide mit Schlüssel: verschlossen', paket && paket.krypto === 2 && paket.kuverts.length === 2);
 
   fakten = { ...basis, schluessel: [sA] };
   pruefe('Gegenüber ohne Gerät, neuer Chat: Klartext (null)', (await ctx2.KryptoWeb.verschliessen('chat2', 'Hallo')) === null);
@@ -122,7 +124,7 @@ function umgebung(speicher, konto, konten, routen) {
   const verlauf = [zuNachricht(vonB, 'm1'), zuNachricht(falsch, 'm2')];
   ctx2.KryptoWeb.stapelOeffnen(verlauf);
   await ctx2.KryptoWeb.absenderPruefen(verlauf);
-  pruefe('Echte Nachricht geöffnet, nicht gekennzeichnet', verlauf[0].text === 'echt' && !verlauf[0].nichtPruefbar);
+  pruefe('Altnachricht lesbar, fehlende Kontextbindung gekennzeichnet', verlauf[0].text === 'echt' && verlauf[0].nichtPruefbar);
   pruefe('Fälschung geöffnet UND als nicht prüfbar gekennzeichnet', verlauf[1].text === 'falsch' && verlauf[1].nichtPruefbar === true);
 
   // Sicherheitsnummer

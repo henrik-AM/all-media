@@ -54,3 +54,46 @@ test('Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar',asy
  ctx.KryptoWeb.vergessen();konto.id='neu';assert.notEqual((await ctx.KryptoWeb.anmelden()).geheim,alt.geheim);
  assert.equal(speicher['allmedia.krypto.geheim'],alt.geheim);
 });
+test('Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar',()=>{
+ const a=Krypto.schluesselpaarErzeugen(),b=Krypto.schluesselpaarErzeugen();
+ const kontext={id:'original',chatId:'chat',senderId:A,antwortAuf:'frage',zitatVon:null,zeit:'2026-11-15T20:00:00.000Z'};
+ const p=Krypto.verschluesseln('Ja, mach das.',a.geheim,[{id:'b',oeffentlich:b.oeffentlich}],kontext);
+ const kopf={version:p.version,chiffre:p.chiffre,nonce:p.nonce,absender:p.absender,kontext};
+ assert.equal(p.version,2);assert.equal(Krypto.entschluesseln(kopf,p.kuverts[0],b.geheim),'Ja, mach das.');
+ for(const [k,v] of Object.entries({id:'kopie',chatId:'fremd',senderId:B,antwortAuf:'andere-frage',zitatVon:'fremdes-zitat',zeit:'2026-11-16T20:00:00.000Z'}))
+  assert.equal(Krypto.entschluesseln({...kopf,kontext:{...kontext,[k]:v}},p.kuverts[0],b.geheim),null,k);
+ assert.equal(Krypto.entschluesseln({...kopf,kontext:undefined},p.kuverts[0],b.geheim),null);
+ assert.equal(Krypto.entschluesseln({...kopf,version:1},p.kuverts[0],b.geheim),null);
+ const neu=Krypto.umschliessen('Bearbeitet',kopf,p.kuverts[0],b.geheim);
+ assert.ok(neu);assert.equal(Krypto.entschluesseln({...kopf,...neu},p.kuverts[0],b.geheim),'Bearbeitet');
+ const beleg=Krypto.meldebeleg({...kopf,...neu},p.kuverts[0],b.geheim);
+ assert.equal(beleg.text,'Bearbeitet');assert.equal(Krypto.belegPruefen(neu,beleg.sitzung,beleg.text),true);
+});
+test('App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul',async()=>{
+ const db=basis(),c=client(db),h=app(),Ak=h.aktionen();
+ const n=await Ak.nachrichtSenden(c,A,'zwei','sensibel',{antwortAuf:'frage'});
+ const row=db.messages.find(m=>m.id===n.id);assert.equal(row.krypto,2);assert.equal(row.text,'');
+ const me=await h.K.meinSchluessel(c,A),[offen]=await h.K.aufschliessen(c,[{...row}],me,{absenderPruefen:true});
+ assert.equal(offen.text,'sensibel');assert.equal(offen.nichtPruefbar,false);
+ await Ak.nachrichtBearbeiten(c,A,n.id,'bearbeitet');
+ const [neu]=await h.K.aufschliessen(c,[{...row}],me);assert.equal(neu.text,'bearbeitet');
+ const [falsch]=await h.K.aufschliessen(c,[{...row,reply_to:'andereFrage'}],me);assert.equal(falsch.text,h.K.NICHT_LESBAR);
+});
+test('Browser → Server → App: Format2 Identität und Zeit bleiben unverändert',async()=>{
+ const db=basis(),c=client(db),konto={id:A};
+ const ctx=browser(konto,(url,opt)=>{
+  if(url==='/api/krypto/schluessel')return antwort({id:'web-a'});
+  if(url.startsWith('/api/krypto/empfaenger/'))return S.kryptoFakten(c,'zwei',A).then(antwort);
+  throw new Error(url);
+ });
+ const paket=await ctx.KryptoWeb.verschliessen('zwei','Browsertext',{antwortAuf:'frage'});
+ assert.equal(paket.krypto,2);
+ const e=await S.handleSendMessage(c,A,'zwei','',{...paket,antwortAuf:'frage'});
+ assert.equal(e.ok,true);assert.equal(e.nachricht.id,paket.nachrichtId);assert.equal(e.nachricht.krypto_gesendet_am,paket.gesendetAm);
+ const b={id:'b',geheim:db.pb.geheim,oeffentlich:db.pb.oeffentlich};
+ const [g]=await app().K.aufschliessen(c,[{...e.nachricht}],b);assert.equal(g.text,'Browsertext');
+ const p={id:e.nachricht.id,chatId:'zwei',senderId:A,gesendetAm:paket.gesendetAm,antwortAufId:'frage',krypto:2,chiffre:paket.chiffre,kryptoNonce:paket.kryptoNonce,absenderSchluessel:paket.absenderSchluessel,kuvert:paket.kuverts.find(k=>k.schluesselId==='web-a')};
+ // Own browser key is added even when the server list lacks the just registered device.
+ assert.equal(ctx.KryptoWeb.oeffnen({...p}).text,'Browsertext');
+ assert.equal(ctx.KryptoWeb.oeffnen({...p,id:'kopie'}).text,ctx.KryptoWeb.NICHT_LESBAR);
+});

@@ -67,7 +67,7 @@
    * Zahl lesbar. Ohne diese Zahl wäre jede Änderung am Format ein stiller
    * Datenverlust.
    */
-  var VERSION = 1;
+  var VERSION = 2;
 
   // ------------------------------------------------------------- Zufall --
 
@@ -268,6 +268,29 @@
     return { nummer: ziffern.toUpperCase().match(/.{4}/g).join(' '), geraete: geraete };
   }
 
+  /** Format 2 bindet die Chiffre an ihre unveränderliche Nachrichtenidentität
+   * und den Antwort-/Zitatbezug. Format 1 bleibt als ungebundener Altbestand lesbar.
+   */
+  function kontextAusZeile(z) {
+    return { id: z.id, chatId: z.chat_id || z.chatId, senderId: z.sender_id || z.senderId,
+      antwortAuf: z.reply_to || z.antwortAufId || null, zitatVon: z.quote_of || z.zitatVonId || null, zeit: z.krypto_gesendet_am || z.gesendetAm };
+  }
+  function kontextText(k) {
+    if (!k || !k.id || !k.chatId || !k.senderId || !k.zeit || !Number.isFinite(Date.parse(k.zeit))) throw new Error('Nachrichtenkontext fehlt');
+    return JSON.stringify([String(k.id), String(k.chatId), String(k.senderId), k.antwortAuf || null, k.zitatVon || null, new Date(k.zeit).toISOString()]);
+  }
+  var FORMAT2 = 'AllMedia-Kontext-2:';
+  function inhaltPacken(text, kontext) {
+    return zuBytes(kontext ? FORMAT2 + JSON.stringify({ kontext: kontextText(kontext), text: String(text) }) : text);
+  }
+  function inhaltOeffnen(klar, version, kontext) {
+    var text = ausBytes(klar);
+    if (Number(version) === 1) return text.indexOf(FORMAT2) === 0 ? null : text;
+    if (Number(version) !== 2 || text.indexOf(FORMAT2) !== 0) return null;
+    var p = JSON.parse(text.slice(FORMAT2.length));
+    return p.kontext === kontextText(kontext) && typeof p.text === 'string' ? p.text : null;
+  }
+
   // -------------------------------------------------------- Verschließen --
 
   /**
@@ -282,13 +305,13 @@
    * Rückgabe passt eins zu eins auf die Datenbankspalten:
    *   { version, chiffre, nonce, absender, kuverts: [{ schluesselId, nonce, chiffre }] }
    */
-  function verschluesseln(text, meinGeheim, empfaenger) {
+  function verschluesseln(text, meinGeheim, empfaenger, kontext) {
     var liste = empfaenger || [];
     if (!liste.length) throw new Error('Kein Empfängerschlüssel — nichts zu verschließen');
 
     var sitzung = nacl.randomBytes(nacl.secretbox.keyLength);
     var nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-    var chiffre = nacl.secretbox(zuBytes(text), nonce, sitzung);
+    var chiffre = nacl.secretbox(inhaltPacken(text, kontext), nonce, sitzung);
 
     var geheim = ausBase64(meinGeheim);
     var meinOeffentlich = zuBase64(nacl.box.keyPair.fromSecretKey(geheim).publicKey);
@@ -305,7 +328,7 @@
     }
 
     return {
-      version: VERSION,
+      version: kontext ? VERSION : 1,
       chiffre: zuBase64(chiffre),
       nonce: zuBase64(nonce),
       absender: meinOeffentlich,
@@ -328,7 +351,7 @@
   function entschluesseln(nachricht, kuvert, meinGeheim) {
     try {
       if (!nachricht || !kuvert || !meinGeheim) return null;
-      if (Number(nachricht.version) !== VERSION) return null;
+      if (![1, 2].includes(Number(nachricht.version))) return null;
 
       var geheim = ausBase64(meinGeheim);
       var sitzung = nacl.box.open(
@@ -346,7 +369,7 @@
       );
       if (!klar) return null;
 
-      return ausBytes(klar);
+      return inhaltOeffnen(klar, nachricht.version, nachricht.kontext);
     } catch (e) {
       return null;
     }
@@ -376,7 +399,7 @@
   function umschliessen(text, nachricht, kuvert, meinGeheim) {
     try {
       if (!nachricht || !kuvert || !meinGeheim) return null;
-      if (Number(nachricht.version) !== VERSION) return null;
+      if (![1, 2].includes(Number(nachricht.version))) return null;
       var sitzung = nacl.box.open(
         ausBase64(kuvert.chiffre),
         ausBase64(kuvert.nonce),
@@ -384,8 +407,9 @@
         ausBase64(meinGeheim)
       );
       if (!sitzung) return null;
+      if (Number(nachricht.version) === 2 && entschluesseln(nachricht, kuvert, meinGeheim) === null) return null;
       var nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-      var chiffre = nacl.secretbox(zuBytes(text), nonce, sitzung);
+      var chiffre = nacl.secretbox(inhaltPacken(text, Number(nachricht.version) === 2 ? nachricht.kontext : null), nonce, sitzung);
       return { chiffre: zuBase64(chiffre), nonce: zuBase64(nonce) };
     } catch (e) {
       return null;
@@ -421,7 +445,7 @@
   function meldebeleg(nachricht, kuvert, meinGeheim) {
     try {
       if (!nachricht || !kuvert || !meinGeheim) return null;
-      if (Number(nachricht.version) !== VERSION) return null;
+      if (![1, 2].includes(Number(nachricht.version))) return null;
       var sitzung = nacl.box.open(
         ausBase64(kuvert.chiffre),
         ausBase64(kuvert.nonce),
@@ -431,7 +455,8 @@
       if (!sitzung) return null;
       var klar = nacl.secretbox.open(ausBase64(nachricht.chiffre), ausBase64(nachricht.nonce), sitzung);
       if (!klar) return null;
-      return { text: ausBytes(klar), sitzung: zuBase64(sitzung) };
+      var text = inhaltOeffnen(klar, nachricht.version, nachricht.kontext);
+      return text === null ? null : { text: text, sitzung: zuBase64(sitzung) };
     } catch (e) {
       return null;
     }
@@ -455,7 +480,9 @@
       if (nonce.length !== nacl.secretbox.nonceLength) return false;
       var klar = nacl.secretbox.open(ausBase64(verschlossen.chiffre), nonce, schluessel);
       if (!klar) return false;
-      return ausBytes(klar) === String(text == null ? '' : text);
+      var offen = ausBytes(klar);
+      if (offen.indexOf(FORMAT2) === 0) offen = JSON.parse(offen.slice(FORMAT2.length)).text;
+      return offen === String(text == null ? '' : text);
     } catch (e) {
       return false;
     }
@@ -703,6 +730,7 @@
 
   return {
     VERSION: VERSION,
+    kontextAusZeile: kontextAusZeile,
     MELDUNG_NICHT_VERSCHLUESSELT: MELDUNG_NICHT_VERSCHLUESSELT,
     MELDUNG_NUR_ZU_ZWEIT: MELDUNG_NUR_ZU_ZWEIT,
     zuVieleMitglieder: zuVieleMitglieder,

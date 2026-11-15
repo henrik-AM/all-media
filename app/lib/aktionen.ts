@@ -1534,7 +1534,7 @@ export async function nachrichtSenden(
   text: string,
   anhang: Anhang = {}
 ): Promise<{ id: string; created_at: string }> {
-  const paket = await fuerChatVerschliessen(client, chatId, ichId, text);
+  const paket = await fuerChatVerschliessen(client, chatId, ichId, text, { antwortAuf: anhang.antwortAuf, zitatVon: anhang.zitatVon });
 
   const { data, error } = await client
     .from('messages')

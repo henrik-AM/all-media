@@ -475,7 +475,7 @@ const handleFindPerson = handler('Person suchen', async (client, nutzerId, einga
 
 /** Nur die Kryptofelder eines Browserpakets, keine mitgeschickten Medienbezüge. */
 function kryptoAngaben(p = {}) {
-  return { krypto: p.krypto, chiffre: p.chiffre, kryptoNonce: p.kryptoNonce,
+  return { nachrichtId: p.nachrichtId, gesendetAm: p.gesendetAm, krypto: p.krypto, chiffre: p.chiffre, kryptoNonce: p.kryptoNonce,
     absenderSchluessel: p.absenderSchluessel, kuverts: p.kuverts };
 }
 
@@ -922,6 +922,7 @@ const handleStoryReply = handler(
     const e = await handleSendMessage(client, nutzerId, chatId, Number(krypto.krypto || 0) > 0 ? '' : text, {
       storyId,
       klartextPruefen: true,
+      nachrichtId: krypto.nachrichtId, gesendetAm: krypto.gesendetAm,
       krypto: Number(krypto.krypto || 0),
       chiffre: krypto.chiffre || null,
       kryptoNonce: krypto.kryptoNonce || null,
@@ -1280,14 +1281,19 @@ const handleSendMessage = handler(
     }
 
     if (Number(medien.krypto || 0) > 0 &&
-        (Number(medien.krypto) !== Krypto.VERSION || text || !medien.chiffre || !medien.kryptoNonce ||
+        (![1, 2].includes(Number(medien.krypto)) || text || !medien.chiffre || !medien.kryptoNonce ||
          !medien.absenderSchluessel || !Array.isArray(medien.kuverts) || !medien.kuverts.length)) {
       return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
+    }
+
+    if (Number(medien.krypto) === 2 && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(medien.nachrichtId || '')) {
+      return { ok: false, fehler: 'Nachrichtenkennung fehlt' };
     }
 
     const { data, error } = await client
       .from('messages')
       .insert({
+        ...(Number(medien.krypto) === 2 ? { id: medien.nachrichtId, krypto_gesendet_am: medien.gesendetAm } : {}),
         chat_id: chatId,
         sender_id: nutzerId,
         text: text,
@@ -2571,7 +2577,7 @@ const handleNachrichtWeiterleiten = handler(
       const ziel = ziele.find((z) => z && z.chatId === chatId) || {};
       const krypto = Number(ziel.krypto || 0);
       if (krypto > 0) {
-        if (!ziel.chiffre || !ziel.kryptoNonce || !Array.isArray(ziel.kuverts) || !ziel.kuverts.length) {
+        if (![1, 2].includes(krypto) || (krypto === 2 && !/^[0-9a-f-]{36}$/i.test(ziel.nachrichtId || '')) || !ziel.chiffre || !ziel.kryptoNonce || !Array.isArray(ziel.kuverts) || !ziel.kuverts.length) {
           return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
         }
         plan.push({ chatId, krypto, ziel });
@@ -2599,6 +2605,7 @@ const handleNachrichtWeiterleiten = handler(
       const { data: neu, error: fehler } = await client
         .from('messages')
         .insert({
+          ...(schritt.krypto === 2 ? { id: schritt.ziel.nachrichtId, krypto_gesendet_am: schritt.ziel.gesendetAm } : {}),
           chat_id: schritt.chatId,
           sender_id: nutzerId,
           text: schritt.krypto ? '' : schritt.text,

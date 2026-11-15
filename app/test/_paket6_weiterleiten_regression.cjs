@@ -29,9 +29,9 @@ test('Zwei gültige Ziele: getrennte Chiffren, jedes Ziel mit passendem lesbarem
  const neu=db.messages.filter(m=>m.id!=='quelle');
  assert.equal(neu.length,2);assert.notEqual(neu[0].chiffre,neu[1].chiffre);
  for(const n of neu){
-  assert.equal(n.text,'');assert.equal(n.krypto,1);
+  assert.equal(n.text,'');assert.equal(n.krypto,2);
   const kuvert=db.message_keys.find(k=>k.message_id===n.id&&k.schluessel_id==='b');
   assert.ok(kuvert);
-  assert.equal(Krypto.entschluesseln({version:n.krypto,chiffre:n.chiffre,nonce:n.krypto_nonce,absender:n.absender_schluessel},kuvert,db.pb.geheim),'Weiterleitung');
+  assert.equal(Krypto.entschluesseln({version:n.krypto,kontext:Krypto.kontextAusZeile(n),chiffre:n.chiffre,nonce:n.krypto_nonce,absender:n.absender_schluessel},kuvert,db.pb.geheim),'Weiterleitung');
  }
 });

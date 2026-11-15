@@ -928,6 +928,7 @@ app.post('/api/messages/:chatId', route(async (req) => {
     zitatVon: req.body?.zitatVon || null,
     krypto,
     chiffre: req.body?.chiffre || null,
+    nachrichtId: req.body?.nachrichtId || null, gesendetAm: req.body?.gesendetAm || null,
     kryptoNonce: req.body?.kryptoNonce || null,
     absenderSchluessel: req.body?.absenderSchluessel || null,
     kuverts: req.body?.kuverts || [],
@@ -1065,7 +1066,7 @@ app.post('/api/messages/:chatId/anhang', route(async (req) => {
   if (gedeutet.error) return { ok: false, error: gedeutet.error };
   const { text, medien } = gedeutet;
   const paket = req.body?.paket || {};
-  for (const k of ['krypto', 'chiffre', 'kryptoNonce', 'absenderSchluessel', 'kuverts']) medien[k] = paket[k];
+  for (const k of ['nachrichtId', 'gesendetAm', 'krypto', 'chiffre', 'kryptoNonce', 'absenderSchluessel', 'kuverts']) medien[k] = paket[k];
   // Kasten 4.3a: ein Anhang kann eine Antwort oder ein Zitat sein — wie Text.
   medien.antwortAuf = req.body?.antwortAuf || null;
   medien.zitatVon = req.body?.zitatVon || null;
@@ -3245,6 +3246,7 @@ app.post('/api/stories/:id/reply', route(async (req) => {
     chatId: req.body?.chatId || null,
     krypto,
     chiffre: req.body?.chiffre || null,
+    nachrichtId: req.body?.nachrichtId || null, gesendetAm: req.body?.gesendetAm || null,
     kryptoNonce: req.body?.kryptoNonce || null,
     absenderSchluessel: req.body?.absenderSchluessel || null,
     kuverts: req.body?.kuverts || [],
@@ -3815,7 +3817,8 @@ app.post('/api/messages/:chatId/:messageId/bearbeiten', route(async (req) =>
       {
         krypto: req.body?.krypto,
         chiffre: req.body?.chiffre || null,
-        kryptoNonce: req.body?.kryptoNonce || null,
+        nachrichtId: req.body?.nachrichtId || null, gesendetAm: req.body?.gesendetAm || null,
+    kryptoNonce: req.body?.kryptoNonce || null,
       }
     )
   )

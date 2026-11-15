@@ -866,7 +866,7 @@ async function nachrichtenHolen(chatId) {
  */
 async function sendeKoerper(chatId, text, weiteres = {}) {
   if (!window.KryptoWeb) throw new Error('Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte lade die Seite neu.');
-  const paket = await window.KryptoWeb.verschliessen(chatId, text);
+  const paket = await window.KryptoWeb.verschliessen(chatId, text, weiteres);
   if (!paket) return { text, ...weiteres };
   return { text: '', ...paket, ...weiteres };
 }
@@ -22270,6 +22270,11 @@ async function sendMessage(chat) {
     msg.lokal = true;
     if (koerper.chiffre) {
       const meiner = window.KryptoWeb?.meinSchluessel();
+      msg.chatId = chat.id;
+      msg.senderId = window.Anmeldung?.nutzer?.()?.id;
+      msg.antwortAufId = koerper.antwortAuf || null;
+      msg.zitatVonId = koerper.zitatVon || null;
+      msg.gesendetAm = koerper.gesendetAm;
       msg.chiffre = koerper.chiffre;
       msg.kryptoNonce = koerper.kryptoNonce;
       msg.absenderSchluessel = koerper.absenderSchluessel;

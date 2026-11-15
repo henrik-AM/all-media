@@ -852,7 +852,7 @@ export async function ladeNachrichten(
       // Die vier Kryptospalten muessen mit: eine verschluesselte Nachricht,
       // auf die geantwortet wird, haette sonst einen leeren `text` — und im
       // Antwortbezug staende eine leere Zeile statt des Zitierten.
-      .select('id, text, sender_id, krypto, chiffre, krypto_nonce, absender_schluessel')
+      .select('id, chat_id, sender_id, reply_to, quote_of, krypto_gesendet_am, text, krypto, chiffre, krypto_nonce, absender_schluessel')
       .in('id', bezugIds);
     bezugZeilen.push(...((gefunden ?? []) as any[]));
   }
