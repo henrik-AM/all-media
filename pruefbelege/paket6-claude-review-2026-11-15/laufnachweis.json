@@ -1,0 +1,16 @@
+{
+  "is_error": false,
+  "num_turns": 45,
+  "session_id": "b700e2fe-1ce8-4d95-a74f-48c1618dcd91",
+  "duration_ms": 380056,
+  "permission_denials": [],
+  "models": [
+    "claude-opus-5-5"
+  ],
+  "reviewed_commit": "627fa86f7b985ae847705f9995caba434c29ceb4",
+  "codex_reproduced": {
+    "migration": "10/10, Exit 0",
+    "bearbeiten": "4/4, Exit 0",
+    "wiedereinspielen": "3/3, Exit 0"
+  }
+}

@@ -1,0 +1,6 @@
+BELEGT Senden desselben Klartexts wird abgelehnt (AR-05) (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+BELEGT Bearbeiten derselben Worte wird angenommen ({"ok":true})
+BELEGT Datenbankzeile erhält den neuen Text im Klartext
+BELEGT Zeile bleibt krypto = 0
+
+Ergebnis: 4/4 Aussagen belegt
