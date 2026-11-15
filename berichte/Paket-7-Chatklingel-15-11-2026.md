@@ -100,3 +100,9 @@ Native→Website rund1,25–2,09s ab Datenbankspeicherung bis DOM-Anzeige.
 Eigene native Instanzen beendet, Simulator ausgeschaltet, Metro beendet.
 
 Vollständiger Bestandslauf jetzt auf festem Code; Ergebnis noch offen.
+
+Erster Gesamtlauf nach3/100 kontrolliert beendet: smoke ist historisch
+fest auf localhost3000 verdrahtet und konnte nur3300 nicht nutzen.
+Keine Produktfehlermeldung; 32 eigene Testmitteilungen bereinigt, Rest0.
+Port3000 exklusiv belegt, identischer eigener Worktree-Server zusätzlich
+gestartet; vollständige Wiederholung ohne Änderung des Prüf- oder Produktcodes.
