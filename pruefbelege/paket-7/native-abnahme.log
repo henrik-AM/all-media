@@ -1,0 +1,23 @@
+OK Zwei native Geräte mit getrennten Original-Chatkomponenten bereit
+Getippt: 1. [Button] "Zweierchat"  (138,169 90x35)
+Getippt: 2. [Button] "Konto A"  (0,169 69x35)
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (0,204 136x35)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native A an echte Website B Chiffre
+Getippt: 1. [Button] "Konto B"  (69,169 69x35)
+OK Native B liest Native A ohne Neuöffnung Chiffre
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (0,204 136x35)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native B an echte Website A Chiffre
+Getippt: 1. [Button] "Konto A"  (0,169 69x35)
+OK Native A liest Native B ohne Neuöffnung Chiffre
+Traceback (most recent call last):
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-7/app/test/_paket7_native.py", line 49, in <module>
+    text='Website B an Native A '+art;ab=int(time.time()*1000);api('websend',{'index':1,'gruppe':gruppe,'text':text});warte(text,3);check('Echte Website an Native A '+art,int(time.time()*1000)-ab<3000);bild('native-A-'+art+'.png')
+                                                                                                                                    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-7/app/test/_paket7_native.py", line 38, in check
+    assert b,t;ok+=1;print('OK '+t,flush=True)
+           ^
+AssertionError: Echte Website an Native A Chiffre

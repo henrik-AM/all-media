@@ -12,6 +12,9 @@
   OK   Reaktion klingelt nicht in der Liste  — 0
   OK   Bearbeiten klingelt  — 1
   OK   Löschen klingelt  — 1
+  OK   Nachgeliefertes Kuvert klingelt im Chat  — 1
+  OK   Kuvert klingelt in der Empfängerliste  — 1
+  OK   Kuvert klingelt nicht in fremder Liste  — 0
 
 4. Mitgliedszeile
   OK   eigene Zeile klingelt in der eigenen Liste  — 1
@@ -33,4 +36,4 @@
   OK   anon darf klingel_hoeren_erlaubt nicht  — false
   OK   Auslöserfunktion nicht aufrufbar  — false
 
-22/22 bestanden — alles zurückgerollt.
+25/25 bestanden — alles zurückgerollt.

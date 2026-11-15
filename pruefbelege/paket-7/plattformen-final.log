@@ -1,0 +1,45 @@
+2026-11-15T19:39:24.129Z A P7-STATUS realtime:nutzer:3baafacd-bbdb-40fb-8ef4-a4e365ae00c4 SUBSCRIBED 
+2026-11-15T19:39:26.335Z B P7-STATUS realtime:nutzer:62616c1d-82e2-4ee4-aab9-950e40e438a4 SUBSCRIBED 
+2026-11-15T19:39:27.310Z A P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:39:29.237Z B P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:39:30.674Z KANALE A [{"topic":"realtime:nutzer:3baafacd-bbdb-40fb-8ef4-a4e365ae00c4","state":"joined","joined":true},{"topic":"realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02","state":"joined","joined":true}]
+2026-11-15T19:39:30.676Z KANALE B [{"topic":"realtime:nutzer:62616c1d-82e2-4ee4-aab9-950e40e438a4","state":"joined","joined":true},{"topic":"realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02","state":"joined","joined":true}]
+2026-11-15T19:39:31.149Z A P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 CLOSED 
+2026-11-15T19:39:31.699Z A P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:39:34.486Z OK Website liest Web A an B Chiffre 1529 ms seit DB-Schreiben
+2026-11-15T19:39:35.008Z B P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 CLOSED 
+2026-11-15T19:39:35.937Z B P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:39:38.352Z OK Website liest Web B an A Chiffre 1355 ms seit DB-Schreiben
+2026-11-15T19:39:38.933Z A P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 CLOSED 
+2026-11-15T19:39:39.252Z A P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 SUBSCRIBED 
+2026-11-15T19:39:39.718Z B P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 CLOSED 
+2026-11-15T19:39:40.018Z B P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 SUBSCRIBED 
+2026-11-15T19:39:41.459Z KANALE A [{"topic":"realtime:nutzer:3baafacd-bbdb-40fb-8ef4-a4e365ae00c4","state":"joined","joined":true},{"topic":"realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6","state":"joined","joined":true}]
+2026-11-15T19:39:41.460Z KANALE B [{"topic":"realtime:nutzer:62616c1d-82e2-4ee4-aab9-950e40e438a4","state":"joined","joined":true},{"topic":"realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6","state":"joined","joined":true}]
+2026-11-15T19:39:42.036Z A P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 CLOSED 
+2026-11-15T19:39:42.386Z A P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 SUBSCRIBED 
+2026-11-15T19:39:45.201Z OK Website liest Web A an B Gruppe 2050 ms seit DB-Schreiben
+2026-11-15T19:39:45.965Z B P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 CLOSED 
+2026-11-15T19:39:46.978Z B P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 SUBSCRIBED 
+2026-11-15T19:39:48.568Z OK Website liest Web B an A Gruppe 1335 ms seit DB-Schreiben
+2026-11-15T19:39:48.586Z B P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 CLOSED 
+2026-11-15T19:39:49.262Z A P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 CLOSED 
+2026-11-15T19:39:49.837Z A P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 SUBSCRIBED 
+2026-11-15T19:39:51.589Z OK Echte Website-Chatliste sofort aktuell 1124 ms
+2026-11-15T19:39:52.173Z A P7-STATUS realtime:chat:2b37ca1d-d376-4308-9a9a-05b7faed51f6 CLOSED 
+2026-11-15T19:39:53.161Z A P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:39:54.639Z B P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:39:55.749Z Egress-Ruhemessung 65 s begonnen
+2026-11-15T19:41:00.751Z OK Website A gedrosselt 65 s 2 Chatstand + 1 Listenstand statt etwa16+6
+2026-11-15T19:41:00.752Z OK Website B gedrosselt 65 s 2 Chatstand + 1 Listenstand statt etwa16+6
+2026-11-15T19:41:01.515Z A P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 CLOSED 
+2026-11-15T19:41:02.915Z A P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:41:03.468Z B P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 CLOSED 
+2026-11-15T19:41:04.442Z BRIDGE BEREIT 3302; Native starten
+2026-11-15T19:41:04.743Z B P7-STATUS realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02 SUBSCRIBED 
+2026-11-15T19:41:52.755Z OK Echte Zweierchat-Zeilen ausschließlich Chiffren 
+2026-11-15T19:41:52.755Z OK Gruppenchat bleibt lesbarer Klartext 
+2026-11-15T19:41:52.757Z DEBUG KANALE A [{"topic":"realtime:nutzer:3baafacd-bbdb-40fb-8ef4-a4e365ae00c4","state":"joined"},{"topic":"realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02","state":"joined"}]
+2026-11-15T19:41:52.758Z DEBUG KANALE B [{"topic":"realtime:nutzer:62616c1d-82e2-4ee4-aab9-950e40e438a4","state":"joined"},{"topic":"realtime:chat:8233cce5-503f-46ab-92d2-17dc232d2f02","state":"joined"}]
+2026-11-15T19:41:54.182Z OK Plattformfixtures und Geräte entfernt 
+2026-11-15T19:41:54.182Z 10/10 Plattformprüfungen bestanden

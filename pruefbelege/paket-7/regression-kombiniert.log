@@ -1,0 +1,35 @@
+✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (3.011833ms)
+✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (1.374084ms)
+✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (1.363875ms)
+✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (1.123291ms)
+✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (149.76375ms)
+✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (106.465125ms)
+Chat nachsehen fehlgeschlagen: simulierter Lesefehler
+✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (80.229291ms)
+✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (75.767083ms)
+✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.369417ms)
+✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.432667ms)
+✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (26.387333ms)
+✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (23.637542ms)
+✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (24.641667ms)
+✔ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.605334ms)
+✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.089875ms)
+✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (104.796875ms)
+✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (20.56325ms)
+✔ Dauernde Klingeln werden begrenzt gebündelt und nie endlos verschoben (952.007375ms)
+✔ Abofehler räumt schon angelegten Kanal und Timer auf (0.335417ms)
+✔ Server: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (41.560083ms)
+✔ App: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (19.712208ms)
+✔ Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe (101.457541ms)
+✔ Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach (79.128291ms)
+✔ Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich (12.671625ms)
+✔ Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join (3.975958ms)
+✔ Kuvert-Signal überlebt die Bündelung mit gewöhnlichen Klingeln (301.013167ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1668.080125

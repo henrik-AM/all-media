@@ -1,0 +1,26 @@
+{
+  "messungen": [
+    {
+      "konto": "A",
+      "sekunden": 65,
+      "chat": 2,
+      "liste": 1
+    },
+    {
+      "konto": "B",
+      "sekunden": 65,
+      "chat": 2,
+      "liste": 1
+    }
+  ],
+  "gut": 15,
+  "fehler": 0,
+  "nativeTexte": [
+    "Native A an B Chiffre",
+    "Native B an A Chiffre",
+    "Native A an B Chiffre 771917",
+    "Native B an A Chiffre 771917",
+    "Native A an B Gruppe 771917",
+    "Native B an A Gruppe 771917"
+  ]
+}

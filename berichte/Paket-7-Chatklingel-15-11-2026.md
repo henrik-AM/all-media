@@ -73,3 +73,30 @@ Echte Website-Phase **10/10**: beide Richtungen, Chiffre/Gruppe, Liste,
 Empfang nun per DOM-Mutationszeit ab DB-Speicherung gemessen; Gesamtzeit
 inklusive Vorbereitung ist separat und kein Ersatz für Klingellatenz.
 Native Abschlussrunde mit absichtlich späterem Kuvert steht noch aus.
+
+## Messgrenzen der nativen Runde
+
+Original-ChatDetailScreen zweimal unter getrennten Konto-Kontexten montiert,
+echte Supabase-Sitzungen und native SecureStore-Geräte. Die Sicht wechselt,
+die jeweils andere Komponente bleibt aktiv. Das belegt App↔App auf zwei
+nativen Komponenteninstanzen, nicht zwei getrennte physische Telefone.
+Die Startseiten-/Profil-/Einstellungskontexte sind Test-Rahmen, kein Produktlogin.
+Vor der nativen Geräteanmeldung versandte Website-Chiffren sind auf diesen
+neuen Geräten absichtlich unlesbar; geprüft werden ausschließlich neue
+Nachrichten nach Geräteanmeldung mit eindeutiger Rundenkennung.
+Native→Website wird ab DB-created_at bis zur ersten DOM-Mutation gemessen;
+AXe-Bedien- und Erkennungszeiten gehören nicht zur Datenbank-Klingellatenz.
+
+## Native Abschlussabnahme
+
+**14/14 native UI-Prüfungen**, **16/16 Plattform-/Backendprüfungen**,
+beide Prozesse Exit0, eigene Chat-/Nachrichten-/Gerätefixtures **Rest0**.
+App↔App, App↔Website und Website↔Website: Zweierchat verschlüsselt,
+Gruppe Klartext; drei Sekunden absichtlich zurückgehaltenes Kuvert heilt
+nach eigener Kuvert-Klingel; im Hintergrund gesendete Nachricht nach
+Rückkehr ohne Chat-Neuöffnung sichtbar. Neue native Texte mit Rundenkennung
+771917 geprüft; Bilder für Chiffre, Gruppe, Kuvert, Hintergrund angesehen.
+Native→Website rund1,25–2,09s ab Datenbankspeicherung bis DOM-Anzeige.
+Eigene native Instanzen beendet, Simulator ausgeschaltet, Metro beendet.
+
+Vollständiger Bestandslauf jetzt auf festem Code; Ergebnis noch offen.

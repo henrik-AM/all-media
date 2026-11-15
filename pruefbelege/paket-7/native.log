@@ -1,0 +1,14 @@
+OK Zwei native Geräte mit getrennten Original-Chatkomponenten bereit
+Getippt: 1. [Button] "Zweierchat"  (138,169 90x35)
+Getippt: 2. [Button] "Konto A"  (0,169 69x35)
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (0,204 136x35)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+Traceback (most recent call last):
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-7/app/test/_paket7_native.py", line 45, in <module>
+    text='Native A an B '+art;ab=senden(text);r=api('seen',{'index':1,'text':text,'ab':ab});check('Native A an echte Website B '+art,r['ok'])
+                                                                                            ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/henrik.dikta/allmedia-wt-codex/paket-7/app/test/_paket7_native.py", line 38, in check
+    assert b,t;ok+=1;print('OK '+t,flush=True)
+           ^
+AssertionError: Native A an echte Website B Chiffre

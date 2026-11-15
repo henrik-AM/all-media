@@ -1,0 +1,38 @@
+OK Zwei native Geräte mit getrennten Original-Chatkomponenten bereit
+Getippt: 1. [Button] "Zweierchat"  (138,169 90x35)
+Getippt: 2. [Button] "Konto A"  (0,169 69x35)
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (0,204 136x35)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native A an echte Website B Chiffre
+Getippt: 1. [Button] "Konto B"  (69,169 69x35)
+OK Native B liest Native A ohne Neuöffnung Chiffre
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (0,204 136x35)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native B an echte Website A Chiffre
+Getippt: 1. [Button] "Konto A"  (0,169 69x35)
+OK Native A liest Native B ohne Neuöffnung Chiffre
+OK Echte Website an Native A Chiffre
+Getippt: 1. [Button] "Gruppe"  (228,169 66x35)
+Getippt: 2. [Button] "Konto A"  (0,169 69x35)
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (0,204 136x35)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native A an echte Website B Gruppe
+Getippt: 1. [Button] "Konto B"  (69,169 69x35)
+OK Native B liest Native A ohne Neuöffnung Gruppe
+Getippt: 1. [TextArea] "Nachricht"  (72,794 194x38)
+Getippt: 1. [Button] "Tastatur schließen"  (0,204 136x35)
+Getippt: 1. [GenericElement] "Senden"  (352,794 38x38)
+OK Native B an echte Website A Gruppe
+Getippt: 1. [Button] "Konto A"  (0,169 69x35)
+OK Native A liest Native B ohne Neuöffnung Gruppe
+OK Echte Website an Native A Gruppe
+Getippt: 1. [Button] "Zweierchat"  (138,169 90x35)
+Getippt: 2. [Button] "Konto A"  (0,169 69x35)
+OK Nachgeliefertes Kuvert heilt per eigener Klingel
+Getippt: 1. [Button] "Gruppe"  (228,169 66x35)
+OK Hintergrund-Rückkehr lädt tatsächliche Nachricht nach
+OK Backend bestätigt verschlüsselte Zweierchats und Klartextgruppen
+14/14 native Plattformprüfungen

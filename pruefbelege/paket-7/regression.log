@@ -1,16 +1,17 @@
-✔ Dauernde Klingeln werden begrenzt gebündelt und nie endlos verschoben (952.509834ms)
-✔ Abofehler räumt schon angelegten Kanal und Timer auf (0.815791ms)
-✔ Server: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (52.510042ms)
-✔ App: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (14.899417ms)
-✔ Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe (51.85875ms)
-✔ Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach (31.892583ms)
-✔ Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich (4.391542ms)
-✔ Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join (0.296959ms)
-ℹ tests 8
+✔ Dauernde Klingeln werden begrenzt gebündelt und nie endlos verschoben (953.540791ms)
+✔ Abofehler räumt schon angelegten Kanal und Timer auf (1.286084ms)
+✔ Server: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (53.07225ms)
+✔ App: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (14.307875ms)
+✔ Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe (56.895291ms)
+✔ Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach (33.040125ms)
+✔ Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich (4.78625ms)
+✔ Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join (0.254583ms)
+✔ Kuvert-Signal überlebt die Bündelung mit gewöhnlichen Klingeln (302.084042ms)
+ℹ tests 9
 ℹ suites 0
-ℹ pass 8
+ℹ pass 9
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1238.265125
+ℹ duration_ms 1533.832167

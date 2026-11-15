@@ -4,7 +4,7 @@ Nur All-Media Codex. UI-Ziele ausschließlich beschriftet über tippen.js.
 import subprocess,json,pathlib,time,os,urllib.request
 ROOT=pathlib.Path(__file__).resolve().parents[2];APP=ROOT/'app';OUT=ROOT/'pruefbelege/paket-7'
 SIM='/Applications/Xcode.app/Contents/Developer/usr/bin/simctl';UDID='5210E675-C198-4328-B3E2-30FCE9E0F624';ENV={**os.environ,'SIM_GERAET':'All-Media Codex'}
-ok=0
+ok=0;kennung=" "+str(int(time.time()))[-6:]
 
 def cmd(args,timeout=35):return subprocess.check_output(args,cwd=APP,env=ENV,text=True,stderr=subprocess.PIPE,timeout=timeout)
 def api(art,d={}):
@@ -42,11 +42,11 @@ warte('Paket 7 bereit',90);check('Zwei native Geräte mit getrennten Original-Ch
 for gruppe in [False,True]:
  art='Gruppe' if gruppe else 'Chiffre';tap('Gruppe' if gruppe else 'Zweierchat');tap('Konto A');api('mode',{'gruppe':gruppe})
  # Beide native Instanzen bleiben eingehängt; nur die Anzeige wechselt.
- text='Native A an B '+art;ab=senden(text);r=api('seen',{'index':1,'text':text,'ab':ab,'gruppe':gruppe});check('Native A an echte Website B '+art,r['ok'])
+ text='Native A an B '+art+kennung;ab=senden(text);r=api('seen',{'index':1,'text':text,'ab':ab,'gruppe':gruppe});check('Native A an echte Website B '+art,r['ok'])
  tap('Konto B');warte(text,3);check('Native B liest Native A ohne Neuöffnung '+art);bild('native-B-'+art+'.png')
- text='Native B an A '+art;ab=senden(text);r=api('seen',{'index':0,'text':text,'ab':ab,'gruppe':gruppe});check('Native B an echte Website A '+art,r['ok'])
+ text='Native B an A '+art+kennung;ab=senden(text);r=api('seen',{'index':0,'text':text,'ab':ab,'gruppe':gruppe});check('Native B an echte Website A '+art,r['ok'])
  tap('Konto A');warte(text,3);check('Native A liest Native B ohne Neuöffnung '+art)
- text='Website B an Native A '+art;ab=int(time.time()*1000);api('websend',{'index':1,'gruppe':gruppe,'text':text});warte(text,3);check('Echte Website an Native A '+art,int(time.time()*1000)-ab<3000);bild('native-A-'+art+'.png')
+ text='Website B an Native A '+art+kennung;r=api('websend',{'index':1,'gruppe':gruppe,'text':text});warte(text,3);check('Echte Website an Native A '+art,int(time.time()*1000)-r['ab']<3000);bild('native-A-'+art+'.png')
 tap('Zweierchat');tap('Konto A');api('mode',{'gruppe':False});api('spaet');time.sleep(3);ab=time.time();api('nachreichen');warte('Kuvert nach Klingel angekommen',4);check('Nachgeliefertes Kuvert heilt per eigener Klingel',time.time()-ab<4);bild('native-kuvert.png')
 tap('Gruppe');api('mode',{'gruppe':True})
 # Funkloch-/Hintergrund-Nachholen am echten AppState, keine Chat-Neuöffnung.
