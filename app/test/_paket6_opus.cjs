@@ -97,3 +97,45 @@ test('Browser → Server → App: Format2 Identität und Zeit bleiben unverände
  assert.equal(ctx.KryptoWeb.oeffnen({...p}).text,'Browsertext');
  assert.equal(ctx.KryptoWeb.oeffnen({...p,id:'kopie'}).text,ctx.KryptoWeb.NICHT_LESBAR);
 });
+test('App: echte Format2-Quelle wird mit vollem Kontext geöffnet und neu weitergeleitet',async()=>{
+ const db=basis(),base=client(db),h=app(),Ak=h.aktionen();
+ const quelle=await Ak.nachrichtSenden(base,A,'zwei','Geheime Quelle',{antwortAuf:'frage'});
+ // Supabase liefert nur ausdrücklich ausgewählte Felder; der allgemeine
+ // Speicherclient allein hätte eine fehlende Kontextspalte verdeckt.
+ const c={...base,from(t){const q=base.from(t),select=q.select,then=q.then;let spalten='';
+  q.select=s=>{spalten=s;return select(s);};
+  q.then=(res,rej)=>then.call(q,r=>{
+    if(t==='messages'&&r.data&&!Array.isArray(r.data)&&spalten&&spalten!=='*')return res({...r,data:Object.fromEntries(spalten.split(',').map(s=>s.trim()).filter(Boolean).map(k=>[k,r.data[k]]))});
+    return res(r);
+  },rej);return q;
+ }};
+ assert.equal(await Ak.nachrichtWeiterleiten(c,A,quelle.id,['zwei']),1);
+ const row=db.messages.at(-1);assert.notEqual(row.id,quelle.id);
+ const [n]=await h.K.aufschliessen(base,[{...row}],await h.K.meinSchluessel(base,A));assert.equal(n.text,'Geheime Quelle');
+});
+test('Server: Senderzeit darf weder alte Nachrichten vortäuschen noch Serverzeit ersetzen',async()=>{
+ const db=basis(),c=client(db),a=Krypto.schluesselpaarErzeugen();
+ for(const zeit of ['2020-01-01T00:00:00Z','2099-01-01T00:00:00Z','kaputt']) {
+  const p=Krypto.verschluesseln('falsch datiert',a.geheim,db.krypto_schluessel,{id:require('crypto').randomUUID(),chatId:'zwei',senderId:A,zeit:new Date().toISOString()});
+  const e=await S.handleSendMessage(c,A,'zwei','',{nachrichtId:require('crypto').randomUUID(),gesendetAm:zeit,krypto:2,chiffre:p.chiffre,kryptoNonce:p.nonce,absenderSchluessel:p.absender,kuverts:p.kuverts});
+  assert.equal(e.ok,false);assert.equal(db.messages.length,0);
+ }
+});
+test('Eigener lokaler Fingerabdruck und getrennte Listen bleiben unabhängige Vergleichsreferenz',()=>{
+ const a=Krypto.schluesselpaarErzeugen(),b=Krypto.schluesselpaarErzeugen(),x=Krypto.schluesselpaarErzeugen();
+ const nr=Krypto.paarSicherheitsnummer(A,[a.oeffentlich],B,[b.oeffentlich,x.oeffentlich]);
+ const text=Krypto.vergleichstext(nr,a.oeffentlich,[a.oeffentlich],[b.oeffentlich,x.oeffentlich]);
+ assert.ok(text.includes('Lokaler Fingerabdruck dieses Geräts:\n'+Krypto.fingerabdruck(a.oeffentlich)));
+ assert.ok(text.includes('Deine registrierten Geräteschlüssel (1)'));
+ assert.ok(text.includes('Geräteschlüssel des Gegenübers (2)'));
+ assert.ok(text.includes(Krypto.fingerabdruck(x.oeffentlich)));
+ assert.ok(text.includes('beim bloßen Nummernvergleich nicht auf'));
+ assert.throws(()=>Krypto.vergleichstext(nr,a.oeffentlich,[x.oeffentlich],[b.oeffentlich]),/lokale Gerät fehlt/);
+});
+test('Abweichende Empfangszeit öffnet Format2 nicht als unverändert geprüfte Nachricht',()=>{
+ const db=basis(),zeit=new Date().toISOString(),kontext={id:'m',chatId:'zwei',senderId:A,zeit};
+ const p=Krypto.verschluesseln('echt',db.pa.geheim,[{id:'b',oeffentlich:db.pb.oeffentlich}],kontext);
+ const kopf={version:2,chiffre:p.chiffre,nonce:p.nonce,absender:p.absender,kontext:{...kontext,empfangenAm:zeit}};
+ assert.equal(Krypto.entschluesseln(kopf,p.kuverts[0],db.pb.geheim),'echt');
+ assert.equal(Krypto.entschluesseln({...kopf,kontext:{...kontext,empfangenAm:'2020-01-01T00:00:00Z'}},p.kuverts[0],db.pb.geheim),null);
+});

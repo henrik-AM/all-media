@@ -22,9 +22,11 @@ OK Drittes Mitglied ohne Schlüssel erhält keine aktive Schlossanzeige
 OK Echte Blase zeigt Absenderwarnung
 OK Echte Teilen-Route schreibt verschlüsselt samt Beitragsbezug
 OK Echte Anhangroute verschließt die Beschriftung
+OK Echte Anhangaktion erhält den verschlossenen Antwortbezug
 OK Echte Storyroute verschließt Antwort mit Storybezug
 OK Alter Anhang-Aufrufer wird ausdrücklich abgewiesen
 OK Fehlendes Kryptoskript sendet keinen Klartext
+OK Echter Kontaktinfotext erklärt den gemeinsamen Vergleich
 OK Keine externen Browseranfragen
 OK Keine Browser-Skriptfehler
-26/26 Offline-Browserprüfungen; Port 3310, keine Supabase-Verbindung.
+28/28 Offline-Browserprüfungen; Port 3310, keine Supabase-Verbindung.

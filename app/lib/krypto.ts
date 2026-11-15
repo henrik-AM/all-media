@@ -227,6 +227,10 @@ export function sicherheitsnummer(
   return Krypto.sicherheitsnummer(oeffentliche);
 }
 
+export function vergleichstext(paar: { nummer: string; geraete: number }, lokal: string, eigene: string[], fremde: string[]): string {
+  return Krypto.vergleichstext(paar, lokal, eigene, fremde);
+}
+
 export function paarSicherheitsnummer(kontoA: string, a: string[], kontoB: string, b: string[]): { nummer: string; geraete: number } | null {
   return Krypto.paarSicherheitsnummer(kontoA, a, kontoB, b);
 }
@@ -494,7 +498,7 @@ export async function fuerBearbeitenUmschliessen(
   const [{ data: n }, { data: kuvert }] = await Promise.all([
     client
       .from('messages')
-      .select('id, chat_id, sender_id, reply_to, quote_of, krypto_gesendet_am, krypto, chiffre, krypto_nonce, absender_schluessel')
+      .select('id, chat_id, sender_id, reply_to, quote_of, created_at, krypto_gesendet_am, krypto, chiffre, krypto_nonce, absender_schluessel')
       .eq('id', nachrichtId)
       .maybeSingle(),
     client
@@ -536,7 +540,7 @@ export async function meldebelegHolen(
 ): Promise<{ text: string; sitzung?: string } | null> {
   const { data: n } = await client
     .from('messages')
-    .select('id, chat_id, sender_id, reply_to, quote_of, krypto_gesendet_am, krypto, chiffre, krypto_nonce, absender_schluessel')
+    .select('id, chat_id, sender_id, reply_to, quote_of, created_at, krypto_gesendet_am, krypto, chiffre, krypto_nonce, absender_schluessel')
     .eq('id', nachrichtId)
     .maybeSingle();
   if (!n) return null;
@@ -641,7 +645,6 @@ export async function aufschliessen(
     z.text = klar === null ? NICHT_LESBAR : klar;
     z.warVerschluesselt = true;
     z._geoeffnet = klar !== null;
-    if (klar !== null && Number(z.krypto) === 2) z.created_at = z.krypto_gesendet_am;
   }
 
   /*

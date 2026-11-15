@@ -25,7 +25,7 @@ export interface NachrichtKopf {
 }
 
 export interface Nachrichtenkontext {
-  id: string; chatId: string; senderId: string; zeit: string;
+  id: string; chatId: string; senderId: string; zeit: string; empfangenAm?: string;
   antwortAuf?: string | null; zitatVon?: string | null;
 }
 export function kontextAusZeile(z: Record<string, any>): Nachrichtenkontext;
@@ -44,6 +44,7 @@ export function zufallBereit(): boolean;
 export function schluesselpaarErzeugen(): { oeffentlich: string; geheim: string };
 export function fingerabdruck(oeffentlich: string): string;
 export function sicherheitsnummer(oeffentliche: string[]): { nummer: string; geraete: number } | null;
+export function vergleichstext(paar: { nummer: string; geraete: number }, lokal: string, eigene: string[], fremde: string[]): string;
 export function paarSicherheitsnummer(kontoA: string, a: string[], kontoB: string, b: string[]): { nummer: string; geraete: number } | null;
 export function verschluesseln(
   text: string,

@@ -437,6 +437,7 @@
     fingerabdruck,
     sicherheitsnummer,
     paarSicherheitsnummer: Krypto.paarSicherheitsnummer,
+    vergleichstext: Krypto.vergleichstext,
     bereit,
     meinSchluessel: () => bereit() ? meiner : null,
   };

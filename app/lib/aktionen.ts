@@ -2853,7 +2853,7 @@ export async function nachrichtWeiterleiten(
   const { data, error } = await client
     .from('messages')
     .select(
-      'id, text, media_url, media_type, file_name, file_size, sender_id,' +
+      'id, chat_id, reply_to, quote_of, created_at, krypto_gesendet_am, text, media_url, media_type, file_name, file_size, sender_id,' +
       ' krypto, chiffre, krypto_nonce, absender_schluessel'
     )
     .eq('id', nachrichtId)

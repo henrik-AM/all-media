@@ -1290,6 +1290,10 @@ const handleSendMessage = handler(
       return { ok: false, fehler: 'Nachrichtenkennung fehlt' };
     }
 
+    if (Number(medien.krypto) === 2 && (!Number.isFinite(Date.parse(medien.gesendetAm)) || Math.abs(Date.now() - Date.parse(medien.gesendetAm)) > 300000)) {
+      return { ok: false, fehler: 'Die Sendezeit stimmt nicht. Bitte prüfe die Geräteuhr und sende die Nachricht erneut.' };
+    }
+
     const { data, error } = await client
       .from('messages')
       .insert({
@@ -2580,6 +2584,7 @@ const handleNachrichtWeiterleiten = handler(
         if (![1, 2].includes(krypto) || (krypto === 2 && !/^[0-9a-f-]{36}$/i.test(ziel.nachrichtId || '')) || !ziel.chiffre || !ziel.kryptoNonce || !Array.isArray(ziel.kuverts) || !ziel.kuverts.length) {
           return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
         }
+        if (krypto === 2 && (!Number.isFinite(Date.parse(ziel.gesendetAm)) || Math.abs(Date.now() - Date.parse(ziel.gesendetAm)) > 300000)) return { ok: false, fehler: 'Die Sendezeit stimmt nicht. Bitte sende die Nachricht erneut.' };
         plan.push({ chatId, krypto, ziel });
         continue;
       }

@@ -140,12 +140,24 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   pruefe('Echte Teilen-Route schreibt verschlüsselt samt Beitragsbezug',post.ok&&db.messages.at(-1).shared_post_id===postId&&db.messages.at(-1).text==='');
   const a=await page.evaluate(async()=>{const vorab=await api('/api/messages/zwei/anhang/vorbereiten',{art:'gif'});return api('/api/messages/zwei/anhang',{art:'gif',paket:await sendeKoerper('zwei',vorab.text)});});
   pruefe('Echte Anhangroute verschließt die Beschriftung',a.ok&&db.messages.at(-1).krypto===2&&db.messages.at(-1).text==='');
+  const sticker=await page.evaluate(async()=>{
+    let message;await anhangSenden({pfad:'/api/messages/zwei/anhang',chatId:'zwei',bezug:()=>({antwortAuf:state.messages[0].id}),fertig:m=>{message=m;}},'stickerZeichen',null,'🙂');return message;
+  });
+  pruefe('Echte Anhangaktion erhält den verschlossenen Antwortbezug',sticker?.text==='🙂'&&db.messages.at(-1).reply_to===db.messages[0].id);
   const story=await page.evaluate(()=>storyAntwortSenden('story','Schöne Story'));
   pruefe('Echte Storyroute verschließt Antwort mit Storybezug',story.ok&&db.messages.at(-1).reply_to_story==='story'&&db.messages.at(-1).text==='');
   const raw=await page.evaluate(()=>api('/api/messages/zwei/anhang',{art:'gif'}));
   pruefe('Alter Anhang-Aufrufer wird ausdrücklich abgewiesen',raw.ok===false&&/nicht verschlüsseln/.test(raw.error));
   const fehlt=await page.evaluate(async()=>{const alt=window.KryptoWeb;window.KryptoWeb=null;try{await sendeKoerper('zwei','geheim');return false;}catch{return true;}finally{window.KryptoWeb=alt;}});
   pruefe('Fehlendes Kryptoskript sendet keinen Klartext',fehlt);
+  const dialog=await page.evaluate(async B=>{
+    const original=openEinstellung;
+    try {let info;openEinstellung=x=>{info=x.info;};await kontaktZeile('Verschlüsselung',B,ziel,{});return info;}
+    finally {openEinstellung=original;}
+  },B);
+  pruefe('Echter Kontaktinfotext erklärt den gemeinsamen Vergleich',dialog.includes('Gemeinsame Sicherheitsnummer')&&dialog.includes('auf beiden Geräten gleich')&&dialog.includes('Lokaler Fingerabdruck dieses Geräts')&&dialog.includes('Deine registrierten Geräteschlüssel')&&dialog.includes('beim bloßen Nummernvergleich nicht auf'));
+  await page.evaluate(dialog=>{document.querySelector('#messages').textContent=dialog;document.querySelector('#messages').style.whiteSpace='pre-wrap';document.querySelector('.composer').remove();document.querySelector('#hinweis').textContent='';},dialog);
+  await page.screenshot({path:path.join(out,'browser-paarvergleich.png'),fullPage:true});
   pruefe('Keine externen Browseranfragen',extern.length===0);
   pruefe('Keine Browser-Skriptfehler',fehler.length===0);
   console.log(`${ok}/${ok} Offline-Browserprüfungen; Port ${PORT}, keine Supabase-Verbindung.`);

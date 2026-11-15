@@ -646,3 +646,5 @@ Aktuelle Paket-6-Fortsetzung und verbleibende Abnahme:
 Erst Schema 127 prüfen und anwenden, danach neue Clients veröffentlichen.
 Format 1 bleibt lesbar; frühere Clients verstehen Format 2 nicht.
 Schema 127 ist noch nicht live eingespielt.
+
+Schema 127 begrenzt die mitverschlossene Absenderzeit auf ±5 Minuten zur Serverzeit und schützt sie anschließend mit dem internen Trigger `krypto_zeit_fest`; Anzeige und Sortierung verwenden weiter `created_at`. Direktaufrufrechte der Triggerfunktion sind entzogen.

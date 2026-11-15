@@ -4555,11 +4555,11 @@ function openCall(ziel, art, ort = {}) {
  */
 /*
  * Seit dem 16.10.2026 (AR-04) ist die Sicherheitsnummer ueber ALLE Geraete
- * des Gegenuebers gebildet, mit deren Zahl — nicht mehr der Fingerabdruck des
+ * beider Konten gebildet, mit deren Zahl — nicht mehr der Fingerabdruck des
  * juengsten. Gleiche Rechnung in der App (ContactProfileScreen).
  */
 async function kryptoZustand(userId, chat) {
-  const nichts = { an: false, fingerabdruck: null, geraete: 0 };
+  const nichts = { an: false, fingerabdruck: null, vergleich: null, geraete: 0 };
   if (!chat || chat.isGroup || !window.KryptoWeb) return nichts;
   try {
     const meiner = await window.KryptoWeb.anmelden();
@@ -4575,6 +4575,9 @@ async function kryptoZustand(userId, chat) {
     return {
       an: Boolean(verschluesselbar && nr),
       fingerabdruck: nr ? nr.nummer : null,
+      vergleich: nr ? window.KryptoWeb.vergleichstext(nr, meiner.oeffentlich,
+        fakten.schluessel.filter(k => k.user_id === fakten.ichId).map(k => k.oeffentlich),
+        fakten.schluessel.filter(k => k.user_id === userId).map(k => k.oeffentlich)) : null,
       geraete: nr ? nr.geraete : 0,
     };
   } catch (fehler) {
@@ -5201,16 +5204,7 @@ async function kontaktZeile(label, userId, chat, daten, optionen = {}) {
           'Nachrichten von vor dem 07.09.2026. Wer mit wem schreibt, ist ' +
           'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
           'Verbindung.\n\n' +
-          (krypto.fingerabdruck
-            ? 'Gemeinsame Sicherheitsnummer (' +
-              (krypto.geraete === 1 ? '1 Geräteschlüssel' : `${krypto.geraete} Geräteschlüssel`) +
-              '):\n' +
-              krypto.fingerabdruck +
-              '\n\nÖffnet beide diese Kontaktinfo und vergleicht die Nummer persönlich. ' +
-              'Sie muss auf beiden Geräten gleich sein. Vergleicht sie erneut, ' +
-              'wenn ein Gerät dazukommt oder wegfällt. Ein Vergleich schützt ' +
-              'nur, solange ihr den beteiligten Geräten vertraut.'
-            : '')
+          (krypto.vergleich || '')
         : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
           'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +
           'ohne dessen Schlüssel gibt es niemanden, für den verschlossen ' +
@@ -15363,7 +15357,7 @@ async function anhangSenden(ziel, art, chat, zeichen) {
     if (ziel.chatId) {
       const vorab = await api(`${ziel.pfad}/vorbereiten`, koerper);
       if (!vorab?.ok) { toast(vorab?.error || 'Anhang nicht vorbereitet'); return null; }
-      try { koerper = { ...koerper, paket: await sendeKoerper(ziel.chatId, vorab.text) }; }
+      try { koerper = { ...koerper, paket: await sendeKoerper(ziel.chatId, vorab.text, bezug || {}) }; }
       catch (fehler) { toast(fehler.message); return null; }
     }
 

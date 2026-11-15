@@ -7,7 +7,7 @@ let fehler=0;
 const laeufe=[
   ['_krypto_einheit.js',/36 von 36/],['_krypto_app_einheit.js',/18 von 18/],
   ['_krypto_web_einheit.js',/16 von 16/],['_krypto_server_einheit.js',/18 von 18/],
-  ['_paket6_offline.js',/pass 22/],['_paket6_opus.cjs',/pass 10/],['_melden_einheit.js',/105\/105/],['_schema.js',/Schema und Code passen zusammen/],
+  ['_paket6_offline.js',/pass 22/],['_paket6_opus.cjs',/pass 14/],['_melden_einheit.js',/105\/105/],['_schema.js',/Schema und Code passen zusammen/],
 ];
 for(const [name,erwartung] of laeufe){
   const r=spawnSync(process.execPath,['--require','./app/test/_offline_sperre.cjs',...(['_paket6_offline.js','_paket6_opus.cjs'].includes(name)?['--test']:[]),'app/test/'+name],{cwd:wurzel,encoding:'utf8',timeout:30000});

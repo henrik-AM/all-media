@@ -44,8 +44,8 @@
  * - Die öffentlichen Schlüssel kommen vom Server. Wer den Server beherrscht,
  *   kann einen eigenen Schlüssel unterschieben. Dagegen hilft nur ein
  *   Vergleich der Sicherheitsnummer von Hand — `sicherheitsnummer()` bildet
- *   sie über ALLE Geräte einer Person (seit 16.10.2026, AR-04), die
- *   Oberfläche zeigt sie samt Gerätezahl im Kontaktprofil.
+ *   sie über ALLE Geräte einer Person; `paarSicherheitsnummer` bindet beide
+ *   Konten. Die Kontaktinfos zeigen dieselbe gemeinsame Vergleichsnummer.
  */
 
 (function (global, factory) {
@@ -273,7 +273,7 @@
    */
   function kontextAusZeile(z) {
     return { id: z.id, chatId: z.chat_id || z.chatId, senderId: z.sender_id || z.senderId,
-      antwortAuf: z.reply_to || z.antwortAufId || null, zitatVon: z.quote_of || z.zitatVonId || null, zeit: z.krypto_gesendet_am || z.gesendetAm };
+      antwortAuf: z.reply_to || z.antwortAufId || null, zitatVon: z.quote_of || z.zitatVonId || null, zeit: z.krypto_gesendet_am || z.gesendetAm, empfangenAm: z.created_at || z.zeitpunkt };
   }
   function kontextText(k) {
     if (!k || !k.id || !k.chatId || !k.senderId || !k.zeit || !Number.isFinite(Date.parse(k.zeit))) throw new Error('Nachrichtenkontext fehlt');
@@ -288,7 +288,25 @@
     if (Number(version) === 1) return text.indexOf(FORMAT2) === 0 ? null : text;
     if (Number(version) !== 2 || text.indexOf(FORMAT2) !== 0) return null;
     var p = JSON.parse(text.slice(FORMAT2.length));
+    if (kontext && kontext.empfangenAm && (!Number.isFinite(Date.parse(kontext.empfangenAm)) || Math.abs(Date.parse(kontext.empfangenAm) - Date.parse(kontext.zeit)) > 300000)) return null;
     return p.kontext === kontextText(kontext) && typeof p.text === 'string' ? p.text : null;
+  }
+
+  /** Lokaler Schlüssel als unabhängige Referenz; Serverlisten allein beweisen
+   * nicht, dass darin nur berechtigte Geräte stehen.
+   */
+  function vergleichstext(paar, lokal, eigene, fremde) {
+    function liste(paare) { return Array.from(new Set(paare)).sort().map(fingerabdruck); }
+    if (!eigene.includes(lokal)) throw new Error('Das lokale Gerät fehlt in der registrierten Geräteliste');
+    var ich = liste(eigene), du = liste(fremde);
+    return 'Gemeinsame Sicherheitsnummer (' + paar.geraete + ' Geräteschlüssel):\n' + paar.nummer +
+      '\n\nLokaler Fingerabdruck dieses Geräts:\n' + fingerabdruck(lokal) +
+      '\n\nDeine registrierten Geräteschlüssel (' + ich.length + '):\n' + ich.join('\n') +
+      '\n\nGeräteschlüssel des Gegenübers (' + du.length + '):\n' + du.join('\n') +
+      '\n\nVergleicht jeden Eintrag mit dem lokalen Fingerabdruck auf dem zugehörigen Gerät. ' +
+      'Ein unbekannter Eintrag ist dadurch nicht bestätigt; schreibt dann nicht weiter. ' +
+      'Die gemeinsame Nummer muss auf beiden Geräten gleich sein. Allein beweist das nicht, ' +
+      'dass alle Geräte berechtigt sind: ein beiden Seiten gleich gezeigtes Zusatzgerät fällt beim bloßen Nummernvergleich nicht auf.';
   }
 
   // -------------------------------------------------------- Verschließen --
@@ -742,6 +760,7 @@
     fingerabdruck: fingerabdruck,
     sicherheitsnummer: sicherheitsnummer,
     paarSicherheitsnummer: paarSicherheitsnummer,
+    vergleichstext: vergleichstext,
     verschluesseln: verschluesseln,
     entschluesseln: entschluesseln,
     umschliessen: umschliessen,

@@ -1,0 +1,14 @@
+{
+  "basis": "627fa86",
+  "reviewbasis": "966f283",
+  "offline_gruppen": "10/10",
+  "offline_testfaelle": "56/56",
+  "browser_assertionen": "28/28",
+  "krypto_und_melde_assertionen": "193/193",
+  "lokale_sql_assertionen": "16/16",
+  "sql_engine": "PGlite 0.5.16",
+  "typescript_exit": 0,
+  "schema127_live": false,
+  "live_testbestand": "fremd belegt durch Paket7",
+  "native_abnahme": "noch offen"
+}

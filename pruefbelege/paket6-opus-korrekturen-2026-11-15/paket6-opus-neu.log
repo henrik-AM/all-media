@@ -1,19 +1,23 @@
 Gerätschlüssel nicht verfügbar: offline
-✔ Gemeinsame Nummer stimmt auf beiden Seiten und bindet Kontozuordnung (5.396334ms)
-✔ Server: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (1.340917ms)
-✔ App: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (90.163792ms)
-✔ App: abgemeldetes historisches Konto bekommt Altpaar, neues Konto niemals (16.587583ms)
-✔ App: nach altem Löschen erhaltene kontogebundene Kopie wiederfinden (6.830042ms)
-✔ App: fehlender Kontonachweis verändert den Altbestand nicht (6.636292ms)
-✔ Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar (50.063792ms)
-✔ Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar (6.834541ms)
-✔ App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul (39.259625ms)
-✔ Browser → Server → App: Format2 Identität und Zeit bleiben unverändert (60.751667ms)
-ℹ tests 10
+✔ Gemeinsame Nummer stimmt auf beiden Seiten und bindet Kontozuordnung (5.3475ms)
+✔ Server: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (1.40025ms)
+✔ App: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (90.269584ms)
+✔ App: abgemeldetes historisches Konto bekommt Altpaar, neues Konto niemals (16.477625ms)
+✔ App: nach altem Löschen erhaltene kontogebundene Kopie wiederfinden (7.283167ms)
+✔ App: fehlender Kontonachweis verändert den Altbestand nicht (6.694333ms)
+✔ Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar (48.898625ms)
+✔ Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar (6.705ms)
+✔ App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul (38.919708ms)
+✔ Browser → Server → App: Format2 Identität und Zeit bleiben unverändert (60.694208ms)
+✔ App: echte Format2-Quelle wird mit vollem Kontext geöffnet und neu weitergeleitet (33.464083ms)
+✔ Server: Senderzeit darf weder alte Nachrichten vortäuschen noch Serverzeit ersetzen (3.906291ms)
+✔ Eigener lokaler Fingerabdruck und getrennte Listen bleiben unabhängige Vergleichsreferenz (1.094083ms)
+✔ Abweichende Empfangszeit öffnet Format2 nicht als unverändert geprüfte Nachricht (1.9475ms)
+ℹ tests 14
 ℹ suites 0
-ℹ pass 10
+ℹ pass 14
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 382.220333
+ℹ duration_ms 422.806458

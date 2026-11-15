@@ -1,40 +1,79 @@
-✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (2.511208ms)
-✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (0.657834ms)
-✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (0.823ms)
-✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (0.782458ms)
-✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (145.479625ms)
-✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (70.665958ms)
+✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (6.91325ms)
+✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (3.843ms)
+✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (3.342042ms)
+✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (2.835375ms)
+✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (209.714166ms)
+✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (97.488334ms)
 Chat nachsehen fehlgeschlagen: simulierter Lesefehler
-✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (63.906167ms)
-✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (56.168083ms)
-✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.362875ms)
-✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.384709ms)
-✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (25.435125ms)
-✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (16.418625ms)
-✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (20.56525ms)
-✖ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.865375ms)
-✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.089791ms)
-✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (91.561792ms)
-✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (11.243875ms)
+✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (82.562834ms)
+✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (69.3045ms)
+✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.640875ms)
+✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.7465ms)
+✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (25.615167ms)
+✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (23.467708ms)
+✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (38.499791ms)
+✔ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (6.858375ms)
+✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.084792ms)
+✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (91.07775ms)
+✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (11.025959ms)
+Gerätschlüssel nicht verfügbar: Ungültige Kontokennung
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+✔ Alle 1201 Geräte: App und Server lesen auch den ältesten Schlüssel (110.012042ms)
+✔ Verkürzte Seite, Fehler in Seite 2, wechselnde Anzahl: kein Teilergebnis (1.644375ms)
+✔ Unvollständige Fakten und fehlende Mitgliedschaft werden abgelehnt (0.123958ms)
+✔ Absender: 251 verschiedene Paare werden vollständig geprüft (20.338209ms)
+✔ Absender: entfernter Schlüssel wird nach Ablauf erneut geprüft (0.211958ms)
+✔ App: Altbestand ohne Gerätekennung bleibt lesbar; neue Konten sind getrennt (29.818875ms)
+✔ App: unterbrochene Fachschreibung verliert vorhandenen Schlüssel nicht (24.696125ms)
+✔ App: frische Konten bekommen auch bei parallelem Start getrennte Schlüssel (21.856917ms)
+✔ App: unzulässige Fachkennung wird abgewiesen statt mit anderer zu kollidieren (12.970208ms)
+✔ App: Chat-/Verlauf-/Mitgliederfehler verhindern Senden einschließlich Anhang (49.721458ms)
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Teilen an bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+Nachricht senden fehlgeschlagen: Chat nicht ladbar
+✔ Browser: zwei parallele Kontoanmeldungen verwechseln ihre Ergebnisse nicht (52.86325ms)
+✔ Browser: vergessen widerruft auch eine noch laufende Anmeldung (25.1305ms)
+✔ Browser: fehlende/alte Fakten und Kontowechsel beim Senden sperren Klartext (64.576125ms)
+✔ Browser: nicht ladbarer Absender wird sichtbar gewarnt; späterer Erfolg löscht Warnung (20.6575ms)
+✔ Server: Kontakttext und Beitrag-Teilen können nicht mehr offen am Wächter vorbei (1.920625ms)
+✔ Server: verschlüsselte Kontakt-/Beitragsnachricht erreicht alle Kuverts (4.256167ms)
+✔ App: Kontakt und Beitrag-Teilen benutzen die echte Verschlüsselung (120.325208ms)
+✔ Server: fehlende Chiffre/Kuverts und unlesbarer Chat führen zu null Schreibvorgängen (0.907667ms)
+✔ Absender: abgelaufene positive Prüfung bei Netzfehler ohne Vertrauen (0.117709ms)
+✔ Sicherheitsnummer: kaputter Schlüssel darf keine gültige Nummer vortäuschen (0.072583ms)
+✔ App: drittes Mitglied ohne eigenes Gerät bekommt kein Verschlüsselungsschloss (8.98475ms)
+✔ Kontakt-/Teilen-Kryptopaket kann keine fremden Medien-/Storybezüge einschleusen (4.791917ms)
+Gerätschlüssel nicht verfügbar: offline
+✔ Gemeinsame Nummer stimmt auf beiden Seiten und bindet Kontozuordnung (8.681416ms)
+✔ Server: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (1.45925ms)
+✔ App: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (201.777167ms)
+✔ App: abgemeldetes historisches Konto bekommt Altpaar, neues Konto niemals (27.354833ms)
+✔ App: nach altem Löschen erhaltene kontogebundene Kopie wiederfinden (12.709958ms)
+✔ App: fehlender Kontonachweis verändert den Altbestand nicht (16.023458ms)
+✔ Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar (72.988042ms)
+✔ Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar (8.477125ms)
+✔ App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul (58.793084ms)
+✔ Browser → Server → App: Format2 Identität und Zeit bleiben unverändert (75.852583ms)
+✔ App: echte Format2-Quelle wird mit vollem Kontext geöffnet und neu weitergeleitet (50.278834ms)
+✔ Server: Senderzeit darf weder alte Nachrichten vortäuschen noch Serverzeit ersetzen (5.139875ms)
+✔ Eigener lokaler Fingerabdruck und getrennte Listen bleiben unabhängige Vergleichsreferenz (1.254958ms)
+✔ Abweichende Empfangszeit öffnet Format2 nicht als unverändert geprüfte Nachricht (2.165542ms)
 Verschlüsselung nicht prüfbar: Chat nicht ladbar
-✔ Später nicht lesbares Ziel: kein vorheriger Nachrichten-/Kuvertschreibvorgang (139.449625ms)
-✔ Späterer Zweierchat mit drittem Mitglied: kein Teilversand (56.385875ms)
-✔ Zwei gültige Ziele: getrennte Chiffren, jedes Ziel mit passendem lesbarem Kuvert (41.600791ms)
-ℹ tests 20
+✔ Später nicht lesbares Ziel: kein vorheriger Nachrichten-/Kuvertschreibvorgang (210.366959ms)
+✔ Späterer Zweierchat mit drittem Mitglied: kein Teilversand (65.96475ms)
+✔ Zwei gültige Ziele: getrennte Chiffren, jedes Ziel mit passendem lesbarem Kuvert (45.207584ms)
+ℹ tests 56
 ℹ suites 0
-ℹ pass 19
-ℹ fail 1
+ℹ pass 56
+ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 611.226833
-
-✖ failing tests:
-
-test at app/test/_paket6_kuvert_regression.cjs:58:1
-✖ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.865375ms)
-  TypeError: Krypto.kontextAusZeile is not a function
-      at Object.aufschliessen (evalmachine.<anonymous>:31:150)
-      at async TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket6-claude-review/app/test/_paket6_kuvert_regression.cjs:62:55)
-      at async Test.run (node:internal/test_runner/test:1389:7)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+ℹ duration_ms 800.923833

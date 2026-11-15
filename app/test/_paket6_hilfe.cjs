@@ -36,7 +36,7 @@ function client(db, fehler = () => null) {
           wert={ id:crypto.randomUUID(),...wert }; t.push(wert); return {data:wert,error:null};
         }
         if (art==='insert') {
-          const rows=(Array.isArray(wert)?wert:[wert]).map(z=>({id:'n'+ ++zaehler,created_at:'2026-11-10T18:00:00Z',...z}));
+          const rows=(Array.isArray(wert)?wert:[wert]).map(z=>({id:'n'+ ++zaehler,created_at:new Date().toISOString(),...z}));
           t.push(...rows); return {data:einzeln?rows[0]:rows,error:null};
         }
         let rows=t.filter(z=>filter.every(f=>f(z)));
