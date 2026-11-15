@@ -230,6 +230,7 @@ export const ContactProfileScreen = ({
     let gilt = true;
     (async () => {
       try {
+        if (!(await Krypto.meinSchluessel(supabase, ichId))) return;
         const [data, eigene] = await Promise.all([
           Krypto.kontoSchluessel(supabase, userId), Krypto.kontoSchluessel(supabase, ichId),
         ]);

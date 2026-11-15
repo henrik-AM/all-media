@@ -1,0 +1,75 @@
+✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (8.738333ms)
+✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (11.591708ms)
+✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (1.000166ms)
+✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (1.163208ms)
+✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (181.090917ms)
+✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (70.507291ms)
+Chat nachsehen fehlgeschlagen: simulierter Lesefehler
+✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (58.844208ms)
+✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (62.658083ms)
+✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.380292ms)
+✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.406959ms)
+✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (20.36075ms)
+✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (18.575792ms)
+✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (26.412125ms)
+✔ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.554542ms)
+✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.082625ms)
+✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (84.804583ms)
+✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (10.862375ms)
+Gerätschlüssel nicht verfügbar: Ungültige Kontokennung
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+✔ Alle 1201 Geräte: App und Server lesen auch den ältesten Schlüssel (94.816083ms)
+✔ Verkürzte Seite, Fehler in Seite 2, wechselnde Anzahl: kein Teilergebnis (1.525458ms)
+✔ Unvollständige Fakten und fehlende Mitgliedschaft werden abgelehnt (0.090375ms)
+✔ Absender: 251 verschiedene Paare werden vollständig geprüft (0.466167ms)
+✔ Absender: entfernter Schlüssel wird nach Ablauf erneut geprüft (0.089125ms)
+✔ App: Altbestand ohne Gerätekennung bleibt lesbar; neue Konten sind getrennt (22.769291ms)
+✔ App: unterbrochene Fachschreibung verliert vorhandenen Schlüssel nicht (10.97825ms)
+✔ App: frische Konten bekommen auch bei parallelem Start getrennte Schlüssel (19.159875ms)
+✔ App: unzulässige Fachkennung wird abgewiesen statt mit anderer zu kollidieren (9.291208ms)
+✔ App: Chat-/Verlauf-/Mitgliederfehler verhindern Senden einschließlich Anhang (27.05125ms)
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Teilen an bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+Nachricht senden fehlgeschlagen: Chat nicht ladbar
+✔ Browser: zwei parallele Kontoanmeldungen verwechseln ihre Ergebnisse nicht (52.198334ms)
+✔ Browser: vergessen widerruft auch eine noch laufende Anmeldung (19.349916ms)
+✔ Browser: fehlende/alte Fakten und Kontowechsel beim Senden sperren Klartext (53.930292ms)
+✔ Browser: nicht ladbarer Absender wird sichtbar gewarnt; späterer Erfolg löscht Warnung (18.37925ms)
+✔ Server: Kontakttext und Beitrag-Teilen können nicht mehr offen am Wächter vorbei (1.234ms)
+✔ Server: verschlüsselte Kontakt-/Beitragsnachricht erreicht alle Kuverts (4.814708ms)
+✔ App: Kontakt und Beitrag-Teilen benutzen die echte Verschlüsselung (91.663125ms)
+✔ Server: fehlende Chiffre/Kuverts und unlesbarer Chat führen zu null Schreibvorgängen (0.77875ms)
+✔ Absender: abgelaufene positive Prüfung bei Netzfehler ohne Vertrauen (0.096125ms)
+✔ Sicherheitsnummer: kaputter Schlüssel darf keine gültige Nummer vortäuschen (0.063041ms)
+✔ App: drittes Mitglied ohne eigenes Gerät bekommt kein Verschlüsselungsschloss (8.645709ms)
+✔ Kontakt-/Teilen-Kryptopaket kann keine fremden Medien-/Storybezüge einschleusen (3.684ms)
+Gerätschlüssel nicht verfügbar: offline
+✔ Gemeinsame Nummer stimmt auf beiden Seiten und bindet Kontozuordnung (9.252292ms)
+✔ Server: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (1.577291ms)
+✔ App: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (164.525666ms)
+✔ App: abgemeldetes historisches Konto bekommt Altpaar, neues Konto niemals (20.104208ms)
+✔ App: nach altem Löschen erhaltene kontogebundene Kopie wiederfinden (8.227167ms)
+✔ App: fehlender Kontonachweis verändert den Altbestand nicht (12.018292ms)
+✔ Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar (55.969208ms)
+✔ Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar (7.243292ms)
+✔ App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul (47.026167ms)
+✔ Browser → Server → App: Format2 Identität und Zeit bleiben unverändert (71.690958ms)
+Verschlüsselung nicht prüfbar: Chat nicht ladbar
+✔ Später nicht lesbares Ziel: kein vorheriger Nachrichten-/Kuvertschreibvorgang (167.3085ms)
+✔ Späterer Zweierchat mit drittem Mitglied: kein Teilversand (53.322958ms)
+✔ Zwei gültige Ziele: getrennte Chiffren, jedes Ziel mit passendem lesbarem Kuvert (42.727958ms)
+ℹ tests 52
+ℹ suites 0
+ℹ pass 52
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 662.114041

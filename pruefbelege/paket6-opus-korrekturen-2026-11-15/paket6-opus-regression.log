@@ -1,0 +1,40 @@
+✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (2.511208ms)
+✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (0.657834ms)
+✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (0.823ms)
+✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (0.782458ms)
+✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (145.479625ms)
+✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (70.665958ms)
+Chat nachsehen fehlgeschlagen: simulierter Lesefehler
+✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (63.906167ms)
+✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (56.168083ms)
+✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.362875ms)
+✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.384709ms)
+✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (25.435125ms)
+✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (16.418625ms)
+✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (20.56525ms)
+✖ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.865375ms)
+✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.089791ms)
+✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (91.561792ms)
+✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (11.243875ms)
+Verschlüsselung nicht prüfbar: Chat nicht ladbar
+✔ Später nicht lesbares Ziel: kein vorheriger Nachrichten-/Kuvertschreibvorgang (139.449625ms)
+✔ Späterer Zweierchat mit drittem Mitglied: kein Teilversand (56.385875ms)
+✔ Zwei gültige Ziele: getrennte Chiffren, jedes Ziel mit passendem lesbarem Kuvert (41.600791ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 19
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 611.226833
+
+✖ failing tests:
+
+test at app/test/_paket6_kuvert_regression.cjs:58:1
+✖ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.865375ms)
+  TypeError: Krypto.kontextAusZeile is not a function
+      at Object.aufschliessen (evalmachine.<anonymous>:31:150)
+      at async TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket6-claude-review/app/test/_paket6_kuvert_regression.cjs:62:55)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)

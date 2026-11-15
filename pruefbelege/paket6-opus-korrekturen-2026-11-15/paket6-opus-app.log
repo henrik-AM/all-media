@@ -1,0 +1,24 @@
+  OK   Altbestand übernommen (Konto A, gleiches Paar)
+  OK   Gleichzeitige Zugriffe: ein Paar
+  OK   Altes Fach bleibt erhalten
+  OK   Zweites angemeldetes Konto B bekommt es auch
+  OK   Neues Konto C: eigenes Paar
+Gerätschlüssel nicht verfügbar: Kein Konto
+  OK   Kein Konto: null statt Wurf
+  OK   Zweierchat: verschlossen, Text leer
+  OK   Gruppe: Klartext
+  OK   Gegenüber ohne Gerät: Klartext
+  OK   Drittes Mitglied: VerschluesselnFehler  (Dieser Chat ist keine Gruppe, hat aber mehr als zwei Mitglieder. Damit niemand unbemerkt mitliest, wurde die Nachricht nicht gesendet.)
+  OK   … auch ein Anhang ohne Text
+Gerätschlüssel nicht verfügbar: Störung krypto_schluessel
+Verschlüsselung nicht prüfbar: Störung krypto_schluessel
+  OK   Schlüsselabfrage gestört: abgelehnt statt Klartext  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   Gemerkter Chat, leere Liste vom Server: abgelehnt  (Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.)
+  OK   Schon verschlüsselt geschrieben, Gegenüber ohne Schlüssel: abgelehnt
+Gerätschlüssel nicht verfügbar: Keychain
+  OK   Schlüsselkette nicht lesbar: abgelehnt statt Klartext
+  OK   Echte Altnachricht offen, fehlende Kontextbindung gekennzeichnet
+  OK   Fälschung offen, als nicht prüfbar gekennzeichnet
+  OK   Schlüssel nicht ladbar: lesbar mit Warnung
+
+18 von 18 Pruefungen bestanden.

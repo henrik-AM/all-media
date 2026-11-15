@@ -4562,10 +4562,11 @@ async function kryptoZustand(userId, chat) {
   const nichts = { an: false, fingerabdruck: null, geraete: 0 };
   if (!chat || chat.isGroup || !window.KryptoWeb) return nichts;
   try {
+    const meiner = await window.KryptoWeb.anmelden();
+    if (!meiner) return nichts;
     const antwort = await fetch(`/api/krypto/empfaenger/${chat.id}`);
     if (!antwort.ok) throw new Error('Server antwortet mit ' + antwort.status);
     const fakten = await antwort.json();
-    const meiner = await window.KryptoWeb.anmelden();
     if (fakten.ichId !== window.Anmeldung?.nutzer?.()?.id) throw new Error('Konto gewechselt');
     const nr = window.KryptoWeb.paarSicherheitsnummer(fakten.ichId,
       (fakten.schluessel || []).filter(k => k.user_id === fakten.ichId).map(k => k.oeffentlich), userId,

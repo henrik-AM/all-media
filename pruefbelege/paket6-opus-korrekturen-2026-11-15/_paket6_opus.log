@@ -1,0 +1,21 @@
+Gerätschlüssel nicht verfügbar: offline
+✔ Gemeinsame Nummer stimmt auf beiden Seiten und bindet Kontozuordnung (5.37125ms)
+✔ Server: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (1.37275ms)
+✔ App: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (90.62ms)
+✔ App: abgemeldetes historisches Konto bekommt Altpaar, neues Konto niemals (16.883375ms)
+✔ App: nach altem Löschen erhaltene kontogebundene Kopie wiederfinden (7.055875ms)
+✔ App: fehlender Kontonachweis verändert den Altbestand nicht (6.818458ms)
+✔ Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar (50.983084ms)
+✔ Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar (6.947042ms)
+✔ App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul (39.68ms)
+✔ Browser → Server → App: Format2 Identität und Zeit bleiben unverändert (61.571959ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 387.65675
+
+Exit: 0
