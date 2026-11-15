@@ -1,0 +1,22 @@
+✔ Browser: verspätetes eigenes Kuvert heilt, fremdes Gerät nicht (101.494375ms)
+✔ Browser: Kuvert vor erster Standabfrage heilt Initialplatzhalter (59.056458ms)
+Chat nachsehen fehlgeschlagen: simulierter Lesefehler
+✔ Browser: Pending-ID außerhalb des 30er-Fensters heilt (52.260958ms)
+✔ Browser: gescheiterter Vollreload verbraucht Stand nicht (53.257208ms)
+✔ Pending: Klartext-Platzhalter und Absenderwarnung ohne Marker nicht abfragen (0.333541ms)
+✔ Kuvertabfrage: 500 IDs in5 Blöcken; Grenze/UUID strikt vor Zugriff (0.367916ms)
+✔ App-Stand: keine Schlüsselregistrierung innerhalb periodischer Datenfunktion (19.039542ms)
+✔ App: echter Poll-Effekt registriert Gerät nur einmal und heilt verspätete Kuverts (15.521166ms)
+✔ Browser-Krypto: fehlendes Kuvert markieren, kaputte Chiffre und Absenderwarnung nicht (20.0945ms)
+✔ App-Krypto: fehlendes Kuvert markieren, kaputte Chiffre nicht (4.117584ms)
+✔ Geheilter Antwort-/Zitatbezug ersetzt alten Zustand bei gleichem Haupttext (0.0785ms)
+✔ Browser: 500 Hauptnachrichten+500 Zitate werden über2 begrenzte Requests geheilt (81.811417ms)
+✔ App: Nullschlüssel wird mit Backoff erneut versucht, erfolgreiche ID danach gecached (11.003917ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 513.843083

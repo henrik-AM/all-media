@@ -1,0 +1,38 @@
+
+[N1] Sendezeit Format 2
+NICHT  Server nimmt zurückdatierte Format-2-Nachricht an  ("Die Sendezeit stimmt nicht. Bitte prüfe die Geräteuhr und sende die Nachricht erneut.")
+NICHT  Zeile trägt krypto_gesendet_am = gewählte Zeit
+NICHT  Empfänger öffnet sie gültig (Kontext stimmt)
+NICHT  App ersetzt created_at durch die Absenderzeit  (2026-11-15T12:00:00.000Z)
+NICHT  App zeigt keine Absenderwarnung
+NICHT  Website-Server zeigt krypto_gesendet_am vor created_at
+NICHT  Schema 127 begrenzt krypto_gesendet_am nicht gegen now()/created_at
+BELEGT Schema 95 erzwingt dagegen created_at := now() beim Einfügen
+
+[N2] App-Weiterleiten Format 2
+NICHT  Weiterleiten-Select ohne chat_id/krypto_gesendet_am  (id chat_id reply_to quote_of created_at krypto_gesendet_am text media_url media_type file_name file_size sender_id krypto chiffre krypto_nonce absender_schluessel)
+NICHT  Mit diesen Spalten bleibt die Nachricht für B unlesbar
+NICHT  Gegenprobe: volle Zeile öffnet
+
+[N3] Browser-Anhang mit Antwortbezug
+NICHT  anhangSenden verschliesst ohne Bezug, schickt Bezug aber mit
+BELEGT Anhangroute setzt antwortAuf aus dem Körper
+BELEGT Empfänger B kann die Anhangbeschriftung nicht öffnen
+BELEGT Absender A (zweites Gerät) ebenfalls nicht
+BELEGT Gegenprobe ohne reply_to: öffnet
+
+[N4] Paarnummer
+BELEGT Einschub ändert die Nummer gegenüber vorher
+BELEGT Beide Seiten sehen nach Einschub dieselbe Nummer (Vergleich besteht)
+BELEGT Anzeige liefert nur Gesamtzahl, keine Zahl je Konto
+BELEGT Gegenprobe: unterschiedliche Sichten werden erkannt
+
+[N5] Migration
+BELEGT App: abgemeldetes Altkonto B erhält L nach Kontonachweis
+BELEGT App: Altfach bleibt erhalten
+BELEGT App: neues Konto ohne Nachweis erhält eigenes Paar
+Gerätschlüssel nicht verfügbar: netz
+BELEGT App: Abfragefehler ergibt keinen Schlüssel und kein Ersatzpaar
+BELEGT Web: B erhält L nach Kontonachweis
+
+Ergebnis: 14/25 Aussagen belegt
