@@ -176,12 +176,26 @@
     try {
       kanal = client.channel(thema, { config: { private: true } });
       kanal.on('broadcast', { event: 'klingel' }, klingeln);
-      kanal.subscribe(function (status) {
+      var abonnieren = function () {
         if (aus) return;
-        var verbunden = status === 'SUBSCRIBED';
-        zustand(verbunden);
-        if (verbunden) klingeln();
-      });
+        kanal.subscribe(function (status) {
+          if (aus) return;
+          var verbunden = status === 'SUBSCRIBED';
+          zustand(verbunden);
+          if (verbunden) klingeln();
+        });
+      };
+      // Ältere Browser-SDKs übernehmen das Anmeldungstoken nicht sicher in
+      // private Broadcast-Abos. Vor dem Join ausdrücklich setzen (kein RPC).
+      if (client.auth && client.realtime && typeof client.auth.getSession === 'function' &&
+          typeof client.realtime.setAuth === 'function') {
+        Promise.resolve().then(function () { return client.auth.getSession(); })
+          .then(function (r) {
+            if (aus) return;
+            if (r.error || !r.data || !r.data.session || !r.data.session.access_token) throw Error('Keine Klingelsitzung');
+            return client.realtime.setAuth(r.data.session.access_token);
+          }).then(abonnieren).catch(function () { if (!aus) zustand(false); });
+      } else abonnieren();
     } catch (e) {
       aus = true;
       clearTimeout(uhr);

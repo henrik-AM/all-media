@@ -35,3 +35,22 @@ endlos aufgeschoben werden; fehlerhafte Abo-Anlage räumt auf. Chatlisten
 bestätigen den Stand erst nach erfolgreichem Nachladen, auch beim Erststart;
 Website bündelt parallele Listenabrufe und prüft Konto/Generation.
 Unterthema aktualisiert sich trotz Eingabe und erhält Text/Fokus/Auswahl.
+
+## Echte Klingelprüfung und Browserfund
+
+Direkte Zwei-Konten-Prüfung **39/39**: Zweier-/Gruppenchat, Insert,
+Bearbeiten/Zurücknehmen/Delete, Reaktion hinzufügen/ändern/löschen,
+Lesebestätigung, eigene Liste, Wiederverbinden, fremde/anonyme Kanäle,
+Rechteentzug und unveröffentlichte Tabellen. Messung ab Schreibbeginn.
+Kontakt-/Lesebestätigungs-Grundstand wiederhergestellt, eigene Chatfixtures Rest0.
+Der alte Live-Test las erst nach Zurücknahme, sodass chat_gelesen rechtmäßig
+nichts bestätigte. Neuer Test liest vorher und prüft den gespeicherten Wert.
+
+Echte Website zeigte zuerst Polling statt Klingel: Browserbibliothek 2.47.10
+trat trotz Anmeldung ohne wirksames Realtime-Token bei (eigene private
+Nutzerkanäle „Unauthorized“). Vor Subscribe jetzt getSession + setAuth,
+bei Tokenauffrischung ebenfalls setAuth. Danach Nutzer-/Chatkanäle
+nachweislich SUBSCRIBED. Offline-Gegenproben inzwischen **8/8**;
+Website-Rundreise, Egress-Ruhemessung und native Komponentenabnahme laufen.
+Die bisherige Website-Gesamtzeit inklusive Krypto-Vorbereitung liegt bei
+2,6–2,9 s für Chiffren, 1,6 s für Gruppen; Empfangszeit getrennt messen.

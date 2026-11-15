@@ -41,7 +41,7 @@ async function mutation(name,h,fn){const n=h.n,ab=Date.now();await fn();await bi
   await daten(a.client.from('chats').insert({id,name:'P7 '+lauf,is_group:gruppe,bereich:'community',created_by:a.id}));
   await daten(a.client.from('chat_members').insert([{chat_id:id,user_id:a.id},{chat_id:id,user_id:b.id}]));
   const zustand=await daten(b.client.from('chats').select('anfrage_zustand').eq('id',id).single());
-  if(zustand.anfrage_zustand!=='angenommen')await daten(b.client.from('chats').update({anfrage_zustand:'angenommen'}).eq('id',id).select('id').single());
+  if(zustand.anfrage_zustand==='wartet')await daten(b.client.from('chats').update({anfrage_zustand:'angenommen'}).eq('id',id).select('id').single());
   const hb=await hoeren(b.client,'chat:'+id),ha=await hoeren(a.client,'chat:'+id),hl=await hoeren(b.client,'nutzer:'+b.id);
   check((gruppe?'Gruppe':'Zweierchat')+' beide privaten Kanäle verbunden',hb.verbunden&&ha.verbunden&&hl.verbunden);
   const mid=crypto.randomUUID(),ln=hl.n;

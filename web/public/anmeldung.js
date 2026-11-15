@@ -100,6 +100,7 @@
 
     client.auth.onAuthStateChange((ereignis, neue) => {
       sitzung = neue;
+      if (neue?.access_token) client.realtime.setAuth(neue.access_token);
       // Jede neue Sitzung sofort ins Kontenfach — das Erneuerungstoken wird
       // bei jedem Auffrischen ausgetauscht, das alte ist dann verbraucht.
       if (neue && (ereignis === 'SIGNED_IN' || ereignis === 'TOKEN_REFRESHED' || ereignis === 'USER_UPDATED' || ereignis === 'INITIAL_SESSION')) {
