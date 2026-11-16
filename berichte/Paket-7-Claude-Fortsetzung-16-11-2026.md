@@ -166,3 +166,16 @@ globalen state lesen. Bereitschaft weiterhin anhand echter gefüllter Daten
 prüfen, Wartebedingung nicht entfernen. Produktcode unverändert.
 Diagnosepreloader hatte zuerst einen falschen internen Playwrightpfad;
 0/0,Rest0,kein Produktbefund. Danach nur unterstützte Browser-/Page-Methoden.
+
+### Konfigurationsfehler des Prüfstarts korrigiert
+
+Lauf462c12ec: erste sechs Altfehlerläufe vollständig grün (19/19,10/10,
+23/23,17/17,16/16,6/6; jeweilsCode0). Kamera10/10aberCode2 wegen
+Egress-Sperre eines alten Avatars, anschließend Smoke ebenfalls betroffen.
+Ursache im eigenen Prüfstart: app/web-app.js lädt web/.env.local nicht.
+Diese vorhandene lokale Konfiguration enthält die Medien-/Servicewerte;
+regulärer Einstieg web/server/lokal.js lädt sie vor dem Servermodul.
+Kein Produktfehler und keine nötige Abschwächung der Egress-Sperre.
+Eigener Launcher jetzt über diesen regulären Einstieg, geschützter
+Prozessname bleibt. Lauf vor Änderung kontrolliert beendet, Rohbelege
+bleiben erhalten; erneut kompletter Nachweis erforderlich.

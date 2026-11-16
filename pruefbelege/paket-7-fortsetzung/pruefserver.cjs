@@ -1,3 +1,3 @@
-// Eigener Prozessname: Hauptprojekt-Startskripte pkill -f web-app.js dürfen ihn nicht treffen.
+// Geschützter Prüfprozess mit derselben lokalen Medienkonfiguration wie der reguläre Webstart.
 process.env.PORT='3300';
-require('../../app/web-app');
+require('../../web/server/lokal');

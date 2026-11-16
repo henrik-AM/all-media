@@ -1,1 +1,1 @@
-{"pid": 27974, "quelle": "8884c8c", "ziel": 3300}
+{"pid": 50659, "quelle": "9da10a7", "ziel": 3300, "startskript": "pruefserver.cjs", "konfiguration": "web/.env.local \u00fcber regul\u00e4ren Webstart"}
