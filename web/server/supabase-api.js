@@ -635,6 +635,9 @@ async function ladeChats(client, nutzerId, bereich = 'messenger', schluesselId =
          */
         previewKrypto: vorschau
           ? {
+              gesendetAm: vorschau.krypto_gesendet_am, zeitpunkt: vorschau.created_at,
+              id: vorschau.id, chatId: vorschau.chat_id, senderId: vorschau.sender_id,
+              antwortAufId: vorschau.reply_to || null, zitatVonId: vorschau.quote_of || null,
               krypto: Number(vorschau.krypto || 0),
               chiffre: vorschau.chiffre || null,
               kryptoNonce: vorschau.krypto_nonce || null,
@@ -754,7 +757,7 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
       // Die vier Kryptospalten muessen mit: eine verschluesselte Nachricht,
       // auf die geantwortet wird, haette sonst einen leeren Text — und im
       // Antwortbezug staende eine leere Zeile statt des Zitierten.
-      .select('id, text, sender_id, krypto, chiffre, krypto_nonce, absender_schluessel')
+      .select('id, chat_id, sender_id, reply_to, quote_of, created_at, krypto_gesendet_am, text, krypto, chiffre, krypto_nonce, absender_schluessel')
       .in('id', bezugIds);
     bezugZeilen = gefunden || [];
   }
@@ -821,6 +824,8 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
       id: b.id,
       text: b.text || '',
       autor: b.sender_id === nutzerId ? 'Du' : namen.get(b.sender_id) || '',
+      gesendetAm: b.krypto_gesendet_am, zeitpunkt: b.created_at,
+      chatId: b.chat_id, senderId: b.sender_id, antwortAufId: b.reply_to || null, zitatVonId: b.quote_of || null,
       krypto: Number(b.krypto || 0),
       chiffre: b.chiffre || null,
       kryptoNonce: b.krypto_nonce || null,
@@ -911,6 +916,8 @@ async function ladeNachrichten(client, chatId, nutzerId, schluesselId = null) {
      * Klartext setzt der Browser ein, nachdem er das Kuvert geoeffnet hat.
      * Alle vier Felder gehoeren zusammen; fehlt eins, geht nichts auf.
      */
+    gesendetAm: n.krypto_gesendet_am,
+    antwortAufId: n.reply_to || null, zitatVonId: n.quote_of || null,
     krypto: Number(n.krypto || 0),
     chiffre: n.chiffre || null,
     kryptoNonce: n.krypto_nonce || null,

@@ -44,8 +44,8 @@
  * - Die öffentlichen Schlüssel kommen vom Server. Wer den Server beherrscht,
  *   kann einen eigenen Schlüssel unterschieben. Dagegen hilft nur ein
  *   Vergleich der Sicherheitsnummer von Hand — `sicherheitsnummer()` bildet
- *   sie über ALLE Geräte einer Person (seit 16.10.2026, AR-04), die
- *   Oberfläche zeigt sie samt Gerätezahl im Kontaktprofil.
+ *   sie über ALLE Geräte einer Person; `paarSicherheitsnummer` bindet beide
+ *   Konten. Die Kontaktinfos zeigen dieselbe gemeinsame Vergleichsnummer.
  */
 
 (function (global, factory) {
@@ -67,7 +67,7 @@
    * Zahl lesbar. Ohne diese Zahl wäre jede Änderung am Format ein stiller
    * Datenverlust.
    */
-  var VERSION = 1;
+  var VERSION = 2;
 
   // ------------------------------------------------------------- Zufall --
 
@@ -248,6 +248,67 @@
     };
   }
 
+  /** Gemeinsame Referenz: beide Konten sehen dieselbe Nummer samt Gerätezahl.
+   * Kontozuordnung gehört in den Hash: vertauschte Schlüssel sind nicht gleich.
+   */
+  function paarSicherheitsnummer(kontoA, schluesselA, kontoB, schluesselB) {
+    if (!kontoA || !kontoB || kontoA === kontoB) return null;
+    var seiten = [[String(kontoA), schluesselA], [String(kontoB), schluesselB]];
+    var geraete = 0;
+    for (var i = 0; i < seiten.length; i++) {
+      var liste = Array.from(new Set(seiten[i][1] || [])).sort();
+      if (!sicherheitsnummer(liste)) return null;
+      geraete += liste.length;
+      seiten[i][1] = liste;
+    }
+    seiten.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+    var summe = nacl.hash(zuBytes(JSON.stringify(['AllMedia-Paar-1', seiten])));
+    var ziffern = '';
+    for (var j = 0; j < 16; j++) ziffern += ('0' + summe[j].toString(16)).slice(-2);
+    return { nummer: ziffern.toUpperCase().match(/.{4}/g).join(' '), geraete: geraete };
+  }
+
+  /** Format 2 bindet die Chiffre an ihre unveränderliche Nachrichtenidentität
+   * und den Antwort-/Zitatbezug. Format 1 bleibt als ungebundener Altbestand lesbar.
+   */
+  function kontextAusZeile(z) {
+    return { id: z.id, chatId: z.chat_id || z.chatId, senderId: z.sender_id || z.senderId,
+      antwortAuf: z.reply_to || z.antwortAufId || null, zitatVon: z.quote_of || z.zitatVonId || null, zeit: z.krypto_gesendet_am || z.gesendetAm, empfangenAm: z.created_at || z.zeitpunkt };
+  }
+  function kontextText(k) {
+    if (!k || !k.id || !k.chatId || !k.senderId || !k.zeit || !Number.isFinite(Date.parse(k.zeit))) throw new Error('Nachrichtenkontext fehlt');
+    return JSON.stringify([String(k.id), String(k.chatId), String(k.senderId), k.antwortAuf || null, k.zitatVon || null, new Date(k.zeit).toISOString()]);
+  }
+  var FORMAT2 = 'AllMedia-Kontext-2:';
+  function inhaltPacken(text, kontext) {
+    return zuBytes(kontext ? FORMAT2 + JSON.stringify({ kontext: kontextText(kontext), text: String(text) }) : text);
+  }
+  function inhaltOeffnen(klar, version, kontext) {
+    var text = ausBytes(klar);
+    if (Number(version) === 1) return text.indexOf(FORMAT2) === 0 ? null : text;
+    if (Number(version) !== 2 || text.indexOf(FORMAT2) !== 0) return null;
+    var p = JSON.parse(text.slice(FORMAT2.length));
+    if (kontext && kontext.empfangenAm && (!Number.isFinite(Date.parse(kontext.empfangenAm)) || Math.abs(Date.parse(kontext.empfangenAm) - Date.parse(kontext.zeit)) > 300000)) return null;
+    return p.kontext === kontextText(kontext) && typeof p.text === 'string' ? p.text : null;
+  }
+
+  /** Lokaler Schlüssel als unabhängige Referenz; Serverlisten allein beweisen
+   * nicht, dass darin nur berechtigte Geräte stehen.
+   */
+  function vergleichstext(paar, lokal, eigene, fremde) {
+    function liste(paare) { return Array.from(new Set(paare)).sort().map(fingerabdruck); }
+    if (!eigene.includes(lokal)) throw new Error('Das lokale Gerät fehlt in der registrierten Geräteliste');
+    var ich = liste(eigene), du = liste(fremde);
+    return 'Gemeinsame Sicherheitsnummer (' + paar.geraete + ' Geräteschlüssel):\n' + paar.nummer +
+      '\n\nLokaler Fingerabdruck dieses Geräts:\n' + fingerabdruck(lokal) +
+      '\n\nDeine registrierten Geräteschlüssel (' + ich.length + '):\n' + ich.join('\n') +
+      '\n\nGeräteschlüssel des Gegenübers (' + du.length + '):\n' + du.join('\n') +
+      '\n\nVergleicht jeden Eintrag mit dem lokalen Fingerabdruck auf dem zugehörigen Gerät. ' +
+      'Ein unbekannter Eintrag ist dadurch nicht bestätigt; schreibt dann nicht weiter. ' +
+      'Die gemeinsame Nummer muss auf beiden Geräten gleich sein. Allein beweist das nicht, ' +
+      'dass alle Geräte berechtigt sind: ein beiden Seiten gleich gezeigtes Zusatzgerät fällt beim bloßen Nummernvergleich nicht auf.';
+  }
+
   // -------------------------------------------------------- Verschließen --
 
   /**
@@ -262,13 +323,13 @@
    * Rückgabe passt eins zu eins auf die Datenbankspalten:
    *   { version, chiffre, nonce, absender, kuverts: [{ schluesselId, nonce, chiffre }] }
    */
-  function verschluesseln(text, meinGeheim, empfaenger) {
+  function verschluesseln(text, meinGeheim, empfaenger, kontext) {
     var liste = empfaenger || [];
     if (!liste.length) throw new Error('Kein Empfängerschlüssel — nichts zu verschließen');
 
     var sitzung = nacl.randomBytes(nacl.secretbox.keyLength);
     var nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-    var chiffre = nacl.secretbox(zuBytes(text), nonce, sitzung);
+    var chiffre = nacl.secretbox(inhaltPacken(text, kontext), nonce, sitzung);
 
     var geheim = ausBase64(meinGeheim);
     var meinOeffentlich = zuBase64(nacl.box.keyPair.fromSecretKey(geheim).publicKey);
@@ -285,7 +346,7 @@
     }
 
     return {
-      version: VERSION,
+      version: kontext ? VERSION : 1,
       chiffre: zuBase64(chiffre),
       nonce: zuBase64(nonce),
       absender: meinOeffentlich,
@@ -308,7 +369,7 @@
   function entschluesseln(nachricht, kuvert, meinGeheim) {
     try {
       if (!nachricht || !kuvert || !meinGeheim) return null;
-      if (Number(nachricht.version) !== VERSION) return null;
+      if (![1, 2].includes(Number(nachricht.version))) return null;
 
       var geheim = ausBase64(meinGeheim);
       var sitzung = nacl.box.open(
@@ -326,7 +387,7 @@
       );
       if (!klar) return null;
 
-      return ausBytes(klar);
+      return inhaltOeffnen(klar, nachricht.version, nachricht.kontext);
     } catch (e) {
       return null;
     }
@@ -356,7 +417,7 @@
   function umschliessen(text, nachricht, kuvert, meinGeheim) {
     try {
       if (!nachricht || !kuvert || !meinGeheim) return null;
-      if (Number(nachricht.version) !== VERSION) return null;
+      if (![1, 2].includes(Number(nachricht.version))) return null;
       var sitzung = nacl.box.open(
         ausBase64(kuvert.chiffre),
         ausBase64(kuvert.nonce),
@@ -364,8 +425,9 @@
         ausBase64(meinGeheim)
       );
       if (!sitzung) return null;
+      if (Number(nachricht.version) === 2 && entschluesseln(nachricht, kuvert, meinGeheim) === null) return null;
       var nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
-      var chiffre = nacl.secretbox(zuBytes(text), nonce, sitzung);
+      var chiffre = nacl.secretbox(inhaltPacken(text, Number(nachricht.version) === 2 ? nachricht.kontext : null), nonce, sitzung);
       return { chiffre: zuBase64(chiffre), nonce: zuBase64(nonce) };
     } catch (e) {
       return null;
@@ -401,7 +463,7 @@
   function meldebeleg(nachricht, kuvert, meinGeheim) {
     try {
       if (!nachricht || !kuvert || !meinGeheim) return null;
-      if (Number(nachricht.version) !== VERSION) return null;
+      if (![1, 2].includes(Number(nachricht.version))) return null;
       var sitzung = nacl.box.open(
         ausBase64(kuvert.chiffre),
         ausBase64(kuvert.nonce),
@@ -411,7 +473,8 @@
       if (!sitzung) return null;
       var klar = nacl.secretbox.open(ausBase64(nachricht.chiffre), ausBase64(nachricht.nonce), sitzung);
       if (!klar) return null;
-      return { text: ausBytes(klar), sitzung: zuBase64(sitzung) };
+      var text = inhaltOeffnen(klar, nachricht.version, nachricht.kontext);
+      return text === null ? null : { text: text, sitzung: zuBase64(sitzung) };
     } catch (e) {
       return null;
     }
@@ -435,7 +498,9 @@
       if (nonce.length !== nacl.secretbox.nonceLength) return false;
       var klar = nacl.secretbox.open(ausBase64(verschlossen.chiffre), nonce, schluessel);
       if (!klar) return false;
-      return ausBytes(klar) === String(text == null ? '' : text);
+      var offen = ausBytes(klar);
+      if (offen.indexOf(FORMAT2) === 0) offen = JSON.parse(offen.slice(FORMAT2.length)).text;
+      return offen === String(text == null ? '' : text);
     } catch (e) {
       return false;
     }
@@ -683,6 +748,7 @@
 
   return {
     VERSION: VERSION,
+    kontextAusZeile: kontextAusZeile,
     MELDUNG_NICHT_VERSCHLUESSELT: MELDUNG_NICHT_VERSCHLUESSELT,
     MELDUNG_NUR_ZU_ZWEIT: MELDUNG_NUR_ZU_ZWEIT,
     zuVieleMitglieder: zuVieleMitglieder,
@@ -693,6 +759,8 @@
     schluesselpaarErzeugen: schluesselpaarErzeugen,
     fingerabdruck: fingerabdruck,
     sicherheitsnummer: sicherheitsnummer,
+    paarSicherheitsnummer: paarSicherheitsnummer,
+    vergleichstext: vergleichstext,
     verschluesseln: verschluesseln,
     entschluesseln: entschluesseln,
     umschliessen: umschliessen,

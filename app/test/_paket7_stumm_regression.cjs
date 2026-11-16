@@ -6,7 +6,7 @@ const anfang=text.indexOf('  type StummWunsch')>=0?text.indexOf('  type StummWun
 const quelle=text.slice(anfang,text.indexOf('\n  const chatLeeren =',anfang));
 const tick=()=>new Promise(setImmediate);
 function aufbau(){let slots=[],cursor=0,effekte=[],dirty=false,server=false,calls=[],pending=[];
- const daten={ichId:'A',chats:[{id:'c',muted:false}],communityChats:[],chatsNeuLaden:async()=>{daten.chats=[{id:'c',muted:server}];dirty=true;}};
+ const daten={ichId:'A',chats:[{id:'c',muted:false}],communityChats:[],chatsNeuLaden:async()=>{daten.chats=[{id:'c',muted:server}];dirty=true;return true;}};
  const ctx={daten,supabase:{},chatStumm:[],setChatStumm(){},mitRueckweg:()=>()=>false,console:{error(){},warn(){}},useCallback:f=>f,
   useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;dirty=true;}];},
   useRef(initial){const i=cursor++;if(!(i in slots))slots[i]={current:initial};return slots[i];},
@@ -26,3 +26,6 @@ test('Drei schnelle Tipps behalten letzten Wunsch auch bei Zwischenbestätigunge
 
 test('Kontorückkehr startet keine alten wartenden Schreibaufträge erneut',async()=>{const h=aufbau();h.ui.klick('c',false);h.ui.klick('c',false);h.render();await tick();h.daten.ichId='B';h.render();h.daten.ichId='A';h.render();await h.fertig(0);assert.equal(h.calls.length,1,'alter Auftrag darf nach A/B/A nicht starten');});
 test('Fehlgeschlagener Listenabruf verwirft keine erfolgreich gespeicherte Auswahl',async()=>{const h=aufbau();h.daten.chatsNeuLaden=async()=>{throw Error('Lesefehler');};h.render();h.ui.klick('c',false);h.render();await tick();await h.fertig();assert.equal(h.ui.lesen('c',false),true);h.server(true);h.server(false);assert.equal(h.ui.lesen('c',false),false);});
+
+test('Frisch gelesener Gegenwert vom Zweitgerät gewinnt nach bestätigtem Schreiben',async()=>{const h=aufbau();h.daten.chatsNeuLaden=async()=>{h.server(false);return true;};h.render();h.ui.klick('c',false);h.render();await tick();await h.fertig();assert.equal(h.ui.lesen('c',false),false);});
+test('Nach Lesefehler bestätigt auch unveränderter frischer Serverstand den Fernwert',async()=>{const h=aufbau();h.daten.chatsNeuLaden=async()=>false;h.render();h.ui.klick('c',false);h.render();await tick();await h.fertig();assert.equal(h.ui.lesen('c',false),true);h.daten.chatsGelesenSeit=Date.now()+10;h.server(false);assert.equal(h.ui.lesen('c',false),false);h.server(true);assert.equal(h.ui.lesen('c',true),true);});

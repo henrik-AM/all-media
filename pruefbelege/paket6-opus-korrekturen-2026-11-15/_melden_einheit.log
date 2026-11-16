@@ -1,0 +1,121 @@
+
+1  meldung.js gegen Schema 102
+  OK    Kategorien = reports_kategorie_check (ohne problem)
+  OK    Arten = reports_target_type_check
+  OK    Maßnahmen = reports_massnahme_check
+  OK    jede Kategorie: Name, Erklärung, Grundlage gesetz|regeln
+  OK    jede Kategorie hat eine Vorlage für Moderatoren
+  OK    Alte Arten = Schema 2 (post, comment, story, user, message)
+  OK    jeder grund aus Schema 102 hat einen Satz (26)
+  OK    unbekannter grund → nie leer
+  OK    gültige Meldung geht durch
+  OK    unbekannte Art → art
+  OK    fehlende Kategorie → kategorie
+  OK    unbekannte Kategorie → kategorie
+  OK    9 Zeichen → begruendung
+  OK    10 Zeichen gehen durch
+  OK    Leerzeichen zählen nicht (btrim)
+  OK    Emoji zählt ein Zeichen wie Postgres length()
+  OK    Kindesmissbrauch ohne Begründung geht durch
+  OK    Häkchen fehlt → gutglaeubig
+  OK    Häkchen muss true sein, nicht „ja"
+  OK    ohne Ziel → ziel
+  OK    Problem: ohne Kategorie, ohne Häkchen, ohne Ziel
+  OK    Problem: Begründung trotzdem Pflicht
+  OK    Reihenfolge wie SQL (begruendung vor gutglaeubig)
+  OK    Zähler: „Noch 4 Zeichen"
+  OK    Zähler bei Kindesmissbrauch: nichts beschreiben
+
+   Hinweise und Texte
+  OK    Kindesmissbrauch: nicht beschreiben
+  OK    Kindesmissbrauch: nicht weiterleiten, nicht speichern
+  OK    Kindesmissbrauch: Internet-Beschwerdestelle
+  OK    Kindesmissbrauch: 110
+  OK    Selbstverletzung: Telefonseelsorge 0800 111 0 111
+  OK    Selbstverletzung: Nummer gegen Kummer 116 111
+  OK    andere Kategorie: kein Hinweis
+  OK    Eingangsbestätigung je Weg verschieden
+  OK    Eingangsbestätigung = Satz der SQL-Funktion (Anfang)
+  OK    „kommt mit dem nächsten Update" je Art
+  OK    Titel: Story melden / Problem melden
+  OK    massnahmeText wie SQL (sperren mit Datum)
+  OK    massnahmeText wie SQL (warnen)
+  OK    Widerspruch: Frist offen/abgelaufen
+
+   alter Weg (Schema 102 fehlt)
+  OK    fehltFunktion: 42883, das inhalt_melden selbst nennt
+  OK    fehltFunktion: 42883 einer Hilfsfunktion im Rumpf → KEIN alter Weg (Fund 28)
+  OK    fehltFunktion: 42883 ohne Text → kein alter Weg
+  OK    fehltFunktion: Name der gerufenen Funktion zählt
+  OK    fehltFunktion: PGRST202
+  OK    fehltFunktion: anderer Fehler nicht
+  OK    alter Weg nur für die fünf alten Arten
+  OK    alterGrund: Kategorie, Begründung, gemeldeter Text
+  OK    alterGrund: Sitzungsschlüssel geht nicht mit
+
+   Entscheidung (meldung_entscheiden)
+  OK    gültige Entscheidung
+  OK    Begründung < 20 → begruendung_entscheidung
+  OK    ohne Grundlage → grundlage
+  OK    „keine" braucht keine Grundlage
+  OK    sperren ohne Konto → kein_konto
+  OK    Profil entfernen → massnahme
+  OK    Profil: keine Entfernen-Maßnahmen zur Auswahl
+  OK    Problem: immer durch
+  OK    Dringlichkeit wie SQL-Sortierung
+  OK    Ablauf bei verborgenem Beleg: nicht öffnen, erst entfernen, BKA Pflicht, Sperre nach Bestätigung, 110
+  OK    Ablauf: Beschwerdestelle nur zusätzlich, nicht „bzw." (Fund 6)
+
+   Gate 2: Kindesmissbrauch, Art. 18, Vorschrift, Klausel (Funde 5, 6, 8, 11, 17, 19, 30)
+  OK    Kindesmissbrauch: entfernen ohne Bestätigung geht
+  OK    Kindesmissbrauch: sperren ohne Bestätigung → bestaetigung
+  OK    Kindesmissbrauch: sperren mit Bestätigung, ohne BKA-Vermerk → art18
+  OK    Kindesmissbrauch: sperren mit Bestätigung und Vermerk, ohne Enddatum → durch
+  OK    Kindesmissbrauch: Grundlage Richtlinien → grundlage
+  OK    Kindesmissbrauch: Vorlage nur bei entfernen/entfernen_sperren
+  OK    Kindesmissbrauch: Vorlage bei „Nichts tun" → vorlage
+  OK    Kindesmissbrauch: Vorlage nennt keine Behörde (Fund 17)
+  OK    Sperre ohne Enddatum bei Mobbing → sperre_dauer
+  OK    Sperre 7 Tage bei Mobbing → durch
+  OK    Sperrdauern: „Ohne Enddatum" nur bei Kindesmissbrauch/Drohung
+  OK    Drohung: sperren ohne BKA-Vermerk → art18
+  OK    Art.-18-Pflicht nur bei Kindesmissbrauch und Drohung
+  OK    Art. 18: u-entrance, Beschwerdestelle zusätzlich, 110
+  OK    Vermerk-Mindestlänge = art18_vermerken (5)
+  OK    Bestätigung-Mindestlänge = meldung_entscheiden (10)
+  OK    Gesetz ohne Vorschrift → norm
+  OK    Gesetz mit „130 StGB" ohne § → norm
+  OK    Gesetz mit „§ 130 StGB" → durch
+  OK    „Art." gilt wie in SQL
+  OK    Richtlinien ohne Klausel → klausel
+  OK    Abschnitte = Community-Richtlinien in rechtstexte.js (Nummer und Titel)
+  OK    jede Kategorie hat einen Klausel-Eintrag (Zahl oder bewusst null)
+  OK    Klausel je Kategorie passt (Hass → 4, Kinder → 2, Urheberrecht → 9)
+  OK    nur Verbots-Abschnitte wählbar (2–11)
+  OK    Begründung nennt Nummer und Titel der Klausel
+  OK    Begründung nennt die Vorschrift (erfüllt die SQL-Prüfung auf § / Art.)
+  OK    Vorschrift schon im Text → nicht doppelt
+  OK    „Nichts tun": Begründung unverändert
+  OK    Urteil „stimmt nicht" neutral: Chiffre, später bearbeitet (Fund 30)
+  OK    Medienvorschau: nie bei Kindesmissbrauch, nur offen, nur mit Medium
+  OK    neue Gründe auf Deutsch: bestaetigung, sperre_dauer, ziel_weg, grundlage, norm, vermerk, art18, klausel
+
+2  krypto.js: meldebeleg / belegPruefen (echte Verschlüsselung)
+  OK    meldebeleg liefert Text und Sitzung
+  OK    Sitzung ist 32 Byte (Base64, 44 Zeichen)
+  OK    Gerätschlüssel steht NICHT im Beleg
+  OK    zweites Gerät: derselbe Sitzungsschlüssel
+  OK    belegPruefen: echt
+  OK    belegPruefen: veränderter Text → false
+  OK    belegPruefen: anderer Schlüssel → false
+  OK    Beleg öffnet KEINE andere Nachricht
+  OK    belegPruefen: kaputte Eingaben → false, kein Wurf
+  OK    meldebeleg: fremdes Kuvert → null
+  OK    meldebeleg: falsche Version → null
+  OK    meldebeleg: ohne Kuvert → null
+  OK    bearbeitete Nachricht: Beleg zeigt den aktuellen Text
+  OK    bearbeitete Nachricht: alter Text passt nicht mehr zur neuen Chiffre
+
+105/105 Prüfungen bestanden
+
+Exit: 0

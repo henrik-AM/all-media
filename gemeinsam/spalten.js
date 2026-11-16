@@ -98,7 +98,7 @@ const PROFIL_RUECKGABE_SPALTEN =
 const NACHRICHT_SPALTEN =
   'id, chat_id, sender_id, text, media_url, media_type, created_at, read_at,' +
   ' reply_to, quote_of, forwarded_from, edited_at, deleted_at, file_name, file_size,' +
-  ' krypto, chiffre, krypto_nonce, absender_schluessel,' +
+  ' krypto, chiffre, krypto_nonce, absender_schluessel, krypto_gesendet_am,' +
   // Der Eintrag zu einem Anruf (Henrik 7.9., Schema 35). Gesetztes anruf_art
   // heisst: diese Zeile ist kein Text, sondern eine Anrufnotiz.
   ' anruf_art, anruf_status, anruf_dauer,' +

@@ -1,0 +1,12 @@
+Verschlüsselung nicht prüfbar: Chat nicht ladbar
+✔ Später nicht lesbares Ziel: kein vorheriger Nachrichten-/Kuvertschreibvorgang (94.406583ms)
+✔ Späterer Zweierchat mit drittem Mitglied: kein Teilversand (42.496042ms)
+✔ Zwei gültige Ziele: getrennte Chiffren, jedes Ziel mit passendem lesbarem Kuvert (35.895ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 272.875916

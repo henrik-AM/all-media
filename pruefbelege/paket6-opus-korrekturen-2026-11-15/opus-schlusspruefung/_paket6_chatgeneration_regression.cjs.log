@@ -1,0 +1,12 @@
+✔ Neuöffnung derselben Chat-ID: alte Verlaufantwort überschreibt neues Konto nicht (2.084541ms)
+✔ Veraltete Standantwort startet keinen Verlaufabruf nach Neuöffnung (0.572917ms)
+✔ Stop invalidiert laufenden Abruf und bereits eingereihte alte Timeraufrufe (0.60775ms)
+✔ Stop während json-await invalidiert dieselbe Chat-ID vor UI-Aktualisierung (0.629042ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 160.605875

@@ -999,7 +999,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * zur Bestätigung. Danach gewinnt wieder der Server, auch wenn ein anderes
    * Gerät später zum ursprünglichen Wert zurückschaltet.
    */
-  type StummWunsch = { wert: boolean; basis: boolean; konto: string; nr: number; geschrieben?: boolean };
+  type StummWunsch = { wert: boolean; basis: boolean; konto: string; nr: number; geschrieben?: boolean; geschriebenAm?: number };
   const [chatStummWunsch, setChatStummWunsch] = useState<Record<string, StummWunsch>>({});
   const chatStummOffen = useRef<Record<string, StummWunsch>>({});
   const chatStummNummer = useRef(0);
@@ -1014,13 +1014,14 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     for (const [id, w] of Object.entries(vorher)) {
       // Bestätigte Wünsche entfernen: Kehrt ein Zweitgerät später zum alten
       // Wert zurück, darf der alte Wunsch nicht wieder wirksam werden.
-      if (w.konto === daten.ichId && !(w.geschrieben && server.has(id) && server.get(id) === w.wert)) neu[id] = w;
+      const frisch = (daten.chatsGelesenSeit ?? 0) > (w.geschriebenAm ?? Infinity);
+      if (w.konto === daten.ichId && !(w.geschrieben && (frisch || (server.has(id) && server.get(id) === w.wert)))) neu[id] = w;
     }
     if (Object.keys(neu).length !== Object.keys(vorher).length) {
       chatStummOffen.current = neu;
       setChatStummWunsch(neu);
     }
-  }, [daten.ichId, daten.chats, daten.communityChats, chatStummWunsch]);
+  }, [daten.ichId, daten.chats, daten.communityChats, daten.chatsGelesenSeit, chatStummWunsch]);
 
   const chatStummAnzeige = useCallback(
     (id: string, serverWert: boolean) => {
@@ -1058,7 +1059,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
           await Aktion.chatEinstellung(supabase, konto, id, 'stumm', w.wert);
           if (chatStummOffen.current[id]?.nr === w.nr) {
             // Eine Zwischenantwort älterer Tipps bestätigt keinen neueren Wunsch.
-            const neu = { ...chatStummOffen.current, [id]: { ...w, geschrieben: true } };
+            const neu = { ...chatStummOffen.current, [id]: { ...w, geschrieben: true, geschriebenAm: Date.now() } };
             chatStummOffen.current = neu;
             setChatStummWunsch(neu);
           }
@@ -1074,7 +1075,15 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         // Auch nach einem Schreibfehler den tatsächlich gespeicherten Stand holen.
         // Lesefehler dürfen einen bereits erfolgreichen Wunsch nicht zurückdrehen.
         if (chatStummKonto.current === sitzung) {
-          try { await daten.chatsNeuLaden(); }
+          try {
+            const gelesen = await daten.chatsNeuLaden();
+            if (gelesen && chatStummKonto.current === sitzung && chatStummOffen.current[id]?.nr === w.nr) {
+              const neu = { ...chatStummOffen.current };
+              delete neu[id];
+              chatStummOffen.current = neu;
+              setChatStummWunsch(neu);
+            }
+          }
           catch (e: any) { console.warn('Chatliste nach Stummschalten nicht geladen:', e?.message ?? e); }
         }
 

@@ -475,7 +475,7 @@ const handleFindPerson = handler('Person suchen', async (client, nutzerId, einga
 
 /** Nur die Kryptofelder eines Browserpakets, keine mitgeschickten Medienbezüge. */
 function kryptoAngaben(p = {}) {
-  return { krypto: p.krypto, chiffre: p.chiffre, kryptoNonce: p.kryptoNonce,
+  return { nachrichtId: p.nachrichtId, gesendetAm: p.gesendetAm, krypto: p.krypto, chiffre: p.chiffre, kryptoNonce: p.kryptoNonce,
     absenderSchluessel: p.absenderSchluessel, kuverts: p.kuverts };
 }
 
@@ -922,6 +922,7 @@ const handleStoryReply = handler(
     const e = await handleSendMessage(client, nutzerId, chatId, Number(krypto.krypto || 0) > 0 ? '' : text, {
       storyId,
       klartextPruefen: true,
+      nachrichtId: krypto.nachrichtId, gesendetAm: krypto.gesendetAm,
       krypto: Number(krypto.krypto || 0),
       chiffre: krypto.chiffre || null,
       kryptoNonce: krypto.kryptoNonce || null,
@@ -1280,14 +1281,23 @@ const handleSendMessage = handler(
     }
 
     if (Number(medien.krypto || 0) > 0 &&
-        (Number(medien.krypto) !== Krypto.VERSION || text || !medien.chiffre || !medien.kryptoNonce ||
+        (![1, 2].includes(Number(medien.krypto)) || text || !medien.chiffre || !medien.kryptoNonce ||
          !medien.absenderSchluessel || !Array.isArray(medien.kuverts) || !medien.kuverts.length)) {
       return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
+    }
+
+    if (Number(medien.krypto) === 2 && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(medien.nachrichtId || '')) {
+      return { ok: false, fehler: 'Nachrichtenkennung fehlt' };
+    }
+
+    if (Number(medien.krypto) === 2 && (!Number.isFinite(Date.parse(medien.gesendetAm)) || Math.abs(Date.now() - Date.parse(medien.gesendetAm)) > 300000)) {
+      return { ok: false, fehler: 'Die Sendezeit stimmt nicht. Bitte prüfe die Geräteuhr und sende die Nachricht erneut.' };
     }
 
     const { data, error } = await client
       .from('messages')
       .insert({
+        ...(Number(medien.krypto) === 2 ? { id: medien.nachrichtId, krypto_gesendet_am: medien.gesendetAm } : {}),
         chat_id: chatId,
         sender_id: nutzerId,
         text: text,
@@ -2474,6 +2484,16 @@ const handleNachrichtBearbeiten = handler(
     if (!verschluesselt && !String(text || '').trim()) {
       return { ok: false, fehler: 'Text erforderlich' };
     }
+    const { data: alt, error: fehlerAlt } = await client.from('messages')
+      .select('chat_id, krypto').eq('id', nachrichtId).eq('sender_id', nutzerId).maybeSingle();
+    if (fehlerAlt) throw fehlerAlt;
+    if (!alt || (Number(alt.krypto) > 0) !== verschluesselt) return { ok: false, fehler: 'Nachrichtenformat stimmt nicht' };
+    if (!verschluesselt) {
+      const fakten = await kryptoFakten(client, alt.chat_id, nutzerId, { knapp: true });
+      if (Krypto.sendeweg({ ...fakten, meiner: null }).art !== 'offen') {
+        return { ok: false, fehler: 'Diese alte Klartextnachricht kann hier nicht mehr bearbeitet werden. Bitte sende den Text als neue verschlüsselte Nachricht.' };
+      }
+    }
     const felder = verschluesselt
       ? { chiffre: krypto.chiffre, krypto_nonce: krypto.kryptoNonce }
       : { text };
@@ -2561,9 +2581,10 @@ const handleNachrichtWeiterleiten = handler(
       const ziel = ziele.find((z) => z && z.chatId === chatId) || {};
       const krypto = Number(ziel.krypto || 0);
       if (krypto > 0) {
-        if (!ziel.chiffre || !ziel.kryptoNonce || !Array.isArray(ziel.kuverts) || !ziel.kuverts.length) {
+        if (![1, 2].includes(krypto) || (krypto === 2 && !/^[0-9a-f-]{36}$/i.test(ziel.nachrichtId || '')) || !ziel.chiffre || !ziel.kryptoNonce || !Array.isArray(ziel.kuverts) || !ziel.kuverts.length) {
           return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
         }
+        if (krypto === 2 && (!Number.isFinite(Date.parse(ziel.gesendetAm)) || Math.abs(Date.now() - Date.parse(ziel.gesendetAm)) > 300000)) return { ok: false, fehler: 'Die Sendezeit stimmt nicht. Bitte sende die Nachricht erneut.' };
         plan.push({ chatId, krypto, ziel });
         continue;
       }
@@ -2589,6 +2610,7 @@ const handleNachrichtWeiterleiten = handler(
       const { data: neu, error: fehler } = await client
         .from('messages')
         .insert({
+          ...(schritt.krypto === 2 ? { id: schritt.ziel.nachrichtId, krypto_gesendet_am: schritt.ziel.gesendetAm } : {}),
           chat_id: schritt.chatId,
           sender_id: nutzerId,
           text: schritt.krypto ? '' : schritt.text,

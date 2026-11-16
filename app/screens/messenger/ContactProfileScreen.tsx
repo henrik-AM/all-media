@@ -213,7 +213,7 @@ export const ContactProfileScreen = ({
    */
   /*
    * Seit dem 16.10.2026 (AR-04) steht hier die Sicherheitsnummer über ALLE
-   * Geräte des Gegenübers und deren Zahl — nicht mehr der Fingerabdruck des
+   * Geräte beider Konten und deren Zahl — nicht mehr der Fingerabdruck des
    * jüngsten. Ein untergeschobenes Gerät ändert jetzt die Nummer und die
    * Zahl. Gleiche Abfrage und Rechnung auf der Website
    * (/api/krypto/kontakt, KryptoWeb.sicherheitsnummer).
@@ -221,22 +221,28 @@ export const ContactProfileScreen = ({
   const [kryptoZustand, setKryptoZustand] = useState<{
     an: boolean;
     fingerabdruck: string | null;
+    vergleich: string | null;
     geraete: number;
-  }>({ an: false, fingerabdruck: null, geraete: 0 });
+  }>({ an: false, fingerabdruck: null, vergleich: null, geraete: 0 });
 
   useEffect(() => {
-    setKryptoZustand({ an: false, fingerabdruck: null, geraete: 0 });
+    setKryptoZustand({ an: false, fingerabdruck: null, vergleich: null, geraete: 0 });
     if (!supabase || !ichId || !chat || chat.isGroup) return;
     let gilt = true;
     (async () => {
       try {
-        const data = await Krypto.kontoSchluessel(supabase, userId);
+        const meiner = await Krypto.meinSchluessel(supabase, ichId);
+        if (!meiner) return;
+        const [data, eigene] = await Promise.all([
+          Krypto.kontoSchluessel(supabase, userId), Krypto.kontoSchluessel(supabase, ichId),
+        ]);
         const verschluesselbar = await Krypto.chatVerschluesselbar(supabase, chat.id, ichId);
-        const nr = Krypto.sicherheitsnummer(((data ?? []) as any[]).map((z) => z.oeffentlich));
+        const nr = Krypto.paarSicherheitsnummer(ichId, eigene.map((z) => z.oeffentlich), userId, data.map((z) => z.oeffentlich));
         if (!gilt) return;
         setKryptoZustand({
           an: Boolean(verschluesselbar && nr),
           fingerabdruck: nr?.nummer ?? null,
+          vergleich: nr ? Krypto.vergleichstext(nr, meiner.oeffentlich, eigene.map(z => z.oeffentlich), data.map(z => z.oeffentlich)) : null,
           geraete: nr?.geraete ?? 0,
         });
       } catch (e) {
@@ -549,18 +555,7 @@ export const ContactProfileScreen = ({
                     'Nachrichten von vor dem 07.09.2026. Wer mit wem schreibt, ist ' +
                     'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
                     'Verbindung.\n\n' +
-                    (kryptoZustand.fingerabdruck
-                      ? 'Sicherheitsnummer des Gegenübers (' +
-                        (kryptoZustand.geraete === 1
-                          ? '1 Gerät'
-                          : `${kryptoZustand.geraete} Geräte`) +
-                        '):\n' +
-                        kryptoZustand.fingerabdruck +
-                        '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
-                        'dass niemand dazwischen sitzt. Sie ändert sich, sobald ' +
-                        'ein Gerät dazukommt oder wegfällt — stimmt die Zahl der ' +
-                        'Geräte nicht, fragt nach.'
-                      : '')
+                    (kryptoZustand.vergleich || '')
                   : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
                     'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +
                     'ohne dessen Schlüssel gibt es niemanden, für den verschlossen ' +

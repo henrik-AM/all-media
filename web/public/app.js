@@ -866,7 +866,7 @@ async function nachrichtenHolen(chatId) {
  */
 async function sendeKoerper(chatId, text, weiteres = {}) {
   if (!window.KryptoWeb) throw new Error('Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte lade die Seite neu.');
-  const paket = await window.KryptoWeb.verschliessen(chatId, text);
+  const paket = await window.KryptoWeb.verschliessen(chatId, text, weiteres);
   if (!paket) return { text, ...weiteres };
   return { text: '', ...paket, ...weiteres };
 }
@@ -4563,24 +4563,29 @@ function openCall(ziel, art, ort = {}) {
  */
 /*
  * Seit dem 16.10.2026 (AR-04) ist die Sicherheitsnummer ueber ALLE Geraete
- * des Gegenuebers gebildet, mit deren Zahl — nicht mehr der Fingerabdruck des
+ * beider Konten gebildet, mit deren Zahl — nicht mehr der Fingerabdruck des
  * juengsten. Gleiche Rechnung in der App (ContactProfileScreen).
  */
 async function kryptoZustand(userId, chat) {
-  const nichts = { an: false, fingerabdruck: null, geraete: 0 };
+  const nichts = { an: false, fingerabdruck: null, vergleich: null, geraete: 0 };
   if (!chat || chat.isGroup || !window.KryptoWeb) return nichts;
   try {
+    const meiner = await window.KryptoWeb.anmelden();
+    if (!meiner) return nichts;
     const antwort = await fetch(`/api/krypto/empfaenger/${chat.id}`);
     if (!antwort.ok) throw new Error('Server antwortet mit ' + antwort.status);
     const fakten = await antwort.json();
-    const meiner = await window.KryptoWeb.anmelden();
     if (fakten.ichId !== window.Anmeldung?.nutzer?.()?.id) throw new Error('Konto gewechselt');
-    const nr = window.KryptoWeb.sicherheitsnummer((fakten.schluessel || [])
-      .filter((k) => k.user_id === userId).map((k) => k.oeffentlich));
+    const nr = window.KryptoWeb.paarSicherheitsnummer(fakten.ichId,
+      (fakten.schluessel || []).filter(k => k.user_id === fakten.ichId).map(k => k.oeffentlich), userId,
+      (fakten.schluessel || []).filter(k => k.user_id === userId).map(k => k.oeffentlich));
     const verschluesselbar = Krypto.sendeweg({ ...fakten, meiner }).art === 'verschliessen';
     return {
       an: Boolean(verschluesselbar && nr),
       fingerabdruck: nr ? nr.nummer : null,
+      vergleich: nr ? window.KryptoWeb.vergleichstext(nr, meiner.oeffentlich,
+        fakten.schluessel.filter(k => k.user_id === fakten.ichId).map(k => k.oeffentlich),
+        fakten.schluessel.filter(k => k.user_id === userId).map(k => k.oeffentlich)) : null,
       geraete: nr ? nr.geraete : 0,
     };
   } catch (fehler) {
@@ -5217,16 +5222,7 @@ async function kontaktZeile(label, userId, chat, daten, optionen = {}) {
           'Nachrichten von vor dem 07.09.2026. Wer mit wem schreibt, ist ' +
           'ebenfalls sichtbar — verschlüsselt ist der Inhalt, nicht die ' +
           'Verbindung.\n\n' +
-          (krypto.fingerabdruck
-            ? 'Sicherheitsnummer des Gegenübers (' +
-              (krypto.geraete === 1 ? '1 Gerät' : `${krypto.geraete} Geräte`) +
-              '):\n' +
-              krypto.fingerabdruck +
-              '\n\nVergleicht sie einmal persönlich. Nur dann steht fest, ' +
-              'dass niemand dazwischen sitzt. Sie ändert sich, sobald ' +
-              'ein Gerät dazukommt oder wegfällt — stimmt die Zahl der ' +
-              'Geräte nicht, fragt nach.'
-            : '')
+          (krypto.vergleich || '')
         : 'Für diesen Chat ist keine Verschlüsselung aktiv. Das Gegenüber ' +
           'hat All Media noch auf keinem Gerät geöffnet, seit es sie gibt — ' +
           'ohne dessen Schlüssel gibt es niemanden, für den verschlossen ' +
@@ -15443,7 +15439,7 @@ async function anhangSenden(ziel, art, chat, zeichen) {
     if (ziel.chatId) {
       const vorab = await api(`${ziel.pfad}/vorbereiten`, koerper);
       if (!vorab?.ok) { toast(vorab?.error || 'Anhang nicht vorbereitet'); return null; }
-      try { koerper = { ...koerper, paket: await sendeKoerper(ziel.chatId, vorab.text) }; }
+      try { koerper = { ...koerper, paket: await sendeKoerper(ziel.chatId, vorab.text, bezug || {}) }; }
       catch (fehler) { toast(fehler.message); return null; }
     }
 
@@ -22485,6 +22481,11 @@ async function sendMessage(chat) {
     msg.lokal = true;
     if (koerper.chiffre) {
       const meiner = window.KryptoWeb?.meinSchluessel();
+      msg.chatId = chat.id;
+      msg.senderId = window.Anmeldung?.nutzer?.()?.id;
+      msg.antwortAufId = koerper.antwortAuf || null;
+      msg.zitatVonId = koerper.zitatVon || null;
+      msg.gesendetAm = koerper.gesendetAm;
       msg.chiffre = koerper.chiffre;
       msg.kryptoNonce = koerper.kryptoNonce;
       msg.absenderSchluessel = koerper.absenderSchluessel;

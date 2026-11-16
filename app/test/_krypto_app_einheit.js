@@ -90,12 +90,13 @@ function client(db, stoerung = {}) {
   schluesselkette['allmedia.krypto.geheim'] = alt.geheim;
   schluesselkette['allmedia.krypto.geraet'] = 'alt-geraet';
   gespeicherte = [A, B];
-  const db = { krypto_schluessel: [], chats: [], chat_members: [], messages: [], message_keys: [] };
+  const db = { krypto_schluessel: [{id:'alt-a',user_id:A,geraet:'alt-geraet',oeffentlich:alt.oeffentlich},{id:'alt-b',user_id:B,geraet:'alt-geraet',oeffentlich:alt.oeffentlich}], chats: [], chat_members: [], messages: [], message_keys: [] };
   const c = client(db);
   const [m1, m1b] = await Promise.all([K.meinSchluessel(c, A), K.meinSchluessel(c, A)]);
   pruefe('Altbestand übernommen (Konto A, gleiches Paar)', m1 && m1.geheim === alt.geheim && m1.geraet === 'alt-geraet');
   pruefe('Gleichzeitige Zugriffe: ein Paar', m1b && m1b.geheim === m1.geheim);
-  pruefe('Altes Fach gelöscht', !('allmedia.krypto.geheim' in schluesselkette) && !('allmedia.krypto.geraet' in schluesselkette));
+  pruefe('Altes Fach bleibt erhalten', schluesselkette['allmedia.krypto.geheim'] === alt.geheim);
+  await K.meinSchluessel(c,B);
   pruefe('Zweites angemeldetes Konto B bekommt es auch', schluesselkette['allmedia.krypto.geheim.' + B] === alt.geheim);
   const m3 = await K.meinSchluessel(c, C);
   pruefe('Neues Konto C: eigenes Paar', m3 && m3.geheim !== alt.geheim && schluesselkette['allmedia.krypto.geheim.' + C] === m3.geheim);
@@ -109,7 +110,7 @@ function client(db, stoerung = {}) {
     { chat_id: 'drei', user_id: A }, { chat_id: 'drei', user_id: B }, { chat_id: 'drei', user_id: C },
     { chat_id: 'neu', user_id: A }, { chat_id: 'neu', user_id: 'ohne-geraet' });
   let p = await K.fuerChatVerschliessen(c, 'zwei', A, 'Hallo');
-  pruefe('Zweierchat: verschlossen, Text leer', p.spalten.krypto === 1 && p.spalten.text === '' && p.kuverts.length >= 2);
+  pruefe('Zweierchat: verschlossen, Text leer', p.spalten.krypto === 2 && p.spalten.text === '' && p.kuverts.length >= 2);
   p = await K.fuerChatVerschliessen(c, 'gruppe', A, 'Hallo');
   pruefe('Gruppe: Klartext', p.spalten.krypto === 0 && p.spalten.text === 'Hallo');
   p = await K.fuerChatVerschliessen(c, 'neu', A, 'Hallo');
@@ -151,7 +152,7 @@ function client(db, stoerung = {}) {
   db.message_keys.push({ message_id: 'e1', schluessel_id: meiner.id, ...echt.kuverts[0] }, { message_id: 'f1', schluessel_id: meiner.id, ...falsch.kuverts[0] });
   const z = [zeile(echt, 'e1'), zeile(falsch, 'f1')];
   await K.aufschliessen(c, z, meiner, { absenderPruefen: true });
-  pruefe('Echte Nachricht offen, ohne Kennzeichen', z[0].text === 'echt' && !z[0].nichtPruefbar);
+  pruefe('Echte Altnachricht offen, fehlende Kontextbindung gekennzeichnet', z[0].text === 'echt' && z[0].nichtPruefbar);
   pruefe('Fälschung offen, als nicht prüfbar gekennzeichnet', z[1].text === 'falsch' && z[1].nichtPruefbar === true);
   const z2 = [zeile(falsch, 'f1')];
   await K.aufschliessen(client(db, { krypto_schluessel: true }), z2, meiner, { absenderPruefen: true });

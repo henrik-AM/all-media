@@ -1,0 +1,11 @@
+{
+  "is_error": false,
+  "session_id": "b700e2fe-1ce8-4d95-a74f-48c1618dcd91",
+  "num_turns": 11,
+  "duration_ms": 128961,
+  "permission_denials": [],
+  "models": [
+    "claude-opus-5-5"
+  ],
+  "gepruefter_commit": "ee57c82"
+}

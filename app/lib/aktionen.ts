@@ -1534,7 +1534,7 @@ export async function nachrichtSenden(
   text: string,
   anhang: Anhang = {}
 ): Promise<{ id: string; created_at: string }> {
-  const paket = await fuerChatVerschliessen(client, chatId, ichId, text);
+  const paket = await fuerChatVerschliessen(client, chatId, ichId, text, { antwortAuf: anhang.antwortAuf, zitatVon: anhang.zitatVon });
 
   const { data, error } = await client
     .from('messages')
@@ -2741,7 +2741,10 @@ export async function nachrichtBearbeiten(
     if (!neu) throw new Error('Diese Nachricht lässt sich auf diesem Gerät nicht bearbeiten');
     felder = { ...neu, edited_at: new Date().toISOString() };
   } else {
-    felder = { ...offen(text).spalten, edited_at: new Date().toISOString() };
+    if (!alt) throw new Error('Nachricht nicht ladbar');
+    const pruefung = await fuerChatVerschliessen(client, (alt as any).chat_id, ichId, text);
+    if (pruefung.spalten.krypto) throw new Error('Diese alte Klartextnachricht kann hier nicht mehr bearbeitet werden. Bitte sende den Text als neue verschlüsselte Nachricht.');
+    felder = { ...pruefung.spalten, edited_at: new Date().toISOString() };
   }
 
   const { data: getroffen, error } = await client
@@ -2850,7 +2853,7 @@ export async function nachrichtWeiterleiten(
   const { data, error } = await client
     .from('messages')
     .select(
-      'id, text, media_url, media_type, file_name, file_size, sender_id,' +
+      'id, chat_id, reply_to, quote_of, created_at, krypto_gesendet_am, text, media_url, media_type, file_name, file_size, sender_id,' +
       ' krypto, chiffre, krypto_nonce, absender_schluessel'
     )
     .eq('id', nachrichtId)

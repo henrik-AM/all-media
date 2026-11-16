@@ -79,7 +79,9 @@ interface DatenWert extends AlleDaten {
    * einem Chat und im Takt, wenn sich ihr Stand in der Datenbank geaendert
    * hat. `neuLaden` holt alles und waere dafuer zu schwer.
    */
-  chatsNeuLaden: () => Promise<void>;
+  chatsNeuLaden: () => Promise<boolean>;
+  /** Beginn des zuletzt erfolgreich bestätigten Chatlisten-/Standabrufs. */
+  chatsGelesenSeit: number;
   /**
    * Nimmt einen Beitrag sofort aus dem Feed, ohne alles neu zu laden. Das
    * Schreiben in die Datenbank macht das Drei-Punkte-Menue (BeitragOptionen).
@@ -190,14 +192,22 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
    * alle INTERVALL_LISTE_MIT_KLINGEL_MS.
    */
   const listenStand = useRef<string | null>(null);
+  const chatListenLauf = useRef(0);
+  const [chatsGelesenSeit, setChatsGelesenSeit] = useState(0);
 
   const chatsNeuLaden = useCallback(async () => {
-    if (!supabase || !ichId) return;
+    if (!supabase || !ichId) return false;
+    const lauf = ++chatListenLauf.current;
+    const gelesenSeit = Date.now();
     try {
       const listen = await ladeChatlisten(supabase, ichId);
+      if (lauf !== chatListenLauf.current) return false;
       setDaten((d) => (d.ichId === ichId ? { ...d, ...listen } : d));
+      setChatsGelesenSeit(gelesenSeit);
+      return true;
     } catch (e: any) {
       console.warn('Chatliste nachladen fehlgeschlagen:', e?.message ?? e);
+      return false;
     }
   }, [supabase, ichId]);
 
@@ -211,6 +221,8 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     let klingelDa = false;
     let letzteAbfrage = 0;
     listenStand.current = null;
+    ++chatListenLauf.current;
+    setChatsGelesenSeit(0);
 
     const nachsehen = async (geklingelt = false, kuvert = false) => {
       if (kuvert) kuvertVersion++;
@@ -223,17 +235,22 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
       laeuft = true;
       const kuvertVorher = kuvertVersion;
       letzteAbfrage = Date.now();
+      const lauf = ++chatListenLauf.current;
+      const gelesenSeit = letzteAbfrage;
       try {
         const stand = await ladeChatlistenStand(supabase, ichId);
-        if (aus || stand === null) return;
+        if (aus || stand === null || lauf !== chatListenLauf.current) return;
         const vorher = listenStand.current;
         if (kuvertVorher !== kuvertBestaetigt || vorher !== stand) {
           const listen = await ladeChatlisten(supabase, ichId);
-          if (aus) return;
+          if (aus || lauf !== chatListenLauf.current) return;
           setDaten((d) => (d.ichId === ichId ? { ...d, ...listen } : d));
           listenStand.current = stand; // Erst erfolgreichen Listenabruf bestätigen.
           kuvertBestaetigt = kuvertVorher;
         }
+        // Auch ein unveränderter Stand bestätigt, dass die vorhandene Liste
+        // aktuell ist. Das löst bestätigte Wünsche nach einem Lesefehler ab.
+        setChatsGelesenSeit(gelesenSeit);
       } catch (e: any) {
         console.warn('Chatliste nachsehen fehlgeschlagen:', e?.message ?? e);
       } finally {
@@ -260,6 +277,7 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     );
     return () => {
       aus = true;
+      ++chatListenLauf.current;
       clearInterval(uhr);
       horcher.remove();
       klingelAus();
@@ -331,11 +349,12 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
       fehler,
       neuLaden: laden,
       chatsNeuLaden,
+      chatsGelesenSeit,
       keinInteresseMerken,
       personMerken,
       personenNachladen,
     }),
-    [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, keinInteresseMerken, personMerken, personenNachladen]
+    [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, chatsGelesenSeit, keinInteresseMerken, personMerken, personenNachladen]
   );
 
   return <DatenContext.Provider value={wert}>{children}</DatenContext.Provider>;

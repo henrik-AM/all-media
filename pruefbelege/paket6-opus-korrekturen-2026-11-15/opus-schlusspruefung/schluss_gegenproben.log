@@ -1,0 +1,17 @@
+[N1] Sendezeit
+OK   Server lehnt zurückdatierte Zeit ab, nichts geschrieben  (Die Sendezeit stimmt nicht. Bitte prüfe die Geräteuhr und sende die Nachricht erneut.)
+OK   Server lehnt +10 min ab
+OK   Server nimmt aktuelle Zeit an
+OK   Öffnen mit created_at innerhalb 5 min
+OK   Öffnen mit created_at 2 Tage später → unlesbar
+OK   Ohne created_at (empfangenAm fehlt) wird nicht geprüft → öffnet
+OK   Hinweis: App-Bezugs-Select ohne created_at (Zeitprüfung dort aus)
+OK   App ersetzt created_at nicht mehr
+[N4] Vergleich
+OK   Zahl je Konto sichtbar
+OK   B sieht eingeschobenes X in eigener Liste neben eigenem lokalem Fingerabdruck
+OK   Fehlender lokaler Schlüssel lehnt Vergleich ab  (Das lokale Gerät fehlt in der registrierten Geräteliste)
+OK   Grenze ausdrücklich benannt
+OK   Kein geheimes Material im Text
+
+Ergebnis: 13/13

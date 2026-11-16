@@ -1,0 +1,17 @@
+OK Verworfene Migration hinterlässt keine neue Spalte
+OK Migration wiederholbar und beide Bestandszeilen erhalten
+OK Tabellenrechte unverändert
+OK Normales Format2 mit verschlossener Zeit wird angenommen
+OK Format2 ohne Zeit abgewiesen
+OK Format2 mit Klartext abgewiesen
+OK Unbekannte Version abgewiesen
+OK Format0 mit Chiffre abgewiesen
+OK Format2 zurückdatiert abgewiesen
+OK Format2 vordatiert abgewiesen
+OK Gespeicherte Sendezeit bleibt unveränderlich
+OK Normales verschlüsseltes Bearbeiten bleibt möglich
+OK Triggerfunktion für authenticated nicht direkt aufrufbar
+OK Triggerfunktion für anon nicht direkt aufrufbar
+OK Anonyme Rechte bleiben gesperrt
+OK Präzision der Sendezeit bleibt millisekundengenau
+16/16 lokale SQL-Prüfungen, kein Supabase

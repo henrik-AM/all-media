@@ -33,7 +33,8 @@ test('Absender: entfernter Schlüssel wird nach Ablauf erneut geprüft',async()=
 });
 test('App: Altbestand ohne Gerätekennung bleibt lesbar; neue Konten sind getrennt',async()=>{
   const alt=Krypto.schluesselpaarErzeugen(),speicher={'allmedia.krypto.geheim':alt.geheim};
-  const {K}=app(speicher),c=client(basis());
+  const db=basis();db.krypto_schluessel=[{id:'a-alt',user_id:A,oeffentlich:alt.oeffentlich,geraet:'a-alt'},{id:'b-alt',user_id:B,oeffentlich:alt.oeffentlich,geraet:'b-alt'}];
+  const {K}=app(speicher),c=client(db);
   const [a,b]=await Promise.all([K.meinSchluessel(c,A),K.meinSchluessel(c,B)]);
   assert.equal(a.geheim,alt.geheim);assert.equal(b.geheim,alt.geheim);assert.ok(a.geraet);assert.ok(b.geraet);
   const neu=await K.meinSchluessel(c,'neu');assert.notEqual(neu.geheim,alt.geheim);
@@ -58,15 +59,16 @@ test('App: Chat-/Verlauf-/Mitgliederfehler verhindern Senden einschließlich Anh
 });
 test('Browser: zwei parallele Kontoanmeldungen verwechseln ihre Ergebnisse nicht',async()=>{
   const konto={id:A};const offen=[];const ctx=browser(konto,async(url,opt)=>{
+    if(url.startsWith('/api/krypto/altbestand'))return antwort({kontoId:konto.id,id:null});
     if(url==='/api/krypto/schluessel')return new Promise(res=>offen.push(()=>res(antwort({id:JSON.parse(opt.body).geraet}))));
     throw new Error('unerwartete Route');
   });
-  const a=ctx.KryptoWeb.anmelden();konto.id=B;const b=ctx.KryptoWeb.anmelden();assert.equal(offen.length,2);
+  const a=ctx.KryptoWeb.anmelden();await new Promise(setImmediate);konto.id=B;const b=ctx.KryptoWeb.anmelden();await new Promise(setImmediate);assert.equal(offen.length,2);
   offen[0]();assert.equal(await a,null);offen[1]();assert.equal((await b).kontoId,B);assert.equal(ctx.KryptoWeb.meinSchluessel().kontoId,B);
 });
 test('Browser: vergessen widerruft auch eine noch laufende Anmeldung',async()=>{
   const konto={id:A};let fertig;const ctx=browser(konto,()=>new Promise(res=>{fertig=()=>res(antwort({id:'alt'}));}));
-  const p=ctx.KryptoWeb.anmelden();ctx.KryptoWeb.vergessen();fertig();assert.equal(await p,null);assert.equal(ctx.KryptoWeb.bereit(),false);
+  const p=ctx.KryptoWeb.anmelden();await Promise.resolve();ctx.KryptoWeb.vergessen();fertig();assert.equal(await p,null);assert.equal(ctx.KryptoWeb.bereit(),false);
 });
 test('Browser: fehlende/alte Fakten und Kontowechsel beim Senden sperren Klartext',async()=>{
   for(const fakten of [{},{verschluesselbar:false,schluessel:[]},{istGruppe:false,ichId:B,mitglieder:[A,B],schluessel:[],schonVerschluesselt:false}]) {
@@ -98,7 +100,7 @@ test('App: Kontakt und Beitrag-Teilen benutzen die echte Verschlüsselung',async
     const db=basis(),c=client(db),a=app();
     if(art==='kontakt')await a.aktionen().kontaktHinzufuegen(c,A,B,false,'geheim');
     else {const e=await a.aktionen().teilen(c,A,'post',[B],'geheim');assert.deepEqual(e.gesendet,[B]);}
-    assert.equal(db.messages.length,1);assert.equal(db.messages[0].krypto,1);assert.equal(db.messages[0].text,'');assert.ok(db.message_keys.length>=2);
+    assert.equal(db.messages.length,1);assert.equal(db.messages[0].krypto,2);assert.equal(db.messages[0].text,'');assert.ok(db.message_keys.length>=2);
   }
 });
 test('Server: fehlende Chiffre/Kuverts und unlesbarer Chat führen zu null Schreibvorgängen',async()=>{
