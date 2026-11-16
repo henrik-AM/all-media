@@ -6,6 +6,6 @@ if(!token)throw Error('Verwaltungstoken fehlt');process.env.SUPABASE_TOKEN=token
 for(const k of ['ZIEL','AM_URL','BASE','BASIS','AM_BASIS'])process.env[k]='http://localhost:3300/';
 const suite=require('../../app/test/alles');
 const namen=new Set(['einstellungen','kontaktinfo','henrik','insel','optionen','kasten8','kamera']);
-const zuerst=['kamera','smoke','feedback','einstellungen','kontaktinfo','henrik','insel','optionen','kasten8'];
+const zuerst=['uebernacht','sync','kamera','smoke','feedback','einstellungen','kontaktinfo','henrik','insel','optionen','kasten8'];
 suite.LAEUFE.sort((a,b)=>(zuerst.includes(a[0])?zuerst.indexOf(a[0]):100)-(zuerst.includes(b[0])?zuerst.indexOf(b[0]):100));
 suite.haupt().then(c=>process.exitCode=c).catch(e=>{console.error(e.message);process.exitCode=1;});

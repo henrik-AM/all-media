@@ -79,7 +79,7 @@ function appLesecode() {
  * meldete "Gespeichertes ueber Nacht verloren", obwohl nichts verloren war.
  * Der Like ueberlebte nur, weil das Zuruecksetzen Likes stehen laesst.
  */
-async function anmeldenOhneReset(page, basis = 'http://localhost:3000') {
+async function anmeldenOhneReset(page, basis = process.env.ZIEL || 'http://localhost:3000') {
   mitZeitgrenze(page);
   await page.goto(basis, { waitUntil: 'load' });
   await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });

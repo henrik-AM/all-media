@@ -237,7 +237,7 @@ async function anmelden(page) {
  * Anmelden, zurücksetzen und die Seite neu laden — der übliche Anfang eines
  * Prüflaufs. Danach steht die Oberfläche mit echten Daten da.
  */
-async function vorbereiten(page, basis = 'http://localhost:3000') {
+async function vorbereiten(page, basis = process.env.ZIEL || 'http://localhost:3000') {
   mitZeitgrenze(page);
   await page.goto(basis, { waitUntil: 'load' });
   const an = await anmelden(page);

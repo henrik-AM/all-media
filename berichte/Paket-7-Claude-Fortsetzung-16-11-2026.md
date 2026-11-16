@@ -190,3 +190,20 @@ ursprünglichen Fehlerläufe vollständig bestanden (zusammen101/101).
 Zwischenstand10/101Läufe,253/253Prüfungen,kein fehlgeschlagener Lauf.
 Der vollständige101-Lauf-Nachweis und dessen Bereinigung laufen noch.
 Keine Fertig-/Veröffentlichungsfreigabe daraus abgeleitet.
+
+### Zwei verbliebene feste Prüfziele beseitigt
+
+Nach den ersten10grünenLäufen scheiterte sync5/6: BootstrapHTTP500,
+Serverlog canceling statement due to statement timeout; fremde Storys
+nicht geladen. Kein Chat-/Stummproduktfehler daraus behauptet.
+uebernacht startete noch auf3000 (Code2), obwohl ZIEL3300 gesetzt war:
+vorbereiten in_konto.js und anmeldenOhneReset in_uebernacht.js hatten
+eigene feste Funktionsvorgaben. Beide respektieren jetzt ZIEL; der
+Standard3000bleibt. Vollständige Suche über alle Prüfer/Helper zeigt
+keine weitere wirksame feste3000-Vorgabe in den101Bestandsläufen.
+figma-compare gehört nicht zu diesen Läufen und bleibt unverändert.
+Lauf1e2a8739 kontrolliert beendet:18/101,369/370,Code143,
+Quellenunverändert,Bereinigungerfolgreich/Rest0. Rohbelege erhalten.
+Nächster voller Nachweis beginnt mit uebernacht undsync, danach Medien
+unddie7Altfehler; dieselben101Suiten,keinAusschluss,keineTestwiederholung
+innerhalb einer Messung. Produktcode weiterhin150a88d.
