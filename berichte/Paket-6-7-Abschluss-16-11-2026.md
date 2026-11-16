@@ -126,3 +126,18 @@ Filter bereinigt,Rest0,danachOriginaljournal neu begonnen.
 GemeinsamerGesamtlauf639f542b-5f39-44b3-ae0d-eb9704957820,102Suiten,
 Quellstandbb9f243,läuft unverändert mitOriginal-QuellwächterundBereinigung.
 NochkeinVeröffentlichungsnachweis;main/Push/Render folgen erst nachAuswertung.
+
+## Pause nach Systemhinweis zur aktiven Sitzungszeit
+
+Systemhinweis nach sechs Stunden verlangt Sicherung und Pause vor dem nächsten
+riskanten Schritt. Deshalb keinmain/Push/Deploy in diesem Abschnitt. Der bereits
+gestartete, unabhängig laufendeGesamttest bleibt aktiv (PID29530,Elternsteuerung
+29215,caffeinate29532,Prüfserver26177). Keine Migration läuft. Nicht nochmals
+starten,keineQuellenändern,keinenTestbestandparallelverwenden. Rohstatus:
+app/test/.gesamtlauf-belege/639f542b-5f39-44b3-ae0d-eb9704957820/status.json.
+Endcode:pruefbelege/paket67-abschluss/gesamtlauf-exit.txt;Originaljournal räumt
+Testmitteilungen amLaufende auf. Belegungen bleiben bis dahin bewusst bestehen.
+NachPause zuerst Endstatus,alle102Nenner,Quellgleichheit undRest0 prüfen;
+dann vorhandeneHenrik-Autorisierung fürmain/Push/Render weiterverwenden.
+Die Pause ist keinAbschluss desbeauftragtenZiels. Eigener letzterQuellstand
+bb9f243,seitStart ausschließlichBelege/Dokumentationcommits.

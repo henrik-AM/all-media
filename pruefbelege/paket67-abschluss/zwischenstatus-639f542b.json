@@ -1,0 +1,50 @@
+{
+  "laufId": "639f542b-5f39-44b3-ae0d-eb9704957820",
+  "erwartet": 102,
+  "phase": "laeuft",
+  "bereinigung": "offen",
+  "stempelVorher": "ca68f1b5865832131ec5400beeb6a634763fd044ae93f64e250f55bfb6ef34c1",
+  "ergebnisse": [
+    {
+      "name": "explorer",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "fremdprofil",
+      "code": 0,
+      "zahlen": {
+        "gut": 14,
+        "gesamt": 14
+      }
+    },
+    {
+      "name": "k28-erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 81,
+        "gesamt": 81
+      }
+    },
+    {
+      "name": "uebernacht",
+      "code": 0,
+      "zahlen": {
+        "gut": 11,
+        "gesamt": 11
+      }
+    },
+    {
+      "name": "sync",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    }
+  ],
+  "signal": null
+}
