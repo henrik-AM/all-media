@@ -37,3 +37,16 @@ Paket6-Offlineskript10/10Gruppen inklusiveOpus14/14. Neue Gesamtzahl
 Offen: verworfeneLiveprobe127 mit echtenRLS/Schema95,Einspielung,native
 und plattformübergreifende gemeinsameAbnahme,finalerGesamtlauf,
 Bereinigung,danach autorisiertermain/Push/Rendernachweis.
+
+## Schema127 live geprüft und angewendet
+
+Verworfene Liveprobe auf echten RLS/Schema95:23/23,neue Spalte und
+Constraint nachRollback wiederimOriginalstand,eigeneFixtureRest0.
+Erste Probenfassung erwartete für Schema95 einen CHECK-Code; tatsächlich
+korrekt42501 (Rechtesperre). Erwartung korrigiert, kein Produktfehler.
+Nach grüner Probe Schema127 einmalig angewendet. Nachprüfung: neueSpalte,
+validierterConstraint,internerZeittrigger vorhanden,anon/authenticated
+Direktaufrufgesperrt,Schema95-Trigger erhalten.344Bestandsnachrichten
+und2Format1-Nachrichten vorher/nachher unverändert. SQL-Prüfsumme und
+Metadaten inpruefbelege/paket67-abschluss/schema127-live-einspielung.json.
+Noch keine Veröffentlichung; neueClients undnativeAbnahme folgen.

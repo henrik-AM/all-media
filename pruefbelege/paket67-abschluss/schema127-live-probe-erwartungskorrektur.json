@@ -1,0 +1,42 @@
+{
+  "chat": "c2bab9e7-7a0e-4148-abf6-cfe9564f4f72",
+  "neu": "0c10eae7-8589-4315-a942-da60ab2fda60",
+  "alt": "1d22856b-a295-4326-84aa-f1a4c4d76f05",
+  "vor": [
+    {
+      "spalte": false,
+      "check_def": "CHECK ((((krypto = 0) AND (chiffre IS NULL) AND (krypto_nonce IS NULL)) OR ((krypto = 1) AND (chiffre IS NOT NULL) AND (krypto_nonce IS NOT NULL) AND (absender_schluessel IS NOT NULL) AND (COALESCE(text, ''::text) = ''::text))))"
+    }
+  ],
+  "nach": [
+    {
+      "spalte": false,
+      "check_def": "CHECK ((((krypto = 0) AND (chiffre IS NULL) AND (krypto_nonce IS NULL)) OR ((krypto = 1) AND (chiffre IS NOT NULL) AND (krypto_nonce IS NOT NULL) AND (absender_schluessel IS NOT NULL) AND (COALESCE(text, ''::text) = ''::text))))",
+      "rest": 0
+    }
+  ],
+  "werte": {
+    "acl": "true",
+    "rls": "true",
+    "schema95": "true",
+    "acl_anon": "true",
+    "acl_auth": "true",
+    "format2": "true",
+    "format1": "true",
+    "bearbeiten": "true",
+    "zeit_fest": "zu",
+    "schema95_fest": "anders:42501",
+    "ohne_zeit": "zu",
+    "klartext": "zu",
+    "version3": "zu",
+    "zu_alt": "zu",
+    "zu_neu": "zu",
+    "mitglied_liest": "true",
+    "fremd_update": "true",
+    "entzug_liest_nicht": "true",
+    "entzug_schreibt_nicht": "zu",
+    "anon_liest_nicht": "true"
+  },
+  "gut": 22,
+  "gesamt": 23
+}

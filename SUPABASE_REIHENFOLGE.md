@@ -662,12 +662,12 @@ Veröffentlichung weiter leer. Paket-7-Abnahme: `berichte/Paket-7-Chatklingel-15
 
 **Gesamtreihenfolge der offenen Entwürfe:** 88 → 89 → 90 → 91 → 92 → 93 → 94 → 97 → 98 → 99 → 100.
 
-## Paket 6 – Format 2 (Schema 127, Entwurf)
+## Paket 6 – Format 2 (Schema 127, live 16.11.2026)
 
 `messages_krypto_stimmig`: Schema 31 → **Schema 127**. Zusätzlich
 `messages.krypto_gesendet_am` für die vom Absender mitverschlossene Sendezeit.
 Erst Schema 127 prüfen und anwenden, danach neue Clients veröffentlichen.
 Format 1 bleibt lesbar; frühere Clients verstehen Format 2 nicht.
-Schema 127 ist noch nicht live eingespielt.
+Schema 127 ist seit16.11.2026 nach verworfener Liveprobe23/23 eingespielt; Rechte,Schema95,Constraintvalidierung und Bestandszahlen anschließend gegengelesen. Native/gemeinsame Client-Abnahme und Veröffentlichung folgen separat.
 
 Schema 127 begrenzt die mitverschlossene Absenderzeit auf ±5 Minuten zur Serverzeit und schützt sie anschließend mit dem internen Trigger `krypto_zeit_fest`; Anzeige und Sortierung verwenden weiter `created_at`. Direktaufrufrechte der Triggerfunktion sind entzogen.

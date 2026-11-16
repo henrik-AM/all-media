@@ -1,0 +1,24 @@
+{
+  "sha256": "c6f6f23c4aa94ed51cb9b287096e2afc33ed4daeef36b80e818fe1ed40daadea",
+  "vor": [
+    {
+      "spalte": false,
+      "nachrichten": 344,
+      "format1": 2
+    }
+  ],
+  "nach": [
+    {
+      "spalte": true,
+      "validiert": true,
+      "check_def": "CHECK ((((krypto = 0) AND (chiffre IS NULL) AND (krypto_nonce IS NULL)) OR ((krypto = ANY (ARRAY[1, 2])) AND (chiffre IS NOT NULL) AND (krypto_nonce IS NOT NULL) AND (absender_schluessel IS NOT NULL) AND (COALESCE(text, ''::text) = ''::text) AND ((krypto = 1) OR ((krypto_gesendet_am IS NOT NULL) AND (created_at IS NOT NULL) AND ((krypto_gesendet_am >= (created_at - '00:05:00'::interval)) AND (krypto_gesendet_am <= (created_at + '00:05:00'::interval))))))))",
+      "anon_gesperrt": true,
+      "auth_gesperrt": true,
+      "zeittrigger": 1,
+      "schema95": 1,
+      "nachrichten": 344,
+      "format1": 2
+    }
+  ],
+  "zeit": "2026-11-16T21:42:52.079Z"
+}
