@@ -1,18 +1,18 @@
 Re-extracting code files in . (no LLM needed)...
-[graphify watch] 261 file(s) not classified (no supported extension or shebang), skipped: .env.example, .git, .gitattributes, .gitignore, .renderignore, .vercelignore (+255 more)
-  AST extraction: 100/636 uncached files (15%) [10 workers]
-  AST extraction: 200/636 uncached files (31%) [10 workers]
-  AST extraction: 300/636 uncached files (47%) [10 workers]
-  AST extraction: 400/636 uncached files (62%) [10 workers]
-  AST extraction: 500/636 uncached files (78%) [10 workers]
-  AST extraction: 600/636 uncached files (94%) [10 workers]
-  AST extraction: 636/636 uncached files (100%) [10 workers]
-[graphify watch] community set changed since labeling (750 saved labels, 756 communities now; renamed 63 community(ies) by their hub). Run `graphify label` to refresh names with the LLM.
+[graphify watch] 272 file(s) not classified (no supported extension or shebang), skipped: .env.example, .git, .gitattributes, .gitignore, .renderignore, .vercelignore (+266 more)
+  AST extraction: 100/641 uncached files (15%) [10 workers]
+  AST extraction: 200/641 uncached files (31%) [10 workers]
+  AST extraction: 300/641 uncached files (46%) [10 workers]
+  AST extraction: 400/641 uncached files (62%) [10 workers]
+  AST extraction: 500/641 uncached files (78%) [10 workers]
+  AST extraction: 600/641 uncached files (93%) [10 workers]
+  AST extraction: 641/641 uncached files (100%) [10 workers]
+[graphify watch] community set changed since labeling (756 saved labels, 749 communities now; renamed 99 community(ies) by their hub). Run `graphify label` to refresh names with the LLM.
 [graphify] backed up curated graph (4 files) -> 2026-11-16/
-Graph has 8786 nodes (above 5000 limit). Building aggregated community view...
-graph.html written (aggregated: 756 community nodes, 968 cross-community edges)
+Graph has 8795 nodes (above 5000 limit). Building aggregated community view...
+graph.html written (aggregated: 749 community nodes, 934 cross-community edges)
 Tip: run with --obsidian for full node-level detail.
-[graphify watch] Rebuilt: 8786 nodes, 17005 edges, 756 communities
+[graphify watch] Rebuilt: 8795 nodes, 17023 edges, 749 communities
 [graphify watch] graph.json, graph.html and GRAPH_REPORT.md updated in graphify-out
 Code graph updated. For doc/paper/image changes run /graphify --update in your AI assistant.
 Tip: set GEMINI_API_KEY or GOOGLE_API_KEY to use Gemini for semantic extraction.
