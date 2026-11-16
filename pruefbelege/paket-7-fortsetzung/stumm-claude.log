@@ -1,0 +1,82 @@
+✖ Bestätigter Wunsch wird bei späterer Änderung vom Zweitgerät nicht wiederbelebt (17.158833ms)
+✖ Kontowechsel übernimmt keinen Stumm-Wunsch des anderen Kontos (3.579416ms)
+✖ Zwei schnelle Tipps schreiben seriell an und aus; neuester Wunsch bleibt sichtbar (2.411ms)
+✖ Verspäteter Fehler eines älteren Schreibens entfernt den neueren Wunsch nicht (2.687583ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 117.191875
+
+✖ failing tests:
+
+test at app/test/_paket7_stumm_regression.cjs:20:1
+✖ Bestätigter Wunsch wird bei späterer Änderung vom Zweitgerät nicht wiederbelebt (17.158833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_paket7_stumm_regression.cjs:20:297)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket7_stumm_regression.cjs:21:1
+✖ Kontowechsel übernimmt keinen Stumm-Wunsch des anderen Kontos (3.579416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_paket7_stumm_regression.cjs:21:179)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket7_stumm_regression.cjs:22:1
+✖ Zwei schnelle Tipps schreiben seriell an und aus; neuester Wunsch bleibt sichtbar (2.411ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_paket7_stumm_regression.cjs:22:192)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at app/test/_paket7_stumm_regression.cjs:23:1
+✖ Verspäteter Fehler eines älteren Schreibens entfernt den neueren Wunsch nicht (2.687583ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_paket7_stumm_regression.cjs:23:250)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

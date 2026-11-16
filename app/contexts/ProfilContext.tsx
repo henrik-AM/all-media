@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Clip,
   Community,
@@ -995,18 +995,40 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * Paket 7: chatStumm war eine Umkehr-Liste („Server-Wert umdrehen“). Seit
    * die Klingel die Chatliste sofort neu lädt, kennt chat.muted den neuen
    * Wert schon nach ~1 s — die Liste drehte ihn dann ein zweites Mal um, die
-   * Zeile sprang zurück auf „An“. Jetzt merkt sich das Gerät den Wunsch samt
-   * dem Server-Wert, gegen den er galt: Hat der Server sich bewegt (eigene
-   * Bestätigung oder ein anderes Gerät), gilt wieder der Server.
+   * Zeile sprang zurück auf „An“. Wünsche gelten nur für ihr Konto und bis
+   * zur Bestätigung. Danach gewinnt wieder der Server, auch wenn ein anderes
+   * Gerät später zum ursprünglichen Wert zurückschaltet.
    */
-  const [chatStummWunsch, setChatStummWunsch] = useState<Record<string, { wert: boolean; basis: boolean }>>({});
+  type StummWunsch = { wert: boolean; basis: boolean; konto: string; nr: number };
+  const [chatStummWunsch, setChatStummWunsch] = useState<Record<string, StummWunsch>>({});
+  const chatStummOffen = useRef<Record<string, StummWunsch>>({});
+  const chatStummNummer = useRef(0);
+  const chatStummKonto = useRef(daten.ichId);
+  const chatStummAuftraege = useRef(new Map<string, Promise<void>>());
+
+  useEffect(() => {
+    chatStummKonto.current = daten.ichId;
+    const server = new Map([...daten.chats, ...daten.communityChats].map((c) => [c.id, Boolean(c.muted)]));
+    const vorher = chatStummOffen.current;
+    const neu: Record<string, StummWunsch> = {};
+    for (const [id, w] of Object.entries(vorher)) {
+      // Bestätigte Wünsche entfernen: Kehrt ein Zweitgerät später zum alten
+      // Wert zurück, darf der alte Wunsch nicht wieder wirksam werden.
+      if (w.konto === daten.ichId && !(server.has(id) && server.get(id) !== w.basis && server.get(id) === w.wert)) neu[id] = w;
+    }
+    if (Object.keys(neu).length !== Object.keys(vorher).length) {
+      chatStummOffen.current = neu;
+      setChatStummWunsch(neu);
+    }
+  }, [daten.ichId, daten.chats, daten.communityChats]);
+
   const chatStummAnzeige = useCallback(
     (id: string, serverWert: boolean) => {
       const w = chatStummWunsch[id];
-      if (w && Boolean(serverWert) === w.basis) return w.wert;
+      if (w?.konto === daten.ichId) return w.wert;
       return chatStumm.includes(id) ? !serverWert : Boolean(serverWert);
     },
-    [chatStummWunsch, chatStumm]
+    [chatStummWunsch, chatStumm, daten.ichId]
   );
   const chatStummUmschaltenAlt = useCallback(
     mitRueckweg(chatStumm, setChatStumm, 'Das Stummschalten', (c, ich, id) =>
@@ -1017,23 +1039,47 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   const chatStummUmschalten = useCallback(
     (id: string, serverWert?: boolean) => {
       if (serverWert === undefined) return chatStummUmschaltenAlt(id);
+      if (!supabase || !daten.ichId) return Boolean(serverWert);
+      const konto = daten.ichId;
       const basis = Boolean(serverWert);
-      const jetzt = !chatStummAnzeige(id, basis);
-      const vorher = chatStummWunsch[id];
-      setChatStummWunsch((prev) => ({ ...prev, [id]: { wert: jetzt, basis } }));
-      // Festen Wert schreiben, nicht umschalten: zwei schnelle Tipper oder ein
-      // anderes Gerät dazwischen drehen sonst am Server doppelt.
-      schreiben('Das Stummschalten', (c, ich) => Aktion.chatEinstellung(c, ich, id, 'stumm', jetzt), () =>
-        setChatStummWunsch((prev) => {
-          const neu = { ...prev };
-          if (vorher) neu[id] = vorher;
-          else delete neu[id];
-          return neu;
-        })
-      );
-      return jetzt;
+      const alt = chatStummOffen.current[id];
+      const aktuell = alt?.konto === konto ? alt.wert : basis;
+      const w: StummWunsch = { wert: !aktuell, basis, konto, nr: ++chatStummNummer.current };
+      chatStummOffen.current = { ...chatStummOffen.current, [id]: w };
+      setChatStummWunsch(chatStummOffen.current);
+      const schluessel = konto + ':' + id;
+      // Pro Konto/Chat seriell schreiben; eine langsamere ältere Antwort
+      // darf den letzten Tipp nicht am Server überschreiben.
+      const vorher = chatStummAuftraege.current.get(schluessel) ?? Promise.resolve();
+      const auftrag = vorher.catch(() => {}).then(async () => {
+        if (chatStummKonto.current !== konto) return;
+        try {
+          await Aktion.chatEinstellung(supabase, konto, id, 'stumm', w.wert);
+          if (chatStummOffen.current[id]?.nr === w.nr) {
+            await daten.chatsNeuLaden();
+            if (chatStummOffen.current[id]?.nr === w.nr) {
+              const neu = { ...chatStummOffen.current };
+              delete neu[id];
+              chatStummOffen.current = neu;
+              setChatStummWunsch(neu);
+            }
+          }
+        } catch (e: any) {
+          console.error('Das Stummschalten fehlgeschlagen:', e?.message ?? e);
+          if (chatStummOffen.current[id]?.nr !== w.nr) return;
+          const neu = { ...chatStummOffen.current };
+          delete neu[id];
+          chatStummOffen.current = neu;
+          setChatStummWunsch(neu);
+        }
+      });
+      chatStummAuftraege.current.set(schluessel, auftrag);
+      void auftrag.finally(() => {
+        if (chatStummAuftraege.current.get(schluessel) === auftrag) chatStummAuftraege.current.delete(schluessel);
+      });
+      return w.wert;
     },
-    [chatStummUmschaltenAlt, chatStummAnzeige, chatStummWunsch, schreiben]
+    [chatStummUmschaltenAlt, supabase, daten.ichId, daten.chatsNeuLaden]
   );
 
   const chatLeeren = useCallback(

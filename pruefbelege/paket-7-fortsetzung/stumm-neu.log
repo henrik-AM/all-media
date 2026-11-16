@@ -1,0 +1,12 @@
+✔ Bestätigter Wunsch wird bei späterer Änderung vom Zweitgerät nicht wiederbelebt (20.968209ms)
+✔ Kontowechsel übernimmt keinen Stumm-Wunsch des anderen Kontos (4.674667ms)
+✔ Zwei schnelle Tipps schreiben seriell an und aus; neuester Wunsch bleibt sichtbar (4.075541ms)
+✔ Verspäteter Fehler eines älteren Schreibens entfernt den neueren Wunsch nicht (2.927709ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 123.344708
