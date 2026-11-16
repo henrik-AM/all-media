@@ -207,3 +207,13 @@ Quellenunverändert,Bereinigungerfolgreich/Rest0. Rohbelege erhalten.
 Nächster voller Nachweis beginnt mit uebernacht undsync, danach Medien
 unddie7Altfehler; dieselben101Suiten,keinAusschluss,keineTestwiederholung
 innerhalb einer Messung. Produktcode weiterhin150a88d.
+
+### Laufab21c8a3 nach Prüfzielkorrektur
+
+Stand2c488e0,Produkt150a88d; regulär konfigurierter eigenerServer50659,
+Port3300,keineQuelle während Messung geändert. Übernacht11/11,Sync6/6,
+Kamera10/10,Smoke75/75,Feedback53/53,Einstellungen19/19,Kontaktinfo10/10,
+Henrik23/23,Insel17/17,Optionen16/16,Kasten8 6/6,Testhygiene24/24,
+jeweilsCode0. Zwischenstand12/101Läufe,270/270,keinFehlabschluss.
+Alle zuvor gefundenen Prüfziel-/Konfigurations- und Altfehlerfälle bestanden;
+der restlicheBestandslauf und dessen Bereinigung bleiben offen.
