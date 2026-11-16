@@ -1,0 +1,1461 @@
+  Laufkennung: 0b02dbc2-e225-41b6-b3f8-db3093ca5deb
+
+======================================================================
+  einstellungen
+======================================================================
+
+Einstellungen
+  OK   Die Sprungleiste zeigt alle elf Abschnitte
+  OK   Auswahlpunkte zeigen ihren Stand gleich in der Liste
+  OK   Eine Auswahl lässt sich ändern und bleibt stehen
+ABBRUCH: einstellungen nach 15 Minuten; Zahlen unvollständig.
+
+======================================================================
+  kontaktinfo
+======================================================================
+ABBRUCH: kontaktinfo nach 15 Minuten; Zahlen unvollständig.
+
+======================================================================
+  henrik
+======================================================================
+
+Videos — Home
+  OK   Kommentarzahl stimmt mit der Liste ueberein  — genannt 0, echt 0
+  OK   Story-Ring ist ein Knopf
+  OK   Glocke vorhanden
+  OK   Glocke schaltet sichtbar um  — post__bell  -> post__bell is-on
+
+Videos — Kurzformat
+  OK   Kein "Merken" mehr im Kurzformat
+  OK   Seitenleiste bleibt beim Liken an ihrer Stelle  — y 334 -> 334
+
+Videos — Querformat
+  OK   Querformat-Filter "Alle"  — Alle | Standard | 360° | Live
+  OK   Querformat-Filter "Standard"  — Alle | Standard | 360° | Live
+  OK   Querformat-Filter "360"  — Alle | Standard | 360° | Live
+  OK   Querformat-Filter "Live"  — Alle | Standard | 360° | Live
+
+Videos — Suche
+  OK   Reels-Kachel mit Bildunterschrift
+  OK   Kachel zeigt ein Profilbild
+  OK   Kachel nennt Ort oder Musik  — EY
+          Elif Yilmaz
+        
+      
+  OK   Abschnitts-Ueberschrift ist anklickbar
+
+Profil
+  OK   Followerzahl ist anklickbar
+  OK   Profil bearbeiten erreichbar
+  OK   Bio-Link ist ein Link
+
+Communitys
+  OK   Filter Alle/Öffentlich/Privat vorhanden
+
+Einstellungen
+  OK   Kontowechsel steht in den Einstellungen
+  OK   Messenger-Abschnitt vorhanden
+  OK   Gefolgte in den Einstellungen
+
+Messenger
+  OK   Chat-Kopf ist anklickbar
+  OK   Fuehrt zu den Chat-Einstellungen  — Kontaktinfo
+      Bearbeiten
+    
+
+    
+     
+
+  23 von 23 Punkten erfuellt
+
+  Keine Konsolenfehler
+
+======================================================================
+  insel
+======================================================================
+
+ABBRUCH  testbestand ließ sich nicht prüfen (/Users/henrik.dikta/Library/CloudStorage/OneDrive-Persönlich/Business/AI/Henrik/Claude/Uebergabe/ki-abgleich.sh: spawnSync bash ETIMEDOUT).
+          Dieser Lauf setzt gemeinsame Testdaten zurück und läuft nur mit eigener Belegung:
+          ki-abgleich.sh belegen <ki> testbestand "<zweck>"   (danach: freigeben <ki> testbestand)
+          Gehört sie einer anderen Sitzung: warten oder Henrik fragen, nicht erzwingen.
+
+
+======================================================================
+  optionen
+======================================================================
+ABBRUCH: optionen nach 15 Minuten; Zahlen unvollständig.
+
+======================================================================
+  kasten8
+======================================================================
+  OK   Querformat-Video mit Ort oder Sound im Bestand
+  OK   8.1 Kein Ton-/Lautstaerkeknopf im Querformat-Player
+  OK   8.2 Ort und Sound stehen unter dem Namen im Querformat
+  OK   8.2 Ort antippen oeffnet die Standortseite (nicht das Profil)
+  OK   8.2 Sound antippen oeffnet die Soundseite oder sagt, warum nicht
+  OK   8.1 Chat-Vollformat: Video ohne Browserleiste und mit Ton
+
+6 von 6 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  kamera
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.reload: net::ERR_CONNECTION_REFUSED
+Call log:
+[2m  - waiting for navigation until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_kamera.js:64:14 {
+  log: [ '  - waiting for navigation until "load"' ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  testhygiene
+======================================================================
+✔ Frischer Worktree: beide Fixtures vor dem Stempel; wiederholte Vorbereitung bytegleich (2.577125ms)
+✔ Abweichende Fixture wird abgelehnt und nicht überschrieben (0.722ms)
+✔ Laufjournal belegt Leerstand; Löschen erfasst beide Testkonten auch bei zurückdatierten Vorlagen (0.908208ms)
+✔ Alte Journale bleiben zeitlich begrenzt; Version 2 ohne Leerstandsnachweis wird abgelehnt (0.743459ms)
+✔ Fehlgeschlagene Bereinigung bleibt wiederaufnehmbar; nächster Start räumt zuerst auf (0.580042ms)
+✔ Nichtnull-Rest zählt als Fehler und erhält das Journal (0.385625ms)
+✔ Altbestand ohne Journal blockiert vor dem ersten Löschaufruf (0.358ms)
+✔ Fremdes Projekt und manipulierte DB-Zeit werden ohne SQL abgelehnt (0.546458ms)
+✔ SIGKILL im Startfenster: unklarer Kindprozess verhindert automatische Löschung (0.496167ms)
+✔ Verwaister laufender Prüfprozess blockiert Bereinigung; nach seinem Ende ist Wiederaufnahme möglich (2.599459ms)
+✔ Management-API: HTTP-Fehler wird vor dem Auswerten einer scheinbaren Zählantwort verworfen (0.769083ms)
+✔ Fehlende oder falsch geformte Zählantwort ist kein leerer Bestand (0.421791ms)
+✔ Management-API: nur die ausdrücklich erwartete SQL-Ausnahme passiert eine Negativprobe (0.515375ms)
+✔ Gesamtlauf: Fehlgeschlagene Suite stoppt weitere Suiten nicht; Bereinigung und Rohbelege vorhanden (42.839292ms)
+✔ Gesamtlauf: alle Suiten mit Zahlen, stabile Quellen und Rest null ergeben Exit 0 (21.486792ms)
+✔ Gesamtlauf: fehlendes Token blockiert vor SQL und vor Start eines Prüfers (0.724208ms)
+✔ Gesamtlauf: Exit 0 ohne Prüfzahlen bleibt unvollständig (19.886916ms)
+✔ Gesamtlauf: deutscher Summensatz und node:test werden gezählt, null Prüfungen nicht (79.183541ms)
+✔ Gesamtlauf: Bereinigungsfehler verhindert Erfolg und bewahrt Journal (20.340166ms)
+✔ Gesamtlauf: SIGTERM beendet Kind, überspringt Rest und räumt vor Rückgabe 143 auf (105.124167ms)
+✔ Gesamtlauf: geänderter Prüfcode macht einen sonst grünen Lauf ungültig (24.544042ms)
+✔ Gesamtlauf: sechs Stunden lösen genau eine Warnung aus (39.353875ms)
+✔ Kind mit geerbten Browser-Pipes: Prozessgruppe endet trotz frühem exit (41.282083ms)
+✔ Zeitlimit beendet den Prüfprozess (103.525875ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 512.770458
+
+======================================================================
+  smoke
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/smoke.js:59:11 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  feedback
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_feedback.js:65:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  erstellen
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_erstellen.js:29:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  teilen
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_teilen.js:91:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  sync
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_sync.js:30:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  uebernacht
+======================================================================
+
+  Abend: anmelden und etwas tun
+
+
+ABBRUCH  Der Server auf 3000 (PID 25169) läuft aus
+          /Users/henrik.dikta/Library/CloudStorage/OneDrive-Persönlich/Business/AI/Henrik/All-Media/app
+          dieser Prüflauf misst aber
+          /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung
+          Fremden Server nur nach Rücksprache beenden (andere Sitzung?).
+          Bewusst übergehen: PRUEFSERVER_EGAL=1
+
+
+======================================================================
+  schema
+======================================================================
+PASS  Schema eingelesen  — 104 Tabellen
+PASS  Alle angesprochenen Tabellen gibt es im Schema
+PASS  Alle angesprochenen Spalten gibt es im Schema
+PASS  Tabelle "videos" wird nicht mehr verwendet
+PASS  Tabelle "likes" wird nicht mehr verwendet
+PASS  Tabelle "favorites" wird nicht mehr verwendet
+PASS  Jede doppelt definierte Funktion, Regel und Vorlage steht in SUPABASE_REIHENFOLGE.md
+
+Schema und Code passen zusammen.
+
+======================================================================
+  sammlungen
+======================================================================
+
+Sammlungen
+PASS  Testkonto angemeldet
+PASS  Die alten Namen sind Sammlungen geworden  — 5 gefunden: Zum Prüfen, Später ansehen, Test, Reisen
+PASS  Kein alter Name ist unterwegs verloren gegangen  — 5 geprueft
+PASS  Eine Playlist laesst sich anlegen  — HTTP 201
+PASS  Derselbe Name ein zweites Mal wird abgelehnt  — HTTP 409
+PASS  Derselbe Name als andere Gattung geht  — HTTP 201
+PASS  Es gibt einen eigenen Beitrag zum Einsortieren
+PASS  Ein Beitrag laesst sich in die Playlist legen  — HTTP 201
+PASS  Derselbe Beitrag zweimal wird abgelehnt  — HTTP 409
+PASS  Eine Story in einer Playlist wird abgelehnt  — HTTP 400 {"code":"P0001","details":null,"hint":null,"message":"In ein
+PASS  Eine Story laesst sich in ein Highlight legen  — HTTP 201
+PASS  Ein Eintrag ohne Inhalt wird abgelehnt  — HTTP 400
+PASS  Der Inhalt der Playlist ist abrufbar  — 1 Eintraege
+PASS  Herausgenommen heisst wirklich weg  — 0 uebrig
+PASS  In eine fremde Sammlung laesst sich nichts legen  — HTTP 400
+PASS  Die Pruefsammlungen sind wieder weg  — 0 uebrig
+
+16 von 16 Pruefungen bestanden
+
+======================================================================
+  sammlungenweb
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_sammlungenweb.js:91:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  explorer
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_explorer.js:22:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  anhang
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_anhang.js:37:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  henrik2
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_henrik2.js:32:15 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  suche
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_suche.js:24:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  kasten12
+======================================================================
+
+Gemeinsame Bausteine
+  OK   sammlungen.js und spende.js stehen in UMD_BAUSTEINE
+  OK   index.html bindet beide ein
+  OK   beide Dateien haben eine UMD-Hülle
+
+12.9  Ringfarben
+  OK   Playlist rot wie im Prototyp (#FF0A0A)
+  OK   Highlight orange wie im Prototyp (#FF990A)
+  OK   Die beiden Gattungen unterscheiden sich
+  OK   Strich 4/45 des Durchmessers (64 → 6 px)
+  OK   App: eigenes Profil nimmt die Farbe aus dem Baustein
+  OK   App: fremdes Profil nimmt die Farbe aus dem Baustein
+  OK   Website: ringStil() nimmt Farbe und Stärke aus dem Baustein
+  OK   Website: kein fest verdrahteter Farbverlauf mehr am Ring
+  OK   Website: Ring ist rund
+
+12.7 / 12.8  Titelbild
+  OK   Ohne Wahl: ein Beitrag der Sammlung ist das Titelbild
+  OK   Gewählter Beitrag gewinnt
+  OK   Gewählte Story gewinnt
+  OK   Eigenes Foto gewinnt vor allem
+  OK   Leere Sammlung ohne Foto: kein Bild
+  OK   Schema-Entwurf: Spalten, Prüfung auf Inhalt, idempotent
+  OK   App: Knopf „Titelbild wählen" im eigenen Profil
+  OK   App: speichert über aktionen.titelbildSetzen
+  OK   Website: openTitelbildWahl mit Beitrag, Foto und Kamera
+  OK   Server: POST /api/eigene/sammlung/:id/titelbild
+
+12.3  Spendenziel
+  OK   Formular: Titel, Ziel, Frist, Text werden übernommen
+  OK   Formular: Ziel bleibt freiwillig
+  OK   Formular: Unsinn wird abgelehnt
+  OK   Frist ungültig: fristAus wirft
+  OK   Stand: erreicht, Fortschritt, Spender aus den Buchungen
+  OK   Abgelaufene Frist wird erkannt
+  OK   Eigener Betrag: 2,50 → 250 Cent, 0,10 abgelehnt
+  OK   Schema-Entwurf: spendenstand() nur für angemeldete Nutzer
+  OK   App: Karte, Detailblatt und Spenden-Knopf
+  OK   App: Karte im eigenen und im fremden Profil
+  OK   Website: Karte ist ein Knopf und öffnet openSpendenziel
+  OK   Website: Karte auch im fremden Profil
+  OK   Server: GET /api/spendenstand/:userId
+  OK   Server: Spende-Formular über Spende.ausFormular
+
+12.5  Profilbild
+  OK   Schema-Entwurf: avatar_url nur aus dem Eimer media
+  OK   App: Kopf mit Mediathek, Kamera, Entfernen
+  OK   App: „Profil bearbeiten" zeigt den Kopf
+  OK   App: Ordner avatars, gespeichert über profilbildSetzen
+  OK   Website: kein Profilbild mehr nur im Browser (localStorage)
+  OK   Website: Upload nach avatars und /api/eigene/profilbild
+  OK   Website: Avatare zeigen das Bild (personenAvatar)
+  OK   Server: POST /api/eigene/profilbild prüft Pfad und Zeilenzahl
+  OK   Server: jeder Nutzer bringt sein Bild mit
+  OK   Website: nur noch EIN bildVerkleinern (das zweite brach Storys)
+
+12.1  Tab bleibt
+  OK   App: Reiter liegt in der Shell, nicht im Bildschirm
+  OK   App: Beitrag öffnen merkt sich den Reiter
+  OK   App: Verlassen setzt zurück
+  OK   Website: profilReiterPruefen bei Ober- und Unterleiste
+  OK   Website: Kacheln im Raster öffnen den Beitrag
+
+12.2  Name mittig
+  OK   App: Handle mit eigener Mitte (testID profil-handle)
+  OK   Website: .oprof__handle links und rechts gleich weit
+
+12.4  Profil wechseln
+  OK   App: Video-Profil ruft den Wechsel selbst auf
+  OK   App: nach dem Wechsel landet ein anderes Konto im Video-Profil
+  OK   App: zweimal abholen geht (StrictMode ruft den Initialisierer doppelt)
+  OK   App: dasselbe Konto (Wechsel abgebrochen) springt nicht
+  OK   App: nach drei Minuten gilt die Stelle nicht mehr
+  OK   App: vergessen() räumt ab
+  OK   App: Messenger und Einstellungen vergessen die Stelle vor dem Wechsel
+  OK   App: neue Shell startet im Video-Profil
+  OK   Website: #switchProfile öffnet den Wechsel im Video-Profil
+
+12.6  Online-Punkt
+  OK   App: grüner Punkt antippbar
+  OK   App: öffnet die Sichtbarkeit onlinestatus
+  OK   Website: #onlinePunkt öffnet openSichtbarkeit onlinestatus
+
+65 von 65 Pruefungen bestanden.
+
+======================================================================
+  kasten17
+======================================================================
+
+Gemeinsame Regeln (gemeinsam/sammlungen.js)
+  OK   Untertitel Playlist, Mehrzahl
+  OK   Untertitel Playlist, Einzahl
+  OK   Untertitel Highlight nennt Storys
+  OK   Untertitel Highlight, Einzahl
+  OK   Untertitel leer
+  OK   Alter: gerade eben
+  OK   Alter: Minuten
+  OK   Alter: Stunden
+  OK   Alter: ein Tag
+  OK   Alter: Tage
+  OK   Alter: Wochen
+  OK   Alter: Datum ab vier Wochen
+  OK   Alter: kein Datum → leer
+  OK   Story: fremd, Kennung bleibt
+  OK   Story: Vorname wie in der Leiste
+  OK   Story: Video bleibt Video
+  OK   Story: gemocht
+  OK   Story: Zeitpunkt für den Kopf
+  OK   Story: eigene heißt „me" wie in der Leiste
+
+17.1  Highlight im Story-Betrachter
+  OK   App: kein neuer Betrachter — HighlightBetrachter nutzt StoryViewerScreen
+  OK   App: Betrachter kennt den Highlight-Modus
+  OK   App: Name des Highlights im Kopf
+  OK   App: eigenes Highlight — Bearbeiten, Herausnehmen, Löschen
+  OK   App: eigenes Profil spielt Highlights ab
+  OK   App: fremdes Profil spielt Highlights ab
+  OK   App: fremdes Profil zeigt keinen Hinweis mehr statt der Sammlung
+  OK   App: Storys des Highlights über sammlung_inhalte
+  OK   Website: Highlight-Kreis spielt ab
+  OK   Website: openStory nimmt eine eigene Liste
+  OK   Website: fremdes Profil kommt nach dem Schließen zurück
+  OK   Website: Highlight-Optionen im Betrachter
+  OK   Server: GET /api/sammlung/:id/storys
+  OK   Server und App bauen die Story mit derselben Regel
+
+17.2  Playlist als Ordner
+  OK   App: Ordner mit Untertitel aus der gemeinsamen Regel
+  OK   App: eigenes Profil nutzt den Ordner
+  OK   App: fremdes Profil nutzt den Ordner — ohne kopfRechts
+  OK   App: Kachel im fremden Ordner öffnet den Beitrag
+  OK   App: Story-Kachel im Ordner hatte mediaUri statt mediaUrl (behoben)
+  OK   Website: Untertitel aus der gemeinsamen Regel
+  OK   Website: Löschen und Titelbild nur im eigenen Ordner
+
+17.3  Selbst einordnen und herausnehmen
+  OK   App: „Zu Playlist hinzufügen" nur am eigenen Beitrag
+  OK   App: Playlist-Wahl im selben Blatt
+  OK   App: „Zu Highlight hinzufügen" an der eigenen Story
+  OK   App: Häkchen schaltet hinein und heraus
+  OK   App: „Neue Playlist" legt an und legt hinein
+  OK   App: langes Drücken im eigenen Ordner nimmt heraus
+  OK   Website: „Zu Playlist hinzufügen" im Drei-Punkte-Menü
+  OK   Website: „Zu Highlight hinzufügen" an der eigenen Story
+  OK   Website: langes Drücken im eigenen Raster bietet keine Highlights mehr an
+  OK   Server: Zuordnung lesen, hinein, heraus, neu
+  OK   Server: nur Eigenes lässt sich einordnen
+  OK   Server: Löschen prüft die Zahl der gelöschten Zeilen (RLS)
+  OK   Server: kein Pfad, den DELETE /api/eigene/sammlung/:art/:name verschluckt
+
+53 von 53 Pruefungen bestanden.
+
+======================================================================
+  glocke
+======================================================================
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_glocke.js:30:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+======================================================================
+  pfeile
+======================================================================
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_pfeile.js:37:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+======================================================================
+  profil
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_profil.js:29:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  community
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_community.js:30:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  chatoptionen
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_chatoptionen.js:29:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  player
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_player.js:30:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  gesten
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_gesten.js:53:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  kommentare
+======================================================================
+  START Startseite mit Datenbereitschaft
+  ABBRUCH Startschritt Startseite mit Datenbereitschaft (4 ms)
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_kommentare.js:50:69
+    at startSchritt (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_kommentare.js:42:30)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_kommentare.js:50:9 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  querformat
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_querformat.js:51:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  feinschliff
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_feinschliff.js:32:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  eigenes
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_eigenes.js:40:14 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  datenbank
+======================================================================
+PASS  Testkonto test@all-media.app kann sich anmelden
+PASS  Alle Tabellen aus dem Code gibt es in der Datenbank
+PASS  Beispielprofile vorhanden (Anna, Bob, ...)
+PASS  Beispielbeitraege vorhanden
+PASS  Sounds vorhanden
+PASS  Standorte vorhanden
+PASS  Hashtags vorhanden
+PASS  Oeffentliche Communitys vorhanden
+PASS  Eigener Foto-Beitrag
+PASS  Eigenes Video im Hochformat
+PASS  Eigenes Video im Querformat
+PASS  Eigenes 360-Video
+PASS  Eigener Livebeitrag
+PASS  Eigene Story
+PASS  Merkliste nicht leer
+PASS  Repost vorhanden
+PASS  Kontakte vorhanden
+PASS  Chats vorhanden
+PASS  Mitteilungen vorhanden
+PASS  Punkt auf der Freundeskarte
+PASS  Kein Videobeitrag zeigt auf eine Bilddatei  — 23 geprueft
+PASS  Kein Beitrag haengt noch an einem Platzhalter
+PASS  Eigener Kommentar vorhanden  — 1 Zeilen
+PASS  Jeder eigene Kommentar haengt an einem lesbaren Beitrag  — 1 geprueft
+PASS  Profil des Testkontos ausgefuellt  — Test Nutzer @test
+PASS  Ablage "media": Hochladen geht
+PASS  Ablage "media": HTML wird abgewiesen
+PASS  Ablage "media": NICHT oeffentlich lesbar
+PASS  Ablage "media": unterschriebene Adresse liest die Datei
+
+Datenbank und Code passen zusammen.
+
+======================================================================
+  aktionen
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_aktionen.js:62:15 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  gleichstand
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_gleichstand.js:94:15 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  handbuch
+======================================================================
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+    at page.<computed> (/Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_konto.js:101:29)
+    at /Users/henrik.dikta/allmedia-wt-codex/paket-7-fortsetzung/app/test/_handbuch.js:71:15 {
+  log: [
+    '  - navigating to "http://localhost:3300/", waiting until "load"'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0
+
+======================================================================
+  sichtbarkeit
+======================================================================
+
+Story-Sichtbarkeit
+  OK   Bei „Alle" sieht das andere Konto die Storys  — 2 Stück
+  OK   Bei „Niemand" sieht es keine mehr  — 0 sichtbar
+  OK   Der Eigner sieht seine eigene Story trotzdem  — 2 sichtbar
+  OK   „Niemand bis auf …" laesst die eingetragene Person durch  — 2 sichtbar
+  OK   „Alle bis auf …" sperrt sie wieder aus  — 0 sichtbar
+
+Standort auf der Karte
+  OK   Bei „Niemand" ist die eigene Nadel fuer andere weg  — 0 sichtbar
+  OK   Man selbst sieht seine Nadel weiterhin
+
+Wer darf kommentieren
+  OK   Der Fremde sieht den Prüfbeitrag (sonst sagt „Niemand" nichts)
+  OK   Bei „Alle" kommt ein fremder Kommentar durch
+  OK   Bei „Niemand" wird er abgelehnt  — 42501
+  OK   Unter dem eigenen Beitrag darf man selbst kommentieren
+  OK   Aufräumen: Prüfbeitrag gelöscht (gegengeprüft)
+
+Wer darf mir schreiben
+  OK   Bei „Alle" kommt die Nachricht an
+  OK   Bei „Niemand" wird sie abgelehnt  — 42501
+  OK   Selbst schreiben geht weiterhin
+
+Repost-Sichtbarkeit
+  OK   Bei „Alle" sieht das andere Konto die Reposts  — 2 sichtbar
+  OK   Bei „Niemand" sieht es keine mehr  — 0 sichtbar
+  OK   Die eigenen Reposts bleiben einem selbst sichtbar  — 2 sichtbar
+
+Zuletzt online
+  OK   „Ich bin da" laesst sich vermerken
+  OK   Bei „Alle" sieht das andere Konto den Zeitpunkt  — 1 Zeile(n)
+  OK   Bei „Niemand" ist er weg — nicht „verborgen", sondern gar nicht da  — 0 Zeile(n)
+  OK   Man selbst sieht seinen eigenen Zeitpunkt weiterhin  — 1 Zeile(n)
+
+Wer darf mich markieren
+  OK   Bei „Alle" laesst sich die Person markieren
+  OK   Bei „Niemand" wird die Markierung abgelehnt  — 42501
+  OK   In einem fremden Beitrag darf niemand markieren  — 42501
+  OK   Wer markiert wurde, kann sich selbst wieder austragen  — 0 uebrig
+
+Likes-Sichtbarkeit
+  OK   Die Like-Zahl bleibt davon unberuehrt  — 1 → 1
+
+Download
+  OK   Bei „Alle" ist der Download erlaubt  — true
+  OK   Bei „Niemand" nicht mehr  — false
+
+Push-to-Talk
+  OK   Das andere Konto tritt der Prüfcommunity bei
+  OK   Eine PTT-Nachricht laesst sich senden
+  OK   Bei „Alle" hoert das andere Konto sie  — 1 sichtbar
+  OK   Bei „Niemand" erreicht sie ihn nicht mehr  — 0 sichtbar
+  OK   Die eigene Nachricht bleibt einem selbst sichtbar  — 1 sichtbar
+  OK   Der Pruefchat ist danach wirklich weg  — 0 Zeile(n) geblieben
+  OK   Die Pruefcommunity ist danach wirklich weg  — 0 Zeile(n) geblieben
+
+Die Sichtbarkeit wirkt wirklich.
+
+======================================================================
+  likes
+======================================================================
+Beitrag 22222222-a11e-4d1a-8000-000000000013 (gehoert 11111111-a11e-4d1a-8000-000000000002, keinem der beiden Konten)
+
+Testkonto liked, Prüfkonto schaut
+  OK   Der Name des Likenden ist lesbar  — Test Nutzer
+  OK   Ohne Folgen steht der Name nicht unter dem Beitrag (9.4)  — kein Name
+  OK   Bei „Alle“ ist das Like in der Tabelle trotzdem lesbar
+  OK   like_zahlen liefert eine Zahl  — 2
+  OK   „alle“: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „alle“: Name steht da (9.3)  — Test Nutzer
+  OK   „alle“: Zahl bleibt 2  — 2
+  OK   „niemand“: Zeile in post_likes gesperrt (9.2)  — gesperrt
+  OK   „niemand“: Name fehlt (9.3)  — kein Name
+  OK   „niemand“: Zahl bleibt 2  — 2
+  OK   „niemand_bis_auf“: Zeile in post_likes gesperrt (9.2)  — gesperrt
+  OK   „niemand_bis_auf“: Name fehlt (9.3)  — kein Name
+  OK   „niemand_bis_auf“: Zahl bleibt 2  — 2
+  OK   „niemand_bis_auf“ mit Betrachter auf der Liste: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „niemand_bis_auf“ mit Betrachter auf der Liste: Name steht da (9.3)  — Test Nutzer
+  OK   „niemand_bis_auf“ mit Betrachter auf der Liste: Zahl bleibt 2  — 2
+  OK   „alle_bis_auf“ mit Betrachter auf der Liste: Zeile in post_likes gesperrt (9.2)  — gesperrt
+  OK   „alle_bis_auf“ mit Betrachter auf der Liste: Name fehlt (9.3)  — kein Name
+  OK   „alle_bis_auf“ mit Betrachter auf der Liste: Zahl bleibt 2  — 2
+  OK   „alle_bis_auf“: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „alle_bis_auf“: Name steht da (9.3)  — Test Nutzer
+  OK   „alle_bis_auf“: Zahl bleibt 2  — 2
+  OK   „nur_follower“: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „nur_follower“: Name steht da (9.3)  — Test Nutzer
+  OK   „nur_follower“: Zahl bleibt 2  — 2
+  OK   „nur_follower“ ohne Folgen: Zeile in post_likes gesperrt (Kasten 19)
+  OK   Der Likende sieht sein eigenes Like bei „Niemand“
+
+Prüfkonto liked, Testkonto schaut
+  OK   Der Name des Likenden ist lesbar  — Henrik Prüfname
+  OK   Ohne Folgen steht der Name nicht unter dem Beitrag (9.4)  — kein Name
+  OK   Bei „Alle“ ist das Like in der Tabelle trotzdem lesbar
+  OK   like_zahlen liefert eine Zahl  — 2
+  OK   „alle“: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „alle“: Name steht da (9.3)  — Henrik Prüfname
+  OK   „alle“: Zahl bleibt 2  — 2
+  OK   „niemand“: Zeile in post_likes gesperrt (9.2)  — gesperrt
+  OK   „niemand“: Name fehlt (9.3)  — kein Name
+  OK   „niemand“: Zahl bleibt 2  — 2
+  OK   „niemand_bis_auf“: Zeile in post_likes gesperrt (9.2)  — gesperrt
+  OK   „niemand_bis_auf“: Name fehlt (9.3)  — kein Name
+  OK   „niemand_bis_auf“: Zahl bleibt 2  — 2
+  OK   „niemand_bis_auf“ mit Betrachter auf der Liste: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „niemand_bis_auf“ mit Betrachter auf der Liste: Name steht da (9.3)  — Henrik Prüfname
+  OK   „niemand_bis_auf“ mit Betrachter auf der Liste: Zahl bleibt 2  — 2
+  OK   „alle_bis_auf“ mit Betrachter auf der Liste: Zeile in post_likes gesperrt (9.2)  — gesperrt
+  OK   „alle_bis_auf“ mit Betrachter auf der Liste: Name fehlt (9.3)  — kein Name
+  OK   „alle_bis_auf“ mit Betrachter auf der Liste: Zahl bleibt 2  — 2
+  OK   „alle_bis_auf“: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „alle_bis_auf“: Name steht da (9.3)  — Henrik Prüfname
+  OK   „alle_bis_auf“: Zahl bleibt 2  — 2
+  OK   „nur_follower“: Zeile in post_likes lesbar (9.2)  — lesbar
+  OK   „nur_follower“: Name steht da (9.3)  — Henrik Prüfname
+  OK   „nur_follower“: Zahl bleibt 2  — 2
+  OK   „nur_follower“ ohne Folgen: Zeile in post_likes gesperrt (Kasten 19)
+  OK   Der Likende sieht sein eigenes Like bei „Niemand“
+
+Ersteller-Ausnahme und Kommentar-/Story-Likes (Kasten 26)
+  OK   Ersteller Prüfkonto sieht das Like von Testkonto trotz „Niemand“ (26.4)
+  OK   Aufräumen: Prüfbeitrag des Erstellers gelöscht (gegengeprüft)
+  OK   Kommentar-Like: Ersteller Prüfkonto sieht es trotz „Niemand“ (26.4)
+  OK   Kommentar-Like: der Likende sieht sein eigenes
+  OK   Kommentar-Like-Zahl: 1  — 1
+  OK   Kommentar-Like Dritter bei „niemand“: gesperrt  — gesperrt
+  OK   Kommentar-Like-Zahl bei „niemand“ bleibt 1  — 1
+  OK   Kommentar-Like Dritter bei „alle“: lesbar  — lesbar
+  OK   Kommentar-Like-Zahl bei „alle“ bleibt 1  — 1
+  OK   Kommentar-Like Dritter bei „nur_follower“: lesbar  — lesbar
+  OK   Kommentar-Like-Zahl bei „nur_follower“ bleibt 1  — 1
+  OK   Kommentar-Like „nur_follower“ ohne Folgen: gesperrt
+  OK   Story-Like: Ersteller Prüfkonto sieht es trotz „Niemand“ (26.4)
+  OK   Story-Like: der Likende sieht sein eigenes
+  OK   Story-Like Dritter bei „niemand“: gesperrt
+  OK   Story-Like Dritter bei „alle“: lesbar
+  OK   Ersteller Testkonto sieht das Like von Prüfkonto trotz „Niemand“ (26.4)
+  OK   Aufräumen: Prüfbeitrag des Erstellers gelöscht (gegengeprüft)
+  OK   Kommentar-Like: Ersteller Testkonto sieht es trotz „Niemand“ (26.4)
+  OK   Kommentar-Like: der Likende sieht sein eigenes
+  OK   Kommentar-Like-Zahl: 1  — 1
+  OK   Kommentar-Like Dritter bei „niemand“: gesperrt  — gesperrt
+  OK   Kommentar-Like-Zahl bei „niemand“ bleibt 1  — 1
+  OK   Kommentar-Like Dritter bei „alle“: lesbar  — lesbar
+  OK   Kommentar-Like-Zahl bei „alle“ bleibt 1  — 1
+  OK   Kommentar-Like Dritter bei „nur_follower“: lesbar  — lesbar
+  OK   Kommentar-Like-Zahl bei „nur_follower“ bleibt 1  — 1
+  OK   Kommentar-Like „nur_follower“ ohne Folgen: gesperrt
+  OK   Story-Like: Ersteller Testkonto sieht es trotz „Niemand“ (26.4)
+  OK   Story-Like: der Likende sieht sein eigenes
+  OK   Story-Like Dritter bei „niemand“: gesperrt
+  OK   Story-Like Dritter bei „alle“: lesbar
+
+Aufraeumen
+  OK   Testkonto: Einstellung wie vorher  — keine
+  OK   Testkonto: Like wie vorher
+  OK   Testkonto: Ausnahmeliste wie vorher
+  OK   Prüfkonto: Einstellung wie vorher  — keine
+  OK   Prüfkonto: Like wie vorher
+  OK   Prüfkonto: Ausnahmeliste wie vorher
+  OK   Folgen Testkonto → Pruefkonto wie vorher
+  OK   Folgen Pruefkonto → Testkonto wie vorher
+
+94/94 Pruefungen bestanden
+
+======================================================================
+  fremdprofil
+======================================================================
+
+Der Reiter „Beiträge"
+  OK   Das andere Konto sieht die Beiträge  — 2 Stück
+FEHLER  fetch failed
+
+======================================================================
+  chatanfrage
+======================================================================
+
+Eine Anfrage entsteht von selbst
+  OK   Ein neuer Zweierchat wird zur Anfrage  — wartet
+  OK   Sie kommt von dem, der angelegt hat
+
+Es bleibt bei einer Nachricht
+  OK   Die erste Nachricht geht durch
+  OK   Die zweite wird abgelehnt  — 42501
+  OK   Es steht wirklich nur eine da  — 1 Nachrichten
+
+Über die eigene Anfrage entscheidet man nicht selbst
+  OK   Der Absender kann sie nicht selbst annehmen  — Über die eigene Anfrage entscheidet die angeschriebene Person
+  OK   Und sie steht danach immer noch auf „wartet"  — wartet
+
+Die angeschriebene Person entscheidet
+  OK   Sie kann annehmen
+  OK   Danach darf der Absender weiterschreiben
+
+Ablehnen heißt abgelehnt
+  OK   Die angeschriebene Person kann ablehnen
+  OK   Danach kommt nichts mehr durch
+  OK   Nachgezählt: eine Nachricht  — 1 Nachrichten
+
+Eine Antwort ist eine Annahme
+  OK   Die angeschriebene Person darf antworten
+  OK   Damit gilt die Anfrage als angenommen  — angenommen
+  OK   Und der Absender darf weiterschreiben
+
+Wer schon Kontakt ist, wird nicht gefragt
+  OK   Ein Chat mit einem Kontakt ist keine Anfrage  — offen
+  OK   Und da darf man gleich zweimal schreiben
+
+Die Chat-Anfrage ist eine Bitte, keine Zusage an sich selbst.
+
+======================================================================
+  messengeranfrage
+======================================================================
+
+Kein Weg in den Messenger ohne Zustimmung
+  OK   Kontakt ohne Nummer wird abgewiesen  — Kontakte kommen über die Telefonnummer oder eine angenommene Messenger-Anfrage
+  OK   Nachgezählt: kein Kontakt steht da
+  OK   Einen Fremden in einen Messenger-Chat eintragen geht nicht  — new row violates row-level security policy for table "chat_members"
+  OK   Nachgezählt: der Fremde sieht diesen Chat nicht
+  OK   messenger_erlaubt verrät nichts über fremde Paare  — false
+
+Erst unter Communitys, dann die Frage
+  OK   Unter Communitys lässt sich ein Fremder anschreiben
+  OK   Vor dem Austausch lässt sich nicht fragen  — Schreibt euch erst hier ein wenig, dann kannst du fragen
+  OK   Der Eigner schreibt
+  OK   Der Fremde antwortet
+  OK   Den Zustand von Hand auf „angenommen" setzen geht nicht  — Die Messenger-Anfrage geht über messenger_anfragen und messenger_anfrage_beantworten
+  OK   Nach dem Austausch geht die Anfrage raus
+  OK   Sie steht am Chat, vom Eigner
+  OK   Der Fremde bekommt eine Mitteilung, die in den Chat führt
+  OK   Ein zweites Mal fragen, solange sie läuft, geht nicht  — Die Anfrage läuft schon
+  OK   Die eigene Anfrage annehmen geht nicht  — Über die eigene Anfrage entscheidet die gefragte Person
+
+Ablehnen lässt alles unter Communitys
+  OK   Der Fremde lehnt ab
+  OK   Zustand: abgelehnt
+  OK   Kein Kontakt in keiner Richtung
+  OK   Kein Messenger-Chat zwischen den beiden
+  OK   Der Community-Chat bleibt
+  OK   Und dort geht das Schreiben weiter
+  OK   Wer abgelehnt wurde, fragt nicht noch einmal  — Die Anfrage wurde abgelehnt
+
+Annehmen führt in den Messenger
+  OK   Später darf die andere Seite selbst fragen
+  OK   Der Eigner nimmt an
+  OK   Beide führen sich jetzt als Kontakt
+  OK   Herkunft: die Anfrage, nicht die Nummer
+  OK   Es gibt genau einen Messenger-Chat
+  OK   Der Fremde sieht ihn in seiner Liste
+  OK   Der Eigner schreibt im Messenger
+  OK   Und gleich noch einmal — angenommen ist angenommen
+  OK   Der Fragende erfährt, dass angenommen wurde
+
+Die Nummer bleibt, wo sie war
+  OK   Der Eigner sieht die Nummer des Fremden nicht
+  OK   Der Fremde sieht die Nummer des Eigners nicht
+  OK   Die Herkunft lässt sich nicht umschreiben
+  OK   Nachgezählt: die Nummer bleibt verborgen
+  OK   Aufgeräumt: kein Kontakt bleibt zurück
+  OK   Aufgeräumt: kein Messenger-Chat bleibt zurück
+
+37 von 37 Pruefungen bestanden. In den Messenger kommt nur, wer zugestimmt hat.
+
+======================================================================
+  mitteilungen
+======================================================================
+
+Markierung in einem Beitrag
+  OK   Der Verfasser darf jemanden markieren
+  OK   Der Markierte bekommt genau eine Mitteilung  — 1 Stück
+  OK   Sie kommt vom Markierenden
+  OK   Und sie zeigt auf den Beitrag, nicht auf den Markierenden
+  OK   Der Markierende selbst bekommt keine
+
+Herz an einem Kommentar
+  OK   Ein fremdes Herz an meinem Kommentar geht durch
+  OK   Der Verfasser des Kommentars bekommt eine Mitteilung  — 1 Stück
+  OK   Das Ziel ist der Kommentar, nicht der Beitrag  — comment
+  OK   Das eigene Herz am eigenen Kommentar meldet sich nicht  — 0 Stück
+  OK   Zurückgenommenes Herz nimmt seine Mitteilung mit  — 0 Stück
+
+Chat-Anfrage und ihre Annahme
+  OK   Der Angeschriebene erfährt von der Anfrage  — 1 Stück
+  OK   Sie kommt vom Anfragenden
+  OK   Der Anfragende bekommt keine Mitteilung über seine eigene Anfrage  — 0 Stück
+  OK   Der Angeschriebene kann annehmen
+  OK   Der Anfragende erfährt von der Annahme  — 1 Stück
+  OK   Sie kommt von dem, der angenommen hat
+  OK   Eine Ablehnung meldet sich bei niemandem  — 0 Stück
+
+Der Satz dazu steht in beiden Oberflächen
+  OK   „hat dich in einem Beitrag markiert" kennt die Website
+  OK   „hat dich in einem Beitrag markiert" kennt die App
+  OK   „möchte mit dir schreiben" kennt die Website
+  OK   „möchte mit dir schreiben" kennt die App
+  OK   „hat deine Anfrage angenommen" kennt die Website
+  OK   „hat deine Anfrage angenommen" kennt die App
+  OK   Beide kennen den Gegenstand „Kommentar" für ein Herz
+
+ALLES GRUEN
+
+======================================================================
+  dmsperre
+======================================================================
+
+Ohne Sperre geht alles wie bisher
+  OK   Die Auskunft sagt Ja
+  OK   Die angeschriebene Person lässt sich eintragen
+  OK   Nachgezählt: sie steht wirklich drin
+
+„Niemand" — und zwar schon vor dem Chat
+  OK   Die Auskunft sagt Nein
+  OK   Sie lässt sich nicht mehr eintragen  — 42501
+  OK   Nachgezählt: kein Mitgliedseintrag entstanden
+
+Ein Chat, der schon stand, nimmt nichts mehr an
+  OK   Die Nachricht wird abgewiesen  — 42501
+  OK   Nachgezählt: keine Nachricht steht da  — 0 Nachrichten
+
+Gruppen bleiben ausgenommen
+  OK   „Gruppen: wer darf hinzufügen“ steht für den Schritt auf „Alle“
+  OK   In eine Gruppe darf sie trotz „Niemand"
+  OK   Nachgezählt: sie steht drin
+
+„Niemand bis auf" lässt genau diesen einen durch
+  OK   Ohne Eintrag in der Liste: Nein
+  OK   Mit Eintrag: Ja
+  OK   Und der Chat kommt zustande
+  OK   Auch die Nachricht geht durch
+
+Die eigene Zeile bleibt unberührt
+  OK   Man darf sich selbst schreiben
+  OK   Und sich selbst in einen Chat eintragen
+
+Wer keine Nachrichten will, bekommt auch keinen leeren Chat.
+
+======================================================================
+  lesebestaetigung
+======================================================================
+
+Schalter an — die Bestätigung kommt
+  OK   Vorher steht kein Zeitpunkt
+  OK   Der Aufruf geht durch
+  OK   Er meldet genau eine Bestätigung  — gemeldet: 1
+  OK   Nachgezählt: der Zeitpunkt steht wirklich da
+
+Schalter aus — es passiert nichts
+  OK   Der Aufruf scheitert nicht
+  OK   Er meldet null Bestätigungen  — gemeldet: 0
+  OK   Nachgezählt: es steht kein Zeitpunkt da
+
+Wer nicht im Chat ist, bestätigt auch nichts
+  OK   Der Aufruf meldet null — und verrät nichts  — gemeldet: 0
+  OK   Nachgezählt: die fremde Nachricht bleibt ungelesen
+
+Die eigene Nachricht bestätigt man sich nicht selbst
+  OK   Nur die fremde Nachricht zählt  — gemeldet: 1
+  OK   Die eigene bleibt ohne Zeitpunkt
+
+Ein gesetzter Zeitpunkt wird nicht überschrieben
+  OK   Der zweite Aufruf meldet null  — gemeldet: 0
+  OK   Der erste Zeitpunkt steht unverändert da
+
+Der Haken heißt jetzt, was er zeigt.
+
+======================================================================
+  kanal
+======================================================================
+FEHLER  page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3300/
+Call log:
+[2m  - navigating to "http://localhost:3300/", waiting until "load"[22m
+
+
+======================================================================
+  impressionen
+======================================================================
+
+Mitschreiben
+  OK   Eine Sichtung landet in der Tabelle
+  OK   Mit der gemessenen Dauer  — 4000 ms
+  OK   Und als eine Sichtung gezaehlt
+  OK   Dieselbe Person, derselbe Tag: weiterhin eine Zeile  — 1
+  OK   Die Dauer wird addiert  — 6500 ms
+  OK   Die Anzahl geht hoch
+  OK   Eine andere Herkunft ist eine eigene Zeile
+
+Was nicht durchgehen darf
+  OK   Eine erfundene Herkunft wird abgewiesen  — unbekannte Herkunft: irgendwas
+  OK   Eine absurd lange Sichtung wird gekappt  — 300000 ms
+  OK   Ein direktes INSERT kommt nicht durch  — new row violates row-level security policy for table "post_impressions"
+  OK   Niemand schreibt Sichtungen unter fremdem Namen  — new row violates row-level security policy for table "post_impressions"
+
+Wer was sieht
+  OK   Jeder sieht nur seine eigenen Sichtungen  — 1 Zeile(n)
+
+Gebuendelt
+  OK   Ein Buendel wird angenommen
+  OK   Ein unbrauchbarer Eintrag reisst den Rest nicht mit (still mitgezaehlt, Schema 122)  — 2 von 2 angenommen
+  OK   Der brauchbare Eintrag steht in der Tabelle
+  OK   Der unbrauchbare Eintrag hat nichts geschrieben  — 0 Zeile(n)
+
+Ohne Anmeldung
+  OK   Ohne Anmeldung geht gar nichts  — permission denied for function impression_vermerken
+  OK   Der Lauf laesst nichts zurueck
+
+Sichtungen werden mitgeschrieben — und nur die echten.
+
+======================================================================
+  rang
+======================================================================
+
+Die Funktion antwortet
+  OK   Jeder uebergebene Beitrag bekommt eine Zeile  — 18 von 18
+  OK   Mit einer Punktzahl  — 1.4118
+  OK   Und mit den Bausteinen einzeln
+  OK   Punkte sind nicht alle gleich  — 18 verschiedene Werte
+
+Bewertet wird nur, was gereicht wird
+  OK   Zwei Kennungen hinein, zwei Zeilen heraus  — 2
+  OK   Kein dritter Beitrag mogelt sich dazu
+  OK   Nichts hinein, nichts heraus  — 0 Zeilen
+
+Verweildauer bewegt das Ranking
+  OK   Der Verweilwert steigt  — 0 → 1.5
+  OK   Und er ist gedeckelt, nicht ins Unendliche gewachsen  — 1.5
+
+Schon Gesehenes rutscht nach unten
+  OK   Die Ermuedung faellt unter 1  — 0.3333
+  OK   Und drueckt die Punktzahl  — 1.1268 → 0.5634
+  OK   Im Profil greift die Ermuedung nicht  — 1
+
+Das Interessenbild
+  OK   Es laesst sich lesen
+  OK   Und ist nach Gewicht sortiert
+  OK   Lange Angesehenes faerbt das Interessenbild  — #hafen, #nachtfotografie
+
+Die gemeinsame Reihenfolge (gemeinsam/rang.js)
+  OK   Die Punktekarte hat je Beitrag einen Eintrag
+  OK   Sortiert ist absteigend nach Punkten
+  OK   Und es geht kein Beitrag verloren
+  OK   Auffaechern legt nicht mehr Gleiche nebeneinander als vorher  — 2 vorher, 1 nachher, 6 Verfasser
+  OK   Ohne Punkte bleibt die Reihenfolge, wie sie war
+  OK   Drei Beitraege einer Person stehen nicht mehr am Stueck  — ABCDAEA
+  OK   Der beste steht trotzdem vorn  — a1
+  OK   Alle sieben sind noch da
+  OK   Ohne Auffaechern stuenden sie am Stueck
+  OK   Je Art geordnet: die Fotos stehen nach Punkten  — p1,p2,p3
+  OK   Ein Reel dazwischen verschiebt die Fotos nicht mehr
+  OK   Und es geht auch hier nichts verloren
+  OK   Ohne Erprobung steht der Neuling ganz hinten  — z0 z1 z2 z3 z4 z5 z6 z7 z8 z9 z10 z11
+  OK   Mit Erprobung steht er auf Platz 4  — z0 z1 z2 z3 z11 z4 z5 z6 z7 z8 z9 z10
+  OK   Der Beste steht trotzdem weiter vorn
+  OK   Und es geht keiner verloren
+  OK   Die Neulingsliste kommt aus den Rangzeilen
+
+Anonyme duerfen nicht ranken
+  OK   feed_rang() ist fuer Anonyme zu  — permission denied for function feed_rang
+  OK   interessenbild() ebenso  — permission denied for function interessenbild
+
+Alles in Ordnung.
+
+
+======================================================================
+  verlauf
+======================================================================
+
+1. gemeinsam/verlauf.js
+  OK   Sechs Zeilen (zwei Teilungen zu einer, unlesbarer Beitrag weg)  — 6
+  OK   Neueste zuerst  — speichern,repost,teilen,kommentar,like,teilen
+  OK   Alle fünf Arten vorhanden  — speichern,repost,teilen,kommentar,like
+  OK   Teilen an zwei Personen ist eine Zeile  — Geteilt an Anna, Ben · Vlog
+  OK   Kommentarzeile mit Text und Ersatztitel  — Kommentiert „Schön!" · Video (Hochformat)
+  OK   Speichern-Zeile  — Gespeichert · Berge
+  OK   Ziel je Art
+  OK   Zeit als TT.MM.JJJJ, hh:mm  — 28.09.2026, 07:05
+  OK   Kaputte Zeit gibt leeren Text
+  OK   Schlüssel eindeutig
+
+2. App und Website am selben Baustein
+  OK   App: Einstellungen → Videos → „Mein Verlauf"
+  OK   Website: Einstellungen → Videos → „Mein Verlauf"
+  OK   App lädt über gemeinsam/verlauf.js
+  OK   /api/verlauf lädt über gemeinsam/verlauf.js
+  OK   index.html bindet verlauf.js ein
+  OK   UMD_BAUSTEINE kennt verlauf
+  OK   App: Zeilen antippbar (onOpenKachel)
+  OK   Website: Zeilen anklickbar (data-ziel-id)
+  OK   Website: openPost ist definiert
+
+3. Schema 66
+  OK   Wächter auf saves
+  OK   Wächter auf post_likes
+  OK   Wächter auf reposts
+  OK   Wächter auf comments
+  OK   Wächter auf shares
+  OK   EXECUTE von public entzogen
+  OK   Aufräumen ist auskommentiert (kein DELETE außerhalb des Kommentarblocks)
+  OK   Aufräumen ist als Freigabe markiert
+  OK   REIHENFOLGE erwähnt Schema 66
+
+4. Die fünf Aktionen im Verlauf (Testkonto)
+  OK   Freier Demo-Beitrag gefunden
+
+======================================================================
+  Übersicht
+======================================================================
+  ZEIT  einstellungen          3/3
+  ZEIT  kontaktinfo              —
+  OK    henrik               23/23
+  FEHL  insel                    —
+  ZEIT  optionen                 —
+  OK    kasten8                6/6
+  FEHL  kamera                   —
+  OK    testhygiene          24/24
+  FEHL  smoke                    —
+  FEHL  feedback                 —
+  FEHL  erstellen                —
+  FEHL  teilen                   —
+  FEHL  sync                     —
+  FEHL  uebernacht               —
+  OK    schema                 7/7
+  OK    sammlungen           16/16
+  FEHL  sammlungenweb            —
+  FEHL  explorer                 —
+  FEHL  anhang                   —
+  FEHL  henrik2                  —
+  FEHL  suche                    —
+  OK    kasten12             65/65
+  OK    kasten17             53/53
+  FEHL  glocke                   —
+  FEHL  pfeile                   —
+  FEHL  profil                   —
+  FEHL  community                —
+  FEHL  chatoptionen             —
+  FEHL  player                   —
+  FEHL  gesten                   —
+  FEHL  kommentare               —
+  FEHL  querformat               —
+  FEHL  feinschliff              —
+  FEHL  eigenes                  —
+  OK    datenbank            29/29
+  FEHL  aktionen                 —
+  FEHL  gleichstand              —
+  FEHL  handbuch                 —
+  OK    sichtbarkeit         36/36
+  OK    likes                94/94
+  FEHL  fremdprofil            1/1
+  OK    chatanfrage          17/17
+  OK    messengeranfrage     37/37
+  OK    mitteilungen         24/24
+  OK    dmsperre             17/17
+  OK    lesebestaetigung     13/13
+  FEHL  kanal                    —
+  OK    impressionen         18/18
+  OK    rang                 34/34
+  FEHL  verlauf              29/29
+
+  546 von 546 Prüfungen bestanden, 50/101 Läufe.
+  Ohne zählbare Prüfungen: kontaktinfo, insel, optionen, kamera, smoke, feedback, erstellen, teilen, sync, uebernacht, sammlungenweb, explorer, anhang, henrik2, suche, glocke, pfeile, profil, community, chatoptionen, player, gesten, kommentare, querformat, feinschliff, eigenes, aktionen, gleichstand, handbuch, kanal
+  Nicht durchgekommen: einstellungen, kontaktinfo, insel, optionen, kamera, smoke, feedback, erstellen, teilen, sync, uebernacht, sammlungenweb, explorer, anhang, henrik2, suche, glocke, pfeile, profil, community, chatoptionen, player, gesten, kommentare, querformat, feinschliff, eigenes, aktionen, gleichstand, handbuch, fremdprofil, kanal, verlauf
+  Lauf 0b02dbc2-e225-41b6-b3f8-db3093ca5deb: 146 Mitteilungen entfernt, Rest 0.

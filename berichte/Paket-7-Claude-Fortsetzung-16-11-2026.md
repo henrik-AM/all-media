@@ -131,3 +131,19 @@ als Screenshots vorhanden, relevante Bilder selbst angesehen.
 Fixturelauf e48327e9 beendet, eigeneChats/Mitglieder/Nachrichten **Rest0**.
 Expo-Go-Instanz,Metro3301 und eigenerSimulator beendet. Hauptgerät,
 Hauptserver3000 undExpo8081 unangetastet. Vollständiger Bestandsnachweis offen.
+
+### Gesamtlaufversuch0b02dbc2 nicht verwertbar
+
+Unabhängiger Lauf, aber Prüfserver zunächst noch in einer Werkzeug-Prozesssitzung.
+Diese Server-Sitzung endete mitSIGTERM(Code143); danach Port3300 ohneListener,
+ServeranfrageConnectionRefused. Ursache dieses SIGTERM nicht nachgewiesen;
+kein Produktfehler daraus abgeleitet. Zusätzlich vergingen zwischen Prüfungen
+große Wanduhrintervalle, Einschlafursache nicht behauptet.
+Lauf kontrolliert beendet:50/101gestartet,546/546zählbar,Code143,
+Quellenunverändert,Bereinigung146Mitteilungen/Rest0. Zahlreiche Läufe ohne
+Prüfzahl, daher kein Erfolgsbeleg. Originalprotokollversuch1-gesamtlauf.log.
+
+Neuer eigener Server3300 nun ebenfalls mit neuerProzessgruppe unabhängig
+gestartet(PID27974),HTTP200 geprüft. Vollständiger101-Lauf erneut gestartet,
+Schutz gegen automatischen Ruhezustand an dessen PID gebunden. Beide Instanzen
+messen weiterhin unveränderte Produkt-/Prüfquellen aus8884c8c.
