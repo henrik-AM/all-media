@@ -179,3 +179,14 @@ Kein Produktfehler und keine nötige Abschwächung der Egress-Sperre.
 Eigener Launcher jetzt über diesen regulären Einstieg, geschützter
 Prozessname bleibt. Lauf vor Änderung kontrolliert beendet, Rohbelege
 bleiben erhalten; erneut kompletter Nachweis erforderlich.
+
+### Lauf1e2a8739 — alle sieben Altfehler erstmals vollständig grün
+
+Unveränderte Messquellen, regulärer lokaler Medienstart, eigenständiger
+Prüfserver und Prozessgruppen. Kamera10/10,Smoke75/75,Feedback53/53,
+Einstellungen19/19,Kontaktinfo10/10,Henrik23/23,Insel17/17,Optionen16/16,
+Kasten8 6/6,Testhygiene24/24; **jeweilsCode0**. Damit alle sieben
+ursprünglichen Fehlerläufe vollständig bestanden (zusammen101/101).
+Zwischenstand10/101Läufe,253/253Prüfungen,kein fehlgeschlagener Lauf.
+Der vollständige101-Lauf-Nachweis und dessen Bereinigung laufen noch.
+Keine Fertig-/Veröffentlichungsfreigabe daraus abgeleitet.
