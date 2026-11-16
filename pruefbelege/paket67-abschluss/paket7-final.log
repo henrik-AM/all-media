@@ -1,0 +1,29 @@
+✔ Dauernde Klingeln werden begrenzt gebündelt und nie endlos verschoben (955.008458ms)
+✔ Abofehler räumt schon angelegten Kanal und Timer auf (0.441042ms)
+✔ Server: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (34.211958ms)
+✔ App: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (13.379042ms)
+✔ Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe (64.947875ms)
+✔ Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach (36.54275ms)
+✔ Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich (5.391916ms)
+✔ Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join (0.433708ms)
+✔ Kuvert-Signal überlebt die Bündelung mit gewöhnlichen Klingeln (302.585917ms)
+✔ Native Liste: alte Klingelantwort überschreibt neueren expliziten Abruf nicht (14.654375ms)
+✔ Native Liste: spätere Antwort eines älteren expliziten Abrufs wird verworfen (3.617666ms)
+✔ Native Liste: erfolgreicher unveränderter Stand belegt Frische nach Lesefehler (2.850042ms)
+✔ Bestätigter Wunsch wird bei späterer Änderung vom Zweitgerät nicht wiederbelebt (23.255667ms)
+✔ Kontowechsel übernimmt keinen Stumm-Wunsch des anderen Kontos (5.071458ms)
+✔ Zwei schnelle Tipps schreiben seriell an und aus; neuester Wunsch bleibt sichtbar (5.010916ms)
+✔ Verspäteter Fehler eines älteren Schreibens entfernt den neueren Wunsch nicht (3.526459ms)
+✔ Drei schnelle Tipps behalten letzten Wunsch auch bei Zwischenbestätigungen (6.107458ms)
+✔ Kontorückkehr startet keine alten wartenden Schreibaufträge erneut (12.599833ms)
+✔ Fehlgeschlagener Listenabruf verwirft keine erfolgreich gespeicherte Auswahl (10.586917ms)
+✔ Frisch gelesener Gegenwert vom Zweitgerät gewinnt nach bestätigtem Schreiben (3.718625ms)
+✔ Nach Lesefehler bestätigt auch unveränderter frischer Serverstand den Fernwert (6.866583ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1543.174667
