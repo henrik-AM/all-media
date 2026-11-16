@@ -620,6 +620,11 @@
    * Die Meldung, wenn ein Chat, der keine Gruppe ist, mehr als zwei
    * Mitglieder hat. Wortgleich in App und Website, deshalb hier.
    */
+  var MELDUNG_SENDEZEIT = 'Die Sendezeit stimmt nicht. Bitte prüfe die Geräteuhr und sende die Nachricht erneut.';
+  function sendezeitFehler(fehler) {
+    return Boolean(fehler && fehler.code === '23514' && /messages_krypto_stimmig/.test(fehler.message || ''));
+  }
+
   var MELDUNG_NUR_ZU_ZWEIT =
     'Dieser Chat ist keine Gruppe, hat aber mehr als zwei Mitglieder. ' +
     'Damit niemand unbemerkt mitliest, wurde die Nachricht nicht gesendet.';
@@ -751,6 +756,8 @@
     kontextAusZeile: kontextAusZeile,
     MELDUNG_NICHT_VERSCHLUESSELT: MELDUNG_NICHT_VERSCHLUESSELT,
     MELDUNG_NUR_ZU_ZWEIT: MELDUNG_NUR_ZU_ZWEIT,
+    MELDUNG_SENDEZEIT: MELDUNG_SENDEZEIT,
+    sendezeitFehler: sendezeitFehler,
     zuVieleMitglieder: zuVieleMitglieder,
     sendeweg: sendeweg,
     absenderPruefer: absenderPruefer,

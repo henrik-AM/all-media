@@ -9,6 +9,7 @@ import * as K from '../../lib/krypto';
 import {bereich} from './sicher';
 import {Konto} from './kontexte';
 const basis='http://127.0.0.1:3302';
+const EchtDate=Date;function uhr(ms:number){globalThis.Date=ms?class extends EchtDate{constructor(v?:any){super(arguments.length?v:EchtDate.now()+ms);}static now(){return EchtDate.now()+ms;}} as DateConstructor:EchtDate;}
 async function api(art:string,body:any={}){const r=await fetch(basis+'/'+art,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('Steuerung '+r.status);return r.json();}
 function Stand(){
  const [konten,setzen]=useState<any[]>([]),[sichtbar,zeigen]=useState(0),[gruppe,wahl]=useState(false),[info,melden]=useState('Start');const ins=useSafeAreaInsets();
@@ -20,7 +21,7 @@ function Stand(){
   }setzen(ks);await api('bereit');melden('Paket 7 bereit');})().catch(e=>melden('FEHLER '+e.message));},[]);
  const knopf=(t:string,f:()=>any)=><Pressable key={t} accessibilityRole="button" accessibilityLabel={t} onPress={f} style={{padding:8,borderWidth:1}}><Text>{t}</Text></Pressable>;
  return <View style={{flex:1,paddingTop:ins.top,backgroundColor:'white'}}><Text style={{marginTop:90}}>LIVE Paket 7 · Konto {sichtbar?'B':'A'} · {gruppe?'Gruppe':'verschlüsselt'}</Text>
- <View style={{flexDirection:'row',flexWrap:'wrap'}}>{knopf('Konto A',()=>zeigen(0))}{knopf('Konto B',()=>zeigen(1))}{knopf('Zweierchat',()=>wahl(false))}{knopf('Gruppe',()=>wahl(true))}{knopf('Tastatur schließen',()=>Keyboard.dismiss())}</View><Text>{info}</Text>
+ <View style={{flexDirection:'row',flexWrap:'wrap'}}>{knopf('Konto A',()=>zeigen(0))}{knopf('Konto B',()=>zeigen(1))}{knopf('Zweierchat',()=>wahl(false))}{knopf('Gruppe',()=>wahl(true))}{knopf('Tastatur schließen',()=>Keyboard.dismiss())}{knopf('Uhr vor',()=>uhr(86400000))}{knopf('Uhr normal',()=>uhr(0))}</View><Text>{info}</Text>
  {konten.map((s,i)=><Konto.Provider key={s.id} value={s}><View style={{flex:1,display:i===sichtbar?'flex':'none'}}><ChatDetailScreen key={String(gruppe)} chat={s.chats[gruppe?1:0]} onBack={()=>{}} onCall={()=>{}} onCamera={()=>{}} onOpenProfile={()=>{}} onNotice={melden}/></View></Konto.Provider>)}
  </View>;
 }

@@ -65,3 +65,19 @@ Blatt hinauswachsen. Nur das Verschlüsselungs-Infoblatt ist jetzt auf74% Höhe
 begrenzt und blätterbar; beide Ansichten visuell geprüft, Zurück bedienbar.
 Alle eigenen Chats/Mitgliedschaften/Nachrichten/Schlüssel dieses Laufs entfernt,
 Rest0. Belege:native-ergebnis,native-paar-ergebnis,native-neustart,native-fixtures.
+
+## Geräteuhr: tatsächliche native Gegenprobe und Korrektur
+
+Erster gemeinsamer Format2-Lauf:Website14/14 und eigeneFixturesRest0;
+native Kernprüfungen17grün, aber zusätzlicher Geräteuhr-Meldungstest scheitert,
+Exit1. Die Datenbank lehnt eine um24h verstellte Geräteuhr korrekt ab und der
+Entwurf bleibt erhalten; sichtbar war eine SQL-Constraint-Meldung. Der erste
+Treiber druckte seinen17er-Zwischenzähler vor dieser Zusatzassertion; deshalb
+war dies ausdrücklich KEINE bestandene native Gesamtabnahme.
+Codex reproduziert die Fehlermeldung offline in App und Server:Alt14/16.
+Nur23514 zum Constraint messages_krypto_stimmig bei selbst erzeugtemFormat2
+wird jetzt verständlich zur Geräteuhr-Meldung. Fremde Constraints/Rechtesperren
+bleiben erkennbar. Korrektur16/16,TypeScriptExit0. Die Weiterleitungsroute
+meldet dieselbe Absage. Native Wiederholung mit endgültiger18er-Zählung läuft.
+Ältere Paket6-Livetreiber erwarten für neue Rundreisen jetztFormat2; gezielt
+angelegte historischeFormat1-Gegenproben bleibenFormat1.

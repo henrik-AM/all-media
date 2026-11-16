@@ -139,3 +139,18 @@ test('Abweichende Empfangszeit öffnet Format2 nicht als unverändert geprüfte 
  assert.equal(Krypto.entschluesseln(kopf,p.kuverts[0],db.pb.geheim),'echt');
  assert.equal(Krypto.entschluesseln({...kopf,kontext:{...kontext,empfangenAm:'2020-01-01T00:00:00Z'}},p.kuverts[0],db.pb.geheim),null);
 });
+test('App: Zeitconstraint wird zur Geräteuhr-Meldung, Entwurf kann erneut gesendet werden',async()=>{
+ const db=basis(),c=client(db,(t,a)=>t==='messages'&&a==='insert'?{code:'23514',message:'new row violates check constraint "messages_krypto_stimmig"'}:null);
+ await assert.rejects(app().aktionen().nachrichtSenden(c,A,'zwei','Uhr prüfen'),/Die Sendezeit stimmt nicht.*Geräteuhr/);
+ assert.equal(db.messages.length,0);assert.equal(db.message_keys.length,0);
+});
+test('Server: Zeitconstraint verständlich, andere Datenbankfehler bleiben erkennbar',async()=>{
+ const db=basis(),zeit=new Date().toISOString(),id=require('crypto').randomUUID();
+ const p=Krypto.verschluesseln('Uhr prüfen',db.pa.geheim,db.krypto_schluessel,{id,chatId:'zwei',senderId:A,zeit});
+ const paket={krypto:2,nachrichtId:id,gesendetAm:zeit,chiffre:p.chiffre,kryptoNonce:p.nonce,absenderSchluessel:p.absender,kuverts:p.kuverts};
+ for(const e of [{code:'23514',message:'new row violates check constraint "messages_krypto_stimmig"'},{code:'42501',message:'Rechtesperre'},{code:'23514',message:'andere_pruefung'}]){
+  const r=await S.handleSendMessage(client(db,(t,a)=>t==='messages'&&a==='insert'?e:null),A,'zwei','',paket);
+  assert.equal(r.ok,false);assert.match(r.fehler,e.message.includes('messages_krypto_stimmig')?/Die Sendezeit stimmt nicht.*Geräteuhr/:new RegExp(e.message));
+ }
+ assert.equal(db.messages.length,0);
+});

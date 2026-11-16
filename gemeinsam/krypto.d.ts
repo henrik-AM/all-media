@@ -84,3 +84,6 @@ export function zuVieleMitglieder(fakten: { istGruppe?: boolean; mitglieder?: st
 export function sendeweg(fakten: any): { art: 'offen' | 'ablehnen' | 'verschliessen'; meldung?: string; empfaenger?: { id: string; oeffentlich: string }[] };
 export function zuBase64(bytes: Uint8Array): string;
 export function ausBase64(text: string): Uint8Array;
+
+export const MELDUNG_SENDEZEIT: string;
+export function sendezeitFehler(fehler: { code?: string; message?: string } | null): boolean;

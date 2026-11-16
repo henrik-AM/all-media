@@ -7,7 +7,7 @@ const {createClient}=require('@supabase/supabase-js'),{chromium}=require('playwr
 const {TESTKONTO_PASS,PRUEFKONTO_PASS}=require('./_testpasswoerter');
 const {frage}=require('./_aufraeumen'),{medienEgressSchuetzen}=require('./_medien_egressschutz');
 process.loadEnvFile(path.join(__dirname,'../.env.local'));
-const URL=process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,OUT=path.resolve(__dirname,'../../pruefbelege/paket-7');
+const URL=process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,OUT=process.env.P7_PLATTFORM_OUT||path.resolve(__dirname,'../../pruefbelege/paket-7');
 const lauf=crypto.randomUUID(),chats=[{id:crypto.randomUUID(),isGroup:false,bereich:'community'},{id:crypto.randomUUID(),isGroup:true,bereich:'community'}];
 const konten=[{id:'3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',email:'test@all-media.app',pass:TESTKONTO_PASS,name:'A'},{id:'62616c1d-82e2-4ee4-aab9-950e40e438a4',email:'all.media.prueflauf@web.de',pass:PRUEFKONTO_PASS,name:'B'}];
 let browser,bridge,ende,fehler=0,gut=0,begonnen=false;const keys=[],messungen=[],nativeTexte=[];let spaet;
@@ -61,15 +61,17 @@ async function gesehen(i,text,ab=Date.now()){
   else if(route==='/spaet'){
    await offen(1,false);
    const paket=await konten[1].page.evaluate(()=>sendeKoerper(state.openChatId,'Kuvert nach Klingel angekommen'));
-   assert.equal(paket.krypto,1);
-   const z=await daten(konten[1].client.from('messages').insert({chat_id:chats[0].id,sender_id:konten[1].id,text:'',krypto:1,chiffre:paket.chiffre,krypto_nonce:paket.kryptoNonce,absender_schluessel:paket.absenderSchluessel}).select('id').single());
+   assert.equal(paket.krypto,2);
+   const z=await daten(konten[1].client.from('messages').insert({id:paket.nachrichtId,krypto_gesendet_am:paket.gesendetAm,chat_id:chats[0].id,sender_id:konten[1].id,text:'',krypto:2,chiffre:paket.chiffre,krypto_nonce:paket.kryptoNonce,absender_schluessel:paket.absenderSchluessel}).select('id').single());
    spaet={id:z.id,kuverts:paket.kuverts};result={ok:true,id:z.id};
   }
   else if(route==='/nachreichen'){
    assert.ok(spaet);const ab=Date.now();await daten(konten[1].client.from('message_keys').insert(spaet.kuverts.map(k=>({message_id:spaet.id,schluessel_id:k.schluesselId,nonce:k.nonce,chiffre:k.chiffre}))));result={ok:true,ab};
   }
   else if(route==='/seen'){const zeilen=await daten(konten[0].client.from('messages').select('id,created_at').eq('chat_id',chats[d.gruppe?1:0].id).order('created_at',{ascending:false}).limit(1));assert.equal(zeilen.length,1);const ms=await gesehen(d.index,d.text,Date.parse(zeilen[0].created_at));nativeTexte.push(d.text);result={ok:ms<2500,ms};}
-  else if(route==='/fertig'){const rows=await daten(a.client.from('messages').select('chat_id,text,krypto').in('chat_id',chats.map(c=>c.id)));check('Echte Zweierchat-Zeilen ausschließlich Chiffren',rows.filter(z=>z.chat_id===chats[0].id).every(z=>z.krypto===1&&z.text===''));check('Gruppenchat bleibt lesbarer Klartext',rows.some(z=>z.chat_id===chats[1].id&&z.krypto!==1&&z.text));fs.writeFileSync(path.join(OUT,'plattform-messungen.json'),JSON.stringify({messungen,gut,fehler,nativeTexte},null,2));res.end(JSON.stringify({ok:fehler===0}));ende();return;}
+  else if(route==='/zahl'){const r=await daten(a.client.from('messages').select('id').in('chat_id',chats.map(c=>c.id)));result={anzahl:r.length};}
+  else if(route==='/kopie'){await offen(1,false);const p=await konten[1].page.evaluate(()=>sendeKoerper(state.openChatId,'Kontextkopie darf nicht lesbar sein'));assert.equal(p.krypto,2);const id=crypto.randomUUID();await daten(konten[1].client.from('messages').insert({id,chat_id:chats[0].id,sender_id:konten[1].id,text:'',krypto:2,krypto_gesendet_am:p.gesendetAm,chiffre:p.chiffre,krypto_nonce:p.kryptoNonce,absender_schluessel:p.absenderSchluessel}));await daten(konten[1].client.from('message_keys').insert(p.kuverts.map(k=>({message_id:id,schluessel_id:k.schluesselId,nonce:k.nonce,chiffre:k.chiffre}))));result={ok:true,id};}
+  else if(route==='/fertig'){const rows=await daten(a.client.from('messages').select('chat_id,text,krypto,krypto_gesendet_am').in('chat_id',chats.map(c=>c.id)));check('Echte Zweierchat-Zeilen ausschließlich Chiffren',rows.filter(z=>z.chat_id===chats[0].id).every(z=>z.krypto===2&&z.text===''&&Boolean(z.krypto_gesendet_am)));check('Gruppenchat bleibt lesbarer Klartext',rows.some(z=>z.chat_id===chats[1].id&&z.krypto===0&&z.text));fs.writeFileSync(path.join(OUT,'plattform-messungen.json'),JSON.stringify({messungen,gut,fehler,nativeTexte},null,2));res.end(JSON.stringify({ok:fehler===0}));ende();return;}
   else throw Error('Unbekannte Steuerung');res.end(JSON.stringify(result));
  }catch(e){fehler++;log('BRIDGE FEHLER '+e.message);res.statusCode=500;res.end(JSON.stringify({fehler:e.message}));}});
  await new Promise((r,j)=>{bridge.once('error',j);bridge.listen(3302,'127.0.0.1',r);});log('BRIDGE BEREIT 3302; Native starten');

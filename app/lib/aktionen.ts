@@ -1555,7 +1555,11 @@ export async function nachrichtSenden(
     })
     .select('id, created_at')
     .single();
-  if (error) throw error;
+  if (error) {
+    const KryptoZeit = require('../../gemeinsam/krypto') as typeof import('../../gemeinsam/krypto');
+    if (Number(paket.spalten.krypto) === 2 && KryptoZeit.sendezeitFehler(error)) throw new Error(KryptoZeit.MELDUNG_SENDEZEIT);
+    throw error;
+  }
 
   /*
    * Die Kuverts, einer je mitlesendem Gerät.

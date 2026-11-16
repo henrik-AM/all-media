@@ -2,7 +2,7 @@
 Nur All-Media Codex. UI-Ziele ausschließlich beschriftet über tippen.js.
 """
 import subprocess,json,pathlib,time,os,urllib.request
-ROOT=pathlib.Path(__file__).resolve().parents[2];APP=ROOT/'app';OUT=ROOT/'pruefbelege/paket-7'
+ROOT=pathlib.Path(__file__).resolve().parents[2];APP=ROOT/'app';OUT=pathlib.Path(os.environ.get('P7_PLATTFORM_OUT',str(ROOT/'pruefbelege/paket-7')))
 SIM='/Applications/Xcode.app/Contents/Developer/usr/bin/simctl';UDID='5210E675-C198-4328-B3E2-30FCE9E0F624';ENV={**os.environ,'SIM_GERAET':'All-Media Codex'}
 ok=0;kennung=" "+str(int(time.time()))[-6:]
 
@@ -24,7 +24,7 @@ def warte(text,limit=25):
  raise RuntimeError('Native Text fehlt: '+text)
 def tap(text):
  args=['node','tools/tippen.js',text,'--bewusst']
- if text in ['Konto A','Konto B','Gruppe','Zweierchat','Tastatur schließen']:
+ if text in ['Konto A','Konto B','Gruppe','Zweierchat','Tastatur schließen','Uhr vor','Uhr normal']:
   liste=cmd(['node','tools/tippen.js','--liste',text]);import re
   nr=re.findall(r'^\s*(\d+)\. \[Button\] '+re.escape(json.dumps(text,ensure_ascii=False)),liste,re.M);assert len(nr)==1,liste;args+=['--nr',nr[0]]
  if text=='Nachricht':
@@ -51,4 +51,6 @@ tap('Zweierchat');tap('Konto A');api('mode',{'gruppe':False});api('spaet');time.
 tap('Gruppe');api('mode',{'gruppe':True})
 # Funkloch-/Hintergrund-Nachholen am echten AppState, keine Chat-Neuöffnung.
 cmd([SIM,'launch',UDID,'com.apple.mobilesafari']);text='Während Hintergrund angekommen';api('websend',{'index':1,'gruppe':True,'text':text});ab=time.time();cmd([SIM,'launch',UDID,'host.exp.Exponent']);warte(text,5);check('Hintergrund-Rückkehr lädt tatsächliche Nachricht nach',time.time()-ab<5);bild('native-hintergrund.png')
-r=api('fertig');check('Backend bestätigt verschlüsselte Zweierchats und Klartextgruppen',r['ok']);print(f'{ok}/{ok} native Plattformprüfungen',flush=True)
+tap('Zweierchat');tap('Konto A');api('mode',{'gruppe':False});api('kopie');warte('Auf diesem Gerät nicht lesbar',6);check('Format2-Kontextkopie mit fremder Nachrichten-ID bleibt nativ unlesbar');bild('native-kontextkopie.png')
+vor=api('zahl')['anzahl'];text='Uhrfehler darf nicht gesendet werden';tap('Nachricht');cmd(['axe','type',text,'--udid',UDID]);tap('Tastatur schließen');tap('Uhr vor');tap('Senden');time.sleep(2);freundlich=hat('Die Sendezeit stimmt nicht');tap('Uhr normal');check('Abweichende Geräteuhr schreibt keine Nachricht',api('zahl')['anzahl']==vor);check('Uhrfehler erhält den nativen Entwurf',any(x.get('AXValue')==text for x in ui()));bild('native-uhrfehler.png')
+r=api('fertig');check('Backend bestätigt verschlüsselte Zweierchats und Klartextgruppen',r['ok']);check('Uhrfehler nennt verständlich die Geräteuhr',freundlich);print(f'{ok}/{ok} native Plattformprüfungen',flush=True)

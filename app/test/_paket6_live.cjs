@@ -11,7 +11,7 @@ const {createClient}=require('@supabase/supabase-js');
 const {chromium}=require('playwright-core');
 const {medienEgressSchuetzen}=require('./_medien_egressschutz');
 const {app:appRuntime,Krypto}=require('./_paket6_hilfe.cjs');
-const W=path.resolve(__dirname,'../..'),OUT=path.join(W,'pruefbelege/paket-6'),ZIEL=process.env.ZIEL;
+const W=path.resolve(__dirname,'../..'),OUT=process.env.AM_PAKET6_LIVE_OUT||path.join(W,'pruefbelege/paket-6'),ZIEL=process.env.ZIEL;
 if(!ZIEL||!/^http:\/\/(127\.0\.0\.1|localhost):3300\/?$/.test(ZIEL))throw new Error('Eigener Paket-6-Server auf 3300 erforderlich');
 const URL=process.env.SUPABASE_URL||process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.SUPABASE_ANON_KEY||process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if(!URL||!KEY)throw new Error('Supabase-Konfiguration fehlt');
@@ -82,7 +82,7 @@ function appDatenModul(seite){
   const wtext='Paket6 Web '+sender.id.slice(0,4)+' '+lauf;const gesendet=await webSenden(sender,wtext);pruefe('Website-Sendeantwort '+sender.email,!!gesendet.id);
   const n=await appLesen(empfaenger,wtext);pruefe('Website → App-Logik '+sender.email,!!n&&!n.nichtPruefbar);
  }
- const gespeichert=await zeilen();pruefe('Alle vier Rundreise-Nachrichten nur als Chiffre gespeichert',gespeichert.length===4&&gespeichert.every(n=>n.krypto===1&&n.text===''&&n.chiffre));
+ const gespeichert=await zeilen();pruefe('Alle vier Rundreise-Nachrichten nur als Chiffre gespeichert',gespeichert.length===4&&gespeichert.every(n=>n.krypto===2&&n.text===''&&n.chiffre));
  for(const s of konten){
   const kuverts=await ergebnis(s.client.from('message_keys').select('message_id,schluessel_id').in('message_id',gespeichert.map(n=>n.id)),'Kuverts lesen');
   const eigene=manifest.schluessel.filter(k=>k.konto===s.id).map(k=>k.id);

@@ -1,0 +1,62 @@
+Gerätschlüssel nicht verfügbar: offline
+Nachricht senden fehlgeschlagen: new row violates check constraint "messages_krypto_stimmig"
+✔ Gemeinsame Nummer stimmt auf beiden Seiten und bindet Kontozuordnung (5.903375ms)
+✔ Server: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (1.380208ms)
+✔ App: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (91.640083ms)
+✔ App: abgemeldetes historisches Konto bekommt Altpaar, neues Konto niemals (16.492292ms)
+✔ App: nach altem Löschen erhaltene kontogebundene Kopie wiederfinden (6.936834ms)
+✔ App: fehlender Kontonachweis verändert den Altbestand nicht (6.432459ms)
+✔ Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar (48.987291ms)
+✔ Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar (6.538417ms)
+✔ App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul (39.947041ms)
+✔ Browser → Server → App: Format2 Identität und Zeit bleiben unverändert (59.943792ms)
+✔ App: echte Format2-Quelle wird mit vollem Kontext geöffnet und neu weitergeleitet (33.395792ms)
+✔ Server: Senderzeit darf weder alte Nachrichten vortäuschen noch Serverzeit ersetzen (3.861791ms)
+✔ Eigener lokaler Fingerabdruck und getrennte Listen bleiben unabhängige Vergleichsreferenz (1.1255ms)
+✔ Abweichende Empfangszeit öffnet Format2 nicht als unverändert geprüfte Nachricht (1.92575ms)
+✖ App: Zeitconstraint wird zur Geräteuhr-Meldung, Entwurf kann erneut gesendet werden (31.965875ms)
+✖ Server: Zeitconstraint verständlich, andere Datenbankfehler bleiben erkennbar (1.70275ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 14
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 463.070416
+
+✖ failing tests:
+
+test at app/test/_paket6_opus.cjs:142:1
+✖ App: Zeitconstraint wird zur Geräteuhr-Meldung, Entwurf kann erneut gesendet werden (31.965875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Die Sendezeit stimmt nicht.*Geräteuhr/. Input:
+  
+  '[object Object]'
+  
+      at async TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket67-abschluss/app/test/_paket6_opus.cjs:144:2)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { code: '23514', message: 'new row violates check constraint "messages_krypto_stimmig"' },
+    expected: /Die Sendezeit stimmt nicht.*Geräteuhr/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at app/test/_paket6_opus.cjs:147:1
+✖ Server: Zeitconstraint verständlich, andere Datenbankfehler bleiben erkennbar (1.70275ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Die Sendezeit stimmt nicht.*Geräteuhr/. Input:
+  
+  'new row violates check constraint "messages_krypto_stimmig"'
+  
+      at TestContext.<anonymous> (/Users/henrik.dikta/allmedia-wt-codex/paket67-abschluss/app/test/_paket6_opus.cjs:153:35)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'new row violates check constraint "messages_krypto_stimmig"',
+    expected: /Die Sendezeit stimmt nicht.*Geräteuhr/,
+    operator: 'match',
+    diff: 'simple'
+  }

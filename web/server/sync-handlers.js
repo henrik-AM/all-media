@@ -1291,7 +1291,7 @@ const handleSendMessage = handler(
     }
 
     if (Number(medien.krypto) === 2 && (!Number.isFinite(Date.parse(medien.gesendetAm)) || Math.abs(Date.now() - Date.parse(medien.gesendetAm)) > 300000)) {
-      return { ok: false, fehler: 'Die Sendezeit stimmt nicht. Bitte prüfe die Geräteuhr und sende die Nachricht erneut.' };
+      return { ok: false, fehler: Krypto.MELDUNG_SENDEZEIT };
     }
 
     const { data, error } = await client
@@ -1332,7 +1332,10 @@ const handleSendMessage = handler(
       })
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      if (Number(medien.krypto) === 2 && Krypto.sendezeitFehler(error)) return { ok: false, fehler: Krypto.MELDUNG_SENDEZEIT };
+      throw error;
+    }
 
     /*
      * Die Kuverts, einer je mitlesendem Geraet.
@@ -2584,7 +2587,7 @@ const handleNachrichtWeiterleiten = handler(
         if (![1, 2].includes(krypto) || (krypto === 2 && !/^[0-9a-f-]{36}$/i.test(ziel.nachrichtId || '')) || !ziel.chiffre || !ziel.kryptoNonce || !Array.isArray(ziel.kuverts) || !ziel.kuverts.length) {
           return { ok: false, fehler: Krypto.MELDUNG_NICHT_VERSCHLUESSELT };
         }
-        if (krypto === 2 && (!Number.isFinite(Date.parse(ziel.gesendetAm)) || Math.abs(Date.now() - Date.parse(ziel.gesendetAm)) > 300000)) return { ok: false, fehler: 'Die Sendezeit stimmt nicht. Bitte sende die Nachricht erneut.' };
+        if (krypto === 2 && (!Number.isFinite(Date.parse(ziel.gesendetAm)) || Math.abs(Date.now() - Date.parse(ziel.gesendetAm)) > 300000)) return { ok: false, fehler: Krypto.MELDUNG_SENDEZEIT };
         plan.push({ chatId, krypto, ziel });
         continue;
       }
@@ -2626,7 +2629,10 @@ const handleNachrichtWeiterleiten = handler(
         })
         .select('id')
         .single();
-      if (fehler) throw fehler;
+      if (fehler) {
+        if (schritt.krypto === 2 && Krypto.sendezeitFehler(fehler)) return { ok: false, fehler: Krypto.MELDUNG_SENDEZEIT };
+        throw fehler;
+      }
 
       // Die Kuverts — gleiche Regel wie in handleSendMessage: ohne sie ist
       // die Nachricht fuer niemanden lesbar, also wieder weg damit.
