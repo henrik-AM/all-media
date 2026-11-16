@@ -38,7 +38,7 @@ async function browserAnmelden(seite){
  const k=await page.evaluate(async()=>{const k=await KryptoWeb.anmelden();return k?{id:k.id,oeffentlich:k.oeffentlich,kontoId:k.kontoId}:null;});if(!k?.id)throw new Error('Browsergerät fehlt');merken(seite,k.id);
  seite.page=page;return page;
 }
-async function zeilen(){return ergebnis(konten[0].client.from('messages').select('id,chat_id,sender_id,text,krypto,chiffre,krypto_nonce,absender_schluessel').eq('chat_id',chatId),'Nachrichten gegenlesen');}
+async function zeilen(){return ergebnis(konten[0].client.from('messages').select(require('../../gemeinsam/spalten').NACHRICHT_SPALTEN).eq('chat_id',chatId),'Nachrichten gegenlesen');}
 async function appLesen(seite,text){const z=await zeilen();await seite.runtime.K.aufschliessen(seite.client,z,seite.meiner,{absenderPruefen:true});return z.find(n=>n.text===text);}
 async function webSenden(seite,text){
  return seite.page.evaluate(async({chatId,text})=>{
@@ -94,7 +94,7 @@ function appDatenModul(seite){
  await a.page.route('**/api/krypto/empfaenger/*',r=>r.fulfill({status:503,contentType:'application/json',body:'{}'}));
  const fehler=await a.page.evaluate(async id=>{try{await sendeKoerper(id,'nicht offen');return false;}catch(e){return /nicht verschlüsseln/.test(e.message);}},chatId);
  pruefe('Simulierter Faktenausfall im echten Websiteweg fällt nicht auf Klartext',fehler);await a.page.unroute('**/api/krypto/empfaenger/*');
- const fakten=await a.runtime.K.kontoSchluessel(a.client,b.id);const nr=a.runtime.K.sicherheitsnummer(fakten.map(k=>k.oeffentlich));
+ const fakten=await a.runtime.K.kontoSchluessel(a.client,b.id),eigene=await a.runtime.K.kontoSchluessel(a.client,a.id);const nr=a.runtime.K.paarSicherheitsnummer(a.id,eigene.map(k=>k.oeffentlich),b.id,fakten.map(k=>k.oeffentlich));assert.ok(nr);
  const webNr=await a.page.evaluate(({id,b})=>kryptoZustand(b,{id,isGroup:false}),{id:chatId,b:b.id});
  pruefe('Sicherheitsnummer App/Website umfasst dieselben Geräte',webNr.fingerabdruck===nr.nummer&&webNr.geraete===nr.geraete);
  const extra=Krypto.schluesselpaarErzeugen();const ex=await ergebnis(b.client.from('krypto_schluessel').insert({user_id:b.id,geraet:'paket6-'+lauf,art:'app',oeffentlich:extra.oeffentlich}).select('id').single(),'Zusätzliches Gerät');merken(b,ex.id);
@@ -185,8 +185,11 @@ function appDatenModul(seite){
  // Nur die Pollschleife beenden, bevor nachfolgende Absender-/Cacheproben beginnen.
  await b.page.evaluate(()=>chatNachsehenStoppen());
 
- const fake=Krypto.schluesselpaarErzeugen();const emp=await a.runtime.K.empfaengerSchluessel(a.client,chatId);const pk=Krypto.verschluesseln('Paket6 unregistrierter Absender '+lauf,fake.geheim,emp);
- const f=await a.client.from('messages').insert({chat_id:chatId,sender_id:a.id,text:'',krypto:1,chiffre:pk.chiffre,krypto_nonce:pk.nonce,absender_schluessel:pk.absender}).select('id').single();
+ const altApp=await appLesen(b,spaetText),altWeb=await b.page.evaluate(id=>nachrichtenHolen(id),chatId);
+ pruefe('Historisches Format1 bleibt trotz registriertem Absender nativ ungeprüft',altApp?.nichtPruefbar===true);
+ pruefe('Historisches Format1 behält seine Warnung auf der Website',altWeb.find(n=>n.id===spaet.id)?.nichtPruefbar===true);
+ const fake=Krypto.schluesselpaarErzeugen();const emp=await a.runtime.K.empfaengerSchluessel(a.client,chatId),fakeId=crypto.randomUUID(),fakeZeit=new Date().toISOString();const pk=Krypto.verschluesseln('Paket6 unregistrierter Absender '+lauf,fake.geheim,emp,{id:fakeId,chatId,senderId:a.id,zeit:fakeZeit});
+ const f=await a.client.from('messages').insert({id:fakeId,krypto_gesendet_am:fakeZeit,chat_id:chatId,sender_id:a.id,text:'',krypto:2,chiffre:pk.chiffre,krypto_nonce:pk.nonce,absender_schluessel:pk.absender}).select('id').single();
  if(f.error){throw Error('Absenderprobe nicht ausgeführt: '+(f.error.code||'ohne Code')+' '+f.error.message);}
  else{
   await ergebnis(a.client.from('message_keys').insert(pk.kuverts.map(k=>({message_id:f.data.id,schluessel_id:k.schluesselId,nonce:k.nonce,chiffre:k.chiffre}))),'Fälschungs-Kuverts');

@@ -99,3 +99,16 @@ Textbelegen. NativeApp/Metro3301 beendet. Belege:pruefbelege/paket67-chat-final.
 Paket6-Browserkomponenten mit abgefangener Datenversorgung28/28;keine externen
 Anfragen. Abschließende Offlineprüfung10/10Gruppen inklusiveOpus16/16,
 Paket7zusammen21/21,TypeScriptExit0. Vollständige Live-Paket6-Cacheprobe läuft.
+
+## Paket6-Livetreiber auf Format2 und Paarvergleich nachgezogen
+
+Erster älterer Livetreiber31/38,Exit1,Rest0:Zwei Website→App-Logik-Fälle
+lasen die inzwischen kryptografisch gebundenen Zeitspalten gar nicht; drei
+Sicherheitsnummer-Fälle verglichen weiterhin nur Gegenüber-Geräte statt beider
+Konten;zwei Cache-Erwartungen verlangten das Entfernen der bewusst permanenten
+Format1-Warnung. Diese sieben Fehler widersprechen der getrennten erfolgreichen
+nativen Plattformabnahme nicht:der alte Treiber lieferte unvollständige Eingaben
+bzw.alte Erwartungen. Jetzt zentrale NACHRICHT_SPALTEN,gemeinsamePaarfunktion,
+Format2für den tatsächlichen Vertrauenscachewechsel und zwei zusätzliche
+Format1-Warnungsgegenproben. Produktcode dafür unverändert. Vollständige
+Wiederholung mit40Prüfungen läuft; alterLauf unterpaket67-p6-alt erhalten.
