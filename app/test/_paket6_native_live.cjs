@@ -1,3 +1,5 @@
+// Historischer Format1-Prüfstand vor der Opus-Korrektur; kein Format2-Abnahmenachweis.
+// Aktuelle native Abnahme: _paket7_plattformen.cjs + _paket7_native.py und pruefbelege/paket67-abschluss/native-kontexte.
 /** Paket 6: echte Zwei-Konten-/App-Logik-/Website-Rundreise, kein Reset/Schema.
  * Nur mit exklusiver Sitzungsbelegung; erzeugt eigene Chat-/Gerätefixtures,
  * protokolliert IDs für Wiederaufnahme, prüft Bereinigung ausdrücklich.
@@ -101,10 +103,10 @@ async function webSenden(seite,text){
    if(req.url==='/pruefen'||req.url==='/fertig'){
     const z=await zeilen();let gelesen=0;
     for(let i=0;i<2;i++){const ns=await konten[1-i].page.evaluate(id=>nachrichtenHolen(id),chatId);const trifft=ns.some(n=>n.text==='Native an Website '+(i?'B':'A'));if(trifft)gelesen++;}
-    if(req.url==='/pruefen')return send({text:`Live: ${gelesen}/2 native Nachrichten im Browser lesbar; ${z.length} Zeilen, ${z.filter(n=>n.krypto===2&&n.text==='').length} Chiffren`});
+    if(req.url==='/pruefen')return send({text:`Live: ${gelesen}/2 native Nachrichten im Browser lesbar; ${z.length} Zeilen, ${z.filter(n=>n.krypto===1&&n.text==='').length} Chiffren`});
     pruefe('Nativer Prozessneustart tatsächlich durchlaufen',neustarts===1);
     pruefe('Beide nativen Nachrichten in echter Website lesbar',gelesen===2);
-    pruefe('Alle Live-Zeilen ohne Klartext',z.length>=4&&z.every(n=>n.krypto===2&&n.text===''));
+    pruefe('Alle Live-Zeilen ohne Klartext',z.length>=4&&z.every(n=>n.krypto===1&&n.text===''));
     pruefe('Zusätzliches echtes Gerät ändert native Sicherheitsnummer',nummern.length>=2&&nummern[0].nummer!==nummern[1].nummer&&nummern[1].geraete===nummern[0].geraete+1);
     send({text:'Live abgeschlossen; Bereinigung läuft'});ende();return;
    }
