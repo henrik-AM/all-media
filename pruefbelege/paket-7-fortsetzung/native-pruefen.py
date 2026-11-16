@@ -25,7 +25,7 @@ def reset(gruppe=False):
 def bild(name):subprocess.run(['xcrun','simctl','io',SIM,'screenshot',str(OUT/name)],check=True,capture_output=True,timeout=25)
 def tippen(text):
  args=['node','tools/tippen.js'];s=subprocess.check_output(args+['--liste',text],cwd=ROOT/'app',env=ENV,text=True,timeout=30)
- rows=[(m[0],m[1]) for m in re.findall(r'^\s*(\d+)\. \[Button\] (.+)$',s,re.M) if 'Benachrichtigungen' in m[1]]
+ rows=[(m[0],m[1]) for m in re.findall(r'^\s*(\d+)\. \[(?:Button|GenericElement)\] (.+)$',s,re.M) if 'Benachrichtigungen' in m[1]]
  assert len(rows)==1,s
  print(subprocess.check_output(args+[text,'--nr',rows[0][0],'--bewusst'],cwd=ROOT/'app',env=ENV,text=True,timeout=30),flush=True)
 wait(lambda:api('status')['bereit'],90);check('Native Original-ProfilProvider bereit')
@@ -49,6 +49,7 @@ s=state();check('Zwischenbestätigungen verdrehen Dreifachtipp nicht',all(sample
 bild('stumm-dreifachtipp.png');api('remote',{'wert':False});wait(lambda:wert(False));check('Dreifachtipp hinterlässt keinen dauerhaften lokalen Wunsch')
 cmd('transport',fehler=1,delay=1000);cmd('tipps',n=3);time.sleep(.2);check('Jüngerer Wunsch trotz ausstehendem älterem Fehler sichtbar',state()['chats'][0]['anzeige']);wait(lambda:wert(True));time.sleep(2);check('Älterer Schreibfehler entfernt neueren Wunsch nicht',bool(wert(True)))
 reset();cmd('transport',fehler=1);cmd('tipps',n=1);time.sleep(2);wait(lambda:wert(False));check('Fehler des letzten Schreibens kehrt zum echten Serverstand zurück')
+reset();cmd('transport',lesefehler=16);cmd('tipps',n=1);time.sleep(.5);s=state();check('Listenfehler nach bestätigtem Schreiben hält den neuesten Wunsch',s['chats'][0]['anzeige'] and not s['chats'][0]['server']);wait(lambda:wert(True),15);check('Erfolgreicher späterer Listenabruf bestätigt tatsächliche Speicherung');api('remote',{'wert':False});wait(lambda:wert(False));check('Nach behobenem Lesefehler gewinnt wieder der Server');
 start=len(state()['trace']);cmd('transport',delay=1800);cmd('tipps',n=2);cmd('konto',index=1);time.sleep(.3);check('Konto B übernimmt keinen Wunsch von A',not state()['chats'][0]['anzeige']);cmd('konto',index=0);time.sleep(3);s=state();check('A/B/A startet keinen alten wartenden Auftrag',len([t for t in s['trace'][start:] if t['art']=='start'])==1);check('Konto A zeigt nach Rückkehr seinen tatsächlichen Stand',bool(wert(True)))
 bild('stumm-kontowechsel.png');api('remote',{'wert':False});wait(lambda:wert(False));check('Auch nach Kontorückkehr gewinnt spätere Zweitgerätänderung')
 (OUT/'native-ergebnis.json').write_text(json.dumps({'gut':gut,'gesamt':gut,'stand':state(),'datenbank':api('db')},indent=2))

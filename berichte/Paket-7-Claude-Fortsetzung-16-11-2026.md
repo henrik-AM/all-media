@@ -102,3 +102,32 @@ Neue Gegenproben dauerhaft im Bestandslauf (nun101Läufe):7/7.
 React19.3.0,Expo~58.0.24,RN0.88.1; aktuelle React-/Expo58-Doku via
 Context7 vor Änderung gelesen. WeitereRegression26/26,TypprüfungExit0.
 Native Prüfung des Original-ProfilProvider mit echten Testkonten folgt.
+
+### Native Stumm-Abnahme des korrigierten Original-ProfilProvider
+
+**19/19**, Python-ProzessExit0, echte Supabase-Testkonten A/B auf
+All-Media Codex. OriginalContactProfileScreen undGroupSettingsScreen
+über echte UI-Zeilen betätigt; OriginalProfilProvider wird unverändert
+importiert, nicht ersetzt. Prüfrahmen stellt Konten/Chatlisten bereit,
+liest echte chat_members.is_muted über API und aktualisiert sie.
+Fernänderungen kommen aus einer unabhängigen angemeldeten Supabase-
+Clientinstanz desselben Testkontos, kein Nachweis zweier physischer Telefone.
+
+Geprüft: beide Infoseiten speichern Aus; spätere Fernänderung erscheint An;
+drei schnelle Tipps mit verzögerter erster Antwort; Zwischenbestätigungen;
+älterer Schreibfehler gegen neueren Wunsch; Fehler des letzten Schreibens;
+Listenfehler nach erfolgreichem Schreiben und spätere Erholung; B übernimmt
+keinen A-Wunsch; A/B/A startet keinen alten wartenden Auftrag; spätere
+Fernänderung gewinnt auch danach.11echte bzw. gezielt gestörte Schreibaufträge
+im abschließenden Trace, tatsächliche Datenbankwerte separat gegengelesen.
+Absichtliche503 für Schreib-/Lesefehler nur im lokalen Prüftransport.
+
+Anfangsfehler des Prüfgerüsts korrigiert: GenericElement statt nurButton
+erkennen; is_muted statt der separaten notifications_off-Spalte lesen.
+Diese Fehlversuche sind kein Produktfehler und kein Erfolgsnachweis.
+FinalesProtokoll native-pruefen-final.log; Ergebnis native-ergebnis.json.
+Kontakt/Gruppe Aus und nach FernänderungAn sowie Dreifachtipp/Kontowechsel
+als Screenshots vorhanden, relevante Bilder selbst angesehen.
+Fixturelauf e48327e9 beendet, eigeneChats/Mitglieder/Nachrichten **Rest0**.
+Expo-Go-Instanz,Metro3301 und eigenerSimulator beendet. Hauptgerät,
+Hauptserver3000 undExpo8081 unangetastet. Vollständiger Bestandsnachweis offen.

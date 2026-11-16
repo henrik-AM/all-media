@@ -24,8 +24,8 @@ async function command(body){const n=++nr;queue.push({...body,nr:n});const end=D
  else if(req.url==='/poll')out=queue.shift()||null;
  else if(req.url==='/result')results.set(d.nr,d);
  else if(req.url==='/cmd')out=await command(d);
- else if(req.url==='/remote'){const s=konten[d.konto||0];const r=await s.client.from('chat_members').update({notifications_off:d.wert}).eq('chat_id',chats[d.gruppe?1:0].id).eq('user_id',s.id);if(r.error)throw r.error;}
- else if(req.url==='/db'){const r=await frage(`select chat_id,user_id,notifications_off from chat_members where chat_id in (${chats.map(c=>"'"+c.id+"'").join(',')}) order by chat_id,user_id`);out={rows:r};}
+ else if(req.url==='/remote'){const s=konten[d.konto||0];const r=await s.client.from('chat_members').update({is_muted:d.wert}).eq('chat_id',chats[d.gruppe?1:0].id).eq('user_id',s.id);if(r.error)throw r.error;}
+ else if(req.url==='/db'){const r=await frage(`select chat_id,user_id,is_muted from chat_members where chat_id in (${chats.map(c=>"'"+c.id+"'").join(',')}) order by chat_id,user_id`);out={rows:r};}
  else if(req.url==='/ende'){await cleanup();res.end(JSON.stringify({ok:true,rest:manifest.rest}));server.close();return;}
  else throw Error('Unbekannt');res.end(JSON.stringify(out));
  }catch(e){console.log('BRUECKE FEHLER',e.message);res.statusCode=500;res.end(JSON.stringify({fehler:e.message}));}});
