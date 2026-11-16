@@ -147,3 +147,22 @@ Neuer eigener Server3300 nun ebenfalls mit neuerProzessgruppe unabhängig
 gestartet(PID27974),HTTP200 geprüft. Vollständiger101-Lauf erneut gestartet,
 Schutz gegen automatischen Ruhezustand an dessen PID gebunden. Beide Instanzen
 messen weiterhin unveränderte Produkt-/Prüfquellen aus8884c8c.
+
+### Prüfserver und Bereitschaftswartezeit abgesichert
+
+Startskripte up.js/lokal.js enthalten globales `pkill -f web-app.js`;
+sie können auch den belegten Prüfserver3300 beenden. Nicht verändert,
+sondern eigener Startnamepruefserver.cjs stattweb-app.js; gleiches
+unverändertes Servermodul. ZweiterVorversuch9030ee18 vor Wechsel kontrolliert
+beendet:1/101,3/3Teilprüfungen,Code143,Quellenunverändert,37entfernt/Rest0.
+
+GezielterDiagnoselaufbf08995d: **1/1,19/19,Code0,keineKonsolenfehler**,
+Quellenunverändert,Bereinigungerfolgreich. Detaillierte Phasen zeigen
+nach jedem Reload zusätzliche15s im Bereitschaftshelfer. Browsergegenprobe:
+`typeof state === 'object'`, `typeof window.state === 'undefined'`:
+web/public/app.js deklariert state mitconst im globalen lexikalischen Bereich.
+Prüfhelfer_konto.js las fälschlich window.state; jetzt den tatsächlichen
+globalen state lesen. Bereitschaft weiterhin anhand echter gefüllter Daten
+prüfen, Wartebedingung nicht entfernen. Produktcode unverändert.
+Diagnosepreloader hatte zuerst einen falschen internen Playwrightpfad;
+0/0,Rest0,kein Produktbefund. Danach nur unterstützte Browser-/Page-Methoden.

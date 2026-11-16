@@ -77,7 +77,7 @@ async function inhaltAbwarten(page) {
       () => {
         // `state` ist die Ablage der Website. Sobald irgendetwas Geladenes
         // darin steht, hat der erste Schwung Anfragen geantwortet.
-        const s = window.state;
+        const s = typeof state === 'undefined' ? null : state;
         if (!s) return false;
         return Boolean(
           s.chats?.length || s.posts?.length || s.users?.me || s.communities?.length
