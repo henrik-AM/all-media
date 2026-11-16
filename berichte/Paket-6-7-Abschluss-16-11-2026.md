@@ -161,3 +161,16 @@ NachPause zuerst Endstatus,alle102Nenner,Quellgleichheit undRest0 prüfen;
 dann vorhandeneHenrik-Autorisierung fürmain/Push/Render weiterverwenden.
 Die Pause ist keinAbschluss desbeauftragtenZiels. Eigener letzterQuellstand
 bb9f243,seitStart ausschließlichBelege/Dokumentationcommits.
+
+## Aktueller Vollnachweis: Kontaktinfo-Wiederöffnen noch rot
+
+639f542b bei15/102Suiten:385/386. Kontaktinfo9/10,Code1:NachChatdesign-
+Auswahl und erneutemÖffnen bleibt `.kp__zeileText` nicht innerhalb der festen
+3000ms sichtbar. Alle anderenKontaktfunktionen inklusiveGruppenanruf grün;
+Henrik,Insel,Optionen,Kasten8,Kamera undEinstellungen vollständigCode0.
+Keine pauschale Netzursache behauptet. Statisch lädt openContactProfile
+Profil,Medien undKryptostatus nacheinander; ob bloßeLatenz oder eine
+späteCallback-Reihenfolge denFehler verursacht,wird nach Ende dieses
+unverändertenLaufs mitOriginaltest undergänzender Anfrage-/Sichtbarkeitsmessung
+untersucht. Messvorspann inpruefbelege/paket67-abschluss/kontaktinfo-messung.cjs;
+ersetzt keineAntworten,ändert keineProdukt-/Testsourcen. KeineParallel-Liveprobe.
