@@ -56,7 +56,7 @@ const STRUCTURE = {
   const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + e.message));
   p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
-  await p.goto('http://localhost:3000', { waitUntil: 'load' });
+  await p.goto(process.env.ZIEL || 'http://localhost:3000', { waitUntil: 'load' });
   // Ohne Anmeldung ist die Seite leer: die Regeln der Datenbank lassen
   // anonyme Zugriffe nicht zu. Siehe test/_konto.js.
   const angemeldet = await anmelden(p);

@@ -82,3 +82,23 @@ erlaubten Testkonten entfernt, Rest0. Lauf45a6ff7f läuft auf3300.
 Native Abnahmegerüst mit echtem ProfilProvider vorbereitet: ersetzt keinen
 useProfil-Aufruf; Daten-/Kontorahmen und gezielte Transportstörungen sind
 Prüfsteuerung. Noch kein neuer nativer/live Erfolg behauptet.
+
+### Weitere Korrektur nach drei neuen Gegenbelegen
+
+Gemessene Wiederholung45a6ff7f vor weiteren Quelländerungen kontrolliert
+mit SIGTERM beendet:2/7 gestartet,27/27 zählbar,Code143,
+Quellenunverändert,57Mitteilungen entfernt,Rest0. Einstellungen19/19
+mit ERR_CONNECTION_CLOSED; Kontaktinfo8/8 vor Abbruch, kein Bestehensnachweis.
+Grund: neue echte Stumm-Defekte müssen vor finaler Messung behoben werden;
+zusätzlich nutzt henrik AM_URL statt ZIEL. Alle Zielvariablen auf3300
+vereinheitlicht, Smoke respektiert nun ebenfalls ZIEL (Standard bleibt3000).
+
+ProfilContext bestätigt nur den zuletzt erfolgreich geschriebenen Wunsch
+bei passendem Serverstand. Zwischenantworten älterer Tipps löschen ihn
+nicht. Kontowechsel erzeugt eine neue Sitzungsidentität, auch beiA/B/A;
+alte wartende Aufträge starten nicht erneut. Lesen und Schreiben haben
+getrennte Fehlerwege: Listenfehler verwirft keinen gespeicherten Wunsch.
+Neue Gegenproben dauerhaft im Bestandslauf (nun101Läufe):7/7.
+React19.3.0,Expo~58.0.24,RN0.88.1; aktuelle React-/Expo58-Doku via
+Context7 vor Änderung gelesen. WeitereRegression26/26,TypprüfungExit0.
+Native Prüfung des Original-ProfilProvider mit echten Testkonten folgt.

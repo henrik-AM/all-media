@@ -271,6 +271,7 @@ const LAEUFE = [
   ['k28-karte', 'k28-karte.js'],
   ['chatklingel-einheit', '_chatklingel_einheit.js'],
   ['paket7-offline', '_paket7_regression.cjs'],
+  ['paket7-stumm', '_paket7_stumm_regression.cjs'],
   ['chatklingel-live', '_chatklingel_live.js'],
 ];
 
