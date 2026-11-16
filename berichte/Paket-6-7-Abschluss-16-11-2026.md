@@ -81,3 +81,21 @@ bleiben erkennbar. Korrektur16/16,TypeScriptExit0. Die Weiterleitungsroute
 meldet dieselbe Absage. Native Wiederholung mit endgültiger18er-Zählung läuft.
 Ältere Paket6-Livetreiber erwarten für neue Rundreisen jetztFormat2; gezielt
 angelegte historischeFormat1-Gegenproben bleibenFormat1.
+
+## Gemeinsame native/Website-Abnahme grün
+
+Wiederholung auf korrigiertem Produktstand6ca1138:18/18 native Prüfungen,
+Exit0;14/14 Website-/Plattformprüfungen,Exit0;eigeneFixtureRest0. Tatsächliche
+Original-ChatDetailScreens mit zwei getrennten nativen Geräteschlüsseln,
+Originaldaten-/Krypto-/Schreibmodule und zwei tatsächlich angemeldete Browser.
+Kontextrahmen im Chatprüfstand ersetzt Listen-/Profilversorgung; deren echte
+Provider wurden separat oben geprüft. App↔App,App↔Website,Gruppe,65s gedrosselte
+Standabfragen,3s verspätetesKuvert,Hintergrund-Rückkehr,Format2-Kontextkopie
+mit abweichenderID sowie24h falscheGeräteuhr inklusiveEntwurf undverständlicher
+Meldung bestanden. Vor der nativen Schlüsselregistrierung gesendete Browser-
+Nachrichten bleiben für diese neuen Geräte erwartungsgemäß unlesbar.
+FinaleScreenshots selbst angesehen; keine Zugangswerttreffer in den neuen
+Textbelegen. NativeApp/Metro3301 beendet. Belege:pruefbelege/paket67-chat-final.
+Paket6-Browserkomponenten mit abgefangener Datenversorgung28/28;keine externen
+Anfragen. Abschließende Offlineprüfung10/10Gruppen inklusiveOpus16/16,
+Paket7zusammen21/21,TypeScriptExit0. Vollständige Live-Paket6-Cacheprobe läuft.
