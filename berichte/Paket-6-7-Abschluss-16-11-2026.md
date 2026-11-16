@@ -112,3 +112,17 @@ bzw.alte Erwartungen. Jetzt zentrale NACHRICHT_SPALTEN,gemeinsamePaarfunktion,
 Format2für den tatsächlichen Vertrauenscachewechsel und zwei zusätzliche
 Format1-Warnungsgegenproben. Produktcode dafür unverändert. Vollständige
 Wiederholung mit40Prüfungen läuft; alterLauf unterpaket67-p6-alt erhalten.
+
+## Paket6-Liveabnahme vollständig grün; gemeinsamer Vollnachweis gestartet
+
+Korrigierter Livetreiber40/40,Exit0,FixtureRest0. Echte Browseranmeldungen,
+Supabase-RLS und originale App-Logik mit simuliertem Schlüsselbund:Format2-
+Rundreisen,gemeinsameGerätenummern,Kontowechsel/Neustart,Kuvert-Klingel,
+Validierungsgrenzen500/501,Format1-Warnungen undtatsächlicher60sVertrauenscache
+nachNeuregistrierung/Entfernung bestanden. VollständigeBelege unterpaket67-p6;
+die vorigen31/38undaltenErwartungen bleiben unterpaket67-p6-alt erhalten.
+VierTestmitteilungen aus den exklusivenVorlaufprüfungen mitOriginal-BETEILIGT-
+Filter bereinigt,Rest0,danachOriginaljournal neu begonnen.
+GemeinsamerGesamtlauf639f542b-5f39-44b3-ae0d-eb9704957820,102Suiten,
+Quellstandbb9f243,läuft unverändert mitOriginal-QuellwächterundBereinigung.
+NochkeinVeröffentlichungsnachweis;main/Push/Render folgen erst nachAuswertung.

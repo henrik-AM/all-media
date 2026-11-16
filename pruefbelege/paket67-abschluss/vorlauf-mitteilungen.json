@@ -1,0 +1,17 @@
+{
+  "vorher": [
+    {
+      "anzahl": 4
+    }
+  ],
+  "weg": [
+    {
+      "geloescht": 4
+    }
+  ],
+  "nachher": [
+    {
+      "rest": 0
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "supabaseUrl": "https://ijztosbjfybdgotpdixw.supabase.co",
+  "kontakteVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": []
+  },
+  "schluesselVorher": {
+    "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4": [
+      "871e028c-5274-4d0b-b153-38a973cb26d5",
+      "37fa221e-0c25-4109-907b-707cf42111ed",
+      "6b1cd4bf-f183-4971-8af2-a348a855174a",
+      "50a980f2-bdce-4b78-b325-c1bb99cbb0d2",
+      "88343632-13f3-4343-854d-7496cb07fff8",
+      "19e1dfcc-4f45-449c-a65d-71a426ea6d19",
+      "d2aa4f9a-0dd5-4ae0-a752-8d968e17b502",
+      "0faf8b51-5e65-4008-a45b-fa10a95a1062",
+      "c6f94e85-2db2-48bf-8a9a-5bfdd0d1aef4",
+      "30ee81f9-5029-49fb-9907-dfe2d4bda6ae",
+      "70c6bbd4-03a3-4028-8322-38e484c96613",
+      "b8656946-7cfa-42e7-af97-d41535086a18",
+      "91141467-0dd8-4799-9e34-161af7591e1e",
+      "096464aa-bc1b-479f-a23a-49aad5595c8b",
+      "c9992d57-faab-4986-8123-dfd36e94862b"
+    ],
+    "62616c1d-82e2-4ee4-aab9-950e40e438a4": [
+      "5e7d27d6-5747-4652-8e9a-8931e063fbec",
+      "bc78042d-4549-4f3e-ba5d-231d2fd55392",
+      "86615c9c-002b-48e7-9779-2e273f18e543",
+      "1e60693b-8641-48b1-b35e-264745d04323",
+      "e8923383-c1e1-46c9-b321-284cf09ddf14"
+    ]
+  },
+  "nachrichten": [
+    "b5cfbb60-182a-4375-a957-7e218d76e6a6",
+    "6c5b32a8-f88f-40a6-9681-0e57f01281b0",
+    "c3de3232-7cec-4372-882d-d4af1544dce4",
+    "0d2c99a8-5dd7-4557-8411-3aec61e55956",
+    "2671dde2-8f47-4c73-af63-81e56ba9fedd",
+    "d030fab3-6133-47bc-9b3e-922dbe58775c"
+  ],
+  "lauf": "3b23c9b4-f7b9-489b-b658-6d748848be37",
+  "pid": 29084,
+  "chatId": "41a770b4-f25a-4e01-98b1-996bdd177234",
+  "schluessel": [
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "b9ad73ff-6e05-4952-979c-e07a6412ff31"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "6b2707af-f999-4cf7-a8cc-ff22fca63c6b"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "85399688-83b1-44e2-ad30-64d831ddfc2d"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "e56ad8be-84b4-4a00-8b43-1ff1e176c9fc"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "3bfc7f2d-b0f6-48c7-ab41-65a59f9d6158"
+    },
+    {
+      "konto": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "id": "d17e9b03-ccb1-43d5-a011-354d5d962c7c"
+    },
+    {
+      "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "id": "853cf313-dc61-4254-9ecf-275b2d6c9618"
+    }
+  ],
+  "start": "2026-11-16T22:19:00.684Z",
+  "pruefungen": {
+    "ok": 40,
+    "fehl": 0
+  },
+  "ende": "2026-11-16T22:21:39.823Z",
+  "rest": 0
+}

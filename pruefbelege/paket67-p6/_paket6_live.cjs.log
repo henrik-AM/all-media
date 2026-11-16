@@ -1,0 +1,44 @@
+2026-11-16T22:19:00.684Z LIVE: exklusiver Bestand bestätigt; keine Registrierung, kein Reset, kein Schema
+2026-11-16T22:19:04.411Z OK Zwei App- und zwei echte Browsergeräte registriert
+2026-11-16T22:19:06.227Z OK App → Website test@all-media.app
+2026-11-16T22:19:07.541Z OK Website-Sendeantwort test@all-media.app
+2026-11-16T22:19:07.938Z OK Website → App-Logik test@all-media.app
+2026-11-16T22:19:09.656Z OK App → Website all.media.prueflauf@web.de
+2026-11-16T22:19:11.082Z OK Website-Sendeantwort all.media.prueflauf@web.de
+2026-11-16T22:19:11.443Z OK Website → App-Logik all.media.prueflauf@web.de
+2026-11-16T22:19:11.556Z OK Alle vier Rundreise-Nachrichten nur als Chiffre gespeichert
+2026-11-16T22:19:11.694Z OK Jedes eigene Gerät erhält vier Kuverts test@all-media.app
+2026-11-16T22:19:11.860Z OK Jedes eigene Gerät erhält vier Kuverts all.media.prueflauf@web.de
+2026-11-16T22:19:12.447Z OK Alter Website-Aufrufer mit Klartext ausdrücklich abgewiesen
+2026-11-16T22:19:12.553Z OK Klartext-Abweisung schreibt keine zusätzliche Zeile
+2026-11-16T22:19:12.560Z OK Simulierter Faktenausfall im echten Websiteweg fällt nicht auf Klartext
+2026-11-16T22:19:13.139Z OK Sicherheitsnummer App/Website umfasst dieselben Geräte
+2026-11-16T22:19:13.586Z OK Zusätzliches reales Gerät ändert die Sicherheitsnummer
+2026-11-16T22:19:14.035Z OK Entferntes Gerät stellt die ursprüngliche Nummer wieder her
+2026-11-16T22:19:14.552Z OK Kontowechsel hat eigenes Gerätepaar
+2026-11-16T22:19:14.956Z OK Zurückwechseln verwendet wieder genau das erste Gerät
+2026-11-16T22:19:15.170Z OK Browser-Neustart behält das eigene Konto-Gerätepaar test@all-media.app
+2026-11-16T22:19:16.074Z OK Browser-Neustart liest frühere Rundreise-Chiffren test@all-media.app
+2026-11-16T22:19:16.297Z OK Browser-Neustart behält das eigene Konto-Gerätepaar all.media.prueflauf@web.de
+2026-11-16T22:19:17.308Z OK Browser-Neustart liest frühere Rundreise-Chiffren all.media.prueflauf@web.de
+2026-11-16T22:19:18.054Z OK App-Originalmodul/RLS: Nachricht vor eigenem Kuvert signalisiert 0
+2026-11-16T22:19:19.346Z OK Produktbrowser zeigt tatsächlichen fehlenden Kuvertmarker
+2026-11-16T22:19:19.671Z OK App-Originalmodul/RLS: anderes eigenes Gerät heilt Empfänger nicht
+2026-11-16T22:19:23.643Z OK Produktbrowser bleibt nach zwei Polls mit fremdem Gerätekuvert unlesbar
+2026-11-16T22:19:24.452Z OK App-Originalmodul/RLS: tatsächliches App-Kuvert signalisiert 1
+2026-11-16T22:19:25.490Z OK Produktbrowser heilt Chiffre automatisch im offenen Chat, ohne Neuöffnung
+2026-11-16T22:19:26.482Z OK Standroute akzeptiert Grenze 500 mit echter Anmeldung/RLS
+2026-11-16T22:19:26.561Z OK Standroute weist ungültige UUID explizit ab (HTTP 400)
+2026-11-16T22:19:27.066Z OK Standroute weist 501 Einträge explizit ab (HTTP 400)
+2026-11-16T22:19:28.484Z OK Historisches Format1 bleibt trotz registriertem Absender nativ ungeprüft
+2026-11-16T22:19:28.484Z OK Historisches Format1 behält seine Warnung auf der Website
+2026-11-16T22:19:29.558Z OK App-Logik warnt vor unregistriertem Absenderschlüssel
+2026-11-16T22:19:30.613Z OK Website warnt vor unregistriertem Absenderschlüssel
+2026-11-16T22:19:30.696Z Cache-Probe: reale Neuregistrierung; reguläre 60-Sekunden-Frist abwarten
+2026-11-16T22:20:33.812Z OK App-Logik bestätigt nach Cacheablauf neu registrierten Absender
+2026-11-16T22:20:33.812Z OK Website entfernt Warnung nach regulärem Cacheablauf
+2026-11-16T22:20:33.892Z Cache-Probe: reale Entfernung; reguläre 60-Sekunden-Frist abwarten
+2026-11-16T22:21:37.514Z OK App-Logik entzieht entferntem Absender nach Cacheablauf das Vertrauen
+2026-11-16T22:21:37.514Z OK Website warnt nach tatsächlicher Geräteentfernung erneut
+2026-11-16T22:21:39.823Z OK Geprüfte Bereinigung: keine eigenen Chat-/Nachrichten-/Geräte-/Kontaktreste
+2026-11-16T22:21:39.824Z 40/40 Live-Prüfungen; Rest 0. App-Logik mit simuliertem Schlüsselbund; Browser mit echter Anmeldung und Supabase.
