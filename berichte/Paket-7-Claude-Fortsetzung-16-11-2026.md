@@ -217,3 +217,26 @@ Henrik23/23,Insel17/17,Optionen16/16,Kasten8 6/6,Testhygiene24/24,
 jeweilsCode0. Zwischenstand12/101Läufe,270/270,keinFehlabschluss.
 Alle zuvor gefundenen Prüfziel-/Konfigurations- und Altfehlerfälle bestanden;
 der restlicheBestandslauf und dessen Bereinigung bleiben offen.
+
+## Vollständiger Laufab21c8a3 beendet — noch keine Abnahme
+
+**101/101Läufe,3351/3364zählbarePrüfungen,Code1**, Quellenunverändert.
+Bereinigungerfolgreich:506Mitteilungenentfernt,Rest0. Kein grüner Gesamtlauf.
+Alle sieben ursprünglichen Fehlerläufe sowie Stumm7/7 undKlingel39/39
+vollständigCode0. Drei weitere Fehler:
+- Explorer11/21,Code1: zuerst3sHashtag- und8sOrt-Zeitgrenzen; später
+  bleibt einOverlay über der Soundsuche, dadurch Folgefehler. Keine
+  Konsolenfehler, nicht pauschal als Netzfehler eingeordnet.
+- Fremdprofil1/1,Code1danachProfilroute404; vorhandener Lauf führte
+  AM_URL mitSchlussslash, die Tests hängen /api an.
+- K28-Erstellen78/81,Code1: BASE mitSchlussslash erzeugt doppelten
+  Pfadslash; history.replaceState kann diesen nicht als lokalenPfad
+  übernehmen,Einladungsroute/Parameterprüfung scheitern.
+
+Prüfkonfiguration korrigiert: ZIELmitSlash,AM_URL/BASE/BASIS/AM_BASIS
+ohneSchlussslash. Keine Produkt-/Bestandstestquelle hierfür geändert.
+GezielteWiederholung derdreiFehler mit originalemJournal gestartet.
+Main-Produktvergleich627fa86 ist separat vorbereitet (codex/paket7-
+mainvergleich-2026-11-16,093d449): Produkt unverändert, einzig gleicher
+Prüfhelfer wiePaket7. Noch kein Baseline-Live-Lauf behauptet.
+Vollstatus und redigiertesGesamtlog imPrüfbelegordner; roheOriginale erhalten.
