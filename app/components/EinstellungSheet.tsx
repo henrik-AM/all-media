@@ -41,6 +41,8 @@ interface Props {
   onKnopf?: () => void;
   /** Erklärtext. */
   info?: string;
+  /** Langer Erklärtext bleibt innerhalb eines blätterbaren Blatts. */
+  infoScroll?: boolean;
   /** Nachfrage vor etwas Endgültigem. */
   bestaetigen?: string;
   onBestaetigt?: () => void;
@@ -61,6 +63,7 @@ export const EinstellungSheet = ({
   knopf,
   onKnopf,
   info,
+  infoScroll,
   bestaetigen,
   onBestaetigt,
   onClose,
@@ -69,7 +72,7 @@ export const EinstellungSheet = ({
     visible
     title={titel}
     onClose={onClose}
-    hoch={!!zeilen && zeilen.length > 4}
+    hoch={infoScroll || (!!zeilen && zeilen.length > 4)}
     fuss={
       knopf ? (
         <Druck style={styles.knopf} onPress={onKnopf}>
@@ -129,7 +132,7 @@ export const EinstellungSheet = ({
         </ScrollView>
       ))}
 
-    {info && <Text style={styles.text}>{info}</Text>}
+    {info && (infoScroll ? <ScrollView><Text style={styles.text}>{info}</Text></ScrollView> : <Text style={styles.text}>{info}</Text>)}
 
     {bestaetigen && (
       <Text style={styles.text}>

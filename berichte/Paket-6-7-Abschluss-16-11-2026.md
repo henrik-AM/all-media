@@ -50,3 +50,18 @@ Direktaufrufgesperrt,Schema95-Trigger erhalten.344Bestandsnachrichten
 und2Format1-Nachrichten vorher/nachher unverändert. SQL-Prüfsumme und
 Metadaten inpruefbelege/paket67-abschluss/schema127-live-einspielung.json.
 Noch keine Veröffentlichung; neueClients undnativeAbnahme folgen.
+
+## Native Originalkontexte und Sicherheitsanzeige
+
+Original DatenProvider+ProfilProvider im eigenen iOS-Simulator mit zwei echten
+Testkontensitzungen:18/18; Kontakt/Gruppe, Dreifachtipp, Schreibfehler,
+Lesefehler mit später abweichendem Fernwert und A/B/A geprüft. Authentifizierung
+und gezielte Transportfehler kommen aus einem Prüfrahmen; keine Abnahme zweier
+physischer Geräte oder des vollständigen Anmeldeflusses.
+Paar-Sicherheitsnummern gegen beide Live-Gerätelisten:6/6 inklusive sichtbarem
+Schließen. Zwei Prozessneustarts erhalten dieselben zwei SecureStore-Schlüssel.
+Die vielen vorhandenen Test-Geräteschlüssel ließen den Infotext vorher über das
+Blatt hinauswachsen. Nur das Verschlüsselungs-Infoblatt ist jetzt auf74% Höhe
+begrenzt und blätterbar; beide Ansichten visuell geprüft, Zurück bedienbar.
+Alle eigenen Chats/Mitgliedschaften/Nachrichten/Schlüssel dieses Laufs entfernt,
+Rest0. Belege:native-ergebnis,native-paar-ergebnis,native-neustart,native-fixtures.

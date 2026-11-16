@@ -1,0 +1,16 @@
+{
+  "gut": 6,
+  "gesamt": 6,
+  "ergebnisse": [
+    {
+      "konto": 0,
+      "gleich": true,
+      "geraete": 22
+    },
+    {
+      "konto": 1,
+      "gleich": true,
+      "geraete": 22
+    }
+  ]
+}

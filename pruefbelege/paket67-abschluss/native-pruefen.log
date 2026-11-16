@@ -1,0 +1,27 @@
+OK Native Original-ProfilProvider bereit
+64:167: execution error: „System Events“ hat einen Fehler erhalten: „process "Simulator"“ kann nicht als „true“ gesetzt werden. (-10006)
+64:167: execution error: „System Events“ hat einen Fehler erhalten: „process "Simulator"“ kann nicht als „true“ gesetzt werden. (-10006)
+Getippt: 2. [GenericElement] "Benachrichtigungen, An, "  (0,394 402x46)
+
+OK Original-Kontaktinfo speichert und zeigt Aus
+OK Spätere Änderung vom Zweitgerät wird in Kontaktinfo An
+64:167: execution error: „System Events“ hat einen Fehler erhalten: „process "Simulator"“ kann nicht als „true“ gesetzt werden. (-10006)
+64:167: execution error: „System Events“ hat einen Fehler erhalten: „process "Simulator"“ kann nicht als „true“ gesetzt werden. (-10006)
+Getippt: 3. [Button] "Benachrichtigungen"  (0,664 402x42)
+
+OK Original-Gruppeninfo speichert und zeigt Aus
+OK Spätere Zweitgerätänderung wird in Gruppeninfo An
+OK Dreifachtipp zeigt neuesten Wunsch sofort
+OK Zwischenbestätigungen verdrehen Dreifachtipp nicht
+OK Dritter Wunsch tatsächlich in Datenbank bestätigt
+OK Dreifachtipp hinterlässt keinen dauerhaften lokalen Wunsch
+OK Jüngerer Wunsch trotz ausstehendem älterem Fehler sichtbar
+OK Älterer Schreibfehler entfernt neueren Wunsch nicht
+OK Fehler des letzten Schreibens kehrt zum echten Serverstand zurück
+OK Listenfehler nach bestätigtem Schreiben hält den neuesten Wunsch
+OK Original-DatenProvider bestätigt unveränderten Fernwert nach Lesefehler
+OK Konto B übernimmt keinen Wunsch von A
+OK A/B/A startet keinen alten wartenden Auftrag
+OK Konto A zeigt nach Rückkehr seinen tatsächlichen Stand
+OK Auch nach Kontorückkehr gewinnt spätere Zweitgerätänderung
+18/18 native Stummprüfungen

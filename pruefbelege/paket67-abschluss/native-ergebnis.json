@@ -1,0 +1,155 @@
+{
+  "gut": 18,
+  "gesamt": 18,
+  "stand": {
+    "nr": 190,
+    "konto": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+    "geladen": true,
+    "kontext": "Original DatenProvider + ProfilProvider",
+    "gelesenSeit": 1794866010315,
+    "chats": [
+      {
+        "id": "e223654b-297d-49f3-99bf-c4dc3630f457",
+        "server": false,
+        "anzeige": false
+      },
+      {
+        "id": "4a0bcd62-3d29-45c2-9558-d59563e48f47",
+        "server": false,
+        "anzeige": false
+      }
+    ],
+    "trace": [
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865957993
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865958337
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865963770
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865965614
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865975013
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865976376
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":false}",
+        "at": 1794865976752
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865976865
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865977143
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865977280
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865985693
+      },
+      {
+        "art": "fehler"
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":false}",
+        "at": 1794865986715
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865986899
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865987246
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865987343
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865991726
+      },
+      {
+        "art": "fehler"
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794865994857
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794865994937
+      },
+      {
+        "art": "start",
+        "body": "{\"is_muted\":true}",
+        "at": 1794866003335
+      },
+      {
+        "art": "ende",
+        "status": 204,
+        "at": 1794866005234
+      }
+    ]
+  },
+  "datenbank": {
+    "rows": [
+      {
+        "chat_id": "4a0bcd62-3d29-45c2-9558-d59563e48f47",
+        "user_id": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+        "is_muted": false
+      },
+      {
+        "chat_id": "4a0bcd62-3d29-45c2-9558-d59563e48f47",
+        "user_id": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+        "is_muted": false
+      },
+      {
+        "chat_id": "e223654b-297d-49f3-99bf-c4dc3630f457",
+        "user_id": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+        "is_muted": false
+      },
+      {
+        "chat_id": "e223654b-297d-49f3-99bf-c4dc3630f457",
+        "user_id": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+        "is_muted": false
+      }
+    ]
+  }
+}

@@ -661,7 +661,7 @@ export const ContactProfileScreen = ({
       )}
 
       {offen?.art === 'info' && (
-        <EinstellungSheet titel={offen.titel} info={offen.text} onClose={() => setOffen(null)} />
+        <EinstellungSheet titel={offen.titel} info={offen.text} infoScroll={offen.titel === 'Verschlüsselung'} onClose={() => setOffen(null)} />
       )}
 
       {/* Kasten RS 3: das Melden-Blatt (art 'user', Schema 102) statt einer Grundliste. */}

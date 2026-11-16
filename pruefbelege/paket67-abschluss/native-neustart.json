@@ -1,0 +1,29 @@
+{
+  "gut": true,
+  "anzahl": 2,
+  "vor": [
+    {
+      "id": "de315b21-a730-472a-bc02-75bb711f1e4c",
+      "user_id": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "oeffentlich": "IPselBsTA1EyDqClHhEtTvdvKUevzjJ+msVM7r5+AFI="
+    },
+    {
+      "id": "faca3aaf-24a2-4378-ae23-920dbdfa9693",
+      "user_id": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "oeffentlich": "Oc09RRHRu76BInuh4BWFSor4dkliHcKJ4oQeY45EXF4="
+    }
+  ],
+  "nach": [
+    {
+      "id": "de315b21-a730-472a-bc02-75bb711f1e4c",
+      "user_id": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+      "oeffentlich": "IPselBsTA1EyDqClHhEtTvdvKUevzjJ+msVM7r5+AFI="
+    },
+    {
+      "id": "faca3aaf-24a2-4378-ae23-920dbdfa9693",
+      "user_id": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+      "oeffentlich": "Oc09RRHRu76BInuh4BWFSor4dkliHcKJ4oQeY45EXF4="
+    }
+  ],
+  "art": "Expo-Prozess vor jeder Paarprüfung beendet und neu gestartet; gleiche SecureStore-Bereiche"
+}
