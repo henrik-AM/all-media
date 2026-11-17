@@ -1,0 +1,9 @@
+Gerätschlüssel nicht verfügbar: Speicherfehler
+OK Speicherfehler
+Gerätschlüssel nicht verfügbar: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+OK JSON kaputt
+Gerätschlüssel nicht verfügbar: Gespeicherte Kontenliste ist ungültig
+OK Array statt Objekt
+Gerätschlüssel nicht verfügbar: Gespeicherte Kontenliste ist ungültig
+OK Ungültiger Eintrag
+Browser-Kontenliste: 4/4 Szenarien; Fehler: 0

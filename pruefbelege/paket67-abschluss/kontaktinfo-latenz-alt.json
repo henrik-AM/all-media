@@ -1,0 +1,20 @@
+{
+  "ms": 1362.9000000059605,
+  "trace": [
+    {
+      "name": "profil",
+      "at": 0.19999998807907104
+    },
+    {
+      "name": "medien",
+      "at": 451.69999998807907
+    },
+    {
+      "name": "krypto",
+      "at": 903.5999999940395
+    }
+  ],
+  "zeilen": 17,
+  "design": "Dunkel",
+  "externeAnfragen": 0
+}

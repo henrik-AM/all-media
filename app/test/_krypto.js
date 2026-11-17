@@ -94,7 +94,13 @@ function rechnungPruefen() {
     { id: 'b', oeffentlich: b.oeffentlich },
   ]);
 
-  pruefe('Version steht am Paket', Number(paket.version) === Krypto.VERSION);
+  pruefe('Historisches Paket ohne Kontext trägt Format1', Number(paket.version) === 1);
+  const kontext = { id: crypto.randomUUID(), chatId: crypto.randomUUID(), senderId: crypto.randomUUID(), zeit: new Date().toISOString() };
+  const neu = Krypto.verschluesseln(TEXT, a.geheim, [
+    { id: 'a', oeffentlich: a.oeffentlich }, { id: 'b', oeffentlich: b.oeffentlich },
+  ], kontext);
+  pruefe('Kontextgebundenes Paket trägt die aktuelle Formatversion2', Number(neu.version) === Krypto.VERSION && Number(neu.version) === 2);
+  pruefe('Gegenüber öffnet das aktuelle kontextgebundene Format', Krypto.entschluesseln({ version: neu.version, kontext, chiffre: neu.chiffre, nonce: neu.nonce, absender: neu.absender }, neu.kuverts[1], b.geheim) === TEXT);
   pruefe('Ein Kuvert je Gerät', paket.kuverts.length === 2);
 
   /*

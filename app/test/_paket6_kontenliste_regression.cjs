@@ -1,3 +1,5 @@
+require('./_offline_sperre.cjs');
+const {client:tabellenClient}=require('./_paket6_hilfe.cjs');
 /** Offline: echte kontenspeicher.ts + krypto.ts, keine externen Verbindungen.
  * node diese-datei.cjs /worktree; optional KONTENLISTE_QUELLEN=/temp/qa
  */
@@ -6,24 +8,24 @@ const W=path.resolve(process.argv[2]||path.resolve(__dirname,'../..')),Q=process
 const ts=require(path.join(W,'app/node_modules/typescript')),Krypto=require(path.join(W,'gemeinsam/krypto'));
 Krypto.zufallsquelleSetzen((a,n)=>a.set(crypto.randomBytes(n)));
 function load(file,mocks){const m=new Module(path.join(W,file.replace('.ts','.js')));m.filename=path.join(W,file.replace('.ts','.js'));m.paths=Module._nodeModulePaths(path.dirname(m.filename));const req=m.require.bind(m);m.require=id=>id in mocks?mocks[id]:req(id);m._compile(ts.transpileModule(fs.readFileSync(path.join(Q,file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,m.filename);return m.exports}
-function client(){return {from(){let w;const q={upsert(x){w=x;return q},select(){return q},single:async()=>({data:{id:w.user_id+'|'+w.geraet}})};return q}}}
+function client(alt){return tabellenClient({krypto_schluessel:['a','b'].map(id=>({id:id+'|alt-device',user_id:id,geraet:'alt-device',oeffentlich:alt.oeffentlich}))});}
 let ok=0,fehl=0;
 (async()=>{
  for(const variante of ['Speicherfehler','JSON kaputt','Objekt statt Liste','Ungültiger Eintrag']){
   try{
-   const alt=Krypto.schluesselpaarErzeugen(),store={'allmedia.krypto.geheim':alt.geheim,'allmedia.krypto.geraet':'alt-device'};
+   const alt=Krypto.schluesselpaarErzeugen(),store={'allmedia.krypto.geheim.bekannt':alt.geheim,'allmedia.krypto.geraet.bekannt':'alt-device'};
    let roh=variante==='JSON kaputt'?'{kaputt':variante==='Objekt statt Liste'?'{}':variante==='Ungültiger Eintrag'?'["a",42]':'["a","b"]',defekt=true;
    const session={getItem:async()=>{if(defekt&&variante==='Speicherfehler')throw Error('SecureStore nicht verfügbar');return roh}};
    const konten=load('app/lib/kontenspeicher.ts',{'./sitzungsspeicher':{sitzungsspeicher:session},'../constants/supabase':{SUPABASE_CONFIG:{}}});
    assert.ok(Array.isArray(await konten.gespeicherteKonten()),'normaler UI-Aufruf bleibt fehlertolerant');
    const secure={getItemAsync:async k=>store[k]??null,setItemAsync:async(k,v)=>{store[k]=v},deleteItemAsync:async k=>{delete store[k]}};
    const K=load('app/lib/krypto.ts',{'expo-secure-store':secure,'expo-crypto':{getRandomBytes:n=>crypto.randomBytes(n),randomUUID:()=>crypto.randomUUID()},'./kontenspeicher':konten});
-   assert.equal(Boolean(await K.meinSchluessel(client(),'a')),false,'defekte Liste muss Migration stoppen');
-   assert.equal(store['allmedia.krypto.geheim'],alt.geheim,'globaler Alt-Schlüssel erhalten');
-   assert.equal(store['allmedia.krypto.geraet'],'alt-device','globale Gerätekennung erhalten');
+   assert.equal(Boolean(await K.meinSchluessel(client(alt),'a')),false,'defekte Liste muss Migration stoppen');
+   assert.equal(store['allmedia.krypto.geheim.bekannt'],alt.geheim,'vorhandene Kontokopie erhalten');
+   assert.equal(store['allmedia.krypto.geraet.bekannt'],'alt-device','vorhandene Gerätekennung erhalten');
    assert.equal(store['allmedia.krypto.geheim.a'],undefined,'kein Teilbestand bei unlesbarer Liste');
-   defekt=false;roh='["a","b"]';
-   const a=await K.meinSchluessel(client(),'a'),b=await K.meinSchluessel(client(),'b');
+   defekt=false;roh='["bekannt","a","b"]';
+   const a=await K.meinSchluessel(client(alt),'a'),b=await K.meinSchluessel(client(alt),'b');
    for(const [id,m] of [['a',a],['b',b]]){
     assert.equal(m.geheim,alt.geheim,'historischer Schlüssel '+id);
     assert.equal(m.geraet,'alt-device','historische Gerätekennung '+id);
@@ -31,7 +33,9 @@ let ok=0,fehl=0;
     const kuvert=paket.kuverts.find(k=>k.schluesselId===m.id);
     assert.equal(Krypto.entschluesseln({version:paket.version,chiffre:paket.chiffre,nonce:paket.nonce,absender:paket.absender},kuvert,m.geheim),'Alter Text '+id,'alte Chiffre lesbar '+id);
    }
-   assert.equal(store['allmedia.krypto.geheim'],undefined,'globaler Schlüssel nach vollständiger Migration entfernt');
+   assert.equal(store['allmedia.krypto.geheim.bekannt'],alt.geheim,'Rettungskopie nach vollständiger Übernahme erhalten');
+   assert.equal(store['allmedia.krypto.geheim'],undefined,'gelöschtes globales Altfach wird nicht wieder angelegt');
+   const neu=await K.meinSchluessel(client(alt),'neu');assert.notEqual(neu.geheim,alt.geheim,'neues Konto erbt keine fremde Kopie');
    ok++;console.log('OK',variante);
   }catch(e){fehl++;console.error('FEHL',variante,e.message)}
  }

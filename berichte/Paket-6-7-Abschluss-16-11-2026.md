@@ -174,3 +174,20 @@ späteCallback-Reihenfolge denFehler verursacht,wird nach Ende dieses
 unverändertenLaufs mitOriginaltest undergänzender Anfrage-/Sichtbarkeitsmessung
 untersucht. Messvorspann inpruefbelege/paket67-abschluss/kontaktinfo-messung.cjs;
 ersetzt keineAntworten,ändert keineProdukt-/Testsourcen. KeineParallel-Liveprobe.
+
+## Vollständiger Lauf639f542b beendet — fünf Gruppen zu korrigieren
+
+102/102Suiten,3385/3399,Code1;Quellenunverändert;Originaljournal503Mitteilungen
+entfernt,Rest0. Vier weitere Fehlergruppen nebenKontaktinfo:Krypto22/23 verglich
+ein bewusstesFormat1-Paket ohneKontext mitderaktuellenFormatkonstante2.
+Die drei altenMigration/Kontenlisten-Treiber0/4 verwendeten weder historische
+Serverzuordnung nochderen neueAbfrageverträge undverlangten sogar dasEntfernen
+derjetzt bewusst erhaltenenRettungskopie. AttrappenundErwartungen korrigiert,
+keineProduktlogikfür grüneTests zurückgedreht:jeweils4/4. DefekteKontenlisten
+werden jetzt beimWiederfinden einerKontokopie nach frühergelöschtemGlobalfach
+geprüft; Servernachweis bleibtzwingend. NeuerAccount übernimmt keineAltkopie.
+Kryptotest trenntjetzt Format1-Kompatibilität undFormat2-Version/Rundreise.
+Original-Kontaktinfo-Test mitzusätzlicherMessung läuftohneQuelländerung;
+Offline-Latenzprobe zeigt drei seriell wartende450ms-Quellen:1363msbis zur
+fertigenOriginalansicht. Dasist ein reproduzierbarerLatenzbefund,nochkeine
+pauschaleErklärung derLive-Zeitgrenze.
