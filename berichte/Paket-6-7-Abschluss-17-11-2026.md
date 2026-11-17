@@ -45,8 +45,9 @@ im privaten Roharchiv außerhalb des Repositorys.
 
 ## Vollständiger Bestand und Veröffentlichung
 
-Vollnachweis `abc3d0a7-cefb-426b-affa-ffd1c79ae741` läuft auf eingefrorenen
-Quellen von `1e05d61`. Erstellen wurde nach 15 Minuten abgebrochen (18/19).
+Vollnachweis `abc3d0a7-cefb-426b-affa-ffd1c79ae741` wurde nach 57/103 Gruppen
+kontrolliert beendet: 1439/1468, Exit 143, Quellen von `1e05d61` unverändert,
+453 Testmitteilungen entfernt, Rest 0. Kein vollständiger grüner Nachweis. Erstellen wurde nach 15 Minuten abgebrochen (18/19).
 Kontaktinfo bestand fachlich 10/10, endete wegen ausdrücklich gemeldetem
 `ERR_NETWORK_IO_SUSPENDED` mit Code 1. Der frühere Backend-Diagnoserahmen
 beobachtete außerdem mehrere über 20 Minuten hängende HTTP-Aufrufe.
@@ -56,6 +57,12 @@ der Hörprobe), Kamera 6/10 (Musik noch nicht gespeichert, anschließend drei
 blockierte Klicks). Übernacht brach nach 1/1 beim nächsten page.evaluate ab.
 Endauswertung, gezielte unveränderte Wiederholungen sowie Quellen- und
 Bereinigungsnachweise folgen.
+
+Die Kontaktprobe hatte einen eigenen A→B-Nummernsuchtreffer nicht zurückgesetzt;
+dadurch scheiterte messengeranfrage mit 14/37. Die frühere Rest-0-Aussage bezog
+sich unvollständig auf Kontakte/Chats/Nachrichten/Schlüssel/Mitteilungen. Exakt
+der eigene Treffer wurde entfernt; die Probe stellt künftig Nummernnachweise
+und neue Suchzähler ebenfalls wieder her. Nachweise werden erneut abgenommen.
 
 main, origin/main und Render verbleiben bis zur Abnahme auf `627fa86`.
 Push und Veröffentlichung sind durch Henriks Auftrag bereits autorisiert.

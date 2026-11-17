@@ -1,0 +1,49 @@
+
+Kein Weg in den Messenger ohne Zustimmung
+  OK   Kontakt ohne Nummer wird abgewiesen  — Kontakte kommen über die Telefonnummer oder eine angenommene Messenger-Anfrage
+  OK   Nachgezählt: kein Kontakt steht da
+  OK   Einen Fremden in einen Messenger-Chat eintragen geht nicht  — new row violates row-level security policy for table "chat_members"
+  OK   Nachgezählt: der Fremde sieht diesen Chat nicht
+  OK   messenger_erlaubt verrät nichts über fremde Paare  — false
+
+Erst unter Communitys, dann die Frage
+  OK   Unter Communitys lässt sich ein Fremder anschreiben
+  OK   Vor dem Austausch lässt sich nicht fragen  — Schreibt euch erst hier ein wenig, dann kannst du fragen
+  OK   Der Eigner schreibt
+  OK   Der Fremde antwortet
+  OK   Den Zustand von Hand auf „angenommen" setzen geht nicht  — Die Messenger-Anfrage geht über messenger_anfragen und messenger_anfrage_beantworten
+  OK   Nach dem Austausch geht die Anfrage raus
+  OK   Sie steht am Chat, vom Eigner
+  OK   Der Fremde bekommt eine Mitteilung, die in den Chat führt
+  OK   Ein zweites Mal fragen, solange sie läuft, geht nicht  — Die Anfrage läuft schon
+  OK   Die eigene Anfrage annehmen geht nicht  — Über die eigene Anfrage entscheidet die gefragte Person
+
+Ablehnen lässt alles unter Communitys
+  OK   Der Fremde lehnt ab
+  OK   Zustand: abgelehnt
+  OK   Kein Kontakt in keiner Richtung
+  OK   Kein Messenger-Chat zwischen den beiden
+  OK   Der Community-Chat bleibt
+  OK   Und dort geht das Schreiben weiter
+  OK   Wer abgelehnt wurde, fragt nicht noch einmal  — Die Anfrage wurde abgelehnt
+
+Annehmen führt in den Messenger
+  OK   Später darf die andere Seite selbst fragen
+  OK   Der Eigner nimmt an
+  OK   Beide führen sich jetzt als Kontakt
+  OK   Herkunft: die Anfrage, nicht die Nummer
+  OK   Es gibt genau einen Messenger-Chat
+  OK   Der Fremde sieht ihn in seiner Liste
+  OK   Der Eigner schreibt im Messenger
+  OK   Und gleich noch einmal — angenommen ist angenommen
+  OK   Der Fragende erfährt, dass angenommen wurde
+
+Die Nummer bleibt, wo sie war
+  OK   Der Eigner sieht die Nummer des Fremden nicht
+  OK   Der Fremde sieht die Nummer des Eigners nicht
+  OK   Die Herkunft lässt sich nicht umschreiben
+  OK   Nachgezählt: die Nummer bleibt verborgen
+  OK   Aufgeräumt: kein Kontakt bleibt zurück
+  OK   Aufgeräumt: kein Messenger-Chat bleibt zurück
+
+37 von 37 Pruefungen bestanden. In den Messenger kommt nur, wer zugestimmt hat.

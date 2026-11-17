@@ -1,0 +1,465 @@
+{
+  "laufId": "abc3d0a7-cefb-426b-affa-ffd1c79ae741",
+  "erwartet": 103,
+  "phase": "beendet",
+  "bereinigung": "erfolgreich",
+  "stempelVorher": "f05df4daa18be8170dbc70a3d02a72611a52e5904039bcf347651fa8a34339c8",
+  "ergebnisse": [
+    {
+      "name": "erstellen",
+      "code": "zeit",
+      "zahlen": {
+        "gut": 18,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "anhang",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "feedback",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "paket6-browser",
+      "code": 0,
+      "zahlen": {
+        "gut": 38,
+        "gesamt": 38
+      }
+    },
+    {
+      "name": "kontaktinfo",
+      "code": 1,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "krypto",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "paket6-migration",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-kontenliste",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-webkonten",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "explorer",
+      "code": 1,
+      "zahlen": {
+        "gut": 20,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "fremdprofil",
+      "code": 0,
+      "zahlen": {
+        "gut": 14,
+        "gesamt": 14
+      }
+    },
+    {
+      "name": "k28-erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 81,
+        "gesamt": 81
+      }
+    },
+    {
+      "name": "uebernacht",
+      "code": 1,
+      "zahlen": {
+        "gut": 1,
+        "gesamt": 1
+      }
+    },
+    {
+      "name": "sync",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "kamera",
+      "code": 1,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "smoke",
+      "code": 0,
+      "zahlen": {
+        "gut": 75,
+        "gesamt": 75
+      }
+    },
+    {
+      "name": "einstellungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "henrik",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "insel",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "optionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "kasten8",
+      "code": 1,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "testhygiene",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "teilen",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "schema",
+      "code": 0,
+      "zahlen": {
+        "gut": 7,
+        "gesamt": 7
+      }
+    },
+    {
+      "name": "sammlungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "sammlungenweb",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "henrik2",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "suche",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "kasten12",
+      "code": 0,
+      "zahlen": {
+        "gut": 65,
+        "gesamt": 65
+      }
+    },
+    {
+      "name": "kasten17",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "glocke",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "pfeile",
+      "code": 0,
+      "zahlen": {
+        "gut": 68,
+        "gesamt": 68
+      }
+    },
+    {
+      "name": "profil",
+      "code": 0,
+      "zahlen": {
+        "gut": 22,
+        "gesamt": 22
+      }
+    },
+    {
+      "name": "community",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "chatoptionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "player",
+      "code": 0,
+      "zahlen": {
+        "gut": 15,
+        "gesamt": 15
+      }
+    },
+    {
+      "name": "gesten",
+      "code": 1,
+      "zahlen": {
+        "gut": 9,
+        "gesamt": 9
+      }
+    },
+    {
+      "name": "kommentare",
+      "code": 0,
+      "zahlen": {
+        "gut": 9,
+        "gesamt": 9
+      }
+    },
+    {
+      "name": "querformat",
+      "code": 0,
+      "zahlen": {
+        "gut": 37,
+        "gesamt": 37
+      }
+    },
+    {
+      "name": "feinschliff",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "eigenes",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "datenbank",
+      "code": 0,
+      "zahlen": {
+        "gut": 29,
+        "gesamt": 29
+      }
+    },
+    {
+      "name": "aktionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 43,
+        "gesamt": 43
+      }
+    },
+    {
+      "name": "gleichstand",
+      "code": 0,
+      "zahlen": {
+        "gut": 50,
+        "gesamt": 50
+      }
+    },
+    {
+      "name": "handbuch",
+      "code": 0,
+      "zahlen": {
+        "gut": 32,
+        "gesamt": 32
+      }
+    },
+    {
+      "name": "sichtbarkeit",
+      "code": 0,
+      "zahlen": {
+        "gut": 36,
+        "gesamt": 36
+      }
+    },
+    {
+      "name": "likes",
+      "code": 0,
+      "zahlen": {
+        "gut": 94,
+        "gesamt": 94
+      }
+    },
+    {
+      "name": "chatanfrage",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "messengeranfrage",
+      "code": 1,
+      "zahlen": {
+        "gut": 14,
+        "gesamt": 37
+      }
+    },
+    {
+      "name": "mitteilungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "dmsperre",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "lesebestaetigung",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "kanal",
+      "code": 0,
+      "zahlen": {
+        "gut": 12,
+        "gesamt": 12
+      }
+    },
+    {
+      "name": "impressionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 18,
+        "gesamt": 18
+      }
+    },
+    {
+      "name": "rang",
+      "code": 0,
+      "zahlen": {
+        "gut": 34,
+        "gesamt": 34
+      }
+    },
+    {
+      "name": "verlauf",
+      "code": 0,
+      "zahlen": {
+        "gut": 45,
+        "gesamt": 45
+      }
+    },
+    {
+      "name": "storyvideos",
+      "code": "abbruch",
+      "zahlen": null
+    }
+  ],
+  "signal": "SIGTERM",
+  "quellenUnveraendert": true,
+  "code": 143
+}

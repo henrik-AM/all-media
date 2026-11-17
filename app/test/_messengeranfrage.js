@@ -128,6 +128,12 @@ async function anmelden(zugang) {
       );
     }
 
+    const { data: kenntNummer, error: nummerFehler } = await eigner.client
+      .rpc('nummer_bekannt', { wer: eigner.id, wen: fremder.id });
+    if (nummerFehler || kenntNummer !== false) {
+      throw new Error('Prüfvoraussetzung fehlt: Nummerntreffer des Eigners vorhanden oder nicht lesbar; keine Negativprobe mit bekanntem Kontakt.');
+    }
+
     console.log('\nKein Weg in den Messenger ohne Zustimmung');
 
     const { error: ohneNummer } = await eigner.client

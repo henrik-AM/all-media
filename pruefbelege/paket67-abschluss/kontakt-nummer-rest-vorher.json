@@ -1,0 +1,12 @@
+[
+  {
+    "nutzer": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+    "ziel": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+    "zeit": "2026-11-17 06:44:52.662726+00"
+  },
+  {
+    "nutzer": "62616c1d-82e2-4ee4-aab9-950e40e438a4",
+    "ziel": "3baafacd-bbdb-40fb-8ef4-a4e365ae00c4",
+    "zeit": "2026-11-17 13:01:09.009724+00"
+  }
+]

@@ -310,3 +310,34 @@ alter Code 0/3, Korrektur 3/3. Gesamte Paket7-Regressionsdatei 17/17,
 Offline-Browserprüfung unverändert 38/38, jeweils Exit 0. Kein Schemaeingriff.
 Der lokale Backend-Diagnoserahmen protokolliert nur Pfad, Laufzeit und Status,
 keine Token oder Anfrageparameter. Eigene Wachhaltung während lokaler Tests.
+
+## 17.11. — Eigene unvollständige Nummern-Bereinigung korrigiert
+
+Vollnachweis abc3d0a7 wurde kontrolliert nach 57/103 Gruppen beendet:
+1439/1468 Prüfungen, Exit 143, Quellen unverändert, 453 Testmitteilungen entfernt,
+Rest 0. Das Ergebnis bleibt fehlerhaft und unvollständig. Zusätzlich zu den
+bekannten Laufzeit-/Netzwerkfehlern scheiterte messengeranfrage mit 14/37.
+
+Ursache der Zustimmungs-Kaskade war ein eigener Testrest: kontakt-live hatte
+zwar Kontakte, Chats, Nachrichten, Schlüssel und Mitteilungen entfernt, aber
+den durch finde_per_nummer gesetzten Nachweis nummer_treffer vergessen. Die
+bisherigen Rest-0-Aussagen dieser Probe waren auf die aufgezählten Tabellen
+begrenzt und als vollständige Bereinigung unzutreffend. Ein Treffer A→B vom
+17.11. 06:44:52.662726 UTC passt zur tatsächlichen Kontaktprobe bis 06:45:01 UTC.
+Exakt diese eigene Zeile wurde entfernt; Gegenrichtung aus dem Bestandslauf
+blieb erhalten. Kein Produkt-/RLS-Fehler daraus behauptet.
+
+Die Probe sichert jetzt ihren A→B-Nummerntreffer einschließlich Zeit und die
+vorherigen Suchzähler-IDs, stellt den Treffer nach der Probe exakt wieder her
+und entfernt nur neu entstandene Suchzähler. Die Differenz gehört zur Restzahl.
+Der Negativtest messengeranfrage bricht bei einem vorhandenen Nummernnachweis
+vor der ersten Mutation mit klarer Prüfvoraussetzung ab. Neue Live-Abnahme
+und ungeänderte Zustimmungsgegenprobe folgen vor erneutem Vollnachweis.
+
+Erneute Kontaktprobe mit erweiterter Baseline: 10/10, Exit 0, eigene
+Nummerntreffer-/Zählerdifferenz 0, Gesamt-Rest 0, Empfängerprofil wiederhergestellt.
+Anschließend echte Messenger-Zustimmungsprüfung 37/37, Exit 0; die andere
+Suchrichtung aus dem früheren Bestandslauf blieb dabei unverändert erhalten.
+Das bestätigt die Testkontamination; kein Anlass für neue RLS-/Produktänderung.
+Der nächste Vollnachweis beginnt mit dieser Gruppe und hält Bildschirm sowie
+System für die Dauer des eigenen Prüfprozesses wach.
