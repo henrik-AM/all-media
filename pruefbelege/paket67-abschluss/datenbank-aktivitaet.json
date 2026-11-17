@@ -1,0 +1,41 @@
+{
+  "zeit": "2026-11-17T12:43:33.378Z",
+  "dauerMs": 835,
+  "aktivitaet": [
+    {
+      "state": "idle",
+      "wait_event_type": "Client",
+      "wait_event": "ClientRead",
+      "anzahl": 16,
+      "laengste_sekunden": 6817735
+    },
+    {
+      "state": "active",
+      "wait_event_type": "Client",
+      "wait_event": "WalSenderWaitForWal",
+      "anzahl": 1,
+      "laengste_sekunden": 1234
+    },
+    {
+      "state": "active",
+      "wait_event_type": null,
+      "wait_event": null,
+      "anzahl": 1,
+      "laengste_sekunden": 0
+    },
+    {
+      "state": "idle",
+      "wait_event_type": "Extension",
+      "wait_event": "Extension",
+      "anzahl": 1,
+      "laengste_sekunden": null
+    },
+    {
+      "state": null,
+      "wait_event_type": "Extension",
+      "wait_event": "Extension",
+      "anzahl": 1,
+      "laengste_sekunden": null
+    }
+  ]
+}
