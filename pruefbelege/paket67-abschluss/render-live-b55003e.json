@@ -1,0 +1,52 @@
+{
+  "zeit": "2026-11-17T14:15:39.821Z",
+  "basis": "https://all-media-website.onrender.com",
+  "releaseErwartet": "b55003e4cb6cf4234126b0842c8477bc3d76ce3f",
+  "version": {
+    "status": 200,
+    "inhalt": {
+      "version": "1.0.0",
+      "commit": "b55003e",
+      "quelle": "Render",
+      "zweig": "main",
+      "gestartet": "2026-11-17T14:12:55.298Z"
+    }
+  },
+  "commitStimmt": true,
+  "startseite": {
+    "status": 200,
+    "appEnthalten": true
+  },
+  "dateien": [
+    {
+      "url": "/app.js",
+      "status": 200,
+      "sha256Live": "ef3179900156cbccfc4dc5b8bf13d78cc91346a2987218988b140289c864b528",
+      "sha256Getestet": "ef3179900156cbccfc4dc5b8bf13d78cc91346a2987218988b140289c864b528",
+      "gleich": true
+    },
+    {
+      "url": "/anmeldung.js",
+      "status": 200,
+      "sha256Live": "15e40c4038b5c29d78dfcbff847e368aecf6b1ab551cb4b367d5e3efd9605cbf",
+      "sha256Getestet": "15e40c4038b5c29d78dfcbff847e368aecf6b1ab551cb4b367d5e3efd9605cbf",
+      "gleich": true
+    },
+    {
+      "url": "/krypto.js",
+      "status": 200,
+      "sha256Live": "eabd1aa84a892572ca2b966e8426b886da3075ff43aa818d231bee327eac1974",
+      "sha256Getestet": "eabd1aa84a892572ca2b966e8426b886da3075ff43aa818d231bee327eac1974",
+      "gleich": true
+    },
+    {
+      "url": "/gemeinsam/krypto.js",
+      "status": 200,
+      "sha256Live": "ed4f8d0977cde2b86361bee376a48a6e5ee7d44f72f8dd4e2970b236d7603358",
+      "sha256Getestet": "ed4f8d0977cde2b86361bee376a48a6e5ee7d44f72f8dd4e2970b236d7603358",
+      "gleich": true
+    }
+  ],
+  "erfolgreich": true,
+  "grenze": "Anonyme HTTP-/Versions-/Dateiprüfung; keine neue Anmeldung oder Testdatenmutation auf Render."
+}

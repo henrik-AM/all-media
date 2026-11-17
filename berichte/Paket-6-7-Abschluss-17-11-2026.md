@@ -1,7 +1,7 @@
 # Gemeinsamer Abschluss Paket 6 und 7 — 17.11.2026
 
-Status: Fachliche Abnahme und eigene Testbereinigung abgeschlossen;
-Veröffentlichung und Live-Nachweis noch offen.
+Status: Paket 6/7 auf main veröffentlicht; Render **b55003e** tatsächlich live.
+Fachliche Abnahmen, Einschränkung des Gesamtprüfstands und Bereinigung unten belegt.
 
 ## Ergebnis und Umfang
 
@@ -102,15 +102,31 @@ selbst erzeugten Rohbelege bereinigt.
 
 Native Abnahme im Simulator und Komponentenrahmen; kein Zwei-Handy- oder
 App-Store-Release behauptet. Nach Codeübernahme Website beziehungsweise Expo Go
-neu laden; ein bereits vor der Übernahme laufender lokaler Backendprozess
-muss neu gestartet werden. Die laufenden fremden Ports 3000/8081 bleiben erhalten.
+neu laden. Keine fremde Serversitzung wurde neu gestartet. Schlussprüfung:
+Ports 3000, 8081 und 3300 ohne Listener; eigener Simulator heruntergefahren.
 Drei akzeptierte mittlere Expo-Auditbefunde bestehen fort. Pakete 8–9 und die
 zurückgestellte Einstellungsfeedbackrunde wurden nicht begonnen.
 
 ## Veröffentlichung
 
-main, origin/main und Render stehen vor Übernahme weiterhin auf 627fa86.
-Henriks Freigabe für main/Push/Render liegt vor. Tatsächliche Releasekennung,
-Live-Dateivergleich und abschließender Repositoryzustand werden hier ergänzt.
+Mit Henriks bereits erteilter Freigabe Fastforward von main627fa86 auf
+**b55003e**, nach origin/main gepusht. `/api/version` meldet tatsächlich
+**b55003e**, Startzeit **2026-11-17T14:12:55.298Z**.
+Live-Nachweis vom **2026-11-17T14:15:39.821Z**: Startseite HTTP200;
+`app.js`, `anmeldung.js`, `krypto.js` und `gemeinsam/krypto.js` jeweils HTTP200
+und SHA-256 identisch mit dem geprüften Produktstand. Beleg:
+`pruefbelege/paket67-abschluss/render-live-b55003e.json`.
+
+Der anschließende reine Dokumentationscommit trägt Live-Nachweis und Schluss-
+protokoll nach; er ändert weder App-, Website- noch gemeinsame Produktdateien.
+Render bleibt deshalb auf dem vollständig passenden Produktrelease b55003e.
+Verifiziert wurden öffentliche HTTP-Antworten und Dateien. Die fachlichen
+Zwei-Konten-Prüfungen liefen gegen den eigenen lokalen Server mit Live-Supabase;
+keine erneute Testdatenmutation auf Render.
+
+main und Abschluss-Arbeitskopie werden sauber übergeben. Originale fremde
+Claude-Arbeitskopie und andere nicht veröffentlichte Paketstände bleiben erhalten;
+keine ungetesteten Sammel-/Kasten-Zweige übernommen. Ressourcenfreigabe erfolgt
+im abschließenden KI-Abgleich dieser Sitzung.
 
 Chronologie und verworfene Versuche: `Paket-6-7-Abschluss-16-11-2026.md`.

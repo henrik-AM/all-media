@@ -1,0 +1,15 @@
+{
+  "zeit": "2026-11-17T14:18:39.059035+00:00",
+  "ports": {
+    "3000": [],
+    "8081": [],
+    "3300": []
+  },
+  "eigenerSimulator": [
+    {
+      "name": "All-Media Codex",
+      "state": "Shutdown"
+    }
+  ],
+  "hauptordnerFremdeServerNichtBeendet": true
+}

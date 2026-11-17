@@ -365,3 +365,11 @@ Letzte47 Testmitteilungen nach dem Einzeltest entfernt,Rest0. Die SQL-Alias-
 Großschreibung wurde im Abschlusshelfer korrigiert und fehlende Zähler werden
 nun ausdrücklich abgewiesen; erste Kuvertnachzählung zusätzlich separat0.
 Veröffentlichung und echterRendernachweis folgen auf derselben Produktquelle.
+
+## 17.11. — Veröffentlicht und tatsächlich live geprüft
+
+main627fa86 per Fastforward auf b55003e, origin/main erfolgreich aktualisiert.
+Render meldet b55003e, gestartet2026-11-17T14:12:55.298Z.
+StartseiteHTTP200 und vier produktrelevante JavaScript-DateienHTTP200/SHA256
+identisch. Keine bloße Queue-/Pushbestätigung. Abschlussbericht17.11. ist der
+aktuelle zusammenhängende Stand; dieser Bericht bleibt Chronologie.
