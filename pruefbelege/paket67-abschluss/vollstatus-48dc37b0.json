@@ -1,0 +1,148 @@
+{
+  "laufId": "48dc37b0-ee94-48fc-bcf1-27a044ed9dbb",
+  "erwartet": 102,
+  "phase": "beendet",
+  "bereinigung": "erfolgreich",
+  "stempelVorher": "9b982843496d37ad2bd050826e87d36b79eded1c1587f5ea67293bec1a1de4ac",
+  "ergebnisse": [
+    {
+      "name": "kontaktinfo",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "krypto",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "paket6-migration",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-kontenliste",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-webkonten",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "explorer",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "fremdprofil",
+      "code": 0,
+      "zahlen": {
+        "gut": 14,
+        "gesamt": 14
+      }
+    },
+    {
+      "name": "k28-erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 81,
+        "gesamt": 81
+      }
+    },
+    {
+      "name": "uebernacht",
+      "code": 0,
+      "zahlen": {
+        "gut": 11,
+        "gesamt": 11
+      }
+    },
+    {
+      "name": "sync",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "kamera",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "smoke",
+      "code": 0,
+      "zahlen": {
+        "gut": 75,
+        "gesamt": 75
+      }
+    },
+    {
+      "name": "feedback",
+      "code": 1,
+      "zahlen": {
+        "gut": 28,
+        "gesamt": 32
+      }
+    },
+    {
+      "name": "einstellungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "henrik",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "insel",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "optionen",
+      "code": "abbruch",
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    }
+  ],
+  "signal": "SIGTERM",
+  "quellenUnveraendert": true,
+  "code": 143
+}

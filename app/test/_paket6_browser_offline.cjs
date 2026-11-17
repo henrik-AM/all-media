@@ -19,10 +19,12 @@ c.auth = {getUser: async()=>({data:{user:{id:A}},error:null})};
 const zwischenspeicher=(name,exports)=>{const id=path.join(W,'web/server',name+'.js');require.cache[id]={id,filename:id,loaded:true,exports};};
 zwischenspeicher('supabase',{clientFuer:()=>c,tokenAus:()=> 'offline-attrappe',isConfigured:()=>true,supabaseUrl:ORIGIN,supabaseKey:'offline-attrappe'});
 zwischenspeicher('medien',{signiereMedien:async(_c,x)=>x,ohneFremdeMedien:x=>x,mitBunny:()=>false});
+const apiQuelle=fs.readFileSync(path.join(W,'web/server/supabase-api.js'),'utf8'),apiAst=ts.createSourceFile('supabase-api.js',apiQuelle,ts.ScriptTarget.Latest,true);
+const anfrageZustand=Function('return ('+apiAst.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='anfrageZustand').getText(apiAst)+')')();
 const alsNachricht=m=>({...m,krypto:m.krypto||0,chatId:m.chat_id,senderId:m.sender_id,from:m.sender_id===A?'me':B,
   kryptoNonce:m.krypto_nonce,absenderSchluessel:m.absender_schluessel,time:'18:00',
   kuvert:db.message_keys.find(k=>k.message_id===m.id&&k.schluessel_id===db.krypto_schluessel.find(s=>s.user_id===A&&s.art==='web')?.id)});
-zwischenspeicher('supabase-api',{
+zwischenspeicher('supabase-api',{anfrageZustand,
   ladeNachrichten:async(_c,id)=>db.messages.filter(m=>m.chat_id===id).map(alsNachricht),
   ladeBeitraege:async()=>db.posts.map(p=>({...p,kind:'post'})),
   ladeChats:async()=>[],ladeStandorte:async()=>[],ladeProfil:async(_c,id)=>db.profiles.find(p=>p.id===id),
@@ -158,6 +160,55 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   pruefe('Echter Kontaktinfotext erklärt den gemeinsamen Vergleich',dialog.includes('Gemeinsame Sicherheitsnummer')&&dialog.includes('auf beiden Geräten gleich')&&dialog.includes('Lokaler Fingerabdruck dieses Geräts')&&dialog.includes('Deine registrierten Geräteschlüssel')&&dialog.includes('beim bloßen Nummernvergleich nicht auf'));
   await page.evaluate(dialog=>{document.querySelector('#messages').textContent=dialog;document.querySelector('#messages').style.whiteSpace='pre-wrap';document.querySelector('.composer').remove();document.querySelector('#hinweis').textContent='';},dialog);
   await page.screenshot({path:path.join(out,'browser-paarvergleich.png'),fullPage:true});
+  // Frischer Kontakt: vor dem Kontakt gehört das Paar zu Communitys,
+  // nach dem Kontakt zum Messenger. Unterschiedliche IDs dürfen keinen
+  // verschlüsselten Ersttext an den falschen Kontext binden.
+  db.chats=[];db.chat_members=[];db.contacts=[];db.messages=[];db.message_keys=[];
+  c.rpc=async(name,args)=>{
+    if(name==='finde_per_nummer')return {data:{...db.profiles.find(p=>p.id===B),privat:true},error:null};
+    if(name==='messenger_erlaubt')return {data:db.contacts.some(k=>k.user_id===A&&k.contact_id===B),error:null};
+    if(name==='zweierchat_anlegen'){
+      let chat=db.chats.find(c=>c.bereich===args.p_bereich);
+      if(!chat){chat={id:require('crypto').randomUUID(),bereich:args.p_bereich,is_group:false,created_by:A,anfrage_zustand:'wartet',anfrage_von:A};db.chats.push(chat);db.chat_members.push({chat_id:chat.id,user_id:A},{chat_id:chat.id,user_id:B});}
+      return {data:chat.id,error:null};
+    }
+    return {data:true,error:null};
+  };
+  await page.addScriptTag({content:fs.readFileSync(path.join(W,'gemeinsam/telefon.js'),'utf8')});
+  await page.evaluate(()=>{
+    state.contacts=[];state.chats=[];window.overlay=document.createElement('section');document.body.append(overlay);
+    openSheet=(_titel,html,fn)=>{const sheet=document.createElement('section');sheet.id='kontaktProbe';sheet.innerHTML=html;document.body.append(sheet);fn(sheet,()=>sheet.remove());};
+    openChat=id=>{window.kontaktGeoeffnet=id;};window.kontaktGeoeffnet=null;openAddContact();
+  });
+  await page.locator('#contactHandle').fill('+49 170 1234567');await page.locator('#contactMsg').fill('Erster verschlüsselter Kontakttext');await page.locator('#contactAdd').click();
+  await page.waitForFunction(()=>window.kontaktGeoeffnet||!document.querySelector('#contactFehler')?.hidden);
+  const kontaktStand=await page.evaluate(()=>({id:window.kontaktGeoeffnet,fehler:document.querySelector('#contactFehler')?.textContent}));
+  console.log('Kontaktkontext',JSON.stringify({kontaktStand,chats:db.chats.map(c=>({id:c.id,bereich:c.bereich})),nachrichten:db.messages.length}));
+  pruefe('Neuer Kontakt sendet Format2 im endgültigen Messenger-Kontext',Boolean(kontaktStand.id)&&db.chats.length===1&&db.messages.length===1&&db.messages[0].chat_id===kontaktStand.id&&db.chats.find(c=>c.id===kontaktStand.id)?.bereich==='messenger'&&db.messages[0].krypto===2&&db.messages[0].text==='');
+  const erste=db.messages[0],kontaktKuvert=db.message_keys.find(k=>k.message_id===erste.id&&k.schluessel_id==='b');
+  pruefe('Gegenüber öffnet die verschlüsselte Kontakt-Erstnachricht',Krypto.entschluesseln({version:erste.krypto,kontext:Krypto.kontextAusZeile(erste),chiffre:erste.chiffre,nonce:erste.krypto_nonce,absender:erste.absender_schluessel},kontaktKuvert,db.pb.geheim)==='Erster verschlüsselter Kontakttext');
+  const zweite=await page.evaluate(async id=>api('/api/messages/'+id,await sendeKoerper(id,'Zweite Nachricht vor Annahme')),kontaktStand.id);
+  pruefe('Zweite Nachricht vor Annahme bleibt gesperrt',zweite.ok===false&&/Anfrage/.test(zweite.error)&&db.messages.length===1);
+  // Fehler nach Kontaktanlage: keine unlesbare Nachricht stehenlassen und
+  // beim Wiederholen weder Kontakt noch Chat duplizieren.
+  db.chats=[];db.chat_members=[];db.contacts=[];db.messages=[];db.message_keys=[];stoerung='message_keys';
+  await page.evaluate(()=>{window.kontaktGeoeffnet=null;state.contacts=[];state.chats=[];openAddContact();});
+  await page.locator('#contactHandle').fill('+49 170 1234567');await page.locator('#contactMsg').fill('Entwurf nach Kontaktanlage');
+  await page.locator('#contactAdd').evaluate(b=>{b.click();b.click();});
+  await page.waitForFunction(()=>document.querySelector('#contactFehler')?.textContent.includes('Kontakt angelegt.'));
+  pruefe('Kuvertfehler lässt Entwurf und erneutes Senden im Kontaktblatt',await page.locator('#contactMsg').inputValue()==='Entwurf nach Kontaktanlage'&&await page.locator('#contactAdd').isEnabled());
+  pruefe('Angelegter Empfänger bleibt fest; Doppeltipp erzeugt genau einen Kontakt',await page.locator('#contactHandle').isDisabled()&&db.contacts.length===1&&db.chats.length===1);
+  pruefe('Fehlendes Kuvert hinterlässt keine Nachricht und keinen Klartext',db.messages.length===0&&db.message_keys.length===0);
+  await page.screenshot({path:path.join(out,'browser-kontakt-entwurf.png')});
+  stoerung=null;const kontaktId=db.chats[0].id;
+  const versuch=await page.evaluate(async id=>sendeKoerper(id,'Nicht vom Anfragenden'),kontaktId);
+  db.chats[0].anfrage_von=B;
+  const fremd=await page.evaluate(({id,body})=>api('/api/messages/'+id,body),{id:kontaktId,body:versuch});
+  pruefe('Erstnachricht ist nur dem anfragenden Konto erlaubt',fremd.ok===false&&db.messages.length===0);db.chats[0].anfrage_von=A;
+  stoerung='messages';const unklar=await page.evaluate(({id,body})=>api('/api/messages/'+id,body),{id:kontaktId,body:versuch});
+  pruefe('Nicht ladbare Nachrichtenanzahl öffnet die Anfragesperre nicht',unklar.ok===false&&/Anfrage/.test(unklar.error)&&db.messages.length===0);stoerung=null;
+  await page.locator('#contactAdd').click();await page.waitForFunction(()=>Boolean(window.kontaktGeoeffnet));
+  pruefe('Wiederholung sendet verschlüsselt ohne zweite Kontakt- oder Chatanlage',db.contacts.length===1&&db.chats.length===1&&db.messages.length===1&&db.messages[0].krypto===2&&db.messages[0].text==='');
   pruefe('Keine externen Browseranfragen',extern.length===0);
   pruefe('Keine Browser-Skriptfehler',fehler.length===0);
   console.log(`${ok}/${ok} Offline-Browserprüfungen; Port ${PORT}, keine Supabase-Verbindung.`);

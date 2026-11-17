@@ -219,3 +219,33 @@ verschoben;keineQuelländerungundkeineFremdänderungzurückgedreht. Der ursprün
 Paket7-Worktree mitClaudes erzeugtenDateien bleibtunangetastet.
 NeuerVollnachweis48dc37b0auf1dbcd04läuftunabhängig (PID65397,Server64886).
 Die fünf zuvorrotenGruppen darin bereits gemeinsam47/47,alleCode0.
+
+## 17.11. — Feedback-Folgefehler und neuer Kontakt-Kontextbefund
+
+48dc37b0 kontrolliert beendet:17/102,365/369,Code143,Quellenunverändert,
+151Mitteilungen entfernt,Rest0. Feedback28/32 mitfehlenderAnfragekarte;
+Greta-Chatfläche blockierteFolgeklicks. Optionen13/13 durchkontrollierten
+Abbruch unvollständig,keinbehaupteterProduktfehler. UnveränderterFeedback-
+Messlauf vollständiggrün; Vorbereitung2098ms,Kryptofakten501ms,Speichern2578ms,
+Anfragekarte6338ms nachKlick. Testwartetjetzt aufdie tatsächlichgespeicherte
+Erstnachricht unddanachweiterhinmax8saufdieKarte;unabhängigesChat-Schließen
+verhindertFolgefehler.
+
+DieMessung zeigteauch zwei verschiedeneChat-IDs:VorbereitungohneKontakt
+wähltCommunitys,nachKontaktanlageMessenger. MitregistriertemEmpfängergerät
+bindetFormat2denTextandenCommunity-Chat;derServerlehntdenVersandindenneuen
+Messenger-Kontextab. EchteBrowserfunktion+echteServerrouten/Krypto,inSpeichertabellen
+mitnachgebildeterBereichswahl reproduziert:0Nachrichten,Kontextfehler. Kein
+angeblichesNetzproblem. Korrektur:wieinderAppzuerstKontaktundendgültigenChat
+anlegen,danachfürdieseIDverschlüsselnundsenden. DieunbenutzteVorbereitungsroute
+entfernt. FehlererhältEntwurf,fixiertdenangelegtenEmpfängerundermöglichtWiederholung
+imselbenChat,ohneDuplikate.
+
+Die normaleServer-Schreibsperre erlaubtjetztexaktdieersteNachrichtimnochleeren
+ZweierchatdesanfragendenErstellers;weiterebleibengesperrt. UnveränderteDatenbank-RLS
+entscheidetweiterhinbeimInsert. KeineRechte-/Schemaänderung. Lese-/Zählfehler
+bleibenimZweifelgesperrt. ErweiterteOffline-Browserprüfung37/37:Format2öffnungsfähig,
+richtigerBereich/ID,keineverwaisteVorbereitung,keinzweitesSchreibenvorAnnahme,
+Kuvertfehler/Entwurf/Retry,Doppeltipp/EmpfängerbindungundFail-closed. DieGruppe
+gehörtjetztzumvollständigenNachweis,damit103Suiten. Live-Zwei-Konten-Gegenprobe
+undneuerVollnachweisfolgen.

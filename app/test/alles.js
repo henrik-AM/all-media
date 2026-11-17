@@ -216,6 +216,7 @@ const LAEUFE = [
   ['krypto-server', '_krypto_server_einheit.js'],
   ['paket6-offline', '_paket6_offline.js'],
   ['paket6-opus', '_paket6_opus.cjs'],
+  ['paket6-browser', '_paket6_browser_offline.cjs'],
   // Reine Offline-Regressionsproben; eigener Browser-/Native-Server bleibt separat.
   ['paket6-migration', '_paket6_migration_regression.cjs'],
   ['paket6-kontenliste', '_paket6_kontenliste_regression.cjs'],

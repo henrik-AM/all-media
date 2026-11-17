@@ -4185,41 +4185,52 @@ function openAddContact() {
       };
       input.addEventListener('input', () => melden(''));
 
+      // Wie in der App: erst den Kontakt und damit den endgültigen
+      // Messenger-Chat anlegen, dann für genau dessen ID verschlüsseln.
+      // Vorher wählte die Vorbereitung ohne Kontakt noch Communitys.
+      let angelegt = null;
+      let laeuft = false;
+      const addKnopf = sheet.querySelector('#contactAdd');
       const submit = async () => {
+        if (laeuft) return;
         const handle = input.value.trim();
         if (!handle) return melden('Bitte eine Telefonnummer eingeben');
-
-        // Dieselbe Regel wie in der App und im Server — gemeinsam/telefon.js.
         const grund = window.Telefon.pruefe(handle);
         if (grund) return melden(grund);
-
         const nachricht = msg.value.trim();
-        let paket = null;
-        if (nachricht) {
-          const vorab = await api('/api/contacts/vorbereiten', { handle });
-          if (!vorab?.ok) return melden(vorab?.error || 'Die Anfrage ging nicht raus');
-          try { paket = { chatId: vorab.chatId, ...(await sendeKoerper(vorab.chatId, nachricht)) }; }
-          catch (fehler) { return melden(fehler.message); }
+        laeuft = true;
+        addKnopf.disabled = true;
+        melden('');
+        try {
+          if (!angelegt) {
+            const res = await fetch('/api/contacts', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ handle }),
+            });
+            const result = await res.json();
+            if (!res.ok || !result.ok) throw new Error(result.error || 'Die Anfrage ging nicht raus');
+            angelegt = result;
+            // Ein erneuter Versuch gilt genau diesem angelegten Kontakt.
+            input.disabled = true;
+          }
+          if (nachricht) {
+            const paket = await sendeKoerper(angelegt.chat.id, nachricht);
+            const gesendet = await api('/api/messages/' + angelegt.chat.id, paket);
+            if (!gesendet?.id) throw new Error(gesendet?.error || 'Die Nachricht wurde nicht gesendet. Bitte versuch es erneut.');
+          }
+          if (!state.contacts.some(c => c.id === angelegt.contact.id)) state.contacts.push(angelegt.contact);
+          if (angelegt.chat && !state.chats.some(c => c.id === angelegt.chat.id)) state.chats.unshift(angelegt.chat);
+          close();
+          toast(nachricht ? `Anfrage mit Nachricht an ${angelegt.contact.name} gesendet` : `Anfrage an ${angelegt.contact.name} gesendet`);
+          if (overlay.querySelector('#contactSearch')) renderContacts();
+          else if (angelegt.chat) openChat(angelegt.chat.id);
+        } catch (fehler) {
+          melden((angelegt ? 'Kontakt angelegt. ' : '') + fehler.message);
+          if (angelegt) addKnopf.textContent = 'Nachricht erneut senden';
+        } finally {
+          laeuft = false;
+          addKnopf.disabled = false;
         }
-        const res = await fetch('/api/contacts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ handle, nachricht: paket?.krypto ? '' : nachricht, paket }),
-        });
-        const result = await res.json();
-
-        if (!result.ok) return melden(result.error);
-
-        state.contacts.push(result.contact);
-        if (result.chat) state.chats.unshift(result.chat);
-        close();
-        toast(
-          nachricht
-            ? `Anfrage mit Nachricht an ${result.contact.name} gesendet`
-            : `Anfrage an ${result.contact.name} gesendet`
-        );
-        if (overlay.querySelector('#contactSearch')) renderContacts();
-        else if (result.chat) openChat(result.chat.id);
       };
 
       /*

@@ -251,7 +251,10 @@ const pruefe = (was, ok, zusatz = '') => {
   // Suche per Nummer
   await page.fill('#contactHandle', '+49 174 8901234');   // Greta - noch kein Kontakt
   await page.fill('#contactMsg', 'Hi, hier ist Henrik!');
+  const ersteAntwort = page.waitForResponse(r => r.request().method() === 'POST' && /^\/api\/messages\/[^/]+$/.test(new URL(r.url()).pathname), { timeout: 30000 });
   await page.click('#contactAdd');
+  const gespeichert = await (await ersteAntwort).json();
+  if (!gespeichert.id) throw new Error('Kontakt-Erstnachricht nicht gespeichert: ' + (gespeichert.error || 'keine Kennung'));
   // Die Anfrage geht jetzt in die Datenbank — 800 ms reichten dafuer nicht
   // zuverlaessig, und der Prueflauf meldete einen Fehler, den es nicht gab.
   await page.waitForSelector('.anfrage', { timeout: 8000 }).catch(() => {});
@@ -274,9 +277,9 @@ const pruefe = (was, ok, zusatz = '') => {
     const eigeneWahl = await page.$('[data-anfrage]');
     pruefe('Der Absender kann seine Anfrage nicht selbst annehmen', !eigeneWahl);
 
-    await page.click('#chatBack').catch(() => {});
-    await page.waitForTimeout(400);
   }
+  if (await page.$('#chatBack')) await page.click('#chatBack').catch(() => {});
+  await page.waitForTimeout(400);
 
   console.log('\nGruppe erstellen');
   await page.click('#newChat');

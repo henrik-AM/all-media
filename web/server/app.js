@@ -991,7 +991,19 @@ async function chatGesperrt(req, chatId) {
   ]);
 
   if (blockiert > 0) return 'Diese Person ist blockiert';
-  if (kontakt?.status === 'pending') return 'Warte, bis die Anfrage angenommen wurde';
+  if (kontakt?.status === 'pending') {
+    // Genau die erste Nachricht des anfragenden Kontos ist erlaubt, wie
+    // beim direkten App-Schreibweg. Weitere bleiben bis zur Annahme zu.
+    const [chatAntwort, nachrichtenAntwort] = await Promise.all([
+      req.db.from('chats').select('is_group, created_by, anfrage_zustand, anfrage_von').eq('id', chatId).maybeSingle(),
+      req.db.from('messages').select('id', { count: 'exact', head: true }).eq('chat_id', chatId),
+    ]);
+    const chat = chatAntwort.data;
+    const erste = !chatAntwort.error && !nachrichtenAntwort.error && chat && chat.is_group === false
+      && chat.created_by === req.nutzerId && chat.anfrage_zustand === 'wartet'
+      && chat.anfrage_von === req.nutzerId && nachrichtenAntwort.count === 0;
+    if (!erste) return 'Warte, bis die Anfrage angenommen wurde';
+  }
   return null;
 }
 
@@ -1190,16 +1202,6 @@ app.get('/api/qr.svg', route(async (req, res) => {
  * Suche, keine Fehler der Anfrage. Deshalb 200 mit ok-Feld statt 404/409 —
  * sonst protokolliert der Browser bei jeder Fehleingabe einen Ladefehler.
  */
-// Nur den Zielchat ermitteln; Nachricht wird anschließend im Browser verschlossen.
-app.post('/api/contacts/vorbereiten', route(async (req) => {
-  const eingabe = String(req.body?.handle || '').trim();
-  const grund = Telefon.pruefe(eingabe);
-  if (grund) return { ok: false, error: grund };
-  const gefunden = await syncHandlers.handleFindPerson(req.db, req.nutzerId, eingabe);
-  if (!gefunden?.person) return { ok: false, error: 'Zu dieser Nummer gibt es noch kein Konto' };
-  return antwort(await syncHandlers.handleChatMit(req.db, req.nutzerId, gefunden.person.id, 'messenger'));
-}));
-
 app.post('/api/contacts', route(async (req) => {
   const eingabe = String(req.body?.handle || '').trim();
   if (!eingabe) return { ok: false, error: 'Bitte eine Telefonnummer eingeben' };
