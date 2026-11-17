@@ -37,8 +37,8 @@
    * App (app/lib/krypto.ts). Bis dahin teilten sich alle Konten dieses
    * Browsers ein Paar: gleiche Sicherheitsnummer für Haupt- und Zweitkonto,
    * und wer nach dem Abmelden ein anderes Konto anmeldete, erbte es. Das alte
-   * Fach ohne Kennung wird beim ersten Zugriff übernommen und gelöscht
-   * (altbestandUebernehmen).
+   * Fach bleibt als Rettungskopie erhalten. Übernommen wird es nur nach
+   * bestätigter historischer Kontozuordnung (altbestandUebernehmen).
    */
   const ALT_SCHLUESSEL_FACH = 'allmedia.krypto.geheim';
   const ALT_GERAET_FACH = 'allmedia.krypto.geraet';

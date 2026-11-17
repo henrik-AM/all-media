@@ -4610,10 +4610,15 @@ async function openContactProfile(userId, optionen = {}) {
   const chat = imMessenger
     ? state.chats.find((c) => !c.isGroup && c.userId === userId)
     : (state.communityChats || []).find((c) => !c.isGroup && c.userId === userId);
-  const profil = await (await fetch(`/api/profile/${userId}`)).json().catch(() => ({}));
-  let daten = { medien: [], markiert: [], gesamt: 0 };
-  if (chat) daten = await (await fetch(`/api/chats/${chat.id}/medien`)).json();
-  const krypto = await kryptoZustand(userId, chat);
+  // Unabhängige Quellen gleichzeitig laden: der Wiederaufbau nach einer
+  // Einstellung wartete sonst Profil + Medien + Schlüssel nacheinander ab.
+  const [profil, daten, krypto] = await Promise.all([
+    fetch(`/api/profile/${userId}`).then((r) => r.json().catch(() => ({}))),
+    chat
+      ? fetch(`/api/chats/${chat.id}/medien`).then((r) => r.json())
+      : Promise.resolve({ medien: [], markiert: [], gesamt: 0 }),
+    kryptoZustand(userId, chat),
+  ]);
 
   const kontakt = state.contacts.find((c) => c.id === userId);
   const gemeinsameGruppen = imMessenger

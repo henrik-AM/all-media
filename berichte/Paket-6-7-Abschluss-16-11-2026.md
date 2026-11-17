@@ -191,3 +191,19 @@ Original-Kontaktinfo-Test mitzusätzlicherMessung läuftohneQuelländerung;
 Offline-Latenzprobe zeigt drei seriell wartende450ms-Quellen:1363msbis zur
 fertigenOriginalansicht. Dasist ein reproduzierbarerLatenzbefund,nochkeine
 pauschaleErklärung derLive-Zeitgrenze.
+
+## 17.11.,06:54 — alle fünf Fehlergruppen gezielt grün
+
+Original-Kontaktinfo-Wiederholung auf unverändertem Produkt10/10,Code0;
+Anfrage-/Sichtbarkeitsmessung2290/2294/2802ms. Drei unabhängige Datenquellen
+liefen seriell, wodurch die bestehende3sGrenze wenig Reserve hatte.
+Profil,Medien undKryptostatus laden jetzt parallel; ursprünglicherUI-Test
+unverändert10/10,Code0,gemessene1291/1292/1280ms. VollständigOffline mit
+drei kontrollierten450msQuellen:Alt1363ms,Neu456ms;Originalansicht mit17Zeilen
+undDark-Auswahl,keine externenAnfragen. KeineFristverlängerung imKontakt-Test.
+Prüfhelfer erkenntnach abgeschlossenerSitzungswiederherstellung einAnmeldefenster
+und wartet davor nichtmehr zweimal15saufverborgeneNutzerdaten. ZweiGegenproben
+stellenSitzungswartezeit undunverkürzteDatenprüfung angemeldeterKonten sicher.
+Paket7Regression+Stummjetzt23/23,TypeScript0,Offline10/10Gruppen.
+Kryptotest25/25live,die dreiÜbernahmegruppen jeweils4/4mitCode0.
+Neuer kompletter102erNachweis folgt,die fünf zuvorrotenGruppen zuerst.

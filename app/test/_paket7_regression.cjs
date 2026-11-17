@@ -58,3 +58,17 @@ function listenRennen(){
 test('Native Liste: alte Klingelantwort überschreibt neueren expliziten Abruf nicht',async()=>{const h=listenRennen();await tick();h.now(20);const neu=h.ctx.reload();assert.equal(h.pending.length,2);h.pending[1].resolve({chats:[{id:'neu'}]});assert.equal(await neu,true);h.pending[0].resolve({chats:[{id:'alt'}]});await tick();assert.equal(h.data.chats[0].id,'neu');assert.equal(h.ctx.listenStand.current,null,'verworfene Antwort bestätigt keinen Stand');h.stop();});
 test('Native Liste: spätere Antwort eines älteren expliziten Abrufs wird verworfen',async()=>{const h=listenRennen();await tick();h.pending[0].resolve({chats:[{id:'start'}]});await tick();const alt=h.ctx.reload(),neu=h.ctx.reload();h.pending[2].resolve({chats:[{id:'neu'}]});assert.equal(await neu,true);h.pending[1].resolve({chats:[{id:'alt'}]});assert.equal(await alt,false);assert.equal(h.data.chats[0].id,'neu');h.stop();});
 test('Native Liste: erfolgreicher unveränderter Stand belegt Frische nach Lesefehler',async()=>{const h=listenRennen();await tick();h.pending[0].resolve({chats:[{id:'start',muted:false}]});await tick();const vorher=h.ctx.seit;h.now(100);const fehl=h.ctx.reload();h.pending[1].reject(Error('Lesefehler'));assert.equal(await fehl,false);h.now(200);h.signal();await tick();assert.equal(h.pending.length,2,'gleicher Stand braucht keinen neuen Vollabruf');assert.ok(h.ctx.seit>vorher);assert.equal(h.ctx.seit,200);assert.equal(h.data.chats[0].muted,false);h.stop();});
+
+function bereitProbe(angemeldet, bereit) {
+ const schritte=[],c={window:{Anmeldung:{angemeldet:()=>angemeldet,bereit}}};
+ vm.runInNewContext(fn('app/test/_konto.js','inhaltAbwarten')+';globalThis.run=inhaltAbwarten;',c);
+ const page={evaluate:f=>Promise.resolve().then(f),waitForSelector:async()=>schritte.push('geruest'),waitForFunction:async()=>schritte.push('daten')};
+ return {schritte,run:()=>c.run(page)};
+}
+test('Prüfbereitschaft wartet vor dem Login auf Sitzungswiederherstellung, ohne Datenwartezeit',async()=>{
+ let fertig;const bereit=new Promise(r=>fertig=r),c=bereitProbe(false,bereit),lauf=c.run();
+ await tick();assert.deepEqual(c.schritte,[],'keine Datenprüfung vor geklärter Sitzung');fertig();await lauf;assert.deepEqual(c.schritte,[],'anonymes Anmeldefenster braucht keine Nutzerdaten');
+});
+test('Prüfbereitschaft hält nach Anmeldung Gerüst- und Datenprüfung vollständig aufrecht',async()=>{
+ const c=bereitProbe(true,Promise.resolve());await c.run();assert.deepEqual(c.schritte,['geruest','daten']);
+});

@@ -1,0 +1,32 @@
+
+Die Rechnung
+  OK   Historisches Paket ohne Kontext trägt Format1
+  OK   Kontextgebundenes Paket trägt die aktuelle Formatversion2
+  OK   Gegenüber öffnet das aktuelle kontextgebundene Format
+  OK   Ein Kuvert je Gerät
+  OK   Kein Klartextstück im Paket
+  OK   Der Absender öffnet seine eigene Nachricht
+  OK   Das Gegenüber öffnet sie ebenfalls — mit Umlauten und Emoji
+  OK   Ein fremder Schlüssel öffnet nichts
+  OK   Das falsche Kuvert öffnet nichts
+  OK   Eine geänderte Chiffre fällt auf
+  OK   Ein unbekanntes Format wird nicht geraten
+  OK   Fingerabdruck ist gleich bleibend
+  OK   Fingerabdruck unterscheidet zwei Schlüssel
+  OK   Fingerabdruck ist vorlesbar  — ABD3 A90C EC98 A414 5D39 6A36 30AF 5784
+
+Die Datenbank
+  OK   Beide Geräte haben einen Schlüssel
+  OK   Niemand meldet ein Gerät für ein fremdes Konto an
+  OK   Der Schlüssel des Gegenübers ist im gemeinsamen Chat sichtbar
+  OK   Verschlüsselte Nachricht samt Kuverts geschrieben
+  OK   Der Server hält keinen Klartext
+  OK   Das Gegenüber sieht genau sein eigenes Kuvert  — 1 Kuvert(e)
+  OK   Und öffnet damit den ursprünglichen Text
+  OK   Kennzeichen ohne Chiffre wird abgewiesen
+  OK   Klartext neben der Chiffre wird abgewiesen
+  OK   Chiffre ohne Kennzeichen wird abgewiesen
+  OK   Nur der Absender legt Kuverts zu seiner Nachricht
+
+25 von 25 Pruefungen bestanden.
+Was verschlüsselt heißt, ist auch verschlüsselt.

@@ -71,6 +71,15 @@ const { medienEgressSchuetzen } = require('./_medien_egressschutz');
 
 /** Warten, bis die Oberflaeche steht und Daten da sind. Nie werfen. */
 async function inhaltAbwarten(page) {
+  // Ohne Sitzung stehen nur die Anmeldefelder da. Vor dem Login auf die
+  // versteckte App und deren Nutzerdaten zu warten verbrauchte zweimal15s.
+  const anonym = await page.evaluate(async () => {
+    const a = window.Anmeldung;
+    if (!a || typeof a.angemeldet !== 'function') return false;
+    await a.bereit?.catch(() => null);
+    return !a.angemeldet();
+  }).catch(() => false);
+  if (anonym) return;
   await page.waitForSelector('[data-area]', { timeout: 15000 }).catch(() => {});
   await page
     .waitForFunction(

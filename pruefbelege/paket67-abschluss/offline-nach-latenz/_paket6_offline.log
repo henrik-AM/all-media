@@ -1,0 +1,44 @@
+Gerätschlüssel nicht verfügbar: Ungültige Kontokennung
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+Verschlüsselung nicht prüfbar: offline
+✔ Alle 1201 Geräte: App und Server lesen auch den ältesten Schlüssel (64.155916ms)
+✔ Verkürzte Seite, Fehler in Seite 2, wechselnde Anzahl: kein Teilergebnis (1.352292ms)
+✔ Unvollständige Fakten und fehlende Mitgliedschaft werden abgelehnt (0.082041ms)
+✔ Absender: 251 verschiedene Paare werden vollständig geprüft (0.453583ms)
+✔ Absender: entfernter Schlüssel wird nach Ablauf erneut geprüft (0.091833ms)
+✔ App: Altbestand ohne Gerätekennung bleibt lesbar; neue Konten sind getrennt (16.211334ms)
+✔ App: unterbrochene Fachschreibung verliert vorhandenen Schlüssel nicht (8.281333ms)
+✔ App: frische Konten bekommen auch bei parallelem Start getrennte Schlüssel (8.644417ms)
+✔ App: unzulässige Fachkennung wird abgewiesen statt mit anderer zu kollidieren (7.244ms)
+✔ App: Chat-/Verlauf-/Mitgliederfehler verhindern Senden einschließlich Anhang (20.324375ms)
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Verschlüsselung nicht prüfbar: Konto gewechselt
+Teilen an bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb fehlgeschlagen: Die Nachricht ließ sich gerade nicht verschlüsseln und wurde nicht gesendet. Bitte versuch es noch einmal.
+Nachricht senden fehlgeschlagen: Chat nicht ladbar
+✔ Browser: zwei parallele Kontoanmeldungen verwechseln ihre Ergebnisse nicht (37.0905ms)
+✔ Browser: vergessen widerruft auch eine noch laufende Anmeldung (15.657584ms)
+✔ Browser: fehlende/alte Fakten und Kontowechsel beim Senden sperren Klartext (44.666416ms)
+✔ Browser: nicht ladbarer Absender wird sichtbar gewarnt; späterer Erfolg löscht Warnung (14.984041ms)
+✔ Server: Kontakttext und Beitrag-Teilen können nicht mehr offen am Wächter vorbei (1.727459ms)
+✔ Server: verschlüsselte Kontakt-/Beitragsnachricht erreicht alle Kuverts (3.805042ms)
+✔ App: Kontakt und Beitrag-Teilen benutzen die echte Verschlüsselung (80.912ms)
+✔ Server: fehlende Chiffre/Kuverts und unlesbarer Chat führen zu null Schreibvorgängen (0.695541ms)
+✔ Absender: abgelaufene positive Prüfung bei Netzfehler ohne Vertrauen (0.087458ms)
+✔ Sicherheitsnummer: kaputter Schlüssel darf keine gültige Nummer vortäuschen (0.055042ms)
+✔ App: drittes Mitglied ohne eigenes Gerät bekommt kein Verschlüsselungsschloss (5.354167ms)
+✔ Kontakt-/Teilen-Kryptopaket kann keine fremden Medien-/Storybezüge einschleusen (3.248584ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 436.111
+
+Exit: 0

@@ -6,7 +6,7 @@ if(!token)throw Error('Verwaltungstoken fehlt');process.env.SUPABASE_TOKEN=token
 process.env.ZIEL='http://localhost:3300/';
 for(const k of ['AM_URL','BASE','BASIS','AM_BASIS'])process.env[k]='http://localhost:3300';
 const suite=require('../../app/test/alles');
-const zuerst=['explorer','fremdprofil','k28-erstellen','uebernacht','sync','kamera','smoke','feedback','einstellungen','kontaktinfo','henrik','insel','optionen','kasten8'];
+const zuerst=['kontaktinfo','krypto','paket6-migration','paket6-kontenliste','paket6-webkonten','explorer','fremdprofil','k28-erstellen','uebernacht','sync','kamera','smoke','feedback','einstellungen','henrik','insel','optionen','kasten8'];
 suite.LAEUFE.sort((a,b)=>(zuerst.includes(a[0])?zuerst.indexOf(a[0]):100)-(zuerst.includes(b[0])?zuerst.indexOf(b[0]):100));
 (async()=>{
  require('../../app/test/_ki_belegung').pruefeBelegung('testbestand');
