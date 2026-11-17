@@ -27,17 +27,18 @@ OK Echte Storyroute verschließt Antwort mit Storybezug
 OK Alter Anhang-Aufrufer wird ausdrücklich abgewiesen
 OK Fehlendes Kryptoskript sendet keinen Klartext
 OK Echter Kontaktinfotext erklärt den gemeinsamen Vergleich
-Kontaktkontext {"kontaktStand":{"id":"a43fc877-87c3-4211-ac0b-5915e6ea17f9"},"chats":[{"id":"a43fc877-87c3-4211-ac0b-5915e6ea17f9","bereich":"messenger"}],"nachrichten":1}
+Kontaktkontext {"kontaktStand":{"id":"31f6461a-3f58-407c-99b9-ad4b75c5f603"},"chats":[{"id":"31f6461a-3f58-407c-99b9-ad4b75c5f603","bereich":"messenger"}],"nachrichten":1}
 OK Neuer Kontakt sendet Format2 im endgültigen Messenger-Kontext
 OK Gegenüber öffnet die verschlüsselte Kontakt-Erstnachricht
 OK Zweite Nachricht vor Annahme bleibt gesperrt
+OK Angenommener Chat ist trotz altem Kontaktstatus wieder beschreibbar
 Nachricht senden fehlgeschlagen: simuliert offline
 OK Kuvertfehler lässt Entwurf und erneutes Senden im Kontaktblatt
 OK Angelegter Empfänger bleibt fest; Doppeltipp erzeugt genau einen Kontakt
 OK Fehlendes Kuvert hinterlässt keine Nachricht und keinen Klartext
-OK Erstnachricht ist nur dem anfragenden Konto erlaubt
+OK Widersprüchliche Anfragezuordnung öffnet keine Erstnachricht
 OK Nicht ladbare Nachrichtenanzahl öffnet die Anfragesperre nicht
 OK Wiederholung sendet verschlüsselt ohne zweite Kontakt- oder Chatanlage
 OK Keine externen Browseranfragen
 OK Keine Browser-Skriptfehler
-37/37 Offline-Browserprüfungen; Port 3304, keine Supabase-Verbindung.
+38/38 Offline-Browserprüfungen; Port 3304, keine Supabase-Verbindung.

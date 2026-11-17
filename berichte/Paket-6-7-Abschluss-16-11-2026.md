@@ -249,3 +249,21 @@ richtigerBereich/ID,keineverwaisteVorbereitung,keinzweitesSchreibenvorAnnahme,
 Kuvertfehler/Entwurf/Retry,Doppeltipp/EmpfängerbindungundFail-closed. DieGruppe
 gehörtjetztzumvollständigenNachweis,damit103Suiten. Live-Zwei-Konten-Gegenprobe
 undneuerVollnachweisfolgen.
+
+## 17.11. — Kontaktkorrektur real abgenommen, Feedback vollständig grün
+
+ErweiterteOffline-Browserprüfung38/38. Ein angenommener/offenerZweierchat
+bleibtbeschreibbar,auchwenncontacts.statusnochpendingmeldet;maßgeblichistdie
+tatsächlicheChatanfrage. Pending-Erstnachricht bleibt aufleeren,selbsterstellten
+ChatmitpassenderAnfragezuordnung begrenzt,Lese-/Zählfehlerbleibengesperrt.
+EchteTestkonten:10/10,Code0;privatesEmpfängerprofil,Format2-Erstnachrichtvom
+Gegenüberentschlüsselt,originaleAnfragekarte/gesperrtesEingabefeld,abgewiesene
+zweiteAPI-Nachricht,dannweitereNachrichtnachechterAnnahme. RealeKontaktmaske
+erhältnachgezieltemHTTP-SendeausfallEntwurf,EmpfängerbindungundRetry. Keine
+zusätzlicheCommunity-Vorbereitung. AlleProbechats/Mitglieder/Nachrichten,
+GeräteschlüsselundneueMitteilungenentfernt,Rest0;Empfängerprofilwiederhergestellt.
+Belegekontakt-live-ergebnis.jsonundkontakt-live-fixtures.json;Bildergesichtet.
+DasBildderFehlermaskemitgeschützterTestnummerliegtprivatimRoharchiv
+rohbelege-paket67-2026-11-17/kontakt-live,gehtnichtinsRepository.
+FeedbacknachKorrektur53/53,Code0,keineKonsolenfehler. Neue103erVollwiederholung
+aufgefrorenemStandfolgt. KeineweiterenProduktänderungen währendderMessung.

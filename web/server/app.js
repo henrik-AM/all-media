@@ -1002,7 +1002,9 @@ async function chatGesperrt(req, chatId) {
     const erste = !chatAntwort.error && !nachrichtenAntwort.error && chat && chat.is_group === false
       && chat.created_by === req.nutzerId && chat.anfrage_zustand === 'wartet'
       && chat.anfrage_von === req.nutzerId && nachrichtenAntwort.count === 0;
-    if (!erste) return 'Warte, bis die Anfrage angenommen wurde';
+    const frei = !chatAntwort.error && !nachrichtenAntwort.error && chat && chat.is_group === false
+      && ['offen', 'angenommen'].includes(chat.anfrage_zustand);
+    if (!erste && !frei) return 'Warte, bis die Anfrage angenommen wurde';
   }
   return null;
 }

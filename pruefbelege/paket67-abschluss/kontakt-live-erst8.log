@@ -1,0 +1,10 @@
+OK Beide erlaubten Testkonten tatsächlich angemeldet
+OK Echte Erstnachricht als Format2 ohne Klartext gespeichert
+OK Endgültiger Messenger-Kontext bleibt eine eigene ausgehende Anfrage
+OK Tatsächliches Gegenüber öffnet seine Format2-Erstnachricht
+OK Originalchat zeigt Anfrage und gesperrte weitere Eingabe
+OK Direkter zweiter API-Versuch bleibt auch jenseits der Oberfläche gesperrt
+OK Kein zusätzlicher Community-Chat aus einer Vorbereitung
+Fixture-Rest 0 Profil wiederhergestellt true
+OK Eigene Daten entfernt und Empfängerprofil wiederhergestellt
+8/8 Kontakt-Liveprüfungen

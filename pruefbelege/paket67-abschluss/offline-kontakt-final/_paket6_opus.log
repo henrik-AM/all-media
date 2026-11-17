@@ -1,0 +1,29 @@
+Gerätschlüssel nicht verfügbar: offline
+Nachricht senden fehlgeschlagen: Rechtesperre
+Nachricht senden fehlgeschlagen: andere_pruefung
+✔ Gemeinsame Nummer stimmt auf beiden Seiten und bindet Kontozuordnung (5.215041ms)
+✔ Server: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (1.347416ms)
+✔ App: alte Klartextnachricht im inzwischen verschlüsselten Chat nicht bearbeiten (90.798792ms)
+✔ App: abgemeldetes historisches Konto bekommt Altpaar, neues Konto niemals (16.934541ms)
+✔ App: nach altem Löschen erhaltene kontogebundene Kopie wiederfinden (7.511292ms)
+✔ App: fehlender Kontonachweis verändert den Altbestand nicht (8.440042ms)
+✔ Browser: spät angemeldetes Altkonto erhält nur bestätigtes Altpaar (52.90725ms)
+✔ Format2: Kopie, anderer Chat/Absender/Bezug/Zeit und Downgrade bleiben unlesbar (7.366125ms)
+✔ App: Format2 senden, antworten, öffnen und bearbeiten mit echtem Kryptomodul (44.7335ms)
+✔ Browser → Server → App: Format2 Identität und Zeit bleiben unverändert (62.604333ms)
+✔ App: echte Format2-Quelle wird mit vollem Kontext geöffnet und neu weitergeleitet (35.45825ms)
+✔ Server: Senderzeit darf weder alte Nachrichten vortäuschen noch Serverzeit ersetzen (4.003708ms)
+✔ Eigener lokaler Fingerabdruck und getrennte Listen bleiben unabhängige Vergleichsreferenz (1.171208ms)
+✔ Abweichende Empfangszeit öffnet Format2 nicht als unverändert geprüfte Nachricht (2.029208ms)
+✔ App: Zeitconstraint wird zur Geräteuhr-Meldung, Entwurf kann erneut gesendet werden (29.956125ms)
+✔ Server: Zeitconstraint verständlich, andere Datenbankfehler bleiben erkennbar (1.762208ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 475.229292
+
+Exit: 0

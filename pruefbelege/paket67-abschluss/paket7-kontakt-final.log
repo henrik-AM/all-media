@@ -1,0 +1,31 @@
+✔ Dauernde Klingeln werden begrenzt gebündelt und nie endlos verschoben (954.68475ms)
+✔ Abofehler räumt schon angelegten Kanal und Timer auf (0.294625ms)
+✔ Server: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (29.512167ms)
+✔ App: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (16.94975ms)
+✔ Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe (60.240334ms)
+✔ Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach (35.904792ms)
+✔ Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich (8.505291ms)
+✔ Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join (0.242ms)
+✔ Kuvert-Signal überlebt die Bündelung mit gewöhnlichen Klingeln (302.346125ms)
+✔ Native Liste: alte Klingelantwort überschreibt neueren expliziten Abruf nicht (4.723541ms)
+✔ Native Liste: spätere Antwort eines älteren expliziten Abrufs wird verworfen (3.611375ms)
+✔ Native Liste: erfolgreicher unveränderter Stand belegt Frische nach Lesefehler (2.807125ms)
+✔ Prüfbereitschaft wartet vor dem Login auf Sitzungswiederherstellung, ohne Datenwartezeit (1.541083ms)
+✔ Prüfbereitschaft hält nach Anmeldung Gerüst- und Datenprüfung vollständig aufrecht (0.843333ms)
+✔ Bestätigter Wunsch wird bei späterer Änderung vom Zweitgerät nicht wiederbelebt (23.111417ms)
+✔ Kontowechsel übernimmt keinen Stumm-Wunsch des anderen Kontos (4.905ms)
+✔ Zwei schnelle Tipps schreiben seriell an und aus; neuester Wunsch bleibt sichtbar (4.691125ms)
+✔ Verspäteter Fehler eines älteren Schreibens entfernt den neueren Wunsch nicht (2.984458ms)
+✔ Drei schnelle Tipps behalten letzten Wunsch auch bei Zwischenbestätigungen (2.880625ms)
+✔ Kontorückkehr startet keine alten wartenden Schreibaufträge erneut (2.765875ms)
+✔ Fehlgeschlagener Listenabruf verwirft keine erfolgreich gespeicherte Auswahl (3.260459ms)
+✔ Frisch gelesener Gegenwert vom Zweitgerät gewinnt nach bestätigtem Schreiben (4.501125ms)
+✔ Nach Lesefehler bestätigt auch unveränderter frischer Serverstand den Fernwert (2.802292ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1523.915

@@ -189,6 +189,9 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   pruefe('Gegenüber öffnet die verschlüsselte Kontakt-Erstnachricht',Krypto.entschluesseln({version:erste.krypto,kontext:Krypto.kontextAusZeile(erste),chiffre:erste.chiffre,nonce:erste.krypto_nonce,absender:erste.absender_schluessel},kontaktKuvert,db.pb.geheim)==='Erster verschlüsselter Kontakttext');
   const zweite=await page.evaluate(async id=>api('/api/messages/'+id,await sendeKoerper(id,'Zweite Nachricht vor Annahme')),kontaktStand.id);
   pruefe('Zweite Nachricht vor Annahme bleibt gesperrt',zweite.ok===false&&/Anfrage/.test(zweite.error)&&db.messages.length===1);
+  db.chats[0].anfrage_zustand='angenommen';
+  const angenommen=await page.evaluate(async id=>api('/api/messages/'+id,await sendeKoerper(id,'Nach angenommener Chatanfrage')),kontaktStand.id);
+  pruefe('Angenommener Chat ist trotz altem Kontaktstatus wieder beschreibbar',Boolean(angenommen.id)&&db.messages.length===2);
   // Fehler nach Kontaktanlage: keine unlesbare Nachricht stehenlassen und
   // beim Wiederholen weder Kontakt noch Chat duplizieren.
   db.chats=[];db.chat_members=[];db.contacts=[];db.messages=[];db.message_keys=[];stoerung='message_keys';
@@ -204,7 +207,7 @@ const pruefe=(titel,b)=>{assert.ok(b,titel);ok++;console.log(`OK ${titel}`);};
   const versuch=await page.evaluate(async id=>sendeKoerper(id,'Nicht vom Anfragenden'),kontaktId);
   db.chats[0].anfrage_von=B;
   const fremd=await page.evaluate(({id,body})=>api('/api/messages/'+id,body),{id:kontaktId,body:versuch});
-  pruefe('Erstnachricht ist nur dem anfragenden Konto erlaubt',fremd.ok===false&&db.messages.length===0);db.chats[0].anfrage_von=A;
+  pruefe('Widersprüchliche Anfragezuordnung öffnet keine Erstnachricht',fremd.ok===false&&db.messages.length===0);db.chats[0].anfrage_von=A;
   stoerung='messages';const unklar=await page.evaluate(({id,body})=>api('/api/messages/'+id,body),{id:kontaktId,body:versuch});
   pruefe('Nicht ladbare Nachrichtenanzahl öffnet die Anfragesperre nicht',unklar.ok===false&&/Anfrage/.test(unklar.error)&&db.messages.length===0);stoerung=null;
   await page.locator('#contactAdd').click();await page.waitForFunction(()=>Boolean(window.kontaktGeoeffnet));
