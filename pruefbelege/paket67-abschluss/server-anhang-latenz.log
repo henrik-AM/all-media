@@ -1,0 +1,6 @@
+  web/.env.local geladen
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+  All Media Website: http://localhost:3300
+TRACE DB /rest/v1/rpc/zuruecksetzen 2127 200
+TRACE DB /rest/v1/krypto_schluessel 98178 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2253 200

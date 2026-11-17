@@ -434,12 +434,24 @@ require('./_fixtures').bereiteFixturesVor();
 
   await pruefe('Community-Glocke zeigt eigene Mitteilungen', async () => {
     await gehe('communities', 'profile');
-    await page.click('[data-oact="bell"]');
-    await page.waitForSelector('.mitt-liste', { timeout: 3000 });
-    const texte = await page.$$eval('.mitt__text', (els) => els.map((e) => e.textContent));
-    if (texte.length < 3) throw new Error('nur ' + texte.length);
-    if (!texte.some((t) => t.includes('Kanal') || t.includes('beigetreten'))) throw new Error(texte.join(' | '));
-    await page.click('[data-sheet-close]');
+    // Erst die tatsächliche Antwort, danach weiterhin höchstens 3s für die UI.
+    try {
+      const [res] = await Promise.all([
+        page.waitForResponse(r =>
+          new URL(r.url()).pathname === '/api/mitteilungen/communities'
+          && r.request().method() === 'GET'),
+        page.click('[data-oact="bell"]'),
+      ]);
+      if (!res.ok()) throw new Error('Mitteilungen HTTP ' + res.status());
+      await res.json();
+      await page.waitForSelector('.mitt-liste', { timeout: 3000 });
+      const texte = await page.$$eval('.mitt__text', (els) => els.map((e) => e.textContent));
+      if (texte.length < 3) throw new Error('nur ' + texte.length);
+      if (!texte.some((t) => t.includes('Kanal') || t.includes('beigetreten'))) throw new Error(texte.join(' | '));
+    } finally {
+      const schliessen = page.locator('[data-sheet-close]');
+      if (await schliessen.count()) await schliessen.first().click();
+    }
   });
 
   // Seit 21.10. eigene Seite nach Figma (Kasten 28/16): Name, Bild (Pflicht),

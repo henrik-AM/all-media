@@ -1,0 +1,33 @@
+
+Anhang im Chat
+  OK   Das Plus zeigt alle Anhang-Arten
+TRACE Nachricht 200 {}
+  OK   Standort landet als Karte im Chat
+  OK   Ortssuche abgefangen, nicht am echten Dienst
+  OK   Die Standort-Karte fuehrt zur Kartenansicht des Ortes
+TRACE AnhangHTTP /api/messages/e6d2d1b9-e90a-4e41-9a6f-7d10e707ed0f/anhang/vorbereiten 200 550
+TRACE Nachricht 200 {}
+  FEHL Kontakt landet als Karte im Chat — page.waitForResponse: Timeout 30000ms exceeded while waiting for event "response"
+  OK   Der Chatpartner steht nicht in der Auswahl
+TRACE AnhangHTTP /api/messages/e6d2d1b9-e90a-4e41-9a6f-7d10e707ed0f/anhang 200 47251
+TRACE Nachricht 200 {}
+TRACE AnhangHTTP /api/messages/e6d2d1b9-e90a-4e41-9a6f-7d10e707ed0f/anhang/vorbereiten 200 397
+TRACE Nachricht 200 {}
+TRACE AnhangHTTP /api/messages/e6d2d1b9-e90a-4e41-9a6f-7d10e707ed0f/anhang 200 1369
+TRACE Nachricht 200 {}
+  OK   Foto wird wirklich angezeigt, nicht nur benannt
+  OK   Die Chatliste zeigt den Anhang als Vorschau
+
+Weitere Optionen im Profil
+  OK   Der Mehr-Knopf zeigt fuenf Optionen
+  OK   Stummschalten wird im Profil angezeigt
+  OK   Blockieren nimmt die Person aus den Kontakten
+  OK   Der Nachricht-Knopf ist dann gesperrt
+  OK   Melden fragt nach Kategorie und Begründung
+
+12 von 13 Pruefungen bestanden
+Konsolenfehler: keine
+TRACE Nachricht 200 {}
+TRACE Nachricht 200 {}
+TRACE Nachricht 200 {}
+TRACE Nachricht 200 {}

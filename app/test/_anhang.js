@@ -162,18 +162,30 @@ require('./_fixtures').bereiteFixturesVor();
   });
 
   await pruefe('Kontakt landet als Karte im Chat', async () => {
-    await anhangAuf('kontakt');
-    await page.waitForSelector('[data-kontakt]', { timeout: 3000 });
-    await page.click(`[data-kontakt="${K.person('u4')}"]`);
-    // Der Anhang geht jetzt in die Datenbank; danach wird der Chat neu
-    // gezeichnet. Warten statt raten.
-    await page.waitForFunction(
-      () => [...document.querySelectorAll('.msg__kontaktText strong')]
-        .some((n) => n.textContent.includes('David König')),
-      null, { timeout: 10000 }
-    ).catch(() => {});
-    const namen = await page.$$eval('.msg__kontaktText strong', (els) => els.map((e) => e.textContent));
-    if (!namen.includes('David König')) throw new Error(namen.join(' | '));
+    try {
+      await anhangAuf('kontakt');
+      await page.waitForSelector('[data-kontakt]', { timeout: 3000 });
+      // Verschlüsselung und Persistierung zuerst; die UI behält ihre 10s-Grenze.
+      const [res] = await Promise.all([
+        page.waitForResponse(r =>
+          /^\/api\/messages\/[^/]+\/anhang$/.test(new URL(r.url()).pathname)
+          && r.request().method() === 'POST', { timeout: 60000 }),
+        page.click(`[data-kontakt="${K.person('u4')}"]`),
+      ]);
+      const daten = await res.json();
+      if (!res.ok() || !daten.ok || !daten.message?.id) {
+        throw new Error(daten.error || 'Kontakt nicht gespeichert: HTTP ' + res.status());
+      }
+      await page.waitForFunction(
+        () => [...document.querySelectorAll('.msg__kontaktText strong')]
+          .some((n) => n.textContent.includes('David König')),
+        null, { timeout: 10000 }
+      );
+      const namen = await page.$$eval('.msg__kontaktText strong', (els) => els.map((e) => e.textContent));
+      if (!namen.includes('David König')) throw new Error(namen.join(' | ') || 'keine Kontaktkarte');
+    } finally {
+      await blaetterZu();
+    }
   });
 
   await pruefe('Der Chatpartner steht nicht in der Auswahl', async () => {
@@ -191,7 +203,16 @@ require('./_fixtures').bereiteFixturesVor();
     await anhangAuf('galerie');
     const auswahl = await wartet;
     if (!auswahl) throw new Error('die Dateiauswahl ging nicht auf');
-    await auswahl.setFiles(BILD);
+    const [res] = await Promise.all([
+      page.waitForResponse(r =>
+        /^\/api\/messages\/[^/]+\/anhang$/.test(new URL(r.url()).pathname)
+        && r.request().method() === 'POST', { timeout: 60000 }),
+      auswahl.setFiles(BILD),
+    ]);
+    const daten = await res.json();
+    if (!res.ok() || !daten.ok || !daten.message?.id) {
+      throw new Error(daten.error || 'Foto nicht gespeichert: HTTP ' + res.status());
+    }
 
     /*
      * Auf die Blase warten, nicht auf die Uhr.

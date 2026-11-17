@@ -8,7 +8,7 @@ process.env.AM_OFFLINE_PORT='3304';
 process.env.AM_OFFLINE_BILDER=path.join(__dirname,'browser-vollnachweis');
 for(const k of ['AM_URL','BASE','BASIS','AM_BASIS'])process.env[k]='http://localhost:3300';
 const suite=require('../../app/test/alles');
-const zuerst=['feedback','paket6-browser','kontaktinfo','krypto','paket6-migration','paket6-kontenliste','paket6-webkonten','explorer','fremdprofil','k28-erstellen','uebernacht','sync','kamera','smoke','einstellungen','henrik','insel','optionen','kasten8'];
+const zuerst=['erstellen','anhang','feedback','paket6-browser','kontaktinfo','krypto','paket6-migration','paket6-kontenliste','paket6-webkonten','explorer','fremdprofil','k28-erstellen','uebernacht','sync','kamera','smoke','einstellungen','henrik','insel','optionen','kasten8'];
 suite.LAEUFE.sort((a,b)=>(zuerst.includes(a[0])?zuerst.indexOf(a[0]):100)-(zuerst.includes(b[0])?zuerst.indexOf(b[0]):100));
 (async()=>{
  require('../../app/test/_ki_belegung').pruefeBelegung('testbestand');

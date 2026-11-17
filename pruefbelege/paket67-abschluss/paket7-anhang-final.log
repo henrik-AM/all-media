@@ -1,0 +1,25 @@
+✔ Dauernde Klingeln werden begrenzt gebündelt und nie endlos verschoben (956.655709ms)
+✔ Abofehler räumt schon angelegten Kanal und Timer auf (2.4675ms)
+✔ Server: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (52.776583ms)
+✔ App: fehlgeschlagene Reaktionsabfrage bestätigt keinen leeren Stand (14.902292ms)
+✔ Website-Chatliste lädt ersten Stand und wiederholt fehlgeschlagene Listenabrufe (52.750708ms)
+✔ Website-Chatliste bündelt Klingel während laufendem Abruf und holt danach nach (31.979875ms)
+✔ Native Chatliste bestätigt fehlgeschlagenen Abruf nicht und lädt ersten Stand wirklich (5.334459ms)
+✔ Private Klingel setzt Sitzungstoken vor Subscribe; Abmelden vor getSession verhindert Join (0.307791ms)
+✔ Kuvert-Signal überlebt die Bündelung mit gewöhnlichen Klingeln (301.965917ms)
+✔ Native Liste: alte Klingelantwort überschreibt neueren expliziten Abruf nicht (14.478792ms)
+✔ Native Liste: spätere Antwort eines älteren expliziten Abrufs wird verworfen (7.637959ms)
+✔ Native Liste: erfolgreicher unveränderter Stand belegt Frische nach Lesefehler (6.488292ms)
+✔ Prüfbereitschaft wartet vor dem Login auf Sitzungswiederherstellung, ohne Datenwartezeit (5.545167ms)
+✔ Prüfbereitschaft hält nach Anmeldung Gerüst- und Datenprüfung vollständig aufrecht (1.47025ms)
+✔ Anhangantwort bleibt nach Chatwechsel aus dem fremden Verlauf und Bezug fern (42.258709ms)
+✔ Anhangantwort aus alter Chatöffnung verändert auch denselben erneut geöffneten Chat nicht (31.614416ms)
+✔ Anhangantwort bleibt kontogetrennt und aktualisiert die unveränderte Ansicht weiterhin (52.414542ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1681.474541

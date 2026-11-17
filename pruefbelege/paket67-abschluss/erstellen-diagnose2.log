@@ -1,0 +1,59 @@
+TRACE toast 1794912186472 true:
+TRACE toast 1794912189689 true:
+TRACE toast 1794912193141 true:
+TRACE toast 1794912194999 true:
+
+Glocke — Mitteilungen
+  OK   Roter Punkt zeigt ungelesene Mitteilungen
+TRACE HTTP GET /api/mitteilungen/videos 200
+  OK   Glocke oeffnet die Liste mit Text und Zeitangabe
+TRACE HTTP POST /api/mitteilungen/34763520-772b-4255-babc-908cd1a92a3c/gelesen 200
+  OK   Antippen fuehrt zum Profil, aus dem die Mitteilung stammt
+TRACE HTTP GET /api/mitteilungen/videos 200
+TRACE HTTP POST /api/mitteilungen/videos/alle-gelesen 200
+TRACE toast 1794912210681 false:Alle Mitteilungen gelesen
+  OK   Alle als gelesen markieren nimmt den roten Punkt weg
+
+Menue — Einstellungen des Bereichs
+TRACE toast 1794912213180 true:Alle Mitteilungen gelesen
+  OK   Menue im Video-Profil springt zum Abschnitt Videos
+  OK   Menue im Community-Profil springt zum Abschnitt Communitys
+
+Plus — Erstellen
+  OK   Die neun Punkte stehen wie im Prototyp
+TRACE toast 1794912220180 false:„Sommer" angelegt
+  OK   Highlight anlegen erscheint sofort im Profil
+TRACE toast 1794912221679 true:
+  OK   Derselbe Name wird kein zweites Mal angelegt
+TRACE toast 1794912223680 false:„Beste Momente" angelegt
+TRACE toast 1794912225680 true:„Beste Momente" angelegt
+  OK   Playlist anlegen erscheint im Profil
+TRACE toast 1794912231179 false:Beitrag veröffentlicht
+TRACE toast 1794912233181 true:Beitrag veröffentlicht
+  OK   Beitrag mit Foto landet im Feed und im eigenen Raster
+TRACE toast 1794912242681 false:Beitrag veröffentlicht
+TRACE toast 1794912244679 true:Beitrag veröffentlicht
+  OK   Ausschnitt beim Erstellen wird auf der Soundseite markiert
+TRACE toast 1794912247179 false:Spendenaktion läuft
+  OK   Spendenaktion erscheint mit Fortschrittsbalken im Profil
+TRACE toast 1794912249679 true:Spendenaktion läuft
+TRACE toast 1794912250179 false:Spendenaktion läuft
+  OK   Eine Spendenaktion geht auch ohne Ziel
+TRACE toast 1794912252181 true:Spendenaktion läuft
+TRACE toast 1794912252679 true:
+  OK   Ein unsinniges Spendenziel wird weiterhin abgelehnt
+  OK   Livestream laeuft und hinterlaesst die Aufzeichnung
+
+Community-Profil
+TRACE toast 1794912495116 false:Livestream beendet, die Aufzeichnung steht im Querformat
+TRACE toast 1794912497615 true:Livestream beendet, die Aufzeichnung steht im Querformat
+TRACE HTTP GET /api/mitteilungen/communities 200
+  OK   Community-Glocke zeigt eigene Mitteilungen
+TRACE toast 1794912501615 false:„Nachtschicht“ erstellt
+  OK   Neue Community erstellen legt sie unter Erstellt an
+TRACE toast 1794912504115 true:„Nachtschicht“ erstellt
+  OK   Dieselbe Community gibt es kein zweites Mal
+TRACE toast 1794912507391 true:
+
+19 von 19 Pruefungen bestanden
+Konsolenfehler: keine

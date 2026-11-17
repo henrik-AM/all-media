@@ -1,0 +1,265 @@
+{
+  "laufId": "54a2008c-b662-4d1f-9648-b5e06b1f3da0",
+  "erwartet": 103,
+  "phase": "beendet",
+  "bereinigung": "erfolgreich",
+  "stempelVorher": "32efaac003e02125fa3fe4eab4658a4440d8afcb029ab17554e6c0711eddfed8",
+  "ergebnisse": [
+    {
+      "name": "feedback",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "paket6-browser",
+      "code": 0,
+      "zahlen": {
+        "gut": 38,
+        "gesamt": 38
+      }
+    },
+    {
+      "name": "kontaktinfo",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "krypto",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "paket6-migration",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-kontenliste",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "paket6-webkonten",
+      "code": 0,
+      "zahlen": {
+        "gut": 4,
+        "gesamt": 4
+      }
+    },
+    {
+      "name": "explorer",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "fremdprofil",
+      "code": 0,
+      "zahlen": {
+        "gut": 14,
+        "gesamt": 14
+      }
+    },
+    {
+      "name": "k28-erstellen",
+      "code": 0,
+      "zahlen": {
+        "gut": 81,
+        "gesamt": 81
+      }
+    },
+    {
+      "name": "uebernacht",
+      "code": 0,
+      "zahlen": {
+        "gut": 11,
+        "gesamt": 11
+      }
+    },
+    {
+      "name": "sync",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "kamera",
+      "code": 0,
+      "zahlen": {
+        "gut": 10,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "smoke",
+      "code": 0,
+      "zahlen": {
+        "gut": 75,
+        "gesamt": 75
+      }
+    },
+    {
+      "name": "einstellungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "henrik",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "insel",
+      "code": 0,
+      "zahlen": {
+        "gut": 17,
+        "gesamt": 17
+      }
+    },
+    {
+      "name": "optionen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "kasten8",
+      "code": 0,
+      "zahlen": {
+        "gut": 6,
+        "gesamt": 6
+      }
+    },
+    {
+      "name": "testhygiene",
+      "code": 0,
+      "zahlen": {
+        "gut": 24,
+        "gesamt": 24
+      }
+    },
+    {
+      "name": "erstellen",
+      "code": 1,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "teilen",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "schema",
+      "code": 0,
+      "zahlen": {
+        "gut": 7,
+        "gesamt": 7
+      }
+    },
+    {
+      "name": "sammlungen",
+      "code": 0,
+      "zahlen": {
+        "gut": 16,
+        "gesamt": 16
+      }
+    },
+    {
+      "name": "sammlungenweb",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "anhang",
+      "code": 1,
+      "zahlen": {
+        "gut": 12,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "henrik2",
+      "code": 0,
+      "zahlen": {
+        "gut": 19,
+        "gesamt": 19
+      }
+    },
+    {
+      "name": "suche",
+      "code": 0,
+      "zahlen": {
+        "gut": 13,
+        "gesamt": 13
+      }
+    },
+    {
+      "name": "kasten12",
+      "code": 0,
+      "zahlen": {
+        "gut": 65,
+        "gesamt": 65
+      }
+    },
+    {
+      "name": "kasten17",
+      "code": 0,
+      "zahlen": {
+        "gut": 53,
+        "gesamt": 53
+      }
+    },
+    {
+      "name": "glocke",
+      "code": 0,
+      "zahlen": {
+        "gut": 21,
+        "gesamt": 21
+      }
+    },
+    {
+      "name": "pfeile",
+      "code": "abbruch",
+      "zahlen": null
+    }
+  ],
+  "signal": "SIGTERM",
+  "quellenUnveraendert": true,
+  "code": 143
+}

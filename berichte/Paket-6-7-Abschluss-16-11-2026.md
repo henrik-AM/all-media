@@ -267,3 +267,46 @@ DasBildderFehlermaskemitgeschützterTestnummerliegtprivatimRoharchiv
 rohbelege-paket67-2026-11-17/kontakt-live,gehtnichtinsRepository.
 FeedbacknachKorrektur53/53,Code0,keineKonsolenfehler. Neue103erVollwiederholung
 aufgefrorenemStandfolgt. KeineweiterenProduktänderungen währendderMessung.
+
+## 17.11. — Vollnachweis 54a2008c kontrolliert unterbrochen
+
+Unveränderter Produktstand e5b2b08: 32/103 abgeschlossene Gruppen,
+731/735 Prüfungen, Exit 143 nach kontrolliertem Abbruch. 270 Testmitteilungen
+entfernt, Rest 0. Unterbrochene Gruppe pfeile besitzt keine vollständige Wertung.
+Belege: vollstatus-54a2008c.json, vollprotokoll-54a2008c.log, vollcode-54a2008c.txt.
+
+Community-Glocke überschritt die bisher ab Klick gemessene 3s-Grenze; das später
+geöffnete Blatt blockierte zwei folgende Erstellen-Prüfungen. Der Test wartet
+jetzt zuerst auf die tatsächliche HTTP-Antwort, behält danach 3s für die UI und
+schließt das Blatt auch bei Fehlern. Kontaktkarte fehlte innerhalb von 10s;
+die unveränderte instrumentierte Einzelwiederholung bestand 13/13. Damit ist
+die ursprüngliche Ursache nicht abschließend bewiesen. Die Kontaktprüfung
+trennt jetzt erfolgreiche Persistierung und anschließende 10s-Darstellung und
+meldet Serverfehler ausdrücklich. Keine Produktänderung für diese beiden Befunde.
+
+Gezielte Erstellen-Diagnose mit protokollierten HTTP-Statuscodes und beobachtetem
+Toast-Lebenszyklus: 19/19, Exit 0, keine Konsolenfehler. Der Hinweis verschwand
+regulär nach ungefähr 2,5s; Community-Antwort HTTP 200, alle Folgeprüfungen grün.
+Die vorherige unveränderte Einzelmessung war 15/19 mit einem zusätzlichen
+401 beim Sammlungsabruf; ein Diagnose-Start scheiterte vor den Prüfungen an der
+60s-Grenze für page.evaluate. Diese Fehlversuche bleiben als Belege erhalten;
+sie werden nicht in einen erfolgreichen Gesamtnachweis umgedeutet.
+
+## 17.11. — Langsame Anhangantworten und fremde Chatansichten
+
+Instrumentierung zeigt Kontakt-Vorbereitung HTTP 200 nach 550ms, abschließende
+Anhangantwort HTTP 200 erst nach 47.251ms. Eine weitere Messung zeigt einen
+Schlüssellesezugriff /rest/v1/krypto_schluessel mit 98.178ms. Das ist beobachtete
+Backend-Latenz; ihre externe Ursache ist nicht abschließend belegt. Kontakt-
+und Fototest warten nun bis zu 60s auf erfolgreiche Persistierung, anschließend
+unverändert 10s beziehungsweise 15s auf Darstellung. Keine automatischen Retries.
+
+Zusätzlich wurde ein echter Rückkehrfehler sichtbar: nach Verlassen des Chats
+schrieb eine verspätete Anhangantwort in state.messages und rief paintMessages
+ohne Nachrichtenansicht auf. Sie konnte ebenso einen inzwischen anderen Bezug
+löschen. zielChat bindet beide Abschluss-Callbacks jetzt an Konto, Chat-ID und
+Öffnungsgeneration. Drei reproduzierbare Gegenproben mit Originalfunktion:
+alter Code 0/3, Korrektur 3/3. Gesamte Paket7-Regressionsdatei 17/17,
+Offline-Browserprüfung unverändert 38/38, jeweils Exit 0. Kein Schemaeingriff.
+Der lokale Backend-Diagnoserahmen protokolliert nur Pfad, Laufzeit und Status,
+keine Token oder Anfrageparameter. Eigene Wachhaltung während lokaler Tests.

@@ -1,0 +1,10 @@
+/Users/henrik.dikta/allmedia-wt-codex/paket67-abschluss/app/test/_konto.js:191
+          () => ablehnen(new Error(`page.evaluate kam nach ${ms} ms nicht zurueck`)),
+                         ^
+
+Error: page.evaluate kam nach 60000 ms nicht zurueck
+    at Timeout._onTimeout (/Users/henrik.dikta/allmedia-wt-codex/paket67-abschluss/app/test/_konto.js:191:26)
+    at listOnTimeout (node:internal/timers:635:17)
+    at process.processTimers (node:internal/timers:571:7)
+
+Node.js v24.19.0

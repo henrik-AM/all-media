@@ -15118,6 +15118,11 @@ function openProfilSenden(profile) {
  *   fertig    was mit der angelegten Nachricht geschieht
  */
 function zielChat(chat) {
+  // Verspätete Anhänge gehören zur ursprünglichen Konto-/Chatöffnung.
+  const generation = chatNachsehenGeneration;
+  const kontoId = state.users.me?.id;
+  const aktuell = () => generation === chatNachsehenGeneration
+    && state.openChatId === chat.id && state.users.me?.id === kontoId;
   return {
     pfad: `/api/messages/${chat.id}/anhang`,
     chatId: chat.id,
@@ -15131,6 +15136,7 @@ function zielChat(chat) {
           }
         : null,
     bezugFertig: () => {
+      if (!aktuell()) return;
       msgBezug = null;
       document.querySelector('.msgbezug')?.remove();
     },
@@ -15138,6 +15144,7 @@ function zielChat(chat) {
     // Regel in ChatDetailScreen.tsx (ohne=…).
     ohne: chat.userId ? [] : ['standortAnfragen'],
     fertig: (nachricht) => {
+      if (!aktuell()) return;
       state.messages.push(nachricht);
       paintMessages(chat);
     },

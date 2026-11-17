@@ -1,0 +1,39 @@
+
+Anhang im Chat
+  OK   Das Plus zeigt alle Anhang-Arten
+TRACE Nachricht 200 {}
+  OK   Standort landet als Karte im Chat
+  OK   Ortssuche abgefangen, nicht am echten Dienst
+  OK   Die Standort-Karte fuehrt zur Kartenansicht des Ortes
+TRACE AnhangHTTP /api/messages/27f56af9-c36e-4d1c-b680-4941e3787aea/anhang/vorbereiten 200 572
+TRACE Nachricht 200 {}
+TRACE AnhangHTTP /api/messages/27f56af9-c36e-4d1c-b680-4941e3787aea/anhang 200 1412
+TRACE Nachricht 200 {}
+  OK   Kontakt landet als Karte im Chat
+  OK   Der Chatpartner steht nicht in der Auswahl
+TRACE AnhangHTTP /api/messages/27f56af9-c36e-4d1c-b680-4941e3787aea/anhang/vorbereiten 200 262
+TRACE Nachricht 200 {}
+TRACE DOM {"karten":["David König"],"hinweise":["Kontakt gesendet"]}
+  FEHL Foto wird wirklich angezeigt, nicht nur benannt — kein Bild in der Blase
+  OK   Die Chatliste zeigt den Anhang als Vorschau
+
+Weitere Optionen im Profil
+TRACE AnhangHTTP /api/messages/27f56af9-c36e-4d1c-b680-4941e3787aea/anhang 200 2154
+TRACE Nachricht 200 {}
+  OK   Der Mehr-Knopf zeigt fuenf Optionen
+  OK   Stummschalten wird im Profil angezeigt
+  OK   Blockieren nimmt die Person aus den Kontakten
+  OK   Der Nachricht-Knopf ist dann gesperrt
+  OK   Melden fragt nach Kategorie und Begründung
+
+12 von 13 Pruefungen bestanden
+Konsolenfehler:
+Konsole: Unhandled promise rejection: TypeError: Cannot set properties of null (setting 'innerHTML')
+    at paintMessages (http://localhost:3300/app.js:21422:17)
+    at Object.fertig (http://localhost:3300/app.js:15142:7)
+    at anhangSenden (http://localhost:3300/app.js:15491:10)
+JS-Fehler: Cannot set properties of null (setting 'innerHTML')
+TRACE Nachricht 200 {}
+TRACE Nachricht 200 {}
+TRACE Nachricht 200 {}
+TRACE Nachricht 200 {}

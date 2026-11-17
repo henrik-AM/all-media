@@ -1,0 +1,64 @@
+
+Glocke — Mitteilungen
+  OK   Roter Punkt zeigt ungelesene Mitteilungen
+  OK   Glocke oeffnet die Liste mit Text und Zeitangabe
+  OK   Antippen fuehrt zum Profil, aus dem die Mitteilung stammt
+  FEHL Alle als gelesen markieren nimmt den roten Punkt weg — Punkt ist noch da
+
+Menue — Einstellungen des Bereichs
+  OK   Menue im Video-Profil springt zum Abschnitt Videos
+  OK   Menue im Community-Profil springt zum Abschnitt Communitys
+
+Plus — Erstellen
+  OK   Die neun Punkte stehen wie im Prototyp
+  OK   Highlight anlegen erscheint sofort im Profil
+  OK   Derselbe Name wird kein zweites Mal angelegt
+  OK   Playlist anlegen erscheint im Profil
+  OK   Beitrag mit Foto landet im Feed und im eigenen Raster
+  OK   Ausschnitt beim Erstellen wird auf der Soundseite markiert
+  OK   Spendenaktion erscheint mit Fortschrittsbalken im Profil
+  OK   Eine Spendenaktion geht auch ohne Ziel
+  OK   Ein unsinniges Spendenziel wird weiterhin abgelehnt
+  OK   Livestream laeuft und hinterlaesst die Aufzeichnung
+
+Community-Profil
+  FEHL Community-Glocke zeigt eigene Mitteilungen — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-area="communities"]')[22m
+[2m    - locator resolved to <button class="navbtn " data-area="communities">…</button>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div id="toast" class="toast">Livestream beendet, die Aufzeichnung steht im Que…</div> intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is visible, enabled and stable[22m
+[2m      - scrolling into view if needed[22m
+[2m      - done scrolling[22m
+[2m      - <div id="toast" class="toast">Livestream beendet, die Aufzeichnung steht im Que…</div> intercepts pointer events[22m
+[2m    - retrying click action[22m
+[2m      - waiting 100ms[22m
+[2m    - waiting for element to be visible, enabled and stable[22m
+[2m    - element is visible, enabled and stable[22m
+[2m    - scrolling into view if needed[22m
+[2m    - done scrolling[22m
+[2m    - <div id="toast" class="toast">Livestream beendet, die Aufzeichnung steht im Que…</div> intercepts pointer events[22m
+[2m  - retrying click action[22m
+[2m    - waiting 500ms[22m
+[2m    - waiting for element to be visible, enabled and stable[22m
+
+  FEHL Neue Community erstellen legt sie unter Erstellt an — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-oact="create"]')[22m
+
+  FEHL Dieselbe Community gibt es kein zweites Mal — page.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-oact="create"]')[22m
+
+
+15 von 19 Pruefungen bestanden
+Konsolenfehler:
+Konsole: Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3300/api/sammlungen?art=playlist

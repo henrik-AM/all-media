@@ -72,3 +72,24 @@ test('Prüfbereitschaft wartet vor dem Login auf Sitzungswiederherstellung, ohne
 test('Prüfbereitschaft hält nach Anmeldung Gerüst- und Datenprüfung vollständig aufrecht',async()=>{
  const c=bereitProbe(true,Promise.resolve());await c.run();assert.deepEqual(c.schritte,['geruest','daten']);
 });
+
+function anhangZielProbe() {
+ const c={state:{openChatId:'a',users:{me:{id:'konto-a'}},messages:[]},chatNachsehenGeneration:1,
+   msgBezug:{art:'antwort'},msgBearbeitet:null,paintMessages:()=>c.gezeichnet++,gezeichnet:0,
+   document:{querySelector:()=>({remove:()=>c.entfernt++})},entfernt:0};
+ vm.runInNewContext(fn('web/public/app.js','zielChat')+';globalThis.ziel=zielChat({id:"a",userId:"b"});',c);
+ return c;
+}
+test('Anhangantwort bleibt nach Chatwechsel aus dem fremden Verlauf und Bezug fern',()=>{
+ const c=anhangZielProbe();c.state.openChatId='anderer';c.ziel.fertig({id:'m'});c.ziel.bezugFertig();
+ assert.equal(c.state.messages.length,0);assert.equal(c.gezeichnet,0);assert.equal(c.entfernt,0);assert.ok(c.msgBezug);
+});
+test('Anhangantwort aus alter Chatöffnung verändert auch denselben erneut geöffneten Chat nicht',()=>{
+ const c=anhangZielProbe();c.chatNachsehenGeneration++;c.ziel.fertig({id:'m'});c.ziel.bezugFertig();
+ assert.equal(c.state.messages.length,0);assert.equal(c.gezeichnet,0);assert.equal(c.entfernt,0);
+});
+test('Anhangantwort bleibt kontogetrennt und aktualisiert die unveränderte Ansicht weiterhin',()=>{
+ const alt=anhangZielProbe();alt.state.users.me.id='konto-b';alt.ziel.fertig({id:'alt'});assert.equal(alt.state.messages.length,0);
+ const c=anhangZielProbe();c.ziel.fertig({id:'neu'});c.ziel.bezugFertig();
+ assert.equal(c.state.messages[0].id,'neu');assert.equal(c.gezeichnet,1);assert.equal(c.entfernt,1);assert.equal(c.msgBezug,null);
+});
