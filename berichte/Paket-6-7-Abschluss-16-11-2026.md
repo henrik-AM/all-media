@@ -341,3 +341,27 @@ Suchrichtung aus dem früheren Bestandslauf blieb dabei unverändert erhalten.
 Das bestätigt die Testkontamination; kein Anlass für neue RLS-/Produktänderung.
 Der nächste Vollnachweis beginnt mit dieser Gruppe und hält Bildschirm sowie
 System für die Dauer des eigenen Prüfprozesses wach.
+
+## 17.11. — Vollständiger Bestand und abschließende Gegenprüfungen
+
+cabb24b4: alle103 Prozesse gestartet/beendet,3414/3419,Code1,Quellen unverändert,
+469 Mitteilungen entfernt,Rest0. Vier rote Gruppen: Kontaktinfo10/10 mit
+Reset-Abbruch,Teilen vor Prüfungen am Reset abgebrochen,Sammlungen22/23,
+Querformat33/37. Alle Paket6/7-Gruppen selbst Code0.
+Unveränderte gezielte Gegenprüfung7f5692ca:94/95,Code1;Teilen25/25,
+Sammlungen23/23,Querformat37/37 mitCode0;Kontaktinfo9/10 durch die3s-Grenze
+für einen asynchronen Profilaufbau. Keine Konsolenfehler in dieser Gruppe.
+
+Nur der Kontaktinfo-Test trennt jetzt die drei neu ausgelösten HTTP-Anfragen
+von der unveränderten3s-UI-Frist. 10/10,Code0,keineKonsolenfehler;
+Datenphasen1153/1138ms. Kein Produktcode geändert. Kein grünerGesamtlauf
+behauptet;vollständigerLauf und Gegenprüfungen bleiben getrennte Belege.
+Ein geänderter Produktstand wurde nicht durch Zusammenschieben verschleiert.
+
+Eigener Server83962 und SimulatorAll-MediaCodex beendet. 51+9 verschiedene
+eigene temporäre Webschlüssel samt zugeordneten Kuverts archiviert/entfernt,
+Rest0;15 unmittelbar vorgefundene geschützte Bestandsschlüssel unverändert.
+Letzte47 Testmitteilungen nach dem Einzeltest entfernt,Rest0. Die SQL-Alias-
+Großschreibung wurde im Abschlusshelfer korrigiert und fehlende Zähler werden
+nun ausdrücklich abgewiesen; erste Kuvertnachzählung zusätzlich separat0.
+Veröffentlichung und echterRendernachweis folgen auf derselben Produktquelle.

@@ -1,0 +1,276 @@
+{
+  "archiv": "/Users/henrik.dikta/allmedia-wt-codex/rohbelege-paket67-2026-11-17/integration-20261117T140854Z",
+  "zeit": "2026-11-17T14:08:54.928719+00:00",
+  "dateien": [
+    {
+      "pfad": "bilder/glocke/web-home-an.png",
+      "bytes": 23763,
+      "sha256": "52cedb0a6094b910c48b3768596db73a177da4dff0d7790af37cef35058e3d3a",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/glocke/web-home-aus.png",
+      "bytes": 23102,
+      "sha256": "c0900920b9e9687ecf34e5abe12e4604020f91d176de275dec55c98aa35a86cd",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/glocke/web-kurz-an.png",
+      "bytes": 62371,
+      "sha256": "f1aa043572b03b9cc496e4444b97804947c3e9205a26718216d8ac5e879d74db",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/glocke/web-kurz-aus.png",
+      "bytes": 37736,
+      "sha256": "138f6d6a7f43b29d015f3eb94a89cb58e7dbceaf84e2574c36c18027b78a2f2a",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten5/web-home.png",
+      "bytes": 97315,
+      "sha256": "e8447a778c218585ee282affed0ca502a8bdf7a0a06a608f20fafb9860ae1455",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten5/web-kurz.png",
+      "bytes": 60191,
+      "sha256": "806629394786de74796a10210bffea67239f6c8bf23d94dffed8b1b7df610b05",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten5/web-live-auf.png",
+      "bytes": 205914,
+      "sha256": "f87cfc43d5578d541ba6cb057a63ed2287a1ddde152105b327c738308c5a9564",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten5/web-live-zu.png",
+      "bytes": 217137,
+      "sha256": "efe8aaf848d1ac3790715086c4d072af19989d3bcb2455f17acf4a49552f30aa",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-aehnlich-liste.png",
+      "bytes": 16330,
+      "sha256": "81ad41e7812cdc85f17d3ff9623596dcb699b686ee7187b6e8a80274eba06b0c",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-aehnlich.png",
+      "bytes": 206240,
+      "sha256": "ee06ec8cb4ac1f3ac347f473e8f283650a321665ff01a4546c479ac882d1c172",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-kapitel-kurz.png",
+      "bytes": 267194,
+      "sha256": "9a1353c4997228da74e0b4552f13b0167e08f19e94bff2b1f703e751bc2a0ce0",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-kapitel.png",
+      "bytes": 111961,
+      "sha256": "8f43cb22a88fd5a1fec5b06e7ecc717212a0f8ffc241a813d8f57d6ec18ff0a9",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-leiste-vor.png",
+      "bytes": 111895,
+      "sha256": "c77fe2b0317fa3b8b4244ec61b339a4429274fa919e5497a8f52ff9cdcd59788",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-live-aktionen.png",
+      "bytes": 177672,
+      "sha256": "90034186e51691234a7cee6d5bdcad42a629ae06c9cba066bae6fcf1f622d684",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-live-auto-schalter.png",
+      "bytes": 29609,
+      "sha256": "7d24b62232de4a59226ad8342ded991798c8c9cb8cf04bfc477b83b1c195be83",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-live-einstellungen.png",
+      "bytes": 87243,
+      "sha256": "79e18b939bd303b4b76ccd56f80763121c2eac539a63a2c48f9b504f195b3125",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-live-ende-veroeffentlicht.png",
+      "bytes": 179094,
+      "sha256": "eeb775f98bd1d442458b38b1a45909f681ede7c3da136b8996bf507d286b0ba6",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-live-ende-wahl.png",
+      "bytes": 26823,
+      "sha256": "bcb40582139ce7225578c6356c819aad8020cd0d2e0e6f8332be7d8389ce9458",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-live-menue.png",
+      "bytes": 105090,
+      "sha256": "40896c00ebee8595e8440aee4048ec6d5c24199abaf452600e8fbce2e192fb60",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-live-zurueck.png",
+      "bytes": 154875,
+      "sha256": "d26c16975190d076c39f3f866a76d59f591ca1f0484440824c7c16d691177666",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-spende-blatt.png",
+      "bytes": 177672,
+      "sha256": "90034186e51691234a7cee6d5bdcad42a629ae06c9cba066bae6fcf1f622d684",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-spende-code-falsch.png",
+      "bytes": 82382,
+      "sha256": "cdd90dbca658f1b817831627dd82d73d32a2f358cec344d83d888a9a236ce2da",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-spende-code.png",
+      "bytes": 87000,
+      "sha256": "adbe709496026926de85c06cf07408d10c5244fe24048a1d2d253c6c882362be",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-spende-ok.png",
+      "bytes": 180583,
+      "sha256": "b121a5d48512d22e5fa84da785c4aa18c07cc3563e98862c2d867356748089bf",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "bilder/kasten6/web-spende-zu-klein.png",
+      "bytes": 112194,
+      "sha256": "11a3da2f416e478bd7079c481cc873d8f3cb212080302e823cdda226b79ca61a",
+      "art": "eigenes generiertes Prüfbild"
+    },
+    {
+      "pfad": "pruefbelege/paket-6/_paket6_opus.log",
+      "bytes": 1497,
+      "sha256": "a11ade7a730bf893cb2ef565ee414f8975326523abd7ba54848cd5112d7852b0",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/__pycache__/gezielt-start.cpython-315.pyc",
+      "bytes": 1820,
+      "sha256": "f70a388b708c9bee24b302f3f50ef8e59663ec488a4db158c5a6d8d109d8c2f3",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-anhang/browser-absenderwarnung.png",
+      "bytes": 55217,
+      "sha256": "ae29cfecc89ab0737622b419dd6b83010d1328e0fc52a99fee9d90a9fe9b7021",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-anhang/browser-kontakt-entwurf.png",
+      "bytes": 108396,
+      "sha256": "aae0182b5cb8d93065713e029ead9c5ff1c42b02609282b86f74d122cc207e5d",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-anhang/browser-paarvergleich.png",
+      "bytes": 116332,
+      "sha256": "333e72355c6d2407071ef2fb2486899e900c303ca036d2befadd66c111cfea39",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-anhang/browser-sendesperre.png",
+      "bytes": 41553,
+      "sha256": "ff991ecdb5e82609ea079c935f611007f8d5afe299110ccf07bd131761199b94",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-vollnachweis/browser-absenderwarnung.png",
+      "bytes": 55118,
+      "sha256": "db20e3ff557cb4579ac6dd575749a28890a5d32cb49d108c23498527f9829db0",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-vollnachweis/browser-kontakt-entwurf.png",
+      "bytes": 109142,
+      "sha256": "df7a72189373f66dfc190e328efeebba448c870a4f82bc960040ce83ce7828d7",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-vollnachweis/browser-paarvergleich.png",
+      "bytes": 116972,
+      "sha256": "e6e6488ab1868055cb894224fe7dddae48e021adfdfa9af18236822eb1a3ab27",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/browser-vollnachweis/browser-sendesperre.png",
+      "bytes": 41553,
+      "sha256": "ff991ecdb5e82609ea079c935f611007f8d5afe299110ccf07bd131761199b94",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/gesamt-steuerung.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/gesamtlauf-exit.txt",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/gesamtlauf.log",
+      "bytes": 247501,
+      "sha256": "9332cf725b749014ef8b6ed60d81f6a1f07bdd1fc8aed25851dba0773bc5fd17",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/gezielt-exit.txt",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/gezielt-steuerung.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/gezielt.log",
+      "bytes": 7380,
+      "sha256": "11165310acac0ed108dfb8f90f679ac1da387038c8dbed230e837085b1ec5481",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/native-paar-pruefen.log",
+      "bytes": 1293,
+      "sha256": "0cb4fc3f3709f69d975e4d750574ce6185a6789ee1b274f29c0fc985a5f67a77",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/server-diagnose.log",
+      "bytes": 31684,
+      "sha256": "aa69f1f4e05f329ee8eb7b48a8771ffd11fcd356d70cca98047924b296fb4362",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/server-prozess.json",
+      "bytes": 32,
+      "sha256": "f38f448f26b6d4f87b0f5d66200d961fac0844293ba146438db5ad1d9f41ece2",
+      "art": "eigene Rohdatei"
+    },
+    {
+      "pfad": "pruefbelege/paket67-abschluss/server.log",
+      "bytes": 1520,
+      "sha256": "e60131a6469276f9f5b2d57f5b9d7bce850184b8d2fc00a4bee192f9e7819bd3",
+      "art": "eigene Rohdatei"
+    }
+  ]
+}

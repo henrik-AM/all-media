@@ -1,0 +1,44 @@
+{
+  "laufId": "7f5692ca-cbf2-4ce8-a27c-732cbdf88027",
+  "erwartet": 4,
+  "phase": "beendet",
+  "bereinigung": "erfolgreich",
+  "stempelVorher": "0f35fba25bfc1023ff21f40681bef7c90325186c590d0991c2c22fc09418558b",
+  "ergebnisse": [
+    {
+      "name": "kontaktinfo",
+      "code": 1,
+      "zahlen": {
+        "gut": 9,
+        "gesamt": 10
+      }
+    },
+    {
+      "name": "teilen",
+      "code": 0,
+      "zahlen": {
+        "gut": 25,
+        "gesamt": 25
+      }
+    },
+    {
+      "name": "sammlungenweb",
+      "code": 0,
+      "zahlen": {
+        "gut": 23,
+        "gesamt": 23
+      }
+    },
+    {
+      "name": "querformat",
+      "code": 0,
+      "zahlen": {
+        "gut": 37,
+        "gesamt": 37
+      }
+    }
+  ],
+  "signal": null,
+  "quellenUnveraendert": true,
+  "code": 1
+}

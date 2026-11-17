@@ -1,0 +1,19 @@
+
+Kontaktinfo
+  Datenphase Kontaktinfo: 1153ms; danach UI-Grenze 3000ms
+  OK   Aus dem Chat heraus kommt die Kontaktinfo, nicht das Beitragsprofil
+  OK   Alle Zeilen aus dem Prototyp-Frame stehen da
+  OK   Die beiden anderen Profile der Person sind erreichbar
+  OK   Benachrichtigungen lassen sich umschalten
+  Datenphase Kontaktinfo: 1138ms; danach UI-Grenze 3000ms
+  OK   Chatdesign merkt sich die Auswahl
+  OK   Lange Drücken markiert eine Nachricht, sie erscheint in der Liste
+  OK   Im Chat suchen findet eine Nachricht
+  OK   Chat leeren nimmt die Nachrichten weg
+
+Gruppenanruf
+  OK   Eine Gruppe lässt sich anrufen, alle Mitglieder stehen da
+  OK   Der Gruppenanruf ist „gestartet" und zählt keine erfundene Dauer
+
+10 von 10 Pruefungen bestanden
+Konsolenfehler: keine

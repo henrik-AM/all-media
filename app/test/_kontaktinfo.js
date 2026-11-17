@@ -101,7 +101,29 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   const zurKontaktinfo = async () => {
     await imChat('Anna Schmidt');
-    await page.click('.chathead__body[data-profile]');
+    const userId = await page.getAttribute('.chathead__body[data-profile]', 'data-profile');
+    const chatId = await page.evaluate(() => state.openChatId);
+    const begonnen = Date.now();
+    // Neue Anfragen dieses Öffnens beobachten, nicht alte Antworten davor.
+    const geladen = async (pfad) => {
+      const req = await page.waitForRequest(r =>
+        new URL(r.url()).pathname === pfad && r.method() === 'GET', { timeout: 30000 });
+      let uhr;
+      try {
+        await Promise.race([
+          req.response().then(async res => {
+            if (!res || !res.ok()) throw new Error(pfad + ': HTTP ' + (res?.status() || 'abgebrochen'));
+            await res.json();
+          }),
+          new Promise((_, ablehnen) => { uhr = setTimeout(() => ablehnen(new Error(pfad + ': keine Antwort nach 30s')), 30000); }),
+        ]);
+      } finally { clearTimeout(uhr); }
+    };
+    await Promise.all([
+      Promise.all([`/api/profile/${userId}`, `/api/chats/${chatId}/medien`, `/api/krypto/empfaenger/${chatId}`].map(geladen)),
+      page.click('.chathead__body[data-profile]'),
+    ]);
+    console.log('  Datenphase Kontaktinfo: ' + (Date.now() - begonnen) + 'ms; danach UI-Grenze 3000ms');
     await page.waitForSelector('.kp__zeileText', { timeout: 3000 });
   };
 

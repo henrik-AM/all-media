@@ -1,0 +1,14 @@
+{
+  "prozesscode": 0,
+  "prozesscodeBeobachtet": "exec_command Sitzung 30630, abgeschlossener Prozess mit exit_code 0",
+  "gut": 10,
+  "gesamt": 10,
+  "logSha256": "135d043a28cd900ca07b1d55f36bfaec5f3b6787c54d5b54eac3f379be516334",
+  "testSha256": "f19b4c754871ede8518981ff013dc4f765a3f6728f42ebc9e46f985826805675",
+  "produktquellenGegenC9e2fadUnveraendert": true,
+  "testaenderung": "Neue Profil-/Medien-/Kryptoanfragen vor urspr\u00fcnglicher UI-Grenze 3000ms abwarten",
+  "datenphaseMs": [
+    1153,
+    1138
+  ]
+}

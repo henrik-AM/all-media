@@ -1,0 +1,176 @@
+  Laufkennung: 7f5692ca-cbf2-4ce8-a27c-732cbdf88027
+
+======================================================================
+  kontaktinfo
+======================================================================
+
+Kontaktinfo
+  OK   Aus dem Chat heraus kommt die Kontaktinfo, nicht das Beitragsprofil
+  OK   Alle Zeilen aus dem Prototyp-Frame stehen da
+  OK   Die beiden anderen Profile der Person sind erreichbar
+  OK   Benachrichtigungen lassen sich umschalten
+  FEHL Chatdesign merkt sich die Auswahl — page.waitForSelector: Timeout 3000ms exceeded.
+Call log:
+[2m  - waiting for locator('.kp__zeileText') to be visible[22m
+
+  OK   Lange Drücken markiert eine Nachricht, sie erscheint in der Liste
+  OK   Im Chat suchen findet eine Nachricht
+  OK   Chat leeren nimmt die Nachrichten weg
+
+Gruppenanruf
+  OK   Eine Gruppe lässt sich anrufen, alle Mitglieder stehen da
+  OK   Der Gruppenanruf ist „gestartet" und zählt keine erfundene Dauer
+
+9 von 10 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  teilen
+======================================================================
+
+Blatt: Suche oben, Senden unten
+  OK   Der Teilen-Knopf oeffnet das Blatt mit Suchleiste
+  OK   Gruppen: Kontakte zuerst, dann ganze Communitys — keine fremden Vorschlaege
+  OK   Ohne Auswahl ist Senden aus
+  OK   Antippen waehlt aus und sendet noch nicht
+  OK   Die Suche filtert nach Name
+  OK   Ein halber Nutzername findet keinen Fremden
+  OK   Der genaue Nutzername findet den Fremden
+  OK   Die Auswahl bleibt beim Suchen erhalten
+  OK   Senden schickt die Auswahl ab und schliesst das Blatt
+  OK   Der Beitrag liegt als Karte im Chat
+  OK   Die Chatliste zeigt "Beitrag geteilt" als Vorschau
+
+Ganze Communitys
+  OK   Nur beigetretene Communitys stehen im Blatt, mit Unterthema
+  OK   Person und Community zusammen: der Knopf nennt beides
+  OK   Die Suche filtert auch die Communitys
+  OK   Das Unterthema ist wählbar, voreingestellt das erste
+  OK   Senden legt die Karte ins gewählte Unterthema, nicht ins erste
+  OK   Ohne Wahl geht die Karte ins erste Unterthema
+  OK   Ein Unterthema einer anderen Community wird abgelehnt
+  OK   Ohne Mitgliedschaft lehnt die Datenbank ab — auch am Blatt vorbei
+
+Fremde: ein Video bis zur Annahme
+  OK   Hochformat: ein Video an den Fremden geht durch und zaehlt mit
+  OK   Der Fremde landet unter Communitys, nicht im Messenger
+  OK   Querformat: der Fremde ist gesperrt und sagt warum
+  OK   Querformat: an einen Kontakt geht es durch
+  OK   Die Datenbank laesst kein zweites Video durch — mit Grund
+
+Live
+  OK   Live: der Teilen-Knopf oeffnet das Blatt und sendet
+
+25 von 25 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  sammlungenweb
+======================================================================
+
+Sammlungen auf der Website
+  OK   Eine Playlist laesst sich anlegen
+  OK   Sie ist danach eine echte Sammlung, nicht nur ein Name
+  OK   Frisch angelegt ist sie leer — und sagt das auch
+  OK   Eine leere Sammlung hat kein Bild
+  OK   Es gibt einen eigenen Beitrag zum Einsortieren
+  OK   Der Beitrag laesst sich hineinlegen
+  OK   Derselbe Beitrag ein zweites Mal wird abgelehnt
+  OK   Darin liegt genau dieser eine Beitrag
+  OK   Die Kachel bringt eine unterschriebene Adresse mit
+  OK   Jetzt hat die Sammlung ein Bild
+  OK   In ein Highlight kommt kein Beitrag
+
+Auf dem Bildschirm
+  OK   Die Kreise stehen im eigenen Profil
+  OK   Der Kreis traegt die id seiner Sammlung
+  OK   Antippen zeigt den Inhalt, nicht eine Meldung
+  OK   Im Raster liegt genau eine Kachel
+  OK   Der Zaehler im Kopf nennt dieselbe Zahl
+
+Loeschen
+  OK   Der Loeschknopf steht im Kopf der eigenen Sammlung
+  OK   Die Rueckfrage sagt, dass die Beitraege bleiben
+  OK   Nach dem Loeschen ist der Kreis weg, der gleichnamige Highlight-Kreis bleibt
+  OK   Sie ist auch in der Datenbank weg, nicht nur auf dem Schirm
+  OK   Den Beitrag darin gibt es weiterhin
+  OK   Loeschen trifft nur die eigene Sammlung, nicht die gleichnamige fremde
+
+Aufraeumen
+  OK   Die Pruefsammlungen sind wieder weg
+
+23 von 23 Pruefungen bestanden
+Konsolenfehler: keine
+
+======================================================================
+  querformat
+======================================================================
+
+6.3 Rote Zeitleiste
+  OK   Ein fertiges Video hat Speichern, Aufrufe und „Zu Story" im Menü
+  OK   Antippen weit hinten spult vor — das Video springt mit
+  OK   Antippen weiter vorn spult zurück
+  OK   Ziehen über die Leiste spult mit
+
+6.4 Kapitel
+  OK   Alle Kapitel liegen im Video, jede Dauer passt
+  OK   Rechts neben der Leiste steht die Länge der Datei
+  OK   Ein kurzes Video mit Kapiteln weit hinter dem Ende zeigt keine sinnlosen
+
+6.7 Vollbild — Browser mit Vollbild-API
+  OK   Vollbild im Hochkant-Handy dreht den Player um 90 Grad
+  OK   Das Bild nutzt die lange Seite und ist ganz zu sehen
+  OK   Auch gedreht springt die Leiste an die angetippte Stelle
+  OK   Der Knopf beendet das Vollbild wieder
+
+6.7 Vollbild — iPhone ohne Vollbild-API
+  OK   Vollbild im Hochkant-Handy dreht den Player um 90 Grad
+  OK   Das Bild nutzt die lange Seite und ist ganz zu sehen
+  OK   Auch gedreht springt die Leiste an die angetippte Stelle
+  OK   Der Knopf beendet das Vollbild wieder
+
+6.6 Ähnliche Videos
+  OK   Ein ähnliches Video antippen öffnet genau dieses
+  OK   „Ähnliche Videos →" führt zur ganzen Querformat-Liste
+
+6.1 / 6.2 Live
+  OK   Live zeigt das Bild, nicht nur die Leiste
+  OK   Live läuft in Echtzeit, auch wenn sonst 2× eingestellt ist
+  OK   Die Video-Einstellungen bieten bei Live keine Geschwindigkeit an
+  OK   Live beginnt an der Stelle, die gerade gesendet wird, nicht bei 0:00
+  OK   Vorspulen über die gesendete Stelle hinaus geht nicht
+  OK   Zurückspulen geht, um Verpasstes zu sehen
+  OK   „LIVE" führt zurück an die gesendete Stelle, nicht weiter
+  OK   Bei Live: kein Speichern, Zuschauer statt Aufrufe
+  OK   Das Drei-Punkte-Menü bietet bei Live weder Herunterladen noch Story
+  OK   Live zeigt keine Kapitel
+
+6.5 Spenden mit eigenem Betrag
+  OK   Zahlungsmethode und Spendencode des Prüfkontos stehen
+  OK   Das Spendenblatt bietet „Eigener Betrag" an
+  OK   Ein zu kleiner Betrag wird abgewiesen, das Feld bleibt offen
+  OK   2,50 € gehen durch und stehen so in der Datenbank
+  OK   Die Spende ist nur vorgemerkt und trägt die Zahlungsmethode
+
+6.8 Livestream beenden: veröffentlichen oder löschen
+  OK   Während der Sendung steht genau ein Beitrag, und zwar als Live
+  OK   Beenden fragt: als Video veröffentlichen oder löschen
+  OK   Veröffentlichen macht denselben Beitrag zum Standard-Video, ohne Duplikat
+  OK   Löschen lässt keinen Beitrag zurück
+  OK   Mit „automatisch veröffentlichen" endet der Stream ohne Rückfrage
+
+  37 von 37 Punkten erfuellt
+
+  Keine Konsolenfehler
+
+======================================================================
+  Übersicht
+======================================================================
+  FEHL  kontaktinfo           9/10
+  OK    teilen               25/25
+  OK    sammlungenweb        23/23
+  OK    querformat           37/37
+
+  94 von 95 Prüfungen bestanden, 4/4 Läufe.
+  Nicht durchgekommen: kontaktinfo
+  Lauf 7f5692ca-cbf2-4ce8-a27c-732cbdf88027: 93 Mitteilungen entfernt, Rest 0.

@@ -1,0 +1,16 @@
+{
+  "webschluesselSeparatEntfernt": 60,
+  "eigenerWebschluesselRest": 0,
+  "zugehoerigerKuvertRest": 0,
+  "bestandsschluesselVorher": 15,
+  "bestandsschluesselNachher": 15,
+  "bestandUnveraendert": true,
+  "letzteMitteilungen": {
+    "zeit": "2026-11-17T14:04:01.273Z",
+    "vorher": 47,
+    "geloescht": 47,
+    "rest": 0
+  },
+  "eigenerServer3300Beendet": true,
+  "eigenerSimulatorHeruntergefahren": true
+}

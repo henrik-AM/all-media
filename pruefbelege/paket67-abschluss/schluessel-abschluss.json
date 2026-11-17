@@ -1,0 +1,12 @@
+{
+  "zeit": "2026-11-17T14:01:26.834Z",
+  "quelle": "e5b2b08:pruefbelege/paket67-abschluss/kontakt-live-fixtures.json",
+  "vorher": 9,
+  "rest": 0,
+  "kuvertRest": 0,
+  "ausgangslisteVorher": 15,
+  "ausgangslisteNachher": 15,
+  "ausgangslisteUnveraendert": true,
+  "roharchiv": "/Users/henrik.dikta/allmedia-wt-codex/rohbelege-paket67-2026-11-17/schluessel/1794924086100.json",
+  "sha256": "671a92123fcd258e956d1aca267471e090115729ee50b232a3747fd583190937"
+}

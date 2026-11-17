@@ -22,7 +22,7 @@ const filter=`user_id in(${ids(basis.kontoIds)}) and id not in(${ids(basis.bewah
  await frage(`begin;set local lock_timeout='3s';set local statement_timeout='15s';delete from krypto_schluessel where id in(${auswahl}) and ${filter};commit;select 1 ok`);
  const nachher=await frage(`select (select count(*) from krypto_schluessel where ${filter})::int rest,(select count(*) from message_keys where schluessel_id in(${auswahl}))::int kuvertRest`);
  const erhaltenNachher=await frage(`select id from krypto_schluessel where user_id in(${ids(basis.kontoIds)}) and id in(${ids(basis.bewahren)}) order by id`);
- const beleg={zeit:new Date().toISOString(),quelle:basis.quelle,vorher:vorher.length,rest:nachher[0].rest,kuvertRest:nachher[0].kuvertRest,ausgangslisteVorher:erhaltenVorher.length,ausgangslisteNachher:erhaltenNachher.length,ausgangslisteUnveraendert:JSON.stringify(erhaltenVorher)===JSON.stringify(erhaltenNachher),roharchiv:datei,sha256:crypto.createHash('sha256').update(inhalt).digest('hex')};
+ const beleg={zeit:new Date().toISOString(),quelle:basis.quelle,vorher:vorher.length,rest:nachher[0].rest,kuvertRest:nachher[0].kuvertrest,ausgangslisteVorher:erhaltenVorher.length,ausgangslisteNachher:erhaltenNachher.length,ausgangslisteUnveraendert:JSON.stringify(erhaltenVorher)===JSON.stringify(erhaltenNachher),roharchiv:datei,sha256:crypto.createHash('sha256').update(inhalt).digest('hex')};
  fs.writeFileSync(path.join(__dirname,'schluessel-abschluss.json'),JSON.stringify(beleg,null,2));console.log(JSON.stringify(beleg));
- if(beleg.rest||beleg.kuvertRest||!beleg.ausgangslisteUnveraendert)throw Error('Schlüssel-Abschluss noch unvollständig');
+ if(!Number.isSafeInteger(beleg.rest)||!Number.isSafeInteger(beleg.kuvertRest)||beleg.rest||beleg.kuvertRest||!beleg.ausgangslisteUnveraendert)throw Error('Schlüssel-Abschluss noch unvollständig');
 })().catch(e=>{console.error(e.message);process.exitCode=1});

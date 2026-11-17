@@ -1,0 +1,49 @@
+Aus eigener Serverdiagnose 17.11.; enthält mehrere Messungen.
+Filter: /rpc/zuruecksetzen und POST /api/reset; keine Header/Parameter.
+TRACE DB /rest/v1/rpc/zuruecksetzen 2127 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2253 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2584 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 7595 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2004 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2096 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 3301 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 5499 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2118 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 3427 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2386 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2331 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2477 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2762 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 11090 500
+POST /api/reset fehlgeschlagen: canceling statement due to statement timeout
+TRACE DB /rest/v1/rpc/zuruecksetzen 5598 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2095 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 5530 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2285 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2130 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 12235 500
+POST /api/reset fehlgeschlagen: canceling statement due to statement timeout
+TRACE DB /rest/v1/rpc/zuruecksetzen 8213 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 9958 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2196 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 5004 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2144 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 13341 500
+POST /api/reset fehlgeschlagen: canceling statement due to statement timeout
+TRACE DB /rest/v1/rpc/zuruecksetzen 8829 500
+POST /api/reset fehlgeschlagen: canceling statement due to statement timeout
+TRACE DB /rest/v1/rpc/zuruecksetzen 2618 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2012 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 4039 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2986 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2183 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2477 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2730 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 3438 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2571 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2811 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2607 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2174 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2162 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2043 200
+TRACE DB /rest/v1/rpc/zuruecksetzen 2073 200
