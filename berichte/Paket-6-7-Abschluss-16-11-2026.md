@@ -207,3 +207,15 @@ stellenSitzungswartezeit undunverkürzteDatenprüfung angemeldeterKonten sicher.
 Paket7Regression+Stummjetzt23/23,TypeScript0,Offline10/10Gruppen.
 Kryptotest25/25live,die dreiÜbernahmegruppen jeweils4/4mitCode0.
 Neuer kompletter102erNachweis folgt,die fünf zuvorrotenGruppen zuerst.
+
+## Alte eigene Arbeitskopie bereinigt, Rohdaten erhalten
+
+`paket-7-fortsetzung` bleibt auf1eef00b undist jetztgitsauber.246eigene
+Rohbelege/erzeugteBilder (3347702Bytes) unverändert mitSHA256-Manifest unter
+`~/allmedia-wt-codex/rohbelege-paket67-2026-11-17/fortsetzung` archiviert;
+196ignorierteOriginalbelege bleiben zusätzlichamaltenOrt. Nur eigeneerzeugte
+Bilder/Fixture-Metadaten zurückgestellt undgesicherteungetrackteSitzungslogs
+verschoben;keineQuelländerungundkeineFremdänderungzurückgedreht. Der ursprüngliche
+Paket7-Worktree mitClaudes erzeugtenDateien bleibtunangetastet.
+NeuerVollnachweis48dc37b0auf1dbcd04läuftunabhängig (PID65397,Server64886).
+Die fünf zuvorrotenGruppen darin bereits gemeinsam47/47,alleCode0.
