@@ -7,12 +7,12 @@ Prüfstände. Diese Matrix beschreibt den maßgeblichen aktuellen Stand.
 
 | Anforderung | Geprüfter Beleg | Status |
 |---|---|---|
-| Genau eine tatsächliche Claude-Testschleife, danach Codex-Korrektur | `pruefbelege/paket67-abschluss/claude-pruefung.md`, `claude-nachholpruefung.md`; neue Reproduktion scheitert, korrigierte Stumm-/Listenfälle zusammen 21/21 | Erfüllt; Quote war verfügbar |
+| Genau eine tatsächliche Claude-Testschleife, danach Codex-Korrektur | `pruefbelege/paket67-abschluss/claude-pruefung.md`, `claude-nachholpruefung.md`; neue Reproduktion scheitert, korrigierte Stumm-/Listenfälle und Bereitschaft zusammen 23/23 | Erfüllt; Quote war verfügbar |
 | Alte sieben Gesamtlauffehler einzeln auswerten | `berichte/Paket-7-Claude-Fortsetzung-16-11-2026.md`; Einzelläufe einschließlich Prozesscodes, Startkonfiguration und Prüfzielkorrektur dokumentiert | Erfüllt; abschließender gemeinsamer Lauf noch offen |
 | Tatsächliche Original-Provider mit echten Testkonten | `native-ergebnis.json`:18/18; Kontakt/Gruppe, Dreifachtipp, Fehler, Fernänderung und A/B/A | Erfüllt; Authentifizierung aus Prüfrahmen, keine Behauptung physischer Geräte |
 | Neue Verschlüsselung, gemeinsame Nummern und native Plattformwirkung | `native-paar-ergebnis.json`:6/6; `native-neustart.json`:2 unveränderte Schlüssel; `paket67-chat-final`:native18/18,Plattform14/14,Exit0 | Erfüllt; ursprüngliche Bildschirme, separate Testkontexte wie unten beschrieben |
-| Paket6-Nacharbeiten einschließlich Schema127 | `schema127-live-probe.json`:23/23, verworfen; Einspielungsbeleg; `paket67-p6`:Live40/40, Browser28/28; Offline10/10Gruppen | Erfüllt; Clients noch nicht veröffentlicht |
-| Vollständiger integrierter Nachweis | Originalstatus639f542b,102Suiten,Quellwächter und Bereinigungsjournal | **Läuft; Endcode, alle Nenner, Quellgleichheit und Rest0 noch prüfen** |
+| Paket6-Nacharbeiten einschließlich Schema127 | `schema127-live-probe.json`:23/23, verworfen; Einspielungsbeleg; `paket67-p6`:Live40/40; aktuelle Browser38/38 und Kontakt-Live10/10; Offline10/10Gruppen | Erfüllt; Clients noch nicht veröffentlicht |
+| Vollständiger integrierter Nachweis | Aktueller Originalstatus54a2008c,103Suiten,Quellstande5b2b08,Quellwächter und Bereinigungsjournal | **Läuft; Endcode, alle Nenner, Quellgleichheit und Rest0 noch prüfen** |
 | Aktuelle Projektübersichten, Testdaten und Prozesse sauber abschließen | Native-/Plattform-/Paket6-Fixtures jeweilsRest0; Vaultübersichten aktualisiert; Gesamtlauf/Prüfserver noch aktiv | **Abschluss nach Gesamtlauf offen** |
 | Geprüfte Inhalte nachmain und Push übernehmen, Render tatsächlich prüfen | Henriks ausdrücklicher gemeinsamer Auftrag; `origin/main` und Hauptordner weiterhin627fa86, sauber, Vorfahr des Integrationszweigs | **Veröffentlichung und Live-Nachweis offen; Autorisierung vorhanden** |
 

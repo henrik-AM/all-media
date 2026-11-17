@@ -1,4 +1,4 @@
-// Gemeinsamer Paket6/7-Nachweis: alle102Suiten, unveränderte Quellen, Originaljournal/Bereinigung.
+// Gemeinsamer Paket6/7-Nachweis: alle103Suiten, unveränderte Quellen, Originaljournal/Bereinigung.
 const fs=require('node:fs'),path=require('node:path');
 const vault='/Users/henrik.dikta/Library/CloudStorage/OneDrive-Persönlich/Business/AI/Henrik/2.Gehirn.md/04 Ressourcen/Zugangsdaten/Supabase.md';
 const token=fs.readFileSync(vault,'utf8').match(/sbp_[A-Za-z0-9_-]{20,}/)?.[0];
