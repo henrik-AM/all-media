@@ -37,7 +37,7 @@ import { meldebelegHolen, meinSchluessel } from '../../lib/krypto';
 import { useAktionen } from '../../lib/useAktionen';
 import { useProfil } from '../../contexts/ProfilContext';
 import { useEinstellungen } from '../../contexts/EinstellungenContext';
-import { Chat, Contact, Message } from '../../types';
+import { Community, Chat, Contact, Message } from '../../types';
 import { haptic } from '../../lib/haptics';
 import { nachrichtTon } from '../../lib/toene';
 // Dieselbe mm:ss-Schreibweise wie im Anrufbildschirm — sonst stuende im Chat
@@ -83,6 +83,7 @@ interface Props {
   chat: Chat;
   /** Nachrichten, die ausserhalb des Chats entstanden sind (Story-Antwort). */
   extraMessages?: Message[];
+  geoeffneteKanalCommunity?: Community;
   onBack: () => void;
   onCall: (kind: 'audio' | 'video') => void;
   onCamera: () => void;
@@ -137,6 +138,7 @@ interface Props {
 export const ChatDetailScreen = ({
   chat,
   extraMessages,
+  geoeffneteKanalCommunity,
   onBack,
   onCall,
   onCamera,
@@ -228,7 +230,7 @@ export const ChatDetailScreen = ({
    */
   const kanalCommunity = communities.find((c) =>
     (c.unterthemen ?? []).some((u) => u.id === chat.id)
-  );
+  ) ?? geoeffneteKanalCommunity;
   /** Kasten 8.2: kanalCommunity ist die Community dieses Unterthemas — auch fuer Push-to-Talk. */
   const istKanal = !!kanalCommunity;
   /** Kasten 8.6: die angetippte Sitzung „Push to Talk", deren Verlauf offen ist. */

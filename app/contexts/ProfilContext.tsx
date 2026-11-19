@@ -161,6 +161,7 @@ interface NeuesVideo {
 
 interface ProfilWert {
   /* --- Glocke --- */
+  pttMitteilungenErgaenzen: (liste: Mitteilung[]) => void;
   mitteilungen: (bereich: MitteilungsBereich) => MitteilungAnzeige[];
   ungelesen: (bereich: MitteilungsBereich) => number;
   alsGelesen: (id: string) => void;
@@ -368,6 +369,15 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const [alle, setAlle] = useState<Mitteilung[]>([]);
+  useEffect(() => setAlle(daten.mitteilungen), [daten.mitteilungen]);
+  const pttMitteilungenErgaenzen = useCallback((liste: Mitteilung[]) => {
+    setAlle((vorher) => {
+      const bekannt = new Set(vorher.map((m) => m.id));
+      const neu = liste.filter((m) => !bekannt.has(m.id));
+      return neu.length ? [...neu, ...vorher].slice(0, 100) : vorher;
+    });
+  }, []);
+
   const [communities, setCommunities] = useState<Community[]>([]);
 
   const [eigeneBeitraege, setEigeneBeitraege] = useState<Post[]>([]);
@@ -419,7 +429,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    */
   useEffect(() => {
     if (!daten.geladen) return;
-    setAlle(daten.mitteilungen);
     setCommunities(daten.communities);
     setClips(daten.clips);
     setHighlights(daten.highlights);
@@ -1159,6 +1168,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
   const wert = useMemo<ProfilWert>(
     () => ({
+      pttMitteilungenErgaenzen,
       mitteilungen,
       ungelesen,
       alsGelesen,
@@ -1213,7 +1223,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       profilSpeichernWarten,
     }),
     [
-      mitteilungen, ungelesen, alsGelesen, mitteilungWeg, alleGelesen,
+      pttMitteilungenErgaenzen, mitteilungen, ungelesen, alsGelesen, mitteilungWeg, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,

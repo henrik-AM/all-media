@@ -1498,11 +1498,14 @@ const COMMUNITY_SPALTEN =
  * nicht geladen und nicht vorgeschlagen ist. Gleiche Regel in
  * web/server/supabase-api.js (ladeCommunities).
  */
-export async function ladeCommunities(client: SupabaseClient, ichId: string, suche = ''): Promise<Community[]> {
+export async function ladeCommunities(
+  client: SupabaseClient, ichId: string, suche = '', communityId?: string,
+): Promise<Community[]> {
   const abfrage = (zaehlung: string) => {
     let q = client.from('communities').select(COMMUNITY_SPALTEN + zaehlung);
     const filter = Beitritt.suchFilter(['name', 'topic'], suche);
     if (filter) q = q.or(filter);
+    if (communityId) q = q.eq('id', communityId);
     return q.order('created_at', { ascending: true }).limit(filter ? 30 : 100);
   };
   let { data, error } = await abfrage(', mitglieder_anzahl');
@@ -1563,6 +1566,17 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string, suc
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0) || String(a.created_at).localeCompare(String(b.created_at)))
       .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [], ...Erstellen.kanalFelder(zusatz, k.id, ichId) })),
   })));
+}
+
+export async function ladeCommunityZuUnterthema(
+  client: SupabaseClient, ichId: string, kanalId: string,
+): Promise<Community | undefined> {
+  const { data, error } = await client.from('community_channels')
+    .select('community_id').eq('id', kanalId).maybeSingle();
+  if (error) throw error;
+  if (!data) return undefined;
+  const [community] = await ladeCommunities(client, ichId, '', data.community_id);
+  return community;
 }
 
 export async function ladeKanalNachrichten(
@@ -1781,14 +1795,17 @@ export async function ladeStandorte(client: SupabaseClient): Promise<Place[]> {
 
 export async function ladeMitteilungen(
   client: SupabaseClient,
-  ichId: string
+  ichId: string,
+  nurPtt = false,
 ): Promise<Mitteilung[]> {
-  const { data, error } = await client
+  const abfrage = client
     .from('notifications')
     .select('id, actor_id, art, bereich, target_type, target_id, text, read_at, created_at')
-    .eq('user_id', ichId)
+    .eq('user_id', ichId);
+  if (nurPtt) abfrage.eq('art', 'ptt');
+  const { data, error } = await abfrage
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(nurPtt ? 20 : 100);
   if (error) throw error;
 
   return (data ?? []).map((b: any) => ({

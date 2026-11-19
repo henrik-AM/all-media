@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useContext, useRef, useState } from 'react';
-import { Modal, StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, Modal, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { ThemeContext, ThemeProvider } from './contexts/ThemeContext';
@@ -20,7 +20,7 @@ import { profilOeffnerSetzen } from './lib/markierung';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenBereich, TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
-import { kommentarOrt, ladeEinstellungen } from './lib/daten';
+import { kommentarOrt, ladeCommunityZuUnterthema, ladeEinstellungen, ladeMitteilungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
 import { KontoFreigabe } from './components/KontoFreigabe';
 import { NeueBedingungen } from './components/NeueBedingungen';
@@ -85,7 +85,7 @@ const ChatAbgleich = require('../gemeinsam/chatabgleich') as typeof import('../g
 const Beitritt = require('../gemeinsam/beitritt') as typeof import('../gemeinsam/beitritt');
 
 type Overlay =
-  | { kind: 'chat'; chat: Chat; extra?: Message[] }
+  | { kind: 'chat'; chat: Chat; extra?: Message[]; kanalCommunity?: Community }
   /**
    * `liste`: durch welche Storys geblättert wird. Aus der Leiste ist es die
    * ganze Leiste, von einem Ring am Profilbild nur diese Person (Kasten 11.1).
@@ -334,6 +334,41 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   const profil = useProfil();
 
   const sub = subs[area];
+  const { pttMitteilungenErgaenzen } = profil;
+  const eigenId = daten.ichId;
+  const pttGlockeSichtbar = area === 'communities' && sub === 'profile' && !overlay
+    && (!sheet || sheet === 'mitteilungen');
+
+  // Die Live-Datenbank veröffentlicht keine Realtime-Ereignisse für Mitteilungen.
+  // Nur die sichtbare Community-Glocke fragt nach neuen PTT-Einladungen.
+  useEffect(() => {
+    if (!pttGlockeSichtbar || !sbClient || !eigenId) return;
+    let aktiv = true;
+    let laeuft = false;
+    const laden = async () => {
+      if (laeuft || AppState.currentState !== 'active') return;
+      laeuft = true;
+      try {
+        const liste = await ladeMitteilungen(sbClient, eigenId, true);
+        if (aktiv) pttMitteilungenErgaenzen(liste);
+      } catch (e: any) {
+        if (aktiv) console.warn('PTT-Mitteilungen nachladen fehlgeschlagen:', e?.message ?? e);
+      } finally {
+        laeuft = false;
+      }
+    };
+    void laden();
+    const uhr = setInterval(laden, 5000);
+    const horcher = AppState.addEventListener('change', (z) => {
+      if (z === 'active') void laden();
+    });
+    return () => {
+      aktiv = false;
+      clearInterval(uhr);
+      horcher.remove();
+    };
+  }, [pttGlockeSichtbar, sbClient, eigenId, pttMitteilungenErgaenzen]);
+
   const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
 
   /*
@@ -646,8 +681,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     chatId ? [...(extraNachrichten[chatId] ?? [])] : [];
 
   /** Chat oeffnen und dabei alles mitgeben, was frueher hineingeteilt wurde. */
-  const oeffneChat = (chat: Chat, zusatz?: Message[]) =>
-    setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])] });
+  const oeffneChat = (chat: Chat, zusatz?: Message[], kanalCommunity?: Community) =>
+    setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])], kanalCommunity });
 
   /**
    * Einen Chat mit dieser Person öffnen — und ihn dabei wirklich anlegen.
@@ -1370,7 +1405,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       preview: unterthema.themen.join(' · '),
       time: '',
       unreadCount: 0,
-    });
+    }, undefined, community);
 
   /* ---------------- Glocke, Plus und Menü im eigenen Profil -------------- */
   /*
@@ -1522,7 +1557,16 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     if (ziel.art === 'channel') {
       const com = daten.communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === ziel.id));
       const ut = com?.unterthemen?.find((u) => u.id === ziel.id);
-      return com && ut ? oeffneUnterthema(com, ut) : setNotice('Dieses Unterthema gibt es nicht mehr');
+      if (com && ut) return oeffneUnterthema(com, ut);
+      if (!sbClient || !daten.ichId) return setNotice('Dieses Unterthema gibt es nicht mehr');
+      return void ladeCommunityZuUnterthema(sbClient, daten.ichId, ziel.id)
+        .then((community) => {
+          const unterthema = community?.unterthemen?.find((u) => u.id === ziel.id);
+          if (!community || !unterthema) return setNotice('Dieses Unterthema gibt es nicht mehr');
+          profil.communityMerken(community);
+          oeffneUnterthema(community, unterthema);
+        })
+        .catch(() => setNotice('Das Unterthema ließ sich nicht öffnen'));
     }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);
@@ -1846,6 +1890,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <ChatDetailScreen
         chat={overlay.chat}
         extraMessages={overlay.extra}
+        geoeffneteKanalCommunity={overlay.kanalCommunity}
         onBack={() => {
           setOverlay(null);
           // Kasten 27: die Liste zeigt danach die letzte Nachricht dieses
@@ -1859,7 +1904,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
            * Community-Zweierchat (vorher landete er im Messenger-Chat mit
            * derselben Person) und im Unterthema (vorher gar nicht).
            */
-          const kanal = daten.communities.some((c) =>
+          const kanal = Boolean(overlay.kanalCommunity) || daten.communities.some((c) =>
             (c.unterthemen ?? []).some((u) => u.id === overlay.chat.id)
           );
           const ort = kanal ? { kanalId: overlay.chat.id } : { chatId: overlay.chat.id };
@@ -2825,6 +2870,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     if (overlay?.kind === 'chat' || overlay?.kind === 'gruppe') {
       const id = overlay.chat.id;
       return !(
+        (overlay.kind === 'chat' && overlay.kanalCommunity) ||
         daten.communityChats.some((c) => c.id === id) ||
         daten.communities.some((c) => c.id === id || (c.unterthemen ?? []).some((u) => u.id === id))
       );
