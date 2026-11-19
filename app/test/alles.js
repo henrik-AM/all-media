@@ -271,6 +271,7 @@ const LAEUFE = [
   ['k28-commbild', 'k28-commbild.js'],
   ['k28-gruppe', 'k28-gruppe.js'],
   ['k28-karte', 'k28-karte.js'],
+  ['k28-anruf-ptt', 'k28-anruf-ptt.js'],
   ['chatklingel-einheit', '_chatklingel_einheit.js'],
   ['paket7-offline', '_paket7_regression.cjs'],
   ['paket7-stumm', '_paket7_stumm_regression.cjs'],

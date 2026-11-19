@@ -176,30 +176,31 @@ async function teilB() {
   console.log('\nB  Wirkung mit zwei Konten (setzt Schema 89 + 90 voraus)');
   const A = await konto('test@all-media.app', TESTKONTO_PASS);
   const B = await konto('all.media.prueflauf@web.de', PRUEFKONTO_PASS);
-  const warte = (ms) => new Promise((r) => setTimeout(r, ms));
   // Zweierchat + Kontakt des Testpaars sichern (fehlten am 06.11.2026 im
   // Testbestand) — sonst fällt der Messenger-Teil von 5.x stumm aus.
   const Testpaar = require('./_testpaar');
   const pttPfade = [];
+  let com;
+  const unterthemen = [];
   try {
     await Testpaar.testpaarSichern();
-  } catch (e) {
-    pruefe('Testpaar @test ↔ @prueflauf (Kontakt + Zweierchat) sichern', false, e.message);
-  }
-
-  // Prüfcommunity von B, öffentlich, zwei Unterthemen; A tritt bei.
-  const name = 'Prüfcommunity PTT ' + Date.now();
-  const { data: com, error: eCom } = await B.c.from('communities')
-    .insert({ name, topic: 'Prüflauf', visibility: 'public', created_by: B.id }).select().single();
-  pruefe('B legt Prüfcommunity an', !eCom && !!com, eCom?.message);
-  if (!com) return;
-  try {
+    const name = 'Prüfcommunity PTT ' + Date.now();
+    const { data, error } = await B.c.from('communities')
+      .insert({ name, topic: 'Prüflauf', visibility: 'public', created_by: B.id }).select().single();
+    com = data;
+    pruefe('B legt Prüfcommunity an', !error && !!com, error?.message);
+    if (!com) return;
     await B.c.from('community_members').insert({ community_id: com.id, user_id: B.id });
-    const k = async (slug) => (await B.c.from('community_channels')
-      .insert({ community_id: com.id, slug, name: slug, topics: [] }).select('id').single()).data;
+    const k = async (slug) => {
+      const { data } = await B.c.from('community_channels')
+        .insert({ community_id: com.id, slug, name: slug, topics: [] }).select('id').single().throwOnError();
+      unterthemen.push(data.id);
+      return data;
+    };
     const k1 = await k('ptt-aus');
     const k2 = await k('ptt-an');
     pruefe('Zwei Unterthemen angelegt', !!k1 && !!k2);
+    if (!k1 || !k2) return;
     const { error: eJoin } = await A.c.from('community_members').insert({ community_id: com.id, user_id: A.id });
     pruefe('A tritt bei', !eJoin, eJoin?.message);
 
@@ -242,7 +243,7 @@ async function teilB() {
 
     const mitteilungenA = async (kanal) =>
       ((await A.c.from('notifications').select('id, art, actor_id, target_type, target_id')
-        .eq('user_id', A.id).eq('art', 'ptt').eq('target_id', kanal)).data || []);
+        .eq('user_id', A.id).eq('art', 'ptt').eq('target_id', kanal).throwOnError()).data);
     // Seit Schema 117/118: nur ein eigener Upload unter der eigenen Adresse
     // (Platzhalter wie example.invalid lehnt die Datenbank ab).
     const pttMedium = await Testpaar.eigenesMedium(URL, B.id, 'ptt', 'k28-ptt-' + Date.now() + '.m4a', 'audio/mp4');
@@ -260,7 +261,6 @@ async function teilB() {
     // ---- 8.7 Schalter AUS → keine Mitteilung
     const p1 = await ptt(k1.id);
     pruefe('8.2 B spricht in Unterthema 1', !p1.error && !!p1.data?.sitzung_id, p1.error?.message);
-    await warte(800);
     pruefe('8.7 Schalter AUS: A bekommt KEINE Mitteilung', (await mitteilungenA(k1.id)).length === 0);
 
     // ---- 8.4 wirksam / 8.3 / 8.7 Schalter AN
@@ -270,12 +270,12 @@ async function teilB() {
     const p3 = await ptt(k2.id);
     pruefe('8.2 B spricht zweimal in Unterthema 2', !p2.error && !p3.error);
     pruefe('Sitzung: beide Wortmeldungen in derselben Sitzung', p2.data?.sitzung_id && p2.data.sitzung_id === p3.data?.sitzung_id);
-    await warte(800);
     const mA = await mitteilungenA(k2.id);
     pruefe('8.3/8.4 wirksam/8.7: A bekommt GENAU EINE Mitteilung „ptt" (erste Wortmeldung)', mA.length === 1, String(mA.length));
     pruefe('8.3 Absender B, Ziel Unterthema', mA[0] && mA[0].actor_id === B.id && mA[0].target_type === 'channel');
-    const { data: mB } = await B.c.from('notifications').select('id').eq('user_id', B.id).eq('art', 'ptt').eq('target_id', k2.id);
-    pruefe('8.3 nie an den Sprecher selbst', (mB || []).length === 0);
+    const { data: mB } = await B.c.from('notifications').select('id').eq('user_id', B.id)
+      .eq('art', 'ptt').eq('target_id', k2.id).throwOnError();
+    pruefe('8.3 nie an den Sprecher selbst', mB.length === 0);
 
     // ---- 8.5 eine Zeile je Sitzung, 8.6 Verlauf
     const { data: zeilen } = await A.c.from('community_channel_messages')
@@ -290,14 +290,33 @@ async function teilB() {
       .insert({ channel_id: k2.id, sender_id: A.id, text: '', ptt_sitzung: true });
     pruefe('Eine Sitzungszeile kann niemand selbst schreiben', !!eSelbst);
 
-    // Mitteilung von A wieder weg (falls erlaubt) — sonst räumt zuruecksetzen() auf.
-    await A.c.from('notifications').delete().eq('user_id', A.id).eq('art', 'ptt').eq('target_id', k2.id);
   } finally {
-    await B.c.from('communities').delete().eq('id', com.id);
-    for (const p of pttPfade) await Testpaar.eigenesMediumWeg(p).catch(() => {});
-    await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
-    const { data: rest } = await B.c.from('communities').select('id').eq('id', com.id);
-    pruefe('Prüfcommunity ist wieder weg', (rest || []).length === 0);
+    if (unterthemen.length) {
+      try {
+        // Teilnehmer dürfen ihre Mitteilungen lesen, aber nicht löschen.
+        const { frage } = require('./_aufraeumen');
+        if (!unterthemen.every((id) => /^[0-9a-f-]{36}$/.test(id))) throw new Error('Ungültige Unterthema-ID');
+        const ziele = unterthemen.map((id) => `'${id}'::uuid`).join(', ');
+        const filter = `art = 'ptt' and target_id in (${ziele})
+          and actor_id = '${Testpaar.PRUEFKONTO}'
+          and user_id in ('${Testpaar.TESTKONTO}', '${Testpaar.PRUEFKONTO}')`;
+        await frage(`delete from public.notifications where ${filter}`);
+        const rest = await frage(`select count(*) as anzahl from public.notifications where ${filter}`);
+        pruefe('PTT-Mitteilungen der Probe sind weg', Number(rest?.[0]?.anzahl) === 0);
+      } catch (e) {
+        pruefe('PTT-Mitteilungen der Probe sind weg', false, e.message);
+      }
+    }
+    if (com) {
+      const { error } = await B.c.from('communities').delete().eq('id', com.id);
+      const { data: rest, error: lesefehler } = await B.c.from('communities').select('id').eq('id', com.id);
+      pruefe('Prüfcommunity ist wieder weg', !error && !lesefehler && rest?.length === 0,
+        error?.message || lesefehler?.message);
+    }
+    for (const p of pttPfade) {
+      await Testpaar.eigenesMediumWeg(p).catch((e) => pruefe('Prüfmedium entfernen', false, e.message));
+    }
+    await Testpaar.testpaarLoesen().catch((e) => pruefe('Testpaar aufräumen', false, e.message));
   }
 }
 
