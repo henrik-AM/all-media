@@ -615,6 +615,7 @@ export interface Mitteilung {
   ziel: MitteilungsZiel;
   /** Wie lange her, in Minuten. Daraus wird "vor 10 min", "vor 3 W" ... */
   minuten: number;
+  zeitpunkt?: string;
   gelesen: boolean;
 }
 

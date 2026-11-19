@@ -334,8 +334,12 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   const profil = useProfil();
 
   const sub = subs[area];
-  const { pttMitteilungenErgaenzen } = profil;
-  const eigenId = daten.ichId;
+  const { pttMitteilungenErgaenzen, communityMerken } = profil;
+  const profilCommunities = useRef(profil.communities);
+  profilCommunities.current = profil.communities;
+  const eigenId = user?.id;
+  const aktuelleAnmeldung = useRef(eigenId);
+  aktuelleAnmeldung.current = eigenId;
   const pttGlockeSichtbar = area === 'communities' && sub === 'profile' && !overlay
     && (!sheet || sheet === 'mitteilungen');
 
@@ -345,12 +349,27 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     if (!pttGlockeSichtbar || !sbClient || !eigenId) return;
     let aktiv = true;
     let laeuft = false;
+    let seit: string | undefined;
+    const kanalIds = new Set(profilCommunities.current.flatMap((c) => (c.unterthemen ?? []).map((u) => u.id)));
     const laden = async () => {
       if (laeuft || AppState.currentState !== 'active') return;
       laeuft = true;
       try {
-        const liste = await ladeMitteilungen(sbClient, eigenId, true);
-        if (aktiv) pttMitteilungenErgaenzen(liste);
+        const liste = await ladeMitteilungen(sbClient, eigenId, { seit });
+        if (!aktiv) return;
+        for (const { ziel } of liste) {
+          if (ziel.art !== 'channel' || kanalIds.has(ziel.id)) continue;
+          const community = await ladeCommunityZuUnterthema(sbClient, eigenId, ziel.id);
+          if (!aktiv) return;
+          kanalIds.add(ziel.id);
+          if (community) {
+            for (const u of community.unterthemen ?? []) kanalIds.add(u.id);
+            communityMerken(community, true);
+          }
+        }
+        // Kurze Überlappung für gleichzeitig abgeschlossene Schreibvorgänge.
+        if (liste[0]?.zeitpunkt) seit = new Date(Date.parse(liste[0].zeitpunkt) - 30000).toISOString();
+        pttMitteilungenErgaenzen(liste);
       } catch (e: any) {
         if (aktiv) console.warn('PTT-Mitteilungen nachladen fehlgeschlagen:', e?.message ?? e);
       } finally {
@@ -367,7 +386,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       clearInterval(uhr);
       horcher.remove();
     };
-  }, [pttGlockeSichtbar, sbClient, eigenId, pttMitteilungenErgaenzen]);
+  }, [pttGlockeSichtbar, sbClient, eigenId, pttMitteilungenErgaenzen, communityMerken]);
 
   const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
 
@@ -1558,15 +1577,18 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       const com = daten.communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === ziel.id));
       const ut = com?.unterthemen?.find((u) => u.id === ziel.id);
       if (com && ut) return oeffneUnterthema(com, ut);
-      if (!sbClient || !daten.ichId) return setNotice('Dieses Unterthema gibt es nicht mehr');
-      return void ladeCommunityZuUnterthema(sbClient, daten.ichId, ziel.id)
+      if (!sbClient || !eigenId) return setNotice('Dieses Unterthema gibt es nicht mehr');
+      return void ladeCommunityZuUnterthema(sbClient, eigenId, ziel.id)
         .then((community) => {
+          if (aktuelleAnmeldung.current !== eigenId) return;
           const unterthema = community?.unterthemen?.find((u) => u.id === ziel.id);
           if (!community || !unterthema) return setNotice('Dieses Unterthema gibt es nicht mehr');
-          profil.communityMerken(community);
+          communityMerken(community, true);
           oeffneUnterthema(community, unterthema);
         })
-        .catch(() => setNotice('Das Unterthema ließ sich nicht öffnen'));
+        .catch(() => {
+          if (aktuelleAnmeldung.current === eigenId) setNotice('Das Unterthema ließ sich nicht öffnen');
+        });
     }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);

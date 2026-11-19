@@ -1796,16 +1796,19 @@ export async function ladeStandorte(client: SupabaseClient): Promise<Place[]> {
 export async function ladeMitteilungen(
   client: SupabaseClient,
   ichId: string,
-  nurPtt = false,
+  ptt?: { seit?: string },
 ): Promise<Mitteilung[]> {
   const abfrage = client
     .from('notifications')
     .select('id, actor_id, art, bereich, target_type, target_id, text, read_at, created_at')
     .eq('user_id', ichId);
-  if (nurPtt) abfrage.eq('art', 'ptt');
+  if (ptt) {
+    abfrage.eq('art', 'ptt');
+    if (ptt.seit) abfrage.gte('created_at', ptt.seit);
+  }
   const { data, error } = await abfrage
     .order('created_at', { ascending: false })
-    .limit(nurPtt ? 20 : 100);
+    .limit(ptt ? 20 : 100);
   if (error) throw error;
 
   return (data ?? []).map((b: any) => ({
@@ -1817,6 +1820,7 @@ export async function ladeMitteilungen(
     text: b.text || undefined,
     ziel: { art: b.target_type, id: b.target_id },
     minuten: Math.max(0, Math.floor((Date.now() - new Date(b.created_at).getTime()) / 60000)),
+    zeitpunkt: b.created_at,
     gelesen: Boolean(b.read_at),
   }));
 }

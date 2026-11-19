@@ -261,7 +261,7 @@ interface ProfilWert {
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
   /** Kasten 28/15.5: eine Community aus der Datenbanksuche in die Liste aufnehmen. */
-  communityMerken: (community: Community) => void;
+  communityMerken: (community: Community, unterthemenAktualisieren?: boolean) => void;
 
   /* --- Folgen --- */
   /*
@@ -1162,8 +1162,12 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * ersten 100 geladenen stehen. Wer eine davon öffnet, braucht sie hier —
    * Community-Seite und Beitreten suchen in dieser Liste.
    */
-  const communityMerken = useCallback((community: Community) => {
-    setCommunities((prev) => (prev.some((c) => c.id === community.id) ? prev : [...prev, community]));
+  const communityMerken = useCallback((community: Community, unterthemenAktualisieren = false) => {
+    setCommunities((prev) => {
+      if (!prev.some((c) => c.id === community.id)) return [...prev, community];
+      if (!unterthemenAktualisieren) return prev;
+      return prev.map((c) => c.id === community.id ? { ...c, unterthemen: community.unterthemen } : c);
+    });
   }, []);
 
   const wert = useMemo<ProfilWert>(
