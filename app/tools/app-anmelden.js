@@ -1,3 +1,4 @@
+const { pruefKopf } = require('../test/_anmelden'); // captcha-feste Anmeldung (C8)
 // Meldet die App im Pruefsimulator am Testkonto an — ohne Tippen.
 //
 // Warum es das gibt: ein Tippen laesst sich im Simulator von aussen nicht
@@ -69,7 +70,7 @@ async function main() {
 
   const antwort = await fetch(`${ADRESSE}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    headers: pruefKopf(KEY),
     body: JSON.stringify({ email: MAIL, password: PASS }),
   }).then((r) => r.json());
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Kasten 23 — „Personen, die du kennen könntest" (Henrik 06.10.2026: „wie z. B.
  * bei Instagram … nur unter Videos und Communitys").
@@ -99,7 +100,7 @@ const mitFrist = (versprechen, was, ms = 20000) =>
 
 async function anmelden(zugang) {
   const client = createClient(URL, KEY, { auth: { persistSession: false } });
-  const { data, error } = await client.auth.signInWithPassword({ email: zugang.email, password: zugang.passwort });
+  const { data, error } = await pruefAnmelden(client, { email: zugang.email, password: zugang.passwort });
   if (error) throw new Error(`${zugang.email}: ${error.message}`);
   return { client, id: data.user.id, rufname: zugang.rufname };
 }
@@ -470,7 +471,7 @@ async function websitePruefen(P, id) {
     await seite.goto(BASIS, { waitUntil: 'load' });
     await seite.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
     await seite.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
-    const an = await seite.evaluate(({ m, p }) => window.Anmeldung.anmelden(m, p), { m: MAIL, p: PASS });
+    const an = await seiteAnmelden(seite, MAIL, PASS);
     pruefe('12 Anmeldung ohne Reset', !!an?.ok, an?.fehler);
     if (!an?.ok) return;
     await seite.reload({ waitUntil: 'load' });

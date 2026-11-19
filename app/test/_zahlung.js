@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Spendencode, Zahlungsmethoden, Kontowechsel, nur Testkonten
  * (Feedback 21.09.2026, Kasten 13).
@@ -241,7 +242,7 @@ function nurTestkonten() {
 async function anmelden(zugang) {
   const { createClient } = require('@supabase/supabase-js');
   const client = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await client.auth.signInWithPassword({ email: zugang.email, password: zugang.passwort });
+  const { data, error } = await pruefAnmelden(client, { email: zugang.email, password: zugang.passwort });
   if (error) throw new Error(`${zugang.email}: ${error.message}`);
   return { client, id: data.user.id };
 }

@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Die Gegenseite für den App-Bildnachweis zu Kasten 3.
 //
 // Im Prüfsimulator ist @test angemeldet. Damit dort eine Anfrage eingehen
@@ -20,7 +21,7 @@ const client = createClient(wert('EXPO_PUBLIC_SUPABASE_URL'), wert('EXPO_PUBLIC_
 
 (async () => {
   const [was, text] = process.argv.slice(2);
-  const { data: an, error: anFehler } = await client.auth.signInWithPassword({
+  const { data: an, error: anFehler } = await pruefAnmelden(client, {
     email: 'all.media.prueflauf@web.de',
     password: PRUEFKONTO_PASS,
   });

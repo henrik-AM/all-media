@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Community-Chat vor Messenger — hält die Datenbank, was Henrik viermal
  * verlangt hat? (Feedback 21.09.2026, Kasten 3, Schema 57)
@@ -49,7 +50,7 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 async function anmelden(zugang) {
   const client = createClient(URL, KEY);
-  const { data, error } = await client.auth.signInWithPassword({
+  const { data, error } = await pruefAnmelden(client, {
     email: zugang.email,
     password: zugang.passwort,
   });

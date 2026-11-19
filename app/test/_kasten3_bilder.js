@@ -1,3 +1,4 @@
+const { seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Bildnachweis Website zu Kasten 3 (Feedback 21.09.2026, „Community-Chat vor
 // Messenger"). Zwei Browser, zwei Testkonten — nie ein echtes Konto:
 //
@@ -39,7 +40,7 @@ async function seite(browser, zugang, fehler) {
   await page.goto(ZIEL, { waitUntil: 'load' });
   await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
   await page.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
-  const an = await page.evaluate(({ mail, pass }) => window.Anmeldung.anmelden(mail, pass), zugang);
+  const an = await seiteAnmelden(page, zugang.mail, zugang.pass);
   if (!an.ok) throw new Error('Anmeldung ' + zugang.mail + ': ' + an.fehler);
   await neu(page);
   return page;

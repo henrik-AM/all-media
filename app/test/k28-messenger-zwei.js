@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Kasten 28/12.4 mit zwei Konten und zwei Geräten (10.11.2026).
  *
@@ -51,7 +52,7 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 async function anmelden(zugang) {
   const client = createClient(URL_, KEY, { auth: { persistSession: false } });
-  const { data, error } = await client.auth.signInWithPassword({ email: zugang.email, password: zugang.passwort });
+  const { data, error } = await pruefAnmelden(client, { email: zugang.email, password: zugang.passwort });
   if (error) throw new Error(`${zugang.email}: ${error.message}`);
   return { client, id: data.user.id };
 }

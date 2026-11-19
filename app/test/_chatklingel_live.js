@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /** Paket 7: echte private Broadcasts, zwei erlaubte Konten, kein Reset.
  * Gegenlesen jeder Änderung, Zeitmessung ab VOR dem Schreiben.
  * Cleanup ausschließlich eigene Lauf-Chat-IDs; anschließend Restkontrolle.
@@ -27,7 +28,7 @@ async function mutation(name,h,fn){const n=h.n,ab=Date.now();await fn();await bi
  assert.ok(process.env.SUPABASE_TOKEN,'Managementtoken für geprüfte Bereinigung erforderlich');
  for(const [email,password] of [['test@all-media.app',TESTKONTO_PASS],['all.media.prueflauf@web.de',PRUEFKONTO_PASS]]){
   const client=createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(u,o)=>fetch(u,{...o,signal:AbortSignal.timeout(15000)})}});
-  const r=await client.auth.signInWithPassword({email,password});if(r.error)throw r.error;konten.push({client,id:r.data.user.id});
+  const r=await pruefAnmelden(client, {email,password});if(r.error)throw r.error;konten.push({client,id:r.data.user.id});
  }
  const [a,b]=konten;
  assert.equal(a.id,'3baafacd-bbdb-40fb-8ef4-a4e365ae00c4');assert.equal(b.id,'62616c1d-82e2-4ee4-aab9-950e40e438a4');

@@ -1,3 +1,4 @@
+const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /** Paket 7: Originalwebsite + native Original-Chatkomponenten, echte Testkonten.
  * Nur eigener Server3300 und exklusiver Testbestand. Keine Schemas/Resets.
  */
@@ -24,12 +25,12 @@ async function gesehen(i,text,ab=Date.now()){
 }
 (async()=>{
  assert.ok(process.env.SUPABASE_TOKEN,'Managementtoken fehlt');fs.mkdirSync(OUT,{recursive:true});sichern();
- for(const s of konten){s.client=createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(u,o)=>fetch(u,{...o,signal:AbortSignal.timeout(15000)})}});const r=await s.client.auth.signInWithPassword({email:s.email,password:s.pass});if(r.error)throw r.error;assert.equal(r.data.user.id,s.id);s.session=r.data.session;s.vorher=(await daten(s.client.from('krypto_schluessel').select('id').eq('user_id',s.id))).map(z=>z.id);}
+ for(const s of konten){s.client=createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(u,o)=>fetch(u,{...o,signal:AbortSignal.timeout(15000)})}});const r=await pruefAnmelden(s.client, {email:s.email,password:s.pass});if(r.error)throw r.error;assert.equal(r.data.user.id,s.id);s.session=r.data.session;s.vorher=(await daten(s.client.from('krypto_schluessel').select('id').eq('user_id',s.id))).map(z=>z.id);}
  const [a,b]=konten;
  await frage(`begin;insert into chats(id,name,is_group,bereich,created_by,anfrage_zustand) values ${chats.map(c=>`('${c.id}','P7 Plattform ${lauf}',${c.isGroup},'community','${a.id}','angenommen')`).join(',')};insert into chat_members(chat_id,user_id) values ${chats.flatMap(c=>konten.map(s=>`('${c.id}','${s.id}')`)).join(',')};commit;select 1 ok`);
  browser=await chromium.launch();
  for(const s of konten){const ctx=await browser.newContext({viewport:{width:430,height:920},serviceWorkers:'block'});const p=await ctx.newPage();s.page=p;s.ctx=ctx;s.req=[];s.responses=[];await medienEgressSchuetzen(p);p.setDefaultTimeout(20000);p.on('response',async r=>{if(/\/api\/(chatstand|chats|messages)/.test(r.url()))s.responses.push({url:new globalThis.URL(r.url()).pathname,status:r.status(),at:Date.now(),timing:r.request().timing()});});p.on('request',r=>{if(/\/api\/(chatstand|messages\/[^/]+\/stand)/.test(r.url()))s.req.push({at:Date.now(),url:new globalThis.URL(r.url()).pathname});});
-  await p.goto('http://127.0.0.1:3300',{waitUntil:'domcontentloaded'});await p.waitForFunction(()=>!!window.Anmeldung);const r=await p.evaluate(async({email,pass})=>Anmeldung.anmelden(email,pass),{email:s.email,pass:s.pass});assert.ok(r.ok,'Testanmeldung Browser');await p.waitForFunction(id=>Anmeldung.nutzer()?.id===id,s.id);
+  await p.goto('http://127.0.0.1:3300',{waitUntil:'domcontentloaded'});await p.waitForFunction(()=>!!window.Anmeldung);const r=await seiteAnmelden(p,s.email,s.pass);assert.ok(r.ok,'Testanmeldung Browser');await p.waitForFunction(id=>Anmeldung.nutzer()?.id===id,s.id);
   p.on('console',m=>{if(m.text().startsWith('P7-'))log(s.name+' '+m.text());});
   await p.evaluate(()=>{const c=Anmeldung.client(),channel=c.channel.bind(c);c.channel=(...args)=>{const k=channel(...args),subscribe=k.subscribe.bind(k);k.subscribe=(fn)=>subscribe((status,error)=>{console.log('P7-STATUS',k.topic,status,error?.message||'');fn?.(status,error);});return k;};});
   await p.evaluate(()=>{

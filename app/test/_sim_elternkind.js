@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Testfall fürs App-Elternblatt im Simulator (F12): ein Kinderkonto entsteht
  * per SQL und fragt per Telefonnummer bei @test (Simulatorkonto) an.
@@ -46,7 +47,7 @@ function geborenVor(jahre) {
     const [eltern] = await frage(`select phone from public.profiles where id =
       (select id from auth.users where email = 'test@all-media.app')`);
     const c = createClient(URL, KEY, { auth: { persistSession: false } });
-    const an = await c.auth.signInWithPassword({ email: mail, password: pass });
+    const an = await pruefAnmelden(c, { email: mail, password: pass });
     if (an.error) throw an.error;
     const { data, error } = await c.rpc('eltern_anfragen', { p_eltern: eltern.phone });
     console.log('angefragt:', JSON.stringify(error || data));

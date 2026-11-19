@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Prueft den Teilen-Dialog (Feedback 21.09.2026, Kasten 4).
 //
 // Henrik: oben eine Suchleiste — Kontakte, Communitys, gefolgte Profile und
@@ -42,7 +43,7 @@ const PRUEFER = {
 
 async function direkt(zugang) {
   const client = createClient(SB_URL, SB_KEY);
-  const { data, error } = await client.auth.signInWithPassword({ email: zugang.email, password: zugang.passwort });
+  const { data, error } = await pruefAnmelden(client, { email: zugang.email, password: zugang.passwort });
   if (error) throw new Error(`${zugang.email}: ${error.message}`);
   return { client, id: data.user.id };
 }

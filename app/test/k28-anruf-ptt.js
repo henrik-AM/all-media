@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Feedback 28.09.2026, Kästen 5 und 8 — Agent „Anruf + PTT".
  *
@@ -168,7 +169,7 @@ async function teilB() {
 
   const konto = async (mail, pass) => {
     const c = createClient(URL, KEY, { auth: { persistSession: false } });
-    const { data, error } = await c.auth.signInWithPassword({ email: nurTestkonto(mail), password: pass });
+    const { data, error } = await pruefAnmelden(c, { email: nurTestkonto(mail), password: pass });
     if (error) throw new Error(mail + ': ' + error.message);
     return { c, id: data.user.id };
   };

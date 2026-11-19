@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Feedback 28.09.2026, Kasten 6 — Agent „Anhänge".
  *
@@ -135,7 +136,7 @@ function teilA() {
 /* ------------------------------------------------------- B/C Website + DB */
 async function direkt(zugang) {
   const client = createClient(URL, KEY);
-  const { data, error } = await client.auth.signInWithPassword({ email: zugang.email, password: zugang.passwort });
+  const { data, error } = await pruefAnmelden(client, { email: zugang.email, password: zugang.passwort });
   if (error) throw new Error(`${zugang.email}: ${error.message}`);
   return { client, id: data.user.id };
 }

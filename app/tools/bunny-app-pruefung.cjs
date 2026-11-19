@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('../test/_anmelden'); // captcha-feste Anmeldung (C8)
 // Begleitprobe zur echten Simulatorbedienung. Kein Reset.
 // leer-loeschen entfernt ausschließlich medienlose Bunny-App-Prüfbeiträge.
 // Tokens und signierte URLs bleiben ausschließlich im Arbeitsspeicher.
@@ -61,7 +62,7 @@ async function befehl(s) {
   }
 }
 (async()=>{
-  const {data,error}=await client.auth.signInWithPassword({email:'test@all-media.app',password:wert('AM_TESTKONTO_PASS')});
+  const {data,error}=await pruefAnmelden(client, {email:'test@all-media.app',password:wert('AM_TESTKONTO_PASS')});
   if(error) throw error;
   ich=data.user.id;token=data.session.access_token;anfang=(await bestand()).length;
   protokoll({bereit:true,anfang,konto:'test@all-media.app'});

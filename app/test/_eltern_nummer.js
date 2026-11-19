@@ -1,3 +1,4 @@
+const { seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Den Elternteil über die Telefonnummer finden — auf der Website (Schema 58).
  *
@@ -76,7 +77,7 @@ async function seiteAngemeldet(browser, mail, passwort) {
   await page.goto(ZIEL, { waitUntil: 'load' });
   await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
   await page.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
-  const an = await page.evaluate(([m, p]) => window.Anmeldung.anmelden(m, p), [mail, passwort]);
+  const an = await seiteAnmelden(page, mail, passwort);
   if (!an.ok) throw new Error(`${mail}: ${an.fehler}`);
   await page.reload({ waitUntil: 'load' });
   return page;

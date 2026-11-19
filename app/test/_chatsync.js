@@ -1,3 +1,4 @@
+const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Kasten 27 — „A schreibt ‚cxv', bei B kommt ‚cwkdew' an."
  *
@@ -162,7 +163,7 @@ async function teilZwei() {
 
   const anmelden = async (email, passwort) => {
     const client = createClient(URL, KEY);
-    const { data, error } = await client.auth.signInWithPassword({ email, password: passwort });
+    const { data, error } = await pruefAnmelden(client, { email, password: passwort });
     if (error) throw new Error(`${email}: ${error.message}`);
     return { client, id: data.user.id };
   };
@@ -280,8 +281,7 @@ async function teilDrei(db) {
     await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
     await page.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
     const { PRUEFKONTO_PASS: PASS } = require('./_testpasswoerter');
-    const an = await page.evaluate(({ mail, pass }) => window.Anmeldung.anmelden(mail, pass),
-      { mail: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'), pass: process.env.AM_TEST_PASS || PASS });
+    const an = await seiteAnmelden(page, nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'), process.env.AM_TEST_PASS || PASS);
     if (!an.ok) { pruefe('Prüfkonto angemeldet', false, an.fehler); return; }
     await page.reload({ waitUntil: 'load' });
 

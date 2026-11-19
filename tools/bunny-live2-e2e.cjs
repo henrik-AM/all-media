@@ -1,3 +1,4 @@
+const { pruefAnmelden, seiteAnmelden } = require('../app/test/_anmelden'); // captcha-feste Anmeldung (C8)
 /** Website-Formular und App-Uploadweg, echte Prüfbeiträge mit vollständiger Bereinigung. */
 const fs=require('fs'),path=require('path'),os=require('os'),vm=require('vm'),assert=require('assert/strict');
 const {createRequire}=require('module'),{execFileSync}=require('child_process');
@@ -54,14 +55,14 @@ async function cleanup(){
  const {data,error}=await client.from('posts').select('id').eq('user_id',uid).like('description',prefix+'%');assert.ifError(error);check('Testbeiträge nachher 0',data.length===0);
 }
 (async()=>{
- const login=await supabase.auth.signInWithPassword({email:'test@all-media.app',password:TESTKONTO_PASS});assert.ifError(login.error);
+ const login=await pruefAnmelden(supabase, {email:'test@all-media.app',password:TESTKONTO_PASS});assert.ifError(login.error);
  token=login.data.session.access_token;uid=login.data.user.id;client=supabase;
  const {data:vor}=await client.from('posts').select('id').eq('user_id',uid).like('description',prefix+'%');check('Testbeiträge vorher 0',vor.length===0);
  browser=await chromium.launch({channel:'chromium-headless-shell'});
  const page=await browser.newPage({viewport:{width:1200,height:900}});
  try{
   await page.goto('http://127.0.0.1:3300',{waitUntil:'load'});await page.waitForFunction(()=>!!window.Anmeldung);
-  const an=await page.evaluate(pass=>window.Anmeldung.anmelden('test@all-media.app',pass),TESTKONTO_PASS);assert.equal(an.ok,true);
+  const an=await seiteAnmelden(page,'test@all-media.app',TESTKONTO_PASS);assert.equal(an.ok,true);
   await page.reload({waitUntil:'load'});await page.waitForSelector('[data-area]',{timeout:45000});await page.evaluate(()=>{state.area='videos';state.sub.videos='home';render();});await page.waitForSelector('.post',{timeout:45000});
   for(const [art,bytes,mime] of [['post',jpg,'image/jpeg'],['reels',mp4,'video/mp4']]){
    const chooser=page.waitForEvent('filechooser');await page.evaluate(art=>{void erstelle(art);},art);

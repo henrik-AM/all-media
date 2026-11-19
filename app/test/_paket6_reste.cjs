@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /** Wiederaufnahme nur der protokollierten Paket-6-Fixtures, ohne Reset. */
 require('./_ki_belegung').pruefeBelegung('testbestand');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -27,7 +28,7 @@ const q=async p=>{const r=await p;if(r.error)throw Error(r.error.message);return
  try{
   for(let i=0;i<2;i++){
    const c=createClient(process.env.EXPO_PUBLIC_SUPABASE_URL,process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});clients.push(c);
-   const r=await c.auth.signInWithPassword({email:konten[i][0],password:konten[i][1]});if(r.error)throw r.error;assert.equal(r.data.user.id,ids[i]);
+   const r=await pruefAnmelden(c, {email:konten[i][0],password:konten[i][1]});if(r.error)throw r.error;assert.equal(r.data.user.id,ids[i]);
   }
   const a=clients[0];
   if(m.chatId!==null){const ch=await q(a.from('chats').select('id,name,created_by').eq('id',m.chatId).maybeSingle());

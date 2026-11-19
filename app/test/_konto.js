@@ -29,6 +29,7 @@
 
 const { nurTestkonto } = require('./_nur_testkonten');
 const { PRUEFKONTO_PASS } = require('./_testpasswoerter');
+const { seiteAnmelden } = require('./_anmelden');
 const MAIL = nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de');
 const PASS = process.env.AM_TEST_PASS || PRUEFKONTO_PASS;
 const NAME = process.env.AM_TEST_NAME || 'prueflauf';
@@ -201,6 +202,18 @@ async function anmelden(page) {
   // Warten, bis die Anmeldung im Browser bereitsteht.
   await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
   await page.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
+
+  /*
+   * Captcha-fest (Fahrplan C8, 19.11.2026): die Token holt Node über
+   * _anmelden.js, die Seite übernimmt sie per „Konto wechseln“. So braucht
+   * der Prüfbrowser kein Captcha, auch wenn Supabase es verlangt. Nur wenn
+   * es das Konto noch gar nicht gibt, geht es unten wie bisher weiter.
+   */
+  const schon = await page.evaluate(() => window.Anmeldung.angemeldet());
+  if (!schon) {
+    const direkt = await seiteAnmelden(page, MAIL, PASS);
+    if (!direkt.ok && direkt.status !== 400) return { ok: false, fehler: direkt.fehler };
+  }
 
   const ergebnis = await page.evaluate(
     async ({ mail, pass, name }) => {

@@ -1,3 +1,4 @@
+const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Eigene Bildschirmzeit — die Wirkung (Kasten 22).
  *
@@ -74,7 +75,7 @@ function geborenVor(jahre) {
 
 async function anmelden(email, passwort) {
   const client = createClient(URL, KEY, { auth: { persistSession: false } });
-  const { data, error } = await client.auth.signInWithPassword({ email, password: passwort });
+  const { data, error } = await pruefAnmelden(client, { email, password: passwort });
   if (error) throw new Error(`${email}: ${error.message}`);
   return { client, id: data.user.id };
 }
@@ -109,7 +110,7 @@ async function seiteAngemeldet(browser) {
   await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
   await page.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
   // Die echte Anmeldung der Seite — ohne /api/reset.
-  const an = await page.evaluate(([m, p]) => window.Anmeldung.anmelden(m, p), [PRUEFER.email, PRUEFER.passwort]);
+  const an = await seiteAnmelden(page, PRUEFER.email, PRUEFER.passwort);
   if (!an.ok) throw new Error(`${PRUEFER.email}: ${an.fehler}`);
   await page.reload({ waitUntil: 'load' });
   await page.waitForFunction(() => typeof bzBereit === 'function' && bzBereit(), null, { timeout: 20000 });

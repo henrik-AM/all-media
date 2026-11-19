@@ -1,3 +1,4 @@
+const { pruefKopf } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Prueft Playlists und Highlights auf der WEBSITE — anlegen, fuellen, oeffnen.
 //
 // WARUM ES DIESEN LAUF GIBT
@@ -44,7 +45,7 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 async function kopfZeilen() {
   const anmeldung = await fetch(`${URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    headers: pruefKopf(KEY),
     body: JSON.stringify({ email: MAIL, password: PASS }),
   }).then((r) => r.json());
   const token = anmeldung.access_token;

@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('../app/test/_anmelden'); // captcha-feste Anmeldung (C8)
 /** Eigenes migriertes Testmedium: Bunny löschen, Supabase-Original ausdrücklich behalten. */
 const fs=require('fs'),path=require('path'),assert=require('assert/strict'),crypto=require('crypto');
 const {dienst,testumgebung,basis,frage}=require('./bunny-umzug-helfer.cjs');
@@ -7,7 +8,7 @@ const web='https://all-media-website.onrender.com';
 const aus=path.resolve('pruefbelege/bunny-umzug');
 (async()=>{
  const key=await dienst();
- const {data,error}=await supabase.auth.signInWithPassword({email:'test@all-media.app',password:process.env.AM_TESTKONTO_PASS});assert.ifError(error);
+ const {data,error}=await pruefAnmelden(supabase, {email:'test@all-media.app',password:process.env.AM_TESTKONTO_PASS});assert.ifError(error);
  const token=data.session.access_token,uid=data.user.id;
  const pfad=`posts/${uid}-umzug-loeschprobe-${Date.now()}.jpg`;
  const bild=require('child_process').execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=32x32','-frames:v','1','-f','image2pipe','-vcodec','mjpeg','pipe:1']);

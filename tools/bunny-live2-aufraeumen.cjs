@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('../app/test/_anmelden'); // captcha-feste Anmeldung (C8)
 /** Nur eigene Runde-2-Prüfbeiträge und freigegebene Medien entfernen, Mitteilungen nachzählen. */
 const assert=require('assert/strict');
 const {supabase}=require('../web/server/supabase');
@@ -9,7 +10,7 @@ const speicher=Bunny.erstelleBunny(Bunny.konfigurationAus(),{abruf:async(url,opt
 (async()=>{
  for(const [email,password] of [['test@all-media.app',TESTKONTO_PASS],['all.media.prueflauf@web.de',PRUEFKONTO_PASS]]){
  console.log('Bereinigung '+email);
- const {data,error}=await supabase.auth.signInWithPassword({email,password});assert.ifError(error);
+ const {data,error}=await pruefAnmelden(supabase, {email,password});assert.ifError(error);
  const uid=data.user.id,token=data.session.access_token;
  async function api(route,body){const r=await fetch('http://127.0.0.1:3300'+route,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)});const z=await r.json();assert.ok(r.ok&&z.ok,'Bereinigung '+route);}
  const {data:posts,error:e}=await supabase.from('posts').select('id').eq('user_id',uid).like('description','Bunny-Runde2-%');assert.ifError(e);

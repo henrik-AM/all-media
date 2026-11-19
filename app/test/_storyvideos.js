@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * „Story auch in Videos teilen" — wirkt der Schalter, oder steht er nur da?
  *
@@ -55,7 +56,7 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 async function anmelden(zugang) {
   const client = createClient(URL, KEY);
-  const { data, error } = await client.auth.signInWithPassword({
+  const { data, error } = await pruefAnmelden(client, {
     email: zugang.email,
     password: zugang.passwort,
   });

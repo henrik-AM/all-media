@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * @-Markierungen wirken? — Kasten 25 (Schema 86_markierungen)
  *
@@ -66,7 +67,7 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 async function anmeldenDb(zugang) {
   const client = createClient(URL, KEY);
-  const { data, error } = await client.auth.signInWithPassword({ email: zugang.email, password: zugang.passwort });
+  const { data, error } = await pruefAnmelden(client, { email: zugang.email, password: zugang.passwort });
   if (error) throw new Error(`${zugang.email}: ${error.message}`);
   const { data: p } = await client.from('profiles').select('handle, name').eq('id', data.user.id).single();
   return { client, id: data.user.id, handle: p.handle, name: p.name };

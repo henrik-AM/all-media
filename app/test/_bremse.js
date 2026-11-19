@@ -1,3 +1,4 @@
+const { pruefKopf } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Prueft die Bremse der Nummernsuche (SUPABASE_SCHEMA_38_nummer_bremse.sql).
 //
 // Warum es diesen Test gibt: `finde_per_nummer` uebersetzt eine Telefonnummer
@@ -97,7 +98,7 @@ async function main() {
   // ------------------------------------------------------------ Anmelden --
   const anmeldung = await fetch(`${URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    headers: pruefKopf(KEY),
     // Supabase will `password`, die Konstante heisst `passwort` — genau hier
     // lief der erste Lauf am 13.09.2026 in eine leere Antwort.
     body: JSON.stringify({ email: KONTO.email, password: KONTO.passwort }),

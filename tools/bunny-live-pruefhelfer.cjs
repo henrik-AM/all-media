@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('../app/test/_anmelden'); // captcha-feste Anmeldung (C8)
 /** Lesender Browsernachweis: echter App-Code über _modulquelle, Serverbasis 3300. */
 const fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert/strict');
 const root=path.resolve(__dirname,'..');
@@ -18,7 +19,7 @@ async function main(){
   fs.writeFileSync(path.join(tmp,'probe.js'),"import { medienServerBasis, signiereEine } from './medien';\nexport { medienServerBasis, signiereEine };\n");
   const code=zusammengelegt(tmp,'probe.js');
   check('Produktionsfallback im Prüfhilfsteil ersetzt',!code.includes('https://all-media-website.onrender.com'));
-  const {data,error}=await supabase.auth.signInWithPassword({email:'test@all-media.app',password:TESTKONTO_PASS});
+  const {data,error}=await pruefAnmelden(supabase, {email:'test@all-media.app',password:TESTKONTO_PASS});
   if(error)throw Error('Prüfkonto-Anmeldung fehlgeschlagen');
   browser=await chromium.launch({channel:'chromium-headless-shell'});
   const p=await browser.newPage({bypassCSP:true});

@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Likes-Sichtbarkeit mit zwei Konten: wirkt die Einstellung wirklich?
  *
@@ -66,7 +67,7 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 async function anmelden(zugang) {
   const client = createClient(URL, KEY, { auth: { persistSession: false } });
-  const { data, error } = await client.auth.signInWithPassword({
+  const { data, error } = await pruefAnmelden(client, {
     email: zugang.email,
     password: zugang.passwort,
   });

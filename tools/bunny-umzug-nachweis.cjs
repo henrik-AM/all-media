@@ -1,3 +1,4 @@
+const { pruefAnmelden, seiteAnmelden } = require('../app/test/_anmelden'); // captcha-feste Anmeldung (C8)
 /** Produktions-Signierweg: Testkonto, keine Rücksetzung und keine echten Konten. */
 const fs=require('fs'),path=require('path'),assert=require('assert/strict'),crypto=require('crypto');
 const {testumgebung}=require('./bunny-umzug-helfer.cjs');
@@ -7,7 +8,7 @@ const root=path.resolve(__dirname,'../../bunny-umzug-zustand');
 const aus=path.resolve('pruefbelege/bunny-umzug');
 const web='https://all-media-website.onrender.com';
 (async()=>{
- const {data,error}=await supabase.auth.signInWithPassword({email:'test@all-media.app',password:process.env.AM_TESTKONTO_PASS});assert.ifError(error);
+ const {data,error}=await pruefAnmelden(supabase, {email:'test@all-media.app',password:process.env.AM_TESTKONTO_PASS});assert.ifError(error);
  const token=data.session.access_token;
  const modus=process.argv[2];
  const journal=fs.readFileSync(path.join(root,'zustand.jsonl'),'utf8').trim().split('\n').map(l=>JSON.parse(l)).filter(e=>e.sha256);
@@ -22,7 +23,7 @@ const web='https://all-media-website.onrender.com';
  if(modus==='pilot')return;
  const {chromium}=require('../app/node_modules/playwright-core');const browser=await chromium.launch({channel:'chromium-headless-shell'});
  try{const page=await browser.newPage({viewport:{width:1200,height:900}});await page.goto(web,{waitUntil:'load'});await page.waitForFunction(()=>!!window.Anmeldung);
- const login=await page.evaluate(pass=>window.Anmeldung.anmelden('test@all-media.app',pass),process.env.AM_TESTKONTO_PASS);assert.equal(login.ok,true);await page.reload({waitUntil:'load'});await page.waitForSelector('[data-area]',{timeout:60000});
+ const login=await seiteAnmelden(page,'test@all-media.app',process.env.AM_TESTKONTO_PASS);assert.equal(login.ok,true);await page.reload({waitUntil:'load'});await page.waitForSelector('[data-area]',{timeout:60000});
  await page.evaluate(()=>{state.area='videos';state.sub.videos='home';render();});await page.waitForSelector('.post',{timeout:60000});
  await page.waitForFunction(()=>[...document.images].some(i=>i.src.includes('allmedia-cdn.b-cdn.net')&&i.complete&&i.naturalWidth>0),{timeout:60000});
  await page.locator('.post').nth(1).scrollIntoViewIfNeeded();await page.waitForTimeout(1200);

@@ -37,13 +37,10 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const PROJEKT = (URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] || '';
 
-// Die Stellen, an denen die beiden Oberflaechen sich anmelden. Wenn ein
-// CAPTCHA aktiv ist, muss hier ein `captchaToken` mitgehen — sonst weist
-// Supabase jede Registrierung und jede Anmeldung ab.
-const CLIENTS = [
-  ['Website', path.join(__dirname, '..', '..', 'web', 'public', 'anmeldung.js')],
-  ['App', path.join(__dirname, '..', 'lib', 'supabaseAuth.ts')],
-];
+// Die Stellen, an denen sich App und Website anmelden, findet seit 19.11.2026
+// test/_captcha_clients.js selbst. Ist ein CAPTCHA aktiv, muss in jedem
+// dieser Aufrufe ein `captchaToken` mitgehen — sonst weist Supabase ab.
+const { aufrufeFinden } = require('./_captcha_clients');
 
 let fehler = 0;
 let gesamt = 0;
@@ -137,17 +134,20 @@ async function main() {
   // CAPTCHA-Schalter um, ohne dass die Clients einen Token schicken. Ab dann
   // kommt niemand mehr in die App — weder neu noch angemeldet. Der Schalter
   // sieht nach mehr Sicherheit aus und ist in Wahrheit ein Totalausfall.
+  //
+  // Seit 19.11.2026 (Fahrplan C9) jeder einzelne Anmeldeaufruf, nicht nur zwei
+  // Dateien: auch Spendencode, Passwort ändern, Konto löschen. Siehe
+  // test/_captcha_clients.js.
   const captchaAn = k.security_captcha_enabled === true;
-  const clientsMitToken = CLIENTS.filter(
-    ([, datei]) => fs.existsSync(datei) && /captchaToken/.test(fs.readFileSync(datei, 'utf8'))
-  ).map(([name]) => name);
+  const aufrufe = aufrufeFinden();
+  const ohneToken = aufrufe.filter((a) => !a.mitToken);
 
   pruefe(
     'CAPTCHA und Clients passen zusammen',
-    !captchaAn || clientsMitToken.length === CLIENTS.length,
+    !captchaAn || (aufrufe.length > 0 && ohneToken.length === 0),
     captchaAn
-      ? `CAPTCHA ist AN, Token senden: ${clientsMitToken.join(', ') || 'keiner'} von ${CLIENTS.length}`
-      : 'CAPTCHA ist aus, Clients brauchen keinen Token'
+      ? `CAPTCHA ist AN, ohne Token: ${ohneToken.map((a) => a.datei + ':' + a.zeile).join(', ') || 'keiner'} von ${aufrufe.length}`
+      : `CAPTCHA ist aus — ${aufrufe.length - ohneToken.length}/${aufrufe.length} Aufrufe senden schon einen Token`
   );
 
   // ------------------------------- Die Kopplung: eigener Mailversand braucht CAPTCHA --

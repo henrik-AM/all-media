@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * „Mein Verlauf" — landet jede der fünf Aktionen dort, mit Zeitpunkt und
  * Ziel? Und bleibt Fremdes draußen? (Feedback 21.09.2026, Kasten 10)
@@ -129,7 +130,7 @@ function ohneNetz() {
 async function anmelden(zugang) {
   const { createClient } = require('@supabase/supabase-js');
   const client = createClient(URL, KEY, { auth: { persistSession: false } });
-  const { data, error } = await client.auth.signInWithPassword({ email: zugang.email, password: zugang.passwort });
+  const { data, error } = await pruefAnmelden(client, { email: zugang.email, password: zugang.passwort });
   if (error) throw new Error(`${zugang.email}: ${error.message}`);
   return { client, id: data.user.id };
 }

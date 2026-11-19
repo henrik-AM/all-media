@@ -1,3 +1,4 @@
+const { pruefKopf } = require('../test/_anmelden'); // captcha-feste Anmeldung (C8)
 /*
  * Echte Testmedien fuer All Media — Fotos und Videos, keine Farbflaechen.
  *
@@ -303,7 +304,7 @@ async function fotosBauen(nachweise) {
 async function anmelden() {
   const antwort = await fetch(`${ADRESSE}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: SCHLUESSEL, 'Content-Type': 'application/json' },
+    headers: pruefKopf(SCHLUESSEL),
     body: JSON.stringify({ email: KONTO, password: PASSWORT }),
   });
   const daten = await antwort.json();

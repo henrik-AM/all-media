@@ -1,3 +1,4 @@
+const { pruefAnmelden, seiteAnmelden } = require('../app/test/_anmelden'); // captcha-feste Anmeldung (C8)
 /** Lokale Website-/App-Prüfung, nur eigenes Testkonto, kein Reset. */
 const path=require('path'),fs=require('fs'),vm=require('vm');
 const {createRequire}=require('module');
@@ -12,7 +13,7 @@ const {execFileSync}=require('child_process');
 const jpeg=execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=96x64','-frames:v','1','-f','image2pipe','-vcodec','mjpeg','pipe:1']);
 const mp4=execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=96x64:r=10','-t','1','-c:v','libx264','-pix_fmt','yuv420p','-movflags','frag_keyframe+empty_moov','-f','mp4','pipe:1']);
 async function main(){
- const {data,error}=await supabase.auth.signInWithPassword({email:'test@all-media.app',password:TESTKONTO_PASS});
+ const {data,error}=await pruefAnmelden(supabase, {email:'test@all-media.app',password:TESTKONTO_PASS});
  if(error)throw Error('Testkonto-Anmeldung fehlgeschlagen: '+error.code);
  const token=data.session.access_token;
  async function weg(url){
@@ -47,7 +48,7 @@ async function main(){
   const p=await b.newPage({viewport:{width:1200,height:900}});
   await p.goto('http://127.0.0.1:3300',{waitUntil:'load'});
   await p.waitForFunction(()=>Boolean(window.Anmeldung));
-  const an=await p.evaluate(async pass=>window.Anmeldung.anmelden('test@all-media.app',pass),TESTKONTO_PASS);
+  const an=await seiteAnmelden(p,'test@all-media.app',TESTKONTO_PASS);
   if(!an.ok)throw Error('Website-Anmeldung fehlgeschlagen');
   await p.reload({waitUntil:'load'});
   await p.waitForFunction(()=>typeof state!=='undefined'&&state.users?.me,{timeout:45000}).catch(()=>{});

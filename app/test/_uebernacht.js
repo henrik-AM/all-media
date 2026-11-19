@@ -1,3 +1,4 @@
+const { seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Prueft Henriks Frage vom 21.09.2026 woertlich:
 //
 //   "wenn ich zum Beispiel etwas liken und am naechsten Morgen mit meinem
@@ -84,10 +85,7 @@ async function anmeldenOhneReset(page, basis = process.env.ZIEL || 'http://local
   await page.goto(basis, { waitUntil: 'load' });
   await page.waitForFunction(() => Boolean(window.Anmeldung), null, { timeout: 15000 });
   await page.evaluate(() => window.Anmeldung.bereit?.catch(() => null));
-  const an = await page.evaluate(
-    ({ mail, pass }) => window.Anmeldung.anmelden(mail, pass),
-    { mail: MAIL, pass: PASS }
-  );
+  const an = await seiteAnmelden(page, MAIL, PASS);
   if (!an.ok) return false;
   await page.reload({ waitUntil: 'load' });
   await page.evaluate(() => window.Anmeldung?.bereit?.catch(() => null));

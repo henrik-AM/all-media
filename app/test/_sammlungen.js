@@ -1,3 +1,4 @@
+const { pruefKopf } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Prueft die Sammlungen — Playlists und Highlights (SUPABASE_SCHEMA_46).
 //
 // Warum es diesen Test gibt: bis zum 20.09.2026 waren `profiles.highlights`
@@ -67,7 +68,7 @@ async function main() {
 
   const anmeldung = await fetch(`${URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    headers: pruefKopf(KEY),
     body: JSON.stringify({ email: KONTO.email, password: KONTO.passwort }),
   });
   const sitzung = await anmeldung.json();

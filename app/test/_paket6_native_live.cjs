@@ -1,3 +1,4 @@
+const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Historischer Format1-Prüfstand vor der Opus-Korrektur; kein Format2-Abnahmenachweis.
 // Aktuelle native Abnahme: _paket7_plattformen.cjs + _paket7_native.py und pruefbelege/paket67-abschluss/native-kontexte.
 /** Paket 6: echte Zwei-Konten-/App-Logik-/Website-Rundreise, kein Reset/Schema.
@@ -34,7 +35,7 @@ async function browserAnmelden(seite){
  const ctx=await browser.newContext({viewport:{width:430,height:920},serviceWorkers:'block'});const page=await ctx.newPage();seiten.push({ctx,page,seite});
  await medienEgressSchuetzen(page);page.setDefaultTimeout(20000);
  await page.goto(ZIEL,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>Boolean(window.Anmeldung));
- const r=await page.evaluate(async({email,pass})=>Anmeldung.anmelden(email,pass),{email:seite.email,pass:seite.pass});
+ const r=await seiteAnmelden(page,seite.email,seite.pass);
  if(!r?.ok)throw new Error('Browser-Testanmeldung fehlgeschlagen');
  await page.waitForFunction(id=>Anmeldung.nutzer()?.id===id,seite.id);
  const k=await page.evaluate(async()=>{const k=await KryptoWeb.anmelden();return k?{id:k.id,oeffentlich:k.oeffentlich,kontoId:k.kontoId}:null;});if(!k?.id)throw new Error('Browsergerät fehlt');merken(seite,k.id);
@@ -50,7 +51,7 @@ async function webSenden(seite,text){
 (async()=>{
  log('LIVE: exklusiver Bestand bestätigt; keine Registrierung, kein Reset, kein Schema');
  for(const s of konten){
-  s.client=client();const r=await s.client.auth.signInWithPassword({email:s.email,password:s.pass});if(r.error)throw new Error('Testanmeldung fehlgeschlagen: '+r.error.message);assert.equal(r.data.user.id,s.id);
+  s.client=client();const r=await pruefAnmelden(s.client, {email:s.email,password:s.pass});if(r.error)throw new Error('Testanmeldung fehlgeschlagen: '+r.error.message);assert.equal(r.data.user.id,s.id);
   const k=await ergebnis(s.client.from('contacts').select('id').eq('user_id',s.id).in('contact_id',konten.map(x=>x.id)),'Kontakt-Grundstand');k.forEach(x=>kontakteVorher.add(x.id));manifest.kontakteVorher[s.id]=k.map(x=>x.id);manifest.schluesselVorher[s.id]=(await ergebnis(s.client.from('krypto_schluessel').select('id').eq('user_id',s.id),'Geräte-Grundstand')).map(x=>x.id);sichern();
  }
  // Beide Kontaktgrundstände sichern, bevor das erste Gerät angelegt wird.

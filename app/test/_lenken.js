@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 /**
  * Prüflauf „Feed steuern" (Kasten 24) — wirkt die Lenkung auf BEIDEN Seiten?
  *
@@ -110,7 +111,7 @@ async function vorhersage(client, zeilen, eintraege) {
 
   // Dasselbe Konto noch einmal in Node — für die Vorhersage und die Gegenproben.
   const ich = createClient(URL_, KEY);
-  const { data: anm, error: anmFehler } = await ich.auth.signInWithPassword({ email: MAIL, password: PASS });
+  const { data: anm, error: anmFehler } = await pruefAnmelden(ich, { email: MAIL, password: PASS });
   if (anmFehler) {
     console.error('FEHLER  Node-Anmeldung: ' + anmFehler.message);
     await beenden(browser, 1);
@@ -351,7 +352,7 @@ async function vorhersage(client, zeilen, eintraege) {
     console.log('\nFremde sehen nichts');
     await webApi('/api/lenkung', { art: 'hashtag', wert: t, anzeige: t, richtung: 'mehr' });
     const anderer = createClient(URL_, KEY);
-    const { data: anderesKonto, error: andererFehler } = await anderer.auth.signInWithPassword({
+    const { data: anderesKonto, error: andererFehler } = await pruefAnmelden(anderer, {
       email: 'test@all-media.app',
       password: TESTKONTO_PASS,
     });

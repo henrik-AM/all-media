@@ -1,3 +1,4 @@
+const { pruefKopf } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 // Prueft die echte Datenbank — nicht den Code, sondern das, was in Supabase
 // wirklich steht.
 //
@@ -70,7 +71,7 @@ async function main() {
   // ------------------------------------------------------------ Anmelden --
   const anmeldung = await fetch(`${URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    headers: pruefKopf(KEY),
     body: JSON.stringify({ email: KONTO.email, password: KONTO.passwort }),
   }).then((r) => r.json());
 

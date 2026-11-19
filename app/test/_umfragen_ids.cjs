@@ -1,3 +1,4 @@
+const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -42,7 +43,7 @@ function laden(datei) {
   const env=fs.readFileSync(abhaengigkeiten+'/app/.env.local','utf8');
   const v=n=>(env.match(new RegExp('^'+n+'=(.*)$','m'))||[])[1]?.trim();
   const c=createClient(v('EXPO_PUBLIC_SUPABASE_URL'),v('EXPO_PUBLIC_SUPABASE_ANON_KEY'),{auth:{persistSession:false}});
-  const a=await c.auth.signInWithPassword({email:'test@all-media.app',password:v('AM_TESTKONTO_PASS')});
+  const a=await pruefAnmelden(c, {email:'test@all-media.app',password:v('AM_TESTKONTO_PASS')});
   if(a.error) throw a.error;
   const p=await c.from('posts').select('id').limit(20); if(p.error)throw p.error;
   assert.ok(p.data.length);
