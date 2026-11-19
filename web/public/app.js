@@ -14080,7 +14080,7 @@ function openKontoLoeschen() {
             window.KryptoWeb?.vergessen();
             // Ein gelöschtes Konto gehört nicht unter „Frühere Konten“.
             fruehereVergessen(ich.id);
-          })
+          }, () => window.Captcha?.holen())
         );
         if (!r.ok) {
           knopf.disabled = feld.disabled = false;
@@ -16182,7 +16182,14 @@ function spendenweg(anfrage, bereich) {
                 if (!passwort) return melden('Bitte dein Passwort eingeben');
                 // Frisch anmelden — die Datenbank prüft den Zeitpunkt (amr).
                 const email = Anmeldung.nutzer()?.email;
-                const { error } = await db.auth.signInWithPassword({ email, password: passwort });
+                // Captcha (Fahrplan C5): undefined, solange keins eingerichtet ist.
+                const pruefung = await Anmeldung.captcha();
+                if (pruefung.fehler) return melden(pruefung.fehler);
+                const { error } = await db.auth.signInWithPassword({
+                  email,
+                  password: passwort,
+                  options: { captchaToken: pruefung.token },
+                });
                 if (error) return melden('Das Passwort stimmt nicht');
               }
               const { data, error } = await db.rpc('spendencode_setzen', { p_neu: neu, p_bisher: bisher });

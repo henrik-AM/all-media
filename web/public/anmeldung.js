@@ -69,6 +69,20 @@
     return steht ? window.Passwort.GELEAKT_TEXT : null;
   }
 
+  /*
+   * Captcha-Token für genau einen Auth-Aufruf (Fahrplan C5, Entwurf).
+   * `{ token }` — token ist undefined, solange kein Captcha eingerichtet ist;
+   * `{ fehler }` — abgebrochen oder nicht geladen. Siehe public/captcha.js.
+   */
+  async function captcha() {
+    if (!window.Captcha) return { token: undefined };
+    try {
+      return { token: await window.Captcha.holen() };
+    } catch (e) {
+      return { fehler: e?.message || 'Die Sicherheitsprüfung hat nicht geklappt.' };
+    }
+  }
+
   // ------------------------------------------------------------- Aufbau --
 
   function skriptLaden(pfad) {
@@ -406,7 +420,13 @@
       };
     }
 
-    const { data, error } = await c.auth.signInWithPassword({ email, password: passwort });
+    const pruefung = await captcha();
+    if (pruefung.fehler) return { ok: false, fehler: pruefung.fehler };
+    const { data, error } = await c.auth.signInWithPassword({
+      email,
+      password: passwort,
+      options: { captchaToken: pruefung.token },
+    });
     if (error) return { ok: false, fehler: uebersetze(error.message) };
 
     sitzung = data.session;
@@ -490,10 +510,13 @@
     const passwortGrund = await passwortPruefen(passwort);
     if (passwortGrund) return { ok: false, fehler: passwortGrund, feld: 'passwort' };
 
+    const sicherheit = await captcha();
+    if (sicherheit.fehler) return { ok: false, fehler: sicherheit.fehler };
     const { data, error } = await c.auth.signUp({
       email,
       password: passwort,
       options: {
+        captchaToken: sicherheit.token,
         data: {
           handle: pruefung.handle,
           name: name || benutzername,
@@ -584,8 +607,11 @@
     const c = await aufbauen();
     if (!c) return { ok: false, fehler: 'Anmeldung ist nicht eingerichtet.' };
 
+    const pruefung = await captcha();
+    if (pruefung.fehler) return { ok: false, fehler: pruefung.fehler };
     const { error } = await c.auth.resetPasswordForEmail(email, {
       redirectTo: location.origin,
+      captchaToken: pruefung.token,
     });
     if (error) return { ok: false, fehler: uebersetze(error.message) };
     return { ok: true };
@@ -621,9 +647,12 @@
     const mail = sitzung?.user?.email;
     if (!mail) return { ok: false, fehler: 'Bitte melde dich neu an.' };
 
+    const pruefung = await captcha();
+    if (pruefung.fehler) return { ok: false, fehler: pruefung.fehler };
     const { error: fehlerAnmeldung } = await c.auth.signInWithPassword({
       email: mail,
       password: bisher,
+      options: { captchaToken: pruefung.token },
     });
     if (fehlerAnmeldung) return { ok: false, fehler: 'Das bisherige Passwort stimmt nicht.' };
 
@@ -644,6 +673,8 @@
     kontoAbmelden,
     passwortVergessen,
     passwortAendern,
+    // Für Neuanmeldungen außerhalb dieser Datei (Spenden-PIN, Konto löschen).
+    captcha,
     benutzernameFrei,
     nummerFrei,
     benutzernameAendern,

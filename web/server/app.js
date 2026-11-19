@@ -496,7 +496,64 @@ app.get('/api/version', (_req, res) => {
  * Regeln, nicht durch Geheimhaltung dieses Schlüssels.
  */
 app.get('/api/konfiguration', (_req, res) => {
-  res.json({ supabaseUrl, supabaseKey, konfiguriert: isConfigured() });
+  // turnstileSiteKey: öffentlicher Schlüssel des Captcha-Widgets (Fahrplan
+  // C5/C6). Leer = kein Captcha, App und Website melden sich wie bisher an.
+  res.json({ supabaseUrl, supabaseKey, konfiguriert: isConfigured(), turnstileSiteKey: TURNSTILE_SITE_KEY });
+});
+
+/*
+ * CAPTCHA-SEITE (Fahrplan Mail/Captcha C5/C6, Entwurf 19.11.2026)
+ *
+ * Supabase verlangt nach dem Captcha-Schalter bei jeder Anmeldung mit
+ * Passwort, jeder Registrierung und „Passwort vergessen" ein Token von
+ * Cloudflare Turnstile. Turnstile ist ein Skript von challenges.cloudflare.com.
+ *
+ * Es liegt bewusst NICHT auf der Hauptseite: deren CSP lässt nur Skripte vom
+ * eigenen Server zu (Richtlinie 7.1, test:recht), und jeder Seitenaufruf
+ * würde sonst die IP an Cloudflare schicken. Stattdessen diese eine kleine
+ * Seite mit eigener, enger CSP. Sie wird nur geladen, wenn sich jemand
+ * anmeldet — die Website zeigt sie in einem Rahmen (web/public/captcha.js),
+ * die App in einer WebView (app/components/CaptchaHost.tsx). Ein Weg, eine
+ * Seite, ein Turnstile-Hostname für beide Oberflächen.
+ *
+ * ⚠️ Vor dem Ausliefern mit Schlüssel: Cloudflare Turnstile in die
+ * Datenschutzerklärung (gemeinsam/rechtstexte.js) und in die DIENSTE-Liste
+ * von test/_rechtstexte_einheit.js — erst der Text, dann der Code.
+ */
+const TURNSTILE_SITE_KEY = (process.env.TURNSTILE_SITE_KEY || '').trim();
+const TURNSTILE_QUELLE = 'https://challenges.cloudflare.com';
+app.get('/captcha', (_req, res) => {
+  res.set('Content-Security-Policy', [
+    "default-src 'self'",
+    `script-src 'self' ${TURNSTILE_QUELLE}`,
+    `frame-src ${TURNSTILE_QUELLE}`,
+    "style-src 'self' 'unsafe-inline'",
+    "connect-src 'self'",
+    "img-src 'self' data:",
+    // Die Website bettet die Seite selbst ein; fremde Seiten dürfen es nicht.
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'none'",
+  ].join('; '));
+  res.set('X-Frame-Options', 'SAMEORIGIN');
+  res.set('Cache-Control', 'no-store');
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sicherheitsprüfung</title>
+<style>
+  html,body{margin:0;height:100%;font-family:-apple-system,system-ui,sans-serif;background:transparent;color:#111}
+  main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;box-sizing:border-box;text-align:center}
+  #hinweis{font-size:14px;color:#555;max-width:320px}
+</style></head>
+<body><main>
+  <div id="widget"></div>
+  <div id="hinweis">Kurze Sicherheitsprüfung gegen automatisch angelegte Konten.</div>
+</main>
+<script src="/captcha-seite.js"></script>
+</body></html>`);
 });
 
 /*

@@ -68,6 +68,7 @@
     datenbank: 'Dein Konto lässt sich gerade nicht löschen. Es wurde nichts gelöscht. Schreib uns über „Problem melden"',
     noch_nicht: 'Konto löschen ist noch nicht freigeschaltet. Schreib uns über „Problem melden", dann löschen wir dein Konto von Hand',
     netz: 'Keine Verbindung — es wurde nichts gelöscht',
+    captcha: 'Die Sicherheitsprüfung wurde nicht abgeschlossen — es wurde nichts gelöscht',
   };
 
   /** Hinweistext vor dem Löschen, für beide Oberflächen gleich. */
@@ -120,7 +121,11 @@
   async function ablauf(passwort, schritte) {
     var nein = function (grund) { return { ok: false, grund: grund, text: grundText(grund) }; };
     try {
-      if (!passwort || !(await schritte.passwortPruefen(passwort))) return nein('passwort');
+      if (!passwort) return nein('passwort');
+      var stimmt = await schritte.passwortPruefen(passwort);
+      // 'captcha': Sicherheitsprüfung abgebrochen/fehlgeschlagen (Fahrplan C5/C6).
+      if (stimmt === 'captcha') return nein('captcha');
+      if (!stimmt) return nein('passwort');
 
       var liste = await schritte.medien();
       if (fehltFunktion(liste.error)) return nein('noch_nicht');
@@ -154,11 +159,26 @@
    * Die Schritte für ablauf() mit einem supabase-js-Client. Die erneute
    * Anmeldung prüft nur das Passwort — sie bleibt dasselbe Konto.
    */
-  function schritteFuer(client, email, abmelden) {
+  /*
+   * captchaHolen (optional, Fahrplan C5/C6): async () => Token | undefined,
+   * wirft bei Abbruch. Ohne die Funktion geht kein Token mit — richtig,
+   * solange das Captcha in Supabase aus ist.
+   */
+  function schritteFuer(client, email, abmelden, captchaHolen) {
     return {
       passwortPruefen: async function (passwort) {
         if (!email) return false;
-        var r = await client.auth.signInWithPassword({ email: email, password: passwort });
+        var token;
+        try {
+          token = captchaHolen ? await captchaHolen() : undefined;
+        } catch (e) {
+          return 'captcha';
+        }
+        var r = await client.auth.signInWithPassword({
+          email: email,
+          password: passwort,
+          options: { captchaToken: token },
+        });
         return !r.error;
       },
       medien: function () {
