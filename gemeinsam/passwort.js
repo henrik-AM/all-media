@@ -188,6 +188,9 @@
      */
     if (m.indexOf('weak password') >= 0 || m.indexOf('password should') >= 0)
       return 'Das Passwort ist zu einfach. ' + REGEL_TEXT + '.';
+    // Supabase mit eingeschaltetem Captcha (Fahrplan Mail/Captcha), Token fehlt/abgelaufen.
+    if (m.indexOf('captcha') >= 0)
+      return 'Die Sicherheitsprüfung hat nicht geklappt. Bitte versuche es noch einmal.';
     if (m.indexOf('rate limit') >= 0 || m.indexOf('too many') >= 0)
       return 'Zu viele Versuche. Bitte kurz warten.';
     if (m.indexOf('unable to validate email') >= 0)

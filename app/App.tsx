@@ -27,6 +27,7 @@ import { NeueBedingungen } from './components/NeueBedingungen';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
 import { Toast } from './components/Toast';
+import { CaptchaHost } from './components/CaptchaHost';
 import { BildschirmzeitSperre } from './components/BildschirmzeitSperre';
 import { BildschirmzeitProvider, useBildschirmzeit } from './contexts/BildschirmzeitContext';
 import { Bildschirmzeit } from './lib/bildschirmzeit';
@@ -3015,6 +3016,8 @@ const App = () => (
                   <SpendenwegProvider>
                     <FarbfilterRahmen>
                       <Root />
+                      {/* Fahrplan C6: Sicherheitsprüfung für alle Anmeldewege. */}
+                      <CaptchaHost />
                     </FarbfilterRahmen>
                   </SpendenwegProvider>
                 </ProfilProvider>

@@ -22,6 +22,7 @@ import { SheetRahmen } from './SheetRahmen';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { AuthContext } from '../contexts/AuthContext';
 import { useSupabase } from '../contexts/SupabaseContext';
+import { captchaHolen } from '../lib/captcha';
 
 const KontoLoeschen = require('../../gemeinsam/konto-loeschen') as typeof import('../../gemeinsam/konto-loeschen');
 
@@ -61,7 +62,7 @@ export const KontoLoeschenSheet = ({ visible, onClose, onDatenauskunft, onGeloes
         await logout();
         // logout() merkt sich das Konto unter „Frühere Konten" — ein gelöschtes gehört da nicht hin.
         frueheresVergessen(id);
-      })
+      }, captchaHolen)
     );
     if (r.ok) return onGeloescht();
     setLaeuft(false);

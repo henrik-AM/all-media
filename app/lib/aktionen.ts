@@ -26,6 +26,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien, medienAnfrage, eigeneMedienadresse } from './medien';
+import { captchaHolen } from './captcha';
 // Kasten 1.3 (Nachtrag 10.10.2026): Texte der Seite „Profil bearbeiten“.
 const Profilfelder = require('../../gemeinsam/profilfelder') as typeof import('../../gemeinsam/profilfelder');
 const Kontaktbild = require('../../gemeinsam/kontaktbild') as typeof import('../../gemeinsam/kontaktbild');
@@ -3592,7 +3593,9 @@ export async function spendencodeMitPasswort(
 ) {
   const falsch = Zahlung.codePruefe(neu);
   if (falsch) throw new SpendenFehler('ungueltig');
-  const { error } = await client.auth.signInWithPassword({ email, password: passwort });
+  // Captcha (Fahrplan C6): wirft CaptchaAbbruch mit lesbarer Meldung.
+  const captchaToken = await captchaHolen();
+  const { error } = await client.auth.signInWithPassword({ email, password: passwort, options: { captchaToken } });
   if (error) throw new Error('Das Passwort stimmt nicht');
   return spendencodeSetzen(client, neu, null);
 }

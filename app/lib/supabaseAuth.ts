@@ -35,6 +35,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import * as Crypto from 'expo-crypto';
 import { SUPABASE_CONFIG } from '../constants/supabase';
+import { CaptchaAbbruch, captchaHolen } from './captcha';
 
 const Passwort = require('../../gemeinsam/passwort') as typeof import('../../gemeinsam/passwort');
 
@@ -100,10 +101,12 @@ export async function signUpWithEmail(
   if (zuSchwach) return { success: false, user: null, error: zuSchwach };
 
   try {
+    // Captcha (Fahrplan C6): undefined, solange keins eingerichtet ist.
+    const captchaToken = await captchaHolen();
     const { data, error } = await client.auth.signUp({
       email,
       password,
-      options: metadaten ? { data: metadaten } : undefined,
+      options: { captchaToken, ...(metadaten ? { data: metadaten } : {}) },
     });
 
     if (error) {
@@ -126,6 +129,7 @@ export async function signUpWithEmail(
 
     return { success: true, user: data.user, error: null };
   } catch (err: any) {
+    if (err instanceof CaptchaAbbruch) return { success: false, user: null, error: err.message };
     console.error('Registrierung fehlgeschlagen:', err?.message ?? err);
     return { success: false, user: null, error: Passwort.uebersetze(err?.message) };
   }
@@ -137,7 +141,8 @@ export async function signInWithEmail(
   password: string
 ): Promise<AuthErgebnis> {
   try {
-    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    const captchaToken = await captchaHolen();
+    const { data, error } = await client.auth.signInWithPassword({ email, password, options: { captchaToken } });
 
     if (error) {
       console.error('Anmeldung fehlgeschlagen:', error.message);
@@ -146,6 +151,7 @@ export async function signInWithEmail(
 
     return { success: true, user: data.user, error: null };
   } catch (err: any) {
+    if (err instanceof CaptchaAbbruch) return { success: false, user: null, error: err.message };
     console.error('Anmeldung fehlgeschlagen:', err?.message ?? err);
     return { success: false, user: null, error: Passwort.uebersetze(err?.message) };
   }
@@ -189,8 +195,10 @@ export async function resetPasswordForEmail(client: SupabaseClient | null, email
       return { success: true };
     }
 
+    const captchaToken = await captchaHolen();
     const { error } = await client.auth.resetPasswordForEmail(email, {
       redirectTo: `${SUPABASE_CONFIG.redirectUrl}/reset-password`,
+      captchaToken,
     });
 
     if (error) {
@@ -210,6 +218,7 @@ export async function resetPasswordForEmail(client: SupabaseClient | null, email
 
     return { success: true };
   } catch (err: any) {
+    if (err instanceof CaptchaAbbruch) return { success: false, error: err.message };
     console.error('Passwort zuruecksetzen fehlgeschlagen:', err?.message ?? err);
     return { success: false, error: Passwort.uebersetze(err?.message) };
   }

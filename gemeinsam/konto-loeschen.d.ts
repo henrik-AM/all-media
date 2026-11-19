@@ -6,7 +6,8 @@ export function fehltFunktion(fehler: { code?: string; message?: string } | null
 export function grundText(grund: string): string;
 export function paeckchen(medien: { bucket: string; name: string }[] | null | undefined): { bucket: string; namen: string[] }[];
 export interface LoeschSchritte {
-  passwortPruefen(passwort: string): Promise<boolean>;
+  /** 'captcha': Sicherheitsprüfung abgebrochen (Fahrplan C5/C6). */
+  passwortPruefen(passwort: string): Promise<boolean | 'captcha'>;
   medien(): Promise<{ data: { bucket: string; name: string }[] | null; error: any }>;
   probe(): Promise<{ data: { ok: boolean; grund?: string } | null; error: any }>;
   dateienLoeschen(bucket: string, namen: string[]): Promise<{ error: any } | void>;
@@ -14,7 +15,13 @@ export interface LoeschSchritte {
   abmelden(): Promise<void>;
 }
 /** Die Schritte mit einem supabase-js-Client (App und Website). `abmelden` nimmt das Konto auch aus der Kontoliste. */
-export function schritteFuer(client: any, email: string | null | undefined, abmelden: () => Promise<void>): LoeschSchritte;
+export function schritteFuer(
+  client: any,
+  email: string | null | undefined,
+  abmelden: () => Promise<void>,
+  /** Fahrplan C5/C6: Captcha-Token holen; undefined = keins eingerichtet, wirft bei Abbruch. */
+  captchaHolen?: () => Promise<string | undefined>
+): LoeschSchritte;
 export function ablauf(
   passwort: string,
   schritte: LoeschSchritte
