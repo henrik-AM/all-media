@@ -128,7 +128,7 @@ export const CommunityOptionenSheet = ({
             <View style={styles.symbol}>
               <Ionicons name="notifications-outline" size={18} color={colors.text2} />
             </View>
-            <Text style={styles.label}>Benachrichtigungen</Text>
+            <Text style={[styles.textBlock, styles.label]}>Benachrichtigungen</Text>
             {/* Markenfarbe wie in den Einstellungen — der Grundzustand des
                 iOS-Schalters ist gruen und faellt sonst aus der App heraus. */}
             <Switch
@@ -174,7 +174,7 @@ export const CommunityOptionenSheet = ({
             <View style={styles.symbol}>
               <Ionicons name="close-outline" size={18} color={colors.danger} />
             </View>
-            <Text style={[styles.label, styles.gefahr]}>Community verlassen</Text>
+            <Text style={[styles.textBlock, styles.label, styles.gefahr]}>Community verlassen</Text>
           </Druck>
         )}
       </View>
@@ -202,7 +202,7 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   textBlock: { flex: 1 },
-  label: { flex: 1, ...typography.body, color: colors.text },
+  label: { ...typography.body, color: colors.text },
   neben: { ...typography.small, color: colors.text2, marginTop: 2 },
   gefahr: { color: colors.danger },
 }));

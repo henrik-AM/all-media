@@ -195,8 +195,10 @@ async function teilB() {
   const pttPfade = [];
   const unterthemen = [];
   let com;
+  let zweierAnruf;
   try {
-    await Testpaar.testpaarSichern();
+    const zweier = await Testpaar.testpaarSichern();
+    if (!zweier) throw new Error('Das Testpaar hat keinen Zweierchat');
     const name = 'Prüfcommunity PTT ' + Date.now();
     const { data, error } = await B.c.from('communities')
       .insert({ name, topic: 'Prüflauf', visibility: 'public', created_by: B.id }).select().single();
@@ -237,25 +239,16 @@ async function teilB() {
       .insert({ channel_id: k1.id, sender_id: B.id, text: '', anruf_art: 'audio', anruf_status: 'gestartet', anruf_dauer: 180 });
     pruefe('5.1 „gestartet" mit Dauer verletzt eine Prüfbedingung', eFake?.code === '23514', eFake?.message);
 
-    // Zweierchat A–B, falls vorhanden.
-    const { data: meineB } = await B.c.from('chat_members').select('chat_id, chats(is_group)').eq('user_id', B.id);
-    const kandidaten = (meineB || []).filter((m) => m.chats && !m.chats.is_group).map((m) => m.chat_id);
-    const { data: gemeinsam } = kandidaten.length
-      ? await A.c.from('chat_members').select('chat_id').eq('user_id', A.id).in('chat_id', kandidaten.slice(0, 100))
-      : { data: [] };
-    const zweier = (gemeinsam || [])[0]?.chat_id;
-    if (zweier) {
-      const { data: m, error: eM } = await B.c.from('messages')
-        .insert({ chat_id: zweier, sender_id: B.id, text: '', anruf_art: 'audio', anruf_status: 'gestartet', anruf_dauer: 0 })
-        .select('id').single();
-      pruefe('5.2 B vermerkt Sprachanruf im Zweierchat', !eM && !!m, eM?.message);
-      if (m) {
-        const { data: ms } = await A.c.from('messages').select('sender_id, anruf_status').eq('id', m.id).maybeSingle();
-        pruefe('5.4 A sieht ihn im selben Chat', ms && ms.sender_id === B.id && ms.anruf_status === 'gestartet');
-        await B.c.from('messages').delete().eq('id', m.id);
-      }
-    } else {
-      console.log('  --   kein Zweierchat A–B im Bestand, Messenger-Teil übersprungen');
+    // Den vorbereiteten Zweierchat verwenden und nur die eigene Probezeile entfernen.
+    const { data: m, error: eM } = await B.c.from('messages')
+      .insert({ chat_id: zweier, sender_id: B.id, text: '', anruf_art: 'audio', anruf_status: 'gestartet', anruf_dauer: 0 })
+      .select('id').single();
+    zweierAnruf = m?.id;
+    pruefe('5.2 B vermerkt Sprachanruf im Zweierchat', !eM && !!m, eM?.message);
+    if (m) {
+      const { data: ms } = await A.c.from('messages').select('sender_id, anruf_status')
+        .eq('id', m.id).maybeSingle().throwOnError();
+      pruefe('5.4 A sieht ihn im selben Chat', ms && ms.sender_id === B.id && ms.anruf_status === 'gestartet');
     }
 
     const mitteilungenA = async (kanal) =>
@@ -337,6 +330,16 @@ async function teilB() {
       const { data: rest, error: lesefehler } = await B.c.from('communities').select('id').eq('id', com.id);
       pruefe('Prüfcommunity ist wieder weg', !error && !lesefehler && rest?.length === 0,
         error?.message || lesefehler?.message);
+    }
+    if (zweierAnruf) {
+      try {
+        const filter = `id = ${uuid(zweierAnruf)} and sender_id = ${uuid(B.id)}`;
+        await frage(`delete from public.messages where ${filter}`);
+        const rest = await frage(`select count(*) as anzahl from public.messages where ${filter}`);
+        pruefe('Anrufzeile der Probe im Zweierchat ist weg', Number(rest?.[0]?.anzahl) === 0);
+      } catch (e) {
+        pruefe('Anrufzeile der Probe im Zweierchat ist weg', false, e.message);
+      }
     }
     for (const p of pttPfade) {
       await Testpaar.eigenesMediumWeg(p).catch((e) => pruefe('Prüfmedium entfernen', false, e.message));
