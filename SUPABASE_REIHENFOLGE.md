@@ -38,6 +38,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 
 | Objekt | definiert in (Reihenfolge) | gilt |
 |---|---|---|
+| Funktion public.medium_sichtbar() | SUPABASE_SCHEMA_95_sicherheit.sql → SUPABASE_SCHEMA_128_private_kontaktbilder.sql | **SUPABASE_SCHEMA_128_private_kontaktbilder.sql** |
 | Funktion public.bunny_objekt_vorgaben() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_116_bunny_altmedien.sql | **SUPABASE_SCHEMA_116_bunny_altmedien.sql** |
 | Funktion public.bunny_ursprung_frei() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_116_bunny_altmedien.sql | **SUPABASE_SCHEMA_116_bunny_altmedien.sql** |
 | Funktion public.darf_markieren() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_86_markierungen.sql | **SUPABASE_SCHEMA_86_markierungen.sql** |
@@ -671,3 +672,13 @@ Format 1 bleibt lesbar; frühere Clients verstehen Format 2 nicht.
 Schema 127 ist seit16.11.2026 nach verworfener Liveprobe23/23 eingespielt; Rechte,Schema95,Constraintvalidierung und Bestandszahlen anschließend gegengelesen. Native/gemeinsame Client-Abnahme und Veröffentlichung folgen separat.
 
 Schema 127 begrenzt die mitverschlossene Absenderzeit auf ±5 Minuten zur Serverzeit und schützt sie anschließend mit dem internen Trigger `krypto_zeit_fest`; Anzeige und Sortierung verwenden weiter `created_at`. Direktaufrufrechte der Triggerfunktion sind entzogen.
+
+## Schema 128 – private Kontaktbilder (Paket 8, 20.11.2026)
+
+`medium_sichtbar` gibt `avatars/` nur noch frei, wenn ein Profil (`avatar_url`) oder eine
+Community (`bild_url`) darauf zeigt — wie `bunny_medium_lesbar` (115) für Bunny-Dateien.
+Kontaktfotos (Schema 94) sind damit auch als Supabase-Datei privat (OWASP A01-002).
+Ersetzt den nie eingespielten Entwurf 107 (Sammelzweig); dessen Referenz-Auslöser ist seit 117 live.
+Nach 95/115/117. Probe: `app/test/_probe128.js` (verworfen). **Kein Index auf
+`profiles.avatar_url`** — macht Profil-Updates nicht-HOT und scheitert am Ausdrucksindex
+mit `telefonbuch_schluessel()` (42501). Alte 95 nicht erneut einspielen: öffnet `avatars/` wieder.
