@@ -1,5 +1,8 @@
--- AF3 / Schema 108 — ENTWURF, nicht eingespielt. Nach 107 und 82.
--- Ersetzt feed_rang aus Schema 82; keine öffentliche Negativzahl.
+-- Schema 129 — AF3 „Gefällt mir nicht" unter Videos (Paket 9, 20.11.2026).
+-- Entwurf 108 aus dem Sammelzweig, auf den Live-Stand gebracht: feed_rang
+-- ist die Fassung aus Schema 122 (beitrag_lesbar) plus Negativfaktor.
+-- Nach 122/128. Keine öffentliche Negativzahl; nur die Person selbst sieht
+-- ihre eigenen Zeilen. Schreiben nur über beitrag_reaktion() (definer).
 create table if not exists public.post_dislikes (
   post_id uuid not null references public.posts(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -39,12 +42,12 @@ language plpgsql security definer set search_path=public as $$
 declare an boolean;
 begin
   if auth.uid() is null or not public.konto_freigegeben() then raise exception 'Konto nicht freigegeben'; end if;
-  -- Auch direkt aufgerufen kein unberechtigter Beitrag; dieselben Sichtbedingungen wie posts.
-  if not exists(select 1 from public.posts p where p.id=p_post
-      and public.beitrag_sichtbar(p.user_id,p.demo)
-      and not public.blockiert_zwischen(auth.uid(),p.user_id)
-      and (p.publish_at is null or p.publish_at<=now() or p.user_id=auth.uid())) then raise exception 'Beitrag nicht sichtbar'; end if;
-  if p_art not in ('like','dislike') or p_art is null then raise exception 'Unbekannte Reaktion'; end if;
+  if p_art is null or p_art not in ('like','dislike') then raise exception 'Unbekannte Reaktion'; end if;
+  -- Definer umgeht RLS: dieselbe Lesbarkeit wie überall (Schema 119/122) plus Blockieren.
+  if not public.beitrag_lesbar(p_post)
+     or exists(select 1 from public.posts p where p.id=p_post and public.blockiert_zwischen(auth.uid(),p.user_id)) then
+    raise exception 'Beitrag nicht sichtbar';
+  end if;
   if p_art='dislike' and not exists(select 1 from public.posts where id=p_post and kind in ('reel','clip')) then raise exception 'Nur Videos'; end if;
   perform pg_advisory_xact_lock(hashtextextended(auth.uid()::text || p_post::text,108));
   if p_art='like' then
@@ -61,6 +64,7 @@ end $$;
 revoke execute on function public.beitrag_reaktion(uuid,text) from public,anon;
 grant execute on function public.beitrag_reaktion(uuid,text) to authenticated;
 
+-- Fassung aus Schema 122, neu nur der Negativfaktor (Schema 129).
 create or replace function public.feed_rang(
   beitraege uuid[],
   herkunft  text default 'feed'
@@ -88,8 +92,8 @@ declare
    */
   lern_ab timestamptz;
 begin
-  if ich is null or not public.konto_freigegeben() then
-    raise exception 'Konto nicht freigegeben';
+  if ich is null then
+    raise exception 'nicht angemeldet';
   end if;
 
   select greatest(now() - interval '60 days',
@@ -118,19 +122,22 @@ begin
            coalesce(p.shares_basis, 0)   as teil_sockel
       from public.posts p
      where p.id = any(beitraege)
-       -- SECURITY DEFINER umgeht RLS: dieselben Sichtgrenzen hier anwenden.
-       and public.beitrag_sichtbar(p.user_id,p.demo)
-       and not public.blockiert_zwischen(ich,p.user_id)
-       and (p.publish_at is null or p.publish_at<=now() or p.user_id=ich)
+       -- Schema 122: unlesbare Beitraege bekommen keine Zeile (keine
+       -- Zaehler, Sichtungen, kein Hinweis, dass es sie gibt).
+       and public.beitrag_lesbar(p.id)
   ),
 
+  -- Schema 129 (AF3): eigene „Gefällt mir nicht" senken den Beitrag stark,
+  -- dieselbe Person und gleiche Schlagworte schwächer. Nur eigene Signale.
   negativ as (
     select k.id, case
       when exists(select 1 from public.post_dislikes d where d.user_id=ich and d.post_id=k.id and d.created_at>=lern_ab) then 0.02
       when exists(select 1 from public.post_dislikes d join public.posts n on n.id=d.post_id where d.user_id=ich and d.created_at>=lern_ab and n.user_id=k.user_id) then 0.3
       when exists(select 1 from public.post_dislikes d join public.posts n on n.id=d.post_id where d.user_id=ich and d.created_at>=lern_ab and n.tags && k.tags) then 0.5
-      else 1.0 end as faktor from kandidat k
+      else 1.0 end::numeric as faktor
+      from kandidat k
   ),
+
   -- Was der Beitrag bei allen zusammen ausgeloest hat.
   echo as (
     select k.id,
@@ -363,10 +370,33 @@ begin
     round(g.interesse, 4),
     round(g.ermuedung, 4),
     (g.neuling and n.faktor >= 0.5)
-    from gerechnet g join negativ n on n.id=g.id
+    from gerechnet g
+    join negativ n on n.id = g.id
    order by 2 desc;
 end;
 $$;
 
 revoke execute on function public.feed_rang(uuid[], text) from public, anon;
 grant  execute on function public.feed_rang(uuid[], text) to authenticated;
+
+-- ------------------------------------------------------------ Nachweis --
+do $$
+declare f text;
+begin
+  foreach f in array array['public.feed_rang(uuid[],text)','public.beitrag_reaktion(uuid,text)'] loop
+    if position('beitrag_lesbar(' in pg_get_functiondef(f::regprocedure)) = 0 then
+      raise exception 'Schema 129: % ohne beitrag_lesbar()', f;
+    end if;
+    if has_function_privilege('anon', f, 'execute') then raise exception 'Schema 129: anon darf %', f; end if;
+  end loop;
+  if position('post_dislikes' in pg_get_functiondef('public.feed_rang(uuid[],text)'::regprocedure)) = 0 then
+    raise exception 'Schema 129: feed_rang ohne Negativfaktor';
+  end if;
+  if has_function_privilege('authenticated','public.reaktion_ausschliessen()','execute') then
+    raise exception 'Schema 129: Auslöserfunktion direkt aufrufbar';
+  end if;
+  if has_table_privilege('authenticated','public.post_dislikes','insert')
+     or has_table_privilege('anon','public.post_dislikes','select') then
+    raise exception 'Schema 129: post_dislikes zu offen';
+  end if;
+end $$;

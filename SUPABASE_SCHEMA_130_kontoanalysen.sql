@@ -1,31 +1,11 @@
--- AF7 / Schema 110 — ENTWURF, nicht eingespielt. Nach 108.
--- Keine Rückrechnung historischer Follower-/Vorwahlmerkmale. Neue Messung ab Einspielung.
+-- Schema 130 — AF7 Konto-Analysen (Paket 9, 20.11.2026). Entwurf 110 aus dem
+-- Sammelzweig, auf den Live-Stand gebracht. Nach 129.
+-- Keine Rückrechnung historischer Follower-/Vorwahlmerkmale: Messung ab Einspielung.
 -- post_impressions bleibt privat; der Verfasser erhält ausschließlich Aggregate.
--- Ersetzt impression_vermerken(uuid,integer,text) aus 28: nur sichtbare Beiträge,
--- freigegebene Konten und mindestens 1000 ms; Messdauer bleibt Client-Telemetrie.
-create or replace function public.impression_vermerken(
- beitrag uuid, dauer integer default 0, herkunft text default 'feed'
-) returns void language plpgsql security definer set search_path=public as $$
-declare ich uuid:=auth.uid(); gedeckelt integer;
-begin
- if ich is null or not public.konto_freigegeben() then raise exception 'Konto nicht freigegeben';end if;
- if herkunft is null or herkunft not in ('feed','reels','explorer','profil','community') then raise exception 'Unbekannte Herkunft';end if;
- if not exists(select 1 from public.posts p where p.id=beitrag
-  and public.beitrag_sichtbar(p.user_id,p.demo)
-  and not public.blockiert_zwischen(ich,p.user_id)
-  and (p.publish_at is null or p.publish_at<=now() or p.user_id=ich)) then
-  raise exception 'Beitrag nicht sichtbar';
- end if;
- if coalesce(dauer,0)<1000 then return;end if;
- gedeckelt:=least(dauer,300000);
- insert into public.post_impressions(post_id,user_id,tag,dauer_ms,quelle)
- values(beitrag,ich,(now() at time zone 'utc')::date,gedeckelt,herkunft)
- on conflict(user_id,post_id,tag,quelle) do update set
- dauer_ms=public.post_impressions.dauer_ms+excluded.dauer_ms,
- sichtungen=public.post_impressions.sichtungen+1,zuletzt=now();
-end $$;
-revoke execute on function public.impression_vermerken(uuid,integer,text) from public,anon;
-grant execute on function public.impression_vermerken(uuid,integer,text) to authenticated;
+-- impression_vermerken() bleibt die Fassung aus Schema 122 (beitrag_lesbar,
+-- stilles Nichtstun ohne Orakel). Die 1000-ms-Grenze und die Freigabe gelten
+-- erst beim Übertragen in konto_sichtungen (Auslöser unten), damit der
+-- Feed-Algorithmus seine kurzen Sichtungen weiter sieht.
 create table if not exists public.konto_analysen_start (
   id boolean primary key default true check(id), seit timestamptz not null default now()
 );
@@ -173,3 +153,27 @@ begin
 end $$;
 revoke execute on function public.meine_kontoanalysen() from public,anon;
 grant execute on function public.meine_kontoanalysen() to authenticated;
+
+-- ------------------------------------------------------------ Nachweis --
+do $$
+declare t text;
+begin
+  foreach t in array array['konto_analysen_start','konto_sichtungen','konto_interaktionen'] loop
+    if has_table_privilege('authenticated','public.'||t,'select')
+       or has_table_privilege('authenticated','public.'||t,'insert')
+       or has_table_privilege('anon','public.'||t,'select') then
+      raise exception 'Schema 130: % direkt zugreifbar', t;
+    end if;
+  end loop;
+  if has_function_privilege('anon','public.meine_kontoanalysen()','execute') then
+    raise exception 'Schema 130: anon darf meine_kontoanalysen';
+  end if;
+  if has_function_privilege('authenticated','public.konto_sichtung_messen()','execute')
+     or has_function_privilege('authenticated','public.konto_interaktion_messen()','execute')
+     or has_function_privilege('authenticated','public.analyse_vorwahlland(text)','execute') then
+    raise exception 'Schema 130: Hilfsfunktion direkt aufrufbar';
+  end if;
+  if position('beitrag_lesbar(' in pg_get_functiondef('public.impression_vermerken(uuid,integer,text)'::regprocedure)) = 0 then
+    raise exception 'Schema 130: impression_vermerken ohne beitrag_lesbar (122 überschrieben?)';
+  end if;
+end $$;

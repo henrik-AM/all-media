@@ -1,9 +1,12 @@
--- AF6 / Schema 111 — ENTWURF. Nach 110 und 107 (Medienbesitzerprüfung).
+-- Schema 131 — AF6 Instants für Enge Freunde (Paket 9, 20.11.2026).
+-- Entwurf 111 aus dem Sammelzweig, auf den Live-Stand gebracht. Nach 130.
+-- Regelhelfer liegen in `intern` (Schema 123/125: keine RPC-Orakel);
+-- Besitzprüfung über storage.objects.owner_id statt des nie eingespielten 107.
 -- Kamera-Instants für festgeschriebene Enge Freunde; kein Jahresarchiv.
 -- B2: Vorgabe bis Henriks Entscheidung. Zentral rückbaubar; nie nur Clientfilter.
 -- Schema 52/58 entscheiden die Freigabe beider Konten; Schema 57 den Kontakt.
 -- Die Richtung entspricht Schema 57 auch beim lesenden Empfänger.
-create or replace function public.instant_beziehung_zwischen(p_absender uuid,p_empfaenger uuid) returns boolean
+create or replace function intern.instant_beziehung_zwischen(p_absender uuid,p_empfaenger uuid) returns boolean
 language sql stable security definer set search_path=public as $$
  select auth.uid() in (p_absender,p_empfaenger) and p_absender<>p_empfaenger
  and public.profil_freigegeben(p_absender) and public.profil_freigegeben(p_empfaenger)
@@ -14,14 +17,14 @@ language sql stable security definer set search_path=public as $$
  exists(select 1 from public.follows where follower_id=p_absender and followee_id=p_empfaenger)
  and exists(select 1 from public.follows where follower_id=p_empfaenger and followee_id=p_absender)));
 $$;
-revoke execute on function public.instant_beziehung_zwischen(uuid,uuid) from public,anon;
-grant execute on function public.instant_beziehung_zwischen(uuid,uuid) to authenticated;
-create or replace function public.instant_beziehung_erlaubt(p_freund uuid) returns boolean
+revoke execute on function intern.instant_beziehung_zwischen(uuid,uuid) from public,anon;
+grant execute on function intern.instant_beziehung_zwischen(uuid,uuid) to authenticated;
+create or replace function intern.instant_beziehung_erlaubt(p_freund uuid) returns boolean
 language sql stable security invoker set search_path=public as $$
- select public.instant_beziehung_zwischen(auth.uid(),p_freund);
+ select intern.instant_beziehung_zwischen(auth.uid(),p_freund);
 $$;
-revoke execute on function public.instant_beziehung_erlaubt(uuid) from public,anon;
-grant execute on function public.instant_beziehung_erlaubt(uuid) to authenticated;
+revoke execute on function intern.instant_beziehung_erlaubt(uuid) from public,anon;
+grant execute on function intern.instant_beziehung_erlaubt(uuid) to authenticated;
 create table if not exists public.enge_freunde (
  user_id uuid not null references public.profiles(id) on delete cascade,
  freund_id uuid not null references public.profiles(id) on delete cascade,
@@ -32,7 +35,7 @@ revoke all on public.enge_freunde from public,anon,authenticated;
 grant select,insert,delete on public.enge_freunde to authenticated;
 drop policy if exists eigene on public.enge_freunde;
 create policy eigene on public.enge_freunde for all to authenticated using(user_id=auth.uid())
-with check(user_id=auth.uid() and public.instant_beziehung_erlaubt(freund_id));
+with check(user_id=auth.uid() and intern.instant_beziehung_erlaubt(freund_id));
 
 create table if not exists public.instants (
  id uuid primary key default gen_random_uuid(),
@@ -51,22 +54,22 @@ alter table public.instant_empfaenger enable row level security;
 revoke all on public.instants,public.instant_empfaenger from public,anon,authenticated;
 grant select on public.instants,public.instant_empfaenger to authenticated;
 -- Keine direkten INSERT/UPDATE: IDs, Empfänger, Zeitstempel kommen nur aus RPCs.
-create or replace function public.instant_zugang(p_id uuid) returns boolean
+create or replace function intern.instant_zugang(p_id uuid) returns boolean
 language sql stable security definer set search_path=public as $$
  select auth.uid() is not null and public.konto_freigegeben() and exists(
  select 1 from public.instants i where i.id=p_id and i.expires_at>now()
  and public.profil_freigegeben(i.absender)
  and (i.absender=auth.uid() or exists(select 1 from public.instant_empfaenger e
  where e.instant_id=i.id and e.empfaenger=auth.uid() and e.geoeffnet_at is null
- and public.instant_beziehung_zwischen(i.absender,e.empfaenger))));
+ and intern.instant_beziehung_zwischen(i.absender,e.empfaenger))));
 $$;
-revoke execute on function public.instant_zugang(uuid) from public,anon;
-grant execute on function public.instant_zugang(uuid) to authenticated;
+revoke execute on function intern.instant_zugang(uuid) from public,anon;
+grant execute on function intern.instant_zugang(uuid) to authenticated;
 drop policy if exists sichtbar on public.instants;
-create policy sichtbar on public.instants for select to authenticated using(public.instant_zugang(id));
+create policy sichtbar on public.instants for select to authenticated using(intern.instant_zugang(id));
 drop policy if exists eigen on public.instant_empfaenger;
 create policy eigen on public.instant_empfaenger for select to authenticated
-using(empfaenger=auth.uid() and public.instant_zugang(instant_id));
+using(empfaenger=auth.uid() and intern.instant_zugang(instant_id));
 do $$ declare t text;begin
  foreach t in array array['enge_freunde','instants','instant_empfaenger'] loop
  execute format('drop policy if exists nur_freigegebene on public.%I',t);
@@ -101,7 +104,7 @@ end $$;
 create or replace function public.instant_empfaenger_liste() returns setof uuid
 language sql stable security definer set search_path=public as $$
  select f.freund_id from public.enge_freunde f where f.user_id=auth.uid()
- and public.instant_beziehung_erlaubt(f.freund_id)
+ and intern.instant_beziehung_erlaubt(f.freund_id)
  and not exists(select 1 from public.user_settings s where s.user_id=f.freund_id
  and s.schluessel='instantsEmpfangen' and s.wert='aus');
 $$;
@@ -122,12 +125,12 @@ declare ich uuid:=auth.uid(); neu uuid; an uuid; menge int:=0;
 begin
  if ich is null or not public.konto_freigegeben() then raise exception 'Konto nicht freigegeben';end if;
  if p_pfad !~ ('^instants/'||ich::text||'/[A-Za-z0-9_-]+\.jpg$')
- or not public.medium_besitzer_stimmt(p_pfad,ich)
  or not exists(select 1 from storage.objects o where o.bucket_id='media' and o.name=p_pfad
+     and o.owner_id=ich::text
      and (o.metadata->>'size')::bigint between 1 and 256000 and o.metadata->>'mimetype'='image/jpeg') then
  raise exception 'Nur ein eigenes Kamera-Foto bis 250 KB';end if;
  if length(coalesce(p_text,''))>100 then raise exception 'Höchstens 100 Zeichen';end if;
- if not exists(select 1 from public.enge_freunde f where f.user_id=ich and public.instant_beziehung_erlaubt(f.freund_id)) then
+ if not exists(select 1 from public.enge_freunde f where f.user_id=ich and intern.instant_beziehung_erlaubt(f.freund_id)) then
  raise exception 'Keine berechtigten Empfänger. Prüfe deine Enge-Freunde-Liste.';end if;
  insert into public.instants(absender,bild_pfad,text) values(ich,p_pfad,coalesce(p_text,'')) returning id into neu;
  for an in select public.instant_empfaenger_liste() loop
@@ -163,7 +166,7 @@ grant execute on function public.instant_stand() to authenticated;
 create or replace function public.instant_oeffnen(p_id uuid) returns boolean
 language plpgsql security definer set search_path=public as $$
 begin
- if not public.instant_zugang(p_id) then raise exception 'Instant nicht mehr verfügbar';end if;
+ if not intern.instant_zugang(p_id) then raise exception 'Instant nicht mehr verfügbar';end if;
  update public.instant_empfaenger set geoeffnet_at=now() where instant_id=p_id and empfaenger=auth.uid() and geoeffnet_at is null;
  if not found then return false;end if;
  delete from public.notifications where user_id=auth.uid() and target_type='instant' and target_id=p_id;
@@ -204,11 +207,8 @@ create policy "Instant hochladen" on storage.objects for insert to authenticated
  and public.upload_kontingent_frei() and (metadata->>'size')::bigint between 1 and 256000
  and metadata->>'mimetype'='image/jpeg');
 drop policy if exists "Instant lesen" on storage.objects;
-create policy "Instant lesen" on storage.objects for select to authenticated using(
- bucket_id='media' and split_part(name,'/',1)='instants' and exists(
- select 1 from public.instants i where i.bild_pfad=name and public.instant_zugang(i.id)));
 -- Andere Inhalte dürfen einen Instant-Pfad niemals erneut freigeben.
--- Zusätzliche RESTRICTIVE-Regel wirkt auch auf owner_id und medium_sichtbar aus 95/107.
+-- Zusätzliche RESTRICTIVE-Regel wirkt auch auf owner_id und medium_sichtbar aus 95/128.
 drop policy if exists instant_nur_einmal on storage.objects;
 create policy instant_nur_einmal on storage.objects as restrictive for select to authenticated using(
  bucket_id<>'media' or split_part(name,'/',1)<>'instants');
@@ -246,7 +246,30 @@ create or replace function public.enge_freunde_suche(p_suche text) returns table
 language sql stable security invoker set search_path=public as $$
  select p.id,p.name,p.handle from public.profiles p where length(trim(p_suche))>=2
  and p.name ilike '%'||replace(replace(left(trim(p_suche),80),'%','\%'),'_','\_')||'%'
- and public.instant_beziehung_erlaubt(p.id) order by p.name,p.id limit 20;
+ and intern.instant_beziehung_erlaubt(p.id) order by p.name,p.id limit 20;
 $$;
 revoke execute on function public.enge_freunde_suche(text) from public,anon;
 grant execute on function public.enge_freunde_suche(text) to authenticated;
+
+-- Alte öffentliche Fassungen aus Testläufen des Entwurfs entfernen.
+drop function if exists public.instant_beziehung_erlaubt(uuid);
+drop function if exists public.instant_beziehung_zwischen(uuid,uuid);
+drop function if exists public.instant_zugang(uuid);
+
+-- ------------------------------------------------------------ Nachweis --
+do $$
+declare f text;
+begin
+  foreach f in array array['intern.instant_beziehung_zwischen(uuid,uuid)','intern.instant_beziehung_erlaubt(uuid)','intern.instant_zugang(uuid)'] loop
+    if has_function_privilege('anon', f, 'execute') then raise exception 'Schema 131: anon darf %', f; end if;
+  end loop;
+  foreach f in array array['public.instant_loeschkandidaten()','public.instant_loeschbestaetigen(uuid[])','public.instant_empfaenger_liste()','public.instants_bei_block()','public.enge_freunde_vorgaben()'] loop
+    if has_function_privilege('authenticated', f, 'execute') then raise exception 'Schema 131: authenticated darf %', f; end if;
+  end loop;
+  if has_table_privilege('authenticated','public.instants','insert') or has_table_privilege('authenticated','public.instant_empfaenger','update') then
+    raise exception 'Schema 131: Instants direkt beschreibbar';
+  end if;
+  if not exists(select 1 from pg_policy where polname='instant_nur_einmal' and polrelid='storage.objects'::regclass) then
+    raise exception 'Schema 131: Sperre direkter Instant-Downloads fehlt';
+  end if;
+end $$;
