@@ -205,7 +205,7 @@ async function teilA() {
   pruefe('7.8 App: „Foto bearbeiten" mit Mediathek, Kamera, Entfernen',
     /Kontaktbild\.FOTO_BEARBEITEN/.test(kp) && /Kontaktbild\.ENTFERNEN/.test(kp) && /fotoHochladen\(supabase, quelle, 'avatars'/.test(kp));
   pruefe('7.8 App: Speichern prüft Entfernen nach (RLS-DELETE still)',
-    /export async function kontaktBildSetzen/.test(aktionen) && /if \(rest\?\.length\)/.test(aktionen));
+    /export async function kontaktBildSetzen/.test(aktionen) && /if \((nachFehler \|\| )?rest\?\.length\)/.test(aktionen));
   pruefe('7.8 Server: Route /api/kontaktbild + kontaktBilder im Bootstrap',
     /app\.post\('\/api\/kontaktbild'/.test(serverApp) && /ladeKontaktBilder\(client, nutzerId\)/.test(api));
   pruefe('7.8 Website: Messenger-Stellen mit eigenem Bild, Kanal ohne',
