@@ -105,14 +105,14 @@ export const EinstellungSheet = ({
         <Text style={styles.hinweis}>{leer}</Text>
       ) : (
         <ScrollView>
-          {zeilen.map((z) =>
+          {zeilen.map((z, i) =>
             z.kopf ? (
-              <Text key={z.text} style={styles.gruppe}>
+              <Text key={`${i}-${z.text}`} style={styles.gruppe}>
                 {z.text}
               </Text>
             ) : z.onPress ? (
               <Druck
-                key={z.schluessel ?? z.text}
+                key={`${i}-${z.schluessel ?? z.text}`}
                 style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
                 onPress={z.onPress}
                 accessibilityRole="button"
@@ -123,7 +123,7 @@ export const EinstellungSheet = ({
                 <Ionicons name="chevron-forward" size={16} color={colors.text3} />
               </Druck>
             ) : (
-              <View key={z.schluessel ?? z.text} style={styles.zeile}>
+              <View key={`${i}-${z.schluessel ?? z.text}`} style={styles.zeile}>
                 <Text style={styles.label}>{z.text}</Text>
                 <Text style={styles.neben}>{z.neben}</Text>
               </View>
