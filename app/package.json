@@ -175,8 +175,6 @@
     "test:af-nachpruefung": "node test/af-nachpruefung.js",
     "test:af-schema-proben": "node test/af-schema-proben.js",
     "test:af-video-beleg": "node test/af-video-beleg.js",
-    "test:af-folgerunde": "node test/af-folgerunde.js",
-    "test:af-folgerunde-bilder": "node test/af-folgerunde-bilder.js",
     "test:bunny": "node test/_bunny_einheit.js",
     "test:bunny-upload": "node test/bunny-upload.js",
     "test:af4-karussell": "node test/af4-karussell.js",
