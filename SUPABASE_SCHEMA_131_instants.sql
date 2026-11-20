@@ -204,8 +204,10 @@ create trigger instants_block after insert on public.blocks for each row execute
 drop policy if exists "Instant hochladen" on storage.objects;
 create policy "Instant hochladen" on storage.objects for insert to authenticated with check(
  bucket_id='media' and name ~ ('^instants/'||auth.uid()::text||'/[A-Za-z0-9_-]+\.jpg$')
- and public.upload_kontingent_frei() and (metadata->>'size')::bigint between 1 and 256000
- and metadata->>'mimetype'='image/jpeg');
+ and public.upload_kontingent_frei());
+-- Größe/Typ stehen beim INSERT der Storage-API noch nicht in metadata (live
+-- 20.11. geprüft: Regel mit metadata lehnte jeden Upload ab). Geprüft wird
+-- darum im Server (JPEG ≤ 250 KB) und in instant_senden() nach dem Upload.
 drop policy if exists "Instant lesen" on storage.objects;
 -- Andere Inhalte dürfen einen Instant-Pfad niemals erneut freigeben.
 -- Zusätzliche RESTRICTIVE-Regel wirkt auch auf owner_id und medium_sichtbar aus 95/128.
