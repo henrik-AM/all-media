@@ -1,9 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beitragAnlegen, NeuerBeitrag } from './aktionen';
 import { ladeHoch, ladeMedienlisteHoch, loesche } from './supabaseStorage';
+const Reel = require('../../gemeinsam/reel') as typeof import('../../gemeinsam/reel');
 
 /** Erst erfolgreich hochladen und speichern, danach eine echte Feedkachel zeigen. */
 export async function beitragSpeichern(client: SupabaseClient, ichId: string, felder: NeuerBeitrag) {
+  // AF5: dieselbe 20-Minuten-Grenze wie die Website, vor jedem Upload.
+  if ((felder.art === 'reel' || felder.art === 'clip') && felder.sekunden != null) {
+    const zuLang = Reel.pruefen(felder.sekunden);
+    if (zuLang) throw new Error(zuLang);
+  }
   let adresse = felder.mediaUrl;
   let anzeige = adresse;
   let uploadPfad: string | undefined;

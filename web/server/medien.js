@@ -459,9 +459,11 @@ async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt,{signal}={}) {
 }
 async function loeschen(client,nutzerId,pfad) {
   if(!Bunny.pfadPruefen(pfad,Bunny.ORDNER_LESEN))return {ok:false,error:'Ungültige Datei'};
-  if(mitBunny()) {
-    const {data:anbieter,error}=await client.rpc('medium_loeschrecht',{p_pfad:pfad});
-    if(error || !anbieter)return {ok:false,error:'Diese Datei darfst du nicht löschen oder die Datenbankfreigabe fehlt.'};
+  // Paket 9 (B1): Besitz und „nirgends verwendet" prüft die Datenbank immer,
+  // auch ohne Bunny-Schalter (medium_loeschrecht, Schema 115/134).
+  const {data:anbieter,error}=await client.rpc('medium_loeschrecht',{p_pfad:pfad});
+  if(error || !anbieter)return {ok:false,error:'Diese Datei darfst du nicht löschen oder die Datenbankfreigabe fehlt.'};
+  {
     if(anbieter==='bunny') {
       if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return {ok:false,error:'Der Medienspeicher ist derzeit nicht vollständig eingerichtet.'};
       const {createClient}=require('@supabase/supabase-js');
@@ -472,8 +474,16 @@ async function loeschen(client,nutzerId,pfad) {
     }
     if(anbieter!=='supabase')return {ok:false,error:'Unbekannte Ablage'};
   }
-  const {error}=await client.storage.from('media').remove([pfad]);
-  return error?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
+  // Beitragsdateien sind für Clients löschgesperrt (Schema 132); nach der
+  // Prüfung oben entfernt sie der Dienst.
+  let speicher=client;
+  if(pfad.startsWith('posts/')) {
+    const pruefung=require('./videopruefung');
+    try { speicher=pruefung.dienstclient(); }
+    catch { return {ok:false,error:'Der Medienspeicher ist derzeit nicht vollständig eingerichtet.'}; }
+  }
+  const {error:weg}=await speicher.storage.from('media').remove([pfad]);
+  return weg?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
 }
 async function instantUnterschrift(client,pfad,dienst) {
   if(!/^instants\/[0-9a-f-]{36}\/[A-Za-z0-9_-]+\.jpg$/.test(pfad))throw new Error('Ungültiger Instant-Pfad');

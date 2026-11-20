@@ -23,34 +23,28 @@ function modul(datei, laden, extra={}) {
   vm.runInNewContext(code,{exports:ex,module:{exports:ex},require:laden,console:{error(){}},...extra});return ex;
 }
 const leerDaten = new Proxy({ichId:'a',eigenesProfil:{name:'Test'}},{get:(o,k)=>k in o?o[k]:[]});
-function profil(upload) {
-  const h=hooks(),meldungen=[],schreib=[];
-  const ex=modul('../contexts/ProfilContext.tsx',name=>{
-    if(name==='react')return h.react;
-    if(name==='react-native')return {Alert:{alert:(...s)=>meldungen.push(s)}};
-    if(name.endsWith('DatenContext'))return {useDaten:()=>leerDaten};
-    if(name.endsWith('SupabaseContext'))return {useSupabase:()=>({supabase:{}})};
-    if(name.endsWith('/supabaseStorage'))return {ladeHoch:upload};
+// Paket 9: Uploads der App laufen auf main über lib/beitragSpeichern.
+function speicher(upload) {
+  const schreib=[];
+  const ex=modul('../lib/beitragSpeichern.ts',name=>{
+    if(name.endsWith('/supabaseStorage'))return {ladeHoch:upload,ladeMedienlisteHoch:async()=>[],loesche:async()=>({success:true})};
     if(name.endsWith('/aktionen'))return {beitragAnlegen:async(...args)=>{schreib.push(args);return 'echt';}};
     if(name.startsWith('../../gemeinsam/'))return require(name);
     throw Error('Unerwartetes Modul '+name);
   });
-  const tree=h.render(()=>ex.ProfilProvider({children:null}));
-  return {h,wert:tree.props.value,meldungen,schreib};
+  return {f:ex.beitragSpeichern,schreib};
 }
 function texte(tree) { if(tree==null||typeof tree==='boolean')return '';if(typeof tree!=='object')return String(tree);if(Array.isArray(tree))return tree.map(texte).join('');return texte(tree.children); }
 (async()=>{
-  await test('App-Uploadfehler: kein Post, keine Restkachel, verständlicher Fehler',async()=>{
-    const p=profil(async()=>({success:false,error:'Die Datei überschreitet 50 MB.'}));
-    assert.equal(await p.wert.videoAnlegen({beschreibung:'Test',ort:'',quer:false,mediaUri:'file:///test.mp4',sekunden:1200}),false);
-    assert.equal(p.schreib.length,0);assert.ok(p.meldungen[0][1].includes('50 MB'));
-    assert.ok(!p.h.werte.some(v=>Array.isArray(v)&&v.some(a=>a?.mediaUri==='file:///test.mp4')));
+  await test('App-Uploadfehler: kein Post, verständlicher Fehler',async()=>{
+    const p=speicher(async()=>({success:false,error:'Die Datei überschreitet 50 MB.'}));
+    await assert.rejects(p.f({},'a',{art:'reel',beschreibung:'Test',mediaUrl:'file:///test.mp4',sekunden:1200}),/50 MB/);
+    assert.equal(p.schreib.length,0);
   });
   await test('App normal: Upload vor genau einer Veröffentlichung, echte Medienreferenz',async()=>{
-    const p=profil(async()=>({success:true,url:'https://lokal/gespeichert.mp4'}));
-    assert.equal(await p.wert.videoAnlegen({beschreibung:'Test',ort:'',quer:true,mediaUri:'file:///test.mp4',sekunden:1200}),true);
-    assert.equal(p.schreib.length,1);assert.equal(p.schreib[0][2].mediaUrl,'https://lokal/gespeichert.mp4');
-    assert.equal(p.meldungen.length,0);
+    const p=speicher(async()=>({success:true,url:'https://lokal/gespeichert.mp4'}));
+    const r=await p.f({},'a',{art:'clip',beschreibung:'Test',mediaUrl:'file:///test.mp4',sekunden:1200});
+    assert.equal(r.id,'echt');assert.equal(p.schreib.length,1);assert.equal(p.schreib[0][2].mediaUrl,'https://lokal/gespeichert.mp4');
   });
   for (const fehler of [false,true]) await test(`Web: verspätete ${fehler?'Fehler':'Analyse'} von A nach Kontowechsel B verworfen`,async()=>{
     const quelle=fs.readFileSync(path.join(__dirname,'../../web/public/app.js'),'utf8');
