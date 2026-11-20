@@ -310,6 +310,8 @@ app.use('/api', async (req, _res, next) => {
   next();
 });
 
+const LESENDE_POSTS = new Set(['/medien/unterschreiben']);
+
 /*
  * Zweite Bremse: je KONTO, nur für schreibende Anfragen (Paket 8; Entwurf
  * Sicherheitsprüfung 17.10.2026).
@@ -324,10 +326,14 @@ app.use(
   '/api',
   rateLimit({
     windowMs: 60 * 1000,
-    max: 150,
+    // Dieselbe Grenze wie je Anschluss: ein Konto bekommt über viele
+    // Anschlüsse nicht mehr als über einen. Lesende POSTs (Unterschreiben)
+    // zählen nicht — sonst brach Teilen an viele Empfänger mit 429 ab
+    // (Codex-Gegenprüfung Paket 8).
+    max: 300,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => !req.nutzerId || req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
+    skip: (req) => !req.nutzerId || ['GET', 'HEAD', 'OPTIONS'].includes(req.method) || LESENDE_POSTS.has(req.path),
     keyGenerator: (req) => `konto:${req.nutzerId}`,
     message: { ok: false, error: 'Zu viele Aktionen. Bitte kurz warten.' },
     handler: (req, res, _next, optionen) => {
@@ -1956,7 +1962,8 @@ app.post('/api/eigene/profilbild', route(async (req) => {
     .eq('id', req.nutzerId)
     .select('id');
   if (error) {
-    if (['42703', 'PGRST204', '42501'].includes(error.code)) {
+    if (error.code === '42501') return { ok: false, error: syncHandlers.fuerMenschen(error) };
+    if (['42703', 'PGRST204'].includes(error.code)) {
       return { ok: false, error: 'Profilbilder gehen erst, wenn das Datenbank-Update eingespielt ist' };
     }
     return { ok: false, error: syncHandlers.fuerMenschen(error) };

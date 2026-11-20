@@ -126,7 +126,8 @@ function pfadAus(adresse) {
  * wenn gar nichts zu unterschreiben ist. Sonst laedt jeder Betrachter ein
  * Bild von einem fremden Server.
  */
-async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
+const STANDARD_SEKUNDEN = 4 * 60 * 60;
+async function signiereMedien(client, daten, sekunden = STANDARD_SEKUNDEN) {
   if (daten == null) return daten;
   // Ohne Client wird nichts unterschrieben — fremde Hosts fallen trotzdem weg.
   if (!client) return ohneFremdeMedien(daten);
@@ -140,7 +141,8 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
   const jetzt = Date.now();
   const fehlend = [];
   for (const pfad of pfade) {
-    const eintrag = zwischenspeicher.get(speicherSchluessel(client, pfad));
+    // Kurze Links (Moderation, 5 min) nie aus dem 4-h-Speicher (Codex-Gegenprüfung).
+    const eintrag = sekunden === STANDARD_SEKUNDEN ? zwischenspeicher.get(speicherSchluessel(client, pfad)) : null;
     if (eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
       karte.set(pfad, eintrag.url);
     } else {
@@ -156,7 +158,7 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
       for (const eintrag of data || []) {
         if (eintrag?.signedUrl && !eintrag.error) {
           karte.set(eintrag.path, eintrag.signedUrl);
-          merkeUnterschrift(client, eintrag.path, eintrag.signedUrl, ablauf);
+          if (sekunden === STANDARD_SEKUNDEN) merkeUnterschrift(client, eintrag.path, eintrag.signedUrl, ablauf);
         }
       }
     } catch (fehler) {
@@ -354,7 +356,7 @@ async function signiereMitBunny(client,daten,sekunden) {
       const {data:signiert,error:e}=await client.storage.from('media').createSignedUrls(alt,sekunden);
       if(!e)for(const z of signiert || [])if(z.signedUrl&&!z.error) {
         karte.set(z.path,z.signedUrl);
-        merkeUnterschrift(client,z.path,z.signedUrl,Date.now()+sekunden*1000);
+        if (sekunden === STANDARD_SEKUNDEN) merkeUnterschrift(client,z.path,z.signedUrl,Date.now()+sekunden*1000);
       }
     }
   }

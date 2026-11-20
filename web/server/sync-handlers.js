@@ -96,7 +96,7 @@ function handler(name, fn) {
  * nach Postgres-Innenleben aussieht. Im Serverprotokoll steht er weiter.
  */
 const INTERNER_TEXT =
-  /["`]|\b(relation|column|constraint|violates|row-level security|policy|permission denied|syntax error|duplicate key|null value|invalid input|does not exist|schema cache|could not|operator|function|PGRST|JWT|timeout|canceling statement)\b/i;
+  /["`]|\b(relation|column|constraint|violates|row-level security|policy|permission denied|syntax error|duplicate key|null value|invalid input|does not exist|schema cache|could not|operator|function|PGRST|JWT|timeout|canceling statement|deadlock|lock|serializ|transaction|statement|tuple|index|trigger|cache lookup|out of memory|connection|server closed|internal)\b/i;
 
 function fuerMenschen(fehler) {
   const text = String((fehler && fehler.message) || '').trim();
@@ -556,7 +556,7 @@ const handleAcceptRequest = handler('Anfrage', async (client, nutzerId, chatId, 
     .from('chats')
     .update({ anfrage_zustand: annehmen ? 'angenommen' : 'abgelehnt' })
     .eq('id', chatId);
-  if (error) return { ok: false, fehler: error.message };
+  if (error) return { ok: false, fehler: fuerMenschen(error) };
 
   /*
    * Wer im Messenger annimmt, hat die Person damit auch in den Kontakten.
@@ -593,7 +593,7 @@ const handleAcceptRequest = handler('Anfrage', async (client, nutzerId, chatId, 
  */
 const handleMessengerAnfragen = handler('Messenger-Anfrage', async (client, nutzerId, chatId) => {
   const { data, error } = await client.rpc('messenger_anfragen', { p_chat: chatId });
-  if (error) return { ok: false, fehler: error.message };
+  if (error) return { ok: false, fehler: fuerMenschen(error) };
   return data;
 });
 
@@ -604,7 +604,7 @@ const handleMessengerAnfrageBeantworten = handler(
       p_chat: chatId,
       p_annehmen: annehmen,
     });
-    if (error) return { ok: false, fehler: error.message };
+    if (error) return { ok: false, fehler: fuerMenschen(error) };
     return data;
   }
 );

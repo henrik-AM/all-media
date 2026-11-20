@@ -2453,12 +2453,13 @@ export async function kontaktBildSetzen(
     if (error) throw new Error(fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : error.message);
     // Ein abgelehntes DELETE meldet unter RLS Erfolg mit null Zeilen —
     // nachsehen, ob die Zeile wirklich weg ist.
-    const { data: rest } = await client
+    const { data: rest, error: nachFehler } = await client
       .from('kontakt_bilder')
       .select('kontakt_id')
       .eq('owner_id', ichId)
       .eq('kontakt_id', kontaktId);
-    if (rest?.length) throw new Error(Kontaktbild.NICHT_GESPEICHERT);
+    // Eine fehlgeschlagene Kontrolle ist kein Erfolg (wie POST /api/kontaktbild, Paket 8).
+    if (nachFehler || rest?.length) throw new Error(Kontaktbild.NICHT_GESPEICHERT);
     return;
   }
   if (!Kontaktbild.adresseGueltig(url)) throw new Error(Kontaktbild.NICHT_GESPEICHERT);

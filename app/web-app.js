@@ -38,9 +38,33 @@ const METRO_PFADE = [
  */
 const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/debugger-frontend', '/openurl', '/_expo/open'];
 
+/*
+ * Den Pfad so lesen, wie Metro ihn nach dem Normalisieren sieht (Codex-
+ * Gegenprüfung Paket 8): %-Kodierung, doppelte Schrägstriche, `.`/`..`,
+ * Groß-/Kleinschreibung. Sonst führte `//inspector`, `/%69nspector` oder
+ * `/x/../json` an der Sperre vorbei. Unlesbare Pfade gelten als gesperrt.
+ */
+function normalerPfad(url) {
+  let pfad = String(url || '/').split(/[?#]/)[0];
+  for (let i = 0; i < 3; i++) {
+    let neu;
+    try { neu = decodeURIComponent(pfad); } catch { return null; }
+    if (neu === pfad) break;
+    pfad = neu;
+  }
+  pfad = pfad.replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+  const teile = [];
+  for (const t of pfad.split('/')) {
+    if (!t || t === '.') continue;
+    if (t === '..') teile.pop(); else teile.push(t);
+  }
+  return ('/' + teile.join('/')).toLowerCase();
+}
+
 function istGesperrt(req) {
-  const pfad = req.url.split('?')[0];
-  return GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/') || pfad.startsWith(p + '?'));
+  const pfad = normalerPfad(req.url);
+  if (pfad === null) return true;
+  return GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/'));
 }
 
 function istExpoAnfrage(req) {

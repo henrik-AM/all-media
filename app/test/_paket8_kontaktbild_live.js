@@ -11,6 +11,7 @@
  *
  * Start: node test/_paket8_kontaktbild_live.js   (aus app/)
  */
+require('./_ki_belegung').pruefeBelegung('testbestand');
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');

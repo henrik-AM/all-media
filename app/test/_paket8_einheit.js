@@ -45,6 +45,8 @@ async function pruefe(name, fn) {
     [{ code: 'PGRST202', message: 'Could not find the function public.x(a) in the schema cache' }, NEUTRAL],
     [{ code: '22P02', message: 'invalid input syntax for type uuid: "abc"' }, NEUTRAL],
     [{ code: '57014', message: 'canceling statement due to statement timeout' }, NEUTRAL],
+    [{ code: '40P01', message: 'deadlock detected' }, NEUTRAL],
+    [{ code: '40001', message: 'could not serialize access due to concurrent update' }, NEUTRAL],
     [{ code: '42883', message: 'permission denied for function telefonbuch_schluessel' }, NEUTRAL],
   ];
   for (const [f, soll] of intern) {
@@ -102,10 +104,10 @@ async function pruefe(name, fn) {
     });
   }
   const konto = bremsen.find((b) => b.keyGenerator);
-  await pruefe('zweite Bremse vorhanden, 150 je Minute', () => {
+  await pruefe('zweite Bremse vorhanden, 300 je Minute wie je Anschluss', () => {
     assert.equal(bremsen.length, 2);
     assert.ok(konto);
-    assert.equal(konto.max, 150);
+    assert.equal(konto.max, 300);
     assert.equal(konto.windowMs, 60000);
   });
   await pruefe('zählt je Konto, nicht je Anschluss', () => {
@@ -117,6 +119,10 @@ async function pruefe(name, fn) {
     assert.equal(konto.skip({ nutzerId: null, method: 'POST' }), true);
     assert.equal(konto.skip({ nutzerId: 'A', method: 'POST' }), false);
     assert.equal(konto.skip({ nutzerId: 'A', method: 'DELETE' }), false);
+  });
+  await pruefe('lesender POST (Unterschreiben) zählt nicht', () => {
+    assert.equal(konto.skip({ nutzerId: 'A', method: 'POST', path: '/medien/unterschreiben' }), true);
+    assert.equal(konto.skip({ nutzerId: 'A', method: 'POST', path: '/kontakte/x/chat' }), false);
   });
 
   // --------------------------------------------------------------- 4
@@ -226,6 +232,8 @@ async function pruefe(name, fn) {
       assert.equal(A.aufrufe, 1);
       assert.equal(a2.bild, a.bild);
     });
+    await medien.signiereMedien(A, { bild: adresse }, 300);
+    await pruefe('kurzer Link (5 min) kommt nie aus dem 4-h-Speicher', () => assert.equal(A.aufrufe, 2));
     const ohneKonto = client(undefined, false);
     await medien.signiereMedien(ohneKonto, { bild: adresse });
     await pruefe('Client ohne Konto bekommt keine fremde Unterschrift', () => assert.equal(ohneKonto.aufrufe, 1));
@@ -235,8 +243,8 @@ async function pruefe(name, fn) {
   console.log('\n7 Expo-Weiche');
   {
     const weiche = lies('app/web-app.js');
-    const gesperrt = vm.runInNewContext(`${weiche.match(/const GESPERRT = \[[^\]]*\];/)[0]}\n${weiche.match(/function istGesperrt\(req\) \{[\s\S]*?\n\}/)[0]}\nistGesperrt`);
-    for (const u of ['/inspector/debug?device=0', '/json', '/json/list', '/open-debugger', '/debugger-frontend/x']) {
+    const gesperrt = vm.runInNewContext(`${weiche.match(/const GESPERRT = \[[^\]]*\];/)[0]}\n${weiche.match(/function normalerPfad\(url\) \{[\s\S]*?\n\}/)[0]}\n${weiche.match(/function istGesperrt\(req\) \{[\s\S]*?\n\}/)[0]}\nistGesperrt`);
+    for (const u of ['/inspector/debug?device=0', '/json', '/json/list', '/open-debugger', '/debugger-frontend/x', '//inspector/debug', '/%69nspector/debug', '/x/../json/list', '/JSON/list', '/./json', '/%2Fjson', '/%25%36%39nspector', '/%zz']) {
       await pruefe(`gesperrt: ${u}`, () => assert.equal(gesperrt({ url: u }), true));
     }
     for (const u of ['/', '/index.bundle?platform=ios', '/jsonx', '/assets/x.png']) {
