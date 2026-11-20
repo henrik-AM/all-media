@@ -36,7 +36,7 @@ const METRO_PFADE = [
  * Anfrage als örtlich an. Im WLAN (und über ngrok im Internet) war der
  * Debugger damit offen. Debuggen geht weiter direkt am Mac über Port 8081.
  */
-const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/debugger-frontend', '/openurl', '/_expo/open'];
+const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/debugger-frontend', '/openurl', '/_expo/open', '/_expo/debugger'];
 
 /*
  * Den Pfad so lesen, wie Metro ihn nach dem Normalisieren sieht (Codex-
@@ -44,8 +44,14 @@ const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/deb
  * Groß-/Kleinschreibung. Sonst führte `//inspector`, `/%69nspector` oder
  * `/x/../json` an der Sperre vorbei. Unlesbare Pfade gelten als gesperrt.
  */
-function normalerPfad(url) {
-  let pfad = String(url || '/').split(/[?#]/)[0];
+function normalerPfad(url, alsUrl = false) {
+  let pfad = String(url || '/');
+  if (alsUrl) {
+    // Absolutes Anfrageziel (`GET http://host/inspector`) wie Metro über URL lesen.
+    try { pfad = new URL(pfad, 'http://weiche.invalid').pathname; } catch { return null; }
+  } else {
+    pfad = pfad.split(/[?#]/)[0];
+  }
   for (let i = 0; i < 3; i++) {
     let neu;
     try { neu = decodeURIComponent(pfad); } catch { return null; }
@@ -62,9 +68,9 @@ function normalerPfad(url) {
 }
 
 function istGesperrt(req) {
-  const pfad = normalerPfad(req.url);
-  if (pfad === null) return true;
-  return GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/'));
+  // Beide Lesarten prüfen: Rohpfad (Connect-Routing) und URL.pathname (Metro-Upgrade).
+  return [normalerPfad(req.url), normalerPfad(req.url, true)].some((pfad) =>
+    pfad === null || GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/')));
 }
 
 function istExpoAnfrage(req) {

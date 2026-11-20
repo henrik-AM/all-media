@@ -122,6 +122,8 @@ async function pruefe(name, fn) {
   });
   await pruefe('lesender POST (Unterschreiben) zählt nicht', () => {
     assert.equal(konto.skip({ nutzerId: 'A', method: 'POST', path: '/medien/unterschreiben' }), true);
+    assert.equal(konto.skip({ nutzerId: 'A', method: 'POST', path: '/messages/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/stand' }), true);
+    assert.equal(konto.skip({ nutzerId: 'A', method: 'POST', path: '/messages/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }), false);
     assert.equal(konto.skip({ nutzerId: 'A', method: 'POST', path: '/kontakte/x/chat' }), false);
   });
 
@@ -243,8 +245,8 @@ async function pruefe(name, fn) {
   console.log('\n7 Expo-Weiche');
   {
     const weiche = lies('app/web-app.js');
-    const gesperrt = vm.runInNewContext(`${weiche.match(/const GESPERRT = \[[^\]]*\];/)[0]}\n${weiche.match(/function normalerPfad\(url\) \{[\s\S]*?\n\}/)[0]}\n${weiche.match(/function istGesperrt\(req\) \{[\s\S]*?\n\}/)[0]}\nistGesperrt`);
-    for (const u of ['/inspector/debug?device=0', '/json', '/json/list', '/open-debugger', '/debugger-frontend/x', '//inspector/debug', '/%69nspector/debug', '/x/../json/list', '/JSON/list', '/./json', '/%2Fjson', '/%25%36%39nspector', '/%zz']) {
+    const gesperrt = vm.runInNewContext(`${weiche.match(/const GESPERRT = \[[^\]]*\];/)[0]}\n${weiche.match(/function normalerPfad\(url, alsUrl = false\) \{[\s\S]*?\n\}/)[0]}\n${weiche.match(/function istGesperrt\(req\) \{[\s\S]*?\n\}/)[0]}\nistGesperrt`, { URL });
+    for (const u of ['/inspector/debug?device=0', '/json', '/json/list', '/open-debugger', '/debugger-frontend/x', '//inspector/debug', '/%69nspector/debug', '/x/../json/list', '/JSON/list', '/./json', '/%2Fjson', '/%25%36%39nspector', '/%zz', 'http://x/inspector/debug', 'ws://evil/json/list', '/_expo/debugger/x']) {
       await pruefe(`gesperrt: ${u}`, () => assert.equal(gesperrt({ url: u }), true));
     }
     for (const u of ['/', '/index.bundle?platform=ios', '/jsonx', '/assets/x.png']) {

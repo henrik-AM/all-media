@@ -310,7 +310,8 @@ app.use('/api', async (req, _res, next) => {
   next();
 });
 
-const LESENDE_POSTS = new Set(['/medien/unterschreiben']);
+// Lesende POSTs: zählen nicht als Schreibaktion (Codex-Gegenprüfung Runde 1/2).
+const LESENDE_POSTS = /^\/(medien\/unterschreiben|messages\/[0-9a-f-]{36}\/stand)$/i;
 
 /*
  * Zweite Bremse: je KONTO, nur für schreibende Anfragen (Paket 8; Entwurf
@@ -333,7 +334,7 @@ app.use(
     max: 300,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => !req.nutzerId || ['GET', 'HEAD', 'OPTIONS'].includes(req.method) || LESENDE_POSTS.has(req.path),
+    skip: (req) => !req.nutzerId || ['GET', 'HEAD', 'OPTIONS'].includes(req.method) || LESENDE_POSTS.test(req.path),
     keyGenerator: (req) => `konto:${req.nutzerId}`,
     message: { ok: false, error: 'Zu viele Aktionen. Bitte kurz warten.' },
     handler: (req, res, _next, optionen) => {

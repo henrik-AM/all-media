@@ -58,7 +58,7 @@ async function konto(mail, pass) {
 
     const bListe = await B.c.storage.from('media').list('avatars', { search: name, limit: 10 });
     const gefunden = (bListe.data || []).some((o) => o.name === name);
-    pruefe('B findet A\'s Kontaktfoto NICHT beim Auflisten', !gefunden, `${(bListe.data || []).length} Treffer`);
+    pruefe('B findet A\'s Kontaktfoto NICHT beim Auflisten', !bListe.error && !gefunden, bListe.error ? `Listenfehler: ${bListe.error.message}` : `${(bListe.data || []).length} Treffer`);
 
     const bLese = await B.c.rpc('medien_leseliste', { p_pfade: [pfad] });
     pruefe('B bekommt es NICHT über medien_leseliste', !bLese.error && (bLese.data || []).length === 0, bLese.error?.message || `${(bLese.data || []).length} Zeilen`);
@@ -72,7 +72,7 @@ async function konto(mail, pass) {
   } finally {
     const weg = await A.c.storage.from('media').remove([pfad]);
     const rest = await A.c.storage.from('media').list('avatars', { search: name });
-    pruefe('Aufräumen: Datei gelöscht, Rest 0', !weg.error && (rest.data || []).length === 0, weg.error?.message || `${(rest.data || []).length}`);
+    pruefe('Aufräumen: Datei gelöscht, Rest 0', !weg.error && !rest.error && (rest.data || []).length === 0, weg.error?.message || rest.error?.message || `${(rest.data || []).length}`);
   }
   console.log(`\n${anzahl - fehler}/${anzahl} bestanden`);
   process.exit(fehler ? 1 : 0);

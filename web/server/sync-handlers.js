@@ -58,7 +58,9 @@ async function umschalten(client, tabelle, schluessel) {
     for (const [spalte, wert] of Object.entries(schluessel)) loeschen = loeschen.eq(spalte, wert);
     const { error, count: geloescht } = await loeschen;
     if (error) throw error;
-    if (!geloescht) throw new Error(`Zeile in ${tabelle} liess sich nicht entfernen`);
+    if (!geloescht) // Ohne Tabellennamen — der Satz geht an den Browser (Paket 8).
+      console.error(`Zeile in ${tabelle} liess sich nicht entfernen`);
+      throw new Error('Das ließ sich gerade nicht entfernen. Bitte versuch es noch einmal.');
     return false;
   }
 
