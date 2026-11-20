@@ -63,6 +63,11 @@ async function pruefe(name, fn) {
   }
   await pruefe('leerer Fehler → fester Satz', () => assert.equal(sync.fuerMenschen(null), NEUTRAL));
 
+  await pruefe('Entfernen (Like aus) wirft nicht nach erfolgreichem Löschen', () => {
+    const q = sync.toString ? require('fs').readFileSync(require('path').join(wurzel, 'web/server/sync-handlers.js'), 'utf8') : '';
+    assert.ok(/if \(!geloescht\) \{[\s\S]{0,250}?throw new Error\('Das ließ sich gerade nicht entfernen/.test(q));
+  });
+
   // --------------------------------------------------------------- 2
   console.log('\n2 Website-Routen');
   const appJs = lies('web/server/app.js');
@@ -246,7 +251,7 @@ async function pruefe(name, fn) {
   {
     const weiche = lies('app/web-app.js');
     const gesperrt = vm.runInNewContext(`${weiche.match(/const GESPERRT = \[[^\]]*\];/)[0]}\n${weiche.match(/function normalerPfad\(url, alsUrl = false\) \{[\s\S]*?\n\}/)[0]}\n${weiche.match(/function istGesperrt\(req\) \{[\s\S]*?\n\}/)[0]}\nistGesperrt`, { URL });
-    for (const u of ['/inspector/debug?device=0', '/json', '/json/list', '/open-debugger', '/debugger-frontend/x', '//inspector/debug', '/%69nspector/debug', '/x/../json/list', '/JSON/list', '/./json', '/%2Fjson', '/%25%36%39nspector', '/%zz', 'http://x/inspector/debug', 'ws://evil/json/list', '/_expo/debugger/x']) {
+    for (const u of ['/inspector/debug?device=0', '/json', '/json/list', '/open-debugger', '/debugger-frontend/x', '//inspector/debug', '/%69nspector/debug', '/x/../json/list', '/JSON/list', '/./json', '/%2Fjson', '/%25%36%39nspector', '/%zz', 'http://x/inspector/debug', 'ws://evil/json/list', '/_expo/debugger/x', '/_expo/debugger.json', '/open-stack-frame', '/json.x']) {
       await pruefe(`gesperrt: ${u}`, () => assert.equal(gesperrt({ url: u }), true));
     }
     for (const u of ['/', '/index.bundle?platform=ios', '/jsonx', '/assets/x.png']) {

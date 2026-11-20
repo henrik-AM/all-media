@@ -36,7 +36,7 @@ const METRO_PFADE = [
  * Anfrage als örtlich an. Im WLAN (und über ngrok im Internet) war der
  * Debugger damit offen. Debuggen geht weiter direkt am Mac über Port 8081.
  */
-const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/debugger-frontend', '/openurl', '/_expo/open', '/_expo/debugger'];
+const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/debugger-frontend', '/openurl', '/_expo/open', '/_expo/debugger', '/open-stack-frame'];
 
 /*
  * Den Pfad so lesen, wie Metro ihn nach dem Normalisieren sieht (Codex-
@@ -70,7 +70,8 @@ function normalerPfad(url, alsUrl = false) {
 function istGesperrt(req) {
   // Beide Lesarten prüfen: Rohpfad (Connect-Routing) und URL.pathname (Metro-Upgrade).
   return [normalerPfad(req.url), normalerPfad(req.url, true)].some((pfad) =>
-    pfad === null || GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/')));
+    pfad === null || // Connect trennt auch an „.“ (`/_expo/debugger.x`) — darum auch dort sperren.
+    GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/') || pfad.startsWith(p + '.')));
 }
 
 function istExpoAnfrage(req) {
