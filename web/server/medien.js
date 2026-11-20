@@ -421,7 +421,7 @@ async function unterschreiben(client,pfade) {
 }
 
 /** Bunny braucht einen dauerhaften Eigentumsbeleg. Ohne Schema 113 geschlossen bleiben. */
-async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt) {
+async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt,{signal}={}) {
   const {data:frei,error}=await client.rpc('medium_upload_erlaubt');
   if(error?.code==='PGRST202')return {ok:false,error:'Der Medienspeicher ist noch nicht freigeschaltet. Bitte später erneut versuchen.'};
   if(error || frei!==true)return {ok:false,error:'Dieses Konto darf derzeit keine Medien hochladen.'};
@@ -432,11 +432,30 @@ async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt) {
   // Auch den Metadatenvertrag vor dem ersten Datei-Byte prüfen.
   const {error:bereit}=await dienst.from('medien_objekte').select('pfad').limit(0);
   if(bereit)return {ok:false,error:'Der Medienspeicher ist noch nicht freigeschaltet. Bitte später erneut versuchen.'};
-  const hoch=await Bunny.ablegen(nutzerId,ordner,typ,inhalt);
+  /*
+   * AF5 (Schema 132): Videos für Beiträge misst der Server aus den Bytes
+   * (ffprobe, höchstens 20 Minuten). Die Sekunden stehen im Beleg; die
+   * Datenbank nimmt die Dauer eines Video-Beitrags nur von dort.
+   */
+  let sekunden;
+  if(ordner==='posts' && String(typ).startsWith('video/')) {
+    const pruefung=require('./videopruefung');
+    try { sekunden=await pruefung.pruefen(inhalt); }
+    catch(e) { if(e instanceof pruefung.VideoFehler)return {ok:false,error:e.message}; throw e; }
+  }
+  if(signal?.aborted)return {ok:false,error:'Hochladen abgebrochen.'};
+  const hoch=await Bunny.ablegen(nutzerId,ordner,typ,inhalt,{signal});
   if(!hoch.ok)return hoch;
-  const {error:beleg}=await dienst.from('medien_objekte').insert({pfad:hoch.pfad,owner_id:nutzerId,typ,bytes:inhalt.length,sha256:require('crypto').createHash('sha256').update(inhalt).digest('hex')});
+  const zeile={pfad:hoch.pfad,owner_id:nutzerId,typ,bytes:inhalt.length,sha256:require('crypto').createHash('sha256').update(inhalt).digest('hex')};
+  if(sekunden!==undefined)zeile.sekunden=sekunden;
+  const {error:beleg}=await dienst.from('medien_objekte').insert(zeile);
   if(beleg){await Bunny.loeschen(hoch.pfad);return {ok:false,error:'Die Aufnahme konnte nicht bestätigt werden.'};}
-  return hoch;
+  if(signal?.aborted){
+    await Bunny.loeschen(hoch.pfad);
+    await dienst.from('medien_objekte').delete().eq('pfad',hoch.pfad).eq('owner_id',nutzerId);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
+  return sekunden!==undefined?{...hoch,sekunden}:hoch;
 }
 async function loeschen(client,nutzerId,pfad) {
   if(!Bunny.pfadPruefen(pfad,Bunny.ORDNER_LESEN))return {ok:false,error:'Ungültige Datei'};

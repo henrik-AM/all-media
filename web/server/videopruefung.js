@@ -6,6 +6,19 @@ const {execFile}=require('node:child_process');
 const {promisify}=require('node:util');
 const Reel=require('../../gemeinsam/reel');
 const run=promisify(execFile);
+/*
+ * ffprobe kommt auf Render aus @ffprobe-installer (Linux-Binärdatei im Paket),
+ * lokal notfalls aus dem System. Neuere npm-Fassungen führen postinstall-Skripte
+ * nicht mehr aus; das Ausführbar-Setzen erledigt deshalb der Server selbst.
+ */
+function ffprobePfad(){
+ if(process.env.FFPROBE_PATH)return process.env.FFPROBE_PATH;
+ try{
+  const pfad=require('@ffprobe-installer/ffprobe').path;
+  try{require('node:fs').chmodSync(pfad,0o755);}catch{}
+  return pfad;
+ }catch{return 'ffprobe';}
+}
 // Ausschließlich feste eigene Meldungen dürfen am API-Rand sichtbar werden.
 class VideoFehler extends Error {}
 function auswerten(daten){
@@ -26,7 +39,7 @@ async function pruefen(bytes){
  try{
   ordner=await fs.mkdtemp(path.join(os.tmpdir(),'allmedia-video-'));
   const datei=path.join(ordner,'aufnahme');await fs.writeFile(datei,bytes,{mode:0o600});
-  const {stdout}=await run(process.env.FFPROBE_PATH||'ffprobe',[
+  const {stdout}=await run(ffprobePfad(),[
    '-v','error','-protocol_whitelist','file','-format_whitelist','mov,matroska,webm',
    '-show_entries','format=duration:stream=codec_type,duration:packet=pts_time,duration_time',
    '-show_packets','-of','json',datei],{timeout:45000,maxBuffer:24*1024*1024,windowsHide:true});
@@ -39,4 +52,4 @@ function dienstclient(){
  const {createClient}=require('@supabase/supabase-js');const {supabaseUrl}=require('./supabase');
  return createClient(supabaseUrl,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
 }
-module.exports={VideoFehler,pruefen,auswerten,dienstclient};
+module.exports={VideoFehler,pruefen,auswerten,dienstclient,ffprobePfad};

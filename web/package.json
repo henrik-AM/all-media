@@ -4,6 +4,7 @@
   "private": true,
   "description": "Die dauerhaft erreichbare Fassung der All-Media-Website.",
   "dependencies": {
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@supabase/supabase-js": "^2.43.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
