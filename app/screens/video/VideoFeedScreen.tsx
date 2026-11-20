@@ -160,6 +160,8 @@ export const VideoFeedScreen = ({
    */
   const [fortschritt, setFortschritt] = useState<Record<string, { bei: number; gesamt: number }>>({});
   const spieler = useRef<Record<string, VideoSteuerung | null>>({});
+  /** AF5: Breite der Sprungleiste je Reel (statt measure, RN 0.88). */
+  const leisteBreite = useRef<Record<string, number>>({});
   const letzterTipp = useRef(0);
   const tippZeitgeber = useRef<ReturnType<typeof setTimeout> | null>(null);
   const halten = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -362,7 +364,8 @@ export const VideoFeedScreen = ({
             accessibilityValue={{min:0,max:fortschritt[item.id]?.gesamt || 0,now:fortschritt[item.id]?.bei || 0}}
             accessibilityActions={[{name:'increment'},{name:'decrement'}]}
             onAccessibilityAction={(e) => spieler.current[item.id]?.springen(Math.max(0,Math.min(fortschritt[item.id]?.gesamt || 0,(fortschritt[item.id]?.bei || 0)+(e.nativeEvent.actionName==='increment'?10:-10))))}
-            onPress={(e) => { const f=fortschritt[item.id]; const x=e.nativeEvent.locationX; e.currentTarget.measure((_x,_y,w) => spieler.current[item.id]?.springen(Reel.ziel(x/w,f?.gesamt || 0))); }}
+            onLayout={(e) => { leisteBreite.current[item.id] = e.nativeEvent.layout.width; }}
+            onPress={(e) => { const f=fortschritt[item.id]; const w=leisteBreite.current[item.id] || 1; spieler.current[item.id]?.springen(Reel.ziel(e.nativeEvent.locationX/w,f?.gesamt || 0)); }}
             style={{height:24,justifyContent:'center'}}>
             <View style={{height:4,backgroundColor:'#888'}}><View style={{height:4,backgroundColor:'#fff',width:`${100*Reel.ziel((fortschritt[item.id]?.bei || 0)/(fortschritt[item.id]?.gesamt || 1),1)}%`}} /></View>
           </Pressable>
