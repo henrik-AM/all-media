@@ -384,7 +384,11 @@ async function haupt() {
     }
     const gescheitert = ergebnisse.filter(e => e.code !== 0 || (e.zahlen && e.zahlen.gut !== e.zahlen.gesamt));
     const ohneZahlen = ergebnisse.filter(e => !e.zahlen || e.zahlen.gesamt === 0);
-    console.log(`\n  ${gesamtGut} von ${gesamtAlle} Prüfungen bestanden, ${ergebnisse.length}/${LAEUFE.length} Läufe.`);
+    // Grüne Läufe zählen, nicht gestartete: „106/106 Läufe“ bei fünf roten Läufen
+    // landete so in der Abschlussmeldung von Paket 8 (20.11.2026).
+    const gruen = ergebnisse.filter(e => !gescheitert.includes(e) && !ohneZahlen.includes(e)).length;
+    console.log(`\n  ${gesamtGut} von ${gesamtAlle} Prüfungen bestanden, ${gruen}/${LAEUFE.length} Läufe grün` +
+      ` (${ergebnisse.length}/${LAEUFE.length} gelaufen).`);
     if (ohneZahlen.length) console.log(`  Ohne zählbare Prüfungen: ${ohneZahlen.map(e => e.name).join(', ')}`);
     if (gescheitert.length) console.log(`  Nicht durchgekommen: ${gescheitert.map(e => e.name).join(', ')}`);
     const verwackelt = stempel() !== stempelVorher;
