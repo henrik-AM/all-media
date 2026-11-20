@@ -95,6 +95,10 @@ begin
   if ich is null then
     raise exception 'nicht angemeldet';
   end if;
+  -- Schema 129: wie beitrag_reaktion nur für freigegebene Konten (Entwurf 108).
+  if not public.konto_freigegeben() then
+    raise exception 'Konto nicht freigegeben';
+  end if;
 
   select greatest(now() - interval '60 days',
                   coalesce((select n.zeitpunkt from public.feed_neustart n where n.user_id = ich),
@@ -125,6 +129,8 @@ begin
        -- Schema 122: unlesbare Beitraege bekommen keine Zeile (keine
        -- Zaehler, Sichtungen, kein Hinweis, dass es sie gibt).
        and public.beitrag_lesbar(p.id)
+       -- Schema 129 (wie Entwurf 108): Blockierte in beide Richtungen nicht bewerten.
+       and not public.blockiert_zwischen(ich, p.user_id)
   ),
 
   -- Schema 129 (AF3): eigene „Gefällt mir nicht" senken den Beitrag stark,
