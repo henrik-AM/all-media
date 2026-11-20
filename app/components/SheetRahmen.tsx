@@ -1,4 +1,5 @@
-import React from 'react';
+import { UploadAnzeige, blattOffen } from './UploadAnzeige';
+import React, { useEffect } from 'react';
 import { Animated, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -24,6 +25,8 @@ interface Props {
  */
 export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: Props) => {
   const insets = useSafeAreaInsets();
+  // Paket 9: solange ein Blatt offen ist, zeigt es die Upload-Anzeige selbst.
+  useEffect(() => { if (!visible) return; blattOffen(true); return () => blattOffen(false); }, [visible]);
   /*
    * Punkt 23: nach unten ziehen schliesst das Blatt. Der Griff sitzt nur am
    * Kopf und nicht am ganzen Blatt - sonst liesse sich in einer langen Liste
@@ -75,6 +78,7 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
           */}
           <FarbfilterSchicht radius={22} />
         </Animated.View>
+        <UploadAnzeige eingebettet />
       </KeyboardAvoidingView>
     </Modal>
   );

@@ -10,7 +10,9 @@
    const stop=()=>{xhr.abort();ende(abbruch());};
    xhr.open('POST',url,true);xhr.timeout=10*60*1000;
    Object.entries(headers).forEach(([k,v])=>xhr.setRequestHeader(k,v));
-   xhr.upload.onprogress=e=>fortschritt({geladen:e.loaded,gesamt:e.lengthComputable?e.total:0,phase:'hochladen'});
+   // React Native meldet lengthComputable oft nicht; die Körpergröße ist bekannt.
+   const groesse=body&&(body.byteLength||body.size)||0;
+   xhr.upload.onprogress=e=>fortschritt({geladen:e.loaded,gesamt:e.lengthComputable&&e.total?e.total:groesse,phase:'hochladen'});
    xhr.upload.onload=()=>fortschritt({geladen:0,gesamt:0,phase:'pruefen'});
    xhr.onerror=()=>ende(new Error('Keine Verbindung. Bitte erneut versuchen.'));
    xhr.ontimeout=()=>ende(new Error('Das Hochladen hat zu lange gedauert. Bitte erneut versuchen.'));

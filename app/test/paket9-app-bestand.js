@@ -31,7 +31,7 @@ async function konto(email, pass) {
   const P = await konto('all.media.prueflauf@web.de', PRUEFKONTO_PASS);
   if (process.argv[2] === 'weg') {
     for (const k of [T, P]) {
-      const { data } = await k.c.from('posts').select('id,media_url,medien').eq('user_id', k.id).like('description', 'Paket 9%');
+      const { data } = await k.c.from('posts').select('id,media_url,medien').eq('user_id', k.id).or('description.like.Paket 9%,description.like.Packet 9%');
       for (const b of data || []) await k.c.from('posts').delete().eq('id', b.id);
       for (const b of data || []) for (const u of [b.media_url, ...(b.medien || []).map((m) => m.url)]) {
         const p = String(u || '').split('/storage/v1/object/public/media/')[1];
