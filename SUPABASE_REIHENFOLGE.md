@@ -38,7 +38,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 
 | Objekt | definiert in (Reihenfolge) | gilt |
 |---|---|---|
-| Funktion public.medium_sichtbar() | SUPABASE_SCHEMA_95_sicherheit.sql → SUPABASE_SCHEMA_128_private_kontaktbilder.sql | **SUPABASE_SCHEMA_128_private_kontaktbilder.sql** |
+| Funktion public.medium_sichtbar() | SUPABASE_SCHEMA_95_sicherheit.sql → SUPABASE_SCHEMA_128_private_kontaktbilder.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (Fassung 128 + Medienliste `posts.medien`; 128 neu eingespielt → 133 nachziehen) |
 | Funktion public.bunny_objekt_vorgaben() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_116_bunny_altmedien.sql | **SUPABASE_SCHEMA_116_bunny_altmedien.sql** |
 | Funktion public.bunny_ursprung_frei() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_116_bunny_altmedien.sql | **SUPABASE_SCHEMA_116_bunny_altmedien.sql** |
 | Funktion public.darf_markieren() | SUPABASE_SCHEMA_20_sichtbarkeit_rest.sql → SUPABASE_SCHEMA_86_markierungen.sql | **SUPABASE_SCHEMA_86_markierungen.sql** |
@@ -60,7 +60,10 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.mitteilung_bei_story_markierung() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_75_story_markierung_im_chat.sql | **SUPABASE_SCHEMA_75_story_markierung_im_chat.sql** |
 | Funktion public.spendencode_setzen() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_77_spendenpin_doppelt.sql | **SUPABASE_SCHEMA_77_spendenpin_doppelt.sql** |
 | Funktion public.sammlung_inhalt_pruefen() | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql | **SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql** |
-| Funktion public.feed_rang() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 82 + nur lesbare Beiträge; 82 neu eingespielt → 122 nachziehen) |
+| Funktion public.feed_rang() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql → SUPABASE_SCHEMA_129_video_negativ.sql | **SUPABASE_SCHEMA_129_video_negativ.sql** (Fassung 122 + Negativfaktor, Freigabe, Blockieren; 122 neu eingespielt → 129 nachziehen) |
+| Funktion public.bunny_medium_referenziert() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (Fassung 115 + Medienliste) |
+| Auslöser medienreferenz_pruefen auf posts | SUPABASE_SCHEMA_117_medienreferenz_eigen.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (zusätzlich `update of medien`) |
+| Auslöser video_beleg_pruefen auf posts | SUPABASE_SCHEMA_132_video_uploadbeleg.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (zusätzlich `update of medien`) |
 | Funktion public.impression_vermerken() | SUPABASE_SCHEMA_28_impressionen.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 28 + still nichts bei unlesbarem Beitrag) |
 | Funktion public.spende_senden() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_101_freigabe_nummer_spende.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 101 + p_post muss lesbar sein) |
 | Funktion public.interessenbild() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: nur eigenes Bild, Signale erst ab Neustart) |
@@ -698,3 +701,26 @@ verhindert Wiederfreigabe über fremde Inhaltstabellen. Kurze URLs nur über die
 zentralen Medienmodule (60 s, ohne Vierstunden-Cache). Der Server-Aufräumer braucht
 `INSTANTS_BEREINIGUNG=an` und einen serverseitigen `SUPABASE_SERVICE_ROLE_KEY`;
 noch nicht eingerichtet, keine sofortige physische Löschung behaupten.
+
+## Paket 9 – Neue Funktionen AF 3/4/5/6/7 (Schemas 129–133, 20.11.2026)
+
+Entwürfe 108–113 aus dem Sammelzweig `feedback-ohne-supabase`, auf den Live-Stand
+(115–128) gebracht und neu nummeriert. Reihenfolge 129 → 130 → 131 → 132 → 133.
+Proben in verworfener Transaktion: `node app/test/af-schema-proben.js <n>`.
+
+- **129** `video_negativ`: „Gefällt mir nicht" (`post_dislikes`, nur eigene Zeilen lesbar,
+  Schreiben nur über `beitrag_reaktion`), `feed_rang` = Fassung 122 + Negativfaktor
+  0,02/0,3/0,5 + Freigabe + Blockieren.
+- **130** `kontoanalysen`: private Messung ab Einspielung (`konto_sichtungen`,
+  `konto_interaktionen`), nur Aggregate über `meine_kontoanalysen()`. `impression_vermerken`
+  bleibt Fassung 122; 1000-ms-Grenze und Freigabe im Auslöser.
+- **131** `instants`: Enge Freunde, Instants, Postfach; Regelhelfer in `intern`
+  (`instant_beziehung_*`, `instant_zugang`). Direkte Storage-Downloads gesperrt, Server signiert 60 s.
+- **132** `video_uploadbeleg`: Videodauer aus den Bytes (ffprobe am Server); Bunny:
+  `medien_objekte.sekunden`, Supabase-Rückweg: `video_upload_belege`. Grenze 1200 s.
+- **133** `karussell`: `posts.medien` (geordnet, Bild/Video gemischt), Prüfung je Medium
+  wie 117/132; `medium_sichtbar` (128) und `bunny_medium_referenziert` (115) kennen die Liste.
+
+Entfallen: Entwurf 112 (Startermedien – live bereits korrekt, geprüft 20.11.) und
+114 (Medienumzug – seit Schema 116/28.10. erledigt). Entwurf 107 → Schema 128 (Paket 8).
+

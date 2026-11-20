@@ -58,7 +58,7 @@ revoke execute on function public.video_beleg_entwerten() from public,anon,authe
 drop trigger if exists video_beleg_entwerten on storage.objects;
 create trigger video_beleg_entwerten before update on storage.objects for each row execute function public.video_beleg_entwerten();
 
--- Typ und Eigenbeleg für Invoker-Auslöser (Karussell, Schema 134). Keine Metadatenzeilen.
+-- Typ und Eigenbeleg für Invoker-Auslöser (Karussell, Schema 133). Keine Metadatenzeilen.
 create or replace function intern.medium_typ(p_pfad text) returns text
 language sql stable security definer set search_path=public as $$
  select coalesce((select typ from public.medien_objekte where pfad=p_pfad),

@@ -1,4 +1,4 @@
--- Schema 134 — AF4 gemischte Karussells (Paket 9, 20.11.2026).
+-- Schema 133 — AF4 gemischte Karussells (Paket 9, 20.11.2026).
 -- Karussell-Teil des Entwurfs 113 aus dem Sammelzweig; dessen Bunny-Vertrag ist
 -- seit Schema 115 live und wird hier NICHT erneut angelegt. Nach 128/132.
 --
@@ -134,20 +134,20 @@ grant execute on function public.bunny_medium_referenziert(text) to authenticate
 do $$
 begin
   if position('medien @>' in pg_get_functiondef('public.medium_sichtbar(text)'::regprocedure)) = 0 then
-    raise exception 'Schema 134: medium_sichtbar ohne Medienliste';
+    raise exception 'Schema 133: medium_sichtbar ohne Medienliste';
   end if;
   if position('profiles' in pg_get_functiondef('public.medium_sichtbar(text)'::regprocedure)) = 0
      or position('avatar_url' in pg_get_functiondef('public.medium_sichtbar(text)'::regprocedure)) = 0 then
-    raise exception 'Schema 134: Avatar-Regel aus 128 fehlt';
+    raise exception 'Schema 133: Avatar-Regel aus 128 fehlt';
   end if;
   if has_function_privilege('anon','public.medium_sichtbar(text)','execute') then
-    raise exception 'Schema 134: anon darf medium_sichtbar';
+    raise exception 'Schema 133: anon darf medium_sichtbar';
   end if;
   if not exists(select 1 from pg_trigger where tgname='karussell_pruefen' and tgrelid='public.posts'::regclass) then
-    raise exception 'Schema 134: Karussellprüfung fehlt';
+    raise exception 'Schema 133: Karussellprüfung fehlt';
   end if;
   if position('medien @>' in pg_get_functiondef('public.bunny_medium_referenziert(text)'::regprocedure)) = 0 then
-    raise exception 'Schema 134: Löschschutz ohne Medienliste';
+    raise exception 'Schema 133: Löschschutz ohne Medienliste';
   end if;
 end $$;
 

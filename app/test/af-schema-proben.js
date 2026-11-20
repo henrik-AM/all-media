@@ -9,8 +9,8 @@ require('./_ki_belegung').pruefeBelegung('supabase-schema');
 // Beide Belegungen prüfen (der generische Helfer merkt nur die erste Prüfung).
 delete globalThis.__kiBelegungGeprueft;
 require('./_ki_belegung').pruefeBelegung('testbestand');
-const nr=Number(process.argv[2]);if(![129,130,131,132,134].includes(nr))throw Error('Schema 129/130/131/132/134 angeben');
-// Paket 9: Entwürfe 108/110/111/109/113 heißen auf main 129/130/131/132/134.
+const nr=Number(process.argv[2]);if(![129,130,131,132,133].includes(nr))throw Error('Schema 129/130/131/132/133 angeben');
+// Paket 9: Entwürfe 108/110/111/109/113 heißen auf main 129/130/131/132/133.
 const root=path.resolve(__dirname,'../..');
 const id=n=>`ac260026-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const A=id(1),B=id(2),C=id(3),W=id(4),P=id(10),Q=id(11),F=id(12),D=id(13),I=id(20);
@@ -30,7 +30,7 @@ if(nr<=131)sql+=schema(129)+'\n';
 if(nr===130||nr===131)sql+=schema(130)+'\n';
 if(nr===131)sql+=schema(131)+'\n';
 if(nr>=132)sql+=schema(132)+'\n';
-if(nr===134)sql+=schema(134)+'\n';
+if(nr===133)sql+=schema(133)+'\n';
 // Wegwerfkonten im Rollback: ausdrücklich keine bestehenden Konten ändern.
 for(const [u,name] of [[A,'A'],[B,'B'],[C,'C'],[W,'W']])sql+=`insert into auth.users(id,email,raw_user_meta_data) values('${u}','afprobe-${name}@example.invalid','{"name":"AF Probe ${name}","handle":"@afprobe${name}","geburtsdatum":"1990-01-01","land":"DE"}');update public.konto_alter set status='frei',geburtsdatum='1990-01-01' where user_id='${u}';`;
 sql+=`insert into public.konto_alter(user_id,status,geburtsdatum) values('${W}','wartet','2020-01-01') on conflict(user_id) do update set status='wartet',geburtsdatum='2020-01-01';`;
@@ -58,7 +58,7 @@ if(nr===132){
  sql+=als(B,deny('bunny_fremd_zu',`insert into public.posts(user_id,kind,media_url) values(auth.uid(),'reel',public.medien_adresse('${bp}'))`));
  sql+=owner(check('sekunden_grenze',`(select count(*)=1 from pg_constraint where conname='medien_objekte_sekunden_check')`));
 }
-if(nr===134){
+if(nr===133){
  const bild=`posts/${A}-k1.jpg`,vid=`posts/${A}-k2.mp4`,roh=`posts/${A}-k3.mp4`,fremd=`posts/${B}-f.jpg`;
  sql+=`insert into storage.objects(bucket_id,name,owner_id,metadata) values('media','${bild}','${A}','{"size":1234,"mimetype":"image/jpeg"}'),('media','${fremd}','${B}','{"size":1234,"mimetype":"image/jpeg"}');`;
  sql+=`set local role service_role;insert into public.medien_objekte(pfad,owner_id,typ,bytes,sha256,sekunden) values('${vid}','${A}','video/mp4',1000,repeat('d',64),30),('${roh}','${A}','video/mp4',1000,repeat('e',64),null);reset role;`;
@@ -119,7 +119,7 @@ if(process.env.AF_PROBE_SQL){fs.writeFileSync(process.env.AF_PROBE_SQL,sql);proc
  const ok=new Set(match[1].split('|'));for(const c of checks)console.log(`${ok.has(c)?'OK':'FEHL'} ${c}`);
  console.log(`Schema ${nr}: ${checks.filter(c=>ok.has(c)).length}/${checks.length}, verworfen`);
  // Unabhängige SELECT-Verbindung belegt das Rollback der Konten und Schemata.
- const table={129:'post_dislikes',130:'konto_sichtungen',131:'instants',132:'video_upload_belege',134:'video_upload_belege'}[nr];
+ const table={129:'post_dislikes',130:'konto_sichtungen',131:'instants',132:'video_upload_belege',133:'video_upload_belege'}[nr];
  const nach=await query(`select (select count(*) from auth.users where id='${A}') as konten,to_regclass('public.${table}') as tabelle`);
  const sauber=Array.isArray(nach)&&Number(nach[0]?.konten)===0&&nach[0]?.tabelle===null;
  console.log(`Rollback-Kontrolle: ${sauber?'1/1':'0/1'} (Wegwerfkonten und neues Schema fehlen)`);

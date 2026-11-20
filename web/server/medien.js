@@ -460,7 +460,7 @@ async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt,{signal}={}) {
 async function loeschen(client,nutzerId,pfad) {
   if(!Bunny.pfadPruefen(pfad,Bunny.ORDNER_LESEN))return {ok:false,error:'Ungültige Datei'};
   // Paket 9 (B1): Besitz und „nirgends verwendet" prüft die Datenbank immer,
-  // auch ohne Bunny-Schalter (medium_loeschrecht, Schema 115/134).
+  // auch ohne Bunny-Schalter (medium_loeschrecht, Schema 115/133).
   const {data:anbieter,error}=await client.rpc('medium_loeschrecht',{p_pfad:pfad});
   if(error || !anbieter)return {ok:false,error:'Diese Datei darfst du nicht löschen oder die Datenbankfreigabe fehlt.'};
   {
