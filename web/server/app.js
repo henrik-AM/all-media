@@ -246,7 +246,7 @@ app.use(
     handler: (req, res, _next, optionen) => {
       console.warn(
         `[Bremse] ${new Date().toISOString()} — ${req.ip} hat mehr als ` +
-          `${optionen.max} Anfragen in einer Minute gestellt (${req.method} ${req.originalUrl})`
+          `${optionen.max} Anfragen in einer Minute gestellt (${req.method} /api)`
       );
       res.status(optionen.statusCode).json(optionen.message);
     },
@@ -309,6 +309,36 @@ app.use('/api', async (req, _res, next) => {
   }
   next();
 });
+
+/*
+ * Zweite Bremse: je KONTO, nur für schreibende Anfragen (Paket 8; Entwurf
+ * Sicherheitsprüfung 17.10.2026).
+ *
+ * Die Bremse oben zählt je Anschluss. Wer ein Konto über mehrere Anschlüsse
+ * steuert, kam an ihr vorbei — und jede schreibende Aktion löst Arbeit und
+ * Egress in Supabase aus, deren Kontingent am 10.10. das ganze Projekt
+ * gesperrt hat. 150 je Minute ist weit mehr, als ein Mensch tippt.
+ * Protokolliert wird das Konto, nie die Adresse (Einladungscodes, A09-001).
+ */
+app.use(
+  '/api',
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 150,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => !req.nutzerId || req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
+    keyGenerator: (req) => `konto:${req.nutzerId}`,
+    message: { ok: false, error: 'Zu viele Aktionen. Bitte kurz warten.' },
+    handler: (req, res, _next, optionen) => {
+      console.warn(
+        `[Bremse] ${new Date().toISOString()} — Konto ${req.nutzerId} hat mehr als ` +
+          `${optionen.max} Aktionen in einer Minute ausgelöst (${req.method} /api)`
+      );
+      res.status(optionen.statusCode).json(optionen.message);
+    },
+  })
+);
 
 // ============================================================================
 // Hilfsmittel
@@ -384,7 +414,8 @@ function route(fn) {
        * vollstaendig; das Verschlucken von Fehlern war ja der urspruengliche
        * Grund fuer diesen Umschlag und bleibt ausgeschlossen.
        */
-      console.error(`${req.method} ${req.path} fehlgeschlagen:`, fehler.message);
+      // Nur die feste Routenschablone: Pfad/Query können Einladungscodes tragen (OWASP A09-001).
+      console.error(`${req.method} ${req.route?.path || '/api'} fehlgeschlagen:`, fehler?.code || 'UNBEKANNT');
       if (!res.headersSent) {
         res.status(500).json({ ok: false, error: 'Das hat nicht geklappt. Bitte noch einmal versuchen.' });
       }
@@ -454,7 +485,7 @@ app.get('/api/zustand', async (req, res) => {
         .select('*', { count: 'exact', head: true });
       ergebnis.supabase.erreichbar = !error;
       ergebnis.supabase.profile = error ? null : count;
-      if (error) ergebnis.supabase.fehler = error.message;
+      if (error) ergebnis.supabase.fehler = syncHandlers.fuerMenschen(error);
 
       const { count: beitraege } = await req.db
         .from('posts')
@@ -462,7 +493,7 @@ app.get('/api/zustand', async (req, res) => {
       ergebnis.supabase.beitraege = beitraege ?? null;
     } catch (fehler) {
       ergebnis.supabase.erreichbar = false;
-      ergebnis.supabase.fehler = fehler.message;
+      ergebnis.supabase.fehler = 'Die Verbindung zur Datenbank ist fehlgeschlagen.';
     }
   } else if (isConfigured()) {
     ergebnis.supabase.erreichbar = null;
@@ -1648,7 +1679,7 @@ app.post('/api/profile/:userId/aufruf', route(async (req) =>
  */
 app.post('/api/praesenz', route(async (req) => {
   const { error } = await req.db.rpc('hier_bin_ich');
-  return error ? { ok: false, error: error.message } : { ok: true };
+  return error ? { ok: false, error: syncHandlers.fuerMenschen(error) } : { ok: true };
 }));
 
 /*
@@ -1737,7 +1768,7 @@ app.post('/api/lenkung', route(async (req) => {
     },
     { onConflict: 'user_id,art,wert' }
   );
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, ...(await supabaseApi.lenkungStand(req.db, req.nutzerId)) };
 }));
 
@@ -1928,7 +1959,7 @@ app.post('/api/eigene/profilbild', route(async (req) => {
     if (['42703', 'PGRST204', '42501'].includes(error.code)) {
       return { ok: false, error: 'Profilbilder gehen erst, wenn das Datenbank-Update eingespielt ist' };
     }
-    return { ok: false, error: error.message };
+    return { ok: false, error: syncHandlers.fuerMenschen(error) };
   }
   // RLS: ein abgelehntes UPDATE ändert null Zeilen und meldet keinen Fehler.
   if (!data?.length) return { ok: false, error: 'Das Profilbild ließ sich nicht speichern' };
@@ -1957,13 +1988,15 @@ app.post('/api/kontaktbild', route(async (req) => {
       .delete()
       .eq('owner_id', req.nutzerId)
       .eq('kontakt_id', kontaktId);
-    if (error) return { ok: false, error: fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : error.message };
+    if (error) return { ok: false, error: fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : syncHandlers.fuerMenschen(error) };
     // RLS: ein abgelehntes DELETE meldet Erfolg mit null Zeilen — nachsehen.
-    const { data: rest } = await req.db
+    const { data: rest, error: nachFehler } = await req.db
       .from('kontakt_bilder')
       .select('kontakt_id')
       .eq('owner_id', req.nutzerId)
       .eq('kontakt_id', kontaktId);
+    // Fehlgeschlagene Kontrolle ist kein Erfolg (OWASP 25.10.2026).
+    if (nachFehler) return { ok: false, error: syncHandlers.fuerMenschen(nachFehler) };
     if (rest?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
     return { ok: true, url: null };
   }
@@ -1974,7 +2007,7 @@ app.post('/api/kontaktbild', route(async (req) => {
   if (error) {
     if (fehltSchema(error)) return { ok: false, error: Kontaktbild.FEHLT_SCHEMA };
     if (error.code === '42501') return { ok: false, error: 'Ein eigenes Foto geht nur für Messenger-Kontakte' };
-    return { ok: false, error: error.message };
+    return { ok: false, error: syncHandlers.fuerMenschen(error) };
   }
   if (!data?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
   return { ok: true, url };
@@ -2580,7 +2613,7 @@ app.post('/api/eigene/sammlung/:id/titelbild', route(async (req) => {
     if (error.code === '42703' || error.code === 'PGRST204') {
       return { ok: false, error: 'Titelbilder gehen erst, wenn das Datenbank-Update eingespielt ist' };
     }
-    return { ok: false, error: error.message };
+    return { ok: false, error: syncHandlers.fuerMenschen(error) };
   }
   // RLS: ein abgelehntes UPDATE aendert null Zeilen und meldet keinen Fehler.
   if (!data?.length) return { ok: false, error: 'Diese Sammlung gehört nicht dir' };
@@ -2773,7 +2806,7 @@ app.post('/api/eigene/sammlungsinhalt/:id', route(async (req) => {
     // 42501: Row Level Security — die Sammlung gehört jemand anderem.
     if (error.code === '42501') return { ok: false, error: 'Diese Sammlung gehört nicht dir' };
     // P0001: der Auslöser sammlung_inhalt_pruefen (falsche Gattung).
-    if (error.code === 'P0001') return { ok: false, error: error.message };
+    if (error.code === 'P0001') return { ok: false, error: syncHandlers.fuerMenschen(error) };
     throw error;
   }
   return { ok: true, meldung: 'Hinzugefügt' };
@@ -3070,7 +3103,7 @@ app.post('/api/stories', route(async (req) => {
 app.get('/api/story-markierbar', route(async (req) => {
   const suche = String(req.query?.suche || '').trim().slice(0, 60);
   const { data, error } = await req.db.rpc('story_markierbar', { suche: suche || null });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, personen: data || [] };
 }));
 
@@ -3092,7 +3125,7 @@ app.get('/api/markierung/vorschlaege', route(async (req) => {
   const { data, error } = await req.db.rpc('markierung_vorschlaege', {
     p_suche: suche || null, p_chat: chat, p_kanal: kanal,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, personen: data || [] };
 }));
 
@@ -3106,7 +3139,7 @@ app.get('/api/markierung/profile', route(async (req) => {
     .from('profiles')
     .select('id, handle, name')
     .in('handle', namen.map((h) => '@' + h));
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, profile: data || [] };
 }));
 
@@ -3119,7 +3152,7 @@ app.post('/api/markierungen/melden', route(async (req) => {
   const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).filter((k) => UUID.test(k)).slice(0, 20);
   if (!UUID.test(nachricht)) return { ok: false, error: 'Keine Nachricht' };
   const { data, error } = await req.db.rpc('markierungen_melden', { p_nachricht: nachricht, p_ids: ids });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, anzahl: Number(data || 0) };
 }));
 
@@ -3148,7 +3181,7 @@ app.post('/api/stories/:id/loeschen', route(async (req) => {
     .eq('id', req.params.id)
     .eq('user_id', req.nutzerId)
     .select('id');
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   if (!data || data.length === 0) return { ok: false, error: 'Das ist nicht deine Story' };
 
   const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
@@ -3177,7 +3210,7 @@ app.get('/api/stories/:id/ansichten', route(async (req) => {
     .select('user_id, viewed_at')
     .eq('story_id', req.params.id)
     .order('viewed_at', { ascending: false });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
 
   const ids = (data || []).map((z) => z.user_id).filter((id) => id !== req.nutzerId);
   if (ids.length === 0) return { ok: true, seher: [] };
@@ -4082,7 +4115,7 @@ app.use((fehler, req, res, next) => {
         : 'Die Daten sind zu groß.',
     });
   }
-  console.error(`${req.method} ${req.path} fehlgeschlagen:`, fehler && fehler.message);
+  console.error(`${req.method} ${req.route?.path || '/api'} fehlgeschlagen:`, fehler?.code || 'UNBEKANNT');
   if (res.headersSent) return next(fehler);
   return res.status(fehler && fehler.status ? fehler.status : 500).json({ ok: false, error: 'Das hat nicht geklappt. Bitte noch einmal versuchen.' });
 });

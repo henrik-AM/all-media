@@ -214,6 +214,10 @@ const LAEUFE = [
   ['krypto-app', '_krypto_app_einheit.js'],
   ['krypto-web', '_krypto_web_einheit.js'],
   ['krypto-server', '_krypto_server_einheit.js'],
+  // Paket 8 (Sicherheit/OWASP, 20.11.2026): Fehlertexte, Logs, Konto-Bremse,
+  // CSS-Bildadressen, Token-Herkunft, Unterschriften je Nutzer — ohne Netz.
+  ['paket8-einheit', '_paket8_einheit.js'],
+  ['owasp-server', '_owasp_server_einheit.js'],
   ['paket6-offline', '_paket6_offline.js'],
   ['paket6-opus', '_paket6_opus.cjs'],
   ['paket6-browser', '_paket6_browser_offline.cjs'],

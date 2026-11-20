@@ -59,6 +59,32 @@ const OEFFENTLICH = '/storage/v1/object/public/media/';
  */
 const zwischenspeicher = new Map();
 const PUFFER_MS = 10 * 60 * 1000;
+const MAX_EINTRAEGE = 5000;
+
+/*
+ * Geschlüsselt je Nutzer UND Pfad, nicht nur je Pfad (Paket 8; Entwurf
+ * 17.10.2026, OWASP 25.10.2026). Supabase unterschreibt nur Dateien, die der
+ * Nutzer sehen darf (Schema 95/128). Ein gemeinsamer Speicher gab B die
+ * Adresse, die für A unterschrieben wurde — die Regel lief am Server vorbei.
+ * Das Konto hängt die Anmeldung in app.js an den Client (client.nutzerId).
+ */
+function speicherSchluessel(client, pfad) {
+  return `${(client && client.nutzerId) || '-'}:${pfad}`;
+}
+
+/** Merken, abgelaufene Einträge entfernen, höchstens MAX_EINTRAEGE behalten. */
+function merkeUnterschrift(client, pfad, url, ablauf) {
+  const jetzt = Date.now();
+  for (const [schluessel, eintrag] of zwischenspeicher) {
+    if (eintrag.ablauf - PUFFER_MS <= jetzt) zwischenspeicher.delete(schluessel);
+  }
+  const schluessel = speicherSchluessel(client, pfad);
+  zwischenspeicher.delete(schluessel);
+  while (zwischenspeicher.size >= MAX_EINTRAEGE) {
+    zwischenspeicher.delete(zwischenspeicher.keys().next().value);
+  }
+  zwischenspeicher.set(schluessel, { url, ablauf });
+}
 
 /*
  * Eigene Adresse = eigener Host + Medienpfad, und der GANZE Wert ist eine
@@ -114,7 +140,7 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
   const jetzt = Date.now();
   const fehlend = [];
   for (const pfad of pfade) {
-    const eintrag = zwischenspeicher.get(pfad);
+    const eintrag = zwischenspeicher.get(speicherSchluessel(client, pfad));
     if (eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
       karte.set(pfad, eintrag.url);
     } else {
@@ -130,7 +156,7 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
       for (const eintrag of data || []) {
         if (eintrag?.signedUrl && !eintrag.error) {
           karte.set(eintrag.path, eintrag.signedUrl);
-          zwischenspeicher.set(eintrag.path, { url: eintrag.signedUrl, ablauf });
+          merkeUnterschrift(client, eintrag.path, eintrag.signedUrl, ablauf);
         }
       }
     } catch (fehler) {
@@ -328,7 +354,7 @@ async function signiereMitBunny(client,daten,sekunden) {
       const {data:signiert,error:e}=await client.storage.from('media').createSignedUrls(alt,sekunden);
       if(!e)for(const z of signiert || [])if(z.signedUrl&&!z.error) {
         karte.set(z.path,z.signedUrl);
-        zwischenspeicher.set(z.path,{url:z.signedUrl,ablauf:Date.now()+sekunden*1000});
+        merkeUnterschrift(client,z.path,z.signedUrl,Date.now()+sekunden*1000);
       }
     }
   }
@@ -353,7 +379,7 @@ async function unterschreiben(client,pfade) {
   return {ok:true,dateien:pfade.map(p=>{
     const pfad=typeof p==='string'?p:null;
     const url=gueltig(p)?signiert.get(p):null;
-    const eintrag=zwischenspeicher.get(pfad);
+    const eintrag=zwischenspeicher.get(speicherSchluessel(client,pfad));
     const tokenAblauf=url?Number(new URL(url).searchParams.get('expires'))*1000:0;
     return {pfad,url,ablauf:url?(eintrag?.url===url?eintrag.ablauf:tokenAblauf||Date.now()+4*60*60*1000):null};
   })};

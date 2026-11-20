@@ -265,6 +265,25 @@ function farbe(wert) {
   return FARBE_STANDARD;
 }
 
+/*
+ * Ein Bild als CSS-Hintergrund: `url(...)` — oder `none` (Paket 8, Entwurf
+ * Sicherheitsprüfung 17.10.2026).
+ *
+ * Dieselbe Überlegung wie bei farbe(): Story- und Insight-Adressen schreibt
+ * der Absender selbst in die Datenbank, und im Stil-Attribut hilft esc()
+ * nicht gegen `x);"><meta http-equiv="refresh" …>` — so ließ sich jeder,
+ * der die Storyleiste sah, auf eine fremde Seite umleiten. Durchgelassen
+ * wird nur, was wirklich eine Bildadresse ist, und ohne ein einziges
+ * Zeichen, mit dem man url() oder das Attribut verlässt.
+ */
+function bildUrl(adresse) {
+  const a = String(adresse == null ? '' : adresse).trim();
+  const form = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/|\/(?!\/)|blob:|data:image\/(jpeg|png|webp|gif);base64,)/;
+  if (!form.test(a)) return 'none';
+  if (/[\s"'()<>\\`]/.test(a)) return 'none';
+  return `url(${a})`;
+}
+
 function farbeFuerNadel(farbe) {
   const treffer = String(farbe || '').match(/#[0-9a-f]{3,8}\b|\brgba?\([^)]+\)/i);
   return treffer ? treffer[0] : '#0a66ff';
@@ -2824,8 +2843,8 @@ function aufnahmeMenue(bild, extra = null) {
     `<div class="sheet__body">
        <div class="aufnahme__vorschau" style="background-image:${
          filterSchicht(state.kameraFilter)
-           ? filterSchicht(state.kameraFilter) + ', url(' + bild + ')'
-           : 'url(' + bild + ')'
+           ? filterSchicht(state.kameraFilter) + ', ' + bildUrl(bild)
+           : bildUrl(bild)
        }"></div>
        ${punkte
          .map(
@@ -2971,7 +2990,7 @@ function storyItem(storys, wo = 'messenger') {
         messenger: wo === 'messenger',
       }).bild;
   const kern = standbild
-    ? `<div class="story__inner" style="background-image:url(${standbild});background-size:cover;background-position:center"></div>`
+    ? `<div class="story__inner" style="background-image:${bildUrl(standbild)};background-size:cover;background-position:center"></div>`
     : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}${
         profilbild ? `<img class="story__profilbild" src="${esc(profilbild)}" alt="" onerror="this.remove()" />` : ''
       }</div>`;
@@ -3980,7 +3999,7 @@ function openNewGroup() {
       <div class="sheet__row">
         <div class="group-pic" id="groupPic" ${
           zustand.bild
-            ? `style="background-image:url(${zustand.bild});background-size:cover;background-position:center"`
+            ? `style="background-image:${bildUrl(zustand.bild)};background-size:cover;background-position:center"`
             : ''
         }>${zustand.bild ? '' : ICONS.camera}</div>
         <span class="sheet__label">${zustand.bild ? 'Gruppenbild ändern' : 'Gruppenbild hinzufügen'}</span>
@@ -11617,7 +11636,7 @@ function openInsightSenden(bild) {
   openSheet(
     'Insight senden',
     `<div class="sheet__body insight-senden">
-       <div class="insight__vorschau" style="background-image:${schicht ? schicht + ', url(' + bild + ')' : 'url(' + bild + ')'}"></div>
+       <div class="insight__vorschau" style="background-image:${schicht ? schicht + ', ' + bildUrl(bild) : bildUrl(bild)}"></div>
 
        <p class="insight__titel">Wie lange sichtbar</p>
        <div class="pillen" id="insDauer">
@@ -11812,7 +11831,7 @@ function openInsightAnsehen(userId) {
         <button id="insZu" aria-label="Schließen">${ICONS.close}</button>
       </div>
       <div class="insight-viewer__bild" style="background-image:${
-        schicht ? schicht + ', url(' + i.mediaUrl + ')' : 'url(' + i.mediaUrl + ')'
+        schicht ? schicht + ', ' + bildUrl(i.mediaUrl) : bildUrl(i.mediaUrl)
       }"></div>
       <div class="insight-viewer__fuss">
         <span class="insight-viewer__marke">
@@ -21733,7 +21752,7 @@ function messageBubble(m, chat, i, absender) {
   for (const r of m.reaktionen || []) zaehler[r.emoji] = (zaehler[r.emoji] || 0) + 1;
   const reaktionen = Object.keys(zaehler).length
     ? `<div class="msg__reaktionen">${Object.entries(zaehler)
-        .map(([e, n]) => `<span class="msg__reaktion">${e}${n > 1 ? `<b>${n}</b>` : ''}</span>`)
+        .map(([e, n]) => `<span class="msg__reaktion">${esc(e)}${n > 1 ? `<b>${n}</b>` : ''}</span>`)
         .join('')}</div>`
     : '';
 

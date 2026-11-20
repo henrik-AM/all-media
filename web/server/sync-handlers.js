@@ -76,9 +76,34 @@ function handler(name, fn) {
       return await fn(client, ...rest);
     } catch (fehler) {
       console.error(`${name} fehlgeschlagen:`, fehler.message);
-      return { ok: false, fehler: fehler.message };
+      return { ok: false, fehler: fuerMenschen(fehler) };
     }
   };
+}
+
+/*
+ * Was von einem Datenbankfehler an den Browser geht (Paket 8, OWASP A10-001;
+ * Sicherheitsprüfung 17.10.2026 Fund 14).
+ *
+ * Bis dahin ging jede Meldung von Postgres/PostgREST unverändert hinaus:
+ * „new row violates row-level security policy for table …", „column … does
+ * not exist", Namen von Regeln und Constraints — ein Lageplan der Datenbank
+ * für jeden, der absichtlich falsche Eingaben schickt. Durch dürfen nur die
+ * Sätze, die wir selbst für Menschen geschrieben haben: eigene
+ * `throw new Error(…)` hier im Server und `raise exception '…'` aus unseren
+ * Funktionen — die tragen teils eigene Codes (42501 in Schema 117, 54000 an
+ * der Bremse). Darum entscheidet nicht der Code allein, sondern ob der Text
+ * nach Postgres-Innenleben aussieht. Im Serverprotokoll steht er weiter.
+ */
+const INTERNER_TEXT =
+  /["`]|\b(relation|column|constraint|violates|row-level security|policy|permission denied|syntax error|duplicate key|null value|invalid input|does not exist|schema cache|could not|operator|function|PGRST|JWT|timeout|canceling statement)\b/i;
+
+function fuerMenschen(fehler) {
+  const text = String((fehler && fehler.message) || '').trim();
+  const code = fehler && fehler.code;
+  if (text && !INTERNER_TEXT.test(text) && text.length <= 300) return text;
+  if (code === '42501') return 'Das ist nicht erlaubt.';
+  return 'Das hat nicht geklappt. Bitte versuch es noch einmal.';
 }
 
 // ---------------------------------------------------------------- Profil --
@@ -3106,6 +3131,7 @@ const handleImpressionen = handler('Sichtungen', async (client, nutzerId, eintra
 });
 
 module.exports = {
+  fuerMenschen,
   handleEinladungSpeichern,
   handleEinladungAnnehmen,
   handleUpdateProfile,

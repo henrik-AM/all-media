@@ -26,6 +26,23 @@ const METRO_PFADE = [
   '/debugger-ui', '/open-debugger', '/status', '/openurl',
 ];
 
+/*
+ * Was NIE weitergereicht wird (Sicherheitsprüfung 17.10.2026): der
+ * JS-Debugger von React Native. Über `/json/list` und
+ * `/inspector/debug?device=…` führt jeder, der diesen Server erreicht,
+ * beliebigen Code in der angemeldeten App aus — Sitzung und geheimer
+ * Chatschlüssel inklusive. Metro selbst lässt das nur von localhost zu; weil
+ * diese Weiche aber selbst von 127.0.0.1 aus weiterreicht, sah Metro jede
+ * Anfrage als örtlich an. Im WLAN (und über ngrok im Internet) war der
+ * Debugger damit offen. Debuggen geht weiter direkt am Mac über Port 8081.
+ */
+const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/debugger-frontend', '/openurl', '/_expo/open'];
+
+function istGesperrt(req) {
+  const pfad = req.url.split('?')[0];
+  return GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/') || pfad.startsWith(p + '?'));
+}
+
 function istExpoAnfrage(req) {
   // Expo Go schickt bei der ersten Anfrage immer diesen Kopfeintrag mit.
   if (req.headers['expo-platform']) return true;
@@ -55,6 +72,10 @@ function weiterleiten(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  if (istGesperrt(req)) {
+    res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+    return res.end('Der Debugger ist nur direkt am Mac erreichbar.');
+  }
   if (istExpoAnfrage(req)) return weiterleiten(req, res);
   app(req, res);
 });
@@ -82,6 +103,7 @@ server.listen(PORT, '0.0.0.0', () => {
 // Expos automatisches Neuladen laeuft ueber eine dauerhafte Verbindung.
 // Die muss ebenfalls an Metro weitergereicht werden.
 server.on('upgrade', (req, socket, kopf) => {
+  if (istGesperrt(req)) return socket.destroy();
   const anfrage = http.request({
     host: '127.0.0.1',
     port: METRO_PORT,

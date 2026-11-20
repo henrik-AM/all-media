@@ -303,8 +303,16 @@
   const echtesFetch = window.fetch.bind(window);
 
   window.fetch = function (ziel, einstellungen) {
-    const adresse = typeof ziel === 'string' ? ziel : ziel?.url || '';
-    const eigeneApi = adresse.startsWith('/api') || adresse.includes(location.host + '/api');
+    const adresse = typeof ziel === 'string' ? ziel : ziel instanceof URL ? ziel.href : ziel?.url || '';
+    // Nur die eigene Herkunft bekommt das Token (Paket 8). `includes(host + '/api')`
+    // traf auch https://fremd.example/?x=<host>/api.
+    let eigeneApi = false;
+    try {
+      const u = new URL(adresse, location.href);
+      eigeneApi = u.origin === location.origin && (u.pathname === '/api' || u.pathname.startsWith('/api/'));
+    } catch {
+      eigeneApi = false;
+    }
 
     if (!eigeneApi || !sitzung?.access_token) {
       return echtesFetch(ziel, einstellungen);
