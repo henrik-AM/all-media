@@ -33,4 +33,4 @@ Prüfcommit be20934 (+ dieser Commit). R1-Befunde alle 10 behoben bzw. teilweise
 6 Karussell-Löschen erfasst alle Medien. 7 Abbruch räumt per Dienst. 8 Website verlangt Datei; Trigger nullt Dauer ohne Datei.
 9 Kamera-Video im Beitragsmodus als Video. 10 Instant-Rohupload JPEG-Magic ≤250 KB (direkter Storage-Upload bleibt nötig, Server nutzt Nutzerclient; instant_senden prüft Größe/Typ).
 Neu: SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql (live). Proben 134 7/7; live paket9-live.js 41/41; Website 21/21; rechte 322/322, angriffe 60/60.
-Prüfe die Korrekturen und nur neue echte Befunde. Diff seit R1: git diff 16b0f0e..HEAD (oder 595ca92..HEAD gesamt).
+Prüfe die Korrekturen und nur neue echte Befunde. Diff seit R1: git diff 5b1d6f5..HEAD (oder 595ca92..HEAD gesamt).
