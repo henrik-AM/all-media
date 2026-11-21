@@ -302,11 +302,16 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
   const pfad = ordner === 'instants' ? `instants/${nutzerId}/${Date.now()}-${zufall}.jpg` : `${ordner}/${nutzerId}-${Date.now()}-${zufall}.${endung}`;
 
   let sekunden, dienst;
+  // Gegenprüfung R2: Beitragsdateien darf nur der Dienst löschen (Schema 134) —
+  // auch beim Abbruch eines Bild-Uploads.
+  if (ordner === 'posts') {
+    try { dienst = require('./videopruefung').dienstclient(); }
+    catch { return { ok: false, error: 'Der Medienspeicher ist derzeit nicht verfügbar.' }; }
+  }
   // Vor dem Ablegen aus den empfangenen Bytes bestimmen; Clientwerte ignorieren.
   if (ordner === 'posts' && typ.startsWith('video/')) {
     const pruefung = require('./videopruefung');
     try {
-      dienst = pruefung.dienstclient();
       sekunden = await pruefung.pruefen(inhalt);
     } catch (e) {
       if (e instanceof pruefung.VideoFehler) return { ok: false, error: e.message };
@@ -318,7 +323,11 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
     contentType: typ,
     upsert: false,
   });
-  if (signal?.aborted && !error) {await (dienst || client).storage.from('media').remove([pfad]);return {ok:false,error:'Hochladen abgebrochen.'};}
+  if (signal?.aborted && !error) {
+    const {error:wegFehler}=await (dienst || client).storage.from('media').remove([pfad]);
+    if(wegFehler)console.error('Abgebrochener Upload blieb liegen:', ordner);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
   if (error) {
     // Sichtbar machen, nicht verschlucken: das Verschweigen war der Grund,
     // warum der Fehler in der App ein Vierteljahr unbemerkt blieb.
@@ -326,7 +335,7 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
     return { ok: false, error: 'Die Aufnahme ließ sich nicht speichern' };
   }
 
-  if (dienst) {
+  if (dienst && sekunden !== undefined) {
     try {
       if (!upload?.id) throw new Error('Der Uploadbeleg fehlt.');
       const { error: belegFehler } = await dienst.from('video_upload_belege').insert({

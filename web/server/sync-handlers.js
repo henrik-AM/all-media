@@ -1471,7 +1471,7 @@ const handleDeleteContent = handler('Inhalt löschen', async (client, nutzerId, 
   const tabelle = art === 'comment' ? 'comments' : art === 'story' ? 'stories' : 'posts';
   const Medien = require('./medien');
   let medien = null;
-  if (art === 'post' && Medien.mitBunny()) {
+  if (art === 'post') {
     // Gegenprüfung R1: auch das zweite bis n-te Medium eines Karussells.
     const {data, error} = await client.from('posts').select('media_url, thumbnail_url, medien').eq('id', id).eq('user_id', nutzerId).maybeSingle();
     if (error) throw error;
@@ -1483,10 +1483,12 @@ const handleDeleteContent = handler('Inhalt löschen', async (client, nutzerId, 
   for (const adresse of new Set(medien || [])) {
     if (!Medien.istMedienAdresse(adresse)) continue;
     const pfad = Medien.pfadAus(adresse);
-    // Geteilte Dateien bleiben erhalten; Altmedien werden hier nicht entfernt.
+    // Geteilte Dateien bleiben erhalten (medium_loeschrecht).
     const {data: anbieter, error: recht} = await client.rpc('medium_loeschrecht', {p_pfad:pfad});
     if (recht) throw recht;
-    if (anbieter !== 'bunny') continue;
+    // Gegenprüfung R2: beide Anbieter. Nur was medium_loeschrecht freigibt
+    // (eigen, nirgends mehr verwendet); Bunny-Altmedien melden 'bunny'.
+    if (!anbieter) continue;
     const geloescht = await Medien.loeschen(client, nutzerId, pfad);
     if (!geloescht.ok) throw new Error(geloescht.error);
   }
