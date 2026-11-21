@@ -1480,19 +1480,21 @@ const handleDeleteContent = handler('Inhalt löschen', async (client, nutzerId, 
   const { data: weg, error } = await client.from(tabelle).delete().eq('id', id).eq('user_id', nutzerId).select('id');
   if (error) throw error;
   if (!weg?.length) return {ok:false, error:'Dieser Inhalt ließ sich nicht löschen'};
+  let liegen = 0;
   for (const adresse of new Set(medien || [])) {
     if (!Medien.istMedienAdresse(adresse)) continue;
     const pfad = Medien.pfadAus(adresse);
     // Geteilte Dateien bleiben erhalten (medium_loeschrecht).
     const {data: anbieter, error: recht} = await client.rpc('medium_loeschrecht', {p_pfad:pfad});
-    if (recht) throw recht;
+    if (recht) { liegen++; continue; }
     // Gegenprüfung R2: beide Anbieter. Nur was medium_loeschrecht freigibt
     // (eigen, nirgends mehr verwendet); Bunny-Altmedien melden 'bunny'.
     if (!anbieter) continue;
-    const geloescht = await Medien.loeschen(client, nutzerId, pfad);
-    if (!geloescht.ok) throw new Error(geloescht.error);
+    // Runde 3: eine fehlgeschlagene Datei hält die übrigen nicht auf.
+    const geloescht = await Medien.loeschen(client, nutzerId, pfad).catch((e) => ({ ok: false, error: e.message }));
+    if (!geloescht.ok) { liegen++; console.error('Beitragsmedium blieb liegen:', pfad.split('/')[0]); }
   }
-  return { ok: true };
+  return { ok: true, ...(liegen ? { medienLiegen: liegen } : {}) };
 });
 
 const handleLikeContent = handler('Like', async (client, nutzerId, beitragId) => {

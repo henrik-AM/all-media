@@ -366,6 +366,12 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
   } catch (fehler) {
     console.error('Unterschreiben nach dem Hochladen fehlgeschlagen:', fehler.message);
   }
+  // Runde 3: Abbruch während des Signierens räumt ebenfalls auf.
+  if (signal?.aborted) {
+    const {error:wegFehler}=await (dienst || client).storage.from('media').remove([pfad]);
+    if(wegFehler)console.error('Abgebrochener Upload blieb liegen:', ordner);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
 
   return { ok: true, url: data.publicUrl, anzeige, pfad, sekunden };
 }
