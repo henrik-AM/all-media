@@ -1,4 +1,4 @@
-# Paket 9 – Gegenprüfung (Runde 2)
+# Paket 9 – Gegenprüfung (Runde 3)
 
 Repo: ~/allmedia-wt/paket9, Zweig claude/paket9-funktionen. Basis 595ca92 (origin/main), Prüfcommit HEAD.
 Nur lesen, nichts ändern, keine Live-Datenbank-Schreibzugriffe, keine Prüfläufe gegen Supabase.
@@ -34,3 +34,10 @@ Prüfcommit be20934 (+ dieser Commit). R1-Befunde alle 10 behoben bzw. teilweise
 9 Kamera-Video im Beitragsmodus als Video. 10 Instant-Rohupload JPEG-Magic ≤250 KB (direkter Storage-Upload bleibt nötig, Server nutzt Nutzerclient; instant_senden prüft Größe/Typ).
 Neu: SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql (live). Proben 134 7/7; live paket9-live.js 41/41; Website 21/21; rechte 322/322, angriffe 60/60.
 Prüfe die Korrekturen und nur neue echte Befunde. Diff seit R1: git diff 5b1d6f5..HEAD (oder 595ca92..HEAD gesamt).
+
+## Runde 3 (21.11.2026, letzte)
+R2-Befunde (5) behoben in d6f1ad3: Schema 135 live (video_beleg_pruefen Datei-Prüfung vor Update-Sonderfall; karussell_pruefen nur posts/ und beispiel/;
+meine_kontoanalysen zählt verschiedene Zuschauer-Tage), medien.js: jeder posts/-Upload hat Dienstclient fürs Aufräumen,
+sync-handlers.js: Beitragslöschen bereinigt beide Anbieter nach medium_loeschrecht.
+Belege: Probe 135 3/3 + alle früheren Proben grün, rechte 322/322, angriffe 60/60, live 41/41, Website 21/21.
+Prüfe nur die Korrekturen und neue echte Befunde. Diff seit R2: git diff 4df0ac5..HEAD
