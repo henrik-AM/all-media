@@ -66,7 +66,8 @@ pruefe('Website: Aufnahme endet nach Höchstlänge', web.includes('StoryRegeln.V
 pruefe('Website: Betrachter rechnet mit storyDauer', web.includes("StoryRegeln.storyDauer('video'"));
 pruefe('Website: kein fester Lautsprecher-Knopf mehr', !web.includes('id="storyTon"'));
 pruefe('Server: Endpunkt mit Grenze des Eimers', server.includes("'/api/hochladen/video'") && server.includes('StoryRegeln.VIDEO_BYTES_HOECHSTENS'));
-pruefe('App: Kamera nimmt höchstens die gemeinsame Länge auf', kamera.includes('maxDuration: StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS'));
+// Paket 9 (AF5): Storys behalten ihre Grenze, Reels/Videos bis 20 Minuten.
+pruefe('App: Kamera nimmt höchstens die gemeinsame Länge auf', kamera.includes('maxDuration: zielVideo ? Reel.MAX_SEKUNDEN : StoryRegeln.VIDEO_SEKUNDEN_HOECHSTENS'));
 pruefe('App: Galerie-Video wird geprüft', kamera.includes('StoryRegeln.videoPruefen'));
 pruefe('App: Betrachter rechnet mit storyDauer', betrachter.includes("StoryRegeln.storyDauer('video'"));
 pruefe('App: Hochladen kennt die Größengrenze', aktionen.includes('StoryRegeln.VIDEO_BYTES_HOECHSTENS'));

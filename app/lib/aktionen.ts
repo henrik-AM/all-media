@@ -795,7 +795,8 @@ export async function beitragAnlegen(
   felder: NeuerBeitrag = {}
 ): Promise<string> {
   if(felder.medien!==undefined){const fehler=require('../../gemeinsam/karussell').pruefen(felder.medien);if(fehler)throw new Error(fehler);}
-  if (felder.art === 'reel' || (felder.art === 'clip' && felder.sekunden !== undefined)) {
+  // Dauer gibt nur der Upload vor; die Datenbank nimmt sie aus dem Beleg (Schema 132).
+  if ((felder.art === 'reel' || felder.art === 'clip') && felder.sekunden !== undefined) {
     const fehler = require('../../gemeinsam/reel').pruefen(felder.sekunden);
     if (fehler) throw new Error(fehler);
   }

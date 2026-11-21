@@ -1203,15 +1203,16 @@ ul { margin: 0; padding: 0; list-style: none; }
 */
 .post__actions--fuenf {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* Paket 9: „Gefällt mir nicht“ ist der sechste Knopf (AF3). */
+  grid-template-columns: repeat(6, 1fr);
   gap: 0;
   padding: 12px 8px 8px;
   border-top: 1px solid var(--hairline);
   border-bottom: 1px solid var(--hairline);
   margin-top: 4px;
 }
-/* Bei Live faellt Speichern weg, es bleiben vier. */
-.post__actions--vier { grid-template-columns: repeat(4, 1fr); }
+/* Bei Live faellt Speichern weg, es bleiben fünf. */
+.post__actions--vier { grid-template-columns: repeat(5, 1fr); }
 .post__actions--fuenf .postbtn {
   flex-direction: column;
   gap: 5px;

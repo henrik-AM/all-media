@@ -13,6 +13,15 @@
 // Start:  node test/_kamera.js   (Server muss laufen)
 
 const path = require('path');
+
+/** Paket 9 (AF4): Beiträge wählen Medien zuerst im Karussell-Editor. */
+async function karussellDatei(page, datei) {
+  await page.waitForSelector('.karusselleditor [data-add]', { timeout: 10000 });
+  const [auswahl] = await Promise.all([page.waitForEvent('filechooser'), page.click('.karusselleditor [data-add]')]);
+  await auswahl.setFiles(datei);
+  await page.waitForSelector('.karusselleditor li', { timeout: 5000 });
+  await page.click('.karusselleditor [data-fertig]');
+}
 const { chromium } = require('playwright-core');
 const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const { nurDemoBeitraege } = require('./_nur_testkonten');
@@ -192,13 +201,10 @@ const BILD = path.join(__dirname, '_testbild.png');
   });
 
   await pruefe('Zum Beitrag lässt sich Musik wählen', async () => {
-    const wartet = page.waitForEvent('filechooser');
     await page.click('[data-oact="create"]');
     await page.waitForSelector('.erstellen');
     await page.click('[data-erstellen="post"]');
-    const auswahl = await wartet;
-    await auswahl.setFiles(BILD);
-
+    await karussellDatei(page, BILD);
     await page.waitForSelector('#f_music', { timeout: 4000 });
     const wahl = await page.$$eval('#f_music option', (n) => n.map((e) => e.textContent));
     if (wahl.length < 2) throw new Error('nur ' + wahl.join(' | '));

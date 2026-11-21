@@ -60,24 +60,6 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
   diff: 'simple'
 }
 
-b5-app: erwartetes ROT
-AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
-+ actual - expected
-
-+ []
-- [
--   'posts/neu.mp4'
-- ]
-
-    at /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b5-app.js:10:151 {
-  generatedMessage: true,
-  code: 'ERR_ASSERTION',
-  actual: [],
-  expected: [Array],
-  operator: 'deepStrictEqual',
-  diff: 'simple'
-}
-
 b7: erwartetes ROT
 AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
 

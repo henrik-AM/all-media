@@ -2942,7 +2942,6 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
        * war (Community-Seite → „neues Unterthema erstellen“): Es öffnete
        * sich unsichtbar und tauchte erst nach dem Verlassen auf.
        */}
-      {karussellStart && <KarussellEditor start={karussellStart} onClose={() => setKarussellStart(null)} onFertig={(m) => { setKarussellStart(null); beitragBeschreiben('post', m[0].url, undefined, m); }} />}
       {formular && (
         <FormularSheet
           visible
@@ -2957,6 +2956,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           unten={formular.unten}
         />
       )}
+      {karussellStart && <KarussellEditor start={karussellStart} onClose={() => setKarussellStart(null)} onFertig={(m) => { setKarussellStart(null); beitragBeschreiben('post', m[0].url, undefined, m); }} />}
 
       {/*
        * Kästen 28/10.2 und 16: die Erstellen-Seite liegt in einem eigenen
